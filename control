@@ -1,0 +1,10 @@
+Package: com.primefreebird.tweak
+Name: PrimeFreeBird
+Version: 1.0.0
+Architecture: iphoneos-arm
+Description: A Twitter/X tweak reworked for iOS 26 and Liquid Glass
+Maintainer: PrimeFreeBird
+Author: PrimeFreeBird
+Section: Tweaks
+Depends: mobilesubstrate, ws.hbang.common
+Conflicts: com.bandarhl.bhtwitter, com.den.twigalaxy, xyz.cypwn.twigalaxy, xyz.cypwn.bhtwitter, com.netskao.twitternoads, xyz.cypwn.bringbacktwitter

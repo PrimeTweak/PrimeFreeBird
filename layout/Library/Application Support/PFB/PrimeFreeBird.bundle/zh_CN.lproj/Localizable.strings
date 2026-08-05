@@ -1,0 +1,303 @@
+/*
+  Language: zh_CN
+  PrimeFreeBird
+*/
+
+"NFB_SETTINGS_DETAIL" = "自定义你的 Twitter：隐藏广告、启用 Blue 功能等。";
+
+/*Alerts and popups*/
+
+"CONFIRM_ALERT_MESSAGE" = "你确定要这样做吗？";
+
+/*Settings*/
+"MODERN_SETTINGS_LAYOUT_TITLE" = "常规";
+"MODERN_SETTINGS_LAYOUT_SUBTITLE" = "锁定应用、保持导航栏始终可见等。";
+
+"MODERN_SETTINGS_MEDIA_TITLE" = "媒体";
+"MODERN_SETTINGS_MEDIA_SUBTITLE" = "下载视频、启用时间戳等功能。";
+
+"MODERN_SETTINGS_APPEARANCE_TITLE" = "外观";
+"MODERN_SETTINGS_APPEARANCE_SUBTITLE" = "通过主题、自定义应用图标、字体等内容，打造属于您的 Twitter。";
+
+"MODERN_SETTINGS_TIMELINES_TITLE" = "时间线";
+"MODERN_SETTINGS_TIMELINES_SUBTITLE" = "移除广告、关注推荐和时间线中的其他多余内容。";
+
+"MODERN_SETTINGS_GROK_TITLE" = "Grok";
+"MODERN_SETTINGS_GROK_SUBTITLE" = "隐藏 Grok 按钮并管理自动翻译。";
+
+"MODERN_SETTINGS_PROFILES_TITLE" = "个人资料";
+"MODERN_SETTINGS_PROFILES_SUBTITLE" = "更改您在资料中看到的内容。";
+
+"MODERN_SETTINGS_TWEETS_TITLE" = "推文与回复";
+"MODERN_SETTINGS_TWEETS_SUBTITLE" = "调整推文功能，移除不需要的功能。";
+
+"MODERN_SETTINGS_SEARCH_TITLE" = "搜索与发现";
+"MODERN_SETTINGS_SEARCH_SUBTITLE" = "更改您在“搜索”标签中看到的内容。";
+
+"MODERN_SETTINGS_PRESETS_TITLE" = "预设";
+"MODERN_SETTINGS_PRESETS_SUBTITLE" = "应用一组预设设置，或导出和导入您自己的设置。";
+
+"MODERN_SETTINGS_WEB_TITLE" = "网页与链接";
+"MODERN_SETTINGS_WEB_SUBTITLE" = "调整链接和 Twitter 应用内浏览器的行为。";
+
+"MODERN_SETTINGS_BRANDING_TITLE" = "品牌";
+"MODERN_SETTINGS_BRANDING_SUBTITLE" = "调整您看到多少 Twitter 品牌还原效果。";
+
+"MODERN_SETTINGS_EXPERIMENTAL_TITLE" = "实验室";
+"MODERN_SETTINGS_EXPERIMENTAL_SUBTITLE" = "试用不稳定的新功能。";
+
+"MODERN_SETTINGS_DEBUG_TITLE" = "调试";
+"MODERN_SETTINGS_DEBUG_SUBTITLE" = "找出某项功能无法正常工作的原因。";
+
+"COOL_KIDS_SECTION_HEADER_TITLE" = "酷小孩";
+"SPECIAL_THANKS_SECTION_HEADER_TITLE" = "特别鸣谢";
+
+/*General*/
+
+"HIDE_WHO_TO_FOLLOW_TITLE" = "不显示“推荐关注”";
+"HIDE_WHO_TO_FOLLOW_DETAIL" = "在个人资料中移除关注推荐。";
+
+"HIDE_TIMELINE_PROMPTS_TITLE" = "不显示时间线提示";
+"HIDE_TIMELINE_PROMPTS_DETAIL" = "移除“添加通讯录”等横幅。";
+
+"PADLOCK_TITLE" = "锁定 Twitter";
+"PADLOCK_DETAIL" = "启用 Face ID 或密码解锁 Twitter。";
+
+"NEW_INAPP_WEBVIEW_TITLE" = "改进的应用内浏览器（测试版）";
+"NEW_INAPP_WEBVIEW_DETAIL" = "使用 Twitter 的新应用内浏览器打开链接。";
+
+"ALWAYS_OPEN_SAFARI_TITLE" = "使用外部浏览器";
+"ALWAYS_OPEN_SAFARI_DETAIL" = "在 Safari 或默认浏览器中打开链接。";
+
+"SHARING_DOMAIN_TITLE" = "分享域名";
+
+/*Tweets*/
+"TWEET_TO_IMAGE_TITLE" = "将推文保存为图片";
+"TWEET_TO_IMAGE_DETAIL" = "长按“分享”按钮可导出为图片。";
+
+"LIKE_CONFIRM_TITLE" = "确认点赞";
+"LIKE_CONFIRM_DETAIL" = "点赞前弹出确认提示。";
+
+"TWEET_CONFIRM_TITLE" = "确认发推";
+"TWEET_CONFIRM_DETAIL" = "发布推文前进行确认。";
+
+"HIDE_BLUE_VERIFIED_TITLE" = "隐藏 Blue 认证标记";
+"HIDE_BLUE_VERIFIED_DETAIL" = "在推文中隐藏付费认证标记。这不包括品牌或政府账号。";
+
+"HIDE_VIEW_COUNT_TITLE" = "隐藏浏览量";
+"HIDE_VIEW_COUNT_DETAIL" = "不显示推文下方的浏览次数。";
+
+"HIDE_BOOKMARK_BUTTON_TITLE" = "隐藏书签按钮";
+"HIDE_BOOKMARK_BUTTON_DETAIL" = "移除推文上的书签按钮。";
+"HIDE_DOWNVOTE_BUTTON_TITLE" = "隐藏点踩按钮";
+"HIDE_DOWNVOTE_BUTTON_DETAIL" = "移除推文上的点踩按钮。";
+
+"DISABLE_SENSITIVE_TWEET_WARNINGS_TITLE" = "关闭敏感内容警告";
+
+"BYPASS_AGE_VERIFICATION_TITLE" = "绕过年龄验证";
+"BYPASS_AGE_VERIFICATION_DETAIL" = "跳过敏感内容的年龄验证流程。";
+
+"HIDE_GROK_ANALYZE_TITLE" = "隐藏 Grok 分析按钮";
+
+"HIDE_GROK_SIDEBAR_TITLE" = "隐藏侧边栏中的 Grok";
+
+"HIDE_GROK_CREATE_TITLE" = "隐藏 Grok 创建按钮";
+"HIDE_GROK_CREATE_DETAIL" = "移除使用 Grok 创建或编辑图片和视频的选项。";
+
+"DISABLE_AUTO_TRANSLATE_TITLE" = "禁用自动翻译";
+"DISABLE_AUTO_TRANSLATE_DETAIL" = "不再自动翻译帖子或简介。";
+
+"SQUARE_AVATARS_TITLE" = "方形头像";
+"SQUARE_AVATARS_DETAIL" = "为所有人显示方形头像，就像以前的品牌账号一样。";
+
+"REPLY_SORTING_TITLE" = "不排序回复";
+"REPLY_SORTING_DETAIL" = "禁用推文对话中的回复排序功能。";
+
+"RESTORE_REPLY_CONTEXT_TITLE" = "还原回复上下文";
+"RESTORE_REPLY_CONTEXT_DETAIL" = "显示在推文中被回复的人。";
+
+"RESTORE_TWEET_LABELS_TITLE" = "显示推文来源";
+"RESTORE_TWEET_LABELS_DETAIL" = "显示推文是从哪个客户端发布的（来自 @nyaathea）。";
+
+/*Profiles*/
+"FOLLOW_CONFIRM_TITLE" = "确认关注";
+"FOLLOW_CONFIRM_DETAIL" = "关注前弹出确认提示。";
+
+"COPY_PROFILE_INFO_TITLE" = "复制个人资料信息";
+"COPY_PROFILE_INFO_DETAIL" = "一键复制用户名、简介等信息。";
+
+"DISABLE_ARTICLES_TITLE" = "隐藏“文章”标签";
+"DISABLE_ARTICLES_DETAIL" = "在个人资料中隐藏“文章”标签。";
+
+"DISABLE_HIGHLIGHTS_TITLE" = "隐藏“精选”标签";
+"DISABLE_HIGHLIGHTS_DETAIL" = "在个人资料中隐藏“精选”标签。";
+
+"HIDE_FOLLOW_BUTTON_TITLE" = "推文中不显示关注按钮";
+"HIDE_FOLLOW_BUTTON_DETAIL" = "隐藏推文中的关注按钮。";
+
+"RESTORE_FOLLOW_BUTTON_TITLE" = "不显示订阅按钮";
+"RESTORE_FOLLOW_BUTTON_DETAIL" = "隐藏推文和个人资料中的订阅按钮。";
+
+/*Search*/
+"NO_HISTORY_TITLE" = "关闭搜索历史";
+"NO_HISTORY_DETAIL" = "Twitter 将不再记录你的搜索内容。";
+
+"HIDE_TREND_VIDEOS_TITLE" = "不显示热门视频";
+"HIDE_TREND_VIDEOS_DETAIL" = "从搜索菜单中移除热门视频。";
+
+/*Photos and Videos*/
+"AUTO_HIGHEST_LOAD_TITLE" = "高质量媒体";
+"AUTO_HIGHEST_LOAD_DETAIL" = "以最佳质量上传和浏览媒体内容。";
+
+"DISABLE_VIDEO_CAPTIONS_TITLE" = "关闭视频字幕";
+
+"FORCE_TWEET_FULL_FRAME_TITLE" = "大图显示";
+
+"RESTORE_VIDEO_TIMESTAMP_TITLE" = "视频时间戳";
+"RESTORE_VIDEO_TIMESTAMP_DETAIL" = "在沉浸式播放器中显示时间戳。";
+
+"DISABLE_IMMERSIVE_SCROLL_TITLE" = "禁用视频流滑动";
+
+/*Twitter Blue*/
+"HIDE_PROMOTED_TITLE" = "移除广告";
+"HIDE_PROMOTED_DETAIL" = "删除所有广告。";
+
+"UNDO_TWEET_TITLE" = "撤销推文";
+
+"DOWNLOAD_VIDEOS_TITLE" = "下载媒体";
+"DOWNLOAD_VIDEOS_DETAIL" = "直接从推文中保存视频或 GIF。";
+
+"DIRECT_SAVE_TITLE" = "保存至“照片”";
+"DIRECT_SAVE_DETAIL" = "视频会直接保存到你的“照片”应用中。";
+
+"HIDE_PREMIUM_OFFER_TITLE" = "不显示 Twitter Blue 提示";
+"HIDE_PREMIUM_OFFER_DETAIL" = "移除“验证”和“升级”按钮。";
+
+"THEME_OPTION_TITLE" = "更换主题";
+
+"APP_ICON_TITLE" = "更换 App 图标";
+
+"CUSTOM_TAB_BAR_OPTION_TITLE" = "自定义标签栏";
+
+/*Layout*/
+"HIDE_SPACES_TITLE" = "隐藏 Spaces 栏";
+
+"NO_TAB_BAR_HIDING_TITLE" = "始终显示标签栏";
+"NO_TAB_BAR_HIDING_DETAIL" = "滚动时不要隐藏标签栏（可能导致问题）。";
+
+"HIDE_CUSTOM_TIMELINES_TITLE" = "隐藏自定义时间线";
+"HIDE_CUSTOM_TIMELINES_DETAIL" = "移除首页时间线标签中的添加按钮。";
+
+"HIDE_TRENDS_TITLE" = "隐藏热门内容";
+"HIDE_TRENDS_DETAIL" = "在“探索”标签中仅显示搜索栏，隐藏所有趋势、新闻和页面标签。";
+
+"TAB_BAR_THEMING_TITLE" = "经典导航栏";
+"TAB_BAR_THEMING_DETAIL" = "将您的强调色应用于当前选中的导航项。";
+
+"DISABLE_RTL_TITLE" = "使用从左到右布局";
+"DISABLE_RTL_DETAIL" = "即使是 RTL 语言也强制使用 LTR 布局。";
+
+"SHOW_SCROLL_INDICATOR_TITLE" = "始终显示滚动条";
+
+"CUSTOM_FONTS_TITLE" = "自定义字体";
+"CUSTOM_FONTS_DETAIL" = "为 Twitter 选择一个自定义字体。";
+
+"REGULAR_FONTS_PICKER_OPTION_TITLE" = "选择字体";
+
+"BOLD_FONTS_PICKER_OPTION_TITLE" = "选择粗体字体";
+
+/*Labs*/
+"REPLY_IN_WEBVIEW_TITLE" = "在网页视图中回复";
+"REPLY_IN_WEBVIEW_DETAIL" = "在网页视图中打开回复框以避开 attestation。";
+
+/*Debug*/
+"FLEX_TWITTER_TITLE" = "FLEX 调试模式";
+"FLEX_TWITTER_DETAIL" = "使用 FLEX 工具调试 Twitter。";
+
+/*Developers*/
+"DEVELOPER_SECTION_HEADER_TITLE" = "开发者";
+
+/*Custom fonts*/
+"CUSTOM_FONTS_NAVIGATION_BUTTON_TITLE" = "自定义字体";
+"CUSTOM_FONTS_MENU_TITLE" = "\n选择字体";
+"CUSTOM_FONTS_TUT_ALERT_MESSAGE" = "尚未安装字体。请从 App Store 安装 iFont 应用。";
+
+/*Dwonload*/
+"DOWNLOAD_MENU_TITLE" = "\n选择视频画质";
+"FETCHING_PROGRESS_TITLE" = "稍等片刻...";
+"DOWNLOAD_AS_GIF_OPTION_TITLE" = "下载为 GIF";
+"DOWNLOAD_AS_MP4_OPTION_TITLE" = "下载为 MP4";
+
+/*App icon*/
+"APP_ICON_HEADER_TITLE" = "选择新的 Twitter 图标或主题。";
+
+/*Copy profile info*/
+"COPY_PROFILE_INFO_MENU_OPTION_1" = "复制简介";
+"COPY_PROFILE_INFO_MENU_OPTION_2" = "复制用户名";
+"COPY_PROFILE_INFO_MENU_OPTION_3" = "复制完整用户名";
+"COPY_PROFILE_INFO_MENU_OPTION_4" = "复制简介链接";
+"COPY_PROFILE_INFO_MENU_OPTION_5" = "复制位置";
+
+/*Theme*/
+"THEME_SETTINGS_NAVIGATION_TITLE" = "更换主题";
+"THEME_SETTINGS_NAVIGATION_DETAIL" = "选择一个仅自己可见的主题颜色。";
+
+/*Tab bar*/
+"CUSTOM_TAB_BAR_SETTINGS_NAVIGATION_TITLE" = "自定义标签栏";
+"CUSTOM_TAB_BAR_GRID_DETAIL" = "Tap a destination to add or remove it. Drag the bar below to reorder.";
+"CUSTOM_TAB_BAR_RESET_MESSAGE" = "您确定要将导航栏恢复为默认设置吗？";
+
+/* Restore tab labels */
+"RESTORE_TAB_LABELS_TITLE" = "导航标签";
+"RESTORE_TAB_LABELS_DETAIL" = "在导航图标下方显示文字标签，如旧版 Twitter。";
+
+"COLOR_TWITTER_ICON_IN_TOP_BAR_TITLE" = "为 Twitter 图标着色";
+"COLOR_TWITTER_ICON_IN_TOP_BAR_DETAIL" = "将强调色应用于顶栏的 Twitter 图标。";
+
+"REFRESH_PILL_TEXT" = "已发帖";
+"REFRESH_PILL_LABEL_TITLE" = "在刷新提示条上添加标签";
+"REFRESH_PILL_LABEL_DETAIL" = "当有人发推时，将标签重新添加到刷新提示条。";
+
+"RESTORE_TWITTER_NAMES_TITLE" = "还原 Twitter 术语";
+"RESTORE_TWITTER_NAMES_DETAIL" = "在应用界面中将“X”替换为“Twitter”，“Post”替换为“Tweet”，“Repost”替换为“Retweet”等等。";
+
+/*Deprecated*/
+"MODERN_SETTINGS_PLACEHOLDER_TEXT" = "这里暂时还没有内容。";
+
+"SOURCE_UNAVAILABLE" = "来源不可用";
+
+/*App lock*/
+"PADLOCK_LOCKED_LABEL" = "Locked";
+
+/*Source labels*/
+"UNKNOWN_SOURCE" = "Unknown Source";
+
+/*Media downloads*/
+"DOWNLOAD_VIDEO_NUMBER_TITLE" = "Video %lu";
+"UNKNOWN_ERROR" = "An unknown error occurred.";
+
+/*Custom fonts*/
+"INSTALL_IFONT_BUTTON_TITLE" = "iFont application";
+"FONT_SYSTEM_DEFAULT_SUBTITLE" = "System Default";
+
+/*Legacy login*/
+"LEGACY_LOGIN_INFO_LABEL" = "Log in with your username and password.\n\nGoogle and Apple sign-in aren't supported. If your account uses one of those, add a password to it first.";
+"LEGACY_LOGIN_MISSING_INPUT_TITLE" = "Missing input";
+"LEGACY_LOGIN_MISSING_INPUT_MESSAGE" = "Enter username and password.";
+"LEGACY_LOGIN_VERIFYING_STATUS" = "Verifying…";
+"LEGACY_LOGIN_SIGNING_IN_STATUS" = "Signing in…";
+"LEGACY_LOGIN_UNAVAILABLE_TITLE" = "Unavailable";
+"LEGACY_LOGIN_CLASSES_MISSING_MESSAGE" = "Login classes missing.";
+"LEGACY_LOGIN_BUILD_COMMAND_FAILED_MESSAGE" = "Could not build command.";
+"LEGACY_LOGIN_CRASH_AVOIDED_TITLE" = "Crash avoided";
+"LEGACY_LOGIN_UNEXPECTED_RESPONSE_TITLE" = "Unexpected response";
+"LEGACY_LOGIN_NO_TOKEN_NO_CHALLENGE_MESSAGE" = "No token and no challenge.";
+"LEGACY_LOGIN_CHALLENGE_MISSING_INFO_MESSAGE" = "Challenge is missing its request id or URL.";
+"LEGACY_LOGIN_CHALLENGE_CLASSES_MISSING_MESSAGE" = "Challenge/host classes missing.";
+"LEGACY_LOGIN_BUILD_CHALLENGE_FAILED_MESSAGE" = "Could not build challenge.";
+"LEGACY_LOGIN_NO_TOKEN_MESSAGE" = "No token in response.";
+"LEGACY_LOGIN_FAILED_TITLE" = "Login failed";
+"LEGACY_LOGIN_NO_ACCOUNT_MESSAGE" = "No account was returned.";
+"LEGACY_LOGIN_RATE_LIMITED_TITLE" = "Likely rate limited (243)";
+"LEGACY_LOGIN_RATE_LIMITED_MESSAGE" = "Too many attempts. Wait a while or switch network/VPN, then try again.\n\nDetails:\n%@";
+"LEGACY_LOGIN_UNKNOWN_ERROR" = "Unknown error";

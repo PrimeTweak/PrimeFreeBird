@@ -1,0 +1,688 @@
+//
+//  MutedWordsViewController.m
+//  PrimeFreeBird
+//
+//  The list lives in NSUserDefaults as plain strings. Anything starting with
+//  "@" is treated as an account handle, anything containing a space as a
+//  phrase, everything else as a single word. Timeline.x reads the same keys
+//  and is told to reload through nfbRefreshMutedWords() whenever this screen
+//  changes something, so filtering updates without a restart.
+//
+
+#import "MutedWords/MutedWordsViewController.h"
+#import "Core/BHTBundle.h"
+#import "Core/TwitterChirpFont.h"
+#import "Hooks/HookHelpers.h"
+
+NSString* const kNFBMutedWordsKey = @"nfb_muted_words";
+NSString* const kNFBMutedWholeWordsKey = @"nfb_muted_whole_words";
+NSString* const kNFBMutedInConversationsKey = @"nfb_muted_in_conversations";
+NSString* const kNFBMutedCountKey = @"nfb_muted_words_count";
+NSString* const kNFBMutedExpiryKey = @"nfb_muted_expiry";
+NSString* const kNFBMutedSkipFollowingKey = @"nfb_muted_skip_following";
+NSString* const kNFBMutedIncludeRepostsKey = @"nfb_muted_include_reposts";
+
+// MARK: - add row
+
+@interface NFBMutedAddCell : UITableViewCell
+@property (nonatomic, strong) UITextField* field;
+@property (nonatomic, strong) UIButton* addButton;
+@property (nonatomic, strong) UILabel* hintLabel;
+@end
+
+@implementation NFBMutedAddCell
+
+- (instancetype)initWithStyle:(UITableViewCellStyle)style
+              reuseIdentifier:(NSString*)reuseIdentifier {
+    self = [super initWithStyle:style reuseIdentifier:reuseIdentifier];
+    if (self) {
+        self.selectionStyle = UITableViewCellSelectionStyleNone;
+        self.backgroundColor = [UIColor clearColor];
+
+        // Bordered box, 1px systemGray3, radius 6 — the exact box the advanced
+        // search screen uses, so the two screens read as one design.
+        UIView* box = [[UIView alloc] init];
+        box.layer.borderWidth = 1.0;
+        box.layer.borderColor = [UIColor systemGray3Color].CGColor;
+        box.layer.cornerRadius = 6.0;
+
+        _field = [[UITextField alloc] init];
+        _field.font = [TwitterChirpFont(TwitterFontStyleRegular) fontWithSize:16];
+        _field.autocorrectionType = UITextAutocorrectionTypeNo;
+        _field.autocapitalizationType = UITextAutocapitalizationTypeNone;
+        _field.returnKeyType = UIReturnKeyDone;
+        _field.clearButtonMode = UITextFieldViewModeWhileEditing;
+
+        // The explanation lives inside this cell, under the box: that keeps
+        // the order fixed (box, then hint, then the list) in both the full
+        // screen and the popover, without a separate footer.
+        _hintLabel = [[UILabel alloc] init];
+        _hintLabel.font = [TwitterChirpFont(TwitterFontStyleRegular) fontWithSize:13.5];
+        _hintLabel.textColor = [UIColor secondaryLabelColor];
+        _hintLabel.numberOfLines = 0;
+
+        _addButton = [UIButton buttonWithType:UIButtonTypeSystem];
+        _addButton.titleLabel.font =
+            [TwitterChirpFont(TwitterFontStyleBold) fontWithSize:15];
+        [_addButton setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
+        _addButton.backgroundColor = self.tintColor ?: [UIColor systemBlueColor];
+        _addButton.layer.cornerRadius = 6.0;
+        [_addButton setContentHuggingPriority:UILayoutPriorityRequired
+                                      forAxis:UILayoutConstraintAxisHorizontal];
+
+        for (UIView* v in @[ box, _addButton, _hintLabel ]) {
+            v.translatesAutoresizingMaskIntoConstraints = NO;
+            [self.contentView addSubview:v];
+        }
+        _field.translatesAutoresizingMaskIntoConstraints = NO;
+        [box addSubview:_field];
+
+        UILayoutGuide* m = self.contentView.layoutMarginsGuide;
+        [NSLayoutConstraint activateConstraints:@[
+            [box.leadingAnchor constraintEqualToAnchor:m.leadingAnchor],
+            [box.topAnchor constraintEqualToAnchor:self.contentView.topAnchor
+                                          constant:8.0],
+            [box.heightAnchor constraintEqualToConstant:42.0],
+            [_hintLabel.topAnchor constraintEqualToAnchor:box.bottomAnchor
+                                                 constant:8.0],
+            [_hintLabel.leadingAnchor constraintEqualToAnchor:m.leadingAnchor
+                                                     constant:2.0],
+            [_hintLabel.trailingAnchor constraintEqualToAnchor:m.trailingAnchor],
+            [_hintLabel.bottomAnchor constraintEqualToAnchor:self.contentView.bottomAnchor
+                                                    constant:-10.0],
+            [_field.leadingAnchor constraintEqualToAnchor:box.leadingAnchor
+                                                 constant:12.0],
+            [_field.trailingAnchor constraintEqualToAnchor:box.trailingAnchor
+                                                  constant:-10.0],
+            [_field.centerYAnchor constraintEqualToAnchor:box.centerYAnchor],
+            [_addButton.leadingAnchor constraintEqualToAnchor:box.trailingAnchor
+                                                     constant:10.0],
+            [_addButton.trailingAnchor constraintEqualToAnchor:m.trailingAnchor],
+            [_addButton.centerYAnchor constraintEqualToAnchor:box.centerYAnchor],
+            [_addButton.heightAnchor constraintEqualToConstant:42.0],
+            [_addButton.widthAnchor constraintGreaterThanOrEqualToConstant:64.0],
+        ]];
+    }
+    return self;
+}
+
+- (void)tintColorDidChange {
+    [super tintColorDidChange];
+    self.addButton.backgroundColor = self.tintColor ?: [UIColor systemBlueColor];
+}
+
+@end
+
+// MARK: - term row (badge on the left, remove button on the right)
+
+@interface NFBMutedTermCell : UITableViewCell
+@property (nonatomic, strong) UILabel* kindLabel;
+@property (nonatomic, strong) UILabel* termLabel;
+@property (nonatomic, strong) UIButton* durationButton;
+@property (nonatomic, strong) UIButton* removeButton;
+@end
+
+@implementation NFBMutedTermCell
+
+- (instancetype)initWithStyle:(UITableViewCellStyle)style
+              reuseIdentifier:(NSString*)reuseIdentifier {
+    self = [super initWithStyle:style reuseIdentifier:reuseIdentifier];
+    if (self) {
+        self.selectionStyle = UITableViewCellSelectionStyleNone;
+        self.backgroundColor = [UIColor clearColor];
+
+        _kindLabel = [[UILabel alloc] init];
+        _kindLabel.font = [TwitterChirpFont(TwitterFontStyleRegular) fontWithSize:12];
+        // Derived from the label colour rather than a semantic fill: Twitter
+        // re-themes the system fills, which turned this badge into a dark
+        // block with unreadable text.
+        _kindLabel.textColor = [[UIColor labelColor] colorWithAlphaComponent:0.6];
+        _kindLabel.textAlignment = NSTextAlignmentCenter;
+        _kindLabel.backgroundColor = [[UIColor labelColor] colorWithAlphaComponent:0.07];
+        _kindLabel.layer.cornerRadius = 5.0;
+        _kindLabel.layer.masksToBounds = YES;
+        [_kindLabel setContentHuggingPriority:UILayoutPriorityRequired
+                                      forAxis:UILayoutConstraintAxisHorizontal];
+
+        _termLabel = [[UILabel alloc] init];
+        _termLabel.font = [TwitterChirpFont(TwitterFontStyleRegular) fontWithSize:16.5];
+
+        // Expiry pill: tapping it opens a native duration menu.
+        _durationButton = [UIButton buttonWithType:UIButtonTypeSystem];
+        _durationButton.titleLabel.font =
+            [TwitterChirpFont(TwitterFontStyleRegular) fontWithSize:13];
+        _durationButton.backgroundColor = [[UIColor labelColor] colorWithAlphaComponent:0.05];
+        _durationButton.layer.cornerRadius = 11.0;
+        _durationButton.contentEdgeInsets = UIEdgeInsetsMake(0, 10, 0, 10);
+        _durationButton.showsMenuAsPrimaryAction = YES;
+        [_durationButton setContentHuggingPriority:UILayoutPriorityRequired
+                                           forAxis:UILayoutConstraintAxisHorizontal];
+
+        _removeButton = [UIButton buttonWithType:UIButtonTypeSystem];
+        [_removeButton setImage:[UIImage systemImageNamed:@"xmark.circle.fill"]
+                       forState:UIControlStateNormal];
+        _removeButton.tintColor = [[UIColor labelColor] colorWithAlphaComponent:0.25];
+
+        for (UIView* v in @[ _kindLabel, _termLabel, _durationButton, _removeButton ]) {
+            v.translatesAutoresizingMaskIntoConstraints = NO;
+            [self.contentView addSubview:v];
+        }
+        UILayoutGuide* m = self.contentView.layoutMarginsGuide;
+        [NSLayoutConstraint activateConstraints:@[
+            [_kindLabel.leadingAnchor constraintEqualToAnchor:m.leadingAnchor],
+            [_kindLabel.centerYAnchor
+                constraintEqualToAnchor:self.contentView.centerYAnchor],
+            [_kindLabel.heightAnchor constraintEqualToConstant:22.0],
+            [_kindLabel.widthAnchor constraintGreaterThanOrEqualToConstant:58.0],
+            [_termLabel.leadingAnchor constraintEqualToAnchor:_kindLabel.trailingAnchor
+                                                     constant:12.0],
+            [_termLabel.centerYAnchor
+                constraintEqualToAnchor:self.contentView.centerYAnchor],
+            [_termLabel.trailingAnchor
+                constraintLessThanOrEqualToAnchor:_durationButton.leadingAnchor
+                                         constant:-8.0],
+            [_durationButton.trailingAnchor
+                constraintEqualToAnchor:_removeButton.leadingAnchor
+                               constant:-8.0],
+            [_durationButton.centerYAnchor
+                constraintEqualToAnchor:self.contentView.centerYAnchor],
+            [_durationButton.heightAnchor constraintEqualToConstant:22.0],
+            [_termLabel.topAnchor constraintEqualToAnchor:self.contentView.topAnchor
+                                                 constant:11.0],
+            [_termLabel.bottomAnchor constraintEqualToAnchor:self.contentView.bottomAnchor
+                                                    constant:-11.0],
+            [_removeButton.trailingAnchor constraintEqualToAnchor:m.trailingAnchor],
+            [_removeButton.centerYAnchor
+                constraintEqualToAnchor:self.contentView.centerYAnchor],
+            [_removeButton.widthAnchor constraintEqualToConstant:26.0],
+        ]];
+    }
+    return self;
+}
+
+@end
+
+// MARK: - option row
+
+@interface NFBMutedToggleCell : UITableViewCell
+@property (nonatomic, strong) UILabel* titleLabel2;
+@property (nonatomic, strong) UILabel* subtitleLabel;
+@property (nonatomic, strong) UISwitch* toggle;
+@end
+
+@implementation NFBMutedToggleCell
+
+- (instancetype)initWithStyle:(UITableViewCellStyle)style
+              reuseIdentifier:(NSString*)reuseIdentifier {
+    self = [super initWithStyle:style reuseIdentifier:reuseIdentifier];
+    if (self) {
+        self.selectionStyle = UITableViewCellSelectionStyleNone;
+        self.backgroundColor = [UIColor clearColor];
+
+        _titleLabel2 = [[UILabel alloc] init];
+        _titleLabel2.font = [TwitterChirpFont(TwitterFontStyleRegular) fontWithSize:16.5];
+
+        _subtitleLabel = [[UILabel alloc] init];
+        _subtitleLabel.font = [TwitterChirpFont(TwitterFontStyleRegular) fontWithSize:13.5];
+        _subtitleLabel.textColor = [UIColor secondaryLabelColor];
+        _subtitleLabel.numberOfLines = 0;
+
+        _toggle = [[UISwitch alloc] init];
+
+        for (UIView* v in @[ _titleLabel2, _subtitleLabel, _toggle ]) {
+            v.translatesAutoresizingMaskIntoConstraints = NO;
+            [self.contentView addSubview:v];
+        }
+        UILayoutGuide* m = self.contentView.layoutMarginsGuide;
+        [NSLayoutConstraint activateConstraints:@[
+            [_titleLabel2.topAnchor constraintEqualToAnchor:self.contentView.topAnchor
+                                                   constant:10.0],
+            [_titleLabel2.leadingAnchor constraintEqualToAnchor:m.leadingAnchor],
+            [_titleLabel2.trailingAnchor
+                constraintLessThanOrEqualToAnchor:_toggle.leadingAnchor
+                                         constant:-12.0],
+            [_subtitleLabel.topAnchor constraintEqualToAnchor:_titleLabel2.bottomAnchor
+                                                     constant:2.0],
+            [_subtitleLabel.leadingAnchor constraintEqualToAnchor:m.leadingAnchor],
+            [_subtitleLabel.trailingAnchor constraintEqualToAnchor:_toggle.leadingAnchor
+                                                          constant:-12.0],
+            [_subtitleLabel.bottomAnchor
+                constraintEqualToAnchor:self.contentView.bottomAnchor
+                               constant:-10.0],
+            [_toggle.centerYAnchor constraintEqualToAnchor:self.contentView.centerYAnchor],
+            [_toggle.trailingAnchor constraintEqualToAnchor:m.trailingAnchor],
+        ]];
+    }
+    return self;
+}
+
+@end
+
+// MARK: - controller
+
+@interface MutedWordsViewController () <UITextFieldDelegate,
+                                       UIPopoverPresentationControllerDelegate>
+@property (nonatomic, strong) NSMutableArray<NSString*>* terms;
+@property (nonatomic, assign) BOOL compact;
+@end
+
+@implementation MutedWordsViewController
+
+- (instancetype)init {
+    return [super initWithStyle:UITableViewStyleGrouped];
+}
+
+- (instancetype)initCompact {
+    self = [super initWithStyle:UITableViewStylePlain];
+    if (self) {
+        _compact = YES;
+    }
+    return self;
+}
+
+// A popover on iPhone becomes a full-screen sheet unless the delegate says
+// otherwise; this keeps it an anchored popover on every size class.
+- (UIModalPresentationStyle)adaptivePresentationStyleForPresentationController:
+                                (UIPresentationController*)controller
+                                                          traitCollection:
+                                (UITraitCollection*)traitCollection {
+    return UIModalPresentationNone;
+}
+
+// Height measured from the laid-out table rather than estimated: the first
+// attempt guessed row heights and clipped the last entry.
+- (void)updatePreferredSize {
+    if (!self.compact) {
+        return;
+    }
+    [self.tableView layoutIfNeeded];
+    CGFloat measured = self.tableView.contentSize.height;
+    if (measured < 100.0) {
+        measured = 100.0;
+    }
+    self.preferredContentSize = CGSizeMake(320.0, MIN(measured, 330.0));
+}
+
+- (void)viewDidLayoutSubviews {
+    [super viewDidLayoutSubviews];
+    [self updatePreferredSize];
+}
+
+- (void)viewDidLoad {
+    [super viewDidLoad];
+    BHTBundle* bundle = [BHTBundle sharedBundle];
+    self.title = [bundle localizedStringForKey:@"MUTED_WORDS_TITLE"];
+    self.terms = [([[NSUserDefaults standardUserDefaults] arrayForKey:kNFBMutedWordsKey]
+                       ?: @[]) mutableCopy];
+    [self pruneExpiredTerms];
+    self.tableView.keyboardDismissMode = UIScrollViewKeyboardDismissModeInteractive;
+    if (self.compact) {
+        // A popover draws its own translucent material: forcing an opaque
+        // background is what flattened it into a plain white card.
+        self.tableView.backgroundColor = [UIColor clearColor];
+        self.view.backgroundColor = [UIColor clearColor];
+    } else {
+        // Full screen follows the advanced-search recipe.
+        self.tableView.backgroundColor = [UIColor systemBackgroundColor];
+        self.tableView.separatorStyle = UITableViewCellSeparatorStyleNone;
+    }
+    [self updatePreferredSize];
+    [self.tableView registerClass:[NFBMutedAddCell class] forCellReuseIdentifier:@"add"];
+    [self.tableView registerClass:[NFBMutedToggleCell class] forCellReuseIdentifier:@"opt"];
+    [self.tableView registerClass:[NFBMutedTermCell class] forCellReuseIdentifier:@"term"];
+}
+
+// MARK: expiry
+
+// Expiry lives in a companion dictionary keyed by the term, so an existing
+// list of plain strings keeps working untouched.
+- (NSMutableDictionary*)expiryMap {
+    return [([[NSUserDefaults standardUserDefaults] dictionaryForKey:kNFBMutedExpiryKey]
+                 ?: @{}) mutableCopy];
+}
+
+- (NSTimeInterval)expiryForTerm:(NSString*)term {
+    id value = [self expiryMap][term];
+    return [value respondsToSelector:@selector(doubleValue)] ? [value doubleValue] : 0.0;
+}
+
+- (void)setExpiry:(NSTimeInterval)deadline forTerm:(NSString*)term {
+    NSMutableDictionary* map = [self expiryMap];
+    if (deadline <= 0) {
+        [map removeObjectForKey:term];
+    } else {
+        map[term] = @(deadline);
+    }
+    [[NSUserDefaults standardUserDefaults] setObject:map forKey:kNFBMutedExpiryKey];
+    nfbRefreshMutedWords();
+}
+
+// Drops filters whose deadline has passed, and forgets their entry.
+- (void)pruneExpiredTerms {
+    NSMutableDictionary* map = [self expiryMap];
+    if (map.count == 0) {
+        return;
+    }
+    NSTimeInterval now = [[NSDate date] timeIntervalSince1970];
+    NSMutableArray* alive = [NSMutableArray array];
+    BOOL changed = NO;
+    for (NSString* term in self.terms) {
+        id value = map[term];
+        double deadline =
+            [value respondsToSelector:@selector(doubleValue)] ? [value doubleValue] : 0.0;
+        if (deadline > 0 && deadline <= now) {
+            [map removeObjectForKey:term];
+            changed = YES;
+            continue;
+        }
+        [alive addObject:term];
+    }
+    if (!changed) {
+        return;
+    }
+    self.terms = alive;
+    NSUserDefaults* d = [NSUserDefaults standardUserDefaults];
+    [d setObject:self.terms forKey:kNFBMutedWordsKey];
+    [d setObject:map forKey:kNFBMutedExpiryKey];
+    nfbRefreshMutedWords();
+}
+
+// "forever", or how many days are left.
+- (NSString*)durationLabelForTerm:(NSString*)term {
+    BHTBundle* bundle = [BHTBundle sharedBundle];
+    NSTimeInterval deadline = [self expiryForTerm:term];
+    if (deadline <= 0) {
+        return [bundle localizedStringForKey:@"MUTED_WORDS_DURATION_FOREVER"];
+    }
+    NSTimeInterval remaining = deadline - [[NSDate date] timeIntervalSince1970];
+    NSInteger days = (NSInteger)ceil(remaining / 86400.0);
+    if (days < 1) {
+        days = 1;
+    }
+    return [NSString stringWithFormat:
+                         [bundle localizedStringForKey:@"MUTED_WORDS_EXPIRES_FORMAT"],
+                         (long)days];
+}
+
+- (UIMenu*)durationMenuForTerm:(NSString*)term {
+    BHTBundle* bundle = [BHTBundle sharedBundle];
+    NSTimeInterval current = [self expiryForTerm:term];
+    __weak typeof(self) weakSelf = self;
+    NSArray* options = @[ @[ @"MUTED_WORDS_DURATION_24H", @(86400.0) ],
+                          @[ @"MUTED_WORDS_DURATION_7D", @(604800.0) ],
+                          @[ @"MUTED_WORDS_DURATION_30D", @(2592000.0) ],
+                          @[ @"MUTED_WORDS_DURATION_FOREVER", @(0.0) ] ];
+    NSMutableArray* actions = [NSMutableArray array];
+    for (NSArray* option in options) {
+        double span = [option[1] doubleValue];
+        UIAction* action = [UIAction
+            actionWithTitle:[bundle localizedStringForKey:option[0]]
+                      image:nil
+                 identifier:nil
+                    handler:^(UIAction* a) {
+                        double deadline =
+                            (span <= 0)
+                                ? 0.0
+                                : [[NSDate date] timeIntervalSince1970] + span;
+                        [weakSelf setExpiry:deadline forTerm:term];
+                        [weakSelf.tableView reloadData];
+                    }];
+        BOOL selected = (span <= 0) ? (current <= 0)
+                                    : (current > 0 &&
+                                       fabs((current - [[NSDate date] timeIntervalSince1970]) -
+                                            span) < 86400.0);
+        action.state = selected ? UIMenuElementStateOn : UIMenuElementStateOff;
+        [actions addObject:action];
+    }
+    return [UIMenu menuWithChildren:actions];
+}
+
+// MARK: persistence
+
+- (void)persist {
+    NSUserDefaults* d = [NSUserDefaults standardUserDefaults];
+    [d setObject:self.terms forKey:kNFBMutedWordsKey];
+    // The settings row shows this string on its right-hand side.
+    BHTBundle* bundle = [BHTBundle sharedBundle];
+    NSString* summary =
+        self.terms.count ? [NSString stringWithFormat:@"%lu", (unsigned long)self.terms.count]
+                         : [bundle localizedStringForKey:@"MUTED_WORDS_NONE"];
+    [d setObject:summary forKey:kNFBMutedCountKey];
+    nfbRefreshMutedWords();
+}
+
+// MARK: actions
+
+- (void)addTermFromField:(UITextField*)field {
+    NSString* raw = [field.text stringByTrimmingCharactersInSet:
+                                    [NSCharacterSet whitespaceAndNewlineCharacterSet]];
+    if (raw.length == 0) {
+        return;
+    }
+    for (NSString* existing in self.terms) {
+        if ([existing caseInsensitiveCompare:raw] == NSOrderedSame) {
+            field.text = @"";
+            return;
+        }
+    }
+    [self.terms insertObject:raw atIndex:0];
+    field.text = @"";
+    [self persist];
+    [self updatePreferredSize];
+    [self.tableView reloadData];
+}
+
+- (void)toggleChanged:(UISwitch*)sender {
+    NSArray* keys = @[ kNFBMutedWholeWordsKey, kNFBMutedInConversationsKey,
+                       kNFBMutedSkipFollowingKey, kNFBMutedIncludeRepostsKey ];
+    NSUInteger index = (NSUInteger)sender.tag;
+    if (index >= keys.count) {
+        return;
+    }
+    [[NSUserDefaults standardUserDefaults] setBool:sender.isOn forKey:keys[index]];
+    nfbRefreshMutedWords();
+}
+
+- (BOOL)textFieldShouldReturn:(UITextField*)textField {
+    [self addTermFromField:textField];
+    [textField resignFirstResponder];
+    return YES;
+}
+
+// MARK: table
+
+- (NSInteger)numberOfSectionsInTableView:(UITableView*)tableView {
+    return self.compact ? 1 : 2;
+}
+
+// Section 0 is "Filters": the add row first, then the list (or one empty row).
+- (NSInteger)tableView:(UITableView*)tableView numberOfRowsInSection:(NSInteger)section {
+    if (section == 0) {
+        return 1 + (NSInteger)MAX(self.terms.count, (NSUInteger)1);
+    }
+    return 4;
+}
+
+// Custom headers, Chirp heavy — the advanced-search recipe, instead of the
+// small grey system captions.
+- (UIView*)tableView:(UITableView*)tableView viewForHeaderInSection:(NSInteger)section {
+    if (self.compact) {
+        return nil;
+    }
+    BHTBundle* bundle = [BHTBundle sharedBundle];
+    UIView* container = [[UIView alloc] init];
+    UILabel* label = [[UILabel alloc] init];
+    label.text = [bundle localizedStringForKey:(section == 0)
+                                                   ? @"MUTED_WORDS_LIST_HEADER"
+                                                   : @"MUTED_WORDS_OPTIONS_HEADER"];
+    label.font = [TwitterChirpFont(TwitterFontStyleBold) fontWithSize:20];
+    label.textColor = [UIColor labelColor];
+    label.translatesAutoresizingMaskIntoConstraints = NO;
+    [container addSubview:label];
+    [NSLayoutConstraint activateConstraints:@[
+        [label.leadingAnchor
+            constraintEqualToAnchor:container.layoutMarginsGuide.leadingAnchor],
+        [label.trailingAnchor
+            constraintEqualToAnchor:container.layoutMarginsGuide.trailingAnchor],
+        [label.bottomAnchor constraintEqualToAnchor:container.bottomAnchor
+                                           constant:-6.0],
+    ]];
+    return container;
+}
+
+- (CGFloat)tableView:(UITableView*)tableView heightForHeaderInSection:(NSInteger)section {
+    return self.compact ? 0.01 : 46.0;
+}
+
+// How much the filter actually did today, under the list.
+- (NSString*)tableView:(UITableView*)tableView
+    titleForFooterInSection:(NSInteger)section {
+    if (self.compact || section != 0) {
+        return nil;
+    }
+    return [NSString stringWithFormat:
+                         [[BHTBundle sharedBundle]
+                             localizedStringForKey:@"MUTED_WORDS_COUNT_FORMAT"],
+                         (long)nfbMutedHiddenCountToday()];
+}
+
+// "@handle" -> account, "two words" -> phrase, otherwise a single word.
+- (NSString*)kindLabelForTerm:(NSString*)term {
+    BHTBundle* bundle = [BHTBundle sharedBundle];
+    if ([term hasPrefix:@"@"]) {
+        return [bundle localizedStringForKey:@"MUTED_WORDS_KIND_ACCOUNT"];
+    }
+    if ([term rangeOfString:@" "].location != NSNotFound) {
+        return [bundle localizedStringForKey:@"MUTED_WORDS_KIND_PHRASE"];
+    }
+    return [bundle localizedStringForKey:@"MUTED_WORDS_KIND_WORD"];
+}
+
+- (UITableViewCell*)tableView:(UITableView*)tableView
+        cellForRowAtIndexPath:(NSIndexPath*)indexPath {
+    BHTBundle* bundle = [BHTBundle sharedBundle];
+
+    if (indexPath.section == 0 && indexPath.row == 0) {
+        NFBMutedAddCell* cell = [tableView dequeueReusableCellWithIdentifier:@"add"
+                                                               forIndexPath:indexPath];
+        cell.field.placeholder =
+            [bundle localizedStringForKey:@"MUTED_WORDS_ADD_PLACEHOLDER"];
+        cell.hintLabel.text = [bundle localizedStringForKey:@"MUTED_WORDS_SUBTITLE"];
+        cell.field.delegate = self;
+        [cell.addButton setTitle:[bundle localizedStringForKey:@"MUTED_WORDS_ADD_BUTTON"]
+                        forState:UIControlStateNormal];
+        [cell.addButton removeTarget:nil
+                              action:NULL
+                    forControlEvents:UIControlEventTouchUpInside];
+        [cell.addButton addTarget:self
+                           action:@selector(addTapped:)
+                 forControlEvents:UIControlEventTouchUpInside];
+        return cell;
+    }
+
+    if (indexPath.section == 0) {
+        NSUInteger termIndex = (NSUInteger)indexPath.row - 1;
+        if (self.terms.count == 0) {
+            UITableViewCell* empty =
+                [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleDefault
+                                       reuseIdentifier:nil];
+            empty.selectionStyle = UITableViewCellSelectionStyleNone;
+            empty.textLabel.font =
+                [TwitterChirpFont(TwitterFontStyleRegular) fontWithSize:16];
+            empty.textLabel.textColor = [UIColor secondaryLabelColor];
+            empty.textLabel.text = [bundle localizedStringForKey:@"MUTED_WORDS_EMPTY"];
+            return empty;
+        }
+        NFBMutedTermCell* cell = [tableView dequeueReusableCellWithIdentifier:@"term"
+                                                                 forIndexPath:indexPath];
+        NSString* term = self.terms[termIndex];
+        cell.termLabel.text = term;
+        cell.kindLabel.text = [NSString stringWithFormat:@"  %@  ",
+                                                         [self kindLabelForTerm:term]];
+        [cell.durationButton setTitle:[self durationLabelForTerm:term]
+                             forState:UIControlStateNormal];
+        cell.durationButton.menu = [self durationMenuForTerm:term];
+        cell.removeButton.tag = (NSInteger)termIndex;
+        [cell.removeButton removeTarget:nil
+                                 action:NULL
+                       forControlEvents:UIControlEventTouchUpInside];
+        [cell.removeButton addTarget:self
+                              action:@selector(removeTapped:)
+                    forControlEvents:UIControlEventTouchUpInside];
+        return cell;
+    }
+
+    NFBMutedToggleCell* cell = [tableView dequeueReusableCellWithIdentifier:@"opt"
+                                                              forIndexPath:indexPath];
+    struct {
+        __unsafe_unretained NSString* titleKey;
+        __unsafe_unretained NSString* detailKey;
+        __unsafe_unretained NSString* prefKey;
+        BOOL defaultOn;
+    } options[] = {
+        { @"MUTED_WORDS_WHOLE_TITLE", @"MUTED_WORDS_WHOLE_DETAIL",
+          kNFBMutedWholeWordsKey, YES },
+        { @"MUTED_WORDS_CONVERSATIONS_TITLE", @"MUTED_WORDS_CONVERSATIONS_DETAIL",
+          kNFBMutedInConversationsKey, YES },
+        { @"MUTED_WORDS_FOLLOWING_TITLE", @"MUTED_WORDS_FOLLOWING_DETAIL",
+          kNFBMutedSkipFollowingKey, YES },
+        { @"MUTED_WORDS_REPOSTS_TITLE", @"MUTED_WORDS_REPOSTS_DETAIL",
+          kNFBMutedIncludeRepostsKey, NO },
+    };
+    NSUInteger index = (NSUInteger)indexPath.row;
+    if (index >= sizeof(options) / sizeof(options[0])) {
+        index = 0;
+    }
+    cell.titleLabel2.text = [bundle localizedStringForKey:options[index].titleKey];
+    cell.subtitleLabel.text = [bundle localizedStringForKey:options[index].detailKey];
+    cell.toggle.tag = (NSInteger)index;
+    NSUserDefaults* d = [NSUserDefaults standardUserDefaults];
+    cell.toggle.on = ([d objectForKey:options[index].prefKey] == nil)
+                         ? options[index].defaultOn
+                         : [d boolForKey:options[index].prefKey];
+    [cell.toggle removeTarget:nil action:NULL forControlEvents:UIControlEventValueChanged];
+    [cell.toggle addTarget:self
+                    action:@selector(toggleChanged:)
+          forControlEvents:UIControlEventValueChanged];
+    return cell;
+}
+
+- (void)removeTapped:(UIButton*)sender {
+    NSUInteger index = (NSUInteger)sender.tag;
+    if (index >= self.terms.count) {
+        return;
+    }
+    [self.terms removeObjectAtIndex:index];
+    [self persist];
+    [self updatePreferredSize];
+    [self.tableView reloadData];
+}
+
+- (void)addTapped:(UIButton*)sender {
+    UIView* view = sender;
+    while (view && ![view isKindOfClass:[NFBMutedAddCell class]]) {
+        view = view.superview;
+    }
+    if ([view isKindOfClass:[NFBMutedAddCell class]]) {
+        [self addTermFromField:((NFBMutedAddCell*)view).field];
+    }
+}
+
+- (BOOL)tableView:(UITableView*)tableView
+    canEditRowAtIndexPath:(NSIndexPath*)indexPath {
+    return indexPath.section == 0 && indexPath.row > 0 && self.terms.count > 0;
+}
+
+- (void)tableView:(UITableView*)tableView
+    commitEditingStyle:(UITableViewCellEditingStyle)editingStyle
+     forRowAtIndexPath:(NSIndexPath*)indexPath {
+    if (editingStyle != UITableViewCellEditingStyleDelete) {
+        return;
+    }
+    [self.terms removeObjectAtIndex:(NSUInteger)indexPath.row - 1];
+    [self persist];
+    [self updatePreferredSize];
+    [tableView reloadData];
+}
+
+@end
