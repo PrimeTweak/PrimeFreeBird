@@ -91,12 +91,29 @@ static BOOL nfbIsHomeNavigationBar(UIView* bar) {
 
         UIButton* button = objc_getAssociatedObject(self, kNFBQuickMutedBtnKey);
         if (!button) {
-            UIImage* icon = [UIImage systemImageNamed:@"text.badge.minus"];
+            // Twitter's own "filter" glyph, from its vector library — the same
+            // source as every other icon in this bar, so it matches by
+            // construction. The system symbol is only a safety net if the
+            // asset ever disappears.
+            UIImage* icon = nil;
+            if ([UIImage respondsToSelector:@selector(tfn_vectorImageNamed:
+                                                                 fitsSize:
+                                                                fillColor:)]) {
+                icon = [UIImage tfn_vectorImageNamed:@"filter"
+                                            fitsSize:CGSizeMake(22.0, 22.0)
+                                           fillColor:[UIColor secondaryLabelColor]];
+                icon = [icon imageWithRenderingMode:UIImageRenderingModeAlwaysOriginal];
+            }
+            if (!icon) {
+                icon = [UIImage systemImageNamed:@"line.3.horizontal.decrease"];
+            }
             if (!icon) {
                 return;
             }
             button = [UIButton buttonWithType:UIButtonTypeSystem];
             [button setImage:icon forState:UIControlStateNormal];
+            button.tintColor = [UIColor secondaryLabelColor];
+            button.contentMode = UIViewContentModeCenter;
             button.accessibilityLabel = @"Muted words";
             [button addTarget:self
                           action:@selector(nfbShowQuickMutedWords:)
@@ -110,7 +127,7 @@ static BOOL nfbIsHomeNavigationBar(UIView* bar) {
         [bar bringSubviewToFront:button];
 
         CGFloat side = 34.0;
-        CGFloat inset = 14.0;
+        CGFloat inset = 16.0;   // même marge que l'avatar à gauche
         button.frame = CGRectMake(CGRectGetWidth(bar.bounds) - side - inset,
                                   (CGRectGetHeight(bar.bounds) - side) / 2.0,
                                   side, side);

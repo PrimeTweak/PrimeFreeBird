@@ -64,6 +64,8 @@ static const void* kNFBAdvSearchBtnKey = &kNFBAdvSearchBtnKey;
                                              style:UIBarButtonItemStylePlain
                                             target:self
                                             action:@selector(nfbShowAdvancedSearch)];
+        // Muted grey, like the labels of the unselected tabs next to it.
+        btn.tintColor = [UIColor secondaryLabelColor];
         // Match Twitter's own settings gear, which sits flat in this bar:
         // iOS 26 gives bar buttons a shared Liquid Glass capsule, and opting
         // out is a single property. It only exists on the iOS 26 SDK, so it
