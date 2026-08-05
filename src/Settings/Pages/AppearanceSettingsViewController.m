@@ -60,6 +60,32 @@
     }
 }
 
+// The settings page hands each action the row's indexPath, so a sheet can
+// point back at the row the user actually touched.
+- (void)anchorSheet:(UIAlertController*)sheet toRowFrom:(NSDictionary*)sender {
+    UIPopoverPresentationController* popover = sheet.popoverPresentationController;
+    if (!popover) {
+        return;
+    }
+    NSIndexPath* indexPath = sender[@"indexPath"];
+    UITableViewCell* cell =
+        [indexPath isKindOfClass:[NSIndexPath class]]
+            ? [self.tableView cellForRowAtIndexPath:indexPath]
+            : nil;
+    if (cell) {
+        popover.sourceView = cell;
+        popover.sourceRect = cell.bounds;
+        popover.permittedArrowDirections =
+            UIPopoverArrowDirectionUp | UIPopoverArrowDirectionDown;
+        return;
+    }
+    // No row to point at (shouldn't happen): fall back to the top of the
+    // content rather than the middle of the screen.
+    popover.sourceView = self.view;
+    popover.sourceRect = CGRectMake(CGRectGetMidX(self.view.bounds), 0.0, 0.0, 0.0);
+    popover.permittedArrowDirections = UIPopoverArrowDirectionUp;
+}
+
 - (void)showDarkModeStylePicker:(NSDictionary*)sender {
     BHTBundle* bundle = [BHTBundle sharedBundle];
     UIAlertController* sheet = [UIAlertController
@@ -98,9 +124,10 @@
                                    style:UIAlertActionStyleCancel
                                  handler:nil]];
 
-    sheet.popoverPresentationController.sourceView = self.view;
-    sheet.popoverPresentationController.sourceRect =
-        CGRectMake(self.view.bounds.size.width / 2, self.view.bounds.size.height / 2, 0, 0);
+    // Anchor the sheet on the row that was tapped. Pointing it at the middle
+    // of the screen is what made it land in a random spot: iOS 26 presents
+    // these as popovers, and a popover follows its anchor.
+    [self anchorSheet:sheet toRowFrom:sender];
     [self presentViewController:sheet animated:YES completion:nil];
 }
 
@@ -147,9 +174,10 @@
                                    style:UIAlertActionStyleCancel
                                  handler:nil]];
 
-    sheet.popoverPresentationController.sourceView = self.view;
-    sheet.popoverPresentationController.sourceRect =
-        CGRectMake(self.view.bounds.size.width / 2, self.view.bounds.size.height / 2, 0, 0);
+    // Anchor the sheet on the row that was tapped. Pointing it at the middle
+    // of the screen is what made it land in a random spot: iOS 26 presents
+    // these as popovers, and a popover follows its anchor.
+    [self anchorSheet:sheet toRowFrom:sender];
     [self presentViewController:sheet animated:YES completion:nil];
 }
 
