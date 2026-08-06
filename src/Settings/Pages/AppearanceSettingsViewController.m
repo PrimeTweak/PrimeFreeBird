@@ -8,6 +8,7 @@
 #import "Settings/Pages/AppearanceSettingsViewController.h"
 #import "Core/BHTBundle.h"
 #import "Core/BHTSettings.h"
+#import "Settings/OptionPickerViewController.h"
 #import "Headers/TWHeaders.h"
 #import "Settings/ModernSettingsCells.h"
 #import "ThemeColor/DarkModeStyle.h"
@@ -60,10 +61,16 @@
     }
 }
 
-// Native menus, built on the fly so the checkmark always shows the current
-// value. iOS handles the material, the placement and the animation.
+// Two choices, shown in the fork's own popover so the type stays Chirp.
 
-- (UIMenu*)darkModeStyleMenu:(NSDictionary*)entry {
+- (UITableViewCell*)cellForEntry:(NSDictionary*)entry {
+    NSIndexPath* indexPath = entry[@"indexPath"];
+    return [indexPath isKindOfClass:[NSIndexPath class]]
+               ? [self.tableView cellForRowAtIndexPath:indexPath]
+               : nil;
+}
+
+- (void)showDarkModeStylePicker:(NSDictionary*)sender {
     BHTBundle* bundle = [BHTBundle sharedBundle];
     NSArray<NSString*>* titleKeys = @[
         @"DARK_MODE_STYLE_SYSTEM",
@@ -71,66 +78,58 @@
         @"DARK_MODE_STYLE_GRAY",
         @"DARK_MODE_STYLE_PURE_BLACK"
     ];
-    NSInteger current = [BHTSettings integerForKey:@"dark_mode_style"];
-    __weak typeof(self) weakSelf = self;
-
-    NSMutableArray<UIAction*>* actions = [NSMutableArray array];
-    for (NSInteger i = 0; i < (NSInteger)titleKeys.count; i++) {
-        UIAction* action =
-            [UIAction actionWithTitle:[bundle localizedStringForKey:titleKeys[i]]
-                                image:nil
-                           identifier:nil
-                              handler:^(__kindof UIAction* a) {
-                                  [[NSUserDefaults standardUserDefaults]
-                                      setInteger:i
-                                          forKey:@"dark_mode_style"];
-                                  [[NSUserDefaults standardUserDefaults] synchronize];
-                                  [weakSelf.tableView reloadData];
-                                  [weakSelf showRestartRequiredAlert];
-                              }];
-        action.state = (i == current) ? UIMenuElementStateOn : UIMenuElementStateOff;
-        [actions addObject:action];
+    NSMutableArray<NSString*>* titles = [NSMutableArray array];
+    for (NSString* key in titleKeys) {
+        [titles addObject:[bundle localizedStringForKey:key]];
     }
-    return [UIMenu menuWithTitle:[bundle localizedStringForKey:@"DARK_MODE_STYLE_TITLE"]
-                        children:actions];
+
+    __weak typeof(self) weakSelf = self;
+    OptionPickerViewController* picker = [[OptionPickerViewController alloc]
+        initWithTitle:[bundle localizedStringForKey:@"DARK_MODE_STYLE_TITLE"]
+              message:[bundle localizedStringForKey:@"DARK_MODE_STYLE_DETAIL"]
+              options:titles
+        selectedIndex:[BHTSettings integerForKey:@"dark_mode_style"]
+              handler:^(NSInteger index) {
+                  [[NSUserDefaults standardUserDefaults] setInteger:index
+                                                             forKey:@"dark_mode_style"];
+                  [[NSUserDefaults standardUserDefaults] synchronize];
+                  [weakSelf.tableView reloadData];
+                  [weakSelf showRestartRequiredAlert];
+              }];
+    [picker presentFrom:self sourceView:[self cellForEntry:sender]];
 }
 
-- (UIMenu*)interfaceStyleMenu:(NSDictionary*)entry {
+- (void)showInterfaceStylePicker:(NSDictionary*)sender {
     BHTBundle* bundle = [BHTBundle sharedBundle];
     NSArray<NSString*>* titleKeys = @[
         @"INTERFACE_STYLE_STANDARD",
         @"INTERFACE_STYLE_LIQUID_GLASS"
     ];
-    // Index 0 = Standard (glass off), index 1 = Liquid Glass (glass on).
-    NSInteger current = [BHTSettings boolForKey:@"enable_liquid_glass"] ? 1 : 0;
-    __weak typeof(self) weakSelf = self;
-
-    NSMutableArray<UIAction*>* actions = [NSMutableArray array];
-    for (NSInteger i = 0; i < (NSInteger)titleKeys.count; i++) {
-        UIAction* action =
-            [UIAction actionWithTitle:[bundle localizedStringForKey:titleKeys[i]]
-                                image:nil
-                           identifier:nil
-                              handler:^(__kindof UIAction* a) {
-                                  BOOL wasEnabled = [BHTSettings
-                                      boolForKey:@"enable_liquid_glass"];
-                                  BOOL nowEnabled = (i == 1);
-                                  [[NSUserDefaults standardUserDefaults]
-                                      setBool:nowEnabled
-                                       forKey:@"enable_liquid_glass"];
-                                  [[NSUserDefaults standardUserDefaults] synchronize];
-                                  [weakSelf.tableView reloadData];
-                                  // Only prompt for a restart when the mode
-                                  // actually changed — the original behaviour.
-                                  if (wasEnabled != nowEnabled) {
-                                      [weakSelf showRestartRequiredAlert];
-                                  }
-                              }];
-        action.state = (i == current) ? UIMenuElementStateOn : UIMenuElementStateOff;
-        [actions addObject:action];
+    NSMutableArray<NSString*>* titles = [NSMutableArray array];
+    for (NSString* key in titleKeys) {
+        [titles addObject:[bundle localizedStringForKey:key]];
     }
-    return [UIMenu menuWithTitle:[bundle localizedStringForKey:@"INTERFACE_STYLE_TITLE"]
-                        children:actions];
+    // Index 0 = Standard (glass off), index 1 = Liquid Glass (glass on).
+    BOOL wasEnabled = [BHTSettings boolForKey:@"enable_liquid_glass"];
+
+    __weak typeof(self) weakSelf = self;
+    OptionPickerViewController* picker = [[OptionPickerViewController alloc]
+        initWithTitle:[bundle localizedStringForKey:@"INTERFACE_STYLE_TITLE"]
+              message:[bundle localizedStringForKey:@"INTERFACE_STYLE_DETAIL"]
+              options:titles
+        selectedIndex:(wasEnabled ? 1 : 0)
+              handler:^(NSInteger index) {
+                  BOOL nowEnabled = (index == 1);
+                  [[NSUserDefaults standardUserDefaults] setBool:nowEnabled
+                                                          forKey:@"enable_liquid_glass"];
+                  [[NSUserDefaults standardUserDefaults] synchronize];
+                  [weakSelf.tableView reloadData];
+                  // Only prompt for a restart when the mode actually changed.
+                  if (wasEnabled != nowEnabled) {
+                      [weakSelf showRestartRequiredAlert];
+                  }
+              }];
+    [picker presentFrom:self sourceView:[self cellForEntry:sender]];
 }
 
 #pragma mark - Tab Bar Refresh
