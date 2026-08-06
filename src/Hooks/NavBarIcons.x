@@ -20,6 +20,10 @@
 
 static NSString* const kNFBSettingsButtonIdentifier = @"NavigationBarSettingsButton";
 
+// secondaryLabelColor is the label colour at 60% opacity; dimming the button
+// to the same value gives an identical result whatever draws the glyph.
+static const CGFloat kNFBGreyAlpha = 0.6;
+
 // Forces template rendering, without which a tint is simply ignored.
 static void nfbTintGlyphsIn(UIView* view, UIColor* colour) {
     for (UIView* subview in view.subviews) {
@@ -75,24 +79,22 @@ static UIView* nfbFindSettingsButton(UIView* view) {
         if (!settingsButton) {
             return;   // pas cet écran : rien à faire
         }
+        // Opacity, not tint. The diagnostic proved the button is found and
+        // that view properties stick — its background turned red — yet the
+        // glyph stayed black through every tinting route. So we stop fighting
+        // over how the glyph is drawn: secondaryLabel IS the label colour at
+        // 60% opacity, and dimming the button reproduces it exactly.
+        if (settingsButton.alpha > kNFBGreyAlpha + 0.01) {
+            settingsButton.alpha = kNFBGreyAlpha;
+        }
+
+        // Tinting is still attempted, harmlessly: if a future build makes the
+        // glyph tintable, the colour becomes exact rather than simulated.
         UIColor* grey = [UIColor secondaryLabelColor];
         if (![settingsButton.tintColor isEqual:grey]) {
             settingsButton.tintColor = grey;
         }
         nfbTintGlyphsIn(settingsButton, grey);
-
-        // The diagnostic build settled it: the button IS found — painting its
-        // background red worked — but the glyph stayed black. We run during
-        // the BAR's layout, and the button lays itself out afterwards, undoing
-        // the tint. Re-applying on the next runloop turn lands after it.
-        __weak UIView* weakButton = settingsButton;
-        dispatch_async(dispatch_get_main_queue(), ^{
-            UIView* button = weakButton;
-            if (button.window) {
-                button.tintColor = grey;
-                nfbTintGlyphsIn(button, grey);
-            }
-        });
     } @catch (id exception) {
     }
 }
