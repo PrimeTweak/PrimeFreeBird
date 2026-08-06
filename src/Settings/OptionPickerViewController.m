@@ -6,9 +6,18 @@
 #import "Settings/OptionPickerViewController.h"
 #import "Core/TwitterChirpFont.h"
 
+// Same accent the tinted switches use, so the checkmark follows the theme
+// instead of falling back to the system blue.
+extern UIColor* CurrentAccentColor(void);
+
+static UIColor* NFBPickerAccentColor(void) {
+    UIColor* accent = CurrentAccentColor();
+    return accent ?: [UIColor labelColor];
+}
+
 static const CGFloat kNFBPickerWidth = 300.0;
-static const CGFloat kNFBPickerPillHeight = 48.0;
-static const CGFloat kNFBPickerGap = 8.0;
+static const CGFloat kNFBPickerRowHeight = 46.0;
+static const CGFloat kNFBPickerGap = 0.0;   // rangées jointives
 static const CGFloat kNFBPickerMargin = 14.0;
 static const CGFloat kNFBPickerCheckColumn = 22.0;
 
@@ -53,13 +62,12 @@ static const CGFloat kNFBPickerCheckColumn = 22.0;
     [self.view addSubview:self.stack];
     [NSLayoutConstraint activateConstraints:@[
         [self.stack.topAnchor constraintEqualToAnchor:self.view.topAnchor
-                                             constant:kNFBPickerMargin],
-        [self.stack.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor
-                                                 constant:kNFBPickerMargin],
-        [self.stack.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor
-                                                  constant:-kNFBPickerMargin],
-        [self.stack.bottomAnchor constraintEqualToAnchor:self.view.bottomAnchor
-                                                constant:-kNFBPickerMargin],
+                                             constant:kNFBPickerMargin],   // 14 en haut
+        // Edge to edge: the rows carry their own 16pt inset, and their
+        // separators must reach both sides of the popover.
+        [self.stack.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor],
+        [self.stack.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor],
+        [self.stack.bottomAnchor constraintEqualToAnchor:self.view.bottomAnchor],
     ]];
 
     // Title and message are left-aligned, following the iOS 26 move away from
@@ -70,8 +78,8 @@ static const CGFloat kNFBPickerCheckColumn = 22.0;
         titleLabel.font = [TwitterChirpFont(TwitterFontStyleBold) fontWithSize:16.5];
         titleLabel.textColor = [UIColor labelColor];
         titleLabel.numberOfLines = 0;
-        [self.stack addArrangedSubview:titleLabel];
-        [self.stack setCustomSpacing:4.0 afterView:titleLabel];
+        [self.stack addArrangedSubview:[self inset:titleLabel]];
+        
     }
     if (self.pickerMessage.length) {
         UILabel* messageLabel = [[UILabel alloc] init];
@@ -79,59 +87,88 @@ static const CGFloat kNFBPickerCheckColumn = 22.0;
         messageLabel.font = [TwitterChirpFont(TwitterFontStyleRegular) fontWithSize:13.0];
         messageLabel.textColor = [UIColor secondaryLabelColor];
         messageLabel.numberOfLines = 0;
-        [self.stack addArrangedSubview:messageLabel];
-        [self.stack setCustomSpacing:12.0 afterView:messageLabel];
+        [self.stack addArrangedSubview:[self inset:messageLabel]];
+        
     }
 
     for (NSInteger i = 0; i < (NSInteger)self.options.count; i++) {
-        [self.stack addArrangedSubview:[self pillForIndex:i]];
+        [self.stack addArrangedSubview:[self rowForIndex:i]];
     }
 }
 
-// One grey pill per choice: a fixed check column, then the label, both flush
-// left so the words line up whether or not the row is the selected one.
-- (UIView*)pillForIndex:(NSInteger)index {
-    UIButton* pill = [UIButton buttonWithType:UIButtonTypeCustom];
-    pill.tag = index;
-    // Derived from the label colour rather than a semantic fill: Twitter
-    // re-themes the system fills, which turns them into dark blocks.
-    pill.backgroundColor = [[UIColor labelColor] colorWithAlphaComponent:0.08];
-    pill.layer.cornerRadius = 14.0;
-    pill.clipsToBounds = YES;
-    [pill addTarget:self
-                  action:@selector(pillTapped:)
+// Wraps a label so the header keeps its side margins while the rows below go
+// edge to edge.
+- (UIView*)inset:(UIView*)content {
+    UIView* container = [[UIView alloc] init];
+    content.translatesAutoresizingMaskIntoConstraints = NO;
+    [container addSubview:content];
+    [NSLayoutConstraint activateConstraints:@[
+        [content.leadingAnchor constraintEqualToAnchor:container.leadingAnchor constant:16.0],
+        [content.trailingAnchor constraintEqualToAnchor:container.trailingAnchor constant:-16.0],
+        [content.topAnchor constraintEqualToAnchor:container.topAnchor constant:2.0],
+        [content.bottomAnchor constraintEqualToAnchor:container.bottomAnchor constant:-6.0],
+    ]];
+    return container;
+}
+
+// A flat row per choice. The popover is already the container, so nothing is
+// boxed inside it: the current choice reads from the checkmark and the bolder
+// weight, the way iOS settings and menus do it.
+- (UIView*)rowForIndex:(NSInteger)index {
+    BOOL isSelected = (index == self.selectedIndex);
+    UIButton* row = [UIButton buttonWithType:UIButtonTypeCustom];
+    row.tag = index;
+    [row addTarget:self
+                  action:@selector(rowTapped:)
         forControlEvents:UIControlEventTouchUpInside];
 
-    UILabel* check = [[UILabel alloc] init];
-    check.text = (index == self.selectedIndex) ? @"\u2713" : @"";
-    check.font = [TwitterChirpFont(TwitterFontStyleBold) fontWithSize:17.0];
-    check.textColor = self.view.tintColor ?: [UIColor labelColor];
-    check.textAlignment = NSTextAlignmentLeft;
+    // Hairline above every row but the first, drawn from the label colour so
+    // it holds up on glass in both light and dark.
+    if (index > 0) {
+        UIView* separator = [[UIView alloc] init];
+        separator.backgroundColor = [[UIColor labelColor] colorWithAlphaComponent:0.10];
+        separator.translatesAutoresizingMaskIntoConstraints = NO;
+        separator.userInteractionEnabled = NO;
+        [row addSubview:separator];
+        [NSLayoutConstraint activateConstraints:@[
+            [separator.topAnchor constraintEqualToAnchor:row.topAnchor],
+            [separator.leadingAnchor constraintEqualToAnchor:row.leadingAnchor],
+            [separator.trailingAnchor constraintEqualToAnchor:row.trailingAnchor],
+            [separator.heightAnchor constraintEqualToConstant:0.5],
+        ]];
+    }
 
     UILabel* label = [[UILabel alloc] init];
     label.text = self.options[(NSUInteger)index];
-    label.font = [TwitterChirpFont(TwitterFontStyleBold) fontWithSize:17.0];
+    label.font = [TwitterChirpFont(isSelected ? TwitterFontStyleBold
+                                              : TwitterFontStyleRegular) fontWithSize:17.0];
     label.textColor = [UIColor labelColor];
 
-    for (UIView* v in @[ check, label ]) {
+    UILabel* check = [[UILabel alloc] init];
+    check.text = isSelected ? @"\u2713" : @"";
+    check.font = [TwitterChirpFont(TwitterFontStyleBold) fontWithSize:17.0];
+    check.textColor = NFBPickerAccentColor();
+    check.textAlignment = NSTextAlignmentRight;
+
+    for (UIView* v in @[ label, check ]) {
         v.translatesAutoresizingMaskIntoConstraints = NO;
         v.userInteractionEnabled = NO;
-        [pill addSubview:v];
+        [row addSubview:v];
     }
     [NSLayoutConstraint activateConstraints:@[
-        [pill.heightAnchor constraintEqualToConstant:kNFBPickerPillHeight],
-        [check.leadingAnchor constraintEqualToAnchor:pill.leadingAnchor constant:16.0],
-        [check.centerYAnchor constraintEqualToAnchor:pill.centerYAnchor],
+        [row.heightAnchor constraintEqualToConstant:kNFBPickerRowHeight],
+        [label.leadingAnchor constraintEqualToAnchor:row.leadingAnchor constant:16.0],
+        [label.centerYAnchor constraintEqualToAnchor:row.centerYAnchor],
+        [check.trailingAnchor constraintEqualToAnchor:row.trailingAnchor constant:-16.0],
+        [check.centerYAnchor constraintEqualToAnchor:row.centerYAnchor],
         [check.widthAnchor constraintEqualToConstant:kNFBPickerCheckColumn],
-        [label.leadingAnchor constraintEqualToAnchor:check.trailingAnchor],
-        [label.centerYAnchor constraintEqualToAnchor:pill.centerYAnchor],
-        [label.trailingAnchor constraintLessThanOrEqualToAnchor:pill.trailingAnchor
-                                                       constant:-16.0],
+        [label.trailingAnchor constraintLessThanOrEqualToAnchor:check.leadingAnchor
+                                                        constant:-8.0],
     ]];
-    return pill;
+    return row;
 }
 
-- (void)pillTapped:(UIButton*)sender {
+- (void)rowTapped:(UIButton*)sender {
     NSInteger index = sender.tag;
     void (^handler)(NSInteger) = self.handler;
     [self dismissViewControllerAnimated:YES
@@ -175,11 +212,11 @@ static const CGFloat kNFBPickerCheckColumn = 22.0;
     [super viewDidLayoutSubviews];
     [self.view layoutIfNeeded];
     CGSize fitting = [self.stack
-        systemLayoutSizeFittingSize:CGSizeMake(kNFBPickerWidth - kNFBPickerMargin * 2,
+        systemLayoutSizeFittingSize:CGSizeMake(kNFBPickerWidth,
                                                UILayoutFittingCompressedSize.height)
              withHorizontalFittingPriority:UILayoutPriorityRequired
                    verticalFittingPriority:UILayoutPriorityFittingSizeLevel];
-    CGSize wanted = CGSizeMake(kNFBPickerWidth, fitting.height + kNFBPickerMargin * 2);
+    CGSize wanted = CGSizeMake(kNFBPickerWidth, fitting.height + kNFBPickerMargin + 6.0);
     if (!CGSizeEqualToSize(self.preferredContentSize, wanted)) {
         self.preferredContentSize = wanted;
     }
