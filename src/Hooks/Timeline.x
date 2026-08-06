@@ -193,6 +193,19 @@ static void nfbApplyFleetVisibility(UIView* view) {
 
 %end
 
+// MARK: - Scroll edge effect
+//
+// iOS 26 paints a blurred band under the navigation bar, on its own option.
+// It belongs to the PAGER's scroll view — FLEX put its nearest controller at
+// TFNUISwift.PagingViewController, whose child is the home timeline — and a
+// pager recycles its pages, so acting once when the view lands in a window is
+// not enough: the effect comes back. The scope is therefore decided once and
+// remembered, then re-asserted on every layout pass, which is cheap because
+// the flag is checked first.
+
+static const void* kNFBEdgeScopeKey = &kNFBEdgeScopeKey;
+static const void* kNFBEdgeHiddenKey2 = &kNFBEdgeHiddenKey2;
+
 // True when this controller is the home timeline, or hosts it as a child.
 static BOOL nfbOwnsHomeTimeline(UIViewController* controller) {
     if (!controller) {
@@ -209,15 +222,38 @@ static BOOL nfbOwnsHomeTimeline(UIViewController* controller) {
     return NO;
 }
 
-// MARK: - Scroll edge effect
-//
-// iOS 26 paints a blurred band under the navigation bar (UIScrollEdgeEffect).
-// While the Spaces bar filled that space it went unnoticed; once hidden, the
-// band is left standing on its own. The effect is switched off through the
-// iOS 26 API, reached at runtime because the 16.5 SDK doesn't declare it, and
-// only for the timeline's own scroll view — every other screen keeps it.
+// Hides both through the iOS 26 API and, as a belt, any effect view found
+// among the subviews — the two reach the same thing by different routes.
+static void nfbApplyEdgeEffect(UIScrollView* scrollView) {
+    // Its own option: this band is iOS 26 chrome, not part of the Spaces bar.
+    // Tying it to hide_spaces made the setting mean two unrelated things.
+    BOOL hide = [BHTSettings boolForKey:@"hide_scroll_edge_blur"];
+    BOOL hiddenByUs = objc_getAssociatedObject(scrollView, kNFBEdgeHiddenKey2) != nil;
+    if (!hide && !hiddenByUs) {
+        return;   // rien à faire, et surtout rien à défaire
+    }
 
-static const void* kNFBEdgeHiddenKey = &kNFBEdgeHiddenKey;
+    if ([scrollView respondsToSelector:@selector(topEdgeEffect)]) {
+        id effect =
+            ((id (*)(id, SEL))objc_msgSend)(scrollView, @selector(topEdgeEffect));
+        if ([effect respondsToSelector:@selector(setHidden:)]) {
+            ((void (*)(id, SEL, BOOL))objc_msgSend)(effect, @selector(setHidden:), hide);
+        }
+    }
+    for (UIView* subview in scrollView.subviews) {
+        if ([NSStringFromClass([subview class]) containsString:@"ScrollEdgeEffect"]) {
+            subview.hidden = hide;
+        }
+    }
+
+    if (hide) {
+        objc_setAssociatedObject(scrollView, kNFBEdgeHiddenKey2, @YES,
+                                 OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    } else {
+        objc_setAssociatedObject(scrollView, kNFBEdgeHiddenKey2, nil,
+                                 OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    }
+}
 
 %hook UIScrollView
 
@@ -228,11 +264,11 @@ static const void* kNFBEdgeHiddenKey = &kNFBEdgeHiddenKey;
         if (!self.window) {
             return;
         }
-        BOOL hideSpaces = [BHTSettings boolForKey:@"hide_spaces"];
-        if (![self respondsToSelector:@selector(topEdgeEffect)]) {
-            return;   // avant iOS 26 : rien à faire
+        if (objc_getAssociatedObject(self, kNFBEdgeScopeKey)) {
+            nfbApplyEdgeEffect(self);
+            return;
         }
-        // Scoped to the home timeline: walk up to the owning controller.
+
         UIResponder* responder = self;
         UIViewController* owner = nil;
         while ((responder = responder.nextResponder)) {
@@ -241,49 +277,34 @@ static const void* kNFBEdgeHiddenKey = &kNFBEdgeHiddenKey;
                 break;
             }
         }
-        if (!owner) {
-            return;
-        }
-        // FLEX settled this: the edge effect belongs to the PAGER's collection
-        // view, and the pager is TFNUISwift.PagingViewController — a name that
-        // contains neither "Home" nor "Timeline", which is exactly why the
-        // earlier check never matched. The home timeline is one of its
-        // children (THFHomeTimelineItemsViewController), so that is what we
-        // look for. The pager itself is generic and used elsewhere.
-        if (!nfbOwnsHomeTimeline(owner)) {
-            // Children are sometimes attached a beat after the scroll view
-            // lands in its window; one delayed retry covers that, and only for
-            // a controller that could plausibly be the pager.
-            if ([NSStringFromClass([owner class]) containsString:@"Paging"]) {
-                __weak UIScrollView* weakSelf = self;
-                dispatch_after(
-                    dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.4 * NSEC_PER_SEC)),
-                    dispatch_get_main_queue(), ^{
-                        UIScrollView* scrollView = weakSelf;
-                        if (scrollView.window) {
-                            [scrollView didMoveToWindow];
-                        }
-                    });
-            }
-            return;
-        }
-        id effect = ((id (*)(id, SEL))objc_msgSend)(self, @selector(topEdgeEffect));
-        if (![effect respondsToSelector:@selector(setHidden:)]) {
-            return;
-        }
-        // Same reasoning as the Spaces bar: put the effect back when the option
-        // goes off, and only if we were the ones who hid it.
-        BOOL hiddenByUs = objc_getAssociatedObject(self, kNFBEdgeHiddenKey) != nil;
-        if (hideSpaces) {
-            ((void (*)(id, SEL, BOOL))objc_msgSend)(effect, @selector(setHidden:), YES);
-            if (!hiddenByUs) {
-                objc_setAssociatedObject(self, kNFBEdgeHiddenKey, @YES,
-                                         OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-            }
-        } else if (hiddenByUs) {
-            ((void (*)(id, SEL, BOOL))objc_msgSend)(effect, @selector(setHidden:), NO);
-            objc_setAssociatedObject(self, kNFBEdgeHiddenKey, nil,
+        if (nfbOwnsHomeTimeline(owner)) {
+            objc_setAssociatedObject(self, kNFBEdgeScopeKey, @YES,
                                      OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+            nfbApplyEdgeEffect(self);
+        } else if ([NSStringFromClass([owner class]) containsString:@"Paging"]) {
+            // Children are sometimes attached a beat later; one retry covers it.
+            __weak UIScrollView* weakSelf = self;
+            dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.4 * NSEC_PER_SEC)),
+                           dispatch_get_main_queue(), ^{
+                               UIScrollView* scrollView = weakSelf;
+                               if (scrollView.window) {
+                                   [scrollView didMoveToWindow];
+                               }
+                           });
+        }
+    } @catch (id exception) {
+    }
+}
+
+// Re-assert on layout: a recycled page or a re-enabled effect would otherwise
+// bring the band back. The associated flag is read first, so every other
+// scroll view in the app pays a single pointer comparison.
+- (void)layoutSubviews {
+    %orig;
+
+    @try {
+        if (objc_getAssociatedObject(self, kNFBEdgeScopeKey)) {
+            nfbApplyEdgeEffect(self);
         }
     } @catch (id exception) {
     }

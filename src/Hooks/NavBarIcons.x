@@ -42,8 +42,15 @@ static void nfbTintGlyphsIn(UIView* view, UIColor* colour) {
 // Depth-first search for the settings button by its accessibility identifier.
 static UIView* nfbFindSettingsButton(UIView* view) {
     for (UIView* subview in view.subviews) {
-        if ([subview.accessibilityIdentifier
-                isEqualToString:kNFBSettingsButtonIdentifier]) {
+        // FLEX shows either the identifier or the accessibility label after
+        // the dot, and we cannot tell which from the screenshot — so both are
+        // accepted, plus a prefix match in case Twitter suffixes it.
+        NSString* identifier = subview.accessibilityIdentifier;
+        NSString* label = subview.accessibilityLabel;
+        if ([identifier isEqualToString:kNFBSettingsButtonIdentifier] ||
+            [label isEqualToString:kNFBSettingsButtonIdentifier] ||
+            [identifier hasPrefix:@"NavigationBarSettings"] ||
+            [label hasPrefix:@"NavigationBarSettings"]) {
             return subview;
         }
         UIView* found = nfbFindSettingsButton(subview);
