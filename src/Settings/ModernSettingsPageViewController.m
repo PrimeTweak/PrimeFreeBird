@@ -198,8 +198,13 @@ extern NSInteger NFBColorThemeScreenVisible;
         // attached to the cell rather than in a modal.
         ModernSettingsTableViewCell* cell = [tableView dequeueReusableCellWithIdentifier:@"ButtonCell"
                                                                             forIndexPath:indexPath];
+        NSString* menuSubtitle = @"";
+        NSString* menuSubtitleKey = toggleData[@"subtitleKey"];
+        if (menuSubtitleKey) {
+            menuSubtitle = [[BHTBundle sharedBundle] localizedStringForKey:menuSubtitleKey];
+        }
         [cell configureWithTitle:[self localizedTitleForEntry:toggleData]
-                        subtitle:[self localizedSubtitleForEntry:toggleData]
+                        subtitle:menuSubtitle
                         iconName:toggleData[@"icon"]];
         cell.chevronImageView.hidden = YES;   // rien à pousser : le menu s'ouvre ici
 
