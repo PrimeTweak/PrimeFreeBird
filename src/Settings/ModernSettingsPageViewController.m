@@ -193,6 +193,29 @@ extern NSInteger NFBColorThemeScreenVisible;
         }
         [cell configureWithTitle:title subtitle:subtitle];
         return cell;
+    } else if ([type isEqualToString:@"menu"]) {
+        // Same look as a button row, but the choice happens in a native menu
+        // attached to the cell rather than in a modal.
+        ModernSettingsTableViewCell* cell = [tableView dequeueReusableCellWithIdentifier:@"ButtonCell"
+                                                                            forIndexPath:indexPath];
+        [cell configureWithTitle:[self localizedTitleForEntry:toggleData]
+                        subtitle:[self localizedSubtitleForEntry:toggleData]
+                        iconName:toggleData[@"icon"]];
+        cell.chevronImageView.hidden = YES;   // rien à pousser : le menu s'ouvre ici
+
+        UIMenu* menu = nil;
+        NSString* provider = toggleData[@"menu"];
+        if (provider) {
+            SEL selector = NSSelectorFromString(provider);
+            if ([self respondsToSelector:selector]) {
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Warc-performSelector-leaks"
+                menu = [self performSelector:selector withObject:toggleData];
+#pragma clang diagnostic pop
+            }
+        }
+        [cell setRowMenu:menu];
+        return cell;
     } else if ([type isEqualToString:@"button"]) {
         ModernSettingsTableViewCell* cell = [tableView dequeueReusableCellWithIdentifier:@"ButtonCell"
                                                                             forIndexPath:indexPath];
@@ -238,6 +261,10 @@ extern NSInteger NFBColorThemeScreenVisible;
 - (void)tableView:(UITableView*)tableView didSelectRowAtIndexPath:(NSIndexPath*)indexPath {
     [tableView deselectRowAtIndexPath:indexPath animated:YES];
     NSDictionary* data = self.visibleToggles[indexPath.row];
+    if ([data[@"type"] isEqualToString:@"menu"]) {
+        // Le bouton transparent de la cellule a déjà ouvert le menu.
+        return;
+    }
     if ([data[@"type"] isEqualToString:@"button"] ||
         [data[@"type"] isEqualToString:@"compactButton"]) {
         NSString* actionName = data[@"action"];

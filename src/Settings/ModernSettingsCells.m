@@ -17,7 +17,43 @@
 @property (nonatomic, strong) NSLayoutConstraint* titleLeadingNoIcon;
 @end
 
+@interface ModernSettingsTableViewCell ()
+@property (nonatomic, strong) UIButton* rowMenuButton;
+@end
+
 @implementation ModernSettingsTableViewCell
+
+// A transparent button laid over the row. showsMenuAsPrimaryAction makes a
+// single tap open the menu — iOS draws and places it, we only supply titles.
+- (void)setRowMenu:(UIMenu*)menu {
+    if (!menu) {
+        [self.rowMenuButton removeFromSuperview];
+        self.rowMenuButton = nil;
+        return;
+    }
+    if (!self.rowMenuButton) {
+        UIButton* button = [UIButton buttonWithType:UIButtonTypeCustom];
+        button.backgroundColor = [UIColor clearColor];
+        button.showsMenuAsPrimaryAction = YES;
+        button.translatesAutoresizingMaskIntoConstraints = NO;
+        [self.contentView addSubview:button];
+        [NSLayoutConstraint activateConstraints:@[
+            [button.topAnchor constraintEqualToAnchor:self.contentView.topAnchor],
+            [button.bottomAnchor constraintEqualToAnchor:self.contentView.bottomAnchor],
+            [button.leadingAnchor constraintEqualToAnchor:self.contentView.leadingAnchor],
+            [button.trailingAnchor constraintEqualToAnchor:self.contentView.trailingAnchor],
+        ]];
+        self.rowMenuButton = button;
+    }
+    [self.contentView bringSubviewToFront:self.rowMenuButton];
+    self.rowMenuButton.menu = menu;
+}
+
+- (void)prepareForReuse {
+    [super prepareForReuse];
+    [self setRowMenu:nil];
+}
+
 
 - (instancetype)initWithStyle:(UITableViewCellStyle)style
               reuseIdentifier:(NSString*)reuseIdentifier {
