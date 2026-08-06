@@ -161,6 +161,52 @@ static void SyncHomeAddTabButton(id container, BOOL hidden) {
 
 %end
 
+// MARK: - Scroll edge effect
+//
+// iOS 26 paints a blurred band under the navigation bar (UIScrollEdgeEffect).
+// While the Spaces bar filled that space it went unnoticed; once hidden, the
+// band is left standing on its own. The effect is switched off through the
+// iOS 26 API, reached at runtime because the 16.5 SDK doesn't declare it, and
+// only for the timeline's own scroll view — every other screen keeps it.
+
+%hook UIScrollView
+
+- (void)didMoveToWindow {
+    %orig;
+
+    @try {
+        if (!self.window || ![BHTSettings boolForKey:@"hide_spaces"]) {
+            return;
+        }
+        if (![self respondsToSelector:@selector(topEdgeEffect)]) {
+            return;   // avant iOS 26 : rien à faire
+        }
+        // Scoped to the home timeline: walk up to the owning controller.
+        UIResponder* responder = self;
+        UIViewController* owner = nil;
+        while ((responder = responder.nextResponder)) {
+            if ([responder isKindOfClass:[UIViewController class]]) {
+                owner = (UIViewController*)responder;
+                break;
+            }
+        }
+        if (!owner) {
+            return;
+        }
+        NSString* name = NSStringFromClass([owner class]);
+        if (![name containsString:@"Home"] && ![name containsString:@"Timeline"]) {
+            return;
+        }
+        id effect = ((id (*)(id, SEL))objc_msgSend)(self, @selector(topEdgeEffect));
+        if ([effect respondsToSelector:@selector(setHidden:)]) {
+            ((void (*)(id, SEL, BOOL))objc_msgSend)(effect, @selector(setHidden:), YES);
+        }
+    } @catch (id exception) {
+    }
+}
+
+%end
+
 // MARK: - Hide "Discover more", who-to-follow and prompts
 
 // Resolves the class by name so mangled Swift names work; NSStringFromClass
