@@ -60,13 +60,11 @@
     }
 }
 
-- (void)showDarkModeStylePicker:(NSDictionary*)sender {
-    BHTBundle* bundle = [BHTBundle sharedBundle];
-    UIAlertController* sheet = [UIAlertController
-        alertControllerWithTitle:[bundle localizedStringForKey:@"DARK_MODE_STYLE_TITLE"]
-                         message:[bundle localizedStringForKey:@"DARK_MODE_STYLE_DETAIL"]
-                  preferredStyle:UIAlertControllerStyleAlert];
+// Native menus, built on the fly so the checkmark always shows the current
+// value. iOS handles the material, the placement and the animation.
 
+- (UIMenu*)darkModeStyleMenu:(NSDictionary*)entry {
+    BHTBundle* bundle = [BHTBundle sharedBundle];
     NSArray<NSString*>* titleKeys = @[
         @"DARK_MODE_STYLE_SYSTEM",
         @"DARK_MODE_STYLE_DIM",
@@ -74,77 +72,65 @@
         @"DARK_MODE_STYLE_PURE_BLACK"
     ];
     NSInteger current = [BHTSettings integerForKey:@"dark_mode_style"];
+    __weak typeof(self) weakSelf = self;
 
+    NSMutableArray<UIAction*>* actions = [NSMutableArray array];
     for (NSInteger i = 0; i < (NSInteger)titleKeys.count; i++) {
-        NSString* title = [bundle localizedStringForKey:titleKeys[i]];
-        if (i == current) {
-            title = [NSString stringWithFormat:@"\u2713 %@", title];
-        }
-        UIAlertAction* action =
-            [UIAlertAction actionWithTitle:title
-                                     style:UIAlertActionStyleDefault
-                                   handler:^(UIAlertAction* a) {
-                                       [[NSUserDefaults standardUserDefaults]
-                                           setInteger:i
-                                               forKey:@"dark_mode_style"];
-                                       [[NSUserDefaults standardUserDefaults] synchronize];
-                                       [self showRestartRequiredAlert];
-                                   }];
-        [sheet addAction:action];
+        UIAction* action =
+            [UIAction actionWithTitle:[bundle localizedStringForKey:titleKeys[i]]
+                                image:nil
+                           identifier:nil
+                              handler:^(__kindof UIAction* a) {
+                                  [[NSUserDefaults standardUserDefaults]
+                                      setInteger:i
+                                          forKey:@"dark_mode_style"];
+                                  [[NSUserDefaults standardUserDefaults] synchronize];
+                                  [weakSelf.tableView reloadData];
+                                  [weakSelf showRestartRequiredAlert];
+                              }];
+        action.state = (i == current) ? UIMenuElementStateOn : UIMenuElementStateOff;
+        [actions addObject:action];
     }
-
-    [sheet addAction:[UIAlertAction
-                         actionWithTitle:[bundle localizedTwitterStringForKey:@"CANCEL_ACTION_LABEL"]
-                                   style:UIAlertActionStyleCancel
-                                 handler:nil]];
-
-    [self presentViewController:sheet animated:YES completion:nil];
+    return [UIMenu menuWithTitle:[bundle localizedStringForKey:@"DARK_MODE_STYLE_TITLE"]
+                        children:actions];
 }
 
-- (void)showInterfaceStylePicker:(NSDictionary*)sender {
+- (UIMenu*)interfaceStyleMenu:(NSDictionary*)entry {
     BHTBundle* bundle = [BHTBundle sharedBundle];
-    UIAlertController* sheet = [UIAlertController
-        alertControllerWithTitle:[bundle localizedStringForKey:@"INTERFACE_STYLE_TITLE"]
-                         message:[bundle localizedStringForKey:@"INTERFACE_STYLE_DETAIL"]
-                  preferredStyle:UIAlertControllerStyleAlert];
-
     NSArray<NSString*>* titleKeys = @[
         @"INTERFACE_STYLE_STANDARD",
         @"INTERFACE_STYLE_LIQUID_GLASS"
     ];
     // Index 0 = Standard (glass off), index 1 = Liquid Glass (glass on).
     NSInteger current = [BHTSettings boolForKey:@"enable_liquid_glass"] ? 1 : 0;
+    __weak typeof(self) weakSelf = self;
 
+    NSMutableArray<UIAction*>* actions = [NSMutableArray array];
     for (NSInteger i = 0; i < (NSInteger)titleKeys.count; i++) {
-        NSString* title = [bundle localizedStringForKey:titleKeys[i]];
-        if (i == current) {
-            title = [NSString stringWithFormat:@"\u2713 %@", title];
-        }
-        UIAlertAction* action =
-            [UIAlertAction actionWithTitle:title
-                                     style:UIAlertActionStyleDefault
-                                   handler:^(UIAlertAction* a) {
-                                       BOOL wasEnabled =
-                                           [BHTSettings boolForKey:@"enable_liquid_glass"];
-                                       BOOL nowEnabled = (i == 1);
-                                       [[NSUserDefaults standardUserDefaults]
-                                           setBool:nowEnabled
-                                            forKey:@"enable_liquid_glass"];
-                                       [[NSUserDefaults standardUserDefaults] synchronize];
-                                       // Only prompt for a restart when the mode actually changed.
-                                       if (wasEnabled != nowEnabled) {
-                                           [self showRestartRequiredAlert];
-                                       }
-                                   }];
-        [sheet addAction:action];
+        UIAction* action =
+            [UIAction actionWithTitle:[bundle localizedStringForKey:titleKeys[i]]
+                                image:nil
+                           identifier:nil
+                              handler:^(__kindof UIAction* a) {
+                                  BOOL wasEnabled = [BHTSettings
+                                      boolForKey:@"enable_liquid_glass"];
+                                  BOOL nowEnabled = (i == 1);
+                                  [[NSUserDefaults standardUserDefaults]
+                                      setBool:nowEnabled
+                                       forKey:@"enable_liquid_glass"];
+                                  [[NSUserDefaults standardUserDefaults] synchronize];
+                                  [weakSelf.tableView reloadData];
+                                  // Only prompt for a restart when the mode
+                                  // actually changed — the original behaviour.
+                                  if (wasEnabled != nowEnabled) {
+                                      [weakSelf showRestartRequiredAlert];
+                                  }
+                              }];
+        action.state = (i == current) ? UIMenuElementStateOn : UIMenuElementStateOff;
+        [actions addObject:action];
     }
-
-    [sheet addAction:[UIAlertAction
-                         actionWithTitle:[bundle localizedTwitterStringForKey:@"CANCEL_ACTION_LABEL"]
-                                   style:UIAlertActionStyleCancel
-                                 handler:nil]];
-
-    [self presentViewController:sheet animated:YES completion:nil];
+    return [UIMenu menuWithTitle:[bundle localizedStringForKey:@"INTERFACE_STYLE_TITLE"]
+                        children:actions];
 }
 
 #pragma mark - Tab Bar Refresh
