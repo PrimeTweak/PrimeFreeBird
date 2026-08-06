@@ -472,3 +472,6 @@
 "MUTED_WORDS_DURATION_30D" = "30 jours";
 "MUTED_WORDS_EXPIRES_FORMAT" = "%ld j restants";
 "MUTED_WORDS_EXAMPLE_TERM" = "spoiler";
+
+"HIDE_SCROLL_EDGE_BLUR_TITLE" = "Masquer le flou de bord";
+"HIDE_SCROLL_EDGE_BLUR_DETAIL" = "Retire la bande floue qu'iOS dessine sous la barre de navigation.";
