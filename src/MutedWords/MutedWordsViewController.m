@@ -583,19 +583,33 @@ NSString* const kNFBMutedIncludeRepostsKey = @"nfb_muted_include_reposts";
     if (indexPath.section == 0) {
         NSUInteger termIndex = (NSUInteger)indexPath.row - 1;
         if (self.terms.count == 0) {
-            UITableViewCell* empty =
-                [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleDefault
-                                       reuseIdentifier:nil];
-            empty.selectionStyle = UITableViewCellSelectionStyleNone;
-            empty.textLabel.font =
-                [TwitterChirpFont(TwitterFontStyleRegular) fontWithSize:16];
-            empty.textLabel.textColor = [UIColor secondaryLabelColor];
-            empty.textLabel.text = [bundle localizedStringForKey:@"MUTED_WORDS_EMPTY"];
-            return empty;
+            // A dimmed example instead of "nothing here": it shows what a
+            // filter looks like and what you may type. No remove button, so it
+            // can't be mistaken for a real entry.
+            NFBMutedTermCell* example =
+                [tableView dequeueReusableCellWithIdentifier:@"term"
+                                                forIndexPath:indexPath];
+            example.termLabel.text =
+                [bundle localizedStringForKey:@"MUTED_WORDS_EXAMPLE_TERM"];
+            example.termLabel.font =
+                [TwitterChirpFont(TwitterFontStyleRegular) fontWithSize:16.5];
+            example.kindLabel.text =
+                [NSString stringWithFormat:@"  %@  ",
+                                           [bundle localizedStringForKey:
+                                                       @"MUTED_WORDS_KIND_WORD"]];
+            example.durationButton.hidden = YES;
+            example.removeButton.hidden = YES;
+            example.contentView.alpha = 0.38;
+            return example;
         }
         NFBMutedTermCell* cell = [tableView dequeueReusableCellWithIdentifier:@"term"
                                                                  forIndexPath:indexPath];
         NSString* term = self.terms[termIndex];
+        // Undo whatever the example row changed — cells are reused.
+        cell.contentView.alpha = 1.0;
+        cell.durationButton.hidden = NO;
+        cell.removeButton.hidden = NO;
+        cell.termLabel.font = [TwitterChirpFont(TwitterFontStyleRegular) fontWithSize:16.5];
         cell.termLabel.text = term;
         cell.kindLabel.text = [NSString stringWithFormat:@"  %@  ",
                                                          [self kindLabelForTerm:term]];
