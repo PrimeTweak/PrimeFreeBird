@@ -35,6 +35,24 @@ static UIViewController* nfbBarOwningController(UIView* view) {
     return nil;
 }
 
+// Recursively tint image-only buttons living in the right-hand half of a bar.
+static void nfbTintIconButtons(UIView* view, UIView* bar, UIColor* grey) {
+    for (UIView* subview in view.subviews) {
+        if ([subview isKindOfClass:[UIButton class]]) {
+            UIButton* button = (UIButton*)subview;
+            BOOL hasTitle = button.currentTitle.length > 0;
+            BOOL hasImage = button.currentImage != nil;
+            CGRect inBar = [button convertRect:button.bounds toView:bar];
+            BOOL onTheRight = CGRectGetMidX(inBar) > CGRectGetWidth(bar.bounds) * 0.6;
+            if (hasImage && !hasTitle && onTheRight &&
+                ![button.tintColor isEqual:grey]) {
+                button.tintColor = grey;
+            }
+        }
+        nfbTintIconButtons(subview, bar, grey);
+    }
+}
+
 %hook TFNNavigationBar
 
 - (void)layoutSubviews {
@@ -77,6 +95,13 @@ static UIViewController* nfbBarOwningController(UIView* view) {
                 button.tintColor = grey;
             }
         }
+
+        // Twitter also puts glyphs in an accessory view rather than in bar
+        // button items, and those keep their own colour. Walk the right-hand
+        // side of the bar and tint the icon buttons found there: image-only
+        // buttons past the middle. A text button like "Cancel" has a title and
+        // is skipped; the avatar sits on the left and never matches.
+        nfbTintIconButtons(bar, bar, grey);
     } @catch (id exception) {
     }
 }

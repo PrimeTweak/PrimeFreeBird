@@ -99,7 +99,7 @@ static BOOL nfbIsHomeNavigationBar(UIView* bar) {
             if ([UIImage respondsToSelector:@selector(tfn_vectorImageNamed:
                                                                  fitsSize:
                                                                 fillColor:)]) {
-                icon = [UIImage tfn_vectorImageNamed:@"filter"
+                icon = [UIImage tfn_vectorImageNamed:@"filter_bars"
                                             fitsSize:CGSizeMake(22.0, 22.0)
                                            fillColor:[UIColor secondaryLabelColor]];
                 icon = [icon imageWithRenderingMode:UIImageRenderingModeAlwaysOriginal];
