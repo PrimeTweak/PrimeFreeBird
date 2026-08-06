@@ -49,8 +49,8 @@ static NSDictionary<NSString*, NSDictionary*>* BHTSettingsPages(void) {
                     @{
                         @"titleKey": @"INTERFACE_STYLE_TITLE",
                         @"subtitleKey": @"INTERFACE_STYLE_SUBTITLE",
-                        @"menu": @"interfaceStyleMenu:",
-                        @"type": @"menu"
+                        @"action": @"showInterfaceStylePicker:",
+                        @"type": @"button"
                     },
                     @{
                         @"titleKey": @"CUSTOM_TAB_BAR_OPTION_TITLE",
@@ -91,8 +91,8 @@ static NSDictionary<NSString*, NSDictionary*>* BHTSettingsPages(void) {
                     @{
                         @"titleKey": @"DARK_MODE_STYLE_TITLE",
                         @"subtitleKey": @"DARK_MODE_STYLE_SUBTITLE",
-                        @"menu": @"darkModeStyleMenu:",
-                        @"type": @"menu"
+                        @"action": @"showDarkModeStylePicker:",
+                        @"type": @"button"
                     },
                     @{@"key": @"tab_bar_theming",
                       @"default": @YES},
