@@ -222,6 +222,21 @@ static BOOL nfbOwnsHomeTimeline(UIViewController* controller) {
     return NO;
 }
 
+// Hides every scroll edge effect found under a view, whatever its depth.
+static void nfbSweepEdgeEffects(UIView* view, BOOL hide) {
+    if (!view) {
+        return;
+    }
+    for (UIView* subview in view.subviews) {
+        if ([NSStringFromClass([subview class]) containsString:@"ScrollEdgeEffect"]) {
+            if (subview.hidden != hide) {
+                subview.hidden = hide;
+            }
+        }
+        nfbSweepEdgeEffects(subview, hide);
+    }
+}
+
 // Hides both through the iOS 26 API and, as a belt, any effect view found
 // among the subviews — the two reach the same thing by different routes.
 static void nfbApplyEdgeEffect(UIScrollView* scrollView) {
@@ -240,11 +255,18 @@ static void nfbApplyEdgeEffect(UIScrollView* scrollView) {
             ((void (*)(id, SEL, BOOL))objc_msgSend)(effect, @selector(setHidden:), hide);
         }
     }
-    for (UIView* subview in scrollView.subviews) {
-        if ([NSStringFromClass([subview class]) containsString:@"ScrollEdgeEffect"]) {
-            subview.hidden = hide;
+    // The effect view is not necessarily a subview of the scroll view — FLEX
+    // put its nearest controller at the pager, so it can sit anywhere in that
+    // controller's tree. Sweep from the owning controller's view instead.
+    UIResponder* responder = scrollView;
+    UIViewController* owner = nil;
+    while ((responder = responder.nextResponder)) {
+        if ([responder isKindOfClass:[UIViewController class]]) {
+            owner = (UIViewController*)responder;
+            break;
         }
     }
+    nfbSweepEdgeEffects(owner.viewIfLoaded ?: scrollView, hide);
 
     if (hide) {
         objc_setAssociatedObject(scrollView, kNFBEdgeHiddenKey2, @YES,

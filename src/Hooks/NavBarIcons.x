@@ -61,7 +61,7 @@ static UIView* nfbFindSettingsButton(UIView* view) {
     return nil;
 }
 
-%hook TFNNavigationBar
+%hook UINavigationBar
 
 - (void)layoutSubviews {
     %orig;
