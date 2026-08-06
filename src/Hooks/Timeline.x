@@ -229,9 +229,16 @@ static void nfbSweepEdgeEffects(UIView* view, BOOL hide) {
     }
     for (UIView* subview in view.subviews) {
         if ([NSStringFromClass([subview class]) containsString:@"ScrollEdgeEffect"]) {
-            if (subview.hidden != hide) {
-                subview.hidden = hide;
+            // ---- DIAGNOSTIC (à retirer) ---------------------------------
+            // Painted instead of hidden: if the band turns red, this IS the
+            // view and "hidden" is being ignored or re-set. If the band stays
+            // grey, the band is something else entirely.
+            if (hide) {
+                subview.backgroundColor = [UIColor systemRedColor];
+            } else if (subview.hidden) {
+                subview.hidden = NO;
             }
+            // -------------------------------------------------------------
         }
         nfbSweepEdgeEffects(subview, hide);
     }
@@ -252,7 +259,8 @@ static void nfbApplyEdgeEffect(UIScrollView* scrollView) {
         id effect =
             ((id (*)(id, SEL))objc_msgSend)(scrollView, @selector(topEdgeEffect));
         if ([effect respondsToSelector:@selector(setHidden:)]) {
-            ((void (*)(id, SEL, BOOL))objc_msgSend)(effect, @selector(setHidden:), hide);
+            // DIAGNOSTIC: laissé inactif pour ne pas masquer la vue qu'on veut voir.
+            ((void (*)(id, SEL, BOOL))objc_msgSend)(effect, @selector(setHidden:), NO);
         }
     }
     // The effect view is not necessarily a subview of the scroll view — FLEX

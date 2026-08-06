@@ -75,6 +75,12 @@ static UIView* nfbFindSettingsButton(UIView* view) {
         if (!settingsButton) {
             return;   // pas cet écran : rien à faire
         }
+        // ---- DIAGNOSTIC (à retirer) -------------------------------------
+        // Red means: the button WAS found. If nothing turns red, the search
+        // never matches and the identifier is not what we think.
+        settingsButton.backgroundColor = [UIColor systemRedColor];
+        // -----------------------------------------------------------------
+
         UIColor* grey = [UIColor secondaryLabelColor];
         if (![settingsButton.tintColor isEqual:grey]) {
             settingsButton.tintColor = grey;
