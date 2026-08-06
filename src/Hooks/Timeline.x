@@ -195,97 +195,39 @@ static void nfbApplyFleetVisibility(UIView* view) {
 
 // MARK: - Scroll edge effect
 //
-// iOS 26 paints a blurred band under the navigation bar, on its own option.
-// It belongs to the PAGER's scroll view — FLEX put its nearest controller at
-// TFNUISwift.PagingViewController, whose child is the home timeline — and a
-// pager recycles its pages, so acting once when the view lands in a window is
-// not enough: the effect comes back. The scope is therefore decided once and
-// remembered, then re-asserted on every layout pass, which is cheap because
-// the flag is checked first.
+// Native Twitter never shows a band under its bars — he checked against a
+// clean IPA. The band exists only because this tweak makes the app opt INTO
+// the iOS 26 design (AppLifecycle.x lies about UIDesignRequiresCompatibility
+// so Liquid Glass turns on), and iOS 26 draws a scroll edge effect under every
+// bar. So it appears on the timeline, on search, everywhere — which is exactly
+// what he observed.
+//
+// The option therefore switches that effect off wherever it appears, giving
+// back the stock behaviour while keeping Liquid Glass everywhere else. Earlier
+// versions only targeted the home timeline's scroll view, which is why they
+// never caught it.
 
-static const void* kNFBEdgeScopeKey = &kNFBEdgeScopeKey;
 static const void* kNFBEdgeMarkKey = &kNFBEdgeMarkKey;
-static const void* kNFBEdgeHiddenKey2 = &kNFBEdgeHiddenKey2;
 
-// True when this controller is the home timeline, or hosts it as a child.
-static BOOL nfbOwnsHomeTimeline(UIViewController* controller) {
-    if (!controller) {
-        return NO;
+// Applies (or lifts) the effect on one scroll view. Only ever lifts what we
+// hid ourselves.
+static void nfbApplyEdgeEffect(UIScrollView* scrollView) {
+    if (![scrollView respondsToSelector:@selector(topEdgeEffect)]) {
+        return;   // avant iOS 26 : rien à faire
     }
-    if ([NSStringFromClass([controller class]) containsString:@"HomeTimeline"]) {
-        return YES;
-    }
-    for (UIViewController* child in controller.childViewControllers) {
-        if ([NSStringFromClass([child class]) containsString:@"HomeTimeline"]) {
-            return YES;
-        }
-    }
-    return NO;
-}
-
-// Hides every scroll edge effect found under a view, whatever its depth.
-static void nfbSweepEdgeEffects(UIView* view, BOOL hide) {
-    if (!view) {
+    BOOL hide = [BHTSettings boolForKey:@"hide_scroll_edge_blur"];
+    BOOL hiddenByUs = objc_getAssociatedObject(scrollView, kNFBEdgeMarkKey) != nil;
+    if (!hide && !hiddenByUs) {
         return;
     }
-    for (UIView* subview in view.subviews) {
-        if ([NSStringFromClass([subview class]) containsString:@"ScrollEdgeEffect"]) {
-            BOOL hiddenByUs =
-                objc_getAssociatedObject(subview, kNFBEdgeMarkKey) != nil;
-            if (hide) {
-                if (!subview.hidden) {
-                    subview.hidden = YES;
-                }
-                if (!hiddenByUs) {
-                    objc_setAssociatedObject(subview, kNFBEdgeMarkKey, @YES,
-                                             OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-                }
-            } else if (hiddenByUs) {
-                subview.hidden = NO;
-                objc_setAssociatedObject(subview, kNFBEdgeMarkKey, nil,
-                                         OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-            }
-        }
-        nfbSweepEdgeEffects(subview, hide);
-    }
-}
 
-// Hides both through the iOS 26 API and, as a belt, any effect view found
-// among the subviews — the two reach the same thing by different routes.
-static void nfbApplyEdgeEffect(UIScrollView* scrollView) {
-    // Its own option: this band is iOS 26 chrome, not part of the Spaces bar.
-    // Tying it to hide_spaces made the setting mean two unrelated things.
-    BOOL hide = [BHTSettings boolForKey:@"hide_scroll_edge_blur"];
-    BOOL hiddenByUs = objc_getAssociatedObject(scrollView, kNFBEdgeHiddenKey2) != nil;
-    if (!hide && !hiddenByUs) {
-        return;   // rien à faire, et surtout rien à défaire
+    id effect = ((id (*)(id, SEL))objc_msgSend)(scrollView, @selector(topEdgeEffect));
+    if ([effect respondsToSelector:@selector(setHidden:)]) {
+        ((void (*)(id, SEL, BOOL))objc_msgSend)(effect, @selector(setHidden:), hide);
     }
 
-    if ([scrollView respondsToSelector:@selector(topEdgeEffect)]) {
-        id effect =
-            ((id (*)(id, SEL))objc_msgSend)(scrollView, @selector(topEdgeEffect));
-        if ([effect respondsToSelector:@selector(setHidden:)]) {
-            ((void (*)(id, SEL, BOOL))objc_msgSend)(effect, @selector(setHidden:), hide);
-        }
-    }
-    // The diagnostic build proved the effect is NOT under the owning
-    // controller's view — nothing turned red there. It lives higher up, so the
-    // sweep starts at the window. Throttled, because this scroll view lays out
-    // continuously while the finger is down.
-    static CFAbsoluteTime lastSweep = 0;
-    CFAbsoluteTime now = CFAbsoluteTimeGetCurrent();
-    if (now - lastSweep > 0.25) {
-        lastSweep = now;
-        nfbSweepEdgeEffects(scrollView.window ?: scrollView, hide);
-    }
-
-    if (hide) {
-        objc_setAssociatedObject(scrollView, kNFBEdgeHiddenKey2, @YES,
-                                 OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-    } else {
-        objc_setAssociatedObject(scrollView, kNFBEdgeHiddenKey2, nil,
-                                 OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-    }
+    objc_setAssociatedObject(scrollView, kNFBEdgeMarkKey, hide ? @YES : nil,
+                             OBJC_ASSOCIATION_RETAIN_NONATOMIC);
 }
 
 %hook UIScrollView
@@ -294,49 +236,20 @@ static void nfbApplyEdgeEffect(UIScrollView* scrollView) {
     %orig;
 
     @try {
-        if (!self.window) {
-            return;
-        }
-        if (objc_getAssociatedObject(self, kNFBEdgeScopeKey)) {
+        if (self.window) {
             nfbApplyEdgeEffect(self);
-            return;
-        }
-
-        UIResponder* responder = self;
-        UIViewController* owner = nil;
-        while ((responder = responder.nextResponder)) {
-            if ([responder isKindOfClass:[UIViewController class]]) {
-                owner = (UIViewController*)responder;
-                break;
-            }
-        }
-        if (nfbOwnsHomeTimeline(owner)) {
-            objc_setAssociatedObject(self, kNFBEdgeScopeKey, @YES,
-                                     OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-            nfbApplyEdgeEffect(self);
-        } else if ([NSStringFromClass([owner class]) containsString:@"Paging"]) {
-            // Children are sometimes attached a beat later; one retry covers it.
-            __weak UIScrollView* weakSelf = self;
-            dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.4 * NSEC_PER_SEC)),
-                           dispatch_get_main_queue(), ^{
-                               UIScrollView* scrollView = weakSelf;
-                               if (scrollView.window) {
-                                   [scrollView didMoveToWindow];
-                               }
-                           });
         }
     } @catch (id exception) {
     }
 }
 
-// Re-assert on layout: a recycled page or a re-enabled effect would otherwise
-// bring the band back. The associated flag is read first, so every other
-// scroll view in the app pays a single pointer comparison.
+// Re-assert only on scroll views we already act on: the pointer check costs
+// nothing for every other scroll view in the app.
 - (void)layoutSubviews {
     %orig;
 
     @try {
-        if (objc_getAssociatedObject(self, kNFBEdgeScopeKey)) {
+        if (objc_getAssociatedObject(self, kNFBEdgeMarkKey)) {
             nfbApplyEdgeEffect(self);
         }
     } @catch (id exception) {
