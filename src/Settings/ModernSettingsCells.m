@@ -12,6 +12,11 @@
 #import "ThemeColor/Palette.h"
 #import "Core/TwitterChirpFont.h"
  
+@interface ModernSettingsTableViewCell ()
+@property (nonatomic, strong) NSLayoutConstraint* titleLeadingWithIcon;
+@property (nonatomic, strong) NSLayoutConstraint* titleLeadingNoIcon;
+@end
+
 @implementation ModernSettingsTableViewCell
 
 - (instancetype)initWithStyle:(UITableViewCellStyle)style
