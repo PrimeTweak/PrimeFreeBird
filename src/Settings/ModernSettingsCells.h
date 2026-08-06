@@ -16,10 +16,6 @@
 - (void)configureWithTitle:(NSString*)title
                   subtitle:(NSString*)subtitle
                   iconName:(NSString*)iconName;
-
-// Attaches a native UIMenu that opens on a single tap, anchored on the row.
-// Pass nil to remove it — required, because cells are reused.
-- (void)setRowMenu:(UIMenu*)menu;
 @end
 
 @interface ModernSettingsCompactButtonCell : UITableViewCell
