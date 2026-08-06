@@ -8,7 +8,6 @@
 #import "Settings/Pages/AppearanceSettingsViewController.h"
 #import "Core/BHTBundle.h"
 #import "Core/BHTSettings.h"
-#import "Settings/OptionPickerViewController.h"
 #import "Headers/TWHeaders.h"
 #import "Settings/ModernSettingsCells.h"
 #import "ThemeColor/DarkModeStyle.h"
@@ -61,75 +60,113 @@
     }
 }
 
-// Two choices, shown in the fork's own popover so the type stays Chirp.
-
-- (UITableViewCell*)cellForEntry:(NSDictionary*)entry {
-    NSIndexPath* indexPath = entry[@"indexPath"];
-    return [indexPath isKindOfClass:[NSIndexPath class]]
-               ? [self.tableView cellForRowAtIndexPath:indexPath]
-               : nil;
-}
-
 - (void)showDarkModeStylePicker:(NSDictionary*)sender {
     BHTBundle* bundle = [BHTBundle sharedBundle];
+    UIAlertController* sheet = [UIAlertController
+        alertControllerWithTitle:[bundle localizedStringForKey:@"DARK_MODE_STYLE_TITLE"]
+                         message:[bundle localizedStringForKey:@"DARK_MODE_STYLE_DETAIL"]
+                  preferredStyle:UIAlertControllerStyleActionSheet];
+
     NSArray<NSString*>* titleKeys = @[
         @"DARK_MODE_STYLE_SYSTEM",
         @"DARK_MODE_STYLE_DIM",
         @"DARK_MODE_STYLE_GRAY",
         @"DARK_MODE_STYLE_PURE_BLACK"
     ];
-    NSMutableArray<NSString*>* titles = [NSMutableArray array];
-    for (NSString* key in titleKeys) {
-        [titles addObject:[bundle localizedStringForKey:key]];
+    NSInteger current = [BHTSettings integerForKey:@"dark_mode_style"];
+
+    for (NSInteger i = 0; i < (NSInteger)titleKeys.count; i++) {
+        NSString* title = [bundle localizedStringForKey:titleKeys[i]];
+        if (i == current) {
+            title = [NSString stringWithFormat:@"\u2713 %@", title];
+        }
+        UIAlertAction* action =
+            [UIAlertAction actionWithTitle:title
+                                     style:UIAlertActionStyleDefault
+                                   handler:^(UIAlertAction* a) {
+                                       [[NSUserDefaults standardUserDefaults]
+                                           setInteger:i
+                                               forKey:@"dark_mode_style"];
+                                       [[NSUserDefaults standardUserDefaults] synchronize];
+                                       [self showRestartRequiredAlert];
+                                   }];
+        [sheet addAction:action];
     }
 
-    __weak typeof(self) weakSelf = self;
-    OptionPickerViewController* picker = [[OptionPickerViewController alloc]
-        initWithTitle:[bundle localizedStringForKey:@"DARK_MODE_STYLE_TITLE"]
-              message:[bundle localizedStringForKey:@"DARK_MODE_STYLE_DETAIL"]
-              options:titles
-        selectedIndex:[BHTSettings integerForKey:@"dark_mode_style"]
-              handler:^(NSInteger index) {
-                  [[NSUserDefaults standardUserDefaults] setInteger:index
-                                                             forKey:@"dark_mode_style"];
-                  [[NSUserDefaults standardUserDefaults] synchronize];
-                  [weakSelf.tableView reloadData];
-                  [weakSelf showRestartRequiredAlert];
-              }];
-    [picker presentFrom:self sourceView:[self cellForEntry:sender]];
+    [sheet addAction:[UIAlertAction
+                         actionWithTitle:[bundle localizedTwitterStringForKey:@"CANCEL_ACTION_LABEL"]
+                                   style:UIAlertActionStyleCancel
+                                 handler:nil]];
+
+    // Anchored on the row that was tapped. Pointing at the middle of the screen
+    // is what made these land in a random spot.
+    NSIndexPath* indexPath = sender[@"indexPath"];
+    UITableViewCell* cell = [indexPath isKindOfClass:[NSIndexPath class]]
+                                ? [self.tableView cellForRowAtIndexPath:indexPath]
+                                : nil;
+    sheet.popoverPresentationController.sourceView = cell ?: self.view;
+    sheet.popoverPresentationController.sourceRect =
+        cell ? cell.bounds : CGRectMake(CGRectGetMidX(self.view.bounds), 0, 0, 0);
+    sheet.popoverPresentationController.permittedArrowDirections =
+        UIPopoverArrowDirectionUp | UIPopoverArrowDirectionDown;
+    [self presentViewController:sheet animated:YES completion:nil];
 }
 
 - (void)showInterfaceStylePicker:(NSDictionary*)sender {
     BHTBundle* bundle = [BHTBundle sharedBundle];
+    UIAlertController* sheet = [UIAlertController
+        alertControllerWithTitle:[bundle localizedStringForKey:@"INTERFACE_STYLE_TITLE"]
+                         message:[bundle localizedStringForKey:@"INTERFACE_STYLE_DETAIL"]
+                  preferredStyle:UIAlertControllerStyleActionSheet];
+
     NSArray<NSString*>* titleKeys = @[
         @"INTERFACE_STYLE_STANDARD",
         @"INTERFACE_STYLE_LIQUID_GLASS"
     ];
-    NSMutableArray<NSString*>* titles = [NSMutableArray array];
-    for (NSString* key in titleKeys) {
-        [titles addObject:[bundle localizedStringForKey:key]];
-    }
     // Index 0 = Standard (glass off), index 1 = Liquid Glass (glass on).
-    BOOL wasEnabled = [BHTSettings boolForKey:@"enable_liquid_glass"];
+    NSInteger current = [BHTSettings boolForKey:@"enable_liquid_glass"] ? 1 : 0;
 
-    __weak typeof(self) weakSelf = self;
-    OptionPickerViewController* picker = [[OptionPickerViewController alloc]
-        initWithTitle:[bundle localizedStringForKey:@"INTERFACE_STYLE_TITLE"]
-              message:[bundle localizedStringForKey:@"INTERFACE_STYLE_DETAIL"]
-              options:titles
-        selectedIndex:(wasEnabled ? 1 : 0)
-              handler:^(NSInteger index) {
-                  BOOL nowEnabled = (index == 1);
-                  [[NSUserDefaults standardUserDefaults] setBool:nowEnabled
-                                                          forKey:@"enable_liquid_glass"];
-                  [[NSUserDefaults standardUserDefaults] synchronize];
-                  [weakSelf.tableView reloadData];
-                  // Only prompt for a restart when the mode actually changed.
-                  if (wasEnabled != nowEnabled) {
-                      [weakSelf showRestartRequiredAlert];
-                  }
-              }];
-    [picker presentFrom:self sourceView:[self cellForEntry:sender]];
+    for (NSInteger i = 0; i < (NSInteger)titleKeys.count; i++) {
+        NSString* title = [bundle localizedStringForKey:titleKeys[i]];
+        if (i == current) {
+            title = [NSString stringWithFormat:@"\u2713 %@", title];
+        }
+        UIAlertAction* action =
+            [UIAlertAction actionWithTitle:title
+                                     style:UIAlertActionStyleDefault
+                                   handler:^(UIAlertAction* a) {
+                                       BOOL wasEnabled =
+                                           [BHTSettings boolForKey:@"enable_liquid_glass"];
+                                       BOOL nowEnabled = (i == 1);
+                                       [[NSUserDefaults standardUserDefaults]
+                                           setBool:nowEnabled
+                                            forKey:@"enable_liquid_glass"];
+                                       [[NSUserDefaults standardUserDefaults] synchronize];
+                                       // Only prompt for a restart when the mode actually changed.
+                                       if (wasEnabled != nowEnabled) {
+                                           [self showRestartRequiredAlert];
+                                       }
+                                   }];
+        [sheet addAction:action];
+    }
+
+    [sheet addAction:[UIAlertAction
+                         actionWithTitle:[bundle localizedTwitterStringForKey:@"CANCEL_ACTION_LABEL"]
+                                   style:UIAlertActionStyleCancel
+                                 handler:nil]];
+
+    // Anchored on the row that was tapped. Pointing at the middle of the screen
+    // is what made these land in a random spot.
+    NSIndexPath* indexPath = sender[@"indexPath"];
+    UITableViewCell* cell = [indexPath isKindOfClass:[NSIndexPath class]]
+                                ? [self.tableView cellForRowAtIndexPath:indexPath]
+                                : nil;
+    sheet.popoverPresentationController.sourceView = cell ?: self.view;
+    sheet.popoverPresentationController.sourceRect =
+        cell ? cell.bounds : CGRectMake(CGRectGetMidX(self.view.bounds), 0, 0, 0);
+    sheet.popoverPresentationController.permittedArrowDirections =
+        UIPopoverArrowDirectionUp | UIPopoverArrowDirectionDown;
+    [self presentViewController:sheet animated:YES completion:nil];
 }
 
 #pragma mark - Tab Bar Refresh
