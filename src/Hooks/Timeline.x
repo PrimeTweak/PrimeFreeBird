@@ -204,6 +204,7 @@ static void nfbApplyFleetVisibility(UIView* view) {
 // the flag is checked first.
 
 static const void* kNFBEdgeScopeKey = &kNFBEdgeScopeKey;
+static const void* kNFBEdgeMarkKey = &kNFBEdgeMarkKey;
 static const void* kNFBEdgeHiddenKey2 = &kNFBEdgeHiddenKey2;
 
 // True when this controller is the home timeline, or hosts it as a child.
@@ -229,16 +230,21 @@ static void nfbSweepEdgeEffects(UIView* view, BOOL hide) {
     }
     for (UIView* subview in view.subviews) {
         if ([NSStringFromClass([subview class]) containsString:@"ScrollEdgeEffect"]) {
-            // ---- DIAGNOSTIC (à retirer) ---------------------------------
-            // Painted instead of hidden: if the band turns red, this IS the
-            // view and "hidden" is being ignored or re-set. If the band stays
-            // grey, the band is something else entirely.
+            BOOL hiddenByUs =
+                objc_getAssociatedObject(subview, kNFBEdgeMarkKey) != nil;
             if (hide) {
-                subview.backgroundColor = [UIColor systemRedColor];
-            } else if (subview.hidden) {
+                if (!subview.hidden) {
+                    subview.hidden = YES;
+                }
+                if (!hiddenByUs) {
+                    objc_setAssociatedObject(subview, kNFBEdgeMarkKey, @YES,
+                                             OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+                }
+            } else if (hiddenByUs) {
                 subview.hidden = NO;
+                objc_setAssociatedObject(subview, kNFBEdgeMarkKey, nil,
+                                         OBJC_ASSOCIATION_RETAIN_NONATOMIC);
             }
-            // -------------------------------------------------------------
         }
         nfbSweepEdgeEffects(subview, hide);
     }
@@ -259,22 +265,19 @@ static void nfbApplyEdgeEffect(UIScrollView* scrollView) {
         id effect =
             ((id (*)(id, SEL))objc_msgSend)(scrollView, @selector(topEdgeEffect));
         if ([effect respondsToSelector:@selector(setHidden:)]) {
-            // DIAGNOSTIC: laissé inactif pour ne pas masquer la vue qu'on veut voir.
-            ((void (*)(id, SEL, BOOL))objc_msgSend)(effect, @selector(setHidden:), NO);
+            ((void (*)(id, SEL, BOOL))objc_msgSend)(effect, @selector(setHidden:), hide);
         }
     }
-    // The effect view is not necessarily a subview of the scroll view — FLEX
-    // put its nearest controller at the pager, so it can sit anywhere in that
-    // controller's tree. Sweep from the owning controller's view instead.
-    UIResponder* responder = scrollView;
-    UIViewController* owner = nil;
-    while ((responder = responder.nextResponder)) {
-        if ([responder isKindOfClass:[UIViewController class]]) {
-            owner = (UIViewController*)responder;
-            break;
-        }
+    // The diagnostic build proved the effect is NOT under the owning
+    // controller's view — nothing turned red there. It lives higher up, so the
+    // sweep starts at the window. Throttled, because this scroll view lays out
+    // continuously while the finger is down.
+    static CFAbsoluteTime lastSweep = 0;
+    CFAbsoluteTime now = CFAbsoluteTimeGetCurrent();
+    if (now - lastSweep > 0.25) {
+        lastSweep = now;
+        nfbSweepEdgeEffects(scrollView.window ?: scrollView, hide);
     }
-    nfbSweepEdgeEffects(owner.viewIfLoaded ?: scrollView, hide);
 
     if (hide) {
         objc_setAssociatedObject(scrollView, kNFBEdgeHiddenKey2, @YES,

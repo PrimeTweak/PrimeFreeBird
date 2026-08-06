@@ -75,17 +75,24 @@ static UIView* nfbFindSettingsButton(UIView* view) {
         if (!settingsButton) {
             return;   // pas cet écran : rien à faire
         }
-        // ---- DIAGNOSTIC (à retirer) -------------------------------------
-        // Red means: the button WAS found. If nothing turns red, the search
-        // never matches and the identifier is not what we think.
-        settingsButton.backgroundColor = [UIColor systemRedColor];
-        // -----------------------------------------------------------------
-
         UIColor* grey = [UIColor secondaryLabelColor];
         if (![settingsButton.tintColor isEqual:grey]) {
             settingsButton.tintColor = grey;
         }
         nfbTintGlyphsIn(settingsButton, grey);
+
+        // The diagnostic build settled it: the button IS found — painting its
+        // background red worked — but the glyph stayed black. We run during
+        // the BAR's layout, and the button lays itself out afterwards, undoing
+        // the tint. Re-applying on the next runloop turn lands after it.
+        __weak UIView* weakButton = settingsButton;
+        dispatch_async(dispatch_get_main_queue(), ^{
+            UIView* button = weakButton;
+            if (button.window) {
+                button.tintColor = grey;
+                nfbTintGlyphsIn(button, grey);
+            }
+        });
     } @catch (id exception) {
     }
 }
