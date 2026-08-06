@@ -138,35 +138,35 @@ static void SyncHomeAddTabButton(id container, BOOL hidden) {
 // its height and blurred background. Collapse the view to zero as well.
 static const void* kNFBFleetHiddenKey = &kNFBFleetHiddenKey;
 
-%hook T1FleetLineView
-
-%new
-- (void)nfbApplyFleetVisibility {
+// Plain C rather than a %new method: a %new selector isn't known to the
+// compiler when it's called through an id handle, which is exactly what broke
+// the previous build.
+static void nfbApplyFleetVisibility(UIView* view) {
     // Restore what we hid: without this the bar stays gone after the option is
     // switched back off, until the app is relaunched. We only ever restore a
     // view WE hid, so Twitter's own hiding is never overridden.
-    UIView* view = (UIView*)self;
     BOOL hide = [BHTSettings boolForKey:@"hide_spaces"];
-    BOOL hiddenByUs = objc_getAssociatedObject(self, kNFBFleetHiddenKey) != nil;
+    BOOL hiddenByUs = objc_getAssociatedObject(view, kNFBFleetHiddenKey) != nil;
     if (hide) {
         if (!view.hidden) {
             view.hidden = YES;
         }
         if (!hiddenByUs) {
-            objc_setAssociatedObject(self, kNFBFleetHiddenKey, @YES,
+            objc_setAssociatedObject(view, kNFBFleetHiddenKey, @YES,
                                      OBJC_ASSOCIATION_RETAIN_NONATOMIC);
         }
     } else if (hiddenByUs) {
         view.hidden = NO;
-        objc_setAssociatedObject(self, kNFBFleetHiddenKey, nil,
+        objc_setAssociatedObject(view, kNFBFleetHiddenKey, nil,
                                  OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     }
 }
 
+%hook T1FleetLineView
+
 - (void)didMoveToWindow {
     %orig;
-    id handle = self;
-    [handle nfbApplyFleetVisibility];
+    nfbApplyFleetVisibility((UIView*)self);
 }
 
 // Also on every layout pass: coming back from the settings screen doesn't
@@ -174,8 +174,7 @@ static const void* kNFBFleetHiddenKey = &kNFBFleetHiddenKey;
 // app was relaunched.
 - (void)layoutSubviews {
     %orig;
-    id handle = self;
-    [handle nfbApplyFleetVisibility];
+    nfbApplyFleetVisibility((UIView*)self);
 }
 
 - (CGSize)intrinsicContentSize {
