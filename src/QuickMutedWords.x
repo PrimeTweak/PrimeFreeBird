@@ -1,0 +1,204 @@
+//
+//  QuickMutedWords.x
+//  PrimeFreeBird
+//
+//  A muted-words shortcut in the Home timeline's top bar. FLEX showed that bar
+//  is a TFNNavigationBar — a stable Twitter class — even though its *contents*
+//  are a SwiftUI hosting view whose name is generated at build time
+//  (…$18e770d0c27PlatterContainerHostingView) and must never be hooked. So we
+//  hook the bar and use the plain UINavigationBar API on its top item.
+//
+//  TFNNavigationBar is generic — every screen uses one — so the button is only
+//  added to the instance owned by the Home timeline. If that owner can't be
+//  identified the button simply never appears, exactly like the Explore
+//  advanced-search button: best-effort, never destructive.
+//
+
+#import "HookHelpers.h"
+#import "MutedWords/MutedWordsViewController.h"
+#import <objc/message.h>
+
+static const void* kNFBQuickMutedBtnKey = &kNFBQuickMutedBtnKey;
+
+// Nearest view controller up the responder chain, unwrapping a navigation
+// controller to the screen it is actually showing.
+// The avatar is the square view furthest to the left of the bar. Using it as
+// the reference makes our button match Twitter's own vertical rhythm and
+// horizontal margin, whatever the bar's height happens to be.
+static UIView* nfbFindAvatarView(UIView* view, UIView* bar) {
+    UIView* best = nil;
+    CGFloat bestX = CGFLOAT_MAX;
+    for (UIView* subview in view.subviews) {
+        CGRect inBar = [subview convertRect:subview.bounds toView:bar];
+        CGFloat w = CGRectGetWidth(inBar);
+        CGFloat h = CGRectGetHeight(inBar);
+        BOOL squarish = (w > 24.0 && w < 44.0 && fabs(w - h) < 2.0);
+        if (squarish && CGRectGetMinX(inBar) < CGRectGetWidth(bar.bounds) * 0.25 &&
+            CGRectGetMinX(inBar) < bestX) {
+            bestX = CGRectGetMinX(inBar);
+            best = subview;
+        }
+        UIView* deeper = nfbFindAvatarView(subview, bar);
+        if (deeper) {
+            CGRect deepRect = [deeper convertRect:deeper.bounds toView:bar];
+            if (CGRectGetMinX(deepRect) < bestX) {
+                bestX = CGRectGetMinX(deepRect);
+                best = deeper;
+            }
+        }
+    }
+    return best;
+}
+
+static UIViewController* nfbOwningViewController(UIView* view) {
+    UIResponder* responder = view;
+    while ((responder = responder.nextResponder)) {
+        if (![responder isKindOfClass:[UIViewController class]]) {
+            continue;
+        }
+        UIViewController* controller = (UIViewController*)responder;
+        if ([controller isKindOfClass:[UINavigationController class]]) {
+            UIViewController* top = ((UINavigationController*)controller).topViewController;
+            return top ?: controller;
+        }
+        return controller;
+    }
+    return nil;
+}
+
+static BOOL nfbIsHomeNavigationBar(UIView* bar) {
+    UIViewController* owner = nfbOwningViewController(bar);
+    if (!owner) {
+        return NO;
+    }
+    NSString* name = NSStringFromClass([owner class]);
+    return [name containsString:@"Home"] || [name containsString:@"Timelines"] ||
+           [name containsString:@"TimelineContainer"];
+}
+
+// One grey for every icon we add, frozen to a static colour. The gear is
+// dimmed to 60% opacity because its glyph refuses to be tinted, so our own
+// icons use the label colour at the same 60% — the two then match exactly.
+// Resolving it here also stops the theme's window tint from claiming the icon
+// on a cold launch, a trap the colour work already taught us.
+static UIColor* NFBBarIconGrey(UITraitCollection* traits) {
+    UIColor* grey = [[UIColor labelColor] colorWithAlphaComponent:0.6];
+    if (traits && [grey respondsToSelector:@selector(resolvedColorWithTraitCollection:)]) {
+        return [grey resolvedColorWithTraitCollection:traits] ?: grey;
+    }
+    return grey;
+}
+
+%hook TFNNavigationBar
+
+%new
+- (void)nfbShowQuickMutedWords:(id)sender {
+    UIView* bar = (UIView*)self;
+    UIViewController* owner = nfbOwningViewController(bar);
+    if (!owner) {
+        return;
+    }
+    while (owner.presentedViewController) {
+        owner = owner.presentedViewController;
+    }
+
+    MutedWordsViewController* editor = [[MutedWordsViewController alloc] initCompact];
+    editor.modalPresentationStyle = UIModalPresentationPopover;
+
+    UIPopoverPresentationController* popover = editor.popoverPresentationController;
+    popover.delegate = (id<UIPopoverPresentationControllerDelegate>)editor;
+    popover.permittedArrowDirections = UIPopoverArrowDirectionUp;
+    UIView* anchor = [sender isKindOfClass:[UIView class]] ? (UIView*)sender : bar;
+    popover.sourceView = anchor;
+    popover.sourceRect = anchor.bounds;
+
+    [owner presentViewController:editor animated:YES completion:nil];
+}
+
+// The button is a plain subview pinned to the trailing edge, re-positioned on
+// every layout pass. Bar button items were tried first and never showed: this
+// bar draws its contents through a full-width SwiftUI platter, so anything
+// added through the navigation item can be covered or ignored. A subview is
+// under our control and follows the same re-assert-on-layout pattern the
+// compose button already uses.
+- (void)layoutSubviews {
+    %orig;
+
+    @try {
+        UIView* bar = (UIView*)self;
+        if (!bar.window) {
+            return;
+        }
+
+        UIButton* button = objc_getAssociatedObject(self, kNFBQuickMutedBtnKey);
+        // The owner check runs only to decide whether this bar deserves a
+        // button. Once one exists here, keep maintaining it: the responder
+        // chain is momentarily incomplete during some layout passes, and
+        // bailing out then was making the icon vanish until a relaunch.
+        if (!button && !nfbIsHomeNavigationBar(bar)) {
+            return;
+        }
+        if (!button) {
+            // Twitter's own "filter" glyph, from its vector library — the same
+            // source as every other icon in this bar, so it matches by
+            // construction. The system symbol is only a safety net if the
+            // asset ever disappears.
+            UIImage* icon = nil;
+            if ([UIImage respondsToSelector:@selector(tfn_vectorImageNamed:
+                                                                 fitsSize:
+                                                                fillColor:)]) {
+                icon = [UIImage tfn_vectorImageNamed:@"filter_bars"
+                                            fitsSize:CGSizeMake(26.0, 26.0)
+                                           fillColor:NFBBarIconGrey(bar.traitCollection)];
+                // Template, not original: the fill colour baked by Twitter
+                // came out black, so the button's tintColor does the colouring.
+                icon = [icon imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate];
+            }
+            if (!icon) {
+                icon = [UIImage systemImageNamed:@"line.3.horizontal.decrease"];
+            }
+            if (!icon) {
+                return;
+            }
+            button = [UIButton buttonWithType:UIButtonTypeSystem];
+            [button setImage:icon forState:UIControlStateNormal];
+
+            button.contentMode = UIViewContentModeCenter;
+            button.accessibilityLabel = @"Muted words";
+            [button addTarget:self
+                          action:@selector(nfbShowQuickMutedWords:)
+                forControlEvents:UIControlEventTouchUpInside];
+            objc_setAssociatedObject(self, kNFBQuickMutedBtnKey, button,
+                                     OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        }
+        if (button.superview != bar) {
+            [bar addSubview:button];
+        }
+        [bar bringSubviewToFront:button];
+
+        // Re-asserted every pass, not just at creation: on a cold launch the
+        // theme's window tint claimed the icon until the first tab swipe.
+        UIColor* grey = NFBBarIconGrey(bar.traitCollection);
+        if (![button.tintColor isEqual:grey]) {
+            button.tintColor = grey;
+        }
+
+        // Align on the avatar rather than on the bar's box: the bar is taller
+        // than its content, so centring in bounds left the icon sitting high.
+        CGFloat side = 34.0;
+        CGFloat inset = 16.0;
+        CGFloat centerY = CGRectGetMidY(bar.bounds);
+        UIView* avatar = nfbFindAvatarView(bar, bar);
+        if (avatar) {
+            CGRect inBar = [avatar convertRect:avatar.bounds toView:bar];
+            centerY = CGRectGetMidY(inBar);
+            side = CGRectGetHeight(inBar);
+            inset = CGRectGetMinX(inBar);   // symétrique à la marge de gauche
+        }
+        button.frame = CGRectMake(CGRectGetWidth(bar.bounds) - side - inset,
+                                  centerY - side / 2.0, side, side);
+    } @catch (id exception) {
+    }
+}
+
+%end
