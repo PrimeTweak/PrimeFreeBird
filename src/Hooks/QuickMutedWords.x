@@ -113,11 +113,18 @@ static BOOL nfbIsHomeNavigationBar(UIView* bar) {
 
     @try {
         UIView* bar = (UIView*)self;
-        if (!bar.window || !nfbIsHomeNavigationBar(bar)) {
+        if (!bar.window) {
             return;
         }
 
         UIButton* button = objc_getAssociatedObject(self, kNFBQuickMutedBtnKey);
+        // The owner check runs only to decide whether this bar deserves a
+        // button. Once one exists here, keep maintaining it: the responder
+        // chain is momentarily incomplete during some layout passes, and
+        // bailing out then was making the icon vanish until a relaunch.
+        if (!button && !nfbIsHomeNavigationBar(bar)) {
+            return;
+        }
         if (!button) {
             // Twitter's own "filter" glyph, from its vector library — the same
             // source as every other icon in this bar, so it matches by

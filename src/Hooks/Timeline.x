@@ -136,12 +136,28 @@ static void SyncHomeAddTabButton(id container, BOOL hidden) {
 
 // The header hook removes the content, but the T1FleetLineView itself keeps
 // its height and blurred background. Collapse the view to zero as well.
+static const void* kNFBFleetHiddenKey = &kNFBFleetHiddenKey;
+
 %hook T1FleetLineView
 
 - (void)didMoveToWindow {
     %orig;
-    if ([BHTSettings boolForKey:@"hide_spaces"]) {
-        ((UIView*)self).hidden = YES;
+    // Restore what we hid: without this the bar stays gone after the option is
+    // switched back off, until the app is relaunched. We only ever restore a
+    // view WE hid, so Twitter's own hiding is never overridden.
+    UIView* view = (UIView*)self;
+    BOOL hide = [BHTSettings boolForKey:@"hide_spaces"];
+    BOOL hiddenByUs = objc_getAssociatedObject(self, kNFBFleetHiddenKey) != nil;
+    if (hide) {
+        view.hidden = YES;
+        if (!hiddenByUs) {
+            objc_setAssociatedObject(self, kNFBFleetHiddenKey, @YES,
+                                     OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        }
+    } else if (hiddenByUs) {
+        view.hidden = NO;
+        objc_setAssociatedObject(self, kNFBFleetHiddenKey, nil,
+                                 OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     }
 }
 
@@ -169,15 +185,18 @@ static void SyncHomeAddTabButton(id container, BOOL hidden) {
 // iOS 26 API, reached at runtime because the 16.5 SDK doesn't declare it, and
 // only for the timeline's own scroll view — every other screen keeps it.
 
+static const void* kNFBEdgeHiddenKey = &kNFBEdgeHiddenKey;
+
 %hook UIScrollView
 
 - (void)didMoveToWindow {
     %orig;
 
     @try {
-        if (!self.window || ![BHTSettings boolForKey:@"hide_spaces"]) {
+        if (!self.window) {
             return;
         }
+        BOOL hideSpaces = [BHTSettings boolForKey:@"hide_spaces"];
         if (![self respondsToSelector:@selector(topEdgeEffect)]) {
             return;   // avant iOS 26 : rien à faire
         }
@@ -198,8 +217,22 @@ static void SyncHomeAddTabButton(id container, BOOL hidden) {
             return;
         }
         id effect = ((id (*)(id, SEL))objc_msgSend)(self, @selector(topEdgeEffect));
-        if ([effect respondsToSelector:@selector(setHidden:)]) {
+        if (![effect respondsToSelector:@selector(setHidden:)]) {
+            return;
+        }
+        // Same reasoning as the Spaces bar: put the effect back when the option
+        // goes off, and only if we were the ones who hid it.
+        BOOL hiddenByUs = objc_getAssociatedObject(self, kNFBEdgeHiddenKey) != nil;
+        if (hideSpaces) {
             ((void (*)(id, SEL, BOOL))objc_msgSend)(effect, @selector(setHidden:), YES);
+            if (!hiddenByUs) {
+                objc_setAssociatedObject(self, kNFBEdgeHiddenKey, @YES,
+                                         OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+            }
+        } else if (hiddenByUs) {
+            ((void (*)(id, SEL, BOOL))objc_msgSend)(effect, @selector(setHidden:), NO);
+            objc_setAssociatedObject(self, kNFBEdgeHiddenKey, nil,
+                                     OBJC_ASSOCIATION_RETAIN_NONATOMIC);
         }
     } @catch (id exception) {
     }
