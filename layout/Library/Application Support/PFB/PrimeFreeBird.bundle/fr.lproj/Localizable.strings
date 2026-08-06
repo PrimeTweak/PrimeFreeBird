@@ -452,7 +452,6 @@
 "MUTED_WORDS_ADD_BUTTON" = "Ajouter";
 "MUTED_WORDS_LIST_HEADER" = "Filtres";
 "MUTED_WORDS_OPTIONS_HEADER" = "Options";
-"MUTED_WORDS_EMPTY" = "Aucun filtre pour l'instant";
 "MUTED_WORDS_KIND_WORD" = "mot";
 "MUTED_WORDS_KIND_PHRASE" = "expression";
 "MUTED_WORDS_KIND_ACCOUNT" = "compte";
@@ -472,3 +471,4 @@
 "MUTED_WORDS_DURATION_7D" = "7 jours";
 "MUTED_WORDS_DURATION_30D" = "30 jours";
 "MUTED_WORDS_EXPIRES_FORMAT" = "%ld j restants";
+"MUTED_WORDS_EXAMPLE_TERM" = "spoiler";
