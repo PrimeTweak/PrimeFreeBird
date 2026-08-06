@@ -455,4 +455,4 @@
 "MUTED_WORDS_EXAMPLE_TERM" = "spoiler";
 
 "HIDE_SCROLL_EDGE_BLUR_TITLE" = "Hide scroll edge blur";
-"HIDE_SCROLL_EDGE_BLUR_DETAIL" = "Remove the blurred strip iOS draws under the navigation bar.";
+"HIDE_SCROLL_EDGE_BLUR_DETAIL" = "Remove the blurred strip iOS 26 draws under the bars, as the stock app does.";
