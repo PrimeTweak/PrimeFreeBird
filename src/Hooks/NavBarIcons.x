@@ -65,6 +65,36 @@ static UIView* nfbFindSettingsButton(UIView* view) {
     return nil;
 }
 
+// Notifications: the gear is a plain bar button item. Scoped to that screen
+// through the owning controller, so no other bar is touched.
+static void nfbDimNotificationsGear(UIView* bar) {
+    UIResponder* responder = bar;
+    UIViewController* owner = nil;
+    while ((responder = responder.nextResponder)) {
+        if ([responder isKindOfClass:[UIViewController class]]) {
+            owner = (UIViewController*)responder;
+            if ([owner isKindOfClass:[UINavigationController class]]) {
+                owner = ((UINavigationController*)owner).topViewController ?: owner;
+            }
+            break;
+        }
+    }
+    if (!owner || ![NSStringFromClass([owner class]) containsString:@"Notification"]) {
+        return;
+    }
+    if (![bar respondsToSelector:@selector(topItem)]) {
+        return;
+    }
+    UINavigationItem* item =
+        ((id (*)(id, SEL))objc_msgSend)(bar, @selector(topItem));
+    UIColor* grey = [[UIColor labelColor] colorWithAlphaComponent:0.6];
+    for (UIBarButtonItem* button in item.rightBarButtonItems) {
+        if (![button.tintColor isEqual:grey]) {
+            button.tintColor = grey;
+        }
+    }
+}
+
 %hook UINavigationBar
 
 - (void)layoutSubviews {
@@ -77,7 +107,11 @@ static UIView* nfbFindSettingsButton(UIView* view) {
         }
         UIView* settingsButton = nfbFindSettingsButton(bar);
         if (!settingsButton) {
-            return;   // pas cet écran : rien à faire
+            // Notifications builds its bar the classic way — a title and a
+            // right bar button item — so no view there carries the identifier.
+            // That screen is handled through the item instead, and only there.
+            nfbDimNotificationsGear(bar);
+            return;
         }
         // Opacity, not tint. The diagnostic proved the button is found and
         // that view properties stick — its background turned red — yet the
@@ -90,7 +124,7 @@ static UIView* nfbFindSettingsButton(UIView* view) {
 
         // Tinting is still attempted, harmlessly: if a future build makes the
         // glyph tintable, the colour becomes exact rather than simulated.
-        UIColor* grey = [UIColor secondaryLabelColor];
+        UIColor* grey = [[UIColor labelColor] colorWithAlphaComponent:0.6];
         if (![settingsButton.tintColor isEqual:grey]) {
             settingsButton.tintColor = grey;
         }

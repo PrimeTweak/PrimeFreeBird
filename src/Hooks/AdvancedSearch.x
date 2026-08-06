@@ -16,6 +16,19 @@
 
 static const void* kNFBAdvSearchBtnKey = &kNFBAdvSearchBtnKey;
 
+// One grey for every icon we add, frozen to a static colour. The gear is
+// dimmed to 60% opacity because its glyph refuses to be tinted, so our own
+// icons use the label colour at the same 60% — the two then match exactly.
+// Resolving it here also stops the theme's window tint from claiming the icon
+// on a cold launch, a trap the colour work already taught us.
+static UIColor* NFBBarIconGrey(UITraitCollection* traits) {
+    UIColor* grey = [[UIColor labelColor] colorWithAlphaComponent:0.6];
+    if (traits && [grey respondsToSelector:@selector(resolvedColorWithTraitCollection:)]) {
+        return [grey resolvedColorWithTraitCollection:traits] ?: grey;
+    }
+    return grey;
+}
+
 %hook _TtC14T1TwitterSwift28GuideContainerViewController
 
 %new
@@ -65,7 +78,7 @@ static const void* kNFBAdvSearchBtnKey = &kNFBAdvSearchBtnKey;
                                             target:self
                                             action:@selector(nfbShowAdvancedSearch)];
         // Muted grey, like the labels of the unselected tabs next to it.
-        btn.tintColor = [UIColor secondaryLabelColor];
+        btn.tintColor = NFBBarIconGrey(self.traitCollection);
         // Match Twitter's own settings gear, which sits flat in this bar:
         // iOS 26 gives bar buttons a shared Liquid Glass capsule, and opting
         // out is a single property. It only exists on the iOS 26 SDK, so it

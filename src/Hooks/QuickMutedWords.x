@@ -76,6 +76,19 @@ static BOOL nfbIsHomeNavigationBar(UIView* bar) {
            [name containsString:@"TimelineContainer"];
 }
 
+// One grey for every icon we add, frozen to a static colour. The gear is
+// dimmed to 60% opacity because its glyph refuses to be tinted, so our own
+// icons use the label colour at the same 60% — the two then match exactly.
+// Resolving it here also stops the theme's window tint from claiming the icon
+// on a cold launch, a trap the colour work already taught us.
+static UIColor* NFBBarIconGrey(UITraitCollection* traits) {
+    UIColor* grey = [[UIColor labelColor] colorWithAlphaComponent:0.6];
+    if (traits && [grey respondsToSelector:@selector(resolvedColorWithTraitCollection:)]) {
+        return [grey resolvedColorWithTraitCollection:traits] ?: grey;
+    }
+    return grey;
+}
+
 %hook TFNNavigationBar
 
 %new
@@ -136,7 +149,7 @@ static BOOL nfbIsHomeNavigationBar(UIView* bar) {
                                                                 fillColor:)]) {
                 icon = [UIImage tfn_vectorImageNamed:@"filter_bars"
                                             fitsSize:CGSizeMake(26.0, 26.0)
-                                           fillColor:[UIColor secondaryLabelColor]];
+                                           fillColor:NFBBarIconGrey(bar.traitCollection)];
                 // Template, not original: the fill colour baked by Twitter
                 // came out black, so the button's tintColor does the colouring.
                 icon = [icon imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate];
@@ -149,7 +162,7 @@ static BOOL nfbIsHomeNavigationBar(UIView* bar) {
             }
             button = [UIButton buttonWithType:UIButtonTypeSystem];
             [button setImage:icon forState:UIControlStateNormal];
-            button.tintColor = [UIColor secondaryLabelColor];
+
             button.contentMode = UIViewContentModeCenter;
             button.accessibilityLabel = @"Muted words";
             [button addTarget:self
@@ -162,6 +175,13 @@ static BOOL nfbIsHomeNavigationBar(UIView* bar) {
             [bar addSubview:button];
         }
         [bar bringSubviewToFront:button];
+
+        // Re-asserted every pass, not just at creation: on a cold launch the
+        // theme's window tint claimed the icon until the first tab swipe.
+        UIColor* grey = NFBBarIconGrey(bar.traitCollection);
+        if (![button.tintColor isEqual:grey]) {
+            button.tintColor = grey;
+        }
 
         // Align on the avatar rather than on the bar's box: the bar is taller
         // than its content, so centring in bounds left the icon sitting high.
