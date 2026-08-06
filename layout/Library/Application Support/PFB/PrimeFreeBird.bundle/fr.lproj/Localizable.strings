@@ -474,4 +474,4 @@
 "MUTED_WORDS_EXAMPLE_TERM" = "spoiler";
 
 "HIDE_SCROLL_EDGE_BLUR_TITLE" = "Masquer le flou de bord";
-"HIDE_SCROLL_EDGE_BLUR_DETAIL" = "Retire la bande floue qu'iOS dessine sous la barre de navigation.";
+"HIDE_SCROLL_EDGE_BLUR_DETAIL" = "Retire la bande floue qu'iOS 26 dessine sous les barres, comme l'app d'origine.";
