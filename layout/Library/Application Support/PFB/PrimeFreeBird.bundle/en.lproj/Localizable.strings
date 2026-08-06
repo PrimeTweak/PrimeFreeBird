@@ -453,3 +453,6 @@
 "MUTED_WORDS_DURATION_30D" = "30 days";
 "MUTED_WORDS_EXPIRES_FORMAT" = "%ld d left";
 "MUTED_WORDS_EXAMPLE_TERM" = "spoiler";
+
+"HIDE_SCROLL_EDGE_BLUR_TITLE" = "Hide scroll edge blur";
+"HIDE_SCROLL_EDGE_BLUR_DETAIL" = "Remove the blurred strip iOS draws under the navigation bar.";
