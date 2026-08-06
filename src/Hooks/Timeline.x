@@ -209,23 +209,37 @@ static void nfbApplyFleetVisibility(UIView* view) {
 
 static const void* kNFBEdgeMarkKey = &kNFBEdgeMarkKey;
 
-// Applies (or lifts) the effect on one scroll view. Only ever lifts what we
-// hid ourselves.
-static void nfbApplyEdgeEffect(UIScrollView* scrollView) {
+// The option is cached: reading NSUserDefaults on every layout pass of every
+// scroll view in the app would be far too costly, and a refresh twice a second
+// is plenty for a settings toggle.
+static BOOL gNFBEdgeHide = NO;
+static CFAbsoluteTime gNFBEdgeChecked = 0;
+
+static BOOL nfbEdgeHideEnabled(void) {
+    CFAbsoluteTime now = CFAbsoluteTimeGetCurrent();
+    if (now - gNFBEdgeChecked > 0.5) {
+        gNFBEdgeChecked = now;
+        gNFBEdgeHide = [BHTSettings boolForKey:@"hide_scroll_edge_blur"];
+    }
+    return gNFBEdgeHide;
+}
+
+// Applies (or lifts) the effect on one scroll view, and only ever lifts what
+// we hid ourselves.
+static void nfbApplyEdgeEffect(UIScrollView* scrollView, BOOL hide) {
     if (![scrollView respondsToSelector:@selector(topEdgeEffect)]) {
         return;   // avant iOS 26 : rien à faire
     }
-    BOOL hide = [BHTSettings boolForKey:@"hide_scroll_edge_blur"];
-    BOOL hiddenByUs = objc_getAssociatedObject(scrollView, kNFBEdgeMarkKey) != nil;
-    if (!hide && !hiddenByUs) {
+    id effect = ((id (*)(id, SEL))objc_msgSend)(scrollView, @selector(topEdgeEffect));
+    if (![effect respondsToSelector:@selector(setHidden:)] ||
+        ![effect respondsToSelector:@selector(isHidden)]) {
         return;
     }
-
-    id effect = ((id (*)(id, SEL))objc_msgSend)(scrollView, @selector(topEdgeEffect));
-    if ([effect respondsToSelector:@selector(setHidden:)]) {
-        ((void (*)(id, SEL, BOOL))objc_msgSend)(effect, @selector(setHidden:), hide);
+    BOOL alreadyHidden = ((BOOL (*)(id, SEL))objc_msgSend)(effect, @selector(isHidden));
+    if (alreadyHidden == hide) {
+        return;   // rien à faire : le cas le plus fréquent, et le moins cher
     }
-
+    ((void (*)(id, SEL, BOOL))objc_msgSend)(effect, @selector(setHidden:), hide);
     objc_setAssociatedObject(scrollView, kNFBEdgeMarkKey, hide ? @YES : nil,
                              OBJC_ASSOCIATION_RETAIN_NONATOMIC);
 }
@@ -237,20 +251,27 @@ static void nfbApplyEdgeEffect(UIScrollView* scrollView) {
 
     @try {
         if (self.window) {
-            nfbApplyEdgeEffect(self);
+            nfbApplyEdgeEffect(self, nfbEdgeHideEnabled());
         }
     } @catch (id exception) {
     }
 }
 
-// Re-assert only on scroll views we already act on: the pointer check costs
-// nothing for every other scroll view in the app.
+// Checked on every layout of every scroll view, on purpose. iOS re-enables the
+// effect whenever a bar reconfigures — changing tab, coming back to a screen —
+// and acting only on views we had already marked left Search untouched and the
+// timeline correct only after a few swipes. The work is two message sends when
+// the state already matches, which is nearly always.
 - (void)layoutSubviews {
     %orig;
 
     @try {
-        if (objc_getAssociatedObject(self, kNFBEdgeMarkKey)) {
-            nfbApplyEdgeEffect(self);
+        if (!self.window) {
+            return;
+        }
+        BOOL hide = nfbEdgeHideEnabled();
+        if (hide || objc_getAssociatedObject(self, kNFBEdgeMarkKey)) {
+            nfbApplyEdgeEffect(self, hide);
         }
     } @catch (id exception) {
     }
