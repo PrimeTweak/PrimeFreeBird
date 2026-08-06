@@ -227,9 +227,17 @@ extern NSInteger NFBColorThemeScreenVisible;
     creditLabel.font = [TwitterChirpFont(TwitterFontStyleRegular) fontWithSize:12];
     creditLabel.textColor = [UIColor tertiaryLabelColor];
     // Attribution stays prominent: this fork carries no licence of its own and
-    // stands on BHTwitter and NeoFreeBird.
-    creditLabel.text = @NFB_PRODUCT_NAME
-        "\nBased on NeoFreeBird — original work by @nyaathea & @BandarHL";
+    // stands on BHTwitter and NeoFreeBird. The product name sits a touch larger
+    // than the line below it, so the eye lands on it first.
+    NSString* productName = @NFB_PRODUCT_NAME;
+    NSString* attribution =
+        @"\nBased on NeoFreeBird — original work by @nyaathea & @BandarHL";
+    NSMutableAttributedString* credit = [[NSMutableAttributedString alloc]
+        initWithString:[productName stringByAppendingString:attribution]];
+    [credit addAttribute:NSFontAttributeName
+                   value:[TwitterChirpFont(TwitterFontStyleBold) fontWithSize:14]
+                   range:NSMakeRange(0, productName.length)];
+    creditLabel.attributedText = credit;
     CGSize fitSize = [creditLabel sizeThatFits:CGSizeMake(self.view.bounds.size.width - 40, CGFLOAT_MAX)];
     creditLabel.frame = CGRectMake(0, 0, self.view.bounds.size.width, fitSize.height + 32);
     self.tableView.tableFooterView = creditLabel;
