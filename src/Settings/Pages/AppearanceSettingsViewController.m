@@ -65,7 +65,7 @@
     UIAlertController* sheet = [UIAlertController
         alertControllerWithTitle:[bundle localizedStringForKey:@"DARK_MODE_STYLE_TITLE"]
                          message:[bundle localizedStringForKey:@"DARK_MODE_STYLE_DETAIL"]
-                  preferredStyle:UIAlertControllerStyleActionSheet];
+                  preferredStyle:UIAlertControllerStyleAlert];
 
     NSArray<NSString*>* titleKeys = @[
         @"DARK_MODE_STYLE_SYSTEM",
@@ -98,17 +98,6 @@
                                    style:UIAlertActionStyleCancel
                                  handler:nil]];
 
-    // Anchored on the row that was tapped. Pointing at the middle of the screen
-    // is what made these land in a random spot.
-    NSIndexPath* indexPath = sender[@"indexPath"];
-    UITableViewCell* cell = [indexPath isKindOfClass:[NSIndexPath class]]
-                                ? [self.tableView cellForRowAtIndexPath:indexPath]
-                                : nil;
-    sheet.popoverPresentationController.sourceView = cell ?: self.view;
-    sheet.popoverPresentationController.sourceRect =
-        cell ? cell.bounds : CGRectMake(CGRectGetMidX(self.view.bounds), 0, 0, 0);
-    sheet.popoverPresentationController.permittedArrowDirections =
-        UIPopoverArrowDirectionUp | UIPopoverArrowDirectionDown;
     [self presentViewController:sheet animated:YES completion:nil];
 }
 
@@ -117,7 +106,7 @@
     UIAlertController* sheet = [UIAlertController
         alertControllerWithTitle:[bundle localizedStringForKey:@"INTERFACE_STYLE_TITLE"]
                          message:[bundle localizedStringForKey:@"INTERFACE_STYLE_DETAIL"]
-                  preferredStyle:UIAlertControllerStyleActionSheet];
+                  preferredStyle:UIAlertControllerStyleAlert];
 
     NSArray<NSString*>* titleKeys = @[
         @"INTERFACE_STYLE_STANDARD",
@@ -155,17 +144,6 @@
                                    style:UIAlertActionStyleCancel
                                  handler:nil]];
 
-    // Anchored on the row that was tapped. Pointing at the middle of the screen
-    // is what made these land in a random spot.
-    NSIndexPath* indexPath = sender[@"indexPath"];
-    UITableViewCell* cell = [indexPath isKindOfClass:[NSIndexPath class]]
-                                ? [self.tableView cellForRowAtIndexPath:indexPath]
-                                : nil;
-    sheet.popoverPresentationController.sourceView = cell ?: self.view;
-    sheet.popoverPresentationController.sourceRect =
-        cell ? cell.bounds : CGRectMake(CGRectGetMidX(self.view.bounds), 0, 0, 0);
-    sheet.popoverPresentationController.permittedArrowDirections =
-        UIPopoverArrowDirectionUp | UIPopoverArrowDirectionDown;
     [self presentViewController:sheet animated:YES completion:nil];
 }
 
