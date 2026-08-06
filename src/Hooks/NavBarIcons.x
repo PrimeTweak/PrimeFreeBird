@@ -3,23 +3,25 @@
 //  PrimeFreeBird
 //
 //  Twitter draws the settings gear at full label strength, which reads as
-//  black next to the muted grey of the tab labels beside it. This tints it to
-//  the same secondary grey.
+//  black next to the muted grey of the tab labels beside it.
 //
-//  FLEX gave the whole chain, and it changed the approach entirely. The gear
-//  is not a bar button item and not a loose image view: it is a
-//  TFNBarButtonItemButton carrying the accessibility identifier
-//  "NavigationBarSettingsButton", with its glyph in a UIImageView nested three
-//  levels below. Hooking that class and matching on the identifier is exact —
-//  no walking the navigation bar, no guessing which screen we are on, and no
-//  risk of touching any other button.
+//  Three earlier attempts failed, and the reason matters. The gear is not a
+//  bar button item, and TFNBarButtonItemButton — the class FLEX named — does
+//  not live in the framework this tweak hooks at load time, so hooking it
+//  directly never applied. What does reliably run is TFNNavigationBar's
+//  layout, proven by the quick-access button sitting in that same bar.
+//
+//  So: start from the bar, walk down to the view carrying the accessibility
+//  identifier "NavigationBarSettingsButton" — an exact, stable anchor read off
+//  the binary — and tint the glyph inside it. Nothing else is touched.
 //
 
 #import "HookHelpers.h"
 
-// The glyph lives a few levels down inside the button; template rendering has
-// to be forced, otherwise the tint is simply ignored.
-static void nfbTintGlyph(UIView* view, UIColor* colour) {
+static NSString* const kNFBSettingsButtonIdentifier = @"NavigationBarSettingsButton";
+
+// Forces template rendering, without which a tint is simply ignored.
+static void nfbTintGlyphsIn(UIView* view, UIColor* colour) {
     for (UIView* subview in view.subviews) {
         if ([subview isKindOfClass:[UIImageView class]]) {
             UIImageView* imageView = (UIImageView*)subview;
@@ -33,29 +35,44 @@ static void nfbTintGlyph(UIView* view, UIColor* colour) {
                 }
             }
         }
-        nfbTintGlyph(subview, colour);
+        nfbTintGlyphsIn(subview, colour);
     }
 }
 
-%hook TFNBarButtonItemButton
+// Depth-first search for the settings button by its accessibility identifier.
+static UIView* nfbFindSettingsButton(UIView* view) {
+    for (UIView* subview in view.subviews) {
+        if ([subview.accessibilityIdentifier
+                isEqualToString:kNFBSettingsButtonIdentifier]) {
+            return subview;
+        }
+        UIView* found = nfbFindSettingsButton(subview);
+        if (found) {
+            return found;
+        }
+    }
+    return nil;
+}
+
+%hook TFNNavigationBar
 
 - (void)layoutSubviews {
     %orig;
 
     @try {
-        UIView* button = (UIView*)self;
-        if (!button.window) {
+        UIView* bar = (UIView*)self;
+        if (!bar.window) {
             return;
         }
-        NSString* identifier = button.accessibilityIdentifier;
-        if (![identifier isEqualToString:@"NavigationBarSettingsButton"]) {
-            return;
+        UIView* settingsButton = nfbFindSettingsButton(bar);
+        if (!settingsButton) {
+            return;   // pas cet écran : rien à faire
         }
         UIColor* grey = [UIColor secondaryLabelColor];
-        if (![button.tintColor isEqual:grey]) {
-            button.tintColor = grey;
+        if (![settingsButton.tintColor isEqual:grey]) {
+            settingsButton.tintColor = grey;
         }
-        nfbTintGlyph(button, grey);
+        nfbTintGlyphsIn(settingsButton, grey);
     } @catch (id exception) {
     }
 }
