@@ -35,18 +35,32 @@ static UIViewController* nfbBarOwningController(UIView* view) {
     return nil;
 }
 
-// Recursively tint image-only buttons living in the right-hand half of a bar.
+// FLEX showed the settings gear is a plain UIImageView, not a button — which
+// is why tinting buttons alone did nothing. Both are handled here, and only in
+// the right-hand part of the bar: the avatar and the search field stay put.
 static void nfbTintIconButtons(UIView* view, UIView* bar, UIColor* grey) {
     for (UIView* subview in view.subviews) {
-        if ([subview isKindOfClass:[UIButton class]]) {
+        CGRect inBar = [subview convertRect:subview.bounds toView:bar];
+        BOOL onTheRight = CGRectGetMidX(inBar) > CGRectGetWidth(bar.bounds) * 0.6;
+
+        if (onTheRight && [subview isKindOfClass:[UIButton class]]) {
             UIButton* button = (UIButton*)subview;
-            BOOL hasTitle = button.currentTitle.length > 0;
-            BOOL hasImage = button.currentImage != nil;
-            CGRect inBar = [button convertRect:button.bounds toView:bar];
-            BOOL onTheRight = CGRectGetMidX(inBar) > CGRectGetWidth(bar.bounds) * 0.6;
-            if (hasImage && !hasTitle && onTheRight &&
+            if (button.currentImage && button.currentTitle.length == 0 &&
                 ![button.tintColor isEqual:grey]) {
                 button.tintColor = grey;
+            }
+        } else if (onTheRight && [subview isKindOfClass:[UIImageView class]]) {
+            UIImageView* imageView = (UIImageView*)subview;
+            CGFloat side = CGRectGetWidth(inBar);
+            // Glyph-sized only: leaves photos and banners alone.
+            if (imageView.image && side > 14.0 && side < 34.0 &&
+                ![imageView.tintColor isEqual:grey]) {
+                // Force template rendering, otherwise the tint is ignored.
+                if (imageView.image.renderingMode != UIImageRenderingModeAlwaysTemplate) {
+                    imageView.image = [imageView.image
+                        imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate];
+                }
+                imageView.tintColor = grey;
             }
         }
         nfbTintIconButtons(subview, bar, grey);

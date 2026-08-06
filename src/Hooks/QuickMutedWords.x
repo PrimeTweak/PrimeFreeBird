@@ -22,6 +22,34 @@ static const void* kNFBQuickMutedBtnKey = &kNFBQuickMutedBtnKey;
 
 // Nearest view controller up the responder chain, unwrapping a navigation
 // controller to the screen it is actually showing.
+// The avatar is the square view furthest to the left of the bar. Using it as
+// the reference makes our button match Twitter's own vertical rhythm and
+// horizontal margin, whatever the bar's height happens to be.
+static UIView* nfbFindAvatarView(UIView* view, UIView* bar) {
+    UIView* best = nil;
+    CGFloat bestX = CGFLOAT_MAX;
+    for (UIView* subview in view.subviews) {
+        CGRect inBar = [subview convertRect:subview.bounds toView:bar];
+        CGFloat w = CGRectGetWidth(inBar);
+        CGFloat h = CGRectGetHeight(inBar);
+        BOOL squarish = (w > 24.0 && w < 44.0 && fabs(w - h) < 2.0);
+        if (squarish && CGRectGetMinX(inBar) < CGRectGetWidth(bar.bounds) * 0.25 &&
+            CGRectGetMinX(inBar) < bestX) {
+            bestX = CGRectGetMinX(inBar);
+            best = subview;
+        }
+        UIView* deeper = nfbFindAvatarView(subview, bar);
+        if (deeper) {
+            CGRect deepRect = [deeper convertRect:deeper.bounds toView:bar];
+            if (CGRectGetMinX(deepRect) < bestX) {
+                bestX = CGRectGetMinX(deepRect);
+                best = deeper;
+            }
+        }
+    }
+    return best;
+}
+
 static UIViewController* nfbOwningViewController(UIView* view) {
     UIResponder* responder = view;
     while ((responder = responder.nextResponder)) {
@@ -100,9 +128,11 @@ static BOOL nfbIsHomeNavigationBar(UIView* bar) {
                                                                  fitsSize:
                                                                 fillColor:)]) {
                 icon = [UIImage tfn_vectorImageNamed:@"filter_bars"
-                                            fitsSize:CGSizeMake(22.0, 22.0)
+                                            fitsSize:CGSizeMake(26.0, 26.0)
                                            fillColor:[UIColor secondaryLabelColor]];
-                icon = [icon imageWithRenderingMode:UIImageRenderingModeAlwaysOriginal];
+                // Template, not original: the fill colour baked by Twitter
+                // came out black, so the button's tintColor does the colouring.
+                icon = [icon imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate];
             }
             if (!icon) {
                 icon = [UIImage systemImageNamed:@"line.3.horizontal.decrease"];
@@ -126,11 +156,20 @@ static BOOL nfbIsHomeNavigationBar(UIView* bar) {
         }
         [bar bringSubviewToFront:button];
 
+        // Align on the avatar rather than on the bar's box: the bar is taller
+        // than its content, so centring in bounds left the icon sitting high.
         CGFloat side = 34.0;
-        CGFloat inset = 16.0;   // même marge que l'avatar à gauche
+        CGFloat inset = 16.0;
+        CGFloat centerY = CGRectGetMidY(bar.bounds);
+        UIView* avatar = nfbFindAvatarView(bar, bar);
+        if (avatar) {
+            CGRect inBar = [avatar convertRect:avatar.bounds toView:bar];
+            centerY = CGRectGetMidY(inBar);
+            side = CGRectGetHeight(inBar);
+            inset = CGRectGetMinX(inBar);   // symétrique à la marge de gauche
+        }
         button.frame = CGRectMake(CGRectGetWidth(bar.bounds) - side - inset,
-                                  (CGRectGetHeight(bar.bounds) - side) / 2.0,
-                                  side, side);
+                                  centerY - side / 2.0, side, side);
     } @catch (id exception) {
     }
 }
