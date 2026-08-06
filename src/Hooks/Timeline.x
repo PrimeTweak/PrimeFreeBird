@@ -140,8 +140,8 @@ static const void* kNFBFleetHiddenKey = &kNFBFleetHiddenKey;
 
 %hook T1FleetLineView
 
-- (void)didMoveToWindow {
-    %orig;
+%new
+- (void)nfbApplyFleetVisibility {
     // Restore what we hid: without this the bar stays gone after the option is
     // switched back off, until the app is relaunched. We only ever restore a
     // view WE hid, so Twitter's own hiding is never overridden.
@@ -149,7 +149,9 @@ static const void* kNFBFleetHiddenKey = &kNFBFleetHiddenKey;
     BOOL hide = [BHTSettings boolForKey:@"hide_spaces"];
     BOOL hiddenByUs = objc_getAssociatedObject(self, kNFBFleetHiddenKey) != nil;
     if (hide) {
-        view.hidden = YES;
+        if (!view.hidden) {
+            view.hidden = YES;
+        }
         if (!hiddenByUs) {
             objc_setAssociatedObject(self, kNFBFleetHiddenKey, @YES,
                                      OBJC_ASSOCIATION_RETAIN_NONATOMIC);
@@ -159,6 +161,21 @@ static const void* kNFBFleetHiddenKey = &kNFBFleetHiddenKey;
         objc_setAssociatedObject(self, kNFBFleetHiddenKey, nil,
                                  OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     }
+}
+
+- (void)didMoveToWindow {
+    %orig;
+    id handle = self;
+    [handle nfbApplyFleetVisibility];
+}
+
+// Also on every layout pass: coming back from the settings screen doesn't
+// always move the view to a new window, and the bar would stay gone until the
+// app was relaunched.
+- (void)layoutSubviews {
+    %orig;
+    id handle = self;
+    [handle nfbApplyFleetVisibility];
 }
 
 - (CGSize)intrinsicContentSize {
@@ -176,6 +193,22 @@ static const void* kNFBFleetHiddenKey = &kNFBFleetHiddenKey;
 }
 
 %end
+
+// True when this controller is the home timeline, or hosts it as a child.
+static BOOL nfbOwnsHomeTimeline(UIViewController* controller) {
+    if (!controller) {
+        return NO;
+    }
+    if ([NSStringFromClass([controller class]) containsString:@"HomeTimeline"]) {
+        return YES;
+    }
+    for (UIViewController* child in controller.childViewControllers) {
+        if ([NSStringFromClass([child class]) containsString:@"HomeTimeline"]) {
+            return YES;
+        }
+    }
+    return NO;
+}
 
 // MARK: - Scroll edge effect
 //
@@ -212,8 +245,27 @@ static const void* kNFBEdgeHiddenKey = &kNFBEdgeHiddenKey;
         if (!owner) {
             return;
         }
-        NSString* name = NSStringFromClass([owner class]);
-        if (![name containsString:@"Home"] && ![name containsString:@"Timeline"]) {
+        // FLEX settled this: the edge effect belongs to the PAGER's collection
+        // view, and the pager is TFNUISwift.PagingViewController — a name that
+        // contains neither "Home" nor "Timeline", which is exactly why the
+        // earlier check never matched. The home timeline is one of its
+        // children (THFHomeTimelineItemsViewController), so that is what we
+        // look for. The pager itself is generic and used elsewhere.
+        if (!nfbOwnsHomeTimeline(owner)) {
+            // Children are sometimes attached a beat after the scroll view
+            // lands in its window; one delayed retry covers that, and only for
+            // a controller that could plausibly be the pager.
+            if ([NSStringFromClass([owner class]) containsString:@"Paging"]) {
+                __weak UIScrollView* weakSelf = self;
+                dispatch_after(
+                    dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.4 * NSEC_PER_SEC)),
+                    dispatch_get_main_queue(), ^{
+                        UIScrollView* scrollView = weakSelf;
+                        if (scrollView.window) {
+                            [scrollView didMoveToWindow];
+                        }
+                    });
+            }
             return;
         }
         id effect = ((id (*)(id, SEL))objc_msgSend)(self, @selector(topEdgeEffect));
