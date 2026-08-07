@@ -153,3 +153,6 @@
 + (void)tfn_vectorImageSetOverrideContainerName:(NSString*)arg1;
 + (NSString*)tfn_vectorImageOverrideContainerName;
 @end
+
+@interface TFNBarButtonItemButton : UIButton
+@end
