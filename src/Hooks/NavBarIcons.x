@@ -33,6 +33,10 @@ static const void* kNFBOriginalImageKey = &kNFBOriginalImageKey;
 // other's result as "not mine yet", so the glyph was painted twice and came
 // out pale. The mark travels with the image, so any path recognises it.
 static const void* kNFBPaintedFlagKey = &kNFBPaintedFlagKey;
+// Marks the gear's layers. Removing the fade after the fact never worked:
+// our pass runs before Twitter starts the animation, so there is nothing to
+// remove yet. The animation is refused at the moment it is added instead.
+static const void* kNFBNoFadeKey = &kNFBNoFadeKey;
 
 // One grey for every icon we add or recolour: the label colour at 60%,
 // resolved to a concrete value so nothing can re-resolve it later.
@@ -131,6 +135,9 @@ static void nfbForceOpaque(UIView* view) {
         view.alpha = 1.0;
     }
     [view.layer removeAnimationForKey:@"opacity"];
+    // Marked once and for all, so any fade added later is refused as well.
+    objc_setAssociatedObject(view.layer, kNFBNoFadeKey, @YES,
+                             OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     for (UIView* subview in view.subviews) {
         nfbForceOpaque(subview);
     }
@@ -409,6 +416,29 @@ static BOOL nfbIsRightHandGlyphButton(UIView* button) {
 - (void)layoutSubviews {
     %orig;
     [self nfbGreySettingsGlyphIfNeeded];
+}
+
+%end
+
+// The fade is refused where it is installed. Only layers we marked are
+// affected — every other animation in the app goes through untouched, after a
+// single pointer read.
+
+%hook CALayer
+
+- (void)addAnimation:(CAAnimation*)animation forKey:(NSString*)key {
+    if (!objc_getAssociatedObject(self, kNFBNoFadeKey)) {
+        %orig;
+        return;
+    }
+    BOOL isFade = [key isEqualToString:@"opacity"];
+    if (!isFade && [animation isKindOfClass:[CABasicAnimation class]]) {
+        isFade = [((CABasicAnimation*)animation).keyPath isEqualToString:@"opacity"];
+    }
+    if (isFade) {
+        return;   // pas de fondu sur l'engrenage
+    }
+    %orig;
 }
 
 %end

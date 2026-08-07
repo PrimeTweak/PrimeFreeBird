@@ -193,6 +193,7 @@ static id nfbWantedEntry(id provider) {
         case 3: name = @"articlesEntry"; break;
         case 4: name = @"photoEntry"; break;
         case 5: name = @"videoEntry"; break;
+        case 6: name = @"repostsEntry"; break;
         default: return nil;   // 0 = laisser Twitter décider
     }
 
