@@ -168,3 +168,92 @@ static char kCopyProviderKey;
 }
 
 %end
+
+// MARK: - Open profiles on a chosen tab
+
+// No guesswork here: the Objective-C metadata in the decrypted binary was
+// parsed to find who really owns this. T1ProfileDisplayContentProvider carries
+// initialTabIndex and setInitialTabIndex:, and its subclass exposes one entry
+// per tab — allPostsEntry, tweetsAndRepliesEntry, highlightsEntry,
+// articlesEntry, photoEntry, videoEntry.
+//
+// The index is never hardcoded: the wanted entry is looked up inside
+// contentMainEntries, so a profile that lacks Articles or Highlights still
+// lands on the right tab. If the entry is missing entirely — a profile with no
+// media — the original value is returned and nothing changes.
+
+static NSInteger nfbProfileTabIndex(id provider, NSInteger fallback) {
+    NSString* wanted = nil;
+    switch ([BHTSettings integerForKey:@"profile_initial_tab"]) {
+        case 1: wanted = @"tweetsAndRepliesEntry"; break;
+        case 2: wanted = @"highlightsEntry"; break;
+        case 3: wanted = @"articlesEntry"; break;
+        case 4: wanted = @"photoEntry"; break;
+        case 5: wanted = @"videoEntry"; break;
+        default: return fallback;   // 0 = laisser Twitter décider
+    }
+
+    SEL entrySelector = NSSelectorFromString(wanted);
+    if (![provider respondsToSelector:entrySelector] ||
+        ![provider respondsToSelector:@selector(contentMainEntries)]) {
+        return fallback;
+    }
+    id entry = ((id (*)(id, SEL))objc_msgSend)(provider, entrySelector);
+    NSArray* entries =
+        ((id (*)(id, SEL))objc_msgSend)(provider, @selector(contentMainEntries));
+    if (!entry || ![entries isKindOfClass:[NSArray class]]) {
+        return fallback;
+    }
+    NSUInteger index = [entries indexOfObject:entry];
+    return index == NSNotFound ? fallback : (NSInteger)index;
+}
+
+%hook T1ProfileDisplayContentProvider
+
+- (NSInteger)initialTabIndex {
+    NSInteger original = %orig;
+
+    @try {
+        return nfbProfileTabIndex(self, original);
+    } @catch (id exception) {
+        return original;
+    }
+}
+
+%end
+
+// MARK: - Hide the Videos tab
+
+// Articles and Highlights are switched off through their feature flags, but no
+// flag governs the Videos tab. The model decides instead: shouldDisplayVideosTab
+// on T1ProfileUserViewModel, read straight from the binary's method table. Same
+// shape as the premium-offer hook above — one boolean, nothing to walk.
+
+%hook T1ProfileUserViewModel
+
+- (BOOL)shouldDisplayVideosTab {
+    return [BHTSettings boolForKey:@"disable_videos_tab"] ? NO : %orig;
+}
+
+%end
+
+// MARK: - Expand bios
+
+// No more "Show more" on a truncated bio. The binary's metadata settled what I
+// had first guessed wrong: T1ProfileUserInfoView holds _bioExpanded, a plain
+// BOOL paired with a tap recogniser, and exposes it as isBioExpanded /
+// setBioExpanded:. That is the inline truncation.
+//
+// It is NOT _expandedBioButton, which belongs to the Premium long bio and
+// opens a modal — forcing that one would pop a sheet on every profile.
+//
+// Forcing the getter is enough: the layout asks it whether to clip, and the
+// button that offered the tap has nothing left to reveal.
+
+%hook T1ProfileUserInfoView
+
+- (BOOL)isBioExpanded {
+    return [BHTSettings boolForKey:@"expand_bio"] ? YES : %orig;
+}
+
+%end
