@@ -242,7 +242,7 @@
 
 /* Restore tab labels */
 "RESTORE_TAB_LABELS_TITLE" = "Étiquettes de navigation";
-"RESTORE_TAB_LABELS_DETAIL" = "Affichez les étiquettes sous les icônes comme dans les anciennes versions de Twitter.";
+"RESTORE_TAB_LABELS_DETAIL" = "Affichez les étiquettes sous les icônes comme dans les anciennes versions de Twitter. (Standard seulement)";
 
 "COLOR_TWITTER_ICON_IN_TOP_BAR_TITLE" = "Colorer l'icône Twitter";
 "COLOR_TWITTER_ICON_IN_TOP_BAR_DETAIL" = "Applique la couleur d'accent à l'icône Twitter dans la barre supérieure.";
@@ -474,7 +474,7 @@
 "MUTED_WORDS_EXAMPLE_TERM" = "spoiler";
 
 "HIDE_SCROLL_EDGE_BLUR_TITLE" = "Masquer le flou de bord";
-"HIDE_SCROLL_EDGE_BLUR_DETAIL" = "Retire la bande floue qu'iOS 26 dessine sous les barres, comme l'app d'origine.";
+"HIDE_SCROLL_EDGE_BLUR_DETAIL" = "Retire la bande floue dessinée sous les barres, comme l'app d'origine. (Liquid Glass seulement)";
 
 "SHOW_POLL_RESULTS_TITLE" = "Afficher les résultats";
 "SHOW_POLL_RESULTS_DETAIL" = "Ajoute à chaque choix sa part des votes, avant même d'avoir voté.";
