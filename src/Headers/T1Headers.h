@@ -243,3 +243,31 @@
                              count:(id)arg3
                        highlighted:(_Bool)arg4;
 @end
+
+@interface TFCCardData : NSObject
+@property (readonly, copy, nonatomic) NSString* name;
+- (NSString*)stringForKey:(NSString*)key;
+- (NSString*)stringForKey:(NSString*)key defaultValue:(NSString*)value;
+- (NSNumber*)numberForKey:(NSString*)key;
+- (NSNumber*)numberFromStringForKey:(NSString*)key;
+- (BOOL)boolForKey:(NSString*)key;
+@end
+
+@interface TAVPlaybackState : NSObject
+// AVPlayer semantics: 0 = paused, 1 = waiting to play, 2 = playing.
+@property (nonatomic, readonly) long long timeControlStatus;
+@end
+
+@interface TAVPlayer : NSObject
+@property (nonatomic, readonly) TAVPlaybackState* playbackState;
+- (void)play;
+- (void)pause;
+- (void)playOrReplay;
+@end
+
+@interface _TtC14T1TwitterSwift22ImmersiveVideoPageView : UIView
+@end
+
+@interface _TtC14T1TwitterSwift17ImmersiveCardView : UIView
+- (void)setPausedByUser:(BOOL)paused;
+@end
