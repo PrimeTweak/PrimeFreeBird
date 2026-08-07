@@ -37,6 +37,11 @@ static const void* kNFBPaintedFlagKey = &kNFBPaintedFlagKey;
 // One grey for every icon we add or recolour: the label colour at 60%,
 // resolved to a concrete value so nothing can re-resolve it later.
 static UIColor* NFBBarIconGrey(UITraitCollection* traits) {
+    // DIAGNOSTIC (à retirer): rouge vif au lieu du gris. Si l'icône passe par
+    // un rouge PÂLE avant le rouge franc, c'est la barre entière qui monte en
+    // opacité et notre couleur n'y est pour rien. Si elle passe du noir au
+    // rouge, c'est bien notre repeint qui arrive en retard.
+    return [UIColor systemRedColor];
     UIColor* grey = [[UIColor labelColor] colorWithAlphaComponent:0.6];
     if (traits && [grey respondsToSelector:@selector(resolvedColorWithTraitCollection:)]) {
         return [grey resolvedColorWithTraitCollection:traits] ?: grey;

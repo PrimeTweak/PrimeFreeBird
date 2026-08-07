@@ -255,18 +255,46 @@ static const void* kNFBTabAppliedKey = &kNFBTabAppliedKey;
 
     @try {
         id controller = self;
-        // Once per profile: re-selecting on every appearance would fight the
-        // tab you picked by hand after coming back from a tweet.
         if (objc_getAssociatedObject(controller, kNFBTabAppliedKey)) {
             return;
         }
-        if (![controller respondsToSelector:@selector(currentDisplayContentProvider)] ||
-            ![controller respondsToSelector:@selector(_t1_selectMainEntry:)]) {
-            return;
+
+        // ---- DIAGNOSTIC (à retirer) ---------------------------------------
+        // A square in the top-right corner of the profile says where this
+        // stops. Nothing at all means viewDidAppear never runs here.
+        //   red    : the controller does not answer the two selectors
+        //   orange : provider is nil
+        //   yellow : no entry — the wanted tab is off, absent, or set to
+        //            Default
+        //   green  : entry found and the selection was asked for
+        UIColor* mark = [UIColor systemRedColor];
+        id provider = nil;
+        id entry = nil;
+
+        BOOL answers =
+            [controller respondsToSelector:@selector(currentDisplayContentProvider)] &&
+            [controller respondsToSelector:@selector(_t1_selectMainEntry:)];
+        if (answers) {
+            provider = ((id (*)(id, SEL))objc_msgSend)(
+                controller, @selector(currentDisplayContentProvider));
+            mark = provider ? [UIColor systemYellowColor] : [UIColor systemOrangeColor];
+            if (provider) {
+                entry = nfbWantedEntry(provider);
+                if (entry) {
+                    mark = [UIColor systemGreenColor];
+                }
+            }
         }
-        id provider = ((id (*)(id, SEL))objc_msgSend)(
-            controller, @selector(currentDisplayContentProvider));
-        id entry = nfbWantedEntry(provider);
+
+        UIView* host = ((UIView* (*)(id, SEL))objc_msgSend)(controller, @selector(view));
+        UIView* dot = [[UIView alloc] initWithFrame:CGRectMake(
+            CGRectGetWidth(host.bounds) - 46.0, 8.0, 34.0, 34.0)];
+        dot.backgroundColor = mark;
+        dot.layer.cornerRadius = 17.0;
+        [host addSubview:dot];
+        [host bringSubviewToFront:dot];
+        // -------------------------------------------------------------------
+
         if (!entry) {
             return;
         }
