@@ -37,11 +37,6 @@ static const void* kNFBPaintedFlagKey = &kNFBPaintedFlagKey;
 // One grey for every icon we add or recolour: the label colour at 60%,
 // resolved to a concrete value so nothing can re-resolve it later.
 static UIColor* NFBBarIconGrey(UITraitCollection* traits) {
-    // DIAGNOSTIC (à retirer): rouge vif au lieu du gris. Si l'icône passe par
-    // un rouge PÂLE avant le rouge franc, c'est la barre entière qui monte en
-    // opacité et notre couleur n'y est pour rien. Si elle passe du noir au
-    // rouge, c'est bien notre repeint qui arrive en retard.
-    return [UIColor systemRedColor];
     UIColor* grey = [[UIColor labelColor] colorWithAlphaComponent:0.6];
     if (traits && [grey respondsToSelector:@selector(resolvedColorWithTraitCollection:)]) {
         return [grey resolvedColorWithTraitCollection:traits] ?: grey;
@@ -126,6 +121,21 @@ static BOOL nfbLooksLikeSettingsButton(UIView* view) {
            [label hasPrefix:@"NavigationBarSettings"];
 }
 
+// The gear fades in when the app opens — Twitter animates its opacity, which
+// is the pale pass he sees before the real grey. Our own buttons don't do it
+// because we place them ourselves. Snapping this one to full opacity, and
+// dropping any opacity animation still running on it, removes the fade for
+// the settings gear only. Nothing else in the bar is touched.
+static void nfbForceOpaque(UIView* view) {
+    if (view.alpha < 1.0) {
+        view.alpha = 1.0;
+    }
+    [view.layer removeAnimationForKey:@"opacity"];
+    for (UIView* subview in view.subviews) {
+        nfbForceOpaque(subview);
+    }
+}
+
 // Depth-first search for the settings button by its identifier or label.
 static UIView* nfbFindSettingsButton(UIView* view) {
     for (UIView* subview in view.subviews) {
@@ -196,6 +206,14 @@ static void nfbRepaintNotificationsGear(UIView* bar, UIColor* colour) {
     if (!nfbControllerIsNotifications(nfbBarOwningController(bar))) {
         return;
     }
+    // The item has no view of its own, so the fade is removed from whatever
+    // renders it: the icon buttons on the right of this bar.
+    for (UIView* subview in bar.subviews) {
+        CGRect inBar = [subview convertRect:subview.bounds toView:bar];
+        if (CGRectGetMidX(inBar) > CGRectGetWidth(bar.bounds) * 0.6) {
+            nfbForceOpaque(subview);
+        }
+    }
     if (![bar respondsToSelector:@selector(topItem)]) {
         return;
     }
@@ -242,6 +260,7 @@ static void nfbRepaintNotificationsGear(UIView* bar, UIColor* colour) {
         UIView* settingsButton = nfbFindSettingsButton(bar);
         if (settingsButton) {
             nfbRepaintGlyphs(settingsButton, grey);
+            nfbForceOpaque(settingsButton);
             return;
         }
         nfbRepaintNotificationsGear(bar, grey);
@@ -377,6 +396,7 @@ static BOOL nfbIsRightHandGlyphButton(UIView* button) {
             return;
         }
         nfbRepaintGlyphs(button, NFBBarIconGrey(button.traitCollection));
+        nfbForceOpaque(button);
     } @catch (id exception) {
     }
 }

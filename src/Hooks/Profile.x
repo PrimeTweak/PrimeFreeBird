@@ -218,14 +218,10 @@ static id nfbWantedEntry(id provider) {
     if (!entry) {
         return nil;
     }
-    // Only if the profile actually offers that tab: a locked account has no
-    // media entry, and picking one that is not on screen would land nowhere.
-    NSArray* entries =
-        ((id (*)(id, SEL))objc_msgSend)(provider, @selector(contentMainEntries));
-    if (![entries isKindOfClass:[NSArray class]] ||
-        ![entries containsObject:entry]) {
-        return nil;
-    }
+    // No identity check against contentMainEntries: the diagnostic came back
+    // yellow, which means the entry existed but the array did not contain that
+    // exact object. Whether a tab is actually on screen is answered further
+    // down by the controller itself, which is the authority on it.
     return entry;
 }
 
@@ -258,45 +254,28 @@ static const void* kNFBTabAppliedKey = &kNFBTabAppliedKey;
         if (objc_getAssociatedObject(controller, kNFBTabAppliedKey)) {
             return;
         }
-
-        // ---- DIAGNOSTIC (à retirer) ---------------------------------------
-        // A square in the top-right corner of the profile says where this
-        // stops. Nothing at all means viewDidAppear never runs here.
-        //   red    : the controller does not answer the two selectors
-        //   orange : provider is nil
-        //   yellow : no entry — the wanted tab is off, absent, or set to
-        //            Default
-        //   green  : entry found and the selection was asked for
-        UIColor* mark = [UIColor systemRedColor];
-        id provider = nil;
-        id entry = nil;
-
-        BOOL answers =
-            [controller respondsToSelector:@selector(currentDisplayContentProvider)] &&
-            [controller respondsToSelector:@selector(_t1_selectMainEntry:)];
-        if (answers) {
-            provider = ((id (*)(id, SEL))objc_msgSend)(
-                controller, @selector(currentDisplayContentProvider));
-            mark = provider ? [UIColor systemYellowColor] : [UIColor systemOrangeColor];
-            if (provider) {
-                entry = nfbWantedEntry(provider);
-                if (entry) {
-                    mark = [UIColor systemGreenColor];
-                }
-            }
+        if (![controller respondsToSelector:@selector(currentDisplayContentProvider)] ||
+            ![controller respondsToSelector:@selector(_t1_selectMainEntry:)]) {
+            return;
         }
 
-        UIView* host = ((UIView* (*)(id, SEL))objc_msgSend)(controller, @selector(view));
-        UIView* dot = [[UIView alloc] initWithFrame:CGRectMake(
-            CGRectGetWidth(host.bounds) - 46.0, 8.0, 34.0, 34.0)];
-        dot.backgroundColor = mark;
-        dot.layer.cornerRadius = 17.0;
-        [host addSubview:dot];
-        [host bringSubviewToFront:dot];
-        // -------------------------------------------------------------------
+        id provider = ((id (*)(id, SEL))objc_msgSend)(
+            controller, @selector(currentDisplayContentProvider));
+        id entry = nfbWantedEntry(provider);
+
 
         if (!entry) {
             return;
+        }
+        // The controller knows whether that entry has a tab on screen. Asking
+        // it is more reliable than comparing objects ourselves, and it keeps
+        // the guard: a profile without that tab is left alone.
+        if ([controller respondsToSelector:@selector(_t1_outerTabIndexForEntry:)]) {
+            NSInteger index = ((NSInteger (*)(id, SEL, id))objc_msgSend)(
+                controller, @selector(_t1_outerTabIndexForEntry:), entry);
+            if (index < 0 || index == NSNotFound) {
+                return;
+            }
         }
         objc_setAssociatedObject(controller, kNFBTabAppliedKey, @YES,
                                  OBJC_ASSOCIATION_RETAIN_NONATOMIC);
