@@ -91,6 +91,35 @@ static UIColor* NFBBarIconGrey(UITraitCollection* traits) {
     return grey;
 }
 
+// Renders a glyph into a flat grey bitmap. Every colour route we tried was
+// reclaimed by something: the tint by the theme when the bar re-appears, the
+// alpha by the button's own highlight after a tap, and Twitter's fillColor
+// comes back black. A colour burnt into the pixels survives all three.
+static UIImage* NFBGreyGlyph(UIImage* source, UIColor* colour) {
+    if (!source || !colour) {
+        return source;
+    }
+    CGSize size = source.size;
+    if (size.width < 1.0 || size.height < 1.0) {
+        return source;
+    }
+    UIGraphicsImageRendererFormat* format =
+        [UIGraphicsImageRendererFormat preferredFormat];
+    format.opaque = NO;
+    format.scale = source.scale;
+    UIGraphicsImageRenderer* renderer =
+        [[UIGraphicsImageRenderer alloc] initWithSize:size format:format];
+    UIImage* painted = [renderer
+        imageWithActions:^(UIGraphicsImageRendererContext* context) {
+            CGRect rect = CGRectMake(0.0, 0.0, size.width, size.height);
+            [source drawInRect:rect];
+            CGContextSetBlendMode(context.CGContext, kCGBlendModeSourceIn);
+            [colour setFill];
+            CGContextFillRect(context.CGContext, rect);
+        }];
+    return [painted imageWithRenderingMode:UIImageRenderingModeAlwaysOriginal];
+}
+
 %hook TFNNavigationBar
 
 %new
@@ -149,15 +178,12 @@ static UIColor* NFBBarIconGrey(UITraitCollection* traits) {
             if ([UIImage respondsToSelector:@selector(tfn_vectorImageNamed:
                                                                  fitsSize:
                                                                 fillColor:)]) {
+                // Twitter's own fillColor comes back black whatever we pass,
+                // so the glyph is fetched first and repainted ourselves.
                 icon = [UIImage tfn_vectorImageNamed:@"filter_bars"
                                             fitsSize:CGSizeMake(26.0, 26.0)
-                                           fillColor:NFBBarIconGrey(bar.traitCollection)];
-                // Baked, not template. A template image takes its colour from
-                // the tint, and the theme reclaimed it every time the bar was
-                // re-shown after a scroll — the icon flashed back to the accent
-                // until you changed tab. A colour burnt into the image cannot
-                // be reclaimed by anything.
-                icon = [icon imageWithRenderingMode:UIImageRenderingModeAlwaysOriginal];
+                                           fillColor:[UIColor blackColor]];
+                icon = NFBGreyGlyph(icon, NFBBarIconGrey(bar.traitCollection));
             }
             if (!icon) {
                 icon = [UIImage systemImageNamed:@"line.3.horizontal.decrease"];

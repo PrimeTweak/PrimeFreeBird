@@ -5,50 +5,81 @@
 //  Twitter draws the settings gear at full label strength, which reads as
 //  black next to the muted grey of the tab labels beside it.
 //
-//  Three earlier attempts failed, and the reason matters. The gear is not a
-//  bar button item, and TFNBarButtonItemButton — the class FLEX named — does
-//  not live in the framework this tweak hooks at load time, so hooking it
-//  directly never applied. What does reliably run is TFNNavigationBar's
-//  layout, proven by the quick-access button sitting in that same bar.
+//  Every colour route was tried and each was reclaimed by something: the tint
+//  by the theme, the alpha by the button's own highlight after a tap, and
+//  Twitter's fillColor renders black. So the glyph is repainted into a flat
+//  grey bitmap, which nothing can take back.
 //
-//  So: start from the bar, walk down to the view carrying the accessibility
-//  identifier "NavigationBarSettingsButton" — an exact, stable anchor read off
-//  the binary — and tint the glyph inside it. Nothing else is touched.
+//  Two screens, two shapes. On Explore the gear is a TFNBarButtonItemButton
+//  carrying "NavigationBarSettingsButton", with its image nested a few levels
+//  below. On Notifications it is a plain bar button item. The hook sits on
+//  UINavigationBar — UIKit's base class, always loaded — because Twitter's own
+//  subclass differs between screens.
 //
 
 #import "HookHelpers.h"
 
 static NSString* const kNFBSettingsButtonIdentifier = @"NavigationBarSettingsButton";
+static const void* kNFBGreyedImageKey = &kNFBGreyedImageKey;
 
-// secondaryLabelColor is the label colour at 60% opacity; dimming the button
-// to the same value gives an identical result whatever draws the glyph.
-static const CGFloat kNFBGreyAlpha = 0.6;
+// One grey for every icon we add or recolour: the label colour at 60%,
+// resolved to a concrete value so nothing can re-resolve it later.
+static UIColor* NFBBarIconGrey(UITraitCollection* traits) {
+    UIColor* grey = [[UIColor labelColor] colorWithAlphaComponent:0.6];
+    if (traits && [grey respondsToSelector:@selector(resolvedColorWithTraitCollection:)]) {
+        return [grey resolvedColorWithTraitCollection:traits] ?: grey;
+    }
+    return grey;
+}
 
-// Forces template rendering, without which a tint is simply ignored.
-static void nfbTintGlyphsIn(UIView* view, UIColor* colour) {
+// Repaints a glyph into a flat bitmap of the given colour.
+static UIImage* NFBGreyGlyph(UIImage* source, UIColor* colour) {
+    if (!source || !colour) {
+        return source;
+    }
+    CGSize size = source.size;
+    if (size.width < 1.0 || size.height < 1.0) {
+        return source;
+    }
+    UIGraphicsImageRendererFormat* format = [UIGraphicsImageRendererFormat preferredFormat];
+    format.opaque = NO;
+    format.scale = source.scale;
+    UIGraphicsImageRenderer* renderer =
+        [[UIGraphicsImageRenderer alloc] initWithSize:size format:format];
+    UIImage* painted = [renderer
+        imageWithActions:^(UIGraphicsImageRendererContext* context) {
+            CGRect rect = CGRectMake(0.0, 0.0, size.width, size.height);
+            [source drawInRect:rect];
+            CGContextSetBlendMode(context.CGContext, kCGBlendModeSourceIn);
+            [colour setFill];
+            CGContextFillRect(context.CGContext, rect);
+        }];
+    return [painted imageWithRenderingMode:UIImageRenderingModeAlwaysOriginal];
+}
+
+// Replaces the image of every glyph-sized image view under a view. The result
+// is remembered so the work happens once, and happens again only if Twitter
+// puts its own image back.
+static void nfbRepaintGlyphs(UIView* view, UIColor* colour) {
     for (UIView* subview in view.subviews) {
         if ([subview isKindOfClass:[UIImageView class]]) {
             UIImageView* imageView = (UIImageView*)subview;
-            if (imageView.image) {
-                if (imageView.image.renderingMode != UIImageRenderingModeAlwaysTemplate) {
-                    imageView.image = [imageView.image
-                        imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate];
-                }
-                if (![imageView.tintColor isEqual:colour]) {
-                    imageView.tintColor = colour;
-                }
+            UIImage* current = imageView.image;
+            UIImage* ours = objc_getAssociatedObject(imageView, kNFBGreyedImageKey);
+            if (current && current != ours) {
+                UIImage* painted = NFBGreyGlyph(current, colour);
+                imageView.image = painted;
+                objc_setAssociatedObject(imageView, kNFBGreyedImageKey, painted,
+                                         OBJC_ASSOCIATION_RETAIN_NONATOMIC);
             }
         }
-        nfbTintGlyphsIn(subview, colour);
+        nfbRepaintGlyphs(subview, colour);
     }
 }
 
-// Depth-first search for the settings button by its accessibility identifier.
+// Depth-first search for the settings button by its identifier or label.
 static UIView* nfbFindSettingsButton(UIView* view) {
     for (UIView* subview in view.subviews) {
-        // FLEX shows either the identifier or the accessibility label after
-        // the dot, and we cannot tell which from the screenshot — so both are
-        // accepted, plus a prefix match in case Twitter suffixes it.
         NSString* identifier = subview.accessibilityIdentifier;
         NSString* label = subview.accessibilityLabel;
         if ([identifier isEqualToString:kNFBSettingsButtonIdentifier] ||
@@ -65,23 +96,30 @@ static UIView* nfbFindSettingsButton(UIView* view) {
     return nil;
 }
 
-// True when this controller is the notifications screen, hosts it, or sits
-// inside it.
+// The notifications tab is named after activity, not notifications — the class
+// is T1ActivityHistory… — and the bar belongs to the All/Mentions container,
+// whose own name says nothing. Both spellings are accepted, and children and
+// parents are searched as well as the controller itself.
+static BOOL nfbNameIsNotifications(UIViewController* controller) {
+    NSString* name = controller ? NSStringFromClass([controller class]) : @"";
+    return [name containsString:@"Notification"] || [name containsString:@"Activity"];
+}
+
 static BOOL nfbControllerIsNotifications(UIViewController* controller) {
     if (!controller) {
         return NO;
     }
-    if ([NSStringFromClass([controller class]) containsString:@"Notification"]) {
+    if (nfbNameIsNotifications(controller)) {
         return YES;
     }
     for (UIViewController* child in controller.childViewControllers) {
-        if ([NSStringFromClass([child class]) containsString:@"Notification"]) {
+        if (nfbNameIsNotifications(child)) {
             return YES;
         }
     }
     UIViewController* parent = controller.parentViewController;
     while (parent) {
-        if ([NSStringFromClass([parent class]) containsString:@"Notification"]) {
+        if (nfbNameIsNotifications(parent)) {
             return YES;
         }
         parent = parent.parentViewController;
@@ -89,36 +127,42 @@ static BOOL nfbControllerIsNotifications(UIViewController* controller) {
     return NO;
 }
 
-// Notifications: the gear is a plain bar button item. Scoped to that screen
-// through the owning controller, so no other bar is touched.
-static void nfbDimNotificationsGear(UIView* bar) {
-    UIResponder* responder = bar;
-    UIViewController* owner = nil;
+static UIViewController* nfbBarOwningController(UIView* view) {
+    UIResponder* responder = view;
     while ((responder = responder.nextResponder)) {
-        if ([responder isKindOfClass:[UIViewController class]]) {
-            owner = (UIViewController*)responder;
-            if ([owner isKindOfClass:[UINavigationController class]]) {
-                owner = ((UINavigationController*)owner).topViewController ?: owner;
-            }
-            break;
+        if (![responder isKindOfClass:[UIViewController class]]) {
+            continue;
         }
+        UIViewController* controller = (UIViewController*)responder;
+        if ([controller isKindOfClass:[UINavigationController class]]) {
+            return ((UINavigationController*)controller).topViewController ?: controller;
+        }
+        return controller;
     }
-    // The bar's owner is often a generic container — the All/Mentions
-    // segmented controller here — so its own name says nothing. Look at its
-    // children and its parent too. Exactly the trap the scroll edge effect
-    // taught us: the screen's real name sits one level away.
-    if (!nfbControllerIsNotifications(owner)) {
+    return nil;
+}
+
+// Notifications: the gear is a bar button item, so its image is repainted
+// directly. Scoped to that screen, and icon-only items, so a text button like
+// "Done" is never touched.
+static void nfbRepaintNotificationsGear(UIView* bar, UIColor* colour) {
+    if (!nfbControllerIsNotifications(nfbBarOwningController(bar))) {
         return;
     }
     if (![bar respondsToSelector:@selector(topItem)]) {
         return;
     }
-    UINavigationItem* item =
-        ((id (*)(id, SEL))objc_msgSend)(bar, @selector(topItem));
-    UIColor* grey = [[UIColor labelColor] colorWithAlphaComponent:0.6];
+    UINavigationItem* item = ((id (*)(id, SEL))objc_msgSend)(bar, @selector(topItem));
     for (UIBarButtonItem* button in item.rightBarButtonItems) {
-        if (![button.tintColor isEqual:grey]) {
-            button.tintColor = grey;
+        if (button.title.length > 0 || !button.image) {
+            continue;
+        }
+        UIImage* ours = objc_getAssociatedObject(button, kNFBGreyedImageKey);
+        if (button.image != ours) {
+            UIImage* painted = NFBGreyGlyph(button.image, colour);
+            button.image = painted;
+            objc_setAssociatedObject(button, kNFBGreyedImageKey, painted,
+                                     OBJC_ASSOCIATION_RETAIN_NONATOMIC);
         }
     }
 }
@@ -133,30 +177,14 @@ static void nfbDimNotificationsGear(UIView* bar) {
         if (!bar.window) {
             return;
         }
+        UIColor* grey = NFBBarIconGrey(bar.traitCollection);
+
         UIView* settingsButton = nfbFindSettingsButton(bar);
-        if (!settingsButton) {
-            // Notifications builds its bar the classic way — a title and a
-            // right bar button item — so no view there carries the identifier.
-            // That screen is handled through the item instead, and only there.
-            nfbDimNotificationsGear(bar);
+        if (settingsButton) {
+            nfbRepaintGlyphs(settingsButton, grey);
             return;
         }
-        // Opacity, not tint. The diagnostic proved the button is found and
-        // that view properties stick — its background turned red — yet the
-        // glyph stayed black through every tinting route. So we stop fighting
-        // over how the glyph is drawn: secondaryLabel IS the label colour at
-        // 60% opacity, and dimming the button reproduces it exactly.
-        if (settingsButton.alpha > kNFBGreyAlpha + 0.01) {
-            settingsButton.alpha = kNFBGreyAlpha;
-        }
-
-        // Tinting is still attempted, harmlessly: if a future build makes the
-        // glyph tintable, the colour becomes exact rather than simulated.
-        UIColor* grey = [[UIColor labelColor] colorWithAlphaComponent:0.6];
-        if (![settingsButton.tintColor isEqual:grey]) {
-            settingsButton.tintColor = grey;
-        }
-        nfbTintGlyphsIn(settingsButton, grey);
+        nfbRepaintNotificationsGear(bar, grey);
     } @catch (id exception) {
     }
 }
