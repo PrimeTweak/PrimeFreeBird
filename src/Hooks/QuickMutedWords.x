@@ -102,10 +102,12 @@ static UIColor* NFBBarIconGrey(UITraitCollection* traits) {
 // 6-18 and 9-15, centre lines at y=7, 12.5 and 18 on a 24-unit canvas. Only the
 // bar height changes.
 //
-// 2.55 is measured, not chosen: the gear's stroke is 2.55 units of its own
-// 24-unit canvas. Both numbers have to be honoured together — a stroke only
-// matches if the canvas it is drawn on matches too, which is why the caller
-// asks for 24 points rather than the 26 this icon used to use.
+// Both numbers are measured against the settings gear as it actually reaches
+// the screen, not against the glyph in isolation — that mistake produced an
+// icon simultaneously too heavy and too small. The gear's ink spans 62 points
+// across at three-times scale with an 8 point stroke; this shape only covers
+// 18 of its 24 units, so it needs the larger 27.33 canvas to reach the same
+// width, and 2.2 units of thickness to land on the same stroke there.
 // Left, right, centre line — a block cannot capture a local C array, so the
 // table lives at file scope where it is simply referenced.
 static const CGFloat kNFBBarGeometry[3][3] = {
@@ -114,7 +116,7 @@ static const CGFloat kNFBBarGeometry[3][3] = {
 
 static UIImage* NFBFilterBarsGlyph(CGFloat side) {
     const CGFloat kUnit = 24.0;
-    const CGFloat kThickness = 2.55;
+    const CGFloat kThickness = 2.20;
     CGFloat scale = side / kUnit;
     UIGraphicsImageRendererFormat* format =
         [UIGraphicsImageRendererFormat preferredFormat];
@@ -218,7 +220,7 @@ static UIImage* NFBGreyGlyph(UIImage* source, UIColor* colour) {
             // The old system-symbol safety net is gone with the library
             // lookup it guarded: drawing the shape ourselves cannot come back
             // empty.
-            UIImage* icon = NFBGreyGlyph(NFBFilterBarsGlyph(24.0),
+            UIImage* icon = NFBGreyGlyph(NFBFilterBarsGlyph(27.33),
                                          NFBBarIconGrey(bar.traitCollection));
             button = [UIButton buttonWithType:UIButtonTypeSystem];
             [button setImage:icon forState:UIControlStateNormal];

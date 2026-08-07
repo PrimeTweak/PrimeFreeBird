@@ -8,11 +8,12 @@
 //  items, nothing appears and nothing breaks; the Settings → Search →
 //  Advanced search row remains the guaranteed entry.
 //
-//  The glyph is drawn here rather than fetched. Twitter's own sliders, and the
-//  SF Symbol that stood in for them, are both 2 units thick against the
-//  settings gear's 2.55 — which is what made this icon read thin next to it.
-//  filter_fill is the opposite problem at 3 units. So the shape is Twitter's,
-//  taken from its filter glyph, and only the stroke is ours.
+//  The glyph is drawn here rather than fetched. Twitter draws every one of its
+//  line glyphs at 2 units — filter, filter_bars, bulleted_list, all of them —
+//  while the settings gear beside this button is 2.6, so no glyph in the
+//  library matches it. The shape below is Twitter's own, taken from its filter
+//  glyph; only the stroke and the canvas are ours, both set so the icon
+//  reaches the screen at the gear's width and the gear's stroke.
 //
 
 #import "HookHelpers.h"
@@ -38,7 +39,7 @@ static const CGFloat kNFBSliderGeometry[2][2] = {{7.0, 15.0}, {17.0, 9.0}};
 
 static UIImage* NFBSlidersGlyph(CGFloat side) {
     const CGFloat kUnit = 24.0;
-    const CGFloat kThickness = 2.55;
+    const CGFloat kThickness = 2.20;
     const CGFloat kGap = 1.5;
     const CGFloat kHandleHalfHeight = 4.0;
     CGFloat scale = side / kUnit;
@@ -123,9 +124,10 @@ static UIColor* NFBBarIconGrey(UITraitCollection* traits) {
         if (existingBtn) {
             return;
         }
-        // 24 points, the gear's own canvas: a stroke width only matches if the
-        // canvas it sits on matches too.
-        UIImage* icon = NFBSlidersGlyph(24.0);
+        // 27.33 points, not the gear's 24: this shape covers 18 of its 24
+        // units against the gear's 20.5, so it needs the wider canvas to
+        // reach the same width on screen.
+        UIImage* icon = NFBSlidersGlyph(27.33);
         UIBarButtonItem* btn =
             [[UIBarButtonItem alloc] initWithImage:icon
                                              style:UIBarButtonItemStylePlain
