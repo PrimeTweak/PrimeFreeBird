@@ -919,3 +919,94 @@ static NSArray* FilteredTimelineSections(TFNItemsDataViewController* dataViewCon
 }
 
 %end
+
+// MARK: - Poll results before voting
+//
+// Twitter hides the tallies until you have voted. The counts travel with the
+// card data all along, so the percentage is simply appended to each option's
+// label. Ported from Orion's fork, whose comment saved the hard part: don't
+// derive the choice count from the card name — text polls are named
+// "poll2choice_text_only", but image polls carry no count in their name at
+// all, so the per-choice bindings are probed instead.
+
+static const NSUInteger kNFBPollMaxChoices = 4;
+
+// "choice2_label" -> 2, anything else -> 0.
+static NSUInteger nfbPollChoiceIndexForKey(NSString* key) {
+    if (![key hasPrefix:@"choice"] || ![key hasSuffix:@"_label"]) {
+        return 0;
+    }
+    NSRange digits = NSMakeRange(6, key.length - 6 - 6);
+    NSInteger index = [key substringWithRange:digits].integerValue;
+    return index > 0 ? (NSUInteger)index : 0;
+}
+
+static BOOL nfbPollAlreadyShowsResults(TFCCardData* cardData) {
+    if ([cardData boolForKey:@"counts_are_final"]) {
+        return YES;
+    }
+    return [cardData stringForKey:@"selected_choice"].length > 0;
+}
+
+static NSString* nfbPollPercentageString(double fraction) {
+    static NSNumberFormatter* formatter;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+        formatter = [[NSNumberFormatter alloc] init];
+        formatter.numberStyle = NSNumberFormatterPercentStyle;
+        formatter.maximumFractionDigits = 0;
+    });
+    return [formatter stringFromNumber:@(fraction)];
+}
+
+static NSString* nfbPollTitleWithPercentage(TFCCardData* cardData,
+                                            NSString* key,
+                                            NSString* title) {
+    NSUInteger choice = nfbPollChoiceIndexForKey(key);
+    if (choice == 0 || choice > kNFBPollMaxChoices || title.length == 0 ||
+        ![BHTSettings boolForKey:@"show_poll_results"]) {
+        return title;
+    }
+    if (nfbPollAlreadyShowsResults(cardData)) {
+        return title;
+    }
+
+    // numberForKey: tells a missing binding apart from a zero tally, and
+    // neither it nor numberFromStringForKey: is hooked below, so probing the
+    // siblings cannot recurse back in here.
+    long long total = 0;
+    long long votes = 0;
+    for (NSUInteger i = 1; i <= kNFBPollMaxChoices; i++) {
+        NSString* countKey =
+            [NSString stringWithFormat:@"choice%lu_count", (unsigned long)i];
+        NSNumber* count = [cardData numberForKey:countKey]
+                              ?: [cardData numberFromStringForKey:countKey];
+        if (!count) {
+            continue;
+        }
+        total += count.longLongValue;
+        if (i == choice) {
+            votes = count.longLongValue;
+        }
+    }
+    if (total <= 0) {
+        return title;
+    }
+    return [NSString
+        stringWithFormat:@"%@ (%@)", title,
+                         nfbPollPercentageString((double)votes / (double)total)];
+}
+
+%hook TFCCardData
+
+- (NSString*)stringForKey:(NSString*)key {
+    NSString* title = %orig;
+    return nfbPollTitleWithPercentage(self, key, title);
+}
+
+- (NSString*)stringForKey:(NSString*)key defaultValue:(NSString*)value {
+    NSString* title = %orig;
+    return nfbPollTitleWithPercentage(self, key, title);
+}
+
+%end
