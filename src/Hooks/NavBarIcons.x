@@ -82,15 +82,19 @@ static void nfbRepaintGlyphs(UIView* view, UIColor* colour) {
     }
 }
 
+static BOOL nfbLooksLikeSettingsButton(UIView* view) {
+    NSString* identifier = view.accessibilityIdentifier;
+    NSString* label = view.accessibilityLabel;
+    return [identifier isEqualToString:kNFBSettingsButtonIdentifier] ||
+           [label isEqualToString:kNFBSettingsButtonIdentifier] ||
+           [identifier hasPrefix:@"NavigationBarSettings"] ||
+           [label hasPrefix:@"NavigationBarSettings"];
+}
+
 // Depth-first search for the settings button by its identifier or label.
 static UIView* nfbFindSettingsButton(UIView* view) {
     for (UIView* subview in view.subviews) {
-        NSString* identifier = subview.accessibilityIdentifier;
-        NSString* label = subview.accessibilityLabel;
-        if ([identifier isEqualToString:kNFBSettingsButtonIdentifier] ||
-            [label isEqualToString:kNFBSettingsButtonIdentifier] ||
-            [identifier hasPrefix:@"NavigationBarSettings"] ||
-            [label hasPrefix:@"NavigationBarSettings"]) {
+        if (nfbLooksLikeSettingsButton(subview)) {
             return subview;
         }
         UIView* found = nfbFindSettingsButton(subview);
@@ -107,7 +111,10 @@ static UIView* nfbFindSettingsButton(UIView* view) {
 // parents are searched as well as the controller itself.
 static BOOL nfbNameIsNotifications(UIViewController* controller) {
     NSString* name = controller ? NSStringFromClass([controller class]) : @"";
-    return [name containsString:@"Notification"] || [name containsString:@"Activity"];
+    // "Activity" alone would also match UIActivityViewController — the share
+    // sheet — so the notifications tab is named precisely.
+    return [name containsString:@"Notification"] ||
+           [name containsString:@"ActivityHistory"];
 }
 
 static BOOL nfbControllerIsNotifications(UIViewController* controller) {
@@ -242,6 +249,78 @@ static void nfbRepaintNotificationsGear(UIView* bar, UIColor* colour) {
     objc_setAssociatedObject(self, kNFBGreyedImageKey, painted,
                              OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     %orig(painted);
+}
+
+%end
+
+// The same treatment as Explore, reached from the other side. Notifications
+// builds its bar differently, so searching the bar's subtree never found the
+// gear there — but the button class is the same one Twitter uses everywhere,
+// and hooking it catches the gear whatever the bar around it looks like.
+//
+// didMoveToWindow fires exactly when the bar appears, which is also the moment
+// the colour used to be lost.
+
+// A bar button qualifies only if it is an icon on the right-hand side: no
+// title, a glyph-sized image inside, and past the middle of its own bar. A
+// back chevron sits on the left and a text button has a title, so neither is
+// ever touched.
+static BOOL nfbIsRightHandGlyphButton(UIView* button) {
+    if ([button isKindOfClass:[UIButton class]] &&
+        ((UIButton*)button).currentTitle.length > 0) {
+        return NO;
+    }
+
+    __block BOOL hasGlyph = NO;
+    EnumerateSubviewsRecursively(button, ^(UIView* view) {
+        if (hasGlyph || ![view isKindOfClass:[UIImageView class]]) {
+            return;
+        }
+        UIImageView* imageView = (UIImageView*)view;
+        CGFloat side = CGRectGetWidth(imageView.bounds);
+        if (imageView.image && side > 14.0 && side < 34.0) {
+            hasGlyph = YES;
+        }
+    });
+    if (!hasGlyph) {
+        return NO;
+    }
+
+    UIView* bar = button.superview;
+    while (bar && ![bar isKindOfClass:[UINavigationBar class]]) {
+        bar = bar.superview;
+    }
+    if (!bar) {
+        return NO;
+    }
+    CGRect inBar = [button convertRect:button.bounds toView:bar];
+    return CGRectGetMidX(inBar) > CGRectGetWidth(bar.bounds) * 0.6;
+}
+
+%hook TFNBarButtonItemButton
+
+- (void)didMoveToWindow {
+    %orig;
+
+    @try {
+        UIView* button = (UIView*)self;
+        if (!button.window) {
+            return;
+        }
+        // Either the button says it is the settings one, or we are on the
+        // notifications screen, where the gear is the only icon in the bar.
+        // The identifier is the precise route and covers Explore. The second
+        // route exists only for Notifications, where no view carries it — and
+        // it is fenced in tightly so nothing else on that screen is caught.
+        BOOL wanted = nfbLooksLikeSettingsButton(button) ||
+                      (nfbControllerIsNotifications(nfbBarOwningController(button)) &&
+                       nfbIsRightHandGlyphButton(button));
+        if (!wanted) {
+            return;
+        }
+        nfbRepaintGlyphs(button, NFBBarIconGrey(button.traitCollection));
+    } @catch (id exception) {
+    }
 }
 
 %end
