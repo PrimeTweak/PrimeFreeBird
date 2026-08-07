@@ -226,6 +226,7 @@ static NSDictionary<NSString*, NSDictionary*>* BHTSettingsPages(void) {
                 @"titleKey": @"MODERN_SETTINGS_PROFILES_TITLE",
                 @"subtitleKey": @"MODERN_SETTINGS_PROFILES_SUBTITLE",
                 @"settings": @[
+                    @{@"type": @"header", @"titleKey": @"PROFILES_GROUP_BEHAVIOR"},
                     @{@"key": @"follow_confirm",
                       @"default": @NO,
                       @"type": @"toggle"},
@@ -234,6 +235,7 @@ static NSDictionary<NSString*, NSDictionary*>* BHTSettingsPages(void) {
                         @"default": @NO,
                         @"type": @"toggle"
                     },
+                    @{@"type": @"header", @"titleKey": @"PROFILES_GROUP_TABS"},
                     @{
                         @"key": @"disable_articles",
                         @"default": @YES,
@@ -244,6 +246,7 @@ static NSDictionary<NSString*, NSDictionary*>* BHTSettingsPages(void) {
                         @"default": @YES,
                         @"type": @"toggle"
                     },
+                    @{@"type": @"header", @"titleKey": @"PROFILES_GROUP_APPEARANCE"},
                     @{
                         @"key": @"hide_blue_verified",
                         @"default": @NO,
