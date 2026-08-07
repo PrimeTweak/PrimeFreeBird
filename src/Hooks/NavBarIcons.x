@@ -21,6 +21,9 @@
 
 static NSString* const kNFBSettingsButtonIdentifier = @"NavigationBarSettingsButton";
 static const void* kNFBGreyedImageKey = &kNFBGreyedImageKey;
+// Holds the colour to force on a view we have taken over, so any image set
+// later goes through the same repaint.
+static const void* kNFBGreyTargetKey = &kNFBGreyTargetKey;
 
 // One grey for every icon we add or recolour: the label colour at 60%,
 // resolved to a concrete value so nothing can re-resolve it later.
@@ -68,9 +71,11 @@ static void nfbRepaintGlyphs(UIView* view, UIColor* colour) {
             UIImage* ours = objc_getAssociatedObject(imageView, kNFBGreyedImageKey);
             if (current && current != ours) {
                 UIImage* painted = NFBGreyGlyph(current, colour);
-                imageView.image = painted;
+                objc_setAssociatedObject(imageView, kNFBGreyTargetKey, colour,
+                                         OBJC_ASSOCIATION_RETAIN_NONATOMIC);
                 objc_setAssociatedObject(imageView, kNFBGreyedImageKey, painted,
                                          OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+                imageView.image = painted;
             }
         }
         nfbRepaintGlyphs(subview, colour);
@@ -160,9 +165,11 @@ static void nfbRepaintNotificationsGear(UIView* bar, UIColor* colour) {
         UIImage* ours = objc_getAssociatedObject(button, kNFBGreyedImageKey);
         if (button.image != ours) {
             UIImage* painted = NFBGreyGlyph(button.image, colour);
-            button.image = painted;
+            objc_setAssociatedObject(button, kNFBGreyTargetKey, colour,
+                                     OBJC_ASSOCIATION_RETAIN_NONATOMIC);
             objc_setAssociatedObject(button, kNFBGreyedImageKey, painted,
                                      OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+            button.image = painted;
         }
     }
 }
@@ -187,6 +194,54 @@ static void nfbRepaintNotificationsGear(UIView* bar, UIColor* colour) {
         nfbRepaintNotificationsGear(bar, grey);
     } @catch (id exception) {
     }
+}
+
+%end
+
+// The frames of his screen recording showed the gear flipping between black
+// and grey on one screen: our repaint lands, then Twitter puts its own image
+// back, and nothing calls us again until the bar happens to lay out. So the
+// image is caught as it is set. Only views we have already taken over are
+// affected — everything else pays a single associated-object read.
+
+%hook UIImageView
+
+- (void)setImage:(UIImage*)image {
+    UIColor* target = objc_getAssociatedObject(self, kNFBGreyTargetKey);
+    if (!target || !image) {
+        %orig;
+        return;
+    }
+    UIImage* ours = objc_getAssociatedObject(self, kNFBGreyedImageKey);
+    if (image == ours) {
+        %orig;
+        return;
+    }
+    UIImage* painted = NFBGreyGlyph(image, target);
+    objc_setAssociatedObject(self, kNFBGreyedImageKey, painted,
+                             OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    %orig(painted);
+}
+
+%end
+
+%hook UIBarButtonItem
+
+- (void)setImage:(UIImage*)image {
+    UIColor* target = objc_getAssociatedObject(self, kNFBGreyTargetKey);
+    if (!target || !image) {
+        %orig;
+        return;
+    }
+    UIImage* ours = objc_getAssociatedObject(self, kNFBGreyedImageKey);
+    if (image == ours) {
+        %orig;
+        return;
+    }
+    UIImage* painted = NFBGreyGlyph(image, target);
+    objc_setAssociatedObject(self, kNFBGreyedImageKey, painted,
+                             OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    %orig(painted);
 }
 
 %end
