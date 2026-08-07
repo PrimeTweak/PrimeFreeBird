@@ -484,3 +484,18 @@
 "PROFILES_GROUP_BEHAVIOR" = "Comportement";
 "PROFILES_GROUP_TABS" = "Onglets du profil";
 "PROFILES_GROUP_APPEARANCE" = "Apparence";
+
+"PROFILE_INITIAL_TAB_TITLE" = "Ouvrir les profils sur";
+"PROFILE_INITIAL_TAB_DETAIL" = "Choisit l'onglet d'ouverture d'un profil ; ceux qui ne l'ont pas gardent le réglage d'origine.";
+"PROFILE_TAB_DEFAULT" = "Par défaut";
+"PROFILE_TAB_REPLIES" = "Réponses";
+"PROFILE_TAB_HIGHLIGHTS" = "Moments forts";
+"PROFILE_TAB_ARTICLES" = "Articles";
+"PROFILE_TAB_MEDIA" = "Médias";
+"PROFILE_TAB_VIDEOS" = "Vidéos";
+
+"DISABLE_VIDEOS_TAB_TITLE" = "Masquer l'onglet Vidéos";
+"DISABLE_VIDEOS_TAB_DETAIL" = "Retire l'onglet Vidéos des profils.";
+
+"EXPAND_BIO_TITLE" = "Déplier les bios";
+"EXPAND_BIO_DETAIL" = "Affiche la bio entière d'un profil, sans passer par « Afficher plus ».";
