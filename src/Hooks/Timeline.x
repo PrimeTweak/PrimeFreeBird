@@ -246,20 +246,89 @@ static void nfbApplyEdgeEffect(UIScrollView* scrollView, BOOL hide) {
 
 %hook UIScrollView
 
-// Modal screens used to be left alone here: hiding the effect on Twitter's own
-// settings sheet had broken its content inset, sliding the list up under the
-// title. That exemption is what left the settings sheet as the one place in the
-// app still showing the blurred strip. The guard is lifted so the option means
-// the same thing everywhere; if the inset breaks again, it will do so on that
-// sheet and nowhere else, and switching the option off restores it on the spot.
+// Modal screens are left alone. Hiding the effect on Twitter's own settings
+// sheet broke its content inset — the list slid up under the title. The tabs
+// we care about are never presented modally, so this costs us nothing.
+static UIViewController* nfbOwningController(UIView* view) {
+    UIResponder* responder = view;
+    while ((responder = responder.nextResponder)) {
+        if ([responder isKindOfClass:[UIViewController class]]) {
+            return (UIViewController*)responder;
+        }
+    }
+    return nil;
+}
+
+static BOOL nfbScrollViewIsModal(UIScrollView* scrollView) {
+    UIViewController* owner = nfbOwningController(scrollView);
+    return owner != nil && owner.presentingViewController != nil;
+}
+
+// One modal screen still needs attention: the root of Twitter's own settings.
+// Leaving its effect alone keeps the bar, but the iOS 26 default draws it as a
+// progressive fade — the list shows through above the search field and nothing
+// marks where the bar ends. The hard style puts an opaque background and a
+// boundary back under it, the way the stock app draws that sheet. Sub-pages use
+// the same class, so the root is the first settings controller in the stack —
+// the same test Settings.x already relies on.
+static BOOL nfbControllerIsSettingsRoot(UIViewController* controller) {
+    Class generic = objc_getClass("T1GenericSettingsViewController");
+    Class settings = objc_getClass("T1SettingsViewController");
+    BOOL (^isSettings)(UIViewController*) = ^BOOL(UIViewController* candidate) {
+        return (generic && [candidate isKindOfClass:generic]) ||
+               (settings && [candidate isKindOfClass:settings]);
+    };
+    if (!controller || !isSettings(controller)) {
+        return NO;
+    }
+    for (UIViewController* each in controller.navigationController.viewControllers) {
+        if (each == controller) {
+            return YES;
+        }
+        if (isSettings(each)) {
+            return NO;
+        }
+    }
+    return NO;
+}
+
+// UIScrollEdgeEffectStyle — automatic, soft, then hard.
+static const NSInteger kNFBEdgeStyleHard = 2;
+
+static void nfbApplyHardEdgeIfSettingsRoot(UIScrollView* scrollView) {
+    if (![scrollView respondsToSelector:@selector(topEdgeEffect)]) {
+        return;   // avant iOS 26 : rien à faire
+    }
+    if (!nfbControllerIsSettingsRoot(nfbOwningController(scrollView))) {
+        return;
+    }
+    id effect = ((id (*)(id, SEL))objc_msgSend)(scrollView, @selector(topEdgeEffect));
+    if (![effect respondsToSelector:@selector(setStyle:)] ||
+        ![effect respondsToSelector:@selector(style)]) {
+        return;
+    }
+    // Re-asserted rather than marked, for the same reason as the effect itself:
+    // iOS resets it whenever the bar reconfigures.
+    NSInteger current = ((NSInteger (*)(id, SEL))objc_msgSend)(effect, @selector(style));
+    if (current == kNFBEdgeStyleHard) {
+        return;
+    }
+    ((void (*)(id, SEL, NSInteger))objc_msgSend)(effect, @selector(setStyle:),
+                                                 kNFBEdgeStyleHard);
+}
 
 - (void)didMoveToWindow {
     %orig;
 
     @try {
-        if (self.window) {
-            nfbApplyEdgeEffect(self, nfbEdgeHideEnabled());
+        if (!self.window) {
+            return;
         }
+        if (nfbScrollViewIsModal(self)) {
+            nfbApplyHardEdgeIfSettingsRoot(self);
+            return;
+        }
+        nfbApplyEdgeEffect(self, nfbEdgeHideEnabled());
     } @catch (id exception) {
     }
 }
@@ -278,6 +347,10 @@ static void nfbApplyEdgeEffect(UIScrollView* scrollView, BOOL hide) {
         }
         BOOL marked = objc_getAssociatedObject(self, kNFBEdgeMarkKey) != nil;
         BOOL hide = nfbEdgeHideEnabled();
+        if (!marked && nfbScrollViewIsModal(self)) {
+            nfbApplyHardEdgeIfSettingsRoot(self);
+            return;
+        }
         if (!marked && !hide) {
             return;
         }
