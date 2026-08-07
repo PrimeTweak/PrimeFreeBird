@@ -8,10 +8,11 @@
 //  items, nothing appears and nothing breaks; the Settings → Search →
 //  Advanced search row remains the guaranteed entry.
 //
-//  The glyph is Twitter's own filter_fill rather than an SF Symbol. Measured
-//  side by side, the SF Symbol and Twitter's outlined filter both draw at two
-//  thirds the weight of the gear sitting next to them, which is what made this
-//  icon look thin; filter_fill carries the same stroke as the gear.
+//  The glyph is drawn here rather than fetched. Twitter's own sliders, and the
+//  SF Symbol that stood in for them, are both 2 units thick against the
+//  settings gear's 2.55 — which is what made this icon read thin next to it.
+//  filter_fill is the opposite problem at 3 units. So the shape is Twitter's,
+//  taken from its filter glyph, and only the stroke is ours.
 //
 
 #import "HookHelpers.h"
@@ -26,6 +27,55 @@ static const void* kNFBAdvSearchBtnKey = &kNFBAdvSearchBtnKey;
 // icons use the label colour at the same 60% — the two then match exactly.
 // Resolving it here also stops the theme's window tint from claiming the icon
 // on a cold launch, a trap the colour work already taught us.
+// Twitter's filter glyph at the settings gear's weight. Its geometry, on a
+// 24-unit canvas: two rails centred on y=7 and y=17, each running from x=3 to
+// x=21, crossed by a handle centred on x=15 (top) and x=9 (bottom) standing 8
+// units tall. The rail is cut on the far side of each handle, leaving the 1.5
+// unit gap Twitter draws. Only the stroke changes, 2 units to the gear's 2.55.
+// Rail centre line, handle centre — a block cannot capture a local C array, so
+// the table lives at file scope where it is simply referenced.
+static const CGFloat kNFBSliderGeometry[2][2] = {{7.0, 15.0}, {17.0, 9.0}};
+
+static UIImage* NFBSlidersGlyph(CGFloat side) {
+    const CGFloat kUnit = 24.0;
+    const CGFloat kThickness = 2.55;
+    const CGFloat kGap = 1.5;
+    const CGFloat kHandleHalfHeight = 4.0;
+    CGFloat scale = side / kUnit;
+    CGFloat half = kThickness / 2.0;
+    UIGraphicsImageRendererFormat* format =
+        [UIGraphicsImageRendererFormat preferredFormat];
+    format.opaque = NO;
+    UIGraphicsImageRenderer* renderer =
+        [[UIGraphicsImageRenderer alloc] initWithSize:CGSizeMake(side, side)
+                                               format:format];
+    UIImage* drawn = [renderer
+        imageWithActions:^(UIGraphicsImageRendererContext* context) {
+            [[UIColor blackColor] setFill];
+            for (NSInteger i = 0; i < 2; i++) {
+                CGFloat cy = kNFBSliderGeometry[i][0];
+                CGFloat cx = kNFBSliderGeometry[i][1];
+                CGFloat railEnd = cx - half;
+                CGFloat railStart = cx + half + kGap;
+                // Rail up to the handle, rail after the gap, then the handle.
+                CGContextFillRect(context.CGContext,
+                                  CGRectMake(3.0 * scale, (cy - half) * scale,
+                                             (railEnd - 3.0) * scale,
+                                             kThickness * scale));
+                CGContextFillRect(context.CGContext,
+                                  CGRectMake(railStart * scale, (cy - half) * scale,
+                                             (21.0 - railStart) * scale,
+                                             kThickness * scale));
+                CGContextFillRect(context.CGContext,
+                                  CGRectMake((cx - half) * scale,
+                                             (cy - kHandleHalfHeight) * scale,
+                                             kThickness * scale,
+                                             kHandleHalfHeight * 2.0 * scale));
+            }
+        }];
+    return [drawn imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate];
+}
+
 static UIColor* NFBBarIconGrey(UITraitCollection* traits) {
     UIColor* grey = [[UIColor labelColor] colorWithAlphaComponent:0.6];
     if (traits && [grey respondsToSelector:@selector(resolvedColorWithTraitCollection:)]) {
@@ -73,25 +123,9 @@ static UIColor* NFBBarIconGrey(UITraitCollection* traits) {
         if (existingBtn) {
             return;
         }
-        // Twitter's own glyph, fetched flat and marked as a template so the
-        // tintColor set below still colours it. The SF Symbol stays as a
-        // fallback for any build where the vector library is unreachable — the
-        // same shape, only lighter.
-        UIImage* icon = nil;
-        if ([UIImage respondsToSelector:@selector(tfn_vectorImageNamed:
-                                                              fitsSize:
-                                                             fillColor:)]) {
-            icon = [UIImage tfn_vectorImageNamed:@"filter_fill"
-                                        fitsSize:CGSizeMake(24.0, 24.0)
-                                       fillColor:[UIColor blackColor]];
-            icon = [icon imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate];
-        }
-        if (!icon) {
-            icon = [UIImage systemImageNamed:@"slider.horizontal.3"];
-        }
-        if (!icon) {
-            return;
-        }
+        // 24 points, the gear's own canvas: a stroke width only matches if the
+        // canvas it sits on matches too.
+        UIImage* icon = NFBSlidersGlyph(24.0);
         UIBarButtonItem* btn =
             [[UIBarButtonItem alloc] initWithImage:icon
                                              style:UIBarButtonItemStylePlain

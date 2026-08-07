@@ -95,17 +95,26 @@ static UIColor* NFBBarIconGrey(UITraitCollection* traits) {
 // reclaimed by something: the tint by the theme when the bar re-appears, the
 // alpha by the button's own highlight after a tap, and Twitter's fillColor
 // comes back black. A colour burnt into the pixels survives all three.
-// Twitter's filter_bars drawn one weight heavier. The library has no bold
-// variant of it, and measured side by side its bars come out at two thirds the
-// stroke of the settings gear beside them — which is exactly what reads as
-// "thin" in the bar. The geometry below is Twitter's own, lifted from the
-// glyph: three bars centred on x=12, spans 3-21, 6-18 and 9-15, centre lines at
-// y=7, 12.5 and 18 on a 24-unit canvas. Only the bar height changes, 2 units to
-// 2.8, which lands on the gear's stroke exactly.
+// Twitter's filter_bars drawn at the settings gear's weight. The library has no
+// bold variant of it, and its bars are drawn 2 units thick against the gear's
+// 2.55 — which is what reads as "thin" in the bar. The geometry below is
+// Twitter's own, lifted from the glyph: three bars centred on x=12, spans 3-21,
+// 6-18 and 9-15, centre lines at y=7, 12.5 and 18 on a 24-unit canvas. Only the
+// bar height changes.
+//
+// 2.55 is measured, not chosen: the gear's stroke is 2.55 units of its own
+// 24-unit canvas. Both numbers have to be honoured together — a stroke only
+// matches if the canvas it is drawn on matches too, which is why the caller
+// asks for 24 points rather than the 26 this icon used to use.
+// Left, right, centre line — a block cannot capture a local C array, so the
+// table lives at file scope where it is simply referenced.
+static const CGFloat kNFBBarGeometry[3][3] = {
+    {3.0, 21.0, 7.0}, {6.0, 18.0, 12.5}, {9.0, 15.0, 18.0}
+};
+
 static UIImage* NFBFilterBarsGlyph(CGFloat side) {
     const CGFloat kUnit = 24.0;
-    const CGFloat kThickness = 2.8;
-    const CGFloat bars[3][3] = {{3.0, 21.0, 7.0}, {6.0, 18.0, 12.5}, {9.0, 15.0, 18.0}};
+    const CGFloat kThickness = 2.55;
     CGFloat scale = side / kUnit;
     UIGraphicsImageRendererFormat* format =
         [UIGraphicsImageRendererFormat preferredFormat];
@@ -117,10 +126,11 @@ static UIImage* NFBFilterBarsGlyph(CGFloat side) {
         imageWithActions:^(UIGraphicsImageRendererContext* context) {
             [[UIColor blackColor] setFill];
             for (NSInteger i = 0; i < 3; i++) {
-                CGRect bar = CGRectMake(bars[i][0] * scale,
-                                        (bars[i][2] - kThickness / 2.0) * scale,
-                                        (bars[i][1] - bars[i][0]) * scale,
-                                        kThickness * scale);
+                CGRect bar =
+                    CGRectMake(kNFBBarGeometry[i][0] * scale,
+                               (kNFBBarGeometry[i][2] - kThickness / 2.0) * scale,
+                               (kNFBBarGeometry[i][1] - kNFBBarGeometry[i][0]) * scale,
+                               kThickness * scale);
                 CGContextFillRect(context.CGContext, bar);
             }
         }];
@@ -208,7 +218,7 @@ static UIImage* NFBGreyGlyph(UIImage* source, UIColor* colour) {
             // The old system-symbol safety net is gone with the library
             // lookup it guarded: drawing the shape ourselves cannot come back
             // empty.
-            UIImage* icon = NFBGreyGlyph(NFBFilterBarsGlyph(26.0),
+            UIImage* icon = NFBGreyGlyph(NFBFilterBarsGlyph(24.0),
                                          NFBBarIconGrey(bar.traitCollection));
             button = [UIButton buttonWithType:UIButtonTypeSystem];
             [button setImage:icon forState:UIControlStateNormal];
