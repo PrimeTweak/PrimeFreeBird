@@ -15,8 +15,11 @@
   2. BUTTON rows declare "titleKey" / "subtitleKey" explicitly.
      compactButton rows instead show a live value via "prefKeyForSubtitle",
      so they intentionally have no _DETAIL key.
-  3. GROUP HEADERS use "<PAGE>_GROUP_<NAME>". Write them in Title Case;
-     the header cell renders them uppercase.
+  3. GROUP HEADERS use "<PAGE>_GROUP_<NAME>". Sentence case, like the row
+     titles: the header cell prints them exactly as written, so the case you
+     type is the case on screen.
+     A page earns headers from roughly ten rows up. Below that it stays flat —
+     two headers over four rows is decoration, not structure.
   4. PAGES use "MODERN_SETTINGS_<PAGE>_TITLE" / "_SUBTITLE".
      Note: the General page's keys are historically named _LAYOUT_.
 
@@ -96,7 +99,7 @@
 "CUSTOM_TAB_BAR_OPTION_TITLE" = "Navigation bar";
 "CUSTOM_TAB_BAR_OPTION_SUBTITLE" = "Choose which buttons appear in the bottom navigation bar.";
 "RESTORE_TAB_LABELS_TITLE" = "Tab labels";
-"RESTORE_TAB_LABELS_DETAIL" = "Show labels under the icons in the navigation bar. (Standard only)";
+"RESTORE_TAB_LABELS_DETAIL" = "Show labels under the icons in the navigation bar.";
 "CUSTOM_FONTS_TITLE" = "Custom fonts";
 "CUSTOM_FONTS_DETAIL" = "Use a custom font throughout Twitter.";
 "REGULAR_FONTS_PICKER_OPTION_TITLE" = "Regular font";
@@ -221,8 +224,10 @@
 "SQUARE_AVATARS_DETAIL" = "Show avatars with square corners, like classic Twitter.";
 
 /* ===== SEARCH ===== */
+"SEARCH_GROUP_SEARCHING" = "Searching";
+"SEARCH_GROUP_TRENDS" = "Trends";
 "MODERN_SETTINGS_SEARCH_TITLE" = "Search";
-"MODERN_SETTINGS_SEARCH_SUBTITLE" = "Trends, trending videos, and search history.";
+"MODERN_SETTINGS_SEARCH_SUBTITLE" = "Search history, trends, and trending videos.";
 "NO_HISTORY_TITLE" = "Disable search history";
 "NO_HISTORY_DETAIL" = "Stop Twitter from keeping track of your searches.";
 "HIDE_TRENDS_TITLE" = "Hide trending content";
@@ -455,7 +460,7 @@
 "MUTED_WORDS_EXAMPLE_TERM" = "spoiler";
 
 "HIDE_SCROLL_EDGE_BLUR_TITLE" = "Hide scroll edge blur";
-"HIDE_SCROLL_EDGE_BLUR_DETAIL" = "Remove the blurred strip drawn under the bars, as the stock app does. (Liquid Glass only)";
+"HIDE_SCROLL_EDGE_BLUR_DETAIL" = "Remove the blurred strip iOS 26 draws under the bars, as the stock app does.";
 
 "SHOW_POLL_RESULTS_TITLE" = "Show poll results";
 "SHOW_POLL_RESULTS_DETAIL" = "Add each option's share of the vote to its label, before you have voted.";
@@ -463,7 +468,7 @@
 "TAP_TO_PAUSE_DETAIL" = "Tap a video to pause it; the controls then stay on screen.";
 
 "PROFILES_GROUP_BEHAVIOR" = "Behavior";
-"PROFILES_GROUP_TABS" = "Profile Tabs";
+"PROFILES_GROUP_TABS" = "Profile tabs";
 "PROFILES_GROUP_APPEARANCE" = "Appearance";
 
 "PROFILE_INITIAL_TAB_TITLE" = "Open profiles on";
