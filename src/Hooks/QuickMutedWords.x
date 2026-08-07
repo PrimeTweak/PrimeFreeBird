@@ -95,6 +95,38 @@ static UIColor* NFBBarIconGrey(UITraitCollection* traits) {
 // reclaimed by something: the tint by the theme when the bar re-appears, the
 // alpha by the button's own highlight after a tap, and Twitter's fillColor
 // comes back black. A colour burnt into the pixels survives all three.
+// Twitter's filter_bars drawn one weight heavier. The library has no bold
+// variant of it, and measured side by side its bars come out at two thirds the
+// stroke of the settings gear beside them — which is exactly what reads as
+// "thin" in the bar. The geometry below is Twitter's own, lifted from the
+// glyph: three bars centred on x=12, spans 3-21, 6-18 and 9-15, centre lines at
+// y=7, 12.5 and 18 on a 24-unit canvas. Only the bar height changes, 2 units to
+// 2.8, which lands on the gear's stroke exactly.
+static UIImage* NFBFilterBarsGlyph(CGFloat side) {
+    const CGFloat kUnit = 24.0;
+    const CGFloat kThickness = 2.8;
+    const CGFloat bars[3][3] = {{3.0, 21.0, 7.0}, {6.0, 18.0, 12.5}, {9.0, 15.0, 18.0}};
+    CGFloat scale = side / kUnit;
+    UIGraphicsImageRendererFormat* format =
+        [UIGraphicsImageRendererFormat preferredFormat];
+    format.opaque = NO;
+    UIGraphicsImageRenderer* renderer =
+        [[UIGraphicsImageRenderer alloc] initWithSize:CGSizeMake(side, side)
+                                               format:format];
+    UIImage* drawn = [renderer
+        imageWithActions:^(UIGraphicsImageRendererContext* context) {
+            [[UIColor blackColor] setFill];
+            for (NSInteger i = 0; i < 3; i++) {
+                CGRect bar = CGRectMake(bars[i][0] * scale,
+                                        (bars[i][2] - kThickness / 2.0) * scale,
+                                        (bars[i][1] - bars[i][0]) * scale,
+                                        kThickness * scale);
+                CGContextFillRect(context.CGContext, bar);
+            }
+        }];
+    return drawn;
+}
+
 static UIImage* NFBGreyGlyph(UIImage* source, UIColor* colour) {
     if (!source || !colour) {
         return source;
@@ -170,27 +202,14 @@ static UIImage* NFBGreyGlyph(UIImage* source, UIColor* colour) {
             return;
         }
         if (!button) {
-            // Twitter's own "filter" glyph, from its vector library — the same
-            // source as every other icon in this bar, so it matches by
-            // construction. The system symbol is only a safety net if the
-            // asset ever disappears.
-            UIImage* icon = nil;
-            if ([UIImage respondsToSelector:@selector(tfn_vectorImageNamed:
-                                                                 fitsSize:
-                                                                fillColor:)]) {
-                // Twitter's own fillColor comes back black whatever we pass,
-                // so the glyph is fetched first and repainted ourselves.
-                icon = [UIImage tfn_vectorImageNamed:@"filter_bars"
-                                            fitsSize:CGSizeMake(26.0, 26.0)
-                                           fillColor:[UIColor blackColor]];
-                icon = NFBGreyGlyph(icon, NFBBarIconGrey(bar.traitCollection));
-            }
-            if (!icon) {
-                icon = [UIImage systemImageNamed:@"line.3.horizontal.decrease"];
-            }
-            if (!icon) {
-                return;
-            }
+            // Twitter's filter_bars shape, drawn here at the gear's weight —
+            // see NFBFilterBarsGlyph. Repainted through the same path as
+            // before, so the colour still survives the theme's window tint.
+            // The old system-symbol safety net is gone with the library
+            // lookup it guarded: drawing the shape ourselves cannot come back
+            // empty.
+            UIImage* icon = NFBGreyGlyph(NFBFilterBarsGlyph(26.0),
+                                         NFBBarIconGrey(bar.traitCollection));
             button = [UIButton buttonWithType:UIButtonTypeSystem];
             [button setImage:icon forState:UIControlStateNormal];
 

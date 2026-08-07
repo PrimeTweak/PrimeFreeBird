@@ -3,10 +3,15 @@
 //  PrimeFreeBird
 //
 //  Entry point for the native Advanced Search form, on the Explore screen: a
-//  filters button (slider.horizontal.3) added to the guide container's
-//  navigation item. BEST-EFFORT by design — if this build's Explore chrome
-//  ignores standard bar button items, nothing appears and nothing breaks; the
-//  Settings → Search → Advanced search row remains the guaranteed entry.
+//  filters button added to the guide container's navigation item. BEST-EFFORT
+//  by design — if this build's Explore chrome ignores standard bar button
+//  items, nothing appears and nothing breaks; the Settings → Search →
+//  Advanced search row remains the guaranteed entry.
+//
+//  The glyph is Twitter's own filter_fill rather than an SF Symbol. Measured
+//  side by side, the SF Symbol and Twitter's outlined filter both draw at two
+//  thirds the weight of the gear sitting next to them, which is what made this
+//  icon look thin; filter_fill carries the same stroke as the gear.
 //
 
 #import "HookHelpers.h"
@@ -68,7 +73,22 @@ static UIColor* NFBBarIconGrey(UITraitCollection* traits) {
         if (existingBtn) {
             return;
         }
-        UIImage* icon = [UIImage systemImageNamed:@"slider.horizontal.3"];
+        // Twitter's own glyph, fetched flat and marked as a template so the
+        // tintColor set below still colours it. The SF Symbol stays as a
+        // fallback for any build where the vector library is unreachable — the
+        // same shape, only lighter.
+        UIImage* icon = nil;
+        if ([UIImage respondsToSelector:@selector(tfn_vectorImageNamed:
+                                                              fitsSize:
+                                                             fillColor:)]) {
+            icon = [UIImage tfn_vectorImageNamed:@"filter_fill"
+                                        fitsSize:CGSizeMake(24.0, 24.0)
+                                       fillColor:[UIColor blackColor]];
+            icon = [icon imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate];
+        }
+        if (!icon) {
+            icon = [UIImage systemImageNamed:@"slider.horizontal.3"];
+        }
         if (!icon) {
             return;
         }
