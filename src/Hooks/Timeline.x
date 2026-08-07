@@ -336,6 +336,23 @@ static id nfbHardEdgeStyleLike(id currentStyle) {
     return found;
 }
 
+// iOS only knows of the bar what the screen declares as its safe area, and
+// Twitter lays its search field out lower than that: measured on the sheet, the
+// boundary lands at 49% of the field's height, 20 points above its bottom edge.
+// Widening the screen's safe area drops the boundary below the field and, at the
+// same time, stops the list from resting behind it. Setting an absolute value
+// rather than adding one keeps this idempotent, so no layout can chase it.
+static const CGFloat kNFBSettingsHeaderExtra = 24.0;
+
+static void nfbExtendSettingsHeader(UIViewController* controller) {
+    UIEdgeInsets insets = controller.additionalSafeAreaInsets;
+    if (insets.top >= kNFBSettingsHeaderExtra) {
+        return;
+    }
+    insets.top = kNFBSettingsHeaderExtra;
+    controller.additionalSafeAreaInsets = insets;
+}
+
 static const void* kNFBEdgeStyleWritesKey = &kNFBEdgeStyleWritesKey;
 
 // Two things keep this safe. The setter is only ever called once the runtime has
@@ -343,14 +360,16 @@ static const void* kNFBEdgeStyleWritesKey = &kNFBEdgeStyleWritesKey;
 // and the writes are capped per scroll view, so no chain of write, relayout,
 // write can run away even if the value refuses to stick.
 static void nfbApplyHardEdgeIfSettingsRoot(UIScrollView* scrollView) {
-    NSNumber* writes = objc_getAssociatedObject(scrollView, kNFBEdgeStyleWritesKey);
-    if (writes.integerValue >= 3) {
-        return;
-    }
     if (![scrollView respondsToSelector:@selector(topEdgeEffect)]) {
         return;   // avant iOS 26 : rien à faire
     }
-    if (!nfbControllerIsSettingsRoot(nfbOwningController(scrollView))) {
+    UIViewController* owner = nfbOwningController(scrollView);
+    if (!nfbControllerIsSettingsRoot(owner)) {
+        return;
+    }
+    nfbExtendSettingsHeader(owner);
+    NSNumber* writes = objc_getAssociatedObject(scrollView, kNFBEdgeStyleWritesKey);
+    if (writes.integerValue >= 3) {
         return;
     }
     id effect = ((id (*)(id, SEL))objc_msgSend)(scrollView, @selector(topEdgeEffect));
