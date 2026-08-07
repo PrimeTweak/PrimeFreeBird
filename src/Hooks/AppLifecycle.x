@@ -343,20 +343,60 @@ static UIImage* launchBirdImage(CGFloat side) {
 
 %end
 
+// The black frame he sees comes at the END, not the start: the splash is torn
+// down before the timeline has drawn, and a window with no background colour
+// is black. Painting the window blue fills exactly that gap, and letting the
+// splash fade out rather than cutting hides the seam.
+
+static BOOL gNFBSplashRevealing = NO;
+
+static void paintWindowForSplash(UIView* view) {
+    UIColor* twitterBlue = [UIColor colorWithRed:0x1D / 255.0
+                                           green:0xA1 / 255.0
+                                            blue:0xF2 / 255.0
+                                           alpha:1.0];
+    UIWindow* window = view.window;
+    if (!window) {
+        return;
+    }
+    window.backgroundColor = twitterBlue;
+    // Released once the timeline is on screen, so nothing else inherits it.
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(2.0 * NSEC_PER_SEC)),
+                   dispatch_get_main_queue(), ^{
+                       window.backgroundColor = nil;
+                   });
+}
+
 %hook T1AnimatedLaunchScreenView
 
 - (void)layoutSubviews {
     %orig;
     // layoutSubviews re-installs the mask each pass, so re-strip after %orig.
     stripLaunchRevealMask((UIView*)self);
-    applySplashBrandColors((UIView*)self);
+    // Repainting during the fade would fight the animation, so it stops once
+    // the reveal has begun.
+    if (!gNFBSplashRevealing) {
+        applySplashBrandColors((UIView*)self);
+    }
 }
 
 - (void)animateRevealWithCompletion:(id)completion {
     // Strip only the X mask, then let the native zoom animation run.
     // Our bundled bird is correctly sized, so the zoom no longer distorts it.
     stripLaunchRevealMask((UIView*)self);
-    applySplashBrandColors((UIView*)self);
+    gNFBSplashRevealing = YES;
+    paintWindowForSplash((UIView*)self);
+
+    // Dissolve instead of cutting: the splash thins out over the blue window
+    // while the timeline takes over underneath.
+    UIView* splash = (UIView*)self;
+    [UIView animateWithDuration:0.5
+                     animations:^{
+                         for (UIView* sub in splash.subviews) {
+                             sub.backgroundColor = [UIColor clearColor];
+                         }
+                     }];
+
     %orig(completion);
 }
 
