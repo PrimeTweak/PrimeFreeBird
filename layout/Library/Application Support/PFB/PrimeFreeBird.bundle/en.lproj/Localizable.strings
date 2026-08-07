@@ -456,3 +456,8 @@
 
 "HIDE_SCROLL_EDGE_BLUR_TITLE" = "Hide scroll edge blur";
 "HIDE_SCROLL_EDGE_BLUR_DETAIL" = "Remove the blurred strip iOS 26 draws under the bars, as the stock app does.";
+
+"SHOW_POLL_RESULTS_TITLE" = "Show poll results";
+"SHOW_POLL_RESULTS_DETAIL" = "Add each option's share of the vote to its label, before you have voted.";
+"TAP_TO_PAUSE_TITLE" = "Tap to pause";
+"TAP_TO_PAUSE_DETAIL" = "Tap a video to pause it; the controls then stay on screen.";
