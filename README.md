@@ -25,6 +25,7 @@
 ## Liquid Glass
 
 - **Liquid Glass, enabled** — the stock app opts out of iOS 26's redesign; this turns it back on, or keeps the standard look.
+- **No blurred edge** — turning the redesign on makes iOS draw a strip under every bar; this puts the stock look back, on its own switch.
 
 ## Colour theme
 
@@ -39,6 +40,10 @@
 
 - **Words, phrases or accounts** — one list: type a word, a phrase, or an @account, and the type is recognised on its own.
 - **Quick access from your feed** — an icon in the timeline's top bar opens a small popover to add or remove a filter without leaving your scroll.
+- **Filters that expire** — give a word 24 hours, 7 days or 30 days, or keep it for good; muting "spoiler" for a week is a tap.
+- **People you follow are spared** — filters skip the accounts you follow, unless you'd rather they didn't.
+- **Reposts, if you want them** — reposts are left alone by default and can be filtered like anything else.
+- **A count of what it caught** — how many posts were filtered today, under the list.
 - **Precise by default** — whole-word matching so "cat" never catches "concatenate", and the list applies to replies as well.
 
 ## Timeline
@@ -52,10 +57,15 @@
 ## Media
 
 - **Full HD uploads** — send your own videos in 1080p.
+- **Tap to pause** — tap a video to stop it, rather than reaching for the button.
 - **No mini player** — full-screen videos no longer shrink into a floating player when you drag them away.
 
 ## Tweets &amp; profiles
 
+- **Poll results before voting** — each option carries its share of the vote, so you can read a poll without joining it.
+- **Bios in full** — long bios open expanded, with no *Show more* to tap.
+- **Open profiles where you want** — land on Replies, Highlights, Articles, Media or Videos instead of Posts.
+- **Hide the Videos tab** — alongside the existing switches for Articles and Highlights.
 - **Hide the Tweet button** — remove the compose button from the timeline.
 - **Classic compose button** — or bring back the bird on a coloured circle instead of the native "+".
 - **Profile URL** — added to the copy-profile-details button.
@@ -69,6 +79,7 @@
 ## Elsewhere
 
 - **Grouped settings** — every page is split into labelled groups instead of one long list.
+- **Bar icons that match** — the settings gear, the search filters and the muted-words icon share one grey and keep it.
 - **Full French localization** — every string, including the new screens.
 
 # Fixes
@@ -76,8 +87,9 @@
 - **Tab labels are centred** — restored labels no longer sit off-centre after a cold launch.
 - **The video timestamp shows up** — the option now actually reveals the elapsed time in full-screen videos.
 - **"Open in Following" is honoured** — the setting was silently overridden; the tab you pick now survives a new session.
-- **No black launch screen** — the blue splash also appears on a fresh install.
-- **The Spaces bar fully collapses** — hiding it no longer leaves an empty blurred strip.
+- **No black frame at launch** — the splash dissolves into the timeline instead of cutting to an empty window.
+- **The Spaces bar comes back** — switching the option off restores the bar without relaunching the app.
+- **Pickers open where you tap** — the appearance pickers used to land in the middle of the screen; they are ordinary iOS alerts again.
 - **Pull-to-refresh sound works again** — rebuilt for current Twitter versions, where the old hook no longer exists.
 - **Reply composer sits still** — no keyboard bounce, no doubled insets, no login wall.
 
