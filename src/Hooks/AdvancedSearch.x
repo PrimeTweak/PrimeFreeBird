@@ -78,7 +78,9 @@ static UIColor* NFBBarIconGrey(UITraitCollection* traits) {
                                             target:self
                                             action:@selector(nfbShowAdvancedSearch)];
         // Muted grey, like the labels of the unselected tabs next to it.
-        btn.tintColor = NFBBarIconGrey(self.traitCollection);
+        // Cast, never a bare self.property: this class is only forward-declared,
+        // so the compiler refuses a direct message to it.
+        btn.tintColor = NFBBarIconGrey(((UIViewController*)self).traitCollection);
         // Match Twitter's own settings gear, which sits flat in this bar:
         // iOS 26 gives bar buttons a shared Liquid Glass capsule, and opting
         // out is a single property. It only exists on the iOS 26 SDK, so it
