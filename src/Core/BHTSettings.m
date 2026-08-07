@@ -234,15 +234,15 @@ static NSDictionary<NSString*, NSDictionary*>* BHTSettingsPages(void) {
                       @"default": @NO,
                       @"type": @"toggle"},
                     @{
+                        @"key": @"copy_profile_info",
+                        @"default": @NO,
+                        @"type": @"toggle"
+                    },
+                    @{
                         @"titleKey": @"PROFILE_INITIAL_TAB_TITLE",
                         @"subtitleKey": @"PROFILE_INITIAL_TAB_SUBTITLE",
                         @"action": @"showProfileTabPicker:",
                         @"type": @"button"
-                    },
-                    @{
-                        @"key": @"copy_profile_info",
-                        @"default": @NO,
-                        @"type": @"toggle"
                     },
                     @{@"type": @"header", @"titleKey": @"PROFILES_GROUP_TABS"},
                     @{
