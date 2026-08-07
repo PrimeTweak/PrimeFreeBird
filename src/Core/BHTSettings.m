@@ -233,8 +233,12 @@ static NSDictionary<NSString*, NSDictionary*>* BHTSettingsPages(void) {
                     @{@"key": @"expand_bio",
                       @"default": @NO,
                       @"type": @"toggle"},
-                    @{@"action": @"showProfileTabPicker:",
-                      @"type": @"button"},
+                    @{
+                        @"titleKey": @"PROFILE_INITIAL_TAB_TITLE",
+                        @"subtitleKey": @"PROFILE_INITIAL_TAB_SUBTITLE",
+                        @"action": @"showProfileTabPicker:",
+                        @"type": @"button"
+                    },
                     @{
                         @"key": @"copy_profile_info",
                         @"default": @NO,
