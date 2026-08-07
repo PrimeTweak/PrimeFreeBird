@@ -76,21 +76,15 @@
     NSInteger current = [BHTSettings integerForKey:@"dark_mode_style"];
 
     for (NSInteger i = 0; i < (NSInteger)titleKeys.count; i++) {
-        NSString* title = [bundle localizedStringForKey:titleKeys[i]];
-        if (i == current) {
-            title = [NSString stringWithFormat:@"\u2713 %@", title];
-        }
-        UIAlertAction* action =
-            [UIAlertAction actionWithTitle:title
-                                     style:UIAlertActionStyleDefault
-                                   handler:^(UIAlertAction* a) {
-                                       [[NSUserDefaults standardUserDefaults]
-                                           setInteger:i
-                                               forKey:@"dark_mode_style"];
-                                       [[NSUserDefaults standardUserDefaults] synchronize];
-                                       [self showRestartRequiredAlert];
-                                   }];
-        [sheet addAction:action];
+        [self addOption:[bundle localizedStringForKey:titleKeys[i]]
+               selected:(i == current)
+               toPicker:sheet
+                handler:^{
+                    [[NSUserDefaults standardUserDefaults] setInteger:i
+                                                               forKey:@"dark_mode_style"];
+                    [[NSUserDefaults standardUserDefaults] synchronize];
+                    [self showRestartRequiredAlert];
+                }];
     }
 
     [sheet addAction:[UIAlertAction
@@ -116,27 +110,20 @@
     NSInteger current = [BHTSettings boolForKey:@"enable_liquid_glass"] ? 1 : 0;
 
     for (NSInteger i = 0; i < (NSInteger)titleKeys.count; i++) {
-        NSString* title = [bundle localizedStringForKey:titleKeys[i]];
-        if (i == current) {
-            title = [NSString stringWithFormat:@"\u2713 %@", title];
-        }
-        UIAlertAction* action =
-            [UIAlertAction actionWithTitle:title
-                                     style:UIAlertActionStyleDefault
-                                   handler:^(UIAlertAction* a) {
-                                       BOOL wasEnabled =
-                                           [BHTSettings boolForKey:@"enable_liquid_glass"];
-                                       BOOL nowEnabled = (i == 1);
-                                       [[NSUserDefaults standardUserDefaults]
-                                           setBool:nowEnabled
-                                            forKey:@"enable_liquid_glass"];
-                                       [[NSUserDefaults standardUserDefaults] synchronize];
-                                       // Only prompt for a restart when the mode actually changed.
-                                       if (wasEnabled != nowEnabled) {
-                                           [self showRestartRequiredAlert];
-                                       }
-                                   }];
-        [sheet addAction:action];
+        [self addOption:[bundle localizedStringForKey:titleKeys[i]]
+               selected:(i == current)
+               toPicker:sheet
+                handler:^{
+                    BOOL wasEnabled = [BHTSettings boolForKey:@"enable_liquid_glass"];
+                    BOOL nowEnabled = (i == 1);
+                    [[NSUserDefaults standardUserDefaults] setBool:nowEnabled
+                                                            forKey:@"enable_liquid_glass"];
+                    [[NSUserDefaults standardUserDefaults] synchronize];
+                    // Only prompt for a restart when the mode actually changed.
+                    if (wasEnabled != nowEnabled) {
+                        [self showRestartRequiredAlert];
+                    }
+                }];
     }
 
     [sheet addAction:[UIAlertAction

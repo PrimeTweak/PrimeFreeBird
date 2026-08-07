@@ -64,19 +64,16 @@ extern void applySquareAvatarsSetting(void);
             continue;
         }
         NSString* title = [bundle localizedStringForKey:titleKeys[i]];
-        if (i == current) {
-            title = [NSString stringWithFormat:@"\u2713 %@", title];
-        }
-        [sheet addAction:[UIAlertAction
-                             actionWithTitle:title
-                                       style:UIAlertActionStyleDefault
-                                     handler:^(UIAlertAction* a) {
-                                         [[NSUserDefaults standardUserDefaults]
-                                             setInteger:i
-                                                 forKey:@"profile_initial_tab"];
-                                         [[NSUserDefaults standardUserDefaults] synchronize];
-                                         [weakSelf.tableView reloadData];
-                                     }]];
+        [self addOption:title
+               selected:(i == current)
+               toPicker:sheet
+                handler:^{
+                    [[NSUserDefaults standardUserDefaults]
+                        setInteger:i
+                            forKey:@"profile_initial_tab"];
+                    [[NSUserDefaults standardUserDefaults] synchronize];
+                    [weakSelf.tableView reloadData];
+                }];
     }
     [sheet addAction:[UIAlertAction
                          actionWithTitle:[bundle localizedTwitterStringForKey:@"CANCEL_ACTION_LABEL"]
