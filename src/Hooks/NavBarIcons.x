@@ -299,9 +299,13 @@ static BOOL nfbIsRightHandGlyphButton(UIView* button) {
 
 %hook TFNBarButtonItemButton
 
-- (void)didMoveToWindow {
-    %orig;
-
+// The repaint runs on both entry points. didMoveToWindow alone caught the
+// button before its image view existed on Notifications, so nothing was marked
+// and the interception below never armed — you had to change tab for it to
+// take. layoutSubviews closes that window; once marked, every later pass is a
+// pointer comparison.
+%new
+- (void)nfbGreySettingsGlyphIfNeeded {
     @try {
         UIView* button = (UIView*)self;
         if (!button.window) {
@@ -321,6 +325,16 @@ static BOOL nfbIsRightHandGlyphButton(UIView* button) {
         nfbRepaintGlyphs(button, NFBBarIconGrey(button.traitCollection));
     } @catch (id exception) {
     }
+}
+
+- (void)didMoveToWindow {
+    %orig;
+    [self nfbGreySettingsGlyphIfNeeded];
+}
+
+- (void)layoutSubviews {
+    %orig;
+    [self nfbGreySettingsGlyphIfNeeded];
 }
 
 %end
