@@ -149,30 +149,55 @@ static NSDictionary<NSString*, NSDictionary*>* BHTSettingsPages(void) {
                       @"type": @"toggle"}
                 ]
             },
-            @"grok": @{
-                @"titleKey": @"MODERN_SETTINGS_GROK_TITLE",
-                @"subtitleKey": @"MODERN_SETTINGS_GROK_SUBTITLE",
+            @"tweets": @{
+                @"titleKey": @"MODERN_SETTINGS_TWEETS_TITLE",
+                @"subtitleKey": @"MODERN_SETTINGS_TWEETS_SUBTITLE",
                 @"settings": @[
+                    @{@"type": @"header", @"titleKey": @"TWEETS_GROUP_COMPOSING"},
                     @{
-                        @"key": @"hide_grok_analyze",
-                        @"default": @YES,
-                        @"type": @"toggle"
+                        @"type": @"compactButton",
+                        @"key": @"undo_tweet_timeout",
+                        @"default": @10,
+                        @"titleKey": @"UNDO_TWEET_TITLE",
+                        @"action": @"showUndoTimeoutPicker:"
                     },
+                    @{@"key": @"tweet_confirm",
+                      @"default": @NO,
+                      @"type": @"toggle"},
+                    @{@"key": @"hide_tweet_button",
+                      @"default": @NO,
+                      @"type": @"toggle"},
+                    @{@"type": @"header", @"titleKey": @"TWEETS_GROUP_ACTIONS"},
+                    @{@"key": @"like_confirm",
+                      @"default": @NO,
+                      @"type": @"toggle"},
+                    @{@"key": @"hide_view_count",
+                      @"default": @YES,
+                      @"type": @"toggle"},
+                    @{@"key": @"hide_bookmark_button",
+                      @"default": @NO,
+                      @"type": @"toggle"},
+                    @{@"key": @"hide_downvote_button",
+                      @"default": @NO,
+                      @"type": @"toggle"},
+                    @{@"type": @"header", @"titleKey": @"TWEETS_GROUP_READING"},
                     @{
-                        @"key": @"hide_grok_sidebar",
-                        @"default": @YES,
-                        @"type": @"toggle"
-                    },
-                    @{
-                        @"key": @"hide_grok_create",
-                        @"default": @YES,
-                        @"type": @"toggle"
-                    },
-                    @{
-                        @"key": @"disable_auto_translate",
+                        @"key": @"show_poll_results",
                         @"default": @NO,
                         @"type": @"toggle"
-                    }
+                    },
+                    @{@"key": @"disable_sensitive_tweet_warnings",
+                      @"default": @YES,
+                      @"type": @"toggle"},
+                    @{@"key": @"bypass_age_verification",
+                      @"default": @YES,
+                      @"type": @"toggle"},
+                    @{@"key": @"reply_sorting",
+                      @"default": @NO,
+                      @"type": @"toggle"},
+                    @{@"key": @"restore_reply_context",
+                      @"default": @YES,
+                      @"type": @"toggle"}
                 ]
             },
             @"media_downloads": @{
@@ -281,64 +306,18 @@ static NSDictionary<NSString*, NSDictionary*>* BHTSettingsPages(void) {
                       @"type": @"toggle"}
                 ]
             },
-            @"tweets": @{
-                @"titleKey": @"MODERN_SETTINGS_TWEETS_TITLE",
-                @"subtitleKey": @"MODERN_SETTINGS_TWEETS_SUBTITLE",
-                @"settings": @[
-                    @{@"type": @"header", @"titleKey": @"TWEETS_GROUP_COMPOSING"},
-                    @{
-                        @"type": @"compactButton",
-                        @"key": @"undo_tweet_timeout",
-                        @"default": @10,
-                        @"titleKey": @"UNDO_TWEET_TITLE",
-                        @"action": @"showUndoTimeoutPicker:"
-                    },
-                    @{@"key": @"tweet_confirm",
-                      @"default": @NO,
-                      @"type": @"toggle"},
-                    @{@"key": @"hide_tweet_button",
-                      @"default": @NO,
-                      @"type": @"toggle"},
-                    @{@"type": @"header", @"titleKey": @"TWEETS_GROUP_ACTIONS"},
-                    @{@"key": @"like_confirm",
-                      @"default": @NO,
-                      @"type": @"toggle"},
-                    @{@"key": @"hide_view_count",
-                      @"default": @YES,
-                      @"type": @"toggle"},
-                    @{@"key": @"hide_bookmark_button",
-                      @"default": @NO,
-                      @"type": @"toggle"},
-                    @{@"key": @"hide_downvote_button",
-                      @"default": @NO,
-                      @"type": @"toggle"},
-                    @{@"type": @"header", @"titleKey": @"TWEETS_GROUP_READING"},
-                    @{
-                        @"key": @"show_poll_results",
-                        @"default": @NO,
-                        @"type": @"toggle"
-                    },
-                    @{@"key": @"disable_sensitive_tweet_warnings",
-                      @"default": @YES,
-                      @"type": @"toggle"},
-                    @{@"key": @"bypass_age_verification",
-                      @"default": @YES,
-                      @"type": @"toggle"},
-                    @{@"key": @"reply_sorting",
-                      @"default": @NO,
-                      @"type": @"toggle"},
-                    @{@"key": @"restore_reply_context",
-                      @"default": @YES,
-                      @"type": @"toggle"}
-                ]
-            },
             @"search": @{
                 @"titleKey": @"MODERN_SETTINGS_SEARCH_TITLE",
                 @"subtitleKey": @"MODERN_SETTINGS_SEARCH_SUBTITLE",
                 @"settings": @[
+                    @{@"type": @"header", @"titleKey": @"SEARCH_GROUP_SEARCHING"},
                     @{@"key": @"no_history",
                       @"default": @NO,
                       @"type": @"toggle"},
+                    @{@"key": @"advanced_search",
+                      @"default": @NO,
+                      @"type": @"toggle"},
+                    @{@"type": @"header", @"titleKey": @"SEARCH_GROUP_TRENDS"},
                     @{@"key": @"hide_trends",
                       @"default": @NO,
                       @"type": @"toggle"},
@@ -367,12 +346,7 @@ static NSDictionary<NSString*, NSDictionary*>* BHTSettingsPages(void) {
                       @"indented": @YES,
                       @"default": @NO,
                       @"type": @"toggle"},
-                    @{
-                        @"key": @"hide_trend_videos",
-                        @"default": @NO,
-                        @"type": @"toggle"
-                    },
-                    @{@"key": @"advanced_search",
+                    @{@"key": @"hide_trend_videos",
                       @"default": @NO,
                       @"type": @"toggle"}
                 ]
@@ -410,6 +384,32 @@ static NSDictionary<NSString*, NSDictionary*>* BHTSettingsPages(void) {
                     @{
                         @"key": @"restore_refresh_sounds",
                         @"default": @YES,
+                        @"type": @"toggle"
+                    }
+                ]
+            },
+            @"grok": @{
+                @"titleKey": @"MODERN_SETTINGS_GROK_TITLE",
+                @"subtitleKey": @"MODERN_SETTINGS_GROK_SUBTITLE",
+                @"settings": @[
+                    @{
+                        @"key": @"hide_grok_analyze",
+                        @"default": @YES,
+                        @"type": @"toggle"
+                    },
+                    @{
+                        @"key": @"hide_grok_sidebar",
+                        @"default": @YES,
+                        @"type": @"toggle"
+                    },
+                    @{
+                        @"key": @"hide_grok_create",
+                        @"default": @YES,
+                        @"type": @"toggle"
+                    },
+                    @{
+                        @"key": @"disable_auto_translate",
+                        @"default": @NO,
                         @"type": @"toggle"
                     }
                 ]
