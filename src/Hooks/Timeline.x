@@ -264,38 +264,70 @@ static BOOL nfbScrollViewIsModal(UIScrollView* scrollView) {
     return owner != nil && owner.presentingViewController != nil;
 }
 
-// One modal screen still needs attention: the root of Twitter's own settings.
-// Leaving its effect alone keeps the bar, but the iOS 26 default draws it as a
-// progressive fade — the list shows through above the search field and nothing
-// marks where the bar ends. The hard style puts an opaque background and a
-// boundary back under it, the way the stock app draws that sheet. Sub-pages use
-// the same class, so the root is the first settings controller in the stack —
+// One of those spared screens still needs something: the root of Twitter's own
+// settings, the page carrying the "Search settings" field. Leaving its effect
+// alone keeps the bar, but under Liquid Glass iOS draws that bar as a gradual
+// fade — the list shows through above the field and nothing marks where the bar
+// ends. The hard style puts an opaque background and a boundary back under it,
+// which is how the stock app draws this sheet. Sub-pages share the controller
+// class, so the root is the first settings controller in the navigation stack,
 // the same test Settings.x already relies on.
-static BOOL nfbControllerIsSettingsRoot(UIViewController* controller) {
+static BOOL nfbIsTwitterSettingsClass(UIViewController* controller) {
     Class generic = objc_getClass("T1GenericSettingsViewController");
     Class settings = objc_getClass("T1SettingsViewController");
-    BOOL (^isSettings)(UIViewController*) = ^BOOL(UIViewController* candidate) {
-        return (generic && [candidate isKindOfClass:generic]) ||
-               (settings && [candidate isKindOfClass:settings]);
-    };
-    if (!controller || !isSettings(controller)) {
+    return (generic && [controller isKindOfClass:generic]) ||
+           (settings && [controller isKindOfClass:settings]);
+}
+
+static BOOL nfbControllerIsSettingsRoot(UIViewController* controller) {
+    if (!controller || !nfbIsTwitterSettingsClass(controller)) {
         return NO;
     }
     for (UIViewController* each in controller.navigationController.viewControllers) {
         if (each == controller) {
             return YES;
         }
-        if (isSettings(each)) {
+        if (nfbIsTwitterSettingsClass(each)) {
             return NO;
         }
     }
     return NO;
 }
 
-// UIScrollEdgeEffectStyle — automatic, soft, then hard.
-static const NSInteger kNFBEdgeStyleHard = 2;
+// UIScrollEdgeEffectStyle has three cases: automatic, and the two concrete ones,
+// soft and hard. Which of those two is 1 and which is 2 cannot be checked from
+// here — UIKit is not in the app bundle. What is certain is that the fade on
+// screen today is the soft one, so whenever the getter reports a concrete style
+// the hard one is simply the other value, and nothing is being guessed. The
+// assumption only comes into play if the getter reports automatic instead.
+//
+// It is always derived from the style the scroll view had when we first saw it,
+// never from the current one: deriving it from the current value would flip the
+// two back and forth on every pass.
+static NSInteger nfbHardEdgeStyleGiven(NSInteger originalStyle) {
+    if (originalStyle == 1) {
+        return 2;
+    }
+    if (originalStyle == 2) {
+        return 1;
+    }
+    return 2;
+}
 
+static const void* kNFBEdgeStyleOriginalKey = &kNFBEdgeStyleOriginalKey;
+static const void* kNFBEdgeStyleWritesKey = &kNFBEdgeStyleWritesKey;
+
+// Written at most three times per scroll view, and never again after that. An
+// earlier version re-asserted the style on every layout pass; the value never
+// read back as written, so it wrote again each time, and each write invalidated
+// the layout that had called it. That recursion crashed the app — and a @try
+// cannot catch a stack overflow. The counter makes the loop impossible whatever
+// the property turns out to do.
 static void nfbApplyHardEdgeIfSettingsRoot(UIScrollView* scrollView) {
+    NSNumber* writes = objc_getAssociatedObject(scrollView, kNFBEdgeStyleWritesKey);
+    if (writes.integerValue >= 3) {
+        return;
+    }
     if (![scrollView respondsToSelector:@selector(topEdgeEffect)]) {
         return;   // avant iOS 26 : rien à faire
     }
@@ -303,18 +335,26 @@ static void nfbApplyHardEdgeIfSettingsRoot(UIScrollView* scrollView) {
         return;
     }
     id effect = ((id (*)(id, SEL))objc_msgSend)(scrollView, @selector(topEdgeEffect));
-    if (![effect respondsToSelector:@selector(setStyle:)] ||
-        ![effect respondsToSelector:@selector(style)]) {
+    if (!effect ||
+        ![effect respondsToSelector:@selector(style)] ||
+        ![effect respondsToSelector:@selector(setStyle:)]) {
         return;
     }
-    // Re-asserted rather than marked, for the same reason as the effect itself:
-    // iOS resets it whenever the bar reconfigures.
     NSInteger current = ((NSInteger (*)(id, SEL))objc_msgSend)(effect, @selector(style));
-    if (current == kNFBEdgeStyleHard) {
-        return;
+    NSNumber* original = objc_getAssociatedObject(scrollView, kNFBEdgeStyleOriginalKey);
+    if (!original) {
+        original = @(current);
+        objc_setAssociatedObject(scrollView, kNFBEdgeStyleOriginalKey, original,
+                                 OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     }
-    ((void (*)(id, SEL, NSInteger))objc_msgSend)(effect, @selector(setStyle:),
-                                                 kNFBEdgeStyleHard);
+    NSInteger hard = nfbHardEdgeStyleGiven(original.integerValue);
+    if (current == hard) {
+        return;   // déjà en place : le cas normal après la première écriture
+    }
+    objc_setAssociatedObject(scrollView, kNFBEdgeStyleWritesKey,
+                             @(writes.integerValue + 1),
+                             OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    ((void (*)(id, SEL, NSInteger))objc_msgSend)(effect, @selector(setStyle:), hard);
 }
 
 - (void)didMoveToWindow {
