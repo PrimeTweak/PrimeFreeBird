@@ -475,3 +475,8 @@
 
 "HIDE_SCROLL_EDGE_BLUR_TITLE" = "Masquer le flou de bord";
 "HIDE_SCROLL_EDGE_BLUR_DETAIL" = "Retire la bande floue qu'iOS 26 dessine sous les barres, comme l'app d'origine.";
+
+"SHOW_POLL_RESULTS_TITLE" = "Afficher les résultats";
+"SHOW_POLL_RESULTS_DETAIL" = "Ajoute à chaque choix sa part des votes, avant même d'avoir voté.";
+"TAP_TO_PAUSE_TITLE" = "Toucher pour interrompre";
+"TAP_TO_PAUSE_DETAIL" = "Touchez une vidéo pour l'interrompre ; les contrôles restent alors affichés.";
