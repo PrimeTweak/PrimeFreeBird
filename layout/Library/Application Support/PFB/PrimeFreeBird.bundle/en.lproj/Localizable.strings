@@ -96,7 +96,7 @@
 "CUSTOM_TAB_BAR_OPTION_TITLE" = "Navigation bar";
 "CUSTOM_TAB_BAR_OPTION_SUBTITLE" = "Choose which buttons appear in the bottom navigation bar.";
 "RESTORE_TAB_LABELS_TITLE" = "Tab labels";
-"RESTORE_TAB_LABELS_DETAIL" = "Show labels under the icons in the navigation bar.";
+"RESTORE_TAB_LABELS_DETAIL" = "Show labels under the icons in the navigation bar. (Standard only)";
 "CUSTOM_FONTS_TITLE" = "Custom fonts";
 "CUSTOM_FONTS_DETAIL" = "Use a custom font throughout Twitter.";
 "REGULAR_FONTS_PICKER_OPTION_TITLE" = "Regular font";
@@ -455,7 +455,7 @@
 "MUTED_WORDS_EXAMPLE_TERM" = "spoiler";
 
 "HIDE_SCROLL_EDGE_BLUR_TITLE" = "Hide scroll edge blur";
-"HIDE_SCROLL_EDGE_BLUR_DETAIL" = "Remove the blurred strip iOS 26 draws under the bars, as the stock app does.";
+"HIDE_SCROLL_EDGE_BLUR_DETAIL" = "Remove the blurred strip drawn under the bars, as the stock app does. (Liquid Glass only)";
 
 "SHOW_POLL_RESULTS_TITLE" = "Show poll results";
 "SHOW_POLL_RESULTS_DETAIL" = "Add each option's share of the vote to its label, before you have voted.";
