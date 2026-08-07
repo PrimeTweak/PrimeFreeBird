@@ -182,28 +182,60 @@ static char kCopyProviderKey;
 // lands on the right tab. If the entry is missing entirely — a profile with no
 // media — the original value is returned and nothing changes.
 
-static NSInteger nfbProfileTabIndex(id provider, NSInteger fallback) {
-    NSString* wanted = nil;
+// The wanted tab, as the entry object itself. Each tab is a
+// T1ProfileContentMainEntry, and the provider keeps one per tab —
+// _photoEntry, _videoEntry and so on, straight from the class's ivars.
+static id nfbWantedEntry(id provider) {
+    NSString* name = nil;
     switch ([BHTSettings integerForKey:@"profile_initial_tab"]) {
-        case 1: wanted = @"tweetsAndRepliesEntry"; break;
-        case 2: wanted = @"highlightsEntry"; break;
-        case 3: wanted = @"articlesEntry"; break;
-        case 4: wanted = @"photoEntry"; break;
-        case 5: wanted = @"videoEntry"; break;
-        default: return fallback;   // 0 = laisser Twitter décider
+        case 1: name = @"tweetsAndRepliesEntry"; break;
+        case 2: name = @"highlightsEntry"; break;
+        case 3: name = @"articlesEntry"; break;
+        case 4: name = @"photoEntry"; break;
+        case 5: name = @"videoEntry"; break;
+        default: return nil;   // 0 = laisser Twitter décider
     }
 
-    SEL entrySelector = NSSelectorFromString(wanted);
-    if (![provider respondsToSelector:entrySelector] ||
-        ![provider respondsToSelector:@selector(contentMainEntries)]) {
-        return fallback;
+    // A tab hidden by one of our own switches is refused here too, in case an
+    // old choice survives in the settings after the tab was switched off.
+    NSString* hider = nil;
+    switch ([BHTSettings integerForKey:@"profile_initial_tab"]) {
+        case 2: hider = @"disable_highlights"; break;
+        case 3: hider = @"disable_articles"; break;
+        case 5: hider = @"disable_videos_tab"; break;
+        default: break;
     }
-    id entry = ((id (*)(id, SEL))objc_msgSend)(provider, entrySelector);
+    if (hider && [BHTSettings boolForKey:hider]) {
+        return nil;
+    }
+
+    SEL selector = NSSelectorFromString(name);
+    if (![provider respondsToSelector:selector] ||
+        ![provider respondsToSelector:@selector(contentMainEntries)]) {
+        return nil;
+    }
+    id entry = ((id (*)(id, SEL))objc_msgSend)(provider, selector);
+    if (!entry) {
+        return nil;
+    }
+    // Only if the profile actually offers that tab: a locked account has no
+    // media entry, and picking one that is not on screen would land nowhere.
     NSArray* entries =
         ((id (*)(id, SEL))objc_msgSend)(provider, @selector(contentMainEntries));
-    if (!entry || ![entries isKindOfClass:[NSArray class]]) {
+    if (![entries isKindOfClass:[NSArray class]] ||
+        ![entries containsObject:entry]) {
+        return nil;
+    }
+    return entry;
+}
+
+static NSInteger nfbProfileTabIndex(id provider, NSInteger fallback) {
+    id entry = nfbWantedEntry(provider);
+    if (!entry) {
         return fallback;
     }
+    NSArray* entries =
+        ((id (*)(id, SEL))objc_msgSend)(provider, @selector(contentMainEntries));
     NSUInteger index = [entries indexOfObject:entry];
     return index == NSNotFound ? fallback : (NSInteger)index;
 }
@@ -220,10 +252,19 @@ static NSInteger nfbProfileTabIndex(id provider, NSInteger fallback) {
     }
 }
 
-// The getter alone was not enough: the value is read once, early, before the
-// entries exist — contentMainEntries is still empty at that point, so the
-// lookup fell back and the profile opened on Posts. The setter runs later,
-// when Twitter stores its own choice, and by then the entries are built.
+// The real lever. defaultMainContentEntry holds the entry object Twitter
+// treats as the landing tab — initialTabIndex is only an index derived from
+// it, which is why forcing the index alone changed nothing.
+- (id)defaultMainContentEntry {
+    id original = %orig;
+
+    @try {
+        return nfbWantedEntry(self) ?: original;
+    } @catch (id exception) {
+        return original;
+    }
+}
+
 - (void)setInitialTabIndex:(NSInteger)index {
     NSInteger wanted = index;
 

@@ -73,7 +73,13 @@ static void nfbRepaintGlyphs(UIView* view, UIColor* colour) {
             UIImageView* imageView = (UIImageView*)subview;
             UIImage* current = imageView.image;
             UIImage* ours = objc_getAssociatedObject(imageView, kNFBGreyedImageKey);
-            if (current && current != ours) {
+            // Repaint when the image changed OR when the colour did. At launch
+            // the trait collection is not settled yet, so labelColor resolves
+            // to a different value and the first paint comes out pale; once
+            // the traits land, this comparison catches it.
+            UIColor* usedColour = objc_getAssociatedObject(imageView, kNFBGreyTargetKey);
+            BOOL colourChanged = usedColour && ![usedColour isEqual:colour];
+            if (current && (current != ours || colourChanged)) {
                 // Only remember the original if this image is not one of ours.
                 UIImage* source = current;
                 UIImage* original =
@@ -184,7 +190,9 @@ static void nfbRepaintNotificationsGear(UIView* bar, UIColor* colour) {
             continue;
         }
         UIImage* ours = objc_getAssociatedObject(button, kNFBGreyedImageKey);
-        if (button.image != ours) {
+        UIColor* usedColour = objc_getAssociatedObject(button, kNFBGreyTargetKey);
+        BOOL colourChanged = usedColour && ![usedColour isEqual:colour];
+        if (button.image != ours || colourChanged) {
             UIImage* original =
                 objc_getAssociatedObject(button, kNFBOriginalImageKey);
             UIImage* source = original ?: button.image;
@@ -246,6 +254,9 @@ static void nfbRepaintNotificationsGear(UIView* bar, UIColor* colour) {
         return;
     }
     // Twitter's own image is the source; ours would compound and go pale.
+    if (objc_getAssociatedObject(self, kNFBOriginalImageKey)) {
+        image = objc_getAssociatedObject(self, kNFBOriginalImageKey);
+    }
     objc_setAssociatedObject(self, kNFBOriginalImageKey, image,
                              OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     UIImage* painted = NFBGreyGlyph(image, target);
