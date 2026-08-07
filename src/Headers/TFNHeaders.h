@@ -155,4 +155,7 @@
 @end
 
 @interface TFNBarButtonItemButton : UIButton
+// Added by the tweak (see src/Hooks/NavBarIcons.x); declared so the compiler
+// knows the selector when it is sent to self.
+- (void)nfbGreySettingsGlyphIfNeeded;
 @end
