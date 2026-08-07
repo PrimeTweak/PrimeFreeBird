@@ -2,7 +2,7 @@
     <img src="icon_rounded.png" alt="PrimeFreeBird" width="130" height="130">
 
   # PrimeFreeBird
-  <i>A Twitter/X tweak — reworked for iOS 26 &amp; Liquid Glass.</i>
+  <i>A Twitter/X tweak.</i>
 
 </div>
 
@@ -21,20 +21,17 @@
 - **Liquid Glass, enabled** — the stock app opts out of iOS 26's redesign; this switches it back on, or keeps the flat look.
 - **No blurred edge** — the redesign makes iOS draw a strip under every bar; a switch puts the stock look back.
 - **Bar icons that match** — the settings gear, the search filters and the muted-words icon share one grey and keep it.
-- **Native pickers** — a choice opens as a plain iOS alert, with a system checkmark on the option in use.
 
 ## Colour theme
 
 - **Any colour you want** — a *Custom accent colour* row opens the native iOS picker instead of a fixed set of presets.
 - **Applied everywhere** — the bird, links, @mentions, #hashtags, buttons and the settings switches all follow it.
-- **Independent accents** — the compose button, the selected tab and the Confirm button each follow it, or keep Twitter blue.
 - **Predictable reset** — resetting returns to stock and stays there, across restarts and re-picks.
 - **Dark shades** — choose System, Dim, Gray or Blackout for Twitter's dark backgrounds.
 
 ## Explore &amp; search
 
 - **Per-tab control** — hide any of For You, Trending, News, Sports or Entertainment, rather than the whole page.
-- **Swiping stays native** — the pager holds only the tabs you keep, and the underline tracks the one you're on.
 - **Advanced search** — X ships this form on the web only; here it is native, with results in Twitter's own search.
 
 ## Muted words
@@ -42,8 +39,6 @@
 - **One list for everything** — a word, a phrase or an @account; the type is recognised from what you type.
 - **Quick access from the feed** — an icon in the timeline's top bar adds or removes a filter without leaving your scroll.
 - **Filters that expire** — give a word 24 hours, 7 days or 30 days, or keep it for good.
-- **Scoped the way you want** — filters skip the accounts you follow and leave reposts alone, unless you say otherwise.
-- **A count of what it caught** — how many posts were filtered today, under the list.
 - **Precise by default** — whole-word matching, so "cat" never catches "concatenate".
 
 ## Timeline
@@ -87,12 +82,9 @@
 # Fixes
 
 - **Tab labels are centred** — restored labels no longer sit off-centre after a cold launch.
-- **The top bar comes in solid** — the bar and its tabs used to render pale for a moment while a screen loaded.
 - **The video timestamp shows up** — the option now actually reveals the elapsed time in full-screen videos.
 - **"Open in Following" is honoured** — the setting was silently overridden; the tab you pick survives a new session.
 - **No black frame at launch** — the splash dissolves into the timeline instead of cutting to an empty window.
-- **The Spaces bar comes back** — switching the option off restores the bar without relaunching the app.
-- **Pickers look native again** — the appearance pickers were action sheets landing mid-screen; they are iOS alerts now.
 - **Pull-to-refresh sound works again** — rebuilt for current Twitter versions, where the old hook no longer exists.
 - **Reply composer sits still** — no keyboard bounce, no doubled insets, no login wall.
 
@@ -102,4 +94,4 @@
 
 - [**BHTwitter**](https://github.com/BandarHL/BHTwitter) by BandarHL — the foundation this is built on.
 - The [**NeoFreeBird**](https://github.com/NeoFreeBird) project — the base this fork tracks.
-- [**scar**](https://github.com/theacrat/scar) by theacrat — the branding pipeline.
+- [**scar**](https://github.com/theacrat/scar) by theacrat — the fixes pipeline.
