@@ -230,6 +230,11 @@ static NSDictionary<NSString*, NSDictionary*>* BHTSettingsPages(void) {
                     @{@"key": @"follow_confirm",
                       @"default": @NO,
                       @"type": @"toggle"},
+                    @{@"key": @"expand_bio",
+                      @"default": @NO,
+                      @"type": @"toggle"},
+                    @{@"action": @"showProfileTabPicker:",
+                      @"type": @"button"},
                     @{
                         @"key": @"copy_profile_info",
                         @"default": @NO,
@@ -244,6 +249,11 @@ static NSDictionary<NSString*, NSDictionary*>* BHTSettingsPages(void) {
                     @{
                         @"key": @"disable_highlights",
                         @"default": @YES,
+                        @"type": @"toggle"
+                    },
+                    @{
+                        @"key": @"disable_videos_tab",
+                        @"default": @NO,
                         @"type": @"toggle"
                     },
                     @{@"type": @"header", @"titleKey": @"PROFILES_GROUP_APPEARANCE"},
