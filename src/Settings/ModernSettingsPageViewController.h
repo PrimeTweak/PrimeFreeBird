@@ -34,4 +34,11 @@
 - (void)switchChanged:(UISwitch*)sender;
 - (void)showRestartRequiredAlert;
 
+// Adds one option to a picker alert and marks it when it is the current choice.
+// Every picker goes through here so the mark is decided in one place.
+- (void)addOption:(NSString*)title
+         selected:(BOOL)selected
+         toPicker:(UIAlertController*)picker
+          handler:(void (^)(void))handler;
+
 @end

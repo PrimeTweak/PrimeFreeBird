@@ -517,6 +517,49 @@ extern NSInteger NFBColorThemeScreenVisible;
     [self presentViewController:alert animated:YES completion:nil];
 }
 
+// Gluing a checkmark onto the title pushes the word off the axis every other
+// option sits on — the mark ends up costing the alignment of the whole list.
+// UIAlertAction carries a private "checked" flag that draws the system's own
+// checkmark against the trailing edge and leaves the title centred, which is
+// how iOS marks a choice in its own pickers.
+//
+// Private means it is asked for by name rather than assumed: the setter KVC
+// would reach for is looked up once, and if a future iOS no longer has it the
+// current option is set as the alert's preferred action and comes out bold
+// instead. Neither branch touches the title, so the list stays aligned either
+// way — and a bold option instead of a checkmark is the signal that the flag
+// is gone.
+- (void)addOption:(NSString*)title
+         selected:(BOOL)selected
+         toPicker:(UIAlertController*)picker
+          handler:(void (^)(void))handler {
+    if (!picker || !title) {
+        return;
+    }
+    UIAlertAction* action = [UIAlertAction actionWithTitle:title
+                                                     style:UIAlertActionStyleDefault
+                                                   handler:^(UIAlertAction* a) {
+                                                       if (handler) {
+                                                           handler();
+                                                       }
+                                                   }];
+    [picker addAction:action];
+    if (!selected) {
+        return;
+    }
+    static BOOL checkable = NO;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+        checkable = [UIAlertAction
+            instancesRespondToSelector:NSSelectorFromString(@"setChecked:")];
+    });
+    if (checkable) {
+        [action setValue:@YES forKey:@"checked"];
+    } else {
+        picker.preferredAction = action;
+    }
+}
+
 - (void)updateAndAnimateChangesForKey:(NSString*)key {
     NSArray* oldVisibleToggles = self.visibleToggles;
     [self updateVisibleToggles];
