@@ -499,3 +499,5 @@
 
 "EXPAND_BIO_TITLE" = "Déplier les bios";
 "EXPAND_BIO_DETAIL" = "Affiche la bio entière d'un profil, sans passer par « Afficher plus ».";
+
+"PROFILE_INITIAL_TAB_SUBTITLE" = "Choisit l'onglet d'ouverture d'un profil.";
