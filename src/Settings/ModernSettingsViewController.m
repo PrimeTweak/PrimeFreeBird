@@ -117,13 +117,6 @@ extern NSInteger NFBColorThemeScreenVisible;
             @"action": @"showAppearanceSettings"
         },
         @{
-            @"title": [[BHTBundle sharedBundle] localizedStringForKey:@"MODERN_SETTINGS_GROK_TITLE"],
-            @"subtitle":
-                [[BHTBundle sharedBundle] localizedStringForKey:@"MODERN_SETTINGS_GROK_SUBTITLE"],
-            @"icon": @"grok_icon_stroke",
-            @"action": @"showGrokSettings"
-        },
-        @{
             @"title":
                 [[BHTBundle sharedBundle] localizedStringForKey:@"MODERN_SETTINGS_TIMELINES_TITLE"],
             @"subtitle":
@@ -163,8 +156,15 @@ extern NSInteger NFBColorThemeScreenVisible;
             @"title": [[BHTBundle sharedBundle] localizedStringForKey:@"MODERN_SETTINGS_BRANDING_TITLE"],
             @"subtitle":
                 [[BHTBundle sharedBundle] localizedStringForKey:@"MODERN_SETTINGS_BRANDING_SUBTITLE"],
-            @"icon": @"hash_stroke",
+            @"icon": @"tag_stroke",
             @"action": @"showBrandingSettings"
+        },
+        @{
+            @"title": [[BHTBundle sharedBundle] localizedStringForKey:@"MODERN_SETTINGS_GROK_TITLE"],
+            @"subtitle":
+                [[BHTBundle sharedBundle] localizedStringForKey:@"MODERN_SETTINGS_GROK_SUBTITLE"],
+            @"icon": @"grok_icon_stroke",
+            @"action": @"showGrokSettings"
         },
         @{
             @"title": [[BHTBundle sharedBundle] localizedStringForKey:@"MODERN_SETTINGS_LAB_TITLE"],
