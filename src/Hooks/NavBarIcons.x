@@ -65,6 +65,30 @@ static UIView* nfbFindSettingsButton(UIView* view) {
     return nil;
 }
 
+// True when this controller is the notifications screen, hosts it, or sits
+// inside it.
+static BOOL nfbControllerIsNotifications(UIViewController* controller) {
+    if (!controller) {
+        return NO;
+    }
+    if ([NSStringFromClass([controller class]) containsString:@"Notification"]) {
+        return YES;
+    }
+    for (UIViewController* child in controller.childViewControllers) {
+        if ([NSStringFromClass([child class]) containsString:@"Notification"]) {
+            return YES;
+        }
+    }
+    UIViewController* parent = controller.parentViewController;
+    while (parent) {
+        if ([NSStringFromClass([parent class]) containsString:@"Notification"]) {
+            return YES;
+        }
+        parent = parent.parentViewController;
+    }
+    return NO;
+}
+
 // Notifications: the gear is a plain bar button item. Scoped to that screen
 // through the owning controller, so no other bar is touched.
 static void nfbDimNotificationsGear(UIView* bar) {
@@ -79,7 +103,11 @@ static void nfbDimNotificationsGear(UIView* bar) {
             break;
         }
     }
-    if (!owner || ![NSStringFromClass([owner class]) containsString:@"Notification"]) {
+    // The bar's owner is often a generic container — the All/Mentions
+    // segmented controller here — so its own name says nothing. Look at its
+    // children and its parent too. Exactly the trap the scroll edge effect
+    // taught us: the screen's real name sits one level away.
+    if (!nfbControllerIsNotifications(owner)) {
         return;
     }
     if (![bar respondsToSelector:@selector(topItem)]) {

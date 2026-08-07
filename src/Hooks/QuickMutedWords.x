@@ -82,6 +82,8 @@ static BOOL nfbIsHomeNavigationBar(UIView* bar) {
 // Resolving it here also stops the theme's window tint from claiming the icon
 // on a cold launch, a trap the colour work already taught us.
 static UIColor* NFBBarIconGrey(UITraitCollection* traits) {
+    // Resolved to a concrete colour: a dynamic one handed to Twitter's vector
+    // renderer came back black, and let the theme claim it later.
     UIColor* grey = [[UIColor labelColor] colorWithAlphaComponent:0.6];
     if (traits && [grey respondsToSelector:@selector(resolvedColorWithTraitCollection:)]) {
         return [grey resolvedColorWithTraitCollection:traits] ?: grey;
@@ -150,9 +152,12 @@ static UIColor* NFBBarIconGrey(UITraitCollection* traits) {
                 icon = [UIImage tfn_vectorImageNamed:@"filter_bars"
                                             fitsSize:CGSizeMake(26.0, 26.0)
                                            fillColor:NFBBarIconGrey(bar.traitCollection)];
-                // Template, not original: the fill colour baked by Twitter
-                // came out black, so the button's tintColor does the colouring.
-                icon = [icon imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate];
+                // Baked, not template. A template image takes its colour from
+                // the tint, and the theme reclaimed it every time the bar was
+                // re-shown after a scroll — the icon flashed back to the accent
+                // until you changed tab. A colour burnt into the image cannot
+                // be reclaimed by anything.
+                icon = [icon imageWithRenderingMode:UIImageRenderingModeAlwaysOriginal];
             }
             if (!icon) {
                 icon = [UIImage systemImageNamed:@"line.3.horizontal.decrease"];

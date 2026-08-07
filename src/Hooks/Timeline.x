@@ -246,11 +246,24 @@ static void nfbApplyEdgeEffect(UIScrollView* scrollView, BOOL hide) {
 
 %hook UIScrollView
 
+// Modal screens are left alone. Hiding the effect on Twitter's own settings
+// sheet broke its content inset — the list slid up under the title. The tabs
+// we care about are never presented modally, so this costs us nothing.
+static BOOL nfbScrollViewIsModal(UIScrollView* scrollView) {
+    UIResponder* responder = scrollView;
+    while ((responder = responder.nextResponder)) {
+        if ([responder isKindOfClass:[UIViewController class]]) {
+            return ((UIViewController*)responder).presentingViewController != nil;
+        }
+    }
+    return NO;
+}
+
 - (void)didMoveToWindow {
     %orig;
 
     @try {
-        if (self.window) {
+        if (self.window && !nfbScrollViewIsModal(self)) {
             nfbApplyEdgeEffect(self, nfbEdgeHideEnabled());
         }
     } @catch (id exception) {
@@ -269,10 +282,12 @@ static void nfbApplyEdgeEffect(UIScrollView* scrollView, BOOL hide) {
         if (!self.window) {
             return;
         }
+        BOOL marked = objc_getAssociatedObject(self, kNFBEdgeMarkKey) != nil;
         BOOL hide = nfbEdgeHideEnabled();
-        if (hide || objc_getAssociatedObject(self, kNFBEdgeMarkKey)) {
-            nfbApplyEdgeEffect(self, hide);
+        if (!marked && (!hide || nfbScrollViewIsModal(self))) {
+            return;
         }
+        nfbApplyEdgeEffect(self, hide);
     } @catch (id exception) {
     }
 }
