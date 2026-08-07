@@ -268,10 +268,10 @@ static BOOL nfbScrollViewIsModal(UIScrollView* scrollView) {
 // settings, the page carrying the "Search settings" field. Leaving its effect
 // alone keeps the bar, but under Liquid Glass iOS draws that bar as a gradual
 // fade — the list shows through above the field and nothing marks where the bar
-// ends. The hard style puts an opaque background and a boundary back under it,
-// which is how the stock app draws this sheet. Sub-pages share the controller
-// class, so the root is the first settings controller in the navigation stack,
-// the same test Settings.x already relies on.
+// ends. The hard style puts an opaque background and a boundary back under it.
+//
+// Sub-pages share the controller class, so the root is the first settings
+// controller in the navigation stack — the same test Settings.x already uses.
 static BOOL nfbIsTwitterSettingsClass(UIViewController* controller) {
     Class generic = objc_getClass("T1GenericSettingsViewController");
     Class settings = objc_getClass("T1SettingsViewController");
@@ -294,35 +294,54 @@ static BOOL nfbControllerIsSettingsRoot(UIViewController* controller) {
     return NO;
 }
 
-// UIScrollEdgeEffectStyle has three cases: automatic, and the two concrete ones,
-// soft and hard. Which of those two is 1 and which is 2 cannot be checked from
-// here — UIKit is not in the app bundle. What is certain is that the fade on
-// screen today is the soft one, so whenever the getter reports a concrete style
-// the hard one is simply the other value, and nothing is being guessed. The
-// assumption only comes into play if the getter reports automatic instead.
-//
-// It is always derived from the style the scroll view had when we first saw it,
-// never from the current one: deriving it from the current value would flip the
-// two back and forth on every pass.
-static NSInteger nfbHardEdgeStyleGiven(NSInteger originalStyle) {
-    if (originalStyle == 1) {
-        return 2;
+// A scroll edge effect's style is an OBJECT, not an enum. That is not a guess:
+// an earlier attempt passed the integer 2 to setStyle:, UIKit retained it, and
+// the crash report shows objc_retain dereferencing address 0x2. So the hard
+// style is asked of the style's own class rather than invented — every no-
+// argument class method returning an object is examined, and the one whose name
+// carries "hard" is used, after checking the value really is a style. Nothing is
+// assumed about numbering, ordering, or naming beyond that one word, and if
+// nothing matches the screen is left exactly as it was.
+static id nfbHardEdgeStyleLike(id currentStyle) {
+    if (!currentStyle) {
+        return nil;
     }
-    if (originalStyle == 2) {
-        return 1;
+    Class styleClass = [currentStyle class];
+    unsigned int count = 0;
+    Method* methods = class_copyMethodList(object_getClass(styleClass), &count);
+    if (!methods) {
+        return nil;
     }
-    return 2;
+    id found = nil;
+    for (unsigned int i = 0; i < count && !found; i++) {
+        if (method_getNumberOfArguments(methods[i]) != 2) {
+            continue;   // on ne veut que les +foo, sans argument
+        }
+        char returnType[8] = {0};
+        method_getReturnType(methods[i], returnType, sizeof(returnType));
+        if (returnType[0] != '@') {
+            continue;
+        }
+        SEL selector = method_getName(methods[i]);
+        NSString* name = [NSStringFromSelector(selector) lowercaseString];
+        if (![name hasPrefix:@"hard"]) {
+            continue;
+        }
+        id candidate = ((id (*)(id, SEL))objc_msgSend)(styleClass, selector);
+        if ([candidate isKindOfClass:styleClass]) {
+            found = candidate;
+        }
+    }
+    free(methods);
+    return found;
 }
 
-static const void* kNFBEdgeStyleOriginalKey = &kNFBEdgeStyleOriginalKey;
 static const void* kNFBEdgeStyleWritesKey = &kNFBEdgeStyleWritesKey;
 
-// Written at most three times per scroll view, and never again after that. An
-// earlier version re-asserted the style on every layout pass; the value never
-// read back as written, so it wrote again each time, and each write invalidated
-// the layout that had called it. That recursion crashed the app — and a @try
-// cannot catch a stack overflow. The counter makes the loop impossible whatever
-// the property turns out to do.
+// Two things keep this safe. The setter is only ever called once the runtime has
+// confirmed it takes an object — the check that was missing when this crashed —
+// and the writes are capped per scroll view, so no chain of write, relayout,
+// write can run away even if the value refuses to stick.
 static void nfbApplyHardEdgeIfSettingsRoot(UIScrollView* scrollView) {
     NSNumber* writes = objc_getAssociatedObject(scrollView, kNFBEdgeStyleWritesKey);
     if (writes.integerValue >= 3) {
@@ -340,21 +359,26 @@ static void nfbApplyHardEdgeIfSettingsRoot(UIScrollView* scrollView) {
         ![effect respondsToSelector:@selector(setStyle:)]) {
         return;
     }
-    NSInteger current = ((NSInteger (*)(id, SEL))objc_msgSend)(effect, @selector(style));
-    NSNumber* original = objc_getAssociatedObject(scrollView, kNFBEdgeStyleOriginalKey);
-    if (!original) {
-        original = @(current);
-        objc_setAssociatedObject(scrollView, kNFBEdgeStyleOriginalKey, original,
-                                 OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    // respondsToSelector: proves the selector exists, never what it expects.
+    NSMethodSignature* getter = [effect methodSignatureForSelector:@selector(style)];
+    NSMethodSignature* setter = [effect methodSignatureForSelector:@selector(setStyle:)];
+    if (!getter || !setter || setter.numberOfArguments != 3) {
+        return;
     }
-    NSInteger hard = nfbHardEdgeStyleGiven(original.integerValue);
-    if (current == hard) {
-        return;   // déjà en place : le cas normal après la première écriture
+    const char* returnType = getter.methodReturnType;
+    const char* argumentType = [setter getArgumentTypeAtIndex:2];
+    if (!returnType || returnType[0] != '@' || !argumentType || argumentType[0] != '@') {
+        return;
+    }
+    id current = ((id (*)(id, SEL))objc_msgSend)(effect, @selector(style));
+    id hard = nfbHardEdgeStyleLike(current);
+    if (!hard || hard == current) {
+        return;
     }
     objc_setAssociatedObject(scrollView, kNFBEdgeStyleWritesKey,
                              @(writes.integerValue + 1),
                              OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-    ((void (*)(id, SEL, NSInteger))objc_msgSend)(effect, @selector(setStyle:), hard);
+    ((void (*)(id, SEL, id))objc_msgSend)(effect, @selector(setStyle:), hard);
 }
 
 - (void)didMoveToWindow {
