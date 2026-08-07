@@ -461,3 +461,7 @@
 "SHOW_POLL_RESULTS_DETAIL" = "Add each option's share of the vote to its label, before you have voted.";
 "TAP_TO_PAUSE_TITLE" = "Tap to pause";
 "TAP_TO_PAUSE_DETAIL" = "Tap a video to pause it; the controls then stay on screen.";
+
+"PROFILES_GROUP_BEHAVIOR" = "Behavior";
+"PROFILES_GROUP_TABS" = "Profile Tabs";
+"PROFILES_GROUP_APPEARANCE" = "Appearance";
