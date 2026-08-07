@@ -37,7 +37,8 @@ extern void applySquareAvatarsSetting(void);
         @"PROFILE_TAB_HIGHLIGHTS",
         @"PROFILE_TAB_ARTICLES",
         @"PROFILE_TAB_MEDIA",
-        @"PROFILE_TAB_VIDEOS"
+        @"PROFILE_TAB_VIDEOS",
+        @"PROFILE_TAB_REPOSTS"
     ];
     NSArray<NSString*>* hiddenBy = @[
         @"",                      // Default, jamais masqué
@@ -45,7 +46,8 @@ extern void applySquareAvatarsSetting(void);
         @"disable_highlights",
         @"disable_articles",
         @"",                      // Media, pas d'option
-        @"disable_videos_tab"
+        @"disable_videos_tab",
+        @""                       // Reposts, pas d'option
     ];
     NSInteger current = [BHTSettings integerForKey:@"profile_initial_tab"];
     // If the chosen tab has since been hidden, the checkmark falls back to
