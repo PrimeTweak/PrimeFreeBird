@@ -465,3 +465,18 @@
 "PROFILES_GROUP_BEHAVIOR" = "Behavior";
 "PROFILES_GROUP_TABS" = "Profile Tabs";
 "PROFILES_GROUP_APPEARANCE" = "Appearance";
+
+"PROFILE_INITIAL_TAB_TITLE" = "Open profiles on";
+"PROFILE_INITIAL_TAB_DETAIL" = "Choose which tab a profile opens on; profiles without it keep the default.";
+"PROFILE_TAB_DEFAULT" = "Default";
+"PROFILE_TAB_REPLIES" = "Replies";
+"PROFILE_TAB_HIGHLIGHTS" = "Highlights";
+"PROFILE_TAB_ARTICLES" = "Articles";
+"PROFILE_TAB_MEDIA" = "Media";
+"PROFILE_TAB_VIDEOS" = "Videos";
+
+"DISABLE_VIDEOS_TAB_TITLE" = "Hide Videos tab";
+"DISABLE_VIDEOS_TAB_DETAIL" = "Remove the Videos tab from profiles.";
+
+"EXPAND_BIO_TITLE" = "Expand bios";
+"EXPAND_BIO_DETAIL" = "Show a profile's whole bio at once, without the Show more tap.";
