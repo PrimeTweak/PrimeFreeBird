@@ -190,6 +190,11 @@ static NSDictionary<NSString*, NSDictionary*>* BHTSettingsPages(void) {
                       @"default": @NO,
                       @"type": @"toggle"},
                     @{@"type": @"header", @"titleKey": @"MEDIA_GROUP_PLAYBACK"},
+                    @{
+                        @"key": @"tap_to_pause",
+                        @"default": @NO,
+                        @"type": @"toggle"
+                    },
                     @{@"key": @"restore_video_timestamp",
                       @"default": @NO,
                       @"type": @"toggle"},
@@ -291,6 +296,11 @@ static NSDictionary<NSString*, NSDictionary*>* BHTSettingsPages(void) {
                       @"default": @NO,
                       @"type": @"toggle"},
                     @{@"type": @"header", @"titleKey": @"TWEETS_GROUP_READING"},
+                    @{
+                        @"key": @"show_poll_results",
+                        @"default": @NO,
+                        @"type": @"toggle"
+                    },
                     @{@"key": @"disable_sensitive_tweet_warnings",
                       @"default": @YES,
                       @"type": @"toggle"},
