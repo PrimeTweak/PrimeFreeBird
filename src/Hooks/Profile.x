@@ -240,6 +240,46 @@ static NSInteger nfbProfileTabIndex(id provider, NSInteger fallback) {
     return index == NSNotFound ? fallback : (NSInteger)index;
 }
 
+// The provider only *describes* the tabs; the controller is what selects one.
+// Forcing initialTabIndex and defaultMainContentEntry changed nothing because
+// neither is consulted at that moment — T1ProfileViewController owns
+// _t1_selectMainEntry:, and asking it directly is what actually moves the
+// profile. Read off the class's method table, not guessed.
+
+static const void* kNFBTabAppliedKey = &kNFBTabAppliedKey;
+
+%hook T1ProfileViewController
+
+- (void)viewDidAppear:(BOOL)animated {
+    %orig;
+
+    @try {
+        id controller = self;
+        // Once per profile: re-selecting on every appearance would fight the
+        // tab you picked by hand after coming back from a tweet.
+        if (objc_getAssociatedObject(controller, kNFBTabAppliedKey)) {
+            return;
+        }
+        if (![controller respondsToSelector:@selector(currentDisplayContentProvider)] ||
+            ![controller respondsToSelector:@selector(_t1_selectMainEntry:)]) {
+            return;
+        }
+        id provider = ((id (*)(id, SEL))objc_msgSend)(
+            controller, @selector(currentDisplayContentProvider));
+        id entry = nfbWantedEntry(provider);
+        if (!entry) {
+            return;
+        }
+        objc_setAssociatedObject(controller, kNFBTabAppliedKey, @YES,
+                                 OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        ((void (*)(id, SEL, id))objc_msgSend)(
+            controller, @selector(_t1_selectMainEntry:), entry);
+    } @catch (id exception) {
+    }
+}
+
+%end
+
 %hook T1ProfileDisplayContentProvider
 
 - (NSInteger)initialTabIndex {

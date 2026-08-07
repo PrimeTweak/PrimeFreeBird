@@ -28,6 +28,11 @@ static const void* kNFBGreyTargetKey = &kNFBGreyTargetKey;
 // laid over a colour already at 60% lands at 36%, which is the pale flash he
 // saw before the icon settled. Every repaint starts from this original.
 static const void* kNFBOriginalImageKey = &kNFBOriginalImageKey;
+// Marks an image we produced. Two paths repaint on Notifications — the bar
+// button item and the image view UIKit builds from it — and each saw the
+// other's result as "not mine yet", so the glyph was painted twice and came
+// out pale. The mark travels with the image, so any path recognises it.
+static const void* kNFBPaintedFlagKey = &kNFBPaintedFlagKey;
 
 // One grey for every icon we add or recolour: the label colour at 60%,
 // resolved to a concrete value so nothing can re-resolve it later.
@@ -61,7 +66,10 @@ static UIImage* NFBGreyGlyph(UIImage* source, UIColor* colour) {
             [colour setFill];
             CGContextFillRect(context.CGContext, rect);
         }];
-    return [painted imageWithRenderingMode:UIImageRenderingModeAlwaysOriginal];
+    UIImage* result = [painted imageWithRenderingMode:UIImageRenderingModeAlwaysOriginal];
+    objc_setAssociatedObject(result, kNFBPaintedFlagKey, @YES,
+                             OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    return result;
 }
 
 // Replaces the image of every glyph-sized image view under a view. The result
@@ -79,7 +87,9 @@ static void nfbRepaintGlyphs(UIView* view, UIColor* colour) {
             // the traits land, this comparison catches it.
             UIColor* usedColour = objc_getAssociatedObject(imageView, kNFBGreyTargetKey);
             BOOL colourChanged = usedColour && ![usedColour isEqual:colour];
-            if (current && (current != ours || colourChanged)) {
+            BOOL alreadyOurs =
+                objc_getAssociatedObject(current, kNFBPaintedFlagKey) != nil;
+            if (current && !alreadyOurs && (current != ours || colourChanged)) {
                 // Only remember the original if this image is not one of ours.
                 UIImage* source = current;
                 UIImage* original =
@@ -192,7 +202,9 @@ static void nfbRepaintNotificationsGear(UIView* bar, UIColor* colour) {
         UIImage* ours = objc_getAssociatedObject(button, kNFBGreyedImageKey);
         UIColor* usedColour = objc_getAssociatedObject(button, kNFBGreyTargetKey);
         BOOL colourChanged = usedColour && ![usedColour isEqual:colour];
-        if (button.image != ours || colourChanged) {
+        BOOL alreadyOurs =
+            objc_getAssociatedObject(button.image, kNFBPaintedFlagKey) != nil;
+        if (!alreadyOurs && (button.image != ours || colourChanged)) {
             UIImage* original =
                 objc_getAssociatedObject(button, kNFBOriginalImageKey);
             UIImage* source = original ?: button.image;
@@ -249,7 +261,8 @@ static void nfbRepaintNotificationsGear(UIView* bar, UIColor* colour) {
         return;
     }
     UIImage* ours = objc_getAssociatedObject(self, kNFBGreyedImageKey);
-    if (image == ours) {
+    if (image == ours ||
+        objc_getAssociatedObject(image, kNFBPaintedFlagKey) != nil) {
         %orig;
         return;
     }
@@ -276,7 +289,8 @@ static void nfbRepaintNotificationsGear(UIView* bar, UIColor* colour) {
         return;
     }
     UIImage* ours = objc_getAssociatedObject(self, kNFBGreyedImageKey);
-    if (image == ours) {
+    if (image == ours ||
+        objc_getAssociatedObject(image, kNFBPaintedFlagKey) != nil) {
         %orig;
         return;
     }
