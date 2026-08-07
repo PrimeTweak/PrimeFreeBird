@@ -246,24 +246,18 @@ static void nfbApplyEdgeEffect(UIScrollView* scrollView, BOOL hide) {
 
 %hook UIScrollView
 
-// Modal screens are left alone. Hiding the effect on Twitter's own settings
-// sheet broke its content inset — the list slid up under the title. The tabs
-// we care about are never presented modally, so this costs us nothing.
-static BOOL nfbScrollViewIsModal(UIScrollView* scrollView) {
-    UIResponder* responder = scrollView;
-    while ((responder = responder.nextResponder)) {
-        if ([responder isKindOfClass:[UIViewController class]]) {
-            return ((UIViewController*)responder).presentingViewController != nil;
-        }
-    }
-    return NO;
-}
+// Modal screens used to be left alone here: hiding the effect on Twitter's own
+// settings sheet had broken its content inset, sliding the list up under the
+// title. That exemption is what left the settings sheet as the one place in the
+// app still showing the blurred strip. The guard is lifted so the option means
+// the same thing everywhere; if the inset breaks again, it will do so on that
+// sheet and nowhere else, and switching the option off restores it on the spot.
 
 - (void)didMoveToWindow {
     %orig;
 
     @try {
-        if (self.window && !nfbScrollViewIsModal(self)) {
+        if (self.window) {
             nfbApplyEdgeEffect(self, nfbEdgeHideEnabled());
         }
     } @catch (id exception) {
@@ -284,7 +278,7 @@ static BOOL nfbScrollViewIsModal(UIScrollView* scrollView) {
         }
         BOOL marked = objc_getAssociatedObject(self, kNFBEdgeMarkKey) != nil;
         BOOL hide = nfbEdgeHideEnabled();
-        if (!marked && (!hide || nfbScrollViewIsModal(self))) {
+        if (!marked && !hide) {
             return;
         }
         nfbApplyEdgeEffect(self, hide);
