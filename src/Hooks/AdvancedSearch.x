@@ -39,7 +39,7 @@ static const CGFloat kNFBSliderGeometry[2][2] = {{7.0, 15.0}, {17.0, 9.0}};
 
 static UIImage* NFBSlidersGlyph(CGFloat side) {
     const CGFloat kUnit = 24.0;
-    const CGFloat kThickness = 2.20;
+    const CGFloat kThickness = 2.07;
     const CGFloat kGap = 1.5;
     const CGFloat kHandleHalfHeight = 4.0;
     CGFloat scale = side / kUnit;

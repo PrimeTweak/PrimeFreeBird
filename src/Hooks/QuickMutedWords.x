@@ -104,10 +104,16 @@ static UIColor* NFBBarIconGrey(UITraitCollection* traits) {
 //
 // Both numbers are measured against the settings gear as it actually reaches
 // the screen, not against the glyph in isolation — that mistake produced an
-// icon simultaneously too heavy and too small. The gear's ink spans 62 points
-// across at three-times scale with an 8 point stroke; this shape only covers
-// 18 of its 24 units, so it needs the larger 27.33 canvas to reach the same
-// width, and 2.2 units of thickness to land on the same stroke there.
+// icon simultaneously too heavy and too small. The gear's ink spans 62 pixels
+// across at three-times scale; this shape only covers 18 of its 24 units
+// against the gear's 20.5, so it needs the larger 27.33 canvas to reach the
+// same width.
+//
+// The gear's stroke measures 7.08 pixels there, by two independent methods
+// that agree to within a fiftieth of a pixel. 2.07 units on this canvas comes
+// out at 7.07. Counting whole pixels is not enough at this size: 2.2 units
+// also read as "8 pixels" under a coarser measurement while sitting six
+// percent heavy, which is exactly the difference the eye caught.
 // Left, right, centre line — a block cannot capture a local C array, so the
 // table lives at file scope where it is simply referenced.
 static const CGFloat kNFBBarGeometry[3][3] = {
@@ -116,7 +122,7 @@ static const CGFloat kNFBBarGeometry[3][3] = {
 
 static UIImage* NFBFilterBarsGlyph(CGFloat side) {
     const CGFloat kUnit = 24.0;
-    const CGFloat kThickness = 2.20;
+    const CGFloat kThickness = 2.07;
     CGFloat scale = side / kUnit;
     UIGraphicsImageRendererFormat* format =
         [UIGraphicsImageRendererFormat preferredFormat];
