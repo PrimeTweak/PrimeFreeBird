@@ -24,6 +24,10 @@ static const void* kNFBGreyedImageKey = &kNFBGreyedImageKey;
 // Holds the colour to force on a view we have taken over, so any image set
 // later goes through the same repaint.
 static const void* kNFBGreyTargetKey = &kNFBGreyTargetKey;
+// The untouched glyph. Repainting is not idempotent — a colour at 60% opacity
+// laid over a colour already at 60% lands at 36%, which is the pale flash he
+// saw before the icon settled. Every repaint starts from this original.
+static const void* kNFBOriginalImageKey = &kNFBOriginalImageKey;
 
 // One grey for every icon we add or recolour: the label colour at 60%,
 // resolved to a concrete value so nothing can re-resolve it later.
@@ -70,7 +74,17 @@ static void nfbRepaintGlyphs(UIView* view, UIColor* colour) {
             UIImage* current = imageView.image;
             UIImage* ours = objc_getAssociatedObject(imageView, kNFBGreyedImageKey);
             if (current && current != ours) {
-                UIImage* painted = NFBGreyGlyph(current, colour);
+                // Only remember the original if this image is not one of ours.
+                UIImage* source = current;
+                UIImage* original =
+                    objc_getAssociatedObject(imageView, kNFBOriginalImageKey);
+                if (original) {
+                    source = original;
+                } else {
+                    objc_setAssociatedObject(imageView, kNFBOriginalImageKey, current,
+                                             OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+                }
+                UIImage* painted = NFBGreyGlyph(source, colour);
                 objc_setAssociatedObject(imageView, kNFBGreyTargetKey, colour,
                                          OBJC_ASSOCIATION_RETAIN_NONATOMIC);
                 objc_setAssociatedObject(imageView, kNFBGreyedImageKey, painted,
@@ -171,7 +185,14 @@ static void nfbRepaintNotificationsGear(UIView* bar, UIColor* colour) {
         }
         UIImage* ours = objc_getAssociatedObject(button, kNFBGreyedImageKey);
         if (button.image != ours) {
-            UIImage* painted = NFBGreyGlyph(button.image, colour);
+            UIImage* original =
+                objc_getAssociatedObject(button, kNFBOriginalImageKey);
+            UIImage* source = original ?: button.image;
+            if (!original) {
+                objc_setAssociatedObject(button, kNFBOriginalImageKey, button.image,
+                                         OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+            }
+            UIImage* painted = NFBGreyGlyph(source, colour);
             objc_setAssociatedObject(button, kNFBGreyTargetKey, colour,
                                      OBJC_ASSOCIATION_RETAIN_NONATOMIC);
             objc_setAssociatedObject(button, kNFBGreyedImageKey, painted,
@@ -224,6 +245,9 @@ static void nfbRepaintNotificationsGear(UIView* bar, UIColor* colour) {
         %orig;
         return;
     }
+    // Twitter's own image is the source; ours would compound and go pale.
+    objc_setAssociatedObject(self, kNFBOriginalImageKey, image,
+                             OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     UIImage* painted = NFBGreyGlyph(image, target);
     objc_setAssociatedObject(self, kNFBGreyedImageKey, painted,
                              OBJC_ASSOCIATION_RETAIN_NONATOMIC);

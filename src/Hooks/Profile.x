@@ -220,6 +220,21 @@ static NSInteger nfbProfileTabIndex(id provider, NSInteger fallback) {
     }
 }
 
+// The getter alone was not enough: the value is read once, early, before the
+// entries exist — contentMainEntries is still empty at that point, so the
+// lookup fell back and the profile opened on Posts. The setter runs later,
+// when Twitter stores its own choice, and by then the entries are built.
+- (void)setInitialTabIndex:(NSInteger)index {
+    NSInteger wanted = index;
+
+    @try {
+        wanted = nfbProfileTabIndex(self, index);
+    } @catch (id exception) {
+        wanted = index;
+    }
+    %orig(wanted);
+}
+
 %end
 
 // MARK: - Hide the Videos tab
