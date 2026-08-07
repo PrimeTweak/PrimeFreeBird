@@ -16,6 +16,14 @@
 //  UINavigationBar — UIKit's base class, always loaded — because Twitter's own
 //  subclass differs between screens.
 //
+//  The pale pass that used to precede the grey was never the glyph. Measured
+//  frame by frame on a recording of both screens, the avatar, the search field,
+//  the gear and the tab strip below it all lighten by the same factor — 0.76 —
+//  for about a sixth of a second, with a straight edge at the strip's separator
+//  and nothing below it touched. A blur would fade off gradually; one constant
+//  factor behind a hard edge means a single container view drawn at partial
+//  opacity. So the container is held opaque, not the gear.
+//
 
 #import "HookHelpers.h"
 
@@ -33,9 +41,10 @@ static const void* kNFBOriginalImageKey = &kNFBOriginalImageKey;
 // other's result as "not mine yet", so the glyph was painted twice and came
 // out pale. The mark travels with the image, so any path recognises it.
 static const void* kNFBPaintedFlagKey = &kNFBPaintedFlagKey;
-// Marks the gear's layers. Removing the fade after the fact never worked:
-// our pass runs before Twitter starts the animation, so there is nothing to
-// remove yet. The animation is refused at the moment it is added instead.
+// Marks a layer that must never render at partial opacity. Correcting after
+// the fact never worked — our pass runs before the value is lowered, so there
+// is nothing to correct yet. Every route that could lower it is refused at the
+// moment it is used instead: the alpha, the layer's opacity, and the animation.
 static const void* kNFBNoFadeKey = &kNFBNoFadeKey;
 
 // One grey for every icon we add or recolour: the label colour at 60%,
@@ -125,21 +134,46 @@ static BOOL nfbLooksLikeSettingsButton(UIView* view) {
            [label hasPrefix:@"NavigationBarSettings"];
 }
 
-// The gear fades in when the app opens — Twitter animates its opacity, which
-// is the pale pass he sees before the real grey. Our own buttons don't do it
-// because we place them ourselves. Snapping this one to full opacity, and
-// dropping any opacity animation still running on it, removes the fade for
-// the settings gear only. Nothing else in the bar is touched.
-static void nfbForceOpaque(UIView* view) {
+// Brings one view back to full strength and marks it, so that anything lowering
+// it later — an alpha, a layer opacity, an animation — is refused rather than
+// undone after the fact.
+static void nfbPinOpaque(UIView* view) {
     if (view.alpha < 1.0) {
         view.alpha = 1.0;
     }
+    if (view.layer.opacity < 1.0f) {
+        view.layer.opacity = 1.0f;
+    }
     [view.layer removeAnimationForKey:@"opacity"];
-    // Marked once and for all, so any fade added later is refused as well.
     objc_setAssociatedObject(view.layer, kNFBNoFadeKey, @YES,
                              OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+}
+
+// The gear and everything inside it.
+static void nfbForceOpaque(UIView* view) {
+    nfbPinOpaque(view);
     for (UIView* subview in view.subviews) {
         nfbForceOpaque(subview);
+    }
+}
+
+// The container that holds the bar and the tab strip, reached from the bar
+// upwards. The walk stops before the first view tall enough to be the screen
+// itself, so a push, a modal or a tab change still fades the way it should —
+// only the header band is held. Bars we do not manage never get here.
+static void nfbPinHeaderOpacity(UIView* bar) {
+    UIWindow* window = bar.window;
+    if (!window) {
+        return;
+    }
+    CGFloat screenful = CGRectGetHeight(window.bounds) * 0.5;
+    UIView* view = bar;
+    while (view && view != window) {
+        if (CGRectGetHeight(view.bounds) > screenful) {
+            return;
+        }
+        nfbPinOpaque(view);
+        view = view.superview;
     }
 }
 
@@ -207,12 +241,10 @@ static UIViewController* nfbBarOwningController(UIView* view) {
 }
 
 // Notifications: the gear is a bar button item, so its image is repainted
-// directly. Scoped to that screen, and icon-only items, so a text button like
-// "Done" is never touched.
+// directly. The caller has already established that this is the notifications
+// bar; icon-only items are picked here, so a text button like "Done" is never
+// touched.
 static void nfbRepaintNotificationsGear(UIView* bar, UIColor* colour) {
-    if (!nfbControllerIsNotifications(nfbBarOwningController(bar))) {
-        return;
-    }
     // The item has no view of its own, so the fade is removed from whatever
     // renders it: the icon buttons on the right of this bar.
     for (UIView* subview in bar.subviews) {
@@ -264,7 +296,20 @@ static void nfbRepaintNotificationsGear(UIView* bar, UIColor* colour) {
         }
         UIColor* grey = NFBBarIconGrey(bar.traitCollection);
 
+        // Explore is recognised by the button, Notifications by the screen.
+        // Anything else is left exactly as Twitter draws it — the header is
+        // held opaque on these two bars only.
         UIView* settingsButton = nfbFindSettingsButton(bar);
+        BOOL notifications =
+            settingsButton
+                ? NO
+                : nfbControllerIsNotifications(nfbBarOwningController(bar));
+        if (!settingsButton && !notifications) {
+            return;
+        }
+
+        nfbPinHeaderOpacity(bar);
+
         if (settingsButton) {
             nfbRepaintGlyphs(settingsButton, grey);
             nfbForceOpaque(settingsButton);
@@ -420,11 +465,33 @@ static BOOL nfbIsRightHandGlyphButton(UIView* button) {
 
 %end
 
-// The fade is refused where it is installed. Only layers we marked are
-// affected — every other animation in the app goes through untouched, after a
-// single pointer read.
+// Partial opacity is refused where it is set, by all three routes into it.
+// Every other view and layer in the app pays one float comparison, which fails
+// on the overwhelming majority of calls before anything else is read.
+
+%hook UIView
+
+- (void)setAlpha:(CGFloat)alpha {
+    if (alpha < 1.0 &&
+        objc_getAssociatedObject(self.layer, kNFBNoFadeKey) != nil) {
+        %orig(1.0);
+        return;
+    }
+    %orig;
+}
+
+%end
 
 %hook CALayer
+
+- (void)setOpacity:(float)opacity {
+    if (opacity < 1.0f &&
+        objc_getAssociatedObject(self, kNFBNoFadeKey) != nil) {
+        %orig(1.0f);
+        return;
+    }
+    %orig;
+}
 
 - (void)addAnimation:(CAAnimation*)animation forKey:(NSString*)key {
     if (!objc_getAssociatedObject(self, kNFBNoFadeKey)) {
@@ -436,7 +503,7 @@ static BOOL nfbIsRightHandGlyphButton(UIView* button) {
         isFade = [((CABasicAnimation*)animation).keyPath isEqualToString:@"opacity"];
     }
     if (isFade) {
-        return;   // pas de fondu sur l'engrenage
+        return;
     }
     %orig;
 }
