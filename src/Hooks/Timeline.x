@@ -384,6 +384,53 @@ static void nfbGiveSettingsBarItsMaterial(UINavigationBar* bar) {
                              OBJC_ASSOCIATION_RETAIN_NONATOMIC);
 }
 
+// _UIBarBackground already covers the whole bar — the view tree gives it as
+// {0, -20, 440, 128}, which runs a good twenty points past the bottom of the
+// search field at 108. So the background is not too short; it simply stops
+// PAINTING partway down, and that is a gradient mask on its layer. Clearing it
+// leaves the same material drawn at full strength over its whole height, which
+// is what the field's strip was missing.
+//
+// The same move AppLifecycle already makes on the launch screen, where the mask
+// is what carved the X-shaped hole. Only the background's own subtree is
+// touched: the search field is a sibling, and its pill relies on a mask of its
+// own for those rounded ends.
+static UIView* nfbSubviewNamed(UIView* view, NSString* className) {
+    for (UIView* subview in view.subviews) {
+        if ([NSStringFromClass([subview class]) isEqualToString:className]) {
+            return subview;
+        }
+        UIView* found = nfbSubviewNamed(subview, className);
+        if (found) {
+            return found;
+        }
+    }
+    return nil;
+}
+
+static void nfbUnmaskSubtree(UIView* view) {
+    if (view.layer.mask) {
+        view.layer.mask = nil;
+    }
+    for (UIView* subview in view.subviews) {
+        nfbUnmaskSubtree(subview);
+    }
+}
+
+// Re-run on every pass rather than marked: iOS reinstalls that mask whenever the
+// bar reconfigures, exactly as it re-enables the scroll edge effect. Clearing a
+// mask lays out nothing, so there is no loop to fall into — and once it is nil
+// the walk finds nothing left to do.
+static void nfbUnfadeSettingsBar(UINavigationBar* bar) {
+    if (!bar) {
+        return;
+    }
+    UIView* background = nfbSubviewNamed(bar, @"_UIBarBackground");
+    if (background) {
+        nfbUnmaskSubtree(background);
+    }
+}
+
 static const void* kNFBEdgeStyleWritesKey = &kNFBEdgeStyleWritesKey;
 
 // Two things keep this safe. The setter is only ever called once the runtime has
@@ -406,7 +453,9 @@ static void nfbApplyHardEdgeIfSettingsRoot(UIScrollView* scrollView) {
     if (!nfbControllerIsSettingsRoot(owner)) {
         return;
     }
-    nfbGiveSettingsBarItsMaterial(owner.navigationController.navigationBar);
+    UINavigationBar* settingsBar = owner.navigationController.navigationBar;
+    nfbGiveSettingsBarItsMaterial(settingsBar);
+    nfbUnfadeSettingsBar(settingsBar);
     id effect = ((id (*)(id, SEL))objc_msgSend)(scrollView, @selector(topEdgeEffect));
     if (!effect ||
         ![effect respondsToSelector:@selector(style)] ||
