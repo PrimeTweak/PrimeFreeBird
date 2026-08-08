@@ -352,22 +352,69 @@ static id nfbHardEdgeStyleLike(id currentStyle) {
 // draws the part it has to match. Nothing is added and nothing is matched by
 // hand. The height is converted from the bar rather than written down, so it
 // holds on any device and through rotation.
+static const void* kNFBEdgeStretchTargetKey = &kNFBEdgeStretchTargetKey;
+
+// The height is enforced at the SETTER, not written after the fact. Writing
+// after iOS was attempt seventeen: the math was right and the screen never
+// moved, because these are system-managed views whose frames are recomputed
+// from a model this side cannot see — whoever wrote last won, and it was not
+// us. This is the same cure the FAB needed, verbatim: intercept the setter so
+// that whichever pass writes, the value that lands is ours.
+//
+// One clamp per runtime class, installed lazily from the walk below. Views
+// that carry no target — every edge effect outside the settings sheet — pass
+// through untouched.
+static void nfbInstallFrameClampOnClass(Class viewClass) {
+    static NSMutableSet* patched = nil;
+    if (!patched) {
+        patched = [NSMutableSet set];
+    }
+    NSValue* key = [NSValue valueWithPointer:(__bridge const void*)viewClass];
+    if ([patched containsObject:key]) {
+        return;
+    }
+    Method resolved = class_getInstanceMethod(viewClass, @selector(setFrame:));
+    if (!resolved) {
+        return;
+    }
+    IMP original = method_getImplementation(resolved);
+    IMP clamp = imp_implementationWithBlock(^(UIView* view, CGRect frame) {
+        NSNumber* target = objc_getAssociatedObject(view, kNFBEdgeStretchTargetKey);
+        if (target.doubleValue > 0.5) {
+            frame.size.height = target.doubleValue;
+        }
+        ((void (*)(id, SEL, CGRect))original)(view, @selector(setFrame:), frame);
+    });
+    // class_addMethod lands the clamp on THIS class when setFrame: was only
+    // inherited. Replacing the resolved Method in that case would have patched
+    // UIView itself — every view in the app.
+    if (!class_addMethod(viewClass, @selector(setFrame:), clamp,
+                         method_getTypeEncoding(resolved))) {
+        method_setImplementation(resolved, clamp);
+    }
+    [patched addObject:key];
+}
+
 static void nfbStretchEdgeEffectIn(UIView* view, CGFloat height) {
     for (UIView* subview in view.subviews) {
         if ([NSStringFromClass([subview class]) rangeOfString:@"ScrollEdgeEffect"]
                 .location == NSNotFound) {
             continue;
         }
-        // Set outright, both directions. The first version only ever grew the
-        // view, and it had measured its target in the scroll view's own
-        // coordinates — which move with the content. Mid-scroll that number ran
-        // into the hundreds, the view was stretched to it and never brought
-        // back, and the effect's gradient spread over that whole height until
-        // it was too dilute to see. That is the "nothing at all" screen.
+        nfbInstallFrameClampOnClass(object_getClass(subview));
+        objc_setAssociatedObject(subview, kNFBEdgeStretchTargetKey, @(height),
+                                 OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        // Indelible witness for FLEX: iOS never rewrites this field. If the
+        // identifier is there and the strip still stops short, the frame is
+        // not the lever — that is a finding, not another guess.
+        NSString* marker = [NSString stringWithFormat:@"NFB-stretch-%.0f", height];
+        if (![subview.accessibilityIdentifier isEqualToString:marker]) {
+            subview.accessibilityIdentifier = marker;
+        }
         CGRect frame = subview.frame;
         if (fabs(frame.size.height - height) > 0.5) {
             frame.size.height = height;
-            subview.frame = frame;
+            subview.frame = frame;   // passe par le clamp : la valeur qui atterrit est la nôtre
         }
         nfbStretchEdgeEffectIn(subview, height);
     }
