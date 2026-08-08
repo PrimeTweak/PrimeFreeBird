@@ -336,131 +336,47 @@ static id nfbHardEdgeStyleLike(id currentStyle) {
     return found;
 }
 
-// FLEX named the missing piece: the field sits inside a TFNSearchBar of 440 by
-// 54 points, of which the pill itself is only 40 — Twitter's own bar already
-// reaches thirteen points below the pill. What stops short is the opaque zone,
-// which ends halfway down it, and that is the strip the list shows through.
+// The view tree finally names it, and it was never where I was looking. The
+// frosted strip is not drawn by the navigation bar: _UIBarBackground reads as
+// #000000 at zero alpha, so it paints nothing at all. What draws it lives
+// INSIDE the table, as two of its own subviews — a UIKit.ScrollEdgeEffectView
+// and its backdrop, both {0, 0, 440, 94}.
 //
-// So the search bar is painted with the list's own background rather than the
-// bar being resized: the pill does not move, no frame changes, and the opacity
-// simply carries to the bottom of the view Twitter already draws there. The
-// colour is taken from the scroll view so it follows light, dark and his own
-// dark shades instead of being guessed. Assigning a background triggers no
-// layout, so nothing here can chase itself.
-// The view tree settles both open questions. TFNSearchBar sits at {0, 54, 440,
-// 54} INSIDE the UINavigationBar, which is 108 points tall — so the search bar
-// ends flush with the bottom of the bar, and there is no bar to lengthen. What
-// fades out over those 108 points is the bar's own background, which is why the
-// list shows through the lower half of the field and nowhere else.
+// Ninety-four points. The navigation bar ends at 128, and the search field ends
+// with it. The effect is thirty-four points short, and that is the whole
+// problem. It is also why the boundary sat in the same place through every
+// attempt: none of them ever touched these two views.
 //
-// The tree also shows TFNTableView and TFNSearchBar both marked transparent,
-// which is what defeated the previous attempt: it asked the table for a colour,
-// got nothing opaque, and returned without painting anything. So the colour is
-// climbed from the table upwards — DataViewHostView and the controller's own
-// view sit above it and do carry the sheet's background — and the system
-// background stands in only if that whole climb comes back empty.
-// The native way to say "this bar keeps its material" is to give it an explicit
-// appearance instead of laying anything over it. configureWithDefaultBackground
-// installs the system's own bar background — the very substance every other bar
-// in iOS uses, which is why it lands on the sheet's white rather than the 250 a
-// hand-placed blur produced. Setting it on scrollEdgeAppearance as well is what
-// stops iOS 26 fading that background out while the list sits at the top, and
-// that fade is the whole reason the list showed through beside the field.
-//
-// Written once per bar and never again: an appearance assignment relays the
-// bar, so re-asserting it on every pass would chase itself.
-static const void* kNFBSettingsBarMaterialKey = &kNFBSettingsBarMaterialKey;
-
-static void nfbGiveSettingsBarItsMaterial(UINavigationBar* bar) {
-    if (!bar || objc_getAssociatedObject(bar, kNFBSettingsBarMaterialKey)) {
-        return;
-    }
-    UINavigationBarAppearance* appearance = [[UINavigationBarAppearance alloc] init];
-    [appearance configureWithDefaultBackground];
-    bar.standardAppearance = appearance;
-    bar.scrollEdgeAppearance = appearance;
-    bar.compactAppearance = appearance;
-    objc_setAssociatedObject(bar, kNFBSettingsBarMaterialKey, @YES,
-                             OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-}
-
-// Measured on his own screenshots, the boundary has sat at 49% of the field's
-// height in EVERY build so far — the hard style, the safe-area inset, the bar
-// appearance, the mask strip: none of them moved it by a pixel. It is 20 points
-// short of the field's bottom, and nothing reached from the scroll view or the
-// bar's own background has ever changed that.
-//
-// So the strip is covered directly instead. TFNSearchBar spans the last 54
-// points of the bar — from 74 to 128, which contains the whole gap — and a view
-// of ours goes inside it, beneath the container holding the field. Above
-// whatever stops painting, below the pill. Nothing but a system material, and
-// the thinnest one, so the list stays visible through the strip.
-static UIView* nfbSubviewNamed(UIView* view, NSString* className) {
+// Stretching them to the bar's own bottom edge reproduces the strip above
+// exactly — same view, same material, same tone — because it IS the view that
+// draws the part it has to match. Nothing is added and nothing is matched by
+// hand. The height is converted from the bar rather than written down, so it
+// holds on any device and through rotation.
+static void nfbStretchEdgeEffectIn(UIView* view, CGFloat height) {
     for (UIView* subview in view.subviews) {
-        if ([NSStringFromClass([subview class]) isEqualToString:className]) {
-            return subview;
+        if ([NSStringFromClass([subview class]) rangeOfString:@"ScrollEdgeEffect"]
+                .location == NSNotFound) {
+            continue;
         }
-        UIView* found = nfbSubviewNamed(subview, className);
-        if (found) {
-            return found;
+        CGRect frame = subview.frame;
+        if (frame.size.height < height - 0.5) {
+            frame.size.height = height;
+            subview.frame = frame;
         }
+        nfbStretchEdgeEffectIn(subview, height);
     }
-    return nil;
 }
 
-static const void* kNFBSearchBarFrostKey = &kNFBSearchBarFrostKey;
-
-// Only the search bar of Twitter's settings sheet: its navigation controller's
-// root is a settings controller. Every other TFNSearchBar is left alone.
-static BOOL nfbSearchBarBelongsToSettings(UIView* searchBar) {
-    UIResponder* responder = searchBar;
-    while ((responder = responder.nextResponder)) {
-        if ([responder isKindOfClass:[UINavigationController class]]) {
-            UINavigationController* navigation = (UINavigationController*)responder;
-            return nfbControllerIsSettingsRoot(navigation.viewControllers.firstObject);
-        }
-    }
-    return NO;
-}
-
-static void nfbFrostSettingsSearchBar(UIView* searchBar) {
-    if (!nfbSearchBarBelongsToSettings(searchBar)) {
+static void nfbStretchSettingsEdgeEffect(UIScrollView* scrollView, UINavigationBar* bar) {
+    if (!bar || !bar.window) {
         return;
     }
-    // Nothing is installed until the container exists. An earlier version fell
-    // back to adding it to the search bar itself, which put it on top and hid
-    // the field behind a grey band.
-    UIView* container = nfbSubviewNamed(searchBar, @"_UISearchBarSearchContainerView");
-    UIView* host = container.superview;
-    if (!container || !host) {
-        return;   // pas encore construite : on retentera au prochain layout
+    CGRect barInScroll = [scrollView convertRect:bar.bounds fromView:bar];
+    CGFloat needed = CGRectGetMaxY(barInScroll);
+    if (needed <= 0.0 || needed > CGRectGetHeight(scrollView.bounds)) {
+        return;   // repere aberrant : on ne touche a rien
     }
-    UIVisualEffectView* frost = objc_getAssociatedObject(searchBar, kNFBSearchBarFrostKey);
-    if (!frost) {
-        // The thinnest material iOS offers. ChromeMaterial, which was here
-        // before, is the thickest of the set — it is what bars use when they
-        // are meant to hide what passes under them, and that is why it read as
-        // a flat grey wall. UltraThin lets the list through and blurs it.
-        UIBlurEffect* material =
-            [UIBlurEffect effectWithStyle:UIBlurEffectStyleSystemUltraThinMaterial];
-        frost = [[UIVisualEffectView alloc] initWithEffect:material];
-        frost.autoresizingMask =
-            UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
-        frost.userInteractionEnabled = NO;
-        objc_setAssociatedObject(searchBar, kNFBSearchBarFrostKey, frost,
-                                 OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-    }
-    // The position is checked against the container's own index every pass, not
-    // assumed to have held since it was set.
-    NSUInteger containerIndex = [host.subviews indexOfObject:container];
-    NSUInteger frostIndex = [host.subviews indexOfObject:frost];
-    if (frost.superview != host || frostIndex == NSNotFound ||
-        containerIndex == NSNotFound || frostIndex > containerIndex) {
-        [host insertSubview:frost belowSubview:container];
-    }
-    if (!CGRectEqualToRect(frost.frame, host.bounds)) {
-        frost.frame = host.bounds;
-    }
+    nfbStretchEdgeEffectIn(scrollView, needed);
 }
 
 static const void* kNFBEdgeStyleWritesKey = &kNFBEdgeStyleWritesKey;
@@ -485,7 +401,7 @@ static void nfbApplyHardEdgeIfSettingsRoot(UIScrollView* scrollView) {
     if (!nfbControllerIsSettingsRoot(owner)) {
         return;
     }
-    nfbGiveSettingsBarItsMaterial(owner.navigationController.navigationBar);
+    nfbStretchSettingsEdgeEffect(scrollView, owner.navigationController.navigationBar);
     id effect = ((id (*)(id, SEL))objc_msgSend)(scrollView, @selector(topEdgeEffect));
     if (!effect ||
         ![effect respondsToSelector:@selector(style)] ||
@@ -556,34 +472,6 @@ static void nfbApplyHardEdgeIfSettingsRoot(UIScrollView* scrollView) {
             return;
         }
         nfbApplyEdgeEffect(self, hide);
-    } @catch (id exception) {
-    }
-}
-
-%end
-
-// Driven by the search bar's own layout, not the list's: the list can settle
-// before the bar exists, which left the first screen after a restart untouched.
-%hook TFNSearchBar
-
-- (void)didMoveToWindow {
-    %orig;
-
-    @try {
-        if (((UIView*)self).window) {
-            nfbFrostSettingsSearchBar((UIView*)self);
-        }
-    } @catch (id exception) {
-    }
-}
-
-- (void)layoutSubviews {
-    %orig;
-
-    @try {
-        if (((UIView*)self).window) {
-            nfbFrostSettingsSearchBar((UIView*)self);
-        }
     } @catch (id exception) {
     }
 }
