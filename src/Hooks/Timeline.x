@@ -336,24 +336,46 @@ static id nfbHardEdgeStyleLike(id currentStyle) {
     return found;
 }
 
-// iOS only knows of the bar what the screen declares as its safe area, and
-// Twitter lays its search field out lower than that, so the list came to rest
-// hard against the field with a third of a point between them. Widening the
-// screen's safe area pushes the list down; the value is what it takes to clear
-// the field and then leave the 20 points our own group headers reserve above a
-// title, so this sheet breathes like the rest of the settings.
+// FLEX named the missing piece: the field sits inside a TFNSearchBar of 440 by
+// 54 points, of which the pill itself is only 40 — Twitter's own bar already
+// reaches thirteen points below the pill. What stops short is the opaque zone,
+// which ends halfway down it, and that is the strip the list shows through.
 //
-// Setting an absolute value rather than adding one keeps this idempotent, so no
-// layout can chase it.
-static const CGFloat kNFBSettingsHeaderExtra = 44.0;
+// So the search bar is painted with the list's own background rather than the
+// bar being resized: the pill does not move, no frame changes, and the opacity
+// simply carries to the bottom of the view Twitter already draws there. The
+// colour is taken from the scroll view so it follows light, dark and his own
+// dark shades instead of being guessed. Assigning a background triggers no
+// layout, so nothing here can chase itself.
+static void nfbPaintSearchBarsIn(UIView* view, Class searchBarClass, UIColor* backdrop) {
+    for (UIView* subview in view.subviews) {
+        if ([subview isKindOfClass:searchBarClass]) {
+            if (![subview.backgroundColor isEqual:backdrop]) {
+                subview.backgroundColor = backdrop;
+            }
+            continue;
+        }
+        nfbPaintSearchBarsIn(subview, searchBarClass, backdrop);
+    }
+}
 
-static void nfbExtendSettingsHeader(UIViewController* controller) {
-    UIEdgeInsets insets = controller.additionalSafeAreaInsets;
-    if (insets.top >= kNFBSettingsHeaderExtra) {
+static void nfbPaintSettingsSearchBar(UIViewController* owner, UIScrollView* scrollView) {
+    Class searchBarClass = objc_getClass("TFNSearchBar");
+    if (!searchBarClass) {
         return;
     }
-    insets.top = kNFBSettingsHeaderExtra;
-    controller.additionalSafeAreaInsets = insets;
+    UIColor* backdrop = scrollView.backgroundColor;
+    if (!backdrop || CGColorGetAlpha(backdrop.CGColor) < 1.0) {
+        backdrop = owner.view.backgroundColor;
+    }
+    if (!backdrop || CGColorGetAlpha(backdrop.CGColor) < 1.0) {
+        return;   // rien d'opaque a poser : on ne touche a rien
+    }
+    nfbPaintSearchBarsIn(owner.view, searchBarClass, backdrop);
+    UINavigationBar* bar = owner.navigationController.navigationBar;
+    if (bar) {
+        nfbPaintSearchBarsIn(bar, searchBarClass, backdrop);
+    }
 }
 
 static const void* kNFBEdgeStyleWritesKey = &kNFBEdgeStyleWritesKey;
@@ -378,7 +400,7 @@ static void nfbApplyHardEdgeIfSettingsRoot(UIScrollView* scrollView) {
     if (!nfbControllerIsSettingsRoot(owner)) {
         return;
     }
-    nfbExtendSettingsHeader(owner);
+    nfbPaintSettingsSearchBar(owner, scrollView);
     id effect = ((id (*)(id, SEL))objc_msgSend)(scrollView, @selector(topEdgeEffect));
     if (!effect ||
         ![effect respondsToSelector:@selector(style)] ||
