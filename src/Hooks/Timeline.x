@@ -352,159 +352,24 @@ static id nfbHardEdgeStyleLike(id currentStyle) {
 // draws the part it has to match. Nothing is added and nothing is matched by
 // hand. The height is converted from the bar rather than written down, so it
 // holds on any device and through rotation.
-static const void* kNFBEdgeStretchTargetKey = &kNFBEdgeStretchTargetKey;
+// Nineteen attempts have gone at the strip from the effect's side — styling
+// it, stretching it, clamping every geometry channel it has — and the drawn
+// result never followed. His read on it replaces all of that: the bar itself
+// is the one input every derived number follows, so the bar is made taller and
+// iOS is left to redo its own arithmetic. The 34 comes from his view tree:
+// the field ends at 128, the effect stops at 94.
+static const CGFloat kNFBSettingsBarExtraHeight = 34.0;
 
-// His FLEX read after the setFrame: clamp shipped: frame still (0 0; 440 94),
-// center {220, 47}. The clamp was in place and the number did not move — so
-// UIKit does not position these views through setFrame: at all. It writes
-// bounds and center (94 = bounds height, 47 = its half), and a fresh instance
-// can be laid out before the table's walk has seen it. Three consequences,
-// each handled here: every geometry channel is clamped, not one; the decision
-// "is this ours" is made at the view's own first attached write, so a
-// recreated instance is caught from its very first layout; and the walk writes
-// what it read back into the marker, so one glance at FLEX tells whether the
-// value finally landed.
-static CGFloat nfbStretchTargetFor(UIView* view) {
-    NSNumber* cached = objc_getAssociatedObject(view, kNFBEdgeStretchTargetKey);
-    if (cached) {
-        return cached.doubleValue;   // 0 = pas à nous
-    }
-    UIScrollView* scrollView = nil;
-    UIView* ancestor = view.superview;
-    while (ancestor) {
-        if ([ancestor isKindOfClass:[UIScrollView class]]) {
-            scrollView = (UIScrollView*)ancestor;
-            break;
-        }
-        ancestor = ancestor.superview;
-    }
-    CGFloat target = 0.0;
-    if (scrollView && nfbScrollViewIsModal(scrollView)) {
-        UIViewController* owner = nfbOwningController(scrollView);
-        if (nfbControllerIsSettingsRoot(owner)) {
-            UINavigationBar* bar = owner.navigationController.navigationBar;
-            if (bar && bar.window) {
-                CGFloat barBottom =
-                    CGRectGetMaxY([bar convertRect:bar.bounds toView:nil]);
-                CGFloat listTop =
-                    CGRectGetMinY([scrollView convertRect:scrollView.bounds
-                                                   toView:nil]);
-                CGFloat needed = barBottom - listTop;
-                if (needed > 0.0 && needed <= CGRectGetHeight(scrollView.bounds)) {
-                    target = needed;
-                }
-            }
+static BOOL nfbBarBelongsToSettingsSheet(UINavigationBar* bar) {
+    UIResponder* responder = bar;
+    while ((responder = responder.nextResponder)) {
+        if ([responder isKindOfClass:[UINavigationController class]]) {
+            UINavigationController* navigation = (UINavigationController*)responder;
+            return navigation.presentingViewController != nil &&
+                   nfbControllerIsSettingsRoot(navigation.viewControllers.firstObject);
         }
     }
-    // A view still detached cannot be judged — its init-time writes happen
-    // before it has a superview. Deciding "not ours" there would stick forever,
-    // so the verdict is only cached once the view hangs in a window.
-    if (view.window) {
-        objc_setAssociatedObject(view, kNFBEdgeStretchTargetKey, @(target),
-                                 OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-    }
-    return target;
-}
-
-typedef NS_ENUM(NSInteger, NFBGeometryChannel) {
-    NFBGeometryChannelFrame,
-    NFBGeometryChannelBounds,
-    NFBGeometryChannelCenter,
-};
-
-static void nfbClampGeometrySetter(Class viewClass, SEL selector,
-                                   NFBGeometryChannel channel) {
-    Method resolved = class_getInstanceMethod(viewClass, selector);
-    if (!resolved) {
-        return;
-    }
-    IMP original = method_getImplementation(resolved);
-    IMP clamp;
-    if (channel == NFBGeometryChannelCenter) {
-        clamp = imp_implementationWithBlock(^(UIView* view, CGPoint center) {
-            CGFloat target = nfbStretchTargetFor(view);
-            if (target > 0.5) {
-                center.y = target / 2.0;   // bord haut à 0 quelle que soit
-            }                              // l'ordre bounds/center d'UIKit
-            ((void (*)(id, SEL, CGPoint))original)(view, selector, center);
-        });
-    } else {
-        clamp = imp_implementationWithBlock(^(UIView* view, CGRect rect) {
-            CGFloat target = nfbStretchTargetFor(view);
-            if (target > 0.5) {
-                rect.size.height = target;
-            }
-            ((void (*)(id, SEL, CGRect))original)(view, selector, rect);
-        });
-    }
-    // class_addMethod lands the clamp on THIS class when the setter was only
-    // inherited. Replacing the resolved Method in that case would have patched
-    // UIView itself — every view in the app.
-    if (!class_addMethod(viewClass, selector, clamp,
-                         method_getTypeEncoding(resolved))) {
-        method_setImplementation(resolved, clamp);
-    }
-}
-
-static void nfbInstallGeometryClampsOnClass(Class viewClass) {
-    static NSMutableSet* patched = nil;
-    if (!patched) {
-        patched = [NSMutableSet set];
-    }
-    NSValue* key = [NSValue valueWithPointer:(__bridge const void*)viewClass];
-    if ([patched containsObject:key]) {
-        return;
-    }
-    nfbClampGeometrySetter(viewClass, @selector(setFrame:), NFBGeometryChannelFrame);
-    nfbClampGeometrySetter(viewClass, @selector(setBounds:), NFBGeometryChannelBounds);
-    nfbClampGeometrySetter(viewClass, @selector(setCenter:), NFBGeometryChannelCenter);
-    [patched addObject:key];
-}
-
-static void nfbStretchEdgeEffectIn(UIView* view, CGFloat height) {
-    for (UIView* subview in view.subviews) {
-        if ([NSStringFromClass([subview class]) rangeOfString:@"ScrollEdgeEffect"]
-                .location == NSNotFound) {
-            continue;
-        }
-        nfbInstallGeometryClampsOnClass(object_getClass(subview));
-        objc_setAssociatedObject(subview, kNFBEdgeStretchTargetKey, @(height),
-                                 OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-        CGRect frame = subview.frame;
-        if (fabs(frame.size.height - height) > 0.5) {
-            frame.size.height = height;
-            subview.frame = frame;
-        }
-        // Témoin pour FLEX, avec la RELECTURE incluse: « NFB-128-lu128 » dit
-        // que la valeur a pris; « NFB-128-lu94 » dit qu'un canal m'échappe
-        // encore. iOS ne réécrit jamais ce champ.
-        NSString* marker =
-            [NSString stringWithFormat:@"NFB-%.0f-lu%.0f", height,
-                                       subview.frame.size.height];
-        if (![subview.accessibilityIdentifier isEqualToString:marker]) {
-            subview.accessibilityIdentifier = marker;
-        }
-        nfbStretchEdgeEffectIn(subview, height);
-    }
-}
-
-static void nfbStretchSettingsEdgeEffect(UIScrollView* scrollView, UINavigationBar* bar) {
-    if (!bar || !bar.window) {
-        return;
-    }
-    // Both rectangles are read in the WINDOW, where nothing scrolls: the
-    // field's bottom edge minus the list's visible top. On this sheet that is
-    // 128 points, on any device, at any scroll position. Converting into the
-    // scroll view instead was the previous bug — a scroll view's coordinates
-    // carry its content offset, so the target drifted with every swipe.
-    CGFloat barBottom = CGRectGetMaxY([bar convertRect:bar.bounds toView:nil]);
-    CGFloat listTop = CGRectGetMinY([scrollView convertRect:scrollView.bounds
-                                                     toView:nil]);
-    CGFloat needed = barBottom - listTop;
-    if (needed <= 0.0 || needed > CGRectGetHeight(scrollView.bounds)) {
-        return;   // repere aberrant : on ne touche a rien
-    }
-    nfbStretchEdgeEffectIn(scrollView, needed);
+    return NO;
 }
 
 static const void* kNFBEdgeStyleWritesKey = &kNFBEdgeStyleWritesKey;
@@ -529,7 +394,6 @@ static void nfbApplyHardEdgeIfSettingsRoot(UIScrollView* scrollView) {
     if (!nfbControllerIsSettingsRoot(owner)) {
         return;
     }
-    nfbStretchSettingsEdgeEffect(scrollView, owner.navigationController.navigationBar);
     id effect = ((id (*)(id, SEL))objc_msgSend)(scrollView, @selector(topEdgeEffect));
     if (!effect ||
         ![effect respondsToSelector:@selector(style)] ||
@@ -605,6 +469,23 @@ static void nfbApplyHardEdgeIfSettingsRoot(UIScrollView* scrollView) {
 }
 
 %end
+
+%hook UINavigationBar
+
+- (CGSize)sizeThatFits:(CGSize)size {
+    CGSize fitted = %orig;
+
+    @try {
+        if (nfbBarBelongsToSettingsSheet(self)) {
+            fitted.height += kNFBSettingsBarExtraHeight;
+        }
+    } @catch (id exception) {
+    }
+    return fitted;
+}
+
+%end
+
 
 
 
