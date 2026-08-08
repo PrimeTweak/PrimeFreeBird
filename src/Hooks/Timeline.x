@@ -359,67 +359,72 @@ static id nfbHardEdgeStyleLike(id currentStyle) {
 // climbed from the table upwards — DataViewHostView and the controller's own
 // view sit above it and do carry the sheet's background — and the system
 // background stands in only if that whole climb comes back empty.
-static UIColor* nfbOpaqueBackdropAbove(UIView* view) {
-    UIView* ancestor = view.superview;
-    for (NSInteger hop = 0; ancestor && hop < 8; hop++) {
-        UIColor* colour = ancestor.backgroundColor;
-        if (colour && CGColorGetAlpha(colour.CGColor) >= 1.0) {
-            return colour;
-        }
-        ancestor = ancestor.superview;
-    }
-    return [UIColor systemBackgroundColor];
-}
-
-// The search bar carries a UISearchBarBackground of its own size, and that is
-// the view actually drawing the backdrop — a colour set on the search bar alone
-// would sit behind it. Both are painted, so whichever one is the visible layer
-// ends up opaque.
-static void nfbPaintBackdropLayersIn(UIView* view, UIColor* backdrop) {
+// Twitter's own bar is a material, not a colour: on every other settings page
+// that strip is frosted and the list is guessed behind it. An opaque fill would
+// close the gap and still look wrong, so a UIVisualEffectView carrying the
+// chrome material goes in instead — the same substance the bars use, laid
+// directly beneath the container that holds the field. Above everything drawing
+// the fade, below the pill itself, and its place in the stack is chosen rather
+// than inherited. That is what colouring an existing view could never promise:
+// a colour set on the search bar sits behind the background that draws the
+// backdrop, and one set on that background sits under whatever the glass paints
+// over it.
+static UIView* nfbSubviewNamed(UIView* view, NSString* className) {
     for (UIView* subview in view.subviews) {
-        if ([NSStringFromClass([subview class]) isEqualToString:@"UISearchBarBackground"]) {
-            if (![subview.backgroundColor isEqual:backdrop]) {
-                subview.backgroundColor = backdrop;
-            }
+        if ([NSStringFromClass([subview class]) isEqualToString:className]) {
+            return subview;
         }
-        nfbPaintBackdropLayersIn(subview, backdrop);
+        UIView* found = nfbSubviewNamed(subview, className);
+        if (found) {
+            return found;
+        }
     }
+    return nil;
 }
 
-static BOOL nfbPaintSearchBarsIn(UIView* view, Class searchBarClass, UIColor* backdrop) {
-    BOOL painted = NO;
-    for (UIView* subview in view.subviews) {
-        if ([subview isKindOfClass:searchBarClass]) {
-            if (![subview.backgroundColor isEqual:backdrop]) {
-                subview.backgroundColor = backdrop;
-            }
-            nfbPaintBackdropLayersIn(subview, backdrop);
-            painted = YES;
-            continue;
-        }
-        if (nfbPaintSearchBarsIn(subview, searchBarClass, backdrop)) {
-            painted = YES;
+static const void* kNFBSearchBarFrostKey = &kNFBSearchBarFrostKey;
+
+// True only for the search bar sitting in Twitter's settings sheet: the bar
+// belongs to a navigation controller whose root is a settings controller. Any
+// other TFNSearchBar in the app is left exactly as it is.
+static BOOL nfbSearchBarBelongsToSettings(UIView* searchBar) {
+    UIResponder* responder = searchBar;
+    while ((responder = responder.nextResponder)) {
+        if ([responder isKindOfClass:[UINavigationController class]]) {
+            UINavigationController* navigation = (UINavigationController*)responder;
+            return nfbControllerIsSettingsRoot(navigation.viewControllers.firstObject);
         }
     }
-    return painted;
+    return NO;
 }
 
-static void nfbPaintSettingsSearchBar(UIViewController* owner, UIScrollView* scrollView) {
-    Class searchBarClass = objc_getClass("TFNSearchBar");
-    if (!searchBarClass) {
+static void nfbFrostSettingsSearchBar(UIView* searchBar) {
+    if (!nfbSearchBarBelongsToSettings(searchBar)) {
         return;
     }
-    UIColor* backdrop = nfbOpaqueBackdropAbove(scrollView);
-    if (!backdrop) {
-        return;
+    UIView* container = nfbSubviewNamed(searchBar, @"_UISearchBarSearchContainerView");
+    UIView* host = container.superview ?: searchBar;
+    UIVisualEffectView* frost = objc_getAssociatedObject(searchBar, kNFBSearchBarFrostKey);
+    if (!frost) {
+        UIBlurEffect* material =
+            [UIBlurEffect effectWithStyle:UIBlurEffectStyleSystemChromeMaterial];
+        frost = [[UIVisualEffectView alloc] initWithEffect:material];
+        frost.autoresizingMask =
+            UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+        frost.userInteractionEnabled = NO;
+        objc_setAssociatedObject(searchBar, kNFBSearchBarFrostKey, frost,
+                                 OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     }
-    // The navigation bar first, because that is where the tree puts it; the
-    // controller's own view second, in case another build lays it out there.
-    UINavigationBar* bar = owner.navigationController.navigationBar;
-    if (bar && nfbPaintSearchBarsIn(bar, searchBarClass, backdrop)) {
-        return;
+    if (frost.superview != host) {
+        if (container && container.superview == host) {
+            [host insertSubview:frost belowSubview:container];
+        } else {
+            [host addSubview:frost];
+        }
     }
-    nfbPaintSearchBarsIn(owner.view, searchBarClass, backdrop);
+    if (!CGRectEqualToRect(frost.frame, host.bounds)) {
+        frost.frame = host.bounds;
+    }
 }
 
 static const void* kNFBEdgeStyleWritesKey = &kNFBEdgeStyleWritesKey;
@@ -444,7 +449,6 @@ static void nfbApplyHardEdgeIfSettingsRoot(UIScrollView* scrollView) {
     if (!nfbControllerIsSettingsRoot(owner)) {
         return;
     }
-    nfbPaintSettingsSearchBar(owner, scrollView);
     id effect = ((id (*)(id, SEL))objc_msgSend)(scrollView, @selector(topEdgeEffect));
     if (!effect ||
         ![effect respondsToSelector:@selector(style)] ||
@@ -520,6 +524,36 @@ static void nfbApplyHardEdgeIfSettingsRoot(UIScrollView* scrollView) {
 }
 
 %end
+
+// Installed from the search bar's own layout, not from the list's: the list can
+// settle before the bar exists, which is why the frost only turned up after
+// navigating instead of on the first screen after a restart.
+%hook TFNSearchBar
+
+- (void)didMoveToWindow {
+    %orig;
+
+    @try {
+        if (((UIView*)self).window) {
+            nfbFrostSettingsSearchBar((UIView*)self);
+        }
+    } @catch (id exception) {
+    }
+}
+
+- (void)layoutSubviews {
+    %orig;
+
+    @try {
+        if (((UIView*)self).window) {
+            nfbFrostSettingsSearchBar((UIView*)self);
+        }
+    } @catch (id exception) {
+    }
+}
+
+%end
+
 
 // MARK: - Hide "Discover more", who-to-follow and prompts
 
