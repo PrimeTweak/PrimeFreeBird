@@ -354,17 +354,99 @@ static id nfbHardEdgeStyleLike(id currentStyle) {
 // holds on any device and through rotation.
 static const void* kNFBEdgeStretchTargetKey = &kNFBEdgeStretchTargetKey;
 
-// The height is enforced at the SETTER, not written after the fact. Writing
-// after iOS was attempt seventeen: the math was right and the screen never
-// moved, because these are system-managed views whose frames are recomputed
-// from a model this side cannot see — whoever wrote last won, and it was not
-// us. This is the same cure the FAB needed, verbatim: intercept the setter so
-// that whichever pass writes, the value that lands is ours.
-//
-// One clamp per runtime class, installed lazily from the walk below. Views
-// that carry no target — every edge effect outside the settings sheet — pass
-// through untouched.
-static void nfbInstallFrameClampOnClass(Class viewClass) {
+// His FLEX read after the setFrame: clamp shipped: frame still (0 0; 440 94),
+// center {220, 47}. The clamp was in place and the number did not move — so
+// UIKit does not position these views through setFrame: at all. It writes
+// bounds and center (94 = bounds height, 47 = its half), and a fresh instance
+// can be laid out before the table's walk has seen it. Three consequences,
+// each handled here: every geometry channel is clamped, not one; the decision
+// "is this ours" is made at the view's own first attached write, so a
+// recreated instance is caught from its very first layout; and the walk writes
+// what it read back into the marker, so one glance at FLEX tells whether the
+// value finally landed.
+static CGFloat nfbStretchTargetFor(UIView* view) {
+    NSNumber* cached = objc_getAssociatedObject(view, kNFBEdgeStretchTargetKey);
+    if (cached) {
+        return cached.doubleValue;   // 0 = pas à nous
+    }
+    UIScrollView* scrollView = nil;
+    UIView* ancestor = view.superview;
+    while (ancestor) {
+        if ([ancestor isKindOfClass:[UIScrollView class]]) {
+            scrollView = (UIScrollView*)ancestor;
+            break;
+        }
+        ancestor = ancestor.superview;
+    }
+    CGFloat target = 0.0;
+    if (scrollView && nfbScrollViewIsModal(scrollView)) {
+        UIViewController* owner = nfbOwningController(scrollView);
+        if (nfbControllerIsSettingsRoot(owner)) {
+            UINavigationBar* bar = owner.navigationController.navigationBar;
+            if (bar && bar.window) {
+                CGFloat barBottom =
+                    CGRectGetMaxY([bar convertRect:bar.bounds toView:nil]);
+                CGFloat listTop =
+                    CGRectGetMinY([scrollView convertRect:scrollView.bounds
+                                                   toView:nil]);
+                CGFloat needed = barBottom - listTop;
+                if (needed > 0.0 && needed <= CGRectGetHeight(scrollView.bounds)) {
+                    target = needed;
+                }
+            }
+        }
+    }
+    // A view still detached cannot be judged — its init-time writes happen
+    // before it has a superview. Deciding "not ours" there would stick forever,
+    // so the verdict is only cached once the view hangs in a window.
+    if (view.window) {
+        objc_setAssociatedObject(view, kNFBEdgeStretchTargetKey, @(target),
+                                 OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    }
+    return target;
+}
+
+typedef NS_ENUM(NSInteger, NFBGeometryChannel) {
+    NFBGeometryChannelFrame,
+    NFBGeometryChannelBounds,
+    NFBGeometryChannelCenter,
+};
+
+static void nfbClampGeometrySetter(Class viewClass, SEL selector,
+                                   NFBGeometryChannel channel) {
+    Method resolved = class_getInstanceMethod(viewClass, selector);
+    if (!resolved) {
+        return;
+    }
+    IMP original = method_getImplementation(resolved);
+    IMP clamp;
+    if (channel == NFBGeometryChannelCenter) {
+        clamp = imp_implementationWithBlock(^(UIView* view, CGPoint center) {
+            CGFloat target = nfbStretchTargetFor(view);
+            if (target > 0.5) {
+                center.y = target / 2.0;   // bord haut à 0 quelle que soit
+            }                              // l'ordre bounds/center d'UIKit
+            ((void (*)(id, SEL, CGPoint))original)(view, selector, center);
+        });
+    } else {
+        clamp = imp_implementationWithBlock(^(UIView* view, CGRect rect) {
+            CGFloat target = nfbStretchTargetFor(view);
+            if (target > 0.5) {
+                rect.size.height = target;
+            }
+            ((void (*)(id, SEL, CGRect))original)(view, selector, rect);
+        });
+    }
+    // class_addMethod lands the clamp on THIS class when the setter was only
+    // inherited. Replacing the resolved Method in that case would have patched
+    // UIView itself — every view in the app.
+    if (!class_addMethod(viewClass, selector, clamp,
+                         method_getTypeEncoding(resolved))) {
+        method_setImplementation(resolved, clamp);
+    }
+}
+
+static void nfbInstallGeometryClampsOnClass(Class viewClass) {
     static NSMutableSet* patched = nil;
     if (!patched) {
         patched = [NSMutableSet set];
@@ -373,25 +455,9 @@ static void nfbInstallFrameClampOnClass(Class viewClass) {
     if ([patched containsObject:key]) {
         return;
     }
-    Method resolved = class_getInstanceMethod(viewClass, @selector(setFrame:));
-    if (!resolved) {
-        return;
-    }
-    IMP original = method_getImplementation(resolved);
-    IMP clamp = imp_implementationWithBlock(^(UIView* view, CGRect frame) {
-        NSNumber* target = objc_getAssociatedObject(view, kNFBEdgeStretchTargetKey);
-        if (target.doubleValue > 0.5) {
-            frame.size.height = target.doubleValue;
-        }
-        ((void (*)(id, SEL, CGRect))original)(view, @selector(setFrame:), frame);
-    });
-    // class_addMethod lands the clamp on THIS class when setFrame: was only
-    // inherited. Replacing the resolved Method in that case would have patched
-    // UIView itself — every view in the app.
-    if (!class_addMethod(viewClass, @selector(setFrame:), clamp,
-                         method_getTypeEncoding(resolved))) {
-        method_setImplementation(resolved, clamp);
-    }
+    nfbClampGeometrySetter(viewClass, @selector(setFrame:), NFBGeometryChannelFrame);
+    nfbClampGeometrySetter(viewClass, @selector(setBounds:), NFBGeometryChannelBounds);
+    nfbClampGeometrySetter(viewClass, @selector(setCenter:), NFBGeometryChannelCenter);
     [patched addObject:key];
 }
 
@@ -401,20 +467,22 @@ static void nfbStretchEdgeEffectIn(UIView* view, CGFloat height) {
                 .location == NSNotFound) {
             continue;
         }
-        nfbInstallFrameClampOnClass(object_getClass(subview));
+        nfbInstallGeometryClampsOnClass(object_getClass(subview));
         objc_setAssociatedObject(subview, kNFBEdgeStretchTargetKey, @(height),
                                  OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-        // Indelible witness for FLEX: iOS never rewrites this field. If the
-        // identifier is there and the strip still stops short, the frame is
-        // not the lever — that is a finding, not another guess.
-        NSString* marker = [NSString stringWithFormat:@"NFB-stretch-%.0f", height];
-        if (![subview.accessibilityIdentifier isEqualToString:marker]) {
-            subview.accessibilityIdentifier = marker;
-        }
         CGRect frame = subview.frame;
         if (fabs(frame.size.height - height) > 0.5) {
             frame.size.height = height;
-            subview.frame = frame;   // passe par le clamp : la valeur qui atterrit est la nôtre
+            subview.frame = frame;
+        }
+        // Témoin pour FLEX, avec la RELECTURE incluse: « NFB-128-lu128 » dit
+        // que la valeur a pris; « NFB-128-lu94 » dit qu'un canal m'échappe
+        // encore. iOS ne réécrit jamais ce champ.
+        NSString* marker =
+            [NSString stringWithFormat:@"NFB-%.0f-lu%.0f", height,
+                                       subview.frame.size.height];
+        if (![subview.accessibilityIdentifier isEqualToString:marker]) {
+            subview.accessibilityIdentifier = marker;
         }
         nfbStretchEdgeEffectIn(subview, height);
     }
