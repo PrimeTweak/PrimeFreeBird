@@ -352,35 +352,47 @@ static id nfbHardEdgeStyleLike(id currentStyle) {
 // draws the part it has to match. Nothing is added and nothing is matched by
 // hand. The height is converted from the bar rather than written down, so it
 // holds on any device and through rotation.
-// Reading nfbApplyEdgeEffect — at last — settles what the proven channel is:
-// his own hide feature drives the EFFECT OBJECT (topEdgeEffect.setHidden:),
-// never the ScrollEdgeEffect views. Hiding the views, as the last build did,
-// used a channel nothing had ever validated; and the band went into
-// _UIBarBackground, a container iOS keeps inert. Two wrong bets, same build.
+// His two screenshots close the case. The band IS in the right place — the
+// blue rectangle covers the header zone to the pixel — so after twenty-one
+// builds the pose is finally proven, by his own captures. What remained were
+// two defects, and both trace to exact lines.
 //
-// This one uses neither. Nothing of iOS's is hidden, resized or patched — the
-// strip is simply COVERED. The band lives in the BAR itself, a parent that
-// demonstrably renders (the title and the field are its children), inserted at
-// index zero so everything the bar shows stays above it. The bar draws over
-// the whole table, so the band covers the short fade and the passing content
-// alike; and since it spans the full region in one piece, there is nothing
-// above it left to match — the seam problem is gone by construction. Its
-// geometry is COPIED from _UIBarBackground every pass, never invented: iOS
-// maintains that frame at exactly sheet-top to bar-bottom.
+// The BLUE: Theme.x's confirm treatment (NFBTintConfirmGlassBlue) repaints
+// every UIVisualEffectView it finds under the confirm platter's resolved
+// subtree, recursively, and that resolution can land on a container wide
+// enough to include the whole bar. The band was a UIVisualEffectView, so it
+// was captured — tinted, backgrounded and capped in system blue. A plain
+// UIView fails the isKindOfClass test by nature and cannot be captured. At 0.9
+// opacity the blur contributed nothing visible anyway: the look is the same
+// near-opaque white with a breath of the list showing through, and through
+// systemBackground it follows dark mode on its own.
 //
-// The look: the system's thinnest material, pushed toward white by an overlay.
-// His measurements of the strip he wants — 254 neutral over a 255 sheet, with
-// content faintly showing — are a nearly-opaque white with a breath of
-// translucency, and that is what a 0.9 white veil over ultra-thin gives. That
-// constant is the ONE dial on this whole arrangement.
+// The LATE APPEARANCE: installation was driven by the TABLE's layout. On a
+// fresh open the table settles before the bar background exists, the guard
+// bails — and a settled table does not lay out again until a scroll or a
+// push, which is exactly when the band used to pop in. Driven from the BAR's
+// own lifecycle instead, the first display is covered.
 static const CGFloat kNFBSettingsBandWhiteness = 0.9;
 
-static const void* kNFBSettingsBarFrostKey = &kNFBSettingsBarFrostKey;
+static const void* kNFBSettingsBarBandKey = &kNFBSettingsBarBandKey;
 
-static void nfbLayBandIntoSettingsBar(UINavigationBar* bar) {
-    if (!bar) {
-        return;
+static UINavigationController* nfbSettingsNavigationForBar(UINavigationBar* bar) {
+    UIResponder* responder = bar;
+    while ((responder = responder.nextResponder)) {
+        if ([responder isKindOfClass:[UINavigationController class]]) {
+            UINavigationController* navigation = (UINavigationController*)responder;
+            if (navigation.presentingViewController != nil &&
+                nfbControllerIsSettingsRoot(navigation.viewControllers.firstObject)) {
+                return navigation;
+            }
+            return nil;
+        }
     }
+    return nil;
+}
+
+static void nfbLayBandIntoSettingsBar(UINavigationBar* bar,
+                                      UINavigationController* navigation) {
     UIView* background = nil;
     for (UIView* subview in bar.subviews) {
         if ([NSStringFromClass([subview class]) isEqualToString:@"_UIBarBackground"]) {
@@ -389,22 +401,15 @@ static void nfbLayBandIntoSettingsBar(UINavigationBar* bar) {
         }
     }
     if (!background) {
-        return;   // pas encore construit : on retentera au prochain passage
+        return;   // pas encore construit : la barre repassera par layoutSubviews
     }
-    UIVisualEffectView* band = objc_getAssociatedObject(bar, kNFBSettingsBarFrostKey);
+    UIView* band = objc_getAssociatedObject(bar, kNFBSettingsBarBandKey);
     if (!band) {
-        UIBlurEffect* material =
-            [UIBlurEffect effectWithStyle:UIBlurEffectStyleSystemUltraThinMaterial];
-        band = [[UIVisualEffectView alloc] initWithEffect:material];
+        band = [[UIView alloc] init];
         band.userInteractionEnabled = NO;
-        UIView* veil = [[UIView alloc] init];
-        veil.backgroundColor =
-            [UIColor colorWithWhite:1.0 alpha:kNFBSettingsBandWhiteness];
-        veil.autoresizingMask =
-            UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
-        veil.frame = band.contentView.bounds;
-        [band.contentView addSubview:veil];
-        objc_setAssociatedObject(bar, kNFBSettingsBarFrostKey, band,
+        band.backgroundColor = [[UIColor systemBackgroundColor]
+            colorWithAlphaComponent:kNFBSettingsBandWhiteness];
+        objc_setAssociatedObject(bar, kNFBSettingsBarBandKey, band,
                                  OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     }
     if (band.superview != bar || [bar.subviews indexOfObject:band] != 0) {
@@ -413,7 +418,15 @@ static void nfbLayBandIntoSettingsBar(UINavigationBar* bar) {
     if (!CGRectEqualToRect(band.frame, background.frame)) {
         band.frame = background.frame;
     }
+    // Seule la racine porte le champ de recherche; les pages poussées gardent
+    // leur barre telle quelle.
+    BOOL onRoot =
+        navigation.topViewController == navigation.viewControllers.firstObject;
+    if (band.hidden == onRoot) {
+        band.hidden = !onRoot;
+    }
 }
+
 static const void* kNFBEdgeStyleWritesKey = &kNFBEdgeStyleWritesKey;
 
 // Two things keep this safe. The setter is only ever called once the runtime has
@@ -436,7 +449,6 @@ static void nfbApplyHardEdgeIfSettingsRoot(UIScrollView* scrollView) {
     if (!nfbControllerIsSettingsRoot(owner)) {
         return;
     }
-    nfbLayBandIntoSettingsBar(owner.navigationController.navigationBar);
     id effect = ((id (*)(id, SEL))objc_msgSend)(scrollView, @selector(topEdgeEffect));
     if (!effect ||
         ![effect respondsToSelector:@selector(style)] ||
@@ -512,6 +524,39 @@ static void nfbApplyHardEdgeIfSettingsRoot(UIScrollView* scrollView) {
 }
 
 %end
+
+%hook UINavigationBar
+
+- (void)didMoveToWindow {
+    %orig;
+
+    @try {
+        if (self.window) {
+            UINavigationController* navigation = nfbSettingsNavigationForBar(self);
+            if (navigation) {
+                nfbLayBandIntoSettingsBar(self, navigation);
+            }
+        }
+    } @catch (id exception) {
+    }
+}
+
+- (void)layoutSubviews {
+    %orig;
+
+    @try {
+        if (self.window) {
+            UINavigationController* navigation = nfbSettingsNavigationForBar(self);
+            if (navigation) {
+                nfbLayBandIntoSettingsBar(self, navigation);
+            }
+        }
+    } @catch (id exception) {
+    }
+}
+
+%end
+
 
 
 
