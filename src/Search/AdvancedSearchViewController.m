@@ -558,7 +558,28 @@ static UILabel* NFBAdvInstallBox(UITableViewCell* cell,
 @property (nonatomic, strong) NSArray<NSString*>* languageCodes;
 @end
 
+// The confirm glyph in the navigation bar is baked opaque white by the theme
+// hooks, but only while NFBColorThemeScreenVisible is up — Twitter's settings
+// roots and our own settings pages raise it, and this screen never did. Left
+// out, the glyph stays a template the glass material blends with the capsule
+// underneath, which is the wash that shows on a light accent and nowhere else.
+// Joining the count is the whole fix: the recipe already exists, this screen
+// simply was not counted.
+extern NSInteger NFBColorThemeScreenVisible;
+
 @implementation AdvancedSearchViewController
+
+- (void)viewWillAppear:(BOOL)animated {
+    [super viewWillAppear:animated];
+    NFBColorThemeScreenVisible++;
+}
+
+- (void)viewDidDisappear:(BOOL)animated {
+    [super viewDidDisappear:animated];
+    if (NFBColorThemeScreenVisible > 0) {
+        NFBColorThemeScreenVisible--;
+    }
+}
 
 - (instancetype)init {
     return [super initWithStyle:UITableViewStyleGrouped];
