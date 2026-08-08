@@ -11,8 +11,16 @@
 
 #import "MutedWords/MutedWordsViewController.h"
 #import "Core/BHTBundle.h"
+#import "Core/BHTManager.h"
 #import "Core/TwitterChirpFont.h"
 #import "Hooks/HookHelpers.h"
+
+// Every row on this screen used to hang off the table's layout margins, which
+// resolve to about 20 points inside a cell and about 8 on the bare view a
+// section header is built from. Headers and their own rows therefore sat on two
+// different verticals, and neither matched the 10 points the rest of the
+// settings uses (ModernSettingsCells). One number, applied everywhere.
+static const CGFloat kNFBMutedSideMargin = 10.0;
 
 NSString* const kNFBMutedWordsKey = @"nfb_muted_words";
 NSString* const kNFBMutedWholeWordsKey = @"nfb_muted_whole_words";
@@ -77,17 +85,18 @@ NSString* const kNFBMutedIncludeRepostsKey = @"nfb_muted_include_reposts";
         _field.translatesAutoresizingMaskIntoConstraints = NO;
         [box addSubview:_field];
 
-        UILayoutGuide* m = self.contentView.layoutMarginsGuide;
         [NSLayoutConstraint activateConstraints:@[
-            [box.leadingAnchor constraintEqualToAnchor:m.leadingAnchor],
+            [box.leadingAnchor constraintEqualToAnchor:self.contentView.leadingAnchor
+                                              constant:kNFBMutedSideMargin],
             [box.topAnchor constraintEqualToAnchor:self.contentView.topAnchor
                                           constant:8.0],
             [box.heightAnchor constraintEqualToConstant:42.0],
             [_hintLabel.topAnchor constraintEqualToAnchor:box.bottomAnchor
                                                  constant:8.0],
-            [_hintLabel.leadingAnchor constraintEqualToAnchor:m.leadingAnchor
-                                                     constant:2.0],
-            [_hintLabel.trailingAnchor constraintEqualToAnchor:m.trailingAnchor],
+            [_hintLabel.leadingAnchor constraintEqualToAnchor:self.contentView.leadingAnchor
+                                                     constant:kNFBMutedSideMargin + 2.0],
+            [_hintLabel.trailingAnchor constraintEqualToAnchor:self.contentView.trailingAnchor
+                                                      constant:-kNFBMutedSideMargin],
             [_hintLabel.bottomAnchor constraintEqualToAnchor:self.contentView.bottomAnchor
                                                     constant:-10.0],
             [_field.leadingAnchor constraintEqualToAnchor:box.leadingAnchor
@@ -97,7 +106,8 @@ NSString* const kNFBMutedIncludeRepostsKey = @"nfb_muted_include_reposts";
             [_field.centerYAnchor constraintEqualToAnchor:box.centerYAnchor],
             [_addButton.leadingAnchor constraintEqualToAnchor:box.trailingAnchor
                                                      constant:10.0],
-            [_addButton.trailingAnchor constraintEqualToAnchor:m.trailingAnchor],
+            [_addButton.trailingAnchor constraintEqualToAnchor:self.contentView.trailingAnchor
+                                                      constant:-kNFBMutedSideMargin],
             [_addButton.centerYAnchor constraintEqualToAnchor:box.centerYAnchor],
             [_addButton.heightAnchor constraintEqualToConstant:42.0],
             [_addButton.widthAnchor constraintGreaterThanOrEqualToConstant:64.0],
@@ -167,9 +177,9 @@ NSString* const kNFBMutedIncludeRepostsKey = @"nfb_muted_include_reposts";
             v.translatesAutoresizingMaskIntoConstraints = NO;
             [self.contentView addSubview:v];
         }
-        UILayoutGuide* m = self.contentView.layoutMarginsGuide;
         [NSLayoutConstraint activateConstraints:@[
-            [_kindLabel.leadingAnchor constraintEqualToAnchor:m.leadingAnchor],
+            [_kindLabel.leadingAnchor constraintEqualToAnchor:self.contentView.leadingAnchor
+                                                     constant:kNFBMutedSideMargin],
             [_kindLabel.centerYAnchor
                 constraintEqualToAnchor:self.contentView.centerYAnchor],
             [_kindLabel.heightAnchor constraintEqualToConstant:22.0],
@@ -191,7 +201,8 @@ NSString* const kNFBMutedIncludeRepostsKey = @"nfb_muted_include_reposts";
                                                  constant:11.0],
             [_termLabel.bottomAnchor constraintEqualToAnchor:self.contentView.bottomAnchor
                                                     constant:-11.0],
-            [_removeButton.trailingAnchor constraintEqualToAnchor:m.trailingAnchor],
+            [_removeButton.trailingAnchor constraintEqualToAnchor:self.contentView.trailingAnchor
+                                                         constant:-kNFBMutedSideMargin],
             [_removeButton.centerYAnchor
                 constraintEqualToAnchor:self.contentView.centerYAnchor],
             [_removeButton.widthAnchor constraintEqualToConstant:26.0],
@@ -220,11 +231,8 @@ NSString* const kNFBMutedIncludeRepostsKey = @"nfb_muted_include_reposts";
         self.backgroundColor = [UIColor clearColor];
 
         _titleLabel2 = [[UILabel alloc] init];
-        _titleLabel2.font = [TwitterChirpFont(TwitterFontStyleRegular) fontWithSize:16.5];
 
         _subtitleLabel = [[UILabel alloc] init];
-        _subtitleLabel.font = [TwitterChirpFont(TwitterFontStyleRegular) fontWithSize:13.5];
-        _subtitleLabel.textColor = [UIColor secondaryLabelColor];
         _subtitleLabel.numberOfLines = 0;
 
         _toggle = [[UISwitch alloc] init];
@@ -233,27 +241,49 @@ NSString* const kNFBMutedIncludeRepostsKey = @"nfb_muted_include_reposts";
             v.translatesAutoresizingMaskIntoConstraints = NO;
             [self.contentView addSubview:v];
         }
-        UILayoutGuide* m = self.contentView.layoutMarginsGuide;
+        [self applyTheme];
         [NSLayoutConstraint activateConstraints:@[
             [_titleLabel2.topAnchor constraintEqualToAnchor:self.contentView.topAnchor
-                                                   constant:10.0],
-            [_titleLabel2.leadingAnchor constraintEqualToAnchor:m.leadingAnchor],
+                                                   constant:18.0],
+            [_titleLabel2.leadingAnchor constraintEqualToAnchor:self.contentView.leadingAnchor
+                                                       constant:kNFBMutedSideMargin],
             [_titleLabel2.trailingAnchor
                 constraintLessThanOrEqualToAnchor:_toggle.leadingAnchor
-                                         constant:-12.0],
+                                         constant:-16.0],
             [_subtitleLabel.topAnchor constraintEqualToAnchor:_titleLabel2.bottomAnchor
                                                      constant:2.0],
-            [_subtitleLabel.leadingAnchor constraintEqualToAnchor:m.leadingAnchor],
+            [_subtitleLabel.leadingAnchor constraintEqualToAnchor:_titleLabel2.leadingAnchor],
             [_subtitleLabel.trailingAnchor constraintEqualToAnchor:_toggle.leadingAnchor
-                                                          constant:-12.0],
+                                                          constant:-16.0],
             [_subtitleLabel.bottomAnchor
                 constraintEqualToAnchor:self.contentView.bottomAnchor
-                               constant:-10.0],
+                               constant:-18.0],
             [_toggle.centerYAnchor constraintEqualToAnchor:self.contentView.centerYAnchor],
-            [_toggle.trailingAnchor constraintEqualToAnchor:m.trailingAnchor],
+            [_toggle.trailingAnchor constraintEqualToAnchor:self.contentView.trailingAnchor
+                                                   constant:-kNFBMutedSideMargin],
         ]];
     }
     return self;
+}
+
+// The same fonts and palette colours the rest of the settings uses, rather than
+// hard sizes and system greys: a bold title over a subtitle in the theme's own
+// secondary colour. Re-applied on trait changes because a palette colour, unlike
+// secondaryLabelColor, does not follow light and dark on its own.
+- (void)applyTheme {
+    id fontGroup = [BHTManager sharedFontGroup];
+    self.titleLabel2.font = [fontGroup performSelector:@selector(bodyBoldFont)];
+    self.subtitleLabel.font = [fontGroup performSelector:@selector(subtext2Font)];
+    Class TAEColorSettingsCls = objc_getClass("TAEColorSettings");
+    id settings = [TAEColorSettingsCls sharedSettings];
+    id colorPalette = [[settings currentColorPalette] colorPalette];
+    self.titleLabel2.textColor = [colorPalette performSelector:@selector(textColor)];
+    self.subtitleLabel.textColor = [colorPalette performSelector:@selector(tabBarItemColor)];
+}
+
+- (void)traitCollectionDidChange:(UITraitCollection*)previousTraitCollection {
+    [super traitCollectionDidChange:previousTraitCollection];
+    [self applyTheme];
 }
 
 @end
@@ -520,10 +550,10 @@ NSString* const kNFBMutedIncludeRepostsKey = @"nfb_muted_include_reposts";
     label.translatesAutoresizingMaskIntoConstraints = NO;
     [container addSubview:label];
     [NSLayoutConstraint activateConstraints:@[
-        [label.leadingAnchor
-            constraintEqualToAnchor:container.layoutMarginsGuide.leadingAnchor],
-        [label.trailingAnchor
-            constraintEqualToAnchor:container.layoutMarginsGuide.trailingAnchor],
+        [label.leadingAnchor constraintEqualToAnchor:container.leadingAnchor
+                                            constant:kNFBMutedSideMargin],
+        [label.trailingAnchor constraintEqualToAnchor:container.trailingAnchor
+                                             constant:-kNFBMutedSideMargin],
         [label.bottomAnchor constraintEqualToAnchor:container.bottomAnchor
                                            constant:-6.0],
     ]];
