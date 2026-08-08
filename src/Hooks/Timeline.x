@@ -384,17 +384,19 @@ static void nfbGiveSettingsBarItsMaterial(UINavigationBar* bar) {
                              OBJC_ASSOCIATION_RETAIN_NONATOMIC);
 }
 
-// _UIBarBackground already covers the whole bar — the view tree gives it as
-// {0, -20, 440, 128}, which runs a good twenty points past the bottom of the
-// search field at 108. So the background is not too short; it simply stops
-// PAINTING partway down, and that is a gradient mask on its layer. Clearing it
-// leaves the same material drawn at full strength over its whole height, which
-// is what the field's strip was missing.
+// Measured on his own screenshots, the boundary has sat at 49% of the field's
+// height in EVERY build so far — the hard style, the safe-area inset, the bar
+// appearance, the mask strip: none of them moved it by a pixel. It is 20 points
+// short of the field's bottom, and nothing reached from the scroll view or the
+// bar's own background has ever changed that.
 //
-// The same move AppLifecycle already makes on the launch screen, where the mask
-// is what carved the X-shaped hole. Only the background's own subtree is
-// touched: the search field is a sibling, and its pill relies on a mask of its
-// own for those rounded ends.
+// So the strip is covered directly instead. TFNSearchBar spans the last 54
+// points of the bar — from 74 to 128, which contains the whole gap — and a view
+// of ours goes inside it, beneath the container holding the field. Above
+// whatever stops painting, below the pill. The system's chrome material over an
+// opaque backing: the material so it is the same substance as the rest of the
+// bar, the backing so nothing shows through and it lands on the sheet's own
+// white rather than the 250 a bare blur gives.
 static UIView* nfbSubviewNamed(UIView* view, NSString* className) {
     for (UIView* subview in view.subviews) {
         if ([NSStringFromClass([subview class]) isEqualToString:className]) {
@@ -408,26 +410,57 @@ static UIView* nfbSubviewNamed(UIView* view, NSString* className) {
     return nil;
 }
 
-static void nfbUnmaskSubtree(UIView* view) {
-    if (view.layer.mask) {
-        view.layer.mask = nil;
+static const void* kNFBSearchBarFrostKey = &kNFBSearchBarFrostKey;
+
+// Only the search bar of Twitter's settings sheet: its navigation controller's
+// root is a settings controller. Every other TFNSearchBar is left alone.
+static BOOL nfbSearchBarBelongsToSettings(UIView* searchBar) {
+    UIResponder* responder = searchBar;
+    while ((responder = responder.nextResponder)) {
+        if ([responder isKindOfClass:[UINavigationController class]]) {
+            UINavigationController* navigation = (UINavigationController*)responder;
+            return nfbControllerIsSettingsRoot(navigation.viewControllers.firstObject);
+        }
     }
-    for (UIView* subview in view.subviews) {
-        nfbUnmaskSubtree(subview);
-    }
+    return NO;
 }
 
-// Re-run on every pass rather than marked: iOS reinstalls that mask whenever the
-// bar reconfigures, exactly as it re-enables the scroll edge effect. Clearing a
-// mask lays out nothing, so there is no loop to fall into — and once it is nil
-// the walk finds nothing left to do.
-static void nfbUnfadeSettingsBar(UINavigationBar* bar) {
-    if (!bar) {
+static void nfbFrostSettingsSearchBar(UIView* searchBar) {
+    if (!nfbSearchBarBelongsToSettings(searchBar)) {
         return;
     }
-    UIView* background = nfbSubviewNamed(bar, @"_UIBarBackground");
-    if (background) {
-        nfbUnmaskSubtree(background);
+    // Nothing is installed until the container exists. An earlier version fell
+    // back to adding it to the search bar itself, which put it on top and hid
+    // the field behind a grey band.
+    UIView* container = nfbSubviewNamed(searchBar, @"_UISearchBarSearchContainerView");
+    UIView* host = container.superview;
+    if (!container || !host) {
+        return;   // pas encore construite : on retentera au prochain layout
+    }
+    UIVisualEffectView* frost = objc_getAssociatedObject(searchBar, kNFBSearchBarFrostKey);
+    if (!frost) {
+        UIBlurEffect* material =
+            [UIBlurEffect effectWithStyle:UIBlurEffectStyleSystemChromeMaterial];
+        frost = [[UIVisualEffectView alloc] initWithEffect:material];
+        frost.autoresizingMask =
+            UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+        frost.userInteractionEnabled = NO;
+        // The backing sits behind the material, so the blur has nothing
+        // translucent left to reveal: opaque, and at the sheet's own tone.
+        frost.backgroundColor = [UIColor systemBackgroundColor];
+        objc_setAssociatedObject(searchBar, kNFBSearchBarFrostKey, frost,
+                                 OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    }
+    // The position is checked against the container's own index every pass, not
+    // assumed to have held since it was set.
+    NSUInteger containerIndex = [host.subviews indexOfObject:container];
+    NSUInteger frostIndex = [host.subviews indexOfObject:frost];
+    if (frost.superview != host || frostIndex == NSNotFound ||
+        containerIndex == NSNotFound || frostIndex > containerIndex) {
+        [host insertSubview:frost belowSubview:container];
+    }
+    if (!CGRectEqualToRect(frost.frame, host.bounds)) {
+        frost.frame = host.bounds;
     }
 }
 
@@ -453,9 +486,7 @@ static void nfbApplyHardEdgeIfSettingsRoot(UIScrollView* scrollView) {
     if (!nfbControllerIsSettingsRoot(owner)) {
         return;
     }
-    UINavigationBar* settingsBar = owner.navigationController.navigationBar;
-    nfbGiveSettingsBarItsMaterial(settingsBar);
-    nfbUnfadeSettingsBar(settingsBar);
+    nfbGiveSettingsBarItsMaterial(owner.navigationController.navigationBar);
     id effect = ((id (*)(id, SEL))objc_msgSend)(scrollView, @selector(topEdgeEffect));
     if (!effect ||
         ![effect respondsToSelector:@selector(style)] ||
@@ -531,6 +562,35 @@ static void nfbApplyHardEdgeIfSettingsRoot(UIScrollView* scrollView) {
 }
 
 %end
+
+// Driven by the search bar's own layout, not the list's: the list can settle
+// before the bar exists, which left the first screen after a restart untouched.
+%hook TFNSearchBar
+
+- (void)didMoveToWindow {
+    %orig;
+
+    @try {
+        if (((UIView*)self).window) {
+            nfbFrostSettingsSearchBar((UIView*)self);
+        }
+    } @catch (id exception) {
+    }
+}
+
+- (void)layoutSubviews {
+    %orig;
+
+    @try {
+        if (((UIView*)self).window) {
+            nfbFrostSettingsSearchBar((UIView*)self);
+        }
+    } @catch (id exception) {
+    }
+}
+
+%end
+
 
 
 // MARK: - Hide "Discover more", who-to-follow and prompts
