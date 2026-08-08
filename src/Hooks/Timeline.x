@@ -358,8 +358,14 @@ static void nfbStretchEdgeEffectIn(UIView* view, CGFloat height) {
                 .location == NSNotFound) {
             continue;
         }
+        // Set outright, both directions. The first version only ever grew the
+        // view, and it had measured its target in the scroll view's own
+        // coordinates — which move with the content. Mid-scroll that number ran
+        // into the hundreds, the view was stretched to it and never brought
+        // back, and the effect's gradient spread over that whole height until
+        // it was too dilute to see. That is the "nothing at all" screen.
         CGRect frame = subview.frame;
-        if (frame.size.height < height - 0.5) {
+        if (fabs(frame.size.height - height) > 0.5) {
             frame.size.height = height;
             subview.frame = frame;
         }
@@ -371,8 +377,15 @@ static void nfbStretchSettingsEdgeEffect(UIScrollView* scrollView, UINavigationB
     if (!bar || !bar.window) {
         return;
     }
-    CGRect barInScroll = [scrollView convertRect:bar.bounds fromView:bar];
-    CGFloat needed = CGRectGetMaxY(barInScroll);
+    // Both rectangles are read in the WINDOW, where nothing scrolls: the
+    // field's bottom edge minus the list's visible top. On this sheet that is
+    // 128 points, on any device, at any scroll position. Converting into the
+    // scroll view instead was the previous bug — a scroll view's coordinates
+    // carry its content offset, so the target drifted with every swipe.
+    CGFloat barBottom = CGRectGetMaxY([bar convertRect:bar.bounds toView:nil]);
+    CGFloat listTop = CGRectGetMinY([scrollView convertRect:scrollView.bounds
+                                                     toView:nil]);
+    CGFloat needed = barBottom - listTop;
     if (needed <= 0.0 || needed > CGRectGetHeight(scrollView.bounds)) {
         return;   // repere aberrant : on ne touche a rien
     }
