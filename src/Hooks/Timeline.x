@@ -393,9 +393,8 @@ static void nfbGiveSettingsBarItsMaterial(UINavigationBar* bar) {
 // So the strip is covered directly instead. TFNSearchBar spans the last 54
 // points of the bar — from 74 to 128, which contains the whole gap — and a view
 // of ours goes inside it, beneath the container holding the field. Above
-// whatever stops painting, below the pill. Nothing but the system's chrome
-// material: the same substance as the rest of the bar, and translucent, so the
-// list is still guessed behind the strip instead of being walled off.
+// whatever stops painting, below the pill. Nothing but a system material, and
+// the thinnest one, so the list stays visible through the strip.
 static UIView* nfbSubviewNamed(UIView* view, NSString* className) {
     for (UIView* subview in view.subviews) {
         if ([NSStringFromClass([subview class]) isEqualToString:className]) {
@@ -438,8 +437,12 @@ static void nfbFrostSettingsSearchBar(UIView* searchBar) {
     }
     UIVisualEffectView* frost = objc_getAssociatedObject(searchBar, kNFBSearchBarFrostKey);
     if (!frost) {
+        // The thinnest material iOS offers. ChromeMaterial, which was here
+        // before, is the thickest of the set — it is what bars use when they
+        // are meant to hide what passes under them, and that is why it read as
+        // a flat grey wall. UltraThin lets the list through and blurs it.
         UIBlurEffect* material =
-            [UIBlurEffect effectWithStyle:UIBlurEffectStyleSystemChromeMaterial];
+            [UIBlurEffect effectWithStyle:UIBlurEffectStyleSystemUltraThinMaterial];
         frost = [[UIVisualEffectView alloc] initWithEffect:material];
         frost.autoresizingMask =
             UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
