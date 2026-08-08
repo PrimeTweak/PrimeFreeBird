@@ -1,0 +1,74 @@
+name: Rebrand X
+
+on:
+  workflow_dispatch:
+    inputs:
+      ipa_url:
+        description: "Direct URL of an X IPA"
+        default: ""
+        required: true
+        type: string
+      twitter_branding:
+        description: "Set app name to Twitter"
+        default: true
+        required: false
+        type: boolean
+      resource_pack_url:
+        description: "Override app icons (.ZIP)"
+        default: "https://files.catbox.moe/p63f20.zip"
+        required: false
+        type: string
+      commit_id:
+        description: "(Optional) Commit ID to run at"
+        default: ""
+        required: false
+        type: string
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  rebrand:
+    name: Rebrand IPA
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Main
+        uses: actions/checkout@v6
+        with:
+          path: main
+          ref: ${{ github.event.inputs.commit_id || github.ref }}
+
+      - name: Download IPA
+        id: ipa
+        run: |
+          IPA_EXT=ipa
+          case "${IPA_URL%%\?*}" in *.tipa) IPA_EXT=tipa ;; esac
+          echo "ext=${IPA_EXT}" >> "$GITHUB_OUTPUT"
+          wget "$IPA_URL" --no-verbose -O "main/packages/X-rebranded.${IPA_EXT}"
+        env:
+          IPA_URL: ${{ inputs.ipa_url }}
+
+      - name: Prepare Image Pack
+        if: inputs.resource_pack_url != ''
+        run: |
+          wget "$IMAGE_URL" --no-verbose -O main/resource-pack.zip
+        env:
+          IMAGE_URL: ${{ inputs.resource_pack_url }}
+
+      - name: Rebrand IPA
+        run: |
+          cd ${{ github.workspace }}/main
+          IMAGE_FLAG=""
+          if [ -f resource-pack.zip ]; then IMAGE_FLAG="--resource-pack resource-pack.zip"; fi
+          ./rebrand.sh${{ inputs.twitter_branding && ' --twitter-branding' || '' }} $IMAGE_FLAG \
+            "packages/X-rebranded.${{ steps.ipa.outputs.ext }}"
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: X-rebranded
+          path: ${{ github.workspace }}/main/packages/X-rebranded.${{ steps.ipa.outputs.ext }}
+          archive: false
+          if-no-files-found: error
