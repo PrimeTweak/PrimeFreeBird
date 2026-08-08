@@ -347,11 +347,18 @@ static id nfbHardEdgeStyleLike(id currentStyle) {
 // colour is taken from the scroll view so it follows light, dark and his own
 // dark shades instead of being guessed. Assigning a background triggers no
 // layout, so nothing here can chase itself.
-// The colour is read from whatever is actually painted behind the search bar,
-// climbing its own ancestors until something opaque turns up. Asking the scroll
-// view alone was not enough — a table view whose background is clear, with the
-// colour held by a parent, left this doing nothing at all, which is exactly how
-// the first attempt failed silently.
+// The view tree settles both open questions. TFNSearchBar sits at {0, 54, 440,
+// 54} INSIDE the UINavigationBar, which is 108 points tall — so the search bar
+// ends flush with the bottom of the bar, and there is no bar to lengthen. What
+// fades out over those 108 points is the bar's own background, which is why the
+// list shows through the lower half of the field and nowhere else.
+//
+// The tree also shows TFNTableView and TFNSearchBar both marked transparent,
+// which is what defeated the previous attempt: it asked the table for a colour,
+// got nothing opaque, and returned without painting anything. So the colour is
+// climbed from the table upwards — DataViewHostView and the controller's own
+// view sit above it and do carry the sheet's background — and the system
+// background stands in only if that whole climb comes back empty.
 static UIColor* nfbOpaqueBackdropAbove(UIView* view) {
     UIView* ancestor = view.superview;
     for (NSInteger hop = 0; ancestor && hop < 8; hop++) {
@@ -364,42 +371,55 @@ static UIColor* nfbOpaqueBackdropAbove(UIView* view) {
     return [UIColor systemBackgroundColor];
 }
 
-static BOOL nfbPaintSearchBarsIn(UIView* view, Class searchBarClass) {
+// The search bar carries a UISearchBarBackground of its own size, and that is
+// the view actually drawing the backdrop — a colour set on the search bar alone
+// would sit behind it. Both are painted, so whichever one is the visible layer
+// ends up opaque.
+static void nfbPaintBackdropLayersIn(UIView* view, UIColor* backdrop) {
+    for (UIView* subview in view.subviews) {
+        if ([NSStringFromClass([subview class]) isEqualToString:@"UISearchBarBackground"]) {
+            if (![subview.backgroundColor isEqual:backdrop]) {
+                subview.backgroundColor = backdrop;
+            }
+        }
+        nfbPaintBackdropLayersIn(subview, backdrop);
+    }
+}
+
+static BOOL nfbPaintSearchBarsIn(UIView* view, Class searchBarClass, UIColor* backdrop) {
     BOOL painted = NO;
     for (UIView* subview in view.subviews) {
         if ([subview isKindOfClass:searchBarClass]) {
-            UIColor* backdrop = nfbOpaqueBackdropAbove(subview);
-            if (backdrop && ![subview.backgroundColor isEqual:backdrop]) {
+            if (![subview.backgroundColor isEqual:backdrop]) {
                 subview.backgroundColor = backdrop;
             }
+            nfbPaintBackdropLayersIn(subview, backdrop);
             painted = YES;
             continue;
         }
-        if (nfbPaintSearchBarsIn(subview, searchBarClass)) {
+        if (nfbPaintSearchBarsIn(subview, searchBarClass, backdrop)) {
             painted = YES;
         }
     }
     return painted;
 }
 
-static void nfbPaintSettingsSearchBar(UIViewController* owner) {
+static void nfbPaintSettingsSearchBar(UIViewController* owner, UIScrollView* scrollView) {
     Class searchBarClass = objc_getClass("TFNSearchBar");
     if (!searchBarClass) {
         return;
     }
-    // Three places, tried in order of how tightly they are scoped, stopping at
-    // the first that actually holds one.
-    if (nfbPaintSearchBarsIn(owner.view, searchBarClass)) {
+    UIColor* backdrop = nfbOpaqueBackdropAbove(scrollView);
+    if (!backdrop) {
         return;
     }
+    // The navigation bar first, because that is where the tree puts it; the
+    // controller's own view second, in case another build lays it out there.
     UINavigationBar* bar = owner.navigationController.navigationBar;
-    if (bar && nfbPaintSearchBarsIn(bar, searchBarClass)) {
+    if (bar && nfbPaintSearchBarsIn(bar, searchBarClass, backdrop)) {
         return;
     }
-    UIView* stack = owner.navigationController.view;
-    if (stack) {
-        nfbPaintSearchBarsIn(stack, searchBarClass);
-    }
+    nfbPaintSearchBarsIn(owner.view, searchBarClass, backdrop);
 }
 
 static const void* kNFBEdgeStyleWritesKey = &kNFBEdgeStyleWritesKey;
@@ -424,7 +444,7 @@ static void nfbApplyHardEdgeIfSettingsRoot(UIScrollView* scrollView) {
     if (!nfbControllerIsSettingsRoot(owner)) {
         return;
     }
-    nfbPaintSettingsSearchBar(owner);
+    nfbPaintSettingsSearchBar(owner, scrollView);
     id effect = ((id (*)(id, SEL))objc_msgSend)(scrollView, @selector(topEdgeEffect));
     if (!effect ||
         ![effect respondsToSelector:@selector(style)] ||
