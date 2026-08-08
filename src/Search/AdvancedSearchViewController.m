@@ -636,8 +636,17 @@ static UILabel* NFBAdvInstallBox(UITableViewCell* cell,
                 style:UIBarButtonItemStyleDone
                target:self
                action:@selector(nfbRunSearch)];
+    // The title colour is stated here rather than left to iOS. A prominent bar
+    // button under Liquid Glass derives its label from the capsule's tint —
+    // black over yellow, white over dark accents — which is the same contrast
+    // rule that once turned the confirm glyph and the FAB dark. There the cure
+    // was baking white pixels and rendering them AlwaysOriginal; for a title,
+    // naming the colour outright is the same move. Nothing rewrites this title
+    // afterwards, so none of the write-ordering machinery that the glyph
+    // flicker needed applies here.
     NSDictionary* chirpButton = @{
-        NSFontAttributeName : [TwitterChirpFont(TwitterFontStyleBold) fontWithSize:15]
+        NSFontAttributeName : [TwitterChirpFont(TwitterFontStyleBold) fontWithSize:15],
+        NSForegroundColorAttributeName : [UIColor whiteColor]
     };
     [self.navigationItem.rightBarButtonItem setTitleTextAttributes:chirpButton
                                                           forState:UIControlStateNormal];
