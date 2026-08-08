@@ -337,12 +337,15 @@ static id nfbHardEdgeStyleLike(id currentStyle) {
 }
 
 // iOS only knows of the bar what the screen declares as its safe area, and
-// Twitter lays its search field out lower than that: measured on the sheet, the
-// boundary lands at 49% of the field's height, 20 points above its bottom edge.
-// Widening the screen's safe area drops the boundary below the field and, at the
-// same time, stops the list from resting behind it. Setting an absolute value
-// rather than adding one keeps this idempotent, so no layout can chase it.
-static const CGFloat kNFBSettingsHeaderExtra = 24.0;
+// Twitter lays its search field out lower than that, so the list came to rest
+// hard against the field with a third of a point between them. Widening the
+// screen's safe area pushes the list down; the value is what it takes to clear
+// the field and then leave the 20 points our own group headers reserve above a
+// title, so this sheet breathes like the rest of the settings.
+//
+// Setting an absolute value rather than adding one keeps this idempotent, so no
+// layout can chase it.
+static const CGFloat kNFBSettingsHeaderExtra = 44.0;
 
 static void nfbExtendSettingsHeader(UIViewController* controller) {
     UIEdgeInsets insets = controller.additionalSafeAreaInsets;
@@ -357,8 +360,16 @@ static const void* kNFBEdgeStyleWritesKey = &kNFBEdgeStyleWritesKey;
 
 // Two things keep this safe. The setter is only ever called once the runtime has
 // confirmed it takes an object — the check that was missing when this crashed —
-// and the writes are capped per scroll view, so no chain of write, relayout,
-// write can run away even if the value refuses to stick.
+// and the writes are capped, so no chain of write, relayout, write can run away
+// even if the value refuses to stick.
+//
+// The cap is carried by the EFFECT, not by the scroll view. Counting on the
+// scroll view was what undid the whole thing when the header widened: the extra
+// layout passes that the safe-area change triggers spent the budget, iOS then
+// handed the scroll view a fresh effect object, and there was nothing left to
+// style it with — the bar quietly went back to its gradient. A new object is a
+// new subject and gets its own budget; a runaway loop still hammers one object
+// and is still stopped after three.
 static void nfbApplyHardEdgeIfSettingsRoot(UIScrollView* scrollView) {
     if (![scrollView respondsToSelector:@selector(topEdgeEffect)]) {
         return;   // avant iOS 26 : rien à faire
@@ -368,14 +379,14 @@ static void nfbApplyHardEdgeIfSettingsRoot(UIScrollView* scrollView) {
         return;
     }
     nfbExtendSettingsHeader(owner);
-    NSNumber* writes = objc_getAssociatedObject(scrollView, kNFBEdgeStyleWritesKey);
-    if (writes.integerValue >= 3) {
-        return;
-    }
     id effect = ((id (*)(id, SEL))objc_msgSend)(scrollView, @selector(topEdgeEffect));
     if (!effect ||
         ![effect respondsToSelector:@selector(style)] ||
         ![effect respondsToSelector:@selector(setStyle:)]) {
+        return;
+    }
+    NSNumber* writes = objc_getAssociatedObject(effect, kNFBEdgeStyleWritesKey);
+    if (writes.integerValue >= 3) {
         return;
     }
     // respondsToSelector: proves the selector exists, never what it expects.
@@ -394,7 +405,7 @@ static void nfbApplyHardEdgeIfSettingsRoot(UIScrollView* scrollView) {
     if (!hard || hard == current) {
         return;
     }
-    objc_setAssociatedObject(scrollView, kNFBEdgeStyleWritesKey,
+    objc_setAssociatedObject(effect, kNFBEdgeStyleWritesKey,
                              @(writes.integerValue + 1),
                              OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     ((void (*)(id, SEL, id))objc_msgSend)(effect, @selector(setStyle:), hard);
