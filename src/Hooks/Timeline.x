@@ -372,6 +372,68 @@ static BOOL nfbBarBelongsToSettingsSheet(UINavigationBar* bar) {
     return NO;
 }
 
+// Twenty attempts settle what CAN be done to iOS's own fade. Its view ignores
+// every geometry setter — three of them clamped, and the frame still read 94,
+// which means UIKit writes the layer beneath them. Fighting the compositor is
+// a war this side loses. But ONE mechanism provably sticks on these very
+// classes, in this very tweak: setHidden — it is how hide_scroll_edge_blur
+// clears them on every other screen, and isHidden reads back faithfully. So
+// iOS's short fade is hidden here, and a band of our own replaces it.
+static void nfbHideSettingsEdgeFade(UIScrollView* scrollView) {
+    for (UIView* subview in scrollView.subviews) {
+        if ([NSStringFromClass([subview class]) rangeOfString:@"ScrollEdgeEffect"]
+                .location == NSNotFound) {
+            continue;
+        }
+        if (!subview.hidden) {
+            subview.hidden = YES;
+        }
+    }
+}
+
+// The band goes where his capture points: _UIBarBackground already spans
+// exactly the region — {0, -20, 440, bar height + 20}, from the sheet's top to
+// the bar's bottom — it never scrolls, and everything placed inside it sits
+// beneath the title and the field by construction. It paints nothing itself
+// (black at zero alpha), so the material laid into it IS the bar's look, one
+// uniform surface from top to below the field: nothing above it left to
+// mismatch. Ultra-thin keeps the list guessed through it. If he wants it
+// whiter, the one dial is a white overlay on the material's contentView.
+static const void* kNFBSettingsBarFrostKey = &kNFBSettingsBarFrostKey;
+
+static void nfbLayFrostIntoSettingsBar(UINavigationBar* bar) {
+    if (!bar) {
+        return;
+    }
+    UIView* background = nil;
+    for (UIView* subview in bar.subviews) {
+        if ([NSStringFromClass([subview class]) isEqualToString:@"_UIBarBackground"]) {
+            background = subview;
+            break;
+        }
+    }
+    if (!background) {
+        return;   // pas encore construit : on retentera au prochain passage
+    }
+    UIVisualEffectView* frost = objc_getAssociatedObject(bar, kNFBSettingsBarFrostKey);
+    if (!frost) {
+        UIBlurEffect* material =
+            [UIBlurEffect effectWithStyle:UIBlurEffectStyleSystemUltraThinMaterial];
+        frost = [[UIVisualEffectView alloc] initWithEffect:material];
+        frost.userInteractionEnabled = NO;
+        frost.autoresizingMask =
+            UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+        objc_setAssociatedObject(bar, kNFBSettingsBarFrostKey, frost,
+                                 OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    }
+    if (frost.superview != background) {
+        [background addSubview:frost];
+    }
+    if (!CGRectEqualToRect(frost.frame, background.bounds)) {
+        frost.frame = background.bounds;
+    }
+}
+
 static const void* kNFBEdgeStyleWritesKey = &kNFBEdgeStyleWritesKey;
 
 // Two things keep this safe. The setter is only ever called once the runtime has
@@ -394,6 +456,8 @@ static void nfbApplyHardEdgeIfSettingsRoot(UIScrollView* scrollView) {
     if (!nfbControllerIsSettingsRoot(owner)) {
         return;
     }
+    nfbHideSettingsEdgeFade(scrollView);
+    nfbLayFrostIntoSettingsBar(owner.navigationController.navigationBar);
     id effect = ((id (*)(id, SEL))objc_msgSend)(scrollView, @selector(topEdgeEffect));
     if (!effect ||
         ![effect respondsToSelector:@selector(style)] ||
