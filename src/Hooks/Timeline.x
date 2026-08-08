@@ -393,10 +393,9 @@ static void nfbGiveSettingsBarItsMaterial(UINavigationBar* bar) {
 // So the strip is covered directly instead. TFNSearchBar spans the last 54
 // points of the bar — from 74 to 128, which contains the whole gap — and a view
 // of ours goes inside it, beneath the container holding the field. Above
-// whatever stops painting, below the pill. The system's chrome material over an
-// opaque backing: the material so it is the same substance as the rest of the
-// bar, the backing so nothing shows through and it lands on the sheet's own
-// white rather than the 250 a bare blur gives.
+// whatever stops painting, below the pill. Nothing but the system's chrome
+// material: the same substance as the rest of the bar, and translucent, so the
+// list is still guessed behind the strip instead of being walled off.
 static UIView* nfbSubviewNamed(UIView* view, NSString* className) {
     for (UIView* subview in view.subviews) {
         if ([NSStringFromClass([subview class]) isEqualToString:className]) {
@@ -445,9 +444,6 @@ static void nfbFrostSettingsSearchBar(UIView* searchBar) {
         frost.autoresizingMask =
             UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
         frost.userInteractionEnabled = NO;
-        // The backing sits behind the material, so the blur has nothing
-        // translucent left to reveal: opaque, and at the sheet's own tone.
-        frost.backgroundColor = [UIColor systemBackgroundColor];
         objc_setAssociatedObject(searchBar, kNFBSearchBarFrostKey, frost,
                                  OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     }
