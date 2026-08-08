@@ -359,72 +359,29 @@ static id nfbHardEdgeStyleLike(id currentStyle) {
 // climbed from the table upwards — DataViewHostView and the controller's own
 // view sit above it and do carry the sheet's background — and the system
 // background stands in only if that whole climb comes back empty.
-// Twitter's own bar is a material, not a colour: on every other settings page
-// that strip is frosted and the list is guessed behind it. An opaque fill would
-// close the gap and still look wrong, so a UIVisualEffectView carrying the
-// chrome material goes in instead — the same substance the bars use, laid
-// directly beneath the container that holds the field. Above everything drawing
-// the fade, below the pill itself, and its place in the stack is chosen rather
-// than inherited. That is what colouring an existing view could never promise:
-// a colour set on the search bar sits behind the background that draws the
-// backdrop, and one set on that background sits under whatever the glass paints
-// over it.
-static UIView* nfbSubviewNamed(UIView* view, NSString* className) {
-    for (UIView* subview in view.subviews) {
-        if ([NSStringFromClass([subview class]) isEqualToString:className]) {
-            return subview;
-        }
-        UIView* found = nfbSubviewNamed(subview, className);
-        if (found) {
-            return found;
-        }
-    }
-    return nil;
-}
+// The native way to say "this bar keeps its material" is to give it an explicit
+// appearance instead of laying anything over it. configureWithDefaultBackground
+// installs the system's own bar background — the very substance every other bar
+// in iOS uses, which is why it lands on the sheet's white rather than the 250 a
+// hand-placed blur produced. Setting it on scrollEdgeAppearance as well is what
+// stops iOS 26 fading that background out while the list sits at the top, and
+// that fade is the whole reason the list showed through beside the field.
+//
+// Written once per bar and never again: an appearance assignment relays the
+// bar, so re-asserting it on every pass would chase itself.
+static const void* kNFBSettingsBarMaterialKey = &kNFBSettingsBarMaterialKey;
 
-static const void* kNFBSearchBarFrostKey = &kNFBSearchBarFrostKey;
-
-// True only for the search bar sitting in Twitter's settings sheet: the bar
-// belongs to a navigation controller whose root is a settings controller. Any
-// other TFNSearchBar in the app is left exactly as it is.
-static BOOL nfbSearchBarBelongsToSettings(UIView* searchBar) {
-    UIResponder* responder = searchBar;
-    while ((responder = responder.nextResponder)) {
-        if ([responder isKindOfClass:[UINavigationController class]]) {
-            UINavigationController* navigation = (UINavigationController*)responder;
-            return nfbControllerIsSettingsRoot(navigation.viewControllers.firstObject);
-        }
-    }
-    return NO;
-}
-
-static void nfbFrostSettingsSearchBar(UIView* searchBar) {
-    if (!nfbSearchBarBelongsToSettings(searchBar)) {
+static void nfbGiveSettingsBarItsMaterial(UINavigationBar* bar) {
+    if (!bar || objc_getAssociatedObject(bar, kNFBSettingsBarMaterialKey)) {
         return;
     }
-    UIView* container = nfbSubviewNamed(searchBar, @"_UISearchBarSearchContainerView");
-    UIView* host = container.superview ?: searchBar;
-    UIVisualEffectView* frost = objc_getAssociatedObject(searchBar, kNFBSearchBarFrostKey);
-    if (!frost) {
-        UIBlurEffect* material =
-            [UIBlurEffect effectWithStyle:UIBlurEffectStyleSystemChromeMaterial];
-        frost = [[UIVisualEffectView alloc] initWithEffect:material];
-        frost.autoresizingMask =
-            UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
-        frost.userInteractionEnabled = NO;
-        objc_setAssociatedObject(searchBar, kNFBSearchBarFrostKey, frost,
-                                 OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-    }
-    if (frost.superview != host) {
-        if (container && container.superview == host) {
-            [host insertSubview:frost belowSubview:container];
-        } else {
-            [host addSubview:frost];
-        }
-    }
-    if (!CGRectEqualToRect(frost.frame, host.bounds)) {
-        frost.frame = host.bounds;
-    }
+    UINavigationBarAppearance* appearance = [[UINavigationBarAppearance alloc] init];
+    [appearance configureWithDefaultBackground];
+    bar.standardAppearance = appearance;
+    bar.scrollEdgeAppearance = appearance;
+    bar.compactAppearance = appearance;
+    objc_setAssociatedObject(bar, kNFBSettingsBarMaterialKey, @YES,
+                             OBJC_ASSOCIATION_RETAIN_NONATOMIC);
 }
 
 static const void* kNFBEdgeStyleWritesKey = &kNFBEdgeStyleWritesKey;
@@ -449,6 +406,7 @@ static void nfbApplyHardEdgeIfSettingsRoot(UIScrollView* scrollView) {
     if (!nfbControllerIsSettingsRoot(owner)) {
         return;
     }
+    nfbGiveSettingsBarItsMaterial(owner.navigationController.navigationBar);
     id effect = ((id (*)(id, SEL))objc_msgSend)(scrollView, @selector(topEdgeEffect));
     if (!effect ||
         ![effect respondsToSelector:@selector(style)] ||
@@ -519,35 +477,6 @@ static void nfbApplyHardEdgeIfSettingsRoot(UIScrollView* scrollView) {
             return;
         }
         nfbApplyEdgeEffect(self, hide);
-    } @catch (id exception) {
-    }
-}
-
-%end
-
-// Installed from the search bar's own layout, not from the list's: the list can
-// settle before the bar exists, which is why the frost only turned up after
-// navigating instead of on the first screen after a restart.
-%hook TFNSearchBar
-
-- (void)didMoveToWindow {
-    %orig;
-
-    @try {
-        if (((UIView*)self).window) {
-            nfbFrostSettingsSearchBar((UIView*)self);
-        }
-    } @catch (id exception) {
-    }
-}
-
-- (void)layoutSubviews {
-    %orig;
-
-    @try {
-        if (((UIView*)self).window) {
-            nfbFrostSettingsSearchBar((UIView*)self);
-        }
     } @catch (id exception) {
     }
 }
