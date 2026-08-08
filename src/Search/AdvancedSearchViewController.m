@@ -15,6 +15,7 @@
 #import "Search/AdvancedSearchViewController.h"
 #import "Core/BHTBundle.h"
 #import "Core/TwitterChirpFont.h"
+#import <math.h>
 #import <objc/message.h>
 
 // x.com focus blue (#1D9BF0) — the web form's focus ring.
@@ -565,6 +566,40 @@ static UILabel* NFBAdvInstallBox(UITableViewCell* cell,
 // underneath, which is the wash that shows on a light accent and nowhere else.
 // Joining the count is the whole fix: the recipe already exists, this screen
 // simply was not counted.
+// The confirm glyph comes out clean white on the yellow capsule because it is
+// baked — opaque white pixels handed over as AlwaysOriginal, with nothing left
+// for the glass material to blend. A title has no such escape: the label is
+// drawn by the button itself, and the material washes it. That is the shine
+// that survived giving the title an explicit colour, and it is why the
+// checkmark on this same screen came out clean while the word did not.
+//
+// So the word is baked the same way the glyph is. Drawn once into a bitmap and
+// passed as an image, it takes exactly the path that already works.
+static UIImage* nfbBakedTitleImage(NSString* title, UIFont* font) {
+    if (title.length == 0 || !font) {
+        return nil;
+    }
+    NSDictionary* attributes = @{
+        NSFontAttributeName : font,
+        NSForegroundColorAttributeName : [UIColor whiteColor]
+    };
+    CGSize measured = [title sizeWithAttributes:attributes];
+    CGSize size = CGSizeMake(ceilf((float)measured.width), ceilf((float)measured.height));
+    if (size.width < 1.0 || size.height < 1.0) {
+        return nil;
+    }
+    UIGraphicsImageRendererFormat* format =
+        [UIGraphicsImageRendererFormat preferredFormat];
+    format.opaque = NO;
+    UIGraphicsImageRenderer* renderer =
+        [[UIGraphicsImageRenderer alloc] initWithSize:size format:format];
+    UIImage* drawn = [renderer
+        imageWithActions:^(UIGraphicsImageRendererContext* context) {
+            [title drawAtPoint:CGPointZero withAttributes:attributes];
+        }];
+    return [drawn imageWithRenderingMode:UIImageRenderingModeAlwaysOriginal];
+}
+
 extern NSInteger NFBColorThemeScreenVisible;
 
 @implementation AdvancedSearchViewController
@@ -652,27 +687,34 @@ extern NSInteger NFBColorThemeScreenVisible;
     // custom view gets WRAPPED in a second glass capsule — the double-pill
     // bug), and with no explicit tint it inherits the fork's window tint, so
     // it follows the user's colour theme automatically.
-    self.navigationItem.rightBarButtonItem = [[UIBarButtonItem alloc]
-        initWithTitle:[bundle localizedStringForKey:@"ADVSEARCH_SEARCH"]
-                style:UIBarButtonItemStyleDone
-               target:self
-               action:@selector(nfbRunSearch)];
-    // The title colour is stated here rather than left to iOS. A prominent bar
-    // button under Liquid Glass derives its label from the capsule's tint —
-    // black over yellow, white over dark accents — which is the same contrast
-    // rule that once turned the confirm glyph and the FAB dark. There the cure
-    // was baking white pixels and rendering them AlwaysOriginal; for a title,
-    // naming the colour outright is the same move. Nothing rewrites this title
-    // afterwards, so none of the write-ordering machinery that the glyph
-    // flicker needed applies here.
-    NSDictionary* chirpButton = @{
-        NSFontAttributeName : [TwitterChirpFont(TwitterFontStyleBold) fontWithSize:15],
-        NSForegroundColorAttributeName : [UIColor whiteColor]
-    };
-    [self.navigationItem.rightBarButtonItem setTitleTextAttributes:chirpButton
-                                                          forState:UIControlStateNormal];
-    [self.navigationItem.rightBarButtonItem setTitleTextAttributes:chirpButton
-                                                          forState:UIControlStateHighlighted];
+    NSString* searchTitle = [bundle localizedStringForKey:@"ADVSEARCH_SEARCH"];
+    UIFont* searchFont = [TwitterChirpFont(TwitterFontStyleBold) fontWithSize:15];
+    UIImage* bakedTitle = nfbBakedTitleImage(searchTitle, searchFont);
+    if (bakedTitle) {
+        self.navigationItem.rightBarButtonItem = [[UIBarButtonItem alloc]
+            initWithImage:bakedTitle
+                    style:UIBarButtonItemStyleDone
+                   target:self
+                   action:@selector(nfbRunSearch)];
+        // The word is a picture now, so VoiceOver is told what it says.
+        self.navigationItem.rightBarButtonItem.accessibilityLabel = searchTitle;
+    } else {
+        // Only reachable if the bitmap could not be drawn at all; a bar button
+        // with no image would simply be invisible, so the plain title stands in.
+        self.navigationItem.rightBarButtonItem = [[UIBarButtonItem alloc]
+            initWithTitle:searchTitle
+                    style:UIBarButtonItemStyleDone
+                   target:self
+                   action:@selector(nfbRunSearch)];
+        NSDictionary* chirpButton = @{
+            NSFontAttributeName : searchFont,
+            NSForegroundColorAttributeName : [UIColor whiteColor]
+        };
+        [self.navigationItem.rightBarButtonItem setTitleTextAttributes:chirpButton
+                                                              forState:UIControlStateNormal];
+        [self.navigationItem.rightBarButtonItem setTitleTextAttributes:chirpButton
+                                                              forState:UIControlStateHighlighted];
+    }
 
     if (self.presentingViewController
         || self.navigationController.presentingViewController) {
