@@ -583,8 +583,14 @@ static UIImage* nfbBakedTitleImage(NSString* title, UIFont* font) {
         NSFontAttributeName : font,
         NSForegroundColorAttributeName : [UIColor whiteColor]
     };
+    // A capsule built around an image comes out narrower than one built around a
+    // title: measured side by side, 65.3 points against 84.7 for the same word.
+    // The difference is padded back into the bitmap itself, transparently, so
+    // the button keeps the proportions it had before the word became a picture.
+    const CGFloat kSidePadding = 10.0;
     CGSize measured = [title sizeWithAttributes:attributes];
-    CGSize size = CGSizeMake(ceilf((float)measured.width), ceilf((float)measured.height));
+    CGSize size = CGSizeMake(ceilf((float)measured.width) + kSidePadding * 2.0,
+                             ceilf((float)measured.height));
     if (size.width < 1.0 || size.height < 1.0) {
         return nil;
     }
@@ -595,7 +601,7 @@ static UIImage* nfbBakedTitleImage(NSString* title, UIFont* font) {
         [[UIGraphicsImageRenderer alloc] initWithSize:size format:format];
     UIImage* drawn = [renderer
         imageWithActions:^(UIGraphicsImageRendererContext* context) {
-            [title drawAtPoint:CGPointZero withAttributes:attributes];
+            [title drawAtPoint:CGPointMake(kSidePadding, 0.0) withAttributes:attributes];
         }];
     return [drawn imageWithRenderingMode:UIImageRenderingModeAlwaysOriginal];
 }
