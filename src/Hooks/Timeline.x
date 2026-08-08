@@ -352,56 +352,32 @@ static id nfbHardEdgeStyleLike(id currentStyle) {
 // draws the part it has to match. Nothing is added and nothing is matched by
 // hand. The height is converted from the bar rather than written down, so it
 // holds on any device and through rotation.
-// Nineteen attempts have gone at the strip from the effect's side — styling
-// it, stretching it, clamping every geometry channel it has — and the drawn
-// result never followed. His read on it replaces all of that: the bar itself
-// is the one input every derived number follows, so the bar is made taller and
-// iOS is left to redo its own arithmetic. The 34 comes from his view tree:
-// the field ends at 128, the effect stops at 94.
-static const CGFloat kNFBSettingsBarExtraHeight = 34.0;
+// Reading nfbApplyEdgeEffect — at last — settles what the proven channel is:
+// his own hide feature drives the EFFECT OBJECT (topEdgeEffect.setHidden:),
+// never the ScrollEdgeEffect views. Hiding the views, as the last build did,
+// used a channel nothing had ever validated; and the band went into
+// _UIBarBackground, a container iOS keeps inert. Two wrong bets, same build.
+//
+// This one uses neither. Nothing of iOS's is hidden, resized or patched — the
+// strip is simply COVERED. The band lives in the BAR itself, a parent that
+// demonstrably renders (the title and the field are its children), inserted at
+// index zero so everything the bar shows stays above it. The bar draws over
+// the whole table, so the band covers the short fade and the passing content
+// alike; and since it spans the full region in one piece, there is nothing
+// above it left to match — the seam problem is gone by construction. Its
+// geometry is COPIED from _UIBarBackground every pass, never invented: iOS
+// maintains that frame at exactly sheet-top to bar-bottom.
+//
+// The look: the system's thinnest material, pushed toward white by an overlay.
+// His measurements of the strip he wants — 254 neutral over a 255 sheet, with
+// content faintly showing — are a nearly-opaque white with a breath of
+// translucency, and that is what a 0.9 white veil over ultra-thin gives. That
+// constant is the ONE dial on this whole arrangement.
+static const CGFloat kNFBSettingsBandWhiteness = 0.9;
 
-static BOOL nfbBarBelongsToSettingsSheet(UINavigationBar* bar) {
-    UIResponder* responder = bar;
-    while ((responder = responder.nextResponder)) {
-        if ([responder isKindOfClass:[UINavigationController class]]) {
-            UINavigationController* navigation = (UINavigationController*)responder;
-            return navigation.presentingViewController != nil &&
-                   nfbControllerIsSettingsRoot(navigation.viewControllers.firstObject);
-        }
-    }
-    return NO;
-}
-
-// Twenty attempts settle what CAN be done to iOS's own fade. Its view ignores
-// every geometry setter — three of them clamped, and the frame still read 94,
-// which means UIKit writes the layer beneath them. Fighting the compositor is
-// a war this side loses. But ONE mechanism provably sticks on these very
-// classes, in this very tweak: setHidden — it is how hide_scroll_edge_blur
-// clears them on every other screen, and isHidden reads back faithfully. So
-// iOS's short fade is hidden here, and a band of our own replaces it.
-static void nfbHideSettingsEdgeFade(UIScrollView* scrollView) {
-    for (UIView* subview in scrollView.subviews) {
-        if ([NSStringFromClass([subview class]) rangeOfString:@"ScrollEdgeEffect"]
-                .location == NSNotFound) {
-            continue;
-        }
-        if (!subview.hidden) {
-            subview.hidden = YES;
-        }
-    }
-}
-
-// The band goes where his capture points: _UIBarBackground already spans
-// exactly the region — {0, -20, 440, bar height + 20}, from the sheet's top to
-// the bar's bottom — it never scrolls, and everything placed inside it sits
-// beneath the title and the field by construction. It paints nothing itself
-// (black at zero alpha), so the material laid into it IS the bar's look, one
-// uniform surface from top to below the field: nothing above it left to
-// mismatch. Ultra-thin keeps the list guessed through it. If he wants it
-// whiter, the one dial is a white overlay on the material's contentView.
 static const void* kNFBSettingsBarFrostKey = &kNFBSettingsBarFrostKey;
 
-static void nfbLayFrostIntoSettingsBar(UINavigationBar* bar) {
+static void nfbLayBandIntoSettingsBar(UINavigationBar* bar) {
     if (!bar) {
         return;
     }
@@ -415,25 +391,29 @@ static void nfbLayFrostIntoSettingsBar(UINavigationBar* bar) {
     if (!background) {
         return;   // pas encore construit : on retentera au prochain passage
     }
-    UIVisualEffectView* frost = objc_getAssociatedObject(bar, kNFBSettingsBarFrostKey);
-    if (!frost) {
+    UIVisualEffectView* band = objc_getAssociatedObject(bar, kNFBSettingsBarFrostKey);
+    if (!band) {
         UIBlurEffect* material =
             [UIBlurEffect effectWithStyle:UIBlurEffectStyleSystemUltraThinMaterial];
-        frost = [[UIVisualEffectView alloc] initWithEffect:material];
-        frost.userInteractionEnabled = NO;
-        frost.autoresizingMask =
+        band = [[UIVisualEffectView alloc] initWithEffect:material];
+        band.userInteractionEnabled = NO;
+        UIView* veil = [[UIView alloc] init];
+        veil.backgroundColor =
+            [UIColor colorWithWhite:1.0 alpha:kNFBSettingsBandWhiteness];
+        veil.autoresizingMask =
             UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
-        objc_setAssociatedObject(bar, kNFBSettingsBarFrostKey, frost,
+        veil.frame = band.contentView.bounds;
+        [band.contentView addSubview:veil];
+        objc_setAssociatedObject(bar, kNFBSettingsBarFrostKey, band,
                                  OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     }
-    if (frost.superview != background) {
-        [background addSubview:frost];
+    if (band.superview != bar || [bar.subviews indexOfObject:band] != 0) {
+        [bar insertSubview:band atIndex:0];
     }
-    if (!CGRectEqualToRect(frost.frame, background.bounds)) {
-        frost.frame = background.bounds;
+    if (!CGRectEqualToRect(band.frame, background.frame)) {
+        band.frame = background.frame;
     }
 }
-
 static const void* kNFBEdgeStyleWritesKey = &kNFBEdgeStyleWritesKey;
 
 // Two things keep this safe. The setter is only ever called once the runtime has
@@ -456,8 +436,7 @@ static void nfbApplyHardEdgeIfSettingsRoot(UIScrollView* scrollView) {
     if (!nfbControllerIsSettingsRoot(owner)) {
         return;
     }
-    nfbHideSettingsEdgeFade(scrollView);
-    nfbLayFrostIntoSettingsBar(owner.navigationController.navigationBar);
+    nfbLayBandIntoSettingsBar(owner.navigationController.navigationBar);
     id effect = ((id (*)(id, SEL))objc_msgSend)(scrollView, @selector(topEdgeEffect));
     if (!effect ||
         ![effect respondsToSelector:@selector(style)] ||
@@ -530,22 +509,6 @@ static void nfbApplyHardEdgeIfSettingsRoot(UIScrollView* scrollView) {
         nfbApplyEdgeEffect(self, hide);
     } @catch (id exception) {
     }
-}
-
-%end
-
-%hook UINavigationBar
-
-- (CGSize)sizeThatFits:(CGSize)size {
-    CGSize fitted = %orig;
-
-    @try {
-        if (nfbBarBelongsToSettingsSheet(self)) {
-            fitted.height += kNFBSettingsBarExtraHeight;
-        }
-    } @catch (id exception) {
-    }
-    return fitted;
 }
 
 %end
