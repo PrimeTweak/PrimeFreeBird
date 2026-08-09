@@ -971,6 +971,134 @@ static NSSet<NSNumber*>* ConversationAuthorRepliedToUserIDs(NSArray* sections,
     return repliedToUserIDs;
 }
 
+// MARK: - Reading line survey (temporary instrumentation)
+//
+// Measures, on the home timeline only, how many loaded entry IDs survive a
+// full section replace and whether the previously topmost ID is found again.
+// The numbers decide the reading-line design; the block is removed once read.
+
+static NSString* const kNFBReadingSurveyStatsKey = @"nfb_readline_survey";
+static NSString* const kNFBReadingSurveyLogKey = @"nfb_readline_survey_log";
+static const void* kNFBSurveyKnownIDsKey = &kNFBSurveyKnownIDsKey;
+
+static BOOL NFBSurveyIsHomeTimeline(TFNItemsDataViewController* dataViewController) {
+    return IsInHierarchyOfClass(
+        dataViewController,
+        @"_TtC32TwitterHomeFeatureImplementation35HomeTimelineContainerViewController");
+}
+
+// Stale numbers from a previous run are cleared once per launch, so the Lab
+// row always describes the current session.
+static void NFBSurveyClearOncePerLaunch(void) {
+    static BOOL cleared = NO;
+    if (cleared) {
+        return;
+    }
+    cleared = YES;
+    NSUserDefaults* defaults = [NSUserDefaults standardUserDefaults];
+    [defaults removeObjectForKey:kNFBReadingSurveyStatsKey];
+    [defaults removeObjectForKey:kNFBReadingSurveyLogKey];
+}
+
+static NSArray<NSString*>* NFBSurveyEntryIDs(NSArray* sections) {
+    NSMutableArray<NSString*>* entryIDs = [NSMutableArray array];
+    for (id section in sections) {
+        if (![section isKindOfClass:[NSArray class]]) {
+            continue;
+        }
+        for (id item in (NSArray*)section) {
+            NSString* entryID = ItemEntryID(item);
+            if (entryID.length) {
+                [entryIDs addObject:entryID];
+            }
+        }
+    }
+    return entryIDs;
+}
+
+// Pagination and in-place updates extend what is known without counting as a
+// refresh; only a full replace (setSections:) is measured against it.
+static void NFBSurveyMergeKnown(TFNItemsDataViewController* dataViewController,
+                                NSArray* sections) {
+    if (!NFBSurveyIsHomeTimeline(dataViewController)) {
+        return;
+    }
+    NFBSurveyClearOncePerLaunch();
+    NSArray<NSString*>* fresh = NFBSurveyEntryIDs(sections);
+    if (!fresh.count) {
+        return;
+    }
+    NSArray<NSString*>* known =
+        objc_getAssociatedObject(dataViewController, kNFBSurveyKnownIDsKey);
+    if (!known.count) {
+        objc_setAssociatedObject(dataViewController, kNFBSurveyKnownIDsKey, fresh,
+                                 OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        return;
+    }
+    NSMutableArray<NSString*>* merged = [known mutableCopy];
+    NSSet<NSString*>* have = [NSSet setWithArray:known];
+    for (NSString* entryID in fresh) {
+        if (![have containsObject:entryID]) {
+            [merged addObject:entryID];
+        }
+    }
+    objc_setAssociatedObject(dataViewController, kNFBSurveyKnownIDsKey, merged,
+                             OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+}
+
+static void NFBSurveyRecordRefresh(TFNItemsDataViewController* dataViewController,
+                                   NSArray* sections) {
+    if (!NFBSurveyIsHomeTimeline(dataViewController)) {
+        return;
+    }
+    NFBSurveyClearOncePerLaunch();
+    NSArray<NSString*>* fresh = NFBSurveyEntryIDs(sections);
+    NSArray<NSString*>* known =
+        objc_getAssociatedObject(dataViewController, kNFBSurveyKnownIDsKey);
+    objc_setAssociatedObject(dataViewController, kNFBSurveyKnownIDsKey, fresh,
+                             OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    if (!known.count || !fresh.count) {
+        return;   // first load or teardown, not a refresh
+    }
+    NSSet<NSString*>* freshSet = [NSSet setWithArray:fresh];
+    NSUInteger survivors = 0;
+    for (NSString* entryID in known) {
+        if ([freshSet containsObject:entryID]) {
+            survivors++;
+        }
+    }
+    BOOL anchorFound = [freshSet containsObject:known.firstObject];
+
+    static NSUInteger refreshes = 0;
+    static NSUInteger anchorHits = 0;
+    static NSUInteger survivorTotal = 0;
+    static NSUInteger knownTotal = 0;
+    static NSMutableArray<NSString*>* recent = nil;
+    if (!recent) {
+        recent = [NSMutableArray array];
+    }
+    refreshes++;
+    anchorHits += anchorFound ? 1 : 0;
+    survivorTotal += survivors;
+    knownTotal += known.count;
+    [recent addObject:[NSString stringWithFormat:@"%lu/%lu %@",
+                                                 (unsigned long)survivors,
+                                                 (unsigned long)known.count,
+                                                 anchorFound ? @"\u2713" : @"\u2717"]];
+    while (recent.count > 8) {
+        [recent removeObjectAtIndex:0];
+    }
+    NSUserDefaults* defaults = [NSUserDefaults standardUserDefaults];
+    [defaults setObject:[NSString stringWithFormat:
+                            @"%lu refreshes \u00b7 anchor %lu/%lu \u00b7 items %lu/%lu",
+                            (unsigned long)refreshes, (unsigned long)anchorHits,
+                            (unsigned long)refreshes, (unsigned long)survivorTotal,
+                            (unsigned long)knownTotal]
+                 forKey:kNFBReadingSurveyStatsKey];
+    [defaults setObject:[recent componentsJoinedByString:@"  \u00b7  "]
+                 forKey:kNFBReadingSurveyLogKey];
+}
+
 static NSArray* FilteredTimelineSections(TFNItemsDataViewController* dataViewController,
                                          NSArray* sections) {
     BOOL hideWhoToFollow = [BHTSettings boolForKey:@"hide_who_to_follow"];
@@ -1039,6 +1167,7 @@ static NSArray* FilteredTimelineSections(TFNItemsDataViewController* dataViewCon
 %hook TFNItemsDataViewController
 
 - (void)setSections:(NSArray*)sections restoreScrollPosition:(BOOL)restoreScrollPosition {
+    NFBSurveyRecordRefresh(self, sections);
     %orig(FilteredTimelineSections(self, sections), restoreScrollPosition);
 }
 
@@ -1046,6 +1175,7 @@ static NSArray* FilteredTimelineSections(TFNItemsDataViewController* dataViewCon
     reconfigureItemIdentifiers:(NSArray*)identifiers
               withRowAnimation:(long long)animation
                     completion:(id)completion {
+    NFBSurveyMergeKnown(self, sections);
     %orig(FilteredTimelineSections(self, sections), identifiers, animation, completion);
 }
 
