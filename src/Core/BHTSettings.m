@@ -431,7 +431,19 @@ static NSDictionary<NSString*, NSDictionary*>* BHTSettingsPages(void) {
                         @"action": @"clearWebSession:",
                         @"type": @"button"
                     },
-                    @{@"key": @"flex_twitter", @"default": @NO, @"type": @"toggle"}
+                    @{@"key": @"flex_twitter", @"default": @NO, @"type": @"toggle"},
+                    @{
+                        @"type": @"button",
+                        @"titleKey": @"EXPORT_SETTINGS_TITLE",
+                        @"subtitleKey": @"EXPORT_SETTINGS_DETAIL",
+                        @"action": @"showExportSettings:"
+                    },
+                    @{
+                        @"type": @"button",
+                        @"titleKey": @"IMPORT_SETTINGS_TITLE",
+                        @"subtitleKey": @"IMPORT_SETTINGS_DETAIL",
+                        @"action": @"showImportSettings:"
+                    }
                 ]
             },
         };
@@ -567,6 +579,19 @@ static NSDictionary<NSString*, NSDictionary*>* BHTSettingsIndex(void) {
         return [value integerValue];
     }
     return [[self settingForKey:key][@"default"] integerValue];
+}
+
++ (NSArray<NSString*>*)allOptionKeys {
+    NSMutableArray<NSString*>* keys = [NSMutableArray array];
+    for (NSDictionary* page in BHTSettingsPages().allValues) {
+        for (NSDictionary* setting in page[@"settings"]) {
+            NSString* key = setting[@"key"];
+            if (key && ![keys containsObject:key]) {
+                [keys addObject:key];
+            }
+        }
+    }
+    return keys;
 }
 
 @end

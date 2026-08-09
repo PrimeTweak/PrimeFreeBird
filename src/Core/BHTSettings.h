@@ -18,4 +18,8 @@
 + (BOOL)boolForKey:(NSString*)key;
 + (NSInteger)integerForKey:(NSString*)key;
 
+// Every option key the registry declares, across all pages. Rows that only
+// identify a button are included; they simply never carry a stored value.
++ (NSArray<NSString*>*)allOptionKeys;
+
 @end
