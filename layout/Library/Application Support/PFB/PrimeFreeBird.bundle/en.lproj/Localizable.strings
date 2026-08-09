@@ -259,11 +259,19 @@
 
 /* ===== LAB ===== */
 "MODERN_SETTINGS_LAB_TITLE" = "Lab";
-"MODERN_SETTINGS_LAB_SUBTITLE" = "Cutting-edge features and debugging tools.";
+"MODERN_SETTINGS_LAB_SUBTITLE" = "Experimental features, tools, and settings backup.";
 "REPLY_IN_WEBVIEW_TITLE" = "Reply in web view";
 "REPLY_IN_WEBVIEW_DETAIL" = "Open the reply box in a web view to avoid attestation.";
 "FLEX_TWITTER_TITLE" = "Debug mode";
 "FLEX_TWITTER_DETAIL" = "Show the FLEX inspector for Twitter's views and data.";
+"EXPORT_SETTINGS_TITLE" = "Export settings";
+"EXPORT_SETTINGS_DETAIL" = "Save every option, muted word, and colour to a file.";
+"IMPORT_SETTINGS_TITLE" = "Import settings";
+"IMPORT_SETTINGS_DETAIL" = "Restore a saved file. Unknown keys are ignored.";
+"IMPORT_SETTINGS_DONE_TITLE" = "Settings imported";
+"IMPORT_SETTINGS_DONE_MESSAGE" = "%lu settings restored. Restart Twitter to apply everything.";
+"IMPORT_SETTINGS_FAILED_TITLE" = "Import failed";
+"IMPORT_SETTINGS_FAILED_MESSAGE" = "This file is not a PrimeFreeBird settings backup.";
 /* Reply-in-web-view: the reply screen title + the web-session login/clear
    buttons (Lab) and their alerts. */
 "REPLY_WEBVIEW_TITLE" = "Reply";
