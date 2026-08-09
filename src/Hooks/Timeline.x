@@ -974,17 +974,26 @@ static NSSet<NSNumber*>* ConversationAuthorRepliedToUserIDs(NSArray* sections,
     return repliedToUserIDs;
 }
 
-// MARK: - Reading line
+// MARK: - Reading marker
 //
-// A line in the accent colour above the last Tweet read, drawn while that
-// Tweet is still present in the feed. The anchor is the topmost visible row,
+// Marks the last Tweet read, while it is still present in the feed, in one of
+// two states: a thin accent line when the list top is unchanged since the
+// anchor was captured (nothing new to catch up on), and a full-row accent
+// wash when new Tweets sit above it. The anchor is the topmost visible row,
 // captured when the screen is left, when the app backgrounds, and just before
 // a full section replace. A replace that discards the anchor (For You's
-// algorithmic refresh) hides the line rather than guessing a position.
+// algorithmic refresh) hides the marker rather than guessing a position.
 
 static const void* kNFBReadingAnchorIDKey = &kNFBReadingAnchorIDKey;
 static const void* kNFBReadingAnchorPathKey = &kNFBReadingAnchorPathKey;
-static const void* kNFBReadingLineViewKey = &kNFBReadingLineViewKey;
+static const void* kNFBReadingMarkerViewKey = &kNFBReadingMarkerViewKey;
+static const void* kNFBReadingTopAtCaptureKey = &kNFBReadingTopAtCaptureKey;
+static const void* kNFBReadingWashKey = &kNFBReadingWashKey;
+
+// Low enough that the Tweet stays readable through the wash, high enough to
+// spot at a glance.
+static const CGFloat kNFBReadingMarkerAlpha = 0.15;
+static const CGFloat kNFBReadingLineHeight = 2.0;
 static NSHashTable* gNFBReadingControllers = nil;
 
 static BOOL NFBReadingIsHomeTimeline(TFNItemsDataViewController* dataViewController) {
@@ -1011,6 +1020,23 @@ static NSString* NFBReadingTopVisibleEntryID(TFNItemsDataViewController* dataVie
         return nil;
     }
     return ItemEntryID(((NSArray*)section)[top.row]);
+}
+
+// The list's first datable item — the reference for "has anything new
+// arrived above the anchor since it was captured".
+static NSString* NFBReadingFirstEntryID(NSArray* sections) {
+    for (id section in sections) {
+        if (![section isKindOfClass:[NSArray class]]) {
+            continue;
+        }
+        for (id item in (NSArray*)section) {
+            NSString* entryID = ItemEntryID(item);
+            if (entryID.length) {
+                return entryID;
+            }
+        }
+    }
+    return nil;
 }
 
 static NSIndexPath* NFBReadingIndexPathForEntryID(
@@ -1043,17 +1069,22 @@ static void NFBReadingCaptureAnchor(TFNItemsDataViewController* dataViewControll
     if (top.length) {
         objc_setAssociatedObject(dataViewController, kNFBReadingAnchorIDKey, top,
                                  OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        objc_setAssociatedObject(dataViewController, kNFBReadingTopAtCaptureKey,
+                                 NFBReadingFirstEntryID(dataViewController.sections),
+                                 OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     }
 }
 
-// Places (or hides) the line for the current data. The row rect is content-
-// space, so the placed line scrolls with the feed; only data changes move it.
-static void NFBReadingPositionLine(TFNItemsDataViewController* dataViewController) {
+// Places (or hides) the marker for the current data. The row rect is content-
+// space, so the placed wash scrolls with the feed; only data changes move it.
+// It sits above the cell at low alpha — beneath it, the opaque cell would
+// hide it entirely.
+static void NFBReadingPositionMarker(TFNItemsDataViewController* dataViewController) {
     UITableView* table = dataViewController.tableView;
     if (!table) {
         return;
     }
-    UIView* line = objc_getAssociatedObject(table, kNFBReadingLineViewKey);
+    UIView* marker = objc_getAssociatedObject(table, kNFBReadingMarkerViewKey);
     NSString* anchor =
         objc_getAssociatedObject(dataViewController, kNFBReadingAnchorIDKey);
     NSIndexPath* path = [BHTSettings boolForKey:@"reading_line"]
@@ -1062,25 +1093,40 @@ static void NFBReadingPositionLine(TFNItemsDataViewController* dataViewControlle
     objc_setAssociatedObject(table, kNFBReadingAnchorPathKey, path,
                              OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     if (!path) {
-        line.hidden = YES;
+        marker.hidden = YES;
         return;
     }
-    if (!line) {
-        line = [[UIView alloc] init];
-        line.userInteractionEnabled = NO;
-        objc_setAssociatedObject(table, kNFBReadingLineViewKey, line,
+    if (!marker) {
+        marker = [[UIView alloc] init];
+        marker.userInteractionEnabled = NO;
+        objc_setAssociatedObject(table, kNFBReadingMarkerViewKey, marker,
                                  OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     }
+    NSString* topAtCapture =
+        objc_getAssociatedObject(dataViewController, kNFBReadingTopAtCaptureKey);
+    NSString* topNow = NFBReadingFirstEntryID(dataViewController.sections);
+    BOOL wash = topAtCapture.length && topNow.length &&
+                ![topAtCapture isEqualToString:topNow];
+    objc_setAssociatedObject(table, kNFBReadingWashKey, @(wash),
+                             OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     extern UIColor* CurrentAccentColor(void);
-    line.backgroundColor = CurrentAccentColor() ?: [UIColor systemBlueColor];
+    UIColor* accent = CurrentAccentColor() ?: [UIColor systemBlueColor];
     CGRect rowRect = [table rectForRowAtIndexPath:path];
-    line.frame = CGRectMake(0, CGRectGetMinY(rowRect) - 1.0,
-                            CGRectGetWidth(table.bounds), 2.0);
-    if (line.superview != table) {
-        [table addSubview:line];
+    if (wash) {
+        marker.backgroundColor =
+            [accent colorWithAlphaComponent:kNFBReadingMarkerAlpha];
+        marker.frame = rowRect;
+    } else {
+        marker.backgroundColor = accent;
+        marker.frame = CGRectMake(0, CGRectGetMinY(rowRect) - 1.0,
+                                  CGRectGetWidth(table.bounds),
+                                  kNFBReadingLineHeight);
     }
-    line.hidden = NO;
-    [table bringSubviewToFront:line];
+    if (marker.superview != table) {
+        [table addSubview:marker];
+    }
+    marker.hidden = NO;
+    [table bringSubviewToFront:marker];
 }
 
 // Row heights settle after the reload, so the scan waits one runloop turn.
@@ -1092,32 +1138,36 @@ static void NFBReadingRescanSoon(TFNItemsDataViewController* dataViewController)
     dispatch_async(dispatch_get_main_queue(), ^{
         TFNItemsDataViewController* controller = weakController;
         if (controller) {
-            NFBReadingPositionLine(controller);
+            NFBReadingPositionMarker(controller);
         }
     });
 }
 
 // Self-sizing rows shift their rects as cells realise; the layout tick keeps
-// the line on its row from the cached index path, without rescanning.
+// the wash on its row from the cached index path, without rescanning.
 static void NFBReadingLayoutTick(UIScrollView* scrollView) {
-    UIView* line = objc_getAssociatedObject(scrollView, kNFBReadingLineViewKey);
-    if (!line || line.hidden || ![scrollView isKindOfClass:[UITableView class]]) {
+    UIView* marker = objc_getAssociatedObject(scrollView, kNFBReadingMarkerViewKey);
+    if (!marker || marker.hidden || ![scrollView isKindOfClass:[UITableView class]]) {
         return;
     }
     UITableView* table = (UITableView*)scrollView;
     NSIndexPath* path = objc_getAssociatedObject(table, kNFBReadingAnchorPathKey);
     if (!path || path.section >= table.numberOfSections ||
         path.row >= [table numberOfRowsInSection:path.section]) {
-        line.hidden = YES;
+        marker.hidden = YES;
         return;
     }
     CGRect rowRect = [table rectForRowAtIndexPath:path];
-    CGRect frame = CGRectMake(0, CGRectGetMinY(rowRect) - 1.0,
-                              CGRectGetWidth(table.bounds), 2.0);
-    if (!CGRectEqualToRect(line.frame, frame)) {
-        line.frame = frame;
+    BOOL wash =
+        [objc_getAssociatedObject(table, kNFBReadingWashKey) boolValue];
+    CGRect frame = wash ? rowRect
+                        : CGRectMake(0, CGRectGetMinY(rowRect) - 1.0,
+                                     CGRectGetWidth(table.bounds),
+                                     kNFBReadingLineHeight);
+    if (!CGRectEqualToRect(marker.frame, frame)) {
+        marker.frame = frame;
     }
-    [table bringSubviewToFront:line];
+    [table bringSubviewToFront:marker];
 }
 
 // The app backgrounding is the one leave moment no view callback covers.
@@ -1207,11 +1257,15 @@ static NSArray* FilteredTimelineSections(TFNItemsDataViewController* dataViewCon
 %hook TFNItemsDataViewController
 
 - (void)setSections:(NSArray*)sections restoreScrollPosition:(BOOL)restoreScrollPosition {
+    BOOL keepPlace = restoreScrollPosition;
     if (NFBReadingIsHomeTimeline(self)) {
         NFBReadingTrack(self);
         NFBReadingCaptureAnchor(self);
+        // Twitter's own restore flag, forced on the home timeline so a reload
+        // keeps the reading position instead of jumping to the top.
+        keepPlace = YES;
     }
-    %orig(FilteredTimelineSections(self, sections), restoreScrollPosition);
+    %orig(FilteredTimelineSections(self, sections), keepPlace);
     NFBReadingRescanSoon(self);
 }
 
