@@ -439,28 +439,6 @@ extern NSInteger NFBColorThemeScreenVisible;
     [self presentViewController:alert animated:YES completion:nil];
 }
 
-- (void)showReadingSurveyInfo:(NSDictionary*)sender {
-    BHTBundle* bundle = [BHTBundle sharedBundle];
-    NSUserDefaults* defaults = [NSUserDefaults standardUserDefaults];
-    NSString* stats = [defaults stringForKey:@"nfb_readline_survey"]
-                          ?: [bundle localizedStringForKey:@"READING_SURVEY_EMPTY"];
-    NSString* log = [defaults stringForKey:@"nfb_readline_survey_log"];
-    NSString* info = [bundle localizedStringForKey:@"READING_SURVEY_INFO"];
-    NSString* message =
-        log.length ? [NSString stringWithFormat:@"%@\n%@\n\n%@", stats, log, info]
-                   : [NSString stringWithFormat:@"%@\n\n%@", stats, info];
-    UIAlertController* alert = [UIAlertController
-        alertControllerWithTitle:[bundle localizedStringForKey:@"READING_SURVEY_TITLE"]
-                         message:message
-                  preferredStyle:UIAlertControllerStyleAlert];
-    [alert
-        addAction:[UIAlertAction
-                      actionWithTitle:[bundle localizedStringForKey:@"OK_ACTION"]
-                                style:UIAlertActionStyleDefault
-                              handler:nil]];
-    [self presentViewController:alert animated:YES completion:nil];
-}
-
 // MARK: - Web session
 
 // Opens the interactive web login. Harvest + store happens inside; on success a short
