@@ -124,7 +124,7 @@
     }
 
     // A soft floating-card shadow on the non-selected cards (and the locked Home
-    // card) — the elevated look he liked. The selected card is already defined by
+    // card) — the elevated floating look. The selected card is already defined by
     // its accent border, so it stays flat.
     if (!self.fixed && on) {
         self.container.layer.shadowOpacity = 0.0;
