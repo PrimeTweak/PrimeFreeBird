@@ -40,6 +40,8 @@
 - **Quick access from the feed** — an icon in the timeline's top bar adds or removes a filter without leaving your scroll.
 - **Filters that expire** — give a word 24 hours, 7 days or 30 days, or keep it for good.
 - **Precise by default** — whole-word matching, so "cat" never catches "concatenate".
+- **Scope you decide** — filter replies inside conversations too, spare the people you follow, and choose whether reposts count.
+- **A quiet tally** — the page keeps a small count of what it filtered out today.
 
 ## Timeline
 
@@ -87,6 +89,7 @@
 - **No black frame at launch** — the splash dissolves into the timeline instead of cutting to an empty window.
 - **Pull-to-refresh sound works again** — rebuilt for current Twitter versions, where the old hook no longer exists.
 - **Reply composer sits still** — no keyboard bounce, no doubled insets, no login wall.
+- **The settings sheet has a real header** — under Liquid Glass the list showed through beside the search field; the header is a solid bar again, down past the field.
 
 <sub>…on top of the full BHTwitter and NeoFreeBird toolkit.</sub>
 
