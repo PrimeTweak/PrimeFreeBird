@@ -86,7 +86,7 @@ static const CGFloat kRadioCheckSize = 12.0;
     self.nameLabel.textColor = [UIColor whiteColor];
     // A small white check on a FILLED circle. The old checkmark.circle.fill
     // symbol carries its own artwork margins, which made the checked circle
-    // render smaller than the empty ring — his screenshot. Filling radioView
+    // render smaller than the empty ring on screen. Filling radioView
     // itself keeps the checked state at exactly the ring's 22pt.
     UIImage* check = [[UIImage systemImageNamed:@"checkmark"]
         imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate];

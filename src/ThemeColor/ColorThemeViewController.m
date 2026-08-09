@@ -159,7 +159,7 @@ static UIColor* customAccentColorFromDefaults(void);
 
     // "Custom": the exact same pill+radio control as the six options above —
     // neutral grey and unchecked until a custom colour is actually active,
-    // then it wears that colour like any other swatch. (His requests: after a
+    // then it wears that colour like any other swatch. (Required behaviour: after a
     // reset it must look colourless, match the other pills' size, and carry a
     // real selection circle.)
     ColorSwatchControl* customSwatch = [[ColorSwatchControl alloc] init];
@@ -295,8 +295,8 @@ static UIColor* customAccentColorFromDefaults(void);
     [super viewWillAppear:animated];
     NFBColorThemeScreenVisible++;
     // Returning to this screen triggers no bar layout and no refreshSelection,
-    // so a dark glyph Twitter baked while we were away stayed dark — his BLACK
-    // check on return, yellow only. Pass now, and once more after the
+    // so a dark glyph Twitter baked while we were away stayed dark — a black
+    // check on return, accent only elsewhere. Pass now, and once more after the
     // transition has rebuilt the bar item.
     NFBWhitenNavigationBarConfirm(self.navigationController.navigationBar);
     dispatch_async(dispatch_get_main_queue(), ^{
@@ -328,7 +328,7 @@ static UIColor* customAccentColorFromDefaults(void);
     [self.customSwatch setSwatchSelected:customActive];
     // Always available: reset is NOT the same thing as the blue swatch — blue
     // is an ACTIVE accent (blue bird, blue tabs), reset restores the fully
-    // native look (black chrome, iOS-blue confirm). His request.
+    // native look (black chrome, iOS-blue confirm), by design.
     self.resetButton.hidden = NO;
     // Twitter re-bakes the confirm glyph on the runloop AFTER our colour
     // notifications; run the white-bake now and once more next turn so the
