@@ -12,10 +12,11 @@
 #import "Headers/TWHeaders.h"
 #import "Settings/ModernSettingsCells.h"
 #import "MutedWords/MutedWordsViewController.h"
+#import "Core/BHTSettingsBackup.h"
 #import "ThemeColor/Palette.h"
 #import "Hooks/HookHelpers.h"
 
-@interface ModernSettingsPageViewController ()
+@interface ModernSettingsPageViewController () <UIDocumentPickerDelegate>
 @property (nonatomic, copy) NSString* registryPageKey;
 @end
 
@@ -354,6 +355,88 @@ extern NSInteger NFBColorThemeScreenVisible;
 - (void)showMutedWords:(NSDictionary*)sender {
     MutedWordsViewController* editor = [[MutedWordsViewController alloc] init];
     [self.navigationController pushViewController:editor animated:YES];
+}
+
+// MARK: - Settings backup
+
+- (void)showExportSettings:(NSDictionary*)sender {
+    NSData* data = [BHTSettingsBackup exportData];
+    if (!data) {
+        return;
+    }
+    NSString* path = [NSTemporaryDirectory()
+        stringByAppendingPathComponent:@"PrimeFreeBird-settings.json"];
+    NSURL* url = [NSURL fileURLWithPath:path];
+    if (![data writeToURL:url atomically:YES]) {
+        return;
+    }
+    UIActivityViewController* share =
+        [[UIActivityViewController alloc] initWithActivityItems:@[ url ]
+                                          applicationActivities:nil];
+    share.popoverPresentationController.sourceView = self.view;
+    share.popoverPresentationController.sourceRect =
+        CGRectMake(CGRectGetMidX(self.view.bounds),
+                   CGRectGetMidY(self.view.bounds), 1, 1);
+    [self presentViewController:share animated:YES completion:nil];
+}
+
+- (void)showImportSettings:(NSDictionary*)sender {
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+    UIDocumentPickerViewController* picker = [[UIDocumentPickerViewController alloc]
+        initWithDocumentTypes:@[ @"public.json", @"public.plain-text" ]
+                       inMode:UIDocumentPickerModeImport];
+#pragma clang diagnostic pop
+    picker.delegate = self;
+    [self presentViewController:picker animated:YES completion:nil];
+}
+
+- (void)documentPicker:(UIDocumentPickerViewController*)controller
+    didPickDocumentsAtURLs:(NSArray<NSURL*>*)urls {
+    NSURL* url = urls.firstObject;
+    if (!url) {
+        return;
+    }
+    BOOL scoped = [url startAccessingSecurityScopedResource];
+    NSData* data = [NSData dataWithContentsOfURL:url];
+    if (scoped) {
+        [url stopAccessingSecurityScopedResource];
+    }
+    NSInteger applied = [BHTSettingsBackup importData:data];
+    BHTBundle* bundle = [BHTBundle sharedBundle];
+    NSString* title;
+    NSString* message;
+    if (applied < 0) {
+        title = [bundle localizedStringForKey:@"IMPORT_SETTINGS_FAILED_TITLE"];
+        message = [bundle localizedStringForKey:@"IMPORT_SETTINGS_FAILED_MESSAGE"];
+    } else {
+        title = [bundle localizedStringForKey:@"IMPORT_SETTINGS_DONE_TITLE"];
+        message = [NSString
+            stringWithFormat:
+                [bundle localizedStringForKey:@"IMPORT_SETTINGS_DONE_MESSAGE"],
+                (unsigned long)applied];
+        // The same pair Theme.x listens to after a live colour change, so the
+        // restored accent repaints without waiting for the restart.
+        NSNotificationCenter* center = [NSNotificationCenter defaultCenter];
+        [center postNotificationName:@"TFNDynamicColorsWillReloadNotification"
+                              object:nil];
+        [center postNotificationName:@"TFNDynamicColorsDidReloadNotification"
+                              object:nil];
+        [center postNotificationName:
+                    @"TAEColorSettingsDidChangeUserDefaultsNotification"
+                              object:nil];
+        [self.tableView reloadData];
+    }
+    UIAlertController* alert =
+        [UIAlertController alertControllerWithTitle:title
+                                            message:message
+                                     preferredStyle:UIAlertControllerStyleAlert];
+    [alert
+        addAction:[UIAlertAction
+                      actionWithTitle:[bundle localizedStringForKey:@"OK_ACTION"]
+                                style:UIAlertActionStyleDefault
+                              handler:nil]];
+    [self presentViewController:alert animated:YES completion:nil];
 }
 
 // MARK: - Web session
