@@ -15,11 +15,11 @@
 #import "Core/TwitterChirpFont.h"
 #import "Hooks/HookHelpers.h"
 
-// Every row on this screen used to hang off the table's layout margins, which
-// resolve to about 20 points inside a cell and about 8 on the bare view a
-// section header is built from. Headers and their own rows therefore sat on two
-// different verticals, and neither matched the 10 points the rest of the
-// settings uses (ModernSettingsCells). One number, applied everywhere.
+// The table's layout margins resolve to about 20 points inside a cell and
+// about 8 on the bare view a section header is built from, putting headers
+// and their rows on two different verticals — and neither matches the 10
+// points the rest of the settings uses (ModernSettingsCells). One number,
+// applied everywhere.
 static const CGFloat kNFBMutedSideMargin = 10.0;
 
 NSString* const kNFBMutedWordsKey = @"nfb_muted_words";
@@ -340,8 +340,8 @@ extern NSInteger NFBColorThemeScreenVisible;
     return UIModalPresentationNone;
 }
 
-// Height measured from the laid-out table rather than estimated: the first
-// attempt guessed row heights and clipped the last entry.
+// Height measured from the laid-out table rather than estimated, so the last
+// entry is never clipped.
 - (void)updatePreferredSize {
     if (!self.compact) {
         return;
