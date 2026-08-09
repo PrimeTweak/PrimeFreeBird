@@ -346,9 +346,8 @@
 "IMPORT_SETTINGS_DONE_MESSAGE" = "%lu réglages restaurés. Redémarre Twitter pour tout appliquer.";
 "IMPORT_SETTINGS_FAILED_TITLE" = "Échec de l’importation";
 "IMPORT_SETTINGS_FAILED_MESSAGE" = "Ce fichier n’est pas une sauvegarde PrimeFreeBird.";
-"READING_SURVEY_TITLE" = "Relevé ligne de lecture";
-"READING_SURVEY_EMPTY" = "Aucun rafraîchissement enregistré.";
-"READING_SURVEY_INFO" = "Compte combien de publications chargées survivent à chaque rafraîchissement du fil, et si celle du haut est retrouvée. Utilise For You et Following normalement quelques minutes, puis envoie les chiffres. Relance Twitter pour remettre à zéro.";
+"READING_LINE_TITLE" = "Ligne de lecture";
+"READING_LINE_DETAIL" = "Trace une ligne au-dessus du dernier Tweet lu, tant qu’il est encore dans le fil.";
 "INTERFACE_STYLE_DETAIL" = "Liquid Glass est le design translucide d’iOS 26. Standard garde le look plat.";
 "INTERFACE_STYLE_STANDARD" = "Standard";
 "INTERFACE_STYLE_LIQUID_GLASS" = "Liquid Glass";
