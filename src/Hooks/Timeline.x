@@ -199,6 +199,8 @@ static void nfbApplyFleetVisibility(UIView* view) {
 // bar. This option switches that effect off wherever it appears, keeping
 // Liquid Glass everywhere else.
 
+static void NFBReadingLayoutTick(UIScrollView* scrollView);
+
 static const void* kNFBEdgeMarkKey = &kNFBEdgeMarkKey;
 
 // The option is cached: reading NSUserDefaults on every layout pass of every
@@ -380,6 +382,7 @@ static void nfbLayBandIntoSettingsBar(UINavigationBar* bar,
         }
         BOOL marked = objc_getAssociatedObject(self, kNFBEdgeMarkKey) != nil;
         BOOL hide = nfbEdgeHideEnabled();
+        NFBReadingLayoutTick(self);
         if (!marked && (!hide || nfbScrollViewIsModal(self))) {
             return;
         }
@@ -971,132 +974,169 @@ static NSSet<NSNumber*>* ConversationAuthorRepliedToUserIDs(NSArray* sections,
     return repliedToUserIDs;
 }
 
-// MARK: - Reading line survey (temporary instrumentation)
+// MARK: - Reading line
 //
-// Measures, on the home timeline only, how many loaded entry IDs survive a
-// full section replace and whether the previously topmost ID is found again.
-// The numbers decide the reading-line design; the block is removed once read.
+// A line in the accent colour above the last Tweet read, drawn while that
+// Tweet is still present in the feed. The anchor is the topmost visible row,
+// captured when the screen is left, when the app backgrounds, and just before
+// a full section replace. A replace that discards the anchor (For You's
+// algorithmic refresh) hides the line rather than guessing a position.
 
-static NSString* const kNFBReadingSurveyStatsKey = @"nfb_readline_survey";
-static NSString* const kNFBReadingSurveyLogKey = @"nfb_readline_survey_log";
-static const void* kNFBSurveyKnownIDsKey = &kNFBSurveyKnownIDsKey;
+static const void* kNFBReadingAnchorIDKey = &kNFBReadingAnchorIDKey;
+static const void* kNFBReadingAnchorPathKey = &kNFBReadingAnchorPathKey;
+static const void* kNFBReadingLineViewKey = &kNFBReadingLineViewKey;
+static NSHashTable* gNFBReadingControllers = nil;
 
-static BOOL NFBSurveyIsHomeTimeline(TFNItemsDataViewController* dataViewController) {
+static BOOL NFBReadingIsHomeTimeline(TFNItemsDataViewController* dataViewController) {
     return IsInHierarchyOfClass(
         dataViewController,
         @"_TtC32TwitterHomeFeatureImplementation35HomeTimelineContainerViewController");
 }
 
-// Stale numbers from a previous run are cleared once per launch, so the Lab
-// row always describes the current session.
-static void NFBSurveyClearOncePerLaunch(void) {
-    static BOOL cleared = NO;
-    if (cleared) {
-        return;
+// The topmost visible row's entry ID; nil when the table or the item cannot
+// be resolved. Sections that are not item arrays are opaque and skipped.
+static NSString* NFBReadingTopVisibleEntryID(TFNItemsDataViewController* dataViewController) {
+    UITableView* table = dataViewController.tableView;
+    NSIndexPath* top = table.indexPathsForVisibleRows.firstObject;
+    if (!top) {
+        return nil;
     }
-    cleared = YES;
-    NSUserDefaults* defaults = [NSUserDefaults standardUserDefaults];
-    [defaults removeObjectForKey:kNFBReadingSurveyStatsKey];
-    [defaults removeObjectForKey:kNFBReadingSurveyLogKey];
+    NSArray* sections = dataViewController.sections;
+    if (top.section >= (NSInteger)sections.count) {
+        return nil;
+    }
+    id section = sections[top.section];
+    if (![section isKindOfClass:[NSArray class]] ||
+        top.row >= (NSInteger)((NSArray*)section).count) {
+        return nil;
+    }
+    return ItemEntryID(((NSArray*)section)[top.row]);
 }
 
-static NSArray<NSString*>* NFBSurveyEntryIDs(NSArray* sections) {
-    NSMutableArray<NSString*>* entryIDs = [NSMutableArray array];
-    for (id section in sections) {
+static NSIndexPath* NFBReadingIndexPathForEntryID(
+    TFNItemsDataViewController* dataViewController, NSString* target) {
+    if (!target.length) {
+        return nil;
+    }
+    NSArray* sections = dataViewController.sections;
+    for (NSUInteger sectionIndex = 0; sectionIndex < sections.count; sectionIndex++) {
+        id section = sections[sectionIndex];
         if (![section isKindOfClass:[NSArray class]]) {
             continue;
         }
-        for (id item in (NSArray*)section) {
-            NSString* entryID = ItemEntryID(item);
-            if (entryID.length) {
-                [entryIDs addObject:entryID];
+        NSArray* items = section;
+        for (NSUInteger row = 0; row < items.count; row++) {
+            if ([target isEqualToString:ItemEntryID(items[row])]) {
+                return [NSIndexPath indexPathForRow:row inSection:sectionIndex];
             }
         }
     }
-    return entryIDs;
+    return nil;
 }
 
-// Pagination and in-place updates extend what is known without counting as a
-// refresh; only a full replace (setSections:) is measured against it.
-static void NFBSurveyMergeKnown(TFNItemsDataViewController* dataViewController,
-                                NSArray* sections) {
-    if (!NFBSurveyIsHomeTimeline(dataViewController)) {
+static void NFBReadingCaptureAnchor(TFNItemsDataViewController* dataViewController) {
+    if (![BHTSettings boolForKey:@"reading_line"] ||
+        !NFBReadingIsHomeTimeline(dataViewController)) {
         return;
     }
-    NFBSurveyClearOncePerLaunch();
-    NSArray<NSString*>* fresh = NFBSurveyEntryIDs(sections);
-    if (!fresh.count) {
-        return;
-    }
-    NSArray<NSString*>* known =
-        objc_getAssociatedObject(dataViewController, kNFBSurveyKnownIDsKey);
-    if (!known.count) {
-        objc_setAssociatedObject(dataViewController, kNFBSurveyKnownIDsKey, fresh,
+    NSString* top = NFBReadingTopVisibleEntryID(dataViewController);
+    if (top.length) {
+        objc_setAssociatedObject(dataViewController, kNFBReadingAnchorIDKey, top,
                                  OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-        return;
     }
-    NSMutableArray<NSString*>* merged = [known mutableCopy];
-    NSSet<NSString*>* have = [NSSet setWithArray:known];
-    for (NSString* entryID in fresh) {
-        if (![have containsObject:entryID]) {
-            [merged addObject:entryID];
-        }
-    }
-    objc_setAssociatedObject(dataViewController, kNFBSurveyKnownIDsKey, merged,
-                             OBJC_ASSOCIATION_RETAIN_NONATOMIC);
 }
 
-static void NFBSurveyRecordRefresh(TFNItemsDataViewController* dataViewController,
-                                   NSArray* sections) {
-    if (!NFBSurveyIsHomeTimeline(dataViewController)) {
+// Places (or hides) the line for the current data. The row rect is content-
+// space, so the placed line scrolls with the feed; only data changes move it.
+static void NFBReadingPositionLine(TFNItemsDataViewController* dataViewController) {
+    UITableView* table = dataViewController.tableView;
+    if (!table) {
         return;
     }
-    NFBSurveyClearOncePerLaunch();
-    NSArray<NSString*>* fresh = NFBSurveyEntryIDs(sections);
-    NSArray<NSString*>* known =
-        objc_getAssociatedObject(dataViewController, kNFBSurveyKnownIDsKey);
-    objc_setAssociatedObject(dataViewController, kNFBSurveyKnownIDsKey, fresh,
+    UIView* line = objc_getAssociatedObject(table, kNFBReadingLineViewKey);
+    NSString* anchor =
+        objc_getAssociatedObject(dataViewController, kNFBReadingAnchorIDKey);
+    NSIndexPath* path = [BHTSettings boolForKey:@"reading_line"]
+                            ? NFBReadingIndexPathForEntryID(dataViewController, anchor)
+                            : nil;
+    objc_setAssociatedObject(table, kNFBReadingAnchorPathKey, path,
                              OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-    if (!known.count || !fresh.count) {
-        return;   // first load or teardown, not a refresh
+    if (!path) {
+        line.hidden = YES;
+        return;
     }
-    NSSet<NSString*>* freshSet = [NSSet setWithArray:fresh];
-    NSUInteger survivors = 0;
-    for (NSString* entryID in known) {
-        if ([freshSet containsObject:entryID]) {
-            survivors++;
-        }
+    if (!line) {
+        line = [[UIView alloc] init];
+        line.userInteractionEnabled = NO;
+        objc_setAssociatedObject(table, kNFBReadingLineViewKey, line,
+                                 OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     }
-    BOOL anchorFound = [freshSet containsObject:known.firstObject];
+    extern UIColor* CurrentAccentColor(void);
+    line.backgroundColor = CurrentAccentColor() ?: [UIColor systemBlueColor];
+    CGRect rowRect = [table rectForRowAtIndexPath:path];
+    line.frame = CGRectMake(0, CGRectGetMinY(rowRect) - 1.0,
+                            CGRectGetWidth(table.bounds), 2.0);
+    if (line.superview != table) {
+        [table addSubview:line];
+    }
+    line.hidden = NO;
+    [table bringSubviewToFront:line];
+}
 
-    static NSUInteger refreshes = 0;
-    static NSUInteger anchorHits = 0;
-    static NSUInteger survivorTotal = 0;
-    static NSUInteger knownTotal = 0;
-    static NSMutableArray<NSString*>* recent = nil;
-    if (!recent) {
-        recent = [NSMutableArray array];
+// Row heights settle after the reload, so the scan waits one runloop turn.
+static void NFBReadingRescanSoon(TFNItemsDataViewController* dataViewController) {
+    if (!NFBReadingIsHomeTimeline(dataViewController)) {
+        return;
     }
-    refreshes++;
-    anchorHits += anchorFound ? 1 : 0;
-    survivorTotal += survivors;
-    knownTotal += known.count;
-    [recent addObject:[NSString stringWithFormat:@"%lu/%lu %@",
-                                                 (unsigned long)survivors,
-                                                 (unsigned long)known.count,
-                                                 anchorFound ? @"\u2713" : @"\u2717"]];
-    while (recent.count > 8) {
-        [recent removeObjectAtIndex:0];
+    __weak TFNItemsDataViewController* weakController = dataViewController;
+    dispatch_async(dispatch_get_main_queue(), ^{
+        TFNItemsDataViewController* controller = weakController;
+        if (controller) {
+            NFBReadingPositionLine(controller);
+        }
+    });
+}
+
+// Self-sizing rows shift their rects as cells realise; the layout tick keeps
+// the line on its row from the cached index path, without rescanning.
+static void NFBReadingLayoutTick(UIScrollView* scrollView) {
+    UIView* line = objc_getAssociatedObject(scrollView, kNFBReadingLineViewKey);
+    if (!line || line.hidden || ![scrollView isKindOfClass:[UITableView class]]) {
+        return;
     }
-    NSUserDefaults* defaults = [NSUserDefaults standardUserDefaults];
-    [defaults setObject:[NSString stringWithFormat:
-                            @"%lu refreshes \u00b7 anchor %lu/%lu \u00b7 items %lu/%lu",
-                            (unsigned long)refreshes, (unsigned long)anchorHits,
-                            (unsigned long)refreshes, (unsigned long)survivorTotal,
-                            (unsigned long)knownTotal]
-                 forKey:kNFBReadingSurveyStatsKey];
-    [defaults setObject:[recent componentsJoinedByString:@"  \u00b7  "]
-                 forKey:kNFBReadingSurveyLogKey];
+    UITableView* table = (UITableView*)scrollView;
+    NSIndexPath* path = objc_getAssociatedObject(table, kNFBReadingAnchorPathKey);
+    if (!path || path.section >= table.numberOfSections ||
+        path.row >= [table numberOfRowsInSection:path.section]) {
+        line.hidden = YES;
+        return;
+    }
+    CGRect rowRect = [table rectForRowAtIndexPath:path];
+    CGRect frame = CGRectMake(0, CGRectGetMinY(rowRect) - 1.0,
+                              CGRectGetWidth(table.bounds), 2.0);
+    if (!CGRectEqualToRect(line.frame, frame)) {
+        line.frame = frame;
+    }
+    [table bringSubviewToFront:line];
+}
+
+// The app backgrounding is the one leave moment no view callback covers.
+static void NFBReadingTrack(TFNItemsDataViewController* dataViewController) {
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+        gNFBReadingControllers = [NSHashTable weakObjectsHashTable];
+        [[NSNotificationCenter defaultCenter]
+            addObserverForName:UIApplicationDidEnterBackgroundNotification
+                        object:nil
+                         queue:[NSOperationQueue mainQueue]
+                    usingBlock:^(NSNotification* note) {
+                        for (TFNItemsDataViewController* controller in
+                             gNFBReadingControllers.allObjects) {
+                            NFBReadingCaptureAnchor(controller);
+                        }
+                    }];
+    });
+    [gNFBReadingControllers addObject:dataViewController];
 }
 
 static NSArray* FilteredTimelineSections(TFNItemsDataViewController* dataViewController,
@@ -1167,16 +1207,30 @@ static NSArray* FilteredTimelineSections(TFNItemsDataViewController* dataViewCon
 %hook TFNItemsDataViewController
 
 - (void)setSections:(NSArray*)sections restoreScrollPosition:(BOOL)restoreScrollPosition {
-    NFBSurveyRecordRefresh(self, sections);
+    if (NFBReadingIsHomeTimeline(self)) {
+        NFBReadingTrack(self);
+        NFBReadingCaptureAnchor(self);
+    }
     %orig(FilteredTimelineSections(self, sections), restoreScrollPosition);
+    NFBReadingRescanSoon(self);
 }
 
 - (void)updateSections:(NSArray*)sections
     reconfigureItemIdentifiers:(NSArray*)identifiers
               withRowAnimation:(long long)animation
                     completion:(id)completion {
-    NFBSurveyMergeKnown(self, sections);
     %orig(FilteredTimelineSections(self, sections), identifiers, animation, completion);
+    NFBReadingRescanSoon(self);
+}
+
+- (void)viewWillAppear:(BOOL)animated {
+    %orig;
+    NFBReadingRescanSoon(self);
+}
+
+- (void)viewWillDisappear:(BOOL)animated {
+    NFBReadingCaptureAnchor(self);
+    %orig;
 }
 
 %end
