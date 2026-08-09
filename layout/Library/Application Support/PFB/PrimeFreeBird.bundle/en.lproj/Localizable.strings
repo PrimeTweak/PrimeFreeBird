@@ -272,8 +272,8 @@
 "IMPORT_SETTINGS_DONE_MESSAGE" = "%lu settings restored. Restart Twitter to apply everything.";
 "IMPORT_SETTINGS_FAILED_TITLE" = "Import failed";
 "IMPORT_SETTINGS_FAILED_MESSAGE" = "This file is not a PrimeFreeBird settings backup.";
-"READING_LINE_TITLE" = "Reading line";
-"READING_LINE_DETAIL" = "Draws a line above the last Tweet you read, wherever it still sits in the feed.";
+"READING_LINE_TITLE" = "Reading marker";
+"READING_LINE_DETAIL" = "Marks the last Tweet you read: a thin line normally, a full accent highlight when new Tweets sit above it.";
 /* Reply-in-web-view: the reply screen title + the web-session login/clear
    buttons (Lab) and their alerts. */
 "REPLY_WEBVIEW_TITLE" = "Reply";
