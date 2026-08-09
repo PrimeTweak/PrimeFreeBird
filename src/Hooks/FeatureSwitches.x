@@ -52,11 +52,11 @@ static NSNumber* FeatureSwitchOverrideValueForKey(NSString* key) {
         return nil;
     }
 
-    // Share sheet au screenshot : vaincre le plafond "3 fois puis cooldown".
-    // Twitter met le prompt en cooldown apres max_dismisses rejets dans une
-    // fenetre ; on force ce max a l'infini (le cooldown ne se declenche jamais)
-    // et la duree de cooldown a 0 (efface tout cooldown deja actif). Seulement
-    // quand l'utilisateur veut la feuille (toggle no_screenshot_detection OFF).
+    // Screenshot share sheet: Twitter puts the prompt on cooldown after
+    // max_dismisses dismissals within a window. Force that max to infinity (the
+    // cooldown never triggers) and the cooldown duration to 0 (clears any
+    // cooldown already active) — only while the user wants the sheet
+    // (no_screenshot_detection OFF).
     if (![BHTSettings boolForKey:@"no_screenshot_detection"]) {
         if ([key isEqualToString:@"ios_consideration_share_cooldown_max_dismisses"]) {
             return @(1000000);
@@ -207,10 +207,6 @@ static NSNumber* FeatureSwitchOverrideValueForKey(NSString* key) {
     // ships as YES, with a 720-minute window). Answering NO removes the
     // expiry, so the tab you picked — Following — is still there tomorrow.
     // Off, we answer nothing at all and Twitter's 12-hour rule applies again.
-    //
-    // This used to be short-circuited: an unconditional NO sat earlier in
-    // this function, so the tab was always sticky and this toggle did
-    // nothing. That block is gone; the switch below is the only one now.
     if ([key isEqualToString:@"home_timeline_non_sticky_tab_on_new_session_enabled"]) {
         return [BHTSettings boolForKey:@"force_following_tab"] ? @NO : nil;
     }

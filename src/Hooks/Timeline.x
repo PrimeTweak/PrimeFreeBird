@@ -139,8 +139,7 @@ static void SyncHomeAddTabButton(id container, BOOL hidden) {
 static const void* kNFBFleetHiddenKey = &kNFBFleetHiddenKey;
 
 // Plain C rather than a %new method: a %new selector isn't known to the
-// compiler when it's called through an id handle, which is exactly what broke
-// the previous build.
+// compiler when called through an id handle.
 static void nfbApplyFleetVisibility(UIView* view) {
     // Restore what we hid: without this the bar stays gone after the option is
     // switched back off, until the app is relaunched. We only ever restore a
@@ -195,17 +194,10 @@ static void nfbApplyFleetVisibility(UIView* view) {
 
 // MARK: - Scroll edge effect
 //
-// Native Twitter never shows a band under its bars — he checked against a
-// clean IPA. The band exists only because this tweak makes the app opt INTO
-// the iOS 26 design (AppLifecycle.x lies about UIDesignRequiresCompatibility
-// so Liquid Glass turns on), and iOS 26 draws a scroll edge effect under every
-// bar. So it appears on the timeline, on search, everywhere — which is exactly
-// what he observed.
-//
-// The option therefore switches that effect off wherever it appears, giving
-// back the stock behaviour while keeping Liquid Glass everywhere else. Earlier
-// versions only targeted the home timeline's scroll view, which is why they
-// never caught it.
+// Stock Twitter opts out of the iOS 26 design; this tweak opts back in
+// (AppLifecycle.x), and iOS 26 then draws a scroll edge effect under every
+// bar. This option switches that effect off wherever it appears, keeping
+// Liquid Glass everywhere else.
 
 static const void* kNFBEdgeMarkKey = &kNFBEdgeMarkKey;
 
@@ -294,84 +286,20 @@ static BOOL nfbControllerIsSettingsRoot(UIViewController* controller) {
     return NO;
 }
 
-// A scroll edge effect's style is an OBJECT, not an enum. That is not a guess:
-// an earlier attempt passed the integer 2 to setStyle:, UIKit retained it, and
-// the crash report shows objc_retain dereferencing address 0x2. So the hard
-// style is asked of the style's own class rather than invented — every no-
-// argument class method returning an object is examined, and the one whose name
-// carries "hard" is used, after checking the value really is a style. Nothing is
-// assumed about numbering, ordering, or naming beyond that one word, and if
-// nothing matches the screen is left exactly as it was.
-static id nfbHardEdgeStyleLike(id currentStyle) {
-    if (!currentStyle) {
-        return nil;
-    }
-    Class styleClass = [currentStyle class];
-    unsigned int count = 0;
-    Method* methods = class_copyMethodList(object_getClass(styleClass), &count);
-    if (!methods) {
-        return nil;
-    }
-    id found = nil;
-    for (unsigned int i = 0; i < count && !found; i++) {
-        if (method_getNumberOfArguments(methods[i]) != 2) {
-            continue;   // on ne veut que les +foo, sans argument
-        }
-        char returnType[8] = {0};
-        method_getReturnType(methods[i], returnType, sizeof(returnType));
-        if (returnType[0] != '@') {
-            continue;
-        }
-        SEL selector = method_getName(methods[i]);
-        NSString* name = [NSStringFromSelector(selector) lowercaseString];
-        if (![name hasPrefix:@"hard"]) {
-            continue;
-        }
-        id candidate = ((id (*)(id, SEL))objc_msgSend)(styleClass, selector);
-        if ([candidate isKindOfClass:styleClass]) {
-            found = candidate;
-        }
-    }
-    free(methods);
-    return found;
-}
-
-// The view tree finally names it, and it was never where I was looking. The
-// frosted strip is not drawn by the navigation bar: _UIBarBackground reads as
-// #000000 at zero alpha, so it paints nothing at all. What draws it lives
-// INSIDE the table, as two of its own subviews — a UIKit.ScrollEdgeEffectView
-// and its backdrop, both {0, 0, 440, 94}.
+// An opaque-ish band in the settings sheet's navigation bar, spanning the
+// header zone from the sheet's top to the bar's bottom — under the title and
+// the search field, over the list. iOS 26 draws that zone as a scroll edge
+// effect that stops partway down the search field, and the effect's views
+// ignore UIView-level geometry setters, so the strip is covered rather than
+// resized.
 //
-// Ninety-four points. The navigation bar ends at 128, and the search field ends
-// with it. The effect is thirty-four points short, and that is the whole
-// problem. It is also why the boundary sat in the same place through every
-// attempt: none of them ever touched these two views.
-//
-// Stretching them to the bar's own bottom edge reproduces the strip above
-// exactly — same view, same material, same tone — because it IS the view that
-// draws the part it has to match. Nothing is added and nothing is matched by
-// hand. The height is converted from the bar rather than written down, so it
-// holds on any device and through rotation.
-// His two screenshots close the case. The band IS in the right place — the
-// blue rectangle covers the header zone to the pixel — so after twenty-one
-// builds the pose is finally proven, by his own captures. What remained were
-// two defects, and both trace to exact lines.
-//
-// The BLUE: Theme.x's confirm treatment (NFBTintConfirmGlassBlue) repaints
-// every UIVisualEffectView it finds under the confirm platter's resolved
-// subtree, recursively, and that resolution can land on a container wide
-// enough to include the whole bar. The band was a UIVisualEffectView, so it
-// was captured — tinted, backgrounded and capped in system blue. A plain
-// UIView fails the isKindOfClass test by nature and cannot be captured. At 0.9
-// opacity the blur contributed nothing visible anyway: the look is the same
-// near-opaque white with a breath of the list showing through, and through
-// systemBackground it follows dark mode on its own.
-//
-// The LATE APPEARANCE: installation was driven by the TABLE's layout. On a
-// fresh open the table settles before the bar background exists, the guard
-// bails — and a settled table does not lay out again until a scroll or a
-// push, which is exactly when the band used to pop in. Driven from the BAR's
-// own lifecycle instead, the first display is covered.
+// A plain UIView, not a UIVisualEffectView: the confirm-button treatment in
+// Theme.x repaints every UIVisualEffectView under the platter's resolved
+// subtree, which can span the whole bar. Installed from the BAR's layout, not
+// the table's: the table can settle before the bar background exists and then
+// not lay out again until a scroll or a push. The frame is copied from
+// _UIBarBackground each pass, so it holds on any device and through rotation;
+// systemBackground at 0.9 reads as near-opaque white and follows dark mode.
 static const CGFloat kNFBSettingsBandWhiteness = 0.9;
 
 static const void* kNFBSettingsBarBandKey = &kNFBSettingsBarBandKey;
@@ -401,7 +329,7 @@ static void nfbLayBandIntoSettingsBar(UINavigationBar* bar,
         }
     }
     if (!background) {
-        return;   // pas encore construit : la barre repassera par layoutSubviews
+        return;   // not built yet; the bar will lay out again
     }
     UIView* band = objc_getAssociatedObject(bar, kNFBSettingsBarBandKey);
     if (!band) {
@@ -418,8 +346,8 @@ static void nfbLayBandIntoSettingsBar(UINavigationBar* bar,
     if (!CGRectEqualToRect(band.frame, background.frame)) {
         band.frame = background.frame;
     }
-    // Seule la racine porte le champ de recherche; les pages poussées gardent
-    // leur barre telle quelle.
+    // Only the root page carries the search field; pushed pages keep their
+    // bar untouched.
     BOOL onRoot =
         navigation.topViewController == navigation.viewControllers.firstObject;
     if (band.hidden == onRoot) {
@@ -427,72 +355,13 @@ static void nfbLayBandIntoSettingsBar(UINavigationBar* bar,
     }
 }
 
-static const void* kNFBEdgeStyleWritesKey = &kNFBEdgeStyleWritesKey;
-
-// Two things keep this safe. The setter is only ever called once the runtime has
-// confirmed it takes an object — the check that was missing when this crashed —
-// and the writes are capped, so no chain of write, relayout, write can run away
-// even if the value refuses to stick.
-//
-// The cap is carried by the EFFECT, not by the scroll view. Counting on the
-// scroll view was what undid the whole thing when the header widened: the extra
-// layout passes that the safe-area change triggers spent the budget, iOS then
-// handed the scroll view a fresh effect object, and there was nothing left to
-// style it with — the bar quietly went back to its gradient. A new object is a
-// new subject and gets its own budget; a runaway loop still hammers one object
-// and is still stopped after three.
-static void nfbApplyHardEdgeIfSettingsRoot(UIScrollView* scrollView) {
-    if (![scrollView respondsToSelector:@selector(topEdgeEffect)]) {
-        return;   // avant iOS 26 : rien à faire
-    }
-    UIViewController* owner = nfbOwningController(scrollView);
-    if (!nfbControllerIsSettingsRoot(owner)) {
-        return;
-    }
-    id effect = ((id (*)(id, SEL))objc_msgSend)(scrollView, @selector(topEdgeEffect));
-    if (!effect ||
-        ![effect respondsToSelector:@selector(style)] ||
-        ![effect respondsToSelector:@selector(setStyle:)]) {
-        return;
-    }
-    NSNumber* writes = objc_getAssociatedObject(effect, kNFBEdgeStyleWritesKey);
-    if (writes.integerValue >= 3) {
-        return;
-    }
-    // respondsToSelector: proves the selector exists, never what it expects.
-    NSMethodSignature* getter = [effect methodSignatureForSelector:@selector(style)];
-    NSMethodSignature* setter = [effect methodSignatureForSelector:@selector(setStyle:)];
-    if (!getter || !setter || setter.numberOfArguments != 3) {
-        return;
-    }
-    const char* returnType = getter.methodReturnType;
-    const char* argumentType = [setter getArgumentTypeAtIndex:2];
-    if (!returnType || returnType[0] != '@' || !argumentType || argumentType[0] != '@') {
-        return;
-    }
-    id current = ((id (*)(id, SEL))objc_msgSend)(effect, @selector(style));
-    id hard = nfbHardEdgeStyleLike(current);
-    if (!hard || hard == current) {
-        return;
-    }
-    objc_setAssociatedObject(effect, kNFBEdgeStyleWritesKey,
-                             @(writes.integerValue + 1),
-                             OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-    ((void (*)(id, SEL, id))objc_msgSend)(effect, @selector(setStyle:), hard);
-}
-
 - (void)didMoveToWindow {
     %orig;
 
     @try {
-        if (!self.window) {
-            return;
+        if (self.window && !nfbScrollViewIsModal(self)) {
+            nfbApplyEdgeEffect(self, nfbEdgeHideEnabled());
         }
-        if (nfbScrollViewIsModal(self)) {
-            nfbApplyHardEdgeIfSettingsRoot(self);
-            return;
-        }
-        nfbApplyEdgeEffect(self, nfbEdgeHideEnabled());
     } @catch (id exception) {
     }
 }
@@ -511,11 +380,7 @@ static void nfbApplyHardEdgeIfSettingsRoot(UIScrollView* scrollView) {
         }
         BOOL marked = objc_getAssociatedObject(self, kNFBEdgeMarkKey) != nil;
         BOOL hide = nfbEdgeHideEnabled();
-        if (!marked && nfbScrollViewIsModal(self)) {
-            nfbApplyHardEdgeIfSettingsRoot(self);
-            return;
-        }
-        if (!marked && !hide) {
+        if (!marked && (!hide || nfbScrollViewIsModal(self))) {
             return;
         }
         nfbApplyEdgeEffect(self, hide);
@@ -646,9 +511,8 @@ static long long ItemInReplyToUserID(id viewModel) {
     return ((long long (*)(id, SEL))objc_msgSend)(viewModel, selector);
 }
 
-// Twitter's *ByCurrentAccountState fields are a tri-state (0 unknown, 1 yes,
-// 2 no); if follows still get hidden, flip this to the value logged for a
-// known-followed account.
+// Twitter's *ByCurrentAccountState fields are a tri-state
+// (0 unknown, 1 yes, 2 no).
 static const NSInteger kFollowedByCurrentAccountStateFollowing = 1;
 
 static BOOL BHShouldHideVerifiedItem(id viewModel, BOOL inConversation,

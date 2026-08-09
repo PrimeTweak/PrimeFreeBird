@@ -111,10 +111,10 @@ static NSArray* sectionsByInsertingEntry(TFNItemsDataViewController* settingsVC,
                                          NSArray* sections) {
     NSMutableArray* newSections = [sections mutableCopy] ?: [NSMutableArray array];
     TFNSettingsNavigationItem* entry = makePrimeFreeBirdSettingsItem(settingsVC);
-    // Every sweep and dump proved there is NO hairline view or layer anywhere
-    // near the boundary — the "separator" he kept seeing is the grouped
-    // table's SECTION SEAM, created by injecting the row as its own section at
-    // index 0. Joining Twitter's first section removes the seam structurally:
+    // The apparent "separator" under this row is the grouped table's SECTION
+    // SEAM, created by injecting the row as its own section at index 0 — not a
+    // hairline view. Joining Twitter's first section removes the seam
+    // structurally:
     // the row's bottom edge becomes an ordinary intra-section boundary, drawn
     // (or not drawn) exactly like the native rows below it.
     if (newSections.count > 0 && [newSections[0] isKindOfClass:[NSArray class]]) {

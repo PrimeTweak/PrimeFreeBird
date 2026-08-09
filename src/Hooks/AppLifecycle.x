@@ -343,7 +343,7 @@ static UIImage* launchBirdImage(CGFloat side) {
 
 %end
 
-// The black frame he sees comes at the END, not the start: the splash is torn
+// The black frame comes at the END, not the start: the splash is torn
 // down before the timeline has drawn, and a window with no background colour
 // is black. Painting the window blue fills exactly that gap, and letting the
 // splash fade out rather than cutting hides the seam.

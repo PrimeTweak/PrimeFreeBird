@@ -393,30 +393,26 @@ static BOOL NFBEffectInstallAllowed;
 static char kNFBFABGlassShadowTintKey;
 // The opaque colour cap inside the material's contentView. Snapshots render
 // glass materials blank-white — the transition copies iOS draws during tab
-// changes — while plain layers snapshot correctly. With the live view now
-// PROVEN to hold our tinted effect permanently (his 08:14 log: one swallow per
-// transition, zero churn) and the flash still showing, the snapshot is the
-// last standing explanation.
+// changes — while plain layers snapshot correctly, so the cap is what keeps
+// the snapshot coloured.
 static char kNFBFABGlassCapKey;
 // Tag for the FAB's glass material so the layout guard below can re-assert its
-// colour the instant anything clears it — and log that it happened.
+// colour the instant anything clears it.
 static char kNFBFABGlassKey;
 
-// One place to colour the FAB's glass — three layers, because his log proved
-// the colour is never CLEARED during transitions, so the white frame must be
-// the system re-rendering the material itself:
+// One place to colour the FAB's glass — three layers, because the system can
+// re-render the material itself during transitions:
 // 1. the effect's own tint when the runtime exposes one (the native Liquid
 //    Glass path — lives INSIDE the material, survives its animations),
 // 2. the effect view's backgroundColor (a plain layer that renders even when
 //    the material is snapshotted or drawn blank),
 // 3. the contentView colour (the original approach, kept).
 static void NFBColorFABGlass(UIVisualEffectView* effect, UIColor* blue) {
-    // The A/B across his last two builds settled it: continuous re-tinting is
-    // what suppressed the WHITE flash (an untinted material renders opaque
-    // light, covering even the coloured background beneath), while the
-    // ANIMATED rebuild caused by each effect re-assignment is what flashed the
-    // glyph BLACK. So: keep the material tinted at all times, but re-assign
-    // only on an actual mismatch and with all implicit animation disabled.
+    // Keep the material tinted at all times (an untinted material renders
+    // opaque light, covering even the coloured background beneath), but
+    // re-assign only on an actual mismatch and with all implicit animation
+    // disabled — each effect re-assignment triggers an animated rebuild that
+    // flashes the glyph black.
     // The setEffect: hook below handles the system's own re-installs, so this
     // path should stay quiet outside launch.
     UIVisualEffect* fx = effect.effect;
@@ -713,8 +709,8 @@ static void nfbApplyComposeFABVisibility(UIView* fab) {
 // that remains. Colour it the instant it enters a window, same transaction.
 %hook UIVisualEffectView
 
-// The system periodically re-installs the material's effect during
-// transitions (his 21:23 log: one reset per tab change). Tinting the INCOMING
+// The system re-installs the material's effect on each tab transition.
+// Tinting the INCOMING
 // effect right here means the reset itself installs a coloured material — no
 // extra assignment from us, no rebuild of our own, no untinted frame.
 - (void)setEffect:(UIVisualEffect*)effect {
@@ -730,10 +726,9 @@ static void nfbApplyComposeFABVisibility(UIView* fab) {
             %orig;
             return;
         }
-        // The system's per-transition re-install IS the flash (a pre-tinted
-        // incoming effect still flashed) — swallow it when nothing changes.
-        // No in-place mutation here: self.effect returns a copy, mutating it
-        // was a proven no-op.
+        // The per-transition re-install triggers the animated rebuild —
+        // swallow it when nothing changes. No in-place mutation here:
+        // self.effect returns a copy, so mutating it is a no-op.
         UIVisualEffect* current = self.effect;
         if (current && [current class] == [effect class]) {
             return;
@@ -768,11 +763,8 @@ static void nfbApplyComposeFABVisibility(UIView* fab) {
     }
 }
 
-// Something in the glass pipeline still shows one white frame during tab
-// transitions (standard mode is clean — his report). If anything clears the
-// tagged material's colour mid-transition, this re-asserts it within the same
-// layout pass AND logs the event, so the diagnostics can finally name the
-// culprit.
+// If anything clears the tagged material's colour mid-transition, this
+// re-asserts it within the same layout pass.
 - (void)layoutSubviews {
     %orig;
     if (!objc_getAssociatedObject(self, &kNFBFABGlassKey)) {

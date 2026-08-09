@@ -171,8 +171,8 @@ static char kCopyProviderKey;
 
 // MARK: - Open profiles on a chosen tab
 
-// No guesswork here: the Objective-C metadata in the decrypted binary was
-// parsed to find who really owns this. T1ProfileDisplayContentProvider carries
+// From the Objective-C metadata in the app binary:
+// T1ProfileDisplayContentProvider carries
 // initialTabIndex and setInitialTabIndex:, and its subclass exposes one entry
 // per tab — allPostsEntry, tweetsAndRepliesEntry, highlightsEntry,
 // articlesEntry, photoEntry, videoEntry.
@@ -237,11 +237,9 @@ static NSInteger nfbProfileTabIndex(id provider, NSInteger fallback) {
     return index == NSNotFound ? fallback : (NSInteger)index;
 }
 
-// The provider only *describes* the tabs; the controller is what selects one.
-// Forcing initialTabIndex and defaultMainContentEntry changed nothing because
-// neither is consulted at that moment — T1ProfileViewController owns
-// _t1_selectMainEntry:, and asking it directly is what actually moves the
-// profile. Read off the class's method table, not guessed.
+// The provider only *describes* the tabs; the controller is what selects
+// one. T1ProfileViewController owns _t1_selectMainEntry:, and asking it
+// directly is what actually moves the profile.
 
 static const void* kNFBTabAppliedKey = &kNFBTabAppliedKey;
 
@@ -343,10 +341,9 @@ static const void* kNFBTabAppliedKey = &kNFBTabAppliedKey;
 
 // MARK: - Expand bios
 
-// No more "Show more" on a truncated bio. The binary's metadata settled what I
-// had first guessed wrong: T1ProfileUserInfoView holds _bioExpanded, a plain
-// BOOL paired with a tap recogniser, and exposes it as isBioExpanded /
-// setBioExpanded:. That is the inline truncation.
+// No more "Show more" on a truncated bio. T1ProfileUserInfoView holds
+// _bioExpanded, a plain BOOL paired with a tap recogniser, and exposes it as
+// isBioExpanded / setBioExpanded:. That is the inline truncation.
 //
 // It is NOT _expandedBioButton, which belongs to the Premium long bio and
 // opens a modal — forcing that one would pop a sheet on every profile.

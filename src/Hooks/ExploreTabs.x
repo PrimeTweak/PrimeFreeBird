@@ -2,17 +2,14 @@
 //  ExploreTabs.x
 //  PrimeFreeBird
 //
-//  Granular Explore tabs — FINAL ARCHITECTURE (data-source remap).
+//  Granular Explore tabs — data-source remap.
 //
-//  Every earlier revision fought the SYMPTOMS: the pager kept all 5 pages and
-//  we corrected gestures around the hidden ones (rewrites, taps, deferred
-//  animations). Measured result: there is no artifact-free way to steer a
-//  5-page pager around pages the user must never see.
-//
-//  This version removes the CAUSE. The pager's own data source
+//  Steering a 5-page pager around hidden pages (gesture rewrites, deferred
+//  animations) cannot be made artifact-free, so the page set itself is
+//  reduced. The pager's own data source
 //  (TFNUISwift.PagingViewController — its collectionView:numberOfItemsInSection:
-//  and cellForItemAtIndexPath: are ObjC protocol methods, hookable; verified at
-//  runtime) is remapped so the collection REALLY contains only the kept pages:
+//  and cellForItemAtIndexPath: are ObjC protocol methods, hookable) is
+//  remapped so the collection REALLY contains only the kept pages:
 //
 //    numberOfItemsInSection  -> kept count (N)
 //    cellForItemAtIndexPath  -> remapped item translated to the ABSOLUTE tab
@@ -56,12 +53,11 @@
 //  change triggers ONE pager reloadData (+ offset clamp) so the page set
 //  matches immediately.
 //
-//  Two measured failure modes are closed structurally: (1) STARTUP ORDER —
-//  the pager's data source can be interrogated before the bar exists (scope
-//  unknowable), which used to leave 5 absolute pages for the whole session;
-//  the candidate is now remembered on every pass, and the bar's first filter
-//  run captures it, reloads, and re-expresses the current page in remapped
-//  coordinates. (2) BAR OVERWRITE — the bar's INNER collection re-lays cells
+//  Two failure modes are closed structurally: (1) STARTUP ORDER — the
+//  pager's data source can be interrogated before the bar exists (scope
+//  unknowable); the candidate is remembered on every pass, and the bar's
+//  first filter run captures it, reloads, and re-expresses the current page
+//  in remapped coordinates. (2) BAR OVERWRITE — the bar's INNER collection re-lays cells
 //  to native positions on its own layout passes; the filter now re-applies
 //  after every such pass (identity-guarded), so the packed row cannot be
 //  overwritten for more than one pass.
@@ -594,12 +590,11 @@ static void nfbApplyTabFilter(UIView* bar, UICollectionView* cv) {
     return %orig(collectionView, absPath);
 }
 
-// Underline ticks. Measured: bar layout passes stop before the fine end of a
-// deceleration, so the glide used to park 15-55px short until an unrelated
-// layout (the bold change) finished the job. If this class implements
+// Underline ticks. Bar layout passes stop before the fine end of a
+// deceleration, which parks the glide short of the target. If this class implements
 // scrollViewDidScroll: we get a tick on EVERY offset change (perfect 60fps
 // glide + exact landing); if it does not, Logos installs nothing and the two
-// settle callbacks below (proven hookable) still give an immediate exact
+// settle callbacks below still give an immediate exact
 // placement the moment any gesture or animation ends.
 - (void)scrollViewDidScroll:(id)scrollView {
     %orig;

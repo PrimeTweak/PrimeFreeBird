@@ -121,15 +121,15 @@ static NSString* const ReplyTapDismissScript =
 // (François's spec): the reply box stays IN FLOW with the tweet — never docked, never restyled.
 // Keyboard UP → clear any Show-more pin, then vfix(): a WIDTH-SAFE vertical collapse of the field
 // (min-height:0 + height:auto everywhere; flex-grow:0 ONLY on column-direction parents so a row's
-// width flex is never touched — that row-flex kill was the earlier blank-field bug; plus a
+// width flex is never touched (killing a row's flex blanks the field); plus a
 // max-height cap on the field if still tall). This removes the ~700px x.com reserves under the
 // focused field, which was pushing the tweet far above the composer. Then place() runs
 // IMMEDIATELY — trim + geometry report + scroll aligning the field's bottom just above the
 // keyboard — and re-asserts at +60/+250ms. The re-asserts are idempotent no-ops once geometry is
 // settled (trim: trail already <=24; nfbGeo: excess already <=8; scrollTo: same target), so they
-// can never fight or vibrate. v2.2: this used to be ONE deferred (+250ms) block, which left
-// WebKit's instant (un-animated, see CALayer hook) placement visible for 250ms — the residual
-// top-bounce. Keyboard DOWN (Show more) →
+// can never fight or vibrate. place() runs immediately, not deferred: a deferred-only pass
+// leaves WebKit's instant, un-animated placement (see CALayer hook) visible until it runs.
+// Keyboard DOWN (Show more) →
 // unchanged, confirmed-good: content fits → composer in flow under the tweet; overflows → pinned
 // to the screen bottom.
 static NSString* const ReplyBarPinScript =
@@ -216,9 +216,9 @@ static BOOL gNFBDidRequestFocus = NO;
 static CGFloat gNFBLastKbOverlap = 0;
 
 static __weak UIScrollView* gNFBReplyScroller = nil;   // identity for the CALayer hook
-// THE FIX (named-object, not a guess): the reveal is a CABasicAnimation on the scroll view layer's
-// bounds.origin (from {0,-173} to {0,0}, 0.25s) — proven by the diag panel. During the keyboard-up
-// window we drop exactly that animation when WebKit tries to add it. Counter proves it fired.
+// The reveal is a CABasicAnimation on the scroll view layer's bounds.origin
+// (from {0,-173} to {0,0}, 0.25s). During the keyboard-up window we drop exactly
+// that animation when WebKit tries to add it; the counter records that it fired.
 static int gNFBAnimsKilled = 0;
 static CFTimeInterval gNFBSquelchUntil = 0;   // drop bounds.origin animations before this time
 
@@ -727,11 +727,11 @@ static void ensureSessionThenOpenReply(NSString* statusID) {
 
 // The inline reply button has no dedicated ObjC subclass in 12.3; every inline
 // reply tap funnels through this handler with the status being replied to.
-// THE FIX (v2). WebKit reveals the reply field with a PAIR of CABasicAnimations on the scroll
-// view LAYER — bounds.origin (the -173 pan) and its twin bounds.size — both NAMED by the on-device
-// diagnostic and confirmed killed (animsKilled=2, svK→0, presentation flat, fluide to the eye).
-// During the keyboard-up window, on OUR scroller's layer only, we drop exactly those so they are
-// never installed. Every other layer / keyPath, and (window zeroed) Show more, are untouched.
+// WebKit reveals the reply field with a PAIR of CABasicAnimations on the scroll
+// view LAYER — bounds.origin (the -173 pan) and its twin bounds.size. During the
+// keyboard-up window, on OUR scroller's layer only, those two are dropped so they
+// are never installed. Every other layer / keyPath, and (window zeroed) Show
+// more, are untouched.
 %hook CALayer
 - (void)addAnimation:(CAAnimation*)anim forKey:(NSString*)key {
     if (gBHTReplyWebViewActive && gNFBReplyScroller
@@ -820,7 +820,7 @@ static void ensureSessionThenOpenReply(NSString* statusID) {
 //
 // This is done with method_setImplementation (not %hook) on purpose: the first parameter is
 // a C++ reference, not an Objective-C object, so it MUST be typed void* — otherwise ARC
-// tries to retain/release it and crashes (that was the earlier crash). The selector has been
+// tries to retain/release it and crashes. The selector has been
 // stable since iOS 13; if it's ever missing we simply don't swizzle and focus still works
 // (keyboard then needs one tap).
 %ctor {

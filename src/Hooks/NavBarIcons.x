@@ -16,13 +16,10 @@
 //  UINavigationBar — UIKit's base class, always loaded — because Twitter's own
 //  subclass differs between screens.
 //
-//  The pale pass that used to precede the grey was never the glyph. Measured
-//  frame by frame on a recording of both screens, the avatar, the search field,
-//  the gear and the tab strip below it all lighten by the same factor — 0.76 —
-//  for about a sixth of a second, with a straight edge at the strip's separator
-//  and nothing below it touched. A blur would fade off gradually; one constant
-//  factor behind a hard edge means a single container view drawn at partial
-//  opacity. So the container is held opaque, not the gear.
+//  During bar transitions the whole header — avatar, search field, gear and
+//  tab strip — can lighten by one constant factor behind a hard edge, which
+//  is a single container view drawn at partial opacity, not the glyph. So the
+//  container is held opaque, not the gear.
 //
 
 #import "HookHelpers.h"
@@ -33,13 +30,13 @@ static const void* kNFBGreyedImageKey = &kNFBGreyedImageKey;
 // later goes through the same repaint.
 static const void* kNFBGreyTargetKey = &kNFBGreyTargetKey;
 // The untouched glyph. Repainting is not idempotent — a colour at 60% opacity
-// laid over a colour already at 60% lands at 36%, which is the pale flash he
-// saw before the icon settled. Every repaint starts from this original.
+// laid over a colour already at 60% lands at 36% — so every repaint starts
+// from this original.
 static const void* kNFBOriginalImageKey = &kNFBOriginalImageKey;
 // Marks an image we produced. Two paths repaint on Notifications — the bar
-// button item and the image view UIKit builds from it — and each saw the
-// other's result as "not mine yet", so the glyph was painted twice and came
-// out pale. The mark travels with the image, so any path recognises it.
+// button item and the image view UIKit builds from it — and without the mark
+// each treats the other's result as unpainted, painting the glyph twice. The
+// mark travels with the image, so any path recognises it.
 static const void* kNFBPaintedFlagKey = &kNFBPaintedFlagKey;
 // Marks a layer that must never render at partial opacity. Correcting after
 // the fact never worked — our pass runs before the value is lowered, so there
@@ -322,7 +319,7 @@ static void nfbRepaintNotificationsGear(UIView* bar, UIColor* colour) {
 
 %end
 
-// The frames of his screen recording showed the gear flipping between black
+// Frame-by-frame capture showed the gear flipping between black
 // and grey on one screen: our repaint lands, then Twitter puts its own image
 // back, and nothing calls us again until the bar happens to lay out. So the
 // image is caught as it is set. Only views we have already taken over are
@@ -379,12 +376,10 @@ static void nfbRepaintNotificationsGear(UIView* bar, UIColor* colour) {
 %end
 
 // The same treatment as Explore, reached from the other side. Notifications
-// builds its bar differently, so searching the bar's subtree never found the
-// gear there — but the button class is the same one Twitter uses everywhere,
-// and hooking it catches the gear whatever the bar around it looks like.
-//
-// didMoveToWindow fires exactly when the bar appears, which is also the moment
-// the colour used to be lost.
+// builds its bar differently, so the gear is not found by searching the bar's
+// subtree — but the button class is the same one Twitter uses everywhere, and
+// hooking it catches the gear whatever the bar around it looks like.
+// didMoveToWindow fires exactly when the bar appears.
 
 // A bar button qualifies only if it is an icon on the right-hand side: no
 // title, a glyph-sized image inside, and past the middle of its own bar. A

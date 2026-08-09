@@ -289,11 +289,10 @@ static void NFBSweepTopBarLogos(UIView* root) {
     }
 }
 
-// What we last pushed into a given tab bar. We cannot compare against
-// bar.tintColor: the bar INHERITS the window tint we set elsewhere, so it
-// already reports the new accent while the installed appearance — which is what
-// actually paints the selected icon — is still on the old one. That false
-// "already correct" reading is why the tab bar needed a full app restart.
+// What we last pushed into a given tab bar. bar.tintColor cannot be used for
+// the comparison: the bar INHERITS the window tint, so it reports the new
+// accent while the installed appearance — which actually paints the selected
+// icon — may still carry the old one.
 static char kNFBAppliedAccentKey;
 
 // Raised on every accent change; the view-controller hook below keeps
@@ -320,14 +319,11 @@ static void NFBApplyTabBarAccent(UITabBar* bar) {
         return;
     }
 
-    // Two lessons paid for in failed builds live here. (1) Marking a bar
-    // "done" while it was OFF SCREEN is what kept losing the live update: the
-    // visible repaint never happened, yet every later pass skipped it. So the
-    // transition only counts once the bar is actually in a window. (2)
-    // Re-assigning the appearance on every layout is what turned the
-    // notification badge red: each assignment installs a fresh copy, orphaning
-    // Twitter's own later writes (its badge colour) on the instance it still
-    // holds. One assignment, at the real transition, while visible.
+    // The transition only counts once the bar is in a window: marking an
+    // off-screen bar "done" would skip the visible repaint on every later
+    // pass. And the appearance is assigned exactly once per transition: each
+    // assignment installs a fresh copy, orphaning Twitter's own later writes
+    // (its badge colour) on the instance it still holds.
     if (!bar.window) {
         return;
     }
@@ -410,17 +406,13 @@ static void NFBReapplyChromeAccent(void) {
     else { dispatch_async(dispatch_get_main_queue(), run); }
 }
 
-// Twitter's OWN repaint path, found in the app binary. We used to post
-// TAEColorPaletteDidChangeNotification — a name that appears nowhere in the
-// app, so nothing ever listened. The real machinery is TFNDynamicColorManager:
-// reloadDynamicColors walks every registered dynamic-colour setter and repaints,
-// which is what the navigation bar and tab bar actually use.
+// Twitter's OWN repaint path: TFNDynamicColorManager's reloadDynamicColors
+// walks every registered dynamic-colour setter and repaints, which is what
+// the navigation bar and tab bar actually use.
 static void NFBReloadTwitterDynamicColors(void) {
     Class managerClass = objc_getClass("TFNDynamicColorManager");
     id manager = nil;
     if (managerClass) {
-        // sharedColorManager is present in the app binary and was missing from this
-        // list — the most likely reason the native reload never actually ran.
         for (NSString* accessor in
              @[@"sharedColorManager", @"defaultManager", @"sharedManager", @"sharedInstance"]) {
             SEL sel = NSSelectorFromString(accessor);
@@ -450,9 +442,7 @@ static void NFBReloadTwitterDynamicColors(void) {
     // (T1, TFN, and the Swift hosting views), and the tab icons' vector images
     // register dynamic-colour info on this very bus. Posting the pair directly
     // makes those views re-resolve their colours through our palette hooks even
-    // when the manager accessor above found nothing. Relying on the manager
-    // alone was a silent regression: if its accessor missed, NOBODY posted the
-    // reload any more.
+    // when the manager accessor above finds nothing.
     NSNotificationCenter* nc = NSNotificationCenter.defaultCenter;
     [nc postNotificationName:@"TFNDynamicColorsWillReloadNotification" object:nil];
     [nc postNotificationName:@"TFNDynamicColorsDidReloadNotification" object:nil];
@@ -462,9 +452,8 @@ static void NFBReloadTwitterDynamicColors(void) {
 
 // MARK: - Accent settle timer
 
-// The lifecycle guessing stops here. His test proved the appliers correct in
-// BOTH directions — a manual tab change fixes everything — so the only missing
-// piece was the moment they run. Neither didMoveToWindow, layoutSubviews nor
+// The appliers are idempotent and correct; the open question is only the
+// moment they run. Neither didMoveToWindow, layoutSubviews nor
 // viewDidAppear is guaranteed to fire exactly when the timeline chrome returns
 // (and which view even hosts it differs between Standard and Liquid Glass). So
 // after every accent change, re-run the idempotent, per-view-guarded appliers
@@ -926,8 +915,8 @@ static void NFBForceBackgroundRefresh(void) {
                 }];
 
     // Whenever Twitter repaints its own dynamic colours — for any reason, from
-    // any screen — repaint ours in the same pass. This is the native hook we
-    // were missing: no layout guessing, no timers.
+    // any screen — repaint ours in the same pass: no layout guessing, no
+    // timers.
     [[NSNotificationCenter defaultCenter]
         addObserverForName:@"TFNDynamicColorsDidReloadNotification"
                     object:nil
@@ -939,16 +928,14 @@ static void NFBForceBackgroundRefresh(void) {
     // Surfaces that resolve their colour once at launch and then cache it —
     // the theme screen's confirm control — never see our palette without a
     // reload pass. If an accent is active, broadcast one shortly after boot:
-    // the same pass a live colour change performs. (His regression: confirm
-    // reverted to native blue after every app restart.)
+    // the same pass a live colour change performs.
     if (NFBAccentIsActive()) {
         dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.8 * NSEC_PER_SEC)),
                        dispatch_get_main_queue(), ^{
-                           // The window tint IS the Confirm button's colour. The
-                           // reload alone re-resolves Twitter's own palette but
-                           // never sets our tint, so on a cold start the Confirm
-                           // fell back to native blue (his regression). Set it
-                           // here, at the moment the window exists.
+                           // The window tint IS the Confirm button's colour;
+                           // the reload alone re-resolves Twitter's palette but
+                           // never sets our tint. Set it here, at the moment
+                           // the window exists.
                            NFBApplyGlobalTint();
                            NFBReloadTwitterDynamicColors();
                        });
@@ -1163,10 +1150,9 @@ static UITabBarAppearance* NFBPatchedTabBarAppearance(UITabBarAppearance* appear
     // only a full relaunch did. Neutral = labelColor, the native selected
     // colour in both light and dark mode.
     UITabBarAppearance* patched = [appearance copy];
-    // Our appearance re-assignments cost Twitter its own badge configuration,
-    // and UIKit's default badgeBackgroundColor is red — that is the "badge only
-    // red now" regression. Restore a themed badge deterministically: the accent
-    // when one is active, system blue (visually Twitter's blue) otherwise.
+    // Assigning an appearance costs Twitter its own badge configuration, and
+    // UIKit's default badgeBackgroundColor is red. Restore a themed badge
+    // deterministically: the accent when one is active, system blue otherwise.
     UIColor* badgeColor = CurrentAccentColor();
     NSArray<UITabBarItemAppearance*>* layouts = @[
         patched.stackedLayoutAppearance,
@@ -1225,7 +1211,7 @@ static UITabBarAppearance* NFBPatchedTabBarAppearance(UITabBarAppearance* appear
 // The canonical white bake: draw the original, then sourceIn-fill white — every
 // opaque pixel becomes white, alpha preserved, rendering mode plain. Immune to
 // the imageWithTintColor quirks (its result can stay template and re-tint with
-// the view's tint — the accent — which produced his grey AND, when tint reset,
+// the view's tint — the accent — which produced the grey AND, when tint reset,
 // the black frames). Shared with Branding so the FAB glyph uses the same bake.
 UIImage* NFBWhiteBakedGlyph(UIImage* image) {
     UIGraphicsImageRendererFormat* format =
@@ -1241,14 +1227,13 @@ UIImage* NFBWhiteBakedGlyph(UIImage* image) {
             [[UIColor whiteColor] setFill];
             CGContextFillRect(ctx.CGContext, rect);
         }];
-    // Decisive, from his 13:26 dump: the confirm lives in a SwiftUI glass
-    // platter (NavigationBarPlatterRepresentable → _UIModernBarButton), and a
-    // bar button treats an AUTOMATIC-mode image as a TEMPLATE — the pixels are
-    // just an alpha mask, re-tinted by the button (black over yellow, its
-    // contrast rule; white over dark accents, which is why those always
-    // "worked"). AlwaysOriginal forbids the re-tint: what we baked is what
-    // renders. A plain rendered bitmap accepts the mode change — unlike the
-    // imageWithTintColor result of the earlier attempt.
+    // The confirm lives in a SwiftUI glass platter
+    // (NavigationBarPlatterRepresentable → _UIModernBarButton), and a bar
+    // button treats an AUTOMATIC-mode image as a TEMPLATE — the pixels are an
+    // alpha mask, re-tinted by the button per its contrast rule.
+    // AlwaysOriginal forbids the re-tint: what is baked is what renders; a
+    // plain rendered bitmap accepts the mode change, an imageWithTintColor
+    // result does not.
     return [baked imageWithRenderingMode:UIImageRenderingModeAlwaysOriginal];
 }
 
@@ -1410,10 +1395,8 @@ void NFBWhitenNavigationBarConfirm(UINavigationBar* bar) {
         }
     }
     NFBReapplyTabBarAccent();
-    // The flag used to be consumed by the FIRST screen to appear on the way
-    // back — an intermediate settings page, while the timeline chrome was still
-    // off screen. Only a tab bar's presence proves the timeline is back; until
-    // then the flag stays up and every appearance retries.
+    // Only a tab bar's presence proves the timeline is back; until then the
+    // flag stays up and every appearance retries.
     if (reachedChrome) {
         NFBAccentPending = NO;
     }
