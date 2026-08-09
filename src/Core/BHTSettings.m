@@ -134,6 +134,9 @@ static NSDictionary<NSString*, NSDictionary*>* BHTSettingsPages(void) {
                         @"subtitleKey": @"MUTED_WORDS_DETAIL",
                         @"action": @"showMutedWords:"
                     },
+                    @{@"key": @"reading_line",
+                      @"default": @YES,
+                      @"type": @"toggle"},
                     @{@"type": @"header", @"titleKey": @"TIMELINES_GROUP_BARS"},
                     @{@"key": @"hide_spaces",
                       @"default": @NO,
@@ -443,14 +446,6 @@ static NSDictionary<NSString*, NSDictionary*>* BHTSettingsPages(void) {
                         @"titleKey": @"IMPORT_SETTINGS_TITLE",
                         @"subtitleKey": @"IMPORT_SETTINGS_DETAIL",
                         @"action": @"showImportSettings:"
-                    },
-                    @{
-                        @"type": @"compactButton",
-                        @"key": @"readline_survey_button",
-                        @"titleKey": @"READING_SURVEY_TITLE",
-                        @"action": @"showReadingSurveyInfo:",
-                        @"prefKeyForSubtitle": @"nfb_readline_survey",
-                        @"subtitleDefaultKey": @"READING_SURVEY_EMPTY"
                     }
                 ]
             },
