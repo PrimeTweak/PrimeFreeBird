@@ -272,9 +272,8 @@
 "IMPORT_SETTINGS_DONE_MESSAGE" = "%lu settings restored. Restart Twitter to apply everything.";
 "IMPORT_SETTINGS_FAILED_TITLE" = "Import failed";
 "IMPORT_SETTINGS_FAILED_MESSAGE" = "This file is not a PrimeFreeBird settings backup.";
-"READING_SURVEY_TITLE" = "Reading line survey";
-"READING_SURVEY_EMPTY" = "No refresh recorded yet.";
-"READING_SURVEY_INFO" = "Counts how many loaded posts survive each timeline refresh, and whether the top one is found again. Use For You and Following normally for a few minutes, then send the numbers. Relaunch Twitter to reset.";
+"READING_LINE_TITLE" = "Reading line";
+"READING_LINE_DETAIL" = "Draws a line above the last Tweet you read, wherever it still sits in the feed.";
 /* Reply-in-web-view: the reply screen title + the web-session login/clear
    buttons (Lab) and their alerts. */
 "REPLY_WEBVIEW_TITLE" = "Reply";
