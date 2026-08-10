@@ -3,6 +3,8 @@
 //  PrimeFreeBird
 //
 
+#import <QuartzCore/QuartzCore.h>
+
 #import "HookHelpers.h"
 
 // MARK: - Hide custom timelines
@@ -976,24 +978,27 @@ static NSSet<NSNumber*>* ConversationAuthorRepliedToUserIDs(NSArray* sections,
 
 // MARK: - Reading marker
 //
-// Marks the last Tweet read, while it is still present in the feed, in one of
-// two states: a thin accent line when the list top is unchanged since the
-// anchor was captured (nothing new to catch up on), and a full-row accent
-// wash when new Tweets sit above it. The anchor is the topmost visible row,
+// Highlights the last Tweet read — an accent wash over its header, fading
+// out before the media — while that Tweet is still present in the feed. The anchor is the topmost visible row,
 // captured when the screen is left, when the app backgrounds, and just before
-// a full section replace. A replace that discards the anchor (For You's
-// algorithmic refresh) hides the marker rather than guessing a position.
+// a full section replace. Chronological tabs (Following, Lists) keep their
+// anchor through refreshes, so the marker lives there; a tab that discards
+// its anchor on a large list is algorithmic, and the marker retires on it for
+// the session rather than lying. Tabs whose controllers name themselves
+// "ForYou" never get a marker at all.
 
 static const void* kNFBReadingAnchorIDKey = &kNFBReadingAnchorIDKey;
 static const void* kNFBReadingAnchorPathKey = &kNFBReadingAnchorPathKey;
 static const void* kNFBReadingMarkerViewKey = &kNFBReadingMarkerViewKey;
-static const void* kNFBReadingTopAtCaptureKey = &kNFBReadingTopAtCaptureKey;
-static const void* kNFBReadingWashKey = &kNFBReadingWashKey;
+static const void* kNFBReadingRetiredKey = &kNFBReadingRetiredKey;
+static const void* kNFBReadingForYouKey = &kNFBReadingForYouKey;
 
-// Low enough that the Tweet stays readable through the wash, high enough to
-// spot at a glance.
-static const CGFloat kNFBReadingMarkerAlpha = 0.15;
-static const CGFloat kNFBReadingLineHeight = 2.0;
+// The wash covers the Tweet's header and fades out before the media: solid
+// for the first points, gone by the reach. Low enough to read through, high
+// enough to spot at a glance.
+static const CGFloat kNFBReadingMarkerAlpha = 0.18;
+static const CGFloat kNFBReadingFadeSolid = 34.0;
+static const CGFloat kNFBReadingFadeReach = 110.0;
 static NSHashTable* gNFBReadingControllers = nil;
 
 static BOOL NFBReadingIsHomeTimeline(TFNItemsDataViewController* dataViewController) {
@@ -1022,23 +1027,6 @@ static NSString* NFBReadingTopVisibleEntryID(TFNItemsDataViewController* dataVie
     return ItemEntryID(((NSArray*)section)[top.row]);
 }
 
-// The list's first datable item — the reference for "has anything new
-// arrived above the anchor since it was captured".
-static NSString* NFBReadingFirstEntryID(NSArray* sections) {
-    for (id section in sections) {
-        if (![section isKindOfClass:[NSArray class]]) {
-            continue;
-        }
-        for (id item in (NSArray*)section) {
-            NSString* entryID = ItemEntryID(item);
-            if (entryID.length) {
-                return entryID;
-            }
-        }
-    }
-    return nil;
-}
-
 static NSIndexPath* NFBReadingIndexPathForEntryID(
     TFNItemsDataViewController* dataViewController, NSString* target) {
     if (!target.length) {
@@ -1060,19 +1048,102 @@ static NSIndexPath* NFBReadingIndexPathForEntryID(
     return nil;
 }
 
+// The controller chain names the algorithmic tab on builds where the child
+// controllers carry "ForYou" in their class names; the verdict is cached per
+// controller. A chain that names nothing changes nothing.
+static BOOL NFBReadingLooksLikeForYou(TFNItemsDataViewController* dataViewController) {
+    NSNumber* cached =
+        objc_getAssociatedObject(dataViewController, kNFBReadingForYouKey);
+    if (cached) {
+        return cached.boolValue;
+    }
+    BOOL forYou = NO;
+    UIResponder* responder = dataViewController;
+    while ((responder = responder.nextResponder)) {
+        if ([NSStringFromClass([responder class]) containsString:@"ForYou"]) {
+            forYou = YES;
+            break;
+        }
+        if ([responder isKindOfClass:[UIWindow class]]) {
+            break;
+        }
+    }
+    objc_setAssociatedObject(dataViewController, kNFBReadingForYouKey, @(forYou),
+                             OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    return forYou;
+}
+
+static BOOL NFBReadingMarkerAllowed(TFNItemsDataViewController* dataViewController) {
+    return [BHTSettings boolForKey:@"reading_line"] &&
+           NFBReadingIsHomeTimeline(dataViewController) &&
+           ![objc_getAssociatedObject(dataViewController, kNFBReadingRetiredKey)
+               boolValue] &&
+           !NFBReadingLooksLikeForYou(dataViewController);
+}
+
+static NSUInteger NFBReadingItemCount(NSArray* sections) {
+    NSUInteger count = 0;
+    for (id section in sections) {
+        if ([section isKindOfClass:[NSArray class]]) {
+            count += ((NSArray*)section).count;
+        }
+    }
+    return count;
+}
+
 static void NFBReadingCaptureAnchor(TFNItemsDataViewController* dataViewController) {
-    if (![BHTSettings boolForKey:@"reading_line"] ||
-        !NFBReadingIsHomeTimeline(dataViewController)) {
+    if (!NFBReadingMarkerAllowed(dataViewController)) {
         return;
     }
     NSString* top = NFBReadingTopVisibleEntryID(dataViewController);
     if (top.length) {
         objc_setAssociatedObject(dataViewController, kNFBReadingAnchorIDKey, top,
                                  OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-        objc_setAssociatedObject(dataViewController, kNFBReadingTopAtCaptureKey,
-                                 NFBReadingFirstEntryID(dataViewController.sections),
-                                 OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     }
+}
+
+// One row's true geometry. The rendered cell is authoritative when it is on
+// screen — data sections and table rows do not always map one-to-one on For
+// You, and the computed rect can span the wrong range there. Off screen, the
+// computed rect only decides visibility, so the fallback is harmless.
+static void NFBReadingPlaceMarker(UITableView* table, UIView* marker,
+                                  NSIndexPath* path) {
+    if (path.section >= table.numberOfSections ||
+        path.row >= [table numberOfRowsInSection:path.section]) {
+        marker.hidden = YES;
+        return;
+    }
+    UITableViewCell* cell = [table cellForRowAtIndexPath:path];
+    CGRect rowRect = cell ? cell.frame : [table rectForRowAtIndexPath:path];
+    extern UIColor* CurrentAccentColor(void);
+    UIColor* accent = CurrentAccentColor() ?: [UIColor systemBlueColor];
+    CGFloat reach = MIN(CGRectGetHeight(rowRect), kNFBReadingFadeReach);
+    marker.frame = CGRectMake(CGRectGetMinX(rowRect), CGRectGetMinY(rowRect),
+                              CGRectGetWidth(rowRect), reach);
+    CAGradientLayer* fade =
+        (CAGradientLayer*)marker.layer.sublayers.firstObject;
+    if (![fade isKindOfClass:[CAGradientLayer class]]) {
+        fade = [CAGradientLayer layer];
+        [marker.layer addSublayer:fade];
+    }
+    UIColor* tint = [accent colorWithAlphaComponent:kNFBReadingMarkerAlpha];
+    // The layer would animate every reposition; the marker must simply be
+    // where its Tweet is.
+    [CATransaction begin];
+    [CATransaction setDisableActions:YES];
+    fade.frame = marker.bounds;
+    fade.colors = @[
+        (id)tint.CGColor, (id)tint.CGColor, (id)UIColor.clearColor.CGColor
+    ];
+    fade.locations = @[
+        @0, @(reach > 0.0 ? MIN(kNFBReadingFadeSolid / reach, 1.0) : 0.0), @1
+    ];
+    [CATransaction commit];
+    if (marker.superview != table) {
+        [table addSubview:marker];
+    }
+    marker.hidden = NO;
+    [table bringSubviewToFront:marker];
 }
 
 // Places (or hides) the marker for the current data. The row rect is content-
@@ -1087,12 +1158,22 @@ static void NFBReadingPositionMarker(TFNItemsDataViewController* dataViewControl
     UIView* marker = objc_getAssociatedObject(table, kNFBReadingMarkerViewKey);
     NSString* anchor =
         objc_getAssociatedObject(dataViewController, kNFBReadingAnchorIDKey);
-    NSIndexPath* path = [BHTSettings boolForKey:@"reading_line"]
+    NSIndexPath* path = NFBReadingMarkerAllowed(dataViewController)
                             ? NFBReadingIndexPathForEntryID(dataViewController, anchor)
                             : nil;
     objc_setAssociatedObject(table, kNFBReadingAnchorPathKey, path,
                              OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     if (!path) {
+        // An anchor that vanishes from a large list marks an algorithmic tab:
+        // the data was replaced, not extended. The marker retires there for
+        // the session instead of reappearing to lie after the next capture.
+        if (anchor.length &&
+            NFBReadingItemCount(dataViewController.sections) >= 10) {
+            objc_setAssociatedObject(dataViewController, kNFBReadingRetiredKey,
+                                     @YES, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+            objc_setAssociatedObject(dataViewController, kNFBReadingAnchorIDKey,
+                                     nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        }
         marker.hidden = YES;
         return;
     }
@@ -1102,31 +1183,7 @@ static void NFBReadingPositionMarker(TFNItemsDataViewController* dataViewControl
         objc_setAssociatedObject(table, kNFBReadingMarkerViewKey, marker,
                                  OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     }
-    NSString* topAtCapture =
-        objc_getAssociatedObject(dataViewController, kNFBReadingTopAtCaptureKey);
-    NSString* topNow = NFBReadingFirstEntryID(dataViewController.sections);
-    BOOL wash = topAtCapture.length && topNow.length &&
-                ![topAtCapture isEqualToString:topNow];
-    objc_setAssociatedObject(table, kNFBReadingWashKey, @(wash),
-                             OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-    extern UIColor* CurrentAccentColor(void);
-    UIColor* accent = CurrentAccentColor() ?: [UIColor systemBlueColor];
-    CGRect rowRect = [table rectForRowAtIndexPath:path];
-    if (wash) {
-        marker.backgroundColor =
-            [accent colorWithAlphaComponent:kNFBReadingMarkerAlpha];
-        marker.frame = rowRect;
-    } else {
-        marker.backgroundColor = accent;
-        marker.frame = CGRectMake(0, CGRectGetMinY(rowRect) - 1.0,
-                                  CGRectGetWidth(table.bounds),
-                                  kNFBReadingLineHeight);
-    }
-    if (marker.superview != table) {
-        [table addSubview:marker];
-    }
-    marker.hidden = NO;
-    [table bringSubviewToFront:marker];
+    NFBReadingPlaceMarker(table, marker, path);
 }
 
 // Row heights settle after the reload, so the scan waits one runloop turn.
@@ -1157,17 +1214,7 @@ static void NFBReadingLayoutTick(UIScrollView* scrollView) {
         marker.hidden = YES;
         return;
     }
-    CGRect rowRect = [table rectForRowAtIndexPath:path];
-    BOOL wash =
-        [objc_getAssociatedObject(table, kNFBReadingWashKey) boolValue];
-    CGRect frame = wash ? rowRect
-                        : CGRectMake(0, CGRectGetMinY(rowRect) - 1.0,
-                                     CGRectGetWidth(table.bounds),
-                                     kNFBReadingLineHeight);
-    if (!CGRectEqualToRect(marker.frame, frame)) {
-        marker.frame = frame;
-    }
-    [table bringSubviewToFront:marker];
+    NFBReadingPlaceMarker(table, marker, path);
 }
 
 // The app backgrounding is the one leave moment no view callback covers.
@@ -1259,8 +1306,10 @@ static NSArray* FilteredTimelineSections(TFNItemsDataViewController* dataViewCon
 - (void)setSections:(NSArray*)sections restoreScrollPosition:(BOOL)restoreScrollPosition {
     BOOL keepPlace = restoreScrollPosition;
     if (NFBReadingIsHomeTimeline(self)) {
-        NFBReadingTrack(self);
-        NFBReadingCaptureAnchor(self);
+        if (NFBReadingMarkerAllowed(self)) {
+            NFBReadingTrack(self);
+            NFBReadingCaptureAnchor(self);
+        }
         // Twitter's own restore flag, forced on the home timeline so a reload
         // keeps the reading position instead of jumping to the top.
         keepPlace = YES;
