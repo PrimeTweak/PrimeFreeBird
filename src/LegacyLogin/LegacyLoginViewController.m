@@ -141,7 +141,7 @@ static void SwitchToAccount(id account) {
 #pragma mark - ui_metrics injection
 
 // Hooks fetch/XHR/sendBeacon inside the js_inst page and forwards the requested URLs,
-// so we can take the anti-bot `result=` token.
+// so the anti-bot `result=` token can be taken.
 static NSString* const kJSInstJS =
     @"(function(){function "
     @"rep(u){try{window.webkit.messageHandlers.bht.postMessage(String(u));}catch(e){}}"
