@@ -128,15 +128,15 @@ static NSDictionary<NSString*, NSDictionary*>* BHTSettingsPages(void) {
                     @{@"key": @"hide_verified_tweets",
                       @"default": @NO,
                       @"type": @"toggle"},
+                    @{@"key": @"reading_line",
+                      @"default": @YES,
+                      @"type": @"toggle"},
                     @{
                         @"type": @"button",
                         @"titleKey": @"MUTED_WORDS_TITLE",
                         @"subtitleKey": @"MUTED_WORDS_DETAIL",
                         @"action": @"showMutedWords:"
                     },
-                    @{@"key": @"reading_line",
-                      @"default": @YES,
-                      @"type": @"toggle"},
                     @{@"type": @"header", @"titleKey": @"TIMELINES_GROUP_BARS"},
                     @{@"key": @"hide_spaces",
                       @"default": @NO,
