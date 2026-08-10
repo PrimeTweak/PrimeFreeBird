@@ -347,7 +347,7 @@
 "IMPORT_SETTINGS_FAILED_TITLE" = "Échec de l’importation";
 "IMPORT_SETTINGS_FAILED_MESSAGE" = "Ce fichier n’est pas une sauvegarde PrimeFreeBird.";
 "READING_LINE_TITLE" = "Repère de lecture";
-"READING_LINE_DETAIL" = "Surligne le dernier Tweet lu à ton retour — sur Following et tes Lists.";
+"READING_LINE_DETAIL" = "Marque où tu étais quand de nouveaux Tweets arrivent au-dessus — sur Following et tes Lists.";
 "INTERFACE_STYLE_DETAIL" = "Liquid Glass est le design translucide d’iOS 26. Standard garde le look plat.";
 "INTERFACE_STYLE_STANDARD" = "Standard";
 "INTERFACE_STYLE_LIQUID_GLASS" = "Liquid Glass";
