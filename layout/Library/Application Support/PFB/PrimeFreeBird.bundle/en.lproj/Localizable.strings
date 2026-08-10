@@ -273,7 +273,7 @@
 "IMPORT_SETTINGS_FAILED_TITLE" = "Import failed";
 "IMPORT_SETTINGS_FAILED_MESSAGE" = "This file is not a PrimeFreeBird settings backup.";
 "READING_LINE_TITLE" = "Reading marker";
-"READING_LINE_DETAIL" = "Marks the last Tweet you read: a thin line normally, a full accent highlight when new Tweets sit above it.";
+"READING_LINE_DETAIL" = "Highlights the last Tweet you read when you come back — on Following and your Lists.";
 /* Reply-in-web-view: the reply screen title + the web-session login/clear
    buttons (Lab) and their alerts. */
 "REPLY_WEBVIEW_TITLE" = "Reply";
