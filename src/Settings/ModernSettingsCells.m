@@ -293,7 +293,7 @@
         self.headerLabel = [UILabel new];
         self.headerLabel.translatesAutoresizingMaskIntoConstraints = NO;
         // Chirp Heavy (800), not Bold (700) — the weight Twitter uses for its own
-        // section headers, and the only reason ours read lighter.
+        // section headers, and the only reason the tweak's read lighter.
         self.headerLabel.font = [TwitterChirpFont(TwitterFontStyleBold) fontWithSize:20];
         self.headerLabel.textColor = [UIColor labelColor];
         [self.contentView addSubview:self.headerLabel];

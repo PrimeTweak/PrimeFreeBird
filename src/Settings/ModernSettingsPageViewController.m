@@ -314,9 +314,6 @@ extern NSInteger NFBColorThemeScreenVisible;
 
         // These toggles change which surfaces follow the accent, so push the
         // accent through again instead of waiting for those views to rebuild.
-        // This block previously sat NESTED inside the branch above — a
-        // misplaced insertion — where its condition could never be true: dead
-        // code, and the reason these two switches never reverted anything live.
         if ([key isEqualToString:@"color_twitter_icon_in_top_bar"] ||
             [key isEqualToString:@"tab_bar_theming"]) {
             extern void NFBSyncAccentTheme(void);
@@ -358,48 +355,6 @@ extern NSInteger NFBColorThemeScreenVisible;
 }
 
 // MARK: - Settings backup
-
-- (void)showBadgeSurvey:(NSDictionary*)sender {
-    NSUserDefaults* defaults = [NSUserDefaults standardUserDefaults];
-    NSString* message = [NSString
-        stringWithFormat:@"tick %ld\ntoggle %ld\nresolved %ld\ndesc %ld\nhome "
-                         @"%ld\npass %ld\nseen %ld\nstatus %ld\ncontext "
-                         @"%ld\nnamed %ld\n\n%@\n%@",
-                         (long)[defaults integerForKey:@"nfb_badge_tick"],
-                         (long)[defaults integerForKey:@"nfb_badge_toggle"],
-                         (long)[defaults integerForKey:@"nfb_badge_resolved"],
-                         (long)[defaults integerForKey:@"nfb_badge_desc"],
-                         (long)[defaults integerForKey:@"nfb_badge_home"],
-                         (long)[defaults integerForKey:@"nfb_badge_pass"],
-                         (long)[defaults integerForKey:@"nfb_badge_seen"],
-                         (long)[defaults integerForKey:@"nfb_badge_status"],
-                         (long)[defaults integerForKey:@"nfb_badge_context"],
-                         (long)[defaults integerForKey:@"nfb_badge_named"],
-                         [defaults stringForKey:@"nfb_badge_sample"] ?: @"(no sample)",
-                         [defaults stringForKey:@"nfb_badge_lists"] ?: @"(no lists)"];
-    UIAlertController* alert = [UIAlertController
-        alertControllerWithTitle:@"Badge survey"
-                         message:message
-                  preferredStyle:UIAlertControllerStyleAlert];
-    [alert addAction:[UIAlertAction actionWithTitle:@"Reset"
-                                              style:UIAlertActionStyleDestructive
-                                            handler:^(UIAlertAction* action) {
-        for (NSString* key in @[
-                 @"nfb_badge_tick", @"nfb_badge_toggle", @"nfb_badge_resolved",
-                 @"nfb_badge_desc", @"nfb_badge_home", @"nfb_badge_pass",
-                 @"nfb_badge_seen", @"nfb_badge_status", @"nfb_badge_context",
-                 @"nfb_badge_named", @"nfb_badge_sample", @"nfb_badge_lists"
-             ]) {
-            [defaults removeObjectForKey:key];
-        }
-    }]];
-    [alert addAction:[UIAlertAction
-                         actionWithTitle:[[BHTBundle sharedBundle]
-                                             localizedStringForKey:@"OK_ACTION"]
-                                   style:UIAlertActionStyleDefault
-                                 handler:nil]];
-    [self presentViewController:alert animated:YES completion:nil];
-}
 
 - (void)showExportSettings:(NSDictionary*)sender {
     NSData* data = [BHTSettingsBackup exportData];
@@ -634,7 +589,7 @@ extern NSInteger NFBColorThemeScreenVisible;
                                    style:UIAlertActionStyleDefault
                                  handler:^(UIAlertAction* action) {
                                      // iOS gives an app no way to relaunch itself, so the
-                                     // best we can do is quit cleanly and let the user tap
+                                     // the remaining option is to quit cleanly and let the user tap
                                      // the icon — same approach as the dark-style reset.
                                      [[NSUserDefaults standardUserDefaults] synchronize];
                                      exit(0);
