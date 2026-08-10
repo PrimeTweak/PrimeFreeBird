@@ -398,6 +398,33 @@ static void nfbLayBandIntoSettingsBar(UINavigationBar* bar,
 
 %end
 
+%hook TFNTableView
+
+// Twitter's own table does not necessarily route through UIScrollView's
+// layoutSubviews, so the badge refresh is attached where the rows actually
+// recycle.
+- (void)layoutSubviews {
+    %orig;
+    @try {
+        if (!self.window || ![BHTSettings boolForKey:@"provenance_badges"]) {
+            return;
+        }
+        for (TFNItemsDataViewController* tracked in
+             gNFBReadingControllers.allObjects) {
+            if (![tracked isViewLoaded] ||
+                ![self isDescendantOfView:tracked.view]) {
+                continue;
+            }
+            gNFBBadgeGate[NFBGateDesc]++;
+            NFBBadgePass(tracked);
+            break;
+        }
+    } @catch (id exception) {
+    }
+}
+
+%end
+
 %hook UINavigationBar
 
 - (void)didMoveToWindow {
@@ -1558,43 +1585,82 @@ static id NFBStatusForItem(id item) {
     return item;
 }
 
+// The string the app itself renders above a Tweet ("X reposted", "X liked").
+static NSString* NFBBadgeSocialText(id object) {
+    SEL reach[] = { @selector(socialText), @selector(nonComputedSocialText) };
+    for (NSUInteger index = 0; index < sizeof(reach) / sizeof(reach[0]); index++) {
+        if ([object respondsToSelector:reach[index]]) {
+            NSString* text =
+                ((NSString* (*)(id, SEL))objc_msgSend)(object, reach[index]);
+            if ([text isKindOfClass:[NSString class]] && text.length) {
+                return text;
+            }
+        }
+    }
+    return nil;
+}
+
+static BOOL NFBBadgeIsRepost(id status) {
+    if ([status respondsToSelector:@selector(isRetweet)]) {
+        if (((BOOL (*)(id, SEL))objc_msgSend)(status, @selector(isRetweet))) {
+            return YES;
+        }
+    }
+    SEL reach[] = { @selector(retweetedStatus), @selector(sourceStatus) };
+    for (NSUInteger index = 0; index < sizeof(reach) / sizeof(reach[0]); index++) {
+        if ([status respondsToSelector:reach[index]] &&
+            ((id (*)(id, SEL))objc_msgSend)(status, reach[index])) {
+            return YES;
+        }
+    }
+    return NO;
+}
+
 static NSString* NFBBadgeSymbolForItem(id item) {
     if (!item || NFBBadgeItemIsModule(item)) {
         return nil;
     }
     id status = NFBStatusForItem(item);
-    if (![status respondsToSelector:@selector(socialContext)]) {
-        return nil;
+    if ([status respondsToSelector:@selector(socialContext)]) {
+        gNFBBadgeGate[NFBGateStatus]++;
     }
-    gNFBBadgeGate[NFBGateStatus]++;
-    id context =
-        ((id (*)(id, SEL))objc_msgSend)(status, @selector(socialContext));
-    if (!context) {
-        return nil;
-    }
-    gNFBBadgeGate[NFBGateContext]++;
-    NSString* text = nil;
-    if ([context respondsToSelector:@selector(text)]) {
-        text = ((NSString* (*)(id, SEL))objc_msgSend)(context, @selector(text));
-        if (![text isKindOfClass:[NSString class]]) {
-            text = nil;
+    // The rendered social string first: it is what the app displays, so it is
+    // present whenever a reason is shown to the reader.
+    NSString* text = NFBBadgeSocialText(item) ?: NFBBadgeSocialText(status);
+    if (!text.length && [status respondsToSelector:@selector(socialContext)]) {
+        id context =
+            ((id (*)(id, SEL))objc_msgSend)(status, @selector(socialContext));
+        if (context) {
+            gNFBBadgeGate[NFBGateContext]++;
+            if ([context respondsToSelector:@selector(text)]) {
+                NSString* contextText = ((NSString* (*)(id, SEL))objc_msgSend)(
+                    context, @selector(text));
+                if ([contextText isKindOfClass:[NSString class]]) {
+                    text = contextText;
+                }
+            }
         }
     }
     if (text.length) {
         gNFBBadgeGate[NFBGateNamed]++;
         gNFBBadgeSampleText = text;
-    }
-    if ([text.lowercaseString containsString:@"topic"]) {
-        return @"chart.line.uptrend.xyaxis";
-    }
-    if ([context respondsToSelector:@selector(contextType)]) {
-        NSInteger type = ((NSInteger (*)(id, SEL))objc_msgSend)(
-            context, @selector(contextType));
-        if (type != 0) {
-            return @"heart";
+        NSString* lowered = text.lowercaseString;
+        if ([lowered containsString:@"topic"]) {
+            return @"chart.line.uptrend.xyaxis";
         }
+        if ([lowered containsString:@"repost"] ||
+            [lowered containsString:@"retweet"]) {
+            return @"arrow.2.squarepath";
+        }
+        return @"heart";
     }
-    return text.length ? @"heart" : nil;
+    // No rendered string: a repost still names itself on the status.
+    if (NFBBadgeIsRepost(status)) {
+        gNFBBadgeGate[NFBGateNamed]++;
+        gNFBBadgeSampleText = @"(repost, no text)";
+        return @"arrow.2.squarepath";
+    }
+    return nil;
 }
 
 static id NFBItemAtIndexPath(TFNItemsDataViewController* dataViewController,
