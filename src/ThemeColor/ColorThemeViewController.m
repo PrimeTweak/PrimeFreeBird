@@ -25,7 +25,7 @@ extern void NFBBeginRawPaletteRead(void);
 extern void NFBEndRawPaletteRead(void);
 extern void NFBSyncAccentTheme(void);
 
-// Mirrors CurrentAccentColor's precedence (our override, then Twitter's own
+// Mirrors CurrentAccentColor's precedence (the tweak's override, then Twitter's own
 // option) so the default swatch shows selected before any change.
 static NSInteger CurrentSelectedColorOption(void) {
     NSUserDefaults* defaults = [NSUserDefaults standardUserDefaults];
@@ -53,7 +53,7 @@ static UIColor* NativeAccentColor(NSUInteger option) {
     }
 
     // Twitter's palette colours are DYNAMIC: they re-resolve on every trait or
-    // window-tint change, going through our accent hooks again — without the
+    // window-tint change, going through the tweak's accent hooks again — without the
     // raw-read guard. That repainted every swatch with the custom accent the
     // moment a colour was picked. Freeze light and dark NOW (guard is up here)
     // into a local provider that never touches the palette again.
@@ -69,7 +69,7 @@ static UIColor* NativeAccentColor(NSUInteger option) {
 }
 
 // Glass-mode controls resolve their accent from the primary colour OPTION
-// index, natively in Swift — they never reach our palette hooks. A custom
+// index, natively in Swift — they never reach the tweak's palette hooks. A custom
 // colour therefore has to travel as the option that looks closest to it,
 // otherwise those surfaces fall back to blue (option 1).
 static NSInteger NearestAccentOption(UIColor* color) {
@@ -257,7 +257,7 @@ static UIColor* customAccentColorFromDefaults(void);
 - (void)resetToDefaultColor {
     NSUserDefaults* defaults = NSUserDefaults.standardUserDefaults;
     // Clear every override so NOTHING declares an accent any more: the custom
-    // hex, our picked option, and Twitter's own stored option. With all three
+    // hex, the tweak's picked option, and Twitter's own stored option. With all three
     // gone the window tint is cleared, which is what puts iOS controls (the
     // Confirm button top right) back on the system blue, and leaves every
     // swatch unselected.
@@ -277,7 +277,7 @@ static UIColor* customAccentColorFromDefaults(void);
     [defaults setBool:NO forKey:@"color_twitter_icon_in_top_bar"];
     [defaults synchronize];
 
-    // 0 is Twitter's own default option, not our blue swatch.
+    // 0 is Twitter's own default option, not the tweak's blue swatch.
     id colorSettings = [objc_getClass("TAEColorSettings") sharedSettings];
     if ([colorSettings respondsToSelector:@selector(setPrimaryColorOption:)]) {
         [colorSettings setPrimaryColorOption:0];
@@ -290,12 +290,12 @@ static UIColor* customAccentColorFromDefaults(void);
 
 // Coming back from this screen does not relayout the timeline, so a colour
 // picked here only reached the bird and the tab bar on the next tab change.
-// Re-running the sync once we are off-screen catches them while they are.
+// Re-running the sync once the tweak are off-screen catches them while they are.
 - (void)viewWillAppear:(BOOL)animated {
     [super viewWillAppear:animated];
     NFBColorThemeScreenVisible++;
     // Returning to this screen triggers no bar layout and no refreshSelection,
-    // so a dark glyph Twitter baked while we were away stayed dark — a black
+    // so a dark glyph Twitter baked while the tweak were away stayed dark — a black
     // check on return, accent only elsewhere. Pass now, and once more after the
     // transition has rebuilt the bar item.
     NFBWhitenNavigationBarConfirm(self.navigationController.navigationBar);
@@ -330,7 +330,7 @@ static UIColor* customAccentColorFromDefaults(void);
     // is an ACTIVE accent (blue bird, blue tabs), reset restores the fully
     // native look (black chrome, iOS-blue confirm), by design.
     self.resetButton.hidden = NO;
-    // Twitter re-bakes the confirm glyph on the runloop AFTER our colour
+    // Twitter re-bakes the confirm glyph on the runloop AFTER the tweak's colour
     // notifications; run the white-bake now and once more next turn so the
     // fresh dark bake never reaches the screen.
     NFBWhitenNavigationBarConfirm(self.navigationController.navigationBar);
