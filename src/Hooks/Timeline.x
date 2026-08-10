@@ -978,10 +978,12 @@ static NSSet<NSNumber*>* ConversationAuthorRepliedToUserIDs(NSArray* sections,
 
 // MARK: - Reading marker
 //
-// Highlights the last Tweet read — an accent wash over its header, fading
-// out before the media — while that Tweet is still present in the feed. The anchor is the topmost visible row,
-// captured when the screen is left, when the app backgrounds, and just before
-// a full section replace. Chronological tabs (Following, Lists) keep their
+// Marks where the reading stopped when new Tweets arrive above — an accent
+// wash over that Tweet's header, fading out before the media. With nothing
+// new above the anchor there is nothing to say, and nothing is drawn. The
+// anchor is the topmost visible row, captured when the screen is left, when
+// the app backgrounds, and just before a delivery that puts new content on
+// top. Chronological tabs (Following, Lists) keep their
 // anchor through refreshes, so the marker lives there; a tab that discards
 // its anchor on a large list is algorithmic, and the marker retires on it for
 // the session rather than lying. Tabs whose controllers name themselves
@@ -990,6 +992,7 @@ static NSSet<NSNumber*>* ConversationAuthorRepliedToUserIDs(NSArray* sections,
 static const void* kNFBReadingAnchorIDKey = &kNFBReadingAnchorIDKey;
 static const void* kNFBReadingAnchorPathKey = &kNFBReadingAnchorPathKey;
 static const void* kNFBReadingMarkerViewKey = &kNFBReadingMarkerViewKey;
+static const void* kNFBReadingTopAtCaptureKey = &kNFBReadingTopAtCaptureKey;
 static const void* kNFBReadingRetiredKey = &kNFBReadingRetiredKey;
 static const void* kNFBReadingForYouKey = &kNFBReadingForYouKey;
 
@@ -1025,6 +1028,23 @@ static NSString* NFBReadingTopVisibleEntryID(TFNItemsDataViewController* dataVie
         return nil;
     }
     return ItemEntryID(((NSArray*)section)[top.row]);
+}
+
+// The list's first datable item — the reference for "has anything new
+// arrived above the anchor since it was captured".
+static NSString* NFBReadingFirstEntryID(NSArray* sections) {
+    for (id section in sections) {
+        if (![section isKindOfClass:[NSArray class]]) {
+            continue;
+        }
+        for (id item in (NSArray*)section) {
+            NSString* entryID = ItemEntryID(item);
+            if (entryID.length) {
+                return entryID;
+            }
+        }
+    }
+    return nil;
 }
 
 static NSIndexPath* NFBReadingIndexPathForEntryID(
@@ -1098,6 +1118,9 @@ static void NFBReadingCaptureAnchor(TFNItemsDataViewController* dataViewControll
     NSString* top = NFBReadingTopVisibleEntryID(dataViewController);
     if (top.length) {
         objc_setAssociatedObject(dataViewController, kNFBReadingAnchorIDKey, top,
+                                 OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        objc_setAssociatedObject(dataViewController, kNFBReadingTopAtCaptureKey,
+                                 NFBReadingFirstEntryID(dataViewController.sections),
                                  OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     }
 }
@@ -1174,6 +1197,16 @@ static void NFBReadingPositionMarker(TFNItemsDataViewController* dataViewControl
             objc_setAssociatedObject(dataViewController, kNFBReadingAnchorIDKey,
                                      nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
         }
+        marker.hidden = YES;
+        return;
+    }
+    // Nothing new above the anchor means nothing to say: at the top of an
+    // unchanged list the reader already knows where they are.
+    NSString* topAtCapture =
+        objc_getAssociatedObject(dataViewController, kNFBReadingTopAtCaptureKey);
+    NSString* topNow = NFBReadingFirstEntryID(dataViewController.sections);
+    if (!topAtCapture.length || !topNow.length ||
+        [topAtCapture isEqualToString:topNow]) {
         marker.hidden = YES;
         return;
     }
@@ -1322,6 +1355,14 @@ static NSArray* FilteredTimelineSections(TFNItemsDataViewController* dataViewCon
     reconfigureItemIdentifiers:(NSArray*)identifiers
               withRowAnimation:(long long)animation
                     completion:(id)completion {
+    if (NFBReadingMarkerAllowed(self)) {
+        NSString* incomingTop = NFBReadingFirstEntryID(sections);
+        NSString* currentTop = NFBReadingFirstEntryID(self.sections);
+        if (incomingTop.length && currentTop.length &&
+            ![incomingTop isEqualToString:currentTop]) {
+            NFBReadingCaptureAnchor(self);
+        }
+    }
     %orig(FilteredTimelineSections(self, sections), identifiers, animation, completion);
     NFBReadingRescanSoon(self);
 }
