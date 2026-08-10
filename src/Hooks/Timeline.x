@@ -202,6 +202,7 @@ static void nfbApplyFleetVisibility(UIView* view) {
 // Liquid Glass everywhere else.
 
 static void NFBReadingLayoutTick(UIScrollView* scrollView);
+static void NFBBadgeLayoutTick(UIScrollView* scrollView);
 
 static const void* kNFBEdgeMarkKey = &kNFBEdgeMarkKey;
 
@@ -385,6 +386,7 @@ static void nfbLayBandIntoSettingsBar(UINavigationBar* bar,
         BOOL marked = objc_getAssociatedObject(self, kNFBEdgeMarkKey) != nil;
         BOOL hide = nfbEdgeHideEnabled();
         NFBReadingLayoutTick(self);
+        NFBBadgeLayoutTick(self);
         if (!marked && (!hide || nfbScrollViewIsModal(self))) {
             return;
         }
@@ -995,6 +997,7 @@ static const void* kNFBReadingMarkerViewKey = &kNFBReadingMarkerViewKey;
 static const void* kNFBReadingTopAtCaptureKey = &kNFBReadingTopAtCaptureKey;
 static const void* kNFBReadingRetiredKey = &kNFBReadingRetiredKey;
 static const void* kNFBReadingMissCountKey = &kNFBReadingMissCountKey;
+static const void* kNFBReadingRestoreTriesKey = &kNFBReadingRestoreTriesKey;
 static const void* kNFBReadingForYouKey = &kNFBReadingForYouKey;
 
 // The wash covers the Tweet's header and fades out before the media: solid
@@ -1069,6 +1072,64 @@ static NSIndexPath* NFBReadingIndexPathForEntryID(
     return nil;
 }
 
+// Anchors outlive the process. Which tab an anchor belongs to is never
+// recorded: on the next launch each list looks for the first stored anchor it
+// still contains, so Following and every List recover their own without the
+// tweak having to name them. A list that contains none of them simply starts
+// fresh.
+static NSString* const kNFBReadingStoreKey = @"nfb_reading_anchors";
+static const NSUInteger kNFBReadingStoreLimit = 12;
+
+static void NFBReadingStoreRemember(NSString* previousAnchor, NSString* anchor,
+                                    NSString* head) {
+    if (!anchor.length || !head.length) {
+        return;
+    }
+    NSUserDefaults* defaults = [NSUserDefaults standardUserDefaults];
+    NSMutableArray* entries =
+        [NSMutableArray arrayWithObject:@{@"anchor": anchor, @"head": head}];
+    for (id entry in [defaults arrayForKey:kNFBReadingStoreKey]) {
+        if (entries.count >= kNFBReadingStoreLimit) {
+            break;
+        }
+        if (![entry isKindOfClass:[NSDictionary class]]) {
+            continue;
+        }
+        NSString* storedAnchor = ((NSDictionary*)entry)[@"anchor"];
+        // The tab's own previous entry is replaced, not stacked.
+        if (![storedAnchor isKindOfClass:[NSString class]] ||
+            [storedAnchor isEqualToString:anchor] ||
+            (previousAnchor.length &&
+             [storedAnchor isEqualToString:previousAnchor])) {
+            continue;
+        }
+        [entries addObject:entry];
+    }
+    [defaults setObject:entries forKey:kNFBReadingStoreKey];
+}
+
+static BOOL NFBReadingStoreRestore(TFNItemsDataViewController* dataViewController) {
+    for (id entry in
+         [[NSUserDefaults standardUserDefaults] arrayForKey:kNFBReadingStoreKey]) {
+        if (![entry isKindOfClass:[NSDictionary class]]) {
+            continue;
+        }
+        NSString* anchor = ((NSDictionary*)entry)[@"anchor"];
+        NSString* head = ((NSDictionary*)entry)[@"head"];
+        if (![anchor isKindOfClass:[NSString class]] ||
+            ![head isKindOfClass:[NSString class]] ||
+            !NFBReadingIndexPathForEntryID(dataViewController, anchor)) {
+            continue;
+        }
+        objc_setAssociatedObject(dataViewController, kNFBReadingAnchorIDKey,
+                                 anchor, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        objc_setAssociatedObject(dataViewController, kNFBReadingTopAtCaptureKey,
+                                 head, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        return YES;
+    }
+    return NO;
+}
+
 // The controller chain names the algorithmic tab on builds where the child
 // controllers carry "ForYou" in their class names; the verdict is cached per
 // controller. A chain that names nothing changes nothing.
@@ -1132,10 +1193,13 @@ static void NFBReadingCaptureAnchor(TFNItemsDataViewController* dataViewControll
     if (boundaryActive && ![top isEqualToString:listHead]) {
         return;
     }
+    NSString* previousAnchor =
+        objc_getAssociatedObject(dataViewController, kNFBReadingAnchorIDKey);
     objc_setAssociatedObject(dataViewController, kNFBReadingAnchorIDKey, top,
                              OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     objc_setAssociatedObject(dataViewController, kNFBReadingTopAtCaptureKey,
                              listHead, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    NFBReadingStoreRemember(previousAnchor, top, listHead);
 }
 
 // One row's true geometry. The rendered cell is authoritative when it is on
@@ -1192,6 +1256,19 @@ static void NFBReadingPositionMarker(TFNItemsDataViewController* dataViewControl
         return;
     }
     UIView* marker = objc_getAssociatedObject(table, kNFBReadingMarkerViewKey);
+    // A launch starts with no anchor in memory; the stored ones are tried
+    // against this list a few times while it fills in.
+    if (NFBReadingMarkerAllowed(dataViewController) &&
+        !objc_getAssociatedObject(dataViewController, kNFBReadingAnchorIDKey)) {
+        NSInteger tries = [objc_getAssociatedObject(
+            dataViewController, kNFBReadingRestoreTriesKey) integerValue];
+        if (tries < 3) {
+            objc_setAssociatedObject(dataViewController,
+                                     kNFBReadingRestoreTriesKey, @(tries + 1),
+                                     OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+            NFBReadingStoreRestore(dataViewController);
+        }
+    }
     NSString* anchor =
         objc_getAssociatedObject(dataViewController, kNFBReadingAnchorIDKey);
     NSIndexPath* path = NFBReadingMarkerAllowed(dataViewController)
@@ -1300,6 +1377,137 @@ static void NFBReadingTrack(TFNItemsDataViewController* dataViewController) {
                     }];
     });
     [gNFBReadingControllers addObject:dataViewController];
+}
+
+// MARK: - Provenance badges
+//
+// A thin symbol in a Tweet's top-right corner when it is in the feed for a
+// reason worth naming. The signals come from the item itself: the Swift-side
+// promoted payload, and the scribe component and entry ID that already drive
+// the hide options. An item that names no reason gets no badge, so a signal
+// this side cannot read stays silent rather than guessing.
+
+static const void* kNFBBadgeViewKey = &kNFBBadgeViewKey;
+static const void* kNFBBadgeSymbolKey = &kNFBBadgeSymbolKey;
+static const CGFloat kNFBBadgeSize = 15.0;
+static const CGFloat kNFBBadgeInset = 14.0;
+static const CGFloat kNFBBadgeQuietAlpha = 0.5;
+
+static BOOL NFBItemIsPromoted(id item) {
+    Ivar promoted = class_getInstanceVariable([item class], "promotedContent");
+    if (promoted && object_getIvar(item, promoted) != nil) {
+        return YES;
+    }
+    if ([item respondsToSelector:@selector(scribeItem)]) {
+        id scribe = [item performSelector:@selector(scribeItem)];
+        if ([scribe isKindOfClass:[NSDictionary class]] &&
+            ((NSDictionary*)scribe)[@"promoted_id"] != nil) {
+            return YES;
+        }
+    }
+    return NO;
+}
+
+static NSString* NFBBadgeSymbolForItem(id item, BOOL* usesAccent) {
+    *usesAccent = NO;
+    if (!item) {
+        return nil;
+    }
+    if (NFBItemIsPromoted(item)) {
+        *usesAccent = YES;
+        return @"paperplane";
+    }
+    NSString* component = ItemScribeComponent(item);
+    NSString* entryID = ItemEntryID(item);
+    if ([component isEqualToString:@"suggest_who_to_follow"] ||
+        [entryID containsString:@"who-to-follow"]) {
+        return @"star";
+    }
+    if ([component containsString:@"topic"] || [entryID containsString:@"topic"]) {
+        return @"chart.line.uptrend.xyaxis";
+    }
+    return nil;
+}
+
+static id NFBItemAtIndexPath(TFNItemsDataViewController* dataViewController,
+                             NSIndexPath* path) {
+    NSArray* sections = dataViewController.sections;
+    if (!path || path.section >= (NSInteger)sections.count) {
+        return nil;
+    }
+    id section = sections[path.section];
+    if (![section isKindOfClass:[NSArray class]] ||
+        path.row >= (NSInteger)((NSArray*)section).count) {
+        return nil;
+    }
+    return ((NSArray*)section)[path.row];
+}
+
+// Every visible cell is decided on each pass: a reused cell that no longer
+// carries a reason has its badge hidden rather than inherited.
+static void NFBBadgeLayoutTick(UIScrollView* scrollView) {
+    if (![scrollView isKindOfClass:[UITableView class]] ||
+        ![BHTSettings boolForKey:@"provenance_badges"]) {
+        return;
+    }
+    UITableView* table = (UITableView*)scrollView;
+    UIViewController* owner = nfbOwningController(table);
+    if (![owner isKindOfClass:[TFNItemsDataViewController class]]) {
+        return;
+    }
+    TFNItemsDataViewController* dataViewController =
+        (TFNItemsDataViewController*)owner;
+    if (!NFBReadingIsHomeTimeline(dataViewController)) {
+        return;
+    }
+    extern UIColor* CurrentAccentColor(void);
+    for (UITableViewCell* cell in table.visibleCells) {
+        UIImageView* badge = objc_getAssociatedObject(cell, kNFBBadgeViewKey);
+        BOOL usesAccent = NO;
+        NSString* symbol = NFBBadgeSymbolForItem(
+            NFBItemAtIndexPath(dataViewController, [table indexPathForCell:cell]),
+            &usesAccent);
+        if (!symbol) {
+            badge.hidden = YES;
+            continue;
+        }
+        if (!badge) {
+            badge = [[UIImageView alloc] init];
+            badge.userInteractionEnabled = NO;
+            badge.contentMode = UIViewContentModeScaleAspectFit;
+            badge.autoresizingMask = UIViewAutoresizingFlexibleLeftMargin;
+            objc_setAssociatedObject(cell, kNFBBadgeViewKey, badge,
+                                     OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        }
+        if (![objc_getAssociatedObject(badge, kNFBBadgeSymbolKey)
+                isEqualToString:symbol]) {
+            UIImageSymbolConfiguration* configuration =
+                [UIImageSymbolConfiguration
+                    configurationWithPointSize:kNFBBadgeSize
+                                        weight:UIImageSymbolWeightLight];
+            badge.image = [UIImage systemImageNamed:symbol
+                                  withConfiguration:configuration];
+            objc_setAssociatedObject(badge, kNFBBadgeSymbolKey, symbol,
+                                     OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        }
+        if (!badge.image) {
+            badge.hidden = YES;   // symbole absent de cette version d'iOS
+            continue;
+        }
+        badge.tintColor = usesAccent
+                              ? (CurrentAccentColor() ?: [UIColor systemBlueColor])
+                              : [UIColor secondaryLabelColor];
+        badge.alpha = usesAccent ? 1.0 : kNFBBadgeQuietAlpha;
+        UIView* host = cell.contentView;
+        badge.frame =
+            CGRectMake(CGRectGetWidth(host.bounds) - kNFBBadgeInset - kNFBBadgeSize,
+                       kNFBBadgeInset, kNFBBadgeSize, kNFBBadgeSize);
+        if (badge.superview != host) {
+            [host addSubview:badge];
+        }
+        badge.hidden = NO;
+        [host bringSubviewToFront:badge];
+    }
 }
 
 static NSArray* FilteredTimelineSections(TFNItemsDataViewController* dataViewController,
