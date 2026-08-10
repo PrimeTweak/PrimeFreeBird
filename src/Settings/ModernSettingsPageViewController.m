@@ -362,7 +362,12 @@ extern NSInteger NFBColorThemeScreenVisible;
 - (void)showBadgeSurvey:(NSDictionary*)sender {
     NSUserDefaults* defaults = [NSUserDefaults standardUserDefaults];
     NSString* message = [NSString
-        stringWithFormat:@"seen %ld\nstatus %ld\ncontext %ld\nnamed %ld\n\n%@",
+        stringWithFormat:@"tick %ld\ntoggle %ld\nresolved %ld\nhome %ld\nseen "
+                         @"%ld\nstatus %ld\ncontext %ld\nnamed %ld\n\n%@",
+                         (long)[defaults integerForKey:@"nfb_badge_tick"],
+                         (long)[defaults integerForKey:@"nfb_badge_toggle"],
+                         (long)[defaults integerForKey:@"nfb_badge_resolved"],
+                         (long)[defaults integerForKey:@"nfb_badge_home"],
                          (long)[defaults integerForKey:@"nfb_badge_seen"],
                          (long)[defaults integerForKey:@"nfb_badge_status"],
                          (long)[defaults integerForKey:@"nfb_badge_context"],
@@ -375,9 +380,11 @@ extern NSInteger NFBColorThemeScreenVisible;
     [alert addAction:[UIAlertAction actionWithTitle:@"Reset"
                                               style:UIAlertActionStyleDestructive
                                             handler:^(UIAlertAction* action) {
-        for (NSString* key in @[ @"nfb_badge_seen", @"nfb_badge_status",
-                                 @"nfb_badge_context", @"nfb_badge_named",
-                                 @"nfb_badge_sample" ]) {
+        for (NSString* key in @[
+                 @"nfb_badge_tick", @"nfb_badge_toggle", @"nfb_badge_resolved",
+                 @"nfb_badge_home", @"nfb_badge_seen", @"nfb_badge_status",
+                 @"nfb_badge_context", @"nfb_badge_named", @"nfb_badge_sample"
+             ]) {
             [defaults removeObjectForKey:key];
         }
     }]];
