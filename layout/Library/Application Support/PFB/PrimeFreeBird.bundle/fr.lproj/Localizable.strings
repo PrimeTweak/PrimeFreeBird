@@ -350,6 +350,8 @@
 "READING_LINE_DETAIL" = "Marque où tu étais quand de nouveaux Tweets arrivent au-dessus — sur Following et tes Lists.";
 "PROVENANCE_BADGES_TITLE" = "Badges de provenance";
 "PROVENANCE_BADGES_DETAIL" = "Affiche une petite icône sur les Tweets ajoutés pour un sujet ou l’activité de quelqu’un.";
+"BADGE_SURVEY_TITLE" = "Diagnostic des badges";
+"BADGE_SURVEY_EMPTY" = "Aucune donnée — scrolle For You, puis ouvre ceci.";
 "INTERFACE_STYLE_DETAIL" = "Liquid Glass est le design translucide d’iOS 26. Standard garde le look plat.";
 "INTERFACE_STYLE_STANDARD" = "Standard";
 "INTERFACE_STYLE_LIQUID_GLASS" = "Liquid Glass";
