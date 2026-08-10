@@ -28,7 +28,7 @@ extern void applySquareAvatarsSetting(void);
                          message:[bundle localizedStringForKey:@"PROFILE_INITIAL_TAB_DETAIL"]
                   preferredStyle:UIAlertControllerStyleAlert];
 
-    // A tab you have hidden is not offered here. Highlights, Articles and
+    // A hidden tab is not offered here. Highlights, Articles and
     // Videos each have their own switch on this very page, and listing a tab
     // that will never appear invites a choice that silently does nothing.
     NSArray<NSString*>* titleKeys = @[
