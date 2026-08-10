@@ -1381,41 +1381,49 @@ static void NFBReadingTrack(TFNItemsDataViewController* dataViewController) {
 
 // MARK: - Provenance badges
 //
-// A thin symbol in the top-right corner of a Tweet the timeline added for a
-// reason of its own: a topic, or someone's activity. Promoted Tweets and
-// account suggestions carry no badge — the hide options remove them before
-// they reach the screen, and what is deleted needs no label.
-//
-// The reason is read from the item's scribe component, the same field the
-// hide options already match against. An item whose component names nothing
-// gets no badge, so an unread signal stays silent rather than guessing.
+// A thin symbol in a Tweet's top-right corner when it is in the feed for a
+// reason worth naming. The signals come from the item itself: the Swift-side
+// promoted payload, and the scribe component and entry ID that already drive
+// the hide options. An item that names no reason gets no badge, so a signal
+// this side cannot read stays silent rather than guessing.
 
 static const void* kNFBBadgeViewKey = &kNFBBadgeViewKey;
 static const void* kNFBBadgeSymbolKey = &kNFBBadgeSymbolKey;
 static const CGFloat kNFBBadgeSize = 15.0;
 static const CGFloat kNFBBadgeInset = 14.0;
-static const CGFloat kNFBBadgeAlpha = 0.5;
+static const CGFloat kNFBBadgeQuietAlpha = 0.5;
 
-// Banners, carousels and prompts are modules, not Tweets; their own component
-// can name a topic without a Tweet being involved.
-static BOOL NFBBadgeItemIsModule(id item) {
-    NSString* className = NSStringFromClass([item class]);
-    return [className containsString:@"Banner"] ||
-           [className containsString:@"Collection"] ||
-           [className containsString:@"Carousel"] ||
-           [className containsString:@"Prompt"];
+static BOOL NFBItemIsPromoted(id item) {
+    Ivar promoted = class_getInstanceVariable([item class], "promotedContent");
+    if (promoted && object_getIvar(item, promoted) != nil) {
+        return YES;
+    }
+    if ([item respondsToSelector:@selector(scribeItem)]) {
+        id scribe = [item performSelector:@selector(scribeItem)];
+        if ([scribe isKindOfClass:[NSDictionary class]] &&
+            ((NSDictionary*)scribe)[@"promoted_id"] != nil) {
+            return YES;
+        }
+    }
+    return NO;
 }
 
-static NSString* NFBBadgeSymbolForItem(id item) {
-    if (!item || NFBBadgeItemIsModule(item)) {
+static NSString* NFBBadgeSymbolForItem(id item, BOOL* usesAccent) {
+    *usesAccent = NO;
+    if (!item) {
         return nil;
     }
-    NSString* component = ItemScribeComponent(item);
-    if ([component containsString:@"activity"]) {
-        return @"heart";
+    if (NFBItemIsPromoted(item)) {
+        *usesAccent = YES;
+        return @"paperplane";
     }
-    if ([component containsString:@"topic"] ||
-        [ItemEntryID(item) containsString:@"topic"]) {
+    NSString* component = ItemScribeComponent(item);
+    NSString* entryID = ItemEntryID(item);
+    if ([component isEqualToString:@"suggest_who_to_follow"] ||
+        [entryID containsString:@"who-to-follow"]) {
+        return @"star";
+    }
+    if ([component containsString:@"topic"] || [entryID containsString:@"topic"]) {
         return @"chart.line.uptrend.xyaxis";
     }
     return nil;
@@ -1444,7 +1452,10 @@ static void NFBBadgeLayoutTick(UIScrollView* scrollView) {
     }
     UITableView* table = (UITableView*)scrollView;
     UIViewController* owner = nfbOwningController(table);
-    if (![owner isKindOfClass:[TFNItemsDataViewController class]]) {
+    // Twitter's classes resolve at runtime; a link-time reference to one has
+    // no library to come from.
+    Class dataClass = NSClassFromString(@"TFNItemsDataViewController");
+    if (!dataClass || ![owner isKindOfClass:dataClass]) {
         return;
     }
     TFNItemsDataViewController* dataViewController =
@@ -1452,10 +1463,13 @@ static void NFBBadgeLayoutTick(UIScrollView* scrollView) {
     if (!NFBReadingIsHomeTimeline(dataViewController)) {
         return;
     }
+    extern UIColor* CurrentAccentColor(void);
     for (UITableViewCell* cell in table.visibleCells) {
         UIImageView* badge = objc_getAssociatedObject(cell, kNFBBadgeViewKey);
+        BOOL usesAccent = NO;
         NSString* symbol = NFBBadgeSymbolForItem(
-            NFBItemAtIndexPath(dataViewController, [table indexPathForCell:cell]));
+            NFBItemAtIndexPath(dataViewController, [table indexPathForCell:cell]),
+            &usesAccent);
         if (!symbol) {
             badge.hidden = YES;
             continue;
@@ -1465,8 +1479,6 @@ static void NFBBadgeLayoutTick(UIScrollView* scrollView) {
             badge.userInteractionEnabled = NO;
             badge.contentMode = UIViewContentModeScaleAspectFit;
             badge.autoresizingMask = UIViewAutoresizingFlexibleLeftMargin;
-            badge.tintColor = [UIColor secondaryLabelColor];
-            badge.alpha = kNFBBadgeAlpha;
             objc_setAssociatedObject(cell, kNFBBadgeViewKey, badge,
                                      OBJC_ASSOCIATION_RETAIN_NONATOMIC);
         }
@@ -1485,6 +1497,10 @@ static void NFBBadgeLayoutTick(UIScrollView* scrollView) {
             badge.hidden = YES;   // symbole absent de cette version d'iOS
             continue;
         }
+        badge.tintColor = usesAccent
+                              ? (CurrentAccentColor() ?: [UIColor systemBlueColor])
+                              : [UIColor secondaryLabelColor];
+        badge.alpha = usesAccent ? 1.0 : kNFBBadgeQuietAlpha;
         UIView* host = cell.contentView;
         badge.frame =
             CGRectMake(CGRectGetWidth(host.bounds) - kNFBBadgeInset - kNFBBadgeSize,
