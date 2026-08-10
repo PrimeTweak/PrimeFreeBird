@@ -359,6 +359,36 @@ extern NSInteger NFBColorThemeScreenVisible;
 
 // MARK: - Settings backup
 
+- (void)showBadgeSurvey:(NSDictionary*)sender {
+    NSUserDefaults* defaults = [NSUserDefaults standardUserDefaults];
+    NSString* message = [NSString
+        stringWithFormat:@"seen %ld\nstatus %ld\ncontext %ld\nnamed %ld\n\n%@",
+                         (long)[defaults integerForKey:@"nfb_badge_seen"],
+                         (long)[defaults integerForKey:@"nfb_badge_status"],
+                         (long)[defaults integerForKey:@"nfb_badge_context"],
+                         (long)[defaults integerForKey:@"nfb_badge_named"],
+                         [defaults stringForKey:@"nfb_badge_sample"] ?: @"(no sample)"];
+    UIAlertController* alert = [UIAlertController
+        alertControllerWithTitle:@"Badge survey"
+                         message:message
+                  preferredStyle:UIAlertControllerStyleAlert];
+    [alert addAction:[UIAlertAction actionWithTitle:@"Reset"
+                                              style:UIAlertActionStyleDestructive
+                                            handler:^(UIAlertAction* action) {
+        for (NSString* key in @[ @"nfb_badge_seen", @"nfb_badge_status",
+                                 @"nfb_badge_context", @"nfb_badge_named",
+                                 @"nfb_badge_sample" ]) {
+            [defaults removeObjectForKey:key];
+        }
+    }]];
+    [alert addAction:[UIAlertAction
+                         actionWithTitle:[[BHTBundle sharedBundle]
+                                             localizedStringForKey:@"OK_ACTION"]
+                                   style:UIAlertActionStyleDefault
+                                 handler:nil]];
+    [self presentViewController:alert animated:YES completion:nil];
+}
+
 - (void)showExportSettings:(NSDictionary*)sender {
     NSData* data = [BHTSettingsBackup exportData];
     if (!data) {
