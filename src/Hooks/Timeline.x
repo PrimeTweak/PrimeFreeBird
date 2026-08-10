@@ -203,6 +203,7 @@ static void nfbApplyFleetVisibility(UIView* view) {
 
 static void NFBReadingLayoutTick(UIScrollView* scrollView);
 static void NFBBadgeLayoutTick(UIScrollView* scrollView);
+static void NFBBadgePass(TFNItemsDataViewController* dataViewController);
 
 static const void* kNFBEdgeMarkKey = &kNFBEdgeMarkKey;
 
@@ -1035,22 +1036,6 @@ static NSArray<NSIndexPath*>* NFBListVisibleIndexPaths(UIScrollView* scrollView)
     return @[];
 }
 
-static NSArray* NFBListVisibleCells(UIScrollView* scrollView) {
-    if ([scrollView respondsToSelector:@selector(visibleCells)]) {
-        return ((NSArray* (*)(id, SEL))objc_msgSend)(scrollView,
-                                                     @selector(visibleCells));
-    }
-    return @[];
-}
-
-static NSIndexPath* NFBListIndexPathForCell(UIScrollView* scrollView, UIView* cell) {
-    if ([scrollView respondsToSelector:@selector(indexPathForCell:)]) {
-        return ((NSIndexPath* (*)(id, SEL, id))objc_msgSend)(
-            scrollView, @selector(indexPathForCell:), cell);
-    }
-    return nil;
-}
-
 static BOOL NFBListCellFrame(UIScrollView* scrollView, NSIndexPath* path,
                              CGRect* outFrame) {
     if ([scrollView respondsToSelector:@selector(cellForRowAtIndexPath:)]) {
@@ -1415,6 +1400,7 @@ static void NFBReadingRescanSoon(TFNItemsDataViewController* dataViewController)
         TFNItemsDataViewController* controller = weakController;
         if (controller) {
             NFBReadingPositionMarker(controller);
+            NFBBadgePass(controller);
         }
     });
 }
@@ -1457,11 +1443,12 @@ static void NFBReadingTrack(TFNItemsDataViewController* dataViewController) {
 // MARK: - Provenance badges
 //
 // A thin symbol left of a Tweet's caret menu when the timeline added it for a
-// reason of its own. The reason is read from the status's social-context
-// object (-socialContext, with -contextType and -text), the API the app
-// itself renders from. The pass resolves its controller from the reading
-// registry, which tracks every home controller. Each gate keeps a running
-// count so a silent outcome names its own cause.
+// reason of its own, read from the status's social-context object
+// (-socialContext, with -contextType and -text). Badges are applied from the
+// controller itself, in the same beat as the reading marker: the controller
+// is in hand there, so nothing has to be resolved for the badges to exist.
+// The scroll-view layout pass only refreshes recycled cells when it can find
+// its controller, and every gate keeps a running count.
 
 static const void* kNFBBadgeViewKey = &kNFBBadgeViewKey;
 static const void* kNFBBadgeSymbolKey = &kNFBBadgeSymbolKey;
@@ -1474,7 +1461,9 @@ enum {
     NFBGateTick,
     NFBGateToggle,
     NFBGateResolved,
+    NFBGateDesc,
     NFBGateHome,
+    NFBGatePass,
     NFBGateSeen,
     NFBGateStatus,
     NFBGateContext,
@@ -1483,9 +1472,10 @@ enum {
 };
 static NSInteger gNFBBadgeGate[NFBGateTotal];
 static NSString* gNFBBadgeSampleText;
+static NSString* gNFBBadgeListsText;
 
-// Counter deltas move to defaults at most once a second, so the layout pass
-// never writes to disk on its own.
+// Counter deltas move to defaults at most once a second, so no pass writes to
+// disk on its own.
 static void NFBBadgeFlush(void) {
     static CFAbsoluteTime lastFlush = 0;
     CFAbsoluteTime now = CFAbsoluteTimeGetCurrent();
@@ -1494,9 +1484,10 @@ static void NFBBadgeFlush(void) {
     }
     lastFlush = now;
     static NSString* const keys[NFBGateTotal] = {
-        @"nfb_badge_tick",    @"nfb_badge_toggle", @"nfb_badge_resolved",
-        @"nfb_badge_home",    @"nfb_badge_seen",   @"nfb_badge_status",
-        @"nfb_badge_context", @"nfb_badge_named"
+        @"nfb_badge_tick",   @"nfb_badge_toggle", @"nfb_badge_resolved",
+        @"nfb_badge_desc",   @"nfb_badge_home",   @"nfb_badge_pass",
+        @"nfb_badge_seen",   @"nfb_badge_status", @"nfb_badge_context",
+        @"nfb_badge_named"
     };
     NSUserDefaults* defaults = [NSUserDefaults standardUserDefaults];
     for (NSUInteger index = 0; index < NFBGateTotal; index++) {
@@ -1510,6 +1501,10 @@ static void NFBBadgeFlush(void) {
     if (gNFBBadgeSampleText.length) {
         [defaults setObject:gNFBBadgeSampleText forKey:@"nfb_badge_sample"];
         gNFBBadgeSampleText = nil;
+    }
+    if (gNFBBadgeListsText.length) {
+        [defaults setObject:gNFBBadgeListsText forKey:@"nfb_badge_lists"];
+        gNFBBadgeListsText = nil;
     }
 }
 
@@ -1590,11 +1585,113 @@ static id NFBItemAtIndexPath(TFNItemsDataViewController* dataViewController,
     return ((NSArray*)section)[path.row];
 }
 
-// Every visible cell is decided on each pass: a reused cell that no longer
-// carries a reason has its badge hidden rather than inherited.
+static UIView* NFBListCellAtPath(UIScrollView* scrollView, NSIndexPath* path) {
+    if ([scrollView respondsToSelector:@selector(cellForRowAtIndexPath:)]) {
+        return ((UIView* (*)(id, SEL, id))objc_msgSend)(
+            scrollView, @selector(cellForRowAtIndexPath:), path);
+    }
+    if ([scrollView respondsToSelector:@selector(cellForItemAtIndexPath:)]) {
+        return ((UIView* (*)(id, SEL, id))objc_msgSend)(
+            scrollView, @selector(cellForItemAtIndexPath:), path);
+    }
+    return nil;
+}
+
+static void NFBBadgeApplyToCell(UIView* cell, id item) {
+    UIImageView* badge = objc_getAssociatedObject(cell, kNFBBadgeViewKey);
+    NSString* symbol = NFBBadgeSymbolForItem(item);
+    if (!symbol) {
+        badge.hidden = YES;
+        return;
+    }
+    if (!badge) {
+        badge = [[UIImageView alloc] init];
+        badge.userInteractionEnabled = NO;
+        badge.contentMode = UIViewContentModeScaleAspectFit;
+        badge.autoresizingMask = UIViewAutoresizingFlexibleLeftMargin;
+        badge.tintColor = [UIColor secondaryLabelColor];
+        badge.alpha = kNFBBadgeAlpha;
+        objc_setAssociatedObject(cell, kNFBBadgeViewKey, badge,
+                                 OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    }
+    if (![objc_getAssociatedObject(badge, kNFBBadgeSymbolKey)
+            isEqualToString:symbol]) {
+        UIImageSymbolConfiguration* configuration = [UIImageSymbolConfiguration
+            configurationWithPointSize:kNFBBadgeSize
+                                weight:UIImageSymbolWeightLight];
+        badge.image = [UIImage systemImageNamed:symbol
+                              withConfiguration:configuration];
+        objc_setAssociatedObject(badge, kNFBBadgeSymbolKey, symbol,
+                                 OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    }
+    if (!badge.image) {
+        badge.hidden = YES;
+        return;
+    }
+    UIView* host = cell;
+    if ([cell respondsToSelector:@selector(contentView)]) {
+        host = ((UIView* (*)(id, SEL))objc_msgSend)(cell, @selector(contentView));
+    }
+    badge.frame = CGRectMake(CGRectGetWidth(host.bounds) - kNFBBadgeInset -
+                                 kNFBBadgeDotsClearance - kNFBBadgeSize,
+                             kNFBBadgeInset, kNFBBadgeSize, kNFBBadgeSize);
+    if (badge.superview != host) {
+        [host addSubview:badge];
+    }
+    badge.hidden = NO;
+    [host bringSubviewToFront:badge];
+}
+
+// One line of state for the survey: which lists the controller exposes and
+// how many index paths are visible right now.
+static void NFBBadgeNoteLists(TFNItemsDataViewController* dataViewController,
+                              UIScrollView* list) {
+    id table = [dataViewController respondsToSelector:@selector(tableView)]
+                   ? ((id (*)(id, SEL))objc_msgSend)(dataViewController,
+                                                     @selector(tableView))
+                   : nil;
+    id collection =
+        [dataViewController respondsToSelector:@selector(collectionView)]
+            ? ((id (*)(id, SEL))objc_msgSend)(dataViewController,
+                                              @selector(collectionView))
+            : nil;
+    gNFBBadgeListsText = [NSString
+        stringWithFormat:@"T=%@ C=%@ vis=%lu",
+                         table ? NSStringFromClass([table class]) : @"nil",
+                         collection ? NSStringFromClass([collection class])
+                                    : @"nil",
+                         (unsigned long)NFBListVisibleIndexPaths(list).count];
+}
+
+// Applies badges to every visible row of the controller's own list. The
+// controller is a parameter, never a guess.
+static void NFBBadgePass(TFNItemsDataViewController* dataViewController) {
+    if (![BHTSettings boolForKey:@"provenance_badges"] ||
+        !NFBReadingIsHomeTimeline(dataViewController)) {
+        return;
+    }
+    gNFBBadgeGate[NFBGatePass]++;
+    UIScrollView* list = NFBListScrollView(dataViewController);
+    NFBBadgeNoteLists(dataViewController, list);
+    for (NSIndexPath* path in NFBListVisibleIndexPaths(list)) {
+        gNFBBadgeGate[NFBGateSeen]++;
+        UIView* cell = NFBListCellAtPath(list, path);
+        if (!cell) {
+            continue;
+        }
+        NFBBadgeApplyToCell(cell,
+                            NFBItemAtIndexPath(dataViewController, path));
+    }
+    NFBBadgeFlush();
+}
+
+// The scroll pass refreshes recycled cells. Its controller comes from the
+// reading registry — by pointer when the list is the tracked one, by view
+// ancestry otherwise.
 static void NFBBadgeLayoutTick(UIScrollView* scrollView) {
-    BOOL isList = [scrollView respondsToSelector:@selector(visibleCells)] ||
-                  [scrollView respondsToSelector:@selector(indexPathsForVisibleItems)];
+    BOOL isList =
+        [scrollView respondsToSelector:@selector(visibleCells)] ||
+        [scrollView respondsToSelector:@selector(indexPathsForVisibleItems)];
     if (!isList) {
         return;
     }
@@ -1608,66 +1705,26 @@ static void NFBBadgeLayoutTick(UIScrollView* scrollView) {
     for (TFNItemsDataViewController* tracked in gNFBReadingControllers.allObjects) {
         if (NFBListScrollView(tracked) == scrollView) {
             dataViewController = tracked;
+            gNFBBadgeGate[NFBGateResolved]++;
             break;
+        }
+    }
+    if (!dataViewController) {
+        for (TFNItemsDataViewController* tracked in
+             gNFBReadingControllers.allObjects) {
+            if ([tracked isViewLoaded] &&
+                [scrollView isDescendantOfView:tracked.view]) {
+                dataViewController = tracked;
+                gNFBBadgeGate[NFBGateDesc]++;
+                break;
+            }
         }
     }
     if (!dataViewController) {
         return;
     }
-    gNFBBadgeGate[NFBGateResolved]++;
-    if (!NFBReadingIsHomeTimeline(dataViewController)) {
-        return;
-    }
     gNFBBadgeGate[NFBGateHome]++;
-    for (UIView* cell in NFBListVisibleCells(scrollView)) {
-        gNFBBadgeGate[NFBGateSeen]++;
-        UIImageView* badge = objc_getAssociatedObject(cell, kNFBBadgeViewKey);
-        NSString* symbol = NFBBadgeSymbolForItem(NFBItemAtIndexPath(
-            dataViewController, NFBListIndexPathForCell(scrollView, cell)));
-        if (!symbol) {
-            badge.hidden = YES;
-            continue;
-        }
-        if (!badge) {
-            badge = [[UIImageView alloc] init];
-            badge.userInteractionEnabled = NO;
-            badge.contentMode = UIViewContentModeScaleAspectFit;
-            badge.autoresizingMask = UIViewAutoresizingFlexibleLeftMargin;
-            badge.tintColor = [UIColor secondaryLabelColor];
-            badge.alpha = kNFBBadgeAlpha;
-            objc_setAssociatedObject(cell, kNFBBadgeViewKey, badge,
-                                     OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-        }
-        if (![objc_getAssociatedObject(badge, kNFBBadgeSymbolKey)
-                isEqualToString:symbol]) {
-            UIImageSymbolConfiguration* configuration =
-                [UIImageSymbolConfiguration
-                    configurationWithPointSize:kNFBBadgeSize
-                                        weight:UIImageSymbolWeightLight];
-            badge.image = [UIImage systemImageNamed:symbol
-                                  withConfiguration:configuration];
-            objc_setAssociatedObject(badge, kNFBBadgeSymbolKey, symbol,
-                                     OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-        }
-        if (!badge.image) {
-            badge.hidden = YES;
-            continue;
-        }
-        UIView* host = cell;
-        if ([cell respondsToSelector:@selector(contentView)]) {
-            host = ((UIView* (*)(id, SEL))objc_msgSend)(cell,
-                                                        @selector(contentView));
-        }
-        badge.frame = CGRectMake(CGRectGetWidth(host.bounds) - kNFBBadgeInset -
-                                     kNFBBadgeDotsClearance - kNFBBadgeSize,
-                                 kNFBBadgeInset, kNFBBadgeSize, kNFBBadgeSize);
-        if (badge.superview != host) {
-            [host addSubview:badge];
-        }
-        badge.hidden = NO;
-        [host bringSubviewToFront:badge];
-    }
-    NFBBadgeFlush();
+    NFBBadgePass(dataViewController);
 }
 
 static NSArray* FilteredTimelineSections(TFNItemsDataViewController* dataViewController,
