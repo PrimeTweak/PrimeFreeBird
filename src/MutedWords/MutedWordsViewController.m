@@ -298,7 +298,7 @@ NSString* const kNFBMutedIncludeRepostsKey = @"nfb_muted_include_reposts";
 
 // The confirm glyph in the navigation bar is baked opaque white by the theme
 // hooks, but only while NFBColorThemeScreenVisible is up — Twitter's settings
-// roots and our own settings pages raise it, and this screen never did. Left
+// roots and the tweak's own settings pages raise it, and this screen never did. Left
 // out, the glyph stays a template the glass material blends with the capsule
 // underneath, which is the wash that shows on a light accent and nowhere else.
 // Joining the count is the whole fix: the recipe already exists, this screen
@@ -635,7 +635,7 @@ extern NSInteger NFBColorThemeScreenVisible;
         NSUInteger termIndex = (NSUInteger)indexPath.row - 1;
         if (self.terms.count == 0) {
             // A dimmed example instead of "nothing here": it shows what a
-            // filter looks like and what you may type. No remove button, so it
+            // filter looks like and what may be typed. No remove button, so it
             // can't be mistaken for a real entry.
             NFBMutedTermCell* example =
                 [tableView dequeueReusableCellWithIdentifier:@"term"
