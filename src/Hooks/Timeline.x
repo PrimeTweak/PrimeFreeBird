@@ -1008,6 +1008,84 @@ static const CGFloat kNFBReadingFadeSolid = 34.0;
 static const CGFloat kNFBReadingFadeReach = 110.0;
 static NSHashTable* gNFBReadingControllers = nil;
 
+static UIScrollView* NFBListScrollView(TFNItemsDataViewController* dataViewController) {
+    if ([dataViewController respondsToSelector:@selector(tableView)]) {
+        UIScrollView* table = ((UIScrollView* (*)(id, SEL))objc_msgSend)(
+            dataViewController, @selector(tableView));
+        if (table) {
+            return table;
+        }
+    }
+    if ([dataViewController respondsToSelector:@selector(collectionView)]) {
+        return ((UIScrollView* (*)(id, SEL))objc_msgSend)(
+            dataViewController, @selector(collectionView));
+    }
+    return nil;
+}
+
+static NSArray<NSIndexPath*>* NFBListVisibleIndexPaths(UIScrollView* scrollView) {
+    if ([scrollView respondsToSelector:@selector(indexPathsForVisibleRows)]) {
+        return ((NSArray* (*)(id, SEL))objc_msgSend)(
+            scrollView, @selector(indexPathsForVisibleRows));
+    }
+    if ([scrollView respondsToSelector:@selector(indexPathsForVisibleItems)]) {
+        return ((NSArray* (*)(id, SEL))objc_msgSend)(
+            scrollView, @selector(indexPathsForVisibleItems));
+    }
+    return @[];
+}
+
+static NSArray* NFBListVisibleCells(UIScrollView* scrollView) {
+    if ([scrollView respondsToSelector:@selector(visibleCells)]) {
+        return ((NSArray* (*)(id, SEL))objc_msgSend)(scrollView,
+                                                     @selector(visibleCells));
+    }
+    return @[];
+}
+
+static NSIndexPath* NFBListIndexPathForCell(UIScrollView* scrollView, UIView* cell) {
+    if ([scrollView respondsToSelector:@selector(indexPathForCell:)]) {
+        return ((NSIndexPath* (*)(id, SEL, id))objc_msgSend)(
+            scrollView, @selector(indexPathForCell:), cell);
+    }
+    return nil;
+}
+
+static BOOL NFBListCellFrame(UIScrollView* scrollView, NSIndexPath* path,
+                             CGRect* outFrame) {
+    if ([scrollView respondsToSelector:@selector(cellForRowAtIndexPath:)]) {
+        UIView* cell = ((UIView* (*)(id, SEL, id))objc_msgSend)(
+            scrollView, @selector(cellForRowAtIndexPath:), path);
+        if (cell) {
+            *outFrame = cell.frame;
+            return YES;
+        }
+        if ([scrollView respondsToSelector:@selector(rectForRowAtIndexPath:)]) {
+            *outFrame = ((CGRect (*)(id, SEL, id))objc_msgSend)(
+                scrollView, @selector(rectForRowAtIndexPath:), path);
+            return YES;
+        }
+    }
+    if ([scrollView respondsToSelector:@selector(cellForItemAtIndexPath:)]) {
+        UIView* cell = ((UIView* (*)(id, SEL, id))objc_msgSend)(
+            scrollView, @selector(cellForItemAtIndexPath:), path);
+        if (cell) {
+            *outFrame = cell.frame;
+            return YES;
+        }
+    }
+    if ([scrollView respondsToSelector:@selector(layoutAttributesForItemAtIndexPath:)]) {
+        id attributes = ((id (*)(id, SEL, id))objc_msgSend)(
+            scrollView, @selector(layoutAttributesForItemAtIndexPath:), path);
+        if (attributes && [attributes respondsToSelector:@selector(frame)]) {
+            *outFrame = ((CGRect (*)(id, SEL))objc_msgSend)(attributes,
+                                                            @selector(frame));
+            return YES;
+        }
+    }
+    return NO;
+}
+
 static BOOL NFBReadingIsHomeTimeline(TFNItemsDataViewController* dataViewController) {
     return IsInHierarchyOfClass(
         dataViewController,
@@ -1017,8 +1095,8 @@ static BOOL NFBReadingIsHomeTimeline(TFNItemsDataViewController* dataViewControl
 // The topmost visible row's entry ID; nil when the table or the item cannot
 // be resolved. Sections that are not item arrays are opaque and skipped.
 static NSString* NFBReadingTopVisibleEntryID(TFNItemsDataViewController* dataViewController) {
-    UITableView* table = dataViewController.tableView;
-    NSIndexPath* top = table.indexPathsForVisibleRows.firstObject;
+    UIScrollView* list = NFBListScrollView(dataViewController);
+    NSIndexPath* top = NFBListVisibleIndexPaths(list).firstObject;
     if (!top) {
         return nil;
     }
@@ -1206,15 +1284,13 @@ static void NFBReadingCaptureAnchor(TFNItemsDataViewController* dataViewControll
 // screen — data sections and table rows do not always map one-to-one on For
 // You, and the computed rect can span the wrong range there. Off screen, the
 // computed rect only decides visibility, so the fallback is harmless.
-static void NFBReadingPlaceMarker(UITableView* table, UIView* marker,
+static void NFBReadingPlaceMarker(UIScrollView* table, UIView* marker,
                                   NSIndexPath* path) {
-    if (path.section >= table.numberOfSections ||
-        path.row >= [table numberOfRowsInSection:path.section]) {
+    CGRect rowRect;
+    if (!NFBListCellFrame(table, path, &rowRect)) {
         marker.hidden = YES;
         return;
     }
-    UITableViewCell* cell = [table cellForRowAtIndexPath:path];
-    CGRect rowRect = cell ? cell.frame : [table rectForRowAtIndexPath:path];
     extern UIColor* CurrentAccentColor(void);
     UIColor* accent = CurrentAccentColor() ?: [UIColor systemBlueColor];
     CGFloat reach = MIN(CGRectGetHeight(rowRect), kNFBReadingFadeReach);
@@ -1251,7 +1327,7 @@ static void NFBReadingPlaceMarker(UITableView* table, UIView* marker,
 // It sits above the cell at low alpha — beneath it, the opaque cell would
 // hide it entirely.
 static void NFBReadingPositionMarker(TFNItemsDataViewController* dataViewController) {
-    UITableView* table = dataViewController.tableView;
+    UIScrollView* table = NFBListScrollView(dataViewController);
     if (!table) {
         return;
     }
@@ -1347,17 +1423,16 @@ static void NFBReadingRescanSoon(TFNItemsDataViewController* dataViewController)
 // the wash on its row from the cached index path, without rescanning.
 static void NFBReadingLayoutTick(UIScrollView* scrollView) {
     UIView* marker = objc_getAssociatedObject(scrollView, kNFBReadingMarkerViewKey);
-    if (!marker || marker.hidden || ![scrollView isKindOfClass:[UITableView class]]) {
+    if (!marker || marker.hidden) {
         return;
     }
-    UITableView* table = (UITableView*)scrollView;
-    NSIndexPath* path = objc_getAssociatedObject(table, kNFBReadingAnchorPathKey);
-    if (!path || path.section >= table.numberOfSections ||
-        path.row >= [table numberOfRowsInSection:path.section]) {
+    NSIndexPath* path =
+        objc_getAssociatedObject(scrollView, kNFBReadingAnchorPathKey);
+    if (!path) {
         marker.hidden = YES;
         return;
     }
-    NFBReadingPlaceMarker(table, marker, path);
+    NFBReadingPlaceMarker(scrollView, marker, path);
 }
 
 // The app backgrounding is the one leave moment no view callback covers.
@@ -1381,25 +1456,64 @@ static void NFBReadingTrack(TFNItemsDataViewController* dataViewController) {
 
 // MARK: - Provenance badges
 //
-// A thin symbol in the top-right corner of a Tweet the timeline added for a
-// reason of its own: a topic, or someone's activity. Promoted Tweets and
-// account suggestions carry no badge — the hide options remove them before
-// they reach the screen, and what is deleted needs no label.
-//
-// The reason is read from the item's scribe component, the same field the
-// hide options already match against. An item whose component names nothing
-// gets no badge, so an unread signal stays silent rather than guessing.
+// A thin symbol left of a Tweet's caret menu when the timeline added it for a
+// reason of its own. The reason is read from the status's social-context
+// object (-socialContext, with -contextType and -text), the API the app
+// itself renders from. The pass resolves its controller from the reading
+// registry, which tracks every home controller. Each gate keeps a running
+// count so a silent outcome names its own cause.
 
 static const void* kNFBBadgeViewKey = &kNFBBadgeViewKey;
 static const void* kNFBBadgeSymbolKey = &kNFBBadgeSymbolKey;
 static const CGFloat kNFBBadgeSize = 15.0;
 static const CGFloat kNFBBadgeInset = 14.0;
-// The caret menu owns the corner itself; the badge sits to its left.
 static const CGFloat kNFBBadgeDotsClearance = 26.0;
 static const CGFloat kNFBBadgeAlpha = 0.5;
 
-// Banners, carousels and prompts are modules, not Tweets; their own component
-// can name a topic without a Tweet being involved.
+enum {
+    NFBGateTick,
+    NFBGateToggle,
+    NFBGateResolved,
+    NFBGateHome,
+    NFBGateSeen,
+    NFBGateStatus,
+    NFBGateContext,
+    NFBGateNamed,
+    NFBGateTotal
+};
+static NSInteger gNFBBadgeGate[NFBGateTotal];
+static NSString* gNFBBadgeSampleText;
+
+// Counter deltas move to defaults at most once a second, so the layout pass
+// never writes to disk on its own.
+static void NFBBadgeFlush(void) {
+    static CFAbsoluteTime lastFlush = 0;
+    CFAbsoluteTime now = CFAbsoluteTimeGetCurrent();
+    if (now - lastFlush < 1.0) {
+        return;
+    }
+    lastFlush = now;
+    static NSString* const keys[NFBGateTotal] = {
+        @"nfb_badge_tick",    @"nfb_badge_toggle", @"nfb_badge_resolved",
+        @"nfb_badge_home",    @"nfb_badge_seen",   @"nfb_badge_status",
+        @"nfb_badge_context", @"nfb_badge_named"
+    };
+    NSUserDefaults* defaults = [NSUserDefaults standardUserDefaults];
+    for (NSUInteger index = 0; index < NFBGateTotal; index++) {
+        if (gNFBBadgeGate[index]) {
+            [defaults setInteger:[defaults integerForKey:keys[index]] +
+                                 gNFBBadgeGate[index]
+                          forKey:keys[index]];
+            gNFBBadgeGate[index] = 0;
+        }
+    }
+    if (gNFBBadgeSampleText.length) {
+        [defaults setObject:gNFBBadgeSampleText forKey:@"nfb_badge_sample"];
+        gNFBBadgeSampleText = nil;
+    }
+}
+
+// Banners, carousels and prompts are modules, not Tweets.
 static BOOL NFBBadgeItemIsModule(id item) {
     NSString* className = NSStringFromClass([item class]);
     return [className containsString:@"Banner"] ||
@@ -1408,60 +1522,19 @@ static BOOL NFBBadgeItemIsModule(id item) {
            [className containsString:@"Prompt"];
 }
 
-// The reason lives on the Tweet's social-context object, not on a scribe
-// string. Confirmed in T1Twitter: a status exposes -socialContext, an object
-// with an integer -contextType and a display -text. The URT context types
-// include Heart (liked), Follow, List and so on; a non-zero type is a named
-// social reason. The context text names a topic surface directly.
+// The row view-model reaches its Tweet through -status (a TFNTwitterStatus,
+// which owns -socialContext); -tweet varies by class and is a last resort.
 static id NFBStatusForItem(id item) {
-    // Confirmed in T1Twitter: the row view-model reaches the tweet through
-    // -status (a TFNTwitterStatus, which owns -socialContext). -tweet returns
-    // different types by class, so it is only a last resort.
     SEL reach[] = { @selector(status), @selector(tweet) };
-    for (NSUInteger i = 0; i < sizeof(reach) / sizeof(reach[0]); i++) {
-        if ([item respondsToSelector:reach[i]]) {
-            id value = ((id (*)(id, SEL))objc_msgSend)(item, reach[i]);
+    for (NSUInteger index = 0; index < sizeof(reach) / sizeof(reach[0]); index++) {
+        if ([item respondsToSelector:reach[index]]) {
+            id value = ((id (*)(id, SEL))objc_msgSend)(item, reach[index]);
             if (value) {
                 return value;
             }
         }
     }
     return item;
-}
-
-// Temporary instrumentation: counts, over the visible cells, how far the badge
-// pipeline gets — how many items resolve a status, how many expose a social
-// context, and how many of those name a reason. The Lab row reads these; the
-// block is removed once the numbers are known.
-static void NFBBadgeSurveyNote(id item) {
-    if (![BHTSettings boolForKey:@"provenance_badges"]) {
-        return;
-    }
-    NSUserDefaults* defaults = [NSUserDefaults standardUserDefaults];
-    NSInteger seen = [defaults integerForKey:@"nfb_badge_seen"] + 1;
-    [defaults setInteger:seen forKey:@"nfb_badge_seen"];
-    id status = NFBStatusForItem(item);
-    if (![status respondsToSelector:@selector(socialContext)]) {
-        return;
-    }
-    [defaults setInteger:[defaults integerForKey:@"nfb_badge_status"] + 1
-                  forKey:@"nfb_badge_status"];
-    id context =
-        ((id (*)(id, SEL))objc_msgSend)(status, @selector(socialContext));
-    if (!context) {
-        return;
-    }
-    [defaults setInteger:[defaults integerForKey:@"nfb_badge_context"] + 1
-                  forKey:@"nfb_badge_context"];
-    if ([context respondsToSelector:@selector(text)]) {
-        NSString* text =
-            ((NSString* (*)(id, SEL))objc_msgSend)(context, @selector(text));
-        if ([text isKindOfClass:[NSString class]] && text.length) {
-            [defaults setInteger:[defaults integerForKey:@"nfb_badge_named"] + 1
-                          forKey:@"nfb_badge_named"];
-            [defaults setObject:text forKey:@"nfb_badge_sample"];
-        }
-    }
 }
 
 static NSString* NFBBadgeSymbolForItem(id item) {
@@ -1472,17 +1545,25 @@ static NSString* NFBBadgeSymbolForItem(id item) {
     if (![status respondsToSelector:@selector(socialContext)]) {
         return nil;
     }
+    gNFBBadgeGate[NFBGateStatus]++;
     id context =
         ((id (*)(id, SEL))objc_msgSend)(status, @selector(socialContext));
     if (!context) {
         return nil;
     }
+    gNFBBadgeGate[NFBGateContext]++;
     NSString* text = nil;
     if ([context respondsToSelector:@selector(text)]) {
         text = ((NSString* (*)(id, SEL))objc_msgSend)(context, @selector(text));
+        if (![text isKindOfClass:[NSString class]]) {
+            text = nil;
+        }
     }
-    if ([text isKindOfClass:[NSString class]] &&
-        [text.lowercaseString containsString:@"topic"]) {
+    if (text.length) {
+        gNFBBadgeGate[NFBGateNamed]++;
+        gNFBBadgeSampleText = text;
+    }
+    if ([text.lowercaseString containsString:@"topic"]) {
         return @"chart.line.uptrend.xyaxis";
     }
     if ([context respondsToSelector:@selector(contextType)]) {
@@ -1492,10 +1573,7 @@ static NSString* NFBBadgeSymbolForItem(id item) {
             return @"heart";
         }
     }
-    if ([text isKindOfClass:[NSString class]] && text.length) {
-        return @"heart";
-    }
-    return nil;
+    return text.length ? @"heart" : nil;
 }
 
 static id NFBItemAtIndexPath(TFNItemsDataViewController* dataViewController,
@@ -1515,38 +1593,37 @@ static id NFBItemAtIndexPath(TFNItemsDataViewController* dataViewController,
 // Every visible cell is decided on each pass: a reused cell that no longer
 // carries a reason has its badge hidden rather than inherited.
 static void NFBBadgeLayoutTick(UIScrollView* scrollView) {
-    if (![scrollView isKindOfClass:[UITableView class]] ||
-        ![BHTSettings boolForKey:@"provenance_badges"]) {
+    BOOL isList = [scrollView respondsToSelector:@selector(visibleCells)] ||
+                  [scrollView respondsToSelector:@selector(indexPathsForVisibleItems)];
+    if (!isList) {
         return;
     }
-    UITableView* table = (UITableView*)scrollView;
-    // The reading system already tracks every live home data controller; the
-    // one owning this table is found by identity instead of walking the
-    // responder chain. Twitter's classes resolve at runtime.
+    NFBBadgeFlush();
+    gNFBBadgeGate[NFBGateTick]++;
+    if (![BHTSettings boolForKey:@"provenance_badges"]) {
+        return;
+    }
+    gNFBBadgeGate[NFBGateToggle]++;
     TFNItemsDataViewController* dataViewController = nil;
     for (TFNItemsDataViewController* tracked in gNFBReadingControllers.allObjects) {
-        if (tracked.tableView == table) {
+        if (NFBListScrollView(tracked) == scrollView) {
             dataViewController = tracked;
             break;
         }
     }
     if (!dataViewController) {
-        UIViewController* owner = nfbOwningController(table);
-        Class dataClass = NSClassFromString(@"TFNItemsDataViewController");
-        if (!dataClass || ![owner isKindOfClass:dataClass]) {
-            return;
-        }
-        dataViewController = (TFNItemsDataViewController*)owner;
+        return;
     }
+    gNFBBadgeGate[NFBGateResolved]++;
     if (!NFBReadingIsHomeTimeline(dataViewController)) {
         return;
     }
-    for (UITableViewCell* cell in table.visibleCells) {
+    gNFBBadgeGate[NFBGateHome]++;
+    for (UIView* cell in NFBListVisibleCells(scrollView)) {
+        gNFBBadgeGate[NFBGateSeen]++;
         UIImageView* badge = objc_getAssociatedObject(cell, kNFBBadgeViewKey);
-        id rowItem =
-            NFBItemAtIndexPath(dataViewController, [table indexPathForCell:cell]);
-        NFBBadgeSurveyNote(rowItem);
-        NSString* symbol = NFBBadgeSymbolForItem(rowItem);
+        NSString* symbol = NFBBadgeSymbolForItem(NFBItemAtIndexPath(
+            dataViewController, NFBListIndexPathForCell(scrollView, cell)));
         if (!symbol) {
             badge.hidden = YES;
             continue;
@@ -1573,10 +1650,14 @@ static void NFBBadgeLayoutTick(UIScrollView* scrollView) {
                                      OBJC_ASSOCIATION_RETAIN_NONATOMIC);
         }
         if (!badge.image) {
-            badge.hidden = YES;   // symbole absent de cette version d'iOS
+            badge.hidden = YES;
             continue;
         }
-        UIView* host = cell.contentView;
+        UIView* host = cell;
+        if ([cell respondsToSelector:@selector(contentView)]) {
+            host = ((UIView* (*)(id, SEL))objc_msgSend)(cell,
+                                                        @selector(contentView));
+        }
         badge.frame = CGRectMake(CGRectGetWidth(host.bounds) - kNFBBadgeInset -
                                      kNFBBadgeDotsClearance - kNFBBadgeSize,
                                  kNFBBadgeInset, kNFBBadgeSize, kNFBBadgeSize);
@@ -1586,6 +1667,7 @@ static void NFBBadgeLayoutTick(UIScrollView* scrollView) {
         badge.hidden = NO;
         [host bringSubviewToFront:badge];
     }
+    NFBBadgeFlush();
 }
 
 static NSArray* FilteredTimelineSections(TFNItemsDataViewController* dataViewController,
@@ -1658,8 +1740,11 @@ static NSArray* FilteredTimelineSections(TFNItemsDataViewController* dataViewCon
 - (void)setSections:(NSArray*)sections restoreScrollPosition:(BOOL)restoreScrollPosition {
     BOOL keepPlace = restoreScrollPosition;
     if (NFBReadingIsHomeTimeline(self)) {
+        // Every home controller is tracked, For You included: tracking is pure
+        // registration, and each reading action gates itself on MarkerAllowed.
+        // The badge pass resolves its controller from this registry.
+        NFBReadingTrack(self);
         if (NFBReadingMarkerAllowed(self)) {
-            NFBReadingTrack(self);
             NFBReadingCaptureAnchor(self);
         }
         // Twitter's own restore flag, forced on the home timeline so a reload
