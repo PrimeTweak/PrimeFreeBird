@@ -1391,6 +1391,8 @@ static const void* kNFBBadgeViewKey = &kNFBBadgeViewKey;
 static const void* kNFBBadgeSymbolKey = &kNFBBadgeSymbolKey;
 static const CGFloat kNFBBadgeSize = 15.0;
 static const CGFloat kNFBBadgeInset = 14.0;
+// The caret menu owns the corner itself; the badge sits to its left.
+static const CGFloat kNFBBadgeDotsClearance = 26.0;
 static const CGFloat kNFBBadgeQuietAlpha = 0.5;
 
 static BOOL NFBItemIsPromoted(id item) {
@@ -1451,15 +1453,24 @@ static void NFBBadgeLayoutTick(UIScrollView* scrollView) {
         return;
     }
     UITableView* table = (UITableView*)scrollView;
-    UIViewController* owner = nfbOwningController(table);
-    // Twitter's classes resolve at runtime; a link-time reference to one has
-    // no library to come from.
-    Class dataClass = NSClassFromString(@"TFNItemsDataViewController");
-    if (!dataClass || ![owner isKindOfClass:dataClass]) {
-        return;
+    // The reading system already tracks every live home data controller; the
+    // one owning this table is found by identity instead of walking the
+    // responder chain and guessing which controller it lands on.
+    TFNItemsDataViewController* dataViewController = nil;
+    for (TFNItemsDataViewController* tracked in gNFBReadingControllers.allObjects) {
+        if (tracked.tableView == table) {
+            dataViewController = tracked;
+            break;
+        }
     }
-    TFNItemsDataViewController* dataViewController =
-        (TFNItemsDataViewController*)owner;
+    if (!dataViewController) {
+        UIViewController* owner = nfbOwningController(table);
+        Class dataClass = NSClassFromString(@"TFNItemsDataViewController");
+        if (!dataClass || ![owner isKindOfClass:dataClass]) {
+            return;
+        }
+        dataViewController = (TFNItemsDataViewController*)owner;
+    }
     if (!NFBReadingIsHomeTimeline(dataViewController)) {
         return;
     }
@@ -1502,9 +1513,9 @@ static void NFBBadgeLayoutTick(UIScrollView* scrollView) {
                               : [UIColor secondaryLabelColor];
         badge.alpha = usesAccent ? 1.0 : kNFBBadgeQuietAlpha;
         UIView* host = cell.contentView;
-        badge.frame =
-            CGRectMake(CGRectGetWidth(host.bounds) - kNFBBadgeInset - kNFBBadgeSize,
-                       kNFBBadgeInset, kNFBBadgeSize, kNFBBadgeSize);
+        badge.frame = CGRectMake(CGRectGetWidth(host.bounds) - kNFBBadgeInset -
+                                     kNFBBadgeDotsClearance - kNFBBadgeSize,
+                                 kNFBBadgeInset, kNFBBadgeSize, kNFBBadgeSize);
         if (badge.superview != host) {
             [host addSubview:badge];
         }
