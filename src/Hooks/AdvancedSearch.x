@@ -12,7 +12,7 @@
 //  line glyphs at 2 units — filter, filter_bars, bulleted_list, all of them —
 //  while the settings gear beside this button is 2.6, so no glyph in the
 //  library matches it. The shape below is Twitter's own, taken from its filter
-//  glyph; only the stroke and the canvas are ours, both set so the icon
+//  glyph; only the stroke and the canvas are the tweak's, both set so the icon
 //  reaches the screen at the gear's width and the gear's stroke.
 //
 
@@ -23,11 +23,11 @@
 
 static const void* kNFBAdvSearchBtnKey = &kNFBAdvSearchBtnKey;
 
-// One grey for every icon we add, frozen to a static colour. The gear is
-// dimmed to 60% opacity because its glyph refuses to be tinted, so our own
+// One grey for every icon the tweak adds, frozen to a static colour. The gear is
+// dimmed to 60% opacity because its glyph refuses to be tinted, so the tweak's own
 // icons use the label colour at the same 60% — the two then match exactly.
 // Resolving it here also stops the theme's window tint from claiming the icon
-// on a cold launch, a trap the colour work already taught us.
+// on a cold launch, a trap the colour work already already established.
 // Twitter's filter glyph at the settings gear's weight. Its geometry, on a
 // 24-unit canvas: two rails centred on y=7 and y=17, each running from x=3 to
 // x=21, crossed by a handle centred on x=15 (top) and x=9 (bottom) standing 8
@@ -109,7 +109,7 @@ static UIColor* NFBBarIconGrey(UITraitCollection* traits) {
             return;
         }
         if (!enabled) {
-            // Toggle is off: remove our button if a previous appearance
+            // Toggle is off: remove the tweak's button if a previous appearance
             // added it, so the setting applies live on the next visit.
             if (existingBtn) {
                 NSMutableArray* items =

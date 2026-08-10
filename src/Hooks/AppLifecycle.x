@@ -303,7 +303,7 @@ static void applySplashBrandColors(UIView* view) {
     });
 }
 
-// Render our bundled white bird from its PDF (same technique as the settings bird).
+// Render the tweak's bundled white bird from its PDF (same technique as the settings bird).
 static UIImage* launchBirdImage(CGFloat side) {
     NSURL* url = [[BHTBundle sharedBundle] pathForFile:@"LaunchTwitterBird.pdf"];
     if (!url) {
@@ -328,7 +328,7 @@ static UIImage* launchBirdImage(CGFloat side) {
     return image;
 }
 
-// Replace Twitter's launch "xLogo" with our bundled bird.
+// Replace Twitter's launch "xLogo" with the tweak's bundled bird.
 %hook UIImage
 
 + (UIImage*)imageNamed:(NSString*)name {
@@ -382,7 +382,7 @@ static void paintWindowForSplash(UIView* view) {
 
 - (void)animateRevealWithCompletion:(id)completion {
     // Strip only the X mask, then let the native zoom animation run.
-    // Our bundled bird is correctly sized, so the zoom no longer distorts it.
+    // The bundled bird is sized for this slot, so the zoom leaves it undistorted.
     stripLaunchRevealMask((UIView*)self);
     gNFBSplashRevealing = YES;
     paintWindowForSplash((UIView*)self);

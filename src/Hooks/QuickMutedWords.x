@@ -5,7 +5,7 @@
 //  A muted-words shortcut in the Home timeline's top bar. FLEX showed that bar
 //  is a TFNNavigationBar — a stable Twitter class — even though its *contents*
 //  are a SwiftUI hosting view whose name is generated at build time
-//  (…$18e770d0c27PlatterContainerHostingView) and must never be hooked. So we
+//  (…$18e770d0c27PlatterContainerHostingView) and must never be hooked. So the tweak
 //  hook the bar and use the plain UINavigationBar API on its top item.
 //
 //  TFNNavigationBar is generic — every screen uses one — so the button is only
@@ -23,7 +23,7 @@ static const void* kNFBQuickMutedBtnKey = &kNFBQuickMutedBtnKey;
 // Nearest view controller up the responder chain, unwrapping a navigation
 // controller to the screen it is actually showing.
 // The avatar is the square view furthest to the left of the bar. Using it as
-// the reference makes our button match Twitter's own vertical rhythm and
+// the reference makes the tweak's button match Twitter's own vertical rhythm and
 // horizontal margin, whatever the bar's height happens to be.
 static UIView* nfbFindAvatarView(UIView* view, UIView* bar) {
     UIView* best = nil;
@@ -76,11 +76,11 @@ static BOOL nfbIsHomeNavigationBar(UIView* bar) {
            [name containsString:@"TimelineContainer"];
 }
 
-// One grey for every icon we add, frozen to a static colour. The gear is
-// dimmed to 60% opacity because its glyph refuses to be tinted, so our own
+// One grey for every icon the tweak adds, frozen to a static colour. The gear is
+// dimmed to 60% opacity because its glyph refuses to be tinted, so the tweak's own
 // icons use the label colour at the same 60% — the two then match exactly.
 // Resolving it here also stops the theme's window tint from claiming the icon
-// on a cold launch, a trap the colour work already taught us.
+// on a cold launch, a trap the colour work already already established.
 static UIColor* NFBBarIconGrey(UITraitCollection* traits) {
     // Resolved to a concrete colour: a dynamic one handed to Twitter's vector
     // renderer came back black, and let the theme claim it later.
@@ -91,7 +91,7 @@ static UIColor* NFBBarIconGrey(UITraitCollection* traits) {
     return grey;
 }
 
-// Renders a glyph into a flat grey bitmap. Every colour route we tried was
+// Renders a glyph into a flat grey bitmap. Every colour route the tweak tried was
 // reclaimed by something: the tint by the theme when the bar re-appears, the
 // alpha by the button's own highlight after a tap, and Twitter's fillColor
 // comes back black. A colour burnt into the pixels survives all three.
@@ -197,10 +197,10 @@ static UIImage* NFBGreyGlyph(UIImage* source, UIColor* colour) {
 }
 
 // The button is a plain subview pinned to the trailing edge, re-positioned on
-// every layout pass. Bar button items were tried first and never showed: this
+// every layout pass. Bar button items do not show in this container: this
 // bar draws its contents through a full-width SwiftUI platter, so anything
 // added through the navigation item can be covered or ignored. A subview is
-// under our control and follows the same re-assert-on-layout pattern the
+// under the tweak's control and follows the same re-assert-on-layout pattern the
 // compose button already uses.
 - (void)layoutSubviews {
     %orig;

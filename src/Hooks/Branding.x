@@ -216,7 +216,7 @@ static NSAttributedString* RestoreTwitterAttributed(NSAttributedString* input) {
 
 // MARK: - Rename localized strings
 // Every UI string routes through this Foundation method in 12.3, so the rename
-// applies broadly. Skip our own bundle so the tweak's strings aren't
+// applies broadly. Skip the tweak's own bundle so the tweak's strings aren't
 // reprocessed.
 %hook NSBundle
 - (NSString*)localizedStringForKey:(NSString*)key
@@ -383,11 +383,11 @@ static char kNFBFABGlyphKey;
 // Shared (non-static) so ColorThemeViewController can tag the confirm glyph:
 // once tagged, the setImage: hook below whitens Twitter's re-bakes before
 // their first render — no more timed races.
-// Set while OUR code installs an effect, so the setEffect: hook lets it pass —
-// the 22:11 log's endless swallowed/re-tinted pairs were that hook eating our
+// Set while the tweak's code installs an effect, so the setEffect: hook lets it pass —
+// Without it the setEffect: hook swallows and re-tints in a loop, eating the
 // own reinstalls: the material never got tinted all session.
 static BOOL NFBEffectInstallAllowed;
-// What WE last installed. UIVisualEffectView.effect vends copies whose
+// What the tweak last installed. UIVisualEffectView.effect vends copies whose
 // tintColor does not round-trip, so the getter can never be trusted for
 // mismatch detection — compare against this shadow instead.
 static char kNFBFABGlassShadowTintKey;
@@ -578,9 +578,9 @@ void NFBRestyleComposeFAB(void) {
 }
 
 // Hiding the compose button is independent of restyling it: styleComposeFAB
-// only paints, and returns early when the classic button is off. We track
-// whether WE hid the button so turning the option back off restores it —
-// without ever forcing it visible on a button we never touched (Twitter fades
+// only paints, and returns early when the classic button is off. The tweak tracks
+// whether the tweak hid the button so turning the option back off restores it —
+// without ever forcing it visible on an untouched button (Twitter fades
 // the FAB itself in places, and fighting that would flicker).
 static const void* kNFBFABHiddenByUsKey = &kNFBFABHiddenByUsKey;
 
@@ -704,7 +704,7 @@ static void nfbApplyComposeFABVisibility(UIView* fab) {
 %end
 
 // Same lesson as the glyph, applied to the DISC: during a tab transition the
-// glass material can arrive as a fresh UIVisualEffectView whose contentView we
+// glass material can arrive as a fresh UIVisualEffectView whose contentView the tweak
 // only coloured at the next styling pass — one glassy-white frame, the flick
 // that remains. Colour it the instant it enters a window, same transaction.
 %hook UIVisualEffectView
@@ -712,7 +712,7 @@ static void nfbApplyComposeFABVisibility(UIView* fab) {
 // The system re-installs the material's effect on each tab transition.
 // Tinting the INCOMING
 // effect right here means the reset itself installs a coloured material — no
-// extra assignment from us, no rebuild of our own, no untinted frame.
+// extra assignment from the tweak, no rebuild of the tweak's own, no untinted frame.
 - (void)setEffect:(UIVisualEffect*)effect {
     if (effect && objc_getAssociatedObject(self, &kNFBFABGlassKey) &&
         [BHTSettings boolForKey:@"restore_tweet_button"] &&
@@ -720,7 +720,7 @@ static void nfbApplyComposeFABVisibility(UIView* fab) {
         [effect respondsToSelector:@selector(setTintColor:)]) {
         extern UIColor* CurrentAccentColor(void);
         UIColor* blue = NFBFABBlueColor();
-        // Our own installs pass through, tinted.
+        // The tweak's own installs pass through, tinted.
         if (NFBEffectInstallAllowed) {
             [(id)effect setTintColor:blue];
             %orig;

@@ -33,7 +33,7 @@
 //    1. TAPS: the bar's cells carry absolute indices. The delegate callback
 //       collectionView:didSelectItemAtIndexPath: is intercepted on the bar /
 //       segmented controller (ObjC protocol method on a Swift class — same
-//       mechanism as the pager's hookable delegate methods). We drive the
+//       mechanism as the pager's hookable delegate methods). The tweak drives the
 //       pager ourselves to the REMAPPED offset and do not forward the Swift
 //       navigation, so no absolute-index scroll is ever issued. If that
 //       selector is not the live path on this build, a safety net below
@@ -232,7 +232,7 @@ static BOOL nfbPagerScopeOK(UIScrollView* sv) {
     return root.window != nil && root.window == sv.window;
 }
 
-// THE UNDERLINE IS OURS — a pure function of the pager's offset (measured:
+// THE UNDERLINE IS the tweak's — a pure function of the pager's offset (measured:
 // the native follow both TARGETS and SIZES the underline for the cell at the
 // REMAPPED index — e.g. selection remap-2 highlights the hidden News cell —
 // so at rest the width stayed wrong (sized for the wrong cell) and every
@@ -469,7 +469,7 @@ static void nfbApplyTabFilter(UIView* bar, UICollectionView* cv) {
 
 // PRIMARY TAP BRIDGE. The bar's cells carry ABSOLUTE indices; its delegate
 // callback is an ObjC protocol method, interceptable on the Swift class. When
-// granular is active we navigate the REMAPPED pager ourselves and swallow the
+// granular is active the tweak navigates the REMAPPED pager ourselves and swallow the
 // Swift navigation (no absolute-index scroll is ever issued). Guarded to the
 // Explore bar's own collection; everything else passes through untouched. If
 // this selector is not implemented on this class, Logos simply installs
@@ -592,7 +592,7 @@ static void nfbApplyTabFilter(UIView* bar, UICollectionView* cv) {
 
 // Underline ticks. Bar layout passes stop before the fine end of a
 // deceleration, which parks the glide short of the target. If this class implements
-// scrollViewDidScroll: we get a tick on EVERY offset change (perfect 60fps
+// scrollViewDidScroll: the tweak gets a tick on EVERY offset change (perfect 60fps
 // glide + exact landing); if it does not, Logos installs nothing and the two
 // settle callbacks below still give an immediate exact
 // placement the moment any gesture or animation ends.
@@ -713,7 +713,7 @@ static void nfbApplyTabFilter(UIView* bar, UICollectionView* cv) {
 // The bar's native follow ANIMATES the underline toward — and SIZES it for —
 // the cell at the REMAPPED index (measured: at rest the width stayed sized
 // for the wrong cell, and every settle needed a late correction while the
-// native animation finished). Our placement is a dead set inside
+// native animation finished). The tweak's placement is a dead set inside
 // performWithoutAnimation, so it never enters here; everything the native
 // side tries to animate on that one layer is dropped. Identity-guarded: one
 // pointer compare for every other layer in the app (same proven pattern as
@@ -731,7 +731,7 @@ static void nfbApplyTabFilter(UIView* bar, UICollectionView* cv) {
 // (no animation — invisible to the squelch above) teleported the underline to
 // a phantom position between tabs, and with no further layout pass at rest,
 // nothing repaired it until the next gesture. Every position/bounds write on
-// this one layer now belongs to us: foreign dead sets are dropped, our own
+// this one layer now belongs to the tweak: foreign dead sets are dropped, the tweak's own
 // (flagged) pass through. Identity first — one pointer compare per call for
 // the rest of the app.
 - (void)setPosition:(CGPoint)position {

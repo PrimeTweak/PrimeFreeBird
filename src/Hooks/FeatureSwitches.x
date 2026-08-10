@@ -202,11 +202,11 @@ static NSNumber* FeatureSwitchOverrideValueForKey(NSString* key) {
         return @(![BHTSettings boolForKey:@"hide_grok_analyze"]);
     }
 
-    // Which tab Home opens on. Twitter's own behaviour: your choice survives
+    // Which tab Home opens on. Twitter's own behaviour: the choice survives
     // for 12 hours, then a new session snaps back to "For You" (the switch
     // ships as YES, with a 720-minute window). Answering NO removes the
-    // expiry, so the tab you picked — Following — is still there tomorrow.
-    // Off, we answer nothing at all and Twitter's 12-hour rule applies again.
+    // expiry, so the picked tab — Following — is still there tomorrow.
+    // Off, the tweak answers nothing at all and Twitter's 12-hour rule applies again.
     if ([key isEqualToString:@"home_timeline_non_sticky_tab_on_new_session_enabled"]) {
         return [BHTSettings boolForKey:@"force_following_tab"] ? @NO : nil;
     }

@@ -56,7 +56,7 @@ static TFNSettingsNavigationItem* makePrimeFreeBirdSettingsItem(
     UIColor* iconColor = [UIColor secondaryLabelColor];
 
     // imageNamed: can't see loose PDFs in a bundle (only compiled asset
-    // catalogs), so we open the PDF by path and render its page at icon size,
+    // catalogs), so the tweak opens the PDF by path and render its page at icon size,
     // then tint it grey like the native settings icons.
     UIImage* twitterIcon = nil;
     NSURL* birdURL = [[BHTBundle sharedBundle] pathForFile:@"bird_stroke.pdf"];
@@ -200,17 +200,17 @@ static NSArray* sectionsWithPrimeFreeBirdEntry(TFNItemsDataViewController* setti
     return sectionsWithPrimeFreeBirdEntry(self, updatedSections);
 }
 
-// Kill the non-native hairline under our injected row without touching its
+// Kill the non-native hairline under the tweak's injected row without touching its
 // style: push the native separator inset offscreen, and hide any TFN-drawn
 // hairline inside this ONE cell on the next runloop (dividers are laid out
 // after the cell is returned). The class-name log makes any second round
 // surgical instead of guesswork.
 // The PrimeFreeBird row is injected into TWITTER's settings table
 // (TFNItemsDataViewController), so the separator under it is drawn by Twitter's
-// own cell — not by anything in our code, which is why every ModernSettings
+// own cell — not by anything in the tweak's code, which is why every ModernSettings
 // change and every subview/layer sweep missed it. The IPA shows TFNTextCell
 // carries the real setters setSeparatorHidden: and setTopSeparatorHidden:.
-// Hide our row's bottom separator, and the next row's top separator, using
+// Hide the tweak's row's bottom separator, and the next row's top separator, using
 // those setters directly (KVC on the property threw — this is the class's own
 // API). Reapplied on every vend so cell reuse cannot bring it back.
 static void NFBHideRowSeparator(UITableViewCell* cell) {
@@ -232,11 +232,11 @@ static void NFBHideRowSeparator(UITableViewCell* cell) {
             ((TFNItemsDataViewController*)self).sections)) {
         return cell;
     }
-    // Our row is section 0, row 0; the row directly beneath the visible
+    // The tweak's row is section 0, row 0; the row directly beneath the visible
     // boundary is section 1, row 0. Hide the separator on both sides of the
     // seam so no hairline shows under PrimeFreeBird.
     if (indexPath.section == 0 && (indexPath.row == 0 || indexPath.row == 1)) {
-        // Row 0 is ours; row 1 is the first native row now sharing our
+        // Row 0 is the tweak's; row 1 is the first native row now sharing the tweak's
         // section. Hiding both sides of the seam keeps the edge clean even if
         // this table draws intra-section separators.
         NFBHideRowSeparator(cell);

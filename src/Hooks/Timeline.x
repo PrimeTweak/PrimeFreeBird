@@ -143,9 +143,9 @@ static const void* kNFBFleetHiddenKey = &kNFBFleetHiddenKey;
 // Plain C rather than a %new method: a %new selector isn't known to the
 // compiler when called through an id handle.
 static void nfbApplyFleetVisibility(UIView* view) {
-    // Restore what we hid: without this the bar stays gone after the option is
-    // switched back off, until the app is relaunched. We only ever restore a
-    // view WE hid, so Twitter's own hiding is never overridden.
+    // Restore what the tweak hid: without this the bar stays gone after the option is
+    // switched back off, until the app is relaunched. The tweak only ever restores a
+    // view the tweak hid, so Twitter's own hiding is never overridden.
     BOOL hide = [BHTSettings boolForKey:@"hide_spaces"];
     BOOL hiddenByUs = objc_getAssociatedObject(view, kNFBFleetHiddenKey) != nil;
     if (hide) {
@@ -221,7 +221,7 @@ static BOOL nfbEdgeHideEnabled(void) {
 }
 
 // Applies (or lifts) the effect on one scroll view, and only ever lifts what
-// we hid ourselves.
+// the tweak hid ourselves.
 static void nfbApplyEdgeEffect(UIScrollView* scrollView, BOOL hide) {
     if (![scrollView respondsToSelector:@selector(topEdgeEffect)]) {
         return;   // avant iOS 26 : rien à faire
@@ -244,7 +244,7 @@ static void nfbApplyEdgeEffect(UIScrollView* scrollView, BOOL hide) {
 
 // Modal screens are left alone. Hiding the effect on Twitter's own settings
 // sheet broke its content inset — the list slid up under the title. The tabs
-// we care about are never presented modally, so this costs us nothing.
+// the tweak cares about are never presented modally, so this costs nothing.
 static UIViewController* nfbOwningController(UIView* view) {
     UIResponder* responder = view;
     while ((responder = responder.nextResponder)) {
@@ -372,7 +372,7 @@ static void nfbLayBandIntoSettingsBar(UINavigationBar* bar,
 
 // Checked on every layout of every scroll view, on purpose. iOS re-enables the
 // effect whenever a bar reconfigures — changing tab, coming back to a screen —
-// and acting only on views we had already marked left Search untouched and the
+// and acting only on views the tweak had already marked left Search untouched and the
 // timeline correct only after a few swipes. The work is two message sends when
 // the state already matches, which is nearly always.
 - (void)layoutSubviews {
@@ -1532,7 +1532,7 @@ static NSArray* FilteredTimelineSections(TFNItemsDataViewController* dataViewCon
 - (void)setSections:(NSArray*)sections restoreScrollPosition:(BOOL)restoreScrollPosition {
     BOOL keepPlace = restoreScrollPosition;
     if (NFBReadingIsHomeTimeline(self)) {
-        // Every home controller is tracked, For You included: tracking is pure
+        // Every home controller is tracked, the algorithmic tab included: tracking is pure
         // registration, and each reading action gates itself on MarkerAllowed.
         // The badge pass resolves its controller from this registry.
         NFBReadingTrack(self);
@@ -1577,7 +1577,7 @@ static NSArray* FilteredTimelineSections(TFNItemsDataViewController* dataViewCon
 
 // MARK: - Poll results before voting
 //
-// Twitter hides the tallies until you have voted. The counts travel with the
+// Twitter hides the tallies until a vote is cast. The counts travel with the
 // card data all along, so the percentage is simply appended to each option's
 // label. Ported from Orion's fork, whose comment saved the hard part: don't
 // derive the choice count from the card name — text polls are named

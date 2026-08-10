@@ -68,7 +68,7 @@ static UIColor* NFBLogoAccent(UIColor* orig) {
 // iOS 26 Liquid Glass controls (compose FAB, follow buttons, switches, the
 // new-posts pill, selection highlights) take their accent from the window tint,
 // not the palette. Push the custom accent onto every window's tintColor.
-// Depth counter for the settings stack (Twitter's root, our menu, every page,
+// Depth counter for the settings stack (Twitter's root, the tweak's menu, every page,
 // the theme screen). The Done platter is ONE button shared by the whole stack,
 // so the whitening must live as long as ANY settings screen is up. A counter,
 // not a BOOL: on pop, the target's viewWillAppear fires BEFORE the source's
@@ -104,9 +104,7 @@ static void NFBApplyGlobalTint(void) {
 static __weak UIImageView* NFBTopBarLogoView;
 
 // In Liquid Glass the title plugin returns a CONTAINER, not the image view
-// itself, so a plain isKindOfClass check never matched and the bird could only
-// change when the title view was rebuilt (i.e. on a tab change). Find the image
-// view wherever it sits in the returned hierarchy.
+// itself. Find the image view wherever it sits in the returned hierarchy.
 static UIImageView* NFBFindLogoImageView(UIView* root) {
     if ([root isKindOfClass:[UIImageView class]] && ((UIImageView*)root).image) {
         return (UIImageView*)root;
@@ -120,7 +118,7 @@ static UIImageView* NFBFindLogoImageView(UIView* root) {
     return nil;
 }
 
-// Every logo we have ever vetted, weakly held. Re-tinting the registry is
+// Every logo the tweak have ever vetted, weakly held. Re-tinting the registry is
 // precise and needs no container matching — the name-based sweep misses
 // Twitter's Swift home header, which is why the bird only refreshed when the
 // plugins rebuilt the title view on a tab change.
@@ -154,7 +152,7 @@ static BOOL NFBAccentIsActive(void) {
     return ![defs boolForKey:@"nfb_color_reset_done"];
 }
 
-// Twitter's own logo colour, read raw so our accent hooks don't repaint it.
+// Twitter's own logo colour, read raw so the tweak's accent hooks don't repaint it.
 static UIColor* NFBRawLogoColor(void) {
     NFBBeginRawPaletteRead();
     id palette = [[[objc_getClass("TAEColorSettings") sharedSettings]
@@ -253,7 +251,7 @@ static void NFBReapplyTabBarAccent(void) {
 // navigation bars at refresh time. Works no matter which of Twitter's title
 // plugins built it, or whether the bar is native or custom.
 // Twitter's home header is not always a UINavigationBar, so match on the class
-// name too. Inside such a container we only re-tint image views ALREADY in
+// name too. Inside such a container only image views ALREADY in
 // template mode: converting an arbitrary one here would flatten avatars into
 // silhouettes. The trusted title-view hooks do the first conversion.
 static BOOL NFBIsTopBarContainer(UIView* view) {
@@ -289,7 +287,7 @@ static void NFBSweepTopBarLogos(UIView* root) {
     }
 }
 
-// What we last pushed into a given tab bar. bar.tintColor cannot be used for
+// What was last pushed into a given tab bar. bar.tintColor cannot be used for
 // the comparison: the bar INHERITS the window tint, so it reports the new
 // accent while the installed appearance — which actually paints the selected
 // icon — may still carry the old one.
@@ -382,7 +380,7 @@ static NSInteger NFBCountViewsOfClass(UIView* root, Class cls) {
     return count;
 }
 
-// Re-apply our accent to whatever chrome is on screen right now.
+// Re-apply the tweak's accent to whatever chrome is on screen right now.
 static void NFBReapplyChromeAccent(void) {
     UIColor* accent = CurrentAccentColor();
     void (^run)(void) = ^{
@@ -441,7 +439,7 @@ static void NFBReloadTwitterDynamicColors(void) {
     // of _tfn_dynamicColorsWillReload:/_tfn_dynamicColorsDidReload: observers
     // (T1, TFN, and the Swift hosting views), and the tab icons' vector images
     // register dynamic-colour info on this very bus. Posting the pair directly
-    // makes those views re-resolve their colours through our palette hooks even
+    // makes those views re-resolve their colours through the tweak's palette hooks even
     // when the manager accessor above finds nothing.
     NSNotificationCenter* nc = NSNotificationCenter.defaultCenter;
     [nc postNotificationName:@"TFNDynamicColorsWillReloadNotification" object:nil];
@@ -518,7 +516,7 @@ static void NFBStartAccentSettle(void) {
             }
         }
         // fabs=0 after a reset would prove the button was REMOVED by Twitter
-        // (a rebuild we triggered), not hidden by anything we paint.
+        // (a rebuild the tweak triggered), not hidden by anything the tweak paints.
         if (seen && graceLeft < 0) {
             graceLeft = 2;
         }
@@ -546,7 +544,7 @@ void NFBSyncAccentTheme(void) {
 
     // Rebuild Twitter's cached primary-colour-derived colours (FAB, follow
     // buttons, pill, badges, selection). It resolves through the palette
-    // accessors we now hook on every subclass, so the results become custom.
+    // accessors the tweak now hooks on every subclass, so the results become custom.
     Class T1ColorSettingsCls = objc_getClass("T1ColorSettings");
     if ([T1ColorSettingsCls respondsToSelector:@selector(_t1_applyPrimaryColorOption)]) {
         [T1ColorSettingsCls performSelector:@selector(_t1_applyPrimaryColorOption)];
@@ -910,12 +908,12 @@ static void NFBForceBackgroundRefresh(void) {
                     // reset here too raced ahead of that path: this notification
                     // fires first, so dark_mode_style was already System by the
                     // time the reminder checked, and the popup never appeared.
-                    // Here we only refresh backgrounds.
+                    // Here the tweak only refreshes backgrounds.
                     NFBForceBackgroundRefresh();
                 }];
 
     // Whenever Twitter repaints its own dynamic colours — for any reason, from
-    // any screen — repaint ours in the same pass: no layout guessing, no
+    // any screen — repaint the tweak's in the same pass: no layout guessing, no
     // timers.
     [[NSNotificationCenter defaultCenter]
         addObserverForName:@"TFNDynamicColorsDidReloadNotification"
@@ -926,7 +924,7 @@ static void NFBForceBackgroundRefresh(void) {
                 }];
 
     // Surfaces that resolve their colour once at launch and then cache it —
-    // the theme screen's confirm control — never see our palette without a
+    // the theme screen's confirm control — never see the tweak's palette without a
     // reload pass. If an accent is active, broadcast one shortly after boot:
     // the same pass a live colour change performs.
     if (NFBAccentIsActive()) {
@@ -934,7 +932,7 @@ static void NFBForceBackgroundRefresh(void) {
                        dispatch_get_main_queue(), ^{
                            // The window tint IS the Confirm button's colour;
                            // the reload alone re-resolves Twitter's palette but
-                           // never sets our tint. Set it here, at the moment
+                           // never sets the tweak's tint. Set it here, at the moment
                            // the window exists.
                            NFBApplyGlobalTint();
                            NFBReloadTwitterDynamicColors();
@@ -1368,9 +1366,9 @@ void NFBWhitenNavigationBarConfirm(UINavigationBar* bar) {
 
 %end
 
-// Safety net for containers we do not know by name. For a few seconds after any
+// Safety net for containers not known by name. For a few seconds after any
 // accent change, every controller that appears re-applies the accent to the
-// chrome that is now on screen — which is exactly the moment you come back from
+// chrome that is now on screen — which is exactly the moment of return from
 // the settings screen. Outside that window this costs a single float compare.
 %hook UIViewController
 
@@ -1408,7 +1406,7 @@ void NFBWhitenNavigationBarConfirm(UINavigationBar* bar) {
 // (tfn_vectorImageNamed:...fillColor:, and addDynamicColorInfo registers it for
 // the manager's re-bake — the binary even carries _tae_resetColor_tabBarItemColor).
 // A baked image ignores tintColor and UITabBarAppearance, which is why every
-// repaint we pushed only showed up on the next re-bake: a tab change. Templating
+// repaint the tweak pushed only showed up on the next re-bake: a tab change. Templating
 // the images as they are installed flips them to tint-driven — the appearance
 // patcher and the live tint updates then control them instantly, both directions.
 %hook UITabBarItem

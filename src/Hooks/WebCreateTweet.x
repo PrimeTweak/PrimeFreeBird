@@ -6,9 +6,9 @@
 //  so sideloaded / legacy sessions can post without hitting native attestation.
 //
 //  The seam is NSURLSession: the native app still issues CreateTweet as an ordinary
-//  data/upload task to .../graphql/<queryId>/CreateTweet, so we rewrite that request
+//  data/upload task to .../graphql/<queryId>/CreateTweet, so the tweak rewrites that request
 //  in flight with web-session auth (auth_token + ct0 cookies + csrf header) and a
-//  fresh x-client-transaction-id. We never read the response body, only its status
+//  fresh x-client-transaction-id. The tweak never reads the response body, only its status
 //  code, so response encoding (gzip) is irrelevant.
 //
 //  Gated on the inverse of `reply_in_webview`: when that setting is on, WebReply.x
@@ -39,7 +39,7 @@ static NSString* WebAuthMulti = nil;
 static NSMutableDictionary<NSString*, NSDictionary*>* WebAccountCookies = nil;
 static NSObject* WebAccountCookiesLock = nil;
 
-// The authenticated helper webview is kept alive so we can mint a fresh
+// The authenticated helper webview is kept alive to mint a fresh
 // x-client-transaction-id per send (x rate-limits requests without one).
 static WKWebView* WebHelperWebView = nil;
 static BOOL WebHelperReady = NO;
@@ -47,7 +47,7 @@ static BOOL WebHelperInFlight = NO;
 static NSString* WebXTID = nil;
 static BOOL WebXTIDInFlight = NO;
 
-// Offscreen native webview used to establish/harvest a specific account's web session.
+// Offscreen native webview that establishes and harvests a specific account's web session.
 static UIWindow* WebHarvestWindow = nil;
 static BOOL WebBootstrapInFlight = NO;
 
@@ -901,7 +901,7 @@ NSDictionary* currentWebCredentials(void) {
 // MARK: - Interactive web-session login
 
 // The web session (auth_token + ct0) can't be minted silently on a sideloaded build: the
-// token-exchange path hits native attestation. Instead we let the user sign in once on a
+// token-exchange path hits native attestation. Instead the tweak lets the user sign in once on a
 // real web login, harvest the resulting cookies, and persist them into the shared cookie
 // jar so every read path (currentWebCredentials, harvestSharedCookies, the reply webview)
 // sees the session on this and future launches.

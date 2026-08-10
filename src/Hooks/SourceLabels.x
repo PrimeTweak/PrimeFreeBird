@@ -109,7 +109,7 @@ extern UIColor* CurrentAccentColor(void);
 }
 
 // Pulls the focal tweet's raw source markup out of a TweetDetail response. The
-// conversation also carries replies, so we match the entry by rest_id.
+// conversation also carries replies, so the tweak matches the entry by rest_id.
 + (NSString*)sourceHTMLFromTweetDetail:(NSDictionary*)json forTweetID:(NSString*)tweetID {
     NSDictionary* conversation = json[@"data"][@"threaded_conversation_with_injections_v2"];
     NSArray* instructions = conversation[@"instructions"];
@@ -292,7 +292,7 @@ extern UIColor* CurrentAccentColor(void);
 // MARK: - Footer injection
 //
 // -updateFooterTextView rebuilds the footer text from footerItem.timeAgo, so the
-// source is appended there before %orig; when it arrives async we just re-run it.
+// source is appended there before %orig; when it arrives async the tweak just re-runs it.
 
 %hook T1ConversationFooterTextView
 
@@ -395,7 +395,7 @@ extern UIColor* CurrentAccentColor(void);
     NSString* tweetID = notification.userInfo[@"tweetID"];
     NSString* mine = objc_getAssociatedObject(self, &kFooterTweetIDKey);
     if (tweetID.length > 0 && [tweetID isEqualToString:mine]) {
-        // Posted from the main queue, so we are already on the main thread here.
+        // Posted from the main queue, so the tweak are already on the main thread here.
         [self updateFooterTextView];
         [self setNeedsDisplay];
         [self setNeedsLayout];

@@ -165,10 +165,10 @@ static CTParagraphStyleRef CreateLTRParagraphStyle(CTParagraphStyleRef original)
 
 // MARK: - Clean shared/copied links
 //
-// We observe UIPasteboardChangedNotification and clean any twitter/x URL that
+// The tweak observes UIPasteboardChangedNotification and clean any twitter/x URL that
 // lands in the pasteboard — catching every copy path (setString:, setURL:,
 // setItems:, or the Swift share kit) rather than hooking one write API. A
-// last-cleaned guard stops our re-write from re-triggering the observer.
+// last-cleaned guard stops the tweak's re-write from re-triggering the observer.
 // Removes ?s=, &t= and ref_* when strip_url_tracking is on; the custom
 // sharing_domain is applied independently. Mirrors the reference build's
 // BHTPasteboardChangeObserver.
@@ -313,7 +313,7 @@ static BOOL NFBScreenshotSuppressed(void) {
 
 %end
 
-// (2) Watermark suppression (our approach), gated.
+// (2) Watermark suppression (the tweak's approach), gated.
 @interface TFSAccountFeatureSwitches : NSObject
 @end
 

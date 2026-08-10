@@ -197,7 +197,7 @@ static id nfbWantedEntry(id provider) {
         default: return nil;   // 0 = laisser Twitter décider
     }
 
-    // A tab hidden by one of our own switches is refused here too, in case an
+    // A tab hidden by one of the tweak's own switches is refused here too, in case an
     // old choice survives in the settings after the tab was switched off.
     NSString* hider = nil;
     switch ([BHTSettings integerForKey:@"profile_initial_tab"]) {

@@ -5,7 +5,7 @@
 //  Twitter draws the settings gear at full label strength, which reads as
 //  black next to the muted grey of the tab labels beside it.
 //
-//  Every colour route was tried and each was reclaimed by something: the tint
+//  Colour routes are reclaimed by something in every case: the tint
 //  by the theme, the alpha by the button's own highlight after a tap, and
 //  Twitter's fillColor renders black. So the glyph is repainted into a flat
 //  grey bitmap, which nothing can take back.
@@ -26,25 +26,25 @@
 
 static NSString* const kNFBSettingsButtonIdentifier = @"NavigationBarSettingsButton";
 static const void* kNFBGreyedImageKey = &kNFBGreyedImageKey;
-// Holds the colour to force on a view we have taken over, so any image set
+// Holds the colour to force on a view the tweak have taken over, so any image set
 // later goes through the same repaint.
 static const void* kNFBGreyTargetKey = &kNFBGreyTargetKey;
 // The untouched glyph. Repainting is not idempotent — a colour at 60% opacity
 // laid over a colour already at 60% lands at 36% — so every repaint starts
 // from this original.
 static const void* kNFBOriginalImageKey = &kNFBOriginalImageKey;
-// Marks an image we produced. Two paths repaint on Notifications — the bar
+// Marks an image the tweak produced. Two paths repaint on Notifications — the bar
 // button item and the image view UIKit builds from it — and without the mark
 // each treats the other's result as unpainted, painting the glyph twice. The
 // mark travels with the image, so any path recognises it.
 static const void* kNFBPaintedFlagKey = &kNFBPaintedFlagKey;
 // Marks a layer that must never render at partial opacity. Correcting after
-// the fact never worked — our pass runs before the value is lowered, so there
+// the fact never worked — the tweak's pass runs before the value is lowered, so there
 // is nothing to correct yet. Every route that could lower it is refused at the
 // moment it is used instead: the alpha, the layer's opacity, and the animation.
 static const void* kNFBNoFadeKey = &kNFBNoFadeKey;
 
-// One grey for every icon we add or recolour: the label colour at 60%,
+// One grey for every icon the tweak adds or recolour: the label colour at 60%,
 // resolved to a concrete value so nothing can re-resolve it later.
 static UIColor* NFBBarIconGrey(UITraitCollection* traits) {
     UIColor* grey = [[UIColor labelColor] colorWithAlphaComponent:0.6];
@@ -100,7 +100,7 @@ static void nfbRepaintGlyphs(UIView* view, UIColor* colour) {
             BOOL alreadyOurs =
                 objc_getAssociatedObject(current, kNFBPaintedFlagKey) != nil;
             if (current && !alreadyOurs && (current != ours || colourChanged)) {
-                // Only remember the original if this image is not one of ours.
+                // Only remember the original if this image is not one of the tweak's.
                 UIImage* source = current;
                 UIImage* original =
                     objc_getAssociatedObject(imageView, kNFBOriginalImageKey);
@@ -157,7 +157,7 @@ static void nfbForceOpaque(UIView* view) {
 // The container that holds the bar and the tab strip, reached from the bar
 // upwards. The walk stops before the first view tall enough to be the screen
 // itself, so a push, a modal or a tab change still fades the way it should —
-// only the header band is held. Bars we do not manage never get here.
+// only the header band is held. Unmanaged bars never get here.
 static void nfbPinHeaderOpacity(UIView* bar) {
     UIWindow* window = bar.window;
     if (!window) {
@@ -320,9 +320,9 @@ static void nfbRepaintNotificationsGear(UIView* bar, UIColor* colour) {
 %end
 
 // Frame-by-frame capture showed the gear flipping between black
-// and grey on one screen: our repaint lands, then Twitter puts its own image
-// back, and nothing calls us again until the bar happens to lay out. So the
-// image is caught as it is set. Only views we have already taken over are
+// and grey on one screen: the tweak's repaint lands, then Twitter puts its own image
+// back, and nothing calls back until the bar happens to lay out. So the
+// image is caught as it is set. Only views the tweak have already taken over are
 // affected — everything else pays a single associated-object read.
 
 %hook UIImageView
@@ -339,7 +339,7 @@ static void nfbRepaintNotificationsGear(UIView* bar, UIColor* colour) {
         %orig;
         return;
     }
-    // Twitter's own image is the source; ours would compound and go pale.
+    // Twitter's own image is the source; the tweak's would compound and go pale.
     if (objc_getAssociatedObject(self, kNFBOriginalImageKey)) {
         image = objc_getAssociatedObject(self, kNFBOriginalImageKey);
     }
@@ -421,7 +421,7 @@ static BOOL nfbIsRightHandGlyphButton(UIView* button) {
 
 // The repaint runs on both entry points. didMoveToWindow alone caught the
 // button before its image view existed on Notifications, so nothing was marked
-// and the interception below never armed — you had to change tab for it to
+// and the interception below never armed — a tab change was required for it to
 // take. layoutSubviews closes that window; once marked, every later pass is a
 // pointer comparison.
 %new
@@ -431,7 +431,7 @@ static BOOL nfbIsRightHandGlyphButton(UIView* button) {
         if (!button.window) {
             return;
         }
-        // Either the button says it is the settings one, or we are on the
+        // Either the button says it is the settings one, or the tweak are on the
         // notifications screen, where the gear is the only icon in the bar.
         // The identifier is the precise route and covers Explore. The second
         // route exists only for Notifications, where no view carries it — and

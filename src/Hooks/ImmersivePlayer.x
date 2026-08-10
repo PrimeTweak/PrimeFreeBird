@@ -128,7 +128,7 @@ static BOOL isImmersiveCardPan(id viewController,
 // A single tap on an immersive video toggles playback instead of only
 // revealing the controls. The player is not exposed, so it is read from the
 // page view's ivar. Note the trade-off Orion documents: with this on, the
-// video controls can no longer be hidden — a Twitter limitation.
+// video controls cannot be hidden — a Twitter limitation.
 
 static TAVPlayer* nfbImmersivePagePlayer(UIView* pageView) {
     Ivar playerIvar = class_getInstanceVariable([pageView class], "player");
