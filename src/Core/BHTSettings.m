@@ -131,6 +131,9 @@ static NSDictionary<NSString*, NSDictionary*>* BHTSettingsPages(void) {
                     @{@"key": @"reading_line",
                       @"default": @YES,
                       @"type": @"toggle"},
+                    @{@"key": @"provenance_badges",
+                      @"default": @YES,
+                      @"type": @"toggle"},
                     @{
                         @"type": @"button",
                         @"titleKey": @"MUTED_WORDS_TITLE",
