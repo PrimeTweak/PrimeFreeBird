@@ -994,6 +994,7 @@ static const void* kNFBReadingAnchorPathKey = &kNFBReadingAnchorPathKey;
 static const void* kNFBReadingMarkerViewKey = &kNFBReadingMarkerViewKey;
 static const void* kNFBReadingTopAtCaptureKey = &kNFBReadingTopAtCaptureKey;
 static const void* kNFBReadingRetiredKey = &kNFBReadingRetiredKey;
+static const void* kNFBReadingMissCountKey = &kNFBReadingMissCountKey;
 static const void* kNFBReadingForYouKey = &kNFBReadingForYouKey;
 
 // The wash covers the Tweet's header and fades out before the media: solid
@@ -1116,13 +1117,25 @@ static void NFBReadingCaptureAnchor(TFNItemsDataViewController* dataViewControll
         return;
     }
     NSString* top = NFBReadingTopVisibleEntryID(dataViewController);
-    if (top.length) {
-        objc_setAssociatedObject(dataViewController, kNFBReadingAnchorIDKey, top,
-                                 OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-        objc_setAssociatedObject(dataViewController, kNFBReadingTopAtCaptureKey,
-                                 NFBReadingFirstEntryID(dataViewController.sections),
-                                 OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    if (!top.length) {
+        return;
     }
+    NSString* listHead = NFBReadingFirstEntryID(dataViewController.sections);
+    NSString* storedHead =
+        objc_getAssociatedObject(dataViewController, kNFBReadingTopAtCaptureKey);
+    // An active boundary survives every capture until the reader has reached
+    // the top of the list: a refresh that brings nothing, a backgrounding or
+    // an opened Tweet mid-catch-up must not erase it. Reaching the top IS the
+    // catch-up, and only then does the reference reset.
+    BOOL boundaryActive = storedHead.length && listHead.length &&
+                          ![storedHead isEqualToString:listHead];
+    if (boundaryActive && ![top isEqualToString:listHead]) {
+        return;
+    }
+    objc_setAssociatedObject(dataViewController, kNFBReadingAnchorIDKey, top,
+                             OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    objc_setAssociatedObject(dataViewController, kNFBReadingTopAtCaptureKey,
+                             listHead, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
 }
 
 // One row's true geometry. The rendered cell is authoritative when it is on
@@ -1188,18 +1201,38 @@ static void NFBReadingPositionMarker(TFNItemsDataViewController* dataViewControl
                              OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     if (!path) {
         // An anchor that vanishes from a large list marks an algorithmic tab:
-        // the data was replaced, not extended. The marker retires there for
-        // the session instead of reappearing to lie after the next capture.
+        // the data was replaced, not extended. But a large load can also land
+        // in phases, with the anchor's stretch arriving after the gap row —
+        // one absent pass is not a verdict. Two consecutive ones are, and only
+        // then does the marker retire for the session instead of reappearing
+        // to lie after the next capture.
         if (anchor.length &&
             NFBReadingItemCount(dataViewController.sections) >= 10) {
-            objc_setAssociatedObject(dataViewController, kNFBReadingRetiredKey,
-                                     @YES, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-            objc_setAssociatedObject(dataViewController, kNFBReadingAnchorIDKey,
-                                     nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+            NSInteger misses =
+                [objc_getAssociatedObject(dataViewController,
+                                          kNFBReadingMissCountKey) integerValue] +
+                1;
+            if (misses >= 2) {
+                objc_setAssociatedObject(dataViewController,
+                                         kNFBReadingRetiredKey, @YES,
+                                         OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+                objc_setAssociatedObject(dataViewController,
+                                         kNFBReadingAnchorIDKey, nil,
+                                         OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+                objc_setAssociatedObject(dataViewController,
+                                         kNFBReadingMissCountKey, nil,
+                                         OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+            } else {
+                objc_setAssociatedObject(dataViewController,
+                                         kNFBReadingMissCountKey, @(misses),
+                                         OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+            }
         }
         marker.hidden = YES;
         return;
     }
+    objc_setAssociatedObject(dataViewController, kNFBReadingMissCountKey, nil,
+                             OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     // Nothing new above the anchor means nothing to say: at the top of an
     // unchanged list the reader already knows where they are.
     NSString* topAtCapture =
