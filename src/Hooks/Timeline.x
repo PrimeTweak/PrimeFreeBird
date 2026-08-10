@@ -1414,7 +1414,10 @@ static BOOL NFBBadgeItemIsModule(id item) {
 // include Heart (liked), Follow, List and so on; a non-zero type is a named
 // social reason. The context text names a topic surface directly.
 static id NFBStatusForItem(id item) {
-    SEL reach[] = { @selector(tweet), @selector(status) };
+    // Confirmed in T1Twitter: the row view-model reaches the tweet through
+    // -status (a TFNTwitterStatus, which owns -socialContext). -tweet returns
+    // different types by class, so it is only a last resort.
+    SEL reach[] = { @selector(status), @selector(tweet) };
     for (NSUInteger i = 0; i < sizeof(reach) / sizeof(reach[0]); i++) {
         if ([item respondsToSelector:reach[i]]) {
             id value = ((id (*)(id, SEL))objc_msgSend)(item, reach[i]);
@@ -1424,6 +1427,41 @@ static id NFBStatusForItem(id item) {
         }
     }
     return item;
+}
+
+// Temporary instrumentation: counts, over the visible cells, how far the badge
+// pipeline gets — how many items resolve a status, how many expose a social
+// context, and how many of those name a reason. The Lab row reads these; the
+// block is removed once the numbers are known.
+static void NFBBadgeSurveyNote(id item) {
+    if (![BHTSettings boolForKey:@"provenance_badges"]) {
+        return;
+    }
+    NSUserDefaults* defaults = [NSUserDefaults standardUserDefaults];
+    NSInteger seen = [defaults integerForKey:@"nfb_badge_seen"] + 1;
+    [defaults setInteger:seen forKey:@"nfb_badge_seen"];
+    id status = NFBStatusForItem(item);
+    if (![status respondsToSelector:@selector(socialContext)]) {
+        return;
+    }
+    [defaults setInteger:[defaults integerForKey:@"nfb_badge_status"] + 1
+                  forKey:@"nfb_badge_status"];
+    id context =
+        ((id (*)(id, SEL))objc_msgSend)(status, @selector(socialContext));
+    if (!context) {
+        return;
+    }
+    [defaults setInteger:[defaults integerForKey:@"nfb_badge_context"] + 1
+                  forKey:@"nfb_badge_context"];
+    if ([context respondsToSelector:@selector(text)]) {
+        NSString* text =
+            ((NSString* (*)(id, SEL))objc_msgSend)(context, @selector(text));
+        if ([text isKindOfClass:[NSString class]] && text.length) {
+            [defaults setInteger:[defaults integerForKey:@"nfb_badge_named"] + 1
+                          forKey:@"nfb_badge_named"];
+            [defaults setObject:text forKey:@"nfb_badge_sample"];
+        }
+    }
 }
 
 static NSString* NFBBadgeSymbolForItem(id item) {
@@ -1505,8 +1543,10 @@ static void NFBBadgeLayoutTick(UIScrollView* scrollView) {
     }
     for (UITableViewCell* cell in table.visibleCells) {
         UIImageView* badge = objc_getAssociatedObject(cell, kNFBBadgeViewKey);
-        NSString* symbol = NFBBadgeSymbolForItem(
-            NFBItemAtIndexPath(dataViewController, [table indexPathForCell:cell]));
+        id rowItem =
+            NFBItemAtIndexPath(dataViewController, [table indexPathForCell:cell]);
+        NFBBadgeSurveyNote(rowItem);
+        NSString* symbol = NFBBadgeSymbolForItem(rowItem);
         if (!symbol) {
             badge.hidden = YES;
             continue;
