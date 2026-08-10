@@ -995,6 +995,7 @@ static NSSet<NSNumber*>* ConversationAuthorRepliedToUserIDs(NSArray* sections,
 static const void* kNFBReadingAnchorIDKey = &kNFBReadingAnchorIDKey;
 static const void* kNFBReadingAnchorPathKey = &kNFBReadingAnchorPathKey;
 static const void* kNFBReadingMarkerViewKey = &kNFBReadingMarkerViewKey;
+static const void* kNFBListViewKey = &kNFBListViewKey;
 static const void* kNFBReadingTopAtCaptureKey = &kNFBReadingTopAtCaptureKey;
 static const void* kNFBReadingRetiredKey = &kNFBReadingRetiredKey;
 static const void* kNFBReadingMissCountKey = &kNFBReadingMissCountKey;
@@ -1009,19 +1010,44 @@ static const CGFloat kNFBReadingFadeSolid = 34.0;
 static const CGFloat kNFBReadingFadeReach = 110.0;
 static NSHashTable* gNFBReadingControllers = nil;
 
-static UIScrollView* NFBListScrollView(TFNItemsDataViewController* dataViewController) {
-    if ([dataViewController respondsToSelector:@selector(tableView)]) {
-        UIScrollView* table = ((UIScrollView* (*)(id, SEL))objc_msgSend)(
-            dataViewController, @selector(tableView));
-        if (table) {
-            return table;
+// A list scroll view is one that can name its visible index paths.
+static BOOL NFBViewIsList(UIView* view) {
+    return [view isKindOfClass:[UIScrollView class]] &&
+           ([view respondsToSelector:@selector(indexPathsForVisibleRows)] ||
+            [view respondsToSelector:@selector(indexPathsForVisibleItems)]);
+}
+
+static UIScrollView* NFBFindListInView(UIView* view) {
+    if (NFBViewIsList(view)) {
+        return (UIScrollView*)view;
+    }
+    for (UIView* subview in view.subviews) {
+        UIScrollView* found = NFBFindListInView(subview);
+        if (found) {
+            return found;
         }
     }
-    if ([dataViewController respondsToSelector:@selector(collectionView)]) {
-        return ((UIScrollView* (*)(id, SEL))objc_msgSend)(
-            dataViewController, @selector(collectionView));
-    }
     return nil;
+}
+
+// The controller's list, found in its mounted view tree. Asking the
+// controller for -tableView or -collectionView instead would invoke a lazy
+// getter, which builds a view that was never meant to exist — and on a
+// collection view that raises, taking the app down. Only what is already on
+// screen is inspected here.
+static UIScrollView* NFBListScrollView(TFNItemsDataViewController* dataViewController) {
+    if (![dataViewController isViewLoaded]) {
+        return nil;
+    }
+    UIScrollView* cached =
+        objc_getAssociatedObject(dataViewController, kNFBListViewKey);
+    if (cached.window && [cached isDescendantOfView:dataViewController.view]) {
+        return cached;
+    }
+    UIScrollView* found = NFBFindListInView(dataViewController.view);
+    objc_setAssociatedObject(dataViewController, kNFBListViewKey, found,
+                             OBJC_ASSOCIATION_ASSIGN);
+    return found;
 }
 
 static NSArray<NSIndexPath*>* NFBListVisibleIndexPaths(UIScrollView* scrollView) {
@@ -1642,34 +1668,32 @@ static void NFBBadgeApplyToCell(UIView* cell, id item) {
     [host bringSubviewToFront:badge];
 }
 
-// One line of state for the survey: which lists the controller exposes and
-// how many index paths are visible right now.
+// One line of state for the survey, built only from the list already found:
+// no getter is invoked, so nothing can be created as a side effect.
 static void NFBBadgeNoteLists(TFNItemsDataViewController* dataViewController,
                               UIScrollView* list) {
-    id table = [dataViewController respondsToSelector:@selector(tableView)]
-                   ? ((id (*)(id, SEL))objc_msgSend)(dataViewController,
-                                                     @selector(tableView))
-                   : nil;
-    id collection =
-        [dataViewController respondsToSelector:@selector(collectionView)]
-            ? ((id (*)(id, SEL))objc_msgSend)(dataViewController,
-                                              @selector(collectionView))
-            : nil;
     gNFBBadgeListsText = [NSString
-        stringWithFormat:@"T=%@ C=%@ vis=%lu",
-                         table ? NSStringFromClass([table class]) : @"nil",
-                         collection ? NSStringFromClass([collection class])
-                                    : @"nil",
-                         (unsigned long)NFBListVisibleIndexPaths(list).count];
+        stringWithFormat:@"list=%@ vis=%lu win=%@",
+                         list ? NSStringFromClass([list class]) : @"nil",
+                         (unsigned long)NFBListVisibleIndexPaths(list).count,
+                         list.window ? @"yes" : @"no"];
 }
 
 // Applies badges to every visible row of the controller's own list. The
 // controller is a parameter, never a guess.
 static void NFBBadgePass(TFNItemsDataViewController* dataViewController) {
+    // Resolving a cell forces the list to lay out, which re-enters the layout
+    // pass that called this one. Without this latch the two call each other
+    // until the stack runs out.
+    static BOOL inPass = NO;
+    if (inPass) {
+        return;
+    }
     if (![BHTSettings boolForKey:@"provenance_badges"] ||
         !NFBReadingIsHomeTimeline(dataViewController)) {
         return;
     }
+    inPass = YES;
     gNFBBadgeGate[NFBGatePass]++;
     UIScrollView* list = NFBListScrollView(dataViewController);
     NFBBadgeNoteLists(dataViewController, list);
@@ -1682,6 +1706,7 @@ static void NFBBadgePass(TFNItemsDataViewController* dataViewController) {
         NFBBadgeApplyToCell(cell,
                             NFBItemAtIndexPath(dataViewController, path));
     }
+    inPass = NO;
     NFBBadgeFlush();
 }
 
@@ -1724,7 +1749,24 @@ static void NFBBadgeLayoutTick(UIScrollView* scrollView) {
         return;
     }
     gNFBBadgeGate[NFBGateHome]++;
-    NFBBadgePass(dataViewController);
+    // Recycled cells are refreshed from what the list already has laid out.
+    // Asking the list for a cell here would force a layout inside a layout.
+    if (![scrollView respondsToSelector:@selector(visibleCells)] ||
+        ![scrollView respondsToSelector:@selector(indexPathForCell:)]) {
+        return;
+    }
+    NSArray* cells = ((NSArray* (*)(id, SEL))objc_msgSend)(
+        scrollView, @selector(visibleCells));
+    for (UIView* cell in cells) {
+        NSIndexPath* path = ((NSIndexPath* (*)(id, SEL, id))objc_msgSend)(
+            scrollView, @selector(indexPathForCell:), cell);
+        if (!path) {
+            continue;
+        }
+        gNFBBadgeGate[NFBGateSeen]++;
+        NFBBadgeApplyToCell(cell,
+                            NFBItemAtIndexPath(dataViewController, path));
+    }
 }
 
 static NSArray* FilteredTimelineSections(TFNItemsDataViewController* dataViewController,
