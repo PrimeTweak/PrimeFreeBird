@@ -135,6 +135,14 @@ static NSDictionary<NSString*, NSDictionary*>* BHTSettingsPages(void) {
                       @"default": @YES,
                       @"type": @"toggle"},
                     @{
+                        @"type": @"compactButton",
+                        @"key": @"badge_survey_button",
+                        @"titleKey": @"BADGE_SURVEY_TITLE",
+                        @"action": @"showBadgeSurvey:",
+                        @"prefKeyForSubtitle": @"nfb_badge_sample",
+                        @"subtitleDefaultKey": @"BADGE_SURVEY_EMPTY"
+                    },
+                    @{
                         @"type": @"button",
                         @"titleKey": @"MUTED_WORDS_TITLE",
                         @"subtitleKey": @"MUTED_WORDS_DETAIL",
