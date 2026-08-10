@@ -274,6 +274,8 @@
 "IMPORT_SETTINGS_FAILED_MESSAGE" = "This file is not a PrimeFreeBird settings backup.";
 "READING_LINE_TITLE" = "Reading marker";
 "READING_LINE_DETAIL" = "Marks where you were when new Tweets arrive above — on Following and your Lists.";
+"PROVENANCE_BADGES_TITLE" = "Provenance badges";
+"PROVENANCE_BADGES_DETAIL" = "Show a small icon on promoted Tweets and account suggestions.";
 /* Reply-in-web-view: the reply screen title + the web-session login/clear
    buttons (Lab) and their alerts. */
 "REPLY_WEBVIEW_TITLE" = "Reply";
