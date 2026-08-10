@@ -131,17 +131,6 @@ static NSDictionary<NSString*, NSDictionary*>* BHTSettingsPages(void) {
                     @{@"key": @"reading_line",
                       @"default": @YES,
                       @"type": @"toggle"},
-                    @{@"key": @"provenance_badges",
-                      @"default": @YES,
-                      @"type": @"toggle"},
-                    @{
-                        @"type": @"compactButton",
-                        @"key": @"badge_survey_button",
-                        @"titleKey": @"BADGE_SURVEY_TITLE",
-                        @"action": @"showBadgeSurvey:",
-                        @"prefKeyForSubtitle": @"nfb_badge_sample",
-                        @"subtitleDefaultKey": @"BADGE_SURVEY_EMPTY"
-                    },
                     @{
                         @"type": @"button",
                         @"titleKey": @"MUTED_WORDS_TITLE",
