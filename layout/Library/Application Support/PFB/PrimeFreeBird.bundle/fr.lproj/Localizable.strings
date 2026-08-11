@@ -348,10 +348,6 @@
 "IMPORT_SETTINGS_FAILED_MESSAGE" = "Ce fichier n’est pas une sauvegarde PrimeFreeBird.";
 "READING_LINE_TITLE" = "Repère de lecture";
 "READING_LINE_DETAIL" = "Marque où tu étais quand de nouveaux Tweets arrivent au-dessus — sur Following et tes Lists.";
-"PROVENANCE_BADGES_TITLE" = "Badges de provenance";
-"PROVENANCE_BADGES_DETAIL" = "Affiche une petite icône sur les Tweets ajoutés pour un sujet ou l’activité de quelqu’un.";
-"BADGE_SURVEY_TITLE" = "Diagnostic des badges";
-"BADGE_SURVEY_EMPTY" = "Aucune donnée — scrolle For You, puis ouvre ceci.";
 "INTERFACE_STYLE_DETAIL" = "Liquid Glass est le design translucide d’iOS 26. Standard garde le look plat.";
 "INTERFACE_STYLE_STANDARD" = "Standard";
 "INTERFACE_STYLE_LIQUID_GLASS" = "Liquid Glass";
@@ -460,13 +456,16 @@
 "UNLIMITED_TIMELINE_TABS_DETAIL" = "Épingle plus de fils et débloque les onglets avancés, sauf s'ils sont masqués.";
 
 /* ===== MOTS FILTRÉS (2026-08-05) ===== */
-"MUTED_WORDS_TITLE" = "Mots filtrés";
-"MUTED_WORDS_DETAIL" = "Masque les posts contenant les mots ou comptes que tu choisis.";
 "MUTED_WORDS_SUBTITLE" = "Les posts correspondant à cette liste sont retirés de ton fil.";
+"FILTERS_TITLE" = "Filtres";
+"FILTERS_DETAIL" = "Mots, comptes et langues que tu gardes hors de ton fil.";
+"FILTERS_SEGMENT_WORDS" = "Mots";
+"FILTERS_SEGMENT_LANGUAGES" = "Langues";
+"LANGUAGES_FOOTER_OFF" = "Aucune langue sélectionnée — toutes les langues atteignent ton fil.";
+"LANGUAGES_FOOTER_ON" = "Seules les langues sélectionnées atteignent ton fil. Les Tweets sans langue détectée passent toujours.";
 "MUTED_WORDS_NONE" = "Aucun";
 "MUTED_WORDS_ADD_PLACEHOLDER" = "Ajoute un mot, une expression ou un @compte";
 "MUTED_WORDS_ADD_BUTTON" = "Ajouter";
-"MUTED_WORDS_LIST_HEADER" = "Filtres";
 "MUTED_WORDS_OPTIONS_HEADER" = "Options";
 "MUTED_WORDS_KIND_WORD" = "mot";
 "MUTED_WORDS_KIND_PHRASE" = "expression";
