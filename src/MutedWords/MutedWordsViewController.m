@@ -431,7 +431,7 @@ static NSMutableArray<NSString*>* NFBKeptLanguageList(void) {
         [bundle localizedStringForKey:@"FILTERS_SEGMENT_LANGUAGES"]
     ]];
     control.selectedSegmentIndex = self.mode;
-    control.selectedSegmentTintColor = self.tintColor;
+    control.selectedSegmentTintColor = self.view.tintColor;
     [control addTarget:self
                   action:@selector(modeChanged:)
         forControlEvents:UIControlEventValueChanged];
@@ -721,7 +721,7 @@ static NSMutableArray<NSString*>* NFBKeptLanguageList(void) {
                  : [[UIColor labelColor] colorWithAlphaComponent:0.45];
         cell.accessoryType =
             kept ? UITableViewCellAccessoryCheckmark : UITableViewCellAccessoryNone;
-        cell.tintColor = self.tintColor;
+        cell.tintColor = self.view.tintColor;
         return cell;
     }
 
