@@ -23,6 +23,25 @@
 static const CGFloat kNFBMutedSideMargin = 10.0;
 // A language row's own height, so the switch is spaced like one more entry.
 static const CGFloat kNFBTranslateBarHeight = 44.0;
+// The popover's rounded corners cut into its bottom row, so its list sits a
+// little further in than the full screen's; the segment keeps the card's own
+// margin above it.
+static const CGFloat kNFBCompactRowMargin = 14.0;
+static const NSInteger kNFBTickTag = 7701;
+
+// The material iOS gives its bars. Liquid Glass exists from iOS 26 and is
+// resolved by name because the build SDK predates it; older systems fall back
+// to the chrome material bars used before.
+static UIVisualEffect* NFBBarMaterial(void) {
+    Class glass = NSClassFromString(@"UIGlassEffect");
+    if (glass) {
+        UIVisualEffect* effect = [[glass alloc] init];
+        if (effect) {
+            return effect;
+        }
+    }
+    return [UIBlurEffect effectWithStyle:UIBlurEffectStyleSystemChromeMaterial];
+}
 
 NSString* const kNFBMutedWordsKey = @"nfb_muted_words";
 NSString* const kNFBMutedWholeWordsKey = @"nfb_muted_whole_words";
@@ -311,6 +330,8 @@ NSString* const kNFBMutedIncludeRepostsKey = @"nfb_muted_include_reposts";
 @property (nonatomic, strong) UIView* pinnedHeader;
 @property (nonatomic, strong) UIView* pinnedBar;
 @property (nonatomic, strong) UISwitch* pinnedSwitch;
+@property (nonatomic, strong) UIVisualEffectView* headerMaterial;
+@property (nonatomic, strong) UIVisualEffectView* barMaterial;
 @property (nonatomic, assign) CGFloat pinnedHeaderHeight;
 @end
 
@@ -416,6 +437,7 @@ static NSMutableArray<NSString*>* NFBKeptLanguageList(void) {
     // on every layout pass.
     [self.tableView bringSubviewToFront:self.pinnedHeader];
     [self.tableView bringSubviewToFront:self.pinnedBar];
+    [self updateBarMaterials];
     [self updatePreferredSize];
 }
 
@@ -510,6 +532,7 @@ static NSMutableArray<NSString*>* NFBKeptLanguageList(void) {
             [header.topAnchor constraintEqualToAnchor:tableFrame.topAnchor],
             [header.heightAnchor constraintEqualToConstant:height],
         ]];
+        self.headerMaterial = [self materialBehind:header];
         self.pinnedHeader = header;
         self.pinnedHeaderHeight = height;
         [self installTranslateBar];
@@ -526,6 +549,24 @@ static NSMutableArray<NSString*>* NFBKeptLanguageList(void) {
     header.autoresizingMask = UIViewAutoresizingFlexibleWidth;
     [header layoutIfNeeded];
     self.tableView.tableHeaderView = header;
+}
+
+// The material sits behind a pinned view's own contents, invisible until
+// something scrolls under it.
+- (UIVisualEffectView*)materialBehind:(UIView*)host {
+    UIVisualEffectView* material =
+        [[UIVisualEffectView alloc] initWithEffect:NFBBarMaterial()];
+    material.translatesAutoresizingMaskIntoConstraints = NO;
+    material.userInteractionEnabled = NO;
+    material.alpha = 0.0;
+    [host insertSubview:material atIndex:0];
+    [NSLayoutConstraint activateConstraints:@[
+        [material.leadingAnchor constraintEqualToAnchor:host.leadingAnchor],
+        [material.trailingAnchor constraintEqualToAnchor:host.trailingAnchor],
+        [material.topAnchor constraintEqualToAnchor:host.topAnchor],
+        [material.bottomAnchor constraintEqualToAnchor:host.bottomAnchor],
+    ]];
+    return material;
 }
 
 // The switch is held against the bottom of the table's frame, below the rows
@@ -565,10 +606,10 @@ static NSMutableArray<NSString*>* NFBKeptLanguageList(void) {
     UILayoutGuide* tableFrame = self.tableView.frameLayoutGuide;
     [NSLayoutConstraint activateConstraints:@[
         [label.leadingAnchor constraintEqualToAnchor:bar.leadingAnchor
-                                            constant:kNFBMutedSideMargin],
+                                            constant:[self rowMargin]],
         [label.centerYAnchor constraintEqualToAnchor:bar.centerYAnchor],
         [toggle.trailingAnchor constraintEqualToAnchor:bar.trailingAnchor
-                                              constant:-kNFBMutedSideMargin],
+                                              constant:-[self rowMargin]],
         [toggle.centerYAnchor constraintEqualToAnchor:bar.centerYAnchor],
         [hairline.leadingAnchor constraintEqualToAnchor:bar.leadingAnchor],
         [hairline.trailingAnchor constraintEqualToAnchor:bar.trailingAnchor],
@@ -579,6 +620,7 @@ static NSMutableArray<NSString*>* NFBKeptLanguageList(void) {
         [bar.bottomAnchor constraintEqualToAnchor:tableFrame.bottomAnchor],
         [bar.heightAnchor constraintEqualToConstant:kNFBTranslateBarHeight],
     ]];
+    self.barMaterial = [self materialBehind:bar];
     self.pinnedBar = bar;
     self.pinnedSwitch = toggle;
 }
@@ -598,6 +640,7 @@ static NSMutableArray<NSString*>* NFBKeptLanguageList(void) {
     self.tableView.verticalScrollIndicatorInsets = insets;
     [self.tableView bringSubviewToFront:self.pinnedHeader];
     [self.tableView bringSubviewToFront:self.pinnedBar];
+    [self updateBarMaterials];
 }
 
 
@@ -632,6 +675,30 @@ static NSMutableArray<NSString*>* NFBKeptLanguageList(void) {
 - (BOOL)rowIsTranslate:(NSInteger)row {
     return !self.othersOnly &&
            row == (NSInteger)[self visibleLanguages].count + (self.compact ? 0 : 1);
+}
+
+// Rows of the popover clear the corner curve; the full screen keeps its own.
+- (CGFloat)rowMargin {
+    return self.compact ? kNFBCompactRowMargin : kNFBMutedSideMargin;
+}
+
+// A bar shows its material only while content passes underneath, the way the
+// system's own bars do; at rest it is the card's glass that shows.
+- (void)updateBarMaterials {
+    if (!self.compact) {
+        return;
+    }
+    UIScrollView* list = self.tableView;
+    CGFloat under = list.contentOffset.y + list.adjustedContentInset.top;
+    CGFloat below = list.contentSize.height -
+                    (list.contentOffset.y + CGRectGetHeight(list.bounds) -
+                     list.adjustedContentInset.bottom);
+    self.headerMaterial.alpha = MIN(MAX(under / 8.0, 0.0), 1.0);
+    self.barMaterial.alpha = MIN(MAX(below / 8.0, 0.0), 1.0);
+}
+
+- (void)scrollViewDidScroll:(UIScrollView*)scrollView {
+    [self updateBarMaterials];
 }
 
 - (void)modeChanged:(UISegmentedControl*)control {
@@ -976,10 +1043,10 @@ static NSMutableArray<NSString*>* NFBKeptLanguageList(void) {
         // leave the languages indented past the rows around them.
         cell.preservesSuperviewLayoutMargins = NO;
         cell.contentView.preservesSuperviewLayoutMargins = NO;
-        cell.layoutMargins = UIEdgeInsetsMake(0, kNFBMutedSideMargin, 0,
-                                              kNFBMutedSideMargin);
+        CGFloat margin = [self rowMargin];
+        cell.layoutMargins = UIEdgeInsetsMake(0, margin, 0, margin);
         cell.contentView.layoutMargins = cell.layoutMargins;
-        cell.separatorInset = UIEdgeInsetsMake(0, kNFBMutedSideMargin, 0, 0);
+        cell.separatorInset = UIEdgeInsetsMake(0, margin, 0, 0);
 
         if ([self rowIsPicker:indexPath.row]) {
             NSArray* tail = [self.languageCodes
@@ -1013,15 +1080,28 @@ static NSMutableArray<NSString*>* NFBKeptLanguageList(void) {
         // The system checkmark sits on its own inset, which leaves the right
         // column ragged against the switch below. Supplying the glyph as an
         // accessory view puts it on the cell's own margin instead.
-        if (kept) {
-            UIImageView* tick = [[UIImageView alloc]
-                initWithImage:[UIImage systemImageNamed:@"checkmark"]];
-            tick.tintColor = accent;
-            [tick sizeToFit];
-            cell.accessoryView = tick;
-        } else {
-            cell.accessoryView = nil;
+        // Placed by constraint rather than as an accessory: the system gives
+        // an accessory its own inset, which left this column adrift from the
+        // switch pinned below the list.
+        UIImageView* tick = [cell.contentView viewWithTag:kNFBTickTag];
+        if (!tick) {
+            tick = [[UIImageView alloc] init];
+            tick.tag = kNFBTickTag;
+            tick.contentMode = UIViewContentModeScaleAspectFit;
+            tick.translatesAutoresizingMaskIntoConstraints = NO;
+            [cell.contentView addSubview:tick];
+            [NSLayoutConstraint activateConstraints:@[
+                [tick.trailingAnchor
+                    constraintEqualToAnchor:cell.contentView.trailingAnchor
+                                   constant:-margin],
+                [tick.centerYAnchor
+                    constraintEqualToAnchor:cell.contentView.centerYAnchor],
+            ]];
         }
+        tick.image = [UIImage systemImageNamed:@"checkmark"];
+        tick.tintColor = accent;
+        tick.hidden = !kept;
+        cell.accessoryView = nil;
         cell.accessoryType = UITableViewCellAccessoryNone;
         return cell;
     }
