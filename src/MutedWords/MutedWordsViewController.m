@@ -21,7 +21,8 @@
 // points the rest of the settings uses (ModernSettingsCells). One number,
 // applied everywhere.
 static const CGFloat kNFBMutedSideMargin = 10.0;
-static const CGFloat kNFBTranslateBarHeight = 58.0;
+// A language row's own height, so the switch is spaced like one more entry.
+static const CGFloat kNFBTranslateBarHeight = 44.0;
 
 NSString* const kNFBMutedWordsKey = @"nfb_muted_words";
 NSString* const kNFBMutedWholeWordsKey = @"nfb_muted_whole_words";
@@ -37,6 +38,9 @@ NSString* const kNFBMutedIncludeRepostsKey = @"nfb_muted_include_reposts";
 @property (nonatomic, strong) UITextField* field;
 @property (nonatomic, strong) UIButton* addButton;
 @property (nonatomic, strong) UILabel* hintLabel;
+// The popover closes this gap so the box sits under the segment exactly as
+// the first language row does.
+@property (nonatomic, strong) NSLayoutConstraint* boxTop;
 @end
 
 @implementation NFBMutedAddCell
@@ -86,11 +90,12 @@ NSString* const kNFBMutedIncludeRepostsKey = @"nfb_muted_include_reposts";
         _field.translatesAutoresizingMaskIntoConstraints = NO;
         [box addSubview:_field];
 
+        _boxTop = [box.topAnchor constraintEqualToAnchor:self.contentView.topAnchor
+                                               constant:8.0];
         [NSLayoutConstraint activateConstraints:@[
             [box.leadingAnchor constraintEqualToAnchor:self.contentView.leadingAnchor
                                               constant:kNFBMutedSideMargin],
-            [box.topAnchor constraintEqualToAnchor:self.contentView.topAnchor
-                                          constant:8.0],
+            _boxTop,
             [box.heightAnchor constraintEqualToConstant:42.0],
             [_hintLabel.topAnchor constraintEqualToAnchor:box.bottomAnchor
                                                  constant:8.0],
@@ -526,32 +531,56 @@ static NSMutableArray<NSString*>* NFBKeptLanguageList(void) {
 // The switch is held against the bottom of the table's frame, below the rows
 // it belongs to.
 - (void)installTranslateBar {
-    NFBMutedToggleCell* row =
-        [[NFBMutedToggleCell alloc] initWithStyle:UITableViewCellStyleDefault
-                                  reuseIdentifier:nil];
-    // No surface of its own either: the popover's glass carries the whole
-    // sheet, and a second material on top reads as a panel inside a panel.
-    row.backgroundColor = [UIColor clearColor];
-    row.contentView.backgroundColor = [UIColor clearColor];
-    row.titleLabel2.text =
+    // Built to a language row's proportions rather than reusing the settings
+    // cell, whose 18 pt margins would set it apart from the list above it.
+    UIView* bar = [[UIView alloc] init];
+    bar.backgroundColor = [UIColor clearColor];
+    bar.translatesAutoresizingMaskIntoConstraints = NO;
+
+    UILabel* label = [[UILabel alloc] init];
+    label.text =
         [[BHTBundle sharedBundle] localizedStringForKey:@"LANGUAGES_TRANSLATE_TITLE"];
-    row.subtitleLabel.text = @"";
-    row.toggle.on =
+    label.font = [TwitterChirpFont(TwitterFontStyleRegular) fontWithSize:16.5];
+    label.textColor = [UIColor labelColor];
+    label.translatesAutoresizingMaskIntoConstraints = NO;
+
+    UISwitch* toggle = [[UISwitch alloc] init];
+    toggle.on =
         ![[NSUserDefaults standardUserDefaults] boolForKey:@"disable_auto_translate"];
-    [row.toggle addTarget:self
-                   action:@selector(translateChanged:)
-         forControlEvents:UIControlEventValueChanged];
-    row.translatesAutoresizingMaskIntoConstraints = NO;
-    [self.tableView addSubview:row];
+    [toggle addTarget:self
+                  action:@selector(translateChanged:)
+        forControlEvents:UIControlEventValueChanged];
+    toggle.translatesAutoresizingMaskIntoConstraints = NO;
+
+    // Edge to edge rather than inset like the row separators: it marks where
+    // the scrolling list ends and the pinned switch begins.
+    UIView* hairline = [[UIView alloc] init];
+    hairline.backgroundColor = [UIColor separatorColor];
+    hairline.translatesAutoresizingMaskIntoConstraints = NO;
+
+    for (UIView* v in @[ label, toggle, hairline ]) {
+        [bar addSubview:v];
+    }
+    [self.tableView addSubview:bar];
     UILayoutGuide* tableFrame = self.tableView.frameLayoutGuide;
     [NSLayoutConstraint activateConstraints:@[
-        [row.leadingAnchor constraintEqualToAnchor:tableFrame.leadingAnchor],
-        [row.trailingAnchor constraintEqualToAnchor:tableFrame.trailingAnchor],
-        [row.bottomAnchor constraintEqualToAnchor:tableFrame.bottomAnchor],
-        [row.heightAnchor constraintEqualToConstant:kNFBTranslateBarHeight],
+        [label.leadingAnchor constraintEqualToAnchor:bar.leadingAnchor
+                                            constant:kNFBMutedSideMargin],
+        [label.centerYAnchor constraintEqualToAnchor:bar.centerYAnchor],
+        [toggle.trailingAnchor constraintEqualToAnchor:bar.trailingAnchor
+                                              constant:-kNFBMutedSideMargin],
+        [toggle.centerYAnchor constraintEqualToAnchor:bar.centerYAnchor],
+        [hairline.leadingAnchor constraintEqualToAnchor:bar.leadingAnchor],
+        [hairline.trailingAnchor constraintEqualToAnchor:bar.trailingAnchor],
+        [hairline.topAnchor constraintEqualToAnchor:bar.topAnchor],
+        [hairline.heightAnchor constraintEqualToConstant:0.5],
+        [bar.leadingAnchor constraintEqualToAnchor:tableFrame.leadingAnchor],
+        [bar.trailingAnchor constraintEqualToAnchor:tableFrame.trailingAnchor],
+        [bar.bottomAnchor constraintEqualToAnchor:tableFrame.bottomAnchor],
+        [bar.heightAnchor constraintEqualToConstant:kNFBTranslateBarHeight],
     ]];
-    self.pinnedBar = row;
-    self.pinnedSwitch = row.toggle;
+    self.pinnedBar = bar;
+    self.pinnedSwitch = toggle;
 }
 
 // The rows start below the segment and end above the switch, and the switch
@@ -989,6 +1018,7 @@ static NSMutableArray<NSString*>* NFBKeptLanguageList(void) {
     if (indexPath.section == 0 && indexPath.row == 0) {
         NFBMutedAddCell* cell = [tableView dequeueReusableCellWithIdentifier:@"add"
                                                                forIndexPath:indexPath];
+        cell.boxTop.constant = self.compact ? 0.0 : 8.0;
         cell.field.placeholder =
             [bundle localizedStringForKey:@"MUTED_WORDS_ADD_PLACEHOLDER"];
         cell.hintLabel.text = [bundle localizedStringForKey:@"MUTED_WORDS_SUBTITLE"];
