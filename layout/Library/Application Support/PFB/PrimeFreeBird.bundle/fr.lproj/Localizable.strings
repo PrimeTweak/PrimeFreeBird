@@ -464,7 +464,7 @@
 "FILTERS_SEGMENT_WORDS" = "Mots";
 "FILTERS_SEGMENT_LANGUAGES" = "Langues";
 "LANGUAGES_FOOTER_OFF" = "Aucune langue cochée — toutes les langues atteignent ton fil.";
-"LANGUAGES_FOOTER_ON" = "Seules les langues cochées atteignent ton fil. Les Tweets sans langue détectée passent toujours.";
+"LANGUAGES_FOOTER_ON" = "Seules les langues cochées atteignent ton fil.\nLes Tweets sans langue détectée passent toujours.\nDécoche toutes les langues pour désactiver le filtre.";
 "LANGUAGES_TRANSLATE_TITLE" = "Traduction automatique";
 "LANGUAGES_TRANSLATE_DETAIL" = "Tweets, bios, notes et notifications.";
 "LANGUAGES_OTHERS_TITLE" = "Autres langues";
