@@ -469,7 +469,6 @@
 "LANGUAGES_TRANSLATE_DETAIL" = "Tweets, bios, notes et notifications.";
 "LANGUAGES_OTHERS_TITLE" = "Autres langues";
 "LANGUAGES_OTHERS_NONE" = "Aucune";
-"LANGUAGES_FOOTER_TRANSLATE" = "La traduction automatique ne s’applique plus à ton fil : les langues non cochées sont retirées avant qu’elle puisse agir. Elle reste active pour les bios, les notes et les notifications.";
 "MUTED_WORDS_NONE" = "Aucun";
 "MUTED_WORDS_ADD_PLACEHOLDER" = "Ajoute un mot, une expression ou un @compte";
 "MUTED_WORDS_ADD_BUTTON" = "Ajouter";
