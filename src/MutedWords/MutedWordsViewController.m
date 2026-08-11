@@ -294,6 +294,10 @@ NSString* const kNFBMutedIncludeRepostsKey = @"nfb_muted_include_reposts";
                                        UIPopoverPresentationControllerDelegate>
 @property (nonatomic, strong) NSMutableArray<NSString*>* terms;
 @property (nonatomic, assign) BOOL compact;
+// 0 shows the muted terms, 1 shows the language list. The segmented control
+// above the table drives it, in both presentations.
+@property (nonatomic, assign) NSInteger mode;
+@property (nonatomic, strong) NSArray<NSString*>* languageCodes;
 @end
 
 // The confirm glyph in the navigation bar is baked opaque white by the theme
@@ -321,6 +325,34 @@ extern NSInteger NFBColorThemeScreenVisible;
 
 - (instancetype)init {
     return [super initWithStyle:UITableViewStyleGrouped];
+}
+
+// The languages offered, in the order the advanced-search menu already uses.
+static NSString* const kNFBLanguagesKey = @"nfb_filter_languages";
+
+static NSArray<NSString*>* NFBLanguageCatalog(void) {
+    return @[
+        @"en", @"fr", @"es", @"de", @"it", @"pt", @"ja", @"ko", @"ar", @"ru",
+        @"zh", @"hi", @"id", @"tr", @"nl", @"pl", @"sv", @"uk", @"fa", @"he",
+        @"th", @"vi"
+    ];
+}
+
+// The language's own name, so it is recognised without knowing the code.
+static NSString* NFBLanguageName(NSString* code) {
+    NSLocale* locale = [NSLocale localeWithLocaleIdentifier:code];
+    NSString* name = [locale localizedStringForLanguageCode:code];
+    if (!name.length) {
+        name = [[NSLocale currentLocale] localizedStringForLanguageCode:code];
+    }
+    return name.length ? [name capitalizedStringWithLocale:locale]
+                       : code.uppercaseString;
+}
+
+static NSMutableArray<NSString*>* NFBKeptLanguageList(void) {
+    NSArray* stored =
+        [[NSUserDefaults standardUserDefaults] arrayForKey:kNFBLanguagesKey];
+    return [([stored isKindOfClass:[NSArray class]] ? stored : @[]) mutableCopy];
 }
 
 - (instancetype)initCompact {
@@ -351,7 +383,10 @@ extern NSInteger NFBColorThemeScreenVisible;
     if (measured < 100.0) {
         measured = 100.0;
     }
-    self.preferredContentSize = CGSizeMake(320.0, MIN(measured, 330.0));
+    // The language list is taller than a handful of terms, so the popover is
+    // allowed more room while it is showing.
+    CGFloat cap = (self.mode == 1) ? 430.0 : 330.0;
+    self.preferredContentSize = CGSizeMake(320.0, MIN(measured, cap));
 }
 
 - (void)viewDidLayoutSubviews {
@@ -362,7 +397,7 @@ extern NSInteger NFBColorThemeScreenVisible;
 - (void)viewDidLoad {
     [super viewDidLoad];
     BHTBundle* bundle = [BHTBundle sharedBundle];
-    self.title = [bundle localizedStringForKey:@"MUTED_WORDS_TITLE"];
+    self.title = [bundle localizedStringForKey:@"FILTERS_TITLE"];
     self.terms = [([[NSUserDefaults standardUserDefaults] arrayForKey:kNFBMutedWordsKey]
                        ?: @[]) mutableCopy];
     [self pruneExpiredTerms];
@@ -377,10 +412,48 @@ extern NSInteger NFBColorThemeScreenVisible;
         self.tableView.backgroundColor = [UIColor systemBackgroundColor];
         self.tableView.separatorStyle = UITableViewCellSeparatorStyleNone;
     }
+    self.languageCodes = NFBLanguageCatalog();
+    [self installModeControl];
     [self updatePreferredSize];
     [self.tableView registerClass:[NFBMutedAddCell class] forCellReuseIdentifier:@"add"];
     [self.tableView registerClass:[NFBMutedToggleCell class] forCellReuseIdentifier:@"opt"];
     [self.tableView registerClass:[NFBMutedTermCell class] forCellReuseIdentifier:@"term"];
+}
+
+// MARK: mode
+
+// A segmented control in the table header: it scrolls with the content in full
+// screen and costs the popover a single row of height.
+- (void)installModeControl {
+    BHTBundle* bundle = [BHTBundle sharedBundle];
+    UISegmentedControl* control = [[UISegmentedControl alloc] initWithItems:@[
+        [bundle localizedStringForKey:@"FILTERS_SEGMENT_WORDS"],
+        [bundle localizedStringForKey:@"FILTERS_SEGMENT_LANGUAGES"]
+    ]];
+    control.selectedSegmentIndex = self.mode;
+    control.selectedSegmentTintColor = self.tintColor;
+    [control addTarget:self
+                  action:@selector(modeChanged:)
+        forControlEvents:UIControlEventValueChanged];
+    CGFloat inset = self.compact ? kNFBMutedSideMargin : kNFBMutedSideMargin + 6.0;
+    UIView* header = [[UIView alloc] initWithFrame:CGRectMake(0, 0, 0, 48.0)];
+    control.translatesAutoresizingMaskIntoConstraints = NO;
+    [header addSubview:control];
+    [NSLayoutConstraint activateConstraints:@[
+        [control.leadingAnchor constraintEqualToAnchor:header.leadingAnchor
+                                              constant:inset],
+        [control.trailingAnchor constraintEqualToAnchor:header.trailingAnchor
+                                               constant:-inset],
+        [control.centerYAnchor constraintEqualToAnchor:header.centerYAnchor],
+    ]];
+    self.tableView.tableHeaderView = header;
+    header.frame = CGRectMake(0, 0, self.tableView.bounds.size.width, 48.0);
+}
+
+- (void)modeChanged:(UISegmentedControl*)control {
+    self.mode = control.selectedSegmentIndex;
+    [self.tableView reloadData];
+    [self updatePreferredSize];
 }
 
 // MARK: expiry
@@ -543,11 +616,17 @@ extern NSInteger NFBColorThemeScreenVisible;
 // MARK: table
 
 - (NSInteger)numberOfSectionsInTableView:(UITableView*)tableView {
+    if (self.mode == 1) {
+        return 1;
+    }
     return self.compact ? 1 : 2;
 }
 
 // Section 0 is "Filters": the add row first, then the list (or one empty row).
 - (NSInteger)tableView:(UITableView*)tableView numberOfRowsInSection:(NSInteger)section {
+    if (self.mode == 1) {
+        return (NSInteger)self.languageCodes.count;
+    }
     if (section == 0) {
         return 1 + (NSInteger)MAX(self.terms.count, (NSUInteger)1);
     }
@@ -560,12 +639,14 @@ extern NSInteger NFBColorThemeScreenVisible;
     if (self.compact) {
         return nil;
     }
+    if (self.mode == 1 || section == 0) {
+        // The segment above the table already names this list.
+        return nil;
+    }
     BHTBundle* bundle = [BHTBundle sharedBundle];
     UIView* container = [[UIView alloc] init];
     UILabel* label = [[UILabel alloc] init];
-    label.text = [bundle localizedStringForKey:(section == 0)
-                                                   ? @"MUTED_WORDS_LIST_HEADER"
-                                                   : @"MUTED_WORDS_OPTIONS_HEADER"];
+    label.text = [bundle localizedStringForKey:@"MUTED_WORDS_OPTIONS_HEADER"];
     label.font = [TwitterChirpFont(TwitterFontStyleBold) fontWithSize:20];
     label.textColor = [UIColor labelColor];
     label.translatesAutoresizingMaskIntoConstraints = NO;
@@ -582,12 +663,21 @@ extern NSInteger NFBColorThemeScreenVisible;
 }
 
 - (CGFloat)tableView:(UITableView*)tableView heightForHeaderInSection:(NSInteger)section {
-    return self.compact ? 0.01 : 46.0;
+    if (self.compact || self.mode == 1 || section == 0) {
+        return 0.01;
+    }
+    return 46.0;
 }
 
 // How much the filter actually did today, under the list.
 - (NSString*)tableView:(UITableView*)tableView
     titleForFooterInSection:(NSInteger)section {
+    if (self.mode == 1) {
+        return [[BHTBundle sharedBundle]
+            localizedStringForKey:NFBKeptLanguageList().count
+                                      ? @"LANGUAGES_FOOTER_ON"
+                                      : @"LANGUAGES_FOOTER_OFF"];
+    }
     if (self.compact || section != 0) {
         return nil;
     }
@@ -612,6 +702,28 @@ extern NSInteger NFBColorThemeScreenVisible;
 - (UITableViewCell*)tableView:(UITableView*)tableView
         cellForRowAtIndexPath:(NSIndexPath*)indexPath {
     BHTBundle* bundle = [BHTBundle sharedBundle];
+
+    if (self.mode == 1) {
+        UITableViewCell* cell =
+            [tableView dequeueReusableCellWithIdentifier:@"lang"];
+        if (!cell) {
+            cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleDefault
+                                          reuseIdentifier:@"lang"];
+            cell.backgroundColor = [UIColor clearColor];
+        }
+        NSString* code = self.languageCodes[(NSUInteger)indexPath.row];
+        BOOL kept = [NFBKeptLanguageList() containsObject:code];
+        cell.textLabel.text = NFBLanguageName(code);
+        cell.textLabel.font =
+            [TwitterChirpFont(TwitterFontStyleRegular) fontWithSize:16.5];
+        cell.textLabel.textColor =
+            kept ? [UIColor labelColor]
+                 : [[UIColor labelColor] colorWithAlphaComponent:0.45];
+        cell.accessoryType =
+            kept ? UITableViewCellAccessoryCheckmark : UITableViewCellAccessoryNone;
+        cell.tintColor = self.tintColor;
+        return cell;
+    }
 
     if (indexPath.section == 0 && indexPath.row == 0) {
         NFBMutedAddCell* cell = [tableView dequeueReusableCellWithIdentifier:@"add"
@@ -735,7 +847,29 @@ extern NSInteger NFBColorThemeScreenVisible;
 
 - (BOOL)tableView:(UITableView*)tableView
     canEditRowAtIndexPath:(NSIndexPath*)indexPath {
+    if (self.mode == 1) {
+        return NO;
+    }
     return indexPath.section == 0 && indexPath.row > 0 && self.terms.count > 0;
+}
+
+// Selecting a language keeps it; clearing the last one empties the set, which
+// turns the filter off rather than hiding everything.
+- (void)tableView:(UITableView*)tableView
+    didSelectRowAtIndexPath:(NSIndexPath*)indexPath {
+    [tableView deselectRowAtIndexPath:indexPath animated:YES];
+    if (self.mode != 1) {
+        return;
+    }
+    NSString* code = self.languageCodes[(NSUInteger)indexPath.row];
+    NSMutableArray* kept = NFBKeptLanguageList();
+    if ([kept containsObject:code]) {
+        [kept removeObject:code];
+    } else {
+        [kept addObject:code];
+    }
+    [[NSUserDefaults standardUserDefaults] setObject:kept forKey:kNFBLanguagesKey];
+    [tableView reloadData];
 }
 
 - (void)tableView:(UITableView*)tableView
