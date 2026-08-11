@@ -1462,6 +1462,62 @@ static void NFBReadingTrack(TFNItemsDataViewController* dataViewController) {
     [gNFBReadingControllers addObject:dataViewController];
 }
 
+// MARK: - Language filter
+//
+// A Tweet carries the language of its original text. The kept set lists the
+// languages the reader selected; an empty set means the filter is off. A Tweet
+// whose language could not be detected always passes, so image-only posts are
+// never lost.
+
+static NSString* const kNFBLanguagesKey = @"nfb_filter_languages";
+
+static id NFBStatusForItem(id item) {
+    SEL reach[] = { @selector(status), @selector(tweet) };
+    for (NSUInteger index = 0; index < sizeof(reach) / sizeof(reach[0]); index++) {
+        if ([item respondsToSelector:reach[index]]) {
+            id value = ((id (*)(id, SEL))objc_msgSend)(item, reach[index]);
+            if (value) {
+                return value;
+            }
+        }
+    }
+    return item;
+}
+
+static BOOL NFBItemLanguageAllowed(id item, NSSet<NSString*>* kept) {
+    if (!kept.count) {
+        return YES;
+    }
+    id status = NFBStatusForItem(item);
+    if (![status respondsToSelector:@selector(lang)]) {
+        return YES;
+    }
+    NSString* language =
+        ((NSString* (*)(id, SEL))objc_msgSend)(status, @selector(lang));
+    if (![language isKindOfClass:[NSString class]] || !language.length ||
+        [language isEqualToString:@"und"]) {
+        return YES;
+    }
+    // A regional code ("pt-BR") matches the language it belongs to.
+    NSString* base = [language componentsSeparatedByString:@"-"].firstObject;
+    return [kept containsObject:base.lowercaseString];
+}
+
+static NSSet<NSString*>* NFBKeptLanguages(void) {
+    NSArray* stored =
+        [[NSUserDefaults standardUserDefaults] arrayForKey:kNFBLanguagesKey];
+    if (![stored isKindOfClass:[NSArray class]] || !stored.count) {
+        return nil;
+    }
+    NSMutableSet* set = [NSMutableSet setWithCapacity:stored.count];
+    for (id code in stored) {
+        if ([code isKindOfClass:[NSString class]]) {
+            [set addObject:((NSString*)code).lowercaseString];
+        }
+    }
+    return set;
+}
+
 static NSArray* FilteredTimelineSections(TFNItemsDataViewController* dataViewController,
                                          NSArray* sections) {
     BOOL hideWhoToFollow = [BHTSettings boolForKey:@"hide_who_to_follow"];
@@ -1473,9 +1529,13 @@ static NSArray* FilteredTimelineSections(TFNItemsDataViewController* dataViewCon
     BOOL inProfile = IsInHierarchyOfClass(dataViewController, @"T1ProfileViewController");
 
     BOOL hideVerified = [BHTSettings boolForKey:@"hide_verified_tweets"] && !inProfile;
+    // The language filter belongs to the timelines, not to a conversation or a
+    // profile opened on purpose.
+    NSSet<NSString*>* keptLanguages =
+        (inConversation || inProfile) ? nil : NFBKeptLanguages();
 
     if (!hideWhoToFollow && !hidePrompts && !hideTopics && !hideTopicsToFollow &&
-        !hideVerified && !inConversation) {
+        !hideVerified && !inConversation && !keptLanguages.count) {
         return sections;
     }
 
@@ -1504,7 +1564,8 @@ static NSArray* FilteredTimelineSections(TFNItemsDataViewController* dataViewCon
             if (MemoizedShouldHideTimelineItem(items[i], hideWhoToFollow, hidePrompts, hideTopics,
                                                hideTopicsToFollow, hideVerified, inConversation,
                                                inProfile, conversationRootUserID,
-                                               authorRepliedToUserIDs)) {
+                                               authorRepliedToUserIDs) ||
+                !NFBItemLanguageAllowed(items[i], keptLanguages)) {
                 [removed addIndex:i];
             }
         }
