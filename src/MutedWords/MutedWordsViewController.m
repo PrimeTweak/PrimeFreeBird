@@ -21,6 +21,7 @@
 // points the rest of the settings uses (ModernSettingsCells). One number,
 // applied everywhere.
 static const CGFloat kNFBMutedSideMargin = 10.0;
+static const CGFloat kNFBTranslateBarHeight = 56.0;
 
 NSString* const kNFBMutedWordsKey = @"nfb_muted_words";
 NSString* const kNFBMutedWholeWordsKey = @"nfb_muted_whole_words";
@@ -300,6 +301,10 @@ NSString* const kNFBMutedIncludeRepostsKey = @"nfb_muted_include_reposts";
 @property (nonatomic, strong) NSArray<NSString*>* languageCodes;
 // The pushed screen that holds every language the two shortlists leave out.
 @property (nonatomic, assign) BOOL othersOnly;
+// The pinned segment sits outside the table, so its height is added back when
+// the popover measures itself.
+@property (nonatomic, assign) CGFloat modeHeaderHeight;
+@property (nonatomic, strong) NFBMutedToggleCell* translateBar;
 @end
 
 // The confirm glyph in the navigation bar is baked opaque white by the theme
@@ -386,7 +391,9 @@ static NSMutableArray<NSString*>* NFBKeptLanguageList(void) {
         return;
     }
     [self.tableView layoutIfNeeded];
-    CGFloat measured = self.tableView.contentSize.height;
+    CGFloat measured = self.tableView.contentSize.height +
+                       self.modeHeaderHeight +
+                       (self.mode == 1 ? kNFBTranslateBarHeight : 0.0);
     if (measured < 100.0) {
         measured = 100.0;
     }
@@ -426,6 +433,9 @@ static NSMutableArray<NSString*>* NFBKeptLanguageList(void) {
     self.languageCodes = NFBLanguageCatalog();
     if (!self.othersOnly) {
         [self installModeControl];
+        if (self.compact) {
+            [self installTranslateBar];
+        }
     }
     [self updatePreferredSize];
     [self.tableView registerClass:[NFBMutedAddCell class] forCellReuseIdentifier:@"add"];
@@ -472,8 +482,27 @@ static NSMutableArray<NSString*>* NFBKeptLanguageList(void) {
         vertical,
         [control.heightAnchor constraintEqualToConstant:controlHeight],
     ]];
-    self.tableView.tableHeaderView = header;
-    header.frame = CGRectMake(0, 0, self.tableView.bounds.size.width, height);
+    // Pinned above the table rather than scrolled with it, so the list moves
+    // under a control that stays put.
+    header.translatesAutoresizingMaskIntoConstraints = NO;
+    [self.view addSubview:header];
+    [NSLayoutConstraint activateConstraints:@[
+        [header.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor],
+        [header.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor],
+        [header.topAnchor
+            constraintEqualToAnchor:self.compact
+                                        ? self.view.topAnchor
+                                        : self.view.safeAreaLayoutGuide.topAnchor],
+        [header.heightAnchor constraintEqualToConstant:height],
+    ]];
+    self.modeHeaderHeight = height;
+    // Grouped tables pad above their first section; the header already
+    // supplies that gap, so the inset cancels it out.
+    CGFloat topPad = self.compact ? 0.0 : -18.0;
+    self.tableView.contentInset =
+        UIEdgeInsetsMake(height + topPad, 0, 0, 0);
+    self.tableView.verticalScrollIndicatorInsets =
+        UIEdgeInsetsMake(height, 0, 0, 0);
 }
 
 // The codes this screen lists: the picker takes the tail, the popover the
@@ -494,7 +523,8 @@ static NSMutableArray<NSString*>* NFBKeptLanguageList(void) {
     if (self.othersOnly) {
         return 0;
     }
-    return self.compact ? 1 : 2;
+    // The popover keeps its switch pinned below the list instead of in it.
+    return self.compact ? 0 : 2;
 }
 
 - (BOOL)rowIsPicker:(NSInteger)row {
@@ -510,7 +540,56 @@ static NSMutableArray<NSString*>* NFBKeptLanguageList(void) {
 - (void)modeChanged:(UISegmentedControl*)control {
     self.mode = control.selectedSegmentIndex;
     [self.tableView reloadData];
+    [self updateTranslateBar];
     [self updatePreferredSize];
+}
+
+// In the popover the switch is pinned under the list, so scrolling the
+// languages never carries it off screen.
+- (void)installTranslateBar {
+    BHTBundle* bundle = [BHTBundle sharedBundle];
+    NFBMutedToggleCell* bar =
+        [[NFBMutedToggleCell alloc] initWithStyle:UITableViewCellStyleDefault
+                                  reuseIdentifier:nil];
+    bar.titleLabel2.text = [bundle localizedStringForKey:@"LANGUAGES_TRANSLATE_TITLE"];
+    bar.subtitleLabel.text = @"";
+    bar.toggle.on =
+        ![[NSUserDefaults standardUserDefaults] boolForKey:@"disable_auto_translate"];
+    [bar.toggle addTarget:self
+                   action:@selector(translateChanged:)
+         forControlEvents:UIControlEventValueChanged];
+    // Rows scroll behind the bar, so it carries its own surface and a hairline
+    // to sit on.
+    bar.backgroundColor = [UIColor secondarySystemBackgroundColor];
+    UIView* hairline = [[UIView alloc] init];
+    hairline.backgroundColor = [UIColor separatorColor];
+    hairline.translatesAutoresizingMaskIntoConstraints = NO;
+    [bar addSubview:hairline];
+    [NSLayoutConstraint activateConstraints:@[
+        [hairline.leadingAnchor constraintEqualToAnchor:bar.leadingAnchor],
+        [hairline.trailingAnchor constraintEqualToAnchor:bar.trailingAnchor],
+        [hairline.topAnchor constraintEqualToAnchor:bar.topAnchor],
+        [hairline.heightAnchor constraintEqualToConstant:0.5],
+    ]];
+    bar.translatesAutoresizingMaskIntoConstraints = NO;
+    [self.view addSubview:bar];
+    [NSLayoutConstraint activateConstraints:@[
+        [bar.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor],
+        [bar.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor],
+        [bar.bottomAnchor constraintEqualToAnchor:self.view.bottomAnchor],
+        [bar.heightAnchor constraintEqualToConstant:kNFBTranslateBarHeight],
+    ]];
+    self.translateBar = bar;
+    [self updateTranslateBar];
+}
+
+// The bar belongs to the language list alone, and the table stops above it.
+- (void)updateTranslateBar {
+    BOOL showing = self.mode == 1;
+    self.translateBar.hidden = !showing;
+    self.tableView.contentInset =
+        UIEdgeInsetsMake(self.tableView.contentInset.top, 0,
+                         showing ? kNFBTranslateBarHeight : 0.0, 0);
 }
 
 // MARK: expiry
@@ -658,6 +737,7 @@ static NSMutableArray<NSString*>* NFBKeptLanguageList(void) {
 - (void)translateChanged:(UISwitch*)sender {
     [[NSUserDefaults standardUserDefaults] setBool:!sender.isOn
                                             forKey:@"disable_auto_translate"];
+    self.translateBar.toggle.on = sender.isOn;
     [self.tableView reloadData];
 }
 
