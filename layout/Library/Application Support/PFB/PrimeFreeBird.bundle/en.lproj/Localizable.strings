@@ -453,7 +453,6 @@
 "LANGUAGES_TRANSLATE_DETAIL" = "Tweets, bios, notes and notifications.";
 "LANGUAGES_OTHERS_TITLE" = "Other languages";
 "LANGUAGES_OTHERS_NONE" = "None";
-"LANGUAGES_FOOTER_TRANSLATE" = "Auto-translate no longer reaches your timeline: unchecked languages are removed before it can run. It stays active for bios, notes and notifications.";
 "MUTED_WORDS_NONE" = "None";
 "MUTED_WORDS_ADD_PLACEHOLDER" = "Add a word, phrase or @account";
 "MUTED_WORDS_ADD_BUTTON" = "Add";
