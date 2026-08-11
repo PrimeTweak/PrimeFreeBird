@@ -448,7 +448,7 @@
 "FILTERS_SEGMENT_WORDS" = "Words";
 "FILTERS_SEGMENT_LANGUAGES" = "Languages";
 "LANGUAGES_FOOTER_OFF" = "No language checked — every language reaches your timeline.";
-"LANGUAGES_FOOTER_ON" = "Only the checked languages reach your timeline. Tweets with no detected language always pass.";
+"LANGUAGES_FOOTER_ON" = "Only the checked languages reach your timeline.\nTweets with no detected language always pass.\nUncheck every language to turn the filter off.";
 "LANGUAGES_TRANSLATE_TITLE" = "Auto-translate";
 "LANGUAGES_TRANSLATE_DETAIL" = "Tweets, bios, notes and notifications.";
 "LANGUAGES_OTHERS_TITLE" = "Other languages";
