@@ -274,10 +274,6 @@
 "IMPORT_SETTINGS_FAILED_MESSAGE" = "This file is not a PrimeFreeBird settings backup.";
 "READING_LINE_TITLE" = "Reading marker";
 "READING_LINE_DETAIL" = "Marks where you were when new Tweets arrive above — on Following and your Lists.";
-"PROVENANCE_BADGES_TITLE" = "Provenance badges";
-"PROVENANCE_BADGES_DETAIL" = "Show a small icon on Tweets added for a topic or for someone’s activity.";
-"BADGE_SURVEY_TITLE" = "Badge diagnostic";
-"BADGE_SURVEY_EMPTY" = "No data yet — scroll For You, then open this.";
 /* Reply-in-web-view: the reply screen title + the web-session login/clear
    buttons (Lab) and their alerts. */
 "REPLY_WEBVIEW_TITLE" = "Reply";
@@ -444,13 +440,16 @@
 "UNLIMITED_TIMELINE_TABS_DETAIL" = "Pin more timelines and unlock advanced tabs, unless they're hidden above.";
 
 /* ===== MUTED WORDS (2026-08-05) ===== */
-"MUTED_WORDS_TITLE" = "Muted words";
-"MUTED_WORDS_DETAIL" = "Hide posts containing words or accounts you choose.";
 "MUTED_WORDS_SUBTITLE" = "Posts matching anything in this list are filtered out of your feed.";
+"FILTERS_TITLE" = "Filters";
+"FILTERS_DETAIL" = "Words, accounts and languages you keep out of your feed.";
+"FILTERS_SEGMENT_WORDS" = "Words";
+"FILTERS_SEGMENT_LANGUAGES" = "Languages";
+"LANGUAGES_FOOTER_OFF" = "No language selected — every language reaches your timeline.";
+"LANGUAGES_FOOTER_ON" = "Only the selected languages reach your timeline. Tweets with no detected language always pass.";
 "MUTED_WORDS_NONE" = "None";
 "MUTED_WORDS_ADD_PLACEHOLDER" = "Add a word, phrase or @account";
 "MUTED_WORDS_ADD_BUTTON" = "Add";
-"MUTED_WORDS_LIST_HEADER" = "Filters";
 "MUTED_WORDS_OPTIONS_HEADER" = "Options";
 "MUTED_WORDS_KIND_WORD" = "word";
 "MUTED_WORDS_KIND_PHRASE" = "phrase";
