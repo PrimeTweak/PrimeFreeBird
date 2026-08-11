@@ -133,8 +133,8 @@ static NSDictionary<NSString*, NSDictionary*>* BHTSettingsPages(void) {
                       @"type": @"toggle"},
                     @{
                         @"type": @"button",
-                        @"titleKey": @"MUTED_WORDS_TITLE",
-                        @"subtitleKey": @"MUTED_WORDS_DETAIL",
+                        @"titleKey": @"FILTERS_TITLE",
+                        @"subtitleKey": @"FILTERS_DETAIL",
                         @"action": @"showMutedWords:"
                     },
                     @{@"type": @"header", @"titleKey": @"TIMELINES_GROUP_BARS"},
