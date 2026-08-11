@@ -857,7 +857,12 @@ static NSMutableArray<NSString*>* NFBKeptLanguageList(void) {
 }
 
 - (CGFloat)tableView:(UITableView*)tableView heightForHeaderInSection:(NSInteger)section {
-    if (self.compact || self.mode == 1 || section == 0) {
+    if (self.mode == 1) {
+        // Full screen sets the language list off from the segment by the same
+        // gap the word box keeps above itself; the popover stays tight.
+        return self.compact ? 0.01 : 8.0;
+    }
+    if (self.compact || section == 0) {
         return 0.01;
     }
     return 46.0;
