@@ -450,21 +450,26 @@ static NSMutableArray<NSString*>* NFBKeptLanguageList(void) {
     // The segment keeps its system appearance: it names a place in the screen,
     // not a setting, so it stays out of the accent's vocabulary.
     CGFloat inset = kNFBMutedSideMargin;
-    // The control is pinned to the top with the same margin it has on the
-    // sides, and the header ends where it ends — the row below supplies the
-    // only gap under it.
-    CGFloat top = self.compact ? kNFBMutedSideMargin : 14.0;
+    // The popover pins the control to the top so the row below supplies the
+    // only gap under it; the full screen centres it in a taller header, where
+    // the extra air belongs.
     CGFloat controlHeight = 32.0;
-    CGFloat height = top + controlHeight;
+    CGFloat top = kNFBMutedSideMargin;
+    CGFloat height = self.compact ? top + controlHeight : 48.0;
     UIView* header = [[UIView alloc] initWithFrame:CGRectMake(0, 0, 0, height)];
     control.translatesAutoresizingMaskIntoConstraints = NO;
     [header addSubview:control];
+    NSLayoutConstraint* vertical =
+        self.compact
+            ? [control.topAnchor constraintEqualToAnchor:header.topAnchor
+                                                constant:top]
+            : [control.centerYAnchor constraintEqualToAnchor:header.centerYAnchor];
     [NSLayoutConstraint activateConstraints:@[
         [control.leadingAnchor constraintEqualToAnchor:header.leadingAnchor
                                               constant:inset],
         [control.trailingAnchor constraintEqualToAnchor:header.trailingAnchor
                                                constant:-inset],
-        [control.topAnchor constraintEqualToAnchor:header.topAnchor constant:top],
+        vertical,
         [control.heightAnchor constraintEqualToConstant:controlHeight],
     ]];
     self.tableView.tableHeaderView = header;
