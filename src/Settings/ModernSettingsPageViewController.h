@@ -10,6 +10,9 @@
 @class TFNTwitterAccount;
 
 @interface ModernSettingsPageViewController
+// Redraws the rows whose `disabledWhen` names this key, so a picker outside
+// the shared switch path can keep them in step.
+- (void)reloadRowsHeldBy:(NSString*)key;
     : UIViewController <UITableViewDataSource, UITableViewDelegate>
 
 @property (nonatomic, strong) TFNTwitterAccount* account;

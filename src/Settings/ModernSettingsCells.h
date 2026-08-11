@@ -35,6 +35,9 @@
 - (void)addTarget:(id)target action:(SEL)action forControlEvents:(UIControlEvents)events;
 @property (nonatomic, strong) UIImageView* iconImageView;
 - (void)configureWithTitle:(NSString*)title subtitle:(NSString*)subtitle iconName:(NSString*)iconName;
+// A row another option has taken over: the switch stops responding and the
+// text recedes, so the reason reads as state rather than failure.
+- (void)setRowEnabled:(BOOL)enabled;
 @end
 
 @interface ModernSettingsHeaderCell : UITableViewCell

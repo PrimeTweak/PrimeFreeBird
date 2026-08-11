@@ -220,13 +220,30 @@ extern NSInteger NFBColorThemeScreenVisible;
                                                                          forIndexPath:indexPath];
         NSString* key = toggleData[@"key"];
         NSString* title = [self localizedTitleForEntry:toggleData];
-        NSString* subtitle = [self localizedDetailForKey:key];
+        NSString* blocker = toggleData[@"disabledWhen"];
+        BOOL blocked =
+            blocker && [[NSUserDefaults standardUserDefaults] boolForKey:blocker];
+        // While another option holds this one, the clause explaining that case
+        // is dropped: the greyed row already says it.
+        NSString* subtitle =
+            blocked ? [[BHTBundle sharedBundle]
+                          localizedStringForKey:[NSString
+                                                    stringWithFormat:@"%@_DETAIL_HELD",
+                                                                     key.uppercaseString]]
+                    : [self localizedDetailForKey:key];
         [cell configureWithTitle:title subtitle:subtitle];
         [cell setIndented:[toggleData[@"indented"] boolValue]];
+        [cell setRowEnabled:!blocked];
         BOOL isEnabled = [[[NSUserDefaults standardUserDefaults] objectForKey:key]
                               ?: toggleData[@"default"] boolValue];
-        cell.toggleSwitch.on = isEnabled;
-        objc_setAssociatedObject(cell.toggleSwitch, @"prefKey", key, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        // An option stored as a negative reads and writes flipped, so every
+        // screen can name it the way it behaves.
+        BOOL inverted = [toggleData[@"inverted"] boolValue];
+        cell.toggleSwitch.on = inverted ? !isEnabled : isEnabled;
+        objc_setAssociatedObject(cell.toggleSwitch, @"prefKey", key,
+                                 OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        objc_setAssociatedObject(cell.toggleSwitch, @"inverted", @(inverted),
+                                 OBJC_ASSOCIATION_RETAIN_NONATOMIC);
         [cell addTarget:self
                       action:@selector(switchChanged:)
             forControlEvents:UIControlEventValueChanged];
@@ -292,11 +309,32 @@ extern NSInteger NFBColorThemeScreenVisible;
 
 #pragma mark - Switch Handling
 
+// A row another option holds must redraw the moment that option moves,
+// otherwise it stays enabled until the page is left.
+- (void)reloadRowsHeldBy:(NSString*)key {
+    NSMutableArray<NSIndexPath*>* paths = [NSMutableArray array];
+    [self.visibleToggles enumerateObjectsUsingBlock:^(NSDictionary* entry,
+                                                      NSUInteger row, BOOL* stop) {
+        if ([entry[@"disabledWhen"] isEqualToString:key]) {
+            [paths addObject:[NSIndexPath indexPathForRow:(NSInteger)row inSection:0]];
+        }
+    }];
+    if (paths.count) {
+        [self.tableView reloadRowsAtIndexPaths:paths
+                              withRowAnimation:UITableViewRowAnimationFade];
+    }
+}
+
 - (void)switchChanged:(UISwitch*)sender {
     NSString* key = objc_getAssociatedObject(sender, @"prefKey");
     if (key) {
-        [[NSUserDefaults standardUserDefaults] setBool:sender.isOn forKey:key];
+        BOOL inverted = [objc_getAssociatedObject(sender, @"inverted") boolValue];
+        [[NSUserDefaults standardUserDefaults]
+            setBool:(inverted ? !sender.isOn : sender.isOn)
+             forKey:key];
         [self updateAndAnimateChangesForKey:key];
+
+        [self reloadRowsHeldBy:key];
 
         // The switch-tint toggle changes how every OTHER visible switch is
         // drawn, so re-run applyTheme on the live cells right away.

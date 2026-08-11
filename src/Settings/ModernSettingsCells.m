@@ -404,6 +404,15 @@
     self.subtitleLabel.text = subtitle;
 }
  
+- (void)setRowEnabled:(BOOL)enabled {
+    self.toggleSwitch.enabled = enabled;
+    CGFloat alpha = enabled ? 1.0 : 0.4;
+    self.titleLabel.alpha = alpha;
+    self.subtitleLabel.alpha = alpha;
+    self.toggleSwitch.alpha = alpha;
+    self.userInteractionEnabled = enabled;
+}
+
 - (void)configureWithTitle:(NSString*)title subtitle:(NSString*)subtitle iconName:(NSString*)iconName {
     [self configureWithTitle:title subtitle:subtitle];
     objc_setAssociatedObject(self, @selector(iconImageView), iconName, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
