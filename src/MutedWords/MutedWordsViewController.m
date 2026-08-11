@@ -21,6 +21,7 @@
 // points the rest of the settings uses (ModernSettingsCells). One number,
 // applied everywhere.
 static const CGFloat kNFBMutedSideMargin = 10.0;
+static const CGFloat kNFBTranslateBarHeight = 58.0;
 
 NSString* const kNFBMutedWordsKey = @"nfb_muted_words";
 NSString* const kNFBMutedWholeWordsKey = @"nfb_muted_whole_words";
@@ -300,6 +301,12 @@ NSString* const kNFBMutedIncludeRepostsKey = @"nfb_muted_include_reposts";
 @property (nonatomic, strong) NSArray<NSString*>* languageCodes;
 // The pushed screen that holds every language the two shortlists leave out.
 @property (nonatomic, assign) BOOL othersOnly;
+// In the popover the segment and the switch are held against the table's
+// frame, so only the rows between them move.
+@property (nonatomic, strong) UIView* pinnedHeader;
+@property (nonatomic, strong) UIView* pinnedBar;
+@property (nonatomic, strong) UISwitch* pinnedSwitch;
+@property (nonatomic, assign) CGFloat pinnedHeaderHeight;
 @end
 
 // The confirm glyph in the navigation bar is baked opaque white by the theme
@@ -386,7 +393,9 @@ static NSMutableArray<NSString*>* NFBKeptLanguageList(void) {
         return;
     }
     [self.tableView layoutIfNeeded];
-    CGFloat measured = self.tableView.contentSize.height;
+    CGFloat measured = self.tableView.contentSize.height +
+                       self.tableView.contentInset.top +
+                       self.tableView.contentInset.bottom;
     if (measured < 100.0) {
         measured = 100.0;
     }
@@ -472,6 +481,34 @@ static NSMutableArray<NSString*>* NFBKeptLanguageList(void) {
         vertical,
         [control.heightAnchor constraintEqualToConstant:controlHeight],
     ]];
+    if (self.compact) {
+        // The controller's view IS the table, so a subview of it travels with
+        // the rows unless it is tied to the frame layout guide, which follows
+        // the table's frame instead of its content.
+        UIVisualEffectView* backdrop = [[UIVisualEffectView alloc]
+            initWithEffect:[UIBlurEffect
+                               effectWithStyle:UIBlurEffectStyleSystemMaterial]];
+        backdrop.translatesAutoresizingMaskIntoConstraints = NO;
+        header.translatesAutoresizingMaskIntoConstraints = NO;
+        [backdrop.contentView addSubview:header];
+        [self.tableView addSubview:backdrop];
+        UILayoutGuide* tableFrame = self.tableView.frameLayoutGuide;
+        [NSLayoutConstraint activateConstraints:@[
+            [header.leadingAnchor constraintEqualToAnchor:backdrop.leadingAnchor],
+            [header.trailingAnchor constraintEqualToAnchor:backdrop.trailingAnchor],
+            [header.topAnchor constraintEqualToAnchor:backdrop.topAnchor],
+            [header.bottomAnchor constraintEqualToAnchor:backdrop.bottomAnchor],
+            [backdrop.leadingAnchor constraintEqualToAnchor:tableFrame.leadingAnchor],
+            [backdrop.trailingAnchor constraintEqualToAnchor:tableFrame.trailingAnchor],
+            [backdrop.topAnchor constraintEqualToAnchor:tableFrame.topAnchor],
+            [backdrop.heightAnchor constraintEqualToConstant:height],
+        ]];
+        self.pinnedHeader = backdrop;
+        self.pinnedHeaderHeight = height;
+        [self installTranslateBar];
+        [self updatePinnedInsets];
+        return;
+    }
     // The header's size is read when it is assigned, so its frame is set
     // first; the flexible width keeps it correct if the table is laid out
     // later than this.
@@ -482,6 +519,76 @@ static NSMutableArray<NSString*>* NFBKeptLanguageList(void) {
     header.autoresizingMask = UIViewAutoresizingFlexibleWidth;
     [header layoutIfNeeded];
     self.tableView.tableHeaderView = header;
+}
+
+// The switch is held against the bottom of the table's frame, below the rows
+// it belongs to.
+- (void)installTranslateBar {
+    UIVisualEffectView* backdrop = [[UIVisualEffectView alloc]
+        initWithEffect:[UIBlurEffect
+                           effectWithStyle:UIBlurEffectStyleSystemMaterial]];
+    backdrop.translatesAutoresizingMaskIntoConstraints = NO;
+    NFBMutedToggleCell* row =
+        [[NFBMutedToggleCell alloc] initWithStyle:UITableViewCellStyleDefault
+                                  reuseIdentifier:nil];
+    row.backgroundColor = [UIColor clearColor];
+    row.titleLabel2.text =
+        [[BHTBundle sharedBundle] localizedStringForKey:@"LANGUAGES_TRANSLATE_TITLE"];
+    row.subtitleLabel.text = @"";
+    row.toggle.on =
+        ![[NSUserDefaults standardUserDefaults] boolForKey:@"disable_auto_translate"];
+    [row.toggle addTarget:self
+                   action:@selector(translateChanged:)
+         forControlEvents:UIControlEventValueChanged];
+    row.translatesAutoresizingMaskIntoConstraints = NO;
+    [backdrop.contentView addSubview:row];
+    UIView* hairline = [[UIView alloc] init];
+    hairline.backgroundColor = [UIColor separatorColor];
+    hairline.translatesAutoresizingMaskIntoConstraints = NO;
+    [backdrop.contentView addSubview:hairline];
+    [self.tableView addSubview:backdrop];
+    UILayoutGuide* tableFrame = self.tableView.frameLayoutGuide;
+    [NSLayoutConstraint activateConstraints:@[
+        [row.leadingAnchor constraintEqualToAnchor:backdrop.leadingAnchor],
+        [row.trailingAnchor constraintEqualToAnchor:backdrop.trailingAnchor],
+        [row.topAnchor constraintEqualToAnchor:backdrop.topAnchor],
+        [row.bottomAnchor constraintEqualToAnchor:backdrop.bottomAnchor],
+        [hairline.leadingAnchor constraintEqualToAnchor:backdrop.leadingAnchor],
+        [hairline.trailingAnchor constraintEqualToAnchor:backdrop.trailingAnchor],
+        [hairline.topAnchor constraintEqualToAnchor:backdrop.topAnchor],
+        [hairline.heightAnchor constraintEqualToConstant:0.5],
+        [backdrop.leadingAnchor constraintEqualToAnchor:tableFrame.leadingAnchor],
+        [backdrop.trailingAnchor constraintEqualToAnchor:tableFrame.trailingAnchor],
+        [backdrop.bottomAnchor constraintEqualToAnchor:tableFrame.bottomAnchor],
+        [backdrop.heightAnchor constraintEqualToConstant:kNFBTranslateBarHeight],
+    ]];
+    self.pinnedBar = backdrop;
+    self.pinnedSwitch = row.toggle;
+}
+
+// The rows start below the segment and end above the switch, and the switch
+// only exists while the languages are showing.
+- (void)updatePinnedInsets {
+    if (!self.compact) {
+        return;
+    }
+    BOOL languages = self.mode == 1;
+    self.pinnedBar.hidden = !languages;
+    CGFloat bottom = languages ? kNFBTranslateBarHeight : 0.0;
+    UIEdgeInsets insets =
+        UIEdgeInsetsMake(self.pinnedHeaderHeight, 0, bottom, 0);
+    self.tableView.contentInset = insets;
+    self.tableView.verticalScrollIndicatorInsets = insets;
+    [self.tableView bringSubviewToFront:self.pinnedHeader];
+    [self.tableView bringSubviewToFront:self.pinnedBar];
+}
+
+- (void)viewDidLayoutSubviews {
+    [super viewDidLayoutSubviews];
+    // Reloading adds cells above the pinned views, so their order is restored
+    // on every layout pass.
+    [self.tableView bringSubviewToFront:self.pinnedHeader];
+    [self.tableView bringSubviewToFront:self.pinnedBar];
 }
 
 // The codes this screen lists: the picker takes the tail, the popover the
@@ -502,8 +609,9 @@ static NSMutableArray<NSString*>* NFBKeptLanguageList(void) {
     if (self.othersOnly) {
         return 0;
     }
-    // The popover keeps its switch pinned below the list instead of in it.
-    return self.compact ? 1 : 2;
+    // The popover holds its switch outside the table, so the list carries no
+    // extra row there.
+    return self.compact ? 0 : 2;
 }
 
 - (BOOL)rowIsPicker:(NSInteger)row {
@@ -519,6 +627,7 @@ static NSMutableArray<NSString*>* NFBKeptLanguageList(void) {
 - (void)modeChanged:(UISegmentedControl*)control {
     self.mode = control.selectedSegmentIndex;
     [self.tableView reloadData];
+    [self updatePinnedInsets];
     [self updatePreferredSize];
 }
 
@@ -667,6 +776,7 @@ static NSMutableArray<NSString*>* NFBKeptLanguageList(void) {
 - (void)translateChanged:(UISwitch*)sender {
     [[NSUserDefaults standardUserDefaults] setBool:!sender.isOn
                                             forKey:@"disable_auto_translate"];
+    self.pinnedSwitch.on = sender.isOn;
     [self.tableView reloadData];
 }
 
