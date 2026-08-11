@@ -119,6 +119,7 @@
                     [[NSUserDefaults standardUserDefaults] setBool:nowEnabled
                                                             forKey:@"enable_liquid_glass"];
                     [[NSUserDefaults standardUserDefaults] synchronize];
+                    [self reloadRowsHeldBy:@"enable_liquid_glass"];
                     // Only prompt for a restart when the mode actually changed.
                     if (wasEnabled != nowEnabled) {
                         [self showRestartRequiredAlert];
