@@ -857,12 +857,7 @@ static NSMutableArray<NSString*>* NFBKeptLanguageList(void) {
 }
 
 - (CGFloat)tableView:(UITableView*)tableView heightForHeaderInSection:(NSInteger)section {
-    if (self.mode == 1) {
-        // Full screen sets the language list off from the segment by the same
-        // gap the word box keeps above itself; the popover stays tight.
-        return self.compact ? 0.01 : 8.0;
-    }
-    if (self.compact || section == 0) {
+    if (self.compact || self.mode == 1 || section == 0) {
         return 0.01;
     }
     return 46.0;
@@ -1015,15 +1010,28 @@ static NSMutableArray<NSString*>* NFBKeptLanguageList(void) {
         cell.textLabel.textColor =
             kept ? [UIColor labelColor]
                  : [[UIColor labelColor] colorWithAlphaComponent:0.45];
-        cell.accessoryType =
-            kept ? UITableViewCellAccessoryCheckmark : UITableViewCellAccessoryNone;
+        // The system checkmark sits on its own inset, which leaves the right
+        // column ragged against the switch below. Supplying the glyph as an
+        // accessory view puts it on the cell's own margin instead.
+        if (kept) {
+            UIImageView* tick = [[UIImageView alloc]
+                initWithImage:[UIImage systemImageNamed:@"checkmark"]];
+            tick.tintColor = accent;
+            [tick sizeToFit];
+            cell.accessoryView = tick;
+        } else {
+            cell.accessoryView = nil;
+        }
+        cell.accessoryType = UITableViewCellAccessoryNone;
         return cell;
     }
 
     if (indexPath.section == 0 && indexPath.row == 0) {
         NFBMutedAddCell* cell = [tableView dequeueReusableCellWithIdentifier:@"add"
                                                                forIndexPath:indexPath];
-        cell.boxTop.constant = self.compact ? 0.0 : 8.0;
+        // A language row centres its text 14 pt below its own top edge; the
+        // box starts at the same offset so both panels read alike.
+        cell.boxTop.constant = 14.0;
         cell.field.placeholder =
             [bundle localizedStringForKey:@"MUTED_WORDS_ADD_PLACEHOLDER"];
         cell.hintLabel.text = [bundle localizedStringForKey:@"MUTED_WORDS_SUBTITLE"];
