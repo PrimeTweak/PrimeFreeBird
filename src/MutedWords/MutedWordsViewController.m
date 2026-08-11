@@ -429,6 +429,11 @@ static NSMutableArray<NSString*>* NFBKeptLanguageList(void) {
         // background is what flattened it into a plain white card.
         self.tableView.backgroundColor = [UIColor clearColor];
         self.view.backgroundColor = [UIColor clearColor];
+        // Plain tables reserve room above their first section on iOS 15 and
+        // later; the pinned segment already provides that gap.
+        if (@available(iOS 15.0, *)) {
+            self.tableView.sectionHeaderTopPadding = 0.0;
+        }
     } else {
         // Full screen follows the advanced-search recipe.
         self.tableView.backgroundColor = [UIColor systemBackgroundColor];
@@ -488,26 +493,19 @@ static NSMutableArray<NSString*>* NFBKeptLanguageList(void) {
     if (self.compact) {
         // The controller's view IS the table, so a subview of it travels with
         // the rows unless it is tied to the frame layout guide, which follows
-        // the table's frame instead of its content.
-        UIVisualEffectView* backdrop = [[UIVisualEffectView alloc]
-            initWithEffect:[UIBlurEffect
-                               effectWithStyle:UIBlurEffectStyleSystemMaterial]];
-        backdrop.translatesAutoresizingMaskIntoConstraints = NO;
+        // the table's frame instead of its content. The view carries no
+        // surface of its own: the popover's own glass shows through it.
         header.translatesAutoresizingMaskIntoConstraints = NO;
-        [backdrop.contentView addSubview:header];
-        [self.tableView addSubview:backdrop];
+        header.backgroundColor = [UIColor clearColor];
+        [self.tableView addSubview:header];
         UILayoutGuide* tableFrame = self.tableView.frameLayoutGuide;
         [NSLayoutConstraint activateConstraints:@[
-            [header.leadingAnchor constraintEqualToAnchor:backdrop.leadingAnchor],
-            [header.trailingAnchor constraintEqualToAnchor:backdrop.trailingAnchor],
-            [header.topAnchor constraintEqualToAnchor:backdrop.topAnchor],
-            [header.bottomAnchor constraintEqualToAnchor:backdrop.bottomAnchor],
-            [backdrop.leadingAnchor constraintEqualToAnchor:tableFrame.leadingAnchor],
-            [backdrop.trailingAnchor constraintEqualToAnchor:tableFrame.trailingAnchor],
-            [backdrop.topAnchor constraintEqualToAnchor:tableFrame.topAnchor],
-            [backdrop.heightAnchor constraintEqualToConstant:height],
+            [header.leadingAnchor constraintEqualToAnchor:tableFrame.leadingAnchor],
+            [header.trailingAnchor constraintEqualToAnchor:tableFrame.trailingAnchor],
+            [header.topAnchor constraintEqualToAnchor:tableFrame.topAnchor],
+            [header.heightAnchor constraintEqualToConstant:height],
         ]];
-        self.pinnedHeader = backdrop;
+        self.pinnedHeader = header;
         self.pinnedHeaderHeight = height;
         [self installTranslateBar];
         [self updatePinnedInsets];
@@ -528,14 +526,13 @@ static NSMutableArray<NSString*>* NFBKeptLanguageList(void) {
 // The switch is held against the bottom of the table's frame, below the rows
 // it belongs to.
 - (void)installTranslateBar {
-    UIVisualEffectView* backdrop = [[UIVisualEffectView alloc]
-        initWithEffect:[UIBlurEffect
-                           effectWithStyle:UIBlurEffectStyleSystemMaterial]];
-    backdrop.translatesAutoresizingMaskIntoConstraints = NO;
     NFBMutedToggleCell* row =
         [[NFBMutedToggleCell alloc] initWithStyle:UITableViewCellStyleDefault
                                   reuseIdentifier:nil];
+    // No surface of its own either: the popover's glass carries the whole
+    // sheet, and a second material on top reads as a panel inside a panel.
     row.backgroundColor = [UIColor clearColor];
+    row.contentView.backgroundColor = [UIColor clearColor];
     row.titleLabel2.text =
         [[BHTBundle sharedBundle] localizedStringForKey:@"LANGUAGES_TRANSLATE_TITLE"];
     row.subtitleLabel.text = @"";
@@ -545,28 +542,15 @@ static NSMutableArray<NSString*>* NFBKeptLanguageList(void) {
                    action:@selector(translateChanged:)
          forControlEvents:UIControlEventValueChanged];
     row.translatesAutoresizingMaskIntoConstraints = NO;
-    [backdrop.contentView addSubview:row];
-    UIView* hairline = [[UIView alloc] init];
-    hairline.backgroundColor = [UIColor separatorColor];
-    hairline.translatesAutoresizingMaskIntoConstraints = NO;
-    [backdrop.contentView addSubview:hairline];
-    [self.tableView addSubview:backdrop];
+    [self.tableView addSubview:row];
     UILayoutGuide* tableFrame = self.tableView.frameLayoutGuide;
     [NSLayoutConstraint activateConstraints:@[
-        [row.leadingAnchor constraintEqualToAnchor:backdrop.leadingAnchor],
-        [row.trailingAnchor constraintEqualToAnchor:backdrop.trailingAnchor],
-        [row.topAnchor constraintEqualToAnchor:backdrop.topAnchor],
-        [row.bottomAnchor constraintEqualToAnchor:backdrop.bottomAnchor],
-        [hairline.leadingAnchor constraintEqualToAnchor:backdrop.leadingAnchor],
-        [hairline.trailingAnchor constraintEqualToAnchor:backdrop.trailingAnchor],
-        [hairline.topAnchor constraintEqualToAnchor:backdrop.topAnchor],
-        [hairline.heightAnchor constraintEqualToConstant:0.5],
-        [backdrop.leadingAnchor constraintEqualToAnchor:tableFrame.leadingAnchor],
-        [backdrop.trailingAnchor constraintEqualToAnchor:tableFrame.trailingAnchor],
-        [backdrop.bottomAnchor constraintEqualToAnchor:tableFrame.bottomAnchor],
-        [backdrop.heightAnchor constraintEqualToConstant:kNFBTranslateBarHeight],
+        [row.leadingAnchor constraintEqualToAnchor:tableFrame.leadingAnchor],
+        [row.trailingAnchor constraintEqualToAnchor:tableFrame.trailingAnchor],
+        [row.bottomAnchor constraintEqualToAnchor:tableFrame.bottomAnchor],
+        [row.heightAnchor constraintEqualToConstant:kNFBTranslateBarHeight],
     ]];
-    self.pinnedBar = backdrop;
+    self.pinnedBar = row;
     self.pinnedSwitch = row.toggle;
 }
 
