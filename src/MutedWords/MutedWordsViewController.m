@@ -298,6 +298,8 @@ NSString* const kNFBMutedIncludeRepostsKey = @"nfb_muted_include_reposts";
 // above the table drives it, in both presentations.
 @property (nonatomic, assign) NSInteger mode;
 @property (nonatomic, strong) NSArray<NSString*>* languageCodes;
+// The pushed screen that holds every language the two shortlists leave out.
+@property (nonatomic, assign) BOOL othersOnly;
 @end
 
 // The confirm glyph in the navigation bar is baked opaque white by the theme
@@ -330,13 +332,18 @@ extern NSInteger NFBColorThemeScreenVisible;
 // The languages offered, in the order the advanced-search menu already uses.
 static NSString* const kNFBLanguagesKey = @"nfb_filter_languages";
 
+// The popover shows the first four, the full screen the first six, and the
+// picker holds everything after that.
 static NSArray<NSString*>* NFBLanguageCatalog(void) {
     return @[
-        @"en", @"fr", @"es", @"de", @"it", @"pt", @"ja", @"ko", @"ar", @"ru",
-        @"zh", @"hi", @"id", @"tr", @"nl", @"pl", @"sv", @"uk", @"fa", @"he",
-        @"th", @"vi"
+        @"en", @"fr", @"es", @"zh", @"pt", @"ja", @"hi", @"ar", @"de", @"ru",
+        @"it", @"ko", @"nl", @"pl", @"sv", @"uk", @"fa", @"he", @"th", @"vi",
+        @"id", @"tr"
     ];
 }
+
+static const NSUInteger kNFBLanguagesQuick = 4;
+static const NSUInteger kNFBLanguagesFull = 6;
 
 // The language's own name, so it is recognised without knowing the code.
 static NSString* NFBLanguageName(NSString* code) {
@@ -383,9 +390,9 @@ static NSMutableArray<NSString*>* NFBKeptLanguageList(void) {
     if (measured < 100.0) {
         measured = 100.0;
     }
-    // The language list is taller than a handful of terms, so the popover is
-    // allowed more room while it is showing.
-    CGFloat cap = (self.mode == 1) ? 430.0 : 330.0;
+    // Four languages then scroll: the list is set once, so it does not earn a
+    // taller popover than the terms.
+    CGFloat cap = (self.mode == 1) ? 280.0 : 330.0;
     self.preferredContentSize = CGSizeMake(320.0, MIN(measured, cap));
 }
 
@@ -397,7 +404,9 @@ static NSMutableArray<NSString*>* NFBKeptLanguageList(void) {
 - (void)viewDidLoad {
     [super viewDidLoad];
     BHTBundle* bundle = [BHTBundle sharedBundle];
-    self.title = [bundle localizedStringForKey:@"FILTERS_TITLE"];
+    self.title = [bundle
+        localizedStringForKey:self.othersOnly ? @"LANGUAGES_OTHERS_TITLE"
+                                              : @"FILTERS_TITLE"];
     self.terms = [([[NSUserDefaults standardUserDefaults] arrayForKey:kNFBMutedWordsKey]
                        ?: @[]) mutableCopy];
     [self pruneExpiredTerms];
@@ -413,7 +422,9 @@ static NSMutableArray<NSString*>* NFBKeptLanguageList(void) {
         self.tableView.separatorStyle = UITableViewCellSeparatorStyleNone;
     }
     self.languageCodes = NFBLanguageCatalog();
-    [self installModeControl];
+    if (!self.othersOnly) {
+        [self installModeControl];
+    }
     [self updatePreferredSize];
     [self.tableView registerClass:[NFBMutedAddCell class] forCellReuseIdentifier:@"add"];
     [self.tableView registerClass:[NFBMutedToggleCell class] forCellReuseIdentifier:@"opt"];
@@ -431,12 +442,16 @@ static NSMutableArray<NSString*>* NFBKeptLanguageList(void) {
         [bundle localizedStringForKey:@"FILTERS_SEGMENT_LANGUAGES"]
     ]];
     control.selectedSegmentIndex = self.mode;
-    control.selectedSegmentTintColor = self.view.tintColor;
+    extern UIColor* CurrentAccentColor(void);
+    control.selectedSegmentTintColor = CurrentAccentColor() ?: self.view.tintColor;
+    [control setTitleTextAttributes:@{NSForegroundColorAttributeName : [UIColor whiteColor]}
+                           forState:UIControlStateSelected];
     [control addTarget:self
                   action:@selector(modeChanged:)
         forControlEvents:UIControlEventValueChanged];
     CGFloat inset = self.compact ? kNFBMutedSideMargin : kNFBMutedSideMargin + 6.0;
-    UIView* header = [[UIView alloc] initWithFrame:CGRectMake(0, 0, 0, 48.0)];
+    CGFloat height = self.compact ? 42.0 : 48.0;
+    UIView* header = [[UIView alloc] initWithFrame:CGRectMake(0, 0, 0, height)];
     control.translatesAutoresizingMaskIntoConstraints = NO;
     [header addSubview:control];
     [NSLayoutConstraint activateConstraints:@[
@@ -447,7 +462,38 @@ static NSMutableArray<NSString*>* NFBKeptLanguageList(void) {
         [control.centerYAnchor constraintEqualToAnchor:header.centerYAnchor],
     ]];
     self.tableView.tableHeaderView = header;
-    header.frame = CGRectMake(0, 0, self.tableView.bounds.size.width, 48.0);
+    header.frame = CGRectMake(0, 0, self.tableView.bounds.size.width, height);
+}
+
+// The codes this screen lists: the picker takes the tail, the popover the
+// first four, the full screen the first six.
+- (NSArray<NSString*>*)visibleLanguages {
+    NSArray* all = self.languageCodes;
+    if (self.othersOnly) {
+        return [all subarrayWithRange:NSMakeRange(kNFBLanguagesFull,
+                                                  all.count - kNFBLanguagesFull)];
+    }
+    NSUInteger head = self.compact ? kNFBLanguagesQuick : kNFBLanguagesFull;
+    return [all subarrayWithRange:NSMakeRange(0, MIN(head, all.count))];
+}
+
+// After the languages come the picker row (full screen only) and the
+// auto-translate row; the picker screen has neither.
+- (NSInteger)languageExtraRows {
+    if (self.othersOnly) {
+        return 0;
+    }
+    return self.compact ? 1 : 2;
+}
+
+- (BOOL)rowIsPicker:(NSInteger)row {
+    return !self.othersOnly && !self.compact &&
+           row == (NSInteger)[self visibleLanguages].count;
+}
+
+- (BOOL)rowIsTranslate:(NSInteger)row {
+    return !self.othersOnly &&
+           row == (NSInteger)[self visibleLanguages].count + (self.compact ? 0 : 1);
 }
 
 - (void)modeChanged:(UISegmentedControl*)control {
@@ -596,6 +642,14 @@ static NSMutableArray<NSString*>* NFBKeptLanguageList(void) {
     [self.tableView reloadData];
 }
 
+// The stored flag is the negative one, so the switch reads and writes it
+// inverted: on means Twitter may translate.
+- (void)translateChanged:(UISwitch*)sender {
+    [[NSUserDefaults standardUserDefaults] setBool:!sender.isOn
+                                            forKey:@"disable_auto_translate"];
+    [self.tableView reloadData];
+}
+
 - (void)toggleChanged:(UISwitch*)sender {
     NSArray* keys = @[ kNFBMutedWholeWordsKey, kNFBMutedInConversationsKey,
                        kNFBMutedSkipFollowingKey, kNFBMutedIncludeRepostsKey ];
@@ -625,7 +679,7 @@ static NSMutableArray<NSString*>* NFBKeptLanguageList(void) {
 // Section 0 is "Filters": the add row first, then the list (or one empty row).
 - (NSInteger)tableView:(UITableView*)tableView numberOfRowsInSection:(NSInteger)section {
     if (self.mode == 1) {
-        return (NSInteger)self.languageCodes.count;
+        return (NSInteger)[self visibleLanguages].count + [self languageExtraRows];
     }
     if (section == 0) {
         return 1 + (NSInteger)MAX(self.terms.count, (NSUInteger)1);
@@ -673,10 +727,23 @@ static NSMutableArray<NSString*>* NFBKeptLanguageList(void) {
 - (NSString*)tableView:(UITableView*)tableView
     titleForFooterInSection:(NSInteger)section {
     if (self.mode == 1) {
-        return [[BHTBundle sharedBundle]
-            localizedStringForKey:NFBKeptLanguageList().count
-                                      ? @"LANGUAGES_FOOTER_ON"
-                                      : @"LANGUAGES_FOOTER_OFF"];
+        if (self.compact || self.othersOnly) {
+            return nil;
+        }
+        BHTBundle* bundle = [BHTBundle sharedBundle];
+        if (!NFBKeptLanguageList().count) {
+            return [bundle localizedStringForKey:@"LANGUAGES_FOOTER_OFF"];
+        }
+        NSString* base = [bundle localizedStringForKey:@"LANGUAGES_FOOTER_ON"];
+        BOOL translating =
+            ![[NSUserDefaults standardUserDefaults] boolForKey:@"disable_auto_translate"];
+        // Naming the conflict is the only way a reader can tell the switch is
+        // not broken.
+        return translating
+                   ? [NSString stringWithFormat:@"%@\n\n%@", base,
+                                                [bundle localizedStringForKey:
+                                                            @"LANGUAGES_FOOTER_TRANSLATE"]]
+                   : base;
     }
     if (self.compact || section != 0) {
         return nil;
@@ -704,24 +771,75 @@ static NSMutableArray<NSString*>* NFBKeptLanguageList(void) {
     BHTBundle* bundle = [BHTBundle sharedBundle];
 
     if (self.mode == 1) {
+        extern UIColor* CurrentAccentColor(void);
+        UIColor* accent = CurrentAccentColor() ?: self.view.tintColor;
+
+        if ([self rowIsTranslate:indexPath.row]) {
+            NFBMutedToggleCell* cell =
+                [tableView dequeueReusableCellWithIdentifier:@"opt"
+                                                forIndexPath:indexPath];
+            cell.titleLabel2.text =
+                [bundle localizedStringForKey:@"LANGUAGES_TRANSLATE_TITLE"];
+            // The popover is meant to be read in a glance, so it carries the
+            // switch alone.
+            cell.subtitleLabel.text =
+                self.compact
+                    ? @""
+                    : [bundle localizedStringForKey:@"LANGUAGES_TRANSLATE_DETAIL"];
+            cell.toggle.tag = NSIntegerMax;
+            cell.toggle.on =
+                ![[NSUserDefaults standardUserDefaults] boolForKey:@"disable_auto_translate"];
+            [cell.toggle removeTarget:nil
+                               action:NULL
+                     forControlEvents:UIControlEventValueChanged];
+            [cell.toggle addTarget:self
+                            action:@selector(translateChanged:)
+                  forControlEvents:UIControlEventValueChanged];
+            return cell;
+        }
+
         UITableViewCell* cell =
             [tableView dequeueReusableCellWithIdentifier:@"lang"];
         if (!cell) {
-            cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleDefault
+            cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleValue1
                                           reuseIdentifier:@"lang"];
             cell.backgroundColor = [UIColor clearColor];
         }
-        NSString* code = self.languageCodes[(NSUInteger)indexPath.row];
-        BOOL kept = [NFBKeptLanguageList() containsObject:code];
-        cell.textLabel.text = NFBLanguageName(code);
+        cell.tintColor = accent;
         cell.textLabel.font =
             [TwitterChirpFont(TwitterFontStyleRegular) fontWithSize:16.5];
+
+        if ([self rowIsPicker:indexPath.row]) {
+            NSArray* tail = [self.languageCodes
+                subarrayWithRange:NSMakeRange(kNFBLanguagesFull,
+                                              self.languageCodes.count -
+                                                  kNFBLanguagesFull)];
+            NSMutableArray* picked = [NSMutableArray array];
+            for (NSString* code in tail) {
+                if ([NFBKeptLanguageList() containsObject:code]) {
+                    [picked addObject:NFBLanguageName(code)];
+                }
+            }
+            cell.textLabel.text =
+                [bundle localizedStringForKey:@"LANGUAGES_OTHERS_TITLE"];
+            cell.textLabel.textColor = [UIColor labelColor];
+            cell.detailTextLabel.text =
+                picked.count ? [picked componentsJoinedByString:@", "]
+                             : [bundle localizedStringForKey:@"LANGUAGES_OTHERS_NONE"];
+            cell.detailTextLabel.textColor = [UIColor secondaryLabelColor];
+            cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
+            return cell;
+        }
+
+        NSString* code = [self visibleLanguages][(NSUInteger)indexPath.row];
+        BOOL kept = [NFBKeptLanguageList() containsObject:code];
+        cell.textLabel.text = NFBLanguageName(code);
+        cell.detailTextLabel.text = nil;
         cell.textLabel.textColor =
             kept ? [UIColor labelColor]
                  : [[UIColor labelColor] colorWithAlphaComponent:0.45];
         cell.accessoryType =
             kept ? UITableViewCellAccessoryCheckmark : UITableViewCellAccessoryNone;
-        cell.tintColor = self.view.tintColor;
         return cell;
     }
 
@@ -861,7 +979,17 @@ static NSMutableArray<NSString*>* NFBKeptLanguageList(void) {
     if (self.mode != 1) {
         return;
     }
-    NSString* code = self.languageCodes[(NSUInteger)indexPath.row];
+    if ([self rowIsTranslate:indexPath.row]) {
+        return;
+    }
+    if ([self rowIsPicker:indexPath.row]) {
+        MutedWordsViewController* others = [[MutedWordsViewController alloc] init];
+        others.othersOnly = YES;
+        others.mode = 1;
+        [self.navigationController pushViewController:others animated:YES];
+        return;
+    }
+    NSString* code = [self visibleLanguages][(NSUInteger)indexPath.row];
     NSMutableArray* kept = NFBKeptLanguageList();
     if ([kept containsObject:code]) {
         [kept removeObject:code];
