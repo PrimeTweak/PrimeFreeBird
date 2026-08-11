@@ -500,7 +500,9 @@ static NSMutableArray<NSString*>* NFBKeptLanguageList(void) {
     // the extra air belongs.
     CGFloat controlHeight = 32.0;
     CGFloat top = kNFBMutedSideMargin;
-    CGFloat height = self.compact ? top + controlHeight : 48.0;
+    // The popover's material fills this header, so it carries the same margin
+    // below the segment as above it; the full screen centres in a fixed band.
+    CGFloat height = self.compact ? top + controlHeight + top : 48.0;
     UIView* header = [[UIView alloc] initWithFrame:CGRectMake(0, 0, 0, height)];
     control.translatesAutoresizingMaskIntoConstraints = NO;
     [header addSubview:control];
@@ -1109,9 +1111,10 @@ static NSMutableArray<NSString*>* NFBKeptLanguageList(void) {
     if (indexPath.section == 0 && indexPath.row == 0) {
         NFBMutedAddCell* cell = [tableView dequeueReusableCellWithIdentifier:@"add"
                                                                forIndexPath:indexPath];
-        // A language row centres its text 14 pt below its own top edge; the
-        // box starts at the same offset so both panels read alike.
-        cell.boxTop.constant = 14.0;
+        // A language name's visible top sits 16 pt below its row's edge once
+        // its cap height is taken into account; the box's border starts there
+        // so the two panels read with the same air under the segment.
+        cell.boxTop.constant = 16.0;
         cell.field.placeholder =
             [bundle localizedStringForKey:@"MUTED_WORDS_ADD_PLACEHOLDER"];
         cell.hintLabel.text = [bundle localizedStringForKey:@"MUTED_WORDS_SUBTITLE"];
