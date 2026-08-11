@@ -59,6 +59,7 @@ static NSDictionary<NSString*, NSDictionary*>* BHTSettingsPages(void) {
                         @"type": @"button"
                     },
                     @{@"key": @"restore_tab_labels",
+                      @"disabledWhen": @"enable_liquid_glass",
                       @"default": @NO},
                     @{@"key": @"custom_fonts",
                       @"default": @NO},
@@ -148,6 +149,7 @@ static NSDictionary<NSString*, NSDictionary*>* BHTSettingsPages(void) {
                       @"default": @NO,
                       @"type": @"toggle"},
                     @{@"key": @"unlimited_timeline_tabs",
+                      @"disabledWhen": @"hide_custom_timelines",
                       @"default": @YES,
                       @"type": @"toggle"}
                 ]
@@ -413,6 +415,7 @@ static NSDictionary<NSString*, NSDictionary*>* BHTSettingsPages(void) {
                     @{
                         @"key": @"disable_auto_translate",
                         @"default": @NO,
+                        @"inverted": @YES,
                         @"type": @"toggle"
                     }
                 ]
