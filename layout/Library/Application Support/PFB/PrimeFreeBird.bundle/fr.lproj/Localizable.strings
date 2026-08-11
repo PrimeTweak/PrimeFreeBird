@@ -96,8 +96,8 @@
 "HIDE_GROK_CREATE_TITLE" = "Masquer les boutons de création Grok";
 "HIDE_GROK_CREATE_DETAIL" = "Supprime les options de création ou de modification d'images et de vidéos avec Grok.";
 
-"DISABLE_AUTO_TRANSLATE_TITLE" = "Désactiver la traduction automatique";
-"DISABLE_AUTO_TRANSLATE_DETAIL" = "Ne jamais traduire automatiquement les posts et les bios.";
+"DISABLE_AUTO_TRANSLATE_TITLE" = "Traduction automatique";
+"DISABLE_AUTO_TRANSLATE_DETAIL" = "Traduit les Tweets et les bios automatiquement.";
 
 "SQUARE_AVATARS_TITLE" = "Photos de profil carrées";
 "SQUARE_AVATARS_DETAIL" = "Affiche les avatars à coins carrés, comme sur l'ancien Twitter.";
@@ -245,6 +245,7 @@
 /* Restore tab labels */
 "RESTORE_TAB_LABELS_TITLE" = "Étiquettes de navigation";
 "RESTORE_TAB_LABELS_DETAIL" = "Affichez les étiquettes sous les icônes comme dans les anciennes versions de Twitter.";
+"RESTORE_TAB_LABELS_DETAIL_HELD" = "Liquid Glass dessine sa propre barre d’onglets, sans libellés.";
 
 "COLOR_TWITTER_ICON_IN_TOP_BAR_TITLE" = "Colorer l'icône Twitter";
 "COLOR_TWITTER_ICON_IN_TOP_BAR_DETAIL" = "Applique la couleur d'accent à l'icône Twitter dans la barre supérieure.";
@@ -454,6 +455,7 @@
 "TIMELINES_GROUP_BARS" = "Barres";
 "UNLIMITED_TIMELINE_TABS_TITLE" = "Onglets de fil illimités";
 "UNLIMITED_TIMELINE_TABS_DETAIL" = "Épingle plus de fils et débloque les onglets avancés, sauf s'ils sont masqués.";
+"UNLIMITED_TIMELINE_TABS_DETAIL_HELD" = "Épingle plus de fils et débloque les onglets avancés.";
 
 /* ===== MOTS FILTRÉS (2026-08-05) ===== */
 "MUTED_WORDS_SUBTITLE" = "Les posts correspondant à cette liste sont retirés de ton fil.";
