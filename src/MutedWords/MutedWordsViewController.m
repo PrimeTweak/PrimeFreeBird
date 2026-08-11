@@ -449,8 +449,10 @@ static NSMutableArray<NSString*>* NFBKeptLanguageList(void) {
     [control addTarget:self
                   action:@selector(modeChanged:)
         forControlEvents:UIControlEventValueChanged];
-    CGFloat inset = self.compact ? kNFBMutedSideMargin : kNFBMutedSideMargin + 6.0;
-    CGFloat height = self.compact ? 42.0 : 48.0;
+    // The segment lines up with the rows below it, and sits close to them in
+    // the popover where every point counts.
+    CGFloat inset = kNFBMutedSideMargin;
+    CGFloat height = self.compact ? 36.0 : 48.0;
     UIView* header = [[UIView alloc] initWithFrame:CGRectMake(0, 0, 0, height)];
     control.translatesAutoresizingMaskIntoConstraints = NO;
     [header addSubview:control];
@@ -808,6 +810,14 @@ static NSMutableArray<NSString*>* NFBKeptLanguageList(void) {
         cell.tintColor = accent;
         cell.textLabel.font =
             [TwitterChirpFont(TwitterFontStyleRegular) fontWithSize:16.5];
+        // The table's own margins are wider than this screen's, which would
+        // leave the languages indented past the rows around them.
+        cell.preservesSuperviewLayoutMargins = NO;
+        cell.contentView.preservesSuperviewLayoutMargins = NO;
+        cell.layoutMargins = UIEdgeInsetsMake(0, kNFBMutedSideMargin, 0,
+                                              kNFBMutedSideMargin);
+        cell.contentView.layoutMargins = cell.layoutMargins;
+        cell.separatorInset = UIEdgeInsetsMake(0, kNFBMutedSideMargin, 0, 0);
 
         if ([self rowIsPicker:indexPath.row]) {
             NSArray* tail = [self.languageCodes
