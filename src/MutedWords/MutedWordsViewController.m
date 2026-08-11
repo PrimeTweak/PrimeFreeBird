@@ -390,9 +390,9 @@ static NSMutableArray<NSString*>* NFBKeptLanguageList(void) {
     if (measured < 100.0) {
         measured = 100.0;
     }
-    // Four languages then scroll: the list is set once, so it does not earn a
-    // taller popover than the terms.
-    CGFloat cap = (self.mode == 1) ? 280.0 : 330.0;
+    // Four languages and the switch fit whole: nothing scrolls, so the switch
+    // is always in view instead of hiding below the fold.
+    CGFloat cap = (self.mode == 1) ? 360.0 : 330.0;
     self.preferredContentSize = CGSizeMake(320.0, MIN(measured, cap));
 }
 
@@ -421,6 +421,8 @@ static NSMutableArray<NSString*>* NFBKeptLanguageList(void) {
         self.tableView.backgroundColor = [UIColor systemBackgroundColor];
         self.tableView.separatorStyle = UITableViewCellSeparatorStyleNone;
     }
+    // A self-sizing footer needs an estimate, or the table collapses it.
+    self.tableView.estimatedSectionFooterHeight = 44.0;
     self.languageCodes = NFBLanguageCatalog();
     if (!self.othersOnly) {
         [self installModeControl];
@@ -442,17 +444,18 @@ static NSMutableArray<NSString*>* NFBKeptLanguageList(void) {
         [bundle localizedStringForKey:@"FILTERS_SEGMENT_LANGUAGES"]
     ]];
     control.selectedSegmentIndex = self.mode;
-    extern UIColor* CurrentAccentColor(void);
-    control.selectedSegmentTintColor = CurrentAccentColor() ?: self.view.tintColor;
-    [control setTitleTextAttributes:@{NSForegroundColorAttributeName : [UIColor whiteColor]}
-                           forState:UIControlStateSelected];
     [control addTarget:self
                   action:@selector(modeChanged:)
         forControlEvents:UIControlEventValueChanged];
-    // The segment lines up with the rows below it, and sits close to them in
-    // the popover where every point counts.
+    // The segment keeps its system appearance: it names a place in the screen,
+    // not a setting, so it stays out of the accent's vocabulary.
     CGFloat inset = kNFBMutedSideMargin;
-    CGFloat height = self.compact ? 36.0 : 48.0;
+    // The control is pinned to the top with the same margin it has on the
+    // sides, and the header ends where it ends — the row below supplies the
+    // only gap under it.
+    CGFloat top = self.compact ? kNFBMutedSideMargin : 14.0;
+    CGFloat controlHeight = 32.0;
+    CGFloat height = top + controlHeight;
     UIView* header = [[UIView alloc] initWithFrame:CGRectMake(0, 0, 0, height)];
     control.translatesAutoresizingMaskIntoConstraints = NO;
     [header addSubview:control];
@@ -461,7 +464,8 @@ static NSMutableArray<NSString*>* NFBKeptLanguageList(void) {
                                               constant:inset],
         [control.trailingAnchor constraintEqualToAnchor:header.trailingAnchor
                                                constant:-inset],
-        [control.centerYAnchor constraintEqualToAnchor:header.centerYAnchor],
+        [control.topAnchor constraintEqualToAnchor:header.topAnchor constant:top],
+        [control.heightAnchor constraintEqualToConstant:controlHeight],
     ]];
     self.tableView.tableHeaderView = header;
     header.frame = CGRectMake(0, 0, self.tableView.bounds.size.width, height);
@@ -733,19 +737,9 @@ static NSMutableArray<NSString*>* NFBKeptLanguageList(void) {
             return nil;
         }
         BHTBundle* bundle = [BHTBundle sharedBundle];
-        if (!NFBKeptLanguageList().count) {
-            return [bundle localizedStringForKey:@"LANGUAGES_FOOTER_OFF"];
-        }
-        NSString* base = [bundle localizedStringForKey:@"LANGUAGES_FOOTER_ON"];
-        BOOL translating =
-            ![[NSUserDefaults standardUserDefaults] boolForKey:@"disable_auto_translate"];
-        // Naming the conflict is the only way a reader can tell the switch is
-        // not broken.
-        return translating
-                   ? [NSString stringWithFormat:@"%@\n\n%@", base,
-                                                [bundle localizedStringForKey:
-                                                            @"LANGUAGES_FOOTER_TRANSLATE"]]
-                   : base;
+        return [bundle localizedStringForKey:NFBKeptLanguageList().count
+                                                 ? @"LANGUAGES_FOOTER_ON"
+                                                 : @"LANGUAGES_FOOTER_OFF"];
     }
     if (self.compact || section != 0) {
         return nil;
@@ -766,6 +760,40 @@ static NSMutableArray<NSString*>* NFBKeptLanguageList(void) {
         return [bundle localizedStringForKey:@"MUTED_WORDS_KIND_PHRASE"];
     }
     return [bundle localizedStringForKey:@"MUTED_WORDS_KIND_WORD"];
+}
+
+// The table's own footer sits on the system margin, which is wider than this
+// screen's; the text is drawn instead so it starts under the rows.
+- (UIView*)tableView:(UITableView*)tableView viewForFooterInSection:(NSInteger)section {
+    NSString* text = [self tableView:tableView titleForFooterInSection:section];
+    if (!text.length) {
+        return nil;
+    }
+    UIView* container = [[UIView alloc] init];
+    UILabel* label = [[UILabel alloc] init];
+    label.text = text;
+    label.numberOfLines = 0;
+    label.font = [TwitterChirpFont(TwitterFontStyleRegular) fontWithSize:13.5];
+    label.textColor = [UIColor secondaryLabelColor];
+    label.translatesAutoresizingMaskIntoConstraints = NO;
+    [container addSubview:label];
+    [NSLayoutConstraint activateConstraints:@[
+        [label.leadingAnchor constraintEqualToAnchor:container.leadingAnchor
+                                            constant:kNFBMutedSideMargin],
+        [label.trailingAnchor constraintEqualToAnchor:container.trailingAnchor
+                                             constant:-kNFBMutedSideMargin],
+        [label.topAnchor constraintEqualToAnchor:container.topAnchor constant:14.0],
+        [label.bottomAnchor constraintEqualToAnchor:container.bottomAnchor
+                                           constant:-18.0],
+    ]];
+    return container;
+}
+
+- (CGFloat)tableView:(UITableView*)tableView
+    heightForFooterInSection:(NSInteger)section {
+    return [self tableView:tableView titleForFooterInSection:section].length
+               ? UITableViewAutomaticDimension
+               : 0.01;
 }
 
 - (UITableViewCell*)tableView:(UITableView*)tableView
