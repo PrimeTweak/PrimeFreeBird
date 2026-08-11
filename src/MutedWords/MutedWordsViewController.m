@@ -407,6 +407,10 @@ static NSMutableArray<NSString*>* NFBKeptLanguageList(void) {
 
 - (void)viewDidLayoutSubviews {
     [super viewDidLayoutSubviews];
+    // Reloading adds cells above the pinned views, so their order is restored
+    // on every layout pass.
+    [self.tableView bringSubviewToFront:self.pinnedHeader];
+    [self.tableView bringSubviewToFront:self.pinnedBar];
     [self updatePreferredSize];
 }
 
@@ -583,13 +587,6 @@ static NSMutableArray<NSString*>* NFBKeptLanguageList(void) {
     [self.tableView bringSubviewToFront:self.pinnedBar];
 }
 
-- (void)viewDidLayoutSubviews {
-    [super viewDidLayoutSubviews];
-    // Reloading adds cells above the pinned views, so their order is restored
-    // on every layout pass.
-    [self.tableView bringSubviewToFront:self.pinnedHeader];
-    [self.tableView bringSubviewToFront:self.pinnedBar];
-}
 
 // The codes this screen lists: the picker takes the tail, the popover the
 // first four, the full screen the first six.
