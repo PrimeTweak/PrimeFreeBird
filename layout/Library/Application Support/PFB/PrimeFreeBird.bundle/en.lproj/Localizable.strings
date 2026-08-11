@@ -445,8 +445,13 @@
 "FILTERS_DETAIL" = "Words, accounts and languages you keep out of your feed.";
 "FILTERS_SEGMENT_WORDS" = "Words";
 "FILTERS_SEGMENT_LANGUAGES" = "Languages";
-"LANGUAGES_FOOTER_OFF" = "No language selected — every language reaches your timeline.";
-"LANGUAGES_FOOTER_ON" = "Only the selected languages reach your timeline. Tweets with no detected language always pass.";
+"LANGUAGES_FOOTER_OFF" = "No language checked — every language reaches your timeline.";
+"LANGUAGES_FOOTER_ON" = "Only the checked languages reach your timeline. Tweets with no detected language always pass.";
+"LANGUAGES_TRANSLATE_TITLE" = "Auto-translate";
+"LANGUAGES_TRANSLATE_DETAIL" = "Tweets, bios, notes and notifications.";
+"LANGUAGES_OTHERS_TITLE" = "Other languages";
+"LANGUAGES_OTHERS_NONE" = "None";
+"LANGUAGES_FOOTER_TRANSLATE" = "Auto-translate no longer reaches your timeline: unchecked languages are removed before it can run. It stays active for bios, notes and notifications.";
 "MUTED_WORDS_NONE" = "None";
 "MUTED_WORDS_ADD_PLACEHOLDER" = "Add a word, phrase or @account";
 "MUTED_WORDS_ADD_BUTTON" = "Add";
