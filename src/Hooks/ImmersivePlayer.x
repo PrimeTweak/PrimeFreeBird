@@ -130,6 +130,12 @@ static const CGFloat kNFBPausedGlyphSize = 72.0;
 // bar moves.
 static BOOL gNFBSyntheticToggle = NO;
 
+// The player is not exposed by the page view: it is read from its ivar.
+static TAVPlayer* nfbImmersivePagePlayer(UIView* pageView) {
+    Ivar playerIvar = class_getInstanceVariable([pageView class], "player");
+    return playerIvar ? object_getIvar(pageView, playerIvar) : nil;
+}
+
 // timeControlStatus follows AVPlayer: 0 paused, 1 waiting to play, 2 playing.
 static void nfbTogglePlayback(TAVPlayer* player) {
     if (player.playbackState.timeControlStatus != 0) {
