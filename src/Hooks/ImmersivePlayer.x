@@ -114,9 +114,63 @@ static const void* kNFBPausedGlyphKey = &kNFBPausedGlyphKey;
 static const void* kNFBBarExpandedKey = &kNFBBarExpandedKey;
 static const CGFloat kNFBPausedGlyphSize = 72.0;
 
+static BOOL nfbBarExpanded(UIView* controls);
+
 // Marks a toggle synthesized by the tweak: playback is left alone, only the
 // bar moves.
 static BOOL gNFBSyntheticToggle = NO;
+
+// Temporary instrumentation: a small on-screen readout of every decision this
+// section takes, so a screenshot carries the ground truth out.
+static NSMutableArray<NSString*>* gNFBImmersiveDiagLines = nil;
+
+static void nfbImmersiveDiagShow(UIView* anchor, NSString* line) {
+    if (!gNFBImmersiveDiagLines) {
+        gNFBImmersiveDiagLines = [NSMutableArray array];
+    }
+    [gNFBImmersiveDiagLines addObject:line];
+    while (gNFBImmersiveDiagLines.count > 7) {
+        [gNFBImmersiveDiagLines removeObjectAtIndex:0];
+    }
+    UIWindow* window = anchor.window;
+    if (!window) {
+        return;
+    }
+    static const void* kNFBDiagHudKey = &kNFBDiagHudKey;
+    UILabel* hud = objc_getAssociatedObject(window, kNFBDiagHudKey);
+    if (!hud) {
+        hud = [[UILabel alloc] init];
+        hud.numberOfLines = 0;
+        hud.font = [UIFont monospacedSystemFontOfSize:10 weight:UIFontWeightMedium];
+        hud.textColor = [UIColor whiteColor];
+        hud.backgroundColor = [UIColor colorWithWhite:0 alpha:0.65];
+        hud.layer.cornerRadius = 6;
+        hud.clipsToBounds = YES;
+        hud.userInteractionEnabled = NO;
+        objc_setAssociatedObject(window, kNFBDiagHudKey, hud,
+                                 OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    }
+    if (hud.superview != window) {
+        [window addSubview:hud];
+    }
+    hud.text = [gNFBImmersiveDiagLines componentsJoinedByString:@"\n"];
+    CGSize fit = [hud sizeThatFits:CGSizeMake(280, 400)];
+    hud.frame = CGRectMake(12, 64, fit.width + 12, fit.height + 8);
+    [window bringSubviewToFront:hud];
+}
+
+static NSString* nfbDiagControls(UIView* controls) {
+    if (!controls) {
+        return @"c=\u2014";
+    }
+    return [NSString stringWithFormat:@"c=%.0fx%.0f a=%.1f",
+                                      controls.bounds.size.width,
+                                      controls.bounds.size.height, controls.alpha];
+}
+
+static NSString* nfbDiagMirror(UIView* controls) {
+    return controls ? (nfbBarExpanded(controls) ? @"E" : @"M") : @"?";
+}
 
 static TAVPlayer* nfbImmersivePagePlayer(UIView* pageView) {
     Ivar playerIvar = class_getInstanceVariable([pageView class], "player");
@@ -239,6 +293,11 @@ static void nfbShowPausedGlyph(UIView* card, BOOL paused) {
     // A synthesized tap only moves the bar; a tap with the option off keeps the
     // native behavior. The mirror follows the toggle in both cases.
     if (gNFBSyntheticToggle || ![BHTSettings boolForKey:@"tap_to_pause"]) {
+        nfbImmersiveDiagShow(
+            card, [NSString stringWithFormat:@"%@ %@ mir=%@",
+                                             gNFBSyntheticToggle ? @"syn" : @"off",
+                                             nfbDiagControls(controls),
+                                             nfbDiagMirror(controls)]);
         nfbBarWillToggle(controls);
         %orig;
         return;
@@ -254,6 +313,10 @@ static void nfbShowPausedGlyph(UIView* card, BOOL paused) {
 
     TAVPlayer* player = pageView ? nfbImmersivePagePlayer(pageView) : nil;
     if (!player) {
+        nfbImmersiveDiagShow(
+            card, [NSString stringWithFormat:@"nop %@ mir=%@",
+                                             nfbDiagControls(controls),
+                                             nfbDiagMirror(controls)]);
         nfbBarWillToggle(controls);
         %orig;
         return;
@@ -266,7 +329,14 @@ static void nfbShowPausedGlyph(UIView* card, BOOL paused) {
     // The bar belongs expanded while paused and minimal while playing. The
     // toggle runs only when the mirror disagrees with that.
     BOOL paused = wasPlaying;
-    if (controls && nfbBarExpanded(controls) != paused) {
+    BOOL runsToggle = controls && nfbBarExpanded(controls) != paused;
+    nfbImmersiveDiagShow(
+        card, [NSString stringWithFormat:@"tap %@ mir=%@ p=%@ orig=%@",
+                                         nfbDiagControls(controls),
+                                         nfbDiagMirror(controls),
+                                         paused ? @"P" : @"J",
+                                         runsToggle ? @"Y" : @"N"]);
+    if (runsToggle) {
         nfbBarWillToggle(controls);
         %orig;
     }
@@ -286,14 +356,26 @@ static void nfbShowPausedGlyph(UIView* card, BOOL paused) {
     if (![BHTSettings boolForKey:@"tap_to_pause"]) {
         return;
     }
+    UIView* controlsNow = nfbImmersiveControlsView(card);
+    nfbImmersiveDiagShow(
+        card, [NSString stringWithFormat:@"act w=%@ %@ mir=%@",
+                                         card.window ? @"Y" : @"N",
+                                         nfbDiagControls(controlsNow),
+                                         nfbDiagMirror(controlsNow)]);
     dispatch_after(
         dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.12 * NSEC_PER_SEC)),
         dispatch_get_main_queue(), ^{
             if (!card.window) {
+                nfbImmersiveDiagShow(card, @"syn skip nowin");
                 return;
             }
             UIView* controls = nfbImmersiveControlsView(card);
-            if (!controls || !nfbBarExpanded(controls)) {
+            if (!controls) {
+                nfbImmersiveDiagShow(card, @"syn skip noctl");
+                return;
+            }
+            if (!nfbBarExpanded(controls)) {
+                nfbImmersiveDiagShow(card, @"syn skip min");
                 return;
             }
             Ivar recognizerIvar = class_getInstanceVariable(
@@ -301,6 +383,7 @@ static void nfbShowPausedGlyph(UIView* card, BOOL paused) {
             id recognizer =
                 recognizerIvar ? object_getIvar(card, recognizerIvar) : nil;
             if (!recognizer) {
+                nfbImmersiveDiagShow(card, @"syn skip norec");
                 return;
             }
             gNFBSyntheticToggle = YES;
