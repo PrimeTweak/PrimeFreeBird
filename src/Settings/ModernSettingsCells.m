@@ -10,8 +10,23 @@
 #import "Core/BHTSettings.h"
 #import "Headers/TWHeaders.h"
 #import "ThemeColor/Palette.h"
+#import "ThemeColor/DarkModeStyle.h"
 #import "Core/TwitterChirpFont.h"
  
+// UIKit paints its own selection in a system gray bright enough to sit above
+// the dark-style filter's ceiling, so the row stays gray while the rest of the
+// screen is recolored. The shade is handed to the cell directly instead.
+static void nfbApplySelectedBackground(UITableViewCell* cell) {
+    UIColor* shade = [DarkModeStyle elevatedBackgroundColor];
+    if (!shade) {
+        cell.selectedBackgroundView = nil;
+        return;
+    }
+    UIView* selected = [[UIView alloc] init];
+    selected.backgroundColor = shade;
+    cell.selectedBackgroundView = selected;
+}
+
 @interface ModernSettingsTableViewCell ()
 @property (nonatomic, strong) NSLayoutConstraint* titleLeadingWithIcon;
 @property (nonatomic, strong) NSLayoutConstraint* titleLeadingNoIcon;
@@ -67,6 +82,7 @@
  
     self.backgroundColor = [Palette currentBackgroundColor];
     self.selectionStyle = UITableViewCellSelectionStyleDefault;
+    nfbApplySelectedBackground(self);
 }
  
 - (void)setupConstraints {
@@ -201,6 +217,7 @@
  
     self.backgroundColor = [Palette currentBackgroundColor];
     self.selectionStyle = UITableViewCellSelectionStyleDefault;
+    nfbApplySelectedBackground(self);
     [self updateChevronColor];
 }
  
