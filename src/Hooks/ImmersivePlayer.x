@@ -125,6 +125,8 @@ static const void* kNFBPausedGlyphKey = &kNFBPausedGlyphKey;
 static const void* kNFBReconcilePendingKey = &kNFBReconcilePendingKey;
 static const void* kNFBMinimalBarKey = &kNFBMinimalBarKey;
 static const void* kNFBMinimalTimerKey = &kNFBMinimalTimerKey;
+static const void* kNFBHeldOverlayKey = &kNFBHeldOverlayKey;
+static const CGFloat kNFBOverlayHoldWatchdog = 0.8;
 static const NSInteger kNFBMinimalTrackTag = 90211;
 static const NSInteger kNFBMinimalFillTag = 90212;
 static const NSInteger kNFBMinimalClockTag = 90213;
@@ -285,6 +287,10 @@ static UIView* nfbMinimalBar(UIView* card) {
     }
     bar = [[UIView alloc] init];
     bar.userInteractionEnabled = NO;
+    // Born hidden and clear: a view created visible skips the fade on its very
+    // first appearance, which is the one appearance that matters.
+    bar.hidden = YES;
+    bar.alpha = 0.0;
 
     UIView* track = [[UIView alloc] init];
     track.tag = kNFBMinimalTrackTag;
@@ -351,10 +357,10 @@ static void nfbUpdateMinimalBar(UIView* card, TAVPlayer* player) {
         [card addSubview:bar];
     }
     [card bringSubviewToFront:bar];
-    // Twitter's bar is still fading out when this one arrives: it fades in
-    // rather than appearing at full strength on top of it.
-    BOOL arriving = bar.hidden;
-    if (arriving) {
+    // Twitter's own bar is still fading out when this one arrives, so it fades
+    // in rather than landing at full strength on top of it — from wherever its
+    // opacity currently sits, which keeps a fast tap sequence smooth.
+    if (bar.hidden) {
         bar.alpha = 0.0;
         bar.hidden = NO;
     }
@@ -393,7 +399,7 @@ static void nfbUpdateMinimalBar(UIView* card, TAVPlayer* player) {
     clock.frame = CGRectMake(kNFBMinimalTextInset, clockTop - trackTop,
                              CGRectGetWidth(clock.bounds), clockHeight);
 
-    if (arriving) {
+    if (bar.alpha < 1.0) {
         [UIView animateWithDuration:kNFBMinimalFade
                               delay:0
                             options:UIViewAnimationOptionCurveEaseOut |
@@ -402,8 +408,6 @@ static void nfbUpdateMinimalBar(UIView* card, TAVPlayer* player) {
                            bar.alpha = 1.0;
                          }
                          completion:nil];
-    } else {
-        bar.alpha = 1.0;
     }
 
     if (!objc_getAssociatedObject(card, kNFBMinimalTimerKey)) {
@@ -425,10 +429,96 @@ static void nfbUpdateMinimalBar(UIView* card, TAVPlayer* player) {
     }
 }
 
+// MARK: - Overlay hold at open
+//
+// The app raises its whole overlay as a video opens — top bar, author, actions,
+// controls — and the fold takes it down a moment later, which reads as a flash.
+// The overlay is therefore held at zero opacity from the moment the card enters
+// the window until the fold has happened. Only the app's own immersive views are
+// held: the video and anything drawn over it that survives a fold, captions
+// among them, are left alone. A watchdog gives everything back if the fold has
+// not happened, so a card can never be left without controls.
+
+static BOOL nfbIsHoldableOverlay(UIView* view, UIView* card) {
+    if (view == objc_getAssociatedObject(card, kNFBMinimalBarKey) ||
+        view == objc_getAssociatedObject(card, kNFBPausedGlyphKey)) {
+        return NO;
+    }
+    NSString* name = NSStringFromClass([view class]);
+    if (![name containsString:@"Immersive"] || [name containsString:@"PageView"]) {
+        return NO;
+    }
+    // A container that carries the video is the video, whatever it is called.
+    Class pageClass =
+        NSClassFromString(@"_TtC14T1TwitterSwift22ImmersiveVideoPageView");
+    __block BOOL holdsVideo = NO;
+    if (pageClass) {
+        EnumerateSubviewsRecursively(view, ^(UIView* inner) {
+            if ([inner isKindOfClass:pageClass]) {
+                holdsVideo = YES;
+            }
+        });
+    }
+    return !holdsVideo;
+}
+
+static void nfbReleaseOverlay(UIView* card, BOOL restore) {
+    NSMapTable* held = objc_getAssociatedObject(card, kNFBHeldOverlayKey);
+    if (restore) {
+        for (UIView* view in held.keyEnumerator) {
+            view.alpha = [[held objectForKey:view] doubleValue];
+        }
+    }
+    objc_setAssociatedObject(card, kNFBHeldOverlayKey, nil,
+                             OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+}
+
+static void nfbHoldOverlay(UIView* card) {
+    if (![BHTSettings boolForKey:@"tap_to_pause"] ||
+        objc_getAssociatedObject(card, kNFBHeldOverlayKey)) {
+        return;
+    }
+    NSMapTable* held = [NSMapTable weakToStrongObjectsMapTable];
+    for (UIView* subview in card.subviews) {
+        if (nfbIsHoldableOverlay(subview, card)) {
+            [held setObject:@(subview.alpha) forKey:subview];
+            subview.alpha = 0.0;
+        }
+    }
+    UIView* controls = nfbImmersiveControlsView(card);
+    if (controls) {
+        [held setObject:@(controls.alpha) forKey:controls];
+        controls.alpha = 0.0;
+    }
+    if (!held.count) {
+        return;
+    }
+    objc_setAssociatedObject(card, kNFBHeldOverlayKey, held,
+                             OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+
+    // Nothing stays hidden on a fold that never came.
+    __weak UIView* weakCard = card;
+    dispatch_after(
+        dispatch_time(DISPATCH_TIME_NOW,
+                      (int64_t)(kNFBOverlayHoldWatchdog * NSEC_PER_SEC)),
+        dispatch_get_main_queue(), ^{
+          UIView* strongCard = weakCard;
+          if (!strongCard) {
+              return;
+          }
+          nfbReleaseOverlay(strongCard, nfbImmersiveControlsView(strongCard) != nil);
+        });
+}
+
 %hook _TtC14T1TwitterSwift17ImmersiveCardView
 
 - (void)handleSingleTap:(UITapGestureRecognizer*)tap {
     UIView* card = (UIView*)self;
+    // A tap of the reader's own asks for the overlay: the hold ends here, and
+    // the app is free to raise what it wants.
+    if (!gNFBSyntheticToggle) {
+        nfbReleaseOverlay(card, YES);
+    }
     UIView* controls = nfbImmersiveControlsView(card);
 
     // A synthesized tap only moves the bar; a tap with the option off keeps the
@@ -471,9 +561,13 @@ static void nfbUpdateMinimalBar(UIView* card, TAVPlayer* player) {
 // on its own, so the glyph comes down with the move.
 - (void)didMoveToWindow {
     %orig;
-    nfbShowPausedGlyph((UIView*)self, NO);
-    if (!((UIView*)self).window) {
-        nfbStopMinimalTimer((UIView*)self);
+    UIView* card = (UIView*)self;
+    nfbShowPausedGlyph(card, NO);
+    if (card.window) {
+        nfbHoldOverlay(card);
+    } else {
+        nfbStopMinimalTimer(card);
+        nfbReleaseOverlay(card, NO);
     }
 }
 
@@ -541,6 +635,8 @@ static void nfbUpdateMinimalBar(UIView* card, TAVPlayer* player) {
                        withObject:recognizer];
 #pragma clang diagnostic pop
             gNFBSyntheticToggle = NO;
+            // The fold has run: the app owns those opacities again.
+            nfbReleaseOverlay(card, NO);
         });
 }
 
