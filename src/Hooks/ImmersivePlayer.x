@@ -427,6 +427,70 @@ static void nfbUpdateMinimalBar(UIView* card, TAVPlayer* player) {
     }
 }
 
+// MARK: - Folding the bar as early as it exists
+//
+// The app raises its whole overlay as a video opens and the fold takes it back
+// down, so the gap between the two is what shows. Nothing here touches opacity
+// or visibility: the card's own visibility is what the app reads to decide
+// whether a video may autoplay, and dimming it stops playback outright. The
+// gap is closed by acting sooner instead — the bar is watched on a short
+// repeat and folded on the very tick it appears, while the video plays.
+
+static const NSTimeInterval kNFBFoldTick = 0.03;
+static const NSInteger kNFBFoldAttempts = 24;
+
+static void nfbFoldWhenReady(UIView* card, NSInteger attemptsLeft) {
+    if (attemptsLeft <= 0 || !card.window) {
+        objc_setAssociatedObject(card, kNFBReconcilePendingKey, nil,
+                                 OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        return;
+    }
+    TAVPlayer* player = nfbCardPlayer(card);
+    NSInteger status = player.playbackState.timeControlStatus;
+    BOOL paused = (status == 0);
+    BOOL expanded = (nfbImmersiveControlsView(card) != nil);
+    // 1 is waiting to play: not a state worth matching the bar to.
+    BOOL settled = player && status != 1 && expanded != paused;
+    if (!settled) {
+        __weak UIView* weakCard = card;
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW,
+                                     (int64_t)(kNFBFoldTick * NSEC_PER_SEC)),
+                       dispatch_get_main_queue(), ^{
+                         UIView* strongCard = weakCard;
+                         if (strongCard) {
+                             nfbFoldWhenReady(strongCard, attemptsLeft - 1);
+                         }
+                       });
+        return;
+    }
+    objc_setAssociatedObject(card, kNFBReconcilePendingKey, nil,
+                             OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    Ivar recognizerIvar =
+        class_getInstanceVariable(object_getClass(card), "singleTapRecognizer");
+    id recognizer = recognizerIvar ? object_getIvar(card, recognizerIvar) : nil;
+    if (!recognizer) {
+        return;
+    }
+    gNFBSyntheticToggle = YES;
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Warc-performSelector-leaks"
+    [card performSelector:@selector(handleSingleTap:) withObject:recognizer];
+#pragma clang diagnostic pop
+    gNFBSyntheticToggle = NO;
+}
+
+// One chain per card at a time, started wherever the card first shows a sign of
+// life: entering the window, or its first playback state.
+static void nfbStartFoldWatch(UIView* card) {
+    if (!card || ![BHTSettings boolForKey:@"tap_to_pause"] ||
+        [objc_getAssociatedObject(card, kNFBReconcilePendingKey) boolValue]) {
+        return;
+    }
+    objc_setAssociatedObject(card, kNFBReconcilePendingKey, @YES,
+                             OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    nfbFoldWhenReady(card, kNFBFoldAttempts);
+}
+
 %hook _TtC14T1TwitterSwift17ImmersiveCardView
 
 - (void)handleSingleTap:(UITapGestureRecognizer*)tap {
@@ -475,7 +539,11 @@ static void nfbUpdateMinimalBar(UIView* card, TAVPlayer* player) {
     %orig;
     UIView* card = (UIView*)self;
     nfbShowPausedGlyph(card, NO);
-    if (!card.window) {
+    if (card.window) {
+        // Earliest sign of life: the watch starts here so the fold lands on the
+        // first tick the bar exists, not a fifth of a second later.
+        nfbStartFoldWatch(card);
+    } else {
         nfbStopMinimalTimer(card);
     }
 }
@@ -501,50 +569,7 @@ static void nfbUpdateMinimalBar(UIView* card, TAVPlayer* player) {
     if (host) {
         nfbUpdateMinimalBar(host, nfbImmersivePagePlayer(page));
     }
-    if (![BHTSettings boolForKey:@"tap_to_pause"]) {
-        return;
-    }
-    UIView* card = host;
-    if (!card ||
-        [objc_getAssociatedObject(card, kNFBReconcilePendingKey) boolValue]) {
-        return;
-    }
-    objc_setAssociatedObject(card, kNFBReconcilePendingKey, @YES,
-                             OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-    dispatch_after(
-        dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.15 * NSEC_PER_SEC)),
-        dispatch_get_main_queue(), ^{
-            objc_setAssociatedObject(card, kNFBReconcilePendingKey, nil,
-                                     OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-            if (!card.window) {
-                return;
-            }
-            TAVPlayer* current = nfbImmersivePagePlayer(page);
-            NSInteger status = current.playbackState.timeControlStatus;
-            // 1 is waiting to play: not a state worth matching the bar to.
-            if (!current || status == 1) {
-                return;
-            }
-            BOOL paused = (status == 0);
-            BOOL expanded = (nfbImmersiveControlsView(card) != nil);
-            if (expanded == paused) {
-                return;
-            }
-            Ivar recognizerIvar = class_getInstanceVariable(
-                object_getClass(card), "singleTapRecognizer");
-            id recognizer =
-                recognizerIvar ? object_getIvar(card, recognizerIvar) : nil;
-            if (!recognizer) {
-                return;
-            }
-            gNFBSyntheticToggle = YES;
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Warc-performSelector-leaks"
-            [card performSelector:@selector(handleSingleTap:)
-                       withObject:recognizer];
-#pragma clang diagnostic pop
-            gNFBSyntheticToggle = NO;
-        });
+    nfbStartFoldWatch(host);
 }
 
 %end
