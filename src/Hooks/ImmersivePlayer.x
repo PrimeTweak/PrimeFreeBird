@@ -158,6 +158,11 @@ static const void* kNFBCardShownAtKey = &kNFBCardShownAtKey;
 // finish rather than joining it: two sets of times on screen at once read as a
 // glitch, however brief.
 static const NSTimeInterval kNFBOpeningSettle = 0.22;
+// While a card is opening, a player that reports "waiting to play" is a player
+// about to play: the app draws its overlay over the outgoing timeline for the
+// length of that transition, and waiting for the first frame of video before
+// folding is what leaves it on screen.
+static const NSTimeInterval kNFBOpeningWindow = 0.9;
 static const NSInteger kNFBMinimalTrackTag = 90211;
 static const NSInteger kNFBMinimalFillTag = 90212;
 static const NSInteger kNFBMinimalClockTag = 90213;
@@ -505,9 +510,17 @@ static BOOL nfbFoldIfDue(UIView* card) {
         return YES;
     }
     TAVPlayer* player = nfbCardPlayer(card);
+    if (!player) {
+        return NO;
+    }
+    NSTimeInterval shownAt =
+        [objc_getAssociatedObject(card, kNFBCardShownAtKey) doubleValue];
+    BOOL opening = shownAt > 0 && [NSDate timeIntervalSinceReferenceDate] -
+                                          shownAt < kNFBOpeningWindow;
     NSInteger status = player.playbackState.timeControlStatus;
-    // 1 is waiting to play: not a state worth matching the bar to.
-    if (!player || status == 1) {
+    // 1 is waiting to play: transient everywhere else, but at the opening it is
+    // the state the whole transition runs in.
+    if (status == 1 && !opening) {
         return NO;
     }
     BOOL paused = (status == 0);
