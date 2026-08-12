@@ -2,7 +2,7 @@
 //  DarkModeStyle.h
 //  PrimeFreeBird
 //
-//  Dark mode style selector (System / Dim).
+//  Dark mode style selector (System / Dim / Gray / Pure black).
 //
 //  Approach and Dim color (#15202b) adapted from nyaathea's BHDimPalette and
 //  the BHTThemeDirectBackgroundHooks system in PrimeFreeBird/tweak.
@@ -21,7 +21,10 @@ typedef NS_ENUM(NSInteger, NFBDarkModeStyle) {
 
 + (NFBDarkModeStyle)selectedStyle;
 + (BOOL)isDarkModeActive;
-+ (UIColor*)overrideBackgroundColor;
-+ (BOOL)isDarkBackgroundColor:(UIColor*)color;
+
+// The shade that replaces an incoming background color, or nil to leave it
+// alone. Dark chrome is graded into three depths — base, elevated, selected —
+// and the incoming brightness decides which one it gets.
++ (UIColor* _Nullable)overrideForBackgroundColor:(UIColor*)color;
 
 @end
