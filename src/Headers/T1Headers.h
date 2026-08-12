@@ -5,6 +5,7 @@
 //  Created by BandarHelal
 //
 
+#import <CoreMedia/CoreMedia.h>
 #import <SafariServices/SafariServices.h>
 #import <UIKit/UIKit.h>
 #import <WebKit/WebKit.h>
@@ -256,6 +257,9 @@
 @interface TAVPlaybackState : NSObject
 // AVPlayer semantics: 0 = paused, 1 = waiting to play, 2 = playing.
 @property (nonatomic, readonly) long long timeControlStatus;
+// Both are CMTime: the runtime reports {int64, int32, uint32, int64}.
+@property (nonatomic, readonly) CMTime currentTime;
+@property (nonatomic, readonly) CMTime duration;
 @end
 
 @interface TAVPlayer : NSObject
