@@ -1289,6 +1289,21 @@ static void NFBReadingCaptureAnchor(TFNItemsDataViewController* dataViewControll
     if (!top.length) {
         return;
     }
+    // A controller that has no anchor yet is either brand new or just
+    // relaunched. Claiming the top of the list as its position would bury the
+    // one that is already on disk, so the stored position is looked for first,
+    // and a list too small to hold it is given time to fill.
+    if (!objc_getAssociatedObject(dataViewController, kNFBReadingAnchorIDKey)) {
+        if (NFBReadingStoreRestore(dataViewController)) {
+            return;
+        }
+        NSArray* stored =
+            [[NSUserDefaults standardUserDefaults] arrayForKey:kNFBReadingStoreKey];
+        if ([stored isKindOfClass:[NSArray class]] && stored.count &&
+            NFBReadingItemCount(dataViewController.sections) < 10) {
+            return;
+        }
+    }
     NSString* listHead = NFBReadingFirstEntryID(dataViewController.sections);
     NSString* storedHead =
         objc_getAssociatedObject(dataViewController, kNFBReadingTopAtCaptureKey);
