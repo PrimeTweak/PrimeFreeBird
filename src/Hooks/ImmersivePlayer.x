@@ -125,10 +125,10 @@ static BOOL isImmersiveCardPan(id viewController,
 
 // MARK: - Tap to pause
 //
-// A single tap on an immersive video toggles playback instead of only
-// revealing the controls. The player is not exposed, so it is read from the
-// page view's ivar. Note the trade-off Orion documents: with this on, the
-// video controls cannot be hidden — a Twitter limitation.
+// A single tap on an immersive video toggles playback on top of its native
+// effect. The player is not exposed, so it is read from the page view's ivar.
+// The native handler runs last: it owns showing and hiding the controls, and
+// running it after the playback change lets it decide with the new state.
 
 static TAVPlayer* nfbImmersivePagePlayer(UIView* pageView) {
     Ivar playerIvar = class_getInstanceVariable([pageView class], "player");
@@ -171,6 +171,7 @@ static void nfbTogglePlayback(TAVPlayer* player) {
     BOOL wasPlaying = player.playbackState.timeControlStatus != 0;
     nfbTogglePlayback(player);
     [(_TtC14T1TwitterSwift17ImmersiveCardView*)self setPausedByUser:wasPlaying];
+    %orig;
 }
 
 %end
