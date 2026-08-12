@@ -14,10 +14,9 @@
 // written rather than the tap replayed: the tap handler is not exposed to the
 // Objective-C runtime on this build, so no message can reach it.
 //
-// The flip is applied on the tap that raises the bar, never while the player is
-// opening. The mode is part of the configuration the controls rebuild from, so
-// changing it early pulls the whole bar up in place of the bare progress line
-// the immersive player opens with.
+// The flip is applied as the bar expands, never while the player is opening.
+// The mode is part of the configuration the controls rebuild from, so changing
+// it early pulls the whole bar up in place of the bare progress line.
 
 static const void* kNFBRestoredTimestampKey = &kNFBRestoredTimestampKey;
 
@@ -99,15 +98,25 @@ static BOOL isImmersiveCardPan(id viewController,
 
 // MARK: - Tap to pause
 //
-// A single tap on an immersive video toggles playback. The player is not
-// exposed, so it is read from the page view's ivar. The controls follow the
-// playback state rather than flipping with every tap: paused shows them,
-// playing hides them. The native handler is what moves them, so it runs only
-// when the state it would produce is the one wanted. A glyph marks the pause
-// at the centre of the card, where the app draws none of its own.
+// A single tap on an immersive video toggles playback, and the bar follows the
+// playback state: paused shows the full controls, playing keeps the bare
+// progress line. The bar itself never hides — it switches between a minimal and
+// an expanded configuration (ImmersiveDisplayMode) held in Swift state that
+// cannot be read from here, so its position is mirrored instead: the bar opens
+// expanded, and every pass through the native toggle flips the mirror. The
+// native tap handler is the only lever that moves the bar, so reaching the
+// wanted state means running it when — and only when — the mirror disagrees,
+// and collapsing at open means synthesizing one tap once the card is active.
+// A glyph marks the pause at the centre of the card, where the app draws none
+// of its own.
 
 static const void* kNFBPausedGlyphKey = &kNFBPausedGlyphKey;
+static const void* kNFBBarExpandedKey = &kNFBBarExpandedKey;
 static const CGFloat kNFBPausedGlyphSize = 72.0;
+
+// Marks a toggle synthesized by the tweak: playback is left alone, only the
+// bar moves.
+static BOOL gNFBSyntheticToggle = NO;
 
 static TAVPlayer* nfbImmersivePagePlayer(UIView* pageView) {
     Ivar playerIvar = class_getInstanceVariable([pageView class], "player");
@@ -144,8 +153,27 @@ static UIView* nfbImmersiveControlsView(UIView* card) {
     return controls;
 }
 
-static BOOL nfbControlsAreVisible(UIView* controls) {
-    return controls && !controls.hidden && controls.alpha > 0.5;
+// The mirror of the bar's configuration. A bar that has never been seen is
+// expanded — that is how Twitter builds it.
+static BOOL nfbBarExpanded(UIView* controls) {
+    NSNumber* noted = objc_getAssociatedObject(controls, kNFBBarExpandedKey);
+    return noted ? noted.boolValue : YES;
+}
+
+// Called right before every pass through the native toggle, wherever it is
+// triggered from, so the mirror never misses one. Expansion rebuilds the bar's
+// configuration, and the timestamp byte is flipped first so that same rebuild
+// picks it up.
+static void nfbBarWillToggle(UIView* controls) {
+    if (!controls) {
+        return;
+    }
+    BOOL expanded = !nfbBarExpanded(controls);
+    objc_setAssociatedObject(controls, kNFBBarExpandedKey, @(expanded),
+                             OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    if (expanded) {
+        nfbRestoreTimestamp(controls);
+    }
 }
 
 // Built once per card and kept as an associated object. Touches pass through
@@ -205,16 +233,17 @@ static void nfbShowPausedGlyph(UIView* card, BOOL paused) {
 %hook _TtC14T1TwitterSwift17ImmersiveCardView
 
 - (void)handleSingleTap:(UITapGestureRecognizer*)tap {
-    // Raising the bar is the moment the timestamp becomes visible, and it
-    // happens on this tap whether or not playback is being toggled with it.
-    nfbRestoreTimestamp(nfbImmersiveControlsView((UIView*)self));
+    UIView* card = (UIView*)self;
+    UIView* controls = nfbImmersiveControlsView(card);
 
-    if (![BHTSettings boolForKey:@"tap_to_pause"]) {
+    // A synthesized tap only moves the bar; a tap with the option off keeps the
+    // native behavior. The mirror follows the toggle in both cases.
+    if (gNFBSyntheticToggle || ![BHTSettings boolForKey:@"tap_to_pause"]) {
+        nfbBarWillToggle(controls);
         %orig;
         return;
     }
 
-    UIView* card = (UIView*)self;
     __block UIView* pageView = nil;
     EnumerateSubviewsRecursively(card, ^(UIView* view) {
         if (!pageView &&
@@ -225,6 +254,7 @@ static void nfbShowPausedGlyph(UIView* card, BOOL paused) {
 
     TAVPlayer* player = pageView ? nfbImmersivePagePlayer(pageView) : nil;
     if (!player) {
+        nfbBarWillToggle(controls);
         %orig;
         return;
     }
@@ -233,15 +263,54 @@ static void nfbShowPausedGlyph(UIView* card, BOOL paused) {
     nfbTogglePlayback(player);
     [(_TtC14T1TwitterSwift17ImmersiveCardView*)self setPausedByUser:wasPlaying];
 
-    // The controls belong up while paused and down while playing. The native
-    // handler only flips them, so it is called when — and only when — the flip
-    // lands on the wanted state. With no controls mounted, it keeps its say.
-    UIView* controls = nfbImmersiveControlsView(card);
+    // The bar belongs expanded while paused and minimal while playing. The
+    // toggle runs only when the mirror disagrees with that.
     BOOL paused = wasPlaying;
-    if (!controls || nfbControlsAreVisible(controls) != paused) {
+    if (controls && nfbBarExpanded(controls) != paused) {
+        nfbBarWillToggle(controls);
         %orig;
     }
     nfbShowPausedGlyph(card, paused);
+}
+
+// Fires when this card becomes the one playing — the first video and every
+// swipe to the next. Playback starts here, so the bar belongs minimal: if the
+// mirror says expanded, one tap is synthesized through the card's own
+// recognizer once the bar has had a beat to mount. The recognizer is required:
+// the native handler may read it, and a bar left expanded is better than a
+// crash.
+- (void)didBecomeActiveAutoplayableWithManager:(id)manager {
+    %orig;
+    UIView* card = (UIView*)self;
+    nfbShowPausedGlyph(card, NO);
+    if (![BHTSettings boolForKey:@"tap_to_pause"]) {
+        return;
+    }
+    dispatch_after(
+        dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.12 * NSEC_PER_SEC)),
+        dispatch_get_main_queue(), ^{
+            if (!card.window) {
+                return;
+            }
+            UIView* controls = nfbImmersiveControlsView(card);
+            if (!controls || !nfbBarExpanded(controls)) {
+                return;
+            }
+            Ivar recognizerIvar = class_getInstanceVariable(
+                object_getClass(card), "singleTapRecognizer");
+            id recognizer =
+                recognizerIvar ? object_getIvar(card, recognizerIvar) : nil;
+            if (!recognizer) {
+                return;
+            }
+            gNFBSyntheticToggle = YES;
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Warc-performSelector-leaks"
+            [card performSelector:@selector(handleSingleTap:)
+                       withObject:recognizer];
+#pragma clang diagnostic pop
+            gNFBSyntheticToggle = NO;
+        });
 }
 
 // A recycled card carries its glyph into the next video; playback there starts
