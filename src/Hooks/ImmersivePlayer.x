@@ -123,65 +123,12 @@ static BOOL isImmersiveCardPan(id viewController,
 
 static const void* kNFBPausedGlyphKey = &kNFBPausedGlyphKey;
 static const void* kNFBReconcilePendingKey = &kNFBReconcilePendingKey;
+static const void* kNFBMinimalClockKey = &kNFBMinimalClockKey;
 static const CGFloat kNFBPausedGlyphSize = 72.0;
 
 // Marks a toggle synthesized by the tweak: playback is left alone, only the
 // bar moves.
 static BOOL gNFBSyntheticToggle = NO;
-
-// Temporary instrumentation: a small on-screen readout of every decision this
-// section takes, so a screenshot carries the ground truth out.
-static NSMutableArray<NSString*>* gNFBImmersiveDiagLines = nil;
-
-static void nfbImmersiveDiagShow(UIView* anchor, NSString* line) {
-    if (!gNFBImmersiveDiagLines) {
-        gNFBImmersiveDiagLines = [NSMutableArray array];
-    }
-    [gNFBImmersiveDiagLines addObject:line];
-    while (gNFBImmersiveDiagLines.count > 7) {
-        [gNFBImmersiveDiagLines removeObjectAtIndex:0];
-    }
-    UIWindow* window = anchor.window;
-    if (!window) {
-        return;
-    }
-    static const void* kNFBDiagHudKey = &kNFBDiagHudKey;
-    UILabel* hud = objc_getAssociatedObject(window, kNFBDiagHudKey);
-    if (!hud) {
-        hud = [[UILabel alloc] init];
-        hud.numberOfLines = 0;
-        hud.font = [UIFont monospacedSystemFontOfSize:10 weight:UIFontWeightMedium];
-        hud.textColor = [UIColor whiteColor];
-        hud.backgroundColor = [UIColor colorWithWhite:0 alpha:0.65];
-        hud.layer.cornerRadius = 6;
-        hud.clipsToBounds = YES;
-        hud.userInteractionEnabled = NO;
-        objc_setAssociatedObject(window, kNFBDiagHudKey, hud,
-                                 OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-    }
-    if (hud.superview != window) {
-        [window addSubview:hud];
-    }
-    hud.text = [gNFBImmersiveDiagLines componentsJoinedByString:@"\n"];
-    CGSize fit = [hud sizeThatFits:CGSizeMake(280, 400)];
-    hud.frame = CGRectMake(12, 64, fit.width + 12, fit.height + 8);
-    [window bringSubviewToFront:hud];
-}
-
-static NSString* nfbDiagControls(UIView* controls) {
-    if (!controls) {
-        return @"c=\u2014";
-    }
-    return [NSString stringWithFormat:@"c=%.0fx%.0f a=%.1f",
-                                      controls.bounds.size.width,
-                                      controls.bounds.size.height, controls.alpha];
-}
-
-
-static TAVPlayer* nfbImmersivePagePlayer(UIView* pageView) {
-    Ivar playerIvar = class_getInstanceVariable([pageView class], "player");
-    return playerIvar ? object_getIvar(pageView, playerIvar) : nil;
-}
 
 // timeControlStatus follows AVPlayer: 0 paused, 1 waiting to play, 2 playing.
 static void nfbTogglePlayback(TAVPlayer* player) {
@@ -267,6 +214,93 @@ static void nfbShowPausedGlyph(UIView* card, BOOL paused) {
     glyph.hidden = !paused;
 }
 
+// MARK: - Timestamp beside the progress line
+//
+// The controls view is unmounted while only the progress line shows, and the
+// line itself carries no label — it is a bare set of layers. The elapsed and
+// total times are therefore drawn here, in a label of the tweak's own, placed
+// above the line and following the same option as the one in the full bar.
+
+static NSString* nfbClockText(CMTime time) {
+    CGFloat seconds = CMTIME_IS_NUMERIC(time) ? CMTimeGetSeconds(time) : 0.0;
+    if (seconds < 0 || !isfinite(seconds)) {
+        seconds = 0.0;
+    }
+    NSInteger total = (NSInteger)seconds;
+    NSInteger hours = total / 3600;
+    if (hours > 0) {
+        return [NSString stringWithFormat:@"%ld:%02ld:%02ld", (long)hours,
+                                          (long)((total / 60) % 60), (long)(total % 60)];
+    }
+    return [NSString stringWithFormat:@"%ld:%02ld", (long)(total / 60),
+                                      (long)(total % 60)];
+}
+
+// The bare progress line: the view that stays on screen once the controls are
+// gone, and the anchor the label is placed against.
+static UIView* nfbProgressLineView(UIView* card) {
+    Class lineClass =
+        NSClassFromString(@"_TtC14T1TwitterSwift26ImmersiveVideoTimelineView");
+    if (!lineClass) {
+        return nil;
+    }
+    __block UIView* line = nil;
+    EnumerateSubviewsRecursively(card, ^(UIView* view) {
+        if (!line && [view isKindOfClass:lineClass]) {
+            line = view;
+        }
+    });
+    return line;
+}
+
+static UILabel* nfbMinimalClock(UIView* card) {
+    UILabel* clock = objc_getAssociatedObject(card, kNFBMinimalClockKey);
+    if (clock) {
+        return clock;
+    }
+    clock = [[UILabel alloc] init];
+    clock.userInteractionEnabled = NO;
+    clock.textColor = [UIColor whiteColor];
+    clock.font = [UIFont monospacedDigitSystemFontOfSize:13
+                                                  weight:UIFontWeightSemibold];
+    clock.layer.shadowColor = [UIColor blackColor].CGColor;
+    clock.layer.shadowOpacity = 0.45;
+    clock.layer.shadowRadius = 3.0;
+    clock.layer.shadowOffset = CGSizeZero;
+    objc_setAssociatedObject(card, kNFBMinimalClockKey, clock,
+                             OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    return clock;
+}
+
+// Drawn only while the bar is away: the full bar carries a label of its own.
+static void nfbUpdateMinimalClock(UIView* card, TAVPlayer* player) {
+    UILabel* existing = objc_getAssociatedObject(card, kNFBMinimalClockKey);
+    if (![BHTSettings boolForKey:@"restore_video_timestamp"] || !player ||
+        nfbImmersiveControlsView(card) != nil) {
+        existing.hidden = YES;
+        return;
+    }
+    UIView* line = nfbProgressLineView(card);
+    if (!line || !line.window) {
+        existing.hidden = YES;
+        return;
+    }
+    TAVPlaybackState* state = player.playbackState;
+    UILabel* clock = nfbMinimalClock(card);
+    clock.text = [NSString stringWithFormat:@"%@ / %@", nfbClockText(state.currentTime),
+                                            nfbClockText(state.duration)];
+    [clock sizeToFit];
+    if (clock.superview != card) {
+        [card addSubview:clock];
+    }
+    CGRect anchor = [line convertRect:line.bounds toView:card];
+    clock.frame = CGRectMake(CGRectGetMinX(anchor),
+                             CGRectGetMinY(anchor) - CGRectGetHeight(clock.bounds) - 8.0,
+                             CGRectGetWidth(clock.bounds), CGRectGetHeight(clock.bounds));
+    clock.hidden = NO;
+    [card bringSubviewToFront:clock];
+}
+
 %hook _TtC14T1TwitterSwift17ImmersiveCardView
 
 - (void)handleSingleTap:(UITapGestureRecognizer*)tap {
@@ -276,10 +310,6 @@ static void nfbShowPausedGlyph(UIView* card, BOOL paused) {
     // A synthesized tap only moves the bar; a tap with the option off keeps the
     // native behavior. The mirror follows the toggle in both cases.
     if (gNFBSyntheticToggle || ![BHTSettings boolForKey:@"tap_to_pause"]) {
-        nfbImmersiveDiagShow(
-            card, [NSString stringWithFormat:@"%@ %@",
-                                             gNFBSyntheticToggle ? @"syn" : @"off",
-                                             nfbDiagControls(controls)]);
         %orig;
         return;
     }
@@ -294,8 +324,6 @@ static void nfbShowPausedGlyph(UIView* card, BOOL paused) {
 
     TAVPlayer* player = pageView ? nfbImmersivePagePlayer(pageView) : nil;
     if (!player) {
-        nfbImmersiveDiagShow(card, [NSString stringWithFormat:@"nop %@",
-                                                             nfbDiagControls(controls)]);
         %orig;
         return;
     }
@@ -308,15 +336,11 @@ static void nfbShowPausedGlyph(UIView* card, BOOL paused) {
     BOOL paused = wasPlaying;
     BOOL expanded = (controls != nil);
     BOOL runsToggle = (expanded != paused);
-    nfbImmersiveDiagShow(
-        card, [NSString stringWithFormat:@"tap %@ exp=%@ p=%@ orig=%@",
-                                         nfbDiagControls(controls),
-                                         expanded ? @"Y" : @"N", paused ? @"P" : @"J",
-                                         runsToggle ? @"Y" : @"N"]);
     if (runsToggle) {
         %orig;
     }
     nfbShowPausedGlyph(card, paused);
+    nfbUpdateMinimalClock(card, player);
 }
 
 // A recycled card carries its glyph into the next video; playback there starts
@@ -337,16 +361,20 @@ static void nfbShowPausedGlyph(UIView* card, BOOL paused) {
 
 - (void)player:(id)player didUpdatePlaybackState:(id)playbackState {
     %orig;
+    UIView* page = (UIView*)self;
+    Class hostClass =
+        NSClassFromString(@"_TtC14T1TwitterSwift17ImmersiveCardView");
+    UIView* host = hostClass ? page.superview : nil;
+    while (host && ![host isKindOfClass:hostClass]) {
+        host = host.superview;
+    }
+    if (host) {
+        nfbUpdateMinimalClock(host, nfbImmersivePagePlayer(page));
+    }
     if (![BHTSettings boolForKey:@"tap_to_pause"]) {
         return;
     }
-    UIView* page = (UIView*)self;
-    Class cardClass =
-        NSClassFromString(@"_TtC14T1TwitterSwift17ImmersiveCardView");
-    UIView* card = cardClass ? page.superview : nil;
-    while (card && ![card isKindOfClass:cardClass]) {
-        card = card.superview;
-    }
+    UIView* card = host;
     if (!card ||
         [objc_getAssociatedObject(card, kNFBReconcilePendingKey) boolValue]) {
         return;
@@ -377,13 +405,8 @@ static void nfbShowPausedGlyph(UIView* card, BOOL paused) {
             id recognizer =
                 recognizerIvar ? object_getIvar(card, recognizerIvar) : nil;
             if (!recognizer) {
-                nfbImmersiveDiagShow(card, @"rec skip norec");
                 return;
             }
-            nfbImmersiveDiagShow(
-                card, [NSString stringWithFormat:@"rec p=%@ exp=%@ syn",
-                                                 paused ? @"P" : @"J",
-                                                 expanded ? @"Y" : @"N"]);
             gNFBSyntheticToggle = YES;
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Warc-performSelector-leaks"
