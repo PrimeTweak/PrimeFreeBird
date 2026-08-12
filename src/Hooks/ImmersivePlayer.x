@@ -152,6 +152,12 @@ static const void* kNFBPausedGlyphKey = &kNFBPausedGlyphKey;
 static const void* kNFBReconcilePendingKey = &kNFBReconcilePendingKey;
 static const void* kNFBMinimalBarKey = &kNFBMinimalBarKey;
 static const void* kNFBMinimalTimerKey = &kNFBMinimalTimerKey;
+static const void* kNFBCardShownAtKey = &kNFBCardShownAtKey;
+// The app cross-fades the timeline into the immersive player, and the timeline
+// carries its own control bar out of the frame. This bar waits for that to
+// finish rather than joining it: two sets of times on screen at once read as a
+// glitch, however brief.
+static const NSTimeInterval kNFBOpeningSettle = 0.22;
 static const NSInteger kNFBMinimalTrackTag = 90211;
 static const NSInteger kNFBMinimalFillTag = 90212;
 static const NSInteger kNFBMinimalClockTag = 90213;
@@ -357,6 +363,27 @@ static void nfbStopMinimalTimer(UIView* card) {
 // the app's own bar comes back or the card leaves the screen.
 static void nfbUpdateMinimalBar(UIView* card, TAVPlayer* player) {
     UIView* existing = objc_getAssociatedObject(card, kNFBMinimalBarKey);
+
+    // Still crossing over from the timeline: stay down, and come back when the
+    // crossing is done.
+    NSTimeInterval shownAt =
+        [objc_getAssociatedObject(card, kNFBCardShownAtKey) doubleValue];
+    NSTimeInterval since = [NSDate timeIntervalSinceReferenceDate] - shownAt;
+    if (shownAt > 0 && since < kNFBOpeningSettle) {
+        existing.hidden = YES;
+        __weak UIView* weakCard = card;
+        dispatch_after(
+            dispatch_time(DISPATCH_TIME_NOW,
+                          (int64_t)((kNFBOpeningSettle - since) * NSEC_PER_SEC)),
+            dispatch_get_main_queue(), ^{
+              UIView* strongCard = weakCard;
+              if (strongCard) {
+                  nfbUpdateMinimalBar(strongCard, nfbCardPlayer(strongCard));
+              }
+            });
+        return;
+    }
+
     BOOL wanted = card.window && player &&
                   [BHTSettings boolForKey:@"tap_to_pause"] &&
                   nfbImmersiveControlsView(card) == nil;
@@ -586,6 +613,10 @@ static void nfbStartFoldWatch(UIView* card) {
     nfbShowPausedGlyph(card, NO);
     if (card.window) {
         gNFBActiveCard = card;
+        objc_setAssociatedObject(
+            card, kNFBCardShownAtKey,
+            @([NSDate timeIntervalSinceReferenceDate]),
+            OBJC_ASSOCIATION_RETAIN_NONATOMIC);
         nfbStartFoldWatch(card);
     } else {
         if (gNFBActiveCard == card) {
