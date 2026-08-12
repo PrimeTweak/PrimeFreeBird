@@ -993,22 +993,17 @@ static NSSet<NSNumber*>* ConversationAuthorRepliedToUserIDs(NSArray* sections,
 
 // MARK: - Reading marker
 //
-// Marks the boundary of what has already been seen when new Tweets arrive
-// above it — an accent wash over that Tweet's header, fading out before the
-// media. The anchor is the list's own first Tweet at the moment of capture,
-// taken when the screen is left, when the app backgrounds, and just before a
-// delivery that puts new content on top; everything that lands above it is
-// new, so the wash falls on the first Tweet under the arriving batch. With
-// nothing above the anchor there is nothing to say, and nothing is drawn. The
-// anchor is recaptured only when the list's head is about to change: what sits
-// on top now becomes the first Tweet under the arriving batch. Every other
-// delivery — a refresh that brings nothing, a relaunch, a tab switch — leaves
-// the boundary where it is.
-// Chronological tabs (Following, Lists) keep their
-// anchor through refreshes, so the marker lives there; a tab that discards
-// its anchor on a large list is algorithmic, and the marker retires on it for
-// the session rather than lying. Tabs whose controllers name themselves
-// "ForYou" never get a marker at all.
+// Marks the boundary of what has already been seen — an accent wash over the
+// first Tweet under an arriving batch, fading out before the media. The anchor
+// is the list's first Tweet at the moment of capture, and it is recaptured only
+// when incoming data carries a different head: what sits on top now is what the
+// batch lands above. Every other delivery — a refresh that brings nothing, a
+// relaunch, a tab switch, leaving the screen — keeps the boundary where it is.
+// With nothing above the anchor there is nothing to mark, and nothing is drawn.
+// Chronological tabs (Following, Lists) keep their anchor through refreshes, so
+// the marker lives there; a tab that discards its anchor on a large list is
+// algorithmic, and the marker retires on it for the session rather than lying.
+// Tabs whose controllers name themselves "ForYou" never get a marker at all.
 
 static const void* kNFBReadingAnchorIDKey = &kNFBReadingAnchorIDKey;
 static const void* kNFBReadingAnchorPathKey = &kNFBReadingAnchorPathKey;
@@ -1026,8 +1021,6 @@ static const CGFloat kNFBReadingMarkerAlpha = 0.18;
 static const CGFloat kNFBReadingFadeSolid = 34.0;
 static const CGFloat kNFBReadingFadeReach = 110.0;
 static NSHashTable* gNFBReadingControllers = nil;
-// Temporary instrumentation: the geometry the last placement resolved.
-static NSString* gNFBReadingPlacement = nil;
 
 // A list scroll view is one that can name its visible index paths.
 static BOOL NFBViewIsList(UIView* view) {
@@ -1302,11 +1295,11 @@ static void NFBReadingCaptureAnchor(TFNItemsDataViewController* dataViewControll
     if (!NFBReadingTopVisibleEntryID(dataViewController).length) {
         return;
     }
-    // A controller that has no anchor yet is either brand new or just
-    // relaunched. Claiming the head of the list as its boundary would bury the
-    // one that is already on disk, so the stored position is looked for first,
-    // and a list too small to hold it is given time to fill. With nothing
-    // stored, the head becomes the first boundary.
+    // A controller with no anchor yet is either brand new or just relaunched.
+    // Claiming the head as its boundary would bury the one already on disk, so
+    // the stored anchors are tried first, and a list too small to hold one is
+    // given time to fill. With nothing stored, the head becomes the first
+    // boundary.
     if (!objc_getAssociatedObject(dataViewController, kNFBReadingAnchorIDKey)) {
         if (NFBReadingStoreRestore(dataViewController)) {
             return;
@@ -1323,9 +1316,8 @@ static void NFBReadingCaptureAnchor(TFNItemsDataViewController* dataViewControll
             NFBReadingFirstEntryID(dataViewController.sections);
         if (!incomingHead.length || !currentHead.length ||
             [incomingHead isEqualToString:currentHead]) {
-            // Nothing is arriving above: the boundary is left alone, but it is
-            // written out as it is, otherwise it is the one state that never
-            // reaches disk.
+            // Nothing arrives above: the boundary stays, and is written out
+            // as it is.
             NSString* held =
                 objc_getAssociatedObject(dataViewController, kNFBReadingAnchorIDKey);
             NFBReadingStoreRemember(
@@ -1358,7 +1350,6 @@ static void NFBReadingPlaceMarker(UIScrollView* table, UIView* marker,
                                   NSIndexPath* path) {
     CGRect rowRect;
     if (!NFBListCellFrame(table, path, &rowRect)) {
-        gNFBReadingPlacement = @"no rect";
         marker.hidden = YES;
         return;
     }
@@ -1367,9 +1358,6 @@ static void NFBReadingPlaceMarker(UIScrollView* table, UIView* marker,
     CGFloat reach = MIN(CGRectGetHeight(rowRect), kNFBReadingFadeReach);
     marker.frame = CGRectMake(CGRectGetMinX(rowRect), CGRectGetMinY(rowRect),
                               CGRectGetWidth(rowRect), reach);
-    gNFBReadingPlacement =
-        [NSString stringWithFormat:@"%.0f×%.0f@%.0f", CGRectGetWidth(rowRect),
-                                   reach, CGRectGetMinY(rowRect)];
     CAGradientLayer* fade =
         (CAGradientLayer*)marker.layer.sublayers.firstObject;
     if (![fade isKindOfClass:[CAGradientLayer class]]) {
@@ -1400,90 +1388,9 @@ static void NFBReadingPlaceMarker(UIScrollView* table, UIView* marker,
 // space, so the placed wash scrolls with the feed; only data changes move it.
 // It sits above the cell at low alpha — beneath it, the opaque cell would
 // hide it entirely.
-// Temporary instrumentation: records where the last positioning pass ended and
-// the three identifiers the decision rests on. Removed once the answer is in.
-static NSString* NFBReadingShortID(NSString* identifier) {
-    if (!identifier.length) {
-        return @"—";
-    }
-    return identifier.length > 8
-               ? [identifier substringFromIndex:identifier.length - 8]
-               : identifier;
-}
-
-// The item's position counted across sections, or -1 when it is absent.
-static NSInteger NFBReadingItemIndexForEntryID(
-    TFNItemsDataViewController* dataViewController, NSString* target) {
-    if (!target.length) {
-        return -1;
-    }
-    NSInteger index = 0;
-    for (id section in dataViewController.sections) {
-        if (![section isKindOfClass:[NSArray class]]) {
-            continue;
-        }
-        for (id item in (NSArray*)section) {
-            if ([target isEqualToString:ItemEntryID(item)]) {
-                return index;
-            }
-            index++;
-        }
-    }
-    return -1;
-}
-
-static void NFBReadingNoteDiag(TFNItemsDataViewController* dataViewController,
-                               NSString* stage) {
-    NSUserDefaults* defaults = [NSUserDefaults standardUserDefaults];
-    NSArray* stored = [defaults arrayForKey:kNFBReadingStoreKey];
-    NSString* anchor =
-        objc_getAssociatedObject(dataViewController, kNFBReadingAnchorIDKey);
-    NSString* headThen =
-        objc_getAssociatedObject(dataViewController, kNFBReadingTopAtCaptureKey);
-    // Where the wash sits relative to the reader: its row, the reader's row,
-    // and the distance from the top of the screen to the wash. A dash means
-    // nothing is drawn, which separates "placed far below" from "not placed".
-    UIScrollView* list = NFBListScrollView(dataViewController);
-    UIView* placed = objc_getAssociatedObject(list, kNFBReadingMarkerViewKey);
-    NSString* distance =
-        (placed && !placed.hidden)
-            ? [NSString stringWithFormat:@"%.0f",
-                                         CGRectGetMinY(placed.frame) -
-                                             (list.contentOffset.y +
-                                              list.adjustedContentInset.top)]
-            : @"—";
-    [defaults setObject:[NSString stringWithFormat:
-                            @"%@\nstored %lu · items %lu\nanchor %@\nhead@ %@\n"
-                            @"now %@\nforyou %@ · retired %@\n"
-                            @"line %ld · you %ld · dy %@\nbox %@",
-                            stage,
-                            (unsigned long)([stored isKindOfClass:[NSArray class]]
-                                                ? stored.count
-                                                : 0),
-                            (unsigned long)NFBReadingItemCount(
-                                dataViewController.sections),
-                            NFBReadingShortID(anchor),
-                            NFBReadingShortID(headThen),
-                            NFBReadingShortID(NFBReadingFirstEntryID(
-                                dataViewController.sections)),
-                            NFBReadingLooksLikeForYou(dataViewController) ? @"Y" : @"N",
-                            [objc_getAssociatedObject(dataViewController,
-                                                      kNFBReadingRetiredKey) boolValue]
-                                ? @"Y"
-                                : @"N",
-                            (long)NFBReadingItemIndexForEntryID(dataViewController,
-                                                                anchor),
-                            (long)NFBReadingItemIndexForEntryID(
-                                dataViewController,
-                                NFBReadingTopVisibleEntryID(dataViewController)),
-                            distance, gNFBReadingPlacement ?: @"—"]
-                 forKey:@"nfb_reading_diag"];
-}
-
 static void NFBReadingPositionMarker(TFNItemsDataViewController* dataViewController) {
     UIScrollView* table = NFBListScrollView(dataViewController);
     if (!table) {
-        NFBReadingNoteDiag(dataViewController, @"no list");
         return;
     }
     UIView* marker = objc_getAssociatedObject(table, kNFBReadingMarkerViewKey);
@@ -1541,25 +1448,18 @@ static void NFBReadingPositionMarker(TFNItemsDataViewController* dataViewControl
                                          OBJC_ASSOCIATION_RETAIN_NONATOMIC);
             }
         }
-        NFBReadingNoteDiag(dataViewController,
-                           NFBReadingMarkerAllowed(dataViewController)
-                               ? @"anchor not found"
-                               : @"not allowed");
         marker.hidden = YES;
         return;
     }
     objc_setAssociatedObject(dataViewController, kNFBReadingMissCountKey, nil,
                              OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-    // An anchor that is still the first row has nothing to say: the reader is
-    // where they left off. Anything above it — Tweets that arrived, or a list
-    // the reader has been returned to the top of — gives the marker a purpose.
+    // An anchor that is still the first row has nothing above it to mark.
     NSString* topNow = NFBReadingFirstEntryID(dataViewController.sections);
     if (!topNow.length || [anchor isEqualToString:topNow]) {
-        // The cached path is what the layout tick draws from: an anchor with
-        // nothing to say must leave none behind.
+        // The layout tick draws from the cached path: an anchor with nothing
+        // to mark leaves none behind.
         objc_setAssociatedObject(table, kNFBReadingAnchorPathKey, nil,
                                  OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-        NFBReadingNoteDiag(dataViewController, @"anchor is the first row");
         marker.hidden = YES;
         return;
     }
@@ -1570,7 +1470,6 @@ static void NFBReadingPositionMarker(TFNItemsDataViewController* dataViewControl
                                  OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     }
     NFBReadingPlaceMarker(table, marker, path);
-    NFBReadingNoteDiag(dataViewController, @"shown");
 }
 
 // Row heights settle after the reload, so the scan waits one runloop turn.
@@ -1588,11 +1487,9 @@ static void NFBReadingRescanSoon(TFNItemsDataViewController* dataViewController)
 }
 
 // Self-sizing rows shift their rects as cells realise; the layout tick keeps
-// the wash on its row from the cached index path, without rescanning. The
-// cached path is the authority: a row that had no measurable rect when it was
-// first placed — off screen, unmeasured — is retried here until it has one, so
-// a wash below the fold appears as soon as its Tweet is laid out. No path means
-// nothing to draw.
+// the wash on its row from the cached index path, without rescanning. A row
+// with no measurable rect when it was first placed is retried here until it has
+// one. No cached path means nothing to draw.
 static void NFBReadingLayoutTick(UIScrollView* scrollView) {
     UIView* marker = objc_getAssociatedObject(scrollView, kNFBReadingMarkerViewKey);
     if (!marker) {
