@@ -9,42 +9,33 @@
 
 // The controls view keeps the label's mode in progressLabelMode, a payload-free
 // Swift enum held in a single byte, and Twitter starts it on the countdown.
-// Tapping the label flips that byte, so flipping it here once per controls view
-// has the same effect while leaving later taps free to flip it back. The byte is
+// Tapping the label flips that byte, so flipping it once per controls view has
+// the same effect while leaving later taps free to flip it back. The byte is
 // written rather than the tap replayed: the tap handler is not exposed to the
 // Objective-C runtime on this build, so no message can reach it.
+//
+// The flip is applied on the tap that raises the bar, never while the player is
+// opening. The mode is part of the configuration the controls rebuild from, so
+// changing it early pulls the whole bar up in place of the bare progress line
+// the immersive player opens with.
 
 static const void* kNFBRestoredTimestampKey = &kNFBRestoredTimestampKey;
 
-%hook _TtC14T1TwitterSwift17VideoControlsView
-
-- (void)layoutSubviews {
-    %orig;
-
-    if (![BHTSettings boolForKey:@"restore_video_timestamp"]) {
+static void nfbRestoreTimestamp(UIView* controls) {
+    if (!controls || ![BHTSettings boolForKey:@"restore_video_timestamp"] ||
+        objc_getAssociatedObject(controls, kNFBRestoredTimestampKey)) {
         return;
     }
-    if (objc_getAssociatedObject(self, kNFBRestoredTimestampKey)) {
-        return;
-    }
-    // Logos only forward-declares this Swift class, so everything addressed to
-    // it goes through an id-typed handle rather than the hooked type.
-    id controls = self;
     Ivar modeIvar =
         class_getInstanceVariable(object_getClass(controls), "progressLabelMode");
     if (!modeIvar) {
         return;
     }
-    objc_setAssociatedObject(self, kNFBRestoredTimestampKey, @YES,
+    objc_setAssociatedObject(controls, kNFBRestoredTimestampKey, @YES,
                              OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     uint8_t* mode = (uint8_t*)(__bridge void*)controls + ivar_getOffset(modeIvar);
     *mode = *mode ? 0 : 1;
-    // The mode is read while the controls build themselves, so the change needs
-    // one more pass to reach the label.
-    [controls setNeedsLayout];
 }
-
-%end
 
 // MARK: - Disable video docking
 
@@ -133,15 +124,19 @@ static void nfbTogglePlayback(TAVPlayer* player) {
     }
 }
 
-// The controls bar mounted in this card, or nil while it is not built yet.
+// The bar does not live inside the card — the card only forwards its state to
+// it — so the search starts from the window the card is in. Looking under the
+// card alone finds nothing, and a state that cannot be read is a state that
+// cannot be matched.
 static UIView* nfbImmersiveControlsView(UIView* card) {
     Class controlsClass =
         NSClassFromString(@"_TtC14T1TwitterSwift17VideoControlsView");
     if (!controlsClass) {
         return nil;
     }
+    UIView* root = card.window ?: card;
     __block UIView* controls = nil;
-    EnumerateSubviewsRecursively(card, ^(UIView* view) {
+    EnumerateSubviewsRecursively(root, ^(UIView* view) {
         if (!controls && [view isKindOfClass:controlsClass]) {
             controls = view;
         }
@@ -210,6 +205,10 @@ static void nfbShowPausedGlyph(UIView* card, BOOL paused) {
 %hook _TtC14T1TwitterSwift17ImmersiveCardView
 
 - (void)handleSingleTap:(UITapGestureRecognizer*)tap {
+    // Raising the bar is the moment the timestamp becomes visible, and it
+    // happens on this tap whether or not playback is being toggled with it.
+    nfbRestoreTimestamp(nfbImmersiveControlsView((UIView*)self));
+
     if (![BHTSettings boolForKey:@"tap_to_pause"]) {
         %orig;
         return;
