@@ -65,8 +65,31 @@ static void nfbRestoreTimestamp(UIView* controls) {
 // Polling only ever caught it later.
 - (void)didMoveToWindow {
     %orig;
-    if (!((UIView*)self).window) {
+    UIView* bar = (UIView*)self;
+    if (!bar.window) {
         return;
+    }
+    // Mounting while a card is opening means this is the overlay riding in on
+    // the presentation, not a bar the reader asked for.
+    UIView* card = gNFBActiveCard;
+    NSTimeInterval shownAt =
+        card ? [objc_getAssociatedObject(card, kNFBCardShownAtKey) doubleValue] : 0;
+    NSTimeInterval since = [NSDate timeIntervalSinceReferenceDate] - shownAt;
+    if (shownAt > 0 && since < kNFBBarRevealDelay &&
+        [BHTSettings boolForKey:@"tap_to_pause"]) {
+        bar.alpha = 0.0;
+        // Whatever happens to the fold, the bar is given back: an invisible one
+        // would be worse than a visible flash.
+        __weak UIView* weakBar = bar;
+        dispatch_after(
+            dispatch_time(DISPATCH_TIME_NOW,
+                          (int64_t)((kNFBBarRevealDelay - since) * NSEC_PER_SEC)),
+            dispatch_get_main_queue(), ^{
+              UIView* strongBar = weakBar;
+              if (strongBar) {
+                  strongBar.alpha = 1.0;
+              }
+            });
     }
     dispatch_async(dispatch_get_main_queue(), ^{
       nfbFoldIfDue(gNFBActiveCard);
@@ -163,6 +186,12 @@ static const NSTimeInterval kNFBOpeningSettle = 0.22;
 // length of that transition, and waiting for the first frame of video before
 // folding is what leaves it on screen.
 static const NSTimeInterval kNFBOpeningWindow = 0.9;
+// Measured on screen at 60 frames a second: the app animates its overlay in
+// over about six frames while the timeline is still on its way out, and the
+// fold can only answer once those views exist. The bar is therefore kept clear
+// for the length of that animation — the bar alone, never the card: the card's
+// visibility is what gates autoplay, and dimming it stops playback outright.
+static const NSTimeInterval kNFBBarRevealDelay = 0.45;
 static const NSInteger kNFBMinimalTrackTag = 90211;
 static const NSInteger kNFBMinimalFillTag = 90212;
 static const NSInteger kNFBMinimalClockTag = 90213;
