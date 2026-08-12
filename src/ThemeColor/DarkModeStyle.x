@@ -18,6 +18,9 @@
 //  answered with a matching shade, so sheets, cards and selection states keep
 //  their separation instead of collapsing onto the background.
 //
+//  A surface that carries no color at all — the search pill, drawn as an
+//  image — is handled separately at the end of this file.
+//
 
 #import "ThemeColor/DarkModeStyle.h"
 #import "Core/BHTSettings.h"
@@ -35,6 +38,9 @@
 @interface TFNSolidColorView : UIView
 - (void)setColor:(UIColor*)color;
 - (void)setSolidColor:(UIColor*)color;
+@end
+
+@interface TFNSearchBar : UISearchBar
 @end
 
 @implementation DarkModeStyle
@@ -176,6 +182,17 @@ static UIColor* NFBColorWithRGB(uint32_t rgb) {
     return [self shadeForTier:NFBBackgroundTierElevated style:style];
 }
 
++ (UIColor*)baseBackgroundColor {
+    if (![self isDarkModeActive]) {
+        return nil;
+    }
+    NFBDarkModeStyle style = [self selectedStyle];
+    if (style == NFBDarkModeStyleSystem) {
+        return nil;
+    }
+    return [self shadeForTier:NFBBackgroundTierBase style:style];
+}
+
 + (UIColor*)overrideForBackgroundColor:(UIColor*)color {
     if (![self isDarkModeActive]) {
         return nil;
@@ -243,6 +260,123 @@ static UIColor* NFBReplacement(UIColor* incoming) {
 - (void)setSolidColor:(UIColor*)color {
     UIColor* replacement = NFBReplacement(color);
     %orig(replacement ?: color);
+}
+
+%end
+
+// MARK: - Search pill
+//
+// The search pill on the settings and Explore screens is a stretchable
+// background image owned by UIKit's private image view, not a color any setter
+// carries, so no filter reaches it. It is redrawn here in the elevated shade
+// with round caps that survive the stretch, and rebuilt when the style changes.
+
+static UIImage* NFBSearchPillImage(void) {
+    static UIImage* cached = nil;
+    static NFBDarkModeStyle cachedStyle = NFBDarkModeStyleSystem;
+    UIColor* shade = [DarkModeStyle elevatedBackgroundColor];
+    if (!shade) {
+        return nil;
+    }
+    NFBDarkModeStyle style = [DarkModeStyle selectedStyle];
+    if (cached && cachedStyle == style) {
+        return cached;
+    }
+    const CGFloat diameter = 44.0;
+    UIGraphicsImageRenderer* renderer = [[UIGraphicsImageRenderer alloc]
+        initWithSize:CGSizeMake(diameter, diameter)];
+    UIImage* pill =
+        [renderer imageWithActions:^(UIGraphicsImageRendererContext* context) {
+            [shade setFill];
+            [[UIBezierPath bezierPathWithRoundedRect:CGRectMake(0, 0, diameter, diameter)
+                                        cornerRadius:diameter / 2.0] fill];
+        }];
+    cached = [pill resizableImageWithCapInsets:UIEdgeInsetsMake(diameter / 2.0,
+                                                                diameter / 2.0,
+                                                                diameter / 2.0,
+                                                                diameter / 2.0)
+                                  resizingMode:UIImageResizingModeStretch];
+    cachedStyle = style;
+    return cached;
+}
+
+static void NFBApplySearchPill(UISearchBar* searchBar) {
+    UIImage* pill = NFBSearchPillImage();
+    if (pill) {
+        [searchBar setSearchFieldBackgroundImage:pill forState:UIControlStateNormal];
+    }
+}
+
+// The substitution below belongs to the search field alone: the same UIKit view
+// backs other text fields, and those keep their own image.
+static BOOL NFBIsSearchFieldBackground(UIView* view) {
+    Class searchBarClass = NSClassFromString(@"TFNSearchBar");
+    if (!searchBarClass) {
+        return NO;
+    }
+    for (UIView* ancestor = view.superview; ancestor; ancestor = ancestor.superview) {
+        if ([ancestor isKindOfClass:searchBarClass]) {
+            return YES;
+        }
+    }
+    return NO;
+}
+
+// The bar that carries a search field — settings, Explore — is drawn with a
+// blur, so no color setter reaches it and the filter leaves it in Twitter's own
+// gray beside a recolored page. It is flattened here, from the search field
+// upward: a bar with no search field is never touched.
+static void NFBPaintBarOpaque(UIView* view, UIColor* shade) {
+    if ([view isKindOfClass:[UIVisualEffectView class]]) {
+        ((UIVisualEffectView*)view).effect = nil;
+        view.backgroundColor = shade;
+    } else if ([NSStringFromClass([view class]) containsString:@"BarBackground"]) {
+        view.backgroundColor = shade;
+    }
+    for (UIView* subview in view.subviews) {
+        NFBPaintBarOpaque(subview, shade);
+    }
+}
+
+static void NFBFlattenSearchBarChrome(UIView* searchBar) {
+    UIColor* shade = [DarkModeStyle baseBackgroundColor];
+    if (!shade) {
+        return;
+    }
+    for (UIView* ancestor = searchBar.superview; ancestor;
+         ancestor = ancestor.superview) {
+        if ([ancestor isKindOfClass:[UINavigationBar class]]) {
+            ancestor.backgroundColor = shade;
+            NFBPaintBarOpaque(ancestor, shade);
+            return;
+        }
+    }
+}
+
+%hook TFNSearchBar
+
+- (void)layoutSubviews {
+    %orig;
+    NFBApplySearchPill((UISearchBar*)self);
+    NFBFlattenSearchBarChrome((UIView*)self);
+}
+
+- (void)didMoveToWindow {
+    %orig;
+    NFBApplySearchPill((UISearchBar*)self);
+    NFBFlattenSearchBarChrome((UIView*)self);
+}
+
+%end
+
+// The search bar puts its stock image back after laying out, so the public
+// setter alone does not survive the final pass.
+%hook _UITextFieldImageBackgroundView
+
+- (void)setImage:(UIImage*)image {
+    UIImage* pill =
+        NFBIsSearchFieldBackground((UIView*)self) ? NFBSearchPillImage() : nil;
+    %orig(pill ?: image);
 }
 
 %end

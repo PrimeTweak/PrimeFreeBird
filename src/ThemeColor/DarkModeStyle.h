@@ -32,4 +32,8 @@ typedef NS_ENUM(NSInteger, NFBDarkModeStyle) {
 // the filter can see. Nil when no dark style is active.
 + (UIColor* _Nullable)elevatedBackgroundColor;
 
+// The shade of the base surface, for callers that paint chrome no color setter
+// reaches. Nil when no dark style is active.
++ (UIColor* _Nullable)baseBackgroundColor;
+
 @end
