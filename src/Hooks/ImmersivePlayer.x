@@ -25,6 +25,15 @@ static const void* kNFBRestoredTimestampKey = &kNFBRestoredTimestampKey;
 // the tap section further down, and announced here because the controls view —
 // hooked just below — is what asks for it.
 static __weak UIView* gNFBActiveCard = nil;
+// When a card entered the window. The bar and the fold both read it, and the
+// bar's hook sits at the top of this file, so it is declared here.
+static const void* kNFBCardShownAtKey = &kNFBCardShownAtKey;
+// Measured on screen at 60 frames a second: the app animates its overlay in
+// over about six frames while the timeline is still on its way out, and the
+// fold can only answer once those views exist. The bar is therefore kept clear
+// for the length of that animation — the bar alone, never the card: the card's
+// visibility is what gates autoplay, and dimming it stops playback outright.
+static const NSTimeInterval kNFBBarRevealDelay = 0.45;
 // When the reader last tapped. The player reports its state through an
 // asynchronous machine, so for a moment after a tap it still answers with the
 // old one — long enough for the fold to read "playing" while the bar is coming
@@ -175,7 +184,6 @@ static const void* kNFBPausedGlyphKey = &kNFBPausedGlyphKey;
 static const void* kNFBReconcilePendingKey = &kNFBReconcilePendingKey;
 static const void* kNFBMinimalBarKey = &kNFBMinimalBarKey;
 static const void* kNFBMinimalTimerKey = &kNFBMinimalTimerKey;
-static const void* kNFBCardShownAtKey = &kNFBCardShownAtKey;
 // The app cross-fades the timeline into the immersive player, and the timeline
 // carries its own control bar out of the frame. This bar waits for that to
 // finish rather than joining it: two sets of times on screen at once read as a
@@ -186,12 +194,6 @@ static const NSTimeInterval kNFBOpeningSettle = 0.22;
 // length of that transition, and waiting for the first frame of video before
 // folding is what leaves it on screen.
 static const NSTimeInterval kNFBOpeningWindow = 0.9;
-// Measured on screen at 60 frames a second: the app animates its overlay in
-// over about six frames while the timeline is still on its way out, and the
-// fold can only answer once those views exist. The bar is therefore kept clear
-// for the length of that animation — the bar alone, never the card: the card's
-// visibility is what gates autoplay, and dimming it stops playback outright.
-static const NSTimeInterval kNFBBarRevealDelay = 0.45;
 static const NSInteger kNFBMinimalTrackTag = 90211;
 static const NSInteger kNFBMinimalFillTag = 90212;
 static const NSInteger kNFBMinimalClockTag = 90213;
