@@ -7,11 +7,12 @@
 
 // MARK: - Immersive Player Timestamp
 
-// Twitter hides the elapsed-time label in the immersive player; tapping it is
-// what reveals it. The previous approach forced the label's opacity from the
-// player's Swift state read through raw field offsets — it never put the
-// timestamp on screen on this build. Instead, perform the reveal once per
-// controls view, the first time it lays out, exactly as a user tap would.
+// The controls view keeps the label's mode in progressLabelMode, a payload-free
+// Swift enum held in a single byte, and Twitter starts it on the countdown.
+// Tapping the label flips that byte, so flipping it here once per controls view
+// has the same effect while leaving later taps free to flip it back. The byte is
+// written rather than the tap replayed: the tap handler is not exposed to the
+// Objective-C runtime on this build, so no message can reach it.
 
 static const void* kNFBRestoredTimestampKey = &kNFBRestoredTimestampKey;
 
@@ -26,18 +27,17 @@ static const void* kNFBRestoredTimestampKey = &kNFBRestoredTimestampKey;
     if (objc_getAssociatedObject(self, kNFBRestoredTimestampKey)) {
         return;
     }
-    // Logos only forward-declares this Swift class, so messages go through an
-    // id-typed handle rather than the hooked type.
-    id controls = self;
-    if (![controls respondsToSelector:@selector(timestampLabelTapped)]) {
+    Ivar modeIvar = class_getInstanceVariable([self class], "progressLabelMode");
+    if (!modeIvar) {
         return;
     }
     objc_setAssociatedObject(self, kNFBRestoredTimestampKey, @YES,
                              OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Warc-performSelector-leaks"
-    [controls performSelector:@selector(timestampLabelTapped)];
-#pragma clang diagnostic pop
+    uint8_t* mode = (uint8_t*)(__bridge void*)self + ivar_getOffset(modeIvar);
+    *mode = *mode ? 0 : 1;
+    // The mode is read while the controls build themselves, so the change needs
+    // one more pass to reach the label.
+    [self setNeedsLayout];
 }
 
 %end
@@ -82,27 +82,6 @@ static BOOL isImmersiveCardPan(id viewController,
 }
 
 %hook T1ImmersiveViewController
-
-- (BOOL)gestureRecognizerShouldBegin:(UIGestureRecognizer*)gesture {
-    if ([BHTSettings boolForKey:@"disable_immersive_scroll"] &&
-        isImmersiveCardPan(self, gesture)) {
-        return NO;
-    }
-
-    return %orig;
-}
-
-- (BOOL)isCurrentCardDockEligible {
-    if ([BHTSettings boolForKey:@"disable_video_docking"]) {
-        return NO;
-    }
-
-    return %orig;
-}
-
-%end
-
-%hook T1ImmersiveViewControllerV2
 
 - (BOOL)gestureRecognizerShouldBegin:(UIGestureRecognizer*)gesture {
     if ([BHTSettings boolForKey:@"disable_immersive_scroll"] &&
