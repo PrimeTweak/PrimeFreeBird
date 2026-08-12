@@ -394,27 +394,6 @@ extern NSInteger NFBColorThemeScreenVisible;
 
 // MARK: - Settings backup
 
-- (void)showReadingDiag:(NSDictionary*)sender {
-    NSUserDefaults* defaults = [NSUserDefaults standardUserDefaults];
-    UIAlertController* alert = [UIAlertController
-        alertControllerWithTitle:@"Reading marker"
-                         message:[defaults stringForKey:@"nfb_reading_diag"]
-                                     ?: @"(no data)"
-                  preferredStyle:UIAlertControllerStyleAlert];
-    [alert addAction:[UIAlertAction actionWithTitle:@"Reset"
-                                              style:UIAlertActionStyleDestructive
-                                            handler:^(UIAlertAction* action) {
-        [defaults removeObjectForKey:@"nfb_reading_diag"];
-        [defaults removeObjectForKey:@"nfb_reading_anchors"];
-    }]];
-    [alert addAction:[UIAlertAction
-                         actionWithTitle:[[BHTBundle sharedBundle]
-                                             localizedStringForKey:@"OK_ACTION"]
-                                   style:UIAlertActionStyleDefault
-                                 handler:nil]];
-    [self presentViewController:alert animated:YES completion:nil];
-}
-
 - (void)showExportSettings:(NSDictionary*)sender {
     NSData* data = [BHTSettingsBackup exportData];
     if (!data) {
