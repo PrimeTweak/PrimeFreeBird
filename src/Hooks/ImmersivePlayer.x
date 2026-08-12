@@ -20,6 +20,13 @@
 
 static const void* kNFBRestoredTimestampKey = &kNFBRestoredTimestampKey;
 
+// The card on screen, so the bar can reach it the moment it mounts. Weak: a
+// card that goes away leaves nothing behind. The fold itself is defined with
+// the tap section further down, and announced here because the controls view —
+// hooked just below — is what asks for it.
+static __weak UIView* gNFBActiveCard = nil;
+static BOOL nfbFoldIfDue(UIView* card);
+
 static void nfbRestoreTimestamp(UIView* controls) {
     if (!controls || ![BHTSettings boolForKey:@"restore_video_timestamp"] ||
         objc_getAssociatedObject(controls, kNFBRestoredTimestampKey)) {
@@ -44,6 +51,19 @@ static void nfbRestoreTimestamp(UIView* controls) {
 - (void)layoutSubviews {
     %orig;
     nfbRestoreTimestamp((UIView*)self);
+}
+
+// The bar announcing its own arrival is the earliest the fold can possibly be
+// asked for — one turn of the run loop, before the frame that would show it.
+// Polling only ever caught it later.
+- (void)didMoveToWindow {
+    %orig;
+    if (!((UIView*)self).window) {
+        return;
+    }
+    dispatch_async(dispatch_get_main_queue(), ^{
+      nfbFoldIfDue(gNFBActiveCard);
+    });
 }
 
 %end
@@ -439,37 +459,28 @@ static void nfbUpdateMinimalBar(UIView* card, TAVPlayer* player) {
 static const NSTimeInterval kNFBFoldTick = 0.03;
 static const NSInteger kNFBFoldAttempts = 24;
 
-static void nfbFoldWhenReady(UIView* card, NSInteger attemptsLeft) {
-    if (attemptsLeft <= 0 || !card.window) {
-        objc_setAssociatedObject(card, kNFBReconcilePendingKey, nil,
-                                 OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-        return;
+// Folds when the bar and the playback state disagree. Returns NO while the
+// answer is still to come — the video not yet playing, or the bar not yet
+// mounted — which is the signal to look again.
+static BOOL nfbFoldIfDue(UIView* card) {
+    if (!card || !card.window || ![BHTSettings boolForKey:@"tap_to_pause"]) {
+        return YES;
     }
     TAVPlayer* player = nfbCardPlayer(card);
     NSInteger status = player.playbackState.timeControlStatus;
-    BOOL paused = (status == 0);
-    BOOL expanded = (nfbImmersiveControlsView(card) != nil);
     // 1 is waiting to play: not a state worth matching the bar to.
-    BOOL settled = player && status != 1 && expanded != paused;
-    if (!settled) {
-        __weak UIView* weakCard = card;
-        dispatch_after(dispatch_time(DISPATCH_TIME_NOW,
-                                     (int64_t)(kNFBFoldTick * NSEC_PER_SEC)),
-                       dispatch_get_main_queue(), ^{
-                         UIView* strongCard = weakCard;
-                         if (strongCard) {
-                             nfbFoldWhenReady(strongCard, attemptsLeft - 1);
-                         }
-                       });
-        return;
+    if (!player || status == 1) {
+        return NO;
     }
-    objc_setAssociatedObject(card, kNFBReconcilePendingKey, nil,
-                             OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    BOOL paused = (status == 0);
+    if ((nfbImmersiveControlsView(card) != nil) == paused) {
+        return NO;
+    }
     Ivar recognizerIvar =
         class_getInstanceVariable(object_getClass(card), "singleTapRecognizer");
     id recognizer = recognizerIvar ? object_getIvar(card, recognizerIvar) : nil;
     if (!recognizer) {
-        return;
+        return YES;
     }
     gNFBSyntheticToggle = YES;
 #pragma clang diagnostic push
@@ -477,6 +488,26 @@ static void nfbFoldWhenReady(UIView* card, NSInteger attemptsLeft) {
     [card performSelector:@selector(handleSingleTap:) withObject:recognizer];
 #pragma clang diagnostic pop
     gNFBSyntheticToggle = NO;
+    return YES;
+}
+
+// The safety net behind the mount signal: a card whose bar never announces
+// itself still gets folded, within a fraction of a second.
+static void nfbFoldWhenReady(UIView* card, NSInteger attemptsLeft) {
+    if (attemptsLeft <= 0 || nfbFoldIfDue(card)) {
+        objc_setAssociatedObject(card, kNFBReconcilePendingKey, nil,
+                                 OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        return;
+    }
+    __weak UIView* weakCard = card;
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW,
+                                 (int64_t)(kNFBFoldTick * NSEC_PER_SEC)),
+                   dispatch_get_main_queue(), ^{
+                     UIView* strongCard = weakCard;
+                     if (strongCard) {
+                         nfbFoldWhenReady(strongCard, attemptsLeft - 1);
+                     }
+                   });
 }
 
 // One chain per card at a time, started wherever the card first shows a sign of
@@ -540,10 +571,12 @@ static void nfbStartFoldWatch(UIView* card) {
     UIView* card = (UIView*)self;
     nfbShowPausedGlyph(card, NO);
     if (card.window) {
-        // Earliest sign of life: the watch starts here so the fold lands on the
-        // first tick the bar exists, not a fifth of a second later.
+        gNFBActiveCard = card;
         nfbStartFoldWatch(card);
     } else {
+        if (gNFBActiveCard == card) {
+            gNFBActiveCard = nil;
+        }
         nfbStopMinimalTimer(card);
     }
 }
@@ -569,6 +602,7 @@ static void nfbStartFoldWatch(UIView* card) {
     if (host) {
         nfbUpdateMinimalBar(host, nfbImmersivePagePlayer(page));
     }
+    gNFBActiveCard = host;
     nfbStartFoldWatch(host);
 }
 
