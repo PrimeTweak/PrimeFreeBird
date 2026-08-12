@@ -25,6 +25,13 @@ static const void* kNFBRestoredTimestampKey = &kNFBRestoredTimestampKey;
 // the tap section further down, and announced here because the controls view —
 // hooked just below — is what asks for it.
 static __weak UIView* gNFBActiveCard = nil;
+// When the reader last tapped. The player reports its state through an
+// asynchronous machine, so for a moment after a tap it still answers with the
+// old one — long enough for the fold to read "playing" while the bar is coming
+// up for a pause, and take it straight back down. The reader's own tap already
+// put the bar where it belongs, so nothing else touches it for a beat.
+static NSTimeInterval gNFBLastUserTap = 0;
+static const NSTimeInterval kNFBUserTapGrace = 0.6;
 static BOOL nfbFoldIfDue(UIView* card);
 
 static void nfbRestoreTimestamp(UIView* controls) {
@@ -466,6 +473,10 @@ static BOOL nfbFoldIfDue(UIView* card) {
     if (!card || !card.window || ![BHTSettings boolForKey:@"tap_to_pause"]) {
         return YES;
     }
+    if ([NSDate timeIntervalSinceReferenceDate] - gNFBLastUserTap <
+        kNFBUserTapGrace) {
+        return YES;
+    }
     TAVPlayer* player = nfbCardPlayer(card);
     NSInteger status = player.playbackState.timeControlStatus;
     // 1 is waiting to play: not a state worth matching the bar to.
@@ -526,6 +537,9 @@ static void nfbStartFoldWatch(UIView* card) {
 
 - (void)handleSingleTap:(UITapGestureRecognizer*)tap {
     UIView* card = (UIView*)self;
+    if (!gNFBSyntheticToggle) {
+        gNFBLastUserTap = [NSDate timeIntervalSinceReferenceDate];
+    }
     UIView* controls = nfbImmersiveControlsView(card);
 
     // A synthesized tap only moves the bar; a tap with the option off keeps the
