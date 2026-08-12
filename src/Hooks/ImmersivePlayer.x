@@ -123,7 +123,11 @@ static BOOL isImmersiveCardPan(id viewController,
 
 static const void* kNFBPausedGlyphKey = &kNFBPausedGlyphKey;
 static const void* kNFBReconcilePendingKey = &kNFBReconcilePendingKey;
-static const void* kNFBMinimalClockKey = &kNFBMinimalClockKey;
+static const void* kNFBMinimalBarKey = &kNFBMinimalBarKey;
+static const void* kNFBMinimalTimerKey = &kNFBMinimalTimerKey;
+static const NSInteger kNFBMinimalTrackTag = 90211;
+static const NSInteger kNFBMinimalFillTag = 90212;
+static const NSInteger kNFBMinimalClockTag = 90213;
 static const CGFloat kNFBPausedGlyphSize = 72.0;
 
 // Marks a toggle synthesized by the tweak: playback is left alone, only the
@@ -134,6 +138,23 @@ static BOOL gNFBSyntheticToggle = NO;
 static TAVPlayer* nfbImmersivePagePlayer(UIView* pageView) {
     Ivar playerIvar = class_getInstanceVariable([pageView class], "player");
     return playerIvar ? object_getIvar(pageView, playerIvar) : nil;
+}
+
+// The page view of a card, and the player it holds — the timer has only the
+// card to work from.
+static TAVPlayer* nfbCardPlayer(UIView* card) {
+    Class pageClass =
+        NSClassFromString(@"_TtC14T1TwitterSwift22ImmersiveVideoPageView");
+    if (!pageClass) {
+        return nil;
+    }
+    __block UIView* pageView = nil;
+    EnumerateSubviewsRecursively(card, ^(UIView* view) {
+        if (!pageView && [view isKindOfClass:pageClass]) {
+            pageView = view;
+        }
+    });
+    return pageView ? nfbImmersivePagePlayer(pageView) : nil;
 }
 
 // timeControlStatus follows AVPlayer: 0 paused, 1 waiting to play, 2 playing.
@@ -220,12 +241,19 @@ static void nfbShowPausedGlyph(UIView* card, BOOL paused) {
     glyph.hidden = !paused;
 }
 
-// MARK: - Timestamp beside the progress line
+// MARK: - Minimal bar
 //
-// The controls view is unmounted while only the progress line shows, and the
-// line itself carries no label — it is a bare set of layers. The elapsed and
-// total times are therefore drawn here, in a label of the tweak's own, placed
-// above the line and following the same option as the one in the full bar.
+// Twitter mounts and unmounts its whole bottom bar as one piece: when the
+// controls go, the progress line goes with them and nothing is left over the
+// video. The minimal state is therefore drawn here — a track, its fill, and the
+// times above — and it lives only while the app's own bar is away. The player
+// is polled on a timer rather than driven by playback callbacks, so the fill
+// advances at a steady rate whatever the app reports and when.
+
+static const CGFloat kNFBMinimalSideInset = 14.0;
+static const CGFloat kNFBMinimalTrackHeight = 3.0;
+static const CGFloat kNFBMinimalBottomGap = 14.0;
+static const CGFloat kNFBMinimalClockGap = 8.0;
 
 static NSString* nfbClockText(CMTime time) {
     CGFloat seconds = CMTIME_IS_NUMERIC(time) ? CMTimeGetSeconds(time) : 0.0;
@@ -242,30 +270,31 @@ static NSString* nfbClockText(CMTime time) {
                                       (long)(total % 60)];
 }
 
-// The bare progress line: the view that stays on screen once the controls are
-// gone, and the anchor the label is placed against.
-static UIView* nfbProgressLineView(UIView* card) {
-    Class lineClass =
-        NSClassFromString(@"_TtC14T1TwitterSwift26ImmersiveVideoTimelineView");
-    if (!lineClass) {
-        return nil;
+// Track, fill and clock in one container, built once per card and kept as an
+// associated object. Touches pass through: the card's tap gesture stays the
+// only thing handling them.
+static UIView* nfbMinimalBar(UIView* card) {
+    UIView* bar = objc_getAssociatedObject(card, kNFBMinimalBarKey);
+    if (bar) {
+        return bar;
     }
-    __block UIView* line = nil;
-    EnumerateSubviewsRecursively(card, ^(UIView* view) {
-        if (!line && [view isKindOfClass:lineClass]) {
-            line = view;
-        }
-    });
-    return line;
-}
+    bar = [[UIView alloc] init];
+    bar.userInteractionEnabled = NO;
 
-static UILabel* nfbMinimalClock(UIView* card) {
-    UILabel* clock = objc_getAssociatedObject(card, kNFBMinimalClockKey);
-    if (clock) {
-        return clock;
-    }
-    clock = [[UILabel alloc] init];
-    clock.userInteractionEnabled = NO;
+    UIView* track = [[UIView alloc] init];
+    track.tag = kNFBMinimalTrackTag;
+    track.backgroundColor = [UIColor colorWithWhite:1.0 alpha:0.28];
+    track.layer.cornerRadius = kNFBMinimalTrackHeight / 2.0;
+    [bar addSubview:track];
+
+    UIView* fill = [[UIView alloc] init];
+    fill.tag = kNFBMinimalFillTag;
+    fill.backgroundColor = [UIColor whiteColor];
+    fill.layer.cornerRadius = kNFBMinimalTrackHeight / 2.0;
+    [track addSubview:fill];
+
+    UILabel* clock = [[UILabel alloc] init];
+    clock.tag = kNFBMinimalClockTag;
     clock.textColor = [UIColor whiteColor];
     clock.font = [UIFont monospacedDigitSystemFontOfSize:13
                                                   weight:UIFontWeightSemibold];
@@ -273,38 +302,90 @@ static UILabel* nfbMinimalClock(UIView* card) {
     clock.layer.shadowOpacity = 0.45;
     clock.layer.shadowRadius = 3.0;
     clock.layer.shadowOffset = CGSizeZero;
-    objc_setAssociatedObject(card, kNFBMinimalClockKey, clock,
+    [bar addSubview:clock];
+
+    objc_setAssociatedObject(card, kNFBMinimalBarKey, bar,
                              OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-    return clock;
+    return bar;
 }
 
-// Drawn only while the bar is away: the full bar carries a label of its own.
-static void nfbUpdateMinimalClock(UIView* card, TAVPlayer* player) {
-    UILabel* existing = objc_getAssociatedObject(card, kNFBMinimalClockKey);
-    if (![BHTSettings boolForKey:@"restore_video_timestamp"] || !player ||
-        nfbImmersiveControlsView(card) != nil) {
+static void nfbStopMinimalTimer(UIView* card) {
+    NSTimer* timer = objc_getAssociatedObject(card, kNFBMinimalTimerKey);
+    [timer invalidate];
+    objc_setAssociatedObject(card, kNFBMinimalTimerKey, nil,
+                             OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+}
+
+// Laid out against the card, above the home indicator, and hidden as soon as
+// the app's own bar comes back or the card leaves the screen.
+static void nfbUpdateMinimalBar(UIView* card, TAVPlayer* player) {
+    UIView* existing = objc_getAssociatedObject(card, kNFBMinimalBarKey);
+    BOOL wanted = card.window && player &&
+                  [BHTSettings boolForKey:@"tap_to_pause"] &&
+                  nfbImmersiveControlsView(card) == nil;
+    if (!wanted) {
         existing.hidden = YES;
+        nfbStopMinimalTimer(card);
         return;
     }
-    UIView* line = nfbProgressLineView(card);
-    if (!line || !line.window) {
-        existing.hidden = YES;
-        return;
+
+    UIView* bar = nfbMinimalBar(card);
+    if (bar.superview != card) {
+        [card addSubview:bar];
     }
+    [card bringSubviewToFront:bar];
+    bar.hidden = NO;
+
+    UILabel* clock = (UILabel*)[bar viewWithTag:kNFBMinimalClockTag];
+    UIView* track = [bar viewWithTag:kNFBMinimalTrackTag];
+    UIView* fill = [track viewWithTag:kNFBMinimalFillTag];
+
     TAVPlaybackState* state = player.playbackState;
-    UILabel* clock = nfbMinimalClock(card);
-    clock.text = [NSString stringWithFormat:@"%@ / %@", nfbClockText(state.currentTime),
-                                            nfbClockText(state.duration)];
-    [clock sizeToFit];
-    if (clock.superview != card) {
-        [card addSubview:clock];
+    CGFloat elapsed = CMTIME_IS_NUMERIC(state.currentTime)
+                          ? CMTimeGetSeconds(state.currentTime)
+                          : 0.0;
+    CGFloat total = CMTIME_IS_NUMERIC(state.duration)
+                        ? CMTimeGetSeconds(state.duration)
+                        : 0.0;
+    CGFloat ratio = (total > 0 && isfinite(elapsed)) ? elapsed / total : 0.0;
+    ratio = MAX(0.0, MIN(1.0, ratio));
+
+    BOOL showsClock = [BHTSettings boolForKey:@"restore_video_timestamp"];
+    clock.hidden = !showsClock;
+    if (showsClock) {
+        clock.text = [NSString stringWithFormat:@"%@ / %@", nfbClockText(state.currentTime),
+                                                nfbClockText(state.duration)];
+        [clock sizeToFit];
     }
-    CGRect anchor = [line convertRect:line.bounds toView:card];
-    clock.frame = CGRectMake(CGRectGetMinX(anchor),
-                             CGRectGetMinY(anchor) - CGRectGetHeight(clock.bounds) - 8.0,
-                             CGRectGetWidth(clock.bounds), CGRectGetHeight(clock.bounds));
-    clock.hidden = NO;
-    [card bringSubviewToFront:clock];
+
+    CGFloat width = CGRectGetWidth(card.bounds) - 2 * kNFBMinimalSideInset;
+    CGFloat clockHeight = showsClock ? CGRectGetHeight(clock.bounds) + kNFBMinimalClockGap : 0.0;
+    CGFloat height = clockHeight + kNFBMinimalTrackHeight;
+    CGFloat bottom = CGRectGetHeight(card.bounds) - card.safeAreaInsets.bottom -
+                     kNFBMinimalBottomGap;
+    bar.frame = CGRectMake(kNFBMinimalSideInset, bottom - height, width, height);
+    clock.frame = CGRectMake(0, 0, CGRectGetWidth(clock.bounds),
+                             CGRectGetHeight(clock.bounds));
+    track.frame = CGRectMake(0, clockHeight, width, kNFBMinimalTrackHeight);
+    fill.frame = CGRectMake(0, 0, width * ratio, kNFBMinimalTrackHeight);
+
+    if (!objc_getAssociatedObject(card, kNFBMinimalTimerKey)) {
+        __weak UIView* weakCard = card;
+        NSTimer* timer = [NSTimer
+            scheduledTimerWithTimeInterval:0.25
+                                   repeats:YES
+                                     block:^(NSTimer* scheduled) {
+                                       UIView* strongCard = weakCard;
+                                       if (!strongCard) {
+                                           [scheduled invalidate];
+                                           return;
+                                       }
+                                       nfbUpdateMinimalBar(strongCard,
+                                                           nfbCardPlayer(strongCard));
+                                     }];
+        objc_setAssociatedObject(card, kNFBMinimalTimerKey, timer,
+                                 OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    }
 }
 
 %hook _TtC14T1TwitterSwift17ImmersiveCardView
@@ -346,7 +427,7 @@ static void nfbUpdateMinimalClock(UIView* card, TAVPlayer* player) {
         %orig;
     }
     nfbShowPausedGlyph(card, paused);
-    nfbUpdateMinimalClock(card, player);
+    nfbUpdateMinimalBar(card, player);
 }
 
 // A recycled card carries its glyph into the next video; playback there starts
@@ -354,6 +435,9 @@ static void nfbUpdateMinimalClock(UIView* card, TAVPlayer* player) {
 - (void)didMoveToWindow {
     %orig;
     nfbShowPausedGlyph((UIView*)self, NO);
+    if (!((UIView*)self).window) {
+        nfbStopMinimalTimer((UIView*)self);
+    }
 }
 
 %end
@@ -375,7 +459,7 @@ static void nfbUpdateMinimalClock(UIView* card, TAVPlayer* player) {
         host = host.superview;
     }
     if (host) {
-        nfbUpdateMinimalClock(host, nfbImmersivePagePlayer(page));
+        nfbUpdateMinimalBar(host, nfbImmersivePagePlayer(page));
     }
     if (![BHTSettings boolForKey:@"tap_to_pause"]) {
         return;
