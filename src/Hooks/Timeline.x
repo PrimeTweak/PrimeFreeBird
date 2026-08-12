@@ -395,6 +395,21 @@ static void nfbLayBandIntoSettingsBar(UINavigationBar* bar,
 
 %end
 
+%hook TFNTableView
+
+// Twitter's own table does not route its layout through UIScrollView, so the
+// wash would only be repositioned on a data change and would drift as
+// self-sizing rows settle.
+- (void)layoutSubviews {
+    %orig;
+    @try {
+        NFBReadingLayoutTick(self);
+    } @catch (id exception) {
+    }
+}
+
+%end
+
 %hook UINavigationBar
 
 - (void)didMoveToWindow {
@@ -996,7 +1011,6 @@ static const void* kNFBListViewKey = &kNFBListViewKey;
 static const void* kNFBReadingTopAtCaptureKey = &kNFBReadingTopAtCaptureKey;
 static const void* kNFBReadingRetiredKey = &kNFBReadingRetiredKey;
 static const void* kNFBReadingMissCountKey = &kNFBReadingMissCountKey;
-static const void* kNFBReadingRestoreTriesKey = &kNFBReadingRestoreTriesKey;
 static const void* kNFBReadingForYouKey = &kNFBReadingForYouKey;
 
 // The wash covers the Tweet's header and fades out before the media: solid
@@ -1226,18 +1240,26 @@ static BOOL NFBReadingLooksLikeForYou(TFNItemsDataViewController* dataViewContro
         return cached.boolValue;
     }
     BOOL forYou = NO;
+    BOOL chainComplete = NO;
     UIResponder* responder = dataViewController;
     while ((responder = responder.nextResponder)) {
         if ([NSStringFromClass([responder class]) containsString:@"ForYou"]) {
             forYou = YES;
+            chainComplete = YES;
             break;
         }
         if ([responder isKindOfClass:[UIWindow class]]) {
+            chainComplete = YES;
             break;
         }
     }
-    objc_setAssociatedObject(dataViewController, kNFBReadingForYouKey, @(forYou),
-                             OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    // A controller asked before it is mounted has no chain to walk, and a "no"
+    // read from it would be cached for the session. Only a walk that reached
+    // the window, or found the tab outright, is worth keeping.
+    if (chainComplete) {
+        objc_setAssociatedObject(dataViewController, kNFBReadingForYouKey,
+                                 @(forYou), OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    }
     return forYou;
 }
 
@@ -1344,12 +1366,9 @@ static void NFBReadingPositionMarker(TFNItemsDataViewController* dataViewControl
     // against this list a few times while it fills in.
     if (NFBReadingMarkerAllowed(dataViewController) &&
         !objc_getAssociatedObject(dataViewController, kNFBReadingAnchorIDKey)) {
-        NSInteger tries = [objc_getAssociatedObject(
-            dataViewController, kNFBReadingRestoreTriesKey) integerValue];
-        if (tries < 3) {
-            objc_setAssociatedObject(dataViewController,
-                                     kNFBReadingRestoreTriesKey, @(tries + 1),
-                                     OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        // Retried while the list still has nothing to match against: a fixed
+        // number of attempts runs out before the first page arrives.
+        if (NFBReadingItemCount(dataViewController.sections) > 0) {
             NFBReadingStoreRestore(dataViewController);
         }
     }
@@ -1367,7 +1386,15 @@ static void NFBReadingPositionMarker(TFNItemsDataViewController* dataViewControl
         // one absent pass is not a verdict. Two consecutive ones are, and only
         // then does the marker retire for the session instead of reappearing
         // to lie after the next capture.
-        if (anchor.length &&
+        // A replaced list has a new first item as well as a missing anchor;
+        // an anchor that merely fell out of a list whose head is unchanged is
+        // a loading phase, not an algorithmic wipe.
+        NSString* headNow = NFBReadingFirstEntryID(dataViewController.sections);
+        NSString* headThen =
+            objc_getAssociatedObject(dataViewController, kNFBReadingTopAtCaptureKey);
+        BOOL replaced = headNow.length && headThen.length &&
+                        ![headNow isEqualToString:headThen];
+        if (anchor.length && replaced &&
             NFBReadingItemCount(dataViewController.sections) >= 10) {
             NSInteger misses =
                 [objc_getAssociatedObject(dataViewController,
