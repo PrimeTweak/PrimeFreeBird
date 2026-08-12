@@ -1299,6 +1299,12 @@ static void NFBReadingCaptureAnchor(TFNItemsDataViewController* dataViewControll
     BOOL boundaryActive = storedHead.length && listHead.length &&
                           ![storedHead isEqualToString:listHead];
     if (boundaryActive && ![top isEqualToString:listHead]) {
+        // The boundary stands, so the anchor in memory is left alone — but it
+        // is written out as it is, otherwise the marked position is the one
+        // state that never reaches disk.
+        NSString* held =
+            objc_getAssociatedObject(dataViewController, kNFBReadingAnchorIDKey);
+        NFBReadingStoreRemember(held, held, storedHead);
         return;
     }
     NSString* previousAnchor =
@@ -1356,9 +1362,50 @@ static void NFBReadingPlaceMarker(UIScrollView* table, UIView* marker,
 // space, so the placed wash scrolls with the feed; only data changes move it.
 // It sits above the cell at low alpha — beneath it, the opaque cell would
 // hide it entirely.
+// Temporary instrumentation: records where the last positioning pass ended and
+// the three identifiers the decision rests on. Removed once the answer is in.
+static NSString* NFBReadingShortID(NSString* identifier) {
+    if (!identifier.length) {
+        return @"—";
+    }
+    return identifier.length > 8
+               ? [identifier substringFromIndex:identifier.length - 8]
+               : identifier;
+}
+
+static void NFBReadingNoteDiag(TFNItemsDataViewController* dataViewController,
+                               NSString* stage) {
+    NSUserDefaults* defaults = [NSUserDefaults standardUserDefaults];
+    NSArray* stored = [defaults arrayForKey:kNFBReadingStoreKey];
+    NSString* anchor =
+        objc_getAssociatedObject(dataViewController, kNFBReadingAnchorIDKey);
+    NSString* headThen =
+        objc_getAssociatedObject(dataViewController, kNFBReadingTopAtCaptureKey);
+    [defaults setObject:[NSString stringWithFormat:
+                            @"%@\nstored %lu · items %lu\nanchor %@\nhead@ %@\n"
+                            @"now %@\nforyou %@ · retired %@",
+                            stage,
+                            (unsigned long)([stored isKindOfClass:[NSArray class]]
+                                                ? stored.count
+                                                : 0),
+                            (unsigned long)NFBReadingItemCount(
+                                dataViewController.sections),
+                            NFBReadingShortID(anchor),
+                            NFBReadingShortID(headThen),
+                            NFBReadingShortID(NFBReadingFirstEntryID(
+                                dataViewController.sections)),
+                            NFBReadingLooksLikeForYou(dataViewController) ? @"Y" : @"N",
+                            [objc_getAssociatedObject(dataViewController,
+                                                      kNFBReadingRetiredKey) boolValue]
+                                ? @"Y"
+                                : @"N"]
+                 forKey:@"nfb_reading_diag"];
+}
+
 static void NFBReadingPositionMarker(TFNItemsDataViewController* dataViewController) {
     UIScrollView* table = NFBListScrollView(dataViewController);
     if (!table) {
+        NFBReadingNoteDiag(dataViewController, @"no list");
         return;
     }
     UIView* marker = objc_getAssociatedObject(table, kNFBReadingMarkerViewKey);
@@ -1416,6 +1463,10 @@ static void NFBReadingPositionMarker(TFNItemsDataViewController* dataViewControl
                                          OBJC_ASSOCIATION_RETAIN_NONATOMIC);
             }
         }
+        NFBReadingNoteDiag(dataViewController,
+                           NFBReadingMarkerAllowed(dataViewController)
+                               ? @"anchor not found"
+                               : @"not allowed");
         marker.hidden = YES;
         return;
     }
@@ -1428,6 +1479,7 @@ static void NFBReadingPositionMarker(TFNItemsDataViewController* dataViewControl
     NSString* topNow = NFBReadingFirstEntryID(dataViewController.sections);
     if (!topAtCapture.length || !topNow.length ||
         [topAtCapture isEqualToString:topNow]) {
+        NFBReadingNoteDiag(dataViewController, @"nothing new above");
         marker.hidden = YES;
         return;
     }
@@ -1438,6 +1490,7 @@ static void NFBReadingPositionMarker(TFNItemsDataViewController* dataViewControl
                                  OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     }
     NFBReadingPlaceMarker(table, marker, path);
+    NFBReadingNoteDiag(dataViewController, @"shown");
 }
 
 // Row heights settle after the reload, so the scan waits one runloop turn.
