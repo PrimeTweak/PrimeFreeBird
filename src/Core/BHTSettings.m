@@ -133,6 +133,14 @@ static NSDictionary<NSString*, NSDictionary*>* BHTSettingsPages(void) {
                       @"default": @YES,
                       @"type": @"toggle"},
                     @{
+                        @"type": @"compactButton",
+                        @"key": @"reading_diag_button",
+                        @"titleKey": @"READING_DIAG_TITLE",
+                        @"action": @"showReadingDiag:",
+                        @"prefKeyForSubtitle": @"nfb_reading_diag",
+                        @"subtitleDefaultKey": @"READING_DIAG_EMPTY"
+                    },
+                    @{
                         @"type": @"button",
                         @"titleKey": @"FILTERS_TITLE",
                         @"subtitleKey": @"FILTERS_DETAIL",
