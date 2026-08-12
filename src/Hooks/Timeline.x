@@ -993,12 +993,16 @@ static NSSet<NSNumber*>* ConversationAuthorRepliedToUserIDs(NSArray* sections,
 
 // MARK: - Reading marker
 //
-// Marks where the reading stopped when new Tweets arrive above — an accent
-// wash over that Tweet's header, fading out before the media. With nothing
-// new above the anchor there is nothing to say, and nothing is drawn. The
-// anchor is the topmost visible row, captured when the screen is left, when
-// the app backgrounds, and just before a delivery that puts new content on
-// top. Chronological tabs (Following, Lists) keep their
+// Marks the boundary of what has already been seen when new Tweets arrive
+// above it — an accent wash over that Tweet's header, fading out before the
+// media. The anchor is the list's own first Tweet at the moment of capture,
+// taken when the screen is left, when the app backgrounds, and just before a
+// delivery that puts new content on top; everything that lands above it is
+// new, so the wash falls on the first Tweet under the arriving batch. With
+// nothing above the anchor there is nothing to say, and nothing is drawn. The
+// anchor only moves once the reader has come back down to it, so a relaunch, a
+// tab switch and a refresh that brings nothing all leave it where it is.
+// Chronological tabs (Following, Lists) keep their
 // anchor through refreshes, so the marker lives there; a tab that discards
 // its anchor on a large list is algorithmic, and the marker retires on it for
 // the session rather than lying. Tabs whose controllers name themselves
@@ -1282,9 +1286,10 @@ static NSUInteger NFBReadingItemCount(NSArray* sections) {
 }
 
 // The reader has caught up once the topmost visible row is the anchor or
-// something below it. Reaching the top of the list is not the same thing: a
-// relaunch puts the reader back at the top of a list they had already read
-// into, and the anchor still has something to say there.
+// something below it: everything the anchor was holding back has been passed.
+// Reaching the top of the list is not the same thing — a relaunch, a tab
+// switch and a refresh that brings nothing all put the reader at the top of a
+// list whose marked batch is still unread below them.
 static BOOL NFBReadingCaughtUp(TFNItemsDataViewController* dataViewController) {
     NSString* anchor =
         objc_getAssociatedObject(dataViewController, kNFBReadingAnchorIDKey);
@@ -1310,12 +1315,12 @@ static void NFBReadingCaptureAnchor(TFNItemsDataViewController* dataViewControll
     if (!NFBReadingMarkerAllowed(dataViewController)) {
         return;
     }
-    NSString* top = NFBReadingTopVisibleEntryID(dataViewController);
-    if (!top.length) {
+    // A list with nothing on screen has nothing to record.
+    if (!NFBReadingTopVisibleEntryID(dataViewController).length) {
         return;
     }
     // A controller that has no anchor yet is either brand new or just
-    // relaunched. Claiming the top of the list as its position would bury the
+    // relaunched. Claiming the head of the list as its boundary would bury the
     // one that is already on disk, so the stored position is looked for first,
     // and a list too small to hold it is given time to fill.
     if (!objc_getAssociatedObject(dataViewController, kNFBReadingAnchorIDKey)) {
@@ -1330,27 +1335,32 @@ static void NFBReadingCaptureAnchor(TFNItemsDataViewController* dataViewControll
         }
     }
     NSString* listHead = NFBReadingFirstEntryID(dataViewController.sections);
+    if (!listHead.length) {
+        return;
+    }
     NSString* storedHead =
         objc_getAssociatedObject(dataViewController, kNFBReadingTopAtCaptureKey);
-    // A marked position survives every capture until the reader has caught up
-    // to it: a refresh that brings nothing, a backgrounding, an opened Tweet
-    // or a relaunch must not erase it.
+    // A marked boundary survives every capture until the top of the list has
+    // been read: a refresh that brings nothing, a backgrounding, an opened
+    // Tweet or a relaunch must not erase it.
     if (!NFBReadingCaughtUp(dataViewController)) {
         // The anchor in memory is left alone, but it is written out as it is,
-        // otherwise the marked position is the one state that never reaches
+        // otherwise the marked boundary is the one state that never reaches
         // disk.
         NSString* held =
             objc_getAssociatedObject(dataViewController, kNFBReadingAnchorIDKey);
         NFBReadingStoreRemember(held, held, storedHead);
         return;
     }
+    // The list's first Tweet is the boundary: what arrives after this capture
+    // lands above it, and the wash falls on the first Tweet under the batch.
     NSString* previousAnchor =
         objc_getAssociatedObject(dataViewController, kNFBReadingAnchorIDKey);
-    objc_setAssociatedObject(dataViewController, kNFBReadingAnchorIDKey, top,
+    objc_setAssociatedObject(dataViewController, kNFBReadingAnchorIDKey, listHead,
                              OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     objc_setAssociatedObject(dataViewController, kNFBReadingTopAtCaptureKey,
                              listHead, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-    NFBReadingStoreRemember(previousAnchor, top, listHead);
+    NFBReadingStoreRemember(previousAnchor, listHead, listHead);
 }
 
 // One row's true geometry. The rendered cell is authoritative when it is on
