@@ -125,10 +125,15 @@ static BOOL isImmersiveCardPan(id viewController,
 
 // MARK: - Tap to pause
 //
-// A single tap on an immersive video toggles playback on top of its native
-// effect. The player is not exposed, so it is read from the page view's ivar.
-// The native handler runs last: it owns showing and hiding the controls, and
-// running it after the playback change lets it decide with the new state.
+// A single tap on an immersive video toggles playback. The player is not
+// exposed, so it is read from the page view's ivar. The controls follow the
+// playback state rather than flipping with every tap: paused shows them,
+// playing hides them. The native handler is what moves them, so it runs only
+// when the state it would produce is the one wanted. A glyph marks the pause
+// at the centre of the card, where the app draws none of its own.
+
+static const void* kNFBPausedGlyphKey = &kNFBPausedGlyphKey;
+static const CGFloat kNFBPausedGlyphSize = 72.0;
 
 static TAVPlayer* nfbImmersivePagePlayer(UIView* pageView) {
     Ivar playerIvar = class_getInstanceVariable([pageView class], "player");
@@ -143,6 +148,80 @@ static void nfbTogglePlayback(TAVPlayer* player) {
         // playOrReplay restarts at the end instead of doing nothing.
         [player playOrReplay];
     }
+}
+
+// The controls bar mounted in this card, or nil while it is not built yet.
+static UIView* nfbImmersiveControlsView(UIView* card) {
+    Class controlsClass =
+        NSClassFromString(@"_TtC14T1TwitterSwift17VideoControlsView");
+    if (!controlsClass) {
+        return nil;
+    }
+    __block UIView* controls = nil;
+    EnumerateSubviewsRecursively(card, ^(UIView* view) {
+        if (!controls && [view isKindOfClass:controlsClass]) {
+            controls = view;
+        }
+    });
+    return controls;
+}
+
+static BOOL nfbControlsAreVisible(UIView* controls) {
+    return controls && !controls.hidden && controls.alpha > 0.5;
+}
+
+// Built once per card and kept as an associated object. Touches pass through
+// it, so the card's own tap gesture stays the only thing handling them.
+static UIView* nfbPausedGlyph(UIView* card) {
+    UIView* glyph = objc_getAssociatedObject(card, kNFBPausedGlyphKey);
+    if (glyph) {
+        return glyph;
+    }
+    UIBlurEffect* blur =
+        [UIBlurEffect effectWithStyle:UIBlurEffectStyleSystemThinMaterialDark];
+    UIVisualEffectView* backdrop = [[UIVisualEffectView alloc] initWithEffect:blur];
+    backdrop.userInteractionEnabled = NO;
+    backdrop.frame = CGRectMake(0, 0, kNFBPausedGlyphSize, kNFBPausedGlyphSize);
+    backdrop.layer.cornerRadius = kNFBPausedGlyphSize / 2.0;
+    backdrop.clipsToBounds = YES;
+    backdrop.autoresizingMask =
+        UIViewAutoresizingFlexibleTopMargin | UIViewAutoresizingFlexibleBottomMargin |
+        UIViewAutoresizingFlexibleLeftMargin | UIViewAutoresizingFlexibleRightMargin;
+    UIImageSymbolConfiguration* size =
+        [UIImageSymbolConfiguration configurationWithPointSize:30
+                                                        weight:UIImageSymbolWeightBold];
+    UIImageView* icon = [[UIImageView alloc]
+        initWithImage:[UIImage systemImageNamed:@"play.fill" withConfiguration:size]];
+    icon.tintColor = [UIColor whiteColor];
+    icon.translatesAutoresizingMaskIntoConstraints = NO;
+    [backdrop.contentView addSubview:icon];
+    [NSLayoutConstraint activateConstraints:@[
+        [icon.centerXAnchor constraintEqualToAnchor:backdrop.contentView.centerXAnchor
+                                           constant:2.0],
+        [icon.centerYAnchor constraintEqualToAnchor:backdrop.contentView.centerYAnchor]
+    ]];
+    objc_setAssociatedObject(card, kNFBPausedGlyphKey, backdrop,
+                             OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    return backdrop;
+}
+
+// Shown centred over the card while paused, taken down as soon as playback
+// resumes or the card is remounted for another video.
+static void nfbShowPausedGlyph(UIView* card, BOOL paused) {
+    UIView* glyph = paused ? nfbPausedGlyph(card)
+                           : objc_getAssociatedObject(card, kNFBPausedGlyphKey);
+    if (!glyph) {
+        return;
+    }
+    if (paused) {
+        if (glyph.superview != card) {
+            [card addSubview:glyph];
+        }
+        glyph.center = CGPointMake(CGRectGetMidX(card.bounds),
+                                   CGRectGetMidY(card.bounds));
+        [card bringSubviewToFront:glyph];
+    }
+    glyph.hidden = !paused;
 }
 
 %hook _TtC14T1TwitterSwift17ImmersiveCardView
@@ -171,7 +250,23 @@ static void nfbTogglePlayback(TAVPlayer* player) {
     BOOL wasPlaying = player.playbackState.timeControlStatus != 0;
     nfbTogglePlayback(player);
     [(_TtC14T1TwitterSwift17ImmersiveCardView*)self setPausedByUser:wasPlaying];
+
+    // The controls belong up while paused and down while playing. The native
+    // handler only flips them, so it is called when — and only when — the flip
+    // lands on the wanted state. With no controls mounted, it keeps its say.
+    UIView* controls = nfbImmersiveControlsView(card);
+    BOOL paused = wasPlaying;
+    if (!controls || nfbControlsAreVisible(controls) != paused) {
+        %orig;
+    }
+    nfbShowPausedGlyph(card, paused);
+}
+
+// A recycled card carries its glyph into the next video; playback there starts
+// on its own, so the glyph comes down with the move.
+- (void)didMoveToWindow {
     %orig;
+    nfbShowPausedGlyph((UIView*)self, NO);
 }
 
 %end
