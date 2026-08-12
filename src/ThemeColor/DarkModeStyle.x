@@ -108,6 +108,21 @@ static NFBBackgroundTier NFBTierForColor(UIColor* color) {
     return NFBBackgroundTierSelected;
 }
 
+// Component-wise, because two UIColors built from different color spaces are
+// never equal to -isEqual: even when they paint the same pixels.
+static BOOL NFBColorMatches(UIColor* color, UIColor* shade) {
+    CGFloat red = 0.0, green = 0.0, blue = 0.0, alpha = 0.0;
+    CGFloat shadeRed = 0.0, shadeGreen = 0.0, shadeBlue = 0.0, shadeAlpha = 0.0;
+    if (![color getRed:&red green:&green blue:&blue alpha:&alpha] ||
+        ![shade getRed:&shadeRed green:&shadeGreen blue:&shadeBlue
+                 alpha:&shadeAlpha]) {
+        return NO;
+    }
+    const CGFloat tolerance = 1.0 / 510.0;
+    return fabs(red - shadeRed) < tolerance && fabs(green - shadeGreen) < tolerance &&
+           fabs(blue - shadeBlue) < tolerance && fabs(alpha - shadeAlpha) < tolerance;
+}
+
 static UIColor* NFBColorWithRGB(uint32_t rgb) {
     return [UIColor colorWithRed:((rgb >> 16) & 0xFF) / 255.0
                            green:((rgb >> 8) & 0xFF) / 255.0
@@ -115,33 +130,50 @@ static UIColor* NFBColorWithRGB(uint32_t rgb) {
                            alpha:1.0];
 }
 
-// Measurement pass: the elevated and selected shades are spread far wider than
-// the classic Dim values (#192734 and #1C2836) so a screenshot shows which
-// surface landed in which tier. They tighten to the real palette once the
-// mapping is confirmed.
+// Each style is a ladder of three shades. The rungs are spaced by perceived
+// lightness rather than by raw value — about five points of L* apart — which is
+// what decides whether the eye separates two dark tones. Pure black keeps an
+// exact #000000 base for OLED screens and lifts only what sits above it.
 + (UIColor*)shadeForTier:(NFBBackgroundTier)tier style:(NFBDarkModeStyle)style {
     if (style == NFBDarkModeStylePureBlack) {
-        // Pure black is chosen for OLED screens: it stays flat at every depth.
-        return [UIColor blackColor];
+        switch (tier) {
+            case NFBBackgroundTierElevated:
+                return NFBColorWithRGB(0x121212);
+            case NFBBackgroundTierSelected:
+                return NFBColorWithRGB(0x1E1E1E);
+            default:
+                return [UIColor blackColor];
+        }
     }
     if (style == NFBDarkModeStyleGray) {
         switch (tier) {
             case NFBBackgroundTierElevated:
-                return NFBColorWithRGB(0x2A2A2A);
+                return NFBColorWithRGB(0x232323);
             case NFBBackgroundTierSelected:
-                return NFBColorWithRGB(0x3C3C3C);
+                return NFBColorWithRGB(0x2D2D2D);
             default:
                 return NFBColorWithRGB(0x181818);
         }
     }
     switch (tier) {
         case NFBBackgroundTierElevated:
-            return NFBColorWithRGB(0x1E3247);
+            return NFBColorWithRGB(0x1B2C3D);
         case NFBBackgroundTierSelected:
-            return NFBColorWithRGB(0x2A4562);
+            return NFBColorWithRGB(0x23364C);
         default:
             return NFBColorWithRGB(0x15202B);
     }
+}
+
++ (UIColor*)elevatedBackgroundColor {
+    if (![self isDarkModeActive]) {
+        return nil;
+    }
+    NFBDarkModeStyle style = [self selectedStyle];
+    if (style == NFBDarkModeStyleSystem) {
+        return nil;
+    }
+    return [self shadeForTier:NFBBackgroundTierElevated style:style];
 }
 
 + (UIColor*)overrideForBackgroundColor:(UIColor*)color {
@@ -155,6 +187,15 @@ static UIColor* NFBColorWithRGB(uint32_t rgb) {
     NFBBackgroundTier tier = NFBTierForColor(color);
     if (tier == NFBBackgroundTierNone) {
         return nil;
+    }
+    // A shade this file already produced is graded once and never again. The
+    // gray and black ladders are achromatic and land inside their own bands, so
+    // a second pass over the same color would push it up a rung.
+    for (NFBBackgroundTier rung = NFBBackgroundTierBase;
+         rung <= NFBBackgroundTierSelected; rung++) {
+        if (NFBColorMatches(color, [self shadeForTier:rung style:style])) {
+            return nil;
+        }
     }
     return [self shadeForTier:tier style:style];
 }

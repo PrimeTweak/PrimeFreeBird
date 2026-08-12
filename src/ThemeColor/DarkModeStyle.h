@@ -27,4 +27,9 @@ typedef NS_ENUM(NSInteger, NFBDarkModeStyle) {
 // and the incoming brightness decides which one it gets.
 + (UIColor* _Nullable)overrideForBackgroundColor:(UIColor*)color;
 
+// The shade for surfaces sitting above the base one — sheets, cards, selected
+// rows — for callers that paint their own instead of going through a color
+// the filter can see. Nil when no dark style is active.
++ (UIColor* _Nullable)elevatedBackgroundColor;
+
 @end
