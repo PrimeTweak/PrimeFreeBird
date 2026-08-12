@@ -27,17 +27,21 @@ static const void* kNFBRestoredTimestampKey = &kNFBRestoredTimestampKey;
     if (objc_getAssociatedObject(self, kNFBRestoredTimestampKey)) {
         return;
     }
-    Ivar modeIvar = class_getInstanceVariable([self class], "progressLabelMode");
+    // Logos only forward-declares this Swift class, so everything addressed to
+    // it goes through an id-typed handle rather than the hooked type.
+    id controls = self;
+    Ivar modeIvar =
+        class_getInstanceVariable(object_getClass(controls), "progressLabelMode");
     if (!modeIvar) {
         return;
     }
     objc_setAssociatedObject(self, kNFBRestoredTimestampKey, @YES,
                              OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-    uint8_t* mode = (uint8_t*)(__bridge void*)self + ivar_getOffset(modeIvar);
+    uint8_t* mode = (uint8_t*)(__bridge void*)controls + ivar_getOffset(modeIvar);
     *mode = *mode ? 0 : 1;
     // The mode is read while the controls build themselves, so the change needs
     // one more pass to reach the label.
-    [self setNeedsLayout];
+    [controls setNeedsLayout];
 }
 
 %end
