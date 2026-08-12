@@ -1000,8 +1000,10 @@ static NSSet<NSNumber*>* ConversationAuthorRepliedToUserIDs(NSArray* sections,
 // delivery that puts new content on top; everything that lands above it is
 // new, so the wash falls on the first Tweet under the arriving batch. With
 // nothing above the anchor there is nothing to say, and nothing is drawn. The
-// anchor only moves once the reader has come back down to it, so a relaunch, a
-// tab switch and a refresh that brings nothing all leave it where it is.
+// anchor is recaptured only when the list's head is about to change: what sits
+// on top now becomes the first Tweet under the arriving batch. Every other
+// delivery — a refresh that brings nothing, a relaunch, a tab switch — leaves
+// the boundary where it is.
 // Chronological tabs (Following, Lists) keep their
 // anchor through refreshes, so the marker lives there; a tab that discards
 // its anchor on a large list is algorithmic, and the marker retires on it for
@@ -1287,33 +1289,12 @@ static NSUInteger NFBReadingItemCount(NSArray* sections) {
     return count;
 }
 
-// The reader has caught up once the topmost visible row is the anchor or
-// something below it: everything the anchor was holding back has been passed.
-// Reaching the top of the list is not the same thing — a relaunch, a tab
-// switch and a refresh that brings nothing all put the reader at the top of a
-// list whose marked batch is still unread below them.
-static BOOL NFBReadingCaughtUp(TFNItemsDataViewController* dataViewController) {
-    NSString* anchor =
-        objc_getAssociatedObject(dataViewController, kNFBReadingAnchorIDKey);
-    if (!anchor.length) {
-        return YES;
-    }
-    NSIndexPath* anchorPath =
-        NFBReadingIndexPathForEntryID(dataViewController, anchor);
-    if (!anchorPath) {
-        return YES;
-    }
-    NSString* top = NFBReadingTopVisibleEntryID(dataViewController);
-    NSIndexPath* topPath =
-        top.length ? NFBReadingIndexPathForEntryID(dataViewController, top) : nil;
-    if (!topPath) {
-        return NO;
-    }
-    return topPath.section > anchorPath.section ||
-           (topPath.section == anchorPath.section && topPath.row >= anchorPath.row);
-}
-
-static void NFBReadingCaptureAnchor(TFNItemsDataViewController* dataViewController) {
+// The boundary is taken from the list as it stands, and only when the incoming
+// data has a different head — that is the one moment new Tweets are about to be
+// stacked on top of it. Deliveries that change nothing above, and the leave
+// moments that carry no incoming data at all, only write the held boundary out.
+static void NFBReadingCaptureAnchor(TFNItemsDataViewController* dataViewController,
+                                    NSArray* incomingSections) {
     if (!NFBReadingMarkerAllowed(dataViewController)) {
         return;
     }
@@ -1324,7 +1305,8 @@ static void NFBReadingCaptureAnchor(TFNItemsDataViewController* dataViewControll
     // A controller that has no anchor yet is either brand new or just
     // relaunched. Claiming the head of the list as its boundary would bury the
     // one that is already on disk, so the stored position is looked for first,
-    // and a list too small to hold it is given time to fill.
+    // and a list too small to hold it is given time to fill. With nothing
+    // stored, the head becomes the first boundary.
     if (!objc_getAssociatedObject(dataViewController, kNFBReadingAnchorIDKey)) {
         if (NFBReadingStoreRestore(dataViewController)) {
             return;
@@ -1335,27 +1317,30 @@ static void NFBReadingCaptureAnchor(TFNItemsDataViewController* dataViewControll
             NFBReadingItemCount(dataViewController.sections) < 10) {
             return;
         }
+    } else {
+        NSString* incomingHead = NFBReadingFirstEntryID(incomingSections);
+        NSString* currentHead =
+            NFBReadingFirstEntryID(dataViewController.sections);
+        if (!incomingHead.length || !currentHead.length ||
+            [incomingHead isEqualToString:currentHead]) {
+            // Nothing is arriving above: the boundary is left alone, but it is
+            // written out as it is, otherwise it is the one state that never
+            // reaches disk.
+            NSString* held =
+                objc_getAssociatedObject(dataViewController, kNFBReadingAnchorIDKey);
+            NFBReadingStoreRemember(
+                held, held,
+                objc_getAssociatedObject(dataViewController,
+                                         kNFBReadingTopAtCaptureKey));
+            return;
+        }
     }
     NSString* listHead = NFBReadingFirstEntryID(dataViewController.sections);
     if (!listHead.length) {
         return;
     }
-    NSString* storedHead =
-        objc_getAssociatedObject(dataViewController, kNFBReadingTopAtCaptureKey);
-    // A marked boundary survives every capture until the top of the list has
-    // been read: a refresh that brings nothing, a backgrounding, an opened
-    // Tweet or a relaunch must not erase it.
-    if (!NFBReadingCaughtUp(dataViewController)) {
-        // The anchor in memory is left alone, but it is written out as it is,
-        // otherwise the marked boundary is the one state that never reaches
-        // disk.
-        NSString* held =
-            objc_getAssociatedObject(dataViewController, kNFBReadingAnchorIDKey);
-        NFBReadingStoreRemember(held, held, storedHead);
-        return;
-    }
-    // The list's first Tweet is the boundary: what arrives after this capture
-    // lands above it, and the wash falls on the first Tweet under the batch.
+    // The list's first Tweet is the boundary: the batch lands above it, and the
+    // wash falls on the first Tweet under that batch.
     NSString* previousAnchor =
         objc_getAssociatedObject(dataViewController, kNFBReadingAnchorIDKey);
     objc_setAssociatedObject(dataViewController, kNFBReadingAnchorIDKey, listHead,
@@ -1634,7 +1619,7 @@ static void NFBReadingTrack(TFNItemsDataViewController* dataViewController) {
                     usingBlock:^(NSNotification* note) {
                         for (TFNItemsDataViewController* controller in
                              gNFBReadingControllers.allObjects) {
-                            NFBReadingCaptureAnchor(controller);
+                            NFBReadingCaptureAnchor(controller, nil);
                         }
                     }];
     });
@@ -1771,19 +1756,20 @@ static NSArray* FilteredTimelineSections(TFNItemsDataViewController* dataViewCon
 
 - (void)setSections:(NSArray*)sections restoreScrollPosition:(BOOL)restoreScrollPosition {
     BOOL keepPlace = restoreScrollPosition;
+    NSArray* filtered = FilteredTimelineSections(self, sections);
     if (NFBReadingIsHomeTimeline(self)) {
         // Every home controller is tracked, the algorithmic tab included: tracking is pure
         // registration, and each reading action gates itself on MarkerAllowed.
         // The badge pass resolves its controller from this registry.
         NFBReadingTrack(self);
         if (NFBReadingMarkerAllowed(self)) {
-            NFBReadingCaptureAnchor(self);
+            NFBReadingCaptureAnchor(self, filtered);
         }
         // Twitter's own restore flag, forced on the home timeline so a reload
         // keeps the reading position instead of jumping to the top.
         keepPlace = YES;
     }
-    %orig(FilteredTimelineSections(self, sections), keepPlace);
+    %orig(filtered, keepPlace);
     NFBReadingRescanSoon(self);
 }
 
@@ -1791,15 +1777,11 @@ static NSArray* FilteredTimelineSections(TFNItemsDataViewController* dataViewCon
     reconfigureItemIdentifiers:(NSArray*)identifiers
               withRowAnimation:(long long)animation
                     completion:(id)completion {
+    NSArray* filtered = FilteredTimelineSections(self, sections);
     if (NFBReadingMarkerAllowed(self)) {
-        NSString* incomingTop = NFBReadingFirstEntryID(sections);
-        NSString* currentTop = NFBReadingFirstEntryID(self.sections);
-        if (incomingTop.length && currentTop.length &&
-            ![incomingTop isEqualToString:currentTop]) {
-            NFBReadingCaptureAnchor(self);
-        }
+        NFBReadingCaptureAnchor(self, filtered);
     }
-    %orig(FilteredTimelineSections(self, sections), identifiers, animation, completion);
+    %orig(filtered, identifiers, animation, completion);
     NFBReadingRescanSoon(self);
 }
 
@@ -1809,7 +1791,7 @@ static NSArray* FilteredTimelineSections(TFNItemsDataViewController* dataViewCon
 }
 
 - (void)viewWillDisappear:(BOOL)animated {
-    NFBReadingCaptureAnchor(self);
+    NFBReadingCaptureAnchor(self, nil);
     %orig;
 }
 
