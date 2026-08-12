@@ -197,8 +197,8 @@
 "ENABLE_IMAGE_PRELOADING_DETAIL" = "Load photos and videos ahead of time for smoother scrolling.";
 "FORCE_TWEET_FULL_FRAME_TITLE" = "Uncropped images";
 "FORCE_TWEET_FULL_FRAME_DETAIL" = "Show photos in full instead of cropped previews.";
-"RESTORE_VIDEO_TIMESTAMP_TITLE" = "Video timestamp";
-"RESTORE_VIDEO_TIMESTAMP_DETAIL" = "Show the timestamp when watching a video full-screen.";
+"RESTORE_VIDEO_TIMESTAMP_TITLE" = "Video time";
+"RESTORE_VIDEO_TIMESTAMP_DETAIL" = "Show elapsed and total time on full-screen videos, instead of the countdown.";
 "DISABLE_IMMERSIVE_SCROLL_TITLE" = "Disable video auto-scroll";
 "DISABLE_IMMERSIVE_SCROLL_DETAIL" = "Stop the next video from starting when you swipe in full-screen.";
 
@@ -483,8 +483,8 @@
 
 "SHOW_POLL_RESULTS_TITLE" = "Show poll results";
 "SHOW_POLL_RESULTS_DETAIL" = "Add each option's share of the vote to its label, before you have voted.";
-"TAP_TO_PAUSE_TITLE" = "Tap to pause";
-"TAP_TO_PAUSE_DETAIL" = "Tap a video to pause it; the controls then stay on screen.";
+"TAP_TO_PAUSE_TITLE" = "Tap to play or pause";
+"TAP_TO_PAUSE_DETAIL" = "Controls show while paused and hide during playback, leaving the progress line.";
 
 "PROFILES_GROUP_BEHAVIOR" = "Behavior";
 "PROFILES_GROUP_TABS" = "Profile tabs";
