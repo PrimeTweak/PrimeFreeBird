@@ -1024,6 +1024,8 @@ static const CGFloat kNFBReadingMarkerAlpha = 0.18;
 static const CGFloat kNFBReadingFadeSolid = 34.0;
 static const CGFloat kNFBReadingFadeReach = 110.0;
 static NSHashTable* gNFBReadingControllers = nil;
+// Temporary instrumentation: the geometry the last placement resolved.
+static NSString* gNFBReadingPlacement = nil;
 
 // A list scroll view is one that can name its visible index paths.
 static BOOL NFBViewIsList(UIView* view) {
@@ -1371,6 +1373,7 @@ static void NFBReadingPlaceMarker(UIScrollView* table, UIView* marker,
                                   NSIndexPath* path) {
     CGRect rowRect;
     if (!NFBListCellFrame(table, path, &rowRect)) {
+        gNFBReadingPlacement = @"no rect";
         marker.hidden = YES;
         return;
     }
@@ -1379,6 +1382,9 @@ static void NFBReadingPlaceMarker(UIScrollView* table, UIView* marker,
     CGFloat reach = MIN(CGRectGetHeight(rowRect), kNFBReadingFadeReach);
     marker.frame = CGRectMake(CGRectGetMinX(rowRect), CGRectGetMinY(rowRect),
                               CGRectGetWidth(rowRect), reach);
+    gNFBReadingPlacement =
+        [NSString stringWithFormat:@"%.0f×%.0f@%.0f", CGRectGetWidth(rowRect),
+                                   reach, CGRectGetMinY(rowRect)];
     CAGradientLayer* fade =
         (CAGradientLayer*)marker.layer.sublayers.firstObject;
     if (![fade isKindOfClass:[CAGradientLayer class]]) {
@@ -1420,6 +1426,27 @@ static NSString* NFBReadingShortID(NSString* identifier) {
                : identifier;
 }
 
+// The item's position counted across sections, or -1 when it is absent.
+static NSInteger NFBReadingItemIndexForEntryID(
+    TFNItemsDataViewController* dataViewController, NSString* target) {
+    if (!target.length) {
+        return -1;
+    }
+    NSInteger index = 0;
+    for (id section in dataViewController.sections) {
+        if (![section isKindOfClass:[NSArray class]]) {
+            continue;
+        }
+        for (id item in (NSArray*)section) {
+            if ([target isEqualToString:ItemEntryID(item)]) {
+                return index;
+            }
+            index++;
+        }
+    }
+    return -1;
+}
+
 static void NFBReadingNoteDiag(TFNItemsDataViewController* dataViewController,
                                NSString* stage) {
     NSUserDefaults* defaults = [NSUserDefaults standardUserDefaults];
@@ -1428,9 +1455,22 @@ static void NFBReadingNoteDiag(TFNItemsDataViewController* dataViewController,
         objc_getAssociatedObject(dataViewController, kNFBReadingAnchorIDKey);
     NSString* headThen =
         objc_getAssociatedObject(dataViewController, kNFBReadingTopAtCaptureKey);
+    // Where the wash sits relative to the reader: its row, the reader's row,
+    // and the distance from the top of the screen to the wash. A dash means
+    // nothing is drawn, which separates "placed far below" from "not placed".
+    UIScrollView* list = NFBListScrollView(dataViewController);
+    UIView* placed = objc_getAssociatedObject(list, kNFBReadingMarkerViewKey);
+    NSString* distance =
+        (placed && !placed.hidden)
+            ? [NSString stringWithFormat:@"%.0f",
+                                         CGRectGetMinY(placed.frame) -
+                                             (list.contentOffset.y +
+                                              list.adjustedContentInset.top)]
+            : @"—";
     [defaults setObject:[NSString stringWithFormat:
                             @"%@\nstored %lu · items %lu\nanchor %@\nhead@ %@\n"
-                            @"now %@\nforyou %@ · retired %@",
+                            @"now %@\nforyou %@ · retired %@\n"
+                            @"line %ld · you %ld · dy %@\nbox %@",
                             stage,
                             (unsigned long)([stored isKindOfClass:[NSArray class]]
                                                 ? stored.count
@@ -1445,7 +1485,13 @@ static void NFBReadingNoteDiag(TFNItemsDataViewController* dataViewController,
                             [objc_getAssociatedObject(dataViewController,
                                                       kNFBReadingRetiredKey) boolValue]
                                 ? @"Y"
-                                : @"N"]
+                                : @"N",
+                            (long)NFBReadingItemIndexForEntryID(dataViewController,
+                                                                anchor),
+                            (long)NFBReadingItemIndexForEntryID(
+                                dataViewController,
+                                NFBReadingTopVisibleEntryID(dataViewController)),
+                            distance, gNFBReadingPlacement ?: @"—"]
                  forKey:@"nfb_reading_diag"];
 }
 
@@ -1524,6 +1570,10 @@ static void NFBReadingPositionMarker(TFNItemsDataViewController* dataViewControl
     // the reader has been returned to the top of — gives the marker a purpose.
     NSString* topNow = NFBReadingFirstEntryID(dataViewController.sections);
     if (!topNow.length || [anchor isEqualToString:topNow]) {
+        // The cached path is what the layout tick draws from: an anchor with
+        // nothing to say must leave none behind.
+        objc_setAssociatedObject(table, kNFBReadingAnchorPathKey, nil,
+                                 OBJC_ASSOCIATION_RETAIN_NONATOMIC);
         NFBReadingNoteDiag(dataViewController, @"anchor is the first row");
         marker.hidden = YES;
         return;
@@ -1553,10 +1603,14 @@ static void NFBReadingRescanSoon(TFNItemsDataViewController* dataViewController)
 }
 
 // Self-sizing rows shift their rects as cells realise; the layout tick keeps
-// the wash on its row from the cached index path, without rescanning.
+// the wash on its row from the cached index path, without rescanning. The
+// cached path is the authority: a row that had no measurable rect when it was
+// first placed — off screen, unmeasured — is retried here until it has one, so
+// a wash below the fold appears as soon as its Tweet is laid out. No path means
+// nothing to draw.
 static void NFBReadingLayoutTick(UIScrollView* scrollView) {
     UIView* marker = objc_getAssociatedObject(scrollView, kNFBReadingMarkerViewKey);
-    if (!marker || marker.hidden) {
+    if (!marker) {
         return;
     }
     NSIndexPath* path =
