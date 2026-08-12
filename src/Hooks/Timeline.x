@@ -1281,6 +1281,31 @@ static NSUInteger NFBReadingItemCount(NSArray* sections) {
     return count;
 }
 
+// The reader has caught up once the topmost visible row is the anchor or
+// something below it. Reaching the top of the list is not the same thing: a
+// relaunch puts the reader back at the top of a list they had already read
+// into, and the anchor still has something to say there.
+static BOOL NFBReadingCaughtUp(TFNItemsDataViewController* dataViewController) {
+    NSString* anchor =
+        objc_getAssociatedObject(dataViewController, kNFBReadingAnchorIDKey);
+    if (!anchor.length) {
+        return YES;
+    }
+    NSIndexPath* anchorPath =
+        NFBReadingIndexPathForEntryID(dataViewController, anchor);
+    if (!anchorPath) {
+        return YES;
+    }
+    NSString* top = NFBReadingTopVisibleEntryID(dataViewController);
+    NSIndexPath* topPath =
+        top.length ? NFBReadingIndexPathForEntryID(dataViewController, top) : nil;
+    if (!topPath) {
+        return NO;
+    }
+    return topPath.section > anchorPath.section ||
+           (topPath.section == anchorPath.section && topPath.row >= anchorPath.row);
+}
+
 static void NFBReadingCaptureAnchor(TFNItemsDataViewController* dataViewController) {
     if (!NFBReadingMarkerAllowed(dataViewController)) {
         return;
@@ -1307,16 +1332,13 @@ static void NFBReadingCaptureAnchor(TFNItemsDataViewController* dataViewControll
     NSString* listHead = NFBReadingFirstEntryID(dataViewController.sections);
     NSString* storedHead =
         objc_getAssociatedObject(dataViewController, kNFBReadingTopAtCaptureKey);
-    // An active boundary survives every capture until the reader has reached
-    // the top of the list: a refresh that brings nothing, a backgrounding or
-    // an opened Tweet mid-catch-up must not erase it. Reaching the top IS the
-    // catch-up, and only then does the reference reset.
-    BOOL boundaryActive = storedHead.length && listHead.length &&
-                          ![storedHead isEqualToString:listHead];
-    if (boundaryActive && ![top isEqualToString:listHead]) {
-        // The boundary stands, so the anchor in memory is left alone — but it
-        // is written out as it is, otherwise the marked position is the one
-        // state that never reaches disk.
+    // A marked position survives every capture until the reader has caught up
+    // to it: a refresh that brings nothing, a backgrounding, an opened Tweet
+    // or a relaunch must not erase it.
+    if (!NFBReadingCaughtUp(dataViewController)) {
+        // The anchor in memory is left alone, but it is written out as it is,
+        // otherwise the marked position is the one state that never reaches
+        // disk.
         NSString* held =
             objc_getAssociatedObject(dataViewController, kNFBReadingAnchorIDKey);
         NFBReadingStoreRemember(held, held, storedHead);
@@ -1487,14 +1509,12 @@ static void NFBReadingPositionMarker(TFNItemsDataViewController* dataViewControl
     }
     objc_setAssociatedObject(dataViewController, kNFBReadingMissCountKey, nil,
                              OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-    // Nothing new above the anchor means nothing to say: at the top of an
-    // unchanged list the reader already knows where they are.
-    NSString* topAtCapture =
-        objc_getAssociatedObject(dataViewController, kNFBReadingTopAtCaptureKey);
+    // An anchor that is still the first row has nothing to say: the reader is
+    // where they left off. Anything above it — Tweets that arrived, or a list
+    // the reader has been returned to the top of — gives the marker a purpose.
     NSString* topNow = NFBReadingFirstEntryID(dataViewController.sections);
-    if (!topAtCapture.length || !topNow.length ||
-        [topAtCapture isEqualToString:topNow]) {
-        NFBReadingNoteDiag(dataViewController, @"nothing new above");
+    if (!topNow.length || [anchor isEqualToString:topNow]) {
+        NFBReadingNoteDiag(dataViewController, @"anchor is the first row");
         marker.hidden = YES;
         return;
     }
