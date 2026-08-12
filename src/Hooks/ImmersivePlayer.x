@@ -250,10 +250,15 @@ static void nfbShowPausedGlyph(UIView* card, BOOL paused) {
 // is polled on a timer rather than driven by playback callbacks, so the fill
 // advances at a steady rate whatever the app reports and when.
 
-static const CGFloat kNFBMinimalSideInset = 14.0;
+// Measured off the app's own bar: the line sits 49 pt above the safe area and
+// is 3 pt tall edge to edge, and the times ride 20 pt above it in the system
+// face at 15 pt, regular, in the app's secondary gray. Keeping the same
+// geometry means the line does not move when Twitter's bar takes over.
 static const CGFloat kNFBMinimalTrackHeight = 3.0;
-static const CGFloat kNFBMinimalBottomGap = 14.0;
-static const CGFloat kNFBMinimalClockGap = 8.0;
+static const CGFloat kNFBMinimalTrackLift = 49.0;
+static const CGFloat kNFBMinimalClockLift = 20.0;
+static const CGFloat kNFBMinimalTextInset = 14.0;
+static const CGFloat kNFBMinimalFade = 0.25;
 
 static NSString* nfbClockText(CMTime time) {
     CGFloat seconds = CMTIME_IS_NUMERIC(time) ? CMTimeGetSeconds(time) : 0.0;
@@ -295,11 +300,12 @@ static UIView* nfbMinimalBar(UIView* card) {
 
     UILabel* clock = [[UILabel alloc] init];
     clock.tag = kNFBMinimalClockTag;
-    clock.textColor = [UIColor whiteColor];
-    clock.font = [UIFont monospacedDigitSystemFontOfSize:13
-                                                  weight:UIFontWeightSemibold];
+    clock.textColor = [UIColor colorWithRed:0.569 green:0.569 blue:0.569 alpha:1.0];
+    clock.font = [UIFont systemFontOfSize:15];
+    // The app draws its own times on an opaque strip; these sit on the video,
+    // so they keep a shadow to stay readable on a bright frame.
     clock.layer.shadowColor = [UIColor blackColor].CGColor;
-    clock.layer.shadowOpacity = 0.45;
+    clock.layer.shadowOpacity = 0.35;
     clock.layer.shadowRadius = 3.0;
     clock.layer.shadowOffset = CGSizeZero;
     [bar addSubview:clock];
@@ -324,7 +330,18 @@ static void nfbUpdateMinimalBar(UIView* card, TAVPlayer* player) {
                   [BHTSettings boolForKey:@"tap_to_pause"] &&
                   nfbImmersiveControlsView(card) == nil;
     if (!wanted) {
-        existing.hidden = YES;
+        if (existing && !existing.hidden) {
+            [UIView animateWithDuration:kNFBMinimalFade * 0.6
+                                  delay:0
+                                options:UIViewAnimationOptionCurveEaseIn |
+                                        UIViewAnimationOptionBeginFromCurrentState
+                             animations:^{
+                               existing.alpha = 0.0;
+                             }
+                             completion:^(BOOL finished) {
+                               existing.hidden = YES;
+                             }];
+        }
         nfbStopMinimalTimer(card);
         return;
     }
@@ -334,7 +351,13 @@ static void nfbUpdateMinimalBar(UIView* card, TAVPlayer* player) {
         [card addSubview:bar];
     }
     [card bringSubviewToFront:bar];
-    bar.hidden = NO;
+    // Twitter's bar is still fading out when this one arrives: it fades in
+    // rather than appearing at full strength on top of it.
+    BOOL arriving = bar.hidden;
+    if (arriving) {
+        bar.alpha = 0.0;
+        bar.hidden = NO;
+    }
 
     UILabel* clock = (UILabel*)[bar viewWithTag:kNFBMinimalClockTag];
     UIView* track = [bar viewWithTag:kNFBMinimalTrackTag];
@@ -358,16 +381,30 @@ static void nfbUpdateMinimalBar(UIView* card, TAVPlayer* player) {
         [clock sizeToFit];
     }
 
-    CGFloat width = CGRectGetWidth(card.bounds) - 2 * kNFBMinimalSideInset;
-    CGFloat clockHeight = showsClock ? CGRectGetHeight(clock.bounds) + kNFBMinimalClockGap : 0.0;
-    CGFloat height = clockHeight + kNFBMinimalTrackHeight;
-    CGFloat bottom = CGRectGetHeight(card.bounds) - card.safeAreaInsets.bottom -
-                     kNFBMinimalBottomGap;
-    bar.frame = CGRectMake(kNFBMinimalSideInset, bottom - height, width, height);
-    clock.frame = CGRectMake(0, 0, CGRectGetWidth(clock.bounds),
-                             CGRectGetHeight(clock.bounds));
-    track.frame = CGRectMake(0, clockHeight, width, kNFBMinimalTrackHeight);
+    CGFloat width = CGRectGetWidth(card.bounds);
+    CGFloat floorY = CGRectGetHeight(card.bounds) - card.safeAreaInsets.bottom;
+    CGFloat trackTop = floorY - kNFBMinimalTrackLift - kNFBMinimalTrackHeight;
+    CGFloat clockHeight = CGRectGetHeight(clock.bounds);
+    CGFloat clockTop = floorY - kNFBMinimalClockLift - clockHeight / 2.0;
+    CGFloat height = MAX(clockTop + clockHeight, trackTop + kNFBMinimalTrackHeight) - trackTop;
+    bar.frame = CGRectMake(0, trackTop, width, height);
+    track.frame = CGRectMake(0, 0, width, kNFBMinimalTrackHeight);
     fill.frame = CGRectMake(0, 0, width * ratio, kNFBMinimalTrackHeight);
+    clock.frame = CGRectMake(kNFBMinimalTextInset, clockTop - trackTop,
+                             CGRectGetWidth(clock.bounds), clockHeight);
+
+    if (arriving) {
+        [UIView animateWithDuration:kNFBMinimalFade
+                              delay:0
+                            options:UIViewAnimationOptionCurveEaseOut |
+                                    UIViewAnimationOptionBeginFromCurrentState
+                         animations:^{
+                           bar.alpha = 1.0;
+                         }
+                         completion:nil];
+    } else {
+        bar.alpha = 1.0;
+    }
 
     if (!objc_getAssociatedObject(card, kNFBMinimalTimerKey)) {
         __weak UIView* weakCard = card;
