@@ -954,8 +954,8 @@ static void nfbStartFoldWatch(UIView* card) {
     // The sound button owns its own corner of the screen.
     UIView* ourBar = objc_getAssociatedObject(card, kNFBMinimalBarKey);
     CGPoint where = [tap locationInView:card];
-    for (NSInteger tag in @[ @(kNFBMinimalMuteTag), @(kNFBMinimalGripTag) ]) {
-        UIView* part = [ourBar viewWithTag:tag];
+    for (NSNumber* tag in @[ @(kNFBMinimalMuteTag), @(kNFBMinimalGripTag) ]) {
+        UIView* part = [ourBar viewWithTag:tag.integerValue];
         if (part && !ourBar.hidden &&
             CGRectContainsPoint([part convertRect:part.bounds toView:card], where)) {
             return;
