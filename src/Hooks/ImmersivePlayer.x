@@ -34,6 +34,102 @@ static const void* kNFBCardShownAtKey = &kNFBCardShownAtKey;
 // for the length of that animation — the bar alone, never the card: the card's
 // visibility is what gates autoplay, and dimming it stops playback outright.
 static const NSTimeInterval kNFBBarRevealDelay = 0.45;
+
+// A view the app animates in with the presentation and folds away a moment
+// later is held clear for the length of that animation, then given back
+// unconditionally — an invisible one would be worse than a visible flash.
+// Only the app's own overlay plugins are treated this way, never the card and
+// never anything carrying the video: the card's visibility is what gates
+// autoplay, and dimming it stops playback outright.
+static void nfbHoldThroughOpening(UIView* view) {
+    if (!view.window || ![BHTSettings boolForKey:@"tap_to_pause"]) {
+        return;
+    }
+    UIView* card = gNFBActiveCard;
+    NSTimeInterval shownAt =
+        card ? [objc_getAssociatedObject(card, kNFBCardShownAtKey) doubleValue] : 0;
+    NSTimeInterval since = [NSDate timeIntervalSinceReferenceDate] - shownAt;
+    if (shownAt <= 0 || since >= kNFBBarRevealDelay) {
+        return;
+    }
+    view.alpha = 0.0;
+    __weak UIView* weakView = view;
+    dispatch_after(
+        dispatch_time(DISPATCH_TIME_NOW,
+                      (int64_t)((kNFBBarRevealDelay - since) * NSEC_PER_SEC)),
+        dispatch_get_main_queue(), ^{
+          UIView* strongView = weakView;
+          if (strongView) {
+              strongView.alpha = 1.0;
+          }
+        });
+}
+
+// The plugins the app stacks over a card, each named for what it owns. Only
+// those that carry chrome are listed: the author and body, the engagement row,
+// the back button, the overflow row, the attribution badge and the reply bar.
+// The gradients are left alone — they belong to the picture — and so is
+// anything holding a player or a mirror of one.
+
+// authorContainerView, avatarView, authorView, bodyScrollView, tweetBodyView.
+%hook _TtC14T1TwitterSwift25ImmersiveStatusPluginView
+
+- (void)didMoveToWindow {
+    %orig;
+    nfbHoldThroughOpening((UIView*)self);
+}
+
+%end
+
+// The reply, repost, like, bookmark and share row.
+%hook _TtC14T1TwitterSwift36ImmersiveEngagementActionsPluginView
+
+- (void)didMoveToWindow {
+    %orig;
+    nfbHoldThroughOpening((UIView*)self);
+}
+
+%end
+
+// The arrow at the top left.
+%hook _TtC14T1TwitterSwift29ImmersiveBackButtonPluginView
+
+- (void)didMoveToWindow {
+    %orig;
+    nfbHoldThroughOpening((UIView*)self);
+}
+
+%end
+
+// The overflow row at the top right.
+%hook _TtC14T1TwitterSwift35ImmersiveTopRightActionsPluginsView
+
+- (void)didMoveToWindow {
+    %orig;
+    nfbHoldThroughOpening((UIView*)self);
+}
+
+%end
+
+// The "From …" badge over a quoted or forwarded source.
+%hook _TtC14T1TwitterSwift30ImmersiveAttributionPluginView
+
+- (void)didMoveToWindow {
+    %orig;
+    nfbHoldThroughOpening((UIView*)self);
+}
+
+%end
+
+// The reply field at the bottom.
+%hook _TtC14T1TwitterSwift27ImmersiveReplyBarPluginView
+
+- (void)didMoveToWindow {
+    %orig;
+    nfbHoldThroughOpening((UIView*)self);
+}
+
+%end
 // When the reader last tapped. The player reports its state through an
 // asynchronous machine, so for a moment after a tap it still answers with the
 // old one — long enough for the fold to read "playing" while the bar is coming
@@ -80,26 +176,7 @@ static void nfbRestoreTimestamp(UIView* controls) {
     }
     // Mounting while a card is opening means this is the overlay riding in on
     // the presentation, not a bar the reader asked for.
-    UIView* card = gNFBActiveCard;
-    NSTimeInterval shownAt =
-        card ? [objc_getAssociatedObject(card, kNFBCardShownAtKey) doubleValue] : 0;
-    NSTimeInterval since = [NSDate timeIntervalSinceReferenceDate] - shownAt;
-    if (shownAt > 0 && since < kNFBBarRevealDelay &&
-        [BHTSettings boolForKey:@"tap_to_pause"]) {
-        bar.alpha = 0.0;
-        // Whatever happens to the fold, the bar is given back: an invisible one
-        // would be worse than a visible flash.
-        __weak UIView* weakBar = bar;
-        dispatch_after(
-            dispatch_time(DISPATCH_TIME_NOW,
-                          (int64_t)((kNFBBarRevealDelay - since) * NSEC_PER_SEC)),
-            dispatch_get_main_queue(), ^{
-              UIView* strongBar = weakBar;
-              if (strongBar) {
-                  strongBar.alpha = 1.0;
-              }
-            });
-    }
+    nfbHoldThroughOpening(bar);
     dispatch_async(dispatch_get_main_queue(), ^{
       nfbFoldIfDue(gNFBActiveCard);
     });
