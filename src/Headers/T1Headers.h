@@ -269,6 +269,7 @@
 - (void)play;
 - (void)pause;
 - (void)playOrReplay;
+- (void)seekToTime:(CMTime)time;
 @end
 
 @interface _TtC14T1TwitterSwift22ImmersiveVideoPageView : UIView
