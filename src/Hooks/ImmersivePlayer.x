@@ -34,6 +34,13 @@ static const void* kNFBCardShownAtKey = &kNFBCardShownAtKey;
 // for the length of that animation — the bar alone, never the card: the card's
 // visibility is what gates autoplay, and dimming it stops playback outright.
 static const NSTimeInterval kNFBBarRevealDelay = 0.3;
+// When the reader last tapped. The player reports its state through an
+// asynchronous machine, so for a moment after a tap it still answers with the
+// old one — long enough for the fold to read "playing" while the bar is coming
+// up for a pause, and take it straight back down. The reader's own tap already
+// put the bar where it belongs, so nothing else touches it for a beat.
+static NSTimeInterval gNFBLastUserTap = 0;
+static const NSTimeInterval kNFBUserTapGrace = 0.6;
 
 // A view the app animates in with the presentation and folds away a moment
 // later is held clear for the length of that animation, then given back
