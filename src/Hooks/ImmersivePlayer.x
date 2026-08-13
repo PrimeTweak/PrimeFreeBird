@@ -244,25 +244,77 @@ static TAVPlayer* nfbCardPlayer(UIView* card) {
 // Twitter's own tap handler turns the sound on as well as moving the controls,
 // and this tweak has always kept that off: before, by swallowing the tap
 // entirely — which is why the controls never came back either. Now the handler
-// runs and the audio state is simply put back around it. The player applies
-// sound changes through the same asynchronous machine as playback, so it is
-// restored on this turn and on the next few rather than once.
-static void nfbKeepAudioState(TAVPlayer* player, BOOL wasMuted) {
-    if (!player) {
-        return;
+// runs and the audio state is put back around it.
+//
+// The decision does not live on the player. The immersive session owns it, in
+// an ImmersiveAudioSessionManager held by the card host, whose isMuted byte is
+// what every card reads — a player put back on its own is overruled by the next
+// pass. Both are restored: the session's byte, so the decision stands, and the
+// player, so the sound stops now. Sound changes go through the same
+// asynchronous machine as playback, so it is done on this turn and the next few.
+
+// The session manager sits on the host view above the cards.
+static id nfbImmersiveAudioManager(UIView* card) {
+    Class hostClass =
+        NSClassFromString(@"_TtC14T1TwitterSwift21ImmersiveCardHostView");
+    if (!hostClass) {
+        return nil;
     }
-    if (player.isMuted != wasMuted) {
-        player.isMuted = wasMuted;
+    UIView* host = card;
+    while (host && ![host isKindOfClass:hostClass]) {
+        host = host.superview;
     }
-    for (NSInteger step = 1; step <= 3; step++) {
+    if (!host) {
+        return nil;
+    }
+    Ivar managerIvar =
+        class_getInstanceVariable(object_getClass(host), "audioSessionManager");
+    return managerIvar ? object_getIvar(host, managerIvar) : nil;
+}
+
+// isMuted is a single byte on that manager, as progressLabelMode is on the
+// controls: read and written in place, since no setter is exposed.
+static uint8_t* nfbAudioMutedByte(id manager) {
+    if (!manager) {
+        return NULL;
+    }
+    Ivar mutedIvar = class_getInstanceVariable(object_getClass(manager), "isMuted");
+    if (!mutedIvar) {
+        return NULL;
+    }
+    return (uint8_t*)(__bridge void*)manager + ivar_getOffset(mutedIvar);
+}
+
+static void nfbApplyMuted(TAVPlayer* player, id manager, BOOL muted) {
+    uint8_t* sessionMuted = nfbAudioMutedByte(manager);
+    if (sessionMuted) {
+        *sessionMuted = muted ? 1 : 0;
+    }
+    if (player && player.isMuted != muted) {
+        player.isMuted = muted;
+    }
+}
+
+static void nfbKeepAudioState(UIView* card, TAVPlayer* player, BOOL wasMuted) {
+    id manager = nfbImmersiveAudioManager(card);
+    nfbApplyMuted(player, manager, wasMuted);
+    for (NSInteger step = 1; step <= 4; step++) {
         dispatch_after(
-            dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.05 * step * NSEC_PER_SEC)),
+            dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.06 * step * NSEC_PER_SEC)),
             dispatch_get_main_queue(), ^{
-              if (player.isMuted != wasMuted) {
-                  player.isMuted = wasMuted;
-              }
+              nfbApplyMuted(player, manager, wasMuted);
             });
     }
+}
+
+// The state to hold on to: the session's byte when it can be read, the player's
+// otherwise.
+static BOOL nfbCurrentMuted(UIView* card, TAVPlayer* player) {
+    uint8_t* sessionMuted = nfbAudioMutedByte(nfbImmersiveAudioManager(card));
+    if (sessionMuted) {
+        return *sessionMuted != 0;
+    }
+    return player.isMuted;
 }
 
 // timeControlStatus follows AVPlayer: 0 paused, 1 waiting to play, 2 playing.
@@ -606,14 +658,14 @@ static BOOL nfbFoldIfDue(UIView* card) {
         return YES;
     }
 
-    BOOL wasMuted = player.isMuted;
+    BOOL wasMuted = nfbCurrentMuted(card, player);
     gNFBSyntheticToggle = YES;
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Warc-performSelector-leaks"
     [card performSelector:@selector(handleSingleTap:) withObject:recognizer];
 #pragma clang diagnostic pop
     gNFBSyntheticToggle = NO;
-    nfbKeepAudioState(player, wasMuted);
+    nfbKeepAudioState(card, player, wasMuted);
     return YES;
 }
 
@@ -679,7 +731,7 @@ static void nfbStartFoldWatch(UIView* card) {
     }
 
     BOOL wasPlaying = player.playbackState.timeControlStatus != 0;
-    BOOL wasMuted = player.isMuted;
+    BOOL wasMuted = nfbCurrentMuted(card, player);
     nfbTogglePlayback(player);
     [(_TtC14T1TwitterSwift17ImmersiveCardView*)self setPausedByUser:wasPlaying];
 
@@ -689,7 +741,7 @@ static void nfbStartFoldWatch(UIView* card) {
     BOOL runsToggle = (expanded != paused);
     if (runsToggle) {
         %orig;
-        nfbKeepAudioState(player, wasMuted);
+        nfbKeepAudioState(card, player, wasMuted);
     }
     nfbShowPausedGlyph(card, paused);
     nfbUpdateMinimalBar(card, player);
