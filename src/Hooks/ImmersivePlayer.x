@@ -41,6 +41,9 @@ static const NSTimeInterval kNFBBarRevealDelay = 0.3;
 // put the bar where it belongs, so nothing else touches it for a beat.
 static NSTimeInterval gNFBLastUserTap = 0;
 static const NSTimeInterval kNFBUserTapGrace = 0.6;
+// Defined with the audio helpers further down, and announced here because the
+// dismissal hooks sit above them.
+static void nfbArmSilentWindowIfSilent(void);
 
 // A view the app animates in with the presentation and folds away a moment
 // later is held clear for the length of that animation, then given back
@@ -155,17 +158,27 @@ static void nfbArmSilentWindow(void) {
         [NSDate timeIntervalSinceReferenceDate] + kNFBSilentOpeningWindow;
 }
 
-// isHoldingInlineAudioFocus is the byte next to the flag: set when this video
-// is the one making noise. Clear means the reader was watching it silent, and
-// that is the state the full screen has to open in.
-static BOOL nfbInlineVideoIsSilent(UIView* view) {
-    Ivar focusIvar = class_getInstanceVariable(object_getClass(view),
-                                               "isHoldingInlineAudioFocus");
-    if (!focusIvar) {
-        return NO;
+// The timeline view keeps its player view once loaded, and that view holds the
+// player. Read this way, the answer is the sound itself rather than a flag
+// about focus — which the playing video holds whether or not it is muted, and
+// which was why some videos still opened loud.
+static TAVPlayer* nfbInlinePlayer(UIView* view) {
+    Ivar viewIvar =
+        class_getInstanceVariable(object_getClass(view), "playerViewIfLoaded");
+    id playerView = viewIvar ? object_getIvar(view, viewIvar) : nil;
+    if (!playerView) {
+        return nil;
     }
-    uint8_t* focus = (uint8_t*)(__bridge void*)view + ivar_getOffset(focusIvar);
-    return *focus == 0;
+    Ivar playerIvar =
+        class_getInstanceVariable(object_getClass(playerView), "_player");
+    return playerIvar ? object_getIvar(playerView, playerIvar) : nil;
+}
+
+// Nothing to read means nothing is playing out loud: a tap no longer wakes the
+// sound, so silence is the state to carry into the full screen.
+static BOOL nfbInlineVideoIsSilent(UIView* view) {
+    TAVPlayer* player = nfbInlinePlayer(view);
+    return player ? player.isMuted : YES;
 }
 
 static void nfbClearAutoUnmute(UIView* view) {
@@ -265,14 +278,27 @@ static BOOL isImmersiveCardPan(id viewController,
 // from the first frame of the dismissal.
 %hook T1ImmersiveFullScreenViewController
 
+// The earliest word of a dismissal, well before the view starts to go.
+- (void)prepareSourceForDismissal {
+    nfbArmSilentWindowIfSilent();
+    %orig;
+}
+
 - (void)viewWillDisappear:(BOOL)animated {
-    nfbArmSilentWindow();
+    nfbArmSilentWindowIfSilent();
     %orig;
 }
 
 %end
 
 %hook T1ImmersiveViewController
+
+// Both controllers exist in this build; whichever one is carrying the video,
+// its dismissal is covered.
+- (void)viewWillDisappear:(BOOL)animated {
+    nfbArmSilentWindowIfSilent();
+    %orig;
+}
 
 - (BOOL)gestureRecognizerShouldBegin:(UIGestureRecognizer*)gesture {
     if ([BHTSettings boolForKey:@"disable_immersive_scroll"] &&
@@ -419,18 +445,21 @@ static void nfbApplyMuted(TAVPlayer* player, id manager, BOOL muted) {
     }
 }
 
+// Putting the state back on a timer was never enough: the app turns the sound
+// on late, and through a player that may not even exist yet. A silent stretch
+// is opened instead — the same one the timeline opens — and every route to the
+// sound is refused for its length.
 static void nfbKeepAudioState(UIView* card, TAVPlayer* player, BOOL wasMuted) {
-    id manager = nfbImmersiveAudioManager(card);
-    nfbApplyMuted(player, manager, wasMuted);
-    for (NSInteger step = 1; step <= 4; step++) {
-        dispatch_after(
-            dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.06 * step * NSEC_PER_SEC)),
-            dispatch_get_main_queue(), ^{
-              nfbApplyMuted(player, manager, wasMuted);
-            });
+    if (!wasMuted) {
+        return;
     }
+    nfbArmSilentWindow();
+    nfbApplyMuted(player, nfbImmersiveAudioManager(card), YES);
 }
 
+// Whether the video on screen is silent right now, so leaving or scrubbing
+// never turns the sound on by itself — and never turns it off on a reader who
+// asked for it.
 // The state to hold on to: the session's byte when it can be read, the player's
 // otherwise.
 static BOOL nfbCurrentMuted(UIView* card, TAVPlayer* player) {
@@ -440,6 +469,21 @@ static BOOL nfbCurrentMuted(UIView* card, TAVPlayer* player) {
     }
     return player.isMuted;
 }
+
+static BOOL nfbActiveCardIsSilent(void) {
+    UIView* card = gNFBActiveCard;
+    if (!card) {
+        return NO;
+    }
+    return nfbCurrentMuted(card, nfbCardPlayer(card));
+}
+
+static void nfbArmSilentWindowIfSilent(void) {
+    if (nfbActiveCardIsSilent()) {
+        nfbArmSilentWindow();
+    }
+}
+
 
 // timeControlStatus follows AVPlayer: 0 paused, 1 waiting to play, 2 playing.
 static void nfbTogglePlayback(TAVPlayer* player) {
@@ -749,15 +793,19 @@ static void nfbUpdateMinimalBar(UIView* card, TAVPlayer* player) {
     CGFloat trackTop = floorY - kNFBMinimalTrackLift - trackHeight;
     CGFloat clockHeight = CGRectGetHeight(clock.bounds);
     CGFloat clockTop = floorY - kNFBMinimalClockLift - clockHeight / 2.0;
-    CGFloat height = MAX(clockTop + clockHeight, trackTop + trackHeight) - trackTop;
-    bar.frame = CGRectMake(0, trackTop, width, height);
-    track.frame = CGRectMake(0, 0, width, trackHeight);
+    // The grip reaches above the track, and a subview only takes touches inside
+    // its parent — so the bar has to start where the grip starts, not where the
+    // track does. Getting that wrong left half the band dead to the touch.
+    CGFloat gripTop = trackTop + trackHeight / 2.0 - kNFBMinimalGripHeight / 2.0;
+    CGFloat barTop = MIN(trackTop, gripTop);
+    CGFloat barBottom = MAX(clockTop + clockHeight, trackTop + trackHeight);
+    bar.frame = CGRectMake(0, barTop, width, barBottom - barTop);
+    track.frame = CGRectMake(0, trackTop - barTop, width, trackHeight);
     track.layer.cornerRadius = trackHeight / 2.0;
     fill.frame = CGRectMake(0, 0, width * ratio, trackHeight);
     fill.layer.cornerRadius = trackHeight / 2.0;
-    grip.frame = CGRectMake(0, trackHeight / 2.0 - kNFBMinimalGripHeight / 2.0, width,
-                            kNFBMinimalGripHeight);
-    clock.frame = CGRectMake(kNFBMinimalTextInset, clockTop - trackTop,
+    grip.frame = CGRectMake(0, gripTop - barTop, width, kNFBMinimalGripHeight);
+    clock.frame = CGRectMake(kNFBMinimalTextInset, clockTop - barTop,
                              CGRectGetWidth(clock.bounds), clockHeight);
 
     BOOL muted = nfbCurrentMuted(card, player);
@@ -825,6 +873,11 @@ static void nfbHandleScrubGesture(UIView* card, UILongPressGestureRecognizer* pr
                    press.state == UIGestureRecognizerStateCancelled ||
                    press.state == UIGestureRecognizerStateFailed);
     if (!ending) {
+        // Seeking makes the app treat the video as touched, and a touched video
+        // is one it wants to hear. The silent stretch covers the whole drag.
+        if (press.state == UIGestureRecognizerStateBegan) {
+            nfbArmSilentWindowIfSilent();
+        }
         objc_setAssociatedObject(card, kNFBScrubbingKey, @YES,
                                  OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     }
