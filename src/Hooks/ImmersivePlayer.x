@@ -193,6 +193,13 @@ static void nfbClearAutoUnmute(UIView* view) {
 
 %hook T1InlineVideoView
 
+// Called on the way back from full screen, as the timeline takes its player
+// again — the moment the sound escaped.
+- (void)fadeInControlsAfterImmersiveDismiss {
+    nfbArmSilentWindowIfSilent();
+    %orig;
+}
+
 - (void)didMoveToWindow {
     %orig;
     nfbClearAutoUnmute((UIView*)self);
@@ -300,7 +307,11 @@ static BOOL isImmersiveCardPan(id viewController,
     %orig;
 }
 
+// The swipe that closes the player starts here, well before any view is told
+// it is leaving. Arming on a silent video only ever refuses a sound, so the
+// other gestures that reach this method are unaffected.
 - (BOOL)gestureRecognizerShouldBegin:(UIGestureRecognizer*)gesture {
+    nfbArmSilentWindowIfSilent();
     if ([BHTSettings boolForKey:@"disable_immersive_scroll"] &&
         isImmersiveCardPan(self, gesture)) {
         return NO;
@@ -462,12 +473,17 @@ static void nfbKeepAudioState(UIView* card, TAVPlayer* player, BOOL wasMuted) {
 // asked for it.
 // The state to hold on to: the session's byte when it can be read, the player's
 // otherwise.
+// The player is asked first: it is what is actually heard. The session byte is
+// only the app's memory of the decision, and the mute imposed at playback goes
+// straight to the player without touching it — so reading the byte first
+// answered "not muted" for a video that was plainly silent, and every guard
+// that depends on this answer stood down.
 static BOOL nfbCurrentMuted(UIView* card, TAVPlayer* player) {
-    uint8_t* sessionMuted = nfbAudioMutedByte(nfbImmersiveAudioManager(card));
-    if (sessionMuted) {
-        return *sessionMuted != 0;
+    if (player) {
+        return player.isMuted;
     }
-    return player.isMuted;
+    uint8_t* sessionMuted = nfbAudioMutedByte(nfbImmersiveAudioManager(card));
+    return sessionMuted ? *sessionMuted != 0 : NO;
 }
 
 static BOOL nfbActiveCardIsSilent(void) {
