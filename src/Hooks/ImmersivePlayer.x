@@ -33,7 +33,7 @@ static const void* kNFBCardShownAtKey = &kNFBCardShownAtKey;
 // fold can only answer once those views exist. The bar is therefore kept clear
 // for the length of that animation — the bar alone, never the card: the card's
 // visibility is what gates autoplay, and dimming it stops playback outright.
-static const NSTimeInterval kNFBBarRevealDelay = 0.45;
+static const NSTimeInterval kNFBBarRevealDelay = 0.3;
 
 // A view the app animates in with the presentation and folds away a moment
 // later is held clear for the length of that animation, then given back
@@ -65,78 +65,6 @@ static void nfbHoldThroughOpening(UIView* view) {
         });
 }
 
-// The plugins the app stacks over a card, each named for what it owns. Only
-// those that carry chrome are listed: the author and body, the engagement row,
-// the back button, the overflow row, the attribution badge and the reply bar.
-// The gradients are left alone — they belong to the picture — and so is
-// anything holding a player or a mirror of one.
-
-// authorContainerView, avatarView, authorView, bodyScrollView, tweetBodyView.
-%hook _TtC14T1TwitterSwift25ImmersiveStatusPluginView
-
-- (void)didMoveToWindow {
-    %orig;
-    nfbHoldThroughOpening((UIView*)self);
-}
-
-%end
-
-// The reply, repost, like, bookmark and share row.
-%hook _TtC14T1TwitterSwift36ImmersiveEngagementActionsPluginView
-
-- (void)didMoveToWindow {
-    %orig;
-    nfbHoldThroughOpening((UIView*)self);
-}
-
-%end
-
-// The arrow at the top left.
-%hook _TtC14T1TwitterSwift29ImmersiveBackButtonPluginView
-
-- (void)didMoveToWindow {
-    %orig;
-    nfbHoldThroughOpening((UIView*)self);
-}
-
-%end
-
-// The overflow row at the top right.
-%hook _TtC14T1TwitterSwift35ImmersiveTopRightActionsPluginsView
-
-- (void)didMoveToWindow {
-    %orig;
-    nfbHoldThroughOpening((UIView*)self);
-}
-
-%end
-
-// The "From …" badge over a quoted or forwarded source.
-%hook _TtC14T1TwitterSwift30ImmersiveAttributionPluginView
-
-- (void)didMoveToWindow {
-    %orig;
-    nfbHoldThroughOpening((UIView*)self);
-}
-
-%end
-
-// The reply field at the bottom.
-%hook _TtC14T1TwitterSwift27ImmersiveReplyBarPluginView
-
-- (void)didMoveToWindow {
-    %orig;
-    nfbHoldThroughOpening((UIView*)self);
-}
-
-%end
-// When the reader last tapped. The player reports its state through an
-// asynchronous machine, so for a moment after a tap it still answers with the
-// old one — long enough for the fold to read "playing" while the bar is coming
-// up for a pause, and take it straight back down. The reader's own tap already
-// put the bar where it belongs, so nothing else touches it for a beat.
-static NSTimeInterval gNFBLastUserTap = 0;
-static const NSTimeInterval kNFBUserTapGrace = 0.6;
 static BOOL nfbFoldIfDue(UIView* card);
 
 static void nfbRestoreTimestamp(UIView* controls) {
@@ -265,7 +193,10 @@ static const void* kNFBMinimalTimerKey = &kNFBMinimalTimerKey;
 // carries its own control bar out of the frame. This bar waits for that to
 // finish rather than joining it: two sets of times on screen at once read as a
 // glitch, however brief.
-static const NSTimeInterval kNFBOpeningSettle = 0.22;
+// Measured at 60 frames a second on the opening: the app's overlay is gone by
+// the ninth frame, about 150 ms. This waits just past that and no longer —
+// every extra millisecond is a hole where nothing is on screen.
+static const NSTimeInterval kNFBOpeningSettle = 0.18;
 // While a card is opening, a player that reports "waiting to play" is a player
 // about to play: the app draws its overlay over the outgoing timeline for the
 // length of that transition, and waiting for the first frame of video before
@@ -301,6 +232,30 @@ static TAVPlayer* nfbCardPlayer(UIView* card) {
         }
     });
     return pageView ? nfbImmersivePagePlayer(pageView) : nil;
+}
+
+// Twitter's own tap handler turns the sound on as well as moving the controls,
+// and this tweak has always kept that off: before, by swallowing the tap
+// entirely — which is why the controls never came back either. Now the handler
+// runs and the audio state is simply put back around it. The player applies
+// sound changes through the same asynchronous machine as playback, so it is
+// restored on this turn and on the next few rather than once.
+static void nfbKeepAudioState(TAVPlayer* player, BOOL wasMuted) {
+    if (!player) {
+        return;
+    }
+    if (player.isMuted != wasMuted) {
+        player.isMuted = wasMuted;
+    }
+    for (NSInteger step = 1; step <= 3; step++) {
+        dispatch_after(
+            dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.05 * step * NSEC_PER_SEC)),
+            dispatch_get_main_queue(), ^{
+              if (player.isMuted != wasMuted) {
+                  player.isMuted = wasMuted;
+              }
+            });
+    }
 }
 
 // timeControlStatus follows AVPlayer: 0 paused, 1 waiting to play, 2 playing.
@@ -603,8 +558,10 @@ static void nfbUpdateMinimalBar(UIView* card, TAVPlayer* player) {
 // gap is closed by acting sooner instead — the bar is watched on a short
 // repeat and folded on the very tick it appears, while the video plays.
 
-static const NSTimeInterval kNFBFoldTick = 0.03;
-static const NSInteger kNFBFoldAttempts = 24;
+// One display frame on a 120 Hz screen, so the net behind the mount signal is
+// never late by more than a frame; the count keeps the same 0.7 s of watch.
+static const NSTimeInterval kNFBFoldTick = 0.008;
+static const NSInteger kNFBFoldAttempts = 90;
 
 // Folds when the bar and the playback state disagree. Returns NO while the
 // answer is still to come — the video not yet playing, or the bar not yet
@@ -641,12 +598,15 @@ static BOOL nfbFoldIfDue(UIView* card) {
     if (!recognizer) {
         return YES;
     }
+
+    BOOL wasMuted = player.isMuted;
     gNFBSyntheticToggle = YES;
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Warc-performSelector-leaks"
     [card performSelector:@selector(handleSingleTap:) withObject:recognizer];
 #pragma clang diagnostic pop
     gNFBSyntheticToggle = NO;
+    nfbKeepAudioState(player, wasMuted);
     return YES;
 }
 
@@ -712,6 +672,7 @@ static void nfbStartFoldWatch(UIView* card) {
     }
 
     BOOL wasPlaying = player.playbackState.timeControlStatus != 0;
+    BOOL wasMuted = player.isMuted;
     nfbTogglePlayback(player);
     [(_TtC14T1TwitterSwift17ImmersiveCardView*)self setPausedByUser:wasPlaying];
 
@@ -721,6 +682,7 @@ static void nfbStartFoldWatch(UIView* card) {
     BOOL runsToggle = (expanded != paused);
     if (runsToggle) {
         %orig;
+        nfbKeepAudioState(player, wasMuted);
     }
     nfbShowPausedGlyph(card, paused);
     nfbUpdateMinimalBar(card, player);
