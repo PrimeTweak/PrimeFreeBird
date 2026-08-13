@@ -266,6 +266,8 @@
 @property (nonatomic, readonly) TAVPlaybackState* playbackState;
 // Selectors are isMuted / setIsMuted: on this class.
 @property (nonatomic) BOOL isMuted;
+// The other half of the audio state, and the one the timeline handover raises.
+@property (nonatomic) float volume;
 - (void)play;
 - (void)pause;
 - (void)playOrReplay;
