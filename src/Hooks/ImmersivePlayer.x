@@ -136,6 +136,29 @@ static void nfbRestoreTimestamp(UIView* controls) {
 // before its handler runs. The speaker button in the controls is untouched, and
 // so is every other route to the sound.
 
+// Until when a video opened from the timeline must stay silent. The flag above
+// stops the timeline's own unmute; this carries the same intent into the full
+// screen, where the sound is turned on by a different route.
+static NSTimeInterval gNFBSilentOpeningUntil = 0;
+static const NSTimeInterval kNFBSilentOpeningWindow = 1.2;
+
+static BOOL nfbSilentOpeningActive(void) {
+    return [NSDate timeIntervalSinceReferenceDate] < gNFBSilentOpeningUntil;
+}
+
+// isHoldingInlineAudioFocus is the byte next to the flag: set when this video
+// is the one making noise. Clear means the reader was watching it silent, and
+// that is the state the full screen has to open in.
+static BOOL nfbInlineVideoIsSilent(UIView* view) {
+    Ivar focusIvar = class_getInstanceVariable(object_getClass(view),
+                                               "isHoldingInlineAudioFocus");
+    if (!focusIvar) {
+        return NO;
+    }
+    uint8_t* focus = (uint8_t*)(__bridge void*)view + ivar_getOffset(focusIvar);
+    return *focus == 0;
+}
+
 static void nfbClearAutoUnmute(UIView* view) {
     Ivar flagIvar =
         class_getInstanceVariable(object_getClass(view), "isAutoUnmuteEnabled");
@@ -154,7 +177,26 @@ static void nfbClearAutoUnmute(UIView* view) {
 }
 
 - (void)handleTapWithTapRecognizer:(UITapGestureRecognizer*)recognizer {
-    nfbClearAutoUnmute((UIView*)self);
+    UIView* view = (UIView*)self;
+    nfbClearAutoUnmute(view);
+    if (nfbInlineVideoIsSilent(view)) {
+        gNFBSilentOpeningUntil =
+            [NSDate timeIntervalSinceReferenceDate] + kNFBSilentOpeningWindow;
+    }
+    %orig;
+}
+
+%end
+
+// The one setter the sound really passes through. During the window opened by a
+// tap on a silent video, a request to turn it on is dropped — the reader's own
+// speaker button comes later, outside the window, and works as always.
+%hook TAVPlayer
+
+- (void)setIsMuted:(BOOL)muted {
+    if (!muted && nfbSilentOpeningActive()) {
+        return;
+    }
     %orig;
 }
 
@@ -788,6 +830,9 @@ static void nfbStartFoldWatch(UIView* card) {
     UIView* card = (UIView*)self;
     nfbShowPausedGlyph(card, NO);
     if (card.window) {
+        if (nfbSilentOpeningActive()) {
+            nfbApplyMuted(nfbCardPlayer(card), nfbImmersiveAudioManager(card), YES);
+        }
         gNFBActiveCard = card;
         objc_setAssociatedObject(
             card, kNFBCardShownAtKey,
