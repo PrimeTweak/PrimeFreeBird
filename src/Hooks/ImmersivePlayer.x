@@ -41,9 +41,6 @@ static const NSTimeInterval kNFBBarRevealDelay = 0.3;
 // put the bar where it belongs, so nothing else touches it for a beat.
 static NSTimeInterval gNFBLastUserTap = 0;
 static const NSTimeInterval kNFBUserTapGrace = 0.6;
-// Defined with the audio helpers further down, and announced here because the
-// dismissal hooks sit above them.
-static void nfbArmSilentWindowIfSilent(void);
 
 // A view the app animates in with the presentation and folds away a moment
 // later is held clear for the length of that animation, then given back
@@ -139,47 +136,12 @@ static void nfbRestoreTimestamp(UIView* controls) {
 // before its handler runs. The speaker button in the controls is untouched, and
 // so is every other route to the sound.
 
-// Until when a video opened from the timeline must stay silent. The flag above
-// stops the timeline's own unmute; this carries the same intent into the full
-// screen, where the sound is turned on by a different route.
-static NSTimeInterval gNFBSilentOpeningUntil = 0;
-static const NSTimeInterval kNFBSilentOpeningWindow = 1.2;
-
-// Set while the reader's own button is changing the sound, so the refusal below
-// never stands in their way.
-static BOOL gNFBUserAudioChange = NO;
-
-static BOOL nfbSilentOpeningActive(void) {
-    return [NSDate timeIntervalSinceReferenceDate] < gNFBSilentOpeningUntil;
-}
-
-static void nfbArmSilentWindow(void) {
-    gNFBSilentOpeningUntil =
-        [NSDate timeIntervalSinceReferenceDate] + kNFBSilentOpeningWindow;
-}
-
-// The timeline view keeps its player view once loaded, and that view holds the
-// player. Read this way, the answer is the sound itself rather than a flag
-// about focus — which the playing video holds whether or not it is muted, and
-// which was why some videos still opened loud.
-static TAVPlayer* nfbInlinePlayer(UIView* view) {
-    Ivar viewIvar =
-        class_getInstanceVariable(object_getClass(view), "playerViewIfLoaded");
-    id playerView = viewIvar ? object_getIvar(view, viewIvar) : nil;
-    if (!playerView) {
-        return nil;
-    }
-    Ivar playerIvar =
-        class_getInstanceVariable(object_getClass(playerView), "_player");
-    return playerIvar ? object_getIvar(playerView, playerIvar) : nil;
-}
-
-// Nothing to read means nothing is playing out loud: a tap no longer wakes the
-// sound, so silence is the state to carry into the full screen.
-static BOOL nfbInlineVideoIsSilent(UIView* view) {
-    TAVPlayer* player = nfbInlinePlayer(view);
-    return player ? player.isMuted : YES;
-}
+// One rule, and no timing at all: the sound is off unless the reader turned it
+// on, and the only thing that turns it on is the speaker button on this bar.
+// Stretches of silence armed around each suspected moment were always one
+// signal short — the app wakes the sound on opening, on leaving, and on its own
+// mid-playback, each by a different route, and a stretch that ends is a hole.
+static BOOL gNFBSoundAllowed = NO;
 
 static void nfbClearAutoUnmute(UIView* view) {
     Ivar flagIvar =
@@ -193,54 +155,43 @@ static void nfbClearAutoUnmute(UIView* view) {
 
 %hook T1InlineVideoView
 
-// Called on the way back from full screen, as the timeline takes its player
-// again — the moment the sound escaped.
-- (void)fadeInControlsAfterImmersiveDismiss {
-    nfbArmSilentWindowIfSilent();
-    %orig;
-}
-
 - (void)didMoveToWindow {
     %orig;
     nfbClearAutoUnmute((UIView*)self);
 }
 
 - (void)handleTapWithTapRecognizer:(UITapGestureRecognizer*)recognizer {
-    UIView* view = (UIView*)self;
-    nfbClearAutoUnmute(view);
-    if (nfbInlineVideoIsSilent(view)) {
-        nfbArmSilentWindow();
-    }
+    nfbClearAutoUnmute((UIView*)self);
+    // A video opened from the timeline starts silent, whatever the last one was
+    // left as.
+    gNFBSoundAllowed = NO;
     %orig;
 }
 
 %end
 
-// The one setter the sound really passes through. During the window opened by a
-// tap on a silent video, a request to turn it on is dropped — the reader's own
-// speaker button comes later, outside the window, and works as always.
+// The two doors the sound comes through, both closed unless the reader opened
+// them. The setter covers a player being told to speak up; playback covers a
+// player born unmuted, which is how a full-screen video arrives and how the
+// timeline takes one back.
 %hook TAVPlayer
 
 - (void)setIsMuted:(BOOL)muted {
-    if (!muted && nfbSilentOpeningActive() && !gNFBUserAudioChange) {
+    if (!muted && !gNFBSoundAllowed) {
         return;
     }
     %orig;
 }
 
-// A player opened for a silent video is born unmuted rather than asked to
-// unmute, so refusing the setter alone still let a burst through. Playback
-// itself is the first moment the sound can be heard, and it is where the state
-// is imposed.
 - (void)play {
-    if (nfbSilentOpeningActive() && !gNFBUserAudioChange) {
+    if (!gNFBSoundAllowed) {
         self.isMuted = YES;
     }
     %orig;
 }
 
 - (void)playOrReplay {
-    if (nfbSilentOpeningActive() && !gNFBUserAudioChange) {
+    if (!gNFBSoundAllowed) {
         self.isMuted = YES;
     }
     %orig;
@@ -285,33 +236,11 @@ static BOOL isImmersiveCardPan(id viewController,
 // from the first frame of the dismissal.
 %hook T1ImmersiveFullScreenViewController
 
-// The earliest word of a dismissal, well before the view starts to go.
-- (void)prepareSourceForDismissal {
-    nfbArmSilentWindowIfSilent();
-    %orig;
-}
-
-- (void)viewWillDisappear:(BOOL)animated {
-    nfbArmSilentWindowIfSilent();
-    %orig;
-}
-
 %end
 
 %hook T1ImmersiveViewController
 
-// Both controllers exist in this build; whichever one is carrying the video,
-// its dismissal is covered.
-- (void)viewWillDisappear:(BOOL)animated {
-    nfbArmSilentWindowIfSilent();
-    %orig;
-}
-
-// The swipe that closes the player starts here, well before any view is told
-// it is leaving. Arming on a silent video only ever refuses a sound, so the
-// other gestures that reach this method are unaffected.
 - (BOOL)gestureRecognizerShouldBegin:(UIGestureRecognizer*)gesture {
-    nfbArmSilentWindowIfSilent();
     if ([BHTSettings boolForKey:@"disable_immersive_scroll"] &&
         isImmersiveCardPan(self, gesture)) {
         return NO;
@@ -456,28 +385,9 @@ static void nfbApplyMuted(TAVPlayer* player, id manager, BOOL muted) {
     }
 }
 
-// Putting the state back on a timer was never enough: the app turns the sound
-// on late, and through a player that may not even exist yet. A silent stretch
-// is opened instead — the same one the timeline opens — and every route to the
-// sound is refused for its length.
-static void nfbKeepAudioState(UIView* card, TAVPlayer* player, BOOL wasMuted) {
-    if (!wasMuted) {
-        return;
-    }
-    nfbArmSilentWindow();
-    nfbApplyMuted(player, nfbImmersiveAudioManager(card), YES);
-}
-
-// Whether the video on screen is silent right now, so leaving or scrubbing
-// never turns the sound on by itself — and never turns it off on a reader who
-// asked for it.
-// The state to hold on to: the session's byte when it can be read, the player's
-// otherwise.
 // The player is asked first: it is what is actually heard. The session byte is
-// only the app's memory of the decision, and the mute imposed at playback goes
-// straight to the player without touching it — so reading the byte first
-// answered "not muted" for a video that was plainly silent, and every guard
-// that depends on this answer stood down.
+// only the app's memory of the decision, and a mute imposed at playback goes
+// straight to the player without touching it.
 static BOOL nfbCurrentMuted(UIView* card, TAVPlayer* player) {
     if (player) {
         return player.isMuted;
@@ -485,21 +395,6 @@ static BOOL nfbCurrentMuted(UIView* card, TAVPlayer* player) {
     uint8_t* sessionMuted = nfbAudioMutedByte(nfbImmersiveAudioManager(card));
     return sessionMuted ? *sessionMuted != 0 : NO;
 }
-
-static BOOL nfbActiveCardIsSilent(void) {
-    UIView* card = gNFBActiveCard;
-    if (!card) {
-        return NO;
-    }
-    return nfbCurrentMuted(card, nfbCardPlayer(card));
-}
-
-static void nfbArmSilentWindowIfSilent(void) {
-    if (nfbActiveCardIsSilent()) {
-        nfbArmSilentWindow();
-    }
-}
-
 
 // timeControlStatus follows AVPlayer: 0 paused, 1 waiting to play, 2 playing.
 static void nfbTogglePlayback(TAVPlayer* player) {
@@ -690,9 +585,9 @@ static UIView* nfbMinimalBar(UIView* card) {
               }
               TAVPlayer* player = nfbCardPlayer(strongCard);
               BOOL muted = nfbCurrentMuted(strongCard, player);
-              gNFBUserAudioChange = YES;
+              // The one place the sound is allowed to come on.
+              gNFBSoundAllowed = muted;
               nfbApplyMuted(player, nfbImmersiveAudioManager(strongCard), !muted);
-              gNFBUserAudioChange = NO;
               nfbUpdateMinimalBar(strongCard, player);
             }]
         forControlEvents:UIControlEventTouchUpInside];
@@ -889,11 +784,6 @@ static void nfbHandleScrubGesture(UIView* card, UILongPressGestureRecognizer* pr
                    press.state == UIGestureRecognizerStateCancelled ||
                    press.state == UIGestureRecognizerStateFailed);
     if (!ending) {
-        // Seeking makes the app treat the video as touched, and a touched video
-        // is one it wants to hear. The silent stretch covers the whole drag.
-        if (press.state == UIGestureRecognizerStateBegan) {
-            nfbArmSilentWindowIfSilent();
-        }
         objc_setAssociatedObject(card, kNFBScrubbingKey, @YES,
                                  OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     }
@@ -974,14 +864,12 @@ static BOOL nfbFoldIfDue(UIView* card) {
         return YES;
     }
 
-    BOOL wasMuted = nfbCurrentMuted(card, player);
     gNFBSyntheticToggle = YES;
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Warc-performSelector-leaks"
     [card performSelector:@selector(handleSingleTap:) withObject:recognizer];
 #pragma clang diagnostic pop
     gNFBSyntheticToggle = NO;
-    nfbKeepAudioState(card, player, wasMuted);
     return YES;
 }
 
@@ -1057,7 +945,6 @@ static void nfbStartFoldWatch(UIView* card) {
     }
 
     BOOL wasPlaying = player.playbackState.timeControlStatus != 0;
-    BOOL wasMuted = nfbCurrentMuted(card, player);
     nfbTogglePlayback(player);
     [(_TtC14T1TwitterSwift17ImmersiveCardView*)self setPausedByUser:wasPlaying];
 
@@ -1067,7 +954,6 @@ static void nfbStartFoldWatch(UIView* card) {
     BOOL runsToggle = (expanded != paused);
     if (runsToggle) {
         %orig;
-        nfbKeepAudioState(card, player, wasMuted);
     }
     nfbShowPausedGlyph(card, paused);
     nfbUpdateMinimalBar(card, player);
@@ -1085,7 +971,7 @@ static void nfbStartFoldWatch(UIView* card) {
     UIView* card = (UIView*)self;
     nfbShowPausedGlyph(card, NO);
     if (card.window) {
-        if (nfbSilentOpeningActive()) {
+        if (!gNFBSoundAllowed) {
             nfbApplyMuted(nfbCardPlayer(card), nfbImmersiveAudioManager(card), YES);
         }
         gNFBActiveCard = card;
