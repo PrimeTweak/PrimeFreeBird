@@ -264,6 +264,8 @@
 
 @interface TAVPlayer : NSObject
 @property (nonatomic, readonly) TAVPlaybackState* playbackState;
+// Selectors are isMuted / setIsMuted: on this class.
+@property (nonatomic) BOOL isMuted;
 - (void)play;
 - (void)pause;
 - (void)playOrReplay;
