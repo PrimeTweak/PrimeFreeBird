@@ -208,6 +208,24 @@ static void nfbClearAutoUnmute(UIView* view) {
     %orig;
 }
 
+// A player opened for a silent video is born unmuted rather than asked to
+// unmute, so refusing the setter alone still let a burst through. Playback
+// itself is the first moment the sound can be heard, and it is where the state
+// is imposed.
+- (void)play {
+    if (nfbSilentOpeningActive() && !gNFBUserAudioChange) {
+        self.isMuted = YES;
+    }
+    %orig;
+}
+
+- (void)playOrReplay {
+    if (nfbSilentOpeningActive() && !gNFBUserAudioChange) {
+        self.isMuted = YES;
+    }
+    %orig;
+}
+
 %end
 
 %hook _TtC14T1TwitterSwift24ImmersivePiPDropZoneView
@@ -309,7 +327,15 @@ static const NSInteger kNFBMinimalTrackTag = 90211;
 static const NSInteger kNFBMinimalFillTag = 90212;
 static const NSInteger kNFBMinimalClockTag = 90213;
 static const NSInteger kNFBMinimalMuteTag = 90214;
+static const NSInteger kNFBMinimalGripTag = 90215;
 static const CGFloat kNFBMinimalMuteSize = 34.0;
+// The track is three points tall — too thin to catch a thumb — so an invisible
+// band of its own width carries the touch, and the track thickens under it.
+static const CGFloat kNFBMinimalGripHeight = 26.0;
+static const CGFloat kNFBScrubTrackHeight = 6.0;
+static const void* kNFBScrubbingKey = &kNFBScrubbingKey;
+static const void* kNFBScrubRatioKey = &kNFBScrubRatioKey;
+static NSTimeInterval gNFBLastSeek = 0;
 static const CGFloat kNFBPausedGlyphSize = 72.0;
 
 // Marks a toggle synthesized by the tweak: playback is left alone, only the
@@ -573,6 +599,19 @@ static UIView* nfbMinimalBar(UIView* card) {
     clock.layer.shadowOffset = CGSizeZero;
     [bar addSubview:clock];
 
+    UIView* grip = [[UIView alloc] init];
+    grip.tag = kNFBMinimalGripTag;
+    grip.backgroundColor = [UIColor clearColor];
+    UILongPressGestureRecognizer* scrub = [[UILongPressGestureRecognizer alloc]
+        initWithTarget:card
+                action:NSSelectorFromString(@"nfbHandleScrub:")];
+    // Zero delay: the track answers the moment it is held, not half a second
+    // later, and movement must not cancel what is meant to be a drag.
+    scrub.minimumPressDuration = 0.0;
+    scrub.allowableMovement = CGFLOAT_MAX;
+    [grip addGestureRecognizer:scrub];
+    [bar addSubview:grip];
+
     // The one thing on this bar that answers a touch. The container stays
     // interactive for it, and the card's own tap handler steps aside over its
     // frame, so a press here changes the sound and nothing else.
@@ -673,6 +712,11 @@ static void nfbUpdateMinimalBar(UIView* card, TAVPlayer* player) {
     UIView* track = [bar viewWithTag:kNFBMinimalTrackTag];
     UIView* fill = [track viewWithTag:kNFBMinimalFillTag];
     UIButton* mute = (UIButton*)[bar viewWithTag:kNFBMinimalMuteTag];
+    UIView* grip = [bar viewWithTag:kNFBMinimalGripTag];
+    BOOL scrubbing =
+        [objc_getAssociatedObject(card, kNFBScrubbingKey) boolValue];
+    CGFloat trackHeight =
+        scrubbing ? kNFBScrubTrackHeight : kNFBMinimalTrackHeight;
 
     TAVPlaybackState* state = player.playbackState;
     CGFloat elapsed = CMTIME_IS_NUMERIC(state.currentTime)
@@ -683,24 +727,36 @@ static void nfbUpdateMinimalBar(UIView* card, TAVPlayer* player) {
                         : 0.0;
     CGFloat ratio = (total > 0 && isfinite(elapsed)) ? elapsed / total : 0.0;
     ratio = MAX(0.0, MIN(1.0, ratio));
+    // While the reader drags, the position under the thumb is the truth; the
+    // player is following it, not the other way round.
+    if (scrubbing) {
+        ratio = [objc_getAssociatedObject(card, kNFBScrubRatioKey) doubleValue];
+        elapsed = ratio * total;
+    }
 
     BOOL showsClock = [BHTSettings boolForKey:@"restore_video_timestamp"];
     clock.hidden = !showsClock;
     if (showsClock) {
-        clock.text = [NSString stringWithFormat:@"%@ / %@", nfbClockText(state.currentTime),
+        CMTime shown = scrubbing ? CMTimeMakeWithSeconds(elapsed, 600)
+                                 : state.currentTime;
+        clock.text = [NSString stringWithFormat:@"%@ / %@", nfbClockText(shown),
                                                 nfbClockText(state.duration)];
         [clock sizeToFit];
     }
 
     CGFloat width = CGRectGetWidth(card.bounds);
     CGFloat floorY = CGRectGetHeight(card.bounds) - card.safeAreaInsets.bottom;
-    CGFloat trackTop = floorY - kNFBMinimalTrackLift - kNFBMinimalTrackHeight;
+    CGFloat trackTop = floorY - kNFBMinimalTrackLift - trackHeight;
     CGFloat clockHeight = CGRectGetHeight(clock.bounds);
     CGFloat clockTop = floorY - kNFBMinimalClockLift - clockHeight / 2.0;
-    CGFloat height = MAX(clockTop + clockHeight, trackTop + kNFBMinimalTrackHeight) - trackTop;
+    CGFloat height = MAX(clockTop + clockHeight, trackTop + trackHeight) - trackTop;
     bar.frame = CGRectMake(0, trackTop, width, height);
-    track.frame = CGRectMake(0, 0, width, kNFBMinimalTrackHeight);
-    fill.frame = CGRectMake(0, 0, width * ratio, kNFBMinimalTrackHeight);
+    track.frame = CGRectMake(0, 0, width, trackHeight);
+    track.layer.cornerRadius = trackHeight / 2.0;
+    fill.frame = CGRectMake(0, 0, width * ratio, trackHeight);
+    fill.layer.cornerRadius = trackHeight / 2.0;
+    grip.frame = CGRectMake(0, trackHeight / 2.0 - kNFBMinimalGripHeight / 2.0, width,
+                            kNFBMinimalGripHeight);
     clock.frame = CGRectMake(kNFBMinimalTextInset, clockTop - trackTop,
                              CGRectGetWidth(clock.bounds), clockHeight);
 
@@ -743,6 +799,59 @@ static void nfbUpdateMinimalBar(UIView* card, TAVPlayer* player) {
                                      }];
         objc_setAssociatedObject(card, kNFBMinimalTimerKey, timer,
                                  OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    }
+}
+
+// Dragging the track moves the video. The band above it takes the touch, the
+// track thickens while it is held, and the player is sent to the position under
+// the thumb — throttled, since a seek on every frame of the drag would stutter,
+// with a last one on release so the final position is exact.
+static void nfbHandleScrubGesture(UIView* card, UILongPressGestureRecognizer* press) {
+    UIView* bar = objc_getAssociatedObject(card, kNFBMinimalBarKey);
+    UIView* track = bar ? [bar viewWithTag:kNFBMinimalTrackTag] : nil;
+    TAVPlayer* player = nfbCardPlayer(card);
+    if (!track || !player) {
+        return;
+    }
+    CGFloat width = CGRectGetWidth(track.bounds);
+    CGFloat ratio =
+        width > 0 ? [press locationInView:track].x / width : 0.0;
+    ratio = MAX(0.0, MIN(1.0, ratio));
+    CGFloat total = CMTIME_IS_NUMERIC(player.playbackState.duration)
+                        ? CMTimeGetSeconds(player.playbackState.duration)
+                        : 0.0;
+
+    BOOL ending = (press.state == UIGestureRecognizerStateEnded ||
+                   press.state == UIGestureRecognizerStateCancelled ||
+                   press.state == UIGestureRecognizerStateFailed);
+    if (!ending) {
+        objc_setAssociatedObject(card, kNFBScrubbingKey, @YES,
+                                 OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    }
+    objc_setAssociatedObject(card, kNFBScrubRatioKey, @(ratio),
+                             OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+
+    NSTimeInterval now = [NSDate timeIntervalSinceReferenceDate];
+    if (total > 0 && (ending || now - gNFBLastSeek > 0.06)) {
+        gNFBLastSeek = now;
+        [player seekToTime:CMTimeMakeWithSeconds(ratio * total, 600)];
+    }
+
+    if (ending) {
+        objc_setAssociatedObject(card, kNFBScrubbingKey, nil,
+                                 OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    }
+    if (press.state == UIGestureRecognizerStateBegan || ending) {
+        [UIView animateWithDuration:0.15
+                              delay:0
+                            options:UIViewAnimationOptionCurveEaseOut |
+                                    UIViewAnimationOptionBeginFromCurrentState
+                         animations:^{
+                           nfbUpdateMinimalBar(card, player);
+                         }
+                         completion:nil];
+    } else {
+        nfbUpdateMinimalBar(card, player);
     }
 }
 
@@ -844,11 +953,13 @@ static void nfbStartFoldWatch(UIView* card) {
     UIView* card = (UIView*)self;
     // The sound button owns its own corner of the screen.
     UIView* ourBar = objc_getAssociatedObject(card, kNFBMinimalBarKey);
-    UIView* muteButton = [ourBar viewWithTag:kNFBMinimalMuteTag];
-    if (muteButton && !ourBar.hidden &&
-        CGRectContainsPoint([muteButton convertRect:muteButton.bounds toView:card],
-                            [tap locationInView:card])) {
-        return;
+    CGPoint where = [tap locationInView:card];
+    for (NSInteger tag in @[ @(kNFBMinimalMuteTag), @(kNFBMinimalGripTag) ]) {
+        UIView* part = [ourBar viewWithTag:tag];
+        if (part && !ourBar.hidden &&
+            CGRectContainsPoint([part convertRect:part.bounds toView:card], where)) {
+            return;
+        }
     }
     if (!gNFBSyntheticToggle) {
         gNFBLastUserTap = [NSDate timeIntervalSinceReferenceDate];
@@ -891,6 +1002,11 @@ static void nfbStartFoldWatch(UIView* card) {
     }
     nfbShowPausedGlyph(card, paused);
     nfbUpdateMinimalBar(card, player);
+}
+
+%new
+- (void)nfbHandleScrub:(UILongPressGestureRecognizer*)press {
+    nfbHandleScrubGesture((UIView*)self, press);
 }
 
 // A recycled card carries its glyph into the next video; playback there starts
