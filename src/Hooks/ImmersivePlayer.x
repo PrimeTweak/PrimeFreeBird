@@ -170,10 +170,12 @@ static void nfbClearAutoUnmute(UIView* view) {
 
 %end
 
-// The two doors the sound comes through, both closed unless the reader opened
-// them. The setter covers a player being told to speak up; playback covers a
-// player born unmuted, which is how a full-screen video arrives and how the
-// timeline takes one back.
+// Every door the sound comes through, all closed unless the reader opened them.
+// The mute flag is only one of two levers: the player also carries a volume,
+// and the handover back to the timeline raises that one — which is why a
+// player left muted still made a sound on the way out. Playback covers a player
+// born loud, which is how a full-screen video arrives and how the timeline
+// takes one back.
 %hook TAVPlayer
 
 - (void)setIsMuted:(BOOL)muted {
@@ -183,9 +185,18 @@ static void nfbClearAutoUnmute(UIView* view) {
     %orig;
 }
 
+- (void)setVolume:(float)volume {
+    if (volume > 0 && !gNFBSoundAllowed) {
+        %orig(0);
+        return;
+    }
+    %orig;
+}
+
 - (void)play {
     if (!gNFBSoundAllowed) {
         self.isMuted = YES;
+        self.volume = 0;
     }
     %orig;
 }
@@ -193,6 +204,7 @@ static void nfbClearAutoUnmute(UIView* view) {
 - (void)playOrReplay {
     if (!gNFBSoundAllowed) {
         self.isMuted = YES;
+        self.volume = 0;
     }
     %orig;
 }
@@ -380,8 +392,13 @@ static void nfbApplyMuted(TAVPlayer* player, id manager, BOOL muted) {
     if (sessionMuted) {
         *sessionMuted = muted ? 1 : 0;
     }
-    if (player && player.isMuted != muted) {
-        player.isMuted = muted;
+    if (player) {
+        if (player.isMuted != muted) {
+            player.isMuted = muted;
+        }
+        // The volume is the other half of the state: a player unmuted at zero
+        // volume is still silent.
+        player.volume = muted ? 0.0 : 1.0;
     }
 }
 
