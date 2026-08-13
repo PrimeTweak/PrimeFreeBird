@@ -142,8 +142,17 @@ static void nfbRestoreTimestamp(UIView* controls) {
 static NSTimeInterval gNFBSilentOpeningUntil = 0;
 static const NSTimeInterval kNFBSilentOpeningWindow = 1.2;
 
+// Set while the reader's own button is changing the sound, so the refusal below
+// never stands in their way.
+static BOOL gNFBUserAudioChange = NO;
+
 static BOOL nfbSilentOpeningActive(void) {
     return [NSDate timeIntervalSinceReferenceDate] < gNFBSilentOpeningUntil;
+}
+
+static void nfbArmSilentWindow(void) {
+    gNFBSilentOpeningUntil =
+        [NSDate timeIntervalSinceReferenceDate] + kNFBSilentOpeningWindow;
 }
 
 // isHoldingInlineAudioFocus is the byte next to the flag: set when this video
@@ -180,8 +189,7 @@ static void nfbClearAutoUnmute(UIView* view) {
     UIView* view = (UIView*)self;
     nfbClearAutoUnmute(view);
     if (nfbInlineVideoIsSilent(view)) {
-        gNFBSilentOpeningUntil =
-            [NSDate timeIntervalSinceReferenceDate] + kNFBSilentOpeningWindow;
+        nfbArmSilentWindow();
     }
     %orig;
 }
@@ -194,7 +202,7 @@ static void nfbClearAutoUnmute(UIView* view) {
 %hook TAVPlayer
 
 - (void)setIsMuted:(BOOL)muted {
-    if (!muted && nfbSilentOpeningActive()) {
+    if (!muted && nfbSilentOpeningActive() && !gNFBUserAudioChange) {
         return;
     }
     %orig;
@@ -233,6 +241,18 @@ static BOOL isImmersiveCardPan(id viewController,
         class_getInstanceVariable([viewController class], "panRecognizer");
     return panIvar && object_getIvar(viewController, panIvar) == gesture;
 }
+
+// Leaving full screen hands the sound back to the timeline, and it escapes for
+// a moment on the way. The same window is armed here, so the handover is silent
+// from the first frame of the dismissal.
+%hook T1ImmersiveFullScreenViewController
+
+- (void)viewWillDisappear:(BOOL)animated {
+    nfbArmSilentWindow();
+    %orig;
+}
+
+%end
 
 %hook T1ImmersiveViewController
 
@@ -288,6 +308,8 @@ static const NSTimeInterval kNFBOpeningWindow = 0.9;
 static const NSInteger kNFBMinimalTrackTag = 90211;
 static const NSInteger kNFBMinimalFillTag = 90212;
 static const NSInteger kNFBMinimalClockTag = 90213;
+static const NSInteger kNFBMinimalMuteTag = 90214;
+static const CGFloat kNFBMinimalMuteSize = 34.0;
 static const CGFloat kNFBPausedGlyphSize = 72.0;
 
 // Marks a toggle synthesized by the tweak: playback is left alone, only the
@@ -514,13 +536,14 @@ static NSString* nfbClockText(CMTime time) {
 // Track, fill and clock in one container, built once per card and kept as an
 // associated object. Touches pass through: the card's tap gesture stays the
 // only thing handling them.
+static void nfbUpdateMinimalBar(UIView* card, TAVPlayer* player);
+
 static UIView* nfbMinimalBar(UIView* card) {
     UIView* bar = objc_getAssociatedObject(card, kNFBMinimalBarKey);
     if (bar) {
         return bar;
     }
     bar = [[UIView alloc] init];
-    bar.userInteractionEnabled = NO;
     // Born hidden and clear: a view created visible skips the fade on its very
     // first appearance, which is the one appearance that matters.
     bar.hidden = YES;
@@ -549,6 +572,32 @@ static UIView* nfbMinimalBar(UIView* card) {
     clock.layer.shadowRadius = 3.0;
     clock.layer.shadowOffset = CGSizeZero;
     [bar addSubview:clock];
+
+    // The one thing on this bar that answers a touch. The container stays
+    // interactive for it, and the card's own tap handler steps aside over its
+    // frame, so a press here changes the sound and nothing else.
+    UIButton* mute = [UIButton buttonWithType:UIButtonTypeSystem];
+    mute.tag = kNFBMinimalMuteTag;
+    mute.tintColor = [UIColor whiteColor];
+    mute.layer.shadowColor = [UIColor blackColor].CGColor;
+    mute.layer.shadowOpacity = 0.35;
+    mute.layer.shadowRadius = 3.0;
+    mute.layer.shadowOffset = CGSizeZero;
+    __weak UIView* weakCard = card;
+    [mute addAction:[UIAction actionWithHandler:^(UIAction* action) {
+              UIView* strongCard = weakCard;
+              if (!strongCard) {
+                  return;
+              }
+              TAVPlayer* player = nfbCardPlayer(strongCard);
+              BOOL muted = nfbCurrentMuted(strongCard, player);
+              gNFBUserAudioChange = YES;
+              nfbApplyMuted(player, nfbImmersiveAudioManager(strongCard), !muted);
+              gNFBUserAudioChange = NO;
+              nfbUpdateMinimalBar(strongCard, player);
+            }]
+        forControlEvents:UIControlEventTouchUpInside];
+    [bar addSubview:mute];
 
     objc_setAssociatedObject(card, kNFBMinimalBarKey, bar,
                              OBJC_ASSOCIATION_RETAIN_NONATOMIC);
@@ -623,6 +672,7 @@ static void nfbUpdateMinimalBar(UIView* card, TAVPlayer* player) {
     UILabel* clock = (UILabel*)[bar viewWithTag:kNFBMinimalClockTag];
     UIView* track = [bar viewWithTag:kNFBMinimalTrackTag];
     UIView* fill = [track viewWithTag:kNFBMinimalFillTag];
+    UIButton* mute = (UIButton*)[bar viewWithTag:kNFBMinimalMuteTag];
 
     TAVPlaybackState* state = player.playbackState;
     CGFloat elapsed = CMTIME_IS_NUMERIC(state.currentTime)
@@ -653,6 +703,18 @@ static void nfbUpdateMinimalBar(UIView* card, TAVPlayer* player) {
     fill.frame = CGRectMake(0, 0, width * ratio, kNFBMinimalTrackHeight);
     clock.frame = CGRectMake(kNFBMinimalTextInset, clockTop - trackTop,
                              CGRectGetWidth(clock.bounds), clockHeight);
+
+    BOOL muted = nfbCurrentMuted(card, player);
+    UIImageSymbolConfiguration* symbol =
+        [UIImageSymbolConfiguration configurationWithPointSize:15
+                                                        weight:UIFontWeightMedium];
+    [mute setImage:[UIImage systemImageNamed:muted ? @"speaker.slash.fill"
+                                             : @"speaker.wave.2.fill"
+                           withConfiguration:symbol]
+          forState:UIControlStateNormal];
+    mute.frame = CGRectMake(width - kNFBMinimalTextInset - kNFBMinimalMuteSize,
+                            CGRectGetMidY(clock.frame) - kNFBMinimalMuteSize / 2.0,
+                            kNFBMinimalMuteSize, kNFBMinimalMuteSize);
 
     if (bar.alpha < 1.0) {
         [UIView animateWithDuration:kNFBMinimalFade
@@ -780,6 +842,14 @@ static void nfbStartFoldWatch(UIView* card) {
 
 - (void)handleSingleTap:(UITapGestureRecognizer*)tap {
     UIView* card = (UIView*)self;
+    // The sound button owns its own corner of the screen.
+    UIView* ourBar = objc_getAssociatedObject(card, kNFBMinimalBarKey);
+    UIView* muteButton = [ourBar viewWithTag:kNFBMinimalMuteTag];
+    if (muteButton && !ourBar.hidden &&
+        CGRectContainsPoint([muteButton convertRect:muteButton.bounds toView:card],
+                            [tap locationInView:card])) {
+        return;
+    }
     if (!gNFBSyntheticToggle) {
         gNFBLastUserTap = [NSDate timeIntervalSinceReferenceDate];
     }
