@@ -12,8 +12,6 @@
 |:-------------------------:|:-------------------------:|:-------------------------:|
 |<img width="1604" alt="Screenshot 1" src="1.png">|<img width="1604" alt="Screenshot 2" src="2.png">|<img width="1604" alt="Screenshot 3" src="3.png">|
 
-<sub>Everything below is new in this fork, on top of NeoFreeBird.</sub>
-
 # What's new
 
 ## Liquid Glass
@@ -27,16 +25,17 @@
 - **Any colour you want** — a *Custom accent colour* row opens the native iOS picker instead of a fixed set of presets.
 - **Applied everywhere** — the bird, links, @mentions, #hashtags, buttons and the settings switches all follow it.
 - **Predictable reset** — resetting returns to stock and stays there, across restarts and re-picks.
-- **Dark shades** — choose System, Dim, Gray or Blackout for Twitter's dark backgrounds.
+- **Dark shades** — choose System, Dim, Gray or Blackout, and every surface follows: sheets, cells, the search field and the bars.
 
 ## Explore &amp; search
 
 - **Per-tab control** — hide any of For You, Trending, News, Sports or Entertainment, rather than the whole page.
 - **Advanced search** — X ships this form on the web only; here it is native, with results in Twitter's own search.
 
-## Muted words
+## Filters
 
 - **One list for everything** — a word, a phrase or an @account; the type is recognised from what you type.
+- **Filter by language** — keep only the languages you read; Tweets with no detected language always pass.
 - **Quick access from the feed** — an icon in the timeline's top bar adds or removes a filter without leaving your scroll.
 - **Filters that expire** — give a word 24 hours, 7 days or 30 days, or keep it for good.
 - **Precise by default** — whole-word matching, so "cat" never catches "concatenate".
@@ -46,6 +45,7 @@
 ## Timeline
 
 - **Unlimited timeline tabs** — pin far more lists and topics than X allows, and unlock advanced tabs like Ranked Following.
+- **Reading marker** — a line marks where you were when new Tweets arrive above, on Following and your Lists.
 - **Hide topics** — topic posts and the "Topics to follow" carousel both go.
 - **Open in Following** — start on the Following tab instead of For You, and stay there.
 - **Preload media** — images and videos are ready the moment you scroll to them.
@@ -53,8 +53,11 @@
 
 ## Media
 
+- **Tap to play or pause** — tap a video to start or stop it; the controls come up while paused and clear away during playback.
+- **Video time** — full-screen videos show the elapsed and total time instead of the countdown, on the bar and beside the progress line.
+- **Drag the progress line** — hold the line under a full-screen video and slide to move through it.
+- **Sound left alone** — opening a video no longer turns the sound on, in the timeline or full screen; a speaker button on the bar does that when you want it.
 - **Full HD uploads** — send your own videos in 1080p.
-- **Tap to pause** — tap a video to stop it, rather than reaching for the button.
 - **No mini player** — full-screen videos no longer shrink into a floating player when you drag them away.
 
 ## Tweets
@@ -79,17 +82,17 @@
 
 - **Grouped settings** — every page is split into labelled groups instead of one long list.
 - **Clean shared links** — tracking parameters stripped when you copy *or* share, profiles included.
-- **Full French localization** — every string, including the new screens.
+- **Full French localisation** — every string, including the new screens.
 
 # Fixes
 
 - **Tab labels are centred** — restored labels no longer sit off-centre after a cold launch.
-- **The video timestamp shows up** — the option now actually reveals the elapsed time in full-screen videos.
-- **"Open in Following" is honoured** — the setting was silently overridden; the tab you pick survives a new session.
+- **The video timestamp does something** — the option was wired to a handler Twitter no longer has; it works again.
+- **Full-screen controls come back** — a tap raises them and playback clears them away, instead of leaving the video bare.
 - **No black frame at launch** — the splash dissolves into the timeline instead of cutting to an empty window.
 - **Pull-to-refresh sound works again** — rebuilt for current Twitter versions, where the old hook no longer exists.
 - **Reply composer sits still** — no keyboard bounce, no doubled insets, no login wall.
-- **The settings sheet has a real header** — under Liquid Glass the list showed through beside the search field; the header is a solid bar again, down past the field.
+- **The settings header is solid** — under Liquid Glass the list showed through beside the search field; the header is a bar again, down past the field.
 
 <sub>…on top of the full BHTwitter and NeoFreeBird toolkit.</sub>
 
