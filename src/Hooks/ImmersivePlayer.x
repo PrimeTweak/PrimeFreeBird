@@ -126,6 +126,40 @@ static void nfbRestoreTimestamp(UIView* controls) {
 // own eligibility check — closing both leaves the swipe-to-dismiss gesture
 // free to work normally.
 
+// MARK: - A tap opens a video, it does not wake the sound
+
+// The timeline's video view carries a flag whose whole job is "a tap turns the
+// sound on": isAutoUnmuteEnabled, one byte beside isHoldingInlineAudioFocus.
+// That is why a tapped video came out of the timeline unmuted and stayed that
+// way, while its neighbours kept quiet — the tap that opens full screen is the
+// same tap that lifts the mute. The flag is cleared here, on the view itself,
+// before its handler runs. The speaker button in the controls is untouched, and
+// so is every other route to the sound.
+
+static void nfbClearAutoUnmute(UIView* view) {
+    Ivar flagIvar =
+        class_getInstanceVariable(object_getClass(view), "isAutoUnmuteEnabled");
+    if (!flagIvar) {
+        return;
+    }
+    uint8_t* flag = (uint8_t*)(__bridge void*)view + ivar_getOffset(flagIvar);
+    *flag = 0;
+}
+
+%hook T1InlineVideoView
+
+- (void)didMoveToWindow {
+    %orig;
+    nfbClearAutoUnmute((UIView*)self);
+}
+
+- (void)handleTapWithTapRecognizer:(UITapGestureRecognizer*)recognizer {
+    nfbClearAutoUnmute((UIView*)self);
+    %orig;
+}
+
+%end
+
 %hook _TtC14T1TwitterSwift24ImmersivePiPDropZoneView
 
 - (void)didMoveToWindow {
