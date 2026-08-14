@@ -252,14 +252,30 @@ static void nfbPositionUnderline(UIView* root, UICollectionView* cv) {
     NSInteger total = gNFBPagerTotal ?: kNFBTabCount;
     NSInteger kept = nfbKeptCount(total);
     if (kept < 1) { return; }
+    // The offset is read in the pager's own space, and the pager is not always
+    // in the remapped one: it runs unremapped until the catch-up capture has
+    // reloaded it, and any reload before that answers the absolute page count.
+    // Reading an absolute offset as a remapped one is what put the underline a
+    // slot too far — a page whose absolute index is 2 became kept index 2, and
+    // landed on the tab after the one selected. The pager's own item count says
+    // which space it is in.
+    NSInteger pagerItems = [pager numberOfItemsInSection:0];
+    BOOL pagerRemapped = (pagerItems == kept);
+    NSInteger span = pagerRemapped ? kept : total;
     CGFloat f = pager.contentOffset.x / pw;
     if (f < 0) { f = 0; }
-    if (f > kept - 1) { f = kept - 1; }
+    if (f > span - 1) { f = span - 1; }
     NSInteger i0 = (NSInteger)floor(f);
-    NSInteger i1 = (i0 + 1 <= kept - 1) ? i0 + 1 : kept - 1;
+    NSInteger i1 = (i0 + 1 <= span - 1) ? i0 + 1 : span - 1;
     CGFloat t = f - i0;
-    NSInteger abs0 = nfbAbsFromRemap(i0, total);
-    NSInteger abs1 = nfbAbsFromRemap(i1, total);
+    NSInteger abs0 = pagerRemapped ? nfbAbsFromRemap(i0, total) : i0;
+    NSInteger abs1 = pagerRemapped ? nfbAbsFromRemap(i1, total) : i1;
+    // An absolute page can be one of the hidden ones mid-swipe; the underline
+    // then rides the nearest tab that is actually on screen.
+    if (!pagerRemapped) {
+        if (nfbTabHidden(abs0)) { abs0 = nfbNearestKeptAbs(abs0, total); }
+        if (nfbTabHidden(abs1)) { abs1 = nfbNearestKeptAbs(abs1, total); }
+    }
     CGRect f0 = CGRectZero, f1 = CGRectZero;
     BOOL have0 = NO, have1 = NO;
     for (UICollectionViewCell* cell in cv.visibleCells) {
