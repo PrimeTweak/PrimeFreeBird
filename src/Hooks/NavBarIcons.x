@@ -558,6 +558,32 @@ static UIColor* nfbPortraitNeutral(UIView* view) {
 
 %hook _UIModernBarButton
 
+// Waiting for the view to be in a window paints yellow first and corrects it
+// about five frames later. The tint is therefore refused rather than replaced:
+// whatever the bar hands down, this button answers the text colour, and it does
+// so at the moment the value arrives instead of a layout pass afterwards.
+- (void)setTintColor:(UIColor*)tintColor {
+    UIView* button = (UIView*)self;
+    if (nfbInsideTwitterNavigationBar(button)) {
+        %orig(nfbBarGlyphColour(button));
+        return;
+    }
+    %orig;
+}
+
+// A tint inherited from an ancestor never passes through the setter above; it
+// arrives here, which is the earliest moment it can be seen.
+- (void)tintColorDidChange {
+    %orig;
+    UIView* button = (UIView*)self;
+    if (nfbInsideTwitterNavigationBar(button)) {
+        UIColor* wanted = nfbBarGlyphColour(button);
+        if (![button.tintColor isEqual:wanted]) {
+            button.tintColor = wanted;
+        }
+    }
+}
+
 - (void)didMoveToWindow {
     %orig;
     UIView* button = (UIView*)self;
