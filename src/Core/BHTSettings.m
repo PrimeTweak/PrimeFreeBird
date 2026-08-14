@@ -403,6 +403,16 @@ static NSDictionary<NSString*, NSDictionary*>* BHTSettingsPages(void) {
                         @"default": @NO,
                         @"type": @"toggle"
                     },
+                    @{
+                        @"key": @"voice_transcription",
+                        @"default": @NO,
+                        @"type": @"toggle"
+                    },
+                    @{
+                        @"key": @"download_voice_messages",
+                        @"default": @NO,
+                        @"type": @"toggle"
+                    },
                     @{@"type": @"header", @"titleKey": @"MESSAGES_GROUP_GROK"},
                     @{
                         @"key": @"hide_grok_analyze",
