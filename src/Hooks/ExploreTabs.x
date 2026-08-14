@@ -182,16 +182,6 @@ static BOOL gNFBSettingUnderline = NO;               // our own underline set
 static BOOL gNFBInBarFilter = NO;                    // re-entrancy guard
 static BOOL gNFBSelfNav = NO;          // our own pager navigation in progress
 static BOOL gNFBBarTapHookSeen = NO;   // primary tap path proven live
-static NSMutableString* gNFBBarPaths = nil;   // relevé : chemins vus, dans l'ordre
-static BOOL gNFBBarSelfUpdate = NO;   // notre propre appel à la barre, à ne pas retraduire
-static NSInteger gNFBBarAppliedIndex = -1;   // dernier index imposé à la barre
-
-static void nfbNoteBarPath(NSString* note) {
-    if (!gNFBBarPaths) { gNFBBarPaths = [NSMutableString string]; }
-    if ([gNFBBarPaths rangeOfString:note].location != NSNotFound) { return; }
-    if (gNFBBarPaths.length > 60) { [gNFBBarPaths setString:@""]; }
-    [gNFBBarPaths appendFormat:@"%@ ", note];
-}
 static NSUInteger gNFBAppliedMaskBits = 0xFFFF;   // last mask synced to the pager
 
 void nfbNoteExploreAccessoryView(UIView* v) {
@@ -379,8 +369,7 @@ static void nfbPositionUnderline(UIView* root, UICollectionView* cv) {
                       pagerRemapped ? @"remappe" : @"absolu",
                       sel.count ? [NSString stringWithFormat:@"%ld", (long)sel.firstObject.item]
                                 : @"aucune",
-                      (long)abs0, gNFBBarPaths.length ? gNFBBarPaths : @"aucun",
-                      centreInRoot, width, items]);
+                      (long)abs0, centreInRoot, width, items]);
 }
 
 // MARK: - pager <-> mask sync (defined before use)
@@ -542,16 +531,6 @@ static void nfbApplyTabFilter(UIView* bar, UICollectionView* cv) {
 // Translating on the way in puts the styling back on the tab the reader is
 // actually looking at.
 
-static NSInteger nfbBarIndexIn(NSInteger index) {
-    NSInteger total = gNFBPagerTotal ?: kNFBTabCount;
-    NSInteger kept = nfbKeptCount(total);
-    if (!nfbGranularActive() || kept < 1 || index < 0 || index > kept - 1) {
-        return index;
-    }
-    NSInteger abs = nfbAbsFromRemap(index, total);
-    return (abs >= 0 && abs <= total - 1) ? abs : index;
-}
-
 %hook _TtC10TFNUISwift19SegmentedTabBarView
 
 - (void)layoutSubviews {
@@ -594,150 +573,13 @@ static NSInteger nfbBarIndexIn(NSInteger index) {
         %orig;
         return;
     }
-    NSInteger absIdx = indexPath.item;
-    NSInteger total = gNFBPagerTotal ?: kNFBTabCount;
-    NSInteger r = nfbRemapFromAbs(absIdx, total);
-    if (r < 0) {   // hidden cell: not tappable in practice; be safe
-        %orig;
-        return;
-    }
+    // The cell's index is now the page's index, so the app's own navigation
+    // lands where it should: %orig runs, and with it the bar's own bookkeeping
+    // — which is what puts the bold label and its icon on the right tab.
     gNFBBarTapHookSeen = YES;
-    CGFloat pw = pager.bounds.size.width;
-    if (pw >= 1.0) {
-        gNFBSelfNav = YES;
-        [pager setContentOffset:CGPointMake(r * pw, 0) animated:YES];
-        gNFBSelfNav = NO;
-    }
-    // NO %orig: the Swift absolute navigation must not run. The underline
-    // glides on its own — it follows the animating offset at every layout.
-}
-
-
-- (void)setSelectedIndex:(NSInteger)index {
-    if (gNFBBarSelfUpdate) {
-        %orig;
-        return;
-    }
-    NSInteger t = nfbBarIndexIn(index);
-    nfbNoteBarPath([NSString stringWithFormat:@"sel%ld>%ld", (long)index, (long)t]);
-    %orig(t);
-}
-
-- (void)selectTabAt:(NSInteger)index animated:(BOOL)animated {
-    NSInteger t = nfbBarIndexIn(index);
-    nfbNoteBarPath([NSString stringWithFormat:@"tab%ld>%ld", (long)index, (long)t]);
-    %orig(t, animated);
-}
-
-- (void)finalizePagingToIndex:(NSInteger)index {
-    NSInteger t = nfbBarIndexIn(index);
-    nfbNoteBarPath([NSString stringWithFormat:@"fin%ld>%ld", (long)index, (long)t]);
-    %orig(t);
-}
-
-// Swift calling its own methods does not go through objc_msgSend, so hooking
-// this class's API catches nothing of what Twitter does internally — the relevé
-// proved it, every one of those hooks stayed silent. What UIKit calls, though,
-// is dispatched: the bar is the pager's scroll delegate, and this is where it
-// restyles its labels from the offset. The offset is in the kept space and the
-// labels are indexed absolutely, which is the whole misalignment. So after the
-// app has had its pass, the bar is told the position again — translated, and
-// through a real message send, which its Swift side does answer.
-- (void)scrollViewDidScroll:(id)scrollView {
-    %orig;
-
-    // Identity by the inner collection, not by gNFBExploreBar: that one is a
-    // weak reference to a view the Explore screen vends, and when it has gone
-    // nil this whole block used to return on its first line — the relevé caught
-    // it saying "aucun" while the rest of the file, which identifies the bar by
-    // its collection, kept working.
-    UIView* bar = (UIView*)self;
-    UICollectionView* pager = gNFBPagerCV;
-    UICollectionView* barCV = gNFBBarCV;
-    if (!nfbGranularActive() || !pager || !barCV || ![barCV isDescendantOfView:bar]) {
-        return;
-    }
-    nfbNoteBarPath(gNFBExploreBar ? @"scroll" : @"scroll(barNil)");
-    CGFloat pw = pager.bounds.size.width;
-    NSInteger total = gNFBPagerTotal ?: kNFBTabCount;
-    NSInteger kept = nfbKeptCount(total);
-    if (pw < 1.0 || kept < 1) {
-        return;
-    }
-    CGFloat f = pager.contentOffset.x / pw;
-    if (f < 0) { f = 0; }
-    if (f > kept - 1) { f = kept - 1; }
-    NSInteger i0 = (NSInteger)floor(f);
-    NSInteger i1 = (i0 + 1 <= kept - 1) ? i0 + 1 : i0;
-    CGFloat t = f - i0;
-    CGFloat a0 = (CGFloat)nfbAbsFromRemap(i0, total);
-    CGFloat a1 = (CGFloat)nfbAbsFromRemap(i1, total);
-    CGFloat absF = a0 + (a1 - a0) * t;
-
-    gNFBBarSelfUpdate = YES;
-    ((void (*)(id, SEL, double))objc_msgSend)(
-        self, @selector(updateForFractionalIndex:), (double)absF);
-
-    // Setting the index alone moved the collection's selection — the relevé
-    // showed it land on the right cell — but not the bold label and its icon:
-    // this bar builds that appearance when it configures a cell, not from the
-    // selection. So the index is set, the tab is told its content changed, and
-    // the visible tabs are rebuilt from the corrected state. Only on a real
-    // change of tab, or every scroll tick would rebuild the row.
-    NSInteger settled = (NSInteger)llround(absF);
-    if (fabs(absF - (CGFloat)settled) < 0.02 && settled != gNFBBarAppliedIndex) {
-        gNFBBarAppliedIndex = settled;
-        ((void (*)(id, SEL, NSInteger))objc_msgSend)(
-            self, @selector(setSelectedIndex:), settled);
-        ((void (*)(id, SEL, NSInteger))objc_msgSend)(
-            self, @selector(animateTabContentChangeAt:), settled);
-        ((void (*)(id, SEL))objc_msgSend)(self, @selector(reloadVisibleTabs));
-        nfbNoteBarPath([NSString stringWithFormat:@"pose%ld", (long)settled]);
-    }
-    gNFBBarSelfUpdate = NO;
-}
-
-// The label that turns bold and grows an icon changes here, by index — the one
-// path none of the others covered.
-- (void)animateTabContentChangeAt:(NSInteger)index {
-    if (gNFBBarSelfUpdate) {
-        %orig;
-        return;
-    }
-    NSInteger t = nfbBarIndexIn(index);
-    nfbNoteBarPath([NSString stringWithFormat:@"anim%ld>%ld", (long)index, (long)t]);
-    %orig(t);
-}
-
-// Takes the scroll view, not an index: nothing to translate here, only to
-// record — if this is the live path, the styling is computed inside it and the
-// answer lies further in.
-- (void)updateForScrollOffset:(id)offset {
-    nfbNoteBarPath(@"offs");
     %orig;
 }
 
-// The fractional index drives the styling mid-swipe: the two ends are
-// translated and the position between them is kept.
-- (void)updateForFractionalIndex:(CGFloat)index {
-    if (gNFBBarSelfUpdate) {
-        %orig;
-        return;
-    }
-    NSInteger total = gNFBPagerTotal ?: kNFBTabCount;
-    NSInteger kept = nfbKeptCount(total);
-    if (!nfbGranularActive() || kept < 1) {
-        %orig;
-        return;
-    }
-    CGFloat clamped = index < 0 ? 0 : (index > kept - 1 ? kept - 1 : index);
-    NSInteger i0 = (NSInteger)floor(clamped);
-    NSInteger i1 = (i0 + 1 <= kept - 1) ? i0 + 1 : i0;
-    CGFloat t = clamped - i0;
-    CGFloat a0 = (CGFloat)nfbAbsFromRemap(i0, total);
-    CGFloat a1 = (CGFloat)nfbAbsFromRemap(i1, total);
-    %orig(a0 + (a1 - a0) * t);
-}
 
 %end
 
@@ -755,21 +597,11 @@ static NSInteger nfbBarIndexIn(NSInteger index) {
         %orig;
         return;
     }
-    NSInteger absIdx = indexPath.item;
-    NSInteger total = gNFBPagerTotal ?: kNFBTabCount;
-    NSInteger r = nfbRemapFromAbs(absIdx, total);
-    if (r < 0) {
-        %orig;
-        return;
-    }
+    // Cell index and page index are the same number now, so the app's own
+    // navigation is correct: it runs, and the bar updates its own labels with
+    // it — which no amount of talking to the bar from outside ever achieved.
     gNFBBarTapHookSeen = YES;
-    CGFloat pw = pager.bounds.size.width;
-    if (pw >= 1.0) {
-        gNFBSelfNav = YES;
-        [pager setContentOffset:CGPointMake(r * pw, 0) animated:YES];
-        gNFBSelfNav = NO;
-    }
-    // NO %orig. Underline follows the animating offset at every layout.
+    %orig;
 }
 
 %end
@@ -802,30 +634,13 @@ static NSInteger nfbBarIndexIn(NSInteger index) {
         gNFBPagerCV = collectionView;
     }
     gNFBPagerTotal = n;
-    NSInteger kept = nfbKeptCount(n);
-    return (kept >= 1) ? kept : n;
-}
-
-// Translate the remapped item to the ABSOLUTE tab before %orig, so the
-// visible page mounts the right content.
-- (id)collectionView:(UICollectionView*)collectionView
-    cellForItemAtIndexPath:(NSIndexPath*)indexPath {
-    // Translate ONLY for the officially remapped pager: the invariant is
-    // "translation active ⟺ numberOfItems answered the kept count for this
-    // very collection". Anything else (including an Explore pager that raced
-    // ahead of the bar and still runs unremapped) passes through untouched.
-    if (!nfbGranularActive()
-        || collectionView != gNFBPagerCV
-        || gNFBPagerTotal < 1) {
-        return %orig;
-    }
-    NSInteger absIdx = nfbAbsFromRemap(indexPath.item, gNFBPagerTotal);
-    if (absIdx == indexPath.item) {
-        return %orig;
-    }
-    NSIndexPath* absPath = [NSIndexPath indexPathForItem:absIdx
-                                               inSection:indexPath.section];
-    return %orig(collectionView, absPath);
+    // The pager keeps ALL its pages. Handing it the kept count is what put its
+    // page indices in a different space from the bar's cell indices, and every
+    // misplacement since — the underline, the bold label — came from bridging
+    // those two spaces. With the counts equal, page index IS cell index IS
+    // absolute index, and Twitter's own bar styles the right tab with no help.
+    // Hidden pages are simply never landed on: see the drag handler below.
+    return n;
 }
 
 // Underline ticks. Bar layout passes stop before the fine end of a
@@ -839,6 +654,42 @@ static NSInteger nfbBarIndexIn(NSInteger index) {
     if (!nfbGranularActive()
         || (UICollectionView*)scrollView != gNFBPagerCV) { return; }
     nfbPositionUnderline(gNFBExploreBar, gNFBBarCV);
+}
+
+// The only thing left to enforce: a swipe never comes to rest on a hidden tab.
+// UIKit asks the delegate where the gesture should land, and that answer is
+// moved to the nearest kept page — in the direction the finger was going, so a
+// flick past a hidden tab carries on instead of bouncing back.
+- (void)scrollViewWillEndDragging:(id)scrollView
+                     withVelocity:(CGPoint)velocity
+              targetContentOffset:(inout CGPoint*)target {
+    %orig;
+    if (!nfbGranularActive() || (UICollectionView*)scrollView != gNFBPagerCV) {
+        return;
+    }
+    UICollectionView* pager = gNFBPagerCV;
+    CGFloat pw = pager.bounds.size.width;
+    NSInteger total = gNFBPagerTotal ?: kNFBTabCount;
+    if (pw < 1.0 || !target) {
+        return;
+    }
+    NSInteger wanted = (NSInteger)llround(target->x / pw);
+    if (wanted < 0) { wanted = 0; }
+    if (wanted > total - 1) { wanted = total - 1; }
+    if (!nfbTabHidden(wanted)) {
+        return;
+    }
+    NSInteger step = (velocity.x < 0) ? -1 : 1;
+    NSInteger probe = wanted;
+    while (probe >= 0 && probe <= total - 1 && nfbTabHidden(probe)) {
+        probe += step;
+    }
+    if (probe < 0 || probe > total - 1) {
+        probe = nfbNearestKeptAbs(wanted, total);
+    }
+    if (probe >= 0 && probe <= total - 1) {
+        target->x = probe * pw;
+    }
 }
 
 - (void)scrollViewDidEndDecelerating:(id)scrollView {
