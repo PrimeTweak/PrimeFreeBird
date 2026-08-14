@@ -576,22 +576,36 @@ static UIColor* nfbPortraitNeutral(UIView* view) {
 
 %end
 
+// The disc shown before a portrait arrives is not the view's tint and not a
+// palette answer: it is a layer of its own, placeholderLayer, and its fill is
+// what comes out in the accent. Setting the view's tint moved nothing, which is
+// what pointed here.
+static void nfbNeutralisePlaceholder(UIView* avatar) {
+    if (!nfbInsideTwitterNavigationBar(avatar)) {
+        return;
+    }
+    Ivar layerIvar =
+        class_getInstanceVariable(object_getClass(avatar), "placeholderLayer");
+    if (!layerIvar) {
+        return;
+    }
+    CALayer* placeholder = object_getIvar(avatar, layerIvar);
+    if (![placeholder isKindOfClass:[CALayer class]]) {
+        return;
+    }
+    placeholder.backgroundColor = nfbPortraitNeutral(avatar).CGColor;
+}
+
 %hook T1AvatarImageView
 
 - (void)didMoveToWindow {
     %orig;
-    UIView* avatar = (UIView*)self;
-    if (nfbInsideTwitterNavigationBar(avatar)) {
-        avatar.tintColor = nfbPortraitNeutral(avatar);
-    }
+    nfbNeutralisePlaceholder((UIView*)self);
 }
 
 - (void)layoutSubviews {
     %orig;
-    UIView* avatar = (UIView*)self;
-    if (nfbInsideTwitterNavigationBar(avatar)) {
-        avatar.tintColor = nfbPortraitNeutral(avatar);
-    }
+    nfbNeutralisePlaceholder((UIView*)self);
 }
 
 %end
