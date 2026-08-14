@@ -394,9 +394,16 @@ static NSDictionary<NSString*, NSDictionary*>* BHTSettingsPages(void) {
                 ]
             },
             @"grok": @{
-                @"titleKey": @"MODERN_SETTINGS_GROK_TITLE",
-                @"subtitleKey": @"MODERN_SETTINGS_GROK_SUBTITLE",
+                @"titleKey": @"MODERN_SETTINGS_MESSAGES_TITLE",
+                @"subtitleKey": @"MODERN_SETTINGS_MESSAGES_SUBTITLE",
                 @"settings": @[
+                    @{@"type": @"header", @"titleKey": @"MESSAGES_GROUP_CHAT"},
+                    @{
+                        @"key": @"hide_typing_indicator",
+                        @"default": @NO,
+                        @"type": @"toggle"
+                    },
+                    @{@"type": @"header", @"titleKey": @"MESSAGES_GROUP_GROK"},
                     @{
                         @"key": @"hide_grok_analyze",
                         @"default": @YES,
