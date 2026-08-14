@@ -15,6 +15,10 @@
 #import "Core/TwitterChirpFont.h"
 #import "Hooks/HookHelpers.h"
 
+// The picked accent, defined with the colour theme. Read directly rather than
+// inherited from the window: outside Liquid Glass no window tint is pushed.
+extern UIColor* CurrentAccentColor(void);
+
 // The table's layout margins resolve to about 20 points inside a cell and
 // about 8 on the bare view a section header is built from, putting headers
 // and their rows on two different verticals — and neither matches the 10
@@ -97,7 +101,11 @@ NSString* const kNFBMutedIncludeRepostsKey = @"nfb_muted_include_reposts";
         _addButton.titleLabel.font =
             [TwitterChirpFont(TwitterFontStyleBold) fontWithSize:15];
         [_addButton setTitleColor:[UIColor whiteColor] forState:UIControlStateNormal];
-        _addButton.backgroundColor = self.tintColor ?: [UIColor systemBlueColor];
+        // The accent is read from the theme rather than inherited from the
+        // window: outside Liquid Glass no window tint is pushed, and this
+        // button would fall back to the system colour.
+        _addButton.backgroundColor =
+            CurrentAccentColor() ?: (self.tintColor ?: [UIColor systemBlueColor]);
         _addButton.layer.cornerRadius = 6.0;
         [_addButton setContentHuggingPriority:UILayoutPriorityRequired
                                       forAxis:UILayoutConstraintAxisHorizontal];
@@ -143,7 +151,8 @@ NSString* const kNFBMutedIncludeRepostsKey = @"nfb_muted_include_reposts";
 
 - (void)tintColorDidChange {
     [super tintColorDidChange];
-    self.addButton.backgroundColor = self.tintColor ?: [UIColor systemBlueColor];
+    self.addButton.backgroundColor =
+        CurrentAccentColor() ?: (self.tintColor ?: [UIColor systemBlueColor]);
 }
 
 @end
@@ -1004,7 +1013,6 @@ static NSMutableArray<NSString*>* NFBKeptLanguageList(void) {
     BHTBundle* bundle = [BHTBundle sharedBundle];
 
     if (self.mode == 1) {
-        extern UIColor* CurrentAccentColor(void);
         UIColor* accent = CurrentAccentColor() ?: self.view.tintColor;
 
         if ([self rowIsTranslate:indexPath.row]) {
