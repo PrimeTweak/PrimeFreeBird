@@ -2,65 +2,29 @@
 //  ExploreTabs.x
 //  PrimeFreeBird
 //
-//  Granular Explore tabs — data-source remap.
+//  Granular Explore tabs.
 //
-//  Steering a 5-page pager around hidden pages (gesture rewrites, deferred
-//  animations) cannot be made artifact-free, so the page set itself is
-//  reduced. The pager's own data source
-//  (TFNUISwift.PagingViewController — its collectionView:numberOfItemsInSection:
-//  and cellForItemAtIndexPath: are ObjC protocol methods, hookable) is
-//  remapped so the collection REALLY contains only the kept pages:
+//  The pager keeps every page and the bar keeps every cell, so a page index,
+//  a cell index and a tab index are all the same number. The app's own
+//  navigation, its selected-tab styling and its bookkeeping therefore stay
+//  correct without translation, and a hidden tab is handled by two rules:
 //
-//    numberOfItemsInSection  -> kept count (N)
-//    cellForItemAtIndexPath  -> remapped item translated to the ABSOLUTE tab
-//                               before %orig, so each visible page mounts the
-//                               right content
+//    - the bar hides its cell, packs the survivors together and centres the
+//      row, so nothing empty is left where the tab was;
+//    - a gesture never comes to rest on a hidden page, and a programmatic
+//      navigation aimed at one is redirected to the nearest visible tab.
 //
-//  Consequences, by construction:
-//    - contentSize = N * pageWidth: hidden pages DO NOT EXIST. No white pages,
-//      no mid-swipe bounce, nothing to steer.
-//    - Swiping is 100% native: UIKit's own paging against a real N-item
-//      collection. Ends are REAL content edges, so edge behaviour is exactly
-//      stock Twitter's.
-//    - The 33 ms page-mount hitch at a boundary is stock Twitter behaviour
-//      (it happens with all 5 tabs visible too); with a native deceleration it
-//      reads as native.
+//  The underline is placed here rather than left to the app: with cells packed
+//  by hand, the native placement follows the layout's own frames instead of
+//  theirs. Position and width are interpolated between the two cells around
+//  the current offset and set without animation on every bar layout pass, and
+//  native animations on that one layer are dropped so nothing fights back.
 //
-//  The BAR keeps its proven visual filter (hide cell by index, pack survivors,
-//  centre the row, rescue an orphaned underline). Two bridges connect the
-//  bar's ABSOLUTE world to the pager's REMAPPED world:
-//
-//    1. TAPS: the bar's cells carry absolute indices. The delegate callback
-//       collectionView:didSelectItemAtIndexPath: is intercepted on the bar /
-//       segmented controller (ObjC protocol method on a Swift class — same
-//       mechanism as the pager's hookable delegate methods). The tweak drives the
-//       pager ourselves to the REMAPPED offset and do not forward the Swift
-//       navigation, so no absolute-index scroll is ever issued. If that
-//       selector is not the live path on this build, a safety net below
-//       translates absolute scrolls instead (and disables itself the moment
-//       the primary path is seen working).
-//    2. UNDERLINE: a pure function of the pager offset — position AND width
-//       interpolated between the REAL packed cells of the two pages around
-//       the current offset, set dead on every bar layout pass. Measured: the
-//       native follow both targets and SIZES the underline for the
-//       REMAPPED-index cell (the wrong absolute cell whenever remap differs),
-//       so its animations on that one layer are squelched and never fight
-//       back. Glides natively during flights and taps, exact at rest, no
-//       late corrections.
-//
-//  Setting changes (a tab toggled while Search is open underneath): the bar's
-//  layoutSubviews refires on return, the filter recentres the row, and a mask
-//  change triggers ONE pager reloadData (+ offset clamp) so the page set
-//  matches immediately.
-//
-//  Two failure modes are closed structurally: (1) STARTUP ORDER — the
-//  pager's data source can be interrogated before the bar exists (scope
-//  unknowable); the candidate is remembered on every pass, and the bar's
-//  first filter run captures it, reloads, and re-expresses the current page
-//  in remapped coordinates. (2) BAR OVERWRITE — the bar's INNER collection re-lays cells
-//  to native positions on its own layout passes; the filter now re-applies
-//  after every such pass (identity-guarded), so the packed row cannot be
-//  overwritten for more than one pass.
+//  Two ordering hazards are handled: the pager's data source can be
+//  interrogated before the bar exists, so the candidate collection is
+//  remembered on every pass and adopted once the bar is provably live; and the
+//  bar's inner collection re-lays its cells on its own layout passes, so the
+//  packed row is re-applied after each of them.
 //
 //  Per-tab key <-> index: hide_tab_foryou(0) trending(1) news(2) sports(3)
 //    entertainment(4). ON = HIDE. Keys default NO. Indices beyond the known
@@ -112,38 +76,8 @@ static BOOL nfbGranularActive(void) {
         && nfbAnyTabHidden() && !nfbAllTabsHidden();
 }
 
-// MARK: - absolute <-> remapped index mapping (pure, defined before use)
+// MARK: - tab mask helpers (pure, defined before use)
 
-// Number of KEPT tabs among `total` absolute slots.
-static NSInteger nfbKeptCount(NSInteger total) {
-    NSInteger kept = 0;
-    for (NSInteger i = 0; i < total; i++) {
-        if (!nfbTabHidden(i)) { kept++; }
-    }
-    return kept;
-}
-
-// Absolute index of the r-th kept tab. Clamps to the last kept tab.
-static NSInteger nfbAbsFromRemap(NSInteger r, NSInteger total) {
-    NSInteger seen = -1, lastKept = 0;
-    for (NSInteger i = 0; i < total; i++) {
-        if (nfbTabHidden(i)) { continue; }
-        lastKept = i;
-        seen++;
-        if (seen == r) { return i; }
-    }
-    return lastKept;
-}
-
-// Remapped position of an absolute index. -1 if that tab is hidden.
-static NSInteger nfbRemapFromAbs(NSInteger absIdx, NSInteger total) {
-    if (nfbTabHidden(absIdx)) { return -1; }
-    NSInteger r = 0;
-    for (NSInteger i = 0; i < absIdx && i < total; i++) {
-        if (!nfbTabHidden(i)) { r++; }
-    }
-    return r;
-}
 
 // Nearest KEPT absolute index to `cur` (used only by the safety net).
 static NSInteger nfbNearestKeptAbs(NSInteger cur, NSInteger total) {
@@ -168,12 +102,10 @@ static NSUInteger nfbMaskBits(void) {
 static __weak UIView* gNFBExploreBar = nil;          // the Explore accessory view
 static __weak UICollectionView* gNFBPagerCV = nil;   // the Explore pager collection
 static NSInteger gNFBPagerTotal = 0;                 // absolute page count (%orig)
-// Startup-order fix (measured failure: numberOfItems ran BEFORE the bar was
-// captured -> scope false -> 5 pages forever, and the pager was never
-// captured so no catch-up reload could ever fire). The data source is now
-// remembered as a CANDIDATE on every pass (paging, multi-item collection),
-// and the bar's own filter performs the catch-up: capture + reload + offset
-// realign, the first time it runs with a live bar.
+// The data source can be interrogated before the bar exists, which leaves the
+// scope check with nothing to answer. Any paging, multi-item collection served
+// by that controller is therefore remembered as a candidate on every pass, and
+// the bar's own filter adopts it the first time it runs with a live bar.
 static __weak UICollectionView* gNFBPagerCandidate = nil;
 static NSInteger gNFBPagerCandidateTotal = 0;
 static __weak UICollectionView* gNFBBarCV = nil;     // the bar's inner collection
@@ -181,7 +113,6 @@ static __weak CALayer* gNFBHighlightLayer = nil;     // underline layer (lockdow
 static BOOL gNFBSettingUnderline = NO;               // our own underline set
 static BOOL gNFBInBarFilter = NO;                    // re-entrancy guard
 static BOOL gNFBSelfNav = NO;          // our own pager navigation in progress
-static BOOL gNFBBarTapHookSeen = NO;   // primary tap path proven live
 static NSUInteger gNFBAppliedMaskBits = 0xFFFF;   // last mask synced to the pager
 
 void nfbNoteExploreAccessoryView(UIView* v) {
@@ -232,48 +163,12 @@ static BOOL nfbPagerScopeOK(UIScrollView* sv) {
     return root.window != nil && root.window == sv.window;
 }
 
-// THE UNDERLINE IS the tweak's — a pure function of the pager's offset (measured:
-// the native follow both TARGETS and SIZES the underline for the cell at the
-// REMAPPED index — e.g. selection remap-2 highlights the hidden News cell —
-// so at rest the width stayed wrong (sized for the wrong cell) and every
-// settle needed a late correction). Position AND width are now interpolated
-// between the REAL packed cells of the two pages around the current offset,
-// and set dead (no animation) on every bar layout pass — a native-looking
-// glide during flights, exact at rest, no late corrections. Native underline
+// The underline is placed here. The native placement follows the layout's own
+// cell frames, which are not the packed ones this filter installs, so position
+// AND width are interpolated between the real packed cells of the two pages
+// around the current offset, and set without animation on every bar layout
+// pass — a native-looking glide during flights, exact at rest. Native
 // animations are squelched (CALayer hook below), so nothing fights back.
-// Temporary instrumentation: the numbers this placement rests on, written on
-// screen so a screenshot settles what is guesswork today — which space the
-// pager is in, whether the bar marks a cell as selected, and which tab the
-// calculation picked.
-static void nfbUnderlineDiag(UIView* root, NSString* text) {
-    UIWindow* window = root.window;
-    if (!window) {
-        return;
-    }
-    static const void* kNFBTabDiagKey = &kNFBTabDiagKey;
-    UILabel* hud = objc_getAssociatedObject(window, kNFBTabDiagKey);
-    if (!hud) {
-        hud = [[UILabel alloc] init];
-        hud.numberOfLines = 0;
-        hud.font = [UIFont monospacedSystemFontOfSize:10 weight:UIFontWeightMedium];
-        hud.textColor = [UIColor whiteColor];
-        hud.backgroundColor = [UIColor colorWithWhite:0 alpha:0.7];
-        hud.layer.cornerRadius = 5;
-        hud.clipsToBounds = YES;
-        hud.userInteractionEnabled = NO;
-        objc_setAssociatedObject(window, kNFBTabDiagKey, hud,
-                                 OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-    }
-    if (hud.superview != window) {
-        [window addSubview:hud];
-    }
-    hud.text = text;
-    CGSize fit = [hud sizeThatFits:CGSizeMake(300, 200)];
-    hud.frame = CGRectMake(10, window.bounds.size.height - fit.height - 130,
-                           fit.width + 12, fit.height + 8);
-    [window bringSubviewToFront:hud];
-}
-
 static void nfbPositionUnderline(UIView* root, UICollectionView* cv) {
     UICollectionView* pager = gNFBPagerCV;
     if (!root || !cv || !pager) { return; }
@@ -283,29 +178,18 @@ static void nfbPositionUnderline(UIView* root, UICollectionView* cv) {
     CGFloat pw = pager.bounds.size.width;
     if (pw < 1.0) { return; }
     NSInteger total = gNFBPagerTotal ?: kNFBTabCount;
-    NSInteger kept = nfbKeptCount(total);
-    if (kept < 1) { return; }
-    // Which space the offset is in cannot be asked of the data source: this
-    // tweak answers that question itself, and always says "kept". The pages
-    // actually laid out are the only honest witness — content width over page
-    // width — and they still read absolute until a reload has happened.
-    NSInteger laidOut = (NSInteger)llround(pager.contentSize.width / pw);
-    BOOL pagerRemapped = (laidOut < 1) || (laidOut <= kept);
-    NSInteger span = pagerRemapped ? kept : total;
+    if (total < 1) { return; }
+    // The page index is the tab's own index, so the offset points straight at
+    // a cell. Mid-swipe it can point at a hidden one; the underline then rides
+    // the nearest tab that is on screen.
     CGFloat f = pager.contentOffset.x / pw;
     if (f < 0) { f = 0; }
-    if (f > span - 1) { f = span - 1; }
+    if (f > total - 1) { f = total - 1; }
     NSInteger i0 = (NSInteger)floor(f);
-    NSInteger i1 = (i0 + 1 <= span - 1) ? i0 + 1 : span - 1;
+    NSInteger i1 = (i0 + 1 <= total - 1) ? i0 + 1 : total - 1;
     CGFloat t = f - i0;
-    NSInteger abs0 = pagerRemapped ? nfbAbsFromRemap(i0, total) : i0;
-    NSInteger abs1 = pagerRemapped ? nfbAbsFromRemap(i1, total) : i1;
-    // An absolute page can be one of the hidden ones mid-swipe; the underline
-    // then rides the nearest tab that is actually on screen.
-    if (!pagerRemapped) {
-        if (nfbTabHidden(abs0)) { abs0 = nfbNearestKeptAbs(abs0, total); }
-        if (nfbTabHidden(abs1)) { abs1 = nfbNearestKeptAbs(abs1, total); }
-    }
+    NSInteger abs0 = nfbTabHidden(i0) ? nfbNearestKeptAbs(i0, total) : i0;
+    NSInteger abs1 = nfbTabHidden(i1) ? nfbNearestKeptAbs(i1, total) : i1;
     // At rest, the bar itself knows which tab is selected, and that is what the
     // reader is looking at. Deriving the answer from the pager is only needed
     // while a swipe is in flight, between two tabs.
@@ -350,26 +234,6 @@ static void nfbPositionUnderline(UIView* root, UICollectionView* cv) {
     [UIView performWithoutAnimation:^{ hl.frame = local; }];
     gNFBSettingUnderline = NO;
 
-    NSArray<NSIndexPath*>* sel = cv.indexPathsForSelectedItems;
-    NSMutableString* items = [NSMutableString string];
-    for (UICollectionViewCell* cell in cv.visibleCells) {
-        NSIndexPath* ip = [cv indexPathForCell:cell];
-        if (ip && !cell.hidden) {
-            [items appendFormat:@"%ld@%.0f ", (long)ip.item,
-                                CGRectGetMidX([root convertRect:cell.frame
-                                                       fromView:cell.superview])];
-        }
-    }
-    nfbUnderlineDiag(
-        root,
-        [NSString stringWithFormat:
-                      @"pages %ld posees / %ld gardees / %ld total\noffset %.2f  espace %@\n"
-                      @"selection %@  choix abs %ld\ntrait %.0f l%.0f\ncellules %@",
-                      (long)laidOut, (long)kept, (long)total, f,
-                      pagerRemapped ? @"remappe" : @"absolu",
-                      sel.count ? [NSString stringWithFormat:@"%ld", (long)sel.firstObject.item]
-                                : @"aucune",
-                      (long)abs0, centreInRoot, width, items]);
 }
 
 // MARK: - pager <-> mask sync (defined before use)
@@ -380,18 +244,18 @@ static void nfbPositionUnderline(UIView* root, UICollectionView* cv) {
 // updated first, so the filter's delayed re-assertions do not re-trigger it.
 static void nfbSyncPagerToMask(void) {
     UICollectionView* cv = gNFBPagerCV;
-    if (!cv) { return; }
-    if (!nfbPagerScopeOK(cv)) { return; }
-    [cv reloadData];
+    if (!cv || !nfbPagerScopeOK(cv)) { return; }
     CGFloat pw = cv.bounds.size.width;
     NSInteger total = gNFBPagerTotal ?: kNFBTabCount;
-    NSInteger kept = nfbKeptCount(total);
-    if (pw >= 1.0 && kept >= 1) {
-        CGFloat maxX = (kept - 1) * pw;
-        if (cv.contentOffset.x > maxX + 1.0) {
-            gNFBSelfNav = YES;
-            [cv setContentOffset:CGPointMake(0, 0) animated:NO];
-            gNFBSelfNav = NO;
+    if (pw >= 1.0 && total >= 1) {
+        NSInteger page = (NSInteger)llround(cv.contentOffset.x / pw);
+        if (page >= 0 && page <= total - 1 && nfbTabHidden(page)) {
+            NSInteger kept = nfbNearestKeptAbs(page, total);
+            if (kept >= 0 && kept <= total - 1) {
+                gNFBSelfNav = YES;
+                [cv setContentOffset:CGPointMake(kept * pw, 0) animated:NO];
+                gNFBSelfNav = NO;
+            }
         }
     }
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(50 * NSEC_PER_MSEC)),
@@ -400,32 +264,26 @@ static void nfbSyncPagerToMask(void) {
     });
 }
 
-// CATCH-UP (startup-order fix): the pager was interrogated before the bar
-// existed, so it still runs UNREMAPPED with all absolute pages. Capture the
-// candidate now, reload so numberOfItems is asked again (and answers the kept
-// count), and re-express the CURRENT absolute page as its remapped position so
-// the user stays on the same content (nearest kept if that tab is hidden).
+// Adopts the pager once the bar is provably live, and steps off a page whose
+// tab is hidden so the reader never starts on one.
 static void nfbCapturePagerAndRemap(UICollectionView* candidate) {
     if (!candidate) { return; }
-    CGFloat pw = candidate.bounds.size.width;
     NSInteger total = gNFBPagerCandidateTotal ?: kNFBTabCount;
-    NSInteger absBefore = 0;
-    if (pw >= 1.0) {
-        absBefore = (NSInteger)llround(candidate.contentOffset.x / pw);
-        if (absBefore < 0) { absBefore = 0; }
-        if (absBefore > total - 1) { absBefore = total - 1; }
-    }
     gNFBPagerCV = candidate;
     gNFBPagerTotal = total;
-    [candidate reloadData];
+    CGFloat pw = candidate.bounds.size.width;
     if (pw >= 1.0) {
-        NSInteger absTarget = nfbTabHidden(absBefore)
-            ? nfbNearestKeptAbs(absBefore, total) : absBefore;
-        NSInteger r = nfbRemapFromAbs(absTarget, total);
-        if (r < 0) { r = 0; }
-        gNFBSelfNav = YES;
-        [candidate setContentOffset:CGPointMake(r * pw, 0) animated:NO];
-        gNFBSelfNav = NO;
+        NSInteger page = (NSInteger)llround(candidate.contentOffset.x / pw);
+        if (page < 0) { page = 0; }
+        if (page > total - 1) { page = total - 1; }
+        if (nfbTabHidden(page)) {
+            NSInteger kept = nfbNearestKeptAbs(page, total);
+            if (kept >= 0 && kept <= total - 1) {
+                gNFBSelfNav = YES;
+                [candidate setContentOffset:CGPointMake(kept * pw, 0) animated:NO];
+                gNFBSelfNav = NO;
+            }
+        }
     }
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(50 * NSEC_PER_MSEC)),
                    dispatch_get_main_queue(), ^{
@@ -498,9 +356,8 @@ static void nfbApplyTabFilter(UIView* bar, UICollectionView* cv) {
     // The bar's inner collection is the anchor for the persistent filter hook.
     gNFBBarCV = cv;
 
-    // CATCH-UP (startup order, measured): the pager was interrogated before
-    // the bar existed and still serves all absolute pages. The bar is provably
-    // live right here — capture the candidate, reload, realign the offset.
+    // The bar is provably live right here, so a candidate remembered before it
+    // existed can now be adopted.
     if (!gNFBPagerCV) {
         UICollectionView* cand = gNFBPagerCandidate;
         if (cand && cand != cv && bar.window != nil
@@ -520,16 +377,6 @@ static void nfbApplyTabFilter(UIView* bar, UICollectionView* cv) {
 }
 
 // MARK: - hooks: the bar (visual filter, unchanged)
-
-// MARK: - the bar's own selection (measured: it styles the wrong tab)
-//
-// The relevé settled it: the pager is remapped (3 pages laid out for 3 kept),
-// the bar marks no cell as selected, and at kept page 2 the underline sits on
-// Sports — with the content on Sports too. What is wrong is the bold label:
-// Twitter hands this bar the pager's page index and the bar uses it as a CELL
-// index, so kept page 2 styles cell 2 (News) instead of cell 3 (Sports).
-// Translating on the way in puts the styling back on the tab the reader is
-// actually looking at.
 
 %hook _TtC10TFNUISwift19SegmentedTabBarView
 
@@ -557,13 +404,9 @@ static void nfbApplyTabFilter(UIView* bar, UICollectionView* cv) {
     }
 }
 
-// PRIMARY TAP BRIDGE. The bar's cells carry ABSOLUTE indices; its delegate
-// callback is an ObjC protocol method, interceptable on the Swift class. When
-// granular is active the tweak navigates the REMAPPED pager ourselves and swallow the
-// Swift navigation (no absolute-index scroll is ever issued). Guarded to the
-// Explore bar's own collection; everything else passes through untouched. If
-// this selector is not implemented on this class, Logos simply installs
-// nothing and the safety net below covers taps instead.
+// A tap on a tab. The callback is an ObjC protocol method, so it is
+// interceptable on this Swift class; it is guarded to the Explore bar's own
+// collection and everything else passes through untouched.
 - (void)collectionView:(UICollectionView*)collectionView
     didSelectItemAtIndexPath:(NSIndexPath*)indexPath {
     UIView* root = gNFBExploreBar;
@@ -573,13 +416,11 @@ static void nfbApplyTabFilter(UIView* bar, UICollectionView* cv) {
         %orig;
         return;
     }
-    // The cell's index is now the page's index, so the app's own navigation
-    // lands where it should: %orig runs, and with it the bar's own bookkeeping
-    // — which is what puts the bold label and its icon on the right tab.
-    gNFBBarTapHookSeen = YES;
+    // The cell's index is the page's index, so the app's own navigation lands
+    // on the right page and carries the bar's bookkeeping with it — which is
+    // what puts the bold label and its icon on the tab that was tapped.
     %orig;
 }
-
 
 %end
 
@@ -597,23 +438,21 @@ static void nfbApplyTabFilter(UIView* bar, UICollectionView* cv) {
         %orig;
         return;
     }
-    // Cell index and page index are the same number now, so the app's own
-    // navigation is correct: it runs, and the bar updates its own labels with
-    // it — which no amount of talking to the bar from outside ever achieved.
-    gNFBBarTapHookSeen = YES;
+    // Cell index and page index are the same number, so the app's own
+    // navigation lands on the right page and carries the bar's own styling
+    // with it.
     %orig;
 }
 
 %end
 
-// MARK: - hooks: the pager (data-source remap + settle realign)
+// MARK: - hooks: the pager
 
 %hook _TtC10TFNUISwift20PagingViewController
 
-// The collection asks its data source how many pages exist. Under granular
-// filtering the Explore pager REALLY has only the kept pages. This is also
-// where the pager collection and the absolute total are captured (the
-// argument IS the pager's collection view).
+// The collection asks its data source how many pages exist. The answer is left
+// alone; this is where the pager collection and its page count are captured,
+// the argument being the pager's collection view.
 - (NSInteger)collectionView:(UICollectionView*)collectionView
      numberOfItemsInSection:(NSInteger)section {
     NSInteger n = %orig;
@@ -626,9 +465,9 @@ static void nfbApplyTabFilter(UIView* bar, UICollectionView* cv) {
         gNFBPagerCandidate = collectionView;
         gNFBPagerCandidateTotal = n;
     }
-    // Once captured, the pager stays remapped for its whole life — never
-    // re-test the bar's window (a transient weak-nil there must not flip the
-    // page count mid-session).
+    // Once captured, the pager keeps that identity for its whole life: the
+    // bar's window is never re-tested, so a transient weak-nil there cannot
+    // change what this collection is taken to be mid-session.
     if (collectionView != gNFBPagerCV) {
         if (!nfbPagerScopeOK(collectionView)) { return n; }
         gNFBPagerCV = collectionView;
@@ -644,11 +483,9 @@ static void nfbApplyTabFilter(UIView* bar, UICollectionView* cv) {
 }
 
 // Underline ticks. Bar layout passes stop before the fine end of a
-// deceleration, which parks the glide short of the target. If this class implements
-// scrollViewDidScroll: the tweak gets a tick on EVERY offset change (perfect 60fps
-// glide + exact landing); if it does not, Logos installs nothing and the two
-// settle callbacks below still give an immediate exact
-// placement the moment any gesture or animation ends.
+// deceleration, which parks the glide short of the target, so the underline is
+// placed again on every offset change and once more when any gesture or
+// animation ends.
 - (void)scrollViewDidScroll:(id)scrollView {
     %orig;
     if (!nfbGranularActive()
@@ -708,23 +545,21 @@ static void nfbApplyTabFilter(UIView* bar, UICollectionView* cv) {
 
 %end
 
-// MARK: - safety net (auto-disabling absolute->remap translation)
+// MARK: - hidden pages are never a destination
 //
-// Only relevant if the primary tap bridge above is NOT the live path on this
-// build (its selector absent from both classes). Then the Swift tap issues an
-// ABSOLUTE navigation at the pager; these guards translate it. Both hooks are
-// one pointer-compare for every other scroll view in the app, and both stand
-// down permanently (gNFBBarTapHookSeen) the moment the primary bridge fires.
+// A programmatic navigation can still aim at a tab the reader has hidden —
+// from a deep link, a restored state, or the app's own bookkeeping. The two
+// guards below redirect such a target to the nearest visible tab. Both cost
+// one pointer comparison for every other scroll view in the app.
 
 
 %hook UICollectionView
 
-// PERSISTENT BAR FILTER (measured failure: the bar's INNER collection re-lays
-// its cells to their native positions on its own layout passes, overwriting
-// the packed/centred row for most of the session — the outer bar view's
-// layoutSubviews does not fire then). Re-apply the filter after EVERY layout
-// pass of that one collection. Identity guard first: one pointer compare for
-// every other collection in the app.
+// The bar's inner collection re-lays its cells to their native positions on
+// its own layout passes, and the outer bar view's layoutSubviews does not fire
+// then, so the packed row is re-applied after every layout pass of that one
+// collection. The identity guard comes first: one pointer comparison for every
+// other collection in the app.
 - (void)layoutSubviews {
     %orig;
     if ((UICollectionView*)self != gNFBBarCV || gNFBInBarFilter
@@ -738,38 +573,35 @@ static void nfbApplyTabFilter(UIView* bar, UICollectionView* cv) {
     gNFBInBarFilter = NO;
 }
 
+// A programmatic jump to a hidden tab lands on the nearest visible one
+// instead. Indices are absolute on both sides, so nothing else is touched.
 - (void)scrollToItemAtIndexPath:(NSIndexPath*)indexPath
                atScrollPosition:(NSUInteger)scrollPosition
                        animated:(BOOL)animated {
     if ((UICollectionView*)self != gNFBPagerCV || gNFBSelfNav
-        || gNFBBarTapHookSeen || !nfbGranularActive() || gNFBPagerTotal < 1) {
+        || !nfbGranularActive() || gNFBPagerTotal < 1
+        || !nfbTabHidden(indexPath.item)) {
         %orig;
         return;
     }
-    NSInteger kept = nfbKeptCount(gNFBPagerTotal);
-    NSInteger item = indexPath.item;
-    if (item > kept - 1 || nfbTabHidden(item)) {   // unmistakably ABSOLUTE
-        NSInteger absIdx = nfbTabHidden(item)
-            ? nfbNearestKeptAbs(item, gNFBPagerTotal) : item;
-        NSInteger r = nfbRemapFromAbs(absIdx, gNFBPagerTotal);
-        if (r < 0) { r = 0; }
-        if (r > kept - 1) { r = kept - 1; }
-        NSIndexPath* rp = [NSIndexPath indexPathForItem:r
-                                              inSection:indexPath.section];
-        %orig(rp, scrollPosition, animated);
+    NSInteger kept = nfbNearestKeptAbs(indexPath.item, gNFBPagerTotal);
+    if (kept < 0 || kept > gNFBPagerTotal - 1) {
+        %orig;
         return;
     }
-    %orig;
+    %orig([NSIndexPath indexPathForItem:kept inSection:indexPath.section],
+          scrollPosition, animated);
 }
 
 %end
 
 %hook UIScrollView
 
+// The same redirection for an animated scroll expressed as an offset: a page
+// that resolves to a hidden tab is replaced by the nearest visible one.
 - (void)setContentOffset:(CGPoint)contentOffset animated:(BOOL)animated {
     if ((UIScrollView*)self != (UIScrollView*)gNFBPagerCV || gNFBSelfNav
-        || gNFBBarTapHookSeen || !animated || !nfbGranularActive()
-        || gNFBPagerTotal < 1) {
+        || !animated || !nfbGranularActive() || gNFBPagerTotal < 1) {
         %orig;
         return;
     }
@@ -778,36 +610,29 @@ static void nfbApplyTabFilter(UIView* bar, UICollectionView* cv) {
         %orig;
         return;
     }
-    NSInteger k = (NSInteger)llround(contentOffset.x / pw);
-    BOOL pageExact = fabs(contentOffset.x - k * pw) < 1.0 && k >= 0;
-    NSInteger kept = nfbKeptCount(gNFBPagerTotal);
-    // Translate ONLY unmistakably absolute targets: a hidden tab's slot, or a
-    // page beyond the remapped bounds. Ambiguous values pass through (and the
-    // net stands down entirely once the primary bridge is proven live).
-    if (pageExact && (nfbTabHidden(k) || k > kept - 1)) {
-        NSInteger absIdx = nfbTabHidden(k)
-            ? nfbNearestKeptAbs(k, gNFBPagerTotal) : k;
-        NSInteger r = nfbRemapFromAbs(absIdx, gNFBPagerTotal);
-        if (r < 0) { r = 0; }
-        if (r > kept - 1) { r = kept - 1; }
-        %orig(CGPointMake(r * pw, contentOffset.y), animated);
+    NSInteger page = (NSInteger)llround(contentOffset.x / pw);
+    BOOL exact = fabs(contentOffset.x - page * pw) < 1.0 && page >= 0;
+    if (!exact || !nfbTabHidden(page)) {
+        %orig;
         return;
     }
-    %orig;
+    NSInteger kept = nfbNearestKeptAbs(page, gNFBPagerTotal);
+    if (kept < 0 || kept > gNFBPagerTotal - 1) {
+        %orig;
+        return;
+    }
+    %orig(CGPointMake(kept * pw, contentOffset.y), animated);
 }
 
 %end
 
 // MARK: - underline animation squelch
 //
-// The bar's native follow ANIMATES the underline toward — and SIZES it for —
-// the cell at the REMAPPED index (measured: at rest the width stayed sized
-// for the wrong cell, and every settle needed a late correction while the
-// native animation finished). The tweak's placement is a dead set inside
-// performWithoutAnimation, so it never enters here; everything the native
-// side tries to animate on that one layer is dropped. Identity-guarded: one
-// pointer compare for every other layer in the app (same proven pattern as
-// the reply-compose bounce squelch).
+// The bar animates the underline toward the cell frames of its own layout,
+// which are not the packed ones installed here, so those animations are
+// dropped. The placement above is a dead set inside performWithoutAnimation
+// and never enters here. Identity-guarded: one pointer comparison for every
+// other layer in the app.
 %hook CALayer
 
 - (void)addAnimation:(id)anim forKey:(id)key {
@@ -817,13 +642,12 @@ static void nfbApplyTabFilter(UIView* bar, UICollectionView* cv) {
     %orig;
 }
 
-// Measured (3-hidden video): ~230ms after a clean landing, a NATIVE DEAD SET
-// (no animation — invisible to the squelch above) teleported the underline to
-// a phantom position between tabs, and with no further layout pass at rest,
-// nothing repaired it until the next gesture. Every position/bounds write on
-// this one layer now belongs to the tweak: foreign dead sets are dropped, the tweak's own
-// (flagged) pass through. Identity first — one pointer compare per call for
-// the rest of the app.
+// A write with no animation escapes the drop above and can teleport the
+// underline to a position between tabs, with no further layout pass at rest to
+// repair it. Every position and bounds write on this one layer is therefore
+// accounted for: foreign ones are dropped, the flagged ones from the placement
+// above pass through. Identity first — one pointer comparison per call for the
+// rest of the app.
 - (void)setPosition:(CGPoint)position {
     if ((CALayer*)self == gNFBHighlightLayer && nfbGranularActive()
         && !gNFBSettingUnderline) {
