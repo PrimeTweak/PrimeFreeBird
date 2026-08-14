@@ -246,6 +246,14 @@
 "HIDE_TREND_VIDEOS_TITLE" = "Hide trending videos";
 "HIDE_TREND_VIDEOS_DETAIL" = "Remove trending videos from the search menu.";
 
+/* ===== MESSAGES ===== */
+"MODERN_SETTINGS_MESSAGES_TITLE" = "Messages";
+"MODERN_SETTINGS_MESSAGES_SUBTITLE" = "Read receipts, typing, and Grok's entry points.";
+"MESSAGES_GROUP_CHAT" = "Chat";
+"MESSAGES_GROUP_GROK" = "Grok";
+"HIDE_TYPING_INDICATOR_TITLE" = "Hide typing indicator";
+"HIDE_TYPING_INDICATOR_DETAIL" = "Stop telling the other side that you are writing.";
+
 /* ===== GROK ===== */
 "MODERN_SETTINGS_GROK_TITLE" = "Grok";
 "MODERN_SETTINGS_GROK_SUBTITLE" = "Remove Grok entry points and automatic translation.";
