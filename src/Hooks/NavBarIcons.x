@@ -574,3 +574,25 @@ static UIColor* nfbBarGlyphColour(UIView* view) {
 
 %end
 
+// MARK: - a portrait is not a glyph
+//
+// Measured on the view itself: its image carries renderingMode = alwaysTemplate
+// and its tintColor is the accent, so the picture is drawn as a flat disc of it.
+// A template image has no colours of its own — which is why answering the
+// palette, the placeholder layer or the view's tint moved nothing.
+//
+// The rendering mode is what is corrected, on this class alone: an image handed
+// to an avatar keeps its own colours. Nothing is repainted and no view is
+// walked.
+
+%hook T1AvatarImageView
+
+- (void)setImage:(UIImage*)image {
+    if (image.renderingMode == UIImageRenderingModeAlwaysTemplate) {
+        %orig([image imageWithRenderingMode:UIImageRenderingModeAlwaysOriginal]);
+        return;
+    }
+    %orig;
+}
+
+%end
