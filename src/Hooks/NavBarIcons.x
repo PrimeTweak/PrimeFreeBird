@@ -123,6 +123,47 @@ static void nfbRepaintGlyphs(UIView* view, UIColor* colour) {
     }
 }
 
+// The back chevron takes the palette's primary colour, which a custom accent
+// replaces. It is painted in the text colour instead, and both interception
+// points of this file are armed on it: the item's own key, so a re-set through
+// setImage: is repainted, and its inner button's image views, so a re-set that
+// goes straight to them is repainted too. A single paint does not hold — the
+// app re-images this button within a frame.
+static void nfbHoldBackChevron(UINavigationItem* item, UITraitCollection* traits) {
+    UIBarButtonItem* back = item.leftBarButtonItems.firstObject;
+    if (!back || back.title.length > 0 || !back.image) {
+        return;
+    }
+    UIColor* colour = [UIColor labelColor];
+    if ([colour respondsToSelector:@selector(resolvedColorWithTraitCollection:)] && traits) {
+        colour = [colour resolvedColorWithTraitCollection:traits] ?: colour;
+    }
+    UIColor* used = objc_getAssociatedObject(back, kNFBGreyTargetKey);
+    UIImage* ours = objc_getAssociatedObject(back, kNFBGreyedImageKey);
+    BOOL alreadyOurs = objc_getAssociatedObject(back.image, kNFBPaintedFlagKey) != nil;
+    BOOL colourChanged = used && ![used isEqual:colour];
+    if (!alreadyOurs && (back.image != ours || colourChanged)) {
+        UIImage* original = objc_getAssociatedObject(back, kNFBOriginalImageKey);
+        UIImage* source = original ?: back.image;
+        if (!original) {
+            objc_setAssociatedObject(back, kNFBOriginalImageKey, source,
+                                     OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        }
+        UIImage* painted = NFBGreyGlyph(source, colour);
+        objc_setAssociatedObject(back, kNFBGreyedImageKey, painted,
+                                 OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        back.image = painted;
+    }
+    objc_setAssociatedObject(back, kNFBGreyTargetKey, colour,
+                             OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+
+    Ivar buttonIvar = class_getInstanceVariable(object_getClass(back), "_button");
+    UIView* inner = buttonIvar ? object_getIvar(back, buttonIvar) : nil;
+    if ([inner isKindOfClass:[UIView class]]) {
+        nfbRepaintGlyphs(inner, colour);
+    }
+}
+
 static BOOL nfbLooksLikeSettingsButton(UIView* view) {
     NSString* identifier = view.accessibilityIdentifier;
     NSString* label = view.accessibilityLabel;
@@ -255,6 +296,7 @@ static void nfbRepaintNotificationsGear(UIView* bar, UIColor* colour) {
         return;
     }
     UINavigationItem* item = ((id (*)(id, SEL))objc_msgSend)(bar, @selector(topItem));
+    nfbHoldBackChevron(item, bar.traitCollection);
     for (UIBarButtonItem* button in item.rightBarButtonItems) {
         if (button.title.length > 0 || !button.image) {
             continue;
@@ -386,38 +428,6 @@ static void nfbRepaintNotificationsGear(UIView* bar, UIColor* colour) {
 // title, a glyph-sized image inside, and past the middle of its own bar. A
 // back chevron sits on the left and a text button has a title, so neither is
 // ever touched.
-// The back chevron: a glyph-only button sitting in the left third of the bar.
-// The same shape test as the right-hand one, mirrored, so a titled button or a
-// centred control is never taken for it.
-static BOOL nfbIsBackChevronButton(UIView* button) {
-    if ([button isKindOfClass:[UIButton class]] &&
-        ((UIButton*)button).currentTitle.length > 0) {
-        return NO;
-    }
-    __block BOOL hasGlyph = NO;
-    EnumerateSubviewsRecursively(button, ^(UIView* view) {
-        if (hasGlyph || ![view isKindOfClass:[UIImageView class]]) {
-            return;
-        }
-        UIImageView* imageView = (UIImageView*)view;
-        CGFloat side = CGRectGetWidth(imageView.bounds);
-        if (imageView.image && side > 8.0 && side < 34.0) {
-            hasGlyph = YES;
-        }
-    });
-    if (!hasGlyph) {
-        return NO;
-    }
-    UIView* bar = button.superview;
-    while (bar && ![bar isKindOfClass:[UINavigationBar class]]) {
-        bar = bar.superview;
-    }
-    if (!bar) {
-        return NO;
-    }
-    CGRect inBar = [button convertRect:button.bounds toView:bar];
-    return CGRectGetMidX(inBar) < CGRectGetWidth(bar.bounds) * 0.25;
-}
 
 static BOOL nfbIsRightHandGlyphButton(UIView* button) {
     if ([button isKindOfClass:[UIButton class]] &&
@@ -470,19 +480,6 @@ static BOOL nfbIsRightHandGlyphButton(UIView* button) {
         // The identifier is the precise route and covers Explore. The second
         // route exists only for Notifications, where no view carries it — and
         // it is fenced in tightly so nothing else on that screen is caught.
-        // The back chevron takes the palette's primary colour, which a custom
-        // accent replaces; it is painted in the text colour instead, through
-        // the same route, so the image views stay marked and every later
-        // re-image is repainted where it arrives.
-        if (nfbIsBackChevronButton(button)) {
-            UIColor* label = [UIColor labelColor];
-            if ([label respondsToSelector:@selector(resolvedColorWithTraitCollection:)]) {
-                label = [label resolvedColorWithTraitCollection:button.traitCollection]
-                        ?: label;
-            }
-            nfbRepaintGlyphs(button, label);
-            return;
-        }
         BOOL wanted = nfbLooksLikeSettingsButton(button) ||
                       (nfbControllerIsNotifications(nfbBarOwningController(button)) &&
                        nfbIsRightHandGlyphButton(button));
