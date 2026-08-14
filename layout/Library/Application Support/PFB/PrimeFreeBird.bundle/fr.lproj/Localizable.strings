@@ -524,3 +524,11 @@
 "PROFILE_INITIAL_TAB_SUBTITLE" = "Choisit l'onglet d'ouverture d'un profil.";
 
 "PROFILE_TAB_REPOSTS" = "Republications";
+
+/* ===== MESSAGES ===== */
+"MODERN_SETTINGS_MESSAGES_TITLE" = "Messages";
+"MODERN_SETTINGS_MESSAGES_SUBTITLE" = "Accusés de lecture, saisie et points d'entrée de Grok.";
+"MESSAGES_GROUP_CHAT" = "Discussion";
+"MESSAGES_GROUP_GROK" = "Grok";
+"HIDE_TYPING_INDICATOR_TITLE" = "Masquer l'indicateur de saisie";
+"HIDE_TYPING_INDICATOR_DETAIL" = "Cessez d'indiquer à votre correspondant que vous écrivez.";
