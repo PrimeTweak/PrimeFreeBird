@@ -182,7 +182,15 @@ static BOOL gNFBSettingUnderline = NO;               // our own underline set
 static BOOL gNFBInBarFilter = NO;                    // re-entrancy guard
 static BOOL gNFBSelfNav = NO;          // our own pager navigation in progress
 static BOOL gNFBBarTapHookSeen = NO;   // primary tap path proven live
-static NSString* gNFBLastBarSel = @"-";   // relevé : dernière traduction reçue
+static NSMutableString* gNFBBarPaths = nil;   // relevé : chemins vus, dans l'ordre
+static BOOL gNFBBarSelfUpdate = NO;   // notre propre appel à la barre, à ne pas retraduire
+
+static void nfbNoteBarPath(NSString* note) {
+    if (!gNFBBarPaths) { gNFBBarPaths = [NSMutableString string]; }
+    if ([gNFBBarPaths rangeOfString:note].location != NSNotFound) { return; }
+    if (gNFBBarPaths.length > 60) { [gNFBBarPaths setString:@""]; }
+    [gNFBBarPaths appendFormat:@"%@ ", note];
+}
 static NSUInteger gNFBAppliedMaskBits = 0xFFFF;   // last mask synced to the pager
 
 void nfbNoteExploreAccessoryView(UIView* v) {
@@ -365,12 +373,13 @@ static void nfbPositionUnderline(UIView* root, UICollectionView* cv) {
         root,
         [NSString stringWithFormat:
                       @"pages %ld posees / %ld gardees / %ld total\noffset %.2f  espace %@\n"
-                      @"selection %@  choix abs %ld  barre %@\ntrait %.0f l%.0f\ncellules %@",
+                      @"selection %@  choix abs %ld\nbarre %@\ntrait %.0f l%.0f\ncellules %@",
                       (long)laidOut, (long)kept, (long)total, f,
                       pagerRemapped ? @"remappe" : @"absolu",
                       sel.count ? [NSString stringWithFormat:@"%ld", (long)sel.firstObject.item]
                                 : @"aucune",
-                      (long)abs0, gNFBLastBarSel, centreInRoot, width, items]);
+                      (long)abs0, gNFBBarPaths.length ? gNFBBarPaths : @"aucun",
+                      centreInRoot, width, items]);
 }
 
 // MARK: - pager <-> mask sync (defined before use)
@@ -604,26 +613,94 @@ static NSInteger nfbBarIndexIn(NSInteger index) {
 
 
 - (void)setSelectedIndex:(NSInteger)index {
+    if (gNFBBarSelfUpdate) {
+        %orig;
+        return;
+    }
     NSInteger t = nfbBarIndexIn(index);
-    gNFBLastBarSel = [NSString stringWithFormat:@"sel %ld>%ld", (long)index, (long)t];
+    nfbNoteBarPath([NSString stringWithFormat:@"sel%ld>%ld", (long)index, (long)t]);
     %orig(t);
 }
 
 - (void)selectTabAt:(NSInteger)index animated:(BOOL)animated {
     NSInteger t = nfbBarIndexIn(index);
-    gNFBLastBarSel = [NSString stringWithFormat:@"tab %ld>%ld", (long)index, (long)t];
+    nfbNoteBarPath([NSString stringWithFormat:@"tab%ld>%ld", (long)index, (long)t]);
     %orig(t, animated);
 }
 
 - (void)finalizePagingToIndex:(NSInteger)index {
     NSInteger t = nfbBarIndexIn(index);
-    gNFBLastBarSel = [NSString stringWithFormat:@"fin %ld>%ld", (long)index, (long)t];
+    nfbNoteBarPath([NSString stringWithFormat:@"fin%ld>%ld", (long)index, (long)t]);
     %orig(t);
+}
+
+// Swift calling its own methods does not go through objc_msgSend, so hooking
+// this class's API catches nothing of what Twitter does internally — the relevé
+// proved it, every one of those hooks stayed silent. What UIKit calls, though,
+// is dispatched: the bar is the pager's scroll delegate, and this is where it
+// restyles its labels from the offset. The offset is in the kept space and the
+// labels are indexed absolutely, which is the whole misalignment. So after the
+// app has had its pass, the bar is told the position again — translated, and
+// through a real message send, which its Swift side does answer.
+- (void)scrollViewDidScroll:(id)scrollView {
+    %orig;
+
+    UIView* bar = (UIView*)self;
+    UICollectionView* pager = gNFBPagerCV;
+    if (!nfbGranularActive() || !nfbIsExploreBar(bar) || !pager) {
+        return;
+    }
+    nfbNoteBarPath(scrollView == pager ? @"scroll=pager" : @"scroll=autre");
+    CGFloat pw = pager.bounds.size.width;
+    NSInteger total = gNFBPagerTotal ?: kNFBTabCount;
+    NSInteger kept = nfbKeptCount(total);
+    if (pw < 1.0 || kept < 1) {
+        return;
+    }
+    CGFloat f = pager.contentOffset.x / pw;
+    if (f < 0) { f = 0; }
+    if (f > kept - 1) { f = kept - 1; }
+    NSInteger i0 = (NSInteger)floor(f);
+    NSInteger i1 = (i0 + 1 <= kept - 1) ? i0 + 1 : i0;
+    CGFloat t = f - i0;
+    CGFloat a0 = (CGFloat)nfbAbsFromRemap(i0, total);
+    CGFloat a1 = (CGFloat)nfbAbsFromRemap(i1, total);
+    CGFloat absF = a0 + (a1 - a0) * t;
+
+    gNFBBarSelfUpdate = YES;
+    ((void (*)(id, SEL, double))objc_msgSend)(
+        self, @selector(updateForFractionalIndex:), (double)absF);
+    NSInteger settled = (NSInteger)llround(absF);
+    if (fabs(absF - (CGFloat)settled) < 0.02) {
+        ((void (*)(id, SEL, NSInteger))objc_msgSend)(
+            self, @selector(setSelectedIndex:), settled);
+    }
+    gNFBBarSelfUpdate = NO;
+}
+
+// The label that turns bold and grows an icon changes here, by index — the one
+// path none of the others covered.
+- (void)animateTabContentChangeAt:(NSInteger)index {
+    NSInteger t = nfbBarIndexIn(index);
+    nfbNoteBarPath([NSString stringWithFormat:@"anim%ld>%ld", (long)index, (long)t]);
+    %orig(t);
+}
+
+// Takes the scroll view, not an index: nothing to translate here, only to
+// record — if this is the live path, the styling is computed inside it and the
+// answer lies further in.
+- (void)updateForScrollOffset:(id)offset {
+    nfbNoteBarPath(@"offs");
+    %orig;
 }
 
 // The fractional index drives the styling mid-swipe: the two ends are
 // translated and the position between them is kept.
 - (void)updateForFractionalIndex:(CGFloat)index {
+    if (gNFBBarSelfUpdate) {
+        %orig;
+        return;
+    }
     NSInteger total = gNFBPagerTotal ?: kNFBTabCount;
     NSInteger kept = nfbKeptCount(total);
     if (!nfbGranularActive() || kept < 1) {
