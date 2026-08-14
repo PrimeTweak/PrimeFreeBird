@@ -19,6 +19,10 @@
 // inherited from the window: outside Liquid Glass no window tint is pushed.
 extern UIColor* CurrentAccentColor(void);
 
+// The hidden-conversation registry lives with the code that fills it.
+extern NSArray<NSDictionary*>* NFBHiddenThreads(void);
+extern void NFBUnhideThread(NSString* threadID);
+
 // The table's layout margins resolve to about 20 points inside a cell and
 // about 8 on the bare view a section header is built from, putting headers
 // and their rows on two different verticals — and neither matches the 10
@@ -436,7 +440,7 @@ static NSMutableArray<NSString*>* NFBKeptLanguageList(void) {
     }
     // The language list is short and fixed: the popover asks for its whole
     // height, so nothing scrolls and the switch below stays in view.
-    CGFloat cap = (self.mode == 1) ? 420.0 : 330.0;
+    CGFloat cap = (self.mode == 0) ? 330.0 : 420.0;
     self.preferredContentSize = CGSizeMake(320.0, MIN(measured, cap));
 }
 
@@ -495,7 +499,8 @@ static NSMutableArray<NSString*>* NFBKeptLanguageList(void) {
     BHTBundle* bundle = [BHTBundle sharedBundle];
     UISegmentedControl* control = [[UISegmentedControl alloc] initWithItems:@[
         [bundle localizedStringForKey:@"FILTERS_SEGMENT_WORDS"],
-        [bundle localizedStringForKey:@"FILTERS_SEGMENT_LANGUAGES"]
+        [bundle localizedStringForKey:@"FILTERS_SEGMENT_LANGUAGES"],
+        [bundle localizedStringForKey:@"FILTERS_SEGMENT_THREADS"]
     ]];
     control.selectedSegmentIndex = self.mode;
     [control addTarget:self
@@ -888,7 +893,7 @@ static NSMutableArray<NSString*>* NFBKeptLanguageList(void) {
 // MARK: table
 
 - (NSInteger)numberOfSectionsInTableView:(UITableView*)tableView {
-    if (self.mode == 1) {
+    if (self.mode != 0) {
         return 1;
     }
     return self.compact ? 1 : 2;
@@ -896,6 +901,10 @@ static NSMutableArray<NSString*>* NFBKeptLanguageList(void) {
 
 // Section 0 is "Filters": the add row first, then the list (or one empty row).
 - (NSInteger)tableView:(UITableView*)tableView numberOfRowsInSection:(NSInteger)section {
+    if (self.mode == 2) {
+        // One row stands in for the empty list, as the word list does.
+        return (NSInteger)MAX(NFBHiddenThreads().count, (NSUInteger)1);
+    }
     if (self.mode == 1) {
         return (NSInteger)[self visibleLanguages].count + [self languageExtraRows];
     }
@@ -911,7 +920,7 @@ static NSMutableArray<NSString*>* NFBKeptLanguageList(void) {
     if (self.compact) {
         return nil;
     }
-    if (self.mode == 1 || section == 0) {
+    if (self.mode != 0 || section == 0) {
         // The segment above the table already names this list.
         return nil;
     }
@@ -935,7 +944,7 @@ static NSMutableArray<NSString*>* NFBKeptLanguageList(void) {
 }
 
 - (CGFloat)tableView:(UITableView*)tableView heightForHeaderInSection:(NSInteger)section {
-    if (self.compact || self.mode == 1 || section == 0) {
+    if (self.compact || self.mode != 0 || section == 0) {
         return 0.01;
     }
     return 46.0;
@@ -944,6 +953,12 @@ static NSMutableArray<NSString*>* NFBKeptLanguageList(void) {
 // How much the filter actually did today, under the list.
 - (NSString*)tableView:(UITableView*)tableView
     titleForFooterInSection:(NSInteger)section {
+    if (self.mode == 2) {
+        if (self.compact) {
+            return nil;
+        }
+        return [[BHTBundle sharedBundle] localizedStringForKey:@"THREADS_FOOTER"];
+    }
     if (self.mode == 1) {
         if (self.compact || self.othersOnly) {
             return nil;
@@ -1011,6 +1026,32 @@ static NSMutableArray<NSString*>* NFBKeptLanguageList(void) {
 - (UITableViewCell*)tableView:(UITableView*)tableView
         cellForRowAtIndexPath:(NSIndexPath*)indexPath {
     BHTBundle* bundle = [BHTBundle sharedBundle];
+
+    if (self.mode == 2) {
+        NFBMutedTermCell* cell =
+            [tableView dequeueReusableCellWithIdentifier:@"term"
+                                            forIndexPath:indexPath];
+        NSArray<NSDictionary*>* threads = NFBHiddenThreads();
+        // The badge carries the author and the row its first line: the same
+        // shape as a muted term, so the two lists read alike.
+        cell.durationButton.hidden = YES;
+        cell.removeButton.hidden = YES;
+        if (!threads.count) {
+            cell.kindLabel.hidden = YES;
+            cell.termLabel.text = [bundle localizedStringForKey:@"THREADS_EMPTY"];
+            cell.termLabel.textColor = [UIColor secondaryLabelColor];
+            return cell;
+        }
+        NSDictionary* entry = threads[(NSUInteger)indexPath.row];
+        NSString* preview = entry[@"preview"];
+        cell.kindLabel.hidden = NO;
+        cell.kindLabel.text = entry[@"who"];
+        cell.termLabel.text =
+            preview.length ? preview
+                           : [bundle localizedStringForKey:@"THREADS_NO_PREVIEW"];
+        cell.termLabel.textColor = [UIColor labelColor];
+        return cell;
+    }
 
     if (self.mode == 1) {
         UIColor* accent = CurrentAccentColor() ?: self.view.tintColor;
@@ -1242,6 +1283,9 @@ static NSMutableArray<NSString*>* NFBKeptLanguageList(void) {
 
 - (BOOL)tableView:(UITableView*)tableView
     canEditRowAtIndexPath:(NSIndexPath*)indexPath {
+    if (self.mode == 2) {
+        return NFBHiddenThreads().count > 0;
+    }
     if (self.mode == 1) {
         return NO;
     }
@@ -1281,6 +1325,15 @@ static NSMutableArray<NSString*>* NFBKeptLanguageList(void) {
     commitEditingStyle:(UITableViewCellEditingStyle)editingStyle
      forRowAtIndexPath:(NSIndexPath*)indexPath {
     if (editingStyle != UITableViewCellEditingStyleDelete) {
+        return;
+    }
+    if (self.mode == 2) {
+        NSArray<NSDictionary*>* threads = NFBHiddenThreads();
+        if (indexPath.row < (NSInteger)threads.count) {
+            NFBUnhideThread(threads[(NSUInteger)indexPath.row][@"id"]);
+        }
+        [self updatePreferredSize];
+        [tableView reloadData];
         return;
     }
     [self.terms removeObjectAtIndex:(NSUInteger)indexPath.row - 1];
