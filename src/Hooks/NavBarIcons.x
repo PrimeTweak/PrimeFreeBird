@@ -131,6 +131,17 @@ static BOOL nfbLooksLikeSettingsButton(UIView* view) {
            [label hasPrefix:@"NavigationBarSettings"];
 }
 
+// The back arrow, recognised the same way the settings glyph is: by the
+// identifier the app gives it, not by where it sits or how big it is. Every
+// identification by geometry tried before this one was wrong.
+static BOOL nfbLooksLikeBackButton(UIView* view) {
+    NSString* identifier = view.accessibilityIdentifier;
+    NSString* label = view.accessibilityLabel;
+    return [identifier hasPrefix:@"NavigationBackButton"] ||
+           [label hasPrefix:@"NavigationBackButton"] ||
+           [identifier containsString:@"BackButton"];
+}
+
 // Brings one view back to full strength and marks it, so that anything lowering
 // it later — an alpha, a layer opacity, an animation — is refused rather than
 // undone after the fact.
@@ -436,6 +447,19 @@ static BOOL nfbIsRightHandGlyphButton(UIView* button) {
         // The identifier is the precise route and covers Explore. The second
         // route exists only for Notifications, where no view carries it — and
         // it is fenced in tightly so nothing else on that screen is caught.
+        // The arrow takes the palette's primary colour, which a custom accent
+        // replaces. It is repainted in the text colour through the same route as
+        // the glyphs beside it — the button's own subtree, never its parent's,
+        // so nothing else in the bar can be reached.
+        if (nfbLooksLikeBackButton(button)) {
+            UIColor* label = [UIColor labelColor];
+            if ([label respondsToSelector:@selector(resolvedColorWithTraitCollection:)]) {
+                label = [label resolvedColorWithTraitCollection:button.traitCollection]
+                        ?: label;
+            }
+            nfbRepaintGlyphs(button, label);
+            return;
+        }
         BOOL wanted = nfbLooksLikeSettingsButton(button) ||
                       (nfbControllerIsNotifications(nfbBarOwningController(button)) &&
                        nfbIsRightHandGlyphButton(button));
@@ -498,76 +522,6 @@ static BOOL nfbIsRightHandGlyphButton(UIView* button) {
         isFade = [((CABasicAnimation*)animation).keyPath isEqualToString:@"opacity"];
     }
     if (isFade) {
-        return;
-    }
-    %orig;
-}
-
-%end
-
-// MARK: - the back arrow keeps the text colour
-//
-// Twitter's buttons take their images by name, and the back arrow is one of a
-// small set of chevron assets — so the name is the identity here, rather than a
-// position in a bar or a place in a view hierarchy. A button that receives one
-// of those names is marked, and from then on answers the label colour whatever
-// the palette pushes at it.
-//
-// Nothing is repainted and no image is touched: an avatar arrives through
-// setImage:, never by name, so it cannot be reached from here.
-
-static const void* kNFBChevronKey = &kNFBChevronKey;
-
-static BOOL nfbIsBackChevronName(NSString* name) {
-    if (!name.length) {
-        return NO;
-    }
-    static NSSet<NSString*>* names;
-    static dispatch_once_t once;
-    dispatch_once(&once, ^{
-      names = [NSSet setWithObjects:@"chevron_left", @"chevron_left_small",
-                                    @"arrow_left", @"back", nil];
-    });
-    return [names containsObject:name];
-}
-
-static UIColor* nfbChevronColour(UIView* view) {
-    UIColor* colour = [UIColor labelColor];
-    if (view && [colour respondsToSelector:@selector(resolvedColorWithTraitCollection:)]) {
-        return [colour resolvedColorWithTraitCollection:view.traitCollection] ?: colour;
-    }
-    return colour;
-}
-
-static void nfbMarkChevronButton(UIView* button, NSString* name) {
-    if (!nfbIsBackChevronName(name)) {
-        return;
-    }
-    objc_setAssociatedObject(button, kNFBChevronKey, @YES,
-                             OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-    button.tintColor = nfbChevronColour(button);
-}
-
-%hook TFNButton
-
-- (void)setImageNamed:(NSString*)name
-    isRenderedAsTemplate:(BOOL)isTemplate
-                forState:(NSUInteger)state {
-    %orig;
-    nfbMarkChevronButton((UIView*)self, name);
-}
-
-- (void)setImageNamed:(NSString*)name forState:(NSUInteger)state {
-    %orig;
-    nfbMarkChevronButton((UIView*)self, name);
-}
-
-// The palette pushes its accent onto this button after the image is set, and
-// again on every theme reload. A marked button answers the label colour
-// instead; every other button passes through untouched.
-- (void)setTintColor:(UIColor*)tintColor {
-    if (objc_getAssociatedObject(self, kNFBChevronKey)) {
-        %orig(nfbChevronColour((UIView*)self));
         return;
     }
     %orig;
