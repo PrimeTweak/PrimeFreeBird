@@ -182,6 +182,7 @@ static BOOL gNFBSettingUnderline = NO;               // our own underline set
 static BOOL gNFBInBarFilter = NO;                    // re-entrancy guard
 static BOOL gNFBSelfNav = NO;          // our own pager navigation in progress
 static BOOL gNFBBarTapHookSeen = NO;   // primary tap path proven live
+static NSString* gNFBLastBarSel = @"-";   // relevé : dernière traduction reçue
 static NSUInteger gNFBAppliedMaskBits = 0xFFFF;   // last mask synced to the pager
 
 void nfbNoteExploreAccessoryView(UIView* v) {
@@ -364,12 +365,12 @@ static void nfbPositionUnderline(UIView* root, UICollectionView* cv) {
         root,
         [NSString stringWithFormat:
                       @"pages %ld posees / %ld gardees / %ld total\noffset %.2f  espace %@\n"
-                      @"selection %@  choix abs %ld\ntrait %.0f l%.0f\ncellules %@",
+                      @"selection %@  choix abs %ld  barre %@\ntrait %.0f l%.0f\ncellules %@",
                       (long)laidOut, (long)kept, (long)total, f,
                       pagerRemapped ? @"remappe" : @"absolu",
                       sel.count ? [NSString stringWithFormat:@"%ld", (long)sel.firstObject.item]
                                 : @"aucune",
-                      (long)abs0, centreInRoot, width, items]);
+                      (long)abs0, gNFBLastBarSel, centreInRoot, width, items]);
 }
 
 // MARK: - pager <-> mask sync (defined before use)
@@ -521,6 +522,26 @@ static void nfbApplyTabFilter(UIView* bar, UICollectionView* cv) {
 
 // MARK: - hooks: the bar (visual filter, unchanged)
 
+// MARK: - the bar's own selection (measured: it styles the wrong tab)
+//
+// The relevé settled it: the pager is remapped (3 pages laid out for 3 kept),
+// the bar marks no cell as selected, and at kept page 2 the underline sits on
+// Sports — with the content on Sports too. What is wrong is the bold label:
+// Twitter hands this bar the pager's page index and the bar uses it as a CELL
+// index, so kept page 2 styles cell 2 (News) instead of cell 3 (Sports).
+// Translating on the way in puts the styling back on the tab the reader is
+// actually looking at.
+
+static NSInteger nfbBarIndexIn(NSInteger index) {
+    NSInteger total = gNFBPagerTotal ?: kNFBTabCount;
+    NSInteger kept = nfbKeptCount(total);
+    if (!nfbGranularActive() || kept < 1 || index < 0 || index > kept - 1) {
+        return index;
+    }
+    NSInteger abs = nfbAbsFromRemap(index, total);
+    return (abs >= 0 && abs <= total - 1) ? abs : index;
+}
+
 %hook _TtC10TFNUISwift19SegmentedTabBarView
 
 - (void)layoutSubviews {
@@ -579,6 +600,43 @@ static void nfbApplyTabFilter(UIView* bar, UICollectionView* cv) {
     }
     // NO %orig: the Swift absolute navigation must not run. The underline
     // glides on its own — it follows the animating offset at every layout.
+}
+
+
+- (void)setSelectedIndex:(NSInteger)index {
+    NSInteger t = nfbBarIndexIn(index);
+    gNFBLastBarSel = [NSString stringWithFormat:@"sel %ld>%ld", (long)index, (long)t];
+    %orig(t);
+}
+
+- (void)selectTabAt:(NSInteger)index animated:(BOOL)animated {
+    NSInteger t = nfbBarIndexIn(index);
+    gNFBLastBarSel = [NSString stringWithFormat:@"tab %ld>%ld", (long)index, (long)t];
+    %orig(t, animated);
+}
+
+- (void)finalizePagingToIndex:(NSInteger)index {
+    NSInteger t = nfbBarIndexIn(index);
+    gNFBLastBarSel = [NSString stringWithFormat:@"fin %ld>%ld", (long)index, (long)t];
+    %orig(t);
+}
+
+// The fractional index drives the styling mid-swipe: the two ends are
+// translated and the position between them is kept.
+- (void)updateForFractionalIndex:(CGFloat)index {
+    NSInteger total = gNFBPagerTotal ?: kNFBTabCount;
+    NSInteger kept = nfbKeptCount(total);
+    if (!nfbGranularActive() || kept < 1) {
+        %orig;
+        return;
+    }
+    CGFloat clamped = index < 0 ? 0 : (index > kept - 1 ? kept - 1 : index);
+    NSInteger i0 = (NSInteger)floor(clamped);
+    NSInteger i1 = (i0 + 1 <= kept - 1) ? i0 + 1 : i0;
+    CGFloat t = clamped - i0;
+    CGFloat a0 = (CGFloat)nfbAbsFromRemap(i0, total);
+    CGFloat a1 = (CGFloat)nfbAbsFromRemap(i1, total);
+    %orig(a0 + (a1 - a0) * t);
 }
 
 %end
@@ -706,6 +764,7 @@ static void nfbApplyTabFilter(UIView* bar, UICollectionView* cv) {
 // ABSOLUTE navigation at the pager; these guards translate it. Both hooks are
 // one pointer-compare for every other scroll view in the app, and both stand
 // down permanently (gNFBBarTapHookSeen) the moment the primary bridge fires.
+
 
 %hook UICollectionView
 
