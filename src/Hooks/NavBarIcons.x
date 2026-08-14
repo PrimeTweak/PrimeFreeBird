@@ -544,15 +544,17 @@ static UIColor* nfbBarGlyphColour(UIView* view) {
 
 %hook _UIModernBarButton
 
-// The window arrives after the bar has drawn its first frames, which is what
-// left five images of yellow. The move is announced before it happens, and the
-// button is already in the bar's hierarchy by then — so the colour is set there
-// as well as after.
+// A tint is answered when the glyph is drawn, so setting one always lands after
+// the first frames — measured at six images of accent on every push. The glyph
+// is therefore painted into a flat bitmap instead, the same way the settings
+// icon in this file has always been handled: the button's own subtree is passed,
+// never its parent, and the image view is marked so the interception above keeps
+// it painted when the app re-images it.
 - (void)willMoveToWindow:(UIWindow*)window {
     %orig;
     UIView* button = (UIView*)self;
     if (window && nfbInsideTwitterNavigationBar(button)) {
-        button.tintColor = nfbBarGlyphColour(button);
+        nfbRepaintGlyphs(button, nfbBarGlyphColour(button));
     }
 }
 
@@ -560,7 +562,7 @@ static UIColor* nfbBarGlyphColour(UIView* view) {
     %orig;
     UIView* button = (UIView*)self;
     if (nfbInsideTwitterNavigationBar(button)) {
-        button.tintColor = nfbBarGlyphColour(button);
+        nfbRepaintGlyphs(button, nfbBarGlyphColour(button));
     }
 }
 
@@ -568,7 +570,7 @@ static UIColor* nfbBarGlyphColour(UIView* view) {
     %orig;
     UIView* button = (UIView*)self;
     if (nfbInsideTwitterNavigationBar(button)) {
-        button.tintColor = nfbBarGlyphColour(button);
+        nfbRepaintGlyphs(button, nfbBarGlyphColour(button));
     }
 }
 
