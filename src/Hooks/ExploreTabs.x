@@ -184,6 +184,7 @@ static BOOL gNFBSelfNav = NO;          // our own pager navigation in progress
 static BOOL gNFBBarTapHookSeen = NO;   // primary tap path proven live
 static NSMutableString* gNFBBarPaths = nil;   // relevé : chemins vus, dans l'ordre
 static BOOL gNFBBarSelfUpdate = NO;   // notre propre appel à la barre, à ne pas retraduire
+static NSInteger gNFBBarAppliedIndex = -1;   // dernier index imposé à la barre
 
 static void nfbNoteBarPath(NSString* note) {
     if (!gNFBBarPaths) { gNFBBarPaths = [NSMutableString string]; }
@@ -670,10 +671,22 @@ static NSInteger nfbBarIndexIn(NSInteger index) {
     gNFBBarSelfUpdate = YES;
     ((void (*)(id, SEL, double))objc_msgSend)(
         self, @selector(updateForFractionalIndex:), (double)absF);
+
+    // Setting the index alone moved the collection's selection — the relevé
+    // showed it land on the right cell — but not the bold label and its icon:
+    // this bar builds that appearance when it configures a cell, not from the
+    // selection. So the index is set, the tab is told its content changed, and
+    // the visible tabs are rebuilt from the corrected state. Only on a real
+    // change of tab, or every scroll tick would rebuild the row.
     NSInteger settled = (NSInteger)llround(absF);
-    if (fabs(absF - (CGFloat)settled) < 0.02) {
+    if (fabs(absF - (CGFloat)settled) < 0.02 && settled != gNFBBarAppliedIndex) {
+        gNFBBarAppliedIndex = settled;
         ((void (*)(id, SEL, NSInteger))objc_msgSend)(
             self, @selector(setSelectedIndex:), settled);
+        ((void (*)(id, SEL, NSInteger))objc_msgSend)(
+            self, @selector(animateTabContentChangeAt:), settled);
+        ((void (*)(id, SEL))objc_msgSend)(self, @selector(reloadVisibleTabs));
+        nfbNoteBarPath([NSString stringWithFormat:@"pose%ld", (long)settled]);
     }
     gNFBBarSelfUpdate = NO;
 }
@@ -681,6 +694,10 @@ static NSInteger nfbBarIndexIn(NSInteger index) {
 // The label that turns bold and grows an icon changes here, by index — the one
 // path none of the others covered.
 - (void)animateTabContentChangeAt:(NSInteger)index {
+    if (gNFBBarSelfUpdate) {
+        %orig;
+        return;
+    }
     NSInteger t = nfbBarIndexIn(index);
     nfbNoteBarPath([NSString stringWithFormat:@"anim%ld>%ld", (long)index, (long)t]);
     %orig(t);
