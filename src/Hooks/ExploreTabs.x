@@ -646,12 +646,18 @@ static NSInteger nfbBarIndexIn(NSInteger index) {
 - (void)scrollViewDidScroll:(id)scrollView {
     %orig;
 
+    // Identity by the inner collection, not by gNFBExploreBar: that one is a
+    // weak reference to a view the Explore screen vends, and when it has gone
+    // nil this whole block used to return on its first line — the relevé caught
+    // it saying "aucun" while the rest of the file, which identifies the bar by
+    // its collection, kept working.
     UIView* bar = (UIView*)self;
     UICollectionView* pager = gNFBPagerCV;
-    if (!nfbGranularActive() || !nfbIsExploreBar(bar) || !pager) {
+    UICollectionView* barCV = gNFBBarCV;
+    if (!nfbGranularActive() || !pager || !barCV || ![barCV isDescendantOfView:bar]) {
         return;
     }
-    nfbNoteBarPath(scrollView == pager ? @"scroll=pager" : @"scroll=autre");
+    nfbNoteBarPath(gNFBExploreBar ? @"scroll" : @"scroll(barNil)");
     CGFloat pw = pager.bounds.size.width;
     NSInteger total = gNFBPagerTotal ?: kNFBTabCount;
     NSInteger kept = nfbKeptCount(total);
