@@ -542,45 +542,17 @@ static UIColor* nfbBarGlyphColour(UIView* view) {
     return colour;
 }
 
-// A portrait is not a glyph: it is handed a neutral, so a picture that has not
-// arrived reads as a grey disc rather than a coloured one.
-static UIColor* nfbPortraitNeutral(UIView* view) {
-    UIColor* colour = [UIColor colorWithDynamicProvider:^UIColor*(UITraitCollection* traits) {
-      return traits.userInterfaceStyle == UIUserInterfaceStyleDark
-                 ? [UIColor colorWithWhite:0.22 alpha:1.0]
-                 : [UIColor colorWithWhite:0.85 alpha:1.0];
-    }];
-    if (view && [colour respondsToSelector:@selector(resolvedColorWithTraitCollection:)]) {
-        return [colour resolvedColorWithTraitCollection:view.traitCollection] ?: colour;
-    }
-    return colour;
-}
-
 %hook _UIModernBarButton
 
-// Waiting for the view to be in a window paints yellow first and corrects it
-// about five frames later. The tint is therefore refused rather than replaced:
-// whatever the bar hands down, this button answers the text colour, and it does
-// so at the moment the value arrives instead of a layout pass afterwards.
-- (void)setTintColor:(UIColor*)tintColor {
-    UIView* button = (UIView*)self;
-    if (nfbInsideTwitterNavigationBar(button)) {
-        %orig(nfbBarGlyphColour(button));
-        return;
-    }
-    %orig;
-}
-
-// A tint inherited from an ancestor never passes through the setter above; it
-// arrives here, which is the earliest moment it can be seen.
-- (void)tintColorDidChange {
+// The window arrives after the bar has drawn its first frames, which is what
+// left five images of yellow. The move is announced before it happens, and the
+// button is already in the bar's hierarchy by then — so the colour is set there
+// as well as after.
+- (void)willMoveToWindow:(UIWindow*)window {
     %orig;
     UIView* button = (UIView*)self;
-    if (nfbInsideTwitterNavigationBar(button)) {
-        UIColor* wanted = nfbBarGlyphColour(button);
-        if (![button.tintColor isEqual:wanted]) {
-            button.tintColor = wanted;
-        }
+    if (window && nfbInsideTwitterNavigationBar(button)) {
+        button.tintColor = nfbBarGlyphColour(button);
     }
 }
 
@@ -602,36 +574,3 @@ static UIColor* nfbPortraitNeutral(UIView* view) {
 
 %end
 
-// The disc shown before a portrait arrives is not the view's tint and not a
-// palette answer: it is a layer of its own, placeholderLayer, and its fill is
-// what comes out in the accent. Setting the view's tint moved nothing, which is
-// what pointed here.
-static void nfbNeutralisePlaceholder(UIView* avatar) {
-    if (!nfbInsideTwitterNavigationBar(avatar)) {
-        return;
-    }
-    Ivar layerIvar =
-        class_getInstanceVariable(object_getClass(avatar), "placeholderLayer");
-    if (!layerIvar) {
-        return;
-    }
-    CALayer* placeholder = object_getIvar(avatar, layerIvar);
-    if (![placeholder isKindOfClass:[CALayer class]]) {
-        return;
-    }
-    placeholder.backgroundColor = nfbPortraitNeutral(avatar).CGColor;
-}
-
-%hook T1AvatarImageView
-
-- (void)didMoveToWindow {
-    %orig;
-    nfbNeutralisePlaceholder((UIView*)self);
-}
-
-- (void)layoutSubviews {
-    %orig;
-    nfbNeutralisePlaceholder((UIView*)self);
-}
-
-%end
