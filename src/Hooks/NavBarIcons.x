@@ -368,12 +368,62 @@ static void nfbRepaintNotificationsGear(UIView* bar, UIColor* colour) {
 // image is caught as it is set. Only views the tweak have already taken over are
 // affected — everything else pays a single associated-object read.
 
+// The back chevron's image view is rebuilt rather than re-imaged: a mark placed
+// on one instance is gone by the next pass, which is why a single paint holds
+// for exactly one frame. Any small template glyph that lands in the left edge
+// of a navigation bar is therefore claimed on arrival, whether or not it has
+// been seen before. The position is read one turn later, since a view being
+// given its image has not been laid out yet.
+static void nfbClaimBackChevron(UIImageView* imageView) {
+    UIImage* image = imageView.image;
+    if (!image || image.renderingMode != UIImageRenderingModeAlwaysTemplate) {
+        return;
+    }
+    CGFloat side = MAX(image.size.width, image.size.height);
+    if (side < 8.0 || side > 26.0) {
+        return;
+    }
+    UIView* bar = imageView.superview;
+    NSInteger depth = 0;
+    while (bar && ![bar isKindOfClass:[UINavigationBar class]] && depth < 8) {
+        bar = bar.superview;
+        depth++;
+    }
+    if (![bar isKindOfClass:[UINavigationBar class]]) {
+        return;
+    }
+    __weak UIImageView* weakView = imageView;
+    __weak UIView* weakBar = bar;
+    dispatch_async(dispatch_get_main_queue(), ^{
+      UIImageView* view = weakView;
+      UIView* navBar = weakBar;
+      if (!view || !navBar || !view.window) {
+          return;
+      }
+      CGFloat width = CGRectGetWidth(navBar.bounds);
+      if (width < 1.0) {
+          return;
+      }
+      CGRect inBar = [view convertRect:view.bounds toView:navBar];
+      if (CGRectGetMidX(inBar) > width * 0.2) {
+          return;
+      }
+      UIColor* colour = [UIColor labelColor];
+      if ([colour respondsToSelector:@selector(resolvedColorWithTraitCollection:)]) {
+          colour = [colour resolvedColorWithTraitCollection:navBar.traitCollection]
+                   ?: colour;
+      }
+      nfbRepaintGlyphs(view.superview, colour);
+    });
+}
+
 %hook UIImageView
 
 - (void)setImage:(UIImage*)image {
     UIColor* target = objc_getAssociatedObject(self, kNFBGreyTargetKey);
     if (!target || !image) {
         %orig;
+        nfbClaimBackChevron(self);
         return;
     }
     UIImage* ours = objc_getAssociatedObject(self, kNFBGreyedImageKey);
