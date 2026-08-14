@@ -22,6 +22,7 @@
 #import <objc/message.h>
 
 static const void* kNFBAdvSearchBtnKey = &kNFBAdvSearchBtnKey;
+static const void* kNFBAdvSearchGreyKey = &kNFBAdvSearchGreyKey;
 
 // One grey for every icon the tweak adds, frozen to a static colour. The gear is
 // dimmed to 60% opacity because its glyph refuses to be tinted, so the tweak's own
@@ -37,7 +38,10 @@ static const void* kNFBAdvSearchBtnKey = &kNFBAdvSearchBtnKey;
 // the table lives at file scope where it is simply referenced.
 static const CGFloat kNFBSliderGeometry[2][2] = {{7.0, 15.0}, {17.0, 9.0}};
 
-static UIImage* NFBSlidersGlyph(CGFloat side) {
+// The glyph is drawn in its final colour and returned as an original image, so
+// no tint can reach it: a template would inherit the bar's accent between its
+// creation and the first pass of the grey sweep next door.
+static UIImage* NFBSlidersGlyph(CGFloat side, UIColor* colour) {
     const CGFloat kUnit = 24.0;
     const CGFloat kThickness = 2.07;
     const CGFloat kGap = 1.5;
@@ -52,7 +56,7 @@ static UIImage* NFBSlidersGlyph(CGFloat side) {
                                                format:format];
     UIImage* drawn = [renderer
         imageWithActions:^(UIGraphicsImageRendererContext* context) {
-            [[UIColor blackColor] setFill];
+            [(colour ?: [UIColor blackColor]) setFill];
             for (NSInteger i = 0; i < 2; i++) {
                 CGFloat cy = kNFBSliderGeometry[i][0];
                 CGFloat cx = kNFBSliderGeometry[i][1];
@@ -74,7 +78,7 @@ static UIImage* NFBSlidersGlyph(CGFloat side) {
                                              kHandleHalfHeight * 2.0 * scale));
             }
         }];
-    return [drawn imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate];
+    return [drawn imageWithRenderingMode:UIImageRenderingModeAlwaysOriginal];
 }
 
 static UIColor* NFBBarIconGrey(UITraitCollection* traits) {
@@ -121,22 +125,33 @@ static UIColor* NFBBarIconGrey(UITraitCollection* traits) {
             }
             return;
         }
+        UIColor* grey = NFBBarIconGrey(((UIViewController*)self).traitCollection);
         if (existingBtn) {
+            // A light/dark switch or a theme change resolves to another grey;
+            // the glyph carries its colour, so it is redrawn rather than
+            // re-tinted.
+            UIColor* painted = objc_getAssociatedObject(existingBtn, kNFBAdvSearchGreyKey);
+            if (!painted || ![painted isEqual:grey]) {
+                existingBtn.image = NFBSlidersGlyph(27.33, grey);
+                objc_setAssociatedObject(existingBtn, kNFBAdvSearchGreyKey, grey,
+                                         OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+            }
             return;
         }
         // 27.33 points, not the gear's 24: this shape covers 18 of its 24
         // units against the gear's 20.5, so it needs the wider canvas to
         // reach the same width on screen.
-        UIImage* icon = NFBSlidersGlyph(27.33);
+        UIImage* icon = NFBSlidersGlyph(27.33, grey);
         UIBarButtonItem* btn =
             [[UIBarButtonItem alloc] initWithImage:icon
                                              style:UIBarButtonItemStylePlain
                                             target:self
                                             action:@selector(nfbShowAdvancedSearch)];
-        // Muted grey, like the labels of the unselected tabs next to it.
-        // Cast, never a bare self.property: this class is only forward-declared,
-        // so the compiler refuses a direct message to it.
-        btn.tintColor = NFBBarIconGrey(((UIViewController*)self).traitCollection);
+        // The colour lives in the image; the tint is set to match so that a
+        // highlighted state derived from it stays the same grey.
+        btn.tintColor = grey;
+        objc_setAssociatedObject(btn, kNFBAdvSearchGreyKey, grey,
+                                 OBJC_ASSOCIATION_RETAIN_NONATOMIC);
         // Match Twitter's own settings gear, which sits flat in this bar:
         // iOS 26 gives bar buttons a shared Liquid Glass capsule, and opting
         // out is a single property. It only exists on the iOS 26 SDK, so it
