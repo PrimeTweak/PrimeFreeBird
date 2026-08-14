@@ -252,15 +252,12 @@ static void nfbPositionUnderline(UIView* root, UICollectionView* cv) {
     NSInteger total = gNFBPagerTotal ?: kNFBTabCount;
     NSInteger kept = nfbKeptCount(total);
     if (kept < 1) { return; }
-    // The offset is read in the pager's own space, and the pager is not always
-    // in the remapped one: it runs unremapped until the catch-up capture has
-    // reloaded it, and any reload before that answers the absolute page count.
-    // Reading an absolute offset as a remapped one is what put the underline a
-    // slot too far — a page whose absolute index is 2 became kept index 2, and
-    // landed on the tab after the one selected. The pager's own item count says
-    // which space it is in.
-    NSInteger pagerItems = [pager numberOfItemsInSection:0];
-    BOOL pagerRemapped = (pagerItems == kept);
+    // Which space the offset is in cannot be asked of the data source: this
+    // tweak answers that question itself, and always says "kept". The pages
+    // actually laid out are the only honest witness — content width over page
+    // width — and they still read absolute until a reload has happened.
+    NSInteger laidOut = (NSInteger)llround(pager.contentSize.width / pw);
+    BOOL pagerRemapped = (laidOut < 1) || (laidOut <= kept);
     NSInteger span = pagerRemapped ? kept : total;
     CGFloat f = pager.contentOffset.x / pw;
     if (f < 0) { f = 0; }
@@ -276,6 +273,19 @@ static void nfbPositionUnderline(UIView* root, UICollectionView* cv) {
         if (nfbTabHidden(abs0)) { abs0 = nfbNearestKeptAbs(abs0, total); }
         if (nfbTabHidden(abs1)) { abs1 = nfbNearestKeptAbs(abs1, total); }
     }
+    // At rest, the bar itself knows which tab is selected, and that is what the
+    // reader is looking at. Deriving the answer from the pager is only needed
+    // while a swipe is in flight, between two tabs.
+    if (fabs(f - (CGFloat)llround(f)) < 0.02) {
+        NSArray<NSIndexPath*>* picked = cv.indexPathsForSelectedItems;
+        NSIndexPath* chosen = picked.count == 1 ? picked.firstObject : nil;
+        if (chosen && !nfbTabHidden(chosen.item)) {
+            abs0 = chosen.item;
+            abs1 = chosen.item;
+            t = 0.0;
+        }
+    }
+
     CGRect f0 = CGRectZero, f1 = CGRectZero;
     BOOL have0 = NO, have1 = NO;
     for (UICollectionViewCell* cell in cv.visibleCells) {
