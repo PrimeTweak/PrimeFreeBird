@@ -131,17 +131,6 @@ static BOOL nfbLooksLikeSettingsButton(UIView* view) {
            [label hasPrefix:@"NavigationBarSettings"];
 }
 
-// The back arrow, recognised the same way the settings glyph is: by the
-// identifier the app gives it, not by where it sits or how big it is. Every
-// identification by geometry tried before this one was wrong.
-static BOOL nfbLooksLikeBackButton(UIView* view) {
-    NSString* identifier = view.accessibilityIdentifier;
-    NSString* label = view.accessibilityLabel;
-    return [identifier hasPrefix:@"NavigationBackButton"] ||
-           [label hasPrefix:@"NavigationBackButton"] ||
-           [identifier containsString:@"BackButton"];
-}
-
 // Brings one view back to full strength and marks it, so that anything lowering
 // it later — an alpha, a layer opacity, an animation — is refused rather than
 // undone after the fact.
@@ -447,19 +436,6 @@ static BOOL nfbIsRightHandGlyphButton(UIView* button) {
         // The identifier is the precise route and covers Explore. The second
         // route exists only for Notifications, where no view carries it — and
         // it is fenced in tightly so nothing else on that screen is caught.
-        // The arrow takes the palette's primary colour, which a custom accent
-        // replaces. It is repainted in the text colour through the same route as
-        // the glyphs beside it — the button's own subtree, never its parent's,
-        // so nothing else in the bar can be reached.
-        if (nfbLooksLikeBackButton(button)) {
-            UIColor* label = [UIColor labelColor];
-            if ([label respondsToSelector:@selector(resolvedColorWithTraitCollection:)]) {
-                label = [label resolvedColorWithTraitCollection:button.traitCollection]
-                        ?: label;
-            }
-            nfbRepaintGlyphs(button, label);
-            return;
-        }
         BOOL wanted = nfbLooksLikeSettingsButton(button) ||
                       (nfbControllerIsNotifications(nfbBarOwningController(button)) &&
                        nfbIsRightHandGlyphButton(button));
