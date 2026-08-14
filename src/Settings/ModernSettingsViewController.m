@@ -153,18 +153,18 @@ extern NSInteger NFBColorThemeScreenVisible;
             @"action": @"showSearchSettings"
         },
         @{
-            @"title": [[BHTBundle sharedBundle] localizedStringForKey:@"MODERN_SETTINGS_BRANDING_TITLE"],
-            @"subtitle":
-                [[BHTBundle sharedBundle] localizedStringForKey:@"MODERN_SETTINGS_BRANDING_SUBTITLE"],
-            @"icon": @"tag_stroke",
-            @"action": @"showBrandingSettings"
-        },
-        @{
             @"title": [[BHTBundle sharedBundle] localizedStringForKey:@"MODERN_SETTINGS_MESSAGES_TITLE"],
             @"subtitle":
                 [[BHTBundle sharedBundle] localizedStringForKey:@"MODERN_SETTINGS_MESSAGES_SUBTITLE"],
             @"icon": @"messages_stroke",
             @"action": @"showGrokSettings"
+        },
+        @{
+            @"title": [[BHTBundle sharedBundle] localizedStringForKey:@"MODERN_SETTINGS_BRANDING_TITLE"],
+            @"subtitle":
+                [[BHTBundle sharedBundle] localizedStringForKey:@"MODERN_SETTINGS_BRANDING_SUBTITLE"],
+            @"icon": @"tag_stroke",
+            @"action": @"showBrandingSettings"
         },
         @{
             @"title": [[BHTBundle sharedBundle] localizedStringForKey:@"MODERN_SETTINGS_LAB_TITLE"],
