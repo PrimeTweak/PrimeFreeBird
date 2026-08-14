@@ -504,3 +504,94 @@ static BOOL nfbIsRightHandGlyphButton(UIView* button) {
 }
 
 %end
+
+// MARK: - the conversation bar: arrow and portrait
+//
+// Two views in that bar come out in the accent, and the view tree says they are
+// in different branches:
+//
+//   TFNNavigationBar
+//    ├ _UIModernBarButton                     the back arrow, a UIKit class
+//    └ _UINavigationBarTitleControl
+//        └ DMConversation.AvatarTitleButton
+//            └ … → T1AvatarImageView          the portrait
+//
+// Neither is reached by painting: each is given its own tint, on itself, and
+// only when it sits inside one of Twitter's navigation bars. No image is
+// replaced, no parent is walked, so a sibling cannot be caught — which is what
+// went wrong when the arrow was claimed through its superview.
+
+static BOOL nfbInsideTwitterNavigationBar(UIView* view) {
+    UIView* ancestor = view.superview;
+    NSInteger depth = 0;
+    while (ancestor && depth < 10) {
+        if ([NSStringFromClass([ancestor class]) isEqualToString:@"TFNNavigationBar"]) {
+            return YES;
+        }
+        ancestor = ancestor.superview;
+        depth++;
+    }
+    return NO;
+}
+
+static UIColor* nfbBarGlyphColour(UIView* view) {
+    UIColor* colour = [UIColor labelColor];
+    if (view && [colour respondsToSelector:@selector(resolvedColorWithTraitCollection:)]) {
+        return [colour resolvedColorWithTraitCollection:view.traitCollection] ?: colour;
+    }
+    return colour;
+}
+
+// A portrait is not a glyph: it is handed a neutral, so a picture that has not
+// arrived reads as a grey disc rather than a coloured one.
+static UIColor* nfbPortraitNeutral(UIView* view) {
+    UIColor* colour = [UIColor colorWithDynamicProvider:^UIColor*(UITraitCollection* traits) {
+      return traits.userInterfaceStyle == UIUserInterfaceStyleDark
+                 ? [UIColor colorWithWhite:0.22 alpha:1.0]
+                 : [UIColor colorWithWhite:0.85 alpha:1.0];
+    }];
+    if (view && [colour respondsToSelector:@selector(resolvedColorWithTraitCollection:)]) {
+        return [colour resolvedColorWithTraitCollection:view.traitCollection] ?: colour;
+    }
+    return colour;
+}
+
+%hook _UIModernBarButton
+
+- (void)didMoveToWindow {
+    %orig;
+    UIView* button = (UIView*)self;
+    if (nfbInsideTwitterNavigationBar(button)) {
+        button.tintColor = nfbBarGlyphColour(button);
+    }
+}
+
+- (void)layoutSubviews {
+    %orig;
+    UIView* button = (UIView*)self;
+    if (nfbInsideTwitterNavigationBar(button)) {
+        button.tintColor = nfbBarGlyphColour(button);
+    }
+}
+
+%end
+
+%hook T1AvatarImageView
+
+- (void)didMoveToWindow {
+    %orig;
+    UIView* avatar = (UIView*)self;
+    if (nfbInsideTwitterNavigationBar(avatar)) {
+        avatar.tintColor = nfbPortraitNeutral(avatar);
+    }
+}
+
+- (void)layoutSubviews {
+    %orig;
+    UIView* avatar = (UIView*)self;
+    if (nfbInsideTwitterNavigationBar(avatar)) {
+        avatar.tintColor = nfbPortraitNeutral(avatar);
+    }
+}
+
+%end
