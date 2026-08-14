@@ -48,6 +48,23 @@ static BOOL customAccentActive(void) {
 // Central accent resolver. Every accent-producing palette accessor routes
 // through this: returns the custom colour when active (except during a raw
 // swatch read), otherwise whatever Twitter would natively return.
+// The avatar shown while a portrait loads takes its fill from the palette, and
+// that fill is derived from the primary colour — so a custom accent turns every
+// loading avatar into a flat disc of it. It is answered with a neutral instead,
+// which is what a placeholder is for.
+static UIColor* NFBPlaceholderGrey(void) {
+    static UIColor* grey;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+      grey = [UIColor colorWithDynamicProvider:^UIColor*(UITraitCollection* traits) {
+        return traits.userInterfaceStyle == UIUserInterfaceStyleDark
+                   ? [UIColor colorWithWhite:0.22 alpha:1.0]
+                   : [UIColor colorWithWhite:0.85 alpha:1.0];
+      }];
+    });
+    return grey;
+}
+
 static UIColor* NFBAccent(UIColor* orig) {
     if (customAccentActive() && !NFBRawPaletteReading()) {
         UIColor* c = customAccentColor();
@@ -664,6 +681,15 @@ static void NFBShowRestartReminder(void) {
 %end
 
 %hook TAEDarkColorPalette
+
+- (UIColor*)avatarPlaceholderBackgroundColor {
+    UIColor* o = %orig;
+    return customAccentActive() ? NFBPlaceholderGrey() : o;
+}
+- (UIColor*)avatarPlaceholderUIColor {
+    UIColor* o = %orig;
+    return customAccentActive() ? NFBPlaceholderGrey() : o;
+}
 - (UIColor*)primaryColor {
     UIColor* o = %orig;
     return NFBAccent(o);
@@ -707,6 +733,15 @@ static void NFBShowRestartReminder(void) {
 %end
 
 %hook TAELightColorPalette
+
+- (UIColor*)avatarPlaceholderBackgroundColor {
+    UIColor* o = %orig;
+    return customAccentActive() ? NFBPlaceholderGrey() : o;
+}
+- (UIColor*)avatarPlaceholderUIColor {
+    UIColor* o = %orig;
+    return customAccentActive() ? NFBPlaceholderGrey() : o;
+}
 - (UIColor*)primaryColor {
     UIColor* o = %orig;
     return NFBAccent(o);
@@ -750,6 +785,15 @@ static void NFBShowRestartReminder(void) {
 %end
 
 %hook TFNUIDefaultColorPalette
+
+- (UIColor*)avatarPlaceholderBackgroundColor {
+    UIColor* o = %orig;
+    return customAccentActive() ? NFBPlaceholderGrey() : o;
+}
+- (UIColor*)avatarPlaceholderUIColor {
+    UIColor* o = %orig;
+    return customAccentActive() ? NFBPlaceholderGrey() : o;
+}
 - (UIColor*)primaryColor {
     UIColor* o = %orig;
     return NFBAccent(o);
@@ -801,6 +845,15 @@ static void NFBShowRestartReminder(void) {
 %end
 
 %hook TAEColorPalette
+
+- (UIColor*)avatarPlaceholderBackgroundColor {
+    UIColor* o = %orig;
+    return customAccentActive() ? NFBPlaceholderGrey() : o;
+}
+- (UIColor*)avatarPlaceholderUIColor {
+    UIColor* o = %orig;
+    return customAccentActive() ? NFBPlaceholderGrey() : o;
+}
 - (UIColor*)_t1_infoTextColorForOptions:(NSUInteger)options {
     if (customAccentActive()) {
         UIColor* c = customAccentColor();

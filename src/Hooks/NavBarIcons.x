@@ -82,16 +82,13 @@ static UIImage* NFBGreyGlyph(UIImage* source, UIColor* colour) {
     return result;
 }
 
-
 // Replaces the image of every glyph-sized image view under a view. The result
 // is remembered so the work happens once, and happens again only if Twitter
 // puts its own image back.
-// One image view, and only that one. The walk below hands each of its finds to
-// this, and the back chevron claims itself through it — a container passed by
-// mistake would otherwise repaint every sibling, an avatar included.
-static void nfbRepaintGlyph(UIImageView* imageView, UIColor* colour) {
-    {
-        {
+static void nfbRepaintGlyphs(UIView* view, UIColor* colour) {
+    for (UIView* subview in view.subviews) {
+        if ([subview isKindOfClass:[UIImageView class]]) {
+            UIImageView* imageView = (UIImageView*)subview;
             UIImage* current = imageView.image;
             UIImage* ours = objc_getAssociatedObject(imageView, kNFBGreyedImageKey);
             // Repaint when the image changed OR when the colour did. At launch
@@ -121,56 +118,7 @@ static void nfbRepaintGlyph(UIImageView* imageView, UIColor* colour) {
                 imageView.image = painted;
             }
         }
-    }
-}
-
-static void nfbRepaintGlyphs(UIView* view, UIColor* colour) {
-    for (UIView* subview in view.subviews) {
-        if ([subview isKindOfClass:[UIImageView class]]) {
-            nfbRepaintGlyph((UIImageView*)subview, colour);
-        }
         nfbRepaintGlyphs(subview, colour);
-    }
-}
-
-// The back chevron takes the palette's primary colour, which a custom accent
-// replaces. It is painted in the text colour instead, and both interception
-// points of this file are armed on it: the item's own key, so a re-set through
-// setImage: is repainted, and its inner button's image views, so a re-set that
-// goes straight to them is repainted too. A single paint does not hold — the
-// app re-images this button within a frame.
-static void nfbHoldBackChevron(UINavigationItem* item, UITraitCollection* traits) {
-    UIBarButtonItem* back = item.leftBarButtonItems.firstObject;
-    if (!back || back.title.length > 0 || !back.image) {
-        return;
-    }
-    UIColor* colour = [UIColor labelColor];
-    if ([colour respondsToSelector:@selector(resolvedColorWithTraitCollection:)] && traits) {
-        colour = [colour resolvedColorWithTraitCollection:traits] ?: colour;
-    }
-    UIColor* used = objc_getAssociatedObject(back, kNFBGreyTargetKey);
-    UIImage* ours = objc_getAssociatedObject(back, kNFBGreyedImageKey);
-    BOOL alreadyOurs = objc_getAssociatedObject(back.image, kNFBPaintedFlagKey) != nil;
-    BOOL colourChanged = used && ![used isEqual:colour];
-    if (!alreadyOurs && (back.image != ours || colourChanged)) {
-        UIImage* original = objc_getAssociatedObject(back, kNFBOriginalImageKey);
-        UIImage* source = original ?: back.image;
-        if (!original) {
-            objc_setAssociatedObject(back, kNFBOriginalImageKey, source,
-                                     OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-        }
-        UIImage* painted = NFBGreyGlyph(source, colour);
-        objc_setAssociatedObject(back, kNFBGreyedImageKey, painted,
-                                 OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-        back.image = painted;
-    }
-    objc_setAssociatedObject(back, kNFBGreyTargetKey, colour,
-                             OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-
-    Ivar buttonIvar = class_getInstanceVariable(object_getClass(back), "_button");
-    UIView* inner = buttonIvar ? object_getIvar(back, buttonIvar) : nil;
-    if ([inner isKindOfClass:[UIView class]]) {
-        nfbRepaintGlyphs(inner, colour);
     }
 }
 
@@ -306,7 +254,6 @@ static void nfbRepaintNotificationsGear(UIView* bar, UIColor* colour) {
         return;
     }
     UINavigationItem* item = ((id (*)(id, SEL))objc_msgSend)(bar, @selector(topItem));
-    nfbHoldBackChevron(item, bar.traitCollection);
     for (UIBarButtonItem* button in item.rightBarButtonItems) {
         if (button.title.length > 0 || !button.image) {
             continue;
@@ -378,67 +325,12 @@ static void nfbRepaintNotificationsGear(UIView* bar, UIColor* colour) {
 // image is caught as it is set. Only views the tweak have already taken over are
 // affected — everything else pays a single associated-object read.
 
-// The back chevron's image view is rebuilt rather than re-imaged: a mark placed
-// on one instance is gone by the next pass, which is why a single paint holds
-// for exactly one frame. Any small template glyph that lands in the left edge
-// of a navigation bar is therefore claimed on arrival, whether or not it has
-// been seen before. The position is read one turn later, since a view being
-// given its image has not been laid out yet.
-static void nfbClaimBackChevron(UIImageView* imageView) {
-    UIImage* image = imageView.image;
-    if (!image || image.renderingMode != UIImageRenderingModeAlwaysTemplate) {
-        return;
-    }
-    CGFloat side = MAX(image.size.width, image.size.height);
-    if (side < 8.0 || side > 26.0) {
-        return;
-    }
-    UIView* bar = imageView.superview;
-    NSInteger depth = 0;
-    while (bar && ![bar isKindOfClass:[UINavigationBar class]] && depth < 8) {
-        bar = bar.superview;
-        depth++;
-    }
-    if (![bar isKindOfClass:[UINavigationBar class]]) {
-        return;
-    }
-    __weak UIImageView* weakView = imageView;
-    __weak UIView* weakBar = bar;
-    dispatch_async(dispatch_get_main_queue(), ^{
-      UIImageView* view = weakView;
-      UIView* navBar = weakBar;
-      if (!view || !navBar || !view.window) {
-          return;
-      }
-      CGFloat width = CGRectGetWidth(navBar.bounds);
-      if (width < 1.0) {
-          return;
-      }
-      CGRect inBar = [view convertRect:view.bounds toView:navBar];
-      if (CGRectGetMidX(inBar) > width * 0.2) {
-          return;
-      }
-      // A round image view is a portrait, not a glyph: the avatar of a
-      // conversation sits in this same corner.
-      if (view.layer.cornerRadius > 0.5 || view.layer.mask != nil) {
-          return;
-      }
-      UIColor* colour = [UIColor labelColor];
-      if ([colour respondsToSelector:@selector(resolvedColorWithTraitCollection:)]) {
-          colour = [colour resolvedColorWithTraitCollection:navBar.traitCollection]
-                   ?: colour;
-      }
-      nfbRepaintGlyph(view, colour);
-    });
-}
-
 %hook UIImageView
 
 - (void)setImage:(UIImage*)image {
     UIColor* target = objc_getAssociatedObject(self, kNFBGreyTargetKey);
     if (!target || !image) {
         %orig;
-        nfbClaimBackChevron(self);
         return;
     }
     UIImage* ours = objc_getAssociatedObject(self, kNFBGreyedImageKey);
@@ -493,7 +385,6 @@ static void nfbClaimBackChevron(UIImageView* imageView) {
 // title, a glyph-sized image inside, and past the middle of its own bar. A
 // back chevron sits on the left and a text button has a title, so neither is
 // ever touched.
-
 static BOOL nfbIsRightHandGlyphButton(UIView* button) {
     if ([button isKindOfClass:[UIButton class]] &&
         ((UIButton*)button).currentTitle.length > 0) {
@@ -607,6 +498,76 @@ static BOOL nfbIsRightHandGlyphButton(UIView* button) {
         isFade = [((CABasicAnimation*)animation).keyPath isEqualToString:@"opacity"];
     }
     if (isFade) {
+        return;
+    }
+    %orig;
+}
+
+%end
+
+// MARK: - the back arrow keeps the text colour
+//
+// Twitter's buttons take their images by name, and the back arrow is one of a
+// small set of chevron assets — so the name is the identity here, rather than a
+// position in a bar or a place in a view hierarchy. A button that receives one
+// of those names is marked, and from then on answers the label colour whatever
+// the palette pushes at it.
+//
+// Nothing is repainted and no image is touched: an avatar arrives through
+// setImage:, never by name, so it cannot be reached from here.
+
+static const void* kNFBChevronKey = &kNFBChevronKey;
+
+static BOOL nfbIsBackChevronName(NSString* name) {
+    if (!name.length) {
+        return NO;
+    }
+    static NSSet<NSString*>* names;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+      names = [NSSet setWithObjects:@"chevron_left", @"chevron_left_small",
+                                    @"arrow_left", @"back", nil];
+    });
+    return [names containsObject:name];
+}
+
+static UIColor* nfbChevronColour(UIView* view) {
+    UIColor* colour = [UIColor labelColor];
+    if (view && [colour respondsToSelector:@selector(resolvedColorWithTraitCollection:)]) {
+        return [colour resolvedColorWithTraitCollection:view.traitCollection] ?: colour;
+    }
+    return colour;
+}
+
+static void nfbMarkChevronButton(UIView* button, NSString* name) {
+    if (!nfbIsBackChevronName(name)) {
+        return;
+    }
+    objc_setAssociatedObject(button, kNFBChevronKey, @YES,
+                             OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    button.tintColor = nfbChevronColour(button);
+}
+
+%hook TFNButton
+
+- (void)setImageNamed:(NSString*)name
+    isRenderedAsTemplate:(BOOL)isTemplate
+                forState:(NSUInteger)state {
+    %orig;
+    nfbMarkChevronButton((UIView*)self, name);
+}
+
+- (void)setImageNamed:(NSString*)name forState:(NSUInteger)state {
+    %orig;
+    nfbMarkChevronButton((UIView*)self, name);
+}
+
+// The palette pushes its accent onto this button after the image is set, and
+// again on every theme reload. A marked button answers the label colour
+// instead; every other button passes through untouched.
+- (void)setTintColor:(UIColor*)tintColor {
+    if (objc_getAssociatedObject(self, kNFBChevronKey)) {
+        %orig(nfbChevronColour((UIView*)self));
         return;
     }
     %orig;
