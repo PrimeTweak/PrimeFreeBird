@@ -74,17 +74,24 @@ static void NFBSaveVoiceMessage(NSURL* sourceURL) {
 
 // The audio view carries its own interaction rather than sharing the
 // attachment view's: it is a separate view and wins the touch first.
-%hook _TtC13DMAttachments24AttachmentAssetAudioView
+// The interaction is held by association and the view is addressed as a
+// UIView: this class is known to the compiler only by a forward declaration,
+// so nothing can be added to its interface and no message can be sent to it
+// directly.
+static const void* kNFBVoiceInteractionKey = &kNFBVoiceInteractionKey;
 
-%property (nonatomic, strong) UIContextMenuInteraction* nfbVoiceInteraction;
+%hook _TtC13DMAttachments24AttachmentAssetAudioView
 
 - (void)layoutSubviews {
     %orig;
+    UIView* view = (UIView*)self;
     if ([BHTSettings boolForKey:@"download_voice_messages"] &&
-        self.nfbVoiceInteraction == nil) {
-        self.nfbVoiceInteraction =
-            [[UIContextMenuInteraction alloc] initWithDelegate:self];
-        [self addInteraction:self.nfbVoiceInteraction];
+        !objc_getAssociatedObject(view, kNFBVoiceInteractionKey)) {
+        UIContextMenuInteraction* interaction = [[UIContextMenuInteraction alloc]
+            initWithDelegate:(id<UIContextMenuInteractionDelegate>)self];
+        objc_setAssociatedObject(view, kNFBVoiceInteractionKey, interaction,
+                                 OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        [view addInteraction:interaction];
     }
 }
 
