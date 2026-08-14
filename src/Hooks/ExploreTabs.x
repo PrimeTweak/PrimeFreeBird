@@ -364,7 +364,7 @@ static void nfbPositionUnderline(UIView* root, UICollectionView* cv) {
         root,
         [NSString stringWithFormat:
                       @"pages %ld posees / %ld gardees / %ld total\noffset %.2f  espace %@\n"
-                      @"selection %@  choix abs %ld\nbarre %@\ntrait %.0f l%.0f\ncellules %@",
+                      @"selection %@  choix abs %ld\ntrait %.0f l%.0f\ncellules %@",
                       (long)laidOut, (long)kept, (long)total, f,
                       pagerRemapped ? @"remappe" : @"absolu",
                       sel.count ? [NSString stringWithFormat:@"%ld", (long)sel.firstObject.item]
@@ -662,7 +662,7 @@ static void nfbApplyTabFilter(UIView* bar, UICollectionView* cv) {
 // flick past a hidden tab carries on instead of bouncing back.
 - (void)scrollViewWillEndDragging:(id)scrollView
                      withVelocity:(CGPoint)velocity
-              targetContentOffset:(inout CGPoint*)target {
+              targetContentOffset:(CGPoint*)target {
     %orig;
     if (!nfbGranularActive() || (UICollectionView*)scrollView != gNFBPagerCV) {
         return;
