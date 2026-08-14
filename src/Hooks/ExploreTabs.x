@@ -241,6 +241,39 @@ static BOOL nfbPagerScopeOK(UIScrollView* sv) {
 // and set dead (no animation) on every bar layout pass — a native-looking
 // glide during flights, exact at rest, no late corrections. Native underline
 // animations are squelched (CALayer hook below), so nothing fights back.
+// Temporary instrumentation: the numbers this placement rests on, written on
+// screen so a screenshot settles what is guesswork today — which space the
+// pager is in, whether the bar marks a cell as selected, and which tab the
+// calculation picked.
+static void nfbUnderlineDiag(UIView* root, NSString* text) {
+    UIWindow* window = root.window;
+    if (!window) {
+        return;
+    }
+    static const void* kNFBTabDiagKey = &kNFBTabDiagKey;
+    UILabel* hud = objc_getAssociatedObject(window, kNFBTabDiagKey);
+    if (!hud) {
+        hud = [[UILabel alloc] init];
+        hud.numberOfLines = 0;
+        hud.font = [UIFont monospacedSystemFontOfSize:10 weight:UIFontWeightMedium];
+        hud.textColor = [UIColor whiteColor];
+        hud.backgroundColor = [UIColor colorWithWhite:0 alpha:0.7];
+        hud.layer.cornerRadius = 5;
+        hud.clipsToBounds = YES;
+        hud.userInteractionEnabled = NO;
+        objc_setAssociatedObject(window, kNFBTabDiagKey, hud,
+                                 OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    }
+    if (hud.superview != window) {
+        [window addSubview:hud];
+    }
+    hud.text = text;
+    CGSize fit = [hud sizeThatFits:CGSizeMake(300, 200)];
+    hud.frame = CGRectMake(10, window.bounds.size.height - fit.height - 130,
+                           fit.width + 12, fit.height + 8);
+    [window bringSubviewToFront:hud];
+}
+
 static void nfbPositionUnderline(UIView* root, UICollectionView* cv) {
     UICollectionView* pager = gNFBPagerCV;
     if (!root || !cv || !pager) { return; }
@@ -316,6 +349,27 @@ static void nfbPositionUnderline(UIView* root, UICollectionView* cv) {
     gNFBSettingUnderline = YES;
     [UIView performWithoutAnimation:^{ hl.frame = local; }];
     gNFBSettingUnderline = NO;
+
+    NSArray<NSIndexPath*>* sel = cv.indexPathsForSelectedItems;
+    NSMutableString* items = [NSMutableString string];
+    for (UICollectionViewCell* cell in cv.visibleCells) {
+        NSIndexPath* ip = [cv indexPathForCell:cell];
+        if (ip && !cell.hidden) {
+            [items appendFormat:@"%ld@%.0f ", (long)ip.item,
+                                CGRectGetMidX([root convertRect:cell.frame
+                                                       fromView:cell.superview])];
+        }
+    }
+    nfbUnderlineDiag(
+        root,
+        [NSString stringWithFormat:
+                      @"pages %ld posees / %ld gardees / %ld total\noffset %.2f  espace %@\n"
+                      @"selection %@  choix abs %ld\ntrait %.0f l%.0f\ncellules %@",
+                      (long)laidOut, (long)kept, (long)total, f,
+                      pagerRemapped ? @"remappe" : @"absolu",
+                      sel.count ? [NSString stringWithFormat:@"%ld", (long)sel.firstObject.item]
+                                : @"aucune",
+                      (long)abs0, centreInRoot, width, items]);
 }
 
 // MARK: - pager <-> mask sync (defined before use)
