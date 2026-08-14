@@ -248,7 +248,7 @@
 
 /* ===== MESSAGES ===== */
 "MODERN_SETTINGS_MESSAGES_TITLE" = "Messages";
-"MODERN_SETTINGS_MESSAGES_SUBTITLE" = "Read receipts, typing, and Grok's entry points.";
+"MODERN_SETTINGS_MESSAGES_SUBTITLE" = "Typing, voice notes, and Grok's entry points.";
 "MESSAGES_GROUP_CHAT" = "Chat";
 "MESSAGES_GROUP_GROK" = "Grok";
 "HIDE_TYPING_INDICATOR_TITLE" = "Hide typing indicator";
