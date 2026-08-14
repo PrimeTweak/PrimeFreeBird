@@ -160,10 +160,10 @@ extern NSInteger NFBColorThemeScreenVisible;
             @"action": @"showBrandingSettings"
         },
         @{
-            @"title": [[BHTBundle sharedBundle] localizedStringForKey:@"MODERN_SETTINGS_GROK_TITLE"],
+            @"title": [[BHTBundle sharedBundle] localizedStringForKey:@"MODERN_SETTINGS_MESSAGES_TITLE"],
             @"subtitle":
-                [[BHTBundle sharedBundle] localizedStringForKey:@"MODERN_SETTINGS_GROK_SUBTITLE"],
-            @"icon": @"grok_icon_stroke",
+                [[BHTBundle sharedBundle] localizedStringForKey:@"MODERN_SETTINGS_MESSAGES_SUBTITLE"],
+            @"icon": @"messages_stroke",
             @"action": @"showGrokSettings"
         },
         @{
