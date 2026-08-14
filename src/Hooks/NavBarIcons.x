@@ -82,6 +82,49 @@ static UIImage* NFBGreyGlyph(UIImage* source, UIColor* colour) {
     return result;
 }
 
+// The back chevron is a TFNBarButtonItem holding a TFNButton, and that button
+// carries an image and a style PER STATE: at rest one style, while pressed
+// another, which resolves to the palette's primary colour. A custom accent
+// therefore shows through for the length of a touch. The glyph is painted into
+// a flat bitmap once and installed for both states, so a state change has
+// nothing left to recolour.
+static const void* kNFBBackPaintedKey = &kNFBBackPaintedKey;
+
+static void nfbHoldBackItem(UINavigationItem* item, UIColor* colour) {
+    UIBarButtonItem* back = item.leftBarButtonItems.firstObject;
+    if (!back || back.title.length > 0 || !back.image || !colour) {
+        return;
+    }
+    UIColor* used = objc_getAssociatedObject(back, kNFBBackPaintedKey);
+    if (used && [used isEqual:colour]) {
+        return;
+    }
+    UIImage* original = objc_getAssociatedObject(back, kNFBOriginalImageKey);
+    UIImage* source = original ?: back.image;
+    if (!original) {
+        objc_setAssociatedObject(back, kNFBOriginalImageKey, source,
+                                 OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    }
+    UIImage* painted = NFBGreyGlyph(source, colour);
+    if (!painted) {
+        return;
+    }
+    back.image = painted;
+    back.tintColor = colour;
+    // The inner button keeps its own per-state images; both are set to the
+    // painted one when it can be reached.
+    Ivar buttonIvar = class_getInstanceVariable(object_getClass(back), "_button");
+    id inner = buttonIvar ? object_getIvar(back, buttonIvar) : nil;
+    if ([inner respondsToSelector:@selector(setImage:forState:)]) {
+        ((void (*)(id, SEL, UIImage*, UIControlState))objc_msgSend)(
+            inner, @selector(setImage:forState:), painted, UIControlStateNormal);
+        ((void (*)(id, SEL, UIImage*, UIControlState))objc_msgSend)(
+            inner, @selector(setImage:forState:), painted, UIControlStateHighlighted);
+    }
+    objc_setAssociatedObject(back, kNFBBackPaintedKey, colour,
+                             OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+}
+
 // Replaces the image of every glyph-sized image view under a view. The result
 // is remembered so the work happens once, and happens again only if Twitter
 // puts its own image back.
@@ -254,6 +297,7 @@ static void nfbRepaintNotificationsGear(UIView* bar, UIColor* colour) {
         return;
     }
     UINavigationItem* item = ((id (*)(id, SEL))objc_msgSend)(bar, @selector(topItem));
+    nfbHoldBackItem(item, [UIColor labelColor]);
     for (UIBarButtonItem* button in item.rightBarButtonItems) {
         if (button.title.length > 0 || !button.image) {
             continue;
