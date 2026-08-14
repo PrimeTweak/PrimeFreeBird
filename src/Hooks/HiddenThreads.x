@@ -333,11 +333,14 @@ static void NFBLayoutHideButton(UIView* row) {
     button.frame = CGRectMake(x, (CGRectGetHeight(row.bounds) - side) / 2.0, side, side);
 }
 
-%hook TTAStatusInlineActionsView
+// Kept on the row by association rather than by a declared property: this
+// class is already declared in the headers, so nothing can be added to its
+// interface.
+static const void* kNFBRowThreadKey = &kNFBRowThreadKey;
+static const void* kNFBRowWhoKey = &kNFBRowWhoKey;
+static const void* kNFBRowPreviewKey = &kNFBRowPreviewKey;
 
-%property (nonatomic, strong) NSString* nfbThreadID;
-%property (nonatomic, strong) NSString* nfbThreadWho;
-%property (nonatomic, strong) NSString* nfbThreadPreview;
+%hook TTAStatusInlineActionsView
 
 - (void)layoutSubviews {
     %orig;
@@ -360,9 +363,12 @@ static void NFBLayoutHideButton(UIView* row) {
         return;
     }
 
-    self.nfbThreadID = NFBThreadIDForModel(model);
-    self.nfbThreadWho = NFBAuthorHandleForModel(model);
-    self.nfbThreadPreview = NFBPreviewForModel(model);
+    objc_setAssociatedObject(row, kNFBRowThreadKey, NFBThreadIDForModel(model),
+                             OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    objc_setAssociatedObject(row, kNFBRowWhoKey, NFBAuthorHandleForModel(model),
+                             OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    objc_setAssociatedObject(row, kNFBRowPreviewKey, NFBPreviewForModel(model),
+                             OBJC_ASSOCIATION_RETAIN_NONATOMIC);
 
     if (!existing) {
         existing = [UIButton buttonWithType:UIButtonTypeCustom];
@@ -383,11 +389,13 @@ static void NFBLayoutHideButton(UIView* row) {
 
 %new
 - (void)nfbHideThreadTapped {
-    NSString* threadID = self.nfbThreadID;
+    UIView* row = (UIView*)self;
+    NSString* threadID = objc_getAssociatedObject(row, kNFBRowThreadKey);
     if (!threadID.length) {
         return;
     }
-    NFBHideThread(threadID, self.nfbThreadWho, self.nfbThreadPreview);
+    NFBHideThread(threadID, objc_getAssociatedObject(row, kNFBRowWhoKey),
+                  objc_getAssociatedObject(row, kNFBRowPreviewKey));
     NFBShowHiddenToast(threadID);
 }
 
