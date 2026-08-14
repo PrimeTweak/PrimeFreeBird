@@ -86,10 +86,12 @@ static UIImage* NFBGreyGlyph(UIImage* source, UIColor* colour) {
 // Replaces the image of every glyph-sized image view under a view. The result
 // is remembered so the work happens once, and happens again only if Twitter
 // puts its own image back.
-static void nfbRepaintGlyphs(UIView* view, UIColor* colour) {
-    for (UIView* subview in view.subviews) {
-        if ([subview isKindOfClass:[UIImageView class]]) {
-            UIImageView* imageView = (UIImageView*)subview;
+// One image view, and only that one. The walk below hands each of its finds to
+// this, and the back chevron claims itself through it — a container passed by
+// mistake would otherwise repaint every sibling, an avatar included.
+static void nfbRepaintGlyph(UIImageView* imageView, UIColor* colour) {
+    {
+        {
             UIImage* current = imageView.image;
             UIImage* ours = objc_getAssociatedObject(imageView, kNFBGreyedImageKey);
             // Repaint when the image changed OR when the colour did. At launch
@@ -118,6 +120,14 @@ static void nfbRepaintGlyphs(UIView* view, UIColor* colour) {
                                          OBJC_ASSOCIATION_RETAIN_NONATOMIC);
                 imageView.image = painted;
             }
+        }
+    }
+}
+
+static void nfbRepaintGlyphs(UIView* view, UIColor* colour) {
+    for (UIView* subview in view.subviews) {
+        if ([subview isKindOfClass:[UIImageView class]]) {
+            nfbRepaintGlyph((UIImageView*)subview, colour);
         }
         nfbRepaintGlyphs(subview, colour);
     }
@@ -408,12 +418,17 @@ static void nfbClaimBackChevron(UIImageView* imageView) {
       if (CGRectGetMidX(inBar) > width * 0.2) {
           return;
       }
+      // A round image view is a portrait, not a glyph: the avatar of a
+      // conversation sits in this same corner.
+      if (view.layer.cornerRadius > 0.5 || view.layer.mask != nil) {
+          return;
+      }
       UIColor* colour = [UIColor labelColor];
       if ([colour respondsToSelector:@selector(resolvedColorWithTraitCollection:)]) {
           colour = [colour resolvedColorWithTraitCollection:navBar.traitCollection]
                    ?: colour;
       }
-      nfbRepaintGlyphs(view.superview, colour);
+      nfbRepaintGlyph(view, colour);
     });
 }
 
