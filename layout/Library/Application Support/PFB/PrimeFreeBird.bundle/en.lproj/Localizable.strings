@@ -253,6 +253,10 @@
 "MESSAGES_GROUP_GROK" = "Grok";
 "HIDE_TYPING_INDICATOR_TITLE" = "Hide typing indicator";
 "HIDE_TYPING_INDICATOR_DETAIL" = "Stop telling the other side that you are writing.";
+"VOICE_TRANSCRIPTION_TITLE" = "Voice transcripts";
+"VOICE_TRANSCRIPTION_DETAIL" = "Show the text of a voice note under its waveform.";
+"DOWNLOAD_VOICE_MESSAGES_TITLE" = "Download voice notes";
+"DOWNLOAD_VOICE_MESSAGES_DETAIL" = "Long-press a voice message to save the audio file.";
 
 /* ===== GROK ===== */
 "MODERN_SETTINGS_GROK_TITLE" = "Grok";
@@ -455,6 +459,12 @@
 "FILTERS_DETAIL" = "Words, accounts and languages you keep out of your feed.";
 "FILTERS_SEGMENT_WORDS" = "Words";
 "FILTERS_SEGMENT_LANGUAGES" = "Languages";
+"FILTERS_SEGMENT_THREADS" = "Threads";
+"THREADS_FOOTER" = "Conversations you hid from a post. Swipe a row to bring one back.";
+"THREADS_EMPTY" = "No hidden conversations";
+"THREADS_NO_PREVIEW" = "(no text)";
+"THREADS_HIDDEN_TOAST" = "Conversation hidden";
+"THREADS_UNDO" = "Undo";
 "LANGUAGES_FOOTER_OFF" = "No language checked — every language reaches your timeline.";
 "LANGUAGES_FOOTER_ON" = "Only the checked languages reach your timeline.\nTweets with no detected language always pass.\nUncheck every language to turn the filter off.";
 "LANGUAGES_TRANSLATE_TITLE" = "Auto-translate";
