@@ -255,6 +255,12 @@ static NSNumber* FeatureSwitchOverrideValueForKey(NSString* key) {
         return [BHTSettings boolForKey:@"disable_video_captions"] ? @NO : nil;
     }
 
+    // Voice notes: the transcript is rendered under the waveform, so a message
+    // can be read instead of played.
+    if ([key isEqualToString:@"chat_voice_messages_transcription_enabled"]) {
+        return [BHTSettings boolForKey:@"voice_transcription"] ? @YES : nil;
+    }
+
     // Image preloading (performance): preload media for smoother scrolling
     if ([key isEqualToString:@"ios_performance_image_preloading_enabled"]) {
         return [BHTSettings boolForKey:@"enable_image_preloading"] ? @YES : nil;

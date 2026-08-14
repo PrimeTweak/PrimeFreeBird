@@ -816,7 +816,14 @@ static BOOL NFBObjectMatchesMutedRule(id object) {
     return NO;
 }
 
+// Hidden conversations live in HiddenThreads.x, which owns the registry and
+// the button that fills it.
+extern BOOL nfbThreadIsHidden(id viewModel);
+
 static BOOL NFBItemIsMuted(id viewModel) {
+    if (nfbThreadIsHidden(viewModel)) {
+        return YES;
+    }
     if (gNFBMutedSkipFollowing && NFBAuthorIsFollowed(viewModel)) {
         return NO;
     }

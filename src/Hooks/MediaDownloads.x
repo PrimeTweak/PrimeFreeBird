@@ -30,6 +30,91 @@ static NSArray* DMVideoEntities(UIView* attachmentView) {
     return [entities copy];
 }
 
+// MARK: - Voice messages
+//
+// A voice note is decrypted to disk before playing, so its URL passes through
+// the asset opened to play it. The last one seen is the one under the finger:
+// the view that would answer a long press has no reference to it, and the
+// attachment view above cannot serve this menu — the audio view sits on its
+// own and takes the touch first.
+
+static NSURL* gNFBLastVoiceURL = nil;
+
+%hook AVURLAsset
+
+- (id)initWithURL:(NSURL*)url options:(NSDictionary*)options {
+    if ([url.path containsString:@"/decrypted-media-v2/"]) {
+        gNFBLastVoiceURL = url;
+    }
+    return %orig;
+}
+
+%end
+
+// The file is already on disk and already decrypted; copying it out under a
+// fresh name is enough to hand it to the share sheet.
+static void NFBSaveVoiceMessage(NSURL* sourceURL) {
+    if (!sourceURL.isFileURL) {
+        return;
+    }
+    NSString* extension = sourceURL.pathExtension.length ? sourceURL.pathExtension : @"m4a";
+    NSURL* destination = [[NSURL fileURLWithPath:NSTemporaryDirectory()]
+        URLByAppendingPathComponent:[NSString stringWithFormat:@"%@.%@",
+                                                              NSUUID.UUID.UUIDString,
+                                                              extension]];
+    NSError* copyError = nil;
+    [[NSFileManager defaultManager] copyItemAtURL:sourceURL
+                                            toURL:destination
+                                            error:&copyError];
+    if (copyError) {
+        return;
+    }
+    [BHTManager showSaveVC:destination];
+}
+
+// The audio view carries its own interaction rather than sharing the
+// attachment view's: it is a separate view and wins the touch first.
+%hook _TtC13DMAttachments24AttachmentAssetAudioView
+
+%property (nonatomic, strong) UIContextMenuInteraction* nfbVoiceInteraction;
+
+- (void)layoutSubviews {
+    %orig;
+    if ([BHTSettings boolForKey:@"download_voice_messages"] &&
+        self.nfbVoiceInteraction == nil) {
+        self.nfbVoiceInteraction =
+            [[UIContextMenuInteraction alloc] initWithDelegate:self];
+        [self addInteraction:self.nfbVoiceInteraction];
+    }
+}
+
+%new
+- (UIContextMenuConfiguration*)contextMenuInteraction:(UIContextMenuInteraction*)interaction
+                       configurationForMenuAtLocation:(CGPoint)location {
+    NSURL* voiceURL = gNFBLastVoiceURL;
+    if (!voiceURL) {
+        return nil;
+    }
+    return [UIContextMenuConfiguration
+        configurationWithIdentifier:nil
+                    previewProvider:nil
+                     actionProvider:^UIMenu* _Nullable(
+                         NSArray<UIMenuElement*>* _Nonnull suggestedActions) {
+                       UIAction* saveAction = [UIAction
+                           actionWithTitle:[[BHTBundle sharedBundle]
+                                               localizedTwitterStringForKey:
+                                                   @"DOWNLOAD_ACTIVITY_VIEW_LABEL"]
+                                     image:[UIImage systemImageNamed:@"square.and.arrow.down"]
+                                identifier:nil
+                                   handler:^(__kindof UIAction* _Nonnull action) {
+                                     NFBSaveVoiceMessage(voiceURL);
+                                   }];
+                       return [UIMenu menuWithTitle:@"" children:@[ saveAction ]];
+                     }];
+}
+
+%end
+
 %hook _TtC14DMConversation21MessageAttachmentView
 %property (nonatomic, strong) UIContextMenuInteraction* downloadMenuInteraction;
 %property (nonatomic, strong) DownloadInlineButton* downloadHandler;
