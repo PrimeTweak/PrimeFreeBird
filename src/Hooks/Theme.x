@@ -67,7 +67,11 @@ static UIColor* NFBLogoAccent(UIColor* orig) {
 
 // iOS 26 Liquid Glass controls (compose FAB, follow buttons, switches, the
 // new-posts pill, selection highlights) take their accent from the window tint,
-// not the palette. Push the custom accent onto every window's tintColor.
+// not the palette, so the custom accent is pushed onto every window's
+// tintColor. Under the standard interface the palette carries the accent on its
+// own, and a window tint would only leak onto everything that has no colour of
+// its own — alert buttons, back chevrons, bar glyphs before their own colour is
+// set. It is therefore pushed for Liquid Glass only, and cleared otherwise.
 // Depth counter for the settings stack (Twitter's root, the tweak's menu, every page,
 // the theme screen). The Done platter is ONE button shared by the whole stack,
 // so the whitening must live as long as ANY settings screen is up. A counter,
@@ -86,6 +90,11 @@ static void NFBApplyGlobalTint(void) {
         } else {
             hasAccent = ![defs boolForKey:@"nfb_color_reset_done"];
         }
+    }
+    // Standard interface: no window tint at all, so nothing inherits the accent
+    // that has no colour of its own.
+    if (![BHTSettings boolForKey:@"enable_liquid_glass"]) {
+        hasAccent = NO;
     }
     UIColor* tint = hasAccent ? CurrentAccentColor() : nil;
     void (^apply)(void) = ^{
@@ -779,11 +788,15 @@ static void NFBShowRestartReminder(void) {
 }
 %end
 
-// Liquid Glass: keep the custom tint on any window created after launch.
+// Liquid Glass: keep the custom tint on any window created after launch. Under
+// the standard interface the window keeps its own tint, so nothing inherits the
+// accent that should not.
 %hook UIWindow
 - (void)makeKeyAndVisible {
     %orig;
-    if (customAccentActive()) { self.tintColor = customAccentColor(); }
+    if ([BHTSettings boolForKey:@"enable_liquid_glass"] && customAccentActive()) {
+        self.tintColor = customAccentColor();
+    }
 }
 %end
 
