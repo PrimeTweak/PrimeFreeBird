@@ -192,17 +192,27 @@ static NSInteger NFBReplyCountForModel(id model) {
 // The link between the two is not guessed: the object that answers replyCount
 // is looked for, first among the usual names, then among the model's own
 // instance variables. Only something that actually answers is accepted.
+// What makes an object usable here: it answers at least one of the four values
+// this file needs. Requiring replyCount alone rejected the very model the crash
+// report proved was reachable — it answers inReplyToStatusID, not the count.
+static BOOL NFBRespondsToStatusValue(id candidate) {
+    return [candidate respondsToSelector:@selector(replyCount)] ||
+           [candidate respondsToSelector:@selector(conversationID)] ||
+           [candidate respondsToSelector:@selector(inReplyToStatusID)] ||
+           [candidate respondsToSelector:@selector(statusID)];
+}
+
 static id NFBStatusFromModel(id model) {
     if (!model) {
         return nil;
     }
-    if ([model respondsToSelector:@selector(replyCount)]) {
+    if (NFBRespondsToStatusValue(model)) {
         return model;
     }
     for (NSString* key in @[ @"status", @"tweet", @"canonicalStatus", @"statusModel" ]) {
         @try {
             id candidate = [model valueForKey:key];
-            if ([candidate respondsToSelector:@selector(replyCount)]) {
+            if (NFBRespondsToStatusValue(candidate)) {
                 return candidate;
             }
         } @catch (__unused NSException* exception) {
@@ -217,7 +227,7 @@ static id NFBStatusFromModel(id model) {
             continue;
         }
         id value = object_getIvar(model, ivars[i]);
-        if ([value respondsToSelector:@selector(replyCount)]) {
+        if (NFBRespondsToStatusValue(value)) {
             found = value;
         }
     }
@@ -231,10 +241,17 @@ static BOOL NFBModelIsConversation(id model) {
     if (!model) {
         return NO;
     }
-    if (NFBReplyCountForModel(model) > 0) {
+    if (NFBIdentifierValue(model, @selector(inReplyToStatusID)).length > 0) {
         return YES;
     }
-    return NFBIdentifierValue(model, @selector(inReplyToStatusID)).length > 0;
+    // The count decides only when it can actually be read. Where the model does
+    // not carry it, the button is shown rather than silently withheld: hiding a
+    // conversation is harmless on a Tweet that has none, whereas a button that
+    // never appears is the failure this file has been chasing.
+    if ([model respondsToSelector:@selector(replyCount)]) {
+        return NFBReplyCountForModel(model) > 0;
+    }
+    return YES;
 }
 
 static NSString* NFBAuthorHandleForModel(id model) {
