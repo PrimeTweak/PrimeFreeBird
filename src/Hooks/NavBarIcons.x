@@ -388,10 +388,30 @@ static BOOL nfbIsChatBarGlyph(UIView* view) {
         // which a bar button draws as a template all the same — its description
         // simply names no mode at all. Anything that is not already original is
         // therefore claimed.
-        if (image.renderingMode != UIImageRenderingModeAlwaysOriginal &&
-            nfbIsChatBarGlyph((UIView*)self)) {
-            %orig([image imageWithRenderingMode:UIImageRenderingModeAlwaysOriginal]);
-            return;
+        if (image.renderingMode != UIImageRenderingModeAlwaysOriginal) {
+            if (nfbIsChatBarGlyph((UIView*)self)) {
+                %orig([image imageWithRenderingMode:UIImageRenderingModeAlwaysOriginal]);
+                return;
+            }
+            // A bar button is given its image before it is placed in the bar, so
+            // the ancestors that name it do not exist yet and the test above
+            // cannot answer. The question is asked again on the next turn of the
+            // run loop, once the button has been attached — outside any layout
+            // pass, so nothing is invalidated while a layout is in progress.
+            if (!((UIView*)self).superview) {
+                __weak UIImageView* weakView = (UIImageView*)self;
+                dispatch_async(dispatch_get_main_queue(), ^{
+                  UIImageView* view = weakView;
+                  UIImage* current = view.image;
+                  if (!view || !current ||
+                      current.renderingMode == UIImageRenderingModeAlwaysOriginal ||
+                      !nfbIsChatBarGlyph(view)) {
+                      return;
+                  }
+                  view.image =
+                      [current imageWithRenderingMode:UIImageRenderingModeAlwaysOriginal];
+                });
+            }
         }
         %orig;
         return;
