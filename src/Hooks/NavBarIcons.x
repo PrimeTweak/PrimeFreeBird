@@ -122,6 +122,35 @@ static void nfbRepaintGlyphs(UIView* view, UIColor* colour) {
     }
 }
 
+// The conversation bar of the encrypted chat, named by its controller rather
+// than by geometry. Everything below is fenced behind this: no other bar in the
+// app is touched.
+static BOOL nfbIsChatConversationBar(UIView* view) {
+    UIResponder* responder = view;
+    NSInteger depth = 0;
+    while ((responder = responder.nextResponder) && depth < 12) {
+        NSString* name = NSStringFromClass([responder class]);
+        if ([name containsString:@"XChatDM"]) {
+            return YES;
+        }
+        depth++;
+    }
+    return NO;
+}
+
+// The padlock under the name is a 14pt image view inside the subtitle, a
+// different branch from the portrait beside it — so the subtitle is the only
+// thing walked here, and the avatar is never in reach.
+static void nfbPaintChatSubtitleGlyphs(UIView* view, UIColor* colour) {
+    for (UIView* subview in view.subviews) {
+        if ([NSStringFromClass([subview class]) containsString:@"SubtitleView"]) {
+            nfbRepaintGlyphs(subview, colour);
+            continue;
+        }
+        nfbPaintChatSubtitleGlyphs(subview, colour);
+    }
+}
+
 static BOOL nfbLooksLikeSettingsButton(UIView* view) {
     NSString* identifier = view.accessibilityIdentifier;
     NSString* label = view.accessibilityLabel;
@@ -436,6 +465,17 @@ static BOOL nfbIsRightHandGlyphButton(UIView* button) {
         // The identifier is the precise route and covers Explore. The second
         // route exists only for Notifications, where no view carries it — and
         // it is fenced in tightly so nothing else on that screen is caught.
+        // The trailing icons of the conversation bar: same treatment as the
+        // glyphs beside them, and the button's own subtree is what is passed.
+        if (nfbIsChatConversationBar(button)) {
+            UIColor* label = [UIColor labelColor];
+            if ([label respondsToSelector:@selector(resolvedColorWithTraitCollection:)]) {
+                label = [label resolvedColorWithTraitCollection:button.traitCollection]
+                        ?: label;
+            }
+            nfbRepaintGlyphs(button, label);
+            return;
+        }
         BOOL wanted = nfbLooksLikeSettingsButton(button) ||
                       (nfbControllerIsNotifications(nfbBarOwningController(button)) &&
                        nfbIsRightHandGlyphButton(button));
@@ -541,6 +581,24 @@ static UIColor* nfbBarGlyphColour(UIView* view) {
     }
     return colour;
 }
+
+
+%hook TFNNavigationBar
+
+- (void)layoutSubviews {
+    %orig;
+    UIView* bar = (UIView*)self;
+    if (!bar.window || !nfbIsChatConversationBar(bar)) {
+        return;
+    }
+    UIColor* label = [UIColor labelColor];
+    if ([label respondsToSelector:@selector(resolvedColorWithTraitCollection:)]) {
+        label = [label resolvedColorWithTraitCollection:bar.traitCollection] ?: label;
+    }
+    nfbPaintChatSubtitleGlyphs(bar, label);
+}
+
+%end
 
 %hook _UIModernBarButton
 
