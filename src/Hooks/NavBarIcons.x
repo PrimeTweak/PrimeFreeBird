@@ -373,28 +373,50 @@ static void nfbTintGlyphChain(UIView* view, UIColor* colour) {
 // A glyph of the conversation bar: inside a bar button or the subtitle stack,
 // and inside that bar. Ancestors only — nothing below is visited, so no sibling
 // can be reached.
-// A back button, wherever it is. _UIBackButtonMaskView exists for back buttons
-// only, and _UIButtonBarButton is the bar's own container — the pair names the
-// arrow without a controller, without geometry and without a size. This is the
-// one glyph that should never carry the accent, on any screen.
+// True of a back button's own subtree only: _UIBackButtonMaskView is created
+// for back buttons and for nothing else. Class names are read, never touched —
+// no view in the subtree is painted, which is what once flattened an avatar.
+static BOOL nfbSubtreeHasBackMask(UIView* view, NSInteger depth) {
+    if (!view || depth > 4) {
+        return NO;
+    }
+    if ([NSStringFromClass([view class]) isEqualToString:@"_UIBackButtonMaskView"]) {
+        return YES;
+    }
+    for (UIView* sub in view.subviews) {
+        if (nfbSubtreeHasBackMask(sub, depth + 1)) {
+            return YES;
+        }
+    }
+    return NO;
+}
+
+// A back button, wherever it is. The bar's container is found first, then the
+// button is asked whether it carries a back mask at all — the pair names the
+// arrow without a controller, without geometry and without a size.
+//
+// The mask is required rather than accepted alongside _UIModernBarButton: every
+// modern bar button has one of those, so the looser test also claimed the round
+// confirm of Twitter's own screens and baked its checkmark in the label colour —
+// a black check on an accent disc. Asking the CONTAINER for a mask still covers
+// both image views a back button carries (they share that container), while a
+// button that is not a back button no longer matches.
 static BOOL nfbIsBackArrowGlyph(UIView* view) {
-    BOOL mask = NO;
-    BOOL container = NO;
+    UIView* container = nil;
     UIView* node = view.superview;
     NSInteger depth = 0;
     while (node && depth < 5) {
-        NSString* name = NSStringFromClass([node class]);
-        if ([name isEqualToString:@"_UIBackButtonMaskView"] ||
-            [name isEqualToString:@"_UIModernBarButton"]) {
-            mask = YES;
-        }
-        if ([name isEqualToString:@"_UIButtonBarButton"]) {
-            container = YES;
+        if ([NSStringFromClass([node class]) isEqualToString:@"_UIButtonBarButton"]) {
+            container = node;
+            break;
         }
         node = node.superview;
         depth++;
     }
-    return mask && container;
+    if (!container) {
+        return NO;
+    }
+    return nfbSubtreeHasBackMask(container, 0);
 }
 
 static BOOL nfbIsChatBarGlyph(UIView* view) {
@@ -686,6 +708,72 @@ static BOOL nfbIsRightHandGlyphButton(UIView* button) {
         return;
     }
     %orig;
+}
+
+%end
+
+// MARK: - the inbox filter pill
+//
+// Read from the view tree of the "All" control on the Messages list:
+//
+//   UIKit.NavigationBarPlatterContainer_v2            the system glass platter
+//    └ …PlatterContainerHost…                         SwiftUI host
+//       └ SwiftUI._UIInheritedView                    ×3
+//          └ _TtGC5UIKit22UICorePlatformViewHost…
+//             └ NavigationButtonBar.ItemWrapper
+//                └ DMInbox.InboxNavigationBarMenuBarButtonItemView   57.33 × 40
+//
+// Every level between the platter and the control is a SwiftUI
+// _UIInheritedView, whose purpose is to pass the inherited environment down to
+// what it hosts — the tint among it. The window carries the accent under Liquid
+// Glass and nothing on the way sets a colour of its own, so the control renders
+// in the accent until Twitter's own style lands. The platter container belongs
+// to UIKit and exists under Liquid Glass only, which is why the standard
+// interface never shows this.
+//
+// The control is given its own tint, on itself, so the inheritance stops here
+// and its subtree can no longer read the window's accent. No parent is walked,
+// so no sibling can be reached — the mistake that painted an avatar once.
+// Addressed as a plain UIView: the class is Swift and Logos forward-declares
+// it, so it takes no message of its own.
+
+static void nfbHoldInboxPillColour(UIView* pill) {
+    if (!pill) {
+        return;
+    }
+    UIColor* colour = nfbBarGlyphColour(pill);
+    // Compared before it is set: assigning a tint propagates it through the
+    // subtree, so an unchanged colour is left alone rather than re-announced on
+    // every layout pass.
+    if (![pill.tintColor isEqual:colour]) {
+        pill.tintColor = colour;
+    }
+}
+
+%hook _TtC7DMInbox39InboxNavigationBarMenuBarButtonItemView
+
+// Before the control is ever drawn: the accent is never shown rather than
+// corrected once it has been seen. This is the point that removed the same
+// first-frame flash from the compose button.
+- (void)willMoveToWindow:(UIWindow*)newWindow {
+    %orig;
+    if (newWindow) {
+        nfbHoldInboxPillColour((UIView*)self);
+    }
+}
+
+- (void)didMoveToWindow {
+    %orig;
+    nfbHoldInboxPillColour((UIView*)self);
+}
+
+// The platter re-hosts its content when the bar is rebuilt — returning to the
+// screen is exactly that — and the fresh host arrives inheriting again. A tint
+// carries no intrinsic size, so unlike an image it can be set here without
+// provoking a layout pass.
+- (void)layoutSubviews {
+    %orig;
+    nfbHoldInboxPillColour((UIView*)self);
 }
 
 %end
