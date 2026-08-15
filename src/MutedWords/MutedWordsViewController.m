@@ -168,9 +168,18 @@ NSString* const kNFBMutedIncludeRepostsKey = @"nfb_muted_include_reposts";
 @property (nonatomic, strong) UILabel* termLabel;
 @property (nonatomic, strong) UIButton* durationButton;
 @property (nonatomic, strong) UIButton* removeButton;
+// Hides the kind badge and pulls the text to the row's edge in one call — a
+// hidden label keeps its slot in Auto Layout, so the constraint has to move
+// too, not just the view's visibility.
+- (void)setBadgeHidden:(BOOL)hidden;
 @end
 
-@implementation NFBMutedTermCell
+@implementation NFBMutedTermCell {
+    // The text leads from the badge when it shows, from the row's edge when it
+    // does not. Both are kept and only one is active at a time.
+    NSLayoutConstraint* _termLeadingToBadge;
+    NSLayoutConstraint* _termLeadingToEdge;
+}
 
 - (instancetype)initWithStyle:(UITableViewCellStyle)style
               reuseIdentifier:(NSString*)reuseIdentifier {
@@ -222,8 +231,6 @@ NSString* const kNFBMutedIncludeRepostsKey = @"nfb_muted_include_reposts";
                 constraintEqualToAnchor:self.contentView.centerYAnchor],
             [_kindLabel.heightAnchor constraintEqualToConstant:22.0],
             [_kindLabel.widthAnchor constraintGreaterThanOrEqualToConstant:58.0],
-            [_termLabel.leadingAnchor constraintEqualToAnchor:_kindLabel.trailingAnchor
-                                                     constant:12.0],
             [_termLabel.centerYAnchor
                 constraintEqualToAnchor:self.contentView.centerYAnchor],
             [_termLabel.trailingAnchor
@@ -245,8 +252,30 @@ NSString* const kNFBMutedIncludeRepostsKey = @"nfb_muted_include_reposts";
                 constraintEqualToAnchor:self.contentView.centerYAnchor],
             [_removeButton.widthAnchor constraintEqualToConstant:26.0],
         ]];
+
+        _termLeadingToBadge =
+            [_termLabel.leadingAnchor constraintEqualToAnchor:_kindLabel.trailingAnchor
+                                                     constant:12.0];
+        _termLeadingToEdge =
+            [_termLabel.leadingAnchor constraintEqualToAnchor:self.contentView.leadingAnchor
+                                                     constant:kNFBMutedSideMargin];
+        // The badge is the default: the Words list always shows it.
+        _termLeadingToBadge.active = YES;
     }
     return self;
+}
+
+- (void)setBadgeHidden:(BOOL)hidden {
+    self.kindLabel.hidden = hidden;
+    // Drop the outgoing constraint before adding the incoming one: the two must
+    // never both be active, even for an instant, or Auto Layout logs a conflict.
+    if (hidden) {
+        _termLeadingToBadge.active = NO;
+        _termLeadingToEdge.active = YES;
+    } else {
+        _termLeadingToEdge.active = NO;
+        _termLeadingToBadge.active = YES;
+    }
 }
 
 @end
@@ -1032,20 +1061,30 @@ static NSMutableArray<NSString*>* NFBKeptLanguageList(void) {
             [tableView dequeueReusableCellWithIdentifier:@"term"
                                             forIndexPath:indexPath];
         NSArray<NSDictionary*>* threads = NFBHiddenThreads();
+        // The same cell class serves the Words list, whose empty-state example
+        // dims its content to 0.38 and never restores it — reuse would then
+        // carry that dimming onto the first thread. Full strength is asserted
+        // here so every row reads at the same weight.
+        cell.contentView.alpha = 1.0;
         // The badge carries the author and the row its first line: the same
         // shape as a muted term, so the two lists read alike.
         cell.durationButton.hidden = YES;
         cell.removeButton.hidden = YES;
         if (!threads.count) {
-            cell.kindLabel.hidden = YES;
+            [cell setBadgeHidden:YES];
             cell.termLabel.text = [bundle localizedStringForKey:@"THREADS_EMPTY"];
             cell.termLabel.textColor = [UIColor secondaryLabelColor];
             return cell;
         }
         NSDictionary* entry = threads[(NSUInteger)indexPath.row];
         NSString* preview = entry[@"preview"];
-        cell.kindLabel.hidden = NO;
-        cell.kindLabel.text = entry[@"who"];
+        NSString* who = entry[@"who"];
+        // The badge is the Words list's kind pill (word / phrase / account); it
+        // only fits a thread when the author was actually resolved. Empty, it
+        // would leave the grey box with nothing in it, so it is hidden and the
+        // preview takes the row's edge.
+        [cell setBadgeHidden:who.length == 0];
+        cell.kindLabel.text = who;
         cell.termLabel.text =
             preview.length ? preview
                            : [bundle localizedStringForKey:@"THREADS_NO_PREVIEW"];
@@ -1188,6 +1227,7 @@ static NSMutableArray<NSString*>* NFBKeptLanguageList(void) {
             NFBMutedTermCell* example =
                 [tableView dequeueReusableCellWithIdentifier:@"term"
                                                 forIndexPath:indexPath];
+            [example setBadgeHidden:NO];
             example.termLabel.text =
                 [bundle localizedStringForKey:@"MUTED_WORDS_EXAMPLE_TERM"];
             example.termLabel.font =
@@ -1204,8 +1244,10 @@ static NSMutableArray<NSString*>* NFBKeptLanguageList(void) {
         NFBMutedTermCell* cell = [tableView dequeueReusableCellWithIdentifier:@"term"
                                                                  forIndexPath:indexPath];
         NSString* term = self.terms[termIndex];
-        // Undo whatever the example row changed — cells are reused.
+        // Undo whatever the example row or the Threads list changed — cells are
+        // reused across all three modes.
         cell.contentView.alpha = 1.0;
+        [cell setBadgeHidden:NO];
         cell.durationButton.hidden = NO;
         cell.removeButton.hidden = NO;
         cell.termLabel.font = [TwitterChirpFont(TwitterFontStyleRegular) fontWithSize:16.5];
