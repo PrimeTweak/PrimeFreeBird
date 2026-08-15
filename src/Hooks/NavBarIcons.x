@@ -342,24 +342,44 @@ static void nfbRepaintNotificationsGear(UIView* bar, UIColor* colour) {
 // image is caught as it is set. Only views the tweak have already taken over are
 // affected — everything else pays a single associated-object read.
 
+// A glyph of the conversation bar: inside a bar button or the subtitle stack,
+// and inside that bar. Ancestors only — nothing below is visited, so no sibling
+// can be reached.
+static BOOL nfbIsChatBarGlyph(UIView* view) {
+    UIView* ancestor = view.superview;
+    NSInteger depth = 0;
+    BOOL inHolder = NO;
+    while (ancestor && depth < 4) {
+        NSString* name = NSStringFromClass([ancestor class]);
+        if ([name isEqualToString:@"_UIModernBarButton"] ||
+            [name isEqualToString:@"TFNBarButtonItemButton"] ||
+            [name containsString:@"SelfSizingStackView"]) {
+            inHolder = YES;
+            break;
+        }
+        ancestor = ancestor.superview;
+        depth++;
+    }
+    return inHolder && nfbIsChatConversationBar(view);
+}
+
 %hook UIImageView
 
 - (void)setImage:(UIImage*)image {
-    // The padlock under the conversation name is a 14pt glyph in a self-sizing
-    // stack. Painting it during layout froze the app, so the rendering mode is
-    // corrected instead — the same answer as the portrait: the image keeps its
-    // own colours, its size does not change, and no layout pass is provoked.
-    if (image.renderingMode == UIImageRenderingModeAlwaysTemplate &&
-        image.size.width > 0 && image.size.width <= 16.0 &&
-        [NSStringFromClass([((UIView*)self).superview class])
-            containsString:@"SelfSizingStackView"] &&
-        nfbIsChatConversationBar((UIView*)self)) {
-        %orig([image imageWithRenderingMode:UIImageRenderingModeAlwaysOriginal]);
-        return;
-    }
-
     UIColor* target = objc_getAssociatedObject(self, kNFBGreyTargetKey);
     if (!target || !image) {
+        // The glyphs of the conversation bar — the arrow, the trailing icons,
+        // the padlock — are template images, so they are drawn entirely in
+        // whatever tint reaches them. The rendering mode is corrected here
+        // rather than painted during layout: an image keeps its own colours,
+        // its size does not change, and no layout pass is provoked. Painting a
+        // bar button while it was laying out invalidated its intrinsic size and
+        // froze the app twice.
+        if (image.renderingMode == UIImageRenderingModeAlwaysTemplate &&
+            nfbIsChatBarGlyph((UIView*)self)) {
+            %orig([image imageWithRenderingMode:UIImageRenderingModeAlwaysOriginal]);
+            return;
+        }
         %orig;
         return;
     }
@@ -466,17 +486,6 @@ static BOOL nfbIsRightHandGlyphButton(UIView* button) {
         // The identifier is the precise route and covers Explore. The second
         // route exists only for Notifications, where no view carries it — and
         // it is fenced in tightly so nothing else on that screen is caught.
-        // The trailing icons of the conversation bar: same treatment as the
-        // glyphs beside them, and the button's own subtree is what is passed.
-        if (nfbIsChatConversationBar(button)) {
-            UIColor* label = [UIColor labelColor];
-            if ([label respondsToSelector:@selector(resolvedColorWithTraitCollection:)]) {
-                label = [label resolvedColorWithTraitCollection:button.traitCollection]
-                        ?: label;
-            }
-            nfbRepaintGlyphs(button, label);
-            return;
-        }
         BOOL wanted = nfbLooksLikeSettingsButton(button) ||
                       (nfbControllerIsNotifications(nfbBarOwningController(button)) &&
                        nfbIsRightHandGlyphButton(button));
@@ -562,61 +571,9 @@ static BOOL nfbIsRightHandGlyphButton(UIView* button) {
 // replaced, no parent is walked, so a sibling cannot be caught — which is what
 // went wrong when the arrow was claimed through its superview.
 
-static BOOL nfbInsideTwitterNavigationBar(UIView* view) {
-    UIView* ancestor = view.superview;
-    NSInteger depth = 0;
-    while (ancestor && depth < 10) {
-        if ([NSStringFromClass([ancestor class]) isEqualToString:@"TFNNavigationBar"]) {
-            return YES;
-        }
-        ancestor = ancestor.superview;
-        depth++;
-    }
-    return NO;
-}
-
-static UIColor* nfbBarGlyphColour(UIView* view) {
-    UIColor* colour = [UIColor labelColor];
-    if (view && [colour respondsToSelector:@selector(resolvedColorWithTraitCollection:)]) {
-        return [colour resolvedColorWithTraitCollection:view.traitCollection] ?: colour;
-    }
-    return colour;
-}
 
 
-%hook _UIModernBarButton
 
-// A tint is answered when the glyph is drawn, so setting one always lands after
-// the first frames — measured at six images of accent on every push. The glyph
-// is therefore painted into a flat bitmap instead, the same way the settings
-// icon in this file has always been handled: the button's own subtree is passed,
-// never its parent, and the image view is marked so the interception above keeps
-// it painted when the app re-images it.
-- (void)willMoveToWindow:(UIWindow*)window {
-    %orig;
-    UIView* button = (UIView*)self;
-    if (window && nfbInsideTwitterNavigationBar(button)) {
-        nfbRepaintGlyphs(button, nfbBarGlyphColour(button));
-    }
-}
-
-- (void)didMoveToWindow {
-    %orig;
-    UIView* button = (UIView*)self;
-    if (nfbInsideTwitterNavigationBar(button)) {
-        nfbRepaintGlyphs(button, nfbBarGlyphColour(button));
-    }
-}
-
-- (void)layoutSubviews {
-    %orig;
-    UIView* button = (UIView*)self;
-    if (nfbInsideTwitterNavigationBar(button)) {
-        nfbRepaintGlyphs(button, nfbBarGlyphColour(button));
-    }
-}
-
-%end
 
 // MARK: - a portrait is not a glyph
 //
