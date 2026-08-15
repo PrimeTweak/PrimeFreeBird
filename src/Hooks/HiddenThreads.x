@@ -389,42 +389,13 @@ static void NFBReloadList(__unused UIScrollView* list) {
 // action, and inventing one would put a foreign control inside a native strip.
 // A hidden conversation is restored from Filters › Threads.
 
-// The toast window sits above everything; its message label is reached by name
-// rather than by position.
-static void NFBDarkenToastTextIn(UIView* view, NSInteger depth) {
-    if (depth > 8) {
-        return;
-    }
-    if ([NSStringFromClass([view class]) containsString:@"ToastDefaultContentView"]) {
-        @try {
-            UILabel* message = [view valueForKey:@"messageLabel"];
-            UILabel* detail = [view valueForKey:@"detailLabel"];
-            if ([message isKindOfClass:[UILabel class]]) {
-                message.textColor = [UIColor labelColor];
-            }
-            if ([detail isKindOfClass:[UILabel class]]) {
-                detail.textColor = [UIColor secondaryLabelColor];
-            }
-        } @catch (__unused NSException* exception) {
-        }
-        return;
-    }
-    for (UIView* subview in view.subviews) {
-        NFBDarkenToastTextIn(subview, depth + 1);
-    }
-}
+// Our strip is on screen for a few seconds after it is pushed; only during that
+// window is a toast's text recoloured, so Twitter's other confirmations keep
+// their own appearance.
+static CFAbsoluteTime gNFBToastDeadline = 0;
 
-static void NFBDarkenToastText(void) {
-    for (UIScene* scene in UIApplication.sharedApplication.connectedScenes) {
-        if (![scene isKindOfClass:[UIWindowScene class]]) {
-            continue;
-        }
-        for (UIWindow* window in ((UIWindowScene*)scene).windows) {
-            if ([NSStringFromClass([window class]) containsString:@"ToastWindow"]) {
-                NFBDarkenToastTextIn(window, 0);
-            }
-        }
-    }
+static BOOL NFBOurToastIsShowing(void) {
+    return CFAbsoluteTimeGetCurrent() < gNFBToastDeadline;
 }
 
 static void NFBShowHiddenToast(void) {
@@ -452,17 +423,11 @@ static void NFBShowHiddenToast(void) {
     }
     ((void (*)(id, SEL, id))objc_msgSend)(toaster, @selector(pushToast:), toast);
 
-    // The label is recoloured on the view the app builds, without a hook and
-    // without a guessed signature. One pass on the next turn was too early —
-    // the strip did not exist yet and the text stayed white on white — so it is
-    // attempted a few times over half a second and stops as soon as it lands.
-    for (NSInteger attempt = 0; attempt < 5; attempt++) {
-        dispatch_after(
-            dispatch_time(DISPATCH_TIME_NOW, (int64_t)(attempt * 0.12 * NSEC_PER_SEC)),
-            dispatch_get_main_queue(), ^{
-              NFBDarkenToastText();
-            });
-    }
+    // The colour is applied where the strip lays itself out, not on a timer:
+    // a single pass afterwards was either too early — the view did not exist —
+    // or undone by the app's own layout, which is how the text ended up white
+    // on a light background.
+    gNFBToastDeadline = CFAbsoluteTimeGetCurrent() + 6.0;
 }
 
 // MARK: - The entry in the Tweet's own menu
@@ -570,6 +535,32 @@ static BOOL NFBMenuBelongsToTweet(UIMenu* menu) {
                   NFBShowHiddenToast();
                 }];
     %orig([menu menuByReplacingChildren:[menu.children arrayByAddingObject:hide]]);
+}
+
+%end
+
+// The strip's own content view, recoloured as it lays out. TFNInformationToast
+// carries no text colour, and the label is rebuilt on every layout — so this is
+// the only place the change survives.
+%hook TFNToastDefaultContentView
+
+- (void)layoutSubviews {
+    %orig;
+    if (!NFBOurToastIsShowing()) {
+        return;
+    }
+    UIView* view = (UIView*)self;
+    @try {
+        UILabel* message = [view valueForKey:@"messageLabel"];
+        UILabel* detail = [view valueForKey:@"detailLabel"];
+        if ([message isKindOfClass:[UILabel class]]) {
+            message.textColor = [UIColor labelColor];
+        }
+        if ([detail isKindOfClass:[UILabel class]]) {
+            detail.textColor = [UIColor secondaryLabelColor];
+        }
+    } @catch (__unused NSException* exception) {
+    }
 }
 
 %end
