@@ -826,9 +826,6 @@ static BOOL NFBObjectMatchesMutedRule(id object) {
 extern BOOL nfbThreadIsHidden(id viewModel);
 
 static BOOL NFBItemIsMuted(id viewModel) {
-    if (nfbThreadIsHidden(viewModel)) {
-        return YES;
-    }
     if (gNFBMutedSkipFollowing && NFBAuthorIsFollowed(viewModel)) {
         return NO;
     }
@@ -853,6 +850,13 @@ static BOOL ShouldHideTimelineItem(id item, BOOL hideWhoToFollow, BOOL hidePromp
                                    NSSet<NSNumber*>* authorRepliedToUserIDs) {
     id viewModel = unwrapDataViewItem(item);
     NSString* className = NSStringFromClass([viewModel classForCoder]);
+
+    // Hidden conversations are their own filter: they were tested inside
+    // NFBItemIsMuted, which is only reached when a muted word or handle exists —
+    // so hiding a thread did nothing on an empty word list.
+    if (nfbThreadIsHidden(viewModel)) {
+        return YES;
+    }
 
     if ((gNFBMutedWords.count || gNFBMutedHandles.count) &&
         (!inConversation || gNFBMutedInConversations) && NFBItemIsMuted(viewModel)) {
