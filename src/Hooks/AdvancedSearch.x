@@ -36,16 +36,24 @@ static const void* kNFBAdvSearchGreyKey = &kNFBAdvSearchGreyKey;
 // unit gap Twitter draws. Only the stroke changes, 2 units to the gear's 2.55.
 // Rail centre line, handle centre — a block cannot capture a local C array, so
 // the table lives at file scope where it is simply referenced.
-static const CGFloat kNFBSliderGeometry[2][2] = {{7.0, 15.0}, {17.0, 9.0}};
+// Rows of the glyph on a 24-point grid: {centre y, handle centre x}. The upper
+// handle sits right of centre, the lower one left, so the two rows read as two
+// different settings rather than a repeated shape.
+static const CGFloat kNFBSliderGeometry[2][2] = {{8.0, 14.0}, {16.0, 10.0}};
 
 // The glyph is drawn in its final colour and returned as an original image, so
 // no tint can reach it: a template would inherit the bar's accent between its
 // creation and the first pass of the grey sweep next door.
 static UIImage* NFBSlidersGlyph(CGFloat side, UIColor* colour) {
     const CGFloat kUnit = 24.0;
-    const CGFloat kThickness = 2.07;
-    const CGFloat kGap = 1.5;
-    const CGFloat kHandleHalfHeight = 4.0;
+    // The stroke of the app's own bar glyphs, measured against the settings
+    // gear: two points on a 24-point grid.
+    const CGFloat kThickness = 2.0;
+    // Rendered and compared at actual size: at 2.2 the ring closes up into a
+    // dot and the rail beyond it shrinks to a stub. At 2.8 the opening reads,
+    // and the rail meets the ring rather than stopping short of it.
+    const CGFloat kHandleRadius = 2.8;
+    const CGFloat kInset = 3.0;
     CGFloat scale = side / kUnit;
     CGFloat half = kThickness / 2.0;
     UIGraphicsImageRendererFormat* format =
@@ -56,26 +64,30 @@ static UIImage* NFBSlidersGlyph(CGFloat side, UIColor* colour) {
                                                format:format];
     UIImage* drawn = [renderer
         imageWithActions:^(UIGraphicsImageRendererContext* context) {
-            [(colour ?: [UIColor blackColor]) setFill];
+            CGContextRef ctx = context.CGContext;
+            [(colour ?: [UIColor blackColor]) setStroke];
+            CGContextSetLineWidth(ctx, kThickness * scale);
+            // Round caps and joins: the app's own glyphs are drawn this way, and
+            // a square-ended rectangle cannot imitate it — that difference, not
+            // the stroke width, is what set this icon apart from the gear.
+            CGContextSetLineCap(ctx, kCGLineCapRound);
+            CGContextSetLineJoin(ctx, kCGLineJoinRound);
+            // The handle's outer edge, half a stroke beyond its radius.
+            CGFloat reach = kHandleRadius + half;
             for (NSInteger i = 0; i < 2; i++) {
                 CGFloat cy = kNFBSliderGeometry[i][0];
                 CGFloat cx = kNFBSliderGeometry[i][1];
-                CGFloat railEnd = cx - half;
-                CGFloat railStart = cx + half + kGap;
-                // Rail up to the handle, rail after the gap, then the handle.
-                CGContextFillRect(context.CGContext,
-                                  CGRectMake(3.0 * scale, (cy - half) * scale,
-                                             (railEnd - 3.0) * scale,
-                                             kThickness * scale));
-                CGContextFillRect(context.CGContext,
-                                  CGRectMake(railStart * scale, (cy - half) * scale,
-                                             (21.0 - railStart) * scale,
-                                             kThickness * scale));
-                CGContextFillRect(context.CGContext,
-                                  CGRectMake((cx - half) * scale,
-                                             (cy - kHandleHalfHeight) * scale,
-                                             kThickness * scale,
-                                             kHandleHalfHeight * 2.0 * scale));
+                // Rail up to the handle, then on from its far side.
+                CGContextMoveToPoint(ctx, kInset * scale, cy * scale);
+                CGContextAddLineToPoint(ctx, (cx - reach) * scale, cy * scale);
+                CGContextStrokePath(ctx);
+                CGContextMoveToPoint(ctx, (cx + reach) * scale, cy * scale);
+                CGContextAddLineToPoint(ctx, (kUnit - kInset) * scale, cy * scale);
+                CGContextStrokePath(ctx);
+                // The handle: a ring, like the gear's centre.
+                CGContextAddArc(ctx, cx * scale, cy * scale,
+                                kHandleRadius * scale, 0.0, M_PI * 2.0, 0);
+                CGContextStrokePath(ctx);
             }
         }];
     return [drawn imageWithRenderingMode:UIImageRenderingModeAlwaysOriginal];
