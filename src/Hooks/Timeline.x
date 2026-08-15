@@ -660,6 +660,11 @@ void nfbRefreshMutedWords(void) {
     }
     gNFBMutedCountDay = today;
 
+    // Hidden conversations share this memo: without them in the signature, the
+    // timeline keeps its previous verdict and a hidden thread only vanishes on
+    // the next reload.
+    extern NSArray<NSDictionary*>* NFBHiddenThreads(void);
+    signature = signature * 31 + NFBHiddenThreads().count;
     gNFBMutedSignature = signature * 31 + (gNFBMutedWholeWords ? 2 : 1) +
                          (gNFBMutedSkipFollowing ? 4 : 0) +
                          (gNFBMutedIncludeReposts ? 8 : 0);

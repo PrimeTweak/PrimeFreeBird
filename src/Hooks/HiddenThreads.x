@@ -23,7 +23,6 @@ static NSString* const kNFBThreadIDKey = @"id";
 static NSString* const kNFBThreadWhoKey = @"who";
 static NSString* const kNFBThreadPreviewKey = @"preview";
 
-static const NSInteger kNFBHideButtonTag = 90311;
 static const CGFloat kNFBHideGlyphSide = 16.0;
 
 // MARK: - Registry
@@ -344,6 +343,35 @@ static UIImage* NFBHideThreadGlyph(UIColor* colour) {
     return [drawn imageWithRenderingMode:UIImageRenderingModeAlwaysOriginal];
 }
 
+// Making it disappear at once.
+//
+// The timeline memoises its filtering verdict per item, and that memo is keyed
+// by a signature the muted-word editor already bumps through
+// nfbRefreshMutedWords(). Timeline.x now folds the number of hidden
+// conversations into the same signature, so hiding one invalidates the memo the
+// way adding a muted word does. The list that carries the Tweet is then asked
+// to reload, which drops the row with the right heights rather than leaving a
+// hole behind.
+extern void nfbRefreshMutedWords(void);
+
+static void NFBReloadTimelineAround(UIView* view) {
+    nfbRefreshMutedWords();
+    UIView* node = view;
+    NSInteger depth = 0;
+    while (node && depth < 12) {
+        if ([node isKindOfClass:[UITableView class]]) {
+            [(UITableView*)node reloadData];
+            return;
+        }
+        if ([node isKindOfClass:[UICollectionView class]]) {
+            [(UICollectionView*)node reloadData];
+            return;
+        }
+        node = node.superview;
+        depth++;
+    }
+}
+
 // MARK: - The undo strip
 //
 // A strip above the tab bar rather than an alert: hiding is a small, reversible
@@ -403,6 +431,97 @@ static void NFBShowHiddenToast(NSString* threadID) {
     undo.translatesAutoresizingMaskIntoConstraints = NO;
     [undo addAction:[UIAction actionWithHandler:^(__unused UIAction* action) {
               NFBUnhideThread(threadID);
+              nfbRefreshMutedWords();
+              NFBDismissToast(toast);
+            }]
+        forControlEvents:UIControlEventTouchUpInside];
+    [toast addSubview:undo];
+
+    [NSLayoutConstraint activateConstraints:@[
+        [toast.leadingAnchor constraintEqualToAnchor:window.leadingAnchor constant:16],
+        [toast.trailingAnchor constraintEqualToAnchor:window.trailingAnchor constant:-16],
+        [toast.bottomAnchor constraintEqualToAnchor:window.safeAreaLayoutGuide.bottomAnchor
+                                           constant:-64],
+        [toast.heightAnchor constraintEqualToConstant:46],
+        [label.leadingAnchor constraintEqualToAnchor:toast.leadingAnchor constant:14],
+        [label.centerYAnchor constraintEqualToAnchor:toast.centerYAnchor],
+        [undo.trailingAnchor constraintEqualToAnchor:toast.trailingAnchor constant:-14],
+        [undo.centerYAnchor constraintEqualToAnchor:toast.centerYAnchor],
+    ]];
+
+    toast.alpha = 0;
+    [UIView animateWithDuration:0.2
+                     animations:^{
+                       toast.alpha = 1;
+                     }];
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(4.0 * NSEC_PER_SEC)),
+                   dispatch_get_main_queue(), ^{
+                     if (toast.superview) {
+                         NFBDismissToast(toast);
+                     }
+                   });
+}
+
+// MARK: - The undo strip
+//
+// A strip above the tab bar rather than an alert: hiding is a small, reversible
+// act, and it should not stop the reader to be confirmed. It carries its own
+// undo and clears itself after a few seconds.
+
+static const NSInteger kNFBToastTag = 90312;
+
+static void NFBDismissToast(UIView* toast) {
+    [UIView animateWithDuration:0.2
+        animations:^{
+          toast.alpha = 0;
+        }
+        completion:^(BOOL finished) {
+          [toast removeFromSuperview];
+        }];
+}
+
+static void NFBShowHiddenToast(NSString* threadID) {
+    UIWindow* window = nil;
+    for (UIScene* scene in UIApplication.sharedApplication.connectedScenes) {
+        if (![scene isKindOfClass:[UIWindowScene class]]) {
+            continue;
+        }
+        for (UIWindow* candidate in ((UIWindowScene*)scene).windows) {
+            if (candidate.isKeyWindow) {
+                window = candidate;
+            }
+        }
+    }
+    if (!window) {
+        return;
+    }
+    [[window viewWithTag:kNFBToastTag] removeFromSuperview];
+
+    UIView* toast = [[UIView alloc] init];
+    toast.tag = kNFBToastTag;
+    toast.backgroundColor = [UIColor colorWithWhite:0.07 alpha:0.94];
+    toast.layer.cornerRadius = 12.0;
+    toast.clipsToBounds = YES;
+    toast.translatesAutoresizingMaskIntoConstraints = NO;
+    [window addSubview:toast];
+
+    UILabel* label = [[UILabel alloc] init];
+    label.text = [[BHTBundle sharedBundle] localizedStringForKey:@"THREADS_HIDDEN_TOAST"];
+    label.font = [UIFont systemFontOfSize:14 weight:UIFontWeightMedium];
+    label.textColor = [UIColor whiteColor];
+    label.translatesAutoresizingMaskIntoConstraints = NO;
+    [toast addSubview:label];
+
+    UIButton* undo = [UIButton buttonWithType:UIButtonTypeSystem];
+    [undo setTitle:[[BHTBundle sharedBundle] localizedStringForKey:@"THREADS_UNDO"]
+          forState:UIControlStateNormal];
+    [undo setTitleColor:CurrentAccentColor() ?: [UIColor whiteColor]
+               forState:UIControlStateNormal];
+    undo.titleLabel.font = [UIFont systemFontOfSize:14 weight:UIFontWeightBold];
+    undo.translatesAutoresizingMaskIntoConstraints = NO;
+    [undo addAction:[UIAction actionWithHandler:^(__unused UIAction* action) {
+              NFBUnhideThread(threadID);
+              nfbRefreshMutedWords();
               NFBDismissToast(toast);
             }]
         forControlEvents:UIControlEventTouchUpInside];
@@ -439,123 +558,140 @@ static void NFBShowHiddenToast(NSString* threadID) {
 // the trailing edge, and only when there is room left. Where the reader has
 // hidden one of Twitter's buttons, that room is exactly what was freed.
 
-static void NFBLayoutHideButton(UIView* row) {
-    UIButton* button = (UIButton*)[row viewWithTag:kNFBHideButtonTag];
-    if (!button) {
-        return;
-    }
-    // Measured on the device: the row is 366.67 wide and its own buttons run
-    // from -6 to 373 — they overflow it at both ends, so there is no free space
-    // at the trailing edge and the old guard hid this button on every pass.
-    // The largest gap between two neighbours is used instead.
-    CGFloat gapStart = 0;
-    CGFloat gapWidth = 0;
-    NSMutableArray<NSValue*>* frames = [NSMutableArray array];
-    for (UIView* view in row.subviews) {
-        if (view == button || view.hidden || CGRectGetWidth(view.frame) < 1.0) {
-            continue;
-        }
-        [frames addObject:[NSValue valueWithCGRect:view.frame]];
-    }
-    [frames sortUsingComparator:^NSComparisonResult(NSValue* a, NSValue* b) {
-      CGFloat ax = CGRectGetMinX(a.CGRectValue);
-      CGFloat bx = CGRectGetMinX(b.CGRectValue);
-      return ax < bx ? NSOrderedAscending : (ax > bx ? NSOrderedDescending : NSOrderedSame);
-    }];
-    for (NSUInteger i = 1; i < frames.count; i++) {
-        CGFloat previousEnd = CGRectGetMaxX(frames[i - 1].CGRectValue);
-        CGFloat nextStart = CGRectGetMinX(frames[i].CGRectValue);
-        CGFloat width = nextStart - previousEnd;
-        if (width > gapWidth) {
-            gapWidth = width;
-            gapStart = previousEnd;
-        }
-    }
-    // The row is 18.67 points tall, measured on the device — a 30-point button
-    // hangs six points past it at both ends, and a subview is only drawn within
-    // its parent's bounds. The button therefore takes the row's own height.
-    CGFloat height = CGRectGetHeight(row.bounds);
-    if (height < 1.0) {
-        return;
-    }
-    CGFloat side = MIN(height, 30.0);
-    if (gapWidth < side + 4.0) {
-        // No room between two neighbours: nothing is drawn rather than laid over
-        // a native button.
-        button.hidden = YES;
-        return;
-    }
-    button.hidden = NO;
-    button.frame = CGRectMake(gapStart + (gapWidth - side) / 2.0,
-                              (height - side) / 2.0, side, side);
-}
 
 // Kept on the row by association rather than by a declared property: this
 // class is already declared in the headers, so nothing can be added to its
 // interface.
-static const void* kNFBRowThreadKey = &kNFBRowThreadKey;
-static const void* kNFBRowWhoKey = &kNFBRowWhoKey;
-static const void* kNFBRowPreviewKey = &kNFBRowPreviewKey;
 
-%hook TTAStatusInlineActionsView
 
-- (void)layoutSubviews {
-    %orig;
 
-    UIView* row = (UIView*)self;
-    UIButton* existing = (UIButton*)[row viewWithTag:kNFBHideButtonTag];
+// MARK: - The entry in the Tweet's own menu
+//
+// Measured rather than assumed:
+//   · the menu under the caret is a UIKit context menu (FLEX: _UIContextMenuView
+//     → _UIContextMenuListView), so it is built from a UIMenu;
+//   · TFNButton and TFNMenuCompatibleControl are the two classes in the binary
+//     that vend one for a Tweet;
+//   · the row's model is a T1URTTimelineStatusItemViewModel and it answers
+//     conversationID — the probe printed it.
+//
+// The action provider is not read out of the configuration, which would mean
+// touching a property Apple does not expose: it is wrapped where it is passed,
+// in the public factory below. Twitter builds its menu, ours is appended after.
 
-    // The model is read from the view rather than passed in: the row is
-    // configured before it is laid out, and a recycled row keeps the property
-    // of the Tweet it now shows.
-    id model = nil;
-    @try {
-        model = [row valueForKey:@"viewModel"];
-    } @catch (__unused NSException* exception) {
-        model = nil;
-    }
+static NSString* gNFBMenuThreadID = nil;
+static NSString* gNFBMenuWho = nil;
+static NSString* gNFBMenuPreview = nil;
+static __weak UIView* gNFBMenuView = nil;
 
-    id status = NFBStatusFromModel(model);
-    if (!NFBModelIsConversation(status)) {
-        existing.hidden = YES;
-        return;
-    }
-
-    objc_setAssociatedObject(row, kNFBRowThreadKey, NFBThreadIDForModel(status),
-                             OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-    objc_setAssociatedObject(row, kNFBRowWhoKey, NFBAuthorHandleForModel(status),
-                             OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-    objc_setAssociatedObject(row, kNFBRowPreviewKey, NFBPreviewForModel(status),
-                             OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-
-    if (!existing) {
-        existing = [UIButton buttonWithType:UIButtonTypeCustom];
-        existing.tag = kNFBHideButtonTag;
-        UIColor* grey = [[UIColor labelColor] colorWithAlphaComponent:0.6];
-        if ([grey respondsToSelector:@selector(resolvedColorWithTraitCollection:)]) {
-            grey = [grey resolvedColorWithTraitCollection:row.traitCollection] ?: grey;
+// From the view the menu was asked on, up to something that carries a Tweet.
+static void NFBRememberThreadForMenu(UIView* view) {
+    gNFBMenuThreadID = nil;
+    gNFBMenuWho = nil;
+    gNFBMenuPreview = nil;
+    gNFBMenuView = view;
+    UIView* node = view;
+    NSInteger depth = 0;
+    while (node && depth < 14) {
+        id model = nil;
+        @try {
+            model = [node valueForKey:@"viewModel"];
+        } @catch (__unused NSException* exception) {
+            model = nil;
         }
-        [existing setImage:NFBHideThreadGlyph(grey) forState:UIControlStateNormal];
-        [existing addTarget:self
-                      action:@selector(nfbHideThreadTapped)
-            forControlEvents:UIControlEventTouchUpInside];
-        [row addSubview:existing];
+        id status = NFBStatusFromModel(model);
+        if (status && NFBModelIsConversation(status)) {
+            gNFBMenuThreadID = NFBThreadIDForModel(status);
+            gNFBMenuWho = NFBAuthorHandleForModel(status);
+            gNFBMenuPreview = NFBPreviewForModel(status);
+            return;
+        }
+        node = node.superview;
+        depth++;
     }
-    existing.hidden = NO;
-    NFBLayoutHideButton(row);
 }
 
-%new
-- (void)nfbHideThreadTapped {
-    UIView* row = (UIView*)self;
-    NSString* threadID = objc_getAssociatedObject(row, kNFBRowThreadKey);
-    if (!threadID.length) {
-        return;
+// The menu of a Tweet, recognised by an entry the app itself puts there. The
+// label is read from Twitter's own bundle, so this holds in any language.
+static BOOL NFBMenuBelongsToTweet(UIMenu* menu) {
+    NSString* mark = [[BHTBundle sharedBundle]
+        localizedTwitterStringForKey:@"NOT_INTERESTED_IN_THIS_LABEL"];
+    if (!mark.length) {
+        return NO;
     }
-    NFBHideThread(threadID, objc_getAssociatedObject(row, kNFBRowWhoKey),
-                  objc_getAssociatedObject(row, kNFBRowPreviewKey));
-    NFBShowHiddenToast(threadID);
+    for (UIMenuElement* element in menu.children) {
+        if ([element.title isEqualToString:mark]) {
+            return YES;
+        }
+    }
+    return NO;
+}
+
+static UIMenu* NFBMenuWithHideEntry(UIMenu* menu, NSString* threadID, NSString* who,
+                                    NSString* preview) {
+    NSString* title =
+        [[BHTBundle sharedBundle] localizedStringForKey:@"THREADS_HIDE_ACTION"];
+    UIColor* glyphColour = [UIColor labelColor];
+    if ([glyphColour respondsToSelector:@selector(resolvedColorWithTraitCollection:)]) {
+        glyphColour = [glyphColour
+                          resolvedColorWithTraitCollection:UITraitCollection.currentTraitCollection]
+                      ?: glyphColour;
+    }
+    UIAction* hide = [UIAction
+        actionWithTitle:title
+                  image:NFBHideThreadGlyph(glyphColour)
+             identifier:nil
+                handler:^(__unused UIAction* action) {
+                  NFBHideThread(threadID, who, preview);
+                  NFBReloadTimelineAround(gNFBMenuView);
+                  NFBShowHiddenToast(threadID);
+                }];
+    return [menu menuByReplacingChildren:[menu.children arrayByAddingObject:hide]];
+}
+
+%hook UIContextMenuConfiguration
+
++ (instancetype)configurationWithIdentifier:(id<NSCopying>)identifier
+                            previewProvider:(UIContextMenuContentPreviewProvider)previewProvider
+                             actionProvider:(UIContextMenuActionProvider)actionProvider {
+    NSString* threadID = gNFBMenuThreadID;
+    if (!actionProvider || !threadID.length) {
+        return %orig;
+    }
+    NSString* who = gNFBMenuWho;
+    NSString* preview = gNFBMenuPreview;
+    UIContextMenuActionProvider wrapped =
+        ^UIMenu*(NSArray<UIMenuElement*>* suggested) {
+          UIMenu* menu = actionProvider(suggested);
+          if (![menu isKindOfClass:[UIMenu class]] || !NFBMenuBelongsToTweet(menu)) {
+              return menu;
+          }
+          return NFBMenuWithHideEntry(menu, threadID, who, preview);
+        };
+    return %orig(identifier, previewProvider, wrapped);
 }
 
 %end
 
+// The two classes that vend a menu for a Tweet. The Tweet is noted here, where
+// the view is still known; the configuration built just after carries it.
+
+%hook TFNButton
+
+- (UIContextMenuConfiguration*)contextMenuInteraction:(UIContextMenuInteraction*)interaction
+                       configurationForMenuAtLocation:(CGPoint)location {
+    NFBRememberThreadForMenu(interaction.view);
+    return %orig;
+}
+
+%end
+
+%hook TFNMenuCompatibleControl
+
+- (UIContextMenuConfiguration*)contextMenuInteraction:(UIContextMenuInteraction*)interaction
+                       configurationForMenuAtLocation:(CGPoint)location {
+    NFBRememberThreadForMenu(interaction.view);
+    return %orig;
+}
+
+%end
