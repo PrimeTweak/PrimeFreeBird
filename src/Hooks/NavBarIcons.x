@@ -714,7 +714,16 @@ static BOOL nfbIsRightHandGlyphButton(UIView* button) {
 
 // MARK: - the inbox filter pill
 //
-// Read from the view tree of the "All" control on the Messages list:
+// Measured frame by frame on a recording of the Messages list, returning to the
+// screen: the avatar, the title and the search bar hold a constant pixel count
+// while the pill alone drops to ZERO for about a tenth of a second and comes
+// back. Across all 156 frames its region contains no coloured pixel at all, so
+// nothing here is a tint — it is an opacity fade on that one control.
+//
+// Its view tree says why it fades alone: the pill is hosted in
+// UIKit.NavigationBarPlatterContainer_v2, the system's glass platter, through a
+// chain of SwiftUI._UIInheritedView. Returning to the screen re-hosts that
+// content, and UIKit cross-fades what it replaces.
 //
 //   UIKit.NavigationBarPlatterContainer_v2            the system glass platter
 //    └ …PlatterContainerHost…                         SwiftUI host
@@ -723,57 +732,35 @@ static BOOL nfbIsRightHandGlyphButton(UIView* button) {
 //             └ NavigationButtonBar.ItemWrapper
 //                └ DMInbox.InboxNavigationBarMenuBarButtonItemView   57.33 × 40
 //
-// Every level between the platter and the control is a SwiftUI
-// _UIInheritedView, whose purpose is to pass the inherited environment down to
-// what it hosts — the tint among it. The window carries the accent under Liquid
-// Glass and nothing on the way sets a colour of its own, so the control renders
-// in the accent until Twitter's own style lands. The platter container belongs
-// to UIKit and exists under Liquid Glass only, which is why the standard
-// interface never shows this.
-//
-// The control is given its own tint, on itself, so the inheritance stops here
-// and its subtree can no longer read the window's accent. No parent is walked,
-// so no sibling can be reached — the mistake that painted an avatar once.
-// Addressed as a plain UIView: the class is Swift and Logos forward-declares
-// it, so it takes no message of its own.
-
-static void nfbHoldInboxPillColour(UIView* pill) {
-    if (!pill) {
-        return;
-    }
-    UIColor* colour = nfbBarGlyphColour(pill);
-    // Compared before it is set: assigning a tint propagates it through the
-    // subtree, so an unchanged colour is left alone rather than re-announced on
-    // every layout pass.
-    if (![pill.tintColor isEqual:colour]) {
-        pill.tintColor = colour;
-    }
-}
+// The control is pinned opaque with the three-route refusal the header band
+// already uses: the running animation is dropped and the layer marked, so
+// setAlpha:, setOpacity: and addAnimation: all decline to lower it afterwards.
+// Only this control is marked — nothing above it is walked, and nothing below
+// it is painted. Addressed as a plain UIView: the class is Swift and Logos
+// forward-declares it, so it takes no message of its own.
 
 %hook _TtC7DMInbox39InboxNavigationBarMenuBarButtonItemView
 
-// Before the control is ever drawn: the accent is never shown rather than
-// corrected once it has been seen. This is the point that removed the same
-// first-frame flash from the compose button.
+// Before the control is ever drawn, so the fade is refused rather than caught
+// halfway through.
 - (void)willMoveToWindow:(UIWindow*)newWindow {
     %orig;
     if (newWindow) {
-        nfbHoldInboxPillColour((UIView*)self);
+        nfbPinOpaque((UIView*)self);
     }
 }
 
 - (void)didMoveToWindow {
     %orig;
-    nfbHoldInboxPillColour((UIView*)self);
+    nfbPinOpaque((UIView*)self);
 }
 
-// The platter re-hosts its content when the bar is rebuilt — returning to the
-// screen is exactly that — and the fresh host arrives inheriting again. A tint
-// carries no intrinsic size, so unlike an image it can be set here without
-// provoking a layout pass.
+// The platter re-hosts its content whenever the bar is rebuilt, and the fresh
+// host arrives with a fade of its own. An opacity carries no intrinsic size, so
+// unlike an image it can be settled here without provoking a layout pass.
 - (void)layoutSubviews {
     %orig;
-    nfbHoldInboxPillColour((UIView*)self);
+    nfbPinOpaque((UIView*)self);
 }
 
 %end
