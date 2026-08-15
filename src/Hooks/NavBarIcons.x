@@ -384,7 +384,11 @@ static BOOL nfbIsChatBarGlyph(UIView* view) {
         // its size does not change, and no layout pass is provoked. Painting a
         // bar button while it was laying out invalidated its intrinsic size and
         // froze the app twice.
-        if (image.renderingMode == UIImageRenderingModeAlwaysTemplate &&
+        // Not "== AlwaysTemplate": a bar glyph usually arrives in AUTOMATIC mode,
+        // which a bar button draws as a template all the same — its description
+        // simply names no mode at all. Anything that is not already original is
+        // therefore claimed.
+        if (image.renderingMode != UIImageRenderingModeAlwaysOriginal &&
             nfbIsChatBarGlyph((UIView*)self)) {
             %orig([image imageWithRenderingMode:UIImageRenderingModeAlwaysOriginal]);
             return;
