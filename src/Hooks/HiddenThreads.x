@@ -378,44 +378,106 @@ static void NFBReloadList(__unused UIScrollView* list) {
     nfbReapplyTimelineFilter();
 }
 
-// MARK: - The app's own toast
+// MARK: - The confirmation strip
 //
-// Not a strip of our own any more: TFNInformationToast is what Twitter shows
-// for its own confirmations, and TFNToaster's defaultToaster is what presents
-// them — same shape, same place, same animation. Both are read from the runtime
-// rather than linked, so an absent class simply means no confirmation.
-//
-// It carries no undo button: TFNInformationToast exposes no way to attach an
-// action, and inventing one would put a foreign control inside a native strip.
-// A hidden conversation is restored from Filters › Threads.
-//
-// Its background is left alone. Lightening it turned the app's own white label
-// invisible, and the label cannot be recoloured from here: this build draws the
-// strip with XDSToastContentView — TFNToastViewController holds it as
-// _currentXDSToastView — not the class whose message label is reachable. The
-// strip therefore keeps the appearance Twitter gives all its confirmations.
+// Our own, not the app's. TFNInformationToast draws its label white and gives
+// no way to change it — on this build the strip is rendered by
+// XDSToastContentView, whose label is out of reach — so a light strip with dark
+// text is impossible through it. This one is ours end to end: light background,
+// text in the system label colour, and an undo that puts the conversation back.
 
-static void NFBShowHiddenToast(void) {
-    Class toastClass = NSClassFromString(@"TFNInformationToast");
-    Class toasterClass = NSClassFromString(@"TFNToaster");
-    if (!toastClass || !toasterClass) {
-        return;
-    }
-    NSString* message =
-        [[BHTBundle sharedBundle] localizedStringForKey:@"THREADS_HIDDEN_TOAST"];
-    if (![toastClass instancesRespondToSelector:@selector(initWithMessageText:)] ||
-        ![toasterClass respondsToSelector:@selector(defaultToaster)]) {
-        return;
-    }
-    id toast = ((id (*)(id, SEL, NSString*))objc_msgSend)(
-        [toastClass alloc], @selector(initWithMessageText:), message);
-    id toaster =
-        ((id (*)(id, SEL))objc_msgSend)(toasterClass, @selector(defaultToaster));
-    if (!toast || ![toaster respondsToSelector:@selector(pushToast:)]) {
-        return;
-    }
-    ((void (*)(id, SEL, id))objc_msgSend)(toaster, @selector(pushToast:), toast);
+static const NSInteger kNFBToastTag = 90312;
 
+static void NFBDismissToast(UIView* toast) {
+    [UIView animateWithDuration:0.2
+        animations:^{
+          toast.alpha = 0;
+        }
+        completion:^(BOOL finished) {
+          [toast removeFromSuperview];
+        }];
+}
+
+static void NFBShowHiddenToast(NSString* threadID) {
+    UIWindow* window = nil;
+    for (UIScene* scene in UIApplication.sharedApplication.connectedScenes) {
+        if (![scene isKindOfClass:[UIWindowScene class]]) {
+            continue;
+        }
+        for (UIWindow* candidate in ((UIWindowScene*)scene).windows) {
+            if (candidate.isKeyWindow) {
+                window = candidate;
+            }
+        }
+    }
+    if (!window) {
+        return;
+    }
+    [[window viewWithTag:kNFBToastTag] removeFromSuperview];
+
+    UIView* toast = [[UIView alloc] init];
+    toast.tag = kNFBToastTag;
+    toast.backgroundColor = [UIColor systemBackgroundColor];
+    toast.layer.cornerRadius = 14.0;
+    toast.layer.cornerCurve = kCACornerCurveContinuous;
+    // A light strip needs an edge and a shadow to sit on the timeline; the dark
+    // one did not.
+    toast.layer.borderWidth = 1.0;
+    toast.layer.borderColor = [UIColor separatorColor].CGColor;
+    toast.layer.shadowColor = [UIColor blackColor].CGColor;
+    toast.layer.shadowOpacity = 0.12;
+    toast.layer.shadowRadius = 12.0;
+    toast.layer.shadowOffset = CGSizeMake(0.0, 4.0);
+    toast.translatesAutoresizingMaskIntoConstraints = NO;
+    [window addSubview:toast];
+
+    UILabel* label = [[UILabel alloc] init];
+    label.text = [[BHTBundle sharedBundle] localizedStringForKey:@"THREADS_HIDDEN_TOAST"];
+    label.font = [UIFont systemFontOfSize:15 weight:UIFontWeightMedium];
+    label.textColor = [UIColor labelColor];
+    label.translatesAutoresizingMaskIntoConstraints = NO;
+    [toast addSubview:label];
+
+    UIButton* undo = [UIButton buttonWithType:UIButtonTypeSystem];
+    [undo setTitle:[[BHTBundle sharedBundle] localizedStringForKey:@"THREADS_UNDO"]
+          forState:UIControlStateNormal];
+    extern UIColor* CurrentAccentColor(void);
+    [undo setTitleColor:CurrentAccentColor() ?: [UIColor labelColor]
+               forState:UIControlStateNormal];
+    undo.titleLabel.font = [UIFont systemFontOfSize:15 weight:UIFontWeightSemibold];
+    undo.translatesAutoresizingMaskIntoConstraints = NO;
+    [undo addAction:[UIAction actionWithHandler:^(__unused UIAction* action) {
+              NFBUnhideThread(threadID);
+              nfbRefreshMutedWords();
+              nfbReapplyTimelineFilter();
+              NFBDismissToast(toast);
+            }]
+        forControlEvents:UIControlEventTouchUpInside];
+    [toast addSubview:undo];
+
+    [NSLayoutConstraint activateConstraints:@[
+        [toast.leadingAnchor constraintEqualToAnchor:window.leadingAnchor constant:16],
+        [toast.trailingAnchor constraintEqualToAnchor:window.trailingAnchor constant:-16],
+        [toast.bottomAnchor constraintEqualToAnchor:window.safeAreaLayoutGuide.bottomAnchor
+                                           constant:-72],
+        [toast.heightAnchor constraintEqualToConstant:48],
+        [label.leadingAnchor constraintEqualToAnchor:toast.leadingAnchor constant:16],
+        [label.centerYAnchor constraintEqualToAnchor:toast.centerYAnchor],
+        [undo.trailingAnchor constraintEqualToAnchor:toast.trailingAnchor constant:-16],
+        [undo.centerYAnchor constraintEqualToAnchor:toast.centerYAnchor],
+    ]];
+
+    toast.alpha = 0;
+    [UIView animateWithDuration:0.2
+                     animations:^{
+                       toast.alpha = 1;
+                     }];
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(4.0 * NSEC_PER_SEC)),
+                   dispatch_get_main_queue(), ^{
+                     if (toast.superview) {
+                         NFBDismissToast(toast);
+                     }
+                   });
 }
 
 // MARK: - The entry in the Tweet's own menu
@@ -520,7 +582,7 @@ static BOOL NFBMenuBelongsToTweet(UIMenu* menu) {
                   NFBHideThread(threadID, NFBAuthorForButton(source),
                                 NFBPreviewForButton(source));
                   NFBReloadList(weakList ?: (UIScrollView*)NFBListForButton(source));
-                  NFBShowHiddenToast();
+                  NFBShowHiddenToast(threadID);
                 }];
     %orig([menu menuByReplacingChildren:[menu.children arrayByAddingObject:hide]]);
 }
