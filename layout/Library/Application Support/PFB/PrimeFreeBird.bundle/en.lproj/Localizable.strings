@@ -165,6 +165,8 @@
 "TWEET_CONFIRM_DETAIL" = "Ask before posting a Tweet.";
 "LIKE_CONFIRM_TITLE" = "Confirm likes";
 "LIKE_CONFIRM_DETAIL" = "Ask before liking a Tweet.";
+"HIDE_THREADS_TITLE" = "Hide conversations";
+"HIDE_THREADS_DETAIL" = "Add “Hide this conversation” to a Tweet’s menu and keep hidden ones out of the timeline.";
 "HIDE_VIEW_COUNT_TITLE" = "Hide views";
 "HIDE_VIEW_COUNT_DETAIL" = "Remove the view count under Tweets.";
 "HIDE_BOOKMARK_BUTTON_TITLE" = "Hide bookmarks";
