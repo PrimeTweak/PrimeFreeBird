@@ -388,15 +388,12 @@ static void NFBReloadList(__unused UIScrollView* list) {
 // It carries no undo button: TFNInformationToast exposes no way to attach an
 // action, and inventing one would put a foreign control inside a native strip.
 // A hidden conversation is restored from Filters › Threads.
-
-// Our strip is on screen for a few seconds after it is pushed; only during that
-// window is a toast's text recoloured, so Twitter's other confirmations keep
-// their own appearance.
-static CFAbsoluteTime gNFBToastDeadline = 0;
-
-static BOOL NFBOurToastIsShowing(void) {
-    return CFAbsoluteTimeGetCurrent() < gNFBToastDeadline;
-}
+//
+// Its background is left alone. Lightening it turned the app's own white label
+// invisible, and the label cannot be recoloured from here: this build draws the
+// strip with XDSToastContentView — TFNToastViewController holds it as
+// _currentXDSToastView — not the class whose message label is reachable. The
+// strip therefore keeps the appearance Twitter gives all its confirmations.
 
 static void NFBShowHiddenToast(void) {
     Class toastClass = NSClassFromString(@"TFNInformationToast");
@@ -417,17 +414,8 @@ static void NFBShowHiddenToast(void) {
     if (!toast || ![toaster respondsToSelector:@selector(pushToast:)]) {
         return;
     }
-    if ([toast respondsToSelector:@selector(setBackgroundColor:)]) {
-        ((void (*)(id, SEL, UIColor*))objc_msgSend)(
-            toast, @selector(setBackgroundColor:), [UIColor systemBackgroundColor]);
-    }
     ((void (*)(id, SEL, id))objc_msgSend)(toaster, @selector(pushToast:), toast);
 
-    // The colour is applied where the strip lays itself out, not on a timer:
-    // a single pass afterwards was either too early — the view did not exist —
-    // or undone by the app's own layout, which is how the text ended up white
-    // on a light background.
-    gNFBToastDeadline = CFAbsoluteTimeGetCurrent() + 6.0;
 }
 
 // MARK: - The entry in the Tweet's own menu
@@ -535,32 +523,6 @@ static BOOL NFBMenuBelongsToTweet(UIMenu* menu) {
                   NFBShowHiddenToast();
                 }];
     %orig([menu menuByReplacingChildren:[menu.children arrayByAddingObject:hide]]);
-}
-
-%end
-
-// The strip's own content view, recoloured as it lays out. TFNInformationToast
-// carries no text colour, and the label is rebuilt on every layout — so this is
-// the only place the change survives.
-%hook TFNToastDefaultContentView
-
-- (void)layoutSubviews {
-    %orig;
-    if (!NFBOurToastIsShowing()) {
-        return;
-    }
-    UIView* view = (UIView*)self;
-    @try {
-        UILabel* message = [view valueForKey:@"messageLabel"];
-        UILabel* detail = [view valueForKey:@"detailLabel"];
-        if ([message isKindOfClass:[UILabel class]]) {
-            message.textColor = [UIColor labelColor];
-        }
-        if ([detail isKindOfClass:[UILabel class]]) {
-            detail.textColor = [UIColor secondaryLabelColor];
-        }
-    } @catch (__unused NSException* exception) {
-    }
 }
 
 %end
