@@ -28,13 +28,24 @@
 
 #import "HookHelpers.h"
 #import <string.h>
+#import <os/log.h>
 
 
 
-// NSLog rather than os_log: it reaches Console without a subsystem filter, and
-// the prefix below can be searched as plain text. A probe that cannot be found
-// in the log is worth nothing.
-#define NFBLog(fmt, ...) NSLog(@"NFBPROBE " fmt, ##__VA_ARGS__)
+// os_log, not NSLog: on a device NSLog redacts every object value as <private>,
+// which is what the first run came back with — the numbers were readable, the
+// values were not. Only os_log can mark a value public, and the prefix stays in
+// the static text, so NFBPROBE is still searchable as plain text in Console.
+static os_log_t NFBProbeLog(void) {
+    static os_log_t log;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+      log = os_log_create("com.primefreebird.probe", "row");
+    });
+    return log;
+}
+
+#define NFBLog(fmt, ...) os_log(NFBProbeLog(), "NFBPROBE " fmt, ##__VA_ARGS__)
 
 // MARK: - Reading a value without trusting its type
 //
@@ -61,59 +72,59 @@ static NSString* NFBProbeValue(id target, SEL selector) {
         switch (t[0]) {
             case '@': {
                 id value = ((id (*)(id, SEL))objc_msgSend)(target, selector);
-                return [NSString stringWithFormat:@"@ %@ = %@",
+                return [NSString stringWithFormat:@"@ %{public}@ = %{public}@",
                                                   NSStringFromClass([value class]),
                                                   [value description] ?: @"nil"];
             }
             case 'q':
             case 'Q':
                 return [NSString
-                    stringWithFormat:@"%s = %lld", t,
+                    stringWithFormat:@"%{public}s = %lld", t,
                                      ((long long (*)(id, SEL))objc_msgSend)(target, selector)];
             case 'l':
             case 'L':
-                return [NSString stringWithFormat:@"%s = %ld", t,
+                return [NSString stringWithFormat:@"%{public}s = %ld", t,
                                                   ((long (*)(id, SEL))objc_msgSend)(target, selector)];
             case 'i':
             case 'I':
-                return [NSString stringWithFormat:@"%s = %d", t,
+                return [NSString stringWithFormat:@"%{public}s = %d", t,
                                                   ((int (*)(id, SEL))objc_msgSend)(target, selector)];
             case 's':
             case 'S':
-                return [NSString stringWithFormat:@"%s = %d", t,
+                return [NSString stringWithFormat:@"%{public}s = %d", t,
                                                   (int)((short (*)(id, SEL))objc_msgSend)(target, selector)];
             case 'c':
             case 'C':
             case 'B':
-                return [NSString stringWithFormat:@"%s = %d", t,
+                return [NSString stringWithFormat:@"%{public}s = %d", t,
                                                   (int)((char (*)(id, SEL))objc_msgSend)(target, selector)];
             default:
-                return [NSString stringWithFormat:@"%s (type non lu)", t];
+                return [NSString stringWithFormat:@"%{public}s (type non lu)", t];
         }
     } @catch (NSException* exception) {
-        return [NSString stringWithFormat:@"%s (exception: %@)", t, exception.name];
+        return [NSString stringWithFormat:@"%{public}s (exception: %{public}@)", t, exception.name];
     }
 }
 
 // The four values this feature needs, asked of one object.
 static void NFBProbeStatusValues(id object, NSString* label) {
     if (!object) {
-        NFBLog("%@ : nil", label);
+        NFBLog("%{public}@ : nil", label);
         return;
     }
-    NFBLog("%@ : classe %@", label,
+    NFBLog("%{public}@ : classe %{public}@", label,
            NSStringFromClass([object class]));
-    NFBLog("   replyCount ......... %@",
+    NFBLog("   replyCount ......... %{public}@",
            NFBProbeValue(object, @selector(replyCount)));
-    NFBLog("   conversationID ..... %@",
+    NFBLog("   conversationID ..... %{public}@",
            NFBProbeValue(object, @selector(conversationID)));
-    NFBLog("   inReplyToStatusID .. %@",
+    NFBLog("   inReplyToStatusID .. %{public}@",
            NFBProbeValue(object, @selector(inReplyToStatusID)));
-    NFBLog("   statusID ........... %@",
+    NFBLog("   statusID ........... %{public}@",
            NFBProbeValue(object, @selector(statusID)));
-    NFBLog("   text ............... %@",
+    NFBLog("   text ............... %{public}@",
            NFBProbeValue(object, @selector(text)));
-    NFBLog("   author ............. %@",
+    NFBLog("   author ............. %{public}@",
            NFBProbeValue(object, @selector(author)));
 }
 
@@ -124,7 +135,7 @@ static void NFBProbeClassSurface(id object, NSString* label) {
         return;
     }
     Class cls = object_getClass(object);
-    NFBLog("%@ : surface de %@", label,
+    NFBLog("%{public}@ : surface de %{public}@", label,
            NSStringFromClass(cls));
 
     unsigned int methodCount = 0;
@@ -135,7 +146,7 @@ static void NFBProbeClassSurface(id object, NSString* label) {
     }
     free(methods);
     [names sortUsingSelector:@selector(compare:)];
-    NFBLog("   %lu méthodes : %@", (unsigned long)names.count,
+    NFBLog("   %lu méthodes : %{public}@", (unsigned long)names.count,
            [names componentsJoinedByString:@", "]);
 
     unsigned int ivarCount = 0;
@@ -147,7 +158,7 @@ static void NFBProbeClassSurface(id object, NSString* label) {
             continue;
         }
         if (type[0] != '@') {
-            NFBLog("   ivar %s : %s", ivarName, type);
+            NFBLog("   ivar %{public}s : %{public}s", ivarName, type);
             continue;
         }
         // Read inside a guard: an ivar declared as an object can hold something
@@ -158,11 +169,11 @@ static void NFBProbeClassSurface(id object, NSString* label) {
             BOOL carries = [value respondsToSelector:@selector(replyCount)] ||
                            [value respondsToSelector:@selector(conversationID)] ||
                            [value respondsToSelector:@selector(statusID)];
-            NFBLog("   ivar %s : %@%s", ivarName,
+            NFBLog("   ivar %{public}s : %{public}@%{public}s", ivarName,
                    value ? NSStringFromClass([value class]) : @"nil",
                    carries ? "   <<< PORTE LES VALEURS" : "");
         } @catch (__unused NSException* exception) {
-            NFBLog("   ivar %s : illisible", ivarName);
+            NFBLog("   ivar %{public}s : illisible", ivarName);
         }
     }
     free(ivars);
@@ -187,7 +198,7 @@ static void NFBProbeClassSurface(id object, NSString* label) {
     for (id entry in classes) {
         [names addObject:NSStringFromClass((Class)entry) ?: @"?"];
     }
-    NFBLog("   classes rendues : %@",
+    NFBLog("   classes rendues : %{public}@",
            [names componentsJoinedByString:@", "]);
     NFBLog("   options = %lu · displayType = %lu",
            (unsigned long)options, (unsigned long)displayType);
@@ -209,7 +220,7 @@ static void NFBProbeClassSurface(id object, NSString* label) {
         return;
     }
     seen++;
-    NFBLog("=== RANGÉE (%ld) === cadre %@", (long)seen,
+    NFBLog("=== RANGÉE (%ld) === cadre %{public}@", (long)seen,
            NSStringFromCGRect(row.frame));
 
     // The model, read the way the feature reads it.
@@ -217,7 +228,7 @@ static void NFBProbeClassSurface(id object, NSString* label) {
     @try {
         model = [row valueForKey:@"viewModel"];
     } @catch (NSException* exception) {
-        NFBLog("   valueForKey viewModel : exception %@",
+        NFBLog("   valueForKey viewModel : exception %{public}@",
                exception.name);
     }
     NFBProbeStatusValues(model, @"viewModel de la rangée");
@@ -225,10 +236,10 @@ static void NFBProbeClassSurface(id object, NSString* label) {
     // What the row keeps as its own buttons.
     @try {
         id owned = [row valueForKey:@"inlineActionButtons"];
-        NFBLog("   inlineActionButtons : %@",
+        NFBLog("   inlineActionButtons : %{public}@",
                [owned description] ?: @"nil");
     } @catch (NSException* exception) {
-        NFBLog("   inlineActionButtons : exception %@",
+        NFBLog("   inlineActionButtons : exception %{public}@",
                exception.name);
     }
 
@@ -236,7 +247,7 @@ static void NFBProbeClassSurface(id object, NSString* label) {
     // have to live, and at what size.
     NFBLog("   %lu sous-vues :", (unsigned long)row.subviews.count);
     for (UIView* subview in row.subviews) {
-        NFBLog("      %@ %@ caché=%d alpha=%.2f",
+        NFBLog("      %{public}@ %{public}@ caché=%d alpha=%.2f",
                NSStringFromClass([subview class]),
                NSStringFromCGRect(subview.frame), subview.hidden,
                subview.alpha);
@@ -249,7 +260,7 @@ static void NFBProbeClassSurface(id object, NSString* label) {
     static const NSInteger kMarkerTag = 90777;
     UIView* marker = [row viewWithTag:kMarkerTag];
     if (marker) {
-        NFBLog("   TÉMOIN : toujours présent · cadre %@ caché=%d",
+        NFBLog("   TÉMOIN : toujours présent · cadre %{public}@ caché=%d",
                NSStringFromCGRect(marker.frame), marker.hidden);
     } else {
         marker = [[UIView alloc] initWithFrame:CGRectMake(0.0, 0.0, 4.0, 4.0)];
@@ -264,17 +275,17 @@ static void NFBProbeClassSurface(id object, NSString* label) {
         if (![subview isKindOfClass:%c(TTAStatusInlineActionButton)]) {
             continue;
         }
-        NFBLog("   BOUTON NATIF %@ · cadre %@",
+        NFBLog("   BOUTON NATIF %{public}@ · cadre %{public}@",
                NSStringFromClass([subview class]), NSStringFromCGRect(subview.frame));
-        NFBLog("      visibility ......... %@",
+        NFBLog("      visibility ......... %{public}@",
                NFBProbeValue(subview, @selector(visibility)));
-        NFBLog("      inlineActionType ... %@",
+        NFBLog("      inlineActionType ... %{public}@",
                NFBProbeValue(subview, @selector(inlineActionType)));
-        NFBLog("      shouldShowCount .... %@",
+        NFBLog("      shouldShowCount .... %{public}@",
                NFBProbeValue(subview, @selector(shouldShowCount)));
-        NFBLog("      count .............. %@",
+        NFBLog("      count .............. %{public}@",
                NFBProbeValue(subview, @selector(count)));
-        NFBLog("      actionSheetTitle ... %@",
+        NFBLog("      actionSheetTitle ... %{public}@",
                NFBProbeValue(subview, @selector(actionSheetTitle)));
         UIImageView* imageView = nil;
         @try {
@@ -283,8 +294,8 @@ static void NFBProbeClassSurface(id object, NSString* label) {
         }
         if (imageView) {
             UIImage* image = imageView.image;
-            NFBLog("      imageView %@ · image %.0fx%.0f · mode=%ld · "
-                   "tint %@",
+            NFBLog("      imageView %{public}@ · image %.0fx%.0f · mode=%ld · "
+                   "tint %{public}@",
                    NSStringFromCGRect(imageView.frame), image.size.width,
                    image.size.height, (long)image.renderingMode,
                    [imageView.tintColor description] ?: @"nil");
@@ -298,5 +309,5 @@ static void NFBProbeClassSurface(id object, NSString* label) {
 // Printed as soon as the tweak loads: if this line is missing from the log,
 // the file is not in the build and nothing else below can be expected.
 %ctor {
-    NFBLog(@"chargée — ouvrez le fil, deux ou trois Tweets suffisent");
+    NFBLog("chargée — ouvrez le fil, deux ou trois Tweets suffisent");
 }
