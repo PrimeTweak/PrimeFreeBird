@@ -130,7 +130,11 @@ static BOOL nfbIsChatConversationBar(UIView* view) {
     NSInteger depth = 0;
     while ((responder = responder.nextResponder) && depth < 12) {
         NSString* name = NSStringFromClass([responder class]);
-        if ([name containsString:@"XChatDM"]) {
+        // The conversation of the encrypted chat, and the settings screens of
+        // this tweak — both are named by their controller, so no other screen
+        // in the app is reached.
+        if ([name containsString:@"XChatDM"] ||
+            [name hasPrefix:@"ModernSettings"]) {
             return YES;
         }
         depth++;
