@@ -380,18 +380,21 @@ static void NFBReloadList(__unused UIScrollView* list) {
 
 // MARK: - The confirmation strip
 //
-// Our own, not the app's. TFNInformationToast draws its label white and gives
-// no way to change it — on this build the strip is rendered by
-// XDSToastContentView, whose label is out of reach — so a light strip with dark
-// text is impossible through it. This one is ours end to end: light background,
-// text in the system label colour, and an undo that puts the conversation back.
+// Ours end to end, so its colours are ours too: the app's own strip draws its
+// label white and gives no way to change it — on this build it is rendered by
+// XDSToastContentView, whose label is out of reach.
+//
+// Placed where the app puts its own: a capsule at the top, over the header,
+// on frosted glass. The text takes the system label colour, so it is dark on a
+// light theme and light on a dark one.
 
 static const NSInteger kNFBToastTag = 90312;
 
 static void NFBDismissToast(UIView* toast) {
-    [UIView animateWithDuration:0.2
+    [UIView animateWithDuration:0.22
         animations:^{
           toast.alpha = 0;
+          toast.transform = CGAffineTransformMakeTranslation(0.0, -8.0);
         }
         completion:^(BOOL finished) {
           [toast removeFromSuperview];
@@ -415,28 +418,28 @@ static void NFBShowHiddenToast(NSString* threadID) {
     }
     [[window viewWithTag:kNFBToastTag] removeFromSuperview];
 
-    UIView* toast = [[UIView alloc] init];
+    // The glass itself carries the shape: a capsule, clipped, so the blur takes
+    // the rounded corners rather than a coloured box behind it.
+    UIBlurEffect* effect =
+        [UIBlurEffect effectWithStyle:UIBlurEffectStyleSystemThickMaterial];
+    UIVisualEffectView* toast = [[UIVisualEffectView alloc] initWithEffect:effect];
     toast.tag = kNFBToastTag;
-    toast.backgroundColor = [UIColor systemBackgroundColor];
-    toast.layer.cornerRadius = 14.0;
+    toast.clipsToBounds = YES;
+    toast.layer.cornerRadius = 22.0;
     toast.layer.cornerCurve = kCACornerCurveContinuous;
-    // A light strip needs an edge and a shadow to sit on the timeline; the dark
-    // one did not.
-    toast.layer.borderWidth = 1.0;
+    toast.layer.borderWidth = 0.5;
     toast.layer.borderColor = [UIColor separatorColor].CGColor;
-    toast.layer.shadowColor = [UIColor blackColor].CGColor;
-    toast.layer.shadowOpacity = 0.12;
-    toast.layer.shadowRadius = 12.0;
-    toast.layer.shadowOffset = CGSizeMake(0.0, 4.0);
     toast.translatesAutoresizingMaskIntoConstraints = NO;
     [window addSubview:toast];
+
+    UIView* content = toast.contentView;
 
     UILabel* label = [[UILabel alloc] init];
     label.text = [[BHTBundle sharedBundle] localizedStringForKey:@"THREADS_HIDDEN_TOAST"];
     label.font = [UIFont systemFontOfSize:15 weight:UIFontWeightMedium];
     label.textColor = [UIColor labelColor];
     label.translatesAutoresizingMaskIntoConstraints = NO;
-    [toast addSubview:label];
+    [content addSubview:label];
 
     UIButton* undo = [UIButton buttonWithType:UIButtonTypeSystem];
     [undo setTitle:[[BHTBundle sharedBundle] localizedStringForKey:@"THREADS_UNDO"]
@@ -453,24 +456,28 @@ static void NFBShowHiddenToast(NSString* threadID) {
               NFBDismissToast(toast);
             }]
         forControlEvents:UIControlEventTouchUpInside];
-    [toast addSubview:undo];
+    [content addSubview:undo];
 
     [NSLayoutConstraint activateConstraints:@[
-        [toast.leadingAnchor constraintEqualToAnchor:window.leadingAnchor constant:16],
-        [toast.trailingAnchor constraintEqualToAnchor:window.trailingAnchor constant:-16],
-        [toast.bottomAnchor constraintEqualToAnchor:window.safeAreaLayoutGuide.bottomAnchor
-                                           constant:-72],
-        [toast.heightAnchor constraintEqualToConstant:48],
-        [label.leadingAnchor constraintEqualToAnchor:toast.leadingAnchor constant:16],
-        [label.centerYAnchor constraintEqualToAnchor:toast.centerYAnchor],
-        [undo.trailingAnchor constraintEqualToAnchor:toast.trailingAnchor constant:-16],
-        [undo.centerYAnchor constraintEqualToAnchor:toast.centerYAnchor],
+        [toast.centerXAnchor constraintEqualToAnchor:window.centerXAnchor],
+        [toast.topAnchor constraintEqualToAnchor:window.safeAreaLayoutGuide.topAnchor
+                                        constant:6],
+        [toast.heightAnchor constraintEqualToConstant:44],
+        [toast.leadingAnchor constraintGreaterThanOrEqualToAnchor:window.leadingAnchor
+                                                        constant:20],
+        [label.leadingAnchor constraintEqualToAnchor:content.leadingAnchor constant:18],
+        [label.centerYAnchor constraintEqualToAnchor:content.centerYAnchor],
+        [undo.leadingAnchor constraintEqualToAnchor:label.trailingAnchor constant:14],
+        [undo.trailingAnchor constraintEqualToAnchor:content.trailingAnchor constant:-18],
+        [undo.centerYAnchor constraintEqualToAnchor:content.centerYAnchor],
     ]];
 
     toast.alpha = 0;
-    [UIView animateWithDuration:0.2
+    toast.transform = CGAffineTransformMakeTranslation(0.0, -8.0);
+    [UIView animateWithDuration:0.22
                      animations:^{
                        toast.alpha = 1;
+                       toast.transform = CGAffineTransformIdentity;
                      }];
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(4.0 * NSEC_PER_SEC)),
                    dispatch_get_main_queue(), ^{
