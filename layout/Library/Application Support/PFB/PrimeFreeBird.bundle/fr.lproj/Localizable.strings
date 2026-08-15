@@ -69,6 +69,8 @@
 
 "LIKE_CONFIRM_TITLE" = "Confirmer les likes";
 "LIKE_CONFIRM_DETAIL" = "Demande confirmation avant de liker.";
+"HIDE_THREADS_TITLE" = "Masquer des conversations";
+"HIDE_THREADS_DETAIL" = "Ajoute « Masquer cette conversation » au menu d’un Tweet et retire les conversations masquées du fil.";
 
 "TWEET_CONFIRM_TITLE" = "Confirmer les Tweets";
 "TWEET_CONFIRM_DETAIL" = "Demande confirmation avant de publier.";
