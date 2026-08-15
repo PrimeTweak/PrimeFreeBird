@@ -14,8 +14,10 @@
 //       it exposes — the question that six attempts have guessed at;
 //    2. whether that model, or anything it holds, carries the four values this
 //       feature needs, with their return types;
-//    3. the class of the status handed to a button, which is the other way to
-//       reach those values;
+//    3. (removed) the status handed to a button: hooking that method meant
+//       declaring its parameter types, and one of them is an integer where an
+//       object was assumed — ARC retained the number as an address and the app
+//       came down. A method is not hooked here unless its signature is known.
 //    4. what the row owns: its own buttons, its subviews, their frames;
 //    5. whether a foreign subview added to the row survives a layout pass —
 //       the hypothesis that would explain a button that is built and never seen;
@@ -154,13 +156,20 @@ static void NFBProbeClassSurface(id object, NSString* label) {
             os_log(NFBProbeLog(), "   ivar %{public}s : %{public}s", ivarName, type);
             continue;
         }
-        id value = object_getIvar(object, ivars[i]);
-        BOOL carries = [value respondsToSelector:@selector(replyCount)] ||
-                       [value respondsToSelector:@selector(conversationID)] ||
-                       [value respondsToSelector:@selector(statusID)];
-        os_log(NFBProbeLog(), "   ivar %{public}s : %{public}@%{public}s", ivarName,
-               value ? NSStringFromClass([value class]) : @"nil",
-               carries ? "   <<< PORTE LES VALEURS" : "");
+        // Read inside a guard: an ivar declared as an object can hold something
+        // the runtime cannot retain, and touching it is how the previous build
+        // brought the app down.
+        @try {
+            id value = object_getIvar(object, ivars[i]);
+            BOOL carries = [value respondsToSelector:@selector(replyCount)] ||
+                           [value respondsToSelector:@selector(conversationID)] ||
+                           [value respondsToSelector:@selector(statusID)];
+            os_log(NFBProbeLog(), "   ivar %{public}s : %{public}@%{public}s", ivarName,
+                   value ? NSStringFromClass([value class]) : @"nil",
+                   carries ? "   <<< PORTE LES VALEURS" : "");
+        } @catch (__unused NSException* exception) {
+            os_log(NFBProbeLog(), "   ivar %{public}s : illisible", ivarName);
+        }
     }
     free(ivars);
 }
@@ -290,32 +299,6 @@ static void NFBProbeClassSurface(id object, NSString* label) {
         }
         break;
     }
-}
-
-%end
-
-// MARK: - The status, handed straight to a button
-
-%hook TTAStatusInlineActionButton
-
-- (void)statusDidUpdate:(id)status
-                options:(NSUInteger)options
-     displayTextOptions:(id)displayTextOptions
-               animated:(BOOL)animated
-        featureSwitches:(id)featureSwitches {
-    %orig;
-    static NSInteger seen = 0;
-    if (!NFBProbeEnabled() || seen >= 2) {
-        return;
-    }
-    seen++;
-    // object_getClass rather than [self class]: this class is known to the
-    // compiler only by a forward declaration, so no message can be sent to self
-    // directly.
-    os_log(NFBProbeLog(), "=== STATUT REMIS À UN BOUTON (%ld) === %{public}@",
-           (long)seen, NSStringFromClass(object_getClass(self)));
-    NFBProbeStatusValues(status, @"statut reçu");
-    NFBProbeClassSurface(status, @"statut reçu");
 }
 
 %end
