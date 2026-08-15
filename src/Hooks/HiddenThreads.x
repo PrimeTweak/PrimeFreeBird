@@ -24,7 +24,7 @@ static NSString* const kNFBThreadWhoKey = @"who";
 static NSString* const kNFBThreadPreviewKey = @"preview";
 
 static const NSInteger kNFBHideButtonTag = 90311;
-static const CGFloat kNFBHideGlyphSide = 18.5;
+static const CGFloat kNFBHideGlyphSide = 16.0;
 
 // MARK: - Registry
 
@@ -382,12 +382,19 @@ static void NFBLayoutHideButton(UIView* row) {
         }
         right = MAX(right, CGRectGetMaxX(view.frame));
     }
-    CGFloat side = 30.0;
+    // The row is 18.67 points tall, measured on the device — a 30-point button
+    // hangs six points past it at both ends, and a subview is only drawn within
+    // its parent's bounds. The button therefore takes the row's own height.
+    CGFloat height = CGRectGetHeight(row.bounds);
+    if (height < 1.0) {
+        return;
+    }
+    CGFloat side = MIN(height, 30.0);
     CGFloat width = CGRectGetWidth(row.bounds);
     CGFloat x = width - side;
     // Overlapping a native button would be worse than not appearing at all.
     button.hidden = (right > x - 6.0);
-    button.frame = CGRectMake(x, (CGRectGetHeight(row.bounds) - side) / 2.0, side, side);
+    button.frame = CGRectMake(x, (height - side) / 2.0, side, side);
 }
 
 // Kept on the row by association rather than by a declared property: this
