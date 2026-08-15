@@ -183,6 +183,48 @@ static NSInteger NFBReplyCountForModel(id model) {
     return (NSInteger)NFBAskInteger(model, @selector(replyCount));
 }
 
+// The row holds a view model, but the numbers this file needs — the reply
+// count, the conversation identifier — live on the status object underneath it
+// (TFNTwitterStatus, verified in the binary: it alone carries replyCount,
+// conversationID, inReplyToStatusID and statusID). Asking the view model for
+// them answered nothing, which is why no button was ever built.
+//
+// The link between the two is not guessed: the object that answers replyCount
+// is looked for, first among the usual names, then among the model's own
+// instance variables. Only something that actually answers is accepted.
+static id NFBStatusFromModel(id model) {
+    if (!model) {
+        return nil;
+    }
+    if ([model respondsToSelector:@selector(replyCount)]) {
+        return model;
+    }
+    for (NSString* key in @[ @"status", @"tweet", @"canonicalStatus", @"statusModel" ]) {
+        @try {
+            id candidate = [model valueForKey:key];
+            if ([candidate respondsToSelector:@selector(replyCount)]) {
+                return candidate;
+            }
+        } @catch (__unused NSException* exception) {
+        }
+    }
+    unsigned int count = 0;
+    Ivar* ivars = class_copyIvarList(object_getClass(model), &count);
+    id found = nil;
+    for (unsigned int i = 0; i < count && !found; i++) {
+        const char* type = ivar_getTypeEncoding(ivars[i]);
+        if (!type || type[0] != '@') {
+            continue;
+        }
+        id value = object_getIvar(model, ivars[i]);
+        if ([value respondsToSelector:@selector(replyCount)]) {
+            found = value;
+        }
+    }
+    free(ivars);
+    return found;
+}
+
 // A Tweet is part of a conversation when someone has answered it, or when it is
 // itself an answer. Anything else gets no button.
 static BOOL NFBModelIsConversation(id model) {
@@ -219,7 +261,7 @@ BOOL nfbThreadIsHidden(id viewModel) {
     if (!NFBHiddenThreads().count) {
         return NO;
     }
-    return NFBThreadIDIsHidden(NFBThreadIDForModel(viewModel));
+    return NFBThreadIDIsHidden(NFBThreadIDForModel(NFBStatusFromModel(viewModel)));
 }
 
 // MARK: - The glyph
@@ -422,16 +464,17 @@ static const void* kNFBRowPreviewKey = &kNFBRowPreviewKey;
         model = nil;
     }
 
-    if (!NFBModelIsConversation(model)) {
+    id status = NFBStatusFromModel(model);
+    if (!NFBModelIsConversation(status)) {
         existing.hidden = YES;
         return;
     }
 
-    objc_setAssociatedObject(row, kNFBRowThreadKey, NFBThreadIDForModel(model),
+    objc_setAssociatedObject(row, kNFBRowThreadKey, NFBThreadIDForModel(status),
                              OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-    objc_setAssociatedObject(row, kNFBRowWhoKey, NFBAuthorHandleForModel(model),
+    objc_setAssociatedObject(row, kNFBRowWhoKey, NFBAuthorHandleForModel(status),
                              OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-    objc_setAssociatedObject(row, kNFBRowPreviewKey, NFBPreviewForModel(model),
+    objc_setAssociatedObject(row, kNFBRowPreviewKey, NFBPreviewForModel(status),
                              OBJC_ASSOCIATION_RETAIN_NONATOMIC);
 
     if (!existing) {
