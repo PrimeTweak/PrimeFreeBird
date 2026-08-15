@@ -111,11 +111,28 @@ static long long NFBAskInteger(id target, SEL selector) {
     if (!returnType) {
         return 0;
     }
-    if (strcmp(returnType, "q") == 0 || strcmp(returnType, "l") == 0) {
-        return ((long long (*)(id, SEL))objc_msgSend)(target, selector);
-    }
-    if (strcmp(returnType, "i") == 0) {
-        return ((int (*)(id, SEL))objc_msgSend)(target, selector);
+    // Every integer encoding, signed and unsigned: a count on a timeline model
+    // is an NSUInteger, which reads as "Q" — accepting only "q", "l" and "i"
+    // answered zero for every Tweet, so no button was ever shown.
+    switch (returnType[0]) {
+        case 'q':
+        case 'Q':
+            return ((long long (*)(id, SEL))objc_msgSend)(target, selector);
+        case 'l':
+        case 'L':
+            return (long long)((long (*)(id, SEL))objc_msgSend)(target, selector);
+        case 'i':
+        case 'I':
+            return (long long)((int (*)(id, SEL))objc_msgSend)(target, selector);
+        case 's':
+        case 'S':
+            return (long long)((short (*)(id, SEL))objc_msgSend)(target, selector);
+        case 'c':
+        case 'C':
+        case 'B':
+            return (long long)((char (*)(id, SEL))objc_msgSend)(target, selector);
+        default:
+            break;
     }
     if (strcmp(returnType, "@") == 0) {
         id value = ((id (*)(id, SEL))objc_msgSend)(target, selector);
