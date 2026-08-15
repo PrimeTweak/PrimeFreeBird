@@ -138,18 +138,6 @@ static BOOL nfbIsChatConversationBar(UIView* view) {
     return NO;
 }
 
-// The padlock under the name is a 14pt image view inside the subtitle, a
-// different branch from the portrait beside it — so the subtitle is the only
-// thing walked here, and the avatar is never in reach.
-static void nfbPaintChatSubtitleGlyphs(UIView* view, UIColor* colour) {
-    for (UIView* subview in view.subviews) {
-        if ([NSStringFromClass([subview class]) containsString:@"SubtitleView"]) {
-            nfbRepaintGlyphs(subview, colour);
-            continue;
-        }
-        nfbPaintChatSubtitleGlyphs(subview, colour);
-    }
-}
 
 static BOOL nfbLooksLikeSettingsButton(UIView* view) {
     NSString* identifier = view.accessibilityIdentifier;
@@ -582,23 +570,6 @@ static UIColor* nfbBarGlyphColour(UIView* view) {
     return colour;
 }
 
-
-%hook TFNNavigationBar
-
-- (void)layoutSubviews {
-    %orig;
-    UIView* bar = (UIView*)self;
-    if (!bar.window || !nfbIsChatConversationBar(bar)) {
-        return;
-    }
-    UIColor* label = [UIColor labelColor];
-    if ([label respondsToSelector:@selector(resolvedColorWithTraitCollection:)]) {
-        label = [label resolvedColorWithTraitCollection:bar.traitCollection] ?: label;
-    }
-    nfbPaintChatSubtitleGlyphs(bar, label);
-}
-
-%end
 
 %hook _UIModernBarButton
 
