@@ -1611,8 +1611,13 @@ static NSArray* FilteredTimelineSections(TFNItemsDataViewController* dataViewCon
     NSSet<NSString*>* keptLanguages =
         (inConversation || inProfile) ? nil : NFBKeptLanguages();
 
+    // Hidden conversations open this pass like any other option: without them
+    // here, a reader with no other filter on kept every hidden thread, because
+    // the whole loop below was skipped.
+    BOOL hasHiddenThreads = NFBHiddenThreads().count > 0;
+
     if (!hideWhoToFollow && !hidePrompts && !hideTopics && !hideTopicsToFollow &&
-        !hideVerified && !inConversation && !keptLanguages.count) {
+        !hideVerified && !inConversation && !keptLanguages.count && !hasHiddenThreads) {
         return sections;
     }
 
@@ -1663,6 +1668,44 @@ static NSArray* FilteredTimelineSections(TFNItemsDataViewController* dataViewCon
     }
 
     return modified ? [filteredSections copy] : sections;
+}
+
+// Every data view controller currently on screen, asked to set again what it
+// already has.
+static void NFBReapplyInHierarchy(UIViewController* controller) {
+    if (!controller) {
+        return;
+    }
+    if ([controller isKindOfClass:%c(TFNItemsDataViewController)] &&
+        [controller respondsToSelector:@selector(sections)] &&
+        [controller respondsToSelector:@selector(setSections:restoreScrollPosition:)]) {
+        id sections = ((id (*)(id, SEL))objc_msgSend)(controller, @selector(sections));
+        if ([sections isKindOfClass:[NSArray class]]) {
+            ((void (*)(id, SEL, id, BOOL))objc_msgSend)(
+                controller, @selector(setSections:restoreScrollPosition:), sections, YES);
+        }
+    }
+    for (UIViewController* child in controller.childViewControllers) {
+        NFBReapplyInHierarchy(child);
+    }
+    NFBReapplyInHierarchy(controller.presentedViewController);
+}
+
+// Re-applying the filter to what is already on screen.
+//
+// The filter runs when sections are handed to the data view controller, not when
+// the table draws — so reloading the table changes nothing. The sections are
+// therefore set again, with what the controller is already holding: the pass
+// runs, the hidden thread is dropped, and the reading position is kept.
+void nfbReapplyTimelineFilter(void) {
+    for (UIScene* scene in UIApplication.sharedApplication.connectedScenes) {
+        if (![scene isKindOfClass:[UIWindowScene class]]) {
+            continue;
+        }
+        for (UIWindow* window in ((UIWindowScene*)scene).windows) {
+            NFBReapplyInHierarchy(window.rootViewController);
+        }
+    }
 }
 
 %hook TFNItemsDataViewController

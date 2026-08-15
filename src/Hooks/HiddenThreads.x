@@ -368,11 +368,14 @@ static UIScrollView* NFBListForButton(UIView* view) {
     return nil;
 }
 
-static void NFBReloadList(UIScrollView* list) {
+// Reloading the table does nothing: the filter is applied when the sections are
+// handed to the data view controller, not when the table draws. Timeline.x
+// therefore replays that hand-over on every list on screen.
+extern void nfbReapplyTimelineFilter(void);
+
+static void NFBReloadList(__unused UIScrollView* list) {
     nfbRefreshMutedWords();
-    if ([list respondsToSelector:@selector(reloadData)]) {
-        ((void (*)(id, SEL))objc_msgSend)(list, @selector(reloadData));
-    }
+    nfbReapplyTimelineFilter();
 }
 
 // MARK: - The app's own toast
@@ -449,12 +452,17 @@ static void NFBShowHiddenToast(void) {
     }
     ((void (*)(id, SEL, id))objc_msgSend)(toaster, @selector(pushToast:), toast);
 
-    // The label is recoloured on the view the app has just built, one turn
-    // later — no hook, no guessed signature, and only ever on the strip we have
-    // just pushed. TFNInformationToast carries no text colour of its own.
-    dispatch_async(dispatch_get_main_queue(), ^{
-      NFBDarkenToastText();
-    });
+    // The label is recoloured on the view the app builds, without a hook and
+    // without a guessed signature. One pass on the next turn was too early —
+    // the strip did not exist yet and the text stayed white on white — so it is
+    // attempted a few times over half a second and stops as soon as it lands.
+    for (NSInteger attempt = 0; attempt < 5; attempt++) {
+        dispatch_after(
+            dispatch_time(DISPATCH_TIME_NOW, (int64_t)(attempt * 0.12 * NSEC_PER_SEC)),
+            dispatch_get_main_queue(), ^{
+              NFBDarkenToastText();
+            });
+    }
 }
 
 // MARK: - The entry in the Tweet's own menu
