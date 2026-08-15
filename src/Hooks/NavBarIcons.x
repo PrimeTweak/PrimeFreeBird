@@ -355,7 +355,12 @@ static BOOL nfbIsChatBarGlyph(UIView* view) {
     BOOL inHolder = NO;
     while (ancestor && depth < 4) {
         NSString* name = NSStringFromClass([ancestor class]);
+        // A back button carries TWO image views: one under the modern button and
+        // one under the mask that UIKit actually draws. Correcting only the
+        // first left the visible glyph in the accent — the mask is the one seen.
         if ([name isEqualToString:@"_UIModernBarButton"] ||
+            [name isEqualToString:@"_UIBackButtonMaskView"] ||
+            [name isEqualToString:@"_UIButtonBarButton"] ||
             [name isEqualToString:@"TFNBarButtonItemButton"] ||
             [name containsString:@"SelfSizingStackView"]) {
             inHolder = YES;
