@@ -354,21 +354,24 @@ static UIImage* NFBHideThreadGlyph(UIColor* colour) {
 // hole behind.
 extern void nfbRefreshMutedWords(void);
 
-static void NFBReloadTimelineAround(UIView* view) {
-    nfbRefreshMutedWords();
+static UIScrollView* NFBListForButton(UIView* view) {
     UIView* node = view;
     NSInteger depth = 0;
-    while (node && depth < 12) {
-        if ([node isKindOfClass:[UITableView class]]) {
-            [(UITableView*)node reloadData];
-            return;
-        }
-        if ([node isKindOfClass:[UICollectionView class]]) {
-            [(UICollectionView*)node reloadData];
-            return;
+    while (node && depth < 14) {
+        if ([node isKindOfClass:[UITableView class]] ||
+            [node isKindOfClass:[UICollectionView class]]) {
+            return (UIScrollView*)node;
         }
         node = node.superview;
         depth++;
+    }
+    return nil;
+}
+
+static void NFBReloadList(UIScrollView* list) {
+    nfbRefreshMutedWords();
+    if ([list respondsToSelector:@selector(reloadData)]) {
+        ((void (*)(id, SEL))objc_msgSend)(list, @selector(reloadData));
     }
 }
 
@@ -382,6 +385,44 @@ static void NFBReloadTimelineAround(UIView* view) {
 // It carries no undo button: TFNInformationToast exposes no way to attach an
 // action, and inventing one would put a foreign control inside a native strip.
 // A hidden conversation is restored from Filters › Threads.
+
+// The toast window sits above everything; its message label is reached by name
+// rather than by position.
+static void NFBDarkenToastTextIn(UIView* view, NSInteger depth) {
+    if (depth > 8) {
+        return;
+    }
+    if ([NSStringFromClass([view class]) containsString:@"ToastDefaultContentView"]) {
+        @try {
+            UILabel* message = [view valueForKey:@"messageLabel"];
+            UILabel* detail = [view valueForKey:@"detailLabel"];
+            if ([message isKindOfClass:[UILabel class]]) {
+                message.textColor = [UIColor labelColor];
+            }
+            if ([detail isKindOfClass:[UILabel class]]) {
+                detail.textColor = [UIColor secondaryLabelColor];
+            }
+        } @catch (__unused NSException* exception) {
+        }
+        return;
+    }
+    for (UIView* subview in view.subviews) {
+        NFBDarkenToastTextIn(subview, depth + 1);
+    }
+}
+
+static void NFBDarkenToastText(void) {
+    for (UIScene* scene in UIApplication.sharedApplication.connectedScenes) {
+        if (![scene isKindOfClass:[UIWindowScene class]]) {
+            continue;
+        }
+        for (UIWindow* window in ((UIWindowScene*)scene).windows) {
+            if ([NSStringFromClass([window class]) containsString:@"ToastWindow"]) {
+                NFBDarkenToastTextIn(window, 0);
+            }
+        }
+    }
+}
 
 static void NFBShowHiddenToast(void) {
     Class toastClass = NSClassFromString(@"TFNInformationToast");
@@ -402,7 +443,18 @@ static void NFBShowHiddenToast(void) {
     if (!toast || ![toaster respondsToSelector:@selector(pushToast:)]) {
         return;
     }
+    if ([toast respondsToSelector:@selector(setBackgroundColor:)]) {
+        ((void (*)(id, SEL, UIColor*))objc_msgSend)(
+            toast, @selector(setBackgroundColor:), [UIColor systemBackgroundColor]);
+    }
     ((void (*)(id, SEL, id))objc_msgSend)(toaster, @selector(pushToast:), toast);
+
+    // The label is recoloured on the view the app has just built, one turn
+    // later — no hook, no guessed signature, and only ever on the strip we have
+    // just pushed. TFNInformationToast carries no text colour of its own.
+    dispatch_async(dispatch_get_main_queue(), ^{
+      NFBDarkenToastText();
+    });
 }
 
 // MARK: - The entry in the Tweet's own menu
@@ -484,6 +536,10 @@ static BOOL NFBMenuBelongsToTweet(UIMenu* menu) {
         return;
     }
     __weak UIView* weakButton = button;
+    // The list is noted here, while the button is still in the cell: by the time
+    // the entry is tapped, the menu has taken the button out of the hierarchy
+    // and the walk upwards finds nothing to reload.
+    __weak UIScrollView* weakList = NFBListForButton(button);
     NSString* title =
         [[BHTBundle sharedBundle] localizedStringForKey:@"THREADS_HIDE_ACTION"];
     UIColor* colour = [UIColor labelColor];
@@ -502,7 +558,7 @@ static BOOL NFBMenuBelongsToTweet(UIMenu* menu) {
                   }
                   NFBHideThread(threadID, NFBAuthorForButton(source),
                                 NFBPreviewForButton(source));
-                  NFBReloadTimelineAround(source);
+                  NFBReloadList(weakList ?: (UIScrollView*)NFBListForButton(source));
                   NFBShowHiddenToast();
                 }];
     %orig([menu menuByReplacingChildren:[menu.children arrayByAddingObject:hide]]);
