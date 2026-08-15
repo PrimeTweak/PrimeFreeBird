@@ -309,8 +309,11 @@ static void NFBProbeClassSurface(id object, NSString* label) {
         return;
     }
     seen++;
+    // object_getClass rather than [self class]: this class is known to the
+    // compiler only by a forward declaration, so no message can be sent to self
+    // directly.
     os_log(NFBProbeLog(), "=== STATUT REMIS À UN BOUTON (%ld) === %{public}@",
-           (long)seen, NSStringFromClass([self class]));
+           (long)seen, NSStringFromClass(object_getClass(self)));
     NFBProbeStatusValues(status, @"statut reçu");
     NFBProbeClassSurface(status, @"statut reçu");
 }
