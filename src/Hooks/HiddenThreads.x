@@ -476,18 +476,11 @@ static void NFBShowHiddenToast(NSString* threadID) {
 // touching a property Apple does not expose: it is wrapped where it is passed,
 // in the public factory below. Twitter builds its menu, ours is appended after.
 
-static NSString* gNFBMenuThreadID = nil;
-static NSString* gNFBMenuWho = nil;
-static NSString* gNFBMenuPreview = nil;
-static __weak UIView* gNFBMenuView = nil;
-
-// From the view the menu was asked on, up to something that carries a Tweet.
-static void NFBRememberThreadForMenu(UIView* view) {
-    gNFBMenuThreadID = nil;
-    gNFBMenuWho = nil;
-    gNFBMenuPreview = nil;
-    gNFBMenuView = view;
-    UIView* node = view;
+// From the caret button up to the Tweet it belongs to. The chain is walked at
+// the moment it is needed — when the menu is built, and again when the entry is
+// tapped — so nothing is cached and nothing can go stale.
+static id NFBStatusForButton(UIView* button) {
+    UIView* node = button;
     NSInteger depth = 0;
     while (node && depth < 14) {
         id model = nil;
@@ -498,18 +491,26 @@ static void NFBRememberThreadForMenu(UIView* view) {
         }
         id status = NFBStatusFromModel(model);
         if (status && NFBModelIsConversation(status)) {
-            gNFBMenuThreadID = NFBThreadIDForModel(status);
-            gNFBMenuWho = NFBAuthorHandleForModel(status);
-            gNFBMenuPreview = NFBPreviewForModel(status);
-            return;
+            return status;
         }
         node = node.superview;
         depth++;
     }
+    return nil;
 }
 
-// The menu of a Tweet, recognised by an entry the app itself puts there. The
-// label is read from Twitter's own bundle, so this holds in any language.
+static NSString* NFBThreadIDForButton(UIView* button) {
+    return NFBThreadIDForModel(NFBStatusForButton(button));
+}
+
+static NSString* NFBAuthorForButton(UIView* button) {
+    return NFBAuthorHandleForModel(NFBStatusForButton(button));
+}
+
+static NSString* NFBPreviewForButton(UIView* button) {
+    return NFBPreviewForModel(NFBStatusForButton(button));
+}
+
 static BOOL NFBMenuBelongsToTweet(UIMenu* menu) {
     NSString* mark = [[BHTBundle sharedBundle]
         localizedTwitterStringForKey:@"NOT_INTERESTED_IN_THIS_LABEL"];
@@ -524,71 +525,44 @@ static BOOL NFBMenuBelongsToTweet(UIMenu* menu) {
     return NO;
 }
 
-static UIMenu* NFBMenuWithHideEntry(UIMenu* menu, NSString* threadID, NSString* who,
-                                    NSString* preview) {
+%hook UIButton
+
+- (void)setMenu:(UIMenu*)menu {
+    if (![menu isKindOfClass:[UIMenu class]]) {
+        %orig;
+        return;
+    }
+    UIView* button = (UIView*)self;
+    // Either the menu names itself — an entry the app puts there — or the button
+    // sits under a Tweet. The second covers a menu still being assembled, whose
+    // entries are not readable yet.
+    if (!NFBMenuBelongsToTweet(menu) && !NFBThreadIDForButton(button).length) {
+        %orig;
+        return;
+    }
+    __weak UIView* weakButton = button;
     NSString* title =
         [[BHTBundle sharedBundle] localizedStringForKey:@"THREADS_HIDE_ACTION"];
-    UIColor* glyphColour = [UIColor labelColor];
-    if ([glyphColour respondsToSelector:@selector(resolvedColorWithTraitCollection:)]) {
-        glyphColour = [glyphColour
-                          resolvedColorWithTraitCollection:UITraitCollection.currentTraitCollection]
-                      ?: glyphColour;
+    UIColor* colour = [UIColor labelColor];
+    if ([colour respondsToSelector:@selector(resolvedColorWithTraitCollection:)]) {
+        colour = [colour resolvedColorWithTraitCollection:button.traitCollection] ?: colour;
     }
     UIAction* hide = [UIAction
         actionWithTitle:title
-                  image:NFBHideThreadGlyph(glyphColour)
+                  image:NFBHideThreadGlyph(colour)
              identifier:nil
                 handler:^(__unused UIAction* action) {
-                  NFBHideThread(threadID, who, preview);
-                  NFBReloadTimelineAround(gNFBMenuView);
+                  UIView* source = weakButton;
+                  NSString* threadID = NFBThreadIDForButton(source);
+                  if (!threadID.length) {
+                      return;
+                  }
+                  NFBHideThread(threadID, NFBAuthorForButton(source),
+                                NFBPreviewForButton(source));
+                  NFBReloadTimelineAround(source);
                   NFBShowHiddenToast(threadID);
                 }];
-    return [menu menuByReplacingChildren:[menu.children arrayByAddingObject:hide]];
-}
-
-%hook UIContextMenuConfiguration
-
-+ (instancetype)configurationWithIdentifier:(id<NSCopying>)identifier
-                            previewProvider:(UIContextMenuContentPreviewProvider)previewProvider
-                             actionProvider:(UIContextMenuActionProvider)actionProvider {
-    NSString* threadID = gNFBMenuThreadID;
-    if (!actionProvider || !threadID.length) {
-        return %orig;
-    }
-    NSString* who = gNFBMenuWho;
-    NSString* preview = gNFBMenuPreview;
-    UIContextMenuActionProvider wrapped =
-        ^UIMenu*(NSArray<UIMenuElement*>* suggested) {
-          UIMenu* menu = actionProvider(suggested);
-          if (![menu isKindOfClass:[UIMenu class]] || !NFBMenuBelongsToTweet(menu)) {
-              return menu;
-          }
-          return NFBMenuWithHideEntry(menu, threadID, who, preview);
-        };
-    return %orig(identifier, previewProvider, wrapped);
-}
-
-%end
-
-// The two classes that vend a menu for a Tweet. The Tweet is noted here, where
-// the view is still known; the configuration built just after carries it.
-
-%hook TFNButton
-
-- (UIContextMenuConfiguration*)contextMenuInteraction:(UIContextMenuInteraction*)interaction
-                       configurationForMenuAtLocation:(CGPoint)location {
-    NFBRememberThreadForMenu(interaction.view);
-    return %orig;
-}
-
-%end
-
-%hook TFNMenuCompatibleControl
-
-- (UIContextMenuConfiguration*)contextMenuInteraction:(UIContextMenuInteraction*)interaction
-                       configurationForMenuAtLocation:(CGPoint)location {
-    NFBRememberThreadForMenu(interaction.view);
-    return %orig;
+    %orig([menu menuByReplacingChildren:[menu.children arrayByAddingObject:hide]]);
 }
 
 %end
