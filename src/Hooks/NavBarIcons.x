@@ -373,6 +373,30 @@ static void nfbTintGlyphChain(UIView* view, UIColor* colour) {
 // A glyph of the conversation bar: inside a bar button or the subtitle stack,
 // and inside that bar. Ancestors only — nothing below is visited, so no sibling
 // can be reached.
+// A back button, wherever it is. _UIBackButtonMaskView exists for back buttons
+// only, and _UIButtonBarButton is the bar's own container — the pair names the
+// arrow without a controller, without geometry and without a size. This is the
+// one glyph that should never carry the accent, on any screen.
+static BOOL nfbIsBackArrowGlyph(UIView* view) {
+    BOOL mask = NO;
+    BOOL container = NO;
+    UIView* node = view.superview;
+    NSInteger depth = 0;
+    while (node && depth < 5) {
+        NSString* name = NSStringFromClass([node class]);
+        if ([name isEqualToString:@"_UIBackButtonMaskView"] ||
+            [name isEqualToString:@"_UIModernBarButton"]) {
+            mask = YES;
+        }
+        if ([name isEqualToString:@"_UIButtonBarButton"]) {
+            container = YES;
+        }
+        node = node.superview;
+        depth++;
+    }
+    return mask && container;
+}
+
 static BOOL nfbIsChatBarGlyph(UIView* view) {
     UIView* ancestor = view.superview;
     NSInteger depth = 0;
@@ -413,7 +437,8 @@ static BOOL nfbIsChatBarGlyph(UIView* view) {
         // simply names no mode at all. Anything that is not already original is
         // therefore claimed.
         if (image.renderingMode != UIImageRenderingModeAlwaysOriginal) {
-            if (nfbIsChatBarGlyph((UIView*)self)) {
+            if (nfbIsChatBarGlyph((UIView*)self) ||
+                nfbIsBackArrowGlyph((UIView*)self)) {
                 // Baked at the setter, the way the confirm glyph of the theme
                 // screen already is: whoever writes last, the pixels that land
                 // carry the colour. A mode change alone leaves an alpha mask,
@@ -439,7 +464,7 @@ static BOOL nfbIsChatBarGlyph(UIView* view) {
                   UIImage* current = view.image;
                   if (!view || !current ||
                       current.renderingMode == UIImageRenderingModeAlwaysOriginal ||
-                      !nfbIsChatBarGlyph(view)) {
+                      (!nfbIsChatBarGlyph(view) && !nfbIsBackArrowGlyph(view))) {
                       return;
                   }
                   view.image =
