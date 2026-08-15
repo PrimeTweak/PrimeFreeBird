@@ -346,6 +346,30 @@ static void nfbRepaintNotificationsGear(UIView* bar, UIColor* colour) {
 // image is caught as it is set. Only views the tweak have already taken over are
 // affected — everything else pays a single associated-object read.
 
+// The colour a bar glyph should carry: the text colour, resolved for the
+// current appearance.
+static UIColor* nfbBarGlyphColour(UIView* view) {
+    UIColor* colour = [UIColor labelColor];
+    if (view && [colour respondsToSelector:@selector(resolvedColorWithTraitCollection:)]) {
+        return [colour resolvedColorWithTraitCollection:view.traitCollection] ?: colour;
+    }
+    return colour;
+}
+
+// The button's own chain, four levels at most — never the bar, so no sibling is
+// reached.
+static void nfbTintGlyphChain(UIView* view, UIColor* colour) {
+    UIView* node = view;
+    NSInteger depth = 0;
+    while (node && depth < 4) {
+        if (![node.tintColor isEqual:colour]) {
+            node.tintColor = colour;
+        }
+        node = node.superview;
+        depth++;
+    }
+}
+
 // A glyph of the conversation bar: inside a bar button or the subtitle stack,
 // and inside that bar. Ancestors only — nothing below is visited, so no sibling
 // can be reached.
@@ -390,7 +414,17 @@ static BOOL nfbIsChatBarGlyph(UIView* view) {
         // therefore claimed.
         if (image.renderingMode != UIImageRenderingModeAlwaysOriginal) {
             if (nfbIsChatBarGlyph((UIView*)self)) {
-                %orig([image imageWithRenderingMode:UIImageRenderingModeAlwaysOriginal]);
+                // Baked at the setter, the way the confirm glyph of the theme
+                // screen already is: whoever writes last, the pixels that land
+                // carry the colour. A mode change alone leaves an alpha mask,
+                // which a bar button re-tints per its own contrast rule.
+                UIColor* colour = nfbBarGlyphColour((UIView*)self);
+                UIImage* baked = NFBGreyGlyph(image, colour);
+                // Belt for the one frame a freshly created button can show
+                // before its first baked image lands: with the button's own
+                // chain tinted, even a frame treated as a template is right.
+                nfbTintGlyphChain((UIView*)self, colour);
+                %orig(baked ?: image);
                 return;
             }
             // A bar button is given its image before it is placed in the bar, so
