@@ -345,6 +345,19 @@ static void nfbRepaintNotificationsGear(UIView* bar, UIColor* colour) {
 %hook UIImageView
 
 - (void)setImage:(UIImage*)image {
+    // The padlock under the conversation name is a 14pt glyph in a self-sizing
+    // stack. Painting it during layout froze the app, so the rendering mode is
+    // corrected instead — the same answer as the portrait: the image keeps its
+    // own colours, its size does not change, and no layout pass is provoked.
+    if (image.renderingMode == UIImageRenderingModeAlwaysTemplate &&
+        image.size.width > 0 && image.size.width <= 16.0 &&
+        [NSStringFromClass([((UIView*)self).superview class])
+            containsString:@"SelfSizingStackView"] &&
+        nfbIsChatConversationBar((UIView*)self)) {
+        %orig([image imageWithRenderingMode:UIImageRenderingModeAlwaysOriginal]);
+        return;
+    }
+
     UIColor* target = objc_getAssociatedObject(self, kNFBGreyTargetKey);
     if (!target || !image) {
         %orig;

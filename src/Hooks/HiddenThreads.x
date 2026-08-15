@@ -16,6 +16,7 @@
 //
 
 #import "HookHelpers.h"
+#import <string.h>
 
 static NSString* const kNFBHiddenThreadsKey = @"nfb_hidden_threads";
 static NSString* const kNFBThreadIDKey = @"id";
@@ -85,11 +86,47 @@ static void NFBHideThread(NSString* threadID, NSString* who, NSString* preview) 
 // Values are asked of the model rather than assumed: a timeline carries several
 // kinds of entry, and only some of them answer these.
 
+// The return type is checked before the call. A timeline model answers some of
+// these with an integer, and reading an integer as an object hands a number to
+// the runtime as if it were an address — which is exactly how this crashed.
 static id NFBAsk(id target, SEL selector) {
     if (!target || ![target respondsToSelector:selector]) {
         return nil;
     }
+    NSMethodSignature* signature = [target methodSignatureForSelector:selector];
+    const char* returnType = signature.methodReturnType;
+    if (!returnType || strcmp(returnType, "@") != 0) {
+        return nil;
+    }
     return ((id (*)(id, SEL))objc_msgSend)(target, selector);
+}
+
+// The same question for values that arrive as numbers, boxed or not.
+static long long NFBAskInteger(id target, SEL selector) {
+    if (!target || ![target respondsToSelector:selector]) {
+        return 0;
+    }
+    NSMethodSignature* signature = [target methodSignatureForSelector:selector];
+    const char* returnType = signature.methodReturnType;
+    if (!returnType) {
+        return 0;
+    }
+    if (strcmp(returnType, "q") == 0 || strcmp(returnType, "l") == 0) {
+        return ((long long (*)(id, SEL))objc_msgSend)(target, selector);
+    }
+    if (strcmp(returnType, "i") == 0) {
+        return ((int (*)(id, SEL))objc_msgSend)(target, selector);
+    }
+    if (strcmp(returnType, "@") == 0) {
+        id value = ((id (*)(id, SEL))objc_msgSend)(target, selector);
+        if ([value isKindOfClass:[NSNumber class]]) {
+            return ((NSNumber*)value).longLongValue;
+        }
+        if ([value isKindOfClass:[NSString class]]) {
+            return ((NSString*)value).longLongValue;
+        }
+    }
+    return 0;
 }
 
 static NSString* NFBStringValue(id value) {
@@ -104,26 +141,29 @@ static NSString* NFBStringValue(id value) {
 
 // The conversation's own identifier when the model carries one; the Tweet's own
 // when it does not, which is the case for a root that has replies.
+static NSString* NFBIdentifierValue(id model, SEL selector) {
+    NSString* text = NFBStringValue(NFBAsk(model, selector));
+    if (text.length) {
+        return text;
+    }
+    long long number = NFBAskInteger(model, selector);
+    return number ? [@(number) stringValue] : nil;
+}
+
 static NSString* NFBThreadIDForModel(id model) {
-    NSString* conversation =
-        NFBStringValue(NFBAsk(model, @selector(conversationID)));
+    NSString* conversation = NFBIdentifierValue(model, @selector(conversationID));
     if (conversation.length) {
         return conversation;
     }
-    NSString* inReplyTo =
-        NFBStringValue(NFBAsk(model, @selector(inReplyToStatusID)));
+    NSString* inReplyTo = NFBIdentifierValue(model, @selector(inReplyToStatusID));
     if (inReplyTo.length) {
         return inReplyTo;
     }
-    return NFBStringValue(NFBAsk(model, @selector(statusID)));
+    return NFBIdentifierValue(model, @selector(statusID));
 }
 
 static NSInteger NFBReplyCountForModel(id model) {
-    id count = NFBAsk(model, @selector(replyCount));
-    if ([count isKindOfClass:[NSNumber class]]) {
-        return ((NSNumber*)count).integerValue;
-    }
-    return 0;
+    return (NSInteger)NFBAskInteger(model, @selector(replyCount));
 }
 
 // A Tweet is part of a conversation when someone has answered it, or when it is
@@ -135,7 +175,7 @@ static BOOL NFBModelIsConversation(id model) {
     if (NFBReplyCountForModel(model) > 0) {
         return YES;
     }
-    return NFBStringValue(NFBAsk(model, @selector(inReplyToStatusID))).length > 0;
+    return NFBIdentifierValue(model, @selector(inReplyToStatusID)).length > 0;
 }
 
 static NSString* NFBAuthorHandleForModel(id model) {
