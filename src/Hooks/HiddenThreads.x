@@ -283,7 +283,12 @@ static NSString* NFBPreviewForModel(id model) {
 }
 
 // Read by the timeline predicate, which owns the decision to drop an entry.
+// The toggle gates the whole feature: off, nothing is treated as hidden, so the
+// list the user built is kept on disk but no longer removed from the timeline.
 BOOL nfbThreadIsHidden(id viewModel) {
+    if (![BHTSettings boolForKey:@"hide_threads"]) {
+        return NO;
+    }
     if (!NFBHiddenThreads().count) {
         return NO;
     }
@@ -418,18 +423,39 @@ static void NFBShowHiddenToast(NSString* threadID) {
     }
     [[window viewWithTag:kNFBToastTag] removeFromSuperview];
 
-    // The glass itself carries the shape: a capsule, clipped, so the blur takes
-    // the rounded corners rather than a coloured box behind it.
-    UIBlurEffect* effect =
-        [UIBlurEffect effectWithStyle:UIBlurEffectStyleSystemThickMaterial];
+    // Under Liquid Glass the capsule is real glass — the same UIGlassEffect the
+    // bars use, which draws its own rounded shape and edge. Under the standard
+    // interface it is the frosted material capsule, clipped to a rounded rect
+    // with a hairline border so it reads as a panel rather than a blurred box.
+    // The material path matches what was shipped and confirmed; only the glass
+    // path is new, and only when the setting is on.
+    BOOL liquidGlass = [BHTSettings boolForKey:@"enable_liquid_glass"];
+    Class glassClass = NSClassFromString(@"UIGlassEffect");
+    UIVisualEffect* effect = nil;
+    if (liquidGlass && glassClass) {
+        effect = [[glassClass alloc] init];
+    }
+    if (!effect) {
+        effect = [UIBlurEffect effectWithStyle:UIBlurEffectStyleSystemThickMaterial];
+        liquidGlass = NO;
+    }
     UIVisualEffectView* toast = [[UIVisualEffectView alloc] initWithEffect:effect];
     toast.tag = kNFBToastTag;
-    toast.clipsToBounds = YES;
-    toast.layer.cornerRadius = 22.0;
-    toast.layer.cornerCurve = kCACornerCurveContinuous;
-    toast.layer.borderWidth = 0.5;
-    toast.layer.borderColor = [UIColor separatorColor].CGColor;
     toast.translatesAutoresizingMaskIntoConstraints = NO;
+    if (!liquidGlass) {
+        // Real glass shapes itself; the material capsule needs the corners and
+        // the border drawn on.
+        toast.clipsToBounds = YES;
+        toast.layer.cornerRadius = 22.0;
+        toast.layer.cornerCurve = kCACornerCurveContinuous;
+        toast.layer.borderWidth = 0.5;
+        toast.layer.borderColor = [UIColor separatorColor].CGColor;
+    } else {
+        // The glass rounds its own corners once told the radius; nothing is
+        // clipped, so its shadow and edge treatment survive.
+        toast.layer.cornerRadius = 22.0;
+        toast.layer.cornerCurve = kCACornerCurveContinuous;
+    }
     [window addSubview:toast];
 
     UIView* content = toast.contentView;
@@ -553,7 +579,8 @@ static BOOL NFBMenuBelongsToTweet(UIMenu* menu) {
 %hook UIButton
 
 - (void)setMenu:(UIMenu*)menu {
-    if (![menu isKindOfClass:[UIMenu class]]) {
+    if (![menu isKindOfClass:[UIMenu class]] ||
+        ![BHTSettings boolForKey:@"hide_threads"]) {
         %orig;
         return;
     }

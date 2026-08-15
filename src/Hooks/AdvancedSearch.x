@@ -46,9 +46,12 @@ static const CGFloat kNFBSliderGeometry[2][2] = {{8.0, 14.0}, {16.0, 10.0}};
 // creation and the first pass of the grey sweep next door.
 static UIImage* NFBSlidersGlyph(CGFloat side, UIColor* colour) {
     const CGFloat kUnit = 24.0;
-    // The stroke of the app's own bar glyphs, measured against the settings
-    // gear: two points on a 24-point grid.
-    const CGFloat kThickness = 2.0;
+    // Matched to the settings gear beside it by pixel count on screen, not by
+    // nominal weight. The gear's glyph stands taller than this one, so an equal
+    // stroke reads heavier here: measured at actual size the rails came out
+    // about a sixth thicker than the gear's ring. The stroke is trimmed to sit
+    // at the gear's relative weight — 1.75 on the 24-unit grid, not 2.0.
+    const CGFloat kThickness = 1.75;
     // Rendered and compared at actual size: at 2.2 the ring closes up into a
     // dot and the rail beyond it shrinks to a stub. At 2.8 the opening reads,
     // and the rail meets the ring rather than stopping short of it.

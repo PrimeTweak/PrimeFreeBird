@@ -646,6 +646,65 @@ static void nfbApplyComposeFABVisibility(UIView* fab) {
 
 %end
 
+// The confirm control of Twitter's own screens — the round button in a
+// navigation bar, Explore settings among them — takes the accent as its disc
+// (primaryButtonBackgroundColor is themed) but keeps its checkmark the app's
+// default dark, while every confirm the tweak draws is white. It is recognised
+// by structure, never by a controller name: a small template glyph whose disc,
+// within a few levels, is filled with the current accent, inside a navigation
+// bar. Nothing on a neutral background can match, so no ordinary glyph is
+// touched. The theme screen's own confirm is left to its dedicated path.
+static char kNFBAccentCheckBakedKey;
+
+static BOOL NFBColorMatchesAccent(UIColor* colour) {
+    extern UIColor* CurrentAccentColor(void);
+    UIColor* accent = CurrentAccentColor();
+    if (!colour || !accent) {
+        return NO;
+    }
+    CGFloat r1 = 0, g1 = 0, b1 = 0, a1 = 0;
+    CGFloat r2 = 0, g2 = 0, b2 = 0, a2 = 0;
+    if (![colour getRed:&r1 green:&g1 blue:&b1 alpha:&a1] ||
+        ![accent getRed:&r2 green:&g2 blue:&b2 alpha:&a2]) {
+        return NO;
+    }
+    if (a1 < 0.9) {
+        return NO;
+    }
+    CGFloat tol = 0.06;
+    return fabs(r1 - r2) < tol && fabs(g1 - g2) < tol && fabs(b1 - b2) < tol;
+}
+
+static BOOL NFBGlyphSitsOnAccentDisc(UIImageView* glyph) {
+    if (glyph.bounds.size.width <= 0 || glyph.bounds.size.width > 34) {
+        return NO;
+    }
+    BOOL inNavigationBar = NO;
+    BOOL onAccent = NO;
+    UIView* node = glyph.superview;
+    NSInteger depth = 0;
+    while (node && depth < 5) {
+        if (!onAccent && NFBColorMatchesAccent(node.backgroundColor)) {
+            onAccent = YES;
+        }
+        if (!onAccent) {
+            UIColor* layerColour =
+                node.layer.backgroundColor
+                    ? [UIColor colorWithCGColor:node.layer.backgroundColor]
+                    : nil;
+            if (NFBColorMatchesAccent(layerColour)) {
+                onAccent = YES;
+            }
+        }
+        if ([node isKindOfClass:[UINavigationBar class]]) {
+            inNavigationBar = YES;
+        }
+        node = node.superview;
+        depth++;
+    }
+    return inNavigationBar && onAccent;
+}
+
 // Twitter swaps the glyph IMAGE on an existing image view during tab
 // transitions; new subviews were covered, image replacements were not — that
 // was the frame still blinking. Only views styleComposeFAB has tagged are
@@ -679,6 +738,17 @@ static void nfbApplyComposeFABVisibility(UIView* fab) {
         ancestor = ancestor.superview;
         depth++;
     }
+    // The round confirm's checkmark can be handed its image before the disc is
+    // coloured, so the setter's test failed then. The button is attached now
+    // and outside a layout pass — re-assigning the image runs it back through
+    // setImage:, which bakes it white if the disc is the accent. No walk cost
+    // unless a small template glyph is entering a window.
+    if (self.image &&
+        self.image.renderingMode != UIImageRenderingModeAlwaysOriginal &&
+        objc_getAssociatedObject(self.image, &kNFBAccentCheckBakedKey) == nil &&
+        NFBGlyphSitsOnAccentDisc(self)) {
+        self.image = self.image;
+    }
 }
 
 - (void)setImage:(UIImage*)image {
@@ -696,6 +766,20 @@ static void nfbApplyComposeFABVisibility(UIView* fab) {
             [defaults objectForKey:@"bh_color_theme_selectedColor"] != nil;
         if (accentActive) {
             image = NFBWhiteBakedGlyph(image);
+        }
+    } else if (image &&
+               image.renderingMode != UIImageRenderingModeAlwaysOriginal &&
+               objc_getAssociatedObject(image, &kNFBAccentCheckBakedKey) == nil &&
+               NFBGlyphSitsOnAccentDisc(self)) {
+        // Twitter's round confirm button: its disc is the accent, its checkmark
+        // stayed dark. Baked white here, the same recipe the theme screen's
+        // confirm uses, so the pixels that land carry the colour and no tint
+        // can put the dark check back.
+        UIImage* white = NFBWhiteBakedGlyph(image);
+        if (white) {
+            objc_setAssociatedObject(white, &kNFBAccentCheckBakedKey, @YES,
+                                     OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+            image = white;
         }
     }
     %orig(image);
