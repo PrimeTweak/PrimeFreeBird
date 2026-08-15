@@ -465,6 +465,7 @@
 "THREADS_NO_PREVIEW" = "(no text)";
 "THREADS_HIDDEN_TOAST" = "Conversation hidden";
 "THREADS_UNDO" = "Undo";
+"THREADS_HIDE_ACTION" = "Hide this conversation";
 "LANGUAGES_FOOTER_OFF" = "No language checked — every language reaches your timeline.";
 "LANGUAGES_FOOTER_ON" = "Only the checked languages reach your timeline.\nTweets with no detected language always pass.\nUncheck every language to turn the filter off.";
 "LANGUAGES_TRANSLATE_TITLE" = "Auto-translate";
