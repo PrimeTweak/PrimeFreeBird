@@ -179,7 +179,15 @@ static NSString* NFBThreadIDForModel(id model) {
     return NFBIdentifierValue(model, @selector(statusID));
 }
 
+// Measured on the device: the timeline's view model is a
+// T1URTTimelineStatusItemViewModel, and it does not answer replyCount. Its own
+// name for the same number is aggregatedDisplayReplyCount. Both are asked, in
+// that order, so a model that carries either is understood.
 static NSInteger NFBReplyCountForModel(id model) {
+    if ([model respondsToSelector:@selector(aggregatedDisplayReplyCount)]) {
+        return (NSInteger)NFBAskInteger(model,
+                                        @selector(aggregatedDisplayReplyCount));
+    }
     return (NSInteger)NFBAskInteger(model, @selector(replyCount));
 }
 
@@ -197,6 +205,7 @@ static NSInteger NFBReplyCountForModel(id model) {
 // report proved was reachable — it answers inReplyToStatusID, not the count.
 static BOOL NFBRespondsToStatusValue(id candidate) {
     return [candidate respondsToSelector:@selector(replyCount)] ||
+           [candidate respondsToSelector:@selector(aggregatedDisplayReplyCount)] ||
            [candidate respondsToSelector:@selector(conversationID)] ||
            [candidate respondsToSelector:@selector(inReplyToStatusID)] ||
            [candidate respondsToSelector:@selector(statusID)];
@@ -248,7 +257,8 @@ static BOOL NFBModelIsConversation(id model) {
     // not carry it, the button is shown rather than silently withheld: hiding a
     // conversation is harmless on a Tweet that has none, whereas a button that
     // never appears is the failure this file has been chasing.
-    if ([model respondsToSelector:@selector(replyCount)]) {
+    if ([model respondsToSelector:@selector(replyCount)] ||
+        [model respondsToSelector:@selector(aggregatedDisplayReplyCount)]) {
         return NFBReplyCountForModel(model) > 0;
     }
     return YES;
@@ -434,12 +444,32 @@ static void NFBLayoutHideButton(UIView* row) {
     if (!button) {
         return;
     }
-    CGFloat right = 0;
+    // Measured on the device: the row is 366.67 wide and its own buttons run
+    // from -6 to 373 — they overflow it at both ends, so there is no free space
+    // at the trailing edge and the old guard hid this button on every pass.
+    // The largest gap between two neighbours is used instead.
+    CGFloat gapStart = 0;
+    CGFloat gapWidth = 0;
+    NSMutableArray<NSValue*>* frames = [NSMutableArray array];
     for (UIView* view in row.subviews) {
-        if (view == button || view.hidden) {
+        if (view == button || view.hidden || CGRectGetWidth(view.frame) < 1.0) {
             continue;
         }
-        right = MAX(right, CGRectGetMaxX(view.frame));
+        [frames addObject:[NSValue valueWithCGRect:view.frame]];
+    }
+    [frames sortUsingComparator:^NSComparisonResult(NSValue* a, NSValue* b) {
+      CGFloat ax = CGRectGetMinX(a.CGRectValue);
+      CGFloat bx = CGRectGetMinX(b.CGRectValue);
+      return ax < bx ? NSOrderedAscending : (ax > bx ? NSOrderedDescending : NSOrderedSame);
+    }];
+    for (NSUInteger i = 1; i < frames.count; i++) {
+        CGFloat previousEnd = CGRectGetMaxX(frames[i - 1].CGRectValue);
+        CGFloat nextStart = CGRectGetMinX(frames[i].CGRectValue);
+        CGFloat width = nextStart - previousEnd;
+        if (width > gapWidth) {
+            gapWidth = width;
+            gapStart = previousEnd;
+        }
     }
     // The row is 18.67 points tall, measured on the device — a 30-point button
     // hangs six points past it at both ends, and a subview is only drawn within
@@ -449,11 +479,15 @@ static void NFBLayoutHideButton(UIView* row) {
         return;
     }
     CGFloat side = MIN(height, 30.0);
-    CGFloat width = CGRectGetWidth(row.bounds);
-    CGFloat x = width - side;
-    // Overlapping a native button would be worse than not appearing at all.
-    button.hidden = (right > x - 6.0);
-    button.frame = CGRectMake(x, (height - side) / 2.0, side, side);
+    if (gapWidth < side + 4.0) {
+        // No room between two neighbours: nothing is drawn rather than laid over
+        // a native button.
+        button.hidden = YES;
+        return;
+    }
+    button.hidden = NO;
+    button.frame = CGRectMake(gapStart + (gapWidth - side) / 2.0,
+                              (height - side) / 2.0, side, side);
 }
 
 // Kept on the row by association rather than by a declared property: this
