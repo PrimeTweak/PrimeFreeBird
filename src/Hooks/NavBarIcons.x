@@ -702,9 +702,6 @@ static BOOL nfbIsRightHandGlyphButton(UIView* button) {
 
 %end
 
-// True of a view inside the navigation bar that carries the inbox pill. The
-// walk is bounded and only reads class names — it is on an animation path, so
-// it must stay cheap and must never touch a view.
 // True of the inbox filter pill or anything inside it. Tighter than the bar
 // test below: the avatar in the same bar fades legitimately, and only this
 // control must be held. Class name only, no message to a Swift class.
@@ -714,6 +711,24 @@ static BOOL nfbViewSitsInInboxPill(UIView* view) {
     while (node && depth < 6) {
         if ([NSStringFromClass([node classForCoder])
                 isEqualToString:@"_TtC7DMInbox39InboxNavigationBarMenuBarButtonItemView"]) {
+            return YES;
+        }
+        node = node.superview;
+        depth++;
+    }
+    return NO;
+}
+
+// The platter that holds the bar's buttons — wider than the pill test above,
+// narrower than the whole bar, so the animation journal names the suspects
+// without drowning in the scroll edge effects. Bounded and class-name only:
+// this runs on an animation path.
+static BOOL nfbViewSitsInBarPlatter(UIView* view) {
+    UIView* node = view;
+    NSInteger depth = 0;
+    while (node && depth < 12) {
+        if ([NSStringFromClass([node classForCoder])
+                hasPrefix:@"UIKit.NavigationBarPlatterContainer"]) {
             return YES;
         }
         node = node.superview;
