@@ -722,37 +722,6 @@ static BOOL nfbViewSitsInInboxPill(UIView* view) {
     return NO;
 }
 
-// The platter that holds the bar's buttons — narrower than the bar itself, so
-// logging here names the suspects without drowning in the scroll edge effects.
-static BOOL nfbViewSitsInBarPlatter(UIView* view) {
-    UIView* node = view;
-    NSInteger depth = 0;
-    while (node && depth < 12) {
-        if ([NSStringFromClass([node classForCoder])
-                hasPrefix:@"UIKit.NavigationBarPlatterContainer"]) {
-            return YES;
-        }
-        node = node.superview;
-        depth++;
-    }
-    return NO;
-}
-
-static BOOL nfbViewSitsInInboxBar(UIView* view) {
-    UIView* node = view;
-    NSInteger depth = 0;
-    while (node && depth < 12) {
-        NSString* name = NSStringFromClass([node classForCoder]);
-        if ([name isEqualToString:@"TFNNavigationBar"] ||
-            [name hasPrefix:@"UIKit.NavigationBarPlatterContainer"]) {
-            return YES;
-        }
-        node = node.superview;
-        depth++;
-    }
-    return NO;
-}
-
 %hook CALayer
 
 - (void)setOpacity:(float)opacity {
@@ -901,130 +870,65 @@ static BOOL nfbViewSitsInInboxBar(UIView* view) {
 // instead of leaving a ghost over the next screen. If no new pill ever comes,
 // it expires on its own.
 
-// A PERSISTENT curtain, not a one-shot bridge. The video settled why a bridge
-// per removal fails: returning to Messages is not one re-host but a CASCADE —
-// the bar morphs between two geometries and re-hosts the pill several times in
-// a row, and any removal in that cascade tore down the previous cover before a
-// sized pill was ever stable. Two long gaps resulted, 650 and 966 ms.
+// GLASS, not a cover.
 //
-// So the cover is raised ONCE, at the first removal, and is NOT taken down by
-// any subsequent removal. It comes down on one condition only: a pill with a
-// real size has stayed on screen for a short, stable beat. A cascade of empty
-// arrivals and departures cannot lift it; only genuine settling can. A refresh
-// counter guards the beat, so a departure that lands during the wait cancels
-// that lift and waits for the next sized pill.
+// The whole flash saga had one cause, and it was never a bug in this tweak:
+// Twitter 12.15 ships UIDesignRequiresCompatibility = YES — it REFUSES Liquid
+// Glass — and the tweak overrides that refusal on purpose. UIKit then wraps
+// this pill in the glass platter (NavigationBarPlatterContainer_v2,
+// UIPlatformGlassInteractionView) that Twitter never designed it for, the two
+// disagree about its size, and it is destroyed and rebuilt on every round. In
+// standard mode none of that machinery exists and nothing flashes.
+//
+// Covering the gap fought the symptom. This gives the control what the platter
+// is trying to give it: real glass, the same UIGlassEffect its own menu uses,
+// so it belongs to the interface instead of being dragged through it.
 
-static UIView* gNFBPillCurtain;
-static NSInteger gNFBPillSettleToken;
-
-static void nfbDropPillCurtain(void) {
-    [gNFBPillCurtain removeFromSuperview];
-    gNFBPillCurtain = nil;
-    gNFBPillSettleToken++;  // cancels any lift scheduled against the old curtain
+// The tweak's own Liquid Glass switch, read the same way the rest of the file
+// reads its settings.
+static BOOL nfbLiquidGlassEnabled(void) {
+    return [BHTSettings boolForKey:@"enable_liquid_glass"];
 }
 
-// The bar-scoped ancestor that survives a re-host but dies with the bar, so a
-// curtain left hanging cannot outlive the screen. The window is the fallback
-// only if nothing bar-scoped is found — and a window-hosted curtain is torn
-// down by the settle path, never left behind.
-static UIView* nfbCurtainHost(UIView* pill) {
-    UIView* node = pill.superview;
-    UIView* barScoped = nil;
-    NSInteger depth = 0;
-    while (node && depth < 16) {
-        if ([node isKindOfClass:[UINavigationBar class]]) {
-            return node;
-        }
-        if ([NSStringFromClass([node classForCoder]) hasPrefix:@"UIKit.NavigationBar"]) {
-            barScoped = node;
-        }
-        node = node.superview;
-        depth++;
-    }
-    return barScoped;
-}
+static char kNFBPillGlassKey;
 
-// Raised at a removal. If a curtain already hangs, this does nothing — one
-// cover spans the whole cascade.
-static void nfbRaisePillCurtain(UIView* pill) {
-    if (gNFBPillCurtain) {
-        NFBDebugLog(@"pill: départ <%p> (rideau déjà levé)", pill);
+// Behind the content, never in front: the label and the chevron keep drawing on
+// top, and touches are unaffected.
+static void nfbGlassifyInboxPill(UIView* pill) {
+    if (!nfbLiquidGlassEnabled()) {
         return;
     }
-    // A pill that never had a size was never visible: its departure needs no
-    // cover, and a snapshot of it raises an EMPTY curtain that then blocks the
-    // real one for the whole cascade — the journal says covered, the screen
-    // shows the hole. The journal proved zero-sized instances depart: they
-    // arrive at {0,0} and can leave again before ever growing.
     if (CGSizeEqualToSize(pill.bounds.size, CGSizeZero)) {
-        NFBDebugLog(@"pill: départ taille nulle ignoré <%p>", pill);
         return;
     }
-    UIWindow* window = pill.window;
-    if (!window) {
-        return;
-    }
-    UIView* snapshot = [pill snapshotViewAfterScreenUpdates:NO];
-    if (!snapshot) {
-        return;
-    }
-    snapshot.userInteractionEnabled = NO;
 
-    UIView* host = nfbCurtainHost(pill) ?: window;
-    snapshot.frame = [pill convertRect:pill.bounds toView:host];
-    [host addSubview:snapshot];
-    gNFBPillCurtain = snapshot;
-    NFBDebugLog(@"pill: rideau levé %@ dans %@",
-                NSStringFromCGRect(snapshot.frame),
-                NSStringFromClass([host classForCoder]));
-    // The re-host that follows ADDS the fresh platter subtree to this same
-    // host — above us. A buried curtain covers nothing; the settle path below
-    // re-fronts it on every arrival and layout, so it stays on top for as long
-    // as it hangs.
-
-    // A hard ceiling: even a pathological cascade cannot hold the curtain past
-    // two seconds. Well beyond the 966 ms measured, and the settle path below
-    // is what normally lifts it long before this.
-    NSInteger token = ++gNFBPillSettleToken;
-    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(2.0 * NSEC_PER_SEC)),
-                   dispatch_get_main_queue(), ^{
-        if (gNFBPillCurtain == snapshot && gNFBPillSettleToken == token) {
-            NFBDebugLog(@"pill: rideau plafond 2 s");
-            nfbDropPillCurtain();
+    UIVisualEffectView* glass = objc_getAssociatedObject(pill, &kNFBPillGlassKey);
+    if (!glass) {
+        Class glassClass = NSClassFromString(@"UIGlassEffect");
+        if (!glassClass) {
+            return;  // pre-iOS 26: the platter is not in play either
         }
-    });
-}
-
-// Called when a sized pill is on screen. It schedules a lift after a stable
-// beat; any removal in between bumps the token and cancels it, so only a pill
-// that STAYS lifts the curtain.
-static void nfbSettlePillCurtain(UIView* pill) {
-    if (!gNFBPillCurtain) {
-        return;
+        UIVisualEffect* effect = [[glassClass alloc] init];
+        if (!effect) {
+            return;
+        }
+        glass = [[UIVisualEffectView alloc] initWithEffect:effect];
+        glass.userInteractionEnabled = NO;
+        // Glass shapes itself once told the radius; nothing is clipped, so its
+        // own edge and shadow survive — the same treatment as the toast.
+        glass.layer.cornerCurve = kCACornerCurveContinuous;
+        objc_setAssociatedObject(pill, &kNFBPillGlassKey, glass,
+                                 OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        NFBDebugLog(@"pill: verre posé");
     }
-    // Whatever the re-host stacked above the curtain, the curtain goes back on
-    // top — for as long as it hangs, it must actually be seen.
-    [gNFBPillCurtain.superview bringSubviewToFront:gNFBPillCurtain];
-    if (!pill.window ||
-        CGSizeEqualToSize(pill.bounds.size, CGSizeZero)) {
-        return;
+
+    if (glass.superview != pill) {
+        [pill insertSubview:glass atIndex:0];
+    } else {
+        [pill sendSubviewToBack:glass];
     }
-    NSInteger token = ++gNFBPillSettleToken;
-    __weak UIView* weakPill = pill;
-    // ~120 ms: two of the six-frame re-host windows, long enough that a real
-    // settle is distinguished from a momentary sized frame mid-cascade.
-    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.12 * NSEC_PER_SEC)),
-                   dispatch_get_main_queue(), ^{
-        if (gNFBPillSettleToken != token) {
-            return;  // a removal or a newer settle superseded this one
-        }
-        UIView* strongPill = weakPill;
-        if (strongPill && strongPill.window &&
-            !CGSizeEqualToSize(strongPill.bounds.size, CGSizeZero)) {
-            NFBDebugLog(@"pill: rideau baissé (stable) <%p>", strongPill);
-            nfbDropPillCurtain();
-        }
-    });
+    glass.frame = pill.bounds;
+    glass.layer.cornerRadius = pill.bounds.size.height / 2.0;
 }
 
 %hook _TtC7DMInbox39InboxNavigationBarMenuBarButtonItemView
@@ -1032,16 +936,10 @@ static void nfbSettlePillCurtain(UIView* pill) {
 // Before the control is ever drawn, so the fade is refused rather than caught
 // halfway through.
 - (void)willMoveToWindow:(UIWindow*)newWindow {
-    // Leaving the window is a re-host in the cascade. Raise the curtain (or
-    // leave the standing one in place) before %orig, while the pill still knows
-    // where it sits. Never drop it here — a departure never lifts the cover.
-    if (!newWindow) {
-        nfbRaisePillCurtain((UIView*)self);
-    }
     %orig;
     if (newWindow) {
         nfbForceOpaque((UIView*)self);
-        NFBMark((UIView*)self, @"NavBarIcons/inboxPill → opaque (sous-arbre)");
+        NFBMark((UIView*)self, @"NavBarIcons/inboxPill → verre");
     }
 }
 
@@ -1051,18 +949,15 @@ static void nfbSettlePillCurtain(UIView* pill) {
         return;
     }
     nfbForceOpaque((UIView*)self);
-    // Arrivals come in zero-sized and grow; a sized one schedules a lift that a
-    // later departure can still cancel. layoutSubviews covers the ones that
-    // arrive empty.
-    nfbSettlePillCurtain((UIView*)self);
+    nfbGlassifyInboxPill((UIView*)self);
 }
 
 - (void)layoutSubviews {
     %orig;
     nfbForceOpaque((UIView*)self);
-    // The moment an arrival reaches a real size — the earliest a genuine settle
-    // can be detected.
-    nfbSettlePillCurtain((UIView*)self);
+    // Replacements arrive zero-sized and grow; the glass is fitted here, at the
+    // first layout that has a real size, and refitted on every one after.
+    nfbGlassifyInboxPill((UIView*)self);
 }
 
 // The moment a rebuilt label or chevron joins the control, before it has been
