@@ -206,6 +206,7 @@ const NFBHookRecord NFBHookRecords[] = {
     {"UICollectionView", "scrollToItemAtIndexPath", "Hooks/ExploreTabs.x"},
     {"UIFont", "tfn_fontWithName", "Hooks/Settings.x"},
     {"UIFontPickerViewController", "viewWillAppear", "Hooks/Settings.x"},
+    {"UIImageView", "didMoveToWindow", "Hooks/Branding.x"},
     {"UIImageView", "setImage", "Hooks/Branding.x"},
     {"UIImageView", "willMoveToWindow", "Hooks/Branding.x"},
     {"UINavigationBar", "didMoveToWindow", "Hooks/NavBarIcons.x"},
