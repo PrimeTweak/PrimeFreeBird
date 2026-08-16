@@ -71,6 +71,11 @@
     report.font = [UIFont monospacedSystemFontOfSize:12.0 weight:UIFontWeightRegular];
     report.textColor = [UIColor labelColor];
     report.textContainerInset = UIEdgeInsetsMake(12, 12, 12, 12);
+    // A capture runs to fifty thousand characters; the system find panel is
+    // how a class name is located in it. Long-press → Rechercher.
+    if (@available(iOS 16.0, *)) {
+        report.findInteractionEnabled = YES;
+    }
     [self.view addSubview:report];
     self.reportView = report;
 
