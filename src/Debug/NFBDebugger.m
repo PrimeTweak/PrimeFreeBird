@@ -117,21 +117,45 @@ static NSString* NFBEnvironmentBlock(void) {
 
 // The dead list is collected once per call and shared by the text block and
 // the banner count, so the two can never disagree.
-static NSArray<NSString*>* NFBCollectDead(NSUInteger* okClassesOut,
-                                          NSUInteger* okMethodsOut,
-                                          NSUInteger* okRuntimeOut) {
-    NSMutableArray<NSString*>* dead = [NSMutableArray array];
+typedef struct {
+    NSUInteger okClasses;
+    NSUInteger okMethods;
+    NSUInteger okRuntime;
+} NFBHealthCounts;
+
+// deadClasses  — the class is gone: a real break, counted and shown loud.
+// unresolved   — class present, method not found statically: usually a Swift or
+//                category method the hook still reaches; shown quietly.
+// deadRuntime  — a by-name class is gone: a real break.
+static void NFBCollectHealth(NSMutableArray<NSString*>* deadClasses,
+                             NSMutableArray<NSString*>* unresolvedMethods,
+                             NSMutableArray<NSString*>* deadRuntime,
+                             NFBHealthCounts* counts) {
     NSUInteger okClasses = 0;
     NSUInteger okMethods = 0;
 
     // Class + method dependencies. A NULL method means "class hooked, no
     // specific method" — the class alone is checked.
+    //
+    // Two failure kinds, kept apart because they mean different things:
+    //   · the CLASS is gone      → the whole hook is dead, a real break
+    //   · the class is here but   → often a false alarm: Swift methods and
+    //     the method isn't found     category methods don't always answer
+    //     statically                 class_getInstanceMethod, yet the hook
+    //                                still lands. Reported quietly, not counted
+    //                                as a break.
+    NSMutableArray<NSString*>* deadClasses = [NSMutableArray array];
+    NSMutableArray<NSString*>* unresolvedMethods = [NSMutableArray array];
     for (size_t i = 0; i < NFBHookRecordCount; i++) {
         NFBHookRecord record = NFBHookRecords[i];
         Class cls = objc_getClass(record.className);
         if (!cls) {
-            [dead addObject:[NSString stringWithFormat:@"  ✗ classe %s  (%s)",
-                             record.className, record.file]];
+            // Deduplicate: several methods of one class each produced a row.
+            NSString* entry = [NSString stringWithFormat:@"  ✗ classe %s  (%s)",
+                               record.className, record.file];
+            if (![deadClasses containsObject:entry]) {
+                [deadClasses addObject:entry];
+            }
             continue;
         }
         okClasses++;
@@ -139,14 +163,18 @@ static NSArray<NSString*>* NFBCollectDead(NSUInteger* okClassesOut,
             continue;
         }
         SEL selector = sel_registerName(record.methodName);
-        // Instance first, then class method: hooks target either.
+        // class_getInstanceMethod and getClassMethod both walk the superclass
+        // chain already; respondsToSelector catches dynamically provided ones.
         BOOL exists = class_getInstanceMethod(cls, selector) != NULL ||
-                      class_getClassMethod(cls, selector) != NULL;
+                      class_getClassMethod(cls, selector) != NULL ||
+                      [cls instancesRespondToSelector:selector] ||
+                      [cls respondsToSelector:selector];
         if (exists) {
             okMethods++;
         } else {
-            [dead addObject:[NSString stringWithFormat:@"  ✗ %s -%s  (%s)",
-                             record.className, record.methodName, record.file]];
+            [unresolvedMethods addObject:
+                [NSString stringWithFormat:@"  · %s -%s  (%s)",
+                 record.className, record.methodName, record.file]];
         }
     }
 
@@ -156,34 +184,64 @@ static NSArray<NSString*>* NFBCollectDead(NSUInteger* okClassesOut,
         if (objc_getClass(NFBRuntimeClasses[i])) {
             okRuntime++;
         } else {
-            [dead addObject:[NSString stringWithFormat:@"  ✗ classe (par nom) %s",
-                             NFBRuntimeClasses[i]]];
+            NSString* entry = [NSString stringWithFormat:@"  ✗ classe (par nom) %s",
+                               NFBRuntimeClasses[i]];
+            if (![deadRuntime containsObject:entry]) {
+                [deadRuntime addObject:entry];
+            }
         }
     }
 
-    if (okClassesOut) { *okClassesOut = okClasses; }
-    if (okMethodsOut) { *okMethodsOut = okMethods; }
-    if (okRuntimeOut) { *okRuntimeOut = okRuntime; }
-    return dead;
+    if (counts) {
+        counts->okClasses = okClasses;
+        counts->okMethods = okMethods;
+        counts->okRuntime = okRuntime;
+    }
 }
 
 static NSString* NFBHealthBlock(void) {
-    NSUInteger okClasses = 0, okMethods = 0, okRuntime = 0;
-    NSArray<NSString*>* dead = NFBCollectDead(&okClasses, &okMethods, &okRuntime);
+    NSMutableArray<NSString*>* deadClasses = [NSMutableArray array];
+    NSMutableArray<NSString*>* unresolved = [NSMutableArray array];
+    NSMutableArray<NSString*>* deadRuntime = [NSMutableArray array];
+    NFBHealthCounts counts = {0, 0, 0};
+    NFBCollectHealth(deadClasses, unresolved, deadRuntime, &counts);
+
+    // Only vanished classes count as breaks — the loud number. Unresolved
+    // methods are listed below under their own quiet heading.
+    NSUInteger breaks = deadClasses.count + deadRuntime.count;
     NSMutableString* out = [NSMutableString string];
     [out appendFormat:@"ACCROCHES  %lu classes, %lu méthodes, %lu par nom — %@\n",
-        (unsigned long)okClasses, (unsigned long)okMethods, (unsigned long)okRuntime,
-        dead.count ? [NSString stringWithFormat:@"%lu MANQUANTES", (unsigned long)dead.count]
-                   : @"toutes présentes"];
-    if (dead.count) {
-        [out appendString:[dead componentsJoinedByString:@"\n"]];
+        (unsigned long)counts.okClasses, (unsigned long)counts.okMethods,
+        (unsigned long)counts.okRuntime,
+        breaks ? [NSString stringWithFormat:@"%lu CLASSE%@ MANQUANTE%@",
+                    (unsigned long)breaks, breaks > 1 ? @"S" : @"", breaks > 1 ? @"S" : @""]
+               : @"toutes présentes"];
+    if (deadClasses.count) {
+        [out appendString:[deadClasses componentsJoinedByString:@"\n"]];
+        [out appendString:@"\n"];
+    }
+    if (deadRuntime.count) {
+        [out appendString:[deadRuntime componentsJoinedByString:@"\n"]];
+        [out appendString:@"\n"];
+    }
+    if (unresolved.count) {
+        [out appendFormat:
+            @"\nMÉTHODES NON RÉSOLUES STATIQUEMENT (%lu) — souvent Swift/catégorie, "
+            @"le hook fonctionne quand même :\n", (unsigned long)unresolved.count];
+        [out appendString:[unresolved componentsJoinedByString:@"\n"]];
         [out appendString:@"\n"];
     }
     return out;
 }
 
+// The banner counts only real breaks — vanished classes — not the quiet
+// unresolved-method list, which is mostly false alarms.
 NSUInteger NFBDebuggerMissingCount(void) {
-    return NFBCollectDead(NULL, NULL, NULL).count;
+    NSMutableArray<NSString*>* deadClasses = [NSMutableArray array];
+    NSMutableArray<NSString*>* unresolved = [NSMutableArray array];
+    NSMutableArray<NSString*>* deadRuntime = [NSMutableArray array];
+    NFBCollectHealth(deadClasses, unresolved, deadRuntime, NULL);
+    return deadClasses.count + deadRuntime.count;
 }
 
 // MARK: - view capture
@@ -380,10 +438,21 @@ void NFBDebuggerInstall(void) {
     if (!NFBDebugEnabled()) {
         return;
     }
-    // The launch health check runs once, a moment after launch, so every
-    // framework's classes are loaded before it reads them.
+    // The health check runs twice. The first pass, soon after launch, catches
+    // the obvious. The second, later, gives frameworks that only load with
+    // their screen (DM, Immersive, Guide) time to arrive before their classes
+    // are judged — otherwise every not-yet-loaded class reads as a false break.
+    // The on-device screen recomputes on every open anyway, so it is always
+    // current; these log passes are for a developer watching at launch.
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(2.0 * NSEC_PER_SEC)),
                    dispatch_get_main_queue(), ^{
         os_log(NFBDebugLogHandle(), "%{public}@", NFBHealthBlock());
+    });
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(12.0 * NSEC_PER_SEC)),
+                   dispatch_get_main_queue(), ^{
+        NSUInteger breaks = NFBDebuggerMissingCount();
+        os_log(NFBDebugLogHandle(),
+               "santé (2e passe, 12 s) : %{public}lu classe(s) manquante(s)",
+               (unsigned long)breaks);
     });
 }
