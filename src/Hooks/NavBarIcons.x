@@ -646,6 +646,24 @@ static BOOL nfbIsRightHandGlyphButton(UIView* button) {
 
 %end
 
+// True of a view inside the navigation bar that carries the inbox pill. The
+// walk is bounded and only reads class names — it is on an animation path, so
+// it must stay cheap and must never touch a view.
+static BOOL nfbViewSitsInInboxBar(UIView* view) {
+    UIView* node = view;
+    NSInteger depth = 0;
+    while (node && depth < 12) {
+        NSString* name = NSStringFromClass([node classForCoder]);
+        if ([name isEqualToString:@"TFNNavigationBar"] ||
+            [name hasPrefix:@"UIKit.NavigationBarPlatterContainer"]) {
+            return YES;
+        }
+        node = node.superview;
+        depth++;
+    }
+    return NO;
+}
+
 %hook CALayer
 
 - (void)setOpacity:(float)opacity {
@@ -658,6 +676,26 @@ static BOOL nfbIsRightHandGlyphButton(UIView* button) {
 }
 
 - (void)addAnimation:(CAAnimation*)animation forKey:(NSString*)key {
+    // Evidence before judgement: an opacity animation anywhere in the inbox
+    // navigation bar is recorded, marked or not. The fade that survives a pin
+    // must be coming from a view the pin never reaches — an ancestor — and this
+    // names it instead of leaving another guess.
+    if (NFBDebugIsRecording()) {
+        BOOL opacity = [key isEqualToString:@"opacity"] ||
+            ([animation isKindOfClass:[CABasicAnimation class]] &&
+             [((CABasicAnimation*)animation).keyPath isEqualToString:@"opacity"]);
+        if (opacity) {
+            UIView* owner = (UIView*)self.delegate;
+            if ([owner isKindOfClass:[UIView class]] &&
+                nfbViewSitsInInboxBar(owner)) {
+                NFBDebugLog(@"fondu opacité: %@ %@ durée=%.2f marqué=%@",
+                            NSStringFromClass([owner classForCoder]),
+                            NSStringFromCGRect([owner convertRect:owner.bounds toView:nil]),
+                            animation.duration,
+                            objc_getAssociatedObject(self, kNFBNoFadeKey) ? @"oui" : @"NON");
+            }
+        }
+    }
     if (!objc_getAssociatedObject(self, kNFBNoFadeKey)) {
         %orig;
         return;
@@ -751,14 +789,18 @@ static BOOL nfbIsRightHandGlyphButton(UIView* button) {
 - (void)willMoveToWindow:(UIWindow*)newWindow {
     %orig;
     if (newWindow) {
-        nfbPinOpaque((UIView*)self);
-        NFBMark((UIView*)self, @"NavBarIcons/inboxPill → opaque");
+        // The whole subtree, not the control alone. A capture showed the pill
+        // carries its content in a stack view — the label and the chevron —
+        // and pinning only the control leaves those free to fade under it,
+        // which is what the eye actually sees vanish.
+        nfbForceOpaque((UIView*)self);
+        NFBMark((UIView*)self, @"NavBarIcons/inboxPill → opaque (sous-arbre)");
     }
 }
 
 - (void)didMoveToWindow {
     %orig;
-    nfbPinOpaque((UIView*)self);
+    nfbForceOpaque((UIView*)self);
 }
 
 // The platter re-hosts its content whenever the bar is rebuilt, and the fresh
@@ -766,7 +808,9 @@ static BOOL nfbIsRightHandGlyphButton(UIView* button) {
 // unlike an image it can be settled here without provoking a layout pass.
 - (void)layoutSubviews {
     %orig;
-    nfbPinOpaque((UIView*)self);
+    // Content is rebuilt on layout, so freshly created labels and glyphs are
+    // caught here rather than only at the first appearance.
+    nfbForceOpaque((UIView*)self);
 }
 
 %end
