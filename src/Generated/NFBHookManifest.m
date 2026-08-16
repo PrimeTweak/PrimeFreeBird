@@ -261,6 +261,7 @@ const NFBHookRecord NFBHookRecords[] = {
     {"_TtC32TwitterHomeFeatureImplementation35HomeTimelineContainerViewController", "pinnedTimelinesRepository", "Hooks/Timeline.x"},
     {"_TtC32TwitterHomeFeatureImplementation35HomeTimelineContainerViewController", "tfn_navigationBarAccessoryView", "Hooks/Timeline.x"},
     {"_TtC32TwitterHomeFeatureImplementation35HomeTimelineContainerViewController", "viewDidAppear", "Hooks/Timeline.x"},
+    {"_TtC7DMInbox18InboxContainerView", "willMoveToWindow", "Hooks/NavBarIcons.x"},
     {"_TtC7DMInbox39InboxNavigationBarMenuBarButtonItemView", "didAddSubview", "Hooks/NavBarIcons.x"},
     {"_TtC7DMInbox39InboxNavigationBarMenuBarButtonItemView", "didMoveToWindow", "Hooks/NavBarIcons.x"},
     {"_TtC7DMInbox39InboxNavigationBarMenuBarButtonItemView", "layoutSubviews", "Hooks/NavBarIcons.x"},
