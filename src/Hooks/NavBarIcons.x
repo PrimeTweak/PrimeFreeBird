@@ -493,7 +493,18 @@ static UIColor* nfbSoftConfirmWhite(void) {
     return [UIColor colorWithWhite:0.92 alpha:1.0];
 }
 
-static BOOL nfbIsSettingsConfirmGlyph(UIView* view) {
+// The claim runs in TWO steps, because its two halves are readable at two
+// different moments. The file itself documents that a bar button is given its
+// image BEFORE it is placed in the bar — so at setImage time the responder
+// chain stops at the detached button, the screen cannot be read, and a screen
+// test there says "no settings" for every glyph including the confirm. That is
+// exactly how the previous build left the check glaring. So: the LOCAL half
+// (pure-white tint, modern bar button, not the back arrow) marks the glyph at
+// setImage; the SCREEN half decides at didMoveToWindow, when the chain finally
+// reaches the navigation controller.
+static const char* kNFBPendingConfirmKey = "nfbPendingConfirm";
+
+static BOOL nfbIsWhiteBarGlyphCandidate(UIView* view) {
     UIView* node = view.superview;
     NSInteger depth = 0;
     BOOL inModernBarButton = NO;
@@ -514,17 +525,41 @@ static BOOL nfbIsSettingsConfirmGlyph(UIView* view) {
     if (!tint || ![tint getRed:&r green:&g blue:&b alpha:&a]) {
         return NO;
     }
-    if (!(a > 0.9 && r > 0.9 && g > 0.9 && b > 0.9)) {
-        return NO;
-    }
-    if (![nfbTopViewControllerName(view) containsString:@"Settings"]) {
-        NFBDebugLog(@"glyphe blanc hors reglages: laisse natif");
-        return NO;
-    }
-    return YES;
+    return a > 0.9 && r > 0.9 && g > 0.9 && b > 0.9;
 }
 
 %hook UIImageView
+
+// The second half of the two-step claim: the button is in the bar, the chain
+// reaches the navigation controller, the screen is finally readable.
+- (void)didMoveToWindow {
+    %orig;
+    if (!((UIView*)self).window ||
+        !objc_getAssociatedObject(self, kNFBPendingConfirmKey)) {
+        return;
+    }
+    objc_setAssociatedObject(self, kNFBPendingConfirmKey, nil,
+                             OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    UIImage* current = self.image;
+    if (!current ||
+        current.renderingMode == UIImageRenderingModeAlwaysOriginal) {
+        return;
+    }
+    if (![nfbTopViewControllerName((UIView*)self)
+             containsString:@"Settings"]) {
+        NFBDebugLog(@"glyphe blanc hors reglages: laisse natif");
+        return;
+    }
+    // Baked rather than re-tinted: AlwaysOriginal forbids the bar button from
+    // painting its own white back over ours — and sends the setter straight
+    // through the passthrough above.
+    UIImage* softened = NFBGreyGlyph(current, nfbSoftConfirmWhite());
+    if (softened) {
+        NFBDebugLog(@"glyphe: confirm reglages -> blanc adouci");
+        NFBMark((UIView*)self, @"NavBarIcons/confirmGlyph → blanc adouci");
+        self.image = softened;
+    }
+}
 
 - (void)setImage:(UIImage*)image {
     UIColor* target = objc_getAssociatedObject(self, kNFBGreyTargetKey);
@@ -541,14 +576,11 @@ static BOOL nfbIsSettingsConfirmGlyph(UIView* view) {
         // simply names no mode at all. Anything that is not already original is
         // therefore claimed.
         if (image.renderingMode != UIImageRenderingModeAlwaysOriginal) {
-            if (nfbIsSettingsConfirmGlyph((UIView*)self)) {
-                // Baked rather than re-tinted: AlwaysOriginal forbids the bar
-                // button from painting its own white back over ours.
-                UIImage* softened = NFBGreyGlyph(image, nfbSoftConfirmWhite());
-                NFBDebugLog(@"glyphe: confirm reglages -> blanc adouci");
-                NFBMark((UIView*)self, @"NavBarIcons/confirmGlyph → blanc adouci");
-                %orig(softened ?: image);
-                return;
+            if (nfbIsWhiteBarGlyphCandidate((UIView*)self)) {
+                // The screen is not readable yet — the button is not in the
+                // bar. Marked here, decided at didMoveToWindow below.
+                objc_setAssociatedObject(self, kNFBPendingConfirmKey, @YES,
+                                         OBJC_ASSOCIATION_RETAIN_NONATOMIC);
             }
             if (nfbIsChatBarGlyph((UIView*)self) ||
                 nfbIsBackArrowGlyph((UIView*)self)) {
@@ -1111,8 +1143,13 @@ static void nfbMirrorInboxPill(UIView* pill) {
     if (settled) {
         mirror.frame = slot;
     } else if (!heldSlot) {
-        nfbScheduleMirrorResync(pill);
-        return;
+        // No settled geometry yet — the entry cascade. Refusing to show here
+        // starved the cover for the whole cascade and handed the screen back
+        // to the blinking native content: the flash returned. So the slot is
+        // taken PROVISIONALLY — the cover is up from the first sized layout —
+        // and the settling pass below snaps it to the rest geometry within a
+        // beat. A bounded, transient drift against a flash: the flash loses.
+        mirror.frame = slot;
     }
 
     mirrorLabel.attributedText = realLabel.attributedText;
