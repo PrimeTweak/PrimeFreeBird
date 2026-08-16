@@ -884,17 +884,98 @@ static BOOL nfbViewSitsInInboxBar(UIView* view) {
 // it is painted. Addressed as a plain UIView: the class is Swift and Logos
 // forward-declares it, so it takes no message of its own.
 
+// MARK: the bridge over the re-host gap
+//
+// Measured at 60 fps: on returning to the Messages list the pill is REMOVED
+// from the hierarchy for about six frames and then recreated — the avatar and
+// the title hold perfectly still while its pixel count goes 781 → 0 → 780.
+// Nothing fades and nothing transforms; the view simply is not there. That is
+// why refusing animations, of any kind, changed nothing: there was never an
+// animation to refuse. The platter re-hosts its SwiftUI content, and the gap
+// between the old instance leaving and the new one arriving is the flash.
+//
+// The gap cannot be prevented, so it is covered: as the old pill leaves the
+// window, a snapshot of it is pinned where it stood, and the first new pill to
+// arrive takes it down. The snapshot lives in the navigation bar's own
+// container — never the window — so leaving the tab tears it down with the bar
+// instead of leaving a ghost over the next screen. If no new pill ever comes,
+// it expires on its own.
+
+static UIView* gNFBPillBridge;
+
+static void nfbDropPillBridge(void) {
+    [gNFBPillBridge removeFromSuperview];
+    gNFBPillBridge = nil;
+}
+
+// The ancestor that survives the re-host but dies with the bar. The navigation
+// bar itself when one is reachable; otherwise the bar-scoped containers seen in
+// the captures. The window is deliberately never used.
+static UIView* nfbPillBridgeHost(UIView* pill) {
+    UIView* node = pill.superview;
+    UIView* barScoped = nil;
+    NSInteger depth = 0;
+    while (node && depth < 16) {
+        if ([node isKindOfClass:[UINavigationBar class]]) {
+            return node;
+        }
+        NSString* name = NSStringFromClass([node classForCoder]);
+        if ([name hasPrefix:@"UIKit.NavigationBar"]) {
+            barScoped = node;
+        }
+        node = node.superview;
+        depth++;
+    }
+    return barScoped;
+}
+
+static void nfbBridgeInboxPill(UIView* pill) {
+    if (!pill.window) {
+        return;
+    }
+    UIView* host = nfbPillBridgeHost(pill);
+    if (!host) {
+        return;
+    }
+    UIView* snapshot = [pill snapshotViewAfterScreenUpdates:NO];
+    if (!snapshot) {
+        return;
+    }
+    snapshot.userInteractionEnabled = NO;
+    snapshot.frame = [pill convertRect:pill.bounds toView:host];
+    nfbDropPillBridge();
+    gNFBPillBridge = snapshot;
+    [host addSubview:snapshot];
+    NFBDebugLog(@"pill: pont posé %@ dans %@",
+                NSStringFromCGRect(snapshot.frame),
+                NSStringFromClass([host classForCoder]));
+
+    // Expiry for the day no replacement comes — half a second is well past the
+    // measured six frames, and short enough that a wrong guess never lingers.
+    UIView* expected = snapshot;
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.5 * NSEC_PER_SEC)),
+                   dispatch_get_main_queue(), ^{
+        if (gNFBPillBridge == expected) {
+            nfbDropPillBridge();
+        }
+    });
+}
+
 %hook _TtC7DMInbox39InboxNavigationBarMenuBarButtonItemView
 
 // Before the control is ever drawn, so the fade is refused rather than caught
 // halfway through.
 - (void)willMoveToWindow:(UIWindow*)newWindow {
+    // Leaving the window: the re-host measured on video. The snapshot is taken
+    // before %orig, while the pill still knows its place on screen.
+    if (!newWindow) {
+        nfbBridgeInboxPill((UIView*)self);
+    }
     %orig;
     if (newWindow) {
         // The whole subtree, not the control alone. A capture showed the pill
         // carries its content in a stack view — the label and the chevron —
-        // and pinning only the control leaves those free to fade under it,
-        // which is what the eye actually sees vanish.
+        // and pinning only the control leaves those free to fade under it.
         nfbForceOpaque((UIView*)self);
         NFBMark((UIView*)self, @"NavBarIcons/inboxPill → opaque (sous-arbre)");
     }
@@ -902,7 +983,12 @@ static BOOL nfbViewSitsInInboxBar(UIView* view) {
 
 - (void)didMoveToWindow {
     %orig;
-    nfbForceOpaque((UIView*)self);
+    if (((UIView*)self).window) {
+        nfbForceOpaque((UIView*)self);
+        // The replacement is on screen: the bridge has done its hundred
+        // milliseconds and comes down.
+        nfbDropPillBridge();
+    }
 }
 
 // The platter re-hosts its content whenever the bar is rebuilt, and the fresh
