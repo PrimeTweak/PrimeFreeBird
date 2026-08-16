@@ -212,6 +212,8 @@
 /*Debug*/
 "FLEX_TWITTER_TITLE" = "Mode debug FLEX";
 "FLEX_TWITTER_DETAIL" = "Utilise FLEX pour déboguer Twitter.";
+"DIAGNOSTICS_TITLE" = "Diagnostic";
+"DIAGNOSTICS_DETAIL" = "Santé des accroches, capture par secousse, rapport à partager — tout sur le téléphone.";
 
 /*Developers*/
 
