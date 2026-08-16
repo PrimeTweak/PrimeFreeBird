@@ -144,8 +144,6 @@ static void NFBCollectHealth(NSMutableArray<NSString*>* deadClasses,
     //     statically                 class_getInstanceMethod, yet the hook
     //                                still lands. Reported quietly, not counted
     //                                as a break.
-    NSMutableArray<NSString*>* deadClasses = [NSMutableArray array];
-    NSMutableArray<NSString*>* unresolvedMethods = [NSMutableArray array];
     for (size_t i = 0; i < NFBHookRecordCount; i++) {
         NFBHookRecord record = NFBHookRecords[i];
         Class cls = objc_getClass(record.className);
