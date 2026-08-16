@@ -1024,16 +1024,31 @@ static void nfbInstallContainerWatch(void) {
             NFBDebugLog(@"pill: conteneur introuvable — veille non posée");
             return;
         }
-        Method method = class_getInstanceMethod(container,
-                                                @selector(willMoveToWindow:));
-        if (!method) {
+        SEL selector = @selector(willMoveToWindow:);
+        Method inherited = class_getInstanceMethod(container, selector);
+        if (!inherited) {
             NFBDebugLog(@"pill: willMoveToWindow absent — veille non posée");
             return;
         }
+        // The Swift class does not override this method, so the Method above
+        // is UIView's own — replacing its implementation swizzles EVERY view
+        // in the app, which is precisely what the crash report showed. An
+        // override is therefore ADDED to the subclass itself: only container
+        // instances ever run our code, and the original to call through is
+        // the inherited implementation. If the class one day does override
+        // it, class_addMethod fails and the replacement is then correctly
+        // scoped to that override.
         gNFBOrigContainerWillMove =
-            (void (*)(id, SEL, UIWindow*))method_getImplementation(method);
-        method_setImplementation(method, (IMP)nfbContainerWillMoveToWindow);
-        NFBDebugLog(@"pill: veille du conteneur posée");
+            (void (*)(id, SEL, UIWindow*))method_getImplementation(inherited);
+        if (class_addMethod(container, selector,
+                            (IMP)nfbContainerWillMoveToWindow,
+                            method_getTypeEncoding(inherited))) {
+            NFBDebugLog(@"pill: veille du conteneur posée (ajout)");
+        } else {
+            method_setImplementation(inherited,
+                                     (IMP)nfbContainerWillMoveToWindow);
+            NFBDebugLog(@"pill: veille du conteneur posée (remplacement)");
+        }
     });
 }
 
@@ -1042,10 +1057,15 @@ static void nfbDropInboxMirror(UIView* bar) {
     if (!mirror) {
         return;
     }
-    [mirror removeFromSuperview];
+    // Every trace of state goes FIRST, the destructive call goes LAST. The
+    // crash report showed the opposite order recursing to a stack overflow:
+    // removeFromSuperview fires willMoveToWindow, and a handler that still
+    // sees the state drops again, forever. Cleared first, any re-entry finds
+    // nothing and returns at the guard above.
     objc_setAssociatedObject(bar, kNFBPillMirrorKey, nil,
                              OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     gNFBInboxMirrorBar = nil;
+    [mirror removeFromSuperview];
     NFBDebugLog(@"pill: miroir retire (ecran quitte)");
 }
 
