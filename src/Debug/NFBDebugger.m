@@ -364,6 +364,18 @@ static void NFBCaptureView(UIView* view, NSInteger depth, NSMutableString* out) 
     if (view.hidden) {
         [line appendString:@" HIDDEN"];
     }
+    // zPosition orders sibling subtrees before add-order at composition time;
+    // anything relying on it (the pill mirror does) must be verifiable here.
+    if (view.layer.zPosition != 0) {
+        [line appendFormat:@" z=%.0f", view.layer.zPosition];
+    }
+    if ([view isKindOfClass:[UILabel class]]) {
+        NSString* text = ((UILabel*)view).text ?: @"";
+        if (text.length > 14) {
+            text = [[text substringToIndex:14] stringByAppendingString:@"…"];
+        }
+        [line appendFormat:@" \"%@\"", text];
+    }
     if ([view isKindOfClass:[UIImageView class]]) {
         UIImage* image = ((UIImageView*)view).image;
         [line appendFormat:@" img=%@ mode=%ld",
