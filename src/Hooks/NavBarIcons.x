@@ -135,7 +135,13 @@ static BOOL nfbIsChatConversationBar(UIView* view) {
         // The conversation of the encrypted chat, and the settings screens of
         // this tweak — both are named by their controller, so no other screen
         // in the app is reached.
+        // T1ConversationContainerViewController is the regular DM
+        // conversation — binary-confirmed. Its trailing glyphs (call, video)
+        // take the same label-colour bake as the encrypted chat's, at their
+        // FIRST image set: no accent beat before the bar settles, the exact
+        // pre-regression behaviour.
         if ([name containsString:@"XChatDM"] ||
+            [name containsString:@"ConversationContainer"] ||
             [name hasPrefix:@"ModernSettings"]) {
             return YES;
         }
@@ -403,10 +409,6 @@ static BOOL nfbSubtreeHasBackMask(UIView* view, NSInteger depth) {
 // a black check on an accent disc. Asking the CONTAINER for a mask still covers
 // both image views a back button carries (they share that container), while a
 // button that is not a back button no longer matches.
-// Defined below; declared here so the confirm test can exclude the back arrow
-// without moving either block.
-static BOOL nfbIsBackArrowGlyph(UIView* view);
-
 // The round confirm of Twitter's own screens. A capture of Explore settings
 // settled how to name it: NO ancestor carries the accent disc — the glass
 // platter draws it, not a view — so every attempt to find a background colour
@@ -419,64 +421,6 @@ static BOOL nfbIsBackArrowGlyph(UIView* view);
 // A bar glyph is tinted white only when it sits on a coloured disc, so white is
 // the discriminator. The back arrow is excluded outright, its tint being dark
 // in any case.
-// The screen the softened confirm belongs to. MEASURED regression behind this
-// allowlist: in a DM conversation, the call and video icons showed the theme
-// accent for ~600 ms, then snapped to a washed grey — RGB(231,231,231), which
-// is exactly the 0.92 white this path bakes. Under Liquid Glass the platter
-// hands ANY trailing glyph a pure-white tint while the real colour rides the
-// vibrancy filters, so "white tint" alone names half the app. The claim is
-// therefore fenced to the one screen it was built for, by its controller.
-static BOOL nfbSitsInExploreSettings(UIView* view) {
-    UIResponder* responder = view;
-    NSInteger depth = 0;
-    while ((responder = responder.nextResponder) && depth < 12) {
-        if ([NSStringFromClass([responder class])
-                containsString:@"ExploreSettings"]) {
-            return YES;
-        }
-        depth++;
-    }
-    return NO;
-}
-
-static BOOL nfbIsWhiteTintedBarGlyph(UIView* view) {
-    UIView* node = view.superview;
-    NSInteger depth = 0;
-    BOOL inModernBarButton = NO;
-    while (node && depth < 3) {
-        if ([NSStringFromClass([node classForCoder])
-                isEqualToString:@"_UIModernBarButton"]) {
-            inModernBarButton = YES;
-            break;
-        }
-        node = node.superview;
-        depth++;
-    }
-    if (!inModernBarButton || nfbIsBackArrowGlyph(view)) {
-        return NO;
-    }
-    UIColor* tint = view.tintColor;
-    CGFloat r = 0, g = 0, b = 0, a = 0;
-    if (!tint || ![tint getRed:&r green:&g blue:&b alpha:&a]) {
-        return NO;
-    }
-    if (!(a > 0.9 && r > 0.9 && g > 0.9 && b > 0.9)) {
-        return NO;
-    }
-    if (!nfbSitsInExploreSettings(view)) {
-        NFBDebugLog(@"glyphe blanc hors Explore settings: laissé natif");
-        return NO;
-    }
-    return YES;
-}
-
-// White, but stepped back from the full 255 the tint applies. On the accent
-// disc a pure white check reads harder than the tweak's own glyphs, which sit
-// on calmer backgrounds; this keeps the same stroke and takes the glare off.
-static UIColor* nfbSoftConfirmWhite(void) {
-    return [UIColor colorWithWhite:0.92 alpha:1.0];
-}
-
 static BOOL nfbIsBackArrowGlyph(UIView* view) {
     UIView* container = nil;
     UIView* node = view.superview;
@@ -552,15 +496,6 @@ static BOOL nfbIsChatBarGlyph(UIView* view) {
                 // chain tinted, even a frame treated as a template is right.
                 nfbTintGlyphChain((UIView*)self, colour);
                 %orig(baked ?: image);
-                return;
-            }
-            if (nfbIsWhiteTintedBarGlyph((UIView*)self)) {
-                NFBDebugLog(@"glyphe: confirm Explore → blanc adouci");
-                // Baked rather than re-tinted: AlwaysOriginal forbids the bar
-                // button from painting its own white back over ours.
-                UIImage* softened = NFBGreyGlyph(image, nfbSoftConfirmWhite());
-                NFBMark((UIView*)self, @"NavBarIcons/confirmGlyph → blanc adouci");
-                %orig(softened ?: image);
                 return;
             }
             // A bar button is given its image before it is placed in the bar, so
@@ -913,19 +848,28 @@ static BOOL nfbViewSitsInBarPlatter(UIView* view) {
 // instead of leaving a ghost over the next screen. If no new pill ever comes,
 // it expires on its own.
 
-// GLASS, not a cover.
+// THE MIRROR — the pill's text, owned by us.
 //
-// The whole flash saga had one cause, and it was never a bug in this tweak:
-// Twitter 12.15 ships UIDesignRequiresCompatibility = YES — it REFUSES Liquid
-// Glass — and the tweak overrides that refusal on purpose. UIKit then wraps
-// this pill in the glass platter (NavigationBarPlatterContainer_v2,
-// UIPlatformGlassInteractionView) that Twitter never designed it for, the two
-// disagree about its size, and it is destroyed and rebuilt on every round. In
-// standard mode none of that machinery exists and nothing flashes.
+// Every fact below is measured, none is a theory:
+//   · the platter destroys and recreates the pill in cascades (journal:
+//     different instance pointers around each gap);
+//   · the capsule the platter draws PERSISTS through every gap (video 16:17,
+//     not one missing frame);
+//   · only the CONTENT — the "All" label and its chevron — blinks, ~133 ms
+//     (videos 16:17 and 16:40, identical measurements);
+//   · TFNNavigationBar is reachable from the pill and survives the re-host
+//     (v5 journal: every bridge landed in it and lived).
 //
-// Covering the gap fought the symptom. This gives the control what the platter
-// is trying to give it: real glass, the same UIGlassEffect its own menu uses,
-// so it belongs to the interface instead of being dragged through it.
+// So the fix stops covering and starts OWNING: the real content is hidden, and
+// a mirror of it — same text, same font, same chevron, same colours, copied
+// from the real thing on every layout — lives in the bar, which survives, at
+// layer.zPosition 100, which the re-host cannot bury (sibling subtrees are
+// composited by zPosition before order, so nothing added later draws over it).
+// The real pill stays fully functional underneath: the mirror never takes a
+// touch, so the tap and the menu are Twitter's own, untouched. Standard mode
+// has no platter and no blink, so the mirror simply never engages there.
+
+static const char* kNFBPillMirrorKey = "nfbPillMirror";
 
 // The tweak's own Liquid Glass switch, read the same way the rest of the file
 // reads its settings.
@@ -933,138 +877,120 @@ static BOOL nfbLiquidGlassEnabled(void) {
     return [BHTSettings boolForKey:@"enable_liquid_glass"];
 }
 
-static char kNFBPillGlassKey;
-
-// Behind the content, never in front: the label and the chevron keep drawing on
-// top, and touches are unaffected.
-static void nfbGlassifyInboxPill(UIView* pill) {
-    if (!nfbLiquidGlassEnabled()) {
-        return;
-    }
-    if (CGSizeEqualToSize(pill.bounds.size, CGSizeZero)) {
-        return;
-    }
-
-    UIVisualEffectView* glass = objc_getAssociatedObject(pill, &kNFBPillGlassKey);
-    if (!glass) {
-        Class glassClass = NSClassFromString(@"UIGlassEffect");
-        if (!glassClass) {
-            return;  // pre-iOS 26: the platter is not in play either
-        }
-        UIVisualEffect* effect = [[glassClass alloc] init];
-        if (!effect) {
-            return;
-        }
-        glass = [[UIVisualEffectView alloc] initWithEffect:effect];
-        glass.userInteractionEnabled = NO;
-        // Glass shapes itself once told the radius; nothing is clipped, so its
-        // own edge and shadow survive — the same treatment as the toast.
-        glass.layer.cornerCurve = kCACornerCurveContinuous;
-        objc_setAssociatedObject(pill, &kNFBPillGlassKey, glass,
-                                 OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-        NFBDebugLog(@"pill: verre posé");
-    }
-
-    if (glass.superview != pill) {
-        [pill insertSubview:glass atIndex:0];
-    } else {
-        [pill sendSubviewToBack:glass];
-    }
-    glass.frame = pill.bounds;
-    glass.layer.cornerRadius = pill.bounds.size.height / 2.0;
-}
-
-// MARK: the content bridge
-//
-// With the pill glassed, the video settled what remains of the flash: the
-// capsule now PERSISTS through every re-host — measured without a single
-// missing frame — and only the CONTENT, the "All" label and its chevron, blinks
-// for ~140 ms while the replacement instance grows out of its zero frame.
-//
-// So the bridge covers the content alone, and it lives in the one place the
-// measurement proves survives: the platter capsule. Every earlier cover failed
-// on one of three points, each since settled by data — the host died with the
-// subtree (the capsule does not), the cover was raised from a zero-sized pill
-// (refused here), or it was lifted before the replacement could be seen
-// (lifted only by a SIZED layout, the v8 rule).
-
-static UIView* gNFBPillContentBridge;
-static NSInteger gNFBContentBridgeToken;
-
-static void nfbDropPillContentBridge(void) {
-    [gNFBPillContentBridge removeFromSuperview];
-    gNFBPillContentBridge = nil;
-    gNFBContentBridgeToken++;
-}
-
-// The capsule the video shows persisting: the glass interaction view when it is
-// reachable, otherwise the platter container. Both die with the bar, so a
-// bridge left hanging cannot outlive the screen.
-static UIView* nfbPillCapsuleHost(UIView* pill) {
+static UIView* nfbPillBar(UIView* pill) {
     UIView* node = pill.superview;
-    UIView* platter = nil;
     NSInteger depth = 0;
-    while (node && depth < 12) {
-        NSString* name = NSStringFromClass([node classForCoder]);
-        if ([name hasPrefix:@"UIPlatformGlass"]) {
+    while (node && depth < 16) {
+        if ([node isKindOfClass:[UINavigationBar class]]) {
             return node;
-        }
-        if (!platter && [name hasPrefix:@"UIKit.NavigationBarPlatterContainer"]) {
-            platter = node;
         }
         node = node.superview;
         depth++;
     }
-    return platter;
+    return nil;
 }
 
-static void nfbBridgePillContent(UIView* pill) {
-    if (gNFBPillContentBridge) {
+static void nfbMirrorInboxPill(UIView* pill) {
+    if (CGSizeEqualToSize(pill.bounds.size, CGSizeZero) || !pill.window) {
         return;
     }
-    // Never from a pill that was never visible (the zero-size rule).
-    if (!pill.window || CGSizeEqualToSize(pill.bounds.size, CGSizeZero)) {
+    UIView* bar = nfbPillBar(pill);
+    if (!bar) {
         return;
     }
-    // The content alone: the stack that carries the label and the chevron. The
-    // pill view itself also holds our glass, and a snapshot of that over the
-    // capsule would double the material for the covered beat.
-    UIView* content = nil;
+
+    // The real content: the stack with the label and the chevron.
+    UIStackView* stack = nil;
     for (UIView* sub in pill.subviews) {
         if ([sub isKindOfClass:[UIStackView class]]) {
-            content = sub;
+            stack = (UIStackView*)sub;
             break;
         }
     }
-    if (!content || CGSizeEqualToSize(content.bounds.size, CGSizeZero)) {
-        return;
-    }
-    UIView* host = nfbPillCapsuleHost(pill);
-    if (!host) {
-        return;
-    }
-    UIView* snapshot = [content snapshotViewAfterScreenUpdates:NO];
-    if (!snapshot) {
-        return;
-    }
-    snapshot.userInteractionEnabled = NO;
-    snapshot.frame = [content convertRect:content.bounds toView:host];
-    [host addSubview:snapshot];
-    gNFBPillContentBridge = snapshot;
-    NFBDebugLog(@"pill: contenu doublé %@ dans %@",
-                NSStringFromCGRect(snapshot.frame),
-                NSStringFromClass([host classForCoder]));
-
-    // The ceiling: the measured blink is ~140 ms, the growth of a replacement
-    // ~600 ms; a second and a half outlasts both without ever lingering.
-    NSInteger token = ++gNFBContentBridgeToken;
-    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1.5 * NSEC_PER_SEC)),
-                   dispatch_get_main_queue(), ^{
-        if (gNFBPillContentBridge == snapshot && gNFBContentBridgeToken == token) {
-            NFBDebugLog(@"pill: doublure plafond 1.5 s");
-            nfbDropPillContentBridge();
+    UILabel* realLabel = nil;
+    UIImageView* realChevron = nil;
+    for (UIView* piece in stack.arrangedSubviews) {
+        if (!realLabel && [piece isKindOfClass:[UILabel class]]) {
+            realLabel = (UILabel*)piece;
+        } else if (!realChevron && [piece isKindOfClass:[UIImageView class]]) {
+            realChevron = (UIImageView*)piece;
         }
-    });
+    }
+
+    UIView* mirror = objc_getAssociatedObject(bar, kNFBPillMirrorKey);
+
+    if (!nfbLiquidGlassEnabled()) {
+        // Standard interface: no platter, no blink — nothing of ours belongs
+        // here. Whatever a previous state left behind is undone.
+        if (mirror) {
+            [mirror removeFromSuperview];
+            objc_setAssociatedObject(bar, kNFBPillMirrorKey, nil,
+                                     OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        }
+        stack.hidden = NO;
+        return;
+    }
+    if (!stack || !realLabel) {
+        // A structure this code does not recognise, named once — a silent
+        // mirror must never read as a mystery. The native content stays.
+        static BOOL warned;
+        if (!warned) {
+            warned = YES;
+            NFBDebugLog(@"pill: structure inattendue (stack=%d, label=%d) — miroir inactif",
+                        stack != nil, realLabel != nil);
+        }
+        return;
+    }
+    if (CGSizeEqualToSize(stack.bounds.size, CGSizeZero)) {
+        return;  // still growing; the next sized layout will carry it
+    }
+
+    UILabel* mirrorLabel;
+    UIImageView* mirrorChevron;
+    if (!mirror) {
+        mirror = [UIView new];
+        mirror.userInteractionEnabled = NO;  // every touch reaches the real pill
+        mirror.layer.zPosition = 100;        // above anything the re-host adds
+        mirrorLabel = [UILabel new];
+        mirrorLabel.tag = 1;
+        [mirror addSubview:mirrorLabel];
+        mirrorChevron = [UIImageView new];
+        mirrorChevron.tag = 2;
+        [mirror addSubview:mirrorChevron];
+        [bar addSubview:mirror];
+        objc_setAssociatedObject(bar, kNFBPillMirrorKey, mirror,
+                                 OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        NFBMark(mirror, @"NavBarIcons/inboxPill → miroir");
+        NFBDebugLog(@"pill: miroir posé dans %@",
+                    NSStringFromClass([bar classForCoder]));
+    } else {
+        mirrorLabel = (UILabel*)[mirror viewWithTag:1];
+        mirrorChevron = (UIImageView*)[mirror viewWithTag:2];
+        if (mirror.superview != bar) {
+            [bar addSubview:mirror];
+        }
+    }
+
+    // Copied, never invented: the mirror shows exactly what the real content
+    // shows, wherever the real content sits, in whatever state the filter is —
+    // "All", "Requests", any future label.
+    mirror.frame = [stack convertRect:stack.bounds toView:bar];
+    mirrorLabel.attributedText = realLabel.attributedText;
+    mirrorLabel.font = realLabel.font;
+    mirrorLabel.textColor = realLabel.textColor;
+    mirrorLabel.frame = realLabel.frame;
+    if (realChevron) {
+        mirrorChevron.hidden = NO;
+        mirrorChevron.image = realChevron.image;
+        mirrorChevron.tintColor = realChevron.tintColor;
+        mirrorChevron.contentMode = realChevron.contentMode;
+        mirrorChevron.frame = realChevron.frame;
+    } else {
+        mirrorChevron.hidden = YES;
+    }
+
+    // The blinking original steps aside; the mirror is what is seen.
+    stack.hidden = YES;
 }
 
 %hook _TtC7DMInbox39InboxNavigationBarMenuBarButtonItemView
@@ -1072,15 +998,10 @@ static void nfbBridgePillContent(UIView* pill) {
 // Before the control is ever drawn, so the fade is refused rather than caught
 // halfway through.
 - (void)willMoveToWindow:(UIWindow*)newWindow {
-    // Leaving: the content is doubled into the capsule before %orig, while it
-    // still knows its place. A zero-sized instance is refused by the bridge.
-    if (!newWindow) {
-        nfbBridgePillContent((UIView*)self);
-    }
     %orig;
     if (newWindow) {
         nfbForceOpaque((UIView*)self);
-        NFBMark((UIView*)self, @"NavBarIcons/inboxPill → verre");
+        NFBMark((UIView*)self, @"NavBarIcons/inboxPill → miroir actif");
     }
 }
 
@@ -1090,22 +1011,16 @@ static void nfbBridgePillContent(UIView* pill) {
         return;
     }
     nfbForceOpaque((UIView*)self);
-    nfbGlassifyInboxPill((UIView*)self);
+    nfbMirrorInboxPill((UIView*)self);
 }
 
 - (void)layoutSubviews {
     %orig;
     nfbForceOpaque((UIView*)self);
-    // Replacements arrive zero-sized and grow; the glass is fitted here, at the
-    // first layout that has a real size, and refitted on every one after.
-    nfbGlassifyInboxPill((UIView*)self);
-    // The same sized layout is what lifts the content double: the replacement
-    // is now actually visible, so the beat it covered is over.
-    if (gNFBPillContentBridge &&
-        !CGSizeEqualToSize(((UIView*)self).bounds.size, CGSizeZero)) {
-        NFBDebugLog(@"pill: doublure relevée <%p>", self);
-        nfbDropPillContentBridge();
-    }
+    // Replacements arrive zero-sized and grow; the mirror is synced here, at
+    // every layout that has a real size — text, chevron and frames copied from
+    // the real content each pass.
+    nfbMirrorInboxPill((UIView*)self);
 }
 
 // The moment a rebuilt label or chevron joins the control, before it has been
