@@ -23,6 +23,7 @@
 //
 
 #import "HookHelpers.h"
+#import "Debug/NFBDebugger.h"
 
 static NSString* const kNFBSettingsButtonIdentifier = @"NavigationBarSettingsButton";
 static const void* kNFBGreyedImageKey = &kNFBGreyedImageKey;
@@ -467,6 +468,10 @@ static BOOL nfbIsChatBarGlyph(UIView* view) {
                 // which a bar button re-tints per its own contrast rule.
                 UIColor* colour = nfbBarGlyphColour((UIView*)self);
                 UIImage* baked = NFBGreyGlyph(image, colour);
+                NFBMark((UIView*)self,
+                        nfbIsBackArrowGlyph((UIView*)self)
+                            ? @"NavBarIcons/backArrow → cuit"
+                            : @"NavBarIcons/chatBarGlyph → cuit");
                 // Belt for the one frame a freshly created button can show
                 // before its first baked image lands: with the button's own
                 // chain tinted, even a frame treated as a template is right.
@@ -747,6 +752,7 @@ static BOOL nfbIsRightHandGlyphButton(UIView* button) {
     %orig;
     if (newWindow) {
         nfbPinOpaque((UIView*)self);
+        NFBMark((UIView*)self, @"NavBarIcons/inboxPill → opaque");
     }
 }
 

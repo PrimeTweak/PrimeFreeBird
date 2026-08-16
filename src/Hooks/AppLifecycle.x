@@ -4,6 +4,7 @@
 //
 
 #import "HookHelpers.h"
+#import "Debug/NFBDebugger.h"
 extern void NFBInstallPasteboardObserver(void);
 
 // MARK: - Padlock helpers
@@ -207,6 +208,9 @@ static void presentAuthIfNeeded(void) {
     if ([BHTSettings boolForKey:@"flex_twitter"]) {
         [[%c(FLEXManager) sharedManager] showExplorer];
     }
+    // Same gate as FLEX: the debugger installs its shake handler and runs the
+    // launch health check only when the developer setting is on.
+    NFBDebuggerInstall();
 
     dispatch_async(dispatch_get_main_queue(), ^{
         applySelectedThemeColor();
