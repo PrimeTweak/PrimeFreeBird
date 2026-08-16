@@ -24,6 +24,7 @@
 
 #import "HookHelpers.h"
 #import "Debug/NFBDebugger.h"
+#import <QuartzCore/QuartzCore.h>
 
 static NSString* const kNFBSettingsButtonIdentifier = @"NavigationBarSettingsButton";
 static const void* kNFBGreyedImageKey = &kNFBGreyedImageKey;
@@ -721,6 +722,22 @@ static BOOL nfbViewSitsInInboxPill(UIView* view) {
     return NO;
 }
 
+// The platter that holds the bar's buttons — narrower than the bar itself, so
+// logging here names the suspects without drowning in the scroll edge effects.
+static BOOL nfbViewSitsInBarPlatter(UIView* view) {
+    UIView* node = view;
+    NSInteger depth = 0;
+    while (node && depth < 12) {
+        if ([NSStringFromClass([node classForCoder])
+                hasPrefix:@"UIKit.NavigationBarPlatterContainer"]) {
+            return YES;
+        }
+        node = node.superview;
+        depth++;
+    }
+    return NO;
+}
+
 static BOOL nfbViewSitsInInboxBar(UIView* view) {
     UIView* node = view;
     NSInteger depth = 0;
@@ -748,42 +765,41 @@ static BOOL nfbViewSitsInInboxBar(UIView* view) {
 }
 
 - (void)addAnimation:(CAAnimation*)animation forKey:(NSString*)key {
-    // Evidence before judgement: an opacity animation anywhere in the inbox
-    // navigation bar is recorded, marked or not. The fade that survives a pin
-    // must be coming from a view the pin never reaches — an ancestor — and this
-    // names it instead of leaving another guess.
-    if (NFBDebugIsRecording()) {
-        BOOL opacity = [key isEqualToString:@"opacity"] ||
-            ([animation isKindOfClass:[CABasicAnimation class]] &&
-             [((CABasicAnimation*)animation).keyPath isEqualToString:@"opacity"]);
-        if (opacity) {
-            UIView* owner = (UIView*)self.delegate;
-            if ([owner isKindOfClass:[UIView class]] &&
-                nfbViewSitsInInboxBar(owner)) {
-                NFBDebugLog(@"fondu opacité: %@ %@ durée=%.2f marqué=%@",
-                            NSStringFromClass([owner classForCoder]),
-                            NSStringFromCGRect([owner convertRect:owner.bounds toView:nil]),
-                            animation.duration,
-                            objc_getAssociatedObject(self, kNFBNoFadeKey) ? @"oui" : @"NON");
-            }
+    UIView* owner = (UIView*)self.delegate;
+    BOOL ownerIsView = [owner isKindOfClass:[UIView class]];
+
+    // Every animation reaching the button platter is recorded, whatever its
+    // kind. The previous round logged opacity only and stayed silent on the
+    // pill — which was itself the finding: the fade is not an opacity
+    // animation, so refusing opacity refused nothing. A transition or a
+    // transform carries no "opacity" keyPath and slipped straight through.
+    if (NFBDebugIsRecording() && ownerIsView && nfbViewSitsInBarPlatter(owner)) {
+        NSString* path = @"—";
+        if ([animation isKindOfClass:[CABasicAnimation class]]) {
+            path = ((CABasicAnimation*)animation).keyPath ?: @"nil";
+        } else if ([animation isKindOfClass:[CATransition class]]) {
+            path = [NSString stringWithFormat:@"transition:%@",
+                    ((CATransition*)animation).type ?: @"?"];
         }
+        NFBDebugLog(@"anim platine: %@ [%@] clé=%@ chemin=%@ durée=%.2f pill=%@",
+                    NSStringFromClass([owner classForCoder]),
+                    NSStringFromClass([animation classForCoder]),
+                    key ?: @"nil", path, animation.duration,
+                    nfbViewSitsInInboxPill(owner) ? @"OUI" : @"non");
     }
+
+    // Every animation on this one control is refused, not just opacity. The
+    // measurement above showed the fade never announced itself as an opacity
+    // change, so naming a kind to block was the mistake; the control simply
+    // does not animate. Its neighbours in the same bar are untouched, and the
+    // pill appearing without a transition is exactly what is wanted here.
+    if (ownerIsView && nfbViewSitsInInboxPill(owner)) {
+        return;
+    }
+
     BOOL isFade = [key isEqualToString:@"opacity"];
     if (!isFade && [animation isKindOfClass:[CABasicAnimation class]]) {
         isFade = [((CABasicAnimation*)animation).keyPath isEqualToString:@"opacity"];
-    }
-
-    // Membership is tested here rather than trusted from a mark. The pill's
-    // content is rebuilt when the screen is returned to, so the views that fade
-    // are NEW ones, created after any pin has run — a mark can never win that
-    // race, which is why the previous attempt held and the flash stayed. Asking
-    // the view where it lives, at the moment it is asked to fade, cannot be
-    // outrun. Scoped to this one control: its neighbours still fade normally.
-    if (isFade) {
-        UIView* owner = (UIView*)self.delegate;
-        if ([owner isKindOfClass:[UIView class]] && nfbViewSitsInInboxPill(owner)) {
-            return;
-        }
     }
 
     if (!objc_getAssociatedObject(self, kNFBNoFadeKey)) {
