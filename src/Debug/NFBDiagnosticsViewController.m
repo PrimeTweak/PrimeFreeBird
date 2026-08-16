@@ -88,7 +88,14 @@
 
 - (void)viewWillAppear:(BOOL)animated {
     [super viewWillAppear:animated];
+    // The floating button would otherwise float over its own report.
+    NFBDebuggerSetTriggerHidden(YES);
     [self refresh];
+}
+
+- (void)viewDidDisappear:(BOOL)animated {
+    [super viewDidDisappear:animated];
+    NFBDebuggerSetTriggerHidden(NO);
 }
 
 // Recomputed on every appearance, so reopening the sheet after a capture or a

@@ -353,18 +353,54 @@ NSString* NFBDebuggerReport(void) {
 
 // MARK: - share sheet
 
+// MARK: - floating trigger
+//
+// The shake gesture proved unreliable: motion events travel the first-responder
+// chain, and when nothing is first responder — or the app consumes the event —
+// the window never sees them. A button is not a gesture: it is always there and
+// always answers, the way FLEX's is.
+
+// Its own window so it survives every screen change, above everything, and
+// never becomes key — the capture must read the app's window, not this one.
+@interface NFBDebugOverlayWindow : UIWindow
+@end
+
+@implementation NFBDebugOverlayWindow
+// Everything except the button falls through to the app underneath, so the
+// overlay costs nothing in use.
+- (UIView*)hitTest:(CGPoint)point withEvent:(UIEvent*)event {
+    UIView* hit = [super hitTest:point withEvent:event];
+    return hit == self || hit == self.rootViewController.view ? nil : hit;
+}
+@end
+
+static NFBDebugOverlayWindow* gNFBOverlay;
+
 static UIWindow* NFBActiveWindow(void) {
     for (UIScene* scene in UIApplication.sharedApplication.connectedScenes) {
         if (![scene isKindOfClass:[UIWindowScene class]]) {
             continue;
         }
         for (UIWindow* window in ((UIWindowScene*)scene).windows) {
+            // Never the overlay: the report is about the app's screen.
+            if ([window isKindOfClass:[NFBDebugOverlayWindow class]]) {
+                continue;
+            }
             if (window.isKeyWindow) {
                 return window;
             }
         }
     }
-    return UIApplication.sharedApplication.windows.firstObject;
+    for (UIWindow* window in UIApplication.sharedApplication.windows) {
+        if (![window isKindOfClass:[NFBDebugOverlayWindow class]]) {
+            return window;
+        }
+    }
+    return nil;
+}
+
+void NFBDebuggerSetTriggerHidden(BOOL hidden) {
+    gNFBOverlay.hidden = hidden;
 }
 
 NSURL* NFBDebuggerWriteReportFile(void) {
@@ -407,7 +443,7 @@ void NFBDebuggerPresent(void) {
 
 // The tweak's own window subclass would be heavy; instead the shake is caught
 // on UIWindow via a hook (see NFBDebugShake.x) which calls this.
-void NFBDebuggerHandleShake(void) {
+void NFBDebuggerCaptureAndPresent(void) {
     if (!NFBDebugEnabled()) {
         return;
     }
@@ -432,10 +468,100 @@ void NFBDebuggerHandleShake(void) {
 
 // MARK: - install
 
+// The button's target lives on an object because a UIControl needs one; it does
+// nothing but forward to the capture, and drags itself out of the way.
+@interface NFBDebugTrigger : NSObject
+@end
+
+@implementation NFBDebugTrigger
+
++ (instancetype)shared {
+    static NFBDebugTrigger* shared;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{ shared = [NFBDebugTrigger new]; });
+    return shared;
+}
+
+- (void)tapped {
+    NFBDebuggerCaptureAndPresent();
+}
+
+// Dragged rather than fixed: a diagnostics button that covers the thing being
+// diagnosed is worse than none.
+- (void)dragged:(UIPanGestureRecognizer*)pan {
+    UIView* button = pan.view;
+    CGPoint delta = [pan translationInView:button.superview];
+    CGPoint centre = button.center;
+    centre.x += delta.x;
+    centre.y += delta.y;
+    CGRect bounds = button.superview.bounds;
+    CGFloat inset = button.bounds.size.width / 2 + 4;
+    centre.x = MAX(inset, MIN(bounds.size.width - inset, centre.x));
+    centre.y = MAX(inset, MIN(bounds.size.height - inset, centre.y));
+    button.center = centre;
+    [pan setTranslation:CGPointZero inView:button.superview];
+}
+
+@end
+
+static void NFBInstallTrigger(void) {
+    if (gNFBOverlay) {
+        return;
+    }
+    UIWindowScene* scene = nil;
+    for (UIScene* candidate in UIApplication.sharedApplication.connectedScenes) {
+        if ([candidate isKindOfClass:[UIWindowScene class]] &&
+            candidate.activationState == UISceneActivationStateForegroundActive) {
+            scene = (UIWindowScene*)candidate;
+            break;
+        }
+    }
+    if (!scene) {
+        return;
+    }
+
+    gNFBOverlay = [[NFBDebugOverlayWindow alloc] initWithWindowScene:scene];
+    gNFBOverlay.windowLevel = UIWindowLevelAlert + 100;
+    gNFBOverlay.backgroundColor = UIColor.clearColor;
+    gNFBOverlay.rootViewController = [UIViewController new];
+    gNFBOverlay.rootViewController.view.backgroundColor = UIColor.clearColor;
+    // Shown, never made key: making it key would put the report's own window
+    // in front of the screen it is meant to describe.
+    gNFBOverlay.hidden = NO;
+
+    UIButton* button = [UIButton buttonWithType:UIButtonTypeSystem];
+    button.frame = CGRectMake(0, 0, 46, 46);
+    button.center = CGPointMake(scene.coordinateSpace.bounds.size.width - 38,
+                                scene.coordinateSpace.bounds.size.height * 0.62);
+    button.backgroundColor = [UIColor colorWithWhite:0.09 alpha:0.82];
+    button.layer.cornerRadius = 23.0;
+    button.layer.borderWidth = 1.0;
+    button.layer.borderColor = [UIColor colorWithWhite:1.0 alpha:0.22].CGColor;
+    button.tintColor = UIColor.whiteColor;
+    [button setImage:[UIImage systemImageNamed:@"stethoscope"] forState:UIControlStateNormal];
+    if (!button.currentImage) {
+        [button setTitle:@"PFB" forState:UIControlStateNormal];
+        button.titleLabel.font = [UIFont boldSystemFontOfSize:13];
+    }
+    [button addTarget:[NFBDebugTrigger shared]
+               action:@selector(tapped)
+     forControlEvents:UIControlEventTouchUpInside];
+    [button addGestureRecognizer:
+        [[UIPanGestureRecognizer alloc] initWithTarget:[NFBDebugTrigger shared]
+                                                action:@selector(dragged:)]];
+    [gNFBOverlay.rootViewController.view addSubview:button];
+}
+
 void NFBDebuggerInstall(void) {
     if (!NFBDebugEnabled()) {
         return;
     }
+    // The scene is not connected at launch, so the button is placed once the
+    // first screen is up, and retried if it was not ready.
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(3.0 * NSEC_PER_SEC)),
+                   dispatch_get_main_queue(), ^{ NFBInstallTrigger(); });
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(10.0 * NSEC_PER_SEC)),
+                   dispatch_get_main_queue(), ^{ NFBInstallTrigger(); });
     // The health check runs twice. The first pass, soon after launch, catches
     // the obvious. The second, later, gives frameworks that only load with
     // their screen (DM, Immersive, Guide) time to arrive before their classes
@@ -453,4 +579,10 @@ void NFBDebuggerInstall(void) {
                "santé (2e passe, 12 s) : %{public}lu classe(s) manquante(s)",
                (unsigned long)breaks);
     });
+}
+
+// The shake hook still calls this; kept because it costs nothing and works on
+// screens where the responder chain cooperates.
+void NFBDebuggerHandleShake(void) {
+    NFBDebuggerCaptureAndPresent();
 }

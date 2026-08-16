@@ -53,3 +53,11 @@ extern NSURL* NFBDebuggerWriteReportFile(void);
 // Presents the diagnostics screen over whatever is frontmost. The shake takes
 // a capture first, then calls this; the settings row calls it directly.
 extern void NFBDebuggerPresent(void);
+
+// Captures the frontmost screen and opens the diagnostics sheet. This is what
+// the floating button calls; the shake, when it works, calls it too.
+extern void NFBDebuggerCaptureAndPresent(void);
+
+// Hides the floating button while the diagnostics sheet is up, so it does not
+// sit on top of the report it produced.
+extern void NFBDebuggerSetTriggerHidden(BOOL hidden);
