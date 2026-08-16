@@ -15,6 +15,7 @@
 #import "Core/BHTSettingsBackup.h"
 #import "ThemeColor/Palette.h"
 #import "Hooks/HookHelpers.h"
+#import "Debug/NFBDebugger.h"
 
 @interface ModernSettingsPageViewController () <UIDocumentPickerDelegate>
 @property (nonatomic, copy) NSString* registryPageKey;
@@ -720,6 +721,16 @@ extern NSInteger NFBColorThemeScreenVisible;
                               withRowAnimation:UITableViewRowAnimationAutomatic];
     }
     [self.tableView endUpdates];
+}
+
+
+// MARK: - Diagnostics
+
+// The row lives on the lab page under Debug mode. It opens the on-device
+// diagnostics sheet — hook health, decision log, last capture, share — with no
+// computer attached.
+- (void)showDiagnostics:(NSDictionary*)sender {
+    NFBDebuggerPresent();
 }
 
 @end
