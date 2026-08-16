@@ -901,84 +901,108 @@ static BOOL nfbViewSitsInInboxBar(UIView* view) {
 // instead of leaving a ghost over the next screen. If no new pill ever comes,
 // it expires on its own.
 
-static UIView* gNFBPillBridge;
+// A PERSISTENT curtain, not a one-shot bridge. The video settled why a bridge
+// per removal fails: returning to Messages is not one re-host but a CASCADE —
+// the bar morphs between two geometries and re-hosts the pill several times in
+// a row, and any removal in that cascade tore down the previous cover before a
+// sized pill was ever stable. Two long gaps resulted, 650 and 966 ms.
+//
+// So the cover is raised ONCE, at the first removal, and is NOT taken down by
+// any subsequent removal. It comes down on one condition only: a pill with a
+// real size has stayed on screen for a short, stable beat. A cascade of empty
+// arrivals and departures cannot lift it; only genuine settling can. A refresh
+// counter guards the beat, so a departure that lands during the wait cancels
+// that lift and waits for the next sized pill.
 
-static void nfbDropPillBridge(void) {
-    [gNFBPillBridge removeFromSuperview];
-    gNFBPillBridge = nil;
+static UIView* gNFBPillCurtain;
+static NSInteger gNFBPillSettleToken;
+
+static void nfbDropPillCurtain(void) {
+    [gNFBPillCurtain removeFromSuperview];
+    gNFBPillCurtain = nil;
+    gNFBPillSettleToken++;  // cancels any lift scheduled against the old curtain
 }
 
-static void nfbBridgeInboxPill(UIView* pill) {
+// The bar-scoped ancestor that survives a re-host but dies with the bar, so a
+// curtain left hanging cannot outlive the screen. The window is the fallback
+// only if nothing bar-scoped is found — and a window-hosted curtain is torn
+// down by the settle path, never left behind.
+static UIView* nfbCurtainHost(UIView* pill) {
+    UIView* node = pill.superview;
+    UIView* barScoped = nil;
+    NSInteger depth = 0;
+    while (node && depth < 16) {
+        if ([node isKindOfClass:[UINavigationBar class]]) {
+            return node;
+        }
+        if ([NSStringFromClass([node classForCoder]) hasPrefix:@"UIKit.NavigationBar"]) {
+            barScoped = node;
+        }
+        node = node.superview;
+        depth++;
+    }
+    return barScoped;
+}
+
+// Raised at a removal. If a curtain already hangs, this does nothing — one
+// cover spans the whole cascade.
+static void nfbRaisePillCurtain(UIView* pill) {
+    if (gNFBPillCurtain) {
+        return;
+    }
     UIWindow* window = pill.window;
     if (!window) {
         return;
     }
     UIView* snapshot = [pill snapshotViewAfterScreenUpdates:NO];
     if (!snapshot) {
-        NFBDebugLog(@"pill: instantané indisponible");
         return;
     }
     snapshot.userInteractionEnabled = NO;
-    CGRect inWindow = [pill convertRect:pill.bounds toView:window];
-    snapshot.frame = inWindow;
-    nfbDropPillBridge();
-    gNFBPillBridge = snapshot;
 
-    // Into the WINDOW first, in the same runloop turn as the removal, so not a
-    // single frame renders without cover. A bar-scoped host would be cleaner —
-    // but if the re-host replaces the whole platter subtree, any host inside it
-    // dies in the same transaction and takes the snapshot with it, which leaves
-    // the gap exactly as measured. The window cannot be torn down under us.
-    [window addSubview:snapshot];
-    NFBDebugLog(@"pill: pont posé (fenêtre) %@", NSStringFromCGRect(inWindow));
+    UIView* host = nfbCurtainHost(pill) ?: window;
+    snapshot.frame = [pill convertRect:pill.bounds toView:host];
+    [host addSubview:snapshot];
+    gNFBPillCurtain = snapshot;
+    NFBDebugLog(@"pill: rideau levé %@ dans %@",
+                NSStringFromCGRect(snapshot.frame),
+                NSStringFromClass([host classForCoder]));
 
-    // The ghost problem the window creates is solved one tick later, when the
-    // outcome is knowable: the ancestors recorded here are walked, and the
-    // deepest one still in a window adopts the snapshot — it now dies with the
-    // bar, as it should. No survivor means the whole bar left: a navigation
-    // away, not a re-host, and the cover comes straight down. One tick is
-    // before the next frame, so nothing of this is ever visible.
-    NSMutableArray<UIView*>* ancestors = [NSMutableArray array];
-    UIView* node = pill.superview;
-    NSInteger depth = 0;
-    while (node && depth < 16) {
-        [ancestors addObject:node];
-        node = node.superview;
-        depth++;
-    }
-
-    UIView* expected = snapshot;
-    dispatch_async(dispatch_get_main_queue(), ^{
-        if (gNFBPillBridge != expected) {
-            return;
-        }
-        UIView* survivor = nil;
-        for (UIView* ancestor in ancestors) {
-            if (ancestor.window) {
-                survivor = ancestor;
-                break;
-            }
-        }
-        if (!survivor) {
-            NFBDebugLog(@"pill: pont retiré (départ d'écran, aucun survivant)");
-            nfbDropPillBridge();
-            return;
-        }
-        expected.frame = [window convertRect:inWindow toView:survivor];
-        [survivor addSubview:expected];
-        NFBDebugLog(@"pill: pont reparenté dans %@",
-                    NSStringFromClass([survivor classForCoder]));
-    });
-
-    // Expiry for the day no replacement ever comes. A full second: the journal
-    // showed replacements taking ~600 ms to grow out of their zero frame, and
-    // the real relief is the sized layout above — this is only the net under
-    // it. Reparented into the bar, an expired cover cannot outlive the screen.
-    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1.0 * NSEC_PER_SEC)),
+    // A hard ceiling: even a pathological cascade cannot hold the curtain past
+    // two seconds. Well beyond the 966 ms measured, and the settle path below
+    // is what normally lifts it long before this.
+    NSInteger token = ++gNFBPillSettleToken;
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(2.0 * NSEC_PER_SEC)),
                    dispatch_get_main_queue(), ^{
-        if (gNFBPillBridge == expected) {
-            NFBDebugLog(@"pill: pont expiré sans relève");
-            nfbDropPillBridge();
+        if (gNFBPillCurtain == snapshot && gNFBPillSettleToken == token) {
+            NFBDebugLog(@"pill: rideau plafond 2 s");
+            nfbDropPillCurtain();
+        }
+    });
+}
+
+// Called when a sized pill is on screen. It schedules a lift after a stable
+// beat; any removal in between bumps the token and cancels it, so only a pill
+// that STAYS lifts the curtain.
+static void nfbSettlePillCurtain(UIView* pill) {
+    if (!gNFBPillCurtain || !pill.window ||
+        CGSizeEqualToSize(pill.bounds.size, CGSizeZero)) {
+        return;
+    }
+    NSInteger token = ++gNFBPillSettleToken;
+    __weak UIView* weakPill = pill;
+    // ~120 ms: two of the six-frame re-host windows, long enough that a real
+    // settle is distinguished from a momentary sized frame mid-cascade.
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.12 * NSEC_PER_SEC)),
+                   dispatch_get_main_queue(), ^{
+        if (gNFBPillSettleToken != token) {
+            return;  // a removal or a newer settle superseded this one
+        }
+        UIView* strongPill = weakPill;
+        if (strongPill && strongPill.window &&
+            !CGSizeEqualToSize(strongPill.bounds.size, CGSizeZero)) {
+            NFBDebugLog(@"pill: rideau baissé (stable) <%p>", strongPill);
+            nfbDropPillCurtain();
         }
     });
 }
@@ -988,16 +1012,14 @@ static void nfbBridgeInboxPill(UIView* pill) {
 // Before the control is ever drawn, so the fade is refused rather than caught
 // halfway through.
 - (void)willMoveToWindow:(UIWindow*)newWindow {
-    // Leaving the window: the re-host measured on video. The snapshot is taken
-    // before %orig, while the pill still knows its place on screen.
+    // Leaving the window is a re-host in the cascade. Raise the curtain (or
+    // leave the standing one in place) before %orig, while the pill still knows
+    // where it sits. Never drop it here — a departure never lifts the cover.
     if (!newWindow) {
-        nfbBridgeInboxPill((UIView*)self);
+        nfbRaisePillCurtain((UIView*)self);
     }
     %orig;
     if (newWindow) {
-        // The whole subtree, not the control alone. A capture showed the pill
-        // carries its content in a stack view — the label and the chevron —
-        // and pinning only the control leaves those free to fade under it.
         nfbForceOpaque((UIView*)self);
         NFBMark((UIView*)self, @"NavBarIcons/inboxPill → opaque (sous-arbre)");
     }
@@ -1009,34 +1031,18 @@ static void nfbBridgeInboxPill(UIView* pill) {
         return;
     }
     nfbForceOpaque((UIView*)self);
-    // The journal settled a subtlety here: replacements ARRIVE with a zero
-    // frame — posé {{356.93, 60}, {0, 0}} — and only grow later. Presence in
-    // the window is not visibility, so dropping the cover on arrival opened
-    // the very gap it was built to close. It only comes down for an instance
-    // that actually has a size; layoutSubviews below handles the ones that
-    // arrive empty and grow afterwards.
-    if (gNFBPillBridge &&
-        !CGSizeEqualToSize(((UIView*)self).bounds.size, CGSizeZero)) {
-        NFBDebugLog(@"pill: pont relevé (arrivée) par <%p>", self);
-        nfbDropPillBridge();
-    }
+    // Arrivals come in zero-sized and grow; a sized one schedules a lift that a
+    // later departure can still cancel. layoutSubviews covers the ones that
+    // arrive empty.
+    nfbSettlePillCurtain((UIView*)self);
 }
 
-// The platter re-hosts its content whenever the bar is rebuilt, and the fresh
-// host arrives with a fade of its own. An opacity carries no intrinsic size, so
-// unlike an image it can be settled here without provoking a layout pass.
 - (void)layoutSubviews {
     %orig;
-    // Content is rebuilt on layout, so freshly created labels and glyphs are
-    // caught here rather than only at the first appearance.
     nfbForceOpaque((UIView*)self);
-    // A replacement that arrived zero-sized becomes visible at its first real
-    // layout — the exact moment the cover stops being needed.
-    if (gNFBPillBridge && ((UIView*)self).window &&
-        !CGSizeEqualToSize(((UIView*)self).bounds.size, CGSizeZero)) {
-        NFBDebugLog(@"pill: pont relevé (layout) par <%p>", self);
-        nfbDropPillBridge();
-    }
+    // The moment an arrival reaches a real size — the earliest a genuine settle
+    // can be detected.
+    nfbSettlePillCurtain((UIView*)self);
 }
 
 // The moment a rebuilt label or chevron joins the control, before it has been
