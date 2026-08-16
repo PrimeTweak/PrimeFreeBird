@@ -402,6 +402,53 @@ static BOOL nfbSubtreeHasBackMask(UIView* view, NSInteger depth) {
 // a black check on an accent disc. Asking the CONTAINER for a mask still covers
 // both image views a back button carries (they share that container), while a
 // button that is not a back button no longer matches.
+// Defined below; declared here so the confirm test can exclude the back arrow
+// without moving either block.
+static BOOL nfbIsBackArrowGlyph(UIView* view);
+
+// The round confirm of Twitter's own screens. A capture of Explore settings
+// settled how to name it: NO ancestor carries the accent disc — the glass
+// platter draws it, not a view — so every attempt to find a background colour
+// was bound to fail. What the capture DOES show is the glyph's tint:
+//
+//   UIImageView … mode=0 tint=rgba(255,255,255,1.00)      the confirm
+//   UIImageView … mode=1 tint=rgba(0,0,0,0.60)            the settings gear
+//   UIImageView … mode=0 tint=rgba(0,0,0,1.00)            an ordinary glyph
+//
+// A bar glyph is tinted white only when it sits on a coloured disc, so white is
+// the discriminator. The back arrow is excluded outright, its tint being dark
+// in any case.
+static BOOL nfbIsWhiteTintedBarGlyph(UIView* view) {
+    UIView* node = view.superview;
+    NSInteger depth = 0;
+    BOOL inModernBarButton = NO;
+    while (node && depth < 3) {
+        if ([NSStringFromClass([node classForCoder])
+                isEqualToString:@"_UIModernBarButton"]) {
+            inModernBarButton = YES;
+            break;
+        }
+        node = node.superview;
+        depth++;
+    }
+    if (!inModernBarButton || nfbIsBackArrowGlyph(view)) {
+        return NO;
+    }
+    UIColor* tint = view.tintColor;
+    CGFloat r = 0, g = 0, b = 0, a = 0;
+    if (!tint || ![tint getRed:&r green:&g blue:&b alpha:&a]) {
+        return NO;
+    }
+    return a > 0.9 && r > 0.9 && g > 0.9 && b > 0.9;
+}
+
+// White, but stepped back from the full 255 the tint applies. On the accent
+// disc a pure white check reads harder than the tweak's own glyphs, which sit
+// on calmer backgrounds; this keeps the same stroke and takes the glare off.
+static UIColor* nfbSoftConfirmWhite(void) {
+    return [UIColor colorWithWhite:0.92 alpha:1.0];
+}
+
 static BOOL nfbIsBackArrowGlyph(UIView* view) {
     UIView* container = nil;
     UIView* node = view.superview;
@@ -477,6 +524,14 @@ static BOOL nfbIsChatBarGlyph(UIView* view) {
                 // chain tinted, even a frame treated as a template is right.
                 nfbTintGlyphChain((UIView*)self, colour);
                 %orig(baked ?: image);
+                return;
+            }
+            if (nfbIsWhiteTintedBarGlyph((UIView*)self)) {
+                // Baked rather than re-tinted: AlwaysOriginal forbids the bar
+                // button from painting its own white back over ours.
+                UIImage* softened = NFBGreyGlyph(image, nfbSoftConfirmWhite());
+                NFBMark((UIView*)self, @"NavBarIcons/confirmGlyph → blanc adouci");
+                %orig(softened ?: image);
                 return;
             }
             // A bar button is given its image before it is placed in the bar, so
@@ -649,6 +704,23 @@ static BOOL nfbIsRightHandGlyphButton(UIView* button) {
 // True of a view inside the navigation bar that carries the inbox pill. The
 // walk is bounded and only reads class names — it is on an animation path, so
 // it must stay cheap and must never touch a view.
+// True of the inbox filter pill or anything inside it. Tighter than the bar
+// test below: the avatar in the same bar fades legitimately, and only this
+// control must be held. Class name only, no message to a Swift class.
+static BOOL nfbViewSitsInInboxPill(UIView* view) {
+    UIView* node = view;
+    NSInteger depth = 0;
+    while (node && depth < 6) {
+        if ([NSStringFromClass([node classForCoder])
+                isEqualToString:@"_TtC7DMInbox39InboxNavigationBarMenuBarButtonItemView"]) {
+            return YES;
+        }
+        node = node.superview;
+        depth++;
+    }
+    return NO;
+}
+
 static BOOL nfbViewSitsInInboxBar(UIView* view) {
     UIView* node = view;
     NSInteger depth = 0;
@@ -696,13 +768,27 @@ static BOOL nfbViewSitsInInboxBar(UIView* view) {
             }
         }
     }
-    if (!objc_getAssociatedObject(self, kNFBNoFadeKey)) {
-        %orig;
-        return;
-    }
     BOOL isFade = [key isEqualToString:@"opacity"];
     if (!isFade && [animation isKindOfClass:[CABasicAnimation class]]) {
         isFade = [((CABasicAnimation*)animation).keyPath isEqualToString:@"opacity"];
+    }
+
+    // Membership is tested here rather than trusted from a mark. The pill's
+    // content is rebuilt when the screen is returned to, so the views that fade
+    // are NEW ones, created after any pin has run — a mark can never win that
+    // race, which is why the previous attempt held and the flash stayed. Asking
+    // the view where it lives, at the moment it is asked to fade, cannot be
+    // outrun. Scoped to this one control: its neighbours still fade normally.
+    if (isFade) {
+        UIView* owner = (UIView*)self.delegate;
+        if ([owner isKindOfClass:[UIView class]] && nfbViewSitsInInboxPill(owner)) {
+            return;
+        }
+    }
+
+    if (!objc_getAssociatedObject(self, kNFBNoFadeKey)) {
+        %orig;
+        return;
     }
     if (isFade) {
         return;
@@ -811,6 +897,13 @@ static BOOL nfbViewSitsInInboxBar(UIView* view) {
     // Content is rebuilt on layout, so freshly created labels and glyphs are
     // caught here rather than only at the first appearance.
     nfbForceOpaque((UIView*)self);
+}
+
+// The moment a rebuilt label or chevron joins the control, before it has been
+// laid out or drawn.
+- (void)didAddSubview:(UIView*)subview {
+    %orig;
+    nfbForceOpaque(subview);
 }
 
 %end
