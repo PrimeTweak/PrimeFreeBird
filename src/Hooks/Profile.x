@@ -4,6 +4,7 @@
 //
 
 #import "HookHelpers.h"
+#import "Debug/NFBDebugger.h"
 
 // MARK: - Copy profile info
 
@@ -12,7 +13,6 @@ static char kCopyProviderKey;
 @interface ProfileCopyButtonProvider : NSObject
 @property (nonatomic, weak) T1ProfileHeaderViewController* headerViewController;
 @property (nonatomic, weak) id delegate;
-@property (nonatomic, strong) TFNButton* infoButton;
 @end
 
 @implementation ProfileCopyButtonProvider
@@ -53,75 +53,167 @@ static char kCopyProviderKey;
     ];
 }
 
-- (TFNButton*)buttonView {
-    if (!self.infoButton) {
-        // Style 2 in size class 2 is the bordered round icon style the other
-        // header buttons use.
-        TFNButton* button = [%c(TFNButton) buttonWithTitle:nil
-                                                    imageNamed:@"copy_stroke"
-                                                         style:2
-                                                     sizeClass:2];
-        button.accessibilityLabel =
-            [[BHTBundle sharedBundle] localizedStringForKey:@"COPY_PROFILE_INFO_TITLE"];
-        button.showsMenuAsPrimaryAction = YES;
-
-        // Deferred so each open rebuilds the actions with the loaded profile
-        // data and the current theme's icon color.
-        __weak ProfileCopyButtonProvider* weakSelf = self;
-        void (^actionsProvider)(void (^)(NSArray<UIMenuElement*>*)) =
-            ^(void (^completion)(NSArray<UIMenuElement*>*)) {
-                completion([weakSelf copyActions] ?: @[]);
-            };
-        UIDeferredMenuElement* deferredActions;
-        if (@available(iOS 15.0, *)) {
-            deferredActions = [UIDeferredMenuElement elementWithUncachedProvider:actionsProvider];
-        } else {
-            deferredActions = [UIDeferredMenuElement elementWithProvider:actionsProvider];
-        }
-        button.menu = [UIMenu menuWithTitle:@"" children:@[deferredActions]];
-
-        self.infoButton = button;
-    }
-    return self.infoButton;
-}
-
-- (NSArray*)buttonSpecs {
-    // Native positions run from 2 (follow) to 10 (mute), so 100 lands at the
-    // far end; priority 1 lets every native button win the width fight.
-    __weak ProfileCopyButtonProvider* weakSelf = self;
-    T1ProfileActionButtonSpec* spec = [[%c(T1ProfileActionButtonSpec) alloc] initWithPosition:100
-        priority:1
-        visibilityBlock:^BOOL(double availableWidth) {
-            return YES;
-        }
-        buttonCreationBlock:^UIView* {
-            return [weakSelf buttonView];
-        }];
-    return spec ? @[spec] : @[];
-}
-
 @end
 
-%hook T1ProfileHeaderViewController
+// MARK: - placing the button
+//
+// The mechanism this feature was built on is gone from Twitter 12.15: the
+// health check named T1ProfileActionButtonSpec, actionButtonProviders and their
+// initialiser as all missing, and the Swift replacement exposes no Objective-C
+// selector to hook. So the button is no longer OFFERED to a factory — it is
+// placed directly in the row Twitter already built.
+//
+// A device capture gave that row exactly:
+//
+//   T1ProfileHeaderView {{0,0},{440,311}}
+//     XDSButtonRow {{0,176},{440,54}}
+//       XDSButton {{343,12},{40,40}}      the bell
+//       XDSButton {{391,12},{40,40}}      the share
+//
+// Forty by forty, spaced forty-eight apart, each holding a 20×20 glyph. Ours
+// goes one slot further left, at 295 — where he circled it.
+//
+// Style is COPIED from a neighbour at layout time rather than guessed: corner
+// radius, border, background and glyph tint all come from the button beside it,
+// so a Twitter restyle carries over instead of leaving ours mismatched.
 
-- (NSArray*)actionButtonProviders {
-    NSArray* providers = %orig;
+static char kNFBCopyButtonKey;
+
+// The row that holds the bell and the share, not the overlay row that floats on
+// the banner. The overlay buttons carry an XDSBlur; these do not.
+static BOOL nfbRowIsOverlay(UIView* row) {
+    for (UIView* button in row.subviews) {
+        for (UIView* node in button.subviews) {
+            if ([NSStringFromClass([node classForCoder]) isEqualToString:@"XDSBlur"]) {
+                return YES;
+            }
+            for (UIView* deeper in node.subviews) {
+                if ([NSStringFromClass([deeper classForCoder]) isEqualToString:@"XDSBlur"]) {
+                    return YES;
+                }
+            }
+        }
+    }
+    return NO;
+}
+
+// The leftmost native button in the row — the anchor ours sits beside.
+static UIView* nfbLeftmostRowButton(UIView* row) {
+    UIView* leftmost = nil;
+    for (UIView* candidate in row.subviews) {
+        if (![NSStringFromClass([candidate classForCoder]) isEqualToString:@"XDSButton"]) {
+            continue;
+        }
+        if (!leftmost || CGRectGetMinX(candidate.frame) < CGRectGetMinX(leftmost.frame)) {
+            leftmost = candidate;
+        }
+    }
+    return leftmost;
+}
+
+// Reads the neighbour's own look so ours matches whatever Twitter is doing.
+static void nfbMatchNeighbourStyle(UIButton* ours, UIView* neighbour) {
+    ours.layer.cornerRadius = neighbour.layer.cornerRadius > 0
+        ? neighbour.layer.cornerRadius
+        : neighbour.bounds.size.height / 2.0;
+    ours.layer.cornerCurve = kCACornerCurveContinuous;
+    ours.layer.borderWidth = neighbour.layer.borderWidth;
+    ours.layer.borderColor = neighbour.layer.borderColor;
+    if (neighbour.backgroundColor) {
+        ours.backgroundColor = neighbour.backgroundColor;
+    }
+    // The neighbour's glyph carries the tint the row expects; a template image
+    // of ours then renders in the same colour.
+    for (UIView* node in neighbour.subviews) {
+        for (UIView* deeper in node.subviews) {
+            if ([deeper isKindOfClass:[UIImageView class]] && deeper.tintColor) {
+                ours.tintColor = deeper.tintColor;
+                return;
+            }
+        }
+        if ([node isKindOfClass:[UIImageView class]] && node.tintColor) {
+            ours.tintColor = node.tintColor;
+            return;
+        }
+    }
+}
+
+%hook XDSButtonRow
+
+- (void)layoutSubviews {
+    %orig;
 
     if (![BHTSettings boolForKey:@"copy_profile_info"]) {
-        return providers;
+        return;
+    }
+    UIView* row = (UIView*)self;
+    // Only the profile header's own row, and only the one under the banner.
+    UIView* header = row.superview;
+    if (![NSStringFromClass([header classForCoder])
+            isEqualToString:@"T1ProfileHeaderView"] || nfbRowIsOverlay(row)) {
+        return;
+    }
+    UIView* anchor = nfbLeftmostRowButton(row);
+    if (!anchor || CGRectIsEmpty(anchor.frame)) {
+        return;
     }
 
-    ProfileCopyButtonProvider* copyProvider = objc_getAssociatedObject(self, &kCopyProviderKey);
-    if (!copyProvider) {
-        copyProvider = [ProfileCopyButtonProvider new];
-        copyProvider.headerViewController = self;
-        objc_setAssociatedObject(self, &kCopyProviderKey, copyProvider,
+    UIButton* copyButton = objc_getAssociatedObject(row, &kNFBCopyButtonKey);
+    if (!copyButton) {
+        copyButton = [UIButton buttonWithType:UIButtonTypeSystem];
+        copyButton.accessibilityLabel =
+            [[BHTBundle sharedBundle] localizedStringForKey:@"COPY_PROFILE_INFO_TITLE"];
+        copyButton.showsMenuAsPrimaryAction = YES;
+
+        ProfileCopyButtonProvider* provider = [ProfileCopyButtonProvider new];
+        // The provider reads the profile through the header's view controller,
+        // reached from the responder chain rather than stored — the header is
+        // rebuilt more often than the row.
+        UIResponder* responder = row;
+        while (responder && ![responder isKindOfClass:[UIViewController class]]) {
+            responder = responder.nextResponder;
+        }
+        provider.headerViewController = (id)responder;
+        objc_setAssociatedObject(copyButton, &kCopyProviderKey, provider,
+                                 OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+
+        __weak ProfileCopyButtonProvider* weakProvider = provider;
+        void (^actionsProvider)(void (^)(NSArray<UIMenuElement*>*)) =
+            ^(void (^completion)(NSArray<UIMenuElement*>*)) {
+                completion([weakProvider copyActions] ?: @[]);
+            };
+        UIDeferredMenuElement* deferred;
+        if (@available(iOS 15.0, *)) {
+            deferred = [UIDeferredMenuElement elementWithUncachedProvider:actionsProvider];
+        } else {
+            deferred = [UIDeferredMenuElement elementWithProvider:actionsProvider];
+        }
+        copyButton.menu = [UIMenu menuWithTitle:@"" children:@[deferred]];
+
+        UIImage* glyph = [UIImage tfn_vectorImageNamed:@"copy_stroke"
+                                                  fitsSize:CGSizeMake(20, 20)
+                                                 fillColor:nil];
+        [copyButton setImage:[glyph imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate]
+                    forState:UIControlStateNormal];
+
+        objc_setAssociatedObject(row, &kNFBCopyButtonKey, copyButton,
                                  OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     }
-    return [providers arrayByAddingObject:copyProvider];
+
+    if (copyButton.superview != row) {
+        [row addSubview:copyButton];
+    }
+    // Positioned every pass: the row lays its own buttons out and ours has to
+    // follow them, not a remembered place.
+    CGRect slot = anchor.frame;
+    slot.origin.x = CGRectGetMinX(anchor.frame) - CGRectGetWidth(anchor.frame) - 8.0;
+    copyButton.frame = slot;
+    nfbMatchNeighbourStyle(copyButton, anchor);
+    NFBMark(copyButton, @"Profile/copyButton");
 }
 
 %end
+
 
 // MARK: - Hide premium offer
 

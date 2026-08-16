@@ -948,6 +948,16 @@ static UIView* nfbCurtainHost(UIView* pill) {
 // cover spans the whole cascade.
 static void nfbRaisePillCurtain(UIView* pill) {
     if (gNFBPillCurtain) {
+        NFBDebugLog(@"pill: départ <%p> (rideau déjà levé)", pill);
+        return;
+    }
+    // A pill that never had a size was never visible: its departure needs no
+    // cover, and a snapshot of it raises an EMPTY curtain that then blocks the
+    // real one for the whole cascade — the journal says covered, the screen
+    // shows the hole. The journal proved zero-sized instances depart: they
+    // arrive at {0,0} and can leave again before ever growing.
+    if (CGSizeEqualToSize(pill.bounds.size, CGSizeZero)) {
+        NFBDebugLog(@"pill: départ taille nulle ignoré <%p>", pill);
         return;
     }
     UIWindow* window = pill.window;
@@ -967,6 +977,10 @@ static void nfbRaisePillCurtain(UIView* pill) {
     NFBDebugLog(@"pill: rideau levé %@ dans %@",
                 NSStringFromCGRect(snapshot.frame),
                 NSStringFromClass([host classForCoder]));
+    // The re-host that follows ADDS the fresh platter subtree to this same
+    // host — above us. A buried curtain covers nothing; the settle path below
+    // re-fronts it on every arrival and layout, so it stays on top for as long
+    // as it hangs.
 
     // A hard ceiling: even a pathological cascade cannot hold the curtain past
     // two seconds. Well beyond the 966 ms measured, and the settle path below
@@ -985,7 +999,13 @@ static void nfbRaisePillCurtain(UIView* pill) {
 // beat; any removal in between bumps the token and cancels it, so only a pill
 // that STAYS lifts the curtain.
 static void nfbSettlePillCurtain(UIView* pill) {
-    if (!gNFBPillCurtain || !pill.window ||
+    if (!gNFBPillCurtain) {
+        return;
+    }
+    // Whatever the re-host stacked above the curtain, the curtain goes back on
+    // top — for as long as it hangs, it must actually be seen.
+    [gNFBPillCurtain.superview bringSubviewToFront:gNFBPillCurtain];
+    if (!pill.window ||
         CGSizeEqualToSize(pill.bounds.size, CGSizeZero)) {
         return;
     }
