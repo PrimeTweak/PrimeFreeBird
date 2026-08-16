@@ -870,6 +870,8 @@ static BOOL nfbViewSitsInBarPlatter(UIView* view) {
 // has no platter and no blink, so the mirror simply never engages there.
 
 static const char* kNFBPillMirrorKey = "nfbPillMirror";
+static const char* kNFBPillMirrorSlotKey = "nfbPillMirrorSlot";
+static NSInteger gNFBMirrorSettleToken;
 
 // The tweak's own Liquid Glass switch, read the same way the rest of the file
 // reads its settings.
@@ -971,26 +973,79 @@ static void nfbMirrorInboxPill(UIView* pill) {
         }
     }
 
-    // Copied, never invented: the mirror shows exactly what the real content
-    // shows, wherever the real content sits, in whatever state the filter is —
-    // "All", "Requests", any future label.
-    mirror.frame = [stack convertRect:stack.bounds toView:bar];
+    // Text and imagery are copied from the real content; geometry is NOT.
+    // The device capture settled why: the mirror only gets to sync during the
+    // re-host turbulence, exactly when the real label's frame reads {0,0} — a
+    // copied frame is a copied zero, and the mirror held "All" at size zero,
+    // invisible, for as long as the screen stayed still. So the sizes are
+    // DERIVED from the copied text and image, which are valid at any instant,
+    // and the copied frames are never consulted.
+    CGRect slot = [stack convertRect:stack.bounds toView:bar];
+    if (CGRectIsEmpty(slot)) {
+        return;  // a teardown-moment convert; the last good sync stands
+    }
+    mirror.frame = slot;
+
     mirrorLabel.attributedText = realLabel.attributedText;
-    mirrorLabel.font = realLabel.font;
-    mirrorLabel.textColor = realLabel.textColor;
-    mirrorLabel.frame = realLabel.frame;
-    if (realChevron) {
+    if (!mirrorLabel.attributedText.length && realLabel.text.length) {
+        mirrorLabel.text = realLabel.text;
+        mirrorLabel.font = realLabel.font;
+        mirrorLabel.textColor = realLabel.textColor;
+    }
+    [mirrorLabel sizeToFit];
+
+    CGFloat spacing = stack.spacing > 0 ? stack.spacing : 2.0;
+    CGSize chevronSize = CGSizeZero;
+    if (realChevron.image) {
         mirrorChevron.hidden = NO;
         mirrorChevron.image = realChevron.image;
         mirrorChevron.tintColor = realChevron.tintColor;
         mirrorChevron.contentMode = realChevron.contentMode;
-        mirrorChevron.frame = realChevron.frame;
+        chevronSize = CGRectIsEmpty(realChevron.frame)
+            ? realChevron.image.size
+            : realChevron.frame.size;
     } else {
         mirrorChevron.hidden = YES;
     }
 
+    CGSize labelSize = mirrorLabel.bounds.size;
+    CGFloat height = mirror.bounds.size.height;
+    mirrorLabel.frame = CGRectMake(0,
+                                   (height - labelSize.height) / 2.0,
+                                   labelSize.width, labelSize.height);
+    if (!mirrorChevron.hidden) {
+        mirrorChevron.frame = CGRectMake(labelSize.width + spacing,
+                                         (height - chevronSize.height) / 2.0,
+                                         chevronSize.width, chevronSize.height);
+    }
+
+    if (NFBDebugIsRecording() && CGSizeEqualToSize(labelSize, CGSizeZero)) {
+        NFBDebugLog(@"pill: miroir sans texte mesurable");
+    }
+
     // The blinking original steps aside; the mirror is what is seen.
     stack.hidden = YES;
+
+    // The last sync of a cascade can land mid-morph, when the convert carries
+    // the bar's 1.2× transform — the capture showed exactly that geometry held
+    // at rest. So a settling pass is scheduled whenever the slot CHANGED: it
+    // re-reads the live pill a beat later, and the chain stops by itself the
+    // first time two passes agree. Converges in two passes at most.
+    NSValue* lastSlot = objc_getAssociatedObject(mirror, kNFBPillMirrorSlotKey);
+    if (!lastSlot || !CGRectEqualToRect(lastSlot.CGRectValue, slot)) {
+        objc_setAssociatedObject(mirror, kNFBPillMirrorSlotKey,
+                                 [NSValue valueWithCGRect:slot],
+                                 OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        NSInteger token = ++gNFBMirrorSettleToken;
+        __weak UIView* weakPill = pill;
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.3 * NSEC_PER_SEC)),
+                       dispatch_get_main_queue(), ^{
+            UIView* livePill = weakPill;
+            if (gNFBMirrorSettleToken == token && livePill && livePill.window) {
+                nfbMirrorInboxPill(livePill);
+            }
+        });
+    }
 }
 
 %hook _TtC7DMInbox39InboxNavigationBarMenuBarButtonItemView
