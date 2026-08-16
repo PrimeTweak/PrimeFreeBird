@@ -55,6 +55,7 @@ const NFBHookRecord NFBHookRecords[] = {
     {"T1ProfileDisplayContentProvider", "setInitialTabIndex", "Hooks/Profile.x"},
     {"T1ProfileFriendsFollowingViewModel", "_t1_followCountTextWithLabel", "Hooks/Profile.x"},
     {"T1ProfileHeaderViewController", "actionButtonProviders", "Hooks/Profile.x"},
+    {"T1ProfileHeaderViewController", "viewDidLayoutSubviews", "Hooks/Profile.x"},
     {"T1ProfileSummaryView", "shouldShowGetVerifiedButton", "Hooks/FeatureSwitches.x"},
     {"T1ProfileSummaryView", "shouldShowUnderReviewButton", "Hooks/FeatureSwitches.x"},
     {"T1ProfileUserInfoView", "isBioExpanded", "Hooks/Profile.x"},
