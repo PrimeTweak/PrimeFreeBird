@@ -9,6 +9,11 @@ NFB_NAME := $(shell sed -n 's/^Name: //p' control)
 NFB_VERSION := $(shell sed -n 's/^Version: //p' control)
 NFB_COMMIT := $(shell git rev-parse --short HEAD)
 
+# Regenerate the hook manifest from the current source on every build, before
+# the file list below is evaluated, so the debugger's health check always
+# matches the code that shipped. Hand-editing it would defeat its purpose.
+NFB_MANIFEST := $(shell python3 tools/gen-hook-manifest.py 2>/dev/null && echo done)
+
 PrimeFreeBird_FILES = $(shell find src \( -name '*.x' -o -name '*.m' \) | sort)
 PrimeFreeBird_FRAMEWORKS = UIKit Foundation AVFoundation AVKit CoreMotion GameController VideoToolbox Accelerate CoreMedia CoreVideo CoreImage CoreGraphics ImageIO Photos CoreServices SystemConfiguration SafariServices Security QuartzCore WebKit SceneKit
 PrimeFreeBird_PRIVATE_FRAMEWORKS = Preferences
