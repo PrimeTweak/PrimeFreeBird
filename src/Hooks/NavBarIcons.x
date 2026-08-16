@@ -551,18 +551,20 @@ static BOOL nfbIsWhiteBarGlyphCandidate(UIView* view) {
         current.renderingMode == UIImageRenderingModeAlwaysOriginal) {
         return;
     }
+    // No screen-name test: three builds proved every guessed name wrong on
+    // this app's controller shells. The structural fence is enough — the only
+    // false positives ever measured, the conversation call icons, arrive here
+    // already baked AlwaysOriginal by the chat-bar path and were refused two
+    // lines above. Pure-white tint on a modern bar button that is not the back
+    // arrow and not already baked names exactly one glyph.
     NSString* screen = nfbOwningScreenName((UIView*)self);
-    if (![screen containsString:@"Settings"]) {
-        NFBDebugLog(@"glyphe blanc hors reglages (ecran=%@): laisse natif",
-                    screen.length ? screen : @"?");
-        return;
-    }
     // Baked rather than re-tinted: AlwaysOriginal forbids the bar button from
     // painting its own white back over ours — and sends the setter straight
     // through the passthrough above.
     UIImage* softened = NFBGreyGlyph(current, nfbSoftConfirmWhite());
     if (softened) {
-        NFBDebugLog(@"glyphe: confirm reglages -> blanc adouci");
+        NFBDebugLog(@"glyphe: confirm (ecran=%@) -> blanc adouci",
+                    screen.length ? screen : @"?");
         NFBMark((UIView*)self, @"NavBarIcons/confirmGlyph → blanc adouci");
         self.image = softened;
     }
@@ -989,9 +991,51 @@ static BOOL nfbLiquidGlassEnabled(void) {
     return [BHTSettings boolForKey:@"enable_liquid_glass"];
 }
 
-// The bar the mirror currently hangs on, so the container hook below can take
+// The bar the mirror currently hangs on, so the container watch below can take
 // the mirror down without walking anything. Weak: the bar owns itself.
 static __weak UIView* gNFBInboxMirrorBar;
+
+// The Messages container class lives in a LAZILY loaded framework — the health
+// report itself lists DMInbox among the late loaders, red at launch and green
+// once the screen opens. A load-time %hook therefore never lands on it, which
+// is exactly how the ghost came back. So the watch is installed the way Chat.x
+// already installs its replacement: by IMP, at the moment the first mirror is
+// posed — the screen is on the glass, the class is necessarily loaded.
+static void (*gNFBOrigContainerWillMove)(id, SEL, UIWindow*);
+
+// Defined below; declared here so the watch can call it without moving either
+// block.
+static void nfbDropInboxMirror(UIView* bar);
+
+static void nfbContainerWillMoveToWindow(id self, SEL _cmd, UIWindow* newWindow) {
+    if (!newWindow && gNFBInboxMirrorBar) {
+        nfbDropInboxMirror(gNFBInboxMirrorBar);
+    }
+    if (gNFBOrigContainerWillMove) {
+        gNFBOrigContainerWillMove(self, _cmd, newWindow);
+    }
+}
+
+static void nfbInstallContainerWatch(void) {
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+        Class container = objc_getClass("_TtC7DMInbox18InboxContainerView");
+        if (!container) {
+            NFBDebugLog(@"pill: conteneur introuvable — veille non posée");
+            return;
+        }
+        Method method = class_getInstanceMethod(container,
+                                                @selector(willMoveToWindow:));
+        if (!method) {
+            NFBDebugLog(@"pill: willMoveToWindow absent — veille non posée");
+            return;
+        }
+        gNFBOrigContainerWillMove =
+            (void (*)(id, SEL, UIWindow*))method_getImplementation(method);
+        method_setImplementation(method, (IMP)nfbContainerWillMoveToWindow);
+        NFBDebugLog(@"pill: veille du conteneur posée");
+    });
+}
 
 static void nfbDropInboxMirror(UIView* bar) {
     UIView* mirror = objc_getAssociatedObject(bar, kNFBPillMirrorKey);
@@ -1103,6 +1147,7 @@ static void nfbMirrorInboxPill(UIView* pill) {
         objc_setAssociatedObject(bar, kNFBPillMirrorKey, mirror,
                                  OBJC_ASSOCIATION_RETAIN_NONATOMIC);
         gNFBInboxMirrorBar = bar;
+        nfbInstallContainerWatch();
         NFBMark(mirror, @"NavBarIcons/inboxPill → miroir");
         NFBDebugLog(@"pill: miroir posé dans %@",
                     NSStringFromClass([bar classForCoder]));
@@ -1204,22 +1249,6 @@ static void nfbMirrorInboxPill(UIView* pill) {
         nfbScheduleMirrorResync(pill);
     }
 }
-
-// The Messages screen's own container view — _TtC7DMInbox18InboxContainerView,
-// binary-confirmed. Every journal shows it leaving the window exactly when the
-// screen actually leaves (push, pop, tab), and never during a pill re-host.
-// That is the mirror's lifetime, structural and name-free: the screen goes,
-// the mirror goes, before the ghost's first frame.
-%hook _TtC7DMInbox18InboxContainerView
-
-- (void)willMoveToWindow:(UIWindow*)newWindow {
-    %orig;
-    if (!newWindow && gNFBInboxMirrorBar) {
-        nfbDropInboxMirror(gNFBInboxMirrorBar);
-    }
-}
-
-%end
 
 %hook _TtC7DMInbox39InboxNavigationBarMenuBarButtonItemView
 
