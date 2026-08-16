@@ -421,6 +421,24 @@ static BOOL nfbSubtreeHasBackMask(UIView* view, NSInteger depth) {
 // A bar glyph is tinted white only when it sits on a coloured disc, so white is
 // the discriminator. The back arrow is excluded outright, its tint being dark
 // in any case.
+// The name of the screen the navigation controller currently shows. A bar
+// button's responder chain never reaches the content screen — it climbs into
+// the navigation controller, and the screen is read from there. This is the
+// corrected mechanism behind every screen-scoped decision in this file.
+static NSString* nfbTopViewControllerName(UIView* view) {
+    UIResponder* responder = view;
+    NSInteger depth = 0;
+    while ((responder = responder.nextResponder) && depth < 14) {
+        if ([responder isKindOfClass:[UINavigationController class]]) {
+            UIViewController* top =
+                ((UINavigationController*)responder).topViewController;
+            return NSStringFromClass([top class]);
+        }
+        depth++;
+    }
+    return @"";
+}
+
 static BOOL nfbIsBackArrowGlyph(UIView* view) {
     UIView* container = nil;
     UIView* node = view.superview;
@@ -462,6 +480,50 @@ static BOOL nfbIsChatBarGlyph(UIView* view) {
     return inHolder && nfbIsChatConversationBar(view);
 }
 
+// The confirm check of the settings sheets is the only bar glyph in the app
+// with a pure-white tint (established by capture), and pure white at maximum
+// luminance blooms on the saturated accent disc — measured at 5-6 px of
+// stroke, it reads as 7-8. Stepping the white down to 0.92 sits just under
+// the bloom threshold: same stroke, same geometry, the glare gone. The claim
+// is fenced twice, because a white tint alone once repainted the conversation
+// call icons: the glyph must ALSO sit on a settings screen, read from the
+// navigation controller's top view controller — a DM conversation reads
+// ConversationContainer and can never qualify.
+static UIColor* nfbSoftConfirmWhite(void) {
+    return [UIColor colorWithWhite:0.92 alpha:1.0];
+}
+
+static BOOL nfbIsSettingsConfirmGlyph(UIView* view) {
+    UIView* node = view.superview;
+    NSInteger depth = 0;
+    BOOL inModernBarButton = NO;
+    while (node && depth < 3) {
+        if ([NSStringFromClass([node classForCoder])
+                isEqualToString:@"_UIModernBarButton"]) {
+            inModernBarButton = YES;
+            break;
+        }
+        node = node.superview;
+        depth++;
+    }
+    if (!inModernBarButton || nfbIsBackArrowGlyph(view)) {
+        return NO;
+    }
+    UIColor* tint = view.tintColor;
+    CGFloat r = 0, g = 0, b = 0, a = 0;
+    if (!tint || ![tint getRed:&r green:&g blue:&b alpha:&a]) {
+        return NO;
+    }
+    if (!(a > 0.9 && r > 0.9 && g > 0.9 && b > 0.9)) {
+        return NO;
+    }
+    if (![nfbTopViewControllerName(view) containsString:@"Settings"]) {
+        NFBDebugLog(@"glyphe blanc hors reglages: laisse natif");
+        return NO;
+    }
+    return YES;
+}
+
 %hook UIImageView
 
 - (void)setImage:(UIImage*)image {
@@ -479,6 +541,15 @@ static BOOL nfbIsChatBarGlyph(UIView* view) {
         // simply names no mode at all. Anything that is not already original is
         // therefore claimed.
         if (image.renderingMode != UIImageRenderingModeAlwaysOriginal) {
+            if (nfbIsSettingsConfirmGlyph((UIView*)self)) {
+                // Baked rather than re-tinted: AlwaysOriginal forbids the bar
+                // button from painting its own white back over ours.
+                UIImage* softened = NFBGreyGlyph(image, nfbSoftConfirmWhite());
+                NFBDebugLog(@"glyphe: confirm reglages -> blanc adouci");
+                NFBMark((UIView*)self, @"NavBarIcons/confirmGlyph → blanc adouci");
+                %orig(softened ?: image);
+                return;
+            }
             if (nfbIsChatBarGlyph((UIView*)self) ||
                 nfbIsBackArrowGlyph((UIView*)self)) {
                 // Baked at the setter, the way the confirm glyph of the theme
@@ -879,6 +950,31 @@ static BOOL nfbLiquidGlassEnabled(void) {
     return [BHTSettings boolForKey:@"enable_liquid_glass"];
 }
 
+// The bar is REUSED across the push into a conversation — the video caught the
+// mirror's "All" floating over the conversation's video-call icon at z=100.
+// So the bar's lifetime is the wrong lifetime: the mirror lives while the
+// navigation controller still shows the INBOX, and not a moment longer. On a
+// push the top view controller is already the destination when the departure
+// cascade runs, so the ghost never draws a single frame.
+static BOOL nfbBarShowsInbox(UIView* view) {
+    NSString* top = nfbTopViewControllerName(view);
+    if (!top.length) {
+        return YES;  // shape unknown: never tear the cover down on a guess
+    }
+    return [top containsString:@"Inbox"];
+}
+
+static void nfbDropInboxMirror(UIView* bar) {
+    UIView* mirror = objc_getAssociatedObject(bar, kNFBPillMirrorKey);
+    if (!mirror) {
+        return;
+    }
+    [mirror removeFromSuperview];
+    objc_setAssociatedObject(bar, kNFBPillMirrorKey, nil,
+                             OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    NFBDebugLog(@"pill: miroir retire (ecran quitte)");
+}
+
 static UIView* nfbPillBar(UIView* pill) {
     UIView* node = pill.superview;
     NSInteger depth = 0;
@@ -892,12 +988,30 @@ static UIView* nfbPillBar(UIView* pill) {
     return nil;
 }
 
+static void nfbMirrorInboxPill(UIView* pill);
+
+static void nfbScheduleMirrorResync(UIView* pill) {
+    NSInteger token = ++gNFBMirrorSettleToken;
+    __weak UIView* weakPill = pill;
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.3 * NSEC_PER_SEC)),
+                   dispatch_get_main_queue(), ^{
+        UIView* livePill = weakPill;
+        if (gNFBMirrorSettleToken == token && livePill && livePill.window) {
+            nfbMirrorInboxPill(livePill);
+        }
+    });
+}
+
 static void nfbMirrorInboxPill(UIView* pill) {
     if (CGSizeEqualToSize(pill.bounds.size, CGSizeZero) || !pill.window) {
         return;
     }
     UIView* bar = nfbPillBar(pill);
     if (!bar) {
+        return;
+    }
+    if (!nfbBarShowsInbox(pill)) {
+        nfbDropInboxMirror(bar);
         return;
     }
 
@@ -984,7 +1098,22 @@ static void nfbMirrorInboxPill(UIView* pill) {
     if (CGRectIsEmpty(slot)) {
         return;  // a teardown-moment convert; the last good sync stands
     }
-    mirror.frame = slot;
+    // A mid-morph convert carries the bar's scale — measured at 1.2x in the
+    // capture, and seen on screen as the "All" that drifts. Geometry is taken
+    // only from a convert that is one-to-one with the stack; otherwise the last
+    // settled geometry stands and only the content refreshes. With no settled
+    // geometry yet, the native content stays on: nothing of ours is shown from
+    // a slot that cannot be trusted.
+    BOOL settled =
+        fabs(slot.size.width  - stack.bounds.size.width)  <= stack.bounds.size.width  * 0.05 &&
+        fabs(slot.size.height - stack.bounds.size.height) <= stack.bounds.size.height * 0.05;
+    NSValue* heldSlot = objc_getAssociatedObject(mirror, kNFBPillMirrorSlotKey);
+    if (settled) {
+        mirror.frame = slot;
+    } else if (!heldSlot) {
+        nfbScheduleMirrorResync(pill);
+        return;
+    }
 
     mirrorLabel.attributedText = realLabel.attributedText;
     if (!mirrorLabel.attributedText.length && realLabel.text.length) {
@@ -1031,20 +1160,16 @@ static void nfbMirrorInboxPill(UIView* pill) {
     // at rest. So a settling pass is scheduled whenever the slot CHANGED: it
     // re-reads the live pill a beat later, and the chain stops by itself the
     // first time two passes agree. Converges in two passes at most.
-    NSValue* lastSlot = objc_getAssociatedObject(mirror, kNFBPillMirrorSlotKey);
-    if (!lastSlot || !CGRectEqualToRect(lastSlot.CGRectValue, slot)) {
-        objc_setAssociatedObject(mirror, kNFBPillMirrorSlotKey,
-                                 [NSValue valueWithCGRect:slot],
-                                 OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-        NSInteger token = ++gNFBMirrorSettleToken;
-        __weak UIView* weakPill = pill;
-        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.3 * NSEC_PER_SEC)),
-                       dispatch_get_main_queue(), ^{
-            UIView* livePill = weakPill;
-            if (gNFBMirrorSettleToken == token && livePill && livePill.window) {
-                nfbMirrorInboxPill(livePill);
-            }
-        });
+    if (settled) {
+        if (!heldSlot || !CGRectEqualToRect(heldSlot.CGRectValue, slot)) {
+            objc_setAssociatedObject(mirror, kNFBPillMirrorSlotKey,
+                                     [NSValue valueWithCGRect:slot],
+                                     OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+            nfbScheduleMirrorResync(pill);
+        }
+    } else {
+        // Turbulence: one more pass a beat later converges on the rest state.
+        nfbScheduleMirrorResync(pill);
     }
 }
 
@@ -1053,6 +1178,15 @@ static void nfbMirrorInboxPill(UIView* pill) {
 // Before the control is ever drawn, so the fade is refused rather than caught
 // halfway through.
 - (void)willMoveToWindow:(UIWindow*)newWindow {
+    // Leaving while the navigation controller already shows another screen:
+    // that is a push or a pop, not a re-host — the mirror goes with the screen,
+    // before the ghost's first frame.
+    if (!newWindow && !nfbBarShowsInbox((UIView*)self)) {
+        UIView* bar = nfbPillBar((UIView*)self);
+        if (bar) {
+            nfbDropInboxMirror(bar);
+        }
+    }
     %orig;
     if (newWindow) {
         nfbForceOpaque((UIView*)self);
