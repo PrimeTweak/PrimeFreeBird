@@ -908,54 +908,76 @@ static void nfbDropPillBridge(void) {
     gNFBPillBridge = nil;
 }
 
-// The ancestor that survives the re-host but dies with the bar. The navigation
-// bar itself when one is reachable; otherwise the bar-scoped containers seen in
-// the captures. The window is deliberately never used.
-static UIView* nfbPillBridgeHost(UIView* pill) {
-    UIView* node = pill.superview;
-    UIView* barScoped = nil;
-    NSInteger depth = 0;
-    while (node && depth < 16) {
-        if ([node isKindOfClass:[UINavigationBar class]]) {
-            return node;
-        }
-        NSString* name = NSStringFromClass([node classForCoder]);
-        if ([name hasPrefix:@"UIKit.NavigationBar"]) {
-            barScoped = node;
-        }
-        node = node.superview;
-        depth++;
-    }
-    return barScoped;
-}
-
 static void nfbBridgeInboxPill(UIView* pill) {
-    if (!pill.window) {
-        return;
-    }
-    UIView* host = nfbPillBridgeHost(pill);
-    if (!host) {
+    UIWindow* window = pill.window;
+    if (!window) {
         return;
     }
     UIView* snapshot = [pill snapshotViewAfterScreenUpdates:NO];
     if (!snapshot) {
+        NFBDebugLog(@"pill: instantané indisponible");
         return;
     }
     snapshot.userInteractionEnabled = NO;
-    snapshot.frame = [pill convertRect:pill.bounds toView:host];
+    CGRect inWindow = [pill convertRect:pill.bounds toView:window];
+    snapshot.frame = inWindow;
     nfbDropPillBridge();
     gNFBPillBridge = snapshot;
-    [host addSubview:snapshot];
-    NFBDebugLog(@"pill: pont posé %@ dans %@",
-                NSStringFromCGRect(snapshot.frame),
-                NSStringFromClass([host classForCoder]));
 
-    // Expiry for the day no replacement comes — half a second is well past the
-    // measured six frames, and short enough that a wrong guess never lingers.
+    // Into the WINDOW first, in the same runloop turn as the removal, so not a
+    // single frame renders without cover. A bar-scoped host would be cleaner —
+    // but if the re-host replaces the whole platter subtree, any host inside it
+    // dies in the same transaction and takes the snapshot with it, which leaves
+    // the gap exactly as measured. The window cannot be torn down under us.
+    [window addSubview:snapshot];
+    NFBDebugLog(@"pill: pont posé (fenêtre) %@", NSStringFromCGRect(inWindow));
+
+    // The ghost problem the window creates is solved one tick later, when the
+    // outcome is knowable: the ancestors recorded here are walked, and the
+    // deepest one still in a window adopts the snapshot — it now dies with the
+    // bar, as it should. No survivor means the whole bar left: a navigation
+    // away, not a re-host, and the cover comes straight down. One tick is
+    // before the next frame, so nothing of this is ever visible.
+    NSMutableArray<UIView*>* ancestors = [NSMutableArray array];
+    UIView* node = pill.superview;
+    NSInteger depth = 0;
+    while (node && depth < 16) {
+        [ancestors addObject:node];
+        node = node.superview;
+        depth++;
+    }
+
     UIView* expected = snapshot;
-    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.5 * NSEC_PER_SEC)),
+    dispatch_async(dispatch_get_main_queue(), ^{
+        if (gNFBPillBridge != expected) {
+            return;
+        }
+        UIView* survivor = nil;
+        for (UIView* ancestor in ancestors) {
+            if (ancestor.window) {
+                survivor = ancestor;
+                break;
+            }
+        }
+        if (!survivor) {
+            NFBDebugLog(@"pill: pont retiré (départ d'écran, aucun survivant)");
+            nfbDropPillBridge();
+            return;
+        }
+        expected.frame = [window convertRect:inWindow toView:survivor];
+        [survivor addSubview:expected];
+        NFBDebugLog(@"pill: pont reparenté dans %@",
+                    NSStringFromClass([survivor classForCoder]));
+    });
+
+    // Expiry for the day no replacement ever comes. A full second: the journal
+    // showed replacements taking ~600 ms to grow out of their zero frame, and
+    // the real relief is the sized layout above — this is only the net under
+    // it. Reparented into the bar, an expired cover cannot outlive the screen.
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1.0 * NSEC_PER_SEC)),
                    dispatch_get_main_queue(), ^{
         if (gNFBPillBridge == expected) {
+            NFBDebugLog(@"pill: pont expiré sans relève");
             nfbDropPillBridge();
         }
     });
@@ -983,10 +1005,19 @@ static void nfbBridgeInboxPill(UIView* pill) {
 
 - (void)didMoveToWindow {
     %orig;
-    if (((UIView*)self).window) {
-        nfbForceOpaque((UIView*)self);
-        // The replacement is on screen: the bridge has done its hundred
-        // milliseconds and comes down.
+    if (!((UIView*)self).window) {
+        return;
+    }
+    nfbForceOpaque((UIView*)self);
+    // The journal settled a subtlety here: replacements ARRIVE with a zero
+    // frame — posé {{356.93, 60}, {0, 0}} — and only grow later. Presence in
+    // the window is not visibility, so dropping the cover on arrival opened
+    // the very gap it was built to close. It only comes down for an instance
+    // that actually has a size; layoutSubviews below handles the ones that
+    // arrive empty and grow afterwards.
+    if (gNFBPillBridge &&
+        !CGSizeEqualToSize(((UIView*)self).bounds.size, CGSizeZero)) {
+        NFBDebugLog(@"pill: pont relevé (arrivée) par <%p>", self);
         nfbDropPillBridge();
     }
 }
@@ -999,6 +1030,13 @@ static void nfbBridgeInboxPill(UIView* pill) {
     // Content is rebuilt on layout, so freshly created labels and glyphs are
     // caught here rather than only at the first appearance.
     nfbForceOpaque((UIView*)self);
+    // A replacement that arrived zero-sized becomes visible at its first real
+    // layout — the exact moment the cover stops being needed.
+    if (gNFBPillBridge && ((UIView*)self).window &&
+        !CGSizeEqualToSize(((UIView*)self).bounds.size, CGSizeZero)) {
+        NFBDebugLog(@"pill: pont relevé (layout) par <%p>", self);
+        nfbDropPillBridge();
+    }
 }
 
 // The moment a rebuilt label or chevron joins the control, before it has been
