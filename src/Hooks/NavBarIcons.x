@@ -419,6 +419,26 @@ static BOOL nfbIsBackArrowGlyph(UIView* view);
 // A bar glyph is tinted white only when it sits on a coloured disc, so white is
 // the discriminator. The back arrow is excluded outright, its tint being dark
 // in any case.
+// The screen the softened confirm belongs to. MEASURED regression behind this
+// allowlist: in a DM conversation, the call and video icons showed the theme
+// accent for ~600 ms, then snapped to a washed grey — RGB(231,231,231), which
+// is exactly the 0.92 white this path bakes. Under Liquid Glass the platter
+// hands ANY trailing glyph a pure-white tint while the real colour rides the
+// vibrancy filters, so "white tint" alone names half the app. The claim is
+// therefore fenced to the one screen it was built for, by its controller.
+static BOOL nfbSitsInExploreSettings(UIView* view) {
+    UIResponder* responder = view;
+    NSInteger depth = 0;
+    while ((responder = responder.nextResponder) && depth < 12) {
+        if ([NSStringFromClass([responder class])
+                containsString:@"ExploreSettings"]) {
+            return YES;
+        }
+        depth++;
+    }
+    return NO;
+}
+
 static BOOL nfbIsWhiteTintedBarGlyph(UIView* view) {
     UIView* node = view.superview;
     NSInteger depth = 0;
@@ -440,7 +460,14 @@ static BOOL nfbIsWhiteTintedBarGlyph(UIView* view) {
     if (!tint || ![tint getRed:&r green:&g blue:&b alpha:&a]) {
         return NO;
     }
-    return a > 0.9 && r > 0.9 && g > 0.9 && b > 0.9;
+    if (!(a > 0.9 && r > 0.9 && g > 0.9 && b > 0.9)) {
+        return NO;
+    }
+    if (!nfbSitsInExploreSettings(view)) {
+        NFBDebugLog(@"glyphe blanc hors Explore settings: laissé natif");
+        return NO;
+    }
+    return YES;
 }
 
 // White, but stepped back from the full 255 the tint applies. On the accent
@@ -528,6 +555,7 @@ static BOOL nfbIsChatBarGlyph(UIView* view) {
                 return;
             }
             if (nfbIsWhiteTintedBarGlyph((UIView*)self)) {
+                NFBDebugLog(@"glyphe: confirm Explore → blanc adouci");
                 // Baked rather than re-tinted: AlwaysOriginal forbids the bar
                 // button from painting its own white back over ours.
                 UIImage* softened = NFBGreyGlyph(image, nfbSoftConfirmWhite());
@@ -946,11 +974,109 @@ static void nfbGlassifyInboxPill(UIView* pill) {
     glass.layer.cornerRadius = pill.bounds.size.height / 2.0;
 }
 
+// MARK: the content bridge
+//
+// With the pill glassed, the video settled what remains of the flash: the
+// capsule now PERSISTS through every re-host — measured without a single
+// missing frame — and only the CONTENT, the "All" label and its chevron, blinks
+// for ~140 ms while the replacement instance grows out of its zero frame.
+//
+// So the bridge covers the content alone, and it lives in the one place the
+// measurement proves survives: the platter capsule. Every earlier cover failed
+// on one of three points, each since settled by data — the host died with the
+// subtree (the capsule does not), the cover was raised from a zero-sized pill
+// (refused here), or it was lifted before the replacement could be seen
+// (lifted only by a SIZED layout, the v8 rule).
+
+static UIView* gNFBPillContentBridge;
+static NSInteger gNFBContentBridgeToken;
+
+static void nfbDropPillContentBridge(void) {
+    [gNFBPillContentBridge removeFromSuperview];
+    gNFBPillContentBridge = nil;
+    gNFBContentBridgeToken++;
+}
+
+// The capsule the video shows persisting: the glass interaction view when it is
+// reachable, otherwise the platter container. Both die with the bar, so a
+// bridge left hanging cannot outlive the screen.
+static UIView* nfbPillCapsuleHost(UIView* pill) {
+    UIView* node = pill.superview;
+    UIView* platter = nil;
+    NSInteger depth = 0;
+    while (node && depth < 12) {
+        NSString* name = NSStringFromClass([node classForCoder]);
+        if ([name hasPrefix:@"UIPlatformGlass"]) {
+            return node;
+        }
+        if (!platter && [name hasPrefix:@"UIKit.NavigationBarPlatterContainer"]) {
+            platter = node;
+        }
+        node = node.superview;
+        depth++;
+    }
+    return platter;
+}
+
+static void nfbBridgePillContent(UIView* pill) {
+    if (gNFBPillContentBridge) {
+        return;
+    }
+    // Never from a pill that was never visible (the zero-size rule).
+    if (!pill.window || CGSizeEqualToSize(pill.bounds.size, CGSizeZero)) {
+        return;
+    }
+    // The content alone: the stack that carries the label and the chevron. The
+    // pill view itself also holds our glass, and a snapshot of that over the
+    // capsule would double the material for the covered beat.
+    UIView* content = nil;
+    for (UIView* sub in pill.subviews) {
+        if ([sub isKindOfClass:[UIStackView class]]) {
+            content = sub;
+            break;
+        }
+    }
+    if (!content || CGSizeEqualToSize(content.bounds.size, CGSizeZero)) {
+        return;
+    }
+    UIView* host = nfbPillCapsuleHost(pill);
+    if (!host) {
+        return;
+    }
+    UIView* snapshot = [content snapshotViewAfterScreenUpdates:NO];
+    if (!snapshot) {
+        return;
+    }
+    snapshot.userInteractionEnabled = NO;
+    snapshot.frame = [content convertRect:content.bounds toView:host];
+    [host addSubview:snapshot];
+    gNFBPillContentBridge = snapshot;
+    NFBDebugLog(@"pill: contenu doublé %@ dans %@",
+                NSStringFromCGRect(snapshot.frame),
+                NSStringFromClass([host classForCoder]));
+
+    // The ceiling: the measured blink is ~140 ms, the growth of a replacement
+    // ~600 ms; a second and a half outlasts both without ever lingering.
+    NSInteger token = ++gNFBContentBridgeToken;
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1.5 * NSEC_PER_SEC)),
+                   dispatch_get_main_queue(), ^{
+        if (gNFBPillContentBridge == snapshot && gNFBContentBridgeToken == token) {
+            NFBDebugLog(@"pill: doublure plafond 1.5 s");
+            nfbDropPillContentBridge();
+        }
+    });
+}
+
 %hook _TtC7DMInbox39InboxNavigationBarMenuBarButtonItemView
 
 // Before the control is ever drawn, so the fade is refused rather than caught
 // halfway through.
 - (void)willMoveToWindow:(UIWindow*)newWindow {
+    // Leaving: the content is doubled into the capsule before %orig, while it
+    // still knows its place. A zero-sized instance is refused by the bridge.
+    if (!newWindow) {
+        nfbBridgePillContent((UIView*)self);
+    }
     %orig;
     if (newWindow) {
         nfbForceOpaque((UIView*)self);
@@ -973,6 +1099,13 @@ static void nfbGlassifyInboxPill(UIView* pill) {
     // Replacements arrive zero-sized and grow; the glass is fitted here, at the
     // first layout that has a real size, and refitted on every one after.
     nfbGlassifyInboxPill((UIView*)self);
+    // The same sized layout is what lifts the content double: the replacement
+    // is now actually visible, so the beat it covered is over.
+    if (gNFBPillContentBridge &&
+        !CGSizeEqualToSize(((UIView*)self).bounds.size, CGSizeZero)) {
+        NFBDebugLog(@"pill: doublure relevée <%p>", self);
+        nfbDropPillContentBridge();
+    }
 }
 
 // The moment a rebuilt label or chevron joins the control, before it has been
