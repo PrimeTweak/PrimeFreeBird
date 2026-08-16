@@ -50,29 +50,64 @@ def parse():
     # class -> set of hooked methods (a class hooked with no method still counts)
     hooks = {}
     byname = set()
+    # Classes the tweak DEFINES itself (via @interface … : Super). These are
+    # loaded with the tweak, never part of Twitter, so a hook or a %c() on one
+    # is not an external dependency and must not be health-checked against the
+    # app's own classes. FLEX and Cephei classes are excluded the same way,
+    # by prefix, since they too are injected rather than Twitter's.
+    own_classes = set()
+    own_prefixes = ("FLEX", "HBForce", "Cephei", "PS")
+    interface_re = re.compile(r'^@interface\s+([A-Za-z_][A-Za-z0-9_]*)')
+
+    for path in source_files():
+        rel = os.path.relpath(path, SRC)
+        with open(path, encoding="utf-8") as handle:
+            lines = handle.readlines()
+        for line in lines:
+            match = interface_re.match(line)
+            if match:
+                own_classes.add(match.group(1))
+
     for path in source_files():
         rel = os.path.relpath(path, SRC)
         with open(path, encoding="utf-8") as handle:
             lines = handle.readlines()
         current = None
+        pending_new = False  # the next method line is a %new, created by us
         for line in lines:
             stripped = line.split("//", 1)[0]  # ignore line comments
             hook = HOOK_RE.match(stripped)
             if hook:
                 current = hook.group(1)
                 hooks.setdefault(current, {"methods": set(), "file": rel})
+                pending_new = False
                 continue
             if END_RE.match(stripped):
                 current = None
+                pending_new = False
+                continue
+            # A %new anywhere on the line means the method that follows is added
+            # by the tweak, not a Twitter dependency — never a missing hook.
+            if "%new" in stripped:
+                pending_new = True
                 continue
             if current:
                 method = METHOD_RE.match(stripped)
                 if method:
-                    hooks[current]["methods"].add(method.group(1))
+                    if pending_new:
+                        pending_new = False  # consumed by this method
+                    else:
+                        hooks[current]["methods"].add(method.group(1))
             for match in BYNAME_RE.finditer(stripped):
                 name = match.group(1) or match.group(2) or match.group(3)
                 if name:
                     byname.add(name)
+
+    def is_own(name):
+        return name in own_classes or name.startswith(own_prefixes)
+
+    hooks = {cls: info for cls, info in hooks.items() if not is_own(cls)}
+    byname = {name for name in byname if not is_own(name)}
     return hooks, byname
 
 
