@@ -425,14 +425,20 @@ static BOOL nfbSubtreeHasBackMask(UIView* view, NSInteger depth) {
 // button's responder chain never reaches the content screen — it climbs into
 // the navigation controller, and the screen is read from there. This is the
 // corrected mechanism behind every screen-scoped decision in this file.
-static NSString* nfbTopViewControllerName(UIView* view) {
+// The FIRST view controller in the responder chain — the screen that OWNS the
+// view. The journal proved the previous reading wrong twice in one build: it
+// asked the UINavigationController for its top, and in this app that is the
+// generic TwitterDash shell — never "Inbox", never "Settings" — so the mirror
+// was torn down ON the inbox and the check never baked. TFN bars live inside
+// the screen's own hierarchy, so the first controller on the chain IS the
+// screen.
+static NSString* nfbOwningScreenName(UIView* view) {
     UIResponder* responder = view;
     NSInteger depth = 0;
     while ((responder = responder.nextResponder) && depth < 14) {
-        if ([responder isKindOfClass:[UINavigationController class]]) {
-            UIViewController* top =
-                ((UINavigationController*)responder).topViewController;
-            return NSStringFromClass([top class]);
+        if ([responder isKindOfClass:[UIViewController class]] &&
+            ![responder isKindOfClass:[UINavigationController class]]) {
+            return NSStringFromClass([responder class]);
         }
         depth++;
     }
@@ -545,9 +551,10 @@ static BOOL nfbIsWhiteBarGlyphCandidate(UIView* view) {
         current.renderingMode == UIImageRenderingModeAlwaysOriginal) {
         return;
     }
-    if (![nfbTopViewControllerName((UIView*)self)
-             containsString:@"Settings"]) {
-        NFBDebugLog(@"glyphe blanc hors reglages: laisse natif");
+    NSString* screen = nfbOwningScreenName((UIView*)self);
+    if (![screen containsString:@"Settings"]) {
+        NFBDebugLog(@"glyphe blanc hors reglages (ecran=%@): laisse natif",
+                    screen.length ? screen : @"?");
         return;
     }
     // Baked rather than re-tinted: AlwaysOriginal forbids the bar button from
@@ -982,19 +989,9 @@ static BOOL nfbLiquidGlassEnabled(void) {
     return [BHTSettings boolForKey:@"enable_liquid_glass"];
 }
 
-// The bar is REUSED across the push into a conversation — the video caught the
-// mirror's "All" floating over the conversation's video-call icon at z=100.
-// So the bar's lifetime is the wrong lifetime: the mirror lives while the
-// navigation controller still shows the INBOX, and not a moment longer. On a
-// push the top view controller is already the destination when the departure
-// cascade runs, so the ghost never draws a single frame.
-static BOOL nfbBarShowsInbox(UIView* view) {
-    NSString* top = nfbTopViewControllerName(view);
-    if (!top.length) {
-        return YES;  // shape unknown: never tear the cover down on a guess
-    }
-    return [top containsString:@"Inbox"];
-}
+// The bar the mirror currently hangs on, so the container hook below can take
+// the mirror down without walking anything. Weak: the bar owns itself.
+static __weak UIView* gNFBInboxMirrorBar;
 
 static void nfbDropInboxMirror(UIView* bar) {
     UIView* mirror = objc_getAssociatedObject(bar, kNFBPillMirrorKey);
@@ -1004,6 +1001,7 @@ static void nfbDropInboxMirror(UIView* bar) {
     [mirror removeFromSuperview];
     objc_setAssociatedObject(bar, kNFBPillMirrorKey, nil,
                              OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    gNFBInboxMirrorBar = nil;
     NFBDebugLog(@"pill: miroir retire (ecran quitte)");
 }
 
@@ -1040,10 +1038,6 @@ static void nfbMirrorInboxPill(UIView* pill) {
     }
     UIView* bar = nfbPillBar(pill);
     if (!bar) {
-        return;
-    }
-    if (!nfbBarShowsInbox(pill)) {
-        nfbDropInboxMirror(bar);
         return;
     }
 
@@ -1108,6 +1102,7 @@ static void nfbMirrorInboxPill(UIView* pill) {
         [bar addSubview:mirror];
         objc_setAssociatedObject(bar, kNFBPillMirrorKey, mirror,
                                  OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        gNFBInboxMirrorBar = bar;
         NFBMark(mirror, @"NavBarIcons/inboxPill → miroir");
         NFBDebugLog(@"pill: miroir posé dans %@",
                     NSStringFromClass([bar classForCoder]));
@@ -1210,20 +1205,27 @@ static void nfbMirrorInboxPill(UIView* pill) {
     }
 }
 
+// The Messages screen's own container view — _TtC7DMInbox18InboxContainerView,
+// binary-confirmed. Every journal shows it leaving the window exactly when the
+// screen actually leaves (push, pop, tab), and never during a pill re-host.
+// That is the mirror's lifetime, structural and name-free: the screen goes,
+// the mirror goes, before the ghost's first frame.
+%hook _TtC7DMInbox18InboxContainerView
+
+- (void)willMoveToWindow:(UIWindow*)newWindow {
+    %orig;
+    if (!newWindow && gNFBInboxMirrorBar) {
+        nfbDropInboxMirror(gNFBInboxMirrorBar);
+    }
+}
+
+%end
+
 %hook _TtC7DMInbox39InboxNavigationBarMenuBarButtonItemView
 
 // Before the control is ever drawn, so the fade is refused rather than caught
 // halfway through.
 - (void)willMoveToWindow:(UIWindow*)newWindow {
-    // Leaving while the navigation controller already shows another screen:
-    // that is a push or a pop, not a re-host — the mirror goes with the screen,
-    // before the ghost's first frame.
-    if (!newWindow && !nfbBarShowsInbox((UIView*)self)) {
-        UIView* bar = nfbPillBar((UIView*)self);
-        if (bar) {
-            nfbDropInboxMirror(bar);
-        }
-    }
     %orig;
     if (newWindow) {
         nfbForceOpaque((UIView*)self);
