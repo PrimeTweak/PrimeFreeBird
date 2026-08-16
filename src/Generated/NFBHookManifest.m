@@ -261,7 +261,6 @@ const NFBHookRecord NFBHookRecords[] = {
     {"_TtC32TwitterHomeFeatureImplementation35HomeTimelineContainerViewController", "pinnedTimelinesRepository", "Hooks/Timeline.x"},
     {"_TtC32TwitterHomeFeatureImplementation35HomeTimelineContainerViewController", "tfn_navigationBarAccessoryView", "Hooks/Timeline.x"},
     {"_TtC32TwitterHomeFeatureImplementation35HomeTimelineContainerViewController", "viewDidAppear", "Hooks/Timeline.x"},
-    {"_TtC7DMInbox18InboxContainerView", "willMoveToWindow", "Hooks/NavBarIcons.x"},
     {"_TtC7DMInbox39InboxNavigationBarMenuBarButtonItemView", "didAddSubview", "Hooks/NavBarIcons.x"},
     {"_TtC7DMInbox39InboxNavigationBarMenuBarButtonItemView", "didMoveToWindow", "Hooks/NavBarIcons.x"},
     {"_TtC7DMInbox39InboxNavigationBarMenuBarButtonItemView", "layoutSubviews", "Hooks/NavBarIcons.x"},
@@ -316,5 +315,6 @@ const char* const NFBRuntimeClasses[] = {
     "_TtC14T1TwitterSwift21ImmersiveCardHostView",
     "_TtC14T1TwitterSwift22ImmersiveVideoPageView",
     "_TtC14T1TwitterSwift23URTChromeViewController",
+    "_TtC7DMInbox18InboxContainerView",
 };
 const size_t NFBRuntimeClassCount = sizeof(NFBRuntimeClasses) / sizeof(NFBRuntimeClasses[0]);
