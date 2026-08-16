@@ -61,3 +61,7 @@ extern void NFBDebuggerCaptureAndPresent(void);
 // Hides the floating button while the diagnostics sheet is up, so it does not
 // sit on top of the report it produced.
 extern void NFBDebuggerSetTriggerHidden(BOOL hidden);
+
+// True only when debugging is on. Call sites in hot paths test this before
+// building any log string, so the debugger costs one boolean when off.
+extern BOOL NFBDebugIsRecording(void);
