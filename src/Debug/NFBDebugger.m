@@ -76,7 +76,7 @@ void NFBDebugLog(NSString* format, ...) {
         static NSDateFormatter* formatter;
         if (!formatter) {
             formatter = [NSDateFormatter new];
-            formatter.dateFormat = @"HH:mm:ss";
+            formatter.dateFormat = @"HH:mm:ss.SSS";
         }
         stamp = [formatter stringFromDate:[NSDate date]];
         NSMutableArray* ring = NFBDecisionRing();
@@ -86,6 +86,73 @@ void NFBDebugLog(NSString* format, ...) {
         }
     }
     os_log(NFBDebugLogHandle(), "%{public}@", line);
+}
+
+// MARK: - watch list
+//
+// The flash saga cost three diagnostic builds because the journal only recorded
+// what the current hypothesis said to record. This is the missing capability:
+// class names added HERE, at runtime, from the diagnostics screen — and every
+// lifecycle event on matching views is journaled with millisecond stamps and
+// the instance pointer. "Removed, then a DIFFERENT instance arrives 100 ms
+// later" becomes three journal lines instead of three builds.
+
+static NSString* const kNFBWatchDefaultsKey = @"nfb_watch_classes";
+static NSArray<NSString*>* gNFBWatchCache;
+
+static void NFBWatchReload(void) {
+    gNFBWatchCache = [[NSUserDefaults standardUserDefaults]
+                         arrayForKey:kNFBWatchDefaultsKey] ?: @[];
+}
+
+NSArray<NSString*>* NFBWatchAll(void) {
+    if (!gNFBWatchCache) {
+        NFBWatchReload();
+    }
+    return gNFBWatchCache;
+}
+
+void NFBWatchAdd(NSString* fragment) {
+    NSString* trimmed = [fragment stringByTrimmingCharactersInSet:
+                            [NSCharacterSet whitespaceAndNewlineCharacterSet]];
+    if (!trimmed.length) {
+        return;
+    }
+    NSMutableArray* list = [NFBWatchAll() mutableCopy];
+    if ([list containsObject:trimmed]) {
+        return;
+    }
+    [list addObject:trimmed];
+    [[NSUserDefaults standardUserDefaults] setObject:list forKey:kNFBWatchDefaultsKey];
+    NFBWatchReload();
+    NFBDebugLog(@"surveillance: + %@", trimmed);
+}
+
+void NFBWatchRemove(NSString* fragment) {
+    NSMutableArray* list = [NFBWatchAll() mutableCopy];
+    [list removeObject:fragment];
+    [[NSUserDefaults standardUserDefaults] setObject:list forKey:kNFBWatchDefaultsKey];
+    NFBWatchReload();
+    NFBDebugLog(@"surveillance: - %@", fragment);
+}
+
+// Case-insensitive substring on the class name, so "Inbox" is enough to catch
+// a mangled Swift name. Hot path: the empty-list case costs one count.
+BOOL NFBWatchMatchesClassName(NSString* className) {
+    if (!NFBDebugEnabled()) {
+        return NO;
+    }
+    NSArray<NSString*>* list = NFBWatchAll();
+    if (!list.count || !className.length) {
+        return NO;
+    }
+    for (NSString* fragment in list) {
+        if ([className rangeOfString:fragment
+                             options:NSCaseInsensitiveSearch].location != NSNotFound) {
+            return YES;
+        }
+    }
+    return NO;
 }
 
 // MARK: - environment
@@ -109,12 +176,17 @@ static NSString* NFBEnvironmentBlock(void) {
         ? @"Sombre" : @"Clair";
     BOOL liquidGlass = [BHTSettings boolForKey:@"enable_liquid_glass"];
 
+    NSArray* watches = NFBWatchAll();
+    NSString* watchLine = watches.count
+        ? [NSString stringWithFormat:@"Surveillance: %@\n",
+           [watches componentsJoinedByString:@", "]]
+        : @"";
     return [NSString stringWithFormat:
         @"PFB DIAG\n"
         @"Twitter %@ (%@) · iOS %@ · %@\n"
-        @"Interface: %@ · Liquid Glass %@\n",
+        @"Interface: %@ · Liquid Glass %@\n%@",
         app, build, device.systemVersion, model,
-        style, liquidGlass ? @"ON" : @"OFF"];
+        style, liquidGlass ? @"ON" : @"OFF", watchLine];
 }
 
 // MARK: - hook health

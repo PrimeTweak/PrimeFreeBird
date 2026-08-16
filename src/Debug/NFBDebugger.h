@@ -65,3 +65,12 @@ extern void NFBDebuggerSetTriggerHidden(BOOL hidden);
 // True only when debugging is on. Call sites in hot paths test this before
 // building any log string, so the debugger costs one boolean when off.
 extern BOOL NFBDebugIsRecording(void);
+
+// The watch list: class-name fragments added at runtime from the diagnostics
+// screen. Matching views have their lifecycle journaled with millisecond
+// stamps and instance pointers — the capability whose absence cost the flash
+// saga three diagnostic builds.
+extern NSArray<NSString*>* NFBWatchAll(void);
+extern void NFBWatchAdd(NSString* fragment);
+extern void NFBWatchRemove(NSString* fragment);
+extern BOOL NFBWatchMatchesClassName(NSString* className);

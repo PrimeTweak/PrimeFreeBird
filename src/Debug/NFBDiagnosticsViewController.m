@@ -29,11 +29,17 @@
         [[UIBarButtonItem alloc] initWithBarButtonSystemItem:UIBarButtonSystemItemClose
                                                       target:self
                                                       action:@selector(dismissSheet)];
-    self.navigationItem.rightBarButtonItem =
+    UIBarButtonItem* share =
         [[UIBarButtonItem alloc] initWithImage:[UIImage systemImageNamed:@"square.and.arrow.up"]
                                          style:UIBarButtonItemStylePlain
                                         target:self
                                         action:@selector(shareReport)];
+    UIBarButtonItem* watch =
+        [[UIBarButtonItem alloc] initWithImage:[UIImage systemImageNamed:@"eye"]
+                                         style:UIBarButtonItemStylePlain
+                                        target:self
+                                        action:@selector(editWatchList)];
+    self.navigationItem.rightBarButtonItems = @[share, watch];
 
     // The banner: one line, one colour. Green reads "nothing to do here",
     // red names the count and the list below names the culprits.
@@ -130,6 +136,61 @@
     share.popoverPresentationController.barButtonItem =
         self.navigationItem.rightBarButtonItem;
     [self presentViewController:share animated:YES completion:nil];
+}
+
+
+// MARK: - watch list
+
+// One sheet does it all: each watched fragment removes on tap, and the last row
+// adds a new one. Fragments match class names case-insensitively, so "Inbox" is
+// enough for a mangled Swift name. Changes apply immediately — no rebuild.
+- (void)editWatchList {
+    UIAlertController* sheet =
+        [UIAlertController alertControllerWithTitle:@"Surveillance"
+                                            message:@"Les vues dont la classe contient un fragment surveillé sont journalisées à la milliseconde (cycle de vie + animations)."
+                                     preferredStyle:UIAlertControllerStyleActionSheet];
+    for (NSString* fragment in NFBWatchAll()) {
+        [sheet addAction:[UIAlertAction actionWithTitle:
+            [NSString stringWithFormat:@"Retirer « %@ »", fragment]
+                                                  style:UIAlertActionStyleDestructive
+                                                handler:^(UIAlertAction* action) {
+            NFBWatchRemove(fragment);
+            [self refresh];
+        }]];
+    }
+    [sheet addAction:[UIAlertAction actionWithTitle:@"Ajouter une classe…"
+                                              style:UIAlertActionStyleDefault
+                                            handler:^(UIAlertAction* action) {
+        [self promptForWatchFragment];
+    }]];
+    [sheet addAction:[UIAlertAction actionWithTitle:@"Fermer"
+                                              style:UIAlertActionStyleCancel
+                                            handler:nil]];
+    sheet.popoverPresentationController.barButtonItem =
+        self.navigationItem.rightBarButtonItems.lastObject;
+    [self presentViewController:sheet animated:YES completion:nil];
+}
+
+- (void)promptForWatchFragment {
+    UIAlertController* prompt =
+        [UIAlertController alertControllerWithTitle:@"Surveiller une classe"
+                                            message:@"Fragment du nom de classe — « Inbox » suffit pour le pill des messages."
+                                     preferredStyle:UIAlertControllerStyleAlert];
+    [prompt addTextFieldWithConfigurationHandler:^(UITextField* field) {
+        field.placeholder = @"Fragment de nom de classe";
+        field.autocorrectionType = UITextAutocorrectionTypeNo;
+        field.autocapitalizationType = UITextAutocapitalizationTypeNone;
+    }];
+    [prompt addAction:[UIAlertAction actionWithTitle:@"Surveiller"
+                                               style:UIAlertActionStyleDefault
+                                             handler:^(UIAlertAction* action) {
+        NFBWatchAdd(prompt.textFields.firstObject.text);
+        [self refresh];
+    }]];
+    [prompt addAction:[UIAlertAction actionWithTitle:@"Annuler"
+                                               style:UIAlertActionStyleCancel
+                                             handler:nil]];
+    [self presentViewController:prompt animated:YES completion:nil];
 }
 
 @end
