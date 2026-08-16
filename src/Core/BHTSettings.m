@@ -460,6 +460,12 @@ static NSDictionary<NSString*, NSDictionary*>* BHTSettingsPages(void) {
                     @{@"key": @"flex_twitter", @"default": @NO, @"type": @"toggle"},
                     @{
                         @"type": @"button",
+                        @"titleKey": @"DIAGNOSTICS_TITLE",
+                        @"subtitleKey": @"DIAGNOSTICS_DETAIL",
+                        @"action": @"showDiagnostics:"
+                    },
+                    @{
+                        @"type": @"button",
                         @"titleKey": @"EXPORT_SETTINGS_TITLE",
                         @"subtitleKey": @"EXPORT_SETTINGS_DETAIL",
                         @"action": @"showExportSettings:"
