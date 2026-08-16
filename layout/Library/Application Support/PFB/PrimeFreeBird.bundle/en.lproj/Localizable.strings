@@ -279,6 +279,8 @@
 "REPLY_IN_WEBVIEW_DETAIL" = "Open the reply box in a web view to avoid attestation.";
 "FLEX_TWITTER_TITLE" = "Debug mode";
 "FLEX_TWITTER_DETAIL" = "Show the FLEX inspector for Twitter's views and data.";
+"DIAGNOSTICS_TITLE" = "Diagnostics";
+"DIAGNOSTICS_DETAIL" = "Hook health, shake-to-capture, shareable report — all on the phone.";
 "EXPORT_SETTINGS_TITLE" = "Export settings";
 "EXPORT_SETTINGS_DETAIL" = "Save every option, muted word, and color to a file.";
 "IMPORT_SETTINGS_TITLE" = "Import settings";
