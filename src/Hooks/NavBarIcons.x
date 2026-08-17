@@ -995,6 +995,14 @@ static BOOL nfbLiquidGlassEnabled(void) {
 // the mirror down without walking anything. Weak: the bar owns itself.
 static __weak UIView* gNFBInboxMirrorBar;
 
+// The pill instance the mirror last synced from. Replacement is the RULE, not
+// the exception — journal of 16/08, one single return to Messages: the pill
+// <0x150283480> is re-posed at 20:34:02.185, a brand-new <0x1654a8e00> arrives
+// at 02.435, and the old one leaves for good at 03.093. Every handover is
+// therefore tracked and named, so a mirror stuck on a dead source can never
+// again fail silently.
+static __weak UIView* gNFBInboxMirrorSourcePill;
+
 // The Messages container class lives in a LAZILY loaded framework — the health
 // report itself lists DMInbox among the late loaders, red at launch and green
 // once the screen opens. A load-time %hook therefore never lands on it, which
@@ -1065,6 +1073,7 @@ static void nfbDropInboxMirror(UIView* bar) {
     objc_setAssociatedObject(bar, kNFBPillMirrorKey, nil,
                              OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     gNFBInboxMirrorBar = nil;
+    gNFBInboxMirrorSourcePill = nil;
     [mirror removeFromSuperview];
     NFBDebugLog(@"pill: miroir retire (ecran quitte)");
 }
@@ -1072,12 +1081,23 @@ static void nfbDropInboxMirror(UIView* bar) {
 static UIView* nfbPillBar(UIView* pill) {
     UIView* node = pill.superview;
     NSInteger depth = 0;
-    while (node && depth < 16) {
+    while (node && depth < 32) {
         if ([node isKindOfClass:[UINavigationBar class]]) {
             return node;
         }
         node = node.superview;
         depth++;
+    }
+    // Audit of 16/08: with every other exit of the sync either logged or
+    // self-healing, THIS was the only path left that fails silently and
+    // stays failed — a replacement pill whose ancestor chain resolves no
+    // UINavigationBar leaves the mirror frozen on the dead instance and its
+    // own live content uncovered: the doubled "All". So when a mirror is
+    // already up, its bar is the fallback — the descendant test walks the
+    // whole chain, uncapped, with no class check to miss on.
+    UIView* mirrorBar = gNFBInboxMirrorBar;
+    if (mirrorBar && [pill isDescendantOfView:mirrorBar]) {
+        return mirrorBar;
     }
     return nil;
 }
@@ -1089,8 +1109,18 @@ static void nfbScheduleMirrorResync(UIView* pill) {
     __weak UIView* weakPill = pill;
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.3 * NSEC_PER_SEC)),
                    dispatch_get_main_queue(), ^{
+        if (gNFBMirrorSettleToken != token) {
+            return;  // a newer pass owns the chain
+        }
         UIView* livePill = weakPill;
-        if (gNFBMirrorSettleToken == token && livePill && livePill.window) {
+        if (!livePill || !livePill.window) {
+            // Measured hole: the replaced pill's FINAL layout can own the
+            // last token, then leave the window — the pass no-ops and the
+            // chain dies holding the provisional 1.2× frame. The live source
+            // takes over the pass instead.
+            livePill = gNFBInboxMirrorSourcePill;
+        }
+        if (livePill && livePill.window) {
             nfbMirrorInboxPill(livePill);
         }
     });
@@ -1102,6 +1132,25 @@ static void nfbMirrorInboxPill(UIView* pill) {
     }
     UIView* bar = nfbPillBar(pill);
     if (!bar) {
+        // Named, never silent — this exact silence is what froze the mirror
+        // on 16/08. One line per instance, WITH the chain: if this build
+        // still cannot resolve a bar, the next capture hands over the real
+        // layout instead of another guess.
+        static const char* kNFBPillBarMissKey = "nfbPillBarMiss";
+        if (!objc_getAssociatedObject(pill, kNFBPillBarMissKey)) {
+            objc_setAssociatedObject(pill, kNFBPillBarMissKey, @YES,
+                                     OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+            NSMutableArray<NSString*>* chain = [NSMutableArray array];
+            UIView* node = pill.superview;
+            NSInteger hops = 0;
+            while (node && hops < 40) {
+                [chain addObject:NSStringFromClass([node classForCoder])];
+                node = node.superview;
+                hops++;
+            }
+            NFBDebugLog(@"pill: barre INTROUVABLE <%p> chaine=%@",
+                        pill, [chain componentsJoinedByString:@" > "]);
+        }
         return;
     }
 
@@ -1177,6 +1226,17 @@ static void nfbMirrorInboxPill(UIView* pill) {
         if (mirror.superview != bar) {
             [bar addSubview:mirror];
         }
+    }
+
+    // The sync is acting: this pill is now the mirror's source. A handover —
+    // measured on every return to Messages — is named with both pointers, so
+    // the journal shows the re-bind (or its absence) without costing a build.
+    UIView* previousSource = gNFBInboxMirrorSourcePill;
+    if (previousSource != pill) {
+        if (previousSource) {
+            NFBDebugLog(@"pill: source re-liee <%p> -> <%p>", previousSource, pill);
+        }
+        gNFBInboxMirrorSourcePill = pill;
     }
 
     // Text and imagery are copied from the real content; geometry is NOT.
@@ -1272,16 +1332,13 @@ static void nfbMirrorInboxPill(UIView* pill) {
 
 %hook _TtC7DMInbox39InboxNavigationBarMenuBarButtonItemView
 
-// Before the control is ever drawn, so the fade is refused rather than caught
-// halfway through.
-- (void)willMoveToWindow:(UIWindow*)newWindow {
-    %orig;
-    if (newWindow) {
-        nfbForceOpaque((UIView*)self);
-        NFBMark((UIView*)self, @"NavBarIcons/inboxPill → miroir actif");
-    }
-}
-
+// willMoveToWindow: and didAddSubview: used to be hooked here as well. The
+// health report measured both as never landing — this Swift class does not
+// redefine either method, and Logos on a method the class does not own is the
+// exact trap the container watch documents above. Their only job was opacity
+// pinning, which didMoveToWindow and layoutSubviews below already cover, and
+// nfbForceOpaque walks the subtree. Removed rather than kept as dead weight:
+// the health banner dropping from 5 flags to 3 is this build's own receipt.
 - (void)didMoveToWindow {
     %orig;
     if (!((UIView*)self).window) {
@@ -1298,13 +1355,6 @@ static void nfbMirrorInboxPill(UIView* pill) {
     // every layout that has a real size — text, chevron and frames copied from
     // the real content each pass.
     nfbMirrorInboxPill((UIView*)self);
-}
-
-// The moment a rebuilt label or chevron joins the control, before it has been
-// laid out or drawn.
-- (void)didAddSubview:(UIView*)subview {
-    %orig;
-    nfbForceOpaque(subview);
 }
 
 %end
