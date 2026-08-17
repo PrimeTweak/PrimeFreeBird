@@ -1334,6 +1334,83 @@ static void NFBNotifRefreshDelegateCache(UITableView* table) {
 }
 
 
+
+// MARK: - long press: the gesture that depends on nobody
+//
+// Measured verdict, his 19:42 journal: « édition autorisée par
+// T1URTViewController » appears, « la table DEMANDE les actions de balayage »
+// never does. The table allows editing and UIKit still never asks for the
+// actions — the swipe itself is being taken before the table sees it, which is
+// exactly what a horizontal pager (All / Mentions) does to a horizontal drag.
+// No amount of delegate work can win that.
+//
+// So the action gets a gesture of its own. A long press: it is vertical-free,
+// no proxy, no delegate cache, no pager competition. The recogniser sits on the
+// TABLE, never on a cell — his hard rule about recycled cells stands — and the
+// row is resolved from the touch point. It also does not steal anything: taps,
+// scrolling and the pager keep working (cancelsTouchesInView stays NO).
+
+@interface NFBNotifPressHandler : NSObject
++ (instancetype)shared;
+- (void)handlePress:(UILongPressGestureRecognizer*)press;
+@end
+
+@implementation NFBNotifPressHandler
+
++ (instancetype)shared {
+    static NFBNotifPressHandler* instance;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{ instance = [[NFBNotifPressHandler alloc] init]; });
+    return instance;
+}
+
+- (void)handlePress:(UILongPressGestureRecognizer*)press {
+    if (press.state != UIGestureRecognizerStateBegan || !NFBNotifsEnabled()) {
+        return;
+    }
+    UITableView* table = (UITableView*)press.view;
+    if (![table isKindOfClass:[UITableView class]]) {
+        return;
+    }
+    @try {
+        CGPoint point = [press locationInView:table];
+        NSIndexPath* indexPath = [table indexPathForRowAtPoint:point];
+        if (!indexPath) {
+            return;
+        }
+        id source = NFBNotifRowSourceFor(table.dataSource, table);
+        if (!NFBNotifRowIsOursInTable(source, table, indexPath)) {
+            return;   // not a notification we can name: leave the press alone
+        }
+        id model = NFBNotifModelForRow(source, table, indexPath);
+        NSString* identity = NFBNotifIdentity(model);
+        NFBHideNotifWithText(model, NFBNotifTextFromCell(table, indexPath));
+        NFBDebugLog(@"[notifs] appui long: masquée <%@>", identity);
+        nfbReapplyTimelineFilter();
+        NFBShowNotifToast(identity);
+    } @catch (id exception) {
+        NFBDebugLog(@"[notifs] appui long interrompu — sans conséquence");
+    }
+}
+
+@end
+
+static void NFBNotifAttachLongPress(UITableView* table) {
+    static const char* kNFBNotifPressKey = "nfbNotifPress";
+    if (!NFBNotifsEnabled() || objc_getAssociatedObject(table, kNFBNotifPressKey)) {
+        return;
+    }
+    UILongPressGestureRecognizer* press = [[UILongPressGestureRecognizer alloc]
+        initWithTarget:[NFBNotifPressHandler shared] action:@selector(handlePress:)];
+    press.minimumPressDuration = 0.5;
+    press.cancelsTouchesInView = NO;   // taps, scrolling and the pager untouched
+    press.delaysTouchesBegan = NO;
+    [table addGestureRecognizer:press];
+    objc_setAssociatedObject(table, kNFBNotifPressKey, press,
+                             OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    NFBDebugLog(@"[notifs] appui long posé sur %@", NSStringFromClass([table class]));
+}
+
 static void NFBNotifWireTable(UITableView* table) {
     if (!NFBNotifsEnabled() || !table) {
         return;
@@ -1393,6 +1470,7 @@ static void NFBNotifWireTable(UITableView* table) {
                 [dataSource respondsToSelector:editSel] ? @"OUI" : @"NON");
 
     NFBNotifRefreshDelegateCache(table);
+    NFBNotifAttachLongPress(table);
 
 }
 
