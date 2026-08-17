@@ -28,12 +28,14 @@
 
 // A named subclass so captures and the watch can identify our button — and so
 // it can answer the ONE question the bar's wrapper actually asks. Measured the
-// hard way (two wrong nudges, his capture showing the capsule cut off at the
-// screen edge): _TtCC5UIKit19NavigationButtonBar15ItemWrapperView sizes its
-// child from intrinsicContentSize, NOT from the bounds we set — so a wider
-// bounds just spilled our capsule past the wrapper instead of moving it.
+// hard way: _TtCC5UIKit19NavigationButtonBar15ItemWrapperView sizes its child
+// from intrinsicContentSize, then CLAMPS it to the standard bar-button box —
+// his 13:27 capture caught ours at {{376, 67}, {44, 34}} while the native pill
+// is 57.33 × 40. So we stop fighting the box: the capsule is drawn LARGER than
+// the button, anchored to its right edge, and the touch area follows it.
 @interface NFBInboxPillButton : UIButton
 @property (nonatomic, assign) CGSize nfbIntrinsic;
+@property (nonatomic, assign) CGRect nfbTouchRect;
 @end
 @implementation NFBInboxPillButton
 - (CGSize)intrinsicContentSize {
@@ -41,6 +43,13 @@
         return self.nfbIntrinsic;
     }
     return [super intrinsicContentSize];
+}
+// The visible pill spills outside bounds; a tap anywhere on it must count.
+- (BOOL)pointInside:(CGPoint)point withEvent:(UIEvent*)event {
+    if (!CGRectIsEmpty(self.nfbTouchRect)) {
+        return CGRectContainsPoint(self.nfbTouchRect, point);
+    }
+    return [super pointInside:point withEvent:event];
 }
 @end
 
@@ -125,31 +134,37 @@ static void nfbSwapLayoutButton(void) {
     CGFloat spacing = (chevron.hidden || chevron.bounds.size.width <= 0) ? 0 : 4.0;
     CGFloat contentW = label.bounds.size.width + spacing + (chevron.hidden ? 0 : chevron.bounds.size.width);
     CGFloat width = contentW + 20.0;
-    // No padding tricks any more. The wrapper is told our size, the capsule
-    // fills the button exactly, and the fine adjustment is a pure visual
-    // translation that no layout pass can reinterpret. gNFBSwapShift is the
-    // ONE number to turn if his eye still wants it moved (negative = left).
-    button.nfbIntrinsic = CGSizeMake(width, 40.0);
+    CGFloat height = 40.0;
+    // The wrapper decides the button's box (44 × 34 measured). We keep asking
+    // for the native size in case a future layout honours it, but we no longer
+    // depend on it: the capsule is positioned RELATIVE to whatever box we get,
+    // flush with its right edge and centred vertically. His measurement makes
+    // this exact — right edge 420.0, so 420.0 − 57.33 = 362.67 = the native
+    // left edge (362.7), and (34 − 40)/2 centres it on the native 64 → 104.
+    button.nfbIntrinsic = CGSizeMake(width, height);
     [button invalidateIntrinsicContentSize];
-    button.bounds = CGRectMake(0, 0, width, 40.0);
+    button.clipsToBounds = NO;
     button.transform = CGAffineTransformMakeTranslation(gNFBSwapShift, 0);
+    CGRect box = button.bounds;
+    CGRect capsuleFrame = CGRectMake(box.size.width - width,
+                                     (box.size.height - height) / 2.0,
+                                     width, height);
     UIView* capsule = [button viewWithTag:3];
-    capsule.frame = button.bounds;
-    CGFloat x = 10.0;
-    label.frame = CGRectMake(x, (40.0 - label.bounds.size.height) / 2.0,
+    capsule.frame = capsuleFrame;
+    button.nfbTouchRect = capsuleFrame;
+    CGFloat x = capsuleFrame.origin.x + 10.0;
+    CGFloat midY = CGRectGetMidY(capsuleFrame);
+    label.frame = CGRectMake(x, midY - label.bounds.size.height / 2.0,
                              label.bounds.size.width, label.bounds.size.height);
     if (!chevron.hidden) {
         chevron.frame = CGRectMake(x + label.bounds.size.width + spacing,
-                                   (40.0 - chevron.bounds.size.height) / 2.0,
+                                   midY - chevron.bounds.size.height / 2.0,
                                    chevron.bounds.size.width,
                                    chevron.bounds.size.height);
     }
 
-    // THE RULER — no more guessing which way the bar anchors us. Once per
-    // install, after the layout has settled, print where the capsule actually
-    // landed in SCREEN points next to the native reference measured on his
-    // 21:31 capture (pill 362.7 → 420.0). The correction is then arithmetic:
-    // gNFBSwapShift += (420.0 − right edge).
+    // THE RULER — measures the VISIBLE capsule now, not the wrapper's box.
+    // Reference from his 21:31 capture: the native pill spans 362.7 → 420.0.
     if (!gNFBSwapMeasured && NFBDebugIsRecording()) {
         gNFBSwapMeasured = YES;
         __weak NFBInboxPillButton* weakButton = button;
@@ -160,12 +175,13 @@ static void nfbSwapLayoutButton(void) {
                 gNFBSwapMeasured = NO;  // try again on the next layout
                 return;
             }
-            CGRect onScreen = [live convertRect:live.bounds toView:nil];
+            UIView* liveCapsule = [live viewWithTag:3];
+            CGRect onScreen = [live convertRect:liveCapsule.frame toView:nil];
             NFBDebugLog(@"remplacement: RÈGLE — capsule à l'écran %.1f → %.1f pt "
-                        @"(natif 362.7 → 420.0, décalage courant %.1f)",
+                        @"(natif 362.7 → 420.0, boîte imposée %.0f×%.0f)",
                         onScreen.origin.x,
                         onScreen.origin.x + onScreen.size.width,
-                        gNFBSwapShift);
+                        live.bounds.size.width, live.bounds.size.height);
         });
     }
 }
