@@ -943,3 +943,191 @@ static BOOL NFBNotifRowIsOurs(id dataViewController, NSIndexPath* indexPath) {
 }
 
 %end
+
+// MARK: - stop assuming who answers the table
+//
+// Everything so far hooked the VIEW CONTROLLER, assuming it is the table's own
+// data source and delegate. His FLEX capture shows a DataViewHostView sitting
+// between T1URTViewController and the TFNTableView, so that assumption was
+// never verified — and it explains the total silence: if another object answers
+// the table, our methods are simply never consulted.
+//
+// So nothing is assumed any more. The table is asked who its delegate and data
+// source ARE, both names are journaled (the fact that was missing all along),
+// and the two methods are installed on THOSE classes:
+//   · canEditRowAtIndexPath: on the data source — without it UIKit never even
+//     asks for swipe actions;
+//   · trailingSwipeActionsConfigurationForRowAtIndexPath: on the delegate.
+// Installation uses class_addMethod first and only falls back to replacing an
+// implementation the class owns — the exact shape that stopped the recursion
+// crash: never swizzle a method a class merely inherits.
+
+static NSMutableDictionary<NSString*, NSValue*>* gNFBNotifOrigCanEdit;
+static NSMutableDictionary<NSString*, NSValue*>* gNFBNotifOrigSwipe;
+
+// The object that can actually hand out rows: whichever of these knows about
+// sections. Tried in order, no guess.
+static id NFBNotifRowSourceFor(id candidate, UITableView* table) {
+    SEL sectionsSel = NSSelectorFromString(@"sections");
+    SEL itemSel = NSSelectorFromString(@"itemAtIndexPath:");
+    id options[3] = { candidate, table.dataSource, table.delegate };
+    for (int i = 0; i < 3; i++) {
+        id option = options[i];
+        if (option && ([option respondsToSelector:sectionsSel] ||
+                       [option respondsToSelector:itemSel])) {
+            return option;
+        }
+    }
+    UIResponder* responder = table;
+    NSInteger hops = 0;
+    while ((responder = responder.nextResponder) && hops < 12) {
+        if ([responder respondsToSelector:sectionsSel] ||
+            [responder respondsToSelector:itemSel]) {
+            return responder;
+        }
+        hops++;
+    }
+    return candidate;
+}
+
+static BOOL nfbNotifCanEdit(id self, SEL _cmd, UITableView* table, NSIndexPath* indexPath) {
+    if (NFBNotifRowIsOurs(NFBNotifRowSourceFor(self, table), indexPath)) {
+        static BOOL said;
+        if (!said) {
+            said = YES;
+            NFBDebugLog(@"[notifs] édition autorisée par %@ — le swipe peut apparaître",
+                        NSStringFromClass([self class]));
+        }
+        return YES;
+    }
+    NSValue* boxed = gNFBNotifOrigCanEdit[NSStringFromClass([self class])];
+    if (boxed) {
+        BOOL (*original)(id, SEL, UITableView*, NSIndexPath*) = [boxed pointerValue];
+        return original(self, _cmd, table, indexPath);
+    }
+    return YES;  // UIKit's own default when nobody implements it
+}
+
+static UISwipeActionsConfiguration* nfbNotifTrailingSwipe(id self, SEL _cmd,
+                                                          UITableView* table,
+                                                          NSIndexPath* indexPath) {
+    UISwipeActionsConfiguration* original = nil;
+    NSValue* boxed = gNFBNotifOrigSwipe[NSStringFromClass([self class])];
+    if (boxed) {
+        UISwipeActionsConfiguration* (*orig)(id, SEL, UITableView*, NSIndexPath*) =
+            [boxed pointerValue];
+        original = orig(self, _cmd, table, indexPath);
+    }
+    id source = NFBNotifRowSourceFor(self, table);
+    if (!NFBNotifRowIsOurs(source, indexPath)) {
+        return original;
+    }
+    id model = NFBModelAtIndexPath(source, indexPath);
+    static BOOL said;
+    if (!said) {
+        said = YES;
+        NFBDebugLog(@"[notifs] swipe: action « Masquer » posée par %@",
+                    NSStringFromClass([self class]));
+    }
+
+    NSString* title = [[BHTBundle sharedBundle] localizedStringForKey:@"NOTIFS_HIDE_ACTION"];
+    UIContextualAction* hide = [UIContextualAction
+        contextualActionWithStyle:UIContextualActionStyleDestructive
+                            title:title
+                          handler:^(__unused UIContextualAction* action,
+                                    __unused UIView* sourceView,
+                                    void (^completion)(BOOL)) {
+            NSString* identity = NFBNotifIdentity(model);
+            NFBHideNotif(model);
+            completion(YES);
+            nfbReapplyTimelineFilter();
+            NFBShowNotifToast(identity);
+        }];
+    hide.backgroundColor = [UIColor systemGrayColor];
+    UIImage* glyph = [UIImage systemImageNamed:@"eye.slash.fill"];
+    if (glyph) {
+        hide.image = glyph;
+    }
+    NSMutableArray<UIContextualAction*>* actions = [NSMutableArray arrayWithObject:hide];
+    if (original.actions.count) {
+        [actions addObjectsFromArray:original.actions];
+    }
+    UISwipeActionsConfiguration* configuration =
+        [UISwipeActionsConfiguration configurationWithActions:actions];
+    configuration.performsFirstActionWithFullSwipe = NO;
+    return configuration;
+}
+
+// Add on the subclass, never replace an inherited implementation (the crash
+// lesson). If the class owns the method, its implementation is kept and called.
+static void NFBNotifInstall(id target, SEL selector, IMP replacement,
+                            const char* types,
+                            NSMutableDictionary<NSString*, NSValue*>* store) {
+    if (!target) {
+        return;
+    }
+    Class cls = [target class];
+    NSString* name = NSStringFromClass(cls);
+    if (store[name]) {
+        return;  // already done for this class
+    }
+    Method owned = class_getInstanceMethod(cls, selector);
+    BOOL ownsIt = owned && class_getMethodImplementation(class_getSuperclass(cls), selector)
+                            != method_getImplementation(owned);
+    if (!ownsIt && class_addMethod(cls, selector, replacement, types)) {
+        IMP inherited = owned ? method_getImplementation(owned) : NULL;
+        store[name] = [NSValue valueWithPointer:inherited];
+        NFBDebugLog(@"[notifs] méthode ajoutée à %@ (%@)", name, NSStringFromSelector(selector));
+        return;
+    }
+    if (owned) {
+        IMP previous = method_setImplementation(owned, replacement);
+        store[name] = [NSValue valueWithPointer:previous];
+        NFBDebugLog(@"[notifs] méthode remplacée sur %@ (%@)", name,
+                    NSStringFromSelector(selector));
+    }
+}
+
+static void NFBNotifWireTable(UITableView* table) {
+    if (!NFBNotifsEnabled() || !table) {
+        return;
+    }
+    static NSMutableSet<NSString*>* announced;
+    if (!announced) { announced = [NSMutableSet set]; }
+    if (!gNFBNotifOrigCanEdit) { gNFBNotifOrigCanEdit = [NSMutableDictionary dictionary]; }
+    if (!gNFBNotifOrigSwipe) { gNFBNotifOrigSwipe = [NSMutableDictionary dictionary]; }
+
+    id delegate = table.delegate;
+    id dataSource = table.dataSource;
+    NSString* pair = [NSString stringWithFormat:@"%@|%@",
+                      NSStringFromClass([delegate class]),
+                      NSStringFromClass([dataSource class])];
+    if (![announced containsObject:pair] && announced.count < 8) {
+        [announced addObject:pair];
+        // The fact that was missing since the first attempt.
+        NFBDebugLog(@"[notifs] table %@ — delegate=%@ dataSource=%@",
+                    NSStringFromClass([table class]),
+                    NSStringFromClass([delegate class]),
+                    NSStringFromClass([dataSource class]));
+    }
+
+    NFBNotifInstall(dataSource, @selector(tableView:canEditRowAtIndexPath:),
+                    (IMP)nfbNotifCanEdit, "B@:@@", gNFBNotifOrigCanEdit);
+    NFBNotifInstall(delegate,
+                    @selector(tableView:trailingSwipeActionsConfigurationForRowAtIndexPath:),
+                    (IMP)nfbNotifTrailingSwipe, "@@:@@", gNFBNotifOrigSwipe);
+}
+
+%hook TFNTableView
+
+// The notifications table, named by his FLEX capture. Wiring happens once per
+// class pair, and only where a row of ours can exist.
+- (void)didMoveToWindow {
+    %orig;
+    UIView* table = (UIView*)self;
+    if (table.window) {
+        NFBNotifWireTable((UITableView*)self);
+    }
+}
+
+%end
