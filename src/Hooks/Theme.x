@@ -357,9 +357,11 @@ static void NFBApplyTabBarAccent(UITabBar* bar) {
     if (standard) {
         bar.standardAppearance = standard;
     }
-    UITabBarAppearance* scrollEdge = bar.scrollEdgeAppearance;
-    if (scrollEdge) {
-        bar.scrollEdgeAppearance = scrollEdge;
+    if (@available(iOS 15.0, *)) {
+        UITabBarAppearance* scrollEdge = bar.scrollEdgeAppearance;
+        if (scrollEdge) {
+            bar.scrollEdgeAppearance = scrollEdge;
+        }
     }
 }
 
@@ -388,22 +390,6 @@ static BOOL NFBViewTreeHasTabBar(UIView* root) {
         }
     }
     return NO;
-}
-
-static NSInteger NFBCountTabBars(UIView* root) {
-    NSInteger count = [root isKindOfClass:[UITabBar class]] ? 1 : 0;
-    for (UIView* sub in root.subviews) {
-        count += NFBCountTabBars(sub);
-    }
-    return count;
-}
-
-static NSInteger NFBCountViewsOfClass(UIView* root, Class cls) {
-    NSInteger count = [root isKindOfClass:cls] ? 1 : 0;
-    for (UIView* sub in root.subviews) {
-        count += NFBCountViewsOfClass(sub, cls);
-    }
-    return count;
 }
 
 // Re-apply the tweak's accent to whatever chrome is on screen right now.
@@ -522,27 +508,8 @@ static void NFBStartAccentSettle(void) {
     dispatch_source_set_event_handler(timer, ^{
         ticks++;
         BOOL seen = NFBAccentSettlePass();
-        NSInteger bars = 0;
-        for (id scene in UIApplication.sharedApplication.connectedScenes) {
-            if ([scene isKindOfClass:objc_getClass("UIWindowScene")]) {
-                for (UIWindow* w in [scene windows]) {
-                    bars += NFBCountTabBars(w);
-                }
-            }
-        }
-        NSInteger fabs = 0;
-        Class fabClass = NSClassFromString(@"TFNFloatingActionButton");
-        if (fabClass) {
-            for (id scene in UIApplication.sharedApplication.connectedScenes) {
-                if ([scene isKindOfClass:objc_getClass("UIWindowScene")]) {
-                    for (UIWindow* w in [scene windows]) {
-                        fabs += NFBCountViewsOfClass(w, fabClass);
-                    }
-                }
-            }
-        }
-        // fabs=0 after a reset would prove the button was REMOVED by Twitter
-        // (a rebuild the tweak triggered), not hidden by anything the tweak paints.
+        // (Two diagnostic sweeps once counted tab bars and floating action
+        // buttons here; their results were never read — removed.)
         if (seen && graceLeft < 0) {
             graceLeft = 2;
         }

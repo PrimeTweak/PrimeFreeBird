@@ -7,6 +7,10 @@
 
 #import "HookHelpers.h"
 
+// Declared once at file scope: two distant passes read the hidden-thread
+// list, and a block-scope extern is invisible to the second one.
+extern NSArray<NSDictionary*>* NFBHiddenThreads(void);
+
 // MARK: - Hide custom timelines
 
 static __weak NSObject* PinnedTimelinesRepository;
@@ -663,7 +667,6 @@ void nfbRefreshMutedWords(void) {
     // Hidden conversations share this memo: without them in the signature, the
     // timeline keeps its previous verdict and a hidden thread only vanishes on
     // the next reload.
-    extern NSArray<NSDictionary*>* NFBHiddenThreads(void);
     signature = signature * 31 + NFBHiddenThreads().count;
     gNFBMutedSignature = signature * 31 + (gNFBMutedWholeWords ? 2 : 1) +
                          (gNFBMutedSkipFollowing ? 4 : 0) +
