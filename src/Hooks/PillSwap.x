@@ -108,6 +108,8 @@ static void nfbSwapLayoutButton(void) {
     CGFloat contentW = label.bounds.size.width + spacing + (chevron.hidden ? 0 : chevron.bounds.size.width);
     CGFloat width = contentW + 20.0;
     button.bounds = CGRectMake(0, 0, width, 40.0);
+    UIView* capsule = [button viewWithTag:3];
+    capsule.frame = button.bounds;
     CGFloat x = 10.0;
     label.frame = CGRectMake(x, (40.0 - label.bounds.size.height) / 2.0,
                              label.bounds.size.width, label.bounds.size.height);
@@ -317,7 +319,11 @@ static void nfbSwapApply(UIView* pillView) {
     UILabel* label;
     UIImageView* chevron;
     if (!gNFBSwapItem) {
-        button = [NFBInboxPillButton new];
+        // CUSTOM type: [UIButton new] means a SYSTEM button, and iOS 26
+        // gives system buttons their own glass configuration — the stray
+        // inner lens measured on the 07:34 video. Custom draws nothing.
+        button = (NFBInboxPillButton*)
+            [NFBInboxPillButton buttonWithType:UIButtonTypeCustom];
         label = [UILabel new];
         label.tag = 1;
         [button addSubview:label];
@@ -325,7 +331,34 @@ static void nfbSwapApply(UIView* pillView) {
         chevron.tag = 2;
         [button addSubview:chevron];
         button.showsMenuAsPrimaryAction = YES;
+        // Our OWN capsule, native-shaped (the bar's default treatment for a
+        // plain UIKit item is a CIRCLE — measured ~63 pt on the 07:34 video,
+        // nothing like the wide native pill). Glass via the runtime so the
+        // iOS 16 SDK never hears about UIGlassEffect; his validated recipe:
+        // effect behind the content, radius = height / 2.
+        UIView* capsule = nil;
+        Class glassClass = NSClassFromString(@"UIGlassEffect");
+        UIVisualEffect* effect = glassClass ? [[glassClass alloc] init] : nil;
+        if (!effect) {
+            effect = [UIBlurEffect effectWithStyle:
+                          UIBlurEffectStyleSystemUltraThinMaterial];
+        }
+        capsule = [[UIVisualEffectView alloc] initWithEffect:effect];
+        capsule.userInteractionEnabled = NO;
+        capsule.layer.cornerRadius = 20.0;
+        capsule.layer.masksToBounds = YES;
+        capsule.tag = 3;
+        [button insertSubview:capsule atIndex:0];
+        NFBDebugLog(@"remplacement: capsule maison posée (%@)",
+                    glassClass ? @"UIGlassEffect" : @"repli matériau");
         gNFBSwapItem = [[UIBarButtonItem alloc] initWithCustomView:button];
+        // On OUR plain UIKit item the official per-item switch is exactly in
+        // its intended case — it kills the circular default treatment.
+        if ([gNFBSwapItem respondsToSelector:
+                NSSelectorFromString(@"setHidesSharedBackground:")]) {
+            [gNFBSwapItem setValue:@YES forKey:@"hidesSharedBackground"];
+            NFBDebugLog(@"remplacement: verre UIKit retiré sur notre item");
+        }
         NFBMark(button, @"PillSwap/bouton maison — identique au natif");
     } else {
         button = (NFBInboxPillButton*)gNFBSwapItem.customView;

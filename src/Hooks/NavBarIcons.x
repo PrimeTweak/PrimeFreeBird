@@ -540,8 +540,31 @@ static BOOL nfbIsWhiteBarGlyphCandidate(UIView* view) {
 // reaches the navigation controller, the screen is finally readable.
 - (void)didMoveToWindow {
     %orig;
-    if (!((UIView*)self).window ||
-        !objc_getAssociatedObject(self, kNFBPendingConfirmKey)) {
+    if (!((UIView*)self).window) {
+        return;
+    }
+    // Cold-start belt for the conversation bar, measured 17/08 07:42: at the
+    // FIRST conversation after a relaunch, setImage: fires before the button
+    // is attached and the next-turn retry still cannot read the chain — the
+    // icons stay template and spend the whole visit in the accent, washed by
+    // the platter's vibrancy (grey only from the second visit on). Here the
+    // chain is complete by definition, so the claim that missed at the setter
+    // lands now — the same two-step pattern the confirm glyph uses below.
+    UIImage* current = self.image;
+    if (current &&
+        current.renderingMode != UIImageRenderingModeAlwaysOriginal &&
+        (nfbIsChatBarGlyph((UIView*)self) ||
+         nfbIsBackArrowGlyph((UIView*)self))) {
+        UIColor* colour = nfbBarGlyphColour((UIView*)self);
+        UIImage* baked = NFBGreyGlyph(current, colour);
+        if (baked) {
+            NFBDebugLog(@"glyphe: barre de chat cuit au didMoveToWindow (relance a froid)");
+            NFBMark((UIView*)self, @"NavBarIcons/chatBarGlyph → cuit (fenetre)");
+            nfbTintGlyphChain((UIView*)self, colour);
+            self.image = baked;  // AlwaysOriginal: re-enters the setter and passes through
+        }
+    }
+    if (!objc_getAssociatedObject(self, kNFBPendingConfirmKey)) {
         return;
     }
     objc_setAssociatedObject(self, kNFBPendingConfirmKey, nil,
