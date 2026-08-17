@@ -547,3 +547,16 @@
 "VOICE_TRANSCRIPTION_DETAIL" = "Affiche le texte d'un message vocal sous son onde.";
 "DOWNLOAD_VOICE_MESSAGES_TITLE" = "Télécharger les messages vocaux";
 "DOWNLOAD_VOICE_MESSAGES_DETAIL" = "Appui long sur un message vocal pour enregistrer le fichier audio.";
+
+/* Notifications masquées */
+"NOTIFS_HIDE_ACTION" = "Masquer";
+"NOTIFS_HIDDEN_TOAST" = "Notification masquée";
+"HIDDEN_NOTIFS_TITLE" = "Notifications masquées";
+"HIDDEN_NOTIFS_COUNT" = "%ld masquée(s)";
+"HIDDEN_NOTIFS_CLEAR_ALL" = "Tout effacer";
+"HIDDEN_NOTIFS_EXPIRES_IN" = "expire dans %ld j";
+"HIDDEN_NOTIFS_EXAMPLE" = "Balaye une notification vers la gauche pour la masquer";
+"HIDDEN_NOTIFS_UNHIDE" = "Afficher";
+"HIDDEN_NOTIFS_UNTITLED" = "Notification masquée";
+"HIDE_NOTIFICATIONS_TITLE" = "Masquer les notifications";
+"HIDE_NOTIFICATIONS_DETAIL" = "Balaye une notification vers la gauche pour la masquer, et retrouve les masquées depuis la barre des notifications.";
