@@ -243,7 +243,13 @@ static NSString* NFBNotifIdentity(id model) {
     if (known) {
         return NFBNotifString(NFBNotifAsk(model, NSSelectorFromString(known)));
     }
+    // Measured, 18:20:17 — this model exposes exactly six selectors:
+    // description, scribeComponent, scribeElement, scribeItem,
+    // scribeItemImpressionID, init. So the identifier is a scribe one; the
+    // usual entryId/id names simply do not exist here. scribeItem is tried
+    // first (an object that may carry a stabler id), then the impression id.
     NSArray<NSString*>* candidates = @[
+        @"scribeItemImpressionID", @"scribeItemImpressionId",
         @"entryId", @"entryID", @"identifier", @"notificationId",
         @"notificationID", @"id", @"sortIndex", @"key", @"itemIdentifier"
     ];
@@ -253,6 +259,21 @@ static NSString* NFBNotifIdentity(id model) {
             cache[className] = name;
             NFBDebugLog(@"notifhide: identité de %@ = %@", className, name);
             return value;
+        }
+    }
+    // One level into scribeItem: the wrapper may hold the durable id.
+    id scribeItem = NFBNotifAsk(model, NSSelectorFromString(@"scribeItem"));
+    if (scribeItem && ![scribeItem isKindOfClass:[NSString class]]) {
+        NSArray<NSString*>* inner = @[@"entryId", @"entryID", @"id", @"itemId",
+                                      @"itemID", @"restId", @"identifier",
+                                      @"impressionId", @"impressionID"];
+        for (NSString* name in inner) {
+            NSString* value = NFBNotifString(NFBNotifAsk(scribeItem,
+                                                         NSSelectorFromString(name)));
+            if (value.length) {
+                NFBDebugLog(@"notifhide: identité via scribeItem.%@", name);
+                return [@"si:" stringByAppendingString:value];
+            }
         }
     }
     SEL found = NFBNotifDiscover(model, @[@"entryid", @"identifier", @"sortindex",
@@ -316,17 +337,84 @@ BOOL NFBNotifIsHidden(id model) {
         return NO;   // the hot path costs one dictionary read
     }
     NSString* identity = NFBNotifIdentity(model);
+    // An impression id is not guaranteed to survive a refresh. Rather than
+    // assume either way, the identity seen while FILTERING is journaled twice:
+    // if a hidden notification ever comes back, comparing these lines with
+    // « masquée <…> » says at once whether the id changed between two
+    // displays — no probe build needed.
+    static NSInteger noted;
+    if (identity.length && noted < 2) {
+        noted++;
+        NFBDebugLog(@"notifhide: identité vue au filtre <%@>", identity);
+    }
     return identity.length && hidden[identity] != nil;
 }
 
-static void NFBHideNotif(id model) {
+
+// This view model carries no text either (same measurement), so the wording
+// shown in the hidden list is read from the CELL at the moment of hiding —
+// its labels are the only place the notification's words exist.
+static NSString* NFBNotifTextFromCell(UITableView* table, NSIndexPath* indexPath) {
+    if (![table isKindOfClass:[UITableView class]] || !indexPath) {
+        return nil;
+    }
+    UITableViewCell* cell = [table cellForRowAtIndexPath:indexPath];
+    if (!cell) {
+        return nil;
+    }
+    NSMutableArray<NSString*>* pieces = [NSMutableArray array];
+    __block void (^walk)(UIView*, NSInteger);
+    walk = ^(UIView* view, NSInteger depth) {
+        if (!view || depth > 6 || pieces.count >= 3) {
+            return;
+        }
+        if (view.hidden || view.alpha < 0.05) {
+            return;
+        }
+        NSString* found = nil;
+        if ([view isKindOfClass:[UILabel class]]) {
+            found = ((UILabel*)view).text;
+        } else {
+            for (NSString* name in @[@"text", @"attributedText"]) {
+                SEL selector = NSSelectorFromString(name);
+                if (![view respondsToSelector:selector]) {
+                    continue;
+                }
+                NSMethodSignature* signature = [view methodSignatureForSelector:selector];
+                if (!signature.methodReturnType ||
+                    strcmp(signature.methodReturnType, "@") != 0) {
+                    continue;
+                }
+                id value = ((id (*)(id, SEL))objc_msgSend)(view, selector);
+                if ([value isKindOfClass:[NSString class]]) {
+                    found = value;
+                } else if ([value isKindOfClass:[NSAttributedString class]]) {
+                    found = ((NSAttributedString*)value).string;
+                }
+                if (found.length) {
+                    break;
+                }
+            }
+        }
+        if (found.length > 1 && ![pieces containsObject:found]) {
+            [pieces addObject:found];
+        }
+        for (UIView* sub in view.subviews) {
+            walk(sub, depth + 1);
+        }
+    };
+    walk(cell.contentView, 0);
+    return pieces.count ? [pieces componentsJoinedByString:@" · "] : nil;
+}
+
+static void NFBHideNotifWithText(id model, NSString* cellText) {
     NSString* identity = NFBNotifIdentity(model);
     if (!identity.length) {
         NFBDebugLog(@"notifhide: aucune identité lisible — masquage refusé");
         return;
     }
     NSMutableDictionary* current = [NFBHiddenNotifs() mutableCopy];
-    NSString* text = NFBNotifText(model) ?: @"";
+    NSString* text = NFBNotifText(model) ?: (cellText ?: @"");
     if (text.length > 140) {
         text = [text substringToIndex:140];
     }
@@ -338,6 +426,10 @@ static void NFBHideNotif(id model) {
     [[NSUserDefaults standardUserDefaults] setObject:current forKey:kNFBHiddenNotifsKey];
     NFBDebugLog(@"notifhide: masquée <%@> — %lu au total",
                 identity, (unsigned long)current.count);
+}
+
+static void NFBHideNotif(id model) {
+    NFBHideNotifWithText(model, nil);
 }
 
 // MARK: - The toast (the capsule he validated for Hidden Threads)
@@ -578,7 +670,7 @@ static id NFBModelAtIndexPath(id dataViewController, NSIndexPath* indexPath) {
                                     __unused UIView* sourceView,
                                     void (^completion)(BOOL)) {
             NSString* identity = NFBNotifIdentity(model);
-            NFBHideNotif(model);
+            NFBHideNotifWithText(model, NFBNotifTextFromCell(tableView, indexPath));
             completion(YES);
             nfbReapplyTimelineFilter();
             NFBShowNotifToast(identity);
@@ -888,7 +980,7 @@ static const char* kNFBNotifButtonKey = "nfbNotifQuickButton";
                                     __unused UIView* sourceView,
                                     void (^completion)(BOOL)) {
             NSString* identity = NFBNotifIdentity(model);
-            NFBHideNotif(model);
+            NFBHideNotifWithText(model, NFBNotifTextFromCell(tableView, indexPath));
             completion(YES);
             nfbReapplyTimelineFilter();
             NFBShowNotifToast(identity);
@@ -1135,7 +1227,7 @@ static UISwipeActionsConfiguration* nfbNotifTrailingSwipe(id self, SEL _cmd,
                                     __unused UIView* sourceView,
                                     void (^completion)(BOOL)) {
             NSString* identity = NFBNotifIdentity(model);
-            NFBHideNotif(model);
+            NFBHideNotifWithText(model, NFBNotifTextFromCell(table, indexPath));
             completion(YES);
             nfbReapplyTimelineFilter();
             NFBShowNotifToast(identity);
