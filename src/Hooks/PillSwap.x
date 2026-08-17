@@ -36,14 +36,54 @@
 @interface NFBInboxPillButton : UIButton
 @property (nonatomic, assign) CGSize nfbIntrinsic;
 @property (nonatomic, assign) CGRect nfbTouchRect;
+@property (nonatomic, assign) CGFloat nfbPillWidth;   // capsule width we want
+@property (nonatomic, assign) CGFloat nfbSpacing;     // label ↔ chevron
 @end
 @implementation NFBInboxPillButton
+
 - (CGSize)intrinsicContentSize {
     if (self.nfbIntrinsic.width > 0) {
         return self.nfbIntrinsic;
     }
     return [super intrinsicContentSize];
 }
+
+// v6 — his 15:04 ruler: « capsule à l'écran 318.7 → 376.0 » while the button
+// was logged at frame={{376, 67}, {0, 0}}. The placement had been computed
+// ONCE, at a moment the wrapper had not sized us yet (bounds 0 × 0), and was
+// never redone when it handed over the real 44 × 34 box. So the geometry now
+// lives HERE: every time the wrapper resizes us, we lay ourselves out again
+// from the bounds we actually have. Right edge of the capsule = right edge of
+// the box (measured at 420.0 = the native right edge), so 420 − 57.33 = 362.67
+// = the native left edge, whatever the box turns out to be.
+- (void)layoutSubviews {
+    [super layoutSubviews];
+    if (self.nfbPillWidth <= 0) {
+        return;
+    }
+    CGFloat height = 40.0;
+    CGRect box = self.bounds;
+    CGRect capsuleFrame = CGRectMake(box.size.width - self.nfbPillWidth,
+                                     (box.size.height - height) / 2.0,
+                                     self.nfbPillWidth, height);
+    UIView* capsule = [self viewWithTag:3];
+    capsule.frame = capsuleFrame;
+    self.nfbTouchRect = capsuleFrame;
+
+    UILabel* label = (UILabel*)[self viewWithTag:1];
+    UIImageView* chevron = (UIImageView*)[self viewWithTag:2];
+    CGFloat x = capsuleFrame.origin.x + 10.0;
+    CGFloat midY = CGRectGetMidY(capsuleFrame);
+    label.frame = CGRectMake(x, midY - label.bounds.size.height / 2.0,
+                             label.bounds.size.width, label.bounds.size.height);
+    if (!chevron.hidden) {
+        chevron.frame = CGRectMake(x + label.bounds.size.width + self.nfbSpacing,
+                                   midY - chevron.bounds.size.height / 2.0,
+                                   chevron.bounds.size.width,
+                                   chevron.bounds.size.height);
+    }
+}
+
 // The visible pill spills outside bounds; a tap anywhere on it must count.
 - (BOOL)pointInside:(CGPoint)point withEvent:(UIEvent*)event {
     if (!CGRectIsEmpty(self.nfbTouchRect)) {
@@ -135,33 +175,16 @@ static void nfbSwapLayoutButton(void) {
     CGFloat contentW = label.bounds.size.width + spacing + (chevron.hidden ? 0 : chevron.bounds.size.width);
     CGFloat width = contentW + 20.0;
     CGFloat height = 40.0;
-    // The wrapper decides the button's box (44 × 34 measured). We keep asking
-    // for the native size in case a future layout honours it, but we no longer
-    // depend on it: the capsule is positioned RELATIVE to whatever box we get,
-    // flush with its right edge and centred vertically. His measurement makes
-    // this exact — right edge 420.0, so 420.0 − 57.33 = 362.67 = the native
-    // left edge (362.7), and (34 − 40)/2 centres it on the native 64 → 104.
+    // Content sizes only. WHERE it all goes is decided in -layoutSubviews,
+    // which runs again every time the wrapper changes our box.
+    button.nfbPillWidth = width;
+    button.nfbSpacing = spacing;
     button.nfbIntrinsic = CGSizeMake(width, height);
     [button invalidateIntrinsicContentSize];
     button.clipsToBounds = NO;
     button.transform = CGAffineTransformMakeTranslation(gNFBSwapShift, 0);
-    CGRect box = button.bounds;
-    CGRect capsuleFrame = CGRectMake(box.size.width - width,
-                                     (box.size.height - height) / 2.0,
-                                     width, height);
-    UIView* capsule = [button viewWithTag:3];
-    capsule.frame = capsuleFrame;
-    button.nfbTouchRect = capsuleFrame;
-    CGFloat x = capsuleFrame.origin.x + 10.0;
-    CGFloat midY = CGRectGetMidY(capsuleFrame);
-    label.frame = CGRectMake(x, midY - label.bounds.size.height / 2.0,
-                             label.bounds.size.width, label.bounds.size.height);
-    if (!chevron.hidden) {
-        chevron.frame = CGRectMake(x + label.bounds.size.width + spacing,
-                                   midY - chevron.bounds.size.height / 2.0,
-                                   chevron.bounds.size.width,
-                                   chevron.bounds.size.height);
-    }
+    [button setNeedsLayout];
+    [button layoutIfNeeded];
 
     // THE RULER — measures the VISIBLE capsule now, not the wrapper's box.
     // Reference from his 21:31 capture: the native pill spans 362.7 → 420.0.
