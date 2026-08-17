@@ -36,6 +36,7 @@
 // Twitter (strong: it left the bar, but its menu must stay alive for ours).
 static UIBarButtonItem*  gNFBSwapItem;
 static UIBarButtonItem*  gNFBSwapOriginal;
+static UIMenu*           gNFBSwapMenu;   // harvested from the live control; outlives it
 static NSInteger         gNFBSwapCount;
 static const char*       kNFBSwapNavKey = "nfbSwapNav";
 
@@ -121,10 +122,11 @@ static void nfbSwapLayoutButton(void) {
 // Belt for the label after a menu pick: the stomp normally carries the new
 // state, this re-read covers a bridge that would not stomp.
 static void nfbSwapRefreshLabelFromMenu(void) {
-    if (!gNFBSwapItem || !gNFBSwapOriginal.menu) {
+    UIMenu* live = gNFBSwapOriginal.menu ?: gNFBSwapMenu;
+    if (!gNFBSwapItem || !live) {
         return;
     }
-    NSString* checked = nfbSwapCheckedTitle(gNFBSwapOriginal.menu);
+    NSString* checked = nfbSwapCheckedTitle(live);
     if (!checked.length) {
         return;
     }
@@ -252,17 +254,63 @@ static void nfbSwapApply(UIView* pillView) {
         return;  // content not built yet; the next layout retries
     }
 
-    // First unknown, answered loudly: without the original menu there is no
-    // identical button — native stays, and the journal says why.
+    // First unknown, ANSWERED on 17/08 06:59: the bridge item carries NO
+    // menu — the abandon fired as designed, native stayed. But the 21:31
+    // capture had the clue all along: a UIButtonLabel INSIDE the pill view.
+    // The pill is (or contains) a real UIButton, and a native tap-menu means
+    // showsMenuAsPrimaryAction — the menu lives on that control. Harvest it
+    // there; if it is nowhere, a loud probe prints the class lineage, the
+    // interactions and primaryAction, so the next capture names the carrier.
     UIMenu* menu = original.menu;
+    NSString* menuSource = @"item";
     if (!menu) {
-        static BOOL warned;
-        if (!warned) {
-            warned = YES;
-            NFBDebugLog(@"remplacement: menu original ABSENT — abandon, natif conservé");
+        NSMutableArray<UIView*>* pool = [NSMutableArray arrayWithObject:pillView];
+        for (UIView* sub in pillView.subviews) {
+            [pool addObject:sub];
+            for (UIView* deep in sub.subviews) {
+                [pool addObject:deep];
+            }
         }
-        return;
+        for (UIView* candidate in pool) {
+            if ([candidate isKindOfClass:[UIControl class]] &&
+                [candidate respondsToSelector:@selector(menu)]) {
+                UIMenu* found = ((UIButton*)candidate).menu;
+                if (found) {
+                    menu = found;
+                    menuSource = NSStringFromClass([candidate classForCoder]);
+                    break;
+                }
+            }
+        }
     }
+    if (!menu) {
+        static BOOL probed;
+        if (!probed) {
+            probed = YES;
+            NSMutableArray<NSString*>* lineage = [NSMutableArray array];
+            Class cls = [pillView class];
+            NSInteger depth = 0;
+            while (cls && depth < 6) {
+                [lineage addObject:NSStringFromClass(cls)];
+                cls = class_getSuperclass(cls);
+                depth++;
+            }
+            NSMutableArray<NSString*>* interactions = [NSMutableArray array];
+            for (id<UIInteraction> interaction in pillView.interactions) {
+                [interactions addObject:NSStringFromClass([interaction class])];
+            }
+            NFBDebugLog(@"remplacement: menu INTROUVABLE — sonde: lignee=%@ | "
+                        @"interactions=%@ | primaryAction=%@",
+                        [lineage componentsJoinedByString:@" < "],
+                        interactions.count
+                            ? [interactions componentsJoinedByString:@","] : @"-",
+                        original.primaryAction
+                            ? NSStringFromClass([original.primaryAction class])
+                            : @"nil");
+        }
+        return;  // natif conservé, la sonde a parlé
+    }
+    gNFBSwapMenu = menu;  // strong: it must outlive the mortal native button
 
     // Build ours once; later passes only refresh content and re-install.
     NFBInboxPillButton* button;
@@ -309,7 +357,7 @@ static void nfbSwapApply(UIView* pillView) {
         button.menu = [UIMenu menuWithChildren:@[
             [UIDeferredMenuElement elementWithUncachedProvider:
                 ^(void (^completion)(NSArray<UIMenuElement*>*)) {
-                UIMenu* live = gNFBSwapOriginal.menu;
+                UIMenu* live = gNFBSwapOriginal.menu ?: gNFBSwapMenu;
                 completion(live ? live.children : @[]);
                 dispatch_after(dispatch_time(DISPATCH_TIME_NOW,
                                              (int64_t)(2.0 * NSEC_PER_SEC)),
@@ -341,10 +389,10 @@ static void nfbSwapApply(UIView* pillView) {
                            withObject:gNFBSwapItem];
         nav.rightBarButtonItems = swapped;
     }
-    NFBDebugLog(@"remplacement: item posé #%ld — « %@ », menu %lu action(s), "
+    NFBDebugLog(@"remplacement: item posé #%ld — « %@ », menu %lu action(s) via %@, "
                 @"conteneur %@, écran %@",
                 (long)gNFBSwapCount, liveTitle,
-                (unsigned long)menu.children.count,
+                (unsigned long)menu.children.count, menuSource,
                 group ? @"groupe" : @"right",
                 NSStringFromClass([vc class]));
 }
