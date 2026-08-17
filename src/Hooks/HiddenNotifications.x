@@ -877,3 +877,69 @@ static const char* kNFBNotifButtonKey = "nfbNotifQuickButton";
 }
 
 %end
+
+// MARK: - the missing link
+//
+// He built the previous fix and reported the swipe still doing nothing — AND no
+// « swipe: … » line came out of it, although every refusal path was journaled.
+// A hook that never speaks is a hook that is never called, so the question is
+// not why our action is refused but why UIKit never asks for it.
+//
+// UIKit's own rule answers it: a table row offers NO swipe actions unless its
+// data source allows editing for that row. If Twitter's list answers NO to
+// tableView:canEditRowAtIndexPath: — or simply never gets asked because editing
+// is off — trailingSwipeActionsConfigurationForRowAtIndexPath: is never called
+// at all. That is mechanism, not a guess about their code: it is the documented
+// order in which UITableView asks its questions.
+//
+// So editing is allowed for the rows we can act on, and only those. Everything
+// else keeps Twitter's own answer.
+
+static BOOL NFBNotifRowIsOurs(id dataViewController, NSIndexPath* indexPath) {
+    if (!NFBNotifsEnabled()) {
+        return NO;
+    }
+    id model = NFBModelAtIndexPath(dataViewController, indexPath);
+    if (!model) {
+        return NO;
+    }
+    NSString* modelClass = NSStringFromClass([model class]);
+    return [modelClass containsString:@"Notification"] && NFBNotifIdentity(model) != nil;
+}
+
+%hook T1URTViewController
+
+- (BOOL)tableView:(UITableView*)tableView canEditRowAtIndexPath:(NSIndexPath*)indexPath {
+    if (NFBNotifRowIsOurs(self, indexPath)) {
+        static BOOL said;
+        if (!said) {
+            said = YES;
+            NFBDebugLog(@"[notifs] édition autorisée sur la liste (le swipe peut apparaître)");
+        }
+        return YES;
+    }
+    return %orig;
+}
+
+%end
+
+%hook TFNItemsDataViewController
+
+- (BOOL)tableView:(UITableView*)tableView canEditRowAtIndexPath:(NSIndexPath*)indexPath {
+    id dataVC = self;
+    if ([NSStringFromClass([dataVC class]) isEqualToString:@"T1URTViewController"]) {
+        return %orig;  // handled above — never twice
+    }
+    if (NFBNotifRowIsOurs(dataVC, indexPath)) {
+        static BOOL saidNet;
+        if (!saidNet) {
+            saidNet = YES;
+            NFBDebugLog(@"[notifs] édition autorisée par le filet sur %@",
+                        NSStringFromClass([dataVC class]));
+        }
+        return YES;
+    }
+    return %orig;
+}
+
+%end

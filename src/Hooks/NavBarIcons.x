@@ -330,29 +330,7 @@ static void nfbRepaintNotificationsGear(UIView* bar, UIColor* colour) {
             settingsButton
                 ? NO
                 : nfbControllerIsNotifications(nfbBarOwningController(bar));
-        // Third case, added 17/08 on his report: on a FRESH INSTALL the call and
-        // video glyphs of a conversation flash in the accent before settling.
-        // The setter path (setImage / didMoveToWindow) is simply too late there
-        // — exactly the gear's own history. So the conversation bar is treated
-        // the same way the gear finally was: repainted from THIS hook, which is
-        // on UIKit's own class, always loaded, and runs at every layout — plus
-        // held opaque so the fade cannot show the accent underneath.
-        BOOL conversation =
-            (!settingsButton && !notifications) && nfbIsChatConversationBar(bar);
-        if (!settingsButton && !notifications && !conversation) {
-            return;
-        }
-
-        if (conversation) {
-            // Right-hand glyphs only: the avatar and the title live on the left
-            // and must never be painted (the flattened-avatar lesson).
-            for (UIView* subview in bar.subviews) {
-                CGRect inBar = [subview convertRect:subview.bounds toView:bar];
-                if (CGRectGetMidX(inBar) > CGRectGetWidth(bar.bounds) * 0.6) {
-                    nfbRepaintGlyphs(subview, grey);
-                    nfbForceOpaque(subview);
-                }
-            }
+        if (!settingsButton && !notifications) {
             return;
         }
 
