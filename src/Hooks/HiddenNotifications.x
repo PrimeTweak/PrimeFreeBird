@@ -30,11 +30,9 @@ static NSString* const kNFBHiddenNotifsKey = @"nfb_hidden_notifs";
 static NSString* const kNFBNotifHorizonKey = @"nfb_notif_horizon_days";
 static NSString* const kNFBHideNotifsEnabledKey = @"hide_notifications";
 
-// Call counters for the blind-spot report (UIKit calls only; our own
-// self-test calls are excluded by the flag).
+// Call counters: how many times UIKit actually asked us.
 static NSInteger gNFBNotifCanEditCalls;
 static NSInteger gNFBNotifSwipeCalls;
-static BOOL gNFBNotifSelfTesting;   // tells our own calls apart from UIKit's
 
 
 // Absent key ⇒ ON. The feature must work on the very first build, before the
@@ -1184,9 +1182,7 @@ static id NFBNotifRowSourceFor(id candidate, UITableView* table) {
 
 static BOOL nfbNotifCanEdit(id self, SEL _cmd, UITableView* table, NSIndexPath* indexPath) {
     // Binary question, answered once: does the table ask us at all?
-    if (!gNFBNotifSelfTesting) {
-        gNFBNotifCanEditCalls++;
-    }
+    gNFBNotifCanEditCalls++;
     BOOL ours = NO;
     @try {
         ours = NFBNotifRowIsOursInTable(NFBNotifRowSourceFor(self, table), table, indexPath);
@@ -1213,8 +1209,15 @@ static BOOL nfbNotifCanEdit(id self, SEL _cmd, UITableView* table, NSIndexPath* 
 static UISwipeActionsConfiguration* nfbNotifTrailingSwipe(id self, SEL _cmd,
                                                           UITableView* table,
                                                           NSIndexPath* indexPath) {
-    if (!gNFBNotifSelfTesting) {
-        gNFBNotifSwipeCalls++;
+    gNFBNotifSwipeCalls++;
+    if (gNFBNotifSwipeCalls == 1) {
+        // His 19:29 capture proved canEdit is reached and answers YES. The only
+        // remaining unknown is whether the table ever asks for the ACTIONS —
+        // if this line never appears while « édition autorisée » does, the
+        // gesture itself is being taken elsewhere (the horizontal pager), and
+        // no delegate work can fix that.
+        NFBDebugLog(@"[notifs] la table DEMANDE les actions de balayage (%@)",
+                    NSStringFromClass([self class]));
     }
     UISwipeActionsConfiguration* original = nil;
     NSValue* boxed = gNFBNotifOrigSwipe[NSStringFromClass([self class])];
@@ -1331,145 +1334,6 @@ static void NFBNotifRefreshDelegateCache(UITableView* table) {
 }
 
 
-// MARK: - THE BLIND-SPOT REPORT
-//
-// His fair criticism, and it lands: I was testing ONE hypothesis per build.
-// This prints every link in the chain at once, so a single capture says which
-// one is broken instead of costing another round trip. The two angles I had
-// never even looked at are numbers 8 and 9 — the notifications list lives
-// inside a HORIZONTAL pager (All / Mentions), and a left swipe is a horizontal
-// gesture: if the pager's pan wins, the table never sees the swipe at all, no
-// matter how perfect the delegate wiring is.
-
-static NSString* NFBNotifGestureList(UIView* view) {
-    NSMutableArray<NSString*>* names = [NSMutableArray array];
-    for (UIGestureRecognizer* gesture in view.gestureRecognizers) {
-        [names addObject:[NSString stringWithFormat:@"%@%@",
-                          NSStringFromClass([gesture class]),
-                          gesture.isEnabled ? @"" : @"(off)"]];
-        if (names.count >= 4) { break; }
-    }
-    return names.count ? [names componentsJoinedByString:@","] : @"-";
-}
-
-static void NFBNotifDiagnose(UITableView* table) {
-    if (![table isKindOfClass:[UITableView class]] || !table.window) {
-        return;
-    }
-    // HARD LESSON, his crash on launch: this report asked a table about its
-    // row 0 and then CALLED Twitter's own methods on that index. On a table
-    // with no rows yet — and at launch every table is empty — that is an
-    // out-of-range access inside their code, i.e. a crash caused purely by
-    // instrumentation. A diagnostic must never be able to break the app.
-    // So: only a table that already has a row, only the notifications-side
-    // ones, and everything wrapped.
-    if (table.numberOfSections < 1 || [table numberOfRowsInSection:0] < 1) {
-        return;
-    }
-    NSString* sourceName = NSStringFromClass([table.dataSource class]);
-    if (![sourceName containsString:@"URT"] && ![sourceName containsString:@"Notification"]) {
-        return;   // never report on unrelated tables
-    }
-    @try {
-    id delegate = table.delegate;
-    id dataSource = table.dataSource;
-    SEL swipeSel = @selector(tableView:trailingSwipeActionsConfigurationForRowAtIndexPath:);
-    SEL editSel = @selector(tableView:canEditRowAtIndexPath:);
-    NSIndexPath* probe = [NSIndexPath indexPathForRow:0 inSection:0];
-
-    NFBDebugLog(@"===== [notifs] RAPPORT ANGLES MORTS =====");
-
-    // 1 — the toggle, raw value included: a silent NO disables everything.
-    id rawToggle = [[NSUserDefaults standardUserDefaults] objectForKey:kNFBHideNotifsEnabledKey];
-    NFBDebugLog(@"1. toggle hide_notifications = %@ | actif: %@",
-                rawToggle ?: @"(absent)", NFBNotifsEnabled() ? @"OUI" : @"NON");
-
-    // 2 — the table itself.
-    NFBDebugLog(@"2. table %@ | editing=%d | lignes s0=%ld | gestes: %@",
-                NSStringFromClass([table class]), table.isEditing,
-                (long)[table numberOfRowsInSection:0], NFBNotifGestureList(table));
-
-    // 3/4 — do the two objects admit our methods, and is OUR implementation
-    // the one actually installed on their class?
-    IMP swipeIMP = class_getMethodImplementation([delegate class], swipeSel);
-    IMP editIMP = class_getMethodImplementation([dataSource class], editSel);
-    NFBDebugLog(@"3. delegate %@ | répond=%@ | notre IMP=%@",
-                NSStringFromClass([delegate class]),
-                [delegate respondsToSelector:swipeSel] ? @"OUI" : @"NON",
-                swipeIMP == (IMP)nfbNotifTrailingSwipe ? @"OUI" : @"NON");
-    NFBDebugLog(@"4. dataSource %@ | répond=%@ | notre IMP=%@",
-                NSStringFromClass([dataSource class]),
-                [dataSource respondsToSelector:editSel] ? @"OUI" : @"NON",
-                editIMP == (IMP)nfbNotifCanEdit ? @"OUI" : @"NON");
-
-    // 5/6 — SELF TEST: call the two methods ourselves. If they work when WE
-    // call them but UIKit never does, the wiring is sound and the problem is
-    // upstream (cache, proxy, or a gesture stealing the swipe).
-    gNFBNotifSelfTesting = YES;
-    NSInteger canEditBefore = gNFBNotifCanEditCalls;
-    BOOL editable = NO;
-    @try {
-        if ([dataSource respondsToSelector:editSel]) {
-            editable = ((BOOL (*)(id, SEL, id, id))objc_msgSend)(dataSource, editSel, table, probe);
-        }
-    } @catch (id exception) {
-        NFBDebugLog(@"5b. auto-test canEdit a levé une exception — ignoré");
-    }
-    NFBDebugLog(@"5. auto-test canEdit(0,0) = %@ | notre code atteint: %@",
-                editable ? @"YES" : @"NO",
-                gNFBNotifCanEditCalls > canEditBefore ? @"OUI" : @"NON");
-
-    NSInteger swipeBefore = gNFBNotifSwipeCalls;
-    id configuration = nil;
-    @try {
-        if ([delegate respondsToSelector:swipeSel]) {
-            configuration = ((id (*)(id, SEL, id, id))objc_msgSend)(delegate, swipeSel, table, probe);
-        }
-    } @catch (id exception) {
-        NFBDebugLog(@"6b. auto-test swipe a levé une exception — ignoré");
-    }
-    NFBDebugLog(@"6. auto-test swipe(0,0) = %ld action(s) | notre code atteint: %@",
-                (long)[[configuration valueForKey:@"actions"] count],
-                gNFBNotifSwipeCalls > swipeBefore ? @"OUI" : @"NON");
-    gNFBNotifSelfTesting = NO;
-
-    // 7 — the row itself: model and computed identity, values included.
-    id model = NFBNotifModelForRow(NFBNotifRowSourceFor(dataSource, table), table, probe);
-    NFBDebugLog(@"7. ligne 0: modèle=%@ | identité=%@",
-                model ? NSStringFromClass([model class]) : @"(aucun)",
-                NFBNotifIdentity(model) ?: @"(aucune)");
-
-    // 8 — the cell: anything here can swallow a horizontal drag.
-    UITableViewCell* cell = [table cellForRowAtIndexPath:probe];
-    NFBDebugLog(@"8. cellule %@ | interaction=%d | gestes: %@",
-                cell ? NSStringFromClass([cell class]) : @"(aucune)",
-                cell.isUserInteractionEnabled, NFBNotifGestureList(cell));
-
-    // 9 — THE ANGLE I NEVER LOOKED AT: the ancestors. This screen sits in a
-    // horizontal pager; if its pan recogniser claims the gesture, no delegate
-    // work of ours can ever matter.
-    UIView* node = table.superview;
-    NSInteger depth = 0;
-    while (node && depth < 6) {
-        if (node.gestureRecognizers.count) {
-            NFBDebugLog(@"9.%ld ancêtre %@ | gestes: %@", (long)depth,
-                        NSStringFromClass([node class]), NFBNotifGestureList(node));
-        }
-        node = node.superview;
-        depth++;
-    }
-
-    // 10 — who has actually called us so far (UIKit only; self-tests excluded).
-    NFBDebugLog(@"10. appels reçus d'UIKit — canEdit=%ld swipe=%ld",
-                (long)gNFBNotifCanEditCalls, (long)gNFBNotifSwipeCalls);
-    NFBDebugLog(@"===== fin du rapport =====");
-    } @catch (id exception) {
-        gNFBNotifSelfTesting = NO;
-        NFBDebugLog(@"[notifs] rapport interrompu (%@) — sans conséquence",
-                    [exception respondsToSelector:@selector(name)] ? [exception name] : @"?");
-    }
-}
-
 static void NFBNotifWireTable(UITableView* table) {
     if (!NFBNotifsEnabled() || !table) {
         return;
@@ -1530,13 +1394,6 @@ static void NFBNotifWireTable(UITableView* table) {
 
     NFBNotifRefreshDelegateCache(table);
 
-    // The report runs once the layout has settled — and again on every later
-    // visit, so the call counters show what happened during his gestures.
-    __weak UITableView* weakTable = table;
-    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1.5 * NSEC_PER_SEC)),
-                   dispatch_get_main_queue(), ^{
-        NFBNotifDiagnose(weakTable);
-    });
 }
 
 %hook TFNTableView
