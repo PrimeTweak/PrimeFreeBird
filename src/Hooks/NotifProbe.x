@@ -72,24 +72,6 @@ static double NFBProbeAskDouble(id target, SEL selector) {
 // child whose class name marks it. URT notifications live under classes that
 // carry "Notification" (e.g. the activity/notifications timeline); the account
 // tab's own list does too. Never the home timeline (that has its own owner).
-static BOOL NFBProbeIsNotifications(UIViewController* vc) {
-    if (!vc) {
-        return NO;
-    }
-    NSString* own = NSStringFromClass([vc classForCoder]);
-    if ([own containsString:@"Notification"] || [own containsString:@"Activity"]) {
-        return YES;
-    }
-    for (UIViewController* child in vc.childViewControllers) {
-        NSString* childName = NSStringFromClass([child classForCoder]);
-        if ([childName containsString:@"Notification"] ||
-            [childName containsString:@"Activity"]) {
-            return YES;
-        }
-    }
-    return NO;
-}
-
 static UIViewController* NFBProbeOwningVC(id dataViewController) {
     UIResponder* responder = dataViewController;
     NSInteger hops = 0;
@@ -167,44 +149,45 @@ static double NFBProbeFindDateField(id vm, NSArray<NSString*>* selectors,
     if (!NFBDebugIsRecording()) {
         return;
     }
-    UIViewController* owner = NFBProbeOwningVC(self);
-    if (!NFBProbeIsNotifications(owner)) {
-        return;  // not the notifications surface — stay silent
+    // v2 — his 13:33 capture: he WAS on the notifications tab and the probe
+    // said nothing. Same trap as the opaque band (the real owner was called
+    // PagingViewController — a name matching no guess of mine). So the name
+    // filter is gone: every distinct list surface is catalogued once, and the
+    // capture names them all. First, an unmistakable proof of life.
+    static BOOL armed;
+    if (!armed) {
+        armed = YES;
+        NFBDebugLog(@"notifprobe: sonde armée (si tu ne vois pas cette ligne, "
+                    @"le fichier n'est pas dans le build)");
     }
+    UIViewController* owner = NFBProbeOwningVC(self);
 
-    // (2) the scope anchor, printed once.
+    // (2)+(3) one line per distinct surface, carrying the swipe verdict with
+    // it — so Messages and Notifications can be compared side by side in the
+    // same capture (his lead: the conversations list already swipes natively).
     static NSMutableSet<NSString*>* seenOwners;
     if (!seenOwners) { seenOwners = [NSMutableSet set]; }
-    NSString* ownerName = NSStringFromClass([owner classForCoder]);
+    NSString* ownerName = owner ? NSStringFromClass([owner classForCoder]) : @"?";
     NSMutableArray<NSString*>* childNames = [NSMutableArray array];
     for (UIViewController* child in owner.childViewControllers) {
         [childNames addObject:NSStringFromClass([child classForCoder])];
     }
-    if (![seenOwners containsObject:ownerName]) {
+    if (![seenOwners containsObject:ownerName] && seenOwners.count < 10) {
         [seenOwners addObject:ownerName];
-        NFBDebugLog(@"notifprobe: écran=%@ | enfants=%@ | dataVC=%@",
-                    ownerName,
-                    childNames.count ? [childNames componentsJoinedByString:@","] : @"-",
-                    NSStringFromClass([self classForCoder]));
-    }
-
-    // (3) native swipe support — his lead. Does this list answer the same
-    // trailing-swipe delegate call the conversations list uses?
-    static BOOL swipeReported;
-    if (!swipeReported) {
-        swipeReported = YES;
         SEL swipeSel = NSSelectorFromString(
             @"tableView:trailingSwipeActionsConfigurationForRowAtIndexPath:");
         SEL leadingSel = NSSelectorFromString(
             @"tableView:leadingSwipeActionsConfigurationForRowAtIndexPath:");
         SEL editSel = NSSelectorFromString(
             @"tableView:commitEditingStyle:forRowAtIndexPath:");
-        BOOL trailing = [self respondsToSelector:swipeSel];
-        BOOL leading = [self respondsToSelector:leadingSel];
-        BOOL legacy = [self respondsToSelector:editSel];
-        NFBDebugLog(@"notifprobe: swipe natif — trailing=%d leading=%d legacy=%d "
-                    @"(dataVC est le delegate?)",
-                    trailing, leading, legacy);
+        NFBDebugLog(@"notifprobe: écran=%@ | enfants=%@ | swipe trailing=%d "
+                    @"leading=%d legacy=%d | dataVC=%@",
+                    ownerName,
+                    childNames.count ? [childNames componentsJoinedByString:@","] : @"-",
+                    [self respondsToSelector:swipeSel],
+                    [self respondsToSelector:leadingSel],
+                    [self respondsToSelector:editSel],
+                    NSStringFromClass([self classForCoder]));
     }
 
     // (1)+(4) walk the items: catalogue each distinct view-model class once,
@@ -241,7 +224,7 @@ static double NFBProbeFindDateField(id vm, NSArray<NSString*>* selectors,
             counted++;
             NSString* vmClass = NSStringFromClass([vm classForCoder]);
 
-            if (![seenVMs containsObject:vmClass]) {
+            if (![seenVMs containsObject:vmClass] && seenVMs.count < 14) {
                 [seenVMs addObject:vmClass];
                 NSString* idSel = nil, *dateSel = nil, *textSel = nil;
                 NSString* idVal = NFBProbeFindIdField(vm, idSelectors, &idSel);
@@ -249,8 +232,8 @@ static double NFBProbeFindDateField(id vm, NSArray<NSString*>* selectors,
                 NSString* textVal = NFBProbeFindStringField(vm, textSelectors, &textSel);
                 NSString* preview = textVal.length > 40
                     ? [textVal substringToIndex:40] : (textVal ?: @"-");
-                NFBDebugLog(@"notifprobe: VM=%@ | id=%@(%@) | date=%@(%@) | texte=%@(«%@»)",
-                            vmClass,
+                NFBDebugLog(@"notifprobe: [%@] VM=%@ | id=%@(%@) | date=%@(%@) | texte=%@(«%@»)",
+                            ownerName, vmClass,
                             idSel ?: @"INTROUVABLE", idVal ? @"ok" : @"-",
                             dateSel ?: @"INTROUVABLE",
                             dateVal > 0 ? @"ok" : @"-",
@@ -265,13 +248,21 @@ static double NFBProbeFindDateField(id vm, NSArray<NSString*>* selectors,
         }
     }
 
-    if (oldest > 0) {
+    static NSMutableSet<NSString*>* ageReported;
+    if (!ageReported) { ageReported = [NSMutableSet set]; }
+    if (oldest > 0 && ![ageReported containsObject:ownerName] && ageReported.count < 10) {
+        [ageReported addObject:ownerName];
         double ageDays = ([[NSDate date] timeIntervalSince1970] - oldest) / 86400.0;
-        NFBDebugLog(@"notifprobe: %ld items | plus vieille notif ≈ %.1f jours (horizon)",
-                    (long)counted, ageDays);
+        NFBDebugLog(@"notifprobe: [%@] %ld items | plus vieux ≈ %.1f jours (horizon)",
+                    ownerName, (long)counted, ageDays);
     } else if (counted > 0) {
-        NFBDebugLog(@"notifprobe: %ld items | aucune date lisible (voir selecteurs ci-dessus)",
-                    (long)counted);
+        static NSMutableSet<NSString*>* noDateReported;
+        if (!noDateReported) { noDateReported = [NSMutableSet set]; }
+        if (![noDateReported containsObject:ownerName] && noDateReported.count < 10) {
+            [noDateReported addObject:ownerName];
+            NFBDebugLog(@"notifprobe: [%@] %ld items | aucune date lisible",
+                        ownerName, (long)counted);
+        }
     }
 }
 
