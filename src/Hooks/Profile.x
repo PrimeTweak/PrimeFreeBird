@@ -122,6 +122,28 @@ static void nfbMatchNeighbourStyle(UIButton* ours, UIView* neighbour) {
     if (neighbour.backgroundColor) {
         ours.backgroundColor = neighbour.backgroundColor;
     }
+    // Measured on his 17/08 capture: the bell and the share button wear a thin
+    // grey ring, ours had none — because the neighbour draws that ring in a
+    // SUBVIEW (its own background/blur layer), so copying the button's own
+    // borderWidth yields zero. When nothing came across, draw the ring here.
+    // Derived from labelColor, never from a semantic system fill: Twitter
+    // reinterprets those, and the badge contrast lesson cost a build.
+    if (ours.layer.borderWidth <= 0) {
+        BOOL ringFound = NO;
+        for (UIView* node in neighbour.subviews) {
+            if (node.layer.borderWidth > 0 && node.layer.borderColor) {
+                ours.layer.borderWidth = node.layer.borderWidth;
+                ours.layer.borderColor = node.layer.borderColor;
+                ringFound = YES;
+                break;
+            }
+        }
+        if (!ringFound) {
+            ours.layer.borderWidth = 1.0;
+            ours.layer.borderColor =
+                [[UIColor labelColor] colorWithAlphaComponent:0.14].CGColor;
+        }
+    }
     // The neighbour's glyph carries the tint the row expects; a template image
     // of ours then renders in the same colour.
     for (UIView* node in neighbour.subviews) {
