@@ -943,7 +943,7 @@ static BOOL nfbViewSitsInBarPlatter(UIView* view) {
 // it is painted. Addressed as a plain UIView: the class is Swift and Logos
 // forward-declares it, so it takes no message of its own.
 
-// MARK: the bridge over the re-host gap
+// MARK: the re-host gap — the measured fact the ride is built on
 //
 // Measured at 60 fps: on returning to the Messages list the pill is REMOVED
 // from the hierarchy for about six frames and then recreated — the avatar and
@@ -952,38 +952,43 @@ static BOOL nfbViewSitsInBarPlatter(UIView* view) {
 // why refusing animations, of any kind, changed nothing: there was never an
 // animation to refuse. The platter re-hosts its SwiftUI content, and the gap
 // between the old instance leaving and the new one arriving is the flash.
-//
-// The gap cannot be prevented, so it is covered: as the old pill leaves the
-// window, a snapshot of it is pinned where it stood, and the first new pill to
-// arrive takes it down. The snapshot lives in the navigation bar's own
-// container — never the window — so leaving the tab tears it down with the bar
-// instead of leaving a ghost over the next screen. If no new pill ever comes,
-// it expires on its own.
+// (The snapshot bridge, the curtain and the pinned mirror all tried to cover
+// that gap from the outside; their measured post-mortems live in the project
+// journal. The block below replaces them all.)
 
-// THE MIRROR — the pill's text, owned by us.
+// THE RIDE — the pill's text travels WITH the platter.
 //
-// Every fact below is measured, none is a theory:
-//   · the platter destroys and recreates the pill in cascades (journal:
-//     different instance pointers around each gap);
-//   · the capsule the platter draws PERSISTS through every gap (video 16:17,
-//     not one missing frame);
-//   · only the CONTENT — the "All" label and its chevron — blinks, ~133 ms
-//     (videos 16:17 and 16:40, identical measurements);
-//   · TFNNavigationBar is reachable from the pill and survives the re-host
-//     (v5 journal: every bridge landed in it and lived).
+// Twenty builds taught one structural lesson, measured on video at 60 fps:
+// every covering strategy so far — tint, opacity pinning, snapshot bridge,
+// persistent curtain, glass, understudy, pinned mirror — was the same idea in
+// different clothes: hold a static cover and chase content that the platter
+// destroys and moves. A static cover on an animated platter can only relocate
+// the artifact. The 21:34 video shows its terminal form: on every return the
+// pinned text sits 3.7 pt left of rest for 567 ms and then snaps right in two
+// frames, and around every transition the region goes empty because the
+// content dies before it can draw.
 //
-// So the fix stops covering and starts OWNING: the real content is hidden, and
-// a mirror of it — same text, same font, same chevron, same colours, copied
-// from the real thing on every layout — lives in the bar, which survives, at
-// layer.zPosition 100, which the re-host cannot bury (sibling subtrees are
-// composited by zPosition before order, so nothing added later draws over it).
-// The real pill stays fully functional underneath: the mirror never takes a
-// touch, so the tap and the menu are Twitter's own, untouched. Standard mode
-// has no platter and no blink, so the mirror simply never engages there.
+// The one invariant every measurement agreed on (video 16:17: not a single
+// missing frame): the CAPSULE never dies and animates smoothly. So the anchor
+// changes sides. The text is no longer pinned to a slot and synced from the
+// mortal content — it RIDES the platter: a display link reads the platter's
+// presentation geometry every frame and places the text centred inside it,
+// with the platter's own composite opacity. Morphs, re-hosts and fades are
+// no longer fought; they are followed. Content (label text, font, colour,
+// chevron) still copies from the real stack whenever the real stack exists,
+// and simply holds while it is being rebuilt.
+//
+// The build measures itself (the debugger is the test bench): every ride
+// episode ends with a summary line — tick count, x/y envelope, at-rest jumps,
+// anchor re-links — and any fault (jump at rest, unresolvable platter, lost
+// anchor) is named in DECISIONS with the data needed to fix it without a
+// guess. The receipts for THIS build are written in those lines.
+
+@interface NFBRideDriver : NSObject
+- (void)nfbRideTick:(CADisplayLink*)link;
+@end
 
 static const char* kNFBPillMirrorKey = "nfbPillMirror";
-static const char* kNFBPillMirrorSlotKey = "nfbPillMirrorSlot";
-static NSInteger gNFBMirrorSettleToken;
 
 // The tweak's own Liquid Glass switch, read the same way the rest of the file
 // reads its settings.
@@ -991,41 +996,179 @@ static BOOL nfbLiquidGlassEnabled(void) {
     return [BHTSettings boolForKey:@"enable_liquid_glass"];
 }
 
-// The bar the mirror currently hangs on, so the container watch below can take
-// the mirror down without walking anything. Weak: the bar owns itself.
+// The bar the mirror hangs on (weak: the bar owns itself), the pill instance
+// the content last copied from, and the platter the geometry rides.
 static __weak UIView* gNFBInboxMirrorBar;
-
-// The pill instance the mirror last synced from. Replacement is the RULE, not
-// the exception — journal of 16/08, one single return to Messages: the pill
-// <0x150283480> is re-posed at 20:34:02.185, a brand-new <0x1654a8e00> arrives
-// at 02.435, and the old one leaves for good at 03.093. Every handover is
-// therefore tracked and named, so a mirror stuck on a dead source can never
-// again fail silently.
 static __weak UIView* gNFBInboxMirrorSourcePill;
+static __weak UIView* gNFBPillPlatter;
 
-// The Messages container class lives in a LAZILY loaded framework — the health
-// report itself lists DMInbox among the late loaders, red at launch and green
-// once the screen opens. A load-time %hook therefore never lands on it, which
-// is exactly how the ghost came back. So the watch is installed the way Chat.x
-// already installs its replacement: by IMP, at the moment the first mirror is
-// posed — the screen is on the glass, the class is necessarily loaded.
+// The container instance, kept weak so creation can ask the only structural
+// question that matters: is the inbox on the glass right now? (Measured
+// 21:00:51.711: a stray layout of the departing pill once re-posed an orphan.)
 static void (*gNFBOrigContainerWillMove)(id, SEL, UIWindow*);
-
-// The container instance itself, kept weak so the pose below can ask the only
-// question that matters structurally: is the inbox on the glass right now?
-// Measured 21:00:51.711: a stray layout of the DEPARTING pill re-posed a
-// mirror 300 ms after the drop (the pill leaves ~500 ms after the container),
-// and that orphan floated over the next screen until the inbox came back.
 static __weak UIView* gNFBInboxContainer;
 
-// Defined below; declared here so the watch can call it without moving either
-// block.
+// Exit choreography: when the container leaves, the ride carries the text out
+// with the capsule and the tick's fuse takes it down — faded, recycled, or
+// timed out — instead of a hard drop that leaves an empty capsule behind
+// (measured: the pill outlives the container by ~500 ms on every exit).
+static BOOL     gNFBInboxLeaving;
+static int      gNFBRideOffTicks;
+static CGFloat  gNFBRideMinAlphaLeaving = 1.0;
+
+// The ride itself.
+static CADisplayLink*  gNFBRideLink;
+static NFBRideDriver*  gNFBRideDriver;
+static CGFloat         gNFBRideSpacing = 4.0;
+
+// Telemetry — this build's own receipts.
+static int     gNFBRideTicks;
+static CGFloat gNFBRideMinX, gNFBRideMaxX, gNFBRideMinY, gNFBRideMaxY;
+static int     gNFBRideRestJumps;
+static int     gNFBRideRelinks;
+static CGFloat gNFBRideRelinkMaxDelta;
+static CGRect  gNFBRideLastFrame;
+static BOOL    gNFBRideLastAtRest;
+
+// Defined below; declared here so the driver and the watch can call them.
 static void nfbDropInboxMirror(UIView* bar);
+static void nfbStopRide(void);
+
+@implementation NFBRideDriver
+
+- (void)nfbRideTick:(CADisplayLink*)link {
+    UIView* bar = gNFBInboxMirrorBar;
+    UIView* mirror = bar ? objc_getAssociatedObject(bar, kNFBPillMirrorKey) : nil;
+    if (!bar || !mirror || !nfbLiquidGlassEnabled()) {
+        if (bar && mirror) {
+            nfbDropInboxMirror(bar);
+        } else {
+            nfbStopRide();
+        }
+        return;
+    }
+    UIView* platter = gNFBPillPlatter;
+    if (!platter || !platter.window) {
+        NFBDebugLog(@"pill: ride — platine morte, drop");
+        nfbDropInboxMirror(bar);
+        return;
+    }
+
+    // The animated truth: convert through the PRESENTATION tree, so every
+    // in-flight transform of every ancestor is included. The model convert is
+    // both the sanity fallback and the at-rest reference.
+    CGRect model = [bar convertRect:platter.bounds fromView:platter];
+    CALayer* pres = platter.layer.presentationLayer ?: platter.layer;
+    CALayer* barPres = bar.layer.presentationLayer ?: bar.layer;
+    CGRect r = [pres convertRect:pres.bounds toLayer:barPres];
+    BOOL sane = !isnan(r.origin.x) && !isnan(r.origin.y) &&
+                r.size.width > 0 && r.size.width < 2000 &&
+                fabs(r.origin.x) < 4000 && fabs(r.origin.y) < 4000;
+    if (!sane) {
+        r = model;
+    }
+
+    // Composite opacity of the platter chain, presentation values included —
+    // the text fades exactly as the capsule fades, in and out.
+    CGFloat alpha = 1.0;
+    UIView* v = platter;
+    NSInteger depth = 0;
+    while (v && v != bar && depth < 40) {
+        CALayer* pl = v.layer.presentationLayer ?: v.layer;
+        alpha *= pl.opacity;
+        if (v.hidden) { alpha = 0; }
+        v = v.superview;
+        depth++;
+    }
+
+    BOOL atRest = fabs(r.origin.x - model.origin.x) < 0.1 &&
+                  fabs(r.origin.y - model.origin.y) < 0.1 &&
+                  fabs(r.size.width - model.size.width) < 0.1;
+
+    UILabel* label = (UILabel*)[mirror viewWithTag:1];
+    UIImageView* chevron = (UIImageView*)[mirror viewWithTag:2];
+    CGFloat lw = label.bounds.size.width, lh = label.bounds.size.height;
+    CGFloat cw = chevron.hidden ? 0 : chevron.bounds.size.width;
+    CGFloat chh = chevron.hidden ? 0 : chevron.bounds.size.height;
+    CGFloat sp = (chevron.hidden || cw <= 0) ? 0 : gNFBRideSpacing;
+    CGFloat total = lw + sp + cw;
+
+    [CATransaction begin];
+    [CATransaction setDisableActions:YES];
+    mirror.frame = r;
+    // Centred in the ridden rect — the measured rest layout IS centred:
+    // platter 57.33x44, stack 37.33x16 at {10, 14} = dead centre both ways.
+    CGFloat x0 = (r.size.width - total) / 2.0;
+    label.frame = CGRectMake(x0, (r.size.height - lh) / 2.0, lw, lh);
+    if (!chevron.hidden) {
+        chevron.frame = CGRectMake(x0 + lw + sp,
+                                   (r.size.height - chh) / 2.0, cw, chh);
+    }
+    mirror.alpha = alpha;
+    [CATransaction commit];
+
+    // ---- telemetry: the receipts of this build ----
+    if (gNFBRideTicks == 0) {
+        gNFBRideMinX = gNFBRideMaxX = r.origin.x;
+        gNFBRideMinY = gNFBRideMaxY = r.origin.y;
+        gNFBRideLastFrame = r;
+        gNFBRideLastAtRest = atRest;
+    }
+    gNFBRideTicks++;
+    if (r.origin.x < gNFBRideMinX) { gNFBRideMinX = r.origin.x; }
+    if (r.origin.x > gNFBRideMaxX) { gNFBRideMaxX = r.origin.x; }
+    if (r.origin.y < gNFBRideMinY) { gNFBRideMinY = r.origin.y; }
+    if (r.origin.y > gNFBRideMaxY) { gNFBRideMaxY = r.origin.y; }
+    if (atRest && gNFBRideLastAtRest) {
+        CGFloat dx = fabs(r.origin.x - gNFBRideLastFrame.origin.x);
+        CGFloat dy = fabs(r.origin.y - gNFBRideLastFrame.origin.y);
+        if (dx > 0.5 || dy > 0.5) {
+            gNFBRideRestJumps++;
+            if (gNFBRideRestJumps <= 3) {
+                NFBDebugLog(@"pill: RIDE FAUTE — saut au repos dx=%.1f dy=%.1f pt",
+                            dx, dy);
+            }
+        }
+    }
+    gNFBRideLastFrame = r;
+    gNFBRideLastAtRest = atRest;
+
+    // ---- exit fuse ----
+    if (gNFBInboxLeaving) {
+        if (alpha < gNFBRideMinAlphaLeaving) { gNFBRideMinAlphaLeaving = alpha; }
+        gNFBRideOffTicks++;
+        BOOL faded = alpha < 0.05;
+        BOOL recycled = gNFBRideMinAlphaLeaving < 0.2 &&
+                        alpha > gNFBRideMinAlphaLeaving + 0.3;
+        if (faded || recycled || gNFBRideOffTicks > 90) {
+            NFBDebugLog(@"pill: ride sortie — %@ (%.0f ms)",
+                        faded ? @"fondu complet"
+                              : (recycled ? @"platine recyclee" : @"fusible"),
+                        gNFBRideOffTicks * (1000.0 / 60.0));
+            nfbDropInboxMirror(bar);
+            return;
+        }
+    }
+}
+
+@end
 
 static void nfbContainerWillMoveToWindow(id self, SEL _cmd, UIWindow* newWindow) {
     gNFBInboxContainer = self;
-    if (!newWindow && gNFBInboxMirrorBar) {
-        nfbDropInboxMirror(gNFBInboxMirrorBar);
+    if (!newWindow) {
+        if (gNFBRideLink && gNFBInboxMirrorBar) {
+            // The text rides out with the capsule; the tick's fuse drops it
+            // faded instead of cutting it here and leaving an empty capsule
+            // for the ~500 ms the pill outlives the container.
+            gNFBInboxLeaving = YES;
+            gNFBRideOffTicks = 0;
+            gNFBRideMinAlphaLeaving = 1.0;
+            NFBDebugLog(@"pill: sortie — le texte suit la capsule");
+        } else if (gNFBInboxMirrorBar) {
+            nfbDropInboxMirror(gNFBInboxMirrorBar);
+        }
+    } else {
+        gNFBInboxLeaving = NO;
     }
     if (gNFBOrigContainerWillMove) {
         gNFBOrigContainerWillMove(self, _cmd, newWindow);
@@ -1068,18 +1211,41 @@ static void nfbInstallContainerWatch(void) {
     });
 }
 
+static void nfbStartRide(void) {
+    if (gNFBRideLink) {
+        return;
+    }
+    if (!gNFBRideDriver) {
+        gNFBRideDriver = [NFBRideDriver new];
+    }
+    gNFBRideLink = [CADisplayLink displayLinkWithTarget:gNFBRideDriver
+                                               selector:@selector(nfbRideTick:)];
+    [gNFBRideLink addToRunLoop:[NSRunLoop mainRunLoop]
+                       forMode:NSRunLoopCommonModes];
+    NFBDebugLog(@"pill: ride demarre");
+}
+
+static void nfbStopRide(void) {
+    [gNFBRideLink invalidate];
+    gNFBRideLink = nil;
+}
+
 static void nfbDropInboxMirror(UIView* bar) {
     UIView* mirror = objc_getAssociatedObject(bar, kNFBPillMirrorKey);
     if (!mirror) {
         return;
     }
-    // The native content steps back in for the exit. The departing pill
-    // outlives the container by ~500 ms (measured 21:13: retire at 16.671,
-    // pill still on glass until 17.151) and, with the mirror down and the
-    // pose now refused, a hidden stack is an EMPTY capsule sliding away on
-    // every exit — the refusal killed even the accidental cover the old race
-    // used to paint. Unhidden, the exit shows exactly what standard mode
-    // shows there. Non-destructive, so it runs before the state wipe.
+    nfbStopRide();
+    if (gNFBRideTicks > 0) {
+        // The episode's receipt: envelope, at-rest jumps, anchor re-links.
+        NFBDebugLog(@"pill: ride fini — %d ticks, x %.1f-%.1f, y %.1f-%.1f, "
+                    @"sauts_repos=%d, re-liees=%d (max %.1f pt)",
+                    gNFBRideTicks, gNFBRideMinX, gNFBRideMaxX,
+                    gNFBRideMinY, gNFBRideMaxY,
+                    gNFBRideRestJumps, gNFBRideRelinks, gNFBRideRelinkMaxDelta);
+    }
+    // The native content steps back in — whatever happens after us is
+    // Twitter's own drawing, exactly what standard mode shows.
     BOOL restored = NO;
     UIView* source = gNFBInboxMirrorSourcePill;
     for (UIView* sub in source.subviews) {
@@ -1098,9 +1264,15 @@ static void nfbDropInboxMirror(UIView* bar) {
                              OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     gNFBInboxMirrorBar = nil;
     gNFBInboxMirrorSourcePill = nil;
+    gNFBPillPlatter = nil;
+    gNFBInboxLeaving = NO;
+    gNFBRideTicks = 0;
+    gNFBRideRestJumps = 0;
+    gNFBRideRelinks = 0;
+    gNFBRideRelinkMaxDelta = 0;
     [mirror removeFromSuperview];
-    NFBDebugLog(restored ? @"pill: miroir retire (ecran quitte, natif rendu)"
-                         : @"pill: miroir retire (ecran quitte)");
+    NFBDebugLog(restored ? @"pill: miroir retire (natif rendu)"
+                         : @"pill: miroir retire");
 }
 
 static UIView* nfbPillBar(UIView* pill) {
@@ -1113,13 +1285,9 @@ static UIView* nfbPillBar(UIView* pill) {
         node = node.superview;
         depth++;
     }
-    // Audit of 16/08: with every other exit of the sync either logged or
-    // self-healing, THIS was the only path left that fails silently and
-    // stays failed — a replacement pill whose ancestor chain resolves no
-    // UINavigationBar leaves the mirror frozen on the dead instance and its
-    // own live content uncovered: the doubled "All". So when a mirror is
-    // already up, its bar is the fallback — the descendant test walks the
-    // whole chain, uncapped, with no class check to miss on.
+    // Audit of 16/08: this was the only silent, persistent failure path of
+    // the sync. When a mirror is already up, its bar is the fallback — the
+    // descendant test walks the whole chain, uncapped, with no class check.
     UIView* mirrorBar = gNFBInboxMirrorBar;
     if (mirrorBar && [pill isDescendantOfView:mirrorBar]) {
         return mirrorBar;
@@ -1127,28 +1295,29 @@ static UIView* nfbPillBar(UIView* pill) {
     return nil;
 }
 
-static void nfbMirrorInboxPill(UIView* pill);
-
-static void nfbScheduleMirrorResync(UIView* pill) {
-    NSInteger token = ++gNFBMirrorSettleToken;
-    __weak UIView* weakPill = pill;
-    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.3 * NSEC_PER_SEC)),
-                   dispatch_get_main_queue(), ^{
-        if (gNFBMirrorSettleToken != token) {
-            return;  // a newer pass owns the chain
+// The view the geometry rides: the glass platter above the pill. Measured in
+// the 21:31 capture: DMInbox...ItemView sits under UIPlatformGlassInteractionView
+// {{362.67, 0}, {57.33, 44}} inside the bar. The container_v2 is the fallback
+// if the interaction view ever renames; both are named in the journal.
+static UIView* nfbPillPlatterFor(UIView* pill) {
+    UIView* node = pill.superview;
+    UIView* fallback = nil;
+    NSInteger depth = 0;
+    while (node && depth < 32) {
+        NSString* cls = NSStringFromClass([node classForCoder]);
+        if ([cls containsString:@"PlatformGlass"]) {
+            return node;
         }
-        UIView* livePill = weakPill;
-        if (!livePill || !livePill.window) {
-            // Measured hole: the replaced pill's FINAL layout can own the
-            // last token, then leave the window — the pass no-ops and the
-            // chain dies holding the provisional 1.2× frame. The live source
-            // takes over the pass instead.
-            livePill = gNFBInboxMirrorSourcePill;
+        if (!fallback && [cls containsString:@"Platter"]) {
+            fallback = node;
         }
-        if (livePill && livePill.window) {
-            nfbMirrorInboxPill(livePill);
+        if ([node isKindOfClass:[UINavigationBar class]]) {
+            break;
         }
-    });
+        node = node.superview;
+        depth++;
+    }
+    return fallback;
 }
 
 static void nfbMirrorInboxPill(UIView* pill) {
@@ -1158,9 +1327,7 @@ static void nfbMirrorInboxPill(UIView* pill) {
     UIView* bar = nfbPillBar(pill);
     if (!bar) {
         // Named, never silent — this exact silence is what froze the mirror
-        // on 16/08. One line per instance, WITH the chain: if this build
-        // still cannot resolve a bar, the next capture hands over the real
-        // layout instead of another guess.
+        // on 16/08. One line per instance, WITH the chain.
         static const char* kNFBPillBarMissKey = "nfbPillBarMiss";
         if (!objc_getAssociatedObject(pill, kNFBPillBarMissKey)) {
             objc_setAssociatedObject(pill, kNFBPillBarMissKey, @YES,
@@ -1201,18 +1368,14 @@ static void nfbMirrorInboxPill(UIView* pill) {
 
     if (!nfbLiquidGlassEnabled()) {
         // Standard interface: no platter, no blink — nothing of ours belongs
-        // here. Whatever a previous state left behind is undone.
+        // here. One teardown path for every state.
         if (mirror) {
-            [mirror removeFromSuperview];
-            objc_setAssociatedObject(bar, kNFBPillMirrorKey, nil,
-                                     OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+            nfbDropInboxMirror(bar);
         }
         stack.hidden = NO;
         return;
     }
     if (!stack || !realLabel) {
-        // A structure this code does not recognise, named once — a silent
-        // mirror must never read as a mystery. The native content stays.
         static BOOL warned;
         if (!warned) {
             warned = YES;
@@ -1225,21 +1388,36 @@ static void nfbMirrorInboxPill(UIView* pill) {
         return;  // still growing; the next sized layout will carry it
     }
 
+    // The geometry's anchor. Without it, nothing is hidden and nothing is
+    // shown of ours — fail loud, native stays.
+    UIView* platter = nfbPillPlatterFor(pill);
+    if (!platter) {
+        static const char* kNFBPlatterMissKey = "nfbPillPlatterMiss";
+        if (!objc_getAssociatedObject(pill, kNFBPlatterMissKey)) {
+            objc_setAssociatedObject(pill, kNFBPlatterMissKey, @YES,
+                                     OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+            NSMutableArray<NSString*>* chain = [NSMutableArray array];
+            UIView* node = pill.superview;
+            NSInteger hops = 0;
+            while (node && hops < 40) {
+                [chain addObject:NSStringFromClass([node classForCoder])];
+                node = node.superview;
+                hops++;
+            }
+            NFBDebugLog(@"pill: platine INTROUVABLE <%p> chaine=%@",
+                        pill, [chain componentsJoinedByString:@" > "]);
+        }
+        stack.hidden = NO;
+        return;
+    }
+
     UILabel* mirrorLabel;
     UIImageView* mirrorChevron;
     if (!mirror) {
-        // CREATION is gated on the inbox being on the glass. The journal of
-        // 16/08 21:00 showed the race twice (51.711, 54.650): the drop fires
-        // exactly when the container leaves, then a late layout of the
-        // departing pill — still in the window for ~500 ms — re-posed a fresh
-        // mirror that nothing would ever drop. The container is tracked by
-        // the watch above; before the watch exists (first ever pose) it is
-        // nil and the pose proceeds, which is correct: the screen is up.
-        // Syncs of an existing mirror never pass through here.
+        // CREATION is gated on the inbox being on the glass (measured race
+        // of 21:00: a late layout of the departing pill re-posed an orphan).
         UIView* inbox = gNFBInboxContainer;
         if (inbox && !inbox.window) {
-            // The departing pill keeps drawing for ~500 ms; hand it back its
-            // native content instead of an empty capsule.
             stack.hidden = NO;
             NFBDebugLog(@"pill: pose refusee (inbox hors fenetre)");
             return;
@@ -1258,8 +1436,8 @@ static void nfbMirrorInboxPill(UIView* pill) {
                                  OBJC_ASSOCIATION_RETAIN_NONATOMIC);
         gNFBInboxMirrorBar = bar;
         nfbInstallContainerWatch();
-        NFBMark(mirror, @"NavBarIcons/inboxPill → miroir");
-        NFBDebugLog(@"pill: miroir posé dans %@",
+        NFBMark(mirror, @"NavBarIcons/inboxPill → ride");
+        NFBDebugLog(@"pill: miroir posé dans %@ — le texte suivra la platine",
                     NSStringFromClass([bar classForCoder]));
     } else {
         mirrorLabel = (UILabel*)[mirror viewWithTag:1];
@@ -1269,9 +1447,34 @@ static void nfbMirrorInboxPill(UIView* pill) {
         }
     }
 
-    // The sync is acting: this pill is now the mirror's source. A handover —
-    // measured on every return to Messages — is named with both pointers, so
-    // the journal shows the re-bind (or its absence) without costing a build.
+    // Anchor bind or handover — always named, with the switch delta so a
+    // visible jump can be traced to its exact re-link.
+    UIView* previousPlatter = gNFBPillPlatter;
+    if (previousPlatter != platter) {
+        NSString* cls = NSStringFromClass([platter classForCoder]);
+        if (previousPlatter) {
+            CGFloat delta = 0;
+            if (previousPlatter.window) {
+                CGRect a = [bar convertRect:previousPlatter.bounds
+                                   fromView:previousPlatter];
+                CGRect b = [bar convertRect:platter.bounds fromView:platter];
+                delta = MAX(fabs(a.origin.x - b.origin.x),
+                            fabs(a.origin.y - b.origin.y));
+            }
+            gNFBRideRelinks++;
+            if (delta > gNFBRideRelinkMaxDelta) { gNFBRideRelinkMaxDelta = delta; }
+            NFBDebugLog(@"pill: ancre re-liee <%p> -> <%p> (%@) delta=%.1f pt",
+                        previousPlatter, platter, cls, delta);
+        } else {
+            NFBDebugLog(@"pill: ancre platine posee: %@ <%p>", cls, platter);
+        }
+        gNFBPillPlatter = platter;
+        // First position immediately — the tick refines 16 ms later.
+        mirror.frame = [bar convertRect:platter.bounds fromView:platter];
+    }
+    nfbStartRide();
+
+    // Content handover, named with both pointers.
     UIView* previousSource = gNFBInboxMirrorSourcePill;
     if (previousSource != pill) {
         if (previousSource) {
@@ -1280,39 +1483,9 @@ static void nfbMirrorInboxPill(UIView* pill) {
         gNFBInboxMirrorSourcePill = pill;
     }
 
-    // Text and imagery are copied from the real content; geometry is NOT.
-    // The device capture settled why: the mirror only gets to sync during the
-    // re-host turbulence, exactly when the real label's frame reads {0,0} — a
-    // copied frame is a copied zero, and the mirror held "All" at size zero,
-    // invisible, for as long as the screen stayed still. So the sizes are
-    // DERIVED from the copied text and image, which are valid at any instant,
-    // and the copied frames are never consulted.
-    CGRect slot = [stack convertRect:stack.bounds toView:bar];
-    if (CGRectIsEmpty(slot)) {
-        return;  // a teardown-moment convert; the last good sync stands
-    }
-    // A mid-morph convert carries the bar's scale — measured at 1.2x in the
-    // capture, and seen on screen as the "All" that drifts. Geometry is taken
-    // only from a convert that is one-to-one with the stack; otherwise the last
-    // settled geometry stands and only the content refreshes. With no settled
-    // geometry yet, the native content stays on: nothing of ours is shown from
-    // a slot that cannot be trusted.
-    BOOL settled =
-        fabs(slot.size.width  - stack.bounds.size.width)  <= stack.bounds.size.width  * 0.05 &&
-        fabs(slot.size.height - stack.bounds.size.height) <= stack.bounds.size.height * 0.05;
-    NSValue* heldSlot = objc_getAssociatedObject(mirror, kNFBPillMirrorSlotKey);
-    if (settled) {
-        mirror.frame = slot;
-    } else if (!heldSlot) {
-        // No settled geometry yet — the entry cascade. Refusing to show here
-        // starved the cover for the whole cascade and handed the screen back
-        // to the blinking native content: the flash returned. So the slot is
-        // taken PROVISIONALLY — the cover is up from the first sized layout —
-        // and the settling pass below snaps it to the rest geometry within a
-        // beat. A bounded, transient drift against a flash: the flash loses.
-        mirror.frame = slot;
-    }
-
+    // CONTENT ONLY — geometry belongs to the ride tick. Text, font, colour
+    // and chevron copy from the real thing whenever it exists, and simply
+    // hold while the platter rebuilds it.
     mirrorLabel.attributedText = realLabel.attributedText;
     if (!mirrorLabel.attributedText.length && realLabel.text.length) {
         mirrorLabel.text = realLabel.text;
@@ -1320,66 +1493,34 @@ static void nfbMirrorInboxPill(UIView* pill) {
         mirrorLabel.textColor = realLabel.textColor;
     }
     [mirrorLabel sizeToFit];
-
-    CGFloat spacing = stack.spacing > 0 ? stack.spacing : 2.0;
-    CGSize chevronSize = CGSizeZero;
+    gNFBRideSpacing = stack.spacing > 0 ? stack.spacing : 4.0;
     if (realChevron.image) {
         mirrorChevron.hidden = NO;
         mirrorChevron.image = realChevron.image;
         mirrorChevron.tintColor = realChevron.tintColor;
         mirrorChevron.contentMode = realChevron.contentMode;
-        chevronSize = CGRectIsEmpty(realChevron.frame)
+        CGSize chevronSize = CGRectIsEmpty(realChevron.frame)
             ? realChevron.image.size
             : realChevron.frame.size;
+        mirrorChevron.bounds = (CGRect){CGPointZero, chevronSize};
     } else {
         mirrorChevron.hidden = YES;
     }
-
-    CGSize labelSize = mirrorLabel.bounds.size;
-    CGFloat height = mirror.bounds.size.height;
-    mirrorLabel.frame = CGRectMake(0,
-                                   (height - labelSize.height) / 2.0,
-                                   labelSize.width, labelSize.height);
-    if (!mirrorChevron.hidden) {
-        mirrorChevron.frame = CGRectMake(labelSize.width + spacing,
-                                         (height - chevronSize.height) / 2.0,
-                                         chevronSize.width, chevronSize.height);
-    }
-
-    if (NFBDebugIsRecording() && CGSizeEqualToSize(labelSize, CGSizeZero)) {
+    if (NFBDebugIsRecording() &&
+        CGSizeEqualToSize(mirrorLabel.bounds.size, CGSizeZero)) {
         NFBDebugLog(@"pill: miroir sans texte mesurable");
     }
 
-    // The blinking original steps aside; the mirror is what is seen.
+    // The blinking original steps aside; the ridden text is what is seen.
     stack.hidden = YES;
-
-    // The last sync of a cascade can land mid-morph, when the convert carries
-    // the bar's 1.2× transform — the capture showed exactly that geometry held
-    // at rest. So a settling pass is scheduled whenever the slot CHANGED: it
-    // re-reads the live pill a beat later, and the chain stops by itself the
-    // first time two passes agree. Converges in two passes at most.
-    if (settled) {
-        if (!heldSlot || !CGRectEqualToRect(heldSlot.CGRectValue, slot)) {
-            objc_setAssociatedObject(mirror, kNFBPillMirrorSlotKey,
-                                     [NSValue valueWithCGRect:slot],
-                                     OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-            nfbScheduleMirrorResync(pill);
-        }
-    } else {
-        // Turbulence: one more pass a beat later converges on the rest state.
-        nfbScheduleMirrorResync(pill);
-    }
 }
 
 %hook _TtC7DMInbox39InboxNavigationBarMenuBarButtonItemView
 
 // willMoveToWindow: and didAddSubview: used to be hooked here as well. The
 // health report measured both as never landing — this Swift class does not
-// redefine either method, and Logos on a method the class does not own is the
-// exact trap the container watch documents above. Their only job was opacity
-// pinning, which didMoveToWindow and layoutSubviews below already cover, and
-// nfbForceOpaque walks the subtree. Removed rather than kept as dead weight:
-// the health banner dropping from 5 flags to 3 is this build's own receipt.
+// redefine either method. Their only job was opacity pinning, which the two
+// methods below already cover, and nfbForceOpaque walks the subtree.
 - (void)didMoveToWindow {
     %orig;
     if (!((UIView*)self).window) {
@@ -1392,9 +1533,8 @@ static void nfbMirrorInboxPill(UIView* pill) {
 - (void)layoutSubviews {
     %orig;
     nfbForceOpaque((UIView*)self);
-    // Replacements arrive zero-sized and grow; the mirror is synced here, at
-    // every layout that has a real size — text, chevron and frames copied from
-    // the real content each pass.
+    // Replacements arrive zero-sized and grow; the content is synced here, at
+    // every layout that has a real size. Geometry never is — the ride owns it.
     nfbMirrorInboxPill((UIView*)self);
 }
 
