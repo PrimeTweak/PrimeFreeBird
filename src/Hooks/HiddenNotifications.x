@@ -30,6 +30,13 @@ static NSString* const kNFBHiddenNotifsKey = @"nfb_hidden_notifs";
 static NSString* const kNFBNotifHorizonKey = @"nfb_notif_horizon_days";
 static NSString* const kNFBHideNotifsEnabledKey = @"hide_notifications";
 
+// Call counters for the blind-spot report (UIKit calls only; our own
+// self-test calls are excluded by the flag).
+static NSInteger gNFBNotifCanEditCalls;
+static NSInteger gNFBNotifSwipeCalls;
+static BOOL gNFBNotifSelfTesting;   // tells our own calls apart from UIKit's
+
+
 // Absent key ⇒ ON. The feature must work on the very first build, before the
 // settings row lands; once the row exists (default YES) the two agree.
 static BOOL NFBNotifsEnabled(void) {
@@ -1180,6 +1187,10 @@ static id NFBNotifRowSourceFor(id candidate, UITableView* table) {
 }
 
 static BOOL nfbNotifCanEdit(id self, SEL _cmd, UITableView* table, NSIndexPath* indexPath) {
+    // Binary question, answered once: does the table ask us at all?
+    if (!gNFBNotifSelfTesting) {
+        gNFBNotifCanEditCalls++;
+    }
     if (NFBNotifRowIsOursInTable(NFBNotifRowSourceFor(self, table), table, indexPath)) {
         static BOOL said;
         if (!said) {
@@ -1200,6 +1211,9 @@ static BOOL nfbNotifCanEdit(id self, SEL _cmd, UITableView* table, NSIndexPath* 
 static UISwipeActionsConfiguration* nfbNotifTrailingSwipe(id self, SEL _cmd,
                                                           UITableView* table,
                                                           NSIndexPath* indexPath) {
+    if (!gNFBNotifSelfTesting) {
+        gNFBNotifSwipeCalls++;
+    }
     UISwipeActionsConfiguration* original = nil;
     NSValue* boxed = gNFBNotifOrigSwipe[NSStringFromClass([self class])];
     if (boxed) {
@@ -1277,6 +1291,142 @@ static void NFBNotifInstall(id target, SEL selector, IMP replacement,
     }
 }
 
+static void NFBNotifRefreshDelegateCache(UITableView* table) {
+    if (![table isKindOfClass:[UITableView class]]) {
+        return;
+    }
+    static const char* kNFBNotifRefreshedKey = "nfbNotifRefreshed";
+    if (objc_getAssociatedObject(table, kNFBNotifRefreshedKey)) {
+        return;   // once per table: re-assigning marks the table for reload
+    }
+    objc_setAssociatedObject(table, kNFBNotifRefreshedKey, @YES,
+                             OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    id delegate = table.delegate;
+    id dataSource = table.dataSource;
+    if (delegate) {
+        table.delegate = nil;
+        table.delegate = delegate;
+    }
+    if (dataSource) {
+        table.dataSource = nil;
+        table.dataSource = dataSource;
+    }
+    NFBDebugLog(@"[notifs] cache du delegate reconstruit (%@)",
+                NSStringFromClass([table class]));
+}
+
+
+// MARK: - THE BLIND-SPOT REPORT
+//
+// His fair criticism, and it lands: I was testing ONE hypothesis per build.
+// This prints every link in the chain at once, so a single capture says which
+// one is broken instead of costing another round trip. The two angles I had
+// never even looked at are numbers 8 and 9 — the notifications list lives
+// inside a HORIZONTAL pager (All / Mentions), and a left swipe is a horizontal
+// gesture: if the pager's pan wins, the table never sees the swipe at all, no
+// matter how perfect the delegate wiring is.
+
+static NSString* NFBNotifGestureList(UIView* view) {
+    NSMutableArray<NSString*>* names = [NSMutableArray array];
+    for (UIGestureRecognizer* gesture in view.gestureRecognizers) {
+        [names addObject:[NSString stringWithFormat:@"%@%@",
+                          NSStringFromClass([gesture class]),
+                          gesture.isEnabled ? @"" : @"(off)"]];
+        if (names.count >= 4) { break; }
+    }
+    return names.count ? [names componentsJoinedByString:@","] : @"-";
+}
+
+static void NFBNotifDiagnose(UITableView* table) {
+    if (![table isKindOfClass:[UITableView class]] || !table.window) {
+        return;
+    }
+    id delegate = table.delegate;
+    id dataSource = table.dataSource;
+    SEL swipeSel = @selector(tableView:trailingSwipeActionsConfigurationForRowAtIndexPath:);
+    SEL editSel = @selector(tableView:canEditRowAtIndexPath:);
+    NSIndexPath* probe = [NSIndexPath indexPathForRow:0 inSection:0];
+
+    NFBDebugLog(@"===== [notifs] RAPPORT ANGLES MORTS =====");
+
+    // 1 — the toggle, raw value included: a silent NO disables everything.
+    id rawToggle = [[NSUserDefaults standardUserDefaults] objectForKey:kNFBHideNotifsEnabledKey];
+    NFBDebugLog(@"1. toggle hide_notifications = %@ | actif: %@",
+                rawToggle ?: @"(absent)", NFBNotifsEnabled() ? @"OUI" : @"NON");
+
+    // 2 — the table itself.
+    NFBDebugLog(@"2. table %@ | editing=%d | lignes s0=%ld | gestes: %@",
+                NSStringFromClass([table class]), table.isEditing,
+                (long)[table numberOfRowsInSection:0], NFBNotifGestureList(table));
+
+    // 3/4 — do the two objects admit our methods, and is OUR implementation
+    // the one actually installed on their class?
+    IMP swipeIMP = class_getMethodImplementation([delegate class], swipeSel);
+    IMP editIMP = class_getMethodImplementation([dataSource class], editSel);
+    NFBDebugLog(@"3. delegate %@ | répond=%@ | notre IMP=%@",
+                NSStringFromClass([delegate class]),
+                [delegate respondsToSelector:swipeSel] ? @"OUI" : @"NON",
+                swipeIMP == (IMP)nfbNotifTrailingSwipe ? @"OUI" : @"NON");
+    NFBDebugLog(@"4. dataSource %@ | répond=%@ | notre IMP=%@",
+                NSStringFromClass([dataSource class]),
+                [dataSource respondsToSelector:editSel] ? @"OUI" : @"NON",
+                editIMP == (IMP)nfbNotifCanEdit ? @"OUI" : @"NON");
+
+    // 5/6 — SELF TEST: call the two methods ourselves. If they work when WE
+    // call them but UIKit never does, the wiring is sound and the problem is
+    // upstream (cache, proxy, or a gesture stealing the swipe).
+    gNFBNotifSelfTesting = YES;
+    NSInteger canEditBefore = gNFBNotifCanEditCalls;
+    BOOL editable = NO;
+    if ([dataSource respondsToSelector:editSel]) {
+        editable = ((BOOL (*)(id, SEL, id, id))objc_msgSend)(dataSource, editSel, table, probe);
+    }
+    NFBDebugLog(@"5. auto-test canEdit(0,0) = %@ | notre code atteint: %@",
+                editable ? @"YES" : @"NO",
+                gNFBNotifCanEditCalls > canEditBefore ? @"OUI" : @"NON");
+
+    NSInteger swipeBefore = gNFBNotifSwipeCalls;
+    id configuration = nil;
+    if ([delegate respondsToSelector:swipeSel]) {
+        configuration = ((id (*)(id, SEL, id, id))objc_msgSend)(delegate, swipeSel, table, probe);
+    }
+    NFBDebugLog(@"6. auto-test swipe(0,0) = %ld action(s) | notre code atteint: %@",
+                (long)[[configuration valueForKey:@"actions"] count],
+                gNFBNotifSwipeCalls > swipeBefore ? @"OUI" : @"NON");
+    gNFBNotifSelfTesting = NO;
+
+    // 7 — the row itself: model and computed identity, values included.
+    id model = NFBNotifModelForRow(NFBNotifRowSourceFor(dataSource, table), table, probe);
+    NFBDebugLog(@"7. ligne 0: modèle=%@ | identité=%@",
+                model ? NSStringFromClass([model class]) : @"(aucun)",
+                NFBNotifIdentity(model) ?: @"(aucune)");
+
+    // 8 — the cell: anything here can swallow a horizontal drag.
+    UITableViewCell* cell = [table cellForRowAtIndexPath:probe];
+    NFBDebugLog(@"8. cellule %@ | interaction=%d | gestes: %@",
+                cell ? NSStringFromClass([cell class]) : @"(aucune)",
+                cell.isUserInteractionEnabled, NFBNotifGestureList(cell));
+
+    // 9 — THE ANGLE I NEVER LOOKED AT: the ancestors. This screen sits in a
+    // horizontal pager; if its pan recogniser claims the gesture, no delegate
+    // work of ours can ever matter.
+    UIView* node = table.superview;
+    NSInteger depth = 0;
+    while (node && depth < 6) {
+        if (node.gestureRecognizers.count) {
+            NFBDebugLog(@"9.%ld ancêtre %@ | gestes: %@", (long)depth,
+                        NSStringFromClass([node class]), NFBNotifGestureList(node));
+        }
+        node = node.superview;
+        depth++;
+    }
+
+    // 10 — who has actually called us so far (UIKit only; self-tests excluded).
+    NFBDebugLog(@"10. appels reçus d'UIKit — canEdit=%ld swipe=%ld",
+                (long)gNFBNotifCanEditCalls, (long)gNFBNotifSwipeCalls);
+    NFBDebugLog(@"===== fin du rapport =====");
+}
+
 static void NFBNotifWireTable(UITableView* table) {
     if (!NFBNotifsEnabled() || !table) {
         return;
@@ -1305,6 +1455,34 @@ static void NFBNotifWireTable(UITableView* table) {
     NFBNotifInstall(delegate,
                     @selector(tableView:trailingSwipeActionsConfigurationForRowAtIndexPath:),
                     (IMP)nfbNotifTrailingSwipe, "@@:@@", gNFBNotifOrigSwipe);
+
+    // MEASUREMENT, not theory. Two competing explanations for ten silent
+    // builds — the table caches what its delegate answers, OR the delegate is
+    // a proxy that forwards respondsToSelector: elsewhere and therefore denies
+    // knowing our method. This line settles it on the spot: after installing,
+    // ASK the delegate whether it now recognises the selector.
+    //   répond=OUI  → the object admits the method; if the swipe still never
+    //                 fires, the cache is the culprit.
+    //   répond=NON  → the proxy denies it; the cache is innocent and the fix
+    //                 belongs on respondsToSelector:.
+    SEL swipeSel = @selector(tableView:trailingSwipeActionsConfigurationForRowAtIndexPath:);
+    SEL editSel = @selector(tableView:canEditRowAtIndexPath:);
+    NFBDebugLog(@"[notifs] MESURE — delegate %@ répond au swipe: %@ | dataSource %@ "
+                @"répond à canEdit: %@",
+                NSStringFromClass([delegate class]),
+                [delegate respondsToSelector:swipeSel] ? @"OUI" : @"NON",
+                NSStringFromClass([dataSource class]),
+                [dataSource respondsToSelector:editSel] ? @"OUI" : @"NON");
+
+    NFBNotifRefreshDelegateCache(table);
+
+    // The report runs once the layout has settled — and again on every later
+    // visit, so the call counters show what happened during his gestures.
+    __weak UITableView* weakTable = table;
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1.5 * NSEC_PER_SEC)),
+                   dispatch_get_main_queue(), ^{
+        NFBNotifDiagnose(weakTable);
+    });
 }
 
 %hook TFNTableView
@@ -1317,6 +1495,46 @@ static void NFBNotifWireTable(UITableView* table) {
     if (table.window) {
         NFBNotifWireTable((UITableView*)self);
     }
+}
+
+%end
+
+// MARK: - the cache nobody mentions
+//
+// Ten builds in, everything was installed and nothing was ever asked. The
+// missing fact is UIKit's own: a UITableView interrogates its delegate and its
+// data source ONCE — when they are assigned — and caches which optional methods
+// they answer. Adding a method afterwards changes nothing: the table never asks
+// again. Our methods existed; the table did not know they did.
+//
+// Two consequences, both handled here:
+//   · install BEFORE the assignment (the setter hooks below), so the cache is
+//     built with our methods already in place;
+//   · for a table already wired, re-assign delegate and data source once, which
+//     is the documented way to make the table rebuild that cache.
+
+
+%hook UITableView
+
+// Installing here means the cache below is built WITH our methods present —
+// the ordering that the whole feature was missing.
+- (void)setDelegate:(id)delegate {
+    if (delegate && NFBNotifsEnabled()) {
+        if (!gNFBNotifOrigSwipe) { gNFBNotifOrigSwipe = [NSMutableDictionary dictionary]; }
+        NFBNotifInstall(delegate,
+                        @selector(tableView:trailingSwipeActionsConfigurationForRowAtIndexPath:),
+                        (IMP)nfbNotifTrailingSwipe, "@@:@@", gNFBNotifOrigSwipe);
+    }
+    %orig;
+}
+
+- (void)setDataSource:(id)dataSource {
+    if (dataSource && NFBNotifsEnabled()) {
+        if (!gNFBNotifOrigCanEdit) { gNFBNotifOrigCanEdit = [NSMutableDictionary dictionary]; }
+        NFBNotifInstall(dataSource, @selector(tableView:canEditRowAtIndexPath:),
+                        (IMP)nfbNotifCanEdit, "B@:@@", gNFBNotifOrigCanEdit);
+    }
+    %orig;
 }
 
 %end
