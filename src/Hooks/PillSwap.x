@@ -107,9 +107,14 @@ static void nfbSwapLayoutButton(void) {
     CGFloat spacing = (chevron.hidden || chevron.bounds.size.width <= 0) ? 0 : 4.0;
     CGFloat contentW = label.bounds.size.width + spacing + (chevron.hidden ? 0 : chevron.bounds.size.width);
     CGFloat width = contentW + 20.0;
-    button.bounds = CGRectMake(0, 0, width, 40.0);
+    // Measured on the 08:12 video: our capsule sat ~10 pt right of the native
+    // one (right edge 429.7 vs the native 420). The bar anchors the item's
+    // trailing edge, so the button carries 10 dead points on its right: the
+    // visible capsule and its content land exactly where the native pill was.
+    CGFloat trailingNudge = 10.0;
+    button.bounds = CGRectMake(0, 0, width + trailingNudge, 40.0);
     UIView* capsule = [button viewWithTag:3];
-    capsule.frame = button.bounds;
+    capsule.frame = CGRectMake(0, 0, width, 40.0);
     CGFloat x = 10.0;
     label.frame = CGRectMake(x, (40.0 - label.bounds.size.height) / 2.0,
                              label.bounds.size.width, label.bounds.size.height);
