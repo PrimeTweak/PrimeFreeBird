@@ -531,3 +531,16 @@
 "PROFILE_INITIAL_TAB_SUBTITLE" = "Pick the tab a profile opens on.";
 
 "PROFILE_TAB_REPOSTS" = "Reposts";
+
+/* Hidden notifications */
+"NOTIFS_HIDE_ACTION" = "Hide";
+"NOTIFS_HIDDEN_TOAST" = "Notification hidden";
+"HIDDEN_NOTIFS_TITLE" = "Hidden notifications";
+"HIDDEN_NOTIFS_COUNT" = "%ld hidden";
+"HIDDEN_NOTIFS_CLEAR_ALL" = "Clear all";
+"HIDDEN_NOTIFS_EXPIRES_IN" = "expires in %ldd";
+"HIDDEN_NOTIFS_EXAMPLE" = "Swipe a notification left to hide it";
+"HIDDEN_NOTIFS_UNHIDE" = "Unhide";
+"HIDDEN_NOTIFS_UNTITLED" = "Hidden notification";
+"HIDE_NOTIFICATIONS_TITLE" = "Hide notifications";
+"HIDE_NOTIFICATIONS_DETAIL" = "Swipe a notification left to hide it, and find the hidden ones from the notifications bar.";
