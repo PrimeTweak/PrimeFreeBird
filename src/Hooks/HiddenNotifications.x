@@ -498,10 +498,44 @@ static id NFBModelAtIndexPath(id dataViewController, NSIndexPath* indexPath) {
     }
     id model = NFBModelAtIndexPath(self, indexPath);
     // Only rows that carry a notification, and only ones we can name — a row
-    // we cannot identify could never be unhidden, so it is left alone.
-    NSString* modelClass = NSStringFromClass([model class]);
-    if (![modelClass containsString:@"Notification"] || !NFBNotifIdentity(model)) {
+    // we cannot identify could never be unhidden, so it is left alone. Each
+    // refusal says WHY, once: he reported "no Hide appears", and a silent
+    // guard is exactly what makes that impossible to diagnose without another
+    // probe build.
+    NSString* modelClass = model ? NSStringFromClass([model class]) : @"(rien)";
+    if (!model) {
+        static BOOL saidNoModel;
+        if (!saidNoModel) {
+            saidNoModel = YES;
+            NFBDebugLog(@"[notifs] swipe: aucun modèle à la ligne %ld/%ld — "
+                        @"lecture des sections à revoir",
+                        (long)indexPath.section, (long)indexPath.row);
+        }
         return original;
+    }
+    if (![modelClass containsString:@"Notification"]) {
+        static NSMutableSet<NSString*>* seenClasses;
+        if (!seenClasses) { seenClasses = [NSMutableSet set]; }
+        if (![seenClasses containsObject:modelClass] && seenClasses.count < 6) {
+            [seenClasses addObject:modelClass];
+            NFBDebugLog(@"[notifs] swipe: classe non reconnue « %@ » — pas d'action posée",
+                        modelClass);
+        }
+        return original;
+    }
+    if (!NFBNotifIdentity(model)) {
+        static BOOL saidNoIdentity;
+        if (!saidNoIdentity) {
+            saidNoIdentity = YES;
+            NFBDebugLog(@"[notifs] swipe: %@ sans identité lisible — action refusée",
+                        modelClass);
+        }
+        return original;
+    }
+    static BOOL saidArmed;
+    if (!saidArmed) {
+        saidArmed = YES;
+        NFBDebugLog(@"[notifs] swipe: action « Masquer » posée sur %@", modelClass);
     }
 
     NSString* title = [[BHTBundle sharedBundle] localizedStringForKey:@"NOTIFS_HIDE_ACTION"];
@@ -777,6 +811,69 @@ static const char* kNFBNotifButtonKey = "nfbNotifQuickButton";
     }
     button.frame = CGRectMake(bar.bounds.size.width - side - 52.0,
                               centreY - side / 2.0, side, side);
+}
+
+%end
+
+%hook TFNItemsDataViewController
+
+// Safety net, and a measurement in one: if the notifications list is NOT a
+// plain T1URTViewController on his build, the hook above never fires and the
+// swipe silently does nothing — which is exactly what he reported. This one
+// sits on the base class the whole app's lists inherit from, so it fires
+// wherever the rows live; it declines immediately unless the row really is a
+// notification we can name.
+- (UISwipeActionsConfiguration*)tableView:(UITableView*)tableView
+    trailingSwipeActionsConfigurationForRowAtIndexPath:(NSIndexPath*)indexPath {
+    UISwipeActionsConfiguration* original = %orig;
+    if (!NFBNotifsEnabled()) {
+        return original;
+    }
+    id dataVC = self;
+    if ([NSStringFromClass([dataVC class]) isEqualToString:@"T1URTViewController"]) {
+        return original;  // already handled above — never twice
+    }
+    id model = NFBModelAtIndexPath(dataVC, indexPath);
+    if (!model) {
+        return original;
+    }
+    NSString* modelClass = NSStringFromClass([model class]);
+    if (![modelClass containsString:@"Notification"] || !NFBNotifIdentity(model)) {
+        return original;
+    }
+    static BOOL saidNet;
+    if (!saidNet) {
+        saidNet = YES;
+        NFBDebugLog(@"[notifs] swipe: posé par le filet sur %@ (classe de liste %@)",
+                    modelClass, NSStringFromClass([dataVC class]));
+    }
+
+    NSString* title = [[BHTBundle sharedBundle] localizedStringForKey:@"NOTIFS_HIDE_ACTION"];
+    UIContextualAction* hide = [UIContextualAction
+        contextualActionWithStyle:UIContextualActionStyleDestructive
+                            title:title
+                          handler:^(__unused UIContextualAction* action,
+                                    __unused UIView* sourceView,
+                                    void (^completion)(BOOL)) {
+            NSString* identity = NFBNotifIdentity(model);
+            NFBHideNotif(model);
+            completion(YES);
+            nfbReapplyTimelineFilter();
+            NFBShowNotifToast(identity);
+        }];
+    hide.backgroundColor = [UIColor systemGrayColor];
+    UIImage* glyph = [UIImage systemImageNamed:@"eye.slash.fill"];
+    if (glyph) {
+        hide.image = glyph;
+    }
+    NSMutableArray<UIContextualAction*>* actions = [NSMutableArray arrayWithObject:hide];
+    if (original.actions.count) {
+        [actions addObjectsFromArray:original.actions];
+    }
+    UISwipeActionsConfiguration* configuration =
+        [UISwipeActionsConfiguration configurationWithActions:actions];
+    configuration.performsFirstActionWithFullSwipe = NO;
+    return configuration;
 }
 
 %end
