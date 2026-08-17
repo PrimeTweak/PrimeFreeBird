@@ -550,13 +550,13 @@ static BOOL nfbIsWhiteBarGlyphCandidate(UIView* view) {
     // the platter's vibrancy (grey only from the second visit on). Here the
     // chain is complete by definition, so the claim that missed at the setter
     // lands now — the same two-step pattern the confirm glyph uses below.
-    UIImage* current = self.image;
-    if (current &&
-        current.renderingMode != UIImageRenderingModeAlwaysOriginal &&
+    UIImage* chatImage = self.image;
+    if (chatImage &&
+        chatImage.renderingMode != UIImageRenderingModeAlwaysOriginal &&
         (nfbIsChatBarGlyph((UIView*)self) ||
          nfbIsBackArrowGlyph((UIView*)self))) {
         UIColor* colour = nfbBarGlyphColour((UIView*)self);
-        UIImage* baked = NFBGreyGlyph(current, colour);
+        UIImage* baked = NFBGreyGlyph(chatImage, colour);
         if (baked) {
             NFBDebugLog(@"glyphe: barre de chat cuit au didMoveToWindow (relance a froid)");
             NFBMark((UIView*)self, @"NavBarIcons/chatBarGlyph → cuit (fenetre)");

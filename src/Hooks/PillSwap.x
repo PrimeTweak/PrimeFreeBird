@@ -217,7 +217,11 @@ static void nfbSwapApply(UIView* pillView) {
         if (original) {
             break;
         }
-        if (candidateNav.rightBarButtonItems.count || candidateNav.trailingItemGroups.count) {
+        BOOL hasTrailing = candidateNav.rightBarButtonItems.count > 0;
+        if (@available(iOS 16.0, *)) {
+            hasTrailing = hasTrailing || candidateNav.trailingItemGroups.count > 0;
+        }
+        if (hasTrailing) {
             // Only ours is installed — nothing to swap on this pass.
             return;
         }
@@ -416,11 +420,11 @@ static void nfbSwapApply(UIView* pillView) {
                            withObject:gNFBSwapItem];
         group.barButtonItems = swapped;
     } else {
-        NSMutableArray<UIBarButtonItem*>* swapped =
+        NSMutableArray<UIBarButtonItem*>* swappedRight =
             [nav.rightBarButtonItems mutableCopy];
-        [swapped replaceObjectAtIndex:[swapped indexOfObject:original]
-                           withObject:gNFBSwapItem];
-        nav.rightBarButtonItems = swapped;
+        [swappedRight replaceObjectAtIndex:[swappedRight indexOfObject:original]
+                                withObject:gNFBSwapItem];
+        nav.rightBarButtonItems = swappedRight;
     }
     NFBDebugLog(@"remplacement: item posé #%ld — « %@ », menu %lu action(s) via %@, "
                 @"conteneur %@, écran %@",
