@@ -1011,11 +1011,19 @@ static __weak UIView* gNFBInboxMirrorSourcePill;
 // posed — the screen is on the glass, the class is necessarily loaded.
 static void (*gNFBOrigContainerWillMove)(id, SEL, UIWindow*);
 
+// The container instance itself, kept weak so the pose below can ask the only
+// question that matters structurally: is the inbox on the glass right now?
+// Measured 21:00:51.711: a stray layout of the DEPARTING pill re-posed a
+// mirror 300 ms after the drop (the pill leaves ~500 ms after the container),
+// and that orphan floated over the next screen until the inbox came back.
+static __weak UIView* gNFBInboxContainer;
+
 // Defined below; declared here so the watch can call it without moving either
 // block.
 static void nfbDropInboxMirror(UIView* bar);
 
 static void nfbContainerWillMoveToWindow(id self, SEL _cmd, UIWindow* newWindow) {
+    gNFBInboxContainer = self;
     if (!newWindow && gNFBInboxMirrorBar) {
         nfbDropInboxMirror(gNFBInboxMirrorBar);
     }
@@ -1203,6 +1211,19 @@ static void nfbMirrorInboxPill(UIView* pill) {
     UILabel* mirrorLabel;
     UIImageView* mirrorChevron;
     if (!mirror) {
+        // CREATION is gated on the inbox being on the glass. The journal of
+        // 16/08 21:00 showed the race twice (51.711, 54.650): the drop fires
+        // exactly when the container leaves, then a late layout of the
+        // departing pill — still in the window for ~500 ms — re-posed a fresh
+        // mirror that nothing would ever drop. The container is tracked by
+        // the watch above; before the watch exists (first ever pose) it is
+        // nil and the pose proceeds, which is correct: the screen is up.
+        // Syncs of an existing mirror never pass through here.
+        UIView* inbox = gNFBInboxContainer;
+        if (inbox && !inbox.window) {
+            NFBDebugLog(@"pill: pose refusee (inbox hors fenetre)");
+            return;
+        }
         mirror = [UIView new];
         mirror.userInteractionEnabled = NO;  // every touch reaches the real pill
         mirror.layer.zPosition = 100;        // above anything the re-host adds
