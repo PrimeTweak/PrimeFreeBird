@@ -26,15 +26,33 @@
 #import "HookHelpers.h"
 #import "Debug/NFBDebugger.h"
 
-// A named subclass so captures and the watch can identify our button.
+// A named subclass so captures and the watch can identify our button — and so
+// it can answer the ONE question the bar's wrapper actually asks. Measured the
+// hard way (two wrong nudges, his capture showing the capsule cut off at the
+// screen edge): _TtCC5UIKit19NavigationButtonBar15ItemWrapperView sizes its
+// child from intrinsicContentSize, NOT from the bounds we set — so a wider
+// bounds just spilled our capsule past the wrapper instead of moving it.
 @interface NFBInboxPillButton : UIButton
+@property (nonatomic, assign) CGSize nfbIntrinsic;
 @end
 @implementation NFBInboxPillButton
+- (CGSize)intrinsicContentSize {
+    if (self.nfbIntrinsic.width > 0) {
+        return self.nfbIntrinsic;
+    }
+    return [super intrinsicContentSize];
+}
 @end
 
 // Our item (built once, reused across stomps) and the latest original from
 // Twitter (strong: it left the bar, but its menu must stay alive for ours).
 static UIBarButtonItem*  gNFBSwapItem;
+// The one number to turn if the pill still sits a hair off: negative moves it
+// LEFT, positive RIGHT. It is a visual translation only — layout never fights
+// it. The build measures the result itself (see the ruler below), so the next
+// adjustment is arithmetic, not another guess.
+static CGFloat           gNFBSwapShift = 0.0;
+static BOOL              gNFBSwapMeasured;
 static UIBarButtonItem*  gNFBSwapOriginal;
 static UIMenu*           gNFBSwapMenu;   // harvested from the live control; outlives it
 static NSInteger         gNFBSwapCount;
@@ -107,20 +125,17 @@ static void nfbSwapLayoutButton(void) {
     CGFloat spacing = (chevron.hidden || chevron.bounds.size.width <= 0) ? 0 : 4.0;
     CGFloat contentW = label.bounds.size.width + spacing + (chevron.hidden ? 0 : chevron.bounds.size.width);
     CGFloat width = contentW + 20.0;
-    // Measured on the 08:12 video: our capsule sat ~10 pt right of the native
-    // one (right edge 429.7 vs the native 420). v4 padded the button's TRAILING
-    // side to push the visible capsule left — and it moved the wrong way, so
-    // the bar is not anchoring the trailing edge the way I assumed. Mirrored:
-    // the dead points now sit on the LEADING side and the capsule starts after
-    // them, which shifts the visible pill in the opposite direction — his ask,
-    // "comme c'était avant".
-    CGFloat sidePad = 10.0;
-    button.bounds = CGRectMake(0, 0, width + sidePad, 40.0);
+    // No padding tricks any more. The wrapper is told our size, the capsule
+    // fills the button exactly, and the fine adjustment is a pure visual
+    // translation that no layout pass can reinterpret. gNFBSwapShift is the
+    // ONE number to turn if his eye still wants it moved (negative = left).
+    button.nfbIntrinsic = CGSizeMake(width, 40.0);
+    [button invalidateIntrinsicContentSize];
+    button.bounds = CGRectMake(0, 0, width, 40.0);
+    button.transform = CGAffineTransformMakeTranslation(gNFBSwapShift, 0);
     UIView* capsule = [button viewWithTag:3];
-    capsule.frame = CGRectMake(sidePad, 0, width, 40.0);
-    // The content follows the capsule: its 10 pt inset is measured FROM the
-    // capsule's own left edge, not from the padded button.
-    CGFloat x = sidePad + 10.0;
+    capsule.frame = button.bounds;
+    CGFloat x = 10.0;
     label.frame = CGRectMake(x, (40.0 - label.bounds.size.height) / 2.0,
                              label.bounds.size.width, label.bounds.size.height);
     if (!chevron.hidden) {
@@ -128,6 +143,30 @@ static void nfbSwapLayoutButton(void) {
                                    (40.0 - chevron.bounds.size.height) / 2.0,
                                    chevron.bounds.size.width,
                                    chevron.bounds.size.height);
+    }
+
+    // THE RULER — no more guessing which way the bar anchors us. Once per
+    // install, after the layout has settled, print where the capsule actually
+    // landed in SCREEN points next to the native reference measured on his
+    // 21:31 capture (pill 362.7 → 420.0). The correction is then arithmetic:
+    // gNFBSwapShift += (420.0 − right edge).
+    if (!gNFBSwapMeasured && NFBDebugIsRecording()) {
+        gNFBSwapMeasured = YES;
+        __weak NFBInboxPillButton* weakButton = button;
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.45 * NSEC_PER_SEC)),
+                       dispatch_get_main_queue(), ^{
+            NFBInboxPillButton* live = weakButton;
+            if (!live.window) {
+                gNFBSwapMeasured = NO;  // try again on the next layout
+                return;
+            }
+            CGRect onScreen = [live convertRect:live.bounds toView:nil];
+            NFBDebugLog(@"remplacement: RÈGLE — capsule à l'écran %.1f → %.1f pt "
+                        @"(natif 362.7 → 420.0, décalage courant %.1f)",
+                        onScreen.origin.x,
+                        onScreen.origin.x + onScreen.size.width,
+                        gNFBSwapShift);
+        });
     }
 }
 
