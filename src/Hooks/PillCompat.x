@@ -165,9 +165,12 @@ static void nfbPillCompatApply(UIView* pill) {
                 node = node.superview;
                 depth++;
             }
-            NFBDebugLog(found
-                ? @"pillcompat: platine ENCORE présente (%@) — verre parti, machine pas sortie"
-                : @"pillcompat: platine ABSENTE — sorti de la machine");
+            if (found) {
+                NFBDebugLog(@"pillcompat: platine ENCORE présente (%@) — verre parti, machine pas sortie",
+                            found);
+            } else {
+                NFBDebugLog(@"pillcompat: platine ABSENTE — sorti de la machine");
+            }
         });
     }
 }
