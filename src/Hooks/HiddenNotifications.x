@@ -457,6 +457,38 @@ static void NFBShowNotifToast(NSString* notifID) {
 // to whatever Twitter already returns — nothing of theirs is dropped, and if
 // they return nothing we hand back a configuration with ours alone.
 
+// Ask the CELL. His 18:04 capture proved the delegate is a shared proxy and
+// the data source is the controller — but neither « édition autorisée » nor
+// « swipe posé » ever appeared, so the row itself is what we fail to read.
+// The cell is the one object that certainly holds its own model.
+static id NFBModelFromCell(UITableView* table, NSIndexPath* indexPath) {
+    if (![table isKindOfClass:[UITableView class]]) {
+        return nil;
+    }
+    UITableViewCell* cell = [table cellForRowAtIndexPath:indexPath];
+    if (!cell) {
+        return nil;
+    }
+    NSArray<NSString*>* holders = @[@"viewModel", @"item", @"model", @"dataViewItem",
+                                    @"notification", @"timelineItem"];
+    for (NSString* name in holders) {
+        SEL selector = NSSelectorFromString(name);
+        if (![cell respondsToSelector:selector]) {
+            continue;
+        }
+        NSMethodSignature* signature = [cell methodSignatureForSelector:selector];
+        if (!signature.methodReturnType || strcmp(signature.methodReturnType, "@") != 0) {
+            continue;
+        }
+        id value = ((id (*)(id, SEL))objc_msgSend)(cell, selector);
+        id model = unwrapDataViewItem(value) ?: value;
+        if (model) {
+            return model;
+        }
+    }
+    return nil;
+}
+
 static id NFBModelAtIndexPath(id dataViewController, NSIndexPath* indexPath) {
     SEL itemSel = NSSelectorFromString(@"itemAtIndexPath:");
     if ([dataViewController respondsToSelector:itemSel]) {
@@ -895,22 +927,87 @@ static const char* kNFBNotifButtonKey = "nfbNotifQuickButton";
 // So editing is allowed for the rows we can act on, and only those. Everything
 // else keeps Twitter's own answer.
 
-static BOOL NFBNotifRowIsOurs(id dataViewController, NSIndexPath* indexPath) {
+static BOOL NFBNotifRowIsOursInTable(id dataViewController, UITableView* table,
+                                     NSIndexPath* indexPath);
+
+// The row's model, from the data source or — failing that — from the cell.
+static id NFBNotifModelForRow(id dataViewController, UITableView* table,
+                              NSIndexPath* indexPath) {
+    id model = NFBModelAtIndexPath(dataViewController, indexPath);
+    if (!model) {
+        model = NFBModelFromCell(table, indexPath);
+        if (model) {
+            static BOOL said;
+            if (!said) {
+                said = YES;
+                NFBDebugLog(@"[notifs] modèle lu depuis la cellule (%@)",
+                            NSStringFromClass([model class]));
+            }
+        }
+    }
+    return model;
+}
+
+// Every refusal names itself ONCE. Silence was what cost the last three builds.
+static BOOL NFBNotifRowIsOursInTable(id dataViewController, UITableView* table,
+                                     NSIndexPath* indexPath) {
     if (!NFBNotifsEnabled()) {
         return NO;
     }
-    id model = NFBModelAtIndexPath(dataViewController, indexPath);
+    id model = NFBNotifModelForRow(dataViewController, table, indexPath);
     if (!model) {
+        static BOOL saidNoModel;
+        if (!saidNoModel) {
+            saidNoModel = YES;
+            NFBDebugLog(@"[notifs] ligne %ld/%ld: AUCUN modèle (source=%@) — "
+                        @"ni sections ni cellule",
+                        (long)indexPath.section, (long)indexPath.row,
+                        NSStringFromClass([dataViewController class]));
+        }
         return NO;
     }
     NSString* modelClass = NSStringFromClass([model class]);
-    return [modelClass containsString:@"Notification"] && NFBNotifIdentity(model) != nil;
+    if (![modelClass containsString:@"Notification"]) {
+        static NSMutableSet<NSString*>* seen;
+        if (!seen) { seen = [NSMutableSet set]; }
+        if (![seen containsObject:modelClass] && seen.count < 6) {
+            [seen addObject:modelClass];
+            NFBDebugLog(@"[notifs] ligne portée par « %@ » — pas reconnue comme notification",
+                        modelClass);
+        }
+        return NO;
+    }
+    if (!NFBNotifIdentity(model)) {
+        static NSMutableSet<NSString*>* dumped;
+        if (!dumped) { dumped = [NSMutableSet set]; }
+        if (![dumped containsObject:modelClass] && dumped.count < 3) {
+            [dumped addObject:modelClass];
+            // The runtime knows the real field names; print them rather than
+            // guess a fourth list.
+            unsigned int count = 0;
+            Method* methods = class_copyMethodList([model class], &count);
+            NSMutableArray<NSString*>* names = [NSMutableArray array];
+            for (unsigned int i = 0; methods && i < count && names.count < 40; i++) {
+                NSString* name = NSStringFromSelector(method_getName(methods[i]));
+                if ([name containsString:@":"] || [name hasPrefix:@"_"] ||
+                    [name hasPrefix:@"."]) {
+                    continue;
+                }
+                [names addObject:name];
+            }
+            if (methods) { free(methods); }
+            NFBDebugLog(@"[notifs] %@ SANS identité — sélecteurs: %@", modelClass,
+                        [names componentsJoinedByString:@" "]);
+        }
+        return NO;
+    }
+    return YES;
 }
 
 %hook T1URTViewController
 
 - (BOOL)tableView:(UITableView*)tableView canEditRowAtIndexPath:(NSIndexPath*)indexPath {
-    if (NFBNotifRowIsOurs(self, indexPath)) {
+    if (NFBNotifRowIsOursInTable(self, tableView, indexPath)) {
         static BOOL said;
         if (!said) {
             said = YES;
@@ -930,7 +1027,7 @@ static BOOL NFBNotifRowIsOurs(id dataViewController, NSIndexPath* indexPath) {
     if ([NSStringFromClass([dataVC class]) isEqualToString:@"T1URTViewController"]) {
         return %orig;  // handled above — never twice
     }
-    if (NFBNotifRowIsOurs(dataVC, indexPath)) {
+    if (NFBNotifRowIsOursInTable(dataVC, tableView, indexPath)) {
         static BOOL saidNet;
         if (!saidNet) {
             saidNet = YES;
@@ -991,7 +1088,7 @@ static id NFBNotifRowSourceFor(id candidate, UITableView* table) {
 }
 
 static BOOL nfbNotifCanEdit(id self, SEL _cmd, UITableView* table, NSIndexPath* indexPath) {
-    if (NFBNotifRowIsOurs(NFBNotifRowSourceFor(self, table), indexPath)) {
+    if (NFBNotifRowIsOursInTable(NFBNotifRowSourceFor(self, table), table, indexPath)) {
         static BOOL said;
         if (!said) {
             said = YES;
@@ -1019,10 +1116,10 @@ static UISwipeActionsConfiguration* nfbNotifTrailingSwipe(id self, SEL _cmd,
         original = orig(self, _cmd, table, indexPath);
     }
     id source = NFBNotifRowSourceFor(self, table);
-    if (!NFBNotifRowIsOurs(source, indexPath)) {
+    if (!NFBNotifRowIsOursInTable(source, table, indexPath)) {
         return original;
     }
-    id model = NFBModelAtIndexPath(source, indexPath);
+    id model = NFBNotifModelForRow(source, table, indexPath);
     static BOOL said;
     if (!said) {
         said = YES;
