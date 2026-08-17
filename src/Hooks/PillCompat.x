@@ -62,6 +62,34 @@ static NSArray<UIBarButtonItem*>* nfbPillCompatTrailingItems(UINavigationItem* n
     return all;
 }
 
+// A bar button's responder chain stops at the NAVIGATION controller, never
+// the content screen — measured twice today on the confirm glyph, and missed
+// again here on the first try (the journal named XChatDMNavigationController
+// with zero items: a nav controller's own navigationItem holds nothing). So
+// the holders are probed one storey down: the nav controller's top screen,
+// that screen's first-level children, and the stack itself. The journal
+// names whichever one actually held the button.
+static NSArray<UIViewController*>* nfbPillCompatCandidates(UIViewController* vc) {
+    NSMutableArray<UIViewController*>* out = [NSMutableArray array];
+    void (^add)(UIViewController*) = ^(UIViewController* candidate) {
+        if (candidate && ![out containsObject:candidate] && out.count < 8) {
+            [out addObject:candidate];
+        }
+    };
+    add(vc);
+    if ([vc isKindOfClass:[UINavigationController class]]) {
+        UINavigationController* nav = (UINavigationController*)vc;
+        add(nav.topViewController);
+        for (UIViewController* child in nav.topViewController.childViewControllers) {
+            add(child);
+        }
+        for (UIViewController* stacked in nav.viewControllers) {
+            add(stacked);
+        }
+    }
+    return out;
+}
+
 static void nfbPillCompatApply(UIView* pill) {
     if (!pill.window) {
         return;
@@ -79,16 +107,36 @@ static void nfbPillCompatApply(UIView* pill) {
         }
         return;
     }
-    NSArray<UIBarButtonItem*>* items =
-        nfbPillCompatTrailingItems(vc.navigationItem);
+    NSArray<UIBarButtonItem*>* items = nil;
+    UIViewController* holder = nil;
+    for (UIViewController* candidate in nfbPillCompatCandidates(vc)) {
+        NSArray<UIBarButtonItem*>* found =
+            nfbPillCompatTrailingItems(candidate.navigationItem);
+        if (found.count) {
+            items = found;
+            holder = candidate;
+            break;
+        }
+    }
+    if (items.count) {
+        NFBDebugLog(@"pillcompat: items trouvés sur %@ (%lu)",
+                    NSStringFromClass([holder class]),
+                    (unsigned long)items.count);
+    }
     if (!items.count) {
         // The bridge can attach its items a beat after the view lands; every
-        // later layout retries. Named once so a permanent miss leaves a trace.
+        // later layout retries. Named once so a permanent miss leaves a trace,
+        // with the storey below in the line for the next capture.
         if (!objc_getAssociatedObject(pill, kNFBPillCompatMissKey)) {
             objc_setAssociatedObject(pill, kNFBPillCompatMissKey, @YES,
                                      OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-            NFBDebugLog(@"pillcompat: items pas encore la (ecran=%@) — on ressaie",
-                        NSStringFromClass([vc class]));
+            NSString* top = @"-";
+            if ([vc isKindOfClass:[UINavigationController class]]) {
+                top = NSStringFromClass(
+                    [((UINavigationController*)vc).topViewController class]);
+            }
+            NFBDebugLog(@"pillcompat: items pas encore la (nav=%@, top=%@) — on ressaie",
+                        NSStringFromClass([vc class]), top);
         }
         return;
     }
