@@ -1073,6 +1073,22 @@ static void nfbDropInboxMirror(UIView* bar) {
     if (!mirror) {
         return;
     }
+    // The native content steps back in for the exit. The departing pill
+    // outlives the container by ~500 ms (measured 21:13: retire at 16.671,
+    // pill still on glass until 17.151) and, with the mirror down and the
+    // pose now refused, a hidden stack is an EMPTY capsule sliding away on
+    // every exit — the refusal killed even the accidental cover the old race
+    // used to paint. Unhidden, the exit shows exactly what standard mode
+    // shows there. Non-destructive, so it runs before the state wipe.
+    BOOL restored = NO;
+    UIView* source = gNFBInboxMirrorSourcePill;
+    for (UIView* sub in source.subviews) {
+        if ([sub isKindOfClass:[UIStackView class]]) {
+            sub.hidden = NO;
+            restored = YES;
+            break;
+        }
+    }
     // Every trace of state goes FIRST, the destructive call goes LAST. The
     // crash report showed the opposite order recursing to a stack overflow:
     // removeFromSuperview fires willMoveToWindow, and a handler that still
@@ -1083,7 +1099,8 @@ static void nfbDropInboxMirror(UIView* bar) {
     gNFBInboxMirrorBar = nil;
     gNFBInboxMirrorSourcePill = nil;
     [mirror removeFromSuperview];
-    NFBDebugLog(@"pill: miroir retire (ecran quitte)");
+    NFBDebugLog(restored ? @"pill: miroir retire (ecran quitte, natif rendu)"
+                         : @"pill: miroir retire (ecran quitte)");
 }
 
 static UIView* nfbPillBar(UIView* pill) {
@@ -1221,6 +1238,9 @@ static void nfbMirrorInboxPill(UIView* pill) {
         // Syncs of an existing mirror never pass through here.
         UIView* inbox = gNFBInboxContainer;
         if (inbox && !inbox.window) {
+            // The departing pill keeps drawing for ~500 ms; hand it back its
+            // native content instead of an empty capsule.
+            stack.hidden = NO;
             NFBDebugLog(@"pill: pose refusee (inbox hors fenetre)");
             return;
         }
