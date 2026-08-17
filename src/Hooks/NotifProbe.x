@@ -1,4 +1,12 @@
-// NotifProbe.x — read-only reconnaissance for "Hide a notification".
+// NotifProbe.x — read-only reconnaissance for "Hide a notification".  v3
+//
+// v2 was still silent with the file confirmed in the build, so the remaining
+// suspect is the FEED PATH: the home timeline arrives through
+// setSections:restoreScrollPosition:, but a diffable list updates through
+// updateSections:reconfigure… — v3 listens on both, and on viewDidAppear: so
+// a surface announces itself even when no section ever flows through it.
+//
+// (original notes)
 //
 // GO given 17/08. Before a single line of the feature, one measurement build
 // that names the whole terrain at once (the lesson that unblocked Muted Words
@@ -141,59 +149,56 @@ static double NFBProbeFindDateField(id vm, NSArray<NSString*>* selectors,
     return 0;
 }
 
-%hook TFNItemsDataViewController
-
-- (void)setSections:(NSArray*)sections restoreScrollPosition:(BOOL)restore {
-    %orig;
-
-    if (!NFBDebugIsRecording()) {
-        return;
-    }
-    // v2 — his 13:33 capture: he WAS on the notifications tab and the probe
-    // said nothing. Same trap as the opaque band (the real owner was called
-    // PagingViewController — a name matching no guess of mine). So the name
-    // filter is gone: every distinct list surface is catalogued once, and the
-    // capture names them all. First, an unmistakable proof of life.
+static NSString* NFBProbeNoteSurface(id dataVC, NSString* via) {
     static BOOL armed;
     if (!armed) {
         armed = YES;
-        NFBDebugLog(@"notifprobe: sonde armée (si tu ne vois pas cette ligne, "
-                    @"le fichier n'est pas dans le build)");
+        NFBDebugLog(@"notifprobe: sonde armée (v3) — si cette ligne manque, "
+                    @"le fichier n'est pas dans le build");
     }
-    UIViewController* owner = NFBProbeOwningVC(self);
+    UIViewController* owner = NFBProbeOwningVC(dataVC);
+    NSString* ownerName = owner ? NSStringFromClass([owner classForCoder]) : @"?";
 
-    // (2)+(3) one line per distinct surface, carrying the swipe verdict with
-    // it — so Messages and Notifications can be compared side by side in the
-    // same capture (his lead: the conversations list already swipes natively).
     static NSMutableSet<NSString*>* seenOwners;
     if (!seenOwners) { seenOwners = [NSMutableSet set]; }
-    NSString* ownerName = owner ? NSStringFromClass([owner classForCoder]) : @"?";
-    NSMutableArray<NSString*>* childNames = [NSMutableArray array];
-    for (UIViewController* child in owner.childViewControllers) {
-        [childNames addObject:NSStringFromClass([child classForCoder])];
-    }
-    if (![seenOwners containsObject:ownerName] && seenOwners.count < 10) {
-        [seenOwners addObject:ownerName];
+    NSString* key = [NSString stringWithFormat:@"%@|%@", ownerName, via];
+    if (![seenOwners containsObject:key] && seenOwners.count < 12) {
+        [seenOwners addObject:key];
+        NSMutableArray<NSString*>* childNames = [NSMutableArray array];
+        for (UIViewController* child in owner.childViewControllers) {
+            [childNames addObject:NSStringFromClass([child classForCoder])];
+        }
         SEL swipeSel = NSSelectorFromString(
             @"tableView:trailingSwipeActionsConfigurationForRowAtIndexPath:");
         SEL leadingSel = NSSelectorFromString(
             @"tableView:leadingSwipeActionsConfigurationForRowAtIndexPath:");
         SEL editSel = NSSelectorFromString(
             @"tableView:commitEditingStyle:forRowAtIndexPath:");
-        NFBDebugLog(@"notifprobe: écran=%@ | enfants=%@ | swipe trailing=%d "
+        NFBDebugLog(@"notifprobe: écran=%@ (%@) | enfants=%@ | swipe trailing=%d "
                     @"leading=%d legacy=%d | dataVC=%@",
-                    ownerName,
+                    ownerName, via,
                     childNames.count ? [childNames componentsJoinedByString:@","] : @"-",
-                    [self respondsToSelector:swipeSel],
-                    [self respondsToSelector:leadingSel],
-                    [self respondsToSelector:editSel],
-                    NSStringFromClass([self classForCoder]));
+                    [dataVC respondsToSelector:swipeSel],
+                    [dataVC respondsToSelector:leadingSel],
+                    [dataVC respondsToSelector:editSel],
+                    NSStringFromClass([dataVC classForCoder]));
+    }
+    return ownerName;
+}
+
+static void NFBProbeInspect(id dataVC, NSArray* sections, NSString* via) {
+    if (!NFBDebugIsRecording()) {
+        return;
+    }
+    NSString* ownerName = NFBProbeNoteSurface(dataVC, via);
+    if (!sections.count) {
+        return;
     }
 
-    // (1)+(4) walk the items: catalogue each distinct view-model class once,
-    // and track the oldest date seen across the visible set.
     static NSMutableSet<NSString*>* seenVMs;
     if (!seenVMs) { seenVMs = [NSMutableSet set]; }
+    static NSMutableSet<NSString*>* ageReported;
+    if (!ageReported) { ageReported = [NSMutableSet set]; }
 
     NSArray<NSString*>* idSelectors = @[
         @"entryId", @"entryID", @"identifier", @"clientEventInfo",
@@ -235,12 +240,10 @@ static double NFBProbeFindDateField(id vm, NSArray<NSString*>* selectors,
                 NFBDebugLog(@"notifprobe: [%@] VM=%@ | id=%@(%@) | date=%@(%@) | texte=%@(«%@»)",
                             ownerName, vmClass,
                             idSel ?: @"INTROUVABLE", idVal ? @"ok" : @"-",
-                            dateSel ?: @"INTROUVABLE",
-                            dateVal > 0 ? @"ok" : @"-",
+                            dateSel ?: @"INTROUVABLE", dateVal > 0 ? @"ok" : @"-",
                             textSel ?: @"INTROUVABLE", preview);
             }
 
-            // oldest date across everything visible (for horizon calibration)
             double t = NFBProbeFindDateField(vm, dateSelectors, NULL);
             if (t > 0 && (oldest == 0 || t < oldest)) {
                 oldest = t;
@@ -248,21 +251,40 @@ static double NFBProbeFindDateField(id vm, NSArray<NSString*>* selectors,
         }
     }
 
-    static NSMutableSet<NSString*>* ageReported;
-    if (!ageReported) { ageReported = [NSMutableSet set]; }
-    if (oldest > 0 && ![ageReported containsObject:ownerName] && ageReported.count < 10) {
+    if (counted > 0 && ![ageReported containsObject:ownerName] && ageReported.count < 10) {
         [ageReported addObject:ownerName];
-        double ageDays = ([[NSDate date] timeIntervalSince1970] - oldest) / 86400.0;
-        NFBDebugLog(@"notifprobe: [%@] %ld items | plus vieux ≈ %.1f jours (horizon)",
-                    ownerName, (long)counted, ageDays);
-    } else if (counted > 0) {
-        static NSMutableSet<NSString*>* noDateReported;
-        if (!noDateReported) { noDateReported = [NSMutableSet set]; }
-        if (![noDateReported containsObject:ownerName] && noDateReported.count < 10) {
-            [noDateReported addObject:ownerName];
+        if (oldest > 0) {
+            double ageDays = ([[NSDate date] timeIntervalSince1970] - oldest) / 86400.0;
+            NFBDebugLog(@"notifprobe: [%@] %ld items | plus vieux ≈ %.1f jours (horizon)",
+                        ownerName, (long)counted, ageDays);
+        } else {
             NFBDebugLog(@"notifprobe: [%@] %ld items | aucune date lisible",
                         ownerName, (long)counted);
         }
+    }
+}
+
+%hook TFNItemsDataViewController
+
+- (void)setSections:(NSArray*)sections restoreScrollPosition:(BOOL)restore {
+    %orig;
+    NFBProbeInspect(self, sections, @"setSections");
+}
+
+- (void)updateSections:(NSArray*)sections
+    reconfigureItemIdentifiers:(NSArray*)identifiers
+              withRowAnimation:(long long)animation
+                    completion:(id)completion {
+    %orig;
+    NFBProbeInspect(self, sections, @"updateSections");
+}
+
+// Last resort: a surface that never pushes sections through either setter
+// still announces itself here, so no screen can stay invisible.
+- (void)viewDidAppear:(BOOL)animated {
+    %orig;
+    if (NFBDebugIsRecording()) {
+        NFBProbeNoteSurface(self, @"viewDidAppear");
     }
 }
 
