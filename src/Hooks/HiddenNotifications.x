@@ -435,10 +435,6 @@ static void NFBHideNotifWithText(id model, NSString* cellText) {
                 identity, (unsigned long)current.count);
 }
 
-static void NFBHideNotif(id model) {
-    NFBHideNotifWithText(model, nil);
-}
-
 // MARK: - The toast (the capsule he validated for Hidden Threads)
 
 static const NSInteger kNFBNotifToastTag = 90313;
@@ -1191,7 +1187,13 @@ static BOOL nfbNotifCanEdit(id self, SEL _cmd, UITableView* table, NSIndexPath* 
     if (!gNFBNotifSelfTesting) {
         gNFBNotifCanEditCalls++;
     }
-    if (NFBNotifRowIsOursInTable(NFBNotifRowSourceFor(self, table), table, indexPath)) {
+    BOOL ours = NO;
+    @try {
+        ours = NFBNotifRowIsOursInTable(NFBNotifRowSourceFor(self, table), table, indexPath);
+    } @catch (id exception) {
+        ours = NO;
+    }
+    if (ours) {
         static BOOL said;
         if (!said) {
             said = YES;
@@ -1301,18 +1303,31 @@ static void NFBNotifRefreshDelegateCache(UITableView* table) {
     }
     objc_setAssociatedObject(table, kNFBNotifRefreshedKey, @YES,
                              OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-    id delegate = table.delegate;
-    id dataSource = table.dataSource;
-    if (delegate) {
-        table.delegate = nil;
-        table.delegate = delegate;
-    }
-    if (dataSource) {
-        table.dataSource = nil;
-        table.dataSource = dataSource;
-    }
-    NFBDebugLog(@"[notifs] cache du delegate reconstruit (%@)",
-                NSStringFromClass([table class]));
+    // Re-assigning during a layout pass is a good way to crash a table, so it
+    // happens on the next turn of the run loop, and it is fenced.
+    __weak UITableView* weakTable = table;
+    dispatch_async(dispatch_get_main_queue(), ^{
+        UITableView* live = weakTable;
+        if (!live.window) {
+            return;
+        }
+        @try {
+            id delegate = live.delegate;
+            id dataSource = live.dataSource;
+            if (delegate) {
+                live.delegate = nil;
+                live.delegate = delegate;
+            }
+            if (dataSource) {
+                live.dataSource = nil;
+                live.dataSource = dataSource;
+            }
+            NFBDebugLog(@"[notifs] cache du delegate reconstruit (%@)",
+                        NSStringFromClass([live class]));
+        } @catch (id exception) {
+            NFBDebugLog(@"[notifs] reconstruction du cache abandonnée — sans conséquence");
+        }
+    });
 }
 
 
@@ -1341,6 +1356,21 @@ static void NFBNotifDiagnose(UITableView* table) {
     if (![table isKindOfClass:[UITableView class]] || !table.window) {
         return;
     }
+    // HARD LESSON, his crash on launch: this report asked a table about its
+    // row 0 and then CALLED Twitter's own methods on that index. On a table
+    // with no rows yet — and at launch every table is empty — that is an
+    // out-of-range access inside their code, i.e. a crash caused purely by
+    // instrumentation. A diagnostic must never be able to break the app.
+    // So: only a table that already has a row, only the notifications-side
+    // ones, and everything wrapped.
+    if (table.numberOfSections < 1 || [table numberOfRowsInSection:0] < 1) {
+        return;
+    }
+    NSString* sourceName = NSStringFromClass([table.dataSource class]);
+    if (![sourceName containsString:@"URT"] && ![sourceName containsString:@"Notification"]) {
+        return;   // never report on unrelated tables
+    }
+    @try {
     id delegate = table.delegate;
     id dataSource = table.dataSource;
     SEL swipeSel = @selector(tableView:trailingSwipeActionsConfigurationForRowAtIndexPath:);
@@ -1378,8 +1408,12 @@ static void NFBNotifDiagnose(UITableView* table) {
     gNFBNotifSelfTesting = YES;
     NSInteger canEditBefore = gNFBNotifCanEditCalls;
     BOOL editable = NO;
-    if ([dataSource respondsToSelector:editSel]) {
-        editable = ((BOOL (*)(id, SEL, id, id))objc_msgSend)(dataSource, editSel, table, probe);
+    @try {
+        if ([dataSource respondsToSelector:editSel]) {
+            editable = ((BOOL (*)(id, SEL, id, id))objc_msgSend)(dataSource, editSel, table, probe);
+        }
+    } @catch (id exception) {
+        NFBDebugLog(@"5b. auto-test canEdit a levé une exception — ignoré");
     }
     NFBDebugLog(@"5. auto-test canEdit(0,0) = %@ | notre code atteint: %@",
                 editable ? @"YES" : @"NO",
@@ -1387,8 +1421,12 @@ static void NFBNotifDiagnose(UITableView* table) {
 
     NSInteger swipeBefore = gNFBNotifSwipeCalls;
     id configuration = nil;
-    if ([delegate respondsToSelector:swipeSel]) {
-        configuration = ((id (*)(id, SEL, id, id))objc_msgSend)(delegate, swipeSel, table, probe);
+    @try {
+        if ([delegate respondsToSelector:swipeSel]) {
+            configuration = ((id (*)(id, SEL, id, id))objc_msgSend)(delegate, swipeSel, table, probe);
+        }
+    } @catch (id exception) {
+        NFBDebugLog(@"6b. auto-test swipe a levé une exception — ignoré");
     }
     NFBDebugLog(@"6. auto-test swipe(0,0) = %ld action(s) | notre code atteint: %@",
                 (long)[[configuration valueForKey:@"actions"] count],
@@ -1425,10 +1463,26 @@ static void NFBNotifDiagnose(UITableView* table) {
     NFBDebugLog(@"10. appels reçus d'UIKit — canEdit=%ld swipe=%ld",
                 (long)gNFBNotifCanEditCalls, (long)gNFBNotifSwipeCalls);
     NFBDebugLog(@"===== fin du rapport =====");
+    } @catch (id exception) {
+        gNFBNotifSelfTesting = NO;
+        NFBDebugLog(@"[notifs] rapport interrompu (%@) — sans conséquence",
+                    [exception respondsToSelector:@selector(name)] ? [exception name] : @"?");
+    }
 }
 
 static void NFBNotifWireTable(UITableView* table) {
     if (!NFBNotifsEnabled() || !table) {
+        return;
+    }
+    // Scope, added after his launch crash: only the notifications list. The
+    // previous build installed on every table in the app — Messages, settings,
+    // the timeline — which meant replacing Twitter's own code on screens this
+    // feature has no business touching. Nothing outside the notifications
+    // surface is modified any more.
+    NSString* sourceName = NSStringFromClass([table.dataSource class]);
+    NSString* ownerName = NSStringFromClass([NFBNotifRowSourceFor(table.dataSource, table) class]);
+    if (![sourceName containsString:@"URT"] && ![ownerName containsString:@"URT"] &&
+        ![sourceName containsString:@"Notification"] && ![ownerName containsString:@"Notification"]) {
         return;
     }
     static NSMutableSet<NSString*>* announced;
@@ -1514,27 +1568,3 @@ static void NFBNotifWireTable(UITableView* table) {
 //     is the documented way to make the table rebuild that cache.
 
 
-%hook UITableView
-
-// Installing here means the cache below is built WITH our methods present —
-// the ordering that the whole feature was missing.
-- (void)setDelegate:(id)delegate {
-    if (delegate && NFBNotifsEnabled()) {
-        if (!gNFBNotifOrigSwipe) { gNFBNotifOrigSwipe = [NSMutableDictionary dictionary]; }
-        NFBNotifInstall(delegate,
-                        @selector(tableView:trailingSwipeActionsConfigurationForRowAtIndexPath:),
-                        (IMP)nfbNotifTrailingSwipe, "@@:@@", gNFBNotifOrigSwipe);
-    }
-    %orig;
-}
-
-- (void)setDataSource:(id)dataSource {
-    if (dataSource && NFBNotifsEnabled()) {
-        if (!gNFBNotifOrigCanEdit) { gNFBNotifOrigCanEdit = [NSMutableDictionary dictionary]; }
-        NFBNotifInstall(dataSource, @selector(tableView:canEditRowAtIndexPath:),
-                        (IMP)nfbNotifCanEdit, "B@:@@", gNFBNotifOrigCanEdit);
-    }
-    %orig;
-}
-
-%end
