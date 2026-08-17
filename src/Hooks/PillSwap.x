@@ -37,6 +37,7 @@
 static UIBarButtonItem*  gNFBSwapItem;
 static UIBarButtonItem*  gNFBSwapOriginal;
 static NSInteger         gNFBSwapCount;
+static const char*       kNFBSwapNavKey = "nfbSwapNav";
 
 static UIViewController* nfbSwapOwningVC(UIView* view) {
     UIResponder* responder = view;
@@ -134,6 +135,35 @@ static void nfbSwapRefreshLabelFromMenu(void) {
         nfbSwapLayoutButton();
         NFBDebugLog(@"remplacement: libelle -> %@ (menu)", checked);
     }
+}
+
+// v2 — measured on the 06:41 video: the residual flash was OUR OWN swap.
+// On every return SwiftUI re-sets its item; it lands EMPTY for ~150 ms (the
+// rebuilt content arrives late — the original disease), then our swap-back
+// re-hosts the platter once more. So after the bootstrap, the stomp is
+// intercepted at the SETTER, before anything reaches the bar: the incoming
+// foreign item is captured (fresh menu, fresh checked state) and OUR item
+// goes through in its place. The bar receives the very instance it already
+// hosts — nothing changes, nothing re-hosts, nothing can flash — and the
+// native view is never built again: the ⌚ watch on the ItemView goes silent.
+static NSArray<UIBarButtonItem*>* nfbSwapInterceptItems(UINavigationItem* nav,
+                                                        NSArray<UIBarButtonItem*>* items) {
+    if (!gNFBSwapItem || items.count != 1 ||
+        !objc_getAssociatedObject(nav, kNFBSwapNavKey)) {
+        return items;
+    }
+    UIBarButtonItem* incoming = items.firstObject;
+    if (incoming == gNFBSwapItem) {
+        return items;
+    }
+    if (![BHTSettings boolForKey:@"enable_liquid_glass"]) {
+        return items;
+    }
+    gNFBSwapOriginal = incoming;
+    gNFBSwapCount++;
+    NFBDebugLog(@"remplacement: intercepté au setter #%ld", (long)gNFBSwapCount);
+    nfbSwapRefreshLabelFromMenu();
+    return @[gNFBSwapItem];
 }
 
 static void nfbSwapApply(UIView* pillView) {
@@ -292,7 +322,11 @@ static void nfbSwapApply(UIView* pillView) {
         button.menu = menu;
     }
 
-    // Install in the exact container the original occupied.
+    // Install in the exact container the original occupied — and arm the
+    // setter interception on this navigation item: from here on, stomps are
+    // stopped before they reach the bar.
+    objc_setAssociatedObject(nav, kNFBSwapNavKey, @YES,
+                             OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     gNFBSwapCount++;
     if (group) {
         NSMutableArray<UIBarButtonItem*>* swapped =
@@ -314,6 +348,38 @@ static void nfbSwapApply(UIView* pillView) {
                 group ? @"groupe" : @"right",
                 NSStringFromClass([vc class]));
 }
+
+%hook UINavigationItem
+
+- (void)setRightBarButtonItems:(NSArray<UIBarButtonItem*>*)items {
+    %orig(nfbSwapInterceptItems(self, items));
+}
+
+- (void)setRightBarButtonItems:(NSArray<UIBarButtonItem*>*)items animated:(BOOL)animated {
+    %orig(nfbSwapInterceptItems(self, items), animated);
+}
+
+- (void)setTrailingItemGroups:(NSArray<UIBarButtonItemGroup*>*)groups {
+    if (gNFBSwapItem && objc_getAssociatedObject(self, kNFBSwapNavKey) &&
+        [BHTSettings boolForKey:@"enable_liquid_glass"]) {
+        if (@available(iOS 16.0, *)) {
+            for (UIBarButtonItemGroup* group in groups) {
+                if (group.barButtonItems.count == 1 &&
+                    group.barButtonItems.firstObject != gNFBSwapItem) {
+                    gNFBSwapOriginal = group.barButtonItems.firstObject;
+                    gNFBSwapCount++;
+                    NFBDebugLog(@"remplacement: intercepté au setter (groupe) #%ld",
+                                (long)gNFBSwapCount);
+                    group.barButtonItems = @[gNFBSwapItem];
+                    nfbSwapRefreshLabelFromMenu();
+                }
+            }
+        }
+    }
+    %orig;
+}
+
+%end
 
 %hook _TtC7DMInbox39InboxNavigationBarMenuBarButtonItemView
 
