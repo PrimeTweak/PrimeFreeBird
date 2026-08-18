@@ -526,6 +526,23 @@ static BOOL nfbIsWhiteBarGlyphCandidate(UIView* view) {
     if (!inModernBarButton || nfbIsBackArrowGlyph(view)) {
         return NO;
     }
+    // A glyph we paint ourselves is never a confirm button.
+    //
+    // The fence below assumes that « white tint on a modern bar button » names
+    // exactly one glyph. It does not: during a popover transition UIKit can
+    // hand one of the tweak's own bar icons a white tint for a moment. Marked
+    // then, the icon is baked white AND AlwaysOriginal, which freezes it —
+    // white on a white bar, still tappable, and only a tab swipe repaints it.
+    // That is precisely the reported bug. Any view carrying a grey target is
+    // under our control, so it is refused here.
+    if (objc_getAssociatedObject(view, kNFBGreyTargetKey)) {
+        static BOOL said;
+        if (!said) {
+            said = YES;
+            NFBDebugLog(@"glyphe: confirm REFUSÉ — icône du tweak (teinte blanche passagère)");
+        }
+        return NO;
+    }
     UIColor* tint = view.tintColor;
     CGFloat r = 0, g = 0, b = 0, a = 0;
     if (!tint || ![tint getRed:&r green:&g blue:&b alpha:&a]) {
@@ -572,6 +589,16 @@ static BOOL nfbIsWhiteBarGlyphCandidate(UIView* view) {
     UIImage* current = self.image;
     if (!current ||
         current.renderingMode == UIImageRenderingModeAlwaysOriginal) {
+        return;
+    }
+    // The mark was set when the tint was white; the baking happens later, and
+    // until now nothing re-checked. A white tint held for a moment — which is
+    // what a popover transition does to a bar icon — was therefore enough to
+    // freeze a glyph white AND AlwaysOriginal: invisible on a white bar, still
+    // tappable, repainted only by a tab swipe. Re-testing here costs nothing
+    // and keeps the real confirm button, whose tint stays white.
+    if (!nfbIsWhiteBarGlyphCandidate((UIView*)self)) {
+        NFBDebugLog(@"glyphe: confirm ANNULÉ — la teinte blanche n'a pas tenu");
         return;
     }
     // No screen-name test: three builds proved every guessed name wrong on
