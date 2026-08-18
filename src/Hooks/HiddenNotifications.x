@@ -941,6 +941,76 @@ static NSArray* NFBFilterNotifSections(NSArray* sections) {
     return changed ? result : sections;
 }
 
+
+// MARK: - the sweep (what the filter could never do)
+//
+// Measured in the binary: no section class exposes -items in Objective-C, which
+// is why NFBFilterNotifSections never reached a single row — his journal shows
+// the hide side but not one FILTRE line, with a non-empty registry. So the
+// hidden rows were never filtered out; they only left because the row was
+// deleted by hand, and a refresh brought them straight back.
+//
+// TFNItemsDataViewController does implement -itemAtIndexPath: and
+// -deleteItemAtIndexPath:withRowAnimation: — the second one already works here
+// (« ligne retirée de la liste »). So after every content replacement we walk
+// the rows, ask for each item, and delete the hidden ones from the end.
+
+static BOOL gNFBNotifSweeping;
+
+static void NFBNotifSweep(id dataViewController) {
+    if (gNFBNotifSweeping || !NFBNotifsEnabled() || !dataViewController) {
+        return;
+    }
+    if (!NFBHiddenNotifs().count) {
+        return;
+    }
+    SEL itemSel = NSSelectorFromString(@"itemAtIndexPath:");
+    SEL deleteSel = NSSelectorFromString(@"deleteItemAtIndexPath:withRowAnimation:");
+    if (![dataViewController respondsToSelector:itemSel] ||
+        ![dataViewController respondsToSelector:deleteSel]) {
+        return;
+    }
+    gNFBNotifSweeping = YES;              // deleting triggers updates: no recursion
+    @try {
+        UITableView* table = nil;
+        SEL tableSel = NSSelectorFromString(@"tableView");
+        if ([dataViewController respondsToSelector:tableSel]) {
+            id maybe = ((id (*)(id, SEL))objc_msgSend)(dataViewController, tableSel);
+            if ([maybe isKindOfClass:[UITableView class]]) {
+                table = maybe;
+            }
+        }
+        if (!table) {
+            gNFBNotifSweeping = NO;
+            return;
+        }
+        NSMutableArray<NSIndexPath*>* doomed = [NSMutableArray array];
+        NSInteger sections = table.numberOfSections;
+        for (NSInteger s = 0; s < sections; s++) {
+            NSInteger rows = [table numberOfRowsInSection:s];
+            for (NSInteger r = 0; r < rows; r++) {
+                NSIndexPath* path = [NSIndexPath indexPathForRow:r inSection:s];
+                id item = ((id (*)(id, SEL, id))objc_msgSend)(dataViewController, itemSel, path);
+                if (item && NFBNotifIsHidden(unwrapDataViewItem(item))) {
+                    [doomed addObject:path];
+                }
+            }
+        }
+        // From the end, so earlier index paths stay valid.
+        for (NSIndexPath* path in [doomed reverseObjectEnumerator]) {
+            ((void (*)(id, SEL, id, NSInteger))objc_msgSend)(
+                dataViewController, deleteSel, path, UITableViewRowAnimationNone);
+        }
+        if (doomed.count) {
+            NFBDebugLog(@"[notifs] balayage: %lu masquée(s) retirée(s) après rechargement",
+                        (unsigned long)doomed.count);
+        }
+    } @catch (id exception) {
+        NFBDebugLog(@"[notifs] balayage interrompu — sans conséquence");
+    }
+    gNFBNotifSweeping = NO;
+}
+
 // Measured: T1URTViewController implements NEITHER -sections NOR -setSections:.
 // Both are inherited from TFNItemsDataViewController, so the filter belongs
 // there — hooking the subclass meant it could never speak.
@@ -951,6 +1021,10 @@ static NSArray* NFBFilterNotifSections(NSArray* sections) {
         gNFBNotifScreen = (UIViewController*)self;
     }
     %orig(NFBFilterNotifSections(sections), restore);
+    // The list is in place: remove what is hidden.
+    dispatch_async(dispatch_get_main_queue(), ^{
+        NFBNotifSweep(self);
+    });
 }
 
 - (void)setSections:(NSArray*)sections {
@@ -958,6 +1032,10 @@ static NSArray* NFBFilterNotifSections(NSArray* sections) {
         gNFBNotifScreen = (UIViewController*)self;
     }
     %orig(NFBFilterNotifSections(sections));
+    // The list is in place: remove what is hidden.
+    dispatch_async(dispatch_get_main_queue(), ^{
+        NFBNotifSweep(self);
+    });
 }
 
 - (void)updateSections:(NSArray*)sections {
@@ -965,6 +1043,10 @@ static NSArray* NFBFilterNotifSections(NSArray* sections) {
         gNFBNotifScreen = (UIViewController*)self;
     }
     %orig(NFBFilterNotifSections(sections));
+    // The list is in place: remove what is hidden.
+    dispatch_async(dispatch_get_main_queue(), ^{
+        NFBNotifSweep(self);
+    });
 }
 
 // The four below are why hidden notifications came back on pull-to-refresh:
@@ -977,6 +1059,10 @@ static NSArray* NFBFilterNotifSections(NSArray* sections) {
         gNFBNotifScreen = (UIViewController*)self;
     }
     %orig(NFBFilterNotifSections(sections), completion);
+    // The list is in place: remove what is hidden.
+    dispatch_async(dispatch_get_main_queue(), ^{
+        NFBNotifSweep(self);
+    });
 }
 
 - (void)updateSections:(NSArray*)sections withRowAnimation:(NSInteger)animation {
@@ -984,6 +1070,10 @@ static NSArray* NFBFilterNotifSections(NSArray* sections) {
         gNFBNotifScreen = (UIViewController*)self;
     }
     %orig(NFBFilterNotifSections(sections), animation);
+    // The list is in place: remove what is hidden.
+    dispatch_async(dispatch_get_main_queue(), ^{
+        NFBNotifSweep(self);
+    });
 }
 
 - (void)updateSections:(NSArray*)sections
@@ -993,6 +1083,10 @@ static NSArray* NFBFilterNotifSections(NSArray* sections) {
         gNFBNotifScreen = (UIViewController*)self;
     }
     %orig(NFBFilterNotifSections(sections), animation, completion);
+    // The list is in place: remove what is hidden.
+    dispatch_async(dispatch_get_main_queue(), ^{
+        NFBNotifSweep(self);
+    });
 }
 
 - (void)updateSections:(NSArray*)sections
@@ -1003,6 +1097,10 @@ reconfigureItemIdentifiers:(id)identifiers
         gNFBNotifScreen = (UIViewController*)self;
     }
     %orig(NFBFilterNotifSections(sections), identifiers, animation, completion);
+    // The list is in place: remove what is hidden.
+    dispatch_async(dispatch_get_main_queue(), ^{
+        NFBNotifSweep(self);
+    });
 }
 
 %end
@@ -1289,23 +1387,20 @@ static BOOL NFBNotifRowIsOursInTable(id dataViewController, UITableView* table,
 //   · for a table already wired, re-assign delegate and data source once, which
 //     is the documented way to make the table rebuild that cache.
 
-// MARK: - the eye, as a subview of the bar
+// MARK: - the eye
 //
-// Measured, and written in his own QuickMutedWords.x: « Bar button items do not
-// show in this container: this bar draws its contents through a full-width
-// SwiftUI platter. » That platter is what paints the glass pastille around our
-// icon — the gear escapes it because Twitter draws it itself. So the eye stops
-// being a bar button item and becomes a plain subview of the bar, exactly like
-// his Muted words button. Three things follow for free:
-//   · no shared background, so no Liquid Glass;
-//   · a real view, so the popover can grow its arrow on it;
-//   · NFBGreyGlyph paints the glyph into a flat bitmap and returns it as
-//     AlwaysOriginal, which is the only route his tweak found that the theme's
-//     window tint cannot reclaim — that tint is what turned the icon orange.
+// His journal settles which door works: with T1TabNavigationController the line
+// « œil posé dans la barre de T1NotificationsViewController » appears; with a
+// TFNNavigationBar hook, nothing is ever printed and the icon is simply absent.
+// So we go back to the door that fires, and deal with the glass where it is
+// actually painted — his journal names the culprit itself:
+// _TtCC5UIKit19NavigationButtonBar15ItemWrapperView, animating cornerRadii.
+// That wrapper is UIKit's per-item container; the glyph's own view can do
+// nothing about it, so we walk up to it and turn its background off.
 
-static const char* kNFBNotifEyeKey = "nfbNotifEyeButton";
+static const NSInteger kNFBNotifBarItemTag = 90314;
+static const CGFloat kNFBNotifEyeSide = 24.0;
 
-// Grey resolved to a concrete colour: a dynamic one gets claimed later.
 static UIColor* NFBNotifIconGrey(UITraitCollection* traits) {
     UIColor* grey = [[UIColor labelColor] colorWithAlphaComponent:0.6];
     if (traits && [grey respondsToSelector:@selector(resolvedColorWithTraitCollection:)]) {
@@ -1314,7 +1409,7 @@ static UIColor* NFBNotifIconGrey(UITraitCollection* traits) {
     return grey;
 }
 
-// Flat bitmap + AlwaysOriginal: no tint can repaint it.
+// Flat bitmap + AlwaysOriginal: the theme's window tint cannot repaint it.
 static UIImage* NFBNotifFlatGlyph(UIImage* source, UIColor* colour) {
     if (!source || !colour) {
         return source;
@@ -1338,116 +1433,118 @@ static UIImage* NFBNotifFlatGlyph(UIImage* source, UIColor* colour) {
     return [painted imageWithRenderingMode:UIImageRenderingModeAlwaysOriginal];
 }
 
-// The avatar gives the metric, as in his reference.
-static UIView* NFBNotifAvatarIn(UIView* root, UIView* bar) {
-    for (UIView* sub in root.subviews) {
-        CGRect box = [sub convertRect:sub.bounds toView:bar];
-        BOOL square = fabs(CGRectGetWidth(box) - CGRectGetHeight(box)) < 2.0;
-        if (square && CGRectGetWidth(box) >= 26.0 && CGRectGetWidth(box) <= 44.0 &&
-            CGRectGetMinX(box) < CGRectGetWidth(bar.bounds) / 3.0 &&
-            sub.layer.cornerRadius > 8.0) {
-            return sub;
-        }
-        UIView* deeper = NFBNotifAvatarIn(sub, bar);
-        if (deeper) {
-            return deeper;
-        }
-    }
-    return nil;
-}
+// The eye's button reports its own container so the glass can be switched off.
+@interface NFBNotifEyeButton : UIButton
+- (void)nfbStripGlass;
+@end
 
-static BOOL NFBNotifIsNotificationsBar(UIView* bar) {
-    UIViewController* owner = nil;
-    UIResponder* responder = bar.nextResponder;
-    NSInteger hops = 0;
-    while (responder && hops < 8) {
-        if ([responder isKindOfClass:[UIViewController class]]) {
-            owner = (UIViewController*)responder;
-            break;
-        }
-        responder = responder.nextResponder;
-        hops++;
-    }
-    UIViewController* node = owner;
-    NSInteger up = 0;
-    while (node && up < 8) {
-        if ([NSStringFromClass([node class]) containsString:@"NotificationsViewController"]) {
-            return YES;
-        }
-        node = node.parentViewController;
-        up++;
-    }
-    return NO;
-}
+@implementation NFBNotifEyeButton
 
-%hook TFNNavigationBar
+- (void)didMoveToWindow {
+    [super didMoveToWindow];
+    [self nfbStripGlass];
+}
 
 - (void)layoutSubviews {
+    [super layoutSubviews];
+    [self nfbStripGlass];
+}
+
+- (void)nfbStripGlass {
+    @try {
+        UIView* node = self.superview;
+        NSInteger hops = 0;
+        while (node && hops < 5) {
+            NSString* name = NSStringFromClass([node class]);
+            BOOL wrapper = [name containsString:@"ItemWrapperView"] ||
+                           [name containsString:@"GlassInteraction"] ||
+                           [name containsString:@"SystemBackgroundView"] ||
+                           [name containsString:@"PlatterContainer"];
+            if (wrapper) {
+                node.backgroundColor = [UIColor clearColor];
+                node.layer.backgroundColor = [UIColor clearColor].CGColor;
+                node.layer.borderWidth = 0.0;
+                node.layer.shadowOpacity = 0.0;
+                for (UIView* sub in node.subviews) {
+                    NSString* subName = NSStringFromClass([sub class]);
+                    if ([subName containsString:@"SystemBackgroundView"] ||
+                        [subName containsString:@"VisualEffect"] ||
+                        [subName containsString:@"Glass"]) {
+                        sub.hidden = YES;
+                    }
+                }
+                static BOOL said;
+                if (!said) {
+                    said = YES;
+                    NFBDebugLog(@"[notifs] fond de verre neutralisé sur %@", name);
+                }
+            }
+            node = node.superview;
+            hops++;
+        }
+    } @catch (id exception) {
+    }
+}
+
+@end
+
+%hook T1TabNavigationController
+
+- (void)_t1_main_updateNavigationItemForViewController:(UIViewController*)viewController
+                                                isRoot:(BOOL)isRoot
+                           providingLeftBarButtonItems:(BOOL)left
+                                 rightBarButtonItems:(BOOL)right {
     %orig;
-    if (!NFBNotifsEnabled()) {
+    if (!NFBNotifsEnabled() || !viewController) {
         return;
     }
     @try {
-        UIView* bar = (UIView*)self;
-        if (!bar.window) {
+        if (![NSStringFromClass([viewController class])
+                containsString:@"NotificationsViewController"]) {
             return;
         }
-        UIButton* button = objc_getAssociatedObject(self, kNFBNotifEyeKey);
-        // Once the button exists here, keep maintaining it: the responder chain
-        // is briefly incomplete during some layout passes, and bailing out then
-        // made his Muted words icon vanish until relaunch.
-        if (!button && !NFBNotifIsNotificationsBar(bar)) {
-            return;
-        }
-        if (!button) {
-            UIImage* glyph = nil;
-            if ([UIImage respondsToSelector:@selector(tfn_vectorImageNamed:fitsSize:fillColor:)]) {
-                glyph = [UIImage tfn_vectorImageNamed:@"eye_off"
-                                             fitsSize:CGSizeMake(24, 24)
-                                            fillColor:[UIColor labelColor]];
+        UINavigationItem* item = viewController.navigationItem;
+        for (UIBarButtonItem* existing in item.rightBarButtonItems) {
+            if (existing.tag == kNFBNotifBarItemTag) {
+                return;
             }
-            if (!glyph) {
-                glyph = [UIImage systemImageNamed:@"eye.slash"];
-            }
-            button = [UIButton buttonWithType:UIButtonTypeSystem];
-            [button setImage:NFBNotifFlatGlyph(glyph, NFBNotifIconGrey(bar.traitCollection))
-                    forState:UIControlStateNormal];
-            button.contentMode = UIViewContentModeCenter;
-            button.accessibilityLabel = @"Hidden notifications";
-            [button addTarget:[NFBNotifQuickPresenter shared]
-                       action:@selector(present:)
-             forControlEvents:UIControlEventTouchUpInside];
-            objc_setAssociatedObject(self, kNFBNotifEyeKey, button,
-                                     OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-            NFBDebugLog(@"[notifs] œil posé en sous-vue de la barre (sans verre)");
         }
-        if (button.superview != bar) {
-            [bar addSubview:button];
+        UIImage* glyph = nil;
+        if ([UIImage respondsToSelector:@selector(tfn_vectorImageNamed:fitsSize:fillColor:)]) {
+            glyph = [UIImage tfn_vectorImageNamed:@"eye_off"
+                                         fitsSize:CGSizeMake(kNFBNotifEyeSide, kNFBNotifEyeSide)
+                                        fillColor:[UIColor labelColor]];
         }
-        [bar bringSubviewToFront:button];
+        if (!glyph) {
+            glyph = [UIImage systemImageNamed:@"eye.slash"];
+        }
+        UITraitCollection* traits = viewController.traitCollection;
+        NFBNotifEyeButton* plain = [NFBNotifEyeButton buttonWithType:UIButtonTypeCustom];
+        [plain setImage:NFBNotifFlatGlyph(glyph, NFBNotifIconGrey(traits))
+               forState:UIControlStateNormal];
+        plain.frame = CGRectMake(0, 0, kNFBNotifEyeSide, kNFBNotifEyeSide);
+        plain.accessibilityLabel = @"Hidden notifications";
+        // UIButtonTypeCustom, so no system highlight tint can flash over it.
+        plain.adjustsImageWhenHighlighted = NO;
+        [plain addTarget:[NFBNotifQuickPresenter shared]
+                  action:@selector(present:)
+        forControlEvents:UIControlEventTouchUpInside];
 
-        // Re-asserted every pass: on a cold launch the theme's tint claims the
-        // icon until the first interaction.
-        UIColor* grey = NFBNotifIconGrey(bar.traitCollection);
-        if (![button.tintColor isEqual:grey]) {
-            button.tintColor = grey;
+        UIBarButtonItem* ours = [[UIBarButtonItem alloc] initWithCustomView:plain];
+        ours.tag = kNFBNotifBarItemTag;
+        SEL hideShared = NSSelectorFromString(@"setHidesSharedBackground:");
+        if ([ours respondsToSelector:hideShared]) {
+            ((void (*)(id, SEL, BOOL))objc_msgSend)(ours, hideShared, YES);
         }
-
-        // Metric taken from the avatar, as in his reference. The eye sits just
-        // left of the gear, which keeps its own place.
-        CGFloat side = 30.0;
-        CGFloat inset = 16.0;
-        CGFloat centerY = CGRectGetMidY(bar.bounds);
-        UIView* avatar = NFBNotifAvatarIn(bar, bar);
-        if (avatar) {
-            CGRect inBar = [avatar convertRect:avatar.bounds toView:bar];
-            centerY = CGRectGetMidY(inBar);
-            side = CGRectGetHeight(inBar);
-            inset = CGRectGetMinX(inBar);
-        }
-        button.frame = CGRectMake(CGRectGetWidth(bar.bounds) - side - inset - side - 8.0,
-                                  centerY - side / 2.0, side, side);
+        NSMutableArray<UIBarButtonItem*>* items =
+            [NSMutableArray arrayWithArray:item.rightBarButtonItems ?: @[]];
+        [items addObject:ours];
+        item.rightBarButtonItems = items;
+        NFBDebugLog(@"[notifs] œil posé dans la barre de %@ (%lu bouton(s))",
+                    NSStringFromClass([viewController class]),
+                    (unsigned long)items.count);
     } @catch (id exception) {
+        NFBDebugLog(@"[notifs] pose de l'œil abandonnée — sans conséquence");
     }
 }
 
