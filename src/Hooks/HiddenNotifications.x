@@ -347,10 +347,14 @@ BOOL NFBNotifIsHidden(id model) {
     // if a hidden notification ever comes back, comparing these lines with
     // « masquée <…> » says at once whether the id changed between two
     // displays — no probe build needed.
+    // Printed while the registry is not empty: comparing this value with the
+    // « menu: masquée <…> » line says at once whether the impression id is the
+    // same between two displays — the one risk flagged when it was chosen.
     static NSInteger noted;
-    if (identity.length && noted < 2) {
+    if (identity.length && hidden.count && noted < 4) {
         noted++;
-        NFBDebugLog(@"notifhide: identité vue au filtre <%@>", identity);
+        NFBDebugLog(@"notifhide: identité vue au filtre <%@> | %@",
+                    identity, hidden[identity] ? @"TROUVÉE → masquée" : @"absente du registre");
     }
     return identity.length && hidden[identity] != nil;
 }
@@ -805,23 +809,61 @@ static UIViewController* NFBOwningVC(UIView* view) {
     return nil;
 }
 
+// He reported the button simply absent, and no line said why — the three
+// conditions below were all silent. So the test now speaks, once, and no
+// longer hangs on a single fragile chain.
+//
+// Two independent ways to recognise the bar, either is enough:
+//   · the screen that named itself is an descendant of the bar's controller
+//     (the original chain), OR
+//   · the bar's controller — or one of its ancestors — is the notifications
+//     screen itself, read from the class name his own FLEX capture measured:
+//     T1NotificationsViewController.
 static BOOL NFBBarBelongsToNotifs(UIView* bar) {
-    UIViewController* screen = gNFBNotifScreen;
-    if (!screen || !screen.view.window) {
-        return NO;
-    }
     UIViewController* owner = NFBOwningVC(bar);
     if (!owner) {
         return NO;
     }
-    UIViewController* node = screen;
-    NSInteger hops = 0;
-    while (node && hops < 12) {
-        if (node == owner) {
+
+    // Route 2 first: it depends on nothing but the controller of this bar.
+    UIViewController* node = owner;
+    NSInteger up = 0;
+    while (node && up < 8) {
+        NSString* name = NSStringFromClass([node class]);
+        if ([name containsString:@"NotificationsViewController"]) {
+            NFBDebugLog(@"[notifs] barre reconnue par son écran (%@)", name);
             return YES;
         }
         node = node.parentViewController;
-        hops++;
+        up++;
+    }
+
+    // Route 1: the original chain, kept because it is the stricter one.
+    UIViewController* screen = gNFBNotifScreen;
+    if (screen && screen.view.window) {
+        UIViewController* walk = screen;
+        NSInteger hops = 0;
+        while (walk && hops < 12) {
+            if (walk == owner) {
+                NFBDebugLog(@"[notifs] barre reconnue par la chaîne (%@)",
+                            NSStringFromClass([owner class]));
+                return YES;
+            }
+            walk = walk.parentViewController;
+            hops++;
+        }
+    }
+
+    // Neither worked: say so ONCE, with what was actually seen.
+    static NSMutableSet<NSString*>* refused;
+    if (!refused) { refused = [NSMutableSet set]; }
+    NSString* ownerName = NSStringFromClass([owner class]);
+    if (![refused containsObject:ownerName] && refused.count < 5) {
+        [refused addObject:ownerName];
+        NFBDebugLog(@"[notifs] bouton NON posé — barre de %@ | écran nommé: %@ | à l'écran: %@",
+                    ownerName,
+                    gNFBNotifScreen ? NSStringFromClass([gNFBNotifScreen class]) : @"(aucun)",
+                    gNFBNotifScreen.view.window ? @"oui" : @"non");
     }
     return NO;
 }
@@ -914,6 +956,7 @@ static const char* kNFBNotifButtonKey = "nfbNotifQuickButton";
                       action:@selector(present:)
             forControlEvents:UIControlEventTouchUpInside];
         [bar addSubview:button];
+        NFBDebugLog(@"[notifs] bouton de la liste posé sur la barre");
         objc_setAssociatedObject(bar, kNFBNotifButtonKey, button,
                                  OBJC_ASSOCIATION_RETAIN_NONATOMIC);
         NFBDebugLog(@"notifhide: bouton quick access posé");
@@ -1359,6 +1402,57 @@ static void NFBNotifRefreshDelegateCache(UITableView* table) {
 
 static NSMutableDictionary<NSString*, NSValue*>* gNFBNotifOrigContext;
 
+
+// Twitter's own menu does not come from the table's delegate — our stored
+// original was NULL, which is exactly what crashed us. It comes from an
+// interaction on the CELL. Since our configuration takes priority, his menu
+// disappeared; so we go and ask that interaction for its configuration and
+// fold its entries under ours. Read-only, fenced, and if nothing is found we
+// simply show ours alone.
+static UIMenu* NFBNotifNativeMenuForCell(UITableViewCell* cell, CGPoint point) {
+    if (!cell) {
+        return nil;
+    }
+    @try {
+        for (id<UIInteraction> interaction in cell.interactions) {
+            if (![interaction isKindOfClass:[UIContextMenuInteraction class]]) {
+                continue;
+            }
+            id<UIContextMenuInteractionDelegate> delegate =
+                ((UIContextMenuInteraction*)interaction).delegate;
+            SEL selector = @selector(contextMenuInteraction:configurationForMenuAtLocation:);
+            if (![delegate respondsToSelector:selector]) {
+                continue;
+            }
+            CGPoint inCell = [cell convertPoint:point fromView:cell.superview];
+            UIContextMenuConfiguration* configuration =
+                [delegate contextMenuInteraction:(UIContextMenuInteraction*)interaction
+                 configurationForMenuAtLocation:inCell];
+            if (!configuration) {
+                continue;
+            }
+            id provider = [configuration valueForKey:@"actionProvider"];
+            if (!provider) {
+                continue;
+            }
+            UIMenu* (^build)(NSArray<UIMenuElement*>*) = provider;
+            UIMenu* menu = build(@[]);
+            if (menu.children.count) {
+                static BOOL said;
+                if (!said) {
+                    said = YES;
+                    NFBDebugLog(@"[notifs] menu natif retrouvé sur la cellule (%lu entrée(s))",
+                                (unsigned long)menu.children.count);
+                }
+                return menu;
+            }
+        }
+    } @catch (id exception) {
+        NFBDebugLog(@"[notifs] menu natif illisible — la nôtre s'affichera seule");
+    }
+    return nil;
+}
+
 static id nfbNotifContextMenu(id self, SEL _cmd, UITableView* table,
                               NSIndexPath* indexPath, CGPoint point) {
     UIContextMenuConfiguration* original = nil;
@@ -1408,6 +1502,23 @@ static id nfbNotifContextMenu(id self, SEL _cmd, UITableView* table,
                                        handler:^(__unused UIAction* action) {
         NFBHideNotifWithText(model, cellText);
         NFBDebugLog(@"[notifs] menu: masquée <%@>", identity);
+        // Replay THIS list's sections directly: the global replay targets the
+        // home timeline, and nothing guarantees it reaches this screen. Our
+        // filter runs on the way in, so the row drops out here and now.
+        @try {
+            id owner = table.dataSource;
+            SEL sectionsSel = NSSelectorFromString(@"sections");
+            SEL setSel = NSSelectorFromString(@"setSections:restoreScrollPosition:");
+            if ([owner respondsToSelector:sectionsSel] &&
+                [owner respondsToSelector:setSel]) {
+                id sections = ((id (*)(id, SEL))objc_msgSend)(owner, sectionsSel);
+                ((void (*)(id, SEL, id, BOOL))objc_msgSend)(owner, setSel, sections, YES);
+                NFBDebugLog(@"[notifs] sections rejouées sur %@",
+                            NSStringFromClass([owner class]));
+            }
+        } @catch (id exception) {
+            NFBDebugLog(@"[notifs] rejeu direct impossible — repli global");
+        }
         nfbReapplyTimelineFilter();
         NFBShowNotifToast(identity);
     }];
@@ -1428,12 +1539,18 @@ static id nfbNotifContextMenu(id self, SEL _cmd, UITableView* table,
             id provider = original ? [original valueForKey:@"actionProvider"] : nil;
             if (provider) {
                 UIMenu* (^build)(NSArray<UIMenuElement*>*) = provider;
-                UIMenu* base = build(suggested);
+                UIMenu* base = build(@[]);
                 if (base.children.count) {
                     [children addObjectsFromArray:base.children];
                 }
-            } else if (suggested.count) {
-                [children addObjectsFromArray:suggested];
+            } else {
+                // No original from the delegate: Twitter's entries live on the
+                // cell's own interaction, so they are fetched from there.
+                UIMenu* native = NFBNotifNativeMenuForCell(
+                    [table cellForRowAtIndexPath:indexPath], point);
+                if (native.children.count) {
+                    [children addObjectsFromArray:native.children];
+                }
             }
         } @catch (id exception) {
             // Twitter's entries could not be read: ours alone is still better
