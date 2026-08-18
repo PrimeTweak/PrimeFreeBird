@@ -1,12 +1,12 @@
 #import "HiddenNotificationsViewController.h"
 #import "../Core/BHTBundle.h"
+#import "../Core/TwitterChirpFont.h"
 
 // The registry lives in HiddenNotifications.x; these are its public reads.
 extern NSArray<NSDictionary*>* NFBHiddenNotifList(void);
 extern void NFBUnhideNotif(NSString* notifID);
 extern void NFBUnhideAllNotifs(void);
 extern double NFBNotifDaysLeft(NSDictionary* entry);
-extern NSDate* NFBNotifExpiryDate(NSDictionary* entry);
 extern void nfbReapplyTimelineFilter(void);
 extern UIColor* CurrentAccentColor(void);
 
@@ -41,11 +41,14 @@ extern UIColor* CurrentAccentColor(void);
     [self.contentView addSubview:_snippet];
 
     _expiry = [[UILabel alloc] init];
-    _expiry.font = [UIFont systemFontOfSize:11.5 weight:UIFontWeightSemibold];
+    // Cotes relevées sur sa cellule Muted words (kindLabel), à l'identique :
+    // Chirp regular 12, texte à 60 %, fond à 7 %, rayon 5. Le gras est parti —
+    // c'est lui qui rendait la pastille bavarde.
+    _expiry.font = [TwitterChirpFont(TwitterFontStyleRegular) fontWithSize:12];
     _expiry.textColor = [[UIColor labelColor] colorWithAlphaComponent:0.6];
     _expiry.backgroundColor = [[UIColor labelColor] colorWithAlphaComponent:0.07];
     _expiry.textAlignment = NSTextAlignmentCenter;
-    _expiry.layer.cornerRadius = 10.0;
+    _expiry.layer.cornerRadius = 5.0;
     _expiry.layer.cornerCurve = kCACornerCurveContinuous;
     _expiry.clipsToBounds = YES;
     _expiry.translatesAutoresizingMaskIntoConstraints = NO;
@@ -202,21 +205,10 @@ extern UIColor* CurrentAccentColor(void);
     NSInteger days = (NSInteger)ceil(NFBNotifDaysLeft(row));
     // He asked to see WHEN it expires, not only how long is left — kept on the
     // same pill so nothing is added to the layout: « 30d left · Sep 17 ».
+    // He asked for the date to go: the countdown alone, and quieter.
     NSString* format =
-        [[BHTBundle sharedBundle] localizedStringForKey:@"HIDDEN_NOTIFS_EXPIRES_ON"];
-    static NSDateFormatter* dayFormatter;
-    static dispatch_once_t once;
-    dispatch_once(&once, ^{
-        dayFormatter = [[NSDateFormatter alloc] init];
-        // Day and month in the reader's own order — « Sep 17 » or « 17 sept. »
-        [dayFormatter setLocalizedDateFormatFromTemplate:@"MMMd"];
-    });
-    NSDate* when = NFBNotifExpiryDate(row);
-    cell.expiry.text = when
-        ? [NSString stringWithFormat:format, (long)days, [dayFormatter stringFromDate:when]]
-        : [NSString stringWithFormat:
-               [[BHTBundle sharedBundle] localizedStringForKey:@"HIDDEN_NOTIFS_EXPIRES_IN"],
-               (long)days];
+        [[BHTBundle sharedBundle] localizedStringForKey:@"HIDDEN_NOTIFS_EXPIRES_IN"];
+    cell.expiry.text = [NSString stringWithFormat:format, (long)days];
     return cell;
 }
 
