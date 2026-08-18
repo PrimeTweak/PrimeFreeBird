@@ -17,9 +17,43 @@ extern UIColor* CurrentAccentColor(void);
 // rather than taken from the semantic system fills — Twitter reinterprets
 // those, and a badge came out unreadable once because of it.
 
+// A label that carries its own horizontal padding. The pill used to get it from
+// a hand-written layoutSubviews measured off the ⊗; when that button went, the
+// padding went with it and the background closed onto the text. Declaring the
+// size here means Auto Layout keeps placing it and nothing can drift again.
+@interface NFBNotifPaddedLabel : UILabel
+@end
+
+@implementation NFBNotifPaddedLabel
+
+static const CGFloat kNFBNotifPillPadding = 8.0;   // gauche et droite seulement
+
+- (CGSize)intrinsicContentSize {
+    CGSize size = [super intrinsicContentSize];
+    size.width += kNFBNotifPillPadding * 2.0;
+    return size;
+}
+
+- (CGSize)sizeThatFits:(CGSize)size {
+    CGSize fit = [super sizeThatFits:size];
+    fit.width += kNFBNotifPillPadding * 2.0;
+    return fit;
+}
+
+- (void)drawTextInRect:(CGRect)rect {
+    [super drawTextInRect:UIEdgeInsetsInsetRect(
+        rect, UIEdgeInsetsMake(0, kNFBNotifPillPadding, 0, kNFBNotifPillPadding))];
+}
+
+@end
+
 @interface NFBHiddenNotifCell : UITableViewCell
 @property (nonatomic, strong) UILabel* snippet;
 @property (nonatomic, strong) UILabel* expiry;
+@property (nonatomic, strong) NSLayoutConstraint* snippetTop;
+@property (nonatomic, strong) NSLayoutConstraint* expiryBottom;
+@property (nonatomic, strong) NSLayoutConstraint* snippetBottom;
+- (void)applyEmptyLayout:(BOOL)empty;
 @end
 
 @implementation NFBHiddenNotifCell
@@ -40,7 +74,7 @@ extern UIColor* CurrentAccentColor(void);
     _snippet.translatesAutoresizingMaskIntoConstraints = NO;
     [self.contentView addSubview:_snippet];
 
-    _expiry = [[UILabel alloc] init];
+    _expiry = [[NFBNotifPaddedLabel alloc] init];
     // Cotes relevées sur sa cellule Muted words (kindLabel), à l'identique :
     // Chirp regular 12, texte à 60 %, fond à 7 %, rayon 5. Le gras est parti —
     // c'est lui qui rendait la pastille bavarde.
@@ -71,7 +105,8 @@ extern UIColor* CurrentAccentColor(void);
         // texte — deux lignes maximum, puis « … »
         [_snippet.leadingAnchor constraintEqualToAnchor:self.contentView.leadingAnchor
                                                constant:14],
-        [_snippet.topAnchor constraintEqualToAnchor:self.contentView.topAnchor constant:12],
+        (_snippetTop = [_snippet.topAnchor
+            constraintEqualToAnchor:self.contentView.topAnchor constant:12]),
         // Le ⊗ est parti : le texte va jusqu'à la marge, comme il l'a demandé.
         [_snippet.trailingAnchor constraintEqualToAnchor:self.contentView.trailingAnchor
                                                constant:-14],
@@ -81,11 +116,27 @@ extern UIColor* CurrentAccentColor(void);
         [_expiry.topAnchor constraintEqualToAnchor:_snippet.bottomAnchor constant:6],
         [_expiry.trailingAnchor constraintLessThanOrEqualToAnchor:self.contentView.trailingAnchor
                                                          constant:-14],
-        [_expiry.bottomAnchor constraintEqualToAnchor:self.contentView.bottomAnchor
-                                             constant:-12],
+        (_expiryBottom = [_expiry.bottomAnchor
+            constraintEqualToAnchor:self.contentView.bottomAnchor constant:-12]),
         [_expiry.heightAnchor constraintEqualToConstant:20],
     ]];
     return self;
+}
+
+
+// Empty state: the text stands alone, centred, with air above and below — the
+// cotes taken from his Hide thread screen. With rows, everything returns to the
+// normal two-line layout.
+- (void)applyEmptyLayout:(BOOL)empty {
+    if (!self.snippetBottom) {
+        self.snippetBottom =
+            [self.snippet.bottomAnchor constraintEqualToAnchor:self.contentView.bottomAnchor
+                                                     constant:-28];
+    }
+    self.snippetTop.constant = empty ? 26 : 12;
+    self.expiryBottom.active = !empty;
+    self.snippetBottom.active = empty;
+    self.snippet.numberOfLines = empty ? 0 : 2;
 }
 
 // This used to place the pill by hand, measured from the ⊗ that no longer
@@ -186,13 +237,23 @@ extern UIColor* CurrentAccentColor(void);
     }
     // Recycling: every state a previous row could have left behind is reset.
     cell.contentView.alpha = 1.0;
+    cell.snippet.font = [UIFont systemFontOfSize:14.5];
+    cell.snippet.textColor = [UIColor labelColor];
+    cell.snippet.textAlignment = NSTextAlignmentNatural;
+    [cell applyEmptyLayout:NO];
 
     if (!self.rows.count) {
+        // Cotes de son écran Hide thread: le label de ligne à Chirp 16.5, en
+        // couleur secondaire pleine — pas d'opacité réduite, qui rendait le
+        // texte fantomatique — et centré, avec de l'air autour.
         cell.snippet.text =
             [[BHTBundle sharedBundle] localizedStringForKey:@"HIDDEN_NOTIFS_EXAMPLE"];
+        cell.snippet.font = [TwitterChirpFont(TwitterFontStyleRegular) fontWithSize:16.5];
+        cell.snippet.textColor = [UIColor secondaryLabelColor];
+        cell.snippet.textAlignment = NSTextAlignmentCenter;
         cell.expiry.text = @"";
         cell.expiry.hidden = YES;
-        cell.contentView.alpha = 0.38;
+        [cell applyEmptyLayout:YES];
         return cell;
     }
 
