@@ -964,6 +964,44 @@ static NSArray* NFBFilterNotifSections(NSArray* sections) {
     %orig(NFBFilterNotifSections(sections));
 }
 
+// The four below are why hidden notifications came back on pull-to-refresh:
+// the filter covered three doors out of seven. These names are the ones
+// TFNItemsDataViewController actually implements, read from the binary — there
+// is no eighth to cover.
+
+- (void)updateSections:(NSArray*)sections completion:(id)completion {
+    if (NFBSectionsAreNotifications(sections)) {
+        gNFBNotifScreen = (UIViewController*)self;
+    }
+    %orig(NFBFilterNotifSections(sections), completion);
+}
+
+- (void)updateSections:(NSArray*)sections withRowAnimation:(NSInteger)animation {
+    if (NFBSectionsAreNotifications(sections)) {
+        gNFBNotifScreen = (UIViewController*)self;
+    }
+    %orig(NFBFilterNotifSections(sections), animation);
+}
+
+- (void)updateSections:(NSArray*)sections
+      withRowAnimation:(NSInteger)animation
+            completion:(id)completion {
+    if (NFBSectionsAreNotifications(sections)) {
+        gNFBNotifScreen = (UIViewController*)self;
+    }
+    %orig(NFBFilterNotifSections(sections), animation, completion);
+}
+
+- (void)updateSections:(NSArray*)sections
+reconfigureItemIdentifiers:(id)identifiers
+      withRowAnimation:(NSInteger)animation
+            completion:(id)completion {
+    if (NFBSectionsAreNotifications(sections)) {
+        gNFBNotifScreen = (UIViewController*)self;
+    }
+    %orig(NFBFilterNotifSections(sections), identifiers, animation, completion);
+}
+
 %end
 
 // MARK: - Quick access, the pattern he validated for muted words
@@ -1022,11 +1060,19 @@ static const CGFloat kNFBNotifEyeSide = 24.0;   // cote validée: comme l'engren
         controller.modalPresentationStyle = UIModalPresentationPopover;
         UIPopoverPresentationController* popover =
             controller.popoverPresentationController;
-        if ([sender isKindOfClass:[UIBarButtonItem class]]) {
-            popover.barButtonItem = sender;          // anchors itself, no bounds needed
-        } else if ([sender isKindOfClass:[UIView class]]) {
+        // A real view means a real arrow, pinned to the icon — the behaviour of
+        // his Quick access, which anchors on sourceView.
+        if ([sender isKindOfClass:[UIView class]]) {
             popover.sourceView = sender;
             popover.sourceRect = ((UIView*)sender).bounds;
+        } else if ([sender isKindOfClass:[UIBarButtonItem class]]) {
+            UIView* anchor = ((UIBarButtonItem*)sender).customView;
+            if (anchor) {
+                popover.sourceView = anchor;
+                popover.sourceRect = anchor.bounds;
+            } else {
+                popover.barButtonItem = sender;
+            }
         }
         popover.permittedArrowDirections = UIPopoverArrowDirectionUp;
         popover.delegate = (id)self;
@@ -1296,25 +1342,24 @@ static BOOL NFBNotifRowIsOursInTable(id dataViewController, UITableView* table,
         //   2. a custom view, which is what Twitter itself uses for the gear
         //      next to us (measured: TFNBarButtonItemButton, not a bare image)
         //      — a custom view gets no shared background at all.
-        BOOL glassRefused = NO;
+        // Always a custom view now. Two reasons, both his: it carries no shared
+        // glass background, and — measured against his Quick access — a popover
+        // only grows its little arrow when it can anchor on a REAL view.
+        // A bar button item exposes none, which is why the panel floated free.
+        UIButton* plain = [UIButton buttonWithType:UIButtonTypeSystem];
+        [plain setImage:glyph forState:UIControlStateNormal];
+        plain.tintColor = [UIColor labelColor];
+        plain.frame = CGRectMake(0, 0, kNFBNotifEyeSide, kNFBNotifEyeSide);
+        [plain addTarget:[NFBNotifQuickPresenter shared]
+                  action:@selector(present:)
+        forControlEvents:UIControlEventTouchUpInside];
         SEL hideShared = NSSelectorFromString(@"setHidesSharedBackground:");
         if ([ours respondsToSelector:hideShared]) {
             ((void (*)(id, SEL, BOOL))objc_msgSend)(ours, hideShared, YES);
-            glassRefused = YES;
         }
-        if (!glassRefused) {
-            UIButton* plain = [UIButton buttonWithType:UIButtonTypeSystem];
-            [plain setImage:glyph forState:UIControlStateNormal];
-            plain.tintColor = [UIColor labelColor];
-            plain.frame = CGRectMake(0, 0, kNFBNotifEyeSide, kNFBNotifEyeSide);
-            [plain addTarget:[NFBNotifQuickPresenter shared]
-                      action:@selector(present:)
-            forControlEvents:UIControlEventTouchUpInside];
-            ours = [[UIBarButtonItem alloc] initWithCustomView:plain];
-            ours.tag = kNFBNotifBarItemTag;
-        }
-        NFBDebugLog(@"[notifs] œil sans verre — voie %@",
-                    glassRefused ? @"1 (refus du fond partagé)" : @"2 (vue personnalisée)");
+        ours = [[UIBarButtonItem alloc] initWithCustomView:plain];
+        ours.tag = kNFBNotifBarItemTag;
+        NFBDebugLog(@"[notifs] œil posé en vue personnalisée (ancre du popover)");
         NSMutableArray<UIBarButtonItem*>* items =
             [NSMutableArray arrayWithArray:item.rightBarButtonItems ?: @[]];
         [items addObject:ours];          // after Twitter's own (the gear)
