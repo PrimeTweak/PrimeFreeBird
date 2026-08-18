@@ -101,7 +101,21 @@ static void nfbRepaintGlyphs(UIView* view, UIColor* colour) {
             BOOL colourChanged = usedColour && ![usedColour isEqual:colour];
             BOOL alreadyOurs =
                 objc_getAssociatedObject(current, kNFBPaintedFlagKey) != nil;
-            if (current && !alreadyOurs && (current != ours || colourChanged)) {
+
+            // Same defect as the bar-button path, and the same fix. The
+            // painted flag says « we painted it », not « we painted it for
+            // THIS view »: a glyph baked white elsewhere carries the flag too,
+            // so the repaint below skipped it and it stayed white on a white
+            // bar. His measure: the filters icon came back after the button
+            // path was fixed; the gear — a custom view, handled here — did not.
+            if (current && alreadyOurs && ours && current != ours && !colourChanged) {
+                imageView.image = ours;
+                static BOOL said;
+                if (!said) {
+                    said = YES;
+                    NFBDebugLog(@"glyphe: image de vue restaurée (repeinte ailleurs)");
+                }
+            } else if (current && !alreadyOurs && (current != ours || colourChanged)) {
                 // Only remember the original if this image is not one of the tweak's.
                 UIImage* source = current;
                 UIImage* original =
@@ -292,6 +306,26 @@ static void nfbRepaintNotificationsGear(UIView* bar, UIColor* colour) {
         BOOL colourChanged = usedColour && ![usedColour isEqual:colour];
         BOOL alreadyOurs =
             objc_getAssociatedObject(button.image, kNFBPaintedFlagKey) != nil;
+
+        // Measured in his capture: the advanced-search glyph sat in the bar at
+        // 27.33 pt with tint white, next to a gear at 15,20,25 — it had been
+        // baked white by the confirm path. And it was never repaired, because
+        // EVERY image we paint carries the painted flag, including that white
+        // one: the guard below read the flag and concluded all was well.
+        //
+        // The flag says « we painted it », not « we painted it FOR THIS
+        // BUTTON ». So when the image is one of ours but not the one recorded
+        // for this button, it was overwritten by another path and the recorded
+        // one is simply put back — no repaint, no risk of a loop.
+        if (alreadyOurs && ours && button.image != ours && !colourChanged) {
+            button.image = ours;
+            static BOOL said;
+            if (!said) {
+                said = YES;
+                NFBDebugLog(@"glyphe: icône de barre restaurée (elle avait été repeinte ailleurs)");
+            }
+            continue;
+        }
         if (!alreadyOurs && (button.image != ours || colourChanged)) {
             UIImage* original =
                 objc_getAssociatedObject(button, kNFBOriginalImageKey);
