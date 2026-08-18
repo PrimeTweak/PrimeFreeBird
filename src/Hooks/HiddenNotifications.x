@@ -74,6 +74,19 @@ double NFBNotifDaysLeft(NSDictionary* entry) {
     return left > 0 ? left : 0;
 }
 
+// The day the entry drops out, on the same base as the countdown above so the
+// two can never disagree. He asked to see WHEN, not only how long.
+NSDate* NFBNotifExpiryDate(NSDictionary* entry) {
+    double base = [entry[@"d"] doubleValue];
+    if (base <= 0) {
+        base = [entry[@"h"] doubleValue];
+    }
+    if (base <= 0) {
+        base = [[NSDate date] timeIntervalSince1970];
+    }
+    return [NSDate dateWithTimeIntervalSince1970:base + NFBNotifHorizonDays() * 86400.0];
+}
+
 // Purge on read: an entry past its horizon leaves by itself — his whole point.
 void NFBPurgeExpiredNotifs(void) {
     NSDictionary* current = NFBHiddenNotifs();
@@ -415,6 +428,94 @@ static NSString* NFBNotifTextFromCell(UITableView* table, NSIndexPath* indexPath
     return pieces.count ? [pieces componentsJoinedByString:@" · "] : nil;
 }
 
+
+// The notification's own date, which is what he actually wants the countdown
+// to hang on — not the moment he hid it.
+//
+// Measured: URTTimelineNotificationViewModel exposes no date at all (its six
+// selectors are description / scribeComponent / scribeElement / scribeItem /
+// scribeItemImpressionID / init), and the cell's timestampView is Swift, so the
+// runtime cannot be asked. But the age IS on screen — the cell renders « · 1w »
+// — and that text is already read at hide time. So the date is recovered from
+// it: « 1w » means the notification is seven days old, and the countdown then
+// runs from there.
+//
+// Handles the relative forms Twitter uses (30s / 45m / 5h / 3d / 1w) and the
+// absolute ones it falls back to for older items (« Aug 11 », « Aug 11, 2025 »).
+// Returns 0 when nothing can be read, and the caller keeps its old behaviour.
+static NSTimeInterval NFBNotifDateFromDisplayedAge(NSString* text) {
+    if (!text.length) {
+        return 0;
+    }
+    NSString* tail = [[text componentsSeparatedByString:@" · "] lastObject];
+    tail = [tail stringByTrimmingCharactersInSet:
+                [NSCharacterSet whitespaceAndNewlineCharacterSet]];
+    if (!tail.length) {
+        return 0;
+    }
+
+    static NSRegularExpression* relative;
+    static NSDateFormatter* shortDate;
+    static NSDateFormatter* longDate;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+        relative = [NSRegularExpression regularExpressionWithPattern:@"^(\\d+)\\s*([smhdwy])$"
+                                                             options:NSRegularExpressionCaseInsensitive
+                                                               error:nil];
+        shortDate = [[NSDateFormatter alloc] init];
+        [shortDate setLocalizedDateFormatFromTemplate:@"MMMd"];
+        longDate = [[NSDateFormatter alloc] init];
+        [longDate setLocalizedDateFormatFromTemplate:@"MMMdyyyy"];
+    });
+
+    NSTimeInterval now = [[NSDate date] timeIntervalSince1970];
+    NSTextCheckingResult* match =
+        [relative firstMatchInString:tail options:0 range:NSMakeRange(0, tail.length)];
+    if (match && match.numberOfRanges == 3) {
+        double amount = [[tail substringWithRange:[match rangeAtIndex:1]] doubleValue];
+        NSString* unit = [[tail substringWithRange:[match rangeAtIndex:2]] lowercaseString];
+        double seconds = 0;
+        if ([unit isEqualToString:@"s"]) { seconds = amount; }
+        else if ([unit isEqualToString:@"m"]) { seconds = amount * 60; }
+        else if ([unit isEqualToString:@"h"]) { seconds = amount * 3600; }
+        else if ([unit isEqualToString:@"d"]) { seconds = amount * 86400; }
+        else if ([unit isEqualToString:@"w"]) { seconds = amount * 604800; }
+        else if ([unit isEqualToString:@"y"]) { seconds = amount * 31557600; }
+        if (seconds > 0) {
+            return now - seconds;
+        }
+    }
+
+    for (NSDateFormatter* formatter in @[longDate, shortDate]) {
+        NSDate* parsed = [formatter dateFromString:tail];
+        if (!parsed) {
+            continue;
+        }
+        NSTimeInterval when = [parsed timeIntervalSince1970];
+        // A short form carries no year: the parser assumes 1970, so the day and
+        // month are grafted onto the current year, and pushed back a year if
+        // that would place the notification in the future.
+        if (formatter == shortDate) {
+            NSCalendar* calendar = [NSCalendar currentCalendar];
+            NSDateComponents* parts =
+                [calendar components:NSCalendarUnitMonth | NSCalendarUnitDay fromDate:parsed];
+            NSDateComponents* thisYear =
+                [calendar components:NSCalendarUnitYear fromDate:[NSDate date]];
+            parts.year = thisYear.year;
+            NSDate* rebuilt = [calendar dateFromComponents:parts];
+            when = [rebuilt timeIntervalSince1970];
+            if (when > now) {
+                parts.year = thisYear.year - 1;
+                when = [[calendar dateFromComponents:parts] timeIntervalSince1970];
+            }
+        }
+        if (when > 0 && when <= now) {
+            return when;
+        }
+    }
+    return 0;
+}
+
 static void NFBHideNotifWithText(id model, NSString* cellText) {
     NSString* identity = NFBNotifIdentity(model);
     if (!identity.length) {
@@ -426,11 +527,28 @@ static void NFBHideNotifWithText(id model, NSString* cellText) {
     if (text.length > 140) {
         text = [text substringToIndex:140];
     }
+    // « d » = the notification's own date. The model has none, so it comes from
+    // the age the cell displays; the countdown and the expiry date both read
+    // « d » first and only fall back to « h » (the moment it was hidden).
+    NSTimeInterval notifDate = NFBNotifDate(model);
+    NSString* source = @"modèle";
+    if (notifDate <= 0) {
+        notifDate = NFBNotifDateFromDisplayedAge(cellText ?: text);
+        source = @"âge affiché";
+    }
+    if (notifDate <= 0) {
+        source = @"aucune — repli sur la date de masquage";
+    }
     current[identity] = @{
         @"t": text,
-        @"d": @(NFBNotifDate(model)),
+        @"d": @(notifDate),
         @"h": @([[NSDate date] timeIntervalSince1970])
     };
+    NFBDebugLog(@"notifhide: date de la notification = %@ (%@)",
+                notifDate > 0
+                    ? [NSDate dateWithTimeIntervalSince1970:notifDate]
+                    : (id)@"inconnue",
+                source);
     [[NSUserDefaults standardUserDefaults] setObject:current forKey:kNFBHiddenNotifsKey];
     NFBDebugLog(@"notifhide: masquée <%@> — %lu au total",
                 identity, (unsigned long)current.count);
@@ -505,6 +623,9 @@ static void NFBShowNotifToast(NSString* notifID) {
     UIView* veil = [[UIView alloc] init];
     veil.backgroundColor = [[UIColor systemBackgroundColor] colorWithAlphaComponent:0.80];
     veil.userInteractionEnabled = NO;
+    veil.layer.cornerRadius = 22.0;              // exactement le rayon de la capsule
+    veil.layer.cornerCurve = kCACornerCurveContinuous;
+    veil.layer.masksToBounds = YES;
     veil.translatesAutoresizingMaskIntoConstraints = NO;
     [content addSubview:veil];
     [NSLayoutConstraint activateConstraints:@[
@@ -893,6 +1014,11 @@ static const CGFloat kNFBNotifEyeSide = 24.0;   // cote validée: comme l'engren
         if (!controller) {
             return;
         }
+        // Load the view now, so viewDidLoad → reload → preferredContentSize all
+        // run BEFORE the popover picks its position. Otherwise it places itself
+        // against a stale size and lands on top of the button instead of under
+        // it — which is exactly what his capture showed.
+        (void)controller.view;
         controller.modalPresentationStyle = UIModalPresentationPopover;
         UIPopoverPresentationController* popover =
             controller.popoverPresentationController;
