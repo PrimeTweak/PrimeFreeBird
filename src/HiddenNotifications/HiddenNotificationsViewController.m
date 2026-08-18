@@ -6,6 +6,7 @@ extern NSArray<NSDictionary*>* NFBHiddenNotifList(void);
 extern void NFBUnhideNotif(NSString* notifID);
 extern void NFBUnhideAllNotifs(void);
 extern double NFBNotifDaysLeft(NSDictionary* entry);
+extern NSDate* NFBNotifExpiryDate(NSDictionary* entry);
 extern void nfbReapplyTimelineFilter(void);
 extern UIColor* CurrentAccentColor(void);
 
@@ -145,10 +146,12 @@ extern UIColor* CurrentAccentColor(void);
     self.tableView.estimatedRowHeight = 72;
     // A popover paints its own material: forcing an opaque background here is
     // what once killed the glass on the muted-words popover.
-    self.tableView.backgroundColor =
-        self.compact ? [UIColor clearColor] : [UIColor systemBackgroundColor];
+    self.tableView.backgroundColor = [UIColor systemBackgroundColor];
     if (self.compact) {
-        self.view.backgroundColor = [UIColor clearColor];
+        // Was clear, which is why the navigation bar showed through as grey
+        // blur inside the panel. His reference — the Muted words quick access —
+        // is an opaque sheet, and so is this one now.
+        self.view.backgroundColor = [UIColor systemBackgroundColor];
     }
     [self reload];
 }
@@ -163,9 +166,14 @@ extern UIColor* CurrentAccentColor(void);
     if (!self.compact) {
         return;
     }
+    // Two passes: self-sizing rows report their real height only once the
+    // first layout has measured them. One pass leaves the estimate in place.
     [self.tableView layoutIfNeeded];
-    CGFloat height = MIN(self.tableView.contentSize.height + 6, 330);
-    self.preferredContentSize = CGSizeMake(290, MAX(height, 96));
+    [self.tableView layoutIfNeeded];
+    // contentSize already includes the footer; no padding is added on top of
+    // it, otherwise the sheet grows a strip of white at the bottom.
+    CGFloat height = MIN(self.tableView.contentSize.height, 330);
+    self.preferredContentSize = CGSizeMake(290, MAX(height, 90));
 }
 
 - (void)viewDidLayoutSubviews {
@@ -210,9 +218,23 @@ extern UIColor* CurrentAccentColor(void);
         : [[BHTBundle sharedBundle] localizedStringForKey:@"HIDDEN_NOTIFS_UNTITLED"];
     cell.expiry.hidden = NO;
     NSInteger days = (NSInteger)ceil(NFBNotifDaysLeft(row));
+    // He asked to see WHEN it expires, not only how long is left — kept on the
+    // same pill so nothing is added to the layout: « 30d left · Sep 17 ».
     NSString* format =
-        [[BHTBundle sharedBundle] localizedStringForKey:@"HIDDEN_NOTIFS_EXPIRES_IN"];
-    cell.expiry.text = [NSString stringWithFormat:format, (long)days];
+        [[BHTBundle sharedBundle] localizedStringForKey:@"HIDDEN_NOTIFS_EXPIRES_ON"];
+    static NSDateFormatter* dayFormatter;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+        dayFormatter = [[NSDateFormatter alloc] init];
+        // Day and month in the reader's own order — « Sep 17 » or « 17 sept. »
+        [dayFormatter setLocalizedDateFormatFromTemplate:@"MMMd"];
+    });
+    NSDate* when = NFBNotifExpiryDate(row);
+    cell.expiry.text = when
+        ? [NSString stringWithFormat:format, (long)days, [dayFormatter stringFromDate:when]]
+        : [NSString stringWithFormat:
+               [[BHTBundle sharedBundle] localizedStringForKey:@"HIDDEN_NOTIFS_EXPIRES_IN"],
+               (long)days];
     cell.unhide.tag = indexPath.row;
     [cell.unhide removeTarget:self
                        action:@selector(unhideTapped:)
@@ -263,7 +285,9 @@ extern UIColor* CurrentAccentColor(void);
 // MARK: footer — the count and "clear all"
 
 - (CGFloat)tableView:(UITableView*)tableView heightForFooterInSection:(NSInteger)section {
-    return self.rows.count ? 78 : 0.01;
+    // 11 (haut) + 34 (pilule) + 12 (bas) = 57. C'était resté à 78, d'où le
+    // grand blanc sous « Clear all » sur sa capture.
+    return self.rows.count ? 57 : 0.01;
 }
 
 - (UIView*)tableView:(UITableView*)tableView viewForFooterInSection:(NSInteger)section {
