@@ -30,9 +30,6 @@ static NSString* const kNFBHiddenNotifsKey = @"nfb_hidden_notifs";
 static NSString* const kNFBNotifHorizonKey = @"nfb_notif_horizon_days";
 static NSString* const kNFBHideNotifsEnabledKey = @"hide_notifications";
 
-// Call counters: how many times UIKit actually asked us.
-static NSInteger gNFBNotifCanEditCalls;
-static NSInteger gNFBNotifSwipeCalls;
 
 
 // Absent key ⇒ ON. The feature must work on the very first build, before the
@@ -617,6 +614,31 @@ static id NFBModelAtIndexPath(id dataViewController, NSIndexPath* indexPath) {
     return unwrapDataViewItem(items[indexPath.row]);
 }
 
+
+// Measured in the binary: TFNItemsDataViewController implements
+// -deleteItemAtIndexPath:withRowAnimation:. So a hidden row leaves the list on
+// the spot, instead of hoping a sections replay reaches this screen — which is
+// what never happened. The registry + filter still handle later reloads.
+static void NFBNotifDropRow(id dataViewController, NSIndexPath* indexPath) {
+    if (!dataViewController || !indexPath) {
+        return;
+    }
+    @try {
+        SEL deleteSel = NSSelectorFromString(@"deleteItemAtIndexPath:withRowAnimation:");
+        if ([dataViewController respondsToSelector:deleteSel]) {
+            ((void (*)(id, SEL, id, NSInteger))objc_msgSend)(
+                dataViewController, deleteSel, indexPath, UITableViewRowAnimationLeft);
+            NFBDebugLog(@"[notifs] ligne retirée de la liste (%ld/%ld)",
+                        (long)indexPath.section, (long)indexPath.row);
+            return;
+        }
+        NFBDebugLog(@"[notifs] suppression directe indisponible sur %@",
+                    NSStringFromClass([dataViewController class]));
+    } @catch (id exception) {
+        NFBDebugLog(@"[notifs] suppression directe refusée — la ligne partira au rechargement");
+    }
+}
+
 %hook T1URTViewController
 
 - (UISwipeActionsConfiguration*)tableView:(UITableView*)tableView
@@ -625,7 +647,7 @@ static id NFBModelAtIndexPath(id dataViewController, NSIndexPath* indexPath) {
     if (!NFBNotifsEnabled()) {
         return original;
     }
-    id model = NFBModelAtIndexPath(self, indexPath);
+    id model = NFBModelAtIndexPath(self, indexPath) ?: NFBModelFromCell(tableView, indexPath);
     // Only rows that carry a notification, and only ones we can name — a row
     // we cannot identify could never be unhidden, so it is left alone. Each
     // refusal says WHY, once: he reported "no Hide appears", and a silent
@@ -677,7 +699,7 @@ static id NFBModelAtIndexPath(id dataViewController, NSIndexPath* indexPath) {
             NSString* identity = NFBNotifIdentity(model);
             NFBHideNotifWithText(model, NFBNotifTextFromCell(tableView, indexPath));
             completion(YES);
-            nfbReapplyTimelineFilter();
+            NFBNotifDropRow(self, indexPath);
             NFBShowNotifToast(identity);
         }];
     hide.backgroundColor = [UIColor systemGrayColor];
@@ -773,16 +795,30 @@ static NSArray* NFBFilterNotifSections(NSArray* sections) {
     return changed ? result : sections;
 }
 
-%hook T1URTViewController
+// Measured: T1URTViewController implements NEITHER -sections NOR -setSections:.
+// Both are inherited from TFNItemsDataViewController, so the filter belongs
+// there — hooking the subclass meant it could never speak.
+%hook TFNItemsDataViewController
 
 - (void)setSections:(NSArray*)sections restoreScrollPosition:(BOOL)restore {
     if (NFBSectionsAreNotifications(sections)) {
-        // Cast and assign only — T1URTViewController is not declared in the
-        // headers, so it must never be sent a message (the Logos rule that
-        // broke a build once: "receiver type is a forward declaration").
         gNFBNotifScreen = (UIViewController*)self;
     }
     %orig(NFBFilterNotifSections(sections), restore);
+}
+
+- (void)setSections:(NSArray*)sections {
+    if (NFBSectionsAreNotifications(sections)) {
+        gNFBNotifScreen = (UIViewController*)self;
+    }
+    %orig(NFBFilterNotifSections(sections));
+}
+
+- (void)updateSections:(NSArray*)sections {
+    if (NFBSectionsAreNotifications(sections)) {
+        gNFBNotifScreen = (UIViewController*)self;
+    }
+    %orig(NFBFilterNotifSections(sections));
 }
 
 %end
@@ -809,71 +845,8 @@ static UIViewController* NFBOwningVC(UIView* view) {
     return nil;
 }
 
-// He reported the button simply absent, and no line said why — the three
-// conditions below were all silent. So the test now speaks, once, and no
-// longer hangs on a single fragile chain.
-//
-// Two independent ways to recognise the bar, either is enough:
-//   · the screen that named itself is an descendant of the bar's controller
-//     (the original chain), OR
-//   · the bar's controller — or one of its ancestors — is the notifications
-//     screen itself, read from the class name his own FLEX capture measured:
-//     T1NotificationsViewController.
-static BOOL NFBBarBelongsToNotifs(UIView* bar) {
-    UIViewController* owner = NFBOwningVC(bar);
-    if (!owner) {
-        return NO;
-    }
 
-    // Route 2 first: it depends on nothing but the controller of this bar.
-    UIViewController* node = owner;
-    NSInteger up = 0;
-    while (node && up < 8) {
-        NSString* name = NSStringFromClass([node class]);
-        if ([name containsString:@"NotificationsViewController"]) {
-            NFBDebugLog(@"[notifs] barre reconnue par son écran (%@)", name);
-            return YES;
-        }
-        node = node.parentViewController;
-        up++;
-    }
-
-    // Route 1: the original chain, kept because it is the stricter one.
-    UIViewController* screen = gNFBNotifScreen;
-    if (screen && screen.view.window) {
-        UIViewController* walk = screen;
-        NSInteger hops = 0;
-        while (walk && hops < 12) {
-            if (walk == owner) {
-                NFBDebugLog(@"[notifs] barre reconnue par la chaîne (%@)",
-                            NSStringFromClass([owner class]));
-                return YES;
-            }
-            walk = walk.parentViewController;
-            hops++;
-        }
-    }
-
-    // Neither worked: say so ONCE, with what was actually seen.
-    static NSMutableSet<NSString*>* refused;
-    if (!refused) { refused = [NSMutableSet set]; }
-    NSString* ownerName = NSStringFromClass([owner class]);
-    if (![refused containsObject:ownerName] && refused.count < 5) {
-        [refused addObject:ownerName];
-        NFBDebugLog(@"[notifs] bouton NON posé — barre de %@ | écran nommé: %@ | à l'écran: %@",
-                    ownerName,
-                    gNFBNotifScreen ? NSStringFromClass([gNFBNotifScreen class]) : @"(aucun)",
-                    gNFBNotifScreen.view.window ? @"oui" : @"non");
-    }
-    return NO;
-}
-
-static const char* kNFBNotifButtonKey = "nfbNotifQuickButton";
-
-@interface NFBNotifQuickButton : UIButton
-@end
-@implementation NFBNotifQuickButton
-@end
+static const NSInteger kNFBNotifBarItemTag = 90314;
 
 @interface NFBNotifQuickPresenter : NSObject
 + (instancetype)shared;
@@ -925,63 +898,6 @@ static const char* kNFBNotifButtonKey = "nfbNotifQuickButton";
 
 @end
 
-%hook TFNNavigationBar
-
-- (void)layoutSubviews {
-    %orig;
-    UIView* bar = (UIView*)self;
-    if (!NFBNotifsEnabled()) {
-        return;
-    }
-    NFBNotifQuickButton* button = objc_getAssociatedObject(bar, kNFBNotifButtonKey);
-    if (!button) {
-        // The scoping test governs the DECISION TO INSTALL only — never the
-        // upkeep. Re-testing it on every layout is what made the muted-words
-        // button flicker away when the responder chain was briefly incomplete.
-        if (!NFBBarBelongsToNotifs(bar)) {
-            return;
-        }
-        button = [NFBNotifQuickButton buttonWithType:UIButtonTypeSystem];
-        UIImage* glyph = nil;
-        if ([UIImage respondsToSelector:@selector(tfn_vectorImageNamed:fitsSize:fillColor:)]) {
-            glyph = [UIImage tfn_vectorImageNamed:@"eye_off"
-                                         fitsSize:CGSizeMake(26, 26)
-                                        fillColor:[UIColor secondaryLabelColor]];
-        }
-        glyph = glyph ? [glyph imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate]
-                      : [UIImage systemImageNamed:@"eye.slash"];
-        [button setImage:glyph forState:UIControlStateNormal];
-        button.tintColor = [UIColor secondaryLabelColor];
-        [button addTarget:[NFBNotifQuickPresenter shared]
-                      action:@selector(present:)
-            forControlEvents:UIControlEventTouchUpInside];
-        [bar addSubview:button];
-        NFBDebugLog(@"[notifs] bouton de la liste posé sur la barre");
-        objc_setAssociatedObject(bar, kNFBNotifButtonKey, button,
-                                 OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-        NFBDebugLog(@"notifhide: bouton quick access posé");
-    }
-    [bar bringSubviewToFront:button];
-    // Aligned on the avatar the way the muted-words button is: centring in the
-    // bar's own bounds does not work, the bar is taller than its content.
-    CGFloat side = 34.0;
-    CGFloat centreY = CGRectGetMidY(bar.bounds);
-    for (UIView* sub in bar.subviews) {
-        if (sub == button || sub.hidden || sub.bounds.size.width <= 0) {
-            continue;
-        }
-        CGFloat width = sub.bounds.size.width;
-        CGFloat height = sub.bounds.size.height;
-        if (fabs(width - height) < 2 && width >= 24 && width <= 44) {
-            centreY = CGRectGetMidY(sub.frame);
-            break;
-        }
-    }
-    button.frame = CGRectMake(bar.bounds.size.width - side - 52.0,
-                              centreY - side / 2.0, side, side);
-}
-
-%end
 
 %hook TFNItemsDataViewController
 
@@ -1046,22 +962,13 @@ static const char* kNFBNotifButtonKey = "nfbNotifQuickButton";
 
 %end
 
-// MARK: - the missing link
+// MARK: - recognising one of our rows
 //
-// He built the previous fix and reported the swipe still doing nothing — AND no
-// « swipe: … » line came out of it, although every refusal path was journaled.
-// A hook that never speaks is a hook that is never called, so the question is
-// not why our action is refused but why UIKit never asks for it.
-//
-// UIKit's own rule answers it: a table row offers NO swipe actions unless its
-// data source allows editing for that row. If Twitter's list answers NO to
-// tableView:canEditRowAtIndexPath: — or simply never gets asked because editing
-// is off — trailingSwipeActionsConfigurationForRowAtIndexPath: is never called
-// at all. That is mechanism, not a guess about their code: it is the documented
-// order in which UITableView asks its questions.
-//
-// So editing is allowed for the rows we can act on, and only those. Everything
-// else keeps Twitter's own answer.
+// Measured in the binary, and it corrects everything I assumed earlier:
+// tableView:canEditRowAtIndexPath: is implemented ONLY by T1AccountsViewController
+// and T1TweetDraftsViewController — never by the notifications list. Nobody was
+// refusing the swipe; I was forcing an answer to a question no one asked, on a
+// method that did not exist. That whole apparatus is gone.
 
 static BOOL NFBNotifRowIsOursInTable(id dataViewController, UITableView* table,
                                      NSIndexPath* indexPath);
@@ -1140,506 +1047,8 @@ static BOOL NFBNotifRowIsOursInTable(id dataViewController, UITableView* table,
     return YES;
 }
 
-%hook T1URTViewController
-
-- (BOOL)tableView:(UITableView*)tableView canEditRowAtIndexPath:(NSIndexPath*)indexPath {
-    if (NFBNotifRowIsOursInTable(self, tableView, indexPath)) {
-        static BOOL said;
-        if (!said) {
-            said = YES;
-            NFBDebugLog(@"[notifs] édition autorisée sur la liste (le swipe peut apparaître)");
-        }
-        return YES;
-    }
-    return %orig;
-}
-
-%end
-
-%hook TFNItemsDataViewController
-
-- (BOOL)tableView:(UITableView*)tableView canEditRowAtIndexPath:(NSIndexPath*)indexPath {
-    id dataVC = self;
-    if ([NSStringFromClass([dataVC class]) isEqualToString:@"T1URTViewController"]) {
-        return %orig;  // handled above — never twice
-    }
-    if (NFBNotifRowIsOursInTable(dataVC, tableView, indexPath)) {
-        static BOOL saidNet;
-        if (!saidNet) {
-            saidNet = YES;
-            NFBDebugLog(@"[notifs] édition autorisée par le filet sur %@",
-                        NSStringFromClass([dataVC class]));
-        }
-        return YES;
-    }
-    return %orig;
-}
-
-%end
-
-// MARK: - stop assuming who answers the table
-//
-// Everything so far hooked the VIEW CONTROLLER, assuming it is the table's own
-// data source and delegate. His FLEX capture shows a DataViewHostView sitting
-// between T1URTViewController and the TFNTableView, so that assumption was
-// never verified — and it explains the total silence: if another object answers
-// the table, our methods are simply never consulted.
-//
-// So nothing is assumed any more. The table is asked who its delegate and data
-// source ARE, both names are journaled (the fact that was missing all along),
-// and the two methods are installed on THOSE classes:
-//   · canEditRowAtIndexPath: on the data source — without it UIKit never even
-//     asks for swipe actions;
-//   · trailingSwipeActionsConfigurationForRowAtIndexPath: on the delegate.
-// Installation uses class_addMethod first and only falls back to replacing an
-// implementation the class owns — the exact shape that stopped the recursion
-// crash: never swizzle a method a class merely inherits.
-
-static NSMutableDictionary<NSString*, NSValue*>* gNFBNotifOrigCanEdit;
-static NSMutableDictionary<NSString*, NSValue*>* gNFBNotifOrigSwipe;
-
-// The object that can actually hand out rows: whichever of these knows about
-// sections. Tried in order, no guess.
-static id NFBNotifRowSourceFor(id candidate, UITableView* table) {
-    SEL sectionsSel = NSSelectorFromString(@"sections");
-    SEL itemSel = NSSelectorFromString(@"itemAtIndexPath:");
-    id options[3] = { candidate, table.dataSource, table.delegate };
-    for (int i = 0; i < 3; i++) {
-        id option = options[i];
-        if (option && ([option respondsToSelector:sectionsSel] ||
-                       [option respondsToSelector:itemSel])) {
-            return option;
-        }
-    }
-    UIResponder* responder = table;
-    NSInteger hops = 0;
-    while ((responder = responder.nextResponder) && hops < 12) {
-        if ([responder respondsToSelector:sectionsSel] ||
-            [responder respondsToSelector:itemSel]) {
-            return responder;
-        }
-        hops++;
-    }
-    return candidate;
-}
-
-static BOOL nfbNotifCanEdit(id self, SEL _cmd, UITableView* table, NSIndexPath* indexPath) {
-    // Binary question, answered once: does the table ask us at all?
-    gNFBNotifCanEditCalls++;
-    BOOL ours = NO;
-    @try {
-        ours = NFBNotifRowIsOursInTable(NFBNotifRowSourceFor(self, table), table, indexPath);
-    } @catch (id exception) {
-        ours = NO;
-    }
-    if (ours) {
-        static BOOL said;
-        if (!said) {
-            said = YES;
-            NFBDebugLog(@"[notifs] édition autorisée par %@ — le swipe peut apparaître",
-                        NSStringFromClass([self class]));
-        }
-        return YES;
-    }
-    NSValue* boxed = gNFBNotifOrigCanEdit[NSStringFromClass([self class])];
-    BOOL (*original)(id, SEL, UITableView*, NSIndexPath*) =
-        boxed ? [boxed pointerValue] : NULL;
-    if (original) {
-        return original(self, _cmd, table, indexPath);
-    }
-    return YES;  // UIKit's own default when nobody implements it
-}
-
-static UISwipeActionsConfiguration* nfbNotifTrailingSwipe(id self, SEL _cmd,
-                                                          UITableView* table,
-                                                          NSIndexPath* indexPath) {
-    gNFBNotifSwipeCalls++;
-    if (gNFBNotifSwipeCalls == 1) {
-        // His 19:29 capture proved canEdit is reached and answers YES. The only
-        // remaining unknown is whether the table ever asks for the ACTIONS —
-        // if this line never appears while « édition autorisée » does, the
-        // gesture itself is being taken elsewhere (the horizontal pager), and
-        // no delegate work can fix that.
-        NFBDebugLog(@"[notifs] la table DEMANDE les actions de balayage (%@)",
-                    NSStringFromClass([self class]));
-    }
-    UISwipeActionsConfiguration* original = nil;
-    NSValue* boxed = gNFBNotifOrigSwipe[NSStringFromClass([self class])];
-    UISwipeActionsConfiguration* (*origSwipe)(id, SEL, UITableView*, NSIndexPath*) =
-        boxed ? [boxed pointerValue] : NULL;
-    if (origSwipe) {
-        original = origSwipe(self, _cmd, table, indexPath);
-    }
-    id source = NFBNotifRowSourceFor(self, table);
-    if (!NFBNotifRowIsOursInTable(source, table, indexPath)) {
-        return original;
-    }
-    id model = NFBNotifModelForRow(source, table, indexPath);
-    static BOOL said;
-    if (!said) {
-        said = YES;
-        NFBDebugLog(@"[notifs] swipe: action « Masquer » posée par %@",
-                    NSStringFromClass([self class]));
-    }
-
-    NSString* title = [[BHTBundle sharedBundle] localizedStringForKey:@"NOTIFS_HIDE_ACTION"];
-    UIContextualAction* hide = [UIContextualAction
-        contextualActionWithStyle:UIContextualActionStyleDestructive
-                            title:title
-                          handler:^(__unused UIContextualAction* action,
-                                    __unused UIView* sourceView,
-                                    void (^completion)(BOOL)) {
-            NSString* identity = NFBNotifIdentity(model);
-            NFBHideNotifWithText(model, NFBNotifTextFromCell(table, indexPath));
-            completion(YES);
-            nfbReapplyTimelineFilter();
-            NFBShowNotifToast(identity);
-        }];
-    hide.backgroundColor = [UIColor systemGrayColor];
-    UIImage* glyph = [UIImage systemImageNamed:@"eye.slash.fill"];
-    if (glyph) {
-        hide.image = glyph;
-    }
-    NSMutableArray<UIContextualAction*>* actions = [NSMutableArray arrayWithObject:hide];
-    if (original.actions.count) {
-        [actions addObjectsFromArray:original.actions];
-    }
-    UISwipeActionsConfiguration* configuration =
-        [UISwipeActionsConfiguration configurationWithActions:actions];
-    configuration.performsFirstActionWithFullSwipe = NO;
-    return configuration;
-}
-
-// Add on the subclass, never replace an inherited implementation (the crash
-// lesson). If the class owns the method, its implementation is kept and called.
-static void NFBNotifInstall(id target, SEL selector, IMP replacement,
-                            const char* types,
-                            NSMutableDictionary<NSString*, NSValue*>* store) {
-    if (!target) {
-        return;
-    }
-    Class cls = [target class];
-    NSString* name = NSStringFromClass(cls);
-    if (store[name]) {
-        return;  // already done for this class
-    }
-    Method owned = class_getInstanceMethod(cls, selector);
-    BOOL ownsIt = owned && class_getMethodImplementation(class_getSuperclass(cls), selector)
-                            != method_getImplementation(owned);
-    if (!ownsIt && class_addMethod(cls, selector, replacement, types)) {
-        // Only ever store a REAL implementation. Boxing NULL produced a
-        // non-nil NSValue holding a null pointer, and every caller below
-        // treated "boxed != nil" as "there is an original to call" — which is
-        // a call to address zero, i.e. the crash on the first context menu.
-        IMP inherited = owned ? method_getImplementation(owned) : NULL;
-        if (inherited) {
-            store[name] = [NSValue valueWithPointer:inherited];
-        }
-        NFBDebugLog(@"[notifs] méthode ajoutée à %@ (%@)", name, NSStringFromSelector(selector));
-        return;
-    }
-    if (owned) {
-        IMP previous = method_setImplementation(owned, replacement);
-        store[name] = [NSValue valueWithPointer:previous];
-        NFBDebugLog(@"[notifs] méthode remplacée sur %@ (%@)", name,
-                    NSStringFromSelector(selector));
-    }
-}
-
-static void NFBNotifRefreshDelegateCache(UITableView* table) {
-    if (![table isKindOfClass:[UITableView class]]) {
-        return;
-    }
-    static const char* kNFBNotifRefreshedKey = "nfbNotifRefreshed";
-    if (objc_getAssociatedObject(table, kNFBNotifRefreshedKey)) {
-        return;   // once per table: re-assigning marks the table for reload
-    }
-    objc_setAssociatedObject(table, kNFBNotifRefreshedKey, @YES,
-                             OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-    // Re-assigning during a layout pass is a good way to crash a table, so it
-    // happens on the next turn of the run loop, and it is fenced.
-    __weak UITableView* weakTable = table;
-    dispatch_async(dispatch_get_main_queue(), ^{
-        UITableView* live = weakTable;
-        if (!live.window) {
-            return;
-        }
-        @try {
-            id delegate = live.delegate;
-            id dataSource = live.dataSource;
-            if (delegate) {
-                live.delegate = nil;
-                live.delegate = delegate;
-            }
-            if (dataSource) {
-                live.dataSource = nil;
-                live.dataSource = dataSource;
-            }
-            NFBDebugLog(@"[notifs] cache du delegate reconstruit (%@)",
-                        NSStringFromClass([live class]));
-        } @catch (id exception) {
-            NFBDebugLog(@"[notifs] reconstruction du cache abandonnée — sans conséquence");
-        }
-    });
-}
 
 
-
-
-// MARK: - our entry inside Twitter's own menu
-//
-// His screenshot settles the design question: holding a notification ALREADY
-// opens a native menu (« See less often »). So no gesture of ours is needed or
-// wanted — the action belongs in that menu, which is exactly what he asked for
-// on Hidden Threads: « c'est natif et intuitif ».
-//
-// For a table, that menu comes from the DELEGATE via
-// tableView:contextMenuConfigurationForRowAtIndexPath:point: — the same object
-// our methods are already installed on and, measured, actually called. The
-// original configuration is asked first and its menu is kept whole: our entry
-// is added to Twitter's, never replacing it. If anything in the enrichment
-// fails, the untouched original is returned.
-
-static NSMutableDictionary<NSString*, NSValue*>* gNFBNotifOrigContext;
-
-
-// Twitter's own menu does not come from the table's delegate — our stored
-// original was NULL, which is exactly what crashed us. It comes from an
-// interaction on the CELL. Since our configuration takes priority, his menu
-// disappeared; so we go and ask that interaction for its configuration and
-// fold its entries under ours. Read-only, fenced, and if nothing is found we
-// simply show ours alone.
-static UIMenu* NFBNotifNativeMenuForCell(UITableViewCell* cell, CGPoint point) {
-    if (!cell) {
-        return nil;
-    }
-    @try {
-        for (id<UIInteraction> interaction in cell.interactions) {
-            if (![interaction isKindOfClass:[UIContextMenuInteraction class]]) {
-                continue;
-            }
-            id<UIContextMenuInteractionDelegate> delegate =
-                ((UIContextMenuInteraction*)interaction).delegate;
-            SEL selector = @selector(contextMenuInteraction:configurationForMenuAtLocation:);
-            if (![delegate respondsToSelector:selector]) {
-                continue;
-            }
-            CGPoint inCell = [cell convertPoint:point fromView:cell.superview];
-            UIContextMenuConfiguration* configuration =
-                [delegate contextMenuInteraction:(UIContextMenuInteraction*)interaction
-                 configurationForMenuAtLocation:inCell];
-            if (!configuration) {
-                continue;
-            }
-            id provider = [configuration valueForKey:@"actionProvider"];
-            if (!provider) {
-                continue;
-            }
-            UIMenu* (^build)(NSArray<UIMenuElement*>*) = provider;
-            UIMenu* menu = build(@[]);
-            if (menu.children.count) {
-                static BOOL said;
-                if (!said) {
-                    said = YES;
-                    NFBDebugLog(@"[notifs] menu natif retrouvé sur la cellule (%lu entrée(s))",
-                                (unsigned long)menu.children.count);
-                }
-                return menu;
-            }
-        }
-    } @catch (id exception) {
-        NFBDebugLog(@"[notifs] menu natif illisible — la nôtre s'affichera seule");
-    }
-    return nil;
-}
-
-static id nfbNotifContextMenu(id self, SEL _cmd, UITableView* table,
-                              NSIndexPath* indexPath, CGPoint point) {
-    UIContextMenuConfiguration* original = nil;
-    NSValue* boxed = gNFBNotifOrigContext[NSStringFromClass([self class])];
-    UIContextMenuConfiguration* (*origMenu)(id, SEL, UITableView*, NSIndexPath*, CGPoint) =
-        boxed ? [boxed pointerValue] : NULL;
-    if (origMenu) {
-        @try {
-            original = origMenu(self, _cmd, table, indexPath, point);
-        } @catch (id exception) {
-            original = nil;
-        }
-    }
-    if (!NFBNotifsEnabled()) {
-        return original;
-    }
-
-    id model = nil;
-    NSString* identity = nil;
-    NSString* cellText = nil;
-    @try {
-        id source = NFBNotifRowSourceFor(self, table);
-        if (!NFBNotifRowIsOursInTable(source, table, indexPath)) {
-            return original;
-        }
-        model = NFBNotifModelForRow(source, table, indexPath);
-        identity = NFBNotifIdentity(model);
-        cellText = NFBNotifTextFromCell(table, indexPath);
-    } @catch (id exception) {
-        return original;
-    }
-    if (!model || !identity.length) {
-        return original;
-    }
-
-    static BOOL said;
-    if (!said) {
-        said = YES;
-        NFBDebugLog(@"[notifs] entrée ajoutée au menu natif (%@)",
-                    NSStringFromClass([self class]));
-    }
-
-    NSString* title = [[BHTBundle sharedBundle] localizedStringForKey:@"NOTIFS_HIDE_ACTION"];
-    UIAction* hide = [UIAction actionWithTitle:title
-                                         image:[UIImage systemImageNamed:@"eye.slash"]
-                                    identifier:nil
-                                       handler:^(__unused UIAction* action) {
-        NFBHideNotifWithText(model, cellText);
-        NFBDebugLog(@"[notifs] menu: masquée <%@>", identity);
-        // Replay THIS list's sections directly: the global replay targets the
-        // home timeline, and nothing guarantees it reaches this screen. Our
-        // filter runs on the way in, so the row drops out here and now.
-        @try {
-            id owner = table.dataSource;
-            SEL sectionsSel = NSSelectorFromString(@"sections");
-            SEL setSel = NSSelectorFromString(@"setSections:restoreScrollPosition:");
-            if ([owner respondsToSelector:sectionsSel] &&
-                [owner respondsToSelector:setSel]) {
-                id sections = ((id (*)(id, SEL))objc_msgSend)(owner, sectionsSel);
-                ((void (*)(id, SEL, id, BOOL))objc_msgSend)(owner, setSel, sections, YES);
-                NFBDebugLog(@"[notifs] sections rejouées sur %@",
-                            NSStringFromClass([owner class]));
-            }
-        } @catch (id exception) {
-            NFBDebugLog(@"[notifs] rejeu direct impossible — repli global");
-        }
-        nfbReapplyTimelineFilter();
-        NFBShowNotifToast(identity);
-    }];
-
-    // Twitter's own preview and entries are preserved; ours simply joins them.
-    id previewProvider = nil;
-    @try {
-        previewProvider = [original valueForKey:@"previewProvider"];
-    } @catch (id exception) {
-        previewProvider = nil;
-    }
-    UIContextMenuConfiguration* enriched = [UIContextMenuConfiguration
-        configurationWithIdentifier:original.identifier
-                    previewProvider:previewProvider
-                     actionProvider:^UIMenu*(NSArray<UIMenuElement*>* suggested) {
-        NSMutableArray<UIMenuElement*>* children = [NSMutableArray arrayWithObject:hide];
-        @try {
-            id provider = original ? [original valueForKey:@"actionProvider"] : nil;
-            if (provider) {
-                UIMenu* (^build)(NSArray<UIMenuElement*>*) = provider;
-                UIMenu* base = build(@[]);
-                if (base.children.count) {
-                    [children addObjectsFromArray:base.children];
-                }
-            } else {
-                // No original from the delegate: Twitter's entries live on the
-                // cell's own interaction, so they are fetched from there.
-                UIMenu* native = NFBNotifNativeMenuForCell(
-                    [table cellForRowAtIndexPath:indexPath], point);
-                if (native.children.count) {
-                    [children addObjectsFromArray:native.children];
-                }
-            }
-        } @catch (id exception) {
-            // Twitter's entries could not be read: ours alone is still better
-            // than losing the menu entirely.
-        }
-        return [UIMenu menuWithTitle:@"" children:children];
-    }];
-    return enriched ?: original;
-}
-
-static void NFBNotifWireTable(UITableView* table) {
-    if (!NFBNotifsEnabled() || !table) {
-        return;
-    }
-    // Scope, added after his launch crash: only the notifications list. The
-    // previous build installed on every table in the app — Messages, settings,
-    // the timeline — which meant replacing Twitter's own code on screens this
-    // feature has no business touching. Nothing outside the notifications
-    // surface is modified any more.
-    NSString* sourceName = NSStringFromClass([table.dataSource class]);
-    NSString* ownerName = NSStringFromClass([NFBNotifRowSourceFor(table.dataSource, table) class]);
-    if (![sourceName containsString:@"URT"] && ![ownerName containsString:@"URT"] &&
-        ![sourceName containsString:@"Notification"] && ![ownerName containsString:@"Notification"]) {
-        return;
-    }
-    static NSMutableSet<NSString*>* announced;
-    if (!announced) { announced = [NSMutableSet set]; }
-    if (!gNFBNotifOrigCanEdit) { gNFBNotifOrigCanEdit = [NSMutableDictionary dictionary]; }
-    if (!gNFBNotifOrigSwipe) { gNFBNotifOrigSwipe = [NSMutableDictionary dictionary]; }
-
-    id delegate = table.delegate;
-    id dataSource = table.dataSource;
-    NSString* pair = [NSString stringWithFormat:@"%@|%@",
-                      NSStringFromClass([delegate class]),
-                      NSStringFromClass([dataSource class])];
-    if (![announced containsObject:pair] && announced.count < 8) {
-        [announced addObject:pair];
-        // The fact that was missing since the first attempt.
-        NFBDebugLog(@"[notifs] table %@ — delegate=%@ dataSource=%@",
-                    NSStringFromClass([table class]),
-                    NSStringFromClass([delegate class]),
-                    NSStringFromClass([dataSource class]));
-    }
-
-    NFBNotifInstall(dataSource, @selector(tableView:canEditRowAtIndexPath:),
-                    (IMP)nfbNotifCanEdit, "B@:@@", gNFBNotifOrigCanEdit);
-    NFBNotifInstall(delegate,
-                    @selector(tableView:trailingSwipeActionsConfigurationForRowAtIndexPath:),
-                    (IMP)nfbNotifTrailingSwipe, "@@:@@", gNFBNotifOrigSwipe);
-    if (!gNFBNotifOrigContext) { gNFBNotifOrigContext = [NSMutableDictionary dictionary]; }
-    NFBNotifInstall(delegate,
-                    @selector(tableView:contextMenuConfigurationForRowAtIndexPath:point:),
-                    (IMP)nfbNotifContextMenu, "@@:@@{CGPoint=dd}", gNFBNotifOrigContext);
-
-    // MEASUREMENT, not theory. Two competing explanations for ten silent
-    // builds — the table caches what its delegate answers, OR the delegate is
-    // a proxy that forwards respondsToSelector: elsewhere and therefore denies
-    // knowing our method. This line settles it on the spot: after installing,
-    // ASK the delegate whether it now recognises the selector.
-    //   répond=OUI  → the object admits the method; if the swipe still never
-    //                 fires, the cache is the culprit.
-    //   répond=NON  → the proxy denies it; the cache is innocent and the fix
-    //                 belongs on respondsToSelector:.
-    SEL swipeSel = @selector(tableView:trailingSwipeActionsConfigurationForRowAtIndexPath:);
-    SEL editSel = @selector(tableView:canEditRowAtIndexPath:);
-    NFBDebugLog(@"[notifs] MESURE — delegate %@ répond au swipe: %@ | dataSource %@ "
-                @"répond à canEdit: %@",
-                NSStringFromClass([delegate class]),
-                [delegate respondsToSelector:swipeSel] ? @"OUI" : @"NON",
-                NSStringFromClass([dataSource class]),
-                [dataSource respondsToSelector:editSel] ? @"OUI" : @"NON");
-
-    NFBNotifRefreshDelegateCache(table);
-
-}
-
-%hook TFNTableView
-
-// The notifications table, named by his FLEX capture. Wiring happens once per
-// class pair, and only where a row of ours can exist.
-- (void)didMoveToWindow {
-    %orig;
-    UIView* table = (UIView*)self;
-    if (table.window) {
-        NFBNotifWireTable((UITableView*)self);
-    }
-}
-
-%end
 
 // MARK: - the cache nobody mentions
 //
@@ -1655,4 +1064,66 @@ static void NFBNotifWireTable(UITableView* table) {
 //   · for a table already wired, re-assign delegate and data source once, which
 //     is the documented way to make the table rebuild that cache.
 
+// MARK: - the eye, through the door Twitter actually uses
+//
+// Measured in the binary: the right-hand bar buttons are provided by
+//   T1TabNavigationController
+//     -_t1_main_updateNavigationItemForViewController:isRoot:
+//        providingLeftBarButtonItems:rightBarButtonItems:
+// My previous attempt bolted a subview onto TFNNavigationBar and depended on a
+// three-link chain that silently failed. This one adds a proper bar button
+// item where Twitter adds its own, and only for the notifications screen —
+// recognised by the class name read from the binary, not guessed.
 
+%hook T1TabNavigationController
+
+- (void)_t1_main_updateNavigationItemForViewController:(UIViewController*)viewController
+                                                isRoot:(BOOL)isRoot
+                           providingLeftBarButtonItems:(BOOL)left
+                                 rightBarButtonItems:(BOOL)right {
+    %orig;
+    if (!NFBNotifsEnabled() || !viewController) {
+        return;
+    }
+    @try {
+        if (![NSStringFromClass([viewController class])
+                containsString:@"NotificationsViewController"]) {
+            return;
+        }
+        UINavigationItem* item = viewController.navigationItem;
+        for (UIBarButtonItem* existing in item.rightBarButtonItems) {
+            if (existing.tag == kNFBNotifBarItemTag) {
+                return;   // already there
+            }
+        }
+        UIImage* glyph = nil;
+        if ([UIImage respondsToSelector:@selector(tfn_vectorImageNamed:fitsSize:fillColor:)]) {
+            glyph = [UIImage tfn_vectorImageNamed:@"eye_off"
+                                         fitsSize:CGSizeMake(24, 24)
+                                        fillColor:[UIColor labelColor]];
+        }
+        glyph = glyph ? [glyph imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate]
+                      : [UIImage systemImageNamed:@"eye.slash"];
+        UIBarButtonItem* ours =
+            [[UIBarButtonItem alloc] initWithImage:glyph
+                                             style:UIBarButtonItemStylePlain
+                                            target:[NFBNotifQuickPresenter shared]
+                                            action:@selector(present:)];
+        ours.tag = kNFBNotifBarItemTag;
+        NSMutableArray<UIBarButtonItem*>* items =
+            [NSMutableArray arrayWithArray:item.rightBarButtonItems ?: @[]];
+        [items addObject:ours];          // after Twitter's own (the gear)
+        item.rightBarButtonItems = items;
+        static BOOL said;
+        if (!said) {
+            said = YES;
+            NFBDebugLog(@"[notifs] œil posé dans la barre de %@ (%lu bouton(s))",
+                        NSStringFromClass([viewController class]),
+                        (unsigned long)items.count);
+        }
+    } @catch (id exception) {
+        NFBDebugLog(@"[notifs] pose de l'œil abandonnée — sans conséquence");
+    }
+}
+
+%end
