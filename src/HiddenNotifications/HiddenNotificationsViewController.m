@@ -60,20 +60,43 @@ extern UIColor* CurrentAccentColor(void);
     _unhide.translatesAutoresizingMaskIntoConstraints = NO;
     [self.contentView addSubview:_unhide];
 
+    // Everything sat on ONE horizontal line with 8 pt between the parts: the
+    // text ran into the expiry pill, the pill ran into the ⊗, and a long
+    // notification pushed both off the edge. Measured cotes from the UI plate:
+    // the expiry moves UNDER the text, margins are 14 all round, and the
+    // gutter to the ⊗ is 12 — so nothing can collide any more.
+    self.layoutMargins = UIEdgeInsetsZero;
+    self.contentView.layoutMargins = UIEdgeInsetsZero;
+    self.preservesSuperviewLayoutMargins = NO;
+    self.contentView.preservesSuperviewLayoutMargins = NO;
+
+    [_snippet setContentCompressionResistancePriority:UILayoutPriorityDefaultLow
+                                              forAxis:UILayoutConstraintAxisHorizontal];
+    [_unhide setContentCompressionResistancePriority:UILayoutPriorityRequired
+                                             forAxis:UILayoutConstraintAxisHorizontal];
+
     [NSLayoutConstraint activateConstraints:@[
+        // texte — deux lignes maximum, puis « … »
         [_snippet.leadingAnchor constraintEqualToAnchor:self.contentView.leadingAnchor
-                                               constant:4],
-        [_snippet.centerYAnchor constraintEqualToAnchor:self.contentView.centerYAnchor],
-        [_snippet.trailingAnchor constraintLessThanOrEqualToAnchor:_expiry.leadingAnchor
-                                                          constant:-8],
-        [_expiry.trailingAnchor constraintEqualToAnchor:_unhide.leadingAnchor constant:-8],
-        [_expiry.centerYAnchor constraintEqualToAnchor:self.contentView.centerYAnchor],
+                                               constant:14],
+        [_snippet.topAnchor constraintEqualToAnchor:self.contentView.topAnchor constant:12],
+        [_snippet.trailingAnchor constraintEqualToAnchor:_unhide.leadingAnchor constant:-12],
+
+        // expiration — sous le texte, plus jamais en concurrence de largeur
+        [_expiry.leadingAnchor constraintEqualToAnchor:_snippet.leadingAnchor],
+        [_expiry.topAnchor constraintEqualToAnchor:_snippet.bottomAnchor constant:6],
+        [_expiry.trailingAnchor constraintLessThanOrEqualToAnchor:_unhide.leadingAnchor
+                                                         constant:-12],
+        [_expiry.bottomAnchor constraintEqualToAnchor:self.contentView.bottomAnchor
+                                             constant:-12],
         [_expiry.heightAnchor constraintEqualToConstant:20],
+
+        // ⊗ — calé en haut à droite, marge 14
         [_unhide.trailingAnchor constraintEqualToAnchor:self.contentView.trailingAnchor
-                                               constant:-4],
-        [_unhide.centerYAnchor constraintEqualToAnchor:self.contentView.centerYAnchor],
-        [_unhide.widthAnchor constraintEqualToConstant:22],
-        [_unhide.heightAnchor constraintEqualToConstant:22],
+                                               constant:-14],
+        [_unhide.topAnchor constraintEqualToAnchor:self.contentView.topAnchor constant:13],
+        [_unhide.widthAnchor constraintEqualToConstant:26],
+        [_unhide.heightAnchor constraintEqualToConstant:26],
     ]];
     return self;
 }
@@ -116,7 +139,10 @@ extern UIColor* CurrentAccentColor(void);
     [super viewDidLoad];
     self.title = [[BHTBundle sharedBundle] localizedStringForKey:@"HIDDEN_NOTIFS_TITLE"];
     self.tableView.separatorStyle = UITableViewCellSeparatorStyleNone;
-    self.tableView.rowHeight = 52;
+    // The row now stacks text (up to two lines) above the expiry, so a fixed 52
+    // would clip it. Self-sizing keeps every case correct.
+    self.tableView.rowHeight = UITableViewAutomaticDimension;
+    self.tableView.estimatedRowHeight = 72;
     // A popover paints its own material: forcing an opaque background here is
     // what once killed the glass on the muted-words popover.
     self.tableView.backgroundColor =
@@ -138,8 +164,8 @@ extern UIColor* CurrentAccentColor(void);
         return;
     }
     [self.tableView layoutIfNeeded];
-    CGFloat height = MIN(self.tableView.contentSize.height + 8, 330);
-    self.preferredContentSize = CGSizeMake(330, MAX(height, 120));
+    CGFloat height = MIN(self.tableView.contentSize.height + 6, 330);
+    self.preferredContentSize = CGSizeMake(290, MAX(height, 96));
 }
 
 - (void)viewDidLayoutSubviews {
@@ -250,7 +276,7 @@ extern UIColor* CurrentAccentColor(void);
     NSString* format =
         [[BHTBundle sharedBundle] localizedStringForKey:@"HIDDEN_NOTIFS_COUNT"];
     count.text = [NSString stringWithFormat:format, (long)self.rows.count];
-    count.font = [UIFont systemFontOfSize:12];
+    count.font = [UIFont systemFontOfSize:13 weight:UIFontWeightSemibold];
     count.textColor = [UIColor secondaryLabelColor];
     count.translatesAutoresizingMaskIntoConstraints = NO;
     [footer addSubview:count];
@@ -259,10 +285,10 @@ extern UIColor* CurrentAccentColor(void);
     [clear setTitle:[[BHTBundle sharedBundle] localizedStringForKey:@"HIDDEN_NOTIFS_CLEAR_ALL"]
            forState:UIControlStateNormal];
     [clear setTitleColor:[UIColor secondaryLabelColor] forState:UIControlStateNormal];
-    clear.titleLabel.font = [UIFont systemFontOfSize:15.5];
+    clear.titleLabel.font = [UIFont systemFontOfSize:13.5 weight:UIFontWeightSemibold];
     clear.layer.borderWidth = 1.0;
     clear.layer.borderColor = [UIColor systemGray4Color].CGColor;
-    clear.layer.cornerRadius = 22.0;
+    clear.layer.cornerRadius = 17.0;
     clear.layer.cornerCurve = kCACornerCurveContinuous;
     clear.translatesAutoresizingMaskIntoConstraints = NO;
     [clear addTarget:self
@@ -271,14 +297,14 @@ extern UIColor* CurrentAccentColor(void);
     [footer addSubview:clear];
 
     [NSLayoutConstraint activateConstraints:@[
-        [count.leadingAnchor constraintEqualToAnchor:footer.leadingAnchor constant:20],
-        [count.topAnchor constraintEqualToAnchor:footer.topAnchor constant:8],
-        [clear.trailingAnchor constraintEqualToAnchor:footer.trailingAnchor constant:-16],
+        [count.leadingAnchor constraintEqualToAnchor:footer.leadingAnchor constant:14],
+        [count.centerYAnchor constraintEqualToAnchor:clear.centerYAnchor],
+        [clear.trailingAnchor constraintEqualToAnchor:footer.trailingAnchor constant:-14],
         [clear.leadingAnchor constraintGreaterThanOrEqualToAnchor:count.trailingAnchor
                                                          constant:12],
-        [clear.topAnchor constraintEqualToAnchor:footer.topAnchor constant:20],
-        [clear.heightAnchor constraintEqualToConstant:44],
-        [clear.widthAnchor constraintGreaterThanOrEqualToConstant:120],
+        [clear.topAnchor constraintEqualToAnchor:footer.topAnchor constant:11],
+        [clear.heightAnchor constraintEqualToConstant:34],
+        [clear.widthAnchor constraintGreaterThanOrEqualToConstant:96],
     ]];
     return footer;
 }
