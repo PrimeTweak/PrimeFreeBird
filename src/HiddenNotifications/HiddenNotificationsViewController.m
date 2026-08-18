@@ -20,7 +20,6 @@ extern UIColor* CurrentAccentColor(void);
 @interface NFBHiddenNotifCell : UITableViewCell
 @property (nonatomic, strong) UILabel* snippet;
 @property (nonatomic, strong) UILabel* expiry;
-@property (nonatomic, strong) UIButton* unhide;
 @end
 
 @implementation NFBHiddenNotifCell
@@ -54,18 +53,9 @@ extern UIColor* CurrentAccentColor(void);
                                              forAxis:UILayoutConstraintAxisHorizontal];
     [self.contentView addSubview:_expiry];
 
-    _unhide = [UIButton buttonWithType:UIButtonTypeSystem];
-    [_unhide setImage:[UIImage systemImageNamed:@"xmark.circle.fill"]
-             forState:UIControlStateNormal];
-    _unhide.tintColor = [[UIColor labelColor] colorWithAlphaComponent:0.25];
-    _unhide.translatesAutoresizingMaskIntoConstraints = NO;
-    [self.contentView addSubview:_unhide];
-
-    // Everything sat on ONE horizontal line with 8 pt between the parts: the
-    // text ran into the expiry pill, the pill ran into the ⊗, and a long
-    // notification pushed both off the edge. Measured cotes from the UI plate:
-    // the expiry moves UNDER the text, margins are 14 all round, and the
-    // gutter to the ⊗ is 12 — so nothing can collide any more.
+    // The ⊗ is gone — he asked for the left swipe to be the only way to
+    // unhide, and it already existed. The text now runs to the 14 pt margin,
+    // with the expiry stacked underneath it.
     self.layoutMargins = UIEdgeInsetsZero;
     self.contentView.layoutMargins = UIEdgeInsetsZero;
     self.preservesSuperviewLayoutMargins = NO;
@@ -73,44 +63,32 @@ extern UIColor* CurrentAccentColor(void);
 
     [_snippet setContentCompressionResistancePriority:UILayoutPriorityDefaultLow
                                               forAxis:UILayoutConstraintAxisHorizontal];
-    [_unhide setContentCompressionResistancePriority:UILayoutPriorityRequired
-                                             forAxis:UILayoutConstraintAxisHorizontal];
 
     [NSLayoutConstraint activateConstraints:@[
         // texte — deux lignes maximum, puis « … »
         [_snippet.leadingAnchor constraintEqualToAnchor:self.contentView.leadingAnchor
                                                constant:14],
         [_snippet.topAnchor constraintEqualToAnchor:self.contentView.topAnchor constant:12],
-        [_snippet.trailingAnchor constraintEqualToAnchor:_unhide.leadingAnchor constant:-12],
+        // Le ⊗ est parti : le texte va jusqu'à la marge, comme il l'a demandé.
+        [_snippet.trailingAnchor constraintEqualToAnchor:self.contentView.trailingAnchor
+                                               constant:-14],
 
         // expiration — sous le texte, plus jamais en concurrence de largeur
         [_expiry.leadingAnchor constraintEqualToAnchor:_snippet.leadingAnchor],
         [_expiry.topAnchor constraintEqualToAnchor:_snippet.bottomAnchor constant:6],
-        [_expiry.trailingAnchor constraintLessThanOrEqualToAnchor:_unhide.leadingAnchor
-                                                         constant:-12],
+        [_expiry.trailingAnchor constraintLessThanOrEqualToAnchor:self.contentView.trailingAnchor
+                                                         constant:-14],
         [_expiry.bottomAnchor constraintEqualToAnchor:self.contentView.bottomAnchor
                                              constant:-12],
         [_expiry.heightAnchor constraintEqualToConstant:20],
-
-        // ⊗ — calé en haut à droite, marge 14
-        [_unhide.trailingAnchor constraintEqualToAnchor:self.contentView.trailingAnchor
-                                               constant:-14],
-        [_unhide.topAnchor constraintEqualToAnchor:self.contentView.topAnchor constant:13],
-        [_unhide.widthAnchor constraintEqualToConstant:26],
-        [_unhide.heightAnchor constraintEqualToConstant:26],
     ]];
     return self;
 }
 
-// The pill sizes itself around its text — a plain label needs the padding drawn.
-- (void)layoutSubviews {
-    [super layoutSubviews];
-    CGSize fit = [self.expiry sizeThatFits:CGSizeMake(CGFLOAT_MAX, 20)];
-    CGRect frame = self.expiry.frame;
-    frame.size.width = fit.width + 18;
-    frame.origin.x = CGRectGetMinX(self.unhide.frame) - 8 - frame.size.width;
-    self.expiry.frame = frame;
-}
+// This used to place the pill by hand, measured from the ⊗ that no longer
+// exists — with the button gone its frame is zero, and the pill would have been
+// pushed off the left edge. Auto Layout now owns the position (leading edge,
+// under the text) and the padding comes from the label's own intrinsic size.
 
 @end
 
@@ -118,6 +96,8 @@ extern UIColor* CurrentAccentColor(void);
 
 @interface HiddenNotificationsViewController ()
 @property (nonatomic, assign) BOOL compact;
+@property (nonatomic, strong) UIView* pinnedBar;
+@property (nonatomic, strong) UILabel* pinnedCount;
 @property (nonatomic, strong) NSArray<NSDictionary*>* rows;
 @end
 
@@ -153,12 +133,14 @@ extern UIColor* CurrentAccentColor(void);
         // is an opaque sheet, and so is this one now.
         self.view.backgroundColor = [UIColor systemBackgroundColor];
     }
+    [self installPinnedBar];
     [self reload];
 }
 
 - (void)reload {
     self.rows = NFBHiddenNotifList();
     [self.tableView reloadData];
+    [self refreshPinnedBar];
     [self updatePreferredSize];
 }
 
@@ -172,7 +154,9 @@ extern UIColor* CurrentAccentColor(void);
     [self.tableView layoutIfNeeded];
     // contentSize already includes the footer; no padding is added on top of
     // it, otherwise the sheet grows a strip of white at the bottom.
-    CGFloat height = MIN(self.tableView.contentSize.height, 330);
+    // The pinned bar sits on top of the table, so its height is added rather
+    // than being part of contentSize.
+    CGFloat height = MIN(self.tableView.contentSize.height + kNFBNotifBarHeight, 330);
     self.preferredContentSize = CGSizeMake(290, MAX(height, 90));
 }
 
@@ -199,14 +183,12 @@ extern UIColor* CurrentAccentColor(void);
     }
     // Recycling: every state a previous row could have left behind is reset.
     cell.contentView.alpha = 1.0;
-    cell.unhide.hidden = NO;
 
     if (!self.rows.count) {
         cell.snippet.text =
             [[BHTBundle sharedBundle] localizedStringForKey:@"HIDDEN_NOTIFS_EXAMPLE"];
         cell.expiry.text = @"";
         cell.expiry.hidden = YES;
-        cell.unhide.hidden = YES;
         cell.contentView.alpha = 0.38;
         return cell;
     }
@@ -235,24 +217,7 @@ extern UIColor* CurrentAccentColor(void);
         : [NSString stringWithFormat:
                [[BHTBundle sharedBundle] localizedStringForKey:@"HIDDEN_NOTIFS_EXPIRES_IN"],
                (long)days];
-    cell.unhide.tag = indexPath.row;
-    [cell.unhide removeTarget:self
-                       action:@selector(unhideTapped:)
-             forControlEvents:UIControlEventTouchUpInside];
-    [cell.unhide addTarget:self
-                    action:@selector(unhideTapped:)
-          forControlEvents:UIControlEventTouchUpInside];
     return cell;
-}
-
-- (void)unhideTapped:(UIButton*)sender {
-    if (sender.tag >= (NSInteger)self.rows.count) {
-        return;
-    }
-    NSDictionary* row = self.rows[sender.tag];
-    NFBUnhideNotif(row[@"id"]);
-    nfbReapplyTimelineFilter();
-    [self reload];
 }
 
 // Swipe on this list unhides — the mirror of the gesture that hid it.
@@ -284,26 +249,33 @@ extern UIColor* CurrentAccentColor(void);
 
 // MARK: footer — the count and "clear all"
 
-- (CGFloat)tableView:(UITableView*)tableView heightForFooterInSection:(NSInteger)section {
-    // 11 (haut) + 34 (pilule) + 12 (bas) = 57. C'était resté à 78, d'où le
-    // grand blanc sous « Clear all » sur sa capture.
-    return self.rows.count ? 57 : 0.01;
-}
+// MARK: - the pinned bar (count + clear all)
+//
+// It used to be a table footer, so it scrolled with the list and the swipe
+// could grab it. His reference — the Quick access — pins its bar as a SUBVIEW
+// of the table, constrained to the table's frameLayoutGuide: it stays put, and
+// no gesture on the rows can ever reach it. Same construction here.
 
-- (UIView*)tableView:(UITableView*)tableView viewForFooterInSection:(NSInteger)section {
-    if (!self.rows.count) {
-        return nil;
+static const CGFloat kNFBNotifBarHeight = 57.0;
+
+- (void)installPinnedBar {
+    if (self.pinnedBar || !self.compact) {
+        return;
     }
-    UIView* footer = [[UIView alloc] init];
+    UIView* bar = [[UIView alloc] init];
+    bar.translatesAutoresizingMaskIntoConstraints = NO;
+    bar.backgroundColor = [UIColor systemBackgroundColor];
+
+    UIView* hairline = [[UIView alloc] init];
+    hairline.backgroundColor = [UIColor separatorColor];
+    hairline.translatesAutoresizingMaskIntoConstraints = NO;
+    [bar addSubview:hairline];
 
     UILabel* count = [[UILabel alloc] init];
-    NSString* format =
-        [[BHTBundle sharedBundle] localizedStringForKey:@"HIDDEN_NOTIFS_COUNT"];
-    count.text = [NSString stringWithFormat:format, (long)self.rows.count];
     count.font = [UIFont systemFontOfSize:13 weight:UIFontWeightSemibold];
     count.textColor = [UIColor secondaryLabelColor];
     count.translatesAutoresizingMaskIntoConstraints = NO;
-    [footer addSubview:count];
+    [bar addSubview:count];
 
     UIButton* clear = [UIButton buttonWithType:UIButtonTypeSystem];
     [clear setTitle:[[BHTBundle sharedBundle] localizedStringForKey:@"HIDDEN_NOTIFS_CLEAR_ALL"]
@@ -318,19 +290,47 @@ extern UIColor* CurrentAccentColor(void);
     [clear addTarget:self
                   action:@selector(clearAllTapped)
         forControlEvents:UIControlEventTouchUpInside];
-    [footer addSubview:clear];
+    [bar addSubview:clear];
 
+    [self.tableView addSubview:bar];
+    UILayoutGuide* frame = self.tableView.frameLayoutGuide;
     [NSLayoutConstraint activateConstraints:@[
-        [count.leadingAnchor constraintEqualToAnchor:footer.leadingAnchor constant:14],
+        [bar.leadingAnchor constraintEqualToAnchor:frame.leadingAnchor],
+        [bar.trailingAnchor constraintEqualToAnchor:frame.trailingAnchor],
+        [bar.bottomAnchor constraintEqualToAnchor:frame.bottomAnchor],
+        [bar.heightAnchor constraintEqualToConstant:kNFBNotifBarHeight],
+
+        [hairline.leadingAnchor constraintEqualToAnchor:bar.leadingAnchor],
+        [hairline.trailingAnchor constraintEqualToAnchor:bar.trailingAnchor],
+        [hairline.topAnchor constraintEqualToAnchor:bar.topAnchor],
+        [hairline.heightAnchor constraintEqualToConstant:0.5],
+
+        [count.leadingAnchor constraintEqualToAnchor:bar.leadingAnchor constant:14],
         [count.centerYAnchor constraintEqualToAnchor:clear.centerYAnchor],
-        [clear.trailingAnchor constraintEqualToAnchor:footer.trailingAnchor constant:-14],
+        [clear.trailingAnchor constraintEqualToAnchor:bar.trailingAnchor constant:-14],
         [clear.leadingAnchor constraintGreaterThanOrEqualToAnchor:count.trailingAnchor
                                                          constant:12],
-        [clear.topAnchor constraintEqualToAnchor:footer.topAnchor constant:11],
+        [clear.topAnchor constraintEqualToAnchor:bar.topAnchor constant:11],
         [clear.heightAnchor constraintEqualToConstant:34],
         [clear.widthAnchor constraintGreaterThanOrEqualToConstant:96],
     ]];
-    return footer;
+
+    self.pinnedBar = bar;
+    self.pinnedCount = count;
+    // The rows must not end up underneath it.
+    self.tableView.contentInset =
+        UIEdgeInsetsMake(0, 0, kNFBNotifBarHeight, 0);
+    self.tableView.verticalScrollIndicatorInsets = self.tableView.contentInset;
+}
+
+- (void)refreshPinnedBar {
+    self.pinnedBar.hidden = !self.rows.count;
+    if (!self.rows.count) {
+        return;
+    }
+    NSString* format =
+        [[BHTBundle sharedBundle] localizedStringForKey:@"HIDDEN_NOTIFS_COUNT"];
+    self.pinnedCount.text = [NSString stringWithFormat:format, (long)self.rows.count];
 }
 
 - (void)clearAllTapped {
