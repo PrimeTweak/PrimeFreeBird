@@ -74,18 +74,6 @@ double NFBNotifDaysLeft(NSDictionary* entry) {
     return left > 0 ? left : 0;
 }
 
-// The day the entry drops out, on the same base as the countdown above so the
-// two can never disagree. He asked to see WHEN, not only how long.
-NSDate* NFBNotifExpiryDate(NSDictionary* entry) {
-    double base = [entry[@"d"] doubleValue];
-    if (base <= 0) {
-        base = [entry[@"h"] doubleValue];
-    }
-    if (base <= 0) {
-        base = [[NSDate date] timeIntervalSince1970];
-    }
-    return [NSDate dateWithTimeIntervalSince1970:base + NFBNotifHorizonDays() * 86400.0];
-}
 
 // Purge on read: an entry past its horizon leaves by itself — his whole point.
 void NFBPurgeExpiredNotifs(void) {
@@ -354,17 +342,32 @@ BOOL NFBNotifIsHidden(id model) {
     NSString* identity = NFBNotifIdentity(model);
     // An impression id is not guaranteed to survive a refresh. Rather than
     // assume either way, the identity seen while FILTERING is journaled twice:
-    // if a hidden notification ever comes back, comparing these lines with
-    // « masquée <…> » says at once whether the id changed between two
-    // displays — no probe build needed.
-    // Printed while the registry is not empty: comparing this value with the
-    // « menu: masquée <…> » line says at once whether the impression id is the
-    // same between two displays — the one risk flagged when it was chosen.
+    // ONE measurement, and it settles the pull-to-refresh question for good.
+    //
+    // His journal shows the hide side perfectly (« masquée <f91f6a94…> ») but
+    // never the filter side, so I cannot tell whether the id changed or whether
+    // the filter simply never ran. This prints BOTH facts the first four times
+    // the filter sees a row while the registry is not empty:
+    //   · the identity this display carries — compare it with « masquée <…> »;
+    //   · what the model exposes of itself, in case it holds a stable id or the
+    //     text, which would give a key that a reload cannot change.
+    // If the two identities differ, the impression id is per-response and I
+    // switch key. If they match, the filter is not being called on that path.
     static NSInteger noted;
     if (identity.length && hidden.count && noted < 4) {
         noted++;
-        NFBDebugLog(@"notifhide: identité vue au filtre <%@> | %@",
-                    identity, hidden[identity] ? @"TROUVÉE → masquée" : @"absente du registre");
+        NSString* shape = nil;
+        @try {
+            shape = [model description];
+            if (shape.length > 220) {
+                shape = [shape substringToIndex:220];
+            }
+        } @catch (id exception) {
+            shape = @"(description illisible)";
+        }
+        NFBDebugLog(@"notifhide: FILTRE identité <%@> | %@",
+                    identity, hidden[identity] ? @"TROUVÉE → masquée" : @"ABSENTE du registre");
+        NFBDebugLog(@"notifhide: FILTRE modèle = %@", shape ?: @"(nil)");
     }
     return identity.length && hidden[identity] != nil;
 }
@@ -1015,7 +1018,6 @@ reconfigureItemIdentifiers:(id)identifiers
 
 
 
-static const NSInteger kNFBNotifBarItemTag = 90314;
 static const CGFloat kNFBNotifEyeSide = 24.0;   // cote validée: comme l'engrenage
 
 @interface NFBNotifQuickPresenter : NSObject
@@ -1287,92 +1289,165 @@ static BOOL NFBNotifRowIsOursInTable(id dataViewController, UITableView* table,
 //   · for a table already wired, re-assign delegate and data source once, which
 //     is the documented way to make the table rebuild that cache.
 
-// MARK: - the eye, through the door Twitter actually uses
+// MARK: - the eye, as a subview of the bar
 //
-// Measured in the binary: the right-hand bar buttons are provided by
-//   T1TabNavigationController
-//     -_t1_main_updateNavigationItemForViewController:isRoot:
-//        providingLeftBarButtonItems:rightBarButtonItems:
-// My previous attempt bolted a subview onto TFNNavigationBar and depended on a
-// three-link chain that silently failed. This one adds a proper bar button
-// item where Twitter adds its own, and only for the notifications screen —
-// recognised by the class name read from the binary, not guessed.
+// Measured, and written in his own QuickMutedWords.x: « Bar button items do not
+// show in this container: this bar draws its contents through a full-width
+// SwiftUI platter. » That platter is what paints the glass pastille around our
+// icon — the gear escapes it because Twitter draws it itself. So the eye stops
+// being a bar button item and becomes a plain subview of the bar, exactly like
+// his Muted words button. Three things follow for free:
+//   · no shared background, so no Liquid Glass;
+//   · a real view, so the popover can grow its arrow on it;
+//   · NFBGreyGlyph paints the glyph into a flat bitmap and returns it as
+//     AlwaysOriginal, which is the only route his tweak found that the theme's
+//     window tint cannot reclaim — that tint is what turned the icon orange.
 
-%hook T1TabNavigationController
+static const char* kNFBNotifEyeKey = "nfbNotifEyeButton";
 
-- (void)_t1_main_updateNavigationItemForViewController:(UIViewController*)viewController
-                                                isRoot:(BOOL)isRoot
-                           providingLeftBarButtonItems:(BOOL)left
-                                 rightBarButtonItems:(BOOL)right {
+// Grey resolved to a concrete colour: a dynamic one gets claimed later.
+static UIColor* NFBNotifIconGrey(UITraitCollection* traits) {
+    UIColor* grey = [[UIColor labelColor] colorWithAlphaComponent:0.6];
+    if (traits && [grey respondsToSelector:@selector(resolvedColorWithTraitCollection:)]) {
+        return [grey resolvedColorWithTraitCollection:traits] ?: grey;
+    }
+    return grey;
+}
+
+// Flat bitmap + AlwaysOriginal: no tint can repaint it.
+static UIImage* NFBNotifFlatGlyph(UIImage* source, UIColor* colour) {
+    if (!source || !colour) {
+        return source;
+    }
+    CGSize size = source.size;
+    if (size.width < 1.0 || size.height < 1.0) {
+        return source;
+    }
+    UIGraphicsImageRendererFormat* format = [UIGraphicsImageRendererFormat preferredFormat];
+    format.opaque = NO;
+    format.scale = source.scale;
+    UIGraphicsImageRenderer* renderer =
+        [[UIGraphicsImageRenderer alloc] initWithSize:size format:format];
+    UIImage* painted = [renderer imageWithActions:^(UIGraphicsImageRendererContext* context) {
+        CGRect rect = CGRectMake(0.0, 0.0, size.width, size.height);
+        [source drawInRect:rect];
+        CGContextSetBlendMode(context.CGContext, kCGBlendModeSourceIn);
+        [colour setFill];
+        CGContextFillRect(context.CGContext, rect);
+    }];
+    return [painted imageWithRenderingMode:UIImageRenderingModeAlwaysOriginal];
+}
+
+// The avatar gives the metric, as in his reference.
+static UIView* NFBNotifAvatarIn(UIView* root, UIView* bar) {
+    for (UIView* sub in root.subviews) {
+        CGRect box = [sub convertRect:sub.bounds toView:bar];
+        BOOL square = fabs(CGRectGetWidth(box) - CGRectGetHeight(box)) < 2.0;
+        if (square && CGRectGetWidth(box) >= 26.0 && CGRectGetWidth(box) <= 44.0 &&
+            CGRectGetMinX(box) < CGRectGetWidth(bar.bounds) / 3.0 &&
+            sub.layer.cornerRadius > 8.0) {
+            return sub;
+        }
+        UIView* deeper = NFBNotifAvatarIn(sub, bar);
+        if (deeper) {
+            return deeper;
+        }
+    }
+    return nil;
+}
+
+static BOOL NFBNotifIsNotificationsBar(UIView* bar) {
+    UIViewController* owner = nil;
+    UIResponder* responder = bar.nextResponder;
+    NSInteger hops = 0;
+    while (responder && hops < 8) {
+        if ([responder isKindOfClass:[UIViewController class]]) {
+            owner = (UIViewController*)responder;
+            break;
+        }
+        responder = responder.nextResponder;
+        hops++;
+    }
+    UIViewController* node = owner;
+    NSInteger up = 0;
+    while (node && up < 8) {
+        if ([NSStringFromClass([node class]) containsString:@"NotificationsViewController"]) {
+            return YES;
+        }
+        node = node.parentViewController;
+        up++;
+    }
+    return NO;
+}
+
+%hook TFNNavigationBar
+
+- (void)layoutSubviews {
     %orig;
-    if (!NFBNotifsEnabled() || !viewController) {
+    if (!NFBNotifsEnabled()) {
         return;
     }
     @try {
-        if (![NSStringFromClass([viewController class])
-                containsString:@"NotificationsViewController"]) {
+        UIView* bar = (UIView*)self;
+        if (!bar.window) {
             return;
         }
-        UINavigationItem* item = viewController.navigationItem;
-        for (UIBarButtonItem* existing in item.rightBarButtonItems) {
-            if (existing.tag == kNFBNotifBarItemTag) {
-                return;   // already there
+        UIButton* button = objc_getAssociatedObject(self, kNFBNotifEyeKey);
+        // Once the button exists here, keep maintaining it: the responder chain
+        // is briefly incomplete during some layout passes, and bailing out then
+        // made his Muted words icon vanish until relaunch.
+        if (!button && !NFBNotifIsNotificationsBar(bar)) {
+            return;
+        }
+        if (!button) {
+            UIImage* glyph = nil;
+            if ([UIImage respondsToSelector:@selector(tfn_vectorImageNamed:fitsSize:fillColor:)]) {
+                glyph = [UIImage tfn_vectorImageNamed:@"eye_off"
+                                             fitsSize:CGSizeMake(24, 24)
+                                            fillColor:[UIColor labelColor]];
             }
+            if (!glyph) {
+                glyph = [UIImage systemImageNamed:@"eye.slash"];
+            }
+            button = [UIButton buttonWithType:UIButtonTypeSystem];
+            [button setImage:NFBNotifFlatGlyph(glyph, NFBNotifIconGrey(bar.traitCollection))
+                    forState:UIControlStateNormal];
+            button.contentMode = UIViewContentModeCenter;
+            button.accessibilityLabel = @"Hidden notifications";
+            [button addTarget:[NFBNotifQuickPresenter shared]
+                       action:@selector(present:)
+             forControlEvents:UIControlEventTouchUpInside];
+            objc_setAssociatedObject(self, kNFBNotifEyeKey, button,
+                                     OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+            NFBDebugLog(@"[notifs] œil posé en sous-vue de la barre (sans verre)");
         }
-        UIImage* glyph = nil;
-        if ([UIImage respondsToSelector:@selector(tfn_vectorImageNamed:fitsSize:fillColor:)]) {
-            glyph = [UIImage tfn_vectorImageNamed:@"eye_off"
-                                         fitsSize:CGSizeMake(24, 24)
-                                        fillColor:[UIColor labelColor]];
+        if (button.superview != bar) {
+            [bar addSubview:button];
         }
-        glyph = glyph ? [glyph imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate]
-                      : [UIImage systemImageNamed:@"eye.slash"];
-        UIBarButtonItem* ours =
-            [[UIBarButtonItem alloc] initWithImage:glyph
-                                             style:UIBarButtonItemStylePlain
-                                            target:[NFBNotifQuickPresenter shared]
-                                            action:@selector(present:)];
-        ours.tag = kNFBNotifBarItemTag;
+        [bar bringSubviewToFront:button];
 
-        // He asked for the glass pastille behind the eye to go, position and
-        // size unchanged. Two routes, tried in order in the same build so he
-        // never has to compile twice:
-        //
-        //   1. the bar's own opt-out, when the system offers it;
-        //   2. a custom view, which is what Twitter itself uses for the gear
-        //      next to us (measured: TFNBarButtonItemButton, not a bare image)
-        //      — a custom view gets no shared background at all.
-        // Always a custom view now. Two reasons, both his: it carries no shared
-        // glass background, and — measured against his Quick access — a popover
-        // only grows its little arrow when it can anchor on a REAL view.
-        // A bar button item exposes none, which is why the panel floated free.
-        UIButton* plain = [UIButton buttonWithType:UIButtonTypeSystem];
-        [plain setImage:glyph forState:UIControlStateNormal];
-        plain.tintColor = [UIColor labelColor];
-        plain.frame = CGRectMake(0, 0, kNFBNotifEyeSide, kNFBNotifEyeSide);
-        [plain addTarget:[NFBNotifQuickPresenter shared]
-                  action:@selector(present:)
-        forControlEvents:UIControlEventTouchUpInside];
-        SEL hideShared = NSSelectorFromString(@"setHidesSharedBackground:");
-        if ([ours respondsToSelector:hideShared]) {
-            ((void (*)(id, SEL, BOOL))objc_msgSend)(ours, hideShared, YES);
+        // Re-asserted every pass: on a cold launch the theme's tint claims the
+        // icon until the first interaction.
+        UIColor* grey = NFBNotifIconGrey(bar.traitCollection);
+        if (![button.tintColor isEqual:grey]) {
+            button.tintColor = grey;
         }
-        ours = [[UIBarButtonItem alloc] initWithCustomView:plain];
-        ours.tag = kNFBNotifBarItemTag;
-        NFBDebugLog(@"[notifs] œil posé en vue personnalisée (ancre du popover)");
-        NSMutableArray<UIBarButtonItem*>* items =
-            [NSMutableArray arrayWithArray:item.rightBarButtonItems ?: @[]];
-        [items addObject:ours];          // after Twitter's own (the gear)
-        item.rightBarButtonItems = items;
-        static BOOL said;
-        if (!said) {
-            said = YES;
-            NFBDebugLog(@"[notifs] œil posé dans la barre de %@ (%lu bouton(s))",
-                        NSStringFromClass([viewController class]),
-                        (unsigned long)items.count);
+
+        // Metric taken from the avatar, as in his reference. The eye sits just
+        // left of the gear, which keeps its own place.
+        CGFloat side = 30.0;
+        CGFloat inset = 16.0;
+        CGFloat centerY = CGRectGetMidY(bar.bounds);
+        UIView* avatar = NFBNotifAvatarIn(bar, bar);
+        if (avatar) {
+            CGRect inBar = [avatar convertRect:avatar.bounds toView:bar];
+            centerY = CGRectGetMidY(inBar);
+            side = CGRectGetHeight(inBar);
+            inset = CGRectGetMinX(inBar);
         }
+        button.frame = CGRectMake(CGRectGetWidth(bar.bounds) - side - inset - side - 8.0,
+                                  centerY - side / 2.0, side, side);
     } @catch (id exception) {
-        NFBDebugLog(@"[notifs] pose de l'œil abandonnée — sans conséquence");
     }
 }
 
