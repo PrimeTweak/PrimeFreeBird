@@ -1199,8 +1199,9 @@ static BOOL nfbNotifCanEdit(id self, SEL _cmd, UITableView* table, NSIndexPath* 
         return YES;
     }
     NSValue* boxed = gNFBNotifOrigCanEdit[NSStringFromClass([self class])];
-    if (boxed) {
-        BOOL (*original)(id, SEL, UITableView*, NSIndexPath*) = [boxed pointerValue];
+    BOOL (*original)(id, SEL, UITableView*, NSIndexPath*) =
+        boxed ? [boxed pointerValue] : NULL;
+    if (original) {
         return original(self, _cmd, table, indexPath);
     }
     return YES;  // UIKit's own default when nobody implements it
@@ -1221,10 +1222,10 @@ static UISwipeActionsConfiguration* nfbNotifTrailingSwipe(id self, SEL _cmd,
     }
     UISwipeActionsConfiguration* original = nil;
     NSValue* boxed = gNFBNotifOrigSwipe[NSStringFromClass([self class])];
-    if (boxed) {
-        UISwipeActionsConfiguration* (*orig)(id, SEL, UITableView*, NSIndexPath*) =
-            [boxed pointerValue];
-        original = orig(self, _cmd, table, indexPath);
+    UISwipeActionsConfiguration* (*origSwipe)(id, SEL, UITableView*, NSIndexPath*) =
+        boxed ? [boxed pointerValue] : NULL;
+    if (origSwipe) {
+        original = origSwipe(self, _cmd, table, indexPath);
     }
     id source = NFBNotifRowSourceFor(self, table);
     if (!NFBNotifRowIsOursInTable(source, table, indexPath)) {
@@ -1283,8 +1284,14 @@ static void NFBNotifInstall(id target, SEL selector, IMP replacement,
     BOOL ownsIt = owned && class_getMethodImplementation(class_getSuperclass(cls), selector)
                             != method_getImplementation(owned);
     if (!ownsIt && class_addMethod(cls, selector, replacement, types)) {
+        // Only ever store a REAL implementation. Boxing NULL produced a
+        // non-nil NSValue holding a null pointer, and every caller below
+        // treated "boxed != nil" as "there is an original to call" — which is
+        // a call to address zero, i.e. the crash on the first context menu.
         IMP inherited = owned ? method_getImplementation(owned) : NULL;
-        store[name] = [NSValue valueWithPointer:inherited];
+        if (inherited) {
+            store[name] = [NSValue valueWithPointer:inherited];
+        }
         NFBDebugLog(@"[notifs] méthode ajoutée à %@ (%@)", name, NSStringFromSelector(selector));
         return;
     }
@@ -1356,10 +1363,14 @@ static id nfbNotifContextMenu(id self, SEL _cmd, UITableView* table,
                               NSIndexPath* indexPath, CGPoint point) {
     UIContextMenuConfiguration* original = nil;
     NSValue* boxed = gNFBNotifOrigContext[NSStringFromClass([self class])];
-    if (boxed) {
-        UIContextMenuConfiguration* (*orig)(id, SEL, UITableView*, NSIndexPath*, CGPoint) =
-            [boxed pointerValue];
-        original = orig(self, _cmd, table, indexPath, point);
+    UIContextMenuConfiguration* (*origMenu)(id, SEL, UITableView*, NSIndexPath*, CGPoint) =
+        boxed ? [boxed pointerValue] : NULL;
+    if (origMenu) {
+        @try {
+            original = origMenu(self, _cmd, table, indexPath, point);
+        } @catch (id exception) {
+            original = nil;
+        }
     }
     if (!NFBNotifsEnabled()) {
         return original;
