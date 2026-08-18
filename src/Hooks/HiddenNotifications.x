@@ -490,9 +490,29 @@ static void NFBShowNotifToast(NSString* notifID) {
         toast.layer.borderWidth = 0.5;
         toast.layer.borderColor = [UIColor separatorColor].CGColor;
     }
+    // His call: the toast stays where it is, but the navigation title was
+    // reading through the text. The material alone is too thin, so a veil at
+    // 80 % sits behind the content — enough to stop the title, thin enough to
+    // still let the background breathe, which is what he asked for.
+    toast.layer.shadowColor = [UIColor blackColor].CGColor;
+    toast.layer.shadowOpacity = 0.16;
+    toast.layer.shadowRadius = 10.0;
+    toast.layer.shadowOffset = CGSizeMake(0, 4);
     [window addSubview:toast];
 
     UIView* content = toast.contentView;
+
+    UIView* veil = [[UIView alloc] init];
+    veil.backgroundColor = [[UIColor systemBackgroundColor] colorWithAlphaComponent:0.80];
+    veil.userInteractionEnabled = NO;
+    veil.translatesAutoresizingMaskIntoConstraints = NO;
+    [content addSubview:veil];
+    [NSLayoutConstraint activateConstraints:@[
+        [veil.topAnchor constraintEqualToAnchor:content.topAnchor],
+        [veil.bottomAnchor constraintEqualToAnchor:content.bottomAnchor],
+        [veil.leadingAnchor constraintEqualToAnchor:content.leadingAnchor],
+        [veil.trailingAnchor constraintEqualToAnchor:content.trailingAnchor],
+    ]];
 
     UILabel* label = [[UILabel alloc] init];
     label.text = [[BHTBundle sharedBundle] localizedStringForKey:@"NOTIFS_HIDDEN_TOAST"];
@@ -837,6 +857,7 @@ static NSArray* NFBFilterNotifSections(NSArray* sections) {
 
 
 static const NSInteger kNFBNotifBarItemTag = 90314;
+static const CGFloat kNFBNotifEyeSide = 24.0;   // cote validée: comme l'engrenage
 
 @interface NFBNotifQuickPresenter : NSObject
 + (instancetype)shared;
@@ -1140,6 +1161,34 @@ static BOOL NFBNotifRowIsOursInTable(id dataViewController, UITableView* table,
                                             target:[NFBNotifQuickPresenter shared]
                                             action:@selector(present:)];
         ours.tag = kNFBNotifBarItemTag;
+
+        // He asked for the glass pastille behind the eye to go, position and
+        // size unchanged. Two routes, tried in order in the same build so he
+        // never has to compile twice:
+        //
+        //   1. the bar's own opt-out, when the system offers it;
+        //   2. a custom view, which is what Twitter itself uses for the gear
+        //      next to us (measured: TFNBarButtonItemButton, not a bare image)
+        //      — a custom view gets no shared background at all.
+        BOOL glassRefused = NO;
+        SEL hideShared = NSSelectorFromString(@"setHidesSharedBackground:");
+        if ([ours respondsToSelector:hideShared]) {
+            ((void (*)(id, SEL, BOOL))objc_msgSend)(ours, hideShared, YES);
+            glassRefused = YES;
+        }
+        if (!glassRefused) {
+            UIButton* plain = [UIButton buttonWithType:UIButtonTypeSystem];
+            [plain setImage:glyph forState:UIControlStateNormal];
+            plain.tintColor = [UIColor labelColor];
+            plain.frame = CGRectMake(0, 0, kNFBNotifEyeSide, kNFBNotifEyeSide);
+            [plain addTarget:[NFBNotifQuickPresenter shared]
+                      action:@selector(present:)
+            forControlEvents:UIControlEventTouchUpInside];
+            ours = [[UIBarButtonItem alloc] initWithCustomView:plain];
+            ours.tag = kNFBNotifBarItemTag;
+        }
+        NFBDebugLog(@"[notifs] œil sans verre — voie %@",
+                    glassRefused ? @"1 (refus du fond partagé)" : @"2 (vue personnalisée)");
         NSMutableArray<UIBarButtonItem*>* items =
             [NSMutableArray arrayWithArray:item.rightBarButtonItems ?: @[]];
         [items addObject:ours];          // after Twitter's own (the gear)
@@ -1171,6 +1220,12 @@ static BOOL NFBNotifRowIsOursInTable(id dataViewController, UITableView* table,
 // is already wired to a method of the cell, which is where we act.
 
 static const char* kNFBNotifRevealedKey = "nfbNotifRevealedDismiss";
+static const char* kNFBNotifGlyphKey    = "nfbNotifDismissGlyph";
+// Cotes validées sur la planche UI v2.
+static const CGFloat kNFBNotifDismissTarget = 44.0;   // zone tactile
+static const CGFloat kNFBNotifDismissGlyph  = 15.0;   // corps du symbole ×
+static const CGFloat kNFBNotifDismissInset  = 16.0;   // marge au bord droit
+static const CGFloat kNFBNotifDismissTop    = 4.0;    // haut de la cellule
 
 // The table a cell lives in, walked from the cell itself.
 static UITableView* NFBNotifTableForCell(UIView* cell) {
@@ -1208,15 +1263,51 @@ static UITableView* NFBNotifTableForCell(UIView* cell) {
         if (dismiss.hidden) { dismiss.hidden = NO; changed = YES; }
         if (dismiss.alpha < 0.5) { dismiss.alpha = 1.0; changed = YES; }
         dismiss.userInteractionEnabled = YES;
-        if (dismiss.bounds.size.width < 2 || dismiss.bounds.size.height < 2) {
-            CGRect f = dismiss.frame;
-            CGFloat side = 22;
-            // top-right of the cell, mirroring where FLEX measured it (413,12).
-            f.size = CGSizeMake(side, side);
-            f.origin.x = ((UIView*)self).bounds.size.width - side - 12;
-            f.origin.y = 12;
-            dismiss.frame = f;
+
+        // Agreed geometry: a 44 pt target (Apple's minimum, and what he asked
+        // for — « dur d'accès »), the glyph itself staying small at 22, and a
+        // 16 pt margin so it lines up with the bell on the left instead of
+        // hugging the screen edge at 9 pt.
+        CGFloat side = kNFBNotifDismissTarget;
+        CGRect wanted = CGRectMake(((UIView*)self).bounds.size.width - side - kNFBNotifDismissInset,
+                                   kNFBNotifDismissTop, side, side);
+        if (!CGRectEqualToRect(dismiss.frame, wanted)) {
+            dismiss.frame = wanted;
             changed = YES;
+        }
+
+        // The × replaces the ⋯: « plus d'options » is not what this does.
+        if ([dismiss isKindOfClass:[UIButton class]]) {
+            UIButton* button = (UIButton*)dismiss;
+            if (!objc_getAssociatedObject(dismiss, kNFBNotifGlyphKey)) {
+                UIImage* cross = nil;
+                if (@available(iOS 13.0, *)) {
+                    UIImageSymbolConfiguration* cfg =
+                        [UIImageSymbolConfiguration configurationWithPointSize:kNFBNotifDismissGlyph
+                                                                       weight:UIImageSymbolWeightSemibold];
+                    cross = [UIImage systemImageNamed:@"xmark" withConfiguration:cfg];
+                }
+                if (cross) {
+                    [button setImage:[cross imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate]
+                            forState:UIControlStateNormal];
+                    button.tintColor = [UIColor secondaryLabelColor];
+                    button.contentHorizontalAlignment = UIControlContentHorizontalAlignmentCenter;
+                    button.contentVerticalAlignment = UIControlContentVerticalAlignmentCenter;
+                    objc_setAssociatedObject(dismiss, kNFBNotifGlyphKey, @YES,
+                                             OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+                }
+            }
+            // Touch feedback before the finger lifts.
+            extern UIColor* CurrentAccentColor(void);
+            UIColor* accent = CurrentAccentColor();
+            if (accent) {
+                [button addAction:[UIAction actionWithHandler:^(__unused UIAction* a) {
+                    button.tintColor = accent;
+                }] forControlEvents:UIControlEventTouchDown];
+                [button addAction:[UIAction actionWithHandler:^(__unused UIAction* a) {
+                    button.tintColor = [UIColor secondaryLabelColor];
+                }] forControlEvents:UIControlEventTouchUpOutside | UIControlEventTouchCancel];
+            }
         }
         objc_setAssociatedObject(self, kNFBNotifRevealedKey, @YES,
                                  OBJC_ASSOCIATION_RETAIN_NONATOMIC);
