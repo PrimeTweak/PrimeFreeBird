@@ -832,18 +832,6 @@ static NSArray* NFBFilterNotifSections(NSArray* sections) {
 // controller or one of its ancestors. If nothing matches, no button is added —
 // best effort, never destructive, and the list stays reachable from Settings.
 
-static UIViewController* NFBOwningVC(UIView* view) {
-    UIResponder* responder = view;
-    NSInteger hops = 0;
-    while (responder && hops < 40) {
-        if ([responder isKindOfClass:[UIViewController class]]) {
-            return (UIViewController*)responder;
-        }
-        responder = responder.nextResponder;
-        hops++;
-    }
-    return nil;
-}
 
 
 static const NSInteger kNFBNotifBarItemTag = 90314;
@@ -864,30 +852,70 @@ static const NSInteger kNFBNotifBarItemTag = 90314;
     return instance;
 }
 
-- (void)present:(UIButton*)sender {
+// The sender is now a UIBarButtonItem — the bar's own kind of button, since we
+// go through Twitter's real door. A bar item is NOT a view: it answers neither
+// -bounds nor -nextResponder, and asking it either is an unrecognised selector,
+// i.e. the crash on tap. Both kinds are handled here, and the host controller no
+// longer comes from the sender at all.
+- (void)present:(id)sender {
     Class screenClass = NSClassFromString(@"HiddenNotificationsViewController");
     if (!screenClass) {
         return;
     }
-    id allocated = [screenClass alloc];
-    id screen = ((id (*)(id, SEL))objc_msgSend)(allocated,
-                                                NSSelectorFromString(@"initCompact"));
-    UIViewController* controller = screen;
-    if (!controller) {
-        return;
-    }
-    controller.modalPresentationStyle = UIModalPresentationPopover;
-    controller.popoverPresentationController.sourceView = sender;
-    controller.popoverPresentationController.sourceRect = sender.bounds;
-    controller.popoverPresentationController.permittedArrowDirections =
-        UIPopoverArrowDirectionUp;
-    controller.popoverPresentationController.delegate = (id)self;
+    @try {
+        id allocated = [screenClass alloc];
+        id screen = ((id (*)(id, SEL))objc_msgSend)(allocated,
+                                                    NSSelectorFromString(@"initCompact"));
+        UIViewController* controller = screen;
+        if (!controller) {
+            return;
+        }
+        controller.modalPresentationStyle = UIModalPresentationPopover;
+        UIPopoverPresentationController* popover =
+            controller.popoverPresentationController;
+        if ([sender isKindOfClass:[UIBarButtonItem class]]) {
+            popover.barButtonItem = sender;          // anchors itself, no bounds needed
+        } else if ([sender isKindOfClass:[UIView class]]) {
+            popover.sourceView = sender;
+            popover.sourceRect = ((UIView*)sender).bounds;
+        }
+        popover.permittedArrowDirections = UIPopoverArrowDirectionUp;
+        popover.delegate = (id)self;
 
-    UIViewController* host = NFBOwningVC(sender);
-    while (host.presentedViewController) {
-        host = host.presentedViewController;
+        // Host: the visible controller of the key window — never derived from
+        // the sender, which is exactly what blew up.
+        UIWindow* window = nil;
+        for (UIScene* scene in [UIApplication sharedApplication].connectedScenes) {
+            if (![scene isKindOfClass:[UIWindowScene class]]) {
+                continue;
+            }
+            for (UIWindow* candidate in ((UIWindowScene*)scene).windows) {
+                if (candidate.isKeyWindow) {
+                    window = candidate;
+                    break;
+                }
+                if (!window) {
+                    window = candidate;
+                }
+            }
+            if (window.isKeyWindow) {
+                break;
+            }
+        }
+        UIViewController* host = window.rootViewController;
+        while (host.presentedViewController) {
+            host = host.presentedViewController;
+        }
+        if (!host) {
+            NFBDebugLog(@"[notifs] aucun écran hôte pour la liste — présentation annulée");
+            return;
+        }
+        [host presentViewController:controller animated:YES completion:nil];
+        NFBDebugLog(@"[notifs] liste des masquées présentée depuis %@",
+                    NSStringFromClass([host class]));
+    } @catch (id exception) {
+        NFBDebugLog(@"[notifs] présentation de la liste abandonnée — sans conséquence");
     }
-    [host presentViewController:controller animated:YES completion:nil];
 }
 
 // Without this a popover becomes full screen on iPhone.
@@ -1123,6 +1151,115 @@ static BOOL NFBNotifRowIsOursInTable(id dataViewController, UITableView* table,
         }
     } @catch (id exception) {
         NFBDebugLog(@"[notifs] pose de l'œil abandonnée — sans conséquence");
+    }
+}
+
+%end
+
+// MARK: - the button that was already there
+//
+// Measured in the binary, and visible in his own FLEX capture all along:
+//   T1URTTimelineNotificationCell  ->  dismissButton, setDismissButton:,
+//                                      dismissButtonWasTapped, layoutSubviews
+//   the cell already holds a TFNDismissButton at {413, 12}, 18x18 — HIDDEN.
+//
+// So Twitter ships a dismiss button on every notification row and simply keeps
+// it hidden. Revealing it costs nothing, depends on no gesture, no menu, no
+// delegate and no proxy — the three things that ate this whole evening. The tap
+// is already wired to a method of the cell, which is where we act.
+
+static const char* kNFBNotifRevealedKey = "nfbNotifRevealedDismiss";
+
+// The table a cell lives in, walked from the cell itself.
+static UITableView* NFBNotifTableForCell(UIView* cell) {
+    UIView* node = cell.superview;
+    NSInteger hops = 0;
+    while (node && hops < 6) {
+        if ([node isKindOfClass:[UITableView class]]) {
+            return (UITableView*)node;
+        }
+        node = node.superview;
+        hops++;
+    }
+    return nil;
+}
+
+%hook T1URTTimelineNotificationCell
+
+- (void)layoutSubviews {
+    %orig;
+    if (!NFBNotifsEnabled()) {
+        return;
+    }
+    @try {
+        id button = NFBNotifAsk(self, NSSelectorFromString(@"dismissButton"));
+        if (![button isKindOfClass:[UIView class]]) {
+            return;
+        }
+        UIView* dismiss = button;
+        // Measured: dismissButtonWasTapped just invokes the cell's
+        // dismissButtonTapped block (ivar +0xb8), and layoutSubviews does not
+        // re-hide the button. What I could NOT prove statically is HOW it is
+        // hidden, so every route is covered — hidden flag, alpha, and a zero
+        // frame — and it is marked ours so the tap handler knows.
+        BOOL changed = NO;
+        if (dismiss.hidden) { dismiss.hidden = NO; changed = YES; }
+        if (dismiss.alpha < 0.5) { dismiss.alpha = 1.0; changed = YES; }
+        dismiss.userInteractionEnabled = YES;
+        if (dismiss.bounds.size.width < 2 || dismiss.bounds.size.height < 2) {
+            CGRect f = dismiss.frame;
+            CGFloat side = 22;
+            // top-right of the cell, mirroring where FLEX measured it (413,12).
+            f.size = CGSizeMake(side, side);
+            f.origin.x = self.contentView.bounds.size.width - side - 12;
+            f.origin.y = 12;
+            dismiss.frame = f;
+            changed = YES;
+        }
+        objc_setAssociatedObject(self, kNFBNotifRevealedKey, @YES,
+                                 OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        if (changed) {
+            static BOOL said;
+            if (!said) {
+                said = YES;
+                NFBDebugLog(@"[notifs] bouton × révélé sur la notification");
+            }
+        }
+    } @catch (id exception) {
+    }
+}
+
+- (void)dismissButtonWasTapped {
+    // One decision, taken outside the fence, so %orig is never called from
+    // inside a protected block: either we handled it, or Twitter does.
+    BOOL handled = NO;
+    BOOL ours = objc_getAssociatedObject(self, kNFBNotifRevealedKey) != nil;
+    if (NFBNotifsEnabled() && ours) {
+        @try {
+            UITableView* table = NFBNotifTableForCell((UIView*)self);
+            NSIndexPath* indexPath =
+                table ? [table indexPathForCell:(UITableViewCell*)self] : nil;
+            id source = table.dataSource;
+            id model = indexPath ? (NFBModelAtIndexPath(source, indexPath)
+                                    ?: NFBModelFromCell(table, indexPath))
+                                 : nil;
+            NSString* identity = model ? NFBNotifIdentity(model) : nil;
+            if (identity.length) {
+                NFBHideNotifWithText(model, NFBNotifTextFromCell(table, indexPath));
+                NFBDebugLog(@"[notifs] × : masquée <%@>", identity);
+                NFBNotifDropRow(source, indexPath);
+                NFBShowNotifToast(identity);
+                handled = YES;
+            } else {
+                NFBDebugLog(@"[notifs] × : ligne ou identité introuvable — "
+                            @"action laissée à Twitter");
+            }
+        } @catch (id exception) {
+            NFBDebugLog(@"[notifs] × : masquage interrompu — action laissée à Twitter");
+        }
+    }
+    if (!handled) {
+        %orig;
     }
 }
 
