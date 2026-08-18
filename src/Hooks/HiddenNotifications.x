@@ -1115,9 +1115,6 @@ reconfigureItemIdentifiers:(id)identifiers
 // best effort, never destructive, and the list stays reachable from Settings.
 
 
-
-static const CGFloat kNFBNotifEyeSide = 24.0;   // cote validée: comme l'engrenage
-
 @interface NFBNotifQuickPresenter : NSObject
 + (instancetype)shared;
 - (void)present:(UIButton*)sender;
