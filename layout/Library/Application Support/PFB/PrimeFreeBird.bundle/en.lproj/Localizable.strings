@@ -539,8 +539,9 @@
 "HIDDEN_NOTIFS_COUNT" = "%ld hidden";
 "HIDDEN_NOTIFS_CLEAR_ALL" = "Clear all";
 "HIDDEN_NOTIFS_EXPIRES_IN" = "expires in %ldd";
-"HIDDEN_NOTIFS_EXAMPLE" = "Swipe a notification left to hide it";
+"HIDDEN_NOTIFS_EXPIRES_ON" = "expires in %ldd · %@";
+"HIDDEN_NOTIFS_EXAMPLE" = "Tap × on a notification to hide it";
 "HIDDEN_NOTIFS_UNHIDE" = "Unhide";
 "HIDDEN_NOTIFS_UNTITLED" = "Hidden notification";
 "HIDE_NOTIFICATIONS_TITLE" = "Hide notifications";
-"HIDE_NOTIFICATIONS_DETAIL" = "Swipe a notification left to hide it, and find the hidden ones from the notifications bar.";
+"HIDE_NOTIFICATIONS_DETAIL" = "Tap × on a notification to hide it, and find the hidden ones from the notifications bar.";
