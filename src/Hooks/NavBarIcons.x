@@ -309,7 +309,7 @@ static void nfbRepaintNotificationsGear(UIView* bar, UIColor* colour) {
 
         // Measured in his capture: the advanced-search glyph sat in the bar at
         // 27.33 pt with tint white, next to a gear at 15,20,25 — it had been
-        // baked white by the confirm path. And it was never repaired, because
+        // repainted by another path. And it was never repaired, because
         // EVERY image we paint carries the painted flag, including that white
         // one: the guard below read the flag and concluded all was well.
         //
@@ -433,52 +433,6 @@ static BOOL nfbSubtreeHasBackMask(UIView* view, NSInteger depth) {
     return NO;
 }
 
-// A back button, wherever it is. The bar's container is found first, then the
-// button is asked whether it carries a back mask at all — the pair names the
-// arrow without a controller, without geometry and without a size.
-//
-// The mask is required rather than accepted alongside _UIModernBarButton: every
-// modern bar button has one of those, so the looser test also claimed the round
-// confirm of Twitter's own screens and baked its checkmark in the label colour —
-// a black check on an accent disc. Asking the CONTAINER for a mask still covers
-// both image views a back button carries (they share that container), while a
-// button that is not a back button no longer matches.
-// The round confirm of Twitter's own screens. A capture of Explore settings
-// settled how to name it: NO ancestor carries the accent disc — the glass
-// platter draws it, not a view — so every attempt to find a background colour
-// was bound to fail. What the capture DOES show is the glyph's tint:
-//
-//   UIImageView … mode=0 tint=rgba(255,255,255,1.00)      the confirm
-//   UIImageView … mode=1 tint=rgba(0,0,0,0.60)            the settings gear
-//   UIImageView … mode=0 tint=rgba(0,0,0,1.00)            an ordinary glyph
-//
-// A bar glyph is tinted white only when it sits on a coloured disc, so white is
-// the discriminator. The back arrow is excluded outright, its tint being dark
-// in any case.
-// The name of the screen the navigation controller currently shows. A bar
-// button's responder chain never reaches the content screen — it climbs into
-// the navigation controller, and the screen is read from there. This is the
-// corrected mechanism behind every screen-scoped decision in this file.
-// The FIRST view controller in the responder chain — the screen that OWNS the
-// view. The journal proved the previous reading wrong twice in one build: it
-// asked the UINavigationController for its top, and in this app that is the
-// generic TwitterDash shell — never "Inbox", never "Settings" — so the mirror
-// was torn down ON the inbox and the check never baked. TFN bars live inside
-// the screen's own hierarchy, so the first controller on the chain IS the
-// screen.
-static NSString* nfbOwningScreenName(UIView* view) {
-    UIResponder* responder = view;
-    NSInteger depth = 0;
-    while ((responder = responder.nextResponder) && depth < 14) {
-        if ([responder isKindOfClass:[UIViewController class]] &&
-            ![responder isKindOfClass:[UINavigationController class]]) {
-            return NSStringFromClass([responder class]);
-        }
-        depth++;
-    }
-    return @"";
-}
-
 static BOOL nfbIsBackArrowGlyph(UIView* view) {
     UIView* container = nil;
     UIView* node = view.superview;
@@ -520,71 +474,6 @@ static BOOL nfbIsChatBarGlyph(UIView* view) {
     return inHolder && nfbIsChatConversationBar(view);
 }
 
-// The confirm check of the settings sheets is the only bar glyph in the app
-// with a pure-white tint (established by capture), and pure white at maximum
-// luminance blooms on the saturated accent disc — measured at 5-6 px of
-// stroke, it reads as 7-8. Stepping the white down to 0.92 sits just under
-// the bloom threshold: same stroke, same geometry, the glare gone. The claim
-// is fenced twice, because a white tint alone once repainted the conversation
-// call icons: the glyph must ALSO sit on a settings screen, read from the
-// navigation controller's top view controller — a DM conversation reads
-// ConversationContainer and can never qualify.
-static UIColor* nfbSoftConfirmWhite(void) {
-    return [UIColor colorWithWhite:0.92 alpha:1.0];
-}
-
-// The claim runs in TWO steps, because its two halves are readable at two
-// different moments. The file itself documents that a bar button is given its
-// image BEFORE it is placed in the bar — so at setImage time the responder
-// chain stops at the detached button, the screen cannot be read, and a screen
-// test there says "no settings" for every glyph including the confirm. That is
-// exactly how the previous build left the check glaring. So: the LOCAL half
-// (pure-white tint, modern bar button, not the back arrow) marks the glyph at
-// setImage; the SCREEN half decides at didMoveToWindow, when the chain finally
-// reaches the navigation controller.
-static const char* kNFBPendingConfirmKey = "nfbPendingConfirm";
-
-static BOOL nfbIsWhiteBarGlyphCandidate(UIView* view) {
-    UIView* node = view.superview;
-    NSInteger depth = 0;
-    BOOL inModernBarButton = NO;
-    while (node && depth < 3) {
-        if ([NSStringFromClass([node classForCoder])
-                isEqualToString:@"_UIModernBarButton"]) {
-            inModernBarButton = YES;
-            break;
-        }
-        node = node.superview;
-        depth++;
-    }
-    if (!inModernBarButton || nfbIsBackArrowGlyph(view)) {
-        return NO;
-    }
-    // A glyph we paint ourselves is never a confirm button.
-    //
-    // The fence below assumes that « white tint on a modern bar button » names
-    // exactly one glyph. It does not: during a popover transition UIKit can
-    // hand one of the tweak's own bar icons a white tint for a moment. Marked
-    // then, the icon is baked white AND AlwaysOriginal, which freezes it —
-    // white on a white bar, still tappable, and only a tab swipe repaints it.
-    // That is precisely the reported bug. Any view carrying a grey target is
-    // under our control, so it is refused here.
-    if (objc_getAssociatedObject(view, kNFBGreyTargetKey)) {
-        static BOOL said;
-        if (!said) {
-            said = YES;
-            NFBDebugLog(@"glyphe: confirm REFUSÉ — icône du tweak (teinte blanche passagère)");
-        }
-        return NO;
-    }
-    UIColor* tint = view.tintColor;
-    CGFloat r = 0, g = 0, b = 0, a = 0;
-    if (!tint || ![tint getRed:&r green:&g blue:&b alpha:&a]) {
-        return NO;
-    }
-    return a > 0.9 && r > 0.9 && g > 0.9 && b > 0.9;
-}
-
 %hook UIImageView
 
 // The second half of the two-step claim: the button is in the bar, the chain
@@ -600,7 +489,7 @@ static BOOL nfbIsWhiteBarGlyphCandidate(UIView* view) {
     // icons stay template and spend the whole visit in the accent, washed by
     // the platter's vibrancy (grey only from the second visit on). Here the
     // chain is complete by definition, so the claim that missed at the setter
-    // lands now — the same two-step pattern the confirm glyph uses below.
+    // lands now.
     UIImage* chatImage = self.image;
     if (chatImage &&
         chatImage.renderingMode != UIImageRenderingModeAlwaysOriginal &&
@@ -614,43 +503,6 @@ static BOOL nfbIsWhiteBarGlyphCandidate(UIView* view) {
             nfbTintGlyphChain((UIView*)self, colour);
             self.image = baked;  // AlwaysOriginal: re-enters the setter and passes through
         }
-    }
-    if (!objc_getAssociatedObject(self, kNFBPendingConfirmKey)) {
-        return;
-    }
-    objc_setAssociatedObject(self, kNFBPendingConfirmKey, nil,
-                             OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-    UIImage* current = self.image;
-    if (!current ||
-        current.renderingMode == UIImageRenderingModeAlwaysOriginal) {
-        return;
-    }
-    // The mark was set when the tint was white; the baking happens later, and
-    // until now nothing re-checked. A white tint held for a moment — which is
-    // what a popover transition does to a bar icon — was therefore enough to
-    // freeze a glyph white AND AlwaysOriginal: invisible on a white bar, still
-    // tappable, repainted only by a tab swipe. Re-testing here costs nothing
-    // and keeps the real confirm button, whose tint stays white.
-    if (!nfbIsWhiteBarGlyphCandidate((UIView*)self)) {
-        NFBDebugLog(@"glyphe: confirm ANNULÉ — la teinte blanche n'a pas tenu");
-        return;
-    }
-    // No screen-name test: three builds proved every guessed name wrong on
-    // this app's controller shells. The structural fence is enough — the only
-    // false positives ever measured, the conversation call icons, arrive here
-    // already baked AlwaysOriginal by the chat-bar path and were refused two
-    // lines above. Pure-white tint on a modern bar button that is not the back
-    // arrow and not already baked names exactly one glyph.
-    NSString* screen = nfbOwningScreenName((UIView*)self);
-    // Baked rather than re-tinted: AlwaysOriginal forbids the bar button from
-    // painting its own white back over ours — and sends the setter straight
-    // through the passthrough above.
-    UIImage* softened = NFBGreyGlyph(current, nfbSoftConfirmWhite());
-    if (softened) {
-        NFBDebugLog(@"glyphe: confirm (ecran=%@) -> blanc adouci",
-                    screen.length ? screen : @"?");
-        NFBMark((UIView*)self, @"NavBarIcons/confirmGlyph → blanc adouci");
-        self.image = softened;
     }
 }
 
@@ -669,17 +521,10 @@ static BOOL nfbIsWhiteBarGlyphCandidate(UIView* view) {
         // simply names no mode at all. Anything that is not already original is
         // therefore claimed.
         if (image.renderingMode != UIImageRenderingModeAlwaysOriginal) {
-            if (nfbIsWhiteBarGlyphCandidate((UIView*)self)) {
-                // The screen is not readable yet — the button is not in the
-                // bar. Marked here, decided at didMoveToWindow below.
-                objc_setAssociatedObject(self, kNFBPendingConfirmKey, @YES,
-                                         OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-            }
             if (nfbIsChatBarGlyph((UIView*)self) ||
                 nfbIsBackArrowGlyph((UIView*)self)) {
-                // Baked at the setter, the way the confirm glyph of the theme
-                // screen already is: whoever writes last, the pixels that land
-                // carry the colour. A mode change alone leaves an alpha mask,
+                // Baked at the setter: whoever writes last, the pixels that
+                // land carry the colour. A mode change alone leaves an alpha mask,
                 // which a bar button re-tints per its own contrast rule.
                 UIColor* colour = nfbBarGlyphColour((UIView*)self);
                 UIImage* baked = NFBGreyGlyph(image, colour);
