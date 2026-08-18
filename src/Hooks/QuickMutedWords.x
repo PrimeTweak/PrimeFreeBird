@@ -66,8 +66,7 @@ static UIViewController* nfbOwningViewController(UIView* view) {
     return nil;
 }
 
-static BOOL nfbIsHomeNavigationBar(UIView* bar) {
-    UIViewController* owner = nfbOwningViewController(bar);
+static BOOL nfbControllerIsHome(UIViewController* owner) {
     if (!owner) {
         return NO;
     }
@@ -212,11 +211,40 @@ static UIImage* NFBGreyGlyph(UIImage* source, UIColor* colour) {
         }
 
         UIButton* button = objc_getAssociatedObject(self, kNFBQuickMutedBtnKey);
-        // The owner check runs only to decide whether this bar deserves a
-        // button. Once one exists here, keep maintaining it: the responder
-        // chain is momentarily incomplete during some layout passes, and
-        // bailing out then was making the icon vanish until a relaunch.
-        if (!button && !nfbIsHomeNavigationBar(bar)) {
+
+        // THREE states, not two — this is what caused the icon to leak onto
+        // other screens.
+        //
+        // The button is attached to the BAR, and TFNNavigationBar is REUSED
+        // across screens (measured during the Messages mirror saga: the same
+        // instance is re-populated). The old guard read « once a button exists
+        // here, keep maintaining it », which was written to survive layout
+        // passes where the responder chain is briefly incomplete — a real
+        // problem, the icon used to vanish until relaunch. But it also meant
+        // the button followed the bar everywhere and re-positioned itself at
+        // (width - side - inset) on every pass: on Explore that is x=376,
+        // exactly where the gear sits, which it then covered. His capture of
+        // « Search @…'s Tweets » shows the filter-bars glyph on a screen that
+        // never had one.
+        //
+        // So the two cases the old guard confused are now separated:
+        //   · owner known and it IS home      → create / maintain;
+        //   · owner known and it is NOT home  → REMOVE, the bar moved on;
+        //   · owner unknown (chain incomplete) → change nothing, which is
+        //     precisely what the original guard was protecting.
+        UIViewController* owner = nfbOwningViewController(bar);
+        if (owner) {
+            if (!nfbControllerIsHome(owner)) {
+                if (button) {
+                    [button removeFromSuperview];
+                    objc_setAssociatedObject(self, kNFBQuickMutedBtnKey, nil,
+                                             OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+                    NFBDebugLog(@"mots filtrés: icône retirée — la barre est passée à %@",
+                                NSStringFromClass([owner class]));
+                }
+                return;
+            }
+        } else if (!button) {
             return;
         }
         if (!button) {
