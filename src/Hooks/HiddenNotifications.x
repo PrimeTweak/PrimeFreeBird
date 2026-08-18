@@ -370,6 +370,7 @@ static NSString* NFBNotifTextFromCell(UITableView* table, NSIndexPath* indexPath
     }
     NSMutableArray<NSString*>* pieces = [NSMutableArray array];
     __block void (^walk)(UIView*, NSInteger);
+    __block __weak void (^weakWalk)(UIView*, NSInteger);
     walk = ^(UIView* view, NSInteger depth) {
         if (!view || depth > 6 || pieces.count >= 3) {
             return;
@@ -406,9 +407,10 @@ static NSString* NFBNotifTextFromCell(UITableView* table, NSIndexPath* indexPath
             [pieces addObject:found];
         }
         for (UIView* sub in view.subviews) {
-            walk(sub, depth + 1);
+            void (^w)(UIView*, NSInteger) = weakWalk; if (w) { w(sub, depth + 1); }
         }
-    };
+    };    weakWalk = walk;
+
     walk(cell.contentView, 0);
     return pieces.count ? [pieces componentsJoinedByString:@" · "] : nil;
 }
@@ -1211,7 +1213,7 @@ static UITableView* NFBNotifTableForCell(UIView* cell) {
             CGFloat side = 22;
             // top-right of the cell, mirroring where FLEX measured it (413,12).
             f.size = CGSizeMake(side, side);
-            f.origin.x = self.contentView.bounds.size.width - side - 12;
+            f.origin.x = ((UIView*)self).bounds.size.width - side - 12;
             f.origin.y = 12;
             dismiss.frame = f;
             changed = YES;
