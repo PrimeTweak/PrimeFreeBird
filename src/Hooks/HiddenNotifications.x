@@ -1335,80 +1335,102 @@ static void NFBNotifRefreshDelegateCache(UITableView* table) {
 
 
 
-// MARK: - long press: the gesture that depends on nobody
+
+// MARK: - our entry inside Twitter's own menu
 //
-// Measured verdict, his 19:42 journal: « édition autorisée par
-// T1URTViewController » appears, « la table DEMANDE les actions de balayage »
-// never does. The table allows editing and UIKit still never asks for the
-// actions — the swipe itself is being taken before the table sees it, which is
-// exactly what a horizontal pager (All / Mentions) does to a horizontal drag.
-// No amount of delegate work can win that.
+// His screenshot settles the design question: holding a notification ALREADY
+// opens a native menu (« See less often »). So no gesture of ours is needed or
+// wanted — the action belongs in that menu, which is exactly what he asked for
+// on Hidden Threads: « c'est natif et intuitif ».
 //
-// So the action gets a gesture of its own. A long press: it is vertical-free,
-// no proxy, no delegate cache, no pager competition. The recogniser sits on the
-// TABLE, never on a cell — his hard rule about recycled cells stands — and the
-// row is resolved from the touch point. It also does not steal anything: taps,
-// scrolling and the pager keep working (cancelsTouchesInView stays NO).
+// For a table, that menu comes from the DELEGATE via
+// tableView:contextMenuConfigurationForRowAtIndexPath:point: — the same object
+// our methods are already installed on and, measured, actually called. The
+// original configuration is asked first and its menu is kept whole: our entry
+// is added to Twitter's, never replacing it. If anything in the enrichment
+// fails, the untouched original is returned.
 
-@interface NFBNotifPressHandler : NSObject
-+ (instancetype)shared;
-- (void)handlePress:(UILongPressGestureRecognizer*)press;
-@end
+static NSMutableDictionary<NSString*, NSValue*>* gNFBNotifOrigContext;
 
-@implementation NFBNotifPressHandler
-
-+ (instancetype)shared {
-    static NFBNotifPressHandler* instance;
-    static dispatch_once_t once;
-    dispatch_once(&once, ^{ instance = [[NFBNotifPressHandler alloc] init]; });
-    return instance;
-}
-
-- (void)handlePress:(UILongPressGestureRecognizer*)press {
-    if (press.state != UIGestureRecognizerStateBegan || !NFBNotifsEnabled()) {
-        return;
+static id nfbNotifContextMenu(id self, SEL _cmd, UITableView* table,
+                              NSIndexPath* indexPath, CGPoint point) {
+    UIContextMenuConfiguration* original = nil;
+    NSValue* boxed = gNFBNotifOrigContext[NSStringFromClass([self class])];
+    if (boxed) {
+        UIContextMenuConfiguration* (*orig)(id, SEL, UITableView*, NSIndexPath*, CGPoint) =
+            [boxed pointerValue];
+        original = orig(self, _cmd, table, indexPath, point);
     }
-    UITableView* table = (UITableView*)press.view;
-    if (![table isKindOfClass:[UITableView class]]) {
-        return;
+    if (!NFBNotifsEnabled()) {
+        return original;
     }
+
+    id model = nil;
+    NSString* identity = nil;
+    NSString* cellText = nil;
     @try {
-        CGPoint point = [press locationInView:table];
-        NSIndexPath* indexPath = [table indexPathForRowAtPoint:point];
-        if (!indexPath) {
-            return;
-        }
-        id source = NFBNotifRowSourceFor(table.dataSource, table);
+        id source = NFBNotifRowSourceFor(self, table);
         if (!NFBNotifRowIsOursInTable(source, table, indexPath)) {
-            return;   // not a notification we can name: leave the press alone
+            return original;
         }
-        id model = NFBNotifModelForRow(source, table, indexPath);
-        NSString* identity = NFBNotifIdentity(model);
-        NFBHideNotifWithText(model, NFBNotifTextFromCell(table, indexPath));
-        NFBDebugLog(@"[notifs] appui long: masquée <%@>", identity);
+        model = NFBNotifModelForRow(source, table, indexPath);
+        identity = NFBNotifIdentity(model);
+        cellText = NFBNotifTextFromCell(table, indexPath);
+    } @catch (id exception) {
+        return original;
+    }
+    if (!model || !identity.length) {
+        return original;
+    }
+
+    static BOOL said;
+    if (!said) {
+        said = YES;
+        NFBDebugLog(@"[notifs] entrée ajoutée au menu natif (%@)",
+                    NSStringFromClass([self class]));
+    }
+
+    NSString* title = [[BHTBundle sharedBundle] localizedStringForKey:@"NOTIFS_HIDE_ACTION"];
+    UIAction* hide = [UIAction actionWithTitle:title
+                                         image:[UIImage systemImageNamed:@"eye.slash"]
+                                    identifier:nil
+                                       handler:^(__unused UIAction* action) {
+        NFBHideNotifWithText(model, cellText);
+        NFBDebugLog(@"[notifs] menu: masquée <%@>", identity);
         nfbReapplyTimelineFilter();
         NFBShowNotifToast(identity);
+    }];
+
+    // Twitter's own preview and entries are preserved; ours simply joins them.
+    id previewProvider = nil;
+    @try {
+        previewProvider = [original valueForKey:@"previewProvider"];
     } @catch (id exception) {
-        NFBDebugLog(@"[notifs] appui long interrompu — sans conséquence");
+        previewProvider = nil;
     }
-}
-
-@end
-
-static void NFBNotifAttachLongPress(UITableView* table) {
-    static const char* kNFBNotifPressKey = "nfbNotifPress";
-    if (!NFBNotifsEnabled() || objc_getAssociatedObject(table, kNFBNotifPressKey)) {
-        return;
-    }
-    UILongPressGestureRecognizer* press = [[UILongPressGestureRecognizer alloc]
-        initWithTarget:[NFBNotifPressHandler shared] action:@selector(handlePress:)];
-    press.minimumPressDuration = 0.5;
-    press.cancelsTouchesInView = NO;   // taps, scrolling and the pager untouched
-    press.delaysTouchesBegan = NO;
-    [table addGestureRecognizer:press];
-    objc_setAssociatedObject(table, kNFBNotifPressKey, press,
-                             OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-    NFBDebugLog(@"[notifs] appui long posé sur %@", NSStringFromClass([table class]));
+    UIContextMenuConfiguration* enriched = [UIContextMenuConfiguration
+        configurationWithIdentifier:original.identifier
+                    previewProvider:previewProvider
+                     actionProvider:^UIMenu*(NSArray<UIMenuElement*>* suggested) {
+        NSMutableArray<UIMenuElement*>* children = [NSMutableArray arrayWithObject:hide];
+        @try {
+            id provider = original ? [original valueForKey:@"actionProvider"] : nil;
+            if (provider) {
+                UIMenu* (^build)(NSArray<UIMenuElement*>*) = provider;
+                UIMenu* base = build(suggested);
+                if (base.children.count) {
+                    [children addObjectsFromArray:base.children];
+                }
+            } else if (suggested.count) {
+                [children addObjectsFromArray:suggested];
+            }
+        } @catch (id exception) {
+            // Twitter's entries could not be read: ours alone is still better
+            // than losing the menu entirely.
+        }
+        return [UIMenu menuWithTitle:@"" children:children];
+    }];
+    return enriched ?: original;
 }
 
 static void NFBNotifWireTable(UITableView* table) {
@@ -1450,6 +1472,10 @@ static void NFBNotifWireTable(UITableView* table) {
     NFBNotifInstall(delegate,
                     @selector(tableView:trailingSwipeActionsConfigurationForRowAtIndexPath:),
                     (IMP)nfbNotifTrailingSwipe, "@@:@@", gNFBNotifOrigSwipe);
+    if (!gNFBNotifOrigContext) { gNFBNotifOrigContext = [NSMutableDictionary dictionary]; }
+    NFBNotifInstall(delegate,
+                    @selector(tableView:contextMenuConfigurationForRowAtIndexPath:point:),
+                    (IMP)nfbNotifContextMenu, "@@:@@{CGPoint=dd}", gNFBNotifOrigContext);
 
     // MEASUREMENT, not theory. Two competing explanations for ten silent
     // builds — the table caches what its delegate answers, OR the delegate is
@@ -1470,7 +1496,6 @@ static void NFBNotifWireTable(UITableView* table) {
                 [dataSource respondsToSelector:editSel] ? @"OUI" : @"NON");
 
     NFBNotifRefreshDelegateCache(table);
-    NFBNotifAttachLongPress(table);
 
 }
 
