@@ -999,6 +999,24 @@ static void NFBNotifRecordVerdict(id dataViewController, BOOL sawNotification,
                     NSStringFromClass([dataViewController class]));
         return;
     }
+    // A screen that BELONGS to the notifications tab is never condemned.
+    //
+    // His journal shows an instance of T1URTViewController dropped on « 10
+    // lignes sans notification » — here the Mentions tab, harmless. But the
+    // same could hit the All tab if it ever showed placeholder rows before its
+    // notifications arrived: dropped for good, and the hidden ones would come
+    // back. Staying undecided costs one extra walk on Mentions; being wrong
+    // costs the whole feature.
+    UIViewController* node = [dataViewController isKindOfClass:[UIViewController class]]
+                                 ? (UIViewController*)dataViewController
+                                 : nil;
+    for (NSInteger hop = 0; node && hop < 6; hop++) {
+        if ([NSStringFromClass([node class])
+                containsString:@"NotificationsViewController"]) {
+            return;      // undecided on purpose — keep observing
+        }
+        node = node.parentViewController;
+    }
     // Only decide against a screen once enough items have been seen: an empty
     // or still-loading list must not be condemned on a single empty pass.
     if (examined >= 5) {
@@ -1047,20 +1065,44 @@ static void NFBNotifSyncEmptyState(id dataViewController) {
                         NSStringFromClass([dataViewController class]));
             return;
         }
+        // MEASURED: with every notification hidden, the table still reports
+        // « 1 ligne(s) » — three times in his journal, on a visibly empty
+        // screen. That leftover row is not a notification (the sweep, which
+        // reads every model, never treats it as one): it is a header, a footer
+        // or a zero-height cell.
+        //
+        // So the raw row count is the wrong measure. What decides whether the
+        // screen is empty is how many rows carry a NOTIFICATION model — the
+        // same test the sweep already uses to earn its verdict.
         NSInteger rows = 0;
+        NSInteger notifRows = 0;
+        SEL itemSel = NSSelectorFromString(@"itemAtIndexPath:");
+        BOOL canRead = [dataViewController respondsToSelector:itemSel];
         for (NSInteger s = 0; s < table.numberOfSections; s++) {
-            rows += [table numberOfRowsInSection:s];
+            NSInteger count = [table numberOfRowsInSection:s];
+            rows += count;
+            if (!canRead) {
+                continue;
+            }
+            for (NSInteger r = 0; r < count; r++) {
+                NSIndexPath* path = [NSIndexPath indexPathForRow:r inSection:s];
+                id item = ((id (*)(id, SEL, id))objc_msgSend)(dataViewController,
+                                                             itemSel, path);
+                id model = item ? unwrapDataViewItem(item) : nil;
+                if (model && [NSStringFromClass([model class])
+                                 containsString:@"Notification"]) {
+                    notifRows++;
+                }
+            }
         }
         UIView* existing = [table viewWithTag:kNFBNotifEmptyTag];
         NSUInteger hidden = NFBHiddenNotifs().count;
 
-        // The one number never measured: what the table reports once the last
-        // notification is gone. If the panel still fails to show, this line
-        // says why in one go.
-        NFBDebugLog(@"[vide] %ld ligne(s), %lu masquée(s), panneau %@",
-                    (long)rows, (unsigned long)hidden, existing ? @"posé" : @"absent");
+        NFBDebugLog(@"[vide] %ld ligne(s) dont %ld notification(s), %lu masquée(s), panneau %@",
+                    (long)rows, (long)notifRows, (unsigned long)hidden,
+                    existing ? @"posé" : @"absent");
 
-        if (rows > 0 || hidden == 0) {
+        if (notifRows > 0 || hidden == 0) {
             if (existing) {
                 [existing removeFromSuperview];
                 NFBDebugLog(@"[vide] panneau retiré");
