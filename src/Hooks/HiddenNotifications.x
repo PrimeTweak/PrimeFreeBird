@@ -955,6 +955,102 @@ static NSArray* NFBFilterNotifSections(NSArray* sections) {
 // (« ligne retirée de la liste »). So after every content replacement we walk
 // the rows, ask for each item, and delete the hidden ones from the end.
 
+
+// MARK: - the empty state, using Twitter's own view
+//
+// Measured in the binary: TFNEmptyStateView (initWithFrame:, setConfiguration:)
+// and TFNEmptyStateConfiguration (initWithTitle:, setSubtitleConfiguration:)
+// are plain ObjC classes, resolvable by name. So the panel Twitter shows on its
+// own empty screens can be built here — same font, same sizes, same margins,
+// same max width. Only the words are ours.
+//
+// They have to be: Twitter's own empty text arrives from the server as a
+// timeline item (URTNotificationsEmptyStateSubscriptionManager). When the sweep
+// empties the list, the server DID send notifications — there is no empty-state
+// item to show. Hence its view, our text.
+
+static const NSInteger kNFBNotifEmptyTag = 90315;
+
+static void NFBNotifSyncEmptyState(id dataViewController, UITableView* table) {
+    // Only on the notifications screen. The sweep runs on every
+    // TFNItemsDataViewController — the home timeline included — and an empty
+    // state must never appear there.
+    if (!table || dataViewController != (id)gNFBNotifScreen) {
+        return;
+    }
+    @try {
+        NSInteger rows = 0;
+        for (NSInteger s = 0; s < table.numberOfSections; s++) {
+            rows += [table numberOfRowsInSection:s];
+        }
+        UIView* existing = [table viewWithTag:kNFBNotifEmptyTag];
+        if (rows > 0) {
+            if (existing) {
+                [existing removeFromSuperview];
+            }
+            return;
+        }
+        // Nothing left, and something IS hidden: say so. With an empty registry
+        // the list is empty for Twitter's own reasons, and Twitter handles it.
+        if (existing || !NFBHiddenNotifs().count) {
+            return;
+        }
+        Class configClass = NSClassFromString(@"TFNEmptyStateConfiguration");
+        Class subtitleClass = NSClassFromString(@"TFNEmptyStateSubtitleConfiguration");
+        Class viewClass = NSClassFromString(@"TFNEmptyStateView");
+        if (!configClass || !viewClass) {
+            return;      // a rename would only cost the panel, never a crash
+        }
+        NSString* title =
+            [[BHTBundle sharedBundle] localizedStringForKey:@"HIDDEN_NOTIFS_EMPTY_TITLE"];
+        NSString* body =
+            [[BHTBundle sharedBundle] localizedStringForKey:@"HIDDEN_NOTIFS_EMPTY_BODY"];
+
+        id config = [[configClass alloc] init];
+        SEL setTitle = NSSelectorFromString(@"setTitle:");
+        if (![config respondsToSelector:setTitle]) {
+            return;
+        }
+        ((void (*)(id, SEL, id))objc_msgSend)(config, setTitle, title);
+
+        SEL setSubtitle = NSSelectorFromString(@"setSubtitleConfiguration:");
+        if (subtitleClass && [config respondsToSelector:setSubtitle]) {
+            id subtitle = [[subtitleClass alloc] init];
+            SEL setText = NSSelectorFromString(@"setText:");
+            if ([subtitle respondsToSelector:setText]) {
+                ((void (*)(id, SEL, id))objc_msgSend)(subtitle, setText, body);
+                ((void (*)(id, SEL, id))objc_msgSend)(config, setSubtitle, subtitle);
+            }
+        }
+
+        UIView* panel = [[viewClass alloc] initWithFrame:CGRectZero];
+        SEL setConfig = NSSelectorFromString(@"setConfiguration:");
+        if (![panel respondsToSelector:setConfig]) {
+            return;
+        }
+        ((void (*)(id, SEL, id))objc_msgSend)(panel, setConfig, config);
+        panel.tag = kNFBNotifEmptyTag;
+        panel.userInteractionEnabled = NO;   // nothing to tap, never blocks a pull
+        panel.translatesAutoresizingMaskIntoConstraints = NO;
+        [table addSubview:panel];
+
+        // Centred on the table's VISIBLE frame, like the pinned bar of the
+        // panel: it stays put instead of scrolling away with the content.
+        UILayoutGuide* frame = table.frameLayoutGuide;
+        [NSLayoutConstraint activateConstraints:@[
+            [panel.centerXAnchor constraintEqualToAnchor:frame.centerXAnchor],
+            [panel.centerYAnchor constraintEqualToAnchor:frame.centerYAnchor],
+            [panel.leadingAnchor constraintGreaterThanOrEqualToAnchor:frame.leadingAnchor
+                                                            constant:24],
+            [panel.trailingAnchor constraintLessThanOrEqualToAnchor:frame.trailingAnchor
+                                                          constant:-24],
+        ]];
+        NFBDebugLog(@"[notifs] écran vide affiché (tout est masqué)");
+    } @catch (id exception) {
+        NFBDebugLog(@"[notifs] écran vide abandonné — sans conséquence");
+    }
+}
+
 static BOOL gNFBNotifSweeping;
 
 static void NFBNotifSweep(id dataViewController) {
@@ -1005,6 +1101,8 @@ static void NFBNotifSweep(id dataViewController) {
             NFBDebugLog(@"[notifs] balayage: %lu masquée(s) retirée(s) après rechargement",
                         (unsigned long)doomed.count);
         }
+        // Whether or not a row went, the list may now be empty.
+        NFBNotifSyncEmptyState(dataViewController, table);
     } @catch (id exception) {
         NFBDebugLog(@"[notifs] balayage interrompu — sans conséquence");
     }

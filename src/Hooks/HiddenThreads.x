@@ -460,6 +460,28 @@ static void NFBShowHiddenToast(NSString* threadID) {
 
     UIView* content = toast.contentView;
 
+    // The same veil he validated on the hidden-notification toast: pure glass
+    // let the timeline read straight through the words. 80 % of the background
+    // colour keeps the material visible underneath while the text stays legible.
+    //
+    // The rounded corners and masksToBounds are NOT optional: without them the
+    // veil renders as a square behind a capsule, which is exactly the artefact
+    // that showed up the first time and cost a build.
+    UIView* veil = [[UIView alloc] init];
+    veil.backgroundColor = [[UIColor systemBackgroundColor] colorWithAlphaComponent:0.80];
+    veil.userInteractionEnabled = NO;    // Undo must stay tappable
+    veil.layer.cornerRadius = 22.0;      // exactly the capsule's radius above
+    veil.layer.cornerCurve = kCACornerCurveContinuous;
+    veil.layer.masksToBounds = YES;
+    veil.translatesAutoresizingMaskIntoConstraints = NO;
+    [content addSubview:veil];           // BEFORE the label, so it sits behind
+    [NSLayoutConstraint activateConstraints:@[
+        [veil.topAnchor constraintEqualToAnchor:content.topAnchor],
+        [veil.bottomAnchor constraintEqualToAnchor:content.bottomAnchor],
+        [veil.leadingAnchor constraintEqualToAnchor:content.leadingAnchor],
+        [veil.trailingAnchor constraintEqualToAnchor:content.trailingAnchor],
+    ]];
+
     UILabel* label = [[UILabel alloc] init];
     label.text = [[BHTBundle sharedBundle] localizedStringForKey:@"THREADS_HIDDEN_TOAST"];
     label.font = [UIFont systemFontOfSize:15 weight:UIFontWeightMedium];
