@@ -766,7 +766,7 @@ static id NFBModelAtIndexPath(id dataViewController, NSIndexPath* indexPath) {
 // the spot, instead of hoping a sections replay reaches this screen — which is
 // what never happened. The registry + filter still handle later reloads.
 // Defined further down, next to the sweep it belongs with.
-static void NFBNotifSyncEmptyState(void);
+static void NFBNotifSyncEmptyState(id dataViewController);
 
 static void NFBNotifDropRow(id dataViewController, NSIndexPath* indexPath) {
     if (!dataViewController || !indexPath) {
@@ -785,7 +785,7 @@ static void NFBNotifDropRow(id dataViewController, NSIndexPath* indexPath) {
             // is hidden. Deferred one turn so the table has finished its delete
             // animation and reports its real row count.
             dispatch_async(dispatch_get_main_queue(), ^{
-                NFBNotifSyncEmptyState();
+                NFBNotifSyncEmptyState(dataViewController);
             });
             return;
         }
@@ -982,17 +982,52 @@ static NSArray* NFBFilterNotifSections(NSArray* sections) {
 
 static const NSInteger kNFBNotifEmptyTag = 90315;
 
-// Always works on the notifications screen itself, never on whatever object
-// happened to call it: the two paths that remove a row pass different objects
-// (the controller from the swipe, the cell's source from the ×), and comparing
-// the caller against gNFBNotifScreen silently did nothing for one of them.
-// Finding the table here also means the caller never has to.
-static void NFBNotifSyncEmptyState(void) {
-    // Every exit is named. Two builds were spent guessing which one was taken;
-    // one capture now says it outright.
-    id dataViewController = (id)gNFBNotifScreen;
+// The screen is recognised from the controller in hand, NOT from a global.
+//
+// Measured in his journal: « [vide] sortie: aucun écran de notifications
+// enregistré », four times, at the exact millisecond the sweep was working.
+// gNFBNotifScreen was never armed — NFBSectionsAreNotifications, the function
+// that sets it, tests [section respondsToSelector:@selector(items)], and no
+// section class exposes items. That was measured yesterday, and it is the same
+// dead assumption that had killed the filter. The global is simply always nil.
+//
+// So the check is done on the controller the caller already holds, by walking
+// up its parents for the notifications screen — the class named in his journal
+// by the eye ('œil posé dans la barre de T1NotificationsViewController').
+static const char* kNFBNotifSeenKey = "nfbNotifSeenHere";
+
+static BOOL NFBNotifIsNotificationsController(id controller) {
+    if (!controller) {
+        return NO;
+    }
+    // Measured on the spot: this controller has already displayed a
+    // notification model during a sweep.
+    if (objc_getAssociatedObject(controller, kNFBNotifSeenKey)) {
+        return YES;
+    }
+    if (![controller isKindOfClass:[UIViewController class]]) {
+        return NO;
+    }
+    UIViewController* node = (UIViewController*)controller;
+    for (NSInteger hop = 0; node && hop < 6; hop++) {
+        if ([NSStringFromClass([node class])
+                containsString:@"NotificationsViewController"]) {
+            return YES;
+        }
+        node = node.parentViewController;
+    }
+    return NO;
+}
+
+static void NFBNotifSyncEmptyState(id dataViewController) {
+    // Every exit is named. Two builds were spent guessing which one was taken.
     if (!dataViewController) {
-        NFBDebugLog(@"[vide] sortie: aucun écran de notifications enregistré");
+        NFBDebugLog(@"[vide] sortie: appelée sans contrôleur");
+        return;
+    }
+    if (!NFBNotifIsNotificationsController(dataViewController)) {
+        NFBDebugLog(@"[vide] sortie: %@ n'est pas l'écran des notifications",
+                    NSStringFromClass([dataViewController class]));
         return;
     }
     UITableView* table = nil;
@@ -1132,7 +1167,17 @@ static void NFBNotifSweep(id dataViewController) {
             for (NSInteger r = 0; r < rows; r++) {
                 NSIndexPath* path = [NSIndexPath indexPathForRow:r inSection:s];
                 id item = ((id (*)(id, SEL, id))objc_msgSend)(dataViewController, itemSel, path);
-                if (item && NFBNotifIsHidden(unwrapDataViewItem(item))) {
+                id model = item ? unwrapDataViewItem(item) : nil;
+                // Second, sturdier recognition: a controller that has shown a
+                // notification model IS the notifications screen, whatever its
+                // parent chain looks like. Remembered on the controller, so it
+                // still holds once the list has been emptied.
+                if (model && [NSStringFromClass([model class])
+                                 containsString:@"Notification"]) {
+                    objc_setAssociatedObject(dataViewController, kNFBNotifSeenKey, @YES,
+                                             OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+                }
+                if (model && NFBNotifIsHidden(model)) {
                     [doomed addObject:path];
                 }
             }
@@ -1147,7 +1192,7 @@ static void NFBNotifSweep(id dataViewController) {
                         (unsigned long)doomed.count);
         }
         // Whether or not a row went, the list may now be empty.
-        NFBNotifSyncEmptyState();
+        NFBNotifSyncEmptyState(dataViewController);
     } @catch (id exception) {
         NFBDebugLog(@"[notifs] balayage interrompu — sans conséquence");
     }
