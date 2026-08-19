@@ -15,6 +15,7 @@
 //
 
 #import "HookHelpers.h"
+#import "Debug/NFBDebugger.h"
 #import "MutedWords/MutedWordsViewController.h"
 #import <objc/message.h>
 
