@@ -333,9 +333,30 @@ static void NFBProbeReportShareItems(NSString *porte, id result, NSString *extra
         }
     }
     NSString *liste = (noms.count > 0) ? [noms componentsJoinedByString:@" | "] : @"(aucune)";
-    if (NFBProbeFirstTime([NSString stringWithFormat:@"sheet|%@", liste])) {
-        NFBProbeLog(@"[sonde] feuille de partage · %lu activite(s) · %@",
-                    (unsigned long)applicationActivities.count, liste);
+
+    // AJOUT v5 : le CONTENU partage. C'est lui qui dira si le statut (ou son
+    // media) est disponible a cet instant — 0,4 s avant que le menu d'appui
+    // long ne soit assemble. Sans ce fait, impossible de rattacher une entree
+    // de telechargement au BON tweet.
+    NSMutableArray *contenu = [NSMutableArray array];
+    for (id item in activityItems) {
+        NSString *classe = NSStringFromClass([item class]);
+        NSString *apercu = @"";
+        if ([item isKindOfClass:[NSURL class]] || [item isKindOfClass:[NSString class]]) {
+            NSString *texte = [item description];
+            if (texte.length > 70) {
+                texte = [[texte substringToIndex:70] stringByAppendingString:@"…"];
+            }
+            apercu = [NSString stringWithFormat:@"(%@)", texte];
+        }
+        [contenu addObject:[NSString stringWithFormat:@"%@%@", classe, apercu]];
+    }
+    NSString *listeContenu = (contenu.count > 0) ? [contenu componentsJoinedByString:@" | "] : @"(vide)";
+
+    if (NFBProbeFirstTime([NSString stringWithFormat:@"sheet|%@|%@", liste, listeContenu])) {
+        NFBProbeLog(@"[sonde] feuille de partage · %lu activite(s) · %@ · contenu: %lu · %@",
+                    (unsigned long)applicationActivities.count, liste,
+                    (unsigned long)activityItems.count, listeContenu);
     }
     return result;
 }
@@ -477,5 +498,5 @@ static void NFBProbeReportShareItems(NSString *porte, id result, NSString *extra
 // ---------------------------------------------------------------------------
 
 %ctor {
-    NFBProbeLog(@"[sonde] sonde de menus v4 armee (adresse de l'appelant + actionItems 7 args)");
+    NFBProbeLog(@"[sonde] sonde de menus v5 armee (contenu de la feuille de partage)");
 }
