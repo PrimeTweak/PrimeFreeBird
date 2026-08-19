@@ -765,6 +765,9 @@ static id NFBModelAtIndexPath(id dataViewController, NSIndexPath* indexPath) {
 // -deleteItemAtIndexPath:withRowAnimation:. So a hidden row leaves the list on
 // the spot, instead of hoping a sections replay reaches this screen — which is
 // what never happened. The registry + filter still handle later reloads.
+// Defined further down, next to the sweep it belongs with.
+static void NFBNotifSyncEmptyState(void);
+
 static void NFBNotifDropRow(id dataViewController, NSIndexPath* indexPath) {
     if (!dataViewController || !indexPath) {
         return;
@@ -776,6 +779,14 @@ static void NFBNotifDropRow(id dataViewController, NSIndexPath* indexPath) {
                 dataViewController, deleteSel, indexPath, UITableViewRowAnimationLeft);
             NFBDebugLog(@"[notifs] ligne retirée de la liste (%ld/%ld)",
                         (long)indexPath.section, (long)indexPath.row);
+            // A direct removal goes through NONE of the seven content-replacing
+            // doors, so nothing was re-checking whether the list had just become
+            // empty — which is exactly what happens when the LAST notification
+            // is hidden. Deferred one turn so the table has finished its delete
+            // animation and reports its real row count.
+            dispatch_async(dispatch_get_main_queue(), ^{
+                NFBNotifSyncEmptyState();
+            });
             return;
         }
         NFBDebugLog(@"[notifs] suppression directe indisponible sur %@",
@@ -971,11 +982,25 @@ static NSArray* NFBFilterNotifSections(NSArray* sections) {
 
 static const NSInteger kNFBNotifEmptyTag = 90315;
 
-static void NFBNotifSyncEmptyState(id dataViewController, UITableView* table) {
-    // Only on the notifications screen. The sweep runs on every
-    // TFNItemsDataViewController — the home timeline included — and an empty
-    // state must never appear there.
-    if (!table || dataViewController != (id)gNFBNotifScreen) {
+// Always works on the notifications screen itself, never on whatever object
+// happened to call it: the two paths that remove a row pass different objects
+// (the controller from the swipe, the cell's source from the ×), and comparing
+// the caller against gNFBNotifScreen silently did nothing for one of them.
+// Finding the table here also means the caller never has to.
+static void NFBNotifSyncEmptyState(void) {
+    id dataViewController = (id)gNFBNotifScreen;
+    if (!dataViewController) {
+        return;
+    }
+    UITableView* table = nil;
+    SEL tableSel = NSSelectorFromString(@"tableView");
+    if ([dataViewController respondsToSelector:tableSel]) {
+        id maybe = ((id (*)(id, SEL))objc_msgSend)(dataViewController, tableSel);
+        if ([maybe isKindOfClass:[UITableView class]]) {
+            table = maybe;
+        }
+    }
+    if (!table) {
         return;
     }
     @try {
@@ -1102,7 +1127,7 @@ static void NFBNotifSweep(id dataViewController) {
                         (unsigned long)doomed.count);
         }
         // Whether or not a row went, the list may now be empty.
-        NFBNotifSyncEmptyState(dataViewController, table);
+        NFBNotifSyncEmptyState();
     } @catch (id exception) {
         NFBDebugLog(@"[notifs] balayage interrompu — sans conséquence");
     }
