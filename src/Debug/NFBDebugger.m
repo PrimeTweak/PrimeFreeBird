@@ -9,6 +9,7 @@
 #import "Generated/NFBHookManifest.h"
 #import "Core/BHTSettings.h"
 #import "Debug/NFBDiagnosticsViewController.h"
+#import <CoreGraphics/CoreGraphics.h>
 #import <objc/runtime.h>
 #import <os/log.h>
 #import <sys/utsname.h>
@@ -320,6 +321,98 @@ NSUInteger NFBDebuggerMissingCount(void) {
 
 // MARK: - view capture
 
+
+// The colour actually PAINTED in an image, and the visibility of the view that
+// carries it.
+//
+// Four builds were spent on bar icons that the capture reported as present,
+// alpha 1, with a non-nil image — and that the screen did not show. The report
+// gave the image's SIZE and the view's TINT, but an AlwaysOriginal image
+// carries its own pixels and the tint says nothing about them: a glyph baked
+// white reads exactly like a glyph baked grey. So the one fact that separates
+// « the image is invisible » from « something hides it » was never in the
+// report.
+//
+// ink= is the average colour of the image's non-transparent pixels (nil when
+// the image is fully transparent), and cover= the effective alpha down the
+// ancestor chain plus any ancestor that clips it away.
+static NSString* NFBImageInk(UIImage* image) {
+    if (!image) {
+        return nil;
+    }
+    CGSize size = image.size;
+    if (size.width < 1.0 || size.height < 1.0) {
+        return nil;
+    }
+    // Downsampled to 8x8: enough for an average, cheap enough for a full tree.
+    const int side = 8;
+    unsigned char bytes[8 * 8 * 4];
+    memset(bytes, 0, sizeof(bytes));
+    CGColorSpaceRef space = CGColorSpaceCreateDeviceRGB();
+    CGContextRef ctx = CGBitmapContextCreate(bytes, side, side, 8, side * 4, space,
+                                             kCGImageAlphaPremultipliedLast |
+                                             kCGBitmapByteOrder32Big);
+    CGColorSpaceRelease(space);
+    if (!ctx) {
+        return nil;
+    }
+    UIGraphicsPushContext(ctx);
+    CGContextClearRect(ctx, CGRectMake(0, 0, side, side));
+    [image drawInRect:CGRectMake(0, 0, side, side)];
+    UIGraphicsPopContext();
+    CGContextRelease(ctx);
+
+    double r = 0, g = 0, b = 0, n = 0;
+    for (int i = 0; i < side * side; i++) {
+        double a = bytes[i * 4 + 3] / 255.0;
+        if (a < 0.15) {
+            continue;   // transparent: not ink
+        }
+        // undo premultiplication so the reported colour is the drawn colour
+        r += bytes[i * 4 + 0] / 255.0 / a;
+        g += bytes[i * 4 + 1] / 255.0 / a;
+        b += bytes[i * 4 + 2] / 255.0 / a;
+        n += 1;
+    }
+    if (n < 1) {
+        return @"transparente";
+    }
+    return [NSString stringWithFormat:@"rgb(%.0f,%.0f,%.0f)",
+            MIN(r / n, 1.0) * 255, MIN(g / n, 1.0) * 255, MIN(b / n, 1.0) * 255];
+}
+
+// Effective visibility: alpha multiplied down the chain, and the first ancestor
+// that clips this view out of its own bounds.
+static NSString* NFBViewCover(UIView* view) {
+    CGFloat alpha = 1.0;
+    NSString* clipper = nil;
+    UIView* node = view;
+    NSInteger depth = 0;
+    while (node && depth < 12) {
+        alpha *= node.alpha;
+        if (node.hidden) {
+            return [NSString stringWithFormat:@"MASQUÉ par %@",
+                    NSStringFromClass([node class])];
+        }
+        UIView* parent = node.superview;
+        if (parent && parent.clipsToBounds && !clipper) {
+            CGRect inParent = [node convertRect:node.bounds toView:parent];
+            if (!CGRectIntersectsRect(inParent, parent.bounds)) {
+                clipper = NSStringFromClass([parent class]);
+            }
+        }
+        node = parent;
+        depth++;
+    }
+    if (clipper) {
+        return [NSString stringWithFormat:@"HORS CADRE de %@", clipper];
+    }
+    if (alpha < 0.99) {
+        return [NSString stringWithFormat:@"alpha effectif %.2f", alpha];
+    }
+    return nil;
+}
+
 static NSString* NFBColourText(UIColor* colour) {
     if (!colour) {
         return @"nil";
@@ -382,6 +475,14 @@ static void NFBCaptureView(UIView* view, NSInteger depth, NSMutableString* out) 
             image ? NSStringFromCGSize(image.size) : @"nil",
             image ? (long)image.renderingMode : -1L];
         [line appendFormat:@" tint=%@", NFBColourText(view.tintColor)];
+        NSString* ink = NFBImageInk(image);
+        if (ink) {
+            [line appendFormat:@" ink=%@", ink];
+        }
+        NSString* cover = NFBViewCover(view);
+        if (cover) {
+            [line appendFormat:@" [%@]", cover];
+        }
     }
     if ([view isKindOfClass:[UIVisualEffectView class]]) {
         UIVisualEffect* fx = ((UIVisualEffectView*)view).effect;
