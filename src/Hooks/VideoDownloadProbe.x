@@ -1,202 +1,407 @@
+// ---------------------------------------------------------------------------
+//  VideoDownloadProbe.x — SONDE DE MENUS, v2. LECTURE SEULE.
 //
-//  VideoDownloadProbe.x
+//  Remplace en entier la sonde precedente, qui n'accrochait que
+//  T1Activity -canPerformWithActivityItems: et n'a jamais produit une ligne.
 //
-//  MEASUREMENT ONLY — no behaviour is changed anywhere in this file. Every hook
-//  calls %orig and returns its value untouched. Delete this file and the tweak
-//  is exactly what it was.
+//  Ce qui est MESURE avant d'ecrire ceci (3 videos, 3 lectures identiques) :
+//    - le menu « ... » passe par _t1_actionItemsForStatus: (MediaDownloads.x)
+//      et ne contient JAMAIS l'entree native « Download Video » ;
+//    - sur 4 min 30 de journal continu, aucun autre geste n'a atteint la sonde.
+//  => on se place ici sur les points de passage OBLIGES d'UIKit, et non sur
+//     des classes Twitter supposees.
 //
-//  THE QUESTION
-//  ------------
-//  His entry (« Download media ») lives in the « … » overflow menu — his own
-//  setting says so. Twitter's entry (« Download Video », activity identifier
-//  com.twitter.activity.DownloadVideo) lives in the long-press menu, and it now
-//  shows on some videos only. Everything below exists to find out WHY, without
-//  guessing a ninth time.
-//
-//  THE THEORIES, and what each would look like in the journal
-//  ---------------------------------------------------------
-//   1. The activity is created but declares itself unsupported
-//        → « activité <id> isSupported=NON »
-//   2. It is created and supported, but refuses these items
-//        → « activité <id> canPerform=NON »
-//   3. It is never created at all for that video
-//        → its identifier never appears, while others do
-//   4. The video's media type is not what the tweak expects
-//        → « média: type=N isVideo=… isAnimatedGif=… »
-//   5. The video is not in the status entities (external card, player)
-//        → « média: AUCUNE entité média » on a tweet that clearly has a video
-//   6. The native entry is in the overflow list too, just placed differently
-//        → « actions: N item(s) … contient Download Video: OUI »
-//   7. His own entry is missing from the overflow list
-//        → « actions: … contient Download media: NON »
-//
-//  Each line is printed ONCE per distinct value, so a whole session stays
-//  readable. Everything is wrapped so a probe can never take the app down.
-//
+//  AUCUN hook ne change de comportement : chaque %orig est renvoye tel quel,
+//  aucune valeur n'est reecrite, aucune vue n'est touchee.
+// ---------------------------------------------------------------------------
 
-#import "HookHelpers.h"
-#import "Debug/NFBDebugger.h"
-#import <objc/message.h>
-#import <objc/runtime.h>
+#import <UIKit/UIKit.h>
 
-// Printed once per key, so scrolling the timeline does not flood the journal.
-static BOOL NFBProbeFirstTime(NSString* key) {
-    static NSMutableSet* seen;
+// Journal du debogueur maison.
+// Declare en weak_import : si le symbole n'existe pas, il vaut NULL et on
+// retombe sur NSLog. Aucun en-tete a importer, donc aucun risque de casser
+// le build sur un chemin d'include que je n'ai pas sous la main.
+extern void NFBDebugLog(NSString *format, ...) __attribute__((weak_import));
+
+// Typedef pour le bloc du handler : evite des parentheses imbriquees dans une
+// signature de hook, que le parseur de Logos digere mal.
+typedef void (^NFBProbeActionHandler)(UIAction *action);
+
+// Coquille de declaration pour parler a T1Activity sans en-tete.
+// Jamais instanciee, jamais referencee comme classe : sert uniquement de cast.
+@interface NFBProbeActivityShim : NSObject
+- (NSString *)identifier;
+- (NSString *)actionTitle;
+- (NSString *)mediaKey;
+- (NSString *)mediaType;
+@end
+
+// ---------------------------------------------------------------------------
+//  Journal
+// ---------------------------------------------------------------------------
+
+static void NFBProbeLog(NSString *format, ...) {
+    va_list args;
+    va_start(args, format);
+    NSString *line = [[NSString alloc] initWithFormat:format arguments:args];
+    va_end(args);
+    if (line.length == 0) {
+        return;
+    }
+    if (NFBDebugLog != NULL) {
+        NFBDebugLog(@"%@", line);
+    } else {
+        NSLog(@"%@", line);
+    }
+}
+
+// ---------------------------------------------------------------------------
+//  Deduplication a fenetre glissante
+//
+//  Sans elle, un seul geste noie les 12 dernieres decisions du debogueur.
+//  La fenetre se vide apres 4 s d'inactivite : chaque nouveau geste repart
+//  donc de zero et reimprime ses lignes.
+// ---------------------------------------------------------------------------
+
+static NSMutableSet *gNFBProbeSeen = nil;
+static NSTimeInterval gNFBProbeLastSeenTime = 0;
+
+static NSLock *NFBProbeLock(void) {
+    static NSLock *lock = nil;
     static dispatch_once_t once;
     dispatch_once(&once, ^{
-        seen = [NSMutableSet set];
+        lock = [[NSLock alloc] init];
     });
-    if (!key.length || [seen containsObject:key]) {
+    return lock;
+}
+
+static BOOL NFBProbeFirstTime(NSString *key) {
+    if (key.length == 0) {
         return NO;
     }
-    [seen addObject:key];
-    return YES;
+    BOOL first = NO;
+    NSLock *lock = NFBProbeLock();
+    [lock lock];
+    NSTimeInterval now = [NSDate timeIntervalSinceReferenceDate];
+    if (gNFBProbeSeen == nil) {
+        gNFBProbeSeen = [[NSMutableSet alloc] init];
+    }
+    if (now - gNFBProbeLastSeenTime > 4.0) {
+        [gNFBProbeSeen removeAllObjects];
+    }
+    gNFBProbeLastSeenTime = now;
+    if (![gNFBProbeSeen containsObject:key]) {
+        [gNFBProbeSeen addObject:key];
+        first = YES;
+    }
+    if (gNFBProbeSeen.count > 300) {
+        [gNFBProbeSeen removeAllObjects];
+    }
+    [lock unlock];
+    return first;
 }
 
-// Reads a string-ish property without messaging `self` directly: T1Activity is
-// not declared in the project headers, so Logos only emits a @class for it and
-// a direct message would not compile.
-static NSString* NFBProbeStringValue(id object, NSString* selectorName) {
-    if (!object || !selectorName.length) {
-        return nil;
+// ---------------------------------------------------------------------------
+//  Lecture des elements de menu
+// ---------------------------------------------------------------------------
+
+static NSString *NFBProbeTitleOf(id element) {
+    NSString *title = nil;
+    if ([element respondsToSelector:@selector(title)]) {
+        title = [element title];
     }
-    SEL sel = NSSelectorFromString(selectorName);
-    if (![object respondsToSelector:sel]) {
-        return nil;
+    if (title.length > 0) {
+        return title;
     }
-    id value = ((id (*)(id, SEL))objc_msgSend)(object, sel);
-    if ([value isKindOfClass:[NSString class]]) {
-        return value;
-    }
-    return value ? [value description] : nil;
+    return [NSString stringWithFormat:@"(sans titre:%@)", NSStringFromClass([element class])];
 }
 
-// MARK: - Theories 1, 2 and 3: the activity itself
+static NSString *NFBProbeTitlesOf(NSArray *children) {
+    if (children.count == 0) {
+        return @"(aucun enfant)";
+    }
+    NSMutableArray *parts = [NSMutableArray array];
+    for (id element in children) {
+        NSString *title = NFBProbeTitleOf(element);
+        if ([element isKindOfClass:[UIMenu class]]) {
+            NSArray *nested = [(UIMenu *)element children];
+            NSString *nestedTitles = @"";
+            if (nested.count > 0) {
+                NSMutableArray *inner = [NSMutableArray array];
+                for (id sub in nested) {
+                    [inner addObject:NFBProbeTitleOf(sub)];
+                }
+                nestedTitles = [inner componentsJoinedByString:@" / "];
+            }
+            [parts addObject:[NSString stringWithFormat:@"[sous-menu: %@]", nestedTitles]];
+        } else {
+            [parts addObject:title];
+        }
+    }
+    return [parts componentsJoinedByString:@" | "];
+}
+
+// Un titre est-il un candidat « telechargement » ?
+static BOOL NFBProbeLooksLikeDownload(NSString *text) {
+    if (text.length == 0) {
+        return NO;
+    }
+    NSString *lower = [text lowercaseString];
+    if ([lower rangeOfString:@"download"].location != NSNotFound) {
+        return YES;
+    }
+    if ([lower rangeOfString:@"save"].location != NSNotFound) {
+        return YES;
+    }
+    return NO;
+}
+
+static void NFBProbeReportMenu(NSString *porte, NSString *title, NSString *identifier, NSArray *children) {
+    if (children.count < 2) {
+        return;
+    }
+    NSString *titles = NFBProbeTitlesOf(children);
+    // La cle volontairement SANS la porte : si deux fabriques s'appellent en
+    // cascade pour le meme menu, une seule ligne sort.
+    if (!NFBProbeFirstTime([NSString stringWithFormat:@"menu|%@", titles])) {
+        return;
+    }
+    NSString *nom = (title.length > 0) ? title : @"(sans titre)";
+    NSString *ident = (identifier.length > 0) ? identifier : @"-";
+    NFBProbeLog(@"[sonde] UIMenu %@ « %@ » id=%@ · %lu item(s) · %@",
+                porte, nom, ident, (unsigned long)children.count, titles);
+}
+
+// ---------------------------------------------------------------------------
+//  UIMenu — les trois fabriques publiques
+// ---------------------------------------------------------------------------
+
+%hook UIMenu
+
++ (id)menuWithTitle:(NSString *)title
+              image:(UIImage *)image
+         identifier:(NSString *)identifier
+            options:(NSUInteger)options
+           children:(NSArray *)children {
+    id result = %orig;
+    NFBProbeReportMenu(@"5args", title, identifier, children);
+    return result;
+}
+
++ (id)menuWithTitle:(NSString *)title children:(NSArray *)children {
+    id result = %orig;
+    NFBProbeReportMenu(@"2args", title, nil, children);
+    return result;
+}
+
++ (id)menuWithChildren:(NSArray *)children {
+    id result = %orig;
+    NFBProbeReportMenu(@"1arg", nil, nil, children);
+    return result;
+}
+
+%end
+
+// ---------------------------------------------------------------------------
+//  UIAction — la seule fabrique publique.
+//  Filtree sur « download » / « save » pour ne pas noyer le journal : toute
+//  action de telechargement de l'app passe forcement ici, quel que soit le
+//  menu qui l'accueille ensuite.
+// ---------------------------------------------------------------------------
+
+%hook UIAction
+
++ (id)actionWithTitle:(NSString *)title
+                image:(UIImage *)image
+           identifier:(NSString *)identifier
+              handler:(NFBProbeActionHandler)handler {
+    id result = %orig;
+    BOOL candidat = NFBProbeLooksLikeDownload(title) || NFBProbeLooksLikeDownload(identifier);
+    if (candidat) {
+        NSString *nom = (title.length > 0) ? title : @"(sans titre)";
+        NSString *ident = (identifier.length > 0) ? identifier : @"-";
+        if (NFBProbeFirstTime([NSString stringWithFormat:@"action|%@|%@", nom, ident])) {
+            NFBProbeLog(@"[sonde] UIAction « %@ » id=%@", nom, ident);
+        }
+    }
+    return result;
+}
+
+%end
+
+// ---------------------------------------------------------------------------
+//  Feuille de partage — la piste designee par le nom de la cle native
+//  DOWNLOAD_VIDEO_ACTIVITY_VIEW_LABEL (« activity view » = feuille de partage).
+// ---------------------------------------------------------------------------
+
+%hook UIActivityViewController
+
+- (id)initWithActivityItems:(NSArray *)activityItems applicationActivities:(NSArray *)applicationActivities {
+    id result = %orig;
+    NSMutableArray *noms = [NSMutableArray array];
+    for (id activity in applicationActivities) {
+        NSString *ident = nil;
+        NFBProbeActivityShim *shim = (NFBProbeActivityShim *)activity;
+        if ([activity respondsToSelector:@selector(identifier)]) {
+            ident = [shim identifier];
+        }
+        if (ident.length > 0) {
+            [noms addObject:ident];
+        } else {
+            [noms addObject:NSStringFromClass([activity class])];
+        }
+    }
+    NSString *liste = (noms.count > 0) ? [noms componentsJoinedByString:@" | "] : @"(aucune)";
+    if (NFBProbeFirstTime([NSString stringWithFormat:@"sheet|%@", liste])) {
+        NFBProbeLog(@"[sonde] feuille de partage · %lu activite(s) · %@",
+                    (unsigned long)applicationActivities.count, liste);
+    }
+    return result;
+}
+
+%end
+
+// ---------------------------------------------------------------------------
+//  T1Activity — conserve de la sonde precedente.
+//  RESERVE DITE FRANCHEMENT : ce hook ne voit que l'implementation de la
+//  classe de BASE. Si l'activite « DownloadVideo » est une sous-classe qui
+//  redefinit ces methodes, elle passe a cote — ce qui expliquerait a soi seul
+//  le silence de la sonde v1.
+// ---------------------------------------------------------------------------
 
 %hook T1Activity
 
 - (BOOL)isSupported {
     BOOL supported = %orig;
-    @try {
-        NSString* identifier = NFBProbeStringValue((id)self, @"identifier");
-        NSString* title = NFBProbeStringValue((id)self, @"title");
-        NSString* key = [NSString stringWithFormat:@"sup|%@|%d", identifier, supported];
-        if (NFBProbeFirstTime(key)) {
-            NFBDebugLog(@"[dl] activité %@ (« %@ ») isSupported=%@",
-                        identifier ?: @"?", title ?: @"?", supported ? @"OUI" : @"NON");
-        }
-    } @catch (id exception) {
+    NFBProbeActivityShim *shim = (NFBProbeActivityShim *)self;
+    NSString *ident = nil;
+    if ([shim respondsToSelector:@selector(identifier)]) {
+        ident = [shim identifier];
+    }
+    if (ident.length == 0) {
+        ident = NSStringFromClass([shim class]);
+    }
+    if (NFBProbeFirstTime([NSString stringWithFormat:@"act|%@|%d", ident, (int)supported])) {
+        NFBProbeLog(@"[sonde] T1Activity isSupported=%@ · %@",
+                    supported ? @"OUI" : @"NON", ident);
     }
     return supported;
 }
 
-- (BOOL)canPerformWithActivityItems:(NSArray*)activityItems {
+- (BOOL)canPerformWithActivityItems:(NSArray *)activityItems {
     BOOL can = %orig;
-    @try {
-        NSString* identifier = NFBProbeStringValue((id)self, @"identifier");
-        NSString* key = [NSString stringWithFormat:@"can|%@|%d", identifier, can];
-        if (NFBProbeFirstTime(key)) {
-            NFBDebugLog(@"[dl] activité %@ canPerform=%@ (%lu item(s))",
-                        identifier ?: @"?", can ? @"OUI" : @"NON",
-                        (unsigned long)activityItems.count);
-        }
-    } @catch (id exception) {
+    NFBProbeActivityShim *shim = (NFBProbeActivityShim *)self;
+    NSString *ident = nil;
+    if ([shim respondsToSelector:@selector(identifier)]) {
+        ident = [shim identifier];
+    }
+    if (ident.length == 0) {
+        ident = NSStringFromClass([shim class]);
+    }
+    if (NFBProbeFirstTime([NSString stringWithFormat:@"can|%@|%d", ident, (int)can])) {
+        NFBProbeLog(@"[sonde] T1Activity canPerform=%@ · %@ · %lu item(s)",
+                    can ? @"OUI" : @"NON", ident, (unsigned long)activityItems.count);
     }
     return can;
 }
 
 %end
 
-// MARK: - Theories 4 to 7: what the tweak's own hook actually sees
+// ---------------------------------------------------------------------------
+//  T1ShareController — LE CONSTRUCTEUR DU MENU, nomme dans l'IPA 12.15.
 //
-// Same selector the download feature already hooks. Two hooks on one method
-// chain through %orig, so this one only observes what the other returns.
+//  Encodage de types releve dans __objc_methtype :
+//      @80@0:8@16@24@32@40@48@56@64@72
+//  => les 8 arguments sont TOUS des objets, aucun struct passe par valeur.
+//     C'est ce qui rend ce hook sur une classe Swift sans danger.
+//
+//  On journalise le tableau RETOURNE : c'est lui qui contient, ou non,
+//  l'item « Download Video ».
+// ---------------------------------------------------------------------------
 
-%hook UIViewController
+%hook _TtC14T1TwitterSwift17T1ShareController
 
-- (NSArray*)_t1_actionItemsForStatus:(__unsafe_unretained id)status
-                             account:(__unsafe_unretained id)account
-                     shareableEntity:(__unsafe_unretained id)shareableEntity
-                           entityURL:(__unsafe_unretained id)entityURL
-                              source:(__unsafe_unretained id)source
-                             options:(NSUInteger)options
-                     scribeComponent:(__unsafe_unretained id)scribeComponent
-                           doneBlock:(__unsafe_unretained id)doneBlock {
-    NSArray* items = %orig;
-    @try {
-        // --- the media the tweak inspects to decide whether to add its entry
-        NSMutableString* shape = [NSMutableString string];
-        NSArray* media = nil;
-        if ([status respondsToSelector:@selector(entities)]) {
-            id entities = ((id (*)(id, SEL))objc_msgSend)(status, @selector(entities));
-            if ([entities respondsToSelector:@selector(media)]) {
-                id maybe = ((id (*)(id, SEL))objc_msgSend)(entities, @selector(media));
-                if ([maybe isKindOfClass:[NSArray class]]) {
-                    media = maybe;
-                }
-            }
-        }
-        if (!media.count) {
-            [shape appendString:@"AUCUNE entité média"];
-        }
-        for (id entry in media) {
-            NSInteger type = -1;
-            SEL typeSel = NSSelectorFromString(@"mediaType");
-            if ([entry respondsToSelector:typeSel]) {
-                type = ((NSInteger (*)(id, SEL))objc_msgSend)(entry, typeSel);
-            }
-            // The semantic accessors the binary exposes, next to the raw number
-            // the tweak currently compares against 2 and 3.
-            NSString* isVideo = @"?";
-            SEL videoSel = NSSelectorFromString(@"isVideo");
-            if ([entry respondsToSelector:videoSel]) {
-                isVideo = ((BOOL (*)(id, SEL))objc_msgSend)(entry, videoSel) ? @"oui" : @"non";
-            }
-            NSString* isGif = @"?";
-            SEL gifSel = NSSelectorFromString(@"isAnimatedGif");
-            if ([entry respondsToSelector:gifSel]) {
-                isGif = ((BOOL (*)(id, SEL))objc_msgSend)(entry, gifSel) ? @"oui" : @"non";
-            }
-            [shape appendFormat:@"type=%ld isVideo=%@ isGif=%@ · ", (long)type, isVideo, isGif];
-        }
-
-        // --- what the finished list contains
-        BOOL hasNative = NO;
-        BOOL hasOurs = NO;
-        NSMutableString* titles = [NSMutableString string];
-        for (id item in items) {
-            NSString* title = NFBProbeStringValue(item, @"title");
-            if (!title.length) {
-                title = NFBProbeStringValue(item, @"actionTitle");
-            }
-            if (!title.length) {
-                continue;
-            }
-            if ([title containsString:@"Download Video"]) {
-                hasNative = YES;
-            }
-            if ([title containsString:@"Download media"]) {
-                hasOurs = YES;
-            }
-            if (titles.length < 160) {
-                [titles appendFormat:@"%@ | ", title];
-            }
-        }
-
-        NSString* key = [NSString stringWithFormat:@"act|%@|%d%d|%lu",
-                         shape, hasNative, hasOurs, (unsigned long)items.count];
-        if (NFBProbeFirstTime(key)) {
-            NFBDebugLog(@"[dl] média: %@", shape.length ? shape : @"(vide)");
-            NFBDebugLog(@"[dl] actions: %lu item(s) · natif « Download Video »=%@ · le tien « Download media »=%@",
-                        (unsigned long)items.count,
-                        hasNative ? @"OUI" : @"NON",
-                        hasOurs ? @"OUI" : @"NON");
-            NFBDebugLog(@"[dl] titres: %@", titles.length ? titles : @"(aucun lisible)");
-        }
-    } @catch (id exception) {
-        NFBDebugLog(@"[dl] sonde interrompue — sans conséquence");
+- (id)menuSheetActionItemsForShareable:(id)shareable
+                               account:(id)account
+                         layoutMetrics:(id)layoutMetrics
+                        viewController:(id)viewController
+                         popoverSource:(id)popoverSource
+                         scribeContext:(id)scribeContext
+                           persistence:(id)persistence
+                         videoShareURL:(id)videoShareURL {
+    id result = %orig;
+    NSArray *items = nil;
+    if ([result isKindOfClass:[NSArray class]]) {
+        items = (NSArray *)result;
     }
-    return items;
+    NSMutableArray *parts = [NSMutableArray array];
+    for (id item in items) {
+        NSString *label = nil;
+        NFBProbeActivityShim *shim = (NFBProbeActivityShim *)item;
+        if ([item respondsToSelector:@selector(title)]) {
+            label = [item title];
+        }
+        if (label.length == 0 && [item respondsToSelector:@selector(actionTitle)]) {
+            label = [shim actionTitle];
+        }
+        if (label.length == 0) {
+            label = [NSString stringWithFormat:@"(%@)", NSStringFromClass([item class])];
+        }
+        [parts addObject:label];
+    }
+    NSString *liste = (parts.count > 0) ? [parts componentsJoinedByString:@" | "] : @"(vide)";
+    NSString *avecURL = (videoShareURL != nil) ? @"oui" : @"non";
+    if (NFBProbeFirstTime([NSString stringWithFormat:@"share|%@|%@", liste, avecURL])) {
+        NFBProbeLog(@"[sonde] menuSheetActionItems · %lu item(s) · videoShareURL=%@ · %@",
+                    (unsigned long)parts.count, avecURL, liste);
+    }
+    return result;
 }
 
 %end
+
+// ---------------------------------------------------------------------------
+//  TFSTwitterEntityMedia -allowDownload — LE DRAPEAU CANDIDAT.
+//
+//  Mesure dans l'IPA : simple `ldrb` sur un ivar => BOOL stocke, choisi par
+//  l'AUTEUR du tweet (ApiMediaEntityFragment.AllowDownloadStatus cote serveur).
+//
+//  RESERVE : ses deux seuls appels ObjC dans T1Twitter sont sur le chemin de
+//  COMPOSITION, pas sur celui du menu. Si AUCUNE ligne ne sort ici pendant
+//  l'ouverture du menu, c'est que le lecteur est du Swift en acces direct au
+//  champ — et ce silence est alors la mesure decisive, pas un echec.
+// ---------------------------------------------------------------------------
+
+%hook TFSTwitterEntityMedia
+
+- (BOOL)allowDownload {
+    BOOL allowed = %orig;
+    NFBProbeActivityShim *shim = (NFBProbeActivityShim *)self;
+    NSString *key = nil;
+    if ([shim respondsToSelector:@selector(mediaKey)]) {
+        key = [shim mediaKey];
+    }
+    if (key.length == 0) {
+        key = @"(sans mediaKey)";
+    }
+    NSString *type = nil;
+    if ([shim respondsToSelector:@selector(mediaType)]) {
+        type = [shim mediaType];
+    }
+    NSString *typeTexte = (type.length > 0) ? type : @"?";
+    if (NFBProbeFirstTime([NSString stringWithFormat:@"media|%@|%d", key, (int)allowed])) {
+        NFBProbeLog(@"[sonde] allowDownload=%@ · type=%@ · %@",
+                    allowed ? @"OUI" : @"NON", typeTexte, key);
+    }
+    return allowed;
+}
+
+%end
+
+// ---------------------------------------------------------------------------
+//  Marqueur de version : prouve que CE binaire-ci est bien celui qui tourne.
+// ---------------------------------------------------------------------------
+
+%ctor {
+    NFBProbeLog(@"[sonde] sonde de menus v3 armee (UIMenu + UIAction + partage + T1Activity + T1ShareController + allowDownload)");
+}
