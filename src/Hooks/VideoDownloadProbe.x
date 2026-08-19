@@ -16,6 +16,8 @@
 // ---------------------------------------------------------------------------
 
 #import <UIKit/UIKit.h>
+#import <dlfcn.h>
+#import <string.h>
 
 // Journal du debogueur maison.
 // Declare en weak_import : si le symbole n'existe pas, il vaut NULL et on
@@ -173,6 +175,81 @@ static void NFBProbeReportMenu(NSString *porte, NSString *title, NSString *ident
 }
 
 // ---------------------------------------------------------------------------
+//  Adresse de l'appelant
+//
+//  Avec les stubs `_objc_msgSend$sel` (bl vers le stub, puis br vers
+//  objc_msgSend, puis br vers l'IMP : aucune nouvelle trame de pile),
+//  __builtin_return_address(0) dans le hook rend l'adresse du VRAI appelant.
+//  __TEXT ayant un vmaddr de 0 dans ces binaires, l'offset rendu ici est
+//  directement l'adresse a chercher dans l'IPA.
+// ---------------------------------------------------------------------------
+
+static NSString *NFBProbeCallerDescription(void *returnAddress) {
+    if (returnAddress == NULL) {
+        return @"(inconnu)";
+    }
+    Dl_info info;
+    memset(&info, 0, sizeof(info));
+    if (dladdr(returnAddress, &info) == 0 || info.dli_fbase == NULL) {
+        return [NSString stringWithFormat:@"(hors image) %p", returnAddress];
+    }
+    const char *chemin = (info.dli_fname != NULL) ? info.dli_fname : "?";
+    const char *fin = strrchr(chemin, '/');
+    NSString *image = [NSString stringWithUTF8String:((fin != NULL) ? (fin + 1) : chemin)];
+    unsigned long long offset =
+        (unsigned long long)((uintptr_t)returnAddress - (uintptr_t)info.dli_fbase);
+    NSString *symbole = @"";
+    if (info.dli_sname != NULL) {
+        symbole = [NSString stringWithFormat:@" ~%s", info.dli_sname];
+    }
+    return [NSString stringWithFormat:@"%@+0x%llx%@", image, offset, symbole];
+}
+
+// Titres du menu video, releves dans son journal du 19 aout.
+// « Tweet Video » sort dans les DEUX cas (avec et sans Download Video) :
+// c'est lui qui garantit qu'on obtiendra l'adresse du constructeur.
+static BOOL NFBProbeIsVideoMenuTitle(NSString *text) {
+    if (text.length == 0) {
+        return NO;
+    }
+    static NSArray *titres = nil;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+        titres = @[@"Tweet Video", @"Copy Video Link", @"React with Video",
+                   @"Download Video", @"Add to Offline"];
+    });
+    return [titres containsObject:text];
+}
+
+// Rapport commun aux deux variantes de T1ShareController.
+static void NFBProbeReportShareItems(NSString *porte, id result, NSString *extra) {
+    NSArray *items = nil;
+    if ([result isKindOfClass:[NSArray class]]) {
+        items = (NSArray *)result;
+    }
+    NSMutableArray *parts = [NSMutableArray array];
+    for (id item in items) {
+        NSString *label = nil;
+        NFBProbeActivityShim *shim = (NFBProbeActivityShim *)item;
+        if ([item respondsToSelector:@selector(title)]) {
+            label = [item title];
+        }
+        if (label.length == 0 && [item respondsToSelector:@selector(actionTitle)]) {
+            label = [shim actionTitle];
+        }
+        if (label.length == 0) {
+            label = [NSString stringWithFormat:@"(%@)", NSStringFromClass([item class])];
+        }
+        [parts addObject:label];
+    }
+    NSString *liste = (parts.count > 0) ? [parts componentsJoinedByString:@" | "] : @"(vide)";
+    if (NFBProbeFirstTime([NSString stringWithFormat:@"share|%@|%@|%@", porte, liste, extra])) {
+        NFBProbeLog(@"[sonde] %@ · %lu item(s) · %@ · %@",
+                    porte, (unsigned long)parts.count, extra, liste);
+    }
+}
+
+// ---------------------------------------------------------------------------
 //  UIMenu — les trois fabriques publiques
 // ---------------------------------------------------------------------------
 
@@ -215,13 +292,17 @@ static void NFBProbeReportMenu(NSString *porte, NSString *title, NSString *ident
                 image:(UIImage *)image
            identifier:(NSString *)identifier
               handler:(NFBProbeActionHandler)handler {
+    void *retour = __builtin_return_address(0);
     id result = %orig;
-    BOOL candidat = NFBProbeLooksLikeDownload(title) || NFBProbeLooksLikeDownload(identifier);
+    BOOL candidat = NFBProbeLooksLikeDownload(title)
+                 || NFBProbeLooksLikeDownload(identifier)
+                 || NFBProbeIsVideoMenuTitle(title);
     if (candidat) {
         NSString *nom = (title.length > 0) ? title : @"(sans titre)";
         NSString *ident = (identifier.length > 0) ? identifier : @"-";
-        if (NFBProbeFirstTime([NSString stringWithFormat:@"action|%@|%@", nom, ident])) {
-            NFBProbeLog(@"[sonde] UIAction « %@ » id=%@", nom, ident);
+        NSString *appelant = NFBProbeCallerDescription(retour);
+        if (NFBProbeFirstTime([NSString stringWithFormat:@"action|%@|%@|%@", nom, ident, appelant])) {
+            NFBProbeLog(@"[sonde] UIAction « %@ » id=%@ · appelant %@", nom, ident, appelant);
         }
     }
     return result;
@@ -321,6 +402,8 @@ static void NFBProbeReportMenu(NSString *porte, NSString *title, NSString *ident
 
 %hook _TtC14T1TwitterSwift17T1ShareController
 
+// Encodage releve dans __objc_methtype : @80@0:8@16@24@32@40@48@56@64@72
+// => 8 arguments, tous des objets, aucun struct par valeur.
 - (id)menuSheetActionItemsForShareable:(id)shareable
                                account:(id)account
                          layoutMetrics:(id)layoutMetrics
@@ -330,31 +413,22 @@ static void NFBProbeReportMenu(NSString *porte, NSString *title, NSString *ident
                            persistence:(id)persistence
                          videoShareURL:(id)videoShareURL {
     id result = %orig;
-    NSArray *items = nil;
-    if ([result isKindOfClass:[NSArray class]]) {
-        items = (NSArray *)result;
-    }
-    NSMutableArray *parts = [NSMutableArray array];
-    for (id item in items) {
-        NSString *label = nil;
-        NFBProbeActivityShim *shim = (NFBProbeActivityShim *)item;
-        if ([item respondsToSelector:@selector(title)]) {
-            label = [item title];
-        }
-        if (label.length == 0 && [item respondsToSelector:@selector(actionTitle)]) {
-            label = [shim actionTitle];
-        }
-        if (label.length == 0) {
-            label = [NSString stringWithFormat:@"(%@)", NSStringFromClass([item class])];
-        }
-        [parts addObject:label];
-    }
-    NSString *liste = (parts.count > 0) ? [parts componentsJoinedByString:@" | "] : @"(vide)";
-    NSString *avecURL = (videoShareURL != nil) ? @"oui" : @"non";
-    if (NFBProbeFirstTime([NSString stringWithFormat:@"share|%@|%@", liste, avecURL])) {
-        NFBProbeLog(@"[sonde] menuSheetActionItems · %lu item(s) · videoShareURL=%@ · %@",
-                    (unsigned long)parts.count, avecURL, liste);
-    }
+    NSString *avecURL = (videoShareURL != nil) ? @"videoShareURL=oui" : @"videoShareURL=non";
+    NFBProbeReportShareItems(@"menuSheetActionItems", result, avecURL);
+    return result;
+}
+
+// Encodage releve dans __objc_methtype : @72@0:8@16@24@32@40@48@56@64
+// => 7 arguments, tous des objets.
+- (id)actionItemsForShareable:(id)shareable
+                      account:(id)account
+                layoutMetrics:(id)layoutMetrics
+               viewController:(id)viewController
+                popoverSource:(id)popoverSource
+                scribeContext:(id)scribeContext
+                  persistence:(id)persistence {
+    id result = %orig;
+    NFBProbeReportShareItems(@"actionItems", result, @"7 args");
     return result;
 }
 
@@ -403,5 +477,5 @@ static void NFBProbeReportMenu(NSString *porte, NSString *title, NSString *ident
 // ---------------------------------------------------------------------------
 
 %ctor {
-    NFBProbeLog(@"[sonde] sonde de menus v3 armee (UIMenu + UIAction + partage + T1Activity + T1ShareController + allowDownload)");
+    NFBProbeLog(@"[sonde] sonde de menus v4 armee (adresse de l'appelant + actionItems 7 args)");
 }
