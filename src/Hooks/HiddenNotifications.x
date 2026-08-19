@@ -955,6 +955,52 @@ static NSArray* NFBFilterNotifSections(NSArray* sections) {
 // (« ligne retirée de la liste »). So after every content replacement we walk
 // the rows, ask for each item, and delete the hidden ones from the end.
 
+
+// Which screens the sweep is allowed to touch — decided by observation, not by
+// a class name.
+//
+// Measured in his journal: « [balayage] tourne sur
+// THFHomeTimelineItemsViewController » — the sweep was walking the HOME
+// TIMELINE on every reload, asking for every item, comparing every model. It
+// deleted nothing there, but the work was real and it had no business being on
+// that screen.
+//
+// A name test would be fragile: the notifications list is a plain
+// T1URTViewController, a class Twitter reuses elsewhere. So the verdict is
+// EARNED instead: on its first pass over a controller the sweep watches what
+// the models are. One notification model and the controller is kept forever;
+// several items with none and it is dropped forever. That cannot break the
+// notifications sweep — a screen showing notifications always earns YES — and
+// after one pass the home timeline is never walked again.
+static const char* kNFBNotifVerdictKey = "nfbNotifSweepVerdict";
+
+static BOOL NFBNotifSweepAllowed(id dataViewController) {
+    id verdict = objc_getAssociatedObject(dataViewController, kNFBNotifVerdictKey);
+    return verdict ? [verdict boolValue] : YES;   // undecided: observe once
+}
+
+static void NFBNotifRecordVerdict(id dataViewController, BOOL sawNotification,
+                                  NSInteger examined) {
+    if (objc_getAssociatedObject(dataViewController, kNFBNotifVerdictKey)) {
+        return;
+    }
+    if (sawNotification) {
+        objc_setAssociatedObject(dataViewController, kNFBNotifVerdictKey, @YES,
+                                 OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        NFBDebugLog(@"[balayage] %@ retenu — c'est bien l'écran des notifications",
+                    NSStringFromClass([dataViewController class]));
+        return;
+    }
+    // Only decide against a screen once enough items have been seen: an empty
+    // or still-loading list must not be condemned on a single empty pass.
+    if (examined >= 5) {
+        objc_setAssociatedObject(dataViewController, kNFBNotifVerdictKey, @NO,
+                                 OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        NFBDebugLog(@"[balayage] %@ écarté — aucune notification sur %ld ligne(s)",
+                    NSStringFromClass([dataViewController class]), (long)examined);
+    }
+}
+
 static BOOL gNFBNotifSweeping;
 
 static void NFBNotifSweep(id dataViewController) {
@@ -963,6 +1009,9 @@ static void NFBNotifSweep(id dataViewController) {
     }
     if (!NFBHiddenNotifs().count) {
         return;
+    }
+    if (!NFBNotifSweepAllowed(dataViewController)) {
+        return;              // screen already ruled out — nothing to walk
     }
     SEL itemSel = NSSelectorFromString(@"itemAtIndexPath:");
     SEL deleteSel = NSSelectorFromString(@"deleteItemAtIndexPath:withRowAnimation:");
@@ -1006,13 +1055,22 @@ static void NFBNotifSweep(id dataViewController) {
         }
 
         NSMutableArray<NSIndexPath*>* doomed = [NSMutableArray array];
+        BOOL sawNotification = NO;
+        NSInteger examined = 0;
         NSInteger sections = table.numberOfSections;
         for (NSInteger s = 0; s < sections; s++) {
             NSInteger rows = [table numberOfRowsInSection:s];
             for (NSInteger r = 0; r < rows; r++) {
                 NSIndexPath* path = [NSIndexPath indexPathForRow:r inSection:s];
                 id item = ((id (*)(id, SEL, id))objc_msgSend)(dataViewController, itemSel, path);
-                if (item && NFBNotifIsHidden(unwrapDataViewItem(item))) {
+                id model = item ? unwrapDataViewItem(item) : nil;
+                if (model) {
+                    examined++;
+                    if ([NSStringFromClass([model class]) containsString:@"Notification"]) {
+                        sawNotification = YES;
+                    }
+                }
+                if (model && NFBNotifIsHidden(model)) {
                     [doomed addObject:path];
                 }
             }
@@ -1022,6 +1080,7 @@ static void NFBNotifSweep(id dataViewController) {
             ((void (*)(id, SEL, id, NSInteger))objc_msgSend)(
                 dataViewController, deleteSel, path, UITableViewRowAnimationNone);
         }
+        NFBNotifRecordVerdict(dataViewController, sawNotification, examined);
         if (doomed.count) {
             NFBDebugLog(@"[notifs] balayage: %lu masquée(s) retirée(s) après rechargement",
                         (unsigned long)doomed.count);
