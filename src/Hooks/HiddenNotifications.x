@@ -765,6 +765,8 @@ static id NFBModelAtIndexPath(id dataViewController, NSIndexPath* indexPath) {
 // -deleteItemAtIndexPath:withRowAnimation:. So a hidden row leaves the list on
 // the spot, instead of hoping a sections replay reaches this screen — which is
 // what never happened. The registry + filter still handle later reloads.
+static void NFBNotifSyncEmptyState(id dataViewController);
+
 static void NFBNotifDropRow(id dataViewController, NSIndexPath* indexPath) {
     if (!dataViewController || !indexPath) {
         return;
@@ -776,6 +778,11 @@ static void NFBNotifDropRow(id dataViewController, NSIndexPath* indexPath) {
                 dataViewController, deleteSel, indexPath, UITableViewRowAnimationLeft);
             NFBDebugLog(@"[notifs] ligne retirée de la liste (%ld/%ld)",
                         (long)indexPath.section, (long)indexPath.row);
+            // Deferred one turn: the table must finish its delete animation
+            // before it reports a truthful row count.
+            dispatch_async(dispatch_get_main_queue(), ^{
+                NFBNotifSyncEmptyState(dataViewController);
+            });
             return;
         }
         NFBDebugLog(@"[notifs] suppression directe indisponible sur %@",
@@ -956,6 +963,7 @@ static NSArray* NFBFilterNotifSections(NSArray* sections) {
 // the rows, ask for each item, and delete the hidden ones from the end.
 
 
+
 // Which screens the sweep is allowed to touch — decided by observation, not by
 // a class name.
 //
@@ -1001,6 +1009,116 @@ static void NFBNotifRecordVerdict(id dataViewController, BOOL sawNotification,
     }
 }
 
+// MARK: - the empty panel (two labels, nothing borrowed)
+//
+// The first attempt instantiated Twitter's own TFNEmptyStateView. It crashed
+// the app: an internal view has invariants I don't know, I gave it no image and
+// no button, and a bad access is NOT caught by @try — only ObjC exceptions are.
+// So nothing here belongs to Twitter. Two UILabels in a container, styled from
+// his screenshots. Worst case it looks slightly off; it cannot bring the app
+// down.
+//
+// The anchor IS measured: the sweep's verdict, proven in his journal
+// (« T1URTViewController retenu », « THFHomeTimelineItemsViewController
+// écarté »). Only a controller that earned YES can carry this panel.
+
+static const NSInteger kNFBNotifEmptyTag = 90315;
+
+static void NFBNotifSyncEmptyState(id dataViewController) {
+    if (!dataViewController) {
+        return;
+    }
+    // The verdict the sweep earned by observation — never a class-name guess.
+    id verdict = objc_getAssociatedObject(dataViewController, kNFBNotifVerdictKey);
+    if (![verdict isEqual:@YES]) {
+        return;
+    }
+    @try {
+        UITableView* table = nil;
+        SEL tableSel = NSSelectorFromString(@"tableView");
+        if ([dataViewController respondsToSelector:tableSel]) {
+            id maybe = ((id (*)(id, SEL))objc_msgSend)(dataViewController, tableSel);
+            if ([maybe isKindOfClass:[UITableView class]]) {
+                table = maybe;
+            }
+        }
+        if (!table) {
+            NFBDebugLog(@"[vide] pas de table sur %@",
+                        NSStringFromClass([dataViewController class]));
+            return;
+        }
+        NSInteger rows = 0;
+        for (NSInteger s = 0; s < table.numberOfSections; s++) {
+            rows += [table numberOfRowsInSection:s];
+        }
+        UIView* existing = [table viewWithTag:kNFBNotifEmptyTag];
+        NSUInteger hidden = NFBHiddenNotifs().count;
+
+        // The one number never measured: what the table reports once the last
+        // notification is gone. If the panel still fails to show, this line
+        // says why in one go.
+        NFBDebugLog(@"[vide] %ld ligne(s), %lu masquée(s), panneau %@",
+                    (long)rows, (unsigned long)hidden, existing ? @"posé" : @"absent");
+
+        if (rows > 0 || hidden == 0) {
+            if (existing) {
+                [existing removeFromSuperview];
+                NFBDebugLog(@"[vide] panneau retiré");
+            }
+            return;
+        }
+        if (existing) {
+            return;
+        }
+
+        UIView* panel = [[UIView alloc] init];
+        panel.tag = kNFBNotifEmptyTag;
+        panel.userInteractionEnabled = NO;    // never blocks a pull-to-refresh
+        panel.translatesAutoresizingMaskIntoConstraints = NO;
+
+        UILabel* title = [[UILabel alloc] init];
+        title.text = [[BHTBundle sharedBundle]
+                         localizedStringForKey:@"HIDDEN_NOTIFS_EMPTY_TITLE"];
+        title.font = [UIFont systemFontOfSize:20 weight:UIFontWeightBold];
+        title.textColor = [UIColor labelColor];
+        title.textAlignment = NSTextAlignmentCenter;
+        title.numberOfLines = 0;
+        title.translatesAutoresizingMaskIntoConstraints = NO;
+        [panel addSubview:title];
+
+        UILabel* body = [[UILabel alloc] init];
+        body.text = [[BHTBundle sharedBundle]
+                        localizedStringForKey:@"HIDDEN_NOTIFS_EMPTY_BODY"];
+        body.font = [UIFont systemFontOfSize:14];
+        body.textColor = [UIColor secondaryLabelColor];
+        body.textAlignment = NSTextAlignmentCenter;
+        body.numberOfLines = 0;
+        body.translatesAutoresizingMaskIntoConstraints = NO;
+        [panel addSubview:body];
+
+        [table addSubview:panel];
+        UILayoutGuide* frame = table.frameLayoutGuide;
+        [NSLayoutConstraint activateConstraints:@[
+            [title.topAnchor constraintEqualToAnchor:panel.topAnchor],
+            [title.leadingAnchor constraintEqualToAnchor:panel.leadingAnchor],
+            [title.trailingAnchor constraintEqualToAnchor:panel.trailingAnchor],
+            [body.topAnchor constraintEqualToAnchor:title.bottomAnchor constant:9],
+            [body.leadingAnchor constraintEqualToAnchor:panel.leadingAnchor],
+            [body.trailingAnchor constraintEqualToAnchor:panel.trailingAnchor],
+            [body.bottomAnchor constraintEqualToAnchor:panel.bottomAnchor],
+
+            [panel.centerXAnchor constraintEqualToAnchor:frame.centerXAnchor],
+            [panel.centerYAnchor constraintEqualToAnchor:frame.centerYAnchor],
+            [panel.widthAnchor constraintLessThanOrEqualToConstant:250],
+            [panel.leadingAnchor constraintGreaterThanOrEqualToAnchor:frame.leadingAnchor
+                                                             constant:24],
+        ]];
+        NFBDebugLog(@"[vide] PANNEAU POSÉ");
+    } @catch (id exception) {
+        NFBDebugLog(@"[vide] exception: %@", exception);
+    }
+}
+
 static BOOL gNFBNotifSweeping;
 
 static void NFBNotifSweep(id dataViewController) {
@@ -1008,6 +1126,8 @@ static void NFBNotifSweep(id dataViewController) {
         return;
     }
     if (!NFBHiddenNotifs().count) {
+        // Everything was brought back: the panel must go, so the sync still runs.
+        NFBNotifSyncEmptyState(dataViewController);
         return;
     }
     if (!NFBNotifSweepAllowed(dataViewController)) {
@@ -1081,6 +1201,7 @@ static void NFBNotifSweep(id dataViewController) {
                 dataViewController, deleteSel, path, UITableViewRowAnimationNone);
         }
         NFBNotifRecordVerdict(dataViewController, sawNotification, examined);
+        NFBNotifSyncEmptyState(dataViewController);
         if (doomed.count) {
             NFBDebugLog(@"[notifs] balayage: %lu masquée(s) retirée(s) après rechargement",
                         (unsigned long)doomed.count);
