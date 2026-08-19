@@ -395,6 +395,9 @@ NSString* const kNFBMutedIncludeRepostsKey = @"nfb_muted_include_reposts";
                                        UIPopoverPresentationControllerDelegate>
 @property (nonatomic, strong) NSMutableArray<NSString*>* terms;
 @property (nonatomic, assign) BOOL compact;
+// Tracks whether THIS instance raised the shared theme-screen count, so the
+// decrement can never run for an appearance that did not increment.
+@property (nonatomic, assign) BOOL raisedThemeCount;
 // 0 shows the muted terms, 1 shows the language list. The segmented control
 // above the table drives it, in both presentations.
 @property (nonatomic, assign) NSInteger mode;
@@ -424,13 +427,35 @@ extern NSInteger NFBColorThemeScreenVisible;
 
 - (void)viewWillAppear:(BOOL)animated {
     [super viewWillAppear:animated];
-    NFBColorThemeScreenVisible++;
+    // NOT in compact mode — measured, and this is the whole bar-icon bug.
+    //
+    // Raising this count arms NFBWhitenConfirmGlyphsIn, which white-bakes EVERY
+    // image view sitting in the right-hand 40 % of ANY navigation bar, at any
+    // size under 44 pt. It has no screen test and no button test: the Explore
+    // gear (centre at 398 of 440 = 0.90, 24 pt wide) matches it exactly.
+    //
+    // The full-screen page needs the count: it has a confirm check in its bar,
+    // and a template glyph there washes out against the glass capsule. The
+    // POPOVER has no navigation bar and no check at all — it was arming a
+    // whitener it has no use for.
+    //
+    // And the damage outlives the popover: the baked image is stored as
+    // AlwaysOriginal, so the gear stays white long after the count drops back
+    // to zero. That is why the bug began exactly when Filter was opened from
+    // the timeline, and never healed on its own.
+    if (!self.compact) {
+        NFBColorThemeScreenVisible++;
+        self.raisedThemeCount = YES;
+    }
 }
 
 - (void)viewDidDisappear:(BOOL)animated {
     [super viewDidDisappear:animated];
-    if (NFBColorThemeScreenVisible > 0) {
+    // Only lower what THIS instance raised — otherwise a compact appearance
+    // followed by a full one would drive the shared count negative.
+    if (self.raisedThemeCount && NFBColorThemeScreenVisible > 0) {
         NFBColorThemeScreenVisible--;
+        self.raisedThemeCount = NO;
     }
 }
 
