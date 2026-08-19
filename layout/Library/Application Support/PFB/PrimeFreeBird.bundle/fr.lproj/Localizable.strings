@@ -555,6 +555,8 @@
 "HIDDEN_NOTIFS_COUNT" = "%ld masquée(s)";
 "HIDDEN_NOTIFS_CLEAR_ALL" = "Tout effacer";
 "HIDDEN_NOTIFS_EXPIRES_IN" = "expire dans %ld j";
+"HIDDEN_NOTIFS_EMPTY_TITLE" = "Rien à voir ici pour l’instant";
+"HIDDEN_NOTIFS_EMPTY_BODY" = "Toutes les notifications sont masquées. Touche l’œil au-dessus pour les voir ou en réafficher une.";
 "HIDDEN_NOTIFS_EXPIRES_ON" = "expire dans %ld j · %@";
 "HIDDEN_NOTIFS_EXAMPLE" = "Balaye une notification vers la gauche pour la masquer";
 "HIDDEN_NOTIFS_UNHIDE" = "Afficher";
