@@ -988,8 +988,11 @@ static const NSInteger kNFBNotifEmptyTag = 90315;
 // the caller against gNFBNotifScreen silently did nothing for one of them.
 // Finding the table here also means the caller never has to.
 static void NFBNotifSyncEmptyState(void) {
+    // Every exit is named. Two builds were spent guessing which one was taken;
+    // one capture now says it outright.
     id dataViewController = (id)gNFBNotifScreen;
     if (!dataViewController) {
+        NFBDebugLog(@"[vide] sortie: aucun écran de notifications enregistré");
         return;
     }
     UITableView* table = nil;
@@ -1001,6 +1004,8 @@ static void NFBNotifSyncEmptyState(void) {
         }
     }
     if (!table) {
+        NFBDebugLog(@"[vide] sortie: pas de table sur %@",
+                    NSStringFromClass([dataViewController class]));
         return;
     }
     @try {
@@ -1009,21 +1014,33 @@ static void NFBNotifSyncEmptyState(void) {
             rows += [table numberOfRowsInSection:s];
         }
         UIView* existing = [table viewWithTag:kNFBNotifEmptyTag];
+        NFBDebugLog(@"[vide] appelée: %ld section(s), %ld ligne(s), %lu masquée(s), panneau %@",
+                    (long)table.numberOfSections, (long)rows,
+                    (unsigned long)NFBHiddenNotifs().count,
+                    existing ? @"déjà posé" : @"absent");
         if (rows > 0) {
             if (existing) {
                 [existing removeFromSuperview];
+                NFBDebugLog(@"[vide] panneau retiré — des lignes sont revenues");
             }
             return;
         }
         // Nothing left, and something IS hidden: say so. With an empty registry
         // the list is empty for Twitter's own reasons, and Twitter handles it.
-        if (existing || !NFBHiddenNotifs().count) {
+        if (existing) {
+            return;
+        }
+        if (!NFBHiddenNotifs().count) {
+            NFBDebugLog(@"[vide] sortie: registre vide — c'est l'affaire de Twitter");
             return;
         }
         Class configClass = NSClassFromString(@"TFNEmptyStateConfiguration");
         Class subtitleClass = NSClassFromString(@"TFNEmptyStateSubtitleConfiguration");
         Class viewClass = NSClassFromString(@"TFNEmptyStateView");
         if (!configClass || !viewClass) {
+            NFBDebugLog(@"[vide] sortie: classes natives introuvables (config %@, vue %@)",
+                        configClass ? @"ok" : @"MANQUANTE",
+                        viewClass ? @"ok" : @"MANQUANTE");
             return;      // a rename would only cost the panel, never a crash
         }
         NSString* title =
@@ -1034,6 +1051,7 @@ static void NFBNotifSyncEmptyState(void) {
         id config = [[configClass alloc] init];
         SEL setTitle = NSSelectorFromString(@"setTitle:");
         if (![config respondsToSelector:setTitle]) {
+            NFBDebugLog(@"[vide] sortie: la configuration n'accepte pas setTitle:");
             return;
         }
         ((void (*)(id, SEL, id))objc_msgSend)(config, setTitle, title);
@@ -1054,6 +1072,7 @@ static void NFBNotifSyncEmptyState(void) {
             return;
         }
         ((void (*)(id, SEL, id))objc_msgSend)(panel, setConfig, config);
+        NFBDebugLog(@"[vide] panneau construit — titre « %@ »", title);
         panel.tag = kNFBNotifEmptyTag;
         panel.userInteractionEnabled = NO;   // nothing to tap, never blocks a pull
         panel.translatesAutoresizingMaskIntoConstraints = NO;
@@ -1070,9 +1089,10 @@ static void NFBNotifSyncEmptyState(void) {
             [panel.trailingAnchor constraintLessThanOrEqualToAnchor:frame.trailingAnchor
                                                           constant:-24],
         ]];
-        NFBDebugLog(@"[notifs] écran vide affiché (tout est masqué)");
+        NFBDebugLog(@"[vide] POSÉ dans la table — %@ sous-vue(s), cadre %@",
+                    @(table.subviews.count), NSStringFromCGRect(table.bounds));
     } @catch (id exception) {
-        NFBDebugLog(@"[notifs] écran vide abandonné — sans conséquence");
+        NFBDebugLog(@"[vide] exception: %@", exception);
     }
 }
 
