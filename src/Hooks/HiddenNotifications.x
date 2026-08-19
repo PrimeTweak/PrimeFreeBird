@@ -765,9 +765,6 @@ static id NFBModelAtIndexPath(id dataViewController, NSIndexPath* indexPath) {
 // -deleteItemAtIndexPath:withRowAnimation:. So a hidden row leaves the list on
 // the spot, instead of hoping a sections replay reaches this screen — which is
 // what never happened. The registry + filter still handle later reloads.
-// Defined further down, next to the sweep it belongs with.
-static void NFBNotifSyncEmptyState(id dataViewController);
-
 static void NFBNotifDropRow(id dataViewController, NSIndexPath* indexPath) {
     if (!dataViewController || !indexPath) {
         return;
@@ -779,14 +776,6 @@ static void NFBNotifDropRow(id dataViewController, NSIndexPath* indexPath) {
                 dataViewController, deleteSel, indexPath, UITableViewRowAnimationLeft);
             NFBDebugLog(@"[notifs] ligne retirée de la liste (%ld/%ld)",
                         (long)indexPath.section, (long)indexPath.row);
-            // A direct removal goes through NONE of the seven content-replacing
-            // doors, so nothing was re-checking whether the list had just become
-            // empty — which is exactly what happens when the LAST notification
-            // is hidden. Deferred one turn so the table has finished its delete
-            // animation and reports its real row count.
-            dispatch_async(dispatch_get_main_queue(), ^{
-                NFBNotifSyncEmptyState(dataViewController);
-            });
             return;
         }
         NFBDebugLog(@"[notifs] suppression directe indisponible sur %@",
@@ -966,171 +955,6 @@ static NSArray* NFBFilterNotifSections(NSArray* sections) {
 // (« ligne retirée de la liste »). So after every content replacement we walk
 // the rows, ask for each item, and delete the hidden ones from the end.
 
-
-// MARK: - the empty state, using Twitter's own view
-//
-// Measured in the binary: TFNEmptyStateView (initWithFrame:, setConfiguration:)
-// and TFNEmptyStateConfiguration (initWithTitle:, setSubtitleConfiguration:)
-// are plain ObjC classes, resolvable by name. So the panel Twitter shows on its
-// own empty screens can be built here — same font, same sizes, same margins,
-// same max width. Only the words are ours.
-//
-// They have to be: Twitter's own empty text arrives from the server as a
-// timeline item (URTNotificationsEmptyStateSubscriptionManager). When the sweep
-// empties the list, the server DID send notifications — there is no empty-state
-// item to show. Hence its view, our text.
-
-static const NSInteger kNFBNotifEmptyTag = 90315;
-
-// The screen is recognised from the controller in hand, NOT from a global.
-//
-// Measured in his journal: « [vide] sortie: aucun écran de notifications
-// enregistré », four times, at the exact millisecond the sweep was working.
-// gNFBNotifScreen was never armed — NFBSectionsAreNotifications, the function
-// that sets it, tests [section respondsToSelector:@selector(items)], and no
-// section class exposes items. That was measured yesterday, and it is the same
-// dead assumption that had killed the filter. The global is simply always nil.
-//
-// So the check is done on the controller the caller already holds, by walking
-// up its parents for the notifications screen — the class named in his journal
-// by the eye ('œil posé dans la barre de T1NotificationsViewController').
-static const char* kNFBNotifSeenKey = "nfbNotifSeenHere";
-
-static BOOL NFBNotifIsNotificationsController(id controller) {
-    if (!controller) {
-        return NO;
-    }
-    // Measured on the spot: this controller has already displayed a
-    // notification model during a sweep.
-    if (objc_getAssociatedObject(controller, kNFBNotifSeenKey)) {
-        return YES;
-    }
-    if (![controller isKindOfClass:[UIViewController class]]) {
-        return NO;
-    }
-    UIViewController* node = (UIViewController*)controller;
-    for (NSInteger hop = 0; node && hop < 6; hop++) {
-        if ([NSStringFromClass([node class])
-                containsString:@"NotificationsViewController"]) {
-            return YES;
-        }
-        node = node.parentViewController;
-    }
-    return NO;
-}
-
-static void NFBNotifSyncEmptyState(id dataViewController) {
-    // Every exit is named. Two builds were spent guessing which one was taken.
-    if (!dataViewController) {
-        NFBDebugLog(@"[vide] sortie: appelée sans contrôleur");
-        return;
-    }
-    if (!NFBNotifIsNotificationsController(dataViewController)) {
-        NFBDebugLog(@"[vide] sortie: %@ n'est pas l'écran des notifications",
-                    NSStringFromClass([dataViewController class]));
-        return;
-    }
-    UITableView* table = nil;
-    SEL tableSel = NSSelectorFromString(@"tableView");
-    if ([dataViewController respondsToSelector:tableSel]) {
-        id maybe = ((id (*)(id, SEL))objc_msgSend)(dataViewController, tableSel);
-        if ([maybe isKindOfClass:[UITableView class]]) {
-            table = maybe;
-        }
-    }
-    if (!table) {
-        NFBDebugLog(@"[vide] sortie: pas de table sur %@",
-                    NSStringFromClass([dataViewController class]));
-        return;
-    }
-    @try {
-        NSInteger rows = 0;
-        for (NSInteger s = 0; s < table.numberOfSections; s++) {
-            rows += [table numberOfRowsInSection:s];
-        }
-        UIView* existing = [table viewWithTag:kNFBNotifEmptyTag];
-        NFBDebugLog(@"[vide] appelée: %ld section(s), %ld ligne(s), %lu masquée(s), panneau %@",
-                    (long)table.numberOfSections, (long)rows,
-                    (unsigned long)NFBHiddenNotifs().count,
-                    existing ? @"déjà posé" : @"absent");
-        if (rows > 0) {
-            if (existing) {
-                [existing removeFromSuperview];
-                NFBDebugLog(@"[vide] panneau retiré — des lignes sont revenues");
-            }
-            return;
-        }
-        // Nothing left, and something IS hidden: say so. With an empty registry
-        // the list is empty for Twitter's own reasons, and Twitter handles it.
-        if (existing) {
-            return;
-        }
-        if (!NFBHiddenNotifs().count) {
-            NFBDebugLog(@"[vide] sortie: registre vide — c'est l'affaire de Twitter");
-            return;
-        }
-        Class configClass = NSClassFromString(@"TFNEmptyStateConfiguration");
-        Class subtitleClass = NSClassFromString(@"TFNEmptyStateSubtitleConfiguration");
-        Class viewClass = NSClassFromString(@"TFNEmptyStateView");
-        if (!configClass || !viewClass) {
-            NFBDebugLog(@"[vide] sortie: classes natives introuvables (config %@, vue %@)",
-                        configClass ? @"ok" : @"MANQUANTE",
-                        viewClass ? @"ok" : @"MANQUANTE");
-            return;      // a rename would only cost the panel, never a crash
-        }
-        NSString* title =
-            [[BHTBundle sharedBundle] localizedStringForKey:@"HIDDEN_NOTIFS_EMPTY_TITLE"];
-        NSString* body =
-            [[BHTBundle sharedBundle] localizedStringForKey:@"HIDDEN_NOTIFS_EMPTY_BODY"];
-
-        id config = [[configClass alloc] init];
-        SEL setTitle = NSSelectorFromString(@"setTitle:");
-        if (![config respondsToSelector:setTitle]) {
-            NFBDebugLog(@"[vide] sortie: la configuration n'accepte pas setTitle:");
-            return;
-        }
-        ((void (*)(id, SEL, id))objc_msgSend)(config, setTitle, title);
-
-        SEL setSubtitle = NSSelectorFromString(@"setSubtitleConfiguration:");
-        if (subtitleClass && [config respondsToSelector:setSubtitle]) {
-            id subtitle = [[subtitleClass alloc] init];
-            SEL setText = NSSelectorFromString(@"setText:");
-            if ([subtitle respondsToSelector:setText]) {
-                ((void (*)(id, SEL, id))objc_msgSend)(subtitle, setText, body);
-                ((void (*)(id, SEL, id))objc_msgSend)(config, setSubtitle, subtitle);
-            }
-        }
-
-        UIView* panel = [[viewClass alloc] initWithFrame:CGRectZero];
-        SEL setConfig = NSSelectorFromString(@"setConfiguration:");
-        if (![panel respondsToSelector:setConfig]) {
-            return;
-        }
-        ((void (*)(id, SEL, id))objc_msgSend)(panel, setConfig, config);
-        NFBDebugLog(@"[vide] panneau construit — titre « %@ »", title);
-        panel.tag = kNFBNotifEmptyTag;
-        panel.userInteractionEnabled = NO;   // nothing to tap, never blocks a pull
-        panel.translatesAutoresizingMaskIntoConstraints = NO;
-        [table addSubview:panel];
-
-        // Centred on the table's VISIBLE frame, like the pinned bar of the
-        // panel: it stays put instead of scrolling away with the content.
-        UILayoutGuide* frame = table.frameLayoutGuide;
-        [NSLayoutConstraint activateConstraints:@[
-            [panel.centerXAnchor constraintEqualToAnchor:frame.centerXAnchor],
-            [panel.centerYAnchor constraintEqualToAnchor:frame.centerYAnchor],
-            [panel.leadingAnchor constraintGreaterThanOrEqualToAnchor:frame.leadingAnchor
-                                                            constant:24],
-            [panel.trailingAnchor constraintLessThanOrEqualToAnchor:frame.trailingAnchor
-                                                          constant:-24],
-        ]];
-        NFBDebugLog(@"[vide] POSÉ dans la table — %@ sous-vue(s), cadre %@",
-                    @(table.subviews.count), NSStringFromCGRect(table.bounds));
-    } @catch (id exception) {
-        NFBDebugLog(@"[vide] exception: %@", exception);
-    }
-}
-
 static BOOL gNFBNotifSweeping;
 
 static void NFBNotifSweep(id dataViewController) {
@@ -1160,6 +984,27 @@ static void NFBNotifSweep(id dataViewController) {
             gNFBNotifSweeping = NO;
             return;
         }
+        // MEASURE ONLY — no behaviour change.
+        //
+        // The sweep has no screen guard: it runs on every list controller,
+        // the home timeline included. It deletes nothing there (his journal
+        // shows « ABSENTE du registre » for every tweet), but it walks every
+        // row on every reload. If the timeline flash comes from here, this line
+        // will show the sweep touching the home controller; if it never names
+        // anything but the notifications screen, the flash is Twitter's own.
+        //
+        // Printed once per class, so the journal stays readable.
+        static NSMutableSet* announced;
+        if (!announced) {
+            announced = [NSMutableSet set];
+        }
+        NSString* owner = NSStringFromClass([dataViewController class]);
+        if (![announced containsObject:owner]) {
+            [announced addObject:owner];
+            NFBDebugLog(@"[balayage] tourne sur %@ (%ld section(s))",
+                        owner, (long)table.numberOfSections);
+        }
+
         NSMutableArray<NSIndexPath*>* doomed = [NSMutableArray array];
         NSInteger sections = table.numberOfSections;
         for (NSInteger s = 0; s < sections; s++) {
@@ -1167,17 +1012,7 @@ static void NFBNotifSweep(id dataViewController) {
             for (NSInteger r = 0; r < rows; r++) {
                 NSIndexPath* path = [NSIndexPath indexPathForRow:r inSection:s];
                 id item = ((id (*)(id, SEL, id))objc_msgSend)(dataViewController, itemSel, path);
-                id model = item ? unwrapDataViewItem(item) : nil;
-                // Second, sturdier recognition: a controller that has shown a
-                // notification model IS the notifications screen, whatever its
-                // parent chain looks like. Remembered on the controller, so it
-                // still holds once the list has been emptied.
-                if (model && [NSStringFromClass([model class])
-                                 containsString:@"Notification"]) {
-                    objc_setAssociatedObject(dataViewController, kNFBNotifSeenKey, @YES,
-                                             OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-                }
-                if (model && NFBNotifIsHidden(model)) {
+                if (item && NFBNotifIsHidden(unwrapDataViewItem(item))) {
                     [doomed addObject:path];
                 }
             }
@@ -1191,8 +1026,6 @@ static void NFBNotifSweep(id dataViewController) {
             NFBDebugLog(@"[notifs] balayage: %lu masquée(s) retirée(s) après rechargement",
                         (unsigned long)doomed.count);
         }
-        // Whether or not a row went, the list may now be empty.
-        NFBNotifSyncEmptyState(dataViewController);
     } @catch (id exception) {
         NFBDebugLog(@"[notifs] balayage interrompu — sans conséquence");
     }
