@@ -539,7 +539,7 @@
 "HIDDEN_NOTIFS_COUNT" = "%ld hidden";
 "HIDDEN_NOTIFS_CLEAR_ALL" = "Clear all";
 "HIDDEN_NOTIFS_EXPIRES_IN" = "expires in %ldd";
-"HIDDEN_NOTIFS_EMPTY_TITLE" = "Nothing to see here — yet";
+"HIDDEN_NOTIFS_EMPTY_TITLE" = "Nothing to see here";
 "HIDDEN_NOTIFS_EMPTY_BODY" = "Every notification here is hidden. Tap the eye above to see them or bring one back.";
 "HIDDEN_NOTIFS_EXPIRES_ON" = "expires in %ldd · %@";
 "HIDDEN_NOTIFS_EXAMPLE" = "Tap × on a notification to hide it";
