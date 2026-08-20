@@ -12,7 +12,7 @@ extern UIColor* CurrentAccentColor(void);
 
 // MARK: - The row
 //
-// Same construction as the muted-word row he signed off on: text on the left,
+// Same construction as the muted-word row: text on the left,
 // a soft pill on the right, a ⊗ to remove. Colours are DERIVED FROM labelColor
 // rather than taken from the semantic system fills — Twitter reinterprets
 // those, and a badge came out unreadable once because of it.
@@ -75,9 +75,9 @@ static const CGFloat kNFBNotifPillPadding = 8.0;   // gauche et droite seulement
     [self.contentView addSubview:_snippet];
 
     _expiry = [[NFBNotifPaddedLabel alloc] init];
-    // Cotes relevées sur sa cellule Muted words (kindLabel), à l'identique :
-    // Chirp regular 12, texte à 60 %, fond à 7 %, rayon 5. Le gras est parti —
-    // c'est lui qui rendait la pastille bavarde.
+    // Dimensions taken from the Muted words kindLabel: Chirp regular 12, text
+    // at 60 %, background at 7 %, radius 5. Bold is deliberately not used, as
+    // it made the pill too loud.
     _expiry.font = [TwitterChirpFont(TwitterFontStyleRegular) fontWithSize:12];
     _expiry.textColor = [[UIColor labelColor] colorWithAlphaComponent:0.6];
     _expiry.backgroundColor = [[UIColor labelColor] colorWithAlphaComponent:0.07];
@@ -90,9 +90,9 @@ static const CGFloat kNFBNotifPillPadding = 8.0;   // gauche et droite seulement
                                              forAxis:UILayoutConstraintAxisHorizontal];
     [self.contentView addSubview:_expiry];
 
-    // The ⊗ is gone — he asked for the left swipe to be the only way to
-    // unhide, and it already existed. The text now runs to the 14 pt margin,
-    // with the expiry stacked underneath it.
+    // The remove glyph is gone: the left swipe is the only way to unhide, and
+    // it already existed. The text now runs to the 14 pt margin, with the
+    // expiry stacked underneath it.
     self.layoutMargins = UIEdgeInsetsZero;
     self.contentView.layoutMargins = UIEdgeInsetsZero;
     self.preservesSuperviewLayoutMargins = NO;
@@ -102,12 +102,12 @@ static const CGFloat kNFBNotifPillPadding = 8.0;   // gauche et droite seulement
                                               forAxis:UILayoutConstraintAxisHorizontal];
 
     [NSLayoutConstraint activateConstraints:@[
-        // texte — deux lignes maximum, puis « … »
+        // Text: two lines at most, then an ellipsis.
         [_snippet.leadingAnchor constraintEqualToAnchor:self.contentView.leadingAnchor
                                                constant:14],
         (_snippetTop = [_snippet.topAnchor
             constraintEqualToAnchor:self.contentView.topAnchor constant:12]),
-        // Le ⊗ est parti : le texte va jusqu'à la marge, comme il l'a demandé.
+        // With no remove glyph, the text runs to the margin.
         [_snippet.trailingAnchor constraintEqualToAnchor:self.contentView.trailingAnchor
                                                constant:-14],
 
@@ -124,9 +124,9 @@ static const CGFloat kNFBNotifPillPadding = 8.0;   // gauche et droite seulement
 }
 
 
-// Empty state: the text stands alone, centred, with air above and below — the
-// cotes taken from his Hide thread screen. With rows, everything returns to the
-// normal two-line layout.
+// Empty state: the text stands alone, centred, with air above and below, using
+// the dimensions of the Hide thread screen. With rows, everything returns to
+// the normal two-line layout.
 - (void)applyEmptyLayout:(BOOL)empty {
     if (!self.snippetBottom) {
         self.snippetBottom =
@@ -243,9 +243,9 @@ static const CGFloat kNFBNotifPillPadding = 8.0;   // gauche et droite seulement
     [cell applyEmptyLayout:NO];
 
     if (!self.rows.count) {
-        // Cotes de son écran Hide thread: le label de ligne à Chirp 16.5, en
-        // couleur secondaire pleine — pas d'opacité réduite, qui rendait le
-        // texte fantomatique — et centré, avec de l'air autour.
+        // Dimensions of the Hide thread screen: the row label at Chirp 16.5,
+        // in full secondary colour rather than reduced opacity, which made the
+        // text ghostly, and centred with air around it.
         cell.snippet.text =
             [[BHTBundle sharedBundle] localizedStringForKey:@"HIDDEN_NOTIFS_EXAMPLE"];
         cell.snippet.font = [TwitterChirpFont(TwitterFontStyleRegular) fontWithSize:16.5];
@@ -264,9 +264,8 @@ static const CGFloat kNFBNotifPillPadding = 8.0;   // gauche et droite seulement
         : [[BHTBundle sharedBundle] localizedStringForKey:@"HIDDEN_NOTIFS_UNTITLED"];
     cell.expiry.hidden = NO;
     NSInteger days = (NSInteger)ceil(NFBNotifDaysLeft(row));
-    // He asked to see WHEN it expires, not only how long is left — kept on the
-    // same pill so nothing is added to the layout: « 30d left · Sep 17 ».
-    // He asked for the date to go: the countdown alone, and quieter.
+    // The countdown alone, on the existing pill, so nothing is added to the
+    // layout.
     NSString* format =
         [[BHTBundle sharedBundle] localizedStringForKey:@"HIDDEN_NOTIFS_EXPIRES_IN"];
     cell.expiry.text = [NSString stringWithFormat:format, (long)days];
