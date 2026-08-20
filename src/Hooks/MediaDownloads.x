@@ -296,56 +296,10 @@ static const void* kNFBVoiceInteractionKey = &kNFBVoiceInteractionKey;
 %end
 
 // MARK: - Tweet video download
-
-// _t1_actionItemsForStatus:... is a category method on UIViewController, so the
-// hook has to land on the base class to cover every share/action sheet.
-%hook UIViewController
-- (NSArray*)_t1_actionItemsForStatus:(__unsafe_unretained id)status
-                             account:(__unsafe_unretained id)account
-                     shareableEntity:(__unsafe_unretained id)shareableEntity
-                           entityURL:(__unsafe_unretained id)entityURL
-                              source:(__unsafe_unretained id)source
-                             options:(NSUInteger)options
-                     scribeComponent:(__unsafe_unretained id)scribeComponent
-                           doneBlock:(__unsafe_unretained id)doneBlock {
-    NSArray* origItems = %orig;
-
-    if (![BHTSettings boolForKey:@"download_videos"] ||
-        ![status respondsToSelector:@selector(entities)]) {
-        return origItems;
-    }
-
-    NSArray* mediaEntities = [[status entities] media];
-    BOOL hasVideo = NO;
-    // mediaType 2 = GIF, 3 = video
-    for (TFSTwitterEntityMedia* media in mediaEntities) {
-        if ([media isKindOfClass:%c(TFSTwitterEntityMedia)] &&
-            (media.mediaType == 2 || media.mediaType == 3)) {
-            hasVideo = YES;
-            break;
-        }
-    }
-    if (!hasVideo) {
-        return origItems;
-    }
-
-    static char downloaderKey;
-    DownloadInlineButton* downloader = objc_getAssociatedObject(self, &downloaderKey);
-    if (!downloader) {
-        downloader = [%c(DownloadInlineButton) new];
-        objc_setAssociatedObject(self, &downloaderKey, downloader, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-    }
-
-    TFNActionItem* downloadItem = [%c(TFNActionItem)
-        actionItemWithTitle:[[BHTBundle sharedBundle] localizedStringForKey:@"DOWNLOAD_VIDEOS_TITLE"]
-                  imageName:@"arrow_down_circle_stroke"
-                     action:^{
-                         [downloader presentDownloadOptionsForMediaEntities:mediaEntities];
-                     }];
-
-    NSMutableArray* newItems = origItems ? [origItems mutableCopy] : [NSMutableArray array];
-    NSUInteger insertIndex = newItems.count > 0 ? newItems.count - 1 : 0;
-    [newItems insertObject:downloadItem atIndex:insertIndex];
-    return newItems;
-}
-%end
+//
+// L'entrée « Download media » ne vit plus ici. Elle a été déplacée dans
+// src/Hooks/VideoMenuDownload.x, qui la pose dans le menu d'appui long de la
+// vidéo — sur TOUTES les vidéos, y compris celles où l'entrée native
+// « Download Video » manque (garde mesurée : networkURL nulle).
+// Le crochet sur _t1_actionItemsForStatus: est retiré : le menu « … » ne
+// porte donc plus rien de nous.
