@@ -159,7 +159,7 @@
 "UNDO_TWEET_TITLE" = "Annuler Tweet";
 
 "DOWNLOAD_VIDEOS_TITLE" = "Télécharger les médias";
-"DOWNLOAD_VIDEOS_DETAIL" = "Sauvegarde vidéos et GIFs directement.";
+"DOWNLOAD_VIDEOS_DETAIL" = "Sauvegarde vidéos et GIFs depuis l'appui long sur la vidéo.";
 
 "DIRECT_SAVE_TITLE" = "Enregistrer dans Photos";
 "DIRECT_SAVE_DETAIL" = "Les vidéos se sauvegardent dans l’app Photos.";
