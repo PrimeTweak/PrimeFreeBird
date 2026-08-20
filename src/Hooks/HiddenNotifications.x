@@ -1072,25 +1072,26 @@ static UIColor* NFBNotifDetailColor(void) {
 }
 
 // Twitter composes in Chirp, not in the system face, which is the whole of the
-// difference once size and weight match. The font group is reached the way the
+// difference once size and weight match. Twitter sets these large empty state
+// headlines in Heavy. The font group is reached the way the
 // settings screens already reach it; the system font is the fallback.
-static UIFont* NFBNotifEmptyFont(CGFloat size, BOOL bold) {
+static UIFont* NFBNotifEmptyFont(CGFloat size, BOOL heavy) {
     id group = [BHTManager sharedFontGroup];
     TFNUIDefaultFontGroup* fonts = (TFNUIDefaultFontGroup*)group;
-    if (bold && [group respondsToSelector:@selector(boldFontOfSize:)]) {
-        UIFont* font = [fonts boldFontOfSize:size];
+    if (heavy && [group respondsToSelector:@selector(heavyFontOfSize:)]) {
+        UIFont* font = [fonts heavyFontOfSize:size];
         if ([font isKindOfClass:[UIFont class]]) {
             return font;
         }
     }
-    if (!bold && [group respondsToSelector:@selector(fontOfSize:)]) {
+    if (!heavy && [group respondsToSelector:@selector(fontOfSize:)]) {
         UIFont* font = [fonts fontOfSize:size];
         if ([font isKindOfClass:[UIFont class]]) {
             return font;
         }
     }
-    return bold ? [UIFont systemFontOfSize:size weight:UIFontWeightBold]
-                : [UIFont systemFontOfSize:size];
+    return heavy ? [UIFont systemFontOfSize:size weight:UIFontWeightHeavy]
+                 : [UIFont systemFontOfSize:size];
 }
 
 // Geometry and type taken from the native empty state, measured two ways that
