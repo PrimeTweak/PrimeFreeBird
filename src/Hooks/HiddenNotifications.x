@@ -1044,6 +1044,55 @@ static const NSInteger kNFBNotifEmptyTag = 90315;
 static const NSInteger kNFBNotifEmptyTitleTag = 90316;
 static const NSInteger kNFBNotifEmptyBodyTag = 90317;
 
+// textDetailsColor is the palette entry Twitter uses for secondary copy. It is
+// not declared in src/Headers, so this declaration shim serves as a cast
+// target. Never instantiated, never messaged as a class.
+@interface NFBNotifPaletteShim : NSObject
+- (UIColor*)textDetailsColor;
+@end
+
+// The secondary grey Twitter itself draws with, taken from the live palette so
+// it follows light and dark. Reached by the same path CurrentAccentColor uses.
+// UIColor secondaryLabelColor is a warmer, lighter grey and reads as a
+// different colour beside the native empty state.
+static UIColor* NFBNotifDetailColor(void) {
+    Class settingsClass = objc_getClass("TAEColorSettings");
+    if (settingsClass) {
+        id settings = [settingsClass sharedSettings];
+        id current = [settings currentColorPalette];
+        id palette = [current colorPalette];
+        if ([palette respondsToSelector:@selector(textDetailsColor)]) {
+            UIColor* colour = [(NFBNotifPaletteShim*)palette textDetailsColor];
+            if ([colour isKindOfClass:[UIColor class]]) {
+                return colour;
+            }
+        }
+    }
+    return [UIColor secondaryLabelColor];
+}
+
+// Twitter composes in Chirp, not in the system face, which is the whole of the
+// difference once size and weight match. The font group is reached the way the
+// settings screens already reach it; the system font is the fallback.
+static UIFont* NFBNotifEmptyFont(CGFloat size, BOOL bold) {
+    id group = [BHTManager sharedFontGroup];
+    TFNUIDefaultFontGroup* fonts = (TFNUIDefaultFontGroup*)group;
+    if (bold && [group respondsToSelector:@selector(boldFontOfSize:)]) {
+        UIFont* font = [fonts boldFontOfSize:size];
+        if ([font isKindOfClass:[UIFont class]]) {
+            return font;
+        }
+    }
+    if (!bold && [group respondsToSelector:@selector(fontOfSize:)]) {
+        UIFont* font = [fonts fontOfSize:size];
+        if ([font isKindOfClass:[UIFont class]]) {
+            return font;
+        }
+    }
+    return bold ? [UIFont systemFontOfSize:size weight:UIFontWeightBold]
+                : [UIFont systemFontOfSize:size];
+}
+
 // Geometry and type taken from the native empty state, measured two ways that
 // agree: the view tree in a capture, and the rendered screenshot.
 //
@@ -1085,6 +1134,7 @@ static void NFBNotifLayoutEmptyPanel(UIView* panel, UITableView* table) {
     if (width < 80.0) {
         return;                       // no room to read anything; leave as is
     }
+    body.textColor = NFBNotifDetailColor();
     CGSize titleSize = [title sizeThatFits:CGSizeMake(width, CGFLOAT_MAX)];
     CGSize bodySize = [body sizeThatFits:CGSizeMake(width, CGFLOAT_MAX)];
     title.frame = CGRectMake(0.0, 0.0, width, ceil(titleSize.height));
@@ -1178,8 +1228,7 @@ static void NFBNotifSyncEmptyState(id dataViewController) {
         title.tag = kNFBNotifEmptyTitleTag;
         title.text = [[BHTBundle sharedBundle]
                          localizedStringForKey:@"HIDDEN_NOTIFS_EMPTY_TITLE"];
-        title.font = [UIFont systemFontOfSize:kNFBNotifEmptyTitleSize
-                                       weight:UIFontWeightBold];
+        title.font = NFBNotifEmptyFont(kNFBNotifEmptyTitleSize, YES);
         title.textColor = [UIColor labelColor];
         title.textAlignment = NSTextAlignmentNatural;
         title.numberOfLines = 0;
@@ -1189,8 +1238,8 @@ static void NFBNotifSyncEmptyState(id dataViewController) {
         body.tag = kNFBNotifEmptyBodyTag;
         body.text = [[BHTBundle sharedBundle]
                         localizedStringForKey:@"HIDDEN_NOTIFS_EMPTY_BODY"];
-        body.font = [UIFont systemFontOfSize:kNFBNotifEmptyBodySize];
-        body.textColor = [UIColor secondaryLabelColor];
+        body.font = NFBNotifEmptyFont(kNFBNotifEmptyBodySize, NO);
+        body.textColor = NFBNotifDetailColor();
         body.textAlignment = NSTextAlignmentNatural;
         body.numberOfLines = 0;
         [panel addSubview:body];
