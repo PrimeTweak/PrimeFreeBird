@@ -91,7 +91,7 @@ void NFBDebugLog(NSString* format, ...) {
 
 // MARK: - watch list
 //
-// The flash saga cost three diagnostic builds because the journal only recorded
+// The journal alone could only record
 // what the current hypothesis said to record. This is the missing capability:
 // class names added HERE, at runtime, from the diagnostics screen — and every
 // lifecycle event on matching views is journaled with millisecond stamps and
@@ -226,7 +226,7 @@ static void NFBCollectHealth(NSMutableArray<NSString*>* deadClasses,
         Class cls = objc_getClass(record.className);
         if (!cls) {
             // Deduplicate: several methods of one class each produced a row.
-            NSString* entry = [NSString stringWithFormat:@"  ✗ classe %s  (%s)",
+            NSString* entry = [NSString stringWithFormat:@"  x class %s  (%s)",
                                record.className, record.file];
             if (![deadClasses containsObject:entry]) {
                 [deadClasses addObject:entry];
@@ -259,7 +259,7 @@ static void NFBCollectHealth(NSMutableArray<NSString*>* deadClasses,
         if (objc_getClass(NFBRuntimeClasses[i])) {
             okRuntime++;
         } else {
-            NSString* entry = [NSString stringWithFormat:@"  ✗ classe (par nom) %s",
+            NSString* entry = [NSString stringWithFormat:@"  x class (by name) %s",
                                NFBRuntimeClasses[i]];
             if (![deadRuntime containsObject:entry]) {
                 [deadRuntime addObject:entry];
@@ -285,12 +285,12 @@ static NSString* NFBHealthBlock(void) {
     // methods are listed below under their own quiet heading.
     NSUInteger breaks = deadClasses.count + deadRuntime.count;
     NSMutableString* out = [NSMutableString string];
-    [out appendFormat:@"ACCROCHES  %lu classes, %lu méthodes, %lu par nom — %@\n",
+    [out appendFormat:@"HOOKS  %lu classes, %lu methods, %lu by name - %@\n",
         (unsigned long)counts.okClasses, (unsigned long)counts.okMethods,
         (unsigned long)counts.okRuntime,
-        breaks ? [NSString stringWithFormat:@"%lu CLASSE%@ MANQUANTE%@",
-                    (unsigned long)breaks, breaks > 1 ? @"S" : @"", breaks > 1 ? @"S" : @""]
-               : @"toutes présentes"];
+        breaks ? [NSString stringWithFormat:@"%lu MISSING CLASS%@",
+                    (unsigned long)breaks, breaks > 1 ? @"ES" : @""]
+               : @"all present"];
     if (deadClasses.count) {
         [out appendString:[deadClasses componentsJoinedByString:@"\n"]];
         [out appendString:@"\n"];
@@ -301,8 +301,8 @@ static NSString* NFBHealthBlock(void) {
     }
     if (unresolved.count) {
         [out appendFormat:
-            @"\nMÉTHODES NON RÉSOLUES STATIQUEMENT (%lu) — souvent Swift/catégorie, "
-            @"le hook fonctionne quand même :\n", (unsigned long)unresolved.count];
+            @"\nMETHODS NOT RESOLVED STATICALLY (%lu) - often Swift or a "
+            @"category, in which case the hook still works:\n", (unsigned long)unresolved.count];
         [out appendString:[unresolved componentsJoinedByString:@"\n"]];
         [out appendString:@"\n"];
     }
@@ -325,13 +325,10 @@ NSUInteger NFBDebuggerMissingCount(void) {
 // The colour actually PAINTED in an image, and the visibility of the view that
 // carries it.
 //
-// Four builds were spent on bar icons that the capture reported as present,
-// alpha 1, with a non-nil image — and that the screen did not show. The report
-// gave the image's SIZE and the view's TINT, but an AlwaysOriginal image
-// carries its own pixels and the tint says nothing about them: a glyph baked
-// white reads exactly like a glyph baked grey. So the one fact that separates
-// « the image is invisible » from « something hides it » was never in the
-// report.
+// An AlwaysOriginal image carries its own pixels, so the view's tint says
+// nothing about what is drawn: a glyph baked white reads exactly like a glyph
+// baked grey. Size and tint alone therefore cannot separate "the image is
+// invisible" from "something covers it".
 //
 // ink= is the average colour of the image's non-transparent pixels (nil when
 // the image is fully transparent), and cover= the effective alpha down the
@@ -391,7 +388,7 @@ static NSString* NFBViewCover(UIView* view) {
     while (node && depth < 12) {
         alpha *= node.alpha;
         if (node.hidden) {
-            return [NSString stringWithFormat:@"MASQUÉ par %@",
+            return [NSString stringWithFormat:@"COVERED by %@",
                     NSStringFromClass([node class])];
         }
         UIView* parent = node.superview;
@@ -495,7 +492,7 @@ static void NFBCaptureView(UIView* view, NSInteger depth, NSMutableString* out) 
     [out appendString:@"\n"];
 
     // The tweak's own mark, if this view carries one — the line that turns
-    // "what is this view" into "what did we do to it".
+    // "what is this view" into "what did the tweak do to it".
     NSString* mark = NFBMarkOf(view);
     if (mark) {
         [out appendFormat:@"%s  ⟨PFB: %@⟩\n", indent.UTF8String, mark];
@@ -510,7 +507,7 @@ static NSString* gNFBLastCapture;
 
 static NSString* NFBCaptureBlock(void) {
     if (!gNFBLastCapture.length) {
-        return @"CAPTURE  aucune — secoue l'appareil sur l'écran à diagnostiquer\n";
+        return @"CAPTURE  none - shake the device on the screen to inspect\n";
     }
     return [NSString stringWithFormat:@"CAPTURE\n%@", gNFBLastCapture];
 }
@@ -519,9 +516,9 @@ static NSString* NFBDecisionBlock(void) {
     @synchronized(NFBDecisionRing()) {
         NSArray* ring = NFBDecisionRing();
         if (!ring.count) {
-            return @"DÉCISIONS  (aucune enregistrée)\n";
+            return @"DECISIONS  (none recorded)\n";
         }
-        return [NSString stringWithFormat:@"DÉCISIONS (%lu dernières)\n%@\n",
+        return [NSString stringWithFormat:@"DECISIONS (last %lu)\n%@\n",
                 (unsigned long)ring.count, [ring componentsJoinedByString:@"\n"]];
     }
 }
@@ -650,7 +647,7 @@ void NFBDebuggerCaptureAndPresent(void) {
     UIView* root = top.viewIfLoaded ?: window;
     NFBCaptureView(root, 0, capture);
     gNFBLastCapture = capture;
-    NFBDebugLog(@"capture prise (%lu caractères)", (unsigned long)capture.length);
+    NFBDebugLog(@"capture taken (%lu characters)", (unsigned long)capture.length);
 
     NFBDebuggerPresent();
 }
@@ -765,7 +762,7 @@ void NFBDebuggerInstall(void) {
                    dispatch_get_main_queue(), ^{
         NSUInteger breaks = NFBDebuggerMissingCount();
         os_log(NFBDebugLogHandle(),
-               "santé (2e passe, 12 s) : %{public}lu classe(s) manquante(s)",
+               "health (second pass, 12 s): %{public}lu missing class(es)",
                (unsigned long)breaks);
     });
 }

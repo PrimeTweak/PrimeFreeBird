@@ -5,8 +5,7 @@
 //  matches a watched fragment, window arrivals and departures are journaled
 //  with millisecond stamps, the instance pointer and the window frame. The
 //  pointer is the point: a view that is removed and REPLACED shows up as two
-//  different pointers around a gap — the exact signature that took a 60 fps
-//  video to establish for the inbox pill.
+//  different pointers around a gap.
 //
 //  Cost when the list is empty or debugging is off: one boolean per event.
 //
@@ -20,7 +19,7 @@
     %orig;
     if (!newWindow && self.window &&
         NFBWatchMatchesClassName(NSStringFromClass([self classForCoder]))) {
-        NFBDebugLog(@"⌚ %@ <%p> quitte la fenêtre  était=%@",
+        NFBDebugLog(@"⌚ %@ <%p> left the window  was=%@",
                     NSStringFromClass([self classForCoder]), self,
                     NSStringFromCGRect([self convertRect:self.bounds toView:nil]));
     }
@@ -30,7 +29,7 @@
     %orig;
     if (self.window &&
         NFBWatchMatchesClassName(NSStringFromClass([self classForCoder]))) {
-        NFBDebugLog(@"⌚ %@ <%p> posé  frame=%@",
+        NFBDebugLog(@"⌚ %@ <%p> placed  frame=%@",
                     NSStringFromClass([self classForCoder]), self,
                     NSStringFromCGRect([self convertRect:self.bounds toView:nil]));
     }
@@ -47,7 +46,7 @@
     UIView* owner = (UIView*)self.delegate;
     if ([owner isKindOfClass:[UIView class]] &&
         NFBWatchMatchesClassName(NSStringFromClass([owner classForCoder]))) {
-        NFBDebugLog(@"⌚ %@ <%p> anim [%@] clé=%@ durée=%.2f",
+        NFBDebugLog(@"⌚ %@ <%p> anim [%@] key=%@ duration=%.2f",
                     NSStringFromClass([owner classForCoder]), owner,
                     NSStringFromClass([animation classForCoder]),
                     key ?: @"nil", animation.duration);

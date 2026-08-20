@@ -72,7 +72,7 @@
     report.textColor = [UIColor labelColor];
     report.textContainerInset = UIEdgeInsetsMake(12, 12, 12, 12);
     // A capture runs to fifty thousand characters; the system find panel is
-    // how a class name is located in it. Long-press → Rechercher.
+    // how a class name is located in it, through a long press on the report.
     if (@available(iOS 16.0, *)) {
         report.findInteractionEnabled = YES;
     }
@@ -115,13 +115,12 @@
     NSUInteger missing = NFBDebuggerMissingCount();
     if (missing == 0) {
         self.statusBanner.backgroundColor = [UIColor systemGreenColor];
-        self.statusLabel.text = @"Accroches : toutes présentes";
+        self.statusLabel.text = @"Hooks: all present";
     } else {
         self.statusBanner.backgroundColor = [UIColor systemRedColor];
         self.statusLabel.text = [NSString stringWithFormat:
-            @"%lu accroche%@ manquante%@ — fonctions mortes",
-            (unsigned long)missing, missing > 1 ? @"s" : @"",
-            missing > 1 ? @"s" : @""];
+            @"%lu hook%@ missing - dead functions",
+            (unsigned long)missing, missing > 1 ? @"s" : @""];
     }
     self.reportView.text = NFBDebuggerReport();
 }
@@ -152,18 +151,18 @@
 - (void)editWatchList {
     UIAlertController* sheet =
         [UIAlertController alertControllerWithTitle:@"Surveillance"
-                                            message:@"Les vues dont la classe contient un fragment surveillé sont journalisées à la milliseconde (cycle de vie + animations)."
+                                            message:@"Views whose class name contains a watched fragment are journaled to the millisecond, lifecycle and animations."
                                      preferredStyle:UIAlertControllerStyleActionSheet];
     for (NSString* fragment in NFBWatchAll()) {
         [sheet addAction:[UIAlertAction actionWithTitle:
-            [NSString stringWithFormat:@"Retirer « %@ »", fragment]
+            [NSString stringWithFormat:@"Remove \"%@\"", fragment]
                                                   style:UIAlertActionStyleDestructive
                                                 handler:^(UIAlertAction* action) {
             NFBWatchRemove(fragment);
             [self refresh];
         }]];
     }
-    [sheet addAction:[UIAlertAction actionWithTitle:@"Ajouter une classe…"
+    [sheet addAction:[UIAlertAction actionWithTitle:@"Add a class…"
                                               style:UIAlertActionStyleDefault
                                             handler:^(UIAlertAction* action) {
         [self promptForWatchFragment];
@@ -178,11 +177,11 @@
 
 - (void)promptForWatchFragment {
     UIAlertController* prompt =
-        [UIAlertController alertControllerWithTitle:@"Surveiller une classe"
-                                            message:@"Fragment du nom de classe — « Inbox » suffit pour le pill des messages."
+        [UIAlertController alertControllerWithTitle:@"Watch a class"
+                                            message:@"Fragment of the class name. \"Inbox\" is enough to watch the messages pill."
                                      preferredStyle:UIAlertControllerStyleAlert];
     [prompt addTextFieldWithConfigurationHandler:^(UITextField* field) {
-        field.placeholder = @"Fragment de nom de classe";
+        field.placeholder = @"Class name fragment";
         field.autocorrectionType = UITextAutocorrectionTypeNo;
         field.autocapitalizationType = UITextAutocapitalizationTypeNone;
     }];
