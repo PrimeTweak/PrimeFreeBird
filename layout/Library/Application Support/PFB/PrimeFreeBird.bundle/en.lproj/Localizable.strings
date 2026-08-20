@@ -186,7 +186,7 @@
 "MODERN_SETTINGS_MEDIA_TITLE" = "Media";
 "MODERN_SETTINGS_MEDIA_SUBTITLE" = "Downloads, playback, and image quality.";
 "DOWNLOAD_VIDEOS_TITLE" = "Download media";
-"DOWNLOAD_VIDEOS_DETAIL" = "Save videos and GIFs from the Tweet overflow menu.";
+"DOWNLOAD_VIDEOS_DETAIL" = "Save videos and GIFs from the video long-press menu.";
 "DIRECT_SAVE_TITLE" = "Save to Photos";
 "DIRECT_SAVE_DETAIL" = "Send saved videos straight to your Photos app.";
 "TWEET_TO_IMAGE_TITLE" = "Save Tweet as image";
