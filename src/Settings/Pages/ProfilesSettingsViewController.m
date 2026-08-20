@@ -41,7 +41,7 @@ extern void applySquareAvatarsSetting(void);
         @"PROFILE_TAB_REPOSTS"
     ];
     NSArray<NSString*>* hiddenBy = @[
-        @"",                      // Default, jamais masqué
+        @"",                      // Default, never hidden
         @"",                      // Replies, pas d'option
         @"disable_highlights",
         @"disable_articles",
