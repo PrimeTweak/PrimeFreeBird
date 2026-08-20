@@ -228,7 +228,7 @@ static BOOL nfbEdgeHideEnabled(void) {
 // the tweak hid ourselves.
 static void nfbApplyEdgeEffect(UIScrollView* scrollView, BOOL hide) {
     if (![scrollView respondsToSelector:@selector(topEdgeEffect)]) {
-        return;   // avant iOS 26 : rien à faire
+        return;   // nothing to do before iOS 26
     }
     id effect = ((id (*)(id, SEL))objc_msgSend)(scrollView, @selector(topEdgeEffect));
     if (![effect respondsToSelector:@selector(setHidden:)] ||
@@ -237,7 +237,7 @@ static void nfbApplyEdgeEffect(UIScrollView* scrollView, BOOL hide) {
     }
     BOOL alreadyHidden = ((BOOL (*)(id, SEL))objc_msgSend)(effect, @selector(isHidden));
     if (alreadyHidden == hide) {
-        return;   // rien à faire : le cas le plus fréquent, et le moins cher
+        return;   // nothing to do: the common case, and the cheapest
     }
     ((void (*)(id, SEL, BOOL))objc_msgSend)(effect, @selector(setHidden:), hide);
     objc_setAssociatedObject(scrollView, kNFBEdgeMarkKey, hide ? @YES : nil,
@@ -1022,7 +1022,7 @@ static NSSet<NSNumber*>* ConversationAuthorRepliedToUserIDs(NSArray* sections,
 // Chronological tabs (Following, Lists) keep their anchor through refreshes, so
 // the marker lives there; a tab that discards its anchor on a large list is
 // algorithmic, and the marker retires on it for the session rather than lying.
-// Tabs whose controllers name themselves "ForYou" never get a marker at all.
+// Only the Following tab is eligible, identified by its scribe section.
 
 static const void* kNFBReadingAnchorIDKey = &kNFBReadingAnchorIDKey;
 static const void* kNFBReadingAnchorPathKey = &kNFBReadingAnchorPathKey;
@@ -1031,7 +1031,6 @@ static const void* kNFBListViewKey = &kNFBListViewKey;
 static const void* kNFBReadingTopAtCaptureKey = &kNFBReadingTopAtCaptureKey;
 static const void* kNFBReadingRetiredKey = &kNFBReadingRetiredKey;
 static const void* kNFBReadingMissCountKey = &kNFBReadingMissCountKey;
-static const void* kNFBReadingForYouKey = &kNFBReadingForYouKey;
 
 // The wash covers the Tweet's header and fades out before the media: solid
 // for the first points, gone by the reach. Low enough to read through, high
@@ -1253,34 +1252,36 @@ static BOOL NFBReadingStoreRestore(TFNItemsDataViewController* dataViewControlle
 // The controller chain names the algorithmic tab on builds where the child
 // controllers carry "ForYou" in their class names; the verdict is cached per
 // controller. A chain that names nothing changes nothing.
-static BOOL NFBReadingLooksLikeForYou(TFNItemsDataViewController* dataViewController) {
-    NSNumber* cached =
-        objc_getAssociatedObject(dataViewController, kNFBReadingForYouKey);
-    if (cached) {
-        return cached.boolValue;
+// scribeSection is not declared in src/Headers. This declaration shim is only
+// a cast target: it is never instantiated and never messaged as a class, so no
+// class symbol is referenced.
+@interface NFBReadingScribeShim : NSObject
+- (NSString*)scribeSection;
+@end
+
+// Identifies the Following tab by the timeline's own scribe section. Measured
+// on device: the For you tab reports "home", Following reports "latest", both
+// under the "home" scribe page.
+//
+// This replaces a walk of the responder chain looking for a class name
+// containing "ForYou". A sweep of the binaries finds no such class outside
+// GraphQL model types, and the live responder chain confirms it: PagingCell,
+// PagingCollectionView, PagingViewController, SegmentedViewController,
+// HomeTimelineContainerViewController. The old test could never match, so the
+// marker was allowed on For you and appeared there after a refresh.
+//
+// The test is an allowlist on purpose. A section that cannot be read denies
+// the marker rather than granting it.
+static BOOL NFBReadingIsFollowingTab(TFNItemsDataViewController* dataViewController) {
+    if (![dataViewController respondsToSelector:@selector(scribeSection)]) {
+        return NO;
     }
-    BOOL forYou = NO;
-    BOOL chainComplete = NO;
-    UIResponder* responder = dataViewController;
-    while ((responder = responder.nextResponder)) {
-        if ([NSStringFromClass([responder class]) containsString:@"ForYou"]) {
-            forYou = YES;
-            chainComplete = YES;
-            break;
-        }
-        if ([responder isKindOfClass:[UIWindow class]]) {
-            chainComplete = YES;
-            break;
-        }
+    NFBReadingScribeShim* shim = (NFBReadingScribeShim*)dataViewController;
+    NSString* section = [shim scribeSection];
+    if (![section isKindOfClass:[NSString class]]) {
+        return NO;
     }
-    // A controller asked before it is mounted has no chain to walk, and a "no"
-    // read from it would be cached for the session. Only a walk that reached
-    // the window, or found the tab outright, is worth keeping.
-    if (chainComplete) {
-        objc_setAssociatedObject(dataViewController, kNFBReadingForYouKey,
-                                 @(forYou), OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-    }
-    return forYou;
+    return [section isEqualToString:@"latest"];
 }
 
 static BOOL NFBReadingMarkerAllowed(TFNItemsDataViewController* dataViewController) {
@@ -1288,7 +1289,7 @@ static BOOL NFBReadingMarkerAllowed(TFNItemsDataViewController* dataViewControll
            NFBReadingIsHomeTimeline(dataViewController) &&
            ![objc_getAssociatedObject(dataViewController, kNFBReadingRetiredKey)
                boolValue] &&
-           !NFBReadingLooksLikeForYou(dataViewController);
+           NFBReadingIsFollowingTab(dataViewController);
 }
 
 static NSUInteger NFBReadingItemCount(NSArray* sections) {

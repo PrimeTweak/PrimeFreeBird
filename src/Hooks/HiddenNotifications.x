@@ -1041,6 +1041,49 @@ static void NFBNotifRecordVerdict(id dataViewController, BOOL sawNotification,
 // écarté »). Only a controller that earned YES can carry this panel.
 
 static const NSInteger kNFBNotifEmptyTag = 90315;
+static const NSInteger kNFBNotifEmptyTitleTag = 90316;
+static const NSInteger kNFBNotifEmptyBodyTag = 90317;
+
+// Geometry taken from the native empty state read in a capture: a
+// TFNViewHostTableViewCell of 216 points hosting a TFNEmptyStateView whose
+// content starts 36 points below the top of the cell. That cell is the first
+// row, so 36 is also the offset from the top of the content.
+static const CGFloat kNFBNotifEmptyTopInset = 36.0;
+static const CGFloat kNFBNotifEmptyMaxWidth = 250.0;
+static const CGFloat kNFBNotifEmptySideInset = 24.0;
+static const CGFloat kNFBNotifEmptyGap = 9.0;
+
+// Places the panel with frames in the table's CONTENT coordinate space, the
+// same technique the reading marker uses. A subview of a scroll view placed in
+// content coordinates travels with the list; a subview pinned to
+// frameLayoutGuide stays welded to the viewport, which is why the panel used
+// to sit still. Auto Layout against contentLayoutGuide is avoided on purpose:
+// a table view owns its content size, and constraints that try to drive it
+// fight the table.
+//
+// Called on every sync, so a width change is picked up at the next update.
+static void NFBNotifLayoutEmptyPanel(UIView* panel, UITableView* table) {
+    UILabel* title = (UILabel*)[panel viewWithTag:kNFBNotifEmptyTitleTag];
+    UILabel* body = (UILabel*)[panel viewWithTag:kNFBNotifEmptyBodyTag];
+    if (![title isKindOfClass:[UILabel class]] ||
+        ![body isKindOfClass:[UILabel class]]) {
+        return;
+    }
+    CGFloat tableWidth = CGRectGetWidth(table.bounds);
+    CGFloat width = MIN(kNFBNotifEmptyMaxWidth,
+                        tableWidth - (kNFBNotifEmptySideInset * 2.0));
+    if (width < 80.0) {
+        return;                       // no room to read anything; leave as is
+    }
+    CGSize titleSize = [title sizeThatFits:CGSizeMake(width, CGFLOAT_MAX)];
+    CGSize bodySize = [body sizeThatFits:CGSizeMake(width, CGFLOAT_MAX)];
+    title.frame = CGRectMake(0.0, 0.0, width, ceil(titleSize.height));
+    body.frame = CGRectMake(0.0, CGRectGetMaxY(title.frame) + kNFBNotifEmptyGap,
+                            width, ceil(bodySize.height));
+    panel.frame = CGRectMake(floor((tableWidth - width) / 2.0),
+                             kNFBNotifEmptyTopInset,
+                             width, CGRectGetMaxY(body.frame));
+}
 
 static void NFBNotifSyncEmptyState(id dataViewController) {
     if (!dataViewController) {
@@ -1110,51 +1153,40 @@ static void NFBNotifSyncEmptyState(id dataViewController) {
             return;
         }
         if (existing) {
+            // A width change (rotation, split view) moves the panel; the frames
+            // are recomputed rather than left stale.
+            NFBNotifLayoutEmptyPanel(existing, table);
             return;
         }
 
         UIView* panel = [[UIView alloc] init];
         panel.tag = kNFBNotifEmptyTag;
         panel.userInteractionEnabled = NO;    // never blocks a pull-to-refresh
-        panel.translatesAutoresizingMaskIntoConstraints = NO;
+        panel.autoresizingMask = UIViewAutoresizingFlexibleLeftMargin |
+                                 UIViewAutoresizingFlexibleRightMargin;
 
         UILabel* title = [[UILabel alloc] init];
+        title.tag = kNFBNotifEmptyTitleTag;
         title.text = [[BHTBundle sharedBundle]
                          localizedStringForKey:@"HIDDEN_NOTIFS_EMPTY_TITLE"];
         title.font = [UIFont systemFontOfSize:20 weight:UIFontWeightBold];
         title.textColor = [UIColor labelColor];
         title.textAlignment = NSTextAlignmentCenter;
         title.numberOfLines = 0;
-        title.translatesAutoresizingMaskIntoConstraints = NO;
         [panel addSubview:title];
 
         UILabel* body = [[UILabel alloc] init];
+        body.tag = kNFBNotifEmptyBodyTag;
         body.text = [[BHTBundle sharedBundle]
                         localizedStringForKey:@"HIDDEN_NOTIFS_EMPTY_BODY"];
         body.font = [UIFont systemFontOfSize:14];
         body.textColor = [UIColor secondaryLabelColor];
         body.textAlignment = NSTextAlignmentCenter;
         body.numberOfLines = 0;
-        body.translatesAutoresizingMaskIntoConstraints = NO;
         [panel addSubview:body];
 
         [table addSubview:panel];
-        UILayoutGuide* frame = table.frameLayoutGuide;
-        [NSLayoutConstraint activateConstraints:@[
-            [title.topAnchor constraintEqualToAnchor:panel.topAnchor],
-            [title.leadingAnchor constraintEqualToAnchor:panel.leadingAnchor],
-            [title.trailingAnchor constraintEqualToAnchor:panel.trailingAnchor],
-            [body.topAnchor constraintEqualToAnchor:title.bottomAnchor constant:9],
-            [body.leadingAnchor constraintEqualToAnchor:panel.leadingAnchor],
-            [body.trailingAnchor constraintEqualToAnchor:panel.trailingAnchor],
-            [body.bottomAnchor constraintEqualToAnchor:panel.bottomAnchor],
-
-            [panel.centerXAnchor constraintEqualToAnchor:frame.centerXAnchor],
-            [panel.centerYAnchor constraintEqualToAnchor:frame.centerYAnchor],
-            [panel.widthAnchor constraintLessThanOrEqualToConstant:250],
-            [panel.leadingAnchor constraintGreaterThanOrEqualToAnchor:frame.leadingAnchor
-                                                             constant:24],
-        ]];
+        NFBNotifLayoutEmptyPanel(panel, table);
         NFBDebugLog(@"[vide] PANNEAU POSÉ");
     } @catch (id exception) {
         NFBDebugLog(@"[vide] exception: %@", exception);
