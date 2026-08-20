@@ -1044,14 +1044,25 @@ static const NSInteger kNFBNotifEmptyTag = 90315;
 static const NSInteger kNFBNotifEmptyTitleTag = 90316;
 static const NSInteger kNFBNotifEmptyBodyTag = 90317;
 
-// Geometry taken from the native empty state read in a capture: a
-// TFNViewHostTableViewCell of 216 points hosting a TFNEmptyStateView whose
-// content starts 36 points below the top of the cell. That cell is the first
-// row, so 36 is also the offset from the top of the content.
+// Geometry and type taken from the native empty state, measured two ways that
+// agree: the view tree in a capture, and the rendered screenshot.
+//
+//   TFNViewHostTableViewCell {440 x 216}
+//     TFNEmptyStateView
+//       SemanticContentView {{18, 36}, {404, 164.33}}
+//         UILabel          {{0,  0}, {404,  36}}     one line
+//         TFNLinkTextLabel {{0, 44}, {404,  38.33}}  two lines
+//
+// 18 points of side inset, so 404 wide on a 440 wide table. The title label is
+// 36 points tall for a single line, which is a 30 point face at the usual 1.2
+// line height; the capital height measured on the screenshot agrees at about
+// 21 points, and 21 / 0.72 is 29.4. The body is 38.33 for two lines, so a
+// 19.17 line height, which is a 15 point face. The gap is 44 - 36 = 8.
 static const CGFloat kNFBNotifEmptyTopInset = 36.0;
-static const CGFloat kNFBNotifEmptyMaxWidth = 250.0;
-static const CGFloat kNFBNotifEmptySideInset = 24.0;
-static const CGFloat kNFBNotifEmptyGap = 9.0;
+static const CGFloat kNFBNotifEmptySideInset = 18.0;
+static const CGFloat kNFBNotifEmptyGap = 8.0;
+static const CGFloat kNFBNotifEmptyTitleSize = 30.0;
+static const CGFloat kNFBNotifEmptyBodySize = 15.0;
 
 // Places the panel with frames in the table's CONTENT coordinate space, the
 // same technique the reading marker uses. A subview of a scroll view placed in
@@ -1070,8 +1081,7 @@ static void NFBNotifLayoutEmptyPanel(UIView* panel, UITableView* table) {
         return;
     }
     CGFloat tableWidth = CGRectGetWidth(table.bounds);
-    CGFloat width = MIN(kNFBNotifEmptyMaxWidth,
-                        tableWidth - (kNFBNotifEmptySideInset * 2.0));
+    CGFloat width = tableWidth - (kNFBNotifEmptySideInset * 2.0);
     if (width < 80.0) {
         return;                       // no room to read anything; leave as is
     }
@@ -1080,7 +1090,7 @@ static void NFBNotifLayoutEmptyPanel(UIView* panel, UITableView* table) {
     title.frame = CGRectMake(0.0, 0.0, width, ceil(titleSize.height));
     body.frame = CGRectMake(0.0, CGRectGetMaxY(title.frame) + kNFBNotifEmptyGap,
                             width, ceil(bodySize.height));
-    panel.frame = CGRectMake(floor((tableWidth - width) / 2.0),
+    panel.frame = CGRectMake(kNFBNotifEmptySideInset,
                              kNFBNotifEmptyTopInset,
                              width, CGRectGetMaxY(body.frame));
 }
@@ -1162,16 +1172,16 @@ static void NFBNotifSyncEmptyState(id dataViewController) {
         UIView* panel = [[UIView alloc] init];
         panel.tag = kNFBNotifEmptyTag;
         panel.userInteractionEnabled = NO;    // never blocks a pull-to-refresh
-        panel.autoresizingMask = UIViewAutoresizingFlexibleLeftMargin |
-                                 UIViewAutoresizingFlexibleRightMargin;
+        panel.autoresizingMask = UIViewAutoresizingFlexibleWidth;
 
         UILabel* title = [[UILabel alloc] init];
         title.tag = kNFBNotifEmptyTitleTag;
         title.text = [[BHTBundle sharedBundle]
                          localizedStringForKey:@"HIDDEN_NOTIFS_EMPTY_TITLE"];
-        title.font = [UIFont systemFontOfSize:20 weight:UIFontWeightBold];
+        title.font = [UIFont systemFontOfSize:kNFBNotifEmptyTitleSize
+                                       weight:UIFontWeightBold];
         title.textColor = [UIColor labelColor];
-        title.textAlignment = NSTextAlignmentCenter;
+        title.textAlignment = NSTextAlignmentNatural;
         title.numberOfLines = 0;
         [panel addSubview:title];
 
@@ -1179,9 +1189,9 @@ static void NFBNotifSyncEmptyState(id dataViewController) {
         body.tag = kNFBNotifEmptyBodyTag;
         body.text = [[BHTBundle sharedBundle]
                         localizedStringForKey:@"HIDDEN_NOTIFS_EMPTY_BODY"];
-        body.font = [UIFont systemFontOfSize:14];
+        body.font = [UIFont systemFontOfSize:kNFBNotifEmptyBodySize];
         body.textColor = [UIColor secondaryLabelColor];
-        body.textAlignment = NSTextAlignmentCenter;
+        body.textAlignment = NSTextAlignmentNatural;
         body.numberOfLines = 0;
         [panel addSubview:body];
 
