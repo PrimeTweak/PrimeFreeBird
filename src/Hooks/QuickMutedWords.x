@@ -217,16 +217,15 @@ static UIImage* NFBGreyGlyph(UIImage* source, UIColor* colour) {
         // other screens.
         //
         // The button is attached to the BAR, and TFNNavigationBar is REUSED
-        // across screens (measured during the Messages mirror saga: the same
-        // instance is re-populated). The old guard read « once a button exists
-        // here, keep maintaining it », which was written to survive layout
+        // across screens: the same instance is re-populated. The earlier guard
+        // maintained the button as soon as one existed on the bar, which was
+        // written to survive layout
         // passes where the responder chain is briefly incomplete — a real
         // problem, the icon used to vanish until relaunch. But it also meant
         // the button followed the bar everywhere and re-positioned itself at
         // (width - side - inset) on every pass: on Explore that is x=376,
-        // exactly where the gear sits, which it then covered. His capture of
-        // « Search @…'s Tweets » shows the filter-bars glyph on a screen that
-        // never had one.
+        // exactly where the gear sits, which it then covered: the filter-bars
+        // glyph appeared on search screens that never had one.
         //
         // So the two cases the old guard confused are now separated:
         //   · owner known and it IS home      → create / maintain;
@@ -240,7 +239,7 @@ static UIImage* NFBGreyGlyph(UIImage* source, UIColor* colour) {
                     [button removeFromSuperview];
                     objc_setAssociatedObject(self, kNFBQuickMutedBtnKey, nil,
                                              OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-                    NFBDebugLog(@"mots filtrés: icône retirée — la barre est passée à %@",
+                    NFBDebugLog(@"muted words: icon removed - the bar moved to %@",
                                 NSStringFromClass([owner class]));
                 }
                 return;
@@ -290,7 +289,7 @@ static UIImage* NFBGreyGlyph(UIImage* source, UIColor* colour) {
             CGRect inBar = [avatar convertRect:avatar.bounds toView:bar];
             centerY = CGRectGetMidY(inBar);
             side = CGRectGetHeight(inBar);
-            inset = CGRectGetMinX(inBar);   // symétrique à la marge de gauche
+            inset = CGRectGetMinX(inBar);   // mirrors the left margin
         }
         button.frame = CGRectMake(CGRectGetWidth(bar.bounds) - side - inset,
                                   centerY - side / 2.0, side, side);

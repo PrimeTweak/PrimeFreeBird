@@ -703,7 +703,7 @@ static void nfbApplyComposeFABVisibility(UIView* fab) {
 
 %end
 
-// Same lesson as the glyph, applied to the DISC: during a tab transition the
+// Same principle as the glyph, applied to the DISC: during a tab transition the
 // glass material can arrive as a fresh UIVisualEffectView whose contentView the tweak
 // only coloured at the next styling pass — one glassy-white frame, the flick
 // that remains. Colour it the instant it enters a window, same transaction.

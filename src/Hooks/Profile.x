@@ -70,8 +70,8 @@ static char kCopyProviderKey;
 //       XDSButton {{343,12},{40,40}}      the bell
 //       XDSButton {{391,12},{40,40}}      the share
 //
-// Forty by forty, spaced forty-eight apart, each holding a 20×20 glyph. Ours
-// goes one slot further left, at 295 — where he circled it.
+// Forty by forty, spaced forty-eight apart, each holding a 20x20 glyph. The
+// added button goes one slot further left, at 295.
 //
 // Style is COPIED from a neighbour at layout time rather than guessed: corner
 // radius, border, background and glyph tint all come from the button beside it,
@@ -122,12 +122,12 @@ static void nfbMatchNeighbourStyle(UIButton* ours, UIView* neighbour) {
     if (neighbour.backgroundColor) {
         ours.backgroundColor = neighbour.backgroundColor;
     }
-    // Measured on his 17/08 capture: the bell and the share button wear a thin
+    // Measured on a capture: the bell and the share button wear a thin
     // grey ring, ours had none — because the neighbour draws that ring in a
     // SUBVIEW (its own background/blur layer), so copying the button's own
     // borderWidth yields zero. When nothing came across, draw the ring here.
     // Derived from labelColor, never from a semantic system fill: Twitter
-    // reinterprets those, and the badge contrast lesson cost a build.
+    // reinterprets those, and contrast is lost.
     if (ours.layer.borderWidth <= 0) {
         BOOL ringFound = NO;
         for (UIView* node in neighbour.subviews) {
@@ -308,7 +308,7 @@ static id nfbWantedEntry(id provider) {
         case 4: name = @"photoEntry"; break;
         case 5: name = @"videoEntry"; break;
         case 6: name = @"repostsEntry"; break;
-        default: return nil;   // 0 = laisser Twitter décider
+        default: return nil;   // 0 leaves the choice to Twitter
     }
 
     // A tab hidden by one of the tweak's own switches is refused here too, in case an

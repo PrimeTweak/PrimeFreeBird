@@ -460,13 +460,13 @@ static void NFBShowHiddenToast(NSString* threadID) {
 
     UIView* content = toast.contentView;
 
-    // The same veil he validated on the hidden-notification toast: pure glass
+    // The same veil used on the hidden-notification toast: pure glass
     // let the timeline read straight through the words. 80 % of the background
     // colour keeps the material visible underneath while the text stays legible.
     //
     // The rounded corners and masksToBounds are NOT optional: without them the
     // veil renders as a square behind a capsule, which is exactly the artefact
-    // that showed up the first time and cost a build.
+    // that appears without it.
     UIView* veil = [[UIView alloc] init];
     veil.backgroundColor = [[UIColor systemBackgroundColor] colorWithAlphaComponent:0.80];
     veil.userInteractionEnabled = NO;    // Undo must stay tappable

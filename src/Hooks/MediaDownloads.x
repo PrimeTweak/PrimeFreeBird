@@ -296,50 +296,50 @@ static const void* kNFBVoiceInteractionKey = &kNFBVoiceInteractionKey;
 }
 %end
 
-// MARK: - Tweet video download — dans le menu d'appui long de la vidéo
+// MARK: - Tweet media download -- entry in the media long-press menu
 //
-// L'entrée ne vit plus dans le menu « … » : le crochet sur
-// _t1_actionItemsForStatus: a été retiré. Elle est posée ici, dans le menu
-// d'appui long de la vidéo, sur TOUTES les vidéos.
+// The entry no longer lives in the "..." overflow menu: the hook on
+// _t1_actionItemsForStatus: was removed. It is added here, in the media
+// long-press menu, for every video and GIF.
 //
-// CE QUI EST MESURÉ, et qui rend ce bloc possible (19 août) :
+// Binary facts this block relies on (Twitter 12.15):
 //
-// · Le menu d'appui long vidéo n'est PAS construit par une méthode
-//   Objective-C. Sa fonction vit dans un trou de la table des IMP de
-//   T1Twitter (entre 0x2f7df8 et 0x314818) : rien à accrocher là. Le seul
-//   point ObjC du chemin est `+[UIMenu menuWithTitle:children:]` — la
-//   fabrique à 2 arguments. Le menu « … », lui, passe par celle à 5.
+//   - The media long-press menu is not built by an Objective-C method. Its
+//   builder sits in a gap of the T1Twitter IMP table (between 0x2f7df8 and
+//   0x314818), so there is nothing to hook there. The only Objective-C point
+//   on that path is `+[UIMenu menuWithTitle:children:]`, the two-argument
+//   factory. The "..." overflow menu uses the five-argument one instead.
 //
-// · L'entrée native « Download Video » est gardée dans T1Twitter par un
-//   `cbz` sur `[[média entityURL] networkURL]` (0x30d530). URL nulle ⇒ tout
-//   le bloc de téléchargement est sauté : ni « Download Video », ni
-//   « Download ». C'est la cause de l'intermittence — ni le Premium, ni
-//   `allowDownload` (les deux mesurés hors circuit).
+//   - The native "Download Video" entry is gated in T1Twitter by a `cbz` on
+//   `[[media entityURL] networkURL]` (0x30d530). A nil URL skips the whole
+//   download block: neither "Download Video" nor the generic "Download".
+//   That gate, not Premium and not `allowDownload`, is why the native entry
+//   appears on some videos only.
 //
-// · 0,4 s AVANT l'assemblage du menu, Twitter construit un
-//   `UIActivityViewController` dont l'unique activityItem est un
-//   `T1ActivityItemProvider`, qui expose `-status`. C'est de là que vient le
-//   contexte : sans lui, l'entrée téléchargerait la vidéo d'un AUTRE tweet.
+//   - About 0.4 s before the menu is assembled, Twitter builds a
+//   `UIActivityViewController` whose single activity item is a
+//   `T1ActivityItemProvider`, which exposes `-status`. That object supplies
+//   the tweet: without it, the entry would download another tweet's media.
 //
-// Aucune supposition sur du texte anglais dans la DÉCISION : l'ajout dépend
-// du statut fraîchement capturé et de son média vidéo/GIF (mediaType 2 ou 3,
-// exactement le test d'origine). Les titres ne servent qu'à éviter un doublon
-// quand l'entrée native est déjà là.
+// The decision to add the entry never depends on English menu titles. It
+// depends on the freshly captured status and its video or GIF media
+// (mediaType 2 or 3). Titles are compared only to avoid a duplicate when the
+// native entry is already present.
 
-// T1ActivityItemProvider n'est PAS déclaré dans src/Headers : une coquille de
-// déclaration sert de cast. Jamais instanciée, jamais messagée comme classe —
-// donc aucun symbole de classe n'est référencé, aucune erreur de lien.
+// T1ActivityItemProvider is not declared in src/Headers, so a declaration
+// shim is used purely as a cast target. It is never instantiated and never
+// messaged as a class, so no class symbol is referenced and linking is safe.
 @interface NFBVMDProviderShim : NSObject
 - (id)status;
 @end
 
-// Fenêtre de fraîcheur entre la feuille de partage et le menu. Mesuré : 0,4 s.
-// Au-delà, on n'ajoute rien — mieux vaut pas d'entrée qu'une mauvaise vidéo.
+// Freshness window between the share sheet and the menu. Measured at 0.4 s.
+// Past this delay nothing is added: no entry is better than the wrong media.
 static const NSTimeInterval kNFBVMDFreshness = 3.0;
 
-static id                    gNFBVMDStatus;        // le tweet sous le doigt
+static id                    gNFBVMDStatus;        // tweet under the long press
 static NSTimeInterval        gNFBVMDStatusTime;
-static DownloadInlineButton* gNFBVMDDownloader;    // le téléchargeur, réutilisé
+static DownloadInlineButton* gNFBVMDDownloader;    // reused downloader instance
 
 %hook UIActivityViewController
 
@@ -366,7 +366,7 @@ static DownloadInlineButton* gNFBVMDDownloader;    // le téléchargeur, réutil
 
 %end
 
-// Reprend TEL QUEL le test d'origine : mediaType 2 = GIF, 3 = vidéo.
+// Same media test as the rest of this file: mediaType 2 is a GIF, 3 a video.
 static NSArray* NFBVMDFreshVideoEntities(void) {
     if (!gNFBVMDStatus) {
         return nil;
@@ -388,11 +388,11 @@ static NSArray* NFBVMDFreshVideoEntities(void) {
     return nil;
 }
 
-// Le libellé : celui de Twitter lui-même, donc rigoureusement identique à
-// l'entrée native et traduit dans toutes les langues sans ajouter une seule
-// chaîne. Même mécanisme que la ligne 152 de ce fichier, qui va déjà chercher
-// DOWNLOAD_ACTIVITY_VIEW_LABEL. `localizedStringForKey:value:key` rend la CLÉ
-// quand elle manque : d'où le repli explicite.
+// The title comes from Twitter's own bundle, so it matches the native entry
+// exactly and is translated in every language without adding a string. This
+// mirrors the DOWNLOAD_ACTIVITY_VIEW_LABEL lookup used earlier in this file.
+// localizedStringForKey:value:key returns the key itself when it is missing,
+// hence the explicit fallback.
 static NSString* NFBVMDMenuTitle(void) {
     NSString* key = @"DOWNLOAD_VIDEO_ACTIVITY_VIEW_LABEL";
     NSString* title = [[BHTBundle sharedBundle] localizedTwitterStringForKey:key];
@@ -402,9 +402,9 @@ static NSString* NFBVMDMenuTitle(void) {
     return title;
 }
 
-// Une entrée de téléchargement est-elle déjà là ? Sert UNIQUEMENT à ne pas
-// doubler l'entrée native quand elle apparaît (vidéo avec networkURL) — et,
-// au passage, à ne pas ajouter la nôtre deux fois si le menu est reconstruit.
+// Detects a download entry that is already present. This avoids duplicating
+// the native entry when it appears, and avoids adding the custom one twice if
+// the menu is rebuilt.
 static BOOL NFBVMDAlreadyHasDownload(NSArray* children) {
     NSString* ours = NFBVMDMenuTitle();
     NSString* generic = [[BHTBundle sharedBundle]
@@ -438,8 +438,8 @@ static UIImage* NFBVMDGlyph(void) {
     return glyph;
 }
 
-// Rend le tableau d'enfants à poser : inchangé, ou avec notre entrée insérée
-// AVANT le dernier item (« Share via… »).
+// Returns the children array to install: unchanged, or with the download
+// entry inserted before the last item ("Share via...").
 static NSArray* NFBVMDAugmentedChildren(NSArray* children) {
     if (children.count == 0) {
         return children;
@@ -472,7 +472,7 @@ static NSArray* NFBVMDAugmentedChildren(NSArray* children) {
 
     NSMutableArray* augmented = [children mutableCopy];
     [augmented insertObject:action atIndex:augmented.count - 1];
-    NFBDebugLog(@"[dlvideo] entrée ajoutée au menu vidéo (%lu → %lu items)",
+    NFBDebugLog(@"[dlvideo] entry added to media menu (%lu -> %lu items)",
                 (unsigned long)children.count, (unsigned long)augmented.count);
     return augmented;
 }
@@ -492,5 +492,5 @@ static NSArray* NFBVMDAugmentedChildren(NSArray* children) {
 %end
 
 %ctor {
-    NFBDebugLog(@"[dlvideo] téléchargement vidéo dans le menu d'appui long — armé");
+    NFBDebugLog(@"[dlvideo] media menu download entry armed");
 }

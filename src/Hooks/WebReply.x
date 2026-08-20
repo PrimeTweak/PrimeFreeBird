@@ -118,7 +118,8 @@ static NSString* const ReplyTapDismissScript =
 // Injected on the reply page. The web view is FULL HEIGHT and never resized, with NO manual
 // insets — WKWebView's own keyboard inset and focused-field reveal do the heavy lifting. Native
 // code only forwards keyboard events: window.__nfbKb(up, keyboardOverlap). THE SIMPLE CONTRACT
-// (François's spec): the reply box stays IN FLOW with the tweet — never docked, never restyled.
+// Spec: the reply box stays IN FLOW with the tweet, never docked, never
+// restyled.
 // Keyboard UP → clear any Show-more pin, then vfix(): a WIDTH-SAFE vertical collapse of the field
 // (min-height:0 + height:auto everywhere; flex-grow:0 ONLY on column-direction parents so a row's
 // width flex is never touched (killing a row's flex blanks the field); plus a

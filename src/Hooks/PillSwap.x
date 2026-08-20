@@ -1,6 +1,6 @@
 // PillSwap.x — the "All" pill, rebuilt as a button nobody destroys.
 //
-// His call, his spec: « Fais un bouton identique au natif. » The measured
+// Spec: a button identical to the native one. The measured
 // story (project journal, 16-17/08): under forced Liquid Glass the SwiftUI
 // bridge destroys and recreates the DMInbox trailing item on every pass —
 // that rebuild IS the flash. The avatar, in the same bar under the same
@@ -9,16 +9,18 @@
 // it shows up: same typography (copied live from the real label), same
 // chevron (copied), same paddings (measured: content + 10 pt sides inside
 // a 40 pt row), same glass (UIKit's own default treatment — nothing about
-// backgrounds is touched, per « identique au natif »), and the SAME native
+// backgrounds is touched), and the SAME native
 // UIMenu (Twitter's object, reused — tap opens the real All/Requests menu,
 // their handlers run). When SwiftUI stomps the items back on a later pass,
-// the stomp itself is our signal: the original's view fires our hook, we
+// the stomp itself is the signal: the original's view fires the hook, and the
+// item is
 // swap again (~1 ms, measured cadence of the finder) and refresh the label
-// from the menu's checked state — Twitter's own re-render keeps us in sync.
+// read from the menu's checked state, so Twitter's own re-render keeps it in
+// sync.
 //
 // Two unknowns, journaled loudly rather than assumed:
-//   · does the bridge item carry its UIMenu? If not: « menu original
-//     ABSENT — abandon », native stays, nothing broken.
+//   · does the bridge item carry its UIMenu? If not, the swap is abandoned,
+//     the native item stays and nothing is broken.
 //   · does the label follow a filter change? The stomp should carry it;
 //     a 2 s belt after each menu opening re-reads the checked state.
 // Every action has its line; removal is `git rm` of this one file.
@@ -26,12 +28,12 @@
 #import "HookHelpers.h"
 #import "Debug/NFBDebugger.h"
 
-// A named subclass so captures and the watch can identify our button — and so
+// A named subclass so captures and the watch can identify the button, and so
 // it can answer the ONE question the bar's wrapper actually asks. Measured the
 // hard way: _TtCC5UIKit19NavigationButtonBar15ItemWrapperView sizes its child
 // from intrinsicContentSize, then CLAMPS it to the standard bar-button box —
-// his 13:27 capture caught ours at {{376, 67}, {44, 34}} while the native pill
-// is 57.33 × 40. So we stop fighting the box: the capsule is drawn LARGER than
+// a capture caught it at {{376, 67}, {44, 34}} while the native pill is
+// 57.33 x 40. So the box is not fought: the capsule is drawn LARGER than
 // the button, anchored to its right edge, and the touch area follows it.
 @interface NFBInboxPillButton : UIButton
 @property (nonatomic, assign) CGSize nfbIntrinsic;
@@ -48,12 +50,13 @@
     return [super intrinsicContentSize];
 }
 
-// v6 — his 15:04 ruler: « capsule à l'écran 318.7 → 376.0 » while the button
+// v6, measured on screen: the capsule spanned 318.7 to 376.0 while the button
 // was logged at frame={{376, 67}, {0, 0}}. The placement had been computed
-// ONCE, at a moment the wrapper had not sized us yet (bounds 0 × 0), and was
-// never redone when it handed over the real 44 × 34 box. So the geometry now
-// lives HERE: every time the wrapper resizes us, we lay ourselves out again
-// from the bounds we actually have. Right edge of the capsule = right edge of
+// ONCE, at a moment the wrapper had not sized the view yet (bounds 0 x 0), and
+// was never redone when it handed over the real 44 x 34 box. So the geometry
+// now lives HERE: every time the wrapper resizes the view, it lays itself out
+// again from the bounds it actually has. Right edge of the capsule = right edge
+// of
 // the box (measured at 420.0 = the native right edge), so 420 − 57.33 = 362.67
 // = the native left edge, whatever the box turns out to be.
 - (void)layoutSubviews {
@@ -176,7 +179,7 @@ static void nfbSwapLayoutButton(void) {
     CGFloat width = contentW + 20.0;
     CGFloat height = 40.0;
     // Content sizes only. WHERE it all goes is decided in -layoutSubviews,
-    // which runs again every time the wrapper changes our box.
+    // which runs again every time the wrapper changes the box.
     button.nfbPillWidth = width;
     button.nfbSpacing = spacing;
     button.nfbIntrinsic = CGSizeMake(width, height);
@@ -187,7 +190,7 @@ static void nfbSwapLayoutButton(void) {
     [button layoutIfNeeded];
 
     // THE RULER — measures the VISIBLE capsule now, not the wrapper's box.
-    // Reference from his 21:31 capture: the native pill spans 362.7 → 420.0.
+    // Reference measured on screen: the native pill spans 362.7 to 420.0.
     if (!gNFBSwapMeasured && NFBDebugIsRecording()) {
         gNFBSwapMeasured = YES;
         __weak NFBInboxPillButton* weakButton = button;
@@ -200,8 +203,8 @@ static void nfbSwapLayoutButton(void) {
             }
             UIView* liveCapsule = [live viewWithTag:3];
             CGRect onScreen = [live convertRect:liveCapsule.frame toView:nil];
-            NFBDebugLog(@"remplacement: RÈGLE — capsule à l'écran %.1f → %.1f pt "
-                        @"(natif 362.7 → 420.0, boîte imposée %.0f×%.0f)",
+            NFBDebugLog(@"swap: RULER - capsule on screen %.1f to %.1f pt "
+                        @"(native 362.7 to 420.0, imposed box %.0fx%.0f)",
                         onScreen.origin.x,
                         onScreen.origin.x + onScreen.size.width,
                         live.bounds.size.width, live.bounds.size.height);
@@ -231,7 +234,7 @@ static void nfbSwapRefreshLabelFromMenu(void) {
 
 // v2 — measured on the 06:41 video: the residual flash was OUR OWN swap.
 // On every return SwiftUI re-sets its item; it lands EMPTY for ~150 ms (the
-// rebuilt content arrives late — the original disease), then our swap-back
+// rebuilt content arrives late, the original disease), then the swap-back
 // re-hosts the platter once more. So after the bootstrap, the stomp is
 // intercepted at the SETTER, before anything reaches the bar: the incoming
 // foreign item is captured (fresh menu, fresh checked state) and OUR item
@@ -253,7 +256,7 @@ static NSArray<UIBarButtonItem*>* nfbSwapInterceptItems(UINavigationItem* nav,
     }
     gNFBSwapOriginal = incoming;
     gNFBSwapCount++;
-    NFBDebugLog(@"remplacement: intercepté au setter #%ld", (long)gNFBSwapCount);
+    NFBDebugLog(@"swap: intercepted at setter #%ld", (long)gNFBSwapCount);
     nfbSwapRefreshLabelFromMenu();
     return @[gNFBSwapItem];
 }
@@ -402,7 +405,7 @@ static void nfbSwapApply(UIView* pillView) {
                             ? NSStringFromClass([original.primaryAction class])
                             : @"nil");
         }
-        return;  // natif conservé, la sonde a parlé
+        return;  // native kept, the probe has spoken
     }
     gNFBSwapMenu = menu;  // strong: it must outlive the mortal native button
 
@@ -426,7 +429,7 @@ static void nfbSwapApply(UIView* pillView) {
         // Our OWN capsule, native-shaped (the bar's default treatment for a
         // plain UIKit item is a CIRCLE — measured ~63 pt on the 07:34 video,
         // nothing like the wide native pill). Glass via the runtime so the
-        // iOS 16 SDK never hears about UIGlassEffect; his validated recipe:
+        // The iOS 16 SDK never hears about UIGlassEffect; the working recipe:
         // effect behind the content, radius = height / 2.
         UIView* capsule = nil;
         Class glassClass = NSClassFromString(@"UIGlassEffect");
@@ -441,15 +444,15 @@ static void nfbSwapApply(UIView* pillView) {
         capsule.layer.masksToBounds = YES;
         capsule.tag = 3;
         [button insertSubview:capsule atIndex:0];
-        NFBDebugLog(@"remplacement: capsule maison posée (%@)",
-                    glassClass ? @"UIGlassEffect" : @"repli matériau");
+        NFBDebugLog(@"swap: custom capsule placed (%@)",
+                    glassClass ? @"UIGlassEffect" : @"material fallback");
         gNFBSwapItem = [[UIBarButtonItem alloc] initWithCustomView:button];
         // On OUR plain UIKit item the official per-item switch is exactly in
         // its intended case — it kills the circular default treatment.
         if ([gNFBSwapItem respondsToSelector:
                 NSSelectorFromString(@"setHidesSharedBackground:")]) {
             [gNFBSwapItem setValue:@YES forKey:@"hidesSharedBackground"];
-            NFBDebugLog(@"remplacement: verre UIKit retiré sur notre item");
+            NFBDebugLog(@"swap: UIKit glass removed on the replacement item");
         }
         NFBMark(button, @"PillSwap/bouton maison — identique au natif");
     } else {
@@ -514,8 +517,8 @@ static void nfbSwapApply(UIView* pillView) {
                                 withObject:gNFBSwapItem];
         nav.rightBarButtonItems = swappedRight;
     }
-    NFBDebugLog(@"remplacement: item posé #%ld — « %@ », menu %lu action(s) via %@, "
-                @"conteneur %@, écran %@",
+    NFBDebugLog(@"swap: item placed #%ld - \"%@\", menu %lu action(s) via %@, "
+                @"container %@, screen %@",
                 (long)gNFBSwapCount, liveTitle,
                 (unsigned long)menu.children.count, menuSource,
                 group ? @"groupe" : @"right",
@@ -541,7 +544,7 @@ static void nfbSwapApply(UIView* pillView) {
                     group.barButtonItems.firstObject != gNFBSwapItem) {
                     gNFBSwapOriginal = group.barButtonItems.firstObject;
                     gNFBSwapCount++;
-                    NFBDebugLog(@"remplacement: intercepté au setter (groupe) #%ld",
+                    NFBDebugLog(@"swap: intercepted at setter (group) #%ld",
                                 (long)gNFBSwapCount);
                     group.barButtonItems = @[gNFBSwapItem];
                     nfbSwapRefreshLabelFromMenu();
