@@ -434,7 +434,7 @@ static UIViewController* findViewControllerOfClass(UIViewController* vc,
     [restore setTitle:title forState:UIControlStateNormal];
     // Same quiet style as the theme picker's "Reset to default" pill.
     restore.titleLabel.font = [TwitterChirpFont(TwitterFontStyleRegular) fontWithSize:15];
-    // Texte gris pâle, comme le « Reset to default » du thème de couleur.
+    // Pale grey text, matching the colour theme's "Reset to default" row.
     [restore setTitleColor:[UIColor secondaryLabelColor] forState:UIControlStateNormal];
     restore.backgroundColor = [UIColor systemBackgroundColor];
     restore.layer.cornerRadius = 20;
