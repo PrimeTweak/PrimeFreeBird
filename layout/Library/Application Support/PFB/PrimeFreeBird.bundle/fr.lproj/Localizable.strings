@@ -22,8 +22,6 @@
 "MODERN_SETTINGS_TIMELINES_TITLE" = "Fils";
 "MODERN_SETTINGS_TIMELINES_SUBTITLE" = "Supprimez les pubs, les suggestions de comptes et les autres éléments superflus du fil.";
 
-"MODERN_SETTINGS_GROK_TITLE" = "Grok";
-"MODERN_SETTINGS_GROK_SUBTITLE" = "Masquez les boutons Grok et contrôlez les traductions automatiques.";
 
 "MODERN_SETTINGS_PROFILES_TITLE" = "Profil";
 "MODERN_SETTINGS_PROFILES_SUBTITLE" = "Modifiez ce que vous voyez dans les profils.";
@@ -557,7 +555,6 @@
 "HIDDEN_NOTIFS_EXPIRES_IN" = "expire dans %ld j";
 "HIDDEN_NOTIFS_EMPTY_TITLE" = "Rien à voir ici";
 "HIDDEN_NOTIFS_EMPTY_BODY" = "Toutes les notifications sont masquées. Touche l’œil au-dessus pour les voir ou en réafficher une.";
-"HIDDEN_NOTIFS_EXPIRES_ON" = "expire dans %ld j · %@";
 "HIDDEN_NOTIFS_EXAMPLE" = "Balaye une notification vers la gauche pour la masquer";
 "HIDDEN_NOTIFS_UNHIDE" = "Afficher";
 "HIDDEN_NOTIFS_UNTITLED" = "Notification masquée";
