@@ -261,8 +261,6 @@
 "DOWNLOAD_VOICE_MESSAGES_DETAIL" = "Long-press a voice message to save the audio file.";
 
 /* ===== GROK ===== */
-"MODERN_SETTINGS_GROK_TITLE" = "Grok";
-"MODERN_SETTINGS_GROK_SUBTITLE" = "Remove Grok entry points and automatic translation.";
 "HIDE_GROK_ANALYZE_TITLE" = "Hide analyze button";
 "HIDE_GROK_ANALYZE_DETAIL" = "Remove the 'Analyze with Grok' button from Tweets.";
 "HIDE_GROK_SIDEBAR_TITLE" = "Hide sidebar shortcut";
@@ -541,7 +539,6 @@
 "HIDDEN_NOTIFS_EXPIRES_IN" = "expires in %ldd";
 "HIDDEN_NOTIFS_EMPTY_TITLE" = "Nothing to see here";
 "HIDDEN_NOTIFS_EMPTY_BODY" = "Every notification here is hidden. Tap the eye above to see them or bring one back.";
-"HIDDEN_NOTIFS_EXPIRES_ON" = "expires in %ldd · %@";
 "HIDDEN_NOTIFS_EXAMPLE" = "Tap × on a notification to hide it";
 "HIDDEN_NOTIFS_UNHIDE" = "Unhide";
 "HIDDEN_NOTIFS_UNTITLED" = "Hidden notification";
