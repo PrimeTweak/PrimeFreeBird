@@ -351,6 +351,20 @@ extern NSInteger NFBColorThemeScreenVisible;
             }
         }
 
+        // Reset turns the three accent toggles off and raises a flag that keeps
+        // the accent inactive, so that a reset reverts to native rather than to
+        // the fresh-install accent. Switching one of them back ON is the same
+        // statement of intent as picking a colour, so the flag is cleared here;
+        // without this the toggle would be stored, the views refreshed, and
+        // nothing painted, with no way back short of picking a colour.
+        if (sender.isOn &&
+            ([key isEqualToString:@"tab_bar_theming"] ||
+             [key isEqualToString:@"color_nfb_switches"] ||
+             [key isEqualToString:@"color_twitter_icon_in_top_bar"])) {
+            [[NSUserDefaults standardUserDefaults]
+                removeObjectForKey:@"nfb_color_reset_done"];
+        }
+
         // These toggles change which surfaces follow the accent, so push the
         // accent through again instead of waiting for those views to rebuild.
         if ([key isEqualToString:@"color_twitter_icon_in_top_bar"] ||
