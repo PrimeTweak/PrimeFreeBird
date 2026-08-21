@@ -402,7 +402,7 @@ static NSString* NFBViewCover(UIView* view) {
         depth++;
     }
     if (clipper) {
-        return [NSString stringWithFormat:@"HORS CADRE de %@", clipper];
+        return [NSString stringWithFormat:@"OUT OF FRAME of %@", clipper];
     }
     if (alpha < 0.99) {
         return [NSString stringWithFormat:@"alpha effectif %.2f", alpha];
