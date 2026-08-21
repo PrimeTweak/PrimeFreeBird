@@ -143,6 +143,17 @@ static void nfbRestoreTimestamp(UIView* controls) {
 // mid-playback, each by a different route, and a stretch that ends is a hole.
 static BOOL gNFBSoundAllowed = NO;
 
+// Whether a video opens silent. The reader chooses; the stored default keeps
+// the previous behaviour.
+static BOOL nfbOpensMuted(void) {
+    return [BHTSettings boolForKey:@"video_starts_muted"];
+}
+
+// The state the flag takes when a video is opened from the timeline.
+static BOOL nfbSoundAllowedAtOpen(void) {
+    return !nfbOpensMuted();
+}
+
 static void nfbClearAutoUnmute(UIView* view) {
     Ivar flagIvar =
         class_getInstanceVariable(object_getClass(view), "isAutoUnmuteEnabled");
@@ -162,9 +173,9 @@ static void nfbClearAutoUnmute(UIView* view) {
 
 - (void)handleTapWithTapRecognizer:(UITapGestureRecognizer*)recognizer {
     nfbClearAutoUnmute((UIView*)self);
-    // A video opened from the timeline starts silent, whatever the last one was
-    // left as.
-    gNFBSoundAllowed = NO;
+    // A video opened from the timeline starts in the chosen state, whatever the
+    // last one was left as.
+    gNFBSoundAllowed = nfbSoundAllowedAtOpen();
     %orig;
 }
 
@@ -178,15 +189,20 @@ static void nfbClearAutoUnmute(UIView* view) {
 // takes one back.
 %hook TAVPlayer
 
+// Every guard below is gated on the clean player. With it off, Twitter's own
+// controls are on screen and its own sound button must work: holding the mute
+// there would silence the video with nothing left to lift it.
 - (void)setIsMuted:(BOOL)muted {
-    if (!muted && !gNFBSoundAllowed) {
+    if (!muted && !gNFBSoundAllowed &&
+        [BHTSettings boolForKey:@"tap_to_pause"] && nfbOpensMuted()) {
         return;
     }
     %orig;
 }
 
 - (void)setVolume:(float)volume {
-    if (volume > 0 && !gNFBSoundAllowed) {
+    if (volume > 0 && !gNFBSoundAllowed &&
+        [BHTSettings boolForKey:@"tap_to_pause"] && nfbOpensMuted()) {
         %orig(0);
         return;
     }
@@ -194,7 +210,8 @@ static void nfbClearAutoUnmute(UIView* view) {
 }
 
 - (void)play {
-    if (!gNFBSoundAllowed) {
+    if (!gNFBSoundAllowed && [BHTSettings boolForKey:@"tap_to_pause"] &&
+        nfbOpensMuted()) {
         self.isMuted = YES;
         self.volume = 0;
     }
@@ -202,7 +219,8 @@ static void nfbClearAutoUnmute(UIView* view) {
 }
 
 - (void)playOrReplay {
-    if (!gNFBSoundAllowed) {
+    if (!gNFBSoundAllowed && [BHTSettings boolForKey:@"tap_to_pause"] &&
+        nfbOpensMuted()) {
         self.isMuted = YES;
         self.volume = 0;
     }
@@ -988,7 +1006,8 @@ static void nfbStartFoldWatch(UIView* card) {
     UIView* card = (UIView*)self;
     nfbShowPausedGlyph(card, NO);
     if (card.window) {
-        if (!gNFBSoundAllowed) {
+        if (!gNFBSoundAllowed && [BHTSettings boolForKey:@"tap_to_pause"] &&
+            nfbOpensMuted()) {
             nfbApplyMuted(nfbCardPlayer(card), nfbImmersiveAudioManager(card), YES);
         }
         gNFBActiveCard = card;
