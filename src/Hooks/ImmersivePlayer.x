@@ -53,6 +53,8 @@ static const NSTimeInterval kNFBUserTapGrace = 0.6;
 // no alpha and takes no decision. Milliseconds are counted from the moment the
 // card registers, so every line below is comparable on one timeline.
 static UIView* nfbImmersiveControlsView(UIView* card);
+static NSString* nfbChromeCensus(void);
+static void nfbNameChromeOnScreen(const char* whenLabel, double ms);
 
 static NSTimeInterval gNFBFlashOrigin = 0;
 
@@ -210,7 +212,17 @@ static void nfbClearAutoUnmute(UIView* view) {
     // last one was left as.
     gNFBSoundAllowed = nfbSoundAllowedAtOpen();
     gNFBFlashOrigin = [NSDate timeIntervalSinceReferenceDate];
-    NFBDebugLog(@"[flash] 0 ms | TAP in the timeline");
+    NFBDebugLog(@"[flash] 0 ms | TAP | %@", nfbChromeCensus());
+    // Sample the window across the window our hooks cannot see: the bar only
+    // announces itself at ~120 ms, and the chrome is on screen well before.
+    for (NSInteger ms = 30; ms <= 150; ms += 30) {
+        NSInteger at = ms;
+        dispatch_after(
+            dispatch_time(DISPATCH_TIME_NOW, (int64_t)(at * NSEC_PER_MSEC)),
+            dispatch_get_main_queue(), ^{
+              nfbNameChromeOnScreen("sample", nfbFlashMs());
+            });
+    }
     %orig;
 }
 
@@ -307,14 +319,14 @@ static BOOL isImmersiveCardPan(id viewController,
 
 - (void)viewWillAppear:(BOOL)animated {
     %orig;
-    NFBDebugLog(@"[flash] %.0f ms | immersive controller viewWillAppear",
-                nfbFlashMs());
+    NFBDebugLog(@"[flash] %.0f ms | controller viewWillAppear | %@",
+                nfbFlashMs(), nfbChromeCensus());
 }
 
 - (void)viewDidAppear:(BOOL)animated {
     %orig;
-    NFBDebugLog(@"[flash] %.0f ms | immersive controller viewDidAppear",
-                nfbFlashMs());
+    NFBDebugLog(@"[flash] %.0f ms | controller viewDidAppear | %@",
+                nfbFlashMs(), nfbChromeCensus());
 }
 
 - (BOOL)gestureRecognizerShouldBegin:(UIGestureRecognizer*)gesture {
@@ -520,38 +532,103 @@ static UIView* nfbImmersiveControlsView(UIView* card) {
     return controls;
 }
 
-// TEMPORARY probe: how many bars are in the window, and what the first one
-// looks like. Read only.
-static NSString* nfbControlsCensus(UIView* card) {
-    Class controlsClass =
-        NSClassFromString(@"_TtC14T1TwitterSwift17VideoControlsView");
-    UIView* root = card.window;
-    if (!controlsClass || !root) {
-        return @"no window";
+// TEMPORARY probe. Read only: it walks the mounted hierarchy and reports what
+// the immersive chrome looks like at a given instant. Both the bar and the
+// container it lives in are counted, because either can be what shows.
+// TEMPORARY probe. Names every chrome-looking view on screen at a given
+// instant, with its opacity. Read only: nothing is moved, hidden or decided.
+static void nfbNameChromeOnScreen(const char* whenLabel, double ms) {
+    UIWindow* root = nil;
+    for (UIScene* scene in [UIApplication sharedApplication].connectedScenes) {
+        if (![scene isKindOfClass:[UIWindowScene class]]) {
+            continue;
+        }
+        for (UIWindow* candidate in ((UIWindowScene*)scene).windows) {
+            if (candidate.isKeyWindow) {
+                root = candidate;
+                break;
+            }
+        }
+        if (root) {
+            break;
+        }
     }
-    __block NSInteger count = 0;
-    __block UIView* first = nil;
+    if (!root) {
+        return;
+    }
+    NSMutableArray* found = [NSMutableArray array];
     EnumerateSubviewsRecursively(root, ^(UIView* view) {
-        if ([view isKindOfClass:controlsClass]) {
-            count++;
-            if (!first) {
-                first = view;
+        if (view.hidden || view.alpha < 0.02 || found.count >= 8) {
+            return;
+        }
+        NSString* name = NSStringFromClass([view class]);
+        BOOL interesting = [name containsString:@"Controls"] ||
+                           [name containsString:@"InlineActions"] ||
+                           [name containsString:@"BottomBar"] ||
+                           [name containsString:@"Immersive"];
+        if (!interesting) {
+            return;
+        }
+        CGRect inWindow = [view convertRect:view.bounds toView:root];
+        [found addObject:[NSString stringWithFormat:@"%@ a=%.2f y=%.0f h=%.0f",
+                                                    name, view.alpha,
+                                                    inWindow.origin.y,
+                                                    inWindow.size.height]];
+    });
+    NFBDebugLog(@"[flash] %.0f ms | %s | %@", ms, whenLabel,
+                found.count ? [found componentsJoinedByString:@"  //  "]
+                            : @"(nothing on screen)");
+}
+
+static NSString* nfbChromeCensus(void) {
+    UIWindow* root = nil;
+    for (UIScene* scene in [UIApplication sharedApplication].connectedScenes) {
+        if (![scene isKindOfClass:[UIWindowScene class]]) {
+            continue;
+        }
+        for (UIWindow* candidate in ((UIWindowScene*)scene).windows) {
+            if (candidate.isKeyWindow) {
+                root = candidate;
+                break;
+            }
+        }
+        if (root) {
+            break;
+        }
+    }
+    if (!root) {
+        return @"no key window";
+    }
+    Class barClass =
+        NSClassFromString(@"_TtC14T1TwitterSwift17VideoControlsView");
+    Class boxClass = NSClassFromString(@"_TtC14T1TwitterSwift17BottomBarControls");
+    __block NSInteger bars = 0;
+    __block NSInteger boxes = 0;
+    __block CGFloat barAlpha = -1.0;
+    __block CGFloat boxAlpha = -1.0;
+    __block BOOL barHidden = NO;
+    __block BOOL boxHidden = NO;
+    EnumerateSubviewsRecursively(root, ^(UIView* view) {
+        if (barClass && [view isKindOfClass:barClass]) {
+            bars++;
+            if (barAlpha < 0) {
+                barAlpha = view.alpha;
+                barHidden = view.hidden;
+            }
+        }
+        if (boxClass && [view isKindOfClass:boxClass]) {
+            boxes++;
+            if (boxAlpha < 0) {
+                boxAlpha = view.alpha;
+                boxHidden = view.hidden;
             }
         }
     });
-    if (!first) {
-        return @"0 bar";
-    }
-    NSMutableArray* chain = [NSMutableArray array];
-    UIView* up = first.superview;
-    while (up && chain.count < 3) {
-        [chain addObject:NSStringFromClass([up class])];
-        up = up.superview;
-    }
-    return [NSString stringWithFormat:@"%ld bar(s) | first alpha=%.2f hidden=%@ "
-                                      @"under %@",
-                     (long)count, first.alpha, first.hidden ? @"YES" : @"no",
-                     [chain componentsJoinedByString:@" < "]];
+    return [NSString stringWithFormat:
+                @"bar x%ld (alpha=%.2f hidden=%@) | box x%ld (alpha=%.2f "
+                @"hidden=%@)",
+                (long)bars, barAlpha, barHidden ? @"YES" : @"no", (long)boxes,
+                boxAlpha, boxHidden ? @"YES" : @"no"];
 }
 
 // Built once per card and kept as an associated object. Touches pass through
@@ -1141,7 +1218,7 @@ static void nfbStartFoldWatch(UIView* card) {
         }
         gNFBActiveCard = card;
         NFBDebugLog(@"[flash] %.0f ms | card registered | %@", nfbFlashMs(),
-                    nfbControlsCensus(card));
+                    nfbChromeCensus());
         objc_setAssociatedObject(
             card, kNFBCardShownAtKey,
             @([NSDate timeIntervalSinceReferenceDate]),
