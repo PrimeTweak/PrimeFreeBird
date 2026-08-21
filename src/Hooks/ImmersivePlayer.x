@@ -215,14 +215,14 @@ static void nfbClearAutoUnmute(UIView* view) {
     NFBDebugLog(@"[flash] 0 ms | TAP | %@", nfbChromeCensus());
     // Two snapshots and their difference. Whatever is on screen while the
     // reader sees the flash and gone once it settles comes out by name.
-    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(200 * NSEC_PER_MSEC)),
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(130 * NSEC_PER_MSEC)),
                    dispatch_get_main_queue(), ^{
                      NSMutableSet* early = nfbVisibleSnapshot();
                      NFBDebugLog(@"[flash] %.0f ms | snapshot A: %lu views",
                                  nfbFlashMs(), (unsigned long)early.count);
                      dispatch_after(
                          dispatch_time(DISPATCH_TIME_NOW,
-                                       (int64_t)(600 * NSEC_PER_MSEC)),
+                                       (int64_t)(370 * NSEC_PER_MSEC)),
                          dispatch_get_main_queue(), ^{
                            NSMutableSet* late = nfbVisibleSnapshot();
                            NSMutableSet* gone = [early mutableCopy];
@@ -586,8 +586,23 @@ static NSMutableSet* nfbVisibleSnapshot(void) {
             return;
         }
         CGRect inWindow = [view convertRect:view.bounds toView:root];
-        [seen addObject:[NSString stringWithFormat:@"%@ @%.0f",
-                                                   NSStringFromClass([view class]),
+        // On screen only: the table keeps laid-out cells far below the window,
+        // and they churn between snapshots for reasons of their own.
+        if (inWindow.origin.y < -80 ||
+            inWindow.origin.y > root.bounds.size.height) {
+            return;
+        }
+        NSString* name = NSStringFromClass([view class]);
+        // Timeline furniture: present early, gone once full screen, and never
+        // the thing being looked for.
+        if ([name hasPrefix:@"TTAStatus"] || [name hasPrefix:@"T1Status"] ||
+            [name hasPrefix:@"TFNViewHost"] || [name hasPrefix:@"SwiftUI"] ||
+            [name hasPrefix:@"_UICollectionView"] ||
+            [name hasPrefix:@"TFNUISwift.Shimmer"] ||
+            [name hasPrefix:@"TFNUISwift.Placeholder"]) {
+            return;
+        }
+        [seen addObject:[NSString stringWithFormat:@"%@ @%.0f", name,
                                                    inWindow.origin.y]];
     });
     return seen;
