@@ -82,6 +82,34 @@ void MarkEmptiedModuleChrome(NSArray* items, NSMutableIndexSet* removed) {
     }
 }
 
+// Twitter's brand blue. Not iOS systemBlue, which is darker and belongs to
+// UIKit's own controls.
+UIColor* NFBTwitterBlueColor(void) {
+    return [UIColor colorWithRed:0x1D / 255.0
+                           green:0xA1 / 255.0
+                            blue:0xF2 / 255.0
+                           alpha:1.0];
+}
+
+// The colour for surfaces that carry Twitter's branding: the tab bar accent and
+// the navigation logo. When the user has actually picked an accent it wins;
+// with nothing picked the brand blue is used, never CurrentAccentColor's
+// systemBlue fallback, which would leak iOS blue onto a Twitter surface.
+//
+// Deliberately separate from CurrentAccentColor: that one feeds the window
+// tint, and UIKit's own controls, alert buttons among them, inherit it. Their
+// blue must stay iOS blue.
+UIColor* NFBBrandAccentColor(void) {
+    NSUserDefaults* defs = [NSUserDefaults standardUserDefaults];
+    BOOL picked = [defs objectForKey:@"bh_custom_accent_hex"] ||
+                  [defs objectForKey:@"bh_color_theme_selectedColor"] ||
+                  [defs integerForKey:@"T1ColorSettingsPrimaryColorOptionKey"] >= 1;
+    if (picked) {
+        return CurrentAccentColor() ?: NFBTwitterBlueColor();
+    }
+    return NFBTwitterBlueColor();
+}
+
 UIColor* CurrentAccentColor(void) {
     Class TAEColorSettingsCls = objc_getClass("TAEColorSettings");
     if (!TAEColorSettingsCls) {

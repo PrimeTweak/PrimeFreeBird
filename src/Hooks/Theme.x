@@ -200,7 +200,7 @@ static void NFBApplyLogoTint(UIImageView* logoView) {
     }
     UIColor* target = nil;
     if ([BHTSettings boolForKey:@"color_twitter_icon_in_top_bar"] && NFBAccentIsActive()) {
-        target = CurrentAccentColor();
+        target = NFBBrandAccentColor();
     }
     if (!target) {
         target = NFBRawLogoColor() ?: [UIColor labelColor];
@@ -325,7 +325,9 @@ static BOOL NFBAccentPending = NO;
 
 static void NFBApplyTabBarAccent(UITabBar* bar) {
     BOOL active = [BHTSettings boolForKey:@"tab_bar_theming"] && NFBAccentIsActive();
-    UIColor* accent = active ? CurrentAccentColor() : nil;
+    // Brand accent, not CurrentAccentColor: with nothing picked the latter falls
+    // back to iOS systemBlue, which does not belong on a Twitter surface.
+    UIColor* accent = active ? NFBBrandAccentColor() : nil;
 
     UIColor* applied = objc_getAssociatedObject(bar, &kNFBAppliedAccentKey);
     BOOL changed = !((applied == nil && accent == nil) ||
