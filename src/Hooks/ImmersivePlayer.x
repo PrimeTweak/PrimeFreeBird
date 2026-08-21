@@ -349,6 +349,14 @@ static BOOL isImmersiveCardPan(id viewController,
 // open and on each swipe to the next video, and heals any drift. A glyph marks
 // the pause at the centre of the card, where the app draws none of its own.
 
+// The synthetic tap goes through Twitter's own handler, which moves the bar AND
+// the playback state. The reconciler then measures a state its own tap just
+// changed and asks again, which is how a single opening produced dozens of taps
+// in bursts. One tap per card per cooldown breaks that loop: the first fold
+// still happens at once, and nothing can chase its own tail afterwards.
+static const NSTimeInterval kNFBFoldCooldown = 0.4;
+static const void* kNFBLastFoldKey = &kNFBLastFoldKey;
+
 static const void* kNFBPausedGlyphKey = &kNFBPausedGlyphKey;
 static const void* kNFBReconcilePendingKey = &kNFBReconcilePendingKey;
 static const void* kNFBMinimalBarKey = &kNFBMinimalBarKey;
@@ -1002,6 +1010,18 @@ static BOOL nfbFoldIfDue(UIView* card) {
     if (!recognizer) {
         return YES;
     }
+
+    NSTimeInterval lastFold =
+        [objc_getAssociatedObject(card, kNFBLastFoldKey) doubleValue];
+    NSTimeInterval nowStamp = [NSDate timeIntervalSinceReferenceDate];
+    if (lastFold > 0 && nowStamp - lastFold < kNFBFoldCooldown) {
+        NFBDebugLog(@"[flash] %.0f ms | fold HELD OFF (%.0f ms since the last "
+                    @"one, status=%ld)",
+                    nfbFlashMs(), (nowStamp - lastFold) * 1000.0, (long)status);
+        return YES;
+    }
+    objc_setAssociatedObject(card, kNFBLastFoldKey, @(nowStamp),
+                             OBJC_ASSOCIATION_RETAIN_NONATOMIC);
 
     NFBDebugLog(@"[flash] %.0f ms | fold FIRED (status=%ld)", nfbFlashMs(),
                 (long)status);
