@@ -53,6 +53,7 @@ static const NSTimeInterval kNFBUserTapGrace = 0.6;
 // no alpha and takes no decision. Milliseconds are counted from the moment the
 // card registers, so every line below is comparable on one timeline.
 static UIView* nfbImmersiveControlsView(UIView* card);
+static TAVPlayer* nfbCardPlayer(UIView* card);
 static NSString* nfbChromeCensus(void);
 static NSMutableSet* nfbVisibleSnapshot(void);
 
@@ -83,6 +84,26 @@ static BOOL nfbChromeIsOpening(void) {
     }
     NSTimeInterval since = nfbFlashMs() / 1000.0;
     return since >= 0 && since <= kNFBChromeBlackout;
+}
+
+// TEMPORARY probe. Every attempt to bring a piece of chrome back into view is
+// reported with the moment it happens and the state the player is in, so the
+// rule that should govern it can be read off the journal instead of guessed.
+static void nfbReportChromeAlpha(UIView* view, CGFloat wanted, BOOL blocked) {
+    if (wanted <= 0) {
+        return;
+    }
+    NSInteger status = -1;
+    UIView* card = gNFBActiveCard;
+    TAVPlayer* player = card ? nfbCardPlayer(card) : nil;
+    if (player) {
+        status = player.playbackState.timeControlStatus;
+    }
+    NFBDebugLog(@"[chrome] %.0f ms | %@ -> alpha %.2f | %@ | status=%ld | "
+                @"onscreen=%@",
+                nfbFlashMs(), NSStringFromClass([view class]), wanted,
+                blocked ? @"BLOCKED" : @"let through", (long)status,
+                view.window ? @"YES" : @"no");
 }
 
 static void nfbHoldThroughOpening(UIView* view) {
@@ -1320,7 +1341,9 @@ static void nfbStartFoldWatch(UIView* card) {
 // author, handle and follow control
 %hook _TtC14T1TwitterSwift25ImmersiveStatusPluginView
 - (void)setAlpha:(CGFloat)alpha {
-    if (alpha > 0 && nfbChromeIsOpening()) {
+    BOOL blocked = alpha > 0 && nfbChromeIsOpening();
+    nfbReportChromeAlpha((UIView*)self, alpha, blocked);
+    if (blocked) {
         %orig(0);
         return;
     }
@@ -1331,7 +1354,9 @@ static void nfbStartFoldWatch(UIView* card) {
 // reply, retweet, like, bookmark, share
 %hook _TtC14T1TwitterSwift36ImmersiveEngagementActionsPluginView
 - (void)setAlpha:(CGFloat)alpha {
-    if (alpha > 0 && nfbChromeIsOpening()) {
+    BOOL blocked = alpha > 0 && nfbChromeIsOpening();
+    nfbReportChromeAlpha((UIView*)self, alpha, blocked);
+    if (blocked) {
         %orig(0);
         return;
     }
@@ -1342,7 +1367,9 @@ static void nfbStartFoldWatch(UIView* card) {
 // the row holding those actions
 %hook _TtC14T1TwitterSwift25ImmersiveActionsStackView
 - (void)setAlpha:(CGFloat)alpha {
-    if (alpha > 0 && nfbChromeIsOpening()) {
+    BOOL blocked = alpha > 0 && nfbChromeIsOpening();
+    nfbReportChromeAlpha((UIView*)self, alpha, blocked);
+    if (blocked) {
         %orig(0);
         return;
     }
@@ -1353,7 +1380,9 @@ static void nfbStartFoldWatch(UIView* card) {
 // one action pill
 %hook _TtC14T1TwitterSwift19ImmersiveActionView
 - (void)setAlpha:(CGFloat)alpha {
-    if (alpha > 0 && nfbChromeIsOpening()) {
+    BOOL blocked = alpha > 0 && nfbChromeIsOpening();
+    nfbReportChromeAlpha((UIView*)self, alpha, blocked);
+    if (blocked) {
         %orig(0);
         return;
     }
@@ -1364,7 +1393,9 @@ static void nfbStartFoldWatch(UIView* card) {
 // back button, top left
 %hook _TtC14T1TwitterSwift29ImmersiveBackButtonPluginView
 - (void)setAlpha:(CGFloat)alpha {
-    if (alpha > 0 && nfbChromeIsOpening()) {
+    BOOL blocked = alpha > 0 && nfbChromeIsOpening();
+    nfbReportChromeAlpha((UIView*)self, alpha, blocked);
+    if (blocked) {
         %orig(0);
         return;
     }
@@ -1375,7 +1406,9 @@ static void nfbStartFoldWatch(UIView* card) {
 // overflow button, top right
 %hook _TtC14T1TwitterSwift35ImmersiveTopRightActionsPluginsView
 - (void)setAlpha:(CGFloat)alpha {
-    if (alpha > 0 && nfbChromeIsOpening()) {
+    BOOL blocked = alpha > 0 && nfbChromeIsOpening();
+    nfbReportChromeAlpha((UIView*)self, alpha, blocked);
+    if (blocked) {
         %orig(0);
         return;
     }
@@ -1386,7 +1419,9 @@ static void nfbStartFoldWatch(UIView* card) {
 // the shade behind the top row
 %hook _TtC14T1TwitterSwift30ImmersiveTopGradientPluginView
 - (void)setAlpha:(CGFloat)alpha {
-    if (alpha > 0 && nfbChromeIsOpening()) {
+    BOOL blocked = alpha > 0 && nfbChromeIsOpening();
+    nfbReportChromeAlpha((UIView*)self, alpha, blocked);
+    if (blocked) {
         %orig(0);
         return;
     }
@@ -1397,7 +1432,9 @@ static void nfbStartFoldWatch(UIView* card) {
 // the shade behind the bottom row
 %hook _TtC14T1TwitterSwift33ImmersiveBottomGradientPluginView
 - (void)setAlpha:(CGFloat)alpha {
-    if (alpha > 0 && nfbChromeIsOpening()) {
+    BOOL blocked = alpha > 0 && nfbChromeIsOpening();
+    nfbReportChromeAlpha((UIView*)self, alpha, blocked);
+    if (blocked) {
         %orig(0);
         return;
     }
@@ -1408,7 +1445,9 @@ static void nfbStartFoldWatch(UIView* card) {
 // scrubber, timer and playback buttons
 %hook _TtC14T1TwitterSwift17BottomBarControls
 - (void)setAlpha:(CGFloat)alpha {
-    if (alpha > 0 && nfbChromeIsOpening()) {
+    BOOL blocked = alpha > 0 && nfbChromeIsOpening();
+    nfbReportChromeAlpha((UIView*)self, alpha, blocked);
+    if (blocked) {
         %orig(0);
         return;
     }
