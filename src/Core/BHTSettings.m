@@ -362,43 +362,6 @@ static NSDictionary<NSString*, NSDictionary*>* BHTSettingsPages(void) {
                       @"type": @"toggle"}
                 ]
             },
-            @"branding": @{
-                @"titleKey": @"MODERN_SETTINGS_BRANDING_TITLE",
-                @"subtitleKey": @"MODERN_SETTINGS_BRANDING_SUBTITLE",
-                @"settings": @[
-                    @{
-                        @"titleKey": @"APP_ICON_TITLE",
-                        @"subtitleKey": @"APP_ICON_SUBTITLE",
-                        @"action": @"showAppIconViewController:",
-                        @"type": @"button"
-                    },
-                    @{
-                        @"key": @"restore_twitter_names",
-                        @"default": @([BHTManager isTwitterBranded]),
-                        @"type": @"toggle"
-                    },
-                    @{
-                        @"key": @"refresh_pill_label",
-                        @"default": @([BHTManager isTwitterBranded]),
-                        @"type": @"toggle"
-                    },
-                    @{
-                        @"key": @"restore_tweet_button",
-                        @"default": @([BHTManager isTwitterBranded]),
-                        @"type": @"toggle"
-                    },
-                    @{
-                        @"key": @"restore_tweet_labels",
-                        @"default": @NO,
-                        @"type": @"toggle"
-                    },
-                    @{
-                        @"key": @"restore_refresh_sounds",
-                        @"default": @YES,
-                        @"type": @"toggle"
-                    }
-                ]
-            },
             @"grok": @{
                 @"titleKey": @"MODERN_SETTINGS_MESSAGES_TITLE",
                 @"subtitleKey": @"MODERN_SETTINGS_MESSAGES_SUBTITLE",
@@ -439,6 +402,43 @@ static NSDictionary<NSString*, NSDictionary*>* BHTSettingsPages(void) {
                         @"key": @"disable_auto_translate",
                         @"default": @NO,
                         @"inverted": @YES,
+                        @"type": @"toggle"
+                    }
+                ]
+            },
+            @"branding": @{
+                @"titleKey": @"MODERN_SETTINGS_BRANDING_TITLE",
+                @"subtitleKey": @"MODERN_SETTINGS_BRANDING_SUBTITLE",
+                @"settings": @[
+                    @{
+                        @"titleKey": @"APP_ICON_TITLE",
+                        @"subtitleKey": @"APP_ICON_SUBTITLE",
+                        @"action": @"showAppIconViewController:",
+                        @"type": @"button"
+                    },
+                    @{
+                        @"key": @"restore_twitter_names",
+                        @"default": @([BHTManager isTwitterBranded]),
+                        @"type": @"toggle"
+                    },
+                    @{
+                        @"key": @"refresh_pill_label",
+                        @"default": @([BHTManager isTwitterBranded]),
+                        @"type": @"toggle"
+                    },
+                    @{
+                        @"key": @"restore_tweet_button",
+                        @"default": @([BHTManager isTwitterBranded]),
+                        @"type": @"toggle"
+                    },
+                    @{
+                        @"key": @"restore_tweet_labels",
+                        @"default": @NO,
+                        @"type": @"toggle"
+                    },
+                    @{
+                        @"key": @"restore_refresh_sounds",
+                        @"default": @YES,
                         @"type": @"toggle"
                     }
                 ]
