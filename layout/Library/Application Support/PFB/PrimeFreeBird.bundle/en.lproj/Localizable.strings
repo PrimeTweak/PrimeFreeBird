@@ -504,8 +504,10 @@
 
 "SHOW_POLL_RESULTS_TITLE" = "Show poll results";
 "SHOW_POLL_RESULTS_DETAIL" = "Add each option's share of the vote to its label, before you have voted.";
-"TAP_TO_PAUSE_TITLE" = "Tap to play or pause";
-"TAP_TO_PAUSE_DETAIL" = "Controls show while paused and hide during playback, leaving the progress line.";
+"TAP_TO_PAUSE_TITLE" = "Clean video player";
+"TAP_TO_PAUSE_DETAIL" = "Full-screen videos open bare: tap to play or pause, with only a progress line.";
+"VIDEO_STARTS_MUTED_TITLE" = "Start muted";
+"VIDEO_STARTS_MUTED_DETAIL" = "Open videos silent; tap the speaker to turn sound on.";
 
 "PROFILES_GROUP_BEHAVIOR" = "Behavior";
 "PROFILES_GROUP_TABS" = "Profile tabs";
