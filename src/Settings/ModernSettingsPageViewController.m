@@ -123,7 +123,10 @@ extern NSInteger NFBColorThemeScreenVisible;
     for (NSDictionary* toggleData in self.toggles) {
         NSString* parentKey = toggleData[@"parentKey"];
         if (parentKey) {
-            BOOL parentEnabled = [[defaults objectForKey:parentKey] ?: toggleData[@"default"] boolValue];
+            // The parent's own state, declared default included. Reading the
+            // CHILD's default here would decide a parent's state from a row that
+            // is not the parent.
+            BOOL parentEnabled = [BHTSettings boolForKey:parentKey];
             if (parentEnabled) {
                 [visible addObject:toggleData];
             }
