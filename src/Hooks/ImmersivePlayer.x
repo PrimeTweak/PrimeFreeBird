@@ -135,6 +135,10 @@ static void nfbRestoreTimestamp(UIView* controls) {
 - (void)didMoveToWindow {
     %orig;
     UIView* bar = (UIView*)self;
+    NFBDebugLog(@"[flash] %.0f ms | CONTROLS didMoveToWindow | window=%@ | "
+                @"alpha=%.2f | hidden=%@",
+                nfbFlashMs(), bar.window ? @"YES" : @"no", bar.alpha,
+                bar.hidden ? @"YES" : @"no");
     if (!bar.window) {
         return;
     }
@@ -205,6 +209,8 @@ static void nfbClearAutoUnmute(UIView* view) {
     // A video opened from the timeline starts in the chosen state, whatever the
     // last one was left as.
     gNFBSoundAllowed = nfbSoundAllowedAtOpen();
+    gNFBFlashOrigin = [NSDate timeIntervalSinceReferenceDate];
+    NFBDebugLog(@"[flash] 0 ms | TAP in the timeline");
     %orig;
 }
 
@@ -298,6 +304,18 @@ static BOOL isImmersiveCardPan(id viewController,
 %end
 
 %hook T1ImmersiveViewController
+
+- (void)viewWillAppear:(BOOL)animated {
+    %orig;
+    NFBDebugLog(@"[flash] %.0f ms | immersive controller viewWillAppear",
+                nfbFlashMs());
+}
+
+- (void)viewDidAppear:(BOOL)animated {
+    %orig;
+    NFBDebugLog(@"[flash] %.0f ms | immersive controller viewDidAppear",
+                nfbFlashMs());
+}
 
 - (BOOL)gestureRecognizerShouldBegin:(UIGestureRecognizer*)gesture {
     if ([BHTSettings boolForKey:@"disable_immersive_scroll"] &&
@@ -1064,8 +1082,8 @@ static void nfbStartFoldWatch(UIView* card) {
             nfbApplyMuted(nfbCardPlayer(card), nfbImmersiveAudioManager(card), YES);
         }
         gNFBActiveCard = card;
-        gNFBFlashOrigin = [NSDate timeIntervalSinceReferenceDate];
-        NFBDebugLog(@"[flash] 0 ms | card registered | controls mounted: %@",
+        NFBDebugLog(@"[flash] %.0f ms | card registered | controls mounted: %@",
+                    nfbFlashMs(),
                     nfbImmersiveControlsView(card) ? @"YES" : @"no");
         objc_setAssociatedObject(
             card, kNFBCardShownAtKey,
