@@ -15,6 +15,10 @@
 + (NSString*)titleKeyForPage:(NSString*)pageKey;
 + (NSString*)subtitleKeyForPage:(NSString*)pageKey;
 + (NSDictionary*)settingForKey:(NSString*)key;
+
+// The declared default for a key: its registry row when it has one, otherwise
+// the table of keys that are set from a page of their own.
++ (id)declaredDefaultForKey:(NSString*)key;
 + (BOOL)boolForKey:(NSString*)key;
 + (NSInteger)integerForKey:(NSString*)key;
 

@@ -117,7 +117,7 @@ static NSDictionary<NSString*, NSDictionary*>* BHTSettingsPages(void) {
                       @"default": @YES,
                       @"type": @"toggle"},
                     @{@"key": @"hide_topics_to_follow",
-                      @"default": @NO,
+                      @"default": @YES,
                       @"type": @"toggle"},
                     @{@"key": @"hide_timeline_prompts",
                       @"default": @YES,
@@ -130,7 +130,7 @@ static NSDictionary<NSString*, NSDictionary*>* BHTSettingsPages(void) {
                       @"default": @NO,
                       @"type": @"toggle"},
                     @{@"key": @"reading_line",
-                      @"default": @YES,
+                      @"default": @NO,
                       @"type": @"toggle"},
                     @{
                         @"type": @"button",
@@ -140,13 +140,13 @@ static NSDictionary<NSString*, NSDictionary*>* BHTSettingsPages(void) {
                     },
                     @{@"type": @"header", @"titleKey": @"TIMELINES_GROUP_BARS"},
                     @{@"key": @"hide_spaces",
-                      @"default": @NO,
+                      @"default": @YES,
                       @"type": @"toggle"},
                     @{@"key": @"hide_scroll_edge_blur",
-                      @"default": @NO,
+                      @"default": @YES,
                       @"type": @"toggle"},
                     @{@"key": @"hide_custom_timelines",
-                      @"default": @NO,
+                      @"default": @YES,
                       @"type": @"toggle"},
                     @{@"key": @"unlimited_timeline_tabs",
                       @"disabledWhen": @"hide_custom_timelines",
@@ -167,7 +167,7 @@ static NSDictionary<NSString*, NSDictionary*>* BHTSettingsPages(void) {
                         @"action": @"showUndoTimeoutPicker:"
                     },
                     @{@"key": @"tweet_confirm",
-                      @"default": @NO,
+                      @"default": @YES,
                       @"type": @"toggle"},
                     @{@"key": @"hide_tweet_button",
                       @"default": @NO,
@@ -180,7 +180,7 @@ static NSDictionary<NSString*, NSDictionary*>* BHTSettingsPages(void) {
                       @"default": @YES,
                       @"type": @"toggle"},
                     @{@"key": @"like_confirm",
-                      @"default": @NO,
+                      @"default": @YES,
                       @"type": @"toggle"},
                     @{@"key": @"hide_view_count",
                       @"default": @YES,
@@ -194,7 +194,7 @@ static NSDictionary<NSString*, NSDictionary*>* BHTSettingsPages(void) {
                     @{@"type": @"header", @"titleKey": @"TWEETS_GROUP_READING"},
                     @{
                         @"key": @"show_poll_results",
-                        @"default": @NO,
+                        @"default": @YES,
                         @"type": @"toggle"
                     },
                     @{@"key": @"disable_sensitive_tweet_warnings",
@@ -223,38 +223,38 @@ static NSDictionary<NSString*, NSDictionary*>* BHTSettingsPages(void) {
                       @"default": @NO,
                       @"type": @"toggle"},
                     @{@"key": @"tweet_to_image",
-                      @"default": @NO,
+                      @"default": @YES,
                       @"type": @"toggle"},
                     @{@"type": @"header", @"titleKey": @"MEDIA_GROUP_PLAYBACK"},
                     @{
                         @"key": @"tap_to_pause",
-                        @"default": @NO,
+                        @"default": @YES,
                         @"type": @"toggle"
                     },
                     @{@"key": @"restore_video_timestamp",
-                      @"default": @NO,
+                      @"default": @YES,
                       @"type": @"toggle"},
                     @{@"key": @"disable_video_captions",
-                      @"default": @NO,
+                      @"default": @YES,
                       @"type": @"toggle"},
                     @{@"key": @"disable_immersive_scroll",
-                      @"default": @NO,
+                      @"default": @YES,
                       @"type": @"toggle"},
                     @{@"key": @"disable_video_docking",
-                      @"default": @NO,
+                      @"default": @YES,
                       @"type": @"toggle"},
                     @{@"type": @"header", @"titleKey": @"MEDIA_GROUP_QUALITY"},
                     @{@"key": @"auto_highest_load",
                       @"default": @YES,
                       @"type": @"toggle"},
                     @{@"key": @"enable_image_preloading",
-                      @"default": @NO,
+                      @"default": @YES,
                       @"type": @"toggle"},
                     @{@"key": @"force_tweet_full_frame",
-                      @"default": @NO,
+                      @"default": @YES,
                       @"type": @"toggle"},
                     @{@"key": @"upload_full_hd_videos",
-                      @"default": @NO,
+                      @"default": @YES,
                       @"type": @"toggle"}
                 ]
             },
@@ -264,14 +264,14 @@ static NSDictionary<NSString*, NSDictionary*>* BHTSettingsPages(void) {
                 @"settings": @[
                     @{@"type": @"header", @"titleKey": @"PROFILES_GROUP_BEHAVIOR"},
                     @{@"key": @"follow_confirm",
-                      @"default": @NO,
+                      @"default": @YES,
                       @"type": @"toggle"},
                     @{@"key": @"expand_bio",
-                      @"default": @NO,
+                      @"default": @YES,
                       @"type": @"toggle"},
                     @{
                         @"key": @"copy_profile_info",
-                        @"default": @NO,
+                        @"default": @YES,
                         @"type": @"toggle"
                     },
                     @{
@@ -283,7 +283,7 @@ static NSDictionary<NSString*, NSDictionary*>* BHTSettingsPages(void) {
                     @{@"type": @"header", @"titleKey": @"PROFILES_GROUP_TABS"},
                     @{
                         @"key": @"disable_articles",
-                        @"default": @YES,
+                        @"default": @NO,
                         @"type": @"toggle"
                     },
                     @{
@@ -309,7 +309,7 @@ static NSDictionary<NSString*, NSDictionary*>* BHTSettingsPages(void) {
                     },
                     @{
                         @"key": @"restore_follow_button",
-                        @"default": @NO,
+                        @"default": @YES,
                         @"type": @"toggle"
                     },
                     @{@"key": @"square_avatars",
@@ -323,14 +323,14 @@ static NSDictionary<NSString*, NSDictionary*>* BHTSettingsPages(void) {
                 @"settings": @[
                     @{@"type": @"header", @"titleKey": @"SEARCH_GROUP_SEARCHING"},
                     @{@"key": @"no_history",
-                      @"default": @NO,
+                      @"default": @YES,
                       @"type": @"toggle"},
                     @{@"key": @"advanced_search",
-                      @"default": @NO,
+                      @"default": @YES,
                       @"type": @"toggle"},
                     @{@"type": @"header", @"titleKey": @"SEARCH_GROUP_TRENDS"},
                     @{@"key": @"hide_trends",
-                      @"default": @NO,
+                      @"default": @YES,
                       @"type": @"toggle"},
                     @{@"key": @"hide_tab_foryou",
                       @"parentKey": @"hide_trends",
@@ -340,7 +340,7 @@ static NSDictionary<NSString*, NSDictionary*>* BHTSettingsPages(void) {
                     @{@"key": @"hide_tab_trending",
                       @"parentKey": @"hide_trends",
                       @"indented": @YES,
-                      @"default": @NO,
+                      @"default": @YES,
                       @"type": @"toggle"},
                     @{@"key": @"hide_tab_news",
                       @"parentKey": @"hide_trends",
@@ -355,7 +355,7 @@ static NSDictionary<NSString*, NSDictionary*>* BHTSettingsPages(void) {
                     @{@"key": @"hide_tab_entertainment",
                       @"parentKey": @"hide_trends",
                       @"indented": @YES,
-                      @"default": @NO,
+                      @"default": @YES,
                       @"type": @"toggle"},
                     @{@"key": @"hide_trend_videos",
                       @"default": @NO,
@@ -369,17 +369,17 @@ static NSDictionary<NSString*, NSDictionary*>* BHTSettingsPages(void) {
                     @{@"type": @"header", @"titleKey": @"MESSAGES_GROUP_CHAT"},
                     @{
                         @"key": @"hide_typing_indicator",
-                        @"default": @NO,
+                        @"default": @YES,
                         @"type": @"toggle"
                     },
                     @{
                         @"key": @"voice_transcription",
-                        @"default": @NO,
+                        @"default": @YES,
                         @"type": @"toggle"
                     },
                     @{
                         @"key": @"download_voice_messages",
-                        @"default": @NO,
+                        @"default": @YES,
                         @"type": @"toggle"
                     },
                     @{@"type": @"header", @"titleKey": @"MESSAGES_GROUP_GROK"},
@@ -433,12 +433,12 @@ static NSDictionary<NSString*, NSDictionary*>* BHTSettingsPages(void) {
                     },
                     @{
                         @"key": @"restore_tweet_labels",
-                        @"default": @NO,
+                        @"default": @YES,
                         @"type": @"toggle"
                     },
                     @{
                         @"key": @"restore_refresh_sounds",
-                        @"default": @YES,
+                        @"default": @NO,
                         @"type": @"toggle"
                     }
                 ]
@@ -600,12 +600,35 @@ static NSDictionary<NSString*, NSDictionary*>* BHTSettingsIndex(void) {
     return key ? BHTSettingsIndex()[key] : nil;
 }
 
+// Defaults for options that are set from a page of their own and therefore have
+// no row in the registry. Without an entry here, settingForKey: returns nil and
+// the fallback below reads @"default" from nil, which yields NO or 0 by
+// accident rather than by decision.
+static NSDictionary* NFBKeylessDefaults(void) {
+    static NSDictionary* map = nil;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+        map = @{
+            @"enable_liquid_glass": @YES,
+            @"color_twitter_icon_in_top_bar": @YES,
+        };
+    });
+    return map;
+}
+
+// The declared default for a key: its registry row when it has one, otherwise
+// the table above.
++ (id)declaredDefaultForKey:(NSString*)key {
+    id row = [self settingForKey:key][@"default"];
+    return row ?: NFBKeylessDefaults()[key];
+}
+
 + (BOOL)boolForKey:(NSString*)key {
     id value = [[NSUserDefaults standardUserDefaults] objectForKey:key];
     if (value != nil) {
         return [value boolValue];
     }
-    return [[self settingForKey:key][@"default"] boolValue];
+    return [[self declaredDefaultForKey:key] boolValue];
 }
 
 + (NSInteger)integerForKey:(NSString*)key {
@@ -613,7 +636,7 @@ static NSDictionary<NSString*, NSDictionary*>* BHTSettingsIndex(void) {
     if (value != nil) {
         return [value integerValue];
     }
-    return [[self settingForKey:key][@"default"] integerValue];
+    return [[self declaredDefaultForKey:key] integerValue];
 }
 
 + (NSArray<NSString*>*)allOptionKeys {
