@@ -492,13 +492,38 @@ static void nfbTogglePlayback(TAVPlayer* player) {
 // it — so the search starts from the window the card is in. Looking under the
 // card alone finds nothing, and a state that cannot be read is a state that
 // cannot be matched.
+// The bar belonging to THIS card, found in the card's own subtree.
+//
+// Searching the whole window instead returns the first bar it meets, which on
+// a paging carousel is often another card's. Read as this card's bar, it makes
+// the reconciler believe the strip is up when it is not, and a tap is
+// synthesised that this card never needed. The first video opened after a
+// pause is clean because no other bar is in the window yet; every one after it
+// finds a neighbour's.
 static UIView* nfbImmersiveControlsView(UIView* card) {
     Class controlsClass =
         NSClassFromString(@"_TtC14T1TwitterSwift17VideoControlsView");
-    if (!controlsClass) {
+    if (!controlsClass || !card) {
         return nil;
     }
-    UIView* root = card.window ?: card;
+    __block UIView* controls = nil;
+    EnumerateSubviewsRecursively(card, ^(UIView* view) {
+        if (!controls && [view isKindOfClass:controlsClass]) {
+            controls = view;
+        }
+    });
+    return controls;
+}
+
+// Same search across the whole window. Kept only to show, in the journal, when
+// the two disagree.
+static UIView* nfbAnyControlsViewInWindow(UIView* card) {
+    Class controlsClass =
+        NSClassFromString(@"_TtC14T1TwitterSwift17VideoControlsView");
+    UIView* root = card.window;
+    if (!controlsClass || !root) {
+        return nil;
+    }
     __block UIView* controls = nil;
     EnumerateSubviewsRecursively(root, ^(UIView* view) {
         if (!controls && [view isKindOfClass:controlsClass]) {
@@ -1082,9 +1107,11 @@ static void nfbStartFoldWatch(UIView* card) {
             nfbApplyMuted(nfbCardPlayer(card), nfbImmersiveAudioManager(card), YES);
         }
         gNFBActiveCard = card;
-        NFBDebugLog(@"[flash] %.0f ms | card registered | controls mounted: %@",
+        NFBDebugLog(@"[flash] %.0f ms | card registered | this card's bar: %@ "
+                    @"| any bar in window: %@",
                     nfbFlashMs(),
-                    nfbImmersiveControlsView(card) ? @"YES" : @"no");
+                    nfbImmersiveControlsView(card) ? @"YES" : @"no",
+                    nfbAnyControlsViewInWindow(card) ? @"YES" : @"no");
         objc_setAssociatedObject(
             card, kNFBCardShownAtKey,
             @([NSDate timeIntervalSinceReferenceDate]),
