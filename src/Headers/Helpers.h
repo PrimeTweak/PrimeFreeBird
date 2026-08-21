@@ -85,3 +85,9 @@ static UIViewController* _Nonnull topMostController() {
 
 // Defined in Hooks/BHTHookHelpers.m
 extern UIColor* CurrentAccentColor(void);
+
+// Twitter's brand blue, and the accent for surfaces that carry Twitter's
+// branding. Kept apart from CurrentAccentColor, which feeds the window tint
+// that UIKit controls inherit; their blue must stay iOS blue.
+extern UIColor* NFBTwitterBlueColor(void);
+extern UIColor* NFBBrandAccentColor(void);
