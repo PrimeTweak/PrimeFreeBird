@@ -54,7 +54,7 @@ static const NSTimeInterval kNFBUserTapGrace = 0.6;
 // card registers, so every line below is comparable on one timeline.
 static UIView* nfbImmersiveControlsView(UIView* card);
 static NSString* nfbChromeCensus(void);
-static void nfbNameChromeOnScreen(const char* whenLabel, double ms);
+static NSMutableSet* nfbVisibleSnapshot(void);
 
 static NSTimeInterval gNFBFlashOrigin = 0;
 
@@ -213,16 +213,34 @@ static void nfbClearAutoUnmute(UIView* view) {
     gNFBSoundAllowed = nfbSoundAllowedAtOpen();
     gNFBFlashOrigin = [NSDate timeIntervalSinceReferenceDate];
     NFBDebugLog(@"[flash] 0 ms | TAP | %@", nfbChromeCensus());
-    // Sample the window across the window our hooks cannot see: the bar only
-    // announces itself at ~120 ms, and the chrome is on screen well before.
-    for (NSInteger ms = 140; ms <= 620; ms += 80) {
-        NSInteger at = ms;
-        dispatch_after(
-            dispatch_time(DISPATCH_TIME_NOW, (int64_t)(at * NSEC_PER_MSEC)),
-            dispatch_get_main_queue(), ^{
-              nfbNameChromeOnScreen("sample", nfbFlashMs());
-            });
-    }
+    // Two snapshots and their difference. Whatever is on screen while the
+    // reader sees the flash and gone once it settles comes out by name.
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(200 * NSEC_PER_MSEC)),
+                   dispatch_get_main_queue(), ^{
+                     NSMutableSet* early = nfbVisibleSnapshot();
+                     NFBDebugLog(@"[flash] %.0f ms | snapshot A: %lu views",
+                                 nfbFlashMs(), (unsigned long)early.count);
+                     dispatch_after(
+                         dispatch_time(DISPATCH_TIME_NOW,
+                                       (int64_t)(600 * NSEC_PER_MSEC)),
+                         dispatch_get_main_queue(), ^{
+                           NSMutableSet* late = nfbVisibleSnapshot();
+                           NSMutableSet* gone = [early mutableCopy];
+                           [gone minusSet:late];
+                           NSArray* list = [gone.allObjects
+                               sortedArrayUsingSelector:@selector(compare:)];
+                           if (list.count > 20) {
+                               list = [list subarrayWithRange:NSMakeRange(0, 20)];
+                           }
+                           NFBDebugLog(@"[flash] %.0f ms | snapshot B: %lu views | "
+                                       @"GONE SINCE A (%lu): %@",
+                                       nfbFlashMs(), (unsigned long)late.count,
+                                       (unsigned long)gone.count,
+                                       list.count
+                                           ? [list componentsJoinedByString:@"  //  "]
+                                           : @"nothing");
+                         });
+                   });
     %orig;
 }
 
@@ -535,9 +553,11 @@ static UIView* nfbImmersiveControlsView(UIView* card) {
 // TEMPORARY probe. Read only: it walks the mounted hierarchy and reports what
 // the immersive chrome looks like at a given instant. Both the bar and the
 // container it lives in are counted, because either can be what shows.
-// TEMPORARY probe. Names every chrome-looking view on screen at a given
-// instant, with its opacity. Read only: nothing is moved, hidden or decided.
-static void nfbNameChromeOnScreen(const char* whenLabel, double ms) {
+// TEMPORARY probe. Takes a set of everything visible on screen, so that two
+// snapshots can be subtracted. No class name is guessed: whatever is present
+// early and gone later is reported by name, whatever that name turns out to be.
+static NSMutableSet* nfbVisibleSnapshot(void) {
+    NSMutableSet* seen = [NSMutableSet set];
     UIWindow* root = nil;
     for (UIScene* scene in [UIApplication sharedApplication].connectedScenes) {
         if (![scene isKindOfClass:[UIWindowScene class]]) {
@@ -554,32 +574,23 @@ static void nfbNameChromeOnScreen(const char* whenLabel, double ms) {
         }
     }
     if (!root) {
-        return;
+        return seen;
     }
-    NSMutableArray* found = [NSMutableArray array];
     EnumerateSubviewsRecursively(root, ^(UIView* view) {
-        if (view.hidden || view.alpha < 0.02 || found.count >= 30) {
+        if (view.hidden || view.alpha < 0.05) {
             return;
         }
-        NSString* name = NSStringFromClass([view class]);
-        // Plugins first: the immersive player is assembled from them, and the
-        // full-screen ones carry no chrome, so they are dropped.
-        BOOL interesting = [name containsString:@"Plugin"] ||
-                           [name containsString:@"Controls"] ||
-                           [name containsString:@"Scrub"] ||
-                           [name containsString:@"BottomBar"];
-        if (!interesting || view.bounds.size.height > 600) {
+        CGSize size = view.bounds.size;
+        // Chrome sized: wide enough to read, short enough not to be a backdrop.
+        if (size.width < 40 || size.height < 8 || size.height > 400) {
             return;
         }
         CGRect inWindow = [view convertRect:view.bounds toView:root];
-        [found addObject:[NSString stringWithFormat:@"%@ a=%.2f y=%.0f h=%.0f",
-                                                    name, view.alpha,
-                                                    inWindow.origin.y,
-                                                    inWindow.size.height]];
+        [seen addObject:[NSString stringWithFormat:@"%@ @%.0f",
+                                                   NSStringFromClass([view class]),
+                                                   inWindow.origin.y]];
     });
-    NFBDebugLog(@"[flash] %.0f ms | %s | %@", ms, whenLabel,
-                found.count ? [found componentsJoinedByString:@"  //  "]
-                            : @"(nothing on screen)");
+    return seen;
 }
 
 static NSString* nfbChromeCensus(void) {
