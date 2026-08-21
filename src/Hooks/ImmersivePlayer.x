@@ -76,27 +76,13 @@ static double nfbFlashMs(void) {
 // them.
 static const NSTimeInterval kNFBChromeBlackout = 0.7;
 
-static void nfbHideChromeWhileOpening(UIView* view) {
-    if (!view || !view.window || ![BHTSettings boolForKey:@"tap_to_pause"]) {
-        return;
+// True while a video opened from the timeline is still coming up.
+static BOOL nfbChromeIsOpening(void) {
+    if (![BHTSettings boolForKey:@"tap_to_pause"]) {
+        return NO;
     }
     NSTimeInterval since = nfbFlashMs() / 1000.0;
-    if (since < 0 || since > kNFBChromeBlackout) {
-        return;
-    }
-    view.hidden = YES;
-    __weak UIView* weakView = view;
-    dispatch_after(dispatch_time(DISPATCH_TIME_NOW,
-                                 (int64_t)((kNFBChromeBlackout - since) *
-                                           NSEC_PER_SEC)),
-                   dispatch_get_main_queue(), ^{
-                     // Handed back unconditionally: a view kept invisible for
-                     // good would be a worse defect than the flash.
-                     UIView* strongView = weakView;
-                     if (strongView) {
-                         strongView.hidden = NO;
-                     }
-                   });
+    return since >= 0 && since <= kNFBChromeBlackout;
 }
 
 static void nfbHoldThroughOpening(UIView* view) {
@@ -1322,59 +1308,110 @@ static void nfbStartFoldWatch(UIView* card) {
 %end
 
 // MARK: - The app's chrome stays down while a video opens
+//
+// Measured: none of these are unmounted between openings. The app leaves them
+// in place and drives them with alpha, so a hook on didMoveToWindow fires once
+// in the app's lifetime and never again on a recycled card. What repeats on
+// every opening is the ramp back to alpha 1, and that is what is intercepted.
+//
+// Only for the length of the opening. Afterwards every one of them is left
+// alone, so a tap that asks for the controls still gets them.
 
+// author, handle and follow control
 %hook _TtC14T1TwitterSwift25ImmersiveStatusPluginView
-- (void)didMoveToWindow {
+- (void)setAlpha:(CGFloat)alpha {
+    if (alpha > 0 && nfbChromeIsOpening()) {
+        %orig(0);
+        return;
+    }
     %orig;
-    nfbHideChromeWhileOpening((UIView*)self);
 }
 %end
 
+// reply, retweet, like, bookmark, share
 %hook _TtC14T1TwitterSwift36ImmersiveEngagementActionsPluginView
-- (void)didMoveToWindow {
+- (void)setAlpha:(CGFloat)alpha {
+    if (alpha > 0 && nfbChromeIsOpening()) {
+        %orig(0);
+        return;
+    }
     %orig;
-    nfbHideChromeWhileOpening((UIView*)self);
 }
 %end
 
-%hook _TtC14T1TwitterSwift29ImmersiveBackButtonPluginView
-- (void)didMoveToWindow {
-    %orig;
-    nfbHideChromeWhileOpening((UIView*)self);
-}
-%end
-
-%hook _TtC14T1TwitterSwift35ImmersiveTopRightActionsPluginsView
-- (void)didMoveToWindow {
-    %orig;
-    nfbHideChromeWhileOpening((UIView*)self);
-}
-%end
-
-%hook _TtC14T1TwitterSwift30ImmersiveTopGradientPluginView
-- (void)didMoveToWindow {
-    %orig;
-    nfbHideChromeWhileOpening((UIView*)self);
-}
-%end
-
-%hook _TtC14T1TwitterSwift17BottomBarControls
-- (void)didMoveToWindow {
-    %orig;
-    nfbHideChromeWhileOpening((UIView*)self);
-}
-%end
-
-%hook _TtC14T1TwitterSwift19ImmersiveActionView
-- (void)didMoveToWindow {
-    %orig;
-    nfbHideChromeWhileOpening((UIView*)self);
-}
-%end
-
+// the row holding those actions
 %hook _TtC14T1TwitterSwift25ImmersiveActionsStackView
-- (void)didMoveToWindow {
+- (void)setAlpha:(CGFloat)alpha {
+    if (alpha > 0 && nfbChromeIsOpening()) {
+        %orig(0);
+        return;
+    }
     %orig;
-    nfbHideChromeWhileOpening((UIView*)self);
+}
+%end
+
+// one action pill
+%hook _TtC14T1TwitterSwift19ImmersiveActionView
+- (void)setAlpha:(CGFloat)alpha {
+    if (alpha > 0 && nfbChromeIsOpening()) {
+        %orig(0);
+        return;
+    }
+    %orig;
+}
+%end
+
+// back button, top left
+%hook _TtC14T1TwitterSwift29ImmersiveBackButtonPluginView
+- (void)setAlpha:(CGFloat)alpha {
+    if (alpha > 0 && nfbChromeIsOpening()) {
+        %orig(0);
+        return;
+    }
+    %orig;
+}
+%end
+
+// overflow button, top right
+%hook _TtC14T1TwitterSwift35ImmersiveTopRightActionsPluginsView
+- (void)setAlpha:(CGFloat)alpha {
+    if (alpha > 0 && nfbChromeIsOpening()) {
+        %orig(0);
+        return;
+    }
+    %orig;
+}
+%end
+
+// the shade behind the top row
+%hook _TtC14T1TwitterSwift30ImmersiveTopGradientPluginView
+- (void)setAlpha:(CGFloat)alpha {
+    if (alpha > 0 && nfbChromeIsOpening()) {
+        %orig(0);
+        return;
+    }
+    %orig;
+}
+%end
+
+// the shade behind the bottom row
+%hook _TtC14T1TwitterSwift33ImmersiveBottomGradientPluginView
+- (void)setAlpha:(CGFloat)alpha {
+    if (alpha > 0 && nfbChromeIsOpening()) {
+        %orig(0);
+        return;
+    }
+    %orig;
+}
+%end
+
+// scrubber, timer and playback buttons
+%hook _TtC14T1TwitterSwift17BottomBarControls
+- (void)setAlpha:(CGFloat)alpha {
+    if (alpha > 0 && nfbChromeIsOpening()) {
+        %orig(0);
+        return;
+    }
+    %orig;
 }
 %end
