@@ -545,7 +545,7 @@ static void NFBHideNotifWithText(id model, NSString* cellText) {
     NFBDebugLog(@"notifhide: notification date = %@ (%@)",
                 notifDate > 0
                     ? [NSDate dateWithTimeIntervalSince1970:notifDate]
-                    : (id)@"inconnue",
+                    : (id)@"unknown",
                 source);
     [[NSUserDefaults standardUserDefaults] setObject:current forKey:kNFBHiddenNotifsKey];
     NFBDebugLog(@"notifhide: hidden <%@> - %lu total",
@@ -797,9 +797,9 @@ static void NFBNotifDropRow(id dataViewController, NSIndexPath* indexPath) {
     id model = NFBModelAtIndexPath(self, indexPath) ?: NFBModelFromCell(tableView, indexPath);
     // Only rows that carry a notification, and only ones that can be named: a
     // row that cannot be identified could never be unhidden, so it is left
-    // alone. Each refusal says WHY, once, because a silent guard is impossible
-    // to diagnose without another probe build.
-    NSString* modelClass = model ? NSStringFromClass([model class]) : @"(rien)";
+    // alone. Each refusal says WHY, once, because a silent guard cannot be
+    // diagnosed from the journal.
+    NSString* modelClass = model ? NSStringFromClass([model class]) : @"(none)";
     if (!model) {
         static BOOL saidNoModel;
         if (!saidNoModel) {

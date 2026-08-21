@@ -228,7 +228,7 @@ static void nfbSwapRefreshLabelFromMenu(void) {
     if (![label.text isEqualToString:checked]) {
         label.text = checked;
         nfbSwapLayoutButton();
-        NFBDebugLog(@"remplacement: libelle -> %@ (menu)", checked);
+        NFBDebugLog(@"swap: label -> %@ (menu)", checked);
     }
 }
 
@@ -346,7 +346,7 @@ static void nfbSwapApply(UIView* pillView) {
         if (!objc_getAssociatedObject(pillView, kNFBSwapWaitKey)) {
             objc_setAssociatedObject(pillView, kNFBSwapWaitKey, @YES,
                                      OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-            NFBDebugLog(@"remplacement: attente contenu — on ressaie");
+            NFBDebugLog(@"swap: waiting for content - retrying");
         }
         return;  // content not built yet; the next layout retries
     }
@@ -396,7 +396,7 @@ static void nfbSwapApply(UIView* pillView) {
             for (id<UIInteraction> interaction in pillView.interactions) {
                 [interactions addObject:NSStringFromClass([interaction class])];
             }
-            NFBDebugLog(@"remplacement: menu INTROUVABLE — sonde: lignee=%@ | "
+            NFBDebugLog(@"swap: menu NOT FOUND - probe: lineage=%@ | "
                         @"interactions=%@ | primaryAction=%@",
                         [lineage componentsJoinedByString:@" < "],
                         interactions.count
@@ -454,7 +454,7 @@ static void nfbSwapApply(UIView* pillView) {
             [gNFBSwapItem setValue:@YES forKey:@"hidesSharedBackground"];
             NFBDebugLog(@"swap: UIKit glass removed on the replacement item");
         }
-        NFBMark(button, @"PillSwap/bouton maison — identique au natif");
+        NFBMark(button, @"PillSwap/custom button - identical to native");
     } else {
         button = (NFBInboxPillButton*)gNFBSwapItem.customView;
         label = (UILabel*)[button viewWithTag:1];

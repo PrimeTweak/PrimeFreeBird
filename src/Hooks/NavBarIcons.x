@@ -500,8 +500,8 @@ static BOOL nfbIsChatBarGlyph(UIView* view) {
         UIColor* colour = nfbBarGlyphColour((UIView*)self);
         UIImage* baked = NFBGreyGlyph(chatImage, colour);
         if (baked) {
-            NFBDebugLog(@"glyphe: barre de chat cuit au didMoveToWindow (relance a froid)");
-            NFBMark((UIView*)self, @"NavBarIcons/chatBarGlyph → cuit (fenetre)");
+            NFBDebugLog(@"glyph: chat bar baked at didMoveToWindow (cold start)");
+            NFBMark((UIView*)self, @"NavBarIcons/chatBarGlyph -> baked (window)");
             nfbTintGlyphChain((UIView*)self, colour);
             self.image = baked;  // AlwaysOriginal: re-enters the setter and passes through
         }
@@ -532,8 +532,8 @@ static BOOL nfbIsChatBarGlyph(UIView* view) {
                 UIImage* baked = NFBGreyGlyph(image, colour);
                 NFBMark((UIView*)self,
                         nfbIsBackArrowGlyph((UIView*)self)
-                            ? @"NavBarIcons/backArrow → cuit"
-                            : @"NavBarIcons/chatBarGlyph → cuit");
+                            ? @"NavBarIcons/backArrow -> baked"
+                            : @"NavBarIcons/chatBarGlyph -> baked");
                 // Belt for the one frame a freshly created button can show
                 // before its first baked image lands: with the button's own
                 // chain tinted, even a frame treated as a template is right.
@@ -775,7 +775,7 @@ static BOOL nfbViewSitsInBarPlatter(UIView* view) {
                     NSStringFromClass([owner classForCoder]),
                     NSStringFromClass([animation classForCoder]),
                     key ?: @"nil", path, animation.duration,
-                    nfbViewSitsInInboxPill(owner) ? @"OUI" : @"non");
+                    nfbViewSitsInInboxPill(owner) ? @"YES" : @"no");
     }
 
     // Every animation on this one control is refused, not just opacity. The
