@@ -65,6 +65,40 @@ static double nfbFlashMs(void) {
     return ([NSDate timeIntervalSinceReferenceDate] - gNFBFlashOrigin) * 1000.0;
 }
 
+// The app's own chrome for a full-screen video: avatar, name, follow control,
+// engagement actions, back button, top gradient and the bottom bar. It is
+// painted while the video is opening and taken down a moment later, and that
+// moment is what the reader sees. Every one of these was read off the screen,
+// not guessed, and each name is present in the binary.
+//
+// They are kept out of sight for the length of the opening only. Afterwards the
+// view is left entirely alone, so a tap that asks for the controls still gets
+// them.
+static const NSTimeInterval kNFBChromeBlackout = 0.7;
+
+static void nfbHideChromeWhileOpening(UIView* view) {
+    if (!view || !view.window || ![BHTSettings boolForKey:@"tap_to_pause"]) {
+        return;
+    }
+    NSTimeInterval since = nfbFlashMs() / 1000.0;
+    if (since < 0 || since > kNFBChromeBlackout) {
+        return;
+    }
+    view.hidden = YES;
+    __weak UIView* weakView = view;
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW,
+                                 (int64_t)((kNFBChromeBlackout - since) *
+                                           NSEC_PER_SEC)),
+                   dispatch_get_main_queue(), ^{
+                     // Handed back unconditionally: a view kept invisible for
+                     // good would be a worse defect than the flash.
+                     UIView* strongView = weakView;
+                     if (strongView) {
+                         strongView.hidden = NO;
+                     }
+                   });
+}
+
 static void nfbHoldThroughOpening(UIView* view) {
     if (!view.window || ![BHTSettings boolForKey:@"tap_to_pause"]) {
         return;
@@ -1251,12 +1285,6 @@ static void nfbStartFoldWatch(UIView* card) {
             card, kNFBCardShownAtKey,
             @([NSDate timeIntervalSinceReferenceDate]),
             OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-        // The app has already painted its strip by the time the card registers,
-        // and the fold below only takes it away a couple of milliseconds later.
-        // Those milliseconds are the flash. Holding the strip clear here covers
-        // them; the hold hands the opacity back unconditionally, so a strip that
-        // is meant to stay comes back on its own.
-        nfbHoldThroughOpening(nfbImmersiveControlsView(card));
         nfbStartFoldWatch(card);
     } else {
         if (gNFBActiveCard == card) {
@@ -1291,4 +1319,62 @@ static void nfbStartFoldWatch(UIView* card) {
     nfbStartFoldWatch(host);
 }
 
+%end
+
+// MARK: - The app's chrome stays down while a video opens
+
+%hook _TtC14T1TwitterSwift25ImmersiveStatusPluginView
+- (void)didMoveToWindow {
+    %orig;
+    nfbHideChromeWhileOpening((UIView*)self);
+}
+%end
+
+%hook _TtC14T1TwitterSwift36ImmersiveEngagementActionsPluginView
+- (void)didMoveToWindow {
+    %orig;
+    nfbHideChromeWhileOpening((UIView*)self);
+}
+%end
+
+%hook _TtC14T1TwitterSwift29ImmersiveBackButtonPluginView
+- (void)didMoveToWindow {
+    %orig;
+    nfbHideChromeWhileOpening((UIView*)self);
+}
+%end
+
+%hook _TtC14T1TwitterSwift35ImmersiveTopRightActionsPluginsView
+- (void)didMoveToWindow {
+    %orig;
+    nfbHideChromeWhileOpening((UIView*)self);
+}
+%end
+
+%hook _TtC14T1TwitterSwift30ImmersiveTopGradientPluginView
+- (void)didMoveToWindow {
+    %orig;
+    nfbHideChromeWhileOpening((UIView*)self);
+}
+%end
+
+%hook _TtC14T1TwitterSwift17BottomBarControls
+- (void)didMoveToWindow {
+    %orig;
+    nfbHideChromeWhileOpening((UIView*)self);
+}
+%end
+
+%hook _TtC14T1TwitterSwift19ImmersiveActionView
+- (void)didMoveToWindow {
+    %orig;
+    nfbHideChromeWhileOpening((UIView*)self);
+}
+%end
+
+%hook _TtC14T1TwitterSwift25ImmersiveActionsStackView
+- (void)didMoveToWindow {
+    %orig;
+    nfbHideChromeWhileOpening((UIView*)self);
+}
 %end
