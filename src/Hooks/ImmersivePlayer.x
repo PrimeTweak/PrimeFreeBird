@@ -492,38 +492,17 @@ static void nfbTogglePlayback(TAVPlayer* player) {
 // it — so the search starts from the window the card is in. Looking under the
 // card alone finds nothing, and a state that cannot be read is a state that
 // cannot be matched.
-// The bar belonging to THIS card, found in the card's own subtree.
-//
-// Searching the whole window instead returns the first bar it meets, which on
-// a paging carousel is often another card's. Read as this card's bar, it makes
-// the reconciler believe the strip is up when it is not, and a tap is
-// synthesised that this card never needed. The first video opened after a
-// pause is clean because no other bar is in the window yet; every one after it
-// finds a neighbour's.
+// The controls bar on screen. Measured: the bar is NOT a descendant of the
+// card, so the search has to start at the window. Narrowing it to the card
+// returns nil every time, the reconciler never folds, and Twitter's overlay
+// stays up for good.
 static UIView* nfbImmersiveControlsView(UIView* card) {
     Class controlsClass =
         NSClassFromString(@"_TtC14T1TwitterSwift17VideoControlsView");
-    if (!controlsClass || !card) {
+    if (!controlsClass) {
         return nil;
     }
-    __block UIView* controls = nil;
-    EnumerateSubviewsRecursively(card, ^(UIView* view) {
-        if (!controls && [view isKindOfClass:controlsClass]) {
-            controls = view;
-        }
-    });
-    return controls;
-}
-
-// Same search across the whole window. Kept only to show, in the journal, when
-// the two disagree.
-static UIView* nfbAnyControlsViewInWindow(UIView* card) {
-    Class controlsClass =
-        NSClassFromString(@"_TtC14T1TwitterSwift17VideoControlsView");
-    UIView* root = card.window;
-    if (!controlsClass || !root) {
-        return nil;
-    }
+    UIView* root = card.window ?: card;
     __block UIView* controls = nil;
     EnumerateSubviewsRecursively(root, ^(UIView* view) {
         if (!controls && [view isKindOfClass:controlsClass]) {
@@ -531,6 +510,40 @@ static UIView* nfbAnyControlsViewInWindow(UIView* card) {
         }
     });
     return controls;
+}
+
+// TEMPORARY probe: how many bars are in the window, and what the first one
+// looks like. Read only.
+static NSString* nfbControlsCensus(UIView* card) {
+    Class controlsClass =
+        NSClassFromString(@"_TtC14T1TwitterSwift17VideoControlsView");
+    UIView* root = card.window;
+    if (!controlsClass || !root) {
+        return @"no window";
+    }
+    __block NSInteger count = 0;
+    __block UIView* first = nil;
+    EnumerateSubviewsRecursively(root, ^(UIView* view) {
+        if ([view isKindOfClass:controlsClass]) {
+            count++;
+            if (!first) {
+                first = view;
+            }
+        }
+    });
+    if (!first) {
+        return @"0 bar";
+    }
+    NSMutableArray* chain = [NSMutableArray array];
+    UIView* up = first.superview;
+    while (up && chain.count < 3) {
+        [chain addObject:NSStringFromClass([up class])];
+        up = up.superview;
+    }
+    return [NSString stringWithFormat:@"%ld bar(s) | first alpha=%.2f hidden=%@ "
+                                      @"under %@",
+                     (long)count, first.alpha, first.hidden ? @"YES" : @"no",
+                     [chain componentsJoinedByString:@" < "]];
 }
 
 // Built once per card and kept as an associated object. Touches pass through
@@ -1107,11 +1120,8 @@ static void nfbStartFoldWatch(UIView* card) {
             nfbApplyMuted(nfbCardPlayer(card), nfbImmersiveAudioManager(card), YES);
         }
         gNFBActiveCard = card;
-        NFBDebugLog(@"[flash] %.0f ms | card registered | this card's bar: %@ "
-                    @"| any bar in window: %@",
-                    nfbFlashMs(),
-                    nfbImmersiveControlsView(card) ? @"YES" : @"no",
-                    nfbAnyControlsViewInWindow(card) ? @"YES" : @"no");
+        NFBDebugLog(@"[flash] %.0f ms | card registered | %@", nfbFlashMs(),
+                    nfbControlsCensus(card));
         objc_setAssociatedObject(
             card, kNFBCardShownAtKey,
             @([NSDate timeIntervalSinceReferenceDate]),
