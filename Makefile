@@ -12,7 +12,14 @@ NFB_COMMIT := $(shell git rev-parse --short HEAD)
 # Regenerate the hook manifest from the current source on every build, before
 # the file list below is evaluated, so the debugger's health check always
 # matches the code that shipped. Hand-editing it would defeat its purpose.
-NFB_MANIFEST := $(shell python3 tools/gen-hook-manifest.py 2>/dev/null && echo done)
+#
+# Errors are NOT swallowed: a generator that fails silently would ship a stale
+# manifest, and the health check would then report on hooks that no longer
+# exist while missing the ones that do. A failure stops the build instead.
+NFB_MANIFEST := $(shell python3 tools/gen-hook-manifest.py >/dev/null && echo done)
+ifneq ($(NFB_MANIFEST),done)
+$(error hook manifest generation failed - see the error above; python3 is required)
+endif
 
 PrimeFreeBird_FILES = $(shell find src \( -name '*.x' -o -name '*.m' \) | sort)
 PrimeFreeBird_FRAMEWORKS = UIKit Foundation AVFoundation AVKit CoreMotion GameController VideoToolbox Accelerate CoreMedia CoreVideo CoreImage CoreGraphics ImageIO Photos CoreServices SystemConfiguration SafariServices Security QuartzCore WebKit SceneKit
