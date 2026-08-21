@@ -231,6 +231,11 @@ static NSDictionary<NSString*, NSDictionary*>* BHTSettingsPages(void) {
                         @"default": @YES,
                         @"type": @"toggle"
                     },
+                    @{@"key": @"video_starts_muted",
+                      @"parentKey": @"tap_to_pause",
+                      @"indented": @YES,
+                      @"default": @YES,
+                      @"type": @"toggle"},
                     @{@"key": @"restore_video_timestamp",
                       @"default": @YES,
                       @"type": @"toggle"},
