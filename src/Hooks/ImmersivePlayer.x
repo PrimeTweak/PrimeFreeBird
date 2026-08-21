@@ -48,6 +48,20 @@ static const NSTimeInterval kNFBUserTapGrace = 0.6;
 // Only the app's own overlay plugins are treated this way, never the card and
 // never anything carrying the video: the card's visibility is what gates
 // autoplay, and dimming it stops playback outright.
+// TEMPORARY probe for the opening flash. Read only: it adds no view, changes
+// no alpha and takes no decision. Milliseconds are counted from the moment the
+// card registers, so every line below is comparable on one timeline.
+static UIView* nfbImmersiveControlsView(UIView* card);
+
+static NSTimeInterval gNFBFlashOrigin = 0;
+
+static double nfbFlashMs(void) {
+    if (gNFBFlashOrigin <= 0) {
+        return -1.0;
+    }
+    return ([NSDate timeIntervalSinceReferenceDate] - gNFBFlashOrigin) * 1000.0;
+}
+
 static void nfbHoldThroughOpening(UIView* view) {
     if (!view.window || ![BHTSettings boolForKey:@"tap_to_pause"]) {
         return;
@@ -57,8 +71,17 @@ static void nfbHoldThroughOpening(UIView* view) {
         card ? [objc_getAssociatedObject(card, kNFBCardShownAtKey) doubleValue] : 0;
     NSTimeInterval since = [NSDate timeIntervalSinceReferenceDate] - shownAt;
     if (shownAt <= 0 || since >= kNFBBarRevealDelay) {
+        NFBDebugLog(@"[flash] %.0f ms | bar mounted | hold SKIPPED (%@) | "
+                    @"alpha stays %.2f",
+                    nfbFlashMs(),
+                    !card ? @"no active card"
+                          : (shownAt <= 0 ? @"card not stamped"
+                                          : @"opening already over"),
+                    view.alpha);
         return;
     }
+    NFBDebugLog(@"[flash] %.0f ms | bar mounted | hold APPLIED for %.0f ms",
+                nfbFlashMs(), (kNFBBarRevealDelay - since) * 1000.0);
     view.alpha = 0.0;
     __weak UIView* weakView = view;
     dispatch_after(
@@ -68,6 +91,11 @@ static void nfbHoldThroughOpening(UIView* view) {
           UIView* strongView = weakView;
           if (strongView) {
               strongView.alpha = 1.0;
+              NFBDebugLog(@"[flash] %.0f ms | hold released, alpha back to 1 | "
+                          @"controls still mounted: %@",
+                          nfbFlashMs(),
+                          nfbImmersiveControlsView(gNFBActiveCard) ? @"YES"
+                                                                  : @"no");
           }
         });
 }
@@ -886,10 +914,16 @@ static BOOL nfbFoldIfDue(UIView* card) {
     // 1 is waiting to play: transient everywhere else, but at the opening it is
     // the state the whole transition runs in.
     if (status == 1 && !opening) {
+        NFBDebugLog(@"[flash] %.0f ms | fold REFUSED: waiting to play, opening "
+                    @"window over", nfbFlashMs());
         return NO;
     }
     BOOL paused = (status == 0);
     if ((nfbImmersiveControlsView(card) != nil) == paused) {
+        NFBDebugLog(@"[flash] %.0f ms | fold REFUSED: bar already matches state "
+                    @"(status=%ld, mounted=%@)",
+                    nfbFlashMs(), (long)status,
+                    nfbImmersiveControlsView(card) ? @"YES" : @"no");
         return NO;
     }
     Ivar recognizerIvar =
@@ -899,12 +933,17 @@ static BOOL nfbFoldIfDue(UIView* card) {
         return YES;
     }
 
+    NFBDebugLog(@"[flash] %.0f ms | fold FIRED (status=%ld)", nfbFlashMs(),
+                (long)status);
     gNFBSyntheticToggle = YES;
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Warc-performSelector-leaks"
     [card performSelector:@selector(handleSingleTap:) withObject:recognizer];
 #pragma clang diagnostic pop
     gNFBSyntheticToggle = NO;
+    NFBDebugLog(@"[flash] %.0f ms | fold done, controls mounted: %@",
+                nfbFlashMs(),
+                nfbImmersiveControlsView(card) ? @"YES" : @"no");
     return YES;
 }
 
@@ -1011,6 +1050,9 @@ static void nfbStartFoldWatch(UIView* card) {
             nfbApplyMuted(nfbCardPlayer(card), nfbImmersiveAudioManager(card), YES);
         }
         gNFBActiveCard = card;
+        gNFBFlashOrigin = [NSDate timeIntervalSinceReferenceDate];
+        NFBDebugLog(@"[flash] 0 ms | card registered | controls mounted: %@",
+                    nfbImmersiveControlsView(card) ? @"YES" : @"no");
         objc_setAssociatedObject(
             card, kNFBCardShownAtKey,
             @([NSDate timeIntervalSinceReferenceDate]),
