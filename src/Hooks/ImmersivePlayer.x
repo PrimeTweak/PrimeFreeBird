@@ -1251,6 +1251,12 @@ static void nfbStartFoldWatch(UIView* card) {
             card, kNFBCardShownAtKey,
             @([NSDate timeIntervalSinceReferenceDate]),
             OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        // The app has already painted its strip by the time the card registers,
+        // and the fold below only takes it away a couple of milliseconds later.
+        // Those milliseconds are the flash. Holding the strip clear here covers
+        // them; the hold hands the opacity back unconditionally, so a strip that
+        // is meant to stay comes back on its own.
+        nfbHoldThroughOpening(nfbImmersiveControlsView(card));
         nfbStartFoldWatch(card);
     } else {
         if (gNFBActiveCard == card) {
