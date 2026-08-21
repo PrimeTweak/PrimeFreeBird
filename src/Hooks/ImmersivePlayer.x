@@ -215,7 +215,7 @@ static void nfbClearAutoUnmute(UIView* view) {
     NFBDebugLog(@"[flash] 0 ms | TAP | %@", nfbChromeCensus());
     // Sample the window across the window our hooks cannot see: the bar only
     // announces itself at ~120 ms, and the chrome is on screen well before.
-    for (NSInteger ms = 30; ms <= 150; ms += 30) {
+    for (NSInteger ms = 140; ms <= 620; ms += 80) {
         NSInteger at = ms;
         dispatch_after(
             dispatch_time(DISPATCH_TIME_NOW, (int64_t)(at * NSEC_PER_MSEC)),
@@ -558,15 +558,17 @@ static void nfbNameChromeOnScreen(const char* whenLabel, double ms) {
     }
     NSMutableArray* found = [NSMutableArray array];
     EnumerateSubviewsRecursively(root, ^(UIView* view) {
-        if (view.hidden || view.alpha < 0.02 || found.count >= 8) {
+        if (view.hidden || view.alpha < 0.02 || found.count >= 30) {
             return;
         }
         NSString* name = NSStringFromClass([view class]);
-        BOOL interesting = [name containsString:@"Controls"] ||
-                           [name containsString:@"InlineActions"] ||
-                           [name containsString:@"BottomBar"] ||
-                           [name containsString:@"Immersive"];
-        if (!interesting) {
+        // Plugins first: the immersive player is assembled from them, and the
+        // full-screen ones carry no chrome, so they are dropped.
+        BOOL interesting = [name containsString:@"Plugin"] ||
+                           [name containsString:@"Controls"] ||
+                           [name containsString:@"Scrub"] ||
+                           [name containsString:@"BottomBar"];
+        if (!interesting || view.bounds.size.height > 600) {
             return;
         }
         CGRect inWindow = [view convertRect:view.bounds toView:root];
