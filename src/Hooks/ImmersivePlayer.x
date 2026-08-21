@@ -915,16 +915,29 @@ static BOOL nfbFoldIfDue(UIView* card) {
     // 1 is waiting to play: transient everywhere else, but at the opening it is
     // the state the whole transition runs in.
     if (status == 1 && !opening) {
-        NFBDebugLog(@"[flash] %.0f ms | fold REFUSED: waiting to play, opening "
-                    @"window over", nfbFlashMs());
+        return NO;
+    }
+    // 0 is paused. A real state once the video runs, but at the opening it is
+    // the state the transition starts in, before the first frame plays. Acting
+    // on it there reads "paused, so the bar must be up" and synthesises taps to
+    // MOUNT Twitter's controls - the flash. A tap the reader actually made is
+    // already excluded by the grace period above, so nothing is lost by sitting
+    // this out until the player reports playing.
+    if (status == 0 && opening) {
         return NO;
     }
     BOOL paused = (status == 0);
     if ((nfbImmersiveControlsView(card) != nil) == paused) {
-        NFBDebugLog(@"[flash] %.0f ms | fold REFUSED: bar already matches state "
-                    @"(status=%ld, mounted=%@)",
-                    nfbFlashMs(), (long)status,
-                    nfbImmersiveControlsView(card) ? @"YES" : @"no");
+        // One line per card: the retry ladder asks again every few
+        // milliseconds, and a line per attempt buries the journal.
+        static NSInteger lastReported = -1;
+        if (lastReported != status) {
+            lastReported = status;
+            NFBDebugLog(@"[flash] %.0f ms | settled: bar matches state "
+                        @"(status=%ld, mounted=%@)",
+                        nfbFlashMs(), (long)status,
+                        nfbImmersiveControlsView(card) ? @"YES" : @"no");
+        }
         return NO;
     }
     Ivar recognizerIvar =
