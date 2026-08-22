@@ -57,23 +57,20 @@ static BOOL nfbAnyTabHidden(void) {
     return NO;
 }
 
-static BOOL nfbAllTabsHidden(void) {
-    for (NSInteger i = 0; i < kNFBTabCount; i++) {
-        if (![BHTSettings boolForKey:kNFBTabKeys[i]]) { return NO; }
-    }
-    return YES;
-}
-
+// The two modes are asked for, not inferred. The old pair read a single master
+// and guessed: master ON with no tab chosen meant "hide everything", and master
+// ON with every tab chosen meant the same - which made striking all five
+// identical to striking none. Each mode now has its own switch, and the
+// settings screen refuses to strike the last kept tab, so an empty bar cannot
+// be reached at all.
 BOOL nfbShouldHideAllTrends(void) {
-    if (![BHTSettings boolForKey:@"hide_trends"]) { return NO; }
-    if (!nfbAnyTabHidden()) { return YES; }
-    if (nfbAllTabsHidden()) { return YES; }
-    return NO;
+    return [BHTSettings boolForKey:@"hide_explore_all"];
 }
 
 static BOOL nfbGranularActive(void) {
-    return [BHTSettings boolForKey:@"hide_trends"]
-        && nfbAnyTabHidden() && !nfbAllTabsHidden();
+    return ![BHTSettings boolForKey:@"hide_explore_all"]
+        && [BHTSettings boolForKey:@"choose_explore_tabs"]
+        && nfbAnyTabHidden();
 }
 
 // MARK: - tab mask helpers (pure, defined before use)

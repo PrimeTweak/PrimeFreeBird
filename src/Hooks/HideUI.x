@@ -99,11 +99,10 @@
 
 // MARK: - Hide trending content on the Explore tab
 
-// Defined in ExploreTabs.x. YES only when the whole Explore chrome should be
-// hidden: master "hide_trends" ON *and* either no per-tab choice is made (legacy
-// "hide everything") or every tab is chosen to hide (avoid an empty bar). When
-// the user keeps some tabs (granular mode), this returns NO so the bar stays and
-// ExploreTabs.x removes only the chosen tabs.
+// Defined in ExploreTabs.x. YES when the reader asked for the whole Explore
+// chrome to go, through the "hide_explore_all" switch and nothing else. Choosing
+// which tabs to keep is a separate switch, and it leaves the bar in place while
+// ExploreTabs.x removes only the tabs that were struck.
 extern BOOL nfbShouldHideAllTrends(void);
 // Defined in ExploreTabs.x. Records the exact accessory view this guide vends so
 // the tab filter only ever touches THIS bar (SegmentedTabBarView is a generic
