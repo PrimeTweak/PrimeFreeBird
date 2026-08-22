@@ -540,6 +540,8 @@ static void nfbApplySelectedBackground(UITableViewCell* cell) {
 
 #pragma mark - Explore bar
 
+static const NSInteger kNFBTabUnderlineTag = 90311;
+
 @interface ModernSettingsTabBarCell ()
 @property (nonatomic, strong) UIView* box;
 @property (nonatomic, strong) UILabel* captionLabel;
@@ -602,10 +604,12 @@ static void nfbApplySelectedBackground(UITableViewCell* cell) {
 
         self.barHeight = [self.barContainer.heightAnchor constraintEqualToConstant:44.0];
         [NSLayoutConstraint activateConstraints:@[
+            // Flush with the rows above: their title starts at 10 and their
+            // switch ends at -10, so the box shares both edges.
             [self.box.leadingAnchor constraintEqualToAnchor:self.contentView.leadingAnchor
-                                                   constant:18],
+                                                   constant:10],
             [self.box.trailingAnchor constraintEqualToAnchor:self.contentView.trailingAnchor
-                                                    constant:-18],
+                                                    constant:-10],
             [self.box.topAnchor constraintEqualToAnchor:self.contentView.topAnchor constant:6],
             [self.box.bottomAnchor constraintEqualToAnchor:self.contentView.bottomAnchor
                                                   constant:-18],
@@ -698,8 +702,8 @@ static void nfbApplySelectedBackground(UITableViewCell* cell) {
     if (available <= 0 || self.tabButtons.count == 0) {
         return;
     }
-    const CGFloat lineHeight = 40.0;
-    const CGFloat gap = 2.0;
+    const CGFloat lineHeight = 36.0;
+    const CGFloat gap = 4.0;
     CGFloat x = 0;
     CGFloat y = 0;
     for (UIButton* tab in self.tabButtons) {
@@ -710,6 +714,10 @@ static void nfbApplySelectedBackground(UITableViewCell* cell) {
             y += lineHeight;
         }
         tab.frame = CGRectMake(x, y, width, lineHeight);
+        UIView* mark = [tab viewWithTag:kNFBTabUnderlineTag];
+        if (mark) {
+            mark.frame = CGRectMake(6, lineHeight - 5, MAX(width - 12, 0), 3);
+        }
         x += width + gap;
     }
     CGFloat needed = y + lineHeight;
@@ -778,7 +786,27 @@ static void nfbApplySelectedBackground(UITableViewCell* cell) {
         }
         [tab setAttributedTitle:label forState:UIControlStateNormal];
         tab.alpha = hidden ? 0.45 : 1.0;
-        tab.contentEdgeInsets = UIEdgeInsetsMake(0, 9, 0, 9);
+        tab.contentEdgeInsets = UIEdgeInsetsMake(0, 8, 0, 8);
+
+        // The app underlines the tab Explore opens on. Drawing it here is what
+        // makes this read as the bar rather than as a row of words - and a tab
+        // that is struck through is not opening anything, so it loses the mark.
+        BOOL first = [objc_getAssociatedObject(tab, @"tabIsFirst") boolValue];
+        UIView* mark = [tab viewWithTag:kNFBTabUnderlineTag];
+        if (first && !hidden) {
+            if (!mark) {
+                mark = [UIView new];
+                mark.tag = kNFBTabUnderlineTag;
+                mark.userInteractionEnabled = NO;
+                mark.layer.cornerRadius = 1.5;
+                [tab addSubview:mark];
+            }
+            mark.backgroundColor =
+                [colorPalette performSelector:@selector(primaryColor)];
+            mark.hidden = NO;
+        } else if (mark) {
+            mark.hidden = YES;
+        }
     }
     [self setNeedsLayout];
 }
