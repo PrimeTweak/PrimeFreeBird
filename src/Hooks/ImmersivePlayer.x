@@ -75,15 +75,23 @@ static double nfbFlashMs(void) {
 // They are kept out of sight for the length of the opening only. Afterwards the
 // view is left entirely alone, so a tap that asks for the controls still gets
 // them.
-static const NSTimeInterval kNFBChromeBlackout = 0.7;
+// Whether the reader has asked for the app's chrome on the video now showing.
+// Measured: the app drives every piece of chrome with alpha and re-asserts
+// alpha 1 continuously - hundreds of times while a video plays - so no window
+// of time can hold it down. It is also asserted while the player reports
+// playing, paused and no state at all, so the playback state cannot tell the
+// two apart either. What does tell them apart is who asked: a tap the reader
+// made, or the app bringing it up on its own. Cleared for every new video,
+// raised by a real tap.
+//
+// Nothing that is visible once a video has settled is suppressed by this: every
+// one of these views ends at alpha 0 on its own. Only the ride up and back down
+// is taken away.
+static BOOL gNFBReaderAskedForChrome = NO;
 
-// True while a video opened from the timeline is still coming up.
-static BOOL nfbChromeIsOpening(void) {
-    if (![BHTSettings boolForKey:@"tap_to_pause"]) {
-        return NO;
-    }
-    NSTimeInterval since = nfbFlashMs() / 1000.0;
-    return since >= 0 && since <= kNFBChromeBlackout;
+static BOOL nfbChromeIsUnasked(void) {
+    return !gNFBReaderAskedForChrome &&
+           [BHTSettings boolForKey:@"tap_to_pause"];
 }
 
 // TEMPORARY probe. Every attempt to bring a piece of chrome back into view is
@@ -253,6 +261,7 @@ static void nfbClearAutoUnmute(UIView* view) {
     // last one was left as.
     gNFBSoundAllowed = nfbSoundAllowedAtOpen();
     gNFBFlashOrigin = [NSDate timeIntervalSinceReferenceDate];
+    gNFBReaderAskedForChrome = NO;
     NFBDebugLog(@"[flash] 0 ms | TAP | %@", nfbChromeCensus());
     // Two snapshots and their difference. Whatever is on screen while the
     // reader sees the flash and gone once it settles comes out by name.
@@ -1230,6 +1239,7 @@ static void nfbStartFoldWatch(UIView* card) {
     }
     if (!gNFBSyntheticToggle) {
         gNFBLastUserTap = [NSDate timeIntervalSinceReferenceDate];
+        gNFBReaderAskedForChrome = YES;
     }
     UIView* controls = nfbImmersiveControlsView(card);
 
@@ -1286,6 +1296,9 @@ static void nfbStartFoldWatch(UIView* card) {
             nfbApplyMuted(nfbCardPlayer(card), nfbImmersiveAudioManager(card), YES);
         }
         gNFBActiveCard = card;
+        // A swipe to the next video never goes through the timeline tap, so the
+        // request is cleared here too.
+        gNFBReaderAskedForChrome = NO;
         NFBDebugLog(@"[flash] %.0f ms | card registered | %@", nfbFlashMs(),
                     nfbChromeCensus());
         objc_setAssociatedObject(
@@ -1341,7 +1354,7 @@ static void nfbStartFoldWatch(UIView* card) {
 // author, handle and follow control
 %hook _TtC14T1TwitterSwift25ImmersiveStatusPluginView
 - (void)setAlpha:(CGFloat)alpha {
-    BOOL blocked = alpha > 0 && nfbChromeIsOpening();
+    BOOL blocked = alpha > 0 && nfbChromeIsUnasked();
     nfbReportChromeAlpha((UIView*)self, alpha, blocked);
     if (blocked) {
         %orig(0);
@@ -1354,7 +1367,7 @@ static void nfbStartFoldWatch(UIView* card) {
 // reply, retweet, like, bookmark, share
 %hook _TtC14T1TwitterSwift36ImmersiveEngagementActionsPluginView
 - (void)setAlpha:(CGFloat)alpha {
-    BOOL blocked = alpha > 0 && nfbChromeIsOpening();
+    BOOL blocked = alpha > 0 && nfbChromeIsUnasked();
     nfbReportChromeAlpha((UIView*)self, alpha, blocked);
     if (blocked) {
         %orig(0);
@@ -1367,7 +1380,7 @@ static void nfbStartFoldWatch(UIView* card) {
 // the row holding those actions
 %hook _TtC14T1TwitterSwift25ImmersiveActionsStackView
 - (void)setAlpha:(CGFloat)alpha {
-    BOOL blocked = alpha > 0 && nfbChromeIsOpening();
+    BOOL blocked = alpha > 0 && nfbChromeIsUnasked();
     nfbReportChromeAlpha((UIView*)self, alpha, blocked);
     if (blocked) {
         %orig(0);
@@ -1380,7 +1393,7 @@ static void nfbStartFoldWatch(UIView* card) {
 // one action pill
 %hook _TtC14T1TwitterSwift19ImmersiveActionView
 - (void)setAlpha:(CGFloat)alpha {
-    BOOL blocked = alpha > 0 && nfbChromeIsOpening();
+    BOOL blocked = alpha > 0 && nfbChromeIsUnasked();
     nfbReportChromeAlpha((UIView*)self, alpha, blocked);
     if (blocked) {
         %orig(0);
@@ -1393,7 +1406,7 @@ static void nfbStartFoldWatch(UIView* card) {
 // back button, top left
 %hook _TtC14T1TwitterSwift29ImmersiveBackButtonPluginView
 - (void)setAlpha:(CGFloat)alpha {
-    BOOL blocked = alpha > 0 && nfbChromeIsOpening();
+    BOOL blocked = alpha > 0 && nfbChromeIsUnasked();
     nfbReportChromeAlpha((UIView*)self, alpha, blocked);
     if (blocked) {
         %orig(0);
@@ -1406,7 +1419,7 @@ static void nfbStartFoldWatch(UIView* card) {
 // overflow button, top right
 %hook _TtC14T1TwitterSwift35ImmersiveTopRightActionsPluginsView
 - (void)setAlpha:(CGFloat)alpha {
-    BOOL blocked = alpha > 0 && nfbChromeIsOpening();
+    BOOL blocked = alpha > 0 && nfbChromeIsUnasked();
     nfbReportChromeAlpha((UIView*)self, alpha, blocked);
     if (blocked) {
         %orig(0);
@@ -1419,7 +1432,7 @@ static void nfbStartFoldWatch(UIView* card) {
 // the shade behind the top row
 %hook _TtC14T1TwitterSwift30ImmersiveTopGradientPluginView
 - (void)setAlpha:(CGFloat)alpha {
-    BOOL blocked = alpha > 0 && nfbChromeIsOpening();
+    BOOL blocked = alpha > 0 && nfbChromeIsUnasked();
     nfbReportChromeAlpha((UIView*)self, alpha, blocked);
     if (blocked) {
         %orig(0);
@@ -1432,7 +1445,7 @@ static void nfbStartFoldWatch(UIView* card) {
 // the shade behind the bottom row
 %hook _TtC14T1TwitterSwift33ImmersiveBottomGradientPluginView
 - (void)setAlpha:(CGFloat)alpha {
-    BOOL blocked = alpha > 0 && nfbChromeIsOpening();
+    BOOL blocked = alpha > 0 && nfbChromeIsUnasked();
     nfbReportChromeAlpha((UIView*)self, alpha, blocked);
     if (blocked) {
         %orig(0);
@@ -1445,7 +1458,7 @@ static void nfbStartFoldWatch(UIView* card) {
 // scrubber, timer and playback buttons
 %hook _TtC14T1TwitterSwift17BottomBarControls
 - (void)setAlpha:(CGFloat)alpha {
-    BOOL blocked = alpha > 0 && nfbChromeIsOpening();
+    BOOL blocked = alpha > 0 && nfbChromeIsUnasked();
     nfbReportChromeAlpha((UIView*)self, alpha, blocked);
     if (blocked) {
         %orig(0);
