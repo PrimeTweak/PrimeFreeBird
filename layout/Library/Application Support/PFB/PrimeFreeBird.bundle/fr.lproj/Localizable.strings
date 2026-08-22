@@ -367,16 +367,6 @@
 /* ===== Ajouts 2026-08-04 — onglets Explorer + session web ===== */
 "CANCEL_ACTION" = "Annuler";
 "OK_ACTION" = "OK";
-"HIDE_TAB_FORYOU_TITLE" = "Masquer Pour vous";
-"HIDE_TAB_FORYOU_DETAIL" = "Retire l'onglet Pour vous de la barre Explorer.";
-"HIDE_TAB_TRENDING_TITLE" = "Masquer Tendances";
-"HIDE_TAB_TRENDING_DETAIL" = "Retire l'onglet Tendances de la barre Explorer.";
-"HIDE_TAB_NEWS_TITLE" = "Masquer Actualités";
-"HIDE_TAB_NEWS_DETAIL" = "Retire l'onglet Actualités de la barre Explorer.";
-"HIDE_TAB_SPORTS_TITLE" = "Masquer Sports";
-"HIDE_TAB_SPORTS_DETAIL" = "Retire l'onglet Sports de la barre Explorer.";
-"HIDE_TAB_ENTERTAINMENT_TITLE" = "Masquer Divertissement";
-"HIDE_TAB_ENTERTAINMENT_DETAIL" = "Retire l'onglet Divertissement de la barre Explorer.";
 "REPLY_WEBVIEW_TITLE" = "Répondre";
 "WEB_SESSION_LOGIN_TITLE" = "Connexion session web";
 "WEB_SESSION_LOGIN_SUBTITLE" = "Connecte-toi sur le web une seule fois pour activer Répondre dans la vue web.";
@@ -562,3 +552,12 @@
 "HIDDEN_NOTIFS_UNTITLED" = "Notification masquée";
 "HIDE_NOTIFICATIONS_TITLE" = "Masquer les notifications";
 "HIDE_NOTIFICATIONS_DETAIL" = "Balaye une notification vers la gauche pour la masquer, et retrouve les masquées depuis la barre des notifications.";
+"EXPLORE_TABS_CAPTION" = "Barre Explore";
+"EXPLORE_TABS_HINT" = "Touchez un onglet pour le retirer.";
+"EXPLORE_TABS_HIDDEN_COUNT" = "%lu masqué(s)";
+"EXPLORE_TABS_NONE_HIDDEN" = "Aucun masqué";
+"HIDE_TAB_FORYOU_TAB_NAME" = "Pour vous";
+"HIDE_TAB_TRENDING_TAB_NAME" = "Tendances";
+"HIDE_TAB_NEWS_TAB_NAME" = "Actualités";
+"HIDE_TAB_SPORTS_TAB_NAME" = "Sport";
+"HIDE_TAB_ENTERTAINMENT_TAB_NAME" = "Divertissement";
