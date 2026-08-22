@@ -120,7 +120,6 @@ extern NSInteger NFBColorThemeScreenVisible;
 #pragma mark - Visible Toggles
 
 - (void)updateVisibleToggles {
-    NSUserDefaults* defaults = [NSUserDefaults standardUserDefaults];
     NSMutableArray* visible = [NSMutableArray array];
     for (NSDictionary* toggleData in self.toggles) {
         NSString* parentKey = toggleData[@"parentKey"];
@@ -407,7 +406,7 @@ extern NSInteger NFBColorThemeScreenVisible;
     // row would flash the whole bar for one tap.
     NSIndexPath* path = [self.tableView indexPathForCell:cell];
     NSArray* tabs = path ? [self tabsForEntry:self.visibleToggles[path.row]] : nil;
-    [cell applyTheme];
+    [cell refreshTabs];
     if (tabs) {
         [cell setCountText:[self hiddenCountTextForTabs:tabs]];
     }

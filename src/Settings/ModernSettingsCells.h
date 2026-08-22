@@ -63,6 +63,9 @@
                      hint:(NSString*)hint;
 - (void)setCountText:(NSString*)text;
 - (void)addTabTarget:(id)target action:(SEL)action;
+// Repaints the tabs from the stored state: struck through when hidden, plain
+// when shown. Called after a tap so the bar answers without the row reloading.
+- (void)refreshTabs;
 @end
 
 @interface ModernSettingsHeaderCell : UITableViewCell

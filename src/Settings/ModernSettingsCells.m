@@ -746,6 +746,16 @@ static void nfbApplySelectedBackground(UITableViewCell* cell) {
     self.countLabel.font = [fontGroup performSelector:@selector(subtext2BoldFont)];
     self.countLabel.textColor = soft;
     self.countLabel.backgroundColor = [Palette currentBackgroundColor];
+    [self refreshTabs];
+}
+
+- (void)refreshTabs {
+    id fontGroup = [BHTManager sharedFontGroup];
+    Class TAEColorSettingsCls = objc_getClass("TAEColorSettings");
+    id settings = [TAEColorSettingsCls sharedSettings];
+    id colorPalette = [[settings currentColorPalette] colorPalette];
+    UIColor* ink = [colorPalette performSelector:@selector(textColor)];
+    UIColor* soft = [colorPalette performSelector:@selector(tabBarItemColor)];
 
     for (UIButton* tab in self.tabButtons) {
         NSString* name = objc_getAssociatedObject(tab, @"tabName") ?: @"";
