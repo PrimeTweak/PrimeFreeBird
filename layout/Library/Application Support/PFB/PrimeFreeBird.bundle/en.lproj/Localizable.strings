@@ -263,14 +263,8 @@
 "MODERN_SETTINGS_LAB_SUBTITLE" = "Experimental features, tools, and settings backup.";
 "REPLY_IN_WEBVIEW_TITLE" = "Reply in web view";
 "REPLY_IN_WEBVIEW_DETAIL" = "Open the reply box in a web view to avoid attestation.";
-"FLEX_TWITTER_TITLE" = "Debug mode";
-"FLEX_TWITTER_DETAIL" = "Show the FLEX inspector for Twitter's views and data.";
 "DIAGNOSTICS_TITLE" = "Diagnostics";
 "DIAGNOSTICS_DETAIL" = "Hook health, shake-to-capture, shareable report — all on the phone.";
-"EXPORT_SETTINGS_TITLE" = "Export settings";
-"EXPORT_SETTINGS_DETAIL" = "Save every option, muted word, and color to a file.";
-"IMPORT_SETTINGS_TITLE" = "Import settings";
-"IMPORT_SETTINGS_DETAIL" = "Restore a saved file. Unknown keys are ignored.";
 "IMPORT_SETTINGS_DONE_TITLE" = "Settings imported";
 "IMPORT_SETTINGS_DONE_MESSAGE" = "%lu settings restored. Restart Twitter to apply everything.";
 "IMPORT_SETTINGS_FAILED_TITLE" = "Import failed";
@@ -280,10 +274,7 @@
 /* Reply-in-web-view: the reply screen title + the web-session login/clear
    buttons (Lab) and their alerts. */
 "REPLY_WEBVIEW_TITLE" = "Reply";
-"WEB_SESSION_LOGIN_TITLE" = "Web session login";
-"WEB_SESSION_LOGIN_SUBTITLE" = "Sign in on the web once to enable Reply in web view.";
 "WEB_SESSION_CLEAR_TITLE" = "Clear web session";
-"WEB_SESSION_CLEAR_SUBTITLE" = "Delete the saved web cookies from this device.";
 "WEB_SESSION_SAVED_TITLE" = "Web session saved";
 "WEB_SESSION_SAVED_MESSAGE" = "You're logged in. Reply in web view will work now.";
 "WEB_SESSION_CLEAR_CONFIRM" = "This deletes the saved web login. You'll need to log in again to reply in a web view.";
@@ -549,3 +540,19 @@
 "CHOOSE_EXPLORE_TABS_DETAIL" = "Pick which tabs stay in the bar.";
 "CHOOSE_EXPLORE_TABS_DETAIL_HELD" = "Not needed while all of Explore is hidden.";
 "EXPLORE_TABS_KEEP_ONE" = "Keep one tab, or hide all of Explore.";
+"LAB_GROUP_SESSION" = "Web session";
+"LAB_GROUP_TOOLS" = "Tools";
+"LAB_GROUP_BACKUP" = "Backup";
+"WEB_SESSION_NONE_TITLE" = "No web session";
+"WEB_SESSION_LIVE_DETAIL" = "Signed in on this device.";
+"WEB_SESSION_NONE_DETAIL" = "Sign in to use Reply in web view.";
+"WEB_SESSION_SIGN_IN_ACTION" = "Sign in";
+"REPLY_IN_WEBVIEW_DETAIL_HELD" = "Needs a web session — sign in above.";
+"FLEX_TWITTER_TITLE" = "Developer tools";
+"FLEX_TWITTER_DETAIL" = "FLEX inspector, shake to capture, launch health check.";
+"DIAGNOSTICS_DETAIL_HELD" = "Needs developer tools — turn them on above.";
+"SETTINGS_BACKUP_TITLE" = "Settings backup";
+"SETTINGS_BACKUP_DETAIL" = "Every option, muted word and colour.";
+"EXPORT_SETTINGS_ACTION" = "Export…";
+"IMPORT_SETTINGS_ACTION" = "Import…";
+"WEB_SESSION_LOGIN_TITLE" = "Sign in on the web";
