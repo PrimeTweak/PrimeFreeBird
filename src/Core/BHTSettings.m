@@ -438,37 +438,38 @@ static NSDictionary<NSString*, NSDictionary*>* BHTSettingsPages(void) {
                 @"titleKey": @"MODERN_SETTINGS_LAB_TITLE",
                 @"subtitleKey": @"MODERN_SETTINGS_LAB_SUBTITLE",
                 @"settings": @[
-                    @{@"key": @"reply_in_webview", @"default": @NO, @"type": @"toggle"},
-                    @{
-                        @"titleKey": @"WEB_SESSION_LOGIN_TITLE",
-                        @"subtitleKey": @"WEB_SESSION_LOGIN_SUBTITLE",
-                        @"action": @"showWebSessionLogin:",
-                        @"type": @"button"
-                    },
-                    @{
-                        @"titleKey": @"WEB_SESSION_CLEAR_TITLE",
-                        @"subtitleKey": @"WEB_SESSION_CLEAR_SUBTITLE",
-                        @"action": @"clearWebSession:",
-                        @"type": @"button"
-                    },
+                    @{@"type": @"header", @"titleKey": @"LAB_GROUP_SESSION"},
+                    @{@"type": @"sessionCard", @"key": @"web_session_card"},
+                    @{@"key": @"reply_in_webview",
+                      @"default": @NO,
+                      @"blockedUnless": @"web_session",
+                      @"type": @"toggle"},
+
+                    @{@"type": @"header", @"titleKey": @"LAB_GROUP_TOOLS"},
                     @{@"key": @"flex_twitter", @"default": @NO, @"type": @"toggle"},
                     @{
+                        @"key": @"diagnostics",
                         @"type": @"button",
                         @"titleKey": @"DIAGNOSTICS_TITLE",
                         @"subtitleKey": @"DIAGNOSTICS_DETAIL",
+                        @"blockedUnless": @"flex_twitter",
                         @"action": @"showDiagnostics:"
                     },
+
+                    @{@"type": @"header", @"titleKey": @"LAB_GROUP_BACKUP"},
                     @{
+                        @"key": @"settings_backup",
                         @"type": @"button",
-                        @"titleKey": @"EXPORT_SETTINGS_TITLE",
-                        @"subtitleKey": @"EXPORT_SETTINGS_DETAIL",
-                        @"action": @"showExportSettings:"
+                        @"titleKey": @"SETTINGS_BACKUP_TITLE",
+                        @"subtitleKey": @"SETTINGS_BACKUP_DETAIL"
                     },
                     @{
-                        @"type": @"button",
-                        @"titleKey": @"IMPORT_SETTINGS_TITLE",
-                        @"subtitleKey": @"IMPORT_SETTINGS_DETAIL",
-                        @"action": @"showImportSettings:"
+                        @"type": @"buttonPair",
+                        @"key": @"backup_actions",
+                        @"firstKey": @"EXPORT_SETTINGS_ACTION",
+                        @"secondKey": @"IMPORT_SETTINGS_ACTION",
+                        @"firstAction": @"showExportSettings:",
+                        @"secondAction": @"showImportSettings:"
                     }
                 ]
             },
