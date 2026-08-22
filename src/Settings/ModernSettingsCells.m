@@ -537,3 +537,240 @@ static void nfbApplySelectedBackground(UITableViewCell* cell) {
 }
  
 @end
+
+#pragma mark - Explore bar
+
+@interface ModernSettingsTabBarCell ()
+@property (nonatomic, strong) UIView* box;
+@property (nonatomic, strong) UILabel* captionLabel;
+@property (nonatomic, strong) UIView* barContainer;
+@property (nonatomic, strong) UIView* rule;
+@property (nonatomic, strong) UILabel* hintLabel;
+@property (nonatomic, strong) UILabel* countLabel;
+@property (nonatomic, strong) NSMutableArray<UIButton*>* tabButtons;
+@property (nonatomic, strong) NSLayoutConstraint* barHeight;
+@property (nonatomic, assign) CGFloat laidOutWidth;
+@end
+
+@implementation ModernSettingsTabBarCell
+
+- (instancetype)initWithStyle:(UITableViewCellStyle)style
+              reuseIdentifier:(NSString*)reuseIdentifier {
+    self = [super initWithStyle:style reuseIdentifier:reuseIdentifier];
+    if (self) {
+        self.selectionStyle = UITableViewCellSelectionStyleNone;
+        self.contentView.preservesSuperviewLayoutMargins = NO;
+        self.contentView.layoutMargins = UIEdgeInsetsZero;
+        self.separatorInset = UIEdgeInsetsZero;
+        self.backgroundColor = [Palette currentBackgroundColor];
+        self.tabButtons = [NSMutableArray array];
+
+        self.box = [UIView new];
+        self.box.translatesAutoresizingMaskIntoConstraints = NO;
+        self.box.layer.cornerRadius = 16.0;
+        self.box.layer.borderWidth = 1.0;
+        self.box.layer.masksToBounds = YES;
+        [self.contentView addSubview:self.box];
+
+        self.captionLabel = [UILabel new];
+        self.captionLabel.translatesAutoresizingMaskIntoConstraints = NO;
+        [self.box addSubview:self.captionLabel];
+
+        self.barContainer = [UIView new];
+        self.barContainer.translatesAutoresizingMaskIntoConstraints = NO;
+        [self.box addSubview:self.barContainer];
+
+        self.rule = [UIView new];
+        self.rule.translatesAutoresizingMaskIntoConstraints = NO;
+        [self.box addSubview:self.rule];
+
+        self.hintLabel = [UILabel new];
+        self.hintLabel.translatesAutoresizingMaskIntoConstraints = NO;
+        [self.box addSubview:self.hintLabel];
+
+        self.countLabel = [UILabel new];
+        self.countLabel.translatesAutoresizingMaskIntoConstraints = NO;
+        self.countLabel.textAlignment = NSTextAlignmentCenter;
+        self.countLabel.layer.cornerRadius = 11.0;
+        self.countLabel.layer.masksToBounds = YES;
+        [self.countLabel setContentHuggingPriority:UILayoutPriorityRequired
+                                           forAxis:UILayoutConstraintAxisHorizontal];
+        [self.countLabel
+            setContentCompressionResistancePriority:UILayoutPriorityRequired
+                                            forAxis:UILayoutConstraintAxisHorizontal];
+        [self.box addSubview:self.countLabel];
+
+        self.barHeight = [self.barContainer.heightAnchor constraintEqualToConstant:44.0];
+        [NSLayoutConstraint activateConstraints:@[
+            [self.box.leadingAnchor constraintEqualToAnchor:self.contentView.leadingAnchor
+                                                   constant:18],
+            [self.box.trailingAnchor constraintEqualToAnchor:self.contentView.trailingAnchor
+                                                    constant:-18],
+            [self.box.topAnchor constraintEqualToAnchor:self.contentView.topAnchor constant:6],
+            [self.box.bottomAnchor constraintEqualToAnchor:self.contentView.bottomAnchor
+                                                  constant:-18],
+
+            [self.captionLabel.leadingAnchor constraintEqualToAnchor:self.box.leadingAnchor
+                                                            constant:14],
+            [self.captionLabel.topAnchor constraintEqualToAnchor:self.box.topAnchor constant:12],
+
+            [self.barContainer.leadingAnchor constraintEqualToAnchor:self.box.leadingAnchor
+                                                            constant:8],
+            [self.barContainer.trailingAnchor constraintEqualToAnchor:self.box.trailingAnchor
+                                                             constant:-8],
+            [self.barContainer.topAnchor constraintEqualToAnchor:self.captionLabel.bottomAnchor
+                                                        constant:6],
+            self.barHeight,
+
+            [self.rule.leadingAnchor constraintEqualToAnchor:self.box.leadingAnchor],
+            [self.rule.trailingAnchor constraintEqualToAnchor:self.box.trailingAnchor],
+            [self.rule.topAnchor constraintEqualToAnchor:self.barContainer.bottomAnchor
+                                                constant:8],
+            [self.rule.heightAnchor constraintEqualToConstant:1],
+
+            [self.hintLabel.leadingAnchor constraintEqualToAnchor:self.box.leadingAnchor
+                                                         constant:14],
+            [self.hintLabel.topAnchor constraintEqualToAnchor:self.rule.bottomAnchor constant:10],
+            [self.hintLabel.bottomAnchor constraintEqualToAnchor:self.box.bottomAnchor
+                                                        constant:-12],
+
+            [self.countLabel.trailingAnchor constraintEqualToAnchor:self.box.trailingAnchor
+                                                           constant:-14],
+            [self.countLabel.leadingAnchor
+                constraintGreaterThanOrEqualToAnchor:self.hintLabel.trailingAnchor
+                                            constant:8],
+            [self.countLabel.centerYAnchor constraintEqualToAnchor:self.hintLabel.centerYAnchor],
+            [self.countLabel.heightAnchor constraintEqualToConstant:22],
+        ]];
+        [self applyTheme];
+    }
+    return self;
+}
+
+- (void)configureWithTabs:(NSArray<NSDictionary*>*)tabs
+                  caption:(NSString*)caption
+                     hint:(NSString*)hint {
+    self.captionLabel.text = caption;
+    self.hintLabel.text = hint;
+    if (self.tabButtons.count != tabs.count) {
+        for (UIButton* old in self.tabButtons) {
+            [old removeFromSuperview];
+        }
+        [self.tabButtons removeAllObjects];
+        for (NSUInteger i = 0; i < tabs.count; i++) {
+            UIButton* tab = [UIButton buttonWithType:UIButtonTypeCustom];
+            [self.barContainer addSubview:tab];
+            [self.tabButtons addObject:tab];
+        }
+    }
+    [tabs enumerateObjectsUsingBlock:^(NSDictionary* tab, NSUInteger i, BOOL* stop) {
+      UIButton* button = self.tabButtons[i];
+      objc_setAssociatedObject(button, @"tabKey", tab[@"key"],
+                               OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+      objc_setAssociatedObject(button, @"tabName", tab[@"name"],
+                               OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+      // The first tab is the one Explore opens on, and the app underlines it.
+      objc_setAssociatedObject(button, @"tabIsFirst", @(i == 0),
+                               OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    }];
+    self.laidOutWidth = 0;
+    [self applyTheme];
+    [self setNeedsLayout];
+}
+
+- (void)setCountText:(NSString*)text {
+    self.countLabel.text = [NSString stringWithFormat:@"  %@  ", text];
+}
+
+- (void)addTabTarget:(id)target action:(SEL)action {
+    for (UIButton* tab in self.tabButtons) {
+        [tab removeTarget:nil action:NULL forControlEvents:UIControlEventTouchUpInside];
+        [tab addTarget:target action:action forControlEvents:UIControlEventTouchUpInside];
+    }
+}
+
+// The tabs are flowed by hand rather than stacked: a line is filled until the
+// next tab would not fit, then a new line is started. One line is the common
+// case and costs nothing; a second appears only when it is needed.
+- (void)layoutSubviews {
+    [super layoutSubviews];
+    CGFloat available = self.barContainer.bounds.size.width;
+    if (available <= 0 || self.tabButtons.count == 0) {
+        return;
+    }
+    const CGFloat lineHeight = 40.0;
+    const CGFloat gap = 2.0;
+    CGFloat x = 0;
+    CGFloat y = 0;
+    for (UIButton* tab in self.tabButtons) {
+        CGSize size = [tab sizeThatFits:CGSizeMake(available, lineHeight)];
+        CGFloat width = MIN(ceil(size.width), available);
+        if (x > 0 && x + width > available) {
+            x = 0;
+            y += lineHeight;
+        }
+        tab.frame = CGRectMake(x, y, width, lineHeight);
+        x += width + gap;
+    }
+    CGFloat needed = y + lineHeight;
+    if (fabs(self.barHeight.constant - needed) > 0.5) {
+        self.barHeight.constant = needed;
+        // A changed height has to reach the table, which sized this row before
+        // the flow ran.
+        UITableView* table = (UITableView*)self.superview;
+        while (table && ![table isKindOfClass:[UITableView class]]) {
+            table = (UITableView*)table.superview;
+        }
+        [table beginUpdates];
+        [table endUpdates];
+    }
+}
+
+- (void)applyTheme {
+    id fontGroup = [BHTManager sharedFontGroup];
+    Class TAEColorSettingsCls = objc_getClass("TAEColorSettings");
+    id settings = [TAEColorSettingsCls sharedSettings];
+    id colorPalette = [[settings currentColorPalette] colorPalette];
+    UIColor* ink = [colorPalette performSelector:@selector(textColor)];
+    UIColor* soft = [colorPalette performSelector:@selector(tabBarItemColor)];
+    UIColor* faint = [colorPalette performSelector:@selector(faintBackgroundColor)];
+    UIColor* divider = [colorPalette performSelector:@selector(dividerColor)];
+
+    self.box.backgroundColor = faint;
+    self.box.layer.borderColor = divider.CGColor;
+    self.rule.backgroundColor = divider;
+    self.captionLabel.font = [fontGroup performSelector:@selector(subtext3BoldFont)];
+    self.captionLabel.textColor = soft;
+    self.hintLabel.font = [fontGroup performSelector:@selector(subtext2Font)];
+    self.hintLabel.textColor = soft;
+    self.countLabel.font = [fontGroup performSelector:@selector(subtext2BoldFont)];
+    self.countLabel.textColor = soft;
+    self.countLabel.backgroundColor = [Palette currentBackgroundColor];
+
+    for (UIButton* tab in self.tabButtons) {
+        NSString* name = objc_getAssociatedObject(tab, @"tabName") ?: @"";
+        NSString* key = objc_getAssociatedObject(tab, @"tabKey");
+        BOOL hidden = key ? [BHTSettings boolForKey:key] : NO;
+        NSMutableAttributedString* label = [[NSMutableAttributedString alloc]
+            initWithString:name
+                attributes:@{
+                  NSFontAttributeName :
+                      [fontGroup performSelector:@selector(subtext1BoldFont)],
+                  NSForegroundColorAttributeName : hidden ? soft : ink
+                }];
+        if (hidden) {
+            [label addAttribute:NSStrikethroughStyleAttributeName
+                          value:@(NSUnderlineStyleSingle)
+                          range:NSMakeRange(0, name.length)];
+            [label addAttribute:NSStrikethroughColorAttributeName
+                          value:soft
+                          range:NSMakeRange(0, name.length)];
+        }
+        [tab setAttributedTitle:label forState:UIControlStateNormal];
+        tab.alpha = hidden ? 0.45 : 1.0;
+        tab.contentEdgeInsets = UIEdgeInsetsMake(0, 9, 0, 9);
+    }
+    [self setNeedsLayout];
+}
+
+@end

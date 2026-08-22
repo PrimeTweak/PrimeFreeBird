@@ -110,6 +110,8 @@ extern NSInteger NFBColorThemeScreenVisible;
            forCellReuseIdentifier:@"ButtonCell"];
     [self.tableView registerClass:[ModernSettingsCompactButtonCell class]
            forCellReuseIdentifier:@"CompactButtonCell"];
+    [self.tableView registerClass:[ModernSettingsTabBarCell class]
+           forCellReuseIdentifier:@"TabBarCell"];
     [self.tableView registerClass:[ModernSettingsHeaderCell class]
            forCellReuseIdentifier:@"HeaderCell"];
     [self.view addSubview:self.tableView];
@@ -179,6 +181,20 @@ extern NSInteger NFBColorThemeScreenVisible;
                                             forIndexPath:indexPath];
         [cell configureWithTitle:[[BHTBundle sharedBundle]
                                      localizedStringForKey:toggleData[@"titleKey"]]];
+        return cell;
+    }
+    if ([type isEqualToString:@"tabBar"]) {
+        ModernSettingsTabBarCell* cell =
+            [tableView dequeueReusableCellWithIdentifier:@"TabBarCell"
+                                            forIndexPath:indexPath];
+        NSArray* tabs = [self tabsForEntry:toggleData];
+        [cell configureWithTabs:tabs
+                        caption:[[BHTBundle sharedBundle]
+                                    localizedStringForKey:toggleData[@"captionKey"]]
+                           hint:[[BHTBundle sharedBundle]
+                                    localizedStringForKey:toggleData[@"hintKey"]]];
+        [cell setCountText:[self hiddenCountTextForTabs:tabs]];
+        [cell addTabTarget:self action:@selector(tabTapped:)];
         return cell;
     }
     if ([type isEqualToString:@"compactButton"]) {
@@ -338,6 +354,62 @@ extern NSInteger NFBColorThemeScreenVisible;
     if (paths.count) {
         [self.tableView reloadRowsAtIndexPaths:paths
                               withRowAnimation:UITableViewRowAnimationFade];
+    }
+}
+
+// The tabs of the Explore bar, in the order the app shows them. Each carries
+// the preference key that hides it.
+- (NSArray<NSDictionary*>*)tabsForEntry:(NSDictionary*)entry {
+    NSMutableArray* out = [NSMutableArray array];
+    for (NSString* key in entry[@"tabKeys"]) {
+        NSString* nameKey =
+            [NSString stringWithFormat:@"%@_TAB_NAME", key.uppercaseString];
+        [out addObject:@{
+            @"key" : key,
+            @"name" : [[BHTBundle sharedBundle] localizedStringForKey:nameKey]
+        }];
+    }
+    return out;
+}
+
+- (NSString*)hiddenCountTextForTabs:(NSArray<NSDictionary*>*)tabs {
+    NSUInteger hidden = 0;
+    for (NSDictionary* tab in tabs) {
+        if ([BHTSettings boolForKey:tab[@"key"]]) {
+            hidden++;
+        }
+    }
+    if (hidden == 0) {
+        return [[BHTBundle sharedBundle] localizedStringForKey:@"EXPLORE_TABS_NONE_HIDDEN"];
+    }
+    return [NSString
+        stringWithFormat:[[BHTBundle sharedBundle]
+                             localizedStringForKey:@"EXPLORE_TABS_HIDDEN_COUNT"],
+                         (unsigned long)hidden];
+}
+
+- (void)tabTapped:(UIButton*)sender {
+    NSString* key = objc_getAssociatedObject(sender, @"tabKey");
+    if (!key) {
+        return;
+    }
+    [[NSUserDefaults standardUserDefaults] setBool:![BHTSettings boolForKey:key]
+                                            forKey:key];
+    UIView* walk = sender;
+    while (walk && ![walk isKindOfClass:[ModernSettingsTabBarCell class]]) {
+        walk = walk.superview;
+    }
+    ModernSettingsTabBarCell* cell = (ModernSettingsTabBarCell*)walk;
+    if (!cell) {
+        return;
+    }
+    // Repainting the live cell keeps the strike-through immediate; reloading the
+    // row would flash the whole bar for one tap.
+    NSIndexPath* path = [self.tableView indexPathForCell:cell];
+    NSArray* tabs = path ? [self tabsForEntry:self.visibleToggles[path.row]] : nil;
+    [cell applyTheme];
+    if (tabs) {
+        [cell setCountText:[self hiddenCountTextForTabs:tabs]];
     }
 }
 
@@ -768,10 +840,22 @@ extern NSInteger NFBColorThemeScreenVisible;
         return;
     }
     BOOL isAdding = newVisibleToggles.count > oldVisibleToggles.count;
-    // Children are registered directly after their parent, so their rows are contiguous below it.
+    // Children are NOT necessarily contiguous below their parent: a row that
+    // belongs to neither can sit between them. Each child's row is looked up
+    // where it actually is - in the new list when they are appearing, in the
+    // old one when they are going away.
+    NSArray* reference = isAdding ? newVisibleToggles : oldVisibleToggles;
     NSMutableArray* indexPaths = [NSMutableArray array];
-    for (int i = 0; i < children.count; i++) {
-        [indexPaths addObject:[NSIndexPath indexPathForRow:toggleIndex + 1 + i inSection:0]];
+    [reference enumerateObjectsUsingBlock:^(NSDictionary* entry, NSUInteger row,
+                                            BOOL* stop) {
+      if ([entry[@"parentKey"] isEqualToString:key]) {
+          [indexPaths addObject:[NSIndexPath indexPathForRow:(NSInteger)row
+                                                   inSection:0]];
+      }
+    }];
+    if (indexPaths.count == 0) {
+        [self.tableView endUpdates];
+        return;
     }
     if (isAdding) {
         [self.tableView insertRowsAtIndexPaths:indexPaths
