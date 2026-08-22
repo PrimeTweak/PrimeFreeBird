@@ -541,16 +541,74 @@ static void nfbApplySelectedBackground(UITableViewCell* cell) {
 
 #pragma mark - Explore bar
 
+// Lays its subviews out in a flow and reports the resulting height as its own
+// intrinsic size. Auto Layout then sizes the cell through the normal
+// self-sizing path, so the table is never asked to re-measure from inside a
+// layout pass - an update started there lands in the middle of the insert
+// animation and makes the row jump.
+@interface NFBTabFlowView : UIView
+@property (nonatomic, assign) CGFloat lineHeight;
+@property (nonatomic, assign) CGFloat gap;
+@property (nonatomic, assign) CGFloat reportedHeight;
+@end
+
+@implementation NFBTabFlowView
+
+- (instancetype)initWithFrame:(CGRect)frame {
+    self = [super initWithFrame:frame];
+    if (self) {
+        _lineHeight = 36.0;
+        _gap = 4.0;
+        _reportedHeight = 36.0;
+    }
+    return self;
+}
+
+- (CGFloat)flowInWidth:(CGFloat)available applyingFrames:(BOOL)apply {
+    if (available <= 0 || self.subviews.count == 0) {
+        return self.lineHeight;
+    }
+    CGFloat x = 0;
+    CGFloat y = 0;
+    for (UIView* sub in self.subviews) {
+        CGSize size = [sub sizeThatFits:CGSizeMake(available, self.lineHeight)];
+        CGFloat width = MIN(ceil(size.width), available);
+        if (x > 0 && x + width > available) {
+            x = 0;
+            y += self.lineHeight;
+        }
+        if (apply) {
+            sub.frame = CGRectMake(x, y, width, self.lineHeight);
+        }
+        x += width + self.gap;
+    }
+    return y + self.lineHeight;
+}
+
+- (CGSize)intrinsicContentSize {
+    return CGSizeMake(UIViewNoIntrinsicMetric, self.reportedHeight);
+}
+
+- (void)layoutSubviews {
+    [super layoutSubviews];
+    CGFloat needed = [self flowInWidth:self.bounds.size.width applyingFrames:YES];
+    if (fabs(needed - self.reportedHeight) > 0.5) {
+        self.reportedHeight = needed;
+        // Auto Layout schedules its own pass; nothing is asked of the table.
+        [self invalidateIntrinsicContentSize];
+    }
+}
+
+@end
+
 @interface ModernSettingsTabBarCell ()
 @property (nonatomic, strong) UIView* box;
 @property (nonatomic, strong) UILabel* captionLabel;
-@property (nonatomic, strong) UIView* barContainer;
+@property (nonatomic, strong) NFBTabFlowView* barContainer;
 @property (nonatomic, strong) UIView* rule;
 @property (nonatomic, strong) UILabel* hintLabel;
 @property (nonatomic, strong) UILabel* countLabel;
 @property (nonatomic, strong) NSMutableArray<UIButton*>* tabButtons;
-@property (nonatomic, strong) NSLayoutConstraint* barHeight;
-@property (nonatomic, assign) CGFloat laidOutWidth;
 @property (nonatomic, copy) NSString* hintText;
 @end
 
@@ -578,7 +636,7 @@ static void nfbApplySelectedBackground(UITableViewCell* cell) {
         self.captionLabel.translatesAutoresizingMaskIntoConstraints = NO;
         [self.box addSubview:self.captionLabel];
 
-        self.barContainer = [UIView new];
+        self.barContainer = [NFBTabFlowView new];
         self.barContainer.translatesAutoresizingMaskIntoConstraints = NO;
         [self.box addSubview:self.barContainer];
 
@@ -602,7 +660,6 @@ static void nfbApplySelectedBackground(UITableViewCell* cell) {
                                             forAxis:UILayoutConstraintAxisHorizontal];
         [self.box addSubview:self.countLabel];
 
-        self.barHeight = [self.barContainer.heightAnchor constraintEqualToConstant:44.0];
         [NSLayoutConstraint activateConstraints:@[
             // Flush with the rows above: their title starts at 10 and their
             // switch ends at -10, so the box shares both edges.
@@ -624,7 +681,6 @@ static void nfbApplySelectedBackground(UITableViewCell* cell) {
                                                              constant:-8],
             [self.barContainer.topAnchor constraintEqualToAnchor:self.captionLabel.bottomAnchor
                                                         constant:6],
-            self.barHeight,
 
             [self.rule.leadingAnchor constraintEqualToAnchor:self.box.leadingAnchor],
             [self.rule.trailingAnchor constraintEqualToAnchor:self.box.trailingAnchor],
@@ -674,7 +730,6 @@ static void nfbApplySelectedBackground(UITableViewCell* cell) {
       objc_setAssociatedObject(button, @"tabName", tab[@"name"],
                                OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     }];
-    self.laidOutWidth = 0;
     [self applyTheme];
     [self setNeedsLayout];
 }
@@ -683,11 +738,32 @@ static void nfbApplySelectedBackground(UITableViewCell* cell) {
     self.countLabel.text = [NSString stringWithFormat:@"  %@  ", text];
 }
 
+// A cell can be recycled while a refusal is still on screen. Without this the
+// next row it serves would open with the count invisible and a red line under
+// tabs the reader never touched.
+- (void)prepareForReuse {
+    [super prepareForReuse];
+    if (self.hintText) {
+        self.hintLabel.text = self.hintText;
+        self.hintText = nil;
+    }
+    self.countLabel.alpha = 1.0;
+    self.countLabel.transform = CGAffineTransformIdentity;
+    [self applyTheme];
+}
+
 - (void)refuseTab:(UIButton*)tab withMessage:(NSString*)message {
     if (!self.hintText) {
         self.hintText = self.hintLabel.text;
     }
     self.hintLabel.text = message;
+    // The count steps aside so the message has the whole line, and comes back
+    // with it. Short message plus the freed width means nothing is ever cut.
+    [UIView animateWithDuration:0.2
+                     animations:^{
+                       self.countLabel.alpha = 0.0;
+                       self.countLabel.transform = CGAffineTransformMakeScale(0.85, 0.85);
+                     }];
     Class TAEColorSettingsCls = objc_getClass("TAEColorSettings");
     id colorPalette =
         [[[TAEColorSettingsCls sharedSettings] currentColorPalette] colorPalette];
@@ -702,7 +778,7 @@ static void nfbApplySelectedBackground(UITableViewCell* cell) {
 
     __weak __typeof(self) weakSelf = self;
     NSString* restore = self.hintText;
-    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(2.6 * NSEC_PER_SEC)),
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1.8 * NSEC_PER_SEC)),
                    dispatch_get_main_queue(), ^{
                      __typeof(self) strongSelf = weakSelf;
                      if (!strongSelf ||
@@ -711,6 +787,12 @@ static void nfbApplySelectedBackground(UITableViewCell* cell) {
                      }
                      strongSelf.hintLabel.text = restore;
                      [strongSelf applyTheme];
+                     [UIView animateWithDuration:0.2
+                                      animations:^{
+                                        strongSelf.countLabel.alpha = 1.0;
+                                        strongSelf.countLabel.transform =
+                                            CGAffineTransformIdentity;
+                                      }];
                    });
 }
 
@@ -718,43 +800,6 @@ static void nfbApplySelectedBackground(UITableViewCell* cell) {
     for (UIButton* tab in self.tabButtons) {
         [tab removeTarget:nil action:NULL forControlEvents:UIControlEventTouchUpInside];
         [tab addTarget:target action:action forControlEvents:UIControlEventTouchUpInside];
-    }
-}
-
-// The tabs are flowed by hand rather than stacked: a line is filled until the
-// next tab would not fit, then a new line is started. One line is the common
-// case and costs nothing; a second appears only when it is needed.
-- (void)layoutSubviews {
-    [super layoutSubviews];
-    CGFloat available = self.barContainer.bounds.size.width;
-    if (available <= 0 || self.tabButtons.count == 0) {
-        return;
-    }
-    const CGFloat lineHeight = 36.0;
-    const CGFloat gap = 4.0;
-    CGFloat x = 0;
-    CGFloat y = 0;
-    for (UIButton* tab in self.tabButtons) {
-        CGSize size = [tab sizeThatFits:CGSizeMake(available, lineHeight)];
-        CGFloat width = MIN(ceil(size.width), available);
-        if (x > 0 && x + width > available) {
-            x = 0;
-            y += lineHeight;
-        }
-        tab.frame = CGRectMake(x, y, width, lineHeight);
-        x += width + gap;
-    }
-    CGFloat needed = y + lineHeight;
-    if (fabs(self.barHeight.constant - needed) > 0.5) {
-        self.barHeight.constant = needed;
-        // A changed height has to reach the table, which sized this row before
-        // the flow ran.
-        UITableView* table = (UITableView*)self.superview;
-        while (table && ![table isKindOfClass:[UITableView class]]) {
-            table = (UITableView*)table.superview;
-        }
-        [table beginUpdates];
-        [table endUpdates];
     }
 }
 

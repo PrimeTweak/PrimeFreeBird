@@ -514,9 +514,12 @@ extern NSInteger NFBColorThemeScreenVisible;
         if ([key isEqualToString:@"restore_tweet_button"]) {
             [self showRestartRequiredAlert];
         }
-        if ([key isEqualToString:@"hide_explore_all"] ||
-            [key isEqualToString:@"choose_explore_tabs"] ||
-            [key isEqualToString:@"hide_tweet_button"]) {
+        // Only on the way on: turning one of these off gives the app back its
+        // own behaviour, which needs no warning, and a modal on every flip makes
+        // the section unusable to settle.
+        if (sender.isOn && ([key isEqualToString:@"hide_explore_all"] ||
+                            [key isEqualToString:@"choose_explore_tabs"] ||
+                            [key isEqualToString:@"hide_tweet_button"])) {
             [self showRestartInfoAlert];
         }
     }
