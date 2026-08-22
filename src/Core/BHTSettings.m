@@ -330,15 +330,20 @@ static NSDictionary<NSString*, NSDictionary*>* BHTSettingsPages(void) {
                       @"default": @YES,
                       @"type": @"toggle"},
                     @{@"type": @"header", @"titleKey": @"SEARCH_GROUP_TRENDS"},
-                    @{@"key": @"hide_trends",
-                      @"default": @YES,
-                      @"type": @"toggle"},
                     @{@"key": @"hide_trend_videos",
                       @"default": @NO,
                       @"type": @"toggle"},
+                    @{@"key": @"hide_explore_all",
+                      @"default": @NO,
+                      @"type": @"toggle"},
+                    @{@"key": @"choose_explore_tabs",
+                      @"default": @YES,
+                      @"disabledWhen": @"hide_explore_all",
+                      @"type": @"toggle"},
                     @{@"type": @"tabBar",
                       @"key": @"explore_tabs",
-                      @"parentKey": @"hide_trends",
+                      @"parentKey": @"choose_explore_tabs",
+                      @"hiddenWhen": @"hide_explore_all",
                       @"captionKey": @"EXPLORE_TABS_CAPTION",
                       @"hintKey": @"EXPLORE_TABS_HINT",
                       @"tabKeys": @[
@@ -499,6 +504,7 @@ static NSDictionary<NSString*, NSDictionary*>* BHTSettingsIndex(void) {
 // names to the normalised keys, so existing installs keep their settings.
 + (void)load {
     [self migrateUndoTweetToggle];
+    [self migrateExploreTrendsSplit];
 
     NSUserDefaults* defaults = [NSUserDefaults standardUserDefaults];
     if ([defaults boolForKey:@"nfb_key_migration_v1_done"]) {
@@ -549,6 +555,36 @@ static NSDictionary<NSString*, NSDictionary*>* BHTSettingsIndex(void) {
     }];
 
     [defaults setBool:YES forKey:@"nfb_key_migration_v1_done"];
+}
+
+// "hide_trends" did two jobs at once: hide all of Explore, or keep the bar and
+// prune it, chosen by whether any tab had been struck. The two are separate
+// switches now, so a stored value is carried across by asking the same question
+// the old code asked itself.
++ (void)migrateExploreTrendsSplit {
+    NSUserDefaults* defaults = [NSUserDefaults standardUserDefaults];
+    if ([defaults boolForKey:@"nfb_explore_split_migration_done"]) {
+        return;
+    }
+    id stored = [defaults objectForKey:@"hide_trends"];
+    if (stored != nil && [stored boolValue]) {
+        BOOL anyTabStruck = NO;
+        for (NSString* tabKey in @[
+                 @"hide_tab_foryou", @"hide_tab_trending", @"hide_tab_news",
+                 @"hide_tab_sports", @"hide_tab_entertainment"
+             ]) {
+            if ([self boolForKey:tabKey]) {
+                anyTabStruck = YES;
+                break;
+            }
+        }
+        // Tabs struck means the reader was pruning the bar; none struck means
+        // they wanted Explore gone.
+        [defaults setBool:anyTabStruck forKey:@"choose_explore_tabs"];
+        [defaults setBool:!anyTabStruck forKey:@"hide_explore_all"];
+    }
+    [defaults removeObjectForKey:@"hide_trends"];
+    [defaults setBool:YES forKey:@"nfb_explore_split_migration_done"];
 }
 
 // The Undo Tweet on/off toggle was merged into the timeout picker, where a
