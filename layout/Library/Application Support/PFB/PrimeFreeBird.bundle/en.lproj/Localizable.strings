@@ -548,4 +548,4 @@
 "CHOOSE_EXPLORE_TABS_TITLE" = "Choose Explore tabs";
 "CHOOSE_EXPLORE_TABS_DETAIL" = "Pick which tabs stay in the bar.";
 "CHOOSE_EXPLORE_TABS_DETAIL_HELD" = "Not needed while all of Explore is hidden.";
-"EXPLORE_TABS_KEEP_ONE" = "One tab has to stay — use Hide all of Explore instead.";
+"EXPLORE_TABS_KEEP_ONE" = "Keep one tab, or hide all of Explore.";
