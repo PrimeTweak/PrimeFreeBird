@@ -506,8 +506,8 @@
 "SHOW_POLL_RESULTS_DETAIL" = "Add each option's share of the vote to its label, before you have voted.";
 "TAP_TO_PAUSE_TITLE" = "Clean video player";
 "TAP_TO_PAUSE_DETAIL" = "Full-screen videos open bare: tap to play or pause, with only a progress line.";
-"VIDEO_STARTS_MUTED_TITLE" = "Start muted";
-"VIDEO_STARTS_MUTED_DETAIL" = "Open videos silent; tap the speaker to turn sound on.";
+"VIDEO_STARTS_MUTED_PILL_ON" = "Muted";
+"VIDEO_STARTS_MUTED_PILL_OFF" = "Sound on";
 
 "PROFILES_GROUP_BEHAVIOR" = "Behavior";
 "PROFILES_GROUP_TABS" = "Profile tabs";
