@@ -185,8 +185,6 @@
 "HIDE_VERIFIED_TWEETS_TITLE" = "Masquer les Tweets certifiés";
 "HIDE_VERIFIED_TWEETS_DETAIL" = "Masque les Tweets des comptes certifiés que tu ne suis pas.";
 
-"HIDE_TRENDS_TITLE" = "Masquer les tendances";
-"HIDE_TRENDS_DETAIL" = "Affiche seulement la barre de recherche dans Explorer, sans les tendances.";
 
 "TAB_BAR_THEMING_TITLE" = "Barre de navigation classique";
 "TAB_BAR_THEMING_DETAIL" = "Applique votre couleur d'accent à l'élément de navigation sélectionné.";
@@ -561,3 +559,9 @@
 "HIDE_TAB_NEWS_TAB_NAME" = "Actualités";
 "HIDE_TAB_SPORTS_TAB_NAME" = "Sport";
 "HIDE_TAB_ENTERTAINMENT_TAB_NAME" = "Divertissement";
+"HIDE_EXPLORE_ALL_TITLE" = "Masquer tout Explore";
+"HIDE_EXPLORE_ALL_DETAIL" = "Ne laisser que la barre de recherche.";
+"CHOOSE_EXPLORE_TABS_TITLE" = "Choisir les onglets d’Explore";
+"CHOOSE_EXPLORE_TABS_DETAIL" = "Choisissez les onglets qui restent dans la barre.";
+"CHOOSE_EXPLORE_TABS_DETAIL_HELD" = "Inutile tant que tout Explore est masqué.";
+"EXPLORE_TABS_KEEP_ONE" = "Un onglet doit rester — utilisez Masquer tout Explore.";
