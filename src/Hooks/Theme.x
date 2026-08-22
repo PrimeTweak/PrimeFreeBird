@@ -99,15 +99,13 @@ NSInteger NFBColorThemeScreenVisible;
 static void NFBApplyGlobalTint(void) {
     extern UIColor* CurrentAccentColor(void);
     NSUserDefaults* defs = NSUserDefaults.standardUserDefaults;
-    BOOL hasAccent = customAccentActive();
-    if (!hasAccent) {
-        if ([defs objectForKey:@"bh_color_theme_selectedColor"] ||
-            [defs integerForKey:@"T1ColorSettingsPrimaryColorOptionKey"] >= 1) {
-            hasAccent = YES;
-        } else {
-            hasAccent = ![defs boolForKey:@"nfb_color_reset_done"];
-        }
-    }
+    // The window tint is inherited by UIKit's own controls - the buttons in a
+    // system alert take their colour from it - so it is spent only on a colour
+    // the reader actually picked. The theming toggles are not a colour: turning
+    // them on paints the tab bar and the logo, and leaves the system alone.
+    BOOL hasAccent = customAccentActive() ||
+                     [defs objectForKey:@"bh_color_theme_selectedColor"] != nil ||
+                     [defs integerForKey:@"T1ColorSettingsPrimaryColorOptionKey"] >= 1;
     // Standard interface: no window tint at all, so nothing inherits the accent
     // that has no colour of its own.
     if (![BHTSettings boolForKey:@"enable_liquid_glass"]) {
