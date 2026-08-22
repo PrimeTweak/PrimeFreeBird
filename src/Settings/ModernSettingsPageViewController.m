@@ -277,7 +277,10 @@ extern NSInteger NFBColorThemeScreenVisible;
         [cell configureWithTitle:title subtitle:subtitle iconName:iconName];
         // No action means nowhere to go: the row states something and the
         // chevron would say otherwise.
-        [cell setShowsChevron:(toggleData[@"action"] != nil)];
+        BOOL leadsSomewhere = toggleData[@"action"] != nil;
+        [cell setShowsChevron:leadsSomewhere];
+        cell.selectionStyle = leadsSomewhere ? UITableViewCellSelectionStyleDefault
+                                             : UITableViewCellSelectionStyleNone;
         return cell;
     } else {
         ModernSettingsToggleCell* cell = [tableView dequeueReusableCellWithIdentifier:@"ToggleCell"
@@ -346,6 +349,24 @@ extern NSInteger NFBColorThemeScreenVisible;
 }
 
 #pragma mark - UITableViewDelegate
+
+// A row with nothing to open should not light up under the finger either. The
+// table is asked rather than the cell, so this also covers keyboard focus and
+// VoiceOver, which read highlightability rather than the chevron.
+- (BOOL)tableView:(UITableView*)tableView
+    shouldHighlightRowAtIndexPath:(NSIndexPath*)indexPath {
+    if (indexPath.row >= (NSInteger)self.visibleToggles.count) {
+        return YES;
+    }
+    NSDictionary* data = self.visibleToggles[indexPath.row];
+    NSString* type = data[@"type"];
+    if (([type isEqualToString:@"button"] ||
+         [type isEqualToString:@"compactButton"]) &&
+        data[@"action"] == nil) {
+        return NO;
+    }
+    return YES;
+}
 
 - (void)tableView:(UITableView*)tableView didSelectRowAtIndexPath:(NSIndexPath*)indexPath {
     [tableView deselectRowAtIndexPath:indexPath animated:YES];
