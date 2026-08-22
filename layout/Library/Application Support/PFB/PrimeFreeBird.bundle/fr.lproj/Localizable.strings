@@ -206,8 +206,6 @@
 "REPLY_IN_WEBVIEW_DETAIL" = "Ouvre la zone de réponse dans une vue web pour éviter l'attestation.";
 
 /*Debug*/
-"FLEX_TWITTER_TITLE" = "Mode debug FLEX";
-"FLEX_TWITTER_DETAIL" = "Utilise FLEX pour déboguer Twitter.";
 "DIAGNOSTICS_TITLE" = "Diagnostic";
 "DIAGNOSTICS_DETAIL" = "Santé des accroches, capture par secousse, rapport à partager — tout sur le téléphone.";
 
@@ -339,10 +337,6 @@
 "HIDE_GROK_SIDEBAR_DETAIL" = "Retire le raccourci Grok du menu latéral.";
 "MODERN_SETTINGS_LAB_TITLE" = "Labo";
 "MODERN_SETTINGS_LAB_SUBTITLE" = "Fonctions expérimentales, outils et sauvegarde des réglages.";
-"EXPORT_SETTINGS_TITLE" = "Exporter les réglages";
-"EXPORT_SETTINGS_DETAIL" = "Enregistre chaque option, mot masqué et couleur dans un fichier.";
-"IMPORT_SETTINGS_TITLE" = "Importer les réglages";
-"IMPORT_SETTINGS_DETAIL" = "Restaure un fichier sauvegardé. Les clés inconnues sont ignorées.";
 "IMPORT_SETTINGS_DONE_TITLE" = "Réglages importés";
 "IMPORT_SETTINGS_DONE_MESSAGE" = "%lu réglages restaurés. Redémarre Twitter pour tout appliquer.";
 "IMPORT_SETTINGS_FAILED_TITLE" = "Échec de l’importation";
@@ -366,12 +360,9 @@
 "CANCEL_ACTION" = "Annuler";
 "OK_ACTION" = "OK";
 "REPLY_WEBVIEW_TITLE" = "Répondre";
-"WEB_SESSION_LOGIN_TITLE" = "Connexion session web";
-"WEB_SESSION_LOGIN_SUBTITLE" = "Connecte-toi sur le web une seule fois pour activer Répondre dans la vue web.";
 "WEB_SESSION_SAVED_TITLE" = "Session web enregistrée";
 "WEB_SESSION_SAVED_MESSAGE" = "Tu es connecté. Répondre dans la vue web fonctionne maintenant.";
 "WEB_SESSION_CLEAR_TITLE" = "Effacer la session web";
-"WEB_SESSION_CLEAR_SUBTITLE" = "Supprime les cookies web enregistrés de cet appareil.";
 "WEB_SESSION_CLEAR_ACTION" = "Supprimer";
 "WEB_SESSION_CLEAR_CONFIRM" = "Ceci supprime la connexion web enregistrée. Tu devras te reconnecter pour répondre dans la vue web.";
 
@@ -565,3 +556,19 @@
 "CHOOSE_EXPLORE_TABS_DETAIL" = "Choisissez les onglets qui restent dans la barre.";
 "CHOOSE_EXPLORE_TABS_DETAIL_HELD" = "Inutile tant que tout Explore est masqué.";
 "EXPLORE_TABS_KEEP_ONE" = "Gardez un onglet, ou masquez tout Explore.";
+"LAB_GROUP_SESSION" = "Session web";
+"LAB_GROUP_TOOLS" = "Outils";
+"LAB_GROUP_BACKUP" = "Sauvegarde";
+"WEB_SESSION_NONE_TITLE" = "Aucune session web";
+"WEB_SESSION_LIVE_DETAIL" = "Connecté sur cet appareil.";
+"WEB_SESSION_NONE_DETAIL" = "Connectez-vous pour utiliser la réponse en vue web.";
+"WEB_SESSION_SIGN_IN_ACTION" = "Se connecter";
+"REPLY_IN_WEBVIEW_DETAIL_HELD" = "Nécessite une session web — connectez-vous ci-dessus.";
+"FLEX_TWITTER_TITLE" = "Outils de développement";
+"FLEX_TWITTER_DETAIL" = "Inspecteur FLEX, capture par secousse, contrôle au lancement.";
+"DIAGNOSTICS_DETAIL_HELD" = "Nécessite les outils de développement — activez-les ci-dessus.";
+"SETTINGS_BACKUP_TITLE" = "Sauvegarde des réglages";
+"SETTINGS_BACKUP_DETAIL" = "Toutes les options, mots filtrés et couleurs.";
+"EXPORT_SETTINGS_ACTION" = "Exporter…";
+"IMPORT_SETTINGS_ACTION" = "Importer…";
+"WEB_SESSION_LOGIN_TITLE" = "Se connecter sur le web";
