@@ -564,4 +564,4 @@
 "CHOOSE_EXPLORE_TABS_TITLE" = "Choisir les onglets d’Explore";
 "CHOOSE_EXPLORE_TABS_DETAIL" = "Choisissez les onglets qui restent dans la barre.";
 "CHOOSE_EXPLORE_TABS_DETAIL_HELD" = "Inutile tant que tout Explore est masqué.";
-"EXPLORE_TABS_KEEP_ONE" = "Un onglet doit rester — utilisez Masquer tout Explore.";
+"EXPLORE_TABS_KEEP_ONE" = "Gardez un onglet, ou masquez tout Explore.";
