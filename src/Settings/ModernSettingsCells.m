@@ -394,11 +394,18 @@ static void nfbApplySelectedBackground(UITableViewCell* cell) {
         [self.contentView addSubview:self.toggleSwitch];
         self.pillButton = [UIButton buttonWithType:UIButtonTypeSystem];
         self.pillButton.translatesAutoresizingMaskIntoConstraints = NO;
-        self.pillButton.contentEdgeInsets = UIEdgeInsetsMake(7, 14, 7, 14);
-        self.pillButton.layer.cornerRadius = 15.0;
+        // Vertically tight on purpose: centred on the title, a taller pill would
+        // reach past the title's baseline and clip the first subtitle line.
+        self.pillButton.contentEdgeInsets = UIEdgeInsetsMake(5, 13, 5, 13);
+        self.pillButton.layer.cornerRadius = 13.0;
         self.pillButton.layer.masksToBounds = YES;
         self.pillButton.hidden = YES;
         self.pillButton.alpha = 0.0;
+        [self.pillButton setContentHuggingPriority:UILayoutPriorityRequired
+                                           forAxis:UILayoutConstraintAxisHorizontal];
+        [self.pillButton
+            setContentCompressionResistancePriority:UILayoutPriorityRequired
+                                            forAxis:UILayoutConstraintAxisHorizontal];
         [self.contentView addSubview:self.pillButton];
         [self applyTheme];
         self.titleLeading =
@@ -422,7 +429,12 @@ static void nfbApplySelectedBackground(UITableViewCell* cell) {
             self.titleTrailingToSwitch,
             [self.toggleSwitch.centerYAnchor constraintEqualToAnchor:self.titleLabel.centerYAnchor],
             [self.subtitleLabel.leadingAnchor constraintEqualToAnchor:self.titleLabel.leadingAnchor],
-            [self.subtitleLabel.trailingAnchor constraintEqualToAnchor:self.titleLabel.trailingAnchor],
+            // The subtitle runs UNDER the pill, so it keeps the full width and
+            // is measured against the switch rather than the title. Identical
+            // for every row without a pill, where the title stops there too.
+            [self.subtitleLabel.trailingAnchor
+                constraintEqualToAnchor:self.toggleSwitch.leadingAnchor
+                               constant:-16],
             [self.subtitleLabel.topAnchor constraintEqualToAnchor:self.titleLabel.bottomAnchor
                                                          constant:2],
             [self.subtitleLabel.bottomAnchor constraintEqualToAnchor:self.contentView.bottomAnchor
