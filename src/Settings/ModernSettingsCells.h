@@ -66,6 +66,9 @@
 // Repaints the tabs from the stored state: struck through when hidden, plain
 // when shown. Called after a tap so the bar answers without the row reloading.
 - (void)refreshTabs;
+// A tab that cannot be struck: the button nudges and the hint below says why,
+// then the hint returns on its own.
+- (void)refuseTab:(UIButton*)tab withMessage:(NSString*)message;
 @end
 
 @interface ModernSettingsHeaderCell : UITableViewCell

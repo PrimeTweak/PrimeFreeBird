@@ -122,16 +122,21 @@ extern NSInteger NFBColorThemeScreenVisible;
 - (void)updateVisibleToggles {
     NSMutableArray* visible = [NSMutableArray array];
     for (NSDictionary* toggleData in self.toggles) {
+        // Two relations, opposite directions: a row appears while its parent is
+        // on, and disappears while its blocker is on.
         NSString* parentKey = toggleData[@"parentKey"];
+        NSString* hiddenWhen = toggleData[@"hiddenWhen"];
+        BOOL show = YES;
         if (parentKey) {
             // The parent's own state, declared default included. Reading the
             // CHILD's default here would decide a parent's state from a row that
             // is not the parent.
-            BOOL parentEnabled = [BHTSettings boolForKey:parentKey];
-            if (parentEnabled) {
-                [visible addObject:toggleData];
-            }
-        } else {
+            show = [BHTSettings boolForKey:parentKey];
+        }
+        if (show && hiddenWhen && [BHTSettings boolForKey:hiddenWhen]) {
+            show = NO;
+        }
+        if (show) {
             [visible addObject:toggleData];
         }
     }
@@ -392,23 +397,39 @@ extern NSInteger NFBColorThemeScreenVisible;
     if (!key) {
         return;
     }
-    [[NSUserDefaults standardUserDefaults] setBool:![BHTSettings boolForKey:key]
-                                            forKey:key];
     UIView* walk = sender;
     while (walk && ![walk isKindOfClass:[ModernSettingsTabBarCell class]]) {
         walk = walk.superview;
     }
-    ModernSettingsTabBarCell* cell = (ModernSettingsTabBarCell*)walk;
-    if (!cell) {
-        return;
+    ModernSettingsTabBarCell* host = (ModernSettingsTabBarCell*)walk;
+    NSIndexPath* hostPath = host ? [self.tableView indexPathForCell:host] : nil;
+    NSArray* allTabs = hostPath ? [self tabsForEntry:self.visibleToggles[hostPath.row]] : nil;
+
+    // Striking the last tab left would leave a bar with nothing in it, and a
+    // pager with nothing to show. Hiding all of Explore is a switch of its own,
+    // so the refusal points at it instead of silently doing it.
+    if (!([BHTSettings boolForKey:key])) {
+        NSUInteger kept = 0;
+        for (NSDictionary* tab in allTabs) {
+            if (![BHTSettings boolForKey:tab[@"key"]]) {
+                kept++;
+            }
+        }
+        if (kept <= 1) {
+            [host refuseTab:sender
+                withMessage:[[BHTBundle sharedBundle]
+                                localizedStringForKey:@"EXPLORE_TABS_KEEP_ONE"]];
+            return;
+        }
     }
+
+    [[NSUserDefaults standardUserDefaults] setBool:![BHTSettings boolForKey:key]
+                                            forKey:key];
     // Repainting the live cell keeps the strike-through immediate; reloading the
     // row would flash the whole bar for one tap.
-    NSIndexPath* path = [self.tableView indexPathForCell:cell];
-    NSArray* tabs = path ? [self tabsForEntry:self.visibleToggles[path.row]] : nil;
-    [cell refreshTabs];
-    if (tabs) {
-        [cell setCountText:[self hiddenCountTextForTabs:tabs]];
+    [host refreshTabs];
+    if (allTabs) {
+        [host setCountText:[self hiddenCountTextForTabs:allTabs]];
     }
 }
 
@@ -493,7 +514,8 @@ extern NSInteger NFBColorThemeScreenVisible;
         if ([key isEqualToString:@"restore_tweet_button"]) {
             [self showRestartRequiredAlert];
         }
-        if ([key isEqualToString:@"hide_trends"] ||
+        if ([key isEqualToString:@"hide_explore_all"] ||
+            [key isEqualToString:@"choose_explore_tabs"] ||
             [key isEqualToString:@"hide_tweet_button"]) {
             [self showRestartInfoAlert];
         }
@@ -830,7 +852,8 @@ extern NSInteger NFBColorThemeScreenVisible;
     }
     NSMutableArray* children = [NSMutableArray array];
     for (NSDictionary* toggleData in self.toggles) {
-        if ([toggleData[@"parentKey"] isEqualToString:key]) {
+        if ([toggleData[@"parentKey"] isEqualToString:key] ||
+            [toggleData[@"hiddenWhen"] isEqualToString:key]) {
             [children addObject:toggleData];
         }
     }
@@ -847,7 +870,8 @@ extern NSInteger NFBColorThemeScreenVisible;
     NSMutableArray* indexPaths = [NSMutableArray array];
     [reference enumerateObjectsUsingBlock:^(NSDictionary* entry, NSUInteger row,
                                             BOOL* stop) {
-      if ([entry[@"parentKey"] isEqualToString:key]) {
+      if ([entry[@"parentKey"] isEqualToString:key] ||
+          [entry[@"hiddenWhen"] isEqualToString:key]) {
           [indexPaths addObject:[NSIndexPath indexPathForRow:(NSInteger)row
                                                    inSection:0]];
       }

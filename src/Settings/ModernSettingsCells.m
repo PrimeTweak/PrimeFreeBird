@@ -6,6 +6,7 @@
 //
 
 #import "Settings/ModernSettingsCells.h"
+#import <QuartzCore/QuartzCore.h>
 #import "Core/BHTManager.h"
 #import "Core/BHTSettings.h"
 #import "Headers/TWHeaders.h"
@@ -540,8 +541,6 @@ static void nfbApplySelectedBackground(UITableViewCell* cell) {
 
 #pragma mark - Explore bar
 
-static const NSInteger kNFBTabUnderlineTag = 90311;
-
 @interface ModernSettingsTabBarCell ()
 @property (nonatomic, strong) UIView* box;
 @property (nonatomic, strong) UILabel* captionLabel;
@@ -552,6 +551,7 @@ static const NSInteger kNFBTabUnderlineTag = 90311;
 @property (nonatomic, strong) NSMutableArray<UIButton*>* tabButtons;
 @property (nonatomic, strong) NSLayoutConstraint* barHeight;
 @property (nonatomic, assign) CGFloat laidOutWidth;
+@property (nonatomic, copy) NSString* hintText;
 @end
 
 @implementation ModernSettingsTabBarCell
@@ -673,9 +673,6 @@ static const NSInteger kNFBTabUnderlineTag = 90311;
                                OBJC_ASSOCIATION_RETAIN_NONATOMIC);
       objc_setAssociatedObject(button, @"tabName", tab[@"name"],
                                OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-      // The first tab is the one Explore opens on, and the app underlines it.
-      objc_setAssociatedObject(button, @"tabIsFirst", @(i == 0),
-                               OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     }];
     self.laidOutWidth = 0;
     [self applyTheme];
@@ -684,6 +681,37 @@ static const NSInteger kNFBTabUnderlineTag = 90311;
 
 - (void)setCountText:(NSString*)text {
     self.countLabel.text = [NSString stringWithFormat:@"  %@  ", text];
+}
+
+- (void)refuseTab:(UIButton*)tab withMessage:(NSString*)message {
+    if (!self.hintText) {
+        self.hintText = self.hintLabel.text;
+    }
+    self.hintLabel.text = message;
+    Class TAEColorSettingsCls = objc_getClass("TAEColorSettings");
+    id colorPalette =
+        [[[TAEColorSettingsCls sharedSettings] currentColorPalette] colorPalette];
+    self.hintLabel.textColor =
+        [colorPalette performSelector:@selector(alertColor)];
+
+    CAKeyframeAnimation* nudge =
+        [CAKeyframeAnimation animationWithKeyPath:@"transform.translation.x"];
+    nudge.values = @[ @0, @(-4), @4, @(-2), @0 ];
+    nudge.duration = 0.32;
+    [tab.layer addAnimation:nudge forKey:@"nfbRefuse"];
+
+    __weak __typeof(self) weakSelf = self;
+    NSString* restore = self.hintText;
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(2.6 * NSEC_PER_SEC)),
+                   dispatch_get_main_queue(), ^{
+                     __typeof(self) strongSelf = weakSelf;
+                     if (!strongSelf ||
+                         ![strongSelf.hintLabel.text isEqualToString:message]) {
+                         return;
+                     }
+                     strongSelf.hintLabel.text = restore;
+                     [strongSelf applyTheme];
+                   });
 }
 
 - (void)addTabTarget:(id)target action:(SEL)action {
@@ -714,10 +742,6 @@ static const NSInteger kNFBTabUnderlineTag = 90311;
             y += lineHeight;
         }
         tab.frame = CGRectMake(x, y, width, lineHeight);
-        UIView* mark = [tab viewWithTag:kNFBTabUnderlineTag];
-        if (mark) {
-            mark.frame = CGRectMake(6, lineHeight - 5, MAX(width - 12, 0), 3);
-        }
         x += width + gap;
     }
     CGFloat needed = y + lineHeight;
@@ -787,26 +811,6 @@ static const NSInteger kNFBTabUnderlineTag = 90311;
         [tab setAttributedTitle:label forState:UIControlStateNormal];
         tab.alpha = hidden ? 0.45 : 1.0;
         tab.contentEdgeInsets = UIEdgeInsetsMake(0, 8, 0, 8);
-
-        // The app underlines the tab Explore opens on. Drawing it here is what
-        // makes this read as the bar rather than as a row of words - and a tab
-        // that is struck through is not opening anything, so it loses the mark.
-        BOOL first = [objc_getAssociatedObject(tab, @"tabIsFirst") boolValue];
-        UIView* mark = [tab viewWithTag:kNFBTabUnderlineTag];
-        if (first && !hidden) {
-            if (!mark) {
-                mark = [UIView new];
-                mark.tag = kNFBTabUnderlineTag;
-                mark.userInteractionEnabled = NO;
-                mark.layer.cornerRadius = 1.5;
-                [tab addSubview:mark];
-            }
-            mark.backgroundColor =
-                [colorPalette performSelector:@selector(primaryColor)];
-            mark.hidden = NO;
-        } else if (mark) {
-            mark.hidden = YES;
-        }
     }
     [self setNeedsLayout];
 }
