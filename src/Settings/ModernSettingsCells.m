@@ -429,12 +429,12 @@ static void nfbApplySelectedBackground(UITableViewCell* cell) {
             self.titleTrailingToSwitch,
             [self.toggleSwitch.centerYAnchor constraintEqualToAnchor:self.titleLabel.centerYAnchor],
             [self.subtitleLabel.leadingAnchor constraintEqualToAnchor:self.titleLabel.leadingAnchor],
-            // The subtitle runs UNDER the pill, so it keeps the full width and
-            // is measured against the switch rather than the title. Identical
-            // for every row without a pill, where the title stops there too.
+            // The subtitle stops where the title does, so both share one right
+            // edge and the text wraps at the pill rather than running beneath
+            // it. On a row without a pill the title already stops at the
+            // switch, so nothing there moves.
             [self.subtitleLabel.trailingAnchor
-                constraintEqualToAnchor:self.toggleSwitch.leadingAnchor
-                               constant:-16],
+                constraintEqualToAnchor:self.titleLabel.trailingAnchor],
             [self.subtitleLabel.topAnchor constraintEqualToAnchor:self.titleLabel.bottomAnchor
                                                          constant:2],
             [self.subtitleLabel.bottomAnchor constraintEqualToAnchor:self.contentView.bottomAnchor
