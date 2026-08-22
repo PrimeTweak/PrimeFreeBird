@@ -505,7 +505,7 @@
 "SHOW_POLL_RESULTS_TITLE" = "Show poll results";
 "SHOW_POLL_RESULTS_DETAIL" = "Add each option's share of the vote to its label, before you have voted.";
 "TAP_TO_PAUSE_TITLE" = "Clean video player";
-"TAP_TO_PAUSE_DETAIL" = "Full-screen videos open bare: tap to play or pause, with only a progress line.";
+"TAP_TO_PAUSE_DETAIL" = "Full-screen videos open bare — tap to play or pause.";
 "VIDEO_STARTS_MUTED_PILL_ON" = "Muted";
 "VIDEO_STARTS_MUTED_PILL_OFF" = "Sound on";
 
