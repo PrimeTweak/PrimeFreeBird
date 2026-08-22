@@ -112,6 +112,10 @@ extern NSInteger NFBColorThemeScreenVisible;
            forCellReuseIdentifier:@"CompactButtonCell"];
     [self.tableView registerClass:[ModernSettingsTabBarCell class]
            forCellReuseIdentifier:@"TabBarCell"];
+    [self.tableView registerClass:[ModernSettingsSessionCardCell class]
+           forCellReuseIdentifier:@"SessionCardCell"];
+    [self.tableView registerClass:[ModernSettingsButtonPairCell class]
+           forCellReuseIdentifier:@"ButtonPairCell"];
     [self.tableView registerClass:[ModernSettingsHeaderCell class]
            forCellReuseIdentifier:@"HeaderCell"];
     [self.view addSubview:self.tableView];
@@ -187,6 +191,39 @@ extern NSInteger NFBColorThemeScreenVisible;
                                      localizedStringForKey:toggleData[@"titleKey"]]];
         return cell;
     }
+    if ([type isEqualToString:@"sessionCard"]) {
+        ModernSettingsSessionCardCell* cell =
+            [tableView dequeueReusableCellWithIdentifier:@"SessionCardCell"
+                                            forIndexPath:indexPath];
+        BHTBundle* bundle = [BHTBundle sharedBundle];
+        // The session is stored per account, so the account this page belongs to
+        // is the one the card is about.
+        BOOL signedIn = hasUsableWebCredentials();
+        NSString* handle = self.account.displayUsername;
+        [cell configureWithHandle:(signedIn && handle.length)
+                                      ? handle
+                                      : [bundle localizedStringForKey:@"WEB_SESSION_NONE_TITLE"]
+                         signedIn:signedIn
+                           detail:[bundle localizedStringForKey:
+                                              signedIn ? @"WEB_SESSION_LIVE_DETAIL"
+                                                       : @"WEB_SESSION_NONE_DETAIL"]
+                     primaryTitle:[bundle localizedStringForKey:@"WEB_SESSION_SIGN_IN_ACTION"]
+                 destructiveTitle:[bundle localizedStringForKey:@"WEB_SESSION_CLEAR_ACTION"]];
+        [cell addPrimaryTarget:self action:@selector(sessionSignInTapped:)];
+        [cell addDestructiveTarget:self action:@selector(sessionClearTapped:)];
+        return cell;
+    }
+    if ([type isEqualToString:@"buttonPair"]) {
+        ModernSettingsButtonPairCell* cell =
+            [tableView dequeueReusableCellWithIdentifier:@"ButtonPairCell"
+                                            forIndexPath:indexPath];
+        BHTBundle* bundle = [BHTBundle sharedBundle];
+        [cell configureWithFirst:[bundle localizedStringForKey:toggleData[@"firstKey"]]
+                          second:[bundle localizedStringForKey:toggleData[@"secondKey"]]];
+        [cell addFirstTarget:self action:NSSelectorFromString(toggleData[@"firstAction"])];
+        [cell addSecondTarget:self action:NSSelectorFromString(toggleData[@"secondAction"])];
+        return cell;
+    }
     if ([type isEqualToString:@"tabBar"]) {
         ModernSettingsTabBarCell* cell =
             [tableView dequeueReusableCellWithIdentifier:@"TabBarCell"
@@ -244,6 +281,24 @@ extern NSInteger NFBColorThemeScreenVisible;
                                                                          forIndexPath:indexPath];
         NSString* key = toggleData[@"key"];
         NSString* title = [self localizedTitleForEntry:toggleData];
+        // A row can also wait on something the app knows at run time rather than
+        // on a stored option. Those conditions are named, so the registry stays
+        // declarative.
+        NSString* requires = toggleData[@"blockedUnless"];
+        if (requires) {
+            BOOL met = [requires isEqualToString:@"web_session"]
+                           ? hasUsableWebCredentials()
+                           : [BHTSettings boolForKey:requires];
+            if (!met) {
+                [cell setRowEnabled:NO];
+                NSString* heldKey =
+                    [NSString stringWithFormat:@"%@_DETAIL_HELD", key.uppercaseString];
+                NSString* held = [[BHTBundle sharedBundle] localizedStringForKey:heldKey];
+                if (held.length) {
+                    [cell configureWithTitle:title subtitle:held iconName:nil];
+                }
+            }
+        }
         NSString* blocker = toggleData[@"disabledWhen"];
         BOOL blocked =
             blocker && [[NSUserDefaults standardUserDefaults] boolForKey:blocker];
@@ -390,6 +445,19 @@ extern NSInteger NFBColorThemeScreenVisible;
         stringWithFormat:[[BHTBundle sharedBundle]
                              localizedStringForKey:@"EXPLORE_TABS_HIDDEN_COUNT"],
                          (unsigned long)hidden];
+}
+
+// The card acts on the session and then redraws: the rows that depend on it
+// have no other way to learn that it changed.
+- (void)sessionSignInTapped:(UIButton*)sender {
+    presentWebSessionLogin(^(__unused BOOL success) {
+      [self updateVisibleToggles];
+      [self.tableView reloadData];
+    });
+}
+
+- (void)sessionClearTapped:(UIButton*)sender {
+    [self clearWebSession:nil];
 }
 
 - (void)tabTapped:(UIButton*)sender {

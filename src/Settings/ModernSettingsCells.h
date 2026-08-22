@@ -71,6 +71,27 @@
 - (void)refuseTab:(UIButton*)tab withMessage:(NSString*)message;
 @end
 
+// The state of the web session, with the two actions that change it. It replaces
+// a sign-in row and a clear row that could say nothing about whether there was
+// anything to sign out of.
+@interface ModernSettingsSessionCardCell : UITableViewCell
+- (void)configureWithHandle:(NSString*)handle
+                   signedIn:(BOOL)signedIn
+                     detail:(NSString*)detail
+               primaryTitle:(NSString*)primaryTitle
+           destructiveTitle:(NSString*)destructiveTitle;
+- (void)addPrimaryTarget:(id)target action:(SEL)action;
+- (void)addDestructiveTarget:(id)target action:(SEL)action;
+@end
+
+// Two actions that belong together, side by side rather than stacked as two
+// look-alike rows.
+@interface ModernSettingsButtonPairCell : UITableViewCell
+- (void)configureWithFirst:(NSString*)first second:(NSString*)second;
+- (void)addFirstTarget:(id)target action:(SEL)action;
+- (void)addSecondTarget:(id)target action:(SEL)action;
+@end
+
 @interface ModernSettingsHeaderCell : UITableViewCell
 @property (nonatomic, strong) UILabel* headerLabel;
 - (void)configureWithTitle:(NSString*)title;
