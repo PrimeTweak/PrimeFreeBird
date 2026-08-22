@@ -229,13 +229,9 @@ static NSDictionary<NSString*, NSDictionary*>* BHTSettingsPages(void) {
                     @{
                         @"key": @"tap_to_pause",
                         @"default": @YES,
+                        @"pillKey": @"video_starts_muted",
                         @"type": @"toggle"
                     },
-                    @{@"key": @"video_starts_muted",
-                      @"parentKey": @"tap_to_pause",
-                      @"indented": @YES,
-                      @"default": @YES,
-                      @"type": @"toggle"},
                     @{@"key": @"restore_video_timestamp",
                       @"default": @YES,
                       @"type": @"toggle"},
@@ -616,6 +612,9 @@ static NSDictionary* NFBKeylessDefaults(void) {
         map = @{
             @"enable_liquid_glass": @YES,
             @"color_twitter_icon_in_top_bar": @YES,
+            // Carried by a pill rather than a row of its own, so the registry
+            // holds no default for it.
+            @"video_starts_muted": @YES,
         };
     });
     return map;
