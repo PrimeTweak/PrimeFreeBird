@@ -333,34 +333,19 @@ static NSDictionary<NSString*, NSDictionary*>* BHTSettingsPages(void) {
                     @{@"key": @"hide_trends",
                       @"default": @YES,
                       @"type": @"toggle"},
-                    @{@"key": @"hide_tab_foryou",
-                      @"parentKey": @"hide_trends",
-                      @"indented": @YES,
-                      @"default": @NO,
-                      @"type": @"toggle"},
-                    @{@"key": @"hide_tab_trending",
-                      @"parentKey": @"hide_trends",
-                      @"indented": @YES,
-                      @"default": @YES,
-                      @"type": @"toggle"},
-                    @{@"key": @"hide_tab_news",
-                      @"parentKey": @"hide_trends",
-                      @"indented": @YES,
-                      @"default": @NO,
-                      @"type": @"toggle"},
-                    @{@"key": @"hide_tab_sports",
-                      @"parentKey": @"hide_trends",
-                      @"indented": @YES,
-                      @"default": @NO,
-                      @"type": @"toggle"},
-                    @{@"key": @"hide_tab_entertainment",
-                      @"parentKey": @"hide_trends",
-                      @"indented": @YES,
-                      @"default": @YES,
-                      @"type": @"toggle"},
                     @{@"key": @"hide_trend_videos",
                       @"default": @NO,
-                      @"type": @"toggle"}
+                      @"type": @"toggle"},
+                    @{@"type": @"tabBar",
+                      @"key": @"explore_tabs",
+                      @"parentKey": @"hide_trends",
+                      @"captionKey": @"EXPLORE_TABS_CAPTION",
+                      @"hintKey": @"EXPLORE_TABS_HINT",
+                      @"tabKeys": @[
+                          @"hide_tab_foryou", @"hide_tab_trending",
+                          @"hide_tab_news", @"hide_tab_sports",
+                          @"hide_tab_entertainment"
+                      ]}
                 ]
             },
             @"grok": @{
@@ -615,6 +600,11 @@ static NSDictionary* NFBKeylessDefaults(void) {
             // Carried by a pill rather than a row of its own, so the registry
             // holds no default for it.
             @"video_starts_muted": @YES,
+            // Carried by the Explore bar replica, same reason. Only the two the
+            // registry used to default to YES are named; the rest default to NO
+            // on their own.
+            @"hide_tab_trending": @YES,
+            @"hide_tab_entertainment": @YES,
         };
     });
     return map;
