@@ -392,18 +392,34 @@ static void nfbApplySelectedBackground(UITableViewCell* cell) {
         self.toggleSwitch = [NFBTintedSwitch new];
         self.toggleSwitch.translatesAutoresizingMaskIntoConstraints = NO;
         [self.contentView addSubview:self.toggleSwitch];
+        self.pillButton = [UIButton buttonWithType:UIButtonTypeSystem];
+        self.pillButton.translatesAutoresizingMaskIntoConstraints = NO;
+        self.pillButton.contentEdgeInsets = UIEdgeInsetsMake(7, 14, 7, 14);
+        self.pillButton.layer.cornerRadius = 15.0;
+        self.pillButton.layer.masksToBounds = YES;
+        self.pillButton.hidden = YES;
+        self.pillButton.alpha = 0.0;
+        [self.contentView addSubview:self.pillButton];
         [self applyTheme];
         self.titleLeading =
             [self.titleLabel.leadingAnchor constraintEqualToAnchor:self.contentView.leadingAnchor
                                                           constant:10];
+        self.titleTrailingToSwitch =
+            [self.titleLabel.trailingAnchor constraintEqualToAnchor:self.toggleSwitch.leadingAnchor
+                                                           constant:-16];
+        self.titleTrailingToPill =
+            [self.titleLabel.trailingAnchor constraintEqualToAnchor:self.pillButton.leadingAnchor
+                                                           constant:-12];
         [NSLayoutConstraint activateConstraints:@[
             [self.toggleSwitch.trailingAnchor constraintEqualToAnchor:self.contentView.trailingAnchor
                                                              constant:-10],
+            [self.pillButton.trailingAnchor constraintEqualToAnchor:self.toggleSwitch.leadingAnchor
+                                                           constant:-12],
+            [self.pillButton.centerYAnchor constraintEqualToAnchor:self.toggleSwitch.centerYAnchor],
             self.titleLeading,
             [self.titleLabel.topAnchor constraintEqualToAnchor:self.contentView.topAnchor
                                                       constant:18],
-            [self.titleLabel.trailingAnchor constraintEqualToAnchor:self.toggleSwitch.leadingAnchor
-                                                           constant:-16],
+            self.titleTrailingToSwitch,
             [self.toggleSwitch.centerYAnchor constraintEqualToAnchor:self.titleLabel.centerYAnchor],
             [self.subtitleLabel.leadingAnchor constraintEqualToAnchor:self.titleLabel.leadingAnchor],
             [self.subtitleLabel.trailingAnchor constraintEqualToAnchor:self.titleLabel.trailingAnchor],
@@ -447,6 +463,43 @@ static void nfbApplySelectedBackground(UITableViewCell* cell) {
 - (void)addTarget:(id)target action:(SEL)action forControlEvents:(UIControlEvents)events {
     [self.toggleSwitch addTarget:target action:action forControlEvents:events];
 }
+
+- (void)setPillTitle:(NSString*)title {
+    [self.pillButton setTitle:title forState:UIControlStateNormal];
+}
+
+- (void)addPillTarget:(id)target action:(SEL)action {
+    [self.pillButton removeTarget:nil
+                           action:NULL
+                 forControlEvents:UIControlEventTouchUpInside];
+    [self.pillButton addTarget:target
+                        action:action
+              forControlEvents:UIControlEventTouchUpInside];
+}
+
+// The title gives up its width to the pill in the same breath the pill fades
+// in, so the row reads as one movement rather than two.
+- (void)setPillVisible:(BOOL)visible animated:(BOOL)animated {
+    void (^apply)(void) = ^{
+      self.titleTrailingToSwitch.active = !visible;
+      self.titleTrailingToPill.active = visible;
+      self.pillButton.alpha = visible ? 1.0 : 0.0;
+      [self.contentView layoutIfNeeded];
+    };
+    if (visible) {
+        self.pillButton.hidden = NO;
+    }
+    if (!animated) {
+        apply();
+        self.pillButton.hidden = !visible;
+        return;
+    }
+    [UIView animateWithDuration:0.24
+        animations:apply
+        completion:^(BOOL finished) {
+          self.pillButton.hidden = !visible;
+        }];
+}
  
 - (void)applyTheme {
     id fontGroup = [BHTManager sharedFontGroup];
@@ -457,6 +510,12 @@ static void nfbApplySelectedBackground(UITableViewCell* cell) {
     id colorPalette = [[settings currentColorPalette] colorPalette];
     self.titleLabel.textColor = [colorPalette performSelector:@selector(textColor)];
     self.subtitleLabel.textColor = [colorPalette performSelector:@selector(tabBarItemColor)];
+    self.pillButton.titleLabel.font =
+        [fontGroup performSelector:@selector(subtext1BoldFont)];
+    [self.pillButton setTitleColor:[colorPalette performSelector:@selector(textColor)]
+                          forState:UIControlStateNormal];
+    self.pillButton.backgroundColor =
+        [colorPalette performSelector:@selector(faintBackgroundColor)];
     [(NFBTintedSwitch*)self.toggleSwitch nfb_refreshTint];
 }
  

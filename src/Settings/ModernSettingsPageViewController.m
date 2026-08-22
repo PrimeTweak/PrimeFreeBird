@@ -251,6 +251,18 @@ extern NSInteger NFBColorThemeScreenVisible;
         [cell addTarget:self
                       action:@selector(switchChanged:)
             forControlEvents:UIControlEventValueChanged];
+        // A pill carries a second setting on the same row. It belongs to the
+        // row's own switch, so it is only on screen while that switch is on.
+        NSString* pillKey = toggleData[@"pillKey"];
+        if (pillKey) {
+            [cell setPillTitle:[self pillTitleForKey:pillKey]];
+            objc_setAssociatedObject(cell.pillButton, @"pillKey", pillKey,
+                                     OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+            [cell addPillTarget:self action:@selector(pillTapped:)];
+            [cell setPillVisible:(cell.toggleSwitch.on && !blocked) animated:NO];
+        } else {
+            [cell setPillVisible:NO animated:NO];
+        }
         return cell;
     }
 }
@@ -329,6 +341,25 @@ extern NSInteger NFBColorThemeScreenVisible;
     }
 }
 
+// The pill reads out its own state, so neither position has to be guessed.
+- (NSString*)pillTitleForKey:(NSString*)key {
+    NSString* suffix = [BHTSettings boolForKey:key] ? @"_PILL_ON" : @"_PILL_OFF";
+    return [[BHTBundle sharedBundle]
+        localizedStringForKey:[NSString stringWithFormat:@"%@%@",
+                                                         key.uppercaseString,
+                                                         suffix]];
+}
+
+- (void)pillTapped:(UIButton*)sender {
+    NSString* key = objc_getAssociatedObject(sender, @"pillKey");
+    if (!key) {
+        return;
+    }
+    BOOL next = ![BHTSettings boolForKey:key];
+    [[NSUserDefaults standardUserDefaults] setBool:next forKey:key];
+    [sender setTitle:[self pillTitleForKey:key] forState:UIControlStateNormal];
+}
+
 - (void)switchChanged:(UISwitch*)sender {
     NSString* key = objc_getAssociatedObject(sender, @"prefKey");
     if (key) {
@@ -339,6 +370,18 @@ extern NSInteger NFBColorThemeScreenVisible;
         [self updateAndAnimateChangesForKey:key];
 
         [self reloadRowsHeldBy:key];
+
+        // A row carrying a pill keeps its cell: reloading it would cut the fade
+        // short, so the pill is moved on the live cell instead.
+        UIView* walk = sender;
+        while (walk && ![walk isKindOfClass:[ModernSettingsToggleCell class]]) {
+            walk = walk.superview;
+        }
+        ModernSettingsToggleCell* liveCell = (ModernSettingsToggleCell*)walk;
+        if (liveCell &&
+            objc_getAssociatedObject(liveCell.pillButton, @"pillKey")) {
+            [liveCell setPillVisible:sender.isOn animated:YES];
+        }
 
         // The switch-tint toggle changes how every OTHER visible switch is
         // drawn, so re-run applyTheme on the live cells right away.

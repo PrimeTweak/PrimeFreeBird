@@ -38,6 +38,15 @@
 // A row another option has taken over: the switch stops responding and the
 // text recedes, so the reason reads as state rather than failure.
 - (void)setRowEnabled:(BOOL)enabled;
+// A second control on the same row, carrying a value in words rather than a
+// state to guess. Hidden unless a row asks for one, so every other row is
+// laid out exactly as before.
+@property (nonatomic, strong) UIButton* pillButton;
+@property (nonatomic, strong) NSLayoutConstraint* titleTrailingToSwitch;
+@property (nonatomic, strong) NSLayoutConstraint* titleTrailingToPill;
+- (void)setPillTitle:(NSString*)title;
+- (void)setPillVisible:(BOOL)visible animated:(BOOL)animated;
+- (void)addPillTarget:(id)target action:(SEL)action;
 @end
 
 @interface ModernSettingsHeaderCell : UITableViewCell
