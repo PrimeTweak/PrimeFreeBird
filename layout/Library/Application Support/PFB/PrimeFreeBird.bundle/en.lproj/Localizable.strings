@@ -235,16 +235,6 @@
 "NO_HISTORY_DETAIL" = "Stop Twitter from keeping track of your searches.";
 "HIDE_TRENDS_TITLE" = "Hide trending content";
 "HIDE_TRENDS_DETAIL" = "Show only the search bar on Explore, hiding all trends.";
-"HIDE_TAB_FORYOU_TITLE" = "Hide For You tab";
-"HIDE_TAB_FORYOU_DETAIL" = "Remove the For You tab from the Explore bar.";
-"HIDE_TAB_TRENDING_TITLE" = "Hide Trending tab";
-"HIDE_TAB_TRENDING_DETAIL" = "Remove the Trending tab from the Explore bar.";
-"HIDE_TAB_NEWS_TITLE" = "Hide News tab";
-"HIDE_TAB_NEWS_DETAIL" = "Remove the News tab from the Explore bar.";
-"HIDE_TAB_SPORTS_TITLE" = "Hide Sports tab";
-"HIDE_TAB_SPORTS_DETAIL" = "Remove the Sports tab from the Explore bar.";
-"HIDE_TAB_ENTERTAINMENT_TITLE" = "Hide Entertainment tab";
-"HIDE_TAB_ENTERTAINMENT_DETAIL" = "Remove the Entertainment tab from the Explore bar.";
 "HIDE_TREND_VIDEOS_TITLE" = "Hide trending videos";
 "HIDE_TREND_VIDEOS_DETAIL" = "Remove trending videos from the search menu.";
 
@@ -546,3 +536,12 @@
 "HIDDEN_NOTIFS_UNTITLED" = "Hidden notification";
 "HIDE_NOTIFICATIONS_TITLE" = "Hide notifications";
 "HIDE_NOTIFICATIONS_DETAIL" = "Tap × on a notification to hide it, and find the hidden ones from the notifications bar.";
+"EXPLORE_TABS_CAPTION" = "Explore bar";
+"EXPLORE_TABS_HINT" = "Tap a tab to remove it.";
+"EXPLORE_TABS_HIDDEN_COUNT" = "%lu hidden";
+"EXPLORE_TABS_NONE_HIDDEN" = "None hidden";
+"HIDE_TAB_FORYOU_TAB_NAME" = "For You";
+"HIDE_TAB_TRENDING_TAB_NAME" = "Trending";
+"HIDE_TAB_NEWS_TAB_NAME" = "News";
+"HIDE_TAB_SPORTS_TAB_NAME" = "Sports";
+"HIDE_TAB_ENTERTAINMENT_TAB_NAME" = "Entertainment";
