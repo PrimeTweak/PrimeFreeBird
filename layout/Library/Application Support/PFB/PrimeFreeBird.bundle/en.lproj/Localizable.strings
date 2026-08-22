@@ -233,8 +233,6 @@
 "MODERN_SETTINGS_SEARCH_SUBTITLE" = "Search history, trends, and trending videos.";
 "NO_HISTORY_TITLE" = "Disable search history";
 "NO_HISTORY_DETAIL" = "Stop Twitter from keeping track of your searches.";
-"HIDE_TRENDS_TITLE" = "Hide trending content";
-"HIDE_TRENDS_DETAIL" = "Show only the search bar on Explore, hiding all trends.";
 "HIDE_TREND_VIDEOS_TITLE" = "Hide trending videos";
 "HIDE_TREND_VIDEOS_DETAIL" = "Remove trending videos from the search menu.";
 
@@ -545,3 +543,9 @@
 "HIDE_TAB_NEWS_TAB_NAME" = "News";
 "HIDE_TAB_SPORTS_TAB_NAME" = "Sports";
 "HIDE_TAB_ENTERTAINMENT_TAB_NAME" = "Entertainment";
+"HIDE_EXPLORE_ALL_TITLE" = "Hide all of Explore";
+"HIDE_EXPLORE_ALL_DETAIL" = "Leave only the search bar.";
+"CHOOSE_EXPLORE_TABS_TITLE" = "Choose Explore tabs";
+"CHOOSE_EXPLORE_TABS_DETAIL" = "Pick which tabs stay in the bar.";
+"CHOOSE_EXPLORE_TABS_DETAIL_HELD" = "Not needed while all of Explore is hidden.";
+"EXPLORE_TABS_KEEP_ONE" = "One tab has to stay — use Hide all of Explore instead.";
