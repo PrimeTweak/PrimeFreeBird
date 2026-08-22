@@ -275,6 +275,9 @@ extern NSInteger NFBColorThemeScreenVisible;
         }
         NSString* iconName = toggleData[@"icon"];
         [cell configureWithTitle:title subtitle:subtitle iconName:iconName];
+        // No action means nowhere to go: the row states something and the
+        // chevron would say otherwise.
+        [cell setShowsChevron:(toggleData[@"action"] != nil)];
         return cell;
     } else {
         ModernSettingsToggleCell* cell = [tableView dequeueReusableCellWithIdentifier:@"ToggleCell"

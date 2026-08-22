@@ -35,6 +35,17 @@ static void nfbApplySelectedBackground(UITableViewCell* cell) {
 
 @implementation ModernSettingsTableViewCell
 
+- (void)setShowsChevron:(BOOL)showsChevron {
+    self.chevronImageView.hidden = !showsChevron;
+}
+
+- (void)prepareForReuse {
+    [super prepareForReuse];
+    // Rows are recycled: one that hid its chevron must not pass that on.
+    self.chevronImageView.hidden = NO;
+}
+
+
 - (instancetype)initWithStyle:(UITableViewCellStyle)style
               reuseIdentifier:(NSString*)reuseIdentifier {
     self = [super initWithStyle:style reuseIdentifier:reuseIdentifier];
@@ -628,7 +639,6 @@ static void nfbApplySelectedBackground(UITableViewCell* cell) {
         self.box = [UIView new];
         self.box.translatesAutoresizingMaskIntoConstraints = NO;
         self.box.layer.cornerRadius = 16.0;
-        self.box.layer.borderWidth = 1.0;
         self.box.layer.masksToBounds = YES;
         [self.contentView addSubview:self.box];
 
@@ -682,8 +692,11 @@ static void nfbApplySelectedBackground(UITableViewCell* cell) {
             [self.barContainer.topAnchor constraintEqualToAnchor:self.captionLabel.bottomAnchor
                                                         constant:6],
 
-            [self.rule.leadingAnchor constraintEqualToAnchor:self.box.leadingAnchor],
-            [self.rule.trailingAnchor constraintEqualToAnchor:self.box.trailingAnchor],
+            // Inset like the text it separates, rather than edge to edge.
+            [self.rule.leadingAnchor constraintEqualToAnchor:self.box.leadingAnchor
+                                                    constant:14],
+            [self.rule.trailingAnchor constraintEqualToAnchor:self.box.trailingAnchor
+                                                     constant:-14],
             [self.rule.topAnchor constraintEqualToAnchor:self.barContainer.bottomAnchor
                                                 constant:8],
             [self.rule.heightAnchor constraintEqualToConstant:1],
@@ -814,7 +827,6 @@ static void nfbApplySelectedBackground(UITableViewCell* cell) {
     UIColor* divider = [colorPalette performSelector:@selector(dividerColor)];
 
     self.box.backgroundColor = faint;
-    self.box.layer.borderColor = divider.CGColor;
     self.rule.backgroundColor = divider;
     self.captionLabel.font = [fontGroup performSelector:@selector(subtext3BoldFont)];
     self.captionLabel.textColor = soft;
@@ -1032,7 +1044,10 @@ static void nfbApplySelectedBackground(UITableViewCell* cell) {
     self.box.backgroundColor = faint;
     self.avatarLabel.backgroundColor = accent;
     self.avatarLabel.textColor = [UIColor whiteColor];
-    self.avatarLabel.font = [fontGroup performSelector:@selector(headline1BoldFont)];
+    // Drawn with a system font on purpose: a single letter needs no type ramp,
+    // and taking it from the app's font group made this one glyph depend on a
+    // lookup that everything else here does not need.
+    self.avatarLabel.font = [UIFont systemFontOfSize:17 weight:UIFontWeightHeavy];
     self.handleLabel.font = [fontGroup performSelector:@selector(bodyBoldFont)];
     self.handleLabel.textColor = ink;
     self.detailLabel.font = [fontGroup performSelector:@selector(subtext2Font)];
