@@ -510,8 +510,8 @@
 "SHOW_POLL_RESULTS_DETAIL" = "Ajoute à chaque choix sa part des votes, avant même d'avoir voté.";
 "TAP_TO_PAUSE_TITLE" = "Lecteur vidéo épuré";
 "TAP_TO_PAUSE_DETAIL" = "Les vidéos plein écran s'ouvrent dépouillées : touchez pour lire ou mettre en pause, avec une simple ligne de progression.";
-"VIDEO_STARTS_MUTED_TITLE" = "Ouvrir sans le son";
-"VIDEO_STARTS_MUTED_DETAIL" = "Les vidéos s'ouvrent en silence ; touchez le haut-parleur pour activer le son.";
+"VIDEO_STARTS_MUTED_PILL_ON" = "Sans le son";
+"VIDEO_STARTS_MUTED_PILL_OFF" = "Avec le son";
 
 "PROFILES_GROUP_BEHAVIOR" = "Comportement";
 "PROFILES_GROUP_TABS" = "Onglets du profil";
