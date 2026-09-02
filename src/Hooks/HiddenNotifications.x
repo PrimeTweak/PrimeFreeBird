@@ -1346,17 +1346,8 @@ static void NFBNotifSweep(id dataViewController) {
     }
     %orig(NFBFilterNotifSections(sections), restore);
     // The list is in place: remove what is hidden.
-    // Weak on purpose. The app calls these setters while a list controller is
-    // being torn down - clearing the sections on the way back from a Tweet - and
-    // a strong capture of an object mid-dealloc holds nothing: the block ran a
-    // turn later against freed memory. A weak reference to such an object is
-    // already nil, and the sweep is skipped.
-    __weak __typeof(self) weakSelf = self;
     dispatch_async(dispatch_get_main_queue(), ^{
-      __typeof(self) strongSelf = weakSelf;
-      if (strongSelf) {
-          NFBNotifSweep(strongSelf);
-      }
+        NFBNotifSweep(self);
     });
 }
 
@@ -1366,17 +1357,8 @@ static void NFBNotifSweep(id dataViewController) {
     }
     %orig(NFBFilterNotifSections(sections));
     // The list is in place: remove what is hidden.
-    // Weak on purpose. The app calls these setters while a list controller is
-    // being torn down - clearing the sections on the way back from a Tweet - and
-    // a strong capture of an object mid-dealloc holds nothing: the block ran a
-    // turn later against freed memory. A weak reference to such an object is
-    // already nil, and the sweep is skipped.
-    __weak __typeof(self) weakSelf = self;
     dispatch_async(dispatch_get_main_queue(), ^{
-      __typeof(self) strongSelf = weakSelf;
-      if (strongSelf) {
-          NFBNotifSweep(strongSelf);
-      }
+        NFBNotifSweep(self);
     });
 }
 
@@ -1386,17 +1368,8 @@ static void NFBNotifSweep(id dataViewController) {
     }
     %orig(NFBFilterNotifSections(sections));
     // The list is in place: remove what is hidden.
-    // Weak on purpose. The app calls these setters while a list controller is
-    // being torn down - clearing the sections on the way back from a Tweet - and
-    // a strong capture of an object mid-dealloc holds nothing: the block ran a
-    // turn later against freed memory. A weak reference to such an object is
-    // already nil, and the sweep is skipped.
-    __weak __typeof(self) weakSelf = self;
     dispatch_async(dispatch_get_main_queue(), ^{
-      __typeof(self) strongSelf = weakSelf;
-      if (strongSelf) {
-          NFBNotifSweep(strongSelf);
-      }
+        NFBNotifSweep(self);
     });
 }
 
@@ -1411,17 +1384,8 @@ static void NFBNotifSweep(id dataViewController) {
     }
     %orig(NFBFilterNotifSections(sections), completion);
     // The list is in place: remove what is hidden.
-    // Weak on purpose. The app calls these setters while a list controller is
-    // being torn down - clearing the sections on the way back from a Tweet - and
-    // a strong capture of an object mid-dealloc holds nothing: the block ran a
-    // turn later against freed memory. A weak reference to such an object is
-    // already nil, and the sweep is skipped.
-    __weak __typeof(self) weakSelf = self;
     dispatch_async(dispatch_get_main_queue(), ^{
-      __typeof(self) strongSelf = weakSelf;
-      if (strongSelf) {
-          NFBNotifSweep(strongSelf);
-      }
+        NFBNotifSweep(self);
     });
 }
 
@@ -1431,17 +1395,8 @@ static void NFBNotifSweep(id dataViewController) {
     }
     %orig(NFBFilterNotifSections(sections), animation);
     // The list is in place: remove what is hidden.
-    // Weak on purpose. The app calls these setters while a list controller is
-    // being torn down - clearing the sections on the way back from a Tweet - and
-    // a strong capture of an object mid-dealloc holds nothing: the block ran a
-    // turn later against freed memory. A weak reference to such an object is
-    // already nil, and the sweep is skipped.
-    __weak __typeof(self) weakSelf = self;
     dispatch_async(dispatch_get_main_queue(), ^{
-      __typeof(self) strongSelf = weakSelf;
-      if (strongSelf) {
-          NFBNotifSweep(strongSelf);
-      }
+        NFBNotifSweep(self);
     });
 }
 
@@ -1453,17 +1408,8 @@ static void NFBNotifSweep(id dataViewController) {
     }
     %orig(NFBFilterNotifSections(sections), animation, completion);
     // The list is in place: remove what is hidden.
-    // Weak on purpose. The app calls these setters while a list controller is
-    // being torn down - clearing the sections on the way back from a Tweet - and
-    // a strong capture of an object mid-dealloc holds nothing: the block ran a
-    // turn later against freed memory. A weak reference to such an object is
-    // already nil, and the sweep is skipped.
-    __weak __typeof(self) weakSelf = self;
     dispatch_async(dispatch_get_main_queue(), ^{
-      __typeof(self) strongSelf = weakSelf;
-      if (strongSelf) {
-          NFBNotifSweep(strongSelf);
-      }
+        NFBNotifSweep(self);
     });
 }
 
@@ -1476,17 +1422,8 @@ reconfigureItemIdentifiers:(id)identifiers
     }
     %orig(NFBFilterNotifSections(sections), identifiers, animation, completion);
     // The list is in place: remove what is hidden.
-    // Weak on purpose. The app calls these setters while a list controller is
-    // being torn down - clearing the sections on the way back from a Tweet - and
-    // a strong capture of an object mid-dealloc holds nothing: the block ran a
-    // turn later against freed memory. A weak reference to such an object is
-    // already nil, and the sweep is skipped.
-    __weak __typeof(self) weakSelf = self;
     dispatch_async(dispatch_get_main_queue(), ^{
-      __typeof(self) strongSelf = weakSelf;
-      if (strongSelf) {
-          NFBNotifSweep(strongSelf);
-      }
+        NFBNotifSweep(self);
     });
 }
 
@@ -1613,29 +1550,23 @@ reconfigureItemIdentifiers:(id)identifiers
 // does nothing. This one sits on the base class the whole app's lists inherit
 // from, so it fires wherever the rows live; it declines immediately unless the
 // row really is a nameable notification.
-//
-// Added with %new, not %hook: the base class does not implement this delegate
-// method (measured against the binary), and a %hook on a missing method never
-// attaches. Subclasses that do implement it, T1URTViewController first, keep
-// their own; the rest inherit this one. With nothing to fall back on, declining
-// returns nil, which UIKit reads as "no swipe" - what those lists had before.
-%new
 - (UISwipeActionsConfiguration*)tableView:(UITableView*)tableView
     trailingSwipeActionsConfigurationForRowAtIndexPath:(NSIndexPath*)indexPath {
+    UISwipeActionsConfiguration* original = %orig;
     if (!NFBNotifsEnabled()) {
-        return nil;
+        return original;
     }
     id dataVC = self;
     if ([NSStringFromClass([dataVC class]) isEqualToString:@"T1URTViewController"]) {
-        return nil;  // already handled above - never twice
+        return original;  // already handled above — never twice
     }
     id model = NFBModelAtIndexPath(dataVC, indexPath);
     if (!model) {
-        return nil;
+        return original;
     }
     NSString* modelClass = NSStringFromClass([model class]);
     if (![modelClass containsString:@"Notification"] || !NFBNotifIdentity(model)) {
-        return nil;
+        return original;
     }
     static BOOL saidNet;
     if (!saidNet) {
@@ -1662,10 +1593,10 @@ reconfigureItemIdentifiers:(id)identifiers
     if (glyph) {
         hide.image = glyph;
     }
-    // Nothing to merge: a list that reaches this method has no swipe actions of
-    // its own, or it would have implemented the delegate method and never
-    // inherited this one.
-    NSArray<UIContextualAction*>* actions = @[ hide ];
+    NSMutableArray<UIContextualAction*>* actions = [NSMutableArray arrayWithObject:hide];
+    if (original.actions.count) {
+        [actions addObjectsFromArray:original.actions];
+    }
     UISwipeActionsConfiguration* configuration =
         [UISwipeActionsConfiguration configurationWithActions:actions];
     configuration.performsFirstActionWithFullSwipe = NO;

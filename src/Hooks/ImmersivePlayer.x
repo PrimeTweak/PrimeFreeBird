@@ -4,6 +4,7 @@
 //
 
 #import "HookHelpers.h"
+#import "Debug/NFBDebugger.h"
 
 // MARK: - Immersive Player Timestamp
 
@@ -52,6 +53,18 @@ static const NSTimeInterval kNFBUserTapGrace = 0.6;
 // no alpha and takes no decision. Milliseconds are counted from the moment the
 // card registers, so every line below is comparable on one timeline.
 static UIView* nfbImmersiveControlsView(UIView* card);
+static TAVPlayer* nfbCardPlayer(UIView* card);
+static NSString* nfbChromeCensus(void);
+static NSMutableSet* nfbVisibleSnapshot(void);
+
+static NSTimeInterval gNFBFlashOrigin = 0;
+
+static double nfbFlashMs(void) {
+    if (gNFBFlashOrigin <= 0) {
+        return -1.0;
+    }
+    return ([NSDate timeIntervalSinceReferenceDate] - gNFBFlashOrigin) * 1000.0;
+}
 
 // The app's own chrome for a full-screen video: avatar, name, follow control,
 // engagement actions, back button, top gradient and the bottom bar. It is
@@ -76,18 +89,31 @@ static UIView* nfbImmersiveControlsView(UIView* card);
 // is taken away.
 static BOOL gNFBReaderAskedForChrome = NO;
 
-// Read once per video rather than on every setAlpha: the app re-asserts alpha
-// hundreds of times while a video plays, and the setting cannot change while
-// one is on screen - the settings page is not.
-static BOOL gNFBCleanPlayerOn = NO;
-
-static void nfbRefreshCleanPlayerFlag(void) {
-    gNFBCleanPlayerOn = [BHTSettings boolForKey:@"tap_to_pause"];
-}
-
 static BOOL nfbChromeIsUnasked(void) {
-    return !gNFBReaderAskedForChrome && gNFBCleanPlayerOn;
+    return !gNFBReaderAskedForChrome &&
+           [BHTSettings boolForKey:@"tap_to_pause"];
 }
+
+// TEMPORARY probe. Every attempt to bring a piece of chrome back into view is
+// reported with the moment it happens and the state the player is in, so the
+// rule that should govern it can be read off the journal instead of guessed.
+static void nfbReportChromeAlpha(UIView* view, CGFloat wanted, BOOL blocked) {
+    if (wanted <= 0) {
+        return;
+    }
+    NSInteger status = -1;
+    UIView* card = gNFBActiveCard;
+    TAVPlayer* player = card ? nfbCardPlayer(card) : nil;
+    if (player) {
+        status = player.playbackState.timeControlStatus;
+    }
+    NFBDebugLog(@"[chrome] %.0f ms | %@ -> alpha %.2f | %@ | status=%ld | "
+                @"onscreen=%@",
+                nfbFlashMs(), NSStringFromClass([view class]), wanted,
+                blocked ? @"BLOCKED" : @"let through", (long)status,
+                view.window ? @"YES" : @"no");
+}
+
 static void nfbHoldThroughOpening(UIView* view) {
     if (!view.window || ![BHTSettings boolForKey:@"tap_to_pause"]) {
         return;
@@ -97,8 +123,17 @@ static void nfbHoldThroughOpening(UIView* view) {
         card ? [objc_getAssociatedObject(card, kNFBCardShownAtKey) doubleValue] : 0;
     NSTimeInterval since = [NSDate timeIntervalSinceReferenceDate] - shownAt;
     if (shownAt <= 0 || since >= kNFBBarRevealDelay) {
+        NFBDebugLog(@"[flash] %.0f ms | bar mounted | hold SKIPPED (%@) | "
+                    @"alpha stays %.2f",
+                    nfbFlashMs(),
+                    !card ? @"no active card"
+                          : (shownAt <= 0 ? @"card not stamped"
+                                          : @"opening already over"),
+                    view.alpha);
         return;
     }
+    NFBDebugLog(@"[flash] %.0f ms | bar mounted | hold APPLIED for %.0f ms",
+                nfbFlashMs(), (kNFBBarRevealDelay - since) * 1000.0);
     view.alpha = 0.0;
     __weak UIView* weakView = view;
     dispatch_after(
@@ -108,6 +143,11 @@ static void nfbHoldThroughOpening(UIView* view) {
           UIView* strongView = weakView;
           if (strongView) {
               strongView.alpha = 1.0;
+              NFBDebugLog(@"[flash] %.0f ms | hold released, alpha back to 1 | "
+                          @"controls still mounted: %@",
+                          nfbFlashMs(),
+                          nfbImmersiveControlsView(gNFBActiveCard) ? @"YES"
+                                                                  : @"no");
           }
         });
 }
@@ -146,6 +186,10 @@ static void nfbRestoreTimestamp(UIView* controls) {
 - (void)didMoveToWindow {
     %orig;
     UIView* bar = (UIView*)self;
+    NFBDebugLog(@"[flash] %.0f ms | CONTROLS didMoveToWindow | window=%@ | "
+                @"alpha=%.2f | hidden=%@",
+                nfbFlashMs(), bar.window ? @"YES" : @"no", bar.alpha,
+                bar.hidden ? @"YES" : @"no");
     if (!bar.window) {
         return;
     }
@@ -216,8 +260,37 @@ static void nfbClearAutoUnmute(UIView* view) {
     // A video opened from the timeline starts in the chosen state, whatever the
     // last one was left as.
     gNFBSoundAllowed = nfbSoundAllowedAtOpen();
+    gNFBFlashOrigin = [NSDate timeIntervalSinceReferenceDate];
     gNFBReaderAskedForChrome = NO;
-    nfbRefreshCleanPlayerFlag();
+    NFBDebugLog(@"[flash] 0 ms | TAP | %@", nfbChromeCensus());
+    // Two snapshots and their difference. Whatever is on screen while the
+    // reader sees the flash and gone once it settles comes out by name.
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(130 * NSEC_PER_MSEC)),
+                   dispatch_get_main_queue(), ^{
+                     NSMutableSet* early = nfbVisibleSnapshot();
+                     NFBDebugLog(@"[flash] %.0f ms | snapshot A: %lu views",
+                                 nfbFlashMs(), (unsigned long)early.count);
+                     dispatch_after(
+                         dispatch_time(DISPATCH_TIME_NOW,
+                                       (int64_t)(370 * NSEC_PER_MSEC)),
+                         dispatch_get_main_queue(), ^{
+                           NSMutableSet* late = nfbVisibleSnapshot();
+                           NSMutableSet* gone = [early mutableCopy];
+                           [gone minusSet:late];
+                           NSArray* list = [gone.allObjects
+                               sortedArrayUsingSelector:@selector(compare:)];
+                           if (list.count > 20) {
+                               list = [list subarrayWithRange:NSMakeRange(0, 20)];
+                           }
+                           NFBDebugLog(@"[flash] %.0f ms | snapshot B: %lu views | "
+                                       @"GONE SINCE A (%lu): %@",
+                                       nfbFlashMs(), (unsigned long)late.count,
+                                       (unsigned long)gone.count,
+                                       list.count
+                                           ? [list componentsJoinedByString:@"  //  "]
+                                           : @"nothing");
+                         });
+                   });
     %orig;
 }
 
@@ -311,6 +384,18 @@ static BOOL isImmersiveCardPan(id viewController,
 %end
 
 %hook T1ImmersiveViewController
+
+- (void)viewWillAppear:(BOOL)animated {
+    %orig;
+    NFBDebugLog(@"[flash] %.0f ms | controller viewWillAppear | %@",
+                nfbFlashMs(), nfbChromeCensus());
+}
+
+- (void)viewDidAppear:(BOOL)animated {
+    %orig;
+    NFBDebugLog(@"[flash] %.0f ms | controller viewDidAppear | %@",
+                nfbFlashMs(), nfbChromeCensus());
+}
 
 - (BOOL)gestureRecognizerShouldBegin:(UIGestureRecognizer*)gesture {
     if ([BHTSettings boolForKey:@"disable_immersive_scroll"] &&
@@ -495,19 +580,6 @@ static void nfbTogglePlayback(TAVPlayer* player) {
 // it — so the search starts from the window the card is in. Looking under the
 // card alone finds nothing, and a state that cannot be read is a state that
 // cannot be matched.
-static UIView* nfbFirstDescendantOfClass(UIView* root, Class cls) {
-    for (UIView* sub in root.subviews) {
-        if ([sub isKindOfClass:cls]) {
-            return sub;
-        }
-        UIView* found = nfbFirstDescendantOfClass(sub, cls);
-        if (found) {
-            return found;
-        }
-    }
-    return nil;
-}
-
 // The controls bar on screen. Measured: the bar is NOT a descendant of the
 // card, so the search has to start at the window. Narrowing it to the card
 // returns nil every time, the reconciler never folds, and Twitter's overlay
@@ -519,11 +591,124 @@ static UIView* nfbImmersiveControlsView(UIView* card) {
         return nil;
     }
     UIView* root = card.window ?: card;
-    // Depth-first and out at the first match. The enumerator it replaces kept
-    // visiting every view after finding the bar, and this runs on every tick
-    // of the fold watch.
-    return nfbFirstDescendantOfClass(root, controlsClass);
+    __block UIView* controls = nil;
+    EnumerateSubviewsRecursively(root, ^(UIView* view) {
+        if (!controls && [view isKindOfClass:controlsClass]) {
+            controls = view;
+        }
+    });
+    return controls;
 }
+
+// TEMPORARY probe. Read only: it walks the mounted hierarchy and reports what
+// the immersive chrome looks like at a given instant. Both the bar and the
+// container it lives in are counted, because either can be what shows.
+// TEMPORARY probe. Takes a set of everything visible on screen, so that two
+// snapshots can be subtracted. No class name is guessed: whatever is present
+// early and gone later is reported by name, whatever that name turns out to be.
+static NSMutableSet* nfbVisibleSnapshot(void) {
+    NSMutableSet* seen = [NSMutableSet set];
+    UIWindow* root = nil;
+    for (UIScene* scene in [UIApplication sharedApplication].connectedScenes) {
+        if (![scene isKindOfClass:[UIWindowScene class]]) {
+            continue;
+        }
+        for (UIWindow* candidate in ((UIWindowScene*)scene).windows) {
+            if (candidate.isKeyWindow) {
+                root = candidate;
+                break;
+            }
+        }
+        if (root) {
+            break;
+        }
+    }
+    if (!root) {
+        return seen;
+    }
+    EnumerateSubviewsRecursively(root, ^(UIView* view) {
+        if (view.hidden || view.alpha < 0.05) {
+            return;
+        }
+        CGSize size = view.bounds.size;
+        // Chrome sized: wide enough to read, short enough not to be a backdrop.
+        if (size.width < 40 || size.height < 8 || size.height > 400) {
+            return;
+        }
+        CGRect inWindow = [view convertRect:view.bounds toView:root];
+        // On screen only: the table keeps laid-out cells far below the window,
+        // and they churn between snapshots for reasons of their own.
+        if (inWindow.origin.y < -80 ||
+            inWindow.origin.y > root.bounds.size.height) {
+            return;
+        }
+        NSString* name = NSStringFromClass([view class]);
+        // Timeline furniture: present early, gone once full screen, and never
+        // the thing being looked for.
+        if ([name hasPrefix:@"TTAStatus"] || [name hasPrefix:@"T1Status"] ||
+            [name hasPrefix:@"TFNViewHost"] || [name hasPrefix:@"SwiftUI"] ||
+            [name hasPrefix:@"_UICollectionView"] ||
+            [name hasPrefix:@"TFNUISwift.Shimmer"] ||
+            [name hasPrefix:@"TFNUISwift.Placeholder"]) {
+            return;
+        }
+        [seen addObject:[NSString stringWithFormat:@"%@ @%.0f", name,
+                                                   inWindow.origin.y]];
+    });
+    return seen;
+}
+
+static NSString* nfbChromeCensus(void) {
+    UIWindow* root = nil;
+    for (UIScene* scene in [UIApplication sharedApplication].connectedScenes) {
+        if (![scene isKindOfClass:[UIWindowScene class]]) {
+            continue;
+        }
+        for (UIWindow* candidate in ((UIWindowScene*)scene).windows) {
+            if (candidate.isKeyWindow) {
+                root = candidate;
+                break;
+            }
+        }
+        if (root) {
+            break;
+        }
+    }
+    if (!root) {
+        return @"no key window";
+    }
+    Class barClass =
+        NSClassFromString(@"_TtC14T1TwitterSwift17VideoControlsView");
+    Class boxClass = NSClassFromString(@"_TtC14T1TwitterSwift17BottomBarControls");
+    __block NSInteger bars = 0;
+    __block NSInteger boxes = 0;
+    __block CGFloat barAlpha = -1.0;
+    __block CGFloat boxAlpha = -1.0;
+    __block BOOL barHidden = NO;
+    __block BOOL boxHidden = NO;
+    EnumerateSubviewsRecursively(root, ^(UIView* view) {
+        if (barClass && [view isKindOfClass:barClass]) {
+            bars++;
+            if (barAlpha < 0) {
+                barAlpha = view.alpha;
+                barHidden = view.hidden;
+            }
+        }
+        if (boxClass && [view isKindOfClass:boxClass]) {
+            boxes++;
+            if (boxAlpha < 0) {
+                boxAlpha = view.alpha;
+                boxHidden = view.hidden;
+            }
+        }
+    });
+    return [NSString stringWithFormat:
+                @"bar x%ld (alpha=%.2f hidden=%@) | box x%ld (alpha=%.2f "
+                @"hidden=%@)",
+                (long)bars, barAlpha, barHidden ? @"YES" : @"no", (long)boxes,
+                boxAlpha, boxHidden ? @"YES" : @"no"];
+}
+
 // Built once per card and kept as an associated object. Touches pass through
 // it, so the card's own tap gesture stays the only thing handling them.
 static UIView* nfbPausedGlyph(UIView* card) {
@@ -962,6 +1147,16 @@ static BOOL nfbFoldIfDue(UIView* card) {
     }
     BOOL paused = (status == 0);
     if ((nfbImmersiveControlsView(card) != nil) == paused) {
+        // One line per card: the retry ladder asks again every few
+        // milliseconds, and a line per attempt buries the journal.
+        static NSInteger lastReported = -1;
+        if (lastReported != status) {
+            lastReported = status;
+            NFBDebugLog(@"[flash] %.0f ms | settled: bar matches state "
+                        @"(status=%ld, mounted=%@)",
+                        nfbFlashMs(), (long)status,
+                        nfbImmersiveControlsView(card) ? @"YES" : @"no");
+        }
         return NO;
     }
     Ivar recognizerIvar =
@@ -975,17 +1170,25 @@ static BOOL nfbFoldIfDue(UIView* card) {
         [objc_getAssociatedObject(card, kNFBLastFoldKey) doubleValue];
     NSTimeInterval nowStamp = [NSDate timeIntervalSinceReferenceDate];
     if (lastFold > 0 && nowStamp - lastFold < kNFBFoldCooldown) {
+        NFBDebugLog(@"[flash] %.0f ms | fold HELD OFF (%.0f ms since the last "
+                    @"one, status=%ld)",
+                    nfbFlashMs(), (nowStamp - lastFold) * 1000.0, (long)status);
         return YES;
     }
     objc_setAssociatedObject(card, kNFBLastFoldKey, @(nowStamp),
                              OBJC_ASSOCIATION_RETAIN_NONATOMIC);
 
+    NFBDebugLog(@"[flash] %.0f ms | fold FIRED (status=%ld)", nfbFlashMs(),
+                (long)status);
     gNFBSyntheticToggle = YES;
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Warc-performSelector-leaks"
     [card performSelector:@selector(handleSingleTap:) withObject:recognizer];
 #pragma clang diagnostic pop
     gNFBSyntheticToggle = NO;
+    NFBDebugLog(@"[flash] %.0f ms | fold done, controls mounted: %@",
+                nfbFlashMs(),
+                nfbImmersiveControlsView(card) ? @"YES" : @"no");
     return YES;
 }
 
@@ -1096,7 +1299,8 @@ static void nfbStartFoldWatch(UIView* card) {
         // A swipe to the next video never goes through the timeline tap, so the
         // request is cleared here too.
         gNFBReaderAskedForChrome = NO;
-        nfbRefreshCleanPlayerFlag();
+        NFBDebugLog(@"[flash] %.0f ms | card registered | %@", nfbFlashMs(),
+                    nfbChromeCensus());
         objc_setAssociatedObject(
             card, kNFBCardShownAtKey,
             @([NSDate timeIntervalSinceReferenceDate]),
@@ -1151,6 +1355,7 @@ static void nfbStartFoldWatch(UIView* card) {
 %hook _TtC14T1TwitterSwift25ImmersiveStatusPluginView
 - (void)setAlpha:(CGFloat)alpha {
     BOOL blocked = alpha > 0 && nfbChromeIsUnasked();
+    nfbReportChromeAlpha((UIView*)self, alpha, blocked);
     if (blocked) {
         %orig(0);
         return;
@@ -1163,6 +1368,7 @@ static void nfbStartFoldWatch(UIView* card) {
 %hook _TtC14T1TwitterSwift36ImmersiveEngagementActionsPluginView
 - (void)setAlpha:(CGFloat)alpha {
     BOOL blocked = alpha > 0 && nfbChromeIsUnasked();
+    nfbReportChromeAlpha((UIView*)self, alpha, blocked);
     if (blocked) {
         %orig(0);
         return;
@@ -1175,6 +1381,7 @@ static void nfbStartFoldWatch(UIView* card) {
 %hook _TtC14T1TwitterSwift25ImmersiveActionsStackView
 - (void)setAlpha:(CGFloat)alpha {
     BOOL blocked = alpha > 0 && nfbChromeIsUnasked();
+    nfbReportChromeAlpha((UIView*)self, alpha, blocked);
     if (blocked) {
         %orig(0);
         return;
@@ -1187,6 +1394,7 @@ static void nfbStartFoldWatch(UIView* card) {
 %hook _TtC14T1TwitterSwift19ImmersiveActionView
 - (void)setAlpha:(CGFloat)alpha {
     BOOL blocked = alpha > 0 && nfbChromeIsUnasked();
+    nfbReportChromeAlpha((UIView*)self, alpha, blocked);
     if (blocked) {
         %orig(0);
         return;
@@ -1199,6 +1407,7 @@ static void nfbStartFoldWatch(UIView* card) {
 %hook _TtC14T1TwitterSwift29ImmersiveBackButtonPluginView
 - (void)setAlpha:(CGFloat)alpha {
     BOOL blocked = alpha > 0 && nfbChromeIsUnasked();
+    nfbReportChromeAlpha((UIView*)self, alpha, blocked);
     if (blocked) {
         %orig(0);
         return;
@@ -1211,6 +1420,7 @@ static void nfbStartFoldWatch(UIView* card) {
 %hook _TtC14T1TwitterSwift35ImmersiveTopRightActionsPluginsView
 - (void)setAlpha:(CGFloat)alpha {
     BOOL blocked = alpha > 0 && nfbChromeIsUnasked();
+    nfbReportChromeAlpha((UIView*)self, alpha, blocked);
     if (blocked) {
         %orig(0);
         return;
@@ -1223,6 +1433,7 @@ static void nfbStartFoldWatch(UIView* card) {
 %hook _TtC14T1TwitterSwift30ImmersiveTopGradientPluginView
 - (void)setAlpha:(CGFloat)alpha {
     BOOL blocked = alpha > 0 && nfbChromeIsUnasked();
+    nfbReportChromeAlpha((UIView*)self, alpha, blocked);
     if (blocked) {
         %orig(0);
         return;
@@ -1235,6 +1446,7 @@ static void nfbStartFoldWatch(UIView* card) {
 %hook _TtC14T1TwitterSwift33ImmersiveBottomGradientPluginView
 - (void)setAlpha:(CGFloat)alpha {
     BOOL blocked = alpha > 0 && nfbChromeIsUnasked();
+    nfbReportChromeAlpha((UIView*)self, alpha, blocked);
     if (blocked) {
         %orig(0);
         return;
@@ -1247,6 +1459,7 @@ static void nfbStartFoldWatch(UIView* card) {
 %hook _TtC14T1TwitterSwift17BottomBarControls
 - (void)setAlpha:(CGFloat)alpha {
     BOOL blocked = alpha > 0 && nfbChromeIsUnasked();
+    nfbReportChromeAlpha((UIView*)self, alpha, blocked);
     if (blocked) {
         %orig(0);
         return;

@@ -1075,12 +1075,8 @@ static UIScrollView* NFBListScrollView(TFNItemsDataViewController* dataViewContr
         return cached;
     }
     UIScrollView* found = NFBFindListInView(dataViewController.view);
-    // Retained, not assigned. An assigned pointer is a raw address: the moment
-    // the app releases its list while the controller lives on, `cached.window`
-    // above messages freed memory. Holding it costs one stale scroll view until
-    // the next lookup, and the check above already tells a stale one apart.
     objc_setAssociatedObject(dataViewController, kNFBListViewKey, found,
-                             OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+                             OBJC_ASSOCIATION_ASSIGN);
     return found;
 }
 
