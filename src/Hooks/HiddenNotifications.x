@@ -1662,10 +1662,10 @@ reconfigureItemIdentifiers:(id)identifiers
     if (glyph) {
         hide.image = glyph;
     }
-    NSMutableArray<UIContextualAction*>* actions = [NSMutableArray arrayWithObject:hide];
-    if (original.actions.count) {
-        [actions addObjectsFromArray:original.actions];
-    }
+    // Nothing to merge: a list that reaches this method has no swipe actions of
+    // its own, or it would have implemented the delegate method and never
+    // inherited this one.
+    NSArray<UIContextualAction*>* actions = @[ hide ];
     UISwipeActionsConfiguration* configuration =
         [UISwipeActionsConfiguration configurationWithActions:actions];
     configuration.performsFirstActionWithFullSwipe = NO;
