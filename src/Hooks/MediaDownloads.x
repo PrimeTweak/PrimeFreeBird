@@ -165,6 +165,95 @@ static const void* kNFBVoiceInteractionKey = &kNFBVoiceInteractionKey;
 }
 %end
 
+// MARK: - 12.21: DM attachments moved to the ChatConversation module
+//
+// The DMAttachments module is gone from 12.21 and DMConversation lost its
+// attachment view; both now live in ChatConversation. Same bodies, new names.
+
+%hook _TtC16ChatConversation26MessageAttachmentAudioView
+
+- (void)layoutSubviews {
+    %orig;
+    UIView* view = (UIView*)self;
+    if ([BHTSettings boolForKey:@"download_voice_messages"] &&
+        !objc_getAssociatedObject(view, kNFBVoiceInteractionKey)) {
+        UIContextMenuInteraction* interaction = [[UIContextMenuInteraction alloc]
+            initWithDelegate:(id<UIContextMenuInteractionDelegate>)self];
+        objc_setAssociatedObject(view, kNFBVoiceInteractionKey, interaction,
+                                 OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        [view addInteraction:interaction];
+    }
+}
+
+%new
+- (UIContextMenuConfiguration*)contextMenuInteraction:(UIContextMenuInteraction*)interaction
+                       configurationForMenuAtLocation:(CGPoint)location {
+    NSURL* voiceURL = gNFBLastVoiceURL;
+    if (!voiceURL) {
+        return nil;
+    }
+    return [UIContextMenuConfiguration
+        configurationWithIdentifier:nil
+                    previewProvider:nil
+                     actionProvider:^UIMenu* _Nullable(
+                         NSArray<UIMenuElement*>* _Nonnull suggestedActions) {
+                       UIAction* saveAction = [UIAction
+                           actionWithTitle:[[BHTBundle sharedBundle]
+                                               localizedTwitterStringForKey:
+                                                   @"DOWNLOAD_ACTIVITY_VIEW_LABEL"]
+                                     image:[UIImage systemImageNamed:@"square.and.arrow.down"]
+                                identifier:nil
+                                   handler:^(__kindof UIAction* _Nonnull action) {
+                                     NFBSaveVoiceMessage(voiceURL);
+                                   }];
+                       return [UIMenu menuWithTitle:@"" children:@[ saveAction ]];
+                     }];
+}
+
+%end
+
+%hook _TtC16ChatConversation21MessageAttachmentView
+%property (nonatomic, strong) UIContextMenuInteraction* downloadMenuInteraction;
+%property (nonatomic, strong) DownloadInlineButton* downloadHandler;
+- (void)layoutSubviews {
+    %orig;
+
+    if ([BHTSettings boolForKey:@"download_videos"] && self.downloadMenuInteraction == nil) {
+        self.downloadMenuInteraction = [[UIContextMenuInteraction alloc] initWithDelegate:self];
+        [self addInteraction:self.downloadMenuInteraction];
+    }
+}
+%new
+- (UIContextMenuConfiguration*)contextMenuInteraction:(UIContextMenuInteraction*)interaction
+                       configurationForMenuAtLocation:(CGPoint)location {
+    NSArray* videoEntities = DMVideoEntities(self);
+    if (videoEntities.count == 0) {
+        return nil;
+    }
+
+    return [UIContextMenuConfiguration
+        configurationWithIdentifier:nil
+                    previewProvider:nil
+                     actionProvider:^UIMenu* _Nullable(
+                         NSArray<UIMenuElement*>* _Nonnull suggestedActions) {
+                         UIAction* saveAction = [UIAction
+                             actionWithTitle:
+                                 [[BHTBundle sharedBundle]
+                                     localizedTwitterStringForKey:@"DOWNLOAD_ACTIVITY_VIEW_LABEL"]
+                                       image:[UIImage systemImageNamed:@"square.and.arrow.down"]
+                                  identifier:nil
+                                     handler:^(__kindof UIAction* _Nonnull action) {
+                                         if (self.downloadHandler == nil) {
+                                             self.downloadHandler = [%c(DownloadInlineButton) new];
+                                         }
+                                         [self.downloadHandler
+                                             presentDownloadOptionsForMediaEntities:videoEntities];
+                                     }];
+                         return [UIMenu menuWithTitle:@"" children:@[saveAction]];
+                     }];
+}
+%end
+
 // MARK: - Upload custom voice
 
 // Overwrites the recording at the attachment's existing file path, so the

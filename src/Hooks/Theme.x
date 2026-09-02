@@ -5,6 +5,7 @@
 
 #import <objc/runtime.h>
 #import "HookHelpers.h"
+#import "Debug/NFBDebugger.h"
 
 #import "ThemeColor/DarkModeStyle.h"
 
@@ -192,7 +193,65 @@ static UIColor* NFBRawLogoColor(void) {
     return raw;
 }
 
+
+// TEMPORARY probe for 12.21. Read only. Each site reports once; the point is to
+// learn which of the theming paths still run on the new build and what the
+// chrome around them is made of now.
+static void nfbP21Once(NSString* key, NSString* (^line)(void)) {
+    static NSMutableSet* seen = nil;
+    if (!seen) {
+        seen = [NSMutableSet set];
+    }
+    if ([seen containsObject:key]) {
+        return;
+    }
+    [seen addObject:key];
+    NFBDebugLog(@"[p21] %@", line());
+}
+
+static NSString* nfbP21Classes(UIView* root) {
+    NSMutableArray* names = [NSMutableArray array];
+    for (UIView* sub in root.subviews) {
+        [names addObject:NSStringFromClass([sub class])];
+        if (names.count >= 8) {
+            break;
+        }
+    }
+    return names.count ? [names componentsJoinedByString:@", "] : @"(none)";
+}
+
+// Every distinct class on screen whose name says navigation, tab bar, hosting
+// or accessory, with a count. This is what tells the SwiftUI and XNavigation
+// theories apart.
+static void nfbP21DumpChrome(UIView* root) {
+    NSMutableDictionary* counts = [NSMutableDictionary dictionary];
+    EnumerateSubviewsRecursively(root, ^(UIView* view) {
+      NSString* name = NSStringFromClass([view class]);
+      if ([name containsString:@"NavigationBar"] || [name containsString:@"XNavigation"] ||
+          [name containsString:@"TabBar"] || [name containsString:@"Accessory"] ||
+          [name containsString:@"Hosting"] || [name containsString:@"SwiftUI"] ||
+          [name containsString:@"Segmented"] || [name containsString:@"Paging"] ||
+          [name containsString:@"TitleView"] || [name containsString:@"Logo"]) {
+          counts[name] = @([counts[name] integerValue] + 1);
+      }
+    });
+    NSArray* keys = [counts.allKeys sortedArrayUsingSelector:@selector(compare:)];
+    NSMutableArray* lines = [NSMutableArray array];
+    for (NSString* k in keys) {
+        [lines addObject:[NSString stringWithFormat:@"%@ x%@", k, counts[k]]];
+    }
+    NFBDebugLog(@"[p21] chrome on screen (%lu classes): %@", (unsigned long)keys.count,
+                lines.count ? [lines componentsJoinedByString:@"  //  "] : @"(none matched)");
+}
+
 static void NFBApplyLogoTint(UIImageView* logoView) {
+    nfbP21Once(@"logo", ^{
+      return [NSString stringWithFormat:
+                 @"logo tint CALLED | view=%@ image=%@ mode=%ld | setting=%d accentActive=%d",
+                 NSStringFromClass([logoView class]), logoView.image ? @"yes" : @"nil",
+                 (long)logoView.image.renderingMode,
+                 [BHTSettings boolForKey:@"color_twitter_icon_in_top_bar"], NFBAccentIsActive()];
+    });
     if (!logoView.image) {
         return;
     }
@@ -322,6 +381,13 @@ static char kNFBAppliedAccentKey;
 static BOOL NFBAccentPending = NO;
 
 static void NFBApplyTabBarAccent(UITabBar* bar) {
+    nfbP21Once(@"tabbar", ^{
+      return [NSString stringWithFormat:
+                 @"tab bar accent CALLED | bar=%@ items=%lu | setting=%d accentActive=%d | subviews: %@",
+                 NSStringFromClass([bar class]), (unsigned long)bar.items.count,
+                 [BHTSettings boolForKey:@"tab_bar_theming"], NFBAccentIsActive(),
+                 nfbP21Classes(bar)];
+    });
     BOOL active = [BHTSettings boolForKey:@"tab_bar_theming"] && NFBAccentIsActive();
     // Brand accent, not CurrentAccentColor: with nothing picked the latter falls
     // back to iOS systemBlue, which does not belong on a Twitter surface.
@@ -1136,6 +1202,12 @@ static UIColor* tabItemColor(BOOL selected) {
 - (UIView*)titleView {
     UIView* titleView = %orig;
     UIImageView* logo = NFBFindLogoImageView(titleView);
+    nfbP21Once(@"titleview", ^{
+      return [NSString stringWithFormat:
+                 @"home titleView hook FIRED | titleView=%@ | logo found=%@ | subviews: %@",
+                 NSStringFromClass([titleView class]), logo ? @"yes" : @"NO",
+                 nfbP21Classes(titleView)];
+    });
     if (logo) {
         NFBTopBarLogoView = logo;
         NFBRegisterLogoView(logo);
@@ -1407,6 +1479,16 @@ void NFBWhitenNavigationBarConfirm(UINavigationBar* bar) {
 
 - (void)viewDidAppear:(BOOL)animated {
     %orig;
+    // 12.21 probe: one dump of the chrome classes, taken from the first
+    // controller that appears inside a window, then never again.
+    if (self.view.window) {
+        UIWindow* window = self.view.window;
+        nfbP21Once(@"chrome-dump", ^{
+          nfbP21DumpChrome(window);
+          return [NSString stringWithFormat:@"chrome dump taken from %@",
+                                            NSStringFromClass([self class])];
+        });
+    }
     if (!NFBAccentPending) {
         return;
     }

@@ -32,6 +32,7 @@
 //
 
 #import "HookHelpers.h"
+#import "Debug/NFBDebugger.h"
 #import <QuartzCore/QuartzCore.h>
 
 static NSString* const kNFBTabKeys[] = {
@@ -113,6 +114,22 @@ static BOOL gNFBSelfNav = NO;          // our own pager navigation in progress
 static NSUInteger gNFBAppliedMaskBits = 0xFFFF;   // last mask synced to the pager
 
 void nfbNoteExploreAccessoryView(UIView* v) {
+    // TEMPORARY probe for 12.21: is the accessory still handed to us, and what
+    // is it made of now.
+    static NSInteger probeCalls = 0;
+    if (probeCalls < 3) {
+        probeCalls++;
+        NSMutableArray* names = [NSMutableArray array];
+        for (UIView* sub in v.subviews) {
+            [names addObject:NSStringFromClass([sub class])];
+            if (names.count >= 8) {
+                break;
+            }
+        }
+        NFBDebugLog(@"[p21] explore accessory #%ld | class=%@ | subviews: %@",
+                    (long)probeCalls, v ? NSStringFromClass([v class]) : @"nil",
+                    names.count ? [names componentsJoinedByString:@", "] : @"(none)");
+    }
     gNFBExploreBar = v;
 }
 
@@ -379,6 +396,12 @@ static void nfbApplyTabFilter(UIView* bar, UICollectionView* cv) {
 
 - (void)layoutSubviews {
     %orig;
+    static BOOL probeOnce = NO;
+    if (!probeOnce) {
+        probeOnce = YES;
+        NFBDebugLog(@"[p21] OLD segmented bar layoutSubviews FIRED | granular=%d | isExploreBar=%d",
+                    nfbGranularActive(), nfbIsExploreBar((UIView*)self));
+    }
 
     if (!nfbGranularActive()) { return; }
     if (!nfbIsExploreBar((UIView*)self)) { return; }
@@ -542,6 +565,183 @@ static void nfbApplyTabFilter(UIView* bar, UICollectionView* cv) {
 
 %end
 
+// MARK: - 12.21: the same three classes, renamed with a Legacy prefix
+//
+// Twitter 12.21 renamed SegmentedTabBarView, SegmentedViewController and
+// PagingViewController with a Legacy prefix and shipped no ObjC successor: the
+// new Explore bar is most likely SwiftUI. The blocks below are the same bodies
+// bound to the new names, so whatever screen still uses the legacy bar keeps
+// working. A hook on a class that is absent from the running build attaches to
+// nothing, which is why both sets can coexist.
+
+%hook _TtC10TFNUISwift25LegacySegmentedTabBarView
+
+- (void)layoutSubviews {
+    %orig;
+    static BOOL probeOnce = NO;
+    if (!probeOnce) {
+        probeOnce = YES;
+        NFBDebugLog(@"[p21] LEGACY segmented bar layoutSubviews FIRED | granular=%d | isExploreBar=%d",
+                    nfbGranularActive(), nfbIsExploreBar((UIView*)self));
+    }
+
+    if (!nfbGranularActive()) { return; }
+    if (!nfbIsExploreBar((UIView*)self)) { return; }
+
+    UICollectionView* cv = nfbFindCollection((UIView*)self, 0);
+    if (!cv) { return; }
+
+    nfbApplyTabFilter((UIView*)self, cv);
+
+    __weak UIView* wself = (UIView*)self;
+    __weak UICollectionView* wcv = cv;
+    for (NSNumber* ms in @[ @16, @50, @120, @250 ]) {
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW,
+                                     (int64_t)(ms.intValue * NSEC_PER_MSEC)),
+                       dispatch_get_main_queue(), ^{
+            if (wself && wcv && nfbGranularActive()) {
+                nfbApplyTabFilter(wself, wcv);
+            }
+        });
+    }
+}
+
+// A tap on a tab. The callback is an ObjC protocol method, so it is
+// interceptable on this Swift class; it is guarded to the Explore bar's own
+// collection and everything else passes through untouched.
+- (void)collectionView:(UICollectionView*)collectionView
+    didSelectItemAtIndexPath:(NSIndexPath*)indexPath {
+    UIView* root = gNFBExploreBar;
+    UICollectionView* barCV = root ? nfbFindCollection(root, 0) : nil;
+    UICollectionView* pager = gNFBPagerCV;
+    if (!nfbGranularActive() || !barCV || collectionView != barCV || !pager) {
+        %orig;
+        return;
+    }
+    // The cell's index is the page's index, so the app's own navigation lands
+    // on the right page and carries the bar's bookkeeping with it — which is
+    // what puts the bold label and its icon on the tab that was tapped.
+    %orig;
+}
+
+%end
+
+%hook _TtC10TFNUISwift29LegacySegmentedViewController
+
+- (void)collectionView:(UICollectionView*)collectionView
+    didSelectItemAtIndexPath:(NSIndexPath*)indexPath {
+    UIView* root = gNFBExploreBar;
+    UICollectionView* barCV = root ? nfbFindCollection(root, 0) : nil;
+    UICollectionView* pager = gNFBPagerCV;
+    if (!nfbGranularActive() || !barCV || collectionView != barCV || !pager) {
+        %orig;
+        return;
+    }
+    // Cell index and page index are the same number, so the app's own
+    // navigation lands on the right page and carries the bar's own styling
+    // with it.
+    %orig;
+}
+
+%end
+
+%hook _TtC10TFNUISwift26LegacyPagingViewController
+
+// The collection asks its data source how many pages exist. The answer is left
+// alone; this is where the pager collection and its page count are captured,
+// the argument being the pager's collection view.
+- (NSInteger)collectionView:(UICollectionView*)collectionView
+     numberOfItemsInSection:(NSInteger)section {
+    NSInteger n = %orig;
+    if (!nfbGranularActive()) { return n; }
+    if (![collectionView isKindOfClass:[UICollectionView class]]) { return n; }
+    // Remember the candidate on EVERY pass (startup-order fix): a paging,
+    // multi-item collection served by this controller IS a tab pager. The
+    // bar's filter performs the capture once the bar is provably live.
+    if (collectionView.pagingEnabled && n >= 2) {
+        gNFBPagerCandidate = collectionView;
+        gNFBPagerCandidateTotal = n;
+    }
+    // Once captured, the pager keeps that identity for its whole life: the
+    // bar's window is never re-tested, so a transient weak-nil there cannot
+    // change what this collection is taken to be mid-session.
+    if (collectionView != gNFBPagerCV) {
+        if (!nfbPagerScopeOK(collectionView)) { return n; }
+        gNFBPagerCV = collectionView;
+    }
+    gNFBPagerTotal = n;
+    // The pager keeps ALL its pages. Handing it the kept count is what put its
+    // page indices in a different space from the bar's cell indices, and every
+    // misplacement since — the underline, the bold label — came from bridging
+    // those two spaces. With the counts equal, page index IS cell index IS
+    // absolute index, and Twitter's own bar styles the right tab with no help.
+    // Hidden pages are simply never landed on: see the drag handler below.
+    return n;
+}
+
+// Underline ticks. Bar layout passes stop before the fine end of a
+// deceleration, which parks the glide short of the target, so the underline is
+// placed again on every offset change and once more when any gesture or
+// animation ends.
+- (void)scrollViewDidScroll:(id)scrollView {
+    %orig;
+    if (!nfbGranularActive()
+        || (UICollectionView*)scrollView != gNFBPagerCV) { return; }
+    nfbPositionUnderline(gNFBExploreBar, gNFBBarCV);
+}
+
+// The only thing left to enforce: a swipe never comes to rest on a hidden tab.
+// UIKit asks the delegate where the gesture should land, and that answer is
+// moved to the nearest kept page — in the direction the finger was going, so a
+// flick past a hidden tab carries on instead of bouncing back.
+- (void)scrollViewWillEndDragging:(id)scrollView
+                     withVelocity:(CGPoint)velocity
+              targetContentOffset:(CGPoint*)target {
+    %orig;
+    if (!nfbGranularActive() || (UICollectionView*)scrollView != gNFBPagerCV) {
+        return;
+    }
+    UICollectionView* pager = gNFBPagerCV;
+    CGFloat pw = pager.bounds.size.width;
+    NSInteger total = gNFBPagerTotal ?: kNFBTabCount;
+    if (pw < 1.0 || !target) {
+        return;
+    }
+    NSInteger wanted = (NSInteger)llround(target->x / pw);
+    if (wanted < 0) { wanted = 0; }
+    if (wanted > total - 1) { wanted = total - 1; }
+    if (!nfbTabHidden(wanted)) {
+        return;
+    }
+    NSInteger step = (velocity.x < 0) ? -1 : 1;
+    NSInteger probe = wanted;
+    while (probe >= 0 && probe <= total - 1 && nfbTabHidden(probe)) {
+        probe += step;
+    }
+    if (probe < 0 || probe > total - 1) {
+        probe = nfbNearestKeptAbs(wanted, total);
+    }
+    if (probe >= 0 && probe <= total - 1) {
+        target->x = probe * pw;
+    }
+}
+
+- (void)scrollViewDidEndDecelerating:(id)scrollView {
+    %orig;
+    if (!nfbGranularActive()
+        || (UICollectionView*)scrollView != gNFBPagerCV) { return; }
+    nfbPositionUnderline(gNFBExploreBar, gNFBBarCV);
+}
+
+- (void)scrollViewDidEndScrollingAnimation:(id)scrollView {
+    %orig;
+    if (!nfbGranularActive()
+        || (UICollectionView*)scrollView != gNFBPagerCV) { return; }
+    nfbPositionUnderline(gNFBExploreBar, gNFBBarCV);
+}
+
+%end
+
 // MARK: - hidden pages are never a destination
 //
 // A programmatic navigation can still aim at a tab the reader has hidden —
@@ -559,6 +759,21 @@ static void nfbApplyTabFilter(UIView* bar, UICollectionView* cv) {
 // other collection in the app.
 - (void)layoutSubviews {
     %orig;
+    // TEMPORARY probe for 12.21: the first three collections seen while a bar
+    // is known, with the chain above them, so a SwiftUI host shows its name.
+    static NSInteger probeCalls = 0;
+    if (probeCalls < 3 && gNFBExploreBar && nfbGranularActive()) {
+        probeCalls++;
+        NSMutableArray* chain = [NSMutableArray array];
+        UIView* up = ((UIView*)self).superview;
+        while (up && chain.count < 5) {
+            [chain addObject:NSStringFromClass([up class])];
+            up = up.superview;
+        }
+        NFBDebugLog(@"[p21] collection #%ld | isBarCV=%d isExploreBar=%d | above: %@",
+                    (long)probeCalls, (UICollectionView*)self == gNFBBarCV,
+                    nfbIsExploreBar((UIView*)self), [chain componentsJoinedByString:@" < "]);
+    }
     if ((UICollectionView*)self != gNFBBarCV || gNFBInBarFilter
         || !nfbGranularActive()) {
         return;

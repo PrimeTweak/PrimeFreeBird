@@ -243,6 +243,21 @@ static void nfbSwapRefreshLabelFromMenu(void) {
 // native view is never built again: the ⌚ watch on the ItemView goes silent.
 static NSArray<UIBarButtonItem*>* nfbSwapInterceptItems(UINavigationItem* nav,
                                                         NSArray<UIBarButtonItem*>* items) {
+    // TEMPORARY probe for 12.21: the first five calls, with every reason the
+    // swap could decline. If this never logs, the setter is no longer the path
+    // the app uses to install its items.
+    static NSInteger probeCalls = 0;
+    if (probeCalls < 5) {
+        probeCalls++;
+        UIBarButtonItem* first = items.firstObject;
+        NFBDebugLog(@"[p21] swap intercept #%ld | items=%lu first=%@ customView=%@ | swapItem=%@ navMarked=%@ setting=%d",
+                    (long)probeCalls, (unsigned long)items.count,
+                    first ? NSStringFromClass([first class]) : @"nil",
+                    first.customView ? NSStringFromClass([first.customView class]) : @"nil",
+                    gNFBSwapItem ? @"yes" : @"NIL",
+                    objc_getAssociatedObject(nav, kNFBSwapNavKey) ? @"yes" : @"no",
+                    [BHTSettings boolForKey:@"enable_liquid_glass"]);
+    }
     if (!gNFBSwapItem || items.count != 1 ||
         !objc_getAssociatedObject(nav, kNFBSwapNavKey)) {
         return items;
@@ -536,6 +551,13 @@ static void nfbSwapApply(UIView* pillView) {
 }
 
 - (void)setTrailingItemGroups:(NSArray<UIBarButtonItemGroup*>*)groups {
+    static BOOL probeOnce = NO;
+    if (!probeOnce) {
+        probeOnce = YES;
+        NFBDebugLog(@"[p21] setTrailingItemGroups FIRED | groups=%lu | swapItem=%@ navMarked=%@",
+                    (unsigned long)groups.count, gNFBSwapItem ? @"yes" : @"NIL",
+                    objc_getAssociatedObject(self, kNFBSwapNavKey) ? @"yes" : @"no");
+    }
     if (gNFBSwapItem && objc_getAssociatedObject(self, kNFBSwapNavKey) &&
         [BHTSettings boolForKey:@"enable_liquid_glass"]) {
         if (@available(iOS 16.0, *)) {
