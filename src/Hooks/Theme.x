@@ -514,6 +514,28 @@ static void NFBApplyTabBarAccent(UITabBar* bar) {
 // sized. Sitting just before it in its parent puts the glass over the white
 // panel and under the tab items.
 static const void* kNFBTabGlassKey = &kNFBTabGlassKey;
+static const void* kNFBTabHiddenKey = &kNFBTabHiddenKey;
+
+// The app's solid backdrop, found by colour alone - no size test, because this
+// runs from the host's layoutSubviews and the nested wrappers are not sized
+// yet. The hairline separators sit at alpha 0.80 and stay untouched, so the
+// bar keeps the edge the app drew.
+static NSArray<UIView*>* NFBTabBarBackdrops(UIView* host, UIView* skip) {
+    NSMutableArray<UIView*>* found = [NSMutableArray array];
+    EnumerateSubviewsRecursively(host, ^(UIView* sub) {
+      if (sub == skip || [sub isKindOfClass:[UIVisualEffectView class]]) {
+          return;
+      }
+      UIColor* colour = sub.backgroundColor;
+      CGFloat alpha = 0;
+      if (colour && ([colour getWhite:NULL alpha:&alpha] ||
+                     [colour getRed:NULL green:NULL blue:NULL alpha:&alpha]) &&
+          alpha > 0.9) {
+          [found addObject:sub];
+      }
+    });
+    return found;
+}
 
 static UIView* NFBCustomTabBar(UIView* host) {
     __block UIView* found = nil;
@@ -533,8 +555,12 @@ static void NFBApplyTabBarGlass(UIView* host) {
             [glass removeFromSuperview];
             objc_setAssociatedObject(host, kNFBTabGlassKey, nil,
                                      OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-            NFBDebugLog(@"[tabglass] removed, standard style restored");
         }
+        for (UIView* backdrop in objc_getAssociatedObject(host, kNFBTabHiddenKey)) {
+            backdrop.hidden = NO;
+        }
+        objc_setAssociatedObject(host, kNFBTabHiddenKey, nil,
+                                 OBJC_ASSOCIATION_RETAIN_NONATOMIC);
         return;
     }
 
@@ -580,6 +606,28 @@ static void NFBApplyTabBarGlass(UIView* host) {
     }
     if (!CGRectEqualToRect(glass.frame, parent.bounds)) {
         glass.frame = parent.bounds;
+    }
+
+    // Hidden, not cleared. Glass samples what is behind it, so a solid backdrop
+    // left in place makes it render that solid colour - which is what the last
+    // build did, correctly seated and still white. Clearing the colour was
+    // tried first and lost: the app repaints it and no layout pass follows.
+    // `hidden` survives, because nothing in the app sets it back.
+    NSMutableArray<UIView*>* hidden =
+        objc_getAssociatedObject(host, kNFBTabHiddenKey) ?: [NSMutableArray array];
+    NSUInteger before = hidden.count;
+    for (UIView* backdrop in NFBTabBarBackdrops(host, glass)) {
+        if (![hidden containsObject:backdrop]) {
+            [hidden addObject:backdrop];
+            NFBDebugLog(@"[tabglass] backdrop hidden: %@ %@",
+                        NSStringFromClass([backdrop class]),
+                        backdrop.backgroundColor);
+        }
+        backdrop.hidden = YES;
+    }
+    if (hidden.count != before) {
+        objc_setAssociatedObject(host, kNFBTabHiddenKey, hidden,
+                                 OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     }
 }
 

@@ -73,6 +73,13 @@ extern BOOL NFBDebugIsRecording(void);
 // behaving, instead of scattering one-off probes through the hooks.
 extern void NFBReportBrandingSurfaces(void);
 
+// Everything that can make the bottom bar opaque, in one pass: the full view
+// chain under the host with each view's colour, layer colour, alpha, hidden
+// flag, layer contents and filters, plus where the glass sits among them. Run
+// it twice - once at launch and once on demand - so a value that the app
+// repaints between the two shows up as a difference rather than a guess.
+extern void NFBReportTabBarStack(NSString* moment);
+
 // The watch list: class-name fragments added at runtime from the diagnostics
 // screen. Matching views have their lifecycle journaled with millisecond
 // stamps and instance pointers.

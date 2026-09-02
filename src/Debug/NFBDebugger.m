@@ -752,7 +752,14 @@ void NFBDebuggerInstall(void) {
     // Once, after the first screen has settled, so the journal always carries a
     // picture of the branding surfaces without anyone adding a probe.
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(5.0 * NSEC_PER_SEC)),
-                   dispatch_get_main_queue(), ^{ NFBReportBrandingSurfaces(); });
+                   dispatch_get_main_queue(), ^{
+                     NFBReportBrandingSurfaces();
+                     NFBReportTabBarStack(@"5s");
+                   });
+    // A second look once the app has settled: anything the app repaints between
+    // the two reads shows up as a difference instead of a theory.
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(12.0 * NSEC_PER_SEC)),
+                   dispatch_get_main_queue(), ^{ NFBReportTabBarStack(@"12s"); });
     // The health check runs twice. The first pass, soon after launch, catches
     // the obvious. The second, later, gives frameworks that only load with
     // their screen (DM, Immersive, Guide) time to arrive before their classes
@@ -913,5 +920,111 @@ void NFBReportBrandingSurfaces(void) {
                 [BHTSettings boolForKey:@"color_twitter_icon_in_top_bar"],
                 [BHTSettings boolForKey:@"tab_bar_theming"],
                 [BHTSettings boolForKey:@"enable_liquid_glass"]);
+}
+
+#pragma mark - Tab bar stack
+
+// Reports every property that can put an opaque pixel in front of the glass.
+// Written after five builds spent guessing one cause at a time.
+void NFBReportTabBarStack(NSString* moment) {
+    if (!NFBDebugIsRecording()) {
+        return;
+    }
+    UIWindow* window = nil;
+    for (id scene in UIApplication.sharedApplication.connectedScenes) {
+        if (![scene respondsToSelector:@selector(windows)]) {
+            continue;
+        }
+        for (UIWindow* candidate in [scene windows]) {
+            if (candidate.isKeyWindow) {
+                window = candidate;
+                break;
+            }
+        }
+        if (window) {
+            break;
+        }
+    }
+    __block UIView* host = nil;
+    EnumerateSubviewsRecursively(window, ^(UIView* view) {
+      if (!host && [NSStringFromClass([view class]) isEqualToString:@"T1TabBarHostView"]) {
+          host = view;
+      }
+    });
+    if (!host) {
+        NFBDebugLog(@"[stack:%@] no T1TabBarHostView on screen", moment);
+        return;
+    }
+
+    NFBDebugLog(@"[stack:%@] --- T1TabBarHostView %.0fx%.0f ---", moment,
+                host.bounds.size.width, host.bounds.size.height);
+
+    __block NSInteger line = 0;
+    void (^describe)(UIView*, NSInteger) = ^(UIView* view, NSInteger depth) {
+      if (line >= 30) {
+          return;
+      }
+      line++;
+      NSMutableString* note = [NSMutableString string];
+      for (NSInteger i = 0; i < depth; i++) {
+          [note appendString:@"  "];
+      }
+      [note appendFormat:@"%@ %.0fx%.0f", NSStringFromClass([view class]),
+                         view.bounds.size.width, view.bounds.size.height];
+      if (view.hidden) {
+          [note appendString:@" HIDDEN"];
+      }
+      if (view.alpha < 0.999) {
+          [note appendFormat:@" alpha=%.2f", view.alpha];
+      }
+      CGFloat a = 0;
+      if (view.backgroundColor &&
+          ([view.backgroundColor getWhite:NULL alpha:&a] ||
+           [view.backgroundColor getRed:NULL green:NULL blue:NULL alpha:&a])) {
+          [note appendFormat:@" bg=%@", view.backgroundColor];
+      }
+      if (view.layer.backgroundColor) {
+          const CGFloat* c = CGColorGetComponents(view.layer.backgroundColor);
+          size_t n = CGColorGetNumberOfComponents(view.layer.backgroundColor);
+          if (c && n >= 2) {
+              [note appendFormat:@" layerBg=(%.2f,%.2f)", c[0], c[n - 1]];
+          }
+      }
+      if (view.layer.contents) {
+          [note appendString:@" layerContents=YES"];
+      }
+      if (view.layer.filters.count) {
+          [note appendFormat:@" filters=%lu", (unsigned long)view.layer.filters.count];
+      }
+      if (view.layer.sublayers.count > view.subviews.count) {
+          [note appendFormat:@" extraSublayers=%lu",
+                             (unsigned long)(view.layer.sublayers.count - view.subviews.count)];
+      }
+      if ([view isKindOfClass:[UIVisualEffectView class]]) {
+          UIVisualEffect* effect = ((UIVisualEffectView*)view).effect;
+          [note appendFormat:@" EFFECT=%@",
+                             effect ? NSStringFromClass([effect class]) : @"nil"];
+      }
+      NFBDebugLog(@"[stack:%@] %@", moment, note);
+    };
+
+    // Depth-first, in draw order, so the report reads the way the screen does.
+    // __block, not __weak: a weak reference to a stack block is undefined. The
+    // cycle it creates is broken on the next line, once the walk is done.
+    __block void (^walk)(UIView*, NSInteger) = nil;
+    walk = ^(UIView* view, NSInteger depth) {
+      describe(view, depth);
+      for (UIView* sub in view.subviews) {
+          walk(sub, depth + 1);
+      }
+    };
+    walk(host, 0);
+    walk = nil;
+
+    NFBDebugLog(@"[stack:%@] host.clipsToBounds=%d hostAlpha=%.2f windowLevel=%.0f", moment,
+                host.clipsToBounds, host.alpha, window.windowLevel);
+    NFBDebugLog(@"[stack:%@] glass setting=%d, accent active=%d", moment,
+                [BHTSettings boolForKey:@"enable_liquid_glass"],
+                [BHTSettings boolForKey:@"tab_bar_theming"]);
 }
 
