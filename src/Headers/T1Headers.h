@@ -55,6 +55,7 @@
 
 @interface T1TabView : UIView
 @property (readonly, nonatomic) UILabel* titleLabel;
+@property (readonly, nonatomic) UIImageView* imageView;
 @property (readonly, nonatomic) long long panelID;
 @property (copy, nonatomic) NSString* scribePage;
 @property (readonly, nonatomic) NSString* title;
