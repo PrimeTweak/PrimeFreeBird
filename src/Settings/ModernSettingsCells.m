@@ -501,17 +501,6 @@ static void nfbApplySelectedBackground(UITableViewCell* cell) {
               forControlEvents:UIControlEventTouchUpInside];
 }
 
-// A recycled cell can still be inside the pill's fade: its completion would then
-// land on whatever row the cell serves next. Reset to the no-pill layout and let
-// the next configuration decide.
-- (void)prepareForReuse {
-    [super prepareForReuse];
-    self.pillButton.hidden = YES;
-    self.pillButton.alpha = 0.0;
-    self.titleTrailingToPill.active = NO;
-    self.titleTrailingToSwitch.active = YES;
-}
-
 // The title gives up its width to the pill in the same breath the pill fades
 // in, so the row reads as one movement rather than two.
 - (void)setPillVisible:(BOOL)visible animated:(BOOL)animated {
