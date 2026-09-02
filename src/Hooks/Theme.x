@@ -385,6 +385,22 @@ static BOOL NFBIsTopBarContainer(UIView* view) {
     return [name containsString:@"NavigationBar"] || [name containsString:@"TopBar"];
 }
 
+// Every image view under a title control, painted. The title control is the
+// only place the bar puts a title image, so the reach is exactly the logo.
+static void NFBBakeTitleControlLogos(UIView* root) {
+    if ([NSStringFromClass([root class]) containsString:@"NavigationBarTitleControl"]) {
+        EnumerateSubviewsRecursively(root, ^(UIView* view) {
+          if ([view isKindOfClass:[UIImageView class]]) {
+              NFBApplyLogoTint((UIImageView*)view);
+          }
+        });
+        return;
+    }
+    for (UIView* sub in root.subviews) {
+        NFBBakeTitleControlLogos(sub);
+    }
+}
+
 static void NFBRetintTemplateLogos(UIView* root) {
     if ([root isKindOfClass:[UIImageView class]]) {
         UIImageView* imageView = (UIImageView*)root;
@@ -1229,6 +1245,46 @@ static UIColor* tabItemColor(BOOL selected) {
     return selected ? CurrentAccentColor() : [UIColor secondaryLabelColor];
 }
 
+static const void* kNFBTabOriginalKey = &kNFBTabOriginalKey;
+static const void* kNFBTabBakedKey = &kNFBTabBakedKey;
+static const void* kNFBTabColourKey = &kNFBTabColourKey;
+
+// Same trick as the logo: the colour lives in the pixels, so no tint and no
+// vibrancy filter downstream can undo it. The untouched image is kept so the
+// icon can be handed back when the option goes off.
+static void NFBBakeTabIcon(UIImageView* icon, UIColor* colour) {
+    UIImage* current = icon.image;
+    if (!current || !colour) {
+        return;
+    }
+    UIImage* original = objc_getAssociatedObject(icon, kNFBTabOriginalKey);
+    UIImage* baked = objc_getAssociatedObject(icon, kNFBTabBakedKey);
+    UIColor* bakedColour = objc_getAssociatedObject(icon, kNFBTabColourKey);
+    if (!original || (current != original && current != baked)) {
+        original = current;
+        objc_setAssociatedObject(icon, kNFBTabOriginalKey, original,
+                                 OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        baked = nil;
+    }
+    if (!baked || ![bakedColour isEqual:colour]) {
+        baked = NFBPaintedGlyph(original, colour);
+        objc_setAssociatedObject(icon, kNFBTabBakedKey, baked,
+                                 OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        objc_setAssociatedObject(icon, kNFBTabColourKey, colour,
+                                 OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    }
+    if (icon.image != baked) {
+        icon.image = baked;
+    }
+}
+
+static void NFBRestoreTabIcon(UIImageView* icon) {
+    UIImage* original = objc_getAssociatedObject(icon, kNFBTabOriginalKey);
+    if (original && icon.image != original) {
+        icon.image = original;
+    }
+}
+
 %hook T1TabView
 
 - (void)_t1_updateImageViewAnimated:(BOOL)animated {
@@ -1251,15 +1307,15 @@ static UIColor* tabItemColor(BOOL selected) {
     // 12.21: the tab icon arrives rendered AlwaysOriginal (measured in a
     // capture: mode=1 with the tint set and ignored), so the colour set above
     // never reaches it. Rendering it as a template lets the tint through again.
+    // 12.21: setting iconColor no longer reaches the icon, and a tintColor is
+    // replaced by the app's own right after. Measured in a capture: template
+    // image, tint back to the system grey and to Twitter blue on the selected
+    // tab. So the colour is baked into the image, served AlwaysOriginal, which
+    // nothing downstream can repaint.
     if ([BHTSettings boolForKey:@"tab_bar_theming"]) {
-        UIImageView* icon = self.imageView;
-        if (icon.image && icon.image.renderingMode != UIImageRenderingModeAlwaysTemplate) {
-            icon.image = [icon.image imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate];
-        }
-        UIColor* wanted = tabItemColor(self.selected);
-        if (wanted && ![icon.tintColor isEqual:wanted]) {
-            icon.tintColor = wanted;
-        }
+        NFBBakeTabIcon(self.imageView, tabItemColor(self.selected));
+    } else {
+        NFBRestoreTabIcon(self.imageView);
     }
 }
 
@@ -1312,6 +1368,19 @@ static UIColor* tabItemColor(BOOL selected) {
 - (UIView*)titleView {
     UIView* titleView = %orig;
     UIImageView* logo = NFBFindLogoImageView(titleView);
+    // iOS 27 does not put the handed-over view on screen: it builds its own
+    // image view inside _UINavigationBarTitleControl. Measured in a capture -
+    // two image views, ours hidden, the visible one tinted by the bar. The
+    // sweep below runs after the bar has built that chain.
+    dispatch_async(dispatch_get_main_queue(), ^{
+      UIView* bar = titleView;
+      while (bar && ![NSStringFromClass([bar class]) containsString:@"NavigationBar"]) {
+          bar = bar.superview;
+      }
+      if (bar) {
+          NFBBakeTitleControlLogos(bar);
+      }
+    });
     nfbP21Once(@"titleview", ^{
       return [NSString stringWithFormat:
                  @"home titleView hook FIRED | titleView=%@ | logo found=%@ | subviews: %@",
