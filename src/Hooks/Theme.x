@@ -506,32 +506,19 @@ static void NFBApplyTabBarAccent(UITabBar* bar) {
 // its own native route and iOS glazed the bar itself. There is no switch left
 // to force, so the effect is rebuilt here with the recipe the Inbox pill uses.
 //
-// The glass goes ON TOP of the app's opaque panel rather than behind it. The
-// first attempt cleared that panel's colour, and the journal showed why that
-// loses: cleared at 35.630, opaque again at 40.339, with no layout pass in
-// between to clear it once more. Sitting above it means the app can repaint as
-// often as it likes. The tab items live in a later sibling branch, so they
-// still draw in front.
+// Anchored on TFNCustomTabBar, not on a colour or a size. Two earlier attempts
+// looked for the app's opaque panel: the first cleared its colour and lost the
+// race when the app repainted it, the second refused to build anything until
+// the panel was found - and the panel is still zero-height when the host lays
+// out, so nothing was ever built. The bar itself is always there and always
+// sized. Sitting just before it in its parent puts the glass over the white
+// panel and under the tab items.
 static const void* kNFBTabGlassKey = &kNFBTabGlassKey;
 
-static UIView* NFBTabBarOpaquePanel(UIView* host, UIView* skip) {
+static UIView* NFBCustomTabBar(UIView* host) {
     __block UIView* found = nil;
     EnumerateSubviewsRecursively(host, ^(UIView* sub) {
-      if (found || sub == skip || [sub isKindOfClass:[UIVisualEffectView class]]) {
-          return;
-      }
-      UIColor* colour = sub.backgroundColor;
-      if (!colour) {
-          return;
-      }
-      CGFloat alpha = 0;
-      if (![colour getWhite:NULL alpha:&alpha] &&
-          ![colour getRed:NULL green:NULL blue:NULL alpha:&alpha]) {
-          return;
-      }
-      // The hairline separators are opaque too but a third of a point tall;
-      // leaving them alone keeps the bar's edge where the app drew it.
-      if (alpha > 0.9 && sub.bounds.size.height >= 8) {
+      if (!found && [NSStringFromClass([sub class]) containsString:@"CustomTabBar"]) {
           found = sub;
       }
     });
@@ -539,9 +526,6 @@ static UIView* NFBTabBarOpaquePanel(UIView* host, UIView* skip) {
 }
 
 static void NFBApplyTabBarGlass(UIView* host) {
-    if (!host || host.bounds.size.width < 1) {
-        return;
-    }
     UIVisualEffectView* glass = objc_getAssociatedObject(host, kNFBTabGlassKey);
 
     if (![BHTSettings boolForKey:@"enable_liquid_glass"]) {
@@ -554,9 +538,12 @@ static void NFBApplyTabBarGlass(UIView* host) {
         return;
     }
 
-    UIView* panel = NFBTabBarOpaquePanel(host, glass);
-    if (!panel) {
-        return;  // The panel is laid out later; the next pass will find it.
+    UIView* bar = NFBCustomTabBar(host);
+    UIView* parent = bar.superview;
+    if (!parent) {
+        NFBDebugLog(@"[tabglass] no CustomTabBar under %@ yet",
+                    NSStringFromClass([host class]));
+        return;
     }
 
     if (!glass) {
@@ -570,23 +557,29 @@ static void NFBApplyTabBarGlass(UIView* host) {
         glass.userInteractionEnabled = NO;
         objc_setAssociatedObject(host, kNFBTabGlassKey, glass,
                                  OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-        NFBDebugLog(@"[tabglass] %@ over %@ (%.0fx%.0f)",
+        NFBDebugLog(@"[tabglass] %@ built for %@",
                     glassClass ? @"UIGlassEffect" : @"material fallback",
-                    NSStringFromClass([panel class]), panel.bounds.size.width,
-                    panel.bounds.size.height);
+                    NSStringFromClass([parent class]));
     }
 
-    // Directly above the panel, inside the same parent, on every pass: the app
-    // reorders its own subviews when it rebuilds the bar.
-    UIView* parent = panel.superview;
-    NSUInteger wanted = [parent.subviews indexOfObject:panel] + 1;
-    if (glass.superview != parent || [parent.subviews indexOfObject:glass] != wanted) {
+    // Re-seated on every pass: the app reorders its own subviews when it
+    // rebuilds the bar, and the glass has to stay directly under it.
+    NSUInteger glassIndex = [parent.subviews indexOfObject:glass];
+    NSUInteger barIndex = [parent.subviews indexOfObject:bar];
+    // Compared as a pair, never with barIndex - 1: at index 0 that arithmetic
+    // wraps to NSNotFound and the misplacement reads as correct.
+    BOOL seated = glass.superview == parent && glassIndex != NSNotFound &&
+                  barIndex != NSNotFound && glassIndex + 1 == barIndex;
+    if (!seated) {
         [glass removeFromSuperview];
-        wanted = [parent.subviews indexOfObject:panel] + 1;
-        [parent insertSubview:glass atIndex:wanted];
+        [parent insertSubview:glass belowSubview:bar];
+        NFBDebugLog(@"[tabglass] seated below %@ at %lu/%lu",
+                    NSStringFromClass([bar class]),
+                    (unsigned long)[parent.subviews indexOfObject:glass],
+                    (unsigned long)parent.subviews.count);
     }
-    if (!CGRectEqualToRect(glass.frame, panel.bounds)) {
-        glass.frame = panel.bounds;
+    if (!CGRectEqualToRect(glass.frame, parent.bounds)) {
+        glass.frame = parent.bounds;
     }
 }
 

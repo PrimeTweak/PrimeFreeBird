@@ -837,6 +837,14 @@ void NFBReportBrandingSurfaces(void) {
           });
       }
 
+      if ([name containsString:@"CustomTabBar"]) {
+          NSArray* siblings = view.superview.subviews;
+          NFBDebugLog(@"[surfaces] custom tab bar at %lu/%lu in %@",
+                      (unsigned long)[siblings indexOfObject:view],
+                      (unsigned long)siblings.count,
+                      NSStringFromClass([view.superview class]));
+      }
+
       if ([name isEqualToString:@"T1TabBarHostView"]) {
           tabHost = name;
           CGFloat wide = view.bounds.size.width - 1;
