@@ -839,18 +839,33 @@ void NFBReportBrandingSurfaces(void) {
 
       if ([name isEqualToString:@"T1TabBarHostView"]) {
           tabHost = name;
-          for (UIView* sub in view.subviews) {
-              if ([sub isKindOfClass:[UIVisualEffectView class]]) {
-                  UIVisualEffect* effect = ((UIVisualEffectView*)sub).effect;
-                  tabGlass = effect ? NSStringFromClass([effect class]) : @"nil effect";
-                  continue;
-              }
-              CGFloat alpha = 0;
-              [sub.backgroundColor getWhite:NULL alpha:&alpha];
-              if (alpha > 0.9) {
-                  opaquePanel = [NSString stringWithFormat:@"%@ alpha=%.2f",
-                                                          NSStringFromClass([sub class]), alpha];
-              }
+          CGFloat wide = view.bounds.size.width - 1;
+          NSMutableArray* opaque = [NSMutableArray array];
+          // The whole subtree, not the direct children: the panel that covers
+          // the glass sits two wrappers down, and reading only the top level
+          // reported "none" while a white panel was plainly on screen.
+          EnumerateSubviewsRecursively(view, ^(UIView* sub) {
+            if ([sub isKindOfClass:[UIVisualEffectView class]]) {
+                UIVisualEffect* effect = ((UIVisualEffectView*)sub).effect;
+                tabGlass = effect ? NSStringFromClass([effect class]) : @"nil effect";
+                return;
+            }
+            if (sub.bounds.size.width < wide || sub.bounds.size.height < 8) {
+                return;
+            }
+            CGFloat alpha = 0;
+            if (![sub.backgroundColor getWhite:NULL alpha:&alpha]) {
+                [sub.backgroundColor getRed:NULL green:NULL blue:NULL alpha:&alpha];
+            }
+            if (alpha > 0.9 && opaque.count < 4) {
+                [opaque addObject:[NSString stringWithFormat:@"%@ %.0fx%.0f a=%.2f",
+                                                            NSStringFromClass([sub class]),
+                                                            sub.bounds.size.width,
+                                                            sub.bounds.size.height, alpha]];
+            }
+          });
+          if (opaque.count) {
+              opaquePanel = [opaque componentsJoinedByString:@" // "];
           }
       }
 

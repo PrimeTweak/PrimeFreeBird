@@ -222,7 +222,9 @@ static UIImage* NFBBirdLogoImage(CGSize size) {
     if (cached) {
         return cached;
     }
-    NSURL* birdURL = [[BHTBundle sharedBundle] pathForFile:@"bird_stroke.pdf"];
+    // The filled bird, not the outlined one: measured in the PDFs the tweak
+    // ships - bird_stroke draws a stroke, LaunchTwitterBird fills.
+    NSURL* birdURL = [[BHTBundle sharedBundle] pathForFile:@"LaunchTwitterBird.pdf"];
     if (!birdURL || size.width < 1 || size.height < 1) {
         return nil;
     }
@@ -240,7 +242,10 @@ static UIImage* NFBBirdLogoImage(CGSize size) {
         rendered = [renderer imageWithActions:^(UIGraphicsImageRendererContext* ctx) {
           CGContextRef c = ctx.CGContext;
           CGRect box = CGPDFPageGetBoxRect(page, kCGPDFCropBox);
-          CGFloat scale = MIN(size.width / box.size.width, size.height / box.size.height);
+          // Drawn a shade smaller than the box the bar hands over: the X it
+        // replaces reads narrower than a bird at the same nominal size.
+        CGFloat inset = 0.86;
+        CGFloat scale = MIN(size.width / box.size.width, size.height / box.size.height) * inset;
           CGFloat drawnW = box.size.width * scale;
           CGFloat drawnH = box.size.height * scale;
           CGContextTranslateCTM(c, (size.width - drawnW) / 2.0,
@@ -506,20 +511,27 @@ static const void* kNFBTabGlassKey = &kNFBTabGlassKey;
 static const void* kNFBTabPanelKey = &kNFBTabPanelKey;
 static const void* kNFBTabPanelColourKey = &kNFBTabPanelColourKey;
 
-static UIView* NFBTabBarOpaquePanel(UIView* host, UIView* skip) {
-    for (UIView* sub in host.subviews) {
-        if (sub == skip || [sub isKindOfClass:[UIVisualEffectView class]]) {
-            continue;
-        }
-        CGFloat alpha = 0;
-        if (![sub.backgroundColor getWhite:NULL alpha:&alpha]) {
-            [sub.backgroundColor getRed:NULL green:NULL blue:NULL alpha:&alpha];
-        }
-        if (alpha > 0.9 && sub.bounds.size.width >= host.bounds.size.width - 1) {
-            return sub;
-        }
-    }
-    return nil;
+// The opaque panel does not sit directly under the host: a capture put it two
+// wrapper views down. So the whole subtree is walked, and every full-width
+// opaque fill is collected - clearing only the first one still left the glass
+// covered.
+static NSArray<UIView*>* NFBTabBarOpaquePanels(UIView* host, UIView* skip) {
+    NSMutableArray<UIView*>* found = [NSMutableArray array];
+    CGFloat wide = host.bounds.size.width - 1;
+    EnumerateSubviewsRecursively(host, ^(UIView* sub) {
+      if (sub == skip || [sub isKindOfClass:[UIVisualEffectView class]] ||
+          sub.bounds.size.width < wide || sub.bounds.size.height < 8) {
+          return;
+      }
+      CGFloat alpha = 0;
+      if (![sub.backgroundColor getWhite:NULL alpha:&alpha]) {
+          [sub.backgroundColor getRed:NULL green:NULL blue:NULL alpha:&alpha];
+      }
+      if (alpha > 0.9) {
+          [found addObject:sub];
+      }
+    });
+    return found;
 }
 
 static void NFBApplyTabBarGlass(UIView* host) {
@@ -534,15 +546,17 @@ static void NFBApplyTabBarGlass(UIView* host) {
             objc_setAssociatedObject(host, kNFBTabGlassKey, nil,
                                      OBJC_ASSOCIATION_RETAIN_NONATOMIC);
         }
-        UIView* panel = objc_getAssociatedObject(host, kNFBTabPanelKey);
-        UIColor* saved = objc_getAssociatedObject(host, kNFBTabPanelColourKey);
-        if (panel && saved) {
-            panel.backgroundColor = saved;
-            objc_setAssociatedObject(host, kNFBTabPanelKey, nil,
-                                     OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-            objc_setAssociatedObject(host, kNFBTabPanelColourKey, nil,
-                                     OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        NSArray<UIView*>* panels = objc_getAssociatedObject(host, kNFBTabPanelKey);
+        NSArray<UIColor*>* saved = objc_getAssociatedObject(host, kNFBTabPanelColourKey);
+        if (panels.count == saved.count) {
+            [panels enumerateObjectsUsingBlock:^(UIView* panel, NSUInteger idx, BOOL* stop) {
+              panel.backgroundColor = saved[idx];
+            }];
         }
+        objc_setAssociatedObject(host, kNFBTabPanelKey, nil,
+                                 OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        objc_setAssociatedObject(host, kNFBTabPanelColourKey, nil,
+                                 OBJC_ASSOCIATION_RETAIN_NONATOMIC);
         return;
     }
 
@@ -569,20 +583,26 @@ static void NFBApplyTabBarGlass(UIView* host) {
         [host insertSubview:glass atIndex:0];
     }
 
-    UIView* panel = objc_getAssociatedObject(host, kNFBTabPanelKey);
-    if (!panel) {
-        panel = NFBTabBarOpaquePanel(host, glass);
-        if (panel) {
-            objc_setAssociatedObject(host, kNFBTabPanelKey, panel,
+    NSArray<UIView*>* panels = objc_getAssociatedObject(host, kNFBTabPanelKey);
+    if (!panels.count) {
+        panels = NFBTabBarOpaquePanels(host, glass);
+        if (panels.count) {
+            NSMutableArray<UIColor*>* colours = [NSMutableArray array];
+            for (UIView* panel in panels) {
+                [colours addObject:panel.backgroundColor ?: [UIColor clearColor]];
+            }
+            objc_setAssociatedObject(host, kNFBTabPanelKey, panels,
                                      OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-            objc_setAssociatedObject(host, kNFBTabPanelColourKey, panel.backgroundColor,
+            objc_setAssociatedObject(host, kNFBTabPanelColourKey, colours,
                                      OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-            NFBDebugLog(@"[tabglass] opaque panel cleared: %@",
-                        NSStringFromClass([panel class]));
+            NFBDebugLog(@"[tabglass] %lu opaque panel(s) cleared",
+                        (unsigned long)panels.count);
         }
     }
-    if (panel && panel.backgroundColor) {
-        panel.backgroundColor = [UIColor clearColor];
+    for (UIView* panel in panels) {
+        if (panel.backgroundColor) {
+            panel.backgroundColor = [UIColor clearColor];
+        }
     }
 }
 
