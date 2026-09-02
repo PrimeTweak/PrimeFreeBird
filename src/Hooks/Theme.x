@@ -128,6 +128,12 @@ static void NFBApplyGlobalTint(void) {
 // immediately, without waiting for the title view to be rebuilt (= restart).
 static __weak UIImageView* NFBTopBarLogoView;
 
+// Read by the layer-animation hook in NavBarIcons.x, which has to know which
+// image view is the logo to keep the glass vibrancy filter off it.
+UIImageView* NFBTopBarLogoViewCurrent(void) {
+    return NFBTopBarLogoView;
+}
+
 // In Liquid Glass the title plugin returns a CONTAINER, not the image view
 // itself. Find the image view wherever it sits in the returned hierarchy.
 static UIImageView* NFBFindLogoImageView(UIView* root) {
@@ -175,6 +181,12 @@ static BOOL NFBAccentIsActive(void) {
     // Fresh install (option 0, nothing picked yet) defaults to Twitter blue as the
     // active accent — UNLESS the user reset (which reverts to native/black).
     return ![defs boolForKey:@"nfb_color_reset_done"];
+}
+
+// Read by NavBarIcons.x, whose layer-animation hook keeps the glass vibrancy
+// filter off the tab bar only while a themed bar was asked for.
+BOOL NFBThemedTabBarWanted(void) {
+    return [BHTSettings boolForKey:@"tab_bar_theming"] && NFBAccentIsActive();
 }
 
 // Twitter's own logo colour, read raw so the tweak's accent hooks don't repaint it.
@@ -265,6 +277,16 @@ static void NFBApplyLogoTint(UIImageView* logoView) {
     if (logoView.image.renderingMode != UIImageRenderingModeAlwaysTemplate) {
         logoView.image =
             [logoView.image imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate];
+    }
+    // 12.21 on iOS 27: the navigation bar renders the logo through a Liquid
+    // Glass vibrancy filter (filters.vibrantColorMatrix), which recolours the
+    // content on top of any tint. Measured in the journal as a CASpringAnimation
+    // on that key path against this very image view. The filter goes, and the
+    // animation hook in NavBarIcons.x keeps it from coming back.
+    NSUInteger filterCount = logoView.layer.filters.count;
+    if (filterCount) {
+        logoView.layer.filters = nil;
+        NFBDebugLog(@"[p21] logo: %lu layer filter(s) removed", (unsigned long)filterCount);
     }
     if (![logoView.tintColor isEqual:target]) {
         logoView.tintColor = target;
@@ -431,9 +453,65 @@ static void NFBApplyTabBarAccent(UITabBar* bar) {
     }
 }
 
+// 12.21: the tab bar is XNavigation.TabBarView, a Swift view, and the app no
+// longer mounts a UITabBar at all - the UITabBar hooks below never fire on this
+// build. The view exposes nothing of its items, so the accent is set as the
+// view's tintColor, which template icons inherit, and the glass vibrancy filter
+// is kept off it the way it is kept off the logo. Measured against the binary:
+// the native-tab-bar path was removed from T1TabBarViewController in 12.21.
+static Class NFBXTabBarViewClass(void) {
+    static Class cls;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+      cls = NSClassFromString(@"_TtC11XNavigation10TabBarView");
+    });
+    return cls;
+}
+
+static void NFBApplyXTabBarAccent(UIView* bar) {
+    BOOL active = [BHTSettings boolForKey:@"tab_bar_theming"] && NFBAccentIsActive();
+    UIColor* accent = active ? NFBBrandAccentColor() : nil;
+    if (![bar.tintColor isEqual:accent]) {
+        bar.tintColor = accent;
+    }
+    if (bar.layer.filters.count) {
+        bar.layer.filters = nil;
+    }
+    // TEMPORARY probe: the bar's tree, once, so the precise version can be
+    // written against what is actually inside.
+    static BOOL dumped = NO;
+    if (!dumped) {
+        dumped = YES;
+        NSMutableArray* lines = [NSMutableArray array];
+        EnumerateSubviewsRecursively(bar, ^(UIView* view) {
+          if (lines.count >= 24) {
+              return;
+          }
+          NSString* extra = @"";
+          if ([view isKindOfClass:[UIImageView class]]) {
+              UIImageView* iv = (UIImageView*)view;
+              extra = [NSString stringWithFormat:@" img mode=%ld tint=%@ filters=%lu",
+                                                 (long)iv.image.renderingMode,
+                                                 iv.tintColor ? @"set" : @"nil",
+                                                 (unsigned long)iv.layer.filters.count];
+          }
+          [lines addObject:[NSString stringWithFormat:@"%@%@",
+                                                      NSStringFromClass([view class]), extra]];
+        });
+        NFBDebugLog(@"[p21] XNavigation tab bar | active=%d | tree: %@", active,
+                    [lines componentsJoinedByString:@"  //  "]);
+    }
+}
+
 static void NFBSweepNativeTabBars(UIView* root, UIColor* accent) {
     if ([root isKindOfClass:[UITabBar class]]) {
         NFBApplyTabBarAccent((UITabBar*)root);
+        [root setNeedsLayout];
+        return;
+    }
+    Class xBar = NFBXTabBarViewClass();
+    if (xBar && [root isKindOfClass:xBar]) {
+        NFBApplyXTabBarAccent(root);
         [root setNeedsLayout];
         return;
     }
@@ -1273,6 +1351,15 @@ static UITabBarAppearance* NFBPatchedTabBarAppearance(UITabBarAppearance* appear
     }
     return patched;
 }
+
+%hook _TtC11XNavigation10TabBarView
+
+- (void)layoutSubviews {
+    %orig;
+    NFBApplyXTabBarAccent((UIView*)self);
+}
+
+%end
 
 %hook UITabBar
 

@@ -73,6 +73,12 @@ NSDictionary* currentWebCredentials(void);
 // YES when a usable web session (auth_token + ct0) is available.
 BOOL hasUsableWebCredentials(void);
 
+// The image view currently carrying the top-bar logo, or nil (Theme.x).
+UIImageView* NFBTopBarLogoViewCurrent(void);
+
+// Whether the reader asked for a themed tab bar and an accent is active (Theme.x).
+BOOL NFBThemedTabBarWanted(void);
+
 // Present the interactive "Log in to Web Session" screen. The completion fires with
 // YES once cookies were harvested and stored, NO if the user cancelled.
 void presentWebSessionLogin(void (^completion)(BOOL success));

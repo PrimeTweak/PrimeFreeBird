@@ -131,6 +131,27 @@ void nfbNoteExploreAccessoryView(UIView* v) {
                     names.count ? [names componentsJoinedByString:@", "] : @"(none)");
     }
     gNFBExploreBar = v;
+    // 12.21 hands the accessory over AFTER the segmented bar has laid itself
+    // out, and the bar only adopts its collection from layoutSubviews. Nothing
+    // asks it to lay out again, so it never adopts. Measured: the bar's layout
+    // fired at 53.4 s with the accessory unknown, the accessory arrived at 55.6 s,
+    // and the collection was then recognised but never adopted. Asking for a
+    // layout pass here makes the order irrelevant.
+    if (v) {
+        Class legacyBar = NSClassFromString(@"_TtC10TFNUISwift25LegacySegmentedTabBarView");
+        Class oldBar = NSClassFromString(@"_TtC10TFNUISwift19SegmentedTabBarView");
+        EnumerateSubviewsRecursively(v, ^(UIView* sub) {
+          if ((legacyBar && [sub isKindOfClass:legacyBar]) ||
+              (oldBar && [sub isKindOfClass:oldBar])) {
+              [sub setNeedsLayout];
+              NFBDebugLog(@"[p21] explore: bar %@ asked to lay out again",
+                          NSStringFromClass([sub class]));
+          }
+        });
+        if ([v isKindOfClass:legacyBar] || [v isKindOfClass:oldBar]) {
+            [v setNeedsLayout];
+        }
+    }
 }
 
 static BOOL nfbIsExploreBar(UIView* bar) {
