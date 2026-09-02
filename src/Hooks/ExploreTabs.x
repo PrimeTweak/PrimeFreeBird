@@ -76,7 +76,6 @@ static BOOL nfbGranularActive(void) {
 
 // MARK: - tab mask helpers (pure, defined before use)
 
-
 // Nearest KEPT absolute index to `cur` (used only by the safety net).
 static NSInteger nfbNearestKeptAbs(NSInteger cur, NSInteger total) {
     for (NSInteger d = 1; d < total + 1; d++) {
@@ -114,22 +113,6 @@ static BOOL gNFBSelfNav = NO;          // our own pager navigation in progress
 static NSUInteger gNFBAppliedMaskBits = 0xFFFF;   // last mask synced to the pager
 
 void nfbNoteExploreAccessoryView(UIView* v) {
-    // TEMPORARY probe for 12.21: is the accessory still handed to us, and what
-    // is it made of now.
-    static NSInteger probeCalls = 0;
-    if (probeCalls < 3) {
-        probeCalls++;
-        NSMutableArray* names = [NSMutableArray array];
-        for (UIView* sub in v.subviews) {
-            [names addObject:NSStringFromClass([sub class])];
-            if (names.count >= 8) {
-                break;
-            }
-        }
-        NFBDebugLog(@"[p21] explore accessory #%ld | class=%@ | subviews: %@",
-                    (long)probeCalls, v ? NSStringFromClass([v class]) : @"nil",
-                    names.count ? [names componentsJoinedByString:@", "] : @"(none)");
-    }
     gNFBExploreBar = v;
     // 12.21 hands the accessory over AFTER the segmented bar has laid itself
     // out, and the bar only adopts its collection from layoutSubviews. Nothing
@@ -144,8 +127,6 @@ void nfbNoteExploreAccessoryView(UIView* v) {
           if ((legacyBar && [sub isKindOfClass:legacyBar]) ||
               (oldBar && [sub isKindOfClass:oldBar])) {
               [sub setNeedsLayout];
-              NFBDebugLog(@"[p21] explore: bar %@ asked to lay out again",
-                          NSStringFromClass([sub class]));
           }
         });
         if ([v isKindOfClass:legacyBar] || [v isKindOfClass:oldBar]) {
@@ -417,12 +398,6 @@ static void nfbApplyTabFilter(UIView* bar, UICollectionView* cv) {
 
 - (void)layoutSubviews {
     %orig;
-    static BOOL probeOnce = NO;
-    if (!probeOnce) {
-        probeOnce = YES;
-        NFBDebugLog(@"[p21] OLD segmented bar layoutSubviews FIRED | granular=%d | isExploreBar=%d",
-                    nfbGranularActive(), nfbIsExploreBar((UIView*)self));
-    }
 
     if (!nfbGranularActive()) { return; }
     if (!nfbIsExploreBar((UIView*)self)) { return; }
@@ -599,12 +574,6 @@ static void nfbApplyTabFilter(UIView* bar, UICollectionView* cv) {
 
 - (void)layoutSubviews {
     %orig;
-    static BOOL probeOnce = NO;
-    if (!probeOnce) {
-        probeOnce = YES;
-        NFBDebugLog(@"[p21] LEGACY segmented bar layoutSubviews FIRED | granular=%d | isExploreBar=%d",
-                    nfbGranularActive(), nfbIsExploreBar((UIView*)self));
-    }
 
     if (!nfbGranularActive()) { return; }
     if (!nfbIsExploreBar((UIView*)self)) { return; }
@@ -770,7 +739,6 @@ static void nfbApplyTabFilter(UIView* bar, UICollectionView* cv) {
 // guards below redirect such a target to the nearest visible tab. Both cost
 // one pointer comparison for every other scroll view in the app.
 
-
 %hook UICollectionView
 
 // The bar's inner collection re-lays its cells to their native positions on
@@ -780,21 +748,6 @@ static void nfbApplyTabFilter(UIView* bar, UICollectionView* cv) {
 // other collection in the app.
 - (void)layoutSubviews {
     %orig;
-    // TEMPORARY probe for 12.21: the first three collections seen while a bar
-    // is known, with the chain above them, so a SwiftUI host shows its name.
-    static NSInteger probeCalls = 0;
-    if (probeCalls < 3 && gNFBExploreBar && nfbGranularActive()) {
-        probeCalls++;
-        NSMutableArray* chain = [NSMutableArray array];
-        UIView* up = ((UIView*)self).superview;
-        while (up && chain.count < 5) {
-            [chain addObject:NSStringFromClass([up class])];
-            up = up.superview;
-        }
-        NFBDebugLog(@"[p21] collection #%ld | isBarCV=%d isExploreBar=%d | above: %@",
-                    (long)probeCalls, (UICollectionView*)self == gNFBBarCV,
-                    nfbIsExploreBar((UIView*)self), [chain componentsJoinedByString:@" < "]);
-    }
     if ((UICollectionView*)self != gNFBBarCV || gNFBInBarFilter
         || !nfbGranularActive()) {
         return;

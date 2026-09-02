@@ -243,21 +243,6 @@ static void nfbSwapRefreshLabelFromMenu(void) {
 // native view is never built again: the ⌚ watch on the ItemView goes silent.
 static NSArray<UIBarButtonItem*>* nfbSwapInterceptItems(UINavigationItem* nav,
                                                         NSArray<UIBarButtonItem*>* items) {
-    // TEMPORARY probe for 12.21: the first five calls, with every reason the
-    // swap could decline. If this never logs, the setter is no longer the path
-    // the app uses to install its items.
-    static NSInteger probeCalls = 0;
-    if (probeCalls < 5) {
-        probeCalls++;
-        UIBarButtonItem* first = items.firstObject;
-        NFBDebugLog(@"[p21] swap intercept #%ld | items=%lu first=%@ customView=%@ | swapItem=%@ navMarked=%@ setting=%d",
-                    (long)probeCalls, (unsigned long)items.count,
-                    first ? NSStringFromClass([first class]) : @"nil",
-                    first.customView ? NSStringFromClass([first.customView class]) : @"nil",
-                    gNFBSwapItem ? @"yes" : @"NIL",
-                    objc_getAssociatedObject(nav, kNFBSwapNavKey) ? @"yes" : @"no",
-                    [BHTSettings boolForKey:@"enable_liquid_glass"]);
-    }
     if (!gNFBSwapItem || items.count != 1 ||
         !objc_getAssociatedObject(nav, kNFBSwapNavKey)) {
         return items;
@@ -277,20 +262,15 @@ static NSArray<UIBarButtonItem*>* nfbSwapInterceptItems(UINavigationItem* nav,
 }
 
 static void nfbSwapApply(UIView* pillView) {
-    NFBDebugLog(@"[p21] swap apply: ENTERED | window=%@ class=%@",
-                pillView.window ? @"yes" : @"nil", NSStringFromClass([pillView class]));
     if (!pillView.window) {
-        NFBDebugLog(@"[p21] swap apply: stopped at gate 1");
         return;
     }
     if (![BHTSettings boolForKey:@"enable_liquid_glass"]) {
-        NFBDebugLog(@"[p21] swap apply: stopped at gate 2");
         return;  // standard interface never had the problem — nothing to do
     }
 
     UIViewController* vc = nfbSwapOwningVC(pillView);
     if (!vc) {
-        NFBDebugLog(@"[p21] swap apply: stopped at gate 3");
         return;
     }
 
@@ -334,12 +314,10 @@ static void nfbSwapApply(UIView* pillView) {
         }
         if (hasTrailing) {
             // Only ours is installed — nothing to swap on this pass.
-            NFBDebugLog(@"[p21] swap apply: stopped at gate 4");
             return;
         }
     }
     if (!original) {
-        NFBDebugLog(@"[p21] swap apply: stopped at gate 5");
         return;  // items not attached yet; the next layout retries
     }
 
@@ -370,7 +348,6 @@ static void nfbSwapApply(UIView* pillView) {
                                      OBJC_ASSOCIATION_RETAIN_NONATOMIC);
             NFBDebugLog(@"swap: waiting for content - retrying");
         }
-        NFBDebugLog(@"[p21] swap apply: stopped at gate 6");
         return;  // content not built yet; the next layout retries
     }
 
@@ -428,7 +405,6 @@ static void nfbSwapApply(UIView* pillView) {
                             ? NSStringFromClass([original.primaryAction class])
                             : @"nil");
         }
-        NFBDebugLog(@"[p21] swap apply: stopped at gate 7");
         return;  // native kept, the probe has spoken
     }
     gNFBSwapMenu = menu;  // strong: it must outlive the mortal native button
@@ -560,13 +536,6 @@ static void nfbSwapApply(UIView* pillView) {
 }
 
 - (void)setTrailingItemGroups:(NSArray<UIBarButtonItemGroup*>*)groups {
-    static BOOL probeOnce = NO;
-    if (!probeOnce) {
-        probeOnce = YES;
-        NFBDebugLog(@"[p21] setTrailingItemGroups FIRED | groups=%lu | swapItem=%@ navMarked=%@",
-                    (unsigned long)groups.count, gNFBSwapItem ? @"yes" : @"NIL",
-                    objc_getAssociatedObject(self, kNFBSwapNavKey) ? @"yes" : @"no");
-    }
     if (gNFBSwapItem && objc_getAssociatedObject(self, kNFBSwapNavKey) &&
         [BHTSettings boolForKey:@"enable_liquid_glass"]) {
         if (@available(iOS 16.0, *)) {

@@ -66,6 +66,13 @@ extern void NFBDebuggerSetTriggerHidden(BOOL hidden);
 // building any log string, so the debugger costs one boolean when off.
 extern BOOL NFBDebugIsRecording(void);
 
+// One report of what the branding surfaces actually are on the running build:
+// the top-bar logo, the bottom bar and its glass, the Explore bar, and the four
+// settings that drive them. Read only, once per launch, written into the
+// journal next to the hook health. Reach for this first when a surface stops
+// behaving, instead of scattering one-off probes through the hooks.
+extern void NFBReportBrandingSurfaces(void);
+
 // The watch list: class-name fragments added at runtime from the diagnostics
 // screen. Matching views have their lifecycle journaled with millisecond
 // stamps and instance pointers.

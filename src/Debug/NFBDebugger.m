@@ -8,6 +8,7 @@
 #import "Debug/NFBDebugger.h"
 #import "Generated/NFBHookManifest.h"
 #import "Core/BHTSettings.h"
+#import "Hooks/HookHelpers.h"
 #import "Debug/NFBDiagnosticsViewController.h"
 #import <CoreGraphics/CoreGraphics.h>
 #import <objc/runtime.h>
@@ -748,6 +749,10 @@ void NFBDebuggerInstall(void) {
                    dispatch_get_main_queue(), ^{ NFBInstallTrigger(); });
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(10.0 * NSEC_PER_SEC)),
                    dispatch_get_main_queue(), ^{ NFBInstallTrigger(); });
+    // Once, after the first screen has settled, so the journal always carries a
+    // picture of the branding surfaces without anyone adding a probe.
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(5.0 * NSEC_PER_SEC)),
+                   dispatch_get_main_queue(), ^{ NFBReportBrandingSurfaces(); });
     // The health check runs twice. The first pass, soon after launch, catches
     // the obvious. The second, later, gives frameworks that only load with
     // their screen (DM, Immersive, Guide) time to arrive before their classes
@@ -772,3 +777,107 @@ void NFBDebuggerInstall(void) {
 void NFBDebuggerHandleShake(void) {
     NFBDebuggerCaptureAndPresent();
 }
+
+#pragma mark - Branding surfaces
+
+static NSString* NFBSurfaceImageInfo(UIImageView* view) {
+    UIImage* image = view.image;
+    if (!image) {
+        return @"no image";
+    }
+    return [NSString stringWithFormat:@"%.0fx%.0f mode=%ld tint=%@ filters=%lu",
+                                      image.size.width, image.size.height,
+                                      (long)image.renderingMode,
+                                      view.tintColor ?: (id)@"nil",
+                                      (unsigned long)view.layer.filters.count];
+}
+
+void NFBReportBrandingSurfaces(void) {
+    if (!NFBDebugIsRecording()) {
+        return;
+    }
+    UIWindow* window = nil;
+    for (id scene in UIApplication.sharedApplication.connectedScenes) {
+        if (![scene respondsToSelector:@selector(windows)]) {
+            continue;
+        }
+        for (UIWindow* candidate in [scene windows]) {
+            if (candidate.isKeyWindow) {
+                window = candidate;
+                break;
+            }
+        }
+        if (window) {
+            break;
+        }
+    }
+    if (!window) {
+        NFBDebugLog(@"[surfaces] no key window");
+        return;
+    }
+
+    __block NSInteger logos = 0;
+    __block NSInteger tabIcons = 0;
+    __block NSString* tabHost = @"absent";
+    __block NSString* tabGlass = @"none";
+    __block NSString* opaquePanel = @"none";
+    __block NSString* exploreBar = @"absent";
+
+    EnumerateSubviewsRecursively(window, ^(UIView* view) {
+      NSString* name = NSStringFromClass([view class]);
+
+      if ([name containsString:@"NavigationBarTitleControl"]) {
+          EnumerateSubviewsRecursively(view, ^(UIView* inner) {
+            if ([inner isKindOfClass:[UIImageView class]] && logos < 3) {
+                logos++;
+                NFBDebugLog(@"[surfaces] logo #%ld %@ | %@", (long)logos,
+                            NSStringFromClass([inner class]),
+                            NFBSurfaceImageInfo((UIImageView*)inner));
+            }
+          });
+      }
+
+      if ([name isEqualToString:@"T1TabBarHostView"]) {
+          tabHost = name;
+          for (UIView* sub in view.subviews) {
+              if ([sub isKindOfClass:[UIVisualEffectView class]]) {
+                  UIVisualEffect* effect = ((UIVisualEffectView*)sub).effect;
+                  tabGlass = effect ? NSStringFromClass([effect class]) : @"nil effect";
+                  continue;
+              }
+              CGFloat alpha = 0;
+              [sub.backgroundColor getWhite:NULL alpha:&alpha];
+              if (alpha > 0.9) {
+                  opaquePanel = [NSString stringWithFormat:@"%@ alpha=%.2f",
+                                                          NSStringFromClass([sub class]), alpha];
+              }
+          }
+      }
+
+      if ([name isEqualToString:@"T1TabView"] && tabIcons < 4) {
+          EnumerateSubviewsRecursively(view, ^(UIView* leaf) {
+            if ([leaf isKindOfClass:[UIImageView class]] && leaf.bounds.size.width >= 16 &&
+                tabIcons < 4) {
+                tabIcons++;
+                NFBDebugLog(@"[surfaces] tab icon #%ld | %@", (long)tabIcons,
+                            NFBSurfaceImageInfo((UIImageView*)leaf));
+            }
+          });
+      }
+
+      if ([name containsString:@"SegmentedTabBarView"]) {
+          exploreBar = name;
+      }
+    });
+
+    NFBDebugLog(@"[surfaces] tab host=%@ | glass=%@ | opaque panel=%@", tabHost, tabGlass,
+                opaquePanel);
+    NFBDebugLog(@"[surfaces] explore bar=%@ | logos seen=%ld | tab icons seen=%ld", exploreBar,
+                (long)logos, (long)tabIcons);
+    NFBDebugLog(@"[surfaces] settings: names=%d icon=%d tabbar=%d glass=%d",
+                [BHTSettings boolForKey:@"restore_twitter_names"],
+                [BHTSettings boolForKey:@"color_twitter_icon_in_top_bar"],
+                [BHTSettings boolForKey:@"tab_bar_theming"],
+                [BHTSettings boolForKey:@"enable_liquid_glass"]);
+}
+

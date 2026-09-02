@@ -5,6 +5,7 @@
 
 #import <objc/runtime.h>
 #import "HookHelpers.h"
+#import "Core/BHTBundle.h"
 #import "Debug/NFBDebugger.h"
 
 #import "ThemeColor/DarkModeStyle.h"
@@ -205,66 +206,58 @@ static UIColor* NFBRawLogoColor(void) {
     return raw;
 }
 
-
-// TEMPORARY probe for 12.21. Read only. Each site reports once; the point is to
-// learn which of the theming paths still run on the new build and what the
-// chrome around them is made of now.
-static void nfbP21Once(NSString* key, NSString* (^line)(void)) {
-    static NSMutableSet* seen = nil;
-    if (!seen) {
-        seen = [NSMutableSet set];
-    }
-    if ([seen containsObject:key]) {
-        return;
-    }
-    [seen addObject:key];
-    NFBDebugLog(@"[p21] %@", line());
-}
-
-static NSString* nfbP21Classes(UIView* root) {
-    NSMutableArray* names = [NSMutableArray array];
-    for (UIView* sub in root.subviews) {
-        [names addObject:NSStringFromClass([sub class])];
-        if (names.count >= 8) {
-            break;
-        }
-    }
-    return names.count ? [names componentsJoinedByString:@", "] : @"(none)";
-}
-
-// Every distinct class on screen whose name says navigation, tab bar, hosting
-// or accessory, with a count. This is what tells the SwiftUI and XNavigation
-// theories apart.
-static void nfbP21DumpChrome(UIView* root) {
-    NSMutableDictionary* counts = [NSMutableDictionary dictionary];
-    EnumerateSubviewsRecursively(root, ^(UIView* view) {
-      NSString* name = NSStringFromClass([view class]);
-      if ([name containsString:@"NavigationBar"] || [name containsString:@"XNavigation"] ||
-          [name containsString:@"TabBar"] || [name containsString:@"Accessory"] ||
-          [name containsString:@"Hosting"] || [name containsString:@"SwiftUI"] ||
-          [name containsString:@"Segmented"] || [name containsString:@"Paging"] ||
-          [name containsString:@"TitleView"] || [name containsString:@"Logo"]) {
-          counts[name] = @([counts[name] integerValue] + 1);
-      }
-    });
-    NSArray* keys = [counts.allKeys sortedArrayUsingSelector:@selector(compare:)];
-    NSMutableArray* lines = [NSMutableArray array];
-    for (NSString* k in keys) {
-        [lines addObject:[NSString stringWithFormat:@"%@ x%@", k, counts[k]]];
-    }
-    NFBDebugLog(@"[p21] chrome on screen (%lu classes): %@", (unsigned long)keys.count,
-                lines.count ? [lines componentsJoinedByString:@"  //  "] : @"(none matched)");
-}
-
 static const void* kNFBLogoOriginalKey = &kNFBLogoOriginalKey;
 static const void* kNFBLogoBakedKey = &kNFBLogoBakedKey;
 
-// 12.21 on iOS 27: the navigation bar reapplies its own tintColor to the title
-// control after ours, and its glass vibrancy filter recolours on top of that.
-// Measured in a capture: template image, tint back to the app's text colour.
-// So the colour is baked into the image itself and served AlwaysOriginal, which
-// neither a tint nor a filter can change. The untouched image is kept so the
-// logo can be handed back when the option is off.
+// The bird, rendered from the PDF the tweak already ships, at the size the bar
+// asks for. Cached per size: the render costs a PDF parse and the bar asks on
+// every layout pass. Same recipe as the settings header in Settings.x.
+static UIImage* NFBBirdLogoImage(CGSize size) {
+    static NSMutableDictionary<NSString*, UIImage*>* cache = nil;
+    if (!cache) {
+        cache = [NSMutableDictionary dictionary];
+    }
+    NSString* key = [NSString stringWithFormat:@"%.0fx%.0f", size.width, size.height];
+    UIImage* cached = cache[key];
+    if (cached) {
+        return cached;
+    }
+    NSURL* birdURL = [[BHTBundle sharedBundle] pathForFile:@"bird_stroke.pdf"];
+    if (!birdURL || size.width < 1 || size.height < 1) {
+        return nil;
+    }
+    CGPDFDocumentRef pdf = CGPDFDocumentCreateWithURL((__bridge CFURLRef)birdURL);
+    if (!pdf) {
+        return nil;
+    }
+    UIImage* rendered = nil;
+    CGPDFPageRef page = CGPDFDocumentGetPage(pdf, 1);
+    if (page) {
+        UIGraphicsImageRendererFormat* fmt = [UIGraphicsImageRendererFormat preferredFormat];
+        fmt.opaque = NO;
+        UIGraphicsImageRenderer* renderer =
+            [[UIGraphicsImageRenderer alloc] initWithSize:size format:fmt];
+        rendered = [renderer imageWithActions:^(UIGraphicsImageRendererContext* ctx) {
+          CGContextRef c = ctx.CGContext;
+          CGRect box = CGPDFPageGetBoxRect(page, kCGPDFCropBox);
+          CGFloat scale = MIN(size.width / box.size.width, size.height / box.size.height);
+          CGFloat drawnW = box.size.width * scale;
+          CGFloat drawnH = box.size.height * scale;
+          CGContextTranslateCTM(c, (size.width - drawnW) / 2.0,
+                                size.height - (size.height - drawnH) / 2.0);
+          CGContextScaleCTM(c, 1, -1);
+          CGContextScaleCTM(c, scale, scale);
+          CGContextDrawPDFPage(c, page);
+        }];
+        rendered = [rendered imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate];
+    }
+    CGPDFDocumentRelease(pdf);
+    if (rendered) {
+        cache[key] = rendered;
+    }
+    return rendered;
+}
+
 static void NFBApplyLogoTint(UIImageView* logoView) {
     UIImage* current = logoView.image;
     if (!current) {
@@ -282,6 +275,20 @@ static void NFBApplyLogoTint(UIImageView* logoView) {
         objc_setAssociatedObject(logoView, kNFBLogoBakedKey, nil,
                                  OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     }
+    // The bird replaces the X when the reader asked for Twitter's branding back.
+    // Substituting the image, not the tint: the glyph itself is what changed.
+    if ([BHTSettings boolForKey:@"restore_twitter_names"]) {
+        UIImage* bird = NFBBirdLogoImage(original.size);
+        if (bird && original != bird) {
+            original = bird;
+            objc_setAssociatedObject(logoView, kNFBLogoOriginalKey, bird,
+                                     OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+            baked = nil;
+            objc_setAssociatedObject(logoView, kNFBLogoBakedKey, nil,
+                                     OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+            NFBDebugLog(@"[logo] bird substituted for the X");
+        }
+    }
     UIColor* target = nil;
     if ([BHTSettings boolForKey:@"color_twitter_icon_in_top_bar"] && NFBAccentIsActive()) {
         target = NFBBrandAccentColor();
@@ -290,8 +297,15 @@ static void NFBApplyLogoTint(UIImageView* logoView) {
         logoView.layer.filters = nil;
     }
     if (!target) {
+        // Option off: hand the untouched image back AND restore the native
+        // colour, the way this function did before the baking was added.
         if (current != original) {
             logoView.image = original;
+        }
+        UIColor* raw = NFBRawLogoColor() ?: [UIColor labelColor];
+        if (original.renderingMode == UIImageRenderingModeAlwaysTemplate &&
+            ![logoView.tintColor isEqual:raw]) {
+            logoView.tintColor = raw;
         }
         return;
     }
@@ -299,7 +313,7 @@ static void NFBApplyLogoTint(UIImageView* logoView) {
         baked = NFBPaintedGlyph(original, target);
         objc_setAssociatedObject(logoView, kNFBLogoBakedKey, baked,
                                  OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-        NFBDebugLog(@"[p21] logo: colour baked into the image");
+        NFBDebugLog(@"[logo] colour baked into the image");
     }
     if (current != baked) {
         logoView.image = baked;
@@ -437,13 +451,6 @@ static char kNFBAppliedAccentKey;
 static BOOL NFBAccentPending = NO;
 
 static void NFBApplyTabBarAccent(UITabBar* bar) {
-    nfbP21Once(@"tabbar", ^{
-      return [NSString stringWithFormat:
-                 @"tab bar accent CALLED | bar=%@ items=%lu | setting=%d accentActive=%d | subviews: %@",
-                 NSStringFromClass([bar class]), (unsigned long)bar.items.count,
-                 [BHTSettings boolForKey:@"tab_bar_theming"], NFBAccentIsActive(),
-                 nfbP21Classes(bar)];
-    });
     BOOL active = [BHTSettings boolForKey:@"tab_bar_theming"] && NFBAccentIsActive();
     // Brand accent, not CurrentAccentColor: with nothing picked the latter falls
     // back to iOS systemBlue, which does not belong on a Twitter surface.
@@ -487,65 +494,101 @@ static void NFBApplyTabBarAccent(UITabBar* bar) {
     }
 }
 
-// 12.21: the tab bar is XNavigation.TabBarView, a Swift view, and the app no
-// longer mounts a UITabBar at all - the UITabBar hooks below never fire on this
-// build. The view exposes nothing of its items, so the accent is set as the
-// view's tintColor, which template icons inherit, and the glass vibrancy filter
-// is kept off it the way it is kept off the logo. Measured against the binary:
-// the native-tab-bar path was removed from T1TabBarViewController in 12.21.
-static Class NFBXTabBarViewClass(void) {
-    static Class cls;
-    static dispatch_once_t once;
-    dispatch_once(&once, ^{
-      cls = NSClassFromString(@"_TtC11XNavigation10TabBarView");
-    });
-    return cls;
+
+// Twitter 12.21 deleted T1LiquidGlassTabBarController and its whole native
+// tab-bar path (measured: absent from all 56 binaries, present in 12.15). Until
+// then, forcing UIDesignRequiresCompatibility to NO was enough - the app took
+// its own native route and iOS glazed the bar itself. There is no switch left
+// to force, so the effect is rebuilt here with the recipe the Inbox pill uses:
+// a UIGlassEffect view behind the bar, the app's opaque panel cleared, and the
+// panel's colour remembered so Standard puts it back exactly as it was.
+static const void* kNFBTabGlassKey = &kNFBTabGlassKey;
+static const void* kNFBTabPanelKey = &kNFBTabPanelKey;
+static const void* kNFBTabPanelColourKey = &kNFBTabPanelColourKey;
+
+static UIView* NFBTabBarOpaquePanel(UIView* host, UIView* skip) {
+    for (UIView* sub in host.subviews) {
+        if (sub == skip || [sub isKindOfClass:[UIVisualEffectView class]]) {
+            continue;
+        }
+        CGFloat alpha = 0;
+        if (![sub.backgroundColor getWhite:NULL alpha:&alpha]) {
+            [sub.backgroundColor getRed:NULL green:NULL blue:NULL alpha:&alpha];
+        }
+        if (alpha > 0.9 && sub.bounds.size.width >= host.bounds.size.width - 1) {
+            return sub;
+        }
+    }
+    return nil;
 }
 
-static void NFBApplyXTabBarAccent(UIView* bar) {
-    BOOL active = [BHTSettings boolForKey:@"tab_bar_theming"] && NFBAccentIsActive();
-    UIColor* accent = active ? NFBBrandAccentColor() : nil;
-    if (![bar.tintColor isEqual:accent]) {
-        bar.tintColor = accent;
+static void NFBApplyTabBarGlass(UIView* host) {
+    if (!host || host.bounds.size.width < 1) {
+        return;
     }
-    if (bar.layer.filters.count) {
-        bar.layer.filters = nil;
+    UIVisualEffectView* glass = objc_getAssociatedObject(host, kNFBTabGlassKey);
+
+    if (![BHTSettings boolForKey:@"enable_liquid_glass"]) {
+        if (glass) {
+            [glass removeFromSuperview];
+            objc_setAssociatedObject(host, kNFBTabGlassKey, nil,
+                                     OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        }
+        UIView* panel = objc_getAssociatedObject(host, kNFBTabPanelKey);
+        UIColor* saved = objc_getAssociatedObject(host, kNFBTabPanelColourKey);
+        if (panel && saved) {
+            panel.backgroundColor = saved;
+            objc_setAssociatedObject(host, kNFBTabPanelKey, nil,
+                                     OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+            objc_setAssociatedObject(host, kNFBTabPanelColourKey, nil,
+                                     OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        }
+        return;
     }
-    // TEMPORARY probe: the bar's tree, once, so the precise version can be
-    // written against what is actually inside.
-    static BOOL dumped = NO;
-    if (!dumped) {
-        dumped = YES;
-        NSMutableArray* lines = [NSMutableArray array];
-        EnumerateSubviewsRecursively(bar, ^(UIView* view) {
-          if (lines.count >= 24) {
-              return;
-          }
-          NSString* extra = @"";
-          if ([view isKindOfClass:[UIImageView class]]) {
-              UIImageView* iv = (UIImageView*)view;
-              extra = [NSString stringWithFormat:@" img mode=%ld tint=%@ filters=%lu",
-                                                 (long)iv.image.renderingMode,
-                                                 iv.tintColor ? @"set" : @"nil",
-                                                 (unsigned long)iv.layer.filters.count];
-          }
-          [lines addObject:[NSString stringWithFormat:@"%@%@",
-                                                      NSStringFromClass([view class]), extra]];
-        });
-        NFBDebugLog(@"[p21] XNavigation tab bar | active=%d | tree: %@", active,
-                    [lines componentsJoinedByString:@"  //  "]);
+
+    if (!glass) {
+        Class glassClass = NSClassFromString(@"UIGlassEffect");
+        UIVisualEffect* effect = glassClass ? [[glassClass alloc] init] : nil;
+        if (!effect) {
+            effect = [UIBlurEffect effectWithStyle:
+                          UIBlurEffectStyleSystemChromeMaterial];
+        }
+        glass = [[UIVisualEffectView alloc] initWithEffect:effect];
+        glass.userInteractionEnabled = NO;
+        [host insertSubview:glass atIndex:0];
+        objc_setAssociatedObject(host, kNFBTabGlassKey, glass,
+                                 OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        NFBDebugLog(@"[tabglass] %@ placed behind %@",
+                    glassClass ? @"UIGlassEffect" : @"material fallback",
+                    NSStringFromClass([host class]));
+    }
+    if (!CGRectEqualToRect(glass.frame, host.bounds)) {
+        glass.frame = host.bounds;
+    }
+    if (host.subviews.firstObject != glass) {
+        [host insertSubview:glass atIndex:0];
+    }
+
+    UIView* panel = objc_getAssociatedObject(host, kNFBTabPanelKey);
+    if (!panel) {
+        panel = NFBTabBarOpaquePanel(host, glass);
+        if (panel) {
+            objc_setAssociatedObject(host, kNFBTabPanelKey, panel,
+                                     OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+            objc_setAssociatedObject(host, kNFBTabPanelColourKey, panel.backgroundColor,
+                                     OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+            NFBDebugLog(@"[tabglass] opaque panel cleared: %@",
+                        NSStringFromClass([panel class]));
+        }
+    }
+    if (panel && panel.backgroundColor) {
+        panel.backgroundColor = [UIColor clearColor];
     }
 }
 
 static void NFBSweepNativeTabBars(UIView* root, UIColor* accent) {
     if ([root isKindOfClass:[UITabBar class]]) {
         NFBApplyTabBarAccent((UITabBar*)root);
-        [root setNeedsLayout];
-        return;
-    }
-    Class xBar = NFBXTabBarViewClass();
-    if (xBar && [root isKindOfClass:xBar]) {
-        NFBApplyXTabBarAccent(root);
         [root setNeedsLayout];
         return;
     }
@@ -1381,12 +1424,6 @@ static void NFBRestoreTabIcon(UIImageView* icon) {
           NFBBakeTitleControlLogos(bar);
       }
     });
-    nfbP21Once(@"titleview", ^{
-      return [NSString stringWithFormat:
-                 @"home titleView hook FIRED | titleView=%@ | logo found=%@ | subviews: %@",
-                 NSStringFromClass([titleView class]), logo ? @"yes" : @"NO",
-                 nfbP21Classes(titleView)];
-    });
     if (logo) {
         NFBTopBarLogoView = logo;
         NFBRegisterLogoView(logo);
@@ -1453,11 +1490,11 @@ static UITabBarAppearance* NFBPatchedTabBarAppearance(UITabBarAppearance* appear
     return patched;
 }
 
-%hook _TtC11XNavigation10TabBarView
+%hook T1TabBarHostView
 
 - (void)layoutSubviews {
     %orig;
-    NFBApplyXTabBarAccent((UIView*)self);
+    NFBApplyTabBarGlass((UIView*)self);
 }
 
 %end
@@ -1667,16 +1704,6 @@ void NFBWhitenNavigationBarConfirm(UINavigationBar* bar) {
 
 - (void)viewDidAppear:(BOOL)animated {
     %orig;
-    // 12.21 probe: one dump of the chrome classes, taken from the first
-    // controller that appears inside a window, then never again.
-    if (self.view.window) {
-        UIWindow* window = self.view.window;
-        nfbP21Once(@"chrome-dump", ^{
-          nfbP21DumpChrome(window);
-          return [NSString stringWithFormat:@"chrome dump taken from %@",
-                                            NSStringFromClass([self class])];
-        });
-    }
     if (!NFBAccentPending) {
         return;
     }
