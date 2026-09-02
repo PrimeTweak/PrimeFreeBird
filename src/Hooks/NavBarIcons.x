@@ -57,7 +57,7 @@ static UIColor* NFBBarIconGrey(UITraitCollection* traits) {
 }
 
 // Repaints a glyph into a flat bitmap of the given colour.
-static UIImage* NFBGreyGlyph(UIImage* source, UIColor* colour) {
+UIImage* NFBGreyGlyph(UIImage* source, UIColor* colour) {
     if (!source || !colour) {
         return source;
     }

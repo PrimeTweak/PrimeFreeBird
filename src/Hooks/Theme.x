@@ -256,44 +256,62 @@ static void nfbP21DumpChrome(UIView* root) {
                 lines.count ? [lines componentsJoinedByString:@"  //  "] : @"(none matched)");
 }
 
+static const void* kNFBLogoOriginalKey = &kNFBLogoOriginalKey;
+static const void* kNFBLogoBakedKey = &kNFBLogoBakedKey;
+
+// 12.21 on iOS 27: the navigation bar reapplies its own tintColor to the title
+// control after ours, and its glass vibrancy filter recolours on top of that.
+// Measured in a capture: template image, tint back to the app's text colour.
+// So the colour is baked into the image itself and served AlwaysOriginal, which
+// neither a tint nor a filter can change. The untouched image is kept so the
+// logo can be handed back when the option is off.
 static void NFBApplyLogoTint(UIImageView* logoView) {
-    nfbP21Once(@"logo", ^{
-      return [NSString stringWithFormat:
-                 @"logo tint CALLED | view=%@ image=%@ mode=%ld | setting=%d accentActive=%d",
-                 NSStringFromClass([logoView class]), logoView.image ? @"yes" : @"nil",
-                 (long)logoView.image.renderingMode,
-                 [BHTSettings boolForKey:@"color_twitter_icon_in_top_bar"], NFBAccentIsActive()];
-    });
-    if (!logoView.image) {
+    UIImage* current = logoView.image;
+    if (!current) {
         return;
+    }
+    NFBRegisterLogoView(logoView);
+    UIImage* original = objc_getAssociatedObject(logoView, kNFBLogoOriginalKey);
+    UIImage* baked = objc_getAssociatedObject(logoView, kNFBLogoBakedKey);
+    if (!original || (current != original && current != baked)) {
+        // A new image from the app: remember it as the one to paint from.
+        original = current;
+        objc_setAssociatedObject(logoView, kNFBLogoOriginalKey, original,
+                                 OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        baked = nil;
+        objc_setAssociatedObject(logoView, kNFBLogoBakedKey, nil,
+                                 OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     }
     UIColor* target = nil;
     if ([BHTSettings boolForKey:@"color_twitter_icon_in_top_bar"] && NFBAccentIsActive()) {
         target = NFBBrandAccentColor();
     }
-    if (!target) {
-        target = NFBRawLogoColor() ?: [UIColor labelColor];
-    }
-    if (logoView.image.renderingMode != UIImageRenderingModeAlwaysTemplate) {
-        logoView.image =
-            [logoView.image imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate];
-    }
-    // 12.21 on iOS 27: the navigation bar renders the logo through a Liquid
-    // Glass vibrancy filter (filters.vibrantColorMatrix), which recolours the
-    // content on top of any tint. Measured in the journal as a CASpringAnimation
-    // on that key path against this very image view. The filter goes, and the
-    // animation hook in NavBarIcons.x keeps it from coming back.
-    NSUInteger filterCount = logoView.layer.filters.count;
-    if (filterCount) {
+    if (logoView.layer.filters.count) {
         logoView.layer.filters = nil;
-        NFBDebugLog(@"[p21] logo: %lu layer filter(s) removed", (unsigned long)filterCount);
     }
-    if (![logoView.tintColor isEqual:target]) {
-        logoView.tintColor = target;
+    if (!target) {
+        if (current != original) {
+            logoView.image = original;
+        }
+        return;
+    }
+    if (!baked) {
+        baked = NFBGreyGlyph(original, target);
+        objc_setAssociatedObject(logoView, kNFBLogoBakedKey, baked,
+                                 OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        NFBDebugLog(@"[p21] logo: colour baked into the image");
+    }
+    if (current != baked) {
+        logoView.image = baked;
     }
 }
 
 static void NFBRetintRegisteredLogos(void) {
+    // The baked copy is tied to one colour; a new accent starts over.
+    for (UIImageView* logo in NFBLogoRegistry) {
+        objc_setAssociatedObject(logo, kNFBLogoBakedKey, nil,
+                                 OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    }
     for (UIImageView* logo in NFBLogoRegistry) {
         NFBApplyLogoTint(logo);
     }
@@ -1229,6 +1247,20 @@ static UIColor* tabItemColor(BOOL selected) {
     updatingTabIconColor = NO;
 
     %orig(animated);
+
+    // 12.21: the tab icon arrives rendered AlwaysOriginal (measured in a
+    // capture: mode=1 with the tint set and ignored), so the colour set above
+    // never reaches it. Rendering it as a template lets the tint through again.
+    if ([BHTSettings boolForKey:@"tab_bar_theming"]) {
+        UIImageView* icon = self.imageView;
+        if (icon.image && icon.image.renderingMode != UIImageRenderingModeAlwaysTemplate) {
+            icon.image = [icon.image imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate];
+        }
+        UIColor* wanted = tabItemColor(self.selected);
+        if (wanted && ![icon.tintColor isEqual:wanted]) {
+            icon.tintColor = wanted;
+        }
+    }
 }
 
 - (void)_t1_updateTitleLabel {
