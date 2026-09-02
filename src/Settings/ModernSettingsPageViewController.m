@@ -753,6 +753,7 @@ extern NSInteger NFBColorThemeScreenVisible;
 
 // Deletes the stored web session, behind a destructive confirmation.
 - (void)clearWebSession:(NSDictionary*)sender {
+    __weak typeof(self) weakSelf = self;
     UIAlertController* confirm = [UIAlertController
         alertControllerWithTitle:[[BHTBundle sharedBundle]
                                      localizedStringForKey:@"WEB_SESSION_CLEAR_TITLE"]
@@ -765,6 +766,11 @@ extern NSInteger NFBColorThemeScreenVisible;
                                      style:UIAlertActionStyleDestructive
                                    handler:^(__unused UIAlertAction* action) {
                                        clearWebSession();
+                                       // The card and the rows gated on the
+                                       // session have no other way to learn it
+                                       // is gone. Sign-in already does this.
+                                       [weakSelf updateVisibleToggles];
+                                       [weakSelf.tableView reloadData];
                                    }]];
     [confirm addAction:[UIAlertAction
                            actionWithTitle:[[BHTBundle sharedBundle]
