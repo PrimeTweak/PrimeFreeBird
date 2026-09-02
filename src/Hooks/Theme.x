@@ -504,22 +504,20 @@ static void NFBApplyTabBarAccent(UITabBar* bar) {
 // tab-bar path (measured: absent from all 56 binaries, present in 12.15). Until
 // then, forcing UIDesignRequiresCompatibility to NO was enough - the app took
 // its own native route and iOS glazed the bar itself. There is no switch left
-// to force, so the effect is rebuilt here with the recipe the Inbox pill uses:
-// a UIGlassEffect view behind the bar, the app's opaque panel cleared, and the
-// panel's colour remembered so Standard puts it back exactly as it was.
+// to force, so the effect is rebuilt here with the recipe the Inbox pill uses.
+//
+// The glass goes ON TOP of the app's opaque panel rather than behind it. The
+// first attempt cleared that panel's colour, and the journal showed why that
+// loses: cleared at 35.630, opaque again at 40.339, with no layout pass in
+// between to clear it once more. Sitting above it means the app can repaint as
+// often as it likes. The tab items live in a later sibling branch, so they
+// still draw in front.
 static const void* kNFBTabGlassKey = &kNFBTabGlassKey;
-static const void* kNFBTabPanelKey = &kNFBTabPanelKey;
-static const void* kNFBTabPanelColourKey = &kNFBTabPanelColourKey;
 
-// Every opaque fill under the host, found by colour alone. Size was the first
-// filter here and it was wrong: this runs from the host's own layoutSubviews,
-// before the nested wrappers have been sized, so the panel still measured
-// {0, 0} and was skipped. A capture showed it plainly at {440, 83} while the
-// search reported nothing.
-static NSArray<UIView*>* NFBTabBarOpaquePanels(UIView* host, UIView* skip) {
-    NSMutableArray<UIView*>* found = [NSMutableArray array];
+static UIView* NFBTabBarOpaquePanel(UIView* host, UIView* skip) {
+    __block UIView* found = nil;
     EnumerateSubviewsRecursively(host, ^(UIView* sub) {
-      if (sub == skip || [sub isKindOfClass:[UIVisualEffectView class]]) {
+      if (found || sub == skip || [sub isKindOfClass:[UIVisualEffectView class]]) {
           return;
       }
       UIColor* colour = sub.backgroundColor;
@@ -531,10 +529,10 @@ static NSArray<UIView*>* NFBTabBarOpaquePanels(UIView* host, UIView* skip) {
           ![colour getRed:NULL green:NULL blue:NULL alpha:&alpha]) {
           return;
       }
-      // The hairline separators are opaque too but only a third of a point
-      // tall; leaving them alone keeps the bar's edge where the app drew it.
+      // The hairline separators are opaque too but a third of a point tall;
+      // leaving them alone keeps the bar's edge where the app drew it.
       if (alpha > 0.9 && sub.bounds.size.height >= 8) {
-          [found addObject:sub];
+          found = sub;
       }
     });
     return found;
@@ -551,19 +549,14 @@ static void NFBApplyTabBarGlass(UIView* host) {
             [glass removeFromSuperview];
             objc_setAssociatedObject(host, kNFBTabGlassKey, nil,
                                      OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+            NFBDebugLog(@"[tabglass] removed, standard style restored");
         }
-        NSArray<UIView*>* panels = objc_getAssociatedObject(host, kNFBTabPanelKey);
-        NSArray<UIColor*>* saved = objc_getAssociatedObject(host, kNFBTabPanelColourKey);
-        if (panels.count == saved.count) {
-            [panels enumerateObjectsUsingBlock:^(UIView* panel, NSUInteger idx, BOOL* stop) {
-              panel.backgroundColor = saved[idx];
-            }];
-        }
-        objc_setAssociatedObject(host, kNFBTabPanelKey, nil,
-                                 OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-        objc_setAssociatedObject(host, kNFBTabPanelColourKey, nil,
-                                 OBJC_ASSOCIATION_RETAIN_NONATOMIC);
         return;
+    }
+
+    UIView* panel = NFBTabBarOpaquePanel(host, glass);
+    if (!panel) {
+        return;  // The panel is laid out later; the next pass will find it.
     }
 
     if (!glass) {
@@ -575,46 +568,25 @@ static void NFBApplyTabBarGlass(UIView* host) {
         }
         glass = [[UIVisualEffectView alloc] initWithEffect:effect];
         glass.userInteractionEnabled = NO;
-        [host insertSubview:glass atIndex:0];
         objc_setAssociatedObject(host, kNFBTabGlassKey, glass,
                                  OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-        NFBDebugLog(@"[tabglass] %@ placed behind %@",
+        NFBDebugLog(@"[tabglass] %@ over %@ (%.0fx%.0f)",
                     glassClass ? @"UIGlassEffect" : @"material fallback",
-                    NSStringFromClass([host class]));
-    }
-    if (!CGRectEqualToRect(glass.frame, host.bounds)) {
-        glass.frame = host.bounds;
-    }
-    if (host.subviews.firstObject != glass) {
-        [host insertSubview:glass atIndex:0];
+                    NSStringFromClass([panel class]), panel.bounds.size.width,
+                    panel.bounds.size.height);
     }
 
-    // Searched again on every pass rather than once: a first pass that finds
-    // nothing must not be remembered as the answer, and the app puts its panel
-    // back whenever it rebuilds the bar. Views already known keep the colour
-    // recorded the first time, so Standard still restores the original.
-    NSMutableArray<UIView*>* known =
-        objc_getAssociatedObject(host, kNFBTabPanelKey)
-            ?: [NSMutableArray array];
-    NSMutableArray<UIColor*>* colours =
-        objc_getAssociatedObject(host, kNFBTabPanelColourKey)
-            ?: [NSMutableArray array];
-    NSUInteger before = known.count;
-    for (UIView* panel in NFBTabBarOpaquePanels(host, glass)) {
-        if (![known containsObject:panel]) {
-            [known addObject:panel];
-            [colours addObject:panel.backgroundColor ?: [UIColor clearColor]];
-        }
-        panel.backgroundColor = [UIColor clearColor];
+    // Directly above the panel, inside the same parent, on every pass: the app
+    // reorders its own subviews when it rebuilds the bar.
+    UIView* parent = panel.superview;
+    NSUInteger wanted = [parent.subviews indexOfObject:panel] + 1;
+    if (glass.superview != parent || [parent.subviews indexOfObject:glass] != wanted) {
+        [glass removeFromSuperview];
+        wanted = [parent.subviews indexOfObject:panel] + 1;
+        [parent insertSubview:glass atIndex:wanted];
     }
-    if (known.count != before) {
-        objc_setAssociatedObject(host, kNFBTabPanelKey, known,
-                                 OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-        objc_setAssociatedObject(host, kNFBTabPanelColourKey, colours,
-                                 OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-        NFBDebugLog(@"[tabglass] %lu opaque panel(s) cleared (%lu new)",
-                    (unsigned long)known.count,
-                    (unsigned long)(known.count - before));
+    if (!CGRectEqualToRect(glass.frame, panel.bounds)) {
+        glass.frame = panel.bounds;
     }
 }
 

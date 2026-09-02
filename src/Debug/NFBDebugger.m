@@ -847,7 +847,15 @@ void NFBReportBrandingSurfaces(void) {
           EnumerateSubviewsRecursively(view, ^(UIView* sub) {
             if ([sub isKindOfClass:[UIVisualEffectView class]]) {
                 UIVisualEffect* effect = ((UIVisualEffectView*)sub).effect;
-                tabGlass = effect ? NSStringFromClass([effect class]) : @"nil effect";
+                // Present is not enough: the panel it is meant to cover sits in
+                // the same parent, so the index decides whether it is seen.
+                NSArray* siblings = sub.superview.subviews;
+                tabGlass = [NSString
+                    stringWithFormat:@"%@ at %lu/%lu in %@",
+                                     effect ? NSStringFromClass([effect class]) : @"nil effect",
+                                     (unsigned long)[siblings indexOfObject:sub],
+                                     (unsigned long)siblings.count,
+                                     NSStringFromClass([sub.superview class])];
                 return;
             }
             if (sub.bounds.size.width < wide || sub.bounds.size.height < 8) {
@@ -858,10 +866,13 @@ void NFBReportBrandingSurfaces(void) {
                 [sub.backgroundColor getRed:NULL green:NULL blue:NULL alpha:&alpha];
             }
             if (alpha > 0.9 && opaque.count < 4) {
-                [opaque addObject:[NSString stringWithFormat:@"%@ %.0fx%.0f a=%.2f",
-                                                            NSStringFromClass([sub class]),
-                                                            sub.bounds.size.width,
-                                                            sub.bounds.size.height, alpha]];
+                NSArray* siblings = sub.superview.subviews;
+                [opaque addObject:[NSString
+                    stringWithFormat:@"%@ %.0fx%.0f a=%.2f at %lu/%lu",
+                                     NSStringFromClass([sub class]), sub.bounds.size.width,
+                                     sub.bounds.size.height, alpha,
+                                     (unsigned long)[siblings indexOfObject:sub],
+                                     (unsigned long)siblings.count]];
             }
           });
           if (opaque.count) {
