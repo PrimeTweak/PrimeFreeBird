@@ -511,23 +511,29 @@ static const void* kNFBTabGlassKey = &kNFBTabGlassKey;
 static const void* kNFBTabPanelKey = &kNFBTabPanelKey;
 static const void* kNFBTabPanelColourKey = &kNFBTabPanelColourKey;
 
-// The opaque panel does not sit directly under the host: a capture put it two
-// wrapper views down. So the whole subtree is walked, and every full-width
-// opaque fill is collected - clearing only the first one still left the glass
-// covered.
+// Every opaque fill under the host, found by colour alone. Size was the first
+// filter here and it was wrong: this runs from the host's own layoutSubviews,
+// before the nested wrappers have been sized, so the panel still measured
+// {0, 0} and was skipped. A capture showed it plainly at {440, 83} while the
+// search reported nothing.
 static NSArray<UIView*>* NFBTabBarOpaquePanels(UIView* host, UIView* skip) {
     NSMutableArray<UIView*>* found = [NSMutableArray array];
-    CGFloat wide = host.bounds.size.width - 1;
     EnumerateSubviewsRecursively(host, ^(UIView* sub) {
-      if (sub == skip || [sub isKindOfClass:[UIVisualEffectView class]] ||
-          sub.bounds.size.width < wide || sub.bounds.size.height < 8) {
+      if (sub == skip || [sub isKindOfClass:[UIVisualEffectView class]]) {
+          return;
+      }
+      UIColor* colour = sub.backgroundColor;
+      if (!colour) {
           return;
       }
       CGFloat alpha = 0;
-      if (![sub.backgroundColor getWhite:NULL alpha:&alpha]) {
-          [sub.backgroundColor getRed:NULL green:NULL blue:NULL alpha:&alpha];
+      if (![colour getWhite:NULL alpha:&alpha] &&
+          ![colour getRed:NULL green:NULL blue:NULL alpha:&alpha]) {
+          return;
       }
-      if (alpha > 0.9) {
+      // The hairline separators are opaque too but only a third of a point
+      // tall; leaving them alone keeps the bar's edge where the app drew it.
+      if (alpha > 0.9 && sub.bounds.size.height >= 8) {
           [found addObject:sub];
       }
     });
@@ -583,26 +589,32 @@ static void NFBApplyTabBarGlass(UIView* host) {
         [host insertSubview:glass atIndex:0];
     }
 
-    NSArray<UIView*>* panels = objc_getAssociatedObject(host, kNFBTabPanelKey);
-    if (!panels.count) {
-        panels = NFBTabBarOpaquePanels(host, glass);
-        if (panels.count) {
-            NSMutableArray<UIColor*>* colours = [NSMutableArray array];
-            for (UIView* panel in panels) {
-                [colours addObject:panel.backgroundColor ?: [UIColor clearColor]];
-            }
-            objc_setAssociatedObject(host, kNFBTabPanelKey, panels,
-                                     OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-            objc_setAssociatedObject(host, kNFBTabPanelColourKey, colours,
-                                     OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-            NFBDebugLog(@"[tabglass] %lu opaque panel(s) cleared",
-                        (unsigned long)panels.count);
+    // Searched again on every pass rather than once: a first pass that finds
+    // nothing must not be remembered as the answer, and the app puts its panel
+    // back whenever it rebuilds the bar. Views already known keep the colour
+    // recorded the first time, so Standard still restores the original.
+    NSMutableArray<UIView*>* known =
+        objc_getAssociatedObject(host, kNFBTabPanelKey)
+            ?: [NSMutableArray array];
+    NSMutableArray<UIColor*>* colours =
+        objc_getAssociatedObject(host, kNFBTabPanelColourKey)
+            ?: [NSMutableArray array];
+    NSUInteger before = known.count;
+    for (UIView* panel in NFBTabBarOpaquePanels(host, glass)) {
+        if (![known containsObject:panel]) {
+            [known addObject:panel];
+            [colours addObject:panel.backgroundColor ?: [UIColor clearColor]];
         }
+        panel.backgroundColor = [UIColor clearColor];
     }
-    for (UIView* panel in panels) {
-        if (panel.backgroundColor) {
-            panel.backgroundColor = [UIColor clearColor];
-        }
+    if (known.count != before) {
+        objc_setAssociatedObject(host, kNFBTabPanelKey, known,
+                                 OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        objc_setAssociatedObject(host, kNFBTabPanelColourKey, colours,
+                                 OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        NFBDebugLog(@"[tabglass] %lu opaque panel(s) cleared (%lu new)",
+                    (unsigned long)known.count,
+                    (unsigned long)(known.count - before));
     }
 }
 
