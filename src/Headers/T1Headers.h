@@ -184,6 +184,16 @@
     UIContextMenuInteractionDelegate>
 @end
 
+// 12.21 moved the DM media container to ChatConversation; same shape.
+@interface _TtC16ChatConversation21MessageAttachmentView : UIView
+@property (nonatomic, strong) UIContextMenuInteraction* downloadMenuInteraction;
+@property (nonatomic, strong) DownloadInlineButton* downloadHandler;
+@end
+
+@interface _TtC16ChatConversation21MessageAttachmentView () <
+    UIContextMenuInteractionDelegate>
+@end
+
 // Shared media view (TweetMediaAttachments.MultiMediaView); its carousel
 // variant exposes -inlineMediaInfos as well
 @interface _TtC21TweetMediaAttachments14MultiMediaView : UIView
