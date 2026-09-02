@@ -84,6 +84,12 @@ static UIImage* NFBGreyGlyph(UIImage* source, UIColor* colour) {
     return result;
 }
 
+// Exported under its own name: QuickMutedWords.x carries a private copy of
+// NFBGreyGlyph, so that symbol cannot be made public without a clash.
+UIImage* NFBPaintedGlyph(UIImage* source, UIColor* colour) {
+    return NFBGreyGlyph(source, colour);
+}
+
 // Replaces the image of every glyph-sized image view under a view. The result
 // is remembered so the work happens once, and happens again only if Twitter
 // puts its own image back.
@@ -743,6 +749,24 @@ static BOOL nfbViewSitsInBarPlatter(UIView* view) {
     return NO;
 }
 
+// 12.21: the vibrancy filter is also animated onto the tab bar's icons. Only
+// while the reader asked for a themed bar; otherwise the bar keeps its glass.
+static BOOL NFBViewSitsInXTabBar(UIView* view) {
+    if (!NFBThemedTabBarWanted()) {
+        return NO;
+    }
+    Class xBar = NSClassFromString(@"_TtC11XNavigation10TabBarView");
+    if (!xBar) {
+        return NO;
+    }
+    for (UIView* v = view; v; v = v.superview) {
+        if ([v isKindOfClass:xBar]) {
+            return YES;
+        }
+    }
+    return NO;
+}
+
 %hook CALayer
 
 - (void)setOpacity:(float)opacity {
@@ -757,6 +781,20 @@ static BOOL nfbViewSitsInBarPlatter(UIView* view) {
 - (void)addAnimation:(CAAnimation*)animation forKey:(NSString*)key {
     UIView* owner = (UIView*)self.delegate;
     BOOL ownerIsView = [owner isKindOfClass:[UIView class]];
+
+    // 12.21 on iOS 27: the glass vibrancy filter is animated back onto the logo
+    // after the tint is set. Refusing the animation and dropping the filter
+    // keeps the logo the colour the reader chose. Only that one view.
+    if (ownerIsView && [key hasPrefix:@"filters."] &&
+        (owner == (UIView*)NFBTopBarLogoViewCurrent() || NFBViewSitsInXTabBar(owner))) {
+        self.filters = nil;
+        static NSInteger refused = 0;
+        if (refused < 3) {
+            refused++;
+            NFBDebugLog(@"[p21] logo: vibrancy animation refused (%@)", key);
+        }
+        return;
+    }
 
     // Every animation reaching the button platter is recorded, whatever its
     // kind. The previous round logged opacity only and stayed silent on the

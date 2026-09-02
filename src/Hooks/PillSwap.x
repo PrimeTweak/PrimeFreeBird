@@ -277,15 +277,20 @@ static NSArray<UIBarButtonItem*>* nfbSwapInterceptItems(UINavigationItem* nav,
 }
 
 static void nfbSwapApply(UIView* pillView) {
+    NFBDebugLog(@"[p21] swap apply: ENTERED | window=%@ class=%@",
+                pillView.window ? @"yes" : @"nil", NSStringFromClass([pillView class]));
     if (!pillView.window) {
+        NFBDebugLog(@"[p21] swap apply: stopped at gate 1");
         return;
     }
     if (![BHTSettings boolForKey:@"enable_liquid_glass"]) {
+        NFBDebugLog(@"[p21] swap apply: stopped at gate 2");
         return;  // standard interface never had the problem — nothing to do
     }
 
     UIViewController* vc = nfbSwapOwningVC(pillView);
     if (!vc) {
+        NFBDebugLog(@"[p21] swap apply: stopped at gate 3");
         return;
     }
 
@@ -329,10 +334,12 @@ static void nfbSwapApply(UIView* pillView) {
         }
         if (hasTrailing) {
             // Only ours is installed — nothing to swap on this pass.
+            NFBDebugLog(@"[p21] swap apply: stopped at gate 4");
             return;
         }
     }
     if (!original) {
+        NFBDebugLog(@"[p21] swap apply: stopped at gate 5");
         return;  // items not attached yet; the next layout retries
     }
 
@@ -363,6 +370,7 @@ static void nfbSwapApply(UIView* pillView) {
                                      OBJC_ASSOCIATION_RETAIN_NONATOMIC);
             NFBDebugLog(@"swap: waiting for content - retrying");
         }
+        NFBDebugLog(@"[p21] swap apply: stopped at gate 6");
         return;  // content not built yet; the next layout retries
     }
 
@@ -420,6 +428,7 @@ static void nfbSwapApply(UIView* pillView) {
                             ? NSStringFromClass([original.primaryAction class])
                             : @"nil");
         }
+        NFBDebugLog(@"[p21] swap apply: stopped at gate 7");
         return;  // native kept, the probe has spoken
     }
     gNFBSwapMenu = menu;  // strong: it must outlive the mortal native button

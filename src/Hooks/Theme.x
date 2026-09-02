@@ -128,6 +128,12 @@ static void NFBApplyGlobalTint(void) {
 // immediately, without waiting for the title view to be rebuilt (= restart).
 static __weak UIImageView* NFBTopBarLogoView;
 
+// Read by the layer-animation hook in NavBarIcons.x, which has to know which
+// image view is the logo to keep the glass vibrancy filter off it.
+UIImageView* NFBTopBarLogoViewCurrent(void) {
+    return NFBTopBarLogoView;
+}
+
 // In Liquid Glass the title plugin returns a CONTAINER, not the image view
 // itself. Find the image view wherever it sits in the returned hierarchy.
 static UIImageView* NFBFindLogoImageView(UIView* root) {
@@ -175,6 +181,12 @@ static BOOL NFBAccentIsActive(void) {
     // Fresh install (option 0, nothing picked yet) defaults to Twitter blue as the
     // active accent — UNLESS the user reset (which reverts to native/black).
     return ![defs boolForKey:@"nfb_color_reset_done"];
+}
+
+// Read by NavBarIcons.x, whose layer-animation hook keeps the glass vibrancy
+// filter off the tab bar only while a themed bar was asked for.
+BOOL NFBThemedTabBarWanted(void) {
+    return [BHTSettings boolForKey:@"tab_bar_theming"] && NFBAccentIsActive();
 }
 
 // Twitter's own logo colour, read raw so the tweak's accent hooks don't repaint it.
@@ -244,34 +256,62 @@ static void nfbP21DumpChrome(UIView* root) {
                 lines.count ? [lines componentsJoinedByString:@"  //  "] : @"(none matched)");
 }
 
+static const void* kNFBLogoOriginalKey = &kNFBLogoOriginalKey;
+static const void* kNFBLogoBakedKey = &kNFBLogoBakedKey;
+
+// 12.21 on iOS 27: the navigation bar reapplies its own tintColor to the title
+// control after ours, and its glass vibrancy filter recolours on top of that.
+// Measured in a capture: template image, tint back to the app's text colour.
+// So the colour is baked into the image itself and served AlwaysOriginal, which
+// neither a tint nor a filter can change. The untouched image is kept so the
+// logo can be handed back when the option is off.
 static void NFBApplyLogoTint(UIImageView* logoView) {
-    nfbP21Once(@"logo", ^{
-      return [NSString stringWithFormat:
-                 @"logo tint CALLED | view=%@ image=%@ mode=%ld | setting=%d accentActive=%d",
-                 NSStringFromClass([logoView class]), logoView.image ? @"yes" : @"nil",
-                 (long)logoView.image.renderingMode,
-                 [BHTSettings boolForKey:@"color_twitter_icon_in_top_bar"], NFBAccentIsActive()];
-    });
-    if (!logoView.image) {
+    UIImage* current = logoView.image;
+    if (!current) {
         return;
+    }
+    NFBRegisterLogoView(logoView);
+    UIImage* original = objc_getAssociatedObject(logoView, kNFBLogoOriginalKey);
+    UIImage* baked = objc_getAssociatedObject(logoView, kNFBLogoBakedKey);
+    if (!original || (current != original && current != baked)) {
+        // A new image from the app: remember it as the one to paint from.
+        original = current;
+        objc_setAssociatedObject(logoView, kNFBLogoOriginalKey, original,
+                                 OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        baked = nil;
+        objc_setAssociatedObject(logoView, kNFBLogoBakedKey, nil,
+                                 OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     }
     UIColor* target = nil;
     if ([BHTSettings boolForKey:@"color_twitter_icon_in_top_bar"] && NFBAccentIsActive()) {
         target = NFBBrandAccentColor();
     }
+    if (logoView.layer.filters.count) {
+        logoView.layer.filters = nil;
+    }
     if (!target) {
-        target = NFBRawLogoColor() ?: [UIColor labelColor];
+        if (current != original) {
+            logoView.image = original;
+        }
+        return;
     }
-    if (logoView.image.renderingMode != UIImageRenderingModeAlwaysTemplate) {
-        logoView.image =
-            [logoView.image imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate];
+    if (!baked) {
+        baked = NFBPaintedGlyph(original, target);
+        objc_setAssociatedObject(logoView, kNFBLogoBakedKey, baked,
+                                 OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        NFBDebugLog(@"[p21] logo: colour baked into the image");
     }
-    if (![logoView.tintColor isEqual:target]) {
-        logoView.tintColor = target;
+    if (current != baked) {
+        logoView.image = baked;
     }
 }
 
 static void NFBRetintRegisteredLogos(void) {
+    // The baked copy is tied to one colour; a new accent starts over.
+    for (UIImageView* logo in NFBLogoRegistry) {
+        objc_setAssociatedObject(logo, kNFBLogoBakedKey, nil,
+                                 OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    }
     for (UIImageView* logo in NFBLogoRegistry) {
         NFBApplyLogoTint(logo);
     }
@@ -343,6 +383,22 @@ static BOOL NFBIsTopBarContainer(UIView* view) {
     }
     NSString* name = NSStringFromClass([view class]);
     return [name containsString:@"NavigationBar"] || [name containsString:@"TopBar"];
+}
+
+// Every image view under a title control, painted. The title control is the
+// only place the bar puts a title image, so the reach is exactly the logo.
+static void NFBBakeTitleControlLogos(UIView* root) {
+    if ([NSStringFromClass([root class]) containsString:@"NavigationBarTitleControl"]) {
+        EnumerateSubviewsRecursively(root, ^(UIView* view) {
+          if ([view isKindOfClass:[UIImageView class]]) {
+              NFBApplyLogoTint((UIImageView*)view);
+          }
+        });
+        return;
+    }
+    for (UIView* sub in root.subviews) {
+        NFBBakeTitleControlLogos(sub);
+    }
 }
 
 static void NFBRetintTemplateLogos(UIView* root) {
@@ -431,9 +487,65 @@ static void NFBApplyTabBarAccent(UITabBar* bar) {
     }
 }
 
+// 12.21: the tab bar is XNavigation.TabBarView, a Swift view, and the app no
+// longer mounts a UITabBar at all - the UITabBar hooks below never fire on this
+// build. The view exposes nothing of its items, so the accent is set as the
+// view's tintColor, which template icons inherit, and the glass vibrancy filter
+// is kept off it the way it is kept off the logo. Measured against the binary:
+// the native-tab-bar path was removed from T1TabBarViewController in 12.21.
+static Class NFBXTabBarViewClass(void) {
+    static Class cls;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+      cls = NSClassFromString(@"_TtC11XNavigation10TabBarView");
+    });
+    return cls;
+}
+
+static void NFBApplyXTabBarAccent(UIView* bar) {
+    BOOL active = [BHTSettings boolForKey:@"tab_bar_theming"] && NFBAccentIsActive();
+    UIColor* accent = active ? NFBBrandAccentColor() : nil;
+    if (![bar.tintColor isEqual:accent]) {
+        bar.tintColor = accent;
+    }
+    if (bar.layer.filters.count) {
+        bar.layer.filters = nil;
+    }
+    // TEMPORARY probe: the bar's tree, once, so the precise version can be
+    // written against what is actually inside.
+    static BOOL dumped = NO;
+    if (!dumped) {
+        dumped = YES;
+        NSMutableArray* lines = [NSMutableArray array];
+        EnumerateSubviewsRecursively(bar, ^(UIView* view) {
+          if (lines.count >= 24) {
+              return;
+          }
+          NSString* extra = @"";
+          if ([view isKindOfClass:[UIImageView class]]) {
+              UIImageView* iv = (UIImageView*)view;
+              extra = [NSString stringWithFormat:@" img mode=%ld tint=%@ filters=%lu",
+                                                 (long)iv.image.renderingMode,
+                                                 iv.tintColor ? @"set" : @"nil",
+                                                 (unsigned long)iv.layer.filters.count];
+          }
+          [lines addObject:[NSString stringWithFormat:@"%@%@",
+                                                      NSStringFromClass([view class]), extra]];
+        });
+        NFBDebugLog(@"[p21] XNavigation tab bar | active=%d | tree: %@", active,
+                    [lines componentsJoinedByString:@"  //  "]);
+    }
+}
+
 static void NFBSweepNativeTabBars(UIView* root, UIColor* accent) {
     if ([root isKindOfClass:[UITabBar class]]) {
         NFBApplyTabBarAccent((UITabBar*)root);
+        [root setNeedsLayout];
+        return;
+    }
+    Class xBar = NFBXTabBarViewClass();
+    if (xBar && [root isKindOfClass:xBar]) {
+        NFBApplyXTabBarAccent(root);
         [root setNeedsLayout];
         return;
     }
@@ -1133,6 +1245,46 @@ static UIColor* tabItemColor(BOOL selected) {
     return selected ? CurrentAccentColor() : [UIColor secondaryLabelColor];
 }
 
+static const void* kNFBTabOriginalKey = &kNFBTabOriginalKey;
+static const void* kNFBTabBakedKey = &kNFBTabBakedKey;
+static const void* kNFBTabColourKey = &kNFBTabColourKey;
+
+// Same trick as the logo: the colour lives in the pixels, so no tint and no
+// vibrancy filter downstream can undo it. The untouched image is kept so the
+// icon can be handed back when the option goes off.
+static void NFBBakeTabIcon(UIImageView* icon, UIColor* colour) {
+    UIImage* current = icon.image;
+    if (!current || !colour) {
+        return;
+    }
+    UIImage* original = objc_getAssociatedObject(icon, kNFBTabOriginalKey);
+    UIImage* baked = objc_getAssociatedObject(icon, kNFBTabBakedKey);
+    UIColor* bakedColour = objc_getAssociatedObject(icon, kNFBTabColourKey);
+    if (!original || (current != original && current != baked)) {
+        original = current;
+        objc_setAssociatedObject(icon, kNFBTabOriginalKey, original,
+                                 OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        baked = nil;
+    }
+    if (!baked || ![bakedColour isEqual:colour]) {
+        baked = NFBPaintedGlyph(original, colour);
+        objc_setAssociatedObject(icon, kNFBTabBakedKey, baked,
+                                 OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        objc_setAssociatedObject(icon, kNFBTabColourKey, colour,
+                                 OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    }
+    if (icon.image != baked) {
+        icon.image = baked;
+    }
+}
+
+static void NFBRestoreTabIcon(UIImageView* icon) {
+    UIImage* original = objc_getAssociatedObject(icon, kNFBTabOriginalKey);
+    if (original && icon.image != original) {
+        icon.image = original;
+    }
+}
+
 %hook T1TabView
 
 - (void)_t1_updateImageViewAnimated:(BOOL)animated {
@@ -1151,6 +1303,20 @@ static UIColor* tabItemColor(BOOL selected) {
     updatingTabIconColor = NO;
 
     %orig(animated);
+
+    // 12.21: the tab icon arrives rendered AlwaysOriginal (measured in a
+    // capture: mode=1 with the tint set and ignored), so the colour set above
+    // never reaches it. Rendering it as a template lets the tint through again.
+    // 12.21: setting iconColor no longer reaches the icon, and a tintColor is
+    // replaced by the app's own right after. Measured in a capture: template
+    // image, tint back to the system grey and to Twitter blue on the selected
+    // tab. So the colour is baked into the image, served AlwaysOriginal, which
+    // nothing downstream can repaint.
+    if ([BHTSettings boolForKey:@"tab_bar_theming"]) {
+        NFBBakeTabIcon(self.imageView, tabItemColor(self.selected));
+    } else {
+        NFBRestoreTabIcon(self.imageView);
+    }
 }
 
 - (void)_t1_updateTitleLabel {
@@ -1202,6 +1368,19 @@ static UIColor* tabItemColor(BOOL selected) {
 - (UIView*)titleView {
     UIView* titleView = %orig;
     UIImageView* logo = NFBFindLogoImageView(titleView);
+    // iOS 27 does not put the handed-over view on screen: it builds its own
+    // image view inside _UINavigationBarTitleControl. Measured in a capture -
+    // two image views, ours hidden, the visible one tinted by the bar. The
+    // sweep below runs after the bar has built that chain.
+    dispatch_async(dispatch_get_main_queue(), ^{
+      UIView* bar = titleView;
+      while (bar && ![NSStringFromClass([bar class]) containsString:@"NavigationBar"]) {
+          bar = bar.superview;
+      }
+      if (bar) {
+          NFBBakeTitleControlLogos(bar);
+      }
+    });
     nfbP21Once(@"titleview", ^{
       return [NSString stringWithFormat:
                  @"home titleView hook FIRED | titleView=%@ | logo found=%@ | subviews: %@",
@@ -1273,6 +1452,15 @@ static UITabBarAppearance* NFBPatchedTabBarAppearance(UITabBarAppearance* appear
     }
     return patched;
 }
+
+%hook _TtC11XNavigation10TabBarView
+
+- (void)layoutSubviews {
+    %orig;
+    NFBApplyXTabBarAccent((UIView*)self);
+}
+
+%end
 
 %hook UITabBar
 
