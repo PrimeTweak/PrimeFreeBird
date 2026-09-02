@@ -296,7 +296,7 @@ static void NFBApplyLogoTint(UIImageView* logoView) {
         return;
     }
     if (!baked) {
-        baked = NFBGreyGlyph(original, target);
+        baked = NFBPaintedGlyph(original, target);
         objc_setAssociatedObject(logoView, kNFBLogoBakedKey, baked,
                                  OBJC_ASSOCIATION_RETAIN_NONATOMIC);
         NFBDebugLog(@"[p21] logo: colour baked into the image");

@@ -57,7 +57,7 @@ static UIColor* NFBBarIconGrey(UITraitCollection* traits) {
 }
 
 // Repaints a glyph into a flat bitmap of the given colour.
-UIImage* NFBGreyGlyph(UIImage* source, UIColor* colour) {
+static UIImage* NFBGreyGlyph(UIImage* source, UIColor* colour) {
     if (!source || !colour) {
         return source;
     }
@@ -82,6 +82,12 @@ UIImage* NFBGreyGlyph(UIImage* source, UIColor* colour) {
     objc_setAssociatedObject(result, kNFBPaintedFlagKey, @YES,
                              OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     return result;
+}
+
+// Exported under its own name: QuickMutedWords.x carries a private copy of
+// NFBGreyGlyph, so that symbol cannot be made public without a clash.
+UIImage* NFBPaintedGlyph(UIImage* source, UIColor* colour) {
+    return NFBGreyGlyph(source, colour);
 }
 
 // Replaces the image of every glyph-sized image view under a view. The result

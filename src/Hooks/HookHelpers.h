@@ -81,7 +81,7 @@ BOOL NFBThemedTabBarWanted(void);
 
 // A copy of `source` painted in `colour` through its own alpha, rendered as
 // AlwaysOriginal so no tint can change it afterwards (NavBarIcons.x).
-UIImage* NFBGreyGlyph(UIImage* source, UIColor* colour);
+UIImage* NFBPaintedGlyph(UIImage* source, UIColor* colour);
 
 // Present the interactive "Log in to Web Session" screen. The completion fires with
 // YES once cookies were harvested and stored, NO if the user cancelled.
