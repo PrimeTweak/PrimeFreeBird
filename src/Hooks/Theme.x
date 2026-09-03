@@ -774,6 +774,20 @@ static void NFBApplyTabBarGlass(UIView* host) {
     }
 }
 
+// The app puts its own bar back when the reader changes tab or scrolls the
+// timeline, and neither of those goes through a host layout pass - measured:
+// the bar is clean at launch and the old one returns on the first tab change.
+// Every hook that fires on those two paths reapplies through here.
+static void NFBReapplyTabBarFrom(UIView* view) {
+    UIView* host = view;
+    while (host && ![NSStringFromClass([host class]) isEqualToString:@"T1TabBarHostView"]) {
+        host = host.superview;
+    }
+    if (host) {
+        NFBApplyTabBarGlass(host);
+    }
+}
+
 static void NFBSweepNativeTabBars(UIView* root, UIColor* accent) {
     if ([root isKindOfClass:[UITabBar class]]) {
         NFBApplyTabBarAccent((UITabBar*)root);
@@ -1459,6 +1473,9 @@ static NSArray* orderedTabEntries(NSArray* entries) {
 // The scroll-driven hide only reaches the tab bar as a collapse ratio, so
 // clamping it spares the deliberate hides (fullscreen media, immersive player).
 - (void)setTabBarCollapseRatio:(double)ratio {
+    // Fires while the timeline scrolls, the other path that brings the old bar
+    // back without a host layout.
+    NFBReapplyTabBarFrom(((UIViewController*)self).viewIfLoaded);
     if ([BHTSettings boolForKey:@"no_tab_bar_hiding"]) {
         %orig(0.0);
     } else {
@@ -1519,6 +1536,8 @@ static void NFBRestoreTabIcon(UIImageView* icon) {
 %hook T1TabView
 
 - (void)_t1_updateImageViewAnimated:(BOOL)animated {
+    // Fires on every selection change: the moment the app restores its own bar.
+    NFBReapplyTabBarFrom((UIView*)self);
     // setIconColor: re-enters this method, so swallow the inner call and let
     // %orig below render once with the new color
     if (updatingTabIconColor) {
@@ -1694,13 +1713,7 @@ static UITabBarAppearance* NFBPatchedTabBarAppearance(UITabBarAppearance* appear
 
 - (void)layoutSubviews {
     %orig;
-    UIView* host = (UIView*)self;
-    while (host && ![NSStringFromClass([host class]) isEqualToString:@"T1TabBarHostView"]) {
-        host = host.superview;
-    }
-    if (host) {
-        NFBApplyTabBarGlass(host);
-    }
+    NFBReapplyTabBarFrom((UIView*)self);
 }
 
 %end
