@@ -509,6 +509,10 @@ static UIColor* tabItemColor(BOOL selected) {
     return selected ? CurrentAccentColor() : [UIColor secondaryLabelColor];
 }
 
+static const void* kNFBTabOriginalKey = &kNFBTabOriginalKey;
+static const void* kNFBTabBakedKey = &kNFBTabBakedKey;
+static const void* kNFBTabColourKey = &kNFBTabColourKey;
+
 // Twitter 12.21 deleted T1LiquidGlassTabBarController and its whole native
 // tab-bar path (measured: absent from all 56 binaries, present in 12.15). Until
 // then, forcing UIDesignRequiresCompatibility to NO was enough - the app took
@@ -755,20 +759,20 @@ static void NFBApplyTabBarGlass(UIView* host) {
     // snapped back on the next pass. What the reader picked is whatever differs
     // from the index this code last pushed.
     NSUInteger appIndex = NFBSelectedTabIndex(tabs);
-    NSUInteger barIndex = native.selectedItem
-                              ? [native.items indexOfObject:native.selectedItem]
-                              : NSNotFound;
+    NSUInteger shownIndex = native.selectedItem
+                                ? [native.items indexOfObject:native.selectedItem]
+                                : NSNotFound;
     NSNumber* pushed = objc_getAssociatedObject(host, kNFBTabPushedKey);
-    BOOL readerMoved = barIndex != NSNotFound && barIndex != appIndex &&
-                       (pushed == nil || barIndex != pushed.unsignedIntegerValue);
+    BOOL readerMoved = shownIndex != NSNotFound && shownIndex != appIndex &&
+                       (pushed == nil || shownIndex != pushed.unsignedIntegerValue);
 
     if (readerMoved) {
-        NSString* rung = NFBRouteTabSelection(bar, tabs, barIndex);
-        NFBDebugLog(@"[tabbar] slide to %lu routed via %@", (unsigned long)barIndex,
+        NSString* rung = NFBRouteTabSelection(bar, tabs, shownIndex);
+        NFBDebugLog(@"[tabbar] slide to %lu routed via %@", (unsigned long)shownIndex,
                     rung ?: @"NOTHING");
         objc_setAssociatedObject(host, NFBTabRouteProbeKey(), rung ?: @"NONE",
                                  OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-        objc_setAssociatedObject(host, kNFBTabPushedKey, @(barIndex),
+        objc_setAssociatedObject(host, kNFBTabPushedKey, @(shownIndex),
                                  OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     } else if (appIndex != NSNotFound && appIndex < native.items.count &&
                native.selectedItem != native.items[appIndex]) {
@@ -1545,9 +1549,6 @@ static NSArray* orderedTabEntries(NSArray* entries) {
 static BOOL updatingTabIconColor = NO;
 
 
-static const void* kNFBTabOriginalKey = &kNFBTabOriginalKey;
-static const void* kNFBTabBakedKey = &kNFBTabBakedKey;
-static const void* kNFBTabColourKey = &kNFBTabColourKey;
 
 // Same trick as the logo: the colour lives in the pixels, so no tint and no
 // vibrancy filter downstream can undo it. The untouched image is kept so the

@@ -932,6 +932,15 @@ const void* NFBTabRouteProbeKey(void) {
 
 // Reports every property that can put an opaque pixel in front of the glass.
 // Written after five builds spent guessing one cause at a time.
+// Walks a view tree depth-first, handing each view and its depth to the block.
+static void NFBDescribeTree(UIView* view, NSInteger depth,
+                            void (^describe)(UIView*, NSInteger)) {
+    describe(view, depth);
+    for (UIView* sub in view.subviews) {
+        NFBDescribeTree(sub, depth + 1, describe);
+    }
+}
+
 void NFBReportTabBarStack(NSString* moment) {
     if (!NFBDebugIsRecording()) {
         return;
@@ -1015,17 +1024,9 @@ void NFBReportTabBarStack(NSString* moment) {
     };
 
     // Depth-first, in draw order, so the report reads the way the screen does.
-    // __block, not __weak: a weak reference to a stack block is undefined. The
-    // cycle it creates is broken on the next line, once the walk is done.
-    __block void (^walk)(UIView*, NSInteger) = nil;
-    walk = ^(UIView* view, NSInteger depth) {
-      describe(view, depth);
-      for (UIView* sub in view.subviews) {
-          walk(sub, depth + 1);
-      }
-    };
-    walk(host, 0);
-    walk = nil;
+    // Recursion through a function pointer rather than a self-capturing block:
+    // the block form warns about a retain cycle and needs clearing afterwards.
+    NFBDescribeTree(host, 0, describe);
 
     // The native bar, in detail: whether iOS grafted its own glass machinery on
     // (the _UILiquidLens / platter / floating-provider views), where it sits,
