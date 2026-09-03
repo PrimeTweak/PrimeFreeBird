@@ -503,27 +503,31 @@ static void NFBApplyTabBarAccent(UITabBar* bar) {
 // Twitter 12.21 deleted T1LiquidGlassTabBarController and its whole native
 // tab-bar path (measured: absent from all 56 binaries, present in 12.15). Until
 // then, forcing UIDesignRequiresCompatibility to NO was enough - the app took
-// its own native route and iOS glazed the bar itself. There is no switch left
-// to force, so the effect is rebuilt here with the recipe the Inbox pill uses.
+// its own native route and iOS glazed the bar itself.
 //
-// Anchored on TFNCustomTabBar, not on a colour or a size. Two earlier attempts
-// looked for the app's opaque panel: the first cleared its colour and lost the
-// race when the app repainted it, the second refused to build anything until
-// the panel was found - and the panel is still zero-height when the host lays
-// out, so nothing was ever built. The bar itself is always there and always
-// sized. Sitting just before it in its parent puts the glass over the white
-// panel and under the tab items.
-static const void* kNFBTabGlassKey = &kNFBTabGlassKey;
+// The route taken here is the one PrimeSenger uses on Messenger: a real UITabBar
+// standing outside any UITabBarController still gets the full iOS 26 treatment,
+// platter and capsule included. One difference decides the shape of this code -
+// Messenger hands out UITabBarItem objects and a viewForItem:/didTapButton:
+// pair, so that tweak can hide the host buttons and route the taps. Twitter
+// exposes none of that: no UITabBarItem anywhere, no viewForItem:, no tap
+// handler on the bar.
+//
+// So the bar here is decoration only. It carries no interaction, sits BEHIND
+// Twitter's own T1TabViews, and holds blank items whose sole job is to give the
+// capsule its geometry. Twitter's icons stay on top and keep receiving every
+// touch, which means a failure here costs the look, never the navigation.
+static const void* kNFBTabBarKey = &kNFBTabBarKey;
 static const void* kNFBTabHiddenKey = &kNFBTabHiddenKey;
 
 // The app's solid backdrop, found by colour alone - no size test, because this
 // runs from the host's layoutSubviews and the nested wrappers are not sized
-// yet. The hairline separators sit at alpha 0.80 and stay untouched, so the
-// bar keeps the edge the app drew.
+// yet. The hairline separators sit at alpha 0.80 and stay untouched.
 static NSArray<UIView*>* NFBTabBarBackdrops(UIView* host, UIView* skip) {
     NSMutableArray<UIView*>* found = [NSMutableArray array];
     EnumerateSubviewsRecursively(host, ^(UIView* sub) {
-      if (sub == skip || [sub isKindOfClass:[UIVisualEffectView class]]) {
+      if (sub == skip || [sub isKindOfClass:[UITabBar class]] ||
+          [sub isKindOfClass:[UIVisualEffectView class]]) {
           return;
       }
       UIColor* colour = sub.backgroundColor;
@@ -547,13 +551,40 @@ static UIView* NFBCustomTabBar(UIView* host) {
     return found;
 }
 
+// Twitter's tab views, in the order they sit on screen.
+static NSArray<UIView*>* NFBTabViews(UIView* bar) {
+    NSMutableArray<UIView*>* tabs = [NSMutableArray array];
+    EnumerateSubviewsRecursively(bar, ^(UIView* sub) {
+      if ([NSStringFromClass([sub class]) isEqualToString:@"T1TabView"]) {
+          [tabs addObject:sub];
+      }
+    });
+    [tabs sortUsingComparator:^NSComparisonResult(UIView* a, UIView* b) {
+      CGFloat ax = [a convertPoint:CGPointZero toView:bar].x;
+      CGFloat bx = [b convertPoint:CGPointZero toView:bar].x;
+      return ax < bx ? NSOrderedAscending : (ax > bx ? NSOrderedDescending : NSOrderedSame);
+    }];
+    return tabs;
+}
+
+// Which of Twitter's tabs is selected, or NSNotFound.
+static NSUInteger NFBSelectedTabIndex(NSArray<UIView*>* tabs) {
+    for (NSUInteger i = 0; i < tabs.count; i++) {
+        id tab = tabs[i];
+        if ([tab respondsToSelector:@selector(isSelected)] && [tab isSelected]) {
+            return i;
+        }
+    }
+    return NSNotFound;
+}
+
 static void NFBApplyTabBarGlass(UIView* host) {
-    UIVisualEffectView* glass = objc_getAssociatedObject(host, kNFBTabGlassKey);
+    UITabBar* native = objc_getAssociatedObject(host, kNFBTabBarKey);
 
     if (![BHTSettings boolForKey:@"enable_liquid_glass"]) {
-        if (glass) {
-            [glass removeFromSuperview];
-            objc_setAssociatedObject(host, kNFBTabGlassKey, nil,
+        if (native) {
+            [native removeFromSuperview];
+            objc_setAssociatedObject(host, kNFBTabBarKey, nil,
                                      OBJC_ASSOCIATION_RETAIN_NONATOMIC);
         }
         for (UIView* backdrop in objc_getAssociatedObject(host, kNFBTabHiddenKey)) {
@@ -567,61 +598,74 @@ static void NFBApplyTabBarGlass(UIView* host) {
     UIView* bar = NFBCustomTabBar(host);
     UIView* parent = bar.superview;
     if (!parent) {
-        NFBDebugLog(@"[tabglass] no CustomTabBar under %@ yet",
-                    NSStringFromClass([host class]));
+        return;  // Laid out later; the next pass will find it.
+    }
+    NSArray<UIView*>* tabs = NFBTabViews(bar);
+    if (tabs.count == 0) {
         return;
     }
 
-    if (!glass) {
-        Class glassClass = NSClassFromString(@"UIGlassEffect");
-        UIVisualEffect* effect = glassClass ? [[glassClass alloc] init] : nil;
-        if (!effect) {
-            effect = [UIBlurEffect effectWithStyle:
-                          UIBlurEffectStyleSystemChromeMaterial];
-        }
-        glass = [[UIVisualEffectView alloc] initWithEffect:effect];
-        glass.userInteractionEnabled = NO;
-        objc_setAssociatedObject(host, kNFBTabGlassKey, glass,
+    if (!native) {
+        native = [[UITabBar alloc] initWithFrame:parent.bounds];
+        // No interaction at all: Twitter's own tab views stay on top and keep
+        // every touch, so this can never take navigation away.
+        native.userInteractionEnabled = NO;
+        native.autoresizingMask =
+            UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+        objc_setAssociatedObject(host, kNFBTabBarKey, native,
                                  OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-        NFBDebugLog(@"[tabglass] %@ built for %@",
-                    glassClass ? @"UIGlassEffect" : @"material fallback",
-                    NSStringFromClass([parent class]));
+        NFBDebugLog(@"[tabbar] native UITabBar built for %@ (%lu tabs)",
+                    NSStringFromClass([parent class]), (unsigned long)tabs.count);
     }
 
-    // Re-seated on every pass: the app reorders its own subviews when it
-    // rebuilds the bar, and the glass has to stay directly under it.
-    NSUInteger glassIndex = [parent.subviews indexOfObject:glass];
+    // Blank items, one per tab: they give the capsule its width and position
+    // while Twitter's own icons remain the only ones drawn.
+    if (native.items.count != tabs.count) {
+        NSMutableArray<UITabBarItem*>* items = [NSMutableArray array];
+        for (NSUInteger i = 0; i < tabs.count; i++) {
+            UITabBarItem* item = [[UITabBarItem alloc] initWithTitle:nil
+                                                               image:nil
+                                                                 tag:(NSInteger)i];
+            [items addObject:item];
+        }
+        native.items = items;
+        NFBDebugLog(@"[tabbar] %lu blank item(s) installed", (unsigned long)items.count);
+    }
+
+    // Behind Twitter's bar, inside the same parent, re-seated on every pass:
+    // the app reorders its own subviews when it rebuilds.
+    NSUInteger nativeIndex = [parent.subviews indexOfObject:native];
     NSUInteger barIndex = [parent.subviews indexOfObject:bar];
-    // Compared as a pair, never with barIndex - 1: at index 0 that arithmetic
-    // wraps to NSNotFound and the misplacement reads as correct.
-    BOOL seated = glass.superview == parent && glassIndex != NSNotFound &&
-                  barIndex != NSNotFound && glassIndex + 1 == barIndex;
+    BOOL seated = native.superview == parent && nativeIndex != NSNotFound &&
+                  barIndex != NSNotFound && nativeIndex < barIndex;
     if (!seated) {
-        [glass removeFromSuperview];
-        [parent insertSubview:glass belowSubview:bar];
-        NFBDebugLog(@"[tabglass] seated below %@ at %lu/%lu",
+        [native removeFromSuperview];
+        [parent insertSubview:native belowSubview:bar];
+        NFBDebugLog(@"[tabbar] seated below %@ at %lu/%lu",
                     NSStringFromClass([bar class]),
-                    (unsigned long)[parent.subviews indexOfObject:glass],
+                    (unsigned long)[parent.subviews indexOfObject:native],
                     (unsigned long)parent.subviews.count);
     }
-    if (!CGRectEqualToRect(glass.frame, parent.bounds)) {
-        glass.frame = parent.bounds;
+    if (!CGRectEqualToRect(native.frame, parent.bounds)) {
+        native.frame = parent.bounds;
     }
 
-    // Hidden, not cleared. Glass samples what is behind it, so a solid backdrop
-    // left in place makes it render that solid colour - which is what the last
-    // build did, correctly seated and still white. Clearing the colour was
-    // tried first and lost: the app repaints it and no layout pass follows.
-    // `hidden` survives, because nothing in the app sets it back.
+    NSUInteger selected = NFBSelectedTabIndex(tabs);
+    if (selected != NSNotFound && selected < native.items.count &&
+        native.selectedItem != native.items[selected]) {
+        native.selectedItem = native.items[selected];
+    }
+
+    // The app's opaque backdrop is hidden, not cleared: glass samples what is
+    // behind it, and clearing the colour loses to the app's own repaint.
     NSMutableArray<UIView*>* hidden =
         objc_getAssociatedObject(host, kNFBTabHiddenKey) ?: [NSMutableArray array];
     NSUInteger before = hidden.count;
-    for (UIView* backdrop in NFBTabBarBackdrops(host, glass)) {
+    for (UIView* backdrop in NFBTabBarBackdrops(host, native)) {
         if (![hidden containsObject:backdrop]) {
             [hidden addObject:backdrop];
-            NFBDebugLog(@"[tabglass] backdrop hidden: %@ %@",
-                        NSStringFromClass([backdrop class]),
-                        backdrop.backgroundColor);
+            NFBDebugLog(@"[tabbar] backdrop hidden: %@",
+                        NSStringFromClass([backdrop class]));
         }
         backdrop.hidden = YES;
     }

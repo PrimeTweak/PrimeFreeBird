@@ -1021,6 +1021,78 @@ void NFBReportTabBarStack(NSString* moment) {
     walk(host, 0);
     walk = nil;
 
+    // The native bar, in detail: whether iOS grafted its own glass machinery on
+    // (the _UILiquidLens / platter / floating-provider views), where it sits,
+    // how many items it carries and which one is selected. If the capsule never
+    // appears, this is the line that says whether UIKit built it at all.
+    __block UITabBar* native = nil;
+    EnumerateSubviewsRecursively(host, ^(UIView* sub) {
+      if (!native && [sub isKindOfClass:[UITabBar class]]) {
+          native = (UITabBar*)sub;
+      }
+    });
+    if (!native) {
+        NFBDebugLog(@"[stack:%@] native UITabBar: ABSENT under the host", moment);
+    } else {
+        NSArray* siblings = native.superview.subviews;
+        NSUInteger sel = native.selectedItem
+                             ? [native.items indexOfObject:native.selectedItem]
+                             : NSNotFound;
+        NFBDebugLog(@"[stack:%@] native UITabBar %.0fx%.0f at %lu/%lu in %@ | items=%lu "
+                    @"selected=%@ hidden=%d alpha=%.2f interaction=%d",
+                    moment, native.bounds.size.width, native.bounds.size.height,
+                    (unsigned long)[siblings indexOfObject:native],
+                    (unsigned long)siblings.count,
+                    NSStringFromClass([native.superview class]),
+                    (unsigned long)native.items.count,
+                    sel == NSNotFound ? @"none" : @(sel),
+                    native.hidden, native.alpha, native.isUserInteractionEnabled);
+
+        NSMutableArray* inside = [NSMutableArray array];
+        EnumerateSubviewsRecursively(native, ^(UIView* sub) {
+          if (inside.count < 14) {
+              [inside addObject:[NSString stringWithFormat:@"%@ %.0fx%.0f",
+                                                           NSStringFromClass([sub class]),
+                                                           sub.bounds.size.width,
+                                                           sub.bounds.size.height]];
+          }
+        });
+        NFBDebugLog(@"[stack:%@] native tree: %@", moment,
+                    inside.count ? [inside componentsJoinedByString:@" // "] : @"(empty)");
+
+        NSString* appearance = @"nil";
+        if (native.standardAppearance) {
+            appearance = [NSString
+                stringWithFormat:@"bg=%@ effect=%@",
+                                 native.standardAppearance.backgroundColor ?: (id)@"nil",
+                                 native.standardAppearance.backgroundEffect
+                                     ? NSStringFromClass(
+                                           [native.standardAppearance.backgroundEffect class])
+                                     : @"nil"];
+        }
+        NFBDebugLog(@"[stack:%@] native appearance: %@", moment, appearance);
+    }
+
+    // Twitter's own tab views: still on top, still touchable, and which one the
+    // app treats as selected - the value the capsule is meant to follow.
+    NSMutableArray* twitterTabs = [NSMutableArray array];
+    EnumerateSubviewsRecursively(host, ^(UIView* sub) {
+      if ([NSStringFromClass([sub class]) isEqualToString:@"T1TabView"] &&
+          twitterTabs.count < 6) {
+          BOOL sel = [sub respondsToSelector:@selector(isSelected)] &&
+                     [(id)sub isSelected];
+          [twitterTabs addObject:[NSString stringWithFormat:@"%@%@%@",
+                                                            sel ? @"[SEL]" : @"",
+                                                            sub.hidden ? @"HIDDEN" : @"",
+                                                            sub.isUserInteractionEnabled
+                                                                ? @"tappable"
+                                                                : @"INERT"]];
+      }
+    });
+    NFBDebugLog(@"[stack:%@] twitter tabs: %@", moment,
+                twitterTabs.count ? [twitterTabs componentsJoinedByString:@" "]
+                                  : @"(none found)");
+
     NFBDebugLog(@"[stack:%@] host.clipsToBounds=%d hostAlpha=%.2f windowLevel=%.0f", moment,
                 host.clipsToBounds, host.alpha, window.windowLevel);
     NFBDebugLog(@"[stack:%@] glass setting=%d, accent active=%d", moment,
