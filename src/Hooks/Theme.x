@@ -803,9 +803,12 @@ static void NFBApplyTabBarGlass(UIView* host) {
         hide(sub);
     }
     EnumerateSubviewsRecursively(host, ^(UIView* sub) {
+      // The native bar, its own tree, the app bar and its tree, and any view
+      // the native bar actually sits inside. The parent used to be spared
+      // outright, which left the container holding the white panel untouched -
+      // measured: `UIView 440x83` unhidden, with `bg=(1,1,1,1)` beneath it.
       if (sub == native || [sub isDescendantOfView:native] || sub == bar ||
-          [sub isDescendantOfView:bar] || sub == parent ||
-          [native isDescendantOfView:sub]) {
+          [sub isDescendantOfView:bar] || [native isDescendantOfView:sub]) {
           return;
       }
       UIColor* colour = sub.backgroundColor;
