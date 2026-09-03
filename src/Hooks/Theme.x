@@ -501,6 +501,14 @@ static void NFBApplyTabBarAccent(UITabBar* bar) {
 }
 
 
+// Defined in ThemeColor; declared here at file scope because tabItemColor now
+// sits above the function that used to carry the local declaration.
+extern UIColor* CurrentAccentColor(void);
+
+static UIColor* tabItemColor(BOOL selected) {
+    return selected ? CurrentAccentColor() : [UIColor secondaryLabelColor];
+}
+
 // Twitter 12.21 deleted T1LiquidGlassTabBarController and its whole native
 // tab-bar path (measured: absent from all 56 binaries, present in 12.15). Until
 // then, forcing UIDesignRequiresCompatibility to NO was enough - the app took
@@ -521,6 +529,7 @@ static void NFBApplyTabBarAccent(UITabBar* bar) {
 static const void* kNFBTabBarKey = &kNFBTabBarKey;
 static const void* kNFBTabHiddenKey = &kNFBTabHiddenKey;
 static const void* kNFBTabBridgeKey = &kNFBTabBridgeKey;
+static const void* kNFBTabPushedKey = &kNFBTabPushedKey;
 // Shared with the debugger, which reports the rung the last tap used.
 extern const void* NFBTabRouteProbeKey(void);
 
@@ -690,7 +699,13 @@ static void NFBApplyTabBarGlass(UIView* host) {
             UIImage* image = nil;
             NSString* title = nil;
             if ([tab respondsToSelector:@selector(imageView)]) {
-                image = [(UIImageView*)[tab imageView] image];
+                UIImageView* icon = (UIImageView*)[tab imageView];
+                // The untouched image, never the baked one: the baked copy
+                // carries whatever colour that tab held at install time and
+                // never changes again, which is why the icons came out black,
+                // grey and blue at once. A clean template lets UIKit colour
+                // selected and unselected itself, the way a real bar does.
+                image = objc_getAssociatedObject(icon, kNFBTabOriginalKey) ?: icon.image;
             }
             if ([tab respondsToSelector:@selector(title)]) {
                 title = [tab title];
@@ -705,6 +720,16 @@ static void NFBApplyTabBarGlass(UIView* host) {
         native.items = items;
         NFBDebugLog(@"[tabbar] %lu item(s) installed from the app's own tabs",
                     (unsigned long)items.count);
+    }
+    // UIKit paints selected and unselected on its own once it is told which
+    // colours to use, so nothing here has to follow the selection.
+    UIColor* accent = tabItemColor(YES);
+    if (![native.tintColor isEqual:accent]) {
+        native.tintColor = accent;
+    }
+    UIColor* resting = tabItemColor(NO);
+    if (![native.unselectedItemTintColor isEqual:resting]) {
+        native.unselectedItemTintColor = resting;
     }
 
     // On top of the host bar, re-seated every pass: the bar has to receive the
@@ -725,10 +750,31 @@ static void NFBApplyTabBarGlass(UIView* host) {
         native.frame = parent.bounds;
     }
 
-    NSUInteger selected = NFBSelectedTabIndex(tabs);
-    if (selected != NSNotFound && selected < native.items.count &&
-        native.selectedItem != native.items[selected]) {
-        native.selectedItem = native.items[selected];
+    // Selection, both ways. The long-press-and-slide sets selectedItem without
+    // calling the delegate, so the tap route alone never sees it and the app
+    // snapped back on the next pass. What the reader picked is whatever differs
+    // from the index this code last pushed.
+    NSUInteger appIndex = NFBSelectedTabIndex(tabs);
+    NSUInteger barIndex = native.selectedItem
+                              ? [native.items indexOfObject:native.selectedItem]
+                              : NSNotFound;
+    NSNumber* pushed = objc_getAssociatedObject(host, kNFBTabPushedKey);
+    BOOL readerMoved = barIndex != NSNotFound && barIndex != appIndex &&
+                       (pushed == nil || barIndex != pushed.unsignedIntegerValue);
+
+    if (readerMoved) {
+        NSString* rung = NFBRouteTabSelection(bar, tabs, barIndex);
+        NFBDebugLog(@"[tabbar] slide to %lu routed via %@", (unsigned long)barIndex,
+                    rung ?: @"NOTHING");
+        objc_setAssociatedObject(host, NFBTabRouteProbeKey(), rung ?: @"NONE",
+                                 OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        objc_setAssociatedObject(host, kNFBTabPushedKey, @(barIndex),
+                                 OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    } else if (appIndex != NSNotFound && appIndex < native.items.count &&
+               native.selectedItem != native.items[appIndex]) {
+        native.selectedItem = native.items[appIndex];
+        objc_setAssociatedObject(host, kNFBTabPushedKey, @(appIndex),
+                                 OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     }
 
     // The app's own icons and its opaque backdrop are hidden, not cleared: the
@@ -772,6 +818,15 @@ static void NFBApplyTabBarGlass(UIView* host) {
         NFBDebugLog(@"[tabbar] %lu view(s) hidden behind the native bar",
                     (unsigned long)hidden.count);
     }
+}
+
+// True when a native bar is installed for the host above this view.
+static BOOL NFBHostHasNativeBar(UIView* view) {
+    UIView* host = view;
+    while (host && ![NSStringFromClass([host class]) isEqualToString:@"T1TabBarHostView"]) {
+        host = host.superview;
+    }
+    return host && objc_getAssociatedObject(host, kNFBTabBarKey) != nil;
 }
 
 // The app puts its own bar back when the reader changes tab or scrolls the
@@ -1489,9 +1544,6 @@ static NSArray* orderedTabEntries(NSArray* entries) {
 
 static BOOL updatingTabIconColor = NO;
 
-static UIColor* tabItemColor(BOOL selected) {
-    return selected ? CurrentAccentColor() : [UIColor secondaryLabelColor];
-}
 
 static const void* kNFBTabOriginalKey = &kNFBTabOriginalKey;
 static const void* kNFBTabBakedKey = &kNFBTabBakedKey;
@@ -1562,7 +1614,10 @@ static void NFBRestoreTabIcon(UIImageView* icon) {
     // image, tint back to the system grey and to Twitter blue on the selected
     // tab. So the colour is baked into the image, served AlwaysOriginal, which
     // nothing downstream can repaint.
-    if ([BHTSettings boolForKey:@"tab_bar_theming"]) {
+    // Nothing is baked while the native bar is up: those icons are hidden, and
+    // baking froze the colour the native items were later built from.
+    BOOL nativeBarUp = NFBHostHasNativeBar((UIView*)self);
+    if (!nativeBarUp && [BHTSettings boolForKey:@"tab_bar_theming"]) {
         NFBBakeTabIcon(self.imageView, tabItemColor(self.selected));
     } else {
         NFBRestoreTabIcon(self.imageView);
