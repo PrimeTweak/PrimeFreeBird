@@ -743,16 +743,26 @@ static void NFBApplyTabBarGlass(UIView* host) {
       view.hidden = YES;
     };
     hide(bar);
+    // Every sibling that draws something, not only the opaque ones: the app's
+    // own capsule and its faded icons showed through the glass because they
+    // carry a translucent fill, and the alpha > 0.9 test walked past them.
+    for (UIView* sub in parent.subviews) {
+        if (sub == native || sub == bar) {
+            continue;
+        }
+        hide(sub);
+    }
     EnumerateSubviewsRecursively(host, ^(UIView* sub) {
       if (sub == native || [sub isDescendantOfView:native] || sub == bar ||
-          [sub isDescendantOfView:bar]) {
+          [sub isDescendantOfView:bar] || sub == parent ||
+          [native isDescendantOfView:sub]) {
           return;
       }
       UIColor* colour = sub.backgroundColor;
       CGFloat alpha = 0;
       if (colour && ([colour getWhite:NULL alpha:&alpha] ||
                      [colour getRed:NULL green:NULL blue:NULL alpha:&alpha]) &&
-          alpha > 0.9) {
+          alpha > 0.05) {
           hide(sub);
       }
     });
@@ -1673,6 +1683,24 @@ static UITabBarAppearance* NFBPatchedTabBarAppearance(UITabBarAppearance* appear
 - (void)layoutSubviews {
     %orig;
     NFBApplyTabBarGlass((UIView*)self);
+}
+
+%end
+
+// The app lays its own bar out without the host taking part, and puts back what
+// was hidden while doing it. Reapplying from here closes that gap - the same
+// hook point PrimeSenger uses on Messenger's own bar.
+%hook TFNCustomTabBar
+
+- (void)layoutSubviews {
+    %orig;
+    UIView* host = (UIView*)self;
+    while (host && ![NSStringFromClass([host class]) isEqualToString:@"T1TabBarHostView"]) {
+        host = host.superview;
+    }
+    if (host) {
+        NFBApplyTabBarGlass(host);
+    }
 }
 
 %end
