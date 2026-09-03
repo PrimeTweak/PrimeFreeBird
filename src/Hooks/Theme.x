@@ -4,6 +4,7 @@
 //
 
 #import <objc/runtime.h>
+#import <objc/message.h>
 #import "HookHelpers.h"
 #import "Core/BHTBundle.h"
 #import "Debug/NFBDebugger.h"
@@ -505,41 +506,23 @@ static void NFBApplyTabBarAccent(UITabBar* bar) {
 // then, forcing UIDesignRequiresCompatibility to NO was enough - the app took
 // its own native route and iOS glazed the bar itself.
 //
-// The route taken here is the one PrimeSenger uses on Messenger: a real UITabBar
-// standing outside any UITabBarController still gets the full iOS 26 treatment,
-// platter and capsule included. One difference decides the shape of this code -
-// Messenger hands out UITabBarItem objects and a viewForItem:/didTapButton:
-// pair, so that tweak can hide the host buttons and route the taps. Twitter
-// exposes none of that: no UITabBarItem anywhere, no viewForItem:, no tap
-// handler on the bar.
+// Rebuilt the way PrimeSenger does it on Messenger: a real UITabBar standing
+// outside any UITabBarController still receives the full iOS 26 treatment.
+// It has to be the real, interactive control - the long-press-and-slide that
+// moves between tabs belongs to UITabBar's own gesture machinery, and a
+// decorative copy with interaction switched off loses it.
 //
-// So the bar here is decoration only. It carries no interaction, sits BEHIND
-// Twitter's own T1TabViews, and holds blank items whose sole job is to give the
-// capsule its geometry. Twitter's icons stay on top and keep receiving every
-// touch, which means a failure here costs the look, never the navigation.
+// Messenger hands out UITabBarItem objects plus viewForItem:/didTapButton:, so
+// that tweak routes taps in one line. Twitter exposes none of that, so the
+// selection is routed through a cascade, tried in order and reported: the
+// app's own selectTabAtIndex:, then setSelectedIndex:, then the tab's host
+// view as a control, then its gesture recognisers. If every rung fails the
+// host bar is handed straight back, so navigation is never lost.
 static const void* kNFBTabBarKey = &kNFBTabBarKey;
 static const void* kNFBTabHiddenKey = &kNFBTabHiddenKey;
-
-// The app's solid backdrop, found by colour alone - no size test, because this
-// runs from the host's layoutSubviews and the nested wrappers are not sized
-// yet. The hairline separators sit at alpha 0.80 and stay untouched.
-static NSArray<UIView*>* NFBTabBarBackdrops(UIView* host, UIView* skip) {
-    NSMutableArray<UIView*>* found = [NSMutableArray array];
-    EnumerateSubviewsRecursively(host, ^(UIView* sub) {
-      if (sub == skip || [sub isKindOfClass:[UITabBar class]] ||
-          [sub isKindOfClass:[UIVisualEffectView class]]) {
-          return;
-      }
-      UIColor* colour = sub.backgroundColor;
-      CGFloat alpha = 0;
-      if (colour && ([colour getWhite:NULL alpha:&alpha] ||
-                     [colour getRed:NULL green:NULL blue:NULL alpha:&alpha]) &&
-          alpha > 0.9) {
-          [found addObject:sub];
-      }
-    });
-    return found;
-}
+static const void* kNFBTabBridgeKey = &kNFBTabBridgeKey;
+// Shared with the debugger, which reports the rung the last tap used.
+extern const void* NFBTabRouteProbeKey(void);
 
 static UIView* NFBCustomTabBar(UIView* host) {
     __block UIView* found = nil;
@@ -551,7 +534,7 @@ static UIView* NFBCustomTabBar(UIView* host) {
     return found;
 }
 
-// Twitter's tab views, in the order they sit on screen.
+// Twitter's tab views, left to right.
 static NSArray<UIView*>* NFBTabViews(UIView* bar) {
     NSMutableArray<UIView*>* tabs = [NSMutableArray array];
     EnumerateSubviewsRecursively(bar, ^(UIView* sub) {
@@ -567,7 +550,6 @@ static NSArray<UIView*>* NFBTabViews(UIView* bar) {
     return tabs;
 }
 
-// Which of Twitter's tabs is selected, or NSNotFound.
 static NSUInteger NFBSelectedTabIndex(NSArray<UIView*>* tabs) {
     for (NSUInteger i = 0; i < tabs.count; i++) {
         id tab = tabs[i];
@@ -578,6 +560,86 @@ static NSUInteger NFBSelectedTabIndex(NSArray<UIView*>* tabs) {
     return NSNotFound;
 }
 
+// First responder up the chain that answers `sel`, starting at the view.
+static id NFBResponderAnswering(UIView* view, SEL sel) {
+    UIResponder* candidate = view;
+    while (candidate) {
+        if ([candidate respondsToSelector:sel]) {
+            return candidate;
+        }
+        candidate = candidate.nextResponder;
+    }
+    return nil;
+}
+
+// Selection routing, rung by rung. Returns the name of the rung that worked.
+static NSString* NFBRouteTabSelection(UIView* hostBar, NSArray<UIView*>* tabs,
+                                      NSUInteger index) {
+    if (index >= tabs.count) {
+        return nil;
+    }
+    UIView* tab = tabs[index];
+
+    id target = NFBResponderAnswering(hostBar, @selector(selectTabAtIndex:));
+    if (target) {
+        ((void (*)(id, SEL, NSInteger))objc_msgSend)(target, @selector(selectTabAtIndex:),
+                                                     (NSInteger)index);
+        return @"selectTabAtIndex:";
+    }
+    target = NFBResponderAnswering(hostBar, @selector(setSelectedIndex:));
+    if (target) {
+        ((void (*)(id, SEL, NSInteger))objc_msgSend)(target, @selector(setSelectedIndex:),
+                                                     (NSInteger)index);
+        return @"setSelectedIndex:";
+    }
+    // The tab's own host view, if the app made it a control.
+    for (UIView* up = tab; up && up != hostBar.superview; up = up.superview) {
+        if ([up isKindOfClass:[UIControl class]]) {
+            [(UIControl*)up sendActionsForControlEvents:UIControlEventTouchUpInside];
+            return @"UIControl";
+        }
+    }
+    // No further rung is attempted. Firing a gesture recogniser by hand is not
+    // something UIKit supports, and a wrong guess here would leave the reader
+    // with a bar that does not navigate. The caller hands the app's bar back
+    // instead, and the probe reports what the tab chain does expose.
+    return nil;
+}
+
+@interface NFBTabBarBridge : NSObject <UITabBarDelegate>
+@property (nonatomic, weak) UIView* host;
+@end
+
+@implementation NFBTabBarBridge
+
+- (void)tabBar:(UITabBar*)tabBar didSelectItem:(UITabBarItem*)item {
+    UIView* host = self.host;
+    UIView* bar = host ? NFBCustomTabBar(host) : nil;
+    if (!bar) {
+        return;
+    }
+    NSArray<UIView*>* tabs = NFBTabViews(bar);
+    NSUInteger index = (NSUInteger)item.tag;
+    NSString* rung = NFBRouteTabSelection(bar, tabs, index);
+    objc_setAssociatedObject(host, NFBTabRouteProbeKey(), rung ?: @"NONE",
+                             OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    NFBDebugLog(@"[tabbar] tab %lu routed via %@", (unsigned long)index, rung ?: @"NOTHING");
+    if (rung) {
+        return;
+    }
+    // Nothing worked: give the app its own bar back rather than leave the
+    // reader with a tab bar that does not navigate.
+    for (UIView* hidden in objc_getAssociatedObject(host, kNFBTabHiddenKey)) {
+        hidden.hidden = NO;
+    }
+    objc_setAssociatedObject(host, kNFBTabHiddenKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    [tabBar removeFromSuperview];
+    objc_setAssociatedObject(host, kNFBTabBarKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    NFBDebugLog(@"[tabbar] FAILSAFE: no route found, host bar restored");
+}
+
+@end
+
 static void NFBApplyTabBarGlass(UIView* host) {
     UITabBar* native = objc_getAssociatedObject(host, kNFBTabBarKey);
 
@@ -586,9 +648,11 @@ static void NFBApplyTabBarGlass(UIView* host) {
             [native removeFromSuperview];
             objc_setAssociatedObject(host, kNFBTabBarKey, nil,
                                      OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+            objc_setAssociatedObject(host, kNFBTabBridgeKey, nil,
+                                     OBJC_ASSOCIATION_RETAIN_NONATOMIC);
         }
-        for (UIView* backdrop in objc_getAssociatedObject(host, kNFBTabHiddenKey)) {
-            backdrop.hidden = NO;
+        for (UIView* hidden in objc_getAssociatedObject(host, kNFBTabHiddenKey)) {
+            hidden.hidden = NO;
         }
         objc_setAssociatedObject(host, kNFBTabHiddenKey, nil,
                                  OBJC_ASSOCIATION_RETAIN_NONATOMIC);
@@ -597,51 +661,62 @@ static void NFBApplyTabBarGlass(UIView* host) {
 
     UIView* bar = NFBCustomTabBar(host);
     UIView* parent = bar.superview;
-    if (!parent) {
+    NSArray<UIView*>* tabs = bar ? NFBTabViews(bar) : nil;
+    if (!parent || tabs.count == 0) {
         return;  // Laid out later; the next pass will find it.
-    }
-    NSArray<UIView*>* tabs = NFBTabViews(bar);
-    if (tabs.count == 0) {
-        return;
     }
 
     if (!native) {
+        NFBTabBarBridge* bridge = [[NFBTabBarBridge alloc] init];
+        bridge.host = host;
         native = [[UITabBar alloc] initWithFrame:parent.bounds];
-        // No interaction at all: Twitter's own tab views stay on top and keep
-        // every touch, so this can never take navigation away.
-        native.userInteractionEnabled = NO;
+        native.delegate = bridge;
         native.autoresizingMask =
             UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
         objc_setAssociatedObject(host, kNFBTabBarKey, native,
+                                 OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        objc_setAssociatedObject(host, kNFBTabBridgeKey, bridge,
                                  OBJC_ASSOCIATION_RETAIN_NONATOMIC);
         NFBDebugLog(@"[tabbar] native UITabBar built for %@ (%lu tabs)",
                     NSStringFromClass([parent class]), (unsigned long)tabs.count);
     }
 
-    // Blank items, one per tab: they give the capsule its width and position
-    // while Twitter's own icons remain the only ones drawn.
+    // Items carry the app's own icons and titles, so the bar reads as Twitter's
+    // while UIKit draws the platter, the capsule and the slide gesture.
     if (native.items.count != tabs.count) {
         NSMutableArray<UITabBarItem*>* items = [NSMutableArray array];
         for (NSUInteger i = 0; i < tabs.count; i++) {
-            UITabBarItem* item = [[UITabBarItem alloc] initWithTitle:nil
-                                                               image:nil
-                                                                 tag:(NSInteger)i];
+            id tab = tabs[i];
+            UIImage* image = nil;
+            NSString* title = nil;
+            if ([tab respondsToSelector:@selector(imageView)]) {
+                image = [(UIImageView*)[tab imageView] image];
+            }
+            if ([tab respondsToSelector:@selector(title)]) {
+                title = [tab title];
+            }
+            UITabBarItem* item =
+                [[UITabBarItem alloc] initWithTitle:title
+                                              image:[image imageWithRenderingMode:
+                                                                UIImageRenderingModeAlwaysTemplate]
+                                                tag:(NSInteger)i];
             [items addObject:item];
         }
         native.items = items;
-        NFBDebugLog(@"[tabbar] %lu blank item(s) installed", (unsigned long)items.count);
+        NFBDebugLog(@"[tabbar] %lu item(s) installed from the app's own tabs",
+                    (unsigned long)items.count);
     }
 
-    // Behind Twitter's bar, inside the same parent, re-seated on every pass:
-    // the app reorders its own subviews when it rebuilds.
+    // On top of the host bar, re-seated every pass: the bar has to receive the
+    // touches for the long-press-and-slide to exist at all.
     NSUInteger nativeIndex = [parent.subviews indexOfObject:native];
     NSUInteger barIndex = [parent.subviews indexOfObject:bar];
     BOOL seated = native.superview == parent && nativeIndex != NSNotFound &&
-                  barIndex != NSNotFound && nativeIndex < barIndex;
+                  barIndex != NSNotFound && nativeIndex > barIndex;
     if (!seated) {
         [native removeFromSuperview];
-        [parent insertSubview:native belowSubview:bar];
-        NFBDebugLog(@"[tabbar] seated below %@ at %lu/%lu",
+        [parent insertSubview:native aboveSubview:bar];
+        NFBDebugLog(@"[tabbar] seated above %@ at %lu/%lu",
                     NSStringFromClass([bar class]),
                     (unsigned long)[parent.subviews indexOfObject:native],
                     (unsigned long)parent.subviews.count);
@@ -656,22 +731,36 @@ static void NFBApplyTabBarGlass(UIView* host) {
         native.selectedItem = native.items[selected];
     }
 
-    // The app's opaque backdrop is hidden, not cleared: glass samples what is
-    // behind it, and clearing the colour loses to the app's own repaint.
+    // The app's own icons and its opaque backdrop are hidden, not cleared: the
+    // native bar draws the icons now, and glass samples what is behind it.
     NSMutableArray<UIView*>* hidden =
         objc_getAssociatedObject(host, kNFBTabHiddenKey) ?: [NSMutableArray array];
     NSUInteger before = hidden.count;
-    for (UIView* backdrop in NFBTabBarBackdrops(host, native)) {
-        if (![hidden containsObject:backdrop]) {
-            [hidden addObject:backdrop];
-            NFBDebugLog(@"[tabbar] backdrop hidden: %@",
-                        NSStringFromClass([backdrop class]));
-        }
-        backdrop.hidden = YES;
-    }
+    void (^hide)(UIView*) = ^(UIView* view) {
+      if (view && ![hidden containsObject:view]) {
+          [hidden addObject:view];
+      }
+      view.hidden = YES;
+    };
+    hide(bar);
+    EnumerateSubviewsRecursively(host, ^(UIView* sub) {
+      if (sub == native || [sub isDescendantOfView:native] || sub == bar ||
+          [sub isDescendantOfView:bar]) {
+          return;
+      }
+      UIColor* colour = sub.backgroundColor;
+      CGFloat alpha = 0;
+      if (colour && ([colour getWhite:NULL alpha:&alpha] ||
+                     [colour getRed:NULL green:NULL blue:NULL alpha:&alpha]) &&
+          alpha > 0.9) {
+          hide(sub);
+      }
+    });
     if (hidden.count != before) {
         objc_setAssociatedObject(host, kNFBTabHiddenKey, hidden,
                                  OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        NFBDebugLog(@"[tabbar] %lu view(s) hidden behind the native bar",
+                    (unsigned long)hidden.count);
     }
 }
 

@@ -924,6 +924,12 @@ void NFBReportBrandingSurfaces(void) {
 
 #pragma mark - Tab bar stack
 
+// Shared with Theme.x, which records the rung that carried the last tap.
+const void* NFBTabRouteProbeKey(void) {
+    static const void* key = &key;
+    return key;
+}
+
 // Reports every property that can put an opaque pixel in front of the glass.
 // Written after five builds spent guessing one cause at a time.
 void NFBReportTabBarStack(NSString* moment) {
@@ -1092,6 +1098,81 @@ void NFBReportTabBarStack(NSString* moment) {
     NFBDebugLog(@"[stack:%@] twitter tabs: %@", moment,
                 twitterTabs.count ? [twitterTabs componentsJoinedByString:@" "]
                                   : @"(none found)");
+
+    // Which selection route exists, measured before any tap: the responder
+    // chain above the app's bar is walked and every candidate reported, so a
+    // bar that renders but does not navigate names its own cause.
+    __block UIView* appBar = nil;
+    EnumerateSubviewsRecursively(host, ^(UIView* sub) {
+      if (!appBar && [NSStringFromClass([sub class]) containsString:@"CustomTabBar"]) {
+          appBar = sub;
+      }
+    });
+    if (appBar) {
+        NSMutableArray* chain = [NSMutableArray array];
+        NSMutableArray* routes = [NSMutableArray array];
+        UIResponder* up = appBar;
+        NSInteger depth = 0;
+        while (up && depth < 8) {
+            [chain addObject:NSStringFromClass([up class])];
+            if ([up respondsToSelector:NSSelectorFromString(@"selectTabAtIndex:")]) {
+                [routes addObject:[NSString stringWithFormat:@"selectTabAtIndex: on %@",
+                                                             NSStringFromClass([up class])]];
+            }
+            if ([up respondsToSelector:NSSelectorFromString(@"setSelectedIndex:")]) {
+                [routes addObject:[NSString stringWithFormat:@"setSelectedIndex: on %@",
+                                                             NSStringFromClass([up class])]];
+            }
+            if ([up respondsToSelector:NSSelectorFromString(@"setSelectedTab:")]) {
+                [routes addObject:[NSString stringWithFormat:@"setSelectedTab: on %@",
+                                                             NSStringFromClass([up class])]];
+            }
+            up = up.nextResponder;
+            depth++;
+        }
+        NFBDebugLog(@"[stack:%@] responder chain: %@", moment,
+                    [chain componentsJoinedByString:@" > "]);
+        NFBDebugLog(@"[stack:%@] selection routes: %@", moment,
+                    routes.count ? [routes componentsJoinedByString:@" // "] : @"NONE FOUND");
+
+        // The tab views themselves: controls, gestures, and what the app calls
+        // them - the raw material for any other route.
+        NSMutableArray* tabInfo = [NSMutableArray array];
+        EnumerateSubviewsRecursively(appBar, ^(UIView* sub) {
+          if (![NSStringFromClass([sub class]) isEqualToString:@"T1TabView"] ||
+              tabInfo.count >= 5) {
+              return;
+          }
+          NSMutableString* line = [NSMutableString string];
+          [line appendFormat:@"%@", [sub respondsToSelector:@selector(isSelected)] &&
+                                            [(id)sub isSelected]
+                                        ? @"[SEL]"
+                                        : @""];
+          UIView* control = nil;
+          for (UIView* u = sub; u && u != appBar.superview; u = u.superview) {
+              if ([u isKindOfClass:[UIControl class]]) {
+                  control = u;
+                  break;
+              }
+          }
+          [line appendFormat:@"control=%@", control ? NSStringFromClass([control class])
+                                                    : @"none"];
+          NSMutableArray* gestures = [NSMutableArray array];
+          for (UIView* u = sub; u && u != appBar.superview; u = u.superview) {
+              for (UIGestureRecognizer* g in u.gestureRecognizers) {
+                  [gestures addObject:NSStringFromClass([g class])];
+              }
+          }
+          [line appendFormat:@" gestures=%@",
+                             gestures.count ? [gestures componentsJoinedByString:@","]
+                                            : @"none"];
+          [tabInfo addObject:line];
+        });
+        NFBDebugLog(@"[stack:%@] tab chain: %@", moment,
+                    tabInfo.count ? [tabInfo componentsJoinedByString:@" || "] : @"(none)");
+        NFBDebugLog(@"[stack:%@] app bar hidden=%d | last route used=%@", moment, appBar.hidden,
+                    objc_getAssociatedObject(host, NFBTabRouteProbeKey()) ?: @"(no tap yet)");
+    }
 
     NFBDebugLog(@"[stack:%@] host.clipsToBounds=%d hostAlpha=%.2f windowLevel=%.0f", moment,
                 host.clipsToBounds, host.alpha, window.windowLevel);
