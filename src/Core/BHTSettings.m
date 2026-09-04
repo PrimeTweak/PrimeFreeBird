@@ -59,7 +59,6 @@ static NSDictionary<NSString*, NSDictionary*>* BHTSettingsPages(void) {
                         @"type": @"button"
                     },
                     @{@"key": @"restore_tab_labels",
-                      @"disabledWhen": @"enable_liquid_glass",
                       @"default": @NO},
                     @{@"key": @"custom_fonts",
                       @"default": @NO},

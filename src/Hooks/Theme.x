@@ -764,8 +764,9 @@ static void NFBApplyTabBarGlass(UIView* host) {
             if ([tab respondsToSelector:@selector(title)]) {
                 title = [tab title];
             }
+            (void)title;  // The title is set below, from the reader's setting.
             UITabBarItem* item =
-                [[UITabBarItem alloc] initWithTitle:title
+                [[UITabBarItem alloc] initWithTitle:nil
                                               image:[image imageWithRenderingMode:
                                                                 UIImageRenderingModeAlwaysTemplate]
                                                 tag:(NSInteger)i];
@@ -775,15 +776,43 @@ static void NFBApplyTabBarGlass(UIView* host) {
         NFBDebugLog(@"[tabbar] %lu item(s) installed from the app's own tabs",
                     (unsigned long)items.count);
     }
-    // UIKit paints selected and unselected on its own once it is told which
-    // colours to use, so nothing here has to follow the selection.
+    // Colours through UITabBarAppearance, not the inherited tintColor pair.
+    // iOS 26 draws the bar in two layers - a tinted copy inside the lens and a
+    // base copy in the platter - and a capture showed the base one at pure
+    // black while unselectedItemTintColor said grey. The appearance object is
+    // the API that reaches both.
     UIColor* accent = tabItemColor(YES);
-    if (![native.tintColor isEqual:accent]) {
-        native.tintColor = accent;
-    }
     UIColor* resting = tabItemColor(NO);
-    if (![native.unselectedItemTintColor isEqual:resting]) {
-        native.unselectedItemTintColor = resting;
+    BOOL labels = [BHTSettings boolForKey:@"restore_tab_labels"];
+    UITabBarAppearance* look = [[UITabBarAppearance alloc] init];
+    [look configureWithTransparentBackground];
+    for (UITabBarItemAppearance* layout in @[ look.stackedLayoutAppearance,
+                                              look.inlineLayoutAppearance,
+                                              look.compactInlineLayoutAppearance ]) {
+        layout.normal.iconColor = resting;
+        layout.selected.iconColor = accent;
+        layout.normal.titleTextAttributes = @{NSForegroundColorAttributeName : resting};
+        layout.selected.titleTextAttributes = @{NSForegroundColorAttributeName : accent};
+    }
+    native.standardAppearance = look;
+    native.scrollEdgeAppearance = look;
+    native.tintColor = accent;
+    native.unselectedItemTintColor = resting;
+
+    // Titles follow the reader's own setting: the native bar carries them, so
+    // the option is live again instead of being held off under Liquid Glass.
+    for (UITabBarItem* item in native.items) {
+        NSInteger tag = item.tag;
+        NSString* wanted = nil;
+        if (labels && tag >= 0 && (NSUInteger)tag < tabs.count) {
+            id tab = tabs[(NSUInteger)tag];
+            if ([tab respondsToSelector:@selector(title)]) {
+                wanted = [tab title];
+            }
+        }
+        if (wanted != item.title && ![wanted isEqualToString:item.title]) {
+            item.title = wanted;
+        }
     }
 
     // On top of the host bar, re-seated every pass: the bar has to receive the
