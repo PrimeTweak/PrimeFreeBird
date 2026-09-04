@@ -538,9 +538,24 @@ static const void* kNFBTabMissKey = &kNFBTabMissKey;
 // Shared with the debugger, which reports the rung the last tap used.
 extern const void* NFBTabRouteProbeKey(void);
 
+// A plain depth-first walk, no filtering. EnumerateSubviewsRecursively skips
+// branches at alpha 0 - sensible for restyling, fatal here: the app's tab views
+// are faded on purpose, and searching with it reported zero tabs, so every tap
+// landed "out of range" and nothing was ever routed.
+static void NFBWalkAllSubviews(UIView* view, NSInteger depth,
+                               void (^block)(UIView*)) {
+    if (!view || depth > 12) {
+        return;
+    }
+    block(view);
+    for (UIView* sub in view.subviews) {
+        NFBWalkAllSubviews(sub, depth + 1, block);
+    }
+}
+
 static UIView* NFBCustomTabBar(UIView* host) {
     __block UIView* found = nil;
-    EnumerateSubviewsRecursively(host, ^(UIView* sub) {
+    NFBWalkAllSubviews(host, 0, ^(UIView* sub) {
       if (!found && [NSStringFromClass([sub class]) containsString:@"CustomTabBar"]) {
           found = sub;
       }
@@ -551,7 +566,7 @@ static UIView* NFBCustomTabBar(UIView* host) {
 // Twitter's tab views, left to right.
 static NSArray<UIView*>* NFBTabViews(UIView* bar) {
     NSMutableArray<UIView*>* tabs = [NSMutableArray array];
-    EnumerateSubviewsRecursively(bar, ^(UIView* sub) {
+    NFBWalkAllSubviews(bar, 0, ^(UIView* sub) {
       if ([NSStringFromClass([sub class]) isEqualToString:@"T1TabView"]) {
           [tabs addObject:sub];
       }
@@ -851,7 +866,7 @@ static void NFBApplyTabBarGlass(UIView* host) {
         }
         hide(sub);
     }
-    EnumerateSubviewsRecursively(host, ^(UIView* sub) {
+    NFBWalkAllSubviews(host, 0, ^(UIView* sub) {
       // The native bar, its own tree, the app bar and its tree, and any view
       // the native bar actually sits inside. The parent used to be spared
       // outright, which left the container holding the white panel untouched -
