@@ -642,8 +642,8 @@ static NSString* NFBRouteTabSelection(UIView* hostBar, NSArray<UIView*>* tabs,
     }
     // Nothing worked: give the app its own bar back rather than leave the
     // reader with a tab bar that does not navigate.
-    for (UIView* hidden in objc_getAssociatedObject(host, kNFBTabHiddenKey)) {
-        hidden.hidden = NO;
+    for (UIView* faded in objc_getAssociatedObject(host, kNFBTabHiddenKey)) {
+        faded.alpha = 1.0;
     }
     objc_setAssociatedObject(host, kNFBTabHiddenKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     [tabBar removeFromSuperview];
@@ -664,8 +664,13 @@ static void NFBApplyTabBarGlass(UIView* host) {
             objc_setAssociatedObject(host, kNFBTabBridgeKey, nil,
                                      OBJC_ASSOCIATION_RETAIN_NONATOMIC);
         }
-        for (UIView* hidden in objc_getAssociatedObject(host, kNFBTabHiddenKey)) {
-            hidden.hidden = NO;
+        for (UIView* faded in objc_getAssociatedObject(host, kNFBTabHiddenKey)) {
+            faded.alpha = 1.0;
+        }
+        // A bar taken by an earlier build, before this moved to the children.
+        UIView* previous = NFBCustomTabBar(host);
+        if (previous.alpha == 0.0) {
+            previous.alpha = 1.0;
         }
         objc_setAssociatedObject(host, kNFBTabHiddenKey, nil,
                                  OBJC_ASSOCIATION_RETAIN_NONATOMIC);
@@ -783,6 +788,11 @@ static void NFBApplyTabBarGlass(UIView* host) {
 
     // The app's own icons and its opaque backdrop are hidden, not cleared: the
     // native bar draws the icons now, and glass samples what is behind it.
+    // Faded to alpha 0, never hidden. `hidden` takes a view out of layout and
+    // out of hit-testing, and the app's own selectTabAtIndex: then does nothing
+    // - measured by the reader: navigation only worked while the old bar was
+    // still on screen. At alpha 0 the app keeps a live, laid-out bar and simply
+    // stops drawing it.
     NSMutableArray<UIView*>* hidden =
         objc_getAssociatedObject(host, kNFBTabHiddenKey) ?: [NSMutableArray array];
     NSUInteger before = hidden.count;
@@ -790,9 +800,18 @@ static void NFBApplyTabBarGlass(UIView* host) {
       if (view && ![hidden containsObject:view]) {
           [hidden addObject:view];
       }
-      view.hidden = YES;
+      if (view.alpha != 0.0) {
+          view.alpha = 0.0;
+      }
     };
-    hide(bar);
+    // Its children, never the bar itself. The app owns alpha on TFNCustomTabBar -
+    // that is what setTabBarCollapseRatio: animates while the timeline scrolls,
+    // so anything set there is overwritten within a frame. Measured: the bar
+    // stood at alpha 1 in a capture taken well after hide() ran. The tab host
+    // views carry the icons and the app leaves their alpha alone.
+    for (UIView* child in bar.subviews) {
+        hide(child);
+    }
     // Every sibling that draws something, not only the opaque ones: the app's
     // own capsule and its faded icons showed through the glass because they
     // carry a translucent fill, and the alpha > 0.9 test walked past them.
@@ -812,10 +831,10 @@ static void NFBApplyTabBarGlass(UIView* host) {
           return;
       }
       UIColor* colour = sub.backgroundColor;
-      CGFloat alpha = 0;
-      if (colour && ([colour getWhite:NULL alpha:&alpha] ||
-                     [colour getRed:NULL green:NULL blue:NULL alpha:&alpha]) &&
-          alpha > 0.05) {
+      CGFloat fill = 0;
+      if (colour && ([colour getWhite:NULL alpha:&fill] ||
+                     [colour getRed:NULL green:NULL blue:NULL alpha:&fill]) &&
+          fill > 0.05) {
           hide(sub);
       }
     });
