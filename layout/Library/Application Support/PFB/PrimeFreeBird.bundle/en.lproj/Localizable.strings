@@ -264,6 +264,8 @@
 "REPLY_IN_WEBVIEW_DETAIL" = "Open the reply box in a web view to avoid attestation.";
 "DIAGNOSTICS_TITLE" = "Diagnostics";
 "DIAGNOSTICS_DETAIL" = "Hook health, shake-to-capture, shareable report — all on the phone.";
+"DEBUG_TOOLS_ON" = "Debug tools on";
+"DEBUG_TOOLS_OFF" = "Debug tools off";
 "IMPORT_SETTINGS_DONE_TITLE" = "Settings imported";
 "IMPORT_SETTINGS_DONE_MESSAGE" = "%lu settings restored. Restart Twitter to apply everything.";
 "IMPORT_SETTINGS_FAILED_TITLE" = "Import failed";
@@ -548,8 +550,7 @@
 "WEB_SESSION_SIGN_IN_ACTION" = "Sign in";
 "REPLY_IN_WEBVIEW_DETAIL_HELD" = "Needs a web session — sign in above.";
 "FLEX_TWITTER_TITLE" = "Developer tools";
-"FLEX_TWITTER_DETAIL" = "FLEX inspector, shake to capture, launch health check.";
-"DIAGNOSTICS_DETAIL_HELD" = "Needs developer tools — turn them on above.";
+"FLEX_TWITTER_DETAIL" = "FLEX inspector for the app, as it runs.";
 "SETTINGS_BACKUP_TITLE" = "Settings backup";
 "SETTINGS_BACKUP_DETAIL" = "Every option, muted word and colour.";
 "EXPORT_SETTINGS_ACTION" = "Export…";

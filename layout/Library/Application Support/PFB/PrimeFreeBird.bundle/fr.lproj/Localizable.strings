@@ -208,6 +208,8 @@
 /*Debug*/
 "DIAGNOSTICS_TITLE" = "Diagnostic";
 "DIAGNOSTICS_DETAIL" = "Santé des accroches, capture par secousse, rapport à partager — tout sur le téléphone.";
+"DEBUG_TOOLS_ON" = "Outils de débogage activés";
+"DEBUG_TOOLS_OFF" = "Outils de débogage désactivés";
 
 /*Developers*/
 
@@ -564,8 +566,7 @@
 "WEB_SESSION_SIGN_IN_ACTION" = "Se connecter";
 "REPLY_IN_WEBVIEW_DETAIL_HELD" = "Nécessite une session web — connectez-vous ci-dessus.";
 "FLEX_TWITTER_TITLE" = "Outils de développement";
-"FLEX_TWITTER_DETAIL" = "Inspecteur FLEX, capture par secousse, contrôle au lancement.";
-"DIAGNOSTICS_DETAIL_HELD" = "Nécessite les outils de développement — activez-les ci-dessus.";
+"FLEX_TWITTER_DETAIL" = "Inspecteur FLEX de l'app, en direct.";
 "SETTINGS_BACKUP_TITLE" = "Sauvegarde des réglages";
 "SETTINGS_BACKUP_DETAIL" = "Toutes les options, mots filtrés et couleurs.";
 "EXPORT_SETTINGS_ACTION" = "Exporter…";
