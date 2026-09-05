@@ -100,7 +100,6 @@
 "CUSTOM_TAB_BAR_OPTION_SUBTITLE" = "Choose which buttons appear in the bottom navigation bar.";
 "RESTORE_TAB_LABELS_TITLE" = "Tab labels";
 "RESTORE_TAB_LABELS_DETAIL" = "Show labels under the icons in the navigation bar.";
-"RESTORE_TAB_LABELS_DETAIL_HELD" = "Liquid Glass draws its own tab bar, without labels.";
 "CUSTOM_FONTS_TITLE" = "Custom fonts";
 "CUSTOM_FONTS_DETAIL" = "Use a custom font throughout Twitter.";
 "REGULAR_FONTS_PICKER_OPTION_TITLE" = "Regular font";
