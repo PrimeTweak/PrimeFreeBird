@@ -791,7 +791,7 @@ static BOOL NFBViewSitsInXTabBar(UIView* view) {
         static NSInteger refused = 0;
         if (refused < 3) {
             refused++;
-            NFBDebugLog(@"[p21] logo: vibrancy animation refused (%@)", key);
+            NFBDebugLog(@"[logo] vibrancy animation refused (%@)", key);
         }
         return;
     }

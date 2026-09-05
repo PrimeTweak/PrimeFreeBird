@@ -48,9 +48,6 @@ static const NSTimeInterval kNFBUserTapGrace = 0.6;
 // Only the app's own overlay plugins are treated this way, never the card and
 // never anything carrying the video: the card's visibility is what gates
 // autoplay, and dimming it stops playback outright.
-// TEMPORARY probe for the opening flash. Read only: it adds no view, changes
-// no alpha and takes no decision. Milliseconds are counted from the moment the
-// card registers, so every line below is comparable on one timeline.
 static UIView* nfbImmersiveControlsView(UIView* card);
 
 // The app's own chrome for a full-screen video: avatar, name, follow control,

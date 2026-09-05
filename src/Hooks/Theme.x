@@ -714,7 +714,22 @@ static NSString* NFBRouteTabSelection(UIView* hostBar, NSArray<UIView*>* tabs,
 
 @end
 
+static void NFBApplyTabBarGlassBody(UIView* host);
+
 static void NFBApplyTabBarGlass(UIView* host) {
+    // Never re-entered. This runs from layout passes, from the collapse ratio
+    // on every scroll frame, and from the tab views' own updates; routing a
+    // selection from inside it can bring it straight back in.
+    static BOOL applying = NO;
+    if (applying) {
+        return;
+    }
+    applying = YES;
+    NFBApplyTabBarGlassBody(host);
+    applying = NO;
+}
+
+static void NFBApplyTabBarGlassBody(UIView* host) {
     UITabBar* native = objc_getAssociatedObject(host, kNFBTabBarKey);
 
     if (![BHTSettings boolForKey:@"enable_liquid_glass"]) {
@@ -1879,12 +1894,15 @@ static UITabBarAppearance* NFBPatchedTabBarAppearance(UITabBarAppearance* appear
 // the frame it saw.
 %hook TFNNavigationBarSearchView
 
-- (void)layoutSubviews {
-    %orig;
-    // Logos only has a forward declaration of this class, so self is cast
-    // once and used as a plain UIView from here on.
+// The correction lives in setFrame:, never in layoutSubviews. Writing a frame
+// from inside layoutSubviews re-enters the parent's layout, which lays this
+// view out again, which writes the frame again - the reader hit exactly that
+// loop as a freeze. Here the incoming value is adjusted before it lands, and
+// nothing is asked to lay out afterwards.
+- (void)setFrame:(CGRect)frame {
     UIView* view = (UIView*)self;
-    if (![BHTSettings boolForKey:@"enable_liquid_glass"] || !view.window) {
+    if (![BHTSettings boolForKey:@"enable_liquid_glass"] || !view.superview) {
+        %orig(frame);
         return;
     }
     UIView* bar = view.superview;
@@ -1892,38 +1910,38 @@ static UITabBarAppearance* NFBPatchedTabBarAppearance(UITabBarAppearance* appear
         bar = bar.superview;
     }
     if (!bar) {
+        %orig(frame);
         return;
     }
-    CGRect inBar = [view convertRect:view.bounds toView:bar];
-
     // Measured on the broken screen: x=20 w=288 in a 440 bar - the view starts
-    // at the leading margin, over the avatar, which sits at x=20..64 in the same
-    // bar. The correct layout starts past it. When the view lands in the
-    // avatar's zone it is moved out by the overlap, and the width gives back
-    // the same amount so the trailing edge stays where it was.
+    // at the leading margin, over the avatar that sits at x=20..64 of the same
+    // bar. When the incoming frame lands in that zone it is moved out by the
+    // overlap and the width gives the same amount back.
+    CGRect inBar = [view.superview convertRect:frame toView:bar];
     const CGFloat avatarTrailing = 64.0;
     const CGFloat gap = 16.0;
     static NSTimeInterval lastNote = 0;
     NSTimeInterval now = CACurrentMediaTime();
-    if (inBar.origin.x < avatarTrailing) {
+    if (inBar.origin.x < avatarTrailing && inBar.size.width > 100.0) {
         CGFloat shift = (avatarTrailing + gap) - inBar.origin.x;
-        CGRect frame = view.frame;
-        frame.origin.x += shift;
-        frame.size.width = MAX(80.0, frame.size.width - shift);
-        view.frame = frame;
+        CGRect fixed = frame;
+        fixed.origin.x += shift;
+        fixed.size.width = MAX(80.0, fixed.size.width - shift);
         if (now - lastNote > 0.5) {
             lastNote = now;
-            NFBDebugLog(@"[search] moved out of the avatar zone: x=%.0f w=%.0f -> x=%.0f w=%.0f",
+            NFBDebugLog(@"[search] frame moved out of the avatar zone: x=%.0f w=%.0f -> x=%.0f w=%.0f",
                         inBar.origin.x, inBar.size.width, inBar.origin.x + shift,
-                        frame.size.width);
+                        fixed.size.width);
         }
+        %orig(fixed);
         return;
     }
     if (now - lastNote > 0.5) {
         lastNote = now;
-        NFBDebugLog(@"[search] x=%.0f w=%.0f of bar w=%.0f", inBar.origin.x, inBar.size.width,
-                    bar.bounds.size.width);
+        NFBDebugLog(@"[search] frame x=%.0f w=%.0f of bar w=%.0f", inBar.origin.x,
+                    inBar.size.width, bar.bounds.size.width);
     }
+    %orig(frame);
 }
 
 %end
