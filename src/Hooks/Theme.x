@@ -505,6 +505,13 @@ static void NFBApplyTabBarAccent(UITabBar* bar) {
 // sits above the function that used to carry the local declaration.
 extern UIColor* CurrentAccentColor(void);
 
+// The resting colour for the native bar's icons. Kept apart from tabItemColor,
+// which also drives the app's own bar: that one keeps its secondary grey for
+// the classic style, while the glass bar draws its unselected icons in black.
+static UIColor* NFBGlassTabRestingColor(void) {
+    return [UIColor labelColor];
+}
+
 static UIColor* tabItemColor(BOOL selected) {
     return selected ? CurrentAccentColor() : [UIColor secondaryLabelColor];
 }
@@ -785,7 +792,7 @@ static void NFBApplyTabBarGlass(UIView* host) {
             // logo already relies on.
             UITabBarItem* item =
                 [[UITabBarItem alloc] initWithTitle:nil
-                                              image:NFBPaintedGlyph(image, tabItemColor(NO))
+                                              image:NFBPaintedGlyph(image, NFBGlassTabRestingColor())
                                                 tag:(NSInteger)i];
             item.selectedImage = NFBPaintedGlyph(image, tabItemColor(YES));
             objc_setAssociatedObject(item, kNFBTabSourceKey, image,
@@ -802,7 +809,7 @@ static void NFBApplyTabBarGlass(UIView* host) {
     // black while unselectedItemTintColor said grey. The appearance object is
     // the API that reaches both.
     UIColor* accent = tabItemColor(YES);
-    UIColor* resting = tabItemColor(NO);
+    UIColor* resting = NFBGlassTabRestingColor();
     BOOL labels = [BHTSettings boolForKey:@"restore_tab_labels"];
     UITabBarAppearance* look = [[UITabBarAppearance alloc] init];
     [look configureWithTransparentBackground];
