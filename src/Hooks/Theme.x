@@ -783,6 +783,9 @@ static void NFBApplyTabBarGlass(UIView* host) {
             [items addObject:item];
         }
         native.items = items;
+        // A fresh set of items carries no appearance; the block below sees the
+        // bar's colour unchanged and would skip them, so it is cleared here.
+        native.standardAppearance = [[UITabBarAppearance alloc] init];
         NFBDebugLog(@"[tabbar] %lu item(s) installed from the app's own tabs",
                     (unsigned long)items.count);
     }
@@ -804,15 +807,21 @@ static void NFBApplyTabBarGlass(UIView* host) {
         layout.normal.titleTextAttributes = @{NSForegroundColorAttributeName : resting};
         layout.selected.titleTextAttributes = @{NSForegroundColorAttributeName : accent};
     }
-    // Assigning an appearance forces a relayout, so it is handed over only when
-    // the colour actually differs.
+    // On the bar and on every item. Measured: with the bar-level appearance
+    // alone, all four icons came out carrying the accent - the item colours
+    // were never consulted, and only the global tintColor reached them. An
+    // item's own appearance is the more specific one and does get honoured.
     UIColor* current = native.standardAppearance.stackedLayoutAppearance.normal.iconColor;
     if (![current isEqual:resting]) {
         native.standardAppearance = look;
         if (@available(iOS 15.0, *)) {
             native.scrollEdgeAppearance = look;
         }
-        NFBDebugLog(@"[tabbar] appearance set: rest=%@ accent=%@", resting, accent);
+        for (UITabBarItem* item in native.items) {
+            item.standardAppearance = look;
+        }
+        NFBDebugLog(@"[tabbar] appearance set on the bar and %lu item(s): rest=%@",
+                    (unsigned long)native.items.count, resting);
     }
     native.tintColor = accent;
     native.unselectedItemTintColor = resting;
