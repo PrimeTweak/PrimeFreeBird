@@ -1061,6 +1061,21 @@ void NFBReportTabBarStack(NSString* moment) {
                     sel == NSNotFound ? @"none" : @(sel),
                     native.hidden, native.alpha, native.isUserInteractionEnabled);
 
+        // What each item actually carries. The painting happens once at launch
+        // and its line has scrolled out of the journal by the time anyone
+        // shakes, so the state is read here instead of trusted from a log.
+        NSMutableArray* itemState = [NSMutableArray array];
+        for (UITabBarItem* item in native.items) {
+            [itemState addObject:[NSString
+                stringWithFormat:@"[%ld img=%@ mode=%ld sel=%@ mode=%ld]", (long)item.tag,
+                                 item.image ? @"yes" : @"nil",
+                                 (long)item.image.renderingMode,
+                                 item.selectedImage ? @"yes" : @"nil",
+                                 (long)item.selectedImage.renderingMode]];
+        }
+        NFBDebugLog(@"[stack:%@] items: %@", moment,
+                    itemState.count ? [itemState componentsJoinedByString:@" "] : @"(none)");
+
         NSMutableArray* inside = [NSMutableArray array];
         EnumerateSubviewsRecursively(native, ^(UIView* sub) {
           if (inside.count < 14) {
@@ -1212,43 +1227,39 @@ void NFBReportNavigationBar(NSString* moment) {
     if (!NFBDebugIsRecording()) {
         return;
     }
-    UIWindow* window = nil;
+    // Every window of every scene, not just the key one: the first pass looked
+    // at a single window and reported nothing while a capture taken moments
+    // later plainly showed a TFNNavigationBar.
+    __block UIView* bar = nil;
+    NSMutableArray* candidates = [NSMutableArray array];
+    NSMutableArray* roots = [NSMutableArray array];
     for (id scene in UIApplication.sharedApplication.connectedScenes) {
         if (![scene respondsToSelector:@selector(windows)]) {
             continue;
         }
-        for (UIWindow* candidate in [scene windows]) {
-            if (candidate.isKeyWindow) {
-                window = candidate;
-                break;
-            }
-        }
-        if (window) {
-            break;
+        for (UIWindow* w in [scene windows]) {
+            [roots addObject:[NSString stringWithFormat:@"%@%@ %.0fx%.0f",
+                                                        NSStringFromClass([w class]),
+                                                        w.isKeyWindow ? @"(key)" : @"",
+                                                        w.bounds.size.width,
+                                                        w.bounds.size.height]];
+            NFBDescribeTree(w, 0, ^(UIView* view, NSInteger depth) {
+              NSString* name = NSStringFromClass([view class]);
+              if ([name containsString:@"NavigationBar"]) {
+                  if (candidates.count < 8) {
+                      [candidates addObject:name];
+                  }
+                  if (!bar && view.bounds.size.width > 200) {
+                      bar = view;
+                  }
+              }
+            });
         }
     }
-    if (!window) {
-        NFBDebugLog(@"[navbar:%@] no key window", moment);
-        return;
-    }
-    // Anything whose name carries NavigationBar, wherever it sits: the first
-    // pass demanded a suffix and found nothing, which said more about the test
-    // than about the screen.
-    __block UIView* bar = nil;
-    __block NSMutableArray* candidates = [NSMutableArray array];
-    NFBDescribeTree(window, 0, ^(UIView* view, NSInteger depth) {
-      NSString* name = NSStringFromClass([view class]);
-      if ([name containsString:@"NavigationBar"]) {
-          if (candidates.count < 6) {
-              [candidates addObject:name];
-          }
-          if (!bar && view.bounds.size.width > 200) {
-              bar = view;
-          }
-      }
-    });
+    NFBDebugLog(@"[navbar:%@] windows: %@", moment,
+                roots.count ? [roots componentsJoinedByString:@" // "] : @"(none)");
     if (!bar) {
-        NFBDebugLog(@"[navbar:%@] nothing named NavigationBar on screen; saw: %@", moment,
+        NFBDebugLog(@"[navbar:%@] nothing named NavigationBar; saw: %@", moment,
                     candidates.count ? [candidates componentsJoinedByString:@", "] : @"(none)");
         return;
     }
