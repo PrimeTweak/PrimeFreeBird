@@ -580,8 +580,10 @@ static void nfbChromeCensus(UIView* card, NSString* moment) {
     UIView* mounted = controlsClass
                           ? nfbFirstDescendantOfClass(card.window ?: card, controlsClass)
                           : nil;
-    NFBDebugLog(@"[chrome:%@] VideoControlsView mounted=%@ visible=%@", moment,
-                mounted ? @"yes" : @"no", nfbImmersiveControlsView(card) ? @"yes" : @"no");
+    TAVPlayer* censusPlayer = nfbCardPlayer(card);
+    NFBDebugLog(@"[chrome:%@] VideoControlsView mounted=%@ visible=%@ | playback=%ld", moment,
+                mounted ? @"yes" : @"no", nfbImmersiveControlsView(card) ? @"yes" : @"no",
+                censusPlayer ? (long)censusPlayer.playbackState.timeControlStatus : -1L);
 }
 
 static UIView* nfbPausedGlyph(UIView* card) {
@@ -1134,6 +1136,27 @@ static void nfbStartFoldWatch(UIView* card) {
     BOOL runsToggle = (expanded != paused);
     if (runsToggle) {
         %orig;
+        // 12.21's own single tap toggles playback as well as the chrome - read
+        // in the journal: a pause tap left the video playing with the chrome
+        // up, and the fold watch then folded it, which is the flash. The
+        // reader's intent is restored right away and once more after the
+        // app's own handler has had a runloop turn to land.
+        __weak TAVPlayer* weakPlayer = player;
+        void (^restore)(void) = ^{
+          TAVPlayer* p = weakPlayer;
+          if (!p) {
+              return;
+          }
+          BOOL nowPaused = p.playbackState.timeControlStatus == 0;
+          if (nowPaused != paused) {
+              NFBDebugLog(@"[tap] app toggled playback back to %@ - restoring %@",
+                          nowPaused ? @"paused" : @"playing", paused ? @"pause" : @"play");
+              nfbTogglePlayback(p);
+          }
+        };
+        restore();
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.15 * NSEC_PER_SEC)),
+                       dispatch_get_main_queue(), restore);
     }
     nfbShowPausedGlyph(card, paused);
     nfbUpdateMinimalBar(card, player);

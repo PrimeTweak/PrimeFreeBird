@@ -1779,8 +1779,6 @@ static void NFBRestoreTabIcon(UIImageView* icon) {
 %hook T1TabView
 
 - (void)_t1_updateImageViewAnimated:(BOOL)animated {
-    // Fires on every selection change: the moment the app restores its own bar.
-    NFBReapplyTabBarFrom((UIView*)self);
     // setIconColor: re-enters this method, so swallow the inner call and let
     // %orig below render once with the new color
     if (updatingTabIconColor) {
@@ -1796,6 +1794,12 @@ static void NFBRestoreTabIcon(UIImageView* icon) {
     updatingTabIconColor = NO;
 
     %orig(animated);
+
+    // After %orig, not before: this is the call that swaps the tab's glyph
+    // between its filled and outline variants, and the native bar reads that
+    // glyph to follow it. Run ahead of %orig, the reapply captured the old
+    // image - which is how Home kept its filled icon across tab changes.
+    NFBReapplyTabBarFrom((UIView*)self);
 
     // 12.21: the tab icon arrives rendered AlwaysOriginal (measured in a
     // capture: mode=1 with the tint set and ignored), so the colour set above
