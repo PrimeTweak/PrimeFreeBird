@@ -1103,7 +1103,6 @@ static void nfbStartFoldWatch(UIView* card) {
         gNFBLastUserTap = [NSDate timeIntervalSinceReferenceDate];
         gNFBReaderAskedForChrome = YES;
     }
-    UIView* controls = nfbImmersiveControlsView(card);
 
     // A synthesized tap only moves the bar; a tap with the option off keeps the
     // native behavior. The mirror follows the toggle in both cases.
@@ -1126,40 +1125,37 @@ static void nfbStartFoldWatch(UIView* card) {
         return;
     }
 
+    // The app's tap goes first and alone. 12.21's single tap toggles playback
+    // and chrome together, and it does so a runloop turn later than the tap.
+    // Toggling playback ahead of it, as this used to, set up a race of three
+    // toggles - journaled: the same pause tap left the chrome hidden once and
+    // shown the next time. So the app decides, the tweak reads the result
+    // after it has landed, and only toggles playback itself when the app has
+    // left it alone, which is what older builds did.
     BOOL wasPlaying = player.playbackState.timeControlStatus != 0;
-    nfbTogglePlayback(player);
-    [(_TtC14T1TwitterSwift17ImmersiveCardView*)self setPausedByUser:wasPlaying];
-
-    // The bar belongs mounted while paused and gone while playing.
-    BOOL paused = wasPlaying;
-    BOOL expanded = (controls != nil);
-    BOOL runsToggle = (expanded != paused);
-    if (runsToggle) {
-        %orig;
-        // 12.21's own single tap toggles playback as well as the chrome - read
-        // in the journal: a pause tap left the video playing with the chrome
-        // up, and the fold watch then folded it, which is the flash. The
-        // reader's intent is restored right away and once more after the
-        // app's own handler has had a runloop turn to land.
-        __weak TAVPlayer* weakPlayer = player;
-        void (^restore)(void) = ^{
-          TAVPlayer* p = weakPlayer;
-          if (!p) {
-              return;
-          }
-          BOOL nowPaused = p.playbackState.timeControlStatus == 0;
-          if (nowPaused != paused) {
-              NFBDebugLog(@"[tap] app toggled playback back to %@ - restoring %@",
-                          nowPaused ? @"paused" : @"playing", paused ? @"pause" : @"play");
-              nfbTogglePlayback(p);
-          }
-        };
-        restore();
-        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.15 * NSEC_PER_SEC)),
-                       dispatch_get_main_queue(), restore);
-    }
-    nfbShowPausedGlyph(card, paused);
-    nfbUpdateMinimalBar(card, player);
+    %orig;
+    __weak UIView* weakCard = card;
+    __weak TAVPlayer* weakPlayer = player;
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.2 * NSEC_PER_SEC)),
+                   dispatch_get_main_queue(), ^{
+      UIView* strongCard = weakCard;
+      TAVPlayer* strongPlayer = weakPlayer;
+      if (!strongCard || !strongPlayer) {
+          return;
+      }
+      BOOL nowPlaying = strongPlayer.playbackState.timeControlStatus != 0;
+      if (nowPlaying == wasPlaying) {
+          NFBDebugLog(@"[tap] app left playback alone - toggling here");
+          nfbTogglePlayback(strongPlayer);
+          nowPlaying = !nowPlaying;
+      } else {
+          NFBDebugLog(@"[tap] app toggled playback itself -> %@",
+                      nowPlaying ? @"playing" : @"paused");
+      }
+      [(_TtC14T1TwitterSwift17ImmersiveCardView*)strongCard setPausedByUser:!nowPlaying];
+      nfbShowPausedGlyph(strongCard, !nowPlaying);
+      nfbUpdateMinimalBar(strongCard, strongPlayer);
+    });
 }
 
 %new
