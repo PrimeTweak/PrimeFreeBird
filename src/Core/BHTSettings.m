@@ -446,12 +446,15 @@ static NSDictionary<NSString*, NSDictionary*>* BHTSettingsPages(void) {
 
                     @{@"type": @"header", @"titleKey": @"LAB_GROUP_TOOLS"},
                     @{@"key": @"flex_twitter", @"default": @NO, @"type": @"toggle"},
+                    // Shown only while debug_tools is on - a key with no row of
+                    // its own, flipped by a long press on the FLEX row above.
+                    // Readers never see this entry; FLEX itself stays public.
                     @{
                         @"key": @"diagnostics",
                         @"type": @"button",
                         @"titleKey": @"DIAGNOSTICS_TITLE",
                         @"subtitleKey": @"DIAGNOSTICS_DETAIL",
-                        @"blockedUnless": @"flex_twitter",
+                        @"parentKey": @"debug_tools",
                         @"action": @"showDiagnostics:"
                     },
 

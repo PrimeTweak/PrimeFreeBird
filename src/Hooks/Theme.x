@@ -544,7 +544,6 @@ static const void* kNFBTabBridgeKey = &kNFBTabBridgeKey;
 static const void* kNFBTabPushedKey = &kNFBTabPushedKey;
 static const void* kNFBTabMissKey = &kNFBTabMissKey;
 static const void* kNFBTabOursKey = &kNFBTabOursKey;
-static const void* kNFBTabOutlineKey = &kNFBTabOutlineKey;
 // Shared with the debugger, which reports the rung the last tap used.
 extern const void* NFBTabRouteProbeKey(void);
 
@@ -578,6 +577,23 @@ static BOOL NFBIsOurGlassBar(id bar) {
 // image renders tint through alpha, so 0.6 stays grey whatever the tint says.
 // Compositing the glyph over itself six times drives 0.6 to 0.996 and leaves
 // the shape untouched.
+// Both variants of a tab glyph, by name. Measured in the 12.21 bundle: the
+// filled icon is the bare name (home, search, notifications, messages), the
+// outline is the same name with _stroke; T1TabView carries one of the two in
+// imageName. Loaded through the app's own vector loader at the 24 pt the bar
+// draws, filled black, so the bar's tint pair colours them - outline in the
+// resting colour, filled in the accent - and nothing depends on which
+// variant the tab happened to show when the bar was built.
+static UIImage* NFBTabVectorNamed(NSString* name) {
+    if (!name.length ||
+        ![UIImage respondsToSelector:@selector(tfn_vectorImageNamed:fitsSize:fillColor:)]) {
+        return nil;
+    }
+    return [UIImage tfn_vectorImageNamed:name
+                                fitsSize:CGSizeMake(24.0, 24.0)
+                               fillColor:[UIColor blackColor]];
+}
+
 static UIImage* NFBOpaqueTabGlyph(UIImage* source) {
     if (!source || source.size.width < 1.0 || source.size.height < 1.0) {
         return source;
@@ -836,17 +852,23 @@ static void NFBApplyTabBarGlassBody(UIView* host) {
             // colour changed on screen with it. Baked pixels and per-item
             // appearances were both tried after it and both regressed to a
             // single accent on all four icons.
-            // Every icon at full opacity, whatever the app rendered it at: see
-            // NFBOpaqueTabGlyph for the measurement behind this.
-            UITabBarItem* item = [[UITabBarItem alloc] initWithTitle:nil
-                                                               image:NFBOpaqueTabGlyph(image)
-                                                                 tag:(NSInteger)i];
-            BOOL builtFromOutline =
-                !([tab respondsToSelector:@selector(isSelected)] && [tab isSelected]);
-            if (builtFromOutline) {
-                objc_setAssociatedObject(item, kNFBTabOutlineKey, @YES,
-                                         OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-            }
+            NSString* name =
+                [tab respondsToSelector:@selector(imageName)] ? [tab imageName] : nil;
+            NSString* base = [name hasSuffix:@"_stroke"]
+                                 ? [name substringToIndex:name.length - 7]
+                                 : name;
+            UIImage* outline = NFBTabVectorNamed([base stringByAppendingString:@"_stroke"]);
+            UIImage* filled = NFBTabVectorNamed(base);
+            // The tab's own image is the fallback when the bundle has no glyph
+            // under that name; it is whichever variant the tab shows right now.
+            UITabBarItem* item =
+                [[UITabBarItem alloc] initWithTitle:nil
+                                              image:NFBOpaqueTabGlyph(outline ?: image)
+                                                tag:(NSInteger)i];
+            item.selectedImage = filled ? NFBOpaqueTabGlyph(filled) : nil;
+            NFBDebugLog(@"[tabbar] tab %lu '%@': outline=%@ filled=%@", (unsigned long)i,
+                        base ?: @"(no name)", outline ? @"yes" : @"fallback",
+                        filled ? @"yes" : @"none");
             [items addObject:item];
         }
         native.items = items;
@@ -905,32 +927,6 @@ static void NFBApplyTabBarGlassBody(UIView* host) {
     // calling the delegate, so the tap route alone never sees it and the app
     // snapped back on the next pass. What the reader picked is whatever differs
     // from the index this code last pushed.
-    // The outline glyph, taken from each tab the first time it is seen
-    // unselected. The items were built at launch, when Home was the selected
-    // tab and drew its filled variant - so Home kept a filled icon while the
-    // other three, unselected at that moment, got their outlines. A tab shows
-    // its outline whenever it is not selected; the item follows once and is
-    // marked so it is not rebuilt on every pass.
-    for (NSUInteger i = 0; i < tabs.count && i < native.items.count; i++) {
-        id tab = tabs[i];
-        UITabBarItem* item = native.items[i];
-        if (objc_getAssociatedObject(item, kNFBTabOutlineKey)) {
-            continue;
-        }
-        BOOL tabSelected = [tab respondsToSelector:@selector(isSelected)] && [tab isSelected];
-        if (tabSelected || ![tab respondsToSelector:@selector(imageView)]) {
-            continue;
-        }
-        UIImage* outline = [(UIImageView*)[tab imageView] image];
-        if (!outline) {
-            continue;
-        }
-        item.image = NFBOpaqueTabGlyph(outline);
-        objc_setAssociatedObject(item, kNFBTabOutlineKey, @YES,
-                                 OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-        NFBDebugLog(@"[tabbar] item %lu now carries its outline glyph", (unsigned long)i);
-    }
-
     NSUInteger appIndex = NFBSelectedTabIndex(tabs);
     NSUInteger shownIndex = native.selectedItem
                                 ? [native.items indexOfObject:native.selectedItem]

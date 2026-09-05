@@ -259,3 +259,6 @@ packages/
 !packages/PUT_IPA_HERE
 
 deps/*/build/
+
+# fleXD is fetched by deps/flex/Makefile at build time, never tracked
+deps/flex/fleXD/

@@ -5,8 +5,13 @@ submodule at `upstream/` and any wrapper files in the folder root.
 
 ## flex
 
-https://github.com/FLEXTool/FLEX, wrapped as the `libbhFLEX` subproject
-(Makefile and injection filter plist in the folder root).
+https://github.com/TimOliver/fleXD (6.2.0), Tim Oliver's fork of FLEX
+redrawn for iOS 26, wrapped as the `libbhFLEX` subproject (Makefile and
+injection filter plist in the folder root). The Makefile clones the pinned
+tag into `fleXD/` at build time - that folder is not tracked - and links
+Xcode's iOS SDK into `$THEOS/sdks` when nothing at 26 or above is there,
+since fleXD names `UIGlassEffect` directly. The `upstream/` submodule is the
+original FLEX it replaced; it is no longer built.
 
 ## zxPluginsInject
 

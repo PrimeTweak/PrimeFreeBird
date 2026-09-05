@@ -62,7 +62,7 @@ static void nfbTagIfChatSocket(NSURLSessionWebSocketTask* task, NSURL* url) {
 // opening with those that appear while typing.
 
 static void nfbLogChatFrame(NSData* data) {
-    if (!data.length || ![BHTSettings boolForKey:@"flex_twitter"]) {
+    if (!data.length || ![BHTSettings boolForKey:@"debug_tools"]) {
         return;
     }
     static os_log_t log;

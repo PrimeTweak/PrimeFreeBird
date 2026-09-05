@@ -16,6 +16,7 @@
 #import "ThemeColor/Palette.h"
 #import "Hooks/HookHelpers.h"
 #import "Debug/NFBDebugger.h"
+#import "Headers/FLEXHeaders.h"
 
 @interface ModernSettingsPageViewController () <UIDocumentPickerDelegate>
 @property (nonatomic, copy) NSString* registryPageKey;
@@ -327,6 +328,19 @@ extern NSInteger NFBColorThemeScreenVisible;
         cell.toggleSwitch.on = inverted ? !isEnabled : isEnabled;
         objc_setAssociatedObject(cell.toggleSwitch, @"prefKey", key,
                                  OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        // The FLEX row doubles as the door to the debug tools: a long press
+        // flips debug_tools, which has no row of its own, and the diagnostics
+        // entry below follows through its parentKey. One recognizer per cell,
+        // reading the key at press time since cells are reused.
+        if (!objc_getAssociatedObject(cell, @selector(debugToolsPressed:))) {
+            UILongPressGestureRecognizer* press = [[UILongPressGestureRecognizer alloc]
+                initWithTarget:self
+                        action:@selector(debugToolsPressed:)];
+            press.minimumPressDuration = 1.5;
+            [cell addGestureRecognizer:press];
+            objc_setAssociatedObject(cell, @selector(debugToolsPressed:), @YES,
+                                     OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        }
         objc_setAssociatedObject(cell.toggleSwitch, @"inverted", @(inverted),
                                  OBJC_ASSOCIATION_RETAIN_NONATOMIC);
         [cell addTarget:self
@@ -997,6 +1011,30 @@ extern NSInteger NFBColorThemeScreenVisible;
 // The row lives on the lab page under Debug mode. It opens the on-device
 // diagnostics sheet — hook health, decision log, last capture, share — with no
 // computer attached.
+- (void)debugToolsPressed:(UILongPressGestureRecognizer*)press {
+    if (press.state != UIGestureRecognizerStateBegan) {
+        return;
+    }
+    ModernSettingsToggleCell* cell = (ModernSettingsToggleCell*)press.view;
+    NSString* key = objc_getAssociatedObject(cell.toggleSwitch, @"prefKey");
+    if (![key isEqualToString:@"flex_twitter"]) {
+        return;
+    }
+    BOOL on = ![BHTSettings boolForKey:@"debug_tools"];
+    [[NSUserDefaults standardUserDefaults] setBool:on forKey:@"debug_tools"];
+    [[UINotificationFeedbackGenerator new]
+        notificationOccurred:on ? UINotificationFeedbackTypeSuccess
+                                : UINotificationFeedbackTypeWarning];
+    [self updateVisibleToggles];
+    [self.tableView reloadData];
+    NSString* note = [[BHTBundle sharedBundle]
+        localizedStringForKey:on ? @"DEBUG_TOOLS_ON" : @"DEBUG_TOOLS_OFF"];
+    Class alert = NSClassFromString(@"FLEXAlert");
+    if ([alert respondsToSelector:@selector(showQuickAlert:from:)]) {
+        [alert showQuickAlert:note from:self];
+    }
+}
+
 - (void)showDiagnostics:(NSDictionary*)sender {
     NFBDebuggerPresent();
 }

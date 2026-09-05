@@ -2,7 +2,7 @@
 //  NFBDebugger.m
 //
 //  See NFBDebugger.h for the shape of the thing. Everything here is inert
-//  unless flex_twitter is on, checked once and cached.
+//  unless debug_tools is on, checked once and cached.
 //
 
 #import "Debug/NFBDebugger.h"
@@ -21,7 +21,7 @@ static BOOL NFBDebugEnabled(void) {
     static BOOL enabled;
     static dispatch_once_t once;
     dispatch_once(&once, ^{
-        enabled = [BHTSettings boolForKey:@"flex_twitter"];
+        enabled = [BHTSettings boolForKey:@"debug_tools"];
     });
     return enabled;
 }
