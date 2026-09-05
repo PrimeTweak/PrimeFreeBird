@@ -554,6 +554,13 @@ static void NFBWalkAllSubviews(UIView* view, NSInteger depth,
     }
 }
 
+// True for the bar this file builds. A plain function, not a %new method: the
+// compiler needs a visible declaration to type-check a message send, and Logos
+// only adds %new methods at runtime.
+static BOOL NFBIsOurGlassBar(id bar) {
+    return objc_getAssociatedObject(bar, kNFBTabOursKey) != nil;
+}
+
 static UIView* NFBCustomTabBar(UIView* host) {
     __block UIView* found = nil;
     NFBWalkAllSubviews(host, 0, ^(UIView* sub) {
@@ -802,7 +809,9 @@ static void NFBApplyTabBarGlass(UIView* host) {
     UIColor* current = native.standardAppearance.stackedLayoutAppearance.normal.iconColor;
     if (![current isEqual:resting]) {
         native.standardAppearance = look;
-        native.scrollEdgeAppearance = look;
+        if (@available(iOS 15.0, *)) {
+            native.scrollEdgeAppearance = look;
+        }
         NFBDebugLog(@"[tabbar] appearance set: rest=%@ accent=%@", resting, accent);
     }
     native.tintColor = accent;
@@ -1885,14 +1894,9 @@ static UITabBarAppearance* NFBPatchedTabBarAppearance(UITabBarAppearance* appear
 // pass through untouched. Without this guard the appearance set on it went
 // straight back through NFBPatchedTabBarAppearance, which forces labelColor -
 // the black icons the reader reported.
-%new
-- (BOOL)nfb_isOurGlassBar {
-    return objc_getAssociatedObject(self, kNFBTabOursKey) != nil;
-}
-
 - (void)didMoveToWindow {
     %orig;
-    if (![self nfb_isOurGlassBar]) {
+    if (!NFBIsOurGlassBar(self)) {
         NFBApplyTabBarAccent(self);
     }
 }
@@ -1901,13 +1905,13 @@ static UITabBarAppearance* NFBPatchedTabBarAppearance(UITabBarAppearance* appear
 // not re-attach the bar, but it always re-lays it out.
 - (void)layoutSubviews {
     %orig;
-    if (![self nfb_isOurGlassBar]) {
+    if (!NFBIsOurGlassBar(self)) {
         NFBApplyTabBarAccent(self);
     }
 }
 
 - (void)setStandardAppearance:(UITabBarAppearance*)appearance {
-    if ([self nfb_isOurGlassBar]) {
+    if (NFBIsOurGlassBar(self)) {
         %orig(appearance);
         return;
     }
@@ -1915,7 +1919,7 @@ static UITabBarAppearance* NFBPatchedTabBarAppearance(UITabBarAppearance* appear
 }
 
 - (void)setScrollEdgeAppearance:(UITabBarAppearance*)appearance {
-    if ([self nfb_isOurGlassBar]) {
+    if (NFBIsOurGlassBar(self)) {
         %orig(appearance);
         return;
     }
