@@ -1881,38 +1881,41 @@ static UITabBarAppearance* NFBPatchedTabBarAppearance(UITabBarAppearance* appear
 
 - (void)layoutSubviews {
     %orig;
-    if (![BHTSettings boolForKey:@"enable_liquid_glass"] || !self.window) {
+    // Logos only has a forward declaration of this class, so self is cast
+    // once and used as a plain UIView from here on.
+    UIView* view = (UIView*)self;
+    if (![BHTSettings boolForKey:@"enable_liquid_glass"] || !view.window) {
         return;
     }
-    UIView* bar = self.superview;
+    UIView* bar = view.superview;
     while (bar && ![bar isKindOfClass:[UINavigationBar class]]) {
         bar = bar.superview;
     }
     if (!bar) {
         return;
     }
-    CGRect inBar = [self convertRect:self.bounds toView:bar];
+    CGRect inBar = [view convertRect:view.bounds toView:bar];
     static NSTimeInterval lastNote = 0;
     NSTimeInterval now = CACurrentMediaTime();
     if (now - lastNote > 0.5) {
         lastNote = now;
         NFBDebugLog(@"[search] x=%.0f w=%.0f of bar w=%.0f | siblings=%lu", inBar.origin.x,
                     inBar.size.width, bar.bounds.size.width,
-                    (unsigned long)self.superview.subviews.count);
+                    (unsigned long)view.superview.subviews.count);
     }
     // At the leading edge there is nothing left of it for the avatar to sit in:
     // that is the broken geometry. One relayout of the bar is requested, once
     // per landing, and the result shows up in the next journal line.
     if (inBar.origin.x < 40.0 && inBar.size.width > bar.bounds.size.width * 0.8) {
-        NSNumber* asked = objc_getAssociatedObject(self, @selector(layoutSubviews));
+        NSNumber* asked = objc_getAssociatedObject(view, @selector(layoutSubviews));
         if (!asked) {
-            objc_setAssociatedObject(self, @selector(layoutSubviews), @YES,
+            objc_setAssociatedObject(view, @selector(layoutSubviews), @YES,
                                      OBJC_ASSOCIATION_RETAIN_NONATOMIC);
             NFBDebugLog(@"[search] full-width at the leading edge - relayout requested");
-            [self invalidateIntrinsicContentSize];
+            [view invalidateIntrinsicContentSize];
             [bar setNeedsLayout];
             dispatch_async(dispatch_get_main_queue(), ^{
-              objc_setAssociatedObject(self, @selector(layoutSubviews), nil,
+              objc_setAssociatedObject(view, @selector(layoutSubviews), nil,
                                        OBJC_ASSOCIATION_RETAIN_NONATOMIC);
             });
         }
