@@ -5,6 +5,7 @@
 
 #import <objc/runtime.h>
 #import <objc/message.h>
+#import <QuartzCore/QuartzCore.h>
 #import "HookHelpers.h"
 #import "Core/BHTBundle.h"
 #import "Debug/NFBDebugger.h"
@@ -543,8 +544,6 @@ static const void* kNFBTabBridgeKey = &kNFBTabBridgeKey;
 static const void* kNFBTabPushedKey = &kNFBTabPushedKey;
 static const void* kNFBTabMissKey = &kNFBTabMissKey;
 static const void* kNFBTabOursKey = &kNFBTabOursKey;
-static const void* kNFBTabSourceKey = &kNFBTabSourceKey;
-static const void* kNFBTabPaintKey = &kNFBTabPaintKey;
 // Shared with the debugger, which reports the rung the last tap used.
 extern const void* NFBTabRouteProbeKey(void);
 
@@ -790,62 +789,35 @@ static void NFBApplyTabBarGlass(UIView* host) {
             // global tint. A baked image served AlwaysOriginal cannot be
             // repainted by anything downstream - the same trick the top-bar
             // logo already relies on.
+            // Template images, coloured by the bar's own tint pair below. This
+            // is the one recipe a build has been seen to honour: the resting
+            // colour changed on screen with it. Baked pixels and per-item
+            // appearances were both tried after it and both regressed to a
+            // single accent on all four icons.
             UITabBarItem* item =
                 [[UITabBarItem alloc] initWithTitle:nil
-                                              image:NFBPaintedGlyph(image, NFBGlassTabRestingColor())
+                                              image:[image imageWithRenderingMode:
+                                                                UIImageRenderingModeAlwaysTemplate]
                                                 tag:(NSInteger)i];
-            item.selectedImage = NFBPaintedGlyph(image, tabItemColor(YES));
-            objc_setAssociatedObject(item, kNFBTabSourceKey, image,
-                                     OBJC_ASSOCIATION_RETAIN_NONATOMIC);
             [items addObject:item];
         }
         native.items = items;
         NFBDebugLog(@"[tabbar] %lu item(s) installed from the app's own tabs",
                     (unsigned long)items.count);
     }
-    // Colours through UITabBarAppearance, not the inherited tintColor pair.
-    // iOS 26 draws the bar in two layers - a tinted copy inside the lens and a
-    // base copy in the platter - and a capture showed the base one at pure
-    // black while unselectedItemTintColor said grey. The appearance object is
-    // the API that reaches both.
+    // The bar's own tint pair, nothing else. tintColor is the selected colour,
+    // unselectedItemTintColor the resting one; the floating bar on iOS 26 was
+    // measured honouring exactly this pair and ignoring UITabBarAppearance.
     UIColor* accent = tabItemColor(YES);
     UIColor* resting = NFBGlassTabRestingColor();
     BOOL labels = [BHTSettings boolForKey:@"restore_tab_labels"];
-    UITabBarAppearance* look = [[UITabBarAppearance alloc] init];
-    [look configureWithTransparentBackground];
-    for (UITabBarItemAppearance* layout in @[ look.stackedLayoutAppearance,
-                                              look.inlineLayoutAppearance,
-                                              look.compactInlineLayoutAppearance ]) {
-        layout.normal.iconColor = resting;
-        layout.selected.iconColor = accent;
-        layout.normal.titleTextAttributes = @{NSForegroundColorAttributeName : resting};
-        layout.selected.titleTextAttributes = @{NSForegroundColorAttributeName : accent};
+    if (![native.tintColor isEqual:accent]) {
+        native.tintColor = accent;
     }
-    // Only the titles come from the appearance; the icons carry their colour in
-    // their own pixels. The accent can change while the bar is up, so the pair
-    // is repainted whenever it no longer matches.
-    native.standardAppearance = look;
-    if (@available(iOS 15.0, *)) {
-        native.scrollEdgeAppearance = look;
+    if (![native.unselectedItemTintColor isEqual:resting]) {
+        native.unselectedItemTintColor = resting;
+        NFBDebugLog(@"[tabbar] tints set: accent=%@ resting=%@", accent, resting);
     }
-    NSNumber* painted = objc_getAssociatedObject(native, kNFBTabPaintKey);
-    NSUInteger stamp = (NSUInteger)accent.hash ^ (NSUInteger)resting.hash;
-    if (painted.unsignedIntegerValue != stamp) {
-        for (UITabBarItem* item in native.items) {
-            UIImage* source = objc_getAssociatedObject(item, kNFBTabSourceKey);
-            if (!source) {
-                continue;
-            }
-            item.image = NFBPaintedGlyph(source, resting);
-            item.selectedImage = NFBPaintedGlyph(source, accent);
-        }
-        objc_setAssociatedObject(native, kNFBTabPaintKey, @(stamp),
-                                 OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-        NFBDebugLog(@"[tabbar] %lu icon(s) painted: rest=%@ accent=%@",
-                    (unsigned long)native.items.count, resting, accent);
-    }
-    native.tintColor = accent;
-    native.unselectedItemTintColor = resting;
 
     // Titles follow the reader's own setting: the native bar carries them, so
     // the option is live again instead of being held off under Liquid Glass.
@@ -1896,6 +1868,58 @@ static UITabBarAppearance* NFBPatchedTabBarAppearance(UITabBarAppearance* appear
     }
     return patched;
 }
+
+
+// The Explore header. Under forced Liquid Glass the navigation bar's platter is
+// rebuilt on every re-host, and this title view - laid out once by the app for
+// the compatibility layout - comes back at the full bar width, swallowing the
+// avatar on its left. Measured by the reader: correct in Standard, broken after
+// a round trip in Liquid Glass. When the view lands at the bar's leading edge
+// the bar is asked to lay out again; each pass is journaled so a failure names
+// the frame it saw.
+%hook TFNNavigationBarSearchView
+
+- (void)layoutSubviews {
+    %orig;
+    if (![BHTSettings boolForKey:@"enable_liquid_glass"] || !self.window) {
+        return;
+    }
+    UIView* bar = self.superview;
+    while (bar && ![bar isKindOfClass:[UINavigationBar class]]) {
+        bar = bar.superview;
+    }
+    if (!bar) {
+        return;
+    }
+    CGRect inBar = [self convertRect:self.bounds toView:bar];
+    static NSTimeInterval lastNote = 0;
+    NSTimeInterval now = CACurrentMediaTime();
+    if (now - lastNote > 0.5) {
+        lastNote = now;
+        NFBDebugLog(@"[search] x=%.0f w=%.0f of bar w=%.0f | siblings=%lu", inBar.origin.x,
+                    inBar.size.width, bar.bounds.size.width,
+                    (unsigned long)self.superview.subviews.count);
+    }
+    // At the leading edge there is nothing left of it for the avatar to sit in:
+    // that is the broken geometry. One relayout of the bar is requested, once
+    // per landing, and the result shows up in the next journal line.
+    if (inBar.origin.x < 40.0 && inBar.size.width > bar.bounds.size.width * 0.8) {
+        NSNumber* asked = objc_getAssociatedObject(self, @selector(layoutSubviews));
+        if (!asked) {
+            objc_setAssociatedObject(self, @selector(layoutSubviews), @YES,
+                                     OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+            NFBDebugLog(@"[search] full-width at the leading edge - relayout requested");
+            [self invalidateIntrinsicContentSize];
+            [bar setNeedsLayout];
+            dispatch_async(dispatch_get_main_queue(), ^{
+              objc_setAssociatedObject(self, @selector(layoutSubviews), nil,
+                                       OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+            });
+        }
+    }
+}
+
+%end
 
 %hook T1TabBarHostView
 
