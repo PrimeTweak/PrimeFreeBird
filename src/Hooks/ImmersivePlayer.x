@@ -510,6 +510,21 @@ static UIView* nfbFirstDescendantOfClass(UIView* root, Class cls) {
 // card, so the search has to start at the window. Narrowing it to the card
 // returns nil every time, the reconciler never folds, and Twitter's overlay
 // stays up for good.
+// Present means visible, not merely mounted. 12.15 unmounted VideoControlsView
+// when the chrome folded; 12.21 keeps it mounted at alpha 1 under a
+// BottomBarControls held at alpha 0 - measured, every census line reported it
+// found. Read as "chrome up", that kept the minimal bar away for good and had
+// the reconciler tapping to dismiss chrome that was not showing, which is the
+// flash on resume. A view that cannot be seen is answered as absent.
+static BOOL nfbViewCanBeSeen(UIView* view) {
+    for (UIView* v = view; v; v = v.superview) {
+        if (v.hidden || v.alpha <= 0.01) {
+            return NO;
+        }
+    }
+    return view.window != nil;
+}
+
 static UIView* nfbImmersiveControlsView(UIView* card) {
     Class controlsClass =
         NSClassFromString(@"_TtC14T1TwitterSwift17VideoControlsView");
@@ -520,7 +535,8 @@ static UIView* nfbImmersiveControlsView(UIView* card) {
     // Depth-first and out at the first match. The enumerator it replaces kept
     // visiting every view after finding the bar, and this runs on every tick
     // of the fold watch.
-    return nfbFirstDescendantOfClass(root, controlsClass);
+    UIView* controls = nfbFirstDescendantOfClass(root, controlsClass);
+    return nfbViewCanBeSeen(controls) ? controls : nil;
 }
 // Built once per card and kept as an associated object. Touches pass through
 // it, so the card's own tap gesture stays the only thing handling them.
@@ -560,8 +576,12 @@ static void nfbChromeCensus(UIView* card, NSString* moment) {
     nfbCensusWalk(card.window, 0, lines);
     NFBDebugLog(@"[chrome:%@] %@", moment,
                 lines.count ? [lines componentsJoinedByString:@" | "] : @"(nothing matched)");
-    NFBDebugLog(@"[chrome:%@] controls found by nfbImmersiveControlsView: %@", moment,
-                nfbImmersiveControlsView(card) ? @"yes" : @"NO");
+    Class controlsClass = NSClassFromString(@"_TtC14T1TwitterSwift17VideoControlsView");
+    UIView* mounted = controlsClass
+                          ? nfbFirstDescendantOfClass(card.window ?: card, controlsClass)
+                          : nil;
+    NFBDebugLog(@"[chrome:%@] VideoControlsView mounted=%@ visible=%@", moment,
+                mounted ? @"yes" : @"no", nfbImmersiveControlsView(card) ? @"yes" : @"no");
 }
 
 static UIView* nfbPausedGlyph(UIView* card) {

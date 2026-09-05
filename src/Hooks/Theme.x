@@ -544,6 +544,7 @@ static const void* kNFBTabBridgeKey = &kNFBTabBridgeKey;
 static const void* kNFBTabPushedKey = &kNFBTabPushedKey;
 static const void* kNFBTabMissKey = &kNFBTabMissKey;
 static const void* kNFBTabOursKey = &kNFBTabOursKey;
+static const void* kNFBTabOutlineKey = &kNFBTabOutlineKey;
 // Shared with the debugger, which reports the rung the last tap used.
 extern const void* NFBTabRouteProbeKey(void);
 
@@ -840,6 +841,12 @@ static void NFBApplyTabBarGlassBody(UIView* host) {
             UITabBarItem* item = [[UITabBarItem alloc] initWithTitle:nil
                                                                image:NFBOpaqueTabGlyph(image)
                                                                  tag:(NSInteger)i];
+            BOOL builtFromOutline =
+                !([tab respondsToSelector:@selector(isSelected)] && [tab isSelected]);
+            if (builtFromOutline) {
+                objc_setAssociatedObject(item, kNFBTabOutlineKey, @YES,
+                                         OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+            }
             [items addObject:item];
         }
         native.items = items;
@@ -898,6 +905,32 @@ static void NFBApplyTabBarGlassBody(UIView* host) {
     // calling the delegate, so the tap route alone never sees it and the app
     // snapped back on the next pass. What the reader picked is whatever differs
     // from the index this code last pushed.
+    // The outline glyph, taken from each tab the first time it is seen
+    // unselected. The items were built at launch, when Home was the selected
+    // tab and drew its filled variant - so Home kept a filled icon while the
+    // other three, unselected at that moment, got their outlines. A tab shows
+    // its outline whenever it is not selected; the item follows once and is
+    // marked so it is not rebuilt on every pass.
+    for (NSUInteger i = 0; i < tabs.count && i < native.items.count; i++) {
+        id tab = tabs[i];
+        UITabBarItem* item = native.items[i];
+        if (objc_getAssociatedObject(item, kNFBTabOutlineKey)) {
+            continue;
+        }
+        BOOL tabSelected = [tab respondsToSelector:@selector(isSelected)] && [tab isSelected];
+        if (tabSelected || ![tab respondsToSelector:@selector(imageView)]) {
+            continue;
+        }
+        UIImage* outline = [(UIImageView*)[tab imageView] image];
+        if (!outline) {
+            continue;
+        }
+        item.image = NFBOpaqueTabGlyph(outline);
+        objc_setAssociatedObject(item, kNFBTabOutlineKey, @YES,
+                                 OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        NFBDebugLog(@"[tabbar] item %lu now carries its outline glyph", (unsigned long)i);
+    }
+
     NSUInteger appIndex = NFBSelectedTabIndex(tabs);
     NSUInteger shownIndex = native.selectedItem
                                 ? [native.items indexOfObject:native.selectedItem]
