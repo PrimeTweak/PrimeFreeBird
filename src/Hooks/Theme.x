@@ -1895,30 +1895,34 @@ static UITabBarAppearance* NFBPatchedTabBarAppearance(UITabBarAppearance* appear
         return;
     }
     CGRect inBar = [view convertRect:view.bounds toView:bar];
+
+    // Measured on the broken screen: x=20 w=288 in a 440 bar - the view starts
+    // at the leading margin, over the avatar, which sits at x=20..64 in the same
+    // bar. The correct layout starts past it. When the view lands in the
+    // avatar's zone it is moved out by the overlap, and the width gives back
+    // the same amount so the trailing edge stays where it was.
+    const CGFloat avatarTrailing = 64.0;
+    const CGFloat gap = 16.0;
     static NSTimeInterval lastNote = 0;
     NSTimeInterval now = CACurrentMediaTime();
+    if (inBar.origin.x < avatarTrailing) {
+        CGFloat shift = (avatarTrailing + gap) - inBar.origin.x;
+        CGRect frame = view.frame;
+        frame.origin.x += shift;
+        frame.size.width = MAX(80.0, frame.size.width - shift);
+        view.frame = frame;
+        if (now - lastNote > 0.5) {
+            lastNote = now;
+            NFBDebugLog(@"[search] moved out of the avatar zone: x=%.0f w=%.0f -> x=%.0f w=%.0f",
+                        inBar.origin.x, inBar.size.width, inBar.origin.x + shift,
+                        frame.size.width);
+        }
+        return;
+    }
     if (now - lastNote > 0.5) {
         lastNote = now;
-        NFBDebugLog(@"[search] x=%.0f w=%.0f of bar w=%.0f | siblings=%lu", inBar.origin.x,
-                    inBar.size.width, bar.bounds.size.width,
-                    (unsigned long)view.superview.subviews.count);
-    }
-    // At the leading edge there is nothing left of it for the avatar to sit in:
-    // that is the broken geometry. One relayout of the bar is requested, once
-    // per landing, and the result shows up in the next journal line.
-    if (inBar.origin.x < 40.0 && inBar.size.width > bar.bounds.size.width * 0.8) {
-        NSNumber* asked = objc_getAssociatedObject(view, @selector(layoutSubviews));
-        if (!asked) {
-            objc_setAssociatedObject(view, @selector(layoutSubviews), @YES,
-                                     OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-            NFBDebugLog(@"[search] full-width at the leading edge - relayout requested");
-            [view invalidateIntrinsicContentSize];
-            [bar setNeedsLayout];
-            dispatch_async(dispatch_get_main_queue(), ^{
-              objc_setAssociatedObject(view, @selector(layoutSubviews), nil,
-                                       OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-            });
-        }
+        NFBDebugLog(@"[search] x=%.0f w=%.0f of bar w=%.0f", inBar.origin.x, inBar.size.width,
+                    bar.bounds.size.width);
     }
 }
 
