@@ -80,6 +80,10 @@ extern void NFBReportBrandingSurfaces(void);
 // repaints between the two shows up as a difference rather than a guess.
 extern void NFBReportTabBarStack(NSString* moment);
 
+// The navigation bar's own tree with frames. Shake on a good screen and on a
+// bad one; the difference names the view that moved.
+extern void NFBReportNavigationBar(NSString* moment);
+
 // The watch list: class-name fragments added at runtime from the diagnostics
 // screen. Matching views have their lifecycle journaled with millisecond
 // stamps and instance pointers.

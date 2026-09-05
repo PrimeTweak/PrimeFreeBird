@@ -650,6 +650,12 @@ void NFBDebuggerCaptureAndPresent(void) {
     gNFBLastCapture = capture;
     NFBDebugLog(@"capture taken (%lu characters)", (unsigned long)capture.length);
 
+    // The tab bar as it stands right now, not five seconds after launch: the
+    // faults being chased only appear once the reader has scrolled, and a fixed
+    // delay never catches them.
+    NFBReportTabBarStack(@"shake");
+    NFBReportNavigationBar(@"shake");
+
     NFBDebuggerPresent();
 }
 
@@ -1175,10 +1181,82 @@ void NFBReportTabBarStack(NSString* moment) {
                     objc_getAssociatedObject(host, NFBTabRouteProbeKey()) ?: @"(no tap yet)");
     }
 
+    // Who actually answers a touch at each tab's centre. This is the question
+    // three failed theories danced around: the native bar can be present,
+    // interactive and on top and still not be the view UIKit hands the touch to.
+    if (native) {
+        NSMutableArray* hits = [NSMutableArray array];
+        for (NSUInteger i = 0; i < native.items.count && i < 4; i++) {
+            CGFloat step = native.bounds.size.width / MAX(1u, (unsigned)native.items.count);
+            CGPoint point = CGPointMake(step * (i + 0.5), native.bounds.size.height / 2.0);
+            UIView* hit = [window hitTest:[native convertPoint:point toView:window]
+                                withEvent:nil];
+            [hits addObject:hit ? NSStringFromClass([hit class]) : @"nil"];
+        }
+        NFBDebugLog(@"[stack:%@] hit test at each tab: %@", moment,
+                    [hits componentsJoinedByString:@" | "]);
+    }
+
     NFBDebugLog(@"[stack:%@] host.clipsToBounds=%d hostAlpha=%.2f windowLevel=%.0f", moment,
                 host.clipsToBounds, host.alpha, window.windowLevel);
     NFBDebugLog(@"[stack:%@] glass setting=%d, accent active=%d", moment,
                 [BHTSettings boolForKey:@"enable_liquid_glass"],
                 [BHTSettings boolForKey:@"tab_bar_theming"]);
+}
+
+#pragma mark - Navigation bar
+
+// The top bar's own tree, with each view's frame. Shake once on a good screen
+// and once on a bad one: the two reports name the view that moved.
+void NFBReportNavigationBar(NSString* moment) {
+    if (!NFBDebugIsRecording()) {
+        return;
+    }
+    UIWindow* window = nil;
+    for (id scene in UIApplication.sharedApplication.connectedScenes) {
+        if (![scene respondsToSelector:@selector(windows)]) {
+            continue;
+        }
+        for (UIWindow* candidate in [scene windows]) {
+            if (candidate.isKeyWindow) {
+                window = candidate;
+                break;
+            }
+        }
+        if (window) {
+            break;
+        }
+    }
+    __block UIView* bar = nil;
+    NFBDescribeTree(window, 0, ^(UIView* view, NSInteger depth) {
+      if (!bar && [NSStringFromClass([view class]) hasSuffix:@"NavigationBar"]) {
+          bar = view;
+      }
+    });
+    if (!bar) {
+        NFBDebugLog(@"[navbar:%@] no navigation bar on screen", moment);
+        return;
+    }
+    NFBDebugLog(@"[navbar:%@] --- %@ %.0fx%.0f ---", moment,
+                NSStringFromClass([bar class]), bar.bounds.size.width,
+                bar.bounds.size.height);
+    __block NSInteger line = 0;
+    NFBDescribeTree(bar, 0, ^(UIView* view, NSInteger depth) {
+      if (line >= 26) {
+          return;
+      }
+      line++;
+      NSMutableString* note = [NSMutableString string];
+      for (NSInteger i = 0; i < depth; i++) {
+          [note appendString:@"  "];
+      }
+      CGRect inBar = [view convertRect:view.bounds toView:bar];
+      [note appendFormat:@"%@ x=%.0f w=%.0f h=%.0f", NSStringFromClass([view class]),
+                         inBar.origin.x, inBar.size.width, inBar.size.height];
+      if (view.hidden) {
+          [note appendString:@" HIDDEN"];
+      }
+      NFBDebugLog(@"[navbar:%@] %@", moment, note);
+    });
 }
 

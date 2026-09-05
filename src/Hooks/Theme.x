@@ -535,6 +535,7 @@ static const void* kNFBTabHiddenKey = &kNFBTabHiddenKey;
 static const void* kNFBTabBridgeKey = &kNFBTabBridgeKey;
 static const void* kNFBTabPushedKey = &kNFBTabPushedKey;
 static const void* kNFBTabMissKey = &kNFBTabMissKey;
+static const void* kNFBTabOursKey = &kNFBTabOursKey;
 // Shared with the debugger, which reports the rung the last tap used.
 extern const void* NFBTabRouteProbeKey(void);
 
@@ -736,6 +737,8 @@ static void NFBApplyTabBarGlass(UIView* host) {
         native.delegate = bridge;
         native.autoresizingMask =
             UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+        objc_setAssociatedObject(native, kNFBTabOursKey, @YES,
+                                 OBJC_ASSOCIATION_RETAIN_NONATOMIC);
         objc_setAssociatedObject(host, kNFBTabBarKey, native,
                                  OBJC_ASSOCIATION_RETAIN_NONATOMIC);
         objc_setAssociatedObject(host, kNFBTabBridgeKey, bridge,
@@ -794,8 +797,14 @@ static void NFBApplyTabBarGlass(UIView* host) {
         layout.normal.titleTextAttributes = @{NSForegroundColorAttributeName : resting};
         layout.selected.titleTextAttributes = @{NSForegroundColorAttributeName : accent};
     }
-    native.standardAppearance = look;
-    native.scrollEdgeAppearance = look;
+    // Assigning an appearance forces a relayout, so it is handed over only when
+    // the colour actually differs.
+    UIColor* current = native.standardAppearance.stackedLayoutAppearance.normal.iconColor;
+    if (![current isEqual:resting]) {
+        native.standardAppearance = look;
+        native.scrollEdgeAppearance = look;
+        NFBDebugLog(@"[tabbar] appearance set: rest=%@ accent=%@", resting, accent);
+    }
     native.tintColor = accent;
     native.unselectedItemTintColor = resting;
 
@@ -1872,30 +1881,45 @@ static UITabBarAppearance* NFBPatchedTabBarAppearance(UITabBarAppearance* appear
 
 %hook UITabBar
 
+// The bar built for the Liquid Glass style carries its own colours and has to
+// pass through untouched. Without this guard the appearance set on it went
+// straight back through NFBPatchedTabBarAppearance, which forces labelColor -
+// the black icons the reader reported.
+%new
+- (BOOL)nfb_isOurGlassBar {
+    return objc_getAssociatedObject(self, kNFBTabOursKey) != nil;
+}
+
 - (void)didMoveToWindow {
     %orig;
-    NFBApplyTabBarAccent(self);
+    if (![self nfb_isOurGlassBar]) {
+        NFBApplyTabBarAccent(self);
+    }
 }
 
 // didMoveToWindow alone was not enough: returning from the settings screen does
 // not re-attach the bar, but it always re-lays it out.
 - (void)layoutSubviews {
     %orig;
-    NFBApplyTabBarAccent(self);
+    if (![self nfb_isOurGlassBar]) {
+        NFBApplyTabBarAccent(self);
+    }
 }
 
 - (void)setStandardAppearance:(UITabBarAppearance*)appearance {
-    UITabBarAppearance* patched = NFBPatchedTabBarAppearance(appearance);
-    if (NFBAccentPending) {
+    if ([self nfb_isOurGlassBar]) {
+        %orig(appearance);
+        return;
     }
-    %orig(patched);
+    %orig(NFBPatchedTabBarAppearance(appearance));
 }
 
 - (void)setScrollEdgeAppearance:(UITabBarAppearance*)appearance {
-    UITabBarAppearance* patched = NFBPatchedTabBarAppearance(appearance);
-    if (NFBAccentPending) {
+    if ([self nfb_isOurGlassBar]) {
+        %orig(appearance);
+        return;
     }
-    %orig(patched);
+    %orig(NFBPatchedTabBarAppearance(appearance));
 }
 
 %end
@@ -2075,6 +2099,19 @@ void NFBWhitenNavigationBarConfirm(UINavigationBar* bar) {
 
 - (void)viewDidAppear:(BOOL)animated {
     %orig;
+    // Forced Liquid Glass rebuilds the navigation bar platter on every re-host,
+    // and the app - never compiled for that mode - lays its title view out once
+    // and never again, so the avatar ends up inside the search capsule after a
+    // round trip. Asking the bar to lay out again costs one pass and restores
+    // the geometry when the constraints are merely stale. If they were rebuilt
+    // wrong, this changes nothing and the probe below says so.
+    if ([BHTSettings boolForKey:@"enable_liquid_glass"]) {
+        UINavigationBar* bar = self.navigationController.navigationBar;
+        if (bar.window) {
+            [bar setNeedsLayout];
+            [bar layoutIfNeeded];
+        }
+    }
     if (!NFBAccentPending) {
         return;
     }
