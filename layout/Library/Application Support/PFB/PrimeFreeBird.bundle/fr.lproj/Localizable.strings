@@ -243,7 +243,6 @@
 /* Restore tab labels */
 "RESTORE_TAB_LABELS_TITLE" = "Étiquettes de navigation";
 "RESTORE_TAB_LABELS_DETAIL" = "Affichez les étiquettes sous les icônes comme dans les anciennes versions de Twitter.";
-"RESTORE_TAB_LABELS_DETAIL_HELD" = "Liquid Glass dessine sa propre barre d’onglets, sans libellés.";
 
 "COLOR_TWITTER_ICON_IN_TOP_BAR_TITLE" = "Colorer l'icône Twitter";
 "COLOR_TWITTER_ICON_IN_TOP_BAR_DETAIL" = "Applique la couleur d'accent à l'icône Twitter dans la barre supérieure.";
