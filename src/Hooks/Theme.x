@@ -536,6 +536,8 @@ static const void* kNFBTabBridgeKey = &kNFBTabBridgeKey;
 static const void* kNFBTabPushedKey = &kNFBTabPushedKey;
 static const void* kNFBTabMissKey = &kNFBTabMissKey;
 static const void* kNFBTabOursKey = &kNFBTabOursKey;
+static const void* kNFBTabSourceKey = &kNFBTabSourceKey;
+static const void* kNFBTabPaintKey = &kNFBTabPaintKey;
 // Shared with the debugger, which reports the rung the last tap used.
 extern const void* NFBTabRouteProbeKey(void);
 
@@ -775,17 +777,22 @@ static void NFBApplyTabBarGlass(UIView* host) {
                 title = [tab title];
             }
             (void)title;  // The title is set below, from the reader's setting.
+            // The colour is painted into the pixels, not asked for through an
+            // appearance. Measured twice: with the bar's appearance and again
+            // with each item's own, all four icons still came out carrying the
+            // global tint. A baked image served AlwaysOriginal cannot be
+            // repainted by anything downstream - the same trick the top-bar
+            // logo already relies on.
             UITabBarItem* item =
                 [[UITabBarItem alloc] initWithTitle:nil
-                                              image:[image imageWithRenderingMode:
-                                                                UIImageRenderingModeAlwaysTemplate]
+                                              image:NFBPaintedGlyph(image, tabItemColor(NO))
                                                 tag:(NSInteger)i];
+            item.selectedImage = NFBPaintedGlyph(image, tabItemColor(YES));
+            objc_setAssociatedObject(item, kNFBTabSourceKey, image,
+                                     OBJC_ASSOCIATION_RETAIN_NONATOMIC);
             [items addObject:item];
         }
         native.items = items;
-        // A fresh set of items carries no appearance; the block below sees the
-        // bar's colour unchanged and would skip them, so it is cleared here.
-        native.standardAppearance = [[UITabBarAppearance alloc] init];
         NFBDebugLog(@"[tabbar] %lu item(s) installed from the app's own tabs",
                     (unsigned long)items.count);
     }
@@ -807,21 +814,28 @@ static void NFBApplyTabBarGlass(UIView* host) {
         layout.normal.titleTextAttributes = @{NSForegroundColorAttributeName : resting};
         layout.selected.titleTextAttributes = @{NSForegroundColorAttributeName : accent};
     }
-    // On the bar and on every item. Measured: with the bar-level appearance
-    // alone, all four icons came out carrying the accent - the item colours
-    // were never consulted, and only the global tintColor reached them. An
-    // item's own appearance is the more specific one and does get honoured.
-    UIColor* current = native.standardAppearance.stackedLayoutAppearance.normal.iconColor;
-    if (![current isEqual:resting]) {
-        native.standardAppearance = look;
-        if (@available(iOS 15.0, *)) {
-            native.scrollEdgeAppearance = look;
-        }
+    // Only the titles come from the appearance; the icons carry their colour in
+    // their own pixels. The accent can change while the bar is up, so the pair
+    // is repainted whenever it no longer matches.
+    native.standardAppearance = look;
+    if (@available(iOS 15.0, *)) {
+        native.scrollEdgeAppearance = look;
+    }
+    NSNumber* painted = objc_getAssociatedObject(native, kNFBTabPaintKey);
+    NSUInteger stamp = (NSUInteger)accent.hash ^ (NSUInteger)resting.hash;
+    if (painted.unsignedIntegerValue != stamp) {
         for (UITabBarItem* item in native.items) {
-            item.standardAppearance = look;
+            UIImage* source = objc_getAssociatedObject(item, kNFBTabSourceKey);
+            if (!source) {
+                continue;
+            }
+            item.image = NFBPaintedGlyph(source, resting);
+            item.selectedImage = NFBPaintedGlyph(source, accent);
         }
-        NFBDebugLog(@"[tabbar] appearance set on the bar and %lu item(s): rest=%@",
-                    (unsigned long)native.items.count, resting);
+        objc_setAssociatedObject(native, kNFBTabPaintKey, @(stamp),
+                                 OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        NFBDebugLog(@"[tabbar] %lu icon(s) painted: rest=%@ accent=%@",
+                    (unsigned long)native.items.count, resting, accent);
     }
     native.tintColor = accent;
     native.unselectedItemTintColor = resting;

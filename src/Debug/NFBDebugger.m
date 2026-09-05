@@ -1227,16 +1227,33 @@ void NFBReportNavigationBar(NSString* moment) {
             break;
         }
     }
+    if (!window) {
+        NFBDebugLog(@"[navbar:%@] no key window", moment);
+        return;
+    }
+    // Anything whose name carries NavigationBar, wherever it sits: the first
+    // pass demanded a suffix and found nothing, which said more about the test
+    // than about the screen.
     __block UIView* bar = nil;
+    __block NSMutableArray* candidates = [NSMutableArray array];
     NFBDescribeTree(window, 0, ^(UIView* view, NSInteger depth) {
-      if (!bar && [NSStringFromClass([view class]) hasSuffix:@"NavigationBar"]) {
-          bar = view;
+      NSString* name = NSStringFromClass([view class]);
+      if ([name containsString:@"NavigationBar"]) {
+          if (candidates.count < 6) {
+              [candidates addObject:name];
+          }
+          if (!bar && view.bounds.size.width > 200) {
+              bar = view;
+          }
       }
     });
     if (!bar) {
-        NFBDebugLog(@"[navbar:%@] no navigation bar on screen", moment);
+        NFBDebugLog(@"[navbar:%@] nothing named NavigationBar on screen; saw: %@", moment,
+                    candidates.count ? [candidates componentsJoinedByString:@", "] : @"(none)");
         return;
     }
+    NFBDebugLog(@"[navbar:%@] candidates: %@", moment,
+                [candidates componentsJoinedByString:@", "]);
     NFBDebugLog(@"[navbar:%@] --- %@ %.0fx%.0f ---", moment,
                 NSStringFromClass([bar class]), bar.bounds.size.width,
                 bar.bounds.size.height);
