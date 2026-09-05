@@ -17,6 +17,7 @@
 //
 
 #import "HookHelpers.h"
+#import "Debug/NFBDebugger.h"
 #import "Search/AdvancedSearchViewController.h"
 #import <objc/runtime.h>
 #import <objc/message.h>
@@ -103,6 +104,158 @@ static UIColor* NFBBarIconGrey(UITraitCollection* traits) {
     }
     return grey;
 }
+
+// MARK: - the app's own Filters button
+
+// 12.21 puts a sliders button on every search results screen that opens its
+// native Filters tray - the same glyph this tweak draws on Explore for its
+// own form, so the two read as one control that behaves two ways. While the
+// tweak's form is on, the native item is replaced by the tweak's on any
+// search screen: same glyph, same form, one meaning. The native item is told
+// apart by the vector it shows (Branding.x keeps every loaded vector's name on
+// the image) or, failing that, by its accessibility label.
+
+@interface NFBAdvSearchLauncher : NSObject
+@property (nonatomic, weak) UIViewController* owner;
+- (void)launch:(id)sender;
+@end
+
+@implementation NFBAdvSearchLauncher
+- (void)launch:(id)sender {
+    UIViewController* owner = self.owner;
+    if (!owner || owner.presentedViewController) {
+        return;
+    }
+    AdvancedSearchViewController* form = [[AdvancedSearchViewController alloc] init];
+    UINavigationController* nav =
+        [[UINavigationController alloc] initWithRootViewController:form];
+    nav.modalPresentationStyle = UIModalPresentationPageSheet;
+    [owner presentViewController:nav animated:YES completion:nil];
+}
+@end
+
+static const void* kNFBAdvLauncherKey = &kNFBAdvLauncherKey;
+static const void* kNFBAdvReplacedKey = &kNFBAdvReplacedKey;
+
+static NSString* nfbAdvVectorName(UIImage* image) {
+    return image ? objc_getAssociatedObject(
+                       image, @selector(tfn_vectorImageNamed:fitsSize:fillColor:))
+                 : nil;
+}
+
+static BOOL nfbAdvIsFiltersItem(UIBarButtonItem* item) {
+    if (objc_getAssociatedObject(item, kNFBAdvReplacedKey)) {
+        return NO;
+    }
+    NSSet* glyphs = [NSSet setWithObjects:@"settings_slider", @"filter_bars", nil];
+    NSString* name = nfbAdvVectorName(item.image);
+    if (name && [glyphs containsObject:name]) {
+        return YES;
+    }
+    if (item.customView) {
+        __block BOOL found = NO;
+        EnumerateSubviewsRecursively(item.customView, ^(UIView* view) {
+            if (!found && [view isKindOfClass:[UIImageView class]]) {
+                NSString* inner = nfbAdvVectorName([(UIImageView*)view image]);
+                found = inner && [glyphs containsObject:inner];
+            }
+        });
+        if (found) {
+            return YES;
+        }
+    }
+    NSString* label = item.accessibilityLabel ?: item.customView.accessibilityLabel;
+    NSSet* labels = [NSSet setWithObjects:@"Filters", @"Filter", @"Filtres", @"Filtre", nil];
+    return label && [labels containsObject:label];
+}
+
+static UIBarButtonItem* nfbAdvReplacementFor(UIViewController* owner) {
+    UIColor* grey = NFBBarIconGrey(owner.traitCollection);
+    NFBAdvSearchLauncher* launcher = [NFBAdvSearchLauncher new];
+    launcher.owner = owner;
+    UIBarButtonItem* btn = [[UIBarButtonItem alloc] initWithImage:NFBSlidersGlyph(27.33, grey)
+                                                            style:UIBarButtonItemStylePlain
+                                                           target:launcher
+                                                           action:@selector(launch:)];
+    btn.tintColor = grey;
+    btn.accessibilityLabel = [[BHTBundle sharedBundle] localizedStringForKey:@"ADVANCED_SEARCH_TITLE"];
+    if ([btn respondsToSelector:@selector(setHidesSharedBackground:)]) {
+        ((void (*)(id, SEL, BOOL))objc_msgSend)(btn, @selector(setHidesSharedBackground:), YES);
+    }
+    // The item holds its launcher; the launcher only holds the owner weakly.
+    objc_setAssociatedObject(btn, kNFBAdvLauncherKey, launcher, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    objc_setAssociatedObject(btn, kNFBAdvReplacedKey, @YES, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    return btn;
+}
+
+static void nfbAdvReplaceFilters(UIViewController* owner) {
+    if (![BHTSettings boolForKey:@"advanced_search"]) {
+        return;
+    }
+    UINavigationItem* item = owner.navigationItem;
+    NSInteger replaced = 0;
+    NSMutableArray* seen = [NSMutableArray array];
+    NSArray* right = item.rightBarButtonItems ?: @[];
+    NSMutableArray* rebuilt = [NSMutableArray arrayWithCapacity:right.count];
+    for (UIBarButtonItem* entry in right) {
+        [seen addObject:nfbAdvVectorName(entry.image) ?: (entry.accessibilityLabel ?: @"?")];
+        if (nfbAdvIsFiltersItem(entry)) {
+            [rebuilt addObject:nfbAdvReplacementFor(owner)];
+            replaced++;
+        } else {
+            [rebuilt addObject:entry];
+        }
+    }
+    if (replaced) {
+        item.rightBarButtonItems = rebuilt;
+    }
+    if (@available(iOS 16.0, *)) {
+        for (UIBarButtonItemGroup* group in item.trailingItemGroups) {
+            NSMutableArray* members = [group.barButtonItems mutableCopy];
+            BOOL changed = NO;
+            for (NSUInteger i = 0; i < members.count; i++) {
+                UIBarButtonItem* entry = members[i];
+                [seen addObject:nfbAdvVectorName(entry.image) ?: (entry.accessibilityLabel ?: @"?")];
+                if (nfbAdvIsFiltersItem(entry)) {
+                    members[i] = nfbAdvReplacementFor(owner);
+                    changed = YES;
+                    replaced++;
+                }
+            }
+            if (changed) {
+                group.barButtonItems = members;
+            }
+        }
+    }
+    if (seen.count) {
+        NFBDebugLog(@"[advsearch] %@: items %@ - replaced %ld", NSStringFromClass([owner class]),
+                    [seen componentsJoinedByString:@", "], (long)replaced);
+    }
+}
+
+static BOOL nfbAdvIsSearchScreen(UIViewController* vc) {
+    NSString* name = NSStringFromClass([vc class]);
+    return [name rangeOfString:@"search" options:NSCaseInsensitiveSearch].location != NSNotFound &&
+           ![vc isKindOfClass:[AdvancedSearchViewController class]];
+}
+
+%hook UIViewController
+
+- (void)viewWillAppear:(BOOL)animated {
+    %orig;
+    if (nfbAdvIsSearchScreen(self)) {
+        nfbAdvReplaceFilters(self);
+    }
+}
+
+- (void)viewDidAppear:(BOOL)animated {
+    %orig;
+    if (nfbAdvIsSearchScreen(self)) {
+        nfbAdvReplaceFilters(self);
+    }
+}
+
+%end
 
 %hook _TtC14T1TwitterSwift28GuideContainerViewController
 

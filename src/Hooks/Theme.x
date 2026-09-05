@@ -594,6 +594,57 @@ static UIImage* NFBTabVectorNamed(NSString* name) {
                                fillColor:[UIColor blackColor]];
 }
 
+// The ink of a glyph: its alpha summed over a small bitmap. Two variants that
+// draw the same pixels score the same, which is how a "filled" name that only
+// repeats the outline is told apart from a real second glyph.
+static double NFBGlyphInk(UIImage* glyph) {
+    if (!glyph) {
+        return 0;
+    }
+    const size_t side = 24;
+    uint8_t* pixels = calloc(side * side, 1);
+    CGColorSpaceRef gray = CGColorSpaceCreateDeviceGray();
+    CGContextRef context = CGBitmapContextCreate(pixels, side, side, 8, side, gray,
+                                                 kCGImageAlphaOnly);
+    CGColorSpaceRelease(gray);
+    double ink = 0;
+    if (context) {
+        CGContextDrawImage(context, CGRectMake(0, 0, side, side), glyph.CGImage);
+        for (size_t i = 0; i < side * side; i++) {
+            ink += pixels[i];
+        }
+        CGContextRelease(context);
+    }
+    free(pixels);
+    return ink;
+}
+
+// A heavier weight of the same glyph, for tabs whose selected icon is not a
+// fill but a bolder stroke - the magnifier. The outline is drawn over itself
+// at eight sub-pixel offsets, which thickens every line by about a pixel and
+// keeps the shape. Measured need: the bundle's bare "search" either fails to
+// load or repeats search_stroke, while home, notifications and messages have
+// true filled variants.
+static UIImage* NFBEmboldenedGlyph(UIImage* outline) {
+    if (!outline || outline.size.width < 1.0) {
+        return nil;
+    }
+    UIGraphicsImageRendererFormat* format = [UIGraphicsImageRendererFormat preferredFormat];
+    format.opaque = NO;
+    format.scale = outline.scale;
+    UIGraphicsImageRenderer* renderer =
+        [[UIGraphicsImageRenderer alloc] initWithSize:outline.size format:format];
+    return [renderer imageWithActions:^(UIGraphicsImageRendererContext* context) {
+      const CGFloat d = 0.75;
+      const CGPoint offsets[] = {{-d, 0}, {d, 0},  {0, -d}, {0, d},
+                                 {-d, -d}, {d, -d}, {-d, d}, {d, d}, {0, 0}};
+      for (size_t i = 0; i < sizeof(offsets) / sizeof(offsets[0]); i++) {
+          [outline drawInRect:CGRectMake(offsets[i].x, offsets[i].y, outline.size.width,
+                                         outline.size.height)];
+      }
+    }];
+}
+
 static UIImage* NFBOpaqueTabGlyph(UIImage* source) {
     if (!source || source.size.width < 1.0 || source.size.height < 1.0) {
         return source;
@@ -861,14 +912,22 @@ static void NFBApplyTabBarGlassBody(UIView* host) {
             UIImage* filled = NFBTabVectorNamed(base);
             // The tab's own image is the fallback when the bundle has no glyph
             // under that name; it is whichever variant the tab shows right now.
-            UITabBarItem* item =
-                [[UITabBarItem alloc] initWithTitle:nil
-                                              image:NFBOpaqueTabGlyph(outline ?: image)
-                                                tag:(NSInteger)i];
+            UIImage* resting = outline ?: image;
+            NSString* selectedSource = @"filled";
+            double restingInk = NFBGlyphInk(resting);
+            double filledInk = NFBGlyphInk(filled);
+            if (!filled || fabs(filledInk - restingInk) < restingInk * 0.05) {
+                filled = NFBEmboldenedGlyph(resting);
+                selectedSource = filledInk > 0 ? @"emboldened (same ink as outline)"
+                                               : @"emboldened (no filled glyph)";
+            }
+            UITabBarItem* item = [[UITabBarItem alloc] initWithTitle:nil
+                                                               image:NFBOpaqueTabGlyph(resting)
+                                                                 tag:(NSInteger)i];
             item.selectedImage = filled ? NFBOpaqueTabGlyph(filled) : nil;
-            NFBDebugLog(@"[tabbar] tab %lu '%@': outline=%@ filled=%@", (unsigned long)i,
-                        base ?: @"(no name)", outline ? @"yes" : @"fallback",
-                        filled ? @"yes" : @"none");
+            NFBDebugLog(@"[tabbar] tab %lu '%@': outline=%@ ink=%.0f | selected=%@ ink=%.0f",
+                        (unsigned long)i, base ?: @"(no name)", outline ? @"yes" : @"fallback",
+                        restingInk, selectedSource, NFBGlyphInk(filled));
             [items addObject:item];
         }
         native.items = items;

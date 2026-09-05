@@ -344,13 +344,24 @@ static BOOL isComposePlusGlyph(NSString* name) {
     return [name isKindOfClass:[NSString class]] && [name isEqualToString:@"plus"];
 }
 
+// Every vector the app loads by name keeps that name on the image, under the
+// loader's own selector as the key so any file can read it back without a
+// shared declaration. It is how a bar button is told apart by what it shows.
+static id NFBNamedVector(id image, id name) {
+    if (image && [name isKindOfClass:[NSString class]]) {
+        objc_setAssociatedObject(image, @selector(tfn_vectorImageNamed:fitsSize:fillColor:),
+                                 name, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    }
+    return image;
+}
+
 %hook UIImage
 
 + (id)tfn_vectorImageNamed:(id)name fitsSize:(CGSize)size fillColor:(id)color {
     if (isComposePlusGlyph(name)) {
         return %orig(@"quill", size, [UIColor whiteColor]);
     }
-    return %orig(name, size, color);
+    return NFBNamedVector(%orig(name, size, color), name);
 }
 
 + (id)tfn_vectorImageNamed:(id)name
@@ -360,14 +371,14 @@ static BOOL isComposePlusGlyph(NSString* name) {
     if (isComposePlusGlyph(name)) {
         return %orig(@"quill", variant, size, [UIColor whiteColor]);
     }
-    return %orig(name, variant, size, color);
+    return NFBNamedVector(%orig(name, variant, size, color), name);
 }
 
 + (id)tfn_vectorImageNamed:(id)name height:(double)height fillColor:(id)color {
     if (isComposePlusGlyph(name)) {
         return %orig(@"quill", height, [UIColor whiteColor]);
     }
-    return %orig(name, height, color);
+    return NFBNamedVector(%orig(name, height, color), name);
 }
 
 %end
