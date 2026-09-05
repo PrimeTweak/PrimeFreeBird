@@ -569,6 +569,32 @@ static BOOL NFBIsOurGlassBar(id bar) {
     return objc_getAssociatedObject(bar, kNFBTabOursKey) != nil;
 }
 
+// A tab glyph at full opacity. Measured on the reader's device: Home renders
+// black and the other three the same grey, tint and mode identical on all four.
+// The only thing left to differ is the pixels, and it is the alpha - the app
+// draws its resting icons at secondaryLabelColor, black at 60 %, baked into
+// the image itself; the selected tab keeps its opaque original. A template
+// image renders tint through alpha, so 0.6 stays grey whatever the tint says.
+// Compositing the glyph over itself six times drives 0.6 to 0.996 and leaves
+// the shape untouched.
+static UIImage* NFBOpaqueTabGlyph(UIImage* source) {
+    if (!source || source.size.width < 1.0 || source.size.height < 1.0) {
+        return source;
+    }
+    UIGraphicsImageRendererFormat* format = [UIGraphicsImageRendererFormat preferredFormat];
+    format.opaque = NO;
+    format.scale = source.scale;
+    UIGraphicsImageRenderer* renderer =
+        [[UIGraphicsImageRenderer alloc] initWithSize:source.size format:format];
+    UIImage* solid = [renderer imageWithActions:^(UIGraphicsImageRendererContext* context) {
+      CGRect box = CGRectMake(0, 0, source.size.width, source.size.height);
+      for (NSInteger pass = 0; pass < 6; pass++) {
+          [source drawInRect:box blendMode:kCGBlendModeNormal alpha:1.0];
+      }
+    }];
+    return [solid imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate];
+}
+
 static UIView* NFBCustomTabBar(UIView* host) {
     __block UIView* found = nil;
     NFBWalkAllSubviews(host, 0, ^(UIView* sub) {
@@ -809,19 +835,11 @@ static void NFBApplyTabBarGlassBody(UIView* host) {
             // colour changed on screen with it. Baked pixels and per-item
             // appearances were both tried after it and both regressed to a
             // single accent on all four icons.
-            // Every icon goes through the same normalisation. Measured by the
-            // reader: Home came out black and the other three grey. Home was
-            // the only tab whose clean original had been stored before the
-            // native bar went up; the others fell back to the app's own image,
-            // already rendered in its resting grey, which a template mode does
-            // not strip. Repainting the glyph from its alpha alone makes the
-            // four identical, and the bar's tint pair then colours them alike.
-            UIImage* glyph = NFBPaintedGlyph(image, [UIColor blackColor]) ?: image;
-            UITabBarItem* item =
-                [[UITabBarItem alloc] initWithTitle:nil
-                                              image:[glyph imageWithRenderingMode:
-                                                                UIImageRenderingModeAlwaysTemplate]
-                                                tag:(NSInteger)i];
+            // Every icon at full opacity, whatever the app rendered it at: see
+            // NFBOpaqueTabGlyph for the measurement behind this.
+            UITabBarItem* item = [[UITabBarItem alloc] initWithTitle:nil
+                                                               image:NFBOpaqueTabGlyph(image)
+                                                                 tag:(NSInteger)i];
             [items addObject:item];
         }
         native.items = items;

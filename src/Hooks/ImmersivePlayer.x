@@ -1292,6 +1292,56 @@ static void nfbStartFoldWatch(UIView* card) {
 %end
 
 // scrubber, timer and playback buttons
+// 12.21 additions, measured with the chrome census. With the player running and
+// the chrome folded, these three still sat at alpha 1: the native timeline
+// (440x3), its scrub label strip (440x36) and the attribution line - so the
+// app's own bar showed through under the tweak's minimal one. On a tap the
+// play/pause plugin rose to 1 while the plugins listed above stayed at 0, which
+// is the half-mounted chrome the reader saw. Same rule as every plugin above.
+%hook _TtC14T1TwitterSwift32ImmersiveVideoTimelinePluginView
+- (void)setAlpha:(CGFloat)alpha {
+    BOOL blocked = alpha > 0 && nfbChromeIsUnasked();
+    if (blocked) {
+        %orig(0);
+        return;
+    }
+    %orig;
+}
+%end
+
+%hook _TtC14T1TwitterSwift37ImmersiveScrubProgressLabelPluginView
+- (void)setAlpha:(CGFloat)alpha {
+    BOOL blocked = alpha > 0 && nfbChromeIsUnasked();
+    if (blocked) {
+        %orig(0);
+        return;
+    }
+    %orig;
+}
+%end
+
+%hook _TtC14T1TwitterSwift34ImmersivePlayPauseButtonPluginView
+- (void)setAlpha:(CGFloat)alpha {
+    BOOL blocked = alpha > 0 && nfbChromeIsUnasked();
+    if (blocked) {
+        %orig(0);
+        return;
+    }
+    %orig;
+}
+%end
+
+%hook _TtC14T1TwitterSwift30ImmersiveAttributionPluginView
+- (void)setAlpha:(CGFloat)alpha {
+    BOOL blocked = alpha > 0 && nfbChromeIsUnasked();
+    if (blocked) {
+        %orig(0);
+        return;
+    }
+    %orig;
+}
+%end
+
 %hook _TtC14T1TwitterSwift17BottomBarControls
 - (void)setAlpha:(CGFloat)alpha {
     BOOL blocked = alpha > 0 && nfbChromeIsUnasked();
