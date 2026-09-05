@@ -523,6 +523,46 @@ static UIView* nfbImmersiveControlsView(UIView* card) {
 }
 // Built once per card and kept as an associated object. Touches pass through
 // it, so the card's own tap gesture stays the only thing handling them.
+
+// One census of the card's chrome, taken twice after it opens and once on every
+// pause. 12.21 shipped 82 immersive classes this file has never heard of -
+// among them ImmersivePlayPauseButtonPluginView and ImmersiveVideoTimelinePluginView,
+// the two that match what the reader sees: native controls coming back on
+// pause, and a flash. The list names each mounted plugin with its alpha, so the
+// hide list below can be extended from fact rather than from the class dump.
+static void nfbCensusWalk(UIView* view, NSInteger depth, NSMutableArray* lines) {
+    NSString* name = NSStringFromClass([view class]);
+    if (depth > 0 && lines.count < 40 &&
+        ([name containsString:@"Plugin"] || [name containsString:@"Controls"] ||
+         [name containsString:@"Timeline"] || [name containsString:@"Scrub"] ||
+         [name containsString:@"PlayPause"] || [name containsString:@"BottomBar"])) {
+        NSString* shortName = [name componentsSeparatedByString:@"Swift"].lastObject;
+        shortName = [shortName stringByTrimmingCharactersInSet:
+                                   [NSCharacterSet decimalDigitCharacterSet]];
+        [lines addObject:[NSString stringWithFormat:@"%@ a=%.2f%@ %.0fx%.0f", shortName,
+                                                    view.alpha, view.hidden ? @" HIDDEN" : @"",
+                                                    view.bounds.size.width,
+                                                    view.bounds.size.height]];
+    }
+    if (depth < 14) {
+        for (UIView* sub in view.subviews) {
+            nfbCensusWalk(sub, depth + 1, lines);
+        }
+    }
+}
+
+static void nfbChromeCensus(UIView* card, NSString* moment) {
+    if (!card.window) {
+        return;
+    }
+    NSMutableArray* lines = [NSMutableArray array];
+    nfbCensusWalk(card.window, 0, lines);
+    NFBDebugLog(@"[chrome:%@] %@", moment,
+                lines.count ? [lines componentsJoinedByString:@" | "] : @"(nothing matched)");
+    NFBDebugLog(@"[chrome:%@] controls found by nfbImmersiveControlsView: %@", moment,
+                nfbImmersiveControlsView(card) ? @"yes" : @"NO");
+}
+
 static UIView* nfbPausedGlyph(UIView* card) {
     UIView* glyph = objc_getAssociatedObject(card, kNFBPausedGlyphKey);
     if (glyph) {
@@ -1020,6 +1060,11 @@ static void nfbStartFoldWatch(UIView* card) {
 %hook _TtC14T1TwitterSwift17ImmersiveCardView
 
 - (void)handleSingleTap:(UITapGestureRecognizer*)tap {
+    {
+        __weak UIView* tappedCard = (UIView*)self;
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.4 * NSEC_PER_SEC)),
+                       dispatch_get_main_queue(), ^{ nfbChromeCensus(tappedCard, @"tap"); });
+    }
     UIView* card = (UIView*)self;
     // The sound button owns its own corner of the screen.
     UIView* ourBar = objc_getAssociatedObject(card, kNFBMinimalBarKey);
@@ -1099,6 +1144,11 @@ static void nfbStartFoldWatch(UIView* card) {
             @([NSDate timeIntervalSinceReferenceDate]),
             OBJC_ASSOCIATION_RETAIN_NONATOMIC);
         nfbStartFoldWatch(card);
+        __weak UIView* censusCard = card;
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1.0 * NSEC_PER_SEC)),
+                       dispatch_get_main_queue(), ^{ nfbChromeCensus(censusCard, @"1s"); });
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(3.0 * NSEC_PER_SEC)),
+                       dispatch_get_main_queue(), ^{ nfbChromeCensus(censusCard, @"3s"); });
     } else {
         if (gNFBActiveCard == card) {
             gNFBActiveCard = nil;

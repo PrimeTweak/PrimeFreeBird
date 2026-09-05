@@ -240,42 +240,62 @@ static NSString* NFBNotifIdentity(id model) {
     static NSMutableDictionary<NSString*, NSString*>* cache;
     if (!cache) { cache = [NSMutableDictionary dictionary]; }
     NSString* className = NSStringFromClass([model class]);
-
     NSString* known = cache[className];
     if (known) {
         return NFBNotifString(NFBNotifAsk(model, NSSelectorFromString(known)));
     }
-    // Measured, 18:20:17 — this model exposes exactly six selectors:
+    // Measured, 18:20:17 - this model exposes exactly six selectors:
     // description, scribeComponent, scribeElement, scribeItem,
-    // scribeItemImpressionID, init. So the identifier is a scribe one; the
-    // usual entryId/id names simply do not exist here. scribeItem is tried
-    // first (an object that may carry a stabler id), then the impression id.
+    // scribeItemImpressionID, init. The impression id used to be tried first,
+    // and that is why a hidden notification came back after a reinstall: an
+    // impression id is minted per display, so the key written when hiding
+    // never matched the key seen when filtering again. Durable names go first
+    // now - the ones inside scribeItem, then the usual entry ids - and the
+    // impression id is the last resort, journaled as such.
+    id scribeItem = NFBNotifAsk(model, NSSelectorFromString(@"scribeItem"));
+    if (scribeItem && ![scribeItem isKindOfClass:[NSString class]]) {
+        NSArray<NSString*>* inner = @[@"entryId", @"entryID", @"id", @"itemId",
+                                      @"itemID", @"restId", @"identifier",
+                                      @"tweetId", @"userId", @"notificationId"];
+        for (NSString* name in inner) {
+            NSString* value = NFBNotifString(NFBNotifAsk(scribeItem,
+                                                         NSSelectorFromString(name)));
+            if (value.length) {
+                NFBDebugLog(@"notifhide: identity via scribeItem.%@ (durable)", name);
+                return [@"si:" stringByAppendingString:value];
+            }
+        }
+        static BOOL described;
+        if (!described) {
+            described = YES;
+            NSString* shape = nil;
+            @try {
+                shape = [scribeItem description];
+                if (shape.length > 260) {
+                    shape = [shape substringToIndex:260];
+                }
+            } @catch (id exception) {
+                shape = @"(description unreadable)";
+            }
+            NFBDebugLog(@"notifhide: scribeItem is %@ and answers none of the durable "
+                        @"names; description = %@",
+                        NSStringFromClass([scribeItem class]), shape ?: @"(nil)");
+        }
+    }
     NSArray<NSString*>* candidates = @[
-        @"scribeItemImpressionID", @"scribeItemImpressionId",
-        @"entryId", @"entryID", @"identifier", @"notificationId",
-        @"notificationID", @"id", @"sortIndex", @"key", @"itemIdentifier"
+        @"entryId", @"entryID", @"identifier", @"notificationId", @"notificationID",
+        @"id", @"sortIndex", @"key", @"itemIdentifier",
+        @"scribeItemImpressionID", @"scribeItemImpressionId"
     ];
     for (NSString* name in candidates) {
         NSString* value = NFBNotifString(NFBNotifAsk(model, NSSelectorFromString(name)));
         if (value.length) {
             cache[className] = name;
-            NFBDebugLog(@"notifhide: identity of %@ = %@", className, name);
+            NFBDebugLog(@"notifhide: identity of %@ = %@%@", className, name,
+                        [name hasPrefix:@"scribeItemImpression"]
+                            ? @" (IMPRESSION ID - not stable across sessions)"
+                            : @"");
             return value;
-        }
-    }
-    // One level into scribeItem: the wrapper may hold the durable id.
-    id scribeItem = NFBNotifAsk(model, NSSelectorFromString(@"scribeItem"));
-    if (scribeItem && ![scribeItem isKindOfClass:[NSString class]]) {
-        NSArray<NSString*>* inner = @[@"entryId", @"entryID", @"id", @"itemId",
-                                      @"itemID", @"restId", @"identifier",
-                                      @"impressionId", @"impressionID"];
-        for (NSString* name in inner) {
-            NSString* value = NFBNotifString(NFBNotifAsk(scribeItem,
-                                                         NSSelectorFromString(name)));
-            if (value.length) {
-                NFBDebugLog(@"notifhide: identity via scribeItem.%@", name);
-                return [@"si:" stringByAppendingString:value];
-            }
         }
     }
     SEL found = NFBNotifDiscover(model, @[@"entryid", @"identifier", @"sortindex",

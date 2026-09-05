@@ -809,9 +809,17 @@ static void NFBApplyTabBarGlassBody(UIView* host) {
             // colour changed on screen with it. Baked pixels and per-item
             // appearances were both tried after it and both regressed to a
             // single accent on all four icons.
+            // Every icon goes through the same normalisation. Measured by the
+            // reader: Home came out black and the other three grey. Home was
+            // the only tab whose clean original had been stored before the
+            // native bar went up; the others fell back to the app's own image,
+            // already rendered in its resting grey, which a template mode does
+            // not strip. Repainting the glyph from its alpha alone makes the
+            // four identical, and the bar's tint pair then colours them alike.
+            UIImage* glyph = NFBPaintedGlyph(image, [UIColor blackColor]) ?: image;
             UITabBarItem* item =
                 [[UITabBarItem alloc] initWithTitle:nil
-                                              image:[image imageWithRenderingMode:
+                                              image:[glyph imageWithRenderingMode:
                                                                 UIImageRenderingModeAlwaysTemplate]
                                                 tag:(NSInteger)i];
             [items addObject:item];
