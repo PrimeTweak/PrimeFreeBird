@@ -993,9 +993,13 @@ static BOOL nfbFoldIfDue(UIView* card) {
     if (!card || !card.window || ![BHTSettings boolForKey:@"tap_to_pause"]) {
         return YES;
     }
+    // Inside the grace window the answer is "not yet", never "done": YES ends
+    // the watch for good, and it used to end it on the reader's first tap -
+    // seen on film as a pause that sat 1.8 s without its chrome, since nothing
+    // was left to ask for it.
     if ([NSDate timeIntervalSinceReferenceDate] - gNFBLastUserTap <
         kNFBUserTapGrace) {
-        return YES;
+        return NO;
     }
     TAVPlayer* player = nfbCardPlayer(card);
     if (!player) {
@@ -1155,6 +1159,9 @@ static void nfbStartFoldWatch(UIView* card) {
       [(_TtC14T1TwitterSwift17ImmersiveCardView*)strongCard setPausedByUser:!nowPlaying];
       nfbShowPausedGlyph(strongCard, !nowPlaying);
       nfbUpdateMinimalBar(strongCard, strongPlayer);
+      // A fresh budget of ticks after every real tap: the watch is what brings
+      // the chrome up on a pause and folds it on a resume.
+      nfbStartFoldWatch(strongCard);
     });
 }
 
