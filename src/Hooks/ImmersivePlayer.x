@@ -72,7 +72,25 @@ static UIView* nfbImmersiveControlsView(UIView* card);
 // Nothing that is visible once a video has settled is suppressed by this: every
 // one of these views ends at alpha 0 on its own. Only the ride up and back down
 // is taken away.
-static BOOL gNFBReaderAskedForChrome = NO;
+// The reader's intent. Set by a real tap - "was playing, so wants paused" -
+// and by nothing else. Playback is held to it after every tap the app sees,
+// because 12.21's own tap toggles playback a runloop turn later than the tap.
+static BOOL gNFBWantPaused = NO;
+
+// The chrome gate. Every chrome setAlpha: records the alpha the app wanted,
+// then passes it through when the gate is open (paused) and pins 0 when it is
+// closed (playing). Opening the gate replays the wanted alphas, so a pause
+// shows the chrome the app already raised without a tap, and closing it hides
+// the chrome at once - no flash on resume. The recorded alphas are also the
+// only honest reading of what the app itself wants shown.
+static NSHashTable<UIView*>* gNFBGatedViews = nil;
+static const void* kNFBWantedAlphaKey = &kNFBWantedAlphaKey;
+
+// Synthetic taps left for the current pause. The app raises its chrome through
+// its tap and through nothing else, so when the reader pauses and the app's
+// chrome is down a tap is sent - bounded, spaced, and never for a resume.
+static NSInteger gNFBSyntheticBudget = 0;
+static const NSInteger kNFBSyntheticPerPause = 3;
 
 // Read once per video rather than on every setAlpha: the app re-asserts alpha
 // hundreds of times while a video plays, and the setting cannot change while
@@ -84,7 +102,92 @@ static void nfbRefreshCleanPlayerFlag(void) {
 }
 
 static BOOL nfbChromeIsUnasked(void) {
-    return !gNFBReaderAskedForChrome && gNFBCleanPlayerOn;
+    return gNFBCleanPlayerOn && !gNFBWantPaused;
+}
+
+static void nfbNoteChromeAlpha(UIView* view, CGFloat alpha) {
+    if (!gNFBGatedViews) {
+        gNFBGatedViews = [NSHashTable weakObjectsHashTable];
+    }
+    [gNFBGatedViews addObject:view];
+    objc_setAssociatedObject(view, kNFBWantedAlphaKey, @(alpha),
+                             OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+}
+
+// What the app wants shown, read from the alphas it asked for. The engagement
+// row is the sentinel when it is on screen; failing that, any gated chrome.
+static BOOL nfbAppChromeUp(UIView* card) {
+    if (!card.window) {
+        return NO;
+    }
+    Class sentinel =
+        NSClassFromString(@"_TtC14T1TwitterSwift36ImmersiveEngagementActionsPluginView");
+    BOOL sawSentinel = NO;
+    BOOL anyUp = NO;
+    for (UIView* view in gNFBGatedViews) {
+        if (view.window != card.window) {
+            continue;
+        }
+        CGFloat wanted = [objc_getAssociatedObject(view, kNFBWantedAlphaKey) doubleValue];
+        if (sentinel && [view isKindOfClass:sentinel]) {
+            sawSentinel = YES;
+            if (wanted > 0.5) {
+                return YES;
+            }
+        } else if (wanted > 0.5) {
+            anyUp = YES;
+        }
+    }
+    return sawSentinel ? NO : anyUp;
+}
+
+// Opening the gate: every gated view gets the alpha the app last asked for,
+// through its own setter, which now lets it through.
+static void nfbReplayChromeAlphas(UIView* card) {
+    for (UIView* view in [gNFBGatedViews allObjects]) {
+        if (view.window != card.window) {
+            continue;
+        }
+        NSNumber* wanted = objc_getAssociatedObject(view, kNFBWantedAlphaKey);
+        if (wanted) {
+            view.alpha = wanted.doubleValue;
+        }
+    }
+}
+
+// Playback held to the reader's intent, on a short ladder after any tap the
+// app has seen: the app's own toggle lands a turn or more later, and on 12.21
+// it lands whatever the tap was for. Each rung re-reads the state and only
+// acts on a mismatch, so a tap the app answered correctly costs nothing.
+static void nfbShowPausedGlyph(UIView* card, BOOL paused);
+static void nfbUpdateMinimalBar(UIView* card, TAVPlayer* player);
+static TAVPlayer* nfbCardPlayer(UIView* card);
+static void nfbEnforcePlayback(UIView* card) {
+    __weak UIView* weakCard = card;
+    NSArray<NSNumber*>* rungs = @[ @0.05, @0.15, @0.30, @0.60, @1.00 ];
+    for (NSNumber* rung in rungs) {
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW,
+                                     (int64_t)(rung.doubleValue * NSEC_PER_SEC)),
+                       dispatch_get_main_queue(), ^{
+          UIView* strongCard = weakCard;
+          TAVPlayer* player = strongCard ? nfbCardPlayer(strongCard) : nil;
+          if (!player || !strongCard.window) {
+              return;
+          }
+          BOOL paused = player.playbackState.timeControlStatus == 0;
+          if (paused != gNFBWantPaused) {
+              NFBDebugLog(@"[tap] +%.2fs playback is %@, intent is %@ - held", rung.doubleValue,
+                          paused ? @"paused" : @"playing", gNFBWantPaused ? @"paused" : @"playing");
+              if (gNFBWantPaused) {
+                  [player pause];
+              } else {
+                  [player playOrReplay];
+              }
+          }
+          nfbShowPausedGlyph(strongCard, gNFBWantPaused);
+          nfbUpdateMinimalBar(strongCard, player);
+        });
+    }
 }
 static void nfbHoldThroughOpening(UIView* view) {
     if (!view.window || ![BHTSettings boolForKey:@"tap_to_pause"]) {
@@ -214,7 +317,8 @@ static void nfbClearAutoUnmute(UIView* view) {
     // A video opened from the timeline starts in the chosen state, whatever the
     // last one was left as.
     gNFBSoundAllowed = nfbSoundAllowedAtOpen();
-    gNFBReaderAskedForChrome = NO;
+    gNFBWantPaused = NO;
+    gNFBSyntheticBudget = 0;
     nfbRefreshCleanPlayerFlag();
     %orig;
 }
@@ -347,7 +451,7 @@ static BOOL isImmersiveCardPan(id viewController,
 // changed and asks again, which is how a single opening produced dozens of taps
 // in bursts. One tap per card per cooldown breaks that loop: the first fold
 // still happens at once, and nothing can chase its own tail afterwards.
-static const NSTimeInterval kNFBFoldCooldown = 0.4;
+static const NSTimeInterval kNFBFoldCooldown = 0.5;
 static const void* kNFBLastFoldKey = &kNFBLastFoldKey;
 
 static const void* kNFBPausedGlyphKey = &kNFBPausedGlyphKey;
@@ -362,11 +466,6 @@ static const void* kNFBMinimalTimerKey = &kNFBMinimalTimerKey;
 // the ninth frame, about 150 ms. This waits just past that and no longer —
 // every extra millisecond is a hole where nothing is on screen.
 static const NSTimeInterval kNFBOpeningSettle = 0.18;
-// While a card is opening, a player that reports "waiting to play" is a player
-// about to play: the app draws its overlay over the outgoing timeline for the
-// length of that transition, and waiting for the first frame of video before
-// folding is what leaves it on screen.
-static const NSTimeInterval kNFBOpeningWindow = 0.9;
 static const NSInteger kNFBMinimalTrackTag = 90211;
 static const NSInteger kNFBMinimalFillTag = 90212;
 static const NSInteger kNFBMinimalClockTag = 90213;
@@ -477,16 +576,6 @@ static BOOL nfbCurrentMuted(UIView* card, TAVPlayer* player) {
     }
     uint8_t* sessionMuted = nfbAudioMutedByte(nfbImmersiveAudioManager(card));
     return sessionMuted ? *sessionMuted != 0 : NO;
-}
-
-// timeControlStatus follows AVPlayer: 0 paused, 1 waiting to play, 2 playing.
-static void nfbTogglePlayback(TAVPlayer* player) {
-    if (player.playbackState.timeControlStatus != 0) {
-        [player pause];
-    } else {
-        // playOrReplay restarts at the end instead of doing nothing.
-        [player playOrReplay];
-    }
 }
 
 // The bar does not live inside the card — the card only forwards its state to
@@ -675,7 +764,6 @@ static NSString* nfbClockText(CMTime time) {
 // Track, fill and clock in one container, built once per card and kept as an
 // associated object. Touches pass through: the card's tap gesture stays the
 // only thing handling them.
-static void nfbUpdateMinimalBar(UIView* card, TAVPlayer* player);
 
 static UIView* nfbMinimalBar(UIView* card) {
     UIView* bar = objc_getAssociatedObject(card, kNFBMinimalBarKey);
@@ -983,74 +1071,53 @@ static void nfbHandleScrubGesture(UIView* card, UILongPressGestureRecognizer* pr
 
 // One display frame on a 120 Hz screen, so the net behind the mount signal is
 // never late by more than a frame; the count keeps the same 0.7 s of watch.
-static const NSTimeInterval kNFBFoldTick = 0.008;
-static const NSInteger kNFBFoldAttempts = 90;
+static const NSTimeInterval kNFBFoldTick = 0.05;
+static const NSInteger kNFBFoldAttempts = 60;
 
 // Folds when the bar and the playback state disagree. Returns NO while the
 // answer is still to come — the video not yet playing, or the bar not yet
 // mounted — which is the signal to look again.
+// One tick of the control loop. Returns YES only when there is nothing left to
+// watch - the card is gone or the feature is off; every other answer is "not
+// now", so the watch keeps ticking until its budget runs out. The loop has one
+// rule: while the reader wants a pause and the app's own chrome is down, send
+// the app a tap, since its tap is the only thing that raises its chrome.
+// Nothing is ever sent for a resume - the gate hides the chrome on its own.
 static BOOL nfbFoldIfDue(UIView* card) {
     if (!card || !card.window || ![BHTSettings boolForKey:@"tap_to_pause"]) {
         return YES;
     }
-    // Inside the grace window the answer is "not yet", never "done": YES ends
-    // the watch for good, and it used to end it on the reader's first tap -
-    // seen on film as a pause that sat 1.8 s without its chrome, since nothing
-    // was left to ask for it.
-    if ([NSDate timeIntervalSinceReferenceDate] - gNFBLastUserTap <
-        kNFBUserTapGrace) {
+    if ([NSDate timeIntervalSinceReferenceDate] - gNFBLastUserTap < kNFBUserTapGrace) {
         return NO;
     }
-    TAVPlayer* player = nfbCardPlayer(card);
-    if (!player) {
+    if (!gNFBWantPaused || nfbAppChromeUp(card)) {
         return NO;
     }
-    NSTimeInterval shownAt =
-        [objc_getAssociatedObject(card, kNFBCardShownAtKey) doubleValue];
-    BOOL opening = shownAt > 0 && [NSDate timeIntervalSinceReferenceDate] -
-                                          shownAt < kNFBOpeningWindow;
-    NSInteger status = player.playbackState.timeControlStatus;
-    // 1 is waiting to play: transient everywhere else, but at the opening it is
-    // the state the whole transition runs in.
-    if (status == 1 && !opening) {
+    if (gNFBSyntheticBudget <= 0) {
         return NO;
     }
-    // 0 is paused. A real state once the video runs, but at the opening it is
-    // the state the transition starts in, before the first frame plays. Acting
-    // on it there reads "paused, so the bar must be up" and synthesises taps to
-    // MOUNT Twitter's controls - the flash. A tap the reader actually made is
-    // already excluded by the grace period above, so nothing is lost by sitting
-    // this out until the player reports playing.
-    if (status == 0 && opening) {
+    NSTimeInterval lastFold = [objc_getAssociatedObject(card, kNFBLastFoldKey) doubleValue];
+    NSTimeInterval nowStamp = [NSDate timeIntervalSinceReferenceDate];
+    if (lastFold > 0 && nowStamp - lastFold < kNFBFoldCooldown) {
         return NO;
     }
-    BOOL paused = (status == 0);
-    if ((nfbImmersiveControlsView(card) != nil) == paused) {
-        return NO;
-    }
-    Ivar recognizerIvar =
-        class_getInstanceVariable(object_getClass(card), "singleTapRecognizer");
+    Ivar recognizerIvar = class_getInstanceVariable(object_getClass(card), "singleTapRecognizer");
     id recognizer = recognizerIvar ? object_getIvar(card, recognizerIvar) : nil;
     if (!recognizer) {
         return YES;
     }
-
-    NSTimeInterval lastFold =
-        [objc_getAssociatedObject(card, kNFBLastFoldKey) doubleValue];
-    NSTimeInterval nowStamp = [NSDate timeIntervalSinceReferenceDate];
-    if (lastFold > 0 && nowStamp - lastFold < kNFBFoldCooldown) {
-        return YES;
-    }
-    objc_setAssociatedObject(card, kNFBLastFoldKey, @(nowStamp),
-                             OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-
+    objc_setAssociatedObject(card, kNFBLastFoldKey, @(nowStamp), OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    gNFBSyntheticBudget--;
+    NFBDebugLog(@"[loop] paused but the app's chrome is down - tapping (%ld left)",
+                (long)gNFBSyntheticBudget);
     gNFBSyntheticToggle = YES;
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Warc-performSelector-leaks"
     [card performSelector:@selector(handleSingleTap:) withObject:recognizer];
 #pragma clang diagnostic pop
     gNFBSyntheticToggle = NO;
-    return YES;
+    nfbEnforcePlayback(card);
+    return NO;
 }
 
 // The safety net behind the mount signal: a card whose bar never announces
@@ -1103,68 +1170,62 @@ static void nfbStartFoldWatch(UIView* card) {
             return;
         }
     }
-    if (!gNFBSyntheticToggle) {
-        gNFBLastUserTap = [NSDate timeIntervalSinceReferenceDate];
-        gNFBReaderAskedForChrome = YES;
-    }
-
-    // A synthesized tap only moves the bar; a tap with the option off keeps the
-    // native behavior. The mirror follows the toggle in both cases.
+    // A synthetic tap is the loop asking the app to raise its chrome: it goes
+    // straight through. Playback is held afterwards by the caller.
     if (gNFBSyntheticToggle || ![BHTSettings boolForKey:@"tap_to_pause"]) {
         %orig;
         return;
     }
-
     __block UIView* pageView = nil;
     EnumerateSubviewsRecursively(card, ^(UIView* view) {
-        if (!pageView &&
-            [view isKindOfClass:%c(_TtC14T1TwitterSwift22ImmersiveVideoPageView)]) {
+        if (!pageView && [view isKindOfClass:%c(_TtC14T1TwitterSwift22ImmersiveVideoPageView)]) {
             pageView = view;
         }
     });
-
     TAVPlayer* player = pageView ? nfbImmersivePagePlayer(pageView) : nil;
     if (!player) {
         %orig;
         return;
     }
-
-    // The app's tap goes first and alone. 12.21's single tap toggles playback
-    // and chrome together, and it does so a runloop turn later than the tap.
-    // Toggling playback ahead of it, as this used to, set up a race of three
-    // toggles - journaled: the same pause tap left the chrome hidden once and
-    // shown the next time. So the app decides, the tweak reads the result
-    // after it has landed, and only toggles playback itself when the app has
-    // left it alone, which is what older builds did.
+    // A real tap sets the intent from the state it found: playing means the
+    // reader wants a pause, anything else means play. The gate follows at once
+    // - open, it replays the alphas the app asked for, so chrome the app has
+    // already raised shows without a tap; closed, everything goes dark now.
+    gNFBLastUserTap = [NSDate timeIntervalSinceReferenceDate];
     BOOL wasPlaying = player.playbackState.timeControlStatus != 0;
-    %orig;
-    __weak UIView* weakCard = card;
-    __weak TAVPlayer* weakPlayer = player;
-    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.2 * NSEC_PER_SEC)),
-                   dispatch_get_main_queue(), ^{
-      UIView* strongCard = weakCard;
-      TAVPlayer* strongPlayer = weakPlayer;
-      if (!strongCard || !strongPlayer) {
-          return;
-      }
-      BOOL nowPlaying = strongPlayer.playbackState.timeControlStatus != 0;
-      if (nowPlaying == wasPlaying) {
-          NFBDebugLog(@"[tap] app left playback alone - toggling here");
-          nfbTogglePlayback(strongPlayer);
-          nowPlaying = !nowPlaying;
-      } else {
-          NFBDebugLog(@"[tap] app toggled playback itself -> %@",
-                      nowPlaying ? @"playing" : @"paused");
-      }
-      [(_TtC14T1TwitterSwift17ImmersiveCardView*)strongCard setPausedByUser:!nowPlaying];
-      nfbShowPausedGlyph(strongCard, !nowPlaying);
-      nfbUpdateMinimalBar(strongCard, strongPlayer);
-      // A fresh budget of ticks after every real tap: the watch is what brings
-      // the chrome up on a pause and folds it on a resume.
-      nfbStartFoldWatch(strongCard);
-    });
+    gNFBWantPaused = wasPlaying;
+    gNFBSyntheticBudget = gNFBWantPaused ? kNFBSyntheticPerPause : 0;
+    BOOL appChromeUp = nfbAppChromeUp(card);
+    NFBDebugLog(@"[tap] reader %@ | app chrome %@", gNFBWantPaused ? @"pauses" : @"resumes",
+                appChromeUp ? @"up" : @"down");
+    if (gNFBWantPaused) {
+        nfbReplayChromeAlphas(card);
+    } else {
+        for (UIView* view in [gNFBGatedViews allObjects]) {
+            if (view.window == card.window) {
+                view.alpha = 0.0;
+            }
+        }
+    }
+    // The app's tap is forwarded only when its chrome intent must flip: down
+    // on a pause. On a resume the gate has already hidden the chrome and the
+    // app's intent is left as it is - its next raise comes for free.
+    if (gNFBWantPaused && !appChromeUp) {
+        objc_setAssociatedObject(card, kNFBLastFoldKey, @(gNFBLastUserTap),
+                                 OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        gNFBSyntheticBudget--;
+        %orig;
+    }
+    [(_TtC14T1TwitterSwift17ImmersiveCardView*)self setPausedByUser:gNFBWantPaused];
+    if (wasPlaying) {
+        [player pause];
+    } else {
+        [player playOrReplay];
+    }
+    nfbShowPausedGlyph(card, gNFBWantPaused);
+    nfbEnforcePlayback(card);
+    nfbStartFoldWatch(card);
 }
-
 %new
 - (void)nfbHandleScrub:(UILongPressGestureRecognizer*)press {
     nfbHandleScrubGesture((UIView*)self, press);
@@ -1184,7 +1245,8 @@ static void nfbStartFoldWatch(UIView* card) {
         gNFBActiveCard = card;
         // A swipe to the next video never goes through the timeline tap, so the
         // request is cleared here too.
-        gNFBReaderAskedForChrome = NO;
+        gNFBWantPaused = NO;
+        gNFBSyntheticBudget = 0;
         nfbRefreshCleanPlayerFlag();
         objc_setAssociatedObject(
             card, kNFBCardShownAtKey,
@@ -1244,6 +1306,7 @@ static void nfbStartFoldWatch(UIView* card) {
 // author, handle and follow control
 %hook _TtC14T1TwitterSwift25ImmersiveStatusPluginView
 - (void)setAlpha:(CGFloat)alpha {
+    nfbNoteChromeAlpha((UIView*)self, alpha);
     BOOL blocked = alpha > 0 && nfbChromeIsUnasked();
     if (blocked) {
         %orig(0);
@@ -1256,6 +1319,7 @@ static void nfbStartFoldWatch(UIView* card) {
 // reply, retweet, like, bookmark, share
 %hook _TtC14T1TwitterSwift36ImmersiveEngagementActionsPluginView
 - (void)setAlpha:(CGFloat)alpha {
+    nfbNoteChromeAlpha((UIView*)self, alpha);
     BOOL blocked = alpha > 0 && nfbChromeIsUnasked();
     if (blocked) {
         %orig(0);
@@ -1268,6 +1332,7 @@ static void nfbStartFoldWatch(UIView* card) {
 // the row holding those actions
 %hook _TtC14T1TwitterSwift25ImmersiveActionsStackView
 - (void)setAlpha:(CGFloat)alpha {
+    nfbNoteChromeAlpha((UIView*)self, alpha);
     BOOL blocked = alpha > 0 && nfbChromeIsUnasked();
     if (blocked) {
         %orig(0);
@@ -1280,6 +1345,7 @@ static void nfbStartFoldWatch(UIView* card) {
 // one action pill
 %hook _TtC14T1TwitterSwift19ImmersiveActionView
 - (void)setAlpha:(CGFloat)alpha {
+    nfbNoteChromeAlpha((UIView*)self, alpha);
     BOOL blocked = alpha > 0 && nfbChromeIsUnasked();
     if (blocked) {
         %orig(0);
@@ -1292,6 +1358,7 @@ static void nfbStartFoldWatch(UIView* card) {
 // back button, top left
 %hook _TtC14T1TwitterSwift29ImmersiveBackButtonPluginView
 - (void)setAlpha:(CGFloat)alpha {
+    nfbNoteChromeAlpha((UIView*)self, alpha);
     BOOL blocked = alpha > 0 && nfbChromeIsUnasked();
     if (blocked) {
         %orig(0);
@@ -1304,6 +1371,7 @@ static void nfbStartFoldWatch(UIView* card) {
 // overflow button, top right
 %hook _TtC14T1TwitterSwift35ImmersiveTopRightActionsPluginsView
 - (void)setAlpha:(CGFloat)alpha {
+    nfbNoteChromeAlpha((UIView*)self, alpha);
     BOOL blocked = alpha > 0 && nfbChromeIsUnasked();
     if (blocked) {
         %orig(0);
@@ -1316,6 +1384,7 @@ static void nfbStartFoldWatch(UIView* card) {
 // the shade behind the top row
 %hook _TtC14T1TwitterSwift30ImmersiveTopGradientPluginView
 - (void)setAlpha:(CGFloat)alpha {
+    nfbNoteChromeAlpha((UIView*)self, alpha);
     BOOL blocked = alpha > 0 && nfbChromeIsUnasked();
     if (blocked) {
         %orig(0);
@@ -1328,6 +1397,7 @@ static void nfbStartFoldWatch(UIView* card) {
 // the shade behind the bottom row
 %hook _TtC14T1TwitterSwift33ImmersiveBottomGradientPluginView
 - (void)setAlpha:(CGFloat)alpha {
+    nfbNoteChromeAlpha((UIView*)self, alpha);
     BOOL blocked = alpha > 0 && nfbChromeIsUnasked();
     if (blocked) {
         %orig(0);
@@ -1346,6 +1416,7 @@ static void nfbStartFoldWatch(UIView* card) {
 // is the half-mounted chrome the reader saw. Same rule as every plugin above.
 %hook _TtC14T1TwitterSwift32ImmersiveVideoTimelinePluginView
 - (void)setAlpha:(CGFloat)alpha {
+    nfbNoteChromeAlpha((UIView*)self, alpha);
     BOOL blocked = alpha > 0 && nfbChromeIsUnasked();
     if (blocked) {
         %orig(0);
@@ -1357,6 +1428,7 @@ static void nfbStartFoldWatch(UIView* card) {
 
 %hook _TtC14T1TwitterSwift37ImmersiveScrubProgressLabelPluginView
 - (void)setAlpha:(CGFloat)alpha {
+    nfbNoteChromeAlpha((UIView*)self, alpha);
     BOOL blocked = alpha > 0 && nfbChromeIsUnasked();
     if (blocked) {
         %orig(0);
@@ -1368,6 +1440,7 @@ static void nfbStartFoldWatch(UIView* card) {
 
 %hook _TtC14T1TwitterSwift34ImmersivePlayPauseButtonPluginView
 - (void)setAlpha:(CGFloat)alpha {
+    nfbNoteChromeAlpha((UIView*)self, alpha);
     BOOL blocked = alpha > 0 && nfbChromeIsUnasked();
     if (blocked) {
         %orig(0);
@@ -1379,6 +1452,7 @@ static void nfbStartFoldWatch(UIView* card) {
 
 %hook _TtC14T1TwitterSwift30ImmersiveAttributionPluginView
 - (void)setAlpha:(CGFloat)alpha {
+    nfbNoteChromeAlpha((UIView*)self, alpha);
     BOOL blocked = alpha > 0 && nfbChromeIsUnasked();
     if (blocked) {
         %orig(0);
@@ -1390,6 +1464,7 @@ static void nfbStartFoldWatch(UIView* card) {
 
 %hook _TtC14T1TwitterSwift17BottomBarControls
 - (void)setAlpha:(CGFloat)alpha {
+    nfbNoteChromeAlpha((UIView*)self, alpha);
     BOOL blocked = alpha > 0 && nfbChromeIsUnasked();
     if (blocked) {
         %orig(0);
