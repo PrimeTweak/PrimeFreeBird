@@ -29,8 +29,6 @@
 #import "Debug/NFBDebugger.h"
 #import <QuartzCore/QuartzCore.h>
 
-static void nfbSwapEnsureGlass(UIVisualEffectView* capsule);
-
 // A named subclass so captures and the watch can identify the button, and so
 // it can answer the ONE question the bar's wrapper actually asks. Measured the
 // hard way: _TtCC5UIKit19NavigationButtonBar15ItemWrapperView sizes its child
@@ -62,6 +60,19 @@ static void nfbSwapEnsureGlass(UIVisualEffectView* capsule);
 // of
 // the box (measured at 420.0 = the native right edge), so 420 − 57.33 = 362.67
 // = the native left edge, whatever the box turns out to be.
+// The glass on a bar button is drawn by UIKit, in the platform glass view the
+// item is hosted in - measured in a capture: the app's own items carry a
+// _UISystemBackgroundView there, ours carried none because the item asked for
+// hidesSharedBackground. A hand-made UIVisualEffectView draws nothing here:
+// with UIGlassEffect set, on screen, at the right size, it reported
+// subviews=0, and still zero after the effect was reapplied. So UIKit draws
+// the glass, and the button simply claims the width that makes it a capsule
+// rather than the circle a square item gets.
+- (CGSize)intrinsicContentSize {
+    CGFloat width = self.nfbPillWidth > 0 ? self.nfbPillWidth : UIViewNoIntrinsicMetric;
+    return CGSizeMake(width, 34.0);
+}
+
 - (void)layoutSubviews {
     [super layoutSubviews];
     if (self.nfbPillWidth <= 0) {
@@ -72,9 +83,6 @@ static void nfbSwapEnsureGlass(UIVisualEffectView* capsule);
     CGRect capsuleFrame = CGRectMake(box.size.width - self.nfbPillWidth,
                                      (box.size.height - height) / 2.0,
                                      self.nfbPillWidth, height);
-    UIVisualEffectView* capsule = (UIVisualEffectView*)[self viewWithTag:3];
-    capsule.frame = capsuleFrame;
-    nfbSwapEnsureGlass(capsule);
     self.nfbTouchRect = capsuleFrame;
 
     UILabel* label = (UILabel*)[self viewWithTag:1];
@@ -193,7 +201,8 @@ static void nfbSwapLayoutButton(void) {
     [button setNeedsLayout];
     [button layoutIfNeeded];
 
-    // THE RULER — measures the VISIBLE capsule now, not the wrapper's box.
+    // THE RULER - the button's own box now: UIKit draws the glass around it, so
+    // the box IS the capsule.
     // Reference measured on screen: the native pill spans 362.7 to 420.0.
     if (!gNFBSwapMeasured && NFBDebugIsRecording()) {
         gNFBSwapMeasured = YES;
@@ -205,8 +214,7 @@ static void nfbSwapLayoutButton(void) {
                 gNFBSwapMeasured = NO;  // try again on the next layout
                 return;
             }
-            UIView* liveCapsule = [live viewWithTag:3];
-            CGRect onScreen = [live convertRect:liveCapsule.frame toView:nil];
+            CGRect onScreen = [live convertRect:live.bounds toView:nil];
             NFBDebugLog(@"swap: RULER - capsule on screen %.1f to %.1f pt "
                         @"(native 362.7 to 420.0, imposed box %.0fx%.0f)",
                         onScreen.origin.x,
@@ -281,63 +289,6 @@ static NSArray<UIBarButtonItem*>* nfbSwapInterceptItems(UINavigationItem* nav,
     return @[gNFBSwapItem];
 }
 
-// The glass on the capsule, set now or repaired later. Filmed: on a cold
-// launch the pill showed its outline with no glass behind it for two seconds,
-// until a tab change - the effect had been chosen once, at a moment
-// UIGlassEffect was not resolvable yet, and the fallback material stayed for
-// the session. The effect is therefore re-read on every pass and upgraded the
-// moment the class answers.
-static void nfbSwapEnsureGlass(UIVisualEffectView* capsule) {
-    if (!capsule) {
-        return;
-    }
-    Class glassClass = NSClassFromString(@"UIGlassEffect");
-    BOOL hasGlass = glassClass && [capsule.effect isKindOfClass:glassClass];
-    // Reports what the capsule actually ends up with, at most twice a second:
-    // the class, the effect on it, its frame, and whether it is on screen. The
-    // glass was assumed missing at launch and set again on every pass, and the
-    // pill still showed no glass at all - so the assumption is measured now
-    // instead of replaced by another one.
-    static NSTimeInterval lastNote = 0;
-    NSTimeInterval now = CACurrentMediaTime();
-    if (now - lastNote > 0.5) {
-        lastNote = now;
-        NFBDebugLog(@"[glass] class=%@ effect=%@ frame=%.0fx%.0f alpha=%.2f hidden=%d "
-                    @"window=%@ subviews=%lu",
-                    glassClass ? @"yes" : @"NO",
-                    capsule.effect ? NSStringFromClass([capsule.effect class]) : @"nil",
-                    capsule.bounds.size.width, capsule.bounds.size.height, capsule.alpha,
-                    capsule.hidden, capsule.window ? @"yes" : @"no",
-                    (unsigned long)capsule.subviews.count);
-    }
-    // Measured: effect=UIGlassEffect, frame 57x40, on screen, alpha 1 - and
-    // subviews=0. A visual effect view that renders builds a backdrop of its
-    // own, so an empty one draws nothing, which is the pill with no glass. The
-    // effect was set before the view had a size, and setting it again to the
-    // same object is a no-op. Clearing it first forces the rebuild.
-    if (hasGlass && capsule.subviews.count == 0 && capsule.window &&
-        capsule.bounds.size.width > 0) {
-        UIVisualEffect* effect = capsule.effect;
-        capsule.effect = nil;
-        capsule.effect = effect;
-        NFBDebugLog(@"[glass] backdrop was empty - effect reapplied, subviews now %lu",
-                    (unsigned long)capsule.subviews.count);
-        return;
-    }
-    if (hasGlass) {
-        return;
-    }
-    if (glassClass) {
-        capsule.effect = [[glassClass alloc] init];
-        NFBDebugLog(@"[glass] effect set to UIGlassEffect");
-        return;
-    }
-    if (!capsule.effect) {
-        capsule.effect =
-            [UIBlurEffect effectWithStyle:UIBlurEffectStyleSystemUltraThinMaterial];
-        NFBDebugLog(@"[glass] effect set to material fallback");
-    }
-}
 
 static void nfbSwapApply(UIView* pillView) {
     if (!pillView.window) {
@@ -519,21 +470,9 @@ static void nfbSwapApply(UIView* pillView) {
         // nothing like the wide native pill). Glass via the runtime so the
         // The iOS 16 SDK never hears about UIGlassEffect; the working recipe:
         // effect behind the content, radius = height / 2.
-        UIVisualEffectView* capsule = [[UIVisualEffectView alloc] initWithEffect:nil];
-        capsule.userInteractionEnabled = NO;
-        capsule.layer.cornerRadius = 20.0;
-        capsule.layer.masksToBounds = YES;
-        capsule.tag = 3;
-        [button insertSubview:capsule atIndex:0];
-        nfbSwapEnsureGlass(capsule);
         gNFBSwapItem = [[UIBarButtonItem alloc] initWithCustomView:button];
         // On OUR plain UIKit item the official per-item switch is exactly in
         // its intended case — it kills the circular default treatment.
-        if ([gNFBSwapItem respondsToSelector:
-                NSSelectorFromString(@"setHidesSharedBackground:")]) {
-            [gNFBSwapItem setValue:@YES forKey:@"hidesSharedBackground"];
-            NFBDebugLog(@"swap: UIKit glass removed on the replacement item");
-        }
         NFBMark(button, @"PillSwap/custom button - identical to native");
     } else {
         button = (NFBInboxPillButton*)gNFBSwapItem.customView;

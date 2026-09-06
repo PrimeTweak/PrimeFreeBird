@@ -324,7 +324,19 @@ static void NFBApplyLogoTint(UIImageView* logoView) {
             baked = nil;
             objc_setAssociatedObject(logoView, kNFBLogoBakedKey, nil,
                                      OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-            NFBDebugLog(@"[logo] bird substituted for the X");
+            // Names the view the bird just replaced, and its line of parents.
+            // The reader watched a conversation avatar load correctly and then
+            // turn into the bird, and no title sweep ran on that screen, so the
+            // path that reaches it is unknown and is printed here rather than
+            // guessed at.
+            NSMutableArray* lineage = [NSMutableArray array];
+            for (UIView* node = logoView; node && lineage.count < 6;
+                 node = node.superview) {
+                [lineage addObject:NSStringFromClass([node class])];
+            }
+            NFBDebugLog(@"[logo] bird substituted on %.0fx%.0f | %@",
+                        logoView.bounds.size.width, logoView.bounds.size.height,
+                        [lineage componentsJoinedByString:@" < "]);
         }
     }
     UIColor* target = nil;
