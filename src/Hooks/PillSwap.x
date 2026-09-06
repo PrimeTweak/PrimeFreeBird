@@ -29,6 +29,8 @@
 #import "Debug/NFBDebugger.h"
 #import <QuartzCore/QuartzCore.h>
 
+static void nfbSwapEnsureGlass(UIVisualEffectView* capsule);
+
 // A named subclass so captures and the watch can identify the button, and so
 // it can answer the ONE question the bar's wrapper actually asks. Measured the
 // hard way: _TtCC5UIKit19NavigationButtonBar15ItemWrapperView sizes its child
@@ -45,12 +47,6 @@
 @implementation NFBInboxPillButton
 
 - (CGSize)intrinsicContentSize {
-    // The pill width first: UIKit draws the item's glass around the box this
-    // returns, so a box the width of the capsule gets a capsule rather than
-    // the circle a square box gets.
-    if (self.nfbPillWidth > 0) {
-        return CGSizeMake(self.nfbPillWidth, 34.0);
-    }
     if (self.nfbIntrinsic.width > 0) {
         return self.nfbIntrinsic;
     }
@@ -84,6 +80,9 @@
     CGRect capsuleFrame = CGRectMake(box.size.width - self.nfbPillWidth,
                                      (box.size.height - height) / 2.0,
                                      self.nfbPillWidth, height);
+    UIVisualEffectView* capsule = (UIVisualEffectView*)[self viewWithTag:3];
+    capsule.frame = capsuleFrame;
+    nfbSwapEnsureGlass(capsule);
     self.nfbTouchRect = capsuleFrame;
 
     UILabel* label = (UILabel*)[self viewWithTag:1];
@@ -291,6 +290,28 @@ static NSArray<UIBarButtonItem*>* nfbSwapInterceptItems(UINavigationItem* nav,
 }
 
 
+// The capsule's effect, read again on every pass: UIGlassEffect is not always
+// resolvable at the moment the button is built, and a material is kept until
+// it is. Measured caveat, unresolved: a hand-made effect view was once seen
+// with the effect set and no backdrop of its own.
+static void nfbSwapEnsureGlass(UIVisualEffectView* capsule) {
+    if (!capsule) {
+        return;
+    }
+    Class glassClass = NSClassFromString(@"UIGlassEffect");
+    if (glassClass && ![capsule.effect isKindOfClass:glassClass]) {
+        capsule.effect = [[glassClass alloc] init];
+        NFBDebugLog(@"[glass] effect set to UIGlassEffect");
+    } else if (!glassClass && !capsule.effect) {
+        capsule.effect =
+            [UIBlurEffect effectWithStyle:UIBlurEffectStyleSystemUltraThinMaterial];
+        NFBDebugLog(@"[glass] effect set to material fallback");
+    }
+    NFBDebugLog(@"[glass] frame=%.0fx%.0f alpha=%.2f window=%@ subviews=%lu",
+                capsule.bounds.size.width, capsule.bounds.size.height, capsule.alpha,
+                capsule.window ? @"yes" : @"no", (unsigned long)capsule.subviews.count);
+}
+
 static void nfbSwapApply(UIView* pillView) {
     if (!pillView.window) {
         return;
@@ -466,6 +487,16 @@ static void nfbSwapApply(UIView* pillView) {
         chevron.tag = 2;
         [button addSubview:chevron];
         button.showsMenuAsPrimaryAction = YES;
+        // The tweak's own capsule. UIKit's shared background is a circle on a
+        // box this shape - measured - so it is turned off below and the shape
+        // is drawn here instead.
+        UIVisualEffectView* capsule = [[UIVisualEffectView alloc] initWithEffect:nil];
+        capsule.userInteractionEnabled = NO;
+        capsule.layer.cornerRadius = 20.0;
+        capsule.layer.masksToBounds = YES;
+        capsule.tag = 3;
+        [button insertSubview:capsule atIndex:0];
+        nfbSwapEnsureGlass(capsule);
         // Our OWN capsule, native-shaped (the bar's default treatment for a
         // plain UIKit item is a CIRCLE — measured ~63 pt on the 07:34 video,
         // nothing like the wide native pill). Glass via the runtime so the
@@ -474,6 +505,10 @@ static void nfbSwapApply(UIView* pillView) {
         gNFBSwapItem = [[UIBarButtonItem alloc] initWithCustomView:button];
         // On OUR plain UIKit item the official per-item switch is exactly in
         // its intended case — it kills the circular default treatment.
+        if ([gNFBSwapItem respondsToSelector:
+                NSSelectorFromString(@"setHidesSharedBackground:")]) {
+            [gNFBSwapItem setValue:@YES forKey:@"hidesSharedBackground"];
+        }
         NFBMark(button, @"PillSwap/custom button - identical to native");
     } else {
         button = (NFBInboxPillButton*)gNFBSwapItem.customView;

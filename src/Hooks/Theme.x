@@ -301,6 +301,14 @@ static void NFBApplyLogoTint(UIImageView* logoView) {
     if (!current) {
         return;
     }
+    // Here rather than at the sweeps: this function registers what it paints,
+    // and the registry is repainted later with no filter of its own, so a view
+    // that slipped through once was painted for good. Measured by the reader
+    // with the bird off - a conversation avatar came out a flat accent-coloured
+    // disc, which is this function's baking applied to a photograph.
+    if (NFBLooksLikeAvatar(logoView)) {
+        return;
+    }
     NFBRegisterLogoView(logoView);
     UIImage* original = objc_getAssociatedObject(logoView, kNFBLogoOriginalKey);
     UIImage* baked = objc_getAssociatedObject(logoView, kNFBLogoBakedKey);
@@ -363,7 +371,12 @@ static void NFBApplyLogoTint(UIImageView* logoView) {
         baked = NFBPaintedGlyph(original, target);
         objc_setAssociatedObject(logoView, kNFBLogoBakedKey, baked,
                                  OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-        NFBDebugLog(@"[logo] colour baked into the image");
+        NSMutableArray* bakedOn = [NSMutableArray array];
+        for (UIView* node = logoView; node && bakedOn.count < 5; node = node.superview) {
+            [bakedOn addObject:NSStringFromClass([node class])];
+        }
+        NFBDebugLog(@"[logo] colour baked on %.0fx%.0f | %@", logoView.bounds.size.width,
+                    logoView.bounds.size.height, [bakedOn componentsJoinedByString:@" < "]);
     }
     if (current != baked) {
         logoView.image = baked;
@@ -455,24 +468,7 @@ static BOOL NFBIsTopBarContainer(UIView* view) {
 static void NFBBakeTitleControlLogos(UIView* root) {
     if ([NSStringFromClass([root class]) containsString:@"NavigationBarTitleControl"]) {
         EnumerateSubviewsRecursively(root, ^(UIView* view) {
-          if (![view isKindOfClass:[UIImageView class]]) {
-              return;
-          }
-          UIImageView* candidate = (UIImageView*)view;
-          BOOL avatar = NFBLooksLikeAvatar(candidate);
-          // Every image view this sweep reaches, named. The avatar in a
-          // conversation header still came back as the bird, so the guard is
-          // measured against the real class rather than assumed to match.
-          NFBDebugLog(@"[titlesweep] %@ %.0fx%.0f mode=%ld subs=%@ -> %@",
-                      NSStringFromClass([candidate class]), candidate.bounds.size.width,
-                      candidate.bounds.size.height, (long)candidate.image.renderingMode,
-                      candidate.subviews.count
-                          ? NSStringFromClass([candidate.subviews.firstObject class])
-                          : @"none",
-                      avatar ? @"skipped" : @"painted");
-          if (!avatar) {
-              NFBApplyLogoTint(candidate);
-          }
+          NFBApplyLogoTint((UIImageView*)view);
         });
         return;
     }
@@ -494,7 +490,7 @@ static void NFBRetintTemplateLogos(UIView* root) {
     }
     if ([root isKindOfClass:[UIImageView class]]) {
         UIImageView* imageView = (UIImageView*)root;
-        if (imageView.image && !NFBLooksLikeAvatar(imageView) &&
+        if (imageView.image &&
             imageView.image.renderingMode == UIImageRenderingModeAlwaysTemplate &&
             imageView.bounds.size.width > 0 && imageView.bounds.size.width < 60) {
             NFBApplyLogoTint(imageView);
