@@ -46,10 +46,9 @@ static __weak UIViewController* gNFBNotifScreen;
 
 // The registry: id → { "t": text, "d": notification date, "h": hidden at }.
 // A dictionary keyed by id makes lookup O(1) on the hot filtering path.
-// The registry is written through this, never straight to the defaults.
-// NSUserDefaults flushes when the system chooses - usually at backgrounding -
-// so a crash between hiding a notification and that flush loses it, which is
-// what the reader saw. The store is asked to write now.
+// NSUserDefaults writes when the system decides, usually at backgrounding, so
+// a crash between hiding a notification and that flush loses it. The store is
+// asked to write now. Nothing else about the registry changes.
 static void NFBWriteHiddenNotifs(NSDictionary* registry) {
     NSUserDefaults* defaults = [NSUserDefaults standardUserDefaults];
     if (registry.count) {
@@ -123,6 +122,16 @@ NSArray<NSDictionary*>* NFBHiddenNotifList(void) {
 
 void NFBUnhideNotif(NSString* notifID) {
     NSMutableDictionary* current = [NFBHiddenNotifs() mutableCopy];
+    // A notification is filed under two keys that hold the same entry; both go,
+    // or the row comes back at the next launch under the twin.
+    NSDictionary* going = current[notifID];
+    if (going) {
+        for (NSString* key in current.allKeys) {
+            if ([current[key] isEqual:going]) {
+                [current removeObjectForKey:key];
+            }
+        }
+    }
     [current removeObjectForKey:notifID];
     NFBWriteHiddenNotifs(current);
 }
@@ -250,30 +259,48 @@ static SEL NFBNotifDiscover(id model, NSArray<NSString*>* wanted, char kind) {
 
 // Identity, date and text of a row's model. The three lookups share one shape:
 // try the known names, then sweep, then remember — and say once what was found.
-static double NFBNotifDate(id model);
-static NSString* NFBNotifText(id model);
+// A second key for the same notification, meant to survive a relaunch. The
+// model answers seven selectors and only two carry anything: scribeItem, which
+// was measured empty, and description, which prints the object's own contents.
+// Hex addresses are stripped so the string is the data and not where it sits in
+// memory. Used ALONGSIDE the identity below, never instead of it: that one is
+// what makes hiding work at all, and it is left untouched.
+static NSString* NFBNotifDurableKey(id model) {
+    if (!model) {
+        return nil;
+    }
+    NSString* text = nil;
+    @try {
+        text = [model description];
+    } @catch (id exception) {
+        return nil;
+    }
+    if (text.length < 8) {
+        return nil;
+    }
+    NSMutableString* stable = [text mutableCopy];
+    NSRegularExpression* addresses =
+        [NSRegularExpression regularExpressionWithPattern:@"0x[0-9a-fA-F]+"
+                                                 options:0
+                                                   error:NULL];
+    [addresses replaceMatchesInString:stable
+                              options:0
+                                range:NSMakeRange(0, stable.length)
+                         withTemplate:@""];
+    if (stable.length < 8) {
+        return nil;
+    }
+    return [NSString stringWithFormat:@"dk:%lu/%lu", (unsigned long)stable.hash,
+                                      (unsigned long)stable.length];
+}
 
 static NSString* NFBNotifIdentity(id model) {
     static NSMutableDictionary<NSString*, NSString*>* cache;
     if (!cache) { cache = [NSMutableDictionary dictionary]; }
     NSString* className = NSStringFromClass([model class]);
     NSString* known = cache[className];
-    // A cached route that comes back empty falls through to everything below.
-    // Returning nil here - which this did - meant one empty scribeItem poisoned
-    // every later call for the class, silently, and the row went back to
-    // Twitter with its own menu.
-    if ([known hasPrefix:@"scribeItem."]) {
-        id item = NFBNotifAsk(model, NSSelectorFromString(@"scribeItem"));
-        NSString* value = NFBNotifString(
-            NFBNotifAsk(item, NSSelectorFromString([known substringFromIndex:11])));
-        if (value.length) {
-            return [@"si:" stringByAppendingString:value];
-        }
-    } else if (known) {
-        NSString* value = NFBNotifString(NFBNotifAsk(model, NSSelectorFromString(known)));
-        if (value.length) {
-            return value;
-        }
+    if (known) {
+        return NFBNotifString(NFBNotifAsk(model, NSSelectorFromString(known)));
     }
     // Measured, 18:20:17 - this model exposes exactly six selectors:
     // description, scribeComponent, scribeElement, scribeItem,
@@ -292,9 +319,7 @@ static NSString* NFBNotifIdentity(id model) {
             NSString* value = NFBNotifString(NFBNotifAsk(scribeItem,
                                                          NSSelectorFromString(name)));
             if (value.length) {
-                cache[className] = [@"scribeItem." stringByAppendingString:name];
-                NFBDebugLog(@"notifhide: identity of %@ = scribeItem.%@ (durable)",
-                            className, name);
+                NFBDebugLog(@"notifhide: identity via scribeItem.%@ (durable)", name);
                 return [@"si:" stringByAppendingString:value];
             }
         }
@@ -315,14 +340,10 @@ static NSString* NFBNotifIdentity(id model) {
                         NSStringFromClass([scribeItem class]), shape ?: @"(nil)");
         }
     }
-    // Measured in the 12.21 binary: URTTimelineNotificationViewModel answers
-    // seven selectors, and scribeItemImpressionID is one of them - an id minted
-    // per display. Storing it means the key written when hiding never matches
-    // the key seen when filtering again, which is a notification coming back
-    // after a relaunch. It is not a candidate at all.
     NSArray<NSString*>* candidates = @[
         @"entryId", @"entryID", @"identifier", @"notificationId", @"notificationID",
-        @"id", @"sortIndex", @"key", @"itemIdentifier"
+        @"id", @"sortIndex", @"key", @"itemIdentifier",
+        @"scribeItemImpressionID", @"scribeItemImpressionId"
     ];
     for (NSString* name in candidates) {
         NSString* value = NFBNotifString(NFBNotifAsk(model, NSSelectorFromString(name)));
@@ -342,18 +363,6 @@ static NSString* NFBNotifIdentity(id model) {
         NFBDebugLog(@"notifhide: identity of %@ = %@ (discovered)",
                     className, NSStringFromSelector(found));
         return NFBNotifString(NFBNotifAsk(model, found));
-    }
-    // Last resort, and never nil: the notification's own text and date. Both
-    // are read from the model already, both are the same on the next launch,
-    // and returning nothing here is what handed the row back to Twitter and
-    // put its "See less often" menu in front of the reader.
-    NSString* text = NFBNotifText(model);
-    double when = NFBNotifDate(model);
-    if (text.length || when > 0) {
-        NSString* fallback =
-            [NSString stringWithFormat:@"tx:%lu/%.0f", (unsigned long)text.hash, when];
-        NFBDebugLog(@"notifhide: identity of %@ = text+date fallback", className);
-        return fallback;
     }
     return nil;
 }
@@ -406,6 +415,10 @@ BOOL NFBNotifIsHidden(id model) {
     NSDictionary* hidden = NFBHiddenNotifs();
     if (!hidden.count) {
         return NO;   // the hot path costs one dictionary read
+    }
+    NSString* durableKey = NFBNotifDurableKey(model);
+    if (durableKey.length && hidden[durableKey] != nil) {
+        return YES;
     }
     NSString* identity = NFBNotifIdentity(model);
     // An impression id is not guaranteed to survive a refresh. Rather than
@@ -606,11 +619,21 @@ static void NFBHideNotifWithText(id model, NSString* cellText) {
     if (notifDate <= 0) {
         source = @"none - falling back to the hide date";
     }
-    current[identity] = @{
+    NSDictionary* entry = @{
         @"t": text,
         @"d": @(notifDate),
         @"h": @([[NSDate date] timeIntervalSince1970])
     };
+    current[identity] = entry;
+    // The same notification is also filed under its durable key, so the next
+    // launch - where the identity above is a fresh impression id - still finds
+    // it. Both entries hold the same values and expire on the same horizon.
+    NSString* durable = NFBNotifDurableKey(model);
+    if (durable.length) {
+        current[durable] = entry;
+    }
+    NFBDebugLog(@"notifhide: filed under %@%@", identity,
+                durable.length ? [@" and " stringByAppendingString:durable] : @" only");
     NFBDebugLog(@"notifhide: notification date = %@ (%@)",
                 notifDate > 0
                     ? [NSDate dateWithTimeIntervalSince1970:notifDate]
@@ -1266,12 +1289,9 @@ static void NFBNotifSyncEmptyState(id dataViewController) {
                     (long)rows, (long)notifRows, (unsigned long)hidden,
                     existing ? @"placed" : @"absent");
 
-        // A table that has not delivered anything yet is a loading table, not an
-        // emptied one. Measured at l.1231: the panel went up whenever no
-        // notification was visible and the registry was not empty, which is
-        // exactly the state of a relaunch before the list arrives - the flash.
-        // The screen must have shown rows at least once in this session before
-        // the panel can be placed.
+        // A table that has not delivered anything yet is loading, not emptied.
+        // The panel used to go up whenever nothing was visible and the registry
+        // was not empty - the state of a relaunch before the list arrives.
         NSNumber* everFilled = objc_getAssociatedObject(dataViewController,
                                                         kNFBNotifEverFilledKey);
         if (rows > 0) {
@@ -1283,7 +1303,6 @@ static void NFBNotifSyncEmptyState(id dataViewController) {
             if (existing) {
                 [existing removeFromSuperview];
             }
-            NFBDebugLog(@"[empty] table has never filled this session - panel withheld");
             return;
         }
         if (notifRows > 0 || hidden == 0) {
@@ -2083,40 +2102,10 @@ static UITableView* NFBNotifTableForCell(UIView* cell) {
             UITableView* table = NFBNotifTableForCell((UIView*)self);
             NSIndexPath* indexPath =
                 table ? [table indexPathForCell:(UITableViewCell*)self] : nil;
-            // The table's data source is not always the controller that answers
-            // itemAtIndexPath: - measured on 12.24, this route returned nothing
-            // and the row was handed back to Twitter with its own menu. The
-            // responder chain is walked for a controller that can answer, and
-            // the route that worked is named in the journal.
             id source = table.dataSource;
-            NSString* route = @"dataSource";
-            SEL itemSel = NSSelectorFromString(@"itemAtIndexPath:");
-            if (![source respondsToSelector:itemSel]) {
-                source = nil;
-                for (UIResponder* node = table; node; node = node.nextResponder) {
-                    if ([node respondsToSelector:itemSel]) {
-                        source = node;
-                        route = NSStringFromClass([node class]);
-                        break;
-                    }
-                }
-                if (!source && gNFBNotifScreen &&
-                    [gNFBNotifScreen respondsToSelector:itemSel]) {
-                    source = gNFBNotifScreen;
-                    route = @"remembered screen";
-                }
-            }
             id model = indexPath ? (NFBModelAtIndexPath(source, indexPath)
                                     ?: NFBModelFromCell(table, indexPath))
                                  : nil;
-            NFBDebugLog(@"[notifs] x: table=%@ row=%@ source=%@ model=%@",
-                        table ? @"yes" : @"nil",
-                        indexPath ? [NSString stringWithFormat:@"%ld/%ld",
-                                                              (long)indexPath.section,
-                                                              (long)indexPath.row]
-                                  : @"nil",
-                        source ? route : @"NONE",
-                        model ? NSStringFromClass([model class]) : @"nil");
             NSString* identity = model ? NFBNotifIdentity(model) : nil;
             if (identity.length) {
                 NFBHideNotifWithText(model, NFBNotifTextFromCell(table, indexPath));
