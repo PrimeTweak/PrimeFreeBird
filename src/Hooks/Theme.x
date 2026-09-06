@@ -468,7 +468,9 @@ static BOOL NFBIsTopBarContainer(UIView* view) {
 static void NFBBakeTitleControlLogos(UIView* root) {
     if ([NSStringFromClass([root class]) containsString:@"NavigationBarTitleControl"]) {
         EnumerateSubviewsRecursively(root, ^(UIView* view) {
-          NFBApplyLogoTint((UIImageView*)view);
+          if ([view isKindOfClass:[UIImageView class]]) {
+              NFBApplyLogoTint((UIImageView*)view);
+          }
         });
         return;
     }
