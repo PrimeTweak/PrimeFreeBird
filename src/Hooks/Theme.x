@@ -433,9 +433,23 @@ static BOOL NFBIsTopBarContainer(UIView* view) {
 static void NFBBakeTitleControlLogos(UIView* root) {
     if ([NSStringFromClass([root class]) containsString:@"NavigationBarTitleControl"]) {
         EnumerateSubviewsRecursively(root, ^(UIView* view) {
-          if ([view isKindOfClass:[UIImageView class]] &&
-              !NFBLooksLikeAvatar((UIImageView*)view)) {
-              NFBApplyLogoTint((UIImageView*)view);
+          if (![view isKindOfClass:[UIImageView class]]) {
+              return;
+          }
+          UIImageView* candidate = (UIImageView*)view;
+          BOOL avatar = NFBLooksLikeAvatar(candidate);
+          // Every image view this sweep reaches, named. The avatar in a
+          // conversation header still came back as the bird, so the guard is
+          // measured against the real class rather than assumed to match.
+          NFBDebugLog(@"[titlesweep] %@ %.0fx%.0f mode=%ld subs=%@ -> %@",
+                      NSStringFromClass([candidate class]), candidate.bounds.size.width,
+                      candidate.bounds.size.height, (long)candidate.image.renderingMode,
+                      candidate.subviews.count
+                          ? NSStringFromClass([candidate.subviews.firstObject class])
+                          : @"none",
+                      avatar ? @"skipped" : @"painted");
+          if (!avatar) {
+              NFBApplyLogoTint(candidate);
           }
         });
         return;

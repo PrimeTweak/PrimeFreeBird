@@ -293,18 +293,35 @@ static void nfbSwapEnsureGlass(UIVisualEffectView* capsule) {
     }
     Class glassClass = NSClassFromString(@"UIGlassEffect");
     BOOL hasGlass = glassClass && [capsule.effect isKindOfClass:glassClass];
+    // Reports what the capsule actually ends up with, at most twice a second:
+    // the class, the effect on it, its frame, and whether it is on screen. The
+    // glass was assumed missing at launch and set again on every pass, and the
+    // pill still showed no glass at all - so the assumption is measured now
+    // instead of replaced by another one.
+    static NSTimeInterval lastNote = 0;
+    NSTimeInterval now = CACurrentMediaTime();
+    if (now - lastNote > 0.5) {
+        lastNote = now;
+        NFBDebugLog(@"[glass] class=%@ effect=%@ frame=%.0fx%.0f alpha=%.2f hidden=%d "
+                    @"window=%@ subviews=%lu",
+                    glassClass ? @"yes" : @"NO",
+                    capsule.effect ? NSStringFromClass([capsule.effect class]) : @"nil",
+                    capsule.bounds.size.width, capsule.bounds.size.height, capsule.alpha,
+                    capsule.hidden, capsule.window ? @"yes" : @"no",
+                    (unsigned long)capsule.subviews.count);
+    }
     if (hasGlass) {
         return;
     }
     if (glassClass) {
         capsule.effect = [[glassClass alloc] init];
-        NFBDebugLog(@"swap: capsule glass set (UIGlassEffect)");
+        NFBDebugLog(@"[glass] effect set to UIGlassEffect");
         return;
     }
     if (!capsule.effect) {
         capsule.effect =
             [UIBlurEffect effectWithStyle:UIBlurEffectStyleSystemUltraThinMaterial];
-        NFBDebugLog(@"swap: capsule glass set (material fallback)");
+        NFBDebugLog(@"[glass] effect set to material fallback");
     }
 }
 
