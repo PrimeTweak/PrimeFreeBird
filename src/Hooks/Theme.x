@@ -274,9 +274,19 @@ static UIImage* NFBBirdLogoImage(CGSize size) {
 // TIP and carries a TIPImageViewObserver - and the class name, which says
 // Avatar on every one of them.
 static BOOL NFBLooksLikeAvatar(UIImageView* view) {
-    NSString* name = NSStringFromClass([view class]);
-    if ([name containsString:@"Avatar"] || [name containsString:@"Profile"]) {
-        return YES;
+    // Measured in a capture: a conversation avatar is a plain UIImageView with
+    // no TIP observer of its own - ChatUI.ConversationAvatarView > UIImageView
+    // 56x56. The name that says avatar is on an ancestor, so the walk goes up
+    // a few levels, and the TIP observer is looked for on the way.
+    for (UIView* node = view; node; node = node.superview) {
+        NSString* name = NSStringFromClass([node class]);
+        if ([name containsString:@"Avatar"] || [name containsString:@"Profile"] ||
+            [name containsString:@"TIPImageView"]) {
+            return YES;
+        }
+        if (node != view && [name containsString:@"NavigationBarTitleControl"]) {
+            break;
+        }
     }
     for (UIView* sub in view.subviews) {
         if ([NSStringFromClass([sub class]) containsString:@"TIPImageView"]) {

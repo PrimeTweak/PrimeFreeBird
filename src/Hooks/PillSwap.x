@@ -310,6 +310,20 @@ static void nfbSwapEnsureGlass(UIVisualEffectView* capsule) {
                     capsule.hidden, capsule.window ? @"yes" : @"no",
                     (unsigned long)capsule.subviews.count);
     }
+    // Measured: effect=UIGlassEffect, frame 57x40, on screen, alpha 1 - and
+    // subviews=0. A visual effect view that renders builds a backdrop of its
+    // own, so an empty one draws nothing, which is the pill with no glass. The
+    // effect was set before the view had a size, and setting it again to the
+    // same object is a no-op. Clearing it first forces the rebuild.
+    if (hasGlass && capsule.subviews.count == 0 && capsule.window &&
+        capsule.bounds.size.width > 0) {
+        UIVisualEffect* effect = capsule.effect;
+        capsule.effect = nil;
+        capsule.effect = effect;
+        NFBDebugLog(@"[glass] backdrop was empty - effect reapplied, subviews now %lu",
+                    (unsigned long)capsule.subviews.count);
+        return;
+    }
     if (hasGlass) {
         return;
     }
