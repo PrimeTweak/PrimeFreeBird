@@ -312,16 +312,40 @@ static void nfbSwapEnsureGlass(UIVisualEffectView* capsule) {
                 capsule.window ? @"yes" : @"no", (unsigned long)capsule.subviews.count);
 }
 
+// Every way out of nfbSwapApply, named. Six of its seven exits were silent, so
+// a cold launch that left the pill untouched said nothing at all. One line per
+// outcome, the first time it is reached and then at most twice a second, so a
+// single reading names which door was taken.
+static void nfbSwapNote(NSString* outcome, NSString* detail) {
+    static NSMutableDictionary<NSString*, NSNumber*>* lastSeen;
+    static NSMutableSet<NSString*>* everSeen;
+    if (!lastSeen) {
+        lastSeen = [NSMutableDictionary dictionary];
+        everSeen = [NSMutableSet set];
+    }
+    NSTimeInterval now = CACurrentMediaTime();
+    BOOL firstTime = ![everSeen containsObject:outcome];
+    if (!firstTime && now - lastSeen[outcome].doubleValue < 0.5) {
+        return;
+    }
+    [everSeen addObject:outcome];
+    lastSeen[outcome] = @(now);
+    NFBDebugLog(@"swap: EXIT %@%@%@", outcome, detail.length ? @" - " : @"", detail ?: @"");
+}
+
 static void nfbSwapApply(UIView* pillView) {
     if (!pillView.window) {
+        nfbSwapNote(@"no window", NSStringFromClass([pillView class]));
         return;
     }
     if (![BHTSettings boolForKey:@"enable_liquid_glass"]) {
+        nfbSwapNote(@"liquid glass off", nil);
         return;  // standard interface never had the problem — nothing to do
     }
 
     UIViewController* vc = nfbSwapOwningVC(pillView);
     if (!vc) {
+        nfbSwapNote(@"no owning view controller", nil);
         return;
     }
 
@@ -364,11 +388,13 @@ static void nfbSwapApply(UIView* pillView) {
             hasTrailing = hasTrailing || candidateNav.trailingItemGroups.count > 0;
         }
         if (hasTrailing) {
-            // Only ours is installed — nothing to swap on this pass.
+            // Only ours is installed - nothing to swap on this pass.
+            nfbSwapNote(@"ours already installed", NSStringFromClass([candidate class]));
             return;
         }
     }
     if (!original) {
+        nfbSwapNote(@"no native item yet", NSStringFromClass([vc class]));
         return;  // items not attached yet; the next layout retries
     }
 
@@ -409,6 +435,10 @@ static void nfbSwapApply(UIView* pillView) {
                                      OBJC_ASSOCIATION_RETAIN_NONATOMIC);
             NFBDebugLog(@"swap: waiting for content - retrying");
         }
+        nfbSwapNote(@"no title yet",
+                    [NSString stringWithFormat:@"label=%@ remembered=%@",
+                                               realLabel ? @"yes" : @"nil",
+                                               nfbSwapRememberedTitle() ?: @"none"]);
         return;  // content not built yet; the next layout retries
     }
 
@@ -466,8 +496,10 @@ static void nfbSwapApply(UIView* pillView) {
                             ? NSStringFromClass([original.primaryAction class])
                             : @"nil");
         }
+        nfbSwapNote(@"menu not found", nil);
         return;  // native kept, the probe has spoken
     }
+    nfbSwapNote(@"replaced", nil);
     gNFBSwapMenu = menu;  // strong: it must outlive the mortal native button
 
     // Build ours once; later passes only refresh content and re-install.

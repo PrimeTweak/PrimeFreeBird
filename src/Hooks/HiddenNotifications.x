@@ -255,6 +255,12 @@ static NSString* NFBNotifIdentity(id model) {
     if (!cache) { cache = [NSMutableDictionary dictionary]; }
     NSString* className = NSStringFromClass([model class]);
     NSString* known = cache[className];
+    if ([known hasPrefix:@"scribeItem."]) {
+        id item = NFBNotifAsk(model, NSSelectorFromString(@"scribeItem"));
+        NSString* value = NFBNotifString(
+            NFBNotifAsk(item, NSSelectorFromString([known substringFromIndex:11])));
+        return value.length ? [@"si:" stringByAppendingString:value] : nil;
+    }
     if (known) {
         return NFBNotifString(NFBNotifAsk(model, NSSelectorFromString(known)));
     }
@@ -275,7 +281,9 @@ static NSString* NFBNotifIdentity(id model) {
             NSString* value = NFBNotifString(NFBNotifAsk(scribeItem,
                                                          NSSelectorFromString(name)));
             if (value.length) {
-                NFBDebugLog(@"notifhide: identity via scribeItem.%@ (durable)", name);
+                cache[className] = [@"scribeItem." stringByAppendingString:name];
+                NFBDebugLog(@"notifhide: identity of %@ = scribeItem.%@ (durable)",
+                            className, name);
                 return [@"si:" stringByAppendingString:value];
             }
         }
@@ -296,10 +304,14 @@ static NSString* NFBNotifIdentity(id model) {
                         NSStringFromClass([scribeItem class]), shape ?: @"(nil)");
         }
     }
+    // Measured in the 12.21 binary: URTTimelineNotificationViewModel answers
+    // seven selectors, and scribeItemImpressionID is one of them - an id minted
+    // per display. Storing it means the key written when hiding never matches
+    // the key seen when filtering again, which is a notification coming back
+    // after a relaunch. It is not a candidate at all.
     NSArray<NSString*>* candidates = @[
         @"entryId", @"entryID", @"identifier", @"notificationId", @"notificationID",
-        @"id", @"sortIndex", @"key", @"itemIdentifier",
-        @"scribeItemImpressionID", @"scribeItemImpressionId"
+        @"id", @"sortIndex", @"key", @"itemIdentifier"
     ];
     for (NSString* name in candidates) {
         NSString* value = NFBNotifString(NFBNotifAsk(model, NSSelectorFromString(name)));
@@ -1006,6 +1018,7 @@ static NSArray* NFBFilterNotifSections(NSArray* sections) {
 // notifications sweep — a screen showing notifications always earns YES — and
 // after one pass the home timeline is never walked again.
 static const char* kNFBNotifVerdictKey = "nfbNotifSweepVerdict";
+static const char* kNFBNotifEverFilledKey = "nfbNotifEverFilled";
 
 static BOOL NFBNotifSweepAllowed(id dataViewController) {
     id verdict = objc_getAssociatedObject(dataViewController, kNFBNotifVerdictKey);
@@ -1230,6 +1243,26 @@ static void NFBNotifSyncEmptyState(id dataViewController) {
                     (long)rows, (long)notifRows, (unsigned long)hidden,
                     existing ? @"placed" : @"absent");
 
+        // A table that has not delivered anything yet is a loading table, not an
+        // emptied one. Measured at l.1231: the panel went up whenever no
+        // notification was visible and the registry was not empty, which is
+        // exactly the state of a relaunch before the list arrives - the flash.
+        // The screen must have shown rows at least once in this session before
+        // the panel can be placed.
+        NSNumber* everFilled = objc_getAssociatedObject(dataViewController,
+                                                        kNFBNotifEverFilledKey);
+        if (rows > 0) {
+            everFilled = @YES;
+            objc_setAssociatedObject(dataViewController, kNFBNotifEverFilledKey, @YES,
+                                     OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        }
+        if (![everFilled isEqual:@YES]) {
+            if (existing) {
+                [existing removeFromSuperview];
+            }
+            NFBDebugLog(@"[empty] table has never filled this session - panel withheld");
+            return;
+        }
         if (notifRows > 0 || hidden == 0) {
             if (existing) {
                 [existing removeFromSuperview];
