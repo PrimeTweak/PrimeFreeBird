@@ -123,16 +123,23 @@ static void nfbSwapReport(UIView* button) {
 - (void)layoutSubviews {
     [super layoutSubviews];
     nfbSwapReport(self);
+    // The capsule is placed before anything can return. It used to sit below
+    // the early exit, so on a cold launch - where the app has not filled its
+    // own label yet and nfbPillWidth is still 0 - the capsule kept a zero
+    // frame: present, with its effect set, and invisible. Filmed as an outline
+    // with no glass until the first tab change, which is when the width was
+    // finally computed. Until then it takes the button's own box.
+    CGFloat height = 40.0;
+    CGRect box = self.bounds;
+    CGFloat capsuleWidth = self.nfbPillWidth > 0 ? self.nfbPillWidth : box.size.width;
+    CGRect capsuleFrame = CGRectMake(box.size.width - capsuleWidth,
+                                     (box.size.height - height) / 2.0, capsuleWidth,
+                                     height);
+    UIView* capsule = [self viewWithTag:3];
+    capsule.frame = capsuleFrame;
     if (self.nfbPillWidth <= 0) {
         return;
     }
-    CGFloat height = 40.0;
-    CGRect box = self.bounds;
-    CGRect capsuleFrame = CGRectMake(box.size.width - self.nfbPillWidth,
-                                     (box.size.height - height) / 2.0,
-                                     self.nfbPillWidth, height);
-    UIView* capsule = [self viewWithTag:3];
-    capsule.frame = capsuleFrame;
     self.nfbTouchRect = capsuleFrame;
 
     UILabel* label = (UILabel*)[self viewWithTag:1];
