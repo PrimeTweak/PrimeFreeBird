@@ -45,6 +45,12 @@
 @implementation NFBInboxPillButton
 
 - (CGSize)intrinsicContentSize {
+    // The pill width first: UIKit draws the item's glass around the box this
+    // returns, so a box the width of the capsule gets a capsule rather than
+    // the circle a square box gets.
+    if (self.nfbPillWidth > 0) {
+        return CGSizeMake(self.nfbPillWidth, 34.0);
+    }
     if (self.nfbIntrinsic.width > 0) {
         return self.nfbIntrinsic;
     }
@@ -68,11 +74,6 @@
 // subviews=0, and still zero after the effect was reapplied. So UIKit draws
 // the glass, and the button simply claims the width that makes it a capsule
 // rather than the circle a square item gets.
-- (CGSize)intrinsicContentSize {
-    CGFloat width = self.nfbPillWidth > 0 ? self.nfbPillWidth : UIViewNoIntrinsicMetric;
-    return CGSizeMake(width, 34.0);
-}
-
 - (void)layoutSubviews {
     [super layoutSubviews];
     if (self.nfbPillWidth <= 0) {
