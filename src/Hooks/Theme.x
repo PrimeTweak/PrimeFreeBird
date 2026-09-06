@@ -423,6 +423,16 @@ static void NFBBakeTitleControlLogos(UIView* root) {
 }
 
 static void NFBRetintTemplateLogos(UIView* root) {
+    // The bar's button items are never logos. iOS 26 hosts them in a platter
+    // container, older systems in a button bar; both are skipped whole, or a
+    // 24-point template share icon gets the logo's tint and, with the bird on,
+    // the bird - seen on the search results screen once the filters item was
+    // rebuilt.
+    NSString* name = NSStringFromClass([root class]);
+    if ([name containsString:@"Platter"] || [name containsString:@"ButtonBar"] ||
+        [name containsString:@"BarButton"]) {
+        return;
+    }
     if ([root isKindOfClass:[UIImageView class]]) {
         UIImageView* imageView = (UIImageView*)root;
         if (imageView.image &&
@@ -619,30 +629,93 @@ static double NFBGlyphInk(UIImage* glyph) {
     return ink;
 }
 
-// A heavier weight of the same glyph, for tabs whose selected icon is not a
-// fill but a bolder stroke - the magnifier. The outline is drawn over itself
-// at eight sub-pixel offsets, which thickens every line by about a pixel and
-// keeps the shape. Measured need: the bundle's bare "search" either fails to
-// load or repeats search_stroke, while home, notifications and messages have
-// true filled variants.
-static UIImage* NFBEmboldenedGlyph(UIImage* outline) {
-    if (!outline || outline.size.width < 1.0) {
+// A filled glyph built from its outline, for tabs whose bundle has no true
+// filled variant - the magnifier. The outline is rendered as a mask, the
+// outside is flooded from the edges, and every enclosed pixel becomes ink:
+// the lens turns solid, the handle already was. Drawn at twice the size for
+// clean edges, returned at the bar's 24 points as a template.
+static UIImage* NFBFilledGlyph(UIImage* outline) {
+    if (!outline.CGImage) {
         return nil;
     }
-    UIGraphicsImageRendererFormat* format = [UIGraphicsImageRendererFormat preferredFormat];
-    format.opaque = NO;
-    format.scale = outline.scale;
-    UIGraphicsImageRenderer* renderer =
-        [[UIGraphicsImageRenderer alloc] initWithSize:outline.size format:format];
-    return [renderer imageWithActions:^(UIGraphicsImageRendererContext* context) {
-      const CGFloat d = 0.75;
-      const CGPoint offsets[] = {{-d, 0}, {d, 0},  {0, -d}, {0, d},
-                                 {-d, -d}, {d, -d}, {-d, d}, {d, d}, {0, 0}};
-      for (size_t i = 0; i < sizeof(offsets) / sizeof(offsets[0]); i++) {
-          [outline drawInRect:CGRectMake(offsets[i].x, offsets[i].y, outline.size.width,
-                                         outline.size.height)];
-      }
-    }];
+    const size_t side = 48;
+    const size_t count = side * side;
+    uint8_t* alpha = calloc(count, 1);
+    CGColorSpaceRef gray = CGColorSpaceCreateDeviceGray();
+    CGContextRef maskContext =
+        CGBitmapContextCreate(alpha, side, side, 8, side, gray, kCGImageAlphaOnly);
+    CGColorSpaceRelease(gray);
+    if (!maskContext) {
+        free(alpha);
+        return nil;
+    }
+    CGContextDrawImage(maskContext, CGRectMake(0, 0, side, side), outline.CGImage);
+    CGContextRelease(maskContext);
+
+    // 0 = unknown, 1 = ink, 2 = outside.
+    uint8_t* cell = calloc(count, 1);
+    for (size_t k = 0; k < count; k++) {
+        cell[k] = alpha[k] > 127 ? 1 : 0;
+    }
+    size_t* stack = malloc(count * sizeof(size_t));
+    size_t top = 0;
+    for (size_t x = 0; x < side; x++) {
+        stack[top++] = x;
+        stack[top++] = (side - 1) * side + x;
+    }
+    for (size_t y = 1; y + 1 < side; y++) {
+        stack[top++] = y * side;
+        stack[top++] = y * side + side - 1;
+    }
+    while (top > 0) {
+        size_t k = stack[--top];
+        if (cell[k] != 0) {
+            continue;
+        }
+        cell[k] = 2;
+        size_t x = k % side;
+        size_t y = k / side;
+        if (x > 0) {
+            stack[top++] = k - 1;
+        }
+        if (x + 1 < side) {
+            stack[top++] = k + 1;
+        }
+        if (y > 0) {
+            stack[top++] = k - side;
+        }
+        if (y + 1 < side) {
+            stack[top++] = k + side;
+        }
+    }
+    free(stack);
+
+    uint8_t* rgba = calloc(count * 4, 1);
+    for (size_t k = 0; k < count; k++) {
+        if (cell[k] != 2) {
+            rgba[k * 4 + 3] = 255;
+        }
+    }
+    free(cell);
+    free(alpha);
+    CGColorSpaceRef rgb = CGColorSpaceCreateDeviceRGB();
+    CGContextRef imageContext = CGBitmapContextCreate(
+        rgba, side, side, 8, side * 4, rgb, kCGImageAlphaPremultipliedLast);
+    CGColorSpaceRelease(rgb);
+    if (!imageContext) {
+        free(rgba);
+        return nil;
+    }
+    CGImageRef cgImage = CGBitmapContextCreateImage(imageContext);
+    CGContextRelease(imageContext);
+    free(rgba);
+    if (!cgImage) {
+        return nil;
+    }
+    UIImage* filled = [[UIImage imageWithCGImage:cgImage scale:2.0 orientation:UIImageOrientationUp]
+        imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate];
+    CGImageRelease(cgImage);
+    return filled;
 }
 
 static UIImage* NFBOpaqueTabGlyph(UIImage* source) {
@@ -921,9 +994,9 @@ static void NFBApplyTabBarGlassBody(UIView* host) {
             // fill: the magnifier has no interior to fill. That one is thickened
             // so the selected state still reads heavier.
             if (!filled || filledInk < restingInk * 1.6) {
-                filled = NFBEmboldenedGlyph(filled ?: resting);
-                selectedSource = filledInk > 0 ? @"emboldened (stroke variant)"
-                                               : @"emboldened (no filled glyph)";
+                filled = NFBFilledGlyph(resting);
+                selectedSource = filledInk > 0 ? @"filled from outline (stroke variant)"
+                                               : @"filled from outline (no filled glyph)";
             }
             UITabBarItem* item = [[UITabBarItem alloc] initWithTitle:nil
                                                                image:NFBOpaqueTabGlyph(resting)
