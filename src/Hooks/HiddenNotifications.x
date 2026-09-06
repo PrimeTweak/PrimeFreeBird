@@ -250,6 +250,9 @@ static SEL NFBNotifDiscover(id model, NSArray<NSString*>* wanted, char kind) {
 
 // Identity, date and text of a row's model. The three lookups share one shape:
 // try the known names, then sweep, then remember — and say once what was found.
+static double NFBNotifDate(id model);
+static NSString* NFBNotifText(id model);
+
 static NSString* NFBNotifIdentity(id model) {
     static NSMutableDictionary<NSString*, NSString*>* cache;
     if (!cache) { cache = [NSMutableDictionary dictionary]; }
@@ -331,6 +334,18 @@ static NSString* NFBNotifIdentity(id model) {
         NFBDebugLog(@"notifhide: identity of %@ = %@ (discovered)",
                     className, NSStringFromSelector(found));
         return NFBNotifString(NFBNotifAsk(model, found));
+    }
+    // Last resort, and never nil: the notification's own text and date. Both
+    // are read from the model already, both are the same on the next launch,
+    // and returning nothing here is what handed the row back to Twitter and
+    // put its "See less often" menu in front of the reader.
+    NSString* text = NFBNotifText(model);
+    double when = NFBNotifDate(model);
+    if (text.length || when > 0) {
+        NSString* fallback =
+            [NSString stringWithFormat:@"tx:%lu/%.0f", (unsigned long)text.hash, when];
+        NFBDebugLog(@"notifhide: identity of %@ = text+date fallback", className);
+        return fallback;
     }
     return nil;
 }

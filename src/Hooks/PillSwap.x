@@ -30,6 +30,7 @@
 #import <QuartzCore/QuartzCore.h>
 
 static const void* kNFBSwapWidthRuleKey = &kNFBSwapWidthRuleKey;
+static void nfbSwapReport(UIView* button);
 
 // A named subclass so captures and the watch can identify the button, and so
 // it can answer the ONE question the bar's wrapper actually asks. Measured the
@@ -70,8 +71,63 @@ static const void* kNFBSwapWidthRuleKey = &kNFBSwapWidthRuleKey;
 // subviews=0, and still zero after the effect was reapplied. So UIKit draws
 // the glass, and the button simply claims the width that makes it a capsule
 // rather than the circle a square item gets.
+// Everything the pill's glass depends on, in one line, from the button's own
+// layout. The journal keeps the last 80 decisions, so a probe that only speaks
+// at launch has scrolled away by the time anyone shakes: this one repeats,
+// twice a second at most, and is therefore always in the report. It reads what
+// UIKit did rather than what the tweak asked for - the imposed box, the width
+// rule, the platform glass host and its background view, which is the thing
+// that draws.
+static void nfbSwapReport(UIView* button) {
+    static NSTimeInterval lastNote;
+    NSTimeInterval now = CACurrentMediaTime();
+    if (now - lastNote < 0.5) {
+        return;
+    }
+    lastNote = now;
+    NSLayoutConstraint* rule = objc_getAssociatedObject(button, kNFBSwapWidthRuleKey);
+    UIView* glassHost = nil;
+    UIView* platter = nil;
+    for (UIView* node = button.superview; node; node = node.superview) {
+        NSString* name = NSStringFromClass([node class]);
+        if (!glassHost && [name containsString:@"PlatformGlassInteraction"]) {
+            glassHost = node;
+        }
+        if (!platter && ([name containsString:@"TAMICAdaptor"] ||
+                         [name containsString:@"ItemWrapperView"])) {
+            platter = node;
+        }
+    }
+    __block NSString* background = @"none";
+    if (glassHost) {
+        EnumerateSubviewsRecursively(glassHost, ^(UIView* view) {
+            NSString* name = NSStringFromClass([view class]);
+            if ([background isEqualToString:@"none"] &&
+                ([name containsString:@"SystemBackground"] ||
+                 [name containsString:@"BackdropView"] ||
+                 [name containsString:@"GlassView"])) {
+                background = [NSString stringWithFormat:@"%@ %.0fx%.0f alpha=%.2f", name,
+                                                        view.bounds.size.width,
+                                                        view.bounds.size.height, view.alpha];
+            }
+        });
+    }
+    NFBDebugLog(@"[pill] box=%.0fx%.0f want=%.0f rule=%@ glassHost=%@ wrapper=%@ bg=%@",
+                button.bounds.size.width, button.bounds.size.height,
+                ((NFBInboxPillButton*)button).nfbPillWidth,
+                rule ? [NSString stringWithFormat:@"%.0f%@", rule.constant,
+                                                  rule.isActive ? @"" : @" INACTIVE"]
+                     : @"none",
+                glassHost ? [NSString stringWithFormat:@"%.0fx%.0f",
+                                                       glassHost.bounds.size.width,
+                                                       glassHost.bounds.size.height]
+                          : @"NOT FOUND",
+                platter ? NSStringFromClass([platter class]) : @"none", background);
+}
+
 - (void)layoutSubviews {
     [super layoutSubviews];
+    nfbSwapReport(self);
     if (self.nfbPillWidth <= 0) {
         return;
     }
