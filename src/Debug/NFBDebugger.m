@@ -951,27 +951,28 @@ void NFBReportTabBarStack(NSString* moment) {
     if (!NFBDebugIsRecording()) {
         return;
     }
-    UIWindow* window = nil;
+    // Every window, not the key one: at a shake the key window is the
+    // debugger's own overlay, and the host lives in the app's window.
+    __block UIView* host = nil;
     for (id scene in UIApplication.sharedApplication.connectedScenes) {
         if (![scene respondsToSelector:@selector(windows)]) {
             continue;
         }
         for (UIWindow* candidate in [scene windows]) {
-            if (candidate.isKeyWindow) {
-                window = candidate;
+            EnumerateSubviewsRecursively(candidate, ^(UIView* view) {
+              if (!host && [NSStringFromClass([view class]) isEqualToString:@"T1TabBarHostView"]) {
+                  host = view;
+              }
+            });
+            if (host) {
                 break;
             }
         }
-        if (window) {
+        if (host) {
             break;
         }
     }
-    __block UIView* host = nil;
-    EnumerateSubviewsRecursively(window, ^(UIView* view) {
-      if (!host && [NSStringFromClass([view class]) isEqualToString:@"T1TabBarHostView"]) {
-          host = view;
-      }
-    });
+    UIWindow* window = host.window;
     if (!host) {
         NFBDebugLog(@"[stack:%@] no T1TabBarHostView on screen", moment);
         return;
@@ -1066,12 +1067,18 @@ void NFBReportTabBarStack(NSString* moment) {
         // shakes, so the state is read here instead of trusted from a log.
         NSMutableArray* itemState = [NSMutableArray array];
         for (UITabBarItem* item in native.items) {
+            // The vector name each image was loaded under, when Branding.x
+            // tagged it, and whether the selected image is a distinct object.
+            NSString* imageName =
+                item.image ? objc_getAssociatedObject(
+                                 item.image, @selector(tfn_vectorImageNamed:fitsSize:fillColor:))
+                           : nil;
             [itemState addObject:[NSString
-                stringWithFormat:@"[%ld img=%@ mode=%ld sel=%@ mode=%ld]", (long)item.tag,
-                                 item.image ? @"yes" : @"nil",
+                stringWithFormat:@"[%ld img=%@ mode=%ld sel=%@ %@]", (long)item.tag,
+                                 imageName ?: (item.image ? @"untagged" : @"nil"),
                                  (long)item.image.renderingMode,
                                  item.selectedImage ? @"yes" : @"nil",
-                                 (long)item.selectedImage.renderingMode]];
+                                 item.selectedImage == item.image ? @"SAME" : @"distinct"]];
         }
         NFBDebugLog(@"[stack:%@] items: %@", moment,
                     itemState.count ? [itemState componentsJoinedByString:@" "] : @"(none)");

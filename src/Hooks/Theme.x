@@ -916,9 +916,13 @@ static void NFBApplyTabBarGlassBody(UIView* host) {
             NSString* selectedSource = @"filled";
             double restingInk = NFBGlyphInk(resting);
             double filledInk = NFBGlyphInk(filled);
-            if (!filled || fabs(filledInk - restingInk) < restingInk * 0.05) {
-                filled = NFBEmboldenedGlyph(resting);
-                selectedSource = filledInk > 0 ? @"emboldened (same ink as outline)"
+            // A true fill carries well over twice its outline's ink - the house,
+            // the bell, the bubble. A variant under 1.6x is another stroke, not a
+            // fill: the magnifier has no interior to fill. That one is thickened
+            // so the selected state still reads heavier.
+            if (!filled || filledInk < restingInk * 1.6) {
+                filled = NFBEmboldenedGlyph(filled ?: resting);
+                selectedSource = filledInk > 0 ? @"emboldened (stroke variant)"
                                                : @"emboldened (no filled glyph)";
             }
             UITabBarItem* item = [[UITabBarItem alloc] initWithTitle:nil
@@ -2010,6 +2014,33 @@ static UITabBarAppearance* NFBPatchedTabBarAppearance(UITabBarAppearance* appear
 // a round trip in Liquid Glass. When the view lands at the bar's leading edge
 // the bar is asked to lay out again; each pass is journaled so a failure names
 // the frame it saw.
+// Inside the search title view, the app lays its own search bar out with a
+// negative x on the results screen - measured: {-36, -10, 258, 64} against
+// {4, -10, 218, 64} on Explore - which pushes the capsule under the back
+// button. The bar is kept inside its container: the overshoot goes to x and
+// comes off the width, which lands exactly on the Explore geometry.
+%hook TFNSearchBar
+
+- (void)setFrame:(CGRect)frame {
+    UIView* view = (UIView*)self;
+    if ([BHTSettings boolForKey:@"enable_liquid_glass"] && frame.origin.x < 4.0 &&
+        [NSStringFromClass([view.superview class]) isEqualToString:@"TFNNavigationBarSearchView"]) {
+        CGFloat overshoot = 4.0 - frame.origin.x;
+        static NSTimeInterval lastNote = 0;
+        NSTimeInterval now = CACurrentMediaTime();
+        if (now - lastNote > 0.5) {
+            lastNote = now;
+            NFBDebugLog(@"[search] bar kept inside its container: x=%.0f w=%.0f -> x=4 w=%.0f",
+                        frame.origin.x, frame.size.width, frame.size.width - overshoot);
+        }
+        frame.origin.x = 4.0;
+        frame.size.width = MAX(80.0, frame.size.width - overshoot);
+    }
+    %orig(frame);
+}
+
+%end
+
 %hook TFNNavigationBarSearchView
 
 // The correction lives in setFrame:, never in layoutSubviews. Writing a frame

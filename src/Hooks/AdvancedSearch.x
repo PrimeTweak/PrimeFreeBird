@@ -143,30 +143,109 @@ static NSString* nfbAdvVectorName(UIImage* image) {
                  : nil;
 }
 
-static BOOL nfbAdvIsFiltersItem(UIBarButtonItem* item) {
+// The sliders glyph as a 24-point alpha mask, drawn from the app's own vector
+// so it matches what the app draws elsewhere. Rendered once.
+static const size_t kNFBAdvMaskSide = 24;
+
+static BOOL nfbAdvRenderMask(UIImage* image, uint8_t* pixels) {
+    if (!image.CGImage) {
+        return NO;
+    }
+    CGColorSpaceRef gray = CGColorSpaceCreateDeviceGray();
+    CGContextRef context = CGBitmapContextCreate(pixels, kNFBAdvMaskSide, kNFBAdvMaskSide, 8,
+                                                 kNFBAdvMaskSide, gray, kCGImageAlphaOnly);
+    CGColorSpaceRelease(gray);
+    if (!context) {
+        return NO;
+    }
+    memset(pixels, 0, kNFBAdvMaskSide * kNFBAdvMaskSide);
+    CGContextDrawImage(context, CGRectMake(0, 0, kNFBAdvMaskSide, kNFBAdvMaskSide),
+                       image.CGImage);
+    CGContextRelease(context);
+    return YES;
+}
+
+static const uint8_t* nfbAdvSlidersMask(void) {
+    static uint8_t mask[kNFBAdvMaskSide * kNFBAdvMaskSide];
+    static BOOL ready = NO;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+      if ([UIImage respondsToSelector:@selector(tfn_vectorImageNamed:fitsSize:fillColor:)]) {
+          UIImage* glyph = [UIImage tfn_vectorImageNamed:@"settings_slider"
+                                                fitsSize:CGSizeMake(kNFBAdvMaskSide, kNFBAdvMaskSide)
+                                               fillColor:[UIColor blackColor]];
+          ready = nfbAdvRenderMask(glyph, mask);
+      }
+    });
+    return ready ? mask : NULL;
+}
+
+// How much of two 24-point masks agree, both thresholded at half alpha.
+static double nfbAdvMaskAgreement(UIImage* image) {
+    const uint8_t* reference = nfbAdvSlidersMask();
+    if (!reference || !image) {
+        return 0;
+    }
+    uint8_t candidate[kNFBAdvMaskSide * kNFBAdvMaskSide];
+    if (!nfbAdvRenderMask(image, candidate)) {
+        return 0;
+    }
+    size_t agree = 0;
+    size_t inked = 0;
+    for (size_t i = 0; i < kNFBAdvMaskSide * kNFBAdvMaskSide; i++) {
+        BOOL a = reference[i] > 127;
+        BOOL b = candidate[i] > 127;
+        if (a || b) {
+            inked++;
+            if (a == b) {
+                agree++;
+            }
+        }
+    }
+    return inked ? (double)agree / (double)inked : 0;
+}
+
+// The first image an item shows, wherever it keeps it: on the item itself, or
+// inside a custom view - the search screen's items are TFNBarButtonItemButton
+// views with a plain UIImageView inside, measured, and carry no name or label.
+static UIImage* nfbAdvItemImage(UIBarButtonItem* item) {
+    if (item.image) {
+        return item.image;
+    }
+    __block UIImage* image = nil;
+    if (item.customView) {
+        EnumerateSubviewsRecursively(item.customView, ^(UIView* view) {
+            if (!image && [view isKindOfClass:[UIImageView class]]) {
+                image = [(UIImageView*)view image];
+            }
+        });
+    }
+    return image;
+}
+
+static BOOL nfbAdvIsFiltersItem(UIBarButtonItem* item, double* agreementOut) {
     if (objc_getAssociatedObject(item, kNFBAdvReplacedKey)) {
         return NO;
     }
     NSSet* glyphs = [NSSet setWithObjects:@"settings_slider", @"filter_bars", nil];
-    NSString* name = nfbAdvVectorName(item.image);
+    UIImage* image = nfbAdvItemImage(item);
+    NSString* name = nfbAdvVectorName(image);
     if (name && [glyphs containsObject:name]) {
         return YES;
     }
-    if (item.customView) {
-        __block BOOL found = NO;
-        EnumerateSubviewsRecursively(item.customView, ^(UIView* view) {
-            if (!found && [view isKindOfClass:[UIImageView class]]) {
-                NSString* inner = nfbAdvVectorName([(UIImageView*)view image]);
-                found = inner && [glyphs containsObject:inner];
-            }
-        });
-        if (found) {
-            return YES;
-        }
-    }
     NSString* label = item.accessibilityLabel ?: item.customView.accessibilityLabel;
     NSSet* labels = [NSSet setWithObjects:@"Filters", @"Filter", @"Filtres", @"Filtre", nil];
-    return label && [labels containsObject:label];
+    if (label && [labels containsObject:label]) {
+        return YES;
+    }
+    // Neither a name nor a label: the pixels decide. The same vector drawn by
+    // the app's Swift icon code and by its ObjC loader agrees almost entirely;
+    // any other glyph in this bar agrees far less.
+    double agreement = nfbAdvMaskAgreement(image);
+    if (agreementOut) {
+        *agreementOut = agreement;
+    }
+    return agreement >= 0.85;
 }
 
 static UIBarButtonItem* nfbAdvReplacementFor(UIViewController* owner) {
@@ -198,8 +277,14 @@ static void nfbAdvReplaceFilters(UIViewController* owner) {
     NSArray* right = item.rightBarButtonItems ?: @[];
     NSMutableArray* rebuilt = [NSMutableArray arrayWithCapacity:right.count];
     for (UIBarButtonItem* entry in right) {
-        [seen addObject:nfbAdvVectorName(entry.image) ?: (entry.accessibilityLabel ?: @"?")];
-        if (nfbAdvIsFiltersItem(entry)) {
+        double agreement = 0;
+        BOOL match = nfbAdvIsFiltersItem(entry, &agreement);
+        [seen addObject:[NSString stringWithFormat:@"%@(%.2f)",
+                                                   nfbAdvVectorName(nfbAdvItemImage(entry))
+                                                       ?: (entry.accessibilityLabel
+                                                               ?: NSStringFromClass([entry.customView class]) ?: @"?"),
+                                                   agreement]];
+        if (match) {
             [rebuilt addObject:nfbAdvReplacementFor(owner)];
             replaced++;
         } else {
@@ -215,8 +300,14 @@ static void nfbAdvReplaceFilters(UIViewController* owner) {
             BOOL changed = NO;
             for (NSUInteger i = 0; i < members.count; i++) {
                 UIBarButtonItem* entry = members[i];
-                [seen addObject:nfbAdvVectorName(entry.image) ?: (entry.accessibilityLabel ?: @"?")];
-                if (nfbAdvIsFiltersItem(entry)) {
+                double agreement = 0;
+                BOOL match = nfbAdvIsFiltersItem(entry, &agreement);
+                [seen addObject:[NSString stringWithFormat:@"%@(%.2f)",
+                                                           nfbAdvVectorName(nfbAdvItemImage(entry))
+                                                               ?: (entry.accessibilityLabel
+                                                                       ?: NSStringFromClass([entry.customView class]) ?: @"?"),
+                                                           agreement]];
+                if (match) {
                     members[i] = nfbAdvReplacementFor(owner);
                     changed = YES;
                     replaced++;
@@ -238,6 +329,67 @@ static BOOL nfbAdvIsSearchScreen(UIViewController* vc) {
     return [name rangeOfString:@"search" options:NSCaseInsensitiveSearch].location != NSNotFound &&
            ![vc isKindOfClass:[AdvancedSearchViewController class]];
 }
+
+// The item is set on the container after the results land, well after the
+// container appeared - the journal showed one item at viewDidAppear and the
+// sliders only later. The setters are the moment; the owner is the visible
+// search screen at the top of the stack, and the scan runs once the setter
+// has returned.
+static UIViewController* nfbAdvTopViewController(void) {
+    UIWindow* window = nil;
+    for (id scene in UIApplication.sharedApplication.connectedScenes) {
+        if (![scene respondsToSelector:@selector(windows)]) {
+            continue;
+        }
+        for (UIWindow* candidate in [scene windows]) {
+            if (candidate.isKeyWindow || (!window && candidate.rootViewController)) {
+                window = candidate;
+            }
+        }
+    }
+    UIViewController* top = window.rootViewController;
+    while (top.presentedViewController) {
+        top = top.presentedViewController;
+    }
+    while (YES) {
+        if ([top isKindOfClass:[UINavigationController class]]) {
+            top = [(UINavigationController*)top topViewController];
+        } else if ([top isKindOfClass:[UITabBarController class]]) {
+            top = [(UITabBarController*)top selectedViewController];
+        } else {
+            break;
+        }
+    }
+    return top;
+}
+
+static void nfbAdvRescanSoon(void) {
+    dispatch_async(dispatch_get_main_queue(), ^{
+      UIViewController* top = nfbAdvTopViewController();
+      if (top && nfbAdvIsSearchScreen(top)) {
+          nfbAdvReplaceFilters(top);
+      }
+    });
+}
+
+%hook UINavigationItem
+
+- (void)setRightBarButtonItems:(NSArray<UIBarButtonItem*>*)items {
+    %orig;
+    nfbAdvRescanSoon();
+}
+
+- (void)setRightBarButtonItems:(NSArray<UIBarButtonItem*>*)items animated:(BOOL)animated {
+    %orig;
+    nfbAdvRescanSoon();
+}
+
+- (void)setTrailingItemGroups:(NSArray<UIBarButtonItemGroup*>*)groups {
+    %orig;
+    nfbAdvRescanSoon();
+}
+
+%end
 
 %hook UIViewController
 
