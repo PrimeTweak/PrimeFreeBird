@@ -29,7 +29,7 @@
 #import "Debug/NFBDebugger.h"
 #import <QuartzCore/QuartzCore.h>
 
-static void nfbSwapEnsureGlass(UIVisualEffectView* capsule);
+static const void* kNFBSwapWidthRuleKey = &kNFBSwapWidthRuleKey;
 
 // A named subclass so captures and the watch can identify the button, and so
 // it can answer the ONE question the bar's wrapper actually asks. Measured the
@@ -80,9 +80,6 @@ static void nfbSwapEnsureGlass(UIVisualEffectView* capsule);
     CGRect capsuleFrame = CGRectMake(box.size.width - self.nfbPillWidth,
                                      (box.size.height - height) / 2.0,
                                      self.nfbPillWidth, height);
-    UIVisualEffectView* capsule = (UIVisualEffectView*)[self viewWithTag:3];
-    capsule.frame = capsuleFrame;
-    nfbSwapEnsureGlass(capsule);
     self.nfbTouchRect = capsuleFrame;
 
     UILabel* label = (UILabel*)[self viewWithTag:1];
@@ -193,6 +190,11 @@ static void nfbSwapLayoutButton(void) {
     // Content sizes only. WHERE it all goes is decided in -layoutSubviews,
     // which runs again every time the wrapper changes the box.
     button.nfbPillWidth = width;
+    NSLayoutConstraint* widthRule =
+        objc_getAssociatedObject(button, kNFBSwapWidthRuleKey);
+    if (widthRule && widthRule.constant != width) {
+        widthRule.constant = width;
+    }
     button.nfbSpacing = spacing;
     button.nfbIntrinsic = CGSizeMake(width, height);
     [button invalidateIntrinsicContentSize];
@@ -290,27 +292,6 @@ static NSArray<UIBarButtonItem*>* nfbSwapInterceptItems(UINavigationItem* nav,
 }
 
 
-// The capsule's effect, read again on every pass: UIGlassEffect is not always
-// resolvable at the moment the button is built, and a material is kept until
-// it is. Measured caveat, unresolved: a hand-made effect view was once seen
-// with the effect set and no backdrop of its own.
-static void nfbSwapEnsureGlass(UIVisualEffectView* capsule) {
-    if (!capsule) {
-        return;
-    }
-    Class glassClass = NSClassFromString(@"UIGlassEffect");
-    if (glassClass && ![capsule.effect isKindOfClass:glassClass]) {
-        capsule.effect = [[glassClass alloc] init];
-        NFBDebugLog(@"[glass] effect set to UIGlassEffect");
-    } else if (!glassClass && !capsule.effect) {
-        capsule.effect =
-            [UIBlurEffect effectWithStyle:UIBlurEffectStyleSystemUltraThinMaterial];
-        NFBDebugLog(@"[glass] effect set to material fallback");
-    }
-    NFBDebugLog(@"[glass] frame=%.0fx%.0f alpha=%.2f window=%@ subviews=%lu",
-                capsule.bounds.size.width, capsule.bounds.size.height, capsule.alpha,
-                capsule.window ? @"yes" : @"no", (unsigned long)capsule.subviews.count);
-}
 
 // Every way out of nfbSwapApply, named. Six of its seven exits were silent, so
 // a cold launch that left the pill untouched said nothing at all. One line per
@@ -522,13 +503,20 @@ static void nfbSwapApply(UIView* pillView) {
         // The tweak's own capsule. UIKit's shared background is a circle on a
         // box this shape - measured - so it is turned off below and the shape
         // is drawn here instead.
-        UIVisualEffectView* capsule = [[UIVisualEffectView alloc] initWithEffect:nil];
-        capsule.userInteractionEnabled = NO;
-        capsule.layer.cornerRadius = 20.0;
-        capsule.layer.masksToBounds = YES;
-        capsule.tag = 3;
-        [button insertSubview:capsule atIndex:0];
-        nfbSwapEnsureGlass(capsule);
+        // No capsule of our own. Measured twice on the reader's device, with the
+        // effect correctly set and the view on screen at the right size:
+        // effect=UIGlassEffect frame=57x40 window=yes subviews=0. A visual
+        // effect view that renders builds a backdrop; this one never does, so
+        // an app on an older SDK cannot draw UIGlassEffect itself. UIKit's own
+        // shared background is the only glass available, and it is kept below.
+        // What it needs is a box the width of a pill, imposed by a constraint,
+        // or it draws the circle a 44-point box deserves.
+        button.translatesAutoresizingMaskIntoConstraints = NO;
+        NSLayoutConstraint* widthRule = [button.widthAnchor constraintEqualToConstant:57.0];
+        widthRule.priority = UILayoutPriorityRequired;
+        widthRule.active = YES;
+        objc_setAssociatedObject(button, kNFBSwapWidthRuleKey, widthRule,
+                                 OBJC_ASSOCIATION_RETAIN_NONATOMIC);
         // Our OWN capsule, native-shaped (the bar's default treatment for a
         // plain UIKit item is a CIRCLE — measured ~63 pt on the 07:34 video,
         // nothing like the wide native pill). Glass via the runtime so the
@@ -537,10 +525,6 @@ static void nfbSwapApply(UIView* pillView) {
         gNFBSwapItem = [[UIBarButtonItem alloc] initWithCustomView:button];
         // On OUR plain UIKit item the official per-item switch is exactly in
         // its intended case — it kills the circular default treatment.
-        if ([gNFBSwapItem respondsToSelector:
-                NSSelectorFromString(@"setHidesSharedBackground:")]) {
-            [gNFBSwapItem setValue:@YES forKey:@"hidesSharedBackground"];
-        }
         NFBMark(button, @"PillSwap/custom button - identical to native");
     } else {
         button = (NFBInboxPillButton*)gNFBSwapItem.customView;
