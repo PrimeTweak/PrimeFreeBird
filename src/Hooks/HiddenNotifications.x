@@ -46,6 +46,20 @@ static __weak UIViewController* gNFBNotifScreen;
 
 // The registry: id → { "t": text, "d": notification date, "h": hidden at }.
 // A dictionary keyed by id makes lookup O(1) on the hot filtering path.
+// The registry is written through this, never straight to the defaults.
+// NSUserDefaults flushes when the system chooses - usually at backgrounding -
+// so a crash between hiding a notification and that flush loses it, which is
+// what the reader saw. The store is asked to write now.
+static void NFBWriteHiddenNotifs(NSDictionary* registry) {
+    NSUserDefaults* defaults = [NSUserDefaults standardUserDefaults];
+    if (registry.count) {
+        [defaults setObject:registry forKey:kNFBHiddenNotifsKey];
+    } else {
+        [defaults removeObjectForKey:kNFBHiddenNotifsKey];
+    }
+    [defaults synchronize];
+}
+
 static NSDictionary* NFBHiddenNotifs(void) {
     NSDictionary* stored =
         [[NSUserDefaults standardUserDefaults] dictionaryForKey:kNFBHiddenNotifsKey];
@@ -105,20 +119,6 @@ NSArray<NSDictionary*>* NFBHiddenNotifList(void) {
         return [b[@"h"] compare:a[@"h"]];
     }];
     return rows;
-}
-
-// The registry is written through this, never straight to the defaults.
-// NSUserDefaults flushes when the system chooses - usually at backgrounding -
-// so a crash between hiding a notification and that flush loses it, which is
-// what the reader saw. The store is asked to write now.
-static void NFBWriteHiddenNotifs(NSDictionary* registry) {
-    NSUserDefaults* defaults = [NSUserDefaults standardUserDefaults];
-    if (registry.count) {
-        [defaults setObject:registry forKey:kNFBHiddenNotifsKey];
-    } else {
-        [defaults removeObjectForKey:kNFBHiddenNotifsKey];
-    }
-    [defaults synchronize];
 }
 
 void NFBUnhideNotif(NSString* notifID) {
