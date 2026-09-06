@@ -290,6 +290,13 @@ static UIBarButtonItem* nfbAdvReplacementFor(UIViewController* owner) {
                                                            action:@selector(launch:)];
     btn.tintColor = grey;
     btn.accessibilityLabel = [[BHTBundle sharedBundle] localizedStringForKey:@"ADVANCED_SEARCH_TITLE"];
+    // Out of UIKit's shared glass capsule, exactly as the Explore button above
+    // already does. Without it this replacement joins the group and the glass
+    // spreads to whatever sits beside it - the settings gear and the avatar.
+    if ([btn respondsToSelector:@selector(setHidesSharedBackground:)]) {
+        ((void (*)(id, SEL, BOOL))objc_msgSend)(
+            btn, @selector(setHidesSharedBackground:), YES);
+    }
     if ([btn respondsToSelector:@selector(setHidesSharedBackground:)]) {
         ((void (*)(id, SEL, BOOL))objc_msgSend)(btn, @selector(setHidesSharedBackground:), YES);
     }
