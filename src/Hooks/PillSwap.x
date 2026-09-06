@@ -583,6 +583,50 @@ static void nfbSwapApply(UIView* pillView) {
 
 %end
 
+// Coming back from a conversation, the inbox is restored with the app's own
+// item and the replacement waits for that view to enter a window again -
+// filmed: the pill blanks for about a second on the way back. The screen
+// appearing is a second signal, and the swap runs from whichever pill view is
+// on the bar. Nothing happens when the item is already the tweak's.
+static void nfbSwapApplyFromScreen(void) {
+    Class inboxItemClass =
+        NSClassFromString(@"_TtC7DMInbox39InboxNavigationBarMenuBarButtonItemView");
+    if (!inboxItemClass) {
+        return;
+    }
+    for (id scene in UIApplication.sharedApplication.connectedScenes) {
+        if (![scene respondsToSelector:@selector(windows)]) {
+            continue;
+        }
+        for (UIWindow* window in [scene windows]) {
+            __block UIView* pillView = nil;
+            EnumerateSubviewsRecursively(window, ^(UIView* view) {
+                if (!pillView && [view isKindOfClass:inboxItemClass]) {
+                    pillView = view;
+                }
+            });
+            if (pillView) {
+                nfbSwapApply(pillView);
+                return;
+            }
+        }
+    }
+}
+
+%hook _TtC7DMInbox19InboxViewController
+
+- (void)viewDidAppear:(BOOL)animated {
+    %orig;
+    nfbSwapApplyFromScreen();
+    for (NSNumber* delay in @[ @0.05, @0.25, @0.6 ]) {
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW,
+                                     (int64_t)(delay.doubleValue * NSEC_PER_SEC)),
+                       dispatch_get_main_queue(), ^{ nfbSwapApplyFromScreen(); });
+    }
+}
+
+%end
+
 %hook _TtC7DMInbox39InboxNavigationBarMenuBarButtonItemView
 
 // The original's view appearing IS the stomp signal: SwiftUI has put its

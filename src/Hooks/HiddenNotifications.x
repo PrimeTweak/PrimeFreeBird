@@ -87,7 +87,7 @@ void NFBPurgeExpiredNotifs(void) {
         }
     }
     if (kept.count != current.count) {
-        [[NSUserDefaults standardUserDefaults] setObject:kept forKey:kNFBHiddenNotifsKey];
+        NFBWriteHiddenNotifs(kept);
     }
 }
 
@@ -107,14 +107,28 @@ NSArray<NSDictionary*>* NFBHiddenNotifList(void) {
     return rows;
 }
 
+// The registry is written through this, never straight to the defaults.
+// NSUserDefaults flushes when the system chooses - usually at backgrounding -
+// so a crash between hiding a notification and that flush loses it, which is
+// what the reader saw. The store is asked to write now.
+static void NFBWriteHiddenNotifs(NSDictionary* registry) {
+    NSUserDefaults* defaults = [NSUserDefaults standardUserDefaults];
+    if (registry.count) {
+        [defaults setObject:registry forKey:kNFBHiddenNotifsKey];
+    } else {
+        [defaults removeObjectForKey:kNFBHiddenNotifsKey];
+    }
+    [defaults synchronize];
+}
+
 void NFBUnhideNotif(NSString* notifID) {
     NSMutableDictionary* current = [NFBHiddenNotifs() mutableCopy];
     [current removeObjectForKey:notifID];
-    [[NSUserDefaults standardUserDefaults] setObject:current forKey:kNFBHiddenNotifsKey];
+    NFBWriteHiddenNotifs(current);
 }
 
 void NFBUnhideAllNotifs(void) {
-    [[NSUserDefaults standardUserDefaults] removeObjectForKey:kNFBHiddenNotifsKey];
+    NFBWriteHiddenNotifs(nil);
 }
 
 NSInteger NFBHiddenNotifCount(void) {
@@ -567,7 +581,7 @@ static void NFBHideNotifWithText(id model, NSString* cellText) {
                     ? [NSDate dateWithTimeIntervalSince1970:notifDate]
                     : (id)@"unknown",
                 source);
-    [[NSUserDefaults standardUserDefaults] setObject:current forKey:kNFBHiddenNotifsKey];
+    NFBWriteHiddenNotifs(current);
     NFBDebugLog(@"notifhide: hidden <%@> - %lu total",
                 identity, (unsigned long)current.count);
 }

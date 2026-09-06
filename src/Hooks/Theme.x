@@ -265,9 +265,24 @@ static UIImage* NFBBirdLogoImage(CGSize size) {
     return rendered;
 }
 
+// A logo is a flat glyph the app hands over as a template, or one this tweak
+// has already baked. A conversation header puts the correspondent's avatar in
+// the same title control the home logo uses, so reaching every image view
+// under that control also reaches a photograph - which then took the logo's
+// tint and, with the bird on, became the bird. Measured on the reader's
+// device, in the Chat list and in an open thread.
+static BOOL NFBLooksLikeLogo(UIImageView* view) {
+    if (objc_getAssociatedObject(view, kNFBLogoBakedKey) ||
+        objc_getAssociatedObject(view, kNFBLogoOriginalKey)) {
+        return YES;
+    }
+    UIImage* image = view.image;
+    return image.renderingMode == UIImageRenderingModeAlwaysTemplate;
+}
+
 static void NFBApplyLogoTint(UIImageView* logoView) {
     UIImage* current = logoView.image;
-    if (!current) {
+    if (!current || !NFBLooksLikeLogo(logoView)) {
         return;
     }
     NFBRegisterLogoView(logoView);
@@ -284,14 +299,7 @@ static void NFBApplyLogoTint(UIImageView* logoView) {
     }
     // The bird replaces the X when the reader asked for Twitter's branding back.
     // Substituting the image, not the tint: the glyph itself is what changed.
-    // Only a flat glyph is ever swapped for the bird. A conversation header's
-    // avatar is a photograph, reaches this through the bar sweep, and came
-    // back as the bird: measured on the reader's device, the Chat list and an
-    // open thread both showed it. A template image is a glyph by construction;
-    // anything else is content.
-    BOOL isGlyph = original.renderingMode == UIImageRenderingModeAlwaysTemplate ||
-                   objc_getAssociatedObject(logoView, kNFBLogoBakedKey) != nil;
-    if (isGlyph && [BHTSettings boolForKey:@"restore_twitter_names"]) {
+    if ([BHTSettings boolForKey:@"restore_twitter_names"]) {
         UIImage* bird = NFBBirdLogoImage(original.size);
         if (bird && original != bird) {
             original = bird;
@@ -413,8 +421,9 @@ static BOOL NFBIsTopBarContainer(UIView* view) {
     return [name containsString:@"NavigationBar"] || [name containsString:@"TopBar"];
 }
 
-// Every image view under a title control, painted. The title control is the
-// only place the bar puts a title image, so the reach is exactly the logo.
+// Every image view under a title control is offered; NFBApplyLogoTint keeps
+// the glyphs and lets photographs through untouched - a conversation header
+// puts its avatar in this same control.
 static void NFBBakeTitleControlLogos(UIView* root) {
     if ([NSStringFromClass([root class]) containsString:@"NavigationBarTitleControl"]) {
         EnumerateSubviewsRecursively(root, ^(UIView* view) {
