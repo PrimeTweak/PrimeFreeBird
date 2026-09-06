@@ -629,11 +629,11 @@ static double NFBGlyphInk(UIImage* glyph) {
     return ink;
 }
 
-// A filled glyph built from its outline, for tabs whose bundle has no true
+// A selected glyph built from its outline, for tabs whose bundle has no true
 // filled variant - the magnifier. The outline is rendered as a mask, the
-// outside is flooded from the edges, and every enclosed pixel becomes ink:
-// the lens turns solid, the handle already was. Drawn at twice the size for
-// clean edges, returned at the bar's 24 points as a template.
+// outside is flooded from the edges, and the enclosed area is what is left:
+// the lens. Drawn at twice the size for clean edges, returned at the bar's
+// 24 points as a template.
 static UIImage* NFBFilledGlyph(UIImage* outline) {
     if (!outline.CGImage) {
         return nil;
@@ -690,9 +690,24 @@ static UIImage* NFBFilledGlyph(UIImage* outline) {
     }
     free(stack);
 
+    // Not the whole lens: the ring stays, and only the lower half of the
+    // enclosed area is inked - a half-disc hung from the lens's own centre,
+    // found as the centroid of the enclosed pixels. A full disc read as odd on
+    // the bar next to three outlines.
+    double sumY = 0;
+    size_t enclosed = 0;
+    for (size_t k = 0; k < count; k++) {
+        if (cell[k] == 0) {
+            sumY += (double)(k / side);
+            enclosed++;
+        }
+    }
+    double centreY = enclosed ? sumY / (double)enclosed : (double)side / 2.0;
     uint8_t* rgba = calloc(count * 4, 1);
     for (size_t k = 0; k < count; k++) {
-        if (cell[k] != 2) {
+        BOOL ink = cell[k] == 1;
+        BOOL lowerHalf = cell[k] == 0 && (double)(k / side) >= centreY;
+        if (ink || lowerHalf) {
             rgba[k * 4 + 3] = 255;
         }
     }

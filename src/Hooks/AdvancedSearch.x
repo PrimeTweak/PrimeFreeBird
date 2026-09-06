@@ -248,8 +248,40 @@ static BOOL nfbAdvIsFiltersItem(UIBarButtonItem* item, double* agreementOut) {
     return agreement >= 0.85;
 }
 
+// The colour the bar's other items are drawn in: on the results screen the
+// share glyph is the label colour, measured at (15,20,25), while Explore's
+// gear is grey. The neighbour decides, and the Explore grey is the fallback.
+static UIColor* nfbAdvNeighbourTint(UINavigationItem* item, UIViewController* owner) {
+    NSMutableArray<UIBarButtonItem*>* candidates = [NSMutableArray array];
+    [candidates addObjectsFromArray:item.rightBarButtonItems ?: @[]];
+    if (@available(iOS 16.0, *)) {
+        for (UIBarButtonItemGroup* group in item.trailingItemGroups) {
+            [candidates addObjectsFromArray:group.barButtonItems];
+        }
+    }
+    for (UIBarButtonItem* entry in candidates) {
+        if (objc_getAssociatedObject(entry, kNFBAdvReplacedKey)) {
+            continue;
+        }
+        __block UIColor* tint = nil;
+        if (entry.customView) {
+            EnumerateSubviewsRecursively(entry.customView, ^(UIView* view) {
+                if (!tint && [view isKindOfClass:[UIImageView class]] && view.tintColor) {
+                    tint = view.tintColor;
+                }
+            });
+        } else if (entry.tintColor) {
+            tint = entry.tintColor;
+        }
+        if (tint) {
+            return tint;
+        }
+    }
+    return NFBBarIconGrey(owner.traitCollection);
+}
+
 static UIBarButtonItem* nfbAdvReplacementFor(UIViewController* owner) {
-    UIColor* grey = NFBBarIconGrey(owner.traitCollection);
+    UIColor* grey = nfbAdvNeighbourTint(owner.navigationItem, owner);
     NFBAdvSearchLauncher* launcher = [NFBAdvSearchLauncher new];
     launcher.owner = owner;
     UIBarButtonItem* btn = [[UIBarButtonItem alloc] initWithImage:NFBSlidersGlyph(27.33, grey)
@@ -389,6 +421,23 @@ static void nfbAdvRescanSoon(void) {
     nfbAdvRescanSoon();
 }
 
+- (void)setPinnedTrailingGroup:(UIBarButtonItemGroup*)group {
+    %orig;
+    nfbAdvRescanSoon();
+}
+
+%end
+
+// A group already on the bar can have its items swapped without any setter
+// on the navigation item firing - measured: after a restart the sliders sat
+// in place with no scan triggered until the next appearance.
+%hook UIBarButtonItemGroup
+
+- (void)setBarButtonItems:(NSArray<UIBarButtonItem*>*)items {
+    %orig;
+    nfbAdvRescanSoon();
+}
+
 %end
 
 %hook UIViewController
@@ -404,6 +453,20 @@ static void nfbAdvRescanSoon(void) {
     %orig;
     if (nfbAdvIsSearchScreen(self)) {
         nfbAdvReplaceFilters(self);
+        // The results, and the item that comes with them, land after the
+        // screen has appeared. A few later looks cost nothing when the item is
+        // already the tweak's.
+        __weak UIViewController* weakSelf = self;
+        for (NSNumber* delay in @[ @0.4, @1.2, @3.0 ]) {
+            dispatch_after(dispatch_time(DISPATCH_TIME_NOW,
+                                         (int64_t)(delay.doubleValue * NSEC_PER_SEC)),
+                           dispatch_get_main_queue(), ^{
+              UIViewController* strongSelf = weakSelf;
+              if (strongSelf.viewIfLoaded.window) {
+                  nfbAdvReplaceFilters(strongSelf);
+              }
+            });
+        }
     }
 }
 
