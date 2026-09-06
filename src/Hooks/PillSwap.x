@@ -27,6 +27,9 @@
 
 #import "HookHelpers.h"
 #import "Debug/NFBDebugger.h"
+#import <QuartzCore/QuartzCore.h>
+
+static void nfbSwapEnsureGlass(UIVisualEffectView* capsule);
 
 // A named subclass so captures and the watch can identify the button, and so
 // it can answer the ONE question the bar's wrapper actually asks. Measured the
@@ -69,8 +72,9 @@
     CGRect capsuleFrame = CGRectMake(box.size.width - self.nfbPillWidth,
                                      (box.size.height - height) / 2.0,
                                      self.nfbPillWidth, height);
-    UIView* capsule = [self viewWithTag:3];
+    UIVisualEffectView* capsule = (UIVisualEffectView*)[self viewWithTag:3];
     capsule.frame = capsuleFrame;
+    nfbSwapEnsureGlass(capsule);
     self.nfbTouchRect = capsuleFrame;
 
     UILabel* label = (UILabel*)[self viewWithTag:1];
@@ -277,6 +281,33 @@ static NSArray<UIBarButtonItem*>* nfbSwapInterceptItems(UINavigationItem* nav,
     return @[gNFBSwapItem];
 }
 
+// The glass on the capsule, set now or repaired later. Filmed: on a cold
+// launch the pill showed its outline with no glass behind it for two seconds,
+// until a tab change - the effect had been chosen once, at a moment
+// UIGlassEffect was not resolvable yet, and the fallback material stayed for
+// the session. The effect is therefore re-read on every pass and upgraded the
+// moment the class answers.
+static void nfbSwapEnsureGlass(UIVisualEffectView* capsule) {
+    if (!capsule) {
+        return;
+    }
+    Class glassClass = NSClassFromString(@"UIGlassEffect");
+    BOOL hasGlass = glassClass && [capsule.effect isKindOfClass:glassClass];
+    if (hasGlass) {
+        return;
+    }
+    if (glassClass) {
+        capsule.effect = [[glassClass alloc] init];
+        NFBDebugLog(@"swap: capsule glass set (UIGlassEffect)");
+        return;
+    }
+    if (!capsule.effect) {
+        capsule.effect =
+            [UIBlurEffect effectWithStyle:UIBlurEffectStyleSystemUltraThinMaterial];
+        NFBDebugLog(@"swap: capsule glass set (material fallback)");
+    }
+}
+
 static void nfbSwapApply(UIView* pillView) {
     if (!pillView.window) {
         return;
@@ -457,21 +488,13 @@ static void nfbSwapApply(UIView* pillView) {
         // nothing like the wide native pill). Glass via the runtime so the
         // The iOS 16 SDK never hears about UIGlassEffect; the working recipe:
         // effect behind the content, radius = height / 2.
-        UIView* capsule = nil;
-        Class glassClass = NSClassFromString(@"UIGlassEffect");
-        UIVisualEffect* effect = glassClass ? [[glassClass alloc] init] : nil;
-        if (!effect) {
-            effect = [UIBlurEffect effectWithStyle:
-                          UIBlurEffectStyleSystemUltraThinMaterial];
-        }
-        capsule = [[UIVisualEffectView alloc] initWithEffect:effect];
+        UIVisualEffectView* capsule = [[UIVisualEffectView alloc] initWithEffect:nil];
         capsule.userInteractionEnabled = NO;
         capsule.layer.cornerRadius = 20.0;
         capsule.layer.masksToBounds = YES;
         capsule.tag = 3;
         [button insertSubview:capsule atIndex:0];
-        NFBDebugLog(@"swap: custom capsule placed (%@)",
-                    glassClass ? @"UIGlassEffect" : @"material fallback");
+        nfbSwapEnsureGlass(capsule);
         gNFBSwapItem = [[UIBarButtonItem alloc] initWithCustomView:button];
         // On OUR plain UIKit item the official per-item switch is exactly in
         // its intended case — it kills the circular default treatment.
@@ -613,16 +636,56 @@ static void nfbSwapApplyFromScreen(void) {
     }
 }
 
+// A display link for the length of the transition: one pass per frame for
+// half a second, then it stops. Cheap - each pass returns at once when the
+// item on the bar is already the tweak's.
+@interface NFBSwapTicker : NSObject
+@property (nonatomic, strong) CADisplayLink* link;
+@property (nonatomic, assign) NSTimeInterval until;
+@end
+
+@implementation NFBSwapTicker
+- (void)tick {
+    if ([NSDate timeIntervalSinceReferenceDate] > self.until) {
+        [self.link invalidate];
+        self.link = nil;
+        return;
+    }
+    nfbSwapApplyFromScreen();
+}
+@end
+
+static NFBSwapTicker* gNFBSwapTicker = nil;
+
+static void nfbSwapWatchTransition(void) {
+    if (!gNFBSwapTicker) {
+        gNFBSwapTicker = [NFBSwapTicker new];
+    }
+    gNFBSwapTicker.until = [NSDate timeIntervalSinceReferenceDate] + 0.5;
+    if (!gNFBSwapTicker.link) {
+        gNFBSwapTicker.link = [CADisplayLink displayLinkWithTarget:gNFBSwapTicker
+                                                          selector:@selector(tick)];
+        [gNFBSwapTicker.link addToRunLoop:[NSRunLoop mainRunLoop]
+                                  forMode:NSRunLoopCommonModes];
+    }
+}
+
 %hook _TtC7DMInbox19InboxViewController
+
+// The gap the reader filmed is about a quarter second wide, while the screen
+// is still coming back - it opens before viewDidAppear and closes on its own.
+// The swap therefore starts at viewWillAppear and runs on every frame of the
+// transition, which is what covers a gap that short.
+- (void)viewWillAppear:(BOOL)animated {
+    %orig;
+    nfbSwapApplyFromScreen();
+    nfbSwapWatchTransition();
+}
 
 - (void)viewDidAppear:(BOOL)animated {
     %orig;
     nfbSwapApplyFromScreen();
-    for (NSNumber* delay in @[ @0.05, @0.25, @0.6 ]) {
-        dispatch_after(dispatch_time(DISPATCH_TIME_NOW,
-                                     (int64_t)(delay.doubleValue * NSEC_PER_SEC)),
-                       dispatch_get_main_queue(), ^{ nfbSwapApplyFromScreen(); });
-    }
+    nfbSwapWatchTransition();
 }
 
 %end

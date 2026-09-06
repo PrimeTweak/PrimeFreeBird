@@ -265,24 +265,30 @@ static UIImage* NFBBirdLogoImage(CGSize size) {
     return rendered;
 }
 
-// A logo is a flat glyph the app hands over as a template, or one this tweak
-// has already baked. A conversation header puts the correspondent's avatar in
-// the same title control the home logo uses, so reaching every image view
-// under that control also reaches a photograph - which then took the logo's
-// tint and, with the bird on, became the bird. Measured on the reader's
-// device, in the Chat list and in an open thread.
-static BOOL NFBLooksLikeLogo(UIImageView* view) {
-    if (objc_getAssociatedObject(view, kNFBLogoBakedKey) ||
-        objc_getAssociatedObject(view, kNFBLogoOriginalKey)) {
+// An avatar, not a logo. A conversation header puts the correspondent's photo
+// in the same title control the home logo uses, so sweeping every image view
+// under that control also reaches the photo - which took the logo's tint and,
+// with the bird on, became the bird. Rendering mode does not separate them:
+// the home logo arrives AlwaysOriginal too, measured at mode=1 in a capture.
+// What does separate them is the pipeline - a network photo is loaded through
+// TIP and carries a TIPImageViewObserver - and the class name, which says
+// Avatar on every one of them.
+static BOOL NFBLooksLikeAvatar(UIImageView* view) {
+    NSString* name = NSStringFromClass([view class]);
+    if ([name containsString:@"Avatar"] || [name containsString:@"Profile"]) {
         return YES;
     }
-    UIImage* image = view.image;
-    return image.renderingMode == UIImageRenderingModeAlwaysTemplate;
+    for (UIView* sub in view.subviews) {
+        if ([NSStringFromClass([sub class]) containsString:@"TIPImageView"]) {
+            return YES;
+        }
+    }
+    return NO;
 }
 
 static void NFBApplyLogoTint(UIImageView* logoView) {
     UIImage* current = logoView.image;
-    if (!current || !NFBLooksLikeLogo(logoView)) {
+    if (!current) {
         return;
     }
     NFBRegisterLogoView(logoView);
@@ -427,7 +433,8 @@ static BOOL NFBIsTopBarContainer(UIView* view) {
 static void NFBBakeTitleControlLogos(UIView* root) {
     if ([NSStringFromClass([root class]) containsString:@"NavigationBarTitleControl"]) {
         EnumerateSubviewsRecursively(root, ^(UIView* view) {
-          if ([view isKindOfClass:[UIImageView class]]) {
+          if ([view isKindOfClass:[UIImageView class]] &&
+              !NFBLooksLikeAvatar((UIImageView*)view)) {
               NFBApplyLogoTint((UIImageView*)view);
           }
         });
@@ -451,7 +458,7 @@ static void NFBRetintTemplateLogos(UIView* root) {
     }
     if ([root isKindOfClass:[UIImageView class]]) {
         UIImageView* imageView = (UIImageView*)root;
-        if (imageView.image &&
+        if (imageView.image && !NFBLooksLikeAvatar(imageView) &&
             imageView.image.renderingMode == UIImageRenderingModeAlwaysTemplate &&
             imageView.bounds.size.width > 0 && imageView.bounds.size.width < 60) {
             NFBApplyLogoTint(imageView);
