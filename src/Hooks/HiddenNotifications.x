@@ -258,14 +258,22 @@ static NSString* NFBNotifIdentity(id model) {
     if (!cache) { cache = [NSMutableDictionary dictionary]; }
     NSString* className = NSStringFromClass([model class]);
     NSString* known = cache[className];
+    // A cached route that comes back empty falls through to everything below.
+    // Returning nil here - which this did - meant one empty scribeItem poisoned
+    // every later call for the class, silently, and the row went back to
+    // Twitter with its own menu.
     if ([known hasPrefix:@"scribeItem."]) {
         id item = NFBNotifAsk(model, NSSelectorFromString(@"scribeItem"));
         NSString* value = NFBNotifString(
             NFBNotifAsk(item, NSSelectorFromString([known substringFromIndex:11])));
-        return value.length ? [@"si:" stringByAppendingString:value] : nil;
-    }
-    if (known) {
-        return NFBNotifString(NFBNotifAsk(model, NSSelectorFromString(known)));
+        if (value.length) {
+            return [@"si:" stringByAppendingString:value];
+        }
+    } else if (known) {
+        NSString* value = NFBNotifString(NFBNotifAsk(model, NSSelectorFromString(known)));
+        if (value.length) {
+            return value;
+        }
     }
     // Measured, 18:20:17 - this model exposes exactly six selectors:
     // description, scribeComponent, scribeElement, scribeItem,
@@ -2075,10 +2083,40 @@ static UITableView* NFBNotifTableForCell(UIView* cell) {
             UITableView* table = NFBNotifTableForCell((UIView*)self);
             NSIndexPath* indexPath =
                 table ? [table indexPathForCell:(UITableViewCell*)self] : nil;
+            // The table's data source is not always the controller that answers
+            // itemAtIndexPath: - measured on 12.24, this route returned nothing
+            // and the row was handed back to Twitter with its own menu. The
+            // responder chain is walked for a controller that can answer, and
+            // the route that worked is named in the journal.
             id source = table.dataSource;
+            NSString* route = @"dataSource";
+            SEL itemSel = NSSelectorFromString(@"itemAtIndexPath:");
+            if (![source respondsToSelector:itemSel]) {
+                source = nil;
+                for (UIResponder* node = table; node; node = node.nextResponder) {
+                    if ([node respondsToSelector:itemSel]) {
+                        source = node;
+                        route = NSStringFromClass([node class]);
+                        break;
+                    }
+                }
+                if (!source && gNFBNotifScreen &&
+                    [gNFBNotifScreen respondsToSelector:itemSel]) {
+                    source = gNFBNotifScreen;
+                    route = @"remembered screen";
+                }
+            }
             id model = indexPath ? (NFBModelAtIndexPath(source, indexPath)
                                     ?: NFBModelFromCell(table, indexPath))
                                  : nil;
+            NFBDebugLog(@"[notifs] x: table=%@ row=%@ source=%@ model=%@",
+                        table ? @"yes" : @"nil",
+                        indexPath ? [NSString stringWithFormat:@"%ld/%ld",
+                                                              (long)indexPath.section,
+                                                              (long)indexPath.row]
+                                  : @"nil",
+                        source ? route : @"NONE",
+                        model ? NSStringFromClass([model class]) : @"nil");
             NSString* identity = model ? NFBNotifIdentity(model) : nil;
             if (identity.length) {
                 NFBHideNotifWithText(model, NFBNotifTextFromCell(table, indexPath));
