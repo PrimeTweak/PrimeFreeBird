@@ -676,26 +676,35 @@ static void nfbSwapWatchTransition(void) {
     }
 }
 
-%hook _TtC7DMInbox19InboxViewController
+// UIViewController, not the inbox class. Measured in the health report: the
+// two hooks on _TtC7DMInbox19InboxViewController were listed as dead - the
+// class implements both methods, so it simply is not loaded when Logos
+// installs its hooks, and the DMInbox framework arrives later. UIKit is always
+// there, and the screen is recognised by its class name at call time.
+%hook UIViewController
 
-// The gap the reader filmed is about a quarter second wide, while the screen
-// is still coming back - it opens before viewDidAppear and closes on its own.
-// The swap therefore starts at viewWillAppear and runs on every frame of the
-// transition, which is what covers a gap that short.
 - (void)viewWillAppear:(BOOL)animated {
     %orig;
-    nfbSwapApplyFromScreen();
-    nfbSwapWatchTransition();
+    if ([NSStringFromClass([self class]) containsString:@"InboxViewController"]) {
+        nfbSwapApplyFromScreen();
+        nfbSwapWatchTransition();
+    }
 }
 
 - (void)viewDidAppear:(BOOL)animated {
     %orig;
-    nfbSwapApplyFromScreen();
-    nfbSwapWatchTransition();
+    if ([NSStringFromClass([self class]) containsString:@"InboxViewController"]) {
+        nfbSwapApplyFromScreen();
+        nfbSwapWatchTransition();
+    }
 }
 
 %end
 
+// Same framework as the dead pair above, so the same risk: if DMInbox is not
+// loaded when the hooks go in, this one never fires either and the swap never
+// runs at all. The UIKit hooks above cover that case; this stays for the
+// precise moment the app puts its own item back.
 %hook _TtC7DMInbox39InboxNavigationBarMenuBarButtonItemView
 
 // The original's view appearing IS the stomp signal: SwiftUI has put its
