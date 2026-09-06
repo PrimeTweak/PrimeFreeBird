@@ -284,7 +284,14 @@ static void NFBApplyLogoTint(UIImageView* logoView) {
     }
     // The bird replaces the X when the reader asked for Twitter's branding back.
     // Substituting the image, not the tint: the glyph itself is what changed.
-    if ([BHTSettings boolForKey:@"restore_twitter_names"]) {
+    // Only a flat glyph is ever swapped for the bird. A conversation header's
+    // avatar is a photograph, reaches this through the bar sweep, and came
+    // back as the bird: measured on the reader's device, the Chat list and an
+    // open thread both showed it. A template image is a glyph by construction;
+    // anything else is content.
+    BOOL isGlyph = original.renderingMode == UIImageRenderingModeAlwaysTemplate ||
+                   objc_getAssociatedObject(logoView, kNFBLogoBakedKey) != nil;
+    if (isGlyph && [BHTSettings boolForKey:@"restore_twitter_names"]) {
         UIImage* bird = NFBBirdLogoImage(original.size);
         if (bird && original != bird) {
             original = bird;
@@ -690,24 +697,28 @@ static UIImage* NFBFilledGlyph(UIImage* outline) {
     }
     free(stack);
 
-    // Not the whole lens: the ring stays, and only the lower half of the
-    // enclosed area is inked - a half-disc hung from the lens's own centre,
-    // found as the centroid of the enclosed pixels. A full disc read as odd on
-    // the bar next to three outlines.
+    // The ring stays and a disc sits at the lens's centre, at 62% of the
+    // enclosed area's radius, so a ring of glass is left between the two. The
+    // centre and the radius both come from the enclosed pixels themselves.
+    double sumX = 0;
     double sumY = 0;
     size_t enclosed = 0;
     for (size_t k = 0; k < count; k++) {
         if (cell[k] == 0) {
+            sumX += (double)(k % side);
             sumY += (double)(k / side);
             enclosed++;
         }
     }
+    double centreX = enclosed ? sumX / (double)enclosed : (double)side / 2.0;
     double centreY = enclosed ? sumY / (double)enclosed : (double)side / 2.0;
+    double radius = enclosed ? sqrt((double)enclosed / M_PI) * 0.62 : 0;
     uint8_t* rgba = calloc(count * 4, 1);
     for (size_t k = 0; k < count; k++) {
-        BOOL ink = cell[k] == 1;
-        BOOL lowerHalf = cell[k] == 0 && (double)(k / side) >= centreY;
-        if (ink || lowerHalf) {
+        double dx = (double)(k % side) - centreX;
+        double dy = (double)(k / side) - centreY;
+        BOOL inDisc = radius > 0 && (dx * dx + dy * dy) <= radius * radius;
+        if (cell[k] == 1 || inDisc) {
             rgba[k * 4 + 3] = 255;
         }
     }

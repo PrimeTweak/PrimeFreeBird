@@ -214,6 +214,21 @@ static void nfbSwapLayoutButton(void) {
 
 // Belt for the label after a menu pick: the stomp normally carries the new
 // state, this re-read covers a bridge that would not stomp.
+// The label the pill last showed, kept across launches. Without it the pill
+// has nothing to say until the app's own item arrives with its menu, which is
+// what made it appear only after a swipe between tabs.
+static NSString* nfbSwapRememberedTitle(void) {
+    NSString* stored =
+        [[NSUserDefaults standardUserDefaults] stringForKey:@"nfb_swap_last_title"];
+    return stored.length ? stored : nil;
+}
+
+static void nfbSwapRememberTitle(NSString* title) {
+    if (title.length) {
+        [[NSUserDefaults standardUserDefaults] setObject:title forKey:@"nfb_swap_last_title"];
+    }
+}
+
 static void nfbSwapRefreshLabelFromMenu(void) {
     UIMenu* live = gNFBSwapOriginal.menu ?: gNFBSwapMenu;
     if (!gNFBSwapItem || !live) {
@@ -230,6 +245,7 @@ static void nfbSwapRefreshLabelFromMenu(void) {
         nfbSwapLayoutButton();
         NFBDebugLog(@"swap: label -> %@ (menu)", checked);
     }
+    nfbSwapRememberTitle(checked);
 }
 
 // v2 — measured on the 06:41 video: the residual flash was OUR OWN swap.
@@ -341,6 +357,16 @@ static void nfbSwapApply(UIView* pillView) {
     }
     NSString* liveTitle = realLabel.attributedText.length
         ? realLabel.attributedText.string : realLabel.text;
+    // The app fills its own label only once the inbox has drawn, so the swap
+    // used to stand down until then and the pill appeared on the first swipe
+    // between tabs. The remembered title carries it through that gap; the live
+    // one replaces it as soon as it arrives.
+    if (realLabel && !liveTitle.length) {
+        liveTitle = nfbSwapRememberedTitle();
+        if (liveTitle.length) {
+            NFBDebugLog(@"swap: no live title yet - using remembered '%@'", liveTitle);
+        }
+    }
     if (!realLabel || !liveTitle.length) {
         static const char* kNFBSwapWaitKey = "nfbSwapWait";
         if (!objc_getAssociatedObject(pillView, kNFBSwapWaitKey)) {
