@@ -12,6 +12,7 @@
 #import "Hooks/HookHelpers.h"
 #import "Debug/NFBDebugger.h"
 #import <QuartzCore/QuartzCore.h>
+#import <execinfo.h>
 
 static const void* kNFBTerrainNotedKey = &kNFBTerrainNotedKey;
 
@@ -281,6 +282,38 @@ static NFBTerrainCounters nfbTerrainSample(void) {
 - (void)setHidesSharedBackground:(BOOL)hides;
 @end
 
+// The stack that invalidates a bar while it is storming. Captured once per run,
+// and only past the threshold, so a healthy session pays nothing for it.
+static char* gNFBStormStack = NULL;
+
+static void nfbTerrainNoteInvalidation(void) {
+    if (gNFBStormStack) {
+        return;
+    }
+    static NSTimeInterval windowStart = 0;
+    static int64_t windowCount = 0;
+    NSTimeInterval now = CACurrentMediaTime();
+    if (now - windowStart > 0.5) {
+        windowStart = now;
+        windowCount = 0;
+    }
+    if (++windowCount < 200) {
+        return;
+    }
+    void* frames[24];
+    int depth = backtrace(frames, 24);
+    char** symbols = backtrace_symbols(frames, depth);
+    if (!symbols) {
+        return;
+    }
+    NSMutableString* text = [NSMutableString string];
+    for (int i = 0; i < depth; i++) {
+        [text appendFormat:@"%s\n", symbols[i]];
+    }
+    free(symbols);
+    gNFBStormStack = strdup(text.UTF8String);
+}
+
 static NSString* nfbTerrainHangPath(void) {
     return [NSTemporaryDirectory() stringByAppendingPathComponent:@"nfb-hang.txt"];
 }
@@ -303,6 +336,10 @@ static void nfbTerrainWriteHang(NSTimeInterval stuckFor,
                          now.hidesShared - start.hidesShared,
                          gNFBLastBarClass ?: @"none",
                          gNFBLastPopAt > 0 ? CACurrentMediaTime() - gNFBLastPopAt : -1.0];
+    if (gNFBStormStack) {
+        report = [report stringByAppendingFormat:@"\nSTORM STACK\n%s",
+                                                 gNFBStormStack];
+    }
     [report writeToFile:nfbTerrainHangPath()
              atomically:YES
                encoding:NSUTF8StringEncoding
@@ -317,7 +354,11 @@ static void nfbTerrainReplayHang(void) {
                                                  encoding:NSUTF8StringEncoding
                                                     error:NULL];
     if (report.length) {
-        NFBDebugLog(@"[p27] previous run: %@", report);
+        for (NSString* line in [report componentsSeparatedByString:@"\n"]) {
+            if (line.length) {
+                NFBDebugLog(@"[p27] previous run: %@", line);
+            }
+        }
         [[NSFileManager defaultManager] removeItemAtPath:path error:NULL];
     }
 }
@@ -403,6 +444,10 @@ static void nfbTerrainInstallWatchdog(void) {
     gNFBSetNeedsLayout++;
     if (gNFBInBarLayout > 0) {
         gNFBNeedsInPass++;
+    }
+    @try {
+        nfbTerrainNoteInvalidation();
+    } @catch (id exception) {
     }
     %orig;
 }
