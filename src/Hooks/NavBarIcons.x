@@ -176,6 +176,29 @@ static BOOL nfbLooksLikeSettingsButton(UIView* view) {
 // A navigation transition fades the bar. Refusing that fade leaves the
 // transition unable to settle, and the bar oscillates between the two
 // screens' heights. Fades pass through for its duration.
+
+// Rotating bisect. Each launch disables one family of this file's hooks, so
+// the culprit is isolated by relaunching rather than by rebuilding.
+static NSInteger gNFBBisectGroup = -1;
+
+static NSInteger nfbBisectGroup(void) {
+    if (gNFBBisectGroup < 0) {
+        NSUserDefaults* defaults = [NSUserDefaults standardUserDefaults];
+        gNFBBisectGroup = ([defaults integerForKey:@"nfb_bisect_group"] + 1) % 5;
+        [defaults setInteger:gNFBBisectGroup forKey:@"nfb_bisect_group"];
+        static const char* names[5] = { "nothing (all live)", "opacity pinning",
+                                        "glyph baking", "bar layout pass",
+                                        "settings button" };
+        NFBDebugLog(@"[p30] bisect launch: group %ld off - %s",
+                    (long)gNFBBisectGroup, names[gNFBBisectGroup]);
+    }
+    return gNFBBisectGroup;
+}
+
+static BOOL nfbBisectOff(NSInteger group) {
+    return nfbBisectGroup() == group;
+}
+
 static NSTimeInterval gNFBFadeWindowUntil = 0;
 
 static BOOL nfbFadesAllowed(void) {
@@ -187,7 +210,7 @@ static void nfbOpenFadeWindow(void) {
 }
 
 static void nfbPinOpaque(UIView* view) {
-    if (nfbFadesAllowed()) {
+    if (nfbFadesAllowed() || nfbBisectOff(1)) {
         return;
     }
     if (view.alpha < 1.0) {
@@ -508,6 +531,10 @@ static void nfbQueueBarGlassPass(UIView* bar) {
 %hook UINavigationBar
 
 - (void)layoutSubviews {
+    if (nfbBisectOff(3)) {
+        %orig;
+        return;
+    }
     %orig;
 
     @try {
@@ -649,6 +676,10 @@ static BOOL nfbIsChatBarGlyph(UIView* view) {
 // The second half of the two-step claim: the button is in the bar, the chain
 // reaches the navigation controller, the screen is finally readable.
 - (void)didMoveToWindow {
+    if (nfbBisectOff(2)) {
+        %orig;
+        return;
+    }
     %orig;
     if (!((UIView*)self).window) {
         return;
@@ -673,6 +704,10 @@ static BOOL nfbIsChatBarGlyph(UIView* view) {
 }
 
 - (void)setImage:(UIImage*)image {
+    if (nfbBisectOff(2)) {
+        %orig;
+        return;
+    }
     UIColor* target = objc_getAssociatedObject(self, kNFBGreyTargetKey);
     if (!target || !image) {
         // Not "== AlwaysTemplate": a bar glyph usually arrives in automatic mode,
@@ -741,6 +776,10 @@ static BOOL nfbIsChatBarGlyph(UIView* view) {
 %hook UIBarButtonItem
 
 - (void)setImage:(UIImage*)image {
+    if (nfbBisectOff(2)) {
+        %orig;
+        return;
+    }
     UIColor* target = objc_getAssociatedObject(self, kNFBGreyTargetKey);
     if (!target || !image) {
         %orig;
@@ -806,6 +845,10 @@ static BOOL nfbIsRightHandGlyphButton(UIView* button) {
 // interception never arms. Once marked, every later pass is a pointer comparison.
 %new
 - (void)nfbGreySettingsGlyphIfNeeded {
+    if (nfbBisectOff(4)) {
+        %orig;
+        return;
+    }
     @try {
         UIView* button = (UIView*)self;
         if (!button.window) {
@@ -827,11 +870,19 @@ static BOOL nfbIsRightHandGlyphButton(UIView* button) {
 }
 
 - (void)didMoveToWindow {
+    if (nfbBisectOff(4)) {
+        %orig;
+        return;
+    }
     %orig;
     [self nfbGreySettingsGlyphIfNeeded];
 }
 
 - (void)layoutSubviews {
+    if (nfbBisectOff(4)) {
+        %orig;
+        return;
+    }
     %orig;
     [self nfbGreySettingsGlyphIfNeeded];
 }
@@ -845,7 +896,7 @@ static BOOL nfbIsRightHandGlyphButton(UIView* button) {
 %hook UIView
 
 - (void)setAlpha:(CGFloat)alpha {
-    if (alpha < 1.0 && !nfbFadesAllowed() &&
+    if (alpha < 1.0 && !nfbFadesAllowed() && !nfbBisectOff(1) &&
         objc_getAssociatedObject(self.layer, kNFBNoFadeKey) != nil) {
         %orig(1.0);
         return;
@@ -910,7 +961,7 @@ static BOOL NFBViewSitsInXTabBar(UIView* view) {
 %hook CALayer
 
 - (void)setOpacity:(float)opacity {
-    if (opacity < 1.0f && !nfbFadesAllowed() &&
+    if (opacity < 1.0f && !nfbFadesAllowed() && !nfbBisectOff(1) &&
         objc_getAssociatedObject(self, kNFBNoFadeKey) != nil) {
         %orig(1.0f);
         return;
@@ -919,6 +970,10 @@ static BOOL NFBViewSitsInXTabBar(UIView* view) {
 }
 
 - (void)addAnimation:(CAAnimation*)animation forKey:(NSString*)key {
+    if (nfbBisectOff(1)) {
+        %orig;
+        return;
+    }
     UIView* owner = (UIView*)self.delegate;
     BOOL ownerIsView = [owner isKindOfClass:[UIView class]];
 
@@ -1018,6 +1073,10 @@ static BOOL NFBViewSitsInXTabBar(UIView* view) {
 %hook T1AvatarImageView
 
 - (void)setImage:(UIImage*)image {
+    if (nfbBisectOff(2)) {
+        %orig;
+        return;
+    }
     if (image.renderingMode == UIImageRenderingModeAlwaysTemplate) {
         %orig([image imageWithRenderingMode:UIImageRenderingModeAlwaysOriginal]);
         return;
