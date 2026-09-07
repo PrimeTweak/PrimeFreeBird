@@ -259,6 +259,23 @@ static volatile int64_t gNFBSetTint = 0;
 static volatile int64_t gNFBSetTitleAttrs = 0;
 static volatile int64_t gNFBSetHidesShared = 0;
 static volatile int64_t gNFBSetNeedsLayout = 0;
+static volatile int64_t gNFBNeedsInPass = 0;
+static volatile int64_t gNFBBarDidMove = 0;
+static volatile int32_t gNFBInBarLayout = 0;
+
+// Every counter sampled at the same instant, so the report carries deltas over
+// the hang instead of totals since launch.
+typedef struct {
+    int64_t layouts, needs, needsInPass, didMove, tint, titleAttrs, hidesShared;
+} NFBTerrainCounters;
+
+static NFBTerrainCounters nfbTerrainSample(void) {
+    NFBTerrainCounters c = { gNFBBarLayouts,     gNFBSetNeedsLayout,
+                             gNFBNeedsInPass,    gNFBBarDidMove,
+                             gNFBSetTint,        gNFBSetTitleAttrs,
+                             gNFBSetHidesShared };
+    return c;
+}
 
 @interface UIBarButtonItem (NFBTerrain)
 - (void)setHidesSharedBackground:(BOOL)hides;
@@ -270,13 +287,20 @@ static NSString* nfbTerrainHangPath(void) {
 
 // Written from the watchdog thread while the main thread is stuck, so it must not
 // touch UIKit or any state the main thread owns beyond these counters.
-static void nfbTerrainWriteHang(NSTimeInterval stuckFor, int64_t layoutsAtStart) {
+static void nfbTerrainWriteHang(NSTimeInterval stuckFor,
+                                NFBTerrainCounters start) {
+    NFBTerrainCounters now = nfbTerrainSample();
     NSString* report = [NSString
-        stringWithFormat:@"HANG %.1f s | bar layouts %lld -> %lld | tint %lld | "
-                         @"titleAttrs %lld | hidesShared %lld | needsLayout %lld | "
-                         @"last bar %@ | pop %.1f s before",
-                         stuckFor, layoutsAtStart, gNFBBarLayouts, gNFBSetTint,
-                         gNFBSetTitleAttrs, gNFBSetHidesShared, gNFBSetNeedsLayout,
+        stringWithFormat:@"HANG %.1f s | layouts +%lld | needsLayout +%lld "
+                         @"(inside a UIKit pass %lld) | didMove +%lld | tint +%lld "
+                         @"| titleAttrs +%lld | hidesShared +%lld | last bar %@ | "
+                         @"pop %.1f s before",
+                         stuckFor, now.layouts - start.layouts,
+                         now.needs - start.needs,
+                         now.needsInPass - start.needsInPass,
+                         now.didMove - start.didMove, now.tint - start.tint,
+                         now.titleAttrs - start.titleAttrs,
+                         now.hidesShared - start.hidesShared,
                          gNFBLastBarClass ?: @"none",
                          gNFBLastPopAt > 0 ? CACurrentMediaTime() - gNFBLastPopAt : -1.0];
     [report writeToFile:nfbTerrainHangPath()
@@ -311,14 +335,14 @@ static void nfbTerrainInstallWatchdog(void) {
                               (uint64_t)(0.3 * NSEC_PER_SEC), 0.1 * NSEC_PER_SEC);
     dispatch_source_set_event_handler(gNFBWatchdog, ^{
       static BOOL reported = NO;
-      static int64_t layoutsAtStart = 0;
+      static NFBTerrainCounters start;
       NSTimeInterval idle = CACurrentMediaTime() - gNFBMainTick;
       if (idle < 0.5) {
           reported = NO;
-          layoutsAtStart = gNFBBarLayouts;
+          start = nfbTerrainSample();
       } else if (idle > 2.0 && !reported) {
           reported = YES;
-          nfbTerrainWriteHang(idle, layoutsAtStart);
+          nfbTerrainWriteHang(idle, start);
       }
       dispatch_async(dispatch_get_main_queue(),
                      ^{ gNFBMainTick = CACurrentMediaTime(); });
@@ -377,10 +401,14 @@ static void nfbTerrainInstallWatchdog(void) {
 
 - (void)setNeedsLayout {
     gNFBSetNeedsLayout++;
+    if (gNFBInBarLayout > 0) {
+        gNFBNeedsInPass++;
+    }
     %orig;
 }
 
 - (void)didMoveToWindow {
+    gNFBBarDidMove++;
     %orig;
     @try {
         if (!NFBDebugIsRecording() || !self.window) {
@@ -406,7 +434,11 @@ static void nfbTerrainInstallWatchdog(void) {
 }
 
 - (void)layoutSubviews {
+    // The bracket covers UIKit's own pass only: this hook loads first, so the
+    // other files' hooks wrap it rather than run inside it.
+    gNFBInBarLayout++;
     %orig;
+    gNFBInBarLayout--;
     @try {
         if (!NFBDebugIsRecording()) {
             return;
