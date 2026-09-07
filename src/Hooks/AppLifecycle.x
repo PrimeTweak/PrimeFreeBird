@@ -5,6 +5,7 @@
 
 #import "HookHelpers.h"
 #import "Debug/NFBDebugger.h"
+#import <execinfo.h>
 extern void NFBInstallPasteboardObserver(void);
 
 // MARK: - Padlock helpers
@@ -411,28 +412,80 @@ static void paintWindowForSplash(UIView* view) {
 static NSString* const kNFBGlassPersistedGate =
     @"T1LiquidGlassRedesignPersistedGate";
 
+// Reads the gate as a plain object, so "never written" is told apart from NO.
+static NSString* nfbGateValue(void) {
+    id value = [[NSUserDefaults standardUserDefaults]
+        objectForKey:kNFBGlassPersistedGate];
+    return value ? [value description] : @"(unset)";
+}
+
+// The app's own answer, read from whichever class exposes the getter.
+static NSString* nfbGlassAnswer(void) {
+    Class appearance = objc_getClass("_TtC11XAppearance10Appearance");
+    SEL isEnabled = NSSelectorFromString(@"isLiquidGlassEnabled");
+    if (!appearance || ![appearance respondsToSelector:isEnabled]) {
+        return @"unreachable";
+    }
+    return ((BOOL (*)(id, SEL))objc_msgSend)((id)appearance, isEnabled) ? @"YES"
+                                                                       : @"NO";
+}
+
+// Names whoever writes the gate. The value alone never said who put it back to
+// zero, and no other hook in the tweak touches this key, so frame 2 is the
+// caller and not another trampoline.
+%hook NSUserDefaults
+
+- (void)setObject:(id)value forKey:(NSString*)key {
+    if ([key isEqualToString:kNFBGlassPersistedGate]) {
+        void* frames[4];
+        int depth = backtrace(frames, 4);
+        Dl_info info;
+        const char* caller = "unknown";
+        if (depth > 2 && dladdr(frames[2], &info) && info.dli_sname) {
+            caller = info.dli_sname;
+        }
+        NFBDebugLog(@"[p32] gate written = %@ by %s", value ?: @"(nil)", caller);
+    }
+    %orig;
+}
+
+%end
+
 %ctor {
     NSUserDefaults* defaults = [NSUserDefaults standardUserDefaults];
     BOOL glassEnabled = [defaults boolForKey:@"enable_liquid_glass"];
     [defaults setBool:glassEnabled
                forKey:@"com.apple.SwiftUI.IgnoreSolariumOptOut"];
 
-    // Written from the constructor so it is in place before anything reads it.
+    NFBDebugLog(@"[p32] 1 ctor before write: gate=%@", nfbGateValue());
     [defaults setBool:glassEnabled forKey:kNFBGlassPersistedGate];
+    NFBDebugLog(@"[p32] 2 ctor after write: gate=%@", nfbGateValue());
 
-    // The app's own installer, once its framework is loaded. It may do more than
-    // persist the flag, and it is the supported way in.
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1.0 * NSEC_PER_SEC)),
                    dispatch_get_main_queue(), ^{
+      NFBDebugLog(@"[p32] 3 before installer: gate=%@ answer=%@", nfbGateValue(),
+                  nfbGlassAnswer());
       Class installer = objc_getClass("T1LiquidGlassGateInstaller");
       SEL install = NSSelectorFromString(@"installGateWithRedesignEnabled:");
       if (installer && [installer respondsToSelector:install]) {
           ((void (*)(id, SEL, BOOL))objc_msgSend)((id)installer, install,
                                                   glassEnabled);
-          NFBDebugLog(@"[p31] native gate installer called with %d",
-                      glassEnabled ? 1 : 0);
+          NFBDebugLog(@"[p32] 4 installer called with %d", glassEnabled ? 1 : 0);
       } else {
-          NFBDebugLog(@"[p31] native gate installer not reachable");
+          NFBDebugLog(@"[p32] 4 installer not reachable");
       }
+      NFBDebugLog(@"[p32] 5 after installer: gate=%@ answer=%@", nfbGateValue(),
+                  nfbGlassAnswer());
+    });
+
+    // Late enough that any early reset by the app has already happened. If the
+    // gate is back to zero here, the writer above named who did it.
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(6.0 * NSEC_PER_SEC)),
+                   dispatch_get_main_queue(), ^{
+      NFBDebugLog(@"[p32] 6 six seconds in: gate=%@ answer=%@ compat=%@",
+                  nfbGateValue(), nfbGlassAnswer(),
+                  [[NSBundle mainBundle]
+                      objectForInfoDictionaryKey:@"UIDesignRequiresCompatibility"]
+                      ?: @"(nil)");
     });
 }
