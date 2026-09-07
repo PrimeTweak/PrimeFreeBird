@@ -70,8 +70,6 @@
     CGRect capsuleFrame = CGRectMake(box.size.width - self.nfbPillWidth,
                                      (box.size.height - height) / 2.0,
                                      self.nfbPillWidth, height);
-    UIView* capsule = [self viewWithTag:3];
-    capsule.frame = capsuleFrame;
     self.nfbTouchRect = capsuleFrame;
 
     UILabel* label = (UILabel*)[self viewWithTag:1];
@@ -202,8 +200,7 @@ static void nfbSwapLayoutButton(void) {
                 gNFBSwapMeasured = NO;  // try again on the next layout
                 return;
             }
-            UIView* liveCapsule = [live viewWithTag:3];
-            CGRect onScreen = [live convertRect:liveCapsule.frame toView:nil];
+            CGRect onScreen = [live convertRect:live.nfbTouchRect toView:nil];
             NFBDebugLog(@"swap: RULER - capsule on screen %.1f to %.1f pt "
                         @"(native 362.7 to 420.0, imposed box %.0fx%.0f)",
                         onScreen.origin.x,
@@ -427,26 +424,11 @@ static void nfbSwapApply(UIView* pillView) {
         chevron.tag = 2;
         [button addSubview:chevron];
         button.showsMenuAsPrimaryAction = YES;
-        // Our OWN capsule, native-shaped (the bar's default treatment for a
-        // plain UIKit item is a CIRCLE — measured ~63 pt on the 07:34 video,
-        // nothing like the wide native pill). Glass via the runtime so the
-        // The iOS 16 SDK never hears about UIGlassEffect; the working recipe:
-        // effect behind the content, radius = height / 2.
-        UIView* capsule = nil;
-        Class glassClass = NSClassFromString(@"UIGlassEffect");
-        UIVisualEffect* effect = glassClass ? [[glassClass alloc] init] : nil;
-        if (!effect) {
-            effect = [UIBlurEffect effectWithStyle:
-                          UIBlurEffectStyleSystemUltraThinMaterial];
-        }
-        capsule = [[UIVisualEffectView alloc] initWithEffect:effect];
-        capsule.userInteractionEnabled = NO;
-        capsule.layer.cornerRadius = 20.0;
-        capsule.layer.masksToBounds = YES;
-        capsule.tag = 3;
-        [button insertSubview:capsule atIndex:0];
-        NFBDebugLog(@"swap: custom capsule placed (%@)",
-                    glassClass ? @"UIGlassEffect" : @"material fallback");
+        // No capsule. This item used to carry its own UIVisualEffectView with
+        // UIGlassEffect behind the label, which is where the pill's glass came
+        // from. The navigation bar carries none anywhere else - the settings
+        // gear, the avatar - so the replacement carries none either and shows
+        // its label and chevron flat, like every other item in this bar.
         gNFBSwapItem = [[UIBarButtonItem alloc] initWithCustomView:button];
         // On OUR plain UIKit item the official per-item switch is exactly in
         // its intended case — it kills the circular default treatment.
