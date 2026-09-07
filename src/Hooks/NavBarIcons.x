@@ -43,6 +43,9 @@ static const void* kNFBPaintedFlagKey = &kNFBPaintedFlagKey;
 // is too late, so every route that could lower it is refused as it is used: the
 // alpha, the layer's opacity and the animation.
 static const void* kNFBNoFadeKey = &kNFBNoFadeKey;
+// Marks a bar item already asked to go without the shared glass, so the request
+// is made once instead of on every layout pass.
+static const void* kNFBFlatItemKey = &kNFBFlatItemKey;
 
 // One grey for every icon the tweak adds or recolour: the label colour at 60%,
 // resolved to a concrete value so nothing can re-resolve it later.
@@ -329,6 +332,41 @@ static void nfbRepaintNotificationsGear(UIView* bar, UIColor* colour) {
     }
 }
 
+// The gear and the avatar are Twitter's own bar items, so the flat treatment the
+// tweak already applies to its own buttons is asked of them here. Icon-only items
+// only: a text button such as Done keeps the capsule iOS gives it.
+static void nfbFlattenBarItemGlass(UIView* bar) {
+    if (![BHTSettings boolForKey:@"enable_liquid_glass"] ||
+        ![bar respondsToSelector:@selector(topItem)]) {
+        return;
+    }
+    UINavigationItem* item =
+        ((id (*)(id, SEL))objc_msgSend)(bar, @selector(topItem));
+    if (!item) {
+        return;
+    }
+    SEL hideShared = NSSelectorFromString(@"setHidesSharedBackground:");
+    NSMutableArray<UIBarButtonItem*>* items = [NSMutableArray array];
+    [items addObjectsFromArray:item.leftBarButtonItems ?: @[]];
+    [items addObjectsFromArray:item.rightBarButtonItems ?: @[]];
+    for (UIBarButtonItem* button in items) {
+        if (![button isKindOfClass:[UIBarButtonItem class]] ||
+            button.title.length > 0 ||
+            objc_getAssociatedObject(button, kNFBFlatItemKey) != nil ||
+            ![button respondsToSelector:hideShared]) {
+            continue;
+        }
+        objc_setAssociatedObject(button, kNFBFlatItemKey, @YES,
+                                 OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        ((void (*)(id, SEL, BOOL))objc_msgSend)(button, hideShared, YES);
+        NFBDebugLog(@"[p24] bar item flattened: image=%@ customView=%@",
+                    button.image ? @"yes" : @"no",
+                    button.customView
+                        ? NSStringFromClass([button.customView class])
+                        : @"none");
+    }
+}
+
 %hook UINavigationBar
 
 - (void)layoutSubviews {
@@ -354,6 +392,7 @@ static void nfbRepaintNotificationsGear(UIView* bar, UIColor* colour) {
         }
 
         nfbPinHeaderOpacity(bar);
+        nfbFlattenBarItemGlass(bar);
 
         if (settingsButton) {
             nfbRepaintGlyphs(settingsButton, grey);
