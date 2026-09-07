@@ -326,6 +326,18 @@ static void nfbTerrainInstallWatchdog(void) {
     return %orig;
 }
 
+// A back button does not go through the method above: UIKit asks the bar's
+// delegate, which is the navigation controller itself. This is the one a tap on
+// the chevron reaches.
+- (BOOL)navigationBar:(UINavigationBar*)bar shouldPopItem:(UINavigationItem*)item {
+    if (NFBDebugIsRecording()) {
+        gNFBLastPopAt = CACurrentMediaTime();
+        NFBDebugLog(@"[p27] back button pop from %@",
+                    NSStringFromClass([self.topViewController class]));
+    }
+    return %orig;
+}
+
 %end
 
 %hook UINavigationBar
