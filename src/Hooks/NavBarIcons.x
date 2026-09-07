@@ -420,12 +420,19 @@ static UIColor* nfbBarGlyphColour(UIView* view) {
     return colour;
 }
 
-// The button's own chain, four levels at most — never the bar, so no sibling is
-// reached.
+// The button's own chain, four levels at most, and never past the button. Above it
+// sits the platter host every item of the bar draws from, so a tint written there
+// fills the glass capsule of the siblings too.
 static void nfbTintGlyphChain(UIView* view, UIColor* colour) {
     UIView* node = view;
     NSInteger depth = 0;
     while (node && depth < 4) {
+        NSString* name = NSStringFromClass([node class]);
+        if ([node isKindOfClass:[UINavigationBar class]] ||
+            [name containsString:@"Platter"] ||
+            [name containsString:@"ItemWrapperView"]) {
+            return;
+        }
         if (![node.tintColor isEqual:colour]) {
             node.tintColor = colour;
         }
