@@ -32,6 +32,13 @@ static NSString* nfbTerrainColour(UIColor* colour) {
     return @"?";
 }
 
+// The tint a view resolves to. A Liquid Glass capsule takes its fill from this,
+// not from backgroundColor, so a census without it cannot name a coloured button.
+static NSString* nfbTerrainTint(UIView* view) {
+    UIColor* tint = view.tintColor;
+    return tint ? nfbTerrainColour(tint) : @"nil";
+}
+
 static NSString* nfbTerrainLayerColour(CALayer* layer) {
     if (!layer.backgroundColor) {
         return @"nil";
@@ -52,12 +59,13 @@ static void nfbTerrainWalk(UIView* view, NSInteger depth, NSInteger maxDepth,
         [pad appendString:@"  "];
     }
     CGRect f = view.frame;
-    NFBDebugLog(@"[p25] %@ %@%@ x=%.0f y=%.0f %.0fx%.0f a=%.2f%@ bg=%@ lbg=%@%@",
+    NFBDebugLog(@"[p25] %@ %@%@ x=%.0f y=%.0f %.0fx%.0f a=%.2f%@ bg=%@ lbg=%@ "
+                @"tint=%@%@",
                 tag, pad, NSStringFromClass([view class]), f.origin.x, f.origin.y,
                 f.size.width, f.size.height, view.alpha,
                 view.hidden ? @" HIDDEN" : @"",
                 nfbTerrainColour(view.backgroundColor),
-                nfbTerrainLayerColour(view.layer),
+                nfbTerrainLayerColour(view.layer), nfbTerrainTint(view),
                 view.layer.contents ? @" contents" : @"");
     for (UIView* sub in view.subviews) {
         nfbTerrainWalk(sub, depth + 1, maxDepth, budget, tag);
@@ -191,6 +199,51 @@ static BOOL nfbTerrainBarIsInteresting(UINavigationBar* bar, NSInteger depth) {
     }
     return NO;
 }
+
+// Every tint written onto a view that lives in a navigation bar, reported once per
+// class and colour. A capsule that renders dark has been told to, by someone: this
+// names who is written to, with what, and in which bar.
+static BOOL nfbTerrainInNavigationBar(UIView* view) {
+    UIView* node = view;
+    for (NSInteger up = 0; node && up < 12; up++) {
+        if ([node isKindOfClass:[UINavigationBar class]]) {
+            return YES;
+        }
+        node = node.superview;
+    }
+    return NO;
+}
+
+%hook UIView
+
+- (void)setTintColor:(UIColor*)tint {
+    %orig;
+    @try {
+        if (!NFBDebugIsRecording() || !tint) {
+            return;
+        }
+        UIView* view = (UIView*)self;
+        if (!view.window || !nfbTerrainInNavigationBar(view)) {
+            return;
+        }
+        static NSMutableSet* seen;
+        if (!seen) {
+            seen = [NSMutableSet set];
+        }
+        NSString* key = [NSString stringWithFormat:@"%@|%@",
+                                  NSStringFromClass([view class]),
+                                  nfbTerrainColour(tint)];
+        if ([seen containsObject:key]) {
+            return;
+        }
+        [seen addObject:key];
+        NFBDebugLog(@"[p25] tint set on %@ = %@ (in a navigation bar)",
+                    NSStringFromClass([view class]), nfbTerrainColour(tint));
+    } @catch (id exception) {
+    }
+}
+
+%end
 
 %hook UINavigationBar
 
