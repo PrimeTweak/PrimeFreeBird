@@ -17,6 +17,7 @@
 #import "Core/TwitterChirpFont.h"
 #import <math.h>
 #import <objc/message.h>
+#import <objc/runtime.h>
 
 // x.com focus blue (#1D9BF0) — the web form's focus ring.
 static UIColor* NFBAdvBlue(void) {
@@ -712,6 +713,10 @@ extern NSInteger NFBColorThemeScreenVisible;
             initWithBarButtonSystemItem:UIBarButtonSystemItemCancel
                                  target:self
                                  action:@selector(nfbCancel)];
+        // Marked for the bar-glass pass: this one keeps the capsule iOS gives it.
+        objc_setAssociatedObject(self.navigationItem.leftBarButtonItem,
+                                 @selector(nfbKeepsBarGlass), @YES,
+                                 OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     }
     NSDictionary* chirpTitle = @{
         NSFontAttributeName : [TwitterChirpFont(TwitterFontStyleBold) fontWithSize:17]
