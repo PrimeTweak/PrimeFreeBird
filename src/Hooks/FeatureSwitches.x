@@ -4,6 +4,7 @@
 //
 
 #import "HookHelpers.h"
+#import "Debug/NFBDebugger.h"
 
 // While set, -isSubscribedTo: (below) reports the account's genuine
 // subscription state instead of the forced premium tiers, so paths that need
@@ -50,6 +51,20 @@ static NSNumber* FeatureSwitchOverrideValueForKey(NSString* key) {
     } 
     if (![key isKindOfClass:[NSString class]]) {
         return nil;
+    }
+
+    // Twitter 12.24 carries its own Liquid Glass redesign behind this switch,
+    // with the bar geometry that goes with it. Asking for it beats lying to
+    // UIKit, which leaves the app laying out for a design it was never told of.
+    if ([key isEqualToString:@"ios_liquid_glass_redesign_enabled"] ||
+        [key isEqualToString:@"xchat_liquid_glass_convo_header_enabled"]) {
+        BOOL wanted = [BHTSettings boolForKey:@"enable_liquid_glass"];
+        static dispatch_once_t askedOnce;
+        dispatch_once(&askedOnce, ^{
+          NFBDebugLog(@"[p31] Twitter asked for the glass switch; answering %@",
+                      wanted ? @"YES" : @"(pass through)");
+        });
+        return wanted ? @YES : nil;
     }
 
     // Screenshot share sheet: the prompt goes on cooldown after max_dismisses

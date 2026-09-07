@@ -405,18 +405,9 @@ static void paintWindowForSplash(UIView* view) {
 
 // MARK: - Liquid Glass
 
-%hook NSBundle
-- (id)objectForInfoDictionaryKey:(NSString*)key {
-    if ([key isEqualToString:@"UIDesignRequiresCompatibility"] &&
-        self == [NSBundle mainBundle]) {
-        BOOL glassEnabled =
-            [[NSUserDefaults standardUserDefaults] boolForKey:@"enable_liquid_glass"];
-        return @(!glassEnabled);
-    }
-    return %orig;
-}
-%end
-
+// The app now gets the design through its own gate, forced in FeatureSwitches.x,
+// so its layout code knows about it. Answering UIKit behind Twitter's back left
+// the bar computing heights for a design it had never been told was in use.
 %ctor {
     BOOL glassEnabled = [[NSUserDefaults standardUserDefaults] boolForKey:@"enable_liquid_glass"];
     [[NSUserDefaults standardUserDefaults] setBool:glassEnabled
