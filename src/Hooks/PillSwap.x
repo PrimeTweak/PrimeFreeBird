@@ -26,7 +26,6 @@
 // Every action has its line; removal is `git rm` of this one file.
 
 #import "HookHelpers.h"
-#import <objc/message.h>
 #import "Debug/NFBDebugger.h"
 
 // A named subclass so captures and the watch can identify the button, and so
@@ -424,11 +423,12 @@ static void nfbSwapApply(UIView* pillView) {
         chevron.tag = 2;
         [button addSubview:chevron];
         button.showsMenuAsPrimaryAction = YES;
-        // No capsule. This item used to carry its own UIVisualEffectView with
-        // UIGlassEffect behind the label, which is where the pill's glass came
-        // from. The navigation bar carries none anywhere else - the settings
-        // gear, the avatar - so the replacement carries none either and shows
-        // its label and chevron flat, like every other item in this bar.
+        // No capsule behind the label. This item used to carry its own
+        // UIVisualEffectView with UIGlassEffect, and that view WAS the pill's
+        // glass. The navigation bar shows none anywhere else - not on the
+        // settings gear, not on the avatar - so the replacement shows none
+        // either: label and chevron, flat. The item swap above is untouched,
+        // and it is the part that answers the flash.
         gNFBSwapItem = [[UIBarButtonItem alloc] initWithCustomView:button];
         // On OUR plain UIKit item the official per-item switch is exactly in
         // its intended case — it kills the circular default treatment.
@@ -508,55 +508,14 @@ static void nfbSwapApply(UIView* pillView) {
                 NSStringFromClass([vc class]));
 }
 
-// The navigation bar carries no glass. Forcing the iOS 26 design turns on
-// UIKit's shared background behind every bar button - the settings gear, the
-// avatar - which the app never had. The tweak's own replacement item already
-// opts out one by one below; this asks the same of the app's items as they are
-// posted. Scope is the navigation bar only: the tab bar keeps its glass, which
-// is the one place the reader wants it.
-static void NFBFlattenBarItems(NSArray* items) {
-    if (![BHTSettings boolForKey:@"enable_liquid_glass"]) {
-        return;
-    }
-    SEL hideShared = NSSelectorFromString(@"setHidesSharedBackground:");
-    for (UIBarButtonItem* item in items) {
-        if ([item isKindOfClass:[UIBarButtonItem class]] &&
-            [item respondsToSelector:hideShared]) {
-            ((void (*)(id, SEL, BOOL))objc_msgSend)(item, hideShared, YES);
-        }
-    }
-}
-
 %hook UINavigationItem
 
 - (void)setRightBarButtonItems:(NSArray<UIBarButtonItem*>*)items {
-    NFBFlattenBarItems(items);
     %orig(nfbSwapInterceptItems(self, items));
 }
 
 - (void)setRightBarButtonItems:(NSArray<UIBarButtonItem*>*)items animated:(BOOL)animated {
-    NFBFlattenBarItems(items);
     %orig(nfbSwapInterceptItems(self, items), animated);
-}
-
-- (void)setLeftBarButtonItems:(NSArray*)items {
-    NFBFlattenBarItems(items);
-    %orig;
-}
-
-- (void)setLeftBarButtonItems:(NSArray*)items animated:(BOOL)animated {
-    NFBFlattenBarItems(items);
-    %orig;
-}
-
-- (void)setRightBarButtonItem:(UIBarButtonItem*)item {
-    NFBFlattenBarItems(item ? @[ item ] : @[]);
-    %orig;
-}
-
-- (void)setLeftBarButtonItem:(UIBarButtonItem*)item {
-    NFBFlattenBarItems(item ? @[ item ] : @[]);
-    %orig;
 }
 
 - (void)setTrailingItemGroups:(NSArray<UIBarButtonItemGroup*>*)groups {

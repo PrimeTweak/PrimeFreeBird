@@ -265,48 +265,9 @@ static UIImage* NFBBirdLogoImage(CGSize size) {
     return rendered;
 }
 
-// An avatar, not a logo. A conversation header puts the correspondent's photo
-// in the same title control the home logo uses, so sweeping every image view
-// under that control also reaches the photo - which took the logo's tint and,
-// with the bird on, became the bird. Rendering mode does not separate them:
-// the home logo arrives AlwaysOriginal too, measured at mode=1 in a capture.
-// What does separate them is the pipeline - a network photo is loaded through
-// TIP and carries a TIPImageViewObserver - and the class name, which says
-// Avatar on every one of them.
-static BOOL NFBLooksLikeAvatar(UIImageView* view) {
-    // Measured in a capture: a conversation avatar is a plain UIImageView with
-    // no TIP observer of its own - ChatUI.ConversationAvatarView > UIImageView
-    // 56x56. The name that says avatar is on an ancestor, so the walk goes up
-    // a few levels, and the TIP observer is looked for on the way.
-    for (UIView* node = view; node; node = node.superview) {
-        NSString* name = NSStringFromClass([node class]);
-        if ([name containsString:@"Avatar"] || [name containsString:@"Profile"] ||
-            [name containsString:@"TIPImageView"]) {
-            return YES;
-        }
-        if (node != view && [name containsString:@"NavigationBarTitleControl"]) {
-            break;
-        }
-    }
-    for (UIView* sub in view.subviews) {
-        if ([NSStringFromClass([sub class]) containsString:@"TIPImageView"]) {
-            return YES;
-        }
-    }
-    return NO;
-}
-
 static void NFBApplyLogoTint(UIImageView* logoView) {
     UIImage* current = logoView.image;
     if (!current) {
-        return;
-    }
-    // Here rather than at the sweeps: this function registers what it paints,
-    // and the registry is repainted later with no filter of its own, so a view
-    // that slipped through once was painted for good. Measured by the reader
-    // with the bird off - a conversation avatar came out a flat accent-coloured
-    // disc, which is this function's baking applied to a photograph.
-    if (NFBLooksLikeAvatar(logoView)) {
         return;
     }
     NFBRegisterLogoView(logoView);
@@ -332,19 +293,7 @@ static void NFBApplyLogoTint(UIImageView* logoView) {
             baked = nil;
             objc_setAssociatedObject(logoView, kNFBLogoBakedKey, nil,
                                      OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-            // Names the view the bird just replaced, and its line of parents.
-            // The reader watched a conversation avatar load correctly and then
-            // turn into the bird, and no title sweep ran on that screen, so the
-            // path that reaches it is unknown and is printed here rather than
-            // guessed at.
-            NSMutableArray* lineage = [NSMutableArray array];
-            for (UIView* node = logoView; node && lineage.count < 6;
-                 node = node.superview) {
-                [lineage addObject:NSStringFromClass([node class])];
-            }
-            NFBDebugLog(@"[logo] bird substituted on %.0fx%.0f | %@",
-                        logoView.bounds.size.width, logoView.bounds.size.height,
-                        [lineage componentsJoinedByString:@" < "]);
+            NFBDebugLog(@"[logo] bird substituted for the X");
         }
     }
     UIColor* target = nil;
@@ -371,12 +320,7 @@ static void NFBApplyLogoTint(UIImageView* logoView) {
         baked = NFBPaintedGlyph(original, target);
         objc_setAssociatedObject(logoView, kNFBLogoBakedKey, baked,
                                  OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-        NSMutableArray* bakedOn = [NSMutableArray array];
-        for (UIView* node = logoView; node && bakedOn.count < 5; node = node.superview) {
-            [bakedOn addObject:NSStringFromClass([node class])];
-        }
-        NFBDebugLog(@"[logo] colour baked on %.0fx%.0f | %@", logoView.bounds.size.width,
-                    logoView.bounds.size.height, [bakedOn componentsJoinedByString:@" < "]);
+        NFBDebugLog(@"[logo] colour baked into the image");
     }
     if (current != baked) {
         logoView.image = baked;
@@ -462,9 +406,8 @@ static BOOL NFBIsTopBarContainer(UIView* view) {
     return [name containsString:@"NavigationBar"] || [name containsString:@"TopBar"];
 }
 
-// Every image view under a title control is offered; NFBApplyLogoTint keeps
-// the glyphs and lets photographs through untouched - a conversation header
-// puts its avatar in this same control.
+// Every image view under a title control, painted. The title control is the
+// only place the bar puts a title image, so the reach is exactly the logo.
 static void NFBBakeTitleControlLogos(UIView* root) {
     if ([NSStringFromClass([root class]) containsString:@"NavigationBarTitleControl"]) {
         EnumerateSubviewsRecursively(root, ^(UIView* view) {
@@ -747,28 +690,24 @@ static UIImage* NFBFilledGlyph(UIImage* outline) {
     }
     free(stack);
 
-    // The ring stays and a disc sits at the lens's centre, at 62% of the
-    // enclosed area's radius, so a ring of glass is left between the two. The
-    // centre and the radius both come from the enclosed pixels themselves.
-    double sumX = 0;
+    // Not the whole lens: the ring stays, and only the lower half of the
+    // enclosed area is inked - a half-disc hung from the lens's own centre,
+    // found as the centroid of the enclosed pixels. A full disc read as odd on
+    // the bar next to three outlines.
     double sumY = 0;
     size_t enclosed = 0;
     for (size_t k = 0; k < count; k++) {
         if (cell[k] == 0) {
-            sumX += (double)(k % side);
             sumY += (double)(k / side);
             enclosed++;
         }
     }
-    double centreX = enclosed ? sumX / (double)enclosed : (double)side / 2.0;
     double centreY = enclosed ? sumY / (double)enclosed : (double)side / 2.0;
-    double radius = enclosed ? sqrt((double)enclosed / M_PI) * 0.62 : 0;
     uint8_t* rgba = calloc(count * 4, 1);
     for (size_t k = 0; k < count; k++) {
-        double dx = (double)(k % side) - centreX;
-        double dy = (double)(k / side) - centreY;
-        BOOL inDisc = radius > 0 && (dx * dx + dy * dy) <= radius * radius;
-        if (cell[k] == 1 || inDisc) {
+        BOOL ink = cell[k] == 1;
+        BOOL lowerHalf = cell[k] == 0 && (double)(k / side) >= centreY;
+        if (ink || lowerHalf) {
             rgba[k * 4 + 3] = 255;
         }
     }
@@ -2480,6 +2419,19 @@ void NFBWhitenNavigationBarConfirm(UINavigationBar* bar) {
 
 - (void)viewDidAppear:(BOOL)animated {
     %orig;
+    // Forced Liquid Glass rebuilds the navigation bar platter on every re-host,
+    // and the app - never compiled for that mode - lays its title view out once
+    // and never again, so the avatar ends up inside the search capsule after a
+    // round trip. Asking the bar to lay out again costs one pass and restores
+    // the geometry when the constraints are merely stale. If they were rebuilt
+    // wrong, this changes nothing and the probe below says so.
+    if ([BHTSettings boolForKey:@"enable_liquid_glass"]) {
+        UINavigationBar* bar = self.navigationController.navigationBar;
+        if (bar.window) {
+            [bar setNeedsLayout];
+            [bar layoutIfNeeded];
+        }
+    }
     if (!NFBAccentPending) {
         return;
     }
