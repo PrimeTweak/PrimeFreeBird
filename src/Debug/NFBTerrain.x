@@ -475,12 +475,93 @@ static void nfbTerrainReplayHang(void) {
     }
 }
 
+// [p31] Every lever the glass redesign can hang on, read once at launch. Each
+// line is a fact: the class is there or not, it answers or not, the value is
+// what it is. Nothing here writes.
+static void nfbTerrainReportGlassGate(void) {
+    NFBDebugLog(@"[p31] --- glass gate report ---");
+
+    NFBDebugLog(@"[p31] setting enable_liquid_glass = %d",
+                [[NSUserDefaults standardUserDefaults]
+                    boolForKey:@"enable_liquid_glass"] ? 1 : 0);
+    NFBDebugLog(@"[p31] SwiftUI IgnoreSolariumOptOut = %d",
+                [[NSUserDefaults standardUserDefaults]
+                    boolForKey:@"com.apple.SwiftUI.IgnoreSolariumOptOut"] ? 1 : 0);
+
+    id compat = [[NSBundle mainBundle]
+        objectForInfoDictionaryKey:@"UIDesignRequiresCompatibility"];
+    NFBDebugLog(@"[p31] UIDesignRequiresCompatibility as UIKit reads it = %@",
+                compat ?: @"(nil)");
+
+    // The classes that carry Twitter's own gate, and whether they answer.
+    const char* classNames[] = {
+        "T1LiquidGlassGateInstaller",
+        "_TtC14T1TwitterSwift27LiquidGlassRedesignFeatures",
+        "_TtC11XAppearance10Appearance",
+        "T1AppearanceWriter",
+        "TFSFeatureSwitches",
+    };
+    const char* selectorNames[] = {
+        "installGateWithRedesignEnabled:",
+        "isLiquidGlassEnabled",
+        "installLiquidGlassRedesignGate:",
+        "persistGate:",
+        "sharedInstance",
+    };
+    for (NSUInteger c = 0; c < 5; c++) {
+        Class klass = objc_getClass(classNames[c]);
+        if (!klass) {
+            NFBDebugLog(@"[p31] class %s ABSENT", classNames[c]);
+            continue;
+        }
+        NSMutableString* answers = [NSMutableString string];
+        for (NSUInteger s = 0; s < 5; s++) {
+            SEL selector = NSSelectorFromString(
+                [NSString stringWithUTF8String:selectorNames[s]]);
+            BOOL onClass = [klass respondsToSelector:selector];
+            BOOL onInstance = [klass instancesRespondToSelector:selector];
+            if (onClass || onInstance) {
+                [answers appendFormat:@" %s(%@)", selectorNames[s],
+                                      onClass ? @"class" : @"instance"];
+            }
+        }
+        NFBDebugLog(@"[p31] class %s present ->%@", classNames[c],
+                    answers.length ? answers : @" no known selector");
+    }
+
+    // Static getter, read only if the class exposes it to the runtime.
+    Class features =
+        objc_getClass("_TtC14T1TwitterSwift27LiquidGlassRedesignFeatures");
+    SEL isEnabled = NSSelectorFromString(@"isLiquidGlassEnabled");
+    if (features && [features respondsToSelector:isEnabled]) {
+        BOOL value = ((BOOL (*)(id, SEL))objc_msgSend)((id)features, isEnabled);
+        NFBDebugLog(@"[p31] LiquidGlassRedesignFeatures.isLiquidGlassEnabled = %d",
+                    value ? 1 : 0);
+    } else {
+        NFBDebugLog(@"[p31] isLiquidGlassEnabled not reachable from the runtime");
+    }
+
+    // The UIKit classes the new design brings with it: present means the design
+    // is live, whatever the switches say.
+    const char* designClasses[] = {
+        "UIPlatformGlassInteractionView",
+        "UIGlassEffect",
+        "_UIBarButtonItemGroupView",
+    };
+    for (NSUInteger d = 0; d < 3; d++) {
+        NFBDebugLog(@"[p31] runtime %s = %@", designClasses[d],
+                    objc_getClass(designClasses[d]) ? @"present" : @"absent");
+    }
+    NFBDebugLog(@"[p31] --- end of report ---");
+}
+
 static void nfbTerrainInstallWatchdog(void) {
     if (gNFBWatchdog) {
         return;
     }
     nfbTerrainReplayHang();
     NFBDebugLog(@"[p29] probe: mutations+stack+counters, all hooks live");
+    nfbTerrainReportGlassGate();
     gNFBMainTick = CACurrentMediaTime();
     dispatch_queue_t queue =
         dispatch_queue_create("nfb.watchdog", DISPATCH_QUEUE_SERIAL);
