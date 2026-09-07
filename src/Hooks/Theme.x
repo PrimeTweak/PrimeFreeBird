@@ -2180,10 +2180,19 @@ static void NFBFlattenBarItems(NSArray* items) {
     }
     SEL hideShared = NSSelectorFromString(@"setHidesSharedBackground:");
     for (UIBarButtonItem* item in items) {
-        if ([item isKindOfClass:[UIBarButtonItem class]] &&
-            [item respondsToSelector:hideShared]) {
-            ((void (*)(id, SEL, BOOL))objc_msgSend)(item, hideShared, YES);
+        if (![item isKindOfClass:[UIBarButtonItem class]] ||
+            ![item respondsToSelector:hideShared]) {
+            continue;
         }
+        // The tweak's own items are left alone: they already decide for
+        // themselves, and the inbox pill draws its capsule on the very
+        // background this would take away. Recognised by the view they carry,
+        // and by the tag the notifications eye sets on itself.
+        NSString* custom = NSStringFromClass([item.customView class]);
+        if ([custom isEqualToString:@"NFBInboxPillButton"] || item.tag == 90314) {
+            continue;
+        }
+        ((void (*)(id, SEL, BOOL))objc_msgSend)(item, hideShared, YES);
     }
 }
 
