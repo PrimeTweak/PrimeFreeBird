@@ -330,18 +330,23 @@ static void nfbRepaintNotificationsGear(UIView* bar, UIColor* colour) {
 }
 
 // Forcing the iOS 26 design switches on UIKit's shared background behind every bar
-// button, which this app never had. Every item of every navigation bar is asked to
-// go without, with no exception: a text button takes the bar's ink as its fill.
-static void nfbFlattenBarItemGlass(UIView* bar) {
+// button, which this app never had. Every item goes without, with no exception:
+// a text button takes the bar's ink as its fill.
+
+// With apply NO nothing is written and the answer is whether a pass is owed:
+// setting an item property invalidates the bar, so the writes never happen
+// inside a layout pass.
+static BOOL nfbBarGlassPass(UIView* bar, BOOL apply) {
     if (![BHTSettings boolForKey:@"enable_liquid_glass"] ||
         ![bar respondsToSelector:@selector(topItem)]) {
-        return;
+        return NO;
     }
     UINavigationItem* item =
         ((id (*)(id, SEL))objc_msgSend)(bar, @selector(topItem));
     if (!item) {
-        return;
+        return NO;
     }
+    BOOL owed = NO;
     NSMutableArray<UIBarButtonItem*>* items = [NSMutableArray array];
     [items addObjectsFromArray:item.leftBarButtonItems ?: @[]];
     [items addObjectsFromArray:item.rightBarButtonItems ?: @[]];
@@ -390,6 +395,10 @@ static void nfbFlattenBarItemGlass(UIView* bar) {
         // not as the primary action.
         if (objc_getAssociatedObject(button, @selector(nfbKeepsBarGlass))) {
             if (flat) {
+                owed = YES;
+                if (!apply) {
+                    continue;
+                }
                 ((void (*)(id, SEL, BOOL))objc_msgSend)(button, hideShared, NO);
                 NFBDebugLog(@"[p24] bar item kept glazed (marked): class=%@",
                             NSStringFromClass([button class]));
@@ -403,12 +412,18 @@ static void nfbFlattenBarItemGlass(UIView* bar) {
         if (button.style == UIBarButtonItemStyleDone) {
             BOOL changed = NO;
             if (flat) {
-                ((void (*)(id, SEL, BOOL))objc_msgSend)(button, hideShared, NO);
-                changed = YES;
+                owed = YES;
+                if (apply) {
+                    ((void (*)(id, SEL, BOOL))objc_msgSend)(button, hideShared, NO);
+                    changed = YES;
+                }
             }
             if (![button.tintColor isEqual:blue]) {
-                button.tintColor = blue;
-                changed = YES;
+                owed = YES;
+                if (apply) {
+                    button.tintColor = blue;
+                    changed = YES;
+                }
             }
             // The label is drawn over a filled capsule, so it is set white for both
             // states. Merged, never replaced: the title may already carry a font.
@@ -418,6 +433,10 @@ static void nfbFlattenBarItemGlass(UIView* bar) {
                 NSDictionary* existing = [button titleTextAttributesForState:states[s]];
                 if ([existing[NSForegroundColorAttributeName]
                         isEqual:[UIColor whiteColor]]) {
+                    continue;
+                }
+                owed = YES;
+                if (!apply) {
                     continue;
                 }
                 NSMutableDictionary* attributes = [(existing ?: @{}) mutableCopy];
@@ -436,6 +455,10 @@ static void nfbFlattenBarItemGlass(UIView* bar) {
         if (flat) {
             continue;
         }
+        owed = YES;
+        if (!apply) {
+            continue;
+        }
         ((void (*)(id, SEL, BOOL))objc_msgSend)(button, hideShared, YES);
         NFBDebugLog(@"[p24] bar item flattened: title=%@ image=%@ customView=%@",
                     button.title.length ? button.title : @"-",
@@ -444,6 +467,24 @@ static void nfbFlattenBarItemGlass(UIView* bar) {
                         ? NSStringFromClass([button.customView class])
                         : @"none");
     }
+    return owed;
+}
+
+// Queues one pass for the next turn of the run loop, and only one: a run of
+// layout passes must not queue a block per pass.
+static void nfbQueueBarGlassPass(UIView* bar) {
+    if (objc_getAssociatedObject(bar, @selector(nfbBarGlassPending))) {
+        return;
+    }
+    objc_setAssociatedObject(bar, @selector(nfbBarGlassPending), @YES,
+                             OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    dispatch_async(dispatch_get_main_queue(), ^{
+      objc_setAssociatedObject(bar, @selector(nfbBarGlassPending), nil,
+                               OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+      if (bar.window) {
+          nfbBarGlassPass(bar, YES);
+      }
+    });
 }
 
 %hook UINavigationBar
@@ -457,8 +498,11 @@ static void nfbFlattenBarItemGlass(UIView* bar) {
             return;
         }
         // Every navigation bar, before the two-screen guard below: the glass the
-        // forced design adds is on all of them, not only on these two.
-        nfbFlattenBarItemGlass(bar);
+        // forced design adds is on all of them, not only on these two. Read here,
+        // written off the pass.
+        if (nfbBarGlassPass(bar, NO)) {
+            nfbQueueBarGlassPass(bar);
+        }
 
         UIColor* grey = NFBBarIconGrey(bar.traitCollection);
 
