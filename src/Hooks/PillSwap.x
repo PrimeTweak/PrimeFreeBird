@@ -27,10 +27,6 @@
 
 #import "HookHelpers.h"
 #import "Debug/NFBDebugger.h"
-#import <QuartzCore/QuartzCore.h>
-#import <objc/message.h>
-
-static void nfbSwapReport(UIView* button);
 
 // A named subclass so captures and the watch can identify the button, and so
 // it can answer the ONE question the bar's wrapper actually asks. Measured the
@@ -63,84 +59,18 @@ static void nfbSwapReport(UIView* button);
 // of
 // the box (measured at 420.0 = the native right edge), so 420 − 57.33 = 362.67
 // = the native left edge, whatever the box turns out to be.
-// The glass on a bar button is drawn by UIKit, in the platform glass view the
-// item is hosted in - measured in a capture: the app's own items carry a
-// _UISystemBackgroundView there, ours carried none because the item asked for
-// hidesSharedBackground. A hand-made UIVisualEffectView draws nothing here:
-// with UIGlassEffect set, on screen, at the right size, it reported
-// subviews=0, and still zero after the effect was reapplied. So UIKit draws
-// the glass, and the button simply claims the width that makes it a capsule
-// rather than the circle a square item gets.
-// Everything the pill's glass depends on, in one line, from the button's own
-// layout. The journal keeps the last 80 decisions, so a probe that only speaks
-// at launch has scrolled away by the time anyone shakes: this one repeats,
-// twice a second at most, and is therefore always in the report. It reads what
-// UIKit did rather than what the tweak asked for - the imposed box, the width
-// rule, the platform glass host and its background view, which is the thing
-// that draws.
-static void nfbSwapReport(UIView* button) {
-    static NSTimeInterval lastNote;
-    NSTimeInterval now = CACurrentMediaTime();
-    if (now - lastNote < 0.5) {
-        return;
-    }
-    lastNote = now;
-    UIView* glassHost = nil;
-    UIView* platter = nil;
-    for (UIView* node = button.superview; node; node = node.superview) {
-        NSString* name = NSStringFromClass([node class]);
-        if (!glassHost && [name containsString:@"PlatformGlassInteraction"]) {
-            glassHost = node;
-        }
-        if (!platter && ([name containsString:@"TAMICAdaptor"] ||
-                         [name containsString:@"ItemWrapperView"])) {
-            platter = node;
-        }
-    }
-    __block NSString* background = @"none";
-    if (glassHost) {
-        EnumerateSubviewsRecursively(glassHost, ^(UIView* view) {
-            NSString* name = NSStringFromClass([view class]);
-            if ([background isEqualToString:@"none"] &&
-                ([name containsString:@"SystemBackground"] ||
-                 [name containsString:@"BackdropView"] ||
-                 [name containsString:@"GlassView"])) {
-                background = [NSString stringWithFormat:@"%@ %.0fx%.0f alpha=%.2f", name,
-                                                        view.bounds.size.width,
-                                                        view.bounds.size.height, view.alpha];
-            }
-        });
-    }
-    NFBDebugLog(@"[pill] box=%.0fx%.0f want=%.0f glassHost=%@ wrapper=%@ bg=%@",
-                button.bounds.size.width, button.bounds.size.height,
-                ((NFBInboxPillButton*)button).nfbPillWidth,
-                glassHost ? [NSString stringWithFormat:@"%.0fx%.0f",
-                                                       glassHost.bounds.size.width,
-                                                       glassHost.bounds.size.height]
-                          : @"NOT FOUND",
-                platter ? NSStringFromClass([platter class]) : @"none", background);
-}
-
 - (void)layoutSubviews {
     [super layoutSubviews];
-    nfbSwapReport(self);
-    // The capsule is placed before anything can return. It used to sit below
-    // the early exit, so on a cold launch - where the app has not filled its
-    // own label yet and nfbPillWidth is still 0 - the capsule kept a zero
-    // frame: present, with its effect set, and invisible. Filmed as an outline
-    // with no glass until the first tab change, which is when the width was
-    // finally computed. Until then it takes the button's own box.
-    CGFloat height = 40.0;
-    CGRect box = self.bounds;
-    CGFloat capsuleWidth = self.nfbPillWidth > 0 ? self.nfbPillWidth : box.size.width;
-    CGRect capsuleFrame = CGRectMake(box.size.width - capsuleWidth,
-                                     (box.size.height - height) / 2.0, capsuleWidth,
-                                     height);
-    UIView* capsule = [self viewWithTag:3];
-    capsule.frame = capsuleFrame;
     if (self.nfbPillWidth <= 0) {
         return;
     }
+    CGFloat height = 40.0;
+    CGRect box = self.bounds;
+    CGRect capsuleFrame = CGRectMake(box.size.width - self.nfbPillWidth,
+                                     (box.size.height - height) / 2.0,
+                                     self.nfbPillWidth, height);
+    UIView* capsule = [self viewWithTag:3];
+    capsule.frame = capsuleFrame;
     self.nfbTouchRect = capsuleFrame;
 
     UILabel* label = (UILabel*)[self viewWithTag:1];
@@ -259,8 +189,7 @@ static void nfbSwapLayoutButton(void) {
     [button setNeedsLayout];
     [button layoutIfNeeded];
 
-    // THE RULER - the button's own box now: UIKit draws the glass around it, so
-    // the box IS the capsule.
+    // THE RULER — measures the VISIBLE capsule now, not the wrapper's box.
     // Reference measured on screen: the native pill spans 362.7 to 420.0.
     if (!gNFBSwapMeasured && NFBDebugIsRecording()) {
         gNFBSwapMeasured = YES;
@@ -272,7 +201,8 @@ static void nfbSwapLayoutButton(void) {
                 gNFBSwapMeasured = NO;  // try again on the next layout
                 return;
             }
-            CGRect onScreen = [live convertRect:live.bounds toView:nil];
+            UIView* liveCapsule = [live viewWithTag:3];
+            CGRect onScreen = [live convertRect:liveCapsule.frame toView:nil];
             NFBDebugLog(@"swap: RULER - capsule on screen %.1f to %.1f pt "
                         @"(native 362.7 to 420.0, imposed box %.0fx%.0f)",
                         onScreen.origin.x,
@@ -284,21 +214,6 @@ static void nfbSwapLayoutButton(void) {
 
 // Belt for the label after a menu pick: the stomp normally carries the new
 // state, this re-read covers a bridge that would not stomp.
-// The label the pill last showed, kept across launches. Without it the pill
-// has nothing to say until the app's own item arrives with its menu, which is
-// what made it appear only after a swipe between tabs.
-static NSString* nfbSwapRememberedTitle(void) {
-    NSString* stored =
-        [[NSUserDefaults standardUserDefaults] stringForKey:@"nfb_swap_last_title"];
-    return stored.length ? stored : nil;
-}
-
-static void nfbSwapRememberTitle(NSString* title) {
-    if (title.length) {
-        [[NSUserDefaults standardUserDefaults] setObject:title forKey:@"nfb_swap_last_title"];
-    }
-}
-
 static void nfbSwapRefreshLabelFromMenu(void) {
     UIMenu* live = gNFBSwapOriginal.menu ?: gNFBSwapMenu;
     if (!gNFBSwapItem || !live) {
@@ -315,7 +230,6 @@ static void nfbSwapRefreshLabelFromMenu(void) {
         nfbSwapLayoutButton();
         NFBDebugLog(@"swap: label -> %@ (menu)", checked);
     }
-    nfbSwapRememberTitle(checked);
 }
 
 // v2 — measured on the 06:41 video: the residual flash was OUR OWN swap.
@@ -347,42 +261,16 @@ static NSArray<UIBarButtonItem*>* nfbSwapInterceptItems(UINavigationItem* nav,
     return @[gNFBSwapItem];
 }
 
-
-
-// Every way out of nfbSwapApply, named. Six of its seven exits were silent, so
-// a cold launch that left the pill untouched said nothing at all. One line per
-// outcome, the first time it is reached and then at most twice a second, so a
-// single reading names which door was taken.
-static void nfbSwapNote(NSString* outcome, NSString* detail) {
-    static NSMutableDictionary<NSString*, NSNumber*>* lastSeen;
-    static NSMutableSet<NSString*>* everSeen;
-    if (!lastSeen) {
-        lastSeen = [NSMutableDictionary dictionary];
-        everSeen = [NSMutableSet set];
-    }
-    NSTimeInterval now = CACurrentMediaTime();
-    BOOL firstTime = ![everSeen containsObject:outcome];
-    if (!firstTime && now - lastSeen[outcome].doubleValue < 0.5) {
-        return;
-    }
-    [everSeen addObject:outcome];
-    lastSeen[outcome] = @(now);
-    NFBDebugLog(@"swap: EXIT %@%@%@", outcome, detail.length ? @" - " : @"", detail ?: @"");
-}
-
 static void nfbSwapApply(UIView* pillView) {
     if (!pillView.window) {
-        nfbSwapNote(@"no window", NSStringFromClass([pillView class]));
         return;
     }
     if (![BHTSettings boolForKey:@"enable_liquid_glass"]) {
-        nfbSwapNote(@"liquid glass off", nil);
         return;  // standard interface never had the problem — nothing to do
     }
 
     UIViewController* vc = nfbSwapOwningVC(pillView);
     if (!vc) {
-        nfbSwapNote(@"no owning view controller", nil);
         return;
     }
 
@@ -425,13 +313,11 @@ static void nfbSwapApply(UIView* pillView) {
             hasTrailing = hasTrailing || candidateNav.trailingItemGroups.count > 0;
         }
         if (hasTrailing) {
-            // Only ours is installed - nothing to swap on this pass.
-            nfbSwapNote(@"ours already installed", NSStringFromClass([candidate class]));
+            // Only ours is installed — nothing to swap on this pass.
             return;
         }
     }
     if (!original) {
-        nfbSwapNote(@"no native item yet", NSStringFromClass([vc class]));
         return;  // items not attached yet; the next layout retries
     }
 
@@ -455,16 +341,6 @@ static void nfbSwapApply(UIView* pillView) {
     }
     NSString* liveTitle = realLabel.attributedText.length
         ? realLabel.attributedText.string : realLabel.text;
-    // The app fills its own label only once the inbox has drawn, so the swap
-    // used to stand down until then and the pill appeared on the first swipe
-    // between tabs. The remembered title carries it through that gap; the live
-    // one replaces it as soon as it arrives.
-    if (realLabel && !liveTitle.length) {
-        liveTitle = nfbSwapRememberedTitle();
-        if (liveTitle.length) {
-            NFBDebugLog(@"swap: no live title yet - using remembered '%@'", liveTitle);
-        }
-    }
     if (!realLabel || !liveTitle.length) {
         static const char* kNFBSwapWaitKey = "nfbSwapWait";
         if (!objc_getAssociatedObject(pillView, kNFBSwapWaitKey)) {
@@ -472,10 +348,6 @@ static void nfbSwapApply(UIView* pillView) {
                                      OBJC_ASSOCIATION_RETAIN_NONATOMIC);
             NFBDebugLog(@"swap: waiting for content - retrying");
         }
-        nfbSwapNote(@"no title yet",
-                    [NSString stringWithFormat:@"label=%@ remembered=%@",
-                                               realLabel ? @"yes" : @"nil",
-                                               nfbSwapRememberedTitle() ?: @"none"]);
         return;  // content not built yet; the next layout retries
     }
 
@@ -533,10 +405,8 @@ static void nfbSwapApply(UIView* pillView) {
                             ? NSStringFromClass([original.primaryAction class])
                             : @"nil");
         }
-        nfbSwapNote(@"menu not found", nil);
         return;  // native kept, the probe has spoken
     }
-    nfbSwapNote(@"replaced", nil);
     gNFBSwapMenu = menu;  // strong: it must outlive the mortal native button
 
     // Build ours once; later passes only refresh content and re-install.
@@ -556,48 +426,34 @@ static void nfbSwapApply(UIView* pillView) {
         chevron.tag = 2;
         [button addSubview:chevron];
         button.showsMenuAsPrimaryAction = YES;
-        // The tweak's own capsule. UIKit's shared background is a circle on a
-        // box this shape - measured - so it is turned off below and the shape
-        // is drawn here instead.
-        // No capsule of our own. Measured twice on the reader's device, with the
-        // effect correctly set and the view on screen at the right size:
-        // effect=UIGlassEffect frame=57x40 window=yes subviews=0. A visual
-        // effect view that renders builds a backdrop; this one never does, so
-        // an app on an older SDK cannot draw UIGlassEffect itself. UIKit's own
-        // shared background is the only glass available, and it is kept below.
-        // What it needs is a box the width of a pill, imposed by a constraint,
-        // or it draws the circle a 44-point box deserves.
-        UIVisualEffectView* capsule = [[UIVisualEffectView alloc] initWithEffect:nil];
-        capsule.userInteractionEnabled = NO;
-        capsule.layer.cornerRadius = 20.0;
-        capsule.layer.masksToBounds = YES;
-        capsule.tag = 3;
-        [button insertSubview:capsule atIndex:0];
-        Class glassClass = NSClassFromString(@"UIGlassEffect");
-        capsule.effect = glassClass
-                             ? (UIVisualEffect*)[[glassClass alloc] init]
-                             : [UIBlurEffect effectWithStyle:
-                                    UIBlurEffectStyleSystemUltraThinMaterial];
         // Our OWN capsule, native-shaped (the bar's default treatment for a
         // plain UIKit item is a CIRCLE — measured ~63 pt on the 07:34 video,
         // nothing like the wide native pill). Glass via the runtime so the
         // The iOS 16 SDK never hears about UIGlassEffect; the working recipe:
         // effect behind the content, radius = height / 2.
+        UIView* capsule = nil;
+        Class glassClass = NSClassFromString(@"UIGlassEffect");
+        UIVisualEffect* effect = glassClass ? [[glassClass alloc] init] : nil;
+        if (!effect) {
+            effect = [UIBlurEffect effectWithStyle:
+                          UIBlurEffectStyleSystemUltraThinMaterial];
+        }
+        capsule = [[UIVisualEffectView alloc] initWithEffect:effect];
+        capsule.userInteractionEnabled = NO;
+        capsule.layer.cornerRadius = 20.0;
+        capsule.layer.masksToBounds = YES;
+        capsule.tag = 3;
+        [button insertSubview:capsule atIndex:0];
+        NFBDebugLog(@"swap: custom capsule placed (%@)",
+                    glassClass ? @"UIGlassEffect" : @"material fallback");
         gNFBSwapItem = [[UIBarButtonItem alloc] initWithCustomView:button];
         // On OUR plain UIKit item the official per-item switch is exactly in
         // its intended case — it kills the circular default treatment.
-        // Measured with the pill probe: without this, glassHost=112x44 - UIKit
-        // puts our item and its neighbour inside ONE shared glass capsule, which
-        // is the ring the reader saw swallowing the call and video buttons. The
-        // item leaves that group; the capsule below is ours alone.
-        // UIKit's shared background is left ON for this item, and it is what
-        // draws the pill's glass: the tweak's own capsule was measured with
-        // UIGlassEffect set, on screen, at the right size, and subviews=0 -
-        // it renders nothing. Asking for hidesSharedBackground here removed
-        // the only glass there was, and whether the flag landed before or
-        // after the bar drew is what made the pill alternate between launches.
-        // Every OTHER bar item is flattened in Theme.x, so this group holds
-        // this item alone and the capsule cannot spread to a neighbour.
+        if ([gNFBSwapItem respondsToSelector:
+                NSSelectorFromString(@"setHidesSharedBackground:")]) {
+            [gNFBSwapItem setValue:@YES forKey:@"hidesSharedBackground"];
+            NFBDebugLog(@"swap: UIKit glass removed on the replacement item");
+        }
         NFBMark(button, @"PillSwap/custom button - identical to native");
     } else {
         button = (NFBInboxPillButton*)gNFBSwapItem.customView;
@@ -669,64 +525,14 @@ static void nfbSwapApply(UIView* pillView) {
                 NSStringFromClass([vc class]));
 }
 
-// Every bar button, not only the tweak's. Forced Liquid Glass makes UIKit
-// draw a shared glass capsule behind navigation bar items; each item the tweak
-// creates already opts out one by one, so the app's own - the settings gear,
-// the avatar - were the only ones left wearing it. The same property is set on
-// them as they are posted. It exists on the iOS 26 SDK only, so it goes
-// through the runtime and older systems skip it.
-static void NFBFlattenBarItems(NSArray* items) {
-    if (![BHTSettings boolForKey:@"enable_liquid_glass"]) {
-        return;
-    }
-    SEL hideShared = NSSelectorFromString(@"setHidesSharedBackground:");
-    for (UIBarButtonItem* item in items) {
-        if (![item isKindOfClass:[UIBarButtonItem class]] ||
-            ![item respondsToSelector:hideShared]) {
-            continue;
-        }
-        // The tweak's own items are left alone: they already decide for
-        // themselves, and the inbox pill draws its capsule on the very
-        // background this would take away. Recognised by the view they carry,
-        // and by the tag the notifications eye sets on itself.
-        NSString* custom = NSStringFromClass([item.customView class]);
-        if ([custom isEqualToString:@"NFBInboxPillButton"] || item.tag == 90314) {
-            continue;
-        }
-        ((void (*)(id, SEL, BOOL))objc_msgSend)(item, hideShared, YES);
-    }
-}
-
 %hook UINavigationItem
 
 - (void)setRightBarButtonItems:(NSArray<UIBarButtonItem*>*)items {
-    NFBFlattenBarItems(items);
     %orig(nfbSwapInterceptItems(self, items));
 }
 
 - (void)setRightBarButtonItems:(NSArray<UIBarButtonItem*>*)items animated:(BOOL)animated {
-    NFBFlattenBarItems(items);
     %orig(nfbSwapInterceptItems(self, items), animated);
-}
-
-- (void)setLeftBarButtonItems:(NSArray*)items {
-    NFBFlattenBarItems(items);
-    %orig;
-}
-
-- (void)setLeftBarButtonItems:(NSArray*)items animated:(BOOL)animated {
-    NFBFlattenBarItems(items);
-    %orig;
-}
-
-- (void)setRightBarButtonItem:(UIBarButtonItem*)item {
-    NFBFlattenBarItems(item ? @[ item ] : @[]);
-    %orig;
-}
-
-- (void)setLeftBarButtonItem:(UIBarButtonItem*)item {
-    NFBFlattenBarItems(item ? @[ item ] : @[]);
-    %orig;
 }
 
 - (void)setTrailingItemGroups:(NSArray<UIBarButtonItemGroup*>*)groups {
@@ -751,99 +557,6 @@ static void NFBFlattenBarItems(NSArray* items) {
 
 %end
 
-// Coming back from a conversation, the inbox is restored with the app's own
-// item and the replacement waits for that view to enter a window again -
-// filmed: the pill blanks for about a second on the way back. The screen
-// appearing is a second signal, and the swap runs from whichever pill view is
-// on the bar. Nothing happens when the item is already the tweak's.
-static void nfbSwapApplyFromScreen(void) {
-    Class inboxItemClass =
-        NSClassFromString(@"_TtC7DMInbox39InboxNavigationBarMenuBarButtonItemView");
-    if (!inboxItemClass) {
-        return;
-    }
-    for (id scene in UIApplication.sharedApplication.connectedScenes) {
-        if (![scene respondsToSelector:@selector(windows)]) {
-            continue;
-        }
-        for (UIWindow* window in [scene windows]) {
-            __block UIView* pillView = nil;
-            EnumerateSubviewsRecursively(window, ^(UIView* view) {
-                if (!pillView && [view isKindOfClass:inboxItemClass]) {
-                    pillView = view;
-                }
-            });
-            if (pillView) {
-                nfbSwapApply(pillView);
-                return;
-            }
-        }
-    }
-}
-
-// A display link for the length of the transition: one pass per frame for
-// half a second, then it stops. Cheap - each pass returns at once when the
-// item on the bar is already the tweak's.
-@interface NFBSwapTicker : NSObject
-@property (nonatomic, strong) CADisplayLink* link;
-@property (nonatomic, assign) NSTimeInterval until;
-@end
-
-@implementation NFBSwapTicker
-- (void)tick {
-    if ([NSDate timeIntervalSinceReferenceDate] > self.until) {
-        [self.link invalidate];
-        self.link = nil;
-        return;
-    }
-    nfbSwapApplyFromScreen();
-}
-@end
-
-static NFBSwapTicker* gNFBSwapTicker = nil;
-
-static void nfbSwapWatchTransition(void) {
-    if (!gNFBSwapTicker) {
-        gNFBSwapTicker = [NFBSwapTicker new];
-    }
-    gNFBSwapTicker.until = [NSDate timeIntervalSinceReferenceDate] + 0.5;
-    if (!gNFBSwapTicker.link) {
-        gNFBSwapTicker.link = [CADisplayLink displayLinkWithTarget:gNFBSwapTicker
-                                                          selector:@selector(tick)];
-        [gNFBSwapTicker.link addToRunLoop:[NSRunLoop mainRunLoop]
-                                  forMode:NSRunLoopCommonModes];
-    }
-}
-
-// UIViewController, not the inbox class. Measured in the health report: the
-// two hooks on _TtC7DMInbox19InboxViewController were listed as dead - the
-// class implements both methods, so it simply is not loaded when Logos
-// installs its hooks, and the DMInbox framework arrives later. UIKit is always
-// there, and the screen is recognised by its class name at call time.
-%hook UIViewController
-
-- (void)viewWillAppear:(BOOL)animated {
-    %orig;
-    if ([NSStringFromClass([self class]) containsString:@"InboxViewController"]) {
-        nfbSwapApplyFromScreen();
-        nfbSwapWatchTransition();
-    }
-}
-
-- (void)viewDidAppear:(BOOL)animated {
-    %orig;
-    if ([NSStringFromClass([self class]) containsString:@"InboxViewController"]) {
-        nfbSwapApplyFromScreen();
-        nfbSwapWatchTransition();
-    }
-}
-
-%end
-
-// Same framework as the dead pair above, so the same risk: if DMInbox is not
-// loaded when the hooks go in, this one never fires either and the swap never
-// runs at all. The UIKit hooks above cover that case; this stays for the
-// precise moment the app puts its own item back.
 %hook _TtC7DMInbox39InboxNavigationBarMenuBarButtonItemView
 
 // The original's view appearing IS the stomp signal: SwiftUI has put its
