@@ -2168,6 +2168,59 @@ static UITabBarAppearance* NFBPatchedTabBarAppearance(UITabBarAppearance* appear
 // {4, -10, 218, 64} on Explore - which pushes the capsule under the back
 // button. The bar is kept inside its container: the overshoot goes to x and
 // comes off the width, which lands exactly on the Explore geometry.
+// Every bar button, not only the tweak's. Forced Liquid Glass makes UIKit
+// draw a shared glass capsule behind navigation bar items; each item the tweak
+// creates already opts out one by one, so the app's own - the settings gear,
+// the avatar - were the only ones left wearing it. The same property is set on
+// them as they are posted. It exists on the iOS 26 SDK only, so it goes
+// through the runtime and older systems skip it.
+static void NFBFlattenBarItems(NSArray* items) {
+    if (![BHTSettings boolForKey:@"enable_liquid_glass"]) {
+        return;
+    }
+    SEL hideShared = NSSelectorFromString(@"setHidesSharedBackground:");
+    for (UIBarButtonItem* item in items) {
+        if ([item isKindOfClass:[UIBarButtonItem class]] &&
+            [item respondsToSelector:hideShared]) {
+            ((void (*)(id, SEL, BOOL))objc_msgSend)(item, hideShared, YES);
+        }
+    }
+}
+
+%hook UINavigationItem
+
+- (void)setRightBarButtonItems:(NSArray*)items {
+    NFBFlattenBarItems(items);
+    %orig;
+}
+
+- (void)setRightBarButtonItems:(NSArray*)items animated:(BOOL)animated {
+    NFBFlattenBarItems(items);
+    %orig;
+}
+
+- (void)setLeftBarButtonItems:(NSArray*)items {
+    NFBFlattenBarItems(items);
+    %orig;
+}
+
+- (void)setLeftBarButtonItems:(NSArray*)items animated:(BOOL)animated {
+    NFBFlattenBarItems(items);
+    %orig;
+}
+
+- (void)setRightBarButtonItem:(UIBarButtonItem*)item {
+    NFBFlattenBarItems(item ? @[ item ] : @[]);
+    %orig;
+}
+
+- (void)setLeftBarButtonItem:(UIBarButtonItem*)item {
+    NFBFlattenBarItems(item ? @[ item ] : @[]);
+    %orig;
+}
+
+%end
+
 %hook TFNSearchBar
 
 - (void)setFrame:(CGRect)frame {
