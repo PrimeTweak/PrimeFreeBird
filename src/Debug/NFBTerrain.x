@@ -253,6 +253,17 @@ static NSTimeInterval gNFBLastPopAt = 0;
 static NSString* gNFBLastBarClass = nil;
 static dispatch_source_t gNFBWatchdog = nil;
 
+// Counters for the writes that invalidate a navigation bar. During a hang their
+// deltas name what is feeding the storm, which the layout count alone cannot.
+static volatile int64_t gNFBSetTint = 0;
+static volatile int64_t gNFBSetTitleAttrs = 0;
+static volatile int64_t gNFBSetHidesShared = 0;
+static volatile int64_t gNFBSetNeedsLayout = 0;
+
+@interface UIBarButtonItem (NFBTerrain)
+- (void)setHidesSharedBackground:(BOOL)hides;
+@end
+
 static NSString* nfbTerrainHangPath(void) {
     return [NSTemporaryDirectory() stringByAppendingPathComponent:@"nfb-hang.txt"];
 }
@@ -261,9 +272,11 @@ static NSString* nfbTerrainHangPath(void) {
 // touch UIKit or any state the main thread owns beyond these counters.
 static void nfbTerrainWriteHang(NSTimeInterval stuckFor, int64_t layoutsAtStart) {
     NSString* report = [NSString
-        stringWithFormat:@"HANG %.1f s | bar layouts %lld -> %lld | last bar %@ | "
-                         @"pop %.1f s before",
-                         stuckFor, layoutsAtStart, gNFBBarLayouts,
+        stringWithFormat:@"HANG %.1f s | bar layouts %lld -> %lld | tint %lld | "
+                         @"titleAttrs %lld | hidesShared %lld | needsLayout %lld | "
+                         @"last bar %@ | pop %.1f s before",
+                         stuckFor, layoutsAtStart, gNFBBarLayouts, gNFBSetTint,
+                         gNFBSetTitleAttrs, gNFBSetHidesShared, gNFBSetNeedsLayout,
                          gNFBLastBarClass ?: @"none",
                          gNFBLastPopAt > 0 ? CACurrentMediaTime() - gNFBLastPopAt : -1.0];
     [report writeToFile:nfbTerrainHangPath()
@@ -315,6 +328,26 @@ static void nfbTerrainInstallWatchdog(void) {
 }
 
 // The moment a pop starts, so a hang can be told apart from a slow screen.
+%hook UIBarButtonItem
+
+- (void)setTintColor:(UIColor*)tint {
+    gNFBSetTint++;
+    %orig;
+}
+
+- (void)setTitleTextAttributes:(NSDictionary*)attributes
+                      forState:(UIControlState)state {
+    gNFBSetTitleAttrs++;
+    %orig;
+}
+
+- (void)setHidesSharedBackground:(BOOL)hides {
+    gNFBSetHidesShared++;
+    %orig;
+}
+
+%end
+
 %hook UINavigationController
 
 - (UIViewController*)popViewControllerAnimated:(BOOL)animated {
@@ -341,6 +374,11 @@ static void nfbTerrainInstallWatchdog(void) {
 %end
 
 %hook UINavigationBar
+
+- (void)setNeedsLayout {
+    gNFBSetNeedsLayout++;
+    %orig;
+}
 
 - (void)didMoveToWindow {
     %orig;
