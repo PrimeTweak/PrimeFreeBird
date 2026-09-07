@@ -24,6 +24,7 @@
 
 #import "HookHelpers.h"
 #import "Debug/NFBDebugger.h"
+#import <QuartzCore/QuartzCore.h>
 
 static NSString* const kNFBHiddenNotifsKey = @"nfb_hidden_notifs";
 static NSString* const kNFBNotifHorizonKey = @"nfb_notif_horizon_days";
@@ -284,9 +285,16 @@ static NSString* NFBNotifDurableKey(id model) {
     NSString* meat = [[stable componentsSeparatedByCharactersInSet:noise]
         componentsJoinedByString:@""];
     if (meat.length < 12) {
-        NFBDebugLog(@"notifhide: description carries nothing distinguishing "
-                    @"(%lu chars) - no durable key",
-                    (unsigned long)meat.length);
+        // Once a second at most: this fires for every row of every sweep, and a
+        // single pass over a full timeline used to write more than a hundred lines.
+        static NSTimeInterval lastNote = 0;
+        NSTimeInterval now = CACurrentMediaTime();
+        if (now - lastNote > 1.0) {
+            lastNote = now;
+            NFBDebugLog(@"notifhide: description carries nothing distinguishing "
+                        @"(%lu chars) - no durable key",
+                        (unsigned long)meat.length);
+        }
         return nil;
     }
     return [NSString stringWithFormat:@"dk:%lu/%lu", (unsigned long)meat.hash,
