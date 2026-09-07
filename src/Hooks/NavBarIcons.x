@@ -172,7 +172,24 @@ static BOOL nfbLooksLikeSettingsButton(UIView* view) {
 // Brings one view back to full strength and marks it, so that anything lowering
 // it later — an alpha, a layer opacity, an animation — is refused rather than
 // undone after the fact.
+
+// A navigation transition fades the bar. Refusing that fade leaves the
+// transition unable to settle, and the bar oscillates between the two
+// screens' heights. Fades pass through for its duration.
+static NSTimeInterval gNFBFadeWindowUntil = 0;
+
+static BOOL nfbFadesAllowed(void) {
+    return CACurrentMediaTime() < gNFBFadeWindowUntil;
+}
+
+static void nfbOpenFadeWindow(void) {
+    gNFBFadeWindowUntil = CACurrentMediaTime() + 0.8;
+}
+
 static void nfbPinOpaque(UIView* view) {
+    if (nfbFadesAllowed()) {
+        return;
+    }
     if (view.alpha < 1.0) {
         view.alpha = 1.0;
     }
@@ -828,7 +845,7 @@ static BOOL nfbIsRightHandGlyphButton(UIView* button) {
 %hook UIView
 
 - (void)setAlpha:(CGFloat)alpha {
-    if (alpha < 1.0 &&
+    if (alpha < 1.0 && !nfbFadesAllowed() &&
         objc_getAssociatedObject(self.layer, kNFBNoFadeKey) != nil) {
         %orig(1.0);
         return;
@@ -893,7 +910,7 @@ static BOOL NFBViewSitsInXTabBar(UIView* view) {
 %hook CALayer
 
 - (void)setOpacity:(float)opacity {
-    if (opacity < 1.0f &&
+    if (opacity < 1.0f && !nfbFadesAllowed() &&
         objc_getAssociatedObject(self, kNFBNoFadeKey) != nil) {
         %orig(1.0f);
         return;
@@ -949,13 +966,34 @@ static BOOL NFBViewSitsInXTabBar(UIView* view) {
         isFade = [((CABasicAnimation*)animation).keyPath isEqualToString:@"opacity"];
     }
 
-    if (!objc_getAssociatedObject(self, kNFBNoFadeKey)) {
+    if (nfbFadesAllowed() || !objc_getAssociatedObject(self, kNFBNoFadeKey)) {
         %orig;
         return;
     }
     if (isFade) {
         return;
     }
+    %orig;
+}
+
+%end
+
+// The three ways a navigation stack starts a transition. Each opens the window
+// in which the bar is allowed to fade.
+%hook UINavigationController
+
+- (BOOL)navigationBar:(UINavigationBar*)bar shouldPopItem:(UINavigationItem*)item {
+    nfbOpenFadeWindow();
+    return %orig;
+}
+
+- (UIViewController*)popViewControllerAnimated:(BOOL)animated {
+    nfbOpenFadeWindow();
+    return %orig;
+}
+
+- (void)pushViewController:(UIViewController*)controller animated:(BOOL)animated {
+    nfbOpenFadeWindow();
     %orig;
 }
 
