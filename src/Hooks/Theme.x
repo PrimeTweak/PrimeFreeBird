@@ -972,15 +972,26 @@ static void NFBApplyTabBarGlassBody(UIView* host) {
     // The bar's own tint pair, nothing else. tintColor is the selected colour,
     // unselectedItemTintColor the resting one; the floating bar on iOS 26 was
     // measured honouring exactly this pair and ignoring UITabBarAppearance.
-    UIColor* accent = tabItemColor(YES);
+
+    // Same rule as the bird in the top bar: the accent only when its own toggle
+    // is on and a colour is picked, otherwise the neutral label colour.
+    BOOL themed =
+        [BHTSettings boolForKey:@"tab_bar_theming"] && NFBAccentIsActive();
+    UIColor* accent = themed ? tabItemColor(YES) : [UIColor labelColor];
     UIColor* resting = NFBGlassTabRestingColor();
     BOOL labels = [BHTSettings boolForKey:@"restore_tab_labels"];
+    BOOL tintsMoved = NO;
     if (![native.tintColor isEqual:accent]) {
         native.tintColor = accent;
+        tintsMoved = YES;
     }
     if (![native.unselectedItemTintColor isEqual:resting]) {
         native.unselectedItemTintColor = resting;
-        NFBDebugLog(@"[tabbar] tints set: accent=%@ resting=%@", accent, resting);
+        tintsMoved = YES;
+    }
+    if (tintsMoved) {
+        NFBDebugLog(@"[tabbar] tints set: themed=%d accent=%@ resting=%@",
+                    themed ? 1 : 0, accent, resting);
     }
 
     // Titles follow the setting: the native bar carries them, so
