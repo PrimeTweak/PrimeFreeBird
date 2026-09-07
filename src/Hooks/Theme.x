@@ -2480,19 +2480,6 @@ void NFBWhitenNavigationBarConfirm(UINavigationBar* bar) {
 
 - (void)viewDidAppear:(BOOL)animated {
     %orig;
-    // Forced Liquid Glass rebuilds the navigation bar platter on every re-host,
-    // and the app - never compiled for that mode - lays its title view out once
-    // and never again, so the avatar ends up inside the search capsule after a
-    // round trip. Asking the bar to lay out again costs one pass and restores
-    // the geometry when the constraints are merely stale. If they were rebuilt
-    // wrong, this changes nothing and the probe below says so.
-    if ([BHTSettings boolForKey:@"enable_liquid_glass"]) {
-        UINavigationBar* bar = self.navigationController.navigationBar;
-        if (bar.window) {
-            [bar setNeedsLayout];
-            [bar layoutIfNeeded];
-        }
-    }
     if (!NFBAccentPending) {
         return;
     }
