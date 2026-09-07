@@ -846,7 +846,6 @@ static BOOL nfbIsRightHandGlyphButton(UIView* button) {
 %new
 - (void)nfbGreySettingsGlyphIfNeeded {
     if (nfbBisectOff(4)) {
-        %orig;
         return;
     }
     @try {
