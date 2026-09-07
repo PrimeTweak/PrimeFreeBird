@@ -690,24 +690,29 @@ static UIImage* NFBFilledGlyph(UIImage* outline) {
     }
     free(stack);
 
-    // Not the whole lens: the ring stays, and only the lower half of the
-    // enclosed area is inked - a half-disc hung from the lens's own centre,
-    // found as the centroid of the enclosed pixels. A full disc read as odd on
-    // the bar next to three outlines.
+    // The ring stays and a disc sits at the lens's centre, at 62% of the
+    // enclosed area's radius, leaving a ring of glass between the two. Centre
+    // and radius both come from the enclosed pixels themselves, so the shape
+    // follows whatever glyph the bundle provides.
+    double sumX = 0;
     double sumY = 0;
     size_t enclosed = 0;
     for (size_t k = 0; k < count; k++) {
         if (cell[k] == 0) {
+            sumX += (double)(k % side);
             sumY += (double)(k / side);
             enclosed++;
         }
     }
+    double centreX = enclosed ? sumX / (double)enclosed : (double)side / 2.0;
     double centreY = enclosed ? sumY / (double)enclosed : (double)side / 2.0;
+    double radius = enclosed ? sqrt((double)enclosed / M_PI) * 0.62 : 0;
     uint8_t* rgba = calloc(count * 4, 1);
     for (size_t k = 0; k < count; k++) {
-        BOOL ink = cell[k] == 1;
-        BOOL lowerHalf = cell[k] == 0 && (double)(k / side) >= centreY;
-        if (ink || lowerHalf) {
+        double dx = (double)(k % side) - centreX;
+        double dy = (double)(k / side) - centreY;
+        BOOL inDisc = radius > 0 && (dx * dx + dy * dy) <= radius * radius;
+        if (cell[k] == 1 || inDisc) {
             rgba[k * 4 + 3] = 255;
         }
     }
@@ -2419,19 +2424,6 @@ void NFBWhitenNavigationBarConfirm(UINavigationBar* bar) {
 
 - (void)viewDidAppear:(BOOL)animated {
     %orig;
-    // Forced Liquid Glass rebuilds the navigation bar platter on every re-host,
-    // and the app - never compiled for that mode - lays its title view out once
-    // and never again, so the avatar ends up inside the search capsule after a
-    // round trip. Asking the bar to lay out again costs one pass and restores
-    // the geometry when the constraints are merely stale. If they were rebuilt
-    // wrong, this changes nothing and the probe below says so.
-    if ([BHTSettings boolForKey:@"enable_liquid_glass"]) {
-        UINavigationBar* bar = self.navigationController.navigationBar;
-        if (bar.window) {
-            [bar setNeedsLayout];
-            [bar layoutIfNeeded];
-        }
-    }
     if (!NFBAccentPending) {
         return;
     }
