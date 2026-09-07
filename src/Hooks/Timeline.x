@@ -297,15 +297,7 @@ static const void* kNFBSettingsBarBandKey = &kNFBSettingsBarBandKey;
 // so a run of layout passes queues one block and not one per pass.
 static const void* kNFBSettingsBandPendingKey = &kNFBSettingsBandPendingKey;
 
-// Bisect build: the band is the only view the tweak injects into a navigation
-// bar, and the back-button storm shows no tweak frame in its stack. Returning nil
-// here removes the band entirely and answers whether it is involved at all.
-static const BOOL kNFBSettingsBandDisabled = YES;
-
 static UINavigationController* nfbSettingsNavigationForBar(UINavigationBar* bar) {
-    if (kNFBSettingsBandDisabled) {
-        return nil;
-    }
     UIResponder* responder = bar;
     while ((responder = responder.nextResponder)) {
         if ([responder isKindOfClass:[UINavigationController class]]) {
