@@ -529,15 +529,26 @@ static void nfbTerrainReportGlassGate(void) {
                     answers.length ? answers : @" no known selector");
     }
 
-    // Static getter, read only if the class exposes it to the runtime.
-    Class features =
-        objc_getClass("_TtC14T1TwitterSwift27LiquidGlassRedesignFeatures");
+    // The persisted flag the app's own compatibility override reads.
+    NFBDebugLog(@"[p31] T1LiquidGlassRedesignPersistedGate = %@",
+                [[NSUserDefaults standardUserDefaults]
+                    objectForKey:@"T1LiquidGlassRedesignPersistedGate"]
+                    ?: @"(never written)");
+
+    // Whichever class exposes the getter answers it. The previous report named
+    // XAppearance.Appearance as the one that does.
     SEL isEnabled = NSSelectorFromString(@"isLiquidGlassEnabled");
-    if (features && [features respondsToSelector:isEnabled]) {
-        BOOL value = ((BOOL (*)(id, SEL))objc_msgSend)((id)features, isEnabled);
-        NFBDebugLog(@"[p31] LiquidGlassRedesignFeatures.isLiquidGlassEnabled = %d",
-                    value ? 1 : 0);
-    } else {
+    BOOL answered = NO;
+    for (NSUInteger c = 0; c < 5; c++) {
+        Class klass = objc_getClass(classNames[c]);
+        if (klass && [klass respondsToSelector:isEnabled]) {
+            BOOL value = ((BOOL (*)(id, SEL))objc_msgSend)((id)klass, isEnabled);
+            NFBDebugLog(@"[p31] %s.isLiquidGlassEnabled = %d", classNames[c],
+                        value ? 1 : 0);
+            answered = YES;
+        }
+    }
+    if (!answered) {
         NFBDebugLog(@"[p31] isLiquidGlassEnabled not reachable from the runtime");
     }
 
