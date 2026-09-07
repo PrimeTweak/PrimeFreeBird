@@ -28,6 +28,7 @@
 #import "HookHelpers.h"
 #import "Debug/NFBDebugger.h"
 #import <QuartzCore/QuartzCore.h>
+#import <objc/message.h>
 
 static void nfbSwapReport(UIView* button);
 
@@ -589,10 +590,14 @@ static void nfbSwapApply(UIView* pillView) {
         // puts our item and its neighbour inside ONE shared glass capsule, which
         // is the ring the reader saw swallowing the call and video buttons. The
         // item leaves that group; the capsule below is ours alone.
-        if ([gNFBSwapItem respondsToSelector:
-                NSSelectorFromString(@"setHidesSharedBackground:")]) {
-            [gNFBSwapItem setValue:@YES forKey:@"hidesSharedBackground"];
-        }
+        // UIKit's shared background is left ON for this item, and it is what
+        // draws the pill's glass: the tweak's own capsule was measured with
+        // UIGlassEffect set, on screen, at the right size, and subviews=0 -
+        // it renders nothing. Asking for hidesSharedBackground here removed
+        // the only glass there was, and whether the flag landed before or
+        // after the bar drew is what made the pill alternate between launches.
+        // Every OTHER bar item is flattened in Theme.x, so this group holds
+        // this item alone and the capsule cannot spread to a neighbour.
         NFBMark(button, @"PillSwap/custom button - identical to native");
     } else {
         button = (NFBInboxPillButton*)gNFBSwapItem.customView;
@@ -664,14 +669,64 @@ static void nfbSwapApply(UIView* pillView) {
                 NSStringFromClass([vc class]));
 }
 
+// Every bar button, not only the tweak's. Forced Liquid Glass makes UIKit
+// draw a shared glass capsule behind navigation bar items; each item the tweak
+// creates already opts out one by one, so the app's own - the settings gear,
+// the avatar - were the only ones left wearing it. The same property is set on
+// them as they are posted. It exists on the iOS 26 SDK only, so it goes
+// through the runtime and older systems skip it.
+static void NFBFlattenBarItems(NSArray* items) {
+    if (![BHTSettings boolForKey:@"enable_liquid_glass"]) {
+        return;
+    }
+    SEL hideShared = NSSelectorFromString(@"setHidesSharedBackground:");
+    for (UIBarButtonItem* item in items) {
+        if (![item isKindOfClass:[UIBarButtonItem class]] ||
+            ![item respondsToSelector:hideShared]) {
+            continue;
+        }
+        // The tweak's own items are left alone: they already decide for
+        // themselves, and the inbox pill draws its capsule on the very
+        // background this would take away. Recognised by the view they carry,
+        // and by the tag the notifications eye sets on itself.
+        NSString* custom = NSStringFromClass([item.customView class]);
+        if ([custom isEqualToString:@"NFBInboxPillButton"] || item.tag == 90314) {
+            continue;
+        }
+        ((void (*)(id, SEL, BOOL))objc_msgSend)(item, hideShared, YES);
+    }
+}
+
 %hook UINavigationItem
 
 - (void)setRightBarButtonItems:(NSArray<UIBarButtonItem*>*)items {
+    NFBFlattenBarItems(items);
     %orig(nfbSwapInterceptItems(self, items));
 }
 
 - (void)setRightBarButtonItems:(NSArray<UIBarButtonItem*>*)items animated:(BOOL)animated {
+    NFBFlattenBarItems(items);
     %orig(nfbSwapInterceptItems(self, items), animated);
+}
+
+- (void)setLeftBarButtonItems:(NSArray*)items {
+    NFBFlattenBarItems(items);
+    %orig;
+}
+
+- (void)setLeftBarButtonItems:(NSArray*)items animated:(BOOL)animated {
+    NFBFlattenBarItems(items);
+    %orig;
+}
+
+- (void)setRightBarButtonItem:(UIBarButtonItem*)item {
+    NFBFlattenBarItems(item ? @[ item ] : @[]);
+    %orig;
+}
+
+- (void)setLeftBarButtonItem:(UIBarButtonItem*)item {
+    NFBFlattenBarItems(item ? @[ item ] : @[]);
+    %orig;
 }
 
 - (void)setTrailingItemGroups:(NSArray<UIBarButtonItemGroup*>*)groups {
