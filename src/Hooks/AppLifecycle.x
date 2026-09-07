@@ -4,6 +4,7 @@
 //
 
 #import "HookHelpers.h"
+#import "Debug/NFBDebugger.h"
 extern void NFBInstallPasteboardObserver(void);
 
 // MARK: - Padlock helpers
