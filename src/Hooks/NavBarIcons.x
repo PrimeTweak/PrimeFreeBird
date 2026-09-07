@@ -337,14 +337,7 @@ static void nfbRepaintNotificationsGear(UIView* bar, UIColor* colour) {
 // setting an item property invalidates the bar, so the writes never happen
 // inside a layout pass.
 
-// Bisect build: the flattened state is the last thing the tweak still imposes on
-// a navigation bar. Turning it off keeps the forced design and removes only this.
-static const BOOL kNFBFlattenDisabled = YES;
-
 static BOOL nfbBarGlassPass(UIView* bar, BOOL apply) {
-    if (kNFBFlattenDisabled) {
-        return NO;
-    }
     if (![BHTSettings boolForKey:@"enable_liquid_glass"] ||
         ![bar respondsToSelector:@selector(topItem)]) {
         return NO;
@@ -505,14 +498,6 @@ static void nfbQueueBarGlassPass(UIView* bar) {
         if (!bar.window) {
             return;
         }
-        // One line per launch naming what this build has disabled, so a report is
-        // never again read against the wrong binary.
-        static dispatch_once_t bisectOnce;
-        dispatch_once(&bisectOnce, ^{
-          NFBDebugLog(@"[p28] bisect: flatten=%s band=on",
-                      kNFBFlattenDisabled ? "off" : "on");
-        });
-
         // Every navigation bar, before the two-screen guard below: the glass the
         // forced design adds is on all of them, not only on these two. Read here,
         // written off the pass.
