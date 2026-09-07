@@ -76,7 +76,7 @@ BOOL hasUsableWebCredentials(void);
 // The image view currently carrying the top-bar logo, or nil (Theme.x).
 UIImageView* NFBTopBarLogoViewCurrent(void);
 
-// Whether the reader asked for a themed tab bar and an accent is active (Theme.x).
+// Whether a themed tab bar is switched on and an accent is active (Theme.x).
 BOOL NFBThemedTabBarWanted(void);
 
 // A copy of `source` painted in `colour` through its own alpha, rendered as

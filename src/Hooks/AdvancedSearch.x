@@ -25,21 +25,9 @@
 static const void* kNFBAdvSearchBtnKey = &kNFBAdvSearchBtnKey;
 static const void* kNFBAdvSearchGreyKey = &kNFBAdvSearchGreyKey;
 
-// One grey for every icon the tweak adds, frozen to a static colour. The gear is
-// dimmed to 60% opacity because its glyph refuses to be tinted, so the tweak's own
-// icons use the label colour at the same 60% — the two then match exactly.
-// Resolving it here also stops the theme's window tint from claiming the icon
-// on a cold launch, a trap the colour work already already established.
-// Twitter's filter glyph at the settings gear's weight. Its geometry, on a
-// 24-unit canvas: two rails centred on y=7 and y=17, each running from x=3 to
-// x=21, crossed by a handle centred on x=15 (top) and x=9 (bottom) standing 8
-// units tall. The rail is cut on the far side of each handle, leaving the 1.5
-// unit gap Twitter draws. Only the stroke changes, 2 units to the gear's 2.55.
-// Rail centre line, handle centre — a block cannot capture a local C array, so
-// the table lives at file scope where it is simply referenced.
-// Rows of the glyph on a 24-point grid: {centre y, handle centre x}. The upper
-// handle sits right of centre, the lower one left, so the two rows read as two
-// different settings rather than a repeated shape.
+// Rows of Twitter's filter glyph on a 24-point grid: {centre y, handle centre x}.
+// The upper handle sits right of centre and the lower one left, so the two rows
+// read as two settings. A block cannot capture a local C array.
 static const CGFloat kNFBSliderGeometry[2][2] = {{8.0, 14.0}, {16.0, 10.0}};
 
 // The glyph is drawn in its final colour and returned as an original image, so
@@ -47,11 +35,9 @@ static const CGFloat kNFBSliderGeometry[2][2] = {{8.0, 14.0}, {16.0, 10.0}};
 // creation and the first pass of the grey sweep next door.
 static UIImage* NFBSlidersGlyph(CGFloat side, UIColor* colour) {
     const CGFloat kUnit = 24.0;
-    // Matched to the settings gear beside it by pixel count on screen, not by
-    // nominal weight. The gear's glyph stands taller than this one, so an equal
-    // stroke reads heavier here: measured at actual size the rails came out
-    // about a sixth thicker than the gear's ring. The stroke is trimmed to sit
-    // at the gear's relative weight — 1.75 on the 24-unit grid, not 2.0.
+    // Matched to the settings gear by pixel count on screen, not by nominal weight:
+    // the gear's glyph stands taller, so an equal stroke reads heavier here. Trimmed
+    // to 1.75 on the 24-unit grid rather than 2.0.
     const CGFloat kThickness = 1.75;
     // Rendered and compared at actual size: at 2.2 the ring closes up into a
     // dot and the rail beyond it shrinks to a stub. At 2.8 the opening reads,
@@ -107,13 +93,9 @@ static UIColor* NFBBarIconGrey(UITraitCollection* traits) {
 
 // MARK: - the app's own Filters button
 
-// 12.21 puts a sliders button on every search results screen that opens its
-// native Filters tray - the same glyph this tweak draws on Explore for its
-// own form, so the two read as one control that behaves two ways. While the
-// tweak's form is on, the native item is replaced by the tweak's on any
-// search screen: same glyph, same form, one meaning. The native item is told
-// apart by the vector it shows (Branding.x keeps every loaded vector's name on
-// the image) or, failing that, by its accessibility label.
+// Every search results screen carries a sliders button opening the native Filters
+// tray, drawn with the same glyph as this form's on Explore, so the native item is
+// replaced. It is told apart by the vector it shows, or by its accessibility label.
 
 @interface NFBAdvSearchLauncher : NSObject
 @property (nonatomic, weak) UIViewController* owner;
@@ -362,11 +344,9 @@ static BOOL nfbAdvIsSearchScreen(UIViewController* vc) {
            ![vc isKindOfClass:[AdvancedSearchViewController class]];
 }
 
-// The item is set on the container after the results land, well after the
-// container appeared - the journal showed one item at viewDidAppear and the
-// sliders only later. The setters are the moment; the owner is the visible
-// search screen at the top of the stack, and the scan runs once the setter
-// has returned.
+// The item is set on the container after the results land, well after the container
+// appeared, so the setters are the moment. The owner is the search screen at the top
+// of the stack, and the scan runs once the setter has returned.
 static UIViewController* nfbAdvTopViewController(void) {
     UIWindow* window = nil;
     for (id scene in UIApplication.sharedApplication.connectedScenes) {
@@ -535,10 +515,9 @@ static void nfbAdvRescanSoon(void) {
         btn.tintColor = grey;
         objc_setAssociatedObject(btn, kNFBAdvSearchGreyKey, grey,
                                  OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-        // Match Twitter's own settings gear, which sits flat in this bar:
-        // iOS 26 gives bar buttons a shared Liquid Glass capsule, and opting
-        // out is a single property. It only exists on the iOS 26 SDK, so it
-        // goes through the runtime — older systems simply skip it.
+        // Matches Twitter's own settings gear, which sits flat in this bar: iOS 26
+        // gives bar buttons a shared glass capsule and opting out is one property.
+        // Reached through the runtime, since it exists on the iOS 26 SDK only.
         if ([btn respondsToSelector:@selector(setHidesSharedBackground:)]) {
             ((void (*)(id, SEL, BOOL))objc_msgSend)(
                 btn, @selector(setHidesSharedBackground:), YES);

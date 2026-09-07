@@ -44,11 +44,9 @@ static BOOL NFBNotifsEnabled(void) {
 // guessing a class name.
 static __weak UIViewController* gNFBNotifScreen;
 
-// The registry: id → { "t": text, "d": notification date, "h": hidden at }.
-// A dictionary keyed by id makes lookup O(1) on the hot filtering path.
-// NSUserDefaults writes when the system decides, usually at backgrounding, so
-// a crash between hiding a notification and that flush loses it. The store is
-// asked to write now. Nothing else about the registry changes.
+// Writes the registry now. NSUserDefaults flushes when the system decides,
+// usually at backgrounding, so a crash between hiding a notification and that
+// flush loses it.
 static void NFBWriteHiddenNotifs(NSDictionary* registry) {
     NSUserDefaults* defaults = [NSUserDefaults standardUserDefaults];
     if (registry.count) {
@@ -136,10 +134,9 @@ NSInteger NFBHiddenNotifCount(void) {
 }
 
 // MARK: - Reading a notification without knowing its class
-//
-// Type-safe throughout: a selector whose return type is not the expected one is
-// never called, because a guessed signature can make ARC retain an integer as
-// if it were an object.
+
+// A selector whose return type is not the expected one is never called: a guessed
+// signature can make ARC retain an integer as if it were an object.
 
 static id NFBNotifAsk(id target, SEL selector) {
     if (!target || ![target respondsToSelector:selector]) {
@@ -247,14 +244,9 @@ static SEL NFBNotifDiscover(id model, NSArray<NSString*>* wanted, char kind) {
     return winner;
 }
 
-// Identity, date and text of a row's model. The three lookups share one shape:
-// try the known names, then sweep, then remember — and say once what was found.
-// A second key for the same notification, meant to survive a relaunch. The
-// model answers seven selectors and only two carry anything: scribeItem, which
-// was measured empty, and description, which prints the object's own contents.
-// Hex addresses are stripped so the string is the data and not where it sits in
-// memory. Used ALONGSIDE the identity below, never instead of it: that one is
-// what makes hiding work at all, and it is left untouched.
+// A second key for the same notification, meant to survive a relaunch, built from
+// the model's own description with hex addresses stripped. Used alongside the
+// session identity below, never instead of it.
 static NSString* NFBNotifDurableKey(id model) {
     if (!model) {
         return nil;
@@ -277,12 +269,9 @@ static NSString* NFBNotifDurableKey(id model) {
                               options:0
                                 range:NSMakeRange(0, stable.length)
                          withTemplate:@""];
-    // The class name is stripped too, and what is left must still say
-    // something. A model that only answers the default <Class: 0x...> would
-    // otherwise give every notification of that class the SAME key, and hiding
-    // one would hide them all. When nothing distinguishing remains the durable
-    // key is refused and the session identity is used alone - no persistence
-    // across a relaunch, but never a wrong match.
+    // The class name is stripped too and what is left must still say something: a
+    // model answering only the default <Class: 0x...> would give every notification
+    // of that class the same key. Without it the session identity is used alone.
     NSString* className = NSStringFromClass([model class]);
     if (className.length) {
         [stable replaceOccurrencesOfString:className
@@ -312,14 +301,9 @@ static NSString* NFBNotifIdentity(id model) {
     if (known) {
         return NFBNotifString(NFBNotifAsk(model, NSSelectorFromString(known)));
     }
-    // Measured, 18:20:17 - this model exposes exactly six selectors:
-    // description, scribeComponent, scribeElement, scribeItem,
-    // scribeItemImpressionID, init. The impression id used to be tried first,
-    // and that is why a hidden notification came back after a reinstall: an
-    // impression id is minted per display, so the key written when hiding
-    // never matched the key seen when filtering again. Durable names go first
-    // now - the ones inside scribeItem, then the usual entry ids - and the
-    // impression id is the last resort, journaled as such.
+    // Durable names first, the ones inside scribeItem and then the usual entry
+    // ids. The impression id is the last resort: it is minted per display, so a key
+    // written from it never matches on a later pass.
     id scribeItem = NFBNotifAsk(model, NSSelectorFromString(@"scribeItem"));
     if (scribeItem && ![scribeItem isKindOfClass:[NSString class]]) {
         NSArray<NSString*>* inner = @[@"entryId", @"entryID", @"id", @"itemId",
@@ -448,16 +432,9 @@ BOOL NFBNotifIsHidden(id model) {
             }
         }
     }
-    // An impression id is not guaranteed to survive a refresh. Rather than
-    // assume either way, the identity seen while FILTERING is journaled twice:
-    // ONE measurement, and it settles the pull-to-refresh question for good.
-    //
-    // Both facts are journaled the first four times the filter sees a row while
-    // the registry is not empty: the identity the display carries, to compare
-    // with the one written when hiding, and what the model exposes of itself,
-    // in case it holds a stable id or the text. Two different identities mean
-    // the impression id is per-response; two identical ones mean the filter is
-    // not called on that path.
+    // The first four times the filter sees a row with a non-empty registry, both
+    // the identity the display carries and what the model exposes are journaled, so
+    // a per-response identity can be told from a filter that never runs.
     static NSInteger noted;
     if (identity.length && hidden.count && noted < 4) {
         noted++;
@@ -537,19 +514,9 @@ static NSString* NFBNotifTextFromCell(UITableView* table, NSIndexPath* indexPath
 }
 
 
-// The notification's own date, which is what the countdown hangs on, rather
-// than the moment it was hidden.
-//
-// Measured: URTTimelineNotificationViewModel exposes no date at all (its six
-// selectors are description / scribeComponent / scribeElement / scribeItem /
-// scribeItemImpressionID / init), and the cell's timestampView is Swift, so the
-// runtime cannot be asked. The age IS on screen though: the cell renders a
-// relative form such as "1w", and that text is already read at hide time. The
-// date is recovered from it, and the countdown runs from there.
-//
-// Handles the relative forms Twitter uses (30s / 45m / 5h / 3d / 1w) and the
-// absolute ones it falls back to for older items ("Aug 11", "Aug 11, 2025").
-// Returns 0 when nothing can be read, and the caller keeps its old behaviour.
+// The notification's own date, which the countdown hangs on. The model exposes no
+// date and the timestamp view is Swift, so the date is recovered from the age the
+// cell renders: relative forms (30s, 5h, 1w) and absolute ones. 0 when unreadable.
 static NSTimeInterval NFBNotifDateFromDisplayedAge(NSString* text) {
     if (!text.length) {
         return 0;
@@ -646,11 +613,9 @@ static void NFBHideNotifWithText(id model, NSString* cellText) {
     if (notifDate <= 0) {
         source = @"none - falling back to the hide date";
     }
-    // ONE entry per notification. The durable key is what the registry is keyed
-    // by when there is one - it survives a relaunch, where the identity is a
-    // fresh impression id - and the session identity rides along inside it so
-    // the filter can match either. Writing two entries listed the notification
-    // twice in the menu and counted it twice.
+    // One entry per notification: the registry is keyed by the durable key when
+    // there is one, and the session identity rides inside the value so the filter
+    // can match either.
     NSString* durable = NFBNotifDurableKey(model);
     NSMutableDictionary* entry = [@{
         @"t": text,
@@ -725,10 +690,8 @@ static void NFBShowNotifToast(NSString* notifID) {
         toast.layer.borderWidth = 0.5;
         toast.layer.borderColor = [UIColor separatorColor].CGColor;
     }
-    // The toast stays where it is, but the navigation title reads through the
-    // text. The material alone is too thin, so a veil at 80 % sits behind the
-    // content: enough to stop the title, thin enough to let the background
-    // still breathe.
+    // The material alone is thin enough for the navigation title to read through
+    // the text, so a veil at 80 % sits behind the content.
     toast.layer.shadowColor = [UIColor blackColor].CGColor;
     toast.layer.shadowOpacity = 0.16;
     toast.layer.shadowRadius = 10.0;
@@ -805,11 +768,9 @@ static void NFBShowNotifToast(NSString* notifID) {
 }
 
 // MARK: - The swipe, on the list's own delegate
-//
-// Measured: T1URTViewController answers the trailing-swipe delegate call
-// (trailing=1) while the home timeline does not (0). So the action is appended
-// to whatever Twitter already returns: nothing native is dropped, and when
-// Twitter returns nothing the configuration carries the added action alone.
+
+// The action is appended to whatever Twitter already returns, so nothing native
+// is dropped and an empty return carries the added action alone.
 
 // Ask the CELL. The delegate is a shared proxy and the data source is the
 // controller, and neither of them yields the row, so the cell is the one
@@ -874,10 +835,9 @@ static id NFBModelAtIndexPath(id dataViewController, NSIndexPath* indexPath) {
 }
 
 
-// Measured in the binary: TFNItemsDataViewController implements
-// -deleteItemAtIndexPath:withRowAnimation:. So a hidden row leaves the list on
-// the spot, instead of hoping a sections replay reaches this screen — which is
-// what never happened. The registry + filter still handle later reloads.
+// TFNItemsDataViewController implements -deleteItemAtIndexPath:withRowAnimation:,
+// so a hidden row leaves the list on the spot rather than waiting for a sections
+// replay. The registry and filter still handle later reloads.
 static void NFBNotifSyncEmptyState(id dataViewController);
 
 static void NFBNotifDropRow(id dataViewController, NSIndexPath* indexPath) {
@@ -914,10 +874,9 @@ static void NFBNotifDropRow(id dataViewController, NSIndexPath* indexPath) {
         return original;
     }
     id model = NFBModelAtIndexPath(self, indexPath) ?: NFBModelFromCell(tableView, indexPath);
-    // Only rows that carry a notification, and only ones that can be named: a
-    // row that cannot be identified could never be unhidden, so it is left
-    // alone. Each refusal says WHY, once, because a silent guard cannot be
-    // diagnosed from the journal.
+    // Only rows that carry a notification and can be named: one that cannot be
+    // identified could never be unhidden. Each refusal is journaled once with its
+    // reason.
     NSString* modelClass = model ? NSStringFromClass([model class]) : @"(none)";
     if (!model) {
         static BOOL saidNoModel;
@@ -986,10 +945,9 @@ static void NFBNotifDropRow(id dataViewController, NSIndexPath* indexPath) {
 %end
 
 // MARK: - Keeping them out of the list
-//
-// Same shape as Hidden Threads: filter the sections on their way in. An id in
-// the registry can only belong to a hidden notification, so no other screen can
-// match and the filter needs no scoping of its own.
+
+// The sections are filtered on their way in. An id in the registry can only belong
+// to a hidden notification, so the filter needs no scoping of its own.
 
 // True when the batch carries at least one notification model — checked on the
 // first few items only, so the hot path stays cheap.
@@ -1061,35 +1019,17 @@ static NSArray* NFBFilterNotifSections(NSArray* sections) {
 }
 
 
-// MARK: - the sweep (what the filter could never do)
-//
-// Measured in the binary: no section class exposes -items in Objective-C, which
-// is why NFBFilterNotifSections never reached a single row: with a non-empty
-// registry the hide side is journaled but no filter line ever is. The hidden
-// rows were therefore never filtered out; they only left because the row was
-// deleted by hand, and a refresh brought them straight back.
-//
-// TFNItemsDataViewController does implement -itemAtIndexPath: and
-// -deleteItemAtIndexPath:withRowAnimation:, and the second one works here. So
-// after every content replacement the rows are walked, each item is requested,
-// and the hidden ones are deleted from the end.
+// MARK: - the sweep
+
+// No section class exposes -items in Objective-C, so the section filter reaches
+// no rows. TFNItemsDataViewController implements -itemAtIndexPath:, so the rows
+// are walked after each content replacement and the hidden ones deleted.
 
 
 
-// Which screens the sweep is allowed to touch — decided by observation, not by
-// a class name.
-//
-// Measured: without this guard the sweep walks the HOME TIMELINE on every
-// reload, asking for every item and comparing every model. It deletes nothing
-// there, but the work is real and has no business being on that screen.
-//
-// A name test would be fragile: the notifications list is a plain
-// T1URTViewController, a class Twitter reuses elsewhere. So the verdict is
-// EARNED instead: on its first pass over a controller the sweep watches what
-// the models are. One notification model and the controller is kept forever;
-// several items with none and it is dropped forever. That cannot break the
-// notifications sweep — a screen showing notifications always earns YES — and
-// after one pass the home timeline is never walked again.
+// Which screens the sweep may touch, decided by observation rather than by class
+// name. One notification model keeps a controller, several without drops it, and
+// the home timeline is then never walked again.
 static const char* kNFBNotifVerdictKey = "nfbNotifSweepVerdict";
 static const char* kNFBNotifEverFilledKey = "nfbNotifEverFilled";
 
@@ -1110,14 +1050,9 @@ static void NFBNotifRecordVerdict(id dataViewController, BOOL sawNotification,
                     NSStringFromClass([dataViewController class]));
         return;
     }
-    // A screen that BELONGS to the notifications tab is never condemned.
-    //
-    // Measured: an instance of T1URTViewController can be dropped for showing
-    // rows that carry no notification, the Mentions tab being one. But the
-    // same could hit the All tab if it ever showed placeholder rows before its
-    // notifications arrived: dropped for good, and the hidden ones would come
-    // back. Staying undecided costs one extra walk on Mentions; being wrong
-    // costs the whole feature.
+    // A screen belonging to the notifications tab is never condemned: it could be
+    // dropped for showing placeholder rows before its notifications arrive. Staying
+    // undecided costs one extra walk; being wrong costs the feature.
     UIViewController* node = [dataViewController isKindOfClass:[UIViewController class]]
                                  ? (UIViewController*)dataViewController
                                  : nil;
@@ -1138,17 +1073,11 @@ static void NFBNotifRecordVerdict(id dataViewController, BOOL sawNotification,
     }
 }
 
-// MARK: - the empty panel (two labels, nothing borrowed)
-//
-// The first attempt instantiated Twitter's own TFNEmptyStateView. It crashed
-// the app: an internal view carries invariants that cannot be known from
-// outside, it was given no image and no button, and a bad access is NOT caught
-// by @try, since only ObjC exceptions are. So nothing here belongs to Twitter:
-// two UILabels in a container. Worst case it looks slightly off; it cannot
-// bring the app down.
-//
-// The anchor is the sweep's verdict, which is measured on the running screen.
-// Only a controller that earned YES can carry this panel.
+// MARK: - the empty panel
+
+// Two UILabels in a container, nothing borrowed: an internal view such as
+// TFNEmptyStateView carries invariants unknowable from outside, and a bad access
+// is not caught by @try. Anchored on the sweep's verdict.
 
 static const NSInteger kNFBNotifEmptyTag = 90315;
 static const NSInteger kNFBNotifEmptyTitleTag = 90316;
@@ -1161,10 +1090,9 @@ static const NSInteger kNFBNotifEmptyBodyTag = 90317;
 - (UIColor*)textDetailsColor;
 @end
 
-// The secondary grey Twitter itself draws with, taken from the live palette so
-// it follows light and dark. Reached by the same path CurrentAccentColor uses.
-// UIColor secondaryLabelColor is a warmer, lighter grey and reads as a
-// different colour beside the native empty state.
+// The secondary grey Twitter draws with, taken from the live palette so it
+// follows light and dark. secondaryLabelColor is warmer and reads as a different
+// colour beside the native empty state.
 static UIColor* NFBNotifDetailColor(void) {
     Class settingsClass = objc_getClass("TAEColorSettings");
     if (settingsClass) {
@@ -1181,10 +1109,9 @@ static UIColor* NFBNotifDetailColor(void) {
     return [UIColor secondaryLabelColor];
 }
 
-// Twitter composes in Chirp, not in the system face, which is the whole of the
-// difference once size and weight match. Twitter sets these large empty state
-// headlines in Heavy. The font group is reached the way the
-// settings screens already reach it; the system font is the fallback.
+// Twitter composes in Chirp, and sets these large empty-state headlines in Heavy.
+// The font group is reached the way the settings screens reach it; the system font
+// is the fallback.
 static UIFont* NFBNotifEmptyFont(CGFloat size, BOOL heavy) {
     id group = [BHTManager sharedFontGroup];
     TFNUIDefaultFontGroup* fonts = (TFNUIDefaultFontGroup*)group;
@@ -1204,35 +1131,17 @@ static UIFont* NFBNotifEmptyFont(CGFloat size, BOOL heavy) {
                  : [UIFont systemFontOfSize:size];
 }
 
-// Geometry and type taken from the native empty state, measured two ways that
-// agree: the view tree in a capture, and the rendered screenshot.
-//
-//   TFNViewHostTableViewCell {440 x 216}
-//     TFNEmptyStateView
-//       SemanticContentView {{18, 36}, {404, 164.33}}
-//         UILabel          {{0,  0}, {404,  36}}     one line
-//         TFNLinkTextLabel {{0, 44}, {404,  38.33}}  two lines
-//
-// 18 points of side inset, so 404 wide on a 440 wide table. The title label is
-// 36 points tall for a single line, which is a 30 point face at the usual 1.2
-// line height; the capital height measured on the screenshot agrees at about
-// 21 points, and 21 / 0.72 is 29.4. The body is 38.33 for two lines, so a
-// 19.17 line height, which is a 15 point face. The gap is 44 - 36 = 8.
+// Geometry and type taken from the native empty state: 18 pt of side inset, a
+// 30 pt title face, a 15 pt body face and an 8 pt gap between them.
 static const CGFloat kNFBNotifEmptyTopInset = 36.0;
 static const CGFloat kNFBNotifEmptySideInset = 18.0;
 static const CGFloat kNFBNotifEmptyGap = 8.0;
 static const CGFloat kNFBNotifEmptyTitleSize = 30.0;
 static const CGFloat kNFBNotifEmptyBodySize = 15.0;
 
-// Places the panel with frames in the table's CONTENT coordinate space, the
-// same technique the reading marker uses. A subview of a scroll view placed in
-// content coordinates travels with the list; a subview pinned to
-// frameLayoutGuide stays welded to the viewport, which is why the panel used
-// to sit still. Auto Layout against contentLayoutGuide is avoided on purpose:
-// a table view owns its content size, and constraints that try to drive it
-// fight the table.
-//
-// Called on every sync, so a width change is picked up at the next update.
+// Places the panel with frames in the table's content coordinate space, so it
+// travels with the list; pinned to frameLayoutGuide it would stay welded to the
+// viewport. Auto Layout is avoided: a table view owns its own content size.
 static void NFBNotifLayoutEmptyPanel(UIView* panel, UITableView* table) {
     UILabel* title = (UILabel*)[panel viewWithTag:kNFBNotifEmptyTitleTag];
     UILabel* body = (UILabel*)[panel viewWithTag:kNFBNotifEmptyBodyTag];
@@ -1279,15 +1188,9 @@ static void NFBNotifSyncEmptyState(id dataViewController) {
                         NSStringFromClass([dataViewController class]));
             return;
         }
-        // MEASURED: with every notification hidden, the table still reports
-        // one row on a visibly empty screen, repeatedly. That leftover row is
-        // not a notification (the sweep, which
-        // reads every model, never treats it as one): it is a header, a footer
-        // or a zero-height cell.
-        //
-        // So the raw row count is the wrong measure. What decides whether the
-        // screen is empty is how many rows carry a NOTIFICATION model — the
-        // same test the sweep already uses to earn its verdict.
+        // The raw row count is the wrong measure: a header, a footer or a
+        // zero-height cell leaves one row on a visibly empty screen. Emptiness is
+        // decided by how many rows carry a notification model.
         NSInteger rows = 0;
         NSInteger notifRows = 0;
         SEL itemSel = NSSelectorFromString(@"itemAtIndexPath:");
@@ -1413,15 +1316,9 @@ static void NFBNotifSweep(id dataViewController) {
             gNFBNotifSweeping = NO;
             return;
         }
-        // MEASURE ONLY — no behaviour change.
-        //
-        // The sweep has no screen guard: it runs on every list controller,
-        // the home timeline included. It deletes nothing there, since no tweet
-        // is in the registry, but it walks every row on every reload. This line
-        // names the controller the sweep touches, so a timeline flash can be
-        // attributed to it or ruled out.
-        //
-        // Printed once per class, so the journal stays readable.
+        // Names the controller the sweep touches, once per class. Read-only: the
+        // sweep runs on every list controller and deletes nothing outside the
+        // notifications list.
         static NSMutableSet* announced;
         if (!announced) {
             announced = [NSMutableSet set];
@@ -1509,10 +1406,9 @@ static void NFBNotifSweep(id dataViewController) {
     });
 }
 
-// The four below are why hidden notifications came back on pull-to-refresh:
-// the filter covered three doors out of seven. These names are the ones
-// TFNItemsDataViewController actually implements, read from the binary — there
-// is no eighth to cover.
+// The four below complete the filter: these are the content-replacement entry
+// points TFNItemsDataViewController implements. Covering fewer lets hidden rows
+// return on a refresh.
 
 - (void)updateSections:(NSArray*)sections completion:(id)completion {
     if (NFBSectionsAreNotifications(sections)) {
@@ -1566,13 +1462,10 @@ reconfigureItemIdentifiers:(id)identifiers
 %end
 
 // MARK: - Quick access, the pattern shared with muted words
-//
-// Scoping is the whole difficulty of a bar button (TFNNavigationBar is generic
-// — every screen has one). Rather than guess the notifications screen's class
-// name, the screen NAMES ITSELF: the filter above runs on it, so it records the
-// controller it saw. A bar then belongs to notifications when its owner is that
-// controller or one of its ancestors. If nothing matches, no button is added —
-// best effort, never destructive, and the list stays reachable from Settings.
+
+// TFNNavigationBar is generic, so the screen names itself instead: the filter
+// above records the controller it ran on, and a bar belongs to notifications when
+// its owner is that controller or an ancestor. No match means no button.
 
 
 @interface NFBNotifQuickPresenter : NSObject
@@ -1591,11 +1484,9 @@ reconfigureItemIdentifiers:(id)identifiers
     return instance;
 }
 
-// The sender is a UIBarButtonItem, the bar's own kind of button, since the
-// entry point is Twitter's own. A bar item is NOT a view: it answers neither
-// -bounds nor -nextResponder, and asking it either is an unrecognised selector,
-// i.e. the crash on tap. Both kinds are handled here, and the host controller no
-// longer comes from the sender at all.
+// The sender can be a UIBarButtonItem, which is not a view: it answers neither
+// -bounds nor -nextResponder. Both kinds are handled here, and the host
+// controller does not come from the sender.
 - (void)present:(id)sender {
     Class screenClass = NSClassFromString(@"HiddenNotificationsViewController");
     if (!screenClass) {
@@ -1609,10 +1500,9 @@ reconfigureItemIdentifiers:(id)identifiers
         if (!controller) {
             return;
         }
-        // Load the view now, so viewDidLoad → reload → preferredContentSize all
-        // run BEFORE the popover picks its position. Otherwise it places itself
-        // against a stale size and lands on top of the button instead of under
-        // it.
+        // Load the view now so viewDidLoad, reload and preferredContentSize all run
+        // before the popover picks its position, otherwise it places itself against
+        // a stale size.
         (void)controller.view;
         controller.modalPresentationStyle = UIModalPresentationPopover;
         UIPopoverPresentationController* popover =
@@ -1681,11 +1571,9 @@ reconfigureItemIdentifiers:(id)identifiers
 
 %hook TFNItemsDataViewController
 
-// Safety net, and a measurement in one: when the notifications list is not a
-// plain T1URTViewController, the hook above never fires and the swipe silently
-// does nothing. This one sits on the base class the whole app's lists inherit
-// from, so it fires wherever the rows live; it declines immediately unless the
-// row really is a nameable notification.
+// Safety net for a notifications list that is not a plain T1URTViewController,
+// where the hook above never fires. Sits on the base class the app's lists
+// inherit from and declines unless the row is a nameable notification.
 - (UISwipeActionsConfiguration*)tableView:(UITableView*)tableView
     trailingSwipeActionsConfigurationForRowAtIndexPath:(NSIndexPath*)indexPath {
     UISwipeActionsConfiguration* original = %orig;
@@ -1742,11 +1630,10 @@ reconfigureItemIdentifiers:(id)identifiers
 %end
 
 // MARK: - recognising a hidden-capable row
-//
-// Measured in the binary: tableView:canEditRowAtIndexPath: is implemented ONLY
-// by T1AccountsViewController and T1TweetDraftsViewController, never by the
-// notifications list. Nothing refuses the swipe there, so no answer has to be
-// forced on a method that does not exist.
+
+// tableView:canEditRowAtIndexPath: is implemented only by the accounts and drafts
+// controllers, never by the notifications list, so nothing refuses the swipe there
+// and no answer has to be forced.
 
 static BOOL NFBNotifRowIsOursInTable(id dataViewController, UITableView* table,
                                      NSIndexPath* indexPath);
@@ -1829,30 +1716,17 @@ static BOOL NFBNotifRowIsOursInTable(id dataViewController, UITableView* table,
 
 
 
-// MARK: - the cache nobody mentions
-//
-// Ten builds in, everything was installed and nothing was ever asked. The
-// missing fact is UIKit's own: a UITableView interrogates its delegate and its
-// data source ONCE — when they are assigned — and caches which optional methods
-// they answer. Adding a method afterwards changes nothing: the table never asks
-// again. Our methods existed; the table did not know they did.
-//
-// Two consequences, both handled here:
-//   · install BEFORE the assignment (the setter hooks below), so the cache is
-//     built with the added methods already in place;
-//   · for a table already wired, re-assign delegate and data source once, which
-//     is the documented way to make the table rebuild that cache.
+// MARK: - the optional-method cache
+
+// A UITableView asks its delegate and data source which optional methods they
+// answer once, when they are assigned, and caches the answer. So methods are
+// installed before the assignment, and an already-wired table is re-assigned.
 
 // MARK: - the eye
-//
-// Measured: with T1TabNavigationController the eye is placed and journaled;
-// with a TFNNavigationBar hook nothing is ever printed and the icon is simply
-// absent. So the door that fires is used, and the glass is dealt with where it
-// is actually painted:
-// _TtCC5UIKit19NavigationButtonBar15ItemWrapperView, animating cornerRadii.
-// That wrapper is UIKit's per-item container; the glyph's own view can do
-// nothing about it, so the wrapper is walked up to and its background turned
-// off.
+
+// Placed through T1TabNavigationController, the door that fires here. The glass
+// is painted on UIKit's per-item wrapper, not on the glyph's own view, so the
+// wrapper is walked up to and its background turned off.
 
 static const NSInteger kNFBNotifBarItemTag = 90314;
 static const CGFloat kNFBNotifEyeSide = 24.0;
@@ -2007,16 +1881,10 @@ static UIImage* NFBNotifFlatGlyph(UIImage* source, UIColor* colour) {
 %end
 
 // MARK: - the button that was already there
-//
-// Measured in the binary, and visible in a view hierarchy capture:
-//   T1URTTimelineNotificationCell  ->  dismissButton, setDismissButton:,
-//                                      dismissButtonWasTapped, layoutSubviews
-//   the cell already holds a TFNDismissButton at {413, 12}, 18x18, HIDDEN.
-//
-// So Twitter ships a dismiss button on every notification row and simply keeps
-// it hidden. Revealing it costs nothing and depends on no gesture, no menu, no
-// delegate and no proxy. The tap is already wired to a method of the cell,
-// which is where the hide is performed.
+
+// Every notification cell already holds a hidden TFNDismissButton, wired to a
+// method of the cell. Revealing it depends on no gesture, menu, delegate or
+// proxy, and the hide is performed where the tap already lands.
 
 static const char* kNFBNotifRevealedKey = "nfbNotifRevealedDismiss";
 static const char* kNFBNotifGlyphKey    = "nfbNotifDismissGlyph";
@@ -2052,11 +1920,9 @@ static UITableView* NFBNotifTableForCell(UIView* cell) {
             return;
         }
         UIView* dismiss = button;
-        // Measured: dismissButtonWasTapped just invokes the cell's
-        // dismissButtonTapped block (ivar +0xb8), and layoutSubviews does not
-        // re-hide the button. How it is hidden cannot be proven statically, so
-        // every route is covered - hidden flag, alpha, and a zero frame - and
-        // the button is marked so the tap handler recognises it.
+        // How the button is hidden cannot be established statically, so every
+        // route is covered: hidden flag, alpha and a zero frame. The button is
+        // marked so the tap handler recognises it.
         BOOL changed = NO;
         if (dismiss.hidden) { dismiss.hidden = NO; changed = YES; }
         if (dismiss.alpha < 0.5) { dismiss.alpha = 1.0; changed = YES; }

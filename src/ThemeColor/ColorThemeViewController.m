@@ -52,11 +52,9 @@ static UIColor* NativeAccentColor(NSUInteger option) {
         return nil;
     }
 
-    // Twitter's palette colours are DYNAMIC: they re-resolve on every trait or
-    // window-tint change, going through the tweak's accent hooks again — without the
-    // raw-read guard. That repainted every swatch with the custom accent the
-    // moment a colour was picked. Freeze light and dark NOW (guard is up here)
-    // into a local provider that never touches the palette again.
+    // Twitter's palette colours re-resolve on every trait or window-tint change and
+    // go through the accent hooks again, without the raw-read guard. Light and dark
+    // are frozen here into a local provider that never touches the palette again.
     UIColor* lightC = [color
         resolvedColorWithTraitCollection:
             [UITraitCollection traitCollectionWithUserInterfaceStyle:UIUserInterfaceStyleLight]];
@@ -68,10 +66,9 @@ static UIColor* NativeAccentColor(NSUInteger option) {
     }];
 }
 
-// Glass-mode controls resolve their accent from the primary colour OPTION
-// index, natively in Swift — they never reach the tweak's palette hooks. A custom
-// colour therefore has to travel as the option that looks closest to it,
-// otherwise those surfaces fall back to blue (option 1).
+// Glass-mode controls resolve their accent from the primary colour option index,
+// natively in Swift, and never reach the palette hooks. A custom colour therefore
+// travels as the nearest option, or those surfaces fall back to blue.
 static NSInteger NearestAccentOption(UIColor* color) {
     CGFloat r = 0, g = 0, b = 0, a = 0;
     if (![color getRed:&r green:&g blue:&b alpha:&a]) {
@@ -157,11 +154,9 @@ static UIColor* customAccentColorFromDefaults(void);
     }
     NFBEndRawPaletteRead();
 
-    // "Custom": the exact same pill+radio control as the six options above —
-    // neutral grey and unchecked until a custom colour is actually active,
-    // then it wears that colour like any other swatch. (Required behaviour: after a
-    // reset it must look colourless, match the other pills' size, and carry a
-    // real selection circle.)
+    // The same pill and radio control as the six options above: neutral grey and
+    // unchecked until a custom colour is active, then wearing that colour like any
+    // other swatch.
     ColorSwatchControl* customSwatch = [[ColorSwatchControl alloc] init];
     customSwatch.translatesAutoresizingMaskIntoConstraints = NO;
     customSwatch.colorID = -1;
@@ -256,11 +251,9 @@ static UIColor* customAccentColorFromDefaults(void);
 
 - (void)resetToDefaultColor {
     NSUserDefaults* defaults = NSUserDefaults.standardUserDefaults;
-    // Clear every override so NOTHING declares an accent any more: the custom
-    // hex, the tweak's picked option, and Twitter's own stored option. With all three
-    // gone the window tint is cleared, which is what puts iOS controls (the
-    // Confirm button top right) back on the system blue, and leaves every
-    // swatch unselected.
+    // Clears every override so nothing declares an accent: the custom hex, the
+    // picked option and Twitter's own stored option. With all three gone the window
+    // tint is cleared and every swatch is left unselected.
     [defaults setBool:NO forKey:@"bh_custom_is_active"];
     [defaults removeObjectForKey:@"bh_custom_accent_hex"];
     [defaults removeObjectForKey:@"bh_color_theme_selectedColor"];
@@ -294,9 +287,8 @@ static UIColor* customAccentColorFromDefaults(void);
 - (void)viewWillAppear:(BOOL)animated {
     [super viewWillAppear:animated];
     NFBColorThemeScreenVisible++;
-    // Returning to this screen triggers no bar layout and no refreshSelection,
-    // so a dark glyph Twitter baked while the tweak were away stayed dark — a black
-    // check on return, accent only elsewhere. Pass now, and once more after the
+    // Returning to this screen triggers no bar layout and no refreshSelection, so a
+    // glyph baked dark meanwhile stays dark. One pass now, and one more after the
     // transition has rebuilt the bar item.
     NFBWhitenNavigationBarConfirm(self.navigationController.navigationBar);
     dispatch_async(dispatch_get_main_queue(), ^{

@@ -21,11 +21,9 @@
 
 static const void* kNFBQuickMutedBtnKey = &kNFBQuickMutedBtnKey;
 
-// Nearest view controller up the responder chain, unwrapping a navigation
-// controller to the screen it is actually showing.
-// The avatar is the square view furthest to the left of the bar. Using it as
-// the reference makes the tweak's button match Twitter's own vertical rhythm and
-// horizontal margin, whatever the bar's height happens to be.
+// The avatar is the square view furthest to the left of the bar. Using it as the
+// reference makes the added button match Twitter's own vertical rhythm and
+// horizontal margin, whatever the bar's height.
 static UIView* nfbFindAvatarView(UIView* view, UIView* bar) {
     UIView* best = nil;
     CGFloat bestX = CGFLOAT_MAX;
@@ -76,11 +74,9 @@ static BOOL nfbControllerIsHome(UIViewController* owner) {
            [name containsString:@"TimelineContainer"];
 }
 
-// One grey for every icon the tweak adds, frozen to a static colour. The gear is
-// dimmed to 60% opacity because its glyph refuses to be tinted, so the tweak's own
-// icons use the label colour at the same 60% — the two then match exactly.
-// Resolving it here also stops the theme's window tint from claiming the icon
-// on a cold launch, a trap the colour work already already established.
+// One grey for every icon added here, frozen to a static colour. The gear is dimmed
+// to 60 % because its glyph refuses to be tinted, so these icons use the label
+// colour at the same 60 %. Resolving it here also keeps the window tint off it.
 static UIColor* NFBBarIconGrey(UITraitCollection* traits) {
     // Resolved to a concrete colour: a dynamic one handed to Twitter's vector
     // renderer came back black, and let the theme claim it later.
@@ -91,31 +87,9 @@ static UIColor* NFBBarIconGrey(UITraitCollection* traits) {
     return grey;
 }
 
-// Renders a glyph into a flat grey bitmap. Every colour route the tweak tried was
-// reclaimed by something: the tint by the theme when the bar re-appears, the
-// alpha by the button's own highlight after a tap, and Twitter's fillColor
-// comes back black. A colour burnt into the pixels survives all three.
-// Twitter's filter_bars drawn at the settings gear's weight. The library has no
-// bold variant of it, and its bars are drawn 2 units thick against the gear's
-// 2.55 — which is what reads as "thin" in the bar. The geometry below is
-// Twitter's own, lifted from the glyph: three bars centred on x=12, spans 3-21,
-// 6-18 and 9-15, centre lines at y=7, 12.5 and 18 on a 24-unit canvas. Only the
-// bar height changes.
-//
-// Both numbers are measured against the settings gear as it actually reaches
-// the screen, not against the glyph in isolation — that mistake produced an
-// icon simultaneously too heavy and too small. The gear's ink spans 62 pixels
-// across at three-times scale; this shape only covers 18 of its 24 units
-// against the gear's 20.5, so it needs the larger 27.33 canvas to reach the
-// same width.
-//
-// The gear's stroke measures 7.08 pixels there, by two independent methods
-// that agree to within a fiftieth of a pixel. 2.07 units on this canvas comes
-// out at 7.07. Counting whole pixels is not enough at this size: 2.2 units
-// also read as "8 pixels" under a coarser measurement while sitting six
-// percent heavy, which is exactly the difference the eye caught.
-// Left, right, centre line — a block cannot capture a local C array, so the
-// table lives at file scope where it is simply referenced.
+// Twitter's filter_bars geometry, drawn at the settings gear's weight: three bars
+// centred on x=12 on a 24-unit canvas, spans 3-21, 6-18 and 9-15. A block cannot
+// capture a local C array, so the table lives at file scope.
 static const CGFloat kNFBBarGeometry[3][3] = {
     {3.0, 21.0, 7.0}, {6.0, 18.0, 12.5}, {9.0, 15.0, 18.0}
 };
@@ -196,12 +170,9 @@ static UIImage* NFBGreyGlyph(UIImage* source, UIColor* colour) {
     [owner presentViewController:editor animated:YES completion:nil];
 }
 
-// The button is a plain subview pinned to the trailing edge, re-positioned on
-// every layout pass. Bar button items do not show in this container: this
-// bar draws its contents through a full-width SwiftUI platter, so anything
-// added through the navigation item can be covered or ignored. A subview is
-// under the tweak's control and follows the same re-assert-on-layout pattern the
-// compose button already uses.
+// A plain subview pinned to the trailing edge, re-positioned on every layout pass.
+// Bar button items do not show in this container: the bar draws its contents
+// through a full-width SwiftUI platter that can cover or ignore them.
 - (void)layoutSubviews {
     %orig;
 
@@ -213,25 +184,9 @@ static UIImage* NFBGreyGlyph(UIImage* source, UIColor* colour) {
 
         UIButton* button = objc_getAssociatedObject(self, kNFBQuickMutedBtnKey);
 
-        // THREE states, not two — this is what caused the icon to leak onto
-        // other screens.
-        //
-        // The button is attached to the BAR, and TFNNavigationBar is REUSED
-        // across screens: the same instance is re-populated. The earlier guard
-        // maintained the button as soon as one existed on the bar, which was
-        // written to survive layout
-        // passes where the responder chain is briefly incomplete — a real
-        // problem, the icon used to vanish until relaunch. But it also meant
-        // the button followed the bar everywhere and re-positioned itself at
-        // (width - side - inset) on every pass: on Explore that is x=376,
-        // exactly where the gear sits, which it then covered: the filter-bars
-        // glyph appeared on search screens that never had one.
-        //
-        // So the two cases the old guard confused are now separated:
-        //   · owner known and it IS home      → create / maintain;
-        //   · owner known and it is NOT home  → REMOVE, the bar moved on;
-        //   · owner unknown (chain incomplete) → change nothing, which is
-        //     precisely what the original guard was protecting.
+        // Three states, not two, because TFNNavigationBar is reused across screens.
+        // Owner known and home: create or maintain. Owner known and not home:
+        // remove. Owner unknown, the chain being incomplete: change nothing.
         UIViewController* owner = nfbOwningViewController(bar);
         if (owner) {
             if (!nfbControllerIsHome(owner)) {
@@ -248,12 +203,9 @@ static UIImage* NFBGreyGlyph(UIImage* source, UIColor* colour) {
             return;
         }
         if (!button) {
-            // Twitter's filter_bars shape, drawn here at the gear's weight —
-            // see NFBFilterBarsGlyph. Repainted through the same path as
-            // before, so the colour still survives the theme's window tint.
-            // The old system-symbol safety net is gone with the library
-            // lookup it guarded: drawing the shape ourselves cannot come back
-            // empty.
+            // Twitter's filter_bars shape drawn at the gear's weight, repainted
+            // through the same path so the colour survives the window tint. Drawing
+            // the shape here cannot come back empty, so no symbol fallback.
             UIImage* icon = NFBGreyGlyph(NFBFilterBarsGlyph(27.33),
                                          NFBBarIconGrey(bar.traitCollection));
             button = [UIButton buttonWithType:UIButtonTypeSystem];

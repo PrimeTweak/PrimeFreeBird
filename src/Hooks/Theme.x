@@ -35,10 +35,9 @@ static UIColor* customAccentColor(void) {
                            alpha:1.0];
 }
 
-// Depth counter, not a flag: raw reads nest. NFBIsAccentColor opens its own raw
-// read during ordinary text rendering, so with a plain boolean its End closed a
-// raw read the colour picker had opened around building its swatches — the
-// remaining swatches then resolved to the custom accent. That was the flicker.
+// Depth counter, not a flag: raw reads nest. With a plain boolean an inner End
+// closes a read opened further out, and the swatches still to be built then
+// resolve to the custom accent.
 static NSInteger NFBRawPaletteDepth = 0;
 static inline BOOL NFBRawPaletteReading(void) { return NFBRawPaletteDepth > 0; }
 void NFBBeginRawPaletteRead(void) { NFBRawPaletteDepth++; }
@@ -49,13 +48,9 @@ static BOOL customAccentActive(void) {
            && customAccentColor() != nil;
 }
 
-// Central accent resolver. Every accent-producing palette accessor routes
-// through this: returns the custom colour when active (except during a raw
-// swatch read), otherwise whatever Twitter would natively return.
-// The avatar shown while a portrait loads takes its fill from the palette, and
-// that fill is derived from the primary colour — so a custom accent turns every
-// loading avatar into a flat disc of it. It is answered with a neutral instead,
-// which is what a placeholder is for.
+// A loading avatar takes its fill from the palette's primary colour, so a custom
+// accent turns every placeholder into a flat disc of it. Answered with a neutral
+// instead.
 static UIColor* NFBPlaceholderGrey(void) {
     static UIColor* grey;
     static dispatch_once_t once;
@@ -69,6 +64,9 @@ static UIColor* NFBPlaceholderGrey(void) {
     return grey;
 }
 
+// Central accent resolver. Every accent-producing palette accessor routes through
+// this: the custom colour when active, except during a raw swatch read, and
+// otherwise whatever Twitter returns natively.
 static UIColor* NFBAccent(UIColor* orig) {
     if (customAccentActive() && !NFBRawPaletteReading()) {
         UIColor* c = customAccentColor();
@@ -86,27 +84,20 @@ static UIColor* NFBLogoAccent(UIColor* orig) {
     return NFBAccent(orig);
 }
 
-// iOS 26 Liquid Glass controls (compose FAB, follow buttons, switches, the
-// new-posts pill, selection highlights) take their accent from the window tint,
-// not the palette, so the custom accent is pushed onto every window's
-// tintColor. Under the standard interface the palette carries the accent on its
-// own, and a window tint would only leak onto everything that has no colour of
-// its own — alert buttons, back chevrons, bar glyphs before their own colour is
-// set. It is therefore pushed for Liquid Glass only, and cleared otherwise.
-// Depth counter for the settings stack (Twitter's root, the tweak's menu, every page,
-// the theme screen). The Done platter is ONE button shared by the whole stack,
-// so the whitening must live as long as ANY settings screen is up. A counter,
-// not a BOOL: on pop, the target's viewWillAppear fires BEFORE the source's
-// viewDidDisappear — a flag would be clobbered to NO mid-stack. >0 = visible.
+// Depth counter for the settings stack. The Done platter is one button shared by
+// the whole stack, and on pop the target's viewWillAppear fires before the
+// source's viewDidDisappear, so a flag would be clobbered mid-stack. >0 = visible.
 NSInteger NFBColorThemeScreenVisible;
 
+// Liquid Glass controls take their accent from the window tint rather than the
+// palette, so the custom accent is pushed onto every window. Under the standard
+// interface the palette carries it alone and a window tint would only leak.
 static void NFBApplyGlobalTint(void) {
     extern UIColor* CurrentAccentColor(void);
     NSUserDefaults* defs = NSUserDefaults.standardUserDefaults;
-    // The window tint is inherited by UIKit's own controls - the buttons in a
-    // system alert take their colour from it - so it is spent only on a colour
-    // the reader actually picked. The theming toggles are not a colour: turning
-    // them on paints the tab bar and the logo, and leaves the system alone.
+    // UIKit's own controls inherit the window tint, so it is spent only on a
+    // colour that was actually picked. The theming toggles are not a colour:
+    // they paint the tab bar and the logo and leave the system alone.
     BOOL hasAccent = customAccentActive() ||
                      [defs objectForKey:@"bh_color_theme_selectedColor"] != nil ||
                      [defs integerForKey:@"T1ColorSettingsPrimaryColorOptionKey"] >= 1;
@@ -152,10 +143,9 @@ static UIImageView* NFBFindLogoImageView(UIView* root) {
     return nil;
 }
 
-// Every logo the tweak have ever vetted, weakly held. Re-tinting the registry is
-// precise and needs no container matching — the name-based sweep misses
-// Twitter's Swift home header, which is why the bird only refreshed when the
-// plugins rebuilt the title view on a tab change.
+// Every logo the tweak has vetted, weakly held. Re-tinting the registry needs no
+// container matching, unlike the name-based sweep, which misses Twitter's Swift
+// home header.
 static NSHashTable<UIImageView*>* NFBLogoRegistry;
 
 static void NFBRegisterLogoView(UIImageView* logo) {
@@ -168,10 +158,8 @@ static void NFBRegisterLogoView(UIImageView* logo) {
     [NFBLogoRegistry addObject:logo];
 }
 
-// CurrentAccentColor() never returns nil — it falls back to systemBlue — so it
-// cannot answer "is an accent actually set?". After a Reset every key is gone
-// and that fallback made the chrome repaint itself blue instead of reverting.
-// This is the real test, matching what NFBApplyGlobalTint uses.
+// CurrentAccentColor() falls back to systemBlue and so cannot report whether an
+// accent is set. This is the real test, matching what NFBApplyGlobalTint uses.
 static BOOL NFBAccentIsActive(void) {
     if (customAccentActive()) {
         return YES;
@@ -282,7 +270,7 @@ static void NFBApplyLogoTint(UIImageView* logoView) {
         objc_setAssociatedObject(logoView, kNFBLogoBakedKey, nil,
                                  OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     }
-    // The bird replaces the X when the reader asked for Twitter's branding back.
+    // The bird replaces the X when Twitter's branding is switched back on.
     // Substituting the image, not the tint: the glyph itself is what changed.
     if ([BHTSettings boolForKey:@"restore_twitter_names"]) {
         UIImage* bird = NFBBirdLogoImage(original.size);
@@ -327,6 +315,9 @@ static void NFBApplyLogoTint(UIImageView* logoView) {
     }
 }
 
+// The live navigation bars are swept at refresh time rather than relying on the
+// logo captured at install: this holds whichever title plugin built it, and
+// whether the bar is native or custom.
 static void NFBRetintRegisteredLogos(void) {
     // The baked copy is tied to one colour; a new accent starts over.
     for (UIImageView* logo in NFBLogoRegistry) {
@@ -391,13 +382,9 @@ static void NFBReapplyTabBarAccent(void) {
     }
 }
 
-// Don't rely on having captured the logo when it was installed: sweep the live
-// navigation bars at refresh time. Works no matter which of Twitter's title
-// plugins built it, or whether the bar is native or custom.
-// Twitter's home header is not always a UINavigationBar, so match on the class
-// name too. Inside such a container only image views ALREADY in
-// template mode: converting an arbitrary one here would flatten avatars into
-// silhouettes. The trusted title-view hooks do the first conversion.
+// Twitter's home header is not always a UINavigationBar, so the class name is
+// matched too. Inside such a container only image views already in template mode
+// are converted; an arbitrary one would flatten avatars into silhouettes.
 static BOOL NFBIsTopBarContainer(UIView* view) {
     if ([view isKindOfClass:[UINavigationBar class]]) {
         return YES;
@@ -423,11 +410,9 @@ static void NFBBakeTitleControlLogos(UIView* root) {
 }
 
 static void NFBRetintTemplateLogos(UIView* root) {
-    // The bar's button items are never logos. iOS 26 hosts them in a platter
-    // container, older systems in a button bar; both are skipped whole, or a
-    // 24-point template share icon gets the logo's tint and, with the bird on,
-    // the bird - seen on the search results screen once the filters item was
-    // rebuilt.
+    // The bar's button items are never logos: iOS 26 hosts them in a platter
+    // container, older systems in a button bar. Both are skipped whole, or a
+    // 24-point template share icon takes the logo's tint and glyph.
     NSString* name = NSStringFromClass([root class]);
     if ([name containsString:@"Platter"] || [name containsString:@"ButtonBar"] ||
         [name containsString:@"BarButton"]) {
@@ -457,10 +442,9 @@ static void NFBSweepTopBarLogos(UIView* root) {
     }
 }
 
-// What was last pushed into a given tab bar. bar.tintColor cannot be used for
-// the comparison: the bar INHERITS the window tint, so it reports the new
-// accent while the installed appearance — which actually paints the selected
-// icon — may still carry the old one.
+// What was last pushed into a given tab bar. bar.tintColor cannot serve for the
+// comparison: the bar inherits the window tint and reports the new accent while
+// the installed appearance, which paints the selected icon, may carry the old.
 static char kNFBAppliedAccentKey;
 
 // Raised on every accent change; the view-controller hook below keeps
@@ -477,23 +461,18 @@ static void NFBApplyTabBarAccent(UITabBar* bar) {
     BOOL changed = !((applied == nil && accent == nil) ||
                      (applied && accent && [applied isEqual:accent]));
 
-    // In Liquid Glass the native tab bar takes its selected colour straight from
-    // tintColor, so this line is what actually paints the tab. Never leave it nil
-    // when the toggle is off: nil makes the bar INHERIT the window tint (iOS blue
-    // after a reset, or the picked colour even with tab_bar_theming off). labelColor
-    // is the native black and, being explicit, it overrides the window tint so the
-    // tab strictly respects the toggle.
+    // In Liquid Glass the native tab bar takes its selected colour from tintColor,
+    // so this line paints the tab. Never nil when the toggle is off: nil makes the
+    // bar inherit the window tint, while labelColor is explicit and overrides it.
     bar.tintColor = accent ?: [UIColor labelColor];
 
     if (!changed) {
         return;
     }
 
-    // The transition only counts once the bar is in a window: marking an
-    // off-screen bar "done" would skip the visible repaint on every later
-    // pass. And the appearance is assigned exactly once per transition: each
-    // assignment installs a fresh copy, orphaning Twitter's own later writes
-    // (its badge colour) on the instance it still holds.
+    // The transition counts only once the bar is in a window; marking an off-screen
+    // bar done would skip the visible repaint. The appearance is assigned once per
+    // transition: each assignment installs a fresh copy, orphaning later writes.
     if (!bar.window) {
         return;
     }
@@ -531,23 +510,9 @@ static const void* kNFBTabOriginalKey = &kNFBTabOriginalKey;
 static const void* kNFBTabBakedKey = &kNFBTabBakedKey;
 static const void* kNFBTabColourKey = &kNFBTabColourKey;
 
-// Twitter 12.21 deleted T1LiquidGlassTabBarController and its whole native
-// tab-bar path (measured: absent from all 56 binaries, present in 12.15). Until
-// then, forcing UIDesignRequiresCompatibility to NO was enough - the app took
-// its own native route and iOS glazed the bar itself.
-//
-// Rebuilt the way PrimeSenger does it on Messenger: a real UITabBar standing
-// outside any UITabBarController still receives the full iOS 26 treatment.
-// It has to be the real, interactive control - the long-press-and-slide that
-// moves between tabs belongs to UITabBar's own gesture machinery, and a
-// decorative copy with interaction switched off loses it.
-//
-// Messenger hands out UITabBarItem objects plus viewForItem:/didTapButton:, so
-// that tweak routes taps in one line. Twitter exposes none of that, so the
-// selection is routed through a cascade, tried in order and reported: the
-// app's own selectTabAtIndex:, then setSelectedIndex:, then the tab's host
-// view as a control, then its gesture recognisers. If every rung fails the
-// host bar is handed straight back, so navigation is never lost.
+// Twitter 12.21 has no native Liquid Glass tab-bar path, so the bar is rebuilt: a
+// real UITabBar outside any UITabBarController still gets the iOS 26 treatment.
+// It must be the real control; a decorative copy loses the slide gesture.
 static const void* kNFBTabBarKey = &kNFBTabBarKey;
 static const void* kNFBTabHiddenKey = &kNFBTabHiddenKey;
 static const void* kNFBTabBridgeKey = &kNFBTabBridgeKey;
@@ -558,9 +523,8 @@ static const void* kNFBTabOursKey = &kNFBTabOursKey;
 extern const void* NFBTabRouteProbeKey(void);
 
 // A plain depth-first walk, no filtering. EnumerateSubviewsRecursively skips
-// branches at alpha 0 - sensible for restyling, fatal here: the app's tab views
-// are faded on purpose, and searching with it reported zero tabs, so every tap
-// landed "out of range" and nothing was ever routed.
+// branches at alpha 0, and the app's tab views are faded on purpose, so it
+// reports no tabs at all here.
 static void NFBWalkAllSubviews(UIView* view, NSInteger depth,
                                void (^block)(UIView*)) {
     if (!view || depth > 12) {
@@ -579,21 +543,9 @@ static BOOL NFBIsOurGlassBar(id bar) {
     return objc_getAssociatedObject(bar, kNFBTabOursKey) != nil;
 }
 
-// A tab glyph at full opacity. Measured on the reader's device: Home renders
-// black and the other three the same grey, tint and mode identical on all four.
-// The only thing left to differ is the pixels, and it is the alpha - the app
-// draws its resting icons at secondaryLabelColor, black at 60 %, baked into
-// the image itself; the selected tab keeps its opaque original. A template
-// image renders tint through alpha, so 0.6 stays grey whatever the tint says.
-// Compositing the glyph over itself six times drives 0.6 to 0.996 and leaves
-// the shape untouched.
-// Both variants of a tab glyph, by name. Measured in the 12.21 bundle: the
-// filled icon is the bare name (home, search, notifications, messages), the
-// outline is the same name with _stroke; T1TabView carries one of the two in
-// imageName. Loaded through the app's own vector loader at the 24 pt the bar
-// draws, filled black, so the bar's tint pair colours them - outline in the
-// resting colour, filled in the accent - and nothing depends on which
-// variant the tab happened to show when the bar was built.
+// Both variants of a tab glyph, by name: the filled icon is the bare name, the
+// outline is the same name with _stroke. Loaded through the app's vector loader
+// at the 24 pt the bar draws, filled black, so the bar's tint pair colours them.
 static UIImage* NFBTabVectorNamed(NSString* name) {
     if (!name.length ||
         ![UIImage respondsToSelector:@selector(tfn_vectorImageNamed:fitsSize:fillColor:)]) {
@@ -629,11 +581,9 @@ static double NFBGlyphInk(UIImage* glyph) {
     return ink;
 }
 
-// A selected glyph built from its outline, for tabs whose bundle has no true
-// filled variant - the magnifier. The outline is rendered as a mask, the
-// outside is flooded from the edges, and the enclosed area is what is left:
-// the lens. Drawn at twice the size for clean edges, returned at the bar's
-// 24 points as a template.
+// A selected glyph built from its outline, for tabs with no true filled variant.
+// The outline is rendered as a mask, the outside flooded from the edges, and the
+// enclosed area is what remains. Drawn at twice the size, returned at 24 pt.
 static UIImage* NFBFilledGlyph(UIImage* outline) {
     if (!outline.CGImage) {
         return nil;
@@ -690,9 +640,8 @@ static UIImage* NFBFilledGlyph(UIImage* outline) {
     }
     free(stack);
 
-    // The ring stays and a disc sits at the lens's centre, at 62% of the
-    // enclosed area's radius, leaving a ring of glass between the two. Centre
-    // and radius both come from the enclosed pixels themselves, so the shape
+    // The ring stays and a disc sits at the lens's centre, at 62 % of the enclosed
+    // area's radius. Centre and radius come from the enclosed pixels, so the shape
     // follows whatever glyph the bundle provides.
     double sumX = 0;
     double sumY = 0;
@@ -738,6 +687,9 @@ static UIImage* NFBFilledGlyph(UIImage* outline) {
     return filled;
 }
 
+// A tab glyph at full opacity. Resting icons are drawn at 60 % black baked into
+// the image, and a template renders tint through alpha, so 0.6 stays grey however
+// it is tinted. Compositing the glyph over itself six times drives 0.6 to 0.996.
 static UIImage* NFBOpaqueTabGlyph(UIImage* source) {
     if (!source || source.size.width < 1.0 || source.size.height < 1.0) {
         return source;
@@ -835,10 +787,9 @@ static NSString* NFBRouteTabSelection(UIView* hostBar, NSArray<UIView*>* tabs,
             return @"UIControl";
         }
     }
-    // No further rung is attempted. Firing a gesture recogniser by hand is not
-    // something UIKit supports, and a wrong guess here would leave the reader
-    // with a bar that does not navigate. The caller hands the app's bar back
-    // instead, and the probe reports what the tab chain does expose.
+    // No further rung is attempted: UIKit does not support firing a gesture
+    // recogniser by hand. The caller hands the app's bar back instead, so
+    // navigation is never lost.
     return nil;
 }
 
@@ -871,10 +822,8 @@ static NSString* NFBRouteTabSelection(UIView* hostBar, NSArray<UIView*>* tabs,
                              OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     NFBDebugLog(@"[tabbar] tab %lu routed via %@", (unsigned long)index, rung ?: @"NOTHING");
 
-    // The net used to tear the whole bar down on the first miss, and that is
-    // what the reader saw: one tap, and the app's old bar was back for good.
-    // A miss is only counted now; the bar goes back after three in a row, and
-    // any success clears the count.
+    // A miss is counted, not acted on: the bar is handed back after three in a
+    // row, and any success clears the count.
     NSInteger misses = [objc_getAssociatedObject(host, kNFBTabMissKey) integerValue];
     if (rung) {
         if (misses) {
@@ -974,28 +923,18 @@ static void NFBApplyTabBarGlassBody(UIView* host) {
             NSString* title = nil;
             if ([tab respondsToSelector:@selector(imageView)]) {
                 UIImageView* icon = (UIImageView*)[tab imageView];
-                // The untouched image, never the baked one: the baked copy
-                // carries whatever colour that tab held at install time and
-                // never changes again, which is why the icons came out black,
-                // grey and blue at once. A clean template lets UIKit colour
-                // selected and unselected itself, the way a real bar does.
+                // The untouched image, never the baked one: a baked copy carries
+                // the colour held at install time and never changes. A clean
+                // template lets UIKit colour selected and unselected itself.
                 image = objc_getAssociatedObject(icon, kNFBTabOriginalKey) ?: icon.image;
             }
             if ([tab respondsToSelector:@selector(title)]) {
                 title = [tab title];
             }
             (void)title;  // The title is set below, from the reader's setting.
-            // The colour is painted into the pixels, not asked for through an
-            // appearance. Measured twice: with the bar's appearance and again
-            // with each item's own, all four icons still came out carrying the
-            // global tint. A baked image served AlwaysOriginal cannot be
-            // repainted by anything downstream - the same trick the top-bar
-            // logo already relies on.
-            // Template images, coloured by the bar's own tint pair below. This
-            // is the one recipe a build has been seen to honour: the resting
-            // colour changed on screen with it. Baked pixels and per-item
-            // appearances were both tried after it and both regressed to a
-            // single accent on all four icons.
+            // Template images, coloured by the bar's own tint pair below. Baked
+            // pixels and per-item appearances both collapse to a single accent on
+            // all four icons.
             NSString* name =
                 [tab respondsToSelector:@selector(imageName)] ? [tab imageName] : nil;
             NSString* base = [name hasSuffix:@"_stroke"]
@@ -1009,9 +948,8 @@ static void NFBApplyTabBarGlassBody(UIView* host) {
             NSString* selectedSource = @"filled";
             double restingInk = NFBGlyphInk(resting);
             double filledInk = NFBGlyphInk(filled);
-            // A true fill carries well over twice its outline's ink - the house,
-            // the bell, the bubble. A variant under 1.6x is another stroke, not a
-            // fill: the magnifier has no interior to fill. That one is thickened
+            // A true fill carries well over twice its outline's ink. A variant
+            // under 1.6x is another stroke, not a fill, and is thickened instead
             // so the selected state still reads heavier.
             if (!filled || filledInk < restingInk * 1.6) {
                 filled = NFBFilledGlyph(resting);
@@ -1045,7 +983,7 @@ static void NFBApplyTabBarGlassBody(UIView* host) {
         NFBDebugLog(@"[tabbar] tints set: accent=%@ resting=%@", accent, resting);
     }
 
-    // Titles follow the reader's own setting: the native bar carries them, so
+    // Titles follow the setting: the native bar carries them, so
     // the option is live again instead of being held off under Liquid Glass.
     for (UITabBarItem* item in native.items) {
         NSInteger tag = item.tag;
@@ -1079,10 +1017,9 @@ static void NFBApplyTabBarGlassBody(UIView* host) {
         native.frame = parent.bounds;
     }
 
-    // Selection, both ways. The long-press-and-slide sets selectedItem without
-    // calling the delegate, so the tap route alone never sees it and the app
-    // snapped back on the next pass. What the reader picked is whatever differs
-    // from the index this code last pushed.
+    // Selection, both ways. The slide gesture sets selectedItem without calling
+    // the delegate, so the tap route alone never sees it. The chosen tab is
+    // whatever differs from the index last pushed here.
     NSUInteger appIndex = NFBSelectedTabIndex(tabs);
     NSUInteger shownIndex = native.selectedItem
                                 ? [native.items indexOfObject:native.selectedItem]
@@ -1106,13 +1043,9 @@ static void NFBApplyTabBarGlassBody(UIView* host) {
                                  OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     }
 
-    // The app's own icons and its opaque backdrop are hidden, not cleared: the
-    // native bar draws the icons now, and glass samples what is behind it.
-    // Faded to alpha 0, never hidden. `hidden` takes a view out of layout and
-    // out of hit-testing, and the app's own selectTabAtIndex: then does nothing
-    // - measured by the reader: navigation only worked while the old bar was
-    // still on screen. At alpha 0 the app keeps a live, laid-out bar and simply
-    // stops drawing it.
+    // Faded to alpha 0, never hidden. `hidden` takes a view out of layout and out
+    // of hit-testing, and the app's own selectTabAtIndex: then does nothing. At
+    // alpha 0 the app keeps a live, laid-out bar and simply stops drawing it.
     NSMutableArray<UIView*>* hidden =
         objc_getAssociatedObject(host, kNFBTabHiddenKey) ?: [NSMutableArray array];
     NSUInteger before = hidden.count;
@@ -1124,11 +1057,9 @@ static void NFBApplyTabBarGlassBody(UIView* host) {
           view.alpha = 0.0;
       }
     };
-    // Its children, never the bar itself. The app owns alpha on TFNCustomTabBar -
-    // that is what setTabBarCollapseRatio: animates while the timeline scrolls,
-    // so anything set there is overwritten within a frame. Measured: the bar
-    // stood at alpha 1 in a capture taken well after hide() ran. The tab host
-    // views carry the icons and the app leaves their alpha alone.
+    // Its children, never the bar itself. The app owns alpha on TFNCustomTabBar,
+    // which setTabBarCollapseRatio: animates on scroll, so anything set there is
+    // overwritten within a frame. The tab host views carry the icons.
     for (UIView* child in bar.subviews) {
         hide(child);
     }
@@ -1142,10 +1073,9 @@ static void NFBApplyTabBarGlassBody(UIView* host) {
         hide(sub);
     }
     NFBWalkAllSubviews(host, 0, ^(UIView* sub) {
-      // The native bar, its own tree, the app bar and its tree, and any view
-      // the native bar actually sits inside. The parent used to be spared
-      // outright, which left the container holding the white panel untouched -
-      // measured: `UIView 440x83` unhidden, with `bg=(1,1,1,1)` beneath it.
+      // The native bar, its own tree, the app bar and its tree, and any view the
+      // native bar sits inside. Sparing the parent outright leaves the container
+      // holding the white panel visible beneath.
       if (sub == native || [sub isDescendantOfView:native] || sub == bar ||
           [sub isDescendantOfView:bar] || [native isDescendantOfView:sub]) {
           return;
@@ -1175,10 +1105,9 @@ static BOOL NFBHostHasNativeBar(UIView* view) {
     return host && objc_getAssociatedObject(host, kNFBTabBarKey) != nil;
 }
 
-// The app puts its own bar back when the reader changes tab or scrolls the
-// timeline, and neither of those goes through a host layout pass - measured:
-// the bar is clean at launch and the old one returns on the first tab change.
-// Every hook that fires on those two paths reapplies through here.
+// The app puts its own bar back on a tab change or a timeline scroll, and
+// neither goes through a host layout pass. Every hook that fires on those two
+// paths reapplies through here.
 static void NFBReapplyTabBarFrom(UIView* view) {
     UIView* host = view;
     while (host && ![NSStringFromClass([host class]) isEqualToString:@"T1TabBarHostView"]) {
@@ -1271,12 +1200,9 @@ static void NFBReloadTwitterDynamicColors(void) {
     }
 #pragma clang diagnostic pop
 
-    // Broadcast the pair Twitter's views actually observe — the binary is full
-    // of _tfn_dynamicColorsWillReload:/_tfn_dynamicColorsDidReload: observers
-    // (T1, TFN, and the Swift hosting views), and the tab icons' vector images
-    // register dynamic-colour info on this very bus. Posting the pair directly
-    // makes those views re-resolve their colours through the tweak's palette hooks even
-    // when the manager accessor above finds nothing.
+    // Broadcast the pair Twitter's views observe: the tab icons' vector images
+    // register dynamic-colour info on this bus, so posting it directly makes them
+    // re-resolve through the palette hooks even when the accessor finds nothing.
     NSNotificationCenter* nc = NSNotificationCenter.defaultCenter;
     [nc postNotificationName:@"TFNDynamicColorsWillReloadNotification" object:nil];
     [nc postNotificationName:@"TFNDynamicColorsDidReloadNotification" object:nil];
@@ -1286,13 +1212,9 @@ static void NFBReloadTwitterDynamicColors(void) {
 
 // MARK: - Accent settle timer
 
-// The appliers are idempotent and correct; the open question is only the
-// moment they run. Neither didMoveToWindow, layoutSubviews nor
-// viewDidAppear is guaranteed to fire exactly when the timeline chrome returns
-// (and which view even hosts it differs between Standard and Liquid Glass). So
-// after every accent change, re-run the idempotent, per-view-guarded appliers
-// on a short cadence until a tab bar has actually been seen on screen, then one
-// grace pass, hard-capped at six seconds. It is the manual tab change, automated.
+// No mount callback is guaranteed to fire when the timeline chrome returns, and
+// the hosting view differs between styles. After an accent change the idempotent
+// appliers re-run on a short cadence until a bar is seen, capped at six seconds.
 static dispatch_source_t NFBAccentSettleTimer;
 
 static BOOL NFBAccentSettlePass(void) {
@@ -1446,12 +1368,9 @@ static void NFBShowRestartReminder(void) {
     // and remind the user to restart so leftover dark backgrounds clear out.
     dispatch_async(dispatch_get_main_queue(), ^{
         if (![DarkModeStyle isDarkModeActive]) {
-            // Twitter switched to a light palette. Read the pinned style FIRST,
-            // then drop it back to System, then (if it wasn't already System)
-            // remind the user to restart so any leftover dark backgrounds on
-            // live views clear out. Order matters: the previous value has to be
-            // captured before the overwrite, or the reminder's condition would
-            // always see System and never fire.
+            // On a switch to a light palette the pinned style is read first, then
+            // dropped back to System, then the restart reminder is shown. Order
+            // matters: after the overwrite the condition would only ever see System.
             NSInteger previous = [[NSUserDefaults standardUserDefaults]
                 integerForKey:@"dark_mode_style"];
             [[NSUserDefaults standardUserDefaults]
@@ -1675,10 +1594,9 @@ static void NFBShowRestartReminder(void) {
     return %orig;
 }
 
-// The resolved accent every control reads (compose FAB, follow buttons, the
-// "new tweets" pill, selection highlights). primaryColorForOption: is the
-// palette-option lookup; -primaryColor is the already-resolved result, and
-// buttons ask for THIS, which is why links went custom but buttons stayed blue.
+// The resolved accent every control reads. primaryColorForOption: is the
+// palette-option lookup; -primaryColor is the already-resolved result, and the
+// controls ask for this one.
 - (UIColor*)primaryColor {
     if (customAccentActive() && !NFBRawPaletteReading()) {
         UIColor* c = customAccentColor();
@@ -1759,13 +1677,9 @@ static void NFBForceBackgroundRefresh(void) {
                     object:nil
                      queue:[NSOperationQueue mainQueue]
                 usingBlock:^(NSNotification* note) {
-                    // Leaving a dark palette is handled in one place only —
-                    // -setCurrentColorPalette: reads the pinned style, drops it
-                    // back to System and shows the restart reminder. Doing the
-                    // reset here too raced ahead of that path: this notification
-                    // fires first, so dark_mode_style was already System by the
-                    // time the reminder checked, and the popup never appeared.
-                    // Here the tweak only refreshes backgrounds.
+                    // Leaving a dark palette is handled in setCurrentColorPalette:
+                    // alone. This notification fires first, so resetting here would
+                    // race it; only backgrounds are refreshed.
                     NFBForceBackgroundRefresh();
                 }];
 
@@ -1780,17 +1694,15 @@ static void NFBForceBackgroundRefresh(void) {
                     NFBReapplyChromeAccent();
                 }];
 
-    // Surfaces that resolve their colour once at launch and then cache it —
-    // the theme screen's confirm control — never see the tweak's palette without a
-    // reload pass. If an accent is active, broadcast one shortly after boot:
-    // the same pass a live colour change performs.
+    // Surfaces that resolve their colour once at launch and cache it never see the
+    // tweak's palette without a reload pass. With an accent active, one is
+    // broadcast shortly after boot.
     if (NFBAccentIsActive()) {
         dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.8 * NSEC_PER_SEC)),
                        dispatch_get_main_queue(), ^{
-                           // The window tint IS the Confirm button's colour;
-                           // the reload alone re-resolves Twitter's palette but
-                           // never sets the tweak's tint. Set it here, at the moment
-                           // the window exists.
+                           // The window tint is the Confirm button's colour. The
+                           // reload re-resolves Twitter's palette but sets no tint,
+                           // so it is set here, once the window exists.
                            NFBApplyGlobalTint();
                            NFBReloadTwitterDynamicColors();
                        });
@@ -1947,22 +1859,14 @@ static void NFBRestoreTabIcon(UIImageView* icon) {
 
     %orig(animated);
 
-    // After %orig, not before: this is the call that swaps the tab's glyph
-    // between its filled and outline variants, and the native bar reads that
-    // glyph to follow it. Run ahead of %orig, the reapply captured the old
-    // image - which is how Home kept its filled icon across tab changes.
+    // After %orig, not before: this call swaps the tab's glyph between its filled
+    // and outline variants, and the native bar reads that glyph. Ahead of %orig the
+    // reapply would capture the old image.
     NFBReapplyTabBarFrom((UIView*)self);
 
-    // 12.21: the tab icon arrives rendered AlwaysOriginal (measured in a
-    // capture: mode=1 with the tint set and ignored), so the colour set above
-    // never reaches it. Rendering it as a template lets the tint through again.
-    // 12.21: setting iconColor no longer reaches the icon, and a tintColor is
-    // replaced by the app's own right after. Measured in a capture: template
-    // image, tint back to the system grey and to Twitter blue on the selected
-    // tab. So the colour is baked into the image, served AlwaysOriginal, which
-    // nothing downstream can repaint.
-    // Nothing is baked while the native bar is up: those icons are hidden, and
-    // baking froze the colour the native items were later built from.
+    // The tab icon arrives rendered AlwaysOriginal, so the colour set above never
+    // reaches it and it is rendered as a template instead. Nothing is baked while
+    // the native bar is up: its items are built from these icons.
     BOOL nativeBarUp = NFBHostHasNativeBar((UIView*)self);
     if (!nativeBarUp && [BHTSettings boolForKey:@"tab_bar_theming"]) {
         NFBBakeTabIcon(self.imageView, tabItemColor(self.selected));
@@ -1986,11 +1890,9 @@ static void NFBRestoreTabIcon(UIImageView* icon) {
     return %orig;
 }
 
-// Restored labels were off-centre until something forced a fresh layout: the
-// settings page relays out the tabs when the switch is flipped, but on a cold
-// launch nothing did, so the tab kept the geometry it computed while the label
-// was still hidden. Re-run Twitter's own tab layout as each tab enters a
-// window and the labels sit centred from the first frame.
+// A restored label keeps the geometry computed while it was still hidden, and on
+// a cold launch nothing forces a fresh layout. Twitter's own tab layout is re-run
+// as each tab enters a window.
 - (void)didMoveToWindow {
     %orig;
 
@@ -2020,10 +1922,9 @@ static void NFBRestoreTabIcon(UIImageView* icon) {
 - (UIView*)titleView {
     UIView* titleView = %orig;
     UIImageView* logo = NFBFindLogoImageView(titleView);
-    // iOS 27 does not put the handed-over view on screen: it builds its own
-    // image view inside _UINavigationBarTitleControl. Measured in a capture -
-    // two image views, ours hidden, the visible one tinted by the bar. The
-    // sweep below runs after the bar has built that chain.
+    // iOS 27 does not put the handed-over view on screen: it builds its own image
+    // view inside _UINavigationBarTitleControl. The sweep below runs after the bar
+    // has built that chain.
     dispatch_async(dispatch_get_main_queue(), ^{
       UIView* bar = titleView;
       while (bar && ![NSStringFromClass([bar class]) containsString:@"NavigationBar"]) {
@@ -2072,11 +1973,9 @@ static UITabBarAppearance* NFBPatchedTabBarAppearance(UITabBarAppearance* appear
     if (!target) {
         return appearance;
     }
-    // Bidirectional on purpose. Restoring a captured "original" appearance was
-    // a trap: the one Twitter installs at launch already carries whatever
-    // accent was active THEN, so putting it back could never yield black —
-    // only a full relaunch did. Neutral = labelColor, the native selected
-    // colour in both light and dark mode.
+    // Bidirectional on purpose: the appearance Twitter installs at launch already
+    // carries whatever accent was active then, so restoring it can never yield
+    // black. Neutral is labelColor, the native selected colour in both modes.
     UITabBarAppearance* patched = [appearance copy];
     // Assigning an appearance costs Twitter its own badge configuration, and
     // UIKit's default badgeBackgroundColor is red. Restore a themed badge
@@ -2100,18 +1999,9 @@ static UITabBarAppearance* NFBPatchedTabBarAppearance(UITabBarAppearance* appear
 }
 
 
-// The Explore header. Under forced Liquid Glass the navigation bar's platter is
-// rebuilt on every re-host, and this title view - laid out once by the app for
-// the compatibility layout - comes back at the full bar width, swallowing the
-// avatar on its left. Measured by the reader: correct in Standard, broken after
-// a round trip in Liquid Glass. When the view lands at the bar's leading edge
-// the bar is asked to lay out again; each pass is journaled so a failure names
-// the frame it saw.
-// Inside the search title view, the app lays its own search bar out with a
-// negative x on the results screen - measured: {-36, -10, 258, 64} against
-// {4, -10, 218, 64} on Explore - which pushes the capsule under the back
-// button. The bar is kept inside its container: the overshoot goes to x and
-// comes off the width, which lands exactly on the Explore geometry.
+// Inside the search title view the app lays its own search bar out with a
+// negative x on the results screen, which pushes the capsule under the back
+// button. The overshoot goes to x and comes off the width.
 %hook TFNSearchBar
 
 - (void)setFrame:(CGRect)frame {
@@ -2136,11 +2026,9 @@ static UITabBarAppearance* NFBPatchedTabBarAppearance(UITabBarAppearance* appear
 
 %hook TFNNavigationBarSearchView
 
-// The correction lives in setFrame:, never in layoutSubviews. Writing a frame
-// from inside layoutSubviews re-enters the parent's layout, which lays this
-// view out again, which writes the frame again - the reader hit exactly that
-// loop as a freeze. Here the incoming value is adjusted before it lands, and
-// nothing is asked to lay out afterwards.
+// The correction lives in setFrame:, never in layoutSubviews: writing a frame
+// from inside a layout pass re-enters the parent's layout and loops. Here the
+// incoming value is adjusted before it lands.
 - (void)setFrame:(CGRect)frame {
     UIView* view = (UIView*)self;
     if (![BHTSettings boolForKey:@"enable_liquid_glass"] || !view.superview) {
@@ -2155,10 +2043,9 @@ static UITabBarAppearance* NFBPatchedTabBarAppearance(UITabBarAppearance* appear
         %orig(frame);
         return;
     }
-    // Measured on the broken screen: x=20 w=288 in a 440 bar - the view starts
-    // at the leading margin, over the avatar that sits at x=20..64 of the same
-    // bar. When the incoming frame lands in that zone it is moved out by the
-    // overlap and the width gives the same amount back.
+    // The view can start at the bar's leading margin, over the avatar that sits
+    // there. A frame landing in that zone is moved out by the overlap, and the
+    // width gives the same amount back.
     CGRect inBar = [view.superview convertRect:frame toView:bar];
     const CGFloat avatarTrailing = 64.0;
     const CGFloat gap = 16.0;
@@ -2211,10 +2098,9 @@ static UITabBarAppearance* NFBPatchedTabBarAppearance(UITabBarAppearance* appear
 
 %hook UITabBar
 
-// The bar built for the Liquid Glass style carries its own colours and has to
-// pass through untouched. Without this guard the appearance set on it went
-// straight back through NFBPatchedTabBarAppearance, which forces labelColor -
-// the black icons the reader reported.
+// The bar built for the Liquid Glass style carries its own colours and passes
+// through untouched. Without this guard its appearance goes back through
+// NFBPatchedTabBarAppearance, which forces labelColor.
 - (void)didMoveToWindow {
     %orig;
     if (!NFBIsOurGlassBar(self)) {
@@ -2249,18 +2135,9 @@ static UITabBarAppearance* NFBPatchedTabBarAppearance(UITabBarAppearance* appear
 
 %end
 
-// Belt and braces for the bird: a colour can be picked while the timeline is
-// off-screen, so also re-apply on every navigation-bar layout. Cheap, and it
-// means returning to the timeline is already enough — no tab switch needed.
-// Whitens the confirm-side glyphs while the theme screen is frontmost. The
-// VC's own viewDidLayoutSubviews misses BAR-INTERNAL relayouts (Twitter swaps
-// or re-bakes the confirm without touching the VC's view) — which is exactly
-// when the grey frame slipped through. The bar's layout is the right moment.
-// The canonical white bake: draw the original, then sourceIn-fill white — every
-// opaque pixel becomes white, alpha preserved, rendering mode plain. Immune to
-// the imageWithTintColor quirks (its result can stay template and re-tint with
-// the view's tint — the accent — which produced the grey AND, when tint reset,
-// the black frames). Shared with Branding so the FAB glyph uses the same bake.
+// The canonical white bake: draw the original, then sourceIn-fill white, so every
+// opaque pixel becomes white with alpha preserved and the rendering mode plain. An
+// imageWithTintColor result can stay template and re-tint with the view's tint.
 UIImage* NFBWhiteBakedGlyph(UIImage* image) {
     UIGraphicsImageRendererFormat* format =
         [UIGraphicsImageRendererFormat preferredFormat];
@@ -2275,13 +2152,9 @@ UIImage* NFBWhiteBakedGlyph(UIImage* image) {
             [[UIColor whiteColor] setFill];
             CGContextFillRect(ctx.CGContext, rect);
         }];
-    // The confirm lives in a SwiftUI glass platter
-    // (NavigationBarPlatterRepresentable → _UIModernBarButton), and a bar
-    // button treats an AUTOMATIC-mode image as a TEMPLATE — the pixels are an
-    // alpha mask, re-tinted by the button per its contrast rule.
-    // AlwaysOriginal forbids the re-tint: what is baked is what renders; a
-    // plain rendered bitmap accepts the mode change, an imageWithTintColor
-    // result does not.
+    // A bar button treats an automatic-mode image as a template and re-tints it
+    // per its contrast rule. AlwaysOriginal forbids that: a plain rendered bitmap
+    // accepts the mode change, an imageWithTintColor result does not.
     return [baked imageWithRenderingMode:UIImageRenderingModeAlwaysOriginal];
 }
 
@@ -2294,11 +2167,9 @@ static char kNFBWhiteBakedKey;
 
 static char kNFBConfirmGlassCapKey;
 
-// Force the confirm platter's glass to iOS system blue — its native colour —
-// while the app's window tint stays Twitter blue for the tab. The glyph is
-// already baked white. Same proven trick as the FAB: tint the glass material
-// and lay an opaque disc over it so the Twitter-blue tint can't bleed through.
-// Scoped to the confirm button's own subtree, so no other glass is touched.
+// Forces the confirm platter's glass to iOS system blue while the window tint
+// stays Twitter blue for the tab: the glass material is tinted and an opaque disc
+// laid over it. Scoped to the confirm button's own subtree.
 static void NFBTintConfirmGlassBlue(UIView* container) {
     UIColor* blue = [UIColor systemBlueColor];
     for (UIView* sub in container.subviews) {
@@ -2392,17 +2263,15 @@ void NFBWhitenNavigationBarConfirm(UINavigationBar* bar) {
 - (void)layoutSubviews {
     %orig;
     NFBWhitenNavigationBarConfirm(self);
-    // Target topItem.titleView specifically: that IS the logo container, so
-    // converting it to a template image here is safe — unlike sweeping any
-    // image view, which would flatten avatars into silhouettes. And at layout
-    // time the bounds are finally real, which setTitleView: cannot offer.
+    // topItem.titleView is the logo container, so converting it to a template here
+    // is safe, unlike sweeping any image view. At layout time the bounds are real,
+    // which setTitleView: cannot offer.
     UIView* titleView = self.topItem.titleView;
     if (titleView) {
         UIImageView* logo = NFBFindLogoImageView(titleView);
-        // Logo-sized only, and tested HERE because bounds are real at layout
-        // time. Without this guard the search screen's title view qualified:
-        // its first image view is the search pill's stretchable BACKGROUND,
-        // which then got template-converted and painted with the accent.
+        // Logo-sized only, tested here because bounds are real at layout time.
+        // Without the guard the search title view qualifies: its first image view
+        // is the search pill's stretchable background.
         if (logo && logo.bounds.size.width > 0 && logo.bounds.size.width < 60) {
             NFBTopBarLogoView = logo;
             NFBRegisterLogoView(logo);
@@ -2416,10 +2285,9 @@ void NFBWhitenNavigationBarConfirm(UINavigationBar* bar) {
 
 %end
 
-// Safety net for containers not known by name. For a few seconds after any
-// accent change, every controller that appears re-applies the accent to the
-// chrome that is now on screen — which is exactly the moment of return from
-// the settings screen. Outside that window this costs a single float compare.
+// Safety net for containers not known by name: for a few seconds after an accent
+// change, every controller that appears re-applies it to the chrome on screen.
+// Outside that window this costs a single float compare.
 %hook UIViewController
 
 - (void)viewDidAppear:(BOOL)animated {
@@ -2452,13 +2320,9 @@ void NFBWhitenNavigationBarConfirm(UINavigationBar* bar) {
 
 %end
 
-// Twitter BAKES the tab icon's colour into the image itself
-// (tfn_vectorImageNamed:...fillColor:, and addDynamicColorInfo registers it for
-// the manager's re-bake — the binary even carries _tae_resetColor_tabBarItemColor).
-// A baked image ignores tintColor and UITabBarAppearance, which is why every
-// repaint the tweak pushed only showed up on the next re-bake: a tab change. Templating
-// the images as they are installed flips them to tint-driven — the appearance
-// patcher and the live tint updates then control them instantly, both directions.
+// Twitter bakes the tab icon's colour into the image itself, and a baked image
+// ignores tintColor and UITabBarAppearance. Templating the images as they are
+// installed makes them tint-driven, in both directions.
 %hook UITabBarItem
 
 - (id)initWithTitle:(NSString*)title image:(UIImage*)image tag:(NSInteger)tag {

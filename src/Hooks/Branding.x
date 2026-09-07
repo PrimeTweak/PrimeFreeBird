@@ -13,14 +13,10 @@ extern char NFBConfirmGlyphTag;
 extern NSInteger NFBColorThemeScreenVisible;
 
 // MARK: - Restore Twitter terminology
-// Two layers, both driven by locale files in the tweak bundle:
-//   1. RenameOverrides.strings — Twitter localization key -> exact replacement,
-//      a missing key falls through to the generic replacement
-//   2. RenameWords.strings — generic word replacements ("X" -> "Twitter",
-//      "Post" -> "Tweet", etc.) applied to localized and server-side strings
-// Both are strictly per-language: a language without its own copy of a file
-// gets no renaming from that layer, rather than English rules applied to
-// non-English text.
+
+// Two layers from the bundle's locale files: RenameOverrides.strings maps a
+// localization key to an exact replacement, RenameWords.strings holds generic word
+// replacements. Both are per-language, with no fallback to English rules.
 
 static NSDictionary<NSString*, NSString*>* RenameTable(NSString* name) {
     NSBundle* bundle = [BHTBundle sharedBundle].mainBundle;
@@ -215,9 +211,9 @@ static NSAttributedString* RestoreTwitterAttributed(NSAttributedString* input) {
 }
 
 // MARK: - Rename localized strings
-// Every UI string routes through this Foundation method in 12.3, so the rename
-// applies broadly. Skip the tweak's own bundle so the tweak's strings aren't
-// reprocessed.
+
+// Every UI string routes through this Foundation method, so the rename applies
+// broadly. The tweak's own bundle is skipped so its strings are not reprocessed.
 %hook NSBundle
 - (NSString*)localizedStringForKey:(NSString*)key
                              value:(NSString*)value
@@ -237,10 +233,10 @@ static NSAttributedString* RestoreTwitterAttributed(NSAttributedString* input) {
 %end
 
 // MARK: - Rename server-composed text
-// TFNAttributedTextView renders chrome and server-composed URT text that
-// carries no localization key, out of the NSBundle hook's reach. The
-// TTAStatusBodyAttributedTextView subclass (tweet bodies) is skipped so a
-// user's own words aren't mangled.
+
+// TFNAttributedTextView renders text carrying no localization key, out of the
+// NSBundle hook's reach. The tweet-body subclass is skipped so a user's own words
+// are not mangled.
 %hook TFNAttributedTextView
 - (void)setTextModel:(TFNAttributedTextModel*)model {
     if (!model || !model.attributedString) {
@@ -285,9 +281,9 @@ static NSAttributedString* RestoreTwitterAttributed(NSAttributedString* input) {
 %end
 
 // MARK: - Label the "new posts" refresh pill
-// The facepile pill variant hardcodes blank text (no feature flag gates it).
-// The tweak ships the label in the app's terminology and routes it through the
-// rename pipeline, so "restore_twitter_names" converts it per-language.
+
+// The facepile pill variant hardcodes blank text. The label is shipped in the app's
+// terminology and routed through the rename pipeline, so it converts per-language.
 static NSString* PillLabelText(void) {
     NSString* label =
         [[BHTBundle sharedBundle] localizedStringForKey:@"REFRESH_PILL_TEXT"];
@@ -325,10 +321,9 @@ static NSString* PillLabelText(void) {
 
 // MARK: - Classic compose button
 
-// Two pieces restore the bird-era Tweet button: the "plus" vector glyph is
-// remapped to the classic feather ("quill") rendered in white, and the FAB
-// itself is painted Twitter blue. The FAB is located heuristically: a round
-// square control at least 50pt wide inside the tab bar controller's view.
+// Two pieces restore the bird-era Tweet button: the plus glyph is remapped to the
+// quill in white, and the FAB is painted Twitter blue. The FAB is found as a round
+// square control at least 50 pt wide inside the tab bar controller's view.
 
 static UIColor* NFBTwitterBlue(void) {
     return [UIColor colorWithRed:0x1D / 255.0
@@ -391,41 +386,29 @@ static id NFBNamedVector(id image, id name) {
 // Tag set on the FAB's glyph image views so the UIImageView hook below can
 // recognise them in O(1) and keep swapped-in images template+white.
 static char kNFBFABGlyphKey;
-// Shared (non-static) so ColorThemeViewController can tag the confirm glyph:
-// once tagged, the setImage: hook below whitens Twitter's re-bakes before
-// their first render — no more timed races.
-// Set while the tweak's code installs an effect, so the setEffect: hook lets it pass —
-// Without it the setEffect: hook swallows and re-tints in a loop, eating the
-// own reinstalls: the material never got tinted all session.
+// Set while an effect is being installed here, so the setEffect: hook lets it
+// through. Without it that hook swallows and re-tints in a loop, and the material
+// is never tinted.
 static BOOL NFBEffectInstallAllowed;
 // What the tweak last installed. UIVisualEffectView.effect vends copies whose
 // tintColor does not round-trip, so the getter can never be trusted for
 // mismatch detection — compare against this shadow instead.
 static char kNFBFABGlassShadowTintKey;
-// The opaque colour cap inside the material's contentView. Snapshots render
-// glass materials blank-white — the transition copies iOS draws during tab
-// changes — while plain layers snapshot correctly, so the cap is what keeps
-// the snapshot coloured.
+// The opaque colour cap inside the material's contentView. Snapshots render glass
+// materials blank-white while plain layers snapshot correctly, so the cap is what
+// keeps the snapshot coloured.
 static char kNFBFABGlassCapKey;
 // Tag for the FAB's glass material so the layout guard below can re-assert its
 // colour the instant anything clears it.
 static char kNFBFABGlassKey;
 
-// One place to colour the FAB's glass — three layers, because the system can
-// re-render the material itself during transitions:
-// 1. the effect's own tint when the runtime exposes one (the native Liquid
-//    Glass path — lives INSIDE the material, survives its animations),
-// 2. the effect view's backgroundColor (a plain layer that renders even when
-//    the material is snapshotted or drawn blank),
-// 3. the contentView colour (the original approach, kept).
+// One place to colour the FAB's glass, in three layers since the system can
+// re-render the material during transitions: the effect's own tint, the effect
+// view's backgroundColor, and the contentView colour.
 static void NFBColorFABGlass(UIVisualEffectView* effect, UIColor* blue) {
-    // Keep the material tinted at all times (an untinted material renders
-    // opaque light, covering even the coloured background beneath), but
-    // re-assign only on an actual mismatch and with all implicit animation
-    // disabled — each effect re-assignment triggers an animated rebuild that
-    // flashes the glyph black.
-    // The setEffect: hook below handles the system's own re-installs, so this
-    // path should stay quiet outside launch.
+    // The material is kept tinted at all times, since an untinted one renders
+    // opaque light over the coloured background. Re-assigned only on a mismatch and
+    // without implicit animation: a re-assignment rebuilds and flashes the glyph.
     UIVisualEffect* fx = effect.effect;
     UIColor* lastInstalled = objc_getAssociatedObject(effect, &kNFBFABGlassShadowTintKey);
     if (fx && [fx respondsToSelector:@selector(setTintColor:)] &&
@@ -466,12 +449,9 @@ static void NFBColorFABGlass(UIVisualEffectView* effect, UIColor* blue) {
     }
 }
 
-// The compose FAB is Twitter's brand button — its base colour is Twitter blue,
-// never iOS systemBlue. Use the accent only when the user ACTUALLY picked one
-// (custom hex, a swatch, or Twitter's own non-default option). On a fresh
-// install or right after a reset the palette can briefly resolve option 0 to
-// systemBlue via CurrentAccentColor's fallback — that iOS-blue leak was the FAB
-// bug. Forcing Twitter blue here keeps the FAB on-brand in every no-accent state.
+// The compose FAB is a brand button: its base colour is Twitter blue, never iOS
+// systemBlue. The accent is used only when one was actually picked, since without
+// that the palette can resolve option 0 to systemBlue through the fallback.
 static UIColor* NFBFABBlueColor(void) {
     extern UIColor* CurrentAccentColor(void);
     NSUserDefaults* d = NSUserDefaults.standardUserDefaults;
@@ -552,11 +532,9 @@ static __weak UIView* NFBComposeFABView;
 // Called from NFBSyncAccentTheme (Theme.x) right after the accent changes.
 void NFBRestyleComposeFAB(void) {
     void (^run)(void) = ^{
-        // The cached handle is only a fast path: while the settings screen is
-        // pushed, the timeline's views are detached (window == nil) and the FAB
-        // is often rebuilt on the way back — so a stale or detached reference is
-        // normal. Restyle it unconditionally, then sweep the live hierarchy so
-        // whichever FAB is actually on screen also gets the new accent.
+        // The cached handle is only a fast path: with the settings screen pushed,
+        // the timeline's views are detached and the FAB is often rebuilt, so a stale
+        // reference is normal. The live hierarchy is swept afterwards.
         UIView* known = NFBComposeFABView;
         if (known) {
             styleComposeFAB(known);
@@ -588,11 +566,9 @@ void NFBRestyleComposeFAB(void) {
     }
 }
 
-// Hiding the compose button is independent of restyling it: styleComposeFAB
-// only paints, and returns early when the classic button is off. The tweak tracks
-// whether the tweak hid the button so turning the option back off restores it —
-// without ever forcing it visible on an untouched button (Twitter fades
-// the FAB itself in places, and fighting that would flicker).
+// Hiding the compose button is independent of restyling it: styleComposeFAB only
+// paints. Whether the button was hidden here is recorded, so turning the option
+// off restores it without forcing an untouched button visible.
 static const void* kNFBFABHiddenByUsKey = &kNFBFABHiddenByUsKey;
 
 static void nfbApplyComposeFABVisibility(UIView* fab) {
@@ -639,10 +615,9 @@ static void nfbApplyComposeFABVisibility(UIView* fab) {
     nfbApplyComposeFABVisibility((UIView*)self);
 }
 
-// The glass material and the glyph arrive as SUBVIEWS after the button is
-// attached; willMoveToWindow: ran too early to see them. Styling the instant
-// they land colours them within the same transaction — before their first
-// frame, which was the last visible blink.
+// The glass material and the glyph arrive as subviews after the button is
+// attached, which willMoveToWindow: is too early to see. Styling them as they land
+// colours them within the same transaction, before their first frame.
 - (void)didAddSubview:(UIView*)subview {
     %orig;
     styleComposeFAB((UIView*)self);
@@ -657,17 +632,14 @@ static void nfbApplyComposeFABVisibility(UIView* fab) {
 
 %end
 
-// Twitter swaps the glyph IMAGE on an existing image view during tab
-// transitions; new subviews were covered, image replacements were not — that
-// was the frame still blinking. Only views styleComposeFAB has tagged are
-// touched, so elsewhere this costs a single associated-object lookup.
+// Twitter swaps the glyph image on an existing image view during tab transitions,
+// which the subview hook above does not cover. Only views styleComposeFAB has
+// tagged are touched, so elsewhere this costs one associated-object lookup.
 %hook UIImageView
 
-// The glyph often sits inside the glass material's contentView, where the
-// FAB's own didAddSubview: never fires — a brand-new button could therefore
-// show one untagged, untemplated (black) frame. Tag and template at attach,
-// within the same transaction, before the first frame. The ancestor walk is
-// six levels at most and only runs for image views entering a window.
+// The glyph often sits inside the glass material's contentView, where the FAB's
+// own didAddSubview: never fires. Tagged and templated at attach, in the same
+// transaction; the ancestor walk is six levels at most.
 - (void)willMoveToWindow:(UIWindow*)newWindow {
     %orig;
     if (!newWindow || objc_getAssociatedObject(self, &kNFBFABGlyphKey) ||
@@ -693,10 +665,9 @@ static void nfbApplyComposeFABVisibility(UIView* fab) {
 }
 
 - (void)setImage:(UIImage*)image {
-    // Bake at the SETTER: whoever writes last, the pixels that land are white.
-    // This ends the pass-ordering race that kept resurrecting the dark check
-    // (yellow) and the black FAB frames — a template glyph is only white while
-    // its tint survives; a baked one has nothing left to lose.
+    // Baked at the setter, so the pixels that land are white whoever writes last.
+    // A template glyph is only white while its tint survives; a baked one has
+    // nothing left to lose.
     if (image && objc_getAssociatedObject(self, &kNFBFABGlyphKey)) {
         image = NFBWhiteBakedGlyph(image);
     } else if (image && objc_getAssociatedObject(self, &NFBConfirmGlyphTag) &&
@@ -714,16 +685,14 @@ static void nfbApplyComposeFABVisibility(UIView* fab) {
 
 %end
 
-// Same principle as the glyph, applied to the DISC: during a tab transition the
-// glass material can arrive as a fresh UIVisualEffectView whose contentView the tweak
-// only coloured at the next styling pass — one glassy-white frame, the flick
-// that remains. Colour it the instant it enters a window, same transaction.
+// The same principle applied to the disc: during a tab transition the glass
+// material can arrive as a fresh UIVisualEffectView, coloured only at the next
+// styling pass. It is coloured as it enters a window, in the same transaction.
 %hook UIVisualEffectView
 
-// The system re-installs the material's effect on each tab transition.
-// Tinting the INCOMING
-// effect right here means the reset itself installs a coloured material — no
-// extra assignment from the tweak, no rebuild of the tweak's own, no untinted frame.
+// The system re-installs the material's effect on each tab transition. Tinting the
+// incoming effect here means the reset itself installs a coloured material, with no
+// extra assignment and no rebuild.
 - (void)setEffect:(UIVisualEffect*)effect {
     if (effect && objc_getAssociatedObject(self, &kNFBFABGlassKey) &&
         [BHTSettings boolForKey:@"restore_tweet_button"] &&

@@ -72,10 +72,9 @@ static NSString* const ReplyReadScript =
     @"v=sessionStorage.getItem('__bhtNewReply')||'';sessionStorage.removeItem('__bhtNewReply');"
     @"return v;})();";
 
-// Injected on the reply page: hide only x.com's app-install / sign-in promo banners and the web
-// back arrow. x.com's compose toolbar and layout are left untouched — x.com
-// keeps its toolbar above the keyboard by itself (exactly like the real x.com mobile web), and
-// fighting it with the tweak's own CSS is what caused every positioning bug.
+// Injected on the reply page: hides only the promo banners and the web back arrow.
+// The compose toolbar and layout are left untouched, since x.com keeps its toolbar
+// above the keyboard by itself.
 static NSString* const ReplyStyleScript =
     @"(function(){var css='"
     @"[data-testid=\"app-promo-banner\"],div[role=\"dialog\"] a[href*=\"apple.com\"],"
@@ -87,10 +86,9 @@ static NSString* const ReplyStyleScript =
     @"s.id='nfb-reply-style';s.innerHTML=css;"
     @"if(!s.parentNode){(document.head||document.documentElement).appendChild(s);}})();";
 
-// Injected on the reply page: poll for the compose box (it renders async) and report it ready
-// (nfbReady → reveal). It does NOT focus anymore: focus is issued natively AFTER the icon bar is
-// built, so the keyboard's very first presentation already includes the bar — one keyboard event,
-// one layout, no late bounce.
+// Injected on the reply page: polls for the compose box, which renders async, and
+// reports it ready. Focus is issued natively after the icon bar is built, so the
+// keyboard's first presentation already includes it.
 static NSString* const ReplyFocusScript =
     @"(function(){var n=0;"
     @"function box(){return document.querySelector('div[role=\"textbox\"]')"
@@ -115,24 +113,9 @@ static NSString* const ReplyTapDismissScript =
     @"if(b&&!b.contains(e.target)&&!(t&&t.contains(e.target))){"
     @"var a=document.activeElement;if(a&&a.blur){a.blur();}}},true);})();";
 
-// Injected on the reply page. The web view is FULL HEIGHT and never resized, with NO manual
-// insets — WKWebView's own keyboard inset and focused-field reveal do the heavy lifting. Native
-// code only forwards keyboard events: window.__nfbKb(up, keyboardOverlap). THE SIMPLE CONTRACT
-// Spec: the reply box stays IN FLOW with the tweet, never docked, never
-// restyled.
-// Keyboard UP → clear any Show-more pin, then vfix(): a WIDTH-SAFE vertical collapse of the field
-// (min-height:0 + height:auto everywhere; flex-grow:0 ONLY on column-direction parents so a row's
-// width flex is never touched (killing a row's flex blanks the field); plus a
-// max-height cap on the field if still tall). This removes the ~700px x.com reserves under the
-// focused field, which was pushing the tweet far above the composer. Then place() runs
-// IMMEDIATELY — trim + geometry report + scroll aligning the field's bottom just above the
-// keyboard — and re-asserts at +60/+250ms. The re-asserts are idempotent no-ops once geometry is
-// settled (trim: trail already <=24; nfbGeo: excess already <=8; scrollTo: same target), so they
-// can never fight or vibrate. place() runs immediately, not deferred: a deferred-only pass
-// leaves WebKit's instant, un-animated placement (see CALayer hook) visible until it runs.
-// Keyboard DOWN (Show more) →
-// unchanged, confirmed-good: content fits → composer in flow under the tweet; overflows → pinned
-// to the screen bottom.
+// The web view is full height and never resized, with no manual insets: WKWebView's
+// own keyboard inset and focused-field reveal do the work, and native code only
+// forwards keyboard events. The reply box stays in flow with the tweet.
 static NSString* const ReplyBarPinScript =
     @"(function(){if(window.__nfbKbInit)return;window.__nfbKbInit=1;window.__nfbColl=[];"
     @"function findBox(){"
@@ -223,12 +206,9 @@ static __weak UIScrollView* gNFBReplyScroller = nil;   // identity for the CALay
 static int gNFBAnimsKilled = 0;
 static CFTimeInterval gNFBSquelchUntil = 0;   // drop bounds.origin animations before this time
 
-// ---------------------------------------------------------------------------
-// NATIVE compose icon bar. x.com's real WEB toolbar can't be glued to the
-// keyboard. Instead the tweak extracts x.com's REAL toolbar SVG icons
-// and show them in a small WKWebView that IS the keyboard's inputAccessoryView —
-// WebKit renders the SVGs live (no snapshot), and taps relay to x.com's hidden
-// real buttons. Auto-shown when the keyboard is up, gone on "Show more".
+// Native compose icon bar. The web toolbar cannot be glued to the keyboard, so the
+// real toolbar SVGs are shown in a small WKWebView that is the keyboard's
+// inputAccessoryView, with taps relayed to the hidden real buttons.
 static WKWebView* gNFBIconBar = nil;           // the icon-bar web view = the accessory
 static __weak WKWebView* gNFBRelayWebView = nil;
 
@@ -384,12 +364,9 @@ static void showPostSentAlert(NSString* statusID) {
 }
 @end
 
-// Custom reply web view. Instead of leaning on T1WebViewController's shouldAuthenticate
-// path (which doesn't surface the web session on a sideloaded build → black screen), this
-// seeds the harvested session cookies straight into its own cookie store, then loads. It
-// also owns its spinner/background and the capture/read scripts. The web view stays hidden
-// (alpha 0, spinner over a plain background) until the composer is actually ready, so the
-// user never sees x.com's loading splash / flicker — then it fades in.
+// Custom reply web view. T1WebViewController's shouldAuthenticate path does not
+// surface the web session on a sideloaded build, so the harvested cookies are
+// seeded into its own store. It stays hidden until the composer is ready.
 @interface BHTReplyWebViewController : UIViewController <WKNavigationDelegate, WKScriptMessageHandler>
 @property(nonatomic, copy) NSString* statusID;
 @property(nonatomic, strong) WKWebView* webView;
@@ -418,10 +395,9 @@ static void showPostSentAlert(NSString* statusID) {
     NFBWeakScriptMessageHandler* readyProxy = [[NFBWeakScriptMessageHandler alloc] init];
     readyProxy.target = self;
     [configuration.userContentController addScriptMessageHandler:readyProxy name:@"nfbReady"];
-    // Injected BEFORE x.com's code runs: replace visualViewport with a static fake. x.com's own
-    // keyboard handlers subscribe to an object that never changes, so the page never fights the tweak's
-    // scroll when the keyboard moves (its visualViewport listener was one of the three competing
-    // scrollers in the recordings). All fields present so their reads never throw.
+    // Injected before the page's own code runs: visualViewport is replaced with a
+    // static stand-in, so the page's keyboard handlers subscribe to an object that
+    // never changes. All fields are present so their reads never throw.
     WKUserScript* vvFreeze = [[WKUserScript alloc]
         initWithSource:
             @"(function(){try{"
@@ -531,11 +507,9 @@ static void showPostSentAlert(NSString* statusID) {
         // (one keyboard event, one layout — the late bar attach was the post-open bounce).
         [self nfbFocusComposeIfNeeded];
     } else if ([message.name isEqualToString:@"nfbGeo"]) {
-        // Native scroll-range clamp (measured, not guessed). The page reports where the composer
-        // actually ends (document points); the tweak compares the scroll view's REAL max offset against
-        // "composer bottom at the keyboard top" and subtract the exact excess from the inset —
-        // negative insets are valid and only trim range. Idempotent (excess≈0 → no-op) and reset
-        // when the keyboard hides, so Show more never sees it.
+        // Native scroll-range clamp: the page reports where the composer ends, and
+        // the excess over "composer bottom at the keyboard top" is subtracted from
+        // the inset. Idempotent, and reset when the keyboard hides.
         if (gNFBLastKbOverlap <= 60) { return; }  // only meaningful with the keyboard up
         CGFloat bb = [message.body doubleValue] * self.webView.scrollView.zoomScale;
         if (bb <= 0) { return; }
@@ -579,11 +553,9 @@ static void showPostSentAlert(NSString* statusID) {
         name:UIKeyboardWillHideNotification object:nil];
 }
 
-// The web view stays FULL HEIGHT, never resized. NO manual contentInset either: WKWebView applies
-// its OWN keyboard inset + focused-field reveal internally, so setting the tweak's on top DOUBLED the
-// bottom inset — that was the too-long scroll range / wrong scrollbar zone on keyboard-up (Show
-// more was clean because both insets are zero with the keyboard down), and the double adjustment
-// was the small return bounce. This handler now only forwards keyboard events to the page script.
+// The web view stays full height with no manual contentInset: WKWebView applies its
+// own keyboard inset and focused-field reveal, and adding another doubles it. This
+// handler only forwards keyboard events to the page script.
 - (void)nfbKeyboardWillChangeFrame:(NSNotification*)note {
     CGRect endFrame = [note.userInfo[UIKeyboardFrameEndUserInfoKey] CGRectValue];
     BOOL hiding = [note.name isEqualToString:UIKeyboardWillHideNotification];
@@ -664,10 +636,9 @@ static void showPostSentAlert(NSString* statusID) {
         return;
     }
 
-    // Compose page: hide promo banners, pin the toolbar above the keyboard, then focus the box.
-    // Compose page: hide promo banners, then drop the cursor into the box. The compose box is
-    // pinned to the bottom ONLY when the keyboard is down ("Show more"); while typing it scrolls
-    // naturally with the tweet (pinning a focused field floats it and flickered).
+    // Compose page: hide the promo banners, then drop the cursor into the box. The
+    // box is pinned to the bottom only with the keyboard down; while typing it
+    // scrolls with the tweet, since pinning a focused field floats it.
     [webView evaluateJavaScript:ReplyStyleScript completionHandler:nil];
     [webView evaluateJavaScript:ReplyTapDismissScript completionHandler:nil];
     [webView evaluateJavaScript:ReplyBarPinScript completionHandler:nil];
@@ -726,13 +697,9 @@ static void ensureSessionThenOpenReply(NSString* statusID) {
 
 // MARK: - Hooks
 
-// The inline reply button has no dedicated ObjC subclass in 12.3; every inline
-// reply tap funnels through this handler with the status being replied to.
-// WebKit reveals the reply field with a PAIR of CABasicAnimations on the scroll
-// view LAYER — bounds.origin (the -173 pan) and its twin bounds.size. During the
-// keyboard-up window, on the tweak's scroller's layer only, those two are dropped so they
-// are never installed. Every other layer / keyPath, and (window zeroed) Show
-// more, are untouched.
+// The inline reply button has no dedicated ObjC subclass; every tap funnels through
+// this handler. WebKit reveals the field with a pair of animations on the scroll
+// view layer, dropped here during the keyboard-up window on that layer only.
 %hook CALayer
 - (void)addAnimation:(CAAnimation*)anim forKey:(NSString*)key {
     if (gBHTReplyWebViewActive && gNFBReplyScroller
@@ -815,15 +782,9 @@ static void ensureSessionThenOpenReply(NSString* statusID) {
 }
 %end
 
-// Let the injected focus() raise the keyboard without a user tap. The tweak swizzles the private
-// WKContentView focus callback and force userIsInteracting:YES — but only while the tweak's reply
-// web view is on screen (gBHTReplyWebViewActive), so nothing else in the app is affected.
-//
-// This is done with method_setImplementation (not %hook) on purpose: the first parameter is
-// a C++ reference, not an Objective-C object, so it MUST be typed void* — otherwise ARC
-// tries to retain/release it and crashes. The selector has been
-// stable since iOS 13; when missing, no swizzle is installed and focus still works
-// (keyboard then needs one tap).
+// Lets the injected focus() raise the keyboard without a tap, only while the reply
+// web view is on screen. method_setImplementation, not %hook: the first parameter
+// is a C++ reference and must be typed void*, or ARC retains it and crashes.
 %ctor {
     @autoreleasepool {
         Class contentViewClass = NSClassFromString(@"WKContentView");
@@ -851,11 +812,9 @@ static void ensureSessionThenOpenReply(NSString* statusID) {
         });
         method_setImplementation(focusMethod, overrideIMP);
 
-        // Remove the form-assistant bar (the translucent "^ v Done" pill above the keyboard)
-        // while the tweak's reply web view is on screen: return nil from WKContentView's
-        // inputAccessoryView. Dismissing the keyboard still works — tap anywhere outside the
-        // compose box (handled by ReplyTapDismissScript). Only swizzle if WKContentView
-        // implements it itself, so the tweak never touches UIResponder's inputAccessoryView app-wide.
+        // Removes the form-assistant bar while the reply web view is on screen, by
+        // returning nil from WKContentView's inputAccessoryView. Swizzled only if
+        // WKContentView implements it itself, never UIResponder's.
         SEL accessorySel = @selector(inputAccessoryView);
         unsigned int methodCount = 0;
         Method* methods = class_copyMethodList(contentViewClass, &methodCount);

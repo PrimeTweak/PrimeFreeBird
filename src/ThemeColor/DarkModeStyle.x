@@ -73,12 +73,9 @@ typedef NS_ENUM(NSInteger, NFBBackgroundTier) {
     NFBBackgroundTierSelected   // Pressed rows, unread, highlighted Tweets
 };
 
-// Opaque and achromatic is what separates background chrome from everything
-// else: a color with real hue is media, a brand card or an accent, and
-// flattening it onto the background loses that. Brightness alone cannot tell
-// them apart, which is why the spread between the strongest and weakest
-// component is measured first. Above the ceiling the color is a fill or a
-// separator that has to stay legible, so it is left alone as well.
+// Opaque and achromatic separates background chrome from media, brand cards and
+// accents, which carry real hue. Brightness alone cannot tell them apart, so the
+// spread between the strongest and weakest component is measured first.
 static const CGFloat kNFBChromaAllowance = 0.04;
 static const CGFloat kNFBDarkCeiling = 0.22;
 static const CGFloat kNFBBaseCeiling = 0.05;
@@ -136,10 +133,9 @@ static UIColor* NFBColorWithRGB(uint32_t rgb) {
                            alpha:1.0];
 }
 
-// Each style is a ladder of three shades. The rungs are spaced by perceived
-// lightness rather than by raw value — about five points of L* apart — which is
-// what decides whether the eye separates two dark tones. Pure black keeps an
-// exact #000000 base for OLED screens and lifts only what sits above it.
+// Each style is a ladder of three shades, spaced by perceived lightness rather than
+// raw value, about five points of L* apart. Pure black keeps an exact #000000 base
+// and lifts only what sits above it.
 + (UIColor*)shadeForTier:(NFBBackgroundTier)tier style:(NFBDarkModeStyle)style {
     if (style == NFBDarkModeStylePureBlack) {
         switch (tier) {
@@ -265,11 +261,10 @@ static UIColor* NFBReplacement(UIColor* incoming) {
 %end
 
 // MARK: - Search pill
-//
-// The search pill on the settings and Explore screens is a stretchable
-// background image owned by UIKit's private image view, not a color any setter
-// carries, so no filter reaches it. It is redrawn here in the elevated shade
-// with round caps that survive the stretch, and rebuilt when the style changes.
+
+// The search pill is a stretchable background image owned by a private image view,
+// not a colour any setter carries, so no filter reaches it. Redrawn here in the
+// elevated shade with round caps that survive the stretch.
 
 static UIImage* NFBSearchPillImage(void) {
     static UIImage* cached = nil;
@@ -322,10 +317,9 @@ static BOOL NFBIsSearchFieldBackground(UIView* view) {
     return NO;
 }
 
-// The bar that carries a search field — settings, Explore — is drawn with a
-// blur, so no color setter reaches it and the filter leaves it in Twitter's own
-// gray beside a recolored page. It is flattened here, from the search field
-// upward: a bar with no search field is never touched.
+// A bar carrying a search field is drawn with a blur, so no colour setter reaches
+// it and it stays in Twitter's grey beside a recoloured page. Flattened here from
+// the search field upward; a bar without one is never touched.
 static void NFBPaintBarOpaque(UIView* view, UIColor* shade) {
     if ([view isKindOfClass:[UIVisualEffectView class]]) {
         ((UIVisualEffectView*)view).effect = nil;

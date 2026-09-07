@@ -23,11 +23,9 @@ extern UIColor* CurrentAccentColor(void);
 extern NSArray<NSDictionary*>* NFBHiddenThreads(void);
 extern void NFBUnhideThread(NSString* threadID);
 
-// The table's layout margins resolve to about 20 points inside a cell and
-// about 8 on the bare view a section header is built from, putting headers
-// and their rows on two different verticals — and neither matches the 10
-// points the rest of the settings uses (ModernSettingsCells). One number,
-// applied everywhere.
+// The table's layout margins resolve to about 20 points inside a cell and about 8
+// on a section header's bare view, and neither matches the 10 the rest of the
+// settings uses. One number, applied everywhere.
 static const CGFloat kNFBMutedSideMargin = 10.0;
 // A language row's own height, so the switch is spaced like one more entry.
 static const CGFloat kNFBTranslateBarHeight = 44.0;
@@ -367,10 +365,9 @@ NSString* const kNFBMutedIncludeRepostsKey = @"nfb_muted_include_reposts";
     return self;
 }
 
-// The same fonts and palette colours the rest of the settings uses, rather than
-// hard sizes and system greys: a bold title over a subtitle in the theme's own
-// secondary colour. Re-applied on trait changes because a palette colour, unlike
-// secondaryLabelColor, does not follow light and dark on its own.
+// The same fonts and palette colours as the rest of the settings, rather than hard
+// sizes and system greys. Re-applied on trait changes, since a palette colour does
+// not follow light and dark on its own.
 - (void)applyTheme {
     id fontGroup = [BHTManager sharedFontGroup];
     self.titleLabel2.font = [fontGroup performSelector:@selector(bodyBoldFont)];
@@ -414,35 +411,18 @@ NSString* const kNFBMutedIncludeRepostsKey = @"nfb_muted_include_reposts";
 @property (nonatomic, assign) CGFloat pinnedHeaderHeight;
 @end
 
-// The confirm glyph in the navigation bar is baked opaque white by the theme
-// hooks, but only while NFBColorThemeScreenVisible is up — Twitter's settings
-// roots and the tweak's own settings pages raise it, and this screen never did. Left
-// out, the glyph stays a template the glass material blends with the capsule
-// underneath, which is the wash that shows on a light accent and nowhere else.
-// Joining the count is the whole fix: the recipe already exists, this screen
-// simply was not counted.
+// The confirm glyph is baked opaque white by the theme hooks, but only while
+// NFBColorThemeScreenVisible is up. Without joining that count the glyph stays a
+// template that the glass material blends with the capsule underneath.
 extern NSInteger NFBColorThemeScreenVisible;
 
 @implementation MutedWordsViewController
 
 - (void)viewWillAppear:(BOOL)animated {
     [super viewWillAppear:animated];
-    // NOT in compact mode — measured, and this is the whole bar-icon bug.
-    //
-    // Raising this count arms NFBWhitenConfirmGlyphsIn, which white-bakes EVERY
-    // image view sitting in the right-hand 40 % of ANY navigation bar, at any
-    // size under 44 pt. It has no screen test and no button test: the Explore
-    // gear (centre at 398 of 440 = 0.90, 24 pt wide) matches it exactly.
-    //
-    // The full-screen page needs the count: it has a confirm check in its bar,
-    // and a template glyph there washes out against the glass capsule. The
-    // POPOVER has no navigation bar and no check at all — it was arming a
-    // whitener it has no use for.
-    //
-    // And the damage outlives the popover: the baked image is stored as
-    // AlwaysOriginal, so the gear stays white long after the count drops back
-    // to zero. That is why the bug began exactly when Filter was opened from
-    // the timeline, and never healed on its own.
+    // Not in compact mode. Raising this count arms a whitener that bakes every
+    // small image view in the right-hand 40 % of any navigation bar, and the popover
+    // has no bar and no confirm check, so it would arm one it has no use for.
     if (!self.compact) {
         NFBColorThemeScreenVisible++;
         self.raisedThemeCount = YES;
@@ -622,10 +602,9 @@ static NSMutableArray<NSString*>* NFBKeptLanguageList(void) {
         [control.heightAnchor constraintEqualToConstant:controlHeight],
     ]];
     if (self.compact) {
-        // The controller's view IS the table, so a subview of it travels with
-        // the rows unless it is tied to the frame layout guide, which follows
-        // the table's frame instead of its content. The view carries no
-        // surface of its own: the popover's own glass shows through it.
+        // The controller's view is the table, so a subview travels with the rows
+        // unless tied to the frame layout guide. The view carries no surface of its
+        // own, so the popover's glass shows through.
         header.translatesAutoresizingMaskIntoConstraints = NO;
         header.backgroundColor = [UIColor clearColor];
         [self.tableView addSubview:header];
@@ -1129,9 +1108,8 @@ static NSMutableArray<NSString*>* NFBKeptLanguageList(void) {
         NSDictionary* entry = threads[(NSUInteger)indexPath.row];
         NSString* preview = entry[@"preview"];
         NSString* who = entry[@"who"];
-        // The badge is the Words list's kind pill (word / phrase / account); it
-        // only fits a thread when the author was actually resolved. Empty, it
-        // would leave a grey box with nothing in it, so the row shows the
+        // The badge is the Words list's kind pill, which only fits a thread when the
+        // author was resolved. Empty it would leave a grey box, so the row shows the
         // preview alone.
         [cell applyThreadRowWithMargin:[self rowMargin] showBadge:who.length > 0];
         cell.kindLabel.text = who;
@@ -1217,12 +1195,9 @@ static NSMutableArray<NSString*>* NFBKeptLanguageList(void) {
         cell.textLabel.textColor =
             kept ? [UIColor labelColor]
                  : [[UIColor labelColor] colorWithAlphaComponent:0.45];
-        // The system checkmark sits on its own inset, which leaves the right
-        // column ragged against the switch below. Supplying the glyph as an
-        // accessory view puts it on the cell's own margin instead.
-        // Placed by constraint rather than as an accessory: the system gives
-        // an accessory its own inset, which left this column adrift from the
-        // switch pinned below the list.
+        // Placed by constraint rather than as an accessory: the system gives an
+        // accessory its own inset, which leaves this column adrift from the switch
+        // pinned below the list.
         UIImageView* tick = [cell.contentView viewWithTag:kNFBTickTag];
         if (!tick) {
             tick = [[UIImageView alloc] init];

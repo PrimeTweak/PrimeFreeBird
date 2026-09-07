@@ -441,10 +441,9 @@ static void nfbApplySelectedBackground(UITableViewCell* cell) {
             self.titleTrailingToSwitch,
             [self.toggleSwitch.centerYAnchor constraintEqualToAnchor:self.titleLabel.centerYAnchor],
             [self.subtitleLabel.leadingAnchor constraintEqualToAnchor:self.titleLabel.leadingAnchor],
-            // The subtitle stops where the title does, so both share one right
-            // edge and the text wraps at the pill rather than running beneath
-            // it. On a row without a pill the title already stops at the
-            // switch, so nothing there moves.
+            // The subtitle stops where the title does, so both share one right edge
+            // and the text wraps at the pill. On a row without a pill the title
+            // already stops at the switch.
             [self.subtitleLabel.trailingAnchor
                 constraintEqualToAnchor:self.titleLabel.trailingAnchor],
             [self.subtitleLabel.topAnchor constraintEqualToAnchor:self.titleLabel.bottomAnchor
@@ -475,11 +474,9 @@ static void nfbApplySelectedBackground(UITableViewCell* cell) {
     objc_setAssociatedObject(self, @selector(iconImageView), iconName, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
 }
  
-// Child rows (e.g. the per-tab switches under "Hide trending content") sit a
-// step to the right so they read as a sub-category. 34 = 10 base + 24 indent;
-// the subtitle follows because it is pinned to titleLabel.leadingAnchor.
-// cellForRowAtIndexPath calls this on EVERY toggle cell with the row's flag, so
-// a recycled cell always gets the right value (no stale indentation).
+// Child rows sit a step to the right so they read as a sub-category: 34 = 10 base
+// plus 24 indent, with the subtitle following through titleLabel.leadingAnchor.
+// Called on every toggle cell, so a recycled one never keeps a stale indent.
 - (void)setIndented:(BOOL)indented {
     self.titleLeading.constant = indented ? 34.0 : 10.0;
 }
@@ -563,11 +560,9 @@ static void nfbApplySelectedBackground(UITableViewCell* cell) {
 
 #pragma mark - Explore bar
 
-// Lays its subviews out in a flow and reports the resulting height as its own
-// intrinsic size. Auto Layout then sizes the cell through the normal
-// self-sizing path, so the table is never asked to re-measure from inside a
-// layout pass - an update started there lands in the middle of the insert
-// animation and makes the row jump.
+// Lays its subviews out in a flow and reports the resulting height as its intrinsic
+// size, so Auto Layout sizes the cell through the normal self-sizing path. A
+// re-measure started inside a layout pass lands mid-animation and jumps the row.
 @interface NFBTabFlowView : UIView
 @property (nonatomic, assign) CGFloat lineHeight;
 @property (nonatomic, assign) CGFloat gap;
@@ -764,7 +759,7 @@ static void nfbApplySelectedBackground(UITableViewCell* cell) {
 
 // A cell can be recycled while a refusal is still on screen. Without this the
 // next row it serves would open with the count invisible and a red line under
-// tabs the reader never touched.
+// tabs that were never touched.
 - (void)prepareForReuse {
     [super prepareForReuse];
     if (self.hintText) {

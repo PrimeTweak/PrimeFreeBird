@@ -6,12 +6,9 @@
 #import "Core/BHTBundle.h"
 #import "Headers/TFNHeaders.h"
 
-// Password login (no reset), matching 9.67's built-in sign-in:
-//   1. Generate ui_metrics from x.com/i/js_inst (anti-bot token).
-//   2. xauth_password -> OAuth token directly, or a 2FA challenge.
-//   3. On 2FA, present the app's T1LoginChallengeFactory web challenge, which polls
-//   xauth_challenge.
-//   4. Add the account and switch to it.
+// Password login without reset: ui_metrics from x.com/i/js_inst, then
+// xauth_password for an OAuth token or a 2FA challenge, then the app's own web
+// challenge on 2FA, then the account is added and switched to.
 
 typedef void (^CmdCompletion)(BOOL success, id response, id parseError);
 

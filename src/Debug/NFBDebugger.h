@@ -23,10 +23,9 @@
 
 #import <UIKit/UIKit.h>
 
-// Marks a view as claimed by the tweak, with a short origin like
-// @"NavBarIcons/backArrow". Stored as an associated object; shown in a capture
-// beneath the view it belongs to. No-op when debugging is off. Reads nothing,
-// changes nothing about the view itself.
+// Marks a view as claimed by the tweak, with a short origin such as
+// @"NavBarIcons/backArrow". Stored as an associated object and shown in a capture;
+// a no-op when debugging is off.
 extern void NFBMark(UIView* view, NSString* origin);
 
 // Records a decision the tweak just made, like @"timeline: dropped 3 items" or
@@ -66,18 +65,14 @@ extern void NFBDebuggerSetTriggerHidden(BOOL hidden);
 // building any log string, so the debugger costs one boolean when off.
 extern BOOL NFBDebugIsRecording(void);
 
-// One report of what the branding surfaces actually are on the running build:
-// the top-bar logo, the bottom bar and its glass, the Explore bar, and the four
-// settings that drive them. Read only, once per launch, written into the
-// journal next to the hook health. Reach for this first when a surface stops
-// behaving, instead of scattering one-off probes through the hooks.
+// One report of what the branding surfaces are on the running build: the top-bar
+// logo, the bottom bar and its glass, the Explore bar, and the settings that drive
+// them. Read only, once per launch, written next to the hook health.
 extern void NFBReportBrandingSurfaces(void);
 
-// Everything that can make the bottom bar opaque, in one pass: the full view
-// chain under the host with each view's colour, layer colour, alpha, hidden
-// flag, layer contents and filters, plus where the glass sits among them. Run
-// it twice - once at launch and once on demand - so a value that the app
-// repaints between the two shows up as a difference rather than a guess.
+// Everything that can make the bottom bar opaque, in one pass: the view chain under
+// the host with each view's colour, alpha, hidden flag, contents and filters, plus
+// where the glass sits. Run twice so a repaint between the two shows as a change.
 extern void NFBReportTabBarStack(NSString* moment);
 
 // The navigation bar's own tree with frames. Shake on a good screen and on a

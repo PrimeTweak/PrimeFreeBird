@@ -5,10 +5,9 @@
 
 #import "HookHelpers.h"
 
-// Avatar style 2 is the circular default; style 3 is the rounded-square style
-// the app itself uses for organization accounts (corner radius = width / 8).
-// Coercing the style makes the views handle masking, corner radius, shadow
-// layers and the image pipeline natively.
+// Style 2 is the circular default and style 3 the rounded square the app uses for
+// organization accounts. Coercing the style leaves masking, corner radius, shadow
+// layers and the image pipeline to the views themselves.
 
 @interface TFNAvatarImageView : UIView
 @property (nonatomic) NSInteger style;
@@ -63,10 +62,9 @@ void applySquareAvatarsSetting(void) {
 
 %end
 
-// TUIAvatarImageView picks its circular pre-clip image transformer from the
-// incoming style, so coerce before its own logic runs. Its style mapping class
-// method also feeds the Swift avatar views, whose setter is unreachable from
-// ObjC.
+// TUIAvatarImageView picks its circular pre-clip transformer from the incoming
+// style, so the coercion runs first. Its style mapping also feeds the Swift avatar
+// views, whose setter is unreachable from ObjC.
 %hook TUIAvatarImageView
 
 - (void)setStyle:(NSInteger)style {

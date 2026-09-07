@@ -51,14 +51,9 @@
     return [self.mainBundle localizedStringForKey:key value:key table:nil];
 }
 
-// Fetches one of Twitter's own strings, reusing the app's translations for
-// every language. These flow through the terminology rename hook like any app
-// string.
-// Twitter 12.21 dropped Localization_Localization.bundle, and with it every key
-// borrowed here: the lookup then returns the key itself and the reader sees
-// CANCEL_ACTION_LABEL on a button. Measured against both IPAs - 339 .strings
-// files in 12.15, 136 in 12.21, and the bundle gone. When the app no longer
-// answers, our own translations do.
+// Fetches one of Twitter's own strings, reusing the app's translations. 12.21
+// dropped Localization_Localization.bundle and with it every borrowed key, so the
+// lookup returns the key itself; the tweak's own translations answer instead.
 - (NSString*)localizedTwitterStringForKey:(NSString*)key {
     static NSBundle* twitterBundle = nil;
     static dispatch_once_t onceToken;
@@ -74,7 +69,7 @@
         return result;
     }
     // The app gave nothing back. Ours is keyed the same way, with a TW_ prefix
-    // so a borrowed key can never collide with one of our own.
+    // so a borrowed key can never collide with one of the tweak's own.
     NSString* fallback = [self
         localizedStringForKey:[NSString stringWithFormat:@"TW_%@", key]];
     return fallback.length ? fallback : key;

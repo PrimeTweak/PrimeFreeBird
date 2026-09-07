@@ -35,15 +35,13 @@ static const void* kNFBGreyTargetKey = &kNFBGreyTargetKey;
 // laid over a colour already at 60% lands at 36% — so every repaint starts
 // from this original.
 static const void* kNFBOriginalImageKey = &kNFBOriginalImageKey;
-// Marks an image the tweak produced. Two paths repaint on Notifications — the bar
-// button item and the image view UIKit builds from it — and without the mark
-// each treats the other's result as unpainted, painting the glyph twice. The
-// mark travels with the image, so any path recognises it.
+// Marks an image the tweak produced. Two paths repaint on Notifications, and
+// without the mark each treats the other's result as unpainted. The mark travels
+// with the image, so any path recognises it.
 static const void* kNFBPaintedFlagKey = &kNFBPaintedFlagKey;
-// Marks a layer that must never render at partial opacity. Correcting after
-// the fact never worked — the tweak's pass runs before the value is lowered, so there
-// is nothing to correct yet. Every route that could lower it is refused at the
-// moment it is used instead: the alpha, the layer's opacity, and the animation.
+// Marks a layer that must never render at partial opacity. Correcting afterwards
+// is too late, so every route that could lower it is refused as it is used: the
+// alpha, the layer's opacity and the animation.
 static const void* kNFBNoFadeKey = &kNFBNoFadeKey;
 
 // One grey for every icon the tweak adds or recolour: the label colour at 60%,
@@ -99,22 +97,17 @@ static void nfbRepaintGlyphs(UIView* view, UIColor* colour) {
             UIImageView* imageView = (UIImageView*)subview;
             UIImage* current = imageView.image;
             UIImage* ours = objc_getAssociatedObject(imageView, kNFBGreyedImageKey);
-            // Repaint when the image changed OR when the colour did. At launch
-            // the trait collection is not settled yet, so labelColor resolves
-            // to a different value and the first paint comes out pale; once
-            // the traits land, this comparison catches it.
+            // Repaint when the image changed or when the colour did. At launch the
+            // trait collection is unsettled, so labelColor resolves differently and
+            // the first paint comes out pale.
             UIColor* usedColour = objc_getAssociatedObject(imageView, kNFBGreyTargetKey);
             BOOL colourChanged = usedColour && ![usedColour isEqual:colour];
             BOOL alreadyOurs =
                 objc_getAssociatedObject(current, kNFBPaintedFlagKey) != nil;
 
-            // Same defect as the bar-button path, and the same fix. The
-            // painted flag records that the tweak painted the image, not that
-            // it painted it FOR THIS view: a glyph baked white elsewhere
-            // carries the flag too,
-            // so the repaint below skipped it and it stayed white on a white
-            // bar. His measure: the filters icon came back after the button
-            // path was fixed; the gear — a custom view, handled here — did not.
+            // The painted flag records that the tweak painted the image, not that
+            // it painted it for this view: a glyph baked elsewhere carries it too,
+            // so the recorded image is compared as well.
             if (current && alreadyOurs && ours && current != ours && !colourChanged) {
                 imageView.image = ours;
                 static BOOL said;
@@ -153,14 +146,9 @@ static BOOL nfbIsChatConversationBar(UIView* view) {
     NSInteger depth = 0;
     while ((responder = responder.nextResponder) && depth < 12) {
         NSString* name = NSStringFromClass([responder class]);
-        // The conversation of the encrypted chat, and the settings screens of
-        // this tweak — both are named by their controller, so no other screen
-        // in the app is reached.
-        // T1ConversationContainerViewController is the regular DM
-        // conversation — binary-confirmed. Its trailing glyphs (call, video)
-        // take the same label-colour bake as the encrypted chat's, at their
-        // FIRST image set: no accent beat before the bar settles, the exact
-        // pre-regression behaviour.
+        // The encrypted chat, the regular DM conversation and this tweak's own
+        // settings screens, each named by its controller so no other screen is
+        // reached. Their trailing glyphs take the label-colour bake at first set.
         if ([name containsString:@"XChatDM"] ||
             [name containsString:@"ConversationContainer"] ||
             [name hasPrefix:@"ModernSettings"]) {
@@ -204,10 +192,9 @@ static void nfbForceOpaque(UIView* view) {
     }
 }
 
-// The container that holds the bar and the tab strip, reached from the bar
-// upwards. The walk stops before the first view tall enough to be the screen
-// itself, so a push, a modal or a tab change still fades the way it should —
-// only the header band is held. Unmanaged bars never get here.
+// The container holding the bar and the tab strip, reached from the bar upwards.
+// The walk stops before the first view tall enough to be the screen itself, so
+// only the header band is held.
 static void nfbPinHeaderOpacity(UIView* bar) {
     UIWindow* window = bar.window;
     if (!window) {
@@ -238,10 +225,9 @@ static UIView* nfbFindSettingsButton(UIView* view) {
     return nil;
 }
 
-// The notifications tab is named after activity, not notifications — the class
-// is T1ActivityHistory… — and the bar belongs to the All/Mentions container,
-// whose own name says nothing. Both spellings are accepted, and children and
-// parents are searched as well as the controller itself.
+// The notifications tab is named after activity, and the bar belongs to the
+// All/Mentions container, whose name says nothing. Both spellings are accepted,
+// and children and parents are searched as well as the controller.
 static BOOL nfbNameIsNotifications(UIViewController* controller) {
     NSString* name = controller ? NSStringFromClass([controller class]) : @"";
     // "Activity" alone would also match UIActivityViewController — the share
@@ -287,10 +273,9 @@ static UIViewController* nfbBarOwningController(UIView* view) {
     return nil;
 }
 
-// Notifications: the gear is a bar button item, so its image is repainted
-// directly. The caller has already established that this is the notifications
-// bar; icon-only items are picked here, so a text button like "Done" is never
-// touched.
+// On Notifications the gear is a bar button item, so its image is repainted
+// directly. The caller has established the bar; icon-only items are picked here,
+// so a text button is never touched.
 static void nfbRepaintNotificationsGear(UIView* bar, UIColor* colour) {
     // The item has no view of its own, so the fade is removed from whatever
     // renders it: the icon buttons on the right of this bar.
@@ -314,17 +299,9 @@ static void nfbRepaintNotificationsGear(UIView* bar, UIColor* colour) {
         BOOL alreadyOurs =
             objc_getAssociatedObject(button.image, kNFBPaintedFlagKey) != nil;
 
-        // Measured in a capture: the advanced-search glyph sat in the bar at
-        // 27.33 pt with tint white, next to a gear at 15,20,25 — it had been
-        // repainted by another path. And it was never repaired, because
-        // EVERY painted image carries the painted flag, including that white
-        // one: the guard below read the flag and concluded all was well.
-        //
-        // The flag records that the tweak painted the image, not that it
-        // painted it FOR THIS BUTTON. So when the image is a tweak image but
-        // not the one recorded
-        // for this button, it was overwritten by another path and the recorded
-        // one is simply put back — no repaint, no risk of a loop.
+        // The painted flag records that the tweak painted the image, not that it
+        // painted it for this button. A tweak image that is not the recorded one
+        // was overwritten by another path, so the recorded one is put back.
         if (alreadyOurs && ours && button.image != ours && !colourChanged) {
             button.image = ours;
             static BOOL said;
@@ -390,11 +367,9 @@ static void nfbRepaintNotificationsGear(UIView* bar, UIColor* colour) {
 
 %end
 
-// Frame-by-frame capture showed the gear flipping between black
-// and grey on one screen: the tweak's repaint lands, then Twitter puts its own image
-// back, and nothing calls back until the bar happens to lay out. So the
-// image is caught as it is set. Only views the tweak have already taken over are
-// affected — everything else pays a single associated-object read.
+// Twitter puts its own image back after a repaint and nothing calls back until
+// the bar lays out, so the image is caught as it is set. Only views already taken
+// over are affected; everything else pays one associated-object read.
 
 // The colour a bar glyph should carry: the text colour, resolved for the
 // current appearance.
@@ -420,12 +395,9 @@ static void nfbTintGlyphChain(UIView* view, UIColor* colour) {
     }
 }
 
-// A glyph of the conversation bar: inside a bar button or the subtitle stack,
-// and inside that bar. Ancestors only — nothing below is visited, so no sibling
-// can be reached.
-// True of a back button's own subtree only: _UIBackButtonMaskView is created
-// for back buttons and for nothing else. Class names are read, never touched —
-// no view in the subtree is painted, which is what once flattened an avatar.
+// True of a back button's own subtree only: _UIBackButtonMaskView is created for
+// back buttons and nothing else. Class names are read, never touched, and no view
+// in the subtree is painted.
 static BOOL nfbSubtreeHasBackMask(UIView* view, NSInteger depth) {
     if (!view || depth > 4) {
         return NO;
@@ -491,13 +463,9 @@ static BOOL nfbIsChatBarGlyph(UIView* view) {
     if (!((UIView*)self).window) {
         return;
     }
-    // Cold-start belt for the conversation bar, measured 17/08 07:42: at the
-    // FIRST conversation after a relaunch, setImage: fires before the button
-    // is attached and the next-turn retry still cannot read the chain — the
-    // icons stay template and spend the whole visit in the accent, washed by
-    // the platter's vibrancy (grey only from the second visit on). Here the
-    // chain is complete by definition, so the claim that missed at the setter
-    // lands now.
+    // Cold-start belt for the conversation bar: on the first conversation after a
+    // relaunch, setImage: fires before the button is attached and the retry cannot
+    // read the chain. Here the chain is complete by definition.
     UIImage* chatImage = self.image;
     if (chatImage &&
         chatImage.renderingMode != UIImageRenderingModeAlwaysOriginal &&
@@ -517,17 +485,9 @@ static BOOL nfbIsChatBarGlyph(UIView* view) {
 - (void)setImage:(UIImage*)image {
     UIColor* target = objc_getAssociatedObject(self, kNFBGreyTargetKey);
     if (!target || !image) {
-        // The glyphs of the conversation bar — the arrow, the trailing icons,
-        // the padlock — are template images, so they are drawn entirely in
-        // whatever tint reaches them. The rendering mode is corrected here
-        // rather than painted during layout: an image keeps its own colours,
-        // its size does not change, and no layout pass is provoked. Painting a
-        // bar button while it was laying out invalidated its intrinsic size and
-        // froze the app twice.
-        // Not "== AlwaysTemplate": a bar glyph usually arrives in AUTOMATIC mode,
-        // which a bar button draws as a template all the same — its description
-        // simply names no mode at all. Anything that is not already original is
-        // therefore claimed.
+        // Not "== AlwaysTemplate": a bar glyph usually arrives in automatic mode,
+        // which a bar button draws as a template all the same, so anything not
+        // already original is claimed. Correcting the mode provokes no layout.
         if (image.renderingMode != UIImageRenderingModeAlwaysOriginal) {
             if (nfbIsChatBarGlyph((UIView*)self) ||
                 nfbIsBackArrowGlyph((UIView*)self)) {
@@ -548,10 +508,8 @@ static BOOL nfbIsChatBarGlyph(UIView* view) {
                 return;
             }
             // A bar button is given its image before it is placed in the bar, so
-            // the ancestors that name it do not exist yet and the test above
-            // cannot answer. The question is asked again on the next turn of the
-            // run loop, once the button has been attached — outside any layout
-            // pass, so nothing is invalidated while a layout is in progress.
+            // the ancestors that name it do not exist yet. The question is asked
+            // again on the next run-loop turn, outside any layout pass.
             if (!((UIView*)self).superview) {
                 __weak UIImageView* weakView = (UIImageView*)self;
                 dispatch_async(dispatch_get_main_queue(), ^{
@@ -612,16 +570,13 @@ static BOOL nfbIsChatBarGlyph(UIView* view) {
 
 %end
 
-// The same treatment as Explore, reached from the other side. Notifications
-// builds its bar differently, so the gear is not found by searching the bar's
-// subtree — but the button class is the same one Twitter uses everywhere, and
-// hooking it catches the gear whatever the bar around it looks like.
-// didMoveToWindow fires exactly when the bar appears.
+// The same treatment as Explore, reached from the other side: Notifications
+// builds its bar differently, so the gear is not found in the bar's subtree, but
+// the button class is the one Twitter uses everywhere.
 
-// A bar button qualifies only if it is an icon on the right-hand side: no
-// title, a glyph-sized image inside, and past the middle of its own bar. A
-// back chevron sits on the left and a text button has a title, so neither is
-// ever touched.
+// A bar button qualifies only as an icon on the right-hand side: no title, a
+// glyph-sized image inside, and past the middle of its own bar. A back chevron
+// and a text button are both excluded by that.
 static BOOL nfbIsRightHandGlyphButton(UIView* button) {
     if ([button isKindOfClass:[UIButton class]] &&
         ((UIButton*)button).currentTitle.length > 0) {
@@ -656,11 +611,9 @@ static BOOL nfbIsRightHandGlyphButton(UIView* button) {
 
 %hook TFNBarButtonItemButton
 
-// The repaint runs on both entry points. didMoveToWindow alone caught the
-// button before its image view existed on Notifications, so nothing was marked
-// and the interception below never armed — a tab change was required for it to
-// take. layoutSubviews closes that window; once marked, every later pass is a
-// pointer comparison.
+// The repaint runs on both entry points: didMoveToWindow alone catches the button
+// before its image view exists on Notifications, so nothing is marked and the
+// interception never arms. Once marked, every later pass is a pointer comparison.
 %new
 - (void)nfbGreySettingsGlyphIfNeeded {
     @try {
@@ -668,11 +621,9 @@ static BOOL nfbIsRightHandGlyphButton(UIView* button) {
         if (!button.window) {
             return;
         }
-        // Either the button says it is the settings one, or the tweak are on the
-        // notifications screen, where the gear is the only icon in the bar.
-        // The identifier is the precise route and covers Explore. The second
-        // route exists only for Notifications, where no view carries it — and
-        // it is fenced in tightly so nothing else on that screen is caught.
+        // Either the button identifies itself as the settings one, which covers
+        // Explore, or the screen is Notifications, where no view carries that
+        // identifier and the gear is the only icon in the bar.
         BOOL wanted = nfbLooksLikeSettingsButton(button) ||
                       (nfbControllerIsNotifications(nfbBarOwningController(button)) &&
                        nfbIsRightHandGlyphButton(button));
@@ -731,10 +682,9 @@ static BOOL nfbViewSitsInInboxPill(UIView* view) {
     return NO;
 }
 
-// The platter that holds the bar's buttons — wider than the pill test above,
-// narrower than the whole bar, so the animation journal names the suspects
-// without drowning in the scroll edge effects. Bounded and class-name only:
-// this runs on an animation path.
+// The platter that holds the bar's buttons: wider than the pill test above,
+// narrower than the whole bar. Bounded and class-name only, since this runs on an
+// animation path.
 static BOOL nfbViewSitsInBarPlatter(UIView* view) {
     UIView* node = view;
     NSInteger depth = 0;
@@ -750,7 +700,7 @@ static BOOL nfbViewSitsInBarPlatter(UIView* view) {
 }
 
 // 12.21: the vibrancy filter is also animated onto the tab bar's icons. Only
-// while the reader asked for a themed bar; otherwise the bar keeps its glass.
+// while a themed bar is switched on; otherwise the bar keeps its glass.
 static BOOL NFBViewSitsInXTabBar(UIView* view) {
     if (!NFBThemedTabBarWanted()) {
         return NO;
@@ -784,7 +734,7 @@ static BOOL NFBViewSitsInXTabBar(UIView* view) {
 
     // 12.21 on iOS 27: the glass vibrancy filter is animated back onto the logo
     // after the tint is set. Refusing the animation and dropping the filter
-    // keeps the logo the colour the reader chose. Only that one view.
+    // keeps the logo the chosen colour. Only that one view.
     if (ownerIsView && [key hasPrefix:@"filters."] &&
         (owner == (UIView*)NFBTopBarLogoViewCurrent() || NFBViewSitsInXTabBar(owner))) {
         self.filters = nil;
@@ -796,11 +746,9 @@ static BOOL NFBViewSitsInXTabBar(UIView* view) {
         return;
     }
 
-    // Every animation reaching the button platter is recorded, whatever its
-    // kind. The previous round logged opacity only and stayed silent on the
-    // pill — which was itself the finding: the fade is not an opacity
-    // animation, so refusing opacity refused nothing. A transition or a
-    // transform carries no "opacity" keyPath and slipped straight through.
+    // Every animation reaching the button platter is recorded, whatever its kind:
+    // the fade is not an opacity animation, and a transition or a transform
+    // carries no opacity keyPath.
     if (NFBDebugIsRecording() && ownerIsView && nfbViewSitsInBarPlatter(owner)) {
         NSString* path = @"—";
         if ([animation isKindOfClass:[CABasicAnimation class]]) {
@@ -816,11 +764,9 @@ static BOOL NFBViewSitsInXTabBar(UIView* view) {
                     nfbViewSitsInInboxPill(owner) ? @"YES" : @"no");
     }
 
-    // Every animation on this one control is refused, not just opacity. The
-    // measurement above showed the fade never announced itself as an opacity
-    // change, so naming a kind to block was the mistake; the control simply
-    // does not animate. Its neighbours in the same bar are untouched, and the
-    // pill appearing without a transition is exactly what is wanted here.
+    // Every animation on this one control is refused, not just opacity: the fade
+    // never announces itself as an opacity change. Its neighbours in the same bar
+    // are untouched.
     if (ownerIsView && nfbViewSitsInInboxPill(owner)) {
         return;
     }
@@ -843,35 +789,20 @@ static BOOL NFBViewSitsInXTabBar(UIView* view) {
 %end
 
 // MARK: - the conversation bar: arrow and portrait
-//
-// Two views in that bar come out in the accent, and the view tree says they are
-// in different branches:
-//
-//   TFNNavigationBar
-//    ├ _UIModernBarButton                     the back arrow, a UIKit class
-//    └ _UINavigationBarTitleControl
-//        └ DMConversation.AvatarTitleButton
-//            └ … → T1AvatarImageView          the portrait
-//
-// Neither is reached by painting: each is given its own tint, on itself, and
-// only when it sits inside one of Twitter's navigation bars. No image is
-// replaced, no parent is walked, so a sibling cannot be caught — which is what
-// went wrong when the arrow was claimed through its superview.
+
+// The back arrow and the portrait sit in different branches of the bar. Each is
+// given its own tint, on itself, and only inside one of Twitter's navigation
+// bars: no image is replaced and no parent is walked, so no sibling is caught.
 
 
 
 
 
 // MARK: - a portrait is not a glyph
-//
-// Measured on the view itself: its image carries renderingMode = alwaysTemplate
-// and its tintColor is the accent, so the picture is drawn as a flat disc of it.
-// A template image has no colours of its own — which is why answering the
-// palette, the placeholder layer or the view's tint moved nothing.
-//
-// The rendering mode is what is corrected, on this class alone: an image handed
-// to an avatar keeps its own colours. Nothing is repainted and no view is
-// walked.
+
+// The avatar's image arrives as a template with the accent as its tint, so the
+// picture is drawn as a flat disc of it. The rendering mode is corrected on this
+// class alone; nothing is repainted and no view is walked.
 
 %hook T1AvatarImageView
 
@@ -885,24 +816,8 @@ static BOOL NFBViewSitsInXTabBar(UIView* view) {
 
 %end
 
-// MARK: - the inbox filter pill — left native, by decision
-//
-// The full measured story of this control lives in the project journal.
-// Under forced Liquid Glass the platter destroys and recreates the pill's
-// content on every re-host (60 fps: pixel count 781 → 0 → 780, ~6 frames),
-// morphs the bar between two geometries, and — the finding that ended the
-// campaign — the "persistent" capsule is itself a RELAY of mortal platter
-// views crossfading into each other; no single view survives a cascade,
-// and one even dies at rest (journal 22:12:23.930, mid-Messages). Eight
-// approaches over twenty-two builds — tint, opacity pinning, snapshot
-// bridge, curtain, glass, understudy, pinned mirror, presentation-riding
-// mirror — each traded one artifact for another. The ride's own telemetry
-// closed the case: perfect at rest (393 ticks, x-spread 0.0 pt, zero
-// jumps, one seamless handover at 0.0 pt), 5.4-5.5 pt anchor handovers in
-// every cascade. The receipts were written before the build; they failed;
-// the agreement is honoured.
-//
-// So the pill is Twitter's own, untouched: a ~140 ms content blink during
-// re-hosts and the native morph — which is what forced Liquid Glass makes
-// of a control that opted out of it. It ends the day Twitter adopts
-// Liquid Glass natively. Standard mode never had the problem.
+// MARK: - the inbox filter pill
+
+// Left native. Under forced Liquid Glass the platter recreates the pill's content
+// on every re-host, so it blinks for about 140 ms; no view in that relay survives
+// a cascade. Standard mode does not have it.

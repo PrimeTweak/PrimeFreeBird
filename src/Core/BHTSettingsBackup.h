@@ -5,12 +5,9 @@
 
 #import <Foundation/Foundation.h>
 
-// Serialises the tweak's state to a JSON file and restores it. Covered: every
-// registry option, the page-local picks (interface style, dark shade, profile
-// tab), the custom accent, the two fonts, the advanced-search language, the
-// muted words with their expirations, and the custom tab bar layout. Left out
-// on purpose: internal migration flags, the daily muted counter, and the web
-// session — authentication cookies do not belong in a shareable file.
+// Serialises the tweak's state to a JSON file and restores it: every registry
+// option, the page-local picks, the accent, the fonts, the muted words and the tab
+// bar layout. Migration flags, counters and the web session are left out.
 @interface BHTSettingsBackup : NSObject
 
 // The JSON snapshot of the current state.

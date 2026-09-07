@@ -111,12 +111,9 @@ static NSArray* sectionsByInsertingEntry(TFNItemsDataViewController* settingsVC,
                                          NSArray* sections) {
     NSMutableArray* newSections = [sections mutableCopy] ?: [NSMutableArray array];
     TFNSettingsNavigationItem* entry = makePrimeFreeBirdSettingsItem(settingsVC);
-    // The apparent "separator" under this row is the grouped table's SECTION
-    // SEAM, created by injecting the row as its own section at index 0 — not a
-    // hairline view. Joining Twitter's first section removes the seam
-    // structurally:
-    // the row's bottom edge becomes an ordinary intra-section boundary, drawn
-    // (or not drawn) exactly like the native rows below it.
+    // The apparent separator under this row is the grouped table's section seam,
+    // created by injecting the row as its own section, not a hairline view. Joining
+    // Twitter's first section removes it structurally.
     if (newSections.count > 0 && [newSections[0] isKindOfClass:[NSArray class]]) {
         NSMutableArray* firstSection = [(NSArray*)newSections[0] mutableCopy];
         [firstSection insertObject:entry atIndex:0];
@@ -127,10 +124,9 @@ static NSArray* sectionsByInsertingEntry(TFNItemsDataViewController* settingsVC,
     return newSections;
 }
 
-// Async settings fetches rebuild the sections and discard one-shot inserts, and
-// root-ness is unknowable during the first build (not yet on the nav stack). So
-// tag the root in viewWillAppear, insert once to repair the first build, and let
-// the rebuild transform below re-add the entry on every later snapshot.
+// Async fetches rebuild the sections and discard one-shot inserts, and root-ness is
+// unknowable during the first build. The root is tagged in viewWillAppear, inserted
+// once, and the rebuild transform below re-adds the entry on later snapshots.
 static void insertPrimeFreeBirdSettingsIfRoot(TFNItemsDataViewController* settingsVC) {
     if (!settingsVCIsRoot(settingsVC)) {
         return;
@@ -200,19 +196,9 @@ static NSArray* sectionsWithPrimeFreeBirdEntry(TFNItemsDataViewController* setti
     return sectionsWithPrimeFreeBirdEntry(self, updatedSections);
 }
 
-// Kill the non-native hairline under the tweak's injected row without touching its
-// style: push the native separator inset offscreen, and hide any TFN-drawn
-// hairline inside this ONE cell on the next runloop (dividers are laid out
-// after the cell is returned). The class-name log makes any second round
-// surgical instead of guesswork.
-// The PrimeFreeBird row is injected into TWITTER's settings table
-// (TFNItemsDataViewController), so the separator under it is drawn by Twitter's
-// own cell — not by anything in the tweak's code, which is why every ModernSettings
-// change and every subview/layer sweep missed it. The IPA shows TFNTextCell
-// carries the real setters setSeparatorHidden: and setTopSeparatorHidden:.
-// Hide the tweak's row's bottom separator, and the next row's top separator, using
-// those setters directly (KVC on the property threw — this is the class's own
-// API). Reapplied on every vend so cell reuse cannot bring it back.
+// The injected row sits in Twitter's own settings table, so the separator under it
+// is drawn by Twitter's cell. TFNTextCell carries setSeparatorHidden: and
+// setTopSeparatorHidden:, used directly and reapplied on every vend.
 static void NFBHideRowSeparator(UITableViewCell* cell) {
     SEL hide = @selector(setSeparatorHidden:);
     if ([cell respondsToSelector:hide]) {

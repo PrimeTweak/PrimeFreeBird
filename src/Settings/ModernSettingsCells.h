@@ -52,13 +52,9 @@
 - (void)addPillTarget:(id)target action:(SEL)action;
 @end
 
-// A replica of the Explore bar, laid out the way the app lays it out. Tapping a
-// tab strikes it through instead of removing it, so the bar keeps its shape and
-// nothing is lost from view.
-//
-// The tabs flow: they sit on one line while they fit and take a second line the
-// moment they do not, so a longer name, a translation or a larger text size
-// cannot push one off the edge.
+// A replica of the Explore bar, laid out the way the app lays it out. Tapping a tab
+// strikes it through rather than removing it, and the tabs flow onto a second line
+// when they no longer fit.
 @interface ModernSettingsTabBarCell : UITableViewCell
 // Each entry: @{@"key": <pref key>, @"name": <tab name>}.
 - (void)configureWithTabs:(NSArray<NSDictionary*>*)tabs

@@ -91,14 +91,9 @@ UIColor* NFBTwitterBlueColor(void) {
                            alpha:1.0];
 }
 
-// The colour for surfaces that carry Twitter's branding: the tab bar accent and
-// the navigation logo. When the user has actually picked an accent it wins;
-// with nothing picked the brand blue is used, never CurrentAccentColor's
-// systemBlue fallback, which would leak iOS blue onto a Twitter surface.
-//
-// Deliberately separate from CurrentAccentColor: that one feeds the window
-// tint, and UIKit's own controls, alert buttons among them, inherit it. Their
-// blue must stay iOS blue.
+// The colour for surfaces carrying Twitter's branding: the tab bar accent and the
+// navigation logo. A picked accent wins; with none, the brand blue is used rather
+// than CurrentAccentColor's systemBlue fallback, which feeds the window tint.
 UIColor* NFBBrandAccentColor(void) {
     NSUserDefaults* defs = [NSUserDefaults standardUserDefaults];
     BOOL picked = [defs objectForKey:@"bh_custom_accent_hex"] ||

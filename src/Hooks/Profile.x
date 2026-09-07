@@ -56,26 +56,10 @@ static char kCopyProviderKey;
 @end
 
 // MARK: - placing the button
-//
-// The mechanism this feature was built on is gone from Twitter 12.15: the
-// health check named T1ProfileActionButtonSpec, actionButtonProviders and their
-// initialiser as all missing, and the Swift replacement exposes no Objective-C
-// selector to hook. So the button is no longer OFFERED to a factory — it is
-// placed directly in the row Twitter already built.
-//
-// A device capture gave that row exactly:
-//
-//   T1ProfileHeaderView {{0,0},{440,311}}
-//     XDSButtonRow {{0,176},{440,54}}
-//       XDSButton {{343,12},{40,40}}      the bell
-//       XDSButton {{391,12},{40,40}}      the share
-//
-// Forty by forty, spaced forty-eight apart, each holding a 20x20 glyph. The
-// added button goes one slot further left, at 295.
-//
-// Style is COPIED from a neighbour at layout time rather than guessed: corner
-// radius, border, background and glyph tint all come from the button beside it,
-// so a Twitter restyle carries over instead of leaving ours mismatched.
+
+// The action-button factory is gone and its Swift replacement exposes no ObjC
+// selector, so the button is placed directly in the row Twitter built: 40 by 40,
+// spaced 48 apart, one slot left at 295, with the style copied from a neighbour.
 
 static char kNFBCopyButtonKey;
 
@@ -122,12 +106,9 @@ static void nfbMatchNeighbourStyle(UIButton* ours, UIView* neighbour) {
     if (neighbour.backgroundColor) {
         ours.backgroundColor = neighbour.backgroundColor;
     }
-    // Measured on a capture: the bell and the share button wear a thin
-    // grey ring, ours had none — because the neighbour draws that ring in a
-    // SUBVIEW (its own background/blur layer), so copying the button's own
-    // borderWidth yields zero. When nothing came across, draw the ring here.
-    // Derived from labelColor, never from a semantic system fill: Twitter
-    // reinterprets those, and contrast is lost.
+    // The neighbour draws its thin grey ring in a subview, so copying the button's
+    // own borderWidth yields zero and the ring is drawn here instead. Derived from
+    // labelColor, never a semantic system fill, which Twitter reinterprets.
     if (ours.layer.borderWidth <= 0) {
         BOOL ringFound = NO;
         for (UIView* node in neighbour.subviews) {
@@ -285,16 +266,9 @@ static void nfbMatchNeighbourStyle(UIButton* ours, UIView* neighbour) {
 
 // MARK: - Open profiles on a chosen tab
 
-// From the Objective-C metadata in the app binary:
-// T1ProfileDisplayContentProvider carries
-// initialTabIndex and setInitialTabIndex:, and its subclass exposes one entry
-// per tab — allPostsEntry, tweetsAndRepliesEntry, highlightsEntry,
-// articlesEntry, photoEntry, videoEntry.
-//
-// The index is never hardcoded: the wanted entry is looked up inside
-// contentMainEntries, so a profile that lacks Articles or Highlights still
-// lands on the right tab. If the entry is missing entirely — a profile with no
-// media — the original value is returned and nothing changes.
+// T1ProfileDisplayContentProvider carries initialTabIndex, and its subclass exposes
+// one entry per tab. The index is never hardcoded: the wanted entry is looked up in
+// contentMainEntries, and a missing entry returns the original value.
 
 // The wanted tab, as the entry object itself. Each tab is a
 // T1ProfileContentMainEntry, and the provider keeps one per tab —
@@ -333,10 +307,9 @@ static id nfbWantedEntry(id provider) {
     if (!entry) {
         return nil;
     }
-    // No identity check against contentMainEntries: the diagnostic came back
-    // yellow, which means the entry existed but the array did not contain that
-    // exact object. Whether a tab is actually on screen is answered further
-    // down by the controller itself, which is the authority on it.
+    // No identity check against contentMainEntries: the entry can exist without the
+    // array holding that exact object. Whether a tab is on screen is answered by the
+    // controller further down.
     return entry;
 }
 
@@ -440,10 +413,9 @@ static const void* kNFBTabAppliedKey = &kNFBTabAppliedKey;
 
 // MARK: - Hide the Videos tab
 
-// Articles and Highlights are switched off through their feature flags, but no
-// flag governs the Videos tab. The model decides instead: shouldDisplayVideosTab
-// on T1ProfileUserViewModel, read straight from the binary's method table. Same
-// shape as the premium-offer hook above — one boolean, nothing to walk.
+// Articles and Highlights are switched off through their feature flags, but no flag
+// governs the Videos tab. The model decides instead, through shouldDisplayVideosTab
+// on T1ProfileUserViewModel.
 
 %hook T1ProfileUserViewModel
 
@@ -455,15 +427,9 @@ static const void* kNFBTabAppliedKey = &kNFBTabAppliedKey;
 
 // MARK: - Expand bios
 
-// No more "Show more" on a truncated bio. T1ProfileUserInfoView holds
-// _bioExpanded, a plain BOOL paired with a tap recogniser, and exposes it as
-// isBioExpanded / setBioExpanded:. That is the inline truncation.
-//
-// It is NOT _expandedBioButton, which belongs to the Premium long bio and
-// opens a modal — forcing that one would pop a sheet on every profile.
-//
-// Forcing the getter is enough: the layout asks it whether to clip, and the
-// button that offered the tap has nothing left to reveal.
+// The inline bio truncation is _bioExpanded, exposed as isBioExpanded, not
+// _expandedBioButton, which belongs to the Premium long bio and opens a modal.
+// Forcing the getter is enough: the layout asks it whether to clip.
 
 %hook T1ProfileUserInfoView
 

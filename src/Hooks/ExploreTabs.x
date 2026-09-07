@@ -58,12 +58,9 @@ static BOOL nfbAnyTabHidden(void) {
     return NO;
 }
 
-// The two modes are asked for, not inferred. The old pair read a single master
-// and guessed: master ON with no tab chosen meant "hide everything", and master
-// ON with every tab chosen meant the same - which made striking all five
-// identical to striking none. Each mode now has its own switch, and the
-// settings screen refuses to strike the last kept tab, so an empty bar cannot
-// be reached at all.
+// The two modes are asked for, not inferred: each has its own switch, and the
+// settings screen refuses to strike the last kept tab, so an empty bar cannot be
+// reached.
 BOOL nfbShouldHideAllTrends(void) {
     return [BHTSettings boolForKey:@"hide_explore_all"];
 }
@@ -99,10 +96,9 @@ static NSUInteger nfbMaskBits(void) {
 static __weak UIView* gNFBExploreBar = nil;          // the Explore accessory view
 static __weak UICollectionView* gNFBPagerCV = nil;   // the Explore pager collection
 static NSInteger gNFBPagerTotal = 0;                 // absolute page count (%orig)
-// The data source can be interrogated before the bar exists, which leaves the
-// scope check with nothing to answer. Any paging, multi-item collection served
-// by that controller is therefore remembered as a candidate on every pass, and
-// the bar's own filter adopts it the first time it runs with a live bar.
+// The data source can be interrogated before the bar exists, leaving the scope
+// check with nothing to answer. Any paging, multi-item collection is remembered as
+// a candidate, and the bar's filter adopts it once it runs with a live bar.
 static __weak UICollectionView* gNFBPagerCandidate = nil;
 static NSInteger gNFBPagerCandidateTotal = 0;
 static __weak UICollectionView* gNFBBarCV = nil;     // the bar's inner collection
@@ -114,12 +110,9 @@ static NSUInteger gNFBAppliedMaskBits = 0xFFFF;   // last mask synced to the pag
 
 void nfbNoteExploreAccessoryView(UIView* v) {
     gNFBExploreBar = v;
-    // 12.21 hands the accessory over AFTER the segmented bar has laid itself
-    // out, and the bar only adopts its collection from layoutSubviews. Nothing
-    // asks it to lay out again, so it never adopts. Measured: the bar's layout
-    // fired at 53.4 s with the accessory unknown, the accessory arrived at 55.6 s,
-    // and the collection was then recognised but never adopted. Asking for a
-    // layout pass here makes the order irrelevant.
+    // The accessory can arrive after the segmented bar has laid itself out, and
+    // the bar only adopts its collection from layoutSubviews. Asking for a layout
+    // pass here makes the order irrelevant.
     if (v) {
         Class legacyBar = NSClassFromString(@"_TtC10TFNUISwift25LegacySegmentedTabBarView");
         Class oldBar = NSClassFromString(@"_TtC10TFNUISwift19SegmentedTabBarView");
@@ -168,23 +161,18 @@ static UIView* nfbFindHighlightBar(UIView* v, int depth) {
     return nil;
 }
 
-// Scope: is the Explore bar currently ON SCREEN in the same window as this
-// scroll view? The accessory bar lives in the navigation chrome, NOT inside the
-// SegmentedViewController's view. Off-screen tabs have window == nil, so when
-// Home's pager (same generic class) is used, the guard is false. Only Explore
-// passes.
+// Whether the Explore bar is on screen in the same window as this scroll view.
+// The accessory bar lives in the navigation chrome, and off-screen tabs have a
+// nil window, so Home's pager of the same class does not pass.
 static BOOL nfbPagerScopeOK(UIScrollView* sv) {
     UIView* root = gNFBExploreBar;
     if (!root || !sv) { return NO; }
     return root.window != nil && root.window == sv.window;
 }
 
-// The underline is placed here. The native placement follows the layout's own
-// cell frames, which are not the packed ones this filter installs, so position
-// AND width are interpolated between the real packed cells of the two pages
-// around the current offset, and set without animation on every bar layout
-// pass — a native-looking glide during flights, exact at rest. Native
-// animations are squelched (CALayer hook below), so nothing fights back.
+// The underline is placed here: position and width are interpolated between the
+// packed cells of the two pages around the current offset, without animation, on
+// every bar layout pass. Native animations are dropped by the CALayer hook below.
 static void nfbPositionUnderline(UIView* root, UICollectionView* cv) {
     UICollectionView* pager = gNFBPagerCV;
     if (!root || !cv || !pager) { return; }
@@ -254,10 +242,9 @@ static void nfbPositionUnderline(UIView* root, UICollectionView* cv) {
 
 // MARK: - pager <-> mask sync (defined before use)
 
-// One reloadData when the hidden set changes, so the page set matches the
-// toggles immediately (requirement: toggling a tab recentres the bar AND
-// updates the pages on return to Search). Idempotent: gNFBAppliedMaskBits is
-// updated first, so the filter's delayed re-assertions do not re-trigger it.
+// One reloadData when the hidden set changes, so the page set matches the toggles
+// immediately. Idempotent: gNFBAppliedMaskBits is updated first, so the filter's
+// delayed re-assertions do not re-trigger it.
 static void nfbSyncPagerToMask(void) {
     UICollectionView* cv = gNFBPagerCV;
     if (!cv || !nfbPagerScopeOK(cv)) { return; }
@@ -281,7 +268,7 @@ static void nfbSyncPagerToMask(void) {
 }
 
 // Adopts the pager once the bar is provably live, and steps off a page whose
-// tab is hidden so the reader never starts on one.
+// tab is hidden so a session never starts on one.
 static void nfbCapturePagerAndRemap(UICollectionView* candidate) {
     if (!candidate) { return; }
     NSInteger total = gNFBPagerCandidateTotal ?: kNFBTabCount;
@@ -363,10 +350,8 @@ static void nfbApplyTabFilter(UIView* bar, UICollectionView* cv) {
         }
     }
 
-    // Underline: pure function of the pager offset — position AND width —
-    // applied on every layout pass (replaces the old orphan-only rescue,
-    // which never fired when the natively-placed underline happened to
-    // overlap the WRONG kept cell).
+    // Underline: a pure function of the pager offset, position and width both,
+    // applied on every layout pass.
     nfbPositionUnderline(bar, cv);
 
     // The bar's inner collection is the anchor for the persistent filter hook.
@@ -489,19 +474,15 @@ static void nfbApplyTabFilter(UIView* bar, UICollectionView* cv) {
         gNFBPagerCV = collectionView;
     }
     gNFBPagerTotal = n;
-    // The pager keeps ALL its pages. Handing it the kept count is what put its
-    // page indices in a different space from the bar's cell indices, and every
-    // misplacement since — the underline, the bold label — came from bridging
-    // those two spaces. With the counts equal, page index IS cell index IS
-    // absolute index, and Twitter's own bar styles the right tab with no help.
-    // Hidden pages are simply never landed on: see the drag handler below.
+    // The pager keeps all its pages: handing it the kept count puts its page
+    // indices in a different space from the bar's cell indices. With the counts
+    // equal, page index is cell index; hidden pages are never landed on.
     return n;
 }
 
-// Underline ticks. Bar layout passes stop before the fine end of a
-// deceleration, which parks the glide short of the target, so the underline is
-// placed again on every offset change and once more when any gesture or
-// animation ends.
+// Underline ticks. Bar layout passes stop before the fine end of a deceleration,
+// which parks the glide short of the target, so it is placed again on every offset
+// change and once more when a gesture or animation ends.
 - (void)scrollViewDidScroll:(id)scrollView {
     %orig;
     if (!nfbGranularActive()
@@ -509,10 +490,9 @@ static void nfbApplyTabFilter(UIView* bar, UICollectionView* cv) {
     nfbPositionUnderline(gNFBExploreBar, gNFBBarCV);
 }
 
-// The only thing left to enforce: a swipe never comes to rest on a hidden tab.
-// UIKit asks the delegate where the gesture should land, and that answer is
-// moved to the nearest kept page — in the direction the finger was going, so a
-// flick past a hidden tab carries on instead of bouncing back.
+// A swipe never comes to rest on a hidden tab. UIKit asks the delegate where the
+// gesture should land, and that answer is moved to the nearest kept page in the
+// direction the finger was going.
 - (void)scrollViewWillEndDragging:(id)scrollView
                      withVelocity:(CGPoint)velocity
               targetContentOffset:(CGPoint*)target {
@@ -561,14 +541,11 @@ static void nfbApplyTabFilter(UIView* bar, UICollectionView* cv) {
 
 %end
 
-// MARK: - 12.21: the same three classes, renamed with a Legacy prefix
-//
-// Twitter 12.21 renamed SegmentedTabBarView, SegmentedViewController and
-// PagingViewController with a Legacy prefix and shipped no ObjC successor: the
-// new Explore bar is most likely SwiftUI. The blocks below are the same bodies
-// bound to the new names, so whatever screen still uses the legacy bar keeps
-// working. A hook on a class that is absent from the running build attaches to
-// nothing, which is why both sets can coexist.
+// MARK: - the same three classes under their Legacy names
+
+// 12.21 renamed the segmented bar, its controller and the pager with a Legacy
+// prefix and shipped no ObjC successor. The blocks below are the same bodies bound
+// to the new names; a hook on an absent class attaches to nothing.
 
 %hook _TtC10TFNUISwift25LegacySegmentedTabBarView
 
@@ -660,19 +637,15 @@ static void nfbApplyTabFilter(UIView* bar, UICollectionView* cv) {
         gNFBPagerCV = collectionView;
     }
     gNFBPagerTotal = n;
-    // The pager keeps ALL its pages. Handing it the kept count is what put its
-    // page indices in a different space from the bar's cell indices, and every
-    // misplacement since — the underline, the bold label — came from bridging
-    // those two spaces. With the counts equal, page index IS cell index IS
-    // absolute index, and Twitter's own bar styles the right tab with no help.
-    // Hidden pages are simply never landed on: see the drag handler below.
+    // The pager keeps all its pages: handing it the kept count puts its page
+    // indices in a different space from the bar's cell indices. With the counts
+    // equal, page index is cell index; hidden pages are never landed on.
     return n;
 }
 
-// Underline ticks. Bar layout passes stop before the fine end of a
-// deceleration, which parks the glide short of the target, so the underline is
-// placed again on every offset change and once more when any gesture or
-// animation ends.
+// Underline ticks. Bar layout passes stop before the fine end of a deceleration,
+// which parks the glide short of the target, so it is placed again on every offset
+// change and once more when a gesture or animation ends.
 - (void)scrollViewDidScroll:(id)scrollView {
     %orig;
     if (!nfbGranularActive()
@@ -680,10 +653,9 @@ static void nfbApplyTabFilter(UIView* bar, UICollectionView* cv) {
     nfbPositionUnderline(gNFBExploreBar, gNFBBarCV);
 }
 
-// The only thing left to enforce: a swipe never comes to rest on a hidden tab.
-// UIKit asks the delegate where the gesture should land, and that answer is
-// moved to the nearest kept page — in the direction the finger was going, so a
-// flick past a hidden tab carries on instead of bouncing back.
+// A swipe never comes to rest on a hidden tab. UIKit asks the delegate where the
+// gesture should land, and that answer is moved to the nearest kept page in the
+// direction the finger was going.
 - (void)scrollViewWillEndDragging:(id)scrollView
                      withVelocity:(CGPoint)velocity
               targetContentOffset:(CGPoint*)target {
@@ -733,19 +705,16 @@ static void nfbApplyTabFilter(UIView* bar, UICollectionView* cv) {
 %end
 
 // MARK: - hidden pages are never a destination
-//
-// A programmatic navigation can still aim at a tab the reader has hidden —
-// from a deep link, a restored state, or the app's own bookkeeping. The two
-// guards below redirect such a target to the nearest visible tab. Both cost
-// one pointer comparison for every other scroll view in the app.
+
+// A programmatic navigation can aim at a hidden tab, from a deep link, a restored
+// state or the app's own bookkeeping. The two guards below redirect to the nearest
+// visible tab, at one pointer comparison for every other scroll view.
 
 %hook UICollectionView
 
-// The bar's inner collection re-lays its cells to their native positions on
-// its own layout passes, and the outer bar view's layoutSubviews does not fire
-// then, so the packed row is re-applied after every layout pass of that one
-// collection. The identity guard comes first: one pointer comparison for every
-// other collection in the app.
+// The bar's inner collection re-lays its cells to their native positions on its
+// own layout passes, when the outer bar view's layoutSubviews does not fire, so
+// the packed row is re-applied here. The identity guard comes first.
 - (void)layoutSubviews {
     %orig;
     if ((UICollectionView*)self != gNFBBarCV || gNFBInBarFilter
@@ -813,12 +782,10 @@ static void nfbApplyTabFilter(UIView* bar, UICollectionView* cv) {
 %end
 
 // MARK: - underline animation squelch
-//
-// The bar animates the underline toward the cell frames of its own layout,
-// which are not the packed ones installed here, so those animations are
-// dropped. The placement above is a dead set inside performWithoutAnimation
-// and never enters here. Identity-guarded: one pointer comparison for every
-// other layer in the app.
+
+// The bar animates the underline toward the cell frames of its own layout, not the
+// packed ones installed here, so those animations are dropped. The placement above
+// is a dead set inside performWithoutAnimation and never enters here.
 %hook CALayer
 
 - (void)addAnimation:(id)anim forKey:(id)key {
@@ -828,12 +795,9 @@ static void nfbApplyTabFilter(UIView* bar, UICollectionView* cv) {
     %orig;
 }
 
-// A write with no animation escapes the drop above and can teleport the
-// underline to a position between tabs, with no further layout pass at rest to
-// repair it. Every position and bounds write on this one layer is therefore
-// accounted for: foreign ones are dropped, the flagged ones from the placement
-// above pass through. Identity first — one pointer comparison per call for the
-// rest of the app.
+// A write with no animation escapes the drop above and can leave the underline
+// between tabs, with no later layout pass to repair it. Foreign writes on this one
+// layer are dropped and the flagged ones pass through.
 - (void)setPosition:(CGPoint)position {
     if ((CALayer*)self == gNFBHighlightLayer && nfbGranularActive()
         && !gNFBSettingUnderline) {

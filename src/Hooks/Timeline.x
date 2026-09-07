@@ -17,10 +17,9 @@ static __weak NSObject* PinnedTimelinesRepository;
 static NSArray* LastPinnedTimelineModels;
 static BOOL PinnedTimelinesWriteBypass = NO;
 
-// Applies a toggle without relaunching. Hiding rewrites the UNCHANGED pinned
-// list purely to republish — updatePinnedTimelines: persists server-side, so
-// anything else would unpin for real; the delegate hook below swaps in the
-// empty list on the way through.
+// Applies the toggle without relaunching. The unchanged pinned list is rewritten
+// purely to republish, since updatePinnedTimelines: persists server-side; the
+// delegate hook below swaps in the empty list on the way through.
 void applyHideCustomTimelinesSetting(void) {
     NSObject* repository = PinnedTimelinesRepository;
     if (!repository) {
@@ -199,11 +198,9 @@ static void nfbApplyFleetVisibility(UIView* view) {
 %end
 
 // MARK: - Scroll edge effect
-//
-// Stock Twitter opts out of the iOS 26 design; this tweak opts back in
-// (AppLifecycle.x), and iOS 26 then draws a scroll edge effect under every
-// bar. This option switches that effect off wherever it appears, keeping
-// Liquid Glass everywhere else.
+
+// Opting back into the iOS 26 design makes iOS draw a scroll edge effect under
+// every bar. This option switches that effect off wherever it appears.
 
 static void NFBReadingLayoutTick(UIScrollView* scrollView);
 
@@ -264,14 +261,9 @@ static BOOL nfbScrollViewIsModal(UIScrollView* scrollView) {
     return owner != nil && owner.presentingViewController != nil;
 }
 
-// One of those spared screens still needs something: the root of Twitter's own
-// settings, the page carrying the "Search settings" field. Leaving its effect
-// alone keeps the bar, but under Liquid Glass iOS draws that bar as a gradual
-// fade — the list shows through above the field and nothing marks where the bar
-// ends. The hard style puts an opaque background and a boundary back under it.
-//
-// Sub-pages share the controller class, so the root is the first settings
-// controller in the navigation stack — the same test Settings.x already uses.
+// The root of Twitter's own settings is spared but still needs a boundary: iOS
+// draws its bar as a gradual fade, so the list shows through above the search
+// field. Sub-pages share the class, so the root is the first one in the stack.
 static BOOL nfbIsTwitterSettingsClass(UIViewController* controller) {
     Class generic = objc_getClass("T1GenericSettingsViewController");
     Class settings = objc_getClass("T1SettingsViewController");
@@ -294,20 +286,9 @@ static BOOL nfbControllerIsSettingsRoot(UIViewController* controller) {
     return NO;
 }
 
-// An opaque-ish band in the settings sheet's navigation bar, spanning the
-// header zone from the sheet's top to the bar's bottom — under the title and
-// the search field, over the list. iOS 26 draws that zone as a scroll edge
-// effect that stops partway down the search field, and the effect's views
-// ignore UIView-level geometry setters, so the strip is covered rather than
-// resized.
-//
-// A plain UIView, not a UIVisualEffectView: the confirm-button treatment in
-// Theme.x repaints every UIVisualEffectView under the platter's resolved
-// subtree, which can span the whole bar. Installed from the BAR's layout, not
-// the table's: the table can settle before the bar background exists and then
-// not lay out again until a scroll or a push. The frame is copied from
-// _UIBarBackground each pass, so it holds on any device and through rotation;
-// systemBackground at 0.9 reads as near-opaque white and follows dark mode.
+// A near-opaque band covering the settings sheet's header zone: the scroll edge
+// effect stops partway down the search field and ignores geometry setters. A plain
+// UIView, installed from the bar's layout, with the frame copied from the bar.
 static const CGFloat kNFBSettingsBandWhiteness = 0.9;
 
 static const void* kNFBSettingsBarBandKey = &kNFBSettingsBarBandKey;
@@ -374,11 +355,9 @@ static void nfbLayBandIntoSettingsBar(UINavigationBar* bar,
     }
 }
 
-// Checked on every layout of every scroll view, on purpose. iOS re-enables the
-// effect whenever a bar reconfigures — changing tab, coming back to a screen —
-// and acting only on views the tweak had already marked left Search untouched and the
-// timeline correct only after a few swipes. The work is two message sends when
-// the state already matches, which is nearly always.
+// Checked on every layout of every scroll view, since iOS re-enables the effect
+// whenever a bar reconfigures. The work is two message sends when the state
+// already matches, which is nearly always.
 - (void)layoutSubviews {
     %orig;
 
@@ -586,13 +565,10 @@ static BOOL BHShouldHideVerifiedItem(id viewModel, BOOL inConversation,
 }
 
 // MARK: - Muted words
-//
-// The rule list is cached here rather than read per item: the editor calls
-// nfbRefreshMutedWords() whenever it changes something, and the signature
-// below invalidates the memo cache so the timeline re-evaluates at once.
-// Text and handle are read defensively through several known selectors —
-// verified present in T1Twitter — so a renamed accessor degrades to "no
-// match" instead of breaking the timeline.
+
+// The rule list is cached rather than read per item; the editor calls
+// nfbRefreshMutedWords() and the signature below invalidates the memo. Text and
+// handle are read through several known selectors, so a rename means no match.
 
 static NSArray<NSString*>* gNFBMutedWords = nil;      // lowercased, no "@"
 static NSArray<NSString*>* gNFBMutedHandles = nil;    // lowercased, no "@"
@@ -1011,18 +987,10 @@ static NSSet<NSNumber*>* ConversationAuthorRepliedToUserIDs(NSArray* sections,
 }
 
 // MARK: - Reading marker
-//
-// Marks the boundary of what has already been seen — an accent wash over the
-// first Tweet under an arriving batch, fading out before the media. The anchor
-// is the list's first Tweet at the moment of capture, and it is recaptured only
-// when incoming data carries a different head: what sits on top now is what the
-// batch lands above. Every other delivery — a refresh that brings nothing, a
-// relaunch, a tab switch, leaving the screen — keeps the boundary where it is.
-// With nothing above the anchor there is nothing to mark, and nothing is drawn.
-// Chronological tabs (Following, Lists) keep their anchor through refreshes, so
-// the marker lives there; a tab that discards its anchor on a large list is
-// algorithmic, and the marker retires on it for the session rather than lying.
-// Only the Following tab is eligible, identified by its scribe section.
+
+// An accent wash over the first Tweet under an arriving batch. The anchor is the
+// list's head, recaptured only when incoming data carries a different one; every
+// other delivery keeps the boundary. Only the Following tab is eligible.
 
 static const void* kNFBReadingAnchorIDKey = &kNFBReadingAnchorIDKey;
 static const void* kNFBReadingAnchorPathKey = &kNFBReadingAnchorPathKey;
@@ -1060,11 +1028,9 @@ static UIScrollView* NFBFindListInView(UIView* view) {
     return nil;
 }
 
-// The controller's list, found in its mounted view tree. Asking the
-// controller for -tableView or -collectionView instead would invoke a lazy
-// getter, which builds a view that was never meant to exist — and on a
-// collection view that raises, taking the app down. Only what is already on
-// screen is inspected here.
+// The controller's list, found in its mounted view tree. Asking for -tableView or
+// -collectionView invokes a lazy getter that builds a view never meant to exist,
+// and on a collection view that raises.
 static UIScrollView* NFBListScrollView(TFNItemsDataViewController* dataViewController) {
     if (![dataViewController isViewLoaded]) {
         return nil;
@@ -1075,10 +1041,9 @@ static UIScrollView* NFBListScrollView(TFNItemsDataViewController* dataViewContr
         return cached;
     }
     UIScrollView* found = NFBFindListInView(dataViewController.view);
-    // Retained, not assigned. An assigned pointer is a raw address: the moment
-    // the app releases its list while the controller lives on, `cached.window`
-    // above messages freed memory. Holding it costs one stale scroll view until
-    // the next lookup, and the check above already tells a stale one apart.
+    // Retained, not assigned: an assigned pointer is a raw address, and the check
+    // above would message freed memory once the app releases the list. Holding it
+    // costs one stale scroll view until the next lookup.
     objc_setAssociatedObject(dataViewController, kNFBListViewKey, found,
                              OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     return found;
@@ -1195,11 +1160,9 @@ static NSIndexPath* NFBReadingIndexPathForEntryID(
     return nil;
 }
 
-// Anchors outlive the process. Which tab an anchor belongs to is never
-// recorded: on the next launch each list looks for the first stored anchor it
-// still contains, so Following and every List recover their own without the
-// tweak having to name them. A list that contains none of them simply starts
-// fresh.
+// Anchors outlive the process. Which tab one belongs to is never recorded: each
+// list looks for the first stored anchor it still contains, so a list holding none
+// of them simply starts fresh.
 static NSString* const kNFBReadingStoreKey = @"nfb_reading_anchors";
 static const NSUInteger kNFBReadingStoreLimit = 12;
 
@@ -1253,29 +1216,16 @@ static BOOL NFBReadingStoreRestore(TFNItemsDataViewController* dataViewControlle
     return NO;
 }
 
-// The controller chain names the algorithmic tab on builds where the child
-// controllers carry "ForYou" in their class names; the verdict is cached per
-// controller. A chain that names nothing changes nothing.
-// scribeSection is not declared in src/Headers. This declaration shim is only
-// a cast target: it is never instantiated and never messaged as a class, so no
-// class symbol is referenced.
+// scribeSection is not declared in src/Headers. This shim is only a cast target:
+// never instantiated, never messaged as a class, so no class symbol is
+// referenced.
 @interface NFBReadingScribeShim : NSObject
 - (NSString*)scribeSection;
 @end
 
-// Identifies the Following tab by the timeline's own scribe section. Measured
-// on device: the For you tab reports "home", Following reports "latest", both
-// under the "home" scribe page.
-//
-// This replaces a walk of the responder chain looking for a class name
-// containing "ForYou". A sweep of the binaries finds no such class outside
-// GraphQL model types, and the live responder chain confirms it: PagingCell,
-// PagingCollectionView, PagingViewController, SegmentedViewController,
-// HomeTimelineContainerViewController. The old test could never match, so the
-// marker was allowed on For you and appeared there after a refresh.
-//
-// The test is an allowlist on purpose. A section that cannot be read denies
-// the marker rather than granting it.
+// Identifies the Following tab by the timeline's own scribe section: For you
+// reports "home", Following reports "latest". An allowlist on purpose, so a
+// section that cannot be read denies the marker rather than granting it.
 static BOOL NFBReadingIsFollowingTab(TFNItemsDataViewController* dataViewController) {
     if (![dataViewController respondsToSelector:@selector(scribeSection)]) {
         return NO;
@@ -1306,10 +1256,9 @@ static NSUInteger NFBReadingItemCount(NSArray* sections) {
     return count;
 }
 
-// The boundary is taken from the list as it stands, and only when the incoming
-// data has a different head — that is the one moment new Tweets are about to be
-// stacked on top of it. Deliveries that change nothing above, and the leave
-// moments that carry no incoming data at all, only write the held boundary out.
+// The boundary is taken from the list as it stands, and only when incoming data
+// has a different head. Deliveries that change nothing above only write the held
+// boundary out.
 static void NFBReadingCaptureAnchor(TFNItemsDataViewController* dataViewController,
                                     NSArray* incomingSections) {
     if (!NFBReadingMarkerAllowed(dataViewController)) {
@@ -1319,11 +1268,9 @@ static void NFBReadingCaptureAnchor(TFNItemsDataViewController* dataViewControll
     if (!NFBReadingTopVisibleEntryID(dataViewController).length) {
         return;
     }
-    // A controller with no anchor yet is either brand new or just relaunched.
-    // Claiming the head as its boundary would bury the one already on disk, so
-    // the stored anchors are tried first, and a list too small to hold one is
-    // given time to fill. With nothing stored, the head becomes the first
-    // boundary.
+    // A controller with no anchor is new or just relaunched, and claiming the head
+    // would bury the one on disk. The stored anchors are tried first; with nothing
+    // stored the head becomes the first boundary.
     if (!objc_getAssociatedObject(dataViewController, kNFBReadingAnchorIDKey)) {
         if (NFBReadingStoreRestore(dataViewController)) {
             return;
@@ -1366,10 +1313,9 @@ static void NFBReadingCaptureAnchor(TFNItemsDataViewController* dataViewControll
     NFBReadingStoreRemember(previousAnchor, listHead, listHead);
 }
 
-// One row's true geometry. The rendered cell is authoritative when it is on
-// screen — data sections and table rows do not always map one-to-one on For
-// You, and the computed rect can span the wrong range there. Off screen, the
-// computed rect only decides visibility, so the fallback is harmless.
+// One row's true geometry. The rendered cell is authoritative on screen, since
+// data sections and table rows do not always map one-to-one. Off screen the
+// computed rect only decides visibility.
 static void NFBReadingPlaceMarker(UIScrollView* table, UIView* marker,
                                   NSIndexPath* path) {
     CGRect rowRect;
@@ -1408,10 +1354,9 @@ static void NFBReadingPlaceMarker(UIScrollView* table, UIView* marker,
     [table bringSubviewToFront:marker];
 }
 
-// Places (or hides) the marker for the current data. The row rect is content-
-// space, so the placed wash scrolls with the feed; only data changes move it.
-// It sits above the cell at low alpha — beneath it, the opaque cell would
-// hide it entirely.
+// Places or hides the marker for the current data. The row rect is content-space,
+// so the wash scrolls with the feed. It sits above the cell at low alpha, since an
+// opaque cell would hide it entirely.
 static void NFBReadingPositionMarker(TFNItemsDataViewController* dataViewController) {
     UIScrollView* table = NFBListScrollView(dataViewController);
     if (!table) {
@@ -1436,15 +1381,9 @@ static void NFBReadingPositionMarker(TFNItemsDataViewController* dataViewControl
     objc_setAssociatedObject(table, kNFBReadingAnchorPathKey, path,
                              OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     if (!path) {
-        // An anchor that vanishes from a large list marks an algorithmic tab:
-        // the data was replaced, not extended. But a large load can also land
-        // in phases, with the anchor's stretch arriving after the gap row —
-        // one absent pass is not a verdict. Two consecutive ones are, and only
-        // then does the marker retire for the session instead of reappearing
-        // to lie after the next capture.
-        // A replaced list has a new first item as well as a missing anchor;
-        // an anchor that merely fell out of a list whose head is unchanged is
-        // a loading phase, not an algorithmic wipe.
+        // A replaced list has a new first item as well as a missing anchor; an
+        // anchor that fell out of a list whose head is unchanged is a loading
+        // phase. Two consecutive absent passes retire the marker for the session.
         NSString* headNow = NFBReadingFirstEntryID(dataViewController.sections);
         NSString* headThen =
             objc_getAssociatedObject(dataViewController, kNFBReadingTopAtCaptureKey);
@@ -1510,10 +1449,9 @@ static void NFBReadingRescanSoon(TFNItemsDataViewController* dataViewController)
     });
 }
 
-// Self-sizing rows shift their rects as cells realise; the layout tick keeps
-// the wash on its row from the cached index path, without rescanning. A row
-// with no measurable rect when it was first placed is retried here until it has
-// one. No cached path means nothing to draw.
+// Self-sizing rows shift their rects as cells realise, so the tick keeps the wash
+// on its row from the cached index path. A row with no measurable rect at first
+// placement is retried here.
 static void NFBReadingLayoutTick(UIScrollView* scrollView) {
     UIView* marker = objc_getAssociatedObject(scrollView, kNFBReadingMarkerViewKey);
     if (!marker) {
@@ -1548,11 +1486,10 @@ static void NFBReadingTrack(TFNItemsDataViewController* dataViewController) {
 }
 
 // MARK: - Language filter
-//
-// A Tweet carries the language of its original text. The kept set lists the
-// languages the reader selected; an empty set means the filter is off. A Tweet
-// whose language could not be detected always passes, so image-only posts are
-// never lost.
+
+// A Tweet carries the language of its original text, and the kept set lists the
+// selected ones; empty means off. A Tweet whose language cannot be detected always
+// passes, so image-only posts are never lost.
 
 static NSString* const kNFBLanguagesKey = @"nfb_filter_languages";
 
@@ -1699,12 +1636,9 @@ static void NFBReapplyInHierarchy(UIViewController* controller) {
     NFBReapplyInHierarchy(controller.presentedViewController);
 }
 
-// Re-applying the filter to what is already on screen.
-//
-// The filter runs when sections are handed to the data view controller, not when
-// the table draws — so reloading the table changes nothing. The sections are
-// therefore set again, with what the controller is already holding: the pass
-// runs, the hidden thread is dropped, and the reading position is kept.
+// Re-applies the filter to what is already on screen. It runs when sections are
+// handed to the controller, not when the table draws, so the sections are set
+// again with what the controller already holds.
 void nfbReapplyTimelineFilter(void) {
     for (UIScene* scene in UIApplication.sharedApplication.connectedScenes) {
         if (![scene isKindOfClass:[UIWindowScene class]]) {
@@ -1762,13 +1696,10 @@ void nfbReapplyTimelineFilter(void) {
 %end
 
 // MARK: - Poll results before voting
-//
-// Twitter hides the tallies until a vote is cast. The counts travel with the
-// card data all along, so the percentage is simply appended to each option's
-// label. Ported from Orion's fork, whose comment saved the hard part: don't
-// derive the choice count from the card name — text polls are named
-// "poll2choice_text_only", but image polls carry no count in their name at
-// all, so the per-choice bindings are probed instead.
+
+// The counts travel with the card data before a vote, so the percentage is
+// appended to each option's label. The choice count is not derived from the card
+// name, since image polls carry none; the per-choice bindings are probed instead.
 
 static const NSUInteger kNFBPollMaxChoices = 4;
 

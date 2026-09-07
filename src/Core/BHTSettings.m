@@ -560,10 +560,9 @@ static NSDictionary<NSString*, NSDictionary*>* BHTSettingsIndex(void) {
     [defaults setBool:YES forKey:@"nfb_key_migration_v1_done"];
 }
 
-// "hide_trends" did two jobs at once: hide all of Explore, or keep the bar and
-// prune it, chosen by whether any tab had been struck. The two are separate
-// switches now, so a stored value is carried across by asking the same question
-// the old code asked itself.
+// hide_trends did two jobs at once, hiding all of Explore or pruning the bar,
+// chosen by whether any tab had been struck. The two are separate switches now, and
+// a stored value is carried across by asking that same question.
 + (void)migrateExploreTrendsSplit {
     NSUserDefaults* defaults = [NSUserDefaults standardUserDefaults];
     if ([defaults boolForKey:@"nfb_explore_split_migration_done"]) {
@@ -581,7 +580,7 @@ static NSDictionary<NSString*, NSDictionary*>* BHTSettingsIndex(void) {
                 break;
             }
         }
-        // Tabs struck means the reader was pruning the bar; none struck means
+        // Tabs struck means the bar was being pruned; none struck means
         // they wanted Explore gone.
         [defaults setBool:anyTabStruck forKey:@"choose_explore_tabs"];
         [defaults setBool:!anyTabStruck forKey:@"hide_explore_all"];
@@ -625,10 +624,9 @@ static NSDictionary<NSString*, NSDictionary*>* BHTSettingsIndex(void) {
     return key ? BHTSettingsIndex()[key] : nil;
 }
 
-// Defaults for options that are set from a page of their own and therefore have
-// no row in the registry. Without an entry here, settingForKey: returns nil and
-// the fallback below reads @"default" from nil, which yields NO or 0 by
-// accident rather than by decision.
+// Defaults for options set from a page of their own, which have no row in the
+// registry. Without an entry here settingForKey: returns nil and the fallback reads
+// @"default" from nil, yielding NO or 0 by accident rather than by decision.
 static NSDictionary* NFBKeylessDefaults(void) {
     static NSDictionary* map = nil;
     static dispatch_once_t once;

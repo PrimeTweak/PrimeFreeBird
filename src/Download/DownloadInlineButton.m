@@ -62,10 +62,9 @@ static UIViewController* TopMostController(void) {
             [self.hud hide];
         };
 
-        // Every download runs through FFmpeg: plain mp4s are stream-copied,
-        // GIFs are palette-encoded, HLS-only resolutions are re-encoded with
-        // VideoToolbox. The output path is appended to args; progress comes
-        // from the processed time measured against the probed duration.
+        // Every download runs through FFmpeg: mp4s are stream-copied, GIFs
+        // palette-encoded, HLS-only resolutions re-encoded with VideoToolbox.
+        // Progress comes from the processed time against the probed duration.
         NSString* downloadingText = [[BHTBundle sharedBundle]
             localizedTwitterStringForKey:@"DOWNLOAD_LIVE_ACTIVITY_DOWNLOADING"];
         void (^ffmpegDownload)(NSString*, NSString*, double) = ^(
@@ -191,11 +190,9 @@ static UIViewController* TopMostController(void) {
                              }];
         };
 
-        // videoInfo.variants backs both video (mediaType 3) and GIF (mediaType 2);
-        // photos carry no videoInfo. Probing the playlist supplies the duration
-        // for progress and any HLS-only resolutions, so every quality is offered
-        // in a single sheet. mp4 variants win when both carry the same
-        // resolution; media without a playlist (GIFs) skips the probe entirely.
+        // videoInfo.variants backs both video and GIF; photos carry none. Probing
+        // the playlist supplies the duration and any HLS-only resolutions. mp4
+        // variants win at equal resolution, and media without a playlist skips it.
         void (^buildVariantItems)(TFSTwitterEntityMedia*, void (^)(NSArray*)) = ^(
             TFSTwitterEntityMedia* media, void (^done)(NSArray*)) {
             NSMutableArray<NSURL*>* mp4URLs = [NSMutableArray new];

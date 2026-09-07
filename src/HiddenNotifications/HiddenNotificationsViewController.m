@@ -11,16 +11,14 @@ extern void nfbReapplyTimelineFilter(void);
 extern UIColor* CurrentAccentColor(void);
 
 // MARK: - The row
-//
-// Same construction as the muted-word row: text on the left,
-// a soft pill on the right, a ⊗ to remove. Colours are DERIVED FROM labelColor
-// rather than taken from the semantic system fills — Twitter reinterprets
-// those, and a badge came out unreadable once because of it.
 
-// A label that carries its own horizontal padding. The pill used to get it from
-// a hand-written layoutSubviews measured off the ⊗; when that button went, the
-// padding went with it and the background closed onto the text. Declaring the
-// size here means Auto Layout keeps placing it and nothing can drift again.
+// Same construction as the muted-word row: text on the left, a soft pill on the
+// right. Colours are derived from labelColor rather than the semantic system fills,
+// which Twitter reinterprets.
+
+// A label that carries its own horizontal padding, declared through its intrinsic
+// size so Auto Layout keeps placing it. Measuring the padding by hand ties it to a
+// neighbour that may not be there.
 @interface NFBNotifPaddedLabel : UILabel
 @end
 
@@ -139,10 +137,8 @@ static const CGFloat kNFBNotifPillPadding = 8.0;   // gauche et droite seulement
     self.snippet.numberOfLines = empty ? 0 : 2;
 }
 
-// This used to place the pill by hand, measured from the ⊗ that no longer
-// exists — with the button gone its frame is zero, and the pill would have been
-// pushed off the left edge. Auto Layout now owns the position (leading edge,
-// under the text) and the padding comes from the label's own intrinsic size.
+// Auto Layout owns the pill's position, at the leading edge under the text, and the
+// padding comes from the label's own intrinsic size.
 
 @end
 
@@ -206,10 +202,9 @@ static const CGFloat kNFBNotifPillPadding = 8.0;   // gauche et droite seulement
     // first layout has measured them. One pass leaves the estimate in place.
     [self.tableView layoutIfNeeded];
     [self.tableView layoutIfNeeded];
-    // contentSize already includes the footer; no padding is added on top of
-    // it, otherwise the sheet grows a strip of white at the bottom.
-    // The pinned bar sits on top of the table, so its height is added rather
-    // than being part of contentSize.
+    // contentSize already includes the footer, so no padding is added on top of it.
+    // The pinned bar sits over the table, so its height is added rather than being
+    // part of contentSize.
     CGFloat height = MIN(self.tableView.contentSize.height + kNFBNotifBarHeight, 330);
     self.preferredContentSize = CGSizeMake(290, MAX(height, 90));
 }
@@ -302,11 +297,10 @@ static const CGFloat kNFBNotifPillPadding = 8.0;   // gauche et droite seulement
 // MARK: footer — the count and "clear all"
 
 // MARK: - the pinned bar (count + clear all)
-//
-// It used to be a table footer, so it scrolled with the list and the swipe
-// could grab it. His reference — the Quick access — pins its bar as a SUBVIEW
-// of the table, constrained to the table's frameLayoutGuide: it stays put, and
-// no gesture on the rows can ever reach it. Same construction here.
+
+// A subview of the table constrained to its frameLayoutGuide, the same construction
+// as Quick access: it stays put, and no gesture on the rows can reach it. A table
+// footer would scroll with the list.
 
 static const CGFloat kNFBNotifBarHeight = 57.0;
 

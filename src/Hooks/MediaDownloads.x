@@ -32,12 +32,10 @@ static NSArray* DMVideoEntities(UIView* attachmentView) {
 }
 
 // MARK: - Voice messages
-//
-// A voice note is decrypted to disk before playing, so its URL passes through
-// the asset opened to play it. The last one seen is the one under the finger:
-// the view that would answer a long press has no reference to it, and the
-// attachment view above cannot serve this menu — the audio view sits on its
-// own and takes the touch first.
+
+// A voice note is decrypted to disk before playing, so its URL passes through the
+// asset opened to play it. The last one seen is the one under the finger: the view
+// answering the long press holds no reference to it.
 
 static NSURL* gNFBLastVoiceURL = nil;
 
@@ -73,12 +71,9 @@ static void NFBSaveVoiceMessage(NSURL* sourceURL) {
     [BHTManager showSaveVC:destination];
 }
 
-// The audio view carries its own interaction rather than sharing the
-// attachment view's: it is a separate view and wins the touch first.
-// The interaction is held by association and the view is addressed as a
-// UIView: this class is known to the compiler only by a forward declaration,
-// so nothing can be added to its interface and no message can be sent to it
-// directly.
+// The audio view carries its own interaction, since it is a separate view and wins
+// the touch first. It is held by association and the view addressed as a UIView:
+// the class is known to the compiler only by a forward declaration.
 static const void* kNFBVoiceInteractionKey = &kNFBVoiceInteractionKey;
 
 %hook _TtC13DMAttachments24AttachmentAssetAudioView
@@ -165,8 +160,8 @@ static const void* kNFBVoiceInteractionKey = &kNFBVoiceInteractionKey;
 }
 %end
 
-// MARK: - 12.21: DM attachments moved to the ChatConversation module
-//
+// MARK: - DM attachments under the ChatConversation module
+
 // The DMAttachments module is gone from 12.21 and DMConversation lost its
 // attachment view; both now live in ChatConversation. Same bodies, new names.
 
@@ -385,35 +380,11 @@ static const void* kNFBVoiceInteractionKey = &kNFBVoiceInteractionKey;
 }
 %end
 
-// MARK: - Tweet media download -- entry in the media long-press menu
-//
-// The entry no longer lives in the "..." overflow menu: the hook on
-// _t1_actionItemsForStatus: was removed. It is added here, in the media
-// long-press menu, for every video and GIF.
-//
-// Binary facts this block relies on (Twitter 12.15):
-//
-//   - The media long-press menu is not built by an Objective-C method. Its
-//   builder sits in a gap of the T1Twitter IMP table (between 0x2f7df8 and
-//   0x314818), so there is nothing to hook there. The only Objective-C point
-//   on that path is `+[UIMenu menuWithTitle:children:]`, the two-argument
-//   factory. The "..." overflow menu uses the five-argument one instead.
-//
-//   - The native "Download Video" entry is gated in T1Twitter by a `cbz` on
-//   `[[media entityURL] networkURL]` (0x30d530). A nil URL skips the whole
-//   download block: neither "Download Video" nor the generic "Download".
-//   That gate, not Premium and not `allowDownload`, is why the native entry
-//   appears on some videos only.
-//
-//   - About 0.4 s before the menu is assembled, Twitter builds a
-//   `UIActivityViewController` whose single activity item is a
-//   `T1ActivityItemProvider`, which exposes `-status`. That object supplies
-//   the tweet: without it, the entry would download another tweet's media.
-//
-// The decision to add the entry never depends on English menu titles. It
-// depends on the freshly captured status and its video or GIF media
-// (mediaType 2 or 3). Titles are compared only to avoid a duplicate when the
-// native entry is already present.
+// MARK: - Tweet media download, in the media long-press menu
+
+// That menu has no Objective-C builder, so the only point on its path is the
+// two-argument +[UIMenu menuWithTitle:children:]. The tweet comes from the
+// T1ActivityItemProvider built shortly before.
 
 // T1ActivityItemProvider is not declared in src/Headers, so a declaration
 // shim is used purely as a cast target. It is never instantiated and never
@@ -477,11 +448,9 @@ static NSArray* NFBVMDFreshVideoEntities(void) {
     return nil;
 }
 
-// The title comes from Twitter's own bundle, so it matches the native entry
-// exactly and is translated in every language without adding a string. This
-// mirrors the DOWNLOAD_ACTIVITY_VIEW_LABEL lookup used earlier in this file.
-// localizedStringForKey:value:key returns the key itself when it is missing,
-// hence the explicit fallback.
+// The title comes from Twitter's own bundle, so it matches the native entry and is
+// translated without adding a string. localizedStringForKey:value: returns the key
+// itself when missing, hence the explicit fallback.
 static NSString* NFBVMDMenuTitle(void) {
     NSString* key = @"DOWNLOAD_VIDEO_ACTIVITY_VIEW_LABEL";
     NSString* title = [[BHTBundle sharedBundle] localizedTwitterStringForKey:key];

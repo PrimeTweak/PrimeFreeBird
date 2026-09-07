@@ -91,13 +91,10 @@ void NFBDebugLog(NSString* format, ...) {
 }
 
 // MARK: - watch list
-//
-// The journal alone could only record
-// what the current hypothesis said to record. This is the missing capability:
-// class names added HERE, at runtime, from the diagnostics screen — and every
-// lifecycle event on matching views is journaled with millisecond stamps and
-// the instance pointer. "Removed, then a DIFFERENT instance arrives 100 ms
-// later" becomes three journal lines instead of three builds.
+
+// Class names added at runtime from the diagnostics screen. Every lifecycle event
+// on a matching view is journaled with a millisecond stamp and the instance
+// pointer, so a view being replaced rather than moved is readable.
 
 static NSString* const kNFBWatchDefaultsKey = @"nfb_watch_classes";
 static NSArray<NSString*>* gNFBWatchCache;
@@ -201,10 +198,9 @@ typedef struct {
     NSUInteger okRuntime;
 } NFBHealthCounts;
 
-// deadClasses  — the class is gone: a real break, counted and shown loud.
-// unresolved   — class present, method not found statically: usually a Swift or
-//                category method the hook still reaches; shown quietly.
-// deadRuntime  — a by-name class is gone: a real break.
+// deadClasses: the class is gone, a real break. unresolved: class present, method
+// not found statically, usually a Swift or category method the hook still reaches.
+// deadRuntime: a by-name class is gone, a real break.
 static void NFBCollectHealth(NSMutableArray<NSString*>* deadClasses,
                              NSMutableArray<NSString*>* unresolvedMethods,
                              NSMutableArray<NSString*>* deadRuntime,
@@ -212,16 +208,9 @@ static void NFBCollectHealth(NSMutableArray<NSString*>* deadClasses,
     NSUInteger okClasses = 0;
     NSUInteger okMethods = 0;
 
-    // Class + method dependencies. A NULL method means "class hooked, no
-    // specific method" — the class alone is checked.
-    //
-    // Two failure kinds, kept apart because they mean different things:
-    //   · the CLASS is gone      → the whole hook is dead, a real break
-    //   · the class is here but   → often a false alarm: Swift methods and
-    //     the method isn't found     category methods don't always answer
-    //     statically                 class_getInstanceMethod, yet the hook
-    //                                still lands. Reported quietly, not counted
-    //                                as a break.
+    // A NULL method means the class alone is checked. The two failure kinds are
+    // kept apart: a missing class is a real break, while a missing method is often a
+    // Swift or category method that does not answer statically.
     for (size_t i = 0; i < NFBHookRecordCount; i++) {
         NFBHookRecord record = NFBHookRecords[i];
         Class cls = objc_getClass(record.className);
@@ -323,17 +312,9 @@ NSUInteger NFBDebuggerMissingCount(void) {
 // MARK: - view capture
 
 
-// The colour actually PAINTED in an image, and the visibility of the view that
-// carries it.
-//
-// An AlwaysOriginal image carries its own pixels, so the view's tint says
-// nothing about what is drawn: a glyph baked white reads exactly like a glyph
-// baked grey. Size and tint alone therefore cannot separate "the image is
-// invisible" from "something covers it".
-//
-// ink= is the average colour of the image's non-transparent pixels (nil when
-// the image is fully transparent), and cover= the effective alpha down the
-// ancestor chain plus any ancestor that clips it away.
+// The colour actually painted in an image, since an AlwaysOriginal image carries
+// its own pixels and the view's tint says nothing about what is drawn. ink is the
+// average of the non-transparent pixels; cover is the effective ancestor alpha.
 static NSString* NFBImageInk(UIImage* image) {
     if (!image) {
         return nil;
@@ -541,11 +522,10 @@ NSString* NFBDebuggerReport(void) {
 // MARK: - share sheet
 
 // MARK: - floating trigger
-//
-// The shake gesture proved unreliable: motion events travel the first-responder
-// chain, and when nothing is first responder — or the app consumes the event —
-// the window never sees them. A button is not a gesture: it is always there and
-// always answers, the way FLEX's is.
+
+// A motion gesture travels the first-responder chain, so with nothing first
+// responder, or with the app consuming the event, the window never sees it. A
+// button is always there and always answers.
 
 // Its own window so it survives every screen change, above everything, and
 // never becomes key — the capture must read the app's window, not this one.
@@ -651,7 +631,7 @@ void NFBDebuggerCaptureAndPresent(void) {
     NFBDebugLog(@"capture taken (%lu characters)", (unsigned long)capture.length);
 
     // The tab bar as it stands right now, not five seconds after launch: the
-    // faults being chased only appear once the reader has scrolled, and a fixed
+    // faults being chased only appear after a scroll, and a fixed
     // delay never catches them.
     NFBReportTabBarStack(@"shake");
     NFBReportNavigationBar(@"shake");
@@ -766,12 +746,9 @@ void NFBDebuggerInstall(void) {
     // the two reads shows up as a difference instead of a theory.
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(12.0 * NSEC_PER_SEC)),
                    dispatch_get_main_queue(), ^{ NFBReportTabBarStack(@"12s"); });
-    // The health check runs twice. The first pass, soon after launch, catches
-    // the obvious. The second, later, gives frameworks that only load with
-    // their screen (DM, Immersive, Guide) time to arrive before their classes
-    // are judged — otherwise every not-yet-loaded class reads as a false break.
-    // The on-device screen recomputes on every open anyway, so it is always
-    // current; these log passes are for a developer watching at launch.
+    // The health check runs twice: the first pass catches the obvious, the second
+    // gives frameworks that load with their screen time to arrive before their
+    // classes are judged. The on-device screen recomputes on every open.
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(2.0 * NSEC_PER_SEC)),
                    dispatch_get_main_queue(), ^{
         os_log(NFBDebugLogHandle(), "%{public}@", NFBHealthBlock());
@@ -1035,10 +1012,8 @@ void NFBReportTabBarStack(NSString* moment) {
     // the block form warns about a retain cycle and needs clearing afterwards.
     NFBDescribeTree(host, 0, describe);
 
-    // The native bar, in detail: whether iOS grafted its own glass machinery on
-    // (the _UILiquidLens / platter / floating-provider views), where it sits,
-    // how many items it carries and which one is selected. If the capsule never
-    // appears, this is the line that says whether UIKit built it at all.
+    // The native bar in detail: whether iOS grafted its own glass machinery on,
+    // where it sits, how many items it carries and which one is selected.
     __block UITabBar* native = nil;
     EnumerateSubviewsRecursively(host, ^(UIView* sub) {
       if (!native && [sub isKindOfClass:[UITabBar class]]) {

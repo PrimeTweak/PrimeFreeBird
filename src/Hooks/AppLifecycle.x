@@ -282,11 +282,9 @@ static void applySplashBrandColors(UIView* view) {
                                             blue:0xF2 / 255.0
                                            alpha:1.0];
     view.backgroundColor = twitterBlue;
-    // Fresh installs still flashed black: on the very first render the
-    // backdrop comes from bare CALayers (no backing view) and from subviews
-    // that carry no background colour of their own, so a view-only,
-    // only-if-already-painted repaint never reached it. Paint the layer tree
-    // as well, and paint every non-image subview unconditionally.
+    // On the very first render the backdrop comes from bare CALayers and from
+    // subviews carrying no background colour, which a view-only repaint never
+    // reaches. The layer tree and every non-image subview are painted too.
     view.layer.backgroundColor = twitterBlue.CGColor;
     for (CALayer* layer in view.layer.sublayers) {
         layer.backgroundColor = twitterBlue.CGColor;
@@ -347,10 +345,9 @@ static UIImage* launchBirdImage(CGFloat side) {
 
 %end
 
-// The black frame comes at the END, not the start: the splash is torn
-// down before the timeline has drawn, and a window with no background colour
-// is black. Painting the window blue fills exactly that gap, and letting the
-// splash fade out rather than cutting hides the seam.
+// The splash is torn down before the timeline has drawn, and a window with no
+// background colour is black. Painting the window fills that gap, and fading the
+// splash out rather than cutting hides the seam.
 
 static BOOL gNFBSplashRevealing = NO;
 

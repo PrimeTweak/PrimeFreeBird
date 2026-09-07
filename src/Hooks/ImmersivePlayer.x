@@ -8,86 +8,47 @@
 
 // MARK: - Immersive Player Timestamp
 
-// The controls view keeps the label's mode in progressLabelMode, a payload-free
-// Swift enum held in a single byte, and Twitter starts it on the countdown.
-// Tapping the label flips that byte, so flipping it once per controls view has
-// the same effect while leaving later taps free to flip it back. The byte is
-// written rather than the tap replayed: the tap handler is not exposed to the
-// Objective-C runtime on this build, so no message can reach it.
-//
-// The bar is unmounted while only the progress line shows and mounts fresh for
-// the full strip, so each appearance starts from Twitter's countdown and gets
-// one flip, on its first layout.
+// The label's mode lives in progressLabelMode, a single byte started on the
+// countdown, and a tap flips it. The byte is written directly, once per controls
+// view: the tap handler is not exposed to the runtime on this build.
 
 static const void* kNFBRestoredTimestampKey = &kNFBRestoredTimestampKey;
 
-// The card on screen, so the bar can reach it the moment it mounts. Weak: a
-// card that goes away leaves nothing behind. The fold itself is defined with
-// the tap section further down, and announced here because the controls view —
-// hooked just below — is what asks for it.
+// The card on screen, so the bar can reach it the moment it mounts. Weak, so a
+// card that goes away leaves nothing behind. The fold is defined with the tap
+// section further down and announced here.
 static __weak UIView* gNFBActiveCard = nil;
 // When a card entered the window. The bar and the fold both read it, and the
 // bar's hook sits at the top of this file, so it is declared here.
 static const void* kNFBCardShownAtKey = &kNFBCardShownAtKey;
-// Measured on screen at 60 frames a second: the app animates its overlay in
-// over about six frames while the timeline is still on its way out, and the
-// fold can only answer once those views exist. The bar is therefore kept clear
-// for the length of that animation — the bar alone, never the card: the card's
-// visibility is what gates autoplay, and dimming it stops playback outright.
+// The app animates its overlay in over about six frames while the timeline is
+// still leaving, and the fold can only answer once those views exist. The bar
+// alone is kept clear for that span: the card's visibility gates autoplay.
 static const NSTimeInterval kNFBBarRevealDelay = 0.3;
-// When the reader last tapped. The player reports its state through an
-// asynchronous machine, so for a moment after a tap it still answers with the
-// old one — long enough for the fold to read "playing" while the bar is coming
-// up for a pause, and take it straight back down. The reader's own tap already
-// put the bar where it belongs, so nothing else touches it for a beat.
+// When the last tap landed. The player reports its state asynchronously and for a
+// moment still answers with the old one, so nothing else touches the bar for a
+// beat after a tap has already placed it.
 static NSTimeInterval gNFBLastUserTap = 0;
 static const NSTimeInterval kNFBUserTapGrace = 0.6;
 
-// A view the app animates in with the presentation and folds away a moment
-// later is held clear for the length of that animation, then given back
-// unconditionally — an invisible one would be worse than a visible flash.
-// Only the app's own overlay plugins are treated this way, never the card and
-// never anything carrying the video: the card's visibility is what gates
-// autoplay, and dimming it stops playback outright.
+// A view the app animates in with the presentation is held clear for that
+// animation, then given back unconditionally. Only the overlay plugins, never the
+// card or anything carrying the video: the card's visibility gates autoplay.
 static UIView* nfbImmersiveControlsView(UIView* card);
 
-// The app's own chrome for a full-screen video: avatar, name, follow control,
-// engagement actions, back button, top gradient and the bottom bar. It is
-// painted while the video is opening and taken down a moment later, and that
-// moment is what the reader sees. Every one of these was read off the screen,
-// not guessed, and each name is present in the binary.
-//
-// They are kept out of sight for the length of the opening only. Afterwards the
-// view is left entirely alone, so a tap that asks for the controls still gets
-// them.
-// Whether the reader has asked for the app's chrome on the video now showing.
-// Measured: the app drives every piece of chrome with alpha and re-asserts
-// alpha 1 continuously - hundreds of times while a video plays - so no window
-// of time can hold it down. It is also asserted while the player reports
-// playing, paused and no state at all, so the playback state cannot tell the
-// two apart either. What does tell them apart is who asked: a tap the reader
-// made, or the app bringing it up on its own. Cleared for every new video,
-// raised by a real tap.
-//
-// Nothing that is visible once a video has settled is suppressed by this: every
-// one of these views ends at alpha 0 on its own. Only the ride up and back down
-// is taken away.
-// The reader's intent. Set by a real tap - "was playing, so wants paused" -
-// and by nothing else. Playback is held to it after every tap the app sees,
-// because 12.21's own tap toggles playback a runloop turn later than the tap.
+// Whether the chrome has been asked for on the video now showing. The app drives
+// every piece with alpha and re-asserts 1 continuously, under every playback
+// state, so only who asked tells a real request from the app's own ride up.
 static BOOL gNFBWantPaused = NO;
 
-// The chrome gate. Every chrome setAlpha: records the alpha the app wanted,
-// then passes it through when the gate is open (paused) and pins 0 when it is
-// closed (playing). Opening the gate replays the wanted alphas, so a pause
-// shows the chrome the app already raised without a tap, and closing it hides
-// the chrome at once - no flash on resume. The recorded alphas are also the
-// only honest reading of what the app itself wants shown.
+// The chrome gate. Every chrome setAlpha: records the alpha the app wanted, then
+// passes it through when open and pins 0 when closed. Opening replays the recorded
+// alphas, so a pause shows chrome the app already raised.
 static NSHashTable<UIView*>* gNFBGatedViews = nil;
 static const void* kNFBWantedAlphaKey = &kNFBWantedAlphaKey;
 
 // Synthetic taps left for the current pause. The app raises its chrome through
-// its tap and through nothing else, so when the reader pauses and the app's
+// its tap and through nothing else, so on a pause where the app's
 // chrome is down a tap is sent - bounded, spaced, and never for a resume.
 static NSInteger gNFBSyntheticBudget = 0;
 static const NSInteger kNFBSyntheticPerPause = 3;
@@ -155,10 +116,9 @@ static void nfbReplayChromeAlphas(UIView* card) {
     }
 }
 
-// Playback held to the reader's intent, on a short ladder after any tap the
-// app has seen: the app's own toggle lands a turn or more later, and on 12.21
-// it lands whatever the tap was for. Each rung re-reads the state and only
-// acts on a mismatch, so a tap the app answered correctly costs nothing.
+// Playback held to the recorded intent on a short ladder after any tap: the app's
+// own toggle lands a turn or more later. Each rung re-reads the state and acts
+// only on a mismatch.
 static void nfbShowPausedGlyph(UIView* card, BOOL paused);
 static void nfbUpdateMinimalBar(UIView* card, TAVPlayer* player);
 static TAVPlayer* nfbCardPlayer(UIView* card);
@@ -251,7 +211,7 @@ static void nfbRestoreTimestamp(UIView* controls) {
         return;
     }
     // Mounting while a card is opening means this is the overlay riding in on
-    // the presentation, not a bar the reader asked for.
+    // the presentation, not a bar that was asked for.
     nfbHoldThroughOpening(bar);
     dispatch_async(dispatch_get_main_queue(), ^{
       nfbFoldIfDue(gNFBActiveCard);
@@ -262,26 +222,19 @@ static void nfbRestoreTimestamp(UIView* controls) {
 
 // MARK: - Disable video docking
 
-// Docking shrinks a full-screen video into a floating mini player. Two paths
-// reach it: the drop-zone view the card is dragged onto, and the controllers'
-// own eligibility check — closing both leaves the swipe-to-dismiss gesture
-// free to work normally.
+// Docking shrinks a full-screen video into a floating mini player. Two paths reach
+// it, the drop-zone view and the controllers' eligibility check; closing both
+// leaves swipe-to-dismiss working normally.
 
 // MARK: - A tap opens a video, it does not wake the sound
 
-// The timeline's video view carries a flag whose whole job is "a tap turns the
-// sound on": isAutoUnmuteEnabled, one byte beside isHoldingInlineAudioFocus.
-// That is why a tapped video came out of the timeline unmuted and stayed that
-// way, while its neighbours kept quiet — the tap that opens full screen is the
-// same tap that lifts the mute. The flag is cleared here, on the view itself,
-// before its handler runs. The speaker button in the controls is untouched, and
-// so is every other route to the sound.
+// The timeline's video view carries isAutoUnmuteEnabled, whose job is to let a
+// tap turn the sound on — the same tap that opens full screen. It is cleared on
+// the view before its handler runs; every other route to the sound is untouched.
 
-// One rule, and no timing at all: the sound is off unless the reader turned it
-// on, and the only thing that turns it on is the speaker button on this bar.
-// Stretches of silence armed around each suspected moment were always one
-// signal short — the app wakes the sound on opening, on leaving, and on its own
-// mid-playback, each by a different route, and a stretch that ends is a hole.
+// One rule and no timing: the sound is off unless the speaker button on this bar
+// turned it on. The app wakes it on opening, on leaving and mid-playback by
+// different routes, so any window-based rule leaves a hole.
 static BOOL gNFBSoundAllowed = NO;
 
 // Whether a video opens silent. The reader chooses; the stored default keeps
@@ -325,12 +278,9 @@ static void nfbClearAutoUnmute(UIView* view) {
 
 %end
 
-// Every door the sound comes through, all closed unless the reader opened them.
-// The mute flag is only one of two levers: the player also carries a volume,
-// and the handover back to the timeline raises that one — which is why a
-// player left muted still made a sound on the way out. Playback covers a player
-// born loud, which is how a full-screen video arrives and how the timeline
-// takes one back.
+// Every door the sound comes through. The mute flag is one of two levers: the
+// player also carries a volume, and the handover back to the timeline raises that
+// one. Playback covers a player born loud.
 %hook TAVPlayer
 
 // Every guard below is gated on the clean player. With it off, Twitter's own
@@ -434,23 +384,14 @@ static BOOL isImmersiveCardPan(id viewController,
 %end
 
 // MARK: - Tap to pause
-//
-// A single tap on an immersive video toggles playback, and the bar follows the
-// playback state: paused shows the full controls, playing keeps the bare
-// progress line. The bar's presence is its state — Twitter unmounts the
-// controls view entirely behind the progress line and mounts it back for the
-// full strip — so mounted-or-not is read directly, and the native tap handler,
-// the only lever that moves the bar, runs when that reading disagrees with the
-// playback state. Videos open playing with the bar mounted, so the same match
-// is applied again after every playback-state change: that folds the bar at
-// open and on each swipe to the next video, and heals any drift. A glyph marks
-// the pause at the centre of the card, where the app draws none of its own.
 
-// The synthetic tap goes through Twitter's own handler, which moves the bar AND
-// the playback state. The reconciler then measures a state its own tap just
-// changed and asks again, which is how a single opening produced dozens of taps
-// in bursts. One tap per card per cooldown breaks that loop: the first fold
-// still happens at once, and nothing can chase its own tail afterwards.
+// A tap toggles playback and the bar follows the state: paused shows the full
+// controls, playing keeps the progress line. The bar's presence is its state, and
+// the native tap handler runs whenever the two disagree.
+
+// The synthetic tap goes through Twitter's handler, which moves the bar and the
+// playback state, so the reconciler would measure a state its own tap changed.
+// One tap per card per cooldown breaks that loop.
 static const NSTimeInterval kNFBFoldCooldown = 0.5;
 static const void* kNFBLastFoldKey = &kNFBLastFoldKey;
 
@@ -458,13 +399,9 @@ static const void* kNFBPausedGlyphKey = &kNFBPausedGlyphKey;
 static const void* kNFBReconcilePendingKey = &kNFBReconcilePendingKey;
 static const void* kNFBMinimalBarKey = &kNFBMinimalBarKey;
 static const void* kNFBMinimalTimerKey = &kNFBMinimalTimerKey;
-// The app cross-fades the timeline into the immersive player, and the timeline
-// carries its own control bar out of the frame. This bar waits for that to
-// finish rather than joining it: two sets of times on screen at once read as a
-// glitch, however brief.
-// Measured at 60 frames a second on the opening: the app's overlay is gone by
-// the ninth frame, about 150 ms. This waits just past that and no longer —
-// every extra millisecond is a hole where nothing is on screen.
+// The app's overlay is gone about 150 ms into the opening, and this waits just
+// past that: two sets of times on screen at once read as a glitch, while every
+// extra millisecond is a hole with nothing shown.
 static const NSTimeInterval kNFBOpeningSettle = 0.18;
 static const NSInteger kNFBMinimalTrackTag = 90211;
 static const NSInteger kNFBMinimalFillTag = 90212;
@@ -508,17 +445,9 @@ static TAVPlayer* nfbCardPlayer(UIView* card) {
     return pageView ? nfbImmersivePagePlayer(pageView) : nil;
 }
 
-// Twitter's own tap handler turns the sound on as well as moving the controls,
-// and this tweak has always kept that off: before, by swallowing the tap
-// entirely — which is why the controls never came back either. Now the handler
-// runs and the audio state is put back around it.
-//
-// The decision does not live on the player. The immersive session owns it, in
-// an ImmersiveAudioSessionManager held by the card host, whose isMuted byte is
-// what every card reads — a player put back on its own is overruled by the next
-// pass. Both are restored: the session's byte, so the decision stands, and the
-// player, so the sound stops now. Sound changes go through the same
-// asynchronous machine as playback, so it is done on this turn and the next few.
+// Twitter's tap handler turns the sound on as well as moving the controls, so the
+// handler runs and the audio state is restored around it: the session manager's
+// isMuted byte, which every card reads, and the player itself.
 
 // The session manager sits on the host view above the cards.
 static id nfbImmersiveAudioManager(UIView* card) {
@@ -578,10 +507,8 @@ static BOOL nfbCurrentMuted(UIView* card, TAVPlayer* player) {
     return sessionMuted ? *sessionMuted != 0 : NO;
 }
 
-// The bar does not live inside the card — the card only forwards its state to
-// it — so the search starts from the window the card is in. Looking under the
-// card alone finds nothing, and a state that cannot be read is a state that
-// cannot be matched.
+// The bar does not live inside the card, which only forwards its state, so the
+// search starts from the window. Looking under the card alone finds nothing.
 static UIView* nfbFirstDescendantOfClass(UIView* root, Class cls) {
     for (UIView* sub in root.subviews) {
         if ([sub isKindOfClass:cls]) {
@@ -595,16 +522,9 @@ static UIView* nfbFirstDescendantOfClass(UIView* root, Class cls) {
     return nil;
 }
 
-// The controls bar on screen. Measured: the bar is NOT a descendant of the
-// card, so the search has to start at the window. Narrowing it to the card
-// returns nil every time, the reconciler never folds, and Twitter's overlay
-// stays up for good.
-// Present means visible, not merely mounted. 12.15 unmounted VideoControlsView
-// when the chrome folded; 12.21 keeps it mounted at alpha 1 under a
-// BottomBarControls held at alpha 0 - measured, every census line reported it
-// found. Read as "chrome up", that kept the minimal bar away for good and had
-// the reconciler tapping to dismiss chrome that was not showing, which is the
-// flash on resume. A view that cannot be seen is answered as absent.
+// Present means visible, not merely mounted: 12.21 keeps the controls view
+// mounted at alpha 1 under a BottomBarControls held at alpha 0. A view that
+// cannot be seen is answered as absent.
 static BOOL nfbViewCanBeSeen(UIView* view) {
     for (UIView* v = view; v; v = v.superview) {
         if (v.hidden || v.alpha <= 0.01) {
@@ -631,11 +551,8 @@ static UIView* nfbImmersiveControlsView(UIView* card) {
 // it, so the card's own tap gesture stays the only thing handling them.
 
 // One census of the card's chrome, taken twice after it opens and once on every
-// pause. 12.21 shipped 82 immersive classes this file has never heard of -
-// among them ImmersivePlayPauseButtonPluginView and ImmersiveVideoTimelinePluginView,
-// the two that match what the reader sees: native controls coming back on
-// pause, and a flash. The list names each mounted plugin with its alpha, so the
-// hide list below can be extended from fact rather than from the class dump.
+// pause. Each mounted plugin is named with its alpha, so the hide list below can
+// be extended from what is actually on screen.
 static void nfbCensusWalk(UIView* view, NSInteger depth, NSMutableArray* lines) {
     NSString* name = NSStringFromClass([view class]);
     if (depth > 0 && lines.count < 40 &&
@@ -728,18 +645,14 @@ static void nfbShowPausedGlyph(UIView* card, BOOL paused) {
 }
 
 // MARK: - Minimal bar
-//
-// Twitter mounts and unmounts its whole bottom bar as one piece: when the
-// controls go, the progress line goes with them and nothing is left over the
-// video. The minimal state is therefore drawn here — a track, its fill, and the
-// times above — and it lives only while the app's own bar is away. The player
-// is polled on a timer rather than driven by playback callbacks, so the fill
-// advances at a steady rate whatever the app reports and when.
 
-// Measured off the app's own bar: the line sits 49 pt above the safe area and
-// is 3 pt tall edge to edge, and the times ride 20 pt above it in the system
-// face at 15 pt, regular, in the app's secondary gray. Keeping the same
-// geometry means the line does not move when Twitter's bar takes over.
+// Twitter mounts and unmounts its whole bottom bar as one piece, so nothing is
+// left over the video. A track, its fill and the times are drawn here while the
+// app's bar is away, polled on a timer so the fill advances at a steady rate.
+
+// Taken off the app's own bar: the line sits 49 pt above the safe area, 3 pt tall
+// edge to edge, with the times 20 pt above it at 15 pt regular. The same geometry
+// means the line does not move when Twitter's bar takes over.
 static const CGFloat kNFBMinimalTrackHeight = 3.0;
 static const CGFloat kNFBMinimalTrackLift = 49.0;
 static const CGFloat kNFBMinimalClockLift = 20.0;
@@ -928,7 +841,7 @@ static void nfbUpdateMinimalBar(UIView* card, TAVPlayer* player) {
                         : 0.0;
     CGFloat ratio = (total > 0 && isfinite(elapsed)) ? elapsed / total : 0.0;
     ratio = MAX(0.0, MIN(1.0, ratio));
-    // While the reader drags, the position under the thumb is the truth; the
+    // While a drag is in progress the position under the thumb is the truth; the
     // player is following it, not the other way round.
     if (scrubbing) {
         ratio = [objc_getAssociatedObject(card, kNFBScrubRatioKey) doubleValue];
@@ -1007,10 +920,9 @@ static void nfbUpdateMinimalBar(UIView* card, TAVPlayer* player) {
     }
 }
 
-// Dragging the track moves the video. The band above it takes the touch, the
-// track thickens while it is held, and the player is sent to the position under
-// the thumb — throttled, since a seek on every frame of the drag would stutter,
-// with a last one on release so the final position is exact.
+// Dragging the track moves the video: the band above it takes the touch, the track
+// thickens while held, and the player is sent to the position under the thumb,
+// throttled, with a last seek on release so the final position is exact.
 static void nfbHandleScrubGesture(UIView* card, UILongPressGestureRecognizer* press) {
     UIView* bar = objc_getAssociatedObject(card, kNFBMinimalBarKey);
     UIView* track = bar ? [bar viewWithTag:kNFBMinimalTrackTag] : nil;
@@ -1061,28 +973,19 @@ static void nfbHandleScrubGesture(UIView* card, UILongPressGestureRecognizer* pr
 }
 
 // MARK: - Folding the bar as early as it exists
-//
-// The app raises its whole overlay as a video opens and the fold takes it back
-// down, so the gap between the two is what shows. Nothing here touches opacity
-// or visibility: the card's own visibility is what the app reads to decide
-// whether a video may autoplay, and dimming it stops playback outright. The
-// gap is closed by acting sooner instead — the bar is watched on a short
-// repeat and folded on the very tick it appears, while the video plays.
+
+// The gap between the app raising its overlay and the fold taking it down is what
+// shows. Nothing here touches opacity or visibility, since the card's visibility
+// gates autoplay; the bar is watched on a short repeat and folded as it appears.
 
 // One display frame on a 120 Hz screen, so the net behind the mount signal is
 // never late by more than a frame; the count keeps the same 0.7 s of watch.
 static const NSTimeInterval kNFBFoldTick = 0.05;
 static const NSInteger kNFBFoldAttempts = 60;
 
-// Folds when the bar and the playback state disagree. Returns NO while the
-// answer is still to come — the video not yet playing, or the bar not yet
-// mounted — which is the signal to look again.
-// One tick of the control loop. Returns YES only when there is nothing left to
-// watch - the card is gone or the feature is off; every other answer is "not
-// now", so the watch keeps ticking until its budget runs out. The loop has one
-// rule: while the reader wants a pause and the app's own chrome is down, send
-// the app a tap, since its tap is the only thing that raises its chrome.
-// Nothing is ever sent for a resume - the gate hides the chrome on its own.
+// Folds when the bar and the playback state disagree, and returns NO while the
+// answer is still to come, which is the signal to look again. A tap is sent only
+// to raise the app's chrome for a pause; a resume is handled by the gate.
 static BOOL nfbFoldIfDue(UIView* card) {
     if (!card || !card.window || ![BHTSettings boolForKey:@"tap_to_pause"]) {
         return YES;
@@ -1187,10 +1090,9 @@ static void nfbStartFoldWatch(UIView* card) {
         %orig;
         return;
     }
-    // A real tap sets the intent from the state it found: playing means the
-    // reader wants a pause, anything else means play. The gate follows at once
-    // - open, it replays the alphas the app asked for, so chrome the app has
-    // already raised shows without a tap; closed, everything goes dark now.
+    // A real tap sets the intent from the state it found. The gate follows at
+    // once: open, it replays the alphas the app asked for; closed, everything goes
+    // dark now.
     gNFBLastUserTap = [NSDate timeIntervalSinceReferenceDate];
     BOOL wasPlaying = player.playbackState.timeControlStatus != 0;
     gNFBWantPaused = wasPlaying;
@@ -1268,11 +1170,9 @@ static void nfbStartFoldWatch(UIView* card) {
 
 %end
 
-// Playback-state changes are the one signal that fires at autoplay, at every
-// swipe to a new video and at the end of one, so the bar is re-matched to the
-// playback state here, off the tap path. The synthesized tap goes through the
-// card's own recognizer; without it nothing is sent — a bar out of place is
-// better than a crash on a handler that may read it.
+// Playback-state changes fire at autoplay, at every swipe to a new video and at
+// the end of one, so the bar is re-matched here, off the tap path. Without the
+// card's own recognizer nothing is sent.
 %hook _TtC14T1TwitterSwift22ImmersiveVideoPageView
 
 - (void)player:(id)player didUpdatePlaybackState:(id)playbackState {
@@ -1294,14 +1194,10 @@ static void nfbStartFoldWatch(UIView* card) {
 %end
 
 // MARK: - The app's chrome stays down while a video opens
-//
-// Measured: none of these are unmounted between openings. The app leaves them
-// in place and drives them with alpha, so a hook on didMoveToWindow fires once
-// in the app's lifetime and never again on a recycled card. What repeats on
-// every opening is the ramp back to alpha 1, and that is what is intercepted.
-//
-// Only for the length of the opening. Afterwards every one of them is left
-// alone, so a tap that asks for the controls still gets them.
+
+// None of these are unmounted between openings: the app leaves them in place and
+// drives them with alpha, so the ramp back to alpha 1 is what is intercepted, and
+// only for the length of the opening.
 
 // author, handle and follow control
 %hook _TtC14T1TwitterSwift25ImmersiveStatusPluginView
@@ -1408,12 +1304,10 @@ static void nfbStartFoldWatch(UIView* card) {
 %end
 
 // scrubber, timer and playback buttons
-// 12.21 additions, measured with the chrome census. With the player running and
-// the chrome folded, these three still sat at alpha 1: the native timeline
-// (440x3), its scrub label strip (440x36) and the attribution line - so the
-// app's own bar showed through under the tweak's minimal one. On a tap the
-// play/pause plugin rose to 1 while the plugins listed above stayed at 0, which
-// is the half-mounted chrome the reader saw. Same rule as every plugin above.
+
+// The native timeline, its scrub label strip and the attribution line stay at
+// alpha 1 with the chrome folded, so the app's own bar shows through under the
+// minimal one. Same rule as every plugin above.
 %hook _TtC14T1TwitterSwift32ImmersiveVideoTimelinePluginView
 - (void)setAlpha:(CGFloat)alpha {
     nfbNoteChromeAlpha((UIView*)self, alpha);

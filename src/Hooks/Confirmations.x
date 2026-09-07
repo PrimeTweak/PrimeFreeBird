@@ -112,10 +112,9 @@ static BOOL UndoTweetEnabled(void) {
     return [BHTSettings integerForKey:@"undo_tweet_timeout"] > 0;
 }
 
-// Force every composition onto the premium undo path (outbox timer, no cap) —
-// the free path is just a toast, capped at 10s. Forcing config access and the
-// per-type toggles marks it undoable; the forced undoTimeInterval becomes the
-// real send delay.
+// Forces every composition onto the premium undo path, an outbox timer with no cap,
+// where the free path is a toast capped at 10 s. Config access and the per-type
+// toggles mark it undoable, and undoTimeInterval becomes the send delay.
 %hook T1UndoSendConfig
 
 - (BOOL)hasAccessToUndoSend {

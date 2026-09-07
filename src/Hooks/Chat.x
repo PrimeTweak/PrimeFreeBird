@@ -28,10 +28,9 @@ static BOOL nfbIsChatWebSocketURL(NSURL* url) {
     return host.length > 0 && [host hasPrefix:@"chat-ws."];
 }
 
-// The typing heartbeat is a Thrift TBinaryProtocol struct whose first fields
-// are fixed: a struct opener, field 1 as a struct, field 2 as a string of
-// length zero. Ten bytes are enough to tell it apart from delivery, receipt
-// and presence frames, which differ from the third byte on.
+// The typing heartbeat is a Thrift TBinaryProtocol struct with fixed first fields.
+// Ten bytes are enough to tell it apart from delivery, receipt and presence frames,
+// which differ from the third byte on.
 static const uint8_t kNFBTypingFramePrefix[] = {
     0x0c, 0x00, 0x01, 0x0b, 0x00, 0x02, 0x00, 0x00, 0x00, 0x00
 };
@@ -55,11 +54,9 @@ static void nfbTagIfChatSocket(NSURLSessionWebSocketTask* task, NSURL* url) {
 }
 
 // MARK: - Recorder
-//
+
 // Off unless the debug switch is on. Prints the first sixteen bytes of every
-// outgoing frame on the chat socket, which is what naming a new frame shape
-// takes: open a conversation, read the log, compare the frames that appear on
-// opening with those that appear while typing.
+// outgoing frame on the chat socket, which is what naming a new frame shape takes.
 
 static void nfbLogChatFrame(NSData* data) {
     if (!data.length || ![BHTSettings boolForKey:@"debug_tools"]) {
@@ -80,7 +77,7 @@ static void nfbLogChatFrame(NSData* data) {
 }
 
 // MARK: - Send interception
-//
+
 // The websocket task's class is private, so its send is swizzled on the first
 // instance seen rather than hooked by name.
 

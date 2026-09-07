@@ -81,9 +81,9 @@ static void NFBHideThread(NSString* threadID, NSString* who, NSString* preview) 
 }
 
 // MARK: - Reading a Tweet
-//
+
 // Values are asked of the model rather than assumed: a timeline carries several
-// kinds of entry, and only some of them answer these.
+// kinds of entry, and only some answer these.
 
 // The return type is checked before the call. A timeline model answers some of
 // these with an integer, and reading an integer as an object hands a number to
@@ -178,10 +178,8 @@ static NSString* NFBThreadIDForModel(id model) {
     return NFBIdentifierValue(model, @selector(statusID));
 }
 
-// Measured on the device: the timeline's view model is a
-// T1URTTimelineStatusItemViewModel, and it does not answer replyCount. Its own
-// name for the same number is aggregatedDisplayReplyCount. Both are asked, in
-// that order, so a model that carries either is understood.
+// The timeline's view model does not answer replyCount; its own name for the same
+// number is aggregatedDisplayReplyCount. Both are asked, in that order.
 static NSInteger NFBReplyCountForModel(id model) {
     if ([model respondsToSelector:@selector(aggregatedDisplayReplyCount)]) {
         return (NSInteger)NFBAskInteger(model,
@@ -190,18 +188,9 @@ static NSInteger NFBReplyCountForModel(id model) {
     return (NSInteger)NFBAskInteger(model, @selector(replyCount));
 }
 
-// The row holds a view model, but the numbers this file needs — the reply
-// count, the conversation identifier — live on the status object underneath it
-// (TFNTwitterStatus, verified in the binary: it alone carries replyCount,
-// conversationID, inReplyToStatusID and statusID). Asking the view model for
-// them answered nothing, which is why no button was ever built.
-//
-// The link between the two is not guessed: the object that answers replyCount
-// is looked for, first among the usual names, then among the model's own
-// instance variables. Only something that actually answers is accepted.
 // What makes an object usable here: it answers at least one of the four values
-// this file needs. Requiring replyCount alone rejected the very model the crash
-// report proved was reachable — it answers inReplyToStatusID, not the count.
+// this file needs. Requiring replyCount alone rejects a model that answers
+// inReplyToStatusID and not the count.
 static BOOL NFBRespondsToStatusValue(id candidate) {
     return [candidate respondsToSelector:@selector(replyCount)] ||
            [candidate respondsToSelector:@selector(aggregatedDisplayReplyCount)] ||
@@ -252,10 +241,9 @@ static BOOL NFBModelIsConversation(id model) {
     if (NFBIdentifierValue(model, @selector(inReplyToStatusID)).length > 0) {
         return YES;
     }
-    // The count decides only when it can actually be read. Where the model does
-    // not carry it, the button is shown rather than silently withheld: hiding a
-    // conversation is harmless on a Tweet that has none, whereas a button that
-    // never appears is the failure this file has been chasing.
+    // The count decides only when it can be read. Where the model does not carry
+    // it the button is shown rather than withheld: hiding a conversation is
+    // harmless on a Tweet that has none.
     if ([model respondsToSelector:@selector(replyCount)] ||
         [model respondsToSelector:@selector(aggregatedDisplayReplyCount)]) {
         return NFBReplyCountForModel(model) > 0;
@@ -296,11 +284,10 @@ BOOL nfbThreadIsHidden(id viewModel) {
 }
 
 // MARK: - The glyph
-//
-// Drawn rather than taken from the system set: the icons in this row have a
-// thin, even stroke of their own, and a symbol from elsewhere reads as pasted
-// on. A speech bubble with a tail, crossed by a stroke that leaves a gap around
-// itself so the two shapes stay legible at this size.
+
+// Drawn rather than taken from the system set, since the icons in this row have a
+// thin even stroke of their own. A speech bubble crossed by a stroke that leaves a
+// gap around itself so both shapes stay legible at this size.
 
 static UIImage* NFBHideThreadGlyph(UIColor* colour) {
     CGFloat side = kNFBHideGlyphSide;
@@ -348,15 +335,9 @@ static UIImage* NFBHideThreadGlyph(UIColor* colour) {
     return [drawn imageWithRenderingMode:UIImageRenderingModeAlwaysOriginal];
 }
 
-// Making it disappear at once.
-//
-// The timeline memoises its filtering verdict per item, and that memo is keyed
-// by a signature the muted-word editor already bumps through
-// nfbRefreshMutedWords(). Timeline.x now folds the number of hidden
-// conversations into the same signature, so hiding one invalidates the memo the
-// way adding a muted word does. The list that carries the Tweet is then asked
-// to reload, which drops the row with the right heights rather than leaving a
-// hole behind.
+// The timeline memoises its filtering verdict per item, keyed by a signature that
+// folds in the number of hidden conversations, so hiding one invalidates the memo.
+// The list is then reloaded, which drops the row with the right heights.
 extern void nfbRefreshMutedWords(void);
 
 static UIScrollView* NFBListForButton(UIView* view) {
@@ -384,14 +365,10 @@ static void NFBReloadList(__unused UIScrollView* list) {
 }
 
 // MARK: - The confirmation strip
-//
-// Ours end to end, so its colours are ours too: the app's own strip draws its
-// label white and gives no way to change it — on this build it is rendered by
-// XDSToastContentView, whose label is out of reach.
-//
-// Placed where the app puts its own: a capsule at the top, over the header,
-// on frosted glass. The text takes the system label colour, so it is dark on a
-// light theme and light on a dark one.
+
+// Built here end to end, since the app's own strip draws its label white with no
+// way to change it. Placed where the app puts its own: a capsule at the top, over
+// the header, with the text in the system label colour.
 
 static const NSInteger kNFBToastTag = 90312;
 
@@ -423,12 +400,9 @@ static void NFBShowHiddenToast(NSString* threadID) {
     }
     [[window viewWithTag:kNFBToastTag] removeFromSuperview];
 
-    // Under Liquid Glass the capsule is real glass — the same UIGlassEffect the
-    // bars use, which draws its own rounded shape and edge. Under the standard
-    // interface it is the frosted material capsule, clipped to a rounded rect
-    // with a hairline border so it reads as a panel rather than a blurred box.
-    // The material path matches what was shipped and confirmed; only the glass
-    // path is new, and only when the setting is on.
+    // Under Liquid Glass the capsule is real glass, which draws its own rounded
+    // shape and edge. Under the standard interface it is the frosted material,
+    // clipped to a rounded rect with a hairline border.
     BOOL liquidGlass = [BHTSettings boolForKey:@"enable_liquid_glass"];
     Class glassClass = NSClassFromString(@"UIGlassEffect");
     UIVisualEffect* effect = nil;
@@ -460,13 +434,9 @@ static void NFBShowHiddenToast(NSString* threadID) {
 
     UIView* content = toast.contentView;
 
-    // The same veil used on the hidden-notification toast: pure glass
-    // let the timeline read straight through the words. 80 % of the background
-    // colour keeps the material visible underneath while the text stays legible.
-    //
-    // The rounded corners and masksToBounds are NOT optional: without them the
-    // veil renders as a square behind a capsule, which is exactly the artefact
-    // that appears without it.
+    // The same veil as the hidden-notification toast: pure glass lets the timeline
+    // read through the words, and 80 % of the background colour keeps the material
+    // visible. The rounded corners and masksToBounds are not optional.
     UIView* veil = [[UIView alloc] init];
     veil.backgroundColor = [[UIColor systemBackgroundColor] colorWithAlphaComponent:0.80];
     veil.userInteractionEnabled = NO;    // Undo must stay tappable
@@ -536,18 +506,10 @@ static void NFBShowHiddenToast(NSString* threadID) {
 }
 
 // MARK: - The entry in the Tweet's own menu
-//
-// Measured rather than assumed:
-//   · the menu under the caret is a UIKit context menu (FLEX: _UIContextMenuView
-//     → _UIContextMenuListView), so it is built from a UIMenu;
-//   · TFNButton and TFNMenuCompatibleControl are the two classes in the binary
-//     that vend one for a Tweet;
-//   · the row's model is a T1URTTimelineStatusItemViewModel and it answers
-//     conversationID — the probe printed it.
-//
-// The action provider is not read out of the configuration, which would mean
-// touching a property Apple does not expose: it is wrapped where it is passed,
-// in the public factory below. Twitter builds its menu, ours is appended after.
+
+// The menu under the caret is a UIKit context menu built from a UIMenu, vended by
+// TFNButton and TFNMenuCompatibleControl. The action provider is wrapped in the
+// public factory below rather than read out of the configuration.
 
 // From the caret button up to the Tweet it belongs to. The chain is walked at
 // the moment it is needed — when the menu is built, and again when the entry is

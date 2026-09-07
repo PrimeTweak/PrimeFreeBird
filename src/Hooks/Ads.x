@@ -5,10 +5,9 @@
 
 #import "HookHelpers.h"
 
-// Timeline items are removed from the section data before it reaches the data
-// view controller, so no empty cells or gaps are left behind. This covers every
-// timeline surface (home, profile, search, conversations) regardless of whether
-// it renders through a table view or the newer diffable collection view path.
+// Timeline items are removed from the section data before it reaches the data view
+// controller, so no empty cells are left behind. This covers every timeline surface,
+// table view and diffable collection view alike.
 
 // The promoted state of a status item is only reachable through its Swift-side
 // `status` stored property, which is still registered as an ObjC ivar.

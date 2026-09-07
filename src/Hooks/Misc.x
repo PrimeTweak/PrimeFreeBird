@@ -164,14 +164,10 @@ static CTParagraphStyleRef CreateLTRParagraphStyle(CTParagraphStyleRef original)
 %end
 
 // MARK: - Clean shared/copied links
-//
-// The tweak observes UIPasteboardChangedNotification and clean any twitter/x URL that
-// lands in the pasteboard — catching every copy path (setString:, setURL:,
-// setItems:, or the Swift share kit) rather than hooking one write API. A
-// last-cleaned guard stops the tweak's re-write from re-triggering the observer.
-// Removes ?s=, &t= and ref_* when strip_url_tracking is on; the custom
-// sharing_domain is applied independently. Mirrors the reference build's
-// BHTPasteboardChangeObserver.
+
+// UIPasteboardChangedNotification is observed rather than one write API hooked, so
+// every copy path is caught, with a last-cleaned guard against re-triggering.
+// Removes ?s=, &t= and ref_*; sharing_domain is applied independently.
 
 static NSString* NFBProcessSharedURL(NSString* urlString) {
     if (urlString.length == 0) {
@@ -212,11 +208,9 @@ static NSString* NFBProcessSharedURL(NSString* urlString) {
     return c.URL.absoluteString ?: urlString;
 }
 
-// Every share surface funnels through these builders, so cleaning here covers
-// what the pasteboard observer below cannot see: sharing a link STRAIGHT to
-// another app (Messages, Notes, AirDrop) never touches the clipboard, and
-// profile links have their own builders. A link that is already clean simply
-// passes through unchanged.
+// Every share surface funnels through these builders, which covers what the
+// pasteboard observer cannot see: a link shared straight to another app never
+// touches the clipboard. A clean link passes through unchanged.
 
 %hook TFNTwitterStatus
 

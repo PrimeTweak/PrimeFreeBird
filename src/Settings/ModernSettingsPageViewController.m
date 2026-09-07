@@ -328,10 +328,9 @@ extern NSInteger NFBColorThemeScreenVisible;
         cell.toggleSwitch.on = inverted ? !isEnabled : isEnabled;
         objc_setAssociatedObject(cell.toggleSwitch, @"prefKey", key,
                                  OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-        // The FLEX row doubles as the door to the debug tools: a long press
-        // flips debug_tools, which has no row of its own, and the diagnostics
-        // entry below follows through its parentKey. One recognizer per cell,
-        // reading the key at press time since cells are reused.
+        // The FLEX row doubles as the door to the debug tools: a long press flips
+        // debug_tools, which has no row of its own. One recognizer per cell, reading
+        // the key at press time since cells are reused.
         if (!objc_getAssociatedObject(cell, @selector(debugToolsPressed:))) {
             UILongPressGestureRecognizer* press = [[UILongPressGestureRecognizer alloc]
                 initWithTarget:self
@@ -595,12 +594,9 @@ extern NSInteger NFBColorThemeScreenVisible;
             }
         }
 
-        // Reset turns the three accent toggles off and raises a flag that keeps
-        // the accent inactive, so that a reset reverts to native rather than to
-        // the fresh-install accent. Switching one of them back ON is the same
-        // statement of intent as picking a colour, so the flag is cleared here;
-        // without this the toggle would be stored, the views refreshed, and
-        // nothing painted, with no way back short of picking a colour.
+        // Reset raises a flag that keeps the accent inactive, so it reverts to
+        // native. Switching a toggle back on states the same intent as picking a
+        // colour, so the flag is cleared here or nothing would be painted.
         if (sender.isOn &&
             ([key isEqualToString:@"tab_bar_theming"] ||
              [key isEqualToString:@"color_nfb_switches"] ||
@@ -904,18 +900,9 @@ extern NSInteger NFBColorThemeScreenVisible;
     [self presentViewController:alert animated:YES completion:nil];
 }
 
-// Gluing a checkmark onto the title pushes the word off the axis every other
-// option sits on — the mark ends up costing the alignment of the whole list.
-// UIAlertAction carries a private "checked" flag that draws the system's own
-// checkmark against the trailing edge and leaves the title centred, which is
-// how iOS marks a choice in its own pickers.
-//
-// Private means it is asked for by name rather than assumed: the setter KVC
-// would reach for is looked up once, and if a future iOS no longer has it the
-// current option is set as the alert's preferred action and comes out bold
-// instead. Neither branch touches the title, so the list stays aligned either
-// way — and a bold option instead of a checkmark is the signal that the flag
-// is gone.
+// UIAlertAction carries a private checked flag that draws the system checkmark
+// against the trailing edge and leaves the title centred. It is looked up by name;
+// without it the current option becomes the preferred action and comes out bold.
 - (void)addOption:(NSString*)title
          selected:(BOOL)selected
          toPicker:(UIAlertController*)picker
@@ -977,10 +964,9 @@ extern NSInteger NFBColorThemeScreenVisible;
         return;
     }
     BOOL isAdding = newVisibleToggles.count > oldVisibleToggles.count;
-    // Children are NOT necessarily contiguous below their parent: a row that
-    // belongs to neither can sit between them. Each child's row is looked up
-    // where it actually is - in the new list when they are appearing, in the
-    // old one when they are going away.
+    // Children are not necessarily contiguous below their parent, so each child's
+    // row is looked up where it actually is: in the new list when appearing, in the
+    // old one when going away.
     NSArray* reference = isAdding ? newVisibleToggles : oldVisibleToggles;
     NSMutableArray* indexPaths = [NSMutableArray array];
     [reference enumerateObjectsUsingBlock:^(NSDictionary* entry, NSUInteger row,

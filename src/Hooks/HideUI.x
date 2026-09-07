@@ -7,10 +7,9 @@
 
 // MARK: - Hide Blue verified checkmark
 
-// The author-row badge (SimpleBadgeable.init(statusViewModel:)) builds from the
-// merged verified flag plus identityType and ignores isBlueVerified, so both
-// getters must be silenced; brand/government badges survive via identityType.
-// TFNTwitterUser and TFNTwitterCanonicalUser forward here and need no hooks.
+// The author-row badge builds from the merged verified flag plus identityType and
+// ignores isBlueVerified, so both getters are silenced; brand and government badges
+// survive through identityType.
 
 %hook TFSTwitterUser
 
@@ -99,10 +98,9 @@
 
 // MARK: - Hide trending content on the Explore tab
 
-// Defined in ExploreTabs.x. YES when the reader asked for the whole Explore
-// chrome to go, through the "hide_explore_all" switch and nothing else. Choosing
-// which tabs to keep is a separate switch, and it leaves the bar in place while
-// ExploreTabs.x removes only the tabs that were struck.
+// Defined in ExploreTabs.x. YES only for the hide_explore_all switch, which takes
+// the whole Explore chrome. Choosing which tabs to keep is a separate switch that
+// leaves the bar in place.
 extern BOOL nfbShouldHideAllTrends(void);
 // Defined in ExploreTabs.x. Records the exact accessory view this guide vends so
 // the tab filter only ever touches THIS bar (SegmentedTabBarView is a generic
@@ -142,12 +140,9 @@ extern void nfbNoteExploreAccessoryView(UIView* v);
 
 // MARK: - No Subscribe button
 
-// Every Subscribe surface — the profile button provider (and its answers that
-// demote or hide the Follow button) and the tweet author row — shows only when
-// the relationship's eligible state is 1, so reporting "not eligible" (2) is
-// enough to keep the plain Follow button everywhere. Relationships that are
-// actively super-following stay genuine, so a real subscription keeps its
-// Subscribed button and subscriber timeline.
+// Every Subscribe surface shows only when the relationship's eligible state is 1,
+// so reporting 2 keeps the plain Follow button everywhere. An actively
+// super-following relationship is left genuine.
 
 %hook TFSTwitterRelationship
 

@@ -6,11 +6,10 @@
 #import "HookHelpers.h"
 
 // MARK: - Restore Tweet Source Labels
-//
-// The source is gone from the on-device status models, so it's fetched from
-// x.com's web GraphQL TweetDetail endpoint (reusing the web session that
-// WebCreateTweet.x establishes), cached by tweet ID, and appended to the detail
-// footer item's time string. Original idea by @nyaathea.
+
+// The source is gone from the on-device status models, so it is fetched from the
+// web GraphQL TweetDetail endpoint, reusing the session WebCreateTweet.x
+// establishes, cached by tweet ID and appended to the footer item's time string.
 
 // Source labels keyed by tweet ID (declared in BHTHookHelpers.h).
 NSMutableDictionary* tweetSources = nil;
@@ -290,9 +289,9 @@ extern UIColor* CurrentAccentColor(void);
 @end
 
 // MARK: - Footer injection
-//
+
 // -updateFooterTextView rebuilds the footer text from footerItem.timeAgo, so the
-// source is appended there before %orig; when it arrives async the tweak just re-runs it.
+// source is appended there before %orig, and re-run when it arrives async.
 
 %hook T1ConversationFooterTextView
 

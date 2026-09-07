@@ -52,11 +52,9 @@ static NSNumber* FeatureSwitchOverrideValueForKey(NSString* key) {
         return nil;
     }
 
-    // Screenshot share sheet: Twitter puts the prompt on cooldown after
-    // max_dismisses dismissals within a window. Force that max to infinity (the
-    // cooldown never triggers) and the cooldown duration to 0 (clears any
-    // cooldown already active) — only while the user wants the sheet
-    // (no_screenshot_detection OFF).
+    // Screenshot share sheet: the prompt goes on cooldown after max_dismisses
+    // dismissals. The max is forced to infinity so the cooldown never triggers and
+    // the duration to 0 so any active one clears.
     if (![BHTSettings boolForKey:@"no_screenshot_detection"]) {
         if ([key isEqualToString:@"ios_consideration_share_cooldown_max_dismisses"]) {
             return @(1000000);
@@ -69,12 +67,9 @@ static NSNumber* FeatureSwitchOverrideValueForKey(NSString* key) {
         }
     }
 
-    // Custom timelines overrides.
-    //
-    // Two switches meet here. Hiding always wins: with the strip gone, the
-    // tab options are moot. Otherwise "unlimited_timeline_tabs" decides —
-    // ON unlocks every tab type and lifts the pin limit, OFF returns nil so
-    // Twitter falls back to its own (much smaller) server values.
+    // Two switches meet here. Hiding always wins, since with the strip gone the tab
+    // options are moot. Otherwise unlimited_timeline_tabs unlocks every tab type and
+    // lifts the pin limit, or returns nil for Twitter's own server values.
     BOOL hideCustomTimelines = [BHTSettings boolForKey:@"hide_custom_timelines"];
     BOOL unlimitedTabs = [BHTSettings boolForKey:@"unlimited_timeline_tabs"];
     if ([key isEqualToString:@"hometimeline_pinned_tabs_topics_enabled"] ||
@@ -202,11 +197,9 @@ static NSNumber* FeatureSwitchOverrideValueForKey(NSString* key) {
         return @(![BHTSettings boolForKey:@"hide_grok_analyze"]);
     }
 
-    // Which tab Home opens on. Twitter's own behaviour: the choice survives
-    // for 12 hours, then a new session snaps back to "For You" (the switch
-    // ships as YES, with a 720-minute window). Answering NO removes the
-    // expiry, so the picked tab — Following — is still there tomorrow.
-    // Off, the tweak answers nothing at all and Twitter's 12-hour rule applies again.
+    // Which tab Home opens on: the choice natively survives 12 hours, then a new
+    // session snaps back to For You. Answering NO removes the expiry; off, nothing
+    // is answered and the native rule applies.
     if ([key isEqualToString:@"home_timeline_non_sticky_tab_on_new_session_enabled"]) {
         return [BHTSettings boolForKey:@"force_following_tab"] ? @NO : nil;
     }
@@ -266,10 +259,9 @@ static NSNumber* FeatureSwitchOverrideValueForKey(NSString* key) {
         return [BHTSettings boolForKey:@"enable_image_preloading"] ? @YES : nil;
     }
 
-    // Custom navigation: per-panel tab gates, forced on so every panel exists for
-    // the editor to offer. The tab bar hook keeps them out of the bar and the
-    // dash spoof (below) keeps the panels only unlocked here out of the side
-    // drawer.
+    // Per-panel tab gates, forced on so every panel exists for the editor to offer.
+    // The tab bar hook keeps them out of the bar and the dash spoof below keeps them
+    // out of the side drawer.
     if ([key isEqualToString:@"ios_tab_bar_default_show_profile"] ||
         [key isEqualToString:@"ios_tab_bar_default_show_communities"]) {
         return @YES;
@@ -283,10 +275,9 @@ static NSNumber* FeatureSwitchOverrideValueForKey(NSString* key) {
         return @YES;
     }
 
-    // The Explore News tab's server gate is forced ON unconditionally (the
-    // historical behaviour): Custom Navigation needs the panel to exist, and
-    // the Explore remap in ExploreTabs.x requires a STABLE five-tab
-    // population — hiding tabs is that one mechanism's job alone.
+    // The Explore News tab's server gate is forced on unconditionally: Custom
+    // Navigation needs the panel to exist, and the Explore remap requires a stable
+    // five-tab population.
     if ([key isEqualToString:@"ai_trends_ios_enable_news_tab"]) {
         return @YES;
     }
@@ -419,10 +410,9 @@ static NSNumber* FeatureSwitchOverrideValueForKey(NSString* key) {
         return @NO;
     }
 
-    // The Premium settings row is handled in the
-    // -isSubscriptionsSettingsItemEnabledWithProvider: hook. Creator purchases
-    // and the subscriber-only profile tab already gate on real creator
-    // eligibility, which the forced tier never affects.
+    // The Premium settings row is handled in the subscriptions hook below. Creator
+    // purchases and the subscriber-only profile tab gate on real creator
+    // eligibility, which the forced tier does not affect.
 
     // Creator Studio / Monetization entries gate purely on these switches with no
     // premium check, so follow the genuine status: a real subscriber keeps them
@@ -529,10 +519,9 @@ static NSNumber* FeatureSwitchOverrideValueForKey(NSString* key) {
     return [BHTSettings boolForKey:@"show_scroll_indicator"] ? YES : %orig;
 }
 
-// Premium row in Settings. Its gate (subscriptions_enabled || gating_bypass &&
-// isPremiumTierUser) is on for everyone as an upsell, so %orig can't hide
-// it — short-circuit to NO unless the account (the provider) is genuinely
-// premium.
+// Premium row in Settings. Its own gate is on for everyone as an upsell, so %orig
+// cannot hide it: the answer is short-circuited to NO unless the provider reports a
+// genuinely premium account.
 - (BOOL)isSubscriptionsSettingsItemEnabledWithProvider:(id)provider {
     if (![provider respondsToSelector:@selector(isPremiumTierUser)]) {
         return %orig;
@@ -800,11 +789,9 @@ BOOL panelIsGenuinelyAvailable(long long panelID) {
 
 // MARK: - Custom navigation - side drawer rows
 
-// The drawer builds a row for each panel absent from the tab bar, reading a
-// snapshot taken in updateVisiblePanelIDs. Extra panels are injected only
-// there, scoped by a flag — other visiblePanelIDs readers must see the real tab
-// state. Premium is claimed for a non-premium account, for whom it's just an
-// upsell.
+// The drawer builds a row for each panel absent from the tab bar, from a snapshot
+// taken in updateVisiblePanelIDs. Extra panels are injected only there, scoped by a
+// flag, so other readers see the real tab state.
 
 static __thread BOOL DashPanelIDQuery = NO;
 

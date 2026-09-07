@@ -900,11 +900,9 @@ NSDictionary* currentWebCredentials(void) {
 
 // MARK: - Interactive web-session login
 
-// The web session (auth_token + ct0) can't be minted silently on a sideloaded build: the
-// token-exchange path hits native attestation. Instead the tweak lets the user sign in once on a
-// real web login, harvest the resulting cookies, and persist them into the shared cookie
-// jar so every read path (currentWebCredentials, harvestSharedCookies, the reply webview)
-// sees the session on this and future launches.
+// The web session cannot be minted silently on a sideloaded build, since the
+// token-exchange path hits native attestation. The cookies from one real web login
+// are harvested into the shared jar, so every read path sees the session.
 
 BOOL hasUsableWebCredentials(void) {
     return currentWebCredentials() != nil;

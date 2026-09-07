@@ -2,37 +2,22 @@
 //  RefreshSounds.x
 //  PrimeFreeBird
 //
-//  Restaure le son "pull-to-refresh" classique de Twitter.
+//  Restores the classic pull-to-refresh sound.
 //
-//  Contexte (pour qui reprend ce code) : sur Twitter 12.9 / iOS 26, le
-//  pull-to-refresh du fil est passe en SwiftUI. L'ancien hook
-//  -[TFNPullToRefreshControl _setStatus:fromScrolling:] a disparu (methode
-//  retiree du binaire), et ni le setter -setDidRequestPullToRefresh: ni le
-//  lecteur de son central -[UIApplication _t1_playSoundNamed:] ne sont plus
-//  sur le chemin du geste (verifie : 0 declenchement). De plus, les fichiers
-//  son natifs de Twitter ont ete retires de l'app, donc il n'y a plus rien a
-//  reactiver cote Twitter.
+//  The feed's pull-to-refresh moved to SwiftUI: the old control hook is gone from
+//  the binary, neither the request setter nor the central sound player sits on the
+//  gesture path, and the native sound files were removed from the app.
 //
-//  Approche retenue : le pull-to-refresh reste un GESTE DE SCROLL. On detecte
-//  le tirage via le scroll delegate ObjC (toujours present), sur le controleur
-//  de liste TFNItemsDataViewController. Quand l'utilisateur relache apres avoir
-//  tire la liste au-dela d'un seuil, on joue notre son.
-//
-//  Le son est fourni par le tweak en PCM (psst2.caf). IMPORTANT : le format
-//  doit etre PCM (CAF/WAV/AIFF) -- AudioServicesCreateSystemSoundID NE decode
-//  PAS l'AAC (un .aac se cree sans erreur mais reste muet).
-//
-//  Reglable par l'utilisateur via le toggle "restore_refresh_sounds"
-//  (page Timelines, active par defaut).
+//  The gesture is still a scroll, so the pull is detected through the ObjC scroll
+//  delegate on TFNItemsDataViewController and the sound played on release past a
+//  threshold. The file must be PCM: AudioServicesCreateSystemSoundID has no AAC
+//  decoder, and an .aac created without error stays silent.
 
 #import "HookHelpers.h"
 
-// Seuil de tirage (points sous la position de repos) au-dela duquel on
-// considere que c'est un vrai pull-to-refresh et non un scroll ordinaire.
-// Au repos, le haut du fil peut deja etre legerement negatif (encart de la
-// barre de navigation) ; -100 laisse une marge nette. Un vrai tirage descend
-// bien plus bas (mesure ~ -375), donc le son se declenche de facon fiable
-// sans jamais sonner sur un scroll normal.
+// Pull distance, in points below the resting position, past which the gesture counts
+// as a pull-to-refresh rather than an ordinary scroll. At rest the top of the feed
+// can already sit slightly negative, and a real pull reaches far below -100.
 static const CGFloat kNFBPullToRefreshThreshold = -100.0;
 
 static void NFBPlayRefreshSound(void) {
@@ -63,8 +48,8 @@ static void NFBPlayRefreshSound(void) {
         return;
     }
 
-    // contentOffset.y au moment ou le doigt se leve : tres negatif = la liste a
-    // ete tiree vers le bas au-dela du sommet = intention de rafraichir.
+    // contentOffset.y as the finger lifts: strongly negative means the list was
+    // pulled below its top, which is the refresh intent.
     if (scrollView.contentOffset.y < kNFBPullToRefreshThreshold) {
         NFBPlayRefreshSound();
     }

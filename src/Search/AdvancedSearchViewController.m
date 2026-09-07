@@ -129,11 +129,10 @@ static UILabel* NFBAdvInstallBox(UITableViewCell* cell,
 }
 
 // MARK: - text / number cell
-//
-// The web form's floating-label box, faithfully: FIXED box height, the label
-// sits centred as a placeholder while the field is empty and unfocused, and
-// floats to the top (small, grey) on focus or once there's a value. Two
-// labels cross-faded — no constraint juggling, no row-height changes.
+
+// The web form's floating-label box: fixed box height, the label centred as a
+// placeholder while empty and unfocused, floating small and grey on focus or once
+// there is a value. Two labels cross-faded, so no row height changes.
 
 @interface NFBAdvBoxCell : UITableViewCell <UITextFieldDelegate>
 @property (nonatomic, strong) UIView* box;
@@ -559,22 +558,9 @@ static UILabel* NFBAdvInstallBox(UITableViewCell* cell,
 @property (nonatomic, strong) NSArray<NSString*>* languageCodes;
 @end
 
-// The confirm glyph in the navigation bar is baked opaque white by the theme
-// hooks, but only while NFBColorThemeScreenVisible is up — Twitter's settings
-// roots and the tweak's own settings pages raise it, and this screen never did. Left
-// out, the glyph stays a template the glass material blends with the capsule
-// underneath, which is the wash that shows on a light accent and nowhere else.
-// Joining the count is the whole fix: the recipe already exists, this screen
-// simply was not counted.
-// The confirm glyph comes out clean white on the yellow capsule because it is
-// baked — opaque white pixels handed over as AlwaysOriginal, with nothing left
-// for the glass material to blend. A title has no such escape: the label is
-// drawn by the button itself, and the material washes it. That is the shine
-// that survived giving the title an explicit colour, and it is why the
-// checkmark on this same screen came out clean while the word did not.
-//
-// So the word is baked the same way the glyph is. Drawn once into a bitmap and
-// passed as an image, it takes exactly the path that already works.
+// A glyph escapes the glass material's wash by being baked: opaque pixels handed
+// over as AlwaysOriginal. A title has no such escape, since the label is drawn by
+// the button, so the word is baked into a bitmap and passed as an image.
 static UIImage* nfbBakedTitleImage(NSString* title, UIFont* font) {
     if (title.length == 0 || !font) {
         return nil;
@@ -584,9 +570,8 @@ static UIImage* nfbBakedTitleImage(NSString* title, UIFont* font) {
         NSForegroundColorAttributeName : [UIColor whiteColor]
     };
     // A capsule built around an image comes out narrower than one built around a
-    // title: measured side by side, 65.3 points against 84.7 for the same word.
-    // The difference is padded back into the bitmap itself, transparently, so
-    // the button keeps the proportions it had before the word became a picture.
+    // title, so the difference is padded back into the bitmap transparently and the
+    // button keeps its proportions.
     const CGFloat kSidePadding = 10.0;
     CGSize measured = [title sizeWithAttributes:attributes];
     CGSize size = CGSizeMake(ceilf((float)measured.width) + kSidePadding * 2.0,
@@ -689,10 +674,9 @@ extern NSInteger NFBColorThemeScreenVisible;
         ],
     ];
 
-    // SYSTEM Done bar button: one single native Liquid Glass capsule (a
-    // custom view gets WRAPPED in a second glass capsule — the double-pill
-    // bug), and with no explicit tint it inherits the fork's window tint, so
-    // it follows the user's colour theme automatically.
+    // A system Done bar button gives one native Liquid Glass capsule, where a custom
+    // view would be wrapped in a second one. With no explicit tint it inherits the
+    // window tint and follows the colour theme.
     NSString* searchTitle = [bundle localizedStringForKey:@"ADVSEARCH_SEARCH"];
     UIFont* searchFont = [TwitterChirpFont(TwitterFontStyleBold) fontWithSize:15];
     UIImage* bakedTitle = nfbBakedTitleImage(searchTitle, searchFont);
@@ -1084,12 +1068,9 @@ static NSString* NFBAdvValue(NSString* key) {
         URLWithString:[NSString
                           stringWithFormat:@"twitter://search?query=%@", encoded]];
 
-    // Close the form first, then hand the deep link STRAIGHT to Twitter's own
-    // internal URL router (the app delegate's openURL:options: — the proven
-    // in-app mechanism this fork already uses to open a status natively after
-    // a web reply). Never through iOS: a sideloaded bundle may not have the
-    // twitter:// scheme registered, and any web fallback lands in Safari on a
-    // login wall. Everything stays in-app by construction.
+    // The form closes first, then the deep link goes straight to the app delegate's
+    // own URL router. Never through iOS: a sideloaded bundle may not have the
+    // twitter:// scheme registered, and the web fallback lands on a login wall.
     void (^launch)(void) = ^{
         id delegate = [UIApplication sharedApplication].delegate;
         if (deepLink && [delegate respondsToSelector:@selector(openURL:options:)]) {
