@@ -122,16 +122,6 @@ NSArray<NSDictionary*>* NFBHiddenNotifList(void) {
 
 void NFBUnhideNotif(NSString* notifID) {
     NSMutableDictionary* current = [NFBHiddenNotifs() mutableCopy];
-    // A notification is filed under two keys that hold the same entry; both go,
-    // or the row comes back at the next launch under the twin.
-    NSDictionary* going = current[notifID];
-    if (going) {
-        for (NSString* key in current.allKeys) {
-            if ([current[key] isEqual:going]) {
-                [current removeObjectForKey:key];
-            }
-        }
-    }
     [current removeObjectForKey:notifID];
     NFBWriteHiddenNotifs(current);
 }
@@ -287,11 +277,31 @@ static NSString* NFBNotifDurableKey(id model) {
                               options:0
                                 range:NSMakeRange(0, stable.length)
                          withTemplate:@""];
-    if (stable.length < 8) {
+    // The class name is stripped too, and what is left must still say
+    // something. A model that only answers the default <Class: 0x...> would
+    // otherwise give every notification of that class the SAME key, and hiding
+    // one would hide them all. When nothing distinguishing remains the durable
+    // key is refused and the session identity is used alone - no persistence
+    // across a relaunch, but never a wrong match.
+    NSString* className = NSStringFromClass([model class]);
+    if (className.length) {
+        [stable replaceOccurrencesOfString:className
+                                withString:@""
+                                   options:0
+                                     range:NSMakeRange(0, stable.length)];
+    }
+    NSCharacterSet* noise =
+        [NSCharacterSet characterSetWithCharactersInString:@"<>: \t\n"];
+    NSString* meat = [[stable componentsSeparatedByCharactersInSet:noise]
+        componentsJoinedByString:@""];
+    if (meat.length < 12) {
+        NFBDebugLog(@"notifhide: description carries nothing distinguishing "
+                    @"(%lu chars) - no durable key",
+                    (unsigned long)meat.length);
         return nil;
     }
-    return [NSString stringWithFormat:@"dk:%lu/%lu", (unsigned long)stable.hash,
-                                      (unsigned long)stable.length];
+    return [NSString stringWithFormat:@"dk:%lu/%lu", (unsigned long)meat.hash,
+                                      (unsigned long)meat.length];
 }
 
 static NSString* NFBNotifIdentity(id model) {
@@ -420,7 +430,24 @@ BOOL NFBNotifIsHidden(id model) {
     if (durableKey.length && hidden[durableKey] != nil) {
         return YES;
     }
+    // Read once and reused below: this call walks the model and journals what
+    // it finds, so asking twice doubles both the work and the log.
     NSString* identity = NFBNotifIdentity(model);
+    if (identity.length) {
+        for (NSDictionary* entry in hidden.allValues) {
+            if (![entry isKindOfClass:[NSDictionary class]]) {
+                continue;
+            }
+            // Type-checked: entries written before this key existed carry
+            // nothing here, and a value of another kind would not answer
+            // isEqualToString:.
+            id session = entry[@"s"];
+            if ([session isKindOfClass:[NSString class]] &&
+                [session isEqualToString:identity]) {
+                return YES;
+            }
+        }
+    }
     // An impression id is not guaranteed to survive a refresh. Rather than
     // assume either way, the identity seen while FILTERING is journaled twice:
     // ONE measurement, and it settles the pull-to-refresh question for good.
@@ -619,21 +646,21 @@ static void NFBHideNotifWithText(id model, NSString* cellText) {
     if (notifDate <= 0) {
         source = @"none - falling back to the hide date";
     }
-    NSDictionary* entry = @{
+    // ONE entry per notification. The durable key is what the registry is keyed
+    // by when there is one - it survives a relaunch, where the identity is a
+    // fresh impression id - and the session identity rides along inside it so
+    // the filter can match either. Writing two entries listed the notification
+    // twice in the menu and counted it twice.
+    NSString* durable = NFBNotifDurableKey(model);
+    NSMutableDictionary* entry = [@{
         @"t": text,
         @"d": @(notifDate),
         @"h": @([[NSDate date] timeIntervalSince1970])
-    };
-    current[identity] = entry;
-    // The same notification is also filed under its durable key, so the next
-    // launch - where the identity above is a fresh impression id - still finds
-    // it. Both entries hold the same values and expire on the same horizon.
-    NSString* durable = NFBNotifDurableKey(model);
-    if (durable.length) {
-        current[durable] = entry;
-    }
-    NFBDebugLog(@"notifhide: filed under %@%@", identity,
-                durable.length ? [@" and " stringByAppendingString:durable] : @" only");
+    } mutableCopy];
+    entry[@"s"] = identity;
+    [current removeObjectForKey:identity];
+    current[durable.length ? durable : identity] = entry;
+    NFBDebugLog(@"notifhide: filed under %@", durable.length ? durable : identity);
     NFBDebugLog(@"notifhide: notification date = %@ (%@)",
                 notifDate > 0
                     ? [NSDate dateWithTimeIntervalSince1970:notifDate]
