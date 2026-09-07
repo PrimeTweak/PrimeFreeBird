@@ -508,17 +508,64 @@ static void nfbSwapApply(UIView* pillView) {
                 NSStringFromClass([vc class]));
 }
 
+// The navigation bar carries no glass. Forcing the iOS 26 design switches on
+// UIKit's shared background behind every bar button - the settings gear, the
+// avatar - which this app never had. Each item is asked to go without as it is
+// posted. No exception: the replacement pill below no longer draws a capsule
+// of its own, so it wants none either. The tab bar is untouched; that is the
+// one place the glass belongs.
+static void NFBFlattenBarItems(NSArray* items) {
+    if (![BHTSettings boolForKey:@"enable_liquid_glass"]) {
+        return;
+    }
+    SEL hideShared = NSSelectorFromString(@"setHidesSharedBackground:");
+    for (UIBarButtonItem* item in items) {
+        if ([item isKindOfClass:[UIBarButtonItem class]] &&
+            [item respondsToSelector:hideShared]) {
+            ((void (*)(id, SEL, BOOL))objc_msgSend)(item, hideShared, YES);
+        }
+    }
+}
+
 %hook UINavigationItem
 
 - (void)setRightBarButtonItems:(NSArray<UIBarButtonItem*>*)items {
+    NFBFlattenBarItems(items);
     %orig(nfbSwapInterceptItems(self, items));
 }
 
 - (void)setRightBarButtonItems:(NSArray<UIBarButtonItem*>*)items animated:(BOOL)animated {
+    NFBFlattenBarItems(items);
     %orig(nfbSwapInterceptItems(self, items), animated);
 }
 
+- (void)setLeftBarButtonItems:(NSArray*)items {
+    NFBFlattenBarItems(items);
+    %orig;
+}
+
+- (void)setLeftBarButtonItems:(NSArray*)items animated:(BOOL)animated {
+    NFBFlattenBarItems(items);
+    %orig;
+}
+
+- (void)setRightBarButtonItem:(UIBarButtonItem*)item {
+    NFBFlattenBarItems(item ? @[ item ] : @[]);
+    %orig;
+}
+
+- (void)setLeftBarButtonItem:(UIBarButtonItem*)item {
+    NFBFlattenBarItems(item ? @[ item ] : @[]);
+    %orig;
+}
+
 - (void)setTrailingItemGroups:(NSArray<UIBarButtonItemGroup*>*)groups {
+    // Groups carry the items on iOS 16 and later; each member is flattened too.
+    for (UIBarButtonItemGroup* group in groups) {
+        if ([group isKindOfClass:[UIBarButtonItemGroup class]]) {
+            NFBFlattenBarItems(group.barButtonItems);
+        }
+    }
     if (gNFBSwapItem && objc_getAssociatedObject(self, kNFBSwapNavKey) &&
         [BHTSettings boolForKey:@"enable_liquid_glass"]) {
         if (@available(iOS 16.0, *)) {
