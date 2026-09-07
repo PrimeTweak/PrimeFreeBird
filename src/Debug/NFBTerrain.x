@@ -245,6 +245,89 @@ static BOOL nfbTerrainInNavigationBar(UIView* view) {
 
 %end
 
+// [p27] hang watchdog. A frozen main thread cannot run the capture button, so the
+// only way to see a hang is to watch from another thread and leave a file behind.
+static volatile NSTimeInterval gNFBMainTick = 0;
+static volatile int64_t gNFBBarLayouts = 0;
+static NSTimeInterval gNFBLastPopAt = 0;
+static NSString* gNFBLastBarClass = nil;
+static dispatch_source_t gNFBWatchdog = nil;
+
+static NSString* nfbTerrainHangPath(void) {
+    return [NSTemporaryDirectory() stringByAppendingPathComponent:@"nfb-hang.txt"];
+}
+
+// Written from the watchdog thread while the main thread is stuck, so it must not
+// touch UIKit or any state the main thread owns beyond these counters.
+static void nfbTerrainWriteHang(NSTimeInterval stuckFor, int64_t layoutsAtStart) {
+    NSString* report = [NSString
+        stringWithFormat:@"HANG %.1f s | bar layouts %lld -> %lld | last bar %@ | "
+                         @"pop %.1f s before",
+                         stuckFor, layoutsAtStart, gNFBBarLayouts,
+                         gNFBLastBarClass ?: @"none",
+                         gNFBLastPopAt > 0 ? CACurrentMediaTime() - gNFBLastPopAt : -1.0];
+    [report writeToFile:nfbTerrainHangPath()
+             atomically:YES
+               encoding:NSUTF8StringEncoding
+                  error:NULL];
+}
+
+// A hang report from the previous run is read back into the journal at the first
+// bar of this one, so a force-quit does not lose it.
+static void nfbTerrainReplayHang(void) {
+    NSString* path = nfbTerrainHangPath();
+    NSString* report = [NSString stringWithContentsOfFile:path
+                                                 encoding:NSUTF8StringEncoding
+                                                    error:NULL];
+    if (report.length) {
+        NFBDebugLog(@"[p27] previous run: %@", report);
+        [[NSFileManager defaultManager] removeItemAtPath:path error:NULL];
+    }
+}
+
+static void nfbTerrainInstallWatchdog(void) {
+    if (gNFBWatchdog) {
+        return;
+    }
+    nfbTerrainReplayHang();
+    gNFBMainTick = CACurrentMediaTime();
+    dispatch_queue_t queue =
+        dispatch_queue_create("nfb.watchdog", DISPATCH_QUEUE_SERIAL);
+    gNFBWatchdog = dispatch_source_create(DISPATCH_SOURCE_TYPE_TIMER, 0, 0, queue);
+    dispatch_source_set_timer(gNFBWatchdog, DISPATCH_TIME_NOW,
+                              (uint64_t)(0.3 * NSEC_PER_SEC), 0.1 * NSEC_PER_SEC);
+    dispatch_source_set_event_handler(gNFBWatchdog, ^{
+      static BOOL reported = NO;
+      static int64_t layoutsAtStart = 0;
+      NSTimeInterval idle = CACurrentMediaTime() - gNFBMainTick;
+      if (idle < 0.5) {
+          reported = NO;
+          layoutsAtStart = gNFBBarLayouts;
+      } else if (idle > 2.0 && !reported) {
+          reported = YES;
+          nfbTerrainWriteHang(idle, layoutsAtStart);
+      }
+      dispatch_async(dispatch_get_main_queue(),
+                     ^{ gNFBMainTick = CACurrentMediaTime(); });
+    });
+    dispatch_resume(gNFBWatchdog);
+    NFBDebugLog(@"[p27] hang watchdog armed");
+}
+
+// The moment a pop starts, so a hang can be told apart from a slow screen.
+%hook UINavigationController
+
+- (UIViewController*)popViewControllerAnimated:(BOOL)animated {
+    if (NFBDebugIsRecording()) {
+        gNFBLastPopAt = CACurrentMediaTime();
+        NFBDebugLog(@"[p27] pop started from %@",
+                    NSStringFromClass([self.topViewController class]));
+    }
+    return %orig;
+}
+
+%end
+
 %hook UINavigationBar
 
 - (void)didMoveToWindow {
@@ -275,8 +358,13 @@ static BOOL nfbTerrainInNavigationBar(UIView* view) {
 - (void)layoutSubviews {
     %orig;
     @try {
-        if (NFBDebugIsRecording() && self.window &&
-            nfbTerrainBarIsInteresting(self, 0)) {
+        if (!NFBDebugIsRecording()) {
+            return;
+        }
+        gNFBBarLayouts++;
+        gNFBLastBarClass = NSStringFromClass([self class]);
+        nfbTerrainInstallWatchdog();
+        if (self.window && nfbTerrainBarIsInteresting(self, 0)) {
             nfbTerrainRate(self);
         }
     } @catch (id exception) {
