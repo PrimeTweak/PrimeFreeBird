@@ -215,9 +215,119 @@ static BOOL nfbTerrainInNavigationBar(UIView* view) {
     return NO;
 }
 
+// [p29] Every mutation the tweak makes to a navigation bar, with the function
+// that made it. Armed only while a presented bar is on screen, so a normal
+// session pays nothing.
+#define NFB_MUTATION_SLOTS 48
+
+typedef struct {
+    const char* cls;
+    const char* sel;
+    char caller[72];
+    char detail[56];
+    int64_t count;
+} NFBMutation;
+
+static NFBMutation gNFBMutations[NFB_MUTATION_SLOTS];
+static int64_t gNFBMutationsWritten = 0;
+static BOOL gNFBRingArmed = NO;
+
+// The caller is frame 2: this function, then the logos trampoline, then whoever
+// wrote. dladdr names it, and the image tells our code from UIKit's.
+static void nfbTerrainNoteMutation(id owner, const char* sel, const char* detail) {
+    if (!gNFBRingArmed || !NFBDebugIsRecording()) {
+        return;
+    }
+    if ([owner isKindOfClass:[UIView class]] &&
+        !nfbTerrainInNavigationBar((UIView*)owner)) {
+        return;
+    }
+    void* frames[4];
+    int depth = backtrace(frames, 4);
+    char caller[72];
+    Dl_info info;
+    if (depth > 2 && dladdr(frames[2], &info) && info.dli_sname) {
+        const char* image = info.dli_fname ? strrchr(info.dli_fname, '/') : NULL;
+        snprintf(caller, sizeof(caller), "%s%s",
+                 (image && strstr(image, "PrimeFreeBird")) ? "" : "[app] ",
+                 info.dli_sname);
+    } else {
+        strlcpy(caller, "unknown", sizeof(caller));
+    }
+    const char* cls = object_getClassName(owner);
+    if (gNFBMutationsWritten > 0) {
+        NFBMutation* last =
+            &gNFBMutations[(gNFBMutationsWritten - 1) % NFB_MUTATION_SLOTS];
+        if (last->cls == cls && last->sel == sel &&
+            strcmp(last->caller, caller) == 0) {
+            last->count++;
+            return;
+        }
+    }
+    NFBMutation* slot = &gNFBMutations[gNFBMutationsWritten % NFB_MUTATION_SLOTS];
+    slot->cls = cls;
+    slot->sel = sel;
+    strlcpy(slot->caller, caller, sizeof(slot->caller));
+    strlcpy(slot->detail, detail ?: "", sizeof(slot->detail));
+    slot->count = 1;
+    gNFBMutationsWritten++;
+}
+
+static NSString* nfbTerrainMutationDump(void) {
+    if (gNFBMutationsWritten == 0) {
+        return @"MUTATIONS none recorded";
+    }
+    NSMutableString* text = [NSMutableString stringWithFormat:
+        @"MUTATIONS %lld total, last %d:", gNFBMutationsWritten,
+        (int)MIN(gNFBMutationsWritten, (int64_t)NFB_MUTATION_SLOTS)];
+    int64_t first = gNFBMutationsWritten > NFB_MUTATION_SLOTS
+                        ? gNFBMutationsWritten - NFB_MUTATION_SLOTS
+                        : 0;
+    for (int64_t i = first; i < gNFBMutationsWritten; i++) {
+        NFBMutation* m = &gNFBMutations[i % NFB_MUTATION_SLOTS];
+        [text appendFormat:@"\n%lld x%lld %s %s %s <- %s", i, m->count,
+                           m->cls ?: "?", m->sel ?: "?", m->detail, m->caller];
+    }
+    return text;
+}
+
 %hook UIView
 
+- (void)setFrame:(CGRect)frame {
+    char detail[56];
+    snprintf(detail, sizeof(detail), "%.0fx%.0f@%.0f,%.0f", frame.size.width,
+             frame.size.height, frame.origin.x, frame.origin.y);
+    nfbTerrainNoteMutation(self, "setFrame:", detail);
+    %orig;
+}
+
+- (void)setBounds:(CGRect)bounds {
+    char detail[56];
+    snprintf(detail, sizeof(detail), "%.0fx%.0f", bounds.size.width,
+             bounds.size.height);
+    nfbTerrainNoteMutation(self, "setBounds:", detail);
+    %orig;
+}
+
+- (void)setHidden:(BOOL)hidden {
+    nfbTerrainNoteMutation(self, "setHidden:", hidden ? "YES" : "NO");
+    %orig;
+}
+
+- (void)setAlpha:(CGFloat)alpha {
+    char detail[56];
+    snprintf(detail, sizeof(detail), "%.2f", alpha);
+    nfbTerrainNoteMutation(self, "setAlpha:", detail);
+    %orig;
+}
+
+- (void)invalidateIntrinsicContentSize {
+    nfbTerrainNoteMutation(self, "invalidateIntrinsicContentSize", "");
+    %orig;
+}
+
 - (void)setTintColor:(UIColor*)tint {
+    nfbTerrainNoteMutation(self, "setTintColor:", "");
     %orig;
     @try {
         if (!NFBDebugIsRecording() || !tint) {
@@ -336,6 +446,8 @@ static void nfbTerrainWriteHang(NSTimeInterval stuckFor,
                          now.hidesShared - start.hidesShared,
                          gNFBLastBarClass ?: @"none",
                          gNFBLastPopAt > 0 ? CACurrentMediaTime() - gNFBLastPopAt : -1.0];
+    report = [report stringByAppendingFormat:@"\n%@",
+                                             nfbTerrainMutationDump()];
     if (gNFBStormStack) {
         report = [report stringByAppendingFormat:@"\nSTORM STACK\n%s",
                                                  gNFBStormStack];
@@ -368,6 +480,7 @@ static void nfbTerrainInstallWatchdog(void) {
         return;
     }
     nfbTerrainReplayHang();
+    NFBDebugLog(@"[p29] probe: mutations+stack+counters, all hooks live");
     gNFBMainTick = CACurrentMediaTime();
     dispatch_queue_t queue =
         dispatch_queue_create("nfb.watchdog", DISPATCH_QUEUE_SERIAL);
@@ -393,21 +506,58 @@ static void nfbTerrainInstallWatchdog(void) {
 }
 
 // The moment a pop starts, so a hang can be told apart from a slow screen.
+%hook UIImageView
+
+// An image of a different size changes the intrinsic size of the button that
+// holds it, which invalidates the whole bar. Both sizes are recorded.
+- (void)setImage:(UIImage*)image {
+    if (gNFBRingArmed) {
+        char detail[56];
+        UIImage* was = self.image;
+        snprintf(detail, sizeof(detail), "%.0fx%.0f was %.0fx%.0f",
+                 image.size.width, image.size.height, was.size.width,
+                 was.size.height);
+        nfbTerrainNoteMutation(self, "setImage:", detail);
+    }
+    %orig;
+}
+
+%end
+
 %hook UIBarButtonItem
 
-- (void)setTintColor:(UIColor*)tint {
-    gNFBSetTint++;
+- (void)setImage:(UIImage*)image {
+    char detail[56];
+    snprintf(detail, sizeof(detail), "%.0fx%.0f", image.size.width,
+             image.size.height);
+    nfbTerrainNoteMutation(self, "item setImage:", detail);
+    %orig;
+}
+
+- (void)setWidth:(CGFloat)width {
+    char detail[56];
+    snprintf(detail, sizeof(detail), "%.0f", width);
+    nfbTerrainNoteMutation(self, "item setWidth:", detail);
     %orig;
 }
 
 - (void)setTitleTextAttributes:(NSDictionary*)attributes
                       forState:(UIControlState)state {
     gNFBSetTitleAttrs++;
+    nfbTerrainNoteMutation(self, "item setTitleTextAttributes:", "");
     %orig;
 }
 
 - (void)setHidesSharedBackground:(BOOL)hides {
     gNFBSetHidesShared++;
+    nfbTerrainNoteMutation(self, "item setHidesSharedBackground:",
+                           hides ? "YES" : "NO");
+    %orig;
+}
+
+- (void)setTintColor:(UIColor*)tint {
+    gNFBSetTint++;
+    nfbTerrainNoteMutation(self, "item setTintColor:", "");
     %orig;
 }
 
@@ -455,6 +605,30 @@ static void nfbTerrainInstallWatchdog(void) {
 - (void)didMoveToWindow {
     gNFBBarDidMove++;
     %orig;
+    @try {
+        // The ring only runs while a modally presented bar is on screen, which
+        // is the settings sheet and the moment the chevron acts on.
+        UIResponder* responder = (UIResponder*)self;
+        BOOL presented = NO;
+        for (NSInteger up = 0; responder && up < 6; up++) {
+            responder = responder.nextResponder;
+            if ([responder isKindOfClass:[UINavigationController class]]) {
+                presented = ((UINavigationController*)responder)
+                                .presentingViewController != nil;
+                break;
+            }
+        }
+        if (self.window && presented) {
+            if (!gNFBRingArmed) {
+                gNFBRingArmed = YES;
+                NFBDebugLog(@"[p29] mutation ring armed on %@",
+                            NSStringFromClass([self class]));
+            }
+        } else if (!self.window && gNFBRingArmed) {
+            gNFBRingArmed = NO;
+        }
+    } @catch (id exception) {
+    }
     @try {
         if (!NFBDebugIsRecording() || !self.window) {
             return;
