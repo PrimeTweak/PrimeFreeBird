@@ -369,6 +369,7 @@ static void nfbFlattenBarItemGlass(UIView* bar) {
         }
     }
     SEL hideShared = NSSelectorFromString(@"setHidesSharedBackground:");
+    UIColor* blue = [UIColor systemBlueColor];
     for (UIBarButtonItem* button in items) {
         if (![button isKindOfClass:[UIBarButtonItem class]] ||
             ![button respondsToSelector:hideShared]) {
@@ -381,7 +382,31 @@ static void nfbFlattenBarItemGlass(UIView* bar) {
             current = [button valueForKey:@"hidesSharedBackground"];
         } @catch (id exception) {
         }
-        if ([current respondsToSelector:@selector(boolValue)] && [current boolValue]) {
+        BOOL flat =
+            [current respondsToSelector:@selector(boolValue)] && [current boolValue];
+
+        // A Done-style item is the screen's primary action, and iOS 26 draws it as a
+        // filled capsule. It keeps its glass, tinted the system blue explicitly so
+        // the capsule cannot fill with the bar's own ink and come out dark.
+        if (button.style == UIBarButtonItemStyleDone) {
+            BOOL changed = NO;
+            if (flat) {
+                ((void (*)(id, SEL, BOOL))objc_msgSend)(button, hideShared, NO);
+                changed = YES;
+            }
+            if (![button.tintColor isEqual:blue]) {
+                button.tintColor = blue;
+                changed = YES;
+            }
+            if (changed) {
+                NFBDebugLog(@"[p24] bar item kept glazed: title=%@ class=%@",
+                            button.title.length ? button.title : @"-",
+                            NSStringFromClass([button class]));
+            }
+            continue;
+        }
+
+        if (flat) {
             continue;
         }
         ((void (*)(id, SEL, BOOL))objc_msgSend)(button, hideShared, YES);

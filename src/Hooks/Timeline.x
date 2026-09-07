@@ -293,6 +293,9 @@ static BOOL nfbControllerIsSettingsRoot(UIViewController* controller) {
 static const CGFloat kNFBSettingsBandWhiteness = 0.9;
 
 static const void* kNFBSettingsBarBandKey = &kNFBSettingsBarBandKey;
+// Set while a change to the band is already queued for the next run-loop turn,
+// so a run of layout passes queues one block and not one per pass.
+static const void* kNFBSettingsBandPendingKey = &kNFBSettingsBandPendingKey;
 
 static UINavigationController* nfbSettingsNavigationForBar(UINavigationBar* bar) {
     UIResponder* responder = bar;
@@ -349,9 +352,47 @@ static void nfbInstallSettingsBand(UINavigationBar* bar) {
                 (unsigned long)bar.subviews.count);
 }
 
-// Frame and visibility only. Setting a subview's frame does not invalidate the
-// superview's layout, so this is the part that is safe inside layoutSubviews. A
-// band that has fallen out of the bar is reported, never re-inserted here.
+// Only the root page carries the search field, so a pushed page keeps its bar
+// untouched. Never called from a layout pass: `hidden` takes a view out of layout
+// participation, so writing it there re-invalidates the layout that is running.
+static void nfbSyncSettingsBandVisibility(UINavigationBar* bar,
+                                          UINavigationController* navigation) {
+    UIView* band = objc_getAssociatedObject(bar, kNFBSettingsBarBandKey);
+    if (!band || band.superview != bar) {
+        return;
+    }
+    BOOL onRoot =
+        navigation.topViewController == navigation.viewControllers.firstObject;
+    if (band.hidden != onRoot) {
+        return;
+    }
+    band.hidden = !onRoot;
+    NFBDebugLog(@"[p24] band visibility settled: hidden=%d", band.hidden ? 1 : 0);
+}
+
+// Queues one pass over the band for the next turn of the run loop, and only one:
+// a run of layout passes must not queue a block per pass.
+static void nfbQueueSettingsBandPass(UINavigationBar* bar,
+                                     UINavigationController* navigation) {
+    if (objc_getAssociatedObject(bar, kNFBSettingsBandPendingKey)) {
+        return;
+    }
+    objc_setAssociatedObject(bar, kNFBSettingsBandPendingKey, @YES,
+                             OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    dispatch_async(dispatch_get_main_queue(), ^{
+      objc_setAssociatedObject(bar, kNFBSettingsBandPendingKey, nil,
+                               OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+      if (!bar.window) {
+          return;
+      }
+      nfbInstallSettingsBand(bar);
+      nfbSyncSettingsBandVisibility(bar, navigation);
+    });
+}
+
+// Frame only. Setting a subview's frame does not invalidate the superview's
+// layout, so this is the one part that is safe inside layoutSubviews. Anything
+// else the band needs is answered NO and settled off the layout pass.
 static BOOL nfbUpdateSettingsBand(UINavigationBar* bar,
                                   UINavigationController* navigation) {
     UIView* background = nfbSettingsBarBackground(bar);
@@ -365,14 +406,9 @@ static BOOL nfbUpdateSettingsBand(UINavigationBar* bar,
     if (!CGRectEqualToRect(band.frame, background.frame)) {
         band.frame = background.frame;
     }
-    // Only the root page carries the search field; pushed pages keep their
-    // bar untouched.
     BOOL onRoot =
         navigation.topViewController == navigation.viewControllers.firstObject;
-    if (band.hidden == onRoot) {
-        band.hidden = !onRoot;
-    }
-    return YES;
+    return band.hidden != onRoot;
 }
 
 // [p24] probe only: how often a settings bar lays out and where the band sits
@@ -463,6 +499,7 @@ static void nfbNoteSettingsBarLayout(UINavigationBar* bar, BOOL inPlace) {
             if (navigation) {
                 nfbInstallSettingsBand(self);
                 nfbUpdateSettingsBand(self, navigation);
+                nfbSyncSettingsBandVisibility(self, navigation);
             }
         }
     } @catch (id exception) {
@@ -476,16 +513,10 @@ static void nfbNoteSettingsBarLayout(UINavigationBar* bar, BOOL inPlace) {
         if (self.window) {
             UINavigationController* navigation = nfbSettingsNavigationForBar(self);
             if (navigation) {
-                BOOL inPlace = nfbUpdateSettingsBand(self, navigation);
-                nfbNoteSettingsBarLayout(self, inPlace);
-                if (!inPlace) {
-                    // Outside the layout pass, on the next turn of the run loop.
-                    UINavigationBar* bar = self;
-                    dispatch_async(dispatch_get_main_queue(), ^{
-                      if (bar.window) {
-                          nfbInstallSettingsBand(bar);
-                      }
-                    });
+                BOOL settled = nfbUpdateSettingsBand(self, navigation);
+                nfbNoteSettingsBarLayout(self, settled);
+                if (!settled) {
+                    nfbQueueSettingsBandPass(self, navigation);
                 }
             }
         }
