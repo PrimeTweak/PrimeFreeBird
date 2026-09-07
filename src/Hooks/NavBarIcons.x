@@ -385,6 +385,18 @@ static void nfbFlattenBarItemGlass(UIView* bar) {
         BOOL flat =
             [current respondsToSelector:@selector(boolValue)] && [current boolValue];
 
+        // An item the tweak builds and marks keeps the plain capsule iOS gives it,
+        // with no colour of its own: the cancel control of a sheet reads as chrome,
+        // not as the primary action.
+        if (objc_getAssociatedObject(button, @selector(nfbKeepsBarGlass))) {
+            if (flat) {
+                ((void (*)(id, SEL, BOOL))objc_msgSend)(button, hideShared, NO);
+                NFBDebugLog(@"[p24] bar item kept glazed (marked): class=%@",
+                            NSStringFromClass([button class]));
+            }
+            continue;
+        }
+
         // A Done-style item is the screen's primary action, and iOS 26 draws it as a
         // filled capsule. It keeps its glass, tinted the system blue explicitly so
         // the capsule cannot fill with the bar's own ink and come out dark.
@@ -396,6 +408,21 @@ static void nfbFlattenBarItemGlass(UIView* bar) {
             }
             if (![button.tintColor isEqual:blue]) {
                 button.tintColor = blue;
+                changed = YES;
+            }
+            // The label is drawn over a filled capsule, so it is set white for both
+            // states. Merged, never replaced: the title may already carry a font.
+            UIControlState states[2] = { UIControlStateNormal,
+                                         UIControlStateHighlighted };
+            for (NSUInteger s = 0; s < 2; s++) {
+                NSDictionary* existing = [button titleTextAttributesForState:states[s]];
+                if ([existing[NSForegroundColorAttributeName]
+                        isEqual:[UIColor whiteColor]]) {
+                    continue;
+                }
+                NSMutableDictionary* attributes = [(existing ?: @{}) mutableCopy];
+                attributes[NSForegroundColorAttributeName] = [UIColor whiteColor];
+                [button setTitleTextAttributes:attributes forState:states[s]];
                 changed = YES;
             }
             if (changed) {
