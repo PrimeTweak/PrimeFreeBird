@@ -43,9 +43,6 @@ static const void* kNFBPaintedFlagKey = &kNFBPaintedFlagKey;
 // is too late, so every route that could lower it is refused as it is used: the
 // alpha, the layer's opacity and the animation.
 static const void* kNFBNoFadeKey = &kNFBNoFadeKey;
-// Marks a bar item already asked to go without the shared glass, so the request
-// is made once instead of on every layout pass.
-static const void* kNFBFlatItemKey = &kNFBFlatItemKey;
 
 // One grey for every icon the tweak adds or recolour: the label colour at 60%,
 // resolved to a concrete value so nothing can re-resolve it later.
@@ -332,9 +329,9 @@ static void nfbRepaintNotificationsGear(UIView* bar, UIColor* colour) {
     }
 }
 
-// The gear and the avatar are Twitter's own bar items, so the flat treatment the
-// tweak already applies to its own buttons is asked of them here. Icon-only items
-// only: a text button such as Done keeps the capsule iOS gives it.
+// Forcing the iOS 26 design switches on UIKit's shared background behind every bar
+// button, which this app never had. Every item of every navigation bar is asked to
+// go without, with no exception: a text button takes the bar's ink as its fill.
 static void nfbFlattenBarItemGlass(UIView* bar) {
     if (![BHTSettings boolForKey:@"enable_liquid_glass"] ||
         ![bar respondsToSelector:@selector(topItem)]) {
@@ -345,21 +342,51 @@ static void nfbFlattenBarItemGlass(UIView* bar) {
     if (!item) {
         return;
     }
-    SEL hideShared = NSSelectorFromString(@"setHidesSharedBackground:");
     NSMutableArray<UIBarButtonItem*>* items = [NSMutableArray array];
     [items addObjectsFromArray:item.leftBarButtonItems ?: @[]];
     [items addObjectsFromArray:item.rightBarButtonItems ?: @[]];
+    // Groups carry the items on iOS 16 and later, and an item posted through one
+    // never reaches the two arrays above.
+    SEL groupSelectors[2] = { @selector(leadingItemGroups),
+                              @selector(trailingItemGroups) };
+    for (NSUInteger i = 0; i < 2; i++) {
+        if (![item respondsToSelector:groupSelectors[i]]) {
+            continue;
+        }
+        NSArray* groups =
+            ((id (*)(id, SEL))objc_msgSend)(item, groupSelectors[i]);
+        for (UIBarButtonItemGroup* group in groups) {
+            if ([group isKindOfClass:[UIBarButtonItemGroup class]]) {
+                [items addObjectsFromArray:group.barButtonItems ?: @[]];
+            }
+        }
+    }
+    if ([item respondsToSelector:@selector(pinnedTrailingGroup)]) {
+        UIBarButtonItemGroup* pinned =
+            ((id (*)(id, SEL))objc_msgSend)(item, @selector(pinnedTrailingGroup));
+        if ([pinned isKindOfClass:[UIBarButtonItemGroup class]]) {
+            [items addObjectsFromArray:pinned.barButtonItems ?: @[]];
+        }
+    }
+    SEL hideShared = NSSelectorFromString(@"setHidesSharedBackground:");
     for (UIBarButtonItem* button in items) {
         if (![button isKindOfClass:[UIBarButtonItem class]] ||
-            button.title.length > 0 ||
-            objc_getAssociatedObject(button, kNFBFlatItemKey) != nil ||
             ![button respondsToSelector:hideShared]) {
             continue;
         }
-        objc_setAssociatedObject(button, kNFBFlatItemKey, @YES,
-                                 OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        // Read before writing rather than marking once: UIKit rebuilds an item's
+        // hosting on a re-host, and a mark would leave the rebuilt one glazed.
+        id current = nil;
+        @try {
+            current = [button valueForKey:@"hidesSharedBackground"];
+        } @catch (id exception) {
+        }
+        if ([current respondsToSelector:@selector(boolValue)] && [current boolValue]) {
+            continue;
+        }
         ((void (*)(id, SEL, BOOL))objc_msgSend)(button, hideShared, YES);
-        NFBDebugLog(@"[p24] bar item flattened: image=%@ customView=%@",
+        NFBDebugLog(@"[p24] bar item flattened: title=%@ image=%@ customView=%@",
+                    button.title.length ? button.title : @"-",
                     button.image ? @"yes" : @"no",
                     button.customView
                         ? NSStringFromClass([button.customView class])
@@ -377,6 +404,10 @@ static void nfbFlattenBarItemGlass(UIView* bar) {
         if (!bar.window) {
             return;
         }
+        // Every navigation bar, before the two-screen guard below: the glass the
+        // forced design adds is on all of them, not only on these two.
+        nfbFlattenBarItemGlass(bar);
+
         UIColor* grey = NFBBarIconGrey(bar.traitCollection);
 
         // Explore is recognised by the button, Notifications by the screen.
@@ -392,7 +423,6 @@ static void nfbFlattenBarItemGlass(UIView* bar) {
         }
 
         nfbPinHeaderOpacity(bar);
-        nfbFlattenBarItemGlass(bar);
 
         if (settingsButton) {
             nfbRepaintGlyphs(settingsButton, grey);
