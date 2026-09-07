@@ -9,7 +9,7 @@
 //  which bar items exist and which of them can be flattened, what every view of
 //  a settings header actually is, and how often that bar lays out.
 
-#import "HookHelpers.h"
+#import "Hooks/HookHelpers.h"
 #import "Debug/NFBDebugger.h"
 #import <QuartzCore/QuartzCore.h>
 
