@@ -405,11 +405,34 @@ static void paintWindowForSplash(UIView* view) {
 
 // MARK: - Liquid Glass
 
-// The app now gets the design through its own gate, forced in FeatureSwitches.x,
-// so its layout code knows about it. Answering UIKit behind Twitter's back left
-// the bar computing heights for a design it had never been told was in use.
+// The app carries its own gate for the iOS 26 design: a persisted flag read by
+// its own compatibility override. Writing it beats answering UIKit behind
+// Twitter's back, which left the bar computing heights for another design.
+static NSString* const kNFBGlassPersistedGate =
+    @"T1LiquidGlassRedesignPersistedGate";
+
 %ctor {
-    BOOL glassEnabled = [[NSUserDefaults standardUserDefaults] boolForKey:@"enable_liquid_glass"];
-    [[NSUserDefaults standardUserDefaults] setBool:glassEnabled
-                                            forKey:@"com.apple.SwiftUI.IgnoreSolariumOptOut"];
+    NSUserDefaults* defaults = [NSUserDefaults standardUserDefaults];
+    BOOL glassEnabled = [defaults boolForKey:@"enable_liquid_glass"];
+    [defaults setBool:glassEnabled
+               forKey:@"com.apple.SwiftUI.IgnoreSolariumOptOut"];
+
+    // Written from the constructor so it is in place before anything reads it.
+    [defaults setBool:glassEnabled forKey:kNFBGlassPersistedGate];
+
+    // The app's own installer, once its framework is loaded. It may do more than
+    // persist the flag, and it is the supported way in.
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1.0 * NSEC_PER_SEC)),
+                   dispatch_get_main_queue(), ^{
+      Class installer = objc_getClass("T1LiquidGlassGateInstaller");
+      SEL install = NSSelectorFromString(@"installGateWithRedesignEnabled:");
+      if (installer && [installer respondsToSelector:install]) {
+          ((void (*)(id, SEL, BOOL))objc_msgSend)((id)installer, install,
+                                                  glassEnabled);
+          NFBDebugLog(@"[p31] native gate installer called with %d",
+                      glassEnabled ? 1 : 0);
+      } else {
+          NFBDebugLog(@"[p31] native gate installer not reachable");
+      }
+    });
 }
