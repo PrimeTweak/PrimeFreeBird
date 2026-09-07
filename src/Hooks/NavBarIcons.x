@@ -984,55 +984,89 @@ static BOOL NFBViewSitsInXTabBar(UIView* view) {
 // layout pass, between a collapsed and an expanded value. Under the iOS 26
 // design its target never settles, and the two heights alternate without end.
 
-// Identity only, never messaged: one stack storms at a time, and the state is
-// dropped as soon as another one sets a height.
-static void* gNFBHeightOwner = NULL;
-static double gNFBHeightLast = -1.0;
-static double gNFBHeightBefore = -1.0;
-static NSInteger gNFBHeightFlips = 0;
-static NSTimeInterval gNFBHeightWindow = 0;
-static NSTimeInterval gNFBHeightHold = 0;
+// Owner is identity only, never messaged: one bar storms at a time, and the
+// state is dropped as soon as another one comes through.
+typedef struct {
+    void* owner;
+    double last;
+    double before;
+    NSInteger flips;
+    NSTimeInterval window;
+    NSTimeInterval hold;
+    const char* site;
+} NFBHeightDamper;
 
-// A set that only undoes the previous one, at a rate no transition produces.
-// Answering NO lets the bar keep the height it already has.
-static BOOL nfbHeightSetIsThrashing(void* owner, double height) {
+static NFBHeightDamper gNFBFrameDamper = { NULL, -1, -1, 0, 0, 0, "frame" };
+static NFBHeightDamper gNFBBoundsDamper = { NULL, -1, -1, 0, 0, 0, "bounds" };
+static NFBHeightDamper gNFBSimulatedDamper = { NULL, -1, -1, 0, 0, 0, "simulated" };
+
+// A height that only undoes the previous one, at a rate no transition produces.
+// Answering YES leaves the bar with the height it already has.
+static BOOL nfbHeightIsThrashing(NFBHeightDamper* state, void* owner,
+                                 double height) {
     NSTimeInterval now = CACurrentMediaTime();
-    if (owner != gNFBHeightOwner) {
-        gNFBHeightOwner = owner;
-        gNFBHeightLast = gNFBHeightBefore = -1.0;
-        gNFBHeightFlips = 0;
-        gNFBHeightWindow = now;
-        gNFBHeightHold = 0;
+    if (owner != state->owner) {
+        state->owner = owner;
+        state->last = state->before = -1.0;
+        state->flips = 0;
+        state->window = now;
+        state->hold = 0;
     }
-    if (now < gNFBHeightHold) {
+    if (now < state->hold) {
         return YES;
     }
-    if (now - gNFBHeightWindow > 0.5) {
-        gNFBHeightWindow = now;
-        gNFBHeightFlips = 0;
+    if (now - state->window > 0.5) {
+        state->window = now;
+        state->flips = 0;
     }
-    if (height == gNFBHeightBefore && height != gNFBHeightLast) {
-        gNFBHeightFlips++;
+    if (height == state->before && height != state->last) {
+        state->flips++;
     } else {
-        gNFBHeightFlips = 0;
+        state->flips = 0;
     }
-    gNFBHeightBefore = gNFBHeightLast;
-    gNFBHeightLast = height;
-    if (gNFBHeightFlips < 8) {
+    state->before = state->last;
+    state->last = height;
+    if (state->flips < 8) {
         return NO;
     }
     // Held long enough for the run loop to settle, then the app drives again.
-    gNFBHeightHold = now + 0.5;
-    gNFBHeightFlips = 0;
-    NFBDebugLog(@"[navbar] height thrash damped at %.0f pt", height);
+    state->hold = now + 0.5;
+    state->flips = 0;
+    NFBDebugLog(@"[navbar] %s thrash damped at %.0f pt", state->site, height);
     return YES;
 }
+
+// The measured site: the mutation ring caught this bar alternating between two
+// heights without end, every write coming from the app itself.
+%hook TFNNavigationBar
+
+// setFrame: is the selector the mutation ring actually caught alternating, and
+// UIKit's own setFrame: writes the geometry without going through the public
+// setBounds: below.
+- (void)setFrame:(CGRect)frame {
+    if (nfbHeightIsThrashing(&gNFBFrameDamper, (__bridge void*)self,
+                             frame.size.height)) {
+        return;
+    }
+    %orig;
+}
+
+- (void)setBounds:(CGRect)bounds {
+    if (nfbHeightIsThrashing(&gNFBBoundsDamper, (__bridge void*)self,
+                             bounds.size.height)) {
+        return;
+    }
+    %orig;
+}
+
+%end
 
 %hook TFNNavigationController
 
 - (void)_tfn_setCurrentNavigationBarSimulatedHeight:(double)height
                                          isAnimated:(BOOL)animated {
-    if (nfbHeightSetIsThrashing((__bridge void*)self, height)) {
+    if (nfbHeightIsThrashing(&gNFBSimulatedDamper, (__bridge void*)self,
+                             height)) {
         return;
     }
     %orig;
