@@ -57,7 +57,7 @@ static NSString* NFBMarkOf(UIView* view) {
 // A capture writes about 70 lines of its own reports into this same ring, so at
 // 80 a session left eight lines of history. 600 holds a full census plus the
 // scenario that led to it.
-#define NFB_LOG_CAPACITY 150
+#define NFB_LOG_CAPACITY 300
 
 static NSMutableArray<NSString*>* NFBDecisionRing(void) {
     static NSMutableArray* ring;
