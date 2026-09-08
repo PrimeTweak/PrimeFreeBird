@@ -83,6 +83,19 @@
                                      self.nfbPillWidth, height);
     self.nfbTouchRect = capsuleFrame;
 
+    // Resolved on every pass: a CGColor does not follow a trait change on its
+    // own, and the bar is drawn in both appearances.
+    UIView* ring = [self viewWithTag:3];
+    if (ring) {
+        ring.frame = capsuleFrame;
+        ring.layer.cornerRadius = height / 2.0;
+        UIColor* hairline =
+            [[[UIColor labelColor]
+                resolvedColorWithTraitCollection:self.traitCollection]
+                colorWithAlphaComponent:0.14];
+        ring.layer.borderColor = hairline.CGColor;
+    }
+
     UILabel* label = (UILabel*)[self viewWithTag:1];
     UIImageView* chevron = (UIImageView*)[self viewWithTag:2];
     CGFloat x = capsuleFrame.origin.x + 10.0;
@@ -439,6 +452,16 @@ static void nfbSwapApply(UIView* pillView) {
         chevron = [UIImageView new];
         chevron.tag = 2;
         [button addSubview:chevron];
+
+        // The native capsule outline, kept without its glass: a hairline ring
+        // on the capsule rect, never a filled colour.
+        UIView* ring = [UIView new];
+        ring.tag = 3;
+        ring.userInteractionEnabled = NO;
+        ring.backgroundColor = [UIColor clearColor];
+        ring.layer.borderWidth = 1.0;
+        [button insertSubview:ring atIndex:0];
+
         button.showsMenuAsPrimaryAction = YES;
         // No capsule behind the label. This item used to carry its own
         // UIVisualEffectView with UIGlassEffect, and that view WAS the pill's
