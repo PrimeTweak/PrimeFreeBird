@@ -6,7 +6,6 @@
 #import <QuartzCore/QuartzCore.h>
 
 #import "HookHelpers.h"
-#import "Debug/NFBDebugger.h"   // [p24] probe only, remove with it
 
 // Declared once at file scope: two distant passes read the hidden-thread
 // list, and a block-scope extern is invisible to the second one.
@@ -348,8 +347,6 @@ static void nfbInstallSettingsBand(UINavigationBar* bar) {
         return;
     }
     [bar insertSubview:band atIndex:0];
-    NFBDebugLog(@"[p24] band installed at index 0 (subviews=%lu)",
-                (unsigned long)bar.subviews.count);
 }
 
 // Only the root page carries the search field, so a pushed page keeps its bar
@@ -367,7 +364,6 @@ static void nfbSyncSettingsBandVisibility(UINavigationBar* bar,
         return;
     }
     band.hidden = !onRoot;
-    NFBDebugLog(@"[p24] band visibility settled: hidden=%d", band.hidden ? 1 : 0);
 }
 
 // Queues one pass over the band for the next turn of the run loop, and only one:
@@ -409,34 +405,6 @@ static BOOL nfbUpdateSettingsBand(UINavigationBar* bar,
     BOOL onRoot =
         navigation.topViewController == navigation.viewControllers.firstObject;
     return band.hidden != onRoot;
-}
-
-// [p24] probe only: how often a settings bar lays out and where the band sits
-// while it does. Reported at most twice a second, with the counts since the last
-// line, so a runaway layout reads as a rate rather than a flood.
-static void nfbNoteSettingsBarLayout(UINavigationBar* bar, BOOL inPlace) {
-    static NSInteger passes = 0;
-    static NSInteger strays = 0;
-    static NSTimeInterval lastNote = 0;
-    passes++;
-    if (!inPlace) {
-        strays++;
-    }
-    NSTimeInterval now = CACurrentMediaTime();
-    if (now - lastNote < 0.5) {
-        return;
-    }
-    UIView* band = objc_getAssociatedObject(bar, kNFBSettingsBarBandKey);
-    NSInteger index = (band && band.superview == bar)
-                          ? (NSInteger)[bar.subviews indexOfObject:band]
-                          : -1;
-    NFBDebugLog(@"[p24] settings bar: %ld pass(es) in %.1f s, %ld stray, band "
-                @"index=%ld, subviews=%lu",
-                (long)passes, now - lastNote, (long)strays, (long)index,
-                (unsigned long)bar.subviews.count);
-    passes = 0;
-    strays = 0;
-    lastNote = now;
 }
 
 - (void)didMoveToWindow {
@@ -514,7 +482,6 @@ static void nfbNoteSettingsBarLayout(UINavigationBar* bar, BOOL inPlace) {
             UINavigationController* navigation = nfbSettingsNavigationForBar(self);
             if (navigation) {
                 BOOL settled = nfbUpdateSettingsBand(self, navigation);
-                nfbNoteSettingsBarLayout(self, settled);
                 if (!settled) {
                     nfbQueueSettingsBandPass(self, navigation);
                 }

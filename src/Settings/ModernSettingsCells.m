@@ -827,7 +827,6 @@ static void nfbApplySelectedBackground(UITableViewCell* cell) {
     Class TAEColorSettingsCls = objc_getClass("TAEColorSettings");
     id settings = [TAEColorSettingsCls sharedSettings];
     id colorPalette = [[settings currentColorPalette] colorPalette];
-    UIColor* ink = [colorPalette performSelector:@selector(textColor)];
     UIColor* soft = [colorPalette performSelector:@selector(tabBarItemColor)];
     UIColor* faint = [colorPalette performSelector:@selector(faintBackgroundColor)];
     UIColor* divider = [colorPalette performSelector:@selector(dividerColor)];

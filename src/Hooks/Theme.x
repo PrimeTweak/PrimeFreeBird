@@ -2017,14 +2017,6 @@ static UITabBarAppearance* NFBPatchedTabBarAppearance(UITabBarAppearance* appear
 
 - (void)setFrame:(CGRect)frame {
     UIView* view = (UIView*)self;
-    // [p24] probe only: every incoming geometry, reported when it changes.
-    static CGRect nfbLastSearchBarIn = {{0, 0}, {0, 0}};
-    if (!CGRectEqualToRect(nfbLastSearchBarIn, frame)) {
-        nfbLastSearchBarIn = frame;
-        NFBDebugLog(@"[p24] TFNSearchBar in: x=%.1f w=%.1f h=%.1f super=%@",
-                    frame.origin.x, frame.size.width, frame.size.height,
-                    NSStringFromClass([view.superview class]));
-    }
     if ([BHTSettings boolForKey:@"enable_liquid_glass"] && frame.origin.x < 4.0 &&
         [NSStringFromClass([view.superview class]) isEqualToString:@"TFNNavigationBarSearchView"]) {
         CGFloat overshoot = 4.0 - frame.origin.x;
@@ -2038,10 +2030,6 @@ static UITabBarAppearance* NFBPatchedTabBarAppearance(UITabBarAppearance* appear
         frame.origin.x = 4.0;
         CGFloat wanted = frame.size.width - overshoot;
         frame.size.width = MAX(80.0, wanted);
-        // [p24] probe only: the floor is what a collapsed field would look like.
-        if (wanted < 80.0) {
-            NFBDebugLog(@"[p24] TFNSearchBar width floor: wanted=%.1f served 80", wanted);
-        }
     }
     %orig(frame);
 }
@@ -2088,14 +2076,6 @@ static UITabBarAppearance* NFBPatchedTabBarAppearance(UITabBarAppearance* appear
         }
         %orig(fixed);
         return;
-    }
-    // [p24] probe only: the untouched case, reported when the geometry changes.
-    static CGRect nfbLastSearchViewIn = {{0, 0}, {0, 0}};
-    if (!CGRectEqualToRect(nfbLastSearchViewIn, inBar)) {
-        nfbLastSearchViewIn = inBar;
-        NFBDebugLog(@"[p24] TFNNavigationBarSearchView passed: x=%.1f w=%.1f of bar "
-                    @"w=%.1f",
-                    inBar.origin.x, inBar.size.width, bar.bounds.size.width);
     }
     if (now - lastNote > 0.5) {
         lastNote = now;
@@ -2317,44 +2297,6 @@ void NFBWhitenNavigationBarConfirm(UINavigationBar* bar) {
 
 %end
 
-// [p24] probe only: bounded walk, four levels, so a census cannot cost a full
-// tree on a screen that is already misbehaving.
-static void nfbNoteSearchLevel(UIView* view, NSInteger depth, NSInteger* lines) {
-    if (!view || depth > 4 || *lines >= 12) {
-        return;
-    }
-    if (view.bounds.size.width >= 40.0) {
-        (*lines)++;
-        UIColor* background = view.backgroundColor;
-        NFBDebugLog(@"[p24]   %@ %.0fx%.0f a=%.2f hidden=%d bg=%@",
-                    NSStringFromClass([view class]), view.bounds.size.width,
-                    view.bounds.size.height, view.alpha, view.hidden ? 1 : 0,
-                    background ? [background description] : @"nil");
-    }
-    for (UIView* sub in view.subviews) {
-        nfbNoteSearchLevel(sub, depth + 1, lines);
-    }
-}
-
-// [p24] probe only: the first levels of a search screen with their geometry and
-// opacity, once per controller, so a black screen can be told from a mis-sized
-// one. Read only, nothing is changed.
-static const void* kNFBSearchNotedKey = &kNFBSearchNotedKey;
-static void nfbNoteSearchScreen(UIViewController* controller) {
-    NSString* name = NSStringFromClass([controller class]);
-    if (![name containsString:@"Search"] && ![name containsString:@"Explore"]) {
-        return;
-    }
-    if (objc_getAssociatedObject(controller, kNFBSearchNotedKey)) {
-        return;
-    }
-    objc_setAssociatedObject(controller, kNFBSearchNotedKey, @YES,
-                             OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-    NFBDebugLog(@"[p24] search screen %@ appeared", name);
-    NSInteger lines = 0;
-    nfbNoteSearchLevel(controller.viewIfLoaded, 0, &lines);
-}
-
 // Safety net for containers not known by name: for a few seconds after an accent
 // change, every controller that appears re-applies it to the chrome on screen.
 // Outside that window this costs a single float compare.
@@ -2362,10 +2304,6 @@ static void nfbNoteSearchScreen(UIViewController* controller) {
 
 - (void)viewDidAppear:(BOOL)animated {
     %orig;
-    @try {
-        nfbNoteSearchScreen(self);
-    } @catch (id exception) {
-    }
     if (!NFBAccentPending) {
         return;
     }

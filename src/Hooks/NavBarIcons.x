@@ -420,8 +420,6 @@ static BOOL nfbBarGlassPass(UIView* bar, BOOL apply) {
                     continue;
                 }
                 ((void (*)(id, SEL, BOOL))objc_msgSend)(button, hideShared, NO);
-                NFBDebugLog(@"[p24] bar item kept glazed (marked): class=%@",
-                            NSStringFromClass([button class]));
             }
             continue;
         }
@@ -430,19 +428,16 @@ static BOOL nfbBarGlassPass(UIView* bar, BOOL apply) {
         // filled capsule. It keeps its glass, tinted the system blue explicitly so
         // the capsule cannot fill with the bar's own ink and come out dark.
         if (button.style == UIBarButtonItemStyleDone) {
-            BOOL changed = NO;
             if (flat) {
                 owed = YES;
                 if (apply) {
                     ((void (*)(id, SEL, BOOL))objc_msgSend)(button, hideShared, NO);
-                    changed = YES;
                 }
             }
             if (![button.tintColor isEqual:blue]) {
                 owed = YES;
                 if (apply) {
                     button.tintColor = blue;
-                    changed = YES;
                 }
             }
             // The label is drawn over a filled capsule, so it is set white for both
@@ -462,12 +457,6 @@ static BOOL nfbBarGlassPass(UIView* bar, BOOL apply) {
                 NSMutableDictionary* attributes = [(existing ?: @{}) mutableCopy];
                 attributes[NSForegroundColorAttributeName] = [UIColor whiteColor];
                 [button setTitleTextAttributes:attributes forState:states[s]];
-                changed = YES;
-            }
-            if (changed) {
-                NFBDebugLog(@"[p24] bar item kept glazed: title=%@ class=%@",
-                            button.title.length ? button.title : @"-",
-                            NSStringFromClass([button class]));
             }
             continue;
         }
@@ -480,12 +469,6 @@ static BOOL nfbBarGlassPass(UIView* bar, BOOL apply) {
             continue;
         }
         ((void (*)(id, SEL, BOOL))objc_msgSend)(button, hideShared, YES);
-        NFBDebugLog(@"[p24] bar item flattened: title=%@ image=%@ customView=%@",
-                    button.title.length ? button.title : @"-",
-                    button.image ? @"yes" : @"no",
-                    button.customView
-                        ? NSStringFromClass([button.customView class])
-                        : @"none");
     }
     return owed;
 }
@@ -997,7 +980,6 @@ typedef struct {
 } NFBHeightDamper;
 
 static NFBHeightDamper gNFBFrameDamper = { NULL, -1, -1, 0, 0, 0, "frame" };
-static NFBHeightDamper gNFBBoundsDamper = { NULL, -1, -1, 0, 0, 0, "bounds" };
 static NFBHeightDamper gNFBSimulatedDamper = { NULL, -1, -1, 0, 0, 0, "simulated" };
 
 // A height that only undoes the previous one, at a rate no transition produces.
@@ -1036,6 +1018,39 @@ static BOOL nfbHeightIsThrashing(NFBHeightDamper* state, void* owner,
     return YES;
 }
 
+// Breaking the storm leaves the transition's fade unfinished: UIKit animates
+// layer opacity, not view alpha. Removing the animation snaps each layer back
+// to its model value, so views the app keeps hidden stay hidden.
+static void nfbClearStaleFades(UIView* view, NSInteger depth) {
+    if (!view || depth > 8) {
+        return;
+    }
+    if ([view.layer animationForKey:@"opacity"]) {
+        [view.layer removeAnimationForKey:@"opacity"];
+    }
+    for (UIView* subview in view.subviews) {
+        nfbClearStaleFades(subview, depth + 1);
+    }
+}
+
+// Queued once per damping, after the hold has expired and the app drives again.
+static void nfbQueueFadeRepair(UIView* bar) {
+    if (objc_getAssociatedObject(bar, @selector(nfbFadeRepairPending))) {
+        return;
+    }
+    objc_setAssociatedObject(bar, @selector(nfbFadeRepairPending), @YES,
+                             OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.6 * NSEC_PER_SEC)),
+                   dispatch_get_main_queue(), ^{
+      objc_setAssociatedObject(bar, @selector(nfbFadeRepairPending), nil,
+                               OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+      if (bar.window) {
+          nfbClearStaleFades(bar, 0);
+          NFBDebugLog(@"[navbar] stale fades cleared after damping");
+      }
+    });
+}
+
 // The measured site: the mutation ring caught this bar alternating between two
 // heights without end, every write coming from the app itself.
 %hook TFNNavigationBar
@@ -1046,14 +1061,7 @@ static BOOL nfbHeightIsThrashing(NFBHeightDamper* state, void* owner,
 - (void)setFrame:(CGRect)frame {
     if (nfbHeightIsThrashing(&gNFBFrameDamper, (__bridge void*)self,
                              frame.size.height)) {
-        return;
-    }
-    %orig;
-}
-
-- (void)setBounds:(CGRect)bounds {
-    if (nfbHeightIsThrashing(&gNFBBoundsDamper, (__bridge void*)self,
-                             bounds.size.height)) {
+        nfbQueueFadeRepair((UIView*)self);
         return;
     }
     %orig;
