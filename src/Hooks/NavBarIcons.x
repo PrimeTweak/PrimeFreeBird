@@ -490,6 +490,49 @@ static void nfbQueueBarGlassPass(UIView* bar) {
     });
 }
 
+// The glass is taken off as the items are set, before the bar is ever drawn.
+// Doing it only from the layout pass meant one run-loop turn with the capsule
+// on screen, seen as a flash on a bar whose items appear at once.
+static void nfbFlattenItemsNow(NSArray<UIBarButtonItem*>* items) {
+    if (![BHTSettings boolForKey:@"enable_liquid_glass"]) {
+        return;
+    }
+    SEL hideShared = NSSelectorFromString(@"setHidesSharedBackground:");
+    for (UIBarButtonItem* button in items) {
+        if (![button isKindOfClass:[UIBarButtonItem class]] ||
+            ![button respondsToSelector:hideShared] ||
+            button.style == UIBarButtonItemStyleDone ||
+            objc_getAssociatedObject(button, @selector(nfbKeepsBarGlass))) {
+            continue;
+        }
+        ((void (*)(id, SEL, BOOL))objc_msgSend)(button, hideShared, YES);
+    }
+}
+
+%hook UINavigationItem
+
+- (void)setRightBarButtonItems:(NSArray<UIBarButtonItem*>*)items {
+    nfbFlattenItemsNow(items);
+    %orig;
+}
+
+- (void)setLeftBarButtonItems:(NSArray<UIBarButtonItem*>*)items {
+    nfbFlattenItemsNow(items);
+    %orig;
+}
+
+- (void)setRightBarButtonItem:(UIBarButtonItem*)item {
+    nfbFlattenItemsNow(item ? @[ item ] : @[]);
+    %orig;
+}
+
+- (void)setLeftBarButtonItem:(UIBarButtonItem*)item {
+    nfbFlattenItemsNow(item ? @[ item ] : @[]);
+    %orig;
+}
+
+%end
+
 %hook UINavigationBar
 
 - (void)layoutSubviews {
@@ -973,34 +1016,45 @@ typedef struct {
     void* owner;
     double last;
     double before;
+    double held;
     NSInteger flips;
+    NSInteger writes;
     NSTimeInterval window;
     NSTimeInterval hold;
     const char* site;
 } NFBHeightDamper;
 
-static NFBHeightDamper gNFBFrameDamper = { NULL, -1, -1, 0, 0, 0, "frame" };
-static NFBHeightDamper gNFBSimulatedDamper = { NULL, -1, -1, 0, 0, 0, "simulated" };
+static NFBHeightDamper gNFBFrameDamper = { NULL, -1, -1, -1, 0, 0, 0, 0, "frame" };
+static NFBHeightDamper gNFBSimulatedDamper = { NULL, -1, -1, -1, 0, 0, 0, 0,
+                                               "simulated" };
 
-// A height that only undoes the previous one, at a rate no transition produces.
-// Answering YES leaves the bar with the height it already has.
-static BOOL nfbHeightIsThrashing(NFBHeightDamper* state, void* owner,
-                                 double height) {
+// Two signatures of a storm, because one of them is not enough: a height that
+// only undoes the previous one, and a sheer rate of writes whatever their shape.
+// A transition reaches neither.
+#define NFB_DAMP_FLIPS 8
+#define NFB_DAMP_WRITES 40
+
+// Returns the height to pass on. The caller always calls through: refusing the
+// call leaves UIKit believing it set a geometry it never did, and its own
+// invariants then run on a value it cannot see.
+static double nfbDampedHeight(NFBHeightDamper* state, void* owner,
+                              double height) {
     NSTimeInterval now = CACurrentMediaTime();
     if (owner != state->owner) {
         state->owner = owner;
-        state->last = state->before = -1.0;
-        state->flips = 0;
+        state->last = state->before = state->held = -1.0;
+        state->flips = state->writes = 0;
         state->window = now;
         state->hold = 0;
     }
     if (now < state->hold) {
-        return YES;
+        return state->held >= 0.0 ? state->held : height;
     }
     if (now - state->window > 0.5) {
         state->window = now;
-        state->flips = 0;
+        state->flips = state->writes = 0;
     }
+    state->writes++;
     if (height == state->before && height != state->last) {
         state->flips++;
     } else {
@@ -1008,14 +1062,17 @@ static BOOL nfbHeightIsThrashing(NFBHeightDamper* state, void* owner,
     }
     state->before = state->last;
     state->last = height;
-    if (state->flips < 8) {
-        return NO;
+    if (state->flips < NFB_DAMP_FLIPS && state->writes < NFB_DAMP_WRITES) {
+        return height;
     }
     // Held long enough for the run loop to settle, then the app drives again.
+    const char* pattern = state->flips >= NFB_DAMP_FLIPS ? "alternating" : "rate";
+    state->held = height;
     state->hold = now + 0.5;
-    state->flips = 0;
-    NFBDebugLog(@"[navbar] %s thrash damped at %.0f pt", state->site, height);
-    return YES;
+    state->flips = state->writes = 0;
+    NFBDebugLog(@"[navbar] %s storm damped at %.0f pt (%s)", state->site, height,
+                pattern);
+    return height;
 }
 
 // Breaking the storm leaves the transition's fade unfinished: UIKit animates
@@ -1059,12 +1116,13 @@ static void nfbQueueFadeRepair(UIView* bar) {
 // UIKit's own setFrame: writes the geometry without going through the public
 // setBounds: below.
 - (void)setFrame:(CGRect)frame {
-    if (nfbHeightIsThrashing(&gNFBFrameDamper, (__bridge void*)self,
-                             frame.size.height)) {
+    double damped =
+        nfbDampedHeight(&gNFBFrameDamper, (__bridge void*)self, frame.size.height);
+    if (damped != frame.size.height) {
+        frame.size.height = damped;
         nfbQueueFadeRepair((UIView*)self);
-        return;
     }
-    %orig;
+    %orig(frame);
 }
 
 %end
@@ -1073,11 +1131,8 @@ static void nfbQueueFadeRepair(UIView* bar) {
 
 - (void)_tfn_setCurrentNavigationBarSimulatedHeight:(double)height
                                          isAnimated:(BOOL)animated {
-    if (nfbHeightIsThrashing(&gNFBSimulatedDamper, (__bridge void*)self,
-                             height)) {
-        return;
-    }
-    %orig;
+    %orig(nfbDampedHeight(&gNFBSimulatedDamper, (__bridge void*)self, height),
+          animated);
 }
 
 %end
