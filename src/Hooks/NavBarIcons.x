@@ -1113,6 +1113,64 @@ static void nfbClearStaleFades(UIView* view, NSInteger depth) {
     }
 }
 
+// MARK: - the reply bar
+
+// The reply bar is a view Twitter draws itself, with no UIKit glass container
+// in its subtree, so the forced design never decorates it.
+
+// The glass is laid behind its content, the recipe the tab bar and the toasts
+// already use: real glass when the class is there, thick material otherwise.
+static const NSInteger kNFBReplyGlassTag = 0x4E464247;
+
+static void nfbGlassifyReplyBar(UIView* bar) {
+    UIView* glass = [bar viewWithTag:kNFBReplyGlassTag];
+    if (![BHTSettings boolForKey:@"enable_liquid_glass"]) {
+        [glass removeFromSuperview];
+        return;
+    }
+    if (!glass) {
+        Class glassClass = NSClassFromString(@"UIGlassEffect");
+        UIVisualEffect* effect = glassClass ? [[glassClass alloc] init] : nil;
+        BOOL real = effect != nil;
+        if (!effect) {
+            effect =
+                [UIBlurEffect effectWithStyle:UIBlurEffectStyleSystemThickMaterial];
+        }
+        UIVisualEffectView* view =
+            [[UIVisualEffectView alloc] initWithEffect:effect];
+        view.tag = kNFBReplyGlassTag;
+        view.userInteractionEnabled = NO;
+        if (!real) {
+            // Real glass shapes itself; the material needs its corners drawn.
+            view.clipsToBounds = YES;
+            view.layer.cornerCurve = kCACornerCurveContinuous;
+        }
+        [bar insertSubview:view atIndex:0];
+        glass = view;
+        NFBDebugLog(@"[replybar] glass laid (%@)", real ? @"real" : @"material");
+    }
+    // The keyboard resizes this bar, so the frame is taken on every pass.
+    if (!CGRectEqualToRect(glass.frame, bar.bounds)) {
+        glass.frame = bar.bounds;
+    }
+    CGFloat radius = MIN(bar.bounds.size.height / 2.0, 28.0);
+    if (glass.layer.cornerRadius != radius) {
+        glass.layer.cornerRadius = radius;
+    }
+}
+
+%hook T1PersistentComposeView
+
+- (void)layoutSubviews {
+    %orig;
+    @try {
+        nfbGlassifyReplyBar((UIView*)self);
+    } @catch (id exception) {
+    }
+}
+
+%end
+
 // Queued once per damping, after the hold has expired and the app drives again.
 static void nfbQueueFadeRepair(UIView* bar) {
     if (objc_getAssociatedObject(bar, @selector(nfbFadeRepairPending))) {
@@ -1126,7 +1184,9 @@ static void nfbQueueFadeRepair(UIView* bar) {
                                OBJC_ASSOCIATION_RETAIN_NONATOMIC);
       if (bar.window) {
           nfbClearStaleFades(bar, 0);
-          NFBDebugLog(@"[navbar] stale fades cleared after damping");
+          [bar setNeedsLayout];
+          [bar.superview setNeedsLayout];
+          NFBDebugLog(@"[navbar] fades cleared and layout asked after damping");
       }
     });
 }
