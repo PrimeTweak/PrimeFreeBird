@@ -301,13 +301,51 @@ static NSString* NFBNotifDurableKey(id model) {
                                       (unsigned long)meat.length];
 }
 
+// The entry id is printed in the model's description even when no accessor
+// returns it. It is stable across refreshes, unlike the impression id, so it is
+// read there before any accessor is asked.
+static NSString* NFBNotifEntryIdFromDescription(id model) {
+    NSString* text = [model description];
+    if (!text.length) {
+        return nil;
+    }
+    static NSRegularExpression* pattern;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+      pattern = [NSRegularExpression
+          regularExpressionWithPattern:@"entryId[:= ]+([A-Za-z0-9_-]{8,})"
+                               options:0
+                                 error:NULL];
+    });
+    NSTextCheckingResult* match =
+        [pattern firstMatchInString:text options:0 range:NSMakeRange(0, text.length)];
+    if (!match || match.numberOfRanges < 2) {
+        return nil;
+    }
+    return [text substringWithRange:[match rangeAtIndex:1]];
+}
+
+// Marks a class whose identity is read from the description rather than from
+// an accessor, so the cache does not try to message a selector that is not one.
+static NSString* const kNFBIdentityFromDescription = @"<description>";
+
 static NSString* NFBNotifIdentity(id model) {
     static NSMutableDictionary<NSString*, NSString*>* cache;
     if (!cache) { cache = [NSMutableDictionary dictionary]; }
     NSString* className = NSStringFromClass([model class]);
     NSString* known = cache[className];
+    if ([known isEqualToString:kNFBIdentityFromDescription]) {
+        return NFBNotifEntryIdFromDescription(model);
+    }
     if (known) {
         return NFBNotifString(NFBNotifAsk(model, NSSelectorFromString(known)));
+    }
+    NSString* fromDescription = NFBNotifEntryIdFromDescription(model);
+    if (fromDescription.length) {
+        cache[className] = kNFBIdentityFromDescription;
+        NFBDebugLog(@"notifhide: identity of %@ = entryId from description (durable)",
+                    className);
+        return fromDescription;
     }
     // Durable names first, the ones inside scribeItem and then the usual entry
     // ids. The impression id is the last resort: it is minted per display, so a key
@@ -1286,7 +1324,7 @@ static void NFBNotifSyncEmptyState(id dataViewController) {
         NFBNotifLayoutEmptyPanel(panel, table);
         NFBDebugLog(@"[empty] PANEL PLACED");
     } @catch (id exception) {
-        NFBDebugLog(@"[vide] exception: %@", exception);
+        NFBDebugLog(@"[empty] exception: %@", exception);
     }
 }
 
@@ -1387,8 +1425,14 @@ static void NFBNotifSweep(id dataViewController) {
     }
     %orig(NFBFilterNotifSections(sections), restore);
     // The list is in place: remove what is hidden.
+    __weak id host = self;
     dispatch_async(dispatch_get_main_queue(), ^{
-        NFBNotifSweep(self);
+      id alive = host;
+      if (alive) {
+          NFBNotifSweep(alive);
+      } else {
+          NFBDebugLog(@"[sweep] skipped: the list controller is gone");
+      }
     });
 }
 
@@ -1398,8 +1442,14 @@ static void NFBNotifSweep(id dataViewController) {
     }
     %orig(NFBFilterNotifSections(sections));
     // The list is in place: remove what is hidden.
+    __weak id host = self;
     dispatch_async(dispatch_get_main_queue(), ^{
-        NFBNotifSweep(self);
+      id alive = host;
+      if (alive) {
+          NFBNotifSweep(alive);
+      } else {
+          NFBDebugLog(@"[sweep] skipped: the list controller is gone");
+      }
     });
 }
 
@@ -1409,8 +1459,14 @@ static void NFBNotifSweep(id dataViewController) {
     }
     %orig(NFBFilterNotifSections(sections));
     // The list is in place: remove what is hidden.
+    __weak id host = self;
     dispatch_async(dispatch_get_main_queue(), ^{
-        NFBNotifSweep(self);
+      id alive = host;
+      if (alive) {
+          NFBNotifSweep(alive);
+      } else {
+          NFBDebugLog(@"[sweep] skipped: the list controller is gone");
+      }
     });
 }
 
@@ -1424,8 +1480,14 @@ static void NFBNotifSweep(id dataViewController) {
     }
     %orig(NFBFilterNotifSections(sections), completion);
     // The list is in place: remove what is hidden.
+    __weak id host = self;
     dispatch_async(dispatch_get_main_queue(), ^{
-        NFBNotifSweep(self);
+      id alive = host;
+      if (alive) {
+          NFBNotifSweep(alive);
+      } else {
+          NFBDebugLog(@"[sweep] skipped: the list controller is gone");
+      }
     });
 }
 
@@ -1435,8 +1497,14 @@ static void NFBNotifSweep(id dataViewController) {
     }
     %orig(NFBFilterNotifSections(sections), animation);
     // The list is in place: remove what is hidden.
+    __weak id host = self;
     dispatch_async(dispatch_get_main_queue(), ^{
-        NFBNotifSweep(self);
+      id alive = host;
+      if (alive) {
+          NFBNotifSweep(alive);
+      } else {
+          NFBDebugLog(@"[sweep] skipped: the list controller is gone");
+      }
     });
 }
 
@@ -1448,8 +1516,14 @@ static void NFBNotifSweep(id dataViewController) {
     }
     %orig(NFBFilterNotifSections(sections), animation, completion);
     // The list is in place: remove what is hidden.
+    __weak id host = self;
     dispatch_async(dispatch_get_main_queue(), ^{
-        NFBNotifSweep(self);
+      id alive = host;
+      if (alive) {
+          NFBNotifSweep(alive);
+      } else {
+          NFBDebugLog(@"[sweep] skipped: the list controller is gone");
+      }
     });
 }
 
@@ -1462,8 +1536,14 @@ reconfigureItemIdentifiers:(id)identifiers
     }
     %orig(NFBFilterNotifSections(sections), identifiers, animation, completion);
     // The list is in place: remove what is hidden.
+    __weak id host = self;
     dispatch_async(dispatch_get_main_queue(), ^{
-        NFBNotifSweep(self);
+      id alive = host;
+      if (alive) {
+          NFBNotifSweep(alive);
+      } else {
+          NFBDebugLog(@"[sweep] skipped: the list controller is gone");
+      }
     });
 }
 

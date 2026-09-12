@@ -1052,10 +1052,13 @@ static NFBHeightDamper gNFBSimulatedDamper = { NULL, -1, -1, -1, 0, 0, 0, 0,
                                                "simulated" };
 
 // Two signatures of a storm, because one of them is not enough: a height that
-// only undoes the previous one, and a sheer rate of writes whatever their shape.
-// A transition reaches neither.
+// only undoes the previous one, and a sheer rate of writes whatever the shape.
+
+// The rate is calibrated on measurements. A storm was counted at roughly 1500
+// writes a second; a 120 Hz scroll, which moves this height on every frame,
+// cannot exceed 60 per half second.
 #define NFB_DAMP_FLIPS 8
-#define NFB_DAMP_WRITES 40
+#define NFB_DAMP_WRITES 250
 
 // Returns the height to pass on. The caller always calls through: refusing the
 // call leaves UIKit believing it set a geometry it never did, and its own
@@ -1121,6 +1124,47 @@ static void nfbClearStaleFades(UIView* view, NSInteger depth) {
 // The glass is laid behind its content, the recipe the tab bar and the toasts
 // already use: real glass when the class is there, thick material otherwise.
 static const NSInteger kNFBReplyGlassTag = 0x4E464247;
+static const CGFloat kNFBReplyGlassInset = 10.0;
+static const CGFloat kNFBReplyGlassRadius = 26.0;
+
+// The bar draws hairline separators above and inside its button row. They read
+// as leftover edges on a floating capsule, so any one-point coloured strip goes.
+static void nfbHideReplyHairlines(UIView* node, NSInteger depth) {
+    if (!node || depth > 3) {
+        return;
+    }
+    for (UIView* sub in node.subviews) {
+        BOOL strip = sub.bounds.size.height <= 1.0 && sub.bounds.size.width > 100.0 &&
+                     sub.backgroundColor != nil && sub.subviews.count == 0;
+        if (strip && !sub.hidden) {
+            sub.hidden = YES;
+        }
+        nfbHideReplyHairlines(sub, depth + 1);
+    }
+}
+
+// The app lays an opaque backdrop behind the bar's host, level with it and
+// running to the bottom of the screen. Cleared so the content shows through, as
+// it does under a native floating bar.
+static void nfbClearReplyBackdrop(UIView* bar) {
+    UIView* host = bar.superview;
+    UIView* stage = host.superview;
+    if (!host || !stage) {
+        return;
+    }
+    for (UIView* sibling in stage.subviews) {
+        if (sibling == host || sibling.subviews.count > 0) {
+            continue;
+        }
+        CGFloat alpha = 0.0;
+        [sibling.backgroundColor getRed:NULL green:NULL blue:NULL alpha:&alpha];
+        BOOL levelWithHost = fabs(sibling.frame.origin.y - host.frame.origin.y) < 1.0;
+        if (levelWithHost && alpha >= 0.9 &&
+            sibling.frame.size.height >= host.frame.size.height) {
+            sibling.backgroundColor = [UIColor clearColor];
+        }
+    }
+}
 
 static void nfbGlassifyReplyBar(UIView* bar) {
     UIView* glass = [bar viewWithTag:kNFBReplyGlassTag];
@@ -1149,14 +1193,19 @@ static void nfbGlassifyReplyBar(UIView* bar) {
         glass = view;
         NFBDebugLog(@"[replybar] glass laid (%@)", real ? @"real" : @"material");
     }
-    // The keyboard resizes this bar, so the frame is taken on every pass.
-    if (!CGRectEqualToRect(glass.frame, bar.bounds)) {
-        glass.frame = bar.bounds;
+    // A floating capsule, inset from both edges, not a full-bleed slab. The keyboard
+    // resizes this bar, so the frame is taken on every pass.
+    CGRect box = CGRectInset(bar.bounds, kNFBReplyGlassInset, 0.0);
+    if (!CGRectEqualToRect(glass.frame, box)) {
+        glass.frame = box;
     }
-    CGFloat radius = MIN(bar.bounds.size.height / 2.0, 28.0);
+    CGFloat radius = MIN(box.size.height / 2.0, kNFBReplyGlassRadius);
     if (glass.layer.cornerRadius != radius) {
         glass.layer.cornerRadius = radius;
+        glass.layer.cornerCurve = kCACornerCurveContinuous;
     }
+    nfbHideReplyHairlines(bar, 0);
+    nfbClearReplyBackdrop(bar);
 }
 
 %hook T1PersistentComposeView

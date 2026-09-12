@@ -109,7 +109,7 @@ static const CGFloat kNFBNotifPillPadding = 8.0;   // gauche et droite seulement
         [_snippet.trailingAnchor constraintEqualToAnchor:self.contentView.trailingAnchor
                                                constant:-14],
 
-        // expiration — sous le texte, plus jamais en concurrence de largeur
+        // The expiry sits under the text and never competes with it for width.
         [_expiry.leadingAnchor constraintEqualToAnchor:_snippet.leadingAnchor],
         [_expiry.topAnchor constraintEqualToAnchor:_snippet.bottomAnchor constant:6],
         [_expiry.trailingAnchor constraintLessThanOrEqualToAnchor:self.contentView.trailingAnchor
