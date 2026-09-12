@@ -490,112 +490,6 @@ static void nfbQueueBarGlassPass(UIView* bar) {
     });
 }
 
-// A search bar's cancel control is not a bar button item, so the flattening
-// below cannot reach it: the glass is painted by a UIKit container around it.
-// The container is emptied, the way the notifications eye already does.
-static void nfbStripGlassAbove(UIView* view, UIView* stopAt) {
-    UIView* node = view.superview;
-    NSInteger hops = 0;
-    while (node && node != stopAt && hops < 5) {
-        NSString* name = NSStringFromClass([node class]);
-        if ([name containsString:@"ItemWrapperView"] ||
-            [name containsString:@"GlassInteraction"] ||
-            [name containsString:@"SystemBackgroundView"] ||
-            [name containsString:@"PlatterContainer"]) {
-            node.backgroundColor = [UIColor clearColor];
-            node.layer.backgroundColor = [UIColor clearColor].CGColor;
-            node.layer.borderWidth = 0.0;
-            node.layer.shadowOpacity = 0.0;
-            for (UIView* sub in node.subviews) {
-                NSString* subName = NSStringFromClass([sub class]);
-                if ([subName containsString:@"VisualEffect"] ||
-                    [subName containsString:@"Glass"]) {
-                    sub.hidden = YES;
-                }
-            }
-        }
-        node = node.superview;
-        hops++;
-    }
-}
-
-// Buttons only. The search field's own rounded background is not one, and is
-// left exactly as the app draws it.
-static void nfbStripSearchBarGlass(UIView* node, UIView* bar, NSInteger depth) {
-    if (!node || depth > 6) {
-        return;
-    }
-    if ([node isKindOfClass:[UIButton class]]) {
-        nfbStripGlassAbove(node, bar);
-    }
-    for (UIView* sub in node.subviews) {
-        nfbStripSearchBarGlass(sub, bar, depth + 1);
-    }
-}
-
-// [p33] probe only: a view tree, once per host, so an over-reach or a miss can
-// be read instead of guessed.
-static void nfbNoteSearchBarTree(UIView* node, NSInteger depth) {
-    if (!node || depth > 6) {
-        return;
-    }
-    CGRect f = node.frame;
-    NSMutableString* pad = [NSMutableString string];
-    for (NSInteger i = 0; i < depth; i++) {
-        [pad appendString:@"  "];
-    }
-    NFBDebugLog(@"[p33] %@%@ %.0fx%.0f@%.0f,%.0f bg=%@ hidden=%d", pad,
-                NSStringFromClass([node class]), f.size.width, f.size.height,
-                f.origin.x, f.origin.y,
-                node.backgroundColor ? @"set" : @"nil", node.hidden ? 1 : 0);
-    for (UIView* sub in node.subviews) {
-        nfbNoteSearchBarTree(sub, depth + 1);
-    }
-}
-
-// [p33] probe only: prints a host's tree once, whatever the host.
-static void nfbNoteTreeOnce(UIView* host, NSString* label) {
-    if (!NFBDebugIsRecording() ||
-        objc_getAssociatedObject(host, @selector(nfbTreeNoted))) {
-        return;
-    }
-    objc_setAssociatedObject(host, @selector(nfbTreeNoted), @YES,
-                             OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-    NFBDebugLog(@"[p33] --- %@ tree ---", label);
-    nfbNoteSearchBarTree(host, 0);
-}
-
-%hook TFNSearchBar
-
-- (void)layoutSubviews {
-    %orig;
-    @try {
-        if (![BHTSettings boolForKey:@"enable_liquid_glass"]) {
-            return;
-        }
-        UIView* bar = (UIView*)self;
-        nfbStripSearchBarGlass(bar, bar, 0);
-        nfbNoteTreeOnce(bar, @"search bar");
-    } @catch (id exception) {
-    }
-}
-
-%end
-
-// [p33] probe only: the reply bar of a tweet, which lost its glass and which
-// nothing in the tweak touches. Read-only, nothing is written here.
-%hook T1DockedBarContainer
-
-- (void)layoutSubviews {
-    %orig;
-    @try {
-        nfbNoteTreeOnce((UIView*)self, @"docked bar");
-    } @catch (id exception) {
-    }
-}
-
-%end
-
 // The glass is taken off as the items are set, before the bar is ever drawn.
 // Doing it only from the layout pass meant one run-loop turn with the capsule
 // on screen, seen as a flash on a bar whose items appear at once.
@@ -622,8 +516,31 @@ static void nfbFlattenItemsNow(NSArray<UIBarButtonItem*>* items) {
     %orig;
 }
 
+- (void)setRightBarButtonItems:(NSArray<UIBarButtonItem*>*)items
+                      animated:(BOOL)animated {
+    nfbFlattenItemsNow(items);
+    %orig;
+}
+
 - (void)setLeftBarButtonItems:(NSArray<UIBarButtonItem*>*)items {
     nfbFlattenItemsNow(items);
+    %orig;
+}
+
+- (void)setLeftBarButtonItems:(NSArray<UIBarButtonItem*>*)items
+                     animated:(BOOL)animated {
+    nfbFlattenItemsNow(items);
+    %orig;
+}
+
+// Groups carry the items on iOS 16 and later, and an item posted through one
+// never reaches the arrays above.
+- (void)setTrailingItemGroups:(NSArray<UIBarButtonItemGroup*>*)groups {
+    for (UIBarButtonItemGroup* group in groups) {
+        if ([group isKindOfClass:[UIBarButtonItemGroup class]]) {
+            nfbFlattenItemsNow(group.barButtonItems);
+        }
+    }
     %orig;
 }
 
