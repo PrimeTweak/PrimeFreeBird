@@ -352,6 +352,48 @@ static void nfbRepaintNotificationsGear(UIView* bar, UIColor* colour) {
 // button, which this app never had. Every item goes without, with no exception:
 // a text button takes the bar's ink as its fill.
 
+// A Done-style item is the screen's primary action, and iOS 26 draws it as a
+// filled capsule. It keeps its glass, tinted the system blue explicitly so the
+// capsule cannot fill with the bar's own ink, and its label is set white.
+
+// Returns whether anything was owed; writes only when apply is YES.
+static BOOL nfbStyleDoneItem(UIBarButtonItem* button, BOOL apply) {
+    BOOL owed = NO;
+    SEL hideShared = NSSelectorFromString(@"setHidesSharedBackground:");
+    id current = nil;
+    @try {
+        current = [button valueForKey:@"hidesSharedBackground"];
+    } @catch (id exception) {
+    }
+    if ([current respondsToSelector:@selector(boolValue)] && [current boolValue]) {
+        owed = YES;
+        if (apply && [button respondsToSelector:hideShared]) {
+            ((void (*)(id, SEL, BOOL))objc_msgSend)(button, hideShared, NO);
+        }
+    }
+    UIColor* blue = [UIColor systemBlueColor];
+    if (![button.tintColor isEqual:blue]) {
+        owed = YES;
+        if (apply) {
+            button.tintColor = blue;
+        }
+    }
+    UIControlState states[2] = { UIControlStateNormal, UIControlStateHighlighted };
+    for (NSUInteger s = 0; s < 2; s++) {
+        NSDictionary* existing = [button titleTextAttributesForState:states[s]];
+        if ([existing[NSForegroundColorAttributeName] isEqual:[UIColor whiteColor]]) {
+            continue;
+        }
+        owed = YES;
+        if (apply) {
+            NSMutableDictionary* attributes = [(existing ?: @{}) mutableCopy];
+            attributes[NSForegroundColorAttributeName] = [UIColor whiteColor];
+            [button setTitleTextAttributes:attributes forState:states[s]];
+        }
+    }
+    return owed;
+}
+
 // With apply NO nothing is written and the answer is whether a pass is owed:
 // setting an item property invalidates the bar, so the writes never happen
 // inside a layout pass.
@@ -394,7 +436,6 @@ static BOOL nfbBarGlassPass(UIView* bar, BOOL apply) {
         }
     }
     SEL hideShared = NSSelectorFromString(@"setHidesSharedBackground:");
-    UIColor* blue = [UIColor systemBlueColor];
     for (UIBarButtonItem* button in items) {
         if (![button isKindOfClass:[UIBarButtonItem class]] ||
             ![button respondsToSelector:hideShared]) {
@@ -424,39 +465,9 @@ static BOOL nfbBarGlassPass(UIView* bar, BOOL apply) {
             continue;
         }
 
-        // A Done-style item is the screen's primary action, and iOS 26 draws it as a
-        // filled capsule. It keeps its glass, tinted the system blue explicitly so
-        // the capsule cannot fill with the bar's own ink and come out dark.
         if (button.style == UIBarButtonItemStyleDone) {
-            if (flat) {
+            if (nfbStyleDoneItem(button, apply)) {
                 owed = YES;
-                if (apply) {
-                    ((void (*)(id, SEL, BOOL))objc_msgSend)(button, hideShared, NO);
-                }
-            }
-            if (![button.tintColor isEqual:blue]) {
-                owed = YES;
-                if (apply) {
-                    button.tintColor = blue;
-                }
-            }
-            // The label is drawn over a filled capsule, so it is set white for both
-            // states. Merged, never replaced: the title may already carry a font.
-            UIControlState states[2] = { UIControlStateNormal,
-                                         UIControlStateHighlighted };
-            for (NSUInteger s = 0; s < 2; s++) {
-                NSDictionary* existing = [button titleTextAttributesForState:states[s]];
-                if ([existing[NSForegroundColorAttributeName]
-                        isEqual:[UIColor whiteColor]]) {
-                    continue;
-                }
-                owed = YES;
-                if (!apply) {
-                    continue;
-                }
-                NSMutableDictionary* attributes = [(existing ?: @{}) mutableCopy];
-                attributes[NSForegroundColorAttributeName] = [UIColor whiteColor];
-                [button setTitleTextAttributes:attributes forState:states[s]];
             }
             continue;
         }
@@ -501,8 +512,13 @@ static void nfbFlattenItemsNow(NSArray<UIBarButtonItem*>* items) {
     for (UIBarButtonItem* button in items) {
         if (![button isKindOfClass:[UIBarButtonItem class]] ||
             ![button respondsToSelector:hideShared] ||
-            button.style == UIBarButtonItemStyleDone ||
             objc_getAssociatedObject(button, @selector(nfbKeepsBarGlass))) {
+            continue;
+        }
+        // Styled as it is set, so a re-hosted Done never draws one frame in
+        // the bar's ink before the layout pass paints it blue.
+        if (button.style == UIBarButtonItemStyleDone) {
+            nfbStyleDoneItem(button, YES);
             continue;
         }
         ((void (*)(id, SEL, BOOL))objc_msgSend)(button, hideShared, YES);
