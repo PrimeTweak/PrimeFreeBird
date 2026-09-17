@@ -460,9 +460,20 @@ static NSString* NFBVMDMenuTitle(void) {
     return title;
 }
 
-// Detects a download entry that is already present. This avoids duplicating
-// the native entry when it appears, and avoids adding the custom one twice if
-// the menu is rebuilt.
+// Detects a download entry already in the menu, ours or the app's. The app's
+// own video entry ships untranslated and shows its raw key, so the key itself
+// is matched the same way a translated title would be.
+static BOOL NFBVMDTitleIsDownload(NSString* title, NSString* ours,
+                                  NSString* generic) {
+    if ([title isEqualToString:ours] ||
+        (generic.length > 0 && [title isEqualToString:generic])) {
+        return YES;
+    }
+    NSString* upper = title.uppercaseString;
+    return [upper containsString:@"DOWNLOAD"] &&
+           [upper containsString:@"ACTIVITY_VIEW_LABEL"];
+}
+
 static BOOL NFBVMDAlreadyHasDownload(NSArray* children) {
     NSString* ours = NFBVMDMenuTitle();
     NSString* generic = [[BHTBundle sharedBundle]
@@ -475,8 +486,7 @@ static BOOL NFBVMDAlreadyHasDownload(NSArray* children) {
         if (title.length == 0) {
             continue;
         }
-        if ([title isEqualToString:ours] ||
-            (generic.length > 0 && [title isEqualToString:generic])) {
+        if (NFBVMDTitleIsDownload(title, ours, generic)) {
             return YES;
         }
     }
