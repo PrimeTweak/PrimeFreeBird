@@ -253,9 +253,27 @@ static UIImage* NFBBirdLogoImage(CGSize size) {
     return rendered;
 }
 
+// On Twitter 12.24 the search bar is hosted as the bar's title view, so the
+// title paths reach its magnifier and clear icons. Nothing under a search view
+// is ever the logo.
+static BOOL NFBSitsInSearchView(UIView* view) {
+    UIView* node = view.superview;
+    for (NSInteger up = 0; node && up < 8; up++) {
+        NSString* name = NSStringFromClass([node class]);
+        if ([name containsString:@"Search"]) {
+            return YES;
+        }
+        if ([name containsString:@"NavigationBarTitleControl"]) {
+            return NO;
+        }
+        node = node.superview;
+    }
+    return NO;
+}
+
 static void NFBApplyLogoTint(UIImageView* logoView) {
     UIImage* current = logoView.image;
-    if (!current) {
+    if (!current || NFBSitsInSearchView(logoView)) {
         return;
     }
     NFBRegisterLogoView(logoView);
@@ -2213,11 +2231,44 @@ static void NFBTintConfirmGlassBlue(UIView* container) {
     }
 }
 
+// A back button hosts a mask view beside its glyph. Any glyph whose button
+// carries one is the back arrow, whatever its position during a transition.
+static BOOL NFBSubtreeHasBackMask(UIView* view, NSInteger depth) {
+    if (!view || depth > 4) {
+        return NO;
+    }
+    if ([NSStringFromClass([view class]) containsString:@"BackButtonMask"]) {
+        return YES;
+    }
+    for (UIView* sub in view.subviews) {
+        if (NFBSubtreeHasBackMask(sub, depth + 1)) {
+            return YES;
+        }
+    }
+    return NO;
+}
+
+static BOOL NFBGlyphIsBackArrow(UIView* glyph) {
+    UIView* node = glyph.superview;
+    for (NSInteger up = 0; node && up < 5; up++) {
+        if ([NSStringFromClass([node class]) isEqualToString:@"_UIButtonBarButton"]) {
+            return NFBSubtreeHasBackMask(node, 0);
+        }
+        node = node.superview;
+    }
+    return NO;
+}
+
 static void NFBWhitenConfirmGlyphsIn(UIView* view, UINavigationBar* bar) {
     for (UIView* sub in view.subviews) {
         if ([sub isKindOfClass:[UIImageView class]]) {
             UIImageView* glyph = (UIImageView*)sub;
             CGRect inBar = [glyph convertRect:glyph.bounds toView:bar];
+            // The back arrow slides through the right zone during a transition
+            // and must never be whitened or have its glass tinted.
+            if (NFBGlyphIsBackArrow(glyph)) {
+                continue;
+            }
             if (CGRectGetMidX(inBar) > bar.bounds.size.width * 0.6 &&
                 glyph.bounds.size.width > 0 && glyph.bounds.size.width < 44 &&
                 glyph.image &&
@@ -2265,6 +2316,36 @@ void NFBWhitenNavigationBarConfirm(UINavigationBar* bar) {
     }
 }
 
+// The app lays an opaque backdrop under its own bars, a plain view at index 0
+// running above the bar into the status area. Under the glass design it hides
+// the translucency; cleared there, and given back when the setting is off.
+static const void* kNFBBarBackdropColourKey = &kNFBBarBackdropColourKey;
+
+static void NFBSettleBarBackdrop(UINavigationBar* bar) {
+    UIView* backdrop = bar.subviews.firstObject;
+    if (!backdrop || [backdrop class] != [UIView class] ||
+        backdrop.frame.origin.y >= 0.0 ||
+        fabs(backdrop.frame.size.width - bar.bounds.size.width) > 1.0) {
+        return;
+    }
+    BOOL glass = [BHTSettings boolForKey:@"enable_liquid_glass"];
+    UIColor* kept = objc_getAssociatedObject(backdrop, kNFBBarBackdropColourKey);
+    if (glass) {
+        CGFloat alpha = 0.0;
+        [backdrop.backgroundColor getRed:NULL green:NULL blue:NULL alpha:&alpha];
+        if (alpha > 0.05) {
+            objc_setAssociatedObject(backdrop, kNFBBarBackdropColourKey,
+                                     backdrop.backgroundColor,
+                                     OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+            backdrop.backgroundColor = [UIColor clearColor];
+        }
+    } else if (kept) {
+        backdrop.backgroundColor = kept;
+        objc_setAssociatedObject(backdrop, kNFBBarBackdropColourKey, nil,
+                                 OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    }
+}
+
 %hook UINavigationBar
 
 - (void)didMoveToWindow {
@@ -2274,6 +2355,7 @@ void NFBWhitenNavigationBarConfirm(UINavigationBar* bar) {
 
 - (void)layoutSubviews {
     %orig;
+    NFBSettleBarBackdrop(self);
     NFBWhitenNavigationBarConfirm(self);
     // topItem.titleView is the logo container, so converting it to a template here
     // is safe, unlike sweeping any image view. At layout time the bounds are real,
@@ -2287,8 +2369,6 @@ void NFBWhitenNavigationBarConfirm(UINavigationBar* bar) {
         if (logo && logo.bounds.size.width > 0 && logo.bounds.size.width < 60) {
             NFBTopBarLogoView = logo;
             NFBRegisterLogoView(logo);
-            if (NFBAccentPending) {
-            }
             NFBApplyLogoTint(logo);
         }
     }
