@@ -1140,8 +1140,26 @@ static void nfbClearStaleFades(UIView* view, NSInteger depth) {
 // The glass is laid behind its content, the recipe the tab bar and the toasts
 // already use: real glass when the class is there, thick material otherwise.
 static const NSInteger kNFBReplyGlassTag = 0x4E464247;
-static const CGFloat kNFBReplyGlassInset = 10.0;
+// Matched to the floating tab bar below, measured at 21 points of margin, so
+// the two capsules line up instead of one overhanging the other.
+static const CGFloat kNFBReplyGlassInset = 21.0;
 static const CGFloat kNFBReplyGlassRadius = 26.0;
+
+// The field the text sits in carries its own opaque fill, the width of the bar,
+// which covers the glass entirely. Cleared so the capsule shows through.
+static void nfbClearReplyFieldFill(UIView* bar) {
+    for (UIView* sub in bar.subviews) {
+        if ([sub isKindOfClass:[UIVisualEffectView class]] || sub.hidden ||
+            sub.bounds.size.height < 8.0) {
+            continue;
+        }
+        CGFloat alpha = 0.0;
+        [sub.backgroundColor getRed:NULL green:NULL blue:NULL alpha:&alpha];
+        if (alpha > 0.05 && sub.bounds.size.width > bar.bounds.size.width * 0.8) {
+            sub.backgroundColor = [UIColor clearColor];
+        }
+    }
+}
 
 // The bar draws hairline separators above and inside its button row. They read
 // as leftover edges on a floating capsule, so any one-point coloured strip goes.
@@ -1222,6 +1240,7 @@ static void nfbGlassifyReplyBar(UIView* bar) {
     }
     nfbHideReplyHairlines(bar, 0);
     nfbClearReplyBackdrop(bar);
+    nfbClearReplyFieldFill(bar);
 }
 
 %hook T1PersistentComposeView

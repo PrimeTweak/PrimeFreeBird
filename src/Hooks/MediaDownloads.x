@@ -545,16 +545,50 @@ static NSArray* NFBVMDAugmentedChildren(NSArray* children) {
     return augmented;
 }
 
+// The app's own entry is appended after this menu is first built, so it is
+// dropped wherever the menu is rebuilt: only one download entry survives, ours.
+static NSArray* NFBVMDWithoutNativeDownload(NSArray* children) {
+    NSString* ours = NFBVMDMenuTitle();
+    NSMutableArray* kept = nil;
+    for (id element in children) {
+        if (![element respondsToSelector:@selector(title)]) {
+            continue;
+        }
+        NSString* title = [element title];
+        if (title.length == 0 || [title isEqualToString:ours] ||
+            !NFBVMDTitleIsDownload(title, ours, nil)) {
+            continue;
+        }
+        if (!kept) {
+            kept = [children mutableCopy];
+        }
+        [kept removeObject:element];
+        NFBDebugLog(@"[dlvideo] native entry dropped: %@", title);
+    }
+    return kept ?: children;
+}
+
 %hook UIMenu
 
 + (id)menuWithTitle:(NSString*)title children:(NSArray*)children {
     NSArray* finalChildren = children;
     @try {
-        finalChildren = NFBVMDAugmentedChildren(children);
+        finalChildren = NFBVMDWithoutNativeDownload(children);
+        finalChildren = NFBVMDAugmentedChildren(finalChildren);
     } @catch (id exception) {
         finalChildren = children;
     }
     return %orig(title, finalChildren);
+}
+
+- (UIMenu*)menuByReplacingChildren:(NSArray*)children {
+    NSArray* finalChildren = children;
+    @try {
+        finalChildren = NFBVMDWithoutNativeDownload(children);
+    } @catch (id exception) {
+        finalChildren = children;
+    }
+    return %orig(finalChildren);
 }
 
 %end
