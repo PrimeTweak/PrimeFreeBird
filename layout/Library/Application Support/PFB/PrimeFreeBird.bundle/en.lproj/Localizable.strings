@@ -252,6 +252,8 @@
 "HIDE_GROK_ANALYZE_DETAIL" = "Remove the 'Analyze with Grok' button from Tweets.";
 "HIDE_GROK_SIDEBAR_TITLE" = "Hide sidebar shortcut";
 "HIDE_GROK_SIDEBAR_DETAIL" = "Remove the Grok shortcut from the side menu.";
+"HIDE_GROK_BOT_TITLE" = "Hide Grok Bot";
+"HIDE_GROK_BOT_DETAIL" = "Remove the ‘Try Grok Bot’ row from the side menu.";
 "HIDE_GROK_CREATE_TITLE" = "Hide creation tools";
 "HIDE_GROK_CREATE_DETAIL" = "Remove the options to create or edit media with Grok.";
 "DISABLE_AUTO_TRANSLATE_TITLE" = "Auto-translate";
