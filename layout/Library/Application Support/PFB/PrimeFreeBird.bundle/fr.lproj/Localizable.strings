@@ -336,6 +336,8 @@
 "DISABLE_IMMERSIVE_SCROLL_DETAIL" = "Empêche la vidéo suivante de démarrer quand tu balaies en plein écran.";
 "HIDE_GROK_ANALYZE_DETAIL" = "Retire le bouton « Analyser avec Grok » des Tweets.";
 "HIDE_GROK_SIDEBAR_DETAIL" = "Retire le raccourci Grok du menu latéral.";
+"HIDE_GROK_BOT_TITLE" = "Masquer Grok Bot";
+"HIDE_GROK_BOT_DETAIL" = "Retirer la rangée « Try Grok Bot » du menu latéral.";
 "MODERN_SETTINGS_LAB_TITLE" = "Labo";
 "MODERN_SETTINGS_LAB_SUBTITLE" = "Fonctions expérimentales, outils et sauvegarde des réglages.";
 "IMPORT_SETTINGS_DONE_TITLE" = "Réglages importés";
