@@ -1149,6 +1149,28 @@ static const CGFloat kNFBReplyGlassInset = 21.0;
 static const CGFloat kNFBReplyGlassGap = 8.0;
 static const CGFloat kNFBReplyGlassRadius = 26.0;
 
+// The app lays its content across the full width while the capsule is inset,
+// so text and buttons hang over both edges. Any child that reaches near the
+// full width is brought inside the capsule.
+static void nfbInsetReplyContent(UIView* bar, CGFloat inset) {
+    CGFloat wanted = bar.bounds.size.width - inset * 2.0;
+    if (wanted <= 0.0) {
+        return;
+    }
+    for (UIView* sub in bar.subviews) {
+        if ([sub isKindOfClass:[UIVisualEffectView class]] ||
+            sub.bounds.size.width < bar.bounds.size.width * 0.9) {
+            continue;
+        }
+        CGRect frame = sub.frame;
+        frame.origin.x = inset;
+        frame.size.width = wanted;
+        if (!CGRectEqualToRect(sub.frame, frame)) {
+            sub.frame = frame;
+        }
+    }
+}
+
 // The field the text sits in carries its own opaque fill, the width of the bar,
 // which covers the glass entirely. Cleared so the capsule shows through.
 static void nfbClearReplyFieldFill(UIView* bar) {
@@ -1246,6 +1268,7 @@ static void nfbGlassifyReplyBar(UIView* bar) {
     nfbHideReplyHairlines(bar, 0);
     nfbClearReplyBackdrop(bar);
     nfbClearReplyFieldFill(bar);
+    nfbInsetReplyContent(bar, kNFBReplyGlassInset);
 }
 
 %hook T1PersistentComposeView

@@ -60,6 +60,12 @@ static NSNumber* FeatureSwitchOverrideValueForKey(NSString* key) {
         return [BHTSettings boolForKey:@"enable_liquid_glass"] ? @YES : nil;
     }
 
+    // The Grok Bot row in the side menu is an upsell for a separate app, driven
+    // by its own switch rather than by the Grok panel the row above hides.
+    if ([key isEqualToString:@"grok_ios_grok_bot_sidebar_enabled"]) {
+        return [BHTSettings boolForKey:@"hide_grok_bot"] ? @NO : nil;
+    }
+
     // Screenshot share sheet: the prompt goes on cooldown after max_dismisses
     // dismissals. The max is forced to infinity so the cooldown never triggers and
     // the duration to 0 so any active one clears.
