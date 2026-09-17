@@ -576,6 +576,7 @@
 "TW_DISMISS_LABEL" = "Ignorer";
 "TW_DOWNLOAD_ACTIVITY_VIEW_LABEL" = "Télécharger";
 "TW_DOWNLOAD_LIVE_ACTIVITY_DOWNLOADING" = "Téléchargement…";
+"TW_DOWNLOAD_VIDEO_ACTIVITY_VIEW_LABEL" = "Télécharger la vidéo";
 "TW_ERROR_ALERT_TITLE" = "Erreur";
 "TW_GENERIC_OFF_LABEL" = "Désactivé";
 "TW_LOG_IN_ACTION_LABEL" = "Se connecter";
