@@ -451,7 +451,7 @@ static void nfbAdvClearShowsFilter(UIView* bar) {
     if (!flag) {
         return;
     }
-    BOOL* slot = (BOOL*)((__bridge uint8_t*)bar + ivar_getOffset(flag));
+    BOOL* slot = (BOOL*)((uint8_t*)(__bridge void*)bar + ivar_getOffset(flag));
     if (*slot) {
         *slot = NO;
     }
