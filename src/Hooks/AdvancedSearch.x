@@ -439,9 +439,27 @@ static void nfbAdvRescanSoon(void) {
 // bar button item, so the item passes above never reach it.
 static const void* kNFBAdvNativeWidthKey = &kNFBAdvNativeWidthKey;
 
-// Hidden alone keeps the slot, so the width goes to zero as well. The app does
-// not lay a hidden button out again, so this write settles in one pass. The
-// original width is kept, and the button comes back whole when the setting is off.
+// The bar carries a showsFilterButton field that its own layout reads. Writing
+// it before that layout runs lets the app lay the field out itself, with no
+// geometry written by hand and no pass of its own triggered.
+static void nfbAdvClearShowsFilter(UIView* bar) {
+    static Ivar flag = NULL;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+      flag = class_getInstanceVariable([bar class], "showsFilterButton");
+    });
+    if (!flag) {
+        return;
+    }
+    BOOL* slot = (BOOL*)((__bridge uint8_t*)bar + ivar_getOffset(flag));
+    if (*slot) {
+        *slot = NO;
+    }
+}
+
+// Belt for the case where the field above is not what the layout reads: hidden
+// alone keeps the slot, so the width goes to zero as well. The app does not lay
+// a hidden button out again, so this write settles in one pass.
 static void nfbAdvHideNativeInSearchBar(UIView* bar) {
     BOOL hide = [BHTSettings boolForKey:@"advanced_search"];
     for (UIView* sub in bar.subviews) {
@@ -480,6 +498,12 @@ static void nfbAdvHideNativeInSearchBar(UIView* bar) {
 %hook _TtC15TwitterSearchV211SearchBarV2
 
 - (void)layoutSubviews {
+    @try {
+        if ([BHTSettings boolForKey:@"advanced_search"]) {
+            nfbAdvClearShowsFilter((UIView*)self);
+        }
+    } @catch (id exception) {
+    }
     %orig;
     @try {
         nfbAdvHideNativeInSearchBar((UIView*)self);
