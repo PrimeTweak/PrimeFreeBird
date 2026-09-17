@@ -497,6 +497,18 @@ static void nfbAdvHideNativeInSearchBar(UIView* bar) {
 
 %hook _TtC15TwitterSearchV211SearchBarV2
 
+// Set before the bar's entrance animation picks its targets, so the field is
+// sized once instead of settling into place afterwards.
+- (void)didMoveToWindow {
+    @try {
+        if (self.window && [BHTSettings boolForKey:@"advanced_search"]) {
+            nfbAdvClearShowsFilter((UIView*)self);
+        }
+    } @catch (id exception) {
+    }
+    %orig;
+}
+
 - (void)layoutSubviews {
     @try {
         if ([BHTSettings boolForKey:@"advanced_search"]) {
