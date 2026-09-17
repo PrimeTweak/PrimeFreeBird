@@ -1878,14 +1878,34 @@ static UIImage* NFBNotifFlatGlyph(UIImage* source, UIColor* colour) {
         if (!glyph) {
             glyph = [UIImage systemImageNamed:@"eye.slash"];
         }
-        UITraitCollection* traits = viewController.traitCollection;
+        // The colour is read from the neighbouring gear, as the search filters
+        // button does, so the two glyphs are drawn in the same ink.
+        __block UIColor* ink = nil;
+        for (UIBarButtonItem* neighbour in item.rightBarButtonItems) {
+            if (neighbour.customView) {
+                EnumerateSubviewsRecursively(neighbour.customView, ^(UIView* view) {
+                  if (!ink && [view isKindOfClass:[UIImageView class]] && view.tintColor) {
+                      ink = view.tintColor;
+                  }
+                });
+            } else if (neighbour.tintColor) {
+                ink = neighbour.tintColor;
+            }
+            if (ink) {
+                break;
+            }
+        }
+        if (!ink) {
+            ink = NFBNotifIconGrey(viewController.traitCollection);
+        }
         // An image item, the same kind as the search filters button: the bar
         // gives both the same box and the same spacing next to the gear.
         UIBarButtonItem* ours = [[UIBarButtonItem alloc]
-            initWithImage:NFBNotifFlatGlyph(glyph, NFBNotifIconGrey(traits))
+            initWithImage:NFBNotifFlatGlyph(glyph, ink)
                     style:UIBarButtonItemStylePlain
                    target:[NFBNotifQuickPresenter shared]
                    action:@selector(present:)];
+        ours.tintColor = ink;
         ours.accessibilityLabel = @"Hidden notifications";
         ours.tag = kNFBNotifBarItemTag;
         SEL hideShared = NSSelectorFromString(@"setHidesSharedBackground:");

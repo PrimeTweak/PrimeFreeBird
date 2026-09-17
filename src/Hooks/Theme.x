@@ -253,10 +253,26 @@ static UIImage* NFBBirdLogoImage(CGSize size) {
     return rendered;
 }
 
-// On Twitter 12.24 the search bar is hosted as the bar's title view, so the
-// title paths reach its magnifier and clear icons. Nothing under a search view
-// is ever the logo.
-static BOOL NFBSitsInSearchView(UIView* view) {
+static BOOL NFBSubtreeHostsText(UIView* view, NSInteger depth) {
+    if (!view || depth > 6) {
+        return NO;
+    }
+    if ([view isKindOfClass:[UILabel class]] || [view isKindOfClass:[UITextField class]] ||
+        [view isKindOfClass:[UITextView class]]) {
+        return YES;
+    }
+    for (UIView* sub in view.subviews) {
+        if (NFBSubtreeHostsText(sub, depth + 1)) {
+            return YES;
+        }
+    }
+    return NO;
+}
+
+// The logo is the one title made of an image and nothing else. A title that
+// also hosts text is a search field, a conversation header with its name, or
+// a plain title: the image found there is a magnifier or an avatar, never the X.
+static BOOL NFBSitsInTextTitle(UIView* view) {
     UIView* node = view.superview;
     for (NSInteger up = 0; node && up < 8; up++) {
         NSString* name = NSStringFromClass([node class]);
@@ -264,7 +280,7 @@ static BOOL NFBSitsInSearchView(UIView* view) {
             return YES;
         }
         if ([name containsString:@"NavigationBarTitleControl"]) {
-            return NO;
+            return NFBSubtreeHostsText(node, 0);
         }
         node = node.superview;
     }
@@ -273,7 +289,7 @@ static BOOL NFBSitsInSearchView(UIView* view) {
 
 static void NFBApplyLogoTint(UIImageView* logoView) {
     UIImage* current = logoView.image;
-    if (!current || NFBSitsInSearchView(logoView)) {
+    if (!current || NFBSitsInTextTitle(logoView)) {
         return;
     }
     NFBRegisterLogoView(logoView);
