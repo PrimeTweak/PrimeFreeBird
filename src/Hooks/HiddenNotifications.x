@@ -31,7 +31,6 @@ static NSString* const kNFBNotifHorizonKey = @"nfb_notif_horizon_days";
 static NSString* const kNFBHideNotifsEnabledKey = @"hide_notifications";
 
 
-
 // Absent key ⇒ ON. The feature must work on the very first build, before the
 // settings row lands; once the row exists (default YES) the two agree.
 static BOOL NFBNotifsEnabled(void) {
@@ -1072,7 +1071,6 @@ static NSArray* NFBFilterNotifSections(NSArray* sections) {
 // are walked after each content replacement and the hidden ones deleted.
 
 
-
 // Which screens the sweep may touch, decided by observation rather than by class
 // name. One notification model keeps a controller, several without drops it, and
 // the home timeline is then never walked again.
@@ -1802,8 +1800,6 @@ static BOOL NFBNotifRowIsOursInTable(id dataViewController, UITableView* table,
 }
 
 
-
-
 // MARK: - the optional-method cache
 
 // A UITableView asks its delegate and data source which optional methods they
@@ -1851,60 +1847,6 @@ static UIImage* NFBNotifFlatGlyph(UIImage* source, UIColor* colour) {
     return [painted imageWithRenderingMode:UIImageRenderingModeAlwaysOriginal];
 }
 
-// The eye's button reports its own container so the glass can be switched off.
-@interface NFBNotifEyeButton : UIButton
-- (void)nfbStripGlass;
-@end
-
-@implementation NFBNotifEyeButton
-
-- (void)didMoveToWindow {
-    [super didMoveToWindow];
-    [self nfbStripGlass];
-}
-
-- (void)layoutSubviews {
-    [super layoutSubviews];
-    [self nfbStripGlass];
-}
-
-- (void)nfbStripGlass {
-    @try {
-        UIView* node = self.superview;
-        NSInteger hops = 0;
-        while (node && hops < 5) {
-            NSString* name = NSStringFromClass([node class]);
-            BOOL wrapper = [name containsString:@"ItemWrapperView"] ||
-                           [name containsString:@"GlassInteraction"] ||
-                           [name containsString:@"SystemBackgroundView"] ||
-                           [name containsString:@"PlatterContainer"];
-            if (wrapper) {
-                node.backgroundColor = [UIColor clearColor];
-                node.layer.backgroundColor = [UIColor clearColor].CGColor;
-                node.layer.borderWidth = 0.0;
-                node.layer.shadowOpacity = 0.0;
-                for (UIView* sub in node.subviews) {
-                    NSString* subName = NSStringFromClass([sub class]);
-                    if ([subName containsString:@"SystemBackgroundView"] ||
-                        [subName containsString:@"VisualEffect"] ||
-                        [subName containsString:@"Glass"]) {
-                        sub.hidden = YES;
-                    }
-                }
-                static BOOL said;
-                if (!said) {
-                    said = YES;
-                    NFBDebugLog(@"[notifs] glass background neutralised on %@", name);
-                }
-            }
-            node = node.superview;
-            hops++;
-        }
-    } @catch (id exception) {
-    }
-}
-
-@end
 
 %hook T1TabNavigationController
 
@@ -1937,18 +1879,14 @@ static UIImage* NFBNotifFlatGlyph(UIImage* source, UIColor* colour) {
             glyph = [UIImage systemImageNamed:@"eye.slash"];
         }
         UITraitCollection* traits = viewController.traitCollection;
-        NFBNotifEyeButton* plain = [NFBNotifEyeButton buttonWithType:UIButtonTypeCustom];
-        [plain setImage:NFBNotifFlatGlyph(glyph, NFBNotifIconGrey(traits))
-               forState:UIControlStateNormal];
-        plain.frame = CGRectMake(0, 0, kNFBNotifEyeSide, kNFBNotifEyeSide);
-        plain.accessibilityLabel = @"Hidden notifications";
-        // UIButtonTypeCustom, so no system highlight tint can flash over it.
-        plain.adjustsImageWhenHighlighted = NO;
-        [plain addTarget:[NFBNotifQuickPresenter shared]
-                  action:@selector(present:)
-        forControlEvents:UIControlEventTouchUpInside];
-
-        UIBarButtonItem* ours = [[UIBarButtonItem alloc] initWithCustomView:plain];
+        // An image item, the same kind as the search filters button: the bar
+        // gives both the same box and the same spacing next to the gear.
+        UIBarButtonItem* ours = [[UIBarButtonItem alloc]
+            initWithImage:NFBNotifFlatGlyph(glyph, NFBNotifIconGrey(traits))
+                    style:UIBarButtonItemStylePlain
+                   target:[NFBNotifQuickPresenter shared]
+                   action:@selector(present:)];
+        ours.accessibilityLabel = @"Hidden notifications";
         ours.tag = kNFBNotifBarItemTag;
         SEL hideShared = NSSelectorFromString(@"setHidesSharedBackground:");
         if ([ours respondsToSelector:hideShared]) {
