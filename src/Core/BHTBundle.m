@@ -69,10 +69,14 @@
         return result;
     }
     // The app gave nothing back. Ours is keyed the same way, with a TW_ prefix
-    // so a borrowed key can never collide with one of the tweak's own.
-    NSString* fallback = [self
-        localizedStringForKey:[NSString stringWithFormat:@"TW_%@", key]];
-    return fallback.length ? fallback : key;
+    // so a borrowed key can never collide with one of the tweak's own. A lookup
+    // that misses returns the key it was given, so that case yields the plain key.
+    NSString* prefixed = [NSString stringWithFormat:@"TW_%@", key];
+    NSString* fallback = [self localizedStringForKey:prefixed];
+    if (fallback.length == 0 || [fallback isEqualToString:prefixed]) {
+        return key;
+    }
+    return fallback;
 }
 - (NSURL*)pathForFile:(NSString*)fileName {
     return [self.mainBundle URLForResource:fileName withExtension:nil];
