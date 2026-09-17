@@ -1149,22 +1149,36 @@ static const CGFloat kNFBReplyGlassInset = 21.0;
 static const CGFloat kNFBReplyGlassGap = 8.0;
 static const CGFloat kNFBReplyGlassRadius = 26.0;
 
-// The app lays its content across the full width while the capsule is inset,
-// so text and buttons hang over both edges. Any child that reaches near the
-// full width is brought inside the capsule.
-static void nfbInsetReplyContent(UIView* bar, CGFloat inset) {
+// The label above the field sits flush on the capsule edge while the field
+// carries its own text inset, so it gets the same padding to line up with it.
+static const CGFloat kNFBReplyTextPad = 12.0;
+
+// The app lays its content across the bar's full box while the capsule is inset
+// and shorter, so text and buttons hang over the edges. Any child that reaches
+// near the full width is brought inside the capsule, on both axes.
+static void nfbInsetReplyContent(UIView* bar, CGFloat inset, CGFloat gap) {
     CGFloat wanted = bar.bounds.size.width - inset * 2.0;
-    if (wanted <= 0.0) {
+    CGFloat capsule = bar.bounds.size.height - gap;
+    if (wanted <= 0.0 || capsule <= 0.0) {
         return;
     }
     for (UIView* sub in bar.subviews) {
-        if ([sub isKindOfClass:[UIVisualEffectView class]] ||
+        if ([sub isKindOfClass:[UIVisualEffectView class]] || sub.hidden ||
             sub.bounds.size.width < bar.bounds.size.width * 0.9) {
             continue;
         }
         CGRect frame = sub.frame;
-        frame.origin.x = inset;
-        frame.size.width = wanted;
+        BOOL label = [NSStringFromClass([sub class]) containsString:@"SocialContext"];
+        frame.origin.x = inset + (label ? kNFBReplyTextPad : 0.0);
+        frame.size.width = wanted - (label ? kNFBReplyTextPad * 2.0 : 0.0);
+        if (CGRectGetMaxY(frame) > capsule) {
+            if (frame.size.height >= capsule) {
+                frame.origin.y = 0.0;
+                frame.size.height = capsule;
+            } else {
+                frame.origin.y = capsule - frame.size.height;
+            }
+        }
         if (!CGRectEqualToRect(sub.frame, frame)) {
             sub.frame = frame;
         }
@@ -1268,7 +1282,7 @@ static void nfbGlassifyReplyBar(UIView* bar) {
     nfbHideReplyHairlines(bar, 0);
     nfbClearReplyBackdrop(bar);
     nfbClearReplyFieldFill(bar);
-    nfbInsetReplyContent(bar, kNFBReplyGlassInset);
+    nfbInsetReplyContent(bar, kNFBReplyGlassInset, kNFBReplyGlassGap);
 }
 
 %hook T1PersistentComposeView
