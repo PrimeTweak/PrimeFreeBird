@@ -469,24 +469,21 @@ static BOOL NFBVMDTitleIsDownload(NSString* title, NSString* ours,
         (generic.length > 0 && [title isEqualToString:generic])) {
         return YES;
     }
+    if ([title isEqualToString:generic]) {
+        return YES;
+    }
     NSString* upper = title.uppercaseString;
     return [upper containsString:@"DOWNLOAD"] &&
            [upper containsString:@"ACTIVITY_VIEW_LABEL"];
 }
 
-static BOOL NFBVMDAlreadyHasDownload(NSArray* children) {
+// Guards against adding the entry twice when a menu is rebuilt. The app's own
+// entry does not count: it is dropped below, so ours is the only one left.
+static BOOL NFBVMDAlreadyHasOurs(NSArray* children) {
     NSString* ours = NFBVMDMenuTitle();
-    NSString* generic = [[BHTBundle sharedBundle]
-                            localizedTwitterStringForKey:@"DOWNLOAD_ACTIVITY_VIEW_LABEL"];
     for (id element in children) {
-        if (![element respondsToSelector:@selector(title)]) {
-            continue;
-        }
-        NSString* title = [element title];
-        if (title.length == 0) {
-            continue;
-        }
-        if (NFBVMDTitleIsDownload(title, ours, generic)) {
+        if ([element respondsToSelector:@selector(title)] &&
+            [[element title] isEqualToString:ours]) {
             return YES;
         }
     }
@@ -515,7 +512,7 @@ static NSArray* NFBVMDAugmentedChildren(NSArray* children) {
     if (![BHTSettings boolForKey:@"download_videos"]) {
         return children;
     }
-    if (NFBVMDAlreadyHasDownload(children)) {
+    if (NFBVMDAlreadyHasOurs(children)) {
         return children;
     }
     NSArray* mediaEntities = NFBVMDFreshVideoEntities();
@@ -549,6 +546,8 @@ static NSArray* NFBVMDAugmentedChildren(NSArray* children) {
 // dropped wherever the menu is rebuilt: only one download entry survives, ours.
 static NSArray* NFBVMDWithoutNativeDownload(NSArray* children) {
     NSString* ours = NFBVMDMenuTitle();
+    NSString* generic = [[BHTBundle sharedBundle]
+                            localizedTwitterStringForKey:@"DOWNLOAD_ACTIVITY_VIEW_LABEL"];
     NSMutableArray* kept = nil;
     for (id element in children) {
         if (![element respondsToSelector:@selector(title)]) {
@@ -556,7 +555,7 @@ static NSArray* NFBVMDWithoutNativeDownload(NSArray* children) {
         }
         NSString* title = [element title];
         if (title.length == 0 || [title isEqualToString:ours] ||
-            !NFBVMDTitleIsDownload(title, ours, nil)) {
+            !NFBVMDTitleIsDownload(title, ours, generic)) {
             continue;
         }
         if (!kept) {

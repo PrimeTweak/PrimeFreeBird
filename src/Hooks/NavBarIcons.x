@@ -1143,6 +1143,10 @@ static const NSInteger kNFBReplyGlassTag = 0x4E464247;
 // Matched to the floating tab bar below, measured at 21 points of margin, so
 // the two capsules line up instead of one overhanging the other.
 static const CGFloat kNFBReplyGlassInset = 21.0;
+
+// The bar sits flush on the tab bar. The capsule is lifted off its bottom edge
+// so the two read as two floating pieces rather than one two-storey block.
+static const CGFloat kNFBReplyGlassGap = 8.0;
 static const CGFloat kNFBReplyGlassRadius = 26.0;
 
 // The field the text sits in carries its own opaque fill, the width of the bar,
@@ -1230,6 +1234,7 @@ static void nfbGlassifyReplyBar(UIView* bar) {
     // A floating capsule, inset from both edges, not a full-bleed slab. The keyboard
     // resizes this bar, so the frame is taken on every pass.
     CGRect box = CGRectInset(bar.bounds, kNFBReplyGlassInset, 0.0);
+    box.size.height = MAX(box.size.height - kNFBReplyGlassGap, 1.0);
     if (!CGRectEqualToRect(glass.frame, box)) {
         glass.frame = box;
     }
