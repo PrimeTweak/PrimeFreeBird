@@ -436,8 +436,12 @@ static void nfbAdvRescanSoon(void) {
 }
 
 // The app's own entry lives inside its search bar as a plain button, not as a
-// bar button item, so the item passes above never reach it. It is hidden rather
-// than removed: a view taken out of that bar is put back on the next layout.
+// bar button item, so the item passes above never reach it.
+static const void* kNFBAdvNativeWidthKey = &kNFBAdvNativeWidthKey;
+
+// Hidden alone would keep its slot and leave a gap before Cancel, so the width
+// goes to zero as well and the app's own layout closes the space. The original
+// width is kept so the button comes back whole when the setting is off.
 static void nfbAdvHideNativeInSearchBar(UIView* bar) {
     BOOL hide = [BHTSettings boolForKey:@"advanced_search"];
     for (UIView* sub in bar.subviews) {
@@ -448,8 +452,25 @@ static void nfbAdvHideNativeInSearchBar(UIView* bar) {
         if (button.currentTitle.length > 0 || button.currentImage == nil) {
             continue;
         }
-        if (button.hidden != hide) {
-            button.hidden = hide;
+        NSNumber* kept = objc_getAssociatedObject(button, kNFBAdvNativeWidthKey);
+        CGRect frame = button.frame;
+        if (hide) {
+            if (!kept && frame.size.width > 0.0) {
+                objc_setAssociatedObject(button, kNFBAdvNativeWidthKey,
+                                         @(frame.size.width),
+                                         OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+            }
+            button.hidden = YES;
+            if (frame.size.width != 0.0) {
+                frame.size.width = 0.0;
+                button.frame = frame;
+            }
+        } else if (kept) {
+            button.hidden = NO;
+            frame.size.width = kept.doubleValue;
+            button.frame = frame;
+            objc_setAssociatedObject(button, kNFBAdvNativeWidthKey, nil,
+                                     OBJC_ASSOCIATION_RETAIN_NONATOMIC);
         }
     }
 }

@@ -1171,6 +1171,10 @@ static void nfbInsetReplyContent(UIView* bar, CGFloat inset, CGFloat gap) {
         BOOL label = [NSStringFromClass([sub class]) containsString:@"SocialContext"];
         frame.origin.x = inset + (label ? kNFBReplyTextPad : 0.0);
         frame.size.width = wanted - (label ? kNFBReplyTextPad * 2.0 : 0.0);
+        // The capsule loses the gap at its bottom, so the whole stack moves up
+        // by half of it to keep even margins. Relative order is preserved; only
+        // a child that would still overrun the capsule is clamped.
+        frame.origin.y = MAX(frame.origin.y - gap / 2.0, 0.0);
         if (CGRectGetMaxY(frame) > capsule) {
             if (frame.size.height >= capsule) {
                 frame.origin.y = 0.0;
