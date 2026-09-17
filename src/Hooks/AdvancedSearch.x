@@ -439,55 +439,41 @@ static void nfbAdvRescanSoon(void) {
 // bar button item, so the item passes above never reach it.
 static const void* kNFBAdvNativeWidthKey = &kNFBAdvNativeWidthKey;
 
-// The buttons sit at fixed offsets rather than in a stack, so zeroing a width
-// moves nothing. The field is widened into the freed space instead, which is
-// the bar the app would draw if the button were not there.
-static const CGFloat kNFBAdvFieldToCancel = 12.0;
-
-// The field is the wide coloured panel that holds the text; the entry is a bare
-// UIButton with an image and no title, and Cancel carries one.
+// Hidden alone keeps the slot, so the width goes to zero as well. The app does
+// not lay a hidden button out again, so this write settles in one pass. The
+// original width is kept, and the button comes back whole when the setting is off.
 static void nfbAdvHideNativeInSearchBar(UIView* bar) {
     BOOL hide = [BHTSettings boolForKey:@"advanced_search"];
-    UIButton* entry = nil;
-    UIButton* cancel = nil;
-    UIView* field = nil;
     for (UIView* sub in bar.subviews) {
-        if ([sub class] == [UIButton class]) {
-            UIButton* button = (UIButton*)sub;
-            if (button.currentTitle.length > 0) {
-                cancel = button;
-            } else if (button.currentImage && !entry) {
-                entry = button;
-            }
-        } else if ([sub class] == [UIView class] &&
-                   sub.bounds.size.width > bar.bounds.size.width * 0.5) {
-            field = sub;
+        if ([sub class] != [UIButton class]) {
+            continue;
         }
-    }
-    if (!entry || !field || !cancel) {
-        return;
-    }
-    NSNumber* kept = objc_getAssociatedObject(field, kNFBAdvNativeWidthKey);
-    CGRect frame = field.frame;
-    if (hide) {
-        entry.hidden = YES;
-        CGFloat wanted = CGRectGetMinX(cancel.frame) - kNFBAdvFieldToCancel -
-                         CGRectGetMinX(frame);
-        if (wanted > 0.0 && frame.size.width != wanted) {
-            if (!kept) {
-                objc_setAssociatedObject(field, kNFBAdvNativeWidthKey,
+        UIButton* button = (UIButton*)sub;
+        if (button.currentTitle.length > 0 || button.currentImage == nil) {
+            continue;
+        }
+        NSNumber* kept = objc_getAssociatedObject(button, kNFBAdvNativeWidthKey);
+        CGRect frame = button.frame;
+        if (hide) {
+            if (!kept && frame.size.width > 0.0) {
+                objc_setAssociatedObject(button, kNFBAdvNativeWidthKey,
                                          @(frame.size.width),
                                          OBJC_ASSOCIATION_RETAIN_NONATOMIC);
             }
-            frame.size.width = wanted;
-            field.frame = frame;
+            if (!button.hidden) {
+                button.hidden = YES;
+            }
+            if (frame.size.width != 0.0) {
+                frame.size.width = 0.0;
+                button.frame = frame;
+            }
+        } else if (kept) {
+            button.hidden = NO;
+            frame.size.width = kept.doubleValue;
+            button.frame = frame;
+            objc_setAssociatedObject(button, kNFBAdvNativeWidthKey, nil,
+                                     OBJC_ASSOCIATION_RETAIN_NONATOMIC);
         }
-    } else if (kept) {
-        entry.hidden = NO;
-        frame.size.width = kept.doubleValue;
-        field.frame = frame;
-        objc_setAssociatedObject(field, kNFBAdvNativeWidthKey, nil,
-                                 OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     }
 }
 
