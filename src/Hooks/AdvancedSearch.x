@@ -473,13 +473,10 @@ static void nfbAdvClearShowsFilter(UIView* bar, const char* from) {
     %orig;
 }
 
+// Only didMoveToWindow clears the field. Doing it on every pass fights the bar
+// that morphs into this one: the app restores the field between passes, and the
+// widths swing wider each time, which is what shows as a jump.
 - (void)layoutSubviews {
-    @try {
-        if ([BHTSettings boolForKey:@"advanced_search"]) {
-            nfbAdvClearShowsFilter((UIView*)self, "layoutSubviews");
-        }
-    } @catch (id exception) {
-    }
     %orig;
     @try {
         UIView* bar = (UIView*)self;
