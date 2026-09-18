@@ -436,10 +436,6 @@ static void nfbAdvRescanSoon(void) {
     nfbAdvRescanItemSoon(nil);
 }
 
-// The app's own entry lives inside its search bar as a plain button, not as a
-// bar button item, so the item passes above never reach it.
-static const void* kNFBAdvNativeWidthKey = &kNFBAdvNativeWidthKey;
-
 // The bar carries a showsFilterButton field that its own layout reads. Writing
 // it before that layout runs lets the app lay the field out itself, with no
 // geometry written by hand and no pass of its own triggered.
@@ -461,43 +457,6 @@ static void nfbAdvClearShowsFilter(UIView* bar, const char* from) {
     }
 }
 
-// Belt for the case where the field above is not what the layout reads: hidden
-// alone keeps the slot, so the width goes to zero as well. The app does not lay
-// a hidden button out again, so this write settles in one pass.
-static void nfbAdvHideNativeInSearchBar(UIView* bar) {
-    BOOL hide = [BHTSettings boolForKey:@"advanced_search"];
-    for (UIView* sub in bar.subviews) {
-        if ([sub class] != [UIButton class]) {
-            continue;
-        }
-        UIButton* button = (UIButton*)sub;
-        if (button.currentTitle.length > 0 || button.currentImage == nil) {
-            continue;
-        }
-        NSNumber* kept = objc_getAssociatedObject(button, kNFBAdvNativeWidthKey);
-        CGRect frame = button.frame;
-        if (hide) {
-            if (!kept && frame.size.width > 0.0) {
-                objc_setAssociatedObject(button, kNFBAdvNativeWidthKey,
-                                         @(frame.size.width),
-                                         OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-            }
-            if (!button.hidden) {
-                button.hidden = YES;
-            }
-            if (frame.size.width != 0.0) {
-                frame.size.width = 0.0;
-                button.frame = frame;
-            }
-        } else if (kept) {
-            button.hidden = NO;
-            frame.size.width = kept.doubleValue;
-            button.frame = frame;
-            objc_setAssociatedObject(button, kNFBAdvNativeWidthKey, nil,
-                                     OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-        }
-    }
-}
 
 %hook _TtC15TwitterSearchV211SearchBarV2
 
@@ -524,7 +483,6 @@ static void nfbAdvHideNativeInSearchBar(UIView* bar) {
     %orig;
     @try {
         UIView* bar = (UIView*)self;
-        nfbAdvHideNativeInSearchBar(bar);
         // [entrance] probe only: the field as the layout leaves it, against what
         // is actually on screen. A gap between the two is an animation in flight.
         if (NFBDebugIsRecording()) {
