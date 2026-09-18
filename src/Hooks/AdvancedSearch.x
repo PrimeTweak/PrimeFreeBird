@@ -439,6 +439,44 @@ static void nfbAdvRescanSoon(void) {
 // The app's own entry lives inside its search bar as a plain button, not as a
 // bar button item, so the bar button passes above never reach it.
 
+// The app's own entry lives inside its search bar as a plain button, not as a
+// bar button item, so the bar button passes above never reach it.
+
+// Faded rather than hidden: setting hidden invalidates the bar's layout, which
+// the app then runs again while it is coming in. Opacity leaves the layout
+// untouched, and the touch is turned off so nothing answers where it was.
+static void nfbAdvFadeNativeInSearchBar(UIView* bar) {
+    BOOL hide = [BHTSettings boolForKey:@"advanced_search"];
+    CGFloat wanted = hide ? 0.0 : 1.0;
+    for (UIView* sub in bar.subviews) {
+        if ([sub class] != [UIButton class]) {
+            continue;
+        }
+        UIButton* button = (UIButton*)sub;
+        if (button.currentTitle.length > 0 || button.currentImage == nil) {
+            continue;
+        }
+        if (button.alpha != wanted) {
+            button.alpha = wanted;
+        }
+        if (button.userInteractionEnabled == hide) {
+            button.userInteractionEnabled = !hide;
+        }
+    }
+}
+
+%hook _TtC15TwitterSearchV211SearchBarV2
+
+- (void)layoutSubviews {
+    %orig;
+    @try {
+        nfbAdvFadeNativeInSearchBar((UIView*)self);
+    } @catch (id exception) {
+    }
+}
+
+%end
+
 %hook UINavigationItem
 
 - (void)setRightBarButtonItems:(NSArray<UIBarButtonItem*>*)items {
