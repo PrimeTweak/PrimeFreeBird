@@ -436,9 +436,44 @@ static void nfbAdvRescanSoon(void) {
     nfbAdvRescanItemSoon(nil);
 }
 
-// The bar carries a showsFilterButton field that its own layout reads. Writing
-// it before that layout runs lets the app lay the field out itself, with no
-// geometry written by hand and no pass of its own triggered.
+// Probe only: the field as the layout leaves it against what is on screen, plus
+// the entry and Cancel. Model against shown tells an animation in flight.
+static void nfbAdvReportBar(UIView* bar, BOOL settled) {
+    UIView* field = nil;
+    UIButton* entry = nil;
+    UIButton* cancel = nil;
+    for (UIView* sub in bar.subviews) {
+        if ([sub class] == [UIButton class]) {
+            UIButton* button = (UIButton*)sub;
+            if (button.currentTitle.length > 0) {
+                cancel = button;
+            } else if (button.currentImage && !entry) {
+                entry = button;
+            }
+        } else if ([sub class] == [UIView class] && !field &&
+                   sub.bounds.size.width > bar.bounds.size.width * 0.4) {
+            field = sub;
+        }
+    }
+    if (!field) {
+        return;
+    }
+    CALayer* shown = field.layer.presentationLayer ?: field.layer;
+    NFBDebugLog(@"[entrance] field model %@ shown %@ | entry %@ hidden=%d | "
+                @"cancel x=%.0f | settled=%d animating=%d",
+                NSStringFromCGRect(field.frame), NSStringFromCGRect(shown.frame),
+                entry ? NSStringFromCGRect(entry.frame) : @"none",
+                entry.hidden ? 1 : 0,
+                cancel ? CGRectGetMinX(cancel.frame) : -1.0, settled ? 1 : 0,
+                NFBViewIsAnimating(bar) ? 1 : 0);
+}
+
+// The bar carries a showsFilterButton field that its own layout reads. Clearing
+// it lets the app size the field itself, with no geometry written by hand.
+
+// Marks a bar already cleared, so the write happens once per bar.
+static const void* kNFBAdvFilterClearedKey = &kNFBAdvFilterClearedKey;
+
 static void nfbAdvClearShowsFilter(UIView* bar, const char* from) {
     static Ivar flag = NULL;
     static dispatch_once_t once;
@@ -460,41 +495,22 @@ static void nfbAdvClearShowsFilter(UIView* bar, const char* from) {
 
 %hook _TtC15TwitterSearchV211SearchBarV2
 
-// Set before the bar's entrance animation picks its targets, so the field is
-// sized once instead of settling into place afterwards.
-- (void)didMoveToWindow {
-    @try {
-        UIView* bar = (UIView*)self;
-        if (bar.window && [BHTSettings boolForKey:@"advanced_search"]) {
-            nfbAdvClearShowsFilter(bar, "didMoveToWindow");
-        }
-    } @catch (id exception) {
-    }
-    %orig;
-}
-
-// Only didMoveToWindow clears the field. Doing it on every pass fights the bar
-// that morphs into this one: the app restores the field between passes, and the
-// widths swing wider each time, which is what shows as a jump.
+// Cleared once the bar has settled: at window time the app has not finished
+// configuring it and puts the field back, and on every pass the write competes
+// with the bar that morphs into this one.
 - (void)layoutSubviews {
     %orig;
     @try {
         UIView* bar = (UIView*)self;
-        // [entrance] probe only: the field as the layout leaves it, against what
-        // is actually on screen. A gap between the two is an animation in flight.
+        BOOL settled = bar.window && !NFBViewIsAnimating(bar);
+        if (settled && !objc_getAssociatedObject(bar, kNFBAdvFilterClearedKey) &&
+            [BHTSettings boolForKey:@"advanced_search"]) {
+            objc_setAssociatedObject(bar, kNFBAdvFilterClearedKey, @YES,
+                                     OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+            nfbAdvClearShowsFilter(bar, "settled");
+        }
         if (NFBDebugIsRecording()) {
-            for (UIView* sub in bar.subviews) {
-                if ([sub class] != [UIView class] ||
-                    sub.bounds.size.width < bar.bounds.size.width * 0.4) {
-                    continue;
-                }
-                CALayer* shown = sub.layer.presentationLayer ?: sub.layer;
-                NFBDebugLog(@"[entrance] field model %@ shown %@ animating=%d",
-                            NSStringFromCGRect(sub.frame),
-                            NSStringFromCGRect(shown.frame),
-                            NFBViewIsAnimating(bar) ? 1 : 0);
-                break;
-            }
+            nfbAdvReportBar(bar, settled);
         }
     } @catch (id exception) {
     }
