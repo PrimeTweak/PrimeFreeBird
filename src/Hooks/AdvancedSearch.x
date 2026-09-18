@@ -501,8 +501,9 @@ static void nfbAdvHideNativeInSearchBar(UIView* bar) {
 // sized once instead of settling into place afterwards.
 - (void)didMoveToWindow {
     @try {
-        if (self.window && [BHTSettings boolForKey:@"advanced_search"]) {
-            nfbAdvClearShowsFilter((UIView*)self);
+        UIView* bar = (UIView*)self;
+        if (bar.window && [BHTSettings boolForKey:@"advanced_search"]) {
+            nfbAdvClearShowsFilter(bar);
         }
     } @catch (id exception) {
     }
