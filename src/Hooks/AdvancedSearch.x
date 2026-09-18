@@ -471,11 +471,9 @@ static void nfbAdvReportBar(UIView* bar, BOOL settled) {
 // The bar carries a showsFilterButton field that its own layout reads. Clearing
 // it lets the app size the field itself, with no geometry written by hand.
 
-// Marks a bar already cleared, so the write happens once per bar.
-static const void* kNFBAdvFilterClearedKey = &kNFBAdvFilterClearedKey;
-
-// The pill on Explore has no entry of its own and needs no write; only a bar
-// that actually shows one is touched, and only on its first pass.
+// The pill on Explore has no entry of its own: writing there narrows it while it
+// morphs into this bar, which is what showed as a jump. Only a bar that actually
+// shows an entry is touched.
 static BOOL nfbAdvBarShowsEntry(UIView* bar) {
     for (UIView* sub in bar.subviews) {
         if ([sub class] != [UIButton class]) {
@@ -511,17 +509,14 @@ static void nfbAdvClearShowsFilter(UIView* bar, const char* from) {
 
 %hook _TtC15TwitterSearchV211SearchBarV2
 
-// Cleared before the app's own layout so this pass already sizes the field, and
-// once per bar so nothing competes with the one that morphs into it.
+// Cleared before the app's own layout so this pass already sizes the field. The
+// app restores the field between passes, so the write is repeated.
 - (void)layoutSubviews {
     @try {
         UIView* bar = (UIView*)self;
-        if (!objc_getAssociatedObject(bar, kNFBAdvFilterClearedKey) &&
-            nfbAdvBarShowsEntry(bar) &&
+        if (nfbAdvBarShowsEntry(bar) &&
             [BHTSettings boolForKey:@"advanced_search"]) {
-            objc_setAssociatedObject(bar, kNFBAdvFilterClearedKey, @YES,
-                                     OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-            nfbAdvClearShowsFilter(bar, "first pass with entry");
+            nfbAdvClearShowsFilter(bar, "entry present");
         }
     } @catch (id exception) {
     }
