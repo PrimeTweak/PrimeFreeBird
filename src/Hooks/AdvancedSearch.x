@@ -19,7 +19,6 @@
 #import "HookHelpers.h"
 #import "Debug/NFBDebugger.h"
 #import "Search/AdvancedSearchViewController.h"
-#import <QuartzCore/QuartzCore.h>
 #import <objc/runtime.h>
 #import <objc/message.h>
 
@@ -436,114 +435,96 @@ static void nfbAdvRescanSoon(void) {
     nfbAdvRescanItemSoon(nil);
 }
 
-// The bar keeps the frame it grew from while it is morphing in. A write during
-// that stretch moves the target the app is heading for, which shows as a jump,
-// so the field is only read and written once that frame is empty.
-static CGRect nfbAdvMorphSource(UIView* bar) {
+
+// The app's own entry lives inside its search bar as a plain button, not as a
+// bar button item, so the bar button passes above never reach it.
+
+// The bar keeps the frame it grew from while it morphs in, in an optional whose
+// last byte says whether it holds one. Writing during that stretch moves the
+// target the app is heading for, which shows as a jump.
+static BOOL nfbAdvBarIsMorphing(UIView* bar) {
     static Ivar source = NULL;
     static dispatch_once_t once;
     dispatch_once(&once, ^{
       source = class_getInstanceVariable([bar class], "entranceMorphSourceWindowFrame");
     });
     if (!source) {
-        return CGRectZero;
+        return NO;
     }
-    const double* slot =
-        (const double*)((uint8_t*)(__bridge void*)bar + ivar_getOffset(source));
-    return CGRectMake(slot[0], slot[1], slot[2], slot[3]);
+    const uint8_t* slot = (uint8_t*)(__bridge void*)bar + ivar_getOffset(source);
+    return slot[sizeof(CGRect)] != 0;
 }
 
-// Probe only: the field as the layout leaves it against what is on screen, plus
-// the entry and Cancel. Model against shown tells an animation in flight.
-static void nfbAdvReportBar(UIView* bar, BOOL settled) {
-    UIView* field = nil;
-    UIButton* entry = nil;
-    UIButton* cancel = nil;
-    for (UIView* sub in bar.subviews) {
-        if ([sub class] == [UIButton class]) {
-            UIButton* button = (UIButton*)sub;
-            if (button.currentTitle.length > 0) {
-                cancel = button;
-            } else if (button.currentImage && !entry) {
-                entry = button;
-            }
-        } else if ([sub class] == [UIView class] && !field &&
-                   sub.bounds.size.width > bar.bounds.size.width * 0.4) {
-            field = sub;
-        }
-    }
-    if (!field) {
-        return;
-    }
-    CALayer* shown = field.layer.presentationLayer ?: field.layer;
-    NFBDebugLog(@"[entrance] field %@ | entry %@ hidden=%d | cancel x=%.0f | "
-                @"morph %@ | settled=%d animating=%d",
-                NSStringFromCGRect(field.frame),
-                entry ? NSStringFromCGRect(entry.frame) : @"none",
-                entry.hidden ? 1 : 0,
-                cancel ? CGRectGetMinX(cancel.frame) : -1.0,
-                NSStringFromCGRect(nfbAdvMorphSource(bar)), settled ? 1 : 0,
-                NFBViewIsAnimating(bar) ? 1 : 0);
-}
-
-// The bar carries a showsFilterButton field that its own layout reads. Clearing
-// it lets the app size the field itself, with no geometry written by hand.
-
-// The pill on Explore has no entry of its own: writing there narrows it while it
-// morphs into this bar, which is what showed as a jump. Only a bar that actually
-// shows an entry is touched.
-static BOOL nfbAdvBarShowsEntry(UIView* bar) {
-    for (UIView* sub in bar.subviews) {
-        if ([sub class] != [UIButton class]) {
-            continue;
-        }
-        UIButton* button = (UIButton*)sub;
-        if (button.currentTitle.length == 0 && button.currentImage &&
-            !button.hidden && button.bounds.size.width > 0.0) {
-            return YES;
-        }
-    }
-    return NO;
-}
-
-static void nfbAdvClearShowsFilter(UIView* bar, const char* from) {
+// The field the app's own layout reads to decide whether the entry takes room.
+// Cleared so it sizes the field itself, with no geometry written by hand.
+static void nfbAdvClearShowsFilter(UIView* bar) {
     static Ivar flag = NULL;
     static dispatch_once_t once;
     dispatch_once(&once, ^{
       flag = class_getInstanceVariable([bar class], "showsFilterButton");
     });
     if (!flag) {
-        NFBDebugLog(@"[entrance] showsFilterButton field not found");
         return;
     }
     BOOL* slot = (BOOL*)((uint8_t*)(__bridge void*)bar + ivar_getOffset(flag));
     if (*slot) {
         *slot = NO;
-        NFBDebugLog(@"[entrance] showsFilterButton cleared from %s animating=%d",
-                    from, NFBViewIsAnimating(bar) ? 1 : 0);
     }
 }
 
+static const void* kNFBAdvNativeWidthKey = &kNFBAdvNativeWidthKey;
+
+// Hidden alone keeps the slot, so the width goes to zero as well. The app does
+// not lay a hidden button out again, so this write settles in one pass. The
+// original width is kept, and the button comes back when the setting is off.
+static void nfbAdvHideNativeInSearchBar(UIView* bar) {
+    BOOL hide = [BHTSettings boolForKey:@"advanced_search"];
+    for (UIView* sub in bar.subviews) {
+        if ([sub class] != [UIButton class]) {
+            continue;
+        }
+        UIButton* button = (UIButton*)sub;
+        if (button.currentTitle.length > 0 || button.currentImage == nil) {
+            continue;
+        }
+        NSNumber* kept = objc_getAssociatedObject(button, kNFBAdvNativeWidthKey);
+        CGRect frame = button.frame;
+        if (hide) {
+            if (!kept && frame.size.width > 0.0) {
+                objc_setAssociatedObject(button, kNFBAdvNativeWidthKey,
+                                         @(frame.size.width),
+                                         OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+            }
+            if (!button.hidden) {
+                button.hidden = YES;
+            }
+            if (frame.size.width != 0.0) {
+                frame.size.width = 0.0;
+                button.frame = frame;
+            }
+        } else if (kept) {
+            button.hidden = NO;
+            frame.size.width = kept.doubleValue;
+            button.frame = frame;
+            objc_setAssociatedObject(button, kNFBAdvNativeWidthKey, nil,
+                                     OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        }
+    }
+}
 
 %hook _TtC15TwitterSearchV211SearchBarV2
 
-// Cleared before the app's own layout so this pass already sizes the field. The
-// app restores the field between passes, so the write is repeated.
 - (void)layoutSubviews {
     @try {
         UIView* bar = (UIView*)self;
-        if (nfbAdvBarShowsEntry(bar) && CGRectIsEmpty(nfbAdvMorphSource(bar)) &&
-            [BHTSettings boolForKey:@"advanced_search"]) {
-            nfbAdvClearShowsFilter(bar, "entry present, no morph");
+        if (!nfbAdvBarIsMorphing(bar) && [BHTSettings boolForKey:@"advanced_search"]) {
+            nfbAdvClearShowsFilter(bar);
         }
     } @catch (id exception) {
     }
     %orig;
     @try {
-        UIView* bar = (UIView*)self;
-        if (NFBDebugIsRecording()) {
-            nfbAdvReportBar(bar, bar.window && !NFBViewIsAnimating(bar));
-        }
+        nfbAdvHideNativeInSearchBar((UIView*)self);
     } @catch (id exception) {
     }
 }
