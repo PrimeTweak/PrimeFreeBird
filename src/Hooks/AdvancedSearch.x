@@ -474,6 +474,22 @@ static void nfbAdvReportBar(UIView* bar, BOOL settled) {
 // Marks a bar already cleared, so the write happens once per bar.
 static const void* kNFBAdvFilterClearedKey = &kNFBAdvFilterClearedKey;
 
+// The pill on Explore has no entry of its own and needs no write; only a bar
+// that actually shows one is touched, and only on its first pass.
+static BOOL nfbAdvBarShowsEntry(UIView* bar) {
+    for (UIView* sub in bar.subviews) {
+        if ([sub class] != [UIButton class]) {
+            continue;
+        }
+        UIButton* button = (UIButton*)sub;
+        if (button.currentTitle.length == 0 && button.currentImage &&
+            !button.hidden && button.bounds.size.width > 0.0) {
+            return YES;
+        }
+    }
+    return NO;
+}
+
 static void nfbAdvClearShowsFilter(UIView* bar, const char* from) {
     static Ivar flag = NULL;
     static dispatch_once_t once;
@@ -495,22 +511,25 @@ static void nfbAdvClearShowsFilter(UIView* bar, const char* from) {
 
 %hook _TtC15TwitterSearchV211SearchBarV2
 
-// Cleared once the bar has settled: at window time the app has not finished
-// configuring it and puts the field back, and on every pass the write competes
-// with the bar that morphs into this one.
+// Cleared before the app's own layout so this pass already sizes the field, and
+// once per bar so nothing competes with the one that morphs into it.
 - (void)layoutSubviews {
-    %orig;
     @try {
         UIView* bar = (UIView*)self;
-        BOOL settled = bar.window && !NFBViewIsAnimating(bar);
-        if (settled && !objc_getAssociatedObject(bar, kNFBAdvFilterClearedKey) &&
+        if (!objc_getAssociatedObject(bar, kNFBAdvFilterClearedKey) &&
+            nfbAdvBarShowsEntry(bar) &&
             [BHTSettings boolForKey:@"advanced_search"]) {
             objc_setAssociatedObject(bar, kNFBAdvFilterClearedKey, @YES,
                                      OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-            nfbAdvClearShowsFilter(bar, "settled");
+            nfbAdvClearShowsFilter(bar, "first pass with entry");
         }
+    } @catch (id exception) {
+    }
+    %orig;
+    @try {
+        UIView* bar = (UIView*)self;
         if (NFBDebugIsRecording()) {
-            nfbAdvReportBar(bar, settled);
+            nfbAdvReportBar(bar, bar.window && !NFBViewIsAnimating(bar));
         }
     } @catch (id exception) {
     }
