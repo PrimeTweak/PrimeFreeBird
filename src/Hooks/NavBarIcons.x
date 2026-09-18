@@ -582,13 +582,6 @@ static void nfbFlattenItemsNow(NSArray<UIBarButtonItem*>* items) {
         if (!bar.window) {
             return;
         }
-        // Writing an item property invalidates the bar, so during its entrance
-        // that recomputes the layout mid-animation. The pass that follows it
-        // catches up.
-        if (NFBViewIsAnimating(bar)) {
-            NFBDebugLog(@"[entrance] NavBarIcons pass skipped: bar animating");
-            return;
-        }
         // Every navigation bar, before the two-screen guard below: the glass the
         // forced design adds is on all of them, not only on these two. Read here,
         // written off the pass.

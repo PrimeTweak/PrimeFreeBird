@@ -58,10 +58,6 @@ void applyHideCustomTimelinesSetting(void);
 // gates (FeatureSwitches.x)
 BOOL panelIsGenuinelyAvailable(long long panelID);
 
-// YES while a view or its layer carries a running animation. Writing to a view
-// in that state re-lays it out mid-flight and shows as a jump on screen.
-BOOL NFBViewIsAnimating(UIView* view);
-
 // Restored tweet source labels, keyed by tweet ID (SourceLabels.x)
 extern NSMutableDictionary* tweetSources;
 
