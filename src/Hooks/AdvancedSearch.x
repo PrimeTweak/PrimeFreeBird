@@ -281,6 +281,27 @@ static UIBarButtonItem* nfbAdvReplacementFor(UIViewController* owner) {
     return btn;
 }
 
+// An active search bar puts Cancel in the same trailing group. The app shows
+// nothing else beside it, so the entry is taken out while it is there.
+static BOOL nfbAdvGroupHasCancel(NSArray<UIBarButtonItem*>* items) {
+    NSString* cancel = [[BHTBundle sharedBundle]
+        localizedTwitterStringForKey:@"CANCEL_ACTION_LABEL"];
+    if (cancel.length == 0) {
+        return NO;
+    }
+    for (UIBarButtonItem* entry in items) {
+        if ([entry.title isEqualToString:cancel]) {
+            return YES;
+        }
+    }
+    return NO;
+}
+
+static BOOL nfbAdvIsOurs(UIBarButtonItem* entry) {
+    return objc_getAssociatedObject(entry, kNFBAdvReplacedKey) != nil ||
+           objc_getAssociatedObject(entry, kNFBAdvSearchGreyKey) != nil;
+}
+
 // Works on the item that received the buttons rather than the top controller's:
 // an active search bar sets them on a different navigation item.
 static void nfbAdvReplaceFiltersInItem(UINavigationItem* item,
@@ -291,10 +312,15 @@ static void nfbAdvReplaceFiltersInItem(UINavigationItem* item,
     NSInteger replaced = 0;
     NSMutableArray* seen = [NSMutableArray array];
     NSArray* right = item.rightBarButtonItems ?: @[];
+    BOOL searching = nfbAdvGroupHasCancel(right);
     NSMutableArray* rebuilt = [NSMutableArray arrayWithCapacity:right.count];
     for (UIBarButtonItem* entry in right) {
         double agreement = 0;
         BOOL match = nfbAdvIsFiltersItem(entry, &agreement);
+        if (searching && (match || nfbAdvIsOurs(entry))) {
+            replaced++;
+            continue;
+        }
         [seen addObject:[NSString stringWithFormat:@"%@(%.2f)",
                                                    nfbAdvVectorName(nfbAdvItemImage(entry))
                                                        ?: (entry.accessibilityLabel
@@ -313,11 +339,18 @@ static void nfbAdvReplaceFiltersInItem(UINavigationItem* item,
     if (@available(iOS 16.0, *)) {
         for (UIBarButtonItemGroup* group in item.trailingItemGroups) {
             NSMutableArray* members = [group.barButtonItems mutableCopy];
+            BOOL groupSearching = nfbAdvGroupHasCancel(members);
             BOOL changed = NO;
-            for (NSUInteger i = 0; i < members.count; i++) {
+            for (NSInteger i = (NSInteger)members.count - 1; i >= 0; i--) {
                 UIBarButtonItem* entry = members[i];
                 double agreement = 0;
                 BOOL match = nfbAdvIsFiltersItem(entry, &agreement);
+                if (groupSearching && (match || nfbAdvIsOurs(entry))) {
+                    [members removeObjectAtIndex:i];
+                    changed = YES;
+                    replaced++;
+                    continue;
+                }
                 [seen addObject:[NSString stringWithFormat:@"%@(%.2f)",
                                                            nfbAdvVectorName(nfbAdvItemImage(entry))
                                                                ?: (entry.accessibilityLabel
@@ -381,24 +414,33 @@ static void nfbAdvReplaceFilters(UIViewController* owner) {
     nfbAdvReplaceFiltersInItem(owner.navigationItem, owner);
 }
 
-static void nfbAdvRescanSoon(void) {
+// The navigation item that just received the buttons is passed straight in, so
+// a search bar setting them on its own item is covered too.
+static void nfbAdvRescanItemSoon(UINavigationItem* item) {
     dispatch_async(dispatch_get_main_queue(), ^{
       UIViewController* top = nfbAdvTopViewController();
-      if (top && nfbAdvIsSearchScreen(top)) {
-          nfbAdvReplaceFilters(top);
+      if (!top) {
+          return;
+      }
+      if (nfbAdvIsSearchScreen(top)) {
+          nfbAdvReplaceFiltersInItem(top.navigationItem, top);
+      }
+      if (item && item != top.navigationItem) {
+          nfbAdvReplaceFiltersInItem(item, top);
       }
     });
+}
+
+static void nfbAdvRescanSoon(void) {
+    nfbAdvRescanItemSoon(nil);
 }
 
 
 // The app's own entry lives inside its search bar as a plain button, not as a
 // bar button item, so the bar button passes above never reach it.
 
-static const void* kNFBAdvNativeWidthKey = &kNFBAdvNativeWidthKey;
-
-// Hidden alone keeps the slot, so the width goes to zero as well. The app does
-// not lay a hidden button out again, so this write settles in one pass. The
-// original width is kept, and the button comes back when the setting is off.
+// Only its visibility is touched: writing a frame from a layout pass makes the
+// app lay the bar out again, which shows as a jump while it is coming in.
 static void nfbAdvHideNativeInSearchBar(UIView* bar) {
     BOOL hide = [BHTSettings boolForKey:@"advanced_search"];
     for (UIView* sub in bar.subviews) {
@@ -409,27 +451,8 @@ static void nfbAdvHideNativeInSearchBar(UIView* bar) {
         if (button.currentTitle.length > 0 || button.currentImage == nil) {
             continue;
         }
-        NSNumber* kept = objc_getAssociatedObject(button, kNFBAdvNativeWidthKey);
-        CGRect frame = button.frame;
-        if (hide) {
-            if (!kept && frame.size.width > 0.0) {
-                objc_setAssociatedObject(button, kNFBAdvNativeWidthKey,
-                                         @(frame.size.width),
-                                         OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-            }
-            if (!button.hidden) {
-                button.hidden = YES;
-            }
-            if (frame.size.width != 0.0) {
-                frame.size.width = 0.0;
-                button.frame = frame;
-            }
-        } else if (kept) {
-            button.hidden = NO;
-            frame.size.width = kept.doubleValue;
-            button.frame = frame;
-            objc_setAssociatedObject(button, kNFBAdvNativeWidthKey, nil,
-                                     OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        if (button.hidden != hide) {
+            button.hidden = hide;
         }
     }
 }
@@ -450,22 +473,22 @@ static void nfbAdvHideNativeInSearchBar(UIView* bar) {
 
 - (void)setRightBarButtonItems:(NSArray<UIBarButtonItem*>*)items {
     %orig;
-    nfbAdvRescanSoon();
+    nfbAdvRescanItemSoon(self);
 }
 
 - (void)setRightBarButtonItems:(NSArray<UIBarButtonItem*>*)items animated:(BOOL)animated {
     %orig;
-    nfbAdvRescanSoon();
+    nfbAdvRescanItemSoon(self);
 }
 
 - (void)setTrailingItemGroups:(NSArray<UIBarButtonItemGroup*>*)groups {
     %orig;
-    nfbAdvRescanSoon();
+    nfbAdvRescanItemSoon(self);
 }
 
 - (void)setPinnedTrailingGroup:(UIBarButtonItemGroup*)group {
     %orig;
-    nfbAdvRescanSoon();
+    nfbAdvRescanItemSoon(self);
 }
 
 %end
