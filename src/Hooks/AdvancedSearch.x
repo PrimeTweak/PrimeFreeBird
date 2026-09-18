@@ -439,36 +439,6 @@ static void nfbAdvRescanSoon(void) {
 // The app's own entry lives inside its search bar as a plain button, not as a
 // bar button item, so the bar button passes above never reach it.
 
-// Only its visibility is touched: writing a frame from a layout pass makes the
-// app lay the bar out again, which shows as a jump while it is coming in.
-static void nfbAdvHideNativeInSearchBar(UIView* bar) {
-    BOOL hide = [BHTSettings boolForKey:@"advanced_search"];
-    for (UIView* sub in bar.subviews) {
-        if ([sub class] != [UIButton class]) {
-            continue;
-        }
-        UIButton* button = (UIButton*)sub;
-        if (button.currentTitle.length > 0 || button.currentImage == nil) {
-            continue;
-        }
-        if (button.hidden != hide) {
-            button.hidden = hide;
-        }
-    }
-}
-
-%hook _TtC15TwitterSearchV211SearchBarV2
-
-- (void)layoutSubviews {
-    %orig;
-    @try {
-        nfbAdvHideNativeInSearchBar((UIView*)self);
-    } @catch (id exception) {
-    }
-}
-
-%end
-
 %hook UINavigationItem
 
 - (void)setRightBarButtonItems:(NSArray<UIBarButtonItem*>*)items {

@@ -301,8 +301,12 @@ static NSString* NFBNotifDurableKey(id model) {
 }
 
 // The entry id is printed in the model's description even when no accessor
-// returns it. It is stable across refreshes, unlike the impression id, so it is
-// read there before any accessor is asked.
+// returns it, so it is read there before any accessor is asked.
+
+// Its middle is rewritten on every refresh; only this many trailing characters
+// were measured to stay put, so the key is built from them.
+static const NSUInteger kNFBNotifIdTail = 8;
+
 static NSString* NFBNotifEntryIdFromDescription(id model) {
     NSString* text = [model description];
     if (!text.length) {
@@ -321,7 +325,16 @@ static NSString* NFBNotifEntryIdFromDescription(id model) {
     if (!match || match.numberOfRanges < 2) {
         return nil;
     }
-    return [text substringWithRange:[match rangeAtIndex:1]];
+    NSString* entryId = [text substringWithRange:[match rangeAtIndex:1]];
+    // Measured over six days on the same two notifications: the middle of the id
+    // is rewritten on every refresh while its tail stays put, so only the tail
+    // survives as a key. The whole id is logged to widen that measurement.
+    if (entryId.length <= kNFBNotifIdTail) {
+        return entryId;
+    }
+    NSString* tail = [entryId substringFromIndex:entryId.length - kNFBNotifIdTail];
+    NFBDebugLog(@"notifhide: entryId %@ - key %@", entryId, tail);
+    return tail;
 }
 
 // Marks a class whose identity is read from the description rather than from
