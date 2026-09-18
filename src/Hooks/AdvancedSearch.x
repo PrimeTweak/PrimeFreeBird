@@ -439,39 +439,6 @@ static void nfbAdvRescanSoon(void) {
 // The app's own entry lives inside its search bar as a plain button, not as a
 // bar button item, so the bar button passes above never reach it.
 
-// The bar keeps the frame it grew from while it morphs in, in an optional whose
-// last byte says whether it holds one. Writing during that stretch moves the
-// target the app is heading for, which shows as a jump.
-static BOOL nfbAdvBarIsMorphing(UIView* bar) {
-    static Ivar source = NULL;
-    static dispatch_once_t once;
-    dispatch_once(&once, ^{
-      source = class_getInstanceVariable([bar class], "entranceMorphSourceWindowFrame");
-    });
-    if (!source) {
-        return NO;
-    }
-    const uint8_t* slot = (uint8_t*)(__bridge void*)bar + ivar_getOffset(source);
-    return slot[sizeof(CGRect)] != 0;
-}
-
-// The field the app's own layout reads to decide whether the entry takes room.
-// Cleared so it sizes the field itself, with no geometry written by hand.
-static void nfbAdvClearShowsFilter(UIView* bar) {
-    static Ivar flag = NULL;
-    static dispatch_once_t once;
-    dispatch_once(&once, ^{
-      flag = class_getInstanceVariable([bar class], "showsFilterButton");
-    });
-    if (!flag) {
-        return;
-    }
-    BOOL* slot = (BOOL*)((uint8_t*)(__bridge void*)bar + ivar_getOffset(flag));
-    if (*slot) {
-        *slot = NO;
-    }
-}
-
 static const void* kNFBAdvNativeWidthKey = &kNFBAdvNativeWidthKey;
 
 // Hidden alone keeps the slot, so the width goes to zero as well. The app does
@@ -515,13 +482,6 @@ static void nfbAdvHideNativeInSearchBar(UIView* bar) {
 %hook _TtC15TwitterSearchV211SearchBarV2
 
 - (void)layoutSubviews {
-    @try {
-        UIView* bar = (UIView*)self;
-        if (!nfbAdvBarIsMorphing(bar) && [BHTSettings boolForKey:@"advanced_search"]) {
-            nfbAdvClearShowsFilter(bar);
-        }
-    } @catch (id exception) {
-    }
     %orig;
     @try {
         nfbAdvHideNativeInSearchBar((UIView*)self);
