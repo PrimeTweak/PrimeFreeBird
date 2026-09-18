@@ -436,6 +436,23 @@ static void nfbAdvRescanSoon(void) {
     nfbAdvRescanItemSoon(nil);
 }
 
+// The bar keeps the frame it grew from while it is morphing in. A write during
+// that stretch moves the target the app is heading for, which shows as a jump,
+// so the field is only read and written once that frame is empty.
+static CGRect nfbAdvMorphSource(UIView* bar) {
+    static Ivar source = NULL;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+      source = class_getInstanceVariable([bar class], "entranceMorphSourceWindowFrame");
+    });
+    if (!source) {
+        return CGRectZero;
+    }
+    const double* slot =
+        (const double*)((uint8_t*)(__bridge void*)bar + ivar_getOffset(source));
+    return CGRectMake(slot[0], slot[1], slot[2], slot[3]);
+}
+
 // Probe only: the field as the layout leaves it against what is on screen, plus
 // the entry and Cancel. Model against shown tells an animation in flight.
 static void nfbAdvReportBar(UIView* bar, BOOL settled) {
@@ -459,12 +476,13 @@ static void nfbAdvReportBar(UIView* bar, BOOL settled) {
         return;
     }
     CALayer* shown = field.layer.presentationLayer ?: field.layer;
-    NFBDebugLog(@"[entrance] field model %@ shown %@ | entry %@ hidden=%d | "
-                @"cancel x=%.0f | settled=%d animating=%d",
-                NSStringFromCGRect(field.frame), NSStringFromCGRect(shown.frame),
+    NFBDebugLog(@"[entrance] field %@ | entry %@ hidden=%d | cancel x=%.0f | "
+                @"morph %@ | settled=%d animating=%d",
+                NSStringFromCGRect(field.frame),
                 entry ? NSStringFromCGRect(entry.frame) : @"none",
                 entry.hidden ? 1 : 0,
-                cancel ? CGRectGetMinX(cancel.frame) : -1.0, settled ? 1 : 0,
+                cancel ? CGRectGetMinX(cancel.frame) : -1.0,
+                NSStringFromCGRect(nfbAdvMorphSource(bar)), settled ? 1 : 0,
                 NFBViewIsAnimating(bar) ? 1 : 0);
 }
 
@@ -514,9 +532,9 @@ static void nfbAdvClearShowsFilter(UIView* bar, const char* from) {
 - (void)layoutSubviews {
     @try {
         UIView* bar = (UIView*)self;
-        if (nfbAdvBarShowsEntry(bar) &&
+        if (nfbAdvBarShowsEntry(bar) && CGRectIsEmpty(nfbAdvMorphSource(bar)) &&
             [BHTSettings boolForKey:@"advanced_search"]) {
-            nfbAdvClearShowsFilter(bar, "entry present");
+            nfbAdvClearShowsFilter(bar, "entry present, no morph");
         }
     } @catch (id exception) {
     }
