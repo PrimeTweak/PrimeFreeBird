@@ -130,3 +130,20 @@ UIColor* CurrentAccentColor(void) {
 
     return [UIColor systemBlueColor];
 }
+
+BOOL NFBViewIsAnimating(UIView* view) {
+    if (!view) {
+        return NO;
+    }
+    if (view.layer.animationKeys.count > 0) {
+        return YES;
+    }
+    UIView* node = view.superview;
+    for (NSInteger up = 0; node && up < 3; up++) {
+        if (node.layer.animationKeys.count > 0) {
+            return YES;
+        }
+        node = node.superview;
+    }
+    return NO;
+}

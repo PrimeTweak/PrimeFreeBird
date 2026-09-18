@@ -19,6 +19,7 @@
 #import "HookHelpers.h"
 #import "Debug/NFBDebugger.h"
 #import "Search/AdvancedSearchViewController.h"
+#import <QuartzCore/QuartzCore.h>
 #import <objc/runtime.h>
 #import <objc/message.h>
 
@@ -442,18 +443,21 @@ static const void* kNFBAdvNativeWidthKey = &kNFBAdvNativeWidthKey;
 // The bar carries a showsFilterButton field that its own layout reads. Writing
 // it before that layout runs lets the app lay the field out itself, with no
 // geometry written by hand and no pass of its own triggered.
-static void nfbAdvClearShowsFilter(UIView* bar) {
+static void nfbAdvClearShowsFilter(UIView* bar, const char* from) {
     static Ivar flag = NULL;
     static dispatch_once_t once;
     dispatch_once(&once, ^{
       flag = class_getInstanceVariable([bar class], "showsFilterButton");
     });
     if (!flag) {
+        NFBDebugLog(@"[entrance] showsFilterButton field not found");
         return;
     }
     BOOL* slot = (BOOL*)((uint8_t*)(__bridge void*)bar + ivar_getOffset(flag));
     if (*slot) {
         *slot = NO;
+        NFBDebugLog(@"[entrance] showsFilterButton cleared from %s animating=%d",
+                    from, NFBViewIsAnimating(bar) ? 1 : 0);
     }
 }
 
@@ -503,7 +507,7 @@ static void nfbAdvHideNativeInSearchBar(UIView* bar) {
     @try {
         UIView* bar = (UIView*)self;
         if (bar.window && [BHTSettings boolForKey:@"advanced_search"]) {
-            nfbAdvClearShowsFilter(bar);
+            nfbAdvClearShowsFilter(bar, "didMoveToWindow");
         }
     } @catch (id exception) {
     }
@@ -513,13 +517,30 @@ static void nfbAdvHideNativeInSearchBar(UIView* bar) {
 - (void)layoutSubviews {
     @try {
         if ([BHTSettings boolForKey:@"advanced_search"]) {
-            nfbAdvClearShowsFilter((UIView*)self);
+            nfbAdvClearShowsFilter((UIView*)self, "layoutSubviews");
         }
     } @catch (id exception) {
     }
     %orig;
     @try {
-        nfbAdvHideNativeInSearchBar((UIView*)self);
+        UIView* bar = (UIView*)self;
+        nfbAdvHideNativeInSearchBar(bar);
+        // [entrance] probe only: the field as the layout leaves it, against what
+        // is actually on screen. A gap between the two is an animation in flight.
+        if (NFBDebugIsRecording()) {
+            for (UIView* sub in bar.subviews) {
+                if ([sub class] != [UIView class] ||
+                    sub.bounds.size.width < bar.bounds.size.width * 0.4) {
+                    continue;
+                }
+                CALayer* shown = sub.layer.presentationLayer ?: sub.layer;
+                NFBDebugLog(@"[entrance] field model %@ shown %@ animating=%d",
+                            NSStringFromCGRect(sub.frame),
+                            NSStringFromCGRect(shown.frame),
+                            NFBViewIsAnimating(bar) ? 1 : 0);
+                break;
+            }
+        }
     } @catch (id exception) {
     }
 }

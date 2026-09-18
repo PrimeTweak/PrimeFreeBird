@@ -2366,11 +2366,21 @@ static void NFBSettleBarBackdrop(UINavigationBar* bar) {
 
 - (void)didMoveToWindow {
     %orig;
+    // Asking for a layout while the bar is animating in restarts its entrance
+    // mid-flight; the pass that follows the animation covers it anyway.
+    if (NFBViewIsAnimating(self)) {
+        NFBDebugLog(@"[entrance] Theme didMoveToWindow skipped: bar animating");
+        return;
+    }
     [self setNeedsLayout];
 }
 
 - (void)layoutSubviews {
     %orig;
+    if (NFBViewIsAnimating(self)) {
+        NFBDebugLog(@"[entrance] Theme layout writes skipped: bar animating");
+        return;
+    }
     NFBSettleBarBackdrop(self);
     NFBWhitenNavigationBarConfirm(self);
     // topItem.titleView is the logo container, so converting it to a template here
