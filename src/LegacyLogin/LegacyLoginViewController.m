@@ -5,6 +5,7 @@
 #import <objc/runtime.h>
 #import "Core/BHTBundle.h"
 #import "Headers/TFNHeaders.h"
+#import "WebLoginProbeViewController.h"
 
 // Password login without reset: ui_metrics from x.com/i/js_inst, then
 // xauth_password for an OAuth token or a 2FA challenge, then the app's own web
@@ -216,6 +217,12 @@ static NSString* const kJSInstJS =
     return [[UINavigationController alloc] initWithRootViewController:login];
 }
 
+#pragma mark - Web login probe
+
+- (void)nfbOpenWebLogin {
+    [WebLoginProbeViewController presentFrom:self];
+}
+
 #pragma mark - View setup
 
 - (void)viewDidLoad {
@@ -223,6 +230,14 @@ static NSString* const kJSInstJS =
 
     self.view.backgroundColor = [UIColor systemBackgroundColor];
     self.title = [[BHTBundle sharedBundle] localizedTwitterStringForKey:@"LOG_IN_TITLE"];
+
+    // Measurement entry point: opens the web login screen that logs whether a
+    // session cookie is obtained. Right side so it never clashes with Cancel.
+    self.navigationItem.rightBarButtonItem =
+        [[UIBarButtonItem alloc] initWithTitle:@"Web"
+                                         style:UIBarButtonItemStylePlain
+                                        target:self
+                                        action:@selector(nfbOpenWebLogin)];
 
     if (!self.asRootScreen) {
         self.navigationItem.leftBarButtonItem =
