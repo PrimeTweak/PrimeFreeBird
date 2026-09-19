@@ -4,6 +4,7 @@
 //
 
 #import "HookHelpers.h"
+#import "LegacyLogin/WebLoginProbeViewController.h"
 
 // While set, -isSubscribedTo: (below) reports the account's genuine
 // subscription state instead of the forced premium tiers, so paths that need
