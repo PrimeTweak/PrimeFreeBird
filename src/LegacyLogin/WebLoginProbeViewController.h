@@ -5,4 +5,5 @@
 // the native session yet.
 @interface WebLoginProbeViewController : UIViewController
 + (void)presentFrom:(UIViewController*)presenter;
++ (UINavigationController*)rootNavigationController;
 @end
