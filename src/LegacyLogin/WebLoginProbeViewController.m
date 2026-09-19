@@ -108,6 +108,12 @@ static NSString* const kNFBCsrfCookie = @"ct0";
     NFBDebugLog(@"[weblogin] navigating to %@", webView.URL.absoluteString);
 }
 
+// Installed at the start of every page so the login flow's own onboarding calls
+// are wrapped before they run, not only after a session cookie appears.
+- (void)webView:(WKWebView*)webView didCommitNavigation:(WKNavigation*)navigation {
+    [self probeTokenExchangeWithAuth:nil csrf:nil];
+}
+
 - (void)webView:(WKWebView*)webView
     didReceiveServerRedirectForProvisionalNavigation:(WKNavigation*)navigation {
     NFBDebugLog(@"[weblogin] redirected to %@", webView.URL.absoluteString);
@@ -164,29 +170,38 @@ static NSString* const kNFBCsrfCookie = @"ct0";
     }];
 }
 
-// The reply web view posts through the page's own fetch, which carries the
-// bearer and guest headers a raw request lacks - a raw NSURLSession call gets
-// 401. So the flow is started from inside the page, and the result is read back.
+// The task body cannot be guessed, so the page's own fetch is wrapped and each
+// onboarding/task call it makes is reported: URL, body, and reply shape.
 static NSString* const kNFBExchangeScript =
     @"(function(){"
+    @"  if(window.__nfbWrapped){return;}window.__nfbWrapped=1;"
     @"  var out=function(m){window.webkit.messageHandlers.nfbExchange.postMessage(m);};"
-    @"  fetch('https://api.twitter.com/1.1/onboarding/task.json?flow_name=add_existing_account',"
-    @"        {method:'POST',credentials:'include',"
-    @"         headers:{'Content-Type':'application/json'},body:'{}'})"
-    @"    .then(function(r){return r.text().then(function(t){"
-    @"      out('status '+r.status+' len '+t.length"
-    @"          +' oauth='+(t.indexOf('oauth_token')>=0?1:0)"
-    @"          +' secret='+(t.indexOf('oauth_token_secret')>=0?1:0)"
-    @"          +' flow='+(t.indexOf('flow_token')>=0?1:0)"
-    @"          +' subtask='+(t.indexOf('subtask_id')>=0?1:0));"
-    @"    });})"
-    @"    .catch(function(e){out('error '+e);});"
+    @"  var of=window.fetch;"
+    @"  window.fetch=function(){"
+    @"    var a=arguments;var u=(a[0]&&a[0].url)||a[0]||'';"
+    @"    var opt=(a[0]&&a[0].method)?a[0]:(a[1]||{});"
+    @"    if(String(u).indexOf('onboarding/task')>=0){"
+    @"      var b=opt&&opt.body?String(opt.body):'(no body)';"
+    @"      out('REQ '+String(u).slice(0,90)+' body='+b.slice(0,400));"
+    @"    }"
+    @"    return of.apply(this,a).then(function(r){"
+    @"      if(String(u).indexOf('onboarding/task')>=0){"
+    @"        r.clone().text().then(function(t){"
+    @"          out('RESP status '+r.status+' oauth='+(t.indexOf('oauth_token')>=0?1:0)"
+    @"              +' secret='+(t.indexOf('oauth_token_secret')>=0?1:0)"
+    @"              +' flow='+(t.indexOf('flow_token')>=0?1:0)"
+    @"              +' subtask='+(t.indexOf('subtask_id')>=0?1:0));"
+    @"        });"
+    @"      }"
+    @"      return r;"
+    @"    });"
+    @"  };"
     @"})();";
 
-// Runs the flow inside the page, once the session is live. The result comes back
-// through the nfbExchange handler; only shapes and counts are logged, no values.
+// Wraps the page's fetch as early as possible, so the onboarding calls the login
+// page makes on its own are captured. No request is sent by us here.
 - (void)probeTokenExchangeWithAuth:(NSString*)authToken csrf:(NSString*)csrf {
-    NFBDebugLog(@"[exchange] starting add_existing_account from the page");
+    NFBDebugLog(@"[exchange] fetch wrap installed - watching onboarding/task");
     [self.webView evaluateJavaScript:kNFBExchangeScript completionHandler:nil];
 }
 
