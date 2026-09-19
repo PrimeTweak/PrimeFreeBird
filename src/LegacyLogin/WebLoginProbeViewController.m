@@ -1,5 +1,7 @@
 #import "WebLoginProbeViewController.h"
 #import <WebKit/WebKit.h>
+#import <Security/Security.h>
+#import <objc/runtime.h>
 #import "Debug/NFBDebugger.h"
 
 // The cookies that prove a real session: the auth token and the CSRF token the
@@ -87,6 +89,59 @@ static NSString* const kNFBCsrfCookie = @"ct0";
     [self dismissViewControllerAnimated:YES completion:nil];
 }
 
+// Measures every place a session could live and whether the web view's cookies
+// reach the native side: the shared native cookie jar, the web view's own jar,
+// and the keychain the account reads. Presence and length only, never values.
+- (void)probeSessionStores:(WKHTTPCookieStore*)webStore {
+    NSHTTPCookieStorage* shared = [NSHTTPCookieStorage sharedHTTPCookieStorage];
+    NSUInteger nativeAuth = 0, nativeCsrf = 0, nativeTotal = 0;
+    for (NSHTTPCookie* c in shared.cookies) {
+        if ([c.domain containsString:@"x.com"] || [c.domain containsString:@"twitter.com"]) {
+            nativeTotal++;
+            if ([c.name isEqualToString:@"auth_token"]) {
+                nativeAuth = c.value.length;
+            } else if ([c.name isEqualToString:@"ct0"]) {
+                nativeCsrf = c.value.length;
+            }
+        }
+    }
+    NFBDebugLog(@"[store] native jar: auth=%lu ct0=%lu total=%lu",
+                (unsigned long)nativeAuth, (unsigned long)nativeCsrf,
+                (unsigned long)nativeTotal);
+
+    // Are the two jars the same object, or separate?
+    BOOL sameJar = (webStore ==
+        [WKWebsiteDataStore defaultDataStore].httpCookieStore);
+    NFBDebugLog(@"[store] web jar is default store: %d", sameJar ? 1 : 0);
+
+    // The keychain the account uses: does an OAuth token already live there?
+    for (NSString* service in @[@"com.twitter.", @"com.atebits.",
+                                @"com.atebits.Tweetie2"]) {
+        NSDictionary* q = @{
+            (__bridge id)kSecClass : (__bridge id)kSecClassGenericPassword,
+            (__bridge id)kSecAttrService : service,
+            (__bridge id)kSecMatchLimit : (__bridge id)kSecMatchLimitAll,
+            (__bridge id)kSecReturnAttributes : @YES
+        };
+        CFTypeRef out = NULL;
+        OSStatus st = SecItemCopyMatching((__bridge CFDictionaryRef)q, &out);
+        NSUInteger count = 0;
+        if (st == errSecSuccess && out) {
+            count = [(__bridge NSArray*)out count];
+            CFRelease(out);
+        }
+        NFBDebugLog(@"[store] keychain '%@': status=%d items=%lu", service,
+                    (int)st, (unsigned long)count);
+    }
+
+    // Does the app expose an accounts store we could add to?
+    Class accountCls = objc_getClass("TFNTwitterAccount");
+    Class storeCls = objc_getClass("TFNTwitterAccountsManager")
+                     ?: objc_getClass("TFNTwitterAccountStore");
+    NFBDebugLog(@"[store] TFNTwitterAccount=%d accountsManager=%d",
+                accountCls != nil, storeCls != nil);
+}
+
 - (void)userContentController:(WKUserContentController*)controller
       didReceiveScriptMessage:(WKScriptMessage*)message {
     if (![message.name isEqualToString:@"nfbExchange"]) {
@@ -161,6 +216,7 @@ static NSString* const kNFBCsrfCookie = @"ct0";
           // The fetch/XHR wrap is already installed as a document-start user
           // script; nothing to trigger here.
           NFBDebugLog(@"[exchange] session live, wrap already watching");
+          [self probeSessionStores:store];
       }
     }];
 }
