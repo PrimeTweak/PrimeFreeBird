@@ -135,8 +135,71 @@ static NSString* const kNFBCsrfCookie = @"ct0";
       if (auth && !self.sawAuth) {
           self.sawAuth = YES;
           NFBDebugLog(@"[weblogin] AUTH TOKEN OBTAINED - web login reaches a session");
+          NSString* authValue = nil;
+          NSString* csrfValue = nil;
+          for (NSHTTPCookie* cookie in cookies) {
+              if ([cookie.name isEqualToString:kNFBAuthCookie]) {
+                  authValue = cookie.value;
+              } else if ([cookie.name isEqualToString:kNFBCsrfCookie]) {
+                  csrfValue = cookie.value;
+              }
+          }
+          [self probeTokenExchangeWithAuth:authValue csrf:csrfValue];
       }
     }];
+}
+
+// Replays the account-import flow with the web session, then reads the reply for
+// the OAuth token pair the native account needs. Measurement only: the response
+// keys and whether the pair is present are logged, never their values.
+- (void)probeTokenExchangeWithAuth:(NSString*)authToken csrf:(NSString*)csrf {
+    if (!authToken.length || !csrf.length) {
+        NFBDebugLog(@"[exchange] missing cookie, auth=%d csrf=%d",
+                    authToken.length > 0, csrf.length > 0);
+        return;
+    }
+    NSURL* url = [NSURL URLWithString:@"https://api.twitter.com/1.1/onboarding/task.json"];
+    NSMutableURLRequest* req = [NSMutableURLRequest requestWithURL:url];
+    req.HTTPMethod = @"POST";
+    [req setValue:csrf forHTTPHeaderField:@"x-csrf-token"];
+    [req setValue:@"yes" forHTTPHeaderField:@"x-twitter-active-user"];
+    [req setValue:@"OAuth2Session" forHTTPHeaderField:@"x-twitter-auth-type"];
+    [req setValue:@"application/json" forHTTPHeaderField:@"Content-Type"];
+    NSString* cookie =
+        [NSString stringWithFormat:@"auth_token=%@; ct0=%@", authToken, csrf];
+    [req setValue:cookie forHTTPHeaderField:@"Cookie"];
+    NSDictionary* body = @{@"flow_name" : @"add_existing_account"};
+    req.HTTPBody = [NSJSONSerialization dataWithJSONObject:body options:0 error:NULL];
+
+    NFBDebugLog(@"[exchange] posting add_existing_account flow");
+    NSURLSessionDataTask* task = [[NSURLSession sharedSession]
+        dataTaskWithRequest:req
+          completionHandler:^(NSData* data, NSURLResponse* response, NSError* error) {
+            long code = [response isKindOfClass:[NSHTTPURLResponse class]]
+                            ? ((NSHTTPURLResponse*)response).statusCode
+                            : -1;
+            if (error) {
+                NFBDebugLog(@"[exchange] failed: %@", error.localizedDescription);
+                return;
+            }
+            NFBDebugLog(@"[exchange] http %ld, %lu bytes", code,
+                        (unsigned long)data.length);
+            id json = data.length
+                          ? [NSJSONSerialization JSONObjectWithData:data options:0 error:NULL]
+                          : nil;
+            NSString* text = [[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding];
+            BOOL hasOAuth = [text containsString:@"oauth_token"];
+            BOOL hasSecret = [text containsString:@"oauth_token_secret"];
+            BOOL hasFlow = [text containsString:@"flow_token"];
+            NFBDebugLog(@"[exchange] keys: oauth_token=%d secret=%d flow_token=%d json=%d",
+                        hasOAuth, hasSecret, hasFlow, json != nil);
+            if (hasOAuth && hasSecret) {
+                NFBDebugLog(@"[exchange] OAUTH PAIR RETURNED - native account is reachable");
+            } else if (hasFlow) {
+                NFBDebugLog(@"[exchange] flow continues - needs a subtask step, not a direct pair");
+            }
+          }];
+    [task resume];
 }
 
 - (void)webView:(WKWebView*)webView
