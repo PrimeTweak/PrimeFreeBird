@@ -61,6 +61,14 @@ static NSString* const kNFBCsrfCookie = @"ct0";
     WKWebViewConfiguration* cfg = [[WKWebViewConfiguration alloc] init];
     cfg.websiteDataStore = [WKWebsiteDataStore defaultDataStore];
     [cfg.userContentController addScriptMessageHandler:self name:@"nfbExchange"];
+    // Installed at document start, all frames: the page wraps its own fetch as it
+    // loads, so a late evaluateJavaScript wraps nothing, and the login may run in
+    // a subframe.
+    WKUserScript* wrap =
+        [[WKUserScript alloc] initWithSource:kNFBExchangeScript
+                               injectionTime:WKUserScriptInjectionTimeAtDocumentStart
+                            forMainFrameOnly:NO];
+    [cfg.userContentController addUserScript:wrap];
     self.webView = [[WKWebView alloc] initWithFrame:self.view.bounds
                                       configuration:cfg];
     self.webView.autoresizingMask =
@@ -108,12 +116,6 @@ static NSString* const kNFBCsrfCookie = @"ct0";
     NFBDebugLog(@"[weblogin] navigating to %@", webView.URL.absoluteString);
 }
 
-// Installed at the start of every page so the login flow's own onboarding calls
-// are wrapped before they run, not only after a session cookie appears.
-- (void)webView:(WKWebView*)webView didCommitNavigation:(WKNavigation*)navigation {
-    [self probeTokenExchangeWithAuth:nil csrf:nil];
-}
-
 - (void)webView:(WKWebView*)webView
     didReceiveServerRedirectForProvisionalNavigation:(WKNavigation*)navigation {
     NFBDebugLog(@"[weblogin] redirected to %@", webView.URL.absoluteString);
@@ -156,16 +158,9 @@ static NSString* const kNFBCsrfCookie = @"ct0";
       if (auth && !self.sawAuth) {
           self.sawAuth = YES;
           NFBDebugLog(@"[weblogin] AUTH TOKEN OBTAINED - web login reaches a session");
-          NSString* authValue = nil;
-          NSString* csrfValue = nil;
-          for (NSHTTPCookie* cookie in cookies) {
-              if ([cookie.name isEqualToString:kNFBAuthCookie]) {
-                  authValue = cookie.value;
-              } else if ([cookie.name isEqualToString:kNFBCsrfCookie]) {
-                  csrfValue = cookie.value;
-              }
-          }
-          [self probeTokenExchangeWithAuth:authValue csrf:csrfValue];
+          // The fetch/XHR wrap is already installed as a document-start user
+          // script; nothing to trigger here.
+          NFBDebugLog(@"[exchange] session live, wrap already watching");
       }
     }];
 }
@@ -205,13 +200,6 @@ static NSString* const kNFBExchangeScript =
     @"    return os.apply(this,arguments);"
     @"  };"
     @"})();";
-
-// Wraps the page's fetch as early as possible, so the onboarding calls the login
-// page makes on its own are captured. No request is sent by us here.
-- (void)probeTokenExchangeWithAuth:(NSString*)authToken csrf:(NSString*)csrf {
-    NFBDebugLog(@"[exchange] fetch wrap installed - watching onboarding/task");
-    [self.webView evaluateJavaScript:kNFBExchangeScript completionHandler:nil];
-}
 
 - (void)webView:(WKWebView*)webView
     didFailProvisionalNavigation:(WKNavigation*)navigation
