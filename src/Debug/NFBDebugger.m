@@ -18,13 +18,6 @@
 // MARK: - gate
 
 static BOOL NFBDebugEnabled(void) {
-    // Forced on for the web-login diagnostic: the stethoscope must be reachable
-    // even when the app is stuck before its first screen. Revert to the setting
-    // once login is solved.
-    return YES;
-}
-
-static BOOL NFBDebugEnabledSetting(void) {
     static BOOL enabled;
     static dispatch_once_t once;
     dispatch_once(&once, ^{
