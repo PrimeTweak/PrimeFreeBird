@@ -159,9 +159,11 @@ static NSString* const kTaskURL =
       });
     };
     @try {
-        SEL sel = @selector(initWithContext:responseModelBuilder:completionBlock:);
-        id cmd = ((id (*)(id, SEL, id, id, id))objc_msgSend)(
-            [cmdCls alloc], sel, nfbContext(),
+        // Real selector from the runtime: bearerToken is nil so the command uses
+        // the app's own default bearer, the one its own calls are authorized with.
+        SEL sel = @selector(initWithContext:bearerToken:responseModelBuilder:completionBlock:);
+        id cmd = ((id (*)(id, SEL, id, id, id, id))objc_msgSend)(
+            [cmdCls alloc], sel, nfbContext(), nil,
             nfbBuilder("TFSTwitterGuestActivateResponseBuilder"), [completion copy]);
         if (!cmd) {
             [self fail:@"guest_activate_build" code:0];
