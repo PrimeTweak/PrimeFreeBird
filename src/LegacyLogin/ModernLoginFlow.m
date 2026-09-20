@@ -20,8 +20,16 @@ static id nfbBuilder(const char* name) {
 
 // The public app bearer, split so it is not one grep-able literal. This is the
 // well-known unauthenticated bearer every Twitter client sends.
+static NSString* nfbBearerValue(void);
+
 static NSString* nfbBearer(void) {
-    return [@"Bearer AAAAAAAAAAAAAAAAAAAAAFQODgEAAAAAVHTp76lzh3rFzcHb"
+    return [@"Bearer " stringByAppendingString:nfbBearerValue()];
+}
+
+// The raw public bearer token, no "Bearer " prefix - the guest command wants the
+// token itself.
+static NSString* nfbBearerValue(void) {
+    return [@"AAAAAAAAAAAAAAAAAAAAAFQODgEAAAAAVHTp76lzh3rFzcHb"
             stringByAppendingString:@"mHYli9V7mWo%3DR1RJ4YDpXvXAOJZlXQZFJ2sMuFEbBDLwGoDCV5D5Hh"];
 }
 
@@ -148,8 +156,13 @@ static NSString* const kTaskURL =
         if ([resp respondsToSelector:@selector(guestToken)]) {
             gt = ((id (*)(id, SEL))objc_msgSend)(resp, @selector(guestToken));
         }
-        NFBDebugLog(@"[flow] guest activate ok=%d token_len=%lu", ok,
-                    (unsigned long)gt.length);
+        NFBDebugLog(@"[flow] guest activate ok=%d token_len=%lu resp=%@ err=%@", ok,
+                    (unsigned long)gt.length,
+                    resp ? NSStringFromClass([resp class]) : @"nil",
+                    [err isKindOfClass:[NSError class]]
+                        ? [NSString stringWithFormat:@"%ld/%@",
+                               (long)[(NSError*)err code], [(NSError*)err domain]]
+                        : (err ? [err description] : @"nil"));
         if (!gt.length) {
             [ws fail:@"guest_activate" code:ok ? 0 : 401];
             return;
@@ -159,11 +172,11 @@ static NSString* const kTaskURL =
       });
     };
     @try {
-        // Real selector from the runtime: bearerToken is nil so the command uses
-        // the app's own default bearer, the one its own calls are authorized with.
+        // Real selector from the runtime. The bearer is passed explicitly - the
+        // well-known public bearer guest activate is meant to use.
         SEL sel = @selector(initWithContext:bearerToken:responseModelBuilder:completionBlock:);
         id cmd = ((id (*)(id, SEL, id, id, id, id))objc_msgSend)(
-            [cmdCls alloc], sel, nfbContext(), nil,
+            [cmdCls alloc], sel, nfbContext(), nfbBearerValue(),
             nfbBuilder("TFSTwitterGuestActivateResponseBuilder"), [completion copy]);
         if (!cmd) {
             [self fail:@"guest_activate_build" code:0];
