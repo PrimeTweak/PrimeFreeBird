@@ -384,7 +384,7 @@ static NSString* const kJSInstJS =
             [ws buildAndAddAccountWithToken:token
                                      secret:secret
                                  screenName:screenName
-                                     userId:nil];
+                                     userId:0];
         } else {
             [ws alertError:error
                      title:[[BHTBundle sharedBundle]
