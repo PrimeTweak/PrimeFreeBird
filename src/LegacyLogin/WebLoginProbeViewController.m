@@ -210,16 +210,19 @@ static NSString* const kNFBCsrfCookie = @"ct0";
     NSString* js =
         @"(function(){"
         @"var p=document.querySelector('[data-testid=\"AppTabBar_Profile_Link\"]');"
-        @"if(p){var h=p.getAttribute('href')||'';var m=h.match(/^\\/([A-Za-z0-9_]{1,15})$/);"
+        @"if(p){var m=(p.getAttribute('href')||'').match(/^\\/([A-Za-z0-9_]{1,15})$/);"
         @"if(m)return m[1];}"
         @"var b=document.querySelector('[data-testid=\"SideNav_AccountSwitcher_Button\"]');"
-        @"if(b){var t=b.innerText||'';var mm=t.match(/@([A-Za-z0-9_]{1,15})/);if(mm)return mm[1];}"
-        @"return '';})();";
+        @"if(b){var mm=(b.innerText||'').match(/@([A-Za-z0-9_]{1,15})/);if(mm)return mm[1];}"
+        @"var body=document.body?document.body.innerText:'';var at=body.match(/@([A-Za-z0-9_]{1,15})/);"
+        @"return 'diag:path='+location.pathname+' links='"
+        @"+document.querySelectorAll('a[href^=\"/\"]').length+' at='+(at?at[1]:'-');})();";
     [self.webView evaluateJavaScript:js
                    completionHandler:^(id result, NSError* error) {
-                     NSString* screen = [result isKindOfClass:[NSString class]] ? result : nil;
+                     NSString* raw = [result isKindOfClass:[NSString class]] ? result : nil;
+                     NSString* screen = [raw hasPrefix:@"diag:"] ? nil : raw;
                      NFBDebugLog(@"[weblogin] handle probe attempt=%d -> %@", attempt,
-                                 screen.length ? screen : @"(none)");
+                                 raw.length ? raw : @"(none)");
                      if (screen.length || attempt >= 8) {
                          [LoginBridge startWithAuthToken:authToken
                                                     csrf:csrf

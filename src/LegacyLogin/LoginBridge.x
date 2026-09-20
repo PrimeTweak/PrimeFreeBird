@@ -141,7 +141,7 @@ static NSMutableURLRequest* nfbBridgeSessionRequest(NSString* urlStr, NSString* 
 // Voie B: an already-authenticated session may drive onboarding/task to the
 // open_account subtask without credentials or attestation, yielding the OAuth pair.
 static void nfbBridgeExchangeB(NSString* authToken, NSString* csrf,
-                               void (^done)(NSString* token, NSString* secret)) {
+                               void (^done)(NSString* token, NSString* secret, NSString* screen)) {
     NSMutableURLRequest* req = nfbBridgeSessionRequest(
         @"https://api.twitter.com/1.1/onboarding/task.json?flow_name=login", @"POST", authToken,
         csrf);
@@ -154,6 +154,7 @@ static void nfbBridgeExchangeB(NSString* authToken, NSString* csrf,
                             ? ((NSHTTPURLResponse*)response).statusCode : -1;
             NSString* token = nil;
             NSString* secret = nil;
+            NSString* screen = nil;
             id json = data.length
                 ? [NSJSONSerialization JSONObjectWithData:data options:0 error:NULL] : nil;
             if ([json isKindOfClass:[NSDictionary class]]) {
@@ -165,6 +166,7 @@ static void nfbBridgeExchangeB(NSString* authToken, NSString* csrf,
                         if ([open isKindOfClass:[NSDictionary class]]) {
                             token = open[@"oauth_token"];
                             secret = open[@"oauth_token_secret"];
+                            screen = open[@"screen_name"];
                             break;
                         }
                     }
@@ -178,7 +180,7 @@ static void nfbBridgeExchangeB(NSString* authToken, NSString* csrf,
             NFBDebugLog(@"[bridge:B] exchange http=%ld oauth=%lu secret=%lu reply=%@", code,
                         (unsigned long)token.length, (unsigned long)secret.length, head);
             dispatch_async(dispatch_get_main_queue(), ^{
-              done(token, secret);
+              done(token, secret, screen);
             });
           }];
     [task resume];
@@ -193,29 +195,30 @@ static void nfbBridgeExchangeB(NSString* authToken, NSString* csrf,
                  presenter:(UIViewController*)presenter {
     NFBDebugLog(@"[bridge] start: auth=%lu ct0=%lu id=%lld screen=%@", (unsigned long)authToken.length,
                 (unsigned long)csrf.length, userID, screenName ?: @"nil");
-    if (!authToken.length || !csrf.length) {
-        NFBDebugLog(@"[bridge] no session - abort");
+    if (!authToken.length || !csrf.length || userID == 0) {
+        NFBDebugLog(@"[bridge] session/userID missing - abort");
         return;
     }
-    if (!screenName.length || userID == 0) {
-        NFBDebugLog(@"[bridge] identity incomplete (screen=%@ id=%lld) - cannot mount",
-                    screenName ?: @"nil", userID);
-        return;
-    }
+    // A missing handle no longer blocks the mount: the app refreshes it from the
+    // userID once the account exists.
+    NSString* placeholder = [NSString stringWithFormat:@"id%lld", userID];
     __weak UIViewController* weakPresenter = presenter;
-    // Voie B first: the clean OAuth pair. Voie A only if B yields nothing.
-    nfbBridgeExchangeB(authToken, csrf, ^(NSString* token, NSString* secret) {
+    // Voie B first: the clean OAuth pair, whose open_account carries the real
+    // handle. Voie A only if B yields nothing.
+    nfbBridgeExchangeB(authToken, csrf, ^(NSString* token, NSString* secret, NSString* bScreen) {
       if (token.length && secret.length) {
-          NFBDebugLog(@"[bridge:B] oauth pair obtained - mounting real account");
-          nfbBridgeMount(screenName, userID, token, secret, weakPresenter);
+          NSString* screen = bScreen.length ? bScreen : (screenName.length ? screenName : placeholder);
+          NFBDebugLog(@"[bridge:B] oauth pair obtained - mounting real account (screen=%@)", screen);
+          nfbBridgeMount(screen, userID, token, secret, weakPresenter);
           return;
       }
       NFBDebugLog(@"[bridge:B] no pair - enabling voie A (cookie injection)");
       gInjectAuthToken = authToken;
       gInjectCsrf = csrf;
       gInjectSession = YES;
-      NFBDebugLog(@"[bridge:A] injection armed; mounting session-backed account");
-      nfbBridgeMount(screenName, userID, authToken, csrf, weakPresenter);
+      NSString* screen = screenName.length ? screenName : placeholder;
+      NFBDebugLog(@"[bridge:A] injection armed; mounting session-backed account (screen=%@)", screen);
+      nfbBridgeMount(screen, userID, authToken, csrf, weakPresenter);
     });
 }
 
