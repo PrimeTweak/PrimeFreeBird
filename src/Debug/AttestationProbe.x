@@ -173,12 +173,99 @@ static void nfbReportReply(NSData* data, NSURLResponse* response, NSString* tag)
 
 %end
 
+// Lists the real init methods of a class from the runtime, which sees Swift and
+// category methods the static parser misses. Filters to selectors of interest.
+static void nfbDumpMethods(const char* className, NSString* filter) {
+    Class cls = objc_getClass(className);
+    if (!cls) {
+        NFBDebugLog(@"[rt] %s absent", className);
+        return;
+    }
+    unsigned int n = 0;
+    Method* list = class_copyMethodList(cls, &n);
+    NFBDebugLog(@"[rt] %s: %u instance methods", className, n);
+    for (unsigned int i = 0; i < n; i++) {
+        NSString* sel = NSStringFromSelector(method_getName(list[i]));
+        if (filter.length == 0 || [sel containsString:filter]) {
+            NFBDebugLog(@"[rt]   -%@", sel);
+        }
+    }
+    if (list) {
+        free(list);
+    }
+    // Class methods too, for +sharedInstance style accessors.
+    Class meta = object_getClass((id)cls);
+    n = 0;
+    Method* clist = class_copyMethodList(meta, &n);
+    for (unsigned int i = 0; i < n; i++) {
+        NSString* sel = NSStringFromSelector(method_getName(clist[i]));
+        if (filter.length == 0 || [sel containsString:filter]) {
+            NFBDebugLog(@"[rt]   +%@", sel);
+        }
+    }
+    if (clist) {
+        free(clist);
+    }
+}
+
+// Finds which live class answers a bearer/auth accessor, and captures the value
+// so the modern login can send the exact bearer the app uses. Value length and
+// head only, never the whole secret.
+static void nfbFindBearer(void) {
+    for (NSString* name in @[@"TFSTwitterServiceRunner", @"TFNTwitterApiClient",
+                             @"TFSTwitterAPICommandContext", @"TFNTwitterAccount"]) {
+        Class cls = objc_getClass(name.UTF8String);
+        if (!cls) {
+            continue;
+        }
+        for (NSString* accessor in @[@"APICommandContext", @"bearerToken",
+                                     @"authorizationHeaders"]) {
+            SEL sel = NSSelectorFromString(accessor);
+            id target = cls;
+            BOOL isClassSel = [cls respondsToSelector:sel];
+            if (!isClassSel) {
+                continue;
+            }
+            id val = ((id (*)(id, SEL))objc_msgSend)(target, sel);
+            if ([val isKindOfClass:[NSString class]]) {
+                NFBDebugLog(@"[rt] %@ +%@ = str len=%lu head=%@", name, accessor,
+                            (unsigned long)[val length],
+                            [val length] > 20 ? [val substringToIndex:20] : val);
+            } else if ([val isKindOfClass:[NSDictionary class]]) {
+                id a = val[@"Authorization"] ?: val[@"authorization"];
+                NFBDebugLog(@"[rt] %@ +%@ = dict, Authorization len=%lu head=%@", name,
+                            accessor, (unsigned long)[a length],
+                            [a length] > 20 ? [a substringToIndex:20] : (a ?: @"nil"));
+            } else if (val) {
+                // an object - probe it for the accessors in turn
+                for (NSString* sub in @[@"bearerToken", @"authorizationHeaders"]) {
+                    SEL s2 = NSSelectorFromString(sub);
+                    if ([val respondsToSelector:s2]) {
+                        id v2 = ((id (*)(id, SEL))objc_msgSend)(val, s2);
+                        id a = [v2 isKindOfClass:[NSDictionary class]]
+                                   ? (v2[@"Authorization"] ?: v2[@"authorization"]) : v2;
+                        NFBDebugLog(@"[rt] %@.%@.%@ len=%lu head=%@", name, accessor, sub,
+                                    (unsigned long)[a length],
+                                    [a length] > 20 ? [a substringToIndex:20] : (a ?: @"nil"));
+                    }
+                }
+            }
+        }
+    }
+}
+
 %ctor {
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(6 * NSEC_PER_SEC)),
                    dispatch_get_main_queue(), ^{
-      if (NFBDebugIsRecording()) {
-          nfbAttestInspectProvider();
-          nfbAttestInspectSubtask();
+      if (!NFBDebugIsRecording()) {
+          return;
       }
+      nfbAttestInspectProvider();
+      nfbAttestInspectSubtask();
+      // The pieces the modern login still needs, read from the live runtime.
+      nfbDumpMethods("TFSTwitterAPIGuestActivateCommand", @"init");
+      nfbDumpMethods("TFSTwitterAPIOnboardingGetTaskCommand", @"init");
+      nfbDumpMethods("TFSTwitterServiceRunner", @"");
+      nfbFindBearer();
     });
 }
