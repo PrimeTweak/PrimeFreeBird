@@ -26,6 +26,8 @@ static BOOL nfbBridgeIsTwitterAPI(NSString* url) {
 static BOOL gInjectSession = NO;
 static NSString* gInjectAuthToken = nil;
 static NSString* gInjectCsrf = nil;
+static NSString* const kNFBSessAuthKey = @"nfb_bridge_auth_token";
+static NSString* const kNFBSessCsrfKey = @"nfb_bridge_ct0";
 
 // Adds the web session cookie + csrf to an app API request that lacks them, so
 // the server authenticates it by cookie instead of the missing OAuth signature.
@@ -234,10 +236,25 @@ static void nfbBridgeExchangeB(NSString* authToken, NSString* csrf,
       gInjectAuthToken = authToken;
       gInjectCsrf = csrf;
       gInjectSession = YES;
+      [[NSUserDefaults standardUserDefaults] setObject:authToken forKey:kNFBSessAuthKey];
+      [[NSUserDefaults standardUserDefaults] setObject:csrf forKey:kNFBSessCsrfKey];
       NSString* screen = screenName.length ? screenName : placeholder;
-      NFBDebugLog(@"[bridge:A] injection armed; mounting session-backed account (screen=%@)", screen);
+      NFBDebugLog(@"[bridge:A] injection armed + session saved; mounting account (screen=%@)", screen);
       nfbBridgeMount(screen, userID, authToken, csrf, weakPresenter);
     });
 }
 
 @end
+
+// Restores the injected session at launch, so the persisted account
+// authenticates without re-running the web login each time.
+%ctor {
+    NSString* a = [[NSUserDefaults standardUserDefaults] stringForKey:kNFBSessAuthKey];
+    NSString* c = [[NSUserDefaults standardUserDefaults] stringForKey:kNFBSessCsrfKey];
+    if (a.length && c.length) {
+        gInjectAuthToken = a;
+        gInjectCsrf = c;
+        gInjectSession = YES;
+        NFBDebugLog(@"[bridge:A] session restored at launch, injection armed");
+    }
+}
