@@ -73,6 +73,9 @@ static NSString* const kTaskURL =
     [req setValue:@"yes" forHTTPHeaderField:@"X-Twitter-Active-User"];
     [req setValue:@"en" forHTTPHeaderField:@"X-Twitter-Client-Language"];
     [req setValue:@"TwitterAndroid/10.21.1" forHTTPHeaderField:@"User-Agent"];
+    [req setValue:@"TwitterAndroid" forHTTPHeaderField:@"X-Twitter-Client"];
+    [req setValue:@"10.21.1" forHTTPHeaderField:@"X-Twitter-Client-Version"];
+    [req setValue:@"5" forHTTPHeaderField:@"X-Twitter-API-Version"];
     if (self.guestToken.length) {
         [req setValue:self.guestToken forHTTPHeaderField:@"X-Guest-Token"];
     }
@@ -125,10 +128,12 @@ static NSString* const kTaskURL =
             if (error || code != 200 || ![json isKindOfClass:[NSDictionary class]]) {
                 NSString* reply = data.length
                     ? [[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding] : @"";
-                if (reply.length) {
-                    NFBDebugLog(@"[flow] %@ reply head: %@", stage,
-                                reply.length > 240 ? [reply substringToIndex:240] : reply);
-                }
+                // Full reply and the request headers actually sent, so the exact
+                // server complaint and any missing header are visible at once.
+                NFBDebugLog(@"[flow] %@ FULL reply: %@", stage,
+                            reply.length > 500 ? [reply substringToIndex:500] : reply);
+                NFBDebugLog(@"[flow] %@ sent headers: %@", stage,
+                            req.allHTTPHeaderFields);
                 [self fail:stage code:code];
                 return;
             }
