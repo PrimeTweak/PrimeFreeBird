@@ -1,17 +1,14 @@
 #import "LegacyLoginViewController.h"
 #import <WebKit/WebKit.h>
-#import <dlfcn.h>
 #import <objc/message.h>
 #import <objc/runtime.h>
 #import "Core/BHTBundle.h"
+#import "ModernLoginFlow.h"
 #import "Headers/TFNHeaders.h"
-#import "WebLoginProbeViewController.h"
 
 // Password login without reset: ui_metrics from x.com/i/js_inst, then
 // xauth_password for an OAuth token or a 2FA challenge, then the app's own web
 // challenge on 2FA, then the account is added and switched to.
-
-typedef void (^CmdCompletion)(BOOL success, id response, id parseError);
 
 typedef id (*PwInitIMP)(id, SEL, id context, id accountID, id authContext, id identifier,
                         id password, id simCountryCode, id httpConfig, BOOL supportOneFactor,
@@ -56,43 +53,6 @@ static BOOL IsRateLimit(id error) {
 }
 
 #pragma mark - Command / service accessors
-
-static id GuestAccountID(void) {
-    void* sym = dlsym(RTLD_DEFAULT, "TFSTwitterAPIGuestAccountID");
-    return sym ? (__bridge id)(*(void**)sym) : nil;
-}
-
-static id Loader(void) {
-    return Perform0(objc_getClass("TFSTwitterServiceRunner"), @selector(APICommandLoader));
-}
-
-static id Context(void) {
-    return Perform0(objc_getClass("TFSTwitterServiceRunner"), @selector(APICommandContext));
-}
-
-static id Builder(const char* className) {
-    Class cls = objc_getClass(className);
-    return cls ? [[cls alloc] init] : nil;
-}
-
-static id Storage(void) {
-    Class cls = objc_getClass("T1OnboardingAuthTokenStorage");
-    return cls ? [[cls alloc] init] : nil;
-}
-
-static id KnownDeviceToken(void) {
-    return Perform0(objc_getClass("TFNTwitterAccount"), @selector(knownDeviceToken));
-}
-
-static id HTTPConfig(void) {
-    Class cls = objc_getClass("TNUServiceHTTPConfiguration");
-    SEL sel = @selector(configurationForForegroundRetriableRequest);
-    if (!cls || ![cls respondsToSelector:sel]) {
-        return nil;
-    }
-
-    return ((id (*)(id, SEL))objc_msgSend)(cls, sel);
-}
 
 #pragma mark - Account finalization
 
@@ -217,12 +177,6 @@ static NSString* const kJSInstJS =
     return [[UINavigationController alloc] initWithRootViewController:login];
 }
 
-#pragma mark - Web login probe
-
-- (void)nfbOpenWebLogin {
-    [WebLoginProbeViewController presentFrom:self];
-}
-
 #pragma mark - View setup
 
 - (void)viewDidLoad {
@@ -230,14 +184,6 @@ static NSString* const kJSInstJS =
 
     self.view.backgroundColor = [UIColor systemBackgroundColor];
     self.title = [[BHTBundle sharedBundle] localizedTwitterStringForKey:@"LOG_IN_TITLE"];
-
-    // Measurement entry point: opens the web login screen that logs whether a
-    // session cookie is obtained. Right side so it never clashes with Cancel.
-    self.navigationItem.rightBarButtonItem =
-        [[UIBarButtonItem alloc] initWithTitle:@"Web"
-                                         style:UIBarButtonItemStylePlain
-                                        target:self
-                                        action:@selector(nfbOpenWebLogin)];
 
     if (!self.asRootScreen) {
         self.navigationItem.leftBarButtonItem =
@@ -422,53 +368,29 @@ static NSString* const kJSInstJS =
         return;
     }
 
-    [self showHUD:[[BHTBundle sharedBundle] localizedStringForKey:@"LEGACY_LOGIN_VERIFYING_STATUS"]];
+    [self showHUD:[[BHTBundle sharedBundle] localizedStringForKey:@"LEGACY_LOGIN_SIGNING_IN_STATUS"]];
 
-    [self generateUIMetrics:^(NSString* metrics) {
-        [self.hud
-            setText:[[BHTBundle sharedBundle] localizedStringForKey:@"LEGACY_LOGIN_SIGNING_IN_STATUS"]];
-
-        Class cmdCls = objc_getClass("TFSTwitterAPIXAuthPasswordCommand");
-        if (!cmdCls || !Loader() || !Context()) {
-            [self.hud hide];
-            [self alert:[[BHTBundle sharedBundle] localizedStringForKey:@"LEGACY_LOGIN_UNAVAILABLE_TITLE"]
-                    msg:[[BHTBundle sharedBundle]
-                            localizedStringForKey:@"LEGACY_LOGIN_CLASSES_MISSING_MESSAGE"]];
-            return;
+    // The old xAuth endpoint is gone (404). This runs the modern onboarding/task
+    // login instead, which needs no attestation, and mounts the account from the
+    // oauth pair it returns.
+    __weak typeof(self) ws = self;
+    [ModernLoginFlow startWithUsername:user
+                             password:pass
+                           completion:^(NSString* token, NSString* secret,
+                                        NSString* screenName, NSError* error) {
+      dispatch_async(dispatch_get_main_queue(), ^{
+        [ws.hud hide];
+        if (token.length && secret.length) {
+            [ws buildAndAddAccountWithToken:token
+                                     secret:secret
+                                 screenName:screenName
+                                     userId:nil];
+        } else {
+            [ws alertError:error
+                     title:[[BHTBundle sharedBundle]
+                               localizedStringForKey:@"LEGACY_LOGIN_FAILED_TITLE"]];
         }
-
-        __weak typeof(self) ws = self;
-        CmdCompletion completion = ^(BOOL ok, id resp, id err) {
-            dispatch_async(dispatch_get_main_queue(), ^{
-                [ws handlePassword:ok response:resp error:err];
-            });
-        };
-
-        @try {
-            SEL sel = @selector(initWithContext:accountID:authContext:identifier:password:simCountryCode:
-                                httpRequestConfiguration:supportOneFactorAuthorization:knownDeviceToken:
-                                uiMetrics:authTokenStorage:source:responseModelBuilder:completionBlock:);
-            PwInitIMP imp = (PwInitIMP)objc_msgSend;
-
-            id cmd = imp([cmdCls alloc], sel, Context(), GuestAccountID(), nil, user, pass, nil,
-                         HTTPConfig(), NO, KnownDeviceToken(), metrics, Storage(), nil,
-                         Builder("TFSTwitterXAuthPasswordResponseBuilder"), [completion copy]);
-            if (!cmd) {
-                [self.hud hide];
-                [self
-                    alert:[[BHTBundle sharedBundle] localizedStringForKey:@"LEGACY_LOGIN_UNAVAILABLE_TITLE"]
-                      msg:[[BHTBundle sharedBundle]
-                              localizedStringForKey:@"LEGACY_LOGIN_BUILD_COMMAND_FAILED_MESSAGE"]];
-                return;
-            }
-
-            ((void (*)(id, SEL, id))objc_msgSend)(Loader(), @selector(startCommand:), cmd);
-        } @catch (NSException* ex) {
-            [self.hud hide];
-            [self
-                alert:[[BHTBundle sharedBundle] localizedStringForKey:@"LEGACY_LOGIN_CRASH_AVOIDED_TITLE"]
-                  msg:ex.reason ?: ex.description];
-        }
+      });
     }];
 }
 
