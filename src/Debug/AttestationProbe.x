@@ -81,48 +81,94 @@ static void nfbAttestInspectSubtask(void) {
 
 %end
 
-// The native login posts to onboarding/task through NSURLSession. This reads
-// that request's body and reply, and whether an attestation_token rides along -
-// the one path never measured. Web login (jfapi) is ignored here.
+// The native login skips onboarding/task, so all Twitter API traffic is watched:
+// path, method, auth/attestation fields, and reply. Web login (jfapi) is left out.
+static BOOL nfbIsTwitterAPI(NSString* url) {
+    if (![url isKindOfClass:[NSString class]]) {
+        return NO;
+    }
+    if ([url containsString:@"jfapi"]) {
+        return NO;
+    }
+    return [url containsString:@"api.twitter.com"] ||
+           [url containsString:@"api.x.com"] ||
+           [url containsString:@"/1.1/"] ||
+           [url containsString:@"/onboarding/"] ||
+           [url containsString:@"/auth/"] ||
+           [url containsString:@"/oauth"];
+}
+
+static void nfbReportRequest(NSURLRequest* request, NSString* tag) {
+    NSString* url = request.URL.absoluteString;
+    NSString* path = request.URL.path ?: url;
+    NSData* body = request.HTTPBody;
+    NSString* bodyText = body.length
+        ? [[NSString alloc] initWithData:body encoding:NSUTF8StringEncoding] : @"";
+    NSDictionary* headers = request.allHTTPHeaderFields;
+    BOOL hasAuthHeader = headers[@"Authorization"] != nil ||
+                         headers[@"authorization"] != nil;
+    BOOL hasCsrf = headers[@"x-csrf-token"] != nil;
+    BOOL bodyAttest = [bodyText containsString:@"attestation"];
+    BOOL bodyPassword = [bodyText containsString:@"password"];
+    NFBDebugLog(@"[net:%@] %@ %@", tag, request.HTTPMethod ?: @"GET", path);
+    NFBDebugLog(@"[net:%@] auth_header=%d csrf=%d body_len=%lu attestation=%d password=%d",
+                tag, hasAuthHeader, hasCsrf, (unsigned long)body.length,
+                bodyAttest, bodyPassword);
+    if (bodyText.length && bodyText.length <= 300) {
+        NFBDebugLog(@"[net:%@] body: %@", tag, bodyText);
+    } else if (bodyText.length) {
+        NFBDebugLog(@"[net:%@] body head: %@", tag, [bodyText substringToIndex:300]);
+    }
+}
+
+static void nfbReportReply(NSData* data, NSURLResponse* response, NSString* tag) {
+    long code = [response isKindOfClass:[NSHTTPURLResponse class]]
+                    ? ((NSHTTPURLResponse*)response).statusCode : -1;
+    NSString* reply = data.length
+        ? [[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding] : @"";
+    BOOL attest = [reply containsString:@"ttestation"];
+    BOOL denied = [reply containsString:@"AttestationDenied"];
+    NFBDebugLog(@"[net:%@] reply http=%ld len=%lu attestation=%d denied=%d",
+                tag, code, (unsigned long)data.length, attest, denied);
+    if (reply.length && code != 200) {
+        NFBDebugLog(@"[net:%@] reply head: %@", tag,
+                    reply.length > 280 ? [reply substringToIndex:280] : reply);
+    }
+}
+
 %hook NSURLSession
 
 - (NSURLSessionDataTask*)dataTaskWithRequest:(NSURLRequest*)request
                            completionHandler:(void (^)(NSData*, NSURLResponse*, NSError*))handler {
-    NSString* url = request.URL.absoluteString;
-    if (!NFBDebugIsRecording() || ![url containsString:@"onboarding/task"] ||
-        [url containsString:@"jfapi"]) {
+    if (!NFBDebugIsRecording() || !nfbIsTwitterAPI(request.URL.absoluteString)) {
         return %orig;
     }
-    NSData* body = request.HTTPBody;
-    NSString* bodyText = body.length
-        ? [[NSString alloc] initWithData:body encoding:NSUTF8StringEncoding]
-        : @"(no body)";
-    BOOL hasAttest = [bodyText containsString:@"attestation"];
-    NFBDebugLog(@"[native] onboarding/task POST attestation_in_body=%d len=%lu",
-                hasAttest, (unsigned long)body.length);
-    NFBDebugLog(@"[native] body head: %@",
-                bodyText.length > 220 ? [bodyText substringToIndex:220] : bodyText);
+    nfbReportRequest(request, @"session");
     void (^wrapped)(NSData*, NSURLResponse*, NSError*) =
         ^(NSData* data, NSURLResponse* response, NSError* error) {
-          long code = [response isKindOfClass:[NSHTTPURLResponse class]]
-                          ? ((NSHTTPURLResponse*)response).statusCode : -1;
-          NSString* reply = data.length
-              ? [[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding] : @"";
-          BOOL denied = [reply containsString:@"Attestation"] ||
-                        [reply containsString:@"attestation"];
-          BOOL subtaskInReply = [reply containsString:@"AttestationSubtask"] ||
-                                [reply containsString:@"LoginAttestation"];
-          NFBDebugLog(@"[native] reply http=%ld len=%lu attestation_mentioned=%d subtask=%d",
-                      code, (unsigned long)data.length, denied, subtaskInReply);
-          if (reply.length && code != 200) {
-              NFBDebugLog(@"[native] reply head: %@",
-                          reply.length > 240 ? [reply substringToIndex:240] : reply);
-          }
+          nfbReportReply(data, response, @"session");
           if (handler) {
               handler(data, response, error);
           }
         };
     return %orig(request, wrapped);
+}
+
+- (NSURLSessionUploadTask*)uploadTaskWithRequest:(NSURLRequest*)request
+                                        fromData:(NSData*)bodyData
+                               completionHandler:(void (^)(NSData*, NSURLResponse*, NSError*))handler {
+    if (!NFBDebugIsRecording() || !nfbIsTwitterAPI(request.URL.absoluteString)) {
+        return %orig;
+    }
+    nfbReportRequest(request, @"upload");
+    void (^wrapped)(NSData*, NSURLResponse*, NSError*) =
+        ^(NSData* data, NSURLResponse* response, NSError* error) {
+          nfbReportReply(data, response, @"upload");
+          if (handler) {
+              handler(data, response, error);
+          }
+        };
+    return %orig(request, bodyData, wrapped);
 }
 
 %end
