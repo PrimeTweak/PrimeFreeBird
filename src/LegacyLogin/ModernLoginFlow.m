@@ -132,8 +132,12 @@ static NSString* const kTaskURL =
                 // server complaint and any missing header are visible at once.
                 NFBDebugLog(@"[flow] %@ FULL reply: %@", stage,
                             reply.length > 500 ? [reply substringToIndex:500] : reply);
-                NFBDebugLog(@"[flow] %@ sent headers: %@", stage,
-                            req.allHTTPHeaderFields);
+                NSMutableString* hdrLine = [NSMutableString string];
+                for (NSString* k in req.allHTTPHeaderFields) {
+                    [hdrLine appendFormat:@"%@=%lu ", k,
+                        (unsigned long)[req.allHTTPHeaderFields[k] length]];
+                }
+                NFBDebugLog(@"[flow] %@ sent header keys: %@", stage, hdrLine);
                 [self fail:stage code:code];
                 return;
             }
@@ -177,6 +181,10 @@ static NSString* const kTaskURL =
                 [self fail:@"guest_activate" code:code];
                 return;
             }
+            // The server may set its own ct0; if so, use it for the flow steps.
+            NSString* setCookie = [response isKindOfClass:[NSHTTPURLResponse class]]
+                ? ((NSHTTPURLResponse*)response).allHeaderFields[@"Set-Cookie"] : nil;
+            NFBDebugLog(@"[flow] guest set-cookie: %@", setCookie ?: @"none");
             self.guestToken = gt;
             [self startFlow];
           }];
