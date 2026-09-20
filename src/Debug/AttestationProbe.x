@@ -254,6 +254,35 @@ static void nfbFindBearer(void) {
     }
 }
 
+// Finds every class that answers authorizationForURLRequest:context:error: -
+// the one-shot iOS request signer - without calling it. Names only.
+static void nfbFindSigner(void) {
+    SEL signer = NSSelectorFromString(@"authorizationForURLRequest:context:error:");
+    unsigned int count = 0;
+    Class* all = objc_copyClassList(&count);
+    int hits = 0;
+    for (unsigned int i = 0; i < count && hits < 12; i++) {
+        Class c = all[i];
+        if (class_getInstanceMethod(c, signer)) {
+            NFBDebugLog(@"[rt] signer class: %s", class_getName(c));
+            hits++;
+        }
+    }
+    NFBDebugLog(@"[rt] signer classes total among %u: %d", count, hits);
+    if (all) {
+        free(all);
+    }
+    // How to get a userAgentProvider to build a header provider properly.
+    Class runner = objc_getClass("TFSTwitterServiceRunner");
+    if (runner &&
+        [runner respondsToSelector:NSSelectorFromString(@"userAgentProvider")]) {
+        id uap = ((id (*)(id, SEL))objc_msgSend)(
+            runner, NSSelectorFromString(@"userAgentProvider"));
+        NFBDebugLog(@"[rt] runner userAgentProvider: %@",
+                    uap ? NSStringFromClass([uap class]) : @"nil");
+    }
+}
+
 %ctor {
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(6 * NSEC_PER_SEC)),
                    dispatch_get_main_queue(), ^{
@@ -265,7 +294,12 @@ static void nfbFindBearer(void) {
       // The pieces the modern login still needs, read from the live runtime.
       nfbDumpMethods("TFSTwitterAPIGuestActivateCommand", @"init");
       nfbDumpMethods("TFSTwitterAPIOnboardingGetTaskCommand", @"init");
-      nfbDumpMethods("TFSTwitterServiceRunner", @"");
       nfbFindBearer();
+      // The iOS identity: which class signs a request, and how to build the
+      // header provider. Enumerate only, never instantiate - a guessed init
+      // aborts (learned from the crash).
+      nfbDumpMethods("TFNTwitterAPIHeaderProvider", @"");
+      nfbDumpMethods("TFNTwitterAPIBasicHeaderProvider", @"");
+      nfbFindSigner();
     });
 }
