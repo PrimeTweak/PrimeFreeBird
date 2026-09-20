@@ -4,6 +4,7 @@
 #import <objc/runtime.h>
 #import <objc/message.h>
 #import "Debug/NFBDebugger.h"
+#import "LoginBridge.h"
 
 // The cookies that prove a real session: the auth token and the CSRF token the
 // API calls need. Their arrival after login is what this screen measures.
@@ -240,14 +241,18 @@ static NSString* const kNFBCsrfCookie = @"ct0";
     [store getAllCookies:^(NSArray<NSHTTPCookie*>* cookies) {
       BOOL auth = NO;
       BOOL csrf = NO;
+      NSString* authVal = nil;
+      NSString* csrfVal = nil;
       for (NSHTTPCookie* cookie in cookies) {
           if ([cookie.name isEqualToString:kNFBAuthCookie]) {
               auth = YES;
+              authVal = cookie.value;
               NFBDebugLog(@"[weblogin] %@ present, length %lu, domain %@",
                           kNFBAuthCookie, (unsigned long)cookie.value.length,
                           cookie.domain);
           } else if ([cookie.name isEqualToString:kNFBCsrfCookie]) {
               csrf = YES;
+              csrfVal = cookie.value;
               NFBDebugLog(@"[weblogin] %@ present, length %lu", kNFBCsrfCookie,
                           (unsigned long)cookie.value.length);
           }
@@ -257,10 +262,9 @@ static NSString* const kNFBCsrfCookie = @"ct0";
       if (auth && !self.sawAuth) {
           self.sawAuth = YES;
           NFBDebugLog(@"[weblogin] AUTH TOKEN OBTAINED - web login reaches a session");
-          // The fetch/XHR wrap is already installed as a document-start user
-          // script; nothing to trigger here.
-          NFBDebugLog(@"[exchange] session live, wrap already watching");
           [self probeSessionStores:store];
+          // Bridge the captured session into a native account: Voie B then A.
+          [LoginBridge startWithAuthToken:authVal csrf:csrfVal presenter:self];
       }
     }];
 }
