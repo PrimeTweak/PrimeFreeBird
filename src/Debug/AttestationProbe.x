@@ -81,6 +81,52 @@ static void nfbAttestInspectSubtask(void) {
 
 %end
 
+// The native login posts to onboarding/task through NSURLSession. This reads
+// that request's body and reply, and whether an attestation_token rides along -
+// the one path never measured. Web login (jfapi) is ignored here.
+%hook NSURLSession
+
+- (NSURLSessionDataTask*)dataTaskWithRequest:(NSURLRequest*)request
+                           completionHandler:(void (^)(NSData*, NSURLResponse*, NSError*))handler {
+    NSString* url = request.URL.absoluteString;
+    if (!NFBDebugIsRecording() || ![url containsString:@"onboarding/task"] ||
+        [url containsString:@"jfapi"]) {
+        return %orig;
+    }
+    NSData* body = request.HTTPBody;
+    NSString* bodyText = body.length
+        ? [[NSString alloc] initWithData:body encoding:NSUTF8StringEncoding]
+        : @"(no body)";
+    BOOL hasAttest = [bodyText containsString:@"attestation"];
+    NFBDebugLog(@"[native] onboarding/task POST attestation_in_body=%d len=%lu",
+                hasAttest, (unsigned long)body.length);
+    NFBDebugLog(@"[native] body head: %@",
+                bodyText.length > 220 ? [bodyText substringToIndex:220] : bodyText);
+    void (^wrapped)(NSData*, NSURLResponse*, NSError*) =
+        ^(NSData* data, NSURLResponse* response, NSError* error) {
+          long code = [response isKindOfClass:[NSHTTPURLResponse class]]
+                          ? ((NSHTTPURLResponse*)response).statusCode : -1;
+          NSString* reply = data.length
+              ? [[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding] : @"";
+          BOOL denied = [reply containsString:@"Attestation"] ||
+                        [reply containsString:@"attestation"];
+          BOOL subtaskInReply = [reply containsString:@"AttestationSubtask"] ||
+                                [reply containsString:@"LoginAttestation"];
+          NFBDebugLog(@"[native] reply http=%ld len=%lu attestation_mentioned=%d subtask=%d",
+                      code, (unsigned long)data.length, denied, subtaskInReply);
+          if (reply.length && code != 200) {
+              NFBDebugLog(@"[native] reply head: %@",
+                          reply.length > 240 ? [reply substringToIndex:240] : reply);
+          }
+          if (handler) {
+              handler(data, response, error);
+          }
+        };
+    return %orig(request, wrapped);
+}
+
+%end
+
 %ctor {
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(6 * NSEC_PER_SEC)),
                    dispatch_get_main_queue(), ^{
