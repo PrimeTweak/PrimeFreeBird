@@ -75,6 +75,18 @@ static char kNFBRespBodyKey;
         }
         NFBDebugLog(@"[resp] %@ http=%ld err=%ld body=%@", task.originalRequest.URL.path ?: @"?",
                     code, (long)error.code, body);
+        NSString* path = task.originalRequest.URL.path ?: @"";
+        BOOL isWrite = [path containsString:@"Create"] || [path containsString:@"Favorite"] ||
+                       [path containsString:@"Retweet"] || [path containsString:@"Delete"] ||
+                       [path containsString:@"note_tweet"] || [path containsString:@"Unfavorite"];
+        if (isWrite) {
+            NSMutableString* hdr = [NSMutableString string];
+            NSDictionary* fields = task.originalRequest.allHTTPHeaderFields;
+            for (NSString* k in fields) {
+                [hdr appendFormat:@"%@=%lu ", k, (unsigned long)[fields[k] length]];
+            }
+            NFBDebugLog(@"[resp] write headers %@: %@", path, hdr);
+        }
     }
     if ([self.nfbReal respondsToSelector:_cmd]) {
         [self.nfbReal URLSession:session task:task didCompleteWithError:error];
