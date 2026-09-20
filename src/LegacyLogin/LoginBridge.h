@@ -7,5 +7,6 @@
 + (void)startWithAuthToken:(NSString*)authToken
                       csrf:(NSString*)csrf
                     userID:(long long)userID
+                screenName:(NSString*)screenName
                  presenter:(UIViewController*)presenter;
 @end

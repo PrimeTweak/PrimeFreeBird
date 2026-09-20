@@ -201,6 +201,44 @@ static NSString* const kNFBCsrfCookie = @"ct0";
     }
 }
 
+// The REST identity endpoints are gone (404); the handle is read from the
+// account switcher of the logged-in page, retried a few times while it renders.
+- (void)resolveScreenNameThenBridgeWithAuthToken:(NSString*)authToken
+                                            csrf:(NSString*)csrf
+                                          userID:(long long)userID
+                                         attempt:(int)attempt {
+    NSString* js =
+        @"(function(){"
+        @"var p=document.querySelector('[data-testid=\"AppTabBar_Profile_Link\"]');"
+        @"if(p){var h=p.getAttribute('href')||'';var m=h.match(/^\\/([A-Za-z0-9_]{1,15})$/);"
+        @"if(m)return m[1];}"
+        @"var b=document.querySelector('[data-testid=\"SideNav_AccountSwitcher_Button\"]');"
+        @"if(b){var t=b.innerText||'';var mm=t.match(/@([A-Za-z0-9_]{1,15})/);if(mm)return mm[1];}"
+        @"return '';})();";
+    [self.webView evaluateJavaScript:js
+                   completionHandler:^(id result, NSError* error) {
+                     NSString* screen = [result isKindOfClass:[NSString class]] ? result : nil;
+                     NFBDebugLog(@"[weblogin] handle probe attempt=%d -> %@", attempt,
+                                 screen.length ? screen : @"(none)");
+                     if (screen.length || attempt >= 8) {
+                         [LoginBridge startWithAuthToken:authToken
+                                                    csrf:csrf
+                                                  userID:userID
+                                              screenName:screen
+                                               presenter:self];
+                         return;
+                     }
+                     dispatch_after(
+                         dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.5 * NSEC_PER_SEC)),
+                         dispatch_get_main_queue(), ^{
+                           [self resolveScreenNameThenBridgeWithAuthToken:authToken
+                                                                     csrf:csrf
+                                                                   userID:userID
+                                                                  attempt:attempt + 1];
+                         });
+                   }];
+}
+
 - (void)reload {
     self.statusLabel.text = @"Loading twitter.com/login...";
     NSURL* url = [NSURL URLWithString:@"https://twitter.com/login"];
@@ -269,8 +307,9 @@ static NSString* const kNFBCsrfCookie = @"ct0";
           self.sawAuth = YES;
           NFBDebugLog(@"[weblogin] AUTH TOKEN OBTAINED - web login reaches a session");
           [self probeSessionStores:store];
-          // Bridge the captured session into a native account: Voie B then A.
-          [LoginBridge startWithAuthToken:authVal csrf:csrfVal userID:uid presenter:self];
+          // REST account endpoints are gone (404); read the handle from the page
+          // itself, then bridge the session into a native account (Voie B then A).
+          [self resolveScreenNameThenBridgeWithAuthToken:authVal csrf:csrfVal userID:uid attempt:0];
       }
     }];
 }
