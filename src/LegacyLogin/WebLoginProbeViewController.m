@@ -148,49 +148,41 @@ static NSString* const kNFBCsrfCookie = @"ct0";
 // them. Reads the store's account count, the active one, and its credential
 // fields - shapes only, no values.
 - (void)probeAccountState {
-    for (NSString* name in @[@"TFNTwitterAccountStore",
-                             @"TFNTwitterAccountCredentialsStore",
-                             @"TFSAccountCredentialsSecretStore"]) {
-        Class cls = objc_getClass(name.UTF8String);
-        if (!cls) {
-            NFBDebugLog(@"[account] %@ absent", name);
-            continue;
-        }
-        id shared = nil;
-        for (NSString* sel in @[@"sharedInstance", @"sharedManager",
-                                @"defaultManager", @"sharedStore"]) {
-            SEL s = NSSelectorFromString(sel);
-            if ([cls respondsToSelector:s]) {
-                shared = ((id (*)(id, SEL))objc_msgSend)(cls, s);
-                if (shared) {
-                    NFBDebugLog(@"[account] %@ via +%@", name, sel);
-                    break;
-                }
-            }
-        }
-        if (!shared) {
-            NFBDebugLog(@"[account] %@ no shared accessor", name);
-            continue;
-        }
-        for (NSString* sel in @[@"accounts", @"allAccounts",
-                                @"currentAccount", @"activeAccount"]) {
-            SEL s = NSSelectorFromString(sel);
-            if (![shared respondsToSelector:s]) {
-                continue;
-            }
-            id val = ((id (*)(id, SEL))objc_msgSend)(shared, s);
-            if ([val isKindOfClass:[NSArray class]]) {
-                NFBDebugLog(@"[account] %@.%@ count=%lu", name, sel,
-                            (unsigned long)[val count]);
-            } else if (val) {
-                NSString* hasTok =
-                    [val respondsToSelector:NSSelectorFromString(@"authToken")]
-                        ? @"authToken" : @"-";
-                NFBDebugLog(@"[account] %@.%@ present, %@", name, sel, hasTok);
-            } else {
-                NFBDebugLog(@"[account] %@.%@ nil", name, sel);
-            }
-        }
+    // The store is not a singleton; it is created and asked to loadAccounts,
+    // which reads the keychain entry. This mirrors what the app does at launch
+    // and shows what the keychain actually yields.
+    Class storeCls = objc_getClass("TFNTwitterAccountStore");
+    if (!storeCls) {
+        NFBDebugLog(@"[account] store class absent");
+        return;
+    }
+    id store = [[storeCls alloc] init];
+    if (![store respondsToSelector:NSSelectorFromString(@"loadAccounts")]) {
+        NFBDebugLog(@"[account] store has no loadAccounts");
+        return;
+    }
+    id accounts =
+        ((id (*)(id, SEL))objc_msgSend)(store, NSSelectorFromString(@"loadAccounts"));
+    if (![accounts isKindOfClass:[NSArray class]]) {
+        NFBDebugLog(@"[account] loadAccounts returned %@",
+                    accounts ? NSStringFromClass([accounts class]) : @"nil");
+        return;
+    }
+    NFBDebugLog(@"[account] loadAccounts count=%lu", (unsigned long)[accounts count]);
+    for (id acct in accounts) {
+        NSString* screen =
+            [acct respondsToSelector:NSSelectorFromString(@"screenName")]
+                ? @"screenName" : @"-";
+        BOOL hasAuth =
+            [acct respondsToSelector:NSSelectorFromString(@"authToken")];
+        BOOL hasSecret =
+            [acct respondsToSelector:NSSelectorFromString(@"authTokenSecret")];
+        id tok = hasAuth ? ((id (*)(id, SEL))objc_msgSend)(
+                              acct, NSSelectorFromString(@"authToken")) : nil;
+        id sec = hasSecret ? ((id (*)(id, SEL))objc_msgSend)(
+                               acct, NSSelectorFromString(@"authTokenSecret")) : nil;
+        NFBDebugLog(@"[account] entry: %@ authToken=%lu secret=%lu", screen,
+                    (unsigned long)[tok length], (unsigned long)[sec length]);
     }
 }
 
