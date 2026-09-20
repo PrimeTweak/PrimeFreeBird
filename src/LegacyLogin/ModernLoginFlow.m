@@ -21,11 +21,79 @@ static NSString* nfbBearerValue(void) {
 static NSString* const kTaskURL =
     @"https://api.twitter.com/1.1/onboarding/task.json";
 
+// Builds and caches the app's own iOS header provider from the live user-agent
+// provider. Enumerated inits only, never a guessed one.
+static id nfbIOSHeaderProvider(void) {
+    static id provider = nil;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+        Class runner = objc_getClass("TFSTwitterServiceRunner");
+        Class hp = objc_getClass("TFNTwitterAPIBasicHeaderProvider");
+        SEL uapSel = NSSelectorFromString(@"userAgentProvider");
+        if (!runner || !hp || ![runner respondsToSelector:uapSel]) {
+            return;
+        }
+        id uap = ((id (*)(id, SEL))objc_msgSend)(runner, uapSel);
+        if (!uap) {
+            return;
+        }
+        SEL initSel = NSSelectorFromString(@"initWithUserAgentProvider:");
+        id inst = [hp alloc];
+        if (![inst respondsToSelector:initSel]) {
+            return;
+        }
+        provider = ((id (*)(id, SEL, id))objc_msgSend)(inst, initSel, uap);
+    });
+    return provider;
+}
+
+// Overwrites the request's client headers with the app's real iOS identity, so
+// the flow stops sending an Android user-agent on an iOS binary.
+static void nfbApplyIOSIdentity(NSMutableURLRequest* req) {
+    id provider = nfbIOSHeaderProvider();
+    if (!provider) {
+        NFBDebugLog(@"[flow] ios identity: header provider unavailable");
+        return;
+    }
+    NSUInteger applied = 0;
+    SEL allSel =
+        NSSelectorFromString(@"tnl_allDefaultHTTPHeaderFieldsForRequest:URLRequest:");
+    if ([provider respondsToSelector:allSel]) {
+        id headers =
+            ((id (*)(id, SEL, id, id))objc_msgSend)(provider, allSel, nil, req);
+        if ([headers isKindOfClass:[NSDictionary class]]) {
+            for (NSString* k in (NSDictionary*)headers) {
+                [req setValue:((NSDictionary*)headers)[k] forHTTPHeaderField:k];
+                applied++;
+            }
+        }
+    }
+    if (applied == 0) {
+        // Fallback to the individual accessors when the bulk method yields nothing.
+        NSArray* pairs = @[ @[ @"_tfn_userAgent", @"User-Agent" ],
+                            @[ @"_tfn_platform", @"X-Twitter-Client" ],
+                            @[ @"_tfn_clientVersion", @"X-Twitter-Client-Version" ] ];
+        for (NSArray* pair in pairs) {
+            SEL s = NSSelectorFromString(pair[0]);
+            if ([provider respondsToSelector:s]) {
+                id v = ((id (*)(id, SEL))objc_msgSend)(provider, s);
+                if ([v isKindOfClass:[NSString class]]) {
+                    [req setValue:v forHTTPHeaderField:pair[1]];
+                    applied++;
+                }
+            }
+        }
+    }
+    NSString* ua = req.allHTTPHeaderFields[@"User-Agent"] ?: @"none";
+    NSString* uaHead = ua.length > 24 ? [ua substringToIndex:24] : ua;
+    NFBDebugLog(@"[flow] ios identity: %lu header(s), UA=%@",
+                (unsigned long)applied, uaHead);
+}
+
 @interface ModernLoginFlow ()
 @property (nonatomic, copy) NSString* username;
 @property (nonatomic, copy) NSString* password;
 @property (nonatomic, copy) NSString* guestToken;
-@property (nonatomic, copy) NSString* attToken;
 @property (nonatomic, copy) NSString* csrf;
 @property (nonatomic, copy) void (^done)(NSString*, NSString*, NSString*, NSError*);
 @end
@@ -51,24 +119,90 @@ static NSString* const kTaskURL =
     }
 }
 
-// Common POST to onboarding/task with the headers the flow needs. The att token,
-// once the server issues it, is echoed back on every later call.
+// Mints a guest attestation over this exact body+url, returning the two header
+// values (or nils on failure) and their names, read from the app's constants.
+// Never crashes the flow: a missing provider or nil result yields no headers.
+- (void)attestBody:(NSData*)body
+               url:(NSURL*)url
+        completion:(void (^)(NSString* tokenValue, NSString* sigValue,
+                             NSString* tokenName, NSString* sigName))completion {
+    Class constants = objc_getClass("_TtC15XAppAttestation20AttestationConstants");
+    NSString* tokenName = nil;
+    NSString* sigName = nil;
+    if (constants) {
+        SEL hk = NSSelectorFromString(@"headerKey");
+        SEL sk = NSSelectorFromString(@"signedPayloadHeaderKey");
+        if ([constants respondsToSelector:hk]) {
+            tokenName = ((id (*)(id, SEL))objc_msgSend)(constants, hk);
+        }
+        if ([constants respondsToSelector:sk]) {
+            sigName = ((id (*)(id, SEL))objc_msgSend)(constants, sk);
+        }
+    }
+    NFBDebugLog(@"[flow] attest header names: token=%@ sig=%@",
+                tokenName ?: @"?", sigName ?: @"?");
+
+    Class providerCls = objc_getClass("_TtC15XAppAttestation24AttestationTokenProvider");
+    SEL sharedSel = NSSelectorFromString(@"sharedProvider");
+    SEL attestSel =
+        NSSelectorFromString(@"attestPayload:url:forGuestWithAccountID:completion:");
+    if (!providerCls || ![providerCls respondsToSelector:sharedSel]) {
+        NFBDebugLog(@"[flow] attest: provider class absent");
+        completion(nil, nil, tokenName, sigName);
+        return;
+    }
+    id provider = ((id (*)(id, SEL))objc_msgSend)(providerCls, sharedSel);
+    if (!provider || ![provider respondsToSelector:attestSel]) {
+        NFBDebugLog(@"[flow] attest: provider not ready");
+        completion(nil, nil, tokenName, sigName);
+        return;
+    }
+
+    NSString* accountID = self.guestToken.length ? self.guestToken : @"";
+    NFBDebugLog(@"[flow] attest: requesting for guest (account=%lu chars)",
+                (unsigned long)accountID.length);
+    void (^cb)(id) = ^(id result) {
+        NSString* headerValue = nil;
+        NSString* signedHash = nil;
+        NSString* keyID = nil;
+        if (result) {
+            SEL hv = NSSelectorFromString(@"headerValue");
+            SEL sh = NSSelectorFromString(@"signedHash");
+            SEL ki = NSSelectorFromString(@"keyID");
+            if ([result respondsToSelector:hv]) {
+                headerValue = ((id (*)(id, SEL))objc_msgSend)(result, hv);
+            }
+            if ([result respondsToSelector:sh]) {
+                signedHash = ((id (*)(id, SEL))objc_msgSend)(result, sh);
+            }
+            if ([result respondsToSelector:ki]) {
+                keyID = ((id (*)(id, SEL))objc_msgSend)(result, ki);
+            }
+        }
+        NFBDebugLog(@"[flow] attest result: keyID=%@ value_len=%lu sig_len=%lu",
+                    keyID ?: @"nil", (unsigned long)headerValue.length,
+                    (unsigned long)signedHash.length);
+        completion(headerValue, signedHash, tokenName, sigName);
+    };
+    ((void (*)(id, SEL, id, id, id, id))objc_msgSend)(provider, attestSel, body, url,
+                                                      accountID, cb);
+}
+
+// Common POST to onboarding/task: builds the request, applies the iOS identity,
+// then attaches guest attestation before sending.
 - (void)postTask:(NSDictionary*)body
            query:(NSString*)query
            stage:(NSString*)stage
           handler:(void (^)(NSDictionary* json))handler {
-    NSString* urlStr = query.length ? [NSString stringWithFormat:@"%@?%@", kTaskURL, query] : kTaskURL;
-    NSMutableURLRequest* req =
-        [NSMutableURLRequest requestWithURL:[NSURL URLWithString:urlStr]];
+    NSString* urlStr =
+        query.length ? [NSString stringWithFormat:@"%@?%@", kTaskURL, query] : kTaskURL;
+    NSURL* url = [NSURL URLWithString:urlStr];
+    NSMutableURLRequest* req = [NSMutableURLRequest requestWithURL:url];
     req.HTTPMethod = @"POST";
     [req setValue:nfbBearer() forHTTPHeaderField:@"Authorization"];
     [req setValue:@"application/json" forHTTPHeaderField:@"Content-Type"];
     [req setValue:@"yes" forHTTPHeaderField:@"X-Twitter-Active-User"];
     [req setValue:@"en" forHTTPHeaderField:@"X-Twitter-Client-Language"];
-    [req setValue:@"TwitterAndroid/10.21.1" forHTTPHeaderField:@"User-Agent"];
-    [req setValue:@"TwitterAndroid" forHTTPHeaderField:@"X-Twitter-Client"];
-    [req setValue:@"10.21.1" forHTTPHeaderField:@"X-Twitter-Client-Version"];
-    [req setValue:@"5" forHTTPHeaderField:@"X-Twitter-API-Version"];
     if (self.guestToken.length) {
         [req setValue:self.guestToken forHTTPHeaderField:@"X-Guest-Token"];
     }
@@ -77,21 +211,36 @@ static NSString* const kTaskURL =
     }
     // Shared cookie jar carries __cf_bm and guest_id set by guest activate.
     req.HTTPShouldHandleCookies = YES;
-    if (self.attToken.length) {
-        [req setValue:self.attToken forHTTPHeaderField:@"att"];
-    }
-    req.HTTPBody = [NSJSONSerialization dataWithJSONObject:body options:0 error:NULL];
+    NSData* bodyData = [NSJSONSerialization dataWithJSONObject:body options:0 error:NULL];
+    req.HTTPBody = bodyData;
+    nfbApplyIOSIdentity(req);
 
+    __weak ModernLoginFlow* weakSelf = self;
+    [self attestBody:bodyData
+                 url:url
+          completion:^(NSString* tokenValue, NSString* sigValue,
+                       NSString* tokenName, NSString* sigName) {
+            if (tokenValue.length && tokenName.length) {
+                [req setValue:tokenValue forHTTPHeaderField:tokenName];
+            }
+            if (sigValue.length && sigName.length) {
+                [req setValue:sigValue forHTTPHeaderField:sigName];
+            }
+            [weakSelf sendTask:req stage:stage handler:handler];
+          }];
+}
+
+// Sends the prepared onboarding/task request and reports the outcome. On failure
+// the full reply and the exact headers sent are logged, so the server complaint
+// and any missing header are visible at once.
+- (void)sendTask:(NSMutableURLRequest*)req
+           stage:(NSString*)stage
+         handler:(void (^)(NSDictionary* json))handler {
     NSURLSessionDataTask* task = [[NSURLSession sharedSession]
         dataTaskWithRequest:req
           completionHandler:^(NSData* data, NSURLResponse* response, NSError* error) {
             long code = [response isKindOfClass:[NSHTTPURLResponse class]]
                             ? ((NSHTTPURLResponse*)response).statusCode : -1;
-            NSString* att = [response isKindOfClass:[NSHTTPURLResponse class]]
-                ? ((NSHTTPURLResponse*)response).allHeaderFields[@"att"] : nil;
-            if (att.length) {
-                self.attToken = att;
-            }
             id json = data.length
                 ? [NSJSONSerialization JSONObjectWithData:data options:0 error:NULL] : nil;
             NSString* nextSubtask = @"?";
@@ -106,8 +255,6 @@ static NSString* const kTaskURL =
             if (error || code != 200 || ![json isKindOfClass:[NSDictionary class]]) {
                 NSString* reply = data.length
                     ? [[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding] : @"";
-                // Full reply and the request headers actually sent, so the exact
-                // server complaint and any missing header are visible at once.
                 NFBDebugLog(@"[flow] %@ FULL reply: %@", stage,
                             reply.length > 500 ? [reply substringToIndex:500] : reply);
                 NSMutableString* hdrLine = [NSMutableString string];
@@ -125,8 +272,8 @@ static NSString* const kTaskURL =
 }
 
 // Step 1: a guest token. Sent with a random ct0 as csrf and cookie, which the
-// endpoint now requires - without it the call is 401. Plain NSURLSession, the
-// bearer being the public Android one every working client uses.
+// endpoint now requires - without it the call is 401. The iOS identity is applied
+// so the guest token is minted under the same client the flow later uses.
 - (void)activateGuest {
     NFBDebugLog(@"[flow] start: activating guest");
     self.csrf = [[NSUUID UUID].UUIDString stringByReplacingOccurrencesOfString:@"-"
@@ -136,10 +283,10 @@ static NSString* const kTaskURL =
     req.HTTPMethod = @"POST";
     [req setValue:nfbBearer() forHTTPHeaderField:@"Authorization"];
     [req setValue:self.csrf forHTTPHeaderField:@"x-csrf-token"];
-    [req setValue:@"TwitterAndroid/10.21.1" forHTTPHeaderField:@"User-Agent"];
     // HTTPShouldHandleCookies keeps the jar, so __cf_bm and guest_id from this
     // reply ride along on the flow steps - Cloudflare rejects the flow without them.
     req.HTTPShouldHandleCookies = YES;
+    nfbApplyIOSIdentity(req);
     NSURLSessionDataTask* task = [[NSURLSession sharedSession]
         dataTaskWithRequest:req
           completionHandler:^(NSData* data, NSURLResponse* response, NSError* error) {
@@ -160,7 +307,6 @@ static NSString* const kTaskURL =
                 [self fail:@"guest_activate" code:code];
                 return;
             }
-            // The server may set its own ct0; if so, use it for the flow steps.
             NSString* setCookie = [response isKindOfClass:[NSHTTPURLResponse class]]
                 ? ((NSHTTPURLResponse*)response).allHeaderFields[@"Set-Cookie"] : nil;
             NFBDebugLog(@"[flow] guest set-cookie: %@", setCookie ?: @"none");
@@ -170,26 +316,18 @@ static NSString* const kTaskURL =
     [task resume];
 }
 
-// Step 2: open the login flow, get the first flow_token.
+// Step 2: open the login flow, get the first flow_token. A clean login body -
+// no signup referrer, splash_screen start - so the shape matches a real login.
 - (void)startFlow {
     NSDictionary* body = @{
         @"flow_token" : [NSNull null],
         @"input_flow_data" : @{
-            @"country_code" : [NSNull null],
             @"flow_context" : @{
-                @"referrer_context" : @{
-                    @"referral_details" : @"utm_source=google-play&utm_medium=organic",
-                    @"referrer_url" : @""
-                },
-                @"start_location" : @{@"location" : @"deeplink"}
-            },
-            @"requested_variant" : [NSNull null],
-            @"target_user_id" : @0
+                @"start_location" : @{@"location" : @"splash_screen"}
+            }
         }
     };
-    [self postTask:body
-             query:@"flow_name=login&api_version=1&known_device_token=&sim_country_code=us"
-             stage:@"start_flow"
+    [self postTask:body query:@"flow_name=login" stage:@"start_flow"
            handler:^(NSDictionary* json) {
              [self jsInstrumentation:json[@"flow_token"]];
            }];
