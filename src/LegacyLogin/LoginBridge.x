@@ -29,7 +29,7 @@ static NSString* gInjectCsrf = nil;
 
 // Adds the web session cookie + csrf to an app API request that lacks them, so
 // the server authenticates it by cookie instead of the missing OAuth signature.
-static NSURLRequest* nfbBridgeInject(NSURLRequest* req) {
+static NSURLRequest* nfbBridgeInject(NSURLRequest* req, NSString* via) {
     if (!gInjectSession || !gInjectAuthToken.length || !req) {
         return req;
     }
@@ -46,7 +46,7 @@ static NSURLRequest* nfbBridgeInject(NSURLRequest* req) {
     NSString* merged = cookie.length ? [NSString stringWithFormat:@"%@; %@", cookie, add] : add;
     [m setValue:merged forHTTPHeaderField:@"Cookie"];
     [m setValue:gInjectCsrf forHTTPHeaderField:@"x-csrf-token"];
-    NFBDebugLog(@"[bridge:A] session injected into %@", req.URL.path ?: @"?");
+    NFBDebugLog(@"[bridge:A] injected via %@ -> %@", via, req.URL.path ?: @"?");
     return m;
 }
 
@@ -55,7 +55,22 @@ static NSURLRequest* nfbBridgeInject(NSURLRequest* req) {
 - (NSURLSessionDataTask*)dataTaskWithRequest:(NSURLRequest*)request
                            completionHandler:(void (^)(NSData*, NSURLResponse*, NSError*))handler {
     if (gInjectSession && nfbBridgeIsTwitterAPI(request.URL.absoluteString)) {
-        return %orig(nfbBridgeInject(request), handler);
+        return %orig(nfbBridgeInject(request, @"dataTaskCH"), handler);
+    }
+    return %orig;
+}
+
+- (NSURLSessionDataTask*)dataTaskWithRequest:(NSURLRequest*)request {
+    if (gInjectSession && nfbBridgeIsTwitterAPI(request.URL.absoluteString)) {
+        return %orig(nfbBridgeInject(request, @"dataTask"));
+    }
+    return %orig;
+}
+
+- (NSURLSessionUploadTask*)uploadTaskWithRequest:(NSURLRequest*)request
+                                        fromData:(NSData*)bodyData {
+    if (gInjectSession && nfbBridgeIsTwitterAPI(request.URL.absoluteString)) {
+        return %orig(nfbBridgeInject(request, @"uploadTask"), bodyData);
     }
     return %orig;
 }
