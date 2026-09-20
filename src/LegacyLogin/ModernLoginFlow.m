@@ -72,6 +72,7 @@ static NSString* const kTaskURL =
     [req setValue:@"application/json" forHTTPHeaderField:@"Content-Type"];
     [req setValue:@"yes" forHTTPHeaderField:@"X-Twitter-Active-User"];
     [req setValue:@"en" forHTTPHeaderField:@"X-Twitter-Client-Language"];
+    [req setValue:@"TwitterAndroid/10.21.1" forHTTPHeaderField:@"User-Agent"];
     if (self.guestToken.length) {
         [req setValue:self.guestToken forHTTPHeaderField:@"X-Guest-Token"];
     }
@@ -150,6 +151,7 @@ static NSString* const kTaskURL =
     [req setValue:self.csrf forHTTPHeaderField:@"x-csrf-token"];
     [req setValue:[NSString stringWithFormat:@"ct0=%@", self.csrf]
         forHTTPHeaderField:@"Cookie"];
+    [req setValue:@"TwitterAndroid/10.21.1" forHTTPHeaderField:@"User-Agent"];
     NSURLSessionDataTask* task = [[NSURLSession sharedSession]
         dataTaskWithRequest:req
           completionHandler:^(NSData* data, NSURLResponse* response, NSError* error) {
@@ -181,13 +183,20 @@ static NSString* const kTaskURL =
     NSDictionary* body = @{
         @"flow_token" : [NSNull null],
         @"input_flow_data" : @{
+            @"country_code" : [NSNull null],
             @"flow_context" : @{
-                @"start_location" : @{@"location" : @"manual_link"}
-            }
+                @"referrer_context" : @{
+                    @"referral_details" : @"utm_source=google-play&utm_medium=organic",
+                    @"referrer_url" : @""
+                },
+                @"start_location" : @{@"location" : @"deeplink"}
+            },
+            @"requested_variant" : [NSNull null],
+            @"target_user_id" : @0
         }
     };
     [self postTask:body
-             query:@"flow_name=login"
+             query:@"flow_name=login&api_version=1&known_device_token=&sim_country_code=us"
              stage:@"start_flow"
            handler:^(NSDictionary* json) {
              [self jsInstrumentation:json[@"flow_token"]];
