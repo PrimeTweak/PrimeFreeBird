@@ -90,6 +90,35 @@ static void nfbApplyIOSIdentity(NSMutableURLRequest* req) {
                 (unsigned long)applied, uaHead);
 }
 
+// Ensures the shared attestation provider has a configuration. On a pre-login
+// screen the app may not have set one yet, which makes it bail instantly; the
+// app's own factory builds a working one, and it is only set when missing.
+static void nfbEnsureAttestConfig(id provider) {
+    SEL cfgSel = NSSelectorFromString(@"configuration");
+    id cfg = [provider respondsToSelector:cfgSel]
+                 ? ((id (*)(id, SEL))objc_msgSend)(provider, cfgSel) : nil;
+    if (cfg) {
+        NFBDebugLog(@"[flow] attest config: present");
+        return;
+    }
+    Class factory = objc_getClass(
+        "_TtC14T1TwitterSwift46T1AttestationTokenProviderConfigurationFactory");
+    SEL makeSel = NSSelectorFromString(@"make");
+    SEL setSel = NSSelectorFromString(@"setConfiguration:");
+    if (!factory || ![factory respondsToSelector:makeSel] ||
+        ![provider respondsToSelector:setSel]) {
+        NFBDebugLog(@"[flow] attest config: nil, cannot build");
+        return;
+    }
+    id built = ((id (*)(id, SEL))objc_msgSend)(factory, makeSel);
+    if (!built) {
+        NFBDebugLog(@"[flow] attest config: factory returned nil");
+        return;
+    }
+    ((void (*)(id, SEL, id))objc_msgSend)(provider, setSel, built);
+    NFBDebugLog(@"[flow] attest config: set from factory");
+}
+
 @interface ModernLoginFlow ()
 @property (nonatomic, copy) NSString* username;
 @property (nonatomic, copy) NSString* password;
@@ -144,24 +173,32 @@ static void nfbApplyIOSIdentity(NSMutableURLRequest* req) {
 
     Class providerCls = objc_getClass("_TtC15XAppAttestation24AttestationTokenProvider");
     SEL sharedSel = NSSelectorFromString(@"sharedProvider");
-    SEL attestSel =
-        NSSelectorFromString(@"attestPayload:url:forGuestWithAccountID:completion:");
     if (!providerCls || ![providerCls respondsToSelector:sharedSel]) {
         NFBDebugLog(@"[flow] attest: provider class absent");
         completion(nil, nil, tokenName, sigName);
         return;
     }
     id provider = ((id (*)(id, SEL))objc_msgSend)(providerCls, sharedSel);
-    if (!provider || ![provider respondsToSelector:attestSel]) {
-        NFBDebugLog(@"[flow] attest: provider not ready");
+    if (!provider) {
+        NFBDebugLog(@"[flow] attest: no shared provider");
+        completion(nil, nil, tokenName, sigName);
+        return;
+    }
+    nfbEnsureAttestConfig(provider);
+
+    NSString* accountID = self.guestToken.length ? self.guestToken : @"";
+    SEL genSel = NSSelectorFromString(@"generateTokenForGuestWithAccountID:completion:");
+    SEL attestSel =
+        NSSelectorFromString(@"attestPayload:url:forGuestWithAccountID:completion:");
+    if (![provider respondsToSelector:attestSel]) {
+        NFBDebugLog(@"[flow] attest: attestPayload absent");
         completion(nil, nil, tokenName, sigName);
         return;
     }
 
-    NSString* accountID = self.guestToken.length ? self.guestToken : @"";
-    NFBDebugLog(@"[flow] attest: requesting for guest (account=%lu chars)",
-                (unsigned long)accountID.length);
-    void (^cb)(id) = ^(id result) {
+    // Reads the signed result and hands back the strongest token available: the
+    // per-request header value, else the primed base token.
+    void (^afterAttest)(NSString*, id) = ^(NSString* baseToken, id result) {
         NSString* headerValue = nil;
         NSString* signedHash = nil;
         NSString* keyID = nil;
@@ -179,13 +216,33 @@ static void nfbApplyIOSIdentity(NSMutableURLRequest* req) {
                 keyID = ((id (*)(id, SEL))objc_msgSend)(result, ki);
             }
         }
-        NFBDebugLog(@"[flow] attest result: keyID=%@ value_len=%lu sig_len=%lu",
+        NSString* tokenValue = headerValue.length ? headerValue : baseToken;
+        NFBDebugLog(@"[flow] attest result: keyID=%@ value_len=%lu sig_len=%lu base_len=%lu",
                     keyID ?: @"nil", (unsigned long)headerValue.length,
-                    (unsigned long)signedHash.length);
-        completion(headerValue, signedHash, tokenName, sigName);
+                    (unsigned long)signedHash.length, (unsigned long)baseToken.length);
+        completion(tokenValue, signedHash, tokenName, sigName);
     };
-    ((void (*)(id, SEL, id, id, id, id))objc_msgSend)(provider, attestSel, body, url,
-                                                      accountID, cb);
+
+    void (^runAttest)(NSString*) = ^(NSString* baseToken) {
+        void (^attestCb)(id) = ^(id result) {
+            afterAttest(baseToken, result);
+        };
+        ((void (*)(id, SEL, id, id, id, id))objc_msgSend)(provider, attestSel, body,
+                                                          url, accountID, attestCb);
+    };
+
+    // Prime the provider with a base guest token first, then sign the request.
+    if ([provider respondsToSelector:genSel]) {
+        NFBDebugLog(@"[flow] attest: generating base token for guest");
+        void (^genCb)(id) = ^(id token) {
+            NSString* base = [token isKindOfClass:[NSString class]] ? token : nil;
+            NFBDebugLog(@"[flow] attest base token len=%lu", (unsigned long)base.length);
+            runAttest(base);
+        };
+        ((void (*)(id, SEL, id, id))objc_msgSend)(provider, genSel, accountID, genCb);
+    } else {
+        runAttest(nil);
+    }
 }
 
 // Common POST to onboarding/task: builds the request, applies the iOS identity,

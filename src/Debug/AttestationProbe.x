@@ -173,37 +173,6 @@ static void nfbReportReply(NSData* data, NSURLResponse* response, NSString* tag)
 
 %end
 
-// Asks Apple directly whether this binary can produce an App Attest key. On a
-// re-signed sideloaded app, key generation fails - the root of the login wall.
-static void nfbAppAttestRootCheck(void) {
-    Class svc = objc_getClass("DCAppAttestService");
-    SEL sharedSel = NSSelectorFromString(@"sharedService");
-    if (!svc || ![svc respondsToSelector:sharedSel]) {
-        NFBDebugLog(@"[attest] DCAppAttestService unavailable");
-        return;
-    }
-    id shared = ((id (*)(id, SEL))objc_msgSend)(svc, sharedSel);
-    SEL supSel = NSSelectorFromString(@"isSupported");
-    BOOL supported = [shared respondsToSelector:supSel] &&
-                     ((BOOL (*)(id, SEL))objc_msgSend)(shared, supSel);
-    NFBDebugLog(@"[attest] App Attest isSupported=%d", supported ? 1 : 0);
-    SEL genSel = NSSelectorFromString(@"generateKeyWithCompletionHandler:");
-    if (![shared respondsToSelector:genSel]) {
-        NFBDebugLog(@"[attest] generateKey selector absent");
-        return;
-    }
-    void (^cb)(NSString*, NSError*) = ^(NSString* keyId, NSError* error) {
-        if (keyId.length) {
-            NFBDebugLog(@"[attest] App Attest KEY GENERATED len=%lu - works",
-                        (unsigned long)keyId.length);
-        } else {
-            NFBDebugLog(@"[attest] App Attest key FAILED: %@ code=%ld",
-                        error.domain ?: @"?", (long)error.code);
-        }
-    };
-    ((void (*)(id, SEL, id))objc_msgSend)(shared, genSel, cb);
-}
-
 %ctor {
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(6 * NSEC_PER_SEC)),
                    dispatch_get_main_queue(), ^{
@@ -212,6 +181,5 @@ static void nfbAppAttestRootCheck(void) {
       }
       nfbAttestInspectProvider();
       nfbAttestInspectSubtask();
-      nfbAppAttestRootCheck();
     });
 }
