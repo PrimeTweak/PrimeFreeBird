@@ -77,39 +77,6 @@ static NSString* const kTaskURL =
     }
     // Shared cookie jar carries __cf_bm and guest_id set by guest activate.
     req.HTTPShouldHandleCookies = YES;
-    // Probe: capture the real app bearer the first time, so if an onboarding step
-    // returns 401 the correct bearer is already in the log for the next fix.
-    static dispatch_once_t onceBearer;
-    dispatch_once(&onceBearer, ^{
-      // The iOS header provider dresses a request with the app's real iOS headers
-      // (bearer, user-agent, platform). Capture them to see the true iOS bearer.
-      Class hp = objc_getClass("TFNTwitterAPIBasicHeaderProvider");
-      if (!hp) {
-          NFBDebugLog(@"[flow] iOS header provider absent");
-          return;
-      }
-      id provider = [[hp alloc] init];
-      SEL sel = @selector(tnl_allDefaultHTTPHeaderFieldsForRequest:URLRequest:);
-      if (![provider respondsToSelector:sel]) {
-          NFBDebugLog(@"[flow] provider has no default-headers selector");
-          return;
-      }
-      NSURLRequest* probe = [NSURLRequest requestWithURL:[NSURL URLWithString:kTaskURL]];
-      id hdrs = ((id (*)(id, SEL, id, id))objc_msgSend)(provider, sel, nil, probe);
-      if ([hdrs isKindOfClass:[NSDictionary class]]) {
-          NSString* auth = hdrs[@"Authorization"] ?: hdrs[@"authorization"];
-          NFBDebugLog(@"[flow] iOS headers: %lu fields, bearer len=%lu head=%@",
-                      (unsigned long)[hdrs count], (unsigned long)[auth length],
-                      [auth length] > 24 ? [auth substringToIndex:24] : (auth ?: @"nil"));
-          for (NSString* k in hdrs) {
-              NFBDebugLog(@"[flow] iOS hdr %@ = len %lu", k,
-                          (unsigned long)[hdrs[k] length]);
-          }
-      } else {
-          NFBDebugLog(@"[flow] provider returned %@",
-                      hdrs ? NSStringFromClass([hdrs class]) : @"nil");
-      }
-    });
     if (self.attToken.length) {
         [req setValue:self.attToken forHTTPHeaderField:@"att"];
     }
