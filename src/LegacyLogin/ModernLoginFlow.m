@@ -81,9 +81,9 @@ static NSString* const kTaskURL =
     }
     if (self.csrf.length) {
         [req setValue:self.csrf forHTTPHeaderField:@"x-csrf-token"];
-        [req setValue:[NSString stringWithFormat:@"ct0=%@", self.csrf]
-            forHTTPHeaderField:@"Cookie"];
     }
+    // Shared cookie jar carries __cf_bm and guest_id set by guest activate.
+    req.HTTPShouldHandleCookies = YES;
     // Probe: capture the real app bearer the first time, so if an onboarding step
     // returns 401 the correct bearer is already in the log for the next fix.
     static dispatch_once_t onceBearer;
@@ -158,9 +158,10 @@ static NSString* const kTaskURL =
     req.HTTPMethod = @"POST";
     [req setValue:nfbBearer() forHTTPHeaderField:@"Authorization"];
     [req setValue:self.csrf forHTTPHeaderField:@"x-csrf-token"];
-    [req setValue:[NSString stringWithFormat:@"ct0=%@", self.csrf]
-        forHTTPHeaderField:@"Cookie"];
     [req setValue:@"TwitterAndroid/10.21.1" forHTTPHeaderField:@"User-Agent"];
+    // HTTPShouldHandleCookies keeps the jar, so __cf_bm and guest_id from this
+    // reply ride along on the flow steps - Cloudflare rejects the flow without them.
+    req.HTTPShouldHandleCookies = YES;
     NSURLSessionDataTask* task = [[NSURLSession sharedSession]
         dataTaskWithRequest:req
           completionHandler:^(NSData* data, NSURLResponse* response, NSError* error) {
