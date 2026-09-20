@@ -2,6 +2,7 @@
 #import <WebKit/WebKit.h>
 #import <Security/Security.h>
 #import <objc/runtime.h>
+#import <objc/message.h>
 #import "Debug/NFBDebugger.h"
 
 // The cookies that prove a real session: the auth token and the CSRF token the
@@ -140,6 +141,57 @@ static NSString* const kNFBCsrfCookie = @"ct0";
                      ?: objc_getClass("TFNTwitterAccountStore");
     NFBDebugLog(@"[store] TFNTwitterAccount=%d accountsManager=%d",
                 accountCls != nil, storeCls != nil);
+    [self probeAccountState];
+}
+
+// Cookies are present, so the block is higher up: no account is mounted from
+// them. Reads the store's account count, the active one, and its credential
+// fields - shapes only, no values.
+- (void)probeAccountState {
+    for (NSString* name in @[@"TFNTwitterAccountStore",
+                             @"TFNTwitterAccountCredentialsStore",
+                             @"TFSAccountCredentialsSecretStore"]) {
+        Class cls = objc_getClass(name.UTF8String);
+        if (!cls) {
+            NFBDebugLog(@"[account] %@ absent", name);
+            continue;
+        }
+        id shared = nil;
+        for (NSString* sel in @[@"sharedInstance", @"sharedManager",
+                                @"defaultManager", @"sharedStore"]) {
+            SEL s = NSSelectorFromString(sel);
+            if ([cls respondsToSelector:s]) {
+                shared = ((id (*)(id, SEL))objc_msgSend)(cls, s);
+                if (shared) {
+                    NFBDebugLog(@"[account] %@ via +%@", name, sel);
+                    break;
+                }
+            }
+        }
+        if (!shared) {
+            NFBDebugLog(@"[account] %@ no shared accessor", name);
+            continue;
+        }
+        for (NSString* sel in @[@"accounts", @"allAccounts",
+                                @"currentAccount", @"activeAccount"]) {
+            SEL s = NSSelectorFromString(sel);
+            if (![shared respondsToSelector:s]) {
+                continue;
+            }
+            id val = ((id (*)(id, SEL))objc_msgSend)(shared, s);
+            if ([val isKindOfClass:[NSArray class]]) {
+                NFBDebugLog(@"[account] %@.%@ count=%lu", name, sel,
+                            (unsigned long)[val count]);
+            } else if (val) {
+                NSString* hasTok =
+                    [val respondsToSelector:NSSelectorFromString(@"authToken")]
+                        ? @"authToken" : @"-";
+                NFBDebugLog(@"[account] %@.%@ present, %@", name, sel, hasTok);
+            } else {
+                NFBDebugLog(@"[account] %@.%@ nil", name, sel);
+            }
+        }
+    }
 }
 
 - (void)userContentController:(WKUserContentController*)controller
