@@ -1,5 +1,22 @@
 #import "ModernLoginFlow.h"
 #import "Debug/NFBDebugger.h"
+#import <objc/runtime.h>
+#import <objc/message.h>
+
+// The app's own command stack, which carries the correct app bearer. Reused so
+// guest activate is authorized exactly as the app authorizes it.
+static id nfbLoader(void) {
+    return ((id (*)(id, SEL))objc_msgSend)(
+        objc_getClass("TFSTwitterServiceRunner"), @selector(APICommandLoader));
+}
+static id nfbContext(void) {
+    return ((id (*)(id, SEL))objc_msgSend)(
+        objc_getClass("TFSTwitterServiceRunner"), @selector(APICommandContext));
+}
+static id nfbBuilder(const char* name) {
+    Class cls = objc_getClass(name);
+    return cls ? [[cls alloc] init] : nil;
+}
 
 // The public app bearer, split so it is not one grep-able literal. This is the
 // well-known unauthenticated bearer every Twitter client sends.
@@ -57,6 +74,21 @@ static NSString* const kTaskURL =
     if (self.guestToken.length) {
         [req setValue:self.guestToken forHTTPHeaderField:@"X-Guest-Token"];
     }
+    // Probe: capture the real app bearer the first time, so if an onboarding step
+    // returns 401 the correct bearer is already in the log for the next fix.
+    static dispatch_once_t onceBearer;
+    dispatch_once(&onceBearer, ^{
+      id ctx = nfbContext();
+      if ([ctx respondsToSelector:@selector(authorizationHeaders)]) {
+          id hdrs = ((id (*)(id, SEL))objc_msgSend)(ctx, @selector(authorizationHeaders));
+          id auth = [hdrs isKindOfClass:[NSDictionary class]] ? hdrs[@"Authorization"] : nil;
+          NFBDebugLog(@"[flow] app bearer len=%lu head=%@",
+                      (unsigned long)[auth length],
+                      [auth length] > 24 ? [auth substringToIndex:24] : (auth ?: @"nil"));
+      } else {
+          NFBDebugLog(@"[flow] context has no authorizationHeaders accessor");
+      }
+    });
     if (self.attToken.length) {
         [req setValue:self.attToken forHTTPHeaderField:@"att"];
     }
@@ -98,31 +130,48 @@ static NSString* const kTaskURL =
     [task resume];
 }
 
-// Step 1: a guest token, via the same guest activate endpoint the app uses.
+// Step 1: a guest token via the app's own command, so the bearer is the app's
+// and the call is authorized. The response carries guestToken.
 - (void)activateGuest {
-    NFBDebugLog(@"[flow] start: activating guest");
-    NSMutableURLRequest* req = [NSMutableURLRequest
-        requestWithURL:[NSURL URLWithString:@"https://api.twitter.com/1.1/guest/activate.json"]];
-    req.HTTPMethod = @"POST";
-    [req setValue:nfbBearer() forHTTPHeaderField:@"Authorization"];
-    NSURLSessionDataTask* task = [[NSURLSession sharedSession]
-        dataTaskWithRequest:req
-          completionHandler:^(NSData* data, NSURLResponse* response, NSError* error) {
-            long code = [response isKindOfClass:[NSHTTPURLResponse class]]
-                            ? ((NSHTTPURLResponse*)response).statusCode : -1;
-            id json = data.length
-                ? [NSJSONSerialization JSONObjectWithData:data options:0 error:NULL] : nil;
-            NSString* gt = [json isKindOfClass:[NSDictionary class]] ? json[@"guest_token"] : nil;
-            NFBDebugLog(@"[flow] guest activate http=%ld token_len=%lu", code,
-                        (unsigned long)gt.length);
-            if (!gt.length) {
-                [self fail:@"guest_activate" code:code];
-                return;
-            }
-            self.guestToken = gt;
-            [self startFlow];
-          }];
-    [task resume];
+    NFBDebugLog(@"[flow] start: activating guest via internal command");
+    Class cmdCls = objc_getClass("TFSTwitterAPIGuestActivateCommand");
+    if (!cmdCls || !nfbLoader() || !nfbContext()) {
+        NFBDebugLog(@"[flow] guest command classes missing cmd=%d loader=%d ctx=%d",
+                    cmdCls != nil, nfbLoader() != nil, nfbContext() != nil);
+        [self fail:@"guest_activate_classes" code:0];
+        return;
+    }
+    __weak typeof(self) ws = self;
+    void (^completion)(BOOL, id, id) = ^(BOOL ok, id resp, id err) {
+      dispatch_async(dispatch_get_main_queue(), ^{
+        NSString* gt = nil;
+        if ([resp respondsToSelector:@selector(guestToken)]) {
+            gt = ((id (*)(id, SEL))objc_msgSend)(resp, @selector(guestToken));
+        }
+        NFBDebugLog(@"[flow] guest activate ok=%d token_len=%lu", ok,
+                    (unsigned long)gt.length);
+        if (!gt.length) {
+            [ws fail:@"guest_activate" code:ok ? 0 : 401];
+            return;
+        }
+        ws.guestToken = gt;
+        [ws startFlow];
+      });
+    };
+    @try {
+        SEL sel = @selector(initWithContext:responseModelBuilder:completionBlock:);
+        id cmd = ((id (*)(id, SEL, id, id, id))objc_msgSend)(
+            [cmdCls alloc], sel, nfbContext(),
+            nfbBuilder("TFSTwitterGuestActivateResponseBuilder"), [completion copy]);
+        if (!cmd) {
+            [self fail:@"guest_activate_build" code:0];
+            return;
+        }
+        ((void (*)(id, SEL, id))objc_msgSend)(nfbLoader(), @selector(startCommand:), cmd);
+    } @catch (NSException* ex) {
+        NFBDebugLog(@"[flow] guest activate threw: %@", ex.reason);
+        [self fail:@"guest_activate_exception" code:0];
+    }
 }
 
 // Step 2: open the login flow, get the first flow_token.
