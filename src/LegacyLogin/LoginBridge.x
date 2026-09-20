@@ -46,6 +46,9 @@ static NSURLRequest* nfbBridgeInject(NSURLRequest* req, NSString* via) {
     NSString* merged = cookie.length ? [NSString stringWithFormat:@"%@; %@", cookie, add] : add;
     [m setValue:merged forHTTPHeaderField:@"Cookie"];
     [m setValue:gInjectCsrf forHTTPHeaderField:@"x-csrf-token"];
+    // Replace the shell account's invalid OAuth with the public bearer, so the
+    // server can authenticate by cookie the way the web client does.
+    [m setValue:nfbBridgeBearer() forHTTPHeaderField:@"Authorization"];
     NFBDebugLog(@"[bridge:A] injected via %@ -> %@", via, req.URL.path ?: @"?");
     return m;
 }
