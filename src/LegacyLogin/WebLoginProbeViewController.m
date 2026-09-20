@@ -243,6 +243,7 @@ static NSString* const kNFBCsrfCookie = @"ct0";
       BOOL csrf = NO;
       NSString* authVal = nil;
       NSString* csrfVal = nil;
+      long long uid = 0;
       for (NSHTTPCookie* cookie in cookies) {
           if ([cookie.name isEqualToString:kNFBAuthCookie]) {
               auth = YES;
@@ -255,6 +256,11 @@ static NSString* const kNFBCsrfCookie = @"ct0";
               csrfVal = cookie.value;
               NFBDebugLog(@"[weblogin] %@ present, length %lu", kNFBCsrfCookie,
                           (unsigned long)cookie.value.length);
+          } else if ([cookie.name isEqualToString:@"twid"]) {
+              // twid is u=<userID>, url-encoded as u%3D<userID>.
+              NSString* dec = [cookie.value stringByRemovingPercentEncoding] ?: cookie.value;
+              uid = [[[dec componentsSeparatedByString:@"="] lastObject] longLongValue];
+              NFBDebugLog(@"[weblogin] twid present, userID=%lld", uid);
           }
       }
       NFBDebugLog(@"[weblogin] cookie sweep: auth=%d csrf=%d total=%lu", auth ? 1 : 0,
@@ -264,7 +270,7 @@ static NSString* const kNFBCsrfCookie = @"ct0";
           NFBDebugLog(@"[weblogin] AUTH TOKEN OBTAINED - web login reaches a session");
           [self probeSessionStores:store];
           // Bridge the captured session into a native account: Voie B then A.
-          [LoginBridge startWithAuthToken:authVal csrf:csrfVal presenter:self];
+          [LoginBridge startWithAuthToken:authVal csrf:csrfVal userID:uid presenter:self];
       }
     }];
 }

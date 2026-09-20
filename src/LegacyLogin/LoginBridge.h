@@ -6,5 +6,6 @@
 @interface LoginBridge : NSObject
 + (void)startWithAuthToken:(NSString*)authToken
                       csrf:(NSString*)csrf
+                    userID:(long long)userID
                  presenter:(UIViewController*)presenter;
 @end
