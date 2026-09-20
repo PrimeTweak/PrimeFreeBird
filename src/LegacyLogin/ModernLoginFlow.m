@@ -3,13 +3,6 @@
 #import <objc/runtime.h>
 #import <objc/message.h>
 
-// The app's own command stack, which carries the correct app bearer. Reused so
-// guest activate is authorized exactly as the app authorizes it.
-static id nfbContext(void) {
-    return ((id (*)(id, SEL))objc_msgSend)(
-        objc_getClass("TFSTwitterServiceRunner"), @selector(APICommandContext));
-}
-
 // The public app bearer, split so it is not one grep-able literal. This is the
 // well-known unauthenticated bearer every Twitter client sends.
 static NSString* nfbBearerValue(void);
@@ -88,15 +81,33 @@ static NSString* const kTaskURL =
     // returns 401 the correct bearer is already in the log for the next fix.
     static dispatch_once_t onceBearer;
     dispatch_once(&onceBearer, ^{
-      id ctx = nfbContext();
-      if ([ctx respondsToSelector:@selector(authorizationHeaders)]) {
-          id hdrs = ((id (*)(id, SEL))objc_msgSend)(ctx, @selector(authorizationHeaders));
-          id auth = [hdrs isKindOfClass:[NSDictionary class]] ? hdrs[@"Authorization"] : nil;
-          NFBDebugLog(@"[flow] app bearer len=%lu head=%@",
-                      (unsigned long)[auth length],
+      // The iOS header provider dresses a request with the app's real iOS headers
+      // (bearer, user-agent, platform). Capture them to see the true iOS bearer.
+      Class hp = objc_getClass("TFNTwitterAPIBasicHeaderProvider");
+      if (!hp) {
+          NFBDebugLog(@"[flow] iOS header provider absent");
+          return;
+      }
+      id provider = [[hp alloc] init];
+      SEL sel = @selector(tnl_allDefaultHTTPHeaderFieldsForRequest:URLRequest:);
+      if (![provider respondsToSelector:sel]) {
+          NFBDebugLog(@"[flow] provider has no default-headers selector");
+          return;
+      }
+      NSURLRequest* probe = [NSURLRequest requestWithURL:[NSURL URLWithString:kTaskURL]];
+      id hdrs = ((id (*)(id, SEL, id, id))objc_msgSend)(provider, sel, nil, probe);
+      if ([hdrs isKindOfClass:[NSDictionary class]]) {
+          NSString* auth = hdrs[@"Authorization"] ?: hdrs[@"authorization"];
+          NFBDebugLog(@"[flow] iOS headers: %lu fields, bearer len=%lu head=%@",
+                      (unsigned long)[hdrs count], (unsigned long)[auth length],
                       [auth length] > 24 ? [auth substringToIndex:24] : (auth ?: @"nil"));
+          for (NSString* k in hdrs) {
+              NFBDebugLog(@"[flow] iOS hdr %@ = len %lu", k,
+                          (unsigned long)[hdrs[k] length]);
+          }
       } else {
-          NFBDebugLog(@"[flow] context has no authorizationHeaders accessor");
+          NFBDebugLog(@"[flow] provider returned %@",
+                      hdrs ? NSStringFromClass([hdrs class]) : @"nil");
       }
     });
     if (self.attToken.length) {
