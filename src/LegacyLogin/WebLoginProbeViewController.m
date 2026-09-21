@@ -416,6 +416,50 @@ static UIImage* nfbLoginBirdImage(CGSize size) {
                      }];
 }
 
+// Full-screen cover shown the moment the session is captured, so the web -> native
+// handoff reads as a deliberate step, not a frozen page. It rides along until the
+// account switch dismisses this screen.
+- (void)showSwitchingOverlay {
+    UIView* overlay = [[UIView alloc] initWithFrame:self.view.bounds];
+    overlay.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+    overlay.backgroundColor = [UIColor systemBackgroundColor];
+
+    UIImageView* bird =
+        [[UIImageView alloc] initWithImage:nfbLoginBirdImage(CGSizeMake(48, 48))];
+    bird.tintColor = [UIColor colorWithRed:0.114 green:0.631 blue:0.949 alpha:1.0];
+    bird.contentMode = UIViewContentModeScaleAspectFit;
+    bird.translatesAutoresizingMaskIntoConstraints = NO;
+
+    UILabel* label = [[UILabel alloc] init];
+    label.text = @"Signing you in…";
+    label.font = [UIFont systemFontOfSize:17 weight:UIFontWeightSemibold];
+    label.textColor = [UIColor labelColor];
+    label.translatesAutoresizingMaskIntoConstraints = NO;
+
+    UIActivityIndicatorView* spin = [[UIActivityIndicatorView alloc]
+        initWithActivityIndicatorStyle:UIActivityIndicatorViewStyleMedium];
+    spin.color = [UIColor secondaryLabelColor];
+    spin.translatesAutoresizingMaskIntoConstraints = NO;
+    [spin startAnimating];
+
+    UIStackView* stack =
+        [[UIStackView alloc] initWithArrangedSubviews:@[ bird, label, spin ]];
+    stack.axis = UILayoutConstraintAxisVertical;
+    stack.alignment = UIStackViewAlignmentCenter;
+    stack.spacing = 16;
+    [stack setCustomSpacing:20 afterView:label];
+    stack.translatesAutoresizingMaskIntoConstraints = NO;
+    [overlay addSubview:stack];
+
+    [self.view addSubview:overlay];
+    [NSLayoutConstraint activateConstraints:@[
+        [bird.widthAnchor constraintEqualToConstant:48],
+        [bird.heightAnchor constraintEqualToConstant:48],
+        [stack.centerXAnchor constraintEqualToAnchor:overlay.centerXAnchor],
+        [stack.centerYAnchor constraintEqualToAnchor:overlay.centerYAnchor]
+    ]];
+}
+
 - (void)reload {
     [self.spinner startAnimating];
     self.statusLabel.hidden = YES;
@@ -498,6 +542,7 @@ static UIImage* nfbLoginBirdImage(CGSize size) {
       if (auth && !self.sawAuth) {
           self.sawAuth = YES;
           NFBDebugLog(@"[weblogin] AUTH TOKEN OBTAINED - web login reaches a session");
+          [self showSwitchingOverlay];
           // Seed the shared cookie jar with this session so the read injection and
           // WebCreateTweet.x (writes) both draw on the one session, and it survives
           // relaunch. "Delete web session" wipes this same jar.
