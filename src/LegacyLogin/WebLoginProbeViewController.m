@@ -13,9 +13,12 @@ static NSString* const kNFBCsrfCookie = @"ct0";
 
 @interface WebLoginProbeViewController () <WKNavigationDelegate, WKScriptMessageHandler>
 @property (nonatomic, strong) WKWebView* webView;
+@property (nonatomic, strong) UIView* headerView;
+@property (nonatomic, strong) UIActivityIndicatorView* spinner;
 @property (nonatomic, strong) UILabel* statusLabel;
 @property (nonatomic, assign) BOOL sawAuth;
 @property (nonatomic, assign) BOOL asRoot;
+@property (nonatomic, assign) BOOL didStartInitialLoad;
 @end
 
 @implementation WebLoginProbeViewController
@@ -36,29 +39,9 @@ static NSString* const kNFBCsrfCookie = @"ct0";
 
 - (void)viewDidLoad {
     [super viewDidLoad];
-    self.title = @"Web login";
     self.view.backgroundColor = [UIColor systemBackgroundColor];
-    if (!self.asRoot) {
-        self.navigationItem.leftBarButtonItem =
-            [[UIBarButtonItem alloc] initWithBarButtonSystemItem:UIBarButtonSystemItemCancel
-                                                          target:self
-                                                          action:@selector(dismissSelf)];
-    }
-    self.navigationItem.rightBarButtonItem =
-        [[UIBarButtonItem alloc] initWithBarButtonSystemItem:UIBarButtonSystemItemRefresh
-                                                      target:self
-                                                      action:@selector(reload)];
 
-    // Shown behind the web view, so a blank or failed page still tells the user
-    // what happened without needing the log.
-    self.statusLabel = [[UILabel alloc] initWithFrame:CGRectInset(self.view.bounds, 24, 0)];
-    self.statusLabel.autoresizingMask =
-        UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
-    self.statusLabel.numberOfLines = 0;
-    self.statusLabel.textAlignment = NSTextAlignmentCenter;
-    self.statusLabel.textColor = [UIColor secondaryLabelColor];
-    self.statusLabel.text = @"Loading twitter.com/login...";
-    [self.view addSubview:self.statusLabel];
+    [self setupHeader];
 
     // A desktop user agent and a standing data store: the mobile login page
     // leans on flows the tweak's forced design disturbs, the desktop one does not.
@@ -79,20 +62,149 @@ static NSString* const kNFBCsrfCookie = @"ct0";
     self.webView.customUserAgent =
         @"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 "
         @"(KHTML, like Gecko) Version/17.0 Safari/605.1.15";
+    // Opaque over a matching background so the web area never flashes white before
+    // x.com paints - that flash read as a glitch on the way in.
     self.webView.opaque = NO;
-    // Pinned to the safe area, not the raw bounds, so the page sits below the
-    // navigation bar instead of scrolling up underneath it.
+    self.webView.backgroundColor = [UIColor systemBackgroundColor];
+    self.webView.scrollView.backgroundColor = [UIColor systemBackgroundColor];
     self.webView.translatesAutoresizingMaskIntoConstraints = NO;
     [self.view addSubview:self.webView];
+
+    // Loading spinner and error text, in front of the web area.
+    self.spinner = [[UIActivityIndicatorView alloc]
+        initWithActivityIndicatorStyle:UIActivityIndicatorViewStyleMedium];
+    self.spinner.color = [UIColor secondaryLabelColor];
+    self.spinner.hidesWhenStopped = YES;
+    self.spinner.translatesAutoresizingMaskIntoConstraints = NO;
+    [self.view addSubview:self.spinner];
+
+    self.statusLabel = [[UILabel alloc] init];
+    self.statusLabel.numberOfLines = 0;
+    self.statusLabel.textAlignment = NSTextAlignmentCenter;
+    self.statusLabel.textColor = [UIColor secondaryLabelColor];
+    self.statusLabel.hidden = YES;
+    self.statusLabel.translatesAutoresizingMaskIntoConstraints = NO;
+    [self.view addSubview:self.statusLabel];
+
     [NSLayoutConstraint activateConstraints:@[
-        [self.webView.topAnchor
-            constraintEqualToAnchor:self.view.safeAreaLayoutGuide.topAnchor],
+        [self.webView.topAnchor constraintEqualToAnchor:self.headerView.bottomAnchor],
         [self.webView.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor],
         [self.webView.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor],
         [self.webView.bottomAnchor constraintEqualToAnchor:self.view.bottomAnchor],
+        [self.spinner.centerXAnchor constraintEqualToAnchor:self.webView.centerXAnchor],
+        [self.spinner.centerYAnchor constraintEqualToAnchor:self.webView.centerYAnchor],
+        [self.statusLabel.centerYAnchor constraintEqualToAnchor:self.webView.centerYAnchor],
+        [self.statusLabel.leadingAnchor constraintEqualToAnchor:self.webView.leadingAnchor
+                                                        constant:24],
+        [self.statusLabel.trailingAnchor constraintEqualToAnchor:self.webView.trailingAnchor
+                                                         constant:-24],
+    ]];
+    // The page load itself is deferred to viewDidAppear so it never runs during
+    // the presentation animation.
+}
+
+// Native brand header that stands in for the navigation bar: instant to draw, so
+// the screen has content the moment it animates in.
+- (void)setupHeader {
+    UIView* header = [[UIView alloc] init];
+    header.translatesAutoresizingMaskIntoConstraints = NO;
+    header.backgroundColor = [UIColor systemBackgroundColor];
+    [self.view addSubview:header];
+    self.headerView = header;
+
+    UIImageView* bird =
+        [[UIImageView alloc] initWithImage:[UIImage systemImageNamed:@"bird.fill"]];
+    bird.tintColor = [UIColor colorWithRed:0.114 green:0.631 blue:0.949 alpha:1.0];
+    bird.contentMode = UIViewContentModeScaleAspectFit;
+    bird.translatesAutoresizingMaskIntoConstraints = NO;
+
+    UILabel* name = [[UILabel alloc] init];
+    name.text = @"PrimeFreeBird";
+    name.font = [UIFont systemFontOfSize:21 weight:UIFontWeightHeavy];
+    name.textColor = [UIColor labelColor];
+
+    UILabel* tagline = [[UILabel alloc] init];
+    tagline.text = @"Le fil, sans le bruit.";
+    tagline.font = [UIFont systemFontOfSize:12 weight:UIFontWeightRegular];
+    tagline.textColor = [UIColor secondaryLabelColor];
+
+    UIStackView* stack =
+        [[UIStackView alloc] initWithArrangedSubviews:@[ bird, name, tagline ]];
+    stack.axis = UILayoutConstraintAxisVertical;
+    stack.alignment = UIStackViewAlignmentCenter;
+    stack.spacing = 6;
+    [stack setCustomSpacing:9 afterView:bird];
+    stack.translatesAutoresizingMaskIntoConstraints = NO;
+    [header addSubview:stack];
+
+    UIView* hair = [[UIView alloc] init];
+    hair.backgroundColor = [UIColor separatorColor];
+    hair.translatesAutoresizingMaskIntoConstraints = NO;
+    [header addSubview:hair];
+
+    UIButton* refresh = [UIButton buttonWithType:UIButtonTypeSystem];
+    [refresh setImage:[UIImage systemImageNamed:@"arrow.clockwise"]
+             forState:UIControlStateNormal];
+    refresh.tintColor = [UIColor secondaryLabelColor];
+    refresh.translatesAutoresizingMaskIntoConstraints = NO;
+    [refresh addTarget:self
+                  action:@selector(reload)
+        forControlEvents:UIControlEventTouchUpInside];
+    [header addSubview:refresh];
+
+    NSMutableArray<NSLayoutConstraint*>* c = [NSMutableArray arrayWithArray:@[
+        [header.topAnchor constraintEqualToAnchor:self.view.safeAreaLayoutGuide.topAnchor],
+        [header.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor],
+        [header.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor],
+        [bird.widthAnchor constraintEqualToConstant:40],
+        [bird.heightAnchor constraintEqualToConstant:40],
+        [stack.centerXAnchor constraintEqualToAnchor:header.centerXAnchor],
+        [stack.topAnchor constraintEqualToAnchor:header.topAnchor constant:14],
+        [stack.bottomAnchor constraintEqualToAnchor:header.bottomAnchor constant:-16],
+        [hair.leadingAnchor constraintEqualToAnchor:header.leadingAnchor],
+        [hair.trailingAnchor constraintEqualToAnchor:header.trailingAnchor],
+        [hair.bottomAnchor constraintEqualToAnchor:header.bottomAnchor],
+        [hair.heightAnchor constraintEqualToConstant:0.5],
+        [refresh.trailingAnchor constraintEqualToAnchor:header.trailingAnchor constant:-12],
+        [refresh.topAnchor constraintEqualToAnchor:header.topAnchor constant:8],
+        [refresh.widthAnchor constraintEqualToConstant:36],
+        [refresh.heightAnchor constraintEqualToConstant:36]
     ]];
 
-    [self reload];
+    if (!self.asRoot) {
+        UIButton* close = [UIButton buttonWithType:UIButtonTypeSystem];
+        [close setImage:[UIImage systemImageNamed:@"xmark"] forState:UIControlStateNormal];
+        close.tintColor = [UIColor secondaryLabelColor];
+        close.translatesAutoresizingMaskIntoConstraints = NO;
+        [close addTarget:self
+                    action:@selector(dismissSelf)
+          forControlEvents:UIControlEventTouchUpInside];
+        [header addSubview:close];
+        [c addObjectsFromArray:@[
+            [close.leadingAnchor constraintEqualToAnchor:header.leadingAnchor constant:12],
+            [close.topAnchor constraintEqualToAnchor:header.topAnchor constant:8],
+            [close.widthAnchor constraintEqualToConstant:36],
+            [close.heightAnchor constraintEqualToConstant:36]
+        ]];
+    }
+    [NSLayoutConstraint activateConstraints:c];
+}
+
+- (void)viewWillAppear:(BOOL)animated {
+    [super viewWillAppear:animated];
+    // The brand header replaces the navigation bar, so the screen is one clean
+    // surface instead of two stacked strips.
+    [self.navigationController setNavigationBarHidden:YES animated:NO];
+}
+
+- (void)viewDidAppear:(BOOL)animated {
+    [super viewDidAppear:animated];
+    // x.com is heavy; loading it during the present animation is what stuttered.
+    // Start once the transition has settled.
+    if (!self.didStartInitialLoad) {
+        self.didStartInitialLoad = YES;
+        [self reload];
+    }
 }
 
 - (void)dismissSelf {
@@ -251,7 +363,8 @@ static NSString* const kNFBCsrfCookie = @"ct0";
 }
 
 - (void)reload {
-    self.statusLabel.text = @"Loading twitter.com/login...";
+    [self.spinner startAnimating];
+    self.statusLabel.hidden = YES;
     NSURL* url = [NSURL URLWithString:@"https://twitter.com/login"];
     [self.webView loadRequest:[NSURLRequest requestWithURL:url]];
     NFBDebugLog(@"[weblogin] loading %@", url.absoluteString);
@@ -284,6 +397,7 @@ static NSString* const kNFBCsrfCookie = @"ct0";
 }
 
 - (void)webView:(WKWebView*)webView didFinishNavigation:(WKNavigation*)navigation {
+    [self.spinner stopAnimating];
     self.statusLabel.hidden = YES;
     NFBDebugLog(@"[weblogin] settled at %@", webView.URL.absoluteString);
     WKHTTPCookieStore* store = webView.configuration.websiteDataStore.httpCookieStore;
@@ -374,9 +488,10 @@ static NSString* const kNFBExchangeScript =
 - (void)webView:(WKWebView*)webView
     didFailProvisionalNavigation:(WKNavigation*)navigation
                        withError:(NSError*)error {
+    [self.spinner stopAnimating];
     self.statusLabel.hidden = NO;
     self.statusLabel.text =
-        [NSString stringWithFormat:@"Could not load the login page.\n\n%@\n\nTap refresh to retry.",
+        [NSString stringWithFormat:@"Impossible de charger la page de connexion.\n\n%@\n\nTouchez rafraîchir pour réessayer.",
                                    error.localizedDescription];
     NFBDebugLog(@"[weblogin] provisional navigation failed (%ld): %@",
                 (long)error.code, error.localizedDescription);
