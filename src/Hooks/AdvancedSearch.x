@@ -24,7 +24,7 @@
 
 static const void* kNFBAdvSearchBtnKey = &kNFBAdvSearchBtnKey;
 static const void* kNFBAdvSearchGreyKey = &kNFBAdvSearchGreyKey;
-static const void* kNFBAdvSlotCollapsedKey = &kNFBAdvSlotCollapsedKey;
+static const void* kNFBAdvBarProbeKey = &kNFBAdvBarProbeKey;
 
 // Rows of Twitter's filter glyph on a 24-point grid: {centre y, handle centre x}.
 // The upper handle sits right of centre and the lower one left, so the two rows
@@ -440,16 +440,12 @@ static void nfbAdvRescanSoon(void) {
 // The app's own entry lives inside its search bar as a plain button, not as a
 // bar button item, so the bar button passes above never reach it.
 
-// The app's own entry lives inside its search bar as a plain button, not as a
-// bar button item, so the bar button passes above never reach it.
-
 // Faded rather than hidden: setting hidden invalidates the bar's layout, which
 // the app then runs again while it is coming in. Opacity leaves the layout
 // untouched, and the touch is turned off so nothing answers where it was.
 static void nfbAdvFadeNativeInSearchBar(UIView* bar) {
     BOOL hide = [BHTSettings boolForKey:@"advanced_search"];
     CGFloat wanted = hide ? 0.0 : 1.0;
-    UIButton* nativeAdv = nil;
     for (UIView* sub in bar.subviews) {
         if ([sub class] != [UIButton class]) {
             continue;
@@ -458,7 +454,6 @@ static void nfbAdvFadeNativeInSearchBar(UIView* bar) {
         if (button.currentTitle.length > 0 || button.currentImage == nil) {
             continue;
         }
-        nativeAdv = button;
         if (button.alpha != wanted) {
             button.alpha = wanted;
         }
@@ -466,15 +461,157 @@ static void nfbAdvFadeNativeInSearchBar(UIView* bar) {
             button.userInteractionEnabled = !hide;
         }
     }
-    // Fading the native button leaves its slot reserved, so a gap shows before
-    // Cancel. Removing it lets the bar flow the field full-width on its own - no
-    // frame is written here (writing one re-runs the bar's layout and freezes).
-    // Done once per bar; if the app re-adds it, it is left alone, so there is no loop.
-    if (hide && nativeAdv && !objc_getAssociatedObject(bar, kNFBAdvSlotCollapsedKey)) {
-        objc_setAssociatedObject(bar, kNFBAdvSlotCollapsedKey, @YES,
-                                 OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-        [nativeAdv removeFromSuperview];
+}
+
+// Measurement only. Labels every view relative to the bar (BAR, PARENT, S<i>
+// for the bar's subviews, P<i> for its siblings) so frames and constraints can
+// be cross-read from one capture.
+static NSString* nfbAdvProbeName(id item, UIView* bar) {
+    if (!item) {
+        return @"nil";
     }
+    if (item == bar) {
+        return @"BAR";
+    }
+    if (item == bar.superview) {
+        return @"PARENT";
+    }
+    NSUInteger i = [bar.subviews indexOfObjectIdenticalTo:item];
+    if (i != NSNotFound) {
+        return [NSString stringWithFormat:@"S%lu", (unsigned long)i];
+    }
+    i = [bar.superview.subviews indexOfObjectIdenticalTo:item];
+    if (i != NSNotFound) {
+        return [NSString stringWithFormat:@"P%lu", (unsigned long)i];
+    }
+    for (NSUInteger j = 0; j < bar.subviews.count; j++) {
+        NSUInteger k = [bar.subviews[j].subviews indexOfObjectIdenticalTo:item];
+        if (k != NSNotFound) {
+            return [NSString stringWithFormat:@"S%lu.%lu", (unsigned long)j, (unsigned long)k];
+        }
+    }
+    return NSStringFromClass([item class]);
+}
+
+static NSString* nfbAdvProbeAttr(NSLayoutAttribute a) {
+    switch (a) {
+        case NSLayoutAttributeLeft: return @"left";
+        case NSLayoutAttributeRight: return @"right";
+        case NSLayoutAttributeTop: return @"top";
+        case NSLayoutAttributeBottom: return @"bottom";
+        case NSLayoutAttributeLeading: return @"leading";
+        case NSLayoutAttributeTrailing: return @"trailing";
+        case NSLayoutAttributeWidth: return @"width";
+        case NSLayoutAttributeHeight: return @"height";
+        case NSLayoutAttributeCenterX: return @"centerX";
+        case NSLayoutAttributeCenterY: return @"centerY";
+        case NSLayoutAttributeNotAnAttribute: return @"-";
+        default: return [NSString stringWithFormat:@"attr%ld", (long)a];
+    }
+}
+
+static NSString* nfbAdvProbeConstraint(NSLayoutConstraint* c, UIView* bar) {
+    NSString* rel = c.relation == NSLayoutRelationLessThanOrEqual ? @"<="
+                  : (c.relation == NSLayoutRelationGreaterThanOrEqual ? @">=" : @"==");
+    return [NSString stringWithFormat:@"%@.%@ %@ %@.%@ x%.2f %+.1f p%.0f%@",
+            nfbAdvProbeName(c.firstItem, bar), nfbAdvProbeAttr(c.firstAttribute), rel,
+            nfbAdvProbeName(c.secondItem, bar), nfbAdvProbeAttr(c.secondAttribute),
+            c.multiplier, c.constant, (double)c.priority, c.active ? @"" : @" OFF"];
+}
+
+static NSString* nfbAdvProbeView(UIView* v, UIView* bar, UIView* ref) {
+    CGRect f = (ref && v.superview) ? [v.superview convertRect:v.frame toView:ref] : v.frame;
+    NSString* extra = @"";
+    if ([v isKindOfClass:[UIButton class]]) {
+        UIButton* b = (UIButton*)v;
+        extra = [NSString stringWithFormat:@" t='%@' img=%@", b.currentTitle ?: @"",
+                 b.currentImage ? @"y" : @"n"];
+    }
+    return [NSString stringWithFormat:@"%@=%@ (%.0f,%.0f %.0fx%.0f) a=%.1f%@ tamic=%d c=%lu%@",
+            nfbAdvProbeName(v, bar), NSStringFromClass([v class]),
+            f.origin.x, f.origin.y, f.size.width, f.size.height, v.alpha,
+            v.hidden ? @" HIDDEN" : @"", v.translatesAutoresizingMaskIntoConstraints,
+            (unsigned long)v.constraints.count, extra];
+}
+
+static void nfbAdvProbeSearchBar(UIView* bar, NSString* stage) {
+    UIView* ref = bar.window;
+    NSMutableArray<NSString*>* chain = [NSMutableArray array];
+    UIView* up = bar.superview;
+    for (int i = 0; i < 3 && up; i++) {
+        [chain addObject:nfbAdvProbeView(up, bar, ref)];
+        up = up.superview;
+    }
+    NFBDebugLog(@"[barprobe %@] %@ | ics %.0fx%.0f | parents: %@", stage,
+                nfbAdvProbeView(bar, bar, ref), bar.intrinsicContentSize.width,
+                bar.intrinsicContentSize.height, [chain componentsJoinedByString:@" < "]);
+
+    NSMutableArray<NSString*>* siblings = [NSMutableArray array];
+    for (UIView* s in bar.superview.subviews) {
+        [siblings addObject:s == bar ? @"[BAR]" : nfbAdvProbeView(s, bar, ref)];
+    }
+    NFBDebugLog(@"[barprobe %@] siblings: %@", stage, [siblings componentsJoinedByString:@"; "]);
+
+    NSMutableArray<NSString*>* subs = [NSMutableArray array];
+    for (UIView* s in bar.subviews) {
+        NSMutableArray<NSString*>* inner = [NSMutableArray array];
+        for (UIView* t in s.subviews) {
+            [inner addObject:nfbAdvProbeView(t, bar, ref)];
+        }
+        [subs addObject:[NSString stringWithFormat:@"%@%@", nfbAdvProbeView(s, bar, ref),
+                         inner.count ? [NSString stringWithFormat:@" {%@}",
+                                        [inner componentsJoinedByString:@"; "]] : @""]];
+    }
+    NFBDebugLog(@"[barprobe %@] subs: %@", stage, [subs componentsJoinedByString:@" || "]);
+
+    NSString* cancelTitle = [[BHTBundle sharedBundle]
+        localizedTwitterStringForKey:@"CANCEL_ACTION_LABEL"];
+    UIView* root = bar;
+    while (root.superview) {
+        root = root.superview;
+    }
+    NSString* cancelLine = @"(not found)";
+    NSMutableArray<UIView*>* stack = [NSMutableArray arrayWithObject:root];
+    while (stack.count) {
+        UIView* v = stack.lastObject;
+        [stack removeLastObject];
+        if ([v isKindOfClass:[UIButton class]] &&
+            [((UIButton*)v).currentTitle isEqualToString:cancelTitle]) {
+            NSMutableArray<NSString*>* cons = [NSMutableArray array];
+            for (NSLayoutConstraint* c in v.constraints) {
+                [cons addObject:nfbAdvProbeConstraint(c, bar)];
+            }
+            for (NSLayoutConstraint* c in v.superview.constraints) {
+                if (c.firstItem == v || c.secondItem == v) {
+                    [cons addObject:nfbAdvProbeConstraint(c, bar)];
+                }
+            }
+            cancelLine = [NSString stringWithFormat:@"%@ | parent %@ (%@) | inside bar: %d | cons: %@",
+                          nfbAdvProbeView(v, bar, ref), NSStringFromClass([v.superview class]),
+                          nfbAdvProbeName(v.superview, bar), [v isDescendantOfView:bar],
+                          cons.count ? [cons componentsJoinedByString:@"; "] : @"none"];
+            break;
+        }
+        [stack addObjectsFromArray:v.subviews];
+    }
+    NFBDebugLog(@"[barprobe %@] cancel: %@", stage, cancelLine);
+
+    NSMutableArray<NSString*>* cons = [NSMutableArray array];
+    for (NSLayoutConstraint* c in bar.constraints) {
+        [cons addObject:nfbAdvProbeConstraint(c, bar)];
+    }
+    for (NSLayoutConstraint* c in bar.superview.constraints) {
+        if (c.firstItem == bar || c.secondItem == bar) {
+            [cons addObject:nfbAdvProbeConstraint(c, bar)];
+        }
+    }
+    for (UIView* s in bar.subviews) {
+        for (NSLayoutConstraint* c in s.constraints) {
+            [cons addObject:nfbAdvProbeConstraint(c, bar)];
+        }
+    }
+    NFBDebugLog(@"[barprobe %@] constraints: %@", stage,
+                cons.count ? [cons componentsJoinedByString:@"; "] : @"none (manual frames)");
 }
 
 %hook _TtC15TwitterSearchV211SearchBarV2
@@ -483,6 +620,23 @@ static void nfbAdvFadeNativeInSearchBar(UIView* bar) {
     %orig;
     @try {
         nfbAdvFadeNativeInSearchBar((UIView*)self);
+        // One capture at first layout and one once the bar has settled, so the
+        // final geometry is measured rather than the incoming one.
+        if ([BHTSettings boolForKey:@"debug_tools"] &&
+            !objc_getAssociatedObject(self, kNFBAdvBarProbeKey)) {
+            objc_setAssociatedObject(self, kNFBAdvBarProbeKey, @YES,
+                                     OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+            UIView* bar = (UIView*)self;
+            nfbAdvProbeSearchBar(bar, @"first");
+            __weak UIView* weakBar = bar;
+            dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1.2 * NSEC_PER_SEC)),
+                           dispatch_get_main_queue(), ^{
+                UIView* settled = weakBar;
+                if (settled) {
+                    nfbAdvProbeSearchBar(settled, @"settled");
+                }
+            });
+        }
     } @catch (id exception) {
     }
 }
