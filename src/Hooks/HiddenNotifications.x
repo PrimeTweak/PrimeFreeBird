@@ -897,6 +897,8 @@ static id NFBModelAtIndexPath(id dataViewController, NSIndexPath* indexPath) {
 // so a hidden row leaves the list on the spot rather than waiting for a sections
 // replay. The registry and filter still handle later reloads.
 static void NFBNotifSyncEmptyState(id dataViewController);
+static const char* kNFBNotifVerdictKey = "nfbNotifSweepVerdict";
+static const char* kNFBNotifEverFilledKey = "nfbNotifEverFilled";
 
 static void NFBNotifDropRow(id dataViewController, NSIndexPath* indexPath) {
     if (!dataViewController || !indexPath) {
@@ -909,6 +911,15 @@ static void NFBNotifDropRow(id dataViewController, NSIndexPath* indexPath) {
                 dataViewController, deleteSel, indexPath, UITableViewRowAnimationLeft);
             NFBDebugLog(@"[notifs] row removed from the list (%ld/%ld)",
                         (long)indexPath.section, (long)indexPath.row);
+            // A notification was just hidden from this list, which settles what
+            // the sweep may not have observed yet (it skips its walk while nothing
+            // is hidden): this is the notifications screen. The verdict gates the
+            // empty-state sync, so it is recorded here when still undecided.
+            if (!objc_getAssociatedObject(dataViewController, kNFBNotifVerdictKey)) {
+                objc_setAssociatedObject(dataViewController, kNFBNotifVerdictKey, @YES,
+                                         OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+                NFBDebugLog(@"[notifs] verdict recorded on removal - notifications screen");
+            }
             // Deferred: the table must finish its delete animation before it
             // reports a truthful row count. One turn covers every hide but the
             // last, whose row is still counted until the animation (~0.3 s) ends,
@@ -1093,9 +1104,6 @@ static NSArray* NFBFilterNotifSections(NSArray* sections) {
 // Which screens the sweep may touch, decided by observation rather than by class
 // name. One notification model keeps a controller, several without drops it, and
 // the home timeline is then never walked again.
-static const char* kNFBNotifVerdictKey = "nfbNotifSweepVerdict";
-static const char* kNFBNotifEverFilledKey = "nfbNotifEverFilled";
-
 static BOOL NFBNotifSweepAllowed(id dataViewController) {
     id verdict = objc_getAssociatedObject(dataViewController, kNFBNotifVerdictKey);
     return verdict ? [verdict boolValue] : YES;   // undecided: observe once
@@ -1343,8 +1351,18 @@ static void NFBNotifSyncEmptyState(id dataViewController) {
         body.numberOfLines = 0;
         [panel addSubview:body];
 
+        // Faded in rather than popped, and timed to land as the last row finishes
+        // sliding out, so the two read as one motion instead of a flash.
+        panel.alpha = 0.0;
         [table addSubview:panel];
         NFBNotifLayoutEmptyPanel(panel, table);
+        [UIView animateWithDuration:0.3
+                              delay:0.15
+                            options:UIViewAnimationOptionCurveEaseOut
+                         animations:^{
+                           panel.alpha = 1.0;
+                         }
+                         completion:nil];
         NFBDebugLog(@"[empty] PANEL PLACED");
     } @catch (id exception) {
         NFBDebugLog(@"[empty] exception: %@", exception);
