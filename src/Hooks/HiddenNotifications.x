@@ -909,11 +909,17 @@ static void NFBNotifDropRow(id dataViewController, NSIndexPath* indexPath) {
                 dataViewController, deleteSel, indexPath, UITableViewRowAnimationLeft);
             NFBDebugLog(@"[notifs] row removed from the list (%ld/%ld)",
                         (long)indexPath.section, (long)indexPath.row);
-            // Deferred one turn: the table must finish its delete animation
-            // before it reports a truthful row count.
+            // Deferred: the table must finish its delete animation before it
+            // reports a truthful row count. One turn covers every hide but the
+            // last, whose row is still counted until the animation (~0.3 s) ends,
+            // so a second pass follows it.
             dispatch_async(dispatch_get_main_queue(), ^{
                 NFBNotifSyncEmptyState(dataViewController);
             });
+            dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.45 * NSEC_PER_SEC)),
+                           dispatch_get_main_queue(), ^{
+                             NFBNotifSyncEmptyState(dataViewController);
+                           });
             return;
         }
         NFBDebugLog(@"[notifs] direct removal unavailable on %@",
