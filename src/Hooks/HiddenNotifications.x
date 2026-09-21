@@ -1256,6 +1256,7 @@ static void NFBNotifSyncEmptyState(id dataViewController) {
         // decided by how many rows carry a notification model.
         NSInteger rows = 0;
         NSInteger notifRows = 0;
+        NSMutableArray<NSString*>* cellClasses = [NSMutableArray array];
         SEL itemSel = NSSelectorFromString(@"itemAtIndexPath:");
         BOOL canRead = [dataViewController respondsToSelector:itemSel];
         for (NSInteger s = 0; s < table.numberOfSections; s++) {
@@ -1273,6 +1274,10 @@ static void NFBNotifSyncEmptyState(id dataViewController) {
                                  containsString:@"Notification"]) {
                     notifRows++;
                 }
+                UITableViewCell* cell = [table cellForRowAtIndexPath:path];
+                [cellClasses addObject:[NSString stringWithFormat:@"%ld/%ld %@ | %@", (long)s,
+                                        (long)r, cell ? NSStringFromClass([cell class]) : @"-",
+                                        model ? NSStringFromClass([model class]) : @"-"]];
             }
         }
         UIView* existing = [table viewWithTag:kNFBNotifEmptyTag];
@@ -1281,6 +1286,7 @@ static void NFBNotifSyncEmptyState(id dataViewController) {
         NFBDebugLog(@"[empty] %ld row(s), %ld notification(s), %lu hidden, panel %@",
                     (long)rows, (long)notifRows, (unsigned long)hidden,
                     existing ? @"placed" : @"absent");
+        NFBDebugLog(@"[empty] cells: %@", [cellClasses componentsJoinedByString:@"; "]);
 
         // A table that has not delivered anything yet is loading, not emptied.
         // The panel used to go up whenever nothing was visible and the registry
