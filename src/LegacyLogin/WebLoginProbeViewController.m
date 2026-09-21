@@ -75,14 +75,22 @@ static NSString* const kNFBCsrfCookie = @"ct0";
     [cfg.userContentController addUserScript:wrap];
     self.webView = [[WKWebView alloc] initWithFrame:self.view.bounds
                                       configuration:cfg];
-    self.webView.autoresizingMask =
-        UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
     self.webView.navigationDelegate = self;
     self.webView.customUserAgent =
         @"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 "
         @"(KHTML, like Gecko) Version/17.0 Safari/605.1.15";
     self.webView.opaque = NO;
+    // Pinned to the safe area, not the raw bounds, so the page sits below the
+    // navigation bar instead of scrolling up underneath it.
+    self.webView.translatesAutoresizingMaskIntoConstraints = NO;
     [self.view addSubview:self.webView];
+    [NSLayoutConstraint activateConstraints:@[
+        [self.webView.topAnchor
+            constraintEqualToAnchor:self.view.safeAreaLayoutGuide.topAnchor],
+        [self.webView.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor],
+        [self.webView.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor],
+        [self.webView.bottomAnchor constraintEqualToAnchor:self.view.bottomAnchor],
+    ]];
 
     [self reload];
 }
@@ -309,6 +317,16 @@ static NSString* const kNFBCsrfCookie = @"ct0";
       if (auth && !self.sawAuth) {
           self.sawAuth = YES;
           NFBDebugLog(@"[weblogin] AUTH TOKEN OBTAINED - web login reaches a session");
+          // Seed the shared cookie jar with this session so the read injection and
+          // WebCreateTweet.x (writes) both draw on the one session, and it survives
+          // relaunch. "Delete web session" wipes this same jar.
+          NSHTTPCookieStorage* jar = [NSHTTPCookieStorage sharedHTTPCookieStorage];
+          for (NSHTTPCookie* c in cookies) {
+              NSString* domain = c.domain ?: @"";
+              if ([domain containsString:@"x.com"] || [domain containsString:@"twitter.com"]) {
+                  [jar setCookie:c];
+              }
+          }
           [self probeSessionStores:store];
           // REST account endpoints are gone (404); read the handle from the page
           // itself, then bridge the session into a native account (Voie B then A).

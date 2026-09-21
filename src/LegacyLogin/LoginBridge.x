@@ -21,21 +21,58 @@ static BOOL nfbBridgeIsTwitterAPI(NSString* url) {
            [url containsString:@"twitter.com/i/api"] || [url containsString:@"x.com/i/api"];
 }
 
-#pragma mark - Voie A: session injected into the app's own API traffic
+#pragma mark - Read injection over the shared web session
 
-static BOOL gInjectSession = NO;
-static NSString* gInjectAuthToken = nil;
-static NSString* gInjectCsrf = nil;
-static NSString* const kNFBSessAuthKey = @"nfb_bridge_auth_token";
-static NSString* const kNFBSessCsrfKey = @"nfb_bridge_ct0";
+// GraphQL mutations are left to WebCreateTweet.x, which reroutes them to the web
+// endpoint with its own bearer and x-client-transaction-id. Injecting here would
+// clobber that reroute, so only reads are touched.
+static BOOL nfbBridgeIsWrite(NSString* path) {
+    if (![path isKindOfClass:[NSString class]]) {
+        return NO;
+    }
+    static NSSet* writes = nil;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+        writes = [NSSet setWithArray:@[
+            @"CreateTweet", @"CreateNoteTweet", @"CreateRetweet", @"DeleteRetweet",
+            @"DeleteTweet", @"FavoriteTweet", @"UnfavoriteTweet", @"CreateBookmark",
+            @"DeleteBookmark"
+        ]];
+    });
+    return [writes containsObject:path.lastPathComponent];
+}
 
-// Adds the web session cookie + csrf to an app API request that lacks them, so
-// the server authenticates it by cookie instead of the missing OAuth signature.
-static NSURLRequest* nfbBridgeInject(NSURLRequest* req, NSString* via) {
-    if (!gInjectSession || !gInjectAuthToken.length || !req) {
+// The read session is the shared web session: the one WebCreateTweet.x harvests
+// for writes and "Delete web session" wipes. Reading it here means login,
+// persistence and sign-out all flow through that single place.
+static void nfbBridgeReadSharedSession(NSString** authToken, NSString** csrf) {
+    NSHTTPCookieStorage* jar = [NSHTTPCookieStorage sharedHTTPCookieStorage];
+    // The session may sit on either host, so both are read (as harvestSharedCookies
+    // does), taking each token from wherever it is found.
+    for (NSString* host in @[@"https://x.com", @"https://twitter.com"]) {
+        for (NSHTTPCookie* cookie in [jar cookiesForURL:[NSURL URLWithString:host]]) {
+            if ([cookie.name isEqualToString:@"auth_token"] && cookie.value.length) {
+                *authToken = cookie.value;
+            } else if ([cookie.name isEqualToString:@"ct0"] && cookie.value.length) {
+                *csrf = cookie.value;
+            }
+        }
+    }
+}
+
+// Adds the web session cookie + csrf to an app read request, replacing the shell
+// account's invalid OAuth so the server authenticates it by cookie.
+static NSURLRequest* nfbBridgeInject(NSURLRequest* req) {
+    if (!req || !nfbBridgeIsTwitterAPI(req.URL.absoluteString)) {
         return req;
     }
-    if (!nfbBridgeIsTwitterAPI(req.URL.absoluteString)) {
+    if (nfbBridgeIsWrite(req.URL.path)) {
+        return req;
+    }
+    NSString* authToken = nil;
+    NSString* csrf = nil;
+    nfbBridgeReadSharedSession(&authToken, &csrf);
+    if (authToken.length == 0 || csrf.length == 0) {
         return req;
     }
     NSString* cookie = req.allHTTPHeaderFields[@"Cookie"] ?: @"";
@@ -43,15 +80,11 @@ static NSURLRequest* nfbBridgeInject(NSURLRequest* req, NSString* via) {
         return req;
     }
     NSMutableURLRequest* m = [req mutableCopy];
-    NSString* add =
-        [NSString stringWithFormat:@"auth_token=%@; ct0=%@", gInjectAuthToken, gInjectCsrf];
+    NSString* add = [NSString stringWithFormat:@"auth_token=%@; ct0=%@", authToken, csrf];
     NSString* merged = cookie.length ? [NSString stringWithFormat:@"%@; %@", cookie, add] : add;
     [m setValue:merged forHTTPHeaderField:@"Cookie"];
-    [m setValue:gInjectCsrf forHTTPHeaderField:@"x-csrf-token"];
-    // Replace the shell account's invalid OAuth with the public bearer, so the
-    // server can authenticate by cookie the way the web client does.
+    [m setValue:csrf forHTTPHeaderField:@"x-csrf-token"];
     [m setValue:nfbBridgeBearer() forHTTPHeaderField:@"Authorization"];
-    NFBDebugLog(@"[bridge:A] injected via %@ -> %@", via, req.URL.path ?: @"?");
     return m;
 }
 
@@ -59,23 +92,23 @@ static NSURLRequest* nfbBridgeInject(NSURLRequest* req, NSString* via) {
 
 - (NSURLSessionDataTask*)dataTaskWithRequest:(NSURLRequest*)request
                            completionHandler:(void (^)(NSData*, NSURLResponse*, NSError*))handler {
-    if (gInjectSession && nfbBridgeIsTwitterAPI(request.URL.absoluteString)) {
-        return %orig(nfbBridgeInject(request, @"dataTaskCH"), handler);
+    if (nfbBridgeIsTwitterAPI(request.URL.absoluteString)) {
+        return %orig(nfbBridgeInject(request), handler);
     }
     return %orig;
 }
 
 - (NSURLSessionDataTask*)dataTaskWithRequest:(NSURLRequest*)request {
-    if (gInjectSession && nfbBridgeIsTwitterAPI(request.URL.absoluteString)) {
-        return %orig(nfbBridgeInject(request, @"dataTask"));
+    if (nfbBridgeIsTwitterAPI(request.URL.absoluteString)) {
+        return %orig(nfbBridgeInject(request));
     }
     return %orig;
 }
 
 - (NSURLSessionUploadTask*)uploadTaskWithRequest:(NSURLRequest*)request
                                         fromData:(NSData*)bodyData {
-    if (gInjectSession && nfbBridgeIsTwitterAPI(request.URL.absoluteString)) {
-        return %orig(nfbBridgeInject(request, @"uploadTask"), bodyData);
+    if (nfbBridgeIsTwitterAPI(request.URL.absoluteString)) {
+        return %orig(nfbBridgeInject(request), bodyData);
     }
     return %orig;
 }
@@ -232,29 +265,15 @@ static void nfbBridgeExchangeB(NSString* authToken, NSString* csrf,
           nfbBridgeMount(screen, userID, token, secret, weakPresenter);
           return;
       }
-      NFBDebugLog(@"[bridge:B] no pair - enabling voie A (cookie injection)");
-      gInjectAuthToken = authToken;
-      gInjectCsrf = csrf;
-      gInjectSession = YES;
-      [[NSUserDefaults standardUserDefaults] setObject:authToken forKey:kNFBSessAuthKey];
-      [[NSUserDefaults standardUserDefaults] setObject:csrf forKey:kNFBSessCsrfKey];
+      // Voie A: reads authenticate by cookie over the shared web session (the
+      // NSURLSession hook), so the shell account only needs to exist. The session
+      // itself already lives in the shared cookie jar (seeded at capture), which
+      // is what the injection and WebCreateTweet.x both read.
       NSString* screen = screenName.length ? screenName : placeholder;
-      NFBDebugLog(@"[bridge:A] injection armed + session saved; mounting account (screen=%@)", screen);
+      NFBDebugLog(@"[bridge:A] no pair - mounting shell account over shared session (screen=%@)",
+                  screen);
       nfbBridgeMount(screen, userID, authToken, csrf, weakPresenter);
     });
 }
 
 @end
-
-// Restores the injected session at launch, so the persisted account
-// authenticates without re-running the web login each time.
-%ctor {
-    NSString* a = [[NSUserDefaults standardUserDefaults] stringForKey:kNFBSessAuthKey];
-    NSString* c = [[NSUserDefaults standardUserDefaults] stringForKey:kNFBSessCsrfKey];
-    if (a.length && c.length) {
-        gInjectAuthToken = a;
-        gInjectCsrf = c;
-        gInjectSession = YES;
-        NFBDebugLog(@"[bridge:A] session restored at launch, injection armed");
-    }
-}
