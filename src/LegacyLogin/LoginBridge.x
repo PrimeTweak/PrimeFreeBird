@@ -205,69 +205,6 @@ static void nfbBridgeMount(NSString* screen, long long uid, NSString* token, NSS
     }
 }
 
-#pragma mark - Session-authenticated requests
-
-// Builds a request carrying the captured web session, so the server treats it as
-// the logged-in browser.
-static NSMutableURLRequest* nfbBridgeSessionRequest(NSString* urlStr, NSString* method,
-                                                    NSString* authToken, NSString* csrf) {
-    NSMutableURLRequest* req = [NSMutableURLRequest requestWithURL:[NSURL URLWithString:urlStr]];
-    req.HTTPMethod = method;
-    [req setValue:nfbBridgeBearer() forHTTPHeaderField:@"Authorization"];
-    [req setValue:csrf forHTTPHeaderField:@"x-csrf-token"];
-    [req setValue:[NSString stringWithFormat:@"auth_token=%@; ct0=%@", authToken, csrf]
-        forHTTPHeaderField:@"Cookie"];
-    return req;
-}
-
-// Voie B: an already-authenticated session may drive onboarding/task to the
-// open_account subtask without credentials or attestation, yielding the OAuth pair.
-static void nfbBridgeExchangeB(NSString* authToken, NSString* csrf,
-                               void (^done)(NSString* token, NSString* secret, NSString* screen)) {
-    NSMutableURLRequest* req = nfbBridgeSessionRequest(
-        @"https://api.twitter.com/1.1/onboarding/task.json?flow_name=login", @"POST", authToken,
-        csrf);
-    [req setValue:@"application/json" forHTTPHeaderField:@"Content-Type"];
-    req.HTTPBody = [@"{}" dataUsingEncoding:NSUTF8StringEncoding];
-    NSURLSessionDataTask* task = [[NSURLSession sharedSession]
-        dataTaskWithRequest:req
-          completionHandler:^(NSData* data, NSURLResponse* response, NSError* error) {
-            long code = [response isKindOfClass:[NSHTTPURLResponse class]]
-                            ? ((NSHTTPURLResponse*)response).statusCode : -1;
-            NSString* token = nil;
-            NSString* secret = nil;
-            NSString* screen = nil;
-            id json = data.length
-                ? [NSJSONSerialization JSONObjectWithData:data options:0 error:NULL] : nil;
-            if ([json isKindOfClass:[NSDictionary class]]) {
-                NSArray* subs = json[@"subtasks"];
-                if ([subs isKindOfClass:[NSArray class]]) {
-                    for (id s in subs) {
-                        id open =
-                            [s isKindOfClass:[NSDictionary class]] ? s[@"open_account"] : nil;
-                        if ([open isKindOfClass:[NSDictionary class]]) {
-                            token = open[@"oauth_token"];
-                            secret = open[@"oauth_token_secret"];
-                            screen = open[@"screen_name"];
-                            break;
-                        }
-                    }
-                }
-            }
-            NSString* head = data.length
-                ? [[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding] : @"";
-            if (head.length > 160) {
-                head = [head substringToIndex:160];
-            }
-            NFBDebugLog(@"[bridge:B] exchange http=%ld oauth=%lu secret=%lu reply=%@", code,
-                        (unsigned long)token.length, (unsigned long)secret.length, head);
-            dispatch_async(dispatch_get_main_queue(), ^{
-              done(token, secret, screen);
-            });
-          }];
-    [task resume];
-}
-
 @implementation LoginBridge
 
 + (void)startWithAuthToken:(NSString*)authToken
@@ -281,28 +218,15 @@ static void nfbBridgeExchangeB(NSString* authToken, NSString* csrf,
         NFBDebugLog(@"[bridge] session/userID missing - abort");
         return;
     }
-    // A missing handle no longer blocks the mount: the app refreshes it from the
-    // userID once the account exists.
-    NSString* placeholder = [NSString stringWithFormat:@"id%lld", userID];
-    __weak UIViewController* weakPresenter = presenter;
-    // Voie B first: the clean OAuth pair, whose open_account carries the real
-    // handle. Voie A only if B yields nothing.
-    nfbBridgeExchangeB(authToken, csrf, ^(NSString* token, NSString* secret, NSString* bScreen) {
-      if (token.length && secret.length) {
-          NSString* screen = bScreen.length ? bScreen : (screenName.length ? screenName : placeholder);
-          NFBDebugLog(@"[bridge:B] oauth pair obtained - mounting real account (screen=%@)", screen);
-          nfbBridgeMount(screen, userID, token, secret, weakPresenter);
-          return;
-      }
-      // Voie A: reads authenticate by cookie over the shared web session (the
-      // NSURLSession hook), so the shell account only needs to exist. The session
-      // itself already lives in the shared cookie jar (seeded at capture), which
-      // is what the injection and WebCreateTweet.x both read.
-      NSString* screen = screenName.length ? screenName : placeholder;
-      NFBDebugLog(@"[bridge:A] no pair - mounting shell account over shared session (screen=%@)",
-                  screen);
-      nfbBridgeMount(screen, userID, authToken, csrf, weakPresenter);
-    });
+    // The OAuth exchange (onboarding/task) never succeeded in testing - 500 code
+    // 131 every time - so the shell account is mounted directly over the shared web
+    // session. Reads authenticate by cookie (the NSURLSession hook) and writes
+    // reroute through WebCreateTweet.x; the session already lives in the shared
+    // cookie jar, seeded at capture.
+    NSString* screen =
+        screenName.length ? screenName : [NSString stringWithFormat:@"id%lld", userID];
+    NFBDebugLog(@"[bridge] mounting shell account over shared session (screen=%@)", screen);
+    nfbBridgeMount(screen, userID, authToken, csrf, presenter);
 }
 
 @end

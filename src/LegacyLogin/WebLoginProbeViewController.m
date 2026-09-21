@@ -55,6 +55,7 @@ static UIImage* nfbLoginBirdImage(CGSize size) {
 @property (nonatomic, strong) UIActivityIndicatorView* spinner;
 @property (nonatomic, strong) UILabel* statusLabel;
 @property (nonatomic, strong) UIButton* retryButton;
+@property (nonatomic, strong) UILabel* connectingLabel;
 @property (nonatomic, assign) BOOL sawAuth;
 @property (nonatomic, assign) BOOL asRoot;
 @property (nonatomic, assign) BOOL didStartInitialLoad;
@@ -138,6 +139,14 @@ static UIImage* nfbLoginBirdImage(CGSize size) {
                forControlEvents:UIControlEventTouchUpInside];
     [self.view addSubview:self.retryButton];
 
+    self.connectingLabel = [[UILabel alloc] init];
+    self.connectingLabel.text = @"Connecting to X…";
+    self.connectingLabel.font = [UIFont systemFontOfSize:14 weight:UIFontWeightRegular];
+    self.connectingLabel.textColor = [UIColor secondaryLabelColor];
+    self.connectingLabel.hidden = YES;
+    self.connectingLabel.translatesAutoresizingMaskIntoConstraints = NO;
+    [self.view addSubview:self.connectingLabel];
+
     [NSLayoutConstraint activateConstraints:@[
         [self.webView.topAnchor constraintEqualToAnchor:self.headerView.bottomAnchor],
         [self.webView.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor],
@@ -153,6 +162,9 @@ static UIImage* nfbLoginBirdImage(CGSize size) {
         [self.retryButton.centerXAnchor constraintEqualToAnchor:self.webView.centerXAnchor],
         [self.retryButton.topAnchor constraintEqualToAnchor:self.statusLabel.bottomAnchor
                                                     constant:16],
+        [self.connectingLabel.centerXAnchor constraintEqualToAnchor:self.spinner.centerXAnchor],
+        [self.connectingLabel.topAnchor constraintEqualToAnchor:self.spinner.bottomAnchor
+                                                        constant:12],
     ]];
     // The page load itself is deferred to viewDidAppear so it never runs during
     // the presentation animation.
@@ -409,6 +421,7 @@ static UIImage* nfbLoginBirdImage(CGSize size) {
     }
     self.didRevealWeb = YES;
     [self.spinner stopAnimating];
+    self.connectingLabel.hidden = YES;
     self.statusLabel.hidden = YES;
     [UIView animateWithDuration:0.22
                      animations:^{
@@ -462,6 +475,7 @@ static UIImage* nfbLoginBirdImage(CGSize size) {
 
 - (void)reload {
     [self.spinner startAnimating];
+    self.connectingLabel.hidden = NO;
     self.statusLabel.hidden = YES;
     self.retryButton.hidden = YES;
     self.webView.alpha = 0.0;
@@ -606,6 +620,7 @@ static NSString* const kNFBExchangeScript =
         return;
     }
     [self.spinner stopAnimating];
+    self.connectingLabel.hidden = YES;
     self.statusLabel.hidden = NO;
     self.retryButton.hidden = NO;
     self.statusLabel.text =
