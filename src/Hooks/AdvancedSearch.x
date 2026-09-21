@@ -448,14 +448,8 @@ static void nfbAdvRescanSoon(void) {
 static void nfbAdvFadeNativeInSearchBar(UIView* bar) {
     BOOL hide = [BHTSettings boolForKey:@"advanced_search"];
     CGFloat wanted = hide ? 0.0 : 1.0;
-    UIView* field = nil;
     for (UIView* sub in bar.subviews) {
         if ([sub class] != [UIButton class]) {
-            // The search field is the widest plain view sitting at the leading edge.
-            if (sub.frame.origin.x < 8.0 &&
-                (!field || sub.frame.size.width > field.frame.size.width)) {
-                field = sub;
-            }
             continue;
         }
         UIButton* button = (UIButton*)sub;
@@ -468,14 +462,6 @@ static void nfbAdvFadeNativeInSearchBar(UIView* bar) {
         if (button.userInteractionEnabled == hide) {
             button.userInteractionEnabled = !hide;
         }
-    }
-    // The faded button keeps its slot, leaving a gap before Cancel. Rather than
-    // hide it (which re-runs the bar's layout and bounces), the field is stretched
-    // over that slot every pass, so the bar reads full-width without a layout change.
-    if (hide && field && field.frame.size.width < bar.bounds.size.width - 0.5) {
-        CGRect f = field.frame;
-        f.size.width = bar.bounds.size.width;
-        field.frame = f;
     }
 }
 

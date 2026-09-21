@@ -1977,6 +1977,7 @@ static UIImage* NFBNotifFlatGlyph(UIImage* source, UIColor* colour) {
 
 static const char* kNFBNotifRevealedKey = "nfbNotifRevealedDismiss";
 static const char* kNFBNotifGlyphKey    = "nfbNotifDismissGlyph";
+static const char* kNFBNotifXmarkImageKey = "nfbNotifXmarkImage";
 static const CGFloat kNFBNotifDismissTarget = 44.0;   // touch target
 static const CGFloat kNFBNotifDismissGlyph  = 15.0;   // glyph body
 static const CGFloat kNFBNotifDismissInset  = 16.0;   // margin from the right edge
@@ -2005,36 +2006,6 @@ static UITableView* NFBNotifTableForCell(UIView* cell) {
     }
     @try {
         id button = NFBNotifAsk(self, NSSelectorFromString(@"dismissButton"));
-        if ([BHTSettings boolForKey:@"debug_tools"] &&
-            !objc_getAssociatedObject(self, "nfbBtnProbe")) {
-            objc_setAssociatedObject(self, "nfbBtnProbe", @YES, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-            NSMutableArray<NSString*>* controls = [NSMutableArray array];
-            void (^scan)(UIView*, NSInteger) = nil;
-            __block __weak void (^weakScan)(UIView*, NSInteger) = nil;
-            weakScan = scan = ^(UIView* v, NSInteger depth) {
-                if (!v || depth > 6) {
-                    return;
-                }
-                for (UIView* sub in v.subviews) {
-                    if ([sub isKindOfClass:[UIControl class]] ||
-                        [sub isKindOfClass:[UIButton class]]) {
-                        CGRect fr = sub.frame;
-                        [controls addObject:[NSString stringWithFormat:@"%@ (%.0f,%.0f %.0fx%.0f)",
-                                             NSStringFromClass([sub class]), fr.origin.x,
-                                             fr.origin.y, fr.size.width, fr.size.height]];
-                    }
-                    weakScan(sub, depth + 1);
-                }
-            };
-            scan((UIView*)self, 0);
-            BOOL isBtn = [button isKindOfClass:[UIButton class]];
-            BOOL tagged = button && objc_getAssociatedObject(button, kNFBNotifGlyphKey) != nil;
-            UIImage* img = isBtn ? [(UIButton*)button imageForState:UIControlStateNormal] : nil;
-            NFBDebugLog(@"[btnprobe] dismissButton=%@ isUIButton=%d tagged=%d img=%@ | controls: %@",
-                        button ? NSStringFromClass([button class]) : @"(nil)", isBtn, tagged,
-                        img ? (img.isSymbolImage ? @"symbol" : @"raster") : @"nil",
-                        controls.count ? [controls componentsJoinedByString:@"; "] : @"(none)");
-        }
         if (![button isKindOfClass:[UIView class]]) {
             return;
         }
@@ -2135,6 +2106,56 @@ static UITableView* NFBNotifTableForCell(UIView* cell) {
     }
     if (!handled) {
         %orig;
+    }
+}
+
+%end
+
+// The dismiss button lays itself out after the cell does and reinstates its native
+// glyph, so the cross set on the cell is overwritten - the source of the mismatched
+// buttons. Enforced here, in the button's own layout (the last word), and only
+// while its image is not already ours, so there is no re-layout loop.
+%hook TFNDismissButton
+
+- (void)layoutSubviews {
+    %orig;
+    if (!NFBNotifsEnabled()) {
+        return;
+    }
+    @try {
+        // Scoped to notification rows: other dismiss buttons in the app keep theirs.
+        UIView* node = self.superview;
+        BOOL inNotifCell = NO;
+        for (NSInteger hop = 0; node && hop < 8; hop++) {
+            if ([NSStringFromClass([node class]) containsString:@"NotificationCell"]) {
+                inNotifCell = YES;
+                break;
+            }
+            node = node.superview;
+        }
+        if (!inNotifCell) {
+            return;
+        }
+        UIImage* current = [self imageForState:UIControlStateNormal];
+        if (current && objc_getAssociatedObject(current, kNFBNotifXmarkImageKey)) {
+            return;   // already our cross - nothing to do, no loop
+        }
+        UIImage* cross = nil;
+        if (@available(iOS 13.0, *)) {
+            UIImageSymbolConfiguration* cfg = [UIImageSymbolConfiguration
+                configurationWithPointSize:kNFBNotifDismissGlyph
+                                    weight:UIImageSymbolWeightSemibold];
+            cross = [UIImage systemImageNamed:@"xmark" withConfiguration:cfg];
+        }
+        if (!cross) {
+            return;
+        }
+        cross = [cross imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate];
+        objc_setAssociatedObject(cross, kNFBNotifXmarkImageKey, @YES,
+                                 OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        [self setImage:cross forState:UIControlStateNormal];
+        self.tintColor = [UIColor secondaryLabelColor];
+    } @catch (id exception) {
     }
 }
 
