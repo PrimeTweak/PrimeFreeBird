@@ -421,7 +421,14 @@ static void paintWindowForSplash(UIView* view) {
 %end
 
 %ctor {
-    BOOL glassEnabled = [[NSUserDefaults standardUserDefaults] boolForKey:@"enable_liquid_glass"];
-    [[NSUserDefaults standardUserDefaults] setBool:glassEnabled
-                                            forKey:@"com.apple.SwiftUI.IgnoreSolariumOptOut"];
+    // enable_liquid_glass defaults to YES (see BHTSettings), but that default is
+    // resolved by BHTSettings, not by this plain read - and this runs before the
+    // defaults are registered. Seed it explicitly on a clean install so the design
+    // opts in from the first launch, not only after the toggle is touched.
+    NSUserDefaults* defaults = [NSUserDefaults standardUserDefaults];
+    if ([defaults objectForKey:@"enable_liquid_glass"] == nil) {
+        [defaults setBool:YES forKey:@"enable_liquid_glass"];
+    }
+    BOOL glassEnabled = [defaults boolForKey:@"enable_liquid_glass"];
+    [defaults setBool:glassEnabled forKey:@"com.apple.SwiftUI.IgnoreSolariumOptOut"];
 }
