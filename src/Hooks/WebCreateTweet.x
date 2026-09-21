@@ -16,6 +16,7 @@
 //
 
 #import "HookHelpers.h"
+#import "Debug/NFBDebugger.h"
 
 // MARK: - Constants
 
@@ -795,6 +796,7 @@ static NSMutableURLRequest* webRequestFromNativeSend(NSURLRequest* request) {
             },
             20.0);
         if (WebXTID.length == 0) {
+            NFBDebugLog(@"[webtweet] no reroute: x-client-transaction-id unavailable");
             return nil;
         }
     }
@@ -802,13 +804,30 @@ static NSMutableURLRequest* webRequestFromNativeSend(NSURLRequest* request) {
     harvestSharedCookies();
 
     NSString* postingUserID = postingUserIDFromRequest(request);
-    if (postingUserID.length == 0) {
-        return nil;
-    }
-
     NSString *authToken = nil, *ct0 = nil;
-    if (!resolveWebCreds(postingUserID, &authToken, &ct0)) {
-        return nil;
+    if (postingUserID.length) {
+        if (!resolveWebCreds(postingUserID, &authToken, &ct0)) {
+            NFBDebugLog(@"[webtweet] no reroute: web creds unresolved for %@", postingUserID);
+            return nil;
+        }
+    } else {
+        // A bridged sign-in mounts a shell account whose OAuth token is the web
+        // auth_token itself, not the <userID>-<secret> form, so the poster cannot
+        // be read from it. Fall back to the single shared web session in the cookie
+        // jar - the same session the read injection uses - which is correct while
+        // one account is signed in.
+        if (WebAuthToken.length == 0) {
+            NFBDebugLog(@"[webtweet] no reroute: poster unreadable and no shared session");
+            return nil;
+        }
+        authToken = WebAuthToken;
+        ct0 = fetchCt0Sync(WebAuthToken, userIDFromTwid(WebTwid)) ?: WebCT0;
+        if (ct0.length == 0) {
+            NFBDebugLog(@"[webtweet] no reroute: shared session has no ct0");
+            return nil;
+        }
+        postingUserID = userIDFromTwid(WebTwid);
+        NFBDebugLog(@"[webtweet] reroute via shared session (uid=%@)", postingUserID ?: @"?");
     }
 
     NSMutableURLRequest* outgoing = [request mutableCopy];
@@ -817,8 +836,13 @@ static NSMutableURLRequest* webRequestFromNativeSend(NSURLRequest* request) {
     refreshXTID();
 
     // Tag the request so the task watcher can drop this account's ct0 on a 4xx.
-    objc_setAssociatedObject(outgoing, WebPostingUIDKey, postingUserID,
-                             OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    if (postingUserID.length) {
+        objc_setAssociatedObject(outgoing, WebPostingUIDKey, postingUserID,
+                                 OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    }
+    NFBDebugLog(@"[webtweet] rewrote CreateTweet -> web (auth=%lu ct0=%lu xtid=%lu)",
+                (unsigned long)authToken.length, (unsigned long)ct0.length,
+                (unsigned long)WebXTID.length);
     return outgoing;
 }
 
