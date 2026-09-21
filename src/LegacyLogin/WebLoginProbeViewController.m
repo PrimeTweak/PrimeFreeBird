@@ -461,9 +461,9 @@ static UIImage* nfbLoginBirdImage(CGSize size) {
 }
 
 - (void)webView:(WKWebView*)webView didFinishNavigation:(WKNavigation*)navigation {
-    // Reveal only once the flow settles on x.com, so the brief twitter.com landing
-    // ("Log in / Sign up") never flashes on the way through the redirect.
-    if ([webView.URL.host containsString:@"x.com"]) {
+    // Reveal only once the login flow itself is up, not the brief x.com landing
+    // ("Log in / Sign up") the redirect passes through first.
+    if ([webView.URL.absoluteString containsString:@"i/flow"]) {
         [self revealWebIfNeeded];
     }
     NFBDebugLog(@"[weblogin] settled at %@", webView.URL.absoluteString);
