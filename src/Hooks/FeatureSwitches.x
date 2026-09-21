@@ -583,6 +583,7 @@ static NSNumber* FeatureSwitchOverrideValueForKey(NSString* key) {
 %hook T1AccountsViewController
 
 - (void)private_startLoginFlowWithSender:(id)sender {
+    NFBDebugLog(@"[login-entry] startLoginFlow -> web login presented");
     [WebLoginProbeViewController presentFrom:(UIViewController*)self];
 }
 
@@ -595,6 +596,7 @@ static NSNumber* FeatureSwitchOverrideValueForKey(NSString* key) {
         %orig;
         return;
     }
+    NFBDebugLog(@"[login-entry] makeOnboardingViewController -> web login as root");
     completion([WebLoginProbeViewController rootNavigationController]);
 }
 

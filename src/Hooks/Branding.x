@@ -321,8 +321,8 @@ static NSString* PillLabelText(void) {
 
 // MARK: - Classic compose button
 
-// Two pieces restore the bird-era Tweet button: the plus glyph is remapped to the
-// quill in white, and the FAB is painted Twitter blue. The FAB is found as a round
+// Two pieces restore the bird-era Tweet button: the compose glyph is remapped to
+// the feather in white, and the FAB is painted Twitter blue. The FAB is found as a round
 // square control at least 50 pt wide inside the tab bar controller's view.
 
 static UIColor* NFBTwitterBlue(void) {
@@ -363,7 +363,7 @@ static id NFBNamedVector(id image, id name) {
 
 + (id)tfn_vectorImageNamed:(id)name fitsSize:(CGSize)size fillColor:(id)color {
     if (isComposePlusGlyph(name)) {
-        return %orig(@"quill", size, [UIColor whiteColor]);
+        return %orig(@"feather", size, [UIColor whiteColor]);
     }
     return NFBNamedVector(%orig(name, size, color), name);
 }
@@ -373,14 +373,14 @@ static id NFBNamedVector(id image, id name) {
                     fitsSize:(CGSize)size
                    fillColor:(id)color {
     if (isComposePlusGlyph(name)) {
-        return %orig(@"quill", variant, size, [UIColor whiteColor]);
+        return %orig(@"feather", variant, size, [UIColor whiteColor]);
     }
     return NFBNamedVector(%orig(name, variant, size, color), name);
 }
 
 + (id)tfn_vectorImageNamed:(id)name height:(double)height fillColor:(id)color {
     if (isComposePlusGlyph(name)) {
-        return %orig(@"quill", height, [UIColor whiteColor]);
+        return %orig(@"feather", height, [UIColor whiteColor]);
     }
     return NFBNamedVector(%orig(name, height, color), name);
 }
