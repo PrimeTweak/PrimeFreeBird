@@ -5,6 +5,7 @@
 
 #import "HookHelpers.h"
 #import "LegacyLogin/WebLoginProbeViewController.h"
+#import "Debug/NFBDebugger.h"
 
 // While set, -isSubscribedTo: (below) reports the account's genuine
 // subscription state instead of the forced premium tiers, so paths that need
@@ -595,6 +596,30 @@ static NSNumber* FeatureSwitchOverrideValueForKey(NSString* key) {
         return;
     }
     completion([WebLoginProbeViewController rootNavigationController]);
+}
+
+%end
+
+// MARK: - Skip the notification-permission onboarding subtask
+
+// The native onboarding runs its notification-permission subtask ("Never miss a
+// moment") around the bridged login, where it only flashes. Its own "Not now"
+// action is taken as it appears, so the flow moves on without the flash;
+// notifications stay reachable from Settings.
+@interface ONBNotificationsPermissionPromptSubtaskController : UIViewController
+@end
+
+%hook ONBNotificationsPermissionPromptSubtaskController
+
+- (void)viewWillAppear:(BOOL)animated {
+    %orig;
+    SEL notNow = NSSelectorFromString(@"notNow:");
+    if ([self respondsToSelector:notNow]) {
+        ((void (*)(id, SEL, id))objc_msgSend)(self, notNow, nil);
+        NFBDebugLog(@"[nux] notification-permission subtask skipped");
+    } else {
+        NFBDebugLog(@"[nux] notification-permission subtask has no notNow:");
+    }
 }
 
 %end
