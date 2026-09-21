@@ -19,10 +19,19 @@ static void nfbFabTree(UIView* v, NSInteger depth, NSMutableString* out) {
         [out appendString:@"  "];
     }
     CGRect f = v.frame;
-    [out appendFormat:@"%@ (%.0f,%.0f %.0fx%.0f) r=%.1f bg=%d a=%.1f hidden=%d\n",
+    NSString* extra = @"";
+    if ([v isKindOfClass:[UIImageView class]]) {
+        UIImage* img = ((UIImageView*)v).image;
+        id name = img ? objc_getAssociatedObject(
+                            img, @selector(tfn_vectorImageNamed:fitsSize:fillColor:))
+                      : nil;
+        extra = [NSString stringWithFormat:@" [img=%@ name=%@ sym=%d]", img ? @"y" : @"n",
+                          name ?: @"?", img ? (int)img.isSymbolImage : 0];
+    }
+    [out appendFormat:@"%@ (%.0f,%.0f %.0fx%.0f) r=%.1f bg=%d a=%.1f hidden=%d%@\n",
                       NSStringFromClass([v class]), f.origin.x, f.origin.y, f.size.width,
                       f.size.height, v.layer.cornerRadius, v.backgroundColor != nil, v.alpha,
-                      v.hidden];
+                      v.hidden, extra];
     for (UIView* sub in v.subviews) {
         nfbFabTree(sub, depth + 1, out);
     }
