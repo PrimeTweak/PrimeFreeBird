@@ -2027,8 +2027,12 @@ static UITableView* NFBNotifTableForCell(UIView* cell) {
                 }
             };
             scan((UIView*)self, 0);
-            NFBDebugLog(@"[btnprobe] dismissButton=%@ | controls: %@",
-                        button ? NSStringFromClass([button class]) : @"(nil)",
+            BOOL isBtn = [button isKindOfClass:[UIButton class]];
+            BOOL tagged = button && objc_getAssociatedObject(button, kNFBNotifGlyphKey) != nil;
+            UIImage* img = isBtn ? [(UIButton*)button imageForState:UIControlStateNormal] : nil;
+            NFBDebugLog(@"[btnprobe] dismissButton=%@ isUIButton=%d tagged=%d img=%@ | controls: %@",
+                        button ? NSStringFromClass([button class]) : @"(nil)", isBtn, tagged,
+                        img ? (img.isSymbolImage ? @"symbol" : @"raster") : @"nil",
                         controls.count ? [controls componentsJoinedByString:@"; "] : @"(none)");
         }
         if (![button isKindOfClass:[UIView class]]) {

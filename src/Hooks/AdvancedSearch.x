@@ -448,8 +448,14 @@ static void nfbAdvRescanSoon(void) {
 static void nfbAdvFadeNativeInSearchBar(UIView* bar) {
     BOOL hide = [BHTSettings boolForKey:@"advanced_search"];
     CGFloat wanted = hide ? 0.0 : 1.0;
+    UIView* field = nil;
     for (UIView* sub in bar.subviews) {
         if ([sub class] != [UIButton class]) {
+            // The search field is the widest plain view sitting at the leading edge.
+            if (sub.frame.origin.x < 8.0 &&
+                (!field || sub.frame.size.width > field.frame.size.width)) {
+                field = sub;
+            }
             continue;
         }
         UIButton* button = (UIButton*)sub;
@@ -462,6 +468,14 @@ static void nfbAdvFadeNativeInSearchBar(UIView* bar) {
         if (button.userInteractionEnabled == hide) {
             button.userInteractionEnabled = !hide;
         }
+    }
+    // The faded button keeps its slot, leaving a gap before Cancel. Rather than
+    // hide it (which re-runs the bar's layout and bounces), the field is stretched
+    // over that slot every pass, so the bar reads full-width without a layout change.
+    if (hide && field && field.frame.size.width < bar.bounds.size.width - 0.5) {
+        CGRect f = field.frame;
+        f.size.width = bar.bounds.size.width;
+        field.frame = f;
     }
 }
 
@@ -488,18 +502,26 @@ static void nfbAdvFadeNativeInSearchBar(UIView* bar) {
             NSString* cancelFrame = @"(not found)";
             NSString* cancelTitle = [[BHTBundle sharedBundle]
                 localizedTwitterStringForKey:@"CANCEL_ACTION_LABEL"];
-            UIView* node = bar.superview;
-            for (NSInteger hop = 0; node && hop < 8; hop++) {
-                for (UIView* sib in node.subviews) {
-                    if ([sib isKindOfClass:[UIButton class]] &&
-                        [((UIButton*)sib).currentTitle isEqualToString:cancelTitle]) {
-                        CGRect cf = [sib convertRect:sib.bounds toView:bar];
-                        cancelFrame = [NSString stringWithFormat:@"%@ (%.0f,%.0f %.0fx%.0f in bar)",
-                                       NSStringFromClass([sib class]), cf.origin.x,
-                                       cf.origin.y, cf.size.width, cf.size.height];
-                    }
+            UIView* root = bar;
+            while (root.superview) {
+                root = root.superview;
+            }
+            NSMutableArray<UIView*>* stack = [NSMutableArray arrayWithObject:root];
+            while (stack.count) {
+                UIView* v = stack.lastObject;
+                [stack removeLastObject];
+                if (([v isKindOfClass:[UIButton class]] &&
+                     [((UIButton*)v).currentTitle isEqualToString:cancelTitle]) ||
+                    ([v isKindOfClass:[UILabel class]] &&
+                     [((UILabel*)v).text isEqualToString:cancelTitle])) {
+                    UIView* t = [v isKindOfClass:[UIButton class]] ? v : v.superview;
+                    CGRect cf = [t convertRect:t.bounds toView:bar];
+                    cancelFrame = [NSString stringWithFormat:@"%@ (%.0f,%.0f %.0fx%.0f vs bar)",
+                                   NSStringFromClass([t class]), cf.origin.x, cf.origin.y,
+                                   cf.size.width, cf.size.height];
+                    break;
                 }
-                node = node.superview;
+                [stack addObjectsFromArray:v.subviews];
             }
             NFBDebugLog(@"[barprobe] bar %.0fx%.0f | subs: %@ | cancel: %@",
                         bar.bounds.size.width, bar.bounds.size.height,
