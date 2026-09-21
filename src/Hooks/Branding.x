@@ -488,8 +488,21 @@ static void styleComposeFAB(UIView* fab) {
         if (sub == fab) {
             return;
         }
+        NSString* cls = NSStringFromClass([sub class]);
         if ([sub isKindOfClass:[UIImageView class]]) {
             UIImageView* imageView = (UIImageView*)sub;
+            // Under Liquid Glass the fill is a full-size image; that is not the
+            // glyph, so hide it and let the blue disc show. Only the smaller glyph
+            // is shown, tinted and baked white.
+            if (imageView.bounds.size.width >= fab.bounds.size.width - 6) {
+                if (!imageView.hidden) {
+                    imageView.hidden = YES;
+                }
+                return;
+            }
+            if (imageView.alpha < 1.0) {
+                imageView.alpha = 1.0;
+            }
             BOOL alreadyTagged =
                 objc_getAssociatedObject(imageView, &kNFBFABGlyphKey) != nil;
             objc_setAssociatedObject(imageView, &kNFBFABGlyphKey, @YES,
@@ -502,6 +515,12 @@ static void styleComposeFAB(UIView* fab) {
             if (![imageView.tintColor isEqual:[UIColor whiteColor]]) {
                 imageView.tintColor = [UIColor whiteColor];
             }
+        } else if ([cls containsString:@"GradientView"]) {
+            // Liquid Glass fills the FAB with a gradient view instead of a
+            // visual-effect view; hide it so the solid blue disc shows.
+            if (!sub.hidden) {
+                sub.hidden = YES;
+            }
         } else if ([sub isKindOfClass:[UIVisualEffectView class]]) {
             UIVisualEffectView* effect = (UIVisualEffectView*)sub;
             if ([BHTSettings boolForKey:@"enable_liquid_glass"]) {
@@ -511,15 +530,21 @@ static void styleComposeFAB(UIView* fab) {
             } else if (!effect.hidden) {
                 effect.hidden = YES;
             }
-        } else if (![sub isKindOfClass:[UILabel class]] &&
-                   sub.subviews.count == 0 &&
-                   sub.backgroundColor) {
+        } else if (![sub isKindOfClass:[UILabel class]]) {
+            // A round disc, whether the classic one (hidden at alpha 0 by the
+            // redesign) or the Liquid Glass fill container: show it and paint it
+            // blue so the button reads solid.
             CGFloat r = sub.layer.cornerRadius;
             BOOL isDisc = r > 1.0 &&
                           fabs(sub.bounds.size.width - sub.bounds.size.height) < 2.0 &&
                           fabs(r - sub.bounds.size.width / 2.0) < 2.0;
-            if (isDisc && ![sub.backgroundColor isEqual:blue]) {
-                sub.backgroundColor = blue;
+            if (isDisc) {
+                if (sub.alpha < 1.0) {
+                    sub.alpha = 1.0;
+                }
+                if (![sub.backgroundColor isEqual:blue]) {
+                    sub.backgroundColor = blue;
+                }
             }
         }
     });
