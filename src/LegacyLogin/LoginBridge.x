@@ -23,23 +23,12 @@ static BOOL nfbBridgeIsTwitterAPI(NSString* url) {
 
 #pragma mark - Read injection over the shared web session
 
-// GraphQL mutations are left to WebCreateTweet.x, which reroutes them to the web
-// endpoint with its own bearer and x-client-transaction-id. Injecting here would
-// clobber that reroute, so only reads are touched.
-static BOOL nfbBridgeIsWrite(NSString* path) {
-    if (![path isKindOfClass:[NSString class]]) {
-        return NO;
-    }
-    static NSSet* writes = nil;
-    static dispatch_once_t once;
-    dispatch_once(&once, ^{
-        writes = [NSSet setWithArray:@[
-            @"CreateTweet", @"CreateNoteTweet", @"CreateRetweet", @"DeleteRetweet",
-            @"DeleteTweet", @"FavoriteTweet", @"UnfavoriteTweet", @"CreateBookmark",
-            @"DeleteBookmark"
-        ]];
-    });
-    return [writes containsObject:path.lastPathComponent];
+// Only CreateTweet is left to WebCreateTweet.x, which reroutes it to the web
+// endpoint with a per-operation x-client-transaction-id; injecting here would
+// clobber that reroute. Every other mutation authenticates by cookie like a read.
+static BOOL nfbBridgeIsCreateTweet(NSString* path) {
+    return [path isKindOfClass:[NSString class]] &&
+           [path.lastPathComponent isEqualToString:@"CreateTweet"];
 }
 
 // The read session is the shared web session: the one WebCreateTweet.x harvests
@@ -66,7 +55,7 @@ static NSURLRequest* nfbBridgeInject(NSURLRequest* req) {
     if (!req || !nfbBridgeIsTwitterAPI(req.URL.absoluteString)) {
         return req;
     }
-    if (nfbBridgeIsWrite(req.URL.path)) {
+    if (nfbBridgeIsCreateTweet(req.URL.path)) {
         return req;
     }
     NSString* authToken = nil;
