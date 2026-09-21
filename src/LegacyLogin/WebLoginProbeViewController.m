@@ -16,6 +16,7 @@ static NSString* const kNFBCsrfCookie = @"ct0";
 @property (nonatomic, strong) UIView* headerView;
 @property (nonatomic, strong) UIActivityIndicatorView* spinner;
 @property (nonatomic, strong) UILabel* statusLabel;
+@property (nonatomic, strong) UIButton* retryButton;
 @property (nonatomic, assign) BOOL sawAuth;
 @property (nonatomic, assign) BOOL asRoot;
 @property (nonatomic, assign) BOOL didStartInitialLoad;
@@ -68,6 +69,9 @@ static NSString* const kNFBCsrfCookie = @"ct0";
     self.webView.backgroundColor = [UIColor systemBackgroundColor];
     self.webView.scrollView.backgroundColor = [UIColor systemBackgroundColor];
     self.webView.translatesAutoresizingMaskIntoConstraints = NO;
+    // Kept hidden until the page finishes, so the redirect chain and the X splash
+    // never flash; the header and spinner cover the wait, then it fades in.
+    self.webView.alpha = 0.0;
     [self.view addSubview:self.webView];
 
     // Loading spinner and error text, in front of the web area.
@@ -86,6 +90,15 @@ static NSString* const kNFBCsrfCookie = @"ct0";
     self.statusLabel.translatesAutoresizingMaskIntoConstraints = NO;
     [self.view addSubview:self.statusLabel];
 
+    self.retryButton = [UIButton buttonWithType:UIButtonTypeSystem];
+    [self.retryButton setTitle:@"Retry" forState:UIControlStateNormal];
+    self.retryButton.hidden = YES;
+    self.retryButton.translatesAutoresizingMaskIntoConstraints = NO;
+    [self.retryButton addTarget:self
+                         action:@selector(reload)
+               forControlEvents:UIControlEventTouchUpInside];
+    [self.view addSubview:self.retryButton];
+
     [NSLayoutConstraint activateConstraints:@[
         [self.webView.topAnchor constraintEqualToAnchor:self.headerView.bottomAnchor],
         [self.webView.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor],
@@ -98,6 +111,9 @@ static NSString* const kNFBCsrfCookie = @"ct0";
                                                         constant:24],
         [self.statusLabel.trailingAnchor constraintEqualToAnchor:self.webView.trailingAnchor
                                                          constant:-24],
+        [self.retryButton.centerXAnchor constraintEqualToAnchor:self.webView.centerXAnchor],
+        [self.retryButton.topAnchor constraintEqualToAnchor:self.statusLabel.bottomAnchor
+                                                    constant:16],
     ]];
     // The page load itself is deferred to viewDidAppear so it never runs during
     // the presentation animation.
@@ -124,7 +140,7 @@ static NSString* const kNFBCsrfCookie = @"ct0";
     name.textColor = [UIColor labelColor];
 
     UILabel* tagline = [[UILabel alloc] init];
-    tagline.text = @"Le fil, sans le bruit.";
+    tagline.text = @"The feed, without the noise.";
     tagline.font = [UIFont systemFontOfSize:12 weight:UIFontWeightRegular];
     tagline.textColor = [UIColor secondaryLabelColor];
 
@@ -142,16 +158,6 @@ static NSString* const kNFBCsrfCookie = @"ct0";
     hair.translatesAutoresizingMaskIntoConstraints = NO;
     [header addSubview:hair];
 
-    UIButton* refresh = [UIButton buttonWithType:UIButtonTypeSystem];
-    [refresh setImage:[UIImage systemImageNamed:@"arrow.clockwise"]
-             forState:UIControlStateNormal];
-    refresh.tintColor = [UIColor secondaryLabelColor];
-    refresh.translatesAutoresizingMaskIntoConstraints = NO;
-    [refresh addTarget:self
-                  action:@selector(reload)
-        forControlEvents:UIControlEventTouchUpInside];
-    [header addSubview:refresh];
-
     NSMutableArray<NSLayoutConstraint*>* c = [NSMutableArray arrayWithArray:@[
         [header.topAnchor constraintEqualToAnchor:self.view.safeAreaLayoutGuide.topAnchor],
         [header.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor],
@@ -164,11 +170,7 @@ static NSString* const kNFBCsrfCookie = @"ct0";
         [hair.leadingAnchor constraintEqualToAnchor:header.leadingAnchor],
         [hair.trailingAnchor constraintEqualToAnchor:header.trailingAnchor],
         [hair.bottomAnchor constraintEqualToAnchor:header.bottomAnchor],
-        [hair.heightAnchor constraintEqualToConstant:0.5],
-        [refresh.trailingAnchor constraintEqualToAnchor:header.trailingAnchor constant:-12],
-        [refresh.topAnchor constraintEqualToAnchor:header.topAnchor constant:8],
-        [refresh.widthAnchor constraintEqualToConstant:36],
-        [refresh.heightAnchor constraintEqualToConstant:36]
+        [hair.heightAnchor constraintEqualToConstant:0.5]
     ]];
 
     if (!self.asRoot) {
@@ -365,6 +367,8 @@ static NSString* const kNFBCsrfCookie = @"ct0";
 - (void)reload {
     [self.spinner startAnimating];
     self.statusLabel.hidden = YES;
+    self.retryButton.hidden = YES;
+    self.webView.alpha = 0.0;
     NSURL* url = [NSURL URLWithString:@"https://twitter.com/login"];
     [self.webView loadRequest:[NSURLRequest requestWithURL:url]];
     NFBDebugLog(@"[weblogin] loading %@", url.absoluteString);
@@ -399,6 +403,12 @@ static NSString* const kNFBCsrfCookie = @"ct0";
 - (void)webView:(WKWebView*)webView didFinishNavigation:(WKNavigation*)navigation {
     [self.spinner stopAnimating];
     self.statusLabel.hidden = YES;
+    if (self.webView.alpha < 1.0) {
+        [UIView animateWithDuration:0.22
+                         animations:^{
+                           self.webView.alpha = 1.0;
+                         }];
+    }
     NFBDebugLog(@"[weblogin] settled at %@", webView.URL.absoluteString);
     WKHTTPCookieStore* store = webView.configuration.websiteDataStore.httpCookieStore;
     [store getAllCookies:^(NSArray<NSHTTPCookie*>* cookies) {
@@ -490,8 +500,9 @@ static NSString* const kNFBExchangeScript =
                        withError:(NSError*)error {
     [self.spinner stopAnimating];
     self.statusLabel.hidden = NO;
+    self.retryButton.hidden = NO;
     self.statusLabel.text =
-        [NSString stringWithFormat:@"Impossible de charger la page de connexion.\n\n%@\n\nTouchez rafraîchir pour réessayer.",
+        [NSString stringWithFormat:@"Could not load the login page.\n\n%@",
                                    error.localizedDescription];
     NFBDebugLog(@"[weblogin] provisional navigation failed (%ld): %@",
                 (long)error.code, error.localizedDescription);
