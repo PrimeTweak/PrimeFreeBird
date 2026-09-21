@@ -24,6 +24,7 @@
 
 static const void* kNFBAdvSearchBtnKey = &kNFBAdvSearchBtnKey;
 static const void* kNFBAdvSearchGreyKey = &kNFBAdvSearchGreyKey;
+static const void* kNFBAdvSlotCollapsedKey = &kNFBAdvSlotCollapsedKey;
 
 // Rows of Twitter's filter glyph on a 24-point grid: {centre y, handle centre x}.
 // The upper handle sits right of centre and the lower one left, so the two rows
@@ -448,6 +449,7 @@ static void nfbAdvRescanSoon(void) {
 static void nfbAdvFadeNativeInSearchBar(UIView* bar) {
     BOOL hide = [BHTSettings boolForKey:@"advanced_search"];
     CGFloat wanted = hide ? 0.0 : 1.0;
+    UIButton* nativeAdv = nil;
     for (UIView* sub in bar.subviews) {
         if ([sub class] != [UIButton class]) {
             continue;
@@ -456,12 +458,22 @@ static void nfbAdvFadeNativeInSearchBar(UIView* bar) {
         if (button.currentTitle.length > 0 || button.currentImage == nil) {
             continue;
         }
+        nativeAdv = button;
         if (button.alpha != wanted) {
             button.alpha = wanted;
         }
         if (button.userInteractionEnabled == hide) {
             button.userInteractionEnabled = !hide;
         }
+    }
+    // Fading the native button leaves its slot reserved, so a gap shows before
+    // Cancel. Removing it lets the bar flow the field full-width on its own - no
+    // frame is written here (writing one re-runs the bar's layout and freezes).
+    // Done once per bar; if the app re-adds it, it is left alone, so there is no loop.
+    if (hide && nativeAdv && !objc_getAssociatedObject(bar, kNFBAdvSlotCollapsedKey)) {
+        objc_setAssociatedObject(bar, kNFBAdvSlotCollapsedKey, @YES,
+                                 OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        [nativeAdv removeFromSuperview];
     }
 }
 
@@ -471,48 +483,6 @@ static void nfbAdvFadeNativeInSearchBar(UIView* bar) {
     %orig;
     @try {
         nfbAdvFadeNativeInSearchBar((UIView*)self);
-        // Measurement only: the bar's own subviews and the trailing Cancel, so
-        // the faded entry's footprint and Cancel's alignment can be laid out
-        // from real frames rather than guessed.
-        if ([BHTSettings boolForKey:@"debug_tools"] &&
-            !objc_getAssociatedObject(self, "nfbBarProbe")) {
-            objc_setAssociatedObject(self, "nfbBarProbe", @YES, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-            UIView* bar = (UIView*)self;
-            NSMutableArray<NSString*>* subs = [NSMutableArray array];
-            for (UIView* sub in bar.subviews) {
-                CGRect fr = sub.frame;
-                [subs addObject:[NSString stringWithFormat:@"%@ (%.0f,%.0f %.0fx%.0f) a=%.1f",
-                                 NSStringFromClass([sub class]), fr.origin.x, fr.origin.y,
-                                 fr.size.width, fr.size.height, sub.alpha]];
-            }
-            NSString* cancelFrame = @"(not found)";
-            NSString* cancelTitle = [[BHTBundle sharedBundle]
-                localizedTwitterStringForKey:@"CANCEL_ACTION_LABEL"];
-            UIView* root = bar;
-            while (root.superview) {
-                root = root.superview;
-            }
-            NSMutableArray<UIView*>* stack = [NSMutableArray arrayWithObject:root];
-            while (stack.count) {
-                UIView* v = stack.lastObject;
-                [stack removeLastObject];
-                if (([v isKindOfClass:[UIButton class]] &&
-                     [((UIButton*)v).currentTitle isEqualToString:cancelTitle]) ||
-                    ([v isKindOfClass:[UILabel class]] &&
-                     [((UILabel*)v).text isEqualToString:cancelTitle])) {
-                    UIView* t = [v isKindOfClass:[UIButton class]] ? v : v.superview;
-                    CGRect cf = [t convertRect:t.bounds toView:bar];
-                    cancelFrame = [NSString stringWithFormat:@"%@ (%.0f,%.0f %.0fx%.0f vs bar)",
-                                   NSStringFromClass([t class]), cf.origin.x, cf.origin.y,
-                                   cf.size.width, cf.size.height];
-                    break;
-                }
-                [stack addObjectsFromArray:v.subviews];
-            }
-            NFBDebugLog(@"[barprobe] bar %.0fx%.0f | subs: %@ | cancel: %@",
-                        bar.bounds.size.width, bar.bounds.size.height,
-                        [subs componentsJoinedByString:@"; "], cancelFrame);
-        }
     } @catch (id exception) {
     }
 }
