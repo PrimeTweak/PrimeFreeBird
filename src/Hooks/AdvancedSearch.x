@@ -471,6 +471,40 @@ static void nfbAdvFadeNativeInSearchBar(UIView* bar) {
     %orig;
     @try {
         nfbAdvFadeNativeInSearchBar((UIView*)self);
+        // Measurement only: the bar's own subviews and the trailing Cancel, so
+        // the faded entry's footprint and Cancel's alignment can be laid out
+        // from real frames rather than guessed.
+        if ([BHTSettings boolForKey:@"debug_tools"] &&
+            !objc_getAssociatedObject(self, "nfbBarProbe")) {
+            objc_setAssociatedObject(self, "nfbBarProbe", @YES, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+            UIView* bar = (UIView*)self;
+            NSMutableArray<NSString*>* subs = [NSMutableArray array];
+            for (UIView* sub in bar.subviews) {
+                CGRect fr = sub.frame;
+                [subs addObject:[NSString stringWithFormat:@"%@ (%.0f,%.0f %.0fx%.0f) a=%.1f",
+                                 NSStringFromClass([sub class]), fr.origin.x, fr.origin.y,
+                                 fr.size.width, fr.size.height, sub.alpha]];
+            }
+            NSString* cancelFrame = @"(not found)";
+            NSString* cancelTitle = [[BHTBundle sharedBundle]
+                localizedTwitterStringForKey:@"CANCEL_ACTION_LABEL"];
+            UIView* node = bar.superview;
+            for (NSInteger hop = 0; node && hop < 8; hop++) {
+                for (UIView* sib in node.subviews) {
+                    if ([sib isKindOfClass:[UIButton class]] &&
+                        [((UIButton*)sib).currentTitle isEqualToString:cancelTitle]) {
+                        CGRect cf = [sib convertRect:sib.bounds toView:bar];
+                        cancelFrame = [NSString stringWithFormat:@"%@ (%.0f,%.0f %.0fx%.0f in bar)",
+                                       NSStringFromClass([sib class]), cf.origin.x,
+                                       cf.origin.y, cf.size.width, cf.size.height];
+                    }
+                }
+                node = node.superview;
+            }
+            NFBDebugLog(@"[barprobe] bar %.0fx%.0f | subs: %@ | cancel: %@",
+                        bar.bounds.size.width, bar.bounds.size.height,
+                        [subs componentsJoinedByString:@"; "], cancelFrame);
+        }
     } @catch (id exception) {
     }
 }

@@ -2005,6 +2005,32 @@ static UITableView* NFBNotifTableForCell(UIView* cell) {
     }
     @try {
         id button = NFBNotifAsk(self, NSSelectorFromString(@"dismissButton"));
+        if ([BHTSettings boolForKey:@"debug_tools"] &&
+            !objc_getAssociatedObject(self, "nfbBtnProbe")) {
+            objc_setAssociatedObject(self, "nfbBtnProbe", @YES, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+            NSMutableArray<NSString*>* controls = [NSMutableArray array];
+            void (^scan)(UIView*, NSInteger) = nil;
+            __block __weak void (^weakScan)(UIView*, NSInteger) = nil;
+            weakScan = scan = ^(UIView* v, NSInteger depth) {
+                if (!v || depth > 6) {
+                    return;
+                }
+                for (UIView* sub in v.subviews) {
+                    if ([sub isKindOfClass:[UIControl class]] ||
+                        [sub isKindOfClass:[UIButton class]]) {
+                        CGRect fr = sub.frame;
+                        [controls addObject:[NSString stringWithFormat:@"%@ (%.0f,%.0f %.0fx%.0f)",
+                                             NSStringFromClass([sub class]), fr.origin.x,
+                                             fr.origin.y, fr.size.width, fr.size.height]];
+                    }
+                    weakScan(sub, depth + 1);
+                }
+            };
+            scan((UIView*)self, 0);
+            NFBDebugLog(@"[btnprobe] dismissButton=%@ | controls: %@",
+                        button ? NSStringFromClass([button class]) : @"(nil)",
+                        controls.count ? [controls componentsJoinedByString:@"; "] : @"(none)");
+        }
         if (![button isKindOfClass:[UIView class]]) {
             return;
         }
