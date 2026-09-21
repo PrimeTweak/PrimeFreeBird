@@ -480,7 +480,9 @@ static UIImage* nfbLoginBirdImage(CGSize size) {
     self.retryButton.hidden = YES;
     self.webView.alpha = 0.0;
     self.didRevealWeb = NO;
-    NSURL* url = [NSURL URLWithString:@"https://twitter.com/login"];
+    // The flow entry directly, not twitter.com/login: that route bounces through
+    // the x.com landing before reaching the same flow, and each hop is wait time.
+    NSURL* url = [NSURL URLWithString:@"https://x.com/i/flow/login"];
     [self.webView loadRequest:[NSURLRequest requestWithURL:url]];
     NFBDebugLog(@"[weblogin] loading %@", url.absoluteString);
     // Safety net: if the flow never settles on x.com, show whatever loaded rather
