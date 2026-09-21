@@ -5,11 +5,49 @@
 #import <objc/message.h>
 #import "Debug/NFBDebugger.h"
 #import "LoginBridge.h"
+#import "Core/BHTBundle.h"
 
 // The cookies that prove a real session: the auth token and the CSRF token the
 // API calls need. Their arrival after login is what this screen measures.
 static NSString* const kNFBAuthCookie = @"auth_token";
 static NSString* const kNFBCsrfCookie = @"ct0";
+
+// The tweak's own bird, rendered from the PDF it already ships (the same source as
+// the nav-bar logo), so the login header carries the app's branding instead of an
+// SF Symbol. Template mode lets the header tint it.
+static UIImage* nfbLoginBirdImage(CGSize size) {
+    NSURL* url = [[BHTBundle sharedBundle] pathForFile:@"LaunchTwitterBird.pdf"];
+    if (!url || size.width < 1 || size.height < 1) {
+        return nil;
+    }
+    CGPDFDocumentRef pdf = CGPDFDocumentCreateWithURL((__bridge CFURLRef)url);
+    if (!pdf) {
+        return nil;
+    }
+    UIImage* rendered = nil;
+    CGPDFPageRef page = CGPDFDocumentGetPage(pdf, 1);
+    if (page) {
+        UIGraphicsImageRendererFormat* fmt = [UIGraphicsImageRendererFormat preferredFormat];
+        fmt.opaque = NO;
+        UIGraphicsImageRenderer* renderer =
+            [[UIGraphicsImageRenderer alloc] initWithSize:size format:fmt];
+        rendered = [renderer imageWithActions:^(UIGraphicsImageRendererContext* ctx) {
+          CGContextRef c = ctx.CGContext;
+          CGRect box = CGPDFPageGetBoxRect(page, kCGPDFCropBox);
+          CGFloat scale = MIN(size.width / box.size.width, size.height / box.size.height);
+          CGFloat drawnW = box.size.width * scale;
+          CGFloat drawnH = box.size.height * scale;
+          CGContextTranslateCTM(c, (size.width - drawnW) / 2.0,
+                                size.height - (size.height - drawnH) / 2.0);
+          CGContextScaleCTM(c, 1, -1);
+          CGContextScaleCTM(c, scale, scale);
+          CGContextDrawPDFPage(c, page);
+        }];
+        rendered = [rendered imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate];
+    }
+    CGPDFDocumentRelease(pdf);
+    return rendered;
+}
 
 @interface WebLoginProbeViewController () <WKNavigationDelegate, WKScriptMessageHandler>
 @property (nonatomic, strong) WKWebView* webView;
@@ -20,6 +58,7 @@ static NSString* const kNFBCsrfCookie = @"ct0";
 @property (nonatomic, assign) BOOL sawAuth;
 @property (nonatomic, assign) BOOL asRoot;
 @property (nonatomic, assign) BOOL didStartInitialLoad;
+@property (nonatomic, assign) BOOL didRevealWeb;
 @end
 
 @implementation WebLoginProbeViewController
@@ -129,7 +168,7 @@ static NSString* const kNFBCsrfCookie = @"ct0";
     self.headerView = header;
 
     UIImageView* bird =
-        [[UIImageView alloc] initWithImage:[UIImage systemImageNamed:@"bird.fill"]];
+        [[UIImageView alloc] initWithImage:nfbLoginBirdImage(CGSizeMake(40, 40))];
     bird.tintColor = [UIColor colorWithRed:0.114 green:0.631 blue:0.949 alpha:1.0];
     bird.contentMode = UIViewContentModeScaleAspectFit;
     bird.translatesAutoresizingMaskIntoConstraints = NO;
@@ -364,14 +403,35 @@ static NSString* const kNFBCsrfCookie = @"ct0";
                    }];
 }
 
+- (void)revealWebIfNeeded {
+    if (self.didRevealWeb) {
+        return;
+    }
+    self.didRevealWeb = YES;
+    [self.spinner stopAnimating];
+    self.statusLabel.hidden = YES;
+    [UIView animateWithDuration:0.22
+                     animations:^{
+                       self.webView.alpha = 1.0;
+                     }];
+}
+
 - (void)reload {
     [self.spinner startAnimating];
     self.statusLabel.hidden = YES;
     self.retryButton.hidden = YES;
     self.webView.alpha = 0.0;
+    self.didRevealWeb = NO;
     NSURL* url = [NSURL URLWithString:@"https://twitter.com/login"];
     [self.webView loadRequest:[NSURLRequest requestWithURL:url]];
     NFBDebugLog(@"[weblogin] loading %@", url.absoluteString);
+    // Safety net: if the flow never settles on x.com, show whatever loaded rather
+    // than spin forever.
+    __weak typeof(self) weakSelf = self;
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(10.0 * NSEC_PER_SEC)),
+                   dispatch_get_main_queue(), ^{
+                     [weakSelf revealWebIfNeeded];
+                   });
 }
 
 // After every page settles, the cookie jar is read and the two session cookies
@@ -401,13 +461,10 @@ static NSString* const kNFBCsrfCookie = @"ct0";
 }
 
 - (void)webView:(WKWebView*)webView didFinishNavigation:(WKNavigation*)navigation {
-    [self.spinner stopAnimating];
-    self.statusLabel.hidden = YES;
-    if (self.webView.alpha < 1.0) {
-        [UIView animateWithDuration:0.22
-                         animations:^{
-                           self.webView.alpha = 1.0;
-                         }];
+    // Reveal only once the flow settles on x.com, so the brief twitter.com landing
+    // ("Log in / Sign up") never flashes on the way through the redirect.
+    if ([webView.URL.host containsString:@"x.com"]) {
+        [self revealWebIfNeeded];
     }
     NFBDebugLog(@"[weblogin] settled at %@", webView.URL.absoluteString);
     WKHTTPCookieStore* store = webView.configuration.websiteDataStore.httpCookieStore;
@@ -498,6 +555,11 @@ static NSString* const kNFBExchangeScript =
 - (void)webView:(WKWebView*)webView
     didFailProvisionalNavigation:(WKNavigation*)navigation
                        withError:(NSError*)error {
+    // A redirect supersedes the previous load and cancels it; that is not a real
+    // failure, so leave the spinner running.
+    if (error.code == NSURLErrorCancelled) {
+        return;
+    }
     [self.spinner stopAnimating];
     self.statusLabel.hidden = NO;
     self.retryButton.hidden = NO;

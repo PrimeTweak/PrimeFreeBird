@@ -106,6 +106,40 @@ static NSURLRequest* nfbBridgeInject(NSURLRequest* req) {
 
 #pragma mark - Account mount (the login VC's helpers are file-local, so replicated)
 
+// Prompts a restart once the account is live: the native chrome (Liquid Glass,
+// themed bars) only fully applies on a fresh launch. Same quit-and-relaunch
+// mechanism the tweak's settings already use.
+static void nfbBridgeShowRestartPrompt(void) {
+    UIWindow* keyWindow = nil;
+    for (UIWindow* window in UIApplication.sharedApplication.windows) {
+        if (window.isKeyWindow) {
+            keyWindow = window;
+            break;
+        }
+    }
+    UIViewController* top = keyWindow.rootViewController;
+    if (!top) {
+        return;
+    }
+    while (top.presentedViewController) {
+        top = top.presentedViewController;
+    }
+    UIAlertController* alert = [UIAlertController
+        alertControllerWithTitle:@"Almost there"
+                         message:@"Restart Twitter to finish loading the interface."
+                  preferredStyle:UIAlertControllerStyleAlert];
+    [alert addAction:[UIAlertAction actionWithTitle:@"Later"
+                                              style:UIAlertActionStyleCancel
+                                            handler:nil]];
+    [alert addAction:[UIAlertAction actionWithTitle:@"Restart now"
+                                              style:UIAlertActionStyleDefault
+                                            handler:^(UIAlertAction* action) {
+                                              [[NSUserDefaults standardUserDefaults] synchronize];
+                                              exit(0);
+                                            }]];
+    [top presentViewController:alert animated:YES completion:nil];
+}
+
 // Registers the account with the app's account service and switches the UI to it,
 // dismissing the login screen first. Mirrors the login controller's own sequence.
 static void nfbBridgeMount(NSString* screen, long long uid, NSString* token, NSString* secret,
@@ -155,6 +189,12 @@ static void nfbBridgeMount(NSString* screen, long long uid, NSString* token, NSS
             ((void (*)(id, SEL, id, BOOL))objc_msgSend)(host, viewSel, account, YES);
         }
         NFBDebugLog(@"[bridge] switched to account (host=%d)", host != nil);
+        // Once the native account is live, prompt the restart that settles the
+        // themed chrome; a short delay lets the switch animation land first.
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.8 * NSEC_PER_SEC)),
+                       dispatch_get_main_queue(), ^{
+                         nfbBridgeShowRestartPrompt();
+                       });
     };
 
     UIViewController* dismisser = presenter.presentingViewController ?: presenter;
