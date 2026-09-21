@@ -2115,6 +2115,9 @@ static UITableView* NFBNotifTableForCell(UIView* cell) {
 // glyph, so the cross set on the cell is overwritten - the source of the mismatched
 // buttons. Enforced here, in the button's own layout (the last word), and only
 // while its image is not already ours, so there is no re-layout loop.
+@interface TFNDismissButton : UIButton
+@end
+
 %hook TFNDismissButton
 
 - (void)layoutSubviews {
