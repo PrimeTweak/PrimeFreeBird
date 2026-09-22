@@ -402,7 +402,7 @@ static const CGFloat kNFBNotifBarHeight = 57.0;
         [clear.trailingAnchor constraintEqualToAnchor:bar.trailingAnchor constant:-14],
         [clear.leadingAnchor constraintGreaterThanOrEqualToAnchor:count.trailingAnchor
                                                          constant:12],
-        [clear.topAnchor constraintEqualToAnchor:bar.topAnchor constant:11],
+        [clear.centerYAnchor constraintEqualToAnchor:bar.centerYAnchor],
         [clear.heightAnchor constraintEqualToConstant:34],
         [clear.widthAnchor constraintGreaterThanOrEqualToConstant:96],
     ]];
