@@ -215,25 +215,32 @@ static const CGFloat kNFBNotifPillPadding = 8.0;   // gauche et droite seulement
 - (void)viewDidLayoutSubviews {
     [super viewDidLayoutSubviews];
     [self.tableView bringSubviewToFront:self.pinnedBar];
-    [self liftPinnedBar];
     [self updateBarMaterial];
     [self updatePreferredSize];
 }
 
-// With an arrow the bubble hides the bottom of the content; the pinned bar and
-// the rows' inset rise by that amount, and the popover grows by it.
+- (void)viewDidAppear:(BOOL)animated {
+    [super viewDidAppear:animated];
+    [self liftPinnedBar];
+}
+
+// The bubble hides the bottom of the content by about the arrow's height. Read
+// once, after the popover settles: mid-resize the bubble's shape lags its frame,
+// and a reading then would feed back into the size it corrects.
 - (void)liftPinnedBar {
-    if (!self.compact || !self.pinnedBar) {
+    if (!self.compact || !self.pinnedBar || self.hiddenBottom > 0.0) {
         return;
     }
     CGFloat hidden = NFBPopoverHiddenBottom(self.view);
-    if (fabs(hidden - self.hiddenBottom) < 0.5) {
+    // Anything beyond a few arrows' height is a stale reading, not the arrow.
+    if (hidden < 0.5 || hidden > 40.0) {
         return;
     }
     self.hiddenBottom = hidden;
     self.pinnedBarBottom.constant = -hidden;
     self.tableView.contentInset = UIEdgeInsetsMake(0, 0, kNFBNotifBarHeight + hidden, 0);
     self.tableView.verticalScrollIndicatorInsets = self.tableView.contentInset;
+    [self updatePreferredSize];
 }
 
 // The bar's material fades in as rows pass under it, the way system bars do.
