@@ -1085,9 +1085,17 @@ static void nfbClearStaleFades(UIView* view, NSInteger depth) {
 // The glass is laid behind its content, the recipe the tab bar and the toasts
 // already use: real glass when the class is there, thick material otherwise.
 static const NSInteger kNFBReplyGlassTag = 0x4E464247;
-// Side margin of the floating capsule. A little narrower than the tab bar's so
-// the reply box reads a touch wider, closer to the native composer.
-static const CGFloat kNFBReplyGlassInset = 14.0;
+// Side margin of the floating capsule. At rest it matches the tab bar; while
+// the keyboard is up it widens toward the native composer. The change rides the
+// keyboard animation (see the keyboard observers below).
+static const CGFloat kNFBReplyGlassInsetRest = 21.0;
+static const CGFloat kNFBReplyGlassInsetFocused = 14.0;
+static BOOL gNFBReplyFocused = NO;
+static __weak UIView* gNFBReplyBar = nil;
+
+static CGFloat nfbReplyInset(void) {
+    return gNFBReplyFocused ? kNFBReplyGlassInsetFocused : kNFBReplyGlassInsetRest;
+}
 
 // The bar sits flush on the tab bar. The capsule is lifted off its bottom edge
 // so the two read as two floating pieces rather than one two-storey block.
@@ -1218,7 +1226,8 @@ static void nfbGlassifyReplyBar(UIView* bar) {
     }
     // A floating capsule, inset from both edges, not a full-bleed slab. The keyboard
     // resizes this bar, so the frame is taken on every pass.
-    CGRect box = CGRectInset(bar.bounds, kNFBReplyGlassInset, 0.0);
+    CGFloat inset = nfbReplyInset();
+    CGRect box = CGRectInset(bar.bounds, inset, 0.0);
     box.size.height = MAX(box.size.height - kNFBReplyGlassGap, 1.0);
     if (!CGRectEqualToRect(glass.frame, box)) {
         glass.frame = box;
@@ -1231,7 +1240,48 @@ static void nfbGlassifyReplyBar(UIView* bar) {
     nfbHideReplyHairlines(bar, 0);
     nfbClearReplyBackdrop(bar);
     nfbClearReplyFieldFill(bar);
-    nfbInsetReplyContent(bar, kNFBReplyGlassInset, kNFBReplyGlassGap);
+    nfbInsetReplyContent(bar, inset, kNFBReplyGlassGap);
+}
+
+// The keyboard sets the focused state, and the width change is run inside the
+// keyboard's own animation so the capsule widens or narrows in step with it.
+static void nfbReplyInstallKeyboardObservers(void) {
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+        void (^apply)(NSNotification*, BOOL) = ^(NSNotification* note, BOOL focused) {
+            gNFBReplyFocused = focused;
+            UIView* bar = gNFBReplyBar;
+            if (!bar.window) {
+                return;
+            }
+            NSTimeInterval duration =
+                [note.userInfo[UIKeyboardAnimationDurationUserInfoKey] doubleValue];
+            UIViewAnimationCurve curve = (UIViewAnimationCurve)
+                [note.userInfo[UIKeyboardAnimationCurveUserInfoKey] integerValue];
+            [UIView animateWithDuration:duration
+                                  delay:0.0
+                                options:(UIViewAnimationOptions)(curve << 16)
+                             animations:^{
+                [bar setNeedsLayout];
+                [bar layoutIfNeeded];
+            }
+                             completion:nil];
+        };
+        [[NSNotificationCenter defaultCenter]
+            addObserverForName:UIKeyboardWillShowNotification
+                        object:nil
+                         queue:[NSOperationQueue mainQueue]
+                    usingBlock:^(NSNotification* note) {
+            apply(note, YES);
+        }];
+        [[NSNotificationCenter defaultCenter]
+            addObserverForName:UIKeyboardWillHideNotification
+                        object:nil
+                         queue:[NSOperationQueue mainQueue]
+                    usingBlock:^(NSNotification* note) {
+            apply(note, NO);
+        }];
+    });
 }
 
 %hook T1PersistentComposeView
@@ -1239,6 +1289,8 @@ static void nfbGlassifyReplyBar(UIView* bar) {
 - (void)layoutSubviews {
     %orig;
     @try {
+        gNFBReplyBar = (UIView*)self;
+        nfbReplyInstallKeyboardObservers();
         nfbGlassifyReplyBar((UIView*)self);
     } @catch (id exception) {
     }
