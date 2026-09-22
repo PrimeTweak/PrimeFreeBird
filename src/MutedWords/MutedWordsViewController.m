@@ -28,20 +28,6 @@ static const CGFloat kNFBTranslateBarHeight = 44.0;
 static const CGFloat kNFBCompactRowMargin = 14.0;
 static const NSInteger kNFBTickTag = 7701;
 
-// The material iOS gives its bars. Liquid Glass exists from iOS 26 and is
-// resolved by name because the build SDK predates it; older systems fall back
-// to the chrome material bars used before.
-static UIVisualEffect* NFBBarMaterial(void) {
-    Class glass = NSClassFromString(@"UIGlassEffect");
-    if (glass) {
-        UIVisualEffect* effect = [[glass alloc] init];
-        if (effect) {
-            return effect;
-        }
-    }
-    return [UIBlurEffect effectWithStyle:UIBlurEffectStyleSystemChromeMaterial];
-}
-
 NSString* const kNFBMutedWordsKey = @"nfb_muted_words";
 NSString* const kNFBMutedWholeWordsKey = @"nfb_muted_whole_words";
 NSString* const kNFBMutedInConversationsKey = @"nfb_muted_in_conversations";
@@ -160,8 +146,8 @@ NSString* const kNFBMutedIncludeRepostsKey = @"nfb_muted_include_reposts";
 @property (nonatomic, strong) UIButton* durationButton;
 @property (nonatomic, strong) UIButton* removeButton;
 // The two shapes this row takes. A hidden view keeps its slot in Auto Layout,
-// so the constraints move with the accessories rather than the visibility
-// alone — otherwise the text still stops where the buttons used to be.
+// so the constraints move with the accessories, not just their visibility, or
+// the text would stop at the hidden buttons.
 - (void)applyTermRow;
 // A hidden conversation: no accessories, the badge only when its author is
 // known, and the text running the full width at the list's own margin — the
@@ -401,6 +387,8 @@ NSString* const kNFBMutedIncludeRepostsKey = @"nfb_muted_include_reposts";
 @property (nonatomic, strong) UISwitch* pinnedSwitch;
 @property (nonatomic, strong) UIVisualEffectView* headerMaterial;
 @property (nonatomic, strong) UIVisualEffectView* barMaterial;
+@property (nonatomic, strong) NSLayoutConstraint* pinnedBarBottom;
+@property (nonatomic, assign) CGFloat hiddenBottom;
 @property (nonatomic, assign) CGFloat pinnedHeaderHeight;
 @end
 
@@ -511,8 +499,24 @@ static NSMutableArray<NSString*>* NFBKeptLanguageList(void) {
     // on every layout pass.
     [self.tableView bringSubviewToFront:self.pinnedHeader];
     [self.tableView bringSubviewToFront:self.pinnedBar];
+    [self liftPinnedBar];
     [self updateBarMaterials];
     [self updatePreferredSize];
+}
+
+// With an arrow the bubble hides the bottom of the content; the switch bar and
+// the rows' inset rise by that amount, and the measured size grows with it.
+- (void)liftPinnedBar {
+    if (!self.compact || !self.pinnedBar) {
+        return;
+    }
+    CGFloat hidden = NFBPopoverHiddenBottom(self.view);
+    if (fabs(hidden - self.hiddenBottom) < 0.5) {
+        return;
+    }
+    self.hiddenBottom = hidden;
+    self.pinnedBarBottom.constant = -hidden;
+    [self updatePinnedInsets];
 }
 
 - (void)viewDidLoad {
@@ -608,7 +612,7 @@ static NSMutableArray<NSString*>* NFBKeptLanguageList(void) {
             [header.topAnchor constraintEqualToAnchor:tableFrame.topAnchor],
             [header.heightAnchor constraintEqualToConstant:height],
         ]];
-        self.headerMaterial = [self materialBehind:header];
+        self.headerMaterial = NFBMaterialBehind(header);
         self.pinnedHeader = header;
         self.pinnedHeaderHeight = height;
         [self installTranslateBar];
@@ -625,24 +629,6 @@ static NSMutableArray<NSString*>* NFBKeptLanguageList(void) {
     header.autoresizingMask = UIViewAutoresizingFlexibleWidth;
     [header layoutIfNeeded];
     self.tableView.tableHeaderView = header;
-}
-
-// The material sits behind a pinned view's own contents, invisible until
-// something scrolls under it.
-- (UIVisualEffectView*)materialBehind:(UIView*)host {
-    UIVisualEffectView* material =
-        [[UIVisualEffectView alloc] initWithEffect:NFBBarMaterial()];
-    material.translatesAutoresizingMaskIntoConstraints = NO;
-    material.userInteractionEnabled = NO;
-    material.alpha = 0.0;
-    [host insertSubview:material atIndex:0];
-    [NSLayoutConstraint activateConstraints:@[
-        [material.leadingAnchor constraintEqualToAnchor:host.leadingAnchor],
-        [material.trailingAnchor constraintEqualToAnchor:host.trailingAnchor],
-        [material.topAnchor constraintEqualToAnchor:host.topAnchor],
-        [material.bottomAnchor constraintEqualToAnchor:host.bottomAnchor],
-    ]];
-    return material;
 }
 
 // The switch is held against the bottom of the table's frame, below the rows
@@ -693,10 +679,11 @@ static NSMutableArray<NSString*>* NFBKeptLanguageList(void) {
         [hairline.heightAnchor constraintEqualToConstant:0.5],
         [bar.leadingAnchor constraintEqualToAnchor:tableFrame.leadingAnchor],
         [bar.trailingAnchor constraintEqualToAnchor:tableFrame.trailingAnchor],
-        [bar.bottomAnchor constraintEqualToAnchor:tableFrame.bottomAnchor],
         [bar.heightAnchor constraintEqualToConstant:kNFBTranslateBarHeight],
     ]];
-    self.barMaterial = [self materialBehind:bar];
+    self.pinnedBarBottom = [bar.bottomAnchor constraintEqualToAnchor:tableFrame.bottomAnchor];
+    self.pinnedBarBottom.active = YES;
+    self.barMaterial = NFBMaterialBehind(bar);
     self.pinnedBar = bar;
     self.pinnedSwitch = toggle;
 }
@@ -709,7 +696,7 @@ static NSMutableArray<NSString*>* NFBKeptLanguageList(void) {
     }
     BOOL languages = self.mode == 1;
     self.pinnedBar.hidden = !languages;
-    CGFloat bottom = languages ? kNFBTranslateBarHeight : 0.0;
+    CGFloat bottom = (languages ? kNFBTranslateBarHeight : 0.0) + self.hiddenBottom;
     UIEdgeInsets insets =
         UIEdgeInsetsMake(self.pinnedHeaderHeight, 0, bottom, 0);
     self.tableView.contentInset = insets;
