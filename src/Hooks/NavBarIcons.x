@@ -1085,9 +1085,9 @@ static void nfbClearStaleFades(UIView* view, NSInteger depth) {
 // The glass is laid behind its content, the recipe the tab bar and the toasts
 // already use: real glass when the class is there, thick material otherwise.
 static const NSInteger kNFBReplyGlassTag = 0x4E464247;
-// Matched to the floating tab bar below, measured at 21 points of margin, so
-// the two capsules line up instead of one overhanging the other.
-static const CGFloat kNFBReplyGlassInset = 21.0;
+// Side margin of the floating capsule. A little narrower than the tab bar's so
+// the reply box reads a touch wider, closer to the native composer.
+static const CGFloat kNFBReplyGlassInset = 14.0;
 
 // The bar sits flush on the tab bar. The capsule is lifted off its bottom edge
 // so the two read as two floating pieces rather than one two-storey block.

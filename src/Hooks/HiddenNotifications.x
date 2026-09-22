@@ -1543,12 +1543,25 @@ reconfigureItemIdentifiers:(id)identifiers
             popover.sourceView = sender;
             popover.sourceRect = ((UIView*)sender).bounds;
         } else if ([sender isKindOfClass:[UIBarButtonItem class]]) {
-            UIView* anchor = ((UIBarButtonItem*)sender).customView;
+            UIBarButtonItem* item = (UIBarButtonItem*)sender;
+            UIView* anchor = item.customView;
+            if (!anchor) {
+                // An image item has no customView, and barButtonItem anchoring
+                // draws no arrow inside this bar; its rendered view carries the
+                // on-screen rect the arrow needs.
+                @try {
+                    UIView* rendered = [item valueForKey:@"view"];
+                    if ([rendered isKindOfClass:[UIView class]]) {
+                        anchor = rendered;
+                    }
+                } @catch (id exception) {
+                }
+            }
             if (anchor) {
                 popover.sourceView = anchor;
                 popover.sourceRect = anchor.bounds;
             } else {
-                popover.barButtonItem = sender;
+                popover.barButtonItem = item;
             }
         }
         popover.permittedArrowDirections = UIPopoverArrowDirectionUp;
