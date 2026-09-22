@@ -1,26 +1,6 @@
-//
-//  DarkModeStyle.x
-//  PrimeFreeBird
-//
-//  Dark mode style selector (System / Dim / Gray / Pure black).
-//
-//  The Dim color (#15202b) and the direct-background interception approach are
-//  adapted from nyaathea's BHDimPalette and the BHTThemeDirectBackgroundHooks
-//  system in PrimeFreeBird/tweak. Rather than recoloring palette getters (which
-//  the navigation bars and chrome don't read), this intercepts the color
-//  setters themselves and, only when the incoming color is one of Twitter's
-//  dark backgrounds, swaps in the selected shade. Tinted colors, icons and
-//  translucent overlays are left untouched by the filter.
-//
-//  Dark chrome is not one flat color: the app draws the base surface near
-//  black, anything elevated a step lighter, and pressed or selected rows a
-//  step lighter still. That grading is read from the incoming brightness and
-//  answered with a matching shade, so sheets, cards and selection states keep
-//  their separation instead of collapsing onto the background.
-//
-//  A surface that carries no color at all — the search pill, drawn as an
-//  image — is handled separately at the end of this file.
-//
+// Dark mode styles (Dim #15202b, Gray, Pure black), applied by intercepting the
+// backgrounds directly rather than recolouring palette getters, which the
+// navigation chrome ignores.
 
 #import "ThemeColor/DarkModeStyle.h"
 #import "Core/BHTSettings.h"

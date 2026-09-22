@@ -1,9 +1,4 @@
-//
-//  AppIconViewController.h
-//  PrimeFreeBird
-//
-//  Created by Bandar Alruwaili on 10/12/2023.
-//
+// The app icon picker screen.
 
 #import <UIKit/UIKit.h>
 

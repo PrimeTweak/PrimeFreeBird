@@ -1,17 +1,6 @@
-//
-//  RefreshSounds.x
-//  PrimeFreeBird
-//
-//  Restores the classic pull-to-refresh sound.
-//
-//  The feed's pull-to-refresh moved to SwiftUI: the old control hook is gone from
-//  the binary, neither the request setter nor the central sound player sits on the
-//  gesture path, and the native sound files were removed from the app.
-//
-//  The gesture is still a scroll, so the pull is detected through the ObjC scroll
-//  delegate on TFNItemsDataViewController and the sound played on release past a
-//  threshold. The file must be PCM: AudioServicesCreateSystemSoundID has no AAC
-//  decoder, and an .aac created without error stays silent.
+// Restores the classic pull-to-refresh sound: the pull is detected through the
+// scroll delegate and the sound played on release. The file must be PCM, since
+// AudioServicesCreateSystemSoundID has no AAC decoder.
 
 #import "HookHelpers.h"
 
@@ -58,8 +47,8 @@ static void NFBPlayRefreshSound(void) {
 %end
 
 %ctor {
-    // AudioToolbox n'est pas lie au tweak : on lie ses symboles paresseusement
-    // avant tout appel a AudioServices.
+    // AudioToolbox is not linked by the tweak: its symbols are loaded lazily before
+    // any AudioServices call.
     dlopen("/System/Library/Frameworks/AudioToolbox.framework/AudioToolbox", RTLD_LAZY);
     %init;
 }

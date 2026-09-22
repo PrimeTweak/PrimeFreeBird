@@ -1,25 +1,5 @@
-//
-//  NFBDebugger.h
-//
-//  A built-in debugger for the tweak. Three jobs:
-//
-//    1. HEALTH — at launch, check every class and method the tweak hooks, and
-//       every class it resolves by name, against the running app. A missing one
-//       means Twitter renamed or removed it and that feature is silently dead.
-//       This is the check that would have named today's profile-button bug in
-//       one line instead of a probe, a build and a Console session.
-//
-//    2. CAPTURE — shake the device on a misbehaving screen and the whole view
-//       hierarchy is frozen into a report: classes, frames, colours, render
-//       modes, and the tweak's own marks (below).
-//
-//    3. MARKS + LOG — the tweak calls NFBMark() wherever it claims a view, and
-//       NFBDebugLog() wherever it makes a decision. Both surface in the report,
-//       so a capture says not just what a view is but what the tweak did to it.
-//
-//  The report is written to a file and opened in the share sheet. All of it is
-//  gated behind the existing flex_twitter setting: zero cost when off.
-//
+// The built-in debugger: hook health at launch, a decision journal, captures of
+// the screen state and the watch list. Inert unless debug_tools is on.
 
 #import <UIKit/UIKit.h>
 

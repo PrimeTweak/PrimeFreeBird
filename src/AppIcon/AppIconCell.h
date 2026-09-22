@@ -1,11 +1,4 @@
-//
-//  AppIconCell.h
-//  PrimeFreeBird
-//
-//  Created by Bandar Alruwaili on 10/12/2023.
-//
-//  Styling mirrors the app's native AppIconCell.
-//
+// A cell of the app icon picker, styled like the app's native AppIconCell.
 
 #import <UIKit/UIKit.h>
 

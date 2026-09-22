@@ -1,10 +1,5 @@
-//
-//  CustomTabBarPreviewCell.h
-//  PrimeFreeBird
-//
-//  The bottom tab-bar preview cell, mirroring the native
-//  TabCustomizationSelectedItemCell (a bare icon in a shadow box).
-//
+// The tab-bar preview cell of the tab editor, mirroring the native
+// TabCustomizationSelectedItemCell.
 
 #import <UIKit/UIKit.h>
 

@@ -1,9 +1,4 @@
-//
-//  TimelinesSettingsViewController.m
-//  PrimeFreeBird
-//
-//  Created by nyaathea
-//
+// The Timelines settings page.
 
 #import "Settings/Pages/TimelinesSettingsViewController.h"
 #import "Headers/TWHeaders.h"

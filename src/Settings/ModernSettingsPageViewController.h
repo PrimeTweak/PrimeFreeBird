@@ -1,9 +1,4 @@
-//
-//  ModernSettingsPageViewController.h
-//  PrimeFreeBird
-//
-//  Created by nyaathea
-//
+// A settings page: builds its rows from BHTSettings and handles their actions.
 
 #import <UIKit/UIKit.h>
 

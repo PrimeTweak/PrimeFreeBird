@@ -1,7 +1,4 @@
-//
-//  BHTHookHelpers.m
-//  PrimeFreeBird
-//
+// Shared helpers for the hook files.
 
 #import "HookHelpers.h"
 

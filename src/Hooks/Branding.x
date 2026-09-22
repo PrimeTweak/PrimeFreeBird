@@ -1,7 +1,5 @@
-//
-//  Branding.x
-//  PrimeFreeBird
-//
+// Restores Twitter's terminology and glyphs: localized and server-composed
+// strings, the "new posts" pill label, and the classic compose button.
 
 #import <objc/runtime.h>
 #import "HookHelpers.h"

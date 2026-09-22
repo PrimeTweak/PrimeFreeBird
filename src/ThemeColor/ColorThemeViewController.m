@@ -1,12 +1,4 @@
-//
-//  ColorThemeViewController.m
-//  PrimeFreeBird
-//
-//  Created by Bandar Alruwaili on 10/12/2023.
-//  Modified by actuallyaridan on 25/05/2025.
-//
-//  Clones the native accent picker (ColorThemePickerItem).
-//
+// The accent colour picker, cloned from the app's ColorThemePickerItem.
 
 #import "ColorThemeViewController.h"
 #import <UIKit/UIKit.h>

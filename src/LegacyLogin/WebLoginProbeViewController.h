@@ -1,8 +1,7 @@
 #import <UIKit/UIKit.h>
 
-// A web login screen that loads twitter.com/login in a WKWebView and logs the
-// session cookies as they appear. Measurement only: nothing is injected into
-// the native session yet.
+// The web login screen: x.com's login flow in a WKWebView under a native header;
+// the session cookies are captured and handed to LoginBridge.
 @interface WebLoginProbeViewController : UIViewController
 + (void)presentFrom:(UIViewController*)presenter;
 + (UINavigationController*)rootNavigationController;

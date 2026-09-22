@@ -1,9 +1,4 @@
-//
-//  Palette.h
-//  PrimeFreeBird
-//
-//  Created by nyaathea
-//
+// Colour helpers around the app's active palette.
 
 #import <UIKit/UIKit.h>
 

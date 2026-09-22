@@ -1,12 +1,4 @@
-//
-//  DarkModeStyle.h
-//  PrimeFreeBird
-//
-//  Dark mode style selector (System / Dim / Gray / Pure black).
-//
-//  Approach and Dim color (#15202b) adapted from nyaathea's BHDimPalette and
-//  the BHTThemeDirectBackgroundHooks system in PrimeFreeBird/tweak.
-//
+// Dark mode style selector: System, Dim, Gray, Pure black.
 
 #import <UIKit/UIKit.h>
 

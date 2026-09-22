@@ -1,9 +1,4 @@
-//
-//  TWHeaders.h
-//  PrimeFreeBird
-//
-//  Created by BandarHelal
-//
+// Umbrella header for the app class declarations.
 
 #import "FFmpegKit.h"
 #import "MediaInformationSession.h"

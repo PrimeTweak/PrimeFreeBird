@@ -1,9 +1,5 @@
-//
-//  CustomTabBarViewController.h
-//  PrimeFreeBird
-//
-//  Created by Bandar Alruwaili on 11/12/2023.
-//
+// The tab editor: a grid of every available tab above a drag-reorderable preview
+// row, cloned from the app's native tab-customization screen.
 
 #import <UIKit/UIKit.h>
 

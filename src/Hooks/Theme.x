@@ -1,7 +1,5 @@
-//
-//  Theme.x
-//  PrimeFreeBird
-//
+// Theming: the custom accent colour, tab bar order, visibility and theming, and
+// the top bar logo tint.
 
 #import <objc/runtime.h>
 #import <objc/message.h>
@@ -979,7 +977,6 @@ static void NFBApplyTabBarGlassBody(UIView* host) {
             // The tab's own image is the fallback when the bundle has no glyph
             // under that name; it is whichever variant the tab shows right now.
             UIImage* resting = outline ?: image;
-            NSString* selectedSource = @"filled";
             double restingInk = NFBGlyphInk(resting);
             double filledInk = NFBGlyphInk(filled);
             // A true fill carries well over twice its outline's ink. A variant
@@ -987,16 +984,11 @@ static void NFBApplyTabBarGlassBody(UIView* host) {
             // so the selected state still reads heavier.
             if (!filled || filledInk < restingInk * 1.6) {
                 filled = NFBFilledGlyph(resting);
-                selectedSource = filledInk > 0 ? @"filled from outline (stroke variant)"
-                                               : @"filled from outline (no filled glyph)";
             }
             UITabBarItem* item = [[UITabBarItem alloc] initWithTitle:nil
                                                                image:NFBOpaqueTabGlyph(resting)
                                                                  tag:(NSInteger)i];
             item.selectedImage = filled ? NFBOpaqueTabGlyph(filled) : nil;
-            NFBDebugLog(@"[tabbar] tab %lu '%@': outline=%@ ink=%.0f | selected=%@ ink=%.0f",
-                        (unsigned long)i, base ?: @"(no name)", outline ? @"yes" : @"fallback",
-                        restingInk, selectedSource, NFBGlyphInk(filled));
             [items addObject:item];
         }
         native.items = items;
@@ -1599,75 +1591,6 @@ static void NFBShowRestartReminder(void) {
 }
 %end
 
-%hook TAEColorPalette
-
-- (UIColor*)avatarPlaceholderBackgroundColor {
-    UIColor* o = %orig;
-    return customAccentActive() ? NFBPlaceholderGrey() : o;
-}
-- (UIColor*)avatarPlaceholderUIColor {
-    UIColor* o = %orig;
-    return customAccentActive() ? NFBPlaceholderGrey() : o;
-}
-- (UIColor*)_t1_infoTextColorForOptions:(NSUInteger)options {
-    if (customAccentActive()) {
-        UIColor* c = customAccentColor();
-        if (c) { return c; }
-    }
-    return %orig;
-}
-- (UIColor*)linkColor {
-    if (customAccentActive()) {
-        UIColor* c = customAccentColor();
-        if (c) { return c; }
-    }
-    return %orig;
-}
-- (UIColor*)textLinkColor {
-    if (customAccentActive()) {
-        UIColor* c = customAccentColor();
-        if (c) { return c; }
-    }
-    return %orig;
-}
-
-- (UIColor*)tabBarItemColor {
-    if (customAccentActive()) {
-        UIColor* c = customAccentColor();
-        if (c) { return c; }
-    }
-    return %orig;
-}
-
-// The resolved accent every control reads. primaryColorForOption: is the
-// palette-option lookup; -primaryColor is the already-resolved result, and the
-// controls ask for this one.
-- (UIColor*)primaryColor {
-    if (customAccentActive() && !NFBRawPaletteReading()) {
-        UIColor* c = customAccentColor();
-        if (c) { return c; }
-    }
-    return %orig;
-}
-
-- (UIColor*)primaryButtonBackgroundColor {
-    if (customAccentActive()) {
-        UIColor* c = customAccentColor();
-        if (c) { return c; }
-    }
-    return %orig;
-}
-
-- (UIColor*)primaryOutlinedButtonBorderColor {
-    if (customAccentActive()) {
-        UIColor* c = customAccentColor();
-        if (c) { return c; }
-    }
-    return %orig;
-}
-
-%end
-
 %hook TFNTwitterStatusDisplayAttributedTextModelFontOptions
 - (UIColor*)linkTextColor {
     if (customAccentActive()) {
@@ -1979,23 +1902,6 @@ static void NFBRestoreTabIcon(UIImageView* icon) {
           NFBBakeTitleControlLogos(bar);
       }
     });
-    if (logo) {
-        NFBTopBarLogoView = logo;
-        NFBRegisterLogoView(logo);
-        NFBApplyLogoTint(logo);
-    }
-    return titleView;
-}
-
-%end
-
-// Same treatment for the segmented-label title variant, which the Liquid Glass
-// home can use instead of the default plugin.
-%hook _TtC11TwitterHome46HomeSegmentedLabelNavigationBarTitleViewPlugin
-
-- (UIView*)titleView {
-    UIView* titleView = %orig;
-    UIImageView* logo = NFBFindLogoImageView(titleView);
     if (logo) {
         NFBTopBarLogoView = logo;
         NFBRegisterLogoView(logo);

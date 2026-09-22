@@ -1,11 +1,5 @@
-//
-//  CustomTabBarNativeColors.h
-//  PrimeFreeBird
-//
-//  Resolves the native tab-customization colour tokens (from
-//  [UIColor twitterColors] / [UIColor tfnuiColors] / [T1TabView itemColor]),
-//  falling back to system colours if a selector is missing after an app update.
-//
+// The native tab-customization colour tokens, with system fallbacks when a
+// selector disappears after an app update.
 
 #import <UIKit/UIKit.h>
 

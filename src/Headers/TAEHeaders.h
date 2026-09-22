@@ -1,9 +1,4 @@
-//
-//  TAEHeaders.h
-//  PrimeFreeBird
-//
-//  Created by BandarHelal
-//
+// Declarations of the app's TAE palette classes.
 
 #import <UIKit/UIKit.h>
 

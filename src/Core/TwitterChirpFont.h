@@ -1,9 +1,4 @@
-//
-//  TwitterChirpFont.h
-//  PrimeFreeBird
-//
-//  Created by nyaathea
-//
+// Access to the app's Chirp font faces.
 
 #import <UIKit/UIKit.h>
 #import <objc/runtime.h>

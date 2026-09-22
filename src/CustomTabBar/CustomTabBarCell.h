@@ -1,7 +1,4 @@
-//
-//  CustomTabBarCell.h
-//  PrimeFreeBird
-//
+// A tile of the tab editor, styled like the app's TabCustomizationViewCell.
 
 #import <UIKit/UIKit.h>
 

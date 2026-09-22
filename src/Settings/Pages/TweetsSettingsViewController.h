@@ -1,9 +1,4 @@
-//
-//  TweetsSettingsViewController.h
-//  PrimeFreeBird
-//
-//  Created by nyaathea
-//
+// The Tweets settings page.
 
 #import "Settings/ModernSettingsPageViewController.h"
 

@@ -1,12 +1,5 @@
-//
-//  NFBDiagnosticsViewController.m
-//
-//  A sheet, not a console. The banner answers the only question that matters
-//  at a glance — is anything missing — and the body carries the full report:
-//  environment, every dead hook with the file it lives in, the decision log,
-//  and the last shaken capture. The share button hands the same text off as a
-//  file, so nothing is ever copied by hand.
-//
+// The diagnostics sheet: environment, hook health, decision journal and last
+// capture, shareable as a file.
 
 #import "Debug/NFBDiagnosticsViewController.h"
 #import "Debug/NFBDebugger.h"

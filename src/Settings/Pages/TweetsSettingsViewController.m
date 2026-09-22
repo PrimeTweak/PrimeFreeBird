@@ -1,9 +1,4 @@
-//
-//  TweetsSettingsViewController.m
-//  PrimeFreeBird
-//
-//  Created by nyaathea
-//
+// The Tweets settings page.
 
 #import "Settings/Pages/TweetsSettingsViewController.h"
 #import "Core/BHTBundle.h"

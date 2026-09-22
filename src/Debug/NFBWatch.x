@@ -1,14 +1,5 @@
-//
-//  NFBWatch.x
-//
-//  The event recorder behind the watch list. For every view whose class name
-//  matches a watched fragment, window arrivals and departures are journaled
-//  with millisecond stamps, the instance pointer and the window frame. The
-//  pointer is the point: a view that is removed and REPLACED shows up as two
-//  different pointers around a gap.
-//
-//  Cost when the list is empty or debugging is off: one boolean per event.
-//
+// The watch list recorder: window arrivals and departures of every view whose
+// class name matches a watched fragment, with millisecond stamps and pointers.
 
 #import "Hooks/HookHelpers.h"
 #import "Debug/NFBDebugger.h"

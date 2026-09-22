@@ -1,9 +1,4 @@
-//
-//  ProfilesSettingsViewController.h
-//  PrimeFreeBird
-//
-//  Created by nyaathea
-//
+// The Profiles settings page.
 
 #import "Settings/ModernSettingsPageViewController.h"
 

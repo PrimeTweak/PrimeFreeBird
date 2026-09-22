@@ -1,7 +1,5 @@
-//
-//  Profile.x
-//  PrimeFreeBird
-//
+// Profile options: copy profile info, hide the premium offer, unrounded follower
+// counts, a chosen opening tab, no Videos tab, expanded bios.
 
 #import "HookHelpers.h"
 #import "Debug/NFBDebugger.h"
@@ -81,7 +79,7 @@ static BOOL nfbRowIsOverlay(UIView* row) {
     return NO;
 }
 
-// The leftmost native button in the row — the anchor ours sits beside.
+// The leftmost native button in the row — the anchor the tweak's button sits beside.
 static UIView* nfbLeftmostRowButton(UIView* row) {
     UIView* leftmost = nil;
     for (UIView* candidate in row.subviews) {
@@ -95,7 +93,7 @@ static UIView* nfbLeftmostRowButton(UIView* row) {
     return leftmost;
 }
 
-// Reads the neighbour's own look so ours matches whatever Twitter is doing.
+// Reads the neighbour's own look so the tweak's button matches it.
 static void nfbMatchNeighbourStyle(UIButton* ours, UIView* neighbour) {
     ours.layer.cornerRadius = neighbour.layer.cornerRadius > 0
         ? neighbour.layer.cornerRadius
@@ -126,7 +124,7 @@ static void nfbMatchNeighbourStyle(UIButton* ours, UIView* neighbour) {
         }
     }
     // The neighbour's glyph carries the tint the row expects; a template image
-    // of ours then renders in the same colour.
+    // of the tweak's then renders in the same colour.
     for (UIView* node in neighbour.subviews) {
         for (UIView* deeper in node.subviews) {
             if ([deeper isKindOfClass:[UIImageView class]] && deeper.tintColor) {
@@ -206,7 +204,7 @@ static void nfbMatchNeighbourStyle(UIButton* ours, UIView* neighbour) {
     if (copyButton.superview != row) {
         [row addSubview:copyButton];
     }
-    // Positioned every pass: the row lays its own buttons out and ours has to
+    // Positioned every pass: the row lays its own buttons out and the tweak's has to
     // follow them, not a remembered place.
     CGRect slot = anchor.frame;
     slot.origin.x = CGRectGetMinX(anchor.frame) - CGRectGetWidth(anchor.frame) - 8.0;

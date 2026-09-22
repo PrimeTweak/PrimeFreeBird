@@ -1,9 +1,4 @@
-//
-//  T1Headers.h
-//  PrimeFreeBird
-//
-//  Created by BandarHelal
-//
+// Declarations of the app's T1 classes the tweak talks to.
 
 #import <CoreMedia/CoreMedia.h>
 #import <SafariServices/SafariServices.h>
@@ -84,13 +79,8 @@
 
 #pragma mark - Settings
 
-// T1GenericSettingsViewController backs the 12.3 "settings revamp" root and its
-// sub-pages; T1SettingsViewController is the legacy fallback root.
+// T1GenericSettingsViewController backs the settings root and its sub-pages.
 @interface T1GenericSettingsViewController : TFNItemsDataViewController
-@property (nonatomic, strong) TFNTwitterAccount* account;
-@end
-
-@interface T1SettingsViewController : TFNItemsDataViewController
 @property (nonatomic, strong) TFNTwitterAccount* account;
 @end
 
@@ -175,17 +165,7 @@
 
 @class DownloadInlineButton;
 
-// DM media message container (DMConversation.MessageAttachmentView)
-@interface _TtC14DMConversation21MessageAttachmentView : UIView
-@property (nonatomic, strong) UIContextMenuInteraction* downloadMenuInteraction;
-@property (nonatomic, strong) DownloadInlineButton* downloadHandler;
-@end
-
-@interface _TtC14DMConversation21MessageAttachmentView () <
-    UIContextMenuInteractionDelegate>
-@end
-
-// 12.21 moved the DM media container to ChatConversation; same shape.
+// DM media message container (ChatConversation.MessageAttachmentView).
 @interface _TtC16ChatConversation21MessageAttachmentView : UIView
 @property (nonatomic, strong) UIContextMenuInteraction* downloadMenuInteraction;
 @property (nonatomic, strong) DownloadInlineButton* downloadHandler;

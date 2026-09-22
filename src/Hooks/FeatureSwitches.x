@@ -1,7 +1,6 @@
-//
-//  FeatureSwitches.x
-//  PrimeFreeBird
-//
+// Feature-switch overrides read by the app, the web login mounted in place of the
+// native login screens, the skipped notification-permission onboarding step, and
+// the account feature gates.
 
 #import "HookHelpers.h"
 #import "LegacyLogin/WebLoginProbeViewController.h"
@@ -604,10 +603,8 @@ static NSNumber* FeatureSwitchOverrideValueForKey(NSString* key) {
 
 // MARK: - Skip the notification-permission onboarding subtask
 
-// The native onboarding runs its notification-permission subtask ("Never miss a
-// moment") around the bridged login, where it only flashes. Its own "Not now"
-// action is taken as it appears, so the flow moves on without the flash;
-// notifications stay reachable from Settings.
+// The onboarding's notification-permission subtask only flashes around the
+// bridged login; its own "Not now" action is taken as it appears.
 @interface ONBNotificationsPermissionPromptSubtaskController : UIViewController
 @end
 

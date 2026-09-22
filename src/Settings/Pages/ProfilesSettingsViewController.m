@@ -1,9 +1,4 @@
-//
-//  ProfilesSettingsViewController.m
-//  PrimeFreeBird
-//
-//  Created by nyaathea
-//
+// The Profiles settings page.
 
 #import "Settings/Pages/ProfilesSettingsViewController.h"
 #import "Core/BHTBundle.h"

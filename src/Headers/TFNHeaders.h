@@ -1,9 +1,4 @@
-//
-//  TFNHeaders.h
-//  PrimeFreeBird
-//
-//  Created by BandarHelal
-//
+// Declarations of the app's TFN classes.
 
 #import <UIKit/UIKit.h>
 #import "TFSHeaders.h"

@@ -1,9 +1,4 @@
-//
-//  BHTBundle.m
-//  PrimeFreeBird
-//
-//  Created by BandarHelal on 07/08/2022.
-//
+// The tweak's resource bundle and localized strings.
 
 #import "BHTBundle.h"
 

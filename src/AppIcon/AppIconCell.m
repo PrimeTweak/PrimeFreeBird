@@ -1,9 +1,4 @@
-//
-//  AppIconCell.m
-//  PrimeFreeBird
-//
-//  Created by Bandar Alruwaili on 10/12/2023.
-//
+// A cell of the app icon picker.
 
 #import "AppIconCell.h"
 #import <QuartzCore/QuartzCore.h>

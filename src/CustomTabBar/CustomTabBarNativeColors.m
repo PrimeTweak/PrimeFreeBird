@@ -1,7 +1,4 @@
-//
-//  CustomTabBarNativeColors.m
-//  PrimeFreeBird
-//
+// The native tab-customization colour tokens, with system fallbacks.
 
 #import "CustomTabBarNativeColors.h"
 #import <objc/runtime.h>

@@ -1,7 +1,5 @@
-//
-//  Confirmations.x
-//  PrimeFreeBird
-//
+// Confirmation alerts before tweeting, following and liking, and the undo window
+// after a tweet.
 
 #import "HookHelpers.h"
 
@@ -65,21 +63,6 @@ static void ShowConfirmation(void (^confirmed)(void)) {
 - (void)didTapInlineActionButton:(UIView*)button {
     if (![BHTSettings boolForKey:@"like_confirm"] ||
         ![button isKindOfClass:%c(TTAStatusInlineFavoriteButton)]) {
-        return %orig;
-    }
-
-    ShowConfirmation(^{
-        %orig;
-    });
-}
-
-%end
-
-// The fullscreen media viewer's heart has its own action path.
-%hook T1SlideshowStatusView
-
-- (void)_favoriteAction:(id)sender {
-    if (![BHTSettings boolForKey:@"like_confirm"]) {
         return %orig;
     }
 

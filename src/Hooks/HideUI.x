@@ -1,7 +1,5 @@
-//
-//  HideUI.x
-//  PrimeFreeBird
-//
+// Toggles that remove interface elements: the verified checkmark, search history,
+// trending on Explore, the Subscribe and Follow buttons, and inline action buttons.
 
 #import "HookHelpers.h"
 
@@ -102,9 +100,9 @@
 // the whole Explore chrome. Choosing which tabs to keep is a separate switch that
 // leaves the bar in place.
 extern BOOL nfbShouldHideAllTrends(void);
-// Defined in ExploreTabs.x. Records the exact accessory view this guide vends so
-// the tab filter only ever touches THIS bar (SegmentedTabBarView is a generic
-// class also used by Notifications, search results, …).
+// Defined in ExploreTabs.x. Records the accessory view this guide vends, so the
+// tab filter only touches this bar (the segmented bar class is shared with
+// Notifications and search results).
 extern void nfbNoteExploreAccessoryView(UIView* v);
 
 // Trending content lives in the child URT chrome view controller, whose

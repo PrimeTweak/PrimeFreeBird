@@ -1,9 +1,4 @@
-//
-//  ModernSettingsViewController.m
-//  PrimeFreeBird
-//
-//  Created by BandarHelal on 25/11/2021.
-//
+// The settings root: the list of pages.
 
 #import "Settings/ModernSettingsViewController.h"
 #import "Core/TwitterChirpFont.h"

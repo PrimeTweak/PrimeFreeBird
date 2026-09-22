@@ -1,9 +1,4 @@
-//
-//  CustomTabBarUtility.m
-//  PrimeFreeBird
-//
-//  Created by Bandar Alruwaili on 10/12/2023.
-//
+// Registry and helpers of the custom tab bar: panel ids, images, order.
 
 #import "CustomTabBarUtility.h"
 #import "Headers/T1Headers.h"

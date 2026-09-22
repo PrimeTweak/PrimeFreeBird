@@ -1,9 +1,5 @@
-//
-//  BHTSettings.h
-//  PrimeFreeBird
-//
-//  Created by nyaathea
-//
+// The settings model: every option with its page, type and default; defaults for
+// keys without a row; migrations of renamed keys.
 
 #import <Foundation/Foundation.h>
 

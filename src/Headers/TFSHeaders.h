@@ -1,9 +1,4 @@
-//
-//  TFSHeaders.h
-//  PrimeFreeBird
-//
-//  Created by BandarHelal
-//
+// Declarations of the app's TFS model classes.
 
 #import <Foundation/Foundation.h>
 

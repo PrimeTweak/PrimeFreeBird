@@ -1,9 +1,4 @@
-//
-//  BHTHelpers.h
-//  PrimeFreeBird
-//
-//  Created by BandarHelal
-//
+// Shared helper declarations (accent colours, glyph painting) used across files.
 
 #import <SafariServices/SafariServices.h>
 #import <UIKit/UIKit.h>

@@ -1,21 +1,6 @@
-//
-//  Chat.x
-//  PrimeFreeBird
-//
-//  Chat privacy.
-//
-//  The typing indicator is pushed periodically over the chat websocket, which
-//  also carries message delivery, receipts and presence — so the socket is left
-//  alone and only the frame shape used by the typing heartbeat is dropped. That
-//  shape is described on nfbIsTypingIndicatorFrame.
-//
-//  The read marker travels on the same socket, and its logic lives in a Kotlin
-//  Multiplatform module (Subsystem_ios_iosArm64_main…), so no selector exists
-//  to intercept it. Identifying its frame is the same exercise the typing
-//  shape once was, and the recorder at the end of this file is what it takes:
-//  with the debug switch on, every outgoing frame of the chat socket is logged
-//  as hex, so the shape can be read from the log rather than guessed.
-//
+// Chat privacy: drops the typing-indicator frame from the chat websocket and
+// leaves the rest of the socket alone. With debug tools on, outgoing frames are
+// recorded as hex so a new frame shape can be identified from the log.
 
 #import "HookHelpers.h"
 #import <os/log.h>

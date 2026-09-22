@@ -1,9 +1,4 @@
-//
-//  BHTdownloadManager.m
-//  PrimeFreeBird
-//
-//  Created by BandarHelal.
-//
+// Download and save helpers shared by the media features.
 
 #import "Core/BHTManager.h"
 #import "Core/BHTBundle.h"

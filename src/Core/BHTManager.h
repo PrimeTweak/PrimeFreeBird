@@ -1,9 +1,4 @@
-//
-//  BHTdownloadManager.h
-//  BHT
-//
-//  Created by BandarHelal on 24/12/1441 AH.
-//
+// Download and save helpers shared by the media features.
 
 #import "Headers/TWHeaders.h"
 

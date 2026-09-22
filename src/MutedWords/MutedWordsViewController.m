@@ -1,13 +1,6 @@
-//
-//  MutedWordsViewController.m
-//  PrimeFreeBird
-//
-//  The list lives in NSUserDefaults as plain strings. Anything starting with
-//  "@" is treated as an account handle, anything containing a space as a
-//  phrase, everything else as a single word. Timeline.x reads the same keys
-//  and is told to reload through nfbRefreshMutedWords() whenever this screen
-//  changes something, so filtering updates without a restart.
-//
+// The muted-words list lives in NSUserDefaults as plain strings: an "@" prefix
+// means an account, a space a phrase, anything else a word. Timeline.x reads the
+// same keys and reloads through nfbRefreshMutedWords().
 
 #import "MutedWords/MutedWordsViewController.h"
 #import "Core/BHTBundle.h"

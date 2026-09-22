@@ -1,50 +1,12 @@
-// PillSwap.x — the "All" pill, rebuilt as a button nobody destroys.
-//
-// Spec: a button identical to the native one. The measured
-// story (project journal, 16-17/08): under forced Liquid Glass the SwiftUI
-
-// bridge destroys and recreates the DMInbox trailing item on every pass —
-// that rebuild IS the flash. The avatar, in the same bar under the same
-// glass, never moves: the glass is innocent, the rebuild is the culprit.
-
-// So the SwiftUI item is swapped for OUR plain UIBarButtonItem the moment
-// it shows up: same typography (copied live from the real label), same
-// chevron (copied), same paddings (measured: content + 10 pt sides inside
-
-// a 40 pt row), same glass (UIKit's own default treatment — nothing about
-// backgrounds is touched), and the SAME native
-// UIMenu (Twitter's object, reused — tap opens the real All/Requests menu,
-
-// their handlers run). When SwiftUI stomps the items back on a later pass,
-// the stomp itself is the signal: the original's view fires the hook, and the
-// item is
-
-// swap again (~1 ms, measured cadence of the finder) and refresh the label
-// read from the menu's checked state, so Twitter's own re-render keeps it in
-// sync.
-
-//
-// Two unknowns, journaled loudly rather than assumed:
-//   · does the bridge item carry its UIMenu? If not, the swap is abandoned,
-
-//     the native item stays and nothing is broken.
-//   · does the label follow a filter change? The stomp should carry it;
-//     a 2 s belt after each menu opening re-reads the checked state.
-
-// Every action has its line; removal is `git rm` of this one file.
+// The inbox "All" pill rebuilt as a plain UIBarButtonItem, so the SwiftUI rebuild
+// that flashed it no longer shows. Same look, same native menu.
 
 #import "HookHelpers.h"
 #import "Debug/NFBDebugger.h"
 
-// A named subclass so captures and the watch can identify the button, and so
-// it can answer the ONE question the bar's wrapper actually asks. Measured the
-// hard way: _TtCC5UIKit19NavigationButtonBar15ItemWrapperView sizes its child
-
-// from intrinsicContentSize, then CLAMPS it to the standard bar-button box —
-// a capture caught it at {{376, 67}, {44, 34}} while the native pill is
-// 57.33 x 40. So the box is not fought: the capsule is drawn LARGER than
-
-// the button, anchored to its right edge, and the touch area follows it.
+// A named subclass, so captures can identify the button. The bar's item wrapper
+// clamps its child to the standard bar-button box, so the capsule is drawn
+// larger than the button, anchored to its right edge, and the touch area follows.
 @interface NFBInboxPillButton : UIButton
 @property (nonatomic, assign) CGSize nfbIntrinsic;
 @property (nonatomic, assign) CGRect nfbTouchRect;
@@ -60,17 +22,9 @@
     return [super intrinsicContentSize];
 }
 
-// v6, measured on screen: the capsule spanned 318.7 to 376.0 while the button
-// was logged at frame={{376, 67}, {0, 0}}. The placement had been computed
-// ONCE, at a moment the wrapper had not sized the view yet (bounds 0 x 0), and
-
-// was never redone when it handed over the real 44 x 34 box. So the geometry
-// now lives HERE: every time the wrapper resizes the view, it lays itself out
-// again from the bounds it actually has. Right edge of the capsule = right edge
-
-// of
-// the box (measured at 420.0 = the native right edge), so 420 − 57.33 = 362.67
-// = the native left edge, whatever the box turns out to be.
+// The geometry is laid out from the bounds the wrapper actually hands over, on
+// every resize: the capsule's right edge is the box's right edge, its left edge
+// the native pill's width to the left of it.
 - (void)layoutSubviews {
     [super layoutSubviews];
     if (self.nfbPillWidth <= 0) {
@@ -119,16 +73,12 @@
 }
 @end
 
-// Our item (built once, reused across stomps) and the latest original from
-// Twitter (strong: it left the bar, but its menu must stay alive for ours).
+// The tweak's item (built once, reused across stomps) and the latest original from
+// Twitter (strong: it left the bar, but its menu must stay alive for the replacement).
 static UIBarButtonItem*  gNFBSwapItem;
-// The one number to turn if the pill still sits a hair off: negative moves it
-// LEFT, positive RIGHT. It is a visual translation only — layout never fights
-// it. The build measures the result itself (see the ruler below), so the next
-
-// adjustment is arithmetic, not another guess.
+// Horizontal nudge of the pill: negative moves it left, positive right. A visual
+// translation only, which layout never fights.
 static CGFloat           gNFBSwapShift = 0.0;
-static BOOL              gNFBSwapMeasured;
 static UIBarButtonItem*  gNFBSwapOriginal;
 static UIMenu*           gNFBSwapMenu;   // harvested from the live control; outlives it
 static NSInteger         gNFBSwapCount;
@@ -147,9 +97,8 @@ static UIViewController* nfbSwapOwningVC(UIView* view) {
     return nil;
 }
 
-// A bar button's responder chain stops at the NAVIGATION controller; the
-// items live one storey down (measured 17/08: T1TwitterSwift.XChatViewController
-// holds the single trailing item).
+// A bar button's responder chain stops at the navigation controller; the items
+// live one level down (the chat view controller holds the trailing item).
 static NSArray<UIViewController*>* nfbSwapCandidates(UIViewController* vc) {
     NSMutableArray<UIViewController*>* out = [NSMutableArray array];
     void (^add)(UIViewController*) = ^(UIViewController* candidate) {
@@ -212,27 +161,6 @@ static void nfbSwapLayoutButton(void) {
     button.transform = CGAffineTransformMakeTranslation(gNFBSwapShift, 0);
     [button setNeedsLayout];
     [button layoutIfNeeded];
-
-    // THE RULER — measures the VISIBLE capsule now, not the wrapper's box.
-    // Reference measured on screen: the native pill spans 362.7 to 420.0.
-    if (!gNFBSwapMeasured && NFBDebugIsRecording()) {
-        gNFBSwapMeasured = YES;
-        __weak NFBInboxPillButton* weakButton = button;
-        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.45 * NSEC_PER_SEC)),
-                       dispatch_get_main_queue(), ^{
-            NFBInboxPillButton* live = weakButton;
-            if (!live.window) {
-                gNFBSwapMeasured = NO;  // try again on the next layout
-                return;
-            }
-            CGRect onScreen = [live convertRect:live.nfbTouchRect toView:nil];
-            NFBDebugLog(@"swap: RULER - capsule on screen %.1f to %.1f pt "
-                        @"(native 362.7 to 420.0, imposed box %.0fx%.0f)",
-                        onScreen.origin.x,
-                        onScreen.origin.x + onScreen.size.width,
-                        live.bounds.size.width, live.bounds.size.height);
-        });
-    }
 }
 
 // Belt for the label after a menu pick: the stomp normally carries the new
@@ -255,17 +183,9 @@ static void nfbSwapRefreshLabelFromMenu(void) {
     }
 }
 
-// v2 — measured on the 06:41 video: the residual flash was OUR OWN swap.
-// On every return SwiftUI re-sets its item; it lands EMPTY for ~150 ms (the
-// rebuilt content arrives late, the original disease), then the swap-back
-
-// re-hosts the platter once more. So after the bootstrap, the stomp is
-// intercepted at the SETTER, before anything reaches the bar: the incoming
-// foreign item is captured (fresh menu, fresh checked state) and OUR item
-
-// goes through in its place. The bar receives the very instance it already
-// hosts — nothing changes, nothing re-hosts, nothing can flash — and the
-// native view is never built again: the ⌚ watch on the ItemView goes silent.
+// After the bootstrap the stomp is intercepted at the setter, before anything
+// reaches the bar: the incoming foreign item is read (fresh menu, fresh checked
+// state) and the tweak's item goes through in its place, so nothing re-hosts.
 static NSArray<UIBarButtonItem*>* nfbSwapInterceptItems(UINavigationItem* nav,
                                                         NSArray<UIBarButtonItem*>* items) {
     if (!gNFBSwapItem || items.count != 1 ||
@@ -338,7 +258,7 @@ static void nfbSwapApply(UIView* pillView) {
             hasTrailing = hasTrailing || candidateNav.trailingItemGroups.count > 0;
         }
         if (hasTrailing) {
-            // Only ours is installed — nothing to swap on this pass.
+            // Only the tweak's item is installed - nothing to swap on this pass.
             return;
         }
     }
@@ -376,15 +296,8 @@ static void nfbSwapApply(UIView* pillView) {
         return;  // content not built yet; the next layout retries
     }
 
-    // First unknown, ANSWERED on 17/08 06:59: the bridge item carries NO
-    // menu — the abandon fired as designed, native stayed. But the 21:31
-    // capture had the clue all along: a UIButtonLabel INSIDE the pill view.
-
-    // The pill is (or contains) a real UIButton, and a native tap-menu means
-    // showsMenuAsPrimaryAction — the menu lives on that control. Harvest it
-    // there; if it is nowhere, a loud probe prints the class lineage, the
-
-    // interactions and primaryAction, so the next capture names the carrier.
+    // The bridge item carries no menu; the pill is (or contains) a real UIButton
+    // with showsMenuAsPrimaryAction, so the menu is harvested from that control.
     UIMenu* menu = original.menu;
     NSString* menuSource = @"item";
     if (!menu) {
@@ -408,42 +321,18 @@ static void nfbSwapApply(UIView* pillView) {
         }
     }
     if (!menu) {
-        static BOOL probed;
-        if (!probed) {
-            probed = YES;
-            NSMutableArray<NSString*>* lineage = [NSMutableArray array];
-            Class cls = [pillView class];
-            NSInteger depth = 0;
-            while (cls && depth < 6) {
-                [lineage addObject:NSStringFromClass(cls)];
-                cls = class_getSuperclass(cls);
-                depth++;
-            }
-            NSMutableArray<NSString*>* interactions = [NSMutableArray array];
-            for (id<UIInteraction> interaction in pillView.interactions) {
-                [interactions addObject:NSStringFromClass([interaction class])];
-            }
-            NFBDebugLog(@"swap: menu NOT FOUND - probe: lineage=%@ | "
-                        @"interactions=%@ | primaryAction=%@",
-                        [lineage componentsJoinedByString:@" < "],
-                        interactions.count
-                            ? [interactions componentsJoinedByString:@","] : @"-",
-                        original.primaryAction
-                            ? NSStringFromClass([original.primaryAction class])
-                            : @"nil");
-        }
-        return;  // native kept, the probe has spoken
+        NFBDebugLog(@"swap: menu not found on the native item - native kept");
+        return;
     }
     gNFBSwapMenu = menu;  // strong: it must outlive the mortal native button
 
-    // Build ours once; later passes only refresh content and re-install.
+    // Built once; later passes only refresh content and re-install.
     NFBInboxPillButton* button;
     UILabel* label;
     UIImageView* chevron;
     if (!gNFBSwapItem) {
-        // CUSTOM type: [UIButton new] means a SYSTEM button, and iOS 26
-        // gives system buttons their own glass configuration — the stray
-        // inner lens measured on the 07:34 video. Custom draws nothing.
+        // Custom type: a system button gets its own glass configuration on iOS 26
+        // (a stray inner lens); a custom button draws nothing.
         button = (NFBInboxPillButton*)
             [NFBInboxPillButton buttonWithType:UIButtonTypeCustom];
         label = [UILabel new];
@@ -463,16 +352,11 @@ static void nfbSwapApply(UIView* pillView) {
         [button insertSubview:ring atIndex:0];
 
         button.showsMenuAsPrimaryAction = YES;
-        // No capsule behind the label. This item used to carry its own
-        // UIVisualEffectView with UIGlassEffect, and that view WAS the pill's
-        // glass. The navigation bar shows none anywhere else - not on the
-
-        // settings gear, not on the avatar - so the replacement shows none
-        // either: label and chevron, flat. The item swap above is untouched,
-        // and it is the part that answers the flash.
+        // No capsule behind the label: the navigation bar shows glass nowhere
+        // else (gear, avatar), so the replacement is flat label and chevron.
         gNFBSwapItem = [[UIBarButtonItem alloc] initWithCustomView:button];
-        // On OUR plain UIKit item the official per-item switch is exactly in
-        // its intended case — it kills the circular default treatment.
+        // On a plain UIKit item the per-item switch does what it is meant to: it
+        // removes the circular default treatment.
         if ([gNFBSwapItem respondsToSelector:
                 NSSelectorFromString(@"setHidesSharedBackground:")]) {
             [gNFBSwapItem setValue:@YES forKey:@"hidesSharedBackground"];
@@ -584,9 +468,8 @@ static void nfbSwapApply(UIView* pillView) {
 
 %hook _TtC7DMInbox39InboxNavigationBarMenuBarButtonItemView
 
-// The original's view appearing IS the stomp signal: SwiftUI has put its
-// item back, so ours goes back in. Measured cadence of this finder: ~1 ms
-// after the view lands.
+// The original's view appearing is the stomp signal: SwiftUI has put its item
+// back, so the tweak's goes back in, about 1 ms after the view lands.
 - (void)didMoveToWindow {
     %orig;
     if (((UIView*)self).window) {

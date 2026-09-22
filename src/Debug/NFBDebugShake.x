@@ -1,11 +1,5 @@
-//
-//  NFBDebugShake.x
-//
-//  Catches the shake gesture and hands it to the debugger. Hooking
-//  motionEnded:withEvent: on UIWindow is lighter than a UIWindow subclass and
-//  needs no swap of the app's window. Inert unless debug_tools is on, which
-//  the handler itself re-checks.
-//
+// The shake gesture handed to the debugger (motionEnded:withEvent: on UIWindow).
+// Inert unless debug_tools is on.
 
 #import "Hooks/HookHelpers.h"
 

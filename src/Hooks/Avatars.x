@@ -1,7 +1,4 @@
-//
-//  Avatars.x
-//  PrimeFreeBird
-//
+// Square avatars (square_avatars): the avatar views and their shadow layer.
 
 #import "HookHelpers.h"
 

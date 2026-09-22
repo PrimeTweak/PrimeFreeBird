@@ -1,9 +1,4 @@
-//
-//  AppearanceSettingsViewController.m
-//  PrimeFreeBird
-//
-//  Created by nyaathea
-//
+// The Appearance page: accent colour, dark mode style and tab bar editor entries.
 
 #import "Settings/Pages/AppearanceSettingsViewController.h"
 #import "Core/BHTBundle.h"

@@ -1,10 +1,5 @@
-//
-//  WebReply.x
-//  PrimeFreeBird
-//
-//  Opens replies in an authenticated web composer instead of the native one and
-//  captures the posted reply's ID from the webview. Gated on `reply_in_webview`.
-//
+// Opens replies in an authenticated web composer instead of the native one and
+// captures the posted reply's id from the webview (reply_in_webview).
 
 #import "HookHelpers.h"
 #import <QuartzCore/QuartzCore.h>

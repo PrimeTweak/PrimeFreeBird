@@ -1,19 +1,5 @@
-//
-//  HiddenThreads.x
-//  PrimeFreeBird
-//
-//  Hiding a conversation.
-//
-//  A conversation is kept by its root identifier, so hiding one from any list
-//  hides it in every other: there is no per-tab state to fall out of step. The
-//  registry lives in NSUserDefaults beside the muted words, and the timeline
-//  predicate reads it through nfbThreadIsHidden.
-//
-//  The button is added to the row of actions under a Tweet, and only when the
-//  Tweet is part of a conversation — a root with replies, or a reply itself.
-//  Under a lone Tweet there is nothing to hide, and the row is left as Twitter
-//  built it.
-//
+// Hide a conversation by its root identifier, from every list at once. The button
+// joins the actions under a Tweet only when the Tweet is part of a conversation.
 
 #import "HookHelpers.h"
 #import <string.h>

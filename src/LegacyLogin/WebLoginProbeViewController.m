@@ -1,8 +1,5 @@
 #import "WebLoginProbeViewController.h"
 #import <WebKit/WebKit.h>
-#import <Security/Security.h>
-#import <objc/runtime.h>
-#import <objc/message.h>
 #import "Debug/NFBDebugger.h"
 #import "LoginBridge.h"
 #import "Core/BHTBundle.h"
@@ -49,7 +46,7 @@ static UIImage* nfbLoginBirdImage(CGSize size) {
     return rendered;
 }
 
-@interface WebLoginProbeViewController () <WKNavigationDelegate, WKScriptMessageHandler>
+@interface WebLoginProbeViewController () <WKNavigationDelegate>
 @property (nonatomic, strong) WKWebView* webView;
 @property (nonatomic, strong) UIView* headerView;
 @property (nonatomic, strong) UIActivityIndicatorView* spinner;
@@ -88,15 +85,6 @@ static UIImage* nfbLoginBirdImage(CGSize size) {
     // leans on flows the tweak's forced design disturbs, the desktop one does not.
     WKWebViewConfiguration* cfg = [[WKWebViewConfiguration alloc] init];
     cfg.websiteDataStore = [WKWebsiteDataStore defaultDataStore];
-    [cfg.userContentController addScriptMessageHandler:self name:@"nfbExchange"];
-    // Installed at document start, all frames: the page wraps its own fetch as it
-    // loads, so a late evaluateJavaScript wraps nothing, and the login may run in
-    // a subframe.
-    WKUserScript* wrap =
-        [[WKUserScript alloc] initWithSource:kNFBExchangeScript
-                               injectionTime:WKUserScriptInjectionTimeAtDocumentStart
-                            forMainFrameOnly:NO];
-    [cfg.userContentController addUserScript:wrap];
     self.webView = [[WKWebView alloc] initWithFrame:self.view.bounds
                                       configuration:cfg];
     self.webView.navigationDelegate = self;
@@ -262,116 +250,6 @@ static UIImage* nfbLoginBirdImage(CGSize size) {
 
 - (void)dismissSelf {
     [self dismissViewControllerAnimated:YES completion:nil];
-}
-
-// Measures every place a session could live and whether the web view's cookies
-// reach the native side: the shared native cookie jar, the web view's own jar,
-// and the keychain the account reads. Presence and length only, never values.
-- (void)probeSessionStores:(WKHTTPCookieStore*)webStore {
-    NSHTTPCookieStorage* shared = [NSHTTPCookieStorage sharedHTTPCookieStorage];
-    NSUInteger nativeAuth = 0, nativeCsrf = 0, nativeTotal = 0;
-    for (NSHTTPCookie* c in shared.cookies) {
-        if ([c.domain containsString:@"x.com"] || [c.domain containsString:@"twitter.com"]) {
-            nativeTotal++;
-            if ([c.name isEqualToString:@"auth_token"]) {
-                nativeAuth = c.value.length;
-            } else if ([c.name isEqualToString:@"ct0"]) {
-                nativeCsrf = c.value.length;
-            }
-        }
-    }
-    NFBDebugLog(@"[store] native jar: auth=%lu ct0=%lu total=%lu",
-                (unsigned long)nativeAuth, (unsigned long)nativeCsrf,
-                (unsigned long)nativeTotal);
-
-    // Are the two jars the same object, or separate?
-    BOOL sameJar = (webStore ==
-        [WKWebsiteDataStore defaultDataStore].httpCookieStore);
-    NFBDebugLog(@"[store] web jar is default store: %d", sameJar ? 1 : 0);
-
-    // The keychain the account uses: does an OAuth token already live there?
-    for (NSString* service in @[@"com.twitter.", @"com.atebits.",
-                                @"com.atebits.Tweetie2"]) {
-        NSDictionary* q = @{
-            (__bridge id)kSecClass : (__bridge id)kSecClassGenericPassword,
-            (__bridge id)kSecAttrService : service,
-            (__bridge id)kSecMatchLimit : (__bridge id)kSecMatchLimitAll,
-            (__bridge id)kSecReturnAttributes : @YES
-        };
-        CFTypeRef out = NULL;
-        OSStatus st = SecItemCopyMatching((__bridge CFDictionaryRef)q, &out);
-        NSUInteger count = 0;
-        if (st == errSecSuccess && out) {
-            count = [(__bridge NSArray*)out count];
-            CFRelease(out);
-        }
-        NFBDebugLog(@"[store] keychain '%@': status=%d items=%lu", service,
-                    (int)st, (unsigned long)count);
-    }
-
-    // Does the app expose an accounts store we could add to?
-    Class accountCls = objc_getClass("TFNTwitterAccount");
-    Class storeCls = objc_getClass("TFNTwitterAccountsManager")
-                     ?: objc_getClass("TFNTwitterAccountStore");
-    NFBDebugLog(@"[store] TFNTwitterAccount=%d accountsManager=%d",
-                accountCls != nil, storeCls != nil);
-    [self probeAccountState];
-}
-
-// Cookies are present, so the block is higher up: no account is mounted from
-// them. Reads the store's account count, the active one, and its credential
-// fields - shapes only, no values.
-- (void)probeAccountState {
-    // The store is not a singleton; it is created and asked to loadAccounts,
-    // which reads the keychain entry. This mirrors what the app does at launch
-    // and shows what the keychain actually yields.
-    Class storeCls = objc_getClass("TFNTwitterAccountStore");
-    if (!storeCls) {
-        NFBDebugLog(@"[account] store class absent");
-        return;
-    }
-    id store = [[storeCls alloc] init];
-    if (![store respondsToSelector:NSSelectorFromString(@"loadAccounts")]) {
-        NFBDebugLog(@"[account] store has no loadAccounts");
-        return;
-    }
-    id accounts =
-        ((id (*)(id, SEL))objc_msgSend)(store, NSSelectorFromString(@"loadAccounts"));
-    if (![accounts isKindOfClass:[NSArray class]]) {
-        NFBDebugLog(@"[account] loadAccounts returned %@",
-                    accounts ? NSStringFromClass([accounts class]) : @"nil");
-        return;
-    }
-    NFBDebugLog(@"[account] loadAccounts count=%lu", (unsigned long)[accounts count]);
-    for (id acct in accounts) {
-        NSString* screen =
-            [acct respondsToSelector:NSSelectorFromString(@"screenName")]
-                ? @"screenName" : @"-";
-        BOOL hasAuth =
-            [acct respondsToSelector:NSSelectorFromString(@"authToken")];
-        BOOL hasSecret =
-            [acct respondsToSelector:NSSelectorFromString(@"authTokenSecret")];
-        id tok = hasAuth ? ((id (*)(id, SEL))objc_msgSend)(
-                              acct, NSSelectorFromString(@"authToken")) : nil;
-        id sec = hasSecret ? ((id (*)(id, SEL))objc_msgSend)(
-                               acct, NSSelectorFromString(@"authTokenSecret")) : nil;
-        NFBDebugLog(@"[account] entry: %@ authToken=%lu secret=%lu", screen,
-                    (unsigned long)[tok length], (unsigned long)[sec length]);
-    }
-}
-
-- (void)userContentController:(WKUserContentController*)controller
-      didReceiveScriptMessage:(WKScriptMessage*)message {
-    if (![message.name isEqualToString:@"nfbExchange"]) {
-        return;
-    }
-    NSString* body = [message.body description];
-    NFBDebugLog(@"[exchange] page result: %@", body);
-    if ([body containsString:@"oauth=1"] && [body containsString:@"secret=1"]) {
-        NFBDebugLog(@"[exchange] OAUTH PAIR RETURNED - native account is reachable");
-    } else if ([body containsString:@"flow=1"] || [body containsString:@"subtask=1"]) {
-        NFBDebugLog(@"[exchange] flow continues - a subtask step is needed");
-    }
 }
 
 // The REST identity endpoints are gone (404); the handle is read from the
@@ -569,49 +447,13 @@ static UIImage* nfbLoginBirdImage(CGSize size) {
                   [jar setCookie:c];
               }
           }
-          [self probeSessionStores:store];
-          // REST account endpoints are gone (404); read the handle from the page
-          // itself, then bridge the session into a native account (Voie B then A).
+          // REST account endpoints are gone (404): read the handle from the page
+          // itself, then bridge the session into a native account.
           [self resolveScreenNameThenBridgeWithAuthToken:authVal csrf:csrfVal userID:uid attempt:0];
       }
     }];
 }
 
-// The task body cannot be guessed, so the page's own fetch is wrapped and each
-// onboarding/task call it makes is reported: URL, body, and reply shape.
-static NSString* const kNFBExchangeScript =
-    @"(function(){"
-    @"  if(window.__nfbWrapped){return;}window.__nfbWrapped=1;"
-    @"  var out=function(m){window.webkit.messageHandlers.nfbExchange.postMessage(m);};"
-    @"  var pick=function(u){return String(u).indexOf('/onboarding/')>=0"
-    @"      ||String(u).indexOf('/oauth')>=0||String(u).indexOf('/auth/')>=0;};"
-    @"  var shape=function(t){return ' oauth='+(t.indexOf('oauth_token')>=0?1:0)"
-    @"      +' secret='+(t.indexOf('oauth_token_secret')>=0?1:0)"
-    @"      +' flow='+(t.indexOf('flow_token')>=0?1:0)"
-    @"      +' subtask='+(t.indexOf('subtask_id')>=0?1:0);};"
-    @"  var of=window.fetch;"
-    @"  if(of){window.fetch=function(){"
-    @"    var a=arguments;var u=(a[0]&&a[0].url)||a[0]||'';"
-    @"    var opt=(a[0]&&a[0].method)?a[0]:(a[1]||{});"
-    @"    if(pick(u)){var b=opt&&opt.body?String(opt.body):'';"
-    @"      out('FETCH '+String(u).slice(0,80)+' body='+b.slice(0,300));}"
-    @"    return of.apply(this,a).then(function(r){"
-    @"      if(pick(u)){r.clone().text().then(function(t){"
-    @"        out('FRESP '+r.status+shape(t));});}"
-    @"      return r;});"
-    @"  };}"
-    @"  var oo=XMLHttpRequest.prototype.open;"
-    @"  var os=XMLHttpRequest.prototype.send;"
-    @"  XMLHttpRequest.prototype.open=function(m,u){this.__u=u;return oo.apply(this,arguments);};"
-    @"  XMLHttpRequest.prototype.send=function(body){"
-    @"    var x=this;"
-    @"    if(pick(x.__u)){out('XHR '+String(x.__u).slice(0,80)"
-    @"        +' body='+(body?String(body).slice(0,300):''));"
-    @"      x.addEventListener('load',function(){"
-    @"        out('XRESP '+x.status+shape(x.responseText||''));});}"
-    @"    return os.apply(this,arguments);"
-    @"  };"
-    @"})();";
 
 - (void)webView:(WKWebView*)webView
     didFailProvisionalNavigation:(WKNavigation*)navigation

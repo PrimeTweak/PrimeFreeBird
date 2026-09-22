@@ -1,19 +1,6 @@
-//
-//  WebCreateTweet.x
-//  PrimeFreeBird
-//
-//  Reroutes native tweet posting through x.com's web GraphQL CreateTweet endpoint
-//  so sideloaded / legacy sessions can post without hitting native attestation.
-//
-//  The seam is NSURLSession: the native app still issues CreateTweet as an ordinary
-//  data/upload task to .../graphql/<queryId>/CreateTweet, so the tweak rewrites that request
-//  in flight with web-session auth (auth_token + ct0 cookies + csrf header) and a
-//  fresh x-client-transaction-id. The tweak never reads the response body, only its status
-//  code, so response encoding (gzip) is irrelevant.
-//
-//  Gated on the inverse of `reply_in_webview`: when that setting is on, WebReply.x
-//  handles composing in a webview instead and this interception stays out of the way.
-//
+// Reroutes native tweet posting through x.com's web CreateTweet endpoint with the
+// web session (auth_token, ct0, a fresh transaction id), so a sideloaded session
+// can post. Off when reply_in_webview handles composing.
 
 #import "HookHelpers.h"
 #import "Debug/NFBDebugger.h"
@@ -811,11 +798,9 @@ static NSMutableURLRequest* webRequestFromNativeSend(NSURLRequest* request) {
             return nil;
         }
     } else {
-        // A bridged sign-in mounts a shell account whose OAuth token is the web
-        // auth_token itself, not the <userID>-<secret> form, so the poster cannot
-        // be read from it. Fall back to the single shared web session in the cookie
-        // jar - the same session the read injection uses - which is correct while
-        // one account is signed in.
+        // A bridged sign-in's shell account carries the web auth_token as its OAuth
+        // token, so the poster cannot be read from it: fall back to the shared web
+        // session in the cookie jar, correct while one account is signed in.
         if (WebAuthToken.length == 0) {
             NFBDebugLog(@"[webtweet] no reroute: poster unreadable and no shared session");
             return nil;

@@ -1,9 +1,4 @@
-//
-//  NFBDebugger.m
-//
-//  See NFBDebugger.h for the shape of the thing. Everything here is inert
-//  unless debug_tools is on, checked once and cached.
-//
+// The debugger's implementation; see NFBDebugger.h.
 
 #import "Debug/NFBDebugger.h"
 #import "Generated/NFBHookManifest.h"
@@ -54,9 +49,8 @@ static NSString* NFBMarkOf(UIView* view) {
 
 // MARK: - decision log (ring buffer)
 
-// A capture writes about 70 lines of its own reports into this same ring, so at
-// 80 a session left eight lines of history. 600 holds a full census plus the
-// scenario that led to it.
+// A capture writes about 70 lines of its own reports into this ring; 300 keeps
+// the scenario that led to it as well.
 #define NFB_LOG_CAPACITY 300
 
 static NSMutableArray<NSString*>* NFBDecisionRing(void) {

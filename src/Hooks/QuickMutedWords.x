@@ -1,18 +1,5 @@
-//
-//  QuickMutedWords.x
-//  PrimeFreeBird
-//
-//  A muted-words shortcut in the Home timeline's top bar. FLEX showed that bar
-//  is a TFNNavigationBar — a stable Twitter class — even though its *contents*
-//  are a SwiftUI hosting view whose name is generated at build time
-//  (…$18e770d0c27PlatterContainerHostingView) and must never be hooked. So the tweak
-//  hook the bar and use the plain UINavigationBar API on its top item.
-//
-//  TFNNavigationBar is generic — every screen uses one — so the button is only
-//  added to the instance owned by the Home timeline. If that owner can't be
-//  identified the button simply never appears, exactly like the Explore
-//  advanced-search button: best-effort, never destructive.
-//
+// A muted-words shortcut in the Home timeline's top bar, added only to the bar the
+// Home timeline owns; if that owner cannot be identified, no button appears.
 
 #import "HookHelpers.h"
 #import "Debug/NFBDebugger.h"

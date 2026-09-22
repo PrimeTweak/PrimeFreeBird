@@ -1,13 +1,14 @@
-// Measurement only: watches Twitter's home-grown attestation flow to see what
-// blocks sign-in on a sideloaded build - attestation switches, the onboarding
-// subtask, and all Twitter API traffic. Nothing is forced. Prefix [attest]/[net].
+// Measurement only: watches the app's attestation flow and API traffic to show
+// what blocks sign-in on a sideloaded build. Nothing is forced. Prefix
+// [attest]/[net].
+
 #import <Foundation/Foundation.h>
 #import <objc/runtime.h>
 #import <objc/message.h>
 #import "Debug/NFBDebugger.h"
 
-// Every feature-switch read touching attestation, so we see the exact server
-// keys and their values on this build.
+// Every feature-switch read touching attestation, so the exact server keys and
+// their values on this build are journaled.
 %hook TFSFeatureSwitches
 
 - (BOOL)boolForKey:(NSString*)key {

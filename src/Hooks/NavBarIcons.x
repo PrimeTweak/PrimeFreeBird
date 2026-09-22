@@ -1,26 +1,6 @@
-//
-//  NavBarIcons.x
-//  PrimeFreeBird
-//
-//  Twitter draws the settings gear at full label strength, which reads as
-//  black next to the muted grey of the tab labels beside it.
-//
-//  Colour routes are reclaimed by something in every case: the tint
-//  by the theme, the alpha by the button's own highlight after a tap, and
-//  Twitter's fillColor renders black. So the glyph is repainted into a flat
-//  grey bitmap, which nothing can take back.
-//
-//  Two screens, two shapes. On Explore the gear is a TFNBarButtonItemButton
-//  carrying "NavigationBarSettingsButton", with its image nested a few levels
-//  below. On Notifications it is a plain bar button item. The hook sits on
-//  UINavigationBar — UIKit's base class, always loaded — because Twitter's own
-//  subclass differs between screens.
-//
-//  During bar transitions the whole header — avatar, search field, gear and
-//  tab strip — can lighten by one constant factor behind a hard edge, which
-//  is a single container view drawn at partial opacity, not the glyph. So the
-//  container is held opaque, not the gear.
-//
+// Navigation bars and their glyphs: the settings gear repainted flat grey, the
+// reply and conversation bars, the inbox filter pill, the logo kept free of the
+// glass vibrancy filter, and the bar-height oscillation damper.
 
 #import "HookHelpers.h"
 #import "Debug/NFBDebugger.h"
@@ -939,23 +919,6 @@ static BOOL nfbViewSitsInInboxPill(UIView* view) {
     return NO;
 }
 
-// The platter that holds the bar's buttons: wider than the pill test above,
-// narrower than the whole bar. Bounded and class-name only, since this runs on an
-// animation path.
-static BOOL nfbViewSitsInBarPlatter(UIView* view) {
-    UIView* node = view;
-    NSInteger depth = 0;
-    while (node && depth < 12) {
-        if ([NSStringFromClass([node classForCoder])
-                hasPrefix:@"UIKit.NavigationBarPlatterContainer"]) {
-            return YES;
-        }
-        node = node.superview;
-        depth++;
-    }
-    return NO;
-}
-
 // 12.21: the vibrancy filter is also animated onto the tab bar's icons. Only
 // while a themed bar is switched on; otherwise the bar keeps its glass.
 static BOOL NFBViewSitsInXTabBar(UIView* view) {
@@ -1001,24 +964,6 @@ static BOOL NFBViewSitsInXTabBar(UIView* view) {
             NFBDebugLog(@"[logo] vibrancy animation refused (%@)", key);
         }
         return;
-    }
-
-    // Every animation reaching the button platter is recorded, whatever its kind:
-    // the fade is not an opacity animation, and a transition or a transform
-    // carries no opacity keyPath.
-    if (NFBDebugIsRecording() && ownerIsView && nfbViewSitsInBarPlatter(owner)) {
-        NSString* path = @"—";
-        if ([animation isKindOfClass:[CABasicAnimation class]]) {
-            path = ((CABasicAnimation*)animation).keyPath ?: @"nil";
-        } else if ([animation isKindOfClass:[CATransition class]]) {
-            path = [NSString stringWithFormat:@"transition:%@",
-                    ((CATransition*)animation).type ?: @"?"];
-        }
-        NFBDebugLog(@"platter anim: %@ [%@] key=%@ path=%@ duration=%.2f pill=%@",
-                    NSStringFromClass([owner classForCoder]),
-                    NSStringFromClass([animation classForCoder]),
-                    key ?: @"nil", path, animation.duration,
-                    nfbViewSitsInInboxPill(owner) ? @"YES" : @"no");
     }
 
     // Every animation on this one control is refused, not just opacity: the fade

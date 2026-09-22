@@ -1,7 +1,4 @@
-//
-//  ColorSwatchControl.m
-//  PrimeFreeBird
-//
+// A pill-style accent colour option.
 
 #import "ColorSwatchControl.h"
 

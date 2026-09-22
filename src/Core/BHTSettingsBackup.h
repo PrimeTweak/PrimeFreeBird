@@ -1,7 +1,4 @@
-//
-//  BHTSettingsBackup.h
-//  PrimeFreeBird
-//
+// Export and import of the settings as a file.
 
 #import <Foundation/Foundation.h>
 

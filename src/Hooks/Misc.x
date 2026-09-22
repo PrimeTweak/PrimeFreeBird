@@ -1,7 +1,5 @@
-//
-//  Misc.x
-//  PrimeFreeBird
-//
+// Assorted options: always open in Safari, expanded t.co links, RTL disabled,
+// clean shared links, and no screenshot detection.
 
 #import <CoreText/CoreText.h>
 #import "HookHelpers.h"
@@ -280,7 +278,7 @@ static BOOL NFBScreenshotSuppressed(void) {
     return [BHTSettings boolForKey:@"no_screenshot_detection"];
 }
 
-// (1) Notification-based suppression (theacrat's approach), now gated.
+// (1) Notification-based suppression, gated on the setting.
 %hook NSNotificationCenter
 
 - (id)addObserverForName:(NSNotificationName)name

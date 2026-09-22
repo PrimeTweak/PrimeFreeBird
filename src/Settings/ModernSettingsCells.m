@@ -1,9 +1,4 @@
-//
-//  ModernSettingsCells.m
-//  PrimeFreeBird
-//
-//  Created by nyaathea
-//
+// The cells of the settings screens: toggles, buttons, headers, pickers.
 
 #import "Settings/ModernSettingsCells.h"
 #import <QuartzCore/QuartzCore.h>

@@ -1,9 +1,4 @@
-//
-//  ModernSettingsCells.h
-//  PrimeFreeBird
-//
-//  Created by nyaathea
-//
+// The cells of the settings screens: toggles, buttons, headers, pickers.
 
 #import <UIKit/UIKit.h>
 #import "Core/TwitterChirpFont.h"

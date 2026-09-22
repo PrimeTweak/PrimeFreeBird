@@ -218,11 +218,9 @@ static void nfbBridgeMount(NSString* screen, long long uid, NSString* token, NSS
         NFBDebugLog(@"[bridge] session/userID missing - abort");
         return;
     }
-    // The OAuth exchange (onboarding/task) never succeeded in testing - 500 code
-    // 131 every time - so the shell account is mounted directly over the shared web
-    // session. Reads authenticate by cookie (the NSURLSession hook) and writes
-    // reroute through WebCreateTweet.x; the session already lives in the shared
-    // cookie jar, seeded at capture.
+    // The shell account is mounted directly over the shared web session: reads
+    // authenticate by cookie (the NSURLSession hook), writes reroute through
+    // WebCreateTweet.x, and the session already lives in the shared cookie jar.
     NSString* screen =
         screenName.length ? screenName : [NSString stringWithFormat:@"id%lld", userID];
     NFBDebugLog(@"[bridge] mounting shell account over shared session (screen=%@)", screen);

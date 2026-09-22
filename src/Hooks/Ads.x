@@ -1,7 +1,5 @@
-//
-//  Ads.x
-//  PrimeFreeBird
-//
+// Hides promoted posts, the premium offer and trend videos from the lists the
+// app builds (hide_promoted, hide_premium_offer, hide_trend_videos).
 
 #import "HookHelpers.h"
 

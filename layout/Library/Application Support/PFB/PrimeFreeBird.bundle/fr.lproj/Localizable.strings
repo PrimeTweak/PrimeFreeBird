@@ -274,29 +274,7 @@
 "INSTALL_IFONT_BUTTON_TITLE" = "Application iFont";
 "FONT_SYSTEM_DEFAULT_SUBTITLE" = "Par défaut du système";
 
-/*Legacy login*/
-"LEGACY_LOGIN_INFO_LABEL" = "Connecte-toi avec ton nom d’utilisateur et ton mot de passe.\n\nLa connexion Google et Apple n’est pas prise en charge. Si ton compte en utilise une, ajoute-lui d’abord un mot de passe.";
-"LEGACY_LOGIN_MISSING_INPUT_TITLE" = "Champ manquant";
-"LEGACY_LOGIN_MISSING_INPUT_MESSAGE" = "Entre ton nom d’utilisateur et ton mot de passe.";
-"LEGACY_LOGIN_VERIFYING_STATUS" = "Verifying…";
-"LEGACY_LOGIN_SIGNING_IN_STATUS" = "Connexion…";
-"LEGACY_LOGIN_UNAVAILABLE_TITLE" = "Unavailable";
-"LEGACY_LOGIN_CLASSES_MISSING_MESSAGE" = "Classes de connexion manquantes.";
-"LEGACY_LOGIN_BUILD_COMMAND_FAILED_MESSAGE" = "Impossible de construire la commande.";
-"LEGACY_LOGIN_CRASH_AVOIDED_TITLE" = "Plantage évité";
-"LEGACY_LOGIN_UNEXPECTED_RESPONSE_TITLE" = "Réponse inattendue";
-"LEGACY_LOGIN_NO_TOKEN_NO_CHALLENGE_MESSAGE" = "Aucun jeton et aucun défi.";
-"LEGACY_LOGIN_CHALLENGE_MISSING_INFO_MESSAGE" = "Il manque au défi son identifiant de requête ou son URL.";
-"LEGACY_LOGIN_CHALLENGE_CLASSES_MISSING_MESSAGE" = "Classes de défi/hôte manquantes.";
-"LEGACY_LOGIN_BUILD_CHALLENGE_FAILED_MESSAGE" = "Impossible de construire le défi.";
-"LEGACY_LOGIN_NO_TOKEN_MESSAGE" = "Aucun jeton dans la réponse.";
-"LEGACY_LOGIN_FAILED_TITLE" = "Échec de la connexion";
-"LEGACY_LOGIN_NO_ACCOUNT_MESSAGE" = "Aucun compte n’a été retourné.";
-"LEGACY_LOGIN_RATE_LIMITED_TITLE" = "Probablement limité par le débit (243)";
-"LEGACY_LOGIN_RATE_LIMITED_MESSAGE" = "Trop de tentatives. Attends un moment ou change de réseau/VPN, puis réessaie.\n\nDétails :\n%@";
-"LEGACY_LOGIN_UNKNOWN_ERROR" = "Erreur inconnue";
-
-/* ---- Traductions ajoutées (audit fr : clés manquantes) ---- */
+/* ===== Keys added for parity with en ===== */
 
 "GENERAL_GROUP_PRIVACY" = "Confidentialité";
 "NO_SCREENSHOT_DETECTION_TITLE" = "Captures d’écran propres";
@@ -369,7 +347,7 @@
 "WEB_SESSION_CLEAR_ACTION" = "Supprimer";
 "WEB_SESSION_CLEAR_CONFIRM" = "Ceci supprime la connexion web enregistrée. Tu devras te reconnecter pour répondre dans la vue web.";
 
-/* ===== Recherche avancée (2026-08-04) ===== */
+/* ===== Advanced search ===== */
 "ADVANCED_SEARCH_TITLE" = "Recherche avancée";
 "ADVANCED_SEARCH_DETAIL" = "Ajoute un bouton de filtres dans Explorer pour bâtir des recherches avancées.";
 "ADVSEARCH_SECTION_WORDS" = "Mots";
@@ -394,7 +372,7 @@
 "ADVSEARCH_EMPTY" = "Remplis au moins un champ.";
 "RESTART_INFO_ALERT_MESSAGE" = "Redémarre Twitter pour que le changement s'applique complètement.";
 
-/* ===== Recherche avancée v1.3 — verbatim web (2026-08-04) ===== */
+/* ===== Advanced search: web-verbatim labels ===== */
 "ADVSEARCH_SECTION_FILTERS" = "Filtres";
 "ADVSEARCH_LANGUAGE" = "Langue";
 "ADVSEARCH_ANY_LANGUAGE" = "Toutes les langues";
@@ -441,7 +419,7 @@
 "UNLIMITED_TIMELINE_TABS_DETAIL" = "Épingle plus de fils et débloque les onglets avancés, sauf s'ils sont masqués.";
 "UNLIMITED_TIMELINE_TABS_DETAIL_HELD" = "Épingle plus de fils et débloque les onglets avancés.";
 
-/* ===== MOTS FILTRÉS (2026-08-05) ===== */
+/* ===== Muted words ===== */
 "MUTED_WORDS_SUBTITLE" = "Les posts correspondant à cette liste sont retirés de ton fil.";
 "FILTERS_TITLE" = "Filtres";
 "FILTERS_DETAIL" = "Mots, comptes et langues que tu gardes hors de ton fil.";
@@ -472,7 +450,7 @@
 "MUTED_WORDS_CONVERSATIONS_TITLE" = "Filtrer dans les conversations";
 "MUTED_WORDS_CONVERSATIONS_DETAIL" = "Applique la liste aux réponses autant qu'au fil.";
 
-/* ===== MOTS FILTRÉS — expiration, portée, compteur (2026-08-05) ===== */
+/* ===== Muted words: expiry, scope, counter ===== */
 "MUTED_WORDS_FOLLOWING_TITLE" = "Ignorer les comptes suivis";
 "MUTED_WORDS_FOLLOWING_DETAIL" = "Les posts des comptes que tu suis ne sont jamais filtrés.";
 "MUTED_WORDS_REPOSTS_TITLE" = "Inclure les republications";
@@ -530,7 +508,7 @@
 "DOWNLOAD_VOICE_MESSAGES_TITLE" = "Télécharger les messages vocaux";
 "DOWNLOAD_VOICE_MESSAGES_DETAIL" = "Appui long sur un message vocal pour enregistrer le fichier audio.";
 
-/* Notifications masquées */
+/* Hidden notifications */
 "NOTIFS_HIDE_ACTION" = "Masquer";
 "NOTIFS_HIDDEN_TOAST" = "Notification masquée";
 "HIDDEN_NOTIFS_TITLE" = "Notifications masquées";

@@ -1,7 +1,4 @@
-//
-//  SourceLabels.x
-//  PrimeFreeBird
-//
+// Restores the Tweet source label under a Tweet (restore_tweet_labels).
 
 #import "HookHelpers.h"
 

@@ -1,7 +1,4 @@
-//
-//  CustomTabBarPreviewCell.m
-//  PrimeFreeBird
-//
+// The tab-bar preview cell of the tab editor.
 
 #import "CustomTabBarPreviewCell.h"
 #import <objc/runtime.h>

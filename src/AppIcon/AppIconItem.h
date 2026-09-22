@@ -1,6 +1,4 @@
-// AppIconItem.h
-// PrimeFreeBird
-//
+// An entry of the app icon picker.
 
 #import <Foundation/Foundation.h>
 

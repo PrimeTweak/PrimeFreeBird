@@ -1,9 +1,4 @@
-//
-//  ModernSettingsViewController.h
-//  PrimeFreeBird
-//
-//  Created by nyathea.
-//
+// The settings root: the list of pages.
 
 #import <UIKit/UIKit.h>
 #import "Headers/TWHeaders.h"

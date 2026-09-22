@@ -1,7 +1,5 @@
-//
-//  AppLifecycle.x
-//  PrimeFreeBird
-//
+// Launch-time hooks: the padlock, app-delegate lifecycle, the classic launch
+// animation and the Liquid Glass declaration.
 
 #import "HookHelpers.h"
 #import "Debug/NFBDebugger.h"
@@ -421,10 +419,8 @@ static void paintWindowForSplash(UIView* view) {
 %end
 
 %ctor {
-    // enable_liquid_glass defaults to YES (see BHTSettings), but that default is
-    // resolved by BHTSettings, not by this plain read - and this runs before the
-    // defaults are registered. Seed it explicitly on a clean install so the design
-    // opts in from the first launch, not only after the toggle is touched.
+    // This runs before BHTSettings registers its defaults, so the YES default of
+    // enable_liquid_glass is seeded here on a clean install, from the first launch.
     NSUserDefaults* defaults = [NSUserDefaults standardUserDefaults];
     if ([defaults objectForKey:@"enable_liquid_glass"] == nil) {
         [defaults setBool:YES forKey:@"enable_liquid_glass"];

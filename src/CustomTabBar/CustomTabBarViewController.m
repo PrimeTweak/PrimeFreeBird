@@ -1,12 +1,5 @@
-//  CustomTabBarViewController.m
-//  PrimeFreeBird
-//
-//  Created by Bandar Alruwaili on 11/12/2023.
-//  Modified by actuallyaridan on 31/05/2025.
-//
-//  Clones the app's native tab-customization screen: a grid of every available
-//  tab (tap to add/remove) above a drag-reorderable tab-bar preview row.
-//
+// The tab editor: a grid of every available tab above a drag-reorderable preview
+// row, cloned from the app's native tab-customization screen.
 
 #import "CustomTabBarViewController.h"
 #import <objc/runtime.h>

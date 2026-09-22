@@ -1,10 +1,5 @@
-//
-//  MutedWordsViewController.h
-//  PrimeFreeBird
-//
-//  Editor for the muted-words list: words, phrases and @accounts whose posts
-//  are filtered out of the timeline.
-//
+// Editor of the muted-words list: words, phrases and @accounts filtered out of
+// the timeline.
 
 #import <UIKit/UIKit.h>
 

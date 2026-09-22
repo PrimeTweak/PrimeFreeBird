@@ -1,7 +1,6 @@
-//
-//  Timeline.x
-//  PrimeFreeBird
-//
+// Timeline options: hidden custom timelines, full-frame images, no Spaces bar, the
+// scroll edge effect, hidden prompts, muted words, the reading marker and the
+// language filter.
 
 #import <QuartzCore/QuartzCore.h>
 

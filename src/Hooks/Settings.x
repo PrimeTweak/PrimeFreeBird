@@ -1,7 +1,4 @@
-//
-//  Settings.x
-//  PrimeFreeBird
-//
+// The PrimeFreeBird entry in the app's settings, and the custom font picker.
 
 #import "HookHelpers.h"
 
@@ -13,8 +10,7 @@ static const void* SettingsEntryKey = &SettingsEntryKey;
 static const void* SettingsRootKey = &SettingsRootKey;
 
 static BOOL isSettingsClass(UIViewController* viewController) {
-    return [viewController isKindOfClass:objc_getClass("T1GenericSettingsViewController")] ||
-           [viewController isKindOfClass:objc_getClass("T1SettingsViewController")];
+    return [viewController isKindOfClass:objc_getClass("T1GenericSettingsViewController")];
 }
 
 // The generic controller backs the root and every sub-page alike, so the root is
@@ -173,23 +169,8 @@ static NSArray* sectionsWithPrimeFreeBirdEntry(TFNItemsDataViewController* setti
 }
 %end
 
-%hook T1SettingsViewController
-- (void)viewWillAppear:(BOOL)animated {
-    %orig;
-    NFBColorThemeScreenVisible++;
-    insertPrimeFreeBirdSettingsIfRoot(self);
-}
-
-- (void)viewDidDisappear:(BOOL)animated {
-    %orig;
-    if (NFBColorThemeScreenVisible > 0) {
-        NFBColorThemeScreenVisible--;
-    }
-}
-%end
-
 // Every sections rebuild runs through this transform right before setSections:,
-// so hooking it on the base class covers both settings roots.
+// so hooking it on the base class covers the settings root and its sub-pages.
 %hook TFNItemsDataViewController
 - (NSArray*)updatedSections:(NSArray*)sections forStyle:(NSInteger)style {
     NSArray* updatedSections = %orig;

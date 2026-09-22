@@ -1,10 +1,5 @@
-//
-//  ColorSwatchControl.h
-//  PrimeFreeBird
-//
-//  A pill-style accent-color option: a rounded colored capsule with the color
-//  name inside, and a radio-style checkmark circle below it.
-//
+// A pill-style accent colour option: a coloured capsule with the colour name and
+// a radio checkmark below it.
 
 #import <UIKit/UIKit.h>
 

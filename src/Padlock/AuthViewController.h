@@ -1,9 +1,4 @@
-//
-//  AuthViewController.h
-//  PrimeFreeBird
-//
-//  Created by BandarHelal on 25/09/2021.
-//
+// The padlock screen: the biometric or passcode gate shown at launch.
 
 #import <UIKit/UIKit.h>
 

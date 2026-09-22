@@ -1,7 +1,4 @@
-//
-//  ColorThemeViewController.h
-//  PrimeFreeBird
-//
+// The accent colour picker, cloned from the app's ColorThemePickerItem.
 
 #import <UIKit/UIKit.h>
 #import "ColorSwatchControl.h"

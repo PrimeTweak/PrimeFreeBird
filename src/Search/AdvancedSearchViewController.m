@@ -1,16 +1,5 @@
-//
-//  AdvancedSearchViewController.m
-//  PrimeFreeBird
-//
-//  Twitter's Advanced Search only exists on the web. This is the same form,
-//  native — styled to match x.com/search-advanced verbatim: individually
-//  bordered fields with floating labels, the official example line under each
-//  field, the Filters toggles, the Language menu, calendar date pickers, and
-//  the black pill Search button. Drafts persist between opens; Search
-//  assembles the standard operator query and hands it to the app's OWN search
-//  screen through Twitter's internal URL router — native results, no web view
-//  anywhere.
-//
+// The Advanced Search form, styled after x.com/search-advanced: bordered fields
+// with floating labels, example lines, filter toggles, language menu, date pickers.
 
 #import "Search/AdvancedSearchViewController.h"
 #import "Core/BHTBundle.h"

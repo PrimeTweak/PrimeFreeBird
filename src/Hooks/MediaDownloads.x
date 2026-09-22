@@ -1,16 +1,14 @@
-//
-//  MediaDownloads.x
-//  PrimeFreeBird
-//
+// Download entries: DM videos and voice messages, custom voice uploads, tweet to
+// image, and the download entry in the media long-press menu.
 
 #import "HookHelpers.h"
 #import "Debug/NFBDebugger.h"
 
 // MARK: - DM video download
 
-// The DM UI is Swift now: media messages live in DMConversation.MessageAttachmentView,
-// which hosts a shared TweetMediaAttachments media view exposing its models through
-// -inlineMediaInfos. Collect the entities from whichever descendant carries them.
+// DM media messages (ChatConversation.MessageAttachmentView) host a shared media
+// view exposing its models through -inlineMediaInfos; the entities are collected
+// from whichever descendant carries them.
 static NSArray* DMVideoEntities(UIView* attachmentView) {
     NSMutableArray* entities = [NSMutableArray new];
 
@@ -75,95 +73,6 @@ static void NFBSaveVoiceMessage(NSURL* sourceURL) {
 // the touch first. It is held by association and the view addressed as a UIView:
 // the class is known to the compiler only by a forward declaration.
 static const void* kNFBVoiceInteractionKey = &kNFBVoiceInteractionKey;
-
-%hook _TtC13DMAttachments24AttachmentAssetAudioView
-
-- (void)layoutSubviews {
-    %orig;
-    UIView* view = (UIView*)self;
-    if ([BHTSettings boolForKey:@"download_voice_messages"] &&
-        !objc_getAssociatedObject(view, kNFBVoiceInteractionKey)) {
-        UIContextMenuInteraction* interaction = [[UIContextMenuInteraction alloc]
-            initWithDelegate:(id<UIContextMenuInteractionDelegate>)self];
-        objc_setAssociatedObject(view, kNFBVoiceInteractionKey, interaction,
-                                 OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-        [view addInteraction:interaction];
-    }
-}
-
-%new
-- (UIContextMenuConfiguration*)contextMenuInteraction:(UIContextMenuInteraction*)interaction
-                       configurationForMenuAtLocation:(CGPoint)location {
-    NSURL* voiceURL = gNFBLastVoiceURL;
-    if (!voiceURL) {
-        return nil;
-    }
-    return [UIContextMenuConfiguration
-        configurationWithIdentifier:nil
-                    previewProvider:nil
-                     actionProvider:^UIMenu* _Nullable(
-                         NSArray<UIMenuElement*>* _Nonnull suggestedActions) {
-                       UIAction* saveAction = [UIAction
-                           actionWithTitle:[[BHTBundle sharedBundle]
-                                               localizedTwitterStringForKey:
-                                                   @"DOWNLOAD_ACTIVITY_VIEW_LABEL"]
-                                     image:[UIImage systemImageNamed:@"square.and.arrow.down"]
-                                identifier:nil
-                                   handler:^(__kindof UIAction* _Nonnull action) {
-                                     NFBSaveVoiceMessage(voiceURL);
-                                   }];
-                       return [UIMenu menuWithTitle:@"" children:@[ saveAction ]];
-                     }];
-}
-
-%end
-
-%hook _TtC14DMConversation21MessageAttachmentView
-%property (nonatomic, strong) UIContextMenuInteraction* downloadMenuInteraction;
-%property (nonatomic, strong) DownloadInlineButton* downloadHandler;
-- (void)layoutSubviews {
-    %orig;
-
-    if ([BHTSettings boolForKey:@"download_videos"] && self.downloadMenuInteraction == nil) {
-        self.downloadMenuInteraction = [[UIContextMenuInteraction alloc] initWithDelegate:self];
-        [self addInteraction:self.downloadMenuInteraction];
-    }
-}
-%new
-- (UIContextMenuConfiguration*)contextMenuInteraction:(UIContextMenuInteraction*)interaction
-                       configurationForMenuAtLocation:(CGPoint)location {
-    NSArray* videoEntities = DMVideoEntities(self);
-    if (videoEntities.count == 0) {
-        return nil;
-    }
-
-    return [UIContextMenuConfiguration
-        configurationWithIdentifier:nil
-                    previewProvider:nil
-                     actionProvider:^UIMenu* _Nullable(
-                         NSArray<UIMenuElement*>* _Nonnull suggestedActions) {
-                         UIAction* saveAction = [UIAction
-                             actionWithTitle:
-                                 [[BHTBundle sharedBundle]
-                                     localizedTwitterStringForKey:@"DOWNLOAD_ACTIVITY_VIEW_LABEL"]
-                                       image:[UIImage systemImageNamed:@"square.and.arrow.down"]
-                                  identifier:nil
-                                     handler:^(__kindof UIAction* _Nonnull action) {
-                                         if (self.downloadHandler == nil) {
-                                             self.downloadHandler = [%c(DownloadInlineButton) new];
-                                         }
-                                         [self.downloadHandler
-                                             presentDownloadOptionsForMediaEntities:videoEntities];
-                                     }];
-                         return [UIMenu menuWithTitle:@"" children:@[saveAction]];
-                     }];
-}
-%end
-
-// MARK: - DM attachments under the ChatConversation module
-
-// The DMAttachments module is gone from 12.21 and DMConversation lost its
-// attachment view; both now live in ChatConversation. Same bodies, new names.
 
 %hook _TtC16ChatConversation26MessageAttachmentAudioView
 
@@ -460,7 +369,7 @@ static NSString* NFBVMDMenuTitle(void) {
     return title;
 }
 
-// Detects a download entry already in the menu, ours or the app's. The app's
+// Detects a download entry already in the menu, the tweak's or the app's. The app's
 // own video entry ships untranslated and shows its raw key, so the key itself
 // is matched the same way a translated title would be.
 static BOOL NFBVMDTitleIsDownload(NSString* title, NSString* ours,
@@ -478,7 +387,7 @@ static BOOL NFBVMDTitleIsDownload(NSString* title, NSString* ours,
 }
 
 // Guards against adding the entry twice when a menu is rebuilt. The app's own
-// entry does not count: it is dropped below, so ours is the only one left.
+// entry does not count: it is dropped below, so the tweak's is the only one left.
 static BOOL NFBVMDAlreadyHasOurs(NSArray* children) {
     NSString* ours = NFBVMDMenuTitle();
     for (id element in children) {
@@ -543,7 +452,7 @@ static NSArray* NFBVMDAugmentedChildren(NSArray* children) {
 }
 
 // The app's own entry is appended after this menu is first built, so it is
-// dropped wherever the menu is rebuilt: only one download entry survives, ours.
+// dropped wherever the menu is rebuilt: only one download entry survives, the tweak's.
 static NSArray* NFBVMDWithoutNativeDownload(NSArray* children) {
     NSString* ours = NFBVMDMenuTitle();
     NSString* generic = [[BHTBundle sharedBundle]

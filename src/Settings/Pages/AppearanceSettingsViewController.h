@@ -1,9 +1,4 @@
-//
-//  AppearanceSettingsViewController.h
-//  PrimeFreeBird
-//
-//  Created by nyaathea
-//
+// The Appearance settings page.
 
 #import "Settings/ModernSettingsPageViewController.h"
 

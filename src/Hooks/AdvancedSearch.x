@@ -1,20 +1,6 @@
-//
-//  AdvancedSearch.x
-//  PrimeFreeBird
-//
-//  Entry point for the native Advanced Search form, on the Explore screen: a
-//  filters button added to the guide container's navigation item. BEST-EFFORT
-//  by design — if this build's Explore chrome ignores standard bar button
-//  items, nothing appears and nothing breaks; the Settings → Search →
-//  Advanced search row remains the guaranteed entry.
-//
-//  The glyph is drawn here rather than fetched. Twitter draws every one of its
-//  line glyphs at 2 units — filter, filter_bars, bulleted_list, all of them —
-//  while the settings gear beside this button is 2.6, so no glyph in the
-//  library matches it. The shape below is Twitter's own, taken from its filter
-//  glyph; only the stroke and the canvas are the tweak's, both set so the icon
-//  reaches the screen at the gear's width and the gear's stroke.
-//
+// A Filters button in the Explore bar that opens the native Advanced Search form,
+// with the app's own filter button collapsed inside the search bar. The glyph is
+// drawn here at the settings gear's stroke, since no library glyph matches it.
 
 #import "HookHelpers.h"
 #import "Debug/NFBDebugger.h"

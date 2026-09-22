@@ -1,26 +1,6 @@
-// HiddenNotifications.x — hide a notification, let it expire on its own.
-//
-// Purpose: swipe a notification away the way the conversations list already
-// does, review the hidden ones with a countdown to their expiry, bring one
-// back, or clear them all. Nothing is deleted server side; an entry leaves the
-// registry on its own once its horizon passes.
-//
-// Every structural choice below rests on a measurement:
-//   · the notifications list is a T1URTViewController and it answers
-//     tableView:trailingSwipeActionsConfigurationForRowAtIndexPath: with
-//     trailing=1, while the home timeline answers 0, so the native swipe
-//     mechanism is available here;
-//   · a row's model is TwitterURT.URTTimelineNotificationViewModel, a Swift
-//     class whose field names match no fixed candidate list.
-//
-// The field names are therefore discovered AT RUNTIME: a cascade of likely
-// selectors first, then the class's own zero-argument getters, filtered by
-// return type and name. What it settles on is journaled once, so the choice is
-// auditable rather than magic.
-//
-// Nothing here touches a cell, since cells are recycled: the swipe comes from
-// the table's own delegate, and hiding is done by filtering the sections, the
-// mechanism already proven by Hidden Threads.
+// Hide a notification: swipe or x on a row, a registry that expires on its own,
+// a sweep that keeps hidden rows out of the list, an empty-state panel, and the
+// hidden list reachable from the bar. Nothing is deleted server side.
 
 #import "HookHelpers.h"
 #import "Debug/NFBDebugger.h"
@@ -284,16 +264,6 @@ static NSString* NFBNotifDurableKey(id model) {
     NSString* meat = [[stable componentsSeparatedByCharactersInSet:noise]
         componentsJoinedByString:@""];
     if (meat.length < 12) {
-        // Once a second at most: this fires for every row of every sweep, and a
-        // single pass over a full timeline used to write more than a hundred lines.
-        static NSTimeInterval lastNote = 0;
-        NSTimeInterval now = CACurrentMediaTime();
-        if (now - lastNote > 1.0) {
-            lastNote = now;
-            NFBDebugLog(@"notifhide: description carries nothing distinguishing "
-                        @"(%lu chars) - no durable key",
-                        (unsigned long)meat.length);
-        }
         return nil;
     }
     return [NSString stringWithFormat:@"dk:%lu/%lu", (unsigned long)meat.hash,
@@ -326,15 +296,12 @@ static NSString* NFBNotifEntryIdFromDescription(id model) {
         return nil;
     }
     NSString* entryId = [text substringWithRange:[match rangeAtIndex:1]];
-    // Measured over six days on the same two notifications: the middle of the id
-    // is rewritten on every refresh while its tail stays put, so only the tail
-    // survives as a key. The whole id is logged to widen that measurement.
+    // The middle of the id is rewritten on every refresh while its tail stays
+    // put, so only the tail serves as a key.
     if (entryId.length <= kNFBNotifIdTail) {
         return entryId;
     }
-    NSString* tail = [entryId substringFromIndex:entryId.length - kNFBNotifIdTail];
-    NFBDebugLog(@"notifhide: entryId %@ - key %@", entryId, tail);
-    return tail;
+    return [entryId substringFromIndex:entryId.length - kNFBNotifIdTail];
 }
 
 // Marks a class whose identity is read from the description rather than from
@@ -355,8 +322,6 @@ static NSString* NFBNotifIdentity(id model) {
     NSString* fromDescription = NFBNotifEntryIdFromDescription(model);
     if (fromDescription.length) {
         cache[className] = kNFBIdentityFromDescription;
-        NFBDebugLog(@"notifhide: identity of %@ = entryId from description (durable)",
-                    className);
         return fromDescription;
     }
     // Durable names first, the ones inside scribeItem and then the usual entry
@@ -371,25 +336,8 @@ static NSString* NFBNotifIdentity(id model) {
             NSString* value = NFBNotifString(NFBNotifAsk(scribeItem,
                                                          NSSelectorFromString(name)));
             if (value.length) {
-                NFBDebugLog(@"notifhide: identity via scribeItem.%@ (durable)", name);
                 return [@"si:" stringByAppendingString:value];
             }
-        }
-        static BOOL described;
-        if (!described) {
-            described = YES;
-            NSString* shape = nil;
-            @try {
-                shape = [scribeItem description];
-                if (shape.length > 260) {
-                    shape = [shape substringToIndex:260];
-                }
-            } @catch (id exception) {
-                shape = @"(description unreadable)";
-            }
-            NFBDebugLog(@"notifhide: scribeItem is %@ and answers none of the durable "
-                        @"names; description = %@",
-                        NSStringFromClass([scribeItem class]), shape ?: @"(nil)");
         }
     }
     NSArray<NSString*>* candidates = @[
@@ -401,10 +349,6 @@ static NSString* NFBNotifIdentity(id model) {
         NSString* value = NFBNotifString(NFBNotifAsk(model, NSSelectorFromString(name)));
         if (value.length) {
             cache[className] = name;
-            NFBDebugLog(@"notifhide: identity of %@ = %@%@", className, name,
-                        [name hasPrefix:@"scribeItemImpression"]
-                            ? @" (IMPRESSION ID - not stable across sessions)"
-                            : @"");
             return value;
         }
     }
@@ -412,8 +356,6 @@ static NSString* NFBNotifIdentity(id model) {
                                           @"itemid", @"restid"], '@');
     if (found) {
         cache[className] = NSStringFromSelector(found);
-        NFBDebugLog(@"notifhide: identity of %@ = %@ (discovered)",
-                    className, NSStringFromSelector(found));
         return NFBNotifString(NFBNotifAsk(model, found));
     }
     return nil;
@@ -472,8 +414,7 @@ BOOL NFBNotifIsHidden(id model) {
     if (durableKey.length && hidden[durableKey] != nil) {
         return YES;
     }
-    // Read once and reused below: this call walks the model and journals what
-    // it finds, so asking twice doubles both the work and the log.
+    // Read once and reused below: this call walks the model.
     NSString* identity = NFBNotifIdentity(model);
     if (identity.length) {
         for (NSDictionary* entry in hidden.allValues) {
@@ -489,25 +430,6 @@ BOOL NFBNotifIsHidden(id model) {
                 return YES;
             }
         }
-    }
-    // The first four times the filter sees a row with a non-empty registry, both
-    // the identity the display carries and what the model exposes are journaled, so
-    // a per-response identity can be told from a filter that never runs.
-    static NSInteger noted;
-    if (identity.length && hidden.count && noted < 4) {
-        noted++;
-        NSString* shape = nil;
-        @try {
-            shape = [model description];
-            if (shape.length > 220) {
-                shape = [shape substringToIndex:220];
-            }
-        } @catch (id exception) {
-            shape = @"(description illisible)";
-        }
-        NFBDebugLog(@"notifhide: FILTER identity <%@> | %@",
-                    identity, hidden[identity] ? @"FOUND -> hidden" : @"not in the registry");
-        NFBDebugLog(@"notifhide: FILTER model = %@", shape ?: @"(nil)");
     }
     return identity.length && hidden[identity] != nil;
 }
@@ -663,13 +585,8 @@ static void NFBHideNotifWithText(id model, NSString* cellText) {
     // the age the cell displays; the countdown and the expiry date both read
     // "d" first and only fall back to "h", the moment it was hidden.
     NSTimeInterval notifDate = NFBNotifDate(model);
-    NSString* source = @"model";
     if (notifDate <= 0) {
         notifDate = NFBNotifDateFromDisplayedAge(cellText ?: text);
-        source = @"displayed age";
-    }
-    if (notifDate <= 0) {
-        source = @"none - falling back to the hide date";
     }
     // One entry per notification: the registry is keyed by the durable key when
     // there is one, and the session identity rides inside the value so the filter
@@ -683,12 +600,6 @@ static void NFBHideNotifWithText(id model, NSString* cellText) {
     entry[@"s"] = identity;
     [current removeObjectForKey:identity];
     current[durable.length ? durable : identity] = entry;
-    NFBDebugLog(@"notifhide: filed under %@", durable.length ? durable : identity);
-    NFBDebugLog(@"notifhide: notification date = %@ (%@)",
-                notifDate > 0
-                    ? [NSDate dateWithTimeIntervalSince1970:notifDate]
-                    : (id)@"unknown",
-                source);
     NFBWriteHiddenNotifs(current);
     NFBDebugLog(@"notifhide: hidden <%@> - %lu total",
                 identity, (unsigned long)current.count);
@@ -911,19 +822,15 @@ static void NFBNotifDropRow(id dataViewController, NSIndexPath* indexPath) {
                 dataViewController, deleteSel, indexPath, UITableViewRowAnimationLeft);
             NFBDebugLog(@"[notifs] row removed from the list (%ld/%ld)",
                         (long)indexPath.section, (long)indexPath.row);
-            // A notification was just hidden from this list, which settles what
-            // the sweep may not have observed yet (it skips its walk while nothing
-            // is hidden): this is the notifications screen. The verdict gates the
-            // empty-state sync, so it is recorded here when still undecided.
+            // A hide from this list proves it is the notifications screen; the
+            // verdict gates the empty-state sync, so it is recorded here if undecided.
             if (!objc_getAssociatedObject(dataViewController, kNFBNotifVerdictKey)) {
                 objc_setAssociatedObject(dataViewController, kNFBNotifVerdictKey, @YES,
                                          OBJC_ASSOCIATION_RETAIN_NONATOMIC);
                 NFBDebugLog(@"[notifs] verdict recorded on removal - notifications screen");
             }
-            // Deferred: the table must finish its delete animation before it
-            // reports a truthful row count. One turn covers every hide but the
-            // last, whose row is still counted until the animation (~0.3 s) ends,
-            // so a second pass follows it.
+            // Deferred: the row count is only truthful once the delete animation
+            // has finished, so a second pass follows the first.
             dispatch_async(dispatch_get_main_queue(), ^{
                 NFBNotifSyncEmptyState(dataViewController);
             });
@@ -1264,7 +1171,6 @@ static void NFBNotifSyncEmptyState(id dataViewController) {
         // decided by how many rows carry a notification model.
         NSInteger rows = 0;
         NSInteger notifRows = 0;
-        NSMutableArray<NSString*>* cellClasses = [NSMutableArray array];
         SEL itemSel = NSSelectorFromString(@"itemAtIndexPath:");
         BOOL canRead = [dataViewController respondsToSelector:itemSel];
         for (NSInteger s = 0; s < table.numberOfSections; s++) {
@@ -1282,10 +1188,6 @@ static void NFBNotifSyncEmptyState(id dataViewController) {
                                  containsString:@"Notification"]) {
                     notifRows++;
                 }
-                UITableViewCell* cell = [table cellForRowAtIndexPath:path];
-                [cellClasses addObject:[NSString stringWithFormat:@"%ld/%ld %@ | %@", (long)s,
-                                        (long)r, cell ? NSStringFromClass([cell class]) : @"-",
-                                        model ? NSStringFromClass([model class]) : @"-"]];
             }
         }
         UIView* existing = [table viewWithTag:kNFBNotifEmptyTag];
@@ -1294,7 +1196,6 @@ static void NFBNotifSyncEmptyState(id dataViewController) {
         NFBDebugLog(@"[empty] %ld row(s), %ld notification(s), %lu hidden, panel %@",
                     (long)rows, (long)notifRows, (unsigned long)hidden,
                     existing ? @"placed" : @"absent");
-        NFBDebugLog(@"[empty] cells: %@", [cellClasses componentsJoinedByString:@"; "]);
 
         // A table that has not delivered anything yet is loading, not emptied.
         // The panel used to go up whenever nothing was visible and the registry
@@ -2111,10 +2012,9 @@ static UITableView* NFBNotifTableForCell(UIView* cell) {
 
 %end
 
-// The dismiss button lays itself out after the cell does and reinstates its native
-// glyph, so the cross set on the cell is overwritten - the source of the mismatched
-// buttons. Enforced here, in the button's own layout (the last word), and only
-// while its image is not already ours, so there is no re-layout loop.
+// The dismiss button lays itself out after the cell and reinstates its native
+// glyph, so the cross is enforced in the button's own layout, and only while its
+// image is not already the tweak's, so there is no re-layout loop.
 @interface TFNDismissButton : UIButton
 @end
 

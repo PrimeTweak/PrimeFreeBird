@@ -1,10 +1,4 @@
-//
-//  CustomTabBarCell.m
-//  PrimeFreeBird
-//
-//  Styling mirrors the app's native TabCustomizationViewCell so the editor's
-//  tiles match the stock tab-customization screen.
-//
+// A tile of the tab editor, styled like the app's TabCustomizationViewCell.
 
 #import "CustomTabBarCell.h"
 #import <QuartzCore/QuartzCore.h>

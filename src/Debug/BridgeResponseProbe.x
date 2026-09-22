@@ -1,6 +1,7 @@
-// Measurement only: captures the responses of the app's delegate-based API
-// requests, which the completion-handler logger cannot see. Wraps each session
-// delegate in a transparent forwarding proxy and logs code + body. Prefix [resp].
+// Measurement only: journals failed API responses of the delegate-based requests
+// the completion-handler logger cannot see, by wrapping each session delegate in
+// a forwarding proxy. Prefix [resp].
+
 #import <Foundation/Foundation.h>
 #import <objc/runtime.h>
 #import <objc/message.h>
@@ -73,8 +74,12 @@ static char kNFBRespBodyKey;
         if (body.length > 200) {
             body = [body substringToIndex:200];
         }
-        NFBDebugLog(@"[resp] %@ http=%ld err=%ld body=%@", task.originalRequest.URL.path ?: @"?",
-                    code, (long)error.code, body);
+        // Only failures are journaled: a healthy session answers 200 dozens of
+        // times per minute and would drown the rest of the log.
+        if (code != 200 || error || [body containsString:@"\"errors\""]) {
+            NFBDebugLog(@"[resp] %@ http=%ld err=%ld body=%@", task.originalRequest.URL.path ?: @"?",
+                        code, (long)error.code, body);
+        }
         NSString* path = task.originalRequest.URL.path ?: @"";
         BOOL isWrite = [path containsString:@"Create"] || [path containsString:@"Favorite"] ||
                        [path containsString:@"Retweet"] || [path containsString:@"Delete"] ||

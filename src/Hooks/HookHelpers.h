@@ -1,9 +1,4 @@
-//
-//  BHTHookHelpers.h
-//  PrimeFreeBird
-//
-//  Shared imports and helpers for the hook files in src/Hooks.
-//
+// Shared imports and helpers for the hook files.
 
 #import <AVFoundation/AVFoundation.h>
 #import <AudioToolbox/AudioToolbox.h>
@@ -22,7 +17,6 @@
 #import "CustomTabBar/CustomTabBarUtility.h"
 #import "Download/DownloadInlineButton.h"
 #import "Headers/TWHeaders.h"
-#import "LegacyLogin/LegacyLoginViewController.h"
 #import "Padlock/AuthViewController.h"
 #import "Settings/ModernSettingsViewController.h"
 #import "ThemeColor/Palette.h"
