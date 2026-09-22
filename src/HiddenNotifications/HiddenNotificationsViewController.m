@@ -356,7 +356,9 @@ static const CGFloat kNFBNotifBarHeight = 57.0;
     }
     UIView* bar = [[UIView alloc] init];
     bar.translatesAutoresizingMaskIntoConstraints = NO;
-    bar.backgroundColor = [UIColor clearColor];
+    // Opaque, so a row scrolling under the pinned bar is hidden rather than
+    // refracted through the glass. The material above still adds its sheen.
+    bar.backgroundColor = [UIColor systemBackgroundColor];
 
     UIView* hairline = [[UIView alloc] init];
     hairline.backgroundColor = [UIColor separatorColor];
