@@ -26,6 +26,7 @@ static const void* kNFBAdvSearchBtnKey = &kNFBAdvSearchBtnKey;
 static const void* kNFBAdvSearchGreyKey = &kNFBAdvSearchGreyKey;
 static const void* kNFBAdvBarProbeKey = &kNFBAdvBarProbeKey;
 static const void* kNFBAdvHiddenByTweakKey = &kNFBAdvHiddenByTweakKey;
+static const void* kNFBAdvFlagBackupKey = &kNFBAdvFlagBackupKey;
 
 // Rows of Twitter's filter glyph on a 24-point grid: {centre y, handle centre x}.
 // The upper handle sits right of centre and the lower one left, so the two rows
@@ -441,46 +442,68 @@ static void nfbAdvRescanSoon(void) {
 // The app's own entry lives inside its search bar as a plain button, not as a
 // bar button item, so the bar button passes above never reach it.
 
-// Hidden rather than faded: the bar lays its buttons out by frame and gives a
-// hidden one 0 pt, so its slot goes back to the field. Set before the bar's own
-// layout runs, so the first pass is already the final one and nothing jumps.
+// The bar sizes its filter slot from its stored showsFilterButton flag, not from
+// the button's hidden state (hidden still measures 32 pt). Clearing the flag
+// before the bar lays out frees the slot on the first pass; restored when off.
 static void nfbAdvCollapseNativeInSearchBar(UIView* bar) {
+    static Ivar flagIvar;
+    static Ivar buttonIvar;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+        Class cls = objc_getClass("_TtC15TwitterSearchV211SearchBarV2");
+        flagIvar = class_getInstanceVariable(cls, "showsFilterButton");
+        buttonIvar = class_getInstanceVariable(cls, "filterButton");
+    });
+    if (!flagIvar || !buttonIvar) {
+        return;
+    }
     BOOL hide = [BHTSettings boolForKey:@"advanced_search"];
-    for (UIView* sub in bar.subviews) {
-        if ([sub class] != [UIButton class]) {
-            continue;
-        }
-        UIButton* button = (UIButton*)sub;
-        if (button.currentTitle.length > 0 || button.currentImage == nil) {
-            continue;
-        }
-        BOOL ours = objc_getAssociatedObject(button, kNFBAdvHiddenByTweakKey) != nil;
-        if (hide) {
-            // Only a button the app shows is taken over; one it hides itself is
-            // left alone so it is never un-hidden on release.
-            if (!ours && !button.hidden) {
-                objc_setAssociatedObject(button, kNFBAdvHiddenByTweakKey, @YES,
-                                         OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-                ours = YES;
-            }
-            if (ours) {
-                if (!button.hidden) {
-                    button.hidden = YES;
-                }
-                if (button.alpha != 0.0) {
-                    button.alpha = 0.0;
-                }
-                if (button.userInteractionEnabled) {
-                    button.userInteractionEnabled = NO;
-                }
-            }
-        } else if (ours) {
-            objc_setAssociatedObject(button, kNFBAdvHiddenByTweakKey, nil,
+    BOOL* flag = (BOOL*)((char*)(__bridge void*)bar + ivar_getOffset(flagIvar));
+    NSNumber* backup = objc_getAssociatedObject(bar, kNFBAdvFlagBackupKey);
+    if (hide) {
+        // The app may raise the flag after the first pass; the latest value it
+        // set is the one to give back.
+        if (!backup || *flag) {
+            objc_setAssociatedObject(bar, kNFBAdvFlagBackupKey, @(*flag),
                                      OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-            button.hidden = NO;
-            button.alpha = 1.0;
-            button.userInteractionEnabled = YES;
         }
+        *flag = NO;
+    } else if (backup) {
+        *flag = backup.boolValue;
+        objc_setAssociatedObject(bar, kNFBAdvFlagBackupKey, nil,
+                                 OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    }
+
+    UIButton* button = object_getIvar(bar, buttonIvar);
+    if (![button isKindOfClass:[UIButton class]]) {
+        return;
+    }
+    BOOL ours = objc_getAssociatedObject(button, kNFBAdvHiddenByTweakKey) != nil;
+    if (hide) {
+        // Only a button the app shows is taken over; one it hides itself is
+        // left alone so it is never un-hidden on release.
+        if (!ours && !button.hidden) {
+            objc_setAssociatedObject(button, kNFBAdvHiddenByTweakKey, @YES,
+                                     OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+            ours = YES;
+        }
+        if (ours) {
+            if (!button.hidden) {
+                button.hidden = YES;
+            }
+            if (button.alpha != 0.0) {
+                button.alpha = 0.0;
+            }
+            if (button.userInteractionEnabled) {
+                button.userInteractionEnabled = NO;
+            }
+        }
+    } else if (ours) {
+        objc_setAssociatedObject(button, kNFBAdvHiddenByTweakKey, nil,
+                                 OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        button.hidden = NO;
+        button.alpha = 1.0;
+        button.userInteractionEnabled = YES;
     }
 }
 
@@ -501,7 +524,10 @@ static void nfbAdvLogSearchBarSlots(UIView* bar) {
         [parts addObject:[NSString stringWithFormat:@"%@ x=%.0f w=%.0f%@", tag, f.origin.x,
                           f.size.width, sub.hidden ? @" hidden" : @""]];
     }
-    NFBDebugLog(@"[advsearch] bar w=%.0f | %@", bar.bounds.size.width,
+    Ivar flagIvar = class_getInstanceVariable(
+        objc_getClass("_TtC15TwitterSearchV211SearchBarV2"), "showsFilterButton");
+    BOOL flag = flagIvar ? *(BOOL*)((char*)(__bridge void*)bar + ivar_getOffset(flagIvar)) : NO;
+    NFBDebugLog(@"[advsearch] bar w=%.0f showsFilter=%d | %@", bar.bounds.size.width, flag,
                 [parts componentsJoinedByString:@"; "]);
 }
 
