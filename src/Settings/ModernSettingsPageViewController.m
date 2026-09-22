@@ -804,8 +804,8 @@ extern NSInteger NFBColorThemeScreenVisible;
     return domain;
 }
 
-// Lives in the base class so the General page can present it now that the
-// link settings moved there.
+// Lives in the base class so the General page, which holds the link settings,
+// can present it.
 - (void)showSharingDomainPrompt:(NSDictionary*)data {
     NSUserDefaults* defaults = [NSUserDefaults standardUserDefaults];
     NSString* currentHost = [defaults objectForKey:@"sharing_domain"];

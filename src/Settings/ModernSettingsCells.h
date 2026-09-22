@@ -37,8 +37,8 @@
 // text recedes, so the reason reads as state rather than failure.
 - (void)setRowEnabled:(BOOL)enabled;
 // A second control on the same row, carrying a value in words rather than a
-// state to guess. Hidden unless a row asks for one, so every other row is
-// laid out exactly as before.
+// state to guess. Hidden unless a row asks for one, so every other row keeps
+// its standard layout.
 @property (nonatomic, strong) UIButton* pillButton;
 @property (nonatomic, strong) NSLayoutConstraint* titleTrailingToSwitch;
 @property (nonatomic, strong) NSLayoutConstraint* titleTrailingToPill;
