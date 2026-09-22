@@ -1102,6 +1102,10 @@ static CGFloat nfbReplyInset(void) {
 static const CGFloat kNFBReplyGlassGap = 8.0;
 static const CGFloat kNFBReplyGlassRadius = 26.0;
 
+// Strength of the tint the capsule takes while the keyboard is up.
+static const CGFloat kNFBReplyGlassTint = 0.42;
+static const void* kNFBReplyTintKey = &kNFBReplyTintKey;
+
 // The label above the field sits flush on the capsule edge while the field
 // carries its own text inset, so it gets the same padding to line up with it.
 static const CGFloat kNFBReplyTextPad = 12.0;
@@ -1236,6 +1240,22 @@ static void nfbGlassifyReplyBar(UIView* bar) {
     if (glass.layer.cornerRadius != radius) {
         glass.layer.cornerRadius = radius;
         glass.layer.cornerCurve = kCACornerCurveContinuous;
+    }
+    // While the keyboard is up the glass takes a subtle tint, for legibility over
+    // busy media. Set inside the keyboard animation, so it fades in step with it.
+    BOOL tinted = gNFBReplyFocused;
+    if ([objc_getAssociatedObject(glass, kNFBReplyTintKey) boolValue] != tinted) {
+        objc_setAssociatedObject(glass, kNFBReplyTintKey, @(tinted),
+                                 OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        Class glassClass = NSClassFromString(@"UIGlassEffect");
+        UIVisualEffect* effect = glassClass ? [[glassClass alloc] init] : nil;
+        if (effect && [glass isKindOfClass:[UIVisualEffectView class]]) {
+            if (tinted && [effect respondsToSelector:@selector(setTintColor:)]) {
+                [(id)effect setTintColor:[[UIColor systemBackgroundColor]
+                                             colorWithAlphaComponent:kNFBReplyGlassTint]];
+            }
+            ((UIVisualEffectView*)glass).effect = effect;
+        }
     }
     nfbHideReplyHairlines(bar, 0);
     nfbClearReplyBackdrop(bar);
