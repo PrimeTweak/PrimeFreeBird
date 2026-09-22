@@ -523,8 +523,8 @@ static void NFBApplyTabBarAccent(UITabBar* bar) {
 }
 
 
-// Defined in ThemeColor; declared here at file scope because tabItemColor now
-// sits above the function that used to carry the local declaration.
+// Defined in ThemeColor; declared at file scope because tabItemColor below
+// uses it.
 extern UIColor* CurrentAccentColor(void);
 
 // The resting colour for the native bar's icons. Kept apart from tabItemColor,
@@ -910,11 +910,6 @@ static void NFBApplyTabBarGlassBody(UIView* host) {
         }
         for (UIView* faded in objc_getAssociatedObject(host, kNFBTabHiddenKey)) {
             faded.alpha = 1.0;
-        }
-        // A bar taken by an earlier build, before this moved to the children.
-        UIView* previous = NFBCustomTabBar(host);
-        if (previous.alpha == 0.0) {
-            previous.alpha = 1.0;
         }
         objc_setAssociatedObject(host, kNFBTabHiddenKey, nil,
                                  OBJC_ASSOCIATION_RETAIN_NONATOMIC);

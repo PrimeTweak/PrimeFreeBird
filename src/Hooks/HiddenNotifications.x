@@ -1197,9 +1197,8 @@ static void NFBNotifSyncEmptyState(id dataViewController) {
                     (long)rows, (long)notifRows, (unsigned long)hidden,
                     existing ? @"placed" : @"absent");
 
-        // A table that has not delivered anything yet is loading, not emptied.
-        // The panel used to go up whenever nothing was visible and the registry
-        // was not empty - the state of a relaunch before the list arrives.
+        // A table that has not delivered anything yet is loading, not emptied (a
+        // relaunch before the list arrives): the panel waits for the first rows.
         NSNumber* everFilled = objc_getAssociatedObject(dataViewController,
                                                         kNFBNotifEverFilledKey);
         if (rows > 0) {

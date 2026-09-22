@@ -258,7 +258,7 @@ static NSString* NFBPreviewForModel(id model) {
 
 // Read by the timeline predicate, which owns the decision to drop an entry.
 // The toggle gates the whole feature: off, nothing is treated as hidden, so the
-// list the user built is kept on disk but no longer removed from the timeline.
+// list the user built is kept on disk but not removed from the timeline.
 BOOL nfbThreadIsHidden(id viewModel) {
     if (![BHTSettings boolForKey:@"hide_threads"]) {
         return NO;

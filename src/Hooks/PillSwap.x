@@ -1,5 +1,5 @@
-// The inbox "All" pill rebuilt as a plain UIBarButtonItem, so the SwiftUI rebuild
-// that flashed it no longer shows. Same look, same native menu.
+// The inbox "All" pill rebuilt as a plain UIBarButtonItem, so the app's SwiftUI
+// rebuild never flashes it. Same look, same native menu.
 
 #import "HookHelpers.h"
 #import "Debug/NFBDebugger.h"

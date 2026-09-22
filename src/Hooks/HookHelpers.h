@@ -28,6 +28,13 @@ void EnumerateSubviewsRecursively(UIView* view,
 // TFNDataViewItem unwrapping for timeline section filtering (BHTHookHelpers.m)
 id unwrapDataViewItem(id item);
 
+// Height of a popover's content hidden under the bubble's bottom edge.
+CGFloat NFBPopoverHiddenBottom(UIView* content);
+
+// A bar material pinned behind a view's contents, invisible until something
+// scrolls under it.
+UIVisualEffectView* NFBMaterialBehind(UIView* host);
+
 // Module header/footer cleanup for timeline section filtering (BHTHookHelpers.m)
 BOOL IsModuleHeaderItem(id item);
 BOOL IsModuleFooterItem(id item);

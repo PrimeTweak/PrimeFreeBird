@@ -1,6 +1,7 @@
 // Shared helpers for the hook files.
 
 #import "HookHelpers.h"
+#import "Debug/NFBDebugger.h"
 
 void EnumerateSubviewsRecursively(UIView* view,
                                   void (^block)(UIView* currentView)) {
@@ -126,4 +127,77 @@ UIColor* CurrentAccentColor(void) {
     }
 
     return [UIColor systemBlueColor];
+}
+
+// With an arrow, a popover's content view runs past the bubble's bottom edge.
+// The overflow is read from the clipping ancestor rather than assumed, and each
+// new value is journaled so a change after an iOS update shows in the log.
+CGFloat NFBPopoverHiddenBottom(UIView* content) {
+    if (!content.window) {
+        return 0.0;
+    }
+    CGFloat hidden = 0.0;
+    NSString* clipper = @"none";
+    UIView* node = content.superview;
+    for (NSInteger depth = 0; node && node != content.window && depth < 10; depth++) {
+        CGRect clip = CGRectNull;
+        CALayer* mask = node.layer.mask;
+        if (mask) {
+            clip = mask.frame;
+            if ([mask isKindOfClass:[CAShapeLayer class]] && ((CAShapeLayer*)mask).path) {
+                CGRect shape = CGPathGetBoundingBox(((CAShapeLayer*)mask).path);
+                clip = CGRectOffset(shape, mask.frame.origin.x, mask.frame.origin.y);
+            }
+        } else if (node.clipsToBounds) {
+            clip = node.bounds;
+        }
+        if (!CGRectIsNull(clip)) {
+            // Measured in the clipper's own space, so a presentation transform
+            // above it does not scale the result.
+            CGRect mine = [content convertRect:content.bounds toView:node];
+            CGFloat past = CGRectGetMaxY(mine) - CGRectGetMaxY(clip);
+            if (past > hidden) {
+                hidden = past;
+                clipper = NSStringFromClass([node class]);
+            }
+        }
+        node = node.superview;
+    }
+    static CGFloat logged = -1.0;
+    if (fabs(hidden - logged) > 0.5) {
+        logged = hidden;
+        NFBDebugLog(@"[popover] %.1f pt of content under the bubble edge (clip: %@)",
+                    hidden, clipper);
+    }
+    return hidden;
+}
+
+// The material iOS gives its bars. Liquid Glass exists from iOS 26 and is
+// resolved by name because the build SDK predates it; older systems fall back
+// to the chrome material bars used before.
+static UIVisualEffect* NFBBarMaterial(void) {
+    Class glass = NSClassFromString(@"UIGlassEffect");
+    if (glass) {
+        UIVisualEffect* effect = [[glass alloc] init];
+        if (effect) {
+            return effect;
+        }
+    }
+    return [UIBlurEffect effectWithStyle:UIBlurEffectStyleSystemChromeMaterial];
+}
+
+UIVisualEffectView* NFBMaterialBehind(UIView* host) {
+    UIVisualEffectView* material =
+        [[UIVisualEffectView alloc] initWithEffect:NFBBarMaterial()];
+    material.translatesAutoresizingMaskIntoConstraints = NO;
+    material.userInteractionEnabled = NO;
+    material.alpha = 0.0;
+    [host insertSubview:material atIndex:0];
+    [NSLayoutConstraint activateConstraints:@[
+        [material.leadingAnchor constraintEqualToAnchor:host.leadingAnchor],
+        [material.trailingAnchor constraintEqualToAnchor:host.trailingAnchor],
+        [material.topAnchor constraintEqualToAnchor:host.topAnchor],
+        [material.bottomAnchor constraintEqualToAnchor:host.bottomAnchor],
+    ]];
+    return material;
 }
