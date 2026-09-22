@@ -147,9 +147,23 @@ static const CGFloat kNFBNotifPillPadding = 8.0;   // gauche et droite seulement
 @interface HiddenNotificationsViewController ()
 @property (nonatomic, assign) BOOL compact;
 @property (nonatomic, strong) UIView* pinnedBar;
+@property (nonatomic, strong) UIVisualEffectView* barMaterial;
 @property (nonatomic, strong) UILabel* pinnedCount;
 @property (nonatomic, strong) NSArray<NSDictionary*>* rows;
 @end
+
+// The material iOS gives its bars, matching the muted-words quick access:
+// Liquid Glass from iOS 26, thick chrome material before it.
+static UIVisualEffect* NFBNotifBarMaterial(void) {
+    Class glass = NSClassFromString(@"UIGlassEffect");
+    if (glass) {
+        UIVisualEffect* effect = [[glass alloc] init];
+        if (effect) {
+            return effect;
+        }
+    }
+    return [UIBlurEffect effectWithStyle:UIBlurEffectStyleSystemChromeMaterial];
+}
 
 @implementation HiddenNotificationsViewController
 
@@ -174,13 +188,10 @@ static const CGFloat kNFBNotifPillPadding = 8.0;   // gauche et droite seulement
     // would clip it. Self-sizing keeps every case correct.
     self.tableView.rowHeight = UITableViewAutomaticDimension;
     self.tableView.estimatedRowHeight = 72;
-    // A popover paints its own material: forcing an opaque background here is
-    // what once killed the glass on the muted-words popover.
+    // The card stays opaque as before; only the pinned bar carries glass, the
+    // way the muted-words footer does.
     self.tableView.backgroundColor = [UIColor systemBackgroundColor];
     if (self.compact) {
-        // Was clear, which is why the navigation bar showed through as grey
-        // blur inside the panel. His reference — the Muted words quick access —
-        // is an opaque sheet, and so is this one now.
         self.view.backgroundColor = [UIColor systemBackgroundColor];
     }
     [self installPinnedBar];
@@ -190,6 +201,8 @@ static const CGFloat kNFBNotifPillPadding = 8.0;   // gauche et droite seulement
 - (void)reload {
     self.rows = NFBHiddenNotifList();
     [self.tableView reloadData];
+    // Reloading adds cells above the pinned bar, so its order is restored here.
+    [self.tableView bringSubviewToFront:self.pinnedBar];
     [self refreshPinnedBar];
     [self updatePreferredSize];
 }
@@ -211,7 +224,40 @@ static const CGFloat kNFBNotifPillPadding = 8.0;   // gauche et droite seulement
 
 - (void)viewDidLayoutSubviews {
     [super viewDidLayoutSubviews];
+    [self.tableView bringSubviewToFront:self.pinnedBar];
+    [self updateBarMaterial];
     [self updatePreferredSize];
+}
+
+// The material sits behind a pinned view's contents, invisible until something
+// scrolls under it, so at rest the card's own glass shows.
+- (UIVisualEffectView*)materialBehindHost:(UIView*)host {
+    UIVisualEffectView* material =
+        [[UIVisualEffectView alloc] initWithEffect:NFBNotifBarMaterial()];
+    material.translatesAutoresizingMaskIntoConstraints = NO;
+    material.userInteractionEnabled = NO;
+    material.alpha = 0.0;
+    [host insertSubview:material atIndex:0];
+    [NSLayoutConstraint activateConstraints:@[
+        [material.leadingAnchor constraintEqualToAnchor:host.leadingAnchor],
+        [material.trailingAnchor constraintEqualToAnchor:host.trailingAnchor],
+        [material.topAnchor constraintEqualToAnchor:host.topAnchor],
+        [material.bottomAnchor constraintEqualToAnchor:host.bottomAnchor],
+    ]];
+    return material;
+}
+
+// The bar's material fades in as rows pass under it, the way system bars do.
+- (void)updateBarMaterial {
+    UIScrollView* list = self.tableView;
+    CGFloat below = list.contentSize.height -
+                    (list.contentOffset.y + CGRectGetHeight(list.bounds) -
+                     list.adjustedContentInset.bottom);
+    self.barMaterial.alpha = MIN(MAX(below / 8.0, 0.0), 1.0);
+}
+
+- (void)scrollViewDidScroll:(__unused UIScrollView*)scrollView {
+    [self updateBarMaterial];
 }
 
 - (NSInteger)numberOfSectionsInTableView:(UITableView*)tableView {
@@ -310,7 +356,7 @@ static const CGFloat kNFBNotifBarHeight = 57.0;
     }
     UIView* bar = [[UIView alloc] init];
     bar.translatesAutoresizingMaskIntoConstraints = NO;
-    bar.backgroundColor = [UIColor systemBackgroundColor];
+    bar.backgroundColor = [UIColor clearColor];
 
     UIView* hairline = [[UIView alloc] init];
     hairline.backgroundColor = [UIColor separatorColor];
@@ -361,6 +407,7 @@ static const CGFloat kNFBNotifBarHeight = 57.0;
         [clear.widthAnchor constraintGreaterThanOrEqualToConstant:96],
     ]];
 
+    self.barMaterial = [self materialBehindHost:bar];
     self.pinnedBar = bar;
     self.pinnedCount = count;
     // The rows must not end up underneath it.
