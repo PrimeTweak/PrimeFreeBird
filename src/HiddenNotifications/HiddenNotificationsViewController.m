@@ -1,6 +1,7 @@
 #import "HiddenNotificationsViewController.h"
 #import "../Core/BHTBundle.h"
 #import "../Core/TwitterChirpFont.h"
+#import "../Hooks/HookHelpers.h"
 
 // The registry lives in HiddenNotifications.x; these are its public reads.
 extern NSArray<NSDictionary*>* NFBHiddenNotifList(void);
@@ -148,22 +149,11 @@ static const CGFloat kNFBNotifPillPadding = 8.0;   // gauche et droite seulement
 @property (nonatomic, assign) BOOL compact;
 @property (nonatomic, strong) UIView* pinnedBar;
 @property (nonatomic, strong) UIVisualEffectView* barMaterial;
+@property (nonatomic, strong) NSLayoutConstraint* pinnedBarBottom;
+@property (nonatomic, assign) CGFloat hiddenBottom;
 @property (nonatomic, strong) UILabel* pinnedCount;
 @property (nonatomic, strong) NSArray<NSDictionary*>* rows;
 @end
-
-// The material iOS gives its bars, matching the muted-words quick access:
-// Liquid Glass from iOS 26, thick chrome material before it.
-static UIVisualEffect* NFBNotifBarMaterial(void) {
-    Class glass = NSClassFromString(@"UIGlassEffect");
-    if (glass) {
-        UIVisualEffect* effect = [[glass alloc] init];
-        if (effect) {
-            return effect;
-        }
-    }
-    return [UIBlurEffect effectWithStyle:UIBlurEffectStyleSystemChromeMaterial];
-}
 
 @implementation HiddenNotificationsViewController
 
@@ -184,12 +174,12 @@ static UIVisualEffect* NFBNotifBarMaterial(void) {
     [super viewDidLoad];
     self.title = [[BHTBundle sharedBundle] localizedStringForKey:@"HIDDEN_NOTIFS_TITLE"];
     self.tableView.separatorStyle = UITableViewCellSeparatorStyleNone;
-    // The row now stacks text (up to two lines) above the expiry, so a fixed 52
-    // would clip it. Self-sizing keeps every case correct.
+    // The row stacks text (up to two lines) above the expiry, so rows self-size;
+    // a fixed height would clip them.
     self.tableView.rowHeight = UITableViewAutomaticDimension;
     self.tableView.estimatedRowHeight = 72;
-    // The card stays opaque as before; only the pinned bar carries glass, the
-    // way the muted-words footer does.
+    // The card is opaque; only the pinned bar carries glass, like the
+    // muted-words footer.
     self.tableView.backgroundColor = [UIColor systemBackgroundColor];
     if (self.compact) {
         self.view.backgroundColor = [UIColor systemBackgroundColor];
@@ -219,32 +209,31 @@ static UIVisualEffect* NFBNotifBarMaterial(void) {
     // The pinned bar sits over the table, so its height is added rather than being
     // part of contentSize.
     CGFloat height = MIN(self.tableView.contentSize.height + kNFBNotifBarHeight, 330);
-    self.preferredContentSize = CGSizeMake(290, MAX(height, 90));
+    self.preferredContentSize = CGSizeMake(290, MAX(height, 90) + self.hiddenBottom);
 }
 
 - (void)viewDidLayoutSubviews {
     [super viewDidLayoutSubviews];
     [self.tableView bringSubviewToFront:self.pinnedBar];
+    [self liftPinnedBar];
     [self updateBarMaterial];
     [self updatePreferredSize];
 }
 
-// The material sits behind a pinned view's contents, invisible until something
-// scrolls under it, so at rest the card's own glass shows.
-- (UIVisualEffectView*)materialBehindHost:(UIView*)host {
-    UIVisualEffectView* material =
-        [[UIVisualEffectView alloc] initWithEffect:NFBNotifBarMaterial()];
-    material.translatesAutoresizingMaskIntoConstraints = NO;
-    material.userInteractionEnabled = NO;
-    material.alpha = 0.0;
-    [host insertSubview:material atIndex:0];
-    [NSLayoutConstraint activateConstraints:@[
-        [material.leadingAnchor constraintEqualToAnchor:host.leadingAnchor],
-        [material.trailingAnchor constraintEqualToAnchor:host.trailingAnchor],
-        [material.topAnchor constraintEqualToAnchor:host.topAnchor],
-        [material.bottomAnchor constraintEqualToAnchor:host.bottomAnchor],
-    ]];
-    return material;
+// With an arrow the bubble hides the bottom of the content; the pinned bar and
+// the rows' inset rise by that amount, and the popover grows by it.
+- (void)liftPinnedBar {
+    if (!self.compact || !self.pinnedBar) {
+        return;
+    }
+    CGFloat hidden = NFBPopoverHiddenBottom(self.view);
+    if (fabs(hidden - self.hiddenBottom) < 0.5) {
+        return;
+    }
+    self.hiddenBottom = hidden;
+    self.pinnedBarBottom.constant = -hidden;
+    self.tableView.contentInset = UIEdgeInsetsMake(0, 0, kNFBNotifBarHeight + hidden, 0);
+    self.tableView.verticalScrollIndicatorInsets = self.tableView.contentInset;
 }
 
 // The bar's material fades in as rows pass under it, the way system bars do.
@@ -356,9 +345,7 @@ static const CGFloat kNFBNotifBarHeight = 57.0;
     }
     UIView* bar = [[UIView alloc] init];
     bar.translatesAutoresizingMaskIntoConstraints = NO;
-    // Opaque, so a row scrolling under the pinned bar is hidden rather than
-    // refracted through the glass. The material above still adds its sheen.
-    bar.backgroundColor = [UIColor systemBackgroundColor];
+    bar.backgroundColor = [UIColor clearColor];
 
     UIView* hairline = [[UIView alloc] init];
     hairline.backgroundColor = [UIColor separatorColor];
@@ -391,7 +378,6 @@ static const CGFloat kNFBNotifBarHeight = 57.0;
     [NSLayoutConstraint activateConstraints:@[
         [bar.leadingAnchor constraintEqualToAnchor:frame.leadingAnchor],
         [bar.trailingAnchor constraintEqualToAnchor:frame.trailingAnchor],
-        [bar.bottomAnchor constraintEqualToAnchor:frame.bottomAnchor],
         [bar.heightAnchor constraintEqualToConstant:kNFBNotifBarHeight],
 
         [hairline.leadingAnchor constraintEqualToAnchor:bar.leadingAnchor],
@@ -409,7 +395,9 @@ static const CGFloat kNFBNotifBarHeight = 57.0;
         [clear.widthAnchor constraintGreaterThanOrEqualToConstant:96],
     ]];
 
-    self.barMaterial = [self materialBehindHost:bar];
+    self.pinnedBarBottom = [bar.bottomAnchor constraintEqualToAnchor:frame.bottomAnchor];
+    self.pinnedBarBottom.active = YES;
+    self.barMaterial = NFBMaterialBehind(bar);
     self.pinnedBar = bar;
     self.pinnedCount = count;
     // The rows must not end up underneath it.
