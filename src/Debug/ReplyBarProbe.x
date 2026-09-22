@@ -2,7 +2,8 @@
 // track the bar, or lag it. Samples both presentation layers across the
 // animation and logs whether the app lays out inside an animation. Prefix [replyprobe].
 
-#import "HookHelpers.h"
+#import <UIKit/UIKit.h>
+#import <objc/runtime.h>
 #import "Debug/NFBDebugger.h"
 
 // The glass capsule is the bar's first visual-effect subview; found by class so
