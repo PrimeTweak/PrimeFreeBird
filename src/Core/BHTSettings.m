@@ -638,9 +638,8 @@ static NSDictionary* NFBKeylessDefaults(void) {
             // Carried by a pill rather than a row of its own, so the registry
             // holds no default for it.
             @"video_starts_muted": @YES,
-            // Carried by the Explore bar replica, same reason. Only the two the
-            // registry used to default to YES are named; the rest default to NO
-            // on their own.
+            // Carried by the Explore bar replica, same reason. Only the two that
+            // default to YES are named; the rest default to NO on their own.
             @"hide_tab_trending": @YES,
             @"hide_tab_entertainment": @YES,
         };
