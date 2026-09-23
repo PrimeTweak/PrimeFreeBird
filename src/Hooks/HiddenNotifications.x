@@ -99,41 +99,18 @@ NSArray<NSDictionary*>* NFBHiddenNotifList(void) {
 }
 
 // The list filters what it is handed, and filtering empties the app's own sections,
-// so unhiding changes nothing on screen by itself. The screen is refreshed through
-// the app's refresh command, the path a pull takes, with its own animation.
+// so unhiding changes nothing on screen by itself. The screen loads its top the way
+// a pull does: loadTop: with its own pull control as the sender.
 static void NFBNotifRefreshScreen(void) {
     UIViewController* screen = gNFBNotifScreen;
-    // Measurement only [refreshprobe]: the screen's class chain, which class really
-    // provides loadTop:, whether a pull is enabled, and what is presented over it.
-    if (NFBDebugIsRecording()) {
-        NSMutableArray* chain = [NSMutableArray array];
-        for (Class c = object_getClass(screen); c && chain.count < 6; c = class_getSuperclass(c)) {
-            [chain addObject:NSStringFromClass(c)];
-        }
-        SEL top = NSSelectorFromString(@"loadTop:");
-        NSString* owner = @"none";
-        for (Class c = object_getClass(screen); c; c = class_getSuperclass(c)) {
-            Method mine = class_getInstanceMethod(c, top);
-            Method above = class_getInstanceMethod(class_getSuperclass(c), top);
-            if (mine && (!above || method_getImplementation(mine) != method_getImplementation(above))) {
-                owner = NSStringFromClass(c);
-                break;
-            }
-        }
-        SEL enabled = NSSelectorFromString(@"pullToLoadTopEnabled");
-        BOOL pull = [screen respondsToSelector:enabled] &&
-                    ((BOOL (*)(id, SEL))objc_msgSend)(screen, enabled);
-        NFBDebugLog(@"[refreshprobe] screen %@ | loadTop: from %@ | pull %d | window %d | over it %@",
-                    chain.count ? [chain componentsJoinedByString:@" > "] : @"nil", owner, pull,
-                    screen.view.window != nil,
-                    screen.presentedViewController
-                        ? NSStringFromClass([screen.presentedViewController class])
-                        : @"nothing");
-    }
-    SEL refresh = NSSelectorFromString(@"handleRefreshKeyCommand");
-    BOOL available = screen.isViewLoaded && [screen respondsToSelector:refresh];
+    SEL load = NSSelectorFromString(@"loadTop:");
+    BOOL available = screen.isViewLoaded && [screen respondsToSelector:load];
     if (available) {
-        ((void (*)(id, SEL))objc_msgSend)(screen, refresh);
+        SEL control = NSSelectorFromString(@"pullToLoadTopControl");
+        id sender = [screen respondsToSelector:control]
+                        ? ((id (*)(id, SEL))objc_msgSend)(screen, control)
+                        : nil;
+        ((void (*)(id, SEL, id))objc_msgSend)(screen, load, sender);
     }
     NFBDebugLog(@"[notifs] unhide: list refresh %@", available ? @"asked" : @"unavailable");
 }
@@ -971,32 +948,6 @@ static void NFBNotifDropRow(id dataViewController, NSIndexPath* indexPath) {
 
 // The sections are filtered on their way in. An id in the registry can only belong
 // to a hidden notification, so the filter needs no scoping of its own.
-
-// True when the batch carries at least one notification model — checked on the
-// first few items only, so the hot path stays cheap.
-static BOOL NFBSectionsAreNotifications(NSArray* sections) {
-    NSInteger looked = 0;
-    for (id section in sections) {
-        NSArray* items = nil;
-        if ([section respondsToSelector:@selector(items)]) {
-            id maybe = ((id (*)(id, SEL))objc_msgSend)(section, @selector(items));
-            if ([maybe isKindOfClass:[NSArray class]]) {
-                items = maybe;
-            }
-        }
-        for (id item in items) {
-            id model = unwrapDataViewItem(item);
-            if ([NSStringFromClass([model class]) containsString:@"Notification"]) {
-                return YES;
-            }
-            if (++looked > 8) {
-                return NO;
-            }
-        }
-    }
-    return NO;
-}
-
 static NSArray* NFBFilterNotifSections(NSArray* sections) {
     if (!NFBNotifsEnabled()) {
         return sections;
@@ -1065,6 +1016,7 @@ static void NFBNotifRecordVerdict(id dataViewController, BOOL sawNotification,
     if (sawNotification) {
         objc_setAssociatedObject(dataViewController, kNFBNotifVerdictKey, @YES,
                                  OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        gNFBNotifScreen = (UIViewController*)dataViewController;
         NFBDebugLog(@"[sweep] %@ kept - this is the notifications screen",
                     NSStringFromClass([dataViewController class]));
         return;
@@ -1405,40 +1357,12 @@ static void NFBNotifSweep(id dataViewController) {
     gNFBNotifSweeping = NO;
 }
 
-// The notifications screen is recognised by what it is handed; an unhide refreshes it.
-static void NFBNotifNoteScreen(UIViewController* controller, NSArray* sections) {
-    if (NFBSectionsAreNotifications(sections)) {
-        gNFBNotifScreen = controller;
-        // Measurement only [refreshprobe]: what each delivery to the screen carries.
-        if (NFBDebugIsRecording()) {
-            NSUInteger items = 0;
-            NSUInteger hidden = 0;
-            for (id section in sections) {
-                id list = [section respondsToSelector:@selector(items)]
-                              ? ((id (*)(id, SEL))objc_msgSend)(section, @selector(items))
-                              : nil;
-                if (![list isKindOfClass:[NSArray class]]) {
-                    continue;
-                }
-                items += [list count];
-                for (id item in list) {
-                    hidden += NFBNotifIsHidden(unwrapDataViewItem(item)) ? 1 : 0;
-                }
-            }
-            NFBDebugLog(@"[refreshprobe] delivery to %@: %lu item(s), %lu hidden",
-                        NSStringFromClass([controller class]), (unsigned long)items,
-                        (unsigned long)hidden);
-        }
-    }
-}
-
 // Measured: T1URTViewController implements NEITHER -sections NOR -setSections:.
 // Both are inherited from TFNItemsDataViewController, so the filter belongs
 // there — hooking the subclass meant it could never speak.
 %hook TFNItemsDataViewController
 
 - (void)setSections:(NSArray*)sections restoreScrollPosition:(BOOL)restore {
-    NFBNotifNoteScreen((UIViewController*)self, sections);
     %orig(NFBFilterNotifSections(sections), restore);
     // The list is in place: remove what is hidden.
     __weak id host = self;
@@ -1453,7 +1377,6 @@ static void NFBNotifNoteScreen(UIViewController* controller, NSArray* sections) 
 }
 
 - (void)setSections:(NSArray*)sections {
-    NFBNotifNoteScreen((UIViewController*)self, sections);
     %orig(NFBFilterNotifSections(sections));
     // The list is in place: remove what is hidden.
     __weak id host = self;
@@ -1468,7 +1391,6 @@ static void NFBNotifNoteScreen(UIViewController* controller, NSArray* sections) 
 }
 
 - (void)updateSections:(NSArray*)sections {
-    NFBNotifNoteScreen((UIViewController*)self, sections);
     %orig(NFBFilterNotifSections(sections));
     // The list is in place: remove what is hidden.
     __weak id host = self;
@@ -1487,7 +1409,6 @@ static void NFBNotifNoteScreen(UIViewController* controller, NSArray* sections) 
 // return on a refresh.
 
 - (void)updateSections:(NSArray*)sections completion:(id)completion {
-    NFBNotifNoteScreen((UIViewController*)self, sections);
     %orig(NFBFilterNotifSections(sections), completion);
     // The list is in place: remove what is hidden.
     __weak id host = self;
@@ -1502,7 +1423,6 @@ static void NFBNotifNoteScreen(UIViewController* controller, NSArray* sections) 
 }
 
 - (void)updateSections:(NSArray*)sections withRowAnimation:(NSInteger)animation {
-    NFBNotifNoteScreen((UIViewController*)self, sections);
     %orig(NFBFilterNotifSections(sections), animation);
     // The list is in place: remove what is hidden.
     __weak id host = self;
@@ -1519,7 +1439,6 @@ static void NFBNotifNoteScreen(UIViewController* controller, NSArray* sections) 
 - (void)updateSections:(NSArray*)sections
       withRowAnimation:(NSInteger)animation
             completion:(id)completion {
-    NFBNotifNoteScreen((UIViewController*)self, sections);
     %orig(NFBFilterNotifSections(sections), animation, completion);
     // The list is in place: remove what is hidden.
     __weak id host = self;
@@ -1537,7 +1456,6 @@ static void NFBNotifNoteScreen(UIViewController* controller, NSArray* sections) 
 reconfigureItemIdentifiers:(id)identifiers
       withRowAnimation:(NSInteger)animation
             completion:(id)completion {
-    NFBNotifNoteScreen((UIViewController*)self, sections);
     %orig(NFBFilterNotifSections(sections), identifiers, animation, completion);
     // The list is in place: remove what is hidden.
     __weak id host = self;
