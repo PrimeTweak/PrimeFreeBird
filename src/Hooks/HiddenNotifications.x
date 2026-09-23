@@ -23,8 +23,6 @@ static BOOL NFBNotifsEnabled(void) {
 // records the controller it saw. The quick-access button uses that instead of
 // guessing a class name.
 static __weak UIViewController* gNFBNotifScreen;
-// The last sections the app handed the notifications screen, kept unfiltered.
-static const void* kNFBNotifSectionsKey = &kNFBNotifSectionsKey;
 
 // Writes the registry now. NSUserDefaults flushes when the system decides,
 // usually at backgrounding, so a crash between hiding a notification and that
@@ -100,30 +98,29 @@ NSArray<NSDictionary*>* NFBHiddenNotifList(void) {
     return rows;
 }
 
-// The list filters what it is handed, so unhiding changes nothing on screen by
-// itself. The last sections are replayed through the app's own animated update:
-// the returning rows fade back in place, with no refresh.
-static void NFBNotifReplaySections(void) {
+// The list filters what it is handed, and filtering empties the app's own sections,
+// so unhiding changes nothing on screen by itself. The screen is refreshed through
+// the app's refresh command, the path a pull takes, with its own animation.
+static void NFBNotifRefreshScreen(void) {
     UIViewController* screen = gNFBNotifScreen;
-    NSArray* sections = objc_getAssociatedObject(screen, kNFBNotifSectionsKey);
-    SEL update = NSSelectorFromString(@"updateSections:withRowAnimation:");
-    if (!sections.count || ![screen respondsToSelector:update]) {
-        return;
+    SEL refresh = NSSelectorFromString(@"handleRefreshKeyCommand");
+    BOOL available = screen.isViewLoaded && [screen respondsToSelector:refresh];
+    if (available) {
+        ((void (*)(id, SEL))objc_msgSend)(screen, refresh);
     }
-    ((void (*)(id, SEL, NSArray*, NSInteger))objc_msgSend)(screen, update, sections,
-                                                          UITableViewRowAnimationFade);
+    NFBDebugLog(@"[notifs] unhide: list refresh %@", available ? @"asked" : @"unavailable");
 }
 
 void NFBUnhideNotif(NSString* notifID) {
     NSMutableDictionary* current = [NFBHiddenNotifs() mutableCopy];
     [current removeObjectForKey:notifID];
     NFBWriteHiddenNotifs(current);
-    NFBNotifReplaySections();
+    NFBNotifRefreshScreen();
 }
 
 void NFBUnhideAllNotifs(void) {
     NFBWriteHiddenNotifs(nil);
-    NFBNotifReplaySections();
+    NFBNotifRefreshScreen();
 }
 
 NSInteger NFBHiddenNotifCount(void) {
@@ -1381,25 +1378,11 @@ static void NFBNotifSweep(id dataViewController) {
     gNFBNotifSweeping = NO;
 }
 
-// The notifications screen is recognised by what it is handed, and what the app
-// hands it is kept unfiltered for an unhide to replay. A sweep's own update, or a
-// re-set of what the list already holds, is not a new delivery and is not kept.
+// The notifications screen is recognised by what it is handed; an unhide refreshes it.
 static void NFBNotifNoteScreen(UIViewController* controller, NSArray* sections) {
-    if (!NFBSectionsAreNotifications(sections)) {
-        return;
+    if (NFBSectionsAreNotifications(sections)) {
+        gNFBNotifScreen = controller;
     }
-    gNFBNotifScreen = controller;
-    if (gNFBNotifSweeping) {
-        return;
-    }
-    id held = [controller respondsToSelector:@selector(sections)]
-                  ? ((id (*)(id, SEL))objc_msgSend)(controller, @selector(sections))
-                  : nil;
-    if ([held isKindOfClass:[NSArray class]] && [held isEqualToArray:sections]) {
-        return;
-    }
-    objc_setAssociatedObject(controller, kNFBNotifSectionsKey, sections,
-                             OBJC_ASSOCIATION_RETAIN_NONATOMIC);
 }
 
 // Measured: T1URTViewController implements NEITHER -sections NOR -setSections:.
