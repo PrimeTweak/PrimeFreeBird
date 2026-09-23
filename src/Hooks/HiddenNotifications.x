@@ -840,8 +840,9 @@ static void NFBNotifDropRow(id dataViewController, NSIndexPath* indexPath) {
                 dataViewController, deleteSel, indexPath, UITableViewRowAnimationLeft);
             NFBDebugLog(@"[notifs] row removed from the list (%ld/%ld)",
                         (long)indexPath.section, (long)indexPath.row);
-            // A hide from this list proves it is the notifications screen; the
-            // verdict gates the empty-state sync, so it is recorded here if undecided.
+            // A hide from this list proves it is the notifications screen: it is the one
+            // an unhide refreshes, and its verdict gates the empty-state sync.
+            gNFBNotifScreen = (UIViewController*)dataViewController;
             if (!objc_getAssociatedObject(dataViewController, kNFBNotifVerdictKey)) {
                 objc_setAssociatedObject(dataViewController, kNFBNotifVerdictKey, @YES,
                                          OBJC_ASSOCIATION_RETAIN_NONATOMIC);
@@ -1631,6 +1632,8 @@ reconfigureItemIdentifiers:(id)identifiers
                                     void (^completion)(BOOL)) {
             NSString* identity = NFBNotifIdentity(model);
             NFBHideNotifWithText(model, NFBNotifTextFromCell(tableView, indexPath));
+            // A hide from this list proves it is the one an unhide refreshes.
+            gNFBNotifScreen = (UIViewController*)self;
             completion(YES);
             nfbReapplyTimelineFilter();
             NFBShowNotifToast(identity);
