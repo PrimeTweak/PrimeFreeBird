@@ -8,7 +8,6 @@ extern NSArray<NSDictionary*>* NFBHiddenNotifList(void);
 extern void NFBUnhideNotif(NSString* notifID);
 extern void NFBUnhideAllNotifs(void);
 extern double NFBNotifDaysLeft(NSDictionary* entry);
-extern void nfbReapplyTimelineFilter(void);
 extern UIColor* CurrentAccentColor(void);
 
 // MARK: - The row
@@ -312,7 +311,6 @@ static const CGFloat kNFBNotifPillPadding = 8.0;   // gauche et droite seulement
                                     __unused UIView* view,
                                     void (^completion)(BOOL)) {
             NFBUnhideNotif(row[@"id"]);
-            nfbReapplyTimelineFilter();
             completion(YES);
             [weakSelf reload];
         }];
@@ -411,7 +409,6 @@ static const CGFloat kNFBNotifBarHeight = 57.0;
 
 - (void)clearAllTapped {
     NFBUnhideAllNotifs();
-    nfbReapplyTimelineFilter();
     [self reload];
 }
 
