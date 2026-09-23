@@ -149,8 +149,6 @@ static const CGFloat kNFBNotifPillPadding = 8.0;   // gauche et droite seulement
 @property (nonatomic, assign) BOOL compact;
 @property (nonatomic, strong) UIView* pinnedBar;
 @property (nonatomic, strong) UIVisualEffectView* barMaterial;
-@property (nonatomic, strong) NSLayoutConstraint* pinnedBarBottom;
-@property (nonatomic, assign) CGFloat hiddenBottom;
 @property (nonatomic, strong) UILabel* pinnedCount;
 @property (nonatomic, strong) NSArray<NSDictionary*>* rows;
 @end
@@ -209,7 +207,7 @@ static const CGFloat kNFBNotifPillPadding = 8.0;   // gauche et droite seulement
     // The pinned bar sits over the table, so its height is added rather than being
     // part of contentSize.
     CGFloat height = MIN(self.tableView.contentSize.height + kNFBNotifBarHeight, 330);
-    self.preferredContentSize = CGSizeMake(290, MAX(height, 90) + self.hiddenBottom);
+    self.preferredContentSize = CGSizeMake(290, MAX(height, 90) + NFBPopoverArrowReserve);
 }
 
 - (void)viewDidLayoutSubviews {
@@ -221,26 +219,9 @@ static const CGFloat kNFBNotifPillPadding = 8.0;   // gauche et droite seulement
 
 - (void)viewDidAppear:(BOOL)animated {
     [super viewDidAppear:animated];
-    [self liftPinnedBar];
-}
-
-// The bubble hides the bottom of the content by about the arrow's height. Read
-// once, after the popover settles: mid-resize the bubble's shape lags its frame,
-// and a reading then would feed back into the size it corrects.
-- (void)liftPinnedBar {
-    if (!self.compact || !self.pinnedBar || self.hiddenBottom > 0.0) {
-        return;
+    if (self.compact) {
+        NFBPopoverLogOverflow(self.view);
     }
-    CGFloat hidden = NFBPopoverHiddenBottom(self.view);
-    // Anything beyond a few arrows' height is a stale reading, not the arrow.
-    if (hidden < 0.5 || hidden > 40.0) {
-        return;
-    }
-    self.hiddenBottom = hidden;
-    self.pinnedBarBottom.constant = -hidden;
-    self.tableView.contentInset = UIEdgeInsetsMake(0, 0, kNFBNotifBarHeight + hidden, 0);
-    self.tableView.verticalScrollIndicatorInsets = self.tableView.contentInset;
-    [self updatePreferredSize];
 }
 
 // The bar's material fades in as rows pass under it, the way system bars do.
@@ -386,6 +367,8 @@ static const CGFloat kNFBNotifBarHeight = 57.0;
         [bar.leadingAnchor constraintEqualToAnchor:frame.leadingAnchor],
         [bar.trailingAnchor constraintEqualToAnchor:frame.trailingAnchor],
         [bar.heightAnchor constraintEqualToConstant:kNFBNotifBarHeight],
+        [bar.bottomAnchor constraintEqualToAnchor:frame.bottomAnchor
+                                         constant:-NFBPopoverArrowReserve],
 
         [hairline.leadingAnchor constraintEqualToAnchor:bar.leadingAnchor],
         [hairline.trailingAnchor constraintEqualToAnchor:bar.trailingAnchor],
@@ -402,14 +385,12 @@ static const CGFloat kNFBNotifBarHeight = 57.0;
         [clear.widthAnchor constraintGreaterThanOrEqualToConstant:96],
     ]];
 
-    self.pinnedBarBottom = [bar.bottomAnchor constraintEqualToAnchor:frame.bottomAnchor];
-    self.pinnedBarBottom.active = YES;
     self.barMaterial = NFBMaterialBehind(bar);
     self.pinnedBar = bar;
     self.pinnedCount = count;
     // The rows must not end up underneath it.
     self.tableView.contentInset =
-        UIEdgeInsetsMake(0, 0, kNFBNotifBarHeight, 0);
+        UIEdgeInsetsMake(0, 0, kNFBNotifBarHeight + NFBPopoverArrowReserve, 0);
     self.tableView.verticalScrollIndicatorInsets = self.tableView.contentInset;
 }
 

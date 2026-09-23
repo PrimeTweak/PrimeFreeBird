@@ -387,8 +387,6 @@ NSString* const kNFBMutedIncludeRepostsKey = @"nfb_muted_include_reposts";
 @property (nonatomic, strong) UISwitch* pinnedSwitch;
 @property (nonatomic, strong) UIVisualEffectView* headerMaterial;
 @property (nonatomic, strong) UIVisualEffectView* barMaterial;
-@property (nonatomic, strong) NSLayoutConstraint* pinnedBarBottom;
-@property (nonatomic, assign) CGFloat hiddenBottom;
 @property (nonatomic, assign) CGFloat pinnedHeaderHeight;
 @end
 
@@ -505,25 +503,9 @@ static NSMutableArray<NSString*>* NFBKeptLanguageList(void) {
 
 - (void)viewDidAppear:(BOOL)animated {
     [super viewDidAppear:animated];
-    [self liftPinnedBar];
-}
-
-// The bubble hides the bottom of the content by about the arrow's height. Read
-// once, after the popover settles: mid-resize the bubble's shape lags its frame,
-// and a reading then would feed back into the size it corrects.
-- (void)liftPinnedBar {
-    if (!self.compact || !self.pinnedBar || self.hiddenBottom > 0.0) {
-        return;
+    if (self.compact) {
+        NFBPopoverLogOverflow(self.view);
     }
-    CGFloat hidden = NFBPopoverHiddenBottom(self.view);
-    // Anything beyond a few arrows' height is a stale reading, not the arrow.
-    if (hidden < 0.5 || hidden > 40.0) {
-        return;
-    }
-    self.hiddenBottom = hidden;
-    self.pinnedBarBottom.constant = -hidden;
-    [self updatePinnedInsets];
-    [self updatePreferredSize];
 }
 
 - (void)viewDidLoad {
@@ -687,9 +669,9 @@ static NSMutableArray<NSString*>* NFBKeptLanguageList(void) {
         [bar.leadingAnchor constraintEqualToAnchor:tableFrame.leadingAnchor],
         [bar.trailingAnchor constraintEqualToAnchor:tableFrame.trailingAnchor],
         [bar.heightAnchor constraintEqualToConstant:kNFBTranslateBarHeight],
+        [bar.bottomAnchor constraintEqualToAnchor:tableFrame.bottomAnchor
+                                         constant:-NFBPopoverArrowReserve],
     ]];
-    self.pinnedBarBottom = [bar.bottomAnchor constraintEqualToAnchor:tableFrame.bottomAnchor];
-    self.pinnedBarBottom.active = YES;
     self.barMaterial = NFBMaterialBehind(bar);
     self.pinnedBar = bar;
     self.pinnedSwitch = toggle;
@@ -703,7 +685,7 @@ static NSMutableArray<NSString*>* NFBKeptLanguageList(void) {
     }
     BOOL languages = self.mode == 1;
     self.pinnedBar.hidden = !languages;
-    CGFloat bottom = (languages ? kNFBTranslateBarHeight : 0.0) + self.hiddenBottom;
+    CGFloat bottom = (languages ? kNFBTranslateBarHeight : 0.0) + NFBPopoverArrowReserve;
     UIEdgeInsets insets =
         UIEdgeInsetsMake(self.pinnedHeaderHeight, 0, bottom, 0);
     self.tableView.contentInset = insets;

@@ -129,14 +129,15 @@ UIColor* CurrentAccentColor(void) {
     return [UIColor systemBlueColor];
 }
 
-// With an arrow, a popover's content view runs past the bubble's bottom edge.
-// The overflow is read from the clipping ancestor rather than assumed, and each
-// new value is journaled so a change after an iOS update shows in the log.
-CGFloat NFBPopoverHiddenBottom(UIView* content) {
-    if (!content.window) {
-        return 0.0;
+const CGFloat NFBPopoverArrowReserve = 13.0;
+
+// Read from the clipping ancestor once the popover is open, so an iOS update that
+// changes the arrow shows in the log as a gap between the two values.
+void NFBPopoverLogOverflow(UIView* content) {
+    if (!NFBDebugIsRecording() || !content.window) {
+        return;
     }
-    CGFloat hidden = 0.0;
+    CGFloat past = 0.0;
     NSString* clipper = @"none";
     UIView* node = content.superview;
     for (NSInteger depth = 0; node && node != content.window && depth < 10; depth++) {
@@ -152,24 +153,17 @@ CGFloat NFBPopoverHiddenBottom(UIView* content) {
             clip = node.bounds;
         }
         if (!CGRectIsNull(clip)) {
-            // Measured in the clipper's own space, so a presentation transform
-            // above it does not scale the result.
             CGRect mine = [content convertRect:content.bounds toView:node];
-            CGFloat past = CGRectGetMaxY(mine) - CGRectGetMaxY(clip);
-            if (past > hidden) {
-                hidden = past;
+            CGFloat overflow = CGRectGetMaxY(mine) - CGRectGetMaxY(clip);
+            if (overflow > past) {
+                past = overflow;
                 clipper = NSStringFromClass([node class]);
             }
         }
         node = node.superview;
     }
-    static CGFloat logged = -1.0;
-    if (fabs(hidden - logged) > 0.5) {
-        logged = hidden;
-        NFBDebugLog(@"[popover] %.1f pt of content under the bubble edge (clip: %@)",
-                    hidden, clipper);
-    }
-    return hidden;
+    NFBDebugLog(@"[popover] %.1f pt under the bubble edge, %.1f reserved (clip: %@)",
+                past, NFBPopoverArrowReserve, clipper);
 }
 
 // The material iOS gives its bars. Liquid Glass exists from iOS 26 and is

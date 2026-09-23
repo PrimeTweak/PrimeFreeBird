@@ -28,8 +28,13 @@ void EnumerateSubviewsRecursively(UIView* view,
 // TFNDataViewItem unwrapping for timeline section filtering (BHTHookHelpers.m)
 id unwrapDataViewItem(id item);
 
-// Height of a popover's content hidden under the bubble's bottom edge.
-CGFloat NFBPopoverHiddenBottom(UIView* content);
+// With an arrow, a popover's content runs past the bubble's bottom edge by about
+// the arrow's height; pinned footers reserve it so they open fully in view.
+extern const CGFloat NFBPopoverArrowReserve;
+
+// Journals how far an open popover's content runs past the bubble, beside the
+// reserve. Debug only; it never touches the layout.
+void NFBPopoverLogOverflow(UIView* content);
 
 // A bar material pinned behind a view's contents, invisible until something
 // scrolls under it.

@@ -91,7 +91,6 @@ NSInteger NFBColorThemeScreenVisible;
 // palette, so the custom accent is pushed onto every window. Under the standard
 // interface the palette carries it alone and a window tint would only leak.
 static void NFBApplyGlobalTint(void) {
-    extern UIColor* CurrentAccentColor(void);
     NSUserDefaults* defs = NSUserDefaults.standardUserDefaults;
     // UIKit's own controls inherit the window tint, so it is spent only on a
     // colour that was actually picked. The theming toggles are not a colour:
@@ -523,10 +522,6 @@ static void NFBApplyTabBarAccent(UITabBar* bar) {
 }
 
 
-// Defined in ThemeColor; declared at file scope because tabItemColor below
-// uses it.
-extern UIColor* CurrentAccentColor(void);
-
 // The resting colour for the native bar's icons. Kept apart from tabItemColor,
 // which also drives the app's own bar: that one keeps its secondary grey for
 // the classic style, while the glass bar draws its unselected icons in black.
@@ -535,7 +530,7 @@ static UIColor* NFBGlassTabRestingColor(void) {
 }
 
 static UIColor* tabItemColor(BOOL selected) {
-    return selected ? CurrentAccentColor() : [UIColor secondaryLabelColor];
+    return selected ? NFBBrandAccentColor() : [UIColor secondaryLabelColor];
 }
 
 static const void* kNFBTabOriginalKey = &kNFBTabOriginalKey;
@@ -1915,7 +1910,7 @@ static UITabBarAppearance* NFBPatchedTabBarAppearance(UITabBarAppearance* appear
         return appearance;
     }
     BOOL active = [BHTSettings boolForKey:@"tab_bar_theming"] && NFBAccentIsActive();
-    UIColor* target = active ? CurrentAccentColor() : [UIColor labelColor];
+    UIColor* target = active ? NFBBrandAccentColor() : [UIColor labelColor];
     if (!target) {
         return appearance;
     }
