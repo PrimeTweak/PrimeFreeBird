@@ -21,7 +21,10 @@ extern void NFBUnhideThread(NSString* threadID);
 // settings uses. One number, applied everywhere.
 static const CGFloat kNFBMutedSideMargin = 10.0;
 // A language row's own height, so the switch is spaced like one more entry.
-static const CGFloat kNFBTranslateBarHeight = 44.0;
+static const CGFloat kNFBTranslateBarHeight = 51.0;
+// Space between the last language and the switch, the same as above the list:
+// a hint that more languages fit.
+static const CGFloat kNFBTranslateBarGap = 8.0;
 // The popover's rounded corners cut into its bottom row, so its list sits a
 // little further in than the full screen's; the segment keeps the card's own
 // margin above it.
@@ -677,15 +680,16 @@ static NSMutableArray<NSString*>* NFBKeptLanguageList(void) {
     self.pinnedSwitch = toggle;
 }
 
-// The rows start below the segment and end above the switch, and the switch
-// only exists while the languages are showing.
+// The rows start below the segment and end above the switch, shown only with the
+// languages. The table keeps its rows clear of the edge the arrow hides by itself;
+// only the switch, pinned to the frame, takes the arrow's reserve.
 - (void)updatePinnedInsets {
     if (!self.compact) {
         return;
     }
     BOOL languages = self.mode == 1;
     self.pinnedBar.hidden = !languages;
-    CGFloat bottom = (languages ? kNFBTranslateBarHeight : 0.0) + NFBPopoverArrowReserve;
+    CGFloat bottom = languages ? kNFBTranslateBarHeight + kNFBTranslateBarGap : 0.0;
     UIEdgeInsets insets =
         UIEdgeInsetsMake(self.pinnedHeaderHeight, 0, bottom, 0);
     self.tableView.contentInset = insets;
@@ -694,7 +698,6 @@ static NSMutableArray<NSString*>* NFBKeptLanguageList(void) {
     [self.tableView bringSubviewToFront:self.pinnedBar];
     [self updateBarMaterials];
 }
-
 
 // The codes this screen lists: the picker takes the tail, the popover the
 // first four, the full screen the first six.

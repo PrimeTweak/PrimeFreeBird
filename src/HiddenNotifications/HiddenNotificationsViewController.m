@@ -122,7 +122,6 @@ static const CGFloat kNFBNotifPillPadding = 8.0;   // gauche et droite seulement
     return self;
 }
 
-
 // Empty state: the text stands alone, centred, with air above and below, using
 // the dimensions of the Hide thread screen. With rows, everything returns to
 // the normal two-line layout.
@@ -203,11 +202,14 @@ static const CGFloat kNFBNotifPillPadding = 8.0;   // gauche et droite seulement
     // first layout has measured them. One pass leaves the estimate in place.
     [self.tableView layoutIfNeeded];
     [self.tableView layoutIfNeeded];
-    // contentSize already includes the footer, so no padding is added on top of it.
-    // The pinned bar sits over the table, so its height is added rather than being
-    // part of contentSize.
-    CGFloat height = MIN(self.tableView.contentSize.height + kNFBNotifBarHeight, 330);
-    self.preferredContentSize = CGSizeMake(290, MAX(height, 90) + NFBPopoverArrowReserve);
+    // The pinned bar sits over the table, so its height and the arrow's reserve are
+    // added to the rows'. With nothing hidden the bar is gone and the message row,
+    // which carries its own air, sets the size alone.
+    CGFloat height = self.tableView.contentSize.height;
+    if (self.rows.count) {
+        height = MAX(MIN(height + kNFBNotifBarHeight, 330), 90) + NFBPopoverArrowReserve;
+    }
+    self.preferredContentSize = CGSizeMake(290, height);
 }
 
 - (void)viewDidLayoutSubviews {
@@ -388,14 +390,17 @@ static const CGFloat kNFBNotifBarHeight = 57.0;
     self.barMaterial = NFBMaterialBehind(bar);
     self.pinnedBar = bar;
     self.pinnedCount = count;
-    // The rows must not end up underneath it.
-    self.tableView.contentInset =
-        UIEdgeInsetsMake(0, 0, kNFBNotifBarHeight + NFBPopoverArrowReserve, 0);
-    self.tableView.verticalScrollIndicatorInsets = self.tableView.contentInset;
 }
 
 - (void)refreshPinnedBar {
+    if (!self.pinnedBar) {
+        return;
+    }
     self.pinnedBar.hidden = !self.rows.count;
+    // The rows stop above the bar; with no rows there is no bar to clear.
+    CGFloat bottom = self.rows.count ? kNFBNotifBarHeight + NFBPopoverArrowReserve : 0.0;
+    self.tableView.contentInset = UIEdgeInsetsMake(0, 0, bottom, 0);
+    self.tableView.verticalScrollIndicatorInsets = self.tableView.contentInset;
     if (!self.rows.count) {
         return;
     }
