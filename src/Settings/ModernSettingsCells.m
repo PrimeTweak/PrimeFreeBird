@@ -8,6 +8,7 @@
 #import "ThemeColor/Palette.h"
 #import "ThemeColor/DarkModeStyle.h"
 #import "Core/TwitterChirpFont.h"
+#import "Debug/NFBDebugger.h"
  
 // UIKit paints its own selection in a system gray bright enough to sit above
 // the dark-style filter's ceiling, so the row stays gray while the rest of the
@@ -879,6 +880,8 @@ static void nfbApplySelectedBackground(UITableViewCell* cell) {
 @interface ModernSettingsSessionCardCell ()
 @property (nonatomic, strong) UIView* box;
 @property (nonatomic, strong) UILabel* avatarLabel;
+@property (nonatomic, strong) UIImageView* avatarImage;
+@property (nonatomic, strong) NSURL* avatarURL;
 @property (nonatomic, strong) UILabel* handleLabel;
 @property (nonatomic, strong) UILabel* detailLabel;
 @property (nonatomic, strong) UIView* stateDot;
@@ -911,6 +914,15 @@ static void nfbApplySelectedBackground(UITableViewCell* cell) {
         self.avatarLabel.layer.cornerRadius = 20.0;
         self.avatarLabel.layer.masksToBounds = YES;
         [self.box addSubview:self.avatarLabel];
+
+        // The account's photo sits over the initial, which shows until it loads.
+        self.avatarImage = [UIImageView new];
+        self.avatarImage.translatesAutoresizingMaskIntoConstraints = NO;
+        self.avatarImage.contentMode = UIViewContentModeScaleAspectFill;
+        self.avatarImage.layer.cornerRadius = 20.0;
+        self.avatarImage.layer.masksToBounds = YES;
+        self.avatarImage.alpha = 0.0;
+        [self.box addSubview:self.avatarImage];
 
         self.handleLabel = [UILabel new];
         self.handleLabel.translatesAutoresizingMaskIntoConstraints = NO;
@@ -952,6 +964,10 @@ static void nfbApplySelectedBackground(UITableViewCell* cell) {
             [self.avatarLabel.topAnchor constraintEqualToAnchor:self.box.topAnchor constant:13],
             [self.avatarLabel.widthAnchor constraintEqualToConstant:40],
             [self.avatarLabel.heightAnchor constraintEqualToConstant:40],
+            [self.avatarImage.leadingAnchor constraintEqualToAnchor:self.avatarLabel.leadingAnchor],
+            [self.avatarImage.trailingAnchor constraintEqualToAnchor:self.avatarLabel.trailingAnchor],
+            [self.avatarImage.topAnchor constraintEqualToAnchor:self.avatarLabel.topAnchor],
+            [self.avatarImage.bottomAnchor constraintEqualToAnchor:self.avatarLabel.bottomAnchor],
 
             [self.handleLabel.leadingAnchor constraintEqualToAnchor:self.avatarLabel.trailingAnchor
                                                            constant:11],
@@ -1013,6 +1029,52 @@ static void nfbApplySelectedBackground(UITableViewCell* cell) {
     [self.destructiveButton setTitle:destructiveTitle forState:UIControlStateNormal];
     self.destructiveButton.enabled = signedIn;
     [self applyTheme];
+}
+
+// Kept for the session: the card is redrawn every time the page reloads.
+static NSCache* NFBAvatarCache(void) {
+    static NSCache* cache;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+      cache = [NSCache new];
+    });
+    return cache;
+}
+
+// No address, or a failed download, leaves the initial in place.
+- (void)setAvatarURL:(NSURL*)url {
+    self.avatarURL = url;
+    UIImage* cached = url ? [NFBAvatarCache() objectForKey:url] : nil;
+    self.avatarImage.image = cached;
+    self.avatarImage.alpha = cached ? 1.0 : 0.0;
+    if (!url || cached) {
+        return;
+    }
+    __weak ModernSettingsSessionCardCell* weakSelf = self;
+    NSURLSessionDataTask* task = [[NSURLSession sharedSession]
+          dataTaskWithURL:url
+        completionHandler:^(NSData* data, __unused NSURLResponse* response,
+                            __unused NSError* error) {
+          UIImage* image = data.length ? [UIImage imageWithData:data] : nil;
+          dispatch_async(dispatch_get_main_queue(), ^{
+            NFBDebugLog(@"[session] avatar %@", image ? @"loaded" : @"download failed");
+            if (!image) {
+                return;
+            }
+            [NFBAvatarCache() setObject:image forKey:url];
+            ModernSettingsSessionCardCell* cell = weakSelf;
+            // A reused cell may belong to another account by now.
+            if (![cell.avatarURL isEqual:url]) {
+                return;
+            }
+            cell.avatarImage.image = image;
+            [UIView animateWithDuration:0.2
+                             animations:^{
+                               cell.avatarImage.alpha = 1.0;
+                             }];
+          });
+        }];
+    [task resume];
 }
 
 - (void)addPrimaryTarget:(id)target action:(SEL)action {

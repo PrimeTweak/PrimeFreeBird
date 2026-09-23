@@ -76,6 +76,7 @@
            destructiveTitle:(NSString*)destructiveTitle;
 - (void)addPrimaryTarget:(id)target action:(SEL)action;
 - (void)addDestructiveTarget:(id)target action:(SEL)action;
+- (void)setAvatarURL:(NSURL*)url;
 @end
 
 // Two actions that belong together, side by side rather than stacked as two

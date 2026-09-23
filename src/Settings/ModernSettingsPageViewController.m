@@ -19,6 +19,38 @@
 
 extern NSInteger NFBColorThemeScreenVisible;
 
+// Reads an object property only when the method really returns an object.
+static id NFBAskObject(id target, NSString* name) {
+    SEL selector = NSSelectorFromString(name);
+    if (!target || ![target respondsToSelector:selector]) {
+        return nil;
+    }
+    const char* type = [target methodSignatureForSelector:selector].methodReturnType;
+    if (!type || strcmp(type, "@") != 0) {
+        return nil;
+    }
+    return ((id (*)(id, SEL))objc_msgSend)(target, selector);
+}
+
+// The account's profile photo, from the app's own user model. The 200 px variant
+// keeps the 40 pt circle sharp.
+static NSURL* NFBAccountAvatarURL(TFNTwitterAccount* account) {
+    id entity = NFBAskObject(NFBAskObject(account, @"user"), @"profileImageMediaEntity");
+    id address = NFBAskObject(entity, @"imageURLString") ?: NFBAskObject(entity, @"mediaURL");
+    NSString* string = [address isKindOfClass:[NSURL class]] ? [address absoluteString]
+                     : ([address isKindOfClass:[NSString class]] ? address : nil);
+    if (!string.length) {
+        static BOOL said;
+        if (!said) {
+            said = YES;
+            NFBDebugLog(@"[session] avatar: the account carries no photo address");
+        }
+        return nil;
+    }
+    string = [string stringByReplacingOccurrencesOfString:@"_normal." withString:@"_200x200."];
+    return [NSURL URLWithString:string];
+}
+
 @implementation ModernSettingsPageViewController
 
 - (void)viewWillAppear:(BOOL)animated {
@@ -205,6 +237,7 @@ extern NSInteger NFBColorThemeScreenVisible;
                                                        : @"WEB_SESSION_NONE_DETAIL"]
                      primaryTitle:[bundle localizedStringForKey:@"WEB_SESSION_SIGN_IN_ACTION"]
                  destructiveTitle:[bundle localizedStringForKey:@"WEB_SESSION_CLEAR_ACTION"]];
+        [cell setAvatarURL:NFBAccountAvatarURL(self.account)];
         [cell addPrimaryTarget:self action:@selector(sessionSignInTapped:)];
         [cell addDestructiveTarget:self action:@selector(sessionClearTapped:)];
         return cell;
