@@ -103,6 +103,33 @@ NSArray<NSDictionary*>* NFBHiddenNotifList(void) {
 // the app's refresh command, the path a pull takes, with its own animation.
 static void NFBNotifRefreshScreen(void) {
     UIViewController* screen = gNFBNotifScreen;
+    // Measurement only [refreshprobe]: the screen's class chain, which class really
+    // provides loadTop:, whether a pull is enabled, and what is presented over it.
+    if (NFBDebugIsRecording()) {
+        NSMutableArray* chain = [NSMutableArray array];
+        for (Class c = object_getClass(screen); c && chain.count < 6; c = class_getSuperclass(c)) {
+            [chain addObject:NSStringFromClass(c)];
+        }
+        SEL top = NSSelectorFromString(@"loadTop:");
+        NSString* owner = @"none";
+        for (Class c = object_getClass(screen); c; c = class_getSuperclass(c)) {
+            Method mine = class_getInstanceMethod(c, top);
+            Method above = class_getInstanceMethod(class_getSuperclass(c), top);
+            if (mine && (!above || method_getImplementation(mine) != method_getImplementation(above))) {
+                owner = NSStringFromClass(c);
+                break;
+            }
+        }
+        SEL enabled = NSSelectorFromString(@"pullToLoadTopEnabled");
+        BOOL pull = [screen respondsToSelector:enabled] &&
+                    ((BOOL (*)(id, SEL))objc_msgSend)(screen, enabled);
+        NFBDebugLog(@"[refreshprobe] screen %@ | loadTop: from %@ | pull %d | window %d | over it %@",
+                    chain.count ? [chain componentsJoinedByString:@" > "] : @"nil", owner, pull,
+                    screen.view.window != nil,
+                    screen.presentedViewController
+                        ? NSStringFromClass([screen.presentedViewController class])
+                        : @"nothing");
+    }
     SEL refresh = NSSelectorFromString(@"handleRefreshKeyCommand");
     BOOL available = screen.isViewLoaded && [screen respondsToSelector:refresh];
     if (available) {
@@ -1382,6 +1409,26 @@ static void NFBNotifSweep(id dataViewController) {
 static void NFBNotifNoteScreen(UIViewController* controller, NSArray* sections) {
     if (NFBSectionsAreNotifications(sections)) {
         gNFBNotifScreen = controller;
+        // Measurement only [refreshprobe]: what each delivery to the screen carries.
+        if (NFBDebugIsRecording()) {
+            NSUInteger items = 0;
+            NSUInteger hidden = 0;
+            for (id section in sections) {
+                id list = [section respondsToSelector:@selector(items)]
+                              ? ((id (*)(id, SEL))objc_msgSend)(section, @selector(items))
+                              : nil;
+                if (![list isKindOfClass:[NSArray class]]) {
+                    continue;
+                }
+                items += [list count];
+                for (id item in list) {
+                    hidden += NFBNotifIsHidden(unwrapDataViewItem(item)) ? 1 : 0;
+                }
+            }
+            NFBDebugLog(@"[refreshprobe] delivery to %@: %lu item(s), %lu hidden",
+                        NSStringFromClass([controller class]), (unsigned long)items,
+                        (unsigned long)hidden);
+        }
     }
 }
 

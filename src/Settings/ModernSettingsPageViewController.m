@@ -237,7 +237,7 @@ static NSURL* NFBAccountAvatarURL(TFNTwitterAccount* account) {
                                                        : @"WEB_SESSION_NONE_DETAIL"]
                      primaryTitle:[bundle localizedStringForKey:@"WEB_SESSION_SIGN_IN_ACTION"]
                  destructiveTitle:[bundle localizedStringForKey:@"WEB_SESSION_CLEAR_ACTION"]];
-        [cell setAvatarURL:NFBAccountAvatarURL(self.account)];
+        [cell loadAvatarFromURL:NFBAccountAvatarURL(self.account)];
         [cell addPrimaryTarget:self action:@selector(sessionSignInTapped:)];
         [cell addDestructiveTarget:self action:@selector(sessionClearTapped:)];
         return cell;

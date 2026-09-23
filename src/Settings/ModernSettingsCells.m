@@ -1042,7 +1042,7 @@ static NSCache* NFBAvatarCache(void) {
 }
 
 // No address, or a failed download, leaves the initial in place.
-- (void)setAvatarURL:(NSURL*)url {
+- (void)loadAvatarFromURL:(NSURL*)url {
     self.avatarURL = url;
     UIImage* cached = url ? [NFBAvatarCache() objectForKey:url] : nil;
     self.avatarImage.image = cached;
