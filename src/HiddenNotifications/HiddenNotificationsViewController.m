@@ -409,6 +409,11 @@ static const CGFloat kNFBNotifBarHeight = 57.0;
 
 - (void)clearAllTapped {
     NFBUnhideAllNotifs();
+    // Nothing is left to manage: the bubble closes while the list refreshes behind it.
+    if (self.compact) {
+        [self dismissViewControllerAnimated:YES completion:nil];
+        return;
+    }
     [self reload];
 }
 
