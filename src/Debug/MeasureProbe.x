@@ -15,7 +15,6 @@ static NSObject* gLock;
 static NSMutableArray<NSString*>* gFollowTransitions;   // "before -> after"
 static NSMutableDictionary<NSString*, NSNumber*>* gFontCounts;
 static NSMutableDictionary<NSString*, NSString*>* gFontFamily;  // factory -> first family seen
-static NSUInteger gTfnSubstituted;                      // tfn_fontWithName calls that returned a custom font
 static CFTimeInterval gWorstFrame;                      // longest frame gap in the rolling window
 static CFTimeInterval gWorstFrameAt;
 static CFTimeInterval gLastFrame;
@@ -85,11 +84,17 @@ static NSString* probeSummary(void) {
                 [parts addObject:[NSString stringWithFormat:@"%@ %@x -> %@", factory,
                                   gFontCounts[factory], gFontFamily[factory] ?: @"?"]];
             }
-            [out appendFormat:@"[probe] fonts (custom on): %@\n", [parts componentsJoinedByString:@" | "]];
-            [out appendFormat:@"[probe] fonts: tfn_fontWithName substituted %lu time(s)",
-                              (unsigned long)gTfnSubstituted];
+            [out appendFormat:@"[probe] fonts (custom on): %@", [parts componentsJoinedByString:@" | "]];
         } else {
             [out appendString:@"[probe] fonts: no font built while recording with custom fonts on"];
+        }
+    }
+    NSUserDefaults* defaults = [NSUserDefaults standardUserDefaults];
+    for (NSString* key in @[ @"bhtwitter_font_1", @"bhtwitter_font_2" ]) {
+        NSString* chosen = [defaults objectForKey:key];
+        if (chosen.length) {
+            [out appendFormat:@"\n[probe] %@ = %@ (resolves: %@)", key, chosen,
+                              [UIFont fontWithName:chosen size:12.0] ? @"yes" : @"no"];
         }
     }
     if (gWorstFrame > 0) {
@@ -99,14 +104,21 @@ static NSString* probeSummary(void) {
     return out;
 }
 
+static CADisplayLink* gFrameLink;
+
 %ctor {
     probePrepare();
     NFBDebugAddProbeSummary(^NSString* { return probeSummary(); });
-    NFBProbeFrameWatcher* watcher = [NFBProbeFrameWatcher new];
-    CADisplayLink* link = [CADisplayLink displayLinkWithTarget:watcher selector:@selector(tick:)];
-    // The watcher is captured by the display link, which the run loop keeps.
-    objc_setAssociatedObject(link, _cmd, watcher, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-    [link addToRunLoop:[NSRunLoop mainRunLoop] forMode:NSRunLoopCommonModes];
+    // Started once the app is up, and only while recording, so a frame clock
+    // never runs at full rate outside a measurement session.
+    dispatch_async(dispatch_get_main_queue(), ^{
+      if (!NFBDebugIsRecording() || gFrameLink) {
+          return;
+      }
+      gFrameLink = [CADisplayLink displayLinkWithTarget:[NFBProbeFrameWatcher new]
+                                               selector:@selector(tick:)];
+      [gFrameLink addToRunLoop:[NSRunLoop mainRunLoop] forMode:NSRunLoopCommonModes];
+    });
 }
 
 // MARK: - follow button state, before and after a tap
@@ -117,15 +129,17 @@ static NSString* probeSummary(void) {
     if (!NFBDebugIsRecording()) {
         return %orig;
     }
+    // The class is only forward-declared, so it is reached through id.
+    id button = (id)self;
     SEL sel = @selector(followState);
-    NSInteger before = [self respondsToSelector:sel]
-        ? ((NSInteger (*)(id, SEL))objc_msgSend)(self, sel) : -999;
+    NSInteger before = [button respondsToSelector:sel]
+        ? ((NSInteger (*)(id, SEL))objc_msgSend)(button, sel) : -999;
     %orig;
-    __weak __typeof__(self) weakSelf = self;
+    __weak id weakButton = button;
     dispatch_async(dispatch_get_main_queue(), ^{
-      __typeof__(self) strongSelf = weakSelf;
-      NSInteger after = (strongSelf && [strongSelf respondsToSelector:sel])
-          ? ((NSInteger (*)(id, SEL))objc_msgSend)(strongSelf, sel) : -999;
+      id strongButton = weakButton;
+      NSInteger after = (strongButton && [strongButton respondsToSelector:sel])
+          ? ((NSInteger (*)(id, SEL))objc_msgSend)(strongButton, sel) : -999;
       probePrepare();
       @synchronized(gLock) {
         [gFollowTransitions addObject:[NSString stringWithFormat:@"%ld->%ld",
@@ -142,15 +156,7 @@ static NSString* probeSummary(void) {
 
 + (UIFont*)tfn_fontWithName:(NSString*)name size:(CGFloat)size {
     UIFont* font = %orig;
-    if (NFBDebugIsRecording() && [BHTSettings boolForKey:@"custom_fonts"]) {
-        noteFont(@"UIFont.tfn_fontWithName", font);
-        NSString* wanted = [[NSUserDefaults standardUserDefaults]
-            objectForKey:([name containsString:@"Bold"] || [name containsString:@"Heavy"])
-                             ? @"bhtwitter_font_2" : @"bhtwitter_font_1"];
-        if (wanted && [font.fontName isEqualToString:wanted]) {
-            @synchronized(gLock) { gTfnSubstituted++; }
-        }
-    }
+    noteFont(@"UIFont.tfn_fontWithName", font);
     return font;
 }
 
