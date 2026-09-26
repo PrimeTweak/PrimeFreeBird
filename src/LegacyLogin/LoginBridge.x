@@ -3,8 +3,9 @@
 #import <objc/runtime.h>
 #import <objc/message.h>
 
-// Defined in HookHelpers.m.
+// Defined in HookHelpers.m and WebCreateTweet.x.
 BOOL NFBIsXDomain(NSString* domainOrHost);
+NSString* NFBWebSessionBearer(void);
 
 // The public unauthenticated bearer every client sends, split so it is not one
 // grep-able literal.
@@ -77,7 +78,12 @@ static NSURLRequest* nfbBridgeInject(NSURLRequest* req) {
     NSString* merged = cookie.length ? [NSString stringWithFormat:@"%@; %@", cookie, add] : add;
     [m setValue:merged forHTTPHeaderField:@"Cookie"];
     [m setValue:csrf forHTTPHeaderField:@"x-csrf-token"];
-    [m setValue:nfbBridgeBearer() forHTTPHeaderField:@"Authorization"];
+    // Periscope's OAuth (the gate Spaces loads through) rejects the public bearer
+    // over the web session; it is given the web bearer, as CreateTweet is.
+    NSString* path = req.URL.path ?: @"";
+    BOOL isOAuth = [path containsString:@"periscope"] || [path containsString:@"/oauth/"];
+    [m setValue:isOAuth ? NFBWebSessionBearer() : nfbBridgeBearer()
+        forHTTPHeaderField:@"Authorization"];
     return m;
 }
 
