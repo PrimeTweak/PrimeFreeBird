@@ -46,22 +46,6 @@ static BOOL customAccentActive(void) {
            && customAccentColor() != nil;
 }
 
-// A loading avatar takes its fill from the palette's primary colour, so a custom
-// accent turns every placeholder into a flat disc of it. Answered with a neutral
-// instead.
-static UIColor* NFBPlaceholderGrey(void) {
-    static UIColor* grey;
-    static dispatch_once_t once;
-    dispatch_once(&once, ^{
-      grey = [UIColor colorWithDynamicProvider:^UIColor*(UITraitCollection* traits) {
-        return traits.userInterfaceStyle == UIUserInterfaceStyleDark
-                   ? [UIColor colorWithWhite:0.22 alpha:1.0]
-                   : [UIColor colorWithWhite:0.85 alpha:1.0];
-      }];
-    });
-    return grey;
-}
-
 // Central accent resolver. Every accent-producing palette accessor routes through
 // this: the custom colour when active, except during a raw swatch read, and
 // otherwise whatever Twitter returns natively.

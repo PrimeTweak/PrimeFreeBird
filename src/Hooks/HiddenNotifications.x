@@ -634,8 +634,6 @@ static void NFBDismissNotifToast(UIView* toast) {
         }];
 }
 
-extern void nfbReapplyTimelineFilter(void);
-
 static void NFBShowNotifToast(NSString* notifID) {
     UIWindow* window = nil;
     for (UIScene* scene in UIApplication.sharedApplication.connectedScenes) {
