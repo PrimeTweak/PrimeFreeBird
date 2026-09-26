@@ -3,6 +3,9 @@
 #import <objc/runtime.h>
 #import <objc/message.h>
 
+// Defined in HookHelpers.m.
+BOOL NFBIsXDomain(NSString* domainOrHost);
+
 // The public unauthenticated bearer every client sends, split so it is not one
 // grep-able literal.
 static NSString* nfbBridgeBearer(void) {
@@ -10,15 +13,16 @@ static NSString* nfbBridgeBearer(void) {
             stringByAppendingString:@"RUMF4xAQLsbeBhTSRrCiQpJtxoGWeyHrDb5te2jpGskWDFW82F"];
 }
 
-static BOOL nfbBridgeIsTwitterAPI(NSString* url) {
-    if (![url isKindOfClass:[NSString class]]) {
+// An exact host test, never a substring of the URL: a third-party address that
+// merely mentions an X host must not receive the session.
+static BOOL nfbBridgeIsTwitterAPI(NSURL* url) {
+    if (![url.scheme isEqualToString:@"https"] || !NFBIsXDomain(url.host)) {
         return NO;
     }
-    if ([url containsString:@"jfapi"]) {
+    if ([url.absoluteString containsString:@"jfapi"]) {
         return NO;
     }
-    return [url containsString:@"api.twitter.com"] || [url containsString:@"api.x.com"] ||
-           [url containsString:@"twitter.com/i/api"] || [url containsString:@"x.com/i/api"];
+    return [url.host.lowercaseString hasPrefix:@"api."] || [url.path hasPrefix:@"/i/api"];
 }
 
 #pragma mark - Read injection over the shared web session
@@ -52,7 +56,7 @@ static void nfbBridgeReadSharedSession(NSString** authToken, NSString** csrf) {
 // Adds the web session cookie + csrf to an app read request, replacing the shell
 // account's invalid OAuth so the server authenticates it by cookie.
 static NSURLRequest* nfbBridgeInject(NSURLRequest* req) {
-    if (!req || !nfbBridgeIsTwitterAPI(req.URL.absoluteString)) {
+    if (!req || !nfbBridgeIsTwitterAPI(req.URL)) {
         return req;
     }
     if (nfbBridgeIsCreateTweet(req.URL.path)) {
@@ -81,14 +85,14 @@ static NSURLRequest* nfbBridgeInject(NSURLRequest* req) {
 
 - (NSURLSessionDataTask*)dataTaskWithRequest:(NSURLRequest*)request
                            completionHandler:(void (^)(NSData*, NSURLResponse*, NSError*))handler {
-    if (nfbBridgeIsTwitterAPI(request.URL.absoluteString)) {
+    if (nfbBridgeIsTwitterAPI(request.URL)) {
         return %orig(nfbBridgeInject(request), handler);
     }
     return %orig;
 }
 
 - (NSURLSessionDataTask*)dataTaskWithRequest:(NSURLRequest*)request {
-    if (nfbBridgeIsTwitterAPI(request.URL.absoluteString)) {
+    if (nfbBridgeIsTwitterAPI(request.URL)) {
         return %orig(nfbBridgeInject(request));
     }
     return %orig;
@@ -96,7 +100,7 @@ static NSURLRequest* nfbBridgeInject(NSURLRequest* req) {
 
 - (NSURLSessionUploadTask*)uploadTaskWithRequest:(NSURLRequest*)request
                                         fromData:(NSData*)bodyData {
-    if (nfbBridgeIsTwitterAPI(request.URL.absoluteString)) {
+    if (nfbBridgeIsTwitterAPI(request.URL)) {
         return %orig(nfbBridgeInject(request), bodyData);
     }
     return %orig;

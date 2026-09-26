@@ -205,9 +205,8 @@ static void NFBCollectHealth(NSMutableArray<NSString*>* deadClasses,
     NSUInteger okClasses = 0;
     NSUInteger okMethods = 0;
 
-    // A NULL method means the class alone is checked. The two failure kinds are
-    // kept apart: a missing class is a real break, while a missing method is often a
-    // Swift or category method that does not answer statically.
+    // A NULL method means the class alone is checked. Methods carry their full
+    // selector, so one the runtime cannot find is a hook that never runs.
     for (size_t i = 0; i < NFBHookRecordCount; i++) {
         NFBHookRecord record = NFBHookRecords[i];
         Class cls = objc_getClass(record.className);
@@ -268,16 +267,18 @@ static NSString* NFBHealthBlock(void) {
     NFBHealthCounts counts = {0, 0, 0};
     NFBCollectHealth(deadClasses, unresolved, deadRuntime, &counts);
 
-    // Only vanished classes count as breaks — the loud number. Unresolved
-    // methods are listed below under their own quiet heading.
+    // A vanished class and a missing method both mean a hook that never runs.
     NSUInteger breaks = deadClasses.count + deadRuntime.count;
+    NSUInteger absent = unresolved.count;
     NSMutableString* out = [NSMutableString string];
     [out appendFormat:@"HOOKS  %lu classes, %lu methods, %lu by name - %@\n",
         (unsigned long)counts.okClasses, (unsigned long)counts.okMethods,
         (unsigned long)counts.okRuntime,
-        breaks ? [NSString stringWithFormat:@"%lu MISSING CLASS%@",
-                    (unsigned long)breaks, breaks > 1 ? @"ES" : @""]
-               : @"all present"];
+        (breaks || absent)
+            ? [NSString stringWithFormat:@"%lu MISSING CLASS%@, %lu MISSING METHOD%@",
+                  (unsigned long)breaks, breaks == 1 ? @"" : @"ES", (unsigned long)absent,
+                  absent == 1 ? @"" : @"S"]
+            : @"all present"];
     if (deadClasses.count) {
         [out appendString:[deadClasses componentsJoinedByString:@"\n"]];
         [out appendString:@"\n"];
@@ -288,22 +289,22 @@ static NSString* NFBHealthBlock(void) {
     }
     if (unresolved.count) {
         [out appendFormat:
-            @"\nMETHODS NOT RESOLVED STATICALLY (%lu) - often Swift or a "
-            @"category, in which case the hook still works:\n", (unsigned long)unresolved.count];
+            @"\nMETHODS ABSENT AT RUNTIME (%lu) - these hooks never run:\n",
+            (unsigned long)unresolved.count];
         [out appendString:[unresolved componentsJoinedByString:@"\n"]];
         [out appendString:@"\n"];
     }
     return out;
 }
 
-// The banner counts only real breaks — vanished classes — not the quiet
-// unresolved-method list, which is mostly false alarms.
+// The banner counts every hook that cannot run: vanished classes and missing
+// methods alike.
 NSUInteger NFBDebuggerMissingCount(void) {
     NSMutableArray<NSString*>* deadClasses = [NSMutableArray array];
     NSMutableArray<NSString*>* unresolved = [NSMutableArray array];
     NSMutableArray<NSString*>* deadRuntime = [NSMutableArray array];
     NFBCollectHealth(deadClasses, unresolved, deadRuntime, NULL);
-    return deadClasses.count + deadRuntime.count;
+    return deadClasses.count + deadRuntime.count + unresolved.count;
 }
 
 // MARK: - view capture

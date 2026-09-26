@@ -32,8 +32,12 @@ static NSObject* WebAccountCookiesLock = nil;
 static WKWebView* WebHelperWebView = nil;
 static BOOL WebHelperReady = NO;
 static BOOL WebHelperInFlight = NO;
-static NSString* WebXTID = nil;
-static BOOL WebXTIDInFlight = NO;
+// One transaction id per (method, path), minted ahead of the request that needs it.
+// Written on the main thread and read from the request's thread, so every access
+// takes the lock.
+static NSMutableDictionary<NSString*, NSString*>* WebXTIDByKey = nil;
+static NSMutableSet<NSString*>* WebXTIDMinting = nil;
+static NSObject* WebXTIDLock = nil;
 
 // Offscreen native webview that establishes and harvests a specific account's web session.
 static UIWindow* WebHarvestWindow = nil;
@@ -181,7 +185,7 @@ static void storeWebCookies(NSArray<NSHTTPCookie*>* cookies) {
 
     for (NSHTTPCookie* cookie in cookies) {
         NSString* domain = cookie.domain ?: @"";
-        if (![domain containsString:@"x.com"] && ![domain containsString:@"twitter.com"]) {
+        if (!NFBIsXDomain(domain)) {
             continue;
         }
         if (cookie.value.length == 0) {
@@ -353,34 +357,73 @@ static void onHelperWebViewLoaded(WKWebView* webView) {
               }];
 }
 
-static void refreshXTID(void) {
-    if (WebXTIDInFlight) {
+static void xtidPrepare(void) {
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+      WebXTIDByKey = [NSMutableDictionary dictionary];
+      WebXTIDMinting = [NSMutableSet set];
+      WebXTIDLock = [NSObject new];
+    });
+}
+
+static NSString* xtidKey(NSString* method, NSString* path) {
+    return [NSString stringWithFormat:@"%@ %@", method.uppercaseString ?: @"POST", path ?: @""];
+}
+
+static NSString* cachedXTID(NSString* key) {
+    xtidPrepare();
+    @synchronized(WebXTIDLock) {
+        return WebXTIDByKey[key];
+    }
+}
+
+static NSString* createTweetPath(void) {
+    return [NSString stringWithFormat:@"/graphql/%@/CreateTweet", WebCreateTweetQueryID];
+}
+
+// Mints in the page, where X's own generator runs; one request per key at a time.
+static void refreshXTIDFor(NSString* method, NSString* path) {
+    xtidPrepare();
+    WKWebView* webView = WebHelperWebView;
+    if (![webView isKindOfClass:[WKWebView class]] || path.length == 0) {
         return;
     }
-    WKWebView* webView = WebHelperWebView;
-    if (![webView isKindOfClass:[WKWebView class]]) {
-        return;
+    NSString* verb = method.uppercaseString ?: @"POST";
+    NSString* key = xtidKey(verb, path);
+    @synchronized(WebXTIDLock) {
+        if ([WebXTIDMinting containsObject:key]) {
+            return;
+        }
+        [WebXTIDMinting addObject:key];
     }
     if (@available(iOS 14.0, *)) {
-        WebXTIDInFlight = YES;
-        NSString* path = [NSString stringWithFormat:@"/graphql/%@/CreateTweet", WebCreateTweetQueryID];
-
         dispatch_async(dispatch_get_main_queue(), ^{
             [webView callAsyncJavaScript:@"return await window.__bhtTransactionId(path, method);"
-                               arguments:@{@"method": @"POST", @"path": path}
+                               arguments:@{@"method": verb, @"path": path}
                                  inFrame:nil
                           inContentWorld:WKContentWorld.pageWorld
                        completionHandler:^(id result, __unused NSError* error) {
-                           WebXTIDInFlight = NO;
                            BOOL ok = [result isKindOfClass:[NSString class]] &&
                                      [(NSString*)result length] > 10 &&
                                      ![(NSString*)result hasPrefix:@"ERR:"];
-                           if (ok) {
-                               WebXTID = [result copy];
+                           @synchronized(WebXTIDLock) {
+                               [WebXTIDMinting removeObject:key];
+                               if (ok) {
+                                   WebXTIDByKey[key] = [result copy];
+                               }
                            }
                        }];
         });
+    } else {
+        @synchronized(WebXTIDLock) {
+            [WebXTIDMinting removeObject:key];
+        }
     }
+}
+
+// Keeps the CreateTweet id warm: it is the one write rerouted today.
+static void refreshXTID(void) {
+    refreshXTIDFor(@"POST", createTweetPath());
 }
 
 // MARK: - Native bootstrap webview (per-account web session)
@@ -693,7 +736,12 @@ static BOOL resolveWebCreds(NSString* userID, NSString** outAuthToken, NSString*
 
 // MARK: - Request transform
 
-static BOOL isCreateTweetURL(NSURL* url) { return url && [url.path hasSuffix:@"/CreateTweet"]; }
+// The session is attached only for an HTTPS request to X itself: the path alone
+// could match a third-party URL.
+static BOOL isCreateTweetURL(NSURL* url) {
+    return [url.scheme isEqualToString:@"https"] && NFBIsXDomain(url.host) &&
+           [url.path hasSuffix:@"/CreateTweet"];
+}
 
 // The queryId sits in the request path: .../graphql/<queryId>/CreateTweet
 static NSString* queryIDFromCreateTweetURL(NSURL* url) {
@@ -769,10 +817,11 @@ static NSMutableURLRequest* webRequestFromNativeSend(NSURLRequest* request) {
         [[NSUserDefaults standardUserDefaults] setObject:queryID forKey:WebQueryIDDefaultsKey];
     }
 
-    if (WebXTID.length == 0) {
+    NSString* xtidForSend = xtidKey(@"POST", createTweetPath());
+    if (cachedXTID(xtidForSend).length == 0) {
         waitUntil(
             ^BOOL {
-                return WebXTID.length > 0;
+                return cachedXTID(xtidForSend).length > 0;
             },
             ^{
                 if (!WebHelperWebView) {
@@ -782,7 +831,7 @@ static NSMutableURLRequest* webRequestFromNativeSend(NSURLRequest* request) {
                 }
             },
             20.0);
-        if (WebXTID.length == 0) {
+        if (cachedXTID(xtidForSend).length == 0) {
             NFBDebugLog(@"[webtweet] no reroute: x-client-transaction-id unavailable");
             return nil;
         }
@@ -817,7 +866,8 @@ static NSMutableURLRequest* webRequestFromNativeSend(NSURLRequest* request) {
 
     NSMutableURLRequest* outgoing = [request mutableCopy];
     applyWebAuth(outgoing, authToken, ct0, postingUserID);
-    [outgoing setValue:WebXTID forHTTPHeaderField:@"x-client-transaction-id"];
+    NSString* xtid = cachedXTID(xtidForSend);
+    [outgoing setValue:xtid forHTTPHeaderField:@"x-client-transaction-id"];
     refreshXTID();
 
     // Tag the request so the task watcher can drop this account's ct0 on a 4xx.
@@ -827,7 +877,7 @@ static NSMutableURLRequest* webRequestFromNativeSend(NSURLRequest* request) {
     }
     NFBDebugLog(@"[webtweet] rewrote CreateTweet -> web (auth=%lu ct0=%lu xtid=%lu)",
                 (unsigned long)authToken.length, (unsigned long)ct0.length,
-                (unsigned long)WebXTID.length);
+                (unsigned long)xtid.length);
     return outgoing;
 }
 
@@ -922,7 +972,7 @@ static void persistWebSessionCookies(NSArray<NSHTTPCookie*>* cookies) {
     NSHTTPCookieStorage* jar = [NSHTTPCookieStorage sharedHTTPCookieStorage];
     for (NSHTTPCookie* cookie in cookies) {
         NSString* domain = cookie.domain ?: @"";
-        if (![domain containsString:@"x.com"] && ![domain containsString:@"twitter.com"]) {
+        if (!NFBIsXDomain(domain)) {
             continue;
         }
         [jar setCookie:cookie];
@@ -1027,7 +1077,7 @@ static UIViewController* webSessionTopController(void) {
             BOOL hasCT0 = NO;
             for (NSHTTPCookie* cookie in cookies) {
                 NSString* domain = cookie.domain ?: @"";
-                if (![domain containsString:@"x.com"] && ![domain containsString:@"twitter.com"]) {
+                if (!NFBIsXDomain(domain)) {
                     continue;
                 }
                 if (cookie.value.length == 0) {
@@ -1091,7 +1141,7 @@ void clearWebSession(void) {
     NSHTTPCookieStorage* jar = [NSHTTPCookieStorage sharedHTTPCookieStorage];
     for (NSHTTPCookie* cookie in [jar.cookies copy]) {
         NSString* domain = cookie.domain ?: @"";
-        if ([domain containsString:@"x.com"] || [domain containsString:@"twitter.com"]) {
+        if (NFBIsXDomain(domain)) {
             [jar deleteCookie:cookie];
         }
     }

@@ -1415,9 +1415,3 @@ static void nfbQueueFadeRepair(UIView* bar) {
 }
 
 %end
-
-// MARK: - the inbox filter pill
-
-// Left native. Under forced Liquid Glass the platter recreates the pill's content
-// on every re-host, so it blinks for about 140 ms; no view in that relay survives
-// a cascade. Standard mode does not have it.

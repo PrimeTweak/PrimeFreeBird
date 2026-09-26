@@ -78,7 +78,7 @@ static UIViewController* _Nonnull topMostController() {
 + (void)fetchSourceForTweetID:(NSString*)tweetID;
 @end
 
-// Defined in Hooks/BHTHookHelpers.m
+// Defined in Hooks/HookHelpers.m
 extern UIColor* CurrentAccentColor(void);
 
 // Twitter's brand blue, and the accent for surfaces that carry Twitter's

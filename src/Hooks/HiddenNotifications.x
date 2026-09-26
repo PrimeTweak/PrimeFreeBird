@@ -127,11 +127,6 @@ void NFBUnhideAllNotifs(void) {
     NFBNotifRefreshScreen();
 }
 
-NSInteger NFBHiddenNotifCount(void) {
-    NFBPurgeExpiredNotifs();
-    return (NSInteger)NFBHiddenNotifs().count;
-}
-
 // MARK: - Reading a notification without knowing its class
 
 // A selector whose return type is not the expected one is never called: a guessed
@@ -641,6 +636,24 @@ static void NFBDismissNotifToast(UIView* toast) {
 
 extern void nfbReapplyTimelineFilter(void);
 
+// Measurement only [lag]: how long each step of a hide takes, and when the main
+// thread is free again; the first hide of a session is the slow one.
+static void NFBLagProbeReport(CFTimeInterval start, CFTimeInterval saved,
+                              CFTimeInterval dropped, CFTimeInterval toasted) {
+    if (!NFBDebugIsRecording()) {
+        return;
+    }
+    static NSUInteger hides = 0;
+    NSUInteger number = ++hides;
+    NFBDebugLog(@"[lag] hide #%lu: save %.0f ms, row %.0f ms, toast %.0f ms",
+                (unsigned long)number, (saved - start) * 1000.0,
+                (dropped - saved) * 1000.0, (toasted - dropped) * 1000.0);
+    dispatch_async(dispatch_get_main_queue(), ^{
+      NFBDebugLog(@"[lag] hide #%lu: main thread free %.0f ms after the tap",
+                  (unsigned long)number, (CACurrentMediaTime() - start) * 1000.0);
+    });
+}
+
 static void NFBShowNotifToast(NSString* notifID) {
     UIWindow* window = nil;
     for (UIScene* scene in UIApplication.sharedApplication.connectedScenes) {
@@ -922,10 +935,14 @@ static void NFBNotifDropRow(id dataViewController, NSIndexPath* indexPath) {
                                     __unused UIView* sourceView,
                                     void (^completion)(BOOL)) {
             NSString* identity = NFBNotifIdentity(model);
+            CFTimeInterval lagStart = CACurrentMediaTime();
             NFBHideNotifWithText(model, NFBNotifTextFromCell(tableView, indexPath));
+            CFTimeInterval lagSaved = CACurrentMediaTime();
             completion(YES);
             NFBNotifDropRow(self, indexPath);
+            CFTimeInterval lagDropped = CACurrentMediaTime();
             NFBShowNotifToast(identity);
+            NFBLagProbeReport(lagStart, lagSaved, lagDropped, CACurrentMediaTime());
         }];
     hide.backgroundColor = [UIColor systemGrayColor];
     UIImage* glyph = [UIImage systemImageNamed:@"eye.slash.fill"];
@@ -1988,10 +2005,14 @@ static UITableView* NFBNotifTableForCell(UIView* cell) {
                                  : nil;
             NSString* identity = model ? NFBNotifIdentity(model) : nil;
             if (identity.length) {
+                CFTimeInterval lagStart = CACurrentMediaTime();
                 NFBHideNotifWithText(model, NFBNotifTextFromCell(table, indexPath));
+                CFTimeInterval lagSaved = CACurrentMediaTime();
                 NFBDebugLog(@"[notifs] x: hidden <%@>", identity);
                 NFBNotifDropRow(source, indexPath);
+                CFTimeInterval lagDropped = CACurrentMediaTime();
                 NFBShowNotifToast(identity);
+                NFBLagProbeReport(lagStart, lagSaved, lagDropped, CACurrentMediaTime());
                 handled = YES;
             } else {
                 NFBDebugLog(@"[notifs] x: row or identity not found - "

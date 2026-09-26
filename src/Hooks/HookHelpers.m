@@ -195,3 +195,17 @@ UIVisualEffectView* NFBMaterialBehind(UIView* host) {
     ]];
     return material;
 }
+
+BOOL NFBIsXDomain(NSString* domainOrHost) {
+    NSString* domain = domainOrHost.lowercaseString;
+    if ([domain hasPrefix:@"."]) {
+        domain = [domain substringFromIndex:1];
+    }
+    for (NSString* root in @[ @"x.com", @"twitter.com" ]) {
+        if ([domain isEqualToString:root] ||
+            [domain hasSuffix:[@"." stringByAppendingString:root]]) {
+            return YES;
+        }
+    }
+    return NO;
+}

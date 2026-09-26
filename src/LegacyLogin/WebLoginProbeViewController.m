@@ -4,6 +4,9 @@
 #import "LoginBridge.h"
 #import "Core/BHTBundle.h"
 
+// Defined in HookHelpers.m.
+BOOL NFBIsXDomain(NSString* domainOrHost);
+
 // The cookies that prove a real session: the auth token and the CSRF token the
 // API calls need. Their arrival after login is what this screen measures.
 static NSString* const kNFBAuthCookie = @"auth_token";
@@ -443,7 +446,7 @@ static UIImage* nfbLoginBirdImage(CGSize size) {
           NSHTTPCookieStorage* jar = [NSHTTPCookieStorage sharedHTTPCookieStorage];
           for (NSHTTPCookie* c in cookies) {
               NSString* domain = c.domain ?: @"";
-              if ([domain containsString:@"x.com"] || [domain containsString:@"twitter.com"]) {
+              if (NFBIsXDomain(domain)) {
                   [jar setCookie:c];
               }
           }

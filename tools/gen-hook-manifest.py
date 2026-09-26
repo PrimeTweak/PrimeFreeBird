@@ -27,8 +27,24 @@ OUT = "src/Generated/NFBHookManifest.m"
 HOOK_RE = re.compile(r'^\s*%hook\s+([A-Za-z_][A-Za-z0-9_$]*)\s*$')
 END_RE = re.compile(r'^\s*%end\s*$')
 # A method inside a hook body: - (ret)name...  or  + (ret)name...
-# Only the first selector piece is taken; enough to look the method up.
+# The whole selector is read, across lines when needed, so the on-device check
+# looks up the exact method rather than its first keyword.
 METHOD_RE = re.compile(r'^\s*[-+]\s*\([^)]*\)\s*([A-Za-z_][A-Za-z0-9_]*)')
+
+
+def full_selector(signature):
+    # Every parenthesised type goes, innermost first so block types unwind too.
+    body = re.sub(r'^\s*[-+]\s*', '', signature)
+    while True:
+        stripped = re.sub(r'\([^()]*\)', ' ', body)
+        if stripped == body:
+            break
+        body = stripped
+    pieces = re.findall(r'([A-Za-z_][A-Za-z0-9_]*)\s*:', body)
+    if pieces:
+        return ''.join(piece + ':' for piece in pieces)
+    match = re.match(r'\s*([A-Za-z_][A-Za-z0-9_]*)', body)
+    return match.group(1) if match else None
 # Runtime class resolution, all three spellings the tweak uses.
 BYNAME_RE = re.compile(
     r'%c\(\s*([A-Za-z_][A-Za-z0-9_]*)\s*\)'
@@ -74,17 +90,29 @@ def parse():
             lines = handle.readlines()
         current = None
         pending_new = False  # the next method line is a %new, created by us
+        signature = None  # a method declaration still being read, up to its "{"
+        signature_is_new = False
         for line in lines:
             stripped = line.split("//", 1)[0]  # ignore line comments
+            if signature is not None and not HOOK_RE.match(stripped) and not END_RE.match(stripped):
+                signature += " " + stripped
+                if "{" in stripped:
+                    selector = full_selector(signature.split("{", 1)[0])
+                    if selector and current and not signature_is_new:
+                        hooks[current]["methods"].setdefault(selector, rel)
+                    signature = None
+                continue
             hook = HOOK_RE.match(stripped)
             if hook:
                 current = hook.group(1)
-                hooks.setdefault(current, {"methods": set(), "file": rel})
+                hooks.setdefault(current, {"methods": {}, "file": rel})
                 pending_new = False
+                signature = None
                 continue
             if END_RE.match(stripped):
                 current = None
                 pending_new = False
+                signature = None
                 continue
             # A %new anywhere on the line means the method that follows is added
             # by the tweak, not a Twitter dependency — never a missing hook.
@@ -94,10 +122,15 @@ def parse():
             if current:
                 method = METHOD_RE.match(stripped)
                 if method:
-                    if pending_new:
-                        pending_new = False  # consumed by this method
+                    is_new = pending_new
+                    pending_new = False  # consumed by this method
+                    if "{" in stripped:
+                        selector = full_selector(stripped.split("{", 1)[0])
+                        if selector and not is_new:
+                            hooks[current]["methods"].setdefault(selector, rel)
                     else:
-                        hooks[current]["methods"].add(method.group(1))
+                        signature = stripped
+                        signature_is_new = is_new
             for match in BYNAME_RE.finditer(stripped):
                 name = match.group(1) or match.group(2) or match.group(3)
                 if name:
@@ -131,15 +164,16 @@ def emit(hooks, byname):
     for cls in sorted(hooks):
         info = hooks[cls]
         file_literal = escape(info["file"])
-        methods = sorted(info["methods"])
+        methods = sorted(info["methods"].items())
         if not methods:
             lines.append(
                 '    {"%s", NULL, "%s"},' % (escape(cls), file_literal))
         else:
-            for method in methods:
+            # Each method names the file that hooks it, not the class's first file.
+            for method, method_file in methods:
                 lines.append(
                     '    {"%s", "%s", "%s"},'
-                    % (escape(cls), escape(method), file_literal))
+                    % (escape(cls), escape(method), escape(method_file)))
     lines.append("};")
     lines.append(
         "const size_t NFBHookRecordCount = "

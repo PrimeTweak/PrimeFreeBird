@@ -8,7 +8,7 @@
 // web GraphQL TweetDetail endpoint, reusing the session WebCreateTweet.x
 // establishes, cached by tweet ID and appended to the footer item's time string.
 
-// Source labels keyed by tweet ID (declared in BHTHookHelpers.h).
+// Source labels keyed by tweet ID (declared in HookHelpers.h).
 NSMutableDictionary* tweetSources = nil;
 
 // Per-tweet fetch bookkeeping. All of these — including tweetSources — are only
@@ -61,7 +61,7 @@ static NSString* encodedQueryParameter(id object) {
 
 extern UIColor* CurrentAccentColor(void);
 
-// TweetSourceHelper itself is declared in Headers/BHTHelpers.h; declare only the
+// TweetSourceHelper itself is declared in Headers/Helpers.h; declare only the
 // internals this rewrite adds.
 @interface TweetSourceHelper (SourceLabels)
 + (NSString*)unavailableString;

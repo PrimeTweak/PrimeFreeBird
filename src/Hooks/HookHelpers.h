@@ -21,11 +21,11 @@
 #import "Settings/ModernSettingsViewController.h"
 #import "ThemeColor/Palette.h"
 
-// Recursive view traversal (BHTHookHelpers.m)
+// Recursive view traversal (HookHelpers.m)
 void EnumerateSubviewsRecursively(UIView* view,
                                   void (^block)(UIView* currentView));
 
-// TFNDataViewItem unwrapping for timeline section filtering (BHTHookHelpers.m)
+// TFNDataViewItem unwrapping for timeline section filtering (HookHelpers.m)
 id unwrapDataViewItem(id item);
 
 // With an arrow, a popover's content runs past the bubble's bottom edge by about
@@ -40,7 +40,7 @@ void NFBPopoverLogOverflow(UIView* content);
 // scrolls under it.
 UIVisualEffectView* NFBMaterialBehind(UIView* host);
 
-// Module header/footer cleanup for timeline section filtering (BHTHookHelpers.m)
+// Module header/footer cleanup for timeline section filtering (HookHelpers.m)
 BOOL IsModuleHeaderItem(id item);
 BOOL IsModuleFooterItem(id item);
 void MarkEmptiedModuleChrome(NSArray* items, NSMutableIndexSet* removed);
@@ -98,3 +98,7 @@ void clearWebSession(void);
 
 // Seed a reply webview's own cookie store with the current session, then run done.
 void seedReplyWebViewCookies(WKWebView* webView, void (^done)(void));
+
+// Whether a host or cookie domain belongs to X or Twitter: an exact match or a
+// subdomain, never a substring, so x.com.example.net does not pass.
+BOOL NFBIsXDomain(NSString* domainOrHost);

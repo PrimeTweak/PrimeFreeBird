@@ -2007,11 +2007,6 @@ static UITabBarAppearance* NFBPatchedTabBarAppearance(UITabBarAppearance* appear
         %orig(fixed);
         return;
     }
-    if (now - lastNote > 0.5) {
-        lastNote = now;
-        NFBDebugLog(@"[search] frame x=%.0f w=%.0f of bar w=%.0f", inBar.origin.x,
-                    inBar.size.width, bar.bounds.size.width);
-    }
     %orig(frame);
 }
 
