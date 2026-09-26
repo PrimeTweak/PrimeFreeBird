@@ -45,6 +45,10 @@ extern void NFBDebuggerSetTriggerHidden(BOOL hidden);
 // building any log string, so the debugger costs one boolean when off.
 extern BOOL NFBDebugIsRecording(void);
 
+// Register a block whose text is appended to a capture, under PROBES. For
+// measurement probes whose summary must survive the decision log's eviction.
+extern void NFBDebugAddProbeSummary(NSString* (^summary)(void));
+
 // One report of what the branding surfaces are on the running build: the top-bar
 // logo, the bottom bar and its glass, the Explore bar, and the settings that drive
 // them. Read only, once per launch, written next to the hook health.

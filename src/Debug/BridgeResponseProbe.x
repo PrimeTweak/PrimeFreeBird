@@ -92,6 +92,17 @@ static char kNFBRespBodyKey;
             }
             NFBDebugLog(@"[resp] write headers %@: %@", path, hdr);
         }
+        // Spaces asks for a Periscope token before it loads; logging the auth this
+        // request carries (lengths only) shows whether the web session reached it.
+        BOOL isAuth = [path containsString:@"periscope"] || [path containsString:@"/oauth/"];
+        if (isAuth && code != 200) {
+            NSMutableString* hdr = [NSMutableString string];
+            NSDictionary* fields = task.originalRequest.allHTTPHeaderFields;
+            for (NSString* k in fields) {
+                [hdr appendFormat:@"%@=%lu ", k, (unsigned long)[fields[k] length]];
+            }
+            NFBDebugLog(@"[resp] auth headers %@ (http=%ld): %@", path, code, hdr);
+        }
     }
     if ([self.nfbReal respondsToSelector:_cmd]) {
         [self.nfbReal URLSession:session task:task didCompleteWithError:error];

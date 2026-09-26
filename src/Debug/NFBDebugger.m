@@ -503,6 +503,45 @@ static NSString* NFBDecisionBlock(void) {
     }
 }
 
+// MARK: - probe summaries
+
+static NSMutableArray<NSString* (^)(void)>* NFBProbeSummaries(void) {
+    static NSMutableArray* blocks;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{ blocks = [NSMutableArray array]; });
+    return blocks;
+}
+
+void NFBDebugAddProbeSummary(NSString* (^summary)(void)) {
+    if (!summary) {
+        return;
+    }
+    @synchronized(NFBProbeSummaries()) {
+        [NFBProbeSummaries() addObject:[summary copy]];
+    }
+}
+
+// Each registered block is asked for its text at capture time, so a probe's
+// findings are written then and cannot be pushed out of the decision ring.
+static NSString* NFBProbeBlock(void) {
+    NSArray<NSString* (^)(void)>* blocks;
+    @synchronized(NFBProbeSummaries()) {
+        blocks = [NFBProbeSummaries() copy];
+    }
+    if (blocks.count == 0) {
+        return @"";
+    }
+    NSMutableString* out = [NSMutableString stringWithString:@"PROBES\n"];
+    for (NSString* (^block)(void) in blocks) {
+        NSString* text = block();
+        if (text.length) {
+            [out appendFormat:@"%@\n", text];
+        }
+    }
+    [out appendString:@"\n"];
+    return out;
+}
+
 // MARK: - report
 
 NSString* NFBDebuggerReport(void) {
@@ -513,6 +552,7 @@ NSString* NFBDebuggerReport(void) {
     [report appendString:@"\n"];
     [report appendString:NFBDecisionBlock()];
     [report appendString:@"\n"];
+    [report appendString:NFBProbeBlock()];
     [report appendString:NFBCaptureBlock()];
     return report;
 }
