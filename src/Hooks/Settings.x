@@ -330,8 +330,9 @@ static UIFont* NFBCustomFont(UIFont* original, BOOL bold) {
 // Named-font construction (tweet body and most text styles) funnels through here.
 %hook UIFont
 + (UIFont*)tfn_fontWithName:(NSString*)name size:(CGFloat)size {
+    UIFont* original = %orig;
     BOOL bold = [name containsString:@"Bold"] || [name containsString:@"Heavy"];
-    return NFBCustomFont(%orig, bold);
+    return NFBCustomFont(original, bold);
 }
 %end
 
