@@ -636,24 +636,6 @@ static void NFBDismissNotifToast(UIView* toast) {
 
 extern void nfbReapplyTimelineFilter(void);
 
-// Measurement only [lag]: how long each step of a hide takes, and when the main
-// thread is free again; the first hide of a session is the slow one.
-static void NFBLagProbeReport(CFTimeInterval start, CFTimeInterval saved,
-                              CFTimeInterval dropped, CFTimeInterval toasted) {
-    if (!NFBDebugIsRecording()) {
-        return;
-    }
-    static NSUInteger hides = 0;
-    NSUInteger number = ++hides;
-    NFBDebugLog(@"[lag] hide #%lu: save %.0f ms, row %.0f ms, toast %.0f ms",
-                (unsigned long)number, (saved - start) * 1000.0,
-                (dropped - saved) * 1000.0, (toasted - dropped) * 1000.0);
-    dispatch_async(dispatch_get_main_queue(), ^{
-      NFBDebugLog(@"[lag] hide #%lu: main thread free %.0f ms after the tap",
-                  (unsigned long)number, (CACurrentMediaTime() - start) * 1000.0);
-    });
-}
-
 static void NFBShowNotifToast(NSString* notifID) {
     UIWindow* window = nil;
     for (UIScene* scene in UIApplication.sharedApplication.connectedScenes) {
@@ -935,14 +917,10 @@ static void NFBNotifDropRow(id dataViewController, NSIndexPath* indexPath) {
                                     __unused UIView* sourceView,
                                     void (^completion)(BOOL)) {
             NSString* identity = NFBNotifIdentity(model);
-            CFTimeInterval lagStart = CACurrentMediaTime();
             NFBHideNotifWithText(model, NFBNotifTextFromCell(tableView, indexPath));
-            CFTimeInterval lagSaved = CACurrentMediaTime();
             completion(YES);
             NFBNotifDropRow(self, indexPath);
-            CFTimeInterval lagDropped = CACurrentMediaTime();
             NFBShowNotifToast(identity);
-            NFBLagProbeReport(lagStart, lagSaved, lagDropped, CACurrentMediaTime());
         }];
     hide.backgroundColor = [UIColor systemGrayColor];
     UIImage* glyph = [UIImage systemImageNamed:@"eye.slash.fill"];
@@ -1610,68 +1588,6 @@ reconfigureItemIdentifiers:(id)identifiers
 @end
 
 
-%hook TFNItemsDataViewController
-
-// Safety net for a notifications list that is not a plain T1URTViewController,
-// where the hook above never fires. Sits on the base class the app's lists
-// inherit from and declines unless the row is a nameable notification.
-- (UISwipeActionsConfiguration*)tableView:(UITableView*)tableView
-    trailingSwipeActionsConfigurationForRowAtIndexPath:(NSIndexPath*)indexPath {
-    UISwipeActionsConfiguration* original = %orig;
-    if (!NFBNotifsEnabled()) {
-        return original;
-    }
-    id dataVC = self;
-    if ([NSStringFromClass([dataVC class]) isEqualToString:@"T1URTViewController"]) {
-        return original;  // already handled above — never twice
-    }
-    id model = NFBModelAtIndexPath(dataVC, indexPath);
-    if (!model) {
-        return original;
-    }
-    NSString* modelClass = NSStringFromClass([model class]);
-    if (![modelClass containsString:@"Notification"] || !NFBNotifIdentity(model)) {
-        return original;
-    }
-    static BOOL saidNet;
-    if (!saidNet) {
-        saidNet = YES;
-        NFBDebugLog(@"[notifs] swipe: added by the net on %@ (list class %@)",
-                    modelClass, NSStringFromClass([dataVC class]));
-    }
-
-    NSString* title = [[BHTBundle sharedBundle] localizedStringForKey:@"NOTIFS_HIDE_ACTION"];
-    UIContextualAction* hide = [UIContextualAction
-        contextualActionWithStyle:UIContextualActionStyleDestructive
-                            title:title
-                          handler:^(__unused UIContextualAction* action,
-                                    __unused UIView* sourceView,
-                                    void (^completion)(BOOL)) {
-            NSString* identity = NFBNotifIdentity(model);
-            NFBHideNotifWithText(model, NFBNotifTextFromCell(tableView, indexPath));
-            // A hide from this list proves it is the one an unhide refreshes.
-            gNFBNotifScreen = (UIViewController*)self;
-            completion(YES);
-            nfbReapplyTimelineFilter();
-            NFBShowNotifToast(identity);
-        }];
-    hide.backgroundColor = [UIColor systemGrayColor];
-    UIImage* glyph = [UIImage systemImageNamed:@"eye.slash.fill"];
-    if (glyph) {
-        hide.image = glyph;
-    }
-    NSMutableArray<UIContextualAction*>* actions = [NSMutableArray arrayWithObject:hide];
-    if (original.actions.count) {
-        [actions addObjectsFromArray:original.actions];
-    }
-    UISwipeActionsConfiguration* configuration =
-        [UISwipeActionsConfiguration configurationWithActions:actions];
-    configuration.performsFirstActionWithFullSwipe = NO;
-    return configuration;
-}
-
-%end
-
 // MARK: - recognising a hidden-capable row
 
 // tableView:canEditRowAtIndexPath: is implemented only by the accounts and drafts
@@ -2005,14 +1921,10 @@ static UITableView* NFBNotifTableForCell(UIView* cell) {
                                  : nil;
             NSString* identity = model ? NFBNotifIdentity(model) : nil;
             if (identity.length) {
-                CFTimeInterval lagStart = CACurrentMediaTime();
                 NFBHideNotifWithText(model, NFBNotifTextFromCell(table, indexPath));
-                CFTimeInterval lagSaved = CACurrentMediaTime();
                 NFBDebugLog(@"[notifs] x: hidden <%@>", identity);
                 NFBNotifDropRow(source, indexPath);
-                CFTimeInterval lagDropped = CACurrentMediaTime();
                 NFBShowNotifToast(identity);
-                NFBLagProbeReport(lagStart, lagSaved, lagDropped, CACurrentMediaTime());
                 handled = YES;
             } else {
                 NFBDebugLog(@"[notifs] x: row or identity not found - "

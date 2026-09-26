@@ -397,24 +397,6 @@ static void nfbApplyTabFilter(UIView* bar, UICollectionView* cv) {
 
 %end
 
-%hook _TtC10TFNUISwift29LegacySegmentedViewController
-
-- (void)collectionView:(UICollectionView*)collectionView
-    didSelectItemAtIndexPath:(NSIndexPath*)indexPath {
-    UIView* root = gNFBExploreBar;
-    UICollectionView* barCV = root ? nfbFindCollection(root, 0) : nil;
-    UICollectionView* pager = gNFBPagerCV;
-    if (!nfbGranularActive() || !barCV || collectionView != barCV || !pager) {
-        %orig;
-        return;
-    }
-    // Cell index and page index are the same number, so the app's own
-    // navigation lands on the right page and carries the bar's own styling
-    // with it.
-    %orig;
-}
-
-%end
 
 %hook _TtC10TFNUISwift26LegacyPagingViewController
 

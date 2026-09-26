@@ -1419,14 +1419,6 @@ static void NFBShowRestartReminder(void) {
 
 %hook TAEDarkColorPalette
 
-- (UIColor*)avatarPlaceholderBackgroundColor {
-    UIColor* o = %orig;
-    return customAccentActive() ? NFBPlaceholderGrey() : o;
-}
-- (UIColor*)avatarPlaceholderUIColor {
-    UIColor* o = %orig;
-    return customAccentActive() ? NFBPlaceholderGrey() : o;
-}
 - (UIColor*)primaryColor {
     UIColor* o = %orig;
     return NFBAccent(o);
@@ -1471,14 +1463,6 @@ static void NFBShowRestartReminder(void) {
 
 %hook TAELightColorPalette
 
-- (UIColor*)avatarPlaceholderBackgroundColor {
-    UIColor* o = %orig;
-    return customAccentActive() ? NFBPlaceholderGrey() : o;
-}
-- (UIColor*)avatarPlaceholderUIColor {
-    UIColor* o = %orig;
-    return customAccentActive() ? NFBPlaceholderGrey() : o;
-}
 - (UIColor*)primaryColor {
     UIColor* o = %orig;
     return NFBAccent(o);
@@ -1523,43 +1507,7 @@ static void NFBShowRestartReminder(void) {
 
 %hook TFNUIDefaultColorPalette
 
-- (UIColor*)avatarPlaceholderBackgroundColor {
-    UIColor* o = %orig;
-    return customAccentActive() ? NFBPlaceholderGrey() : o;
-}
-- (UIColor*)avatarPlaceholderUIColor {
-    UIColor* o = %orig;
-    return customAccentActive() ? NFBPlaceholderGrey() : o;
-}
 - (UIColor*)primaryColor {
-    UIColor* o = %orig;
-    return NFBAccent(o);
-}
-- (UIColor*)primaryColorForOption:(NSUInteger)colorOption {
-    UIColor* o = %orig;
-    return NFBAccent(o);
-}
-- (UIColor*)primaryColorOptionBlueColor {
-    UIColor* o = %orig;
-    return NFBAccent(o);
-}
-- (UIColor*)primaryColorOptionGreenColor {
-    UIColor* o = %orig;
-    return NFBAccent(o);
-}
-- (UIColor*)primaryColorOptionYellowColor {
-    UIColor* o = %orig;
-    return NFBAccent(o);
-}
-- (UIColor*)primaryColorOptionOrangeColor {
-    UIColor* o = %orig;
-    return NFBAccent(o);
-}
-- (UIColor*)primaryColorOptionPurpleColor {
-    UIColor* o = %orig;
-    return NFBAccent(o);
-}
-- (UIColor*)primaryColorOptionRedColor {
     UIColor* o = %orig;
     return NFBAccent(o);
 }

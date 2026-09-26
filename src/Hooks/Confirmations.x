@@ -38,6 +38,22 @@ static void ShowConfirmation(void (^confirmed)(void)) {
 
 %end
 
+// Replies sent from the bar under a Tweet go through this rather than the
+// compose screen's send button, so the confirmation is wired here too.
+%hook T1PersistentComposeViewController
+
+- (void)_t1_sendReply {
+    if (![BHTSettings boolForKey:@"tweet_confirm"]) {
+        return %orig;
+    }
+
+    ShowConfirmation(^{
+        %orig;
+    });
+}
+
+%end
+
 // MARK: - Follow confirm
 
 %hook TUIFollowControl
