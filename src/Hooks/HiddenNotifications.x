@@ -942,7 +942,25 @@ static void NFBNotifDropRow(id dataViewController, NSIndexPath* indexPath) {
 
 // The sections are filtered on their way in. An id in the registry can only belong
 // to a hidden notification, so the filter needs no scoping of its own.
+static NSArray* NFBFilterNotifSectionsImpl(NSArray* sections);
+
+// Measurement only: times the notification-list filter, the work that runs on
+// each list reload, so a hitch there is attributable. Logs only when recording.
 static NSArray* NFBFilterNotifSections(NSArray* sections) {
+    if (!NFBDebugIsRecording()) {
+        return NFBFilterNotifSectionsImpl(sections);
+    }
+    CFTimeInterval t0 = CACurrentMediaTime();
+    NSArray* result = NFBFilterNotifSectionsImpl(sections);
+    double ms = (CACurrentMediaTime() - t0) * 1000.0;
+    if (ms > 4.0) {
+        NFBDebugLog(@"[probe] notif filter %.0f ms (%lu sections)", ms,
+                    (unsigned long)sections.count);
+    }
+    return result;
+}
+
+static NSArray* NFBFilterNotifSectionsImpl(NSArray* sections) {
     if (!NFBNotifsEnabled()) {
         return sections;
     }
@@ -1267,7 +1285,24 @@ static void NFBNotifSyncEmptyState(id dataViewController) {
 
 static BOOL gNFBNotifSweeping;
 
+static void NFBNotifSweepImpl(id dataViewController);
+
+// Measurement only: times the row sweep that deletes hidden notifications after
+// a reload; logs only when recording.
 static void NFBNotifSweep(id dataViewController) {
+    if (!NFBDebugIsRecording()) {
+        NFBNotifSweepImpl(dataViewController);
+        return;
+    }
+    CFTimeInterval t0 = CACurrentMediaTime();
+    NFBNotifSweepImpl(dataViewController);
+    double ms = (CACurrentMediaTime() - t0) * 1000.0;
+    if (ms > 4.0) {
+        NFBDebugLog(@"[probe] notif sweep %.0f ms", ms);
+    }
+}
+
+static void NFBNotifSweepImpl(id dataViewController) {
     if (gNFBNotifSweeping || !NFBNotifsEnabled() || !dataViewController) {
         return;
     }

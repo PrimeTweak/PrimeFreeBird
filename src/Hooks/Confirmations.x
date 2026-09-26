@@ -2,6 +2,7 @@
 // after a tweet.
 
 #import "HookHelpers.h"
+#import <objc/message.h>
 
 static void ShowConfirmation(void (^confirmed)(void)) {
     [%c(FLEXAlert)
@@ -28,6 +29,27 @@ static void ShowConfirmation(void (^confirmed)(void)) {
 
 - (void)_t1_didTapSendButton:(__unsafe_unretained UIButton*)sendButton {
     if (![BHTSettings boolForKey:@"tweet_confirm"]) {
+        return %orig;
+    }
+
+    ShowConfirmation(^{
+        %orig;
+    });
+}
+
+%end
+
+// The profile page uses this newer button, and it also drives unfollow, which
+// Twitter confirms on its own. Only a tap that will follow (state 0 = not
+// following, measured on 12.26) is confirmed here.
+%hook TUIFollowButtonV2
+
+- (void)buttonTapped {
+    id button = (id)self;
+    SEL stateSel = @selector(followState);
+    NSInteger state = ([button respondsToSelector:stateSel])
+        ? ((NSInteger (*)(id, SEL))objc_msgSend)(button, stateSel) : -1;
+    if (![BHTSettings boolForKey:@"follow_confirm"] || state != 0) {
         return %orig;
     }
 

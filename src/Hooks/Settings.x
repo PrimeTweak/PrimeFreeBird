@@ -312,21 +312,48 @@ static void NFBHideRowSeparator(UITableViewCell* cell) {
 }
 %end
 
-// All font construction funnels through +[UIFont tfn_fontWithName:size:],
-// so remapping here covers every text style in one place.
+// Swaps an app font for the chosen custom one at the same size, keeping bold
+// where the original was bold. Returns the original when the feature is off, no
+// font is set, or the chosen one will not load.
+static UIFont* NFBCustomFont(UIFont* original, BOOL bold) {
+    if (!original || ![[NSUserDefaults standardUserDefaults] boolForKey:@"custom_fonts"]) {
+        return original;
+    }
+    NSString* customName = [[NSUserDefaults standardUserDefaults]
+        objectForKey:bold ? @"bhtwitter_font_2" : @"bhtwitter_font_1"];
+    if (customName.length == 0) {
+        return original;
+    }
+    return [UIFont fontWithName:customName size:original.pointSize] ?: original;
+}
+
+// Named-font construction (tweet body and most text styles) funnels through here.
 %hook UIFont
 + (UIFont*)tfn_fontWithName:(NSString*)name size:(CGFloat)size {
-    UIFont* origFont = %orig;
-    if (![[NSUserDefaults standardUserDefaults] boolForKey:@"custom_fonts"]) {
-        return origFont;
-    }
-    BOOL isBold = [name containsString:@"Bold"] || [name containsString:@"Heavy"];
-    NSString* customName = [[NSUserDefaults standardUserDefaults]
-        objectForKey:isBold ? @"bhtwitter_font_2" : @"bhtwitter_font_1"];
-    if (!customName) {
-        return origFont;
-    }
-    return [UIFont fontWithName:customName size:size] ?: origFont;
+    BOOL bold = [name containsString:@"Bold"] || [name containsString:@"Heavy"];
+    return NFBCustomFont(%orig, bold);
+}
+%end
+
+// The interface's own text (names, buttons, titles) and the tabular counters are
+// built by XFontCatalog, which never calls tfn_fontWithName, so they are covered
+// here too. Boldness is read from the font the app would have used.
+%hook XFontCatalog
++ (UIFont*)customFontOfSize:(CGFloat)size weight:(NSInteger)weight
+      scalesWithDynamicType:(BOOL)scales {
+    UIFont* original = %orig;
+    BOOL bold = (original.fontDescriptor.symbolicTraits & UIFontDescriptorTraitBold) != 0;
+    return NFBCustomFont(original, bold);
+}
++ (UIFont*)contentFontWithOffset:(CGFloat)offset weight:(NSInteger)weight {
+    UIFont* original = %orig;
+    BOOL bold = (original.fontDescriptor.symbolicTraits & UIFontDescriptorTraitBold) != 0;
+    return NFBCustomFont(original, bold);
+}
++ (UIFont*)tabularDigitsFontOfSize:(CGFloat)size weight:(CGFloat)weight {
+    UIFont* original = %orig;
+    BOOL bold = (original.fontDescriptor.symbolicTraits & UIFontDescriptorTraitBold) != 0;
+    return NFBCustomFont(original, bold);
 }
 %end
 

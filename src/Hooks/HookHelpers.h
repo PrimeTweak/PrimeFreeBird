@@ -102,3 +102,7 @@ void seedReplyWebViewCookies(WKWebView* webView, void (^done)(void));
 // Whether a host or cookie domain belongs to X or Twitter: an exact match or a
 // subdomain, never a substring, so x.com.example.net does not pass.
 BOOL NFBIsXDomain(NSString* domainOrHost);
+
+// The bearer of the web session, for requests that must authenticate as the web
+// client rather than the native app (defined in WebCreateTweet.x).
+NSString* NFBWebSessionBearer(void);
