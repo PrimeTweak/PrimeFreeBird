@@ -323,7 +323,7 @@
 "HIDE_GROK_BOT_TITLE" = "Masquer Grok Bot";
 "HIDE_GROK_BOT_DETAIL" = "Retire la rangée « Try Grok Bot » et les autres promotions de Grok Bot.";
 "MODERN_SETTINGS_LAB_TITLE" = "Outils";
-"MODERN_SETTINGS_LAB_SUBTITLE" = "Sauvegarde, compatibilité et session web.";
+"MODERN_SETTINGS_LAB_SUBTITLE" = "Session web, sauvegarde et compatibilité.";
 "IMPORT_SETTINGS_DONE_TITLE" = "Réglages importés";
 "IMPORT_SETTINGS_DONE_MESSAGE" = "%lu réglages restaurés. Redémarre Twitter pour tout appliquer.";
 "IMPORT_SETTINGS_FAILED_TITLE" = "Échec de l’importation";
