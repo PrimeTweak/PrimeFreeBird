@@ -171,12 +171,12 @@ static NSString* PFBEnvironmentBlock(void) {
 
     UITraitCollection* traits = UITraitCollection.currentTraitCollection;
     NSString* style = traits.userInterfaceStyle == UIUserInterfaceStyleDark
-        ? @"Sombre" : @"Clair";
+        ? @"Dark" : @"Light";
     BOOL liquidGlass = [PFBSettings boolForKey:@"enable_liquid_glass"];
 
     NSArray* watches = PFBWatchAll();
     NSString* watchLine = watches.count
-        ? [NSString stringWithFormat:@"Surveillance: %@\n",
+        ? [NSString stringWithFormat:@"Watching: %@\n",
            [watches componentsJoinedByString:@", "]]
         : @"";
     return [NSString stringWithFormat:

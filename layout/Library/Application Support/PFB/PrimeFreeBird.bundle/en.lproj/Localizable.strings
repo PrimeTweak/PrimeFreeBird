@@ -273,7 +273,7 @@
 
 /* ===== LAB ===== */
 "MODERN_SETTINGS_LAB_TITLE" = "Tools";
-"MODERN_SETTINGS_LAB_SUBTITLE" = "Web session, compatibility, and backup.";
+"MODERN_SETTINGS_LAB_SUBTITLE" = "Backup, compatibility, and web session.";
 "REPLY_IN_WEBVIEW_TITLE" = "Reply in web view";
 "REPLY_IN_WEBVIEW_DETAIL" = "Reply through a web page when the app refuses to send replies.";
 "IMPORT_SETTINGS_DONE_TITLE" = "Settings imported";

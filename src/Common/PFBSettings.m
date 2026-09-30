@@ -491,23 +491,6 @@ static NSDictionary<NSString*, NSDictionary*>* PFBSettingsPages(void) {
                 @"titleKey": @"MODERN_SETTINGS_LAB_TITLE",
                 @"subtitleKey": @"MODERN_SETTINGS_LAB_SUBTITLE",
                 @"settings": @[
-                    @{@"type": @"header", @"titleKey": @"LAB_GROUP_SESSION"},
-                    @{@"type": @"sessionCard", @"key": @"web_session_card"},
-                    @{@"key": @"reply_in_webview",
-                      @"default": @NO,
-                      @"blockedUnless": @"web_session",
-                      @"type": @"toggle"},
-
-                    @{@"type": @"header", @"titleKey": @"LAB_GROUP_TOOLS"},
-                    @{
-                        @"key": @"compatibility",
-                        @"type": @"button",
-                        @"titleKey": @"COMPATIBILITY_TITLE",
-                        @"subtitleKey": @"COMPATIBILITY_DETAIL",
-                        @"action": @"showCompatibility:"
-                    },
-                    @{@"key": @"flex_twitter", @"default": @NO, @"type": @"toggle"},
-
                     @{@"type": @"header", @"titleKey": @"LAB_GROUP_BACKUP"},
                     @{
                         @"key": @"settings_backup",
@@ -522,7 +505,24 @@ static NSDictionary<NSString*, NSDictionary*>* PFBSettingsPages(void) {
                         @"secondKey": @"IMPORT_SETTINGS_ACTION",
                         @"firstAction": @"showExportSettings:",
                         @"secondAction": @"showImportSettings:"
-                    }
+                    },
+
+                    @{@"type": @"header", @"titleKey": @"LAB_GROUP_TOOLS"},
+                    @{
+                        @"key": @"compatibility",
+                        @"type": @"button",
+                        @"titleKey": @"COMPATIBILITY_TITLE",
+                        @"subtitleKey": @"COMPATIBILITY_DETAIL",
+                        @"action": @"showCompatibility:"
+                    },
+                    @{@"key": @"flex_twitter", @"default": @NO, @"type": @"toggle"},
+
+                    @{@"type": @"header", @"titleKey": @"LAB_GROUP_SESSION"},
+                    @{@"type": @"sessionCard", @"key": @"web_session_card"},
+                    @{@"key": @"reply_in_webview",
+                      @"default": @NO,
+                      @"blockedUnless": @"web_session",
+                      @"type": @"toggle"}
                 ]
             },
         };
