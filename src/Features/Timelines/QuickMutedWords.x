@@ -1,0 +1,236 @@
+// A muted-words shortcut in the Home timeline's top bar, added only to the bar the
+// Home timeline owns; if that owner cannot be identified, no button appears.
+
+#import "Support/HookHelpers.h"
+#import "Features/Timelines/PFBMutedWordsViewController.h"
+#import <objc/message.h>
+
+static const void* kPFBQuickMutedBtnKey = &kPFBQuickMutedBtnKey;
+
+// The avatar is the square view furthest to the left of the bar. Using it as the
+// reference makes the added button match Twitter's own vertical rhythm and
+// horizontal margin, whatever the bar's height.
+static UIView* pfbFindAvatarView(UIView* view, UIView* bar) {
+    UIView* best = nil;
+    CGFloat bestX = CGFLOAT_MAX;
+    for (UIView* subview in view.subviews) {
+        CGRect inBar = [subview convertRect:subview.bounds toView:bar];
+        CGFloat w = CGRectGetWidth(inBar);
+        CGFloat h = CGRectGetHeight(inBar);
+        BOOL squarish = (w > 24.0 && w < 44.0 && fabs(w - h) < 2.0);
+        if (squarish && CGRectGetMinX(inBar) < CGRectGetWidth(bar.bounds) * 0.25 &&
+            CGRectGetMinX(inBar) < bestX) {
+            bestX = CGRectGetMinX(inBar);
+            best = subview;
+        }
+        UIView* deeper = pfbFindAvatarView(subview, bar);
+        if (deeper) {
+            CGRect deepRect = [deeper convertRect:deeper.bounds toView:bar];
+            if (CGRectGetMinX(deepRect) < bestX) {
+                bestX = CGRectGetMinX(deepRect);
+                best = deeper;
+            }
+        }
+    }
+    return best;
+}
+
+static UIViewController* pfbOwningViewController(UIView* view) {
+    UIResponder* responder = view;
+    while ((responder = responder.nextResponder)) {
+        if (![responder isKindOfClass:[UIViewController class]]) {
+            continue;
+        }
+        UIViewController* controller = (UIViewController*)responder;
+        if ([controller isKindOfClass:[UINavigationController class]]) {
+            UIViewController* top = ((UINavigationController*)controller).topViewController;
+            return top ?: controller;
+        }
+        return controller;
+    }
+    return nil;
+}
+
+static BOOL pfbControllerIsHome(UIViewController* owner) {
+    if (!owner) {
+        return NO;
+    }
+    NSString* name = NSStringFromClass([owner class]);
+    return [name containsString:@"Home"] || [name containsString:@"Timelines"] ||
+           [name containsString:@"TimelineContainer"];
+}
+
+// One gray for every icon added here, frozen to a static color. The gear is dimmed
+// to 60 % because its glyph refuses to be tinted, so these icons use the label
+// color at the same 60 %. Resolving it here also keeps the window tint off it.
+static UIColor* PFBBarIconGrey(UITraitCollection* traits) {
+    // Resolved to a concrete color: a dynamic one handed to Twitter's vector
+    // renderer came back black, and let the theme claim it later.
+    UIColor* grey = [[UIColor labelColor] colorWithAlphaComponent:0.6];
+    if (traits && [grey respondsToSelector:@selector(resolvedColorWithTraitCollection:)]) {
+        return [grey resolvedColorWithTraitCollection:traits] ?: grey;
+    }
+    return grey;
+}
+
+// Twitter's filter_bars geometry, drawn at the settings gear's weight: three bars
+// centered on x=12 on a 24-unit canvas, spans 3-21, 6-18 and 9-15. A block cannot
+// capture a local C array, so the table lives at file scope.
+static const CGFloat kPFBBarGeometry[3][3] = {
+    {3.0, 21.0, 7.0}, {6.0, 18.0, 12.5}, {9.0, 15.0, 18.0}
+};
+
+static UIImage* PFBFilterBarsGlyph(CGFloat side) {
+    const CGFloat kUnit = 24.0;
+    const CGFloat kThickness = 2.07;
+    CGFloat scale = side / kUnit;
+    UIGraphicsImageRendererFormat* format =
+        [UIGraphicsImageRendererFormat preferredFormat];
+    format.opaque = NO;
+    UIGraphicsImageRenderer* renderer =
+        [[UIGraphicsImageRenderer alloc] initWithSize:CGSizeMake(side, side)
+                                               format:format];
+    UIImage* drawn = [renderer
+        imageWithActions:^(UIGraphicsImageRendererContext* context) {
+            [[UIColor blackColor] setFill];
+            for (NSInteger i = 0; i < 3; i++) {
+                CGRect bar =
+                    CGRectMake(kPFBBarGeometry[i][0] * scale,
+                               (kPFBBarGeometry[i][2] - kThickness / 2.0) * scale,
+                               (kPFBBarGeometry[i][1] - kPFBBarGeometry[i][0]) * scale,
+                               kThickness * scale);
+                CGContextFillRect(context.CGContext, bar);
+            }
+        }];
+    return drawn;
+}
+
+static UIImage* PFBGreyGlyph(UIImage* source, UIColor* colour) {
+    if (!source || !colour) {
+        return source;
+    }
+    CGSize size = source.size;
+    if (size.width < 1.0 || size.height < 1.0) {
+        return source;
+    }
+    UIGraphicsImageRendererFormat* format =
+        [UIGraphicsImageRendererFormat preferredFormat];
+    format.opaque = NO;
+    format.scale = source.scale;
+    UIGraphicsImageRenderer* renderer =
+        [[UIGraphicsImageRenderer alloc] initWithSize:size format:format];
+    UIImage* painted = [renderer
+        imageWithActions:^(UIGraphicsImageRendererContext* context) {
+            CGRect rect = CGRectMake(0.0, 0.0, size.width, size.height);
+            [source drawInRect:rect];
+            CGContextSetBlendMode(context.CGContext, kCGBlendModeSourceIn);
+            [colour setFill];
+            CGContextFillRect(context.CGContext, rect);
+        }];
+    return [painted imageWithRenderingMode:UIImageRenderingModeAlwaysOriginal];
+}
+
+%hook TFNNavigationBar
+
+%new
+- (void)pfbShowQuickMutedWords:(id)sender {
+    UIView* bar = (UIView*)self;
+    UIViewController* owner = pfbOwningViewController(bar);
+    if (!owner) {
+        return;
+    }
+    while (owner.presentedViewController) {
+        owner = owner.presentedViewController;
+    }
+
+    PFBMutedWordsViewController* editor = [[PFBMutedWordsViewController alloc] initCompact];
+    editor.modalPresentationStyle = UIModalPresentationPopover;
+
+    UIPopoverPresentationController* popover = editor.popoverPresentationController;
+    popover.delegate = (id<UIPopoverPresentationControllerDelegate>)editor;
+    popover.permittedArrowDirections = UIPopoverArrowDirectionUp;
+    UIView* anchor = [sender isKindOfClass:[UIView class]] ? (UIView*)sender : bar;
+    popover.sourceView = anchor;
+    popover.sourceRect = anchor.bounds;
+
+    [owner presentViewController:editor animated:YES completion:nil];
+}
+
+// A plain subview pinned to the trailing edge, re-positioned on every layout pass.
+// Bar button items do not show in this container: the bar draws its contents
+// through a full-width SwiftUI platter that can cover or ignore them.
+- (void)layoutSubviews {
+    %orig;
+
+    @try {
+        UIView* bar = (UIView*)self;
+        if (!bar.window) {
+            return;
+        }
+
+        UIButton* button = objc_getAssociatedObject(self, kPFBQuickMutedBtnKey);
+
+        // Three states, not two, because TFNNavigationBar is reused across screens.
+        // Owner known and home: create or maintain. Owner known and not home:
+        // remove. Owner unknown, the chain being incomplete: change nothing.
+        UIViewController* owner = pfbOwningViewController(bar);
+        if (owner) {
+            if (!pfbControllerIsHome(owner)) {
+                if (button) {
+                    [button removeFromSuperview];
+                    objc_setAssociatedObject(self, kPFBQuickMutedBtnKey, nil,
+                                             OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+                }
+                return;
+            }
+        } else if (!button) {
+            return;
+        }
+        if (!button) {
+            // Twitter's filter_bars shape drawn at the gear's weight, repainted
+            // through the same path so the color survives the window tint. Drawing
+            // the shape here cannot come back empty, so no symbol fallback.
+            UIImage* icon = PFBGreyGlyph(PFBFilterBarsGlyph(27.33),
+                                         PFBBarIconGrey(bar.traitCollection));
+            button = [UIButton buttonWithType:UIButtonTypeSystem];
+            [button setImage:icon forState:UIControlStateNormal];
+
+            button.contentMode = UIViewContentModeCenter;
+            button.accessibilityLabel = @"Muted words";
+            [button addTarget:self
+                          action:@selector(pfbShowQuickMutedWords:)
+                forControlEvents:UIControlEventTouchUpInside];
+            objc_setAssociatedObject(self, kPFBQuickMutedBtnKey, button,
+                                     OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        }
+        if (button.superview != bar) {
+            [bar addSubview:button];
+        }
+        [bar bringSubviewToFront:button];
+
+        // Re-asserted every pass, not just at creation: on a cold launch the
+        // theme's window tint claimed the icon until the first tab swipe.
+        UIColor* grey = PFBBarIconGrey(bar.traitCollection);
+        if (![button.tintColor isEqual:grey]) {
+            button.tintColor = grey;
+        }
+
+        // Align on the avatar rather than on the bar's box: the bar is taller
+        // than its content, so centring in bounds left the icon sitting high.
+        CGFloat side = 34.0;
+        CGFloat inset = 16.0;
+        CGFloat centerY = CGRectGetMidY(bar.bounds);
+        UIView* avatar = pfbFindAvatarView(bar, bar);
+        if (avatar) {
+            CGRect inBar = [avatar convertRect:avatar.bounds toView:bar];
+            centerY = CGRectGetMidY(inBar);
+            side = CGRectGetHeight(inBar);
+            inset = CGRectGetMinX(inBar);   // mirrors the left margin
+        }
+        button.frame = CGRectMake(CGRectGetWidth(bar.bounds) - side - inset,
+                                  centerY - side / 2.0, side, side);
+    } @catch (id exception) {
+    }
+}
+
+%end

@@ -1,0 +1,39 @@
+// Declarations of the app's TAE palette classes.
+
+#import <UIKit/UIKit.h>
+
+// Twitter's shared font group.
+@interface TFNUIDefaultFontGroup : NSObject
++ (instancetype)sharedFontGroup;
+- (UIFont*)headline2BoldFont;
+// The five root builders every named font getter dispatches through.
+- (UIFont*)fontOfSize:(CGFloat)size;
+- (UIFont*)mediumFontOfSize:(CGFloat)size;
+- (UIFont*)boldFontOfSize:(CGFloat)size;
+- (UIFont*)heavyFontOfSize:(CGFloat)size;
+- (UIFont*)monospacedDigitFontOfSize:(CGFloat)size weight:(CGFloat)weight;
+@end
+
+@protocol TAEColorPalette
+- (id)colorPalette;
+- (UIColor*)primaryColorForOption:(NSUInteger)colorOption;
+@end
+
+@interface TAETwitterColorPaletteSettingInfo : NSObject
+@property (readonly, nonatomic) id<TAEColorPalette> colorPalette;
+@property (readonly, nonatomic) _Bool isDark;
+@end
+
+@interface TAEColorSettings : NSObject
+@property (retain, nonatomic)
+    TAETwitterColorPaletteSettingInfo* currentColorPalette;
+- (void)setPrimaryColorOption:(NSInteger)colorOption;
+- (void)applyCurrentColorPalette;
++ (instancetype)sharedSettings;
+@end
+
+// Applies the TAE color options above to the UI
+@interface T1ColorSettings : NSObject
++ (void)_t1_applyPrimaryColorOption;
++ (void)_t1_updateOverrideUserInterfaceStyle;
+@end

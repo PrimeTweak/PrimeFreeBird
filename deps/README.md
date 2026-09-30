@@ -1,0 +1,43 @@
+# Dependencies
+
+Each dependency lives in a folder named after it, with the upstream repo as a
+submodule at `upstream/`, or fetched at build time, and any wrapper files in
+the folder root.
+
+## flex
+
+https://github.com/TimOliver/fleXD (6.2.0), Tim Oliver's fork of FLEX
+redrawn for iOS 26, wrapped as the `libpfbFLEX` subproject (Makefile and
+injection filter plist in the folder root). The Makefile clones the pinned
+tag into `fleXD/` at build time - that folder is not tracked - and links
+Xcode's iOS SDK into `$THEOS/sdks` when nothing at 26 or above is there,
+since fleXD names `UIGlassEffect` directly.
+
+## zxPluginsInject
+
+https://github.com/asdfzxcvbn/zxPluginsInject (v1.0.1), only built for
+sideloaded packages. Built directly from `upstream/`.
+
+## ffmpeg-kit-next
+
+https://github.com/arthenica/ffmpeg-kit-next (v8.1.0), source of the
+libffmpegkit wrapper and the pin for the FFmpeg version below. Only needed
+when regenerating the prebuilt libraries.
+
+`build/` (headers at the top, libraries in `lib/`) holds the built stack:
+ffmpeg-kit-next 8.1.0 (FFmpeg n8.1.2), arm64 iOS, static only. Not tracked
+in git: the Build PrimeFreeBird workflow runs `build-ffmpeg.sh` when the
+libraries are missing, compiling with Xcode on macOS or cross-compiling with the
+Theos toolchain on Linux (cached under /tmp afterwards). FFmpeg is trimmed
+to the components the media download flows use (HLS/HTTPS demux,
+H.264/HEVC/AAC decode, scale, VideoToolbox H.264 encode, palette-based
+GIF encode, mp4/gif mux), with TLS provided by the system SecureTransport
+backend instead of OpenSSL.
+The FFmpeg tag must stay in lockstep with the submodule (its vendored
+fftools sources compile against FFmpeg internals).
+
+## Machine prerequisites
+
+- **Theos** at `$THEOS`.
+- **Cephei / CepheiPrefs / CepheiUI** in `$THEOS/lib` (linked via `EXTRA_FRAMEWORKS`).
+- **cyan** (pyzule-rw) for the Inject step of the Build PrimeFreeBird workflow.

@@ -1,0 +1,30 @@
+// The settings model: every option with its page, type and default; defaults for
+// keys without a row; migrations of renamed keys.
+
+#import <Foundation/Foundation.h>
+
+// Single source of truth for every user setting: per-page toggle lists,
+// page titles and the default value used when a key was never toggled.
+@interface PFBSettings : NSObject
+
++ (NSArray<NSDictionary*>*)settingsForPage:(NSString*)pageKey;
++ (NSString*)titleKeyForPage:(NSString*)pageKey;
++ (NSString*)subtitleKeyForPage:(NSString*)pageKey;
++ (NSDictionary*)settingForKey:(NSString*)key;
+
+// The declared default for a key: its registry row when it has one, otherwise
+// the table of keys that are set from a page of their own.
++ (id)declaredDefaultForKey:(NSString*)key;
++ (BOOL)boolForKey:(NSString*)key;
++ (NSInteger)integerForKey:(NSString*)key;
+
+// Every option key the registry declares, across all pages. Rows that only
+// identify a button are included; they simply never carry a stored value.
++ (NSArray<NSString*>*)allOptionKeys;
+
+@end
+
+// The current name of a key stored before the PFB prefix, or nil for any other key.
+FOUNDATION_EXPORT NSString* PFBCurrentKeyForLegacyKey(NSString* key);
+// The value with its dictionary keys renamed the same way.
+FOUNDATION_EXPORT id PFBValueWithCurrentKeys(id value);

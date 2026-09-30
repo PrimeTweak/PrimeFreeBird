@@ -1,0 +1,126 @@
+// Square avatars (square_avatars): the avatar views and their shadow layer.
+
+#import "Support/HookHelpers.h"
+
+// Style 2 is the circular default and style 3 the rounded square the app uses for
+// organization accounts. Coercing the style leaves masking, corner radius, shadow
+// layers and the image pipeline to the views themselves.
+
+@interface TFNAvatarImageView : UIView
+@property (nonatomic) NSInteger style;
+@end
+
+@interface TUIAvatarImageView : TFNAvatarImageView
+@end
+
+// Coerced views are marked so disabling the setting can restore just those,
+// leaving avatars that are natively rounded squares alone.
+static char kCoercedAvatarStyle;
+
+static NSInteger CoercedStyle(UIView* view, NSInteger style) {
+    if (style == 2) {
+        if (![PFBSettings boolForKey:@"square_avatars"]) {
+            PFBCOMPAT_OBSERVE(PFBCompat_square_avatars, @"round avatar found");
+        }
+        if ([PFBSettings boolForKey:@"square_avatars"]) {
+            objc_setAssociatedObject(view, &kCoercedAvatarStyle, @YES,
+                                     OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+            PFBCOMPAT_ACTION(PFBCompat_square_avatars, @"avatar squared");
+            return 3;
+        }
+        objc_setAssociatedObject(view, &kCoercedAvatarStyle, nil,
+                                 OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    }
+    return style;
+}
+
+void PFBApplySquareAvatarsSetting(void) {
+    BOOL enabled = [PFBSettings boolForKey:@"square_avatars"];
+    Class avatarClass = objc_getClass("TFNAvatarImageView");
+
+    for (UIWindow* window in UIApplication.sharedApplication.windows) {
+        PFBEnumerateSubviewsRecursively(window, ^(UIView* view) {
+            if (![view isKindOfClass:avatarClass]) {
+                return;
+            }
+
+            TFNAvatarImageView* avatar = (TFNAvatarImageView*)view;
+            if (enabled
+                    ? avatar.style == 2
+                    : objc_getAssociatedObject(avatar, &kCoercedAvatarStyle) != nil) {
+                // Re-sent as circular; the hook coerces it when the setting is on.
+                [avatar setStyle:2];
+            }
+        });
+    }
+}
+
+%hook TFNAvatarImageView
+
+- (void)setStyle:(NSInteger)style {
+    %orig(CoercedStyle(self, style));
+}
+
+%end
+
+// TUIAvatarImageView picks its circular pre-clip transformer from the incoming
+// style, so the coercion runs first. Its style mapping also feeds the Swift avatar
+// views, whose setter is unreachable from ObjC.
+%hook TUIAvatarImageView
+
+- (void)setStyle:(NSInteger)style {
+    %orig(CoercedStyle(self, style));
+}
+
++ (NSInteger)avatarImageViewStyleWithProfileImageShape:(NSInteger)shape
+                                          identityType:(NSInteger)identityType {
+    return [PFBSettings boolForKey:@"square_avatars"] ? 3 : %orig;
+}
+
+%end
+
+// Some fetch helpers install the circular transformer unconditionally, so
+// images that get pre-clipped are rounded as squares instead of circles.
+%hook UIImage
+
+- (UIImage*)tfn_roundImageWithTargetDimensions:(CGSize)targetDimensions
+                             targetContentMode:
+                                 (UIViewContentMode)targetContentMode {
+    if (![PFBSettings boolForKey:@"square_avatars"]) {
+        return %orig;
+    }
+
+    if (targetDimensions.width <= 0 || targetDimensions.height <= 0) {
+        return self;
+    }
+
+    CGRect imageRect =
+        CGRectMake(0, 0, targetDimensions.width, targetDimensions.height);
+    CGFloat cornerRadius =
+        MIN(targetDimensions.width, targetDimensions.height) / 8.0;
+
+    UIGraphicsBeginImageContextWithOptions(targetDimensions, NO, self.scale);
+    if (!UIGraphicsGetCurrentContext()) {
+        UIGraphicsEndImageContext();
+        return self;
+    }
+
+    [[UIBezierPath bezierPathWithRoundedRect:imageRect
+                                cornerRadius:cornerRadius] addClip];
+    [self drawInRect:imageRect];
+
+    UIImage* roundedImage = UIGraphicsGetImageFromCurrentImageContext();
+    UIGraphicsEndImageContext();
+
+    return roundedImage ?: self;
+}
+
+%end
+
+%hook TFNCircularAvatarShadowLayer
+
+- (void)setHidden:(BOOL)hidden {
+    %orig([PFBSettings boolForKey:@"square_avatars"] ? YES : hidden);
+}
+
+%end
