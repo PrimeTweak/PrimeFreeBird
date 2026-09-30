@@ -127,9 +127,9 @@ static const PFBCompatMeta kMeta[] = {
     {PFBCompat_restore_tweet_button, "restore_tweet_button", "RESTORE_TWEET_BUTTON_TITLE", "MODERN_SETTINGS_BRANDING_TITLE"},
     {PFBCompat_restore_tweet_labels, "restore_tweet_labels", "RESTORE_TWEET_LABELS_TITLE", "MODERN_SETTINGS_BRANDING_TITLE"},
     {PFBCompat_restore_refresh_sounds, "restore_refresh_sounds", "RESTORE_REFRESH_SOUNDS_TITLE", "MODERN_SETTINGS_BRANDING_TITLE"},
-    {PFBCompat_flex_twitter, "flex_twitter", "FLEX_TWITTER_TITLE", "MODERN_SETTINGS_LAB_TITLE"},
     {PFBCompat_web_session, "web_session", "LAB_GROUP_SESSION", "MODERN_SETTINGS_LAB_TITLE"},
     {PFBCompat_reply_in_webview, "reply_in_webview", "REPLY_IN_WEBVIEW_TITLE", "MODERN_SETTINGS_LAB_TITLE"},
+    {PFBCompat_flex_twitter, "flex_twitter", "FLEX_TWITTER_TITLE", "MODERN_SETTINGS_LAB_TITLE"},
 };
 static const size_t kMetaCount = sizeof(kMeta) / sizeof(kMeta[0]);
 

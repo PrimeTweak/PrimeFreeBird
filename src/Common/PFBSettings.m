@@ -491,6 +491,13 @@ static NSDictionary<NSString*, NSDictionary*>* PFBSettingsPages(void) {
                 @"titleKey": @"MODERN_SETTINGS_LAB_TITLE",
                 @"subtitleKey": @"MODERN_SETTINGS_LAB_SUBTITLE",
                 @"settings": @[
+                    @{@"type": @"header", @"titleKey": @"LAB_GROUP_SESSION"},
+                    @{@"type": @"sessionCard", @"key": @"web_session_card"},
+                    @{@"key": @"reply_in_webview",
+                      @"default": @NO,
+                      @"blockedUnless": @"web_session",
+                      @"type": @"toggle"},
+
                     @{@"type": @"header", @"titleKey": @"LAB_GROUP_BACKUP"},
                     @{
                         @"key": @"settings_backup",
@@ -515,14 +522,7 @@ static NSDictionary<NSString*, NSDictionary*>* PFBSettingsPages(void) {
                         @"subtitleKey": @"COMPATIBILITY_DETAIL",
                         @"action": @"showCompatibility:"
                     },
-                    @{@"key": @"flex_twitter", @"default": @NO, @"type": @"toggle"},
-
-                    @{@"type": @"header", @"titleKey": @"LAB_GROUP_SESSION"},
-                    @{@"type": @"sessionCard", @"key": @"web_session_card"},
-                    @{@"key": @"reply_in_webview",
-                      @"default": @NO,
-                      @"blockedUnless": @"web_session",
-                      @"type": @"toggle"}
+                    @{@"key": @"flex_twitter", @"default": @NO, @"type": @"toggle"}
                 ]
             },
         };
