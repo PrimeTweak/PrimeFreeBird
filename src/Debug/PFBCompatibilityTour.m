@@ -778,6 +778,29 @@ static void tourAskCardSwipe(void) {
     PFBCompatTourLog(@"[tour] video full screen: card swipe %@", allowed ? @"allowed" : @"blocked");
 }
 
+// What closing the full-screen player would do with the video, asked while it is on
+// screen. Each question is a getter with no side effect.
+static void tourAskDocking(void) {
+    UIViewController* player = tourFindController(tourRootController(), @"T1ImmersiveFullScreenViewController");
+    if (!player) {
+        PFBCompatTourLog(@"[tour] video full screen: docking not read, no full-screen player");
+        return;
+    }
+    NSString* (^answer)(id, NSString*) = ^NSString*(id target, NSString* name) {
+        SEL selector = NSSelectorFromString(name);
+        if (!target || ![target respondsToSelector:selector]) {
+            return @"absent";
+        }
+        return ((BOOL (*)(id, SEL))objc_msgSend)(target, selector) ? @"yes" : @"no";
+    };
+    Class segment = NSClassFromString(@"T1ImmersiveVideoBottomSegment");
+    SEL shared = NSSelectorFromString(@"shared");
+    id bottom = [segment respondsToSelector:shared] ? ((id (*)(id, SEL))objc_msgSend)(segment, shared) : nil;
+    PFBCompatTourLog(@"[tour] video full screen: drop zone %@, can dock %@, docks on closing %@, bottom player %@",
+                     answer(player, @"isDropToDockEnabled"), answer(player, @"_canDockCurrentVideoToBottomSegment"),
+                     answer(player, @"_shouldAutoDockOnDismiss"), answer(bottom, @"isActive"));
+}
+
 // The handle of the first author on Home who is not the account itself.
 static NSString* tourAuthorHandle(void) {
     id account = tourGetter(UIApplication.sharedApplication.delegate, @"_t1_currentAccount");
@@ -1357,6 +1380,9 @@ static NSArray<NSDictionary*>* tourAllSteps(void) {
              if (open && ++playerLooks == 5) {
                  tourAttempt(@"video full screen", @"asking the card swipe", ^{
                    tourAskCardSwipe();
+                 });
+                 tourAttempt(@"video full screen", @"asking about docking", ^{
+                   tourAskDocking();
                  });
              }
              return open;
