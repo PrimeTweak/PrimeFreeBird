@@ -215,27 +215,31 @@ extern NSInteger PFBColorThemeScreenVisible;
     [self.tableView registerClass:[PFBModernSettingsTableViewCell class]
            forCellReuseIdentifier:@"SettingsCell"];
 
-   // Discreet credit footer acknowledging the upstream authors.
+    // Footer: the tweak's name and version, then the credit to the original work.
+    // The text starts right under the list's own bottom spacing, so it falls on the
+    // rhythm of the rows, with room left below it.
     UILabel* creditLabel = [[UILabel alloc] init];
     creditLabel.numberOfLines = 0;
     creditLabel.textAlignment = NSTextAlignmentCenter;
     creditLabel.font = [TwitterChirpFont(TwitterFontStyleRegular) fontWithSize:12];
     creditLabel.textColor = [UIColor tertiaryLabelColor];
-    // Attribution stays prominent: this fork carries no license of its own and
-    // credits the original work. The product name sits a touch larger than the
-    // line below it, so the eye lands on it first.
-    NSString* productName = @PFB_PRODUCT_NAME;
+    NSString* productLine = @PFB_VERSION_STRING;
     NSString* attribution =
         @"\nBased on NeoFreeBird — original work by @nyaathea & @BandarHL";
     NSMutableAttributedString* credit = [[NSMutableAttributedString alloc]
-        initWithString:[productName stringByAppendingString:attribution]];
+        initWithString:[productLine stringByAppendingString:attribution]];
     [credit addAttribute:NSFontAttributeName
                    value:[TwitterChirpFont(TwitterFontStyleBold) fontWithSize:14]
-                   range:NSMakeRange(0, productName.length)];
+                   range:NSMakeRange(0, productLine.length)];
     creditLabel.attributedText = credit;
-    CGSize fitSize = [creditLabel sizeThatFits:CGSizeMake(self.view.bounds.size.width - 40, CGFLOAT_MAX)];
-    creditLabel.frame = CGRectMake(0, 0, self.view.bounds.size.width, fitSize.height + 32);
-    self.tableView.tableFooterView = creditLabel;
+    CGFloat footerWidth = self.view.bounds.size.width;
+    CGSize fitSize = [creditLabel sizeThatFits:CGSizeMake(footerWidth - 40, CGFLOAT_MAX)];
+    creditLabel.frame = CGRectMake(20, 0, footerWidth - 40, fitSize.height);
+    creditLabel.autoresizingMask = UIViewAutoresizingFlexibleWidth;
+    UIView* footer =
+        [[UIView alloc] initWithFrame:CGRectMake(0, 0, footerWidth, fitSize.height + 16)];
+    [footer addSubview:creditLabel];
+    self.tableView.tableFooterView = footer;
     
     [self.view addSubview:self.tableView];
 }
