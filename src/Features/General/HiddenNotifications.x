@@ -417,19 +417,17 @@ static NSString* PFBNotifText(id model) {
     return nil;
 }
 
-// Which key of the hidden list matches the model ("durable", "session" or "key"),
-// or nil when it is not hidden.
-static NSString* PFBNotifHiddenMatch(id model) {
+BOOL PFBNotifIsHidden(id model) {
     if (!model) {
-        return nil;
+        return NO;
     }
     NSDictionary* hidden = PFBHiddenNotifs();
     if (!hidden.count) {
-        return nil;   // the hot path costs one dictionary read
+        return NO;   // the hot path costs one dictionary read
     }
     NSString* durableKey = PFBNotifDurableKey(model);
     if (durableKey.length && hidden[durableKey] != nil) {
-        return @"durable";
+        return YES;
     }
     // Read once and reused below: this call walks the model.
     NSString* identity = PFBNotifIdentity(model);
@@ -444,15 +442,11 @@ static NSString* PFBNotifHiddenMatch(id model) {
             id session = entry[@"s"];
             if ([session isKindOfClass:[NSString class]] &&
                 [session isEqualToString:identity]) {
-                return @"session";
+                return YES;
             }
         }
     }
-    return identity.length && hidden[identity] != nil ? @"key" : nil;
-}
-
-BOOL PFBNotifIsHidden(id model) {
-    return PFBNotifHiddenMatch(model) != nil;
+    return identity.length && hidden[identity] != nil;
 }
 
 
@@ -996,100 +990,6 @@ static NSArray* PFBFilterNotifSections(NSArray* sections) {
 }
 
 
-// MARK: - Measurement (temporary)
-
-// While activity is recorded: why each row of the notifications screen is kept or
-// removed, what the hidden list holds, and how the panel decides.
-static NSInteger gPFBNotifProbeSweeps;
-static NSString* gPFBNotifProbeLastList;
-static NSString* gPFBNotifProbeLastPanel;
-static BOOL gPFBNotifProbeDescribed;
-
-static NSString* PFBNotifProbeClip(NSString* text, NSUInteger length) {
-    if (!text.length) {
-        return @"-";
-    }
-    return text.length > length ? [[text substringToIndex:length] stringByAppendingString:@"..."]
-                                : text;
-}
-
-static NSString* PFBNotifProbeShortClass(id object) {
-    NSString* name = NSStringFromClass([object class]);
-    NSRange dot = [name rangeOfString:@"." options:NSBackwardsSearch];
-    return dot.location == NSNotFound ? name : [name substringFromIndex:NSMaxRange(dot)];
-}
-
-static NSString* PFBNotifProbeRow(NSIndexPath* path, id model, NSString* match) {
-    return [NSString stringWithFormat:@"row %ld.%ld %@ - id %@ - durable %@ - %@",
-                                      (long)path.section, (long)path.row,
-                                      PFBNotifProbeShortClass(model),
-                                      PFBNotifProbeClip(PFBNotifIdentity(model), 40),
-                                      PFBNotifProbeClip(PFBNotifDurableKey(model), 24),
-                                      match ? [@"removed by " stringByAppendingString:match]
-                                            : @"kept"];
-}
-
-static void PFBNotifProbeDescribe(id model) {
-    if (gPFBNotifProbeDescribed || !model) {
-        return;
-    }
-    gPFBNotifProbeDescribed = YES;
-    NSString* text = nil;
-    @try {
-        text = [model description];
-    } @catch (id exception) {
-        return;
-    }
-    NSString* plain = [text stringByReplacingOccurrencesOfString:@"0x[0-9a-fA-F]+"
-                                                       withString:@"0x"
-                                                          options:NSRegularExpressionSearch
-                                                            range:NSMakeRange(0, text.length)];
-    plain = [[plain componentsSeparatedByCharactersInSet:[NSCharacterSet newlineCharacterSet]]
-        componentsJoinedByString:@" "];
-    PFBDebugLog(@"[notifprobe] description of %@: %@", PFBNotifProbeShortClass(model),
-                PFBNotifProbeClip(plain, 400));
-}
-
-static void PFBNotifProbeList(void) {
-    NSDictionary* hidden = PFBHiddenNotifs();
-    NSArray<NSString*>* keys = [hidden.allKeys sortedArrayUsingSelector:@selector(compare:)];
-    NSString* summary = [keys componentsJoinedByString:@","];
-    if ([summary isEqualToString:gPFBNotifProbeLastList]) {
-        return;
-    }
-    gPFBNotifProbeLastList = summary;
-    PFBDebugLog(@"[notifprobe] hidden list: %lu entr%@", (unsigned long)keys.count,
-                keys.count == 1 ? @"y" : @"ies");
-    NSUInteger shown = 0;
-    for (NSString* key in keys) {
-        if (shown++ >= 10) {
-            break;
-        }
-        NSDictionary* entry = [hidden[key] isKindOfClass:[NSDictionary class]] ? hidden[key] : nil;
-        id session = entry[@"s"];
-        id text = entry[@"t"];
-        PFBDebugLog(@"[notifprobe] hidden %@ - session %@ - \"%@\"", PFBNotifProbeClip(key, 24),
-                    PFBNotifProbeClip([session isKindOfClass:[NSString class]] ? session : nil, 40),
-                    PFBNotifProbeClip([text isKindOfClass:[NSString class]] ? text : nil, 30));
-    }
-}
-
-static void PFBNotifProbePanel(NSInteger rows, NSInteger notifRows, NSUInteger hidden,
-                               BOOL filled, NSString* outcome) {
-    if (!PFBDebugIsRecording()) {
-        return;
-    }
-    NSString* line = [NSString
-        stringWithFormat:@"panel %@: %ld row(s), %ld notification row(s), %lu hidden, %@",
-                         outcome, (long)rows, (long)notifRows, (unsigned long)hidden,
-                         filled ? @"list filled before" : @"list never filled"];
-    if ([line isEqualToString:gPFBNotifProbeLastPanel]) {
-        return;
-    }
-    gPFBNotifProbeLastPanel = line;
-    PFBDebugLog(@"[notifprobe] %@", line);
-}
-
 // MARK: - the sweep
 
 // No section class exposes -items in Objective-C, so the section filter reaches
@@ -1291,14 +1191,12 @@ static void PFBNotifSyncEmptyState(id dataViewController) {
                                      OBJC_ASSOCIATION_RETAIN_NONATOMIC);
         }
         if (![everFilled isEqual:@YES]) {
-            PFBNotifProbePanel(rows, notifRows, hidden, NO, existing ? @"taken down" : @"held back");
             if (existing) {
                 [existing removeFromSuperview];
             }
             return;
         }
         if (notifRows > 0 || hidden == 0) {
-            PFBNotifProbePanel(rows, notifRows, hidden, YES, existing ? @"removed" : @"absent");
             if (existing) {
                 // The panel fades out the way it came in. Its tag goes first, so no
                 // later pass finds it mid-fade.
@@ -1317,11 +1215,9 @@ static void PFBNotifSyncEmptyState(id dataViewController) {
         if (existing) {
             // A width change (rotation, split view) moves the panel; the frames
             // are recomputed rather than left stale.
-            PFBNotifProbePanel(rows, notifRows, hidden, YES, @"kept");
             PFBNotifLayoutEmptyPanel(existing, table);
             return;
         }
-        PFBNotifProbePanel(rows, notifRows, hidden, YES, @"placed");
 
         UIView* panel = [[UIView alloc] init];
         panel.tag = kPFBNotifEmptyTag;
@@ -1405,19 +1301,8 @@ static void PFBNotifSweep(id dataViewController) {
         BOOL sawNotification = NO;
         NSInteger examined = 0;
         NSInteger sections = table.numberOfSections;
-        BOOL probing = PFBDebugIsRecording();
-        NSMutableArray<NSString*>* probeLines = probing ? [NSMutableArray array] : nil;
-        id probeSample = nil;
         for (NSInteger s = 0; s < sections; s++) {
             NSInteger rows = [table numberOfRowsInSection:s];
-            if (probing &&
-                [table.dataSource respondsToSelector:@selector(tableView:numberOfRowsInSection:)]) {
-                NSInteger sourceRows = [table.dataSource tableView:table numberOfRowsInSection:s];
-                if (sourceRows != rows) {
-                    [probeLines addObject:[NSString stringWithFormat:@"section %ld: table %ld row(s), source %ld",
-                                                                     (long)s, (long)rows, (long)sourceRows]];
-                }
-            }
             for (NSInteger r = 0; r < rows; r++) {
                 NSIndexPath* path = [NSIndexPath indexPathForRow:r inSection:s];
                 id item = ((id (*)(id, SEL, id))objc_msgSend)(dataViewController, itemSel, path);
@@ -1426,17 +1311,10 @@ static void PFBNotifSweep(id dataViewController) {
                     examined++;
                     if ([NSStringFromClass([model class]) containsString:@"Notification"]) {
                         sawNotification = YES;
-                        if (!probeSample) {
-                            probeSample = model;
-                        }
                     }
                 }
-                NSString* match = model ? PFBNotifHiddenMatch(model) : nil;
-                if (match) {
+                if (model && PFBNotifIsHidden(model)) {
                     [doomed addObject:path];
-                }
-                if (probing && model && probeLines.count < 16) {
-                    [probeLines addObject:PFBNotifProbeRow(path, model, match)];
                 }
             }
         }
@@ -1446,20 +1324,6 @@ static void PFBNotifSweep(id dataViewController) {
                 dataViewController, deleteSel, path, UITableViewRowAnimationNone);
         }
         PFBNotifRecordVerdict(dataViewController, sawNotification, examined);
-        BOOL notificationsScreen =
-            [objc_getAssociatedObject(dataViewController, kPFBNotifVerdictKey) isEqual:@YES];
-        if (probing && (sawNotification || notificationsScreen) &&
-            (doomed.count || gPFBNotifProbeSweeps < 3)) {
-            gPFBNotifProbeSweeps++;
-            PFBDebugLog(@"[notifprobe] sweep on %@: %ld item(s) read, %lu removed",
-                        PFBNotifProbeShortClass(dataViewController), (long)examined,
-                        (unsigned long)doomed.count);
-            PFBNotifProbeList();
-            PFBNotifProbeDescribe(probeSample);
-            for (NSString* line in probeLines) {
-                PFBDebugLog(@"[notifprobe] %@", line);
-            }
-        }
         PFBNotifSyncEmptyState(dataViewController);
         if (doomed.count) {
             PFBCOMPAT_ACTION(PFBCompat_hide_notifications, @"hidden notification removed");
@@ -1927,10 +1791,47 @@ static UITableView* PFBNotifTableForCell(UIView* cell) {
     return nil;
 }
 
+// A hidden notification is laid out for a frame between Twitter's delivery and
+// the sweep that removes its row, so its cell stays transparent until then. The
+// row is read the way the cross reads it.
+static const char* kPFBNotifMaskedKey = "pfbNotifMasked";
+
+static void PFBNotifMaskHiddenCell(UITableViewCell* cell) {
+    BOOL hide = NO;
+    if (PFBNotifsEnabled() && PFBHiddenNotifs().count) {
+        @try {
+            UITableView* table = PFBNotifTableForCell(cell);
+            NSIndexPath* indexPath = table ? [table indexPathForCell:cell] : nil;
+            id model = indexPath ? (PFBModelAtIndexPath(table.dataSource, indexPath)
+                                    ?: PFBModelFromCell(table, indexPath))
+                                 : nil;
+            hide = model && PFBNotifIsHidden(model);
+        } @catch (id exception) {
+            hide = NO;
+        }
+    }
+    BOOL masked = objc_getAssociatedObject(cell, kPFBNotifMaskedKey) != nil;
+    if (hide && !masked) {
+        cell.alpha = 0;
+        objc_setAssociatedObject(cell, kPFBNotifMaskedKey, @YES,
+                                 OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        static BOOL said;
+        if (!said) {
+            said = YES;
+            PFBDebugLog(@"[notifs] hidden notification kept transparent until its row goes");
+        }
+    } else if (!hide && masked) {
+        cell.alpha = 1;
+        objc_setAssociatedObject(cell, kPFBNotifMaskedKey, nil,
+                                 OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    }
+}
+
 %hook T1URTTimelineNotificationCell
 
 - (void)layoutSubviews {
     %orig;
+    PFBNotifMaskHiddenCell((UITableViewCell*)self);
     if (!PFBNotifsEnabled()) {
         return;
     }
