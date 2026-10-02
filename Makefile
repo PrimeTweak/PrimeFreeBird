@@ -20,7 +20,7 @@ PrimeFreeBird_FRAMEWORKS = UIKit Foundation AVFoundation AVKit CoreMotion GameCo
 PrimeFreeBird_PRIVATE_FRAMEWORKS = Preferences
 PrimeFreeBird_EXTRA_FRAMEWORKS = Cephei CepheiPrefs CepheiUI
 PrimeFreeBird_OBJ_FILES = $(shell find deps/ffmpeg-kit-next/build/lib -name '*.a')
-PrimeFreeBird_CFLAGS = -Isrc -Ideps/ffmpeg-kit-next/build -fobjc-arc -Wno-deprecated-declarations -Wno-nullability-completeness -Wno-unused-function -Wno-unused-property-ivar -Wno-error -DPFB_VERSION_STRING='"$(PFB_NAME) v$(PFB_VERSION)"' -DPFB_PRODUCT_NAME='"$(PFB_NAME)"' -DPFB_COMMIT_STRING='"$(PFB_COMMIT)"'
+PrimeFreeBird_CFLAGS = -Isrc -Ideps/ffmpeg-kit-next/build -fobjc-arc -Wno-deprecated-declarations -Wno-nullability-completeness -Wno-unused-function -Wno-unused-property-ivar -Wno-error -DPFB_VERSION_STRING='"$(PFB_NAME) $(PFB_VERSION)"' -DPFB_PRODUCT_NAME='"$(PFB_NAME)"' -DPFB_COMMIT_STRING='"$(PFB_COMMIT)"'
 
 include $(THEOS_MAKE_PATH)/tweak.mk
 
