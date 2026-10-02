@@ -84,6 +84,7 @@ const PFBHookRecord PFBHookRecords[] = {
     {"T1TwitterCoreStatusViewModelAdapter", "isFromUserVerified", "Features/Tweets/HideUI.x"},
     {"T1URTTimelineNotificationCell", "dismissButtonWasTapped", "Features/General/HiddenNotifications.x"},
     {"T1URTTimelineNotificationCell", "layoutSubviews", "Features/General/HiddenNotifications.x"},
+    {"T1URTTimelineNotificationCell", "setAlpha:", "Features/General/HiddenNotifications.x"},
     {"T1URTViewController", "tableView:trailingSwipeActionsConfigurationForRowAtIndexPath:", "Features/General/HiddenNotifications.x"},
     {"T1UndoSendConfig", "hasAccessToUndoSend", "Features/Tweets/Confirmations.x"},
     {"T1UndoSendConfig", "isUndoSendTurnedOnForOriginalTweets", "Features/Tweets/Confirmations.x"},
