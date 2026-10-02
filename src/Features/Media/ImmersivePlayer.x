@@ -234,10 +234,11 @@ static void pfbRestoreTimestamp(UIView* controls) {
 // tap turn the sound on — the same tap that opens full screen. It is cleared on
 // the view before its handler runs; every other route to the sound is untouched.
 
-// One rule and no timing: the sound is off unless the speaker button on this bar
-// turned it on. The app wakes it on opening, on leaving and mid-playback by
-// different routes, so any window-based rule leaves a hole.
+// The full-screen player's sound is off unless the speaker on its bar turned it on.
+// Timeline videos keep Twitter's own speaker and the silent switch, so the guards
+// hold only while the full-screen player is up.
 static BOOL gPFBSoundAllowed = NO;
+static BOOL gPFBFullScreenShown = NO;
 
 // Whether a video opens silent. The reader chooses; the stored default keeps
 // the previous behavior.
@@ -248,6 +249,13 @@ static BOOL pfbOpensMuted(void) {
 // The state the flag takes when a video is opened from the timeline.
 static BOOL pfbSoundAllowedAtOpen(void) {
     return !pfbOpensMuted();
+}
+
+// A request for sound is held while the full-screen player is up with the clean
+// player on, opening muted, and no sound allowed from its bar yet.
+static BOOL pfbHoldsSound(void) {
+    return gPFBFullScreenShown && !gPFBSoundAllowed &&
+           [PFBSettings boolForKey:@"tap_to_pause"] && pfbOpensMuted();
 }
 
 static void pfbClearAutoUnmute(UIView* view) {
@@ -280,25 +288,22 @@ static void pfbClearAutoUnmute(UIView* view) {
 
 %end
 
-// Every door the sound comes through. The mute flag is one of two levers: the
-// player also carries a volume, and the handover back to the timeline raises that
-// one. Playback covers a player born loud.
+// Every door the full-screen player's sound comes through. The mute flag is one of
+// two levers, the volume is the other, and playback covers a player born loud.
 %hook TAVPlayer
 
 // Every guard below is gated on the clean player. With it off, Twitter's own
 // controls are on screen and its own sound button must work: holding the mute
 // there would silence the video with nothing left to lift it.
 - (void)setIsMuted:(BOOL)muted {
-    if (!muted && !gPFBSoundAllowed &&
-        [PFBSettings boolForKey:@"tap_to_pause"] && pfbOpensMuted()) {
+    if (!muted && pfbHoldsSound()) {
         return;
     }
     %orig;
 }
 
 - (void)setVolume:(float)volume {
-    if (volume > 0 && !gPFBSoundAllowed &&
-        [PFBSettings boolForKey:@"tap_to_pause"] && pfbOpensMuted()) {
+    if (volume > 0 && pfbHoldsSound()) {
         %orig(0);
         return;
     }
@@ -306,8 +311,7 @@ static void pfbClearAutoUnmute(UIView* view) {
 }
 
 - (void)play {
-    if (!gPFBSoundAllowed && [PFBSettings boolForKey:@"tap_to_pause"] &&
-        pfbOpensMuted()) {
+    if (pfbHoldsSound()) {
         self.isMuted = YES;
         self.volume = 0;
     }
@@ -315,11 +319,31 @@ static void pfbClearAutoUnmute(UIView* view) {
 }
 
 - (void)playOrReplay {
-    if (!gPFBSoundAllowed && [PFBSettings boolForKey:@"tap_to_pause"] &&
-        pfbOpensMuted()) {
+    if (pfbHoldsSound()) {
         self.isMuted = YES;
         self.volume = 0;
     }
+    %orig;
+}
+
+%end
+
+// The full-screen player is up from its first card until it starts to leave, and up
+// again when a swipe to close is cancelled.
+%hook T1ImmersiveFullScreenViewController
+
+- (void)viewDidAppear:(BOOL)animated {
+    gPFBFullScreenShown = YES;
+    %orig;
+}
+
+- (void)dismissAnimationCancelled {
+    gPFBFullScreenShown = YES;
+    %orig;
+}
+
+- (void)viewWillDisappear:(BOOL)animated {
+    gPFBFullScreenShown = NO;
     %orig;
 }
 
@@ -1101,13 +1125,13 @@ static void pfbStartFoldWatch(UIView* card) {
     UIView* card = (UIView*)self;
     pfbShowPausedGlyph(card, NO);
     if (card.window) {
+        gPFBFullScreenShown = YES;
         if ([PFBSettings boolForKey:@"tap_to_pause"]) {
             PFBCOMPAT_ACTION(PFBCompat_tap_to_pause, @"clean player on a video");
         } else {
             PFBCOMPAT_OBSERVE(PFBCompat_tap_to_pause, @"full-screen card shown");
         }
-        if (!gPFBSoundAllowed && [PFBSettings boolForKey:@"tap_to_pause"] &&
-            pfbOpensMuted()) {
+        if (pfbHoldsSound()) {
             pfbApplyMuted(pfbCardPlayer(card), pfbImmersiveAudioManager(card), YES);
         }
         gPFBActiveCard = card;
