@@ -1791,10 +1791,47 @@ static UITableView* PFBNotifTableForCell(UIView* cell) {
     return nil;
 }
 
+// A hidden notification is laid out for a frame between Twitter's delivery and
+// the sweep that removes its row, so its cell stays transparent until then. The
+// row is read the way the cross reads it.
+static const char* kPFBNotifMaskedKey = "pfbNotifMasked";
+
+static void PFBNotifMaskHiddenCell(UITableViewCell* cell) {
+    BOOL hide = NO;
+    if (PFBNotifsEnabled() && PFBHiddenNotifs().count) {
+        @try {
+            UITableView* table = PFBNotifTableForCell(cell);
+            NSIndexPath* indexPath = table ? [table indexPathForCell:cell] : nil;
+            id model = indexPath ? (PFBModelAtIndexPath(table.dataSource, indexPath)
+                                    ?: PFBModelFromCell(table, indexPath))
+                                 : nil;
+            hide = model && PFBNotifIsHidden(model);
+        } @catch (id exception) {
+            hide = NO;
+        }
+    }
+    BOOL masked = objc_getAssociatedObject(cell, kPFBNotifMaskedKey) != nil;
+    if (hide && !masked) {
+        cell.alpha = 0;
+        objc_setAssociatedObject(cell, kPFBNotifMaskedKey, @YES,
+                                 OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        static BOOL said;
+        if (!said) {
+            said = YES;
+            PFBDebugLog(@"[notifs] hidden notification kept transparent until its row goes");
+        }
+    } else if (!hide && masked) {
+        cell.alpha = 1;
+        objc_setAssociatedObject(cell, kPFBNotifMaskedKey, nil,
+                                 OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    }
+}
+
 %hook T1URTTimelineNotificationCell
 
 - (void)layoutSubviews {
     %orig;
+    PFBNotifMaskHiddenCell((UITableViewCell*)self);
     if (!PFBNotifsEnabled()) {
         return;
     }
