@@ -809,7 +809,6 @@ static const PFBCompatName kNames[] = {
     {PFBCompat_enable_image_preloading, "Features/Media/MediaPreload.x", "inlineMediaInfos"},
     {PFBCompat_enable_image_preloading, "Features/Media/MediaPreload.x", "imageURL"},
     {PFBCompat_enable_image_preloading, "Features/Media/MediaPreload.x", "itemAtIndexPath:"},
-    {PFBCompat_hide_topics_to_follow, "Features/Timelines/Timeline.x", "suggest_topics_module"},
     {PFBCompat_hide_blocked_retweets, "Features/Timelines/Timeline.x", "isRetweet"},
     {PFBCompat_hide_blocked_retweets, "Features/Timelines/Timeline.x", "representedFromUser"},
     {PFBCompat_hide_blocked_retweets, "Features/Timelines/Timeline.x", "relationship"},
