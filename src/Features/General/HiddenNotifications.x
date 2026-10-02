@@ -1262,234 +1262,6 @@ static void PFBNotifSyncEmptyState(id dataViewController) {
     }
 }
 
-// MARK: - Measurement (temporary)
-
-// While activity is recorded: what the notifications screen shows on every frame
-// for a few seconds after it appears, after each sweep and after each cell layout.
-// A line is written only when the picture changes.
-@interface PFBNotifFilm : NSObject
-@property (nonatomic, weak) UIView* root;
-@property (nonatomic, strong) CADisplayLink* link;
-@property (nonatomic) CFTimeInterval origin;
-@property (nonatomic) CFTimeInterval until;
-@property (nonatomic, copy) NSString* last;
-@property (nonatomic) NSInteger lines;
-@end
-
-static PFBNotifFilm* gPFBNotifFilm;
-static const NSInteger kPFBNotifFilmMaxLines = 70;
-
-// What reaches the screen: hidden anywhere up the chain means nothing, and the
-// opacity is the one being drawn, animations included.
-static CGFloat PFBNotifFilmOpacity(UIView* view, UIView* top) {
-    CGFloat opacity = 1.0;
-    for (UIView* node = view; node; node = node.superview) {
-        if (node.hidden) {
-            return 0.0;
-        }
-        CALayer* drawn = node.layer.presentationLayer ?: node.layer;
-        opacity *= drawn.opacity;
-        if (node == top) {
-            break;
-        }
-    }
-    return opacity;
-}
-
-static BOOL PFBNotifFilmInPanel(UIView* view) {
-    NSInteger hops = 0;
-    for (UIView* node = view; node && hops < 6; node = node.superview, hops++) {
-        if (node.tag == kPFBNotifEmptyTag) {
-            return YES;
-        }
-    }
-    return NO;
-}
-
-static UIView* PFBNotifFilmRootFor(UIView* view) {
-    for (UIResponder* node = view; node; node = node.nextResponder) {
-        if ([node isKindOfClass:[UIViewController class]]) {
-            UIViewController* owner = (UIViewController*)node;
-            return owner.isViewLoaded ? owner.view : nil;
-        }
-    }
-    return view.window;
-}
-
-// The cells on screen are read from the table's subviews: asking visibleCells can
-// make the table bring itself up to date, which would change what is measured.
-static NSArray<UITableViewCell*>* PFBNotifFilmCells(UITableView* table) {
-    NSMutableArray<UITableViewCell*>* cells = [NSMutableArray array];
-    for (UIView* view in table.subviews) {
-        if ([view isKindOfClass:[UITableViewCell class]] && !view.hidden) {
-            [cells addObject:(UITableViewCell*)view];
-        }
-    }
-    return cells;
-}
-
-static NSString* PFBNotifFilmState(UIView* root) {
-    __block UIView* panel = nil;
-    NSMutableArray<UITableView*>* tables = [NSMutableArray array];
-    NSMutableArray<NSString*>* extras = [NSMutableArray array];
-    PFBEnumerateSubviewsRecursively(root, ^(UIView* view) {
-      if (view.tag == kPFBNotifEmptyTag) {
-          panel = view;
-          return;
-      }
-      if ([view isKindOfClass:[UITableView class]] && view.window) {
-          [tables addObject:(UITableView*)view];
-      }
-      NSString* name = NSStringFromClass([view class]);
-      if ([name containsString:@"EmptyState"]) {
-          CGFloat shown = PFBNotifFilmOpacity(view, root);
-          if (shown > 0.05) {
-              [extras addObject:[NSString stringWithFormat:@"%@ %.1f", name, shown]];
-          }
-      }
-      NSString* text = nil;
-      if ([view isKindOfClass:[UILabel class]]) {
-          text = ((UILabel*)view).text;
-      } else if ([view isKindOfClass:[UITextView class]]) {
-          text = ((UITextView*)view).text;
-      }
-      if ([text containsString:@"othing to see"] && !PFBNotifFilmInPanel(view)) {
-          CGFloat shown = PFBNotifFilmOpacity(view, root);
-          if (shown > 0.05) {
-              NSString* head = text.length > 28 ? [text substringToIndex:28] : text;
-              [extras addObject:[NSString stringWithFormat:@"twitter text \"%@\" %.1f in %@",
-                                 head, shown, NSStringFromClass([view.superview class])]];
-          }
-      }
-    });
-    UITableView* table = [panel.superview isKindOfClass:[UITableView class]]
-                             ? (UITableView*)panel.superview
-                             : nil;
-    for (UITableView* candidate in tables) {
-        if (table) {
-            break;
-        }
-        for (UITableViewCell* cell in PFBNotifFilmCells(candidate)) {
-            if ([NSStringFromClass([cell class]) containsString:@"NotificationCell"]) {
-                table = candidate;
-                break;
-            }
-        }
-    }
-    if (!table) {
-        return [NSString stringWithFormat:@"no notifications table (%lu table(s))%@",
-                                          (unsigned long)tables.count,
-                                          extras.count ? [@" - " stringByAppendingString:
-                                                          [extras componentsJoinedByString:@", "]]
-                                                       : @""];
-    }
-    NSInteger rows = 0;
-    for (NSInteger s = 0; s < table.numberOfSections; s++) {
-        rows += [table numberOfRowsInSection:s];
-    }
-    NSMutableArray<NSString*>* notifs = [NSMutableArray array];
-    NSInteger shimmer = 0;
-    NSInteger other = 0;
-    NSInteger covering = 0;
-    NSUInteger panelIndex = panel ? [table.subviews indexOfObject:panel] : NSNotFound;
-    for (UITableViewCell* cell in PFBNotifFilmCells(table)) {
-        CGFloat shown = PFBNotifFilmOpacity(cell, table);
-        NSString* name = NSStringFromClass([cell class]);
-        __block BOOL shimmering = NO;
-        if ([name containsString:@"NotificationCell"]) {
-            [notifs addObject:[NSString stringWithFormat:@"%.1f", shown]];
-        } else {
-            PFBEnumerateSubviewsRecursively(cell, ^(UIView* view) {
-              if (!shimmering && [NSStringFromClass([view class]) containsString:@"Shimmer"]) {
-                  shimmering = YES;
-              }
-            });
-            if (shimmering && shown > 0.05) {
-                shimmer++;
-            } else if (cell.bounds.size.height > 1 && shown > 0.05) {
-                other++;
-            }
-        }
-        NSUInteger cellIndex = [table.subviews indexOfObject:cell];
-        if (panel && shown > 0.05 && CGRectIntersectsRect(cell.frame, panel.frame) &&
-            cellIndex != NSNotFound && panelIndex != NSNotFound && cellIndex > panelIndex) {
-            covering++;
-        }
-    }
-    NSString* panelState = @"panel none";
-    if (panel) {
-        panelState = [NSString stringWithFormat:@"panel %.1f%@", PFBNotifFilmOpacity(panel, table),
-                                                covering ? [NSString stringWithFormat:@" covered by %ld",
-                                                                                      (long)covering]
-                                                         : @""];
-    }
-    return [NSString stringWithFormat:@"rows %ld - notification cells [%@] - shimmer %ld - other %ld - %@ - offset %.0f%@",
-                                      (long)rows, [notifs componentsJoinedByString:@" "],
-                                      (long)shimmer, (long)other, panelState,
-                                      table.contentOffset.y,
-                                      extras.count ? [@" - " stringByAppendingString:
-                                                      [extras componentsJoinedByString:@", "]]
-                                                   : @""];
-}
-
-@implementation PFBNotifFilm
-- (void)tick:(CADisplayLink*)link {
-    CFTimeInterval now = CACurrentMediaTime();
-    UIView* root = self.root;
-    if (!root || now > self.until) {
-        PFBDebugLog(@"[notifflash] +%.0f ms end", (now - self.origin) * 1000.0);
-        [link invalidate];
-        if (gPFBNotifFilm == self) {
-            gPFBNotifFilm = nil;
-        }
-        return;
-    }
-    if (self.lines >= kPFBNotifFilmMaxLines) {
-        return;
-    }
-    NSString* state = nil;
-    @try {
-        state = PFBNotifFilmState(root);
-    } @catch (id exception) {
-        state = @"picture unreadable";
-    }
-    if (![state isEqualToString:self.last]) {
-        self.last = state;
-        self.lines++;
-        PFBDebugLog(@"[notifflash] +%.0f ms %@", (now - self.origin) * 1000.0, state);
-        if (self.lines == kPFBNotifFilmMaxLines) {
-            PFBDebugLog(@"[notifflash] line limit reached");
-        }
-    }
-}
-@end
-
-// Starts a recording, or stretches the running one; the reason is written when
-// one is given.
-static void PFBNotifFilmStart(UIView* root, CFTimeInterval seconds, NSString* reason) {
-    if (!PFBDebugIsRecording() || !root) {
-        return;
-    }
-    CFTimeInterval now = CACurrentMediaTime();
-    PFBNotifFilm* film = gPFBNotifFilm;
-    if (film) {
-        film.until = MAX(film.until, now + seconds);
-        if (reason) {
-            PFBDebugLog(@"[notifflash] +%.0f ms %@", (now - film.origin) * 1000.0, reason);
-        }
-        return;
-    }
-    film = [PFBNotifFilm new];
-    film.root = root;
-    film.origin = now;
-    film.until = now + seconds;
-    film.link = [CADisplayLink displayLinkWithTarget:film selector:@selector(tick:)];
-    [film.link addToRunLoop:[NSRunLoop mainRunLoop] forMode:NSRunLoopCommonModes];
-    gPFBNotifFilm = film;
-    PFBDebugLog(@"[notifflash] start on %@: %@", NSStringFromClass([root class]),
-                reason ?: @"notification cell laid out");
-}
-
 static BOOL gPFBNotifSweeping;
 
 static void PFBNotifSweep(id dataViewController) {
@@ -1553,13 +1325,6 @@ static void PFBNotifSweep(id dataViewController) {
         }
         PFBNotifRecordVerdict(dataViewController, sawNotification, examined);
         PFBNotifSyncEmptyState(dataViewController);
-        if ([objc_getAssociatedObject(dataViewController, kPFBNotifVerdictKey) isEqual:@YES] &&
-            [dataViewController isKindOfClass:[UIViewController class]] &&
-            ((UIViewController*)dataViewController).isViewLoaded) {
-            PFBNotifFilmStart(((UIViewController*)dataViewController).view, 1.5,
-                              [NSString stringWithFormat:@"sweep, %lu row(s) removed",
-                                                         (unsigned long)doomed.count]);
-        }
         if (doomed.count) {
             PFBCOMPAT_ACTION(PFBCompat_hide_notifications, @"hidden notification removed");
         }
@@ -1938,9 +1703,6 @@ static UIImage* PFBNotifFlatGlyph(UIImage* source, UIColor* colour) {
                 containsString:@"NotificationsViewController"]) {
             return;
         }
-        if (viewController.isViewLoaded) {
-            PFBNotifFilmStart(viewController.view, 3.0, @"notifications screen shown");
-        }
         UINavigationItem* item = viewController.navigationItem;
         for (UIBarButtonItem* existing in item.rightBarButtonItems) {
             if (existing.tag == kPFBNotifBarItemTag) {
@@ -2029,9 +1791,9 @@ static UITableView* PFBNotifTableForCell(UIView* cell) {
     return nil;
 }
 
-// A hidden notification is laid out for a frame between Twitter's delivery and
-// the sweep that removes its row, so its cell stays transparent until then. The
-// row is read the way the cross reads it.
+// A hidden notification is laid out between Twitter's delivery and the sweep that
+// removes its row. Its cell is made transparent at every layout and held there
+// against any opacity written back to it. The row is read the way the cross reads it.
 static const char* kPFBNotifMaskedKey = "pfbNotifMasked";
 
 static void PFBNotifMaskHiddenCell(UITableViewCell* cell) {
@@ -2048,30 +1810,40 @@ static void PFBNotifMaskHiddenCell(UITableViewCell* cell) {
             hide = NO;
         }
     }
-    PFBNotifFilmStart(PFBNotifFilmRootFor(cell), 1.5, nil);
     BOOL masked = objc_getAssociatedObject(cell, kPFBNotifMaskedKey) != nil;
-    if (hide && gPFBNotifFilm) {
-        PFBDebugLog(@"[notifflash] +%.0f ms hidden cell laid out: alpha %.1f, %@",
-                    (CACurrentMediaTime() - gPFBNotifFilm.origin) * 1000.0, cell.alpha,
-                    masked ? @"already marked, left as is" : @"made transparent now");
-    }
-    if (hide && !masked) {
-        cell.alpha = 0;
-        objc_setAssociatedObject(cell, kPFBNotifMaskedKey, @YES,
-                                 OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-        static BOOL said;
-        if (!said) {
-            said = YES;
-            PFBDebugLog(@"[notifs] hidden notification kept transparent until its row goes");
+    if (hide) {
+        if (!masked) {
+            objc_setAssociatedObject(cell, kPFBNotifMaskedKey, @YES,
+                                     OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+            static BOOL said;
+            if (!said) {
+                said = YES;
+                PFBDebugLog(@"[notifs] hidden notification kept transparent until its row goes");
+            }
         }
-    } else if (!hide && masked) {
-        cell.alpha = 1;
+        [cell.layer removeAnimationForKey:@"opacity"];
+        cell.alpha = 0;
+    } else if (masked) {
+        // The mark goes first: while it is set, the cell refuses any opacity.
         objc_setAssociatedObject(cell, kPFBNotifMaskedKey, nil,
                                  OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        cell.alpha = 1;
     }
 }
 
 %hook T1URTTimelineNotificationCell
+
+- (void)setAlpha:(CGFloat)alpha {
+    BOOL masked = objc_getAssociatedObject(self, kPFBNotifMaskedKey) != nil;
+    if (masked && alpha > 0) {
+        static BOOL said;
+        if (!said) {
+            said = YES;
+            PFBDebugLog(@"[notifs] opacity written back on a hidden notification - held at 0");
+        }
+    }
+    %orig(masked ? 0.0 : alpha);
+}
 
 - (void)layoutSubviews {
     %orig;
