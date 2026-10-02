@@ -778,27 +778,18 @@ static void tourAskCardSwipe(void) {
     PFBCompatTourLog(@"[tour] video full screen: card swipe %@", allowed ? @"allowed" : @"blocked");
 }
 
-// What closing the full-screen player would do with the video, asked while it is on
-// screen. Each question is a getter with no side effect.
+// Whether the full-screen video may shrink into the bottom player, asked the way
+// closing it would; the question has no side effect.
 static void tourAskDocking(void) {
     UIViewController* player = tourFindController(tourRootController(), @"T1ImmersiveFullScreenViewController");
-    if (!player) {
-        PFBCompatTourLog(@"[tour] video full screen: docking not read, no full-screen player");
+    SEL question = NSSelectorFromString(@"_canDockCurrentVideoToBottomSegment");
+    if (![player respondsToSelector:question]) {
+        PFBCompatTourLog(@"[tour] video full screen: docking not asked, %@",
+                         player ? @"question absent" : @"no full-screen player");
         return;
     }
-    NSString* (^answer)(id, NSString*) = ^NSString*(id target, NSString* name) {
-        SEL selector = NSSelectorFromString(name);
-        if (!target || ![target respondsToSelector:selector]) {
-            return @"absent";
-        }
-        return ((BOOL (*)(id, SEL))objc_msgSend)(target, selector) ? @"yes" : @"no";
-    };
-    Class segment = NSClassFromString(@"T1ImmersiveVideoBottomSegment");
-    SEL shared = NSSelectorFromString(@"shared");
-    id bottom = [segment respondsToSelector:shared] ? ((id (*)(id, SEL))objc_msgSend)(segment, shared) : nil;
-    PFBCompatTourLog(@"[tour] video full screen: drop zone %@, can dock %@, docks on closing %@, bottom player %@",
-                     answer(player, @"isDropToDockEnabled"), answer(player, @"_canDockCurrentVideoToBottomSegment"),
-                     answer(player, @"_shouldAutoDockOnDismiss"), answer(bottom, @"isActive"));
+    BOOL allowed = ((BOOL (*)(id, SEL))objc_msgSend)(player, question);
+    PFBCompatTourLog(@"[tour] video full screen: docking %@", allowed ? @"allowed" : @"refused");
 }
 
 // The handle of the first author on Home who is not the account itself.

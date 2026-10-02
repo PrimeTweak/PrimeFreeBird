@@ -222,12 +222,6 @@ static void pfbRestoreTimestamp(UIView* controls) {
 
 %end
 
-// MARK: - Disable video docking
-
-// Docking shrinks a full-screen video into a floating mini player. Two paths reach
-// it, the drop-zone view and the controllers' eligibility check; closing both
-// leaves swipe-to-dismiss working normally.
-
 // MARK: - A tap opens a video, it does not wake the sound
 
 // The timeline's video view carries isAutoUnmuteEnabled, whose job is to let a
@@ -328,8 +322,14 @@ static void pfbClearAutoUnmute(UIView* view) {
 
 %end
 
-// The full-screen player is up from its first card until it starts to leave, and up
-// again when a swipe to close is cancelled.
+// MARK: - Disable video docking
+
+// Docking shrinks a full-screen video into the bottom player. The drop zone, the
+// eligibility check and the full-screen controller's can-dock question lead there;
+// refusing all three leaves swipe-to-dismiss and closing working normally.
+
+// The full-screen controller also bounds the sound guards above: they hold from its
+// first card until it starts to leave, and again when a swipe to close is cancelled.
 %hook T1ImmersiveFullScreenViewController
 
 - (void)viewDidAppear:(BOOL)animated {
@@ -345,6 +345,17 @@ static void pfbClearAutoUnmute(UIView* view) {
 - (void)viewWillDisappear:(BOOL)animated {
     gPFBFullScreenShown = NO;
     %orig;
+}
+
+// Closing a full-screen video and a notification opened over it both ask this
+// before docking; a refusal makes Twitter close the video instead.
+- (BOOL)_canDockCurrentVideoToBottomSegment {
+    if ([PFBSettings boolForKey:@"disable_video_docking"]) {
+        PFBCOMPAT_ACTION(PFBCompat_disable_video_docking, @"docking refused");
+        return NO;
+    }
+    PFBCOMPAT_OBSERVE(PFBCompat_disable_video_docking, @"docking question asked");
+    return %orig;
 }
 
 %end
