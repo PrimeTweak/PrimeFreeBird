@@ -23,15 +23,6 @@ const PFBHookRecord PFBHookRecords[] = {
     {"NSURLSession", "webSocketTaskWithURL:", "Features/Messages/Chat.x"},
     {"NSURLSession", "webSocketTaskWithURL:protocols:", "Features/Messages/Chat.x"},
     {"NSURLSessionTask", "resume", "Sideload/WebCreateTweet.x"},
-    {"ONBPermissionPromptSubtaskController", "private_requestAuthorizationWithStyle:forceGrant:forceDecline:", "Debug/OnboardingProbe.x"},
-    {"ONBPermissionPromptSubtaskController", "private_requestOneStepAuthorizationWithAccount:", "Debug/OnboardingProbe.x"},
-    {"ONBPermissionPromptSubtaskController", "private_showAlertPrepromptWithOkAction:cancelAction:", "Debug/OnboardingProbe.x"},
-    {"ONBPermissionPromptSubtaskController", "private_showComponentsCoverPrepromptWithOkAction:cancelAction:", "Debug/OnboardingProbe.x"},
-    {"ONBPermissionPromptSubtaskController", "private_showPrepromptWithStyle:okAction:cancelAction:", "Debug/OnboardingProbe.x"},
-    {"ONBPermissionPromptSubtaskController", "startWithNavigationContext:navigationLink:", "Debug/OnboardingProbe.x"},
-    {"ONBSubtaskController", "didActivateNavigationLink:", "Debug/OnboardingProbe.x"},
-    {"ONBSubtaskController", "didActivateNavigationLink:listener:", "Debug/OnboardingProbe.x"},
-    {"ONBSubtaskController", "startWithNavigationContext:navigationLink:", "Debug/OnboardingProbe.x"},
     {"SFSafariViewController", "viewWillAppear:", "Features/General/Misc.x"},
     {"T1AccountsViewController", "private_startLoginFlowWithSender:", "Support/FeatureSwitches.x"},
     {"T1AnimatedLaunchScreenView", "animateRevealWithCompletion:", "Features/General/AppLifecycle.x"},
@@ -355,7 +346,6 @@ const PFBHookRecord PFBHookRecords[] = {
 const size_t PFBHookRecordCount = sizeof(PFBHookRecords) / sizeof(PFBHookRecords[0]);
 
 const char* const PFBRuntimeClasses[] = {
-    "ONBPermissionPromptSubtaskController",
     "T1ColorSettings",
     "T1ConversationFooterItem",
     "T1GenericSettingsViewController",

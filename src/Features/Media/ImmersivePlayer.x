@@ -114,7 +114,7 @@ static void pfbReplayChromeAlphas(UIView* card) {
 // only on a mismatch.
 static void pfbShowPausedGlyph(UIView* card, BOOL paused);
 static void pfbUpdateMinimalBar(UIView* card, TAVPlayer* player);
-static TAVPlayer* pfbCardPlayer(UIView* card);
+static TAVPlayer* pfbVisibleCardPlayer(UIView* card);
 static void pfbEnforcePlayback(UIView* card) {
     __weak UIView* weakCard = card;
     NSArray<NSNumber*>* rungs = @[ @0.05, @0.15, @0.30, @0.60, @1.00 ];
@@ -123,7 +123,7 @@ static void pfbEnforcePlayback(UIView* card) {
                                      (int64_t)(rung.doubleValue * NSEC_PER_SEC)),
                        dispatch_get_main_queue(), ^{
           UIView* strongCard = weakCard;
-          TAVPlayer* player = strongCard ? pfbCardPlayer(strongCard) : nil;
+          TAVPlayer* player = strongCard ? pfbVisibleCardPlayer(strongCard) : nil;
           if (!player || !strongCard.window) {
               return;
           }
@@ -498,6 +498,32 @@ static TAVPlayer* pfbCardPlayer(UIView* card) {
     return pageView ? pfbImmersivePagePlayer(pageView) : nil;
 }
 
+// The video page on screen in a card. A Tweet with several media keeps the other
+// pages mounted beside it, and a photo on screen leaves none.
+static UIView* pfbVisibleVideoPage(UIView* card) {
+    Class pageClass =
+        NSClassFromString(@"_TtC14T1TwitterSwift22ImmersiveVideoPageView");
+    if (!pageClass) {
+        return nil;
+    }
+    __block UIView* pageView = nil;
+    PFBEnumerateSubviewsRecursively(card, ^(UIView* view) {
+        if (pageView || ![view isKindOfClass:pageClass]) {
+            return;
+        }
+        CGRect frame = [view convertRect:view.bounds toView:card];
+        if (CGRectContainsPoint(card.bounds, CGPointMake(CGRectGetMidX(frame), CGRectGetMidY(frame)))) {
+            pageView = view;
+        }
+    });
+    return pageView;
+}
+
+static TAVPlayer* pfbVisibleCardPlayer(UIView* card) {
+    UIView* pageView = pfbVisibleVideoPage(card);
+    return pageView ? pfbImmersivePagePlayer(pageView) : nil;
+}
+
 // The audio session manager held by the host view above the card, or nil.
 static id pfbImmersiveAudioManager(UIView* card) {
     Class hostClass =
@@ -746,7 +772,7 @@ static UIView* pfbMinimalBar(UIView* card) {
               if (!strongCard) {
                   return;
               }
-              TAVPlayer* player = pfbCardPlayer(strongCard);
+              TAVPlayer* player = pfbVisibleCardPlayer(strongCard);
               BOOL muted = pfbCurrentMuted(strongCard, player);
               // The one place the sound is allowed to come on.
               gPFBSoundAllowed = muted;
@@ -787,13 +813,13 @@ static void pfbUpdateMinimalBar(UIView* card, TAVPlayer* player) {
             dispatch_get_main_queue(), ^{
               UIView* strongCard = weakCard;
               if (strongCard) {
-                  pfbUpdateMinimalBar(strongCard, pfbCardPlayer(strongCard));
+                  pfbUpdateMinimalBar(strongCard, pfbVisibleCardPlayer(strongCard));
               }
             });
         return;
     }
 
-    BOOL wanted = card.window && player &&
+    BOOL wanted = card.window && player && player == pfbVisibleCardPlayer(card) &&
                   [PFBSettings boolForKey:@"tap_to_pause"] &&
                   pfbImmersiveControlsView(card) == nil;
     if (!wanted) {
@@ -919,7 +945,7 @@ static void pfbUpdateMinimalBar(UIView* card, TAVPlayer* player) {
                                            return;
                                        }
                                        pfbUpdateMinimalBar(strongCard,
-                                                           pfbCardPlayer(strongCard));
+                                                           pfbVisibleCardPlayer(strongCard));
                                      }];
         objc_setAssociatedObject(card, kPFBMinimalTimerKey, timer,
                                  OBJC_ASSOCIATION_RETAIN_NONATOMIC);
@@ -932,7 +958,7 @@ static void pfbUpdateMinimalBar(UIView* card, TAVPlayer* player) {
 static void pfbHandleScrubGesture(UIView* card, UILongPressGestureRecognizer* press) {
     UIView* bar = objc_getAssociatedObject(card, kPFBMinimalBarKey);
     UIView* track = bar ? [bar viewWithTag:kPFBMinimalTrackTag] : nil;
-    TAVPlayer* player = pfbCardPlayer(card);
+    TAVPlayer* player = pfbVisibleCardPlayer(card);
     if (!track || !player) {
         return;
     }
@@ -1082,13 +1108,7 @@ static void pfbStartFoldWatch(UIView* card) {
         return;
     }
     PFBCOMPAT_ACTION(PFBCompat_tap_to_pause, @"tap to pause");
-    __block UIView* pageView = nil;
-    PFBEnumerateSubviewsRecursively(card, ^(UIView* view) {
-        if (!pageView && [view isKindOfClass:%c(_TtC14T1TwitterSwift22ImmersiveVideoPageView)]) {
-            pageView = view;
-        }
-    });
-    TAVPlayer* player = pageView ? pfbImmersivePagePlayer(pageView) : nil;
+    TAVPlayer* player = pfbVisibleCardPlayer(card);
     if (!player) {
         %orig;
         return;
