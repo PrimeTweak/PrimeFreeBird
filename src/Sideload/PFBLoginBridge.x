@@ -13,14 +13,28 @@ static NSString* pfbBridgeBearer(void) {
 
 // An exact host test, never a substring of the URL: a third-party address that
 // merely mentions an X host must not receive the session.
-static BOOL pfbBridgeIsTwitterAPI(NSURL* url) {
+static BOOL pfbBridgeIsXHost(NSURL* url) {
     if (![url.scheme isEqualToString:@"https"] || !PFBIsXDomain(url.host)) {
         return NO;
     }
-    if ([url.absoluteString containsString:@"jfapi"]) {
+    return ![url.absoluteString containsString:@"jfapi"];
+}
+
+// The shell account's OAuth signature, which the server refuses on any X host.
+static BOOL pfbBridgeCarriesAppOAuth(NSURLRequest* req) {
+    NSString* auth = [req valueForHTTPHeaderField:@"Authorization"];
+    return [auth isKindOfClass:[NSString class]] && [auth containsString:@"oauth_token="];
+}
+
+// API hosts always, and any other X host (media upload included) once the request
+// carries the shell account's OAuth, so a new endpoint is covered without a host list.
+static BOOL pfbBridgeWantsRequest(NSURLRequest* req) {
+    NSURL* url = req.URL;
+    if (!pfbBridgeIsXHost(url)) {
         return NO;
     }
-    return [url.host.lowercaseString hasPrefix:@"api."] || [url.path hasPrefix:@"/i/api"];
+    return [url.host.lowercaseString hasPrefix:@"api."] || [url.path hasPrefix:@"/i/api"] ||
+           pfbBridgeCarriesAppOAuth(req);
 }
 
 #pragma mark - Read injection over the shared web session
@@ -75,7 +89,7 @@ static void pfbBridgeProbeAccount(NSString* line) {
 // invalid OAuth so the server authenticates it by cookie. A request signed for a bridged
 // account goes with that account's own session; the shared one serves the rest.
 static NSURLRequest* pfbBridgeInject(NSURLRequest* req) {
-    if (!req || !pfbBridgeIsTwitterAPI(req.URL)) {
+    if (!req || !pfbBridgeWantsRequest(req)) {
         return req;
     }
     if (pfbBridgeIsCreateTweet(req.URL.path)) {
@@ -92,7 +106,8 @@ static NSURLRequest* pfbBridgeInject(NSURLRequest* req) {
         return req;
     }
     NSString* own = PFBWebAuthTokenOfRequest(req);
-    if (own.length && ![own isEqualToString:authToken]) {
+    BOOL ownSession = own.length && ![own isEqualToString:authToken];
+    if (ownSession) {
         // Never the shared session for another account: its own token, and its csrf once
         // fetched. Until then the request may be refused, but never sent as another account.
         authToken = own;
@@ -100,6 +115,11 @@ static NSURLRequest* pfbBridgeInject(NSURLRequest* req) {
         pfbBridgeProbeAccount(csrf.length
             ? @"[bridge] a request signed for another account went with its own web session"
             : @"[bridge] a request signed for another account went with its own web session, csrf pending");
+    }
+    if ([req.URL.host.lowercaseString hasPrefix:@"upload."]) {
+        pfbBridgeProbeAccount(ownSession
+            ? @"[bridge] media upload went with its own account's web session"
+            : @"[bridge] media upload went with the shared web session");
     }
     NSMutableURLRequest* m = [req mutableCopy];
     NSString* add = csrf.length ? [NSString stringWithFormat:@"auth_token=%@; ct0=%@", authToken, csrf]
@@ -115,25 +135,37 @@ static NSURLRequest* pfbBridgeInject(NSURLRequest* req) {
 
 - (NSURLSessionDataTask*)dataTaskWithRequest:(NSURLRequest*)request
                            completionHandler:(void (^)(NSData*, NSURLResponse*, NSError*))handler {
-    if (pfbBridgeIsTwitterAPI(request.URL)) {
-        return %orig(pfbBridgeInject(request), handler);
-    }
-    return %orig;
+    return %orig(pfbBridgeInject(request), handler);
 }
 
 - (NSURLSessionDataTask*)dataTaskWithRequest:(NSURLRequest*)request {
-    if (pfbBridgeIsTwitterAPI(request.URL)) {
-        return %orig(pfbBridgeInject(request));
-    }
-    return %orig;
+    return %orig(pfbBridgeInject(request));
 }
 
 - (NSURLSessionUploadTask*)uploadTaskWithRequest:(NSURLRequest*)request
                                         fromData:(NSData*)bodyData {
-    if (pfbBridgeIsTwitterAPI(request.URL)) {
-        return %orig(pfbBridgeInject(request), bodyData);
-    }
-    return %orig;
+    return %orig(pfbBridgeInject(request), bodyData);
+}
+
+- (NSURLSessionUploadTask*)uploadTaskWithRequest:(NSURLRequest*)request
+                                        fromData:(NSData*)bodyData
+                               completionHandler:(void (^)(NSData*, NSURLResponse*, NSError*))handler {
+    return %orig(pfbBridgeInject(request), bodyData, handler);
+}
+
+- (NSURLSessionUploadTask*)uploadTaskWithRequest:(NSURLRequest*)request
+                                        fromFile:(NSURL*)fileURL {
+    return %orig(pfbBridgeInject(request), fileURL);
+}
+
+- (NSURLSessionUploadTask*)uploadTaskWithRequest:(NSURLRequest*)request
+                                        fromFile:(NSURL*)fileURL
+                               completionHandler:(void (^)(NSData*, NSURLResponse*, NSError*))handler {
+    return %orig(pfbBridgeInject(request), fileURL, handler);
+}
+
+- (NSURLSessionUploadTask*)uploadTaskWithStreamedRequest:(NSURLRequest*)request {
+    return %orig(pfbBridgeInject(request));
 }
 
 %end
