@@ -55,6 +55,10 @@ static BOOL pfbControllerIsHome(UIViewController* owner) {
         return NO;
     }
     NSString* name = NSStringFromClass([owner class]);
+    // The tweak's own pages, its Timelines settings among them, are never Home.
+    if ([name hasPrefix:@"PFB"]) {
+        return NO;
+    }
     return [name containsString:@"Home"] || [name containsString:@"Timelines"] ||
            [name containsString:@"TimelineContainer"];
 }

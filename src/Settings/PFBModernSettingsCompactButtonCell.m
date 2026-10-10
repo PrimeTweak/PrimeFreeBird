@@ -22,8 +22,6 @@ UIColor* PFBSettingsSubtitleColor(void) {
 @interface PFBModernSettingsCompactButtonCell ()
 @property (nonatomic, strong) NSArray<NSLayoutConstraint*>* singleLine;
 @property (nonatomic, strong) NSArray<NSLayoutConstraint*>* withDetail;
-@property (nonatomic, strong) NSLayoutConstraint* valueToChevron;
-@property (nonatomic, strong) NSLayoutConstraint* valueToEdge;
 @end
 
 @implementation PFBModernSettingsCompactButtonCell
@@ -87,12 +85,6 @@ UIColor* PFBSettingsSubtitleColor(void) {
         [self.detailLabel.trailingAnchor constraintLessThanOrEqualToAnchor:self.subtitleLabel.leadingAnchor
                                                                    constant:-16],
     ];
-    self.valueToChevron = [self.subtitleLabel.trailingAnchor
-        constraintEqualToAnchor:self.chevronImageView.leadingAnchor
-                       constant:-16];
-    self.valueToEdge = [self.subtitleLabel.trailingAnchor
-        constraintEqualToAnchor:self.contentView.trailingAnchor
-                       constant:-10];
     [NSLayoutConstraint activateConstraints:self.singleLine];
     [NSLayoutConstraint activateConstraints:@[
         [self.titleLabel.leadingAnchor constraintEqualToAnchor:self.contentView.leadingAnchor
@@ -103,7 +95,8 @@ UIColor* PFBSettingsSubtitleColor(void) {
         [self.subtitleLabel.leadingAnchor
             constraintGreaterThanOrEqualToAnchor:self.titleLabel.trailingAnchor
                                         constant:16],
-        self.valueToChevron,
+        [self.subtitleLabel.trailingAnchor constraintEqualToAnchor:self.chevronImageView.leadingAnchor
+                                                          constant:-16],
         [self.subtitleLabel.centerYAnchor constraintEqualToAnchor:self.contentView.centerYAnchor],
  
         [self.chevronImageView.trailingAnchor constraintEqualToAnchor:self.contentView.trailingAnchor
@@ -128,11 +121,9 @@ UIColor* PFBSettingsSubtitleColor(void) {
     self.selectionStyle = UITableViewCellSelectionStyleDefault;
 }
 
+// The chevron's place is kept, so a value without one lines up with the others.
 - (void)setShowsChevron:(BOOL)showsChevron {
     self.chevronImageView.hidden = !showsChevron;
-    self.valueToChevron.active = NO;
-    self.valueToEdge.active = NO;
-    (showsChevron ? self.valueToChevron : self.valueToEdge).active = YES;
 }
 
 - (void)configureWithTitle:(NSString*)title subtitle:(NSString*)subtitle detail:(NSString*)detail {
