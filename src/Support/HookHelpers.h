@@ -80,6 +80,12 @@ BOOL PFBHasUsableWebCredentials(void);
 NSMutableURLRequest* PFBWebSessionGETRequest(NSURL* url);
 // Saves the web session cookies for the tweak's own requests.
 void PFBStoreWebCookies(NSArray<NSHTTPCookie*>* cookies);
+// The web auth_token a request was signed with: a bridged account signs with its own
+// session's token, which holds no dash. nil for any other request (WebCreateTweet.x).
+NSString* PFBWebAuthTokenOfRequest(NSURLRequest* request);
+// The ct0 of a web auth_token, or nil while unknown; never blocks. With mint set, an
+// unknown one is fetched in the background for the next request (WebCreateTweet.x).
+NSString* PFBWebCt0ForAuthToken(NSString* authToken, BOOL mint);
 
 // The image view currently carrying the top-bar logo, or nil (Theme.x).
 UIImageView* PFBTopBarLogoViewCurrent(void);

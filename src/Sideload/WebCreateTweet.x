@@ -29,6 +29,10 @@ static NSString* WebAuthMulti = nil;
 static NSMutableDictionary<NSString*, NSDictionary*>* WebAccountCookies = nil;
 static NSObject* WebAccountCookiesLock = nil;
 
+// Per-session csrf tokens (auth_token -> ct0), and the tokens whose ct0 is being fetched.
+static NSMutableDictionary<NSString*, NSString*>* WebCt0ByToken = nil;
+static NSMutableSet<NSString*>* WebCt0Minting = nil;
+
 // The authenticated helper webview is kept alive to mint a fresh
 // x-client-transaction-id per send (x rate-limits requests without one).
 static WKWebView* WebHelperWebView = nil;
@@ -143,8 +147,23 @@ static NSObject* accountCacheLock(void) {
     dispatch_once(&onceToken, ^{
         WebAccountCookiesLock = [NSObject new];
         WebAccountCookies = [NSMutableDictionary dictionary];
+        WebCt0ByToken = [NSMutableDictionary dictionary];
+        WebCt0Minting = [NSMutableSet set];
     });
     return WebAccountCookiesLock;
+}
+
+static void cacheTokenCt0(NSString* authToken, NSString* ct0) {
+    if (authToken.length == 0) {
+        return;
+    }
+    @synchronized(accountCacheLock()) {
+        if (ct0.length) {
+            WebCt0ByToken[authToken] = ct0;
+        } else {
+            [WebCt0ByToken removeObjectForKey:authToken];
+        }
+    }
 }
 
 static void cacheAccountPair(NSString* userID, NSDictionary* pair) {
@@ -152,8 +171,17 @@ static void cacheAccountPair(NSString* userID, NSDictionary* pair) {
         return;
     }
     @synchronized(accountCacheLock()) {
+        NSString* oldToken = WebAccountCookies[userID][@"auth_token"];
+        if (oldToken.length) {
+            [WebCt0ByToken removeObjectForKey:oldToken];
+        }
         if (pair) {
             WebAccountCookies[userID] = pair;
+            NSString* token = pair[@"auth_token"];
+            NSString* ct0 = pair[@"ct0"];
+            if (token.length && ct0.length) {
+                WebCt0ByToken[token] = ct0;
+            }
         } else {
             [WebAccountCookies removeObjectForKey:userID];
         }
@@ -194,6 +222,9 @@ void PFBStoreWebCookies(NSArray<NSHTTPCookie*>* cookies) {
         }
     }
 
+    if (WebAuthToken.length && WebCT0.length) {
+        cacheTokenCt0(WebAuthToken, WebCT0);
+    }
     NSString* userID = userIDFromTwid(WebTwid);
     if (userID.length && WebAuthToken.length && WebCT0.length) {
         cacheAccountPair(userID, @{
@@ -660,6 +691,82 @@ static NSString* fetchCt0Sync(NSString* authToken, NSString* expectedUserID) {
     return fetcher.ct0;
 }
 
+NSString* PFBWebAuthTokenOfRequest(NSURLRequest* request) {
+    NSString* auth = [request valueForHTTPHeaderField:@"Authorization"];
+    if (![auth isKindOfClass:[NSString class]]) {
+        return nil;
+    }
+    NSRange marker = [auth rangeOfString:@"oauth_token=\""];
+    if (marker.location == NSNotFound) {
+        return nil;
+    }
+    NSString* rest = [auth substringFromIndex:NSMaxRange(marker)];
+    NSRange endQuote = [rest rangeOfString:@"\""];
+    NSString* token = endQuote.location == NSNotFound ? nil : [rest substringToIndex:endQuote.location];
+    if (token.length == 0 || [token containsString:@"-"]) {
+        return nil;
+    }
+    return token;
+}
+
+NSString* PFBWebCt0ForAuthToken(NSString* authToken, BOOL mint) {
+    if (authToken.length == 0) {
+        return nil;
+    }
+    harvestSharedCookies();
+    NSString* known = nil;
+    BOOL start = NO;
+    @synchronized(accountCacheLock()) {
+        known = WebCt0ByToken[authToken];
+        if (!known.length && mint && ![WebCt0Minting containsObject:authToken]) {
+            [WebCt0Minting addObject:authToken];
+            start = YES;
+        }
+    }
+    if (start) {
+        dispatch_async(dispatch_get_global_queue(QOS_CLASS_UTILITY, 0), ^{
+            NSString* fresh = fetchCt0Sync(authToken, nil);
+            cacheTokenCt0(authToken, fresh);
+            @synchronized(accountCacheLock()) {
+                [WebCt0Minting removeObject:authToken];
+            }
+            PFBDebugLog(@"[bridge] csrf token fetched for a session: %@", fresh.length ? @"yes" : @"no");
+        });
+    }
+    return known.length ? known : nil;
+}
+
+// The token and csrf a request goes out with: its own account's session when it was
+// signed with one, else the shared session. NO when no ct0 can be had in time.
+static BOOL resolveCredsForRequest(NSURLRequest* request, NSString** outAuthToken, NSString** outCt0,
+                                   BOOL freshCsrf) {
+    // Nothing goes through the web without a signed-in session, as before.
+    if (WebAuthToken.length == 0) {
+        return NO;
+    }
+    NSString* own = PFBWebAuthTokenOfRequest(request);
+    if ([own isEqualToString:WebAuthToken]) {
+        own = nil;
+    }
+    NSString* authToken = own ?: WebAuthToken;
+    NSString* ct0 = freshCsrf ? fetchCt0Sync(authToken, own ? nil : userIDFromTwid(WebTwid)) : nil;
+    if (ct0.length) {
+        cacheTokenCt0(authToken, ct0);
+    } else {
+        ct0 = PFBWebCt0ForAuthToken(authToken, NO);
+    }
+    if (ct0.length == 0) {
+        ct0 = fetchCt0Sync(authToken, own ? nil : userIDFromTwid(WebTwid));
+        cacheTokenCt0(authToken, ct0);
+    }
+    if (ct0.length == 0) {
+        return NO;
+    }
+    *outAuthToken = authToken;
+    *outCt0 = ct0;
+    return YES;
+}
+
 // Resolve credentials for the posting account, bootstrapping and minting as needed.
 // Returns NO if the account can't be authenticated for web posting.
 static BOOL resolveWebCreds(NSString* userID, NSString** outAuthToken, NSString** outCt0) {
@@ -812,16 +919,12 @@ static BOOL isGrokURL(NSURL* url) {
 // headers stripped. A fresh csrf token costs one request to x.com.
 static NSMutableURLRequest* webPathRequest(NSURLRequest* request, NSString* host, NSString* path,
                                            NSString* what, BOOL freshCsrf) {
-    if (WebAuthToken.length == 0) {
-        return nil;
-    }
     harvestSharedCookies();
-    NSString* authToken = WebAuthToken;
-    NSString* fetched = (freshCsrf || WebCT0.length == 0) ? fetchCt0Sync(WebAuthToken, userIDFromTwid(WebTwid)) : nil;
-    NSString* ct0 = fetched ?: WebCT0;
-    if (ct0.length == 0) {
+    NSString *authToken = nil, *ct0 = nil;
+    if (!resolveCredsForRequest(request, &authToken, &ct0, freshCsrf)) {
         return nil;
     }
+    BOOL own = ![authToken isEqualToString:WebAuthToken];
     NSString* method = (request.HTTPMethod ?: @"GET").uppercaseString;
     NSString* key = xtidKey(method, path);
     void (^mint)(void) = ^{
@@ -847,14 +950,14 @@ static NSMutableURLRequest* webPathRequest(NSURLRequest* request, NSString* host
         [NSURLComponents componentsWithURL:request.URL resolvingAgainstBaseURL:NO].percentEncodedQuery;
     NSMutableURLRequest* outgoing = [request mutableCopy];
     outgoing.URL = web.URL;
-    applyWebAuth(outgoing, authToken, ct0, userIDFromTwid(WebTwid));
+    applyWebAuth(outgoing, authToken, ct0, own ? nil : userIDFromTwid(WebTwid));
     NSString* xtid = cachedXTID(key);
     if (xtid.length) {
         [outgoing setValue:xtid forHTTPHeaderField:@"x-client-transaction-id"];
     }
-    PFBDebugLog(@"[webtweet] rewrote %@ -> web (auth=%lu ct0=%lu xtid=%lu)", what,
-                (unsigned long)authToken.length, (unsigned long)ct0.length,
-                (unsigned long)xtid.length);
+    PFBDebugLog(@"[webtweet] rewrote %@ -> web with %@ session (auth=%lu ct0=%lu xtid=%lu)", what,
+                own ? @"its own account's" : @"the shared", (unsigned long)authToken.length,
+                (unsigned long)ct0.length, (unsigned long)xtid.length);
     return outgoing;
 }
 
@@ -932,21 +1035,15 @@ static NSMutableURLRequest* webRequestFromNativeSend(NSURLRequest* request) {
             return nil;
         }
     } else {
-        // A bridged sign-in's shell account carries the web auth_token as its OAuth
-        // token, so the poster cannot be read from it: fall back to the shared web
-        // session in the cookie jar, correct while one account is signed in.
-        if (WebAuthToken.length == 0) {
-            PFBDebugLog(@"[webtweet] no reroute: poster unreadable and no shared session");
+        // A bridged account signs with its own session's auth_token: the Tweet goes out
+        // with that session, and with the shared one only for an unreadable signature.
+        if (!resolveCredsForRequest(request, &authToken, &ct0, YES)) {
+            PFBDebugLog(@"[webtweet] no reroute: no session or no ct0 for the poster");
             return nil;
         }
-        authToken = WebAuthToken;
-        ct0 = fetchCt0Sync(WebAuthToken, userIDFromTwid(WebTwid)) ?: WebCT0;
-        if (ct0.length == 0) {
-            PFBDebugLog(@"[webtweet] no reroute: shared session has no ct0");
-            return nil;
-        }
-        postingUserID = userIDFromTwid(WebTwid);
-        PFBDebugLog(@"[webtweet] reroute via shared session (uid=%@)", postingUserID ?: @"?");
+        BOOL own = ![authToken isEqualToString:WebAuthToken];
+        postingUserID = own ? nil : userIDFromTwid(WebTwid);
+        PFBDebugLog(@"[webtweet] reroute via %@ session", own ? @"its own account's" : @"the shared");
     }
 
     NSMutableURLRequest* outgoing = [request mutableCopy];

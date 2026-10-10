@@ -51,27 +51,14 @@ static void pfbBridgeReadSharedSession(NSString** authToken, NSString** csrf) {
     }
 }
 
-// Once per launch and per answer, while the journal records: whether a request goes out
-// with the web session of the account it was signed for. An account mounted here is
-// signed with its web session's token; an app login's token holds a dash.
-static void pfbBridgeProbeAccount(NSURLRequest* req, NSString* sessionToken) {
+// Once per launch and per answer, while the journal records: which session a request
+// signed for another account than the shared session's goes out with.
+static void pfbBridgeProbeAccount(NSString* line) {
     static NSMutableSet<NSString*>* said;
     static dispatch_once_t once;
     if (!PFBDebugIsRecording()) {
         return;
     }
-    NSString* auth = req.allHTTPHeaderFields[@"Authorization"];
-    NSRange start = [auth rangeOfString:@"oauth_token=\""];
-    if (start.location == NSNotFound) {
-        return;
-    }
-    NSString* rest = [auth substringFromIndex:NSMaxRange(start)];
-    NSRange end = [rest rangeOfString:@"\""];
-    NSString* signedWith = end.location == NSNotFound ? rest : [rest substringToIndex:end.location];
-    NSString* line = [NSString
-        stringWithFormat:@"[bridge] a request signed for %@ went with the web session (its token: %@)",
-                         [signedWith isEqualToString:sessionToken] ? @"the session's account" : @"another account",
-                         [signedWith containsString:@"-"] ? @"an app login's" : @"a web session's"];
     dispatch_once(&once, ^{
       said = [NSMutableSet set];
     });
@@ -84,8 +71,9 @@ static void pfbBridgeProbeAccount(NSURLRequest* req, NSString* sessionToken) {
     PFBDebugLog(@"%@", line);
 }
 
-// Adds the web session cookie + csrf to an app read request, replacing the shell
-// account's invalid OAuth so the server authenticates it by cookie.
+// Adds a web session cookie + csrf to an app request, replacing the shell account's
+// invalid OAuth so the server authenticates it by cookie. A request signed for a bridged
+// account goes with that account's own session; the shared one serves the rest.
 static NSURLRequest* pfbBridgeInject(NSURLRequest* req) {
     if (!req || !pfbBridgeIsTwitterAPI(req.URL)) {
         return req;
@@ -103,9 +91,19 @@ static NSURLRequest* pfbBridgeInject(NSURLRequest* req) {
     if ([cookie containsString:@"auth_token="]) {
         return req;
     }
-    pfbBridgeProbeAccount(req, authToken);
+    NSString* own = PFBWebAuthTokenOfRequest(req);
+    if (own.length && ![own isEqualToString:authToken]) {
+        // Never the shared session for another account: its own token, and its csrf once
+        // fetched. Until then the request may be refused, but never sent as another account.
+        authToken = own;
+        csrf = PFBWebCt0ForAuthToken(own, YES);
+        pfbBridgeProbeAccount(csrf.length
+            ? @"[bridge] a request signed for another account went with its own web session"
+            : @"[bridge] a request signed for another account went with its own web session, csrf pending");
+    }
     NSMutableURLRequest* m = [req mutableCopy];
-    NSString* add = [NSString stringWithFormat:@"auth_token=%@; ct0=%@", authToken, csrf];
+    NSString* add = csrf.length ? [NSString stringWithFormat:@"auth_token=%@; ct0=%@", authToken, csrf]
+                                : [NSString stringWithFormat:@"auth_token=%@", authToken];
     NSString* merged = cookie.length ? [NSString stringWithFormat:@"%@; %@", cookie, add] : add;
     [m setValue:merged forHTTPHeaderField:@"Cookie"];
     [m setValue:csrf forHTTPHeaderField:@"x-csrf-token"];

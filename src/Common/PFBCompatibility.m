@@ -1465,11 +1465,9 @@ static const PFBCompatName kNames[] = {
     {PFBCompat_advanced_search, "Features/Search/AdvancedSearch.x", "showsFilterButton"},
     {PFBCompat_advanced_search, "Features/Search/AdvancedSearch.x", "window"},
     {PFBCompat_choose_explore_tabs, "Features/Search/ExploreTabs.x", "window"},
-    {PFBCompat_color_twitter_icon_in_top_bar, "Features/Appearance/NavBarIcons.x", "boolValue"},
-    {PFBCompat_color_twitter_icon_in_top_bar, "Features/Appearance/NavBarIcons.x", "hidesSharedBackground"},
-    {PFBCompat_color_twitter_icon_in_top_bar, "Features/Appearance/NavBarIcons.x", "setHidesSharedBackground:"},
-    {PFBCompat_color_twitter_icon_in_top_bar, "Features/Appearance/NavBarIcons.x", "title"},
-    {PFBCompat_color_twitter_icon_in_top_bar, "Features/Appearance/NavBarIcons.x", "window"},
+    {PFBCompatOptionCount, "Features/Appearance/NavBarIcons.x", "boolValue"},
+    {PFBCompatOptionCount, "Features/Appearance/NavBarIcons.x", "hidesSharedBackground"},
+    {PFBCompatOptionCount, "Features/Appearance/NavBarIcons.x", "title"},
     {PFBCompat_color_twitter_icon_in_top_bar, "Features/Appearance/Theme.x", "colorPalette"},
     {PFBCompat_color_twitter_icon_in_top_bar, "Features/Appearance/Theme.x", "currentColorPalette"},
     {PFBCompat_color_twitter_icon_in_top_bar, "Features/Appearance/Theme.x", "navigationBarLogoColor"},
@@ -1494,9 +1492,8 @@ static const PFBCompatName kNames[] = {
     {PFBCompat_enable_liquid_glass, "Features/Appearance/Theme.x", "overflowLimit"},
     {PFBCompat_enable_liquid_glass, "Features/Appearance/Theme.x", "textColor"},
     {PFBCompat_enable_liquid_glass, "Features/Appearance/Theme.x", "unreadIndicatorImageView"},
-    {PFBCompat_flex_twitter, "Debug/PFBDebugger.m", "windows"},
-    {PFBCompat_flex_twitter, "Features/Appearance/Theme.x", "setPrimaryColorOption:"},
-    {PFBCompat_flex_twitter, "Features/Appearance/Theme.x", "sharedSettings"},
+    {PFBCompat_accent_color, "Features/Appearance/Theme.x", "setPrimaryColorOption:"},
+    {PFBCompat_accent_color, "Features/Appearance/Theme.x", "sharedSettings"},
     {PFBCompat_hide_explore_all, "Features/Search/ExploreTabs.x", "window"},
     {PFBCompat_hide_grok_sidebar, "Support/FeatureSwitches.x", "currentAccount"},
     {PFBCompat_hide_grok_sidebar, "Support/FeatureSwitches.x", "provider"},
@@ -1528,22 +1525,17 @@ static const PFBCompatName kNames[] = {
     {PFBCompat_no_tab_bar_hiding, "Features/Appearance/Theme.x", "imageName"},
     {PFBCompat_no_tab_bar_hiding, "Features/Appearance/Theme.x", "imageView"},
     {PFBCompat_no_tab_bar_hiding, "Features/Appearance/Theme.x", "title"},
-    {PFBCompat_padlock, "Features/Appearance/Theme.x", "setPrimaryColorOption:"},
-    {PFBCompat_padlock, "Features/Appearance/Theme.x", "sharedSettings"},
-    {PFBCompat_padlock, "Sideload/WebCreateTweet.x", "currentAccount"},
-    {PFBCompat_padlock, "Sideload/WebCreateTweet.x", "sharedHostViewController"},
-    {PFBCompat_padlock, "Sideload/WebCreateTweet.x", "userID"},
-    {PFBCompat_reading_line, "Features/Timelines/Ads.x", "adDisplayLocation"},
-    {PFBCompat_reading_line, "Features/Timelines/Ads.x", "isPromoted"},
-    {PFBCompat_reading_line, "Features/Timelines/Ads.x", "promotedContent"},
-    {PFBCompat_reading_line, "Features/Timelines/Ads.x", "scribeItem"},
-    {PFBCompat_reading_line, "Features/Timelines/Ads.x", "status"},
-    {PFBCompat_reading_line, "Features/General/HiddenNotifications.x", "deleteItemAtIndexPath:withRowAnimation:"},
-    {PFBCompat_reading_line, "Features/General/HiddenNotifications.x", "itemAtIndexPath:"},
-    {PFBCompat_reading_line, "Features/General/HiddenNotifications.x", "items"},
-    {PFBCompat_reading_line, "Features/General/HiddenNotifications.x", "setItems:"},
-    {PFBCompat_reading_line, "Features/General/HiddenNotifications.x", "tableView"},
-    {PFBCompat_reading_line, "Support/HookHelpers.m", "item"},
+    {PFBCompat_web_session, "Sideload/WebCreateTweet.x", "currentAccount"},
+    {PFBCompat_web_session, "Sideload/WebCreateTweet.x", "sharedHostViewController"},
+    {PFBCompat_web_session, "Sideload/WebCreateTweet.x", "userID"},
+    {PFBCompatOptionCount, "Features/Timelines/Ads.x", "adDisplayLocation"},
+    {PFBCompatOptionCount, "Features/Timelines/Ads.x", "isPromoted"},
+    {PFBCompatOptionCount, "Features/Timelines/Ads.x", "promotedContent"},
+    {PFBCompatOptionCount, "Features/Timelines/Ads.x", "scribeItem"},
+    {PFBCompatOptionCount, "Features/Timelines/Ads.x", "status"},
+    {PFBCompatOptionCount, "Features/General/HiddenNotifications.x", "setItems:"},
+    {PFBCompatOptionCount, "Features/General/HiddenNotifications.x", "tableView"},
+    {PFBCompatOptionCount, "Support/HookHelpers.m", "item"},
     {PFBCompat_reading_line, "Features/Timelines/Timeline.x", "entryID"},
     {PFBCompat_reading_line, "Features/Timelines/Timeline.x", "indexPathsForVisibleItems"},
     {PFBCompat_reading_line, "Features/Timelines/Timeline.x", "language"},
@@ -1563,11 +1555,6 @@ static const PFBCompatName kNames[] = {
     {PFBCompat_restore_twitter_names, "Features/Branding/Branding.x", "T1UserRecommendationView"},
     {PFBCompat_restore_twitter_names, "Features/Branding/Branding.x", "T1TweetDraftsDraftCompositionView"},
     {PFBCompat_restore_twitter_names, "Features/Branding/Branding.x", "T1WebCardView"},
-    {PFBCompat_restore_twitter_names, "Features/Appearance/NavBarIcons.x", "boolValue"},
-    {PFBCompat_restore_twitter_names, "Features/Appearance/NavBarIcons.x", "hidesSharedBackground"},
-    {PFBCompat_restore_twitter_names, "Features/Appearance/NavBarIcons.x", "setHidesSharedBackground:"},
-    {PFBCompat_restore_twitter_names, "Features/Appearance/NavBarIcons.x", "title"},
-    {PFBCompat_restore_twitter_names, "Features/Appearance/NavBarIcons.x", "window"},
     {PFBCompat_restore_twitter_names, "Features/Appearance/Theme.x", "colorPalette"},
     {PFBCompat_restore_twitter_names, "Features/Appearance/Theme.x", "currentColorPalette"},
     {PFBCompat_restore_twitter_names, "Features/Appearance/Theme.x", "navigationBarLogoColor"},
@@ -1595,11 +1582,6 @@ static const PFBCompatName kNames[] = {
     {PFBCompat_show_account_location, "Features/Tweets/AccountLocation.x", "setTimeAgo:"},
     {PFBCompat_show_account_location, "Features/Tweets/AccountLocation.x", "timeAgo"},
     {PFBCompat_show_account_location, "Features/Tweets/AccountLocation.x", "viewModel"},
-    {PFBCompat_strip_url_tracking, "Features/Appearance/Theme.x", "setPrimaryColorOption:"},
-    {PFBCompat_strip_url_tracking, "Features/Appearance/Theme.x", "sharedSettings"},
-    {PFBCompat_strip_url_tracking, "Sideload/WebCreateTweet.x", "currentAccount"},
-    {PFBCompat_strip_url_tracking, "Sideload/WebCreateTweet.x", "sharedHostViewController"},
-    {PFBCompat_strip_url_tracking, "Sideload/WebCreateTweet.x", "userID"},
     {PFBCompat_tab_bar_theming, "Features/Appearance/Theme.x", "imageName"},
     {PFBCompat_tab_bar_theming, "Features/Appearance/Theme.x", "imageView"},
     {PFBCompat_tab_bar_theming, "Features/Appearance/Theme.x", "setHighlightBarColor:"},
@@ -1728,6 +1710,11 @@ static const PFBCompatDeclared kDeclared[] = {
     {"Features/Profiles/Avatars.x", "TFNAvatarImageView", "style"},
     {"Features/Appearance/CustomTabBar/PFBCustomTabBarViewController.m", "TFNFloatingActionButton", "hideAnimated:completion:"},
     {"Features/Appearance/CustomTabBar/PFBCustomTabBarViewController.m", "TFNFloatingActionButton", "showAnimated:completion:"},
+    {"Support/Helpers.h", "SFSafariViewController", "initialURL"},
+    {"Support/T1Headers.h", "T1TabView", "setIconColor:"},
+    {"Support/TAEHeaders.h", "TFNUIDefaultFontGroup", "boldFontOfSize:"},
+    {"Support/TAEHeaders.h", "TFNUIDefaultFontGroup", "sharedFontGroup"},
+    {"Support/TFSHeaders.h", "NSNumber", "tfs_twitterAbbreviated"},
 };
 enum { kDeclaredCount = sizeof(kDeclared) / sizeof(kDeclared[0]) };
 
@@ -1745,6 +1732,8 @@ static const PFBCompatOption kFlagOnly[] = {
     PFBCompat_disable_video_captions,
     PFBCompat_voice_transcription,
     PFBCompat_new_inapp_webview,
+    PFBCompat_no_focus_lost,
+    PFBCompat_disable_media_carousel,
 };
 static const size_t kFlagOnlyCount = sizeof(kFlagOnly) / sizeof(kFlagOnly[0]);
 
@@ -3074,6 +3063,12 @@ static BOOL optionEnabled(const PFBCompatMeta* meta) {
         }
         case PFBCompat_profile_initial_tab:
             return [PFBSettings integerForKey:key] > 0;
+        case PFBCompat_disable_auto_translate:
+            // An inverted switch: shown On while the stored key is off.
+            return ![PFBSettings boolForKey:key];
+        case PFBCompat_download_highest_quality:
+        case PFBCompat_direct_save:
+            return [PFBSettings boolForKey:key] && [PFBSettings boolForKey:@"download_videos"];
         case PFBCompat_web_session:
             return PFBHasUsableWebCredentials();
         case PFBCompat_show_account_location:
