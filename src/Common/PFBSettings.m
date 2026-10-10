@@ -17,7 +17,7 @@ static NSDictionary<NSString*, NSDictionary*>* PFBSettingsPages(void) {
                     @{@"key": @"padlock", @"default": @NO},
                     @{@"key": @"no_screenshot_detection", @"default": @YES},
                     @{@"type": @"header", @"titleKey": @"GENERAL_GROUP_BEHAVIOR"},
-                    @{@"key": @"force_following_tab", @"default": @NO},
+                    @{@"key": @"force_following_tab", @"default": @YES},
                     @{@"key": @"no_focus_lost", @"default": @NO},
                     @{@"key": @"no_tab_bar_hiding", @"default": @YES},
                     @{@"key": @"show_scroll_indicator", @"default": @NO},
@@ -314,9 +314,8 @@ static NSDictionary<NSString*, NSDictionary*>* PFBSettingsPages(void) {
                     },
                     @{
                         @"titleKey": @"PROFILE_INITIAL_TAB_TITLE",
-                        @"subtitleKey": @"PROFILE_INITIAL_TAB_SUBTITLE",
                         @"menu": @"profileTabMenu",
-                        @"type": @"button"
+                        @"type": @"compactButton"
                     },
                     @{@"type": @"header", @"titleKey": @"PROFILES_GROUP_TABS"},
                     @{
