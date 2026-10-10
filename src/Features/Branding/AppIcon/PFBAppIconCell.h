@@ -1,0 +1,17 @@
+// A cell of the app icon picker, styled like the app's native AppIconCell.
+
+#import <UIKit/UIKit.h>
+
+NS_ASSUME_NONNULL_BEGIN
+
+@interface PFBAppIconCell : UICollectionViewCell
+
+- (void)configureWithImage:(nullable UIImage*)image
+                    active:(BOOL)active
+               accentColor:(UIColor*)accentColor;
+
++ (NSString*)reuseIdentifier;
+
+@end
+
+NS_ASSUME_NONNULL_END

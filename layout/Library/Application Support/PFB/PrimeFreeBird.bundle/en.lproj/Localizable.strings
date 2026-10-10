@@ -1,0 +1,607 @@
+/*
+  Language: en
+  PrimeFreeBird
+*/
+
+/*
+  =====================================================================
+  HOW KEYS RESOLVE
+
+  1. TOGGLE rows declare no strings in PFBSettings.m. The UI derives them
+     from the toggle's own key:
+         some_toggle_key -> "SOME_TOGGLE_KEY_TITLE"   (row title)
+                         -> "SOME_TOGGLE_KEY_DETAIL"  (grey subtitle)
+     _DETAIL is optional: omit it and no subtitle is drawn.
+  2. BUTTON rows declare "titleKey" / "subtitleKey" explicitly.
+     compactButton rows instead show a live value via "prefKeyForSubtitle",
+     so they intentionally have no _DETAIL key.
+  3. GROUP HEADERS use "<PAGE>_GROUP_<NAME>". Sentence case, like the row
+     titles: the header cell prints them exactly as written, so the case you
+     type is the case on screen.
+     A page earns headers from roughly ten rows up. Below that it stays flat —
+     two headers over four rows is decoration, not structure.
+  4. PAGES use "MODERN_SETTINGS_<PAGE>_TITLE" / "_SUBTITLE".
+     Note: the General page's keys are historically named _LAYOUT_.
+
+  A missing key renders as the raw key name on screen.
+
+  WRITING RULES (keep new strings consistent)
+
+  TITLES — sentence case, no final period, 4 words max.
+  Rows that REMOVE, REVEAL or SWITCH OFF something use a closed family:
+      Hide <thing>      removes UI            "Hide bookmarks"
+      Show <thing>      adds UI               "Show Tweet source labels"
+      Restore <thing>   brings back classic   "Restore reply context"
+      Disable <thing>   turns a behaviour off "Disable auto-translate"
+  Rows that PERFORM an action use that action's own verb: Confirm, Save,
+  Download, Copy, Lock, Clean, Bypass, Preload.
+  Rows that CHANGE a property are bare noun phrases: "Square profile
+  pictures", "Tab labels", "Scroll bar".
+  Buttons opening another screen are always bare nouns: "Theme color".
+  Never "No ...", "Turn off ...", "Use ...", "Always ...".
+
+  SUBTITLES (row) — exactly one sentence, ending with a period, describing
+  what happens when the row is ON. Max ~80 characters. Never restate the
+  title. Prefer the dominant openers: "Remove ..." and "Show ...".
+
+  BODY TEXT (screen-level explanations such as the theme picker intro or the
+  navigation bar editor hint) may run to two sentences — they are
+  instructions, not row subtitles.
+
+  Sections below mirror the settings menu in display order; pickers, editors
+  and alerts follow the page that owns them.
+  =====================================================================
+*/
+
+/* ===== GENERAL — page ===== */
+"MODERN_SETTINGS_LAYOUT_TITLE" = "General";
+"MODERN_SETTINGS_LAYOUT_SUBTITLE" = "Lock the app, control links, and tune how Twitter behaves.";
+
+/* ===== General › Privacy ===== */
+"GENERAL_GROUP_PRIVACY" = "Privacy";
+"PADLOCK_TITLE" = "Lock Twitter";
+"PADLOCK_DETAIL" = "Require Face ID or a passcode to open Twitter.";
+"NO_SCREENSHOT_DETECTION_TITLE" = "Clean screenshots";
+"NO_SCREENSHOT_DETECTION_DETAIL" = "Stop Twitter from adding watermarks or share prompts to screenshots.";
+
+/* ===== General › App behavior ===== */
+"GENERAL_GROUP_BEHAVIOR" = "App behavior";
+"FORCE_FOLLOWING_TAB_TITLE" = "Following by default";
+"FORCE_FOLLOWING_TAB_DETAIL" = "Open the timeline on Following instead of For You.";
+"NO_FOCUS_LOST_TITLE" = "Keep your place";
+"NO_FOCUS_LOST_DETAIL" = "Don't refresh the timeline when you come back from another app.";
+"NO_TAB_BAR_HIDING_TITLE" = "Fixed navigation bar";
+"NO_TAB_BAR_HIDING_DETAIL" = "Don't fade the navigation bar when you scroll.";
+"SHOW_SCROLL_INDICATOR_TITLE" = "Scroll bar";
+"SHOW_SCROLL_INDICATOR_DETAIL" = "Show the position indicator on the right while scrolling.";
+"DISABLE_RTL_TITLE" = "Left-to-right layout";
+"DISABLE_RTL_DETAIL" = "Force a left-to-right layout, even for right-to-left languages.";
+"HIDE_PREMIUM_OFFER_TITLE" = "Hide Twitter Blue prompts";
+"HIDE_PREMIUM_OFFER_DETAIL" = "Remove the “Get Verified” and “Upgrade” buttons.";
+
+/* ===== General › Links ===== */
+"GENERAL_GROUP_LINKS" = "Links";
+"SHARING_DOMAIN_TITLE" = "Sharing domain";
+"STRIP_URL_TRACKING_TITLE" = "Clean shared links";
+"STRIP_URL_TRACKING_DETAIL" = "Remove tracking parameters from links you share or copy.";
+"ALWAYS_OPEN_SAFARI_TITLE" = "External browser";
+"ALWAYS_OPEN_SAFARI_DETAIL" = "Open links in Safari or your default browser.";
+"NEW_INAPP_WEBVIEW_TITLE" = "New in-app browser";
+"NEW_INAPP_WEBVIEW_DETAIL" = "Use Twitter's newer in-app browser for opening links.";
+
+/* ===== APPEARANCE — page ===== */
+"MODERN_SETTINGS_APPEARANCE_TITLE" = "Appearance";
+"MODERN_SETTINGS_APPEARANCE_SUBTITLE" = "Interface style, colors, and fonts.";
+
+/* ===== Appearance › Interface ===== */
+"APPEARANCE_GROUP_INTERFACE" = "Interface";
+"INTERFACE_STYLE_TITLE" = "Interface style";
+"INTERFACE_STYLE_SUBTITLE" = "Choose between the Standard look and the Liquid Glass design.";
+"CUSTOM_TAB_BAR_OPTION_TITLE" = "Navigation bar";
+"CUSTOM_TAB_BAR_OPTION_SUBTITLE" = "Choose which buttons appear in the bottom navigation bar.";
+"RESTORE_TAB_LABELS_TITLE" = "Tab labels";
+"RESTORE_TAB_LABELS_DETAIL" = "Show labels under the icons in the navigation bar.";
+"CUSTOM_FONTS_TITLE" = "Custom fonts";
+"CUSTOM_FONTS_DETAIL" = "Use a custom font throughout Twitter.";
+"REGULAR_FONTS_PICKER_OPTION_TITLE" = "Regular font";
+"BOLD_FONTS_PICKER_OPTION_TITLE" = "Bold font";
+"FONT_SYSTEM_DEFAULT_SUBTITLE" = "System default";
+"DEFAULT_FONT_OPTION_TITLE" = "Reset to default font";
+"DEFAULT_FONT_CONFIRM_MESSAGE" = "Regular and bold go back to Twitter's font, and the recent fonts are cleared.";
+
+/* ===== Appearance › Colors ===== */
+"APPEARANCE_GROUP_COLORS" = "Colors";
+"THEME_OPTION_TITLE" = "Theme color";
+"THEME_OPTION_SUBTITLE" = "Set the accent color used throughout the app.";
+"DARK_MODE_STYLE_TITLE" = "Background color";
+"DARK_MODE_STYLE_SUBTITLE" = "Choose the background shade used in dark mode.";
+"TAB_BAR_THEMING_TITLE" = "Selected tab";
+"TAB_BAR_THEMING_DETAIL" = "Apply the accent color to the selected navigation item.";
+"COLOR_PFB_SWITCHES_TITLE" = "Switches";
+"COLOR_PFB_SWITCHES_DETAIL" = "Apply the accent color to the switches in these settings.";
+"COLOR_TWITTER_ICON_IN_TOP_BAR_TITLE" = "Twitter icon";
+"COLOR_TWITTER_ICON_IN_TOP_BAR_DETAIL" = "Apply the accent color to the bird in the top bar.";
+
+/* ===== BRANDING ===== */
+"MODERN_SETTINGS_BRANDING_TITLE" = "Branding";
+"MODERN_SETTINGS_BRANDING_SUBTITLE" = "Bring back the bird, the Tweet button, and Twitter wording.";
+"APP_ICON_TITLE" = "App icon";
+"APP_ICON_SUBTITLE" = "Choose a classic Twitter icon for your Home Screen.";
+"RESTORE_TWITTER_NAMES_TITLE" = "Restore Twitter terminology";
+"RESTORE_TWITTER_NAMES_DETAIL" = "Bring back the bird, and replace “X” with “Twitter”, “Post” with “Tweet”, and so on.";
+"REFRESH_PILL_LABEL_TITLE" = "Refresh pill label";
+"REFRESH_PILL_LABEL_DETAIL" = "Add “posted” back to the pill that announces new Tweets.";
+"RESTORE_TWEET_BUTTON_TITLE" = "Classic Tweet button";
+"RESTORE_TWEET_BUTTON_DETAIL" = "Show the bird on a colored circle as the Tweet button.";
+
+/* ===== TIMELINES ===== */
+"MODERN_SETTINGS_TIMELINES_TITLE" = "Timelines";
+"MODERN_SETTINGS_TIMELINES_SUBTITLE" = "Clear ads, suggestions, and prompts out of your feed.";
+"HIDE_PROMOTED_TITLE" = "Hide ads";
+"HIDE_PROMOTED_DETAIL" = "Remove all promoted Tweets from your timeline.";
+"HIDE_WHO_TO_FOLLOW_TITLE" = "Hide “Who to follow”";
+"HIDE_WHO_TO_FOLLOW_DETAIL" = "Remove follow suggestions from your timeline.";
+"HIDE_TOPICS_TITLE" = "Hide topic Tweets";
+"HIDE_TOPICS_DETAIL" = "Remove Tweets pushed into your timeline because they match a topic.";
+"HIDE_TOPICS_TO_FOLLOW_TITLE" = "Hide suggested topics";
+"HIDE_TOPICS_TO_FOLLOW_DETAIL" = "Remove the cards that suggest topics to follow.";
+"HIDE_TIMELINE_PROMPTS_TITLE" = "Hide timeline prompts";
+"HIDE_TIMELINE_PROMPTS_DETAIL" = "Remove banners like “Add contacts”.";
+"HIDE_SPACES_TITLE" = "Hide Spaces bar";
+"HIDE_SPACES_DETAIL" = "Remove the Spaces bar from the top of your timeline.";
+"HIDE_CUSTOM_TIMELINES_TITLE" = "Hide custom timelines";
+"HIDE_CUSTOM_TIMELINES_DETAIL" = "Remove pinned lists and communities from the Home tabs, and the Add button.";
+"RESTORE_REFRESH_SOUNDS_TITLE" = "Pull-to-refresh sounds";
+"RESTORE_REFRESH_SOUNDS_DETAIL" = "Play the classic sounds when you pull to refresh.";
+
+"HIDE_VERIFIED_TWEETS_TITLE" = "Hide verified Tweets";
+"HIDE_VERIFIED_TWEETS_DETAIL" = "Remove Tweets from verified accounts you don't follow. Profiles and search keep them.";
+"HIDE_BLOCKED_RETWEETS_TITLE" = "Hide blocked retweets";
+"HIDE_BLOCKED_RETWEETS_DETAIL" = "Remove retweets of accounts that have blocked you.";
+
+/* ===== TWEETS ===== */
+"MODERN_SETTINGS_TWEETS_TITLE" = "Tweets";
+"MODERN_SETTINGS_TWEETS_SUBTITLE" = "Composing, buttons, and how replies are shown.";
+"UNDO_TWEET_TITLE" = "Undo Tweet";
+"TWEET_CONFIRM_TITLE" = "Confirm Tweets";
+"TWEET_CONFIRM_DETAIL" = "Ask before posting a Tweet.";
+"LIKE_CONFIRM_TITLE" = "Confirm likes";
+"LIKE_CONFIRM_DETAIL" = "Ask before liking a Tweet.";
+"HIDE_THREADS_TITLE" = "Hide conversations";
+"HIDE_THREADS_DETAIL" = "Add “Hide this conversation” to a Tweet’s menu and keep hidden ones out of the timeline.";
+"HIDE_VIEW_COUNT_TITLE" = "Hide views";
+"HIDE_VIEW_COUNT_DETAIL" = "Remove the view count under Tweets.";
+"HIDE_BOOKMARK_BUTTON_TITLE" = "Hide bookmarks";
+"HIDE_BOOKMARK_BUTTON_DETAIL" = "Remove the bookmark button from Tweets.";
+"HIDE_DOWNVOTE_BUTTON_TITLE" = "Hide downvotes";
+"HIDE_DOWNVOTE_BUTTON_DETAIL" = "Remove the downvote button from Tweets.";
+"DISABLE_SENSITIVE_TWEET_WARNINGS_TITLE" = "Hide sensitive content warnings";
+"DISABLE_SENSITIVE_TWEET_WARNINGS_DETAIL" = "Show sensitive photos and videos without the warning screen.";
+"BYPASS_AGE_VERIFICATION_TITLE" = "Bypass age verification";
+"BYPASS_AGE_VERIFICATION_DETAIL" = "Skip the age check for sensitive content.";
+"REPLY_SORTING_TITLE" = "Chronological replies";
+"REPLY_SORTING_DETAIL" = "Show replies oldest-first instead of sorted by relevance.";
+"RESTORE_REPLY_CONTEXT_TITLE" = "Restore reply context";
+"RESTORE_REPLY_CONTEXT_DETAIL" = "Show who's being replied to under Tweets.";
+"SHOW_QUOTE_COUNTS_TITLE" = "Quote and Retweet counts";
+"SHOW_QUOTE_COUNTS_DETAIL" = "Show both numbers at the top of a Tweet's Quotes screen.";
+"SHOW_ACCOUNT_LOCATION_TITLE" = "Account location";
+"SHOW_ACCOUNT_LOCATION_DETAIL" = "Show the country an account is based in next to the time of an opened Tweet.";
+"QUOTE_COUNTS_TITLE_FORMAT" = "Quotes: %@ · Retweets: %@";
+
+/* ===== MEDIA ===== */
+"MODERN_SETTINGS_MEDIA_TITLE" = "Media";
+"MODERN_SETTINGS_MEDIA_SUBTITLE" = "Downloads, playback, quality, and layout.";
+"DOWNLOAD_VIDEOS_TITLE" = "Download media";
+"DOWNLOAD_VIDEOS_DETAIL" = "Save videos and GIFs from the media long-press menu.";
+"DOWNLOAD_HIGHEST_QUALITY_TITLE" = "Best quality downloads";
+"DOWNLOAD_HIGHEST_QUALITY_DETAIL" = "Skip the quality menu and save the best video.";
+"DIRECT_SAVE_TITLE" = "Save to Photos";
+"DIRECT_SAVE_DETAIL" = "Send saved videos straight to your Photos app.";
+"TWEET_TO_IMAGE_TITLE" = "Save Tweet as image";
+"TWEET_TO_IMAGE_DETAIL" = "Long-press share to export a Tweet as an image.";
+"DISABLE_VIDEO_CAPTIONS_TITLE" = "Hide video captions";
+"DISABLE_VIDEO_CAPTIONS_DETAIL" = "Remove the automatic subtitles shown on videos.";
+"AUTO_HIGHEST_LOAD_TITLE" = "High-quality media";
+"AUTO_HIGHEST_LOAD_DETAIL" = "Always load photos and videos at the highest resolution.";
+"ENABLE_IMAGE_PRELOADING_TITLE" = "Preload media";
+"ENABLE_IMAGE_PRELOADING_DETAIL" = "Load photos and videos ahead of time for smoother scrolling.";
+"FORCE_TWEET_FULL_FRAME_TITLE" = "Uncropped images";
+"FORCE_TWEET_FULL_FRAME_DETAIL" = "Show photos in full instead of cropped previews.";
+"DISABLE_MEDIA_CAROUSEL_TITLE" = "Classic media grid";
+"DISABLE_MEDIA_CAROUSEL_DETAIL" = "Show several photos in a Tweet as a grid instead of a carousel.";
+"RESTORE_VIDEO_TIMESTAMP_TITLE" = "Video time";
+"RESTORE_VIDEO_TIMESTAMP_DETAIL" = "Show elapsed and total time on full-screen videos, instead of the countdown.";
+"DISABLE_IMMERSIVE_SCROLL_TITLE" = "Disable video auto-scroll";
+"DISABLE_IMMERSIVE_SCROLL_DETAIL" = "Stop the next video from starting when you swipe in full-screen.";
+
+/* ===== PROFILES ===== */
+"MODERN_SETTINGS_PROFILES_TITLE" = "Profiles";
+"MODERN_SETTINGS_PROFILES_SUBTITLE" = "Follow buttons, badges, and profile tabs.";
+"FOLLOW_CONFIRM_TITLE" = "Confirm follows";
+"FOLLOW_CONFIRM_DETAIL" = "Ask before following someone.";
+"COPY_PROFILE_INFO_TITLE" = "Copy profile details";
+"COPY_PROFILE_INFO_DETAIL" = "Copy usernames, bios, and more with one tap.";
+"DISABLE_ARTICLES_TITLE" = "Hide Articles tab";
+"DISABLE_ARTICLES_DETAIL" = "Remove the Articles tab from profiles.";
+"DISABLE_HIGHLIGHTS_TITLE" = "Hide Highlights tab";
+"DISABLE_HIGHLIGHTS_DETAIL" = "Remove the Highlights tab from profiles.";
+"HIDE_BLUE_VERIFIED_TITLE" = "Hide paid checkmarks";
+"HIDE_BLUE_VERIFIED_DETAIL" = "Remove Twitter Blue checkmarks while keeping brand and government badges.";
+"HIDE_FOLLOW_BUTTON_TITLE" = "Hide Follow button";
+"HIDE_FOLLOW_BUTTON_DETAIL" = "Remove the Follow button shown on Tweets in your timeline.";
+"HIDE_MESSAGE_BUTTON_TITLE" = "Hide Message button";
+"HIDE_MESSAGE_BUTTON_DETAIL" = "Remove the Message button shown beside a Tweet’s author.";
+/* Legacy key name: this row HIDES the Subscribe button. Do not rename the
+   key — it is persisted in user defaults. */
+"RESTORE_FOLLOW_BUTTON_TITLE" = "Hide Subscribe button";
+"RESTORE_FOLLOW_BUTTON_DETAIL" = "Remove the Subscribe button from Tweets and profiles.";
+"SQUARE_AVATARS_TITLE" = "Square profile pictures";
+"SQUARE_AVATARS_DETAIL" = "Show avatars with square corners, like classic Twitter.";
+
+/* ===== SEARCH ===== */
+"SEARCH_GROUP_SEARCHING" = "Searching";
+"SEARCH_GROUP_TRENDS" = "Trends";
+"MODERN_SETTINGS_SEARCH_TITLE" = "Search";
+"MODERN_SETTINGS_SEARCH_SUBTITLE" = "Search history, trends, and trending videos.";
+"NO_HISTORY_TITLE" = "Disable search history";
+"NO_HISTORY_DETAIL" = "Stop Twitter from keeping track of your searches.";
+"HIDE_TREND_VIDEOS_TITLE" = "Hide trending videos";
+"HIDE_TREND_VIDEOS_DETAIL" = "Remove trending videos from the search menu.";
+
+/* ===== MESSAGES ===== */
+"MODERN_SETTINGS_MESSAGES_TITLE" = "Messages";
+"MODERN_SETTINGS_MESSAGES_SUBTITLE" = "Typing, voice notes, and Grok's entry points.";
+"MESSAGES_GROUP_CHAT" = "Chat";
+"MESSAGES_GROUP_GROK" = "Grok";
+"HIDE_TYPING_INDICATOR_TITLE" = "Hide typing indicator";
+"HIDE_TYPING_INDICATOR_DETAIL" = "Stop telling the other side that you are writing.";
+"VOICE_TRANSCRIPTION_TITLE" = "Voice transcripts";
+"VOICE_TRANSCRIPTION_DETAIL" = "Show the text of a voice note under its waveform.";
+"DOWNLOAD_VOICE_MESSAGES_TITLE" = "Download voice notes";
+"DOWNLOAD_VOICE_MESSAGES_DETAIL" = "Long-press a voice message to save the audio file.";
+
+/* ===== GROK ===== */
+"HIDE_GROK_ANALYZE_TITLE" = "Hide analyze button";
+"HIDE_GROK_ANALYZE_DETAIL" = "Remove Grok's analyze and ask buttons from Tweets.";
+"HIDE_GROK_SIDEBAR_TITLE" = "Hide sidebar shortcut";
+"HIDE_GROK_SIDEBAR_DETAIL" = "Remove the Grok shortcut from the side menu.";
+"HIDE_GROK_BOT_TITLE" = "Hide Grok Bot";
+"HIDE_GROK_BOT_DETAIL" = "Remove the “Try Grok Bot” row and the other Grok Bot promotions.";
+"HIDE_GROK_CREATE_TITLE" = "Hide creation tools";
+"HIDE_GROK_CREATE_DETAIL" = "Remove the options to create or edit media with Grok.";
+"DISABLE_AUTO_TRANSLATE_TITLE" = "Auto-translate";
+"DISABLE_AUTO_TRANSLATE_DETAIL" = "Translate Tweets and bios automatically.";
+
+/* ===== LAB ===== */
+"MODERN_SETTINGS_LAB_TITLE" = "Tools";
+"MODERN_SETTINGS_LAB_SUBTITLE" = "Web session, backup, and compatibility.";
+"REPLY_IN_WEBVIEW_TITLE" = "Reply in web view";
+"REPLY_IN_WEBVIEW_DETAIL" = "Reply through a web page when the app refuses to send replies.";
+"IMPORT_SETTINGS_DONE_TITLE" = "Settings imported";
+"IMPORT_SETTINGS_DONE_MESSAGE" = "%lu settings restored. Restart Twitter to apply everything.";
+"IMPORT_SETTINGS_FAILED_TITLE" = "Import failed";
+"IMPORT_SETTINGS_FAILED_MESSAGE" = "This file is not a PrimeFreeBird settings backup.";
+"READING_LINE_TITLE" = "Reading marker";
+"READING_LINE_DETAIL" = "Marks where you were when new Tweets arrive above — on Following and your Lists.";
+/* Reply-in-web-view: the reply screen title + the web-session login/clear
+   buttons (Lab) and their alerts. */
+"REPLY_WEBVIEW_TITLE" = "Reply";
+"WEB_SESSION_CLEAR_TITLE" = "Clear web session";
+"WEB_SESSION_CLEAR_CONFIRM" = "This deletes the saved web login. Until you sign in again, new Tweets, Spaces, mute lists, Grok, Twitter's web pages and replies in the web view no longer go through it.";
+"WEB_SESSION_CLEAR_ACTION" = "Delete";
+"OK_ACTION" = "OK";
+"CANCEL_ACTION" = "Cancel";
+
+/* ===== Interface style picker ===== */
+"INTERFACE_STYLE_DETAIL" = "Liquid Glass is the translucent design introduced with iOS 26; Standard keeps the familiar flat look.";
+"INTERFACE_STYLE_STANDARD" = "Standard";
+"INTERFACE_STYLE_LIQUID_GLASS" = "Liquid Glass";
+
+/* ===== Background color picker ===== */
+"DARK_MODE_STYLE_DETAIL" = "Pick the shade Twitter uses for its dark backgrounds.";
+"DARK_MODE_STYLE_DIM" = "Dim";
+"DARK_MODE_STYLE_GRAY" = "Gray";
+"DARK_MODE_STYLE_PURE_BLACK" = "Blackout";
+"DARK_MODE_STYLE_SYSTEM" = "System";
+
+/* ===== Theme color picker ===== */
+"THEME_SETTINGS_NAVIGATION_DETAIL" = "Choose an accent color. Only you can see it.";
+"THEME_SETTINGS_NAVIGATION_TITLE" = "Theme";
+"THEME_RESET_TITLE" = "Reset to default";
+"THEME_CUSTOM_HINT" = "Pick any color for links, buttons, and highlights.";
+"THEME_RESET_HINT" = "Removes the accent color and restores the default appearance.";
+
+/* ===== Navigation bar editor ===== */
+"CUSTOM_TAB_BAR_GRID_DETAIL" = "Tap a destination to add or remove it. Drag the bar below to reorder.";
+"CUSTOM_TAB_BAR_RESET_MESSAGE" = "Restore the navigation bar to its default layout.";
+"CUSTOM_TAB_BAR_SETTINGS_NAVIGATION_TITLE" = "Custom navigation";
+
+/* ===== Fonts picker ===== */
+"CUSTOM_FONTS_MENU_TITLE" = "\nChoose a font";
+"CUSTOM_FONTS_NAVIGATION_BUTTON_TITLE" = "Custom fonts";
+"CUSTOM_FONTS_TUT_ALERT_MESSAGE" = "No custom fonts yet. Install some with the iFont app from the App Store.";
+"INSTALL_IFONT_BUTTON_TITLE" = "Get iFont";
+
+/* ===== Media & download flows ===== */
+"DOWNLOAD_AS_GIF_OPTION_TITLE" = "Download as GIF";
+"DOWNLOAD_AS_MP4_OPTION_TITLE" = "Download as MP4";
+"DOWNLOAD_MENU_TITLE" = "\nChoose video quality";
+"DOWNLOAD_VIDEO_NUMBER_TITLE" = "Video %lu";
+"DOWNLOAD_ALL_VIDEOS_OPTION_TITLE" = "Download all videos";
+
+/* ===== Profile actions ===== */
+"COPY_PROFILE_INFO_MENU_OPTION_1" = "Copy bio";
+"COPY_PROFILE_INFO_MENU_OPTION_2" = "Copy username";
+"COPY_PROFILE_INFO_MENU_OPTION_3" = "Copy name";
+"COPY_PROFILE_INFO_MENU_OPTION_4" = "Copy website";
+"COPY_PROFILE_INFO_MENU_OPTION_5" = "Copy location";
+
+/* ===== Padlock / authentication ===== */
+"PADLOCK_LOCKED_LABEL" = "Locked";
+"PADLOCK_REASON" = "Unlock Twitter";
+
+/* ===== Alerts, confirmations & shared labels ===== */
+"RESTART_REQUIRED_ALERT_MESSAGE" = "Twitter will close so the change can take effect.";
+"RESTART_REQUIRED_ALERT_TITLE" = "Restart required";
+"RESTART_LATER_ACTION" = "Later";
+"RESTART_NOW_ACTION" = "Restart now";
+"LOGIN_RESTART_TITLE" = "Almost there";
+"LOGIN_RESTART_MESSAGE" = "Restart Twitter to finish loading the interface.";
+"LIGHT_MODE_RESTART_TITLE" = "Back to light mode";
+"LIGHT_MODE_RESTART_MESSAGE" = "Your background color was reset to System. Restart Twitter to clear any leftover dark colors.";
+"CLOSE_APP_ACTION" = "Close app";
+
+/* ===== Miscellaneous ===== */
+"FETCHING_PROGRESS_TITLE" = "Just a second…";
+"PFB_SETTINGS_DETAIL" = "Hide ads, restore the bird, and tune Twitter to your taste.";
+"REFRESH_PILL_TEXT" = "posted";
+"UNKNOWN_ERROR" = "An unknown error occurred.";
+"PHOTOS_SAVE_FAILED_MESSAGE" = "Photos did not accept the file. In Settings, check that Twitter may add photos.";
+
+/* ===== Advanced search (2026-08-04) ===== */
+"ADVANCED_SEARCH_TITLE" = "Advanced search";
+"ADVANCED_SEARCH_DETAIL" = "Adds a filters button on Explore to build advanced queries.";
+"ADVSEARCH_SECTION_WORDS" = "Words";
+"ADVSEARCH_SECTION_ACCOUNTS" = "Accounts";
+"ADVSEARCH_SECTION_ENGAGEMENT" = "Engagement";
+"ADVSEARCH_SECTION_DATES" = "Dates";
+"ADVSEARCH_ALL_WORDS" = "All of these words";
+"ADVSEARCH_EXACT_PHRASE" = "This exact phrase";
+"ADVSEARCH_ANY_WORDS" = "Any of these words";
+"ADVSEARCH_NONE_WORDS" = "None of these words";
+"ADVSEARCH_HASHTAGS" = "These hashtags";
+"ADVSEARCH_FROM_ACCOUNTS" = "From these accounts";
+"ADVSEARCH_TO_ACCOUNTS" = "To these accounts";
+"ADVSEARCH_MENTIONING" = "Mentioning these accounts";
+"ADVSEARCH_MIN_REPLIES" = "Minimum replies";
+"ADVSEARCH_MIN_LIKES" = "Minimum likes";
+"ADVSEARCH_MIN_REPOSTS" = "Minimum retweets";
+"ADVSEARCH_SINCE_DATE" = "From date";
+"ADVSEARCH_UNTIL_DATE" = "To date";
+"ADVSEARCH_SEARCH" = "Search";
+"ADVSEARCH_CLEAR" = "Clear all fields";
+"ADVSEARCH_EMPTY" = "Fill in at least one field.";
+"RESTART_INFO_ALERT_MESSAGE" = "Restart Twitter for the change to fully apply.";
+
+/* ===== Advanced search v1.3 — web-verbatim (2026-08-04) ===== */
+"ADVSEARCH_SECTION_FILTERS" = "Filters";
+"ADVSEARCH_LANGUAGE" = "Language";
+"ADVSEARCH_ANY_LANGUAGE" = "Any language";
+"ADVSEARCH_REPLIES" = "Replies";
+"ADVSEARCH_REPLIES_SUB" = "Include replies and original Tweets.";
+"ADVSEARCH_LINKS" = "Links";
+"ADVSEARCH_LINKS_SUB" = "Include Tweets with links.";
+"ADVSEARCH_EX_ALL" = "Example: what's happening · contains both \"what's\" and \"happening\"";
+"ADVSEARCH_EX_EXACT" = "Example: happy hour · contains the exact phrase \"happy hour\"";
+"ADVSEARCH_EX_ANY" = "Example: cats dogs · contains either \"cats\" or \"dogs\" (or both)";
+"ADVSEARCH_EX_NONE" = "Example: cats dogs · does not contain \"cats\" and does not contain \"dogs\"";
+"ADVSEARCH_EX_TAGS" = "Example: #ThrowbackThursday · contains the hashtag #ThrowbackThursday";
+"ADVSEARCH_EX_FROM" = "Example: @NASA · sent from @NASA";
+"ADVSEARCH_EX_TO" = "Example: @NASA · sent in reply to @NASA";
+"ADVSEARCH_EX_MENTION" = "Example: @SFBART @Caltrain · mentions @SFBART or mentions @Caltrain";
+"ADVSEARCH_EX_MINREPLIES" = "Example: 280 · Tweets with at least 280 replies";
+"ADVSEARCH_EX_MINLIKES" = "Example: 280 · Tweets with at least 280 likes";
+"ADVSEARCH_EX_MINREPOSTS" = "Example: 280 · Tweets with at least 280 retweets";
+"ADVSEARCH_EX_SINCE" = "Only Tweets published after this date";
+"ADVSEARCH_EX_UNTIL" = "Only Tweets published before this date";
+
+/* ===== MEDIA — nouveaux groupes et options (2026-08-04) ===== */
+"MEDIA_GROUP_DOWNLOADS" = "Downloads";
+"MEDIA_GROUP_PLAYBACK" = "Playback";
+"MEDIA_GROUP_QUALITY" = "Quality";
+"DISABLE_VIDEO_DOCKING_TITLE" = "Disable video docking";
+"DISABLE_VIDEO_DOCKING_DETAIL" = "Stop full-screen videos from shrinking into a floating player.";
+"UPLOAD_FULL_HD_VIDEOS_TITLE" = "Full HD video uploads";
+"UPLOAD_FULL_HD_VIDEOS_DETAIL" = "Upload your videos in 1080p instead of the compressed default.";
+"COPY_PROFILE_INFO_MENU_OPTION_6" = "Copy profile URL";
+"COPY_PROFILE_INFO_MENU_OPTION_7" = "Copy user ID";
+"COPY_PROFILE_INFO_MENU_OPTION_8" = "Copy date joined";
+"UNROUNDED_COUNTS_TITLE" = "Unrounded counts";
+
+/* ===== TWEETS — groupes et nouvelle option (2026-08-05) ===== */
+"TWEETS_GROUP_COMPOSING" = "Composing";
+"TWEETS_GROUP_ACTIONS" = "Tweet actions";
+"TWEETS_GROUP_READING" = "Reading";
+"HIDE_TWEET_BUTTON_TITLE" = "Hide Tweet button";
+"HIDE_TWEET_BUTTON_DETAIL" = "Remove the compose button from the timeline.";
+"SEND_SOUND_TITLE" = "Send sound";
+"SEND_SOUND_NONE" = "None";
+"SEND_SOUND_IMPORT_ACTION" = "Import…";
+"SEND_SOUND_REMOVE_ACTION" = "Remove";
+"SEND_SOUND_FAILED_TITLE" = "The sound was not imported";
+"SEND_SOUND_TOO_LONG" = "Choose a sound of 7 seconds or less.";
+"SEND_SOUND_UNREADABLE" = "This file is not a sound that can be played.";
+
+/* ===== TIMELINES — groupes et nouvelle option (2026-08-05) ===== */
+"TIMELINES_GROUP_SUGGESTIONS" = "Ads and suggestions";
+"TIMELINES_GROUP_CONTENT" = "Content";
+"TIMELINES_GROUP_BARS" = "Bars";
+"UNLIMITED_TIMELINE_TABS_TITLE" = "Unlimited timeline tabs";
+"UNLIMITED_TIMELINE_TABS_DETAIL" = "Pin more timelines and unlock advanced tabs.";
+"UNLIMITED_TIMELINE_TABS_DETAIL_HELD" = "Pin more timelines and unlock advanced tabs.";
+
+/* ===== MUTED WORDS (2026-08-05) ===== */
+"MUTED_WORDS_SUBTITLE" = "Tweets that match anything in this list are filtered out of your timeline.";
+"FILTERS_TITLE" = "Filters";
+"QUICK_MUTED_WORDS_LABEL" = "Muted words";
+"FILTERS_DETAIL" = "Words, accounts and languages you keep out of your feed.";
+"FILTERS_SEGMENT_WORDS" = "Words";
+"FILTERS_SEGMENT_LANGUAGES" = "Languages";
+"FILTERS_SEGMENT_THREADS" = "Threads";
+"THREADS_FOOTER" = "Conversations you hid from a Tweet. Swipe a row to bring one back.";
+"THREADS_EMPTY" = "No hidden conversations";
+"THREADS_NO_PREVIEW" = "(no text)";
+"THREADS_HIDDEN_TOAST" = "Conversation hidden";
+"THREADS_UNDO" = "Undo";
+"THREADS_HIDE_ACTION" = "Hide this conversation";
+"LANGUAGES_FOOTER_OFF" = "No language checked — every language reaches your timeline.";
+"LANGUAGES_FOOTER_ON" = "Only the checked languages reach your timeline.\nTweets with no detected language always pass.\nUncheck every language to turn the filter off.";
+"LANGUAGES_TRANSLATE_TITLE" = "Auto-translate";
+"LANGUAGES_TRANSLATE_DETAIL" = "Tweets, bios, notes and notifications.";
+"LANGUAGES_OTHERS_TITLE" = "Other languages";
+"LANGUAGES_OTHERS_NONE" = "None";
+"MUTED_WORDS_NONE" = "None";
+"MUTED_WORDS_ADD_PLACEHOLDER" = "Add a word, phrase or @account";
+"MUTED_WORDS_ADD_BUTTON" = "Add";
+"MUTED_WORDS_OPTIONS_HEADER" = "Options";
+"MUTED_WORDS_KIND_WORD" = "word";
+"MUTED_WORDS_KIND_PHRASE" = "phrase";
+"MUTED_WORDS_KIND_ACCOUNT" = "account";
+"MUTED_WORDS_WHOLE_TITLE" = "Whole words only";
+"MUTED_WORDS_WHOLE_DETAIL" = "Match \"cat\" as a word, not inside \"concatenate\".";
+"MUTED_WORDS_CONVERSATIONS_TITLE" = "Filter in conversations";
+"MUTED_WORDS_CONVERSATIONS_DETAIL" = "Apply the list to replies as well as the timeline.";
+
+/* ===== MUTED WORDS — expiry, scope, counter (2026-08-05) ===== */
+"MUTED_WORDS_FOLLOWING_TITLE" = "Skip accounts you follow";
+"MUTED_WORDS_FOLLOWING_DETAIL" = "Tweets from people you follow are never filtered.";
+"MUTED_WORDS_REPOSTS_TITLE" = "Include retweets";
+"MUTED_WORDS_REPOSTS_DETAIL" = "Also filter retweets of a muted word or account.";
+"MUTED_WORDS_COUNT_FORMAT" = "%ld Tweets filtered today";
+"MUTED_WORDS_DURATION_FOREVER" = "forever";
+"MUTED_WORDS_DURATION_24H" = "24 hours";
+"MUTED_WORDS_DURATION_7D" = "7 days";
+"MUTED_WORDS_DURATION_30D" = "30 days";
+"MUTED_WORDS_EXPIRES_FORMAT" = "%ld d left";
+"MUTED_WORDS_EXAMPLE_TERM" = "spoiler";
+
+"HIDE_SCROLL_EDGE_BLUR_TITLE" = "Hide scroll edge blur";
+"HIDE_SCROLL_EDGE_BLUR_DETAIL" = "Remove the blurred band iOS draws under the top bars.";
+
+"SHOW_POLL_RESULTS_TITLE" = "Show poll results";
+"SHOW_POLL_RESULTS_DETAIL" = "Add each option's share of the vote to its label, before you have voted.";
+"TAP_TO_PAUSE_TITLE" = "Clean video player";
+"TAP_TO_PAUSE_DETAIL" = "Full-screen videos open bare — tap to play or pause.";
+"VIDEO_STARTS_MUTED_PILL_ON" = "Muted";
+"VIDEO_STARTS_MUTED_PILL_OFF" = "Sound on";
+
+"PROFILES_GROUP_BEHAVIOR" = "Behavior";
+"PROFILES_GROUP_TABS" = "Profile tabs";
+"PROFILES_GROUP_APPEARANCE" = "Interface";
+
+"PROFILE_INITIAL_TAB_TITLE" = "Open profiles on";
+"PROFILE_TAB_DEFAULT" = "Default";
+"PROFILE_TAB_REPLIES" = "Replies";
+"PROFILE_TAB_HIGHLIGHTS" = "Highlights";
+"PROFILE_TAB_ARTICLES" = "Articles";
+"PROFILE_TAB_MEDIA" = "Media";
+"PROFILE_TAB_VIDEOS" = "Videos";
+
+"DISABLE_VIDEOS_TAB_TITLE" = "Hide Videos tab";
+"DISABLE_VIDEOS_TAB_DETAIL" = "Remove the Videos tab from profiles.";
+
+"EXPAND_BIO_TITLE" = "Expand bios";
+"EXPAND_BIO_DETAIL" = "Show a profile's whole bio at once, without the Show more tap.";
+
+"PROFILE_INITIAL_TAB_SUBTITLE" = "Pick the tab a profile opens on.";
+
+"PROFILE_TAB_REPOSTS" = "Retweets";
+
+/* Hidden notifications */
+"NOTIFS_HIDE_ACTION" = "Hide";
+"NOTIFS_HIDDEN_TOAST" = "Notification hidden";
+"HIDDEN_NOTIFS_TITLE" = "Hidden notifications";
+"HIDDEN_NOTIFS_COUNT" = "%ld hidden";
+"HIDDEN_NOTIFS_CLEAR_ALL" = "Clear all";
+"HIDDEN_NOTIFS_EXPIRES_IN" = "%ld d left";
+"HIDDEN_NOTIFS_EMPTY_TITLE" = "Nothing to see here";
+"HIDDEN_NOTIFS_EMPTY_BODY" = "Every notification here is hidden. Tap the eye above to see them or bring one back.";
+"HIDDEN_NOTIFS_EXAMPLE" = "Tap × on a notification to hide it";
+"HIDDEN_NOTIFS_UNHIDE" = "Unhide";
+"HIDDEN_NOTIFS_UNTITLED" = "Hidden notification";
+"HIDE_NOTIFICATIONS_TITLE" = "Hide notifications";
+"HIDE_NOTIFICATIONS_DETAIL" = "Hide a notification with its × or a swipe. The eye in the notifications bar lists the hidden ones.";
+"EXPLORE_TABS_CAPTION" = "Explore bar";
+"EXPLORE_TABS_HINT" = "Tap a tab to remove it.";
+"EXPLORE_TABS_HIDDEN_COUNT" = "%lu hidden";
+"EXPLORE_TABS_NONE_HIDDEN" = "None hidden";
+"HIDE_TAB_FORYOU_TAB_NAME" = "For You";
+"HIDE_TAB_TRENDING_TAB_NAME" = "Trending";
+"HIDE_TAB_NEWS_TAB_NAME" = "News";
+"HIDE_TAB_SPORTS_TAB_NAME" = "Sports";
+"HIDE_TAB_ENTERTAINMENT_TAB_NAME" = "Entertainment";
+"HIDE_EXPLORE_ALL_TITLE" = "Hide all of Explore";
+"HIDE_EXPLORE_ALL_DETAIL" = "Leave only the search bar.";
+"CHOOSE_EXPLORE_TABS_TITLE" = "Choose Explore tabs";
+"CHOOSE_EXPLORE_TABS_DETAIL" = "Pick which tabs stay in the bar.";
+"CHOOSE_EXPLORE_TABS_DETAIL_HELD" = "Not needed while all of Explore is hidden.";
+"EXPLORE_TABS_KEEP_ONE" = "Keep one tab, or hide all of Explore.";
+"LAB_GROUP_SESSION" = "Web session";
+"LAB_GROUP_TOOLS" = "Troubleshooting";
+"LAB_GROUP_BACKUP" = "Backup";
+"WEB_SESSION_NONE_TITLE" = "No web session";
+"WEB_SESSION_LIVE_DETAIL" = "Signed in on this device.";
+"WEB_SESSION_NONE_DETAIL" = "Sign in to use Reply in web view.";
+"WEB_SESSION_SIGN_IN_ACTION" = "Sign in";
+"REPLY_IN_WEBVIEW_DETAIL_HELD" = "Needs a web session — sign in above.";
+"SHOW_ACCOUNT_LOCATION_DETAIL_HELD" = "Needs a web session — sign in under Tools › Web session.";
+"FLEX_TWITTER_TITLE" = "FLEX explorer";
+"FLEX_TWITTER_DETAIL" = "Inspect the app's screens and data. For developers.";
+"COMPATIBILITY_TITLE" = "Compatibility";
+"COMPATIBILITY_DETAIL" = "Check every option still works after a Twitter update.";
+"COMPATIBILITY_GROUP_CHECKS" = "Monitoring";
+"COMPATIBILITY_RECORD_TITLE" = "Record activity";
+"DEBUG_TOOLS_DETAIL" = "Shows the diagnostic button and keeps a detailed log. Checks run without it.";
+"COMPATIBILITY_REPORT_TITLE" = "Report";
+"COMPATIBILITY_REPORT_DETAIL" = "Not checked yet";
+"SETTINGS_BACKUP_TITLE" = "Settings backup";
+"SETTINGS_BACKUP_DETAIL" = "Every option, muted word, and color.";
+"EXPORT_SETTINGS_ACTION" = "Export…";
+"IMPORT_SETTINGS_ACTION" = "Import…";
+"WEB_SESSION_LOGIN_TITLE" = "Sign in on the web";
+"WEB_LOGIN_CONNECTING" = "Connecting to X…";
+"WEB_LOGIN_TAGLINE" = "The feed, without the noise.";
+"WEB_LOGIN_SIGNING_IN" = "Signing you in…";
+"WEB_LOGIN_RETRY_ACTION" = "Retry";
+"WEB_LOGIN_LOAD_FAILED" = "Could not load the login page.\n\n%@";
+"TW_CANCEL_ACTION_LABEL" = "Cancel";
+"TW_CONTINUE_ACTION_LABEL" = "Continue";
+"TW_COMPOSITION_COMPLETE_SENDING_TWEET_TOAST_NOTIFICATION_MESSAGE" = "Your Tweet was sent.";
+"TW_DISMISS_LABEL" = "Dismiss";
+"TW_DM_MESSAGE_ACTION_OPEN_GENERIC_TITLE" = "Open";
+"TW_DOWNLOAD_ACTIVITY_VIEW_LABEL" = "Download";
+"TW_DOWNLOAD_LIVE_ACTIVITY_DOWNLOADING" = "Downloading…";
+"TW_DOWNLOAD_VIDEO_ACTIVITY_VIEW_LABEL" = "Download Video";
+"TW_ERROR_ALERT_TITLE" = "Error";
+"TW_GENERIC_OFF_LABEL" = "Off";
+"TW_NOT_INTERESTED_IN_THIS_LABEL" = "Not interested in this";
+"TW_OK_ACTION_LABEL" = "OK";
+"TW_SAVE_ACTION_LABEL" = "Save";
+"TW_SUBSCRIPTION_APP_ICON_SETTINGS_DETAIL" = "Choose an alternate icon for your Home Screen.";
+"TW_SUBSCRIPTION_APP_ICON_SETTINGS_TITLE" = "App icon";
+"TW_SUBSCRIPTION_TAB_CUSTOMIZATION_RESTORE_BUTTON_TITLE" = "Restore";
+"TW_SUBSCRIPTION_UNDO_SEND_DURATION_LABEL" = "%ld seconds";
+"MEDIA_GROUP_LAYOUT" = "Layout";
+"BRANDING_GROUP_CLASSIC" = "Classic Twitter";
+"VOICE_NOTE_FROM_VIDEO_TITLE" = "Voice note from a video";
+"VOICE_NOTE_FROM_VIDEO_DETAIL" = "Add a button to a recorded voice note to replace it with a video from your library.";
+"CONFIRM_TWEET_TITLE" = "Post this Tweet";
+"CONFIRM_TWEET_ACTION" = "Tweet";
+"CONFIRM_LIKE_TITLE" = "Like this Tweet";
+"CONFIRM_LIKE_ACTION" = "Like";
+"CONFIRM_FOLLOW_TITLE" = "Follow this account";
+"CONFIRM_FOLLOW_ACTION" = "Follow";
+"HIDE_NEW_TWEETS_PILL_TITLE" = "Hide new Tweets pill";
+"HIDE_NEW_TWEETS_PILL_DETAIL" = "Remove the pill that announces new Tweets at the top of your timeline.";
+"REFRESH_PILL_LABEL_DETAIL_HELD" = "Hide new Tweets pill hides this pill.";

@@ -1,0 +1,372 @@
+// The PrimeFreeBird entry in the app's settings, and the custom font picker.
+
+#import "Support/HookHelpers.h"
+#import "Common/PFBCompatibility.h"
+
+// MARK: - PrimeFreeBird settings entry
+
+static const void* SettingsEntryKey = &SettingsEntryKey;
+static const void* SettingsRootKey = &SettingsRootKey;
+
+static BOOL isSettingsClass(UIViewController* viewController) {
+    return [viewController isKindOfClass:objc_getClass("T1GenericSettingsViewController")];
+}
+
+// The generic controller backs the root and every sub-page alike, so the root is
+// the first settings-class controller in the navigation stack.
+static BOOL settingsVCIsRoot(TFNItemsDataViewController* settingsVC) {
+    for (UIViewController* viewController in settingsVC.navigationController.viewControllers) {
+        if (viewController == settingsVC) {
+            return YES;
+        }
+
+        if (isSettingsClass(viewController)) {
+            return NO;
+        }
+    }
+
+    return NO;
+}
+
+static BOOL sectionsContainPrimeFreeBirdEntry(NSArray* sections) {
+    for (id section in sections) {
+        if (![section isKindOfClass:[NSArray class]]) {
+            continue;
+        }
+
+        for (id entry in (NSArray*)section) {
+            if (objc_getAssociatedObject(entry, SettingsEntryKey)) {
+                return YES;
+            }
+        }
+    }
+
+    return NO;
+}
+
+static TFNSettingsNavigationItem* makePrimeFreeBirdSettingsItem(
+    TFNItemsDataViewController* settingsVC) {
+    // Adapts automatically: darker gray in light mode, light gray in dark mode,
+    // matching the system's other settings icons.
+    UIColor* iconColor = [UIColor secondaryLabelColor];
+
+    // imageNamed: can't see loose PDFs in a bundle (only compiled asset
+    // catalogs), so the tweak opens the PDF by path and render its page at icon size,
+    // then tint it gray like the native settings icons.
+    UIImage* twitterIcon = nil;
+    NSURL* birdURL = [[PFBBundle sharedBundle] pathForFile:@"bird_stroke.pdf"];
+    if (birdURL) {
+        CGPDFDocumentRef pdf = CGPDFDocumentCreateWithURL((__bridge CFURLRef)birdURL);
+        if (pdf) {
+            CGPDFPageRef page = CGPDFDocumentGetPage(pdf, 1);
+            if (page) {
+                CGSize canvasSize = CGSizeMake(20, 20);
+                CGFloat birdSize = 17;
+                CGFloat inset = (canvasSize.width - birdSize) / 2.0;
+                UIGraphicsImageRendererFormat* fmt = [UIGraphicsImageRendererFormat preferredFormat];
+                fmt.opaque = NO;
+                UIGraphicsImageRenderer* renderer =
+                    [[UIGraphicsImageRenderer alloc] initWithSize:canvasSize format:fmt];
+                UIImage* rendered = [renderer imageWithActions:^(UIGraphicsImageRendererContext* ctx) {
+                    CGContextRef c = ctx.CGContext;
+                    CGRect box = CGPDFPageGetBoxRect(page, kCGPDFCropBox);
+                    CGFloat scale = MIN(birdSize / box.size.width,
+                                        birdSize / box.size.height);
+                    CGContextTranslateCTM(c, inset, canvasSize.height - inset);
+                    CGContextScaleCTM(c, 1, -1);
+                    CGContextScaleCTM(c, scale, scale);
+                    CGContextDrawPDFPage(c, page);
+                }];
+                twitterIcon = [[rendered imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate]
+                                  imageWithTintColor:iconColor];
+            }
+            CGPDFDocumentRelease(pdf);
+        }
+    }
+
+    TFNTwitterAccount* account = [(T1GenericSettingsViewController*)settingsVC account];
+    TFNSettingsNavigationItem* settingsEntry = [[objc_getClass("TFNSettingsNavigationItem") alloc]
+            initWithTitle:@PFB_PRODUCT_NAME
+                   detail:[[PFBBundle sharedBundle] localizedStringForKey:@"PFB_SETTINGS_DETAIL"]
+                 iconName:nil
+        controllerFactory:^UIViewController* {
+            return [PFBManager PFBSettingsWithAccount:account];
+        }];
+
+    if (twitterIcon) {
+        [settingsEntry setValue:twitterIcon forKey:@"icon"];
+    }
+
+    objc_setAssociatedObject(settingsEntry, SettingsEntryKey, @YES, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+
+    return settingsEntry;
+}
+
+static NSArray* sectionsByInsertingEntry(TFNItemsDataViewController* settingsVC,
+                                         NSArray* sections) {
+    NSMutableArray* newSections = [sections mutableCopy] ?: [NSMutableArray array];
+    TFNSettingsNavigationItem* entry = makePrimeFreeBirdSettingsItem(settingsVC);
+    // The apparent separator under this row is the grouped table's section seam,
+    // created by injecting the row as its own section, not a hairline view. Joining
+    // Twitter's first section removes it structurally.
+    if (newSections.count > 0 && [newSections[0] isKindOfClass:[NSArray class]]) {
+        NSMutableArray* firstSection = [(NSArray*)newSections[0] mutableCopy];
+        [firstSection insertObject:entry atIndex:0];
+        newSections[0] = firstSection;
+    } else {
+        [newSections insertObject:@[ entry ] atIndex:0];
+    }
+    return newSections;
+}
+
+// Async fetches rebuild the sections and discard one-shot inserts, and root-ness is
+// unknowable during the first build. The root is tagged in viewWillAppear, inserted
+// once, and the rebuild transform below re-adds the entry on later snapshots.
+static void insertPrimeFreeBirdSettingsIfRoot(TFNItemsDataViewController* settingsVC) {
+    if (!settingsVCIsRoot(settingsVC)) {
+        return;
+    }
+
+    objc_setAssociatedObject(settingsVC, SettingsRootKey, @YES, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+
+    if (sectionsContainPrimeFreeBirdEntry(settingsVC.sections)) {
+        return;
+    }
+
+    settingsVC.sections = sectionsByInsertingEntry(settingsVC, settingsVC.sections);
+}
+
+static NSArray* sectionsWithPrimeFreeBirdEntry(TFNItemsDataViewController* settingsVC,
+                                             NSArray* sections) {
+    if (!isSettingsClass(settingsVC)) {
+        return sections;
+    }
+
+    if (![objc_getAssociatedObject(settingsVC, SettingsRootKey) boolValue]) {
+        return sections;
+    }
+
+    if (sectionsContainPrimeFreeBirdEntry(sections)) {
+        return sections;
+    }
+
+    return sectionsByInsertingEntry(settingsVC, sections);
+}
+
+%hook T1GenericSettingsViewController
+- (void)viewWillAppear:(BOOL)animated {
+    %orig;
+    PFBThemeScreenEnter(self);
+    insertPrimeFreeBirdSettingsIfRoot(self);
+}
+
+- (void)viewDidDisappear:(BOOL)animated {
+    %orig;
+    PFBThemeScreenLeave(self);
+}
+%end
+
+// Every sections rebuild runs through this transform right before setSections:,
+// so hooking it on the base class covers the settings root and its sub-pages.
+%hook TFNItemsDataViewController
+- (NSArray*)updatedSections:(NSArray*)sections forStyle:(NSInteger)style {
+    NSArray* updatedSections = %orig;
+    return sectionsWithPrimeFreeBirdEntry(self, updatedSections);
+}
+
+// The injected row sits in Twitter's own settings table, so the separator under it
+// is drawn by Twitter's cell. TFNTextCell carries setSeparatorHidden: and
+// setTopSeparatorHidden:, used directly and reapplied on every vend.
+static void PFBHideRowSeparator(UITableViewCell* cell) {
+    SEL hide = @selector(setSeparatorHidden:);
+    if ([cell respondsToSelector:hide]) {
+        ((void (*)(id, SEL, BOOL))objc_msgSend)(cell, hide, YES);
+    }
+    SEL hideTop = @selector(setTopSeparatorHidden:);
+    if ([cell respondsToSelector:hideTop]) {
+        ((void (*)(id, SEL, BOOL))objc_msgSend)(cell, hideTop, YES);
+    }
+}
+
+- (UITableViewCell*)tableView:(UITableView*)tableView
+        cellForRowAtIndexPath:(NSIndexPath*)indexPath {
+    UITableViewCell* cell = %orig;
+    if (![objc_getAssociatedObject(self, SettingsRootKey) boolValue] || !cell ||
+        !sectionsContainPrimeFreeBirdEntry(
+            ((TFNItemsDataViewController*)self).sections)) {
+        return cell;
+    }
+    // The tweak's row is section 0, row 0; the row directly beneath the visible
+    // boundary is section 0, row 1. Hide the separator on both sides of the
+    // seam so no hairline shows under PrimeFreeBird.
+    if (indexPath.section == 0 && (indexPath.row == 0 || indexPath.row == 1)) {
+        // Row 0 is the tweak's; row 1 is the first native row now sharing the tweak's
+        // section. Hiding both sides of the seam keeps the edge clean even if
+        // this table draws intra-section separators.
+        PFBHideRowSeparator(cell);
+    }
+    return cell;
+}
+
+%end
+
+// MARK: - Change font
+
+%hook UIFontPickerViewController
+- (void)viewWillAppear:(BOOL)arg1 {
+    %orig(arg1);
+    self.navigationItem.rightBarButtonItem = [[UIBarButtonItem alloc]
+        initWithTitle:[[PFBBundle sharedBundle]
+                          localizedStringForKey:@"CUSTOM_FONTS_NAVIGATION_BUTTON_TITLE"]
+                style:UIBarButtonItemStylePlain
+               target:self
+               action:@selector(customFontsHandler)];
+}
+%new
+- (void)customFontsHandler {
+    if ([[NSFileManager defaultManager]
+            fileExistsAtPath:@"/var/mobile/Library/Fonts/AddedFontCache.plist"]) {
+        NSAttributedString* AttString = [[NSAttributedString alloc]
+            initWithString:[[PFBBundle sharedBundle] localizedStringForKey:@"CUSTOM_FONTS_MENU_TITLE"]
+                attributes:@{
+                    NSFontAttributeName: [PFBManager menuTitleFont],
+                    NSForegroundColorAttributeName: UIColor.labelColor
+                }];
+        TFNActiveTextItem* title =
+            [[%c(TFNActiveTextItem) alloc] initWithTextModel:[[%c(TFNAttributedTextModel) alloc]
+                                                                     initWithAttributedString:AttString]
+                                                    activeRanges:nil];
+
+        NSMutableArray* actions = [[NSMutableArray alloc] init];
+        [actions addObject:title];
+
+        NSDictionary* plistDictionary = [NSPropertyListSerialization
+            propertyListWithData:
+                [NSData dataWithContentsOfURL:
+                            [NSURL fileURLWithPath:@"/var/mobile/Library/Fonts/AddedFontCache.plist"]]
+                         options:NSPropertyListImmutable
+                          format:NULL
+                           error:nil];
+        [plistDictionary enumerateKeysAndObjectsUsingBlock:^(id _Nonnull key, id _Nonnull obj,
+                                                             BOOL* _Nonnull stop) {
+            @try {
+                NSString* fontName = ((NSArray*)[obj valueForKey:@"psNames"]).firstObject;
+                TFNActionItem* fontAction = [%c(TFNActionItem)
+                    actionItemWithTitle:fontName
+                                 action:^{
+                                     if (self.configuration.includeFaces) {
+                                         [self setSelectedFontDescriptor:[UIFontDescriptor
+                                                                             fontDescriptorWithFontAttributes:@{
+                                                                                 UIFontDescriptorNameAttribute:
+                                                                                     fontName
+                                                                             }]];
+                                     } else {
+                                         [self setSelectedFontDescriptor:[UIFontDescriptor
+                                                                             fontDescriptorWithFontAttributes:@{
+                                                                                 UIFontDescriptorFamilyAttribute:
+                                                                                     fontName
+                                                                             }]];
+                                     }
+                                     [self.delegate fontPickerViewControllerDidPickFont:self];
+                                 }];
+                [actions addObject:fontAction];
+            } @catch (NSException* exception) {
+            }
+        }];
+
+        TFNMenuSheetViewController* alert = [[%c(TFNMenuSheetViewController) alloc]
+            initWithActionItems:[NSArray arrayWithArray:actions]];
+        [alert tfnPresentedCustomPresentFromViewController:self animated:YES completion:nil];
+    } else {
+        UIAlertController* errAlert = [UIAlertController
+            alertControllerWithTitle:@PFB_PRODUCT_NAME
+                             message:[[PFBBundle sharedBundle]
+                                         localizedStringForKey:@"CUSTOM_FONTS_TUT_ALERT_MESSAGE"]
+                      preferredStyle:UIAlertControllerStyleAlert];
+
+        [errAlert
+            addAction:
+                [UIAlertAction
+                    actionWithTitle:[[PFBBundle sharedBundle]
+                                        localizedStringForKey:@"INSTALL_IFONT_BUTTON_TITLE"]
+                              style:UIAlertActionStyleDefault
+                            handler:^(UIAlertAction* _Nonnull action) {
+                                [[UIApplication sharedApplication]
+                                              openURL:[NSURL
+                                                          URLWithString:
+                                                              @"https://apps.apple.com/sa/app/"
+                                                              @"ifont-find-install-any-font/id1173222289"]
+                                              options:@{}
+                                    completionHandler:nil];
+                            }]];
+        [errAlert addAction:[UIAlertAction
+                                actionWithTitle:[[PFBBundle sharedBundle]
+                                                    localizedTwitterStringForKey:@"OK_ACTION_LABEL"]
+                                          style:UIAlertActionStyleCancel
+                                        handler:nil]];
+        [self presentViewController:errAlert animated:true completion:nil];
+    }
+}
+%end
+
+// Swaps an app font for the chosen custom one at the same size, keeping bold
+// where the original was bold. Returns the original when the feature is off, no
+// font is set, or the chosen one will not load.
+static UIFont* PFBCustomFont(UIFont* original, BOOL bold) {
+    if (!original) {
+        return original;
+    }
+    if (![[NSUserDefaults standardUserDefaults] boolForKey:@"custom_fonts"]) {
+        PFBCOMPAT_OBSERVE(PFBCompat_custom_fonts, @"font request seen");
+        return original;
+    }
+    NSString* customName = [[NSUserDefaults standardUserDefaults]
+        objectForKey:bold ? @"pfb_font_2" : @"pfb_font_1"];
+    if (customName.length == 0) {
+        return original;
+    }
+    UIFont* custom = [UIFont fontWithName:customName size:original.pointSize];
+    if (custom) {
+        PFBCOMPAT_ACTION(PFBCompat_custom_fonts, @"%@", customName);
+    }
+    return custom ?: original;
+}
+
+// Named-font construction (tweet body and most text styles) funnels through here.
+%hook UIFont
++ (UIFont*)tfn_fontWithName:(NSString*)name size:(CGFloat)size {
+    UIFont* original = %orig;
+    BOOL bold = [name containsString:@"Bold"] || [name containsString:@"Heavy"];
+    return PFBCustomFont(original, bold);
+}
+%end
+
+// The interface's own text (names, buttons, titles) and the tabular counters are
+// built by XFontCatalog, which never calls tfn_fontWithName, so they are covered
+// here too. Boldness is read from the font the app would have used.
+%hook XFontCatalog
++ (UIFont*)customFontOfSize:(CGFloat)size weight:(NSInteger)weight
+      scalesWithDynamicType:(BOOL)scales {
+    UIFont* original = %orig;
+    BOOL bold = (original.fontDescriptor.symbolicTraits & UIFontDescriptorTraitBold) != 0;
+    return PFBCustomFont(original, bold);
+}
++ (UIFont*)contentFontWithOffset:(CGFloat)offset weight:(NSInteger)weight {
+    UIFont* original = %orig;
+    BOOL bold = (original.fontDescriptor.symbolicTraits & UIFontDescriptorTraitBold) != 0;
+    return PFBCustomFont(original, bold);
+}
++ (UIFont*)tabularDigitsFontOfSize:(CGFloat)size weight:(CGFloat)weight {
+    UIFont* original = %orig;
+    BOOL bold = (original.fontDescriptor.symbolicTraits & UIFontDescriptorTraitBold) != 0;
+    return PFBCustomFont(original, bold);
+}
+%end
+
+// Cephei blocks HBPreferences access from app processes unless this opt-in
+// returns YES.
+%hook HBForceCepheiPrefs
++ (BOOL)forceCepheiPrefsWhichIReallyNeedToAccessAndIKnowWhatImDoingISwear {
+    return YES;
+}
+%end

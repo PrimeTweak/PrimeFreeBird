@@ -1,0 +1,11 @@
+Package: com.primetweak.primefreebird
+Name: PrimeFreeBird
+Version: 1.0.0
+Architecture: iphoneos-arm
+Description: Adds privacy, media and interface options to Twitter.
+Maintainer: PrimeTweak
+Author: PrimeTweak
+Section: Tweaks
+Depends: mobilesubstrate, ws.hbang.common
+Conflicts: com.primefreebird.tweak, com.bandarhl.bhtwitter, com.den.twigalaxy, xyz.cypwn.twigalaxy, xyz.cypwn.bhtwitter, com.netskao.twitternoads, xyz.cypwn.bringbacktwitter
+Replaces: com.primefreebird.tweak

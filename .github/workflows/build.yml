@@ -1,0 +1,282 @@
+name: Build PrimeFreeBird
+run-name: ${{ inputs.build }} · ${{ github.ref_name }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      build:
+        description: "What to build"
+        type: choice
+        options:
+          - Debug
+          - Release
+        default: Debug
+      ipa_url:
+        description: "Decrypted X IPA link"
+        type: string
+        required: true
+      twitter_branding:
+        description: "Name the app Twitter"
+        type: boolean
+        default: true
+      icon_pack:
+        description: "Apply icon pack"
+        type: boolean
+        default: true
+      icon_pack_url:
+        description: "Other icon pack link (.zip). https://files.catbox.moe/p63f20.zip"
+        type: string
+        default: ""
+
+permissions:
+  contents: write
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: macos-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Hide sensitive inputs
+        uses: levibostian/action-hide-sensitive-inputs@v1
+
+      - name: Read version
+        run: |
+          version=$(grep '^Version:' control | cut -d' ' -f2)
+          if ! echo "$version" | grep -Eq '^[0-9]+(\.[0-9]+)*$'; then
+            echo "::error::No valid Version line in control."
+            exit 1
+          fi
+          ios=$(sed -nE 's/^TARGET.*:([0-9]+(\.[0-9]+)*)[[:space:]]*$/\1/p' Makefile)
+          if [ -z "$ios" ]; then
+            echo "::error::No deployment target at the end of the Makefile TARGET line."
+            exit 1
+          fi
+          echo "VERSION=$version" >> "$GITHUB_ENV"
+          echo "IOS_MIN=$ios" >> "$GITHUB_ENV"
+
+      # A release is built from the default branch only, never twice for the same version,
+      # and only once CHANGELOG.md has a section for it.
+      - name: Check release
+        if: ${{ inputs.build == 'Release' }}
+        run: |
+          branch="${{ github.event.repository.default_branch }}"
+          if [ "${{ github.ref_name }}" != "$branch" ]; then
+            echo "::error::Releases are built from $branch only."
+            exit 1
+          fi
+          if gh api "repos/${{ github.repository }}/releases/tags/v$VERSION" > /dev/null 2>&1; then
+            echo "::error::Version $VERSION is already released. Change Version in control."
+            exit 1
+          fi
+          touch CHANGELOG.md
+          awk -v v="$VERSION" '$0 == "## " v {found = 1; next} found && /^## / {exit} found {print}' \
+            CHANGELOG.md > notes.md
+          if ! grep -q '[^[:space:]]' notes.md; then
+            echo "::error::CHANGELOG.md has no section for $VERSION."
+            exit 1
+          fi
+
+      - name: Download IPA
+        run: |
+          curl -fsSL -o App.ipa "${{ inputs.ipa_url }}"
+          zip -T App.ipa
+
+      # The deployment target follows the app's own minimum; a mismatch is flagged.
+      - name: Read X version
+        run: |
+          plist=$(unzip -Z1 App.ipa | grep -E '^Payload/[^/]+\.app/Info\.plist$' | head -1)
+          unzip -p App.ipa "$plist" > app-info.plist
+          echo "APP_VERSION=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' app-info.plist)" >> "$GITHUB_ENV"
+          app_min=$(/usr/libexec/PlistBuddy -c 'Print :MinimumOSVersion' app-info.plist)
+          if [ "$app_min" != "$IOS_MIN" ]; then
+            echo "::warning::X asks for iOS $app_min; the Makefile targets iOS $IOS_MIN."
+          fi
+
+      # The installer ends by fetching SDKs unauthenticated, which can hit the rate limit after
+      # the clone has succeeded; that failure is tolerated and the clone is checked instead.
+      - name: Install Theos
+        run: |
+          curl -fsSL https://raw.githubusercontent.com/theos/theos/master/bin/install-theos -o /tmp/install-theos
+          bash /tmp/install-theos || echo "installer exited non-zero (SDK fetch); verifying clone"
+          if [ ! -f "$HOME/theos/makefiles/common.mk" ]; then
+            echo "::error::Theos clone incomplete"; exit 1
+          fi
+          echo "THEOS=$HOME/theos" >> "$GITHUB_ENV"
+
+      - name: Ensure iOS 16.5 SDK
+        run: |
+          if [ -d "$THEOS/sdks/iPhoneOS16.5.sdk" ]; then
+            echo "SDK already present"
+          else
+            curl -fsSL -H "Authorization: token ${{ github.token }}" \
+              -o /tmp/sdks.tar.gz \
+              https://codeload.github.com/theos/sdks/tar.gz/refs/heads/master
+            mkdir -p /tmp/sdks
+            tar -xzf /tmp/sdks.tar.gz -C /tmp/sdks --strip-components=1
+            mkdir -p "$THEOS/sdks"
+            mv /tmp/sdks/iPhoneOS16.5.sdk "$THEOS/sdks/"
+          fi
+          ls -1 "$THEOS/sdks"
+
+      - name: Install build tools
+        run: |
+          brew install make dpkg ldid
+          echo "$(brew --prefix make)/libexec/gnubin" >> "$GITHUB_PATH"
+
+      # The ffmpeg stack is built from source once per SDK, submodule commit and build script.
+      - name: Compute ffmpeg cache key
+        id: ffmpeg-key
+        run: |
+          echo "key=ffmpeg-stack-sdk$(xcrun --sdk iphoneos --show-sdk-version)-$(git rev-parse --short HEAD:deps/ffmpeg-kit-next/upstream)-${{ hashFiles('deps/ffmpeg-kit-next/build-ffmpeg.sh') }}" >> "$GITHUB_OUTPUT"
+
+      - name: Cache ffmpeg stack
+        id: ffmpeg-cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ffmpeg-build
+            deps/ffmpeg-kit-next/build
+          key: ${{ steps.ffmpeg-key.outputs.key }}
+
+      - name: Build ffmpeg stack
+        if: ${{ steps.ffmpeg-cache.outputs.cache-hit != 'true' }}
+        run: deps/ffmpeg-kit-next/build-ffmpeg.sh
+        env:
+          BUILD_DIR: ${{ github.workspace }}/ffmpeg-build
+
+      - name: Build dylib
+        run: |
+          make clean || true
+          make FINALPACKAGE=1 SIDELOADED=1
+          mkdir -p dylib
+          for lib in PrimeFreeBird libpfbFLEX zxPluginsInject; do
+            found=$(find .theos deps -name "$lib.dylib" -path '*/obj/*' | head -1)
+            if [ -z "$found" ]; then echo "::error::$lib.dylib not produced"; exit 1; fi
+            cp "$found" "dylib/$lib.dylib"
+          done
+          lipo -info dylib/PrimeFreeBird.dylib
+
+      - name: Build debs
+        if: ${{ inputs.build == 'Release' }}
+        run: |
+          make clean package FINALPACKAGE=1 THEOS_PACKAGE_SCHEME=rootless
+          make clean package FINALPACKAGE=1
+          ls -l packages
+
+      - name: Install cyan
+        run: |
+          python3 -m venv /tmp/cyanenv
+          /tmp/cyanenv/bin/python -m pip install --upgrade pip
+          /tmp/cyanenv/bin/python -m pip install \
+            https://github.com/asdfzxcvbn/pyzule-rw/archive/main.zip
+
+      # The input IPA keeps its own signature, so nothing is re-signed; the app keeps its
+      # extensions, which the plugin fix serves.
+      - name: Inject
+        run: |
+          mkdir -p out
+          /tmp/cyanenv/bin/cyan -i App.ipa -o out/PrimeFreeBird.ipa --ignore-encrypted -u -w \
+            -f dylib/zxPluginsInject.dylib dylib/libpfbFLEX.dylib dylib/PrimeFreeBird.dylib \
+               "layout/Library/Application Support/PFB/PrimeFreeBird.bundle"
+
+      # The icon pack is the repository's branding/resource-pack.zip, unless another link
+      # is given; the default link serves only while the repository has none.
+      - name: Brand as Twitter
+        if: ${{ inputs.twitter_branding || inputs.icon_pack }}
+        env:
+          PACK_URL: ${{ inputs.icon_pack_url }}
+          DEFAULT_PACK_URL: https://files.catbox.moe/p63f20.zip
+        run: |
+          flags=""
+          if [ "${{ inputs.twitter_branding }}" = "true" ]; then flags="--twitter-branding"; fi
+          if [ "${{ inputs.icon_pack }}" = "true" ]; then
+            pack=branding/resource-pack.zip
+            if [ -n "$PACK_URL" ] || [ ! -f "$pack" ]; then
+              url="${PACK_URL:-$DEFAULT_PACK_URL}"
+              pack=resource-pack.zip
+              if ! curl -fsSL --retry 3 --retry-delay 10 --retry-all-errors --connect-timeout 20 -o "$pack" "$url"; then
+                echo "::error::Icon pack not downloaded from $url. Untick Apply icon pack to build without it, or add the pack as branding/resource-pack.zip."
+                exit 1
+              fi
+            fi
+            flags="$flags --resource-pack $pack"
+          fi
+          ./rebrand.sh $flags out/PrimeFreeBird.ipa
+
+      - name: Name files
+        run: |
+          suffix=""
+          if [ "${{ inputs.twitter_branding }}" = "true" ]; then suffix="$suffix-twitter"; fi
+          if [ "${{ inputs.build }}" = "Debug" ]; then suffix="$suffix-debug"; fi
+          ipa="out/PrimeFreeBird-$VERSION-X-$APP_VERSION$suffix.ipa"
+          mv out/PrimeFreeBird.ipa "$ipa"
+          echo "IPA=$ipa" >> "$GITHUB_ENV"
+          if [ "${{ inputs.build }}" = "Release" ]; then
+            mv packages/*_iphoneos-arm64.deb "out/PrimeFreeBird-$VERSION-rootless.deb"
+            mv packages/*_iphoneos-arm.deb "out/PrimeFreeBird-$VERSION-rootful.deb"
+          fi
+          ls -l out
+
+      - name: Check IPA
+        run: |
+          for lib in PrimeFreeBird.dylib libpfbFLEX.dylib zxPluginsInject.dylib; do
+            if ! unzip -Z1 "$IPA" | grep -q "/$lib\$"; then
+              echo "::error::$lib is missing from the IPA."
+              exit 1
+            fi
+          done
+          if ! unzip -Z1 "$IPA" | grep -q '/PrimeFreeBird\.bundle/'; then
+            echo "::error::PrimeFreeBird.bundle is missing from the IPA."
+            exit 1
+          fi
+
+      - name: Check debs
+        if: ${{ inputs.build == 'Release' }}
+        run: |
+          for deb in out/*.deb; do
+            rm -rf debx && mkdir debx
+            (cd debx && ar -x "../$deb")
+            data=$(ls debx/data.tar.* | head -1)
+            tar -xOf "$data" '*PrimeFreeBird.dylib' > deb-dylib
+            if [ ! -s deb-dylib ]; then
+              echo "::error::PrimeFreeBird.dylib is missing from $deb."
+              exit 1
+            fi
+          done
+
+      - name: Publish debug draft
+        if: ${{ inputs.build == 'Debug' }}
+        run: |
+          for id in $(gh api "repos/${{ github.repository }}/releases" --paginate \
+                        --jq '.[] | select(.draft and .tag_name == "debug") | .id'); do
+            gh api -X DELETE "repos/${{ github.repository }}/releases/$id"
+          done
+          gh release create debug "$IPA" --draft --target "${{ github.sha }}" \
+            --title "PrimeFreeBird $VERSION · debug" --notes "For X $APP_VERSION · iOS $IOS_MIN or later"
+
+      - name: Publish release draft
+        if: ${{ inputs.build == 'Release' }}
+        run: |
+          for id in $(gh api "repos/${{ github.repository }}/releases" --paginate \
+                        --jq ".[] | select(.draft and .tag_name == \"v$VERSION\") | .id"); do
+            gh api -X DELETE "repos/${{ github.repository }}/releases/$id"
+          done
+          {
+            echo "For X $APP_VERSION · iOS $IOS_MIN or later"
+            echo
+            echo "## What's new"
+            echo
+            cat notes.md
+          } > body.md
+          gh release create "v$VERSION" out/* --draft --target "${{ github.sha }}" \
+            --title "PrimeFreeBird $VERSION" --notes-file body.md

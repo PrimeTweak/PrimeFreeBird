@@ -1,0 +1,162 @@
+// Media download and save helpers, cache sweep, menu font, branding test and settings screen.
+
+#import "Support/PFBManager.h"
+#import "Settings/PFBModernSettingsViewController.h"
+
+@implementation PFBManager
++ (void)cleanCache {
+    NSArray<NSURL*>* DocumentFiles = [[NSFileManager defaultManager]
+          contentsOfDirectoryAtURL:
+              [NSURL
+                  fileURLWithPath:NSSearchPathForDirectoriesInDomains(
+                                      NSDocumentDirectory, NSUserDomainMask, true)
+                                      .firstObject]
+        includingPropertiesForKeys:@[]
+                           options:NSDirectoryEnumerationSkipsHiddenFiles
+                             error:nil];
+
+    for (NSURL* file in DocumentFiles) {
+        if ([file.pathExtension.lowercaseString isEqualToString:@"mp4"]) {
+            [[NSFileManager defaultManager] removeItemAtURL:file error:nil];
+        }
+    }
+
+    NSArray<NSURL*>* TempFiles = [[NSFileManager defaultManager]
+          contentsOfDirectoryAtURL:[NSURL fileURLWithPath:NSTemporaryDirectory()]
+        includingPropertiesForKeys:@[]
+                           options:NSDirectoryEnumerationSkipsHiddenFiles
+                             error:nil];
+
+    for (NSURL* file in TempFiles) {
+        if ([file.pathExtension.lowercaseString isEqualToString:@"mp4"]) {
+            [[NSFileManager defaultManager] removeItemAtURL:file error:nil];
+        }
+        if ([file.pathExtension.lowercaseString isEqualToString:@"mov"]) {
+            [[NSFileManager defaultManager] removeItemAtURL:file error:nil];
+        }
+        if ([file.pathExtension.lowercaseString isEqualToString:@"tmp"]) {
+            [[NSFileManager defaultManager] removeItemAtURL:file error:nil];
+        }
+        if ([file hasDirectoryPath]) {
+            if ([PFBManager isEmpty:file]) {
+                [[NSFileManager defaultManager] removeItemAtURL:file error:nil];
+            }
+        }
+    }
+}
++ (BOOL)isEmpty:(NSURL*)url {
+    NSArray* FolderFiles = [[NSFileManager defaultManager]
+          contentsOfDirectoryAtURL:url
+        includingPropertiesForKeys:@[]
+                           options:NSDirectoryEnumerationSkipsHiddenFiles
+                             error:nil];
+    if (FolderFiles.count == 0) {
+        return true;
+    } else {
+        return false;
+    }
+}
++ (id)sharedFontGroup {
+    // Twitter's shared font group.
+    return [objc_getClass("TFNUIDefaultFontGroup") sharedFontGroup];
+}
++ (UIFont*)menuTitleFont {
+    UIFont* font = [[self sharedFontGroup] headline2BoldFont];
+    if (!font)
+        font = [UIFont boldSystemFontOfSize:17.0];
+    return font;
+}
++ (NSString*)getVideoQuality:(NSString*)url {
+    NSMutableArray* q = [NSMutableArray new];
+    NSArray* splits = [url componentsSeparatedByString:@"/"];
+    for (int i = 0; i < [splits count]; i++) {
+        NSString* item = [splits objectAtIndex:i];
+        NSArray* dir = [item componentsSeparatedByString:@"x"];
+        for (int k = 0; k < [dir count]; k++) {
+            NSString* item2 = [dir objectAtIndex:k];
+            if (!(item2.length == 0)) {
+                if ([PFBManager doesContainDigitsOnly:item2]) {
+                    if (!(item2.integerValue > 10000)) {
+                        if (!(q.count == 2)) {
+                            [q addObject:item2];
+                        }
+                    }
+                }
+            }
+        }
+    }
+    if (q.count == 0) {
+        return @"GIF";
+    }
+    return [NSString stringWithFormat:@"%@x%@", q.firstObject, q.lastObject];
+}
++ (void)saveToPhotos:(NSURL*)url asGIF:(BOOL)gif completion:(void (^)(BOOL saved))completion {
+    [[PHPhotoLibrary sharedPhotoLibrary]
+        performChanges:^{
+            if (gif) {
+                [PHAssetChangeRequest creationRequestForAssetFromImageAtFileURL:url];
+            } else {
+                [PHAssetChangeRequest creationRequestForAssetFromVideoAtFileURL:url];
+            }
+        }
+        completionHandler:^(BOOL success, __unused NSError* error) {
+            dispatch_async(dispatch_get_main_queue(), ^{
+                completion(success);
+            });
+        }];
+}
++ (void)showSaveVC:(NSURL*)url {
+    [self showSaveVCForItems:@[url]];
+}
++ (void)showSaveVCForItems:(NSArray<NSURL*>*)urls {
+    UIActivityViewController* acVC =
+        [[UIActivityViewController alloc] initWithActivityItems:urls
+                                          applicationActivities:nil];
+    if (is_iPad()) {
+        acVC.popoverPresentationController.sourceView = topMostController().view;
+        acVC.popoverPresentationController.sourceRect =
+            CGRectMake(topMostController().view.bounds.size.width / 2.0,
+                       topMostController().view.bounds.size.height / 2.0, 1.0, 1.0);
+    }
+    [topMostController() presentViewController:acVC animated:true completion:nil];
+}
+
++ (MediaInformation*)getM3U8Information:(NSURL*)mediaURL {
+    MediaInformationSession* mediaInformationSession =
+        [FFprobeKit getMediaInformation:mediaURL.absoluteString];
+    MediaInformation* mediaInformation =
+        [mediaInformationSession getMediaInformation];
+    return mediaInformation;
+}
++ (NSString*)getDownloadingPercent:(float)progress {
+    NSNumberFormatter* numberFormatter = [[NSNumberFormatter alloc] init];
+    [numberFormatter setNumberStyle:NSNumberFormatterPercentStyle];
+    return [numberFormatter stringFromNumber:[NSNumber numberWithFloat:progress]];
+}
+
++ (BOOL)isTwitterBranded {
+    static BOOL branded = NO;
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        branded = [[[NSBundle mainBundle] infoDictionary][@"CFBundleDisplayName"]
+            isEqual:@"Twitter"];
+    });
+    return branded;
+}
+
++ (UIViewController*)PFBSettingsWithAccount:(TFNTwitterAccount*)twAccount {
+    return [[PFBModernSettingsViewController alloc] initWithAccount:twAccount];
+}
+
+// https://stackoverflow.com/a/45356575/9910699
++ (BOOL)doesContainDigitsOnly:(NSString*)string {
+    NSCharacterSet* nonDigits =
+        [[NSCharacterSet decimalDigitCharacterSet] invertedSet];
+
+    BOOL containsDigitsOnly =
+        [string rangeOfCharacterFromSet:nonDigits].location == NSNotFound;
+
+    return containsDigitsOnly;
+}
+
+@end

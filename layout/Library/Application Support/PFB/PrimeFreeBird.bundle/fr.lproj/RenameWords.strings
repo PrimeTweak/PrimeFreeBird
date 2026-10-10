@@ -1,0 +1,25 @@
+/* French word replacements for "Restore Twitter terminology", read like the English table.
+   "poste" and "postes" stay out: they also name a position. */
+
+"post" = "Tweet";
+"posts" = "Tweets";
+"poster" = "tweeter";
+"postez" = "tweetez";
+"postent" = "tweetent";
+"posté" = "tweeté";
+"postée" = "tweetée";
+"postés" = "tweetés";
+"postées" = "tweetées";
+"postant" = "tweetant";
+"repost" = "Retweet";
+"reposts" = "Retweets";
+"reposter" = "retweeter";
+"reposte" = "retweete";
+"repostez" = "retweetez";
+"repostent" = "retweetent";
+"reposté" = "retweeté";
+"repostée" = "retweetée";
+"repostés" = "retweetés";
+"repostant" = "retweetant";
+"Premium" = "Blue";
+"X" = "Twitter";
