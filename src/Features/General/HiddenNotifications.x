@@ -42,6 +42,9 @@ static NSDictionary* PFBHiddenNotifs(void) {
     return stored ?: @{};
 }
 
+static NSTimeInterval PFBNotifDateFromDisplayedAge(NSString* text, NSTimeInterval reference);
+static NSTimeInterval PFBNotifDateFromAgePiece(NSString* tail, NSTimeInterval reference);
+
 double PFBNotifHorizonDays(void) {
     double stored = [[NSUserDefaults standardUserDefaults] doubleForKey:kPFBNotifHorizonKey];
     return stored > 0 ? stored : 30.0;
@@ -52,8 +55,12 @@ double PFBNotifHorizonDays(void) {
 // was hidden, and stated plainly in the UI rather than pretending to be exact.
 double PFBNotifDaysLeft(NSDictionary* entry) {
     double base = [entry[@"d"] doubleValue];
+    double hidden = [entry[@"h"] doubleValue];
+    if (base <= 0 && hidden > 0 && [entry[@"t"] isKindOfClass:[NSString class]]) {
+        base = PFBNotifDateFromDisplayedAge(entry[@"t"], hidden);
+    }
     if (base <= 0) {
-        base = [entry[@"h"] doubleValue];
+        base = hidden;
     }
     if (base <= 0) {
         return PFBNotifHorizonDays();
@@ -509,17 +516,21 @@ static NSString* PFBNotifTextFromCell(UITableView* table, NSIndexPath* indexPath
 
 // The notification's own date, which the countdown hangs on. The model exposes no
 // date and the timestamp view is Swift, so the date is recovered from the age the
-// cell renders: relative forms (30s, 5h, 1w) and absolute ones. 0 when unreadable.
-static NSTimeInterval PFBNotifDateFromDisplayedAge(NSString* text) {
-    if (!text.length) {
-        return 0;
+// cell renders, in any of its " · " pieces: relative forms (30s, 5h, 1w) counted
+// back from `reference`, and absolute ones. 0 when unreadable.
+static NSTimeInterval PFBNotifDateFromDisplayedAge(NSString* text, NSTimeInterval reference) {
+    for (NSString* piece in [text componentsSeparatedByString:@" · "]) {
+        NSString* tail = [piece stringByTrimmingCharactersInSet:
+                                    [NSCharacterSet whitespaceAndNewlineCharacterSet]];
+        NSTimeInterval when = tail.length ? PFBNotifDateFromAgePiece(tail, reference) : 0;
+        if (when > 0) {
+            return when;
+        }
     }
-    NSString* tail = [[text componentsSeparatedByString:@" · "] lastObject];
-    tail = [tail stringByTrimmingCharactersInSet:
-                [NSCharacterSet whitespaceAndNewlineCharacterSet]];
-    if (!tail.length) {
-        return 0;
-    }
+    return 0;
+}
+
+static NSTimeInterval PFBNotifDateFromAgePiece(NSString* tail, NSTimeInterval reference) {
 
     static NSRegularExpression* relative;
     static NSDateFormatter* shortDate;
@@ -535,7 +546,7 @@ static NSTimeInterval PFBNotifDateFromDisplayedAge(NSString* text) {
         [longDate setLocalizedDateFormatFromTemplate:@"MMMdyyyy"];
     });
 
-    NSTimeInterval now = [[NSDate date] timeIntervalSince1970];
+    NSTimeInterval now = reference;
     NSTextCheckingResult* match =
         [relative firstMatchInString:tail options:0 range:NSMakeRange(0, tail.length)];
     if (match && match.numberOfRanges == 3) {
@@ -601,7 +612,7 @@ static NSString* PFBHideNotifWithText(id model, NSString* cellText) {
     // "d" first and only fall back to "h", the moment it was hidden.
     NSTimeInterval notifDate = PFBNotifDate(model);
     if (notifDate <= 0) {
-        notifDate = PFBNotifDateFromDisplayedAge(cellText ?: text);
+        notifDate = PFBNotifDateFromDisplayedAge(cellText ?: text, [[NSDate date] timeIntervalSince1970]);
     }
     // One entry per notification: the registry is keyed by the durable key when
     // there is one, and the session identity rides inside the value so the filter
