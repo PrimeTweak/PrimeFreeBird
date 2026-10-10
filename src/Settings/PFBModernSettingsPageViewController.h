@@ -39,6 +39,8 @@
          toPicker:(UIAlertController*)picker
           handler:(void (^)(void))handler;
 
+// The row description filed as <KEY>_DETAIL, or an empty string when there is none.
+- (NSString*)localizedDetailForKey:(NSString*)key;
 // Opens the menu an entry names under "menu" from anywhere on its row.
 - (void)attachMenuIfNeeded:(UITableViewCell*)cell entry:(NSDictionary*)entry;
 @end

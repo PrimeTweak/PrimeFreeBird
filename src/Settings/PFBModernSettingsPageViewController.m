@@ -318,7 +318,8 @@ static NSURL* PFBAccountAvatarURL(TFNTwitterAccount* account) {
             NSString* defaultSubtitle = [self defaultSubtitleForEntry:toggleData];
             subtitle = [[NSUserDefaults standardUserDefaults] objectForKey:prefKey] ?: defaultSubtitle;
         }
-        [cell configureWithTitle:title subtitle:subtitle];
+        NSString* key = toggleData[@"key"];
+        [cell configureWithTitle:title subtitle:subtitle detail:key ? [self localizedDetailForKey:key] : nil];
         [self attachMenuIfNeeded:cell entry:toggleData];
         return cell;
     } else if ([type isEqualToString:@"button"]) {

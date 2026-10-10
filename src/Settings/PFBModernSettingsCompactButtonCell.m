@@ -19,6 +19,13 @@ UIColor* PFBSettingsSubtitleColor(void) {
     return [colorPalette performSelector:@selector(tabBarItemColor)];
 }
 
+@interface PFBModernSettingsCompactButtonCell ()
+@property (nonatomic, strong) NSArray<NSLayoutConstraint*>* singleLine;
+@property (nonatomic, strong) NSArray<NSLayoutConstraint*>* withDetail;
+@property (nonatomic, strong) NSLayoutConstraint* valueToChevron;
+@property (nonatomic, strong) NSLayoutConstraint* valueToEdge;
+@end
+
 @implementation PFBModernSettingsCompactButtonCell
  
 - (instancetype)initWithStyle:(UITableViewCellStyle)style
@@ -45,6 +52,14 @@ UIColor* PFBSettingsSubtitleColor(void) {
     self.subtitleLabel.textAlignment = NSTextAlignmentRight;
     [self updateSubtitleColor];
     [self.contentView addSubview:self.subtitleLabel];
+
+    self.detailLabel = [[UILabel alloc] init];
+    self.detailLabel.translatesAutoresizingMaskIntoConstraints = NO;
+    self.detailLabel.font = self.subtitleLabel.font;
+    self.detailLabel.numberOfLines = 0;
+    self.detailLabel.hidden = YES;
+    [self.contentView addSubview:self.detailLabel];
+    [self updateSubtitleColor];
  
     self.chevronImageView = [[UIImageView alloc] init];
     self.chevronImageView.translatesAutoresizingMaskIntoConstraints = NO;
@@ -58,20 +73,37 @@ UIColor* PFBSettingsSubtitleColor(void) {
 }
  
 - (void)setupConstraints {
+    self.singleLine = @[
+        [self.titleLabel.centerYAnchor constraintEqualToAnchor:self.contentView.centerYAnchor],
+        [self.titleLabel.bottomAnchor constraintEqualToAnchor:self.contentView.bottomAnchor
+                                                     constant:-18],
+    ];
+    self.withDetail = @[
+        [self.detailLabel.leadingAnchor constraintEqualToAnchor:self.titleLabel.leadingAnchor],
+        [self.detailLabel.topAnchor constraintEqualToAnchor:self.titleLabel.bottomAnchor
+                                                   constant:2],
+        [self.detailLabel.bottomAnchor constraintEqualToAnchor:self.contentView.bottomAnchor
+                                                      constant:-18],
+        [self.detailLabel.trailingAnchor constraintLessThanOrEqualToAnchor:self.subtitleLabel.leadingAnchor
+                                                                   constant:-16],
+    ];
+    self.valueToChevron = [self.subtitleLabel.trailingAnchor
+        constraintEqualToAnchor:self.chevronImageView.leadingAnchor
+                       constant:-16];
+    self.valueToEdge = [self.subtitleLabel.trailingAnchor
+        constraintEqualToAnchor:self.contentView.trailingAnchor
+                       constant:-10];
+    [NSLayoutConstraint activateConstraints:self.singleLine];
     [NSLayoutConstraint activateConstraints:@[
         [self.titleLabel.leadingAnchor constraintEqualToAnchor:self.contentView.leadingAnchor
                                                       constant:10],
-        [self.titleLabel.centerYAnchor constraintEqualToAnchor:self.contentView.centerYAnchor],
         [self.titleLabel.topAnchor constraintEqualToAnchor:self.contentView.topAnchor
                                                   constant:18],
-        [self.titleLabel.bottomAnchor constraintEqualToAnchor:self.contentView.bottomAnchor
-                                                     constant:-18],
  
         [self.subtitleLabel.leadingAnchor
             constraintGreaterThanOrEqualToAnchor:self.titleLabel.trailingAnchor
                                         constant:16],
-        [self.subtitleLabel.trailingAnchor constraintEqualToAnchor:self.chevronImageView.leadingAnchor
-                                                          constant:-16],
+        self.valueToChevron,
         [self.subtitleLabel.centerYAnchor constraintEqualToAnchor:self.contentView.centerYAnchor],
  
         [self.chevronImageView.trailingAnchor constraintEqualToAnchor:self.contentView.trailingAnchor
@@ -87,10 +119,38 @@ UIColor* PFBSettingsSubtitleColor(void) {
     [self.subtitleLabel setContentCompressionResistancePriority:UILayoutPriorityDefaultLow
                                                         forAxis:UILayoutConstraintAxisHorizontal];
 }
- 
-- (void)configureWithTitle:(NSString*)title subtitle:(NSString*)subtitle {
+
+- (void)prepareForReuse {
+    [super prepareForReuse];
+    // Rows are recycled: a described or chevron-less row must not pass that on.
+    [self configureWithTitle:nil subtitle:nil detail:nil];
+    [self setShowsChevron:YES];
+    self.selectionStyle = UITableViewCellSelectionStyleDefault;
+}
+
+- (void)setShowsChevron:(BOOL)showsChevron {
+    self.chevronImageView.hidden = !showsChevron;
+    self.valueToChevron.active = NO;
+    self.valueToEdge.active = NO;
+    (showsChevron ? self.valueToChevron : self.valueToEdge).active = YES;
+}
+
+- (void)configureWithTitle:(NSString*)title subtitle:(NSString*)subtitle detail:(NSString*)detail {
     self.titleLabel.text = title;
     self.subtitleLabel.text = subtitle;
+    BOOL described = detail.length > 0;
+    self.detailLabel.text = detail;
+    self.detailLabel.hidden = !described;
+    [NSLayoutConstraint deactivateConstraints:described ? self.singleLine : self.withDetail];
+    [NSLayoutConstraint activateConstraints:described ? self.withDetail : self.singleLine];
+    // Described, the value keeps its width and the description wraps instead.
+    [self.subtitleLabel setContentCompressionResistancePriority:described ? UILayoutPriorityDefaultHigh + 1
+                                                                          : UILayoutPriorityDefaultLow
+                                                        forAxis:UILayoutConstraintAxisHorizontal];
+}
+ 
+- (void)configureWithTitle:(NSString*)title subtitle:(NSString*)subtitle {
+    [self configureWithTitle:title subtitle:subtitle detail:nil];
 }
  
 - (void)updateChevronColor {
@@ -103,6 +163,7 @@ UIColor* PFBSettingsSubtitleColor(void) {
 - (void)updateSubtitleColor {
     UIColor* subtitleColor = PFBSettingsSubtitleColor();
     self.subtitleLabel.textColor = subtitleColor;
+    self.detailLabel.textColor = subtitleColor;
 }
  
 - (void)traitCollectionDidChange:(UITraitCollection*)previousTraitCollection {
@@ -115,6 +176,7 @@ UIColor* PFBSettingsSubtitleColor(void) {
         id fontGroup = [PFBManager sharedFontGroup];
         self.titleLabel.font = [fontGroup performSelector:@selector(bodyBoldFont)];
         self.subtitleLabel.font = [fontGroup performSelector:@selector(subtext2Font)];
+        self.detailLabel.font = self.subtitleLabel.font;
     }
 }
  

@@ -82,6 +82,7 @@
 /* ===== General › Links ===== */
 "GENERAL_GROUP_LINKS" = "Links";
 "SHARING_DOMAIN_TITLE" = "Sharing domain";
+"SHARING_DOMAIN_DETAIL" = "The address used in links you share.";
 "STRIP_URL_TRACKING_TITLE" = "Clean shared links";
 "STRIP_URL_TRACKING_DETAIL" = "Remove tracking parameters from links you share or copy.";
 "ALWAYS_OPEN_SAFARI_TITLE" = "External browser";
@@ -163,6 +164,7 @@
 "MODERN_SETTINGS_TWEETS_TITLE" = "Tweets";
 "MODERN_SETTINGS_TWEETS_SUBTITLE" = "Composing, buttons, and how replies are shown.";
 "UNDO_TWEET_TITLE" = "Undo Tweet";
+"UNDO_TWEET_TIMEOUT_DETAIL" = "Time to cancel a Tweet after you send it.";
 "TWEET_CONFIRM_TITLE" = "Confirm Tweets";
 "TWEET_CONFIRM_DETAIL" = "Ask before posting a Tweet.";
 "LIKE_CONFIRM_TITLE" = "Confirm likes";
@@ -426,6 +428,7 @@
 "HIDE_TWEET_BUTTON_TITLE" = "Hide Tweet button";
 "HIDE_TWEET_BUTTON_DETAIL" = "Remove the compose button from the timeline.";
 "SEND_SOUND_TITLE" = "Send sound";
+"SEND_SOUND_DETAIL" = "A sound played when a Tweet is sent.";
 "SEND_SOUND_NONE" = "None";
 "SEND_SOUND_IMPORT_ACTION" = "Import…";
 "SEND_SOUND_REMOVE_ACTION" = "Remove";
@@ -501,6 +504,7 @@
 "PROFILES_GROUP_APPEARANCE" = "Interface";
 
 "PROFILE_INITIAL_TAB_TITLE" = "Open profiles on";
+"PROFILE_INITIAL_TAB_DETAIL" = "Pick the tab a profile opens on.";
 "PROFILE_TAB_DEFAULT" = "Default";
 "PROFILE_TAB_REPLIES" = "Replies";
 "PROFILE_TAB_HIGHLIGHTS" = "Highlights";

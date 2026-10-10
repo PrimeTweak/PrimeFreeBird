@@ -58,6 +58,7 @@
 "ALWAYS_OPEN_SAFARI_DETAIL" = "Ouvre les liens dans Safari ou votre navigateur par défaut.";
 
 "SHARING_DOMAIN_TITLE" = "Domaine de partage";
+"SHARING_DOMAIN_DETAIL" = "L’adresse utilisée dans les liens que vous partagez.";
 
 /*Tweets*/
 "TWEET_TO_IMAGE_TITLE" = "Enregistrer Tweet en image";
@@ -158,6 +159,7 @@
 "HIDE_PROMOTED_DETAIL" = "Supprime toutes les pubs.";
 
 "UNDO_TWEET_TITLE" = "Annuler Tweet";
+"UNDO_TWEET_TIMEOUT_DETAIL" = "Délai pour annuler un Tweet après l’envoi.";
 
 "DOWNLOAD_VIDEOS_TITLE" = "Télécharger les médias";
 "DOWNLOAD_VIDEOS_DETAIL" = "Sauvegarde vidéos et GIFs depuis l'appui long sur le média.";
@@ -424,6 +426,7 @@
 "HIDE_TWEET_BUTTON_TITLE" = "Masquer le bouton Tweet";
 "HIDE_TWEET_BUTTON_DETAIL" = "Retire le bouton de rédaction du fil.";
 "SEND_SOUND_TITLE" = "Son d’envoi";
+"SEND_SOUND_DETAIL" = "Un son joué à l’envoi d’un Tweet.";
 "SEND_SOUND_NONE" = "Aucun";
 "SEND_SOUND_IMPORT_ACTION" = "Importer…";
 "SEND_SOUND_REMOVE_ACTION" = "Retirer";
@@ -499,6 +502,7 @@
 "PROFILES_GROUP_APPEARANCE" = "Interface";
 
 "PROFILE_INITIAL_TAB_TITLE" = "Ouvrir les profils sur";
+"PROFILE_INITIAL_TAB_DETAIL" = "Choisit l’onglet d’ouverture d’un profil.";
 "PROFILE_TAB_DEFAULT" = "Par défaut";
 "PROFILE_TAB_REPLIES" = "Réponses";
 "PROFILE_TAB_HIGHLIGHTS" = "Moments forts";

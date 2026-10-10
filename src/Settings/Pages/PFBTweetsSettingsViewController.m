@@ -22,14 +22,23 @@
             [tableView dequeueReusableCellWithIdentifier:@"CompactButtonCell"
                                             forIndexPath:indexPath];
         NSString* title = [[PFBBundle sharedBundle] localizedStringForKey:settingData[@"titleKey"]];
-        [cell configureWithTitle:title subtitle:[self undoTimeoutSubtitle]];
+        [cell configureWithTitle:title
+                        subtitle:[self undoTimeoutSubtitle]
+                          detail:[self localizedDetailForKey:@"undo_tweet_timeout"]];
         [self attachMenuIfNeeded:cell entry:settingData];
         return cell;
     }
+    // The sound's name sits on the right; the buttons below the row change it.
     if ([settingData[@"key"] isEqualToString:@"send_sound"]) {
-        PFBModernSettingsTableViewCell* cell =
-            (PFBModernSettingsTableViewCell*)[super tableView:tableView cellForRowAtIndexPath:indexPath];
-        cell.subtitleLabel.text = [self sendSoundSubtitle];
+        PFBModernSettingsCompactButtonCell* cell =
+            [tableView dequeueReusableCellWithIdentifier:@"CompactButtonCell"
+                                            forIndexPath:indexPath];
+        NSString* title = [[PFBBundle sharedBundle] localizedStringForKey:settingData[@"titleKey"]];
+        [cell configureWithTitle:title
+                        subtitle:[self sendSoundSubtitle]
+                          detail:[self localizedDetailForKey:@"send_sound"]];
+        [cell setShowsChevron:NO];
+        cell.selectionStyle = UITableViewCellSelectionStyleNone;
         return cell;
     }
     if ([settingData[@"key"] isEqualToString:@"send_sound_actions"]) {

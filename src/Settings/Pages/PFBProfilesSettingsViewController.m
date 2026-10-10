@@ -53,7 +53,7 @@ static NSInteger PFBProfileTabCurrent(void) {
     return @"profiles";
 }
 
-// The tab row reads like Undo Tweet's: its title, the chosen tab and a chevron.
+// The tab row reads like Undo Tweet's: its title and description, the chosen tab and a chevron.
 - (UITableViewCell*)tableView:(UITableView*)tableView
         cellForRowAtIndexPath:(NSIndexPath*)indexPath {
     NSDictionary* settingData = self.visibleToggles[indexPath.row];
@@ -63,7 +63,8 @@ static NSInteger PFBProfileTabCurrent(void) {
                                             forIndexPath:indexPath];
         PFBBundle* bundle = [PFBBundle sharedBundle];
         [cell configureWithTitle:[bundle localizedStringForKey:settingData[@"titleKey"]]
-                        subtitle:[bundle localizedStringForKey:PFBProfileTabTitleKeys()[PFBProfileTabCurrent()]]];
+                        subtitle:[bundle localizedStringForKey:PFBProfileTabTitleKeys()[PFBProfileTabCurrent()]]
+                          detail:[self localizedDetailForKey:@"profile_initial_tab"]];
         [self attachMenuIfNeeded:cell entry:settingData];
         return cell;
     }
