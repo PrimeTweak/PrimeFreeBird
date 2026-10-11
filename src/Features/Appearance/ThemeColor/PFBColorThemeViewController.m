@@ -334,6 +334,10 @@ static NSInteger NearestAccentOption(UIColor* color) {
     UIColor* color = viewController.selectedColor;
     CGFloat r = 0, g = 0, b = 0, a = 0;
     [color getRed:&r green:&g blue:&b alpha:&a];
+    // A wide-gamut pick comes back in extended sRGB, outside 0 to 1; the hex holds sRGB.
+    r = MIN(MAX(r, 0.0), 1.0);
+    g = MIN(MAX(g, 0.0), 1.0);
+    b = MIN(MAX(b, 0.0), 1.0);
     NSString* hex = [NSString stringWithFormat:@"%02X%02X%02X",
                      (int)(r * 255), (int)(g * 255), (int)(b * 255)];
     [NSUserDefaults.standardUserDefaults setObject:hex forKey:@"pfb_custom_accent_hex"];

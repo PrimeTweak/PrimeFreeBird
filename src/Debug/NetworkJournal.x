@@ -175,9 +175,11 @@ static char kPFBRespBodyKey;
 
 - (NSURLSessionDataTask*)dataTaskWithRequest:(NSURLRequest*)request
                            completionHandler:(void (^)(NSData*, NSURLResponse*, NSError*))completionHandler {
+    if (!PFBDebugIsRecording() || !completionHandler) {
+        return %orig;
+    }
     NSString* path = request.URL.path ?: @"";
-    if (!PFBDebugIsRecording() || !completionHandler || !pfbRespIsAccountPath(path) ||
-        !pfbRespIsTwitterAPI(request.URL.absoluteString)) {
+    if (!pfbRespIsAccountPath(path) || !pfbRespIsTwitterAPI(request.URL.absoluteString)) {
         return %orig;
     }
     NSString* method = request.HTTPMethod;

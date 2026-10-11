@@ -1998,6 +1998,7 @@ void PFBCompatTourResumeAtLaunch(void) {
                      queue:NSOperationQueue.mainQueue
                 usingBlock:^(__unused NSNotification* note) {
                   [[NSNotificationCenter defaultCenter] removeObserver:observer];
+                  observer = nil;
                   tourRecoverStop();
                   BOOL scheduled = [[NSUserDefaults standardUserDefaults] boolForKey:kPFBTourPendingKey];
                   [[NSUserDefaults standardUserDefaults] removeObjectForKey:kPFBTourPendingKey];

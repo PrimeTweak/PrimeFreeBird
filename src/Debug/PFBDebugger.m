@@ -129,6 +129,8 @@ static void PFBCollectHealth(NSMutableArray<NSString*>* deadClasses,
     NSUInteger okMethods = 0;
     // A method hooked from several files has a row per file; each hook counts once.
     NSMutableSet<NSString*>* counted = [NSMutableSet set];
+    NSMutableArray<NSString*>* deadNames = [NSMutableArray array];
+    NSMutableDictionary<NSString*, NSMutableArray<NSString*>*>* deadFiles = [NSMutableDictionary dictionary];
 
     // A NULL method means the class alone is checked. Methods carry their full
     // selector, so one the runtime cannot find is a hook that never runs.
@@ -142,11 +144,17 @@ static void PFBCollectHealth(NSMutableArray<NSString*>* deadClasses,
         [counted addObject:hook];
         Class cls = objc_getClass(record.className);
         if (!cls) {
-            // Deduplicate: several methods of one class each produced a row.
-            NSString* entry = [NSString stringWithFormat:@"  x class %s  (%s)",
-                               record.className, record.file];
-            if (![deadClasses containsObject:entry]) {
-                [deadClasses addObject:entry];
+            // One line per missing class, naming every file that hooks it.
+            NSString* name = [NSString stringWithUTF8String:record.className];
+            NSString* file = [NSString stringWithUTF8String:record.file];
+            NSMutableArray<NSString*>* files = deadFiles[name];
+            if (!files) {
+                files = [NSMutableArray array];
+                deadFiles[name] = files;
+                [deadNames addObject:name];
+            }
+            if (![files containsObject:file]) {
+                [files addObject:file];
             }
             continue;
         }
@@ -168,6 +176,11 @@ static void PFBCollectHealth(NSMutableArray<NSString*>* deadClasses,
                 [NSString stringWithFormat:@"  · %s -%s  (%s)",
                  record.className, record.methodName, record.file]];
         }
+    }
+
+    for (NSString* name in deadNames) {
+        [deadClasses addObject:[NSString stringWithFormat:@"  x class %@  (%@)", name,
+                                                          [deadFiles[name] componentsJoinedByString:@", "]]];
     }
 
     // Classes resolved by name at runtime (%c / objc_getClass / …).

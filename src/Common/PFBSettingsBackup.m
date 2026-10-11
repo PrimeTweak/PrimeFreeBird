@@ -91,6 +91,7 @@ static BOOL PFBValueIsPortable(id value) {
                                                    error:NULL];
     if (![payload isKindOfClass:[NSDictionary class]] ||
         ![kPFBBackupFormat isEqualToString:payload[@"format"]] ||
+        (payload[@"version"] && ![payload[@"version"] respondsToSelector:@selector(integerValue)]) ||
         [payload[@"version"] integerValue] > kPFBBackupVersion) {
         return -1;
     }

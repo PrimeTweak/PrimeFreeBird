@@ -355,14 +355,11 @@ static void pfbApplyTabFilter(UIView* bar, UICollectionView* cv) {
 - (void)layoutSubviews {
     %orig;
 
+    if (!pfbIsExploreBar((UIView*)self)) { return; }
     if (!pfbGranularActive()) {
-        if (PFBCompatNeedsObservation(PFBCompat_choose_explore_tabs) &&
-            pfbIsExploreBar((UIView*)self)) {
-            PFBCOMPAT_OBSERVE(PFBCompat_choose_explore_tabs, @"Explore tabs found");
-        }
+        PFBCOMPAT_OBSERVE(PFBCompat_choose_explore_tabs, @"Explore tabs found");
         return;
     }
-    if (!pfbIsExploreBar((UIView*)self)) { return; }
 
     UICollectionView* cv = pfbFindCollection((UIView*)self, 0);
     if (!cv) { return; }
@@ -448,8 +445,8 @@ static void pfbJournalPagerSwap(UICollectionView* pager, NSInteger pages) {
 // change and once more when a gesture or animation ends.
 - (void)scrollViewDidScroll:(id)scrollView {
     %orig;
-    if (!pfbGranularActive()
-        || (UICollectionView*)scrollView != gPFBPagerCV) { return; }
+    if ((UICollectionView*)scrollView != gPFBPagerCV
+        || !pfbGranularActive()) { return; }
     pfbPositionUnderline(gPFBExploreBar, gPFBBarCV);
 }
 

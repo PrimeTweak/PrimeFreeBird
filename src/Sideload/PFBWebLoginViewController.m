@@ -378,9 +378,11 @@ static UIImage* pfbLoginBirdImage(CGSize size) {
     decidePolicyForNavigationResponse:(WKNavigationResponse*)response
                     decisionHandler:(void (^)(WKNavigationResponsePolicy))decisionHandler {
     if ([response.response isKindOfClass:[NSHTTPURLResponse class]]) {
-        PFBDebugLog(@"[weblogin] http %ld for %@",
+        // Site and path only: a query can carry account identifiers.
+        NSURL* url = response.response.URL;
+        PFBDebugLog(@"[weblogin] http %ld for %@%@",
                     (long)((NSHTTPURLResponse*)response.response).statusCode,
-                    response.response.URL.absoluteString);
+                    url.host ?: @"", url.path ?: @"");
     }
     decisionHandler(WKNavigationResponsePolicyAllow);
 }
@@ -399,6 +401,10 @@ static UIImage* pfbLoginBirdImage(CGSize size) {
       NSString* csrfVal = nil;
       long long uid = 0;
       for (NSHTTPCookie* cookie in cookies) {
+          // Only X's own cookies count: another site in the flow can use the same names.
+          if (!PFBIsXDomain(cookie.domain ?: @"")) {
+              continue;
+          }
           if ([cookie.name isEqualToString:kPFBAuthCookie]) {
               auth = YES;
               authVal = cookie.value;
@@ -459,6 +465,10 @@ static UIImage* pfbLoginBirdImage(CGSize size) {
 
 - (void)webViewWebContentProcessDidTerminate:(WKWebView*)webView {
     PFBDebugLog(@"[weblogin] web content process terminated");
+    // A page whose process died stays blank: the flow loads again until a session is caught.
+    if (!self.sawAuth) {
+        [self reload];
+    }
 }
 
 @end

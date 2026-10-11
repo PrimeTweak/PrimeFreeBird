@@ -176,12 +176,8 @@ static const void* kPFBVoiceInteractionKey = &kPFBVoiceInteractionKey;
 
     BOOL isVoiceRecording = [self.attachment isKindOfClass:%c(TTMAssetVoiceRecording)];
     BOOL enabled = [PFBSettings boolForKey:@"voice_note_from_video"];
-    if (isVoiceRecording) {
-        if (enabled) {
-            PFBCOMPAT_ACTION(PFBCompat_voice_note_from_video, @"upload button on a voice note");
-        } else {
-            PFBCOMPAT_OBSERVE(PFBCompat_voice_note_from_video, @"voice note attached");
-        }
+    if (isVoiceRecording && !enabled) {
+        PFBCOMPAT_OBSERVE(PFBCompat_voice_note_from_video, @"voice note attached");
     }
 
     if (enabled && isVoiceRecording && self.uploadButton == nil) {
@@ -216,6 +212,9 @@ static const void* kPFBVoiceInteractionKey = &kPFBVoiceInteractionKey;
     }
 
     self.uploadButton.hidden = !(isVoiceRecording && enabled);
+    if (isVoiceRecording && enabled && self.uploadButton) {
+        PFBCOMPAT_ACTION(PFBCompat_voice_note_from_video, @"upload button on a voice note");
+    }
 }
 %new
 - (void)handleUploadButton:(UIButton*)sender {
@@ -230,7 +229,8 @@ static const void* kPFBVoiceInteractionKey = &kPFBVoiceInteractionKey;
     didFinishPickingMediaWithInfo:(NSDictionary<UIImagePickerControllerInfoKey, id>*)info {
     NSURL* videoURL = info[UIImagePickerControllerMediaURL];
     TTMAssetVoiceRecording* attachment = self.attachment;
-    NSURL* recorder_url = [NSURL fileURLWithPath:attachment.filePath];
+    NSString* recorderPath = attachment.filePath;
+    NSURL* recorder_url = recorderPath ? [NSURL fileURLWithPath:recorderPath] : nil;
 
     if (recorder_url != nil) {
         NSFileManager* fileManager = [NSFileManager defaultManager];
@@ -292,7 +292,7 @@ static const void* kPFBVoiceInteractionKey = &kPFBVoiceInteractionKey;
                                                   applicationActivities:nil];
             if (is_iPad()) {
                 acVC.popoverPresentationController.sourceView = self;
-                acVC.popoverPresentationController.sourceRect = self.frame;
+                acVC.popoverPresentationController.sourceRect = self.bounds;
             }
             [topMostController() presentViewController:acVC
                                               animated:true

@@ -227,6 +227,10 @@ NSString* PFBTwitterTerminology(NSString* text) {
                              table:(NSString*)tableName {
     NSString* result = %orig;
     if (![PFBSettings boolForKey:@"restore_twitter_names"]) {
+        if (PFBCompatNeedsObservation(PFBCompat_restore_twitter_names) &&
+            self != [PFBBundle sharedBundle].mainBundle && self != [PFBBundle sharedBundle].englishBundle) {
+            PFBCOMPAT_OBSERVE(PFBCompat_restore_twitter_names, @"read by Twitter");
+        }
         return result;
     }
     PFBBundle* tweak = [PFBBundle sharedBundle];
@@ -239,7 +243,6 @@ NSString* PFBTwitterTerminology(NSString* text) {
         PFBCOMPAT_ACTION(PFBCompat_restore_twitter_names, @"string renamed");
         return override;
     }
-    PFBCOMPAT_OBSERVE(PFBCompat_restore_twitter_names, @"read by Twitter");
     // A plural format carries its forms with it, which a renamed copy loses, and two keys
     // can share one format, which the memo below would mix up: it is left as it is.
     if ([result containsString:@"%#@"]) {
@@ -383,7 +386,7 @@ static UIColor* PFBTwitterBlue(void) {
 }
 
 static BOOL isComposePlusGlyph(NSString* name) {
-    if (![PFBSettings boolForKey:@"restore_tweet_button"] || ![name isKindOfClass:[NSString class]]) {
+    if (![name isKindOfClass:[NSString class]]) {
         return NO;
     }
     // "plus" is the pre-Liquid-Glass compose glyph; the redesign draws the FAB
@@ -395,7 +398,7 @@ static BOOL isComposePlusGlyph(NSString* name) {
             @"plus", @"compose", @"alt_compose", @"alt_compose_plus", @"compose_square"
         ]];
     });
-    return [composeGlyphs containsObject:name];
+    return [composeGlyphs containsObject:name] && [PFBSettings boolForKey:@"restore_tweet_button"];
 }
 
 // Every vector the app loads by name keeps that name on the image, under the

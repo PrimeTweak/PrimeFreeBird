@@ -317,7 +317,9 @@ static NSURL* PFBAccountAvatarURL(TFNTwitterAccount* account) {
         NSString* prefKey = toggleData[@"prefKeyForSubtitle"];
         if (prefKey) {
             NSString* defaultSubtitle = [self defaultSubtitleForEntry:toggleData];
-            subtitle = [[NSUserDefaults standardUserDefaults] objectForKey:prefKey] ?: defaultSubtitle;
+            // A restored backup can hold another type under this key.
+            id stored = [[NSUserDefaults standardUserDefaults] objectForKey:prefKey];
+            subtitle = [stored isKindOfClass:[NSString class]] ? stored : defaultSubtitle;
         }
         NSString* key = toggleData[@"key"];
         [cell configureWithTitle:title subtitle:subtitle detail:key ? [self localizedDetailForKey:key] : nil];
@@ -396,6 +398,8 @@ static NSURL* PFBAccountAvatarURL(TFNTwitterAccount* account) {
             [cell addPillTarget:self action:@selector(pillTapped:)];
             [cell setPillVisible:(cell.toggleSwitch.on && rowEnabled) animated:NO];
         } else {
+            // A reused cell drops the pill key of the row it showed before.
+            objc_setAssociatedObject(cell.pillButton, @"pillKey", nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
             [cell setPillVisible:NO animated:NO];
         }
         return cell;

@@ -28,9 +28,10 @@ void PFBApplyHideCustomTimelinesSetting(void) {
 
     if ([PFBSettings boolForKey:@"hide_custom_timelines"]) {
         NSArray* models = LastPinnedTimelineModels;
-        if (models.count > 0) {
+        SEL update = @selector(updatePinnedTimelines:);
+        if (models.count > 0 && [repository respondsToSelector:update]) {
             PinnedTimelinesWriteBypass = YES;
-            ((void (*)(id, SEL, id))objc_msgSend)(repository, @selector(updatePinnedTimelines:), models);
+            ((void (*)(id, SEL, id))objc_msgSend)(repository, update, models);
             PinnedTimelinesWriteBypass = NO;
         }
     } else if ([repository respondsToSelector:@selector(fetchPinnedTimelinesWithThrottleEnabled:)]) {
@@ -409,8 +410,10 @@ static NSString* ItemScribeComponent(id viewModel) {
 static BOOL ItemIsTopicPost(id viewModel) {
     static NSString* prefix;
     static NSString* suffix;
+    static SEL selector;
     static dispatch_once_t once;
     dispatch_once(&once, ^{
+      selector = NSSelectorFromString(@"socialContextBannerText");
       NSString* path = [NSBundle.mainBundle pathForResource:@"TwitterTweetAnatomy_TwitterTweetAnatomyStrings"
                                                      ofType:@"bundle"];
       NSString* format = [[NSBundle bundleWithPath:path] localizedStringForKey:@"FROM_TAG_TOPIC_SOCIAL_CONTEXT_LABEL_FORMAT"
@@ -422,7 +425,6 @@ static BOOL ItemIsTopicPost(id viewModel) {
           suffix = [format substringFromIndex:NSMaxRange(slot)];
       }
     });
-    SEL selector = NSSelectorFromString(@"socialContextBannerText");
     if (prefix.length + suffix.length == 0 || ![viewModel respondsToSelector:selector]) {
         return NO;
     }
@@ -602,13 +604,17 @@ void pfbRefreshMutedWords(void) {
     }
     gPFBMutedCountDay = today;
 
-    // Hidden conversations share this memo: without them in the signature, the
-    // timeline keeps its previous verdict and a hidden thread only vanishes on
-    // the next reload.
-    signature = signature * 31 + PFBHiddenThreads().count;
+    // Hidden conversations share this memo, signed by their ids: a count alone stays
+    // the same when one is unhidden and another hidden, and the timeline would keep
+    // its previous verdict.
+    for (id thread in PFBHiddenThreads()) {
+        id threadID = [thread isKindOfClass:[NSDictionary class]] ? ((NSDictionary*)thread)[@"id"] : nil;
+        signature = signature * 31 + [threadID hash];
+    }
     gPFBMutedSignature = signature * 31 + (gPFBMutedWholeWords ? 2 : 1) +
                          (gPFBMutedSkipFollowing ? 4 : 0) +
-                         (gPFBMutedIncludeReposts ? 8 : 0);
+                         (gPFBMutedIncludeReposts ? 8 : 0) +
+                         (gPFBMutedInConversations ? 16 : 0);
     gPFBMutedLoaded = YES;
 }
 
@@ -1427,9 +1433,10 @@ static void PFBReadingPositionMarker(TFNItemsDataViewController* dataViewControl
         return;
     }
     UIView* marker = objc_getAssociatedObject(table, kPFBReadingMarkerViewKey);
+    BOOL allowed = PFBReadingMarkerAllowed(dataViewController);
     // A launch starts with no anchor in memory; the stored ones are tried
     // against this list on every pass until one matches.
-    if (PFBReadingMarkerAllowed(dataViewController) &&
+    if (allowed &&
         !objc_getAssociatedObject(dataViewController, kPFBReadingAnchorIDKey)) {
         // Retried while the list still has nothing to match against: a fixed
         // number of attempts runs out before the first page arrives.
@@ -1439,7 +1446,7 @@ static void PFBReadingPositionMarker(TFNItemsDataViewController* dataViewControl
     }
     NSString* anchor =
         objc_getAssociatedObject(dataViewController, kPFBReadingAnchorIDKey);
-    NSIndexPath* path = PFBReadingMarkerAllowed(dataViewController)
+    NSIndexPath* path = allowed
                             ? PFBReadingIndexPathForEntryID(dataViewController, anchor)
                             : nil;
     objc_setAssociatedObject(table, kPFBReadingAnchorPathKey, path,
@@ -1456,7 +1463,7 @@ static void PFBReadingPositionMarker(TFNItemsDataViewController* dataViewControl
             objc_getAssociatedObject(dataViewController, kPFBReadingTopAtCaptureKey);
         BOOL replaced = headNow.length && headThen.length &&
                         ![headNow isEqualToString:headThen];
-        if (anchor.length && replaced &&
+        if (allowed && anchor.length && replaced &&
             PFBReadingItemCount(dataViewController.sections) >= 10) {
             NSInteger misses =
                 [objc_getAssociatedObject(dataViewController,

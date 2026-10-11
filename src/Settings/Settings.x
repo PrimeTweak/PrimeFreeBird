@@ -319,7 +319,7 @@ static UIFont* PFBCustomFont(UIFont* original, BOOL bold) {
         return original;
     }
     NSString* customName = [[NSUserDefaults standardUserDefaults]
-        objectForKey:bold ? @"pfb_font_2" : @"pfb_font_1"];
+        stringForKey:bold ? @"pfb_font_2" : @"pfb_font_1"];
     if (customName.length == 0) {
         return original;
     }

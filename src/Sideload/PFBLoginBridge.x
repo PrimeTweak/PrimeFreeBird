@@ -155,6 +155,7 @@ static NSURLRequest* pfbBridgeInject(NSURLRequest* req) {
     NSString* csrf = nil;
     pfbBridgeReadSharedSession(&authToken, &csrf);
     if (authToken.length == 0 || csrf.length == 0) {
+        PFBCOMPAT_OBSERVE(PFBCompat_web_session, @"request seen, no web session");
         return req;
     }
     NSString* cookie = req.allHTTPHeaderFields[@"Cookie"] ?: @"";

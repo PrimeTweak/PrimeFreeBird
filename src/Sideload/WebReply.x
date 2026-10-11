@@ -222,23 +222,23 @@ void PFBWebReplyStart(void) {
         SEL focusSel = sel_getUid(
             "_elementDidFocus:userIsInteracting:blurPreviousNode:activityStateChanges:userObject:");
         Method focusMethod = class_getInstanceMethod(contentViewClass, focusSel);
-        if (!focusMethod) {
-            return;
+        // Each override stands alone: a renamed focus method leaves the icon bar in place.
+        if (focusMethod) {
+            __block IMP originalFocusIMP = method_getImplementation(focusMethod);
+            IMP overrideIMP = imp_implementationWithBlock(^void(id self_, void* information,
+                                                                BOOL userIsInteracting, BOOL blurPreviousNode,
+                                                                unsigned long long activityStateChanges,
+                                                                id userObject) {
+                if (gPFBReplyWebViewActive && gPFBForceNextFocus) {
+                    gPFBForceNextFocus = NO;  // only the programmatic focus is forced; a dismiss sticks
+                    userIsInteracting = YES;
+                }
+                ((void (*)(id, SEL, void*, BOOL, BOOL, unsigned long long, id))originalFocusIMP)(
+                    self_, focusSel, information, userIsInteracting, blurPreviousNode, activityStateChanges,
+                    userObject);
+            });
+            method_setImplementation(focusMethod, overrideIMP);
         }
-        __block IMP originalFocusIMP = method_getImplementation(focusMethod);
-        IMP overrideIMP = imp_implementationWithBlock(^void(id self_, void* information,
-                                                            BOOL userIsInteracting, BOOL blurPreviousNode,
-                                                            unsigned long long activityStateChanges,
-                                                            id userObject) {
-            if (gPFBReplyWebViewActive && gPFBForceNextFocus) {
-                gPFBForceNextFocus = NO;  // only the programmatic focus is forced; a dismiss sticks
-                userIsInteracting = YES;
-            }
-            ((void (*)(id, SEL, void*, BOOL, BOOL, unsigned long long, id))originalFocusIMP)(
-                self_, focusSel, information, userIsInteracting, blurPreviousNode, activityStateChanges,
-                userObject);
-        });
-        method_setImplementation(focusMethod, overrideIMP);
 
         // Removes the form-assistant bar while the reply web view is on screen, by
         // returning nil from WKContentView's inputAccessoryView. Swizzled only if

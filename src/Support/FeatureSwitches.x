@@ -21,8 +21,14 @@ static __thread BOOL ReportGenuineTabGates = NO;
 // own.
 static BOOL AccountIsGenuinelyPremium(void) {
     Class hostClass = objc_getClass("T1HostViewController");
+    if (![(id)hostClass respondsToSelector:@selector(sharedHostViewController)]) {
+        return NO;
+    }
     id host = ((id (*)(id, SEL))objc_msgSend)(
         (id)hostClass, @selector(sharedHostViewController));
+    if (![host respondsToSelector:@selector(currentAccount)]) {
+        return NO;
+    }
     id account = ((id (*)(id, SEL))objc_msgSend)(host, @selector(currentAccount));
     if (![account respondsToSelector:@selector(isPremiumTierUser)]) {
         return NO;
@@ -348,6 +354,7 @@ static NSNumber* FeatureSwitchOverrideValueForKey(NSString* key) {
             PFBCOMPAT_ACTION(PFBCompat_bypass_age_verification, @"age check skipped");
             return @NO;
         }
+        PFBCOMPAT_OBSERVE(PFBCompat_bypass_age_verification, @"read by Twitter");
     }
 
     // Conversation / tweet detail
@@ -1038,9 +1045,14 @@ BOOL PFBPanelIsGenuinelyAvailable(long long panelID) {
             return genuineSwitchBool(@"recruiting_global_jobs_hub_enabled") ||
                    genuineSwitchBool(@"recruiting_jetfuel_jobs_hub_enabled");
         case 17: { // Money
-            id host =
-                ((id (*)(id, SEL))objc_msgSend)(objc_getClass("T1HostViewController"),
-                                                @selector(sharedHostViewController));
+            id hostClass = (id)objc_getClass("T1HostViewController");
+            if (![hostClass respondsToSelector:@selector(sharedHostViewController)]) {
+                return NO;
+            }
+            id host = ((id (*)(id, SEL))objc_msgSend)(hostClass, @selector(sharedHostViewController));
+            if (![host respondsToSelector:@selector(currentAccount)]) {
+                return NO;
+            }
             id account =
                 ((id (*)(id, SEL))objc_msgSend)(host, @selector(currentAccount));
             return genuineTabGateFlag(account, @selector(canAccessXPayments));

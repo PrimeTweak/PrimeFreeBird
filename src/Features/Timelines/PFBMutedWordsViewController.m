@@ -526,6 +526,12 @@ static NSMutableArray<NSString*>* PFBKeptLanguageList(void) {
             return;
         }
     }
+    // A new term starts with no deadline, even one a removed term left under its name.
+    NSMutableDictionary* map = [self expiryMap];
+    if (map[raw]) {
+        [map removeObjectForKey:raw];
+        [[NSUserDefaults standardUserDefaults] setObject:map forKey:kPFBMutedExpiryKey];
+    }
     [self.terms insertObject:raw atIndex:0];
     field.text = @"";
     [self persist];
@@ -701,7 +707,8 @@ static NSMutableArray<NSString*>* PFBKeptLanguageList(void) {
             [tableView dequeueReusableCellWithIdentifier:@"term"
                                             forIndexPath:indexPath];
         NSArray<NSDictionary*>* threads = PFBHiddenThreads();
-        if (!threads.count) {
+        // The list can shrink after the row count was taken.
+        if ((NSUInteger)indexPath.row >= threads.count) {
             [cell applyThreadRowWithMargin:[self rowMargin] showBadge:NO];
             cell.termLabel.text = [bundle localizedStringForKey:@"THREADS_EMPTY"];
             cell.termLabel.textColor = [UIColor secondaryLabelColor];
@@ -783,6 +790,8 @@ static NSMutableArray<NSString*>* PFBKeptLanguageList(void) {
                              : [bundle localizedStringForKey:@"LANGUAGES_OTHERS_NONE"];
             cell.detailTextLabel.textColor = [UIColor secondaryLabelColor];
             cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
+            // A reused language row can bring its tick along.
+            [cell.contentView viewWithTag:kPFBTickTag].hidden = YES;
             return cell;
         }
 

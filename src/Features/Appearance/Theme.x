@@ -54,7 +54,8 @@ static BOOL customAccentActive(void) {
 // this: the custom color when active, except during a raw swatch read, and
 // otherwise whatever Twitter returns natively.
 static UIColor* PFBAccent(UIColor* orig) {
-    if (customAccentActive() && !PFBRawPaletteReading()) {
+    if (!PFBRawPaletteReading() &&
+        [NSUserDefaults.standardUserDefaults boolForKey:@"pfb_custom_is_active"]) {
         UIColor* c = PFBCustomAccentColor();
         if (c) { return c; }
     }
@@ -204,6 +205,8 @@ static UIColor* PFBRawLogoColor(void) {
 
 static const void* kPFBLogoOriginalKey = &kPFBLogoOriginalKey;
 static const void* kPFBLogoBakedKey = &kPFBLogoBakedKey;
+// Marks a rendered bird, so an original that already is one is not looked up again.
+static const void* kPFBBirdImageKey = &kPFBBirdImageKey;
 
 // The bird, rendered from the bundled PDF at the size the bar asks for. Cached per
 // size: the render costs a PDF parse and the bar asks on every layout pass. Same recipe
@@ -253,6 +256,8 @@ static UIImage* PFBBirdLogoImage(CGSize size) {
     }
     CGPDFDocumentRelease(pdf);
     if (rendered) {
+        objc_setAssociatedObject(rendered, kPFBBirdImageKey, @YES,
+                                 OBJC_ASSOCIATION_RETAIN_NONATOMIC);
         cache[key] = rendered;
     }
     return rendered;
@@ -311,7 +316,8 @@ static void PFBApplyLogoTint(UIImageView* logoView) {
     }
     // The bird replaces the X when Twitter's branding is switched back on.
     // Substituting the image, not the tint: the glyph itself is what changed.
-    if ([PFBSettings boolForKey:@"restore_twitter_names"]) {
+    if ([PFBSettings boolForKey:@"restore_twitter_names"] &&
+        !objc_getAssociatedObject(original, kPFBBirdImageKey)) {
         UIImage* bird = PFBBirdLogoImage(original.size);
         if (bird && original != bird) {
             original = bird;
@@ -1790,10 +1796,13 @@ static void PFBShowRestartReminder(void) {
 void PFBApplySelectedThemeColor(void) {
     NSNumber* selectedColor = selectedThemeColor();
     id colorSettings = [objc_getClass("TAEColorSettings") sharedSettings];
+    if (![colorSettings respondsToSelector:@selector(setPrimaryColorOption:)]) {
+        return;
+    }
     if (selectedColor) {
         [colorSettings setPrimaryColorOption:selectedColor.integerValue];
         PFBCOMPAT_ACTION(PFBCompat_accent_color, @"accent color applied");
-    } else if ([colorSettings respondsToSelector:@selector(setPrimaryColorOption:)]) {
+    } else {
         PFBCOMPAT_OBSERVE(PFBCompat_accent_color, @"color settings found");
     }
 }

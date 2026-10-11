@@ -305,12 +305,21 @@ static void pfbRepaintNotificationsGear(UIView* bar, UIColor* colour) {
     }
 }
 
+// The bar button's shared-background setter, resolved by name once.
+static SEL pfbHideSharedSelector(void) {
+    static SEL selector;
+    if (!selector) {
+        selector = NSSelectorFromString(@"setHidesSharedBackground:");
+    }
+    return selector;
+}
+
 // A Done item, the screen's primary action, keeps its iOS 26 glass capsule, tinted
 // system blue so it never fills with the bar's ink, with a white label. Returns
 // whether anything was owed; writes only when apply is YES.
 static BOOL pfbStyleDoneItem(UIBarButtonItem* button, BOOL apply) {
     BOOL owed = NO;
-    SEL hideShared = NSSelectorFromString(@"setHidesSharedBackground:");
+    SEL hideShared = pfbHideSharedSelector();
     id current = nil;
     @try {
         current = [button valueForKey:@"hidesSharedBackground"];
@@ -385,7 +394,7 @@ static BOOL pfbBarGlassPass(UIView* bar, BOOL apply) {
             [items addObjectsFromArray:pinned.barButtonItems ?: @[]];
         }
     }
-    SEL hideShared = NSSelectorFromString(@"setHidesSharedBackground:");
+    SEL hideShared = pfbHideSharedSelector();
     for (UIBarButtonItem* button in items) {
         if (button.tag == PFBNativeGlassTag) {
             continue;
@@ -459,7 +468,7 @@ static void pfbFlattenItemsNow(NSArray<UIBarButtonItem*>* items) {
     if (![PFBSettings boolForKey:@"enable_liquid_glass"]) {
         return;
     }
-    SEL hideShared = NSSelectorFromString(@"setHidesSharedBackground:");
+    SEL hideShared = pfbHideSharedSelector();
     for (UIBarButtonItem* button in items) {
         if (button.tag == PFBNativeGlassTag) {
             continue;
@@ -566,6 +575,11 @@ static void pfbFlattenItemsNow(NSArray<UIBarButtonItem*>* items) {
         }
         pfbRepaintNotificationsGear(bar, grey);
     } @catch (id exception) {
+        static BOOL reported;
+        if (!reported && PFBDebugIsRecording()) {
+            reported = YES;
+            PFBDebugLog(@"[navbar] bar pass stopped: %@", exception);
+        }
     }
 }
 
@@ -696,17 +710,15 @@ static BOOL pfbIsChatBarGlyph(UIView* view) {
         // which a bar button draws as a template all the same, so anything not
         // already original is claimed. Correcting the mode provokes no layout.
         if (image.renderingMode != UIImageRenderingModeAlwaysOriginal) {
-            if (pfbIsChatBarGlyph((UIView*)self) ||
-                pfbIsBackArrowGlyph((UIView*)self)) {
+            BOOL backArrow = pfbIsBackArrowGlyph((UIView*)self);
+            if (pfbIsChatBarGlyph((UIView*)self) || backArrow) {
                 // Baked at the setter: whoever writes last, the pixels that
                 // land carry the color. A mode change alone leaves an alpha mask,
                 // which a bar button re-tints per its own contrast rule.
                 UIColor* colour = pfbBarGlyphColour((UIView*)self);
                 UIImage* baked = PFBGreyGlyph(image, colour);
-                PFBMark((UIView*)self,
-                        pfbIsBackArrowGlyph((UIView*)self)
-                            ? @"NavBarIcons/backArrow -> baked"
-                            : @"NavBarIcons/chatBarGlyph -> baked");
+                PFBMark((UIView*)self, backArrow ? @"NavBarIcons/backArrow -> baked"
+                                                 : @"NavBarIcons/chatBarGlyph -> baked");
                 // Belt for the one frame a freshly created button can show
                 // before its first baked image lands: with the button's own
                 // chain tinted, even a frame treated as a template is right.
@@ -840,6 +852,11 @@ static BOOL pfbIsRightHandGlyphButton(UIView* button) {
         pfbRepaintGlyphs(button, PFBBarIconGrey(button.traitCollection));
         pfbForceOpaque(button);
     } @catch (id exception) {
+        static BOOL reported;
+        if (!reported && PFBDebugIsRecording()) {
+            reported = YES;
+            PFBDebugLog(@"[navbar] gear repaint stopped: %@", exception);
+        }
     }
 }
 
@@ -938,14 +955,14 @@ static BOOL PFBViewSitsInXTabBar(UIView* view) {
         return;
     }
 
-    BOOL isFade = [key isEqualToString:@"opacity"];
-    if (!isFade && [animation isKindOfClass:[CABasicAnimation class]]) {
-        isFade = [((CABasicAnimation*)animation).keyPath isEqualToString:@"opacity"];
-    }
-
     if (pfbFadesAllowed() || !objc_getAssociatedObject(self, kPFBNoFadeKey)) {
         %orig;
         return;
+    }
+
+    BOOL isFade = [key isEqualToString:@"opacity"];
+    if (!isFade && [animation isKindOfClass:[CABasicAnimation class]]) {
+        isFade = [((CABasicAnimation*)animation).keyPath isEqualToString:@"opacity"];
     }
     if (isFade) {
         return;
@@ -1268,6 +1285,11 @@ static void pfbReplyInstallKeyboardObservers(void) {
         pfbReplyInstallKeyboardObservers();
         pfbGlassifyReplyBar((UIView*)self);
     } @catch (id exception) {
+        static BOOL reported;
+        if (!reported && PFBDebugIsRecording()) {
+            reported = YES;
+            PFBDebugLog(@"[navbar] reply bar pass stopped: %@", exception);
+        }
     }
 }
 

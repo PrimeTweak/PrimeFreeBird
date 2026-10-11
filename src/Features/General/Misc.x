@@ -325,7 +325,9 @@ static BOOL PFBScreenshotSuppressed(void) {
         PFBCOMPAT_ACTION(PFBCompat_no_screenshot_detection, @"screenshot listener muted");
         return %orig(name, obj, queue, ^(NSNotification* note){});
     }
-    PFBCOMPAT_OBSERVE(PFBCompat_no_screenshot_detection, @"read by Twitter");
+    if ([name isEqualToString:UIApplicationUserDidTakeScreenshotNotification]) {
+        PFBCOMPAT_OBSERVE(PFBCompat_no_screenshot_detection, @"read by Twitter");
+    }
     return %orig;
 }
 

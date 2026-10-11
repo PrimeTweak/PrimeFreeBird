@@ -81,7 +81,15 @@ static void pfbReachCopyIDAndDate(UIView* row) {
 @implementation PFBProfileCopyButtonProvider
 
 - (NSArray<UIMenuElement*>*)copyActions {
-    T1ProfileUserViewModel* viewModel = self.headerViewController.viewModel;
+    // Each value is read only where its owner still answers for it.
+    T1ProfileHeaderViewController* header = self.headerViewController;
+    T1ProfileUserViewModel* viewModel =
+        [header respondsToSelector:@selector(viewModel)] ? header.viewModel : nil;
+    NSString* fullName = [viewModel respondsToSelector:@selector(fullName)] ? viewModel.fullName : nil;
+    NSString* username = [viewModel respondsToSelector:@selector(username)] ? viewModel.username : nil;
+    NSString* bio = [viewModel respondsToSelector:@selector(bio)] ? viewModel.bio : nil;
+    NSString* location = [viewModel respondsToSelector:@selector(location)] ? viewModel.location : nil;
+    NSString* url = [viewModel respondsToSelector:@selector(url)] ? viewModel.url : nil;
 
     UIAction* (^copyAction)(NSString*, NSString*, NSString*) =
         ^(NSString* titleKey, NSString* iconName, NSString* value) {
@@ -103,15 +111,14 @@ static void pfbReachCopyIDAndDate(UIView* row) {
         };
 
     return @[
-        copyAction(@"COPY_PROFILE_INFO_MENU_OPTION_3", @"account", viewModel.fullName),
-        copyAction(@"COPY_PROFILE_INFO_MENU_OPTION_2", @"at", viewModel.username),
-        copyAction(@"COPY_PROFILE_INFO_MENU_OPTION_1", @"news_stroke", viewModel.bio),
-        copyAction(@"COPY_PROFILE_INFO_MENU_OPTION_5", @"location_stroke", viewModel.location),
-        copyAction(@"COPY_PROFILE_INFO_MENU_OPTION_4", @"link", viewModel.url),
+        copyAction(@"COPY_PROFILE_INFO_MENU_OPTION_3", @"account", fullName),
+        copyAction(@"COPY_PROFILE_INFO_MENU_OPTION_2", @"at", username),
+        copyAction(@"COPY_PROFILE_INFO_MENU_OPTION_1", @"news_stroke", bio),
+        copyAction(@"COPY_PROFILE_INFO_MENU_OPTION_5", @"location_stroke", location),
+        copyAction(@"COPY_PROFILE_INFO_MENU_OPTION_4", @"link", url),
         copyAction(@"COPY_PROFILE_INFO_MENU_OPTION_6", @"link",
-                   viewModel.username.length
-                       ? [NSString stringWithFormat:@"https://x.com/%@",
-                                                    viewModel.username]
+                   username.length
+                       ? [NSString stringWithFormat:@"https://x.com/%@", username]
                        : nil),
         copyAction(@"COPY_PROFILE_INFO_MENU_OPTION_7", @"bar_chart", pfbProfileUserID(viewModel)),
         copyAction(@"COPY_PROFILE_INFO_MENU_OPTION_8", @"calendar", pfbProfileJoinDate(viewModel)),

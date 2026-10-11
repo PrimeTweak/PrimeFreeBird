@@ -68,7 +68,9 @@ static NSString* const kGridFooterID = @"gridFooter";
 - (void)viewWillDisappear:(BOOL)animated {
     [super viewWillDisappear:animated];
     for (UIView* button in self.hiddenComposeButtons) {
-        [(TFNFloatingActionButton*)button showAnimated:YES completion:nil];
+        if ([button respondsToSelector:@selector(showAnimated:completion:)]) {
+            [(TFNFloatingActionButton*)button showAnimated:YES completion:nil];
+        }
     }
     [self.hiddenComposeButtons removeAllObjects];
 }
@@ -83,7 +85,8 @@ static NSString* const kGridFooterID = @"gridFooter";
 // Tweet button keeps out of sight.
 - (void)findAndHideFloatingActionButtonInView:(UIView*)view {
     if ([view isKindOfClass:NSClassFromString(@"TFNFloatingActionButton")]) {
-        if (!view.hidden && view.alpha > 0.01) {
+        if (!view.hidden && view.alpha > 0.01 &&
+            [view respondsToSelector:@selector(hideAnimated:completion:)]) {
             [self.hiddenComposeButtons addObject:view];
             [(TFNFloatingActionButton*)view hideAnimated:YES completion:nil];
         }

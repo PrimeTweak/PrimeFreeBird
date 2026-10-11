@@ -258,9 +258,11 @@ static void onHelperWebViewLoaded(WKWebView* webView);
 - (void)webView:(WKWebView*)webView didFinishNavigation:(__unused WKNavigation*)navigation {
     onHelperWebViewLoaded(webView);
 }
-- (void)webView:(__unused WKWebView*)webView
+- (void)webView:(WKWebView*)webView
     didFailProvisionalNavigation:(__unused WKNavigation*)navigation
                        withError:(__unused NSError*)error {
+    // A failed page leaves the window, so the next attempt does not stack another one.
+    [webView removeFromSuperview];
     WebHelperWebView = nil;
     WebHelperReady = NO;
     WebHelperInFlight = NO;
@@ -408,8 +410,7 @@ static NSString* createTweetPath(void) {
 // Mints in the page, where X's own generator runs; one request per key at a time.
 static void refreshXTIDFor(NSString* method, NSString* path) {
     xtidPrepare();
-    WKWebView* webView = WebHelperWebView;
-    if (![webView isKindOfClass:[WKWebView class]] || path.length == 0) {
+    if (path.length == 0) {
         return;
     }
     NSString* verb = method.uppercaseString ?: @"POST";
@@ -420,7 +421,15 @@ static void refreshXTIDFor(NSString* method, NSString* path) {
         }
         [WebXTIDMinting addObject:key];
     }
+    // The page is read on the main thread only, where it is created and released.
     dispatch_async(dispatch_get_main_queue(), ^{
+        WKWebView* webView = WebHelperWebView;
+        if (![webView isKindOfClass:[WKWebView class]]) {
+            @synchronized(WebXTIDLock) {
+                [WebXTIDMinting removeObject:key];
+            }
+            return;
+        }
         [webView callAsyncJavaScript:@"return await window.__pfbTransactionId(path, method);"
                            arguments:@{@"method": verb, @"path": path}
                              inFrame:nil
@@ -635,6 +644,11 @@ static NSString* authTokenForUserID(NSString* userID) {
              completionHandler:(void (^)(NSURLRequest*))completionHandler {
     [self captureFromResponse:response];
 
+    // The session token rides in the Cookie header, so a redirect off X is not followed.
+    if (!PFBIsXDomain(request.URL.host ?: @"")) {
+        completionHandler(nil);
+        return;
+    }
     NSString* target = request.URL.absoluteString.lowercaseString ?: @"";
     if ([target containsString:@"login"] || [target containsString:@"logout"] ||
         [target containsString:@"/i/flow/"] || [target containsString:@"account/access"]) {

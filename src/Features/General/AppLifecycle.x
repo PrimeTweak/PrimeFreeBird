@@ -176,7 +176,7 @@ static void askToUnlock(void) {
     _Bool orig = %orig;
 
     [PFBManager cleanCache];
-    if ([PFBSettings boolForKey:@"flex_twitter"]) {
+    if ([PFBSettings boolForKey:@"flex_twitter"] && %c(FLEXManager)) {
         [[%c(FLEXManager) sharedManager] showExplorer];
         PFBCOMPAT_ACTION(PFBCompat_flex_twitter, @"explorer shown at launch");
     } else if (%c(FLEXManager)) {
@@ -232,7 +232,7 @@ static void askToUnlock(void) {
         PFBCOMPAT_ACTION(PFBCompat_padlock, @"screen covered on leaving");
     }
 
-    if ([PFBSettings boolForKey:@"flex_twitter"]) {
+    if ([PFBSettings boolForKey:@"flex_twitter"] && %c(FLEXManager)) {
         [[%c(FLEXManager) sharedManager] showExplorer];
         PFBCOMPAT_ACTION(PFBCompat_flex_twitter, @"explorer shown on leaving");
     }

@@ -6,6 +6,7 @@
 #import "Common/PFBBundle.h"
 #import "Common/PFBSettings.h"
 #import "Common/PFBCompatibility.h"
+#import "FFmpegKitConfig.h"
 
 #pragma mark - Helpers
 static UIWindow* KeyWindow(void) {
@@ -166,6 +167,8 @@ static NSURL* PFBLargestMP4(TFSTwitterEntityMedia* media) {
         void (^ffmpegDownload)(NSString*, NSString*, double, void (^)(NSURL*), void (^)(void)) = ^(
             NSString* args, NSString* ext, double durationMs, void (^collect)(NSURL*), void (^finished)(void)) {
             showHUD(downloadingText);
+            // FFmpeg's own log lines stay out of the system log.
+            [FFmpegKitConfig setLogRedirectionStrategy:LogRedirectionStrategyNeverPrintLogs];
             NSURL* outFile = [[NSURL fileURLWithPath:NSTemporaryDirectory()]
                 URLByAppendingPathComponent:[NSString
                                                 stringWithFormat:@"%@.%@",

@@ -18,6 +18,20 @@ static NSString* const kRegistryKey = @"pfb_tab_registry";
 // Legacy list of hidden tabs; removed whenever the selection is saved or reset.
 static NSString* const kLegacyHiddenKey = @"pfb_tabs_hidden";
 
+// A saved entry is kept only when its fields have the types the editor reads.
+static BOOL PFBRegistryEntryIsValid(id entry) {
+    if (![entry isKindOfClass:[NSDictionary class]] ||
+        ![entry[PFBTabPageKey] isKindOfClass:[NSString class]]) {
+        return NO;
+    }
+    id title = entry[PFBTabTitleKey];
+    id image = entry[PFBTabImageKey];
+    id panelID = entry[PFBTabPanelIDKey];
+    return (!title || [title isKindOfClass:[NSString class]]) &&
+           (!image || [image isKindOfClass:[NSString class]]) &&
+           (!panelID || [panelID isKindOfClass:[NSNumber class]]);
+}
+
 @implementation PFBCustomTabBarUtility
 
 #pragma mark - Live capture
@@ -31,8 +45,10 @@ static NSString* const kLegacyHiddenKey = @"pfb_tabs_hidden";
         registry = [NSMutableArray array];
         NSArray* saved =
             [[NSUserDefaults standardUserDefaults] arrayForKey:kRegistryKey];
-        if (saved) {
-            [registry addObjectsFromArray:saved];
+        for (id entry in saved) {
+            if (PFBRegistryEntryIsValid(entry)) {
+                [registry addObject:entry];
+            }
         }
     });
     return registry;
@@ -53,9 +69,10 @@ static NSString* const kLegacyHiddenKey = @"pfb_tabs_hidden";
         if (image.length == 0) {
             // Avatar-drawn tabs (Profile) have no imageName; use the glyph the
             // native customization screen resolves for the panel.
-            image = [NSClassFromString(@"T1PanelIdentity")
-                        iconImageNameForPanelID:tabView.panelID]
-                        ?: @"";
+            Class identity = NSClassFromString(@"T1PanelIdentity");
+            if ([identity respondsToSelector:@selector(iconImageNameForPanelID:)]) {
+                image = [identity iconImageNameForPanelID:tabView.panelID] ?: @"";
+            }
         }
         NSDictionary* entry = @{
             PFBTabPageKey: page,

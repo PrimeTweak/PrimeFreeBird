@@ -705,9 +705,11 @@ static void PFBShowNotifToast(NSString* notifID) {
     [undo setTitleColor:PFBCurrentAccentColor() forState:UIControlStateNormal];
     undo.titleLabel.font = PFBScaledFont([TwitterChirpFont(TwitterFontStyleSemibold) fontWithSize:15]);
     undo.translatesAutoresizingMaskIntoConstraints = NO;
+    // Weak: the toast holds the button, which holds this action.
+    __weak UIVisualEffectView* weakToast = toast;
     [undo addAction:[UIAction actionWithHandler:^(__unused UIAction* action) {
               PFBUnhideNotif(notifID);
-              PFBDismissNotifToast(toast);
+              PFBDismissNotifToast(weakToast);
             }]
         forControlEvents:UIControlEventTouchUpInside];
     [content addSubview:undo];

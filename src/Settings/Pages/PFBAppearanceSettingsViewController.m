@@ -158,7 +158,7 @@
         }
 
         // Clearing the override lets the label fall back to its default color.
-        if (![PFBSettings boolForKey:@"tab_bar_theming"]) {
+        if (![PFBSettings boolForKey:@"tab_bar_theming"] && [view respondsToSelector:@selector(titleLabel)]) {
             UILabel* titleLabel = [view valueForKey:@"titleLabel"];
             if (titleLabel) {
                 titleLabel.textColor = nil;
@@ -191,7 +191,7 @@
             [view performSelector:@selector(_t1_layoutBadgeViewMaximized)];
         }
 
-        if (![PFBSettings boolForKey:@"tab_bar_theming"]) {
+        if (![PFBSettings boolForKey:@"tab_bar_theming"] && [view respondsToSelector:@selector(titleLabel)]) {
             UILabel* titleLabel = [view valueForKey:@"titleLabel"];
             if (titleLabel) {
                 titleLabel.textColor = nil;
