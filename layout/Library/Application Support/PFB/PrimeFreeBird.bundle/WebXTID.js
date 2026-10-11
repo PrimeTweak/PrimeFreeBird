@@ -1,4 +1,4 @@
-// Injected into the tweak's signed-in offscreen x.com web view. Exposes
+// Injected into the signed-in offscreen x.com web view. Exposes
 // window.__pfbTransactionId(path, method), which calls the web client's own
 // transaction-id generator; path is client-internal, e.g. /graphql/<queryId>/<Operation>.
 (function(){

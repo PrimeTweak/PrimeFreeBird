@@ -16,7 +16,7 @@ const PFBHookRecord PFBHookRecords[] = {
     {"NSNotificationCenter", "addObserverForName:object:queue:usingBlock:", "Features/General/Misc.x"},
     {"NSURLSession", "dataTaskWithRequest:", "Sideload/PFBLoginBridge.x"},
     {"NSURLSession", "dataTaskWithRequest:completionHandler:", "Sideload/PFBLoginBridge.x"},
-    {"NSURLSession", "sessionWithConfiguration:delegate:delegateQueue:", "Debug/BridgeResponseProbe.x"},
+    {"NSURLSession", "sessionWithConfiguration:delegate:delegateQueue:", "Debug/NetworkJournal.x"},
     {"NSURLSession", "uploadTaskWithRequest:fromData:", "Sideload/PFBLoginBridge.x"},
     {"NSURLSession", "uploadTaskWithRequest:fromData:completionHandler:", "Sideload/PFBLoginBridge.x"},
     {"NSURLSession", "uploadTaskWithRequest:fromFile:", "Sideload/PFBLoginBridge.x"},

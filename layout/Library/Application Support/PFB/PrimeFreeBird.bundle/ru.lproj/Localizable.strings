@@ -5,9 +5,6 @@
 
 "PFB_SETTINGS_DETAIL" = "Настрой Twitter: убери рекламу, включи Blue-функции и многое другое.";
 
-/*Alerts and popups*/
-
-
 /*Settings*/
 "MODERN_SETTINGS_LAYOUT_TITLE" = "Общие";
 "MODERN_SETTINGS_LAYOUT_SUBTITLE" = "Заблокируйте приложение, оставьте панель навигации видимой и многое другое.";
@@ -210,8 +207,6 @@
 "FLEX_TWITTER_TITLE" = "Режим отладки FLEX";
 "FLEX_TWITTER_DETAIL" = "Использовать FLEX для отладки Twitter.";
 
-/*Developers*/
-
 /*Custom fonts*/
 "CUSTOM_FONTS_NAVIGATION_BUTTON_TITLE" = "Пользовательские шрифты";
 "CUSTOM_FONTS_MENU_TITLE" = "\nВыбор шрифта";
@@ -222,8 +217,6 @@
 "FETCHING_PROGRESS_TITLE" = "Секундочку...";
 "DOWNLOAD_AS_GIF_OPTION_TITLE" = "Скачать как GIF";
 "DOWNLOAD_AS_MP4_OPTION_TITLE" = "Скачать как MP4";
-
-/*App icon*/
 
 /*Copy profile info*/
 "COPY_PROFILE_INFO_MENU_OPTION_1" = "Скопировать био";
@@ -254,8 +247,6 @@
 
 "RESTORE_TWITTER_NAMES_TITLE" = "Вернуть терминологию Twitter";
 "RESTORE_TWITTER_NAMES_DETAIL" = "Заменяет «X» на «Twitter», «Пост» на «Твит», «Репост» на «Ретвит» и так далее по всему интерфейсу приложения.";
-
-/*Deprecated*/
 
 /*App lock*/
 "PADLOCK_LOCKED_LABEL" = "Locked";

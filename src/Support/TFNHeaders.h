@@ -122,7 +122,7 @@
 @end
 
 @interface TFNBarButtonItemButton : UIButton
-// Added by the tweak (see src/Features/Appearance/NavBarIcons.x); declared so the compiler
-// knows the selector when it is sent to self.
+// Added in src/Features/Appearance/NavBarIcons.x; declared so the compiler knows the
+// selector when it is sent to self.
 - (void)pfbGreySettingsGlyphIfNeeded;
 @end

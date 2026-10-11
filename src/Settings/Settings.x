@@ -50,9 +50,9 @@ static TFNSettingsNavigationItem* makePrimeFreeBirdSettingsItem(
     // matching the system's other settings icons.
     UIColor* iconColor = [UIColor secondaryLabelColor];
 
-    // imageNamed: can't see loose PDFs in a bundle (only compiled asset
-    // catalogs), so the tweak opens the PDF by path and render its page at icon size,
-    // then tint it gray like the native settings icons.
+    // imageNamed: cannot see loose PDFs in a bundle (only compiled asset catalogs), so the
+    // PDF is opened by path, its page rendered at icon size and tinted gray like the native
+    // settings icons.
     UIImage* twitterIcon = nil;
     NSURL* birdURL = [[PFBBundle sharedBundle] pathForFile:@"bird_stroke.pdf"];
     if (birdURL) {
@@ -196,13 +196,9 @@ static void PFBHideRowSeparator(UITableViewCell* cell) {
             ((TFNItemsDataViewController*)self).sections)) {
         return cell;
     }
-    // The tweak's row is section 0, row 0; the row directly beneath the visible
-    // boundary is section 0, row 1. Hide the separator on both sides of the
-    // seam so no hairline shows under PrimeFreeBird.
+    // The PrimeFreeBird row is section 0, row 0, and the first native row is row 1; the
+    // separator is hidden on both sides of the seam so no hairline shows under it.
     if (indexPath.section == 0 && (indexPath.row == 0 || indexPath.row == 1)) {
-        // Row 0 is the tweak's; row 1 is the first native row now sharing the tweak's
-        // section. Hiding both sides of the seam keeps the edge clean even if
-        // this table draws intra-section separators.
         PFBHideRowSeparator(cell);
     }
     return cell;

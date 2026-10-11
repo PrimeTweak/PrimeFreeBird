@@ -1,6 +1,4 @@
 #import "Features/Search/PFBAdvField.h"
-#import "Features/Search/PFBAdvancedSearchViewController.h"
-#import "Common/PFBBundle.h"
 
 @implementation PFBAdvField
 + (instancetype)key:(NSString*)k

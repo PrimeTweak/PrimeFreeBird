@@ -4,6 +4,10 @@
 #import "Common/PFBSettings.h"
 #import "Support/PFBManager.h"
 
+NSArray<NSString*>* PFBExploreTabKeys(void) {
+    return @[ @"hide_tab_foryou", @"hide_tab_trending", @"hide_tab_news", @"hide_tab_sports", @"hide_tab_entertainment" ];
+}
+
 static NSDictionary<NSString*, NSDictionary*>* PFBSettingsPages(void) {
     static NSDictionary<NSString*, NSDictionary*>* pages;
     static dispatch_once_t onceToken;
@@ -387,11 +391,7 @@ static NSDictionary<NSString*, NSDictionary*>* PFBSettingsPages(void) {
                       @"hiddenWhen": @"hide_explore_all",
                       @"captionKey": @"EXPLORE_TABS_CAPTION",
                       @"hintKey": @"EXPLORE_TABS_HINT",
-                      @"tabKeys": @[
-                          @"hide_tab_foryou", @"hide_tab_trending",
-                          @"hide_tab_news", @"hide_tab_sports",
-                          @"hide_tab_entertainment"
-                      ]}
+                      @"tabKeys": PFBExploreTabKeys()}
                 ]
             },
             @"grok": @{
@@ -685,10 +685,7 @@ static void PFBMigrateLegacyKeys(void) {
     id stored = [defaults objectForKey:@"hide_trends"];
     if (stored != nil && [stored boolValue]) {
         BOOL anyTabStruck = NO;
-        for (NSString* tabKey in @[
-                 @"hide_tab_foryou", @"hide_tab_trending", @"hide_tab_news",
-                 @"hide_tab_sports", @"hide_tab_entertainment"
-             ]) {
+        for (NSString* tabKey in PFBExploreTabKeys()) {
             if ([self boolForKey:tabKey]) {
                 anyTabStruck = YES;
                 break;
@@ -745,7 +742,6 @@ static NSDictionary* PFBKeylessDefaults(void) {
     dispatch_once(&once, ^{
         map = @{
             @"enable_liquid_glass": @YES,
-            @"color_twitter_icon_in_top_bar": @YES,
             // Carried by a pill rather than a row of its own, so the registry
             // holds no default for it.
             @"video_starts_muted": @YES,

@@ -5,9 +5,6 @@
 
 "PFB_SETTINGS_DETAIL" = "트위터를 커스텀 해보세요. 광고를 숨기거나 Twitter Blue의 기능을 활성화할 수 있으며, 이외에도 다양한 기능이 있습니다.";
 
-/*Alerts and popups*/
-
-
 /*Settings*/
 "MODERN_SETTINGS_LAYOUT_TITLE" = "일반";
 "MODERN_SETTINGS_LAYOUT_SUBTITLE" = "앱을 잠그고, 내비게이션 바를 항상 표시하는 등 다양한 기능을 제공합니다.";
@@ -210,8 +207,6 @@
 "FLEX_TWITTER_TITLE" = "디버그 모드";
 "FLEX_TWITTER_DETAIL" = "트위터의 작동 및 데이터를 검사하고 디버깅하기 위해 FLEX를 활성화합니다.";
 
-/*Developers*/
-
 /*Custom fonts*/
 "CUSTOM_FONTS_NAVIGATION_BUTTON_TITLE" = "사용자 지정 글꼴";
 "CUSTOM_FONTS_MENU_TITLE" = "\n글꼴을 선택하세요.";
@@ -222,8 +217,6 @@
 "FETCHING_PROGRESS_TITLE" = "잠시 기다려주세요...";
 "DOWNLOAD_AS_GIF_OPTION_TITLE" = "GIF로 다운로드";
 "DOWNLOAD_AS_MP4_OPTION_TITLE" = "MP4로 다운로드";
-
-/*App icon*/
 
 /*Copy profile info*/
 "COPY_PROFILE_INFO_MENU_OPTION_1" = "자기소개 복사";
@@ -254,8 +247,6 @@
 
 "RESTORE_TWITTER_NAMES_TITLE" = "트위터 용어 복원";
 "RESTORE_TWITTER_NAMES_DETAIL" = "앱 인터페이스 전반에서 'X'를 'Twitter'로, 'Post'를 'Tweet'으로, 'Repost'를 'Retweet'으로 바꾸는 등 용어를 복원합니다.";
-
-/*Deprecated*/
 
 /*App lock*/
 "PADLOCK_LOCKED_LABEL" = "Locked";

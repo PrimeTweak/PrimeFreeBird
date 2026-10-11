@@ -134,7 +134,7 @@ static BOOL pfbRowIsHeaderActions(UIView* header, UIView* row) {
     return pfbGetterValue(pfbGetterValue(header, @"topRightActionButtonsController"), @"rowView") == row;
 }
 
-// The leftmost native button in the row — the anchor the tweak's button sits beside.
+// The leftmost native button in the row, the anchor the copy button sits beside.
 static UIView* pfbLeftmostRowButton(UIView* row) {
     UIView* leftmost = nil;
     for (UIView* candidate in row.subviews) {
@@ -148,7 +148,7 @@ static UIView* pfbLeftmostRowButton(UIView* row) {
     return leftmost;
 }
 
-// Reads the neighbour's own look so the tweak's button matches it.
+// Reads the neighbor's own look so the copy button matches it.
 static void pfbMatchNeighbourStyle(UIButton* ours, UIView* neighbour) {
     ours.layer.cornerRadius = neighbour.layer.cornerRadius > 0
         ? neighbour.layer.cornerRadius
@@ -178,8 +178,8 @@ static void pfbMatchNeighbourStyle(UIButton* ours, UIView* neighbour) {
                 [[UIColor labelColor] colorWithAlphaComponent:0.14].CGColor;
         }
     }
-    // The neighbour's glyph carries the tint the row expects; a template image
-    // of the tweak's then renders in the same color.
+    // The neighbor's glyph carries the tint the row expects; the copy button's template
+    // image then renders in the same color.
     for (UIView* node in neighbour.subviews) {
         for (UIView* deeper in node.subviews) {
             if ([deeper isKindOfClass:[UIImageView class]] && deeper.tintColor) {
@@ -259,22 +259,16 @@ static void pfbMatchNeighbourStyle(UIButton* ours, UIView* neighbour) {
     if (copyButton.superview != row) {
         [row addSubview:copyButton];
     }
-    // Positioned every pass: the row lays its own buttons out and the tweak's has to
-    // follow them, not a remembered place.
+    // Positioned every pass: the row lays its own buttons out and the copy button follows
+    // them, not a remembered place.
     CGRect slot = anchor.frame;
     slot.origin.x = CGRectGetMinX(anchor.frame) - CGRectGetWidth(anchor.frame) - 8.0;
     copyButton.frame = slot;
     pfbMatchNeighbourStyle(copyButton, anchor);
     PFBMark(copyButton, @"Profile/copyButton");
-    static BOOL said;
-    if (!said) {
-        said = YES;
-        PFBDebugLog(@"[profile] copy button placed in the header's action row");
-    }
 }
 
 %end
-
 
 // MARK: - Hide premium offer
 
@@ -374,7 +368,7 @@ static id pfbWantedEntry(id provider) {
             return nil;   // 0 leaves the choice to Twitter
     }
 
-    // A tab hidden by one of the tweak's own switches is refused here too, in case an
+    // A tab hidden by one of PrimeFreeBird's own switches is refused here too, in case an
     // old choice survives in the settings after the tab was switched off.
     NSString* hider = nil;
     switch ([PFBSettings integerForKey:@"profile_initial_tab"]) {
@@ -439,13 +433,11 @@ static const void* kPFBTabAppliedKey = &kPFBTabAppliedKey;
             controller, @selector(currentDisplayContentProvider));
         id entry = pfbWantedEntry(provider);
 
-
         if (!entry) {
             return;
         }
-        // The controller knows whether that entry has a tab on screen. Asking
-        // it is more reliable than comparing objects ourselves, and it keeps
-        // the guard: a profile without that tab is left alone.
+        // The controller knows whether that entry has a tab on screen; asking it beats
+        // comparing objects, and keeps the guard: a profile without that tab is left alone.
         if ([controller respondsToSelector:@selector(_t1_outerTabIndexForEntry:)]) {
             NSInteger index = ((NSInteger (*)(id, SEL, id))objc_msgSend)(
                 controller, @selector(_t1_outerTabIndexForEntry:), entry);
@@ -475,9 +467,8 @@ static const void* kPFBTabAppliedKey = &kPFBTabAppliedKey;
     }
 }
 
-// The real lever. defaultMainContentEntry holds the entry object Twitter
-// treats as the landing tab — initialTabIndex is only an index derived from
-// it, which is why forcing the index alone changed nothing.
+// defaultMainContentEntry holds the entry object Twitter treats as the landing tab;
+// initialTabIndex is only an index derived from it.
 - (id)defaultMainContentEntry {
     id original = %orig;
 

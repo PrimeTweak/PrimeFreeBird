@@ -1,5 +1,4 @@
 #import "Support/TwitterChirpFont.h"
-#import "Support/HookHelpers.h"
 #import "Features/General/PFBHiddenNotifCell.h"
 #import "Features/General/PFBNotifPaddedLabel.h"
 

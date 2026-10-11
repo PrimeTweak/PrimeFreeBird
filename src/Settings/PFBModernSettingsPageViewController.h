@@ -14,9 +14,6 @@
 
 - (instancetype)initWithAccount:(TFNTwitterAccount*)account;
 
-// Redraws the rows whose `disabledWhen` names this key.
-- (void)reloadRowsHeldBy:(NSString*)key;
-
 // Data-only pages are created directly with their registry key; pages with
 // custom behavior subclass this and override -pageKey instead.
 - (instancetype)initWithAccount:(TFNTwitterAccount*)account pageKey:(NSString*)pageKey;

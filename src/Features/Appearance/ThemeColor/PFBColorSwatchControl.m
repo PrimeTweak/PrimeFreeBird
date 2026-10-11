@@ -2,6 +2,7 @@
 
 #import "Features/Appearance/ThemeColor/PFBColorSwatchControl.h"
 #import "Support/TwitterChirpFont.h"
+#import "Support/HookHelpers.h"
 
 static const CGFloat kPillHeight = 40.0;
 static const CGFloat kRadioDiameter = 22.0;
@@ -14,9 +15,6 @@ static const CGFloat kRadioCheckSize = 12.0;
 @property (nonatomic, strong) UIImageView* radioCheck;
 @property (nonatomic, strong) UIColor* swatchTint;
 @end
-
-
-UIImage* PFBTwitterGlyphFor(NSString* name, UIImage* systemImage);
 
 @implementation PFBColorSwatchControl
 

@@ -1,11 +1,6 @@
 #import "Common/PFBCompatibility.h"
-#import "Settings/PFBModernSettingsCells.h"
-#import <QuartzCore/QuartzCore.h>
 #import "Support/PFBManager.h"
-#import "Common/PFBSettings.h"
-#import "Support/TWHeaders.h"
 #import "Features/Appearance/ThemeColor/PFBPalette.h"
-#import "Features/Appearance/ThemeColor/PFBDarkModeStyle.h"
 #import "Support/TwitterChirpFont.h"
 #import "Debug/PFBDebugger.h"
 #import "Settings/PFBModernSettingsSessionCardCell.h"
@@ -238,9 +233,7 @@ static NSCache* PFBAvatarCache(void) {
     self.box.backgroundColor = faint;
     self.avatarLabel.backgroundColor = accent;
     self.avatarLabel.textColor = [UIColor whiteColor];
-    // Drawn with a system font on purpose: a single letter needs no type ramp,
-    // and taking it from the app's font group made this one glyph depend on a
-    // lookup that everything else here does not need.
+    // Drawn with a system font: a single letter needs no type ramp or font-group lookup.
     self.avatarLabel.font = [UIFont systemFontOfSize:17 weight:UIFontWeightHeavy];
     self.handleLabel.font = [fontGroup performSelector:@selector(bodyBoldFont)];
     self.handleLabel.textColor = ink;

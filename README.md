@@ -12,7 +12,7 @@
 |:-------------------------:|:-------------------------:|:-------------------------:|
 |<img width="1604" alt="Screenshot 1" src="1.png">|<img width="1604" alt="Screenshot 2" src="2.png">|<img width="1604" alt="Screenshot 3" src="3.png">|
 
-# What's new
+# Features
 
 ## Liquid Glass
 
@@ -83,16 +83,6 @@
 - **Grouped settings** — every page is split into labelled groups instead of one long list.
 - **Clean shared links** — tracking parameters stripped when you copy *or* share, profiles included.
 - **Full French localisation** — every string, including the new screens.
-
-# Fixes
-
-- **Tab labels are centred** — restored labels no longer sit off-centre after a cold launch.
-- **The video timestamp does something** — the option was wired to a handler Twitter no longer has; it works again.
-- **Full-screen controls come back** — a tap raises them and playback clears them away, instead of leaving the video bare.
-- **No black frame at launch** — the splash dissolves into the timeline instead of cutting to an empty window.
-- **Pull-to-refresh sound works again** — rebuilt for current Twitter versions, where the old hook no longer exists.
-- **Reply composer sits still** — no keyboard bounce, no doubled insets, no login wall.
-- **The settings header is solid** — under Liquid Glass the list showed through beside the search field; the header is a bar again, down past the field.
 
 <sub>…on top of the full BHTwitter and NeoFreeBird toolkit.</sub>
 

@@ -54,12 +54,12 @@
         _field.translatesAutoresizingMaskIntoConstraints = NO;
         [box addSubview:_field];
 
-        _boxTop = [box.topAnchor constraintEqualToAnchor:self.contentView.topAnchor
-                                               constant:8.0];
         [NSLayoutConstraint activateConstraints:@[
             [box.leadingAnchor constraintEqualToAnchor:self.contentView.leadingAnchor
                                               constant:kPFBMutedSideMargin],
-            _boxTop,
+            // 16 pt matches the visible top of a language name in the other list.
+            [box.topAnchor constraintEqualToAnchor:self.contentView.topAnchor
+                                          constant:16.0],
             [box.heightAnchor constraintEqualToConstant:42.0],
             [_hintLabel.topAnchor constraintEqualToAnchor:box.bottomAnchor
                                                  constant:8.0],

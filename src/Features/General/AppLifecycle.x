@@ -12,19 +12,17 @@ extern void PFBInstallPasteboardObserver(void);
 static void askToUnlock(void);
 
 static UIWindow* activeKeyWindow(void) {
-    if (@available(iOS 13.0, *)) {
-        for (UIScene* scene in UIApplication.sharedApplication.connectedScenes) {
-            if (scene.activationState == UISceneActivationStateForegroundActive &&
-                [scene isKindOfClass:[UIWindowScene class]]) {
-                UIWindowScene* ws = (UIWindowScene*)scene;
-                for (UIWindow* w in ws.windows) {
-                    if (w.isKeyWindow)
-                        return w;
-                }
-                for (UIWindow* w in ws.windows) {
-                    if (!w.hidden)
-                        return w;
-                }
+    for (UIScene* scene in UIApplication.sharedApplication.connectedScenes) {
+        if (scene.activationState == UISceneActivationStateForegroundActive &&
+            [scene isKindOfClass:[UIWindowScene class]]) {
+            UIWindowScene* ws = (UIWindowScene*)scene;
+            for (UIWindow* w in ws.windows) {
+                if (w.isKeyWindow)
+                    return w;
+            }
+            for (UIWindow* w in ws.windows) {
+                if (!w.hidden)
+                    return w;
             }
         }
     }
@@ -289,7 +287,7 @@ static void applySplashBrandColors(UIView* view) {
     });
 }
 
-// Render the tweak's bundled white bird from its PDF (same technique as the settings bird).
+// Renders the bundled white bird from its PDF (same technique as the settings bird).
 static UIImage* launchBirdImage(CGFloat side) {
     NSURL* url = [[PFBBundle sharedBundle] pathForFile:@"LaunchTwitterBird.pdf"];
     if (!url) {
@@ -314,7 +312,7 @@ static UIImage* launchBirdImage(CGFloat side) {
     return image;
 }
 
-// Replace Twitter's launch "xLogo" with the tweak's bundled bird.
+// Replaces Twitter's launch "xLogo" with the bundled bird.
 %hook UIImage
 
 + (UIImage*)imageNamed:(NSString*)name {

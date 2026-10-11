@@ -10,17 +10,12 @@
 + (NSArray<NSDictionary*>*)settingsForPage:(NSString*)pageKey;
 + (NSString*)titleKeyForPage:(NSString*)pageKey;
 + (NSString*)subtitleKeyForPage:(NSString*)pageKey;
-+ (NSDictionary*)settingForKey:(NSString*)key;
 
-// The declared default for a key: its registry row when it has one, otherwise
-// the table of keys that are set from a page of their own.
-+ (id)declaredDefaultForKey:(NSString*)key;
 + (BOOL)boolForKey:(NSString*)key;
 + (NSInteger)integerForKey:(NSString*)key;
 
 // Every option key the registry declares, across all pages, with the keys a row
-// carries beside its own (pillKey, tabKeys). Rows that only identify a button are
-// included; they simply never carry a stored value.
+// carries beside its own (pillKey, tabKeys).
 + (NSArray<NSString*>*)allOptionKeys;
 
 @end
@@ -29,3 +24,5 @@
 FOUNDATION_EXPORT NSString* PFBCurrentKeyForLegacyKey(NSString* key);
 // The value with its dictionary keys renamed the same way.
 FOUNDATION_EXPORT id PFBValueWithCurrentKeys(id value);
+// The Explore tab keys, in the bar's order (For You, Trending, News, Sports, Entertainment).
+FOUNDATION_EXPORT NSArray<NSString*>* PFBExploreTabKeys(void);

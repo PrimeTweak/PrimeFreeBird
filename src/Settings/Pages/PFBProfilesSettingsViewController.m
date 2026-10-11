@@ -3,10 +3,8 @@
 #import "Settings/Pages/PFBProfilesSettingsViewController.h"
 #import "Common/PFBBundle.h"
 #import "Common/PFBSettings.h"
-#import "Support/TWHeaders.h"
 #import "Settings/PFBModernSettingsCells.h"
-
-extern void PFBApplySquareAvatarsSetting(void);
+#import "Support/HookHelpers.h"
 
 // Seven values, offered as a menu on the row. "Default" keeps whatever Twitter chooses,
 // which is also what a profile without that tab falls back to.

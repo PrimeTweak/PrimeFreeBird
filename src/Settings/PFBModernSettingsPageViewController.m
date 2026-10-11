@@ -2,11 +2,10 @@
 
 #import "Settings/PFBModernSettingsPageViewController.h"
 #import "Common/PFBBundle.h"
-#import "Support/PFBManager.h"
 #import "Common/PFBSettings.h"
-#import "Support/TWHeaders.h"
 #import "Settings/PFBModernSettingsCells.h"
 #import "Features/Timelines/PFBMutedWordsViewController.h"
+#import "Features/Branding/AppIcon/PFBAppIconViewController.h"
 #import "Common/PFBSettingsBackup.h"
 #import "Features/Appearance/ThemeColor/PFBPalette.h"
 #import "Support/HookHelpers.h"
@@ -16,6 +15,8 @@
 
 @interface PFBModernSettingsPageViewController ()
 @property (nonatomic, copy) NSString* registryPageKey;
+// Redraws the rows whose `disabledWhen` names this key.
+- (void)reloadRowsHeldBy:(NSString*)key;
 @end
 
 // Reads an object property only when the method really returns an object.
@@ -505,8 +506,6 @@ static NSURL* PFBAccountAvatarURL(TFNTwitterAccount* account) {
 
 #pragma mark - Switch Handling
 
-// A row another option holds must redraw the moment that option moves,
-// otherwise it stays enabled until the page is left.
 // A row waiting on something the app knows at run time rather than on a stored option;
 // the conditions are named, so the registry stays declarative.
 - (BOOL)rowIsWaiting:(NSDictionary*)entry {
@@ -515,6 +514,8 @@ static NSURL* PFBAccountAvatarURL(TFNTwitterAccount* account) {
                                                                    : [PFBSettings boolForKey:requires]);
 }
 
+// A row another option holds must redraw the moment that option moves,
+// otherwise it stays enabled until the page is left.
 - (void)reloadRowsHeldBy:(NSString*)key {
     NSMutableArray<NSIndexPath*>* paths = [NSMutableArray array];
     [self.visibleToggles enumerateObjectsUsingBlock:^(NSDictionary* entry,
@@ -567,10 +568,6 @@ static NSURL* PFBAccountAvatarURL(TFNTwitterAccount* account) {
       [self updateVisibleToggles];
       [self.tableView reloadData];
     });
-}
-
-- (void)sessionClearTapped:(UIButton*)sender {
-    [self PFBClearWebSession:nil];
 }
 
 - (void)tabTapped:(UIButton*)sender {
@@ -710,19 +707,16 @@ static NSURL* PFBAccountAvatarURL(TFNTwitterAccount* account) {
 }
 
 - (void)showAppIconViewController:(NSDictionary*)sender {
-    Class AppIconViewControllerClass = objc_getClass("PFBAppIconViewController");
-    if (AppIconViewControllerClass) {
-        UIViewController* appIconVC = [[AppIconViewControllerClass alloc] init];
-        if (self.account) {
-            [appIconVC.navigationItem
-                setTitleView:[objc_getClass("TFNTitleView")
-                                 titleViewWithTitle:[[PFBBundle sharedBundle]
-                                                        localizedTwitterStringForKey:
-                                                            @"SUBSCRIPTION_APP_ICON_SETTINGS_TITLE"]
-                                           subtitle:self.account.displayUsername]];
-        }
-        [self.navigationController pushViewController:appIconVC animated:YES];
+    UIViewController* appIconVC = [[PFBAppIconViewController alloc] init];
+    if (self.account) {
+        [appIconVC.navigationItem
+            setTitleView:[objc_getClass("TFNTitleView")
+                             titleViewWithTitle:[[PFBBundle sharedBundle]
+                                                    localizedTwitterStringForKey:
+                                                        @"SUBSCRIPTION_APP_ICON_SETTINGS_TITLE"]
+                                       subtitle:self.account.displayUsername]];
     }
+    [self.navigationController pushViewController:appIconVC animated:YES];
 }
 
 // MARK: - Muted words
@@ -818,7 +812,7 @@ static NSURL* PFBAccountAvatarURL(TFNTwitterAccount* account) {
 // MARK: - Web session
 
 // Deletes the stored web session, behind a destructive confirmation.
-- (void)PFBClearWebSession:(NSDictionary*)sender {
+- (void)sessionClearTapped:(UIButton*)sender {
     __weak typeof(self) weakSelf = self;
     UIAlertController* confirm = [UIAlertController
         alertControllerWithTitle:[[PFBBundle sharedBundle]
@@ -1006,17 +1000,6 @@ static NSURL* PFBAccountAvatarURL(TFNTwitterAccount* account) {
     if (toggleIndex == -1) {
         [self.tableView endUpdates];
         [self.tableView reloadData];
-        return;
-    }
-    NSMutableArray* children = [NSMutableArray array];
-    for (NSDictionary* toggleData in self.toggles) {
-        if ([toggleData[@"parentKey"] isEqualToString:key] ||
-            [toggleData[@"hiddenWhen"] isEqualToString:key]) {
-            [children addObject:toggleData];
-        }
-    }
-    if (children.count == 0) {
-        [self.tableView endUpdates];
         return;
     }
     BOOL isAdding = newVisibleToggles.count > oldVisibleToggles.count;

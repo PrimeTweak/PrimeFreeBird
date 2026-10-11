@@ -1,6 +1,7 @@
 // The download options sheet for Tweet and chat media, and the FFmpeg downloads behind it.
 
 #import "Features/Media/PFBDownloadInlineButton.h"
+#import "Support/PFBManager.h"
 #import <objc/runtime.h>
 #import "Common/PFBBundle.h"
 #import "Common/PFBSettings.h"
@@ -27,7 +28,7 @@ static UIViewController* TopMostController(void) {
     return top;
 }
 
-// An alert under Twitter's error title, with the tweak's message for the key.
+// An alert under Twitter's error title, with the bundled message for the key.
 static void PFBShowDownloadFailure(NSString* messageKey) {
     PFBBundle* bundle = [PFBBundle sharedBundle];
     UIAlertController* alert =

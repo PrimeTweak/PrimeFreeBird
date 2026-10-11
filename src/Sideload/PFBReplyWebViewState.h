@@ -5,7 +5,6 @@
 extern BOOL gPFBReplyWebViewActive;
 extern BOOL gPFBForceNextFocus;
 extern __weak UIScrollView* gPFBReplyScroller;
-extern int gPFBAnimsKilled;
 extern CFTimeInterval gPFBSquelchUntil;
 extern WKWebView* gPFBIconBar;
 extern __weak WKWebView* gPFBRelayWebView;

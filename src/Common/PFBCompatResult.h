@@ -1,4 +1,4 @@
-#import <UIKit/UIKit.h>
+#import <Foundation/Foundation.h>
 
 // OK: proven on this Twitter version. Not tested: no proof yet, whether or not the tour
 // showed its screen. Broken: a path is lost, something it relies on is not in Twitter.

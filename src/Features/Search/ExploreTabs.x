@@ -75,9 +75,9 @@ static __weak UICollectionView* gPFBPagerCandidate = nil;
 static NSInteger gPFBPagerCandidateTotal = 0;
 static __weak UICollectionView* gPFBBarCV = nil;     // the bar's inner collection
 static __weak CALayer* gPFBHighlightLayer = nil;     // underline layer (lockdown)
-static BOOL gPFBSettingUnderline = NO;               // the tweak is setting the underline
+static BOOL gPFBSettingUnderline = NO;               // the underline is being set here
 static BOOL gPFBInBarFilter = NO;                    // re-entrancy guard
-static BOOL gPFBSelfNav = NO;          // a pager move started by the tweak
+static BOOL gPFBSelfNav = NO;          // a pager move started here
 static NSUInteger gPFBAppliedMaskBits = 0xFFFF;   // last mask synced to the pager
 
 void pfbNoteExploreAccessoryView(UIView* v) {
@@ -398,7 +398,7 @@ static NSString* pfbOwners(UIView* view) {
 
 // Once per launch and per owner, while the journal records: a second pager taken for
 // Explore's, with the screens that own it and the tab bar.
-static void pfbProbePagerSwap(UICollectionView* pager, NSInteger pages) {
+static void pfbJournalPagerSwap(UICollectionView* pager, NSInteger pages) {
     static NSMutableSet<NSString*>* said;
     if (!PFBDebugIsRecording()) { return; }
     NSString* owners = pfbOwners(pager);
@@ -432,7 +432,7 @@ static void pfbProbePagerSwap(UICollectionView* pager, NSInteger pages) {
     if (collectionView != gPFBPagerCV) {
         if (!pfbPagerScopeOK(collectionView)) { return n; }
         if (gPFBPagerCV) {
-            pfbProbePagerSwap(collectionView, n);
+            pfbJournalPagerSwap(collectionView, n);
         }
         gPFBPagerCV = collectionView;
     }

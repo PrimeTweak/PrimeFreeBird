@@ -7,8 +7,7 @@
 #import "Common/PFBBundle.h"
 #import "Support/TwitterChirpFont.h"
 #import "Features/Appearance/ThemeColor/PFBPalette.h"
-
-extern UIColor* PFBCurrentAccentColor(void);
+#import "Support/Helpers.h"
 
 // UIApplication's alternateIconName getter goes stale on sideloaded installs
 // (setting the icon works, but the getter keeps reporting an old name across

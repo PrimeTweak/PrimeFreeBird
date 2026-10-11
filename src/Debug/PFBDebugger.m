@@ -383,8 +383,7 @@ static void PFBCaptureView(UIView* view, NSInteger depth, NSMutableString* out) 
     [out appendString:line];
     [out appendString:@"\n"];
 
-    // The tweak's own mark, if this view carries one — the line that turns
-    // "what is this view" into "what did the tweak do to it".
+    // The PrimeFreeBird mark this view carries, if any, naming the code that changed it.
     NSString* mark = PFBMarkOf(view);
     if (mark) {
         [out appendFormat:@"%s  ⟨PFB: %@⟩\n", indent.UTF8String, mark];
@@ -430,10 +429,6 @@ NSString* PFBDebuggerReport(void) {
 }
 
 // MARK: - floating trigger
-
-// A motion gesture travels the first-responder chain, so with nothing first
-// responder, or with the app consuming the event, the window never sees it. A
-// button is always there and always answers.
 
 static PFBDebugOverlayWindow* gPFBOverlay;
 
@@ -508,7 +503,6 @@ void PFBDebuggerCaptureAndPresent(void) {
     UIView* root = top.viewIfLoaded ?: window;
     PFBCaptureView(root, 0, capture);
     gPFBLastCapture = capture;
-    PFBDebugLog(@"[capture] taken (%lu characters)", (unsigned long)capture.length);
 
     PFBDebuggerPresent();
 }

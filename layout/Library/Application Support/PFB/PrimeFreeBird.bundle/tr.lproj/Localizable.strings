@@ -5,9 +5,6 @@
 
 "PFB_SETTINGS_DETAIL" = "Twitter’ı kişiselleştir: reklamları gizle, Blue özelliklerini aç, daha fazlası.";
 
-/*Alerts and popups*/
-
-
 /*Settings*/
 "MODERN_SETTINGS_LAYOUT_TITLE" = "Genel";
 "MODERN_SETTINGS_LAYOUT_SUBTITLE" = "Uygulamayı kilitleyin, gezinme çubuğunu görünür tutun ve daha fazlası.";
@@ -210,8 +207,6 @@
 "FLEX_TWITTER_TITLE" = "FLEX hata ayıklama modu";
 "FLEX_TWITTER_DETAIL" = "Twitter’ı FLEX ile debug et.";
 
-/*Developers*/
-
 /*Custom fonts*/
 "CUSTOM_FONTS_NAVIGATION_BUTTON_TITLE" = "Özel yazı tipleri";
 "CUSTOM_FONTS_MENU_TITLE" = "\nYazı tipi seç";
@@ -222,8 +217,6 @@
 "FETCHING_PROGRESS_TITLE" = "Bir saniye...";
 "DOWNLOAD_AS_GIF_OPTION_TITLE" = "GIF olarak indir";
 "DOWNLOAD_AS_MP4_OPTION_TITLE" = "MP4 olarak indir";
-
-/*App icon*/
 
 /*Copy profile info*/
 "COPY_PROFILE_INFO_MENU_OPTION_1" = "Biyografiyi kopyala";
@@ -254,8 +247,6 @@
 
 "RESTORE_TWITTER_NAMES_TITLE" = "Twitter terminolojisini geri yükle";
 "RESTORE_TWITTER_NAMES_DETAIL" = "Uygulama arayüzünde 'X' yerine 'Twitter', 'Post' yerine 'Tweet', 'Repost' yerine 'Retweet' gibi değişiklikleri geri getirir.";
-
-/*Deprecated*/
 
 /*App lock*/
 "PADLOCK_LOCKED_LABEL" = "Locked";

@@ -1,12 +1,4 @@
-#import "Debug/PFBDebugger.h"
-#import "Support/Generated/PFBHookManifest.h"
-#import "Common/PFBCompatibility.h"
-#import "Common/PFBSettings.h"
-#import "Support/HookHelpers.h"
 #import <CoreGraphics/CoreGraphics.h>
-#import <objc/runtime.h>
-#import <os/log.h>
-#import <sys/utsname.h>
 #import "Debug/PFBDebugOverlayWindow.h"
 
 @implementation PFBDebugOverlayWindow

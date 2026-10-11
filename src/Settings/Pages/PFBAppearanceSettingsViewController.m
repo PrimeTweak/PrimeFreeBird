@@ -4,6 +4,8 @@
 #import "Common/PFBBundle.h"
 #import "Common/PFBSettings.h"
 #import "Support/TWHeaders.h"
+#import "Features/Appearance/ThemeColor/PFBColorThemeViewController.h"
+#import "Features/Appearance/CustomTabBar/PFBCustomTabBarViewController.h"
 
 @interface PFBAppearanceSettingsViewController () <UIFontPickerViewControllerDelegate>
 @end
@@ -22,35 +24,29 @@
 #pragma mark - Sub-page Navigation
 
 - (void)showThemeViewController:(NSDictionary*)sender {
-    Class ColorThemeViewControllerClass = objc_getClass("PFBColorThemeViewController");
-    if (ColorThemeViewControllerClass) {
-        UIViewController* themeVC = [[ColorThemeViewControllerClass alloc] init];
-        if (self.account) {
-            [themeVC.navigationItem
-                setTitleView:
-                    [objc_getClass("TFNTitleView")
-                        titleViewWithTitle:[[PFBBundle sharedBundle]
-                                               localizedStringForKey:@"THEME_SETTINGS_NAVIGATION_TITLE"]
-                                  subtitle:self.account.displayUsername]];
-        }
-        [self.navigationController pushViewController:themeVC animated:YES];
+    UIViewController* themeVC = [[PFBColorThemeViewController alloc] init];
+    if (self.account) {
+        [themeVC.navigationItem
+            setTitleView:
+                [objc_getClass("TFNTitleView")
+                    titleViewWithTitle:[[PFBBundle sharedBundle]
+                                           localizedStringForKey:@"THEME_SETTINGS_NAVIGATION_TITLE"]
+                              subtitle:self.account.displayUsername]];
     }
+    [self.navigationController pushViewController:themeVC animated:YES];
 }
 
 - (void)showCustomTabBarVC:(NSDictionary*)sender {
-    Class CustomTabBarViewControllerClass = objc_getClass("PFBCustomTabBarViewController");
-    if (CustomTabBarViewControllerClass) {
-        UIViewController* customTabBarVC = [[CustomTabBarViewControllerClass alloc] init];
-        if (self.account) {
-            [customTabBarVC.navigationItem
-                setTitleView:[objc_getClass("TFNTitleView")
-                                 titleViewWithTitle:[[PFBBundle sharedBundle]
-                                                        localizedStringForKey:
-                                                            @"CUSTOM_TAB_BAR_SETTINGS_NAVIGATION_TITLE"]
-                                           subtitle:self.account.displayUsername]];
-        }
-        [self.navigationController pushViewController:customTabBarVC animated:YES];
+    UIViewController* customTabBarVC = [[PFBCustomTabBarViewController alloc] init];
+    if (self.account) {
+        [customTabBarVC.navigationItem
+            setTitleView:[objc_getClass("TFNTitleView")
+                             titleViewWithTitle:[[PFBBundle sharedBundle]
+                                                    localizedStringForKey:
+                                                        @"CUSTOM_TAB_BAR_SETTINGS_NAVIGATION_TITLE"]
+                                       subtitle:self.account.displayUsername]];
     }
+    [self.navigationController pushViewController:customTabBarVC animated:YES];
 }
 
 - (void)showDarkModeStylePicker:(NSDictionary*)sender {

@@ -1,13 +1,6 @@
 #import "Common/PFBCompatibility.h"
-#import "Debug/PFBDebugger.h"
-#import "Support/PFBManager.h"
-#import "Common/PFBSettings.h"
 #import "Support/TwitterChirpFont.h"
-#import "Support/TWHeaders.h"
 #import "Support/HookHelpers.h"
-#import "Settings/PFBModernSettingsPageViewController.h"
-#import "Features/Appearance/ThemeColor/PFBPalette.h"
-#import <objc/runtime.h>
 #import "Debug/PFBTourChoicePopover.h"
 
 @implementation PFBTourChoicePopover

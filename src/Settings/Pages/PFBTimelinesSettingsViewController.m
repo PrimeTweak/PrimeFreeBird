@@ -1,9 +1,7 @@
 // The Timelines settings page.
 
 #import "Settings/Pages/PFBTimelinesSettingsViewController.h"
-#import "Support/TWHeaders.h"
-
-extern void PFBApplyHideCustomTimelinesSetting(void);
+#import "Support/HookHelpers.h"
 
 @implementation PFBTimelinesSettingsViewController
 

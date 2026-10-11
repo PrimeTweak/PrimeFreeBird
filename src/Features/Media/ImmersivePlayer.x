@@ -2,8 +2,8 @@
 // immersive scrolling, the restored timestamp, and the app's chrome held down
 // while a video plays.
 
-#import "Support/HookHelpers.h"
 #import "Debug/PFBDebugger.h"
+#import "Support/HookHelpers.h"
 #import "Support/TwitterChirpFont.h"
 
 // MARK: - Immersive Player Timestamp
@@ -171,10 +171,11 @@ static void pfbHoldThroughOpening(UIView* view) {
 static BOOL pfbFoldIfDue(UIView* card);
 
 static void pfbRestoreTimestamp(UIView* controls) {
-    if (controls && ![PFBSettings boolForKey:@"restore_video_timestamp"]) {
+    BOOL enabled = [PFBSettings boolForKey:@"restore_video_timestamp"];
+    if (controls && !enabled) {
         PFBCOMPAT_OBSERVE(PFBCompat_restore_video_timestamp, @"video controls found");
     }
-    if (!controls || ![PFBSettings boolForKey:@"restore_video_timestamp"] ||
+    if (!controls || !enabled ||
         objc_getAssociatedObject(controls, kPFBRestoredTimestampKey)) {
         return;
     }
@@ -471,8 +472,7 @@ static const void* kPFBScrubRatioKey = &kPFBScrubRatioKey;
 static NSTimeInterval gPFBLastSeek = 0;
 static const CGFloat kPFBPausedGlyphSize = 72.0;
 
-// Marks a toggle synthesized by the tweak: playback is left alone, only the
-// bar moves.
+// Marks a synthesized toggle: playback is left alone, only the bar moves.
 static BOOL gPFBSyntheticToggle = NO;
 
 // The player is not exposed by the page view: it is read from its ivar.

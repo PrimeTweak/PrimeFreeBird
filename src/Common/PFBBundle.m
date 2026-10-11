@@ -1,4 +1,4 @@
-// The tweak's resource bundle and localized strings.
+// PrimeFreeBird's resource bundle and localized strings.
 
 #import "Common/PFBBundle.h"
 
@@ -56,9 +56,9 @@ static NSString* const kPFBMissingString = @"<PFB missing string>";
     return text && ![text isEqualToString:kPFBMissingString] ? text : key;
 }
 
-// Fetches one of Twitter's own strings, reusing the app's translations, from the tables
-// that hold the borrowed keys. A key none of them has falls back to the tweak's copy,
-// filed under TW_ so it can never collide with one of the tweak's own keys.
+// Fetches one of Twitter's own strings from the tables that hold the borrowed keys. A key
+// none of them has falls back to the bundled copy, filed under TW_ so it never collides
+// with a PrimeFreeBird key.
 - (NSString*)localizedTwitterStringForKey:(NSString*)key {
     static NSArray<NSBundle*>* tables;
     static dispatch_once_t onceToken;

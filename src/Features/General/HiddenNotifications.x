@@ -6,18 +6,9 @@
 #import "Debug/PFBDebugger.h"
 #import <QuartzCore/QuartzCore.h>
 #import "Support/TwitterChirpFont.h"
+#import "Features/General/PFBHiddenNotificationsViewController.h"
 
 static NSString* const kPFBHiddenNotifsKey = @"pfb_hidden_notifs";
-static NSString* const kPFBNotifHorizonKey = @"pfb_notif_horizon_days";
-static NSString* const kPFBHideNotifsEnabledKey = @"hide_notifications";
-
-
-// Absent key means on, the default of the hide_notifications settings row.
-static BOOL PFBNotifsEnabled(void) {
-    id value = [[NSUserDefaults standardUserDefaults]
-                   objectForKey:kPFBHideNotifsEnabledKey];
-    return value ? [value boolValue] : YES;
-}
 
 // The notifications screen, recorded when a hide drops one of its rows or when the
 // sweep first finds a notification in it. An unhide reloads it.
@@ -45,10 +36,8 @@ static NSDictionary* PFBHiddenNotifs(void) {
 static NSTimeInterval PFBNotifDateFromDisplayedAge(NSString* text, NSTimeInterval reference);
 static NSTimeInterval PFBNotifDateFromAgePiece(NSString* tail, NSTimeInterval reference);
 
-double PFBNotifHorizonDays(void) {
-    double stored = [[NSUserDefaults standardUserDefaults] doubleForKey:kPFBNotifHorizonKey];
-    return stored > 0 ? stored : 30.0;
-}
+// Days a hidden entry lasts, counted from the notification's date.
+static const double kPFBNotifHorizonDays = 30.0;
 
 // Days left before the entry drops out on its own. Counted from the
 // notification's own date when one can be read, otherwise from the moment it
@@ -63,16 +52,15 @@ double PFBNotifDaysLeft(NSDictionary* entry) {
         base = hidden;
     }
     if (base <= 0) {
-        return PFBNotifHorizonDays();
+        return kPFBNotifHorizonDays;
     }
     double elapsed = ([[NSDate date] timeIntervalSince1970] - base) / 86400.0;
-    double left = PFBNotifHorizonDays() - elapsed;
+    double left = kPFBNotifHorizonDays - elapsed;
     return left > 0 ? left : 0;
 }
 
-
 // Purge on read: an entry past its horizon leaves by itself.
-void PFBPurgeExpiredNotifs(void) {
+static void PFBPurgeExpiredNotifs(void) {
     NSDictionary* current = PFBHiddenNotifs();
     if (!current.count) {
         return;
@@ -104,8 +92,8 @@ NSArray<NSDictionary*>* PFBHiddenNotifList(void) {
     return rows;
 }
 
-// The list filters what it is handed, and filtering empties the app's own sections,
-// so unhiding changes nothing on screen by itself. The screen loads its top the way
+// Hidden rows are deleted from the app's own list, so unhiding changes nothing on
+// screen by itself. The screen loads its top the way
 // a pull does: loadTop: with its own pull control as the sender.
 static void PFBNotifRefreshScreen(void) {
     UIViewController* screen = gPFBNotifScreen;
@@ -290,13 +278,12 @@ static NSString* PFBNotifDurableKey(id model) {
                                       (unsigned long)meat.length];
 }
 
-// The entry id is printed in the model's description even when no accessor
-// returns it, so it is read there before any accessor is asked.
-
-// Its middle is rewritten on every refresh; only this many trailing characters
-// were measured to stay put, so the key is built from them.
+// The entry id's middle is rewritten on every refresh; only this many trailing
+// characters stay put, so the key is built from them.
 static const NSUInteger kPFBNotifIdTail = 8;
 
+// Reads the entry id from the model's description, which prints it even when no
+// accessor returns it; tried before any accessor is asked.
 static NSString* PFBNotifEntryIdFromDescription(id model) {
     NSString* text = [model description];
     if (!text.length) {
@@ -422,7 +409,7 @@ static NSString* PFBNotifText(id model) {
     return nil;
 }
 
-BOOL PFBNotifIsHidden(id model) {
+static BOOL PFBNotifIsHidden(id model) {
     if (!model) {
         return NO;
     }
@@ -441,9 +428,8 @@ BOOL PFBNotifIsHidden(id model) {
             if (![entry isKindOfClass:[NSDictionary class]]) {
                 continue;
             }
-            // Type-checked: entries written before this key existed carry
-            // nothing here, and a value of another kind would not answer
-            // isEqualToString:.
+            // Type-checked: older entries carry nothing here, and a value of another kind
+            // would not answer isEqualToString:.
             id session = entry[@"s"];
             if ([session isKindOfClass:[NSString class]] &&
                 [session isEqualToString:identity]) {
@@ -453,7 +439,6 @@ BOOL PFBNotifIsHidden(id model) {
     }
     return identity.length && hidden[identity] != nil;
 }
-
 
 // The notification's view model carries no text, so the wording shown in the hidden
 // list is read from the CELL at the moment of hiding — its labels are the only place
@@ -513,11 +498,9 @@ static NSString* PFBNotifTextFromCell(UITableView* table, NSIndexPath* indexPath
     return pieces.count ? [pieces componentsJoinedByString:@" · "] : nil;
 }
 
-
-// The notification's own date, which the countdown hangs on. The model exposes no
-// date and the timestamp view is Swift, so the date is recovered from the age the
-// cell renders, in any of its " · " pieces: relative forms (30s, 5h, 1w) counted
-// back from `reference`, and absolute ones. 0 when unreadable.
+// The notification's date, recovered from the age its cell renders (the model has none):
+// relative forms (30s, 5h, 1w) counted back from `reference` and absolute ones, in any
+// " · " piece. 0 when unreadable.
 static NSTimeInterval PFBNotifDateFromDisplayedAge(NSString* text, NSTimeInterval reference) {
     for (NSString* piece in [text componentsSeparatedByString:@" · "]) {
         NSString* tail = [piece stringByTrimmingCharactersInSet:
@@ -628,8 +611,6 @@ static NSString* PFBHideNotifWithText(id model, NSString* cellText) {
     NSString* key = durable.length ? durable : identity;
     current[key] = entry;
     PFBWriteHiddenNotifs(current);
-    PFBDebugLog(@"[notifs] hidden <%@> - %lu total",
-                identity, (unsigned long)current.count);
     return key;
 }
 
@@ -826,10 +807,9 @@ static id PFBModelAtIndexPath(id dataViewController, NSIndexPath* indexPath) {
     return PFBUnwrapDataViewItem(items[indexPath.row]);
 }
 
-
 // TFNItemsDataViewController implements -deleteItemAtIndexPath:withRowAnimation:,
 // so a hidden row leaves the list on the spot rather than waiting for a sections
-// replay. The registry and filter still handle later reloads.
+// replay. The registry and sweep still handle later reloads.
 static void PFBNotifSyncEmptyState(id dataViewController);
 static const char* kPFBNotifVerdictKey = "pfbNotifSweepVerdict";
 static const char* kPFBNotifEverFilledKey = "pfbNotifEverFilled";
@@ -843,8 +823,6 @@ static void PFBNotifDropRow(id dataViewController, NSIndexPath* indexPath) {
         if ([dataViewController respondsToSelector:deleteSel]) {
             ((void (*)(id, SEL, id, NSInteger))objc_msgSend)(
                 dataViewController, deleteSel, indexPath, UITableViewRowAnimationLeft);
-            PFBDebugLog(@"[notifs] row removed from the list (%ld/%ld)",
-                        (long)indexPath.section, (long)indexPath.row);
             PFBCOMPAT_ACTION(PFBCompat_hide_notifications, @"notification hidden");
             // A hide from this list proves it is the notifications screen: it is the one
             // an unhide refreshes, and its verdict gates the empty-state sync.
@@ -852,7 +830,6 @@ static void PFBNotifDropRow(id dataViewController, NSIndexPath* indexPath) {
             if (!objc_getAssociatedObject(dataViewController, kPFBNotifVerdictKey)) {
                 objc_setAssociatedObject(dataViewController, kPFBNotifVerdictKey, @YES,
                                          OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-                PFBDebugLog(@"[notifs] verdict recorded on removal - notifications screen");
             }
             // Deferred: the row count is only truthful once the delete animation
             // has finished, so a second pass follows the first.
@@ -877,7 +854,7 @@ static void PFBNotifDropRow(id dataViewController, NSIndexPath* indexPath) {
 - (UISwipeActionsConfiguration*)tableView:(UITableView*)tableView
     trailingSwipeActionsConfigurationForRowAtIndexPath:(NSIndexPath*)indexPath {
     UISwipeActionsConfiguration* original = %orig;
-    if (!PFBNotifsEnabled()) {
+    if (![PFBSettings boolForKey:@"hide_notifications"]) {
         PFBCOMPAT_OBSERVE(PFBCompat_hide_notifications, @"notification swipe seen");
         return original;
     }
@@ -915,11 +892,6 @@ static void PFBNotifDropRow(id dataViewController, NSIndexPath* indexPath) {
         }
         return original;
     }
-    static BOOL saidArmed;
-    if (!saidArmed) {
-        saidArmed = YES;
-        PFBDebugLog(@"[notifs] swipe: \"Hide\" action added on %@", modelClass);
-    }
 
     NSString* title = [[PFBBundle sharedBundle] localizedStringForKey:@"NOTIFS_HIDE_ACTION"];
     UIContextualAction* hide = [UIContextualAction
@@ -955,11 +927,13 @@ static void PFBNotifDropRow(id dataViewController, NSIndexPath* indexPath) {
 
 // MARK: - Keeping them out of the list
 
+// MARK: - the sweep
+
 // Drops hidden items from sections that expose -items and -setItems:; other sections
 // pass through whole. An id in the registry can only belong to a hidden notification,
 // so the filter needs no scoping of its own.
 static NSArray* PFBFilterNotifSections(NSArray* sections) {
-    if (!PFBNotifsEnabled()) {
+    if (![PFBSettings boolForKey:@"hide_notifications"]) {
         return sections;
     }
     if (!PFBHiddenNotifs().count) {
@@ -1002,13 +976,8 @@ static NSArray* PFBFilterNotifSections(NSArray* sections) {
     return changed ? result : sections;
 }
 
-
-// MARK: - the sweep
-
-// No section class exposes -items in Objective-C, so the section filter reaches
-// no rows. TFNItemsDataViewController implements -itemAtIndexPath:, so the rows
-// are walked after each content replacement and the hidden ones deleted.
-
+// Sections that hide their items from Objective-C pass the filter whole; the rows of
+// TFNItemsDataViewController are walked after each content replacement and deleted.
 
 // Which screens the sweep may touch, decided by observation rather than by class
 // name. One notification model keeps a controller, several without drops it, and
@@ -1027,8 +996,6 @@ static void PFBNotifRecordVerdict(id dataViewController, BOOL sawNotification,
         objc_setAssociatedObject(dataViewController, kPFBNotifVerdictKey, @YES,
                                  OBJC_ASSOCIATION_RETAIN_NONATOMIC);
         gPFBNotifScreen = (UIViewController*)dataViewController;
-        PFBDebugLog(@"[sweep] %@ kept - this is the notifications screen",
-                    NSStringFromClass([dataViewController class]));
         return;
     }
     // A screen belonging to the notifications tab is never condemned: it could be
@@ -1221,7 +1188,6 @@ static void PFBNotifSyncEmptyState(id dataViewController) {
                     completion:^(__unused BOOL finished) {
                       [existing removeFromSuperview];
                     }];
-                PFBDebugLog(@"[empty] panel removed");
             }
             return;
         }
@@ -1269,7 +1235,6 @@ static void PFBNotifSyncEmptyState(id dataViewController) {
                            panel.alpha = 1.0;
                          }
                          completion:nil];
-        PFBDebugLog(@"[empty] PANEL PLACED");
     } @catch (id exception) {
         PFBDebugLog(@"[empty] exception: %@", exception);
     }
@@ -1278,7 +1243,7 @@ static void PFBNotifSyncEmptyState(id dataViewController) {
 static BOOL gPFBNotifSweeping;
 
 static void PFBNotifSweep(id dataViewController) {
-    if (gPFBNotifSweeping || !PFBNotifsEnabled() || !dataViewController) {
+    if (gPFBNotifSweeping || ![PFBSettings boolForKey:@"hide_notifications"] || !dataViewController) {
         return;
     }
     if (!PFBHiddenNotifs().count) {
@@ -1358,20 +1323,14 @@ static void PFBNotifSweepLater(id dataViewController) {
     });
 }
 
-// Measured: T1URTViewController implements neither -sections nor -setSections:;
-// both are inherited from TFNItemsDataViewController, so the hooks sit there.
+// T1URTViewController inherits -sections and -setSections: from
+// TFNItemsDataViewController, so the hooks sit there.
 %hook TFNItemsDataViewController
 
 - (void)setSections:(NSArray*)sections restoreScrollPosition:(BOOL)restore {
     %orig(PFBFilterNotifSections(sections), restore);
     // The list is in place: remove what is hidden.
-    __weak id host = self;
-    dispatch_async(dispatch_get_main_queue(), ^{
-      id alive = host;
-      if (alive) {
-          PFBNotifSweep(alive);
-      }
-    });
+    PFBNotifSweepLater(self);
 }
 
 - (void)setSections:(NSArray*)sections {
@@ -1393,25 +1352,13 @@ static void PFBNotifSweepLater(id dataViewController) {
 - (void)updateSections:(NSArray*)sections completion:(id)completion {
     %orig(PFBFilterNotifSections(sections), completion);
     // The list is in place: remove what is hidden.
-    __weak id host = self;
-    dispatch_async(dispatch_get_main_queue(), ^{
-      id alive = host;
-      if (alive) {
-          PFBNotifSweep(alive);
-      }
-    });
+    PFBNotifSweepLater(self);
 }
 
 - (void)updateSections:(NSArray*)sections withRowAnimation:(NSInteger)animation {
     %orig(PFBFilterNotifSections(sections), animation);
     // The list is in place: remove what is hidden.
-    __weak id host = self;
-    dispatch_async(dispatch_get_main_queue(), ^{
-      id alive = host;
-      if (alive) {
-          PFBNotifSweep(alive);
-      }
-    });
+    PFBNotifSweepLater(self);
 }
 
 - (void)updateSections:(NSArray*)sections
@@ -1419,13 +1366,7 @@ static void PFBNotifSweepLater(id dataViewController) {
             completion:(id)completion {
     %orig(PFBFilterNotifSections(sections), animation, completion);
     // The list is in place: remove what is hidden.
-    __weak id host = self;
-    dispatch_async(dispatch_get_main_queue(), ^{
-      id alive = host;
-      if (alive) {
-          PFBNotifSweep(alive);
-      }
-    });
+    PFBNotifSweepLater(self);
 }
 
 - (void)updateSections:(NSArray*)sections
@@ -1434,13 +1375,7 @@ reconfigureItemIdentifiers:(id)identifiers
             completion:(id)completion {
     %orig(PFBFilterNotifSections(sections), identifiers, animation, completion);
     // The list is in place: remove what is hidden.
-    __weak id host = self;
-    dispatch_async(dispatch_get_main_queue(), ^{
-      id alive = host;
-      if (alive) {
-          PFBNotifSweep(alive);
-      }
-    });
+    PFBNotifSweepLater(self);
 }
 
 %end
@@ -1469,15 +1404,9 @@ reconfigureItemIdentifiers:(id)identifiers
 // -bounds nor -nextResponder. Both kinds are handled here, and the host
 // controller does not come from the sender.
 - (void)present:(id)sender {
-    Class screenClass = NSClassFromString(@"PFBHiddenNotificationsViewController");
-    if (!screenClass) {
-        return;
-    }
     @try {
-        id allocated = [screenClass alloc];
-        id screen = ((id (*)(id, SEL))objc_msgSend)(allocated,
-                                                    NSSelectorFromString(@"initCompact"));
-        UIViewController* controller = screen;
+        UIViewController* controller =
+            [[PFBHiddenNotificationsViewController alloc] initCompact];
         if (!controller) {
             return;
         }
@@ -1547,8 +1476,6 @@ reconfigureItemIdentifiers:(id)identifiers
             return;
         }
         [host presentViewController:controller animated:YES completion:nil];
-        PFBDebugLog(@"[notifs] hidden list presented from %@",
-                    NSStringFromClass([host class]));
     } @catch (id exception) {
         PFBDebugLog(@"[notifs] list presentation abandoned - no consequence");
     }
@@ -1603,7 +1530,6 @@ UIImage* PFBFlatGlyph(UIImage* source, UIColor* colour) {
     return [painted imageWithRenderingMode:UIImageRenderingModeAlwaysOriginal];
 }
 
-
 %hook T1TabNavigationController
 
 - (void)_t1_main_updateNavigationItemForViewController:(UIViewController*)viewController
@@ -1611,7 +1537,7 @@ UIImage* PFBFlatGlyph(UIImage* source, UIColor* colour) {
                            providingLeftBarButtonItems:(BOOL)left
                                  rightBarButtonItems:(BOOL)right {
     %orig;
-    if (!PFBNotifsEnabled() || !viewController) {
+    if (![PFBSettings boolForKey:@"hide_notifications"] || !viewController) {
         return;
     }
     @try {
@@ -1715,7 +1641,7 @@ static const char* kPFBNotifMaskedKey = "pfbNotifMasked";
 
 static void PFBNotifMaskHiddenCell(UITableViewCell* cell) {
     BOOL hide = NO;
-    if (PFBNotifsEnabled() && PFBHiddenNotifs().count) {
+    if ([PFBSettings boolForKey:@"hide_notifications"] && PFBHiddenNotifs().count) {
         @try {
             UITableView* table = PFBNotifTableForCell(cell);
             NSIndexPath* indexPath = table ? [table indexPathForCell:cell] : nil;
@@ -1732,11 +1658,6 @@ static void PFBNotifMaskHiddenCell(UITableViewCell* cell) {
         if (!masked) {
             objc_setAssociatedObject(cell, kPFBNotifMaskedKey, @YES,
                                      OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-            static BOOL said;
-            if (!said) {
-                said = YES;
-                PFBDebugLog(@"[notifs] hidden notification kept transparent until its row goes");
-            }
         }
         [cell.layer removeAnimationForKey:@"opacity"];
         cell.alpha = 0;
@@ -1752,20 +1673,13 @@ static void PFBNotifMaskHiddenCell(UITableViewCell* cell) {
 
 - (void)setAlpha:(CGFloat)alpha {
     BOOL masked = objc_getAssociatedObject(self, kPFBNotifMaskedKey) != nil;
-    if (masked && alpha > 0) {
-        static BOOL said;
-        if (!said) {
-            said = YES;
-            PFBDebugLog(@"[notifs] opacity written back on a hidden notification - held at 0");
-        }
-    }
     %orig(masked ? 0.0 : alpha);
 }
 
 - (void)layoutSubviews {
     %orig;
     PFBNotifMaskHiddenCell((UITableViewCell*)self);
-    if (!PFBNotifsEnabled()) {
+    if (![PFBSettings boolForKey:@"hide_notifications"]) {
         return;
     }
     @try {
@@ -1777,9 +1691,8 @@ static void PFBNotifMaskHiddenCell(UITableViewCell* cell) {
         // How the button is hidden cannot be established statically, so every
         // route is covered: hidden flag, alpha and a zero frame. The cell is
         // marked so the tap handler recognizes it.
-        BOOL changed = NO;
-        if (dismiss.hidden) { dismiss.hidden = NO; changed = YES; }
-        if (dismiss.alpha < 0.5) { dismiss.alpha = 1.0; changed = YES; }
+        if (dismiss.hidden) { dismiss.hidden = NO; }
+        if (dismiss.alpha < 0.5) { dismiss.alpha = 1.0; }
         dismiss.userInteractionEnabled = YES;
 
         // A 44 pt touch target, Apple's minimum, with the glyph itself staying
@@ -1790,7 +1703,6 @@ static void PFBNotifMaskHiddenCell(UITableViewCell* cell) {
                                    kPFBNotifDismissTop, side, side);
         if (!CGRectEqualToRect(dismiss.frame, wanted)) {
             dismiss.frame = wanted;
-            changed = YES;
         }
 
         // The cross replaces the ellipsis: this is not a "more options" menu.
@@ -1798,12 +1710,10 @@ static void PFBNotifMaskHiddenCell(UITableViewCell* cell) {
             UIButton* button = (UIButton*)dismiss;
             if (!objc_getAssociatedObject(dismiss, kPFBNotifGlyphKey)) {
                 UIImage* cross = nil;
-                if (@available(iOS 13.0, *)) {
-                    UIImageSymbolConfiguration* cfg =
-                        [UIImageSymbolConfiguration configurationWithPointSize:kPFBNotifDismissGlyph
-                                                                       weight:UIImageSymbolWeightSemibold];
-                    cross = PFBTwitterGlyphFor(@"close", [UIImage systemImageNamed:@"xmark" withConfiguration:cfg]);
-                }
+                UIImageSymbolConfiguration* cfg =
+                    [UIImageSymbolConfiguration configurationWithPointSize:kPFBNotifDismissGlyph
+                                                                   weight:UIImageSymbolWeightSemibold];
+                cross = PFBTwitterGlyphFor(@"close", [UIImage systemImageNamed:@"xmark" withConfiguration:cfg]);
                 if (cross) {
                     [button setImage:[cross imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate]
                             forState:UIControlStateNormal];
@@ -1830,13 +1740,6 @@ static void PFBNotifMaskHiddenCell(UITableViewCell* cell) {
         }
         objc_setAssociatedObject(self, kPFBNotifRevealedKey, @YES,
                                  OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-        if (changed) {
-            static BOOL said;
-            if (!said) {
-                said = YES;
-                PFBDebugLog(@"[notifs] x button revealed on the notification");
-            }
-        }
     } @catch (id exception) {
     }
 }
@@ -1846,7 +1749,7 @@ static void PFBNotifMaskHiddenCell(UITableViewCell* cell) {
     // inside a protected block: either the hide ran here, or Twitter acts.
     BOOL handled = NO;
     BOOL ours = objc_getAssociatedObject(self, kPFBNotifRevealedKey) != nil;
-    if (PFBNotifsEnabled() && ours) {
+    if ([PFBSettings boolForKey:@"hide_notifications"] && ours) {
         @try {
             UITableView* table = PFBNotifTableForCell((UIView*)self);
             NSIndexPath* indexPath =
@@ -1858,7 +1761,6 @@ static void PFBNotifMaskHiddenCell(UITableViewCell* cell) {
             NSString* identity = model ? PFBNotifIdentity(model) : nil;
             if (identity.length) {
                 NSString* hiddenKey = PFBHideNotifWithText(model, PFBNotifTextFromCell(table, indexPath));
-                PFBDebugLog(@"[notifs] x: hidden <%@>", identity);
                 PFBNotifDropRow(source, indexPath);
                 if (hiddenKey) {
                     PFBShowNotifToast(hiddenKey);
@@ -1879,9 +1781,9 @@ static void PFBNotifMaskHiddenCell(UITableViewCell* cell) {
 
 %end
 
-// The dismiss button lays itself out after the cell and reinstates its native
-// glyph, so the cross is enforced in the button's own layout, and only while its
-// image is not already the tweak's, so there is no re-layout loop.
+// The dismiss button lays itself out after the cell and reinstates its native glyph, so
+// the cross is enforced in the button's own layout, only while its image is not already
+// the cross, so there is no re-layout loop.
 @interface TFNDismissButton : UIButton
 @end
 
@@ -1889,7 +1791,7 @@ static void PFBNotifMaskHiddenCell(UITableViewCell* cell) {
 
 - (void)layoutSubviews {
     %orig;
-    if (!PFBNotifsEnabled()) {
+    if (![PFBSettings boolForKey:@"hide_notifications"]) {
         return;
     }
     @try {
@@ -1911,12 +1813,10 @@ static void PFBNotifMaskHiddenCell(UITableViewCell* cell) {
             return;   // the cross is already in place; setting it again would loop
         }
         UIImage* cross = nil;
-        if (@available(iOS 13.0, *)) {
-            UIImageSymbolConfiguration* cfg = [UIImageSymbolConfiguration
-                configurationWithPointSize:kPFBNotifDismissGlyph
-                                    weight:UIImageSymbolWeightSemibold];
-            cross = PFBTwitterGlyphFor(@"close", [UIImage systemImageNamed:@"xmark" withConfiguration:cfg]);
-        }
+        UIImageSymbolConfiguration* cfg = [UIImageSymbolConfiguration
+            configurationWithPointSize:kPFBNotifDismissGlyph
+                                weight:UIImageSymbolWeightSemibold];
+        cross = PFBTwitterGlyphFor(@"close", [UIImage systemImageNamed:@"xmark" withConfiguration:cfg]);
         if (!cross) {
             return;
         }

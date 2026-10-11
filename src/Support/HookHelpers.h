@@ -3,8 +3,6 @@
 #import <AVFoundation/AVFoundation.h>
 #import <AudioToolbox/AudioToolbox.h>
 #import <Foundation/Foundation.h>
-#import <Preferences/PSListController.h>
-#import <Preferences/PSSpecifier.h>
 #import <UIKit/UIKit.h>
 #import <WebKit/WebKit.h>
 #import <dlfcn.h>
@@ -17,9 +15,6 @@
 #import "Features/Appearance/CustomTabBar/PFBCustomTabBarUtility.h"
 #import "Common/PFBCompatibility.h"
 #import "Features/Media/PFBDownloadInlineButton.h"
-#import "Support/TWHeaders.h"
-#import "Settings/PFBModernSettingsViewController.h"
-#import "Features/Appearance/ThemeColor/PFBPalette.h"
 
 // Recursive view traversal (HookHelpers.m)
 void PFBEnumerateSubviewsRecursively(UIView* view,
@@ -32,17 +27,11 @@ id PFBUnwrapDataViewItem(id item);
 // the arrow's height; pinned footers reserve it so they open fully in view.
 extern const CGFloat PFBPopoverArrowReserve;
 
-// Journals how far an open popover's content runs past the bubble, beside the
-// reserve. Debug only; it never touches the layout.
-void PFBPopoverLogOverflow(UIView* content);
-
 // A bar material pinned behind a view's contents, invisible until something
 // scrolls under it.
 UIVisualEffectView* PFBMaterialBehind(UIView* host);
 
 // Module header/footer cleanup for timeline section filtering (HookHelpers.m)
-BOOL PFBIsModuleHeaderItem(id item);
-BOOL PFBIsModuleFooterItem(id item);
 void PFBMarkEmptiedModuleChrome(NSArray* items, NSMutableIndexSet* removed);
 
 // Live square-avatar restyling (Avatars.x)
@@ -71,14 +60,15 @@ BOOL PFBPanelIsGenuinelyAvailable(long long panelID);
 // Web session cookie harvesting (WebCreateTweet.x)
 void PFBPrewarmWebCookiesIfNeeded(void);
 void PFBMaybeHandleHarvestWebView(__unsafe_unretained id webViewController);
-id PFBAccountForAuthenticatedWebView(void);
 
+// The mobile Safari user agent presented by the web views and web requests (HookHelpers.m).
+FOUNDATION_EXPORT NSString* const PFBMobileSafariUserAgent;
 // YES when a usable web session (auth_token + ct0) is available (WebCreateTweet.x).
 BOOL PFBHasUsableWebCredentials(void);
 // A GET signed with the web session; nil without one or for a URL that is not
 // https on x.com (WebCreateTweet.x).
 NSMutableURLRequest* PFBWebSessionGETRequest(NSURL* url);
-// Saves the web session cookies for the tweak's own requests.
+// Saves the web session cookies for PrimeFreeBird's own requests.
 void PFBStoreWebCookies(NSArray<NSHTTPCookie*>* cookies);
 // The web auth_token a request was signed with: a bridged account signs with its own
 // session's token, which holds no dash. nil for any other request (WebCreateTweet.x).
@@ -139,7 +129,7 @@ void PFBEndRawVerifiedRead(void);
 void PFBThemeScreenEnter(UIViewController* screen);
 void PFBThemeScreenLeave(UIViewController* screen);
 
-// Bar items of the tweak's own screens carry this tag and keep UIKit's glass;
+// Bar items of PrimeFreeBird's own screens carry this tag and keep UIKit's glass;
 // the app-wide flattening in NavBarIcons.x leaves them alone.
 static const NSInteger PFBNativeGlassTag = 0x4E4647;
 

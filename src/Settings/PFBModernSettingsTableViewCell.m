@@ -1,5 +1,4 @@
 #import "Support/PFBManager.h"
-#import "Support/TWHeaders.h"
 #import "Features/Appearance/ThemeColor/PFBPalette.h"
 #import "Settings/PFBSettingsCellStyle.h"
 #import "Settings/PFBModernSettingsTableViewCell.h"
@@ -37,11 +36,6 @@
 }
  
 - (void)setupViews {
-    self.contentView.preservesSuperviewLayoutMargins = NO;
-    self.contentView.layoutMargins = UIEdgeInsetsZero;
-    self.preservesSuperviewLayoutMargins = NO;
-    self.layoutMargins = UIEdgeInsetsZero;
-    self.separatorInset = UIEdgeInsetsZero;
     self.iconImageView = [[UIImageView alloc] init];
     self.iconImageView.translatesAutoresizingMaskIntoConstraints = NO;
     self.iconImageView.contentMode = UIViewContentModeScaleAspectFit;

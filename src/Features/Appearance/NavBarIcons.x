@@ -7,24 +7,23 @@
 #import <QuartzCore/QuartzCore.h>
 
 static const void* kPFBGreyedImageKey = &kPFBGreyedImageKey;
-// Holds the color to force on a view the tweak has taken over, so any image set
-// later goes through the same repaint.
+// Holds the color forced on a taken-over view, so any image set later goes
+// through the same repaint.
 static const void* kPFBGreyTargetKey = &kPFBGreyTargetKey;
 // The untouched glyph. Repainting is not idempotent — a color at 60% opacity
 // laid over a color already at 60% lands at 36% — so every repaint starts
 // from this original.
 static const void* kPFBOriginalImageKey = &kPFBOriginalImageKey;
-// Marks an image the tweak produced. Two paths repaint on Notifications, and
-// without the mark each treats the other's result as unpainted. The mark travels
-// with the image, so any path recognizes it.
+// Marks a repainted image. Two paths repaint on Notifications, and without the mark
+// each treats the other's result as unpainted; the mark travels with the image.
 static const void* kPFBPaintedFlagKey = &kPFBPaintedFlagKey;
 // Marks a layer that must never render at partial opacity. Correcting afterwards
 // is too late, so every route that could lower it is refused as it is used: the
 // alpha, the layer's opacity and the animation.
 static const void* kPFBNoFadeKey = &kPFBNoFadeKey;
 
-// One gray for every icon the tweak adds or recolour: the label color at 60%,
-// resolved to a concrete value so nothing can re-resolve it later.
+// One gray for every added or recolored icon: the label color at 60%, resolved
+// to a concrete value so nothing can re-resolve it later.
 static UIColor* PFBBarIconGrey(UITraitCollection* traits) {
     UIColor* grey = [[UIColor labelColor] colorWithAlphaComponent:0.6];
     if (traits && [grey respondsToSelector:@selector(resolvedColorWithTraitCollection:)]) {
@@ -83,18 +82,12 @@ static void pfbRepaintGlyphs(UIView* view, UIColor* colour) {
             BOOL alreadyOurs =
                 objc_getAssociatedObject(current, kPFBPaintedFlagKey) != nil;
 
-            // The painted flag records that the tweak painted the image, not that
-            // it painted it for this view: a glyph baked elsewhere carries it too,
-            // so the recorded image is compared as well.
+            // The painted flag says the image was repainted, not that it was repainted for
+            // this view: a glyph baked elsewhere carries it too, so the recorded image is compared.
             if (current && alreadyOurs && ours && current != ours && !colourChanged) {
                 imageView.image = ours;
-                static BOOL said;
-                if (!said) {
-                    said = YES;
-                    PFBDebugLog(@"[glyph] view image restored (repainted elsewhere)");
-                }
             } else if (current && !alreadyOurs && (current != ours || colourChanged)) {
-                // Only remember the original if this image is not one of the tweak's.
+                // Remembers the original only when this image is not a repainted one.
                 UIImage* source = current;
                 UIImage* original =
                     objc_getAssociatedObject(imageView, kPFBOriginalImageKey);
@@ -285,16 +278,11 @@ static void pfbRepaintNotificationsGear(UIView* bar, UIColor* colour) {
         BOOL alreadyOurs =
             objc_getAssociatedObject(button.image, kPFBPaintedFlagKey) != nil;
 
-        // The painted flag records that the tweak painted the image, not that it
-        // painted it for this button. A tweak image that is not the recorded one
-        // was overwritten by another path, so the recorded one is put back.
+        // The painted flag says the image was repainted, not that it was repainted for this
+        // button. A repainted image other than the recorded one came from another path, so
+        // the recorded one is put back.
         if (alreadyOurs && ours && button.image != ours && !colourChanged) {
             button.image = ours;
-            static BOOL said;
-            if (!said) {
-                said = YES;
-                PFBDebugLog(@"[glyph] bar icon restored (it had been repainted elsewhere)");
-            }
             continue;
         }
         if (!alreadyOurs && (button.image != ours || colourChanged)) {
@@ -414,9 +402,8 @@ static BOOL pfbBarGlassPass(UIView* bar, BOOL apply) {
         BOOL flat =
             [current respondsToSelector:@selector(boolValue)] && [current boolValue];
 
-        // An item the tweak builds and marks keeps the plain capsule iOS gives it,
-        // with no color of its own: the cancel control of a sheet reads as chrome,
-        // not as the primary action.
+        // A marked item built here keeps the plain capsule iOS gives it, with no color of
+        // its own: the cancel control of a sheet reads as chrome, not as the primary action.
         if (objc_getAssociatedObject(button, @selector(pfbKeepsBarGlass))) {
             if (flat) {
                 owed = YES;
@@ -689,7 +676,6 @@ static BOOL pfbIsChatBarGlyph(UIView* view) {
         UIColor* colour = pfbBarGlyphColour((UIView*)self);
         UIImage* baked = PFBGreyGlyph(chatImage, colour);
         if (baked) {
-            PFBDebugLog(@"[glyph] chat bar baked at didMoveToWindow (cold start)");
             PFBMark((UIView*)self, @"NavBarIcons/chatBarGlyph -> baked (window)");
             pfbTintGlyphChain((UIView*)self, colour);
             self.image = baked;  // AlwaysOriginal: re-enters the setter and passes through
@@ -752,7 +738,7 @@ static BOOL pfbIsChatBarGlyph(UIView* view) {
         %orig;
         return;
     }
-    // Twitter's own image is the source; the tweak's would compound and go pale.
+    // Twitter's own image is the source; repainting a repainted image would compound and go pale.
     if (objc_getAssociatedObject(self, kPFBOriginalImageKey)) {
         image = objc_getAssociatedObject(self, kPFBOriginalImageKey);
     }
@@ -938,11 +924,6 @@ static BOOL PFBViewSitsInXTabBar(UIView* view) {
     if (ownerIsView && [key hasPrefix:@"filters."] &&
         (owner == (UIView*)PFBTopBarLogoViewCurrent() || PFBViewSitsInXTabBar(owner))) {
         self.filters = nil;
-        static NSInteger refused = 0;
-        if (refused < 3) {
-            refused++;
-            PFBDebugLog(@"[logo] vibrancy animation refused (%@)", key);
-        }
         return;
     }
 
@@ -1196,7 +1177,6 @@ static void pfbGlassifyReplyBar(UIView* bar) {
         }
         [bar insertSubview:view atIndex:0];
         glass = view;
-        PFBDebugLog(@"[replybar] glass laid (%@)", real ? @"real" : @"material");
     }
     // A floating capsule, inset from both edges, not a full-bleed slab. The keyboard
     // resizes this bar, so the frame is taken on every pass.
@@ -1303,7 +1283,6 @@ static void pfbQueueFadeRepair(UIView* bar) {
           pfbClearStaleFades(bar, 0);
           [bar setNeedsLayout];
           [bar.superview setNeedsLayout];
-          PFBDebugLog(@"[navbar] fades cleared and layout asked after damping");
       }
     });
 }

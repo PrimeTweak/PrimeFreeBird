@@ -177,10 +177,9 @@ static CTParagraphStyleRef CreateLTRParagraphStyle(CTParagraphStyleRef original)
 
 // MARK: - Clean shared/copied links
 
-// UIPasteboardChangedNotification is observed rather than one write API hooked, so
-// every copy path is caught, with a last-cleaned guard against re-triggering.
-// With strip_url_tracking on, removes the s, t, ref_src and ref_url parameters;
-// sharing_domain is applied independently.
+// Observes UIPasteboardChangedNotification so every copy path is caught, guarded against
+// re-triggering. strip_url_tracking removes s, t, ref_src and ref_url; sharing_domain
+// applies independently.
 
 static NSString* PFBProcessSharedURL(NSString* urlString) {
     if (urlString.length == 0) {
@@ -192,10 +191,11 @@ static NSString* PFBProcessSharedURL(NSString* urlString) {
         return urlString;
     }
 
-    // Strip tracking params only when the option is on.
+    // Option off: a tracked link is only noted for the Compatibility sheet.
     if (![PFBSettings boolForKey:@"strip_url_tracking"] && c.queryItems.count > 0) {
         PFBCOMPAT_OBSERVE(PFBCompat_strip_url_tracking, @"tracked link seen");
     }
+    // Strips tracking params when the option is on.
     if ([PFBSettings boolForKey:@"strip_url_tracking"] && c.queryItems.count > 0) {
         static NSSet* tracking = nil;
         static dispatch_once_t trackingOnce;
@@ -261,9 +261,10 @@ static NSString* PFBProcessSharedURL(NSString* urlString) {
 
 %end
 
-// Called from AppLifecycle's applicationDidBecomeActive (declared extern there).
+// The last link written back, so the observer's own write does not re-trigger it.
 static NSString* PFBLastCleanedURL = nil;
 
+// Called from applicationDidBecomeActive in AppLifecycle.x.
 void PFBInstallPasteboardObserver(void) {
     static dispatch_once_t observerOnce;
     dispatch_once(&observerOnce, ^{
@@ -353,7 +354,6 @@ static BOOL PFBCustomScreenshotsAllowed(void) {
 }
 
 %end
-
 
 %hook TUIFollowControlCustomScreenshot
 - (void)didMoveToWindow {

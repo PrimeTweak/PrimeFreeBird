@@ -9,22 +9,14 @@
 #import "Features/Appearance/CustomTabBar/CustomTabBarNativeColors.h"
 #import "Features/Appearance/CustomTabBar/PFBCustomTabBarPreviewCell.h"
 #import "Features/Appearance/CustomTabBar/PFBCustomTabBarUtility.h"
-
-extern UIColor* PFBCurrentAccentColor(void);
-
-// Whether the account genuinely has a panel's tab, ignoring the forced tab
-// gates
-extern BOOL PFBPanelIsGenuinelyAvailable(long long panelID);
+#import "Support/Helpers.h"
+#import "Support/HookHelpers.h"
+#import "Support/T1Headers.h"
 
 // The floating compose button, hidden while the editor is on screen.
 @interface TFNFloatingActionButton : UIView
 - (void)showAnimated:(_Bool)animated completion:(id)completion;
 - (void)hideAnimated:(_Bool)animated completion:(id)completion;
-@end
-
-// The app's tab navigation, asked to recompute its tabs so changes apply live.
-@interface T1TabbedAppNavigationViewController : UIViewController
-- (void)recalculateVisiblePanels;
 @end
 
 static NSString* const kGridHeaderID = @"gridHeader";
@@ -201,8 +193,8 @@ static NSString* const kGridFooterID = @"gridFooter";
 #pragma mark - Data
 
 - (void)loadData {
-    // Offer the captured tabs the account genuinely has; panels that only exist
-    // because of the tweak's forced gates stay out of the grid.
+    // Offers the captured tabs the account genuinely has; panels that exist only
+    // through the forced tab gates stay out of the grid.
     self.allPages = [NSMutableArray array];
     for (NSDictionary* entry in [PFBCustomTabBarUtility availableTabs]) {
         NSNumber* panelID = entry[PFBTabPanelIDKey];

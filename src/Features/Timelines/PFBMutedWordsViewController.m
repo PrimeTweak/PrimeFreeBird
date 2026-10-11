@@ -26,13 +26,12 @@ static const CGFloat kPFBTranslateBarGap = 8.0;
 static const CGFloat kPFBCompactRowMargin = 14.0;
 static const NSInteger kPFBTickTag = 7701;
 
-NSString* const kPFBMutedWordsKey = @"pfb_muted_words";
-NSString* const kPFBMutedWholeWordsKey = @"pfb_muted_whole_words";
-NSString* const kPFBMutedInConversationsKey = @"pfb_muted_in_conversations";
-NSString* const kPFBMutedCountKey = @"pfb_muted_words_count";
-NSString* const kPFBMutedExpiryKey = @"pfb_muted_expiry";
-NSString* const kPFBMutedSkipFollowingKey = @"pfb_muted_skip_following";
-NSString* const kPFBMutedIncludeRepostsKey = @"pfb_muted_include_reposts";
+static NSString* const kPFBMutedWordsKey = @"pfb_muted_words";
+static NSString* const kPFBMutedWholeWordsKey = @"pfb_muted_whole_words";
+static NSString* const kPFBMutedInConversationsKey = @"pfb_muted_in_conversations";
+static NSString* const kPFBMutedExpiryKey = @"pfb_muted_expiry";
+static NSString* const kPFBMutedSkipFollowingKey = @"pfb_muted_skip_following";
+static NSString* const kPFBMutedIncludeRepostsKey = @"pfb_muted_include_reposts";
 
 // MARK: - controller
 
@@ -158,13 +157,6 @@ static NSMutableArray<NSString*>* PFBKeptLanguageList(void) {
     [self updatePreferredSize];
 }
 
-- (void)viewDidAppear:(BOOL)animated {
-    [super viewDidAppear:animated];
-    if (self.compact) {
-        PFBPopoverLogOverflow(self.view);
-    }
-}
-
 - (void)viewDidLoad {
     [super viewDidLoad];
     PFBBundle* bundle = [PFBBundle sharedBundle];
@@ -182,9 +174,7 @@ static NSMutableArray<NSString*>* PFBKeptLanguageList(void) {
         self.view.backgroundColor = [UIColor clearColor];
         // Plain tables reserve room above their first section on iOS 15 and
         // later; the pinned segment already provides that gap.
-        if (@available(iOS 15.0, *)) {
-            self.tableView.sectionHeaderTopPadding = 0.0;
-        }
+        self.tableView.sectionHeaderTopPadding = 0.0;
     } else {
         // Full screen follows the advanced-search recipe.
         self.tableView.backgroundColor = [UIColor systemBackgroundColor];
@@ -312,19 +302,21 @@ static NSMutableArray<NSString*>* PFBKeptLanguageList(void) {
     [NSLayoutConstraint activateConstraints:@[
         [label.leadingAnchor constraintEqualToAnchor:bar.leadingAnchor
                                             constant:[self rowMargin]],
-        [label.centerYAnchor constraintEqualToAnchor:bar.centerYAnchor],
+        [label.centerYAnchor constraintEqualToAnchor:bar.topAnchor
+                                            constant:kPFBTranslateBarHeight / 2.0],
         [toggle.trailingAnchor constraintEqualToAnchor:bar.trailingAnchor
                                               constant:-[self rowMargin]],
-        [toggle.centerYAnchor constraintEqualToAnchor:bar.centerYAnchor],
+        [toggle.centerYAnchor constraintEqualToAnchor:label.centerYAnchor],
         [hairline.leadingAnchor constraintEqualToAnchor:bar.leadingAnchor],
         [hairline.trailingAnchor constraintEqualToAnchor:bar.trailingAnchor],
         [hairline.topAnchor constraintEqualToAnchor:bar.topAnchor],
         [hairline.heightAnchor constraintEqualToConstant:0.5],
         [bar.leadingAnchor constraintEqualToAnchor:tableFrame.leadingAnchor],
         [bar.trailingAnchor constraintEqualToAnchor:tableFrame.trailingAnchor],
-        [bar.heightAnchor constraintEqualToConstant:kPFBTranslateBarHeight],
-        [bar.bottomAnchor constraintEqualToAnchor:tableFrame.bottomAnchor
-                                         constant:-PFBPopoverArrowReserve],
+        // The bar runs to the bubble's edge so its material covers the arrow's
+        // reserve; its controls stay centred in the upper kPFBTranslateBarHeight.
+        [bar.heightAnchor constraintEqualToConstant:kPFBTranslateBarHeight + PFBPopoverArrowReserve],
+        [bar.bottomAnchor constraintEqualToAnchor:tableFrame.bottomAnchor],
     ]];
     self.barMaterial = PFBMaterialBehind(bar);
     self.pinnedBar = bar;
@@ -524,11 +516,6 @@ static NSMutableArray<NSString*>* PFBKeptLanguageList(void) {
 - (void)persist {
     NSUserDefaults* d = [NSUserDefaults standardUserDefaults];
     [d setObject:self.terms forKey:kPFBMutedWordsKey];
-    PFBBundle* bundle = [PFBBundle sharedBundle];
-    NSString* summary =
-        self.terms.count ? [NSString stringWithFormat:@"%lu", (unsigned long)self.terms.count]
-                         : [bundle localizedStringForKey:@"MUTED_WORDS_NONE"];
-    [d setObject:summary forKey:kPFBMutedCountKey];
     pfbRefreshMutedWords();
 }
 
@@ -842,10 +829,6 @@ static NSMutableArray<NSString*>* PFBKeptLanguageList(void) {
     if (indexPath.section == 0 && indexPath.row == 0) {
         PFBMutedAddCell* cell = [tableView dequeueReusableCellWithIdentifier:@"add"
                                                                forIndexPath:indexPath];
-        // A language name's visible top sits 16 pt below its row's edge once
-        // its cap height is taken into account; the box's border starts there
-        // so the two panels read with the same air under the segment.
-        cell.boxTop.constant = 16.0;
         cell.field.placeholder =
             [bundle localizedStringForKey:@"MUTED_WORDS_ADD_PLACEHOLDER"];
         cell.hintLabel.text = [bundle localizedStringForKey:@"MUTED_WORDS_SUBTITLE"];

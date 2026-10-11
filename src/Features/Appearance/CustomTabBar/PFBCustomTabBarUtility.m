@@ -15,8 +15,7 @@ NSString* const PFBTabPanelIDKey = @"panelID";
 static NSString* const kVisibleKey = @"pfb_tabs_visible";
 static NSString* const kRegistryKey = @"pfb_tab_registry";
 
-// Former list of hidden tabs, superseded by the visible list (a tab not in it is
-// hidden); removed whenever the selection is saved or reset.
+// Legacy list of hidden tabs; removed whenever the selection is saved or reset.
 static NSString* const kLegacyHiddenKey = @"pfb_tabs_hidden";
 
 @implementation PFBCustomTabBarUtility

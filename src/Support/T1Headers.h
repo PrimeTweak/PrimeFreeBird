@@ -1,11 +1,10 @@
-// Declarations of the app classes the tweak talks to: T1, TUI, TTM, TTA, TFC, TAV and Swift.
+// Declarations of the app classes PrimeFreeBird calls: T1, TUI, TTM, TTA, TFC, TAV and Swift.
 
 #import <CoreMedia/CoreMedia.h>
 #import <SafariServices/SafariServices.h>
 #import <UIKit/UIKit.h>
 #import <WebKit/WebKit.h>
 #import "Support/TFNHeaders.h"
-#import "Support/TFSHeaders.h"
 
 @interface T1AppDelegate : UIResponder <UIApplicationDelegate>
 @end

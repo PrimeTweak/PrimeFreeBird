@@ -6,15 +6,7 @@
 #import "Features/Appearance/ThemeColor/PFBDarkModeStyle.h"
 #import "Common/PFBSettings.h"
 #import <objc/runtime.h>
-
-@interface TAETwitterColorPaletteSettingInfo : NSObject
-@property (readonly, nonatomic) BOOL isDark;
-@end
-
-@interface TAEColorSettings : NSObject
-+ (instancetype)sharedSettings;
-- (TAETwitterColorPaletteSettingInfo*)currentColorPalette;
-@end
+#import "Support/TAEHeaders.h"
 
 @interface TFNSolidColorView : UIView
 - (void)setColor:(UIColor*)color;

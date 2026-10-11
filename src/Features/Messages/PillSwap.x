@@ -73,15 +73,11 @@
 }
 @end
 
-// The tweak's item (built once, reused across stomps) and the latest original from
+// The replacement item (built once, reused across stomps) and the latest original from
 // Twitter (strong: it left the bar, but its menu must stay alive for the replacement).
 static UIBarButtonItem*  gPFBSwapItem;
-// Horizontal nudge of the pill: negative moves it left, positive right. A visual
-// translation only, which layout never fights.
-static CGFloat           gPFBSwapShift = 0.0;
 static UIBarButtonItem*  gPFBSwapOriginal;
 static UIMenu*           gPFBSwapMenu;   // harvested from the live control; outlives it
-static NSInteger         gPFBSwapCount;
 static const char*       kPFBSwapNavKey = "pfbSwapNav";
 
 static UIViewController* pfbSwapOwningVC(UIView* view) {
@@ -149,9 +145,8 @@ static NSString* pfbSwapCheckedTitle(UIMenu* menu) {
     return nil;
 }
 
-// Native paddings, measured on the real thing: content sits at x=10 in a
-// row 20 pt wider than it, centered in 40 pt of height (stack 37.33x16 at
-// {10, 12} inside 57.33x40).
+// Native paddings: content sits at x=10 in a row 20 pt wider than it, centered in
+// 40 pt of height (stack 37.33x16 at {10, 12} inside 57.33x40).
 static void pfbSwapLayoutButton(void) {
     PFBInboxPillButton* button = (PFBInboxPillButton*)gPFBSwapItem.customView;
     UILabel* label = (UILabel*)[button viewWithTag:1];
@@ -168,7 +163,7 @@ static void pfbSwapLayoutButton(void) {
     button.pfbIntrinsic = CGSizeMake(width, height);
     [button invalidateIntrinsicContentSize];
     button.clipsToBounds = NO;
-    button.transform = CGAffineTransformMakeTranslation(gPFBSwapShift, 0);
+    button.transform = CGAffineTransformIdentity;
     [button setNeedsLayout];
     [button layoutIfNeeded];
 }
@@ -189,13 +184,12 @@ static void pfbSwapRefreshLabelFromMenu(void) {
     if (![label.text isEqualToString:checked]) {
         label.text = checked;
         pfbSwapLayoutButton();
-        PFBDebugLog(@"[swap] label -> %@ (menu)", checked);
     }
 }
 
-// After the bootstrap the stomp is intercepted at the setter, before anything
-// reaches the bar: the incoming foreign item is read (fresh menu, fresh checked
-// state) and the tweak's item goes through in its place, so nothing re-hosts.
+// After the bootstrap the stomp is intercepted at the setter, before anything reaches
+// the bar: the incoming item is read (fresh menu, fresh checked state) and the replacement
+// goes through in its place, so nothing re-hosts.
 static NSArray<UIBarButtonItem*>* pfbSwapInterceptItems(UINavigationItem* nav,
                                                         NSArray<UIBarButtonItem*>* items) {
     if (!gPFBSwapItem || items.count != 1 ||
@@ -210,7 +204,6 @@ static NSArray<UIBarButtonItem*>* pfbSwapInterceptItems(UINavigationItem* nav,
         return items;
     }
     gPFBSwapOriginal = incoming;
-    gPFBSwapCount++;
     pfbSwapRefreshLabelFromMenu();
     return @[gPFBSwapItem];
 }
@@ -228,7 +221,7 @@ static void pfbSwapApply(UIView* pillView) {
         return;
     }
 
-    // Locate the holder and the original among its trailing items. Ours is
+    // Locates the holder and the original among its trailing items. The replacement is
     // recognized by pointer; anything else in trailing position is Twitter's.
     UINavigationItem* nav = nil;
     UIBarButtonItem* original = nil;
@@ -267,7 +260,7 @@ static void pfbSwapApply(UIView* pillView) {
             hasTrailing = hasTrailing || candidateNav.trailingItemGroups.count > 0;
         }
         if (hasTrailing) {
-            // Only the tweak's item is installed - nothing to swap on this pass.
+            // Only the replacement is installed: nothing to swap on this pass.
             return;
         }
     }
@@ -295,19 +288,12 @@ static void pfbSwapApply(UIView* pillView) {
     NSString* liveTitle = realLabel.attributedText.length
         ? realLabel.attributedText.string : realLabel.text;
     if (!realLabel || !liveTitle.length) {
-        static const char* kPFBSwapWaitKey = "pfbSwapWait";
-        if (!objc_getAssociatedObject(pillView, kPFBSwapWaitKey)) {
-            objc_setAssociatedObject(pillView, kPFBSwapWaitKey, @YES,
-                                     OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-            PFBDebugLog(@"[swap] waiting for content - retrying");
-        }
         return;  // content not built yet; the next layout retries
     }
 
     // The bridge item carries no menu; the pill is (or contains) a real UIButton
     // with showsMenuAsPrimaryAction, so the menu is harvested from that control.
     UIMenu* menu = original.menu;
-    NSString* menuSource = @"item";
     if (!menu) {
         NSMutableArray<UIView*>* pool = [NSMutableArray arrayWithObject:pillView];
         for (UIView* sub in pillView.subviews) {
@@ -322,7 +308,6 @@ static void pfbSwapApply(UIView* pillView) {
                 UIMenu* found = ((UIButton*)candidate).menu;
                 if (found) {
                     menu = found;
-                    menuSource = NSStringFromClass([candidate classForCoder]);
                     break;
                 }
             }
@@ -414,7 +399,6 @@ static void pfbSwapApply(UIView* pillView) {
     // stopped before they reach the bar.
     objc_setAssociatedObject(nav, kPFBSwapNavKey, @YES,
                              OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-    gPFBSwapCount++;
     if (group) {
         NSMutableArray<UIBarButtonItem*>* swapped =
             [group.barButtonItems mutableCopy];
@@ -428,17 +412,11 @@ static void pfbSwapApply(UIView* pillView) {
                                 withObject:gPFBSwapItem];
         nav.rightBarButtonItems = swappedRight;
     }
-    PFBDebugLog(@"[swap] item placed #%ld - \"%@\", menu %lu action(s) via %@, "
-                @"container %@, screen %@",
-                (long)gPFBSwapCount, liveTitle,
-                (unsigned long)menu.children.count, menuSource,
-                group ? @"group" : @"right",
-                NSStringFromClass([vc class]));
     PFBCOMPAT_ACTION(PFBCompat_enable_liquid_glass, @"inbox pill placed");
 }
 
 // On the armed inbox navigation item, the setters replace an incoming single item
-// with the tweak's pill.
+// with the replacement pill.
 %hook UINavigationItem
 
 - (void)setRightBarButtonItems:(NSArray<UIBarButtonItem*>*)items {
@@ -457,7 +435,6 @@ static void pfbSwapApply(UIView* pillView) {
                 if (group.barButtonItems.count == 1 &&
                     group.barButtonItems.firstObject != gPFBSwapItem) {
                     gPFBSwapOriginal = group.barButtonItems.firstObject;
-                    gPFBSwapCount++;
                     group.barButtonItems = @[gPFBSwapItem];
                     pfbSwapRefreshLabelFromMenu();
                 }
@@ -472,8 +449,8 @@ static void pfbSwapApply(UIView* pillView) {
 // The inbox filter pill, a TFNUISwift class.
 %hook _TtC10TFNUISwift34NavigationBarMenuBarButtonItemView
 
-// The original's view appearing is the stomp signal: SwiftUI has put its item
-// back, so the tweak's goes back in, about 1 ms after the view lands.
+// The original's view appearing is the stomp signal: SwiftUI has put its item back,
+// so the replacement goes back in, about 1 ms after the view lands.
 - (void)didMoveToWindow {
     %orig;
     if (((UIView*)self).window) {

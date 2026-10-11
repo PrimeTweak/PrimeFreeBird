@@ -3,7 +3,7 @@
 // the account feature gates.
 
 #import "Support/HookHelpers.h"
-#import "Sideload/PFBWebLoginProbeViewController.h"
+#import "Sideload/PFBWebLoginViewController.h"
 #import "Debug/PFBDebugger.h"
 
 // While set, -isSubscribedTo: (below) reports the account's genuine
@@ -551,8 +551,6 @@ static NSNumber* FeatureSwitchOverrideValueForKey(NSString* key) {
         [key isEqualToString:
                  @"subscriptions_gifting_premium_intro_copy_enabled"] ||
         [key isEqualToString:
-                 @"subscriptions_ios_download_to_offline_upsell_enabled"] ||
-        [key isEqualToString:
                  @"ios_notifications_blue_verified_introductory_offer_visible"] ||
         [key isEqualToString:@"ios_notifications_blue_verified_introductory_"
                              @"offer_prefix_visible"] ||
@@ -765,7 +763,7 @@ static NSNumber* FeatureSwitchOverrideValueForKey(NSString* key) {
 
 - (void)private_startLoginFlowWithSender:(id)sender {
     PFBDebugLog(@"[login-entry] startLoginFlow -> web login presented");
-    [PFBWebLoginProbeViewController presentFrom:(UIViewController*)self];
+    [PFBWebLoginViewController presentFrom:(UIViewController*)self];
 }
 
 %end
@@ -778,7 +776,7 @@ static NSNumber* FeatureSwitchOverrideValueForKey(NSString* key) {
         return;
     }
     PFBDebugLog(@"[login-entry] makeOnboardingViewController -> web login as root");
-    completion([PFBWebLoginProbeViewController rootNavigationController]);
+    completion([PFBWebLoginViewController rootNavigationController]);
 }
 
 %end

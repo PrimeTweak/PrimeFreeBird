@@ -5,9 +5,6 @@
 
 "PFB_SETTINGS_DETAIL" = "عدّل تويتر: أخفِ الإعلانات، فعّل ميزات Blue، والمزيد.";
 
-/*Alerts and popups*/
-
-
 /*Settings*/
 "MODERN_SETTINGS_LAYOUT_TITLE" = "عام";
 "MODERN_SETTINGS_LAYOUT_SUBTITLE" = "اقفل التطبيق، وأبقِ شريط التنقل ظاهرًا، والمزيد.";
@@ -210,8 +207,6 @@
 "FLEX_TWITTER_TITLE" = "وضع تصحيح FLEX";
 "FLEX_TWITTER_DETAIL" = "استخدم FLEX لتصحيح تويتر.";
 
-/*Developers*/
-
 /*Custom fonts*/
 "CUSTOM_FONTS_NAVIGATION_BUTTON_TITLE" = "خطوط مخصصة";
 "CUSTOM_FONTS_MENU_TITLE" = "\nاختيار خط";
@@ -222,8 +217,6 @@
 "FETCHING_PROGRESS_TITLE" = "لحظة فقط...";
 "DOWNLOAD_AS_GIF_OPTION_TITLE" = "التحميل بصيغة GIF";
 "DOWNLOAD_AS_MP4_OPTION_TITLE" = "التحميل بصيغة MP4";
-
-/*App icon*/
 
 /*Copy profile info*/
 "COPY_PROFILE_INFO_MENU_OPTION_1" = "نسخ النبذة";
@@ -254,8 +247,6 @@
 
 "RESTORE_TWITTER_NAMES_TITLE" = "استعادة مصطلحات تويتر";
 "RESTORE_TWITTER_NAMES_DETAIL" = "يستبدل 'X' بـ 'تويتر'، و'Post' بـ 'تغريدة'، و'Repost' بـ 'إعادة تغريد' وهكذا في جميع أنحاء واجهة التطبيق.";
-
-/*Deprecated*/
 
 /*App lock*/
 "PADLOCK_LOCKED_LABEL" = "Locked";

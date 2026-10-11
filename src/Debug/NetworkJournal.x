@@ -1,10 +1,9 @@
-// Measurement only, while recording: journals failed API responses, every account
-// request and the media uploads, by wrapping each new session's delegate in a
-// forwarding proxy and each account request's completion handler. Prefix [resp].
+// Network journal, while recording: failed API responses, account requests and media
+// uploads, read through a forwarding proxy on each new session's delegate and on each
+// account request's completion handler. Prefix [resp].
 
 #import <Foundation/Foundation.h>
 #import <objc/runtime.h>
-#import <objc/message.h>
 #import "Debug/PFBDebugger.h"
 
 static BOOL pfbRespIsTwitterAPI(NSString* url) {
@@ -18,7 +17,7 @@ static BOOL pfbRespIsTwitterAPI(NSString* url) {
            [url containsString:@"twitter.com/i/api"] || [url containsString:@"x.com/i/api"];
 }
 
-// The hosts that take media uploads, which the session bridge leaves untouched.
+// The hosts that take media uploads.
 static BOOL pfbRespIsMediaHost(NSString* host) {
     for (NSString* name in @[ @"upload", @"ton", @"caps" ]) {
         for (NSString* root in @[ @"twitter.com", @"x.com" ]) {

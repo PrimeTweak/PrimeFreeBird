@@ -5,9 +5,6 @@
 
 "PFB_SETTINGS_DETAIL" = "Passe dein Twitter-Erlebnis an. Verstecke Werbung, aktiviere Blue-Funktionen und mehr.";
 
-/*Alerts and popups*/
-
-
 /*Settings*/
 "MODERN_SETTINGS_LAYOUT_TITLE" = "Allgemein";
 "MODERN_SETTINGS_LAYOUT_SUBTITLE" = "Sperre die App, halte die Navigationsleiste sichtbar und mehr.";
@@ -210,8 +207,6 @@
 "FLEX_TWITTER_TITLE" = "FLEX-Debug-Modus";
 "FLEX_TWITTER_DETAIL" = "FLEX verwenden, um Twitter zu debuggen.";
 
-/*Developers*/
-
 /*Custom fonts*/
 "CUSTOM_FONTS_NAVIGATION_BUTTON_TITLE" = "Benutzerdefinierte Schriftarten";
 "CUSTOM_FONTS_MENU_TITLE" = "\nSchriftart auswählen";
@@ -222,8 +217,6 @@
 "FETCHING_PROGRESS_TITLE" = "Einen Moment...";
 "DOWNLOAD_AS_GIF_OPTION_TITLE" = "Als GIF herunterladen";
 "DOWNLOAD_AS_MP4_OPTION_TITLE" = "Als MP4 herunterladen";
-
-/*App icon*/
 
 /*Copy profile info*/
 "COPY_PROFILE_INFO_MENU_OPTION_1" = "Bio kopieren";
@@ -254,8 +247,6 @@
 
 "RESTORE_TWITTER_NAMES_TITLE" = "Twitter-Terminologie wiederherstellen";
 "RESTORE_TWITTER_NAMES_DETAIL" = "Ersetzt „X“ durch „Twitter“, „Post“ durch „Tweet“, „Repost“ durch „Retweet“ und so weiter in der gesamten App-Oberfläche.";
-
-/*Deprecated*/
 
 /*App lock*/
 "PADLOCK_LOCKED_LABEL" = "Locked";

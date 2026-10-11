@@ -59,9 +59,9 @@ static NSString* const ReplyFocusScript =
     @"try{window.webkit.messageHandlers.pfbReady.postMessage(1);}catch(e){}"
     @"return;}"
     @"if(n++<40){setTimeout(go,150);}}go();})();";
-// Injected on the reply page: a real TAP outside the compose box or toolbar blurs the
-// field (dismisses the keyboard). The tweak tracks finger movement so a scroll/drag does NOT
-// dismiss — otherwise starting a scroll would close the keyboard and make things jump.
+// Injected on the reply page: a real tap outside the compose box or toolbar blurs the
+// field. Finger movement is tracked so a scroll or drag does not dismiss the keyboard
+// and make the page jump.
 static NSString* const ReplyTapDismissScript =
     @"(function(){if(window.__pfbTapBlur)return;window.__pfbTapBlur=1;"
     @"var sx=0,sy=0,mv=false;"
@@ -149,7 +149,7 @@ static NSString* const ReplyBarPinScript =
 static BOOL gPFBDidRequestFocus = NO;
 // Last keyboard overlap seen, to drop duplicate keyboard notifications.
 static CGFloat gPFBLastKbOverlap = 0;
-// Extract each toolbar button's SVG + color + its index, post to native, then
+// Extract each toolbar button's SVG and its index, post to native, then
 // hide x.com's own toolbar (display:none — no layout space, so the composer stays
 // compact; a dispatched click still fires x.com's React handlers even hidden).
 static NSString* const ReplyIconExtractScript =
@@ -158,8 +158,7 @@ static NSString* const ReplyIconExtractScript =
     @"if(!tb){if(tries++<15){setTimeout(go,300);}return;}"
     @"var bs=tb.querySelectorAll('button,[role=\"button\"]');var out=[];"
     @"for(var i=0;i<bs.length;i++){var s=bs[i].querySelector('svg');if(!s)continue;"
-    @"var col='rgb(29,155,240)';try{col=getComputedStyle(s).color||col;}catch(e){}"
-    @"out.push({h:s.outerHTML,c:col,oi:i});}"
+    @"out.push({h:s.outerHTML,oi:i});}"
     @"if(!out.length){if(tries++<15){setTimeout(go,300);}return;}"
     @"try{window.webkit.messageHandlers.pfbIcons.postMessage(JSON.stringify(out));}catch(e){}"
     @"tb.style.setProperty('display','none','important');}go();})();";
@@ -196,9 +195,7 @@ static void PFBBuildIconBar(NSArray<NSDictionary*>* icons, WKWebView* replyWebVi
     bar.backgroundColor = [UIColor systemBackgroundColor];
     bar.scrollView.backgroundColor = [UIColor clearColor];
     bar.scrollView.scrollEnabled = NO;
-    if (@available(iOS 11.0, *)) {
-        bar.scrollView.contentInsetAdjustmentBehavior = UIScrollViewContentInsetAdjustmentNever;
-    }
+    bar.scrollView.contentInsetAdjustmentBehavior = UIScrollViewContentInsetAdjustmentNever;
     [bar loadHTMLString:html baseURL:nil];
 
     gPFBRelayWebView = replyWebView;
@@ -285,9 +282,7 @@ static void showPostSentAlert(NSString* statusID) {
     self.webView.scrollView.backgroundColor = [UIColor systemBackgroundColor];
     self.webView.scrollView.contentInsetAdjustmentBehavior =
         UIScrollViewContentInsetAdjustmentNever;
-    self.webView.customUserAgent =
-        @"Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like "
-        @"Gecko) Version/17.0 Mobile/15E148 Safari/604.1";
+    self.webView.customUserAgent = PFBMobileSafariUserAgent;
     [self.view addSubview:self.webView];
 
     // FULL-HEIGHT web view, never resized: keyboard geometry goes through contentInset (see
@@ -438,9 +433,8 @@ static void showPostSentAlert(NSString* statusID) {
     }
     BOOL kbUp = (overlap > 60);
     if (kbUp) {
-        // Arms the window that drops WebKit's bounds.origin reveal animation on the tweak's scroller.
+        // Arms the window that drops WebKit's bounds.origin reveal animation on the reply scroller.
         gPFBSquelchUntil = CACurrentMediaTime() + 0.60;
-        gPFBAnimsKilled = 0;
     } else {
         gPFBSquelchUntil = 0;  // keyboard down (Show more): never drop anything
     }

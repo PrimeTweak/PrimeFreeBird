@@ -3,7 +3,6 @@
 // drawn here at the settings gear's stroke, since no library glyph matches it.
 
 #import "Support/HookHelpers.h"
-#import "Debug/PFBDebugger.h"
 #import "Features/Search/PFBAdvancedSearchViewController.h"
 #import <objc/runtime.h>
 #import <objc/message.h>
@@ -23,13 +22,11 @@ static const CGFloat kPFBSliderGeometry[2][2] = {{8.0, 14.0}, {16.0, 10.0}};
 // creation and the first pass of the gray sweep next door.
 static UIImage* PFBSlidersGlyph(CGFloat side, UIColor* colour) {
     const CGFloat kUnit = 24.0;
-    // Matched to the settings gear by pixel count on screen, not by nominal weight:
-    // the gear's glyph stands taller, so an equal stroke reads heavier here. Trimmed
-    // to 1.75 on the 24-unit grid rather than 2.0.
+    // Stroke on the 24-unit grid, lighter than the gear's nominal weight: the gear's glyph
+    // stands taller, so an equal stroke would read heavier here.
     const CGFloat kThickness = 1.75;
-    // Rendered and compared at actual size: at 2.2 the ring closes up into a
-    // dot and the rail beyond it shrinks to a stub. At 2.8 the opening reads,
-    // and the rail meets the ring rather than stopping short of it.
+    // Large enough for the ring's opening to read at actual size, with the rail meeting
+    // the ring; a smaller radius closes the ring into a dot.
     const CGFloat kHandleRadius = 2.8;
     const CGFloat kInset = 3.0;
     CGFloat scale = side / kUnit;
@@ -45,9 +42,7 @@ static UIImage* PFBSlidersGlyph(CGFloat side, UIColor* colour) {
             CGContextRef ctx = context.CGContext;
             [(colour ?: [UIColor blackColor]) setStroke];
             CGContextSetLineWidth(ctx, kThickness * scale);
-            // Round caps and joins: the app's own glyphs are drawn this way, and
-            // a square-ended rectangle cannot imitate it — that difference, not
-            // the stroke width, is what set this icon apart from the gear.
+            // Round caps and joins, as the app's own glyphs are drawn.
             CGContextSetLineCap(ctx, kCGLineCapRound);
             CGContextSetLineJoin(ctx, kCGLineJoinRound);
             // The handle's outer edge, half a stroke beyond its radius.
@@ -85,6 +80,15 @@ static UIColor* PFBBarIconGrey(UITraitCollection* traits) {
 // tray, drawn with the same glyph as this form's on Explore, so the native item is
 // replaced. It is told apart by the vector it shows, or by its accessibility label.
 
+// Presents the Advanced Search form as a page sheet over the given controller.
+static void pfbAdvPresentForm(UIViewController* owner) {
+    PFBAdvancedSearchViewController* form = [[PFBAdvancedSearchViewController alloc] init];
+    UINavigationController* nav =
+        [[UINavigationController alloc] initWithRootViewController:form];
+    nav.modalPresentationStyle = UIModalPresentationPageSheet;
+    [owner presentViewController:nav animated:YES completion:nil];
+}
+
 @interface PFBAdvSearchLauncher : NSObject
 @property (nonatomic, weak) UIViewController* owner;
 - (void)launch:(id)sender;
@@ -96,11 +100,7 @@ static UIColor* PFBBarIconGrey(UITraitCollection* traits) {
     if (!owner || owner.presentedViewController) {
         return;
     }
-    PFBAdvancedSearchViewController* form = [[PFBAdvancedSearchViewController alloc] init];
-    UINavigationController* nav =
-        [[UINavigationController alloc] initWithRootViewController:form];
-    nav.modalPresentationStyle = UIModalPresentationPageSheet;
-    [owner presentViewController:nav animated:YES completion:nil];
+    pfbAdvPresentForm(owner);
 }
 @end
 
@@ -175,9 +175,9 @@ static double pfbAdvMaskAgreement(UIImage* image) {
     return inked ? (double)agree / (double)inked : 0;
 }
 
-// The first image an item shows, wherever it keeps it: on the item itself, or
-// inside a custom view - the search screen's items are TFNBarButtonItemButton
-// views with a plain UIImageView inside, measured, and carry no name or label.
+// The first image an item shows: on the item itself, or inside a custom view (the
+// search screen's items are TFNBarButtonItemButton views with a plain UIImageView
+// inside, carrying no name or label).
 static UIImage* pfbAdvItemImage(UIBarButtonItem* item) {
     if (item.image) {
         return item.image;
@@ -214,9 +214,8 @@ static BOOL pfbAdvIsFiltersItem(UIBarButtonItem* item) {
     return pfbAdvMaskAgreement(image) >= 0.85;
 }
 
-// The color the bar's other items are drawn in: on the results screen the
-// share glyph is the label color, measured at (15,20,25), while Explore's
-// gear is gray. The neighbour decides, and the Explore gray is the fallback.
+// The color the bar's other items are drawn in: the label color on the results screen,
+// gray on Explore. The neighbor decides, and the Explore gray is the fallback.
 static UIColor* pfbAdvNeighbourTint(UINavigationItem* item, UIViewController* owner) {
     NSMutableArray<UIBarButtonItem*>* candidates = [NSMutableArray array];
     [candidates addObjectsFromArray:item.rightBarButtonItems ?: @[]];
@@ -324,13 +323,11 @@ static void pfbAdvReplaceFiltersInItem(UINavigationItem* item,
                 if (groupSearching && (match || pfbAdvIsOurs(entry))) {
                     [members removeObjectAtIndex:i];
                     changed = YES;
-                    replaced++;
                     continue;
                 }
                 if (match) {
                     members[i] = pfbAdvReplacementFor(owner);
                     changed = YES;
-                    replaced++;
                 }
             }
             if (changed) {
@@ -508,9 +505,8 @@ static void pfbAdvCollapseNativeInSearchBar(UIView* bar) {
 
 %end
 
-// A group already on the bar can have its items swapped without any setter
-// on the navigation item firing - measured: after a restart the sliders sat
-// in place with no scan triggered until the next appearance.
+// A group already on the bar can have its items swapped without any setter on the
+// navigation item firing, so the swap is caught on the group itself.
 %hook UIBarButtonItemGroup
 
 - (void)setBarButtonItems:(NSArray<UIBarButtonItem*>*)items {
@@ -533,9 +529,8 @@ static void pfbAdvCollapseNativeInSearchBar(UIView* bar) {
     %orig;
     if (pfbAdvIsSearchScreen(self)) {
         pfbAdvReplaceFilters(self);
-        // The results, and the item that comes with them, land after the
-        // screen has appeared. A few later looks cost nothing when the item is
-        // already the tweak's.
+        // The results, and the item that comes with them, land after the screen has appeared;
+        // a few later looks cost nothing once the item is already replaced.
         __weak UIViewController* weakSelf = self;
         for (NSNumber* delay in @[ @0.4, @1.2, @3.0 ]) {
             dispatch_after(dispatch_time(DISPATCH_TIME_NOW,
@@ -556,13 +551,7 @@ static void pfbAdvCollapseNativeInSearchBar(UIView* bar) {
 
 %new
 - (void)pfbShowAdvancedSearch {
-    PFBAdvancedSearchViewController* form = [[PFBAdvancedSearchViewController alloc] init];
-    UINavigationController* nav =
-        [[UINavigationController alloc] initWithRootViewController:form];
-    nav.modalPresentationStyle = UIModalPresentationPageSheet;
-    [(UIViewController*)self presentViewController:nav
-                                          animated:YES
-                                        completion:nil];
+    pfbAdvPresentForm((UIViewController*)self);
 }
 
 - (void)viewWillAppear:(BOOL)animated {
@@ -577,8 +566,8 @@ static void pfbAdvCollapseNativeInSearchBar(UIView* bar) {
         }
         if (!enabled) {
             PFBCOMPAT_OBSERVE(PFBCompat_advanced_search, @"Explore opened");
-            // Toggle is off: remove the tweak's button if a previous appearance
-            // added it, so the setting applies live on the next visit.
+            // Toggle off: the Filters button a previous appearance added is removed, so the
+            // setting applies live on the next visit.
             if (existingBtn) {
                 NSMutableArray* items =
                     [item.rightBarButtonItems mutableCopy] ?: [NSMutableArray array];

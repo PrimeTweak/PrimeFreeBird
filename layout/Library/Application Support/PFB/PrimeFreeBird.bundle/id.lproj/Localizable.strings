@@ -5,9 +5,6 @@
 
 "PFB_SETTINGS_DETAIL" = "Atur Twitter kamu: sembunyikan iklan, aktifkan fitur Blue, dan lainnya.";
 
-/*Alerts and popups*/
-
-
 /*Settings*/
 "MODERN_SETTINGS_LAYOUT_TITLE" = "Umum";
 "MODERN_SETTINGS_LAYOUT_SUBTITLE" = "Kunci aplikasi, jaga bilah navigasi tetap terlihat, dan banyak lagi.";
@@ -210,8 +207,6 @@
 "FLEX_TWITTER_TITLE" = "Mode debug FLEX";
 "FLEX_TWITTER_DETAIL" = "Gunakan FLEX untuk debug Twitter.";
 
-/*Developers*/
-
 /*Custom fonts*/
 "CUSTOM_FONTS_NAVIGATION_BUTTON_TITLE" = "Font khusus";
 "CUSTOM_FONTS_MENU_TITLE" = "\nPilih font";
@@ -222,8 +217,6 @@
 "FETCHING_PROGRESS_TITLE" = "Tunggu sebentar...";
 "DOWNLOAD_AS_GIF_OPTION_TITLE" = "Unduh sebagai GIF";
 "DOWNLOAD_AS_MP4_OPTION_TITLE" = "Unduh sebagai MP4";
-
-/*App icon*/
 
 /*Copy profile info*/
 "COPY_PROFILE_INFO_MENU_OPTION_1" = "Salin bio";
@@ -254,8 +247,6 @@
 
 "RESTORE_TWITTER_NAMES_TITLE" = "Pulihkan terminologi Twitter";
 "RESTORE_TWITTER_NAMES_DETAIL" = "Ganti 'X' dengan 'Twitter', 'Post' dengan 'Tweet', 'Repost' dengan 'Retweet', dan seterusnya di seluruh antarmuka aplikasi.";
-
-/*Deprecated*/
 
 /*App lock*/
 "PADLOCK_LOCKED_LABEL" = "Locked";

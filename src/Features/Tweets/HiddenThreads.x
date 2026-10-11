@@ -2,7 +2,6 @@
 // entry added to the Tweet's menu.
 
 #import "Support/HookHelpers.h"
-#import <string.h>
 #import "Support/TwitterChirpFont.h"
 
 static NSString* const kPFBHiddenThreadsKey = @"pfb_hidden_threads";
@@ -192,7 +191,7 @@ static id PFBStatusFromModel(id model) {
     if (PFBRespondsToStatusValue(model)) {
         return model;
     }
-    for (NSString* key in @[ @"status", @"tweet", @"canonicalStatus", @"statusModel" ]) {
+    for (NSString* key in @[ @"status", @"tweet", @"canonicalStatus" ]) {
         @try {
             id candidate = [model valueForKey:key];
             if (PFBRespondsToStatusValue(candidate)) {

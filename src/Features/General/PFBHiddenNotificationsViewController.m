@@ -59,7 +59,9 @@ extern double PFBNotifDaysLeft(NSDictionary* entry);
     // The pinned bar sits over the table, so its height and the arrow's reserve are
     // added to the rows'. With nothing hidden the bar is gone and the message row,
     // which carries its own air, sets the size alone.
-    CGFloat height = self.tableView.contentSize.height;
+    // The bubble adds its own top inset to the table, which the rows' height omits.
+    CGFloat systemTop = MAX(self.tableView.adjustedContentInset.top - self.tableView.contentInset.top, 0.0);
+    CGFloat height = self.tableView.contentSize.height + systemTop;
     if (self.rows.count) {
         height = MAX(MIN(height + kPFBNotifBarHeight, 330), 90) + PFBPopoverArrowReserve;
     }
@@ -71,11 +73,6 @@ extern double PFBNotifDaysLeft(NSDictionary* entry);
     [self.tableView bringSubviewToFront:self.pinnedBar];
     [self updateBarMaterial];
     [self updatePreferredSize];
-}
-
-- (void)viewDidAppear:(BOOL)animated {
-    [super viewDidAppear:animated];
-    PFBPopoverLogOverflow(self.view);
 }
 
 // The bar's material fades in as rows pass under it, the way system bars do.
@@ -216,9 +213,10 @@ static const CGFloat kPFBNotifBarHeight = 57.0;
     [NSLayoutConstraint activateConstraints:@[
         [bar.leadingAnchor constraintEqualToAnchor:frame.leadingAnchor],
         [bar.trailingAnchor constraintEqualToAnchor:frame.trailingAnchor],
-        [bar.heightAnchor constraintEqualToConstant:kPFBNotifBarHeight],
-        [bar.bottomAnchor constraintEqualToAnchor:frame.bottomAnchor
-                                         constant:-PFBPopoverArrowReserve],
+        // The bar runs to the bubble's edge so its material covers the arrow's
+        // reserve; its controls stay centred in the upper kPFBNotifBarHeight.
+        [bar.heightAnchor constraintEqualToConstant:kPFBNotifBarHeight + PFBPopoverArrowReserve],
+        [bar.bottomAnchor constraintEqualToAnchor:frame.bottomAnchor],
 
         [hairline.leadingAnchor constraintEqualToAnchor:bar.leadingAnchor],
         [hairline.trailingAnchor constraintEqualToAnchor:bar.trailingAnchor],
@@ -230,7 +228,8 @@ static const CGFloat kPFBNotifBarHeight = 57.0;
         [clear.trailingAnchor constraintEqualToAnchor:bar.trailingAnchor constant:-14],
         [clear.leadingAnchor constraintGreaterThanOrEqualToAnchor:count.trailingAnchor
                                                          constant:12],
-        [clear.centerYAnchor constraintEqualToAnchor:bar.centerYAnchor],
+        [clear.centerYAnchor constraintEqualToAnchor:bar.topAnchor
+                                            constant:kPFBNotifBarHeight / 2.0],
         [clear.heightAnchor constraintEqualToConstant:34],
         [clear.widthAnchor constraintGreaterThanOrEqualToConstant:96],
     ]];

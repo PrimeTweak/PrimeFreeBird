@@ -1,13 +1,6 @@
 #import "Common/PFBCompatibility.h"
-#import "Settings/PFBModernSettingsCells.h"
-#import <QuartzCore/QuartzCore.h>
 #import "Support/PFBManager.h"
 #import "Common/PFBSettings.h"
-#import "Support/TWHeaders.h"
-#import "Features/Appearance/ThemeColor/PFBPalette.h"
-#import "Features/Appearance/ThemeColor/PFBDarkModeStyle.h"
-#import "Support/TwitterChirpFont.h"
-#import "Debug/PFBDebugger.h"
 #import "Settings/PFBTintedSwitch.h"
 
 @implementation PFBTintedSwitch

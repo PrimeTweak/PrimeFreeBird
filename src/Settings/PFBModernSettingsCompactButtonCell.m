@@ -1,13 +1,6 @@
-#import "Common/PFBCompatibility.h"
-#import "Settings/PFBModernSettingsCells.h"
-#import <QuartzCore/QuartzCore.h>
 #import "Support/PFBManager.h"
-#import "Common/PFBSettings.h"
-#import "Support/TWHeaders.h"
 #import "Features/Appearance/ThemeColor/PFBPalette.h"
-#import "Features/Appearance/ThemeColor/PFBDarkModeStyle.h"
 #import "Support/TwitterChirpFont.h"
-#import "Debug/PFBDebugger.h"
 #import "Settings/PFBSettingsCellStyle.h"
 #import "Settings/PFBModernSettingsCompactButtonCell.h"
 
@@ -138,10 +131,6 @@ UIColor* PFBSettingsSubtitleColor(void) {
     [self.subtitleLabel setContentCompressionResistancePriority:described ? UILayoutPriorityDefaultHigh + 1
                                                                           : UILayoutPriorityDefaultLow
                                                         forAxis:UILayoutConstraintAxisHorizontal];
-}
- 
-- (void)configureWithTitle:(NSString*)title subtitle:(NSString*)subtitle {
-    [self configureWithTitle:title subtitle:subtitle detail:nil];
 }
  
 - (void)updateChevronColor {

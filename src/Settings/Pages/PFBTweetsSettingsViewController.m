@@ -5,7 +5,6 @@
 #import "Common/PFBBundle.h"
 #import "Common/PFBSettings.h"
 #import "Support/HookHelpers.h"
-#import "Support/TWHeaders.h"
 #import "Settings/PFBModernSettingsCells.h"
 
 @implementation PFBTweetsSettingsViewController

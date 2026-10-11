@@ -3,6 +3,7 @@
 
 #import "Features/Search/PFBAdvancedSearchViewController.h"
 #import "Common/PFBBundle.h"
+#import "Support/HookHelpers.h"
 #import "Support/TwitterChirpFont.h"
 #import <math.h>
 #import <objc/message.h>
@@ -53,9 +54,6 @@ static UIImage* pfbBakedTitleImage(NSString* title, UIFont* font) {
         }];
     return [drawn imageWithRenderingMode:UIImageRenderingModeAlwaysOriginal];
 }
-
-extern void PFBThemeScreenEnter(UIViewController* screen);
-extern void PFBThemeScreenLeave(UIViewController* screen);
 
 @implementation PFBAdvancedSearchViewController
 
@@ -183,8 +181,7 @@ extern void PFBThemeScreenLeave(UIViewController* screen);
     };
     self.navigationController.navigationBar.titleTextAttributes = chirpTitle;
 
-    // Outline pill, pale gray border and pale gray text — the fork's
-    // "Reset to default" style, per request.
+    // Outline pill with pale gray border and text, the "Reset to default" style.
     UIView* footer = [[UIView alloc] initWithFrame:CGRectMake(0, 0, 0, 78.0)];
     UIButton* clear = [UIButton buttonWithType:UIButtonTypeSystem];
     [clear setTitle:[bundle localizedStringForKey:@"ADVSEARCH_CLEAR"]

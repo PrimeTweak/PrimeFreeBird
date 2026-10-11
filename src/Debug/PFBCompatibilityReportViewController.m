@@ -2,9 +2,7 @@
 // app's palette. Row marks tell a verdict or, under Check, what the row reports.
 #import "Common/PFBCompatibility.h"
 #import "Debug/PFBDebugger.h"
-#import "Support/PFBManager.h"
 #import "Support/TwitterChirpFont.h"
-#import "Support/TWHeaders.h"
 #import "Support/HookHelpers.h"
 #import "Settings/PFBModernSettingsPageViewController.h"
 #import "Features/Appearance/ThemeColor/PFBPalette.h"

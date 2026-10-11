@@ -118,12 +118,8 @@ static void PFBAskForCountry(NSString* handle) {
                                      : 0;
               NSString* country = status == 200 ? PFBCountryFromAnswer(data) : nil;
               dispatch_async(dispatch_get_main_queue(), ^{
-                static BOOL answered, refused;
-                if (status == 200 && !answered) {
-                    answered = YES;
-                    PFBDebugLog(@"[location] about-account answered: @%@ -> %@", handle,
-                                country ?: @"no country");
-                } else if (status != 200 && !refused) {
+                static BOOL refused;
+                if (status != 200 && !refused) {
                     refused = YES;
                     PFBDebugLog(@"[location] about-account http=%ld%@ for @%@", (long)status,
                                 error ? [@" " stringByAppendingString:error.localizedDescription] : @"",

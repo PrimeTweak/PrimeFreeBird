@@ -2,8 +2,6 @@
 // after a tweet.
 
 #import "Support/HookHelpers.h"
-#import "Common/PFBCompatibility.h"
-#import <objc/message.h>
 
 // Asks before an action, with a title that names it and a button that does it.
 static void ShowConfirmation(NSString* titleKey, NSString* actionKey, void (^confirmed)(void)) {

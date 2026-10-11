@@ -55,6 +55,11 @@ static void PFBPlayRefreshSound(NSString* file) {
 // means the new posts are in. The pop answers only the refreshes a pull started.
 static char kPFBManualRefreshKey;
 
+// The control's loading state, read by name.
+@protocol PFBRefreshControlLoading
+@property (nonatomic, readonly) BOOL loading;
+@end
+
 %hook TFNPullToRefreshControl
 - (void)_setStatus:(unsigned long long)status fromScrolling:(BOOL)fromScrolling {
     id control = (id)self;

@@ -5,9 +5,6 @@
 
 "PFB_SETTINGS_DETAIL" = "自訂您的 Twitter：隱藏廣告、啟用 Blue 功能，還有更多自訂選項。";
 
-/*Alerts and popups*/
-
-
 /*Settings*/
 "MODERN_SETTINGS_LAYOUT_TITLE" = "一般";
 "MODERN_SETTINGS_LAYOUT_SUBTITLE" = "鎖定應用程式、保持導覽列顯示等。";
@@ -210,8 +207,6 @@
 "FLEX_TWITTER_TITLE" = "啟用 FLEX 除錯模式";
 "FLEX_TWITTER_DETAIL" = "使用 FLEX 工具對 Twitter 進行除錯。";
 
-/*Developers*/
-
 /*Custom fonts*/
 "CUSTOM_FONTS_NAVIGATION_BUTTON_TITLE" = "自訂字體";
 "CUSTOM_FONTS_MENU_TITLE" = "\n選擇字體";
@@ -222,8 +217,6 @@
 "FETCHING_PROGRESS_TITLE" = "請稍候...";
 "DOWNLOAD_AS_GIF_OPTION_TITLE" = "下載為 GIF";
 "DOWNLOAD_AS_MP4_OPTION_TITLE" = "下載為 MP4";
-
-/*App icon*/
 
 /*Copy profile info*/
 "COPY_PROFILE_INFO_MENU_OPTION_1" = "複製簡介";
@@ -254,8 +247,6 @@
 
 "RESTORE_TWITTER_NAMES_TITLE" = "還原 Twitter 用語";
 "RESTORE_TWITTER_NAMES_DETAIL" = "在整個應用程式介面中，將「X」替換為「Twitter」、「Post」替換為「Tweet」、「Repost」替換為「Retweet」等等。";
-
-/*Deprecated*/
 
 /*App lock*/
 "PADLOCK_LOCKED_LABEL" = "Locked";

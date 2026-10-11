@@ -1,7 +1,6 @@
 // Shared helpers for the hook files.
 
 #import "Support/HookHelpers.h"
-#import "Debug/PFBDebugger.h"
 
 void PFBEnumerateSubviewsRecursively(UIView* view,
                                   void (^block)(UIView* currentView)) {
@@ -39,12 +38,12 @@ id PFBUnwrapDataViewItem(id item) {
     return item;
 }
 
-BOOL PFBIsModuleHeaderItem(id item) {
+static BOOL PFBIsModuleHeaderItem(id item) {
     return [NSStringFromClass([PFBUnwrapDataViewItem(item) classForCoder])
         isEqualToString:@"TwitterURT.URTModuleHeaderViewModel"];
 }
 
-BOOL PFBIsModuleFooterItem(id item) {
+static BOOL PFBIsModuleFooterItem(id item) {
     return [NSStringFromClass([PFBUnwrapDataViewItem(item) classForCoder])
         isEqualToString:@"TwitterURT.URTModuleFooterViewModel"];
 }
@@ -114,7 +113,7 @@ UIColor* PFBCurrentAccentColor(void) {
     id palette = [current colorPalette];
     NSUserDefaults* defs = [NSUserDefaults standardUserDefaults];
 
-    // The tweak's stored pick wins over Twitter's own color option.
+    // The stored PrimeFreeBird pick wins over Twitter's own color option.
     if ([defs objectForKey:@"pfb_color_theme_selectedColor"]) {
         NSInteger opt = [defs integerForKey:@"pfb_color_theme_selectedColor"];
         return [palette primaryColorForOption:opt] ?: [UIColor systemBlueColor];
@@ -131,40 +130,9 @@ UIColor* PFBCurrentAccentColor(void) {
 
 const CGFloat PFBPopoverArrowReserve = 13.0;
 
-// Read from the clipping ancestor once the popover is open, so an iOS update that
-// changes the arrow shows in the log as a gap between the two values.
-void PFBPopoverLogOverflow(UIView* content) {
-    if (!PFBDebugIsRecording() || !content.window) {
-        return;
-    }
-    CGFloat past = 0.0;
-    NSString* clipper = @"none";
-    UIView* node = content.superview;
-    for (NSInteger depth = 0; node && node != content.window && depth < 10; depth++) {
-        CGRect clip = CGRectNull;
-        CALayer* mask = node.layer.mask;
-        if (mask) {
-            clip = mask.frame;
-            if ([mask isKindOfClass:[CAShapeLayer class]] && ((CAShapeLayer*)mask).path) {
-                CGRect shape = CGPathGetBoundingBox(((CAShapeLayer*)mask).path);
-                clip = CGRectOffset(shape, mask.frame.origin.x, mask.frame.origin.y);
-            }
-        } else if (node.clipsToBounds) {
-            clip = node.bounds;
-        }
-        if (!CGRectIsNull(clip)) {
-            CGRect mine = [content convertRect:content.bounds toView:node];
-            CGFloat overflow = CGRectGetMaxY(mine) - CGRectGetMaxY(clip);
-            if (overflow > past) {
-                past = overflow;
-                clipper = NSStringFromClass([node class]);
-            }
-        }
-        node = node.superview;
-    }
-    PFBDebugLog(@"[popover] %.1f pt under the bubble edge, %.1f reserved (clip: %@)",
-                past, PFBPopoverArrowReserve, clipper);
-}
+NSString* const PFBMobileSafariUserAgent =
+    @"Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like "
+    @"Gecko) Version/17.0 Mobile/15E148 Safari/604.1";
 
 // The material iOS gives its bars. Liquid Glass exists from iOS 26 and is
 // resolved by name because the build SDK predates it; older systems fall back

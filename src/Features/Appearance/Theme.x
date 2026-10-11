@@ -11,6 +11,9 @@
 
 #import "Features/Appearance/ThemeColor/PFBDarkModeStyle.h"
 
+// Defined in Branding.x.
+extern void PFBRestyleComposeFAB(void);
+
 // MARK: - Custom accent color
 
 static NSNumber* selectedThemeColor(void) {
@@ -147,9 +150,8 @@ static UIImageView* PFBFindLogoImageView(UIView* root) {
     return nil;
 }
 
-// Every logo the tweak has vetted, weakly held. Re-tinting the registry needs no
-// container matching, unlike the name-based sweep, which misses Twitter's Swift
-// home header.
+// Every vetted logo, weakly held. Re-tinting the registry needs no container matching,
+// unlike the name-based sweep, which misses Twitter's Swift home header.
 static NSHashTable<UIImageView*>* PFBLogoRegistry;
 
 static void PFBRegisterLogoView(UIImageView* logo) {
@@ -184,7 +186,7 @@ BOOL PFBThemedTabBarWanted(void) {
     return [PFBSettings boolForKey:@"tab_bar_theming"] && PFBAccentIsActive();
 }
 
-// Twitter's own logo color, read raw so the tweak's accent hooks don't repaint it.
+// Twitter's own logo color, read raw so the accent hooks do not repaint it.
 static UIColor* PFBRawLogoColor(void) {
     PFBBeginRawPaletteRead();
     id palette = [[[objc_getClass("TAEColorSettings") sharedSettings]
@@ -203,9 +205,9 @@ static UIColor* PFBRawLogoColor(void) {
 static const void* kPFBLogoOriginalKey = &kPFBLogoOriginalKey;
 static const void* kPFBLogoBakedKey = &kPFBLogoBakedKey;
 
-// The bird, rendered from the PDF the tweak already ships, at the size the bar
-// asks for. Cached per size: the render costs a PDF parse and the bar asks on
-// every layout pass. Same recipe as the settings header in Settings.x.
+// The bird, rendered from the bundled PDF at the size the bar asks for. Cached per
+// size: the render costs a PDF parse and the bar asks on every layout pass. Same recipe
+// as the settings header in Settings.x.
 static UIImage* PFBBirdLogoImage(CGSize size) {
     static NSMutableDictionary<NSString*, UIImage*>* cache = nil;
     if (!cache) {
@@ -216,8 +218,7 @@ static UIImage* PFBBirdLogoImage(CGSize size) {
     if (cached) {
         return cached;
     }
-    // The filled bird, not the outlined one: measured in the PDFs the tweak
-    // ships - bird_stroke draws a stroke, LaunchTwitterBird fills.
+    // The filled bird: bird_stroke draws a stroke, LaunchTwitterBird fills.
     NSURL* birdURL = [[PFBBundle sharedBundle] pathForFile:@"LaunchTwitterBird.pdf"];
     if (!birdURL || size.width < 1 || size.height < 1) {
         return nil;
@@ -365,9 +366,8 @@ static void PFBRetintRegisteredLogos(void) {
     }
 }
 
-// Tab icons cache their tinted image, so they need an explicit nudge. Walk the
-// live controller tree and ask every tab view to re-theme its icon. Mirrors the
-// picker's own pass, but from here it also covers toggle changes.
+// Tab icons cache their tinted image, so they need an explicit nudge: walks the
+// live controller tree and asks every tab view to re-theme its icon.
 static void PFBReapplyTabBarAccent(void) {
     Class tabBarVCClass = objc_getClass("T1TabBarViewController");
     if (!tabBarVCClass) {
@@ -527,11 +527,9 @@ static void PFBApplyTabBarAccent(UITabBar* bar) {
     if (standard) {
         bar.standardAppearance = standard;
     }
-    if (@available(iOS 15.0, *)) {
-        UITabBarAppearance* scrollEdge = bar.scrollEdgeAppearance;
-        if (scrollEdge) {
-            bar.scrollEdgeAppearance = scrollEdge;
-        }
+    UITabBarAppearance* scrollEdge = bar.scrollEdgeAppearance;
+    if (scrollEdge) {
+        bar.scrollEdgeAppearance = scrollEdge;
     }
 }
 
@@ -709,10 +707,9 @@ static PFBTabBadge* PFBTabBadgeFor(UIView* tab) {
     return badge;
 }
 
-// The native bar's icons in the order of its items, in the bar's coordinates: left to
-// right, or right to left in a right-to-left language. Each sits in its tab's button,
-// _UITabButton on the glass bar and UITabBarButton on the classic one; the glass bar
-// lays each tab out twice, for its selected and normal look, and the normal copies are read.
+// The native bar's icon frames in item order, in the bar's coordinates (mirrored in RTL).
+// Icons sit in _UITabButton (glass) or UITabBarButton (classic); the glass bar lays each
+// tab out twice, selected and normal, and the normal copies are read.
 static NSArray<NSValue*>* PFBNativeIconFrames(UITabBar* bar) {
     NSMutableDictionary<NSNumber*, NSValue*>* byCenter = [NSMutableDictionary dictionary];
     PFBWalkAllSubviews(bar, 0, ^(UIView* sub) {
@@ -786,7 +783,6 @@ static void PFBPlaceTabBadges(UITabBar* bar, UIView* layer) {
             continue;
         }
         CGRect icon = icons[i].CGRectValue;
-        UIView* shown = dot;
         if (counted) {
             UIFont* font = badge.font ?: [UIFont boldSystemFontOfSize:11.0];
             CGSize textSize = [badge.text sizeWithAttributes:@{NSFontAttributeName : font}];
@@ -802,7 +798,6 @@ static void PFBPlaceTabBadges(UITabBar* bar, UIView* layer) {
             // the badge's height above it.
             label.frame = CGRectMake(CGRectGetMidX(icon) + 12.0 - width / 2.0,
                                      CGRectGetMidY(icon) - height, width, height);
-            shown = label;
         } else {
             UIImage* image = [badge.dot imageWithRenderingMode:UIImageRenderingModeAlwaysOriginal];
             CGSize size = image.size;
@@ -812,13 +807,6 @@ static void PFBPlaceTabBadges(UITabBar* bar, UIView* layer) {
                                    CGRectGetMinY(icon) - size.height / 2.0, size.width, size.height);
         }
         PFBCompatReach(PFBCompatPath_tab_badges);
-        static BOOL saidPlaced;
-        if (!saidPlaced) {
-            saidPlaced = YES;
-            PFBDebugLog(@"[tabbar] badge drawn on tab %lu at x=%.1f y=%.1f w=%.1f, its icon at x=%.1f y=%.1f",
-                        (unsigned long)i, shown.frame.origin.x, shown.frame.origin.y,
-                        shown.frame.size.width, icon.origin.x, icon.origin.y);
-        }
     }
 }
 
@@ -876,10 +864,6 @@ static void PFBRelayTabBadges(UITabBar* native, NSArray<UIView*>* tabs) {
         }
         objc_setAssociatedObject(item, kPFBItemBadgeKey, badge, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
         changed = YES;
-        if (badge) {
-            PFBDebugLog(@"[tabbar] badge relayed on tab %ld: %@", (long)item.tag,
-                        badge.text.length ? badge.text : @"dot");
-        }
     }
     if (changed) {
         PFBRefreshTabBadges(native);
@@ -1212,8 +1196,6 @@ static void PFBApplyTabBarGlassBody(UIView* host) {
                                  OBJC_ASSOCIATION_RETAIN_NONATOMIC);
         objc_setAssociatedObject(host, kPFBTabBridgeKey, bridge,
                                  OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-        PFBDebugLog(@"[tabbar] native UITabBar built for %@ (%lu tabs)",
-                    NSStringFromClass([parent class]), (unsigned long)tabs.count);
         PFBCOMPAT_ACTION(PFBCompat_enable_liquid_glass, @"native tab bar built");
     }
 
@@ -1259,8 +1241,6 @@ static void PFBApplyTabBarGlassBody(UIView* host) {
             [items addObject:item];
         }
         native.items = items;
-        PFBDebugLog(@"[tabbar] %lu item(s) installed from the app's own tabs",
-                    (unsigned long)items.count);
     }
     // Only the bar's tint pair, which the iOS 26 floating bar honors while ignoring
     // UITabBarAppearance: the accent when its toggle is on and a color is picked
@@ -1277,18 +1257,11 @@ static void PFBApplyTabBarGlassBody(UIView* host) {
     if (labels) {
         PFBCOMPAT_ACTION(PFBCompat_restore_tab_labels, @"labels under the tab icons");
     }
-    BOOL tintsMoved = NO;
     if (![native.tintColor isEqual:accent]) {
         native.tintColor = accent;
-        tintsMoved = YES;
     }
     if (![native.unselectedItemTintColor isEqual:resting]) {
         native.unselectedItemTintColor = resting;
-        tintsMoved = YES;
-    }
-    if (tintsMoved) {
-        PFBDebugLog(@"[tabbar] tints set: themed=%d accent=%@ resting=%@",
-                    themed ? 1 : 0, accent, resting);
     }
 
     // Titles follow the setting: the native bar carries them, so the option also
@@ -1317,10 +1290,6 @@ static void PFBApplyTabBarGlassBody(UIView* host) {
     if (!seated) {
         [native removeFromSuperview];
         [parent insertSubview:native aboveSubview:bar];
-        PFBDebugLog(@"[tabbar] seated above %@ at %lu/%lu",
-                    NSStringFromClass([bar class]),
-                    (unsigned long)[parent.subviews indexOfObject:native],
-                    (unsigned long)parent.subviews.count);
     }
     if (!CGRectEqualToRect(native.frame, parent.bounds)) {
         native.frame = parent.bounds;
@@ -1396,8 +1365,6 @@ static void PFBApplyTabBarGlassBody(UIView* host) {
     if (hidden.count != before) {
         objc_setAssociatedObject(host, kPFBTabHiddenKey, hidden,
                                  OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-        PFBDebugLog(@"[tabbar] %lu view(s) hidden behind the native bar",
-                    (unsigned long)hidden.count);
     }
 }
 
@@ -1423,14 +1390,14 @@ static void PFBReapplyTabBarFrom(UIView* view) {
     }
 }
 
-static void PFBSweepNativeTabBars(UIView* root, UIColor* accent) {
+static void PFBSweepNativeTabBars(UIView* root) {
     if ([root isKindOfClass:[UITabBar class]]) {
         PFBApplyTabBarAccent((UITabBar*)root);
         [root setNeedsLayout];
         return;
     }
     for (UIView* sub in root.subviews) {
-        PFBSweepNativeTabBars(sub, accent);
+        PFBSweepNativeTabBars(sub);
     }
 }
 
@@ -1450,9 +1417,8 @@ static BOOL PFBViewTreeHasTabBar(UIView* root) {
     return NO;
 }
 
-// Re-apply the tweak's accent to whatever chrome is on screen right now.
+// Reapplies the custom accent to whatever chrome is on screen.
 static void PFBReapplyChromeAccent(void) {
-    UIColor* accent = PFBCurrentAccentColor();
     void (^run)(void) = ^{
         PFBRetintRegisteredLogos();
         for (id scene in UIApplication.sharedApplication.connectedScenes) {
@@ -1464,7 +1430,7 @@ static void PFBReapplyChromeAccent(void) {
                 // Ungated: the applier is bidirectional and decides
                 // accent-or-native itself, so the native colors also come back
                 // when the switch is turned off.
-                PFBSweepNativeTabBars(w, accent);
+                PFBSweepNativeTabBars(w);
                 [w setNeedsLayout];
                 [w layoutIfNeeded];
             }
@@ -1523,9 +1489,7 @@ static void PFBReloadTwitterDynamicColors(void) {
 static dispatch_source_t PFBAccentSettleTimer;
 
 static BOOL PFBAccentSettlePass(void) {
-    extern void PFBRestyleComposeFAB(void);
     PFBRetintRegisteredLogos();
-    UIColor* accent = PFBCurrentAccentColor();
     BOOL chromeSeen = NO;
     for (id scene in UIApplication.sharedApplication.connectedScenes) {
         if (![scene isKindOfClass:objc_getClass("UIWindowScene")]) {
@@ -1533,7 +1497,7 @@ static BOOL PFBAccentSettlePass(void) {
         }
         for (UIWindow* w in [scene windows]) {
             PFBSweepTopBarLogos(w);
-            PFBSweepNativeTabBars(w, accent);
+            PFBSweepNativeTabBars(w);
             if (!chromeSeen && PFBViewTreeHasTabBar(w)) {
                 chromeSeen = YES;
             }
@@ -1584,9 +1548,8 @@ void PFBSyncAccentTheme(void) {
         [settings performSelector:@selector(applyCurrentColorPalette)];
     }
 
-    // Rebuild Twitter's cached primary-color-derived colors (FAB, follow
-    // buttons, pill, badges, selection). It resolves through the palette
-    // accessors the tweak hooks on every subclass, so the results become custom.
+    // Rebuilds Twitter's cached primary-color-derived colors (FAB, follow buttons, pill,
+    // badges, selection) through the hooked palette accessors, so the results take the accent.
     Class T1ColorSettingsCls = objc_getClass("T1ColorSettings");
     if ([T1ColorSettingsCls respondsToSelector:@selector(_t1_applyPrimaryColorOption)]) {
         [T1ColorSettingsCls performSelector:@selector(_t1_applyPrimaryColorOption)];
@@ -1602,17 +1565,15 @@ void PFBSyncAccentTheme(void) {
     if (logo) {
         PFBApplyLogoTint(logo);
     }
-    extern void PFBRestyleComposeFAB(void);
     PFBRestyleComposeFAB();
     PFBReapplyTabBarAccent();
-    UIColor* sweepAccent = PFBCurrentAccentColor();
     for (id scene in UIApplication.sharedApplication.connectedScenes) {
         if (![scene isKindOfClass:objc_getClass("UIWindowScene")]) {
             continue;
         }
         for (UIWindow* w in [scene windows]) {
             PFBSweepTopBarLogos(w);
-            PFBSweepNativeTabBars(w, sweepAccent);
+            PFBSweepNativeTabBars(w);
             // Force a layout pass so the navigation-bar and tab-bar hooks run
             // now, instead of waiting for the next natural relayout.
             [w setNeedsLayout];
@@ -1869,9 +1830,8 @@ void PFBThemeStart(void) {
                     PFBForceBackgroundRefresh();
                 }];
 
-    // Whenever Twitter repaints its own dynamic colors — for any reason, from
-    // any screen — repaint the tweak's in the same pass: no layout guessing, no
-    // timers.
+    // Whenever Twitter repaints its own dynamic colors, from any screen, the custom
+    // accent is repainted in the same pass.
     [[NSNotificationCenter defaultCenter]
         addObserverForName:@"TFNDynamicColorsDidReloadNotification"
                     object:nil
@@ -1880,9 +1840,8 @@ void PFBThemeStart(void) {
                     PFBReapplyChromeAccent();
                 }];
 
-    // Surfaces that resolve their color once at launch and cache it never see the
-    // tweak's palette without a reload pass. With an accent active, one is
-    // broadcast shortly after boot.
+    // Surfaces that resolve their color once at launch and cache it miss the custom accent
+    // without a reload pass. With an accent active, one is broadcast shortly after boot.
     if (PFBAccentIsActive()) {
         dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.8 * NSEC_PER_SEC)),
                        dispatch_get_main_queue(), ^{
@@ -2241,13 +2200,6 @@ static UITabBarAppearance* PFBPatchedTabBarAppearance(UITabBarAppearance* appear
     if ([PFBSettings boolForKey:@"enable_liquid_glass"] && frame.origin.x < 4.0 &&
         [NSStringFromClass([view.superview class]) isEqualToString:@"TFNNavigationBarSearchView"]) {
         CGFloat overshoot = 4.0 - frame.origin.x;
-        static NSTimeInterval lastNote = 0;
-        NSTimeInterval now = CACurrentMediaTime();
-        if (now - lastNote > 0.5) {
-            lastNote = now;
-            PFBDebugLog(@"[search] bar kept inside its container: x=%.0f w=%.0f -> x=4 w=%.0f",
-                        frame.origin.x, frame.size.width, frame.size.width - overshoot);
-        }
         frame.origin.x = 4.0;
         CGFloat wanted = frame.size.width - overshoot;
         frame.size.width = MAX(80.0, wanted);
@@ -2282,19 +2234,11 @@ static UITabBarAppearance* PFBPatchedTabBarAppearance(UITabBarAppearance* appear
     CGRect inBar = [view.superview convertRect:frame toView:bar];
     const CGFloat avatarTrailing = 64.0;
     const CGFloat gap = 16.0;
-    static NSTimeInterval lastNote = 0;
-    NSTimeInterval now = CACurrentMediaTime();
     if (inBar.origin.x < avatarTrailing && inBar.size.width > 100.0) {
         CGFloat shift = (avatarTrailing + gap) - inBar.origin.x;
         CGRect fixed = frame;
         fixed.origin.x += shift;
         fixed.size.width = MAX(80.0, fixed.size.width - shift);
-        if (now - lastNote > 0.5) {
-            lastNote = now;
-            PFBDebugLog(@"[search] frame moved out of the avatar zone: x=%.0f w=%.0f -> x=%.0f w=%.0f",
-                        inBar.origin.x, inBar.size.width, inBar.origin.x + shift,
-                        fixed.size.width);
-        }
         %orig(fixed);
         return;
     }
@@ -2584,7 +2528,6 @@ static void PFBSettleBarBackdrop(UINavigationBar* bar) {
     if (!PFBAccentPending) {
         return;
     }
-    UIColor* accent = PFBCurrentAccentColor();
     BOOL reachedChrome = NO;
     for (id scene in UIApplication.sharedApplication.connectedScenes) {
         if (![scene isKindOfClass:objc_getClass("UIWindowScene")]) {
@@ -2592,7 +2535,7 @@ static void PFBSettleBarBackdrop(UINavigationBar* bar) {
         }
         for (UIWindow* w in [scene windows]) {
             PFBSweepTopBarLogos(w);
-            PFBSweepNativeTabBars(w, accent);
+            PFBSweepNativeTabBars(w);
             if (!reachedChrome && PFBViewTreeHasTabBar(w)) {
                 reachedChrome = YES;
             }

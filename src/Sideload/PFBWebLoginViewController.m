@@ -1,21 +1,19 @@
-#import "Sideload/PFBWebLoginProbeViewController.h"
+#import "Sideload/PFBWebLoginViewController.h"
 #import <WebKit/WebKit.h>
 #import "Debug/PFBDebugger.h"
 #import "Sideload/PFBLoginBridge.h"
 #import "Common/PFBBundle.h"
 #import "Support/TwitterChirpFont.h"
+#import "Support/HookHelpers.h"
 
-// Defined in HookHelpers.m.
-BOOL PFBIsXDomain(NSString* domainOrHost);
-
-// The cookies that prove a real session: the auth token and the CSRF token the
-// API calls need. Their arrival after login is what this screen measures.
+// The cookies that prove a real session: the auth token and the CSRF token the API
+// calls need; the first auth_token after login starts the bridge.
 static NSString* const kPFBAuthCookie = @"auth_token";
 static NSString* const kPFBCsrfCookie = @"ct0";
 
-// The tweak's own bird, rendered from the PDF it already ships (the same source as
-// the nav-bar logo), so the login header carries the app's branding instead of an
-// SF Symbol. Template mode lets the header tint it.
+// The bird rendered from the bundled PDF (the same source as the nav-bar logo), so the
+// login header carries the app's branding instead of an SF Symbol. Template mode lets
+// the header tint it.
 static UIImage* pfbLoginBirdImage(CGSize size) {
     NSURL* url = [[PFBBundle sharedBundle] pathForFile:@"LaunchTwitterBird.pdf"];
     if (!url || size.width < 1 || size.height < 1) {
@@ -50,7 +48,7 @@ static UIImage* pfbLoginBirdImage(CGSize size) {
     return rendered;
 }
 
-@interface PFBWebLoginProbeViewController () <WKNavigationDelegate>
+@interface PFBWebLoginViewController () <WKNavigationDelegate>
 @property (nonatomic, strong) WKWebView* webView;
 @property (nonatomic, strong) UIView* headerView;
 @property (nonatomic, strong) UIActivityIndicatorView* spinner;
@@ -63,13 +61,10 @@ static UIImage* pfbLoginBirdImage(CGSize size) {
 @property (nonatomic, assign) BOOL didRevealWeb;
 @end
 
-
-UIImage* PFBTwitterGlyphFor(NSString* name, UIImage* systemImage);
-
-@implementation PFBWebLoginProbeViewController
+@implementation PFBWebLoginViewController
 
 + (void)presentFrom:(UIViewController*)presenter {
-    PFBWebLoginProbeViewController* login = [PFBWebLoginProbeViewController new];
+    PFBWebLoginViewController* login = [PFBWebLoginViewController new];
     UINavigationController* nav =
         [[UINavigationController alloc] initWithRootViewController:login];
     nav.modalPresentationStyle = UIModalPresentationFullScreen;
@@ -77,7 +72,7 @@ UIImage* PFBTwitterGlyphFor(NSString* name, UIImage* systemImage);
 }
 
 + (UINavigationController*)rootNavigationController {
-    PFBWebLoginProbeViewController* login = [PFBWebLoginProbeViewController new];
+    PFBWebLoginViewController* login = [PFBWebLoginViewController new];
     login.asRoot = YES;
     return [[UINavigationController alloc] initWithRootViewController:login];
 }
@@ -88,8 +83,8 @@ UIImage* PFBTwitterGlyphFor(NSString* name, UIImage* systemImage);
 
     [self setupHeader];
 
-    // A desktop user agent and a standing data store: the mobile login page
-    // leans on flows the tweak's forced design disturbs, the desktop one does not.
+    // A desktop user agent and a standing data store: the mobile login page leans on flows
+    // the forced iOS 26 design disturbs, the desktop one does not.
     WKWebViewConfiguration* cfg = [[WKWebViewConfiguration alloc] init];
     cfg.websiteDataStore = [WKWebsiteDataStore defaultDataStore];
     self.webView = [[WKWebView alloc] initWithFrame:self.view.bounds
@@ -162,8 +157,6 @@ UIImage* PFBTwitterGlyphFor(NSString* name, UIImage* systemImage);
         [self.connectingLabel.topAnchor constraintEqualToAnchor:self.spinner.bottomAnchor
                                                         constant:12],
     ]];
-    // The page load itself is deferred to viewDidAppear so it never runs during
-    // the presentation animation.
 }
 
 // Native brand header that stands in for the navigation bar: instant to draw, so
@@ -248,8 +241,7 @@ UIImage* PFBTwitterGlyphFor(NSString* name, UIImage* systemImage);
 
 - (void)viewDidAppear:(BOOL)animated {
     [super viewDidAppear:animated];
-    // x.com is heavy; loading it during the present animation is what stuttered.
-    // Start once the transition has settled.
+    // x.com is heavy, so the first load starts once the presentation has settled.
     if (!self.didStartInitialLoad) {
         self.didStartInitialLoad = YES;
         [self reload];
@@ -260,8 +252,8 @@ UIImage* PFBTwitterGlyphFor(NSString* name, UIImage* systemImage);
     [self dismissViewControllerAnimated:YES completion:nil];
 }
 
-// The REST identity endpoints are gone (404); the handle is read from the
-// account switcher of the logged-in page, retried a few times while it renders.
+// The handle is read from the account switcher of the logged-in page (no REST identity
+// endpoint answers), retried a few times while it renders.
 - (void)resolveScreenNameThenBridgeWithAuthToken:(NSString*)authToken
                                             csrf:(NSString*)csrf
                                           userID:(long long)userID
@@ -380,16 +372,6 @@ UIImage* PFBTwitterGlyphFor(NSString* name, UIImage* systemImage);
                    });
 }
 
-- (void)webView:(WKWebView*)webView
-    didStartProvisionalNavigation:(WKNavigation*)navigation {
-    PFBDebugLog(@"[weblogin] navigating to %@", webView.URL.absoluteString);
-}
-
-- (void)webView:(WKWebView*)webView
-    didReceiveServerRedirectForProvisionalNavigation:(WKNavigation*)navigation {
-    PFBDebugLog(@"[weblogin] redirected to %@", webView.URL.absoluteString);
-}
-
 // The server can answer a page with an HTTP error and no navigation failure, so
 // the status code is read here to tell an empty 404 page from a real login form.
 - (void)webView:(WKWebView*)webView
@@ -403,19 +385,16 @@ UIImage* PFBTwitterGlyphFor(NSString* name, UIImage* systemImage);
     decisionHandler(WKNavigationResponsePolicyAllow);
 }
 
-// After every page settles, the cookie jar is read: the two session cookies are
-// logged by presence and length, not value, and the first auth_token starts the bridge.
+// After every page settles, the cookie jar is read; the first auth_token starts the bridge.
 - (void)webView:(WKWebView*)webView didFinishNavigation:(WKNavigation*)navigation {
     // Reveal only once the login flow itself is up, not the brief x.com landing
     // ("Log in / Sign up") the redirect passes through first.
     if ([webView.URL.absoluteString containsString:@"i/flow"]) {
         [self revealWebIfNeeded];
     }
-    PFBDebugLog(@"[weblogin] settled at %@", webView.URL.absoluteString);
     WKHTTPCookieStore* store = webView.configuration.websiteDataStore.httpCookieStore;
     [store getAllCookies:^(NSArray<NSHTTPCookie*>* cookies) {
       BOOL auth = NO;
-      BOOL csrf = NO;
       NSString* authVal = nil;
       NSString* csrfVal = nil;
       long long uid = 0;
@@ -423,23 +402,14 @@ UIImage* PFBTwitterGlyphFor(NSString* name, UIImage* systemImage);
           if ([cookie.name isEqualToString:kPFBAuthCookie]) {
               auth = YES;
               authVal = cookie.value;
-              PFBDebugLog(@"[weblogin] %@ present, length %lu, domain %@",
-                          kPFBAuthCookie, (unsigned long)cookie.value.length,
-                          cookie.domain);
           } else if ([cookie.name isEqualToString:kPFBCsrfCookie]) {
-              csrf = YES;
               csrfVal = cookie.value;
-              PFBDebugLog(@"[weblogin] %@ present, length %lu", kPFBCsrfCookie,
-                          (unsigned long)cookie.value.length);
           } else if ([cookie.name isEqualToString:@"twid"]) {
               // twid is u=<userID>, url-encoded as u%3D<userID>.
               NSString* dec = [cookie.value stringByRemovingPercentEncoding] ?: cookie.value;
               uid = [[[dec componentsSeparatedByString:@"="] lastObject] longLongValue];
-              PFBDebugLog(@"[weblogin] twid present, userID=%lld", uid);
           }
       }
-      PFBDebugLog(@"[weblogin] cookie sweep: auth=%d csrf=%d total=%lu", auth ? 1 : 0,
-                  csrf ? 1 : 0, (unsigned long)cookies.count);
       if (auth && !self.sawAuth) {
           self.sawAuth = YES;
           PFBDebugLog(@"[weblogin] AUTH TOKEN OBTAINED - web login reaches a session");
@@ -454,8 +424,7 @@ UIImage* PFBTwitterGlyphFor(NSString* name, UIImage* systemImage);
                   [jar setCookie:c];
               }
           }
-          // REST account endpoints are gone (404): read the handle from the page
-          // itself, then bridge the session into a native account.
+          // Reads the handle from the page itself, then bridges the session into a native account.
           [self resolveScreenNameThenBridgeWithAuthToken:authVal csrf:csrfVal userID:uid attempt:0];
       }
     }];

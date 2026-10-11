@@ -29,8 +29,7 @@ static const NSTimeInterval kPFBTourDoorRetry = 2.5;
 // Left to the app between a step's clean-up and the next step.
 static const NSTimeInterval kPFBTourSettle = 0.4;
 
-// What one step takes on average, as measured on a full tour (24 screens in 1 min 27),
-// for the duration the launch alert announces.
+// Average duration of one step, for the duration the launch alert announces.
 static const NSTimeInterval kPFBTourSecondsPerStep = 3.6;
 
 // How far down Home is searched for a Tweet carrying a video or photos.
@@ -100,6 +99,7 @@ void PFBCompatTourLog(NSString* format, ...) {
         tourJournalWrite(line);
     }
 }
+
 
 NSString* PFBCompatTourJournalText(void) {
     NSString* text = [NSString stringWithContentsOfFile:tourJournalPath() encoding:NSUTF8StringEncoding error:nil];
@@ -602,7 +602,7 @@ static NSString* tourDuration(NSUInteger steps) {
                 : [NSString stringWithFormat:@"about %lu min", (unsigned long)(seconds / 60)];
 }
 
-// MARK: - What the new steps do
+// MARK: - Step checks
 
 // A Tweet's buttons, read without a tap: like and reply relay to the hooked inline
 // actions, the share button's long press to the hooked handler. Where a relay cannot
@@ -984,7 +984,6 @@ static void tourOpenReadConversation(void) {
     NSMutableArray<NSString*>* skipped = [NSMutableArray array];
     for (UIView* cell in cells) {
         NSString* unread = tourUnreadMark(cell);
-        PFBCompatTourLog(@"[tour] conversation: row %@ %@", NSStringFromClass([cell class]), unread ?: @"reads as read");
         if (unread) {
             [skipped addObject:unread];
             continue;
@@ -1214,10 +1213,6 @@ static void tourDeepScroll(NSString* step, NSInteger drags) {
                          tourAttempt(step, @"scrolling further", ^{
                            UITableView* list = tourFrontList();
                            tourDrag(list, list.bounds.size.height * 1.5);
-                           if (drag == drags) {
-                               PFBCompatTourLog(@"[tour] %@: %@ scrolled to %.0f", step,
-                                                list ? NSStringFromClass([list class]) : @"no list", list.contentOffset.y);
-                           }
                          });
                        });
     }
@@ -1325,8 +1320,8 @@ static NSArray<NSDictionary*>* tourAllSteps(void) {
              return [tourScreenName(after) containsString:@"Search"];
            }, nil, nil)];
     __block BOOL barTapped = NO;
-    // On the screen the search step leaves open: a search link opened later in the tour,
-    // after the composer, goes nowhere (measured twice).
+    // Runs on the screen the search step leaves open: a search link opened later in the tour,
+    // after the composer, goes nowhere.
     [steps addObject:tourStep(@"search field", @"Search field", ^{
            }, ^{
              barTapped = NO;
@@ -1401,7 +1396,6 @@ static NSArray<NSDictionary*>* tourAllSteps(void) {
              UITableView* list = tourFrontList();
              return list && list.contentOffset.y > scrollStart + 10.0;
            }, nil, ^{
-             PFBCompatTourLog(@"[tour] scroll: offset %.0f at the end", tourFrontList().contentOffset.y);
              tourScrollHomeToTop();
            })];
     __block BOOL buttonsRead = NO;
@@ -1503,8 +1497,6 @@ static NSArray<NSDictionary*>* tourAllSteps(void) {
                  tourAttempt(@"other profile", @"folding the header", ^{
                    UITableView* list = tourFrontList();
                    tourDrag(list, list.bounds.size.height * 0.8);
-                   PFBCompatTourLog(@"[tour] other profile: %@ dragged to %.0f",
-                                    list ? NSStringFromClass([list class]) : @"no list", list.contentOffset.y);
                  });
              }
              return profile;

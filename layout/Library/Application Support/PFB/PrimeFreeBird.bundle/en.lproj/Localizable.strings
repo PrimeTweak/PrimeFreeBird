@@ -3,55 +3,9 @@
   PrimeFreeBird
 */
 
-/*
-  =====================================================================
-  HOW KEYS RESOLVE
-
-  1. TOGGLE rows declare no strings in PFBSettings.m. The UI derives them
-     from the toggle's own key:
-         some_toggle_key -> "SOME_TOGGLE_KEY_TITLE"   (row title)
-                         -> "SOME_TOGGLE_KEY_DETAIL"  (grey subtitle)
-     _DETAIL is optional: omit it and no subtitle is drawn.
-  2. BUTTON rows declare "titleKey" / "subtitleKey" explicitly.
-     compactButton rows instead show a live value via "prefKeyForSubtitle",
-     so they intentionally have no _DETAIL key.
-  3. GROUP HEADERS use "<PAGE>_GROUP_<NAME>". Sentence case, like the row
-     titles: the header cell prints them exactly as written, so the case you
-     type is the case on screen.
-     A page earns headers from roughly ten rows up. Below that it stays flat —
-     two headers over four rows is decoration, not structure.
-  4. PAGES use "MODERN_SETTINGS_<PAGE>_TITLE" / "_SUBTITLE".
-     Note: the General page's keys are historically named _LAYOUT_.
-
-  A missing key renders as the raw key name on screen.
-
-  WRITING RULES (keep new strings consistent)
-
-  TITLES — sentence case, no final period, 4 words max.
-  Rows that REMOVE, REVEAL or SWITCH OFF something use a closed family:
-      Hide <thing>      removes UI            "Hide bookmarks"
-      Show <thing>      adds UI               "Show Tweet source labels"
-      Restore <thing>   brings back classic   "Restore reply context"
-      Disable <thing>   turns a behaviour off "Disable auto-translate"
-  Rows that PERFORM an action use that action's own verb: Confirm, Save,
-  Download, Copy, Lock, Clean, Bypass, Preload.
-  Rows that CHANGE a property are bare noun phrases: "Square profile
-  pictures", "Tab labels", "Scroll bar".
-  Buttons opening another screen are always bare nouns: "Theme color".
-  Never "No ...", "Turn off ...", "Use ...", "Always ...".
-
-  SUBTITLES (row) — exactly one sentence, ending with a period, describing
-  what happens when the row is ON. Max ~80 characters. Never restate the
-  title. Prefer the dominant openers: "Remove ..." and "Show ...".
-
-  BODY TEXT (screen-level explanations such as the theme picker intro or the
-  navigation bar editor hint) may run to two sentences — they are
-  instructions, not row subtitles.
-
-  Sections below mirror the settings menu in display order; pickers, editors
-  and alerts follow the page that owns them.
-  =====================================================================
-*/
+/* Toggles read <KEY>_TITLE and optional <KEY>_DETAIL; buttons name titleKey/subtitleKey;
+   headers are <PAGE>_GROUP_<NAME>; pages MODERN_SETTINGS_<PAGE>_TITLE (General uses _LAYOUT_).
+   A missing key shows as the raw key. */
 
 /* ===== GENERAL — page ===== */
 "MODERN_SETTINGS_LAYOUT_TITLE" = "General";
@@ -361,7 +315,7 @@
 "UNKNOWN_ERROR" = "An unknown error occurred.";
 "PHOTOS_SAVE_FAILED_MESSAGE" = "Photos did not accept the file. In Settings, check that Twitter may add photos.";
 
-/* ===== Advanced search (2026-08-04) ===== */
+/* ===== Advanced search ===== */
 "ADVANCED_SEARCH_TITLE" = "Advanced search";
 "ADVANCED_SEARCH_DETAIL" = "Adds a filters button on Explore to build advanced queries.";
 "ADVSEARCH_SECTION_WORDS" = "Words";
@@ -386,7 +340,7 @@
 "ADVSEARCH_EMPTY" = "Fill in at least one field.";
 "RESTART_INFO_ALERT_MESSAGE" = "Restart Twitter for the change to fully apply.";
 
-/* ===== Advanced search v1.3 — web-verbatim (2026-08-04) ===== */
+/* ===== Advanced search: web form labels ===== */
 "ADVSEARCH_SECTION_FILTERS" = "Filters";
 "ADVSEARCH_LANGUAGE" = "Language";
 "ADVSEARCH_ANY_LANGUAGE" = "Any language";
@@ -408,7 +362,7 @@
 "ADVSEARCH_EX_SINCE" = "Only Tweets published after this date";
 "ADVSEARCH_EX_UNTIL" = "Only Tweets published before this date";
 
-/* ===== MEDIA — nouveaux groupes et options (2026-08-04) ===== */
+/* ===== MEDIA: groups and options ===== */
 "MEDIA_GROUP_DOWNLOADS" = "Downloads";
 "MEDIA_GROUP_PLAYBACK" = "Playback";
 "MEDIA_GROUP_QUALITY" = "Quality";
@@ -421,7 +375,7 @@
 "COPY_PROFILE_INFO_MENU_OPTION_8" = "Copy date joined";
 "UNROUNDED_COUNTS_TITLE" = "Unrounded counts";
 
-/* ===== TWEETS — groupes et nouvelle option (2026-08-05) ===== */
+/* ===== TWEETS: groups and options ===== */
 "TWEETS_GROUP_COMPOSING" = "Composing";
 "TWEETS_GROUP_ACTIONS" = "Tweet actions";
 "TWEETS_GROUP_READING" = "Reading";
@@ -436,7 +390,7 @@
 "SEND_SOUND_TOO_LONG" = "Choose a sound of 7 seconds or less.";
 "SEND_SOUND_UNREADABLE" = "This file is not a sound that can be played.";
 
-/* ===== TIMELINES — groupes et nouvelle option (2026-08-05) ===== */
+/* ===== TIMELINES: groups and options ===== */
 "TIMELINES_GROUP_SUGGESTIONS" = "Ads and suggestions";
 "TIMELINES_GROUP_CONTENT" = "Content";
 "TIMELINES_GROUP_BARS" = "Bars";
@@ -444,7 +398,7 @@
 "UNLIMITED_TIMELINE_TABS_DETAIL" = "Pin more timelines and unlock advanced tabs.";
 "UNLIMITED_TIMELINE_TABS_DETAIL_HELD" = "Pin more timelines and unlock advanced tabs.";
 
-/* ===== MUTED WORDS (2026-08-05) ===== */
+/* ===== MUTED WORDS ===== */
 "MUTED_WORDS_SUBTITLE" = "Tweets that match anything in this list are filtered out of your timeline.";
 "FILTERS_TITLE" = "Filters";
 "QUICK_MUTED_WORDS_LABEL" = "Muted words";
@@ -464,7 +418,6 @@
 "LANGUAGES_TRANSLATE_DETAIL" = "Tweets, bios, notes and notifications.";
 "LANGUAGES_OTHERS_TITLE" = "Other languages";
 "LANGUAGES_OTHERS_NONE" = "None";
-"MUTED_WORDS_NONE" = "None";
 "MUTED_WORDS_ADD_PLACEHOLDER" = "Add a word, phrase or @account";
 "MUTED_WORDS_ADD_BUTTON" = "Add";
 "MUTED_WORDS_OPTIONS_HEADER" = "Options";
@@ -476,7 +429,7 @@
 "MUTED_WORDS_CONVERSATIONS_TITLE" = "Filter in conversations";
 "MUTED_WORDS_CONVERSATIONS_DETAIL" = "Apply the list to replies as well as the timeline.";
 
-/* ===== MUTED WORDS — expiry, scope, counter (2026-08-05) ===== */
+/* ===== MUTED WORDS: expiry, scope, counter ===== */
 "MUTED_WORDS_FOLLOWING_TITLE" = "Skip accounts you follow";
 "MUTED_WORDS_FOLLOWING_DETAIL" = "Tweets from people you follow are never filtered.";
 "MUTED_WORDS_REPOSTS_TITLE" = "Include retweets";

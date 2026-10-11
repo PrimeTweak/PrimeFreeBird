@@ -6,9 +6,6 @@
 NS_ASSUME_NONNULL_BEGIN
 
 @interface PFBColorThemeViewController : UIViewController
-
-@property (nonatomic, strong) NSMutableArray<PFBColorSwatchControl*>* swatches;
-
 @end
 
 NS_ASSUME_NONNULL_END

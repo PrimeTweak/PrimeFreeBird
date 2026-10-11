@@ -74,10 +74,6 @@ def _set_display_name_in_app(appdir):
     """Force the on-device app name back to "Twitter"."""
     _patch_info_plist(appdir, lambda data: data.update(CFBundleDisplayName="Twitter"))
 
-def _enable_liquid_glass_in_app(appdir):
-
-    pass
-
 # --- bundle version ----------------------------------------------------------
 
 def _bump_bundle_version(appdir):
@@ -299,7 +295,6 @@ def apply_ipa_branding(ipa):
         if twitter_branding:
             _set_display_name_in_app(appdir)
         _bump_bundle_version(appdir)
-        _enable_liquid_glass_in_app(appdir)
 
         # Repackage once. Use the zip binary (not zipfile) to preserve symlinks
         # and permissions exactly as the original build produced them.

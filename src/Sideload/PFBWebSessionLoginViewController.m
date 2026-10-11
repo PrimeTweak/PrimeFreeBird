@@ -1,5 +1,4 @@
 #import "Support/HookHelpers.h"
-#import "Debug/PFBDebugger.h"
 #import "Sideload/PFBWebSessionLoginViewController.h"
 
 // Persist harvested cookies to the shared jar (survives relaunch) + the in-memory globals.
@@ -33,9 +32,7 @@ static void persistWebSessionCookies(NSArray<NSHTTPCookie*>* cookies) {
     self.loginWebView.autoresizingMask =
         UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
     self.loginWebView.navigationDelegate = self;
-    self.loginWebView.customUserAgent =
-        @"Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like "
-        @"Gecko) Version/17.0 Mobile/15E148 Safari/604.1";
+    self.loginWebView.customUserAgent = PFBMobileSafariUserAgent;
     [self.view addSubview:self.loginWebView];
 
     self.spinner = [[UIActivityIndicatorView alloc]

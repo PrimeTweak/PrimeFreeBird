@@ -1,7 +1,6 @@
 // The download options sheet for Tweet and chat media.
 
-@import UIKit;
-#import "Support/PFBManager.h"
+#import <UIKit/UIKit.h>
 
 NS_ASSUME_NONNULL_BEGIN
 

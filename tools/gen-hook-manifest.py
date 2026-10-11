@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Writes src/Support/Generated/PFBHookManifest.m: every class and method the tweak hooks and every
-class it resolves by name, checked against the running app by the debugger. Run from
-the repo root; the Makefile calls it before each build. The tweak's own classes are skipped.
+"""Writes src/Support/Generated/PFBHookManifest.m: every hooked class and method and every class
+resolved by name, checked against the running app by the debugger. Run from the repo root;
+the Makefile calls it before each build. PrimeFreeBird's own classes are skipped.
 """
 
 import os
@@ -33,7 +33,7 @@ def full_selector(signature):
         return ''.join(piece + ':' for piece in pieces)
     match = re.match(r'\s*([A-Za-z_][A-Za-z0-9_]*)', body)
     return match.group(1) if match else None
-# Runtime class resolution, all three spellings the tweak uses.
+# Runtime class resolution, in all three spellings the sources use.
 BYNAME_RE = re.compile(
     r'%c\(\s*([A-Za-z_][A-Za-z0-9_]*)\s*\)'
     r'|objc_getClass\(\s*"([A-Za-z_][A-Za-z0-9_.]*)"\s*\)'
@@ -54,8 +54,8 @@ def parse():
     # class -> set of hooked methods (a class hooked with no method still counts)
     hooks = {}
     byname = set()
-    # Classes the tweak implements, and FLEX, Cephei and Preferences ones by prefix, ship
-    # with the tweak rather than Twitter, so they are not checked against the app. An
+    # Classes implemented in src/, and FLEX, Cephei and Preferences ones by prefix, ship with
+    # PrimeFreeBird rather than Twitter, so they are not checked against the app. An
     # @interface alone only redeclares a class of the app; categories never count.
     own_classes = set()
     own_prefixes = ("FLEX", "HBForce", "Cephei", "PS")
@@ -74,7 +74,7 @@ def parse():
         with open(path, encoding="utf-8") as handle:
             lines = handle.readlines()
         current = None
-        pending_new = False  # the next method line is a %new, added by the tweak
+        pending_new = False  # the next method line is a %new, added here
         signature = None  # a method declaration still being read, up to its "{"
         signature_is_new = False
         for line in lines:
@@ -99,8 +99,8 @@ def parse():
                 pending_new = False
                 signature = None
                 continue
-            # A %new anywhere on the line means the method that follows is added
-            # by the tweak, not a Twitter dependency — never a missing hook.
+            # A %new anywhere on the line means the method that follows is added here, not a
+            # Twitter dependency, so it is never a missing hook.
             if "%new" in stripped:
                 pending_new = True
                 continue

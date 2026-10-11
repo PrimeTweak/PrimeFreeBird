@@ -3,7 +3,6 @@
 #import "Settings/PFBModernSettingsViewController.h"
 #import "Support/TwitterChirpFont.h"
 #import "Common/PFBBundle.h"
-#import "Support/PFBManager.h"
 #import "Settings/PFBModernSettingsCells.h"
 #import "Settings/PFBModernSettingsPageViewController.h"
 #import "Settings/Pages/PFBAppearanceSettingsViewController.h"
@@ -11,15 +10,13 @@
 #import "Settings/Pages/PFBTimelinesSettingsViewController.h"
 #import "Settings/Pages/PFBTweetsSettingsViewController.h"
 #import "Features/Appearance/ThemeColor/PFBPalette.h"
+#import "Support/HookHelpers.h"
 
 @interface PFBModernSettingsViewController () <UITableViewDataSource, UITableViewDelegate>
 @property (nonatomic, strong) TFNTwitterAccount* account;
 @property (nonatomic, strong) UITableView* tableView;
 @property (nonatomic, strong) NSArray* sections;
 @end
-
-extern void PFBThemeScreenEnter(UIViewController* screen);
-extern void PFBThemeScreenLeave(UIViewController* screen);
 
 @implementation PFBModernSettingsViewController
 
@@ -208,9 +205,9 @@ extern void PFBThemeScreenLeave(UIViewController* screen);
     [self.tableView registerClass:[PFBModernSettingsTableViewCell class]
            forCellReuseIdentifier:@"SettingsCell"];
 
-    // Footer: the tweak's name and version, then the credit to the original work.
-    // The text starts right under the list's own bottom spacing, so it falls on the
-    // rhythm of the rows, with room left below it.
+    // Footer: PrimeFreeBird's name and version, then the credit to the original work. The
+    // text starts right under the list's own bottom spacing, so it falls on the rhythm of
+    // the rows, with room left below it.
     UILabel* creditLabel = [[UILabel alloc] init];
     creditLabel.numberOfLines = 0;
     creditLabel.textAlignment = NSTextAlignmentCenter;

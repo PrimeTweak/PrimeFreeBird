@@ -1,6 +1,6 @@
 // Compatibility report: every option counts what it does and which of its paths ran,
-// kept across tweak builds of one Twitter version, and the report checks that Twitter
-// still has what each option relies on.
+// kept across PrimeFreeBird builds of one Twitter version, and the report checks that
+// Twitter still has what each option relies on.
 #import <UIKit/UIKit.h>
 #import "Common/PFBCompatResult.h"
 
@@ -132,15 +132,11 @@ FOUNDATION_EXPORT void PFBCompatSetDetail(PFBCompatOption option, NSString* deta
 FOUNDATION_EXPORT void PFBCompatReset(void);
 FOUNDATION_EXPORT void PFBCompatRefreshStatus(void);
 FOUNDATION_EXPORT NSArray<PFBCompatResult*>* PFBCompatResults(void);
-FOUNDATION_EXPORT NSString* PFBCompatSummary(NSArray<PFBCompatResult*>* results);
-FOUNDATION_EXPORT NSString* PFBCompatStatusText(void);
-FOUNDATION_EXPORT NSString* PFBCompatInstallText(void);
 FOUNDATION_EXPORT NSString* PFBCompatReportText(void);
 
-// Settings Twitter reads while the debugger records, with a count of reads: they
-// mark the leads Twitter actually reads.
+// Notes a setting Twitter reads while the debugger records: it marks the leads
+// Twitter actually reads.
 FOUNDATION_EXPORT void PFBCompatNoteSettingRead(NSString* key);
-FOUNDATION_EXPORT NSDictionary<NSString*, NSNumber*>* PFBCompatSettingsRead(void);
 
 // Counts one action for an option. The detail is only formatted for the first
 // action of an install, so the call stays cheap on paths that run constantly.
@@ -187,6 +183,8 @@ typedef NS_ENUM(NSInteger, PFBCompatPath) {
     PFBCompatPath_web_mutes,
     PFBCompatPath_web_grok,
     PFBCompatPath_web_pages,
+    PFBCompatPath_web_tweets,
+    PFBCompatPath_web_media,
     PFBCompatPath_tab_badges,
     PFBCompatPathCount,
 };
@@ -222,7 +220,7 @@ FOUNDATION_EXPORT void PFBCompatTourRecord(BOOL full, NSString* stop, NSArray<NS
 // journal of the last tour for the report.
 FOUNDATION_EXPORT void PFBCompatTourLog(NSString* format, ...) NS_FORMAT_FUNCTION(1, 2);
 FOUNDATION_EXPORT NSString* PFBCompatTourJournalText(void);
-// This tweak build's identifier, so a stopped tour is charged to the build it ran on.
+// This PrimeFreeBird build's identifier, so a stopped tour is charged to the build it ran on.
 FOUNDATION_EXPORT NSString* PFBCompatBuildID(void);
 // A new Twitter binary is installed and no full tour has run on it yet.
 FOUNDATION_EXPORT BOOL PFBCompatCheckIsDue(void);

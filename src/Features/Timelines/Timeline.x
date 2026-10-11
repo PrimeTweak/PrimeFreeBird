@@ -156,9 +156,8 @@ static const void* kPFBFleetHiddenKey = &kPFBFleetHiddenKey;
 // Plain C rather than a %new method: a %new selector isn't known to the
 // compiler when called through an id handle.
 static void pfbApplyFleetVisibility(UIView* view) {
-    // Restore what the tweak hid: without this the bar stays gone after the option is
-    // switched back off, until the app is relaunched. The tweak only ever restores a
-    // view the tweak hid, so Twitter's own hiding is never overridden.
+    // Restores a bar hidden here once the option is switched off, without a relaunch. Only
+    // a view hidden here is restored, so Twitter's own hiding is never overridden.
     BOOL hide = [PFBSettings boolForKey:@"hide_spaces"];
     BOOL hiddenByUs = objc_getAssociatedObject(view, kPFBFleetHiddenKey) != nil;
     if (hide) {
@@ -259,9 +258,6 @@ static void pfbApplyEdgeEffect(UIScrollView* scrollView, BOOL hide) {
 
 %hook UIScrollView
 
-// Modal screens are left alone: hiding the effect on Twitter's own settings sheet
-// breaks its content inset and slides the list up under the title. The tabs the
-// tweak cares about are never presented modally, so this costs nothing.
 static UIViewController* pfbOwningController(UIView* view) {
     UIResponder* responder = view;
     while ((responder = responder.nextResponder)) {
@@ -272,6 +268,9 @@ static UIViewController* pfbOwningController(UIView* view) {
     return nil;
 }
 
+// Modal screens are left alone: hiding the effect on Twitter's own settings sheet breaks
+// its content inset and slides the list up under the title. The timeline tabs are never
+// presented modally.
 static BOOL pfbScrollViewIsModal(UIScrollView* scrollView) {
     UIViewController* owner = pfbOwningController(scrollView);
     return owner != nil && owner.presentingViewController != nil;
@@ -1388,7 +1387,6 @@ static void PFBReadingPlaceMarker(UIScrollView* table, UIView* marker,
         marker.hidden = YES;
         return;
     }
-    extern UIColor* PFBCurrentAccentColor(void);
     UIColor* accent = PFBCurrentAccentColor() ?: [UIColor systemBlueColor];
     CGFloat reach = MIN(CGRectGetHeight(rowRect), kPFBReadingFadeReach);
     marker.frame = CGRectMake(CGRectGetMinX(rowRect), CGRectGetMinY(rowRect),

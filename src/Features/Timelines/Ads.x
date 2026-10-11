@@ -174,8 +174,6 @@ static NSArray* FilteredSections(TFNItemsDataViewController* dataViewController,
 // TFNItemsDataViewController, so promoted cards are dropped from that list
 // before they become pages.
 
-static const void* kLoadedPromotedCardsKey = &kLoadedPromotedCardsKey;
-
 // A Swift stored property that holds a class reference, read as an object.
 static id ObjectIvar(id object, const char* name) {
     Ivar ivar = object ? class_getInstanceVariable(object_getClass(object), name) : NULL;
@@ -257,17 +255,6 @@ static void RemovePromotedImmersiveCards(id controller) {
     }
     PFBCompatReach(PFBCompatPath_promoted_video_feed);
 
-    if (PFBDebugIsRecording()) {
-        long long loaded = 0;
-        for (int64_t i = 0; i < MIN(loadedEnd, total); i++) {
-            loaded += ImmersiveCardIsPromoted((__bridge id)elements[i * 2]) ? 1 : 0;
-        }
-        NSNumber* last = objc_getAssociatedObject(coordinator, kLoadedPromotedCardsKey);
-        if (loaded != last.longLongValue) {
-            objc_setAssociatedObject(coordinator, kLoadedPromotedCardsKey, @(loaded), OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-            PFBDebugLog(@"[ads] video feed: %lld promoted card(s) already loaded as pages - left in place", loaded);
-        }
-    }
     if (!enabled || first == total) {
         return;
     }
@@ -320,8 +307,6 @@ static void RemovePromotedImmersiveCards(id controller) {
         unknownObjectRelease(dropped[i]);
     }
     free(dropped);
-    PFBDebugLog(@"[ads] video feed: %lld promoted card(s) removed past page %lld (%lld -> %lld cards)",
-                (long long)droppedCount, (long long)loadedEnd - 1, (long long)total, (long long)kept);
 }
 
 %hook T1ImmersiveViewController

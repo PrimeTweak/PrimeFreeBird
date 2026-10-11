@@ -1,6 +1,4 @@
-#import <QuartzCore/QuartzCore.h>
 #import "Support/PFBManager.h"
-#import "Support/TWHeaders.h"
 #import "Features/Appearance/ThemeColor/PFBPalette.h"
 #import "Settings/PFBModernSettingsToggleCell.h"
 #import "Settings/PFBTintedSwitch.h"
@@ -93,11 +91,6 @@
     self.userInteractionEnabled = enabled;
 }
 
-- (void)configureWithTitle:(NSString*)title subtitle:(NSString*)subtitle iconName:(NSString*)iconName {
-    [self configureWithTitle:title subtitle:subtitle];
-    objc_setAssociatedObject(self, @selector(iconImageView), iconName, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-}
- 
 - (void)addTarget:(id)target action:(SEL)action forControlEvents:(UIControlEvents)events {
     [self.toggleSwitch addTarget:target action:action forControlEvents:events];
 }

@@ -37,20 +37,18 @@ static TFNTwitterStatus* statusFromObject(id object) {
     return nil;
 }
 
-// YES only while the tweak's reply web view is on screen, so the keyboard swizzle below never forces
-// the keyboard for any other web view in the app.
+// YES only while the reply web view is on screen, so the keyboard swizzle below never
+// forces the keyboard for any other web view in the app.
 BOOL gPFBReplyWebViewActive = NO;
 
-// One-shot: set right before the tweak issues the programmatic focus() (after the icon bar is built),
-// consumed by the WKContentView swizzle to raise the keyboard for that focus only. Any later
-// focus (e.g. x.com re-focusing after a dismiss) is NOT forced, so a user dismiss sticks.
+// One-shot: set right before the programmatic focus() (after the icon bar is built) and
+// consumed by the WKContentView swizzle for that focus only; a later focus is not forced,
+// so a dismiss sticks.
 BOOL gPFBForceNextFocus = NO;
 
 __weak UIScrollView* gPFBReplyScroller = nil;   // identity for the CALayer hook
-// The reveal is a CABasicAnimation on the scroll view layer's bounds.origin
-// (from {0,-173} to {0,0}, 0.25s). During the keyboard-up window the tweak drops exactly
-// that animation when WebKit tries to add it; the counter records that it fired.
-int gPFBAnimsKilled = 0;
+// WebKit's reveal is a CABasicAnimation on the scroll view layer's bounds.origin; during
+// the keyboard-up window that animation is dropped as it is added.
 CFTimeInterval gPFBSquelchUntil = 0;   // drop bounds.origin animations before this time
 
 // Native compose icon bar. The web toolbar cannot be glued to the keyboard, so the
@@ -122,9 +120,8 @@ static void ensureSessionThenOpenReply(NSString* statusID) {
 
 // MARK: - Hooks
 
-// The inline reply button has no dedicated ObjC subclass; every tap funnels through
-// this handler. WebKit reveals the field with a pair of animations on the scroll
-// view layer, dropped here during the keyboard-up window on that layer only.
+// WebKit reveals the field with a pair of animations on the scroll view layer, dropped
+// here during the keyboard-up window on that layer only.
 %hook CALayer
 - (void)addAnimation:(CAAnimation*)anim forKey:(NSString*)key {
     if (gPFBReplyWebViewActive && gPFBReplyScroller
@@ -134,7 +131,6 @@ static void ensureSessionThenOpenReply(NSString* statusID) {
         NSString* kp = [(CABasicAnimation*)anim keyPath];
         if ([kp isEqualToString:@"bounds.origin"] || [kp isEqualToString:@"bounds.size"]
             || [kp isEqualToString:@"bounds"]) {
-            gPFBAnimsKilled++;
             return;  // never install WebKit's mis-targeted reveal animation
         }
     }
@@ -142,6 +138,7 @@ static void ensureSessionThenOpenReply(NSString* statusID) {
 }
 %end
 
+// The inline reply button has no dedicated ObjC subclass; every tap funnels through this handler.
 %hook T1StatusViewInlineActionTapEventHandler
 - (void)performReplyActionWithAccount:(__unsafe_unretained id)account
                                 event:(__unsafe_unretained id)event
@@ -232,7 +229,7 @@ void PFBWebReplyStart(void) {
                                                             unsigned long long activityStateChanges,
                                                             id userObject) {
             if (gPFBReplyWebViewActive && gPFBForceNextFocus) {
-                gPFBForceNextFocus = NO;  // only the tweak's own focus is forced; a dismiss sticks
+                gPFBForceNextFocus = NO;  // only the programmatic focus is forced; a dismiss sticks
                 userIsInteracting = YES;
             }
             ((void (*)(id, SEL, void*, BOOL, BOOL, unsigned long long, id))originalFocusIMP)(
@@ -259,7 +256,7 @@ void PFBWebReplyStart(void) {
             __block IMP originalAccessoryIMP = method_getImplementation(accessoryMethod);
             IMP accessoryOverride = imp_implementationWithBlock(^id(id self_) {
                 if (gPFBReplyWebViewActive) {
-                    return gPFBIconBar;  // the tweak's icon bar; nil until built, so no form bar
+                    return gPFBIconBar;  // the reply icon bar; nil until built, so no form bar
                 }
                 return ((id (*)(id, SEL))originalAccessoryIMP)(self_, accessorySel);
             });

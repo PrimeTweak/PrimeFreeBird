@@ -2,7 +2,6 @@
 // image, and the download entry in the media long-press menu.
 
 #import "Support/HookHelpers.h"
-#import "Debug/PFBDebugger.h"
 
 // MARK: - DM video download
 
@@ -78,10 +77,11 @@ static const void* kPFBVoiceInteractionKey = &kPFBVoiceInteractionKey;
 - (void)layoutSubviews {
     %orig;
     UIView* view = (UIView*)self;
-    if (![PFBSettings boolForKey:@"download_voice_messages"]) {
+    BOOL enabled = [PFBSettings boolForKey:@"download_voice_messages"];
+    if (!enabled) {
         PFBCOMPAT_OBSERVE(PFBCompat_download_voice_messages, @"voice note found");
     }
-    if ([PFBSettings boolForKey:@"download_voice_messages"] &&
+    if (enabled &&
         !objc_getAssociatedObject(view, kPFBVoiceInteractionKey)) {
         UIContextMenuInteraction* interaction = [[UIContextMenuInteraction alloc]
             initWithDelegate:(id<UIContextMenuInteractionDelegate>)self];
@@ -125,11 +125,12 @@ static const void* kPFBVoiceInteractionKey = &kPFBVoiceInteractionKey;
 - (void)layoutSubviews {
     %orig;
 
-    if ([PFBSettings boolForKey:@"download_videos"] && self.downloadMenuInteraction == nil) {
+    BOOL enabled = [PFBSettings boolForKey:@"download_videos"];
+    if (enabled && self.downloadMenuInteraction == nil) {
         self.downloadMenuInteraction = [[UIContextMenuInteraction alloc] initWithDelegate:self];
         [self addInteraction:self.downloadMenuInteraction];
         PFBCOMPAT_ACTION(PFBCompat_download_videos, @"save menu on chat media");
-    } else if (![PFBSettings boolForKey:@"download_videos"]) {
+    } else if (!enabled) {
         PFBCOMPAT_OBSERVE(PFBCompat_download_videos, @"chat media found");
     }
 }
@@ -319,12 +320,12 @@ static const void* kPFBVoiceInteractionKey = &kPFBVoiceInteractionKey;
 - (id)status;
 @end
 
-// Freshness window between the share sheet and the menu. Measured at 0.4 s.
-// Past this delay nothing is added: no entry is better than the wrong media.
+// Freshness window between the share sheet and the menu; past it nothing is added,
+// since no entry is better than the wrong media.
 static const NSTimeInterval kPFBVMDFreshness = 3.0;
 
-// The tweak's entry is told apart by identifier: the app's own entry can carry
-// the very same title.
+// The added entry is told apart by identifier: the app's own entry can carry the
+// very same title.
 static NSString* const kPFBVMDActionIdentifier = @"com.primefreebird.download-video";
 
 static id                    gPFBVMDStatus;        // tweet under the long press
@@ -380,9 +381,9 @@ static NSArray* PFBVMDFreshVideoEntities(void) {
     return PFBVMDVideoEntities(gPFBVMDStatus);
 }
 
-// The title comes from Twitter's own strings, so it matches the native entry; the tweak's
-// TW_ copy of the key covers a miss. The lookup returns the key itself when both miss,
-// hence the explicit fallback.
+// The title comes from Twitter's own strings, so it matches the native entry; the bundled
+// TW_ copy covers a miss. The lookup returns the key itself when both miss, hence the
+// explicit fallback.
 static NSString* PFBVMDMenuTitle(void) {
     NSString* key = @"DOWNLOAD_VIDEO_ACTIVITY_VIEW_LABEL";
     NSString* title = [[PFBBundle sharedBundle] localizedTwitterStringForKey:key];
@@ -392,8 +393,8 @@ static NSString* PFBVMDMenuTitle(void) {
     return title;
 }
 
-// A download entry by its title: the tweak's own, which the app's video entry also
-// shows, the app's generic one, or a raw key when the app shows one.
+// A download entry by its title: the added one, which the app's video entry also shows,
+// the app's generic one, or a raw key when the app shows one.
 static BOOL PFBVMDTitleIsDownload(NSString* title, NSString* ours,
                                   NSString* generic) {
     if ([title isEqualToString:ours] ||
@@ -433,8 +434,8 @@ static UIImage* PFBVMDGlyph(void) {
     return glyph;
 }
 
-// The app's own download entries leave a menu that holds the tweak's, so one entry
-// remains; without the tweak's, the app's stay untouched.
+// The app's own download entries leave a menu that holds the added entry, so one entry
+// remains; without it, the app's stay untouched.
 static NSArray* PFBVMDWithoutNativeDownload(NSArray* children) {
     NSString* ours = PFBVMDMenuTitle();
     NSString* generic = [[PFBBundle sharedBundle]
@@ -452,13 +453,12 @@ static NSArray* PFBVMDWithoutNativeDownload(NSArray* children) {
             kept = [children mutableCopy];
         }
         [kept removeObject:element];
-        PFBDebugLog(@"[dlvideo] native entry dropped: %@", title);
     }
     return kept ?: children;
 }
 
-// The children to install: the tweak's entry before the last item ("Share via..."),
-// in place of the app's own; unchanged without a fresh video Tweet or with the option off.
+// The children to install: the added entry before the last item ("Share via..."), in
+// place of the app's own; unchanged without a fresh video Tweet or with the option off.
 static NSArray* PFBVMDMenuChildren(NSArray* children) {
     if (children.count == 0) {
         return children;
@@ -490,14 +490,8 @@ static NSArray* PFBVMDMenuChildren(NSArray* children) {
                                          handler:^(UIAction* sender) {
         [downloader presentDownloadOptionsForMediaEntities:mediaEntities];
     }];
-    if (!action) {
-        return children;
-    }
-
     NSMutableArray* augmented = [PFBVMDWithoutNativeDownload(children) mutableCopy];
     [augmented insertObject:action atIndex:augmented.count ? augmented.count - 1 : 0];
-    PFBDebugLog(@"[dlvideo] entry added to media menu (%lu -> %lu items)",
-                (unsigned long)children.count, (unsigned long)augmented.count);
     return augmented;
 }
 
@@ -527,7 +521,3 @@ static NSArray* PFBVMDMenuChildren(NSArray* children) {
 }
 
 %end
-
-void PFBMediaDownloadsStart(void) {
-    PFBDebugLog(@"[dlvideo] media menu download entry armed");
-}

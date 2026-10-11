@@ -1,5 +1,5 @@
-// Option metadata and requirements follow the measured hook map, the feature-switch
-// table follows FeatureSwitches.x, and the logic is hand-written.
+// Option metadata and requirements follow the hook manifest, the feature-switch table
+// follows FeatureSwitches.x, and the logic is hand-written.
 #import "Common/PFBCompatibility.h"
 #import "Debug/PFBDebugger.h"
 #import "Common/PFBSettings.h"
@@ -15,16 +15,12 @@
 #import <os/lock.h>
 #import "Support/Generated/PFBHookManifest.h"
 #import "Features/Appearance/ThemeColor/PFBDarkModeStyle.h"
+#import "Support/HookHelpers.h"
 
 NSNotificationName const PFBCompatDidChangeNotification = @"PFBCompatDidChangeNotification";
 
-// Theme.x: whether an accent color is set, and whether the tab bar is themed.
+// Theme.x: whether an accent color is set.
 extern BOOL PFBAccentIsActive(void);
-extern BOOL PFBThemedTabBarWanted(void);
-// WebCreateTweet.x: whether a web session can sign requests.
-extern BOOL PFBHasUsableWebCredentials(void);
-// SendSound.x: whether a send sound is stored.
-extern BOOL PFBSendSoundIsSet(void);
 
 typedef struct {
     PFBCompatOption option;
@@ -168,6 +164,8 @@ static const PFBCompatPathMeta kPaths[] = {
     {PFBCompatPath_web_mutes, PFBCompat_web_session, "mute lists"},
     {PFBCompatPath_web_grok, PFBCompat_web_session, "Grok requests"},
     {PFBCompatPath_web_pages, PFBCompat_web_session, "Twitter web pages"},
+    {PFBCompatPath_web_tweets, PFBCompat_web_session, "Tweets sent"},
+    {PFBCompatPath_web_media, PFBCompat_web_session, "media uploads"},
     {PFBCompatPath_tab_badges, PFBCompat_enable_liquid_glass, "tab badges"},
 };
 static const size_t kPathCount = sizeof(kPaths) / sizeof(kPaths[0]);
@@ -954,7 +952,7 @@ static const PFBCompatReq kReqs[] = {
     {PFBCompat_web_session, "T1HostViewController", "-makeOnboardingViewControllerWithCompletion:"},
     {PFBCompat_web_session, "T1WebViewController", "-didFinishLoadingWithError:"},
     {PFBCompat_web_session, "WKWebView", "-loadRequest:"},
-    // Ivars the tweak reads by name, as "$name"; a "|" lists the other names the code accepts.
+    // Ivars read by name, as "$name"; a "|" lists the other names the code accepts.
     {PFBCompat_advanced_search, "_TtC15TwitterSearchV211SearchBarV2", "$showsFilterButton"},
     {PFBCompat_advanced_search, "_TtC15TwitterSearchV211SearchBarV2", "$filterButton"},
     {PFBCompat_restore_video_timestamp, "_TtC14T1TwitterSwift17VideoControlsView", "$progressLabelMode"},
@@ -1088,13 +1086,13 @@ static const PFBCompatFlag kFlags[] = {
 enum { kFlagCount = sizeof(kFlags) / sizeof(kFlags[0]) };
 
 typedef struct {
-    PFBCompatOption option;  // PFBCompatOptionCount: a tweak file rather than an option
+    PFBCompatOption option;  // PFBCompatOptionCount: a source file rather than an option
     const char* file;
     const char* name;
 } PFBCompatName;
 
-// Names the tweak reaches by name (selector strings, ivars, keys). Each must stay
-// in Twitter's binaries; the list is kept by hand.
+// Names reached as strings (selectors, ivars, keys). Each must stay in Twitter's
+// binaries; the list is kept by hand.
 static const PFBCompatName kNames[] = {
     {PFBCompat_like_confirm, "Features/Tweets/Confirmations.x", "displayAsFavorited"},
     {PFBCompat_follow_confirm, "Features/Tweets/Confirmations.x", "followState"},
@@ -1312,7 +1310,7 @@ static const PFBCompatName kNames[] = {
     {PFBCompatOptionCount, "Sideload/PFBLoginBridge.x", "sharedTwitter"},
     {PFBCompatOptionCount, "Sideload/PFBLoginBridge.x", "updateUserInfoAndCredentialsWithToken:secret:username:"},
     {PFBCompatOptionCount, "Sideload/PFBLoginBridge.x", "viewAccount:animated:"},
-    {PFBCompatOptionCount, "Sideload/PFBWebLoginProbeViewController.m", "webView"},
+    {PFBCompatOptionCount, "Sideload/PFBWebLoginViewController.m", "webView"},
     {PFBCompatOptionCount, "Features/Timelines/PFBMutedToggleCell.m", "bodyBoldFont"},
     {PFBCompatOptionCount, "Features/Timelines/PFBMutedToggleCell.m", "colorPalette"},
     {PFBCompatOptionCount, "Features/Timelines/PFBMutedToggleCell.m", "currentColorPalette"},
@@ -1436,7 +1434,6 @@ static const PFBCompatName kNames[] = {
     {PFBCompatOptionCount, "Features/Appearance/ThemeColor/PFBColorThemeViewController.m", "currentColorPalette"},
     {PFBCompatOptionCount, "Features/Appearance/ThemeColor/PFBColorThemeViewController.m", "setPrimaryColorOption:"},
     {PFBCompatOptionCount, "Features/Appearance/ThemeColor/PFBColorThemeViewController.m", "sharedSettings"},
-    {PFBCompatOptionCount, "Features/Appearance/ThemeColor/PFBColorThemeViewController.m", "tabViews"},
     {PFBCompatOptionCount, "Features/Appearance/ThemeColor/PFBColorThemeViewController.m", "titleLabel"},
     {PFBCompatOptionCount, "Features/Appearance/ThemeColor/PFBColorThemeViewController.m", "window"},
     {PFBCompatOptionCount, "Features/Appearance/ThemeColor/PFBDarkModeStyle.x", "currentColorPalette"},
@@ -1602,7 +1599,7 @@ typedef struct {
     const char* selector;
 } PFBCompatDeclared;
 
-// Twitter methods the tweak declares and calls; each must stay on its class.
+// Twitter methods declared and called by PrimeFreeBird; each must stay on its class.
 static const PFBCompatDeclared kDeclared[] = {
     {"Support/T1Headers.h", "T1BaseWebViewController", "webView"},
     {"Support/T1Headers.h", "T1ConversationFocalStatusView", "eventHandler"},
@@ -1895,7 +1892,6 @@ static NSString* stationLabel(NSString* station) {
           @"launch": @"the app's launch",
           @"tab guide": @"the Explore tab",
           @"tab ntab": @"the Notifications tab",
-          @"tab messages": @"the Messages tab",
           @"tab home": @"the Home timeline",
           @"pull": @"a pull to refresh",
           @"first Tweet": @"an opened Tweet",
@@ -1995,7 +1991,7 @@ static NSString* imageUUID(const struct mach_header_64* header) {
     return @"?";
 }
 
-// The start of the tweak's own UUID: a rebuilt tweak is a new install.
+// The start of PrimeFreeBird's own UUID: a rebuild counts as a new install.
 static NSString* tweakBuild(void) {
     Dl_info info;
     if (!dladdr((const void*)&tweakBuild, &info) || !info.dli_fbase) {
@@ -2054,8 +2050,8 @@ static void foldIntoEarlier(void) {
     }
 }
 
-// Loads what was counted before. A rebuilt tweak on the same Twitter keeps what earlier
-// builds proved, shown apart until seen again; a new Twitter version starts clean.
+// Loads what was counted before. A rebuild on the same Twitter keeps what earlier builds
+// proved, shown apart until seen again; a new Twitter version starts clean.
 static void prepare(void) {
     static dispatch_once_t once;
     dispatch_once(&once, ^{
@@ -2301,7 +2297,6 @@ void PFBCompatStationRecord(NSString* station, BOOL reached, NSSet<NSString*>* m
         stations[station] = @{
             @"reached": @(reached),
             @"missed": reached ? (missed.allObjects ?: @[]) : @[],
-            @"at": [NSDate date],
         };
         tour[@"stations"] = stations;
         gStore[@"tour"] = tour;
@@ -2316,7 +2311,7 @@ void PFBCompatStationRecordCrash(NSString* station) {
         NSMutableDictionary* stations = [tour[@"stations"] isKindOfClass:[NSDictionary class]]
                                             ? [tour[@"stations"] mutableCopy]
                                             : [NSMutableDictionary dictionary];
-        stations[station] = @{@"reached": @NO, @"crashed": @YES, @"missed": @[], @"at": [NSDate date]};
+        stations[station] = @{@"reached": @NO, @"crashed": @YES, @"missed": @[]};
         tour[@"stations"] = stations;
         NSMutableArray* crashed = [tour[@"crashed"] isKindOfClass:[NSArray class]] ? [tour[@"crashed"] mutableCopy]
                                                                                    : [NSMutableArray array];
@@ -2469,7 +2464,7 @@ static const char* textSection(NSData* data, const char* name, size_t* size, BOO
     return found;
 }
 
-// Twitter's own binaries: the app and its frameworks, this tweak left out.
+// Twitter's own binaries: the app and its frameworks, PrimeFreeBird's dylib left out.
 static NSArray<NSString*>* twitterBinaries(void) {
     NSMutableArray<NSString*>* binaries = [NSMutableArray array];
     NSString* main = NSBundle.mainBundle.executablePath;
@@ -2655,11 +2650,11 @@ void PFBCompatNoteSettingRead(NSString* key) {
     if (!gSettingsRead) {
         gSettingsRead = [NSMutableDictionary dictionary];
     }
-    gSettingsRead[key] = @(gSettingsRead[key].unsignedIntegerValue + 1);
+    gSettingsRead[key] = @YES;
     os_unfair_lock_unlock(&gReadLock);
 }
 
-NSDictionary<NSString*, NSNumber*>* PFBCompatSettingsRead(void) {
+static NSDictionary<NSString*, NSNumber*>* PFBCompatSettingsRead(void) {
     os_unfair_lock_lock(&gReadLock);
     NSDictionary<NSString*, NSNumber*>* read = [gSettingsRead copy] ?: @{};
     os_unfair_lock_unlock(&gReadLock);
@@ -3174,8 +3169,7 @@ static NSUInteger classTextsGone(PFBCompatOption option, NSUInteger* total, NSSt
     return gone;
 }
 
-// One row per hooked file, from the manifest built with the tweak, so a class or
-// method Twitter dropped shows even where no option names it.
+// How many of the option's string-reached names are gone from Twitter, and the first.
 static NSUInteger namesGone(PFBCompatOption option, NSSet<NSString*>* gone, NSString** first) {
     NSMutableSet<NSString*>* counted = [NSMutableSet set];
     for (size_t i = 0; i < kNameCount; i++) {
@@ -3188,16 +3182,6 @@ static NSUInteger namesGone(PFBCompatOption option, NSSet<NSString*>* gone, NSSt
         }
     }
     return counted.count;
-}
-
-static BOOL declaredPresent(const PFBCompatDeclared* declared) {
-    Class cls = objc_getClass(declared->className);
-    if (!cls) {
-        return NO;
-    }
-    SEL selector = sel_registerName(declared->selector);
-    return class_getInstanceMethod(cls, selector) != NULL || class_getClassMethod(cls, selector) != NULL ||
-           [cls instancesRespondToSelector:selector] || [cls respondsToSelector:selector];
 }
 
 static BOOL hookPresent(const char* className, const char* methodName) {
@@ -3215,7 +3199,8 @@ static NSString* hookPath(const char* className, const char* methodName) {
                       : [NSString stringWithUTF8String:className];
 }
 
-// One row per tweak file: its hooks, and the names it reaches outside any option.
+// One row per hooked source file, from the hook manifest: its hooks, and the names it
+// reaches outside any option, so a dropped class or method shows even where no option names it.
 static void appendInternals(NSMutableArray<PFBCompatResult*>* results, NSSet<NSString*>* goneNames, NSDictionary* leads,
                             NSSet<NSString*>* leadSettings, NSDictionary<NSString*, NSNumber*>* read) {
     NSMutableDictionary<NSString*, NSNumber*>* hooks = [NSMutableDictionary dictionary];
@@ -3249,7 +3234,7 @@ static void appendInternals(NSMutableArray<PFBCompatResult*>* results, NSSet<NSS
     for (size_t i = 0; i < kDeclaredCount; i++) {
         NSString* file = [[NSString stringWithUTF8String:kDeclared[i].file] lastPathComponent];
         names[file] = @(names[file].integerValue + 1);
-        if (!nameGone[file] && !declaredPresent(&kDeclared[i])) {
+        if (!nameGone[file] && !hookPresent(kDeclared[i].className, kDeclared[i].selector)) {
             nameLost[file] = [NSString stringWithFormat:@"%s %s", kDeclared[i].className, kDeclared[i].selector];
             nameGone[file] = [nameLost[file] stringByAppendingString:@" not found"];
         }
@@ -3391,7 +3376,7 @@ static PFBCompatVerdict tourVerdict(const PFBCompatMeta* meta, NSString* key, BO
         return PFBCompatVerdictNotTested;
     }
     if (planned.count == 0) {
-        *detail = capitalizedFirst(absent ?: @"not on the tour");
+        *detail = capitalizedFirst(absent);
     } else if (missedAt) {
         *detail = [NSString stringWithFormat:@"No %@ during the check", absent];
     } else if (failedAt) {
@@ -3464,14 +3449,15 @@ NSArray<PFBCompatResult*>* PFBCompatResults(void) {
         result.enabled = optionEnabled(meta);
         result.alwaysOn = meta->alwaysOn;
         id seen = observed[key] ?: pendingObservation(meta->option, NO);
+        NSString* earlierText = earlierEvidence(earlier, key);
         if (done > 0) {
             id detail = details[key];
             result.evidence = [NSString stringWithFormat:@"%llu\u00d7 \u00b7 %@", (unsigned long long)done,
                                                          [detail isKindOfClass:[NSString class]] ? detail : @"-"];
         } else if ([seen isKindOfClass:[NSString class]]) {
             result.evidence = [@"ready \u00b7 " stringByAppendingString:seen];
-        } else if (earlierEvidence(earlier, key)) {
-            result.evidence = earlierEvidence(earlier, key);
+        } else if (earlierText) {
+            result.evidence = earlierText;
         } else {
             result.evidence = @"not seen yet";
         }
@@ -3482,7 +3468,7 @@ NSArray<PFBCompatResult*>* PFBCompatResults(void) {
         }
         NSString* goneName = nil;
         NSUInteger nameCount = namesGone(meta->option, missingNames, &goneName);
-        // Broken means the tweak's path is lost, not that the feature left Twitter.
+        // Broken means the option's path is lost, not that the feature left Twitter.
         NSString* lostPath = nil;
         if (missing) {
             result.verdict = PFBCompatVerdictBroken;
@@ -3533,7 +3519,7 @@ static NSInteger countVerdict(NSArray<PFBCompatResult*>* results, PFBCompatVerdi
     return n;
 }
 
-NSString* PFBCompatSummary(NSArray<PFBCompatResult*>* results) {
+static NSString* PFBCompatSummary(NSArray<PFBCompatResult*>* results) {
     return [NSString stringWithFormat:@"%ld broken \u00b7 %ld not tested \u00b7 %ld OK",
                                       (long)countVerdict(results, PFBCompatVerdictBroken),
                                       (long)countVerdict(results, PFBCompatVerdictNotTested),
@@ -3552,7 +3538,7 @@ PFBCompatReadState PFBCompatReadStatus(void) {
     return [((NSDictionary*)flags)[@"missing"] isKindOfClass:[NSArray class]] ? PFBCompatReadDone : PFBCompatReadFailed;
 }
 
-NSString* PFBCompatStatusText(void) {
+static NSString* PFBCompatStatusText(void) {
     PFBCompatReadState state = PFBCompatReadStatus();
     if (state == PFBCompatReadPending) {
         return @"Checking\u2026";
@@ -3581,7 +3567,6 @@ void PFBCompatRefreshStatus(void) {
                                                         object:nil];
 }
 
-// The binaries are read once per install, off the main thread.
 // Every path the verdicts can find lost, named as the report names them.
 static NSArray<NSString*>* lostPaths(NSArray<NSString*>* missingFlags, NSArray<NSString*>* missingNames) {
     NSMutableOrderedSet<NSString*>* lost = [NSMutableOrderedSet orderedSetWithArray:missingFlags];
@@ -3602,7 +3587,7 @@ static NSArray<NSString*>* lostPaths(NSArray<NSString*>* missingFlags, NSArray<N
         }
     }
     for (size_t i = 0; i < kDeclaredCount; i++) {
-        if (!declaredPresent(&kDeclared[i])) {
+        if (!hookPresent(kDeclared[i].className, kDeclared[i].selector)) {
             [lost addObject:[NSString stringWithFormat:@"%s %s", kDeclared[i].className, kDeclared[i].selector]];
         }
     }
@@ -3631,7 +3616,7 @@ static void scanThenJudge(void) {
               @"leads": leads,
               @"leadSettings": leadSettings.allObjects
           }
-                                               : @{@"unreliable": @YES};
+                                               : @{};
           writeStore();
       }
       dispatch_async(dispatch_get_main_queue(), ^{
@@ -3666,7 +3651,7 @@ void PFBCompatReset(void) {
     PFBCompatRefreshStatus();
 }
 
-NSString* PFBCompatInstallText(void) {
+static NSString* PFBCompatInstallText(void) {
     prepare();
     id since;
     id earlierSince;

@@ -1,9 +1,4 @@
-#import "Features/Search/PFBAdvancedSearchViewController.h"
 #import "Common/PFBBundle.h"
-#import "Support/TwitterChirpFont.h"
-#import <math.h>
-#import <objc/message.h>
-#import <objc/runtime.h>
 #import "Features/Search/PFBAdvancedSearchStyle.h"
 #import "Support/HookHelpers.h"
 #import "Features/Search/PFBAdvDateCell.h"
@@ -61,7 +56,6 @@
         UILabel* example = nil;
         _floatLabel = PFBAdvInstallBox(self, row, &example);
         _exampleLabel = example;
-        _floatLabel.alpha = 1.0;   // date rows keep their label visible
     }
     return self;
 }

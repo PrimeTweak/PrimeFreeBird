@@ -5,9 +5,6 @@
 
 "PFB_SETTINGS_DETAIL" = "Justera Twitter. Dölj annonser, aktivera Blue-funktioner och mycket mer.";
 
-/*Alerts and popups*/
-
-
 /*Settings*/
 "MODERN_SETTINGS_LAYOUT_TITLE" = "Allmänt";
 "MODERN_SETTINGS_LAYOUT_SUBTITLE" = "Lås appen, håll navigeringsfältet synligt och mer.";
@@ -210,8 +207,6 @@
 "FLEX_TWITTER_TITLE" = "FLEX-felsökningsläge";
 "FLEX_TWITTER_DETAIL" = "Använd FLEX för att felsöka Twitter.";
 
-/*Developers*/
-
 /*Custom fonts*/
 "CUSTOM_FONTS_NAVIGATION_BUTTON_TITLE" = "Anpassade typsnitt";
 "CUSTOM_FONTS_MENU_TITLE" = "\nVälj ett typsnitt";
@@ -222,8 +217,6 @@
 "FETCHING_PROGRESS_TITLE" = "Ett ögonblick...";
 "DOWNLOAD_AS_GIF_OPTION_TITLE" = "Ladda ner som GIF";
 "DOWNLOAD_AS_MP4_OPTION_TITLE" = "Ladda ner som MP4";
-
-/*App icon*/
 
 /*Copy profile info*/
 "COPY_PROFILE_INFO_MENU_OPTION_1" = "Kopiera biografi";
@@ -254,8 +247,6 @@
 
 "RESTORE_TWITTER_NAMES_TITLE" = "Återställ Twitter-terminologi";
 "RESTORE_TWITTER_NAMES_DETAIL" = "Ersätter 'X' med 'Twitter', 'Post' med 'Tweet', 'Repost' med 'Retweet' och så vidare i hela appens gränssnitt.";
-
-/*Deprecated*/
 
 /*App lock*/
 "PADLOCK_LOCKED_LABEL" = "Locked";

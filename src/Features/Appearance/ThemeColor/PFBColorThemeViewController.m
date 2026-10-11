@@ -15,7 +15,7 @@ extern void PFBBeginRawPaletteRead(void);
 extern void PFBEndRawPaletteRead(void);
 extern void PFBSyncAccentTheme(void);
 
-// Mirrors PFBCurrentAccentColor's precedence (the tweak's override, then Twitter's own
+// Mirrors PFBCurrentAccentColor's precedence (the custom override, then Twitter's own
 // option) so the default swatch shows selected before any change.
 static NSInteger CurrentSelectedColorOption(void) {
     NSUserDefaults* defaults = [NSUserDefaults standardUserDefaults];
@@ -83,6 +83,7 @@ static NSInteger NearestAccentOption(UIColor* color) {
 }
 
 @interface PFBColorThemeViewController () <UIColorPickerViewControllerDelegate>
+@property (nonatomic, strong) NSMutableArray<PFBColorSwatchControl*>* swatches;
 @property (nonatomic, strong) PFBColorSwatchControl* customSwatch;
 @end
 
@@ -250,7 +251,7 @@ static NSInteger NearestAccentOption(UIColor* color) {
     [defaults setBool:NO forKey:@"color_twitter_icon_in_top_bar"];
     [defaults synchronize];
 
-    // 0 is Twitter's own default option, not the tweak's blue swatch.
+    // 0 is Twitter's own default option, not the Blue swatch.
     id colorSettings = [objc_getClass("TAEColorSettings") sharedSettings];
     if ([colorSettings respondsToSelector:@selector(setPrimaryColorOption:)]) {
         [colorSettings setPrimaryColorOption:0];
@@ -258,7 +259,6 @@ static NSInteger NearestAccentOption(UIColor* color) {
 
     PFBSyncAccentTheme();
     [self refreshSelection];
-    [self reapplyTabBarAccent];
 }
 
 // MARK: - Visibility
@@ -300,9 +300,8 @@ static NSInteger NearestAccentOption(UIColor* color) {
         [self.customSwatch setSwatchNeutral];
     }
     [self.customSwatch setSwatchSelected:customActive];
-    // Twitter re-bakes the confirm glyph on the runloop AFTER the tweak's color
-    // notifications; run the white-bake now and once more next turn so the
-    // fresh dark bake never reaches the screen.
+    // Twitter re-bakes the confirm glyph on the run loop after the accent notifications, so
+    // the white bake runs now and once more next turn.
     PFBWhitenNavigationBarConfirm(self.navigationController.navigationBar);
     dispatch_async(dispatch_get_main_queue(), ^{
         PFBWhitenNavigationBarConfirm(self.navigationController.navigationBar);
@@ -317,53 +316,6 @@ static NSInteger NearestAccentOption(UIColor* color) {
     PFBSyncAccentTheme();
 
     [self refreshSelection];
-    [self reapplyTabBarAccent];
-}
-
-// MARK: - Tab bar
-
-// Re-tint the live tab bar icons to the new accent.
-- (void)reapplyTabBarAccent {
-    Class t1TabBarVCClass = NSClassFromString(@"T1TabBarViewController");
-    if (!t1TabBarVCClass) return;
-
-    UIWindow* window = nil;
-    for (UIWindowScene* scene in UIApplication.sharedApplication.connectedScenes) {
-        if (scene.activationState == UISceneActivationStateForegroundActive &&
-            [scene isKindOfClass:[UIWindowScene class]]) {
-            if ([scene.delegate respondsToSelector:@selector(window)]) {
-                window = [(id)scene.delegate window];
-            } else {
-                for (UIWindow* w in [(id)scene windows]) {
-                    if (w.isKeyWindow) {
-                        window = w;
-                        break;
-                    }
-                }
-            }
-            if (window) break;
-        }
-    }
-    if (!window) return;
-
-    NSMutableArray* stack = [NSMutableArray arrayWithObject:window.rootViewController];
-    while (stack.count) {
-        UIViewController* vc = stack.firstObject;
-        [stack removeObjectAtIndex:0];
-        if ([vc isKindOfClass:t1TabBarVCClass] && [vc respondsToSelector:@selector(tabViews)]) {
-            for (id tab in [vc valueForKey:@"tabViews"]) {
-                if ([tab respondsToSelector:@selector(applyCurrentThemeToIcon)]) {
-                    [tab performSelector:@selector(applyCurrentThemeToIcon)];
-                }
-            }
-        }
-        if (vc.presentedViewController) [stack addObject:vc.presentedViewController];
-        if ([vc isKindOfClass:[UINavigationController class]])
-            [stack addObjectsFromArray:((UINavigationController*)vc).viewControllers];
-        if ([vc isKindOfClass:[UITabBarController class]])
-            [stack addObjectsFromArray:((UITabBarController*)vc).viewControllers];
-        [stack addObjectsFromArray:vc.childViewControllers];
-    }
 }
 
 // MARK: - Custom color
@@ -391,7 +343,6 @@ static NSInteger NearestAccentOption(UIColor* color) {
     changeTwitterColor(nearest);
     PFBSyncAccentTheme();
     [self refreshSelection];
-    [self reapplyTabBarAccent];
 }
 
 @end

@@ -2,7 +2,7 @@
 
 #import <Foundation/Foundation.h>
 
-// Serializes the tweak's state to JSON and restores it: every registry option, page-local
+// Serializes PrimeFreeBird's state to JSON and restores it: every registry option, page-local
 // picks, accent, fonts, muted words, kept languages and tab bar layout. Migration flags,
 // counters and the web session are left out.
 @interface PFBSettingsBackup : NSObject

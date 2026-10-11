@@ -5,8 +5,6 @@
 
 "PFB_SETTINGS_DETAIL" = "Modifie Twitter : cache les pubs, active les options Blue et plus.";
 
-/*Alerts and popups*/
-
 /*Settings*/
 "MODERN_SETTINGS_LAYOUT_TITLE" = "Général";
 "MODERN_SETTINGS_LAYOUT_SUBTITLE" = "Verrouillez l'app, gardez la barre de navigation visible et plus encore.";
@@ -214,10 +212,6 @@
 "REPLY_IN_WEBVIEW_TITLE" = "Répondre dans une vue web";
 "REPLY_IN_WEBVIEW_DETAIL" = "Répondez via une page web quand l’app refuse d’envoyer les réponses.";
 
-/*Debug*/
-
-/*Developers*/
-
 /*Custom fonts*/
 "CUSTOM_FONTS_NAVIGATION_BUTTON_TITLE" = "Polices personnalisées";
 "CUSTOM_FONTS_MENU_TITLE" = "\nChoisir une police";
@@ -228,8 +222,6 @@
 "FETCHING_PROGRESS_TITLE" = "Une seconde...";
 "DOWNLOAD_AS_GIF_OPTION_TITLE" = "Télécharger en GIF";
 "DOWNLOAD_AS_MP4_OPTION_TITLE" = "Télécharger en MP4";
-
-/*App icon*/
 
 /*Copy profile info*/
 "COPY_PROFILE_INFO_MENU_OPTION_1" = "Copier la bio";
@@ -277,7 +269,7 @@
 "DEFAULT_FONT_OPTION_TITLE" = "Rétablir la police par défaut";
 "DEFAULT_FONT_CONFIRM_MESSAGE" = "Les polices régulière et grasse reviennent à celle de Twitter, et les polices récentes sont effacées.";
 
-/* ===== Keys added for parity with en ===== */
+/* ===== Settings groups and rows ===== */
 
 "GENERAL_GROUP_PRIVACY" = "Confidentialité";
 "NO_SCREENSHOT_DETECTION_TITLE" = "Captures d’écran propres";
@@ -351,7 +343,7 @@
 "LIGHT_MODE_RESTART_MESSAGE" = "Votre couleur d’arrière-plan est revenue à Système. Redémarrez Twitter pour effacer les couleurs sombres restantes.";
 "CLOSE_APP_ACTION" = "Fermer l’app";
 
-/* ===== Ajouts 2026-08-04 — onglets Explorer + session web ===== */
+/* ===== Explore tabs and web session ===== */
 "CANCEL_ACTION" = "Annuler";
 "OK_ACTION" = "OK";
 "REPLY_WEBVIEW_TITLE" = "Répondre";
@@ -406,7 +398,7 @@
 "ADVSEARCH_EX_SINCE" = "Seulement les Tweets publiés après cette date";
 "ADVSEARCH_EX_UNTIL" = "Seulement les Tweets publiés avant cette date";
 
-/* ===== MEDIA — nouveaux groupes et options (2026-08-04) ===== */
+/* ===== MEDIA: groups and options ===== */
 "MEDIA_GROUP_DOWNLOADS" = "Téléchargements";
 "MEDIA_GROUP_PLAYBACK" = "Lecture";
 "MEDIA_GROUP_QUALITY" = "Qualité";
@@ -419,7 +411,7 @@
 "COPY_PROFILE_INFO_MENU_OPTION_8" = "Copier la date d’inscription";
 "UNROUNDED_COUNTS_TITLE" = "Nombres exacts";
 
-/* ===== TWEETS — groupes et nouvelle option (2026-08-05) ===== */
+/* ===== TWEETS: groups and options ===== */
 "TWEETS_GROUP_COMPOSING" = "Rédaction";
 "TWEETS_GROUP_ACTIONS" = "Actions sur les Tweets";
 "TWEETS_GROUP_READING" = "Lecture";
@@ -434,7 +426,7 @@
 "SEND_SOUND_TOO_LONG" = "Choisissez un son de 7 secondes au plus.";
 "SEND_SOUND_UNREADABLE" = "Ce fichier n’est pas un son lisible.";
 
-/* ===== TIMELINES — groupes et nouvelle option (2026-08-05) ===== */
+/* ===== TIMELINES: groups and options ===== */
 "TIMELINES_GROUP_SUGGESTIONS" = "Pubs et suggestions";
 "TIMELINES_GROUP_CONTENT" = "Contenu";
 "TIMELINES_GROUP_BARS" = "Barres";
@@ -462,7 +454,6 @@
 "LANGUAGES_TRANSLATE_DETAIL" = "Tweets, bios, notes et notifications.";
 "LANGUAGES_OTHERS_TITLE" = "Autres langues";
 "LANGUAGES_OTHERS_NONE" = "Aucune";
-"MUTED_WORDS_NONE" = "Aucun";
 "MUTED_WORDS_ADD_PLACEHOLDER" = "Ajoutez un mot, une expression ou un @compte";
 "MUTED_WORDS_ADD_BUTTON" = "Ajouter";
 "MUTED_WORDS_OPTIONS_HEADER" = "Options";

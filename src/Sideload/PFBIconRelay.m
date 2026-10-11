@@ -1,5 +1,4 @@
 #import "Support/HookHelpers.h"
-#import <QuartzCore/QuartzCore.h>
 #import "Sideload/PFBReplyWebViewState.h"
 #import "Sideload/PFBIconRelay.h"
 

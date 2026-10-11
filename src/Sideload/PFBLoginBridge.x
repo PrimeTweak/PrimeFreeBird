@@ -26,6 +26,17 @@ static BOOL pfbBridgeCarriesAppOAuth(NSURLRequest* req) {
     return [auth isKindOfClass:[NSString class]] && [auth containsString:@"oauth_token="];
 }
 
+// A media upload: a write to the upload host, or to the DM media store.
+static BOOL pfbBridgeIsMediaUpload(NSURLRequest* req) {
+    NSString* host = req.URL.host.lowercaseString;
+    NSString* method = req.HTTPMethod.uppercaseString;
+    if (![method isEqualToString:@"POST"] && ![method isEqualToString:@"PUT"]) {
+        return NO;
+    }
+    return [host hasPrefix:@"upload."] ||
+           ([host hasPrefix:@"ton."] && [req.URL.path hasPrefix:@"/i/ton/data/"]);
+}
+
 // API hosts always, and any other X host (media upload included) once the request
 // carries the shell account's OAuth, so a new endpoint is covered without a host list.
 static BOOL pfbBridgeWantsRequest(NSURLRequest* req) {
@@ -116,10 +127,13 @@ static NSURLRequest* pfbBridgeInject(NSURLRequest* req) {
             ? @"[bridge] a request signed for another account went with its own web session"
             : @"[bridge] a request signed for another account went with its own web session, csrf pending");
     }
-    if ([req.URL.host.lowercaseString hasPrefix:@"upload."]) {
-        pfbBridgeProbeAccount(ownSession
-            ? @"[bridge] media upload went with its own account's web session"
-            : @"[bridge] media upload went with the shared web session");
+    if (pfbBridgeIsMediaUpload(req)) {
+        NSString* host = req.URL.host.lowercaseString;
+        pfbBridgeProbeAccount([NSString stringWithFormat:@"[bridge] media upload to %@ went with %@ web session",
+                                                         [host substringToIndex:[host rangeOfString:@"."].location],
+                                                         ownSession ? @"its own account's" : @"the shared"]);
+        PFBCompatReach(PFBCompatPath_web_media);
+        PFBCOMPAT_ACTION(PFBCompat_web_session, @"media uploaded through the web session");
     }
     NSMutableURLRequest* m = [req mutableCopy];
     NSString* add = csrf.length ? [NSString stringWithFormat:@"auth_token=%@; ct0=%@", authToken, csrf]
@@ -172,9 +186,9 @@ static NSURLRequest* pfbBridgeInject(NSURLRequest* req) {
 
 #pragma mark - Account mount
 
-// Prompts a restart once the account is live: the native chrome (Liquid Glass,
-// themed bars) only fully applies on a fresh launch. Same quit-and-relaunch
-// mechanism the tweak's settings already use.
+// Prompts a restart once the account is live: the native chrome (Liquid Glass, themed
+// bars) only fully applies on a fresh launch. Same quit-and-relaunch mechanism as the
+// settings.
 static void pfbBridgeShowRestartPrompt(void) {
     UIWindow* keyWindow = nil;
     for (UIWindow* window in UIApplication.sharedApplication.windows) {
@@ -290,7 +304,6 @@ static void pfbBridgeMount(NSString* screen, long long uid, NSString* token, NSS
     // WebCreateTweet.x, and the session already lives in the shared cookie jar.
     NSString* screen =
         screenName.length ? screenName : [NSString stringWithFormat:@"id%lld", userID];
-    PFBDebugLog(@"[bridge] mounting shell account over shared session (screen=%@)", screen);
     pfbBridgeMount(screen, userID, authToken, csrf, presenter);
 }
 

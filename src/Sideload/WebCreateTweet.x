@@ -55,7 +55,7 @@ static const void* CreateTweetWatcherKey = &CreateTweetWatcherKey;
 
 static void refreshXTID(void);
 static void refreshXTIDFor(NSString* method, NSString* path);
-static void refreshWebCookiesViaWebView(void);
+static id PFBAccountForAuthenticatedWebView(void);
 static void teardownWebHarvestWindow(void);
 
 // MARK: - Small helpers
@@ -332,9 +332,7 @@ static void refreshWebCookiesViaWebView(void) {
                                                 configuration:configuration];
         WebHelperDelegateInstance = [[PFBWebHelperDelegate alloc] init];
         webView.navigationDelegate = WebHelperDelegateInstance;
-        webView.customUserAgent =
-            @"Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like "
-            @"Gecko) Version/17.0 Mobile/15E148 Safari/604.1";
+        webView.customUserAgent = PFBMobileSafariUserAgent;
         webView.userInteractionEnabled = NO;
         webView.alpha = 0.01;
         WebHelperWebView = webView;
@@ -665,9 +663,7 @@ static NSString* fetchCt0Sync(NSString* authToken, NSString* expectedUserID) {
     request.HTTPShouldHandleCookies = NO;
     [request setValue:[NSString stringWithFormat:@"auth_token=%@", authToken]
         forHTTPHeaderField:@"Cookie"];
-    [request setValue:@"Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 "
-                      @"(KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1"
-        forHTTPHeaderField:@"User-Agent"];
+    [request setValue:PFBMobileSafariUserAgent forHTTPHeaderField:@"User-Agent"];
 
     dispatch_semaphore_t done = dispatch_semaphore_create(0);
     [[session dataTaskWithRequest:request
@@ -740,7 +736,7 @@ NSString* PFBWebCt0ForAuthToken(NSString* authToken, BOOL mint) {
 // signed with one, else the shared session. NO when no ct0 can be had in time.
 static BOOL resolveCredsForRequest(NSURLRequest* request, NSString** outAuthToken, NSString** outCt0,
                                    BOOL freshCsrf) {
-    // Nothing goes through the web without a signed-in session, as before.
+    // Nothing goes through the web without a signed-in session.
     if (WebAuthToken.length == 0) {
         return NO;
     }
@@ -1060,6 +1056,8 @@ static NSMutableURLRequest* webRequestFromNativeSend(NSURLRequest* request) {
     PFBDebugLog(@"[webtweet] rewrote CreateTweet -> web (auth=%lu ct0=%lu xtid=%lu)",
                 (unsigned long)authToken.length, (unsigned long)ct0.length,
                 (unsigned long)xtid.length);
+    PFBCompatReach(PFBCompatPath_web_tweets);
+    PFBCOMPAT_ACTION(PFBCompat_web_session, @"Tweet sent through the web session");
     return outgoing;
 }
 
@@ -1115,7 +1113,7 @@ static void watchCreateTweetTask(id task, NSString* userID) {
 
 // MARK: - Shared account accessor
 
-id PFBAccountForAuthenticatedWebView(void) {
+static id PFBAccountForAuthenticatedWebView(void) {
     Class hostClass = %c(T1HostViewController);
     if ([hostClass respondsToSelector:@selector(sharedHostViewController)]) {
         id host = [hostClass sharedHostViewController];

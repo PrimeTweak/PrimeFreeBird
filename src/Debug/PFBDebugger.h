@@ -3,12 +3,12 @@
 
 #import <UIKit/UIKit.h>
 
-// Marks a view as claimed by the tweak, with a short origin such as
+// Marks a view as claimed by PrimeFreeBird, with a short origin such as
 // @"NavBarIcons/backArrow". Stored as an associated object and shown in a capture;
 // a no-op when debugging is off.
 extern void PFBMark(UIView* view, NSString* origin);
 
-// Records a decision the tweak just made, like @"timeline: dropped 3 items" or
+// Records a decision just made, like @"timeline: dropped 3 items" or
 // @"inbox pill: pinned opaque". Kept in a small ring buffer and printed in the
 // report. No-op when debugging is off.
 extern void PFBDebugLog(NSString* format, ...) NS_FORMAT_FUNCTION(1, 2);

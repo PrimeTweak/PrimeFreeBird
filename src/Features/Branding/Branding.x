@@ -220,7 +220,7 @@ NSString* PFBTwitterTerminology(NSString* text) {
 // MARK: - Rename localized strings
 
 // Every UI string routes through this Foundation method, so the rename applies
-// broadly. The tweak's own bundles are skipped so its strings are not reprocessed.
+// broadly. PrimeFreeBird's own bundles are skipped so their strings are not reprocessed.
 %hook NSBundle
 - (NSString*)localizedStringForKey:(NSString*)key
                              value:(NSString*)value
@@ -449,9 +449,8 @@ static char kPFBFABGlyphKey;
 // through. Without it that hook swallows and re-tints in a loop, and the material
 // is never tinted.
 static BOOL PFBEffectInstallAllowed;
-// What the tweak last installed. UIVisualEffectView.effect vends copies whose
-// tintColor does not round-trip, so the getter can never be trusted for
-// mismatch detection — compare against this shadow instead.
+// The tint last installed here. UIVisualEffectView.effect vends copies whose tintColor
+// does not round-trip, so mismatches are detected against this shadow instead.
 static char kPFBFABGlassShadowTintKey;
 // The opaque color cap inside the material's contentView. Snapshots render glass
 // materials blank-white while plain layers snapshot correctly, so the cap is what
@@ -537,9 +536,8 @@ static void styleComposeFAB(UIView* fab) {
         fab.layer.cornerRadius = radius;
     }
     fab.clipsToBounds = YES;
-    // Give the button itself a white tint so any template glyph is white from
-    // its very first render. Waiting to tint the image view is what made the
-    // logo flash black for a frame on every tab change.
+    // The button itself takes a white tint so any template glyph is white from its very
+    // first render; tinting only the image view leaves one black frame on a tab change.
     if (![fab.tintColor isEqual:[UIColor whiteColor]]) {
         fab.tintColor = [UIColor whiteColor];
     }
@@ -659,9 +657,8 @@ static void pfbApplyComposeFABVisibility(UIView* fab) {
 
 %hook TFNFloatingActionButton
 
-// willMoveToWindow: fires before the button is ever drawn, so the white glyph
-// tint and the disc color are in place for its very first frame — that first
-// unstyled frame was the flash still visible on every tab change.
+// willMoveToWindow: fires before the button is ever drawn, so the white glyph tint and
+// the disc color are in place for its very first frame.
 - (void)willMoveToWindow:(UIWindow*)newWindow {
     %orig;
     if (newWindow) {
@@ -762,7 +759,7 @@ static void pfbApplyComposeFABVisibility(UIView* fab) {
         [PFBSettings boolForKey:@"enable_liquid_glass"] &&
         [effect respondsToSelector:@selector(setTintColor:)]) {
         UIColor* blue = PFBFABBlueColor();
-        // The tweak's own installs pass through, tinted.
+        // Installs made here pass through, tinted.
         if (PFBEffectInstallAllowed) {
             [(id)effect setTintColor:blue];
             %orig;
