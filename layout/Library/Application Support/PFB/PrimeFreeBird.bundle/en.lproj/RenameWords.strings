@@ -2,10 +2,10 @@
    keys match whole words case-insensitively and copy the match's capitals; keys with a capital match
    exactly. List each word once; no value may match a key. Per language, no fallback. */
 
-"repost" = "retweet";
-"reposts" = "retweets";
-"reposted" = "retweeted";
-"reposting" = "retweeting";
+"repost" = "Retweet";
+"reposts" = "Retweets";
+"reposted" = "Retweeted";
+"reposting" = "Retweeting";
 "post" = "Tweet";
 "posts" = "Tweets";
 "posted" = "Tweeted";

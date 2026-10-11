@@ -20,16 +20,16 @@
 
 /* ===== General › App behavior ===== */
 "GENERAL_GROUP_BEHAVIOR" = "App behavior";
-"FORCE_FOLLOWING_TAB_TITLE" = "Following by default";
-"FORCE_FOLLOWING_TAB_DETAIL" = "Open the timeline on Following instead of For You.";
+"FORCE_FOLLOWING_TAB_TITLE" = "Remember Home tab";
+"FORCE_FOLLOWING_TAB_DETAIL" = "Don't switch back to For you after 12 hours.";
 "NO_FOCUS_LOST_TITLE" = "Keep your place";
 "NO_FOCUS_LOST_DETAIL" = "Don't refresh the timeline when you come back from another app.";
 "NO_TAB_BAR_HIDING_TITLE" = "Fixed navigation bar";
 "NO_TAB_BAR_HIDING_DETAIL" = "Don't fade the navigation bar when you scroll.";
 "SHOW_SCROLL_INDICATOR_TITLE" = "Scroll bar";
 "SHOW_SCROLL_INDICATOR_DETAIL" = "Show the position indicator on the right while scrolling.";
-"DISABLE_RTL_TITLE" = "Left-to-right layout";
-"DISABLE_RTL_DETAIL" = "Force a left-to-right layout, even for right-to-left languages.";
+"DISABLE_RTL_TITLE" = "Left-to-right text";
+"DISABLE_RTL_DETAIL" = "Show text left to right, even in right-to-left languages.";
 "HIDE_PREMIUM_OFFER_TITLE" = "Hide Twitter Blue prompts";
 "HIDE_PREMIUM_OFFER_DETAIL" = "Remove the “Get Verified” and “Upgrade” buttons.";
 
@@ -60,7 +60,7 @@
 "CUSTOM_FONTS_DETAIL" = "Use a custom font throughout Twitter.";
 "REGULAR_FONTS_PICKER_OPTION_TITLE" = "Regular font";
 "BOLD_FONTS_PICKER_OPTION_TITLE" = "Bold font";
-"FONT_SYSTEM_DEFAULT_SUBTITLE" = "System default";
+"FONT_SYSTEM_DEFAULT_SUBTITLE" = "Default";
 "DEFAULT_FONT_OPTION_TITLE" = "Reset to default font";
 "DEFAULT_FONT_CONFIRM_MESSAGE" = "Regular and bold go back to Twitter's font, and the recent fonts are cleared.";
 
@@ -85,17 +85,17 @@
 "RESTORE_TWITTER_NAMES_TITLE" = "Restore Twitter terminology";
 "RESTORE_TWITTER_NAMES_DETAIL" = "Bring back the bird, and replace “X” with “Twitter”, “Post” with “Tweet”, and so on.";
 "REFRESH_PILL_LABEL_TITLE" = "Refresh pill label";
-"REFRESH_PILL_LABEL_DETAIL" = "Add “posted” back to the pill that announces new Tweets.";
+"REFRESH_PILL_LABEL_DETAIL" = "Add the label back to the new Tweets pill.";
 "RESTORE_TWEET_BUTTON_TITLE" = "Classic Tweet button";
-"RESTORE_TWEET_BUTTON_DETAIL" = "Show the bird on a colored circle as the Tweet button.";
+"RESTORE_TWEET_BUTTON_DETAIL" = "Show the feather on a colored circle.";
 
 /* ===== TIMELINES ===== */
 "MODERN_SETTINGS_TIMELINES_TITLE" = "Timelines";
 "MODERN_SETTINGS_TIMELINES_SUBTITLE" = "Clear ads, suggestions, and prompts out of your feed.";
 "HIDE_PROMOTED_TITLE" = "Hide ads";
-"HIDE_PROMOTED_DETAIL" = "Remove all promoted Tweets from your timeline.";
+"HIDE_PROMOTED_DETAIL" = "Remove promoted Tweets, trends, and video ads.";
 "HIDE_WHO_TO_FOLLOW_TITLE" = "Hide “Who to follow”";
-"HIDE_WHO_TO_FOLLOW_DETAIL" = "Remove follow suggestions from your timeline.";
+"HIDE_WHO_TO_FOLLOW_DETAIL" = "Remove follow suggestions.";
 "HIDE_TOPICS_TITLE" = "Hide topic Tweets";
 "HIDE_TOPICS_DETAIL" = "Remove Tweets pushed into your timeline because they match a topic.";
 "HIDE_TOPICS_TO_FOLLOW_TITLE" = "Hide suggested topics";
@@ -105,14 +105,14 @@
 "HIDE_SPACES_TITLE" = "Hide Spaces bar";
 "HIDE_SPACES_DETAIL" = "Remove the Spaces bar from the top of your timeline.";
 "HIDE_CUSTOM_TIMELINES_TITLE" = "Hide custom timelines";
-"HIDE_CUSTOM_TIMELINES_DETAIL" = "Remove pinned lists and communities from the Home tabs, and the Add button.";
+"HIDE_CUSTOM_TIMELINES_DETAIL" = "Remove pinned Lists and Communities from the Home tabs, and the Add button.";
 "RESTORE_REFRESH_SOUNDS_TITLE" = "Pull-to-refresh sounds";
 "RESTORE_REFRESH_SOUNDS_DETAIL" = "Play the classic sounds when you pull to refresh.";
 
 "HIDE_VERIFIED_TWEETS_TITLE" = "Hide verified Tweets";
 "HIDE_VERIFIED_TWEETS_DETAIL" = "Remove Tweets from verified accounts you don't follow. Profiles and search keep them.";
-"HIDE_BLOCKED_RETWEETS_TITLE" = "Hide blocked retweets";
-"HIDE_BLOCKED_RETWEETS_DETAIL" = "Remove retweets of accounts that have blocked you.";
+"HIDE_BLOCKED_RETWEETS_TITLE" = "Hide blocked Retweets";
+"HIDE_BLOCKED_RETWEETS_DETAIL" = "Remove Retweets of accounts that have blocked you.";
 
 /* ===== TWEETS ===== */
 "MODERN_SETTINGS_TWEETS_TITLE" = "Tweets";
@@ -120,7 +120,7 @@
 "UNDO_TWEET_TITLE" = "Undo Tweet";
 "UNDO_TWEET_TIMEOUT_DETAIL" = "Time to cancel a Tweet after you send it.";
 "TWEET_CONFIRM_TITLE" = "Confirm Tweets";
-"TWEET_CONFIRM_DETAIL" = "Ask before posting a Tweet.";
+"TWEET_CONFIRM_DETAIL" = "Ask before sending a Tweet.";
 "LIKE_CONFIRM_TITLE" = "Confirm likes";
 "LIKE_CONFIRM_DETAIL" = "Ask before liking a Tweet.";
 "HIDE_THREADS_TITLE" = "Hide conversations";
@@ -138,7 +138,7 @@
 "REPLY_SORTING_TITLE" = "Chronological replies";
 "REPLY_SORTING_DETAIL" = "Show replies oldest-first instead of sorted by relevance.";
 "RESTORE_REPLY_CONTEXT_TITLE" = "Restore reply context";
-"RESTORE_REPLY_CONTEXT_DETAIL" = "Show who's being replied to under Tweets.";
+"RESTORE_REPLY_CONTEXT_DETAIL" = "Show “Replying to” on opened replies.";
 "SHOW_QUOTE_COUNTS_TITLE" = "Quote and Retweet counts";
 "SHOW_QUOTE_COUNTS_DETAIL" = "Show both numbers at the top of a Tweet's Quotes screen.";
 "SHOW_ACCOUNT_LOCATION_TITLE" = "Account location";
@@ -158,8 +158,8 @@
 "TWEET_TO_IMAGE_DETAIL" = "Long-press share to export a Tweet as an image.";
 "DISABLE_VIDEO_CAPTIONS_TITLE" = "Hide video captions";
 "DISABLE_VIDEO_CAPTIONS_DETAIL" = "Remove the automatic subtitles shown on videos.";
-"AUTO_HIGHEST_LOAD_TITLE" = "High-quality media";
-"AUTO_HIGHEST_LOAD_DETAIL" = "Always load photos and videos at the highest resolution.";
+"AUTO_HIGHEST_LOAD_TITLE" = "High-quality photos";
+"AUTO_HIGHEST_LOAD_DETAIL" = "Always load photos at the highest resolution.";
 "ENABLE_IMAGE_PRELOADING_TITLE" = "Preload media";
 "ENABLE_IMAGE_PRELOADING_DETAIL" = "Load photos and videos ahead of time for smoother scrolling.";
 "FORCE_TWEET_FULL_FRAME_TITLE" = "Uncropped images";
@@ -169,7 +169,7 @@
 "RESTORE_VIDEO_TIMESTAMP_TITLE" = "Video time";
 "RESTORE_VIDEO_TIMESTAMP_DETAIL" = "Show elapsed and total time on full-screen videos, instead of the countdown.";
 "DISABLE_IMMERSIVE_SCROLL_TITLE" = "Disable video auto-scroll";
-"DISABLE_IMMERSIVE_SCROLL_DETAIL" = "Stop the next video from starting when you swipe in full-screen.";
+"DISABLE_IMMERSIVE_SCROLL_DETAIL" = "Stay on the current full-screen video.";
 
 /* ===== PROFILES ===== */
 "MODERN_SETTINGS_PROFILES_TITLE" = "Profiles";
@@ -177,7 +177,7 @@
 "FOLLOW_CONFIRM_TITLE" = "Confirm follows";
 "FOLLOW_CONFIRM_DETAIL" = "Ask before following someone.";
 "COPY_PROFILE_INFO_TITLE" = "Copy profile details";
-"COPY_PROFILE_INFO_DETAIL" = "Copy usernames, bios, and more with one tap.";
+"COPY_PROFILE_INFO_DETAIL" = "Add a copy button to profiles.";
 "DISABLE_ARTICLES_TITLE" = "Hide Articles tab";
 "DISABLE_ARTICLES_DETAIL" = "Remove the Articles tab from profiles.";
 "DISABLE_HIGHLIGHTS_TITLE" = "Hide Highlights tab";
@@ -193,7 +193,7 @@
 "RESTORE_FOLLOW_BUTTON_TITLE" = "Hide Subscribe button";
 "RESTORE_FOLLOW_BUTTON_DETAIL" = "Remove the Subscribe button from Tweets and profiles.";
 "SQUARE_AVATARS_TITLE" = "Square profile pictures";
-"SQUARE_AVATARS_DETAIL" = "Show avatars with square corners, like classic Twitter.";
+"SQUARE_AVATARS_DETAIL" = "Use rounded squares, like classic Twitter.";
 
 /* ===== SEARCH ===== */
 "SEARCH_GROUP_SEARCHING" = "Searching";
@@ -201,7 +201,7 @@
 "MODERN_SETTINGS_SEARCH_TITLE" = "Search";
 "MODERN_SETTINGS_SEARCH_SUBTITLE" = "Search history, trends, and trending videos.";
 "NO_HISTORY_TITLE" = "Disable search history";
-"NO_HISTORY_DETAIL" = "Stop Twitter from keeping track of your searches.";
+"NO_HISTORY_DETAIL" = "Don't save or show recent searches.";
 "HIDE_TREND_VIDEOS_TITLE" = "Hide trending videos";
 "HIDE_TREND_VIDEOS_DETAIL" = "Remove trending videos from the search menu.";
 
@@ -219,15 +219,15 @@
 
 /* ===== GROK ===== */
 "HIDE_GROK_ANALYZE_TITLE" = "Hide analyze button";
-"HIDE_GROK_ANALYZE_DETAIL" = "Remove Grok's analyze and ask buttons from Tweets.";
+"HIDE_GROK_ANALYZE_DETAIL" = "Remove Grok's analyze and ask buttons.";
 "HIDE_GROK_SIDEBAR_TITLE" = "Hide sidebar shortcut";
-"HIDE_GROK_SIDEBAR_DETAIL" = "Remove the Grok shortcut from the side menu.";
+"HIDE_GROK_SIDEBAR_DETAIL" = "Remove the Grok shortcut from the sidebar.";
 "HIDE_GROK_BOT_TITLE" = "Hide Grok Bot";
 "HIDE_GROK_BOT_DETAIL" = "Remove the “Try Grok Bot” row and the other Grok Bot promotions.";
 "HIDE_GROK_CREATE_TITLE" = "Hide creation tools";
 "HIDE_GROK_CREATE_DETAIL" = "Remove the options to create or edit media with Grok.";
 "DISABLE_AUTO_TRANSLATE_TITLE" = "Auto-translate";
-"DISABLE_AUTO_TRANSLATE_DETAIL" = "Translate Tweets and bios automatically.";
+"DISABLE_AUTO_TRANSLATE_DETAIL" = "Tweets, bios, notes and notifications.";
 
 /* ===== LAB ===== */
 "MODERN_SETTINGS_LAB_TITLE" = "Tools";
@@ -235,7 +235,7 @@
 "REPLY_IN_WEBVIEW_TITLE" = "Reply in web view";
 "REPLY_IN_WEBVIEW_DETAIL" = "Reply through a web page when the app refuses to send replies.";
 "IMPORT_SETTINGS_DONE_TITLE" = "Settings imported";
-"IMPORT_SETTINGS_DONE_MESSAGE" = "%lu settings restored. Restart Twitter to apply everything.";
+"IMPORT_SETTINGS_DONE_MESSAGE" = "Settings restored: %lu. Restart Twitter to apply everything.";
 "IMPORT_SETTINGS_FAILED_TITLE" = "Import failed";
 "IMPORT_SETTINGS_FAILED_MESSAGE" = "This file is not a PrimeFreeBird settings backup.";
 "READING_LINE_TITLE" = "Reading marker";
@@ -271,7 +271,7 @@
 /* ===== Navigation bar editor ===== */
 "CUSTOM_TAB_BAR_GRID_DETAIL" = "Tap a destination to add or remove it. Drag the bar below to reorder.";
 "CUSTOM_TAB_BAR_RESET_MESSAGE" = "Restore the navigation bar to its default layout.";
-"CUSTOM_TAB_BAR_SETTINGS_NAVIGATION_TITLE" = "Custom navigation";
+"CUSTOM_TAB_BAR_SETTINGS_NAVIGATION_TITLE" = "Navigation bar";
 
 /* ===== Fonts picker ===== */
 "CUSTOM_FONTS_MENU_TITLE" = "\nChoose a font";
@@ -332,7 +332,7 @@
 "ADVSEARCH_MENTIONING" = "Mentioning these accounts";
 "ADVSEARCH_MIN_REPLIES" = "Minimum replies";
 "ADVSEARCH_MIN_LIKES" = "Minimum likes";
-"ADVSEARCH_MIN_REPOSTS" = "Minimum retweets";
+"ADVSEARCH_MIN_REPOSTS" = "Minimum Retweets";
 "ADVSEARCH_SINCE_DATE" = "From date";
 "ADVSEARCH_UNTIL_DATE" = "To date";
 "ADVSEARCH_SEARCH" = "Search";
@@ -358,7 +358,7 @@
 "ADVSEARCH_EX_MENTION" = "Example: @SFBART @Caltrain · mentions @SFBART or mentions @Caltrain";
 "ADVSEARCH_EX_MINREPLIES" = "Example: 280 · Tweets with at least 280 replies";
 "ADVSEARCH_EX_MINLIKES" = "Example: 280 · Tweets with at least 280 likes";
-"ADVSEARCH_EX_MINREPOSTS" = "Example: 280 · Tweets with at least 280 retweets";
+"ADVSEARCH_EX_MINREPOSTS" = "Example: 280 · Tweets with at least 280 Retweets";
 "ADVSEARCH_EX_SINCE" = "Only Tweets published after this date";
 "ADVSEARCH_EX_UNTIL" = "Only Tweets published before this date";
 
@@ -372,7 +372,7 @@
 "UPLOAD_FULL_HD_VIDEOS_DETAIL" = "Upload your videos in 1080p instead of the compressed default.";
 "COPY_PROFILE_INFO_MENU_OPTION_6" = "Copy profile URL";
 "COPY_PROFILE_INFO_MENU_OPTION_7" = "Copy user ID";
-"COPY_PROFILE_INFO_MENU_OPTION_8" = "Copy date joined";
+"COPY_PROFILE_INFO_MENU_OPTION_8" = "Copy join date";
 "UNROUNDED_COUNTS_TITLE" = "Unrounded counts";
 
 /* ===== TWEETS: groups and options ===== */
@@ -396,13 +396,13 @@
 "TIMELINES_GROUP_BARS" = "Bars";
 "UNLIMITED_TIMELINE_TABS_TITLE" = "Unlimited timeline tabs";
 "UNLIMITED_TIMELINE_TABS_DETAIL" = "Pin more timelines and unlock advanced tabs.";
-"UNLIMITED_TIMELINE_TABS_DETAIL_HELD" = "Pin more timelines and unlock advanced tabs.";
+"UNLIMITED_TIMELINE_TABS_DETAIL_HELD" = "Not needed while custom timelines are hidden.";
 
 /* ===== MUTED WORDS ===== */
 "MUTED_WORDS_SUBTITLE" = "Tweets that match anything in this list are filtered out of your timeline.";
 "FILTERS_TITLE" = "Filters";
 "QUICK_MUTED_WORDS_LABEL" = "Muted words";
-"FILTERS_DETAIL" = "Words, accounts and languages you keep out of your feed.";
+"FILTERS_DETAIL" = "Words, accounts, languages, and hidden conversations.";
 "FILTERS_SEGMENT_WORDS" = "Words";
 "FILTERS_SEGMENT_LANGUAGES" = "Languages";
 "FILTERS_SEGMENT_THREADS" = "Threads";
@@ -432,9 +432,9 @@
 /* ===== MUTED WORDS: expiry, scope, counter ===== */
 "MUTED_WORDS_FOLLOWING_TITLE" = "Skip accounts you follow";
 "MUTED_WORDS_FOLLOWING_DETAIL" = "Tweets from people you follow are never filtered.";
-"MUTED_WORDS_REPOSTS_TITLE" = "Include retweets";
-"MUTED_WORDS_REPOSTS_DETAIL" = "Also filter retweets of a muted word or account.";
-"MUTED_WORDS_COUNT_FORMAT" = "%ld Tweets filtered today";
+"MUTED_WORDS_REPOSTS_TITLE" = "Include Retweets";
+"MUTED_WORDS_REPOSTS_DETAIL" = "Also filter Retweets of a muted word or account.";
+"MUTED_WORDS_COUNT_FORMAT" = "Filtered today: %ld";
 "MUTED_WORDS_DURATION_FOREVER" = "forever";
 "MUTED_WORDS_DURATION_24H" = "24 hours";
 "MUTED_WORDS_DURATION_7D" = "7 days";
@@ -448,7 +448,7 @@
 "SHOW_POLL_RESULTS_TITLE" = "Show poll results";
 "SHOW_POLL_RESULTS_DETAIL" = "Add each option's share of the vote to its label, before you have voted.";
 "TAP_TO_PAUSE_TITLE" = "Clean video player";
-"TAP_TO_PAUSE_DETAIL" = "Full-screen videos open bare — tap to play or pause.";
+"TAP_TO_PAUSE_DETAIL" = "Minimal bar in full screen; tap to play or pause.";
 "VIDEO_STARTS_MUTED_PILL_ON" = "Muted";
 "VIDEO_STARTS_MUTED_PILL_OFF" = "Sound on";
 
@@ -479,7 +479,7 @@
 "NOTIFS_HIDDEN_TOAST" = "Notification hidden";
 "HIDDEN_NOTIFS_TITLE" = "Hidden notifications";
 "HIDDEN_NOTIFS_COUNT" = "%ld hidden";
-"HIDDEN_NOTIFS_CLEAR_ALL" = "Clear all";
+"HIDDEN_NOTIFS_CLEAR_ALL" = "Unhide all";
 "HIDDEN_NOTIFS_EXPIRES_IN" = "%ld d left";
 "HIDDEN_NOTIFS_EMPTY_TITLE" = "Nothing to see here";
 "HIDDEN_NOTIFS_EMPTY_BODY" = "Every notification here is hidden. Tap the eye above to see them or bring one back.";
@@ -522,7 +522,7 @@
 "COMPATIBILITY_REPORT_TITLE" = "Report";
 "COMPATIBILITY_REPORT_DETAIL" = "Not checked yet";
 "SETTINGS_BACKUP_TITLE" = "Settings backup";
-"SETTINGS_BACKUP_DETAIL" = "Every option, muted word, and color.";
+"SETTINGS_BACKUP_DETAIL" = "Every option, filter, and color.";
 "EXPORT_SETTINGS_ACTION" = "Export…";
 "IMPORT_SETTINGS_ACTION" = "Import…";
 "WEB_SESSION_LOGIN_TITLE" = "Sign in on the web";
@@ -552,7 +552,7 @@
 "BRANDING_GROUP_CLASSIC" = "Classic Twitter";
 "VOICE_NOTE_FROM_VIDEO_TITLE" = "Voice note from a video";
 "VOICE_NOTE_FROM_VIDEO_DETAIL" = "Add a button to a recorded voice note to replace it with a video from your library.";
-"CONFIRM_TWEET_TITLE" = "Post this Tweet";
+"CONFIRM_TWEET_TITLE" = "Send this Tweet";
 "CONFIRM_TWEET_ACTION" = "Tweet";
 "CONFIRM_LIKE_TITLE" = "Like this Tweet";
 "CONFIRM_LIKE_ACTION" = "Like";
@@ -560,7 +560,7 @@
 "CONFIRM_FOLLOW_ACTION" = "Follow";
 "HIDE_NEW_TWEETS_PILL_TITLE" = "Hide new Tweets pill";
 "HIDE_NEW_TWEETS_PILL_DETAIL" = "Remove the pill that announces new Tweets at the top of your timeline.";
-"REFRESH_PILL_LABEL_DETAIL_HELD" = "Hide new Tweets pill hides this pill.";
+"REFRESH_PILL_LABEL_DETAIL_HELD" = "Not needed while the pill is hidden.";
 
 /* ===== COMPATIBILITY: behaviors with no toggle ===== */
 "PREMIUM_UNLOCK_TITLE" = "Premium unlocked";
