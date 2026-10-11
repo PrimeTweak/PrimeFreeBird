@@ -609,3 +609,19 @@
 "HIDE_NEW_TWEETS_PILL_TITLE" = "Cacher la pastille des nouveaux Tweets";
 "HIDE_NEW_TWEETS_PILL_DETAIL" = "Retire la pastille qui annonce les nouveaux Tweets en haut de votre fil.";
 "REFRESH_PILL_LABEL_DETAIL_HELD" = "« Cacher la pastille des nouveaux Tweets » la masque.";
+
+/* ===== COMPATIBILITY: behaviors with no toggle ===== */
+"PREMIUM_UNLOCK_TITLE" = "Premium débloqué";
+"HIDE_UPSELLS_TITLE" = "Cacher les offres d’abonnement";
+"EDIT_TWEET_TITLE" = "Modifier un Tweet";
+"GROK_TRANSLATION_TITLE" = "Bouton Traduire";
+"LAUNCH_SCREEN_TITLE" = "Écran de lancement classique";
+"EXPAND_TCO_LINKS_TITLE" = "Liens complets";
+"REMOVE_RELATED_TWEETS_TITLE" = "Cacher les Tweets similaires";
+"KEEP_READING_POSITION_TITLE" = "Garder votre place au rechargement";
+"CLASSIC_TWEET_DETAIL_TITLE" = "Page de Tweet classique";
+"WEB_LOGIN_TITLE" = "Connexion web";
+"SETTINGS_ENTRY_TITLE" = "PrimeFreeBird dans les réglages";
+"BAR_REPAIRS_TITLE" = "Réparations de la barre de navigation";
+"NO_AUTO_UNMUTE_TITLE" = "Pas de son au toucher";
+"FILTER_LANGUAGES_TITLE" = "Filtre de langues";

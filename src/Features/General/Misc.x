@@ -35,8 +35,13 @@ static BOOL ShouldKeepBrowserURLInApp(NSURL* url) {
         return %orig;
     }
 
-    PFBCOMPAT_ACTION(PFBCompat_always_open_safari, @"link opened in Safari");
-    [[UIApplication sharedApplication] openURL:url options:@{} completionHandler:nil];
+    [[UIApplication sharedApplication] openURL:url
+                                       options:@{}
+                             completionHandler:^(BOOL success) {
+                               if (success) {
+                                   PFBCOMPAT_ACTION(PFBCompat_always_open_safari, @"link opened in Safari");
+                               }
+                             }];
 
     if (completion) {
         completion();
@@ -64,8 +69,13 @@ static BOOL ShouldKeepBrowserURLInApp(NSURL* url) {
         return %orig;
     }
 
-    PFBCOMPAT_ACTION(PFBCompat_always_open_safari, @"link opened in Safari");
-    [[UIApplication sharedApplication] openURL:url options:@{} completionHandler:nil];
+    [[UIApplication sharedApplication] openURL:url
+                                       options:@{}
+                             completionHandler:^(BOOL success) {
+                               if (success) {
+                                   PFBCOMPAT_ACTION(PFBCompat_always_open_safari, @"link opened in Safari");
+                               }
+                             }];
     [self dismissViewControllerAnimated:NO completion:nil];
 }
 
@@ -79,7 +89,11 @@ static BOOL ShouldKeepBrowserURLInApp(NSURL* url) {
     // The entity is also used for URLs that never had a t.co wrapper (e.g.
     // share links), where expandedURL is nil.
     NSString* expandedURL = self.expandedURL;
-    return expandedURL ?: %orig;
+    if (expandedURL) {
+        PFBCOMPAT_ACTION(PFBCompat_expand_tco_links, @"link expanded");
+        return expandedURL;
+    }
+    return %orig;
 }
 
 %end

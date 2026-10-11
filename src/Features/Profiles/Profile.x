@@ -380,8 +380,6 @@ static id pfbWantedEntry(id provider) {
     if (hider && [PFBSettings boolForKey:hider]) {
         return nil;
     }
-    PFBCOMPAT_ACTION(PFBCompat_profile_initial_tab, @"chosen tab opened");
-
     SEL selector = NSSelectorFromString(name);
     if (![provider respondsToSelector:selector] ||
         ![provider respondsToSelector:@selector(contentMainEntries)]) {
@@ -394,6 +392,7 @@ static id pfbWantedEntry(id provider) {
     // No identity check against contentMainEntries: the entry can exist without the
     // array holding that exact object. Whether a tab is on screen is answered by the
     // controller further down.
+    PFBCOMPAT_ACTION(PFBCompat_profile_initial_tab, @"chosen tab opened");
     return entry;
 }
 

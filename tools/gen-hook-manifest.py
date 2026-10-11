@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-"""Writes src/Support/Generated/PFBHookManifest.m: every hooked class and method and every class
-resolved by name, checked against the running app by the debugger. Run from the repo root;
+"""Writes src/Support/Generated/PFBHookManifest.m: every hooked method and class resolved by name,
+with each file relying on it, for the debugger and the Compatibility sheet. Run from the repo root;
 the Makefile calls it before each build. PrimeFreeBird's own classes are skipped.
 """
 
@@ -51,9 +51,10 @@ def source_files():
 
 
 def parse():
-    # class -> set of hooked methods (a class hooked with no method still counts)
+    # class -> its hooked methods, each with the files hooking it (a class hooked with no
+    # method still counts); class resolved by name -> the files resolving it
     hooks = {}
-    byname = set()
+    byname = {}
     # Classes implemented in src/, and FLEX, Cephei and Preferences ones by prefix, ship with
     # PrimeFreeBird rather than Twitter, so they are not checked against the app. An
     # @interface alone only redeclares a class of the app; categories never count.
@@ -84,13 +85,13 @@ def parse():
                 if "{" in stripped:
                     selector = full_selector(signature.split("{", 1)[0])
                     if selector and current and not signature_is_new:
-                        hooks[current]["methods"].setdefault(selector, rel)
+                        hooks[current]["methods"].setdefault(selector, set()).add(rel)
                     signature = None
                 continue
             hook = HOOK_RE.match(stripped)
             if hook:
                 current = hook.group(1)
-                hooks.setdefault(current, {"methods": {}, "file": rel})
+                hooks.setdefault(current, {"methods": {}, "files": set()})["files"].add(rel)
                 pending_new = False
                 signature = None
                 continue
@@ -112,20 +113,20 @@ def parse():
                     if "{" in stripped:
                         selector = full_selector(stripped.split("{", 1)[0])
                         if selector and not is_new:
-                            hooks[current]["methods"].setdefault(selector, rel)
+                            hooks[current]["methods"].setdefault(selector, set()).add(rel)
                     else:
                         signature = stripped
                         signature_is_new = is_new
             for match in BYNAME_RE.finditer(stripped):
                 name = match.group(1) or match.group(2) or match.group(3)
                 if name:
-                    byname.add(name)
+                    byname.setdefault(name, set()).add(rel)
 
     def is_own(name):
         return name in own_classes or name.startswith(own_prefixes)
 
     hooks = {cls: info for cls, info in hooks.items() if not is_own(cls)}
-    byname = {name for name in byname if not is_own(name)}
+    byname = {name: files for name, files in byname.items() if not is_own(name)}
     return hooks, byname
 
 
@@ -140,31 +141,33 @@ def emit(hooks, byname):
     lines.append('#import "Support/Generated/PFBHookManifest.h"')
     lines.append("")
 
-    # Flattened method table: one row per (class, method), plus one row per
-    # class with a NULL method so a class hooked with no method is still checked.
+    # Flattened method table: one row per (class, method, file), so every file that hooks
+    # a method is credited with it, plus one row per class with a NULL method so a class
+    # hooked with no method is still checked.
     lines.append("const PFBHookRecord PFBHookRecords[] = {")
     for cls in sorted(hooks):
         info = hooks[cls]
-        file_literal = escape(info["file"])
         methods = sorted(info["methods"].items())
         if not methods:
-            lines.append(
-                '    {"%s", NULL, "%s"},' % (escape(cls), file_literal))
-        else:
-            # Each method names the file that hooks it, not the class's first file.
-            for method, method_file in methods:
+            for class_file in sorted(info["files"]):
                 lines.append(
-                    '    {"%s", "%s", "%s"},'
-                    % (escape(cls), escape(method), escape(method_file)))
+                    '    {"%s", NULL, "%s"},' % (escape(cls), escape(class_file)))
+        else:
+            for method, method_files in methods:
+                for method_file in sorted(method_files):
+                    lines.append(
+                        '    {"%s", "%s", "%s"},'
+                        % (escape(cls), escape(method), escape(method_file)))
     lines.append("};")
     lines.append(
         "const size_t PFBHookRecordCount = "
         "sizeof(PFBHookRecords) / sizeof(PFBHookRecords[0]);")
     lines.append("")
 
-    lines.append("const char* const PFBRuntimeClasses[] = {")
+    lines.append("const PFBRuntimeClassRecord PFBRuntimeClasses[] = {")
     for name in sorted(byname):
-        lines.append('    "%s",' % escape(name))
+        for name_file in sorted(byname[name]):
+            lines.append('    {"%s", "%s"},' % (escape(name), escape(name_file)))
     lines.append("};")
     lines.append(
         "const size_t PFBRuntimeClassCount = "
@@ -186,7 +189,12 @@ typedef struct {
 extern const PFBHookRecord PFBHookRecords[];
 extern const size_t PFBHookRecordCount;
 
-extern const char* const PFBRuntimeClasses[];
+typedef struct {
+    const char* className;
+    const char* file;
+} PFBRuntimeClassRecord;
+
+extern const PFBRuntimeClassRecord PFBRuntimeClasses[];
 extern const size_t PFBRuntimeClassCount;
 """
 
@@ -204,7 +212,8 @@ def main():
         handle.write(emit_header())
 
     method_rows = sum(
-        len(info["methods"]) or 1 for info in hooks.values())
+        sum(len(files) for files in info["methods"].values()) or len(info["files"])
+        for info in hooks.values())
     sys.stderr.write(
         "gen-hook-manifest: %d classes, %d method rows, %d runtime classes\n"
         % (len(hooks), method_rows, len(byname)))

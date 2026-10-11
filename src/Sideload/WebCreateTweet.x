@@ -968,6 +968,8 @@ static NSMutableURLRequest* webRequestFromNativeSend(NSURLRequest* request) {
         NSMutableURLRequest* outgoing = webPathRequest(request, @"x.com", PeriscopeWebPath, @"periscope token", YES);
         if (outgoing) {
             PFBCOMPAT_ACTION(PFBCompat_web_session, @"Spaces signed in with the web session");
+        } else {
+            PFBCOMPAT_OBSERVE(PFBCompat_web_session, @"Spaces sign-in seen, no web session");
         }
         return outgoing;
     }
@@ -979,6 +981,8 @@ static NSMutableURLRequest* webRequestFromNativeSend(NSURLRequest* request) {
         if (outgoing) {
             PFBCompatReach(PFBCompatPath_web_mutes);
             PFBCOMPAT_ACTION(PFBCompat_web_session, @"mute list sent through the web session");
+        } else {
+            PFBCOMPAT_OBSERVE(PFBCompat_web_session, @"mute list seen, no web session");
         }
         return outgoing;
     }
@@ -988,6 +992,8 @@ static NSMutableURLRequest* webRequestFromNativeSend(NSURLRequest* request) {
         if (outgoing) {
             PFBCompatReach(PFBCompatPath_web_grok);
             PFBCOMPAT_ACTION(PFBCompat_web_session, @"Grok request sent through the web session");
+        } else {
+            PFBCOMPAT_OBSERVE(PFBCompat_web_session, @"Grok request seen, no web session");
         }
         return outgoing;
     }
@@ -1028,6 +1034,7 @@ static NSMutableURLRequest* webRequestFromNativeSend(NSURLRequest* request) {
     if (postingUserID.length) {
         if (!resolveWebCreds(postingUserID, &authToken, &ct0)) {
             PFBDebugLog(@"[webtweet] no reroute: web creds unresolved for %@", postingUserID);
+            PFBCOMPAT_OBSERVE(PFBCompat_web_session, @"Tweet seen, no web session");
             return nil;
         }
     } else {
@@ -1035,6 +1042,7 @@ static NSMutableURLRequest* webRequestFromNativeSend(NSURLRequest* request) {
         // with that session, and with the shared one only for an unreadable signature.
         if (!resolveCredsForRequest(request, &authToken, &ct0, YES)) {
             PFBDebugLog(@"[webtweet] no reroute: no session or no ct0 for the poster");
+            PFBCOMPAT_OBSERVE(PFBCompat_web_session, @"Tweet seen, no web session");
             return nil;
         }
         BOOL own = ![authToken isEqualToString:WebAuthToken];
@@ -1048,23 +1056,21 @@ static NSMutableURLRequest* webRequestFromNativeSend(NSURLRequest* request) {
     [outgoing setValue:xtid forHTTPHeaderField:@"x-client-transaction-id"];
     refreshXTID();
 
-    // Tag the request so the task watcher can drop this account's ct0 on a 4xx.
-    if (postingUserID.length) {
-        objc_setAssociatedObject(outgoing, WebPostingUIDKey, postingUserID,
-                                 OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-    }
+    // Tags the request as a Tweet for the task watcher, with the account whose ct0 a 4xx
+    // drops; empty for an account sending with its own session.
+    objc_setAssociatedObject(outgoing, WebPostingUIDKey, postingUserID.length ? postingUserID : @"",
+                             OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     PFBDebugLog(@"[webtweet] rewrote CreateTweet -> web (auth=%lu ct0=%lu xtid=%lu)",
                 (unsigned long)authToken.length, (unsigned long)ct0.length,
                 (unsigned long)xtid.length);
     PFBCompatReach(PFBCompatPath_web_tweets);
-    PFBCOMPAT_ACTION(PFBCompat_web_session, @"Tweet sent through the web session");
     return outgoing;
 }
 
 // MARK: - Task watcher
 
-// Watches a rewritten CreateTweet task; on a 4xx it invalidates the cached ct0 so the
-// next send re-mints.
+// Watches a rewritten CreateTweet task: a 2xx proves the web session, a 4xx invalidates
+// the cached ct0 so the next send re-mints.
 @interface PFBCreateTweetWatcher : NSObject
 @property (nonatomic, copy) NSString* userID;
 @end
@@ -1089,6 +1095,9 @@ static NSMutableURLRequest* webRequestFromNativeSend(NSURLRequest* request) {
     NSInteger code = [task.response isKindOfClass:[NSHTTPURLResponse class]]
                          ? [(NSHTTPURLResponse*)task.response statusCode]
                          : 0;
+    if (code >= 200 && code < 300) {
+        PFBCOMPAT_ACTION(PFBCompat_web_session, @"Tweet sent through the web session");
+    }
     if (code >= 400 && code < 500 && keepAlive.userID.length) {
         cacheAccountPair(keepAlive.userID, nil);
     }
@@ -1096,7 +1105,7 @@ static NSMutableURLRequest* webRequestFromNativeSend(NSURLRequest* request) {
 @end
 
 static void watchCreateTweetTask(id task, NSString* userID) {
-    if (![task isKindOfClass:[NSURLSessionTask class]] || userID.length == 0) {
+    if (![task isKindOfClass:[NSURLSessionTask class]] || !userID) {
         return;
     }
     PFBCreateTweetWatcher* watcher = [PFBCreateTweetWatcher new];

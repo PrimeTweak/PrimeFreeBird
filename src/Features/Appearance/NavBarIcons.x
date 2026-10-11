@@ -103,6 +103,7 @@ static void pfbRepaintGlyphs(UIView* view, UIColor* colour) {
                 objc_setAssociatedObject(imageView, kPFBGreyedImageKey, painted,
                                          OBJC_ASSOCIATION_RETAIN_NONATOMIC);
                 imageView.image = painted;
+                PFBCOMPAT_ACTION(PFBCompat_bar_repairs, @"settings gear repainted");
             }
         }
         pfbRepaintGlyphs(subview, colour);
@@ -299,6 +300,7 @@ static void pfbRepaintNotificationsGear(UIView* bar, UIColor* colour) {
             objc_setAssociatedObject(button, kPFBGreyedImageKey, painted,
                                      OBJC_ASSOCIATION_RETAIN_NONATOMIC);
             button.image = painted;
+            PFBCOMPAT_ACTION(PFBCompat_bar_repairs, @"Notifications gear repainted");
         }
     }
 }
@@ -677,6 +679,7 @@ static BOOL pfbIsChatBarGlyph(UIView* view) {
         UIImage* baked = PFBGreyGlyph(chatImage, colour);
         if (baked) {
             PFBMark((UIView*)self, @"NavBarIcons/chatBarGlyph -> baked (window)");
+            PFBCOMPAT_ACTION(PFBCompat_bar_repairs, @"bar glyph baked");
             pfbTintGlyphChain((UIView*)self, colour);
             self.image = baked;  // AlwaysOriginal: re-enters the setter and passes through
         }
@@ -708,6 +711,7 @@ static BOOL pfbIsChatBarGlyph(UIView* view) {
                 // before its first baked image lands: with the button's own
                 // chain tinted, even a frame treated as a template is right.
                 pfbTintGlyphChain((UIView*)self, colour);
+                PFBCOMPAT_ACTION(PFBCompat_bar_repairs, @"bar glyph baked");
                 %orig(baked ?: image);
                 return;
             }
@@ -1014,6 +1018,7 @@ static double pfbDampedHeight(PFBHeightDamper* state, void* owner,
     state->flips = state->writes = 0;
     PFBDebugLog(@"[navbar] %s storm damped at %.0f pt (%s)", state->site, height,
                 pattern);
+    PFBCOMPAT_ACTION(PFBCompat_bar_repairs, @"bar height storm damped");
     return height;
 }
 
@@ -1344,6 +1349,7 @@ static void pfbQueueFadeRepair(UIView* bar) {
 
 - (void)setImage:(UIImage*)image {
     if (image.renderingMode == UIImageRenderingModeAlwaysTemplate) {
+        PFBCOMPAT_ACTION(PFBCompat_bar_repairs, @"avatar drawn as a picture");
         %orig([image imageWithRenderingMode:UIImageRenderingModeAlwaysOriginal]);
         return;
     }

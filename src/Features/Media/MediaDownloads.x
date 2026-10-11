@@ -257,7 +257,6 @@ static const void* kPFBVoiceInteractionKey = &kPFBVoiceInteractionKey;
 - (void)didLongPressActionButton:(UILongPressGestureRecognizer*)gestureRecognizer {
     if ([PFBSettings boolForKey:@"tweet_to_image"]) {
         if (gestureRecognizer.state == UIGestureRecognizerStateBegan) {
-            PFBCOMPAT_ACTION(PFBCompat_tweet_to_image, @"Tweet saved as image");
             UIView* statusView = self.superview;
             while (statusView && ![statusView respondsToSelector:@selector(eventHandler)]) {
                 statusView = statusView.superview;
@@ -295,7 +294,11 @@ static const void* kPFBVoiceInteractionKey = &kPFBVoiceInteractionKey;
                 acVC.popoverPresentationController.sourceView = self;
                 acVC.popoverPresentationController.sourceRect = self.frame;
             }
-            [topMostController() presentViewController:acVC animated:true completion:nil];
+            [topMostController() presentViewController:acVC
+                                              animated:true
+                                            completion:^{
+                                              PFBCOMPAT_ACTION(PFBCompat_tweet_to_image, @"Tweet saved as image");
+                                            }];
             return;
         }
     }

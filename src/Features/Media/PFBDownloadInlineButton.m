@@ -159,11 +159,12 @@ static NSURL* PFBLargestMP4(TFSTwitterEntityMedia* media) {
 
         // Every download runs through FFmpeg: mp4s stream-copied, GIFs palette-encoded, HLS-only
         // resolutions re-encoded with VideoToolbox; progress is processed time over probed duration.
-        // With a collect block the file is handed over instead of saved, nil on failure.
+        // With a collect block the file is handed over instead of saved, nil on failure;
+        // finished runs only once FFmpeg has succeeded.
         NSString* downloadingText = [[PFBBundle sharedBundle]
             localizedTwitterStringForKey:@"DOWNLOAD_LIVE_ACTIVITY_DOWNLOADING"];
-        void (^ffmpegDownload)(NSString*, NSString*, double, void (^)(NSURL*)) = ^(
-            NSString* args, NSString* ext, double durationMs, void (^collect)(NSURL*)) {
+        void (^ffmpegDownload)(NSString*, NSString*, double, void (^)(NSURL*), void (^)(void)) = ^(
+            NSString* args, NSString* ext, double durationMs, void (^collect)(NSURL*), void (^finished)(void)) {
             showHUD(downloadingText);
             NSURL* outFile = [[NSURL fileURLWithPath:NSTemporaryDirectory()]
                 URLByAppendingPathComponent:[NSString
@@ -178,6 +179,9 @@ static NSURL* PFBLargestMP4(TFSTwitterEntityMedia* media) {
                     dispatch_async(dispatch_get_main_queue(), ^{
                         dismissHUD();
                         BOOL succeeded = [ReturnCode isSuccess:returnCode];
+                        if (succeeded && finished) {
+                            finished();
+                        }
                         if (succeeded && collect) {
                             collect(outFile);
                         } else if (succeeded) {
@@ -229,7 +233,7 @@ static NSURL* PFBLargestMP4(TFSTwitterEntityMedia* media) {
                                      ffmpegDownload(
                                          [NSString stringWithFormat:@"-i %@ -c copy",
                                                                     url.absoluteString],
-                                         @"mp4", durationMs, nil);
+                                         @"mp4", durationMs, nil, nil);
                                  }];
             };
 
@@ -247,7 +251,7 @@ static NSURL* PFBLargestMP4(TFSTwitterEntityMedia* media) {
                                                           @"split[a][b];[a]palettegen["
                                                           @"p];[b][p]paletteuse",
                                                           url.absoluteString],
-                                     @"gif", durationMs, nil);
+                                     @"gif", durationMs, nil, nil);
                              }];
         };
 
@@ -263,7 +267,7 @@ static NSURL* PFBLargestMP4(TFSTwitterEntityMedia* media) {
                                              @"-i %@ -vf scale=%@:flags=lanczos -c:v "
                                              @"h264_videotoolbox -b:v 2M -c:a copy",
                                              url.absoluteString, resolution],
-                                     @"mp4", durationMs, nil);
+                                     @"mp4", durationMs, nil, nil);
                              }];
         };
 
@@ -293,13 +297,17 @@ static NSURL* PFBLargestMP4(TFSTwitterEntityMedia* media) {
             // pixels is copied as is, never a re-encoded HLS stream.
             if (media.mediaType == 3 && mp4URLs.count > 0) {
                 if ([PFBSettings boolForKey:@"download_highest_quality"]) {
-                    PFBCOMPAT_ACTION(PFBCompat_download_highest_quality, @"best quality saved");
                     ffmpegDownload([NSString stringWithFormat:@"-i %@ -c copy",
                                                               PFBLargestVideo(mp4URLs).absoluteString],
-                                   @"mp4", 0, nil);
+                                   @"mp4", 0, nil, ^{
+                                       PFBCOMPAT_ACTION(PFBCompat_download_highest_quality, @"best quality saved");
+                                   });
                     return;
                 }
                 PFBCOMPAT_OBSERVE(PFBCompat_download_highest_quality, @"quality menu built");
+            } else if (media.mediaType == 3 && [PFBSettings boolForKey:@"download_highest_quality"]) {
+                // No MP4 to copy: the resolutions of the stream are offered instead.
+                PFBCOMPAT_OBSERVE(PFBCompat_download_highest_quality, @"HLS only, resolutions offered");
             }
 
             NSMutableArray* items = [NSMutableArray new];
@@ -434,7 +442,7 @@ static NSURL* PFBLargestMP4(TFSTwitterEntityMedia* media) {
                                                [files addObject:file];
                                            }
                                            downloadNext(index + 1);
-                                       });
+                                       }, nil);
                     };
                     downloadNext(0);
                 };

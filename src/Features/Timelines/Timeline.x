@@ -932,6 +932,7 @@ static BOOL ShouldHideTimelineItem(id item, BOOL hideWhoToFollow, BOOL hidePromp
     }
 
     if (inConversation && [entryID hasPrefix:@"tweetdetailrelatedtweets"]) {
+        PFBCOMPAT_ACTION(PFBCompat_remove_related_tweets, @"related Tweets removed");
         return YES;
     }
 
@@ -1601,7 +1602,11 @@ static BOOL PFBItemLanguageAllowed(id item, NSSet<NSString*>* kept) {
     }
     // A regional code ("pt-BR") matches the language it belongs to.
     NSString* base = [language componentsSeparatedByString:@"-"].firstObject;
-    return [kept containsObject:legacy[base] ?: base];
+    BOOL allowed = [kept containsObject:legacy[base] ?: base];
+    if (!allowed) {
+        PFBCOMPAT_ACTION(PFBCompat_filter_languages, @"Tweet left out by language");
+    }
+    return allowed;
 }
 
 static NSSet<NSString*>* PFBKeptLanguages(void) {
@@ -1626,7 +1631,8 @@ static BOOL PFBTimelineFiltersNeedObservation(void) {
            PFBCompatNeedsObservation(PFBCompat_hide_topics) ||
            PFBCompatNeedsObservation(PFBCompat_hide_topics_to_follow) ||
            PFBCompatNeedsObservation(PFBCompat_hide_verified_tweets) ||
-           PFBCompatNeedsObservation(PFBCompat_hide_blocked_retweets);
+           PFBCompatNeedsObservation(PFBCompat_hide_blocked_retweets) ||
+           PFBCompatNeedsObservation(PFBCompat_filter_languages);
 }
 
 static NSArray* FilteredTimelineSections(TFNItemsDataViewController* dataViewController,
@@ -1684,6 +1690,10 @@ static NSArray* FilteredTimelineSections(TFNItemsDataViewController* dataViewCon
         NSMutableIndexSet* removed = [NSMutableIndexSet indexSet];
 
         for (NSUInteger i = 0; i < items.count; i++) {
+            if (!keptLanguages.count && !inConversation && !inProfile &&
+                PFBCompatNeedsObservation(PFBCompat_filter_languages) && PFBItemLanguage(items[i]).length) {
+                PFBCOMPAT_OBSERVE(PFBCompat_filter_languages, @"language read");
+            }
             if (MemoizedShouldHideTimelineItem(items[i], hideWhoToFollow, hidePrompts, hideTopics,
                                                hideTopicsToFollow, hideVerified, hideBlockedRetweets,
                                                inConversation, inProfile, conversationRootUserID,
@@ -1763,6 +1773,11 @@ void pfbReapplyTimelineFilter(void) {
         }
         // Twitter's own restore flag, forced on the home timeline so a reload
         // keeps the reading position instead of jumping to the top.
+        if (restoreScrollPosition) {
+            PFBCOMPAT_OBSERVE(PFBCompat_keep_reading_position, @"place already kept");
+        } else {
+            PFBCOMPAT_ACTION(PFBCompat_keep_reading_position, @"place kept");
+        }
         keepPlace = YES;
     }
     %orig(filtered, keepPlace);

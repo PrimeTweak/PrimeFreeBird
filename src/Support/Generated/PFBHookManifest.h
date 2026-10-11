@@ -10,5 +10,10 @@ typedef struct {
 extern const PFBHookRecord PFBHookRecords[];
 extern const size_t PFBHookRecordCount;
 
-extern const char* const PFBRuntimeClasses[];
+typedef struct {
+    const char* className;
+    const char* file;
+} PFBRuntimeClassRecord;
+
+extern const PFBRuntimeClassRecord PFBRuntimeClasses[];
 extern const size_t PFBRuntimeClassCount;

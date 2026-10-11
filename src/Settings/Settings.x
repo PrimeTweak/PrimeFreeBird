@@ -134,6 +134,7 @@ static void insertPrimeFreeBirdSettingsIfRoot(TFNItemsDataViewController* settin
     }
 
     settingsVC.sections = sectionsByInsertingEntry(settingsVC, settingsVC.sections);
+    PFBCOMPAT_ACTION(PFBCompat_settings_entry, @"entry in Twitter settings");
 }
 
 static NSArray* sectionsWithPrimeFreeBirdEntry(TFNItemsDataViewController* settingsVC,
@@ -150,6 +151,7 @@ static NSArray* sectionsWithPrimeFreeBirdEntry(TFNItemsDataViewController* setti
         return sections;
     }
 
+    PFBCOMPAT_ACTION(PFBCompat_settings_entry, @"entry in Twitter settings");
     return sectionsByInsertingEntry(settingsVC, sections);
 }
 

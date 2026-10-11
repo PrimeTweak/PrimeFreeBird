@@ -96,6 +96,51 @@ static void pfbBridgeProbeAccount(NSString* line) {
     PFBDebugLog(@"%@", line);
 }
 
+// Marks a media upload sent with a web session, so the hooks below watch its task.
+static const void* kPFBBridgeUploadKey = &kPFBBridgeUploadKey;
+
+// Watches one such upload: a 2xx proves the web session carried it.
+@interface PFBBridgeUploadWatcher : NSObject
+@end
+
+@implementation PFBBridgeUploadWatcher
+- (void)observeValueForKeyPath:(NSString*)keyPath
+                      ofObject:(id)object
+                        change:(__unused NSDictionary*)change
+                       context:(__unused void*)context {
+    NSURLSessionTask* task = object;
+    if (![keyPath isEqualToString:@"state"] || task.state != NSURLSessionTaskStateCompleted) {
+        return;
+    }
+    PFBBridgeUploadWatcher* keepAlive = self;  // stays alive while its retainer is detached below
+    @try {
+        [task removeObserver:keepAlive forKeyPath:@"state"];
+    } @catch (__unused NSException* exception) {
+    }
+    objc_setAssociatedObject(task, kPFBBridgeUploadKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    NSInteger code = [task.response isKindOfClass:[NSHTTPURLResponse class]]
+                         ? [(NSHTTPURLResponse*)task.response statusCode]
+                         : 0;
+    if (code >= 200 && code < 300) {
+        PFBCOMPAT_ACTION(PFBCompat_web_session, @"media uploaded through the web session");
+    }
+}
+@end
+
+// The task as created, watched when its request is a marked upload.
+static id pfbBridgeWatchUpload(id task, NSURLRequest* sent) {
+    if (![task isKindOfClass:[NSURLSessionTask class]] || !objc_getAssociatedObject(sent, kPFBBridgeUploadKey)) {
+        return task;
+    }
+    PFBBridgeUploadWatcher* watcher = [PFBBridgeUploadWatcher new];
+    objc_setAssociatedObject(task, kPFBBridgeUploadKey, watcher, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    @try {
+        [task addObserver:watcher forKeyPath:@"state" options:NSKeyValueObservingOptionNew context:NULL];
+    } @catch (__unused NSException* exception) {
+    }
+    return task;
+}
+
 // Adds a web session cookie + csrf to an app request, replacing the shell account's
 // invalid OAuth so the server authenticates it by cookie. A request signed for a bridged
 // account goes with that account's own session; the shared one serves the rest.
@@ -127,15 +172,11 @@ static NSURLRequest* pfbBridgeInject(NSURLRequest* req) {
             ? @"[bridge] a request signed for another account went with its own web session"
             : @"[bridge] a request signed for another account went with its own web session, csrf pending");
     }
-    if (pfbBridgeIsMediaUpload(req)) {
-        NSString* host = req.URL.host.lowercaseString;
-        pfbBridgeProbeAccount([NSString stringWithFormat:@"[bridge] media upload to %@ went with %@ web session",
-                                                         [host substringToIndex:[host rangeOfString:@"."].location],
-                                                         ownSession ? @"its own account's" : @"the shared"]);
-        PFBCompatReach(PFBCompatPath_web_media);
-        PFBCOMPAT_ACTION(PFBCompat_web_session, @"media uploaded through the web session");
-    }
     NSMutableURLRequest* m = [req mutableCopy];
+    if (pfbBridgeIsMediaUpload(req)) {
+        PFBCompatReach(PFBCompatPath_web_media);
+        objc_setAssociatedObject(m, kPFBBridgeUploadKey, @YES, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    }
     NSString* add = csrf.length ? [NSString stringWithFormat:@"auth_token=%@; ct0=%@", authToken, csrf]
                                 : [NSString stringWithFormat:@"auth_token=%@", authToken];
     NSString* merged = cookie.length ? [NSString stringWithFormat:@"%@; %@", cookie, add] : add;
@@ -149,37 +190,44 @@ static NSURLRequest* pfbBridgeInject(NSURLRequest* req) {
 
 - (NSURLSessionDataTask*)dataTaskWithRequest:(NSURLRequest*)request
                            completionHandler:(void (^)(NSData*, NSURLResponse*, NSError*))handler {
-    return %orig(pfbBridgeInject(request), handler);
+    NSURLRequest* sent = pfbBridgeInject(request);
+    return pfbBridgeWatchUpload(%orig(sent, handler), sent);
 }
 
 - (NSURLSessionDataTask*)dataTaskWithRequest:(NSURLRequest*)request {
-    return %orig(pfbBridgeInject(request));
+    NSURLRequest* sent = pfbBridgeInject(request);
+    return pfbBridgeWatchUpload(%orig(sent), sent);
 }
 
 - (NSURLSessionUploadTask*)uploadTaskWithRequest:(NSURLRequest*)request
                                         fromData:(NSData*)bodyData {
-    return %orig(pfbBridgeInject(request), bodyData);
+    NSURLRequest* sent = pfbBridgeInject(request);
+    return pfbBridgeWatchUpload(%orig(sent, bodyData), sent);
 }
 
 - (NSURLSessionUploadTask*)uploadTaskWithRequest:(NSURLRequest*)request
                                         fromData:(NSData*)bodyData
                                completionHandler:(void (^)(NSData*, NSURLResponse*, NSError*))handler {
-    return %orig(pfbBridgeInject(request), bodyData, handler);
+    NSURLRequest* sent = pfbBridgeInject(request);
+    return pfbBridgeWatchUpload(%orig(sent, bodyData, handler), sent);
 }
 
 - (NSURLSessionUploadTask*)uploadTaskWithRequest:(NSURLRequest*)request
                                         fromFile:(NSURL*)fileURL {
-    return %orig(pfbBridgeInject(request), fileURL);
+    NSURLRequest* sent = pfbBridgeInject(request);
+    return pfbBridgeWatchUpload(%orig(sent, fileURL), sent);
 }
 
 - (NSURLSessionUploadTask*)uploadTaskWithRequest:(NSURLRequest*)request
                                         fromFile:(NSURL*)fileURL
                                completionHandler:(void (^)(NSData*, NSURLResponse*, NSError*))handler {
-    return %orig(pfbBridgeInject(request), fileURL, handler);
+    NSURLRequest* sent = pfbBridgeInject(request);
+    return pfbBridgeWatchUpload(%orig(sent, fileURL, handler), sent);
 }
 
 - (NSURLSessionUploadTask*)uploadTaskWithStreamedRequest:(NSURLRequest*)request {
-    return %orig(pfbBridgeInject(request));
+    NSURLRequest* sent = pfbBridgeInject(request);
+    return pfbBridgeWatchUpload(%orig(sent), sent);
 }
 
 %end

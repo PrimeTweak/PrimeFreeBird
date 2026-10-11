@@ -319,6 +319,7 @@ static UIImage* launchBirdImage(CGFloat side) {
     if ([name isEqualToString:@"xLogo"]) {
         UIImage* bird = launchBirdImage(180);
         if (bird) {
+            PFBCOMPAT_ACTION(PFBCompat_launch_screen, @"bird shown");
             return bird;
         }
     }
@@ -367,6 +368,7 @@ static void paintWindowForSplash(UIView* view) {
     // Strip only the X mask, then let the native zoom animation run.
     // The bundled bird is sized for this slot, so the zoom leaves it undistorted.
     stripLaunchRevealMask((UIView*)self);
+    PFBCOMPAT_ACTION(PFBCompat_launch_screen, @"X reveal mask stripped");
     gPFBSplashRevealing = YES;
     paintWindowForSplash((UIView*)self);
 
@@ -396,6 +398,12 @@ static void paintWindowForSplash(UIView* view) {
         self == [NSBundle mainBundle]) {
         BOOL glassEnabled =
             [[NSUserDefaults standardUserDefaults] boolForKey:@"enable_liquid_glass"];
+        // Read at launch from inside NSBundle: counted without loading the store.
+        if (glassEnabled) {
+            PFBCompatCount(PFBCompat_enable_liquid_glass);
+        } else {
+            PFBCOMPAT_OBSERVE(PFBCompat_enable_liquid_glass, @"system design asked");
+        }
         return @(!glassEnabled);
     }
     return %orig;

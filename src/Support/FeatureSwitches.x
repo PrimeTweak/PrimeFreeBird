@@ -72,6 +72,7 @@ static NSNumber* FeatureSwitchOverrideValueForKey(NSString* key) {
     // Unlock Twitter's native premium color themes, so the accent the user picks
     // is applied everywhere (links, buttons, highlights) by Twitter itself.
     if ([key isEqualToString:@"app_customization_custom_primary_color_enabled"]) {
+        PFBCOMPAT_ACTION(PFBCompat_premium_unlock, @"premium colors unlocked");
         return @YES;
     }
 
@@ -170,12 +171,14 @@ static NSNumber* FeatureSwitchOverrideValueForKey(NSString* key) {
     // Edit tweet
     if ([key isEqualToString:@"edit_tweet_ga_composition_enabled"] ||
         [key isEqualToString:@"edit_tweet_pdp_dialog_enabled"]) {
+        PFBCOMPAT_ACTION(PFBCompat_edit_tweet, @"edit allowed");
         return @YES;
     }
 
     // Restore the animated launch screen (AppLifecycle.x strips its X-shaped
     // reveal mask)
     if ([key isEqualToString:@"app_launch_animated_launch_screen_enabled"]) {
+        PFBCOMPAT_ACTION(PFBCompat_launch_screen, @"animated launch screen kept");
         return @YES;
     }
 
@@ -189,6 +192,7 @@ static NSNumber* FeatureSwitchOverrideValueForKey(NSString* key) {
         [key isEqualToString:
                  @"grok_translations_community_note_translation_is_enabled"] ||
         [key isEqualToString:@"grok_translations_poll_translation_is_enabled"]) {
+        PFBCOMPAT_ACTION(PFBCompat_grok_translation, @"translate allowed");
         return @YES;
     }
 
@@ -358,6 +362,7 @@ static NSNumber* FeatureSwitchOverrideValueForKey(NSString* key) {
 
     if ([key
             isEqualToString:@"ios_tweet_detail_overflow_in_navigation_enabled"]) {
+        PFBCOMPAT_ACTION(PFBCompat_classic_tweet_detail, @"overflow kept in place");
         return @NO;
     }
 
@@ -523,6 +528,7 @@ static NSNumber* FeatureSwitchOverrideValueForKey(NSString* key) {
     // Premium features gate on subscriptions_enabled || (gating bypass && premium
     // tier).
     if ([key isEqualToString:@"subscriptions_gating_bypass"]) {
+        PFBCOMPAT_ACTION(PFBCompat_premium_unlock, @"premium gate opened");
         return @YES;
     }
 
@@ -555,6 +561,7 @@ static NSNumber* FeatureSwitchOverrideValueForKey(NSString* key) {
         [key isEqualToString:@"ios_notifications_blue_verified_introductory_"
                              @"offer_prefix_visible"] ||
         [key isEqualToString:@"dash_items_download_grok_enabled"]) {
+        PFBCOMPAT_ACTION(PFBCompat_hide_upsells, @"upsell off");
         return @NO;
     }
 
@@ -582,6 +589,7 @@ static NSNumber* FeatureSwitchOverrideValueForKey(NSString* key) {
         [key isEqualToString:
                  @"ios_tweet_promote_button_third_party_boost_enabled"] ||
         [key isEqualToString:@"thirdparty_boost_author_view_button_enabled"]) {
+        PFBCOMPAT_ACTION(PFBCompat_hide_upsells, @"Boost button off");
         return @NO;
     }
 
@@ -764,6 +772,7 @@ static NSNumber* FeatureSwitchOverrideValueForKey(NSString* key) {
 - (void)private_startLoginFlowWithSender:(id)sender {
     PFBDebugLog(@"[login-entry] startLoginFlow -> web login presented");
     [PFBWebLoginViewController presentFrom:(UIViewController*)self];
+    PFBCOMPAT_ACTION(PFBCompat_web_login, @"web login shown to add an account");
 }
 
 %end
@@ -777,6 +786,7 @@ static NSNumber* FeatureSwitchOverrideValueForKey(NSString* key) {
     }
     PFBDebugLog(@"[login-entry] makeOnboardingViewController -> web login as root");
     completion([PFBWebLoginViewController rootNavigationController]);
+    PFBCOMPAT_ACTION(PFBCompat_web_login, @"web login shown signed out");
 }
 
 %end
@@ -857,6 +867,7 @@ static BOOL pfbSkipsSensitiveWarnings(void) {
 // forcing those tiers here unlocks premium from one stable seam.
 - (BOOL)isSubscribedTo:(NSUInteger)tier {
     if (!ReportGenuineSubscription && (tier == 0 || tier == 7 || tier == 8)) {
+        PFBCOMPAT_ACTION(PFBCompat_premium_unlock, @"premium tier granted");
         return YES;
     }
     return %orig;

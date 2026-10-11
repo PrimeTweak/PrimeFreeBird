@@ -131,6 +131,23 @@ static const PFBCompatMeta kMeta[] = {
     {PFBCompat_web_session, "web_session", "LAB_GROUP_SESSION", "MODERN_SETTINGS_LAB_TITLE"},
     {PFBCompat_reply_in_webview, "reply_in_webview", "REPLY_IN_WEBVIEW_TITLE", "MODERN_SETTINGS_LAB_TITLE"},
     {PFBCompat_flex_twitter, "flex_twitter", "FLEX_TWITTER_TITLE", "MODERN_SETTINGS_LAB_TITLE"},
+    // Behaviors with no toggle: always active, reported so an IPA update that drops
+    // what they rely on still shows.
+    {PFBCompat_premium_unlock, "premium_unlock", "PREMIUM_UNLOCK_TITLE", "MODERN_SETTINGS_LAYOUT_TITLE", YES},
+    {PFBCompat_hide_upsells, "hide_upsells", "HIDE_UPSELLS_TITLE", "MODERN_SETTINGS_LAYOUT_TITLE", YES},
+    {PFBCompat_edit_tweet, "edit_tweet", "EDIT_TWEET_TITLE", "MODERN_SETTINGS_TWEETS_TITLE", YES},
+    {PFBCompat_grok_translation, "grok_translation", "GROK_TRANSLATION_TITLE", "MODERN_SETTINGS_MESSAGES_TITLE", YES},
+    {PFBCompat_launch_screen, "launch_screen", "LAUNCH_SCREEN_TITLE", "MODERN_SETTINGS_BRANDING_TITLE", YES},
+    {PFBCompat_expand_tco_links, "expand_tco_links", "EXPAND_TCO_LINKS_TITLE", "MODERN_SETTINGS_LAYOUT_TITLE", YES},
+    {PFBCompat_remove_related_tweets, "remove_related_tweets", "REMOVE_RELATED_TWEETS_TITLE", "MODERN_SETTINGS_TWEETS_TITLE", YES},
+    {PFBCompat_keep_reading_position, "keep_reading_position", "KEEP_READING_POSITION_TITLE", "MODERN_SETTINGS_TIMELINES_TITLE", YES},
+    {PFBCompat_classic_tweet_detail, "classic_tweet_detail", "CLASSIC_TWEET_DETAIL_TITLE", "MODERN_SETTINGS_TWEETS_TITLE", YES},
+    {PFBCompat_web_login, "web_login", "WEB_LOGIN_TITLE", "MODERN_SETTINGS_LAB_TITLE", YES},
+    {PFBCompat_settings_entry, "settings_entry", "SETTINGS_ENTRY_TITLE", "MODERN_SETTINGS_LAYOUT_TITLE", YES},
+    {PFBCompat_bar_repairs, "bar_repairs", "BAR_REPAIRS_TITLE", "MODERN_SETTINGS_APPEARANCE_TITLE", YES},
+    {PFBCompat_no_auto_unmute, "no_auto_unmute", "NO_AUTO_UNMUTE_TITLE", "MODERN_SETTINGS_MEDIA_TITLE", YES},
+    // A toggle through its stored list, like muted words: on when a language is kept.
+    {PFBCompat_filter_languages, "filter_languages", "FILTER_LANGUAGES_TITLE", "MODERN_SETTINGS_TIMELINES_TITLE", NO},
 };
 static const size_t kMetaCount = sizeof(kMeta) / sizeof(kMeta[0]);
 
@@ -167,6 +184,7 @@ static const PFBCompatPathMeta kPaths[] = {
     {PFBCompatPath_web_tweets, PFBCompat_web_session, "Tweets sent"},
     {PFBCompatPath_web_media, PFBCompat_web_session, "media uploads"},
     {PFBCompatPath_tab_badges, PFBCompat_enable_liquid_glass, "tab badges"},
+    {PFBCompatPath_starts_muted, PFBCompat_tap_to_pause, "starts muted"},
 };
 static const size_t kPathCount = sizeof(kPaths) / sizeof(kPaths[0]);
 
@@ -358,19 +376,13 @@ static const PFBCompatReq kReqs[] = {
     {PFBCompat_color_twitter_icon_in_top_bar, "UIViewController", "-viewDidAppear:"},
     {PFBCompat_enable_liquid_glass, "T1TabView", "-setBadgeCount:animated:"},
     {PFBCompat_enable_liquid_glass, "T1TabView", "-setHasUnreadContent:animated:"},
-    {PFBCompat_enable_liquid_glass, "CALayer", "-setOpacity:"},
     {PFBCompat_enable_liquid_glass, "NSBundle", "-objectForInfoDictionaryKey:"},
-    {PFBCompat_enable_liquid_glass, "T1AvatarImageView", "-setImage:"},
     {PFBCompat_enable_liquid_glass, "T1PersistentComposeView", "-layoutSubviews"},
     {PFBCompat_enable_liquid_glass, "T1TabBarHostView", "-layoutSubviews"},
     {PFBCompat_enable_liquid_glass, "T1TabBarViewController", "-setTabBarCollapseRatio:"},
     {PFBCompat_enable_liquid_glass, "T1TabView", "-_t1_updateImageViewAnimated:"},
-    {PFBCompat_enable_liquid_glass, "TFNBarButtonItemButton", "-didMoveToWindow"},
-    {PFBCompat_enable_liquid_glass, "TFNBarButtonItemButton", "-layoutSubviews"},
     {PFBCompat_enable_liquid_glass, "TFNCustomTabBar", "-layoutSubviews"},
-    {PFBCompat_enable_liquid_glass, "TFNNavigationBar", "-setFrame:"},
     {PFBCompat_enable_liquid_glass, "TFNNavigationBarSearchView", "-setFrame:"},
-    {PFBCompat_enable_liquid_glass, "TFNNavigationController", "-_tfn_setCurrentNavigationBarSimulatedHeight:isAnimated:"},
     {PFBCompat_enable_liquid_glass, "TFNSearchBar", "-setFrame:"},
     {PFBCompat_enable_liquid_glass, "TFSFeatureSwitches", "-boolForKey:"},
     {PFBCompat_enable_liquid_glass, "TFSFeatureSwitches", "-hasNonDefaultValueForKey:"},
@@ -386,14 +398,10 @@ static const PFBCompatReq kReqs[] = {
     {PFBCompat_enable_liquid_glass, "TFSInstrumentedFeatureSwitches", "-rawValueForKey:"},
     {PFBCompat_enable_liquid_glass, "TFSInstrumentedFeatureSwitches", "-unsafePeekBoolForKey:"},
     {PFBCompat_enable_liquid_glass, "TFSInstrumentedFeatureSwitches", "-unsafePeekIntegerForKey:"},
-    {PFBCompat_enable_liquid_glass, "UIBarButtonItem", "-setImage:"},
     {PFBCompat_enable_liquid_glass, "UIImageView", "-didMoveToWindow"},
     {PFBCompat_enable_liquid_glass, "UIImageView", "-setImage:"},
     {PFBCompat_enable_liquid_glass, "UINavigationBar", "-didMoveToWindow"},
     {PFBCompat_enable_liquid_glass, "UINavigationBar", "-layoutSubviews"},
-    {PFBCompat_enable_liquid_glass, "UINavigationController", "-navigationBar:shouldPopItem:"},
-    {PFBCompat_enable_liquid_glass, "UINavigationController", "-popViewControllerAnimated:"},
-    {PFBCompat_enable_liquid_glass, "UINavigationController", "-pushViewController:animated:"},
     {PFBCompat_enable_liquid_glass, "UINavigationItem", "-setLeftBarButtonItem:"},
     {PFBCompat_enable_liquid_glass, "UINavigationItem", "-setLeftBarButtonItems:"},
     {PFBCompat_enable_liquid_glass, "UINavigationItem", "-setLeftBarButtonItems:animated:"},
@@ -401,9 +409,21 @@ static const PFBCompatReq kReqs[] = {
     {PFBCompat_enable_liquid_glass, "UINavigationItem", "-setRightBarButtonItems:"},
     {PFBCompat_enable_liquid_glass, "UINavigationItem", "-setRightBarButtonItems:animated:"},
     {PFBCompat_enable_liquid_glass, "UINavigationItem", "-setTrailingItemGroups:"},
-    {PFBCompat_enable_liquid_glass, "UIView", "-setAlpha:"},
     {PFBCompat_enable_liquid_glass, "_TtC10TFNUISwift34NavigationBarMenuBarButtonItemView", "-didMoveToWindow"},
     {PFBCompat_enable_liquid_glass, "_TtC10TFNUISwift34NavigationBarMenuBarButtonItemView", "-layoutSubviews"},
+    // Navigation-bar repairs in NavBarIcons.x act whatever the Liquid Glass setting says.
+    {PFBCompat_bar_repairs, "CALayer", "-setOpacity:"},
+    {PFBCompat_bar_repairs, "T1AvatarImageView", "-setImage:"},
+    {PFBCompat_bar_repairs, "TFNBarButtonItemButton", "-didMoveToWindow"},
+    {PFBCompat_bar_repairs, "TFNBarButtonItemButton", "-layoutSubviews"},
+    {PFBCompat_bar_repairs, "TFNNavigationBar", "-setFrame:"},
+    {PFBCompat_bar_repairs, "TFNNavigationController", "-_tfn_setCurrentNavigationBarSimulatedHeight:isAnimated:"},
+    {PFBCompat_bar_repairs, "UIBarButtonItem", "-setImage:"},
+    {PFBCompat_bar_repairs, "UIImageView", "-didMoveToWindow"},
+    {PFBCompat_bar_repairs, "UINavigationController", "-navigationBar:shouldPopItem:"},
+    {PFBCompat_bar_repairs, "UINavigationController", "-popViewControllerAnimated:"},
+    {PFBCompat_bar_repairs, "UINavigationController", "-pushViewController:animated:"},
+    {PFBCompat_bar_repairs, "UIView", "-setAlpha:"},
     {PFBCompat_dark_mode_style, "CALayer", "-setBackgroundColor:"},
     {PFBCompat_dark_mode_style, "TAEColorSettings", "-setCurrentColorPalette:"},
     {PFBCompat_dark_mode_style, "TFNSearchBar", "-didMoveToWindow"},
@@ -947,11 +967,55 @@ static const PFBCompatReq kReqs[] = {
     {PFBCompat_web_session, "NSURLSession", "-uploadTaskWithRequest:fromFile:completionHandler:"},
     {PFBCompat_web_session, "NSURLSession", "-uploadTaskWithStreamedRequest:"},
     {PFBCompat_web_session, "NSURLSessionTask", "-resume"},
-    {PFBCompat_web_session, "T1AccountsViewController", "-private_startLoginFlowWithSender:"},
+    {PFBCompat_web_login, "T1AccountsViewController", "-private_startLoginFlowWithSender:"},
     {PFBCompat_web_session, "T1AppDelegate", "-applicationDidBecomeActive:"},
-    {PFBCompat_web_session, "T1HostViewController", "-makeOnboardingViewControllerWithCompletion:"},
+    {PFBCompat_web_login, "T1HostViewController", "-makeOnboardingViewControllerWithCompletion:"},
     {PFBCompat_web_session, "T1WebViewController", "-didFinishLoadingWithError:"},
     {PFBCompat_web_session, "WKWebView", "-loadRequest:"},
+    {PFBCompat_premium_unlock, "TFNTwitterAccount", "-isSubscribedTo:"},
+    {PFBCompat_premium_unlock, "TFNTwitterAccount", "-isEditProfileUsernameEnabled"},
+    {PFBCompat_premium_unlock, "TFNTwitterAccount", "-isPremiumTierUser"},
+    {PFBCompat_premium_unlock, "TFSAccountFeatureSwitches", "-isSubscriptionsSettingsItemEnabledWithProvider:"},
+    {PFBCompat_premium_unlock, "T1AppServicesManager", "-_brazeTierStringForAccount:"},
+    {PFBCompat_premium_unlock, "T1TabbedAppNavigation", "-showPremiumHubManageSubscriptionWithSource:withCompletion:"},
+    {PFBCompat_premium_unlock, "T1ProfileSummaryView", "-shouldShowUnderReviewButton"},
+    {PFBCompat_launch_screen, "UIImage", "+imageNamed:"},
+    {PFBCompat_launch_screen, "T1AnimatedLaunchScreenView", "-layoutSubviews"},
+    {PFBCompat_launch_screen, "T1AnimatedLaunchScreenView", "-animateRevealWithCompletion:"},
+    {PFBCompat_expand_tco_links, "TFSTwitterEntityURL", "-url"},
+    {PFBCompat_expand_tco_links, "TFSTwitterEntityURL", "-expandedURL"},
+    {PFBCompat_remove_related_tweets, "TFNItemsDataViewController", "-setSections:restoreScrollPosition:"},
+    {PFBCompat_keep_reading_position, "TFNItemsDataViewController", "-setSections:restoreScrollPosition:"},
+    {PFBCompat_settings_entry, "T1GenericSettingsViewController", "-viewWillAppear:"},
+    {PFBCompat_settings_entry, "T1GenericSettingsViewController", "-account"},
+    {PFBCompat_settings_entry, "TFNItemsDataViewController", "-updatedSections:forStyle:"},
+    {PFBCompat_settings_entry, "TFNItemsDataViewController", "-tableView:cellForRowAtIndexPath:"},
+    {PFBCompat_settings_entry, "TFNSettingsNavigationItem", "-initWithTitle:detail:iconName:controllerFactory:"},
+    {PFBCompat_accent_color, "T1GenericSettingsViewController", "-viewWillAppear:"},
+    {PFBCompat_accent_color, "T1GenericSettingsViewController", "-viewDidDisappear:"},
+    {PFBCompat_no_auto_unmute, "T1InlineVideoView", "-didMoveToWindow"},
+    {PFBCompat_color_pfb_switches, "TAEColorSettings", "+sharedSettings"},
+    {PFBCompat_color_pfb_switches, "TAEColorSettings", "-currentColorPalette"},
+    {PFBCompat_color_pfb_switches, "TAETwitterColorPaletteSettingInfo", "-colorPalette"},
+    {PFBCompat_download_videos, "TFSTwitterEntityMedia", "-videoInfo"},
+    {PFBCompat_download_videos, "TFSTwitterEntityMedia", "-mediaType"},
+    {PFBCompat_download_videos, "TFSTwitterEntityMediaVideoInfo", "-variants"},
+    {PFBCompat_download_videos, "TFSTwitterEntityMediaVideoVariant", "-url"},
+    {PFBCompat_download_videos, "TFSTwitterEntityMediaVideoVariant", "-contentType"},
+    {PFBCompat_download_videos, "TFNHUD", "-initWithText:"},
+    {PFBCompat_download_videos, "TFNActiveTextItem", "-initWithTextModel:activeRanges:"},
+    {PFBCompat_download_videos, "UIImage", "+tfn_vectorImageNamed:fitsSize:fillColor:"},
+    {PFBCompat_download_highest_quality, "TFSTwitterEntityMedia", "-videoInfo"},
+    {PFBCompat_download_highest_quality, "TFSTwitterEntityMedia", "-mediaType"},
+    {PFBCompat_download_highest_quality, "TFSTwitterEntityMediaVideoInfo", "-variants"},
+    {PFBCompat_download_highest_quality, "TFSTwitterEntityMediaVideoVariant", "-url"},
+    {PFBCompat_download_highest_quality, "TFSTwitterEntityMediaVideoVariant", "-contentType"},
+    {PFBCompat_custom_fonts, "TFNActiveTextItem", "-initWithTextModel:activeRanges:"},
+    {PFBCompat_custom_tab_bar, "T1PanelIdentity", "+iconImageNameForPanelID:"},
+    {PFBCompat_web_session, "T1WebViewController", "-initWithRootURL:account:shouldAuthenticate:shouldPresentAsNativePage:sourceStatus:scribeComponent:scribeParameters:"},
+    {PFBCompat_advanced_search, "UIImage", "+tfn_vectorImageNamed:fitsSize:fillColor:"},
+    {PFBCompat_tap_to_pause, "UIImage", "+tfn_vectorImageNamed:fitsSize:fillColor:"},
+    {PFBCompat_hide_typing_indicator, "NSURLSessionWebSocketTask", "-sendMessage:completionHandler:"},
     // Ivars read by name, as "$name"; a "|" lists the other names the code accepts.
     {PFBCompat_advanced_search, "_TtC15TwitterSearchV211SearchBarV2", "$showsFilterButton"},
     {PFBCompat_advanced_search, "_TtC15TwitterSearchV211SearchBarV2", "$filterButton"},
@@ -974,6 +1038,7 @@ static const PFBCompatReq kReqs[] = {
     {PFBCompat_show_quote_counts, "T1PostInteractionsViewController", "$account"},
     {PFBCompat_show_quote_counts, "T1PostInteractionsViewController", "$statusID"},
     {PFBCompat_voice_note_from_video, "T1MediaAttachmentsViewCell", "$_removeButton"},
+    {PFBCompat_no_auto_unmute, "T1InlineVideoView", "$isAutoUnmuteEnabled"},
 };
 static const size_t kReqCount = sizeof(kReqs) / sizeof(kReqs[0]);
 
@@ -1082,6 +1147,56 @@ static const PFBCompatFlag kFlags[] = {
     {PFBCompat_custom_tab_bar, "subscriptions_premium_hub_enabled", NO},
     {PFBCompat_custom_tab_bar, "recruiting_global_jobs_hub_enabled", NO},
     {PFBCompat_choose_explore_tabs, "ai_trends_ios_enable_news_tab", NO},
+    {PFBCompat_hide_upsells, "ios_profile_analytics_upsell_enabled", NO},
+    {PFBCompat_hide_upsells, "ios_profile_analytics_upsell_possible_enabled", NO},
+    {PFBCompat_hide_upsells, "ios_profile_upgrade_upsell_enabled", NO},
+    {PFBCompat_hide_upsells, "ios_profile_upgrade_upsell_swapper_enabled", NO},
+    {PFBCompat_hide_upsells, "ios_profile_visitor_upsell_enabled", NO},
+    {PFBCompat_hide_upsells, "subscriptions_upsells_get_verified_profile", NO},
+    {PFBCompat_hide_upsells, "subscriptions_upsells_reply_boost_enabled", NO},
+    {PFBCompat_hide_upsells, "subscriptions_upsells_reply_boost_popup_enabled", NO},
+    {PFBCompat_hide_upsells, "subscriptions_upsells_post_analytics_enabled", NO},
+    {PFBCompat_hide_upsells, "subscriptions_upsells_creator_support_post_conversation_enabled", NO},
+    {PFBCompat_hide_upsells, "longform_notetweets_composer_upsell_enabled", NO},
+    {PFBCompat_hide_upsells, "longform_notetweets_composer_auto_upsell_enabled", NO},
+    {PFBCompat_hide_upsells, "subscriptions_cta_on_replies_enabled", NO},
+    {PFBCompat_hide_upsells, "super_follow_upsell_sticky_button_enabled", NO},
+    {PFBCompat_hide_upsells, "subscriptions_new_paywall_enabled", NO},
+    {PFBCompat_hide_upsells, "subscriptions_offers_promotional_enabled", NO},
+    {PFBCompat_hide_upsells, "subscriptions_gifting_premium_enabled", NO},
+    {PFBCompat_hide_upsells, "subscriptions_gifting_premium_intro_copy_enabled", NO},
+    {PFBCompat_hide_upsells, "subscriptions_ios_download_to_offline_upsell_enabled", NO},
+    {PFBCompat_hide_upsells, "ios_notifications_blue_verified_introductory_offer_visible", NO},
+    {PFBCompat_hide_upsells, "ios_notifications_blue_verified_introductory_offer_prefix_visible", NO},
+    {PFBCompat_hide_upsells, "dash_items_download_grok_enabled", NO},
+    {PFBCompat_hide_upsells, "ios_tweet_promote_button_enabled", NO},
+    {PFBCompat_hide_upsells, "ios_tweet_promote_button_timeline_enabled", NO},
+    {PFBCompat_hide_upsells, "ios_tweet_promote_button_in_tweet_composer_enabled", NO},
+    {PFBCompat_hide_upsells, "ios_tweet_promote_button_in_overflow_menu_enabled", NO},
+    {PFBCompat_hide_upsells, "ios_tweet_promote_button_in_focal_top_toolbar_enabled", NO},
+    {PFBCompat_hide_upsells, "ios_tweet_promote_button_in_focal_bottom_toolbar_enabled", NO},
+    {PFBCompat_hide_upsells, "ios_tweet_promote_button_in_focal_top_analytics_enabled", NO},
+    {PFBCompat_hide_upsells, "ios_tweet_promote_button_in_post_analytics_enabled", NO},
+    {PFBCompat_hide_upsells, "ios_tweet_promote_button_boost_again_in_top_toolbar_enabled", NO},
+    {PFBCompat_hide_upsells, "ios_tweet_promote_button_sent_tweet_toast_enabled", NO},
+    {PFBCompat_hide_upsells, "ios_tweet_promote_button_third_party_boost_enabled", NO},
+    {PFBCompat_hide_upsells, "thirdparty_boost_author_view_button_enabled", NO},
+    {PFBCompat_premium_unlock, "subscriptions_gating_bypass", NO},
+    {PFBCompat_premium_unlock, "creator_studio_nav_enabled", NO},
+    {PFBCompat_premium_unlock, "creator_monetization_dashboard_enabled", NO},
+    {PFBCompat_edit_tweet, "edit_tweet_ga_composition_enabled", NO},
+    {PFBCompat_edit_tweet, "edit_tweet_pdp_dialog_enabled", NO},
+    {PFBCompat_grok_translation, "grok_translations_bio_inline_translation_is_enabled", NO},
+    {PFBCompat_grok_translation, "grok_translations_bio_translation_is_enabled", NO},
+    {PFBCompat_grok_translation, "grok_translations_post_inline_translation_is_enabled", NO},
+    {PFBCompat_grok_translation, "grok_translations_post_translation_is_enabled", NO},
+    {PFBCompat_grok_translation, "grok_translations_community_note_translation_is_enabled", NO},
+    {PFBCompat_grok_translation, "grok_translations_poll_translation_is_enabled", NO},
+    {PFBCompat_launch_screen, "app_launch_animated_launch_screen_enabled", NO},
+    {PFBCompat_classic_tweet_detail, "ios_tweet_detail_overflow_in_navigation_enabled", NO},
+    {PFBCompat_hide_grok_bot, "grok_ios_grok_bot_", YES},
+    {PFBCompat_custom_tab_bar, "recruiting_jetfuel_jobs_hub_enabled", NO},
+    {PFBCompat_premium_unlock, "app_customization_custom_primary_color_enabled", NO},
 };
 enum { kFlagCount = sizeof(kFlags) / sizeof(kFlags[0]) };
 
@@ -1528,7 +1643,7 @@ static const PFBCompatName kNames[] = {
     {PFBCompatOptionCount, "Support/HookHelpers.m", "item"},
     {PFBCompat_reading_line, "Features/Timelines/Timeline.x", "entryID"},
     {PFBCompat_reading_line, "Features/Timelines/Timeline.x", "indexPathsForVisibleItems"},
-    {PFBCompat_reading_line, "Features/Timelines/Timeline.x", "language"},
+    {PFBCompat_filter_languages, "Features/Timelines/Timeline.x", "language"},
     {PFBCompat_reading_line, "Features/Timelines/Timeline.x", "scribeSection"},
     {PFBCompat_reading_line, "Features/Timelines/Timeline.x", "sections"},
     {PFBCompat_reading_line, "Features/Timelines/Timeline.x", "window"},
@@ -1590,8 +1705,87 @@ static const PFBCompatName kNames[] = {
     {PFBCompat_tweet_to_image, "Features/Media/MediaDownloads.x", "eventHandler"},
     {PFBCompat_unrounded_counts, "Features/Profiles/Profile.x", "tweetCount"},
     {PFBCompat_voice_note_from_video, "Features/Media/MediaDownloads.x", "_removeButton"},
+    {PFBCompat_hide_view_count, "Features/Tweets/HideUI.x", "TTAStatusInlineAnalyticsButton"},
+    {PFBCompat_hide_bookmark_button, "Features/Tweets/HideUI.x", "TTAStatusInlineBookmarkButton"},
+    {PFBCompat_hide_downvote_button, "Features/Tweets/HideUI.x", "TTAStatusInlineDownvoteButton"},
+    {PFBCompat_like_confirm, "Features/Tweets/Confirmations.x", "TTAStatusInlineFavoriteButton"},
+    {PFBCompat_hide_explore_all, "Features/Tweets/HideUI.x", "_TtC14T1TwitterSwift23URTChromeViewController"},
+    {PFBCompat_hide_promoted, "Features/Timelines/Ads.x", "_TtC14T1TwitterSwift36ImmersiveGoogleNativeAdCardViewModel"},
+    {PFBCompat_restore_twitter_names, "Features/Branding/Branding.x", "TTAStatusBodyAttributedTextView"},
+    {PFBCompat_voice_note_from_video, "Features/Media/MediaDownloads.x", "TTMAssetVoiceRecording"},
+    {PFBCompatOptionCount, "Support/HookHelpers.m", "TFNDataViewItem"},
+    {PFBCompat_reading_line, "Features/Timelines/Timeline.x", "latest"},
+    {PFBCompat_hide_trend_videos, "Features/Timelines/Ads.x", "OTHER"},
+    {PFBCompat_show_poll_results, "Features/Timelines/Timeline.x", "counts_are_final"},
+    {PFBCompat_show_poll_results, "Features/Timelines/Timeline.x", "selected_choice"},
+    {PFBCompat_hide_threads, "Features/Tweets/HiddenThreads.x", "NOT_INTERESTED_IN_THIS_LABEL"},
+    {PFBCompat_profile_initial_tab, "Features/Profiles/Profile.x", "tweetsAndRepliesEntry"},
+    {PFBCompat_profile_initial_tab, "Features/Profiles/Profile.x", "highlightsEntry"},
+    {PFBCompat_profile_initial_tab, "Features/Profiles/Profile.x", "articlesEntry"},
+    {PFBCompat_profile_initial_tab, "Features/Profiles/Profile.x", "photoEntry"},
+    {PFBCompat_profile_initial_tab, "Features/Profiles/Profile.x", "videoEntry"},
+    {PFBCompat_profile_initial_tab, "Features/Profiles/Profile.x", "repostsEntry"},
+    {PFBCompat_restore_tweet_button, "Features/Branding/Branding.x", "feather"},
+    {PFBCompat_restore_tweet_button, "Features/Branding/Branding.x", "plus|compose|alt_compose|alt_compose_plus|compose_square"},
+    {PFBCompat_hide_notifications, "Features/General/HiddenNotifications.x", "eye_off"},
+    {PFBCompat_hide_notifications, "Features/General/HiddenNotifications.x", "close"},
+    {PFBCompat_padlock, "Features/General/AppLifecycle.x", "lock_stroke"},
+    {PFBCompat_copy_profile_info, "Features/Profiles/Profile.x", "copy_stroke"},
+    {PFBCompat_advanced_search, "Features/Search/AdvancedSearch.x", "settings_slider"},
+    {PFBCompat_advanced_search, "Features/Search/AdvancedSearch.x", "filter_bars"},
+    {PFBCompat_advanced_search, "Features/Search/AdvancedSearch.x", "CANCEL_ACTION_LABEL"},
+    {PFBCompat_tap_to_pause, "Features/Media/ImmersivePlayer.x", "immersive_play"},
+    {PFBCompat_tap_to_pause, "Features/Media/ImmersivePlayer.x", "sound"},
+    {PFBCompat_tap_to_pause, "Features/Media/ImmersivePlayer.x", "sound_off"},
+    {PFBCompat_download_videos, "Features/Media/PFBDownloadInlineButton.m", "arrow_down_circle_stroke"},
+    {PFBCompat_muted_words, "Features/Timelines/PFBMutedTermCell.m", "close_circle_fill"},
+    {PFBCompat_settings_entry, "Settings/PFBModernSettingsTableViewCell.m", "chevron_right"},
+    {PFBCompat_settings_entry, "Settings/PFBModernSettingsViewController.m", "settings_stroke"},
+    {PFBCompat_settings_entry, "Settings/PFBModernSettingsViewController.m", "paintbrush_stroke"},
+    {PFBCompat_settings_entry, "Settings/PFBModernSettingsViewController.m", "home_stroke"},
+    {PFBCompat_settings_entry, "Settings/PFBModernSettingsViewController.m", "quill"},
+    {PFBCompat_settings_entry, "Settings/PFBModernSettingsViewController.m", "media_tab_stroke"},
+    {PFBCompat_settings_entry, "Settings/PFBModernSettingsViewController.m", "person_stroke"},
+    {PFBCompat_settings_entry, "Settings/PFBModernSettingsViewController.m", "search_stroke"},
+    {PFBCompat_settings_entry, "Settings/PFBModernSettingsViewController.m", "messages_stroke"},
+    {PFBCompat_settings_entry, "Settings/PFBModernSettingsViewController.m", "tag_stroke"},
+    {PFBCompat_settings_entry, "Settings/PFBModernSettingsViewController.m", "hammer_stroke"},
+    {PFBCompat_muted_words, "Features/Timelines/Timeline.x", "fullText|tweetText|text|displayText|bodyText"},
+    {PFBCompat_muted_words, "Features/Timelines/Timeline.x", "fromUserName|screenName|authorScreenName|username|handle"},
+    {PFBCompat_hide_threads, "Features/Tweets/HiddenThreads.x", "status|tweet|canonicalStatus"},
+    {PFBCompat_hide_notifications, "Features/General/HiddenNotifications.x", "entryId|entryID|identifier|notificationId|notificationID|id|sortIndex|key|itemIdentifier|scribeItemImpressionID|scribeItemImpressionId"},
+    {PFBCompat_hide_notifications, "Features/General/HiddenNotifications.x", "timestamp|sortTimestamp|createdAt|date|sortDate|timeInMs|createdAtMs|time"},
+    {PFBCompat_hide_notifications, "Features/General/HiddenNotifications.x", "text|message|displayText|bodyText|title|formattedText|attributedText|summary|notificationText"},
+    {PFBCompatOptionCount, "Features/Branding/AppIcon/PFBAppIconViewController.m", "SUBSCRIPTION_APP_ICON_SETTINGS_TITLE"},
+    {PFBCompatOptionCount, "Features/Branding/AppIcon/PFBAppIconViewController.m", "SUBSCRIPTION_APP_ICON_SETTINGS_DETAIL"},
+    {PFBCompat_download_videos, "Features/Media/MediaDownloads.x", "DOWNLOAD_ACTIVITY_VIEW_LABEL"},
+    {PFBCompat_download_videos, "Features/Media/PFBDownloadInlineButton.m", "DOWNLOAD_LIVE_ACTIVITY_DOWNLOADING"},
+    {PFBCompat_download_videos, "Features/Media/PFBDownloadInlineButton.m", "ERROR_ALERT_TITLE"},
+    {PFBCompat_tweet_confirm, "Features/Tweets/Confirmations.x", "CANCEL_ACTION_LABEL"},
+    {PFBCompatOptionCount, "Settings/PFBModernSettingsPageViewController.m", "CANCEL_ACTION_LABEL"},
+    {PFBCompatOptionCount, "Settings/PFBModernSettingsPageViewController.m", "SAVE_ACTION_LABEL"},
+    {PFBCompatOptionCount, "Settings/Pages/PFBAppearanceSettingsViewController.m", "CANCEL_ACTION_LABEL"},
+    {PFBCompatOptionCount, "Settings/Pages/PFBTweetsSettingsViewController.m", "GENERIC_OFF_LABEL"},
+    {PFBCompatOptionCount, "Settings/Pages/PFBTweetsSettingsViewController.m", "SUBSCRIPTION_UNDO_SEND_DURATION_LABEL"},
 };
 enum { kNameCount = sizeof(kNames) / sizeof(kNames[0]) };
+
+// Parts of Twitter class names the options look for with containsString:; each must
+// still sit inside some class name. A "|" lists the other parts the code accepts.
+static const PFBCompatName kClassSubstrings[] = {
+    {PFBCompat_hide_notifications, "Features/General/HiddenNotifications.x", "NotificationsViewController"},
+    {PFBCompat_hide_notifications, "Features/General/HiddenNotifications.x", "NotificationCell"},
+    {PFBCompat_muted_words, "Features/Timelines/QuickMutedWords.x", "TimelineContainer|Timelines|Home"},
+    {PFBCompat_choose_explore_tabs, "Features/Search/ExploreTabs.x", "SegmentedHighlightBarView"},
+    {PFBCompat_restore_tweet_button, "Features/Branding/Branding.x", "FloatingActionButton"},
+    {PFBCompat_enable_liquid_glass, "Features/Messages/PillSwap.x", "Inbox"},
+    {PFBCompat_bar_repairs, "Features/Appearance/NavBarIcons.x", "XChatDM|ConversationContainer"},
+    {PFBCompat_bar_repairs, "Features/Appearance/NavBarIcons.x", "ActivityHistory|Notification"},
+    {PFBCompat_bar_repairs, "Features/Appearance/NavBarIcons.x", "SelfSizingStackView"},
+    {PFBCompat_enable_liquid_glass, "Features/Appearance/NavBarIcons.x", "SocialContext"},
+    {PFBCompat_tab_bar_theming, "Features/Appearance/Theme.x", "CustomTabBar"},
+};
+enum { kClassSubstringCount = sizeof(kClassSubstrings) / sizeof(kClassSubstrings[0]) };
 
 typedef struct {
     const char* file;
@@ -1705,6 +1899,12 @@ static const PFBCompatDeclared kDeclared[] = {
     {"Support/TAEHeaders.h", "TFNUIDefaultFontGroup", "boldFontOfSize:"},
     {"Support/TAEHeaders.h", "TFNUIDefaultFontGroup", "sharedFontGroup"},
     {"Support/TFSHeaders.h", "NSNumber", "tfs_twitterAbbreviated"},
+    {"Support/T1Headers.h", "T1PanelIdentity", "iconImageNameForPanelID:"},
+    {"Support/T1Headers.h", "T1WebViewController", "initWithRootURL:account:shouldAuthenticate:shouldPresentAsNativePage:sourceStatus:scribeComponent:scribeParameters:"},
+    {"Support/TFNHeaders.h", "TFNActiveTextItem", "initWithTextModel:activeRanges:"},
+    {"Support/TFNHeaders.h", "TFNHUD", "initWithText:"},
+    {"Support/TFNHeaders.h", "TFNSettingsNavigationItem", "initWithTitle:detail:iconName:controllerFactory:"},
+    {"Features/Branding/AppIcon/PFBAppIconCell.m", "TFNDynamicColorManager", "isHighContrastForObject:withDefault:"},
 };
 enum { kDeclaredCount = sizeof(kDeclared) / sizeof(kDeclared[0]) };
 
@@ -1724,6 +1924,10 @@ static const PFBCompatOption kFlagOnly[] = {
     PFBCompat_new_inapp_webview,
     PFBCompat_no_focus_lost,
     PFBCompat_disable_media_carousel,
+    PFBCompat_hide_upsells,
+    PFBCompat_edit_tweet,
+    PFBCompat_grok_translation,
+    PFBCompat_classic_tweet_detail,
 };
 static const size_t kFlagOnlyCount = sizeof(kFlagOnly) / sizeof(kFlagOnly[0]);
 
@@ -1742,6 +1946,15 @@ static const PFBCompatClassText kClassTexts[] = {
     {PFBCompat_hide_promoted, "TwitterURT.URTTimelineGoogleNativeAdViewModel"},
     {PFBCompat_hide_promoted, "TwitterURT.URTTimelineTrendViewModel"},
     {PFBCompat_hide_promoted, "TwitterURT.URTTimelineEventSummaryViewModel"},
+    {PFBCompat_remove_related_tweets, "T1ConversationContainerViewController"},
+    {PFBCompat_hide_verified_tweets, "T1ConversationContainerViewController"},
+    {PFBCompat_muted_words, "T1ConversationContainerViewController"},
+    {PFBCompat_hide_verified_tweets, "TTSSearchContainerViewControllerV2|TTSSearchContainerViewController"},
+    {PFBCompat_hide_who_to_follow, "TwitterURT.URTModuleHeaderViewModel"},
+    {PFBCompat_hide_who_to_follow, "TwitterURT.URTModuleFooterViewModel"},
+    {PFBCompat_hide_topics_to_follow, "TwitterURT.URTModuleHeaderViewModel"},
+    {PFBCompat_hide_topics_to_follow, "TwitterURT.URTModuleFooterViewModel"},
+    {PFBCompat_keep_reading_position, "TwitterHomeFeatureImplementation.HomeTimelineContainerViewController"},
 };
 static const size_t kClassTextCount = sizeof(kClassTexts) / sizeof(kClassTexts[0]);
 
@@ -1861,6 +2074,20 @@ static const PFBCompatContract kContract[] = {
     {PFBCompat_reply_in_webview, "Tweet buttons", NULL},
     {PFBCompat_flex_twitter, "launch", NULL},
     {PFBCompat_web_session, "", "a web session only proves itself by creating a Space"},
+    {PFBCompat_premium_unlock, "launch", NULL},
+    {PFBCompat_hide_upsells, "launch", NULL},
+    {PFBCompat_edit_tweet, "launch", NULL},
+    {PFBCompat_grok_translation, "launch", NULL},
+    {PFBCompat_launch_screen, "launch", NULL},
+    {PFBCompat_expand_tco_links, "tab home", "a Tweet carrying a link"},
+    {PFBCompat_remove_related_tweets, "first Tweet", "a related-Tweets module"},
+    {PFBCompat_keep_reading_position, "tab home", NULL},
+    {PFBCompat_classic_tweet_detail, "launch", NULL},
+    {PFBCompat_web_login, "", "the web login only shows while signed out"},
+    {PFBCompat_settings_entry, "PFB settings", NULL},
+    {PFBCompat_bar_repairs, "tab guide", NULL},
+    {PFBCompat_no_auto_unmute, "tab home", "an inline video"},
+    {PFBCompat_filter_languages, "tab home", NULL},
 };
 static const size_t kContractCount = sizeof(kContract) / sizeof(kContract[0]);
 
@@ -2561,54 +2788,74 @@ static uint64_t nameHash(const char* s, size_t length) {
     return hash;
 }
 
-// The kNames entries no longer in Twitter's method names or strings; nil when
-// nothing could be read.
+// The kNames and kClassSubstrings entries gone from Twitter's binaries, nil when nothing
+// could be read. A name matches a whole string, a substring part of a class name; an
+// entry "a|b" is gone only when none of its parts is found.
 static NSArray<NSString*>* scanMissingNames(NSArray<NSString*>* binaries) {
-    const char* names[kNameCount];
-    size_t lengths[kNameCount];
-    uint64_t hashes[kNameCount];
-    BOOL found[kNameCount];
-    size_t count = 0;
+    NSMutableArray<NSString*>* exact = [NSMutableArray array];
+    NSMutableArray<NSString*>* partial = [NSMutableArray array];
+    NSMutableOrderedSet<NSString*>* entries = [NSMutableOrderedSet orderedSet];
+    for (size_t i = 0; i < kNameCount + kClassSubstringCount; i++) {
+        BOOL substring = i >= kNameCount;
+        NSString* entry =
+            [NSString stringWithUTF8String:substring ? kClassSubstrings[i - kNameCount].name : kNames[i].name];
+        [entries addObject:entry];
+        for (NSString* name in [entry componentsSeparatedByString:@"|"]) {
+            NSMutableArray<NSString*>* pool = substring ? partial : exact;
+            if (name.length && ![pool containsObject:name]) {
+                [pool addObject:name];
+            }
+        }
+    }
+    size_t count = exact.count;
+    size_t partialCount = partial.count;
+    const char** names = calloc(count + 1, sizeof(char*));
+    size_t* lengths = calloc(count + 1, sizeof(size_t));
+    uint64_t* hashes = calloc(count + 1, sizeof(uint64_t));
+    BOOL* found = calloc(count + partialCount + 1, sizeof(BOOL));
+    const char** parts = calloc(partialCount + 1, sizeof(char*));
     size_t shortest = SIZE_MAX;
     size_t longest = 0;
-    NSMutableSet<NSString*>* seen = [NSMutableSet set];
-    for (size_t i = 0; i < kNameCount; i++) {
-        NSString* name = [NSString stringWithUTF8String:kNames[i].name];
-        if ([seen containsObject:name]) {
-            continue;
-        }
-        [seen addObject:name];
-        names[count] = kNames[i].name;
-        lengths[count] = strlen(kNames[i].name);
-        hashes[count] = nameHash(names[count], lengths[count]);
-        found[count] = NO;
-        shortest = MIN(shortest, lengths[count]);
-        longest = MAX(longest, lengths[count]);
-        count++;
+    for (size_t i = 0; i < count; i++) {
+        names[i] = exact[i].UTF8String;
+        lengths[i] = strlen(names[i]);
+        hashes[i] = nameHash(names[i], lengths[i]);
+        shortest = MIN(shortest, lengths[i]);
+        longest = MAX(longest, lengths[i]);
+    }
+    for (size_t i = 0; i < partialCount; i++) {
+        parts[i] = partial[i].UTF8String;
     }
     // Class names sit in their own section, apart from selectors and C strings.
     static const char* const kSections[] = {"__objc_methname", "__cstring", "__objc_classname"};
     size_t matched = 0;
+    size_t total = count + partialCount;
     BOOL readAny = NO;
+    BOOL unreadable = NO;
     for (NSString* path in binaries) {
+        if (unreadable || matched >= total) {
+            break;
+        }
         @autoreleasepool {
             NSData* data = [NSData dataWithContentsOfFile:path options:NSDataReadingMappedIfSafe error:nil];
             if (!data) {
                 continue;
             }
-            for (size_t s = 0; s < sizeof(kSections) / sizeof(kSections[0]) && matched < count; s++) {
+            for (size_t s = 0; s < sizeof(kSections) / sizeof(kSections[0]) && matched < total; s++) {
                 size_t size = 0;
                 BOOL encrypted = NO;
                 const char* strings = textSection(data, kSections[s], &size, &encrypted);
                 if (encrypted) {
-                    return nil;
+                    unreadable = YES;
+                    break;
                 }
                 if (!strings) {
                     continue;
                 }
                 readAny = YES;
+                BOOL classNames = s == 2;
                 const char* end = strings + size;
-                for (const char* p = strings; p < end && matched < count;) {
+                for (const char* p = strings; p < end && matched < total;) {
                     size_t length = strnlen(p, (size_t)(end - p));
                     if (length >= shortest && length <= longest) {
                         uint64_t hash = nameHash(p, length);
@@ -2620,18 +2867,46 @@ static NSArray<NSString*>* scanMissingNames(NSArray<NSString*>* binaries) {
                             }
                         }
                     }
+                    if (classNames && length > 0 && p[length] == '\0') {
+                        for (size_t i = 0; i < partialCount; i++) {
+                            if (!found[count + i] && strstr(p, parts[i])) {
+                                found[count + i] = YES;
+                                matched++;
+                            }
+                        }
+                    }
                     p += length + 1;
                 }
             }
         }
     }
-    if (!readAny || matched == 0) {
+    NSMutableSet<NSString*>* present = [NSMutableSet set];
+    for (size_t i = 0; i < count; i++) {
+        if (found[i]) {
+            [present addObject:exact[i]];
+        }
+    }
+    for (size_t i = 0; i < partialCount; i++) {
+        if (found[count + i]) {
+            [present addObject:partial[i]];
+        }
+    }
+    free(names);
+    free(lengths);
+    free(hashes);
+    free(found);
+    free(parts);
+    if (unreadable || !readAny || matched == 0) {
         return nil;
     }
     NSMutableArray<NSString*>* missing = [NSMutableArray array];
-    for (size_t i = 0; i < count; i++) {
-        if (!found[i]) {
-            [missing addObject:[NSString stringWithUTF8String:names[i]]];
+    for (NSString* entry in entries) {
+        BOOL any = NO;
+        for (NSString* name in [entry componentsSeparatedByString:@"|"]) {
+            any = any || [present containsObject:name];
+        }
+        if (!any) {
+            [missing addObject:entry];
         }
     }
     return missing;
@@ -3049,6 +3324,10 @@ static BOOL optionEnabled(const PFBCompatMeta* meta) {
             id words = [defaults objectForKey:@"pfb_muted_words"];
             return [words respondsToSelector:@selector(count)] && [words count] > 0;
         }
+        case PFBCompat_filter_languages: {
+            id langs = [defaults objectForKey:@"pfb_filter_languages"];
+            return [langs respondsToSelector:@selector(count)] && [langs count] > 0;
+        }
         case PFBCompat_profile_initial_tab:
             return [PFBSettings integerForKey:key] > 0;
         case PFBCompat_disable_auto_translate:
@@ -3149,6 +3428,16 @@ static BOOL classOnly(PFBCompatOption option) {
     return NO;
 }
 
+// A class name, or "a|b" for names the code accepts in turn: resolved when any one is.
+static BOOL classTextResolves(NSString* names) {
+    for (NSString* name in [names componentsSeparatedByString:@"|"]) {
+        if (name.length && NSClassFromString(name)) {
+            return YES;
+        }
+    }
+    return NO;
+}
+
 // How many of the option's class names no longer resolve, and the first.
 static NSUInteger classTextsGone(PFBCompatOption option, NSUInteger* total, NSString** first) {
     NSUInteger gone = 0;
@@ -3159,7 +3448,7 @@ static NSUInteger classTextsGone(PFBCompatOption option, NSUInteger* total, NSSt
         }
         (*total)++;
         NSString* name = [NSString stringWithUTF8String:kClassTexts[i].className];
-        if (!NSClassFromString(name)) {
+        if (!classTextResolves(name)) {
             if (gone == 0) {
                 *first = name;
             }
@@ -3172,9 +3461,10 @@ static NSUInteger classTextsGone(PFBCompatOption option, NSUInteger* total, NSSt
 // How many of the option's string-reached names are gone from Twitter, and the first.
 static NSUInteger namesGone(PFBCompatOption option, NSSet<NSString*>* gone, NSString** first) {
     NSMutableSet<NSString*>* counted = [NSMutableSet set];
-    for (size_t i = 0; i < kNameCount; i++) {
-        NSString* name = [NSString stringWithUTF8String:kNames[i].name];
-        if (kNames[i].option == option && [gone containsObject:name] && ![counted containsObject:name]) {
+    for (size_t i = 0; i < kNameCount + kClassSubstringCount; i++) {
+        const PFBCompatName* row = i < kNameCount ? &kNames[i] : &kClassSubstrings[i - kNameCount];
+        NSString* name = [NSString stringWithUTF8String:row->name];
+        if (row->option == option && [gone containsObject:name] && ![counted containsObject:name]) {
             if (counted.count == 0) {
                 *first = name;
             }
@@ -3229,6 +3519,15 @@ static void appendInternals(NSMutableArray<PFBCompatResult*>* results, NSSet<NSS
         if (!nameGone[file] && [goneNames containsObject:name]) {
             nameGone[file] = [name stringByAppendingString:@" not found, read by name"];
             nameLost[file] = name;
+        }
+    }
+    // Classes a file resolves by name (%c, objc_getClass, NSClassFromString).
+    for (size_t i = 0; i < PFBRuntimeClassCount; i++) {
+        NSString* file = [[NSString stringWithUTF8String:PFBRuntimeClasses[i].file] lastPathComponent];
+        names[file] = @(names[file].integerValue + 1);
+        if (!nameGone[file] && !objc_getClass(PFBRuntimeClasses[i].className)) {
+            nameLost[file] = [NSString stringWithUTF8String:PFBRuntimeClasses[i].className];
+            nameGone[file] = [nameLost[file] stringByAppendingString:@" not found, resolved by name"];
         }
     }
     for (size_t i = 0; i < kDeclaredCount; i++) {
@@ -3572,8 +3871,9 @@ static NSArray<NSString*>* lostPaths(NSArray<NSString*>* missingFlags, NSArray<N
     NSMutableOrderedSet<NSString*>* lost = [NSMutableOrderedSet orderedSetWithArray:missingFlags];
     [lost addObjectsFromArray:missingNames];
     for (size_t i = 0; i < kClassTextCount; i++) {
-        if (!objc_getClass(kClassTexts[i].className)) {
-            [lost addObject:[NSString stringWithUTF8String:kClassTexts[i].className]];
+        NSString* names = [NSString stringWithUTF8String:kClassTexts[i].className];
+        if (!classTextResolves(names)) {
+            [lost addObject:names];
         }
     }
     for (size_t i = 0; i < kReqCount; i++) {
@@ -3589,6 +3889,11 @@ static NSArray<NSString*>* lostPaths(NSArray<NSString*>* missingFlags, NSArray<N
     for (size_t i = 0; i < kDeclaredCount; i++) {
         if (!hookPresent(kDeclared[i].className, kDeclared[i].selector)) {
             [lost addObject:[NSString stringWithFormat:@"%s %s", kDeclared[i].className, kDeclared[i].selector]];
+        }
+    }
+    for (size_t i = 0; i < PFBRuntimeClassCount; i++) {
+        if (!objc_getClass(PFBRuntimeClasses[i].className)) {
+            [lost addObject:[NSString stringWithUTF8String:PFBRuntimeClasses[i].className]];
         }
     }
     return lost.array;

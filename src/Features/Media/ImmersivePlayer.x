@@ -255,7 +255,12 @@ static void pfbClearAutoUnmute(UIView* view) {
         return;
     }
     uint8_t* flag = (uint8_t*)(__bridge void*)view + ivar_getOffset(flagIvar);
-    *flag = 0;
+    if (*flag) {
+        *flag = 0;
+        PFBCOMPAT_ACTION(PFBCompat_no_auto_unmute, @"auto-unmute off");
+    } else {
+        PFBCOMPAT_OBSERVE(PFBCompat_no_auto_unmute, @"auto-unmute already off");
+    }
 }
 
 // Whether a timeline video plays with its sound on, read from its own player.
@@ -309,6 +314,7 @@ static BOOL pfbInlineVideoHasSound(UIView* view) {
 // there would silence the video with nothing left to lift it.
 - (void)setIsMuted:(BOOL)muted {
     if (!muted && pfbHoldsSound()) {
+        PFBCompatReach(PFBCompatPath_starts_muted);
         return;
     }
     %orig;
@@ -316,6 +322,7 @@ static BOOL pfbInlineVideoHasSound(UIView* view) {
 
 - (void)setVolume:(float)volume {
     if (volume > 0 && pfbHoldsSound()) {
+        PFBCompatReach(PFBCompatPath_starts_muted);
         %orig(0);
         return;
     }
@@ -324,6 +331,7 @@ static BOOL pfbInlineVideoHasSound(UIView* view) {
 
 - (void)play {
     if (pfbHoldsSound()) {
+        PFBCompatReach(PFBCompatPath_starts_muted);
         self.isMuted = YES;
         self.volume = 0;
     }
@@ -332,6 +340,7 @@ static BOOL pfbInlineVideoHasSound(UIView* view) {
 
 - (void)playOrReplay {
     if (pfbHoldsSound()) {
+        PFBCompatReach(PFBCompatPath_starts_muted);
         self.isMuted = YES;
         self.volume = 0;
     }
@@ -1107,12 +1116,12 @@ static void pfbStartFoldWatch(UIView* card) {
         %orig;
         return;
     }
-    PFBCOMPAT_ACTION(PFBCompat_tap_to_pause, @"tap to pause");
     TAVPlayer* player = pfbVisibleCardPlayer(card);
     if (!player) {
         %orig;
         return;
     }
+    PFBCOMPAT_ACTION(PFBCompat_tap_to_pause, @"tap to pause");
     // A real tap sets the intent from the state it found. The gate follows at
     // once: open, it replays the alphas the app asked for; closed, everything goes
     // dark now.

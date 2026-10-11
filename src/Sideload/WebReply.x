@@ -103,7 +103,11 @@ static BOOL openAuthenticatedTweetWebView(NSString* statusID) {
         [[UINavigationController alloc] initWithRootViewController:replyController];
     modalNavigationController.modalPresentationStyle = UIModalPresentationFullScreen;
 
-    [presentingController presentViewController:modalNavigationController animated:YES completion:nil];
+    [presentingController presentViewController:modalNavigationController
+                                       animated:YES
+                                     completion:^{
+                                       PFBCOMPAT_ACTION(PFBCompat_reply_in_webview, @"reply opened in the web view");
+                                     }];
     return YES;
 }
 
@@ -162,7 +166,6 @@ static void ensureSessionThenOpenReply(NSString* statusID) {
     }
 
     NSString* statusIDString = @(statusID).stringValue;
-    PFBCOMPAT_ACTION(PFBCompat_reply_in_webview, @"reply opened in the web view");
     if (PFBHasUsableWebCredentials()) {
         if (!openAuthenticatedTweetWebView(statusIDString)) {
             return %orig;
@@ -187,7 +190,6 @@ static void ensureSessionThenOpenReply(NSString* statusID) {
     }
 
     NSString* statusIDString = @(statusID).stringValue;
-    PFBCOMPAT_ACTION(PFBCompat_reply_in_webview, @"reply opened in the web view");
     if (PFBHasUsableWebCredentials()) {
         if (!openAuthenticatedTweetWebView(statusIDString)) {
             return %orig;

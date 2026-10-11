@@ -127,11 +127,19 @@ static void PFBCollectHealth(NSMutableArray<NSString*>* deadClasses,
                              PFBHealthCounts* counts) {
     NSUInteger okClasses = 0;
     NSUInteger okMethods = 0;
+    // A method hooked from several files has a row per file; each hook counts once.
+    NSMutableSet<NSString*>* counted = [NSMutableSet set];
 
     // A NULL method means the class alone is checked. Methods carry their full
     // selector, so one the runtime cannot find is a hook that never runs.
     for (size_t i = 0; i < PFBHookRecordCount; i++) {
         PFBHookRecord record = PFBHookRecords[i];
+        NSString* hook = [NSString stringWithFormat:@"%s %s", record.className,
+                                                    record.methodName ?: ""];
+        if ([counted containsObject:hook]) {
+            continue;
+        }
+        [counted addObject:hook];
         Class cls = objc_getClass(record.className);
         if (!cls) {
             // Deduplicate: several methods of one class each produced a row.
@@ -164,12 +172,18 @@ static void PFBCollectHealth(NSMutableArray<NSString*>* deadClasses,
 
     // Classes resolved by name at runtime (%c / objc_getClass / …).
     NSUInteger okRuntime = 0;
+    NSMutableSet<NSString*>* named = [NSMutableSet set];
     for (size_t i = 0; i < PFBRuntimeClassCount; i++) {
-        if (objc_getClass(PFBRuntimeClasses[i])) {
+        NSString* name = [NSString stringWithUTF8String:PFBRuntimeClasses[i].className];
+        if ([named containsObject:name]) {
+            continue;
+        }
+        [named addObject:name];
+        if (objc_getClass(PFBRuntimeClasses[i].className)) {
             okRuntime++;
         } else {
             NSString* entry = [NSString stringWithFormat:@"  x class (by name) %s",
-                               PFBRuntimeClasses[i]];
+                               PFBRuntimeClasses[i].className];
             if (![deadRuntime containsObject:entry]) {
                 [deadRuntime addObject:entry];
             }

@@ -561,3 +561,19 @@
 "HIDE_NEW_TWEETS_PILL_TITLE" = "Hide new Tweets pill";
 "HIDE_NEW_TWEETS_PILL_DETAIL" = "Remove the pill that announces new Tweets at the top of your timeline.";
 "REFRESH_PILL_LABEL_DETAIL_HELD" = "Hide new Tweets pill hides this pill.";
+
+/* ===== COMPATIBILITY: behaviors with no toggle ===== */
+"PREMIUM_UNLOCK_TITLE" = "Premium unlocked";
+"HIDE_UPSELLS_TITLE" = "Hide upsells";
+"EDIT_TWEET_TITLE" = "Edit Tweet";
+"GROK_TRANSLATION_TITLE" = "Translate button";
+"LAUNCH_SCREEN_TITLE" = "Classic launch screen";
+"EXPAND_TCO_LINKS_TITLE" = "Full links";
+"REMOVE_RELATED_TWEETS_TITLE" = "Hide related Tweets";
+"KEEP_READING_POSITION_TITLE" = "Keep your place on reload";
+"CLASSIC_TWEET_DETAIL_TITLE" = "Classic Tweet page";
+"WEB_LOGIN_TITLE" = "Web login";
+"SETTINGS_ENTRY_TITLE" = "PrimeFreeBird in Settings";
+"BAR_REPAIRS_TITLE" = "Navigation bar repairs";
+"NO_AUTO_UNMUTE_TITLE" = "No sound on tap";
+"FILTER_LANGUAGES_TITLE" = "Language filter";

@@ -106,6 +106,20 @@ typedef NS_ENUM(NSInteger, PFBCompatOption) {
     PFBCompat_send_sound,
     PFBCompat_show_account_location,
     PFBCompat_custom_tab_bar,
+    PFBCompat_premium_unlock,
+    PFBCompat_hide_upsells,
+    PFBCompat_edit_tweet,
+    PFBCompat_grok_translation,
+    PFBCompat_launch_screen,
+    PFBCompat_expand_tco_links,
+    PFBCompat_remove_related_tweets,
+    PFBCompat_keep_reading_position,
+    PFBCompat_classic_tweet_detail,
+    PFBCompat_web_login,
+    PFBCompat_settings_entry,
+    PFBCompat_bar_repairs,
+    PFBCompat_no_auto_unmute,
+    PFBCompat_filter_languages,
     PFBCompatOptionCount,
 };
 
@@ -186,6 +200,7 @@ typedef NS_ENUM(NSInteger, PFBCompatPath) {
     PFBCompatPath_web_tweets,
     PFBCompatPath_web_media,
     PFBCompatPath_tab_badges,
+    PFBCompatPath_starts_muted,
     PFBCompatPathCount,
 };
 

@@ -3,8 +3,10 @@
 
 #import "Support/HookHelpers.h"
 
-// Asks before an action, with a title that names it and a button that does it.
-static void ShowConfirmation(NSString* titleKey, NSString* actionKey, void (^confirmed)(void)) {
+// Asks before an action, with a title that names it and a button that does it. The
+// option's proof is counted once the alert is on screen.
+static void ShowConfirmation(PFBCompatOption option, NSString* detail, NSString* titleKey, NSString* actionKey,
+                             void (^confirmed)(void)) {
     PFBBundle* bundle = [PFBBundle sharedBundle];
     UIAlertController* alert = [UIAlertController alertControllerWithTitle:[bundle localizedStringForKey:titleKey]
                                                                    message:nil
@@ -19,7 +21,11 @@ static void ShowConfirmation(NSString* titleKey, NSString* actionKey, void (^con
                                                     }];
     [alert addAction:confirm];
     alert.preferredAction = confirm;
-    [topMostController() presentViewController:alert animated:YES completion:nil];
+    [topMostController() presentViewController:alert
+                                       animated:YES
+                                     completion:^{
+                                       PFBCOMPAT_ACTION(option, @"%@", detail);
+                                     }];
 }
 
 // MARK: - Tweet confirm
@@ -33,8 +39,7 @@ static void ShowConfirmation(NSString* titleKey, NSString* actionKey, void (^con
         PFBCOMPAT_OBSERVE(PFBCompat_tweet_confirm, @"Tweet sent");
         return %orig;
     }
-    PFBCOMPAT_ACTION(PFBCompat_tweet_confirm, @"compose send");
-    ShowConfirmation(@"CONFIRM_TWEET_TITLE", @"CONFIRM_TWEET_ACTION", ^{
+    ShowConfirmation(PFBCompat_tweet_confirm, @"compose send", @"CONFIRM_TWEET_TITLE", @"CONFIRM_TWEET_ACTION", ^{
         %orig;
     });
 }
@@ -54,8 +59,7 @@ static void ShowConfirmation(NSString* titleKey, NSString* actionKey, void (^con
     if (![PFBSettings boolForKey:@"follow_confirm"] || state != 0) {
         return %orig;
     }
-    PFBCOMPAT_ACTION(PFBCompat_follow_confirm, @"profile button");
-    ShowConfirmation(@"CONFIRM_FOLLOW_TITLE", @"CONFIRM_FOLLOW_ACTION", ^{
+    ShowConfirmation(PFBCompat_follow_confirm, @"profile button", @"CONFIRM_FOLLOW_TITLE", @"CONFIRM_FOLLOW_ACTION", ^{
         %orig;
     });
 }
@@ -71,8 +75,7 @@ static void ShowConfirmation(NSString* titleKey, NSString* actionKey, void (^con
         PFBCOMPAT_OBSERVE(PFBCompat_tweet_confirm, @"Tweet sent");
         return %orig;
     }
-    PFBCOMPAT_ACTION(PFBCompat_tweet_confirm, @"reply bar");
-    ShowConfirmation(@"CONFIRM_TWEET_TITLE", @"CONFIRM_TWEET_ACTION", ^{
+    ShowConfirmation(PFBCompat_tweet_confirm, @"reply bar", @"CONFIRM_TWEET_TITLE", @"CONFIRM_TWEET_ACTION", ^{
         %orig;
     });
 }
@@ -84,15 +87,12 @@ static void ShowConfirmation(NSString* titleKey, NSString* actionKey, void (^con
 %hook TUIFollowControl
 
 - (void)_followUser:(id)sender event:(id)event {
-    if ([PFBSettings boolForKey:@"follow_confirm"]) {
-        PFBCOMPAT_ACTION(PFBCompat_follow_confirm, @"tweet button");
-    }
     if (![PFBSettings boolForKey:@"follow_confirm"]) {
         PFBCOMPAT_OBSERVE(PFBCompat_follow_confirm, @"follow tapped");
         return %orig;
     }
 
-    ShowConfirmation(@"CONFIRM_FOLLOW_TITLE", @"CONFIRM_FOLLOW_ACTION", ^{
+    ShowConfirmation(PFBCompat_follow_confirm, @"tweet button", @"CONFIRM_FOLLOW_TITLE", @"CONFIRM_FOLLOW_ACTION", ^{
         %orig;
     });
 }
@@ -128,8 +128,7 @@ static BOOL PFBShowsAsLiked(id viewModel) {
         return %orig;
     }
 
-    PFBCOMPAT_ACTION(PFBCompat_like_confirm, @"inline like");
-    ShowConfirmation(@"CONFIRM_LIKE_TITLE", @"CONFIRM_LIKE_ACTION", ^{
+    ShowConfirmation(PFBCompat_like_confirm, @"inline like", @"CONFIRM_LIKE_TITLE", @"CONFIRM_LIKE_ACTION", ^{
         %orig;
     });
 }
@@ -144,7 +143,7 @@ static BOOL PFBShowsAsLiked(id viewModel) {
         return %orig;
     }
 
-    ShowConfirmation(@"CONFIRM_LIKE_TITLE", @"CONFIRM_LIKE_ACTION", ^{
+    ShowConfirmation(PFBCompat_like_confirm, @"double tap like", @"CONFIRM_LIKE_TITLE", @"CONFIRM_LIKE_ACTION", ^{
         %orig;
     });
 }
