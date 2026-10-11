@@ -23,10 +23,6 @@ void PFBEnumerateSubviewsRecursively(UIView* view,
 // TFNDataViewItem unwrapping for timeline section filtering (HookHelpers.m)
 id PFBUnwrapDataViewItem(id item);
 
-// With an arrow, a popover's content runs past the bubble's bottom edge by about
-// the arrow's height; pinned footers reserve it so they open fully in view.
-extern const CGFloat PFBPopoverArrowReserve;
-
 // A bar material pinned behind a view's contents, invisible until something
 // scrolls under it.
 UIVisualEffectView* PFBMaterialBehind(UIView* host);

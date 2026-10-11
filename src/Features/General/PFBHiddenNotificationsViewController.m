@@ -56,14 +56,13 @@ extern double PFBNotifDaysLeft(NSDictionary* entry);
     // first layout has measured them. One pass leaves the estimate in place.
     [self.tableView layoutIfNeeded];
     [self.tableView layoutIfNeeded];
-    // The pinned bar sits over the table, so its height and the arrow's reserve are
-    // added to the rows'. With nothing hidden the bar is gone and the message row,
-    // which carries its own air, sets the size alone.
-    // The bubble adds its own top inset to the table, which the rows' height omits.
+    // The rows' height, the bubble's own top inset and the pinned bar below them. With
+    // nothing hidden the bar is gone and the message row, which carries its own air,
+    // sets the size alone.
     CGFloat systemTop = MAX(self.tableView.adjustedContentInset.top - self.tableView.contentInset.top, 0.0);
     CGFloat height = self.tableView.contentSize.height + systemTop;
     if (self.rows.count) {
-        height = MAX(MIN(height + kPFBNotifBarHeight, 330), 90) + PFBPopoverArrowReserve;
+        height = MAX(MIN(height + kPFBNotifBarHeight, 330), 90);
     }
     self.preferredContentSize = CGSizeMake(290, height);
 }
@@ -213,9 +212,7 @@ static const CGFloat kPFBNotifBarHeight = 57.0;
     [NSLayoutConstraint activateConstraints:@[
         [bar.leadingAnchor constraintEqualToAnchor:frame.leadingAnchor],
         [bar.trailingAnchor constraintEqualToAnchor:frame.trailingAnchor],
-        // The bar runs to the bubble's edge so its material covers the arrow's
-        // reserve; its controls stay centred in the upper kPFBNotifBarHeight.
-        [bar.heightAnchor constraintEqualToConstant:kPFBNotifBarHeight + PFBPopoverArrowReserve],
+        [bar.heightAnchor constraintEqualToConstant:kPFBNotifBarHeight],
         [bar.bottomAnchor constraintEqualToAnchor:frame.bottomAnchor],
 
         [hairline.leadingAnchor constraintEqualToAnchor:bar.leadingAnchor],
@@ -228,8 +225,7 @@ static const CGFloat kPFBNotifBarHeight = 57.0;
         [clear.trailingAnchor constraintEqualToAnchor:bar.trailingAnchor constant:-14],
         [clear.leadingAnchor constraintGreaterThanOrEqualToAnchor:count.trailingAnchor
                                                          constant:12],
-        [clear.centerYAnchor constraintEqualToAnchor:bar.topAnchor
-                                            constant:kPFBNotifBarHeight / 2.0],
+        [clear.centerYAnchor constraintEqualToAnchor:bar.centerYAnchor],
         [clear.heightAnchor constraintEqualToConstant:34],
         [clear.widthAnchor constraintGreaterThanOrEqualToConstant:96],
     ]];
@@ -245,7 +241,7 @@ static const CGFloat kPFBNotifBarHeight = 57.0;
     }
     self.pinnedBar.hidden = !self.rows.count;
     // The rows stop above the bar; with no rows there is no bar to clear.
-    CGFloat bottom = self.rows.count ? kPFBNotifBarHeight + PFBPopoverArrowReserve : 0.0;
+    CGFloat bottom = self.rows.count ? kPFBNotifBarHeight : 0.0;
     self.tableView.contentInset = UIEdgeInsetsMake(0, 0, bottom, 0);
     self.tableView.verticalScrollIndicatorInsets = self.tableView.contentInset;
     if (!self.rows.count) {

@@ -17,9 +17,6 @@ extern void PFBUnhideThread(NSString* threadID);
 
 // A language row's own height, so the switch is spaced like one more entry.
 static const CGFloat kPFBTranslateBarHeight = 51.0;
-// Space between the last language and the switch, the same as above the list:
-// a hint that more languages fit.
-static const CGFloat kPFBTranslateBarGap = 8.0;
 // The popover's rounded corners cut into its bottom row, so its list sits a
 // little further in than the full screen's; the segment keeps the card's own
 // margin above it.
@@ -302,20 +299,17 @@ static NSMutableArray<NSString*>* PFBKeptLanguageList(void) {
     [NSLayoutConstraint activateConstraints:@[
         [label.leadingAnchor constraintEqualToAnchor:bar.leadingAnchor
                                             constant:[self rowMargin]],
-        [label.centerYAnchor constraintEqualToAnchor:bar.topAnchor
-                                            constant:kPFBTranslateBarHeight / 2.0],
+        [label.centerYAnchor constraintEqualToAnchor:bar.centerYAnchor],
         [toggle.trailingAnchor constraintEqualToAnchor:bar.trailingAnchor
                                               constant:-[self rowMargin]],
-        [toggle.centerYAnchor constraintEqualToAnchor:label.centerYAnchor],
+        [toggle.centerYAnchor constraintEqualToAnchor:bar.centerYAnchor],
         [hairline.leadingAnchor constraintEqualToAnchor:bar.leadingAnchor],
         [hairline.trailingAnchor constraintEqualToAnchor:bar.trailingAnchor],
         [hairline.topAnchor constraintEqualToAnchor:bar.topAnchor],
         [hairline.heightAnchor constraintEqualToConstant:0.5],
         [bar.leadingAnchor constraintEqualToAnchor:tableFrame.leadingAnchor],
         [bar.trailingAnchor constraintEqualToAnchor:tableFrame.trailingAnchor],
-        // The bar runs to the bubble's edge so its material covers the arrow's
-        // reserve; its controls stay centred in the upper kPFBTranslateBarHeight.
-        [bar.heightAnchor constraintEqualToConstant:kPFBTranslateBarHeight + PFBPopoverArrowReserve],
+        [bar.heightAnchor constraintEqualToConstant:kPFBTranslateBarHeight],
         [bar.bottomAnchor constraintEqualToAnchor:tableFrame.bottomAnchor],
     ]];
     self.barMaterial = PFBMaterialBehind(bar);
@@ -323,16 +317,15 @@ static NSMutableArray<NSString*>* PFBKeptLanguageList(void) {
     self.pinnedSwitch = toggle;
 }
 
-// The rows start below the segment and end above the switch, shown only with the
-// languages. The table keeps its rows clear of the edge the arrow hides by itself;
-// only the switch, pinned to the frame, takes the arrow's reserve.
+// The rows start below the segment and end where the switch's bar begins, at the
+// bubble's bottom edge; the bar shows only with the languages.
 - (void)updatePinnedInsets {
     if (!self.compact) {
         return;
     }
     BOOL languages = self.mode == 1;
     self.pinnedBar.hidden = !languages;
-    CGFloat bottom = languages ? kPFBTranslateBarHeight + kPFBTranslateBarGap : 0.0;
+    CGFloat bottom = languages ? kPFBTranslateBarHeight : 0.0;
     UIEdgeInsets insets =
         UIEdgeInsetsMake(self.pinnedHeaderHeight, 0, bottom, 0);
     self.tableView.contentInset = insets;
