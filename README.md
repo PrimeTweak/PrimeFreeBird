@@ -64,7 +64,7 @@
 
 - **Poll results before voting** — each option carries its share of the vote, so you can read a poll without joining it.
 - **Hide the Tweet button** — remove the compose button from the timeline.
-- **Classic compose button** — or bring back the bird on a coloured circle instead of the native "+".
+- **Classic compose button** — or bring back the feather on a coloured circle instead of the native "+".
 
 ## Profiles
 
