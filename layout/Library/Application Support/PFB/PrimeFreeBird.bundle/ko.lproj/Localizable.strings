@@ -10,10 +10,10 @@
 "MODERN_SETTINGS_LAYOUT_SUBTITLE" = "앱을 잠그고, 내비게이션 바를 항상 표시하는 등 다양한 기능을 제공합니다.";
 
 "MODERN_SETTINGS_MEDIA_TITLE" = "사진과 비디오";
-"MODERN_SETTINGS_MEDIA_SUBTITLE" = "비디오 다운로드 버튼 활성화, 타임스탬프 표시 등 미디어가 첨부된 트윗에 대한 설정을 변경합니다.";
+"MODERN_SETTINGS_MEDIA_SUBTITLE" = "다운로드, 재생, 품질, 레이아웃 설정을 변경합니다.";
 
 "MODERN_SETTINGS_APPEARANCE_TITLE" = "모양";
-"MODERN_SETTINGS_APPEARANCE_SUBTITLE" = "테마, 커스텀 앱 아이콘, 글꼴 등으로 당신만의 Twitter를 만들어 보세요.";
+"MODERN_SETTINGS_APPEARANCE_SUBTITLE" = "인터페이스 스타일, 색상, 글꼴 설정을 변경합니다.";
 
 "MODERN_SETTINGS_TIMELINES_TITLE" = "타임라인";
 "MODERN_SETTINGS_TIMELINES_SUBTITLE" = "광고, 팔로우 추천 등 타임라인의 불필요한 요소를 제거합니다.";
@@ -96,8 +96,8 @@
 "HIDE_GROK_CREATE_TITLE" = "Grok 생성 버튼 숨기기";
 "HIDE_GROK_CREATE_DETAIL" = "Grok으로 이미지와 동영상을 만들거나 편집하는 옵션을 제거합니다.";
 
-"DISABLE_AUTO_TRANSLATE_TITLE" = "자동 번역 비활성화";
-"DISABLE_AUTO_TRANSLATE_DETAIL" = "게시물이나 프로필을 자동으로 번역하지 않습니다.";
+"DISABLE_AUTO_TRANSLATE_TITLE" = "자동 번역";
+"DISABLE_AUTO_TRANSLATE_DETAIL" = "트윗, 자기소개, 그룹 노트, 알림을 자동으로 번역합니다.";
 
 "SQUARE_AVATARS_TITLE" = "정사각형 프로필 사진 활성화";
 "SQUARE_AVATARS_DETAIL" = "트위터 초창기 시절이나 조직/정부 계정처럼 모두에게 정사각형 프로필 사진을 적용합니다.";
@@ -106,7 +106,7 @@
 "REPLY_SORTING_DETAIL" = "트윗 아래의 답글 정렬 기준 선택 메뉴를 제거합니다.";
 
 "RESTORE_REPLY_CONTEXT_TITLE" = "답글 타래 표시 방법 복원";
-"RESTORE_REPLY_CONTEXT_DETAIL" = "트윗 아래에서 답장을 받은 사람들을 표시합니다.";
+"RESTORE_REPLY_CONTEXT_DETAIL" = "답글을 열면 본문 위에 누구에게 보낸 답글인지 표시합니다.";
 
 "SHOW_QUOTE_COUNTS_TITLE" = "Quote and Retweet counts";
 "SHOW_QUOTE_COUNTS_DETAIL" = "Show both numbers at the top of a Tweet's Quotes screen.";
@@ -127,28 +127,28 @@
 "DISABLE_HIGHLIGHTS_TITLE" = "하이라이트 탭 제거";
 "DISABLE_HIGHLIGHTS_DETAIL" = "프로필의 하이라이트 탭을 제거합니다.";
 
-"HIDE_FOLLOW_BUTTON_TITLE" = "트윗 상세보기 화면에서 팔로우 버튼 제거";
-"HIDE_FOLLOW_BUTTON_DETAIL" = "화면 우측 상단 팔로우 버튼을 제거합니다.";
+"HIDE_FOLLOW_BUTTON_TITLE" = "팔로우 버튼 제거";
+"HIDE_FOLLOW_BUTTON_DETAIL" = "트윗에 표시되는 팔로우 버튼을 제거합니다.";
 
 "RESTORE_FOLLOW_BUTTON_TITLE" = "구독 버튼 제거";
 "RESTORE_FOLLOW_BUTTON_DETAIL" = "트윗과 프로필에서 구독 버튼을 제거합니다.";
 
 /*Search*/
 "NO_HISTORY_TITLE" = "검색 기록 비활성화";
-"NO_HISTORY_DETAIL" = "사용자의 검색 기록을 기억하거나 추적하지 않습니다.";
+"NO_HISTORY_DETAIL" = "최근 검색어를 저장하거나 표시하지 않습니다.";
 
 "HIDE_TREND_VIDEOS_TITLE" = "트렌딩 비디오 제거";
 "HIDE_TREND_VIDEOS_DETAIL" = "검색 메뉴에서 트렌딩 비디오를 제거합니다.";
 
 /*Photos and Videos*/
-"AUTO_HIGHEST_LOAD_TITLE" = "고품질 미디어";
-"AUTO_HIGHEST_LOAD_DETAIL" = "항상 가능한 최대 품질의 사진과 비디오를 로드합니다.";
+"AUTO_HIGHEST_LOAD_TITLE" = "고품질 사진";
+"AUTO_HIGHEST_LOAD_DETAIL" = "항상 가능한 최대 해상도로 사진을 로드합니다.";
 
 "DISABLE_VIDEO_CAPTIONS_TITLE" = "비디오 자막 비활성화";
 
-"FORCE_TWEET_FULL_FRAME_TITLE" = "미디어를 항상 최대 너비로 표시";
+"FORCE_TWEET_FULL_FRAME_TITLE" = "이미지를 자르지 않고 표시";
 
-"RESTORE_VIDEO_TIMESTAMP_TITLE" = "비디오 타임스탬프 표시";
+"RESTORE_VIDEO_TIMESTAMP_TITLE" = "비디오 재생 시간 표시";
 "RESTORE_VIDEO_TIMESTAMP_DETAIL" = "전체 화면 플레이어에서 영상의 현재/전체 재생시간을 표시합니다.";
 
 "DISABLE_IMMERSIVE_SCROLL_TITLE" = "동영상 피드 스크롤 사용 안 함";
@@ -160,7 +160,7 @@
 "UNDO_TWEET_TITLE" = "트윗 취소하기";
 
 "DOWNLOAD_VIDEOS_TITLE" = "미디어 다운로드";
-"DOWNLOAD_VIDEOS_DETAIL" = "공유 버튼 오른쪽에 비디오나 GIF 사진을 다운로드할 수 있는 버튼을 추가합니다.";
+"DOWNLOAD_VIDEOS_DETAIL" = "미디어를 길게 누르면 나오는 메뉴에서 비디오와 GIF를 저장합니다.";
 
 "DIRECT_SAVE_TITLE" = "'사진'에 저장";
 "DIRECT_SAVE_DETAIL" = "비디오나 GIF 사진이 사진 앱에 바로 저장됩니다.";
@@ -184,13 +184,13 @@
 "HIDE_CUSTOM_TIMELINES_DETAIL" = "홈 타임라인 탭에서 추가 버튼을 제거합니다.";
 
 
-"TAB_BAR_THEMING_TITLE" = "클래식 내비게이션 바";
+"TAB_BAR_THEMING_TITLE" = "선택된 탭";
 "TAB_BAR_THEMING_DETAIL" = "내비게이션 바의 선택된 항목에 대해 테마 컬러를 적용합니다.";
 
-"DISABLE_RTL_TITLE" = "LTR 레이아웃 강제";
-"DISABLE_RTL_DETAIL" = "아랍어 등 RTL(오른쪽에서 왼쪽으로 읽는) 언어 환경에서도 LTR(왼쪽에서 오른쪽으로 읽는) 레이아웃을 강제합니다.";
+"DISABLE_RTL_TITLE" = "텍스트를 왼쪽에서 오른쪽으로 표시";
+"DISABLE_RTL_DETAIL" = "아랍어 등 오른쪽에서 왼쪽으로 쓰는 언어에서도 텍스트를 왼쪽에서 오른쪽으로 표시합니다.";
 
-"SHOW_SCROLL_INDICATOR_TITLE" = "스크롤 바 항상 표시";
+"SHOW_SCROLL_INDICATOR_TITLE" = "스크롤 바 표시";
 
 "CUSTOM_FONTS_TITLE" = "사용자 지정 글꼴";
 "CUSTOM_FONTS_DETAIL" = "트위터에서 사용할 글꼴을 선택합니다.";
@@ -260,7 +260,7 @@
 
 /*Custom fonts*/
 "INSTALL_IFONT_BUTTON_TITLE" = "iFont application";
-"FONT_SYSTEM_DEFAULT_SUBTITLE" = "System Default";
+"FONT_SYSTEM_DEFAULT_SUBTITLE" = "기본값";
 "LIGHT_MODE_RESTART_TITLE" = "Back to light mode";
 "LIGHT_MODE_RESTART_MESSAGE" = "Your background color was reset to System. Restart Twitter to clear any leftover dark colors.";
 "CLOSE_APP_ACTION" = "Close app";

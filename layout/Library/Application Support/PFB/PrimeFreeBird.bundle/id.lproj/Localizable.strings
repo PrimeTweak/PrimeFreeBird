@@ -10,10 +10,10 @@
 "MODERN_SETTINGS_LAYOUT_SUBTITLE" = "Kunci aplikasi, jaga bilah navigasi tetap terlihat, dan banyak lagi.";
 
 "MODERN_SETTINGS_MEDIA_TITLE" = "Media";
-"MODERN_SETTINGS_MEDIA_SUBTITLE" = "Unduh video, aktifkan penanda waktu, dan lainnya.";
+"MODERN_SETTINGS_MEDIA_SUBTITLE" = "Unduhan, pemutaran, kualitas, dan tata letak.";
 
 "MODERN_SETTINGS_APPEARANCE_TITLE" = "Tampilan";
-"MODERN_SETTINGS_APPEARANCE_SUBTITLE" = "Jadikan Twitter milik Anda dengan tema, ikon aplikasi khusus, font, dan lainnya.";
+"MODERN_SETTINGS_APPEARANCE_SUBTITLE" = "Gaya antarmuka, warna, dan font.";
 
 "MODERN_SETTINGS_TIMELINES_TITLE" = "Linimasa";
 "MODERN_SETTINGS_TIMELINES_SUBTITLE" = "Hapus iklan, saran untuk diikuti, dan gangguan lainnya di linimasa.";
@@ -26,7 +26,7 @@
 "MODERN_SETTINGS_TWEETS_SUBTITLE" = "Ubah cara kerja tweet dan sembunyikan fitur yang tidak Anda gunakan.";
 
 "MODERN_SETTINGS_SEARCH_TITLE" = "Pencarian dan penemuan";
-"MODERN_SETTINGS_SEARCH_SUBTITLE" = "Ubah apa yang Anda lihat di tab Pencarian.";
+"MODERN_SETTINGS_SEARCH_SUBTITLE" = "Riwayat pencarian, tren, dan video trending.";
 
 
 
@@ -38,8 +38,8 @@
 
 /*General*/
 
-"HIDE_WHO_TO_FOLLOW_TITLE" = "Tanpa 'Siapa yang harus diikuti'";
-"HIDE_WHO_TO_FOLLOW_DETAIL" = "Sembunyikan saran akun dari profil.";
+"HIDE_WHO_TO_FOLLOW_TITLE" = "Sembunyikan 'Untuk diikuti'";
+"HIDE_WHO_TO_FOLLOW_DETAIL" = "Sembunyikan saran akun untuk diikuti.";
 
 "HIDE_TIMELINE_PROMPTS_TITLE" = "Tanpa ajakan di linimasa";
 "HIDE_TIMELINE_PROMPTS_DETAIL" = "Sembunyikan spanduk seperti 'Tambahkan kontak'.";
@@ -74,7 +74,7 @@
 "SEND_SOUND_UNREADABLE" = "This file is not a sound that can be played.";
 
 "HIDE_BLUE_VERIFIED_TITLE" = "Sembunyikan lencana verifikasi Blue";
-"HIDE_BLUE_VERIFIED_DETAIL" = "Sembunyikan lencana verifikasi berbayar pada Tweet. Ini tidak termasuk akun merek atau pemerintah.";
+"HIDE_BLUE_VERIFIED_DETAIL" = "Hapus lencana verifikasi Twitter Blue; lencana akun merek dan pemerintah tetap ditampilkan.";
 
 "HIDE_VIEW_COUNT_TITLE" = "Sembunyikan jumlah tampilan";
 "HIDE_VIEW_COUNT_DETAIL" = "Jangan tampilkan jumlah tayangan di bawah Tweet.";
@@ -96,8 +96,8 @@
 "HIDE_GROK_CREATE_TITLE" = "Sembunyikan tombol pembuatan Grok";
 "HIDE_GROK_CREATE_DETAIL" = "Menghapus opsi untuk membuat atau mengedit gambar dan video dengan Grok.";
 
-"DISABLE_AUTO_TRANSLATE_TITLE" = "Nonaktifkan terjemahan otomatis";
-"DISABLE_AUTO_TRANSLATE_DETAIL" = "Jangan pernah menerjemahkan postingan atau bio secara otomatis.";
+"DISABLE_AUTO_TRANSLATE_TITLE" = "Terjemahan otomatis";
+"DISABLE_AUTO_TRANSLATE_DETAIL" = "Terjemahkan Tweet, bio, Catatan Komunitas, dan notifikasi secara otomatis.";
 
 "SQUARE_AVATARS_TITLE" = "Foto Profil Kotak";
 "SQUARE_AVATARS_DETAIL" = "Semua pengguna memiliki foto profil kotak seperti akun merek di Twitter lama.";
@@ -106,7 +106,7 @@
 "REPLY_SORTING_DETAIL" = "Menonaktifkan fitur pengurutan balasan dalam percakapan Tweet.";
 
 "RESTORE_REPLY_CONTEXT_TITLE" = "Pulihkan Konteks Balasan";
-"RESTORE_REPLY_CONTEXT_DETAIL" = "Menampilkan kepada siapa balasan ditujukan di bawah Tweet.";
+"RESTORE_REPLY_CONTEXT_DETAIL" = "Menampilkan kepada siapa balasan ditujukan, di atas teks balasan yang Anda buka.";
 
 "SHOW_QUOTE_COUNTS_TITLE" = "Quote and Retweet counts";
 "SHOW_QUOTE_COUNTS_DETAIL" = "Show both numbers at the top of a Tweet's Quotes screen.";
@@ -119,7 +119,7 @@
 "FOLLOW_CONFIRM_DETAIL" = "Tanya dulu sebelum mengikuti akun.";
 
 "COPY_PROFILE_INFO_TITLE" = "Salin info profil";
-"COPY_PROFILE_INFO_DETAIL" = "Salin username, bio, dan lainnya dengan sekali ketuk.";
+"COPY_PROFILE_INFO_DETAIL" = "Tambahkan tombol salin ke profil.";
 
 "DISABLE_ARTICLES_TITLE" = "Tanpa tab Artikel";
 "DISABLE_ARTICLES_DETAIL" = "Sembunyikan tab Artikel di profil.";
@@ -135,21 +135,21 @@
 
 /*Search*/
 "NO_HISTORY_TITLE" = "Tanpa riwayat pencarian";
-"NO_HISTORY_DETAIL" = "Twitter tidak akan menyimpan pencarianmu.";
+"NO_HISTORY_DETAIL" = "Jangan simpan atau tampilkan pencarian terbaru.";
 
 "HIDE_TREND_VIDEOS_TITLE" = "Tanpa video trending";
 "HIDE_TREND_VIDEOS_DETAIL" = "Hapus video trending dari menu pencarian.";
 
 /*Photos and Videos*/
-"AUTO_HIGHEST_LOAD_TITLE" = "Media kualitas tinggi";
-"AUTO_HIGHEST_LOAD_DETAIL" = "Unggah dan tampilkan media dalam kualitas terbaik.";
+"AUTO_HIGHEST_LOAD_TITLE" = "Foto kualitas tinggi";
+"AUTO_HIGHEST_LOAD_DETAIL" = "Selalu muat foto dalam resolusi tertinggi.";
 
 "DISABLE_VIDEO_CAPTIONS_TITLE" = "Tanpa subtitle video";
 
-"FORCE_TWEET_FULL_FRAME_TITLE" = "Gambar besar";
+"FORCE_TWEET_FULL_FRAME_TITLE" = "Gambar tidak dipangkas";
 
-"RESTORE_VIDEO_TIMESTAMP_TITLE" = "Penanda Waktu Video";
-"RESTORE_VIDEO_TIMESTAMP_DETAIL" = "Menampilkan penanda waktu pada pemutar penuh.";
+"RESTORE_VIDEO_TIMESTAMP_TITLE" = "Waktu Video";
+"RESTORE_VIDEO_TIMESTAMP_DETAIL" = "Menampilkan waktu yang telah berlalu dan durasi total pada video layar penuh, bukan hitung mundur.";
 
 "DISABLE_IMMERSIVE_SCROLL_TITLE" = "Tanpa menggulir umpan video";
 
@@ -166,7 +166,7 @@
 "DIRECT_SAVE_DETAIL" = "Video disimpan langsung ke aplikasi Foto.";
 
 "HIDE_PREMIUM_OFFER_TITLE" = "Tanpa promosi Twitter Blue";
-"HIDE_PREMIUM_OFFER_DETAIL" = "Sembunyikan tombol 'Verifikasi' dan 'Upgrade'.";
+"HIDE_PREMIUM_OFFER_DETAIL" = "Sembunyikan tombol 'Dapatkan verifikasi' dan 'Tingkatkan'.";
 
 "THEME_OPTION_TITLE" = "Ganti tema";
 
@@ -184,13 +184,13 @@
 "HIDE_CUSTOM_TIMELINES_DETAIL" = "Hapus tombol Tambah dari tab linimasa beranda.";
 
 
-"TAB_BAR_THEMING_TITLE" = "Bilah Navigasi Klasik";
+"TAB_BAR_THEMING_TITLE" = "Tab yang dipilih";
 "TAB_BAR_THEMING_DETAIL" = "Terapkan warna aksen Anda ke item navigasi yang dipilih.";
 
-"DISABLE_RTL_TITLE" = "Gunakan tampilan kiri-ke-kanan";
-"DISABLE_RTL_DETAIL" = "Paksa tampilan LTR, meski bahasanya RTL.";
+"DISABLE_RTL_TITLE" = "Teks kiri-ke-kanan";
+"DISABLE_RTL_DETAIL" = "Tampilkan teks dari kiri ke kanan, bahkan untuk bahasa yang ditulis dari kanan ke kiri.";
 
-"SHOW_SCROLL_INDICATOR_TITLE" = "Selalu tampilkan scroll bar";
+"SHOW_SCROLL_INDICATOR_TITLE" = "Tampilkan scroll bar";
 
 "CUSTOM_FONTS_TITLE" = "Font khusus";
 "CUSTOM_FONTS_DETAIL" = "Pilih font khusus untuk Twitter.";
@@ -221,8 +221,8 @@
 /*Copy profile info*/
 "COPY_PROFILE_INFO_MENU_OPTION_1" = "Salin bio";
 "COPY_PROFILE_INFO_MENU_OPTION_2" = "Salin username";
-"COPY_PROFILE_INFO_MENU_OPTION_3" = "Salin username lengkap";
-"COPY_PROFILE_INFO_MENU_OPTION_4" = "Salin link bio";
+"COPY_PROFILE_INFO_MENU_OPTION_3" = "Salin nama";
+"COPY_PROFILE_INFO_MENU_OPTION_4" = "Salin situs web";
 "COPY_PROFILE_INFO_MENU_OPTION_5" = "Salin lokasi";
 
 /*Theme*/
@@ -260,7 +260,7 @@
 
 /*Custom fonts*/
 "INSTALL_IFONT_BUTTON_TITLE" = "iFont application";
-"FONT_SYSTEM_DEFAULT_SUBTITLE" = "System Default";
+"FONT_SYSTEM_DEFAULT_SUBTITLE" = "Default";
 "LIGHT_MODE_RESTART_TITLE" = "Back to light mode";
 "LIGHT_MODE_RESTART_MESSAGE" = "Your background color was reset to System. Restart Twitter to clear any leftover dark colors.";
 "CLOSE_APP_ACTION" = "Close app";

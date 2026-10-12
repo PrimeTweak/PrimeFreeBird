@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Writes src/Support/Generated/PFBHookManifest.m: every hooked method and class resolved by name,
-with each file relying on it, for the debugger and the Compatibility sheet. Run from the repo root;
-the Makefile calls it before each build. PrimeFreeBird's own classes are skipped.
+"""Writes src/Support/Generated/PFBHookManifest.m for the debugger and the Compatibility sheet:
+every hooked method and every class named literally in %c(), objc_getClass or NSClassFromString,
+with each file relying on it. PrimeFreeBird's own classes are skipped. Run from the repo root.
 """
 
 import os

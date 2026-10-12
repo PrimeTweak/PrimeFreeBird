@@ -10,10 +10,10 @@
 "MODERN_SETTINGS_LAYOUT_SUBTITLE" = "Заблокируйте приложение, оставьте панель навигации видимой и многое другое.";
 
 "MODERN_SETTINGS_MEDIA_TITLE" = "Медиа";
-"MODERN_SETTINGS_MEDIA_SUBTITLE" = "Загрузка видео, метки времени и т.д.";
+"MODERN_SETTINGS_MEDIA_SUBTITLE" = "Скачивание, воспроизведение, качество и отображение.";
 
 "MODERN_SETTINGS_APPEARANCE_TITLE" = "Внешний вид";
-"MODERN_SETTINGS_APPEARANCE_SUBTITLE" = "Настройте Twitter под себя: темы, свои иконки приложения, шрифты и многое другое.";
+"MODERN_SETTINGS_APPEARANCE_SUBTITLE" = "Стиль интерфейса, цвета и шрифты.";
 
 "MODERN_SETTINGS_TIMELINES_TITLE" = "Ленты";
 "MODERN_SETTINGS_TIMELINES_SUBTITLE" = "Уберите рекламу, рекомендации подписок и прочее лишнее из ленты.";
@@ -26,7 +26,7 @@
 "MODERN_SETTINGS_TWEETS_SUBTITLE" = "Настройте поведение твитов и отключите ненужное.";
 
 "MODERN_SETTINGS_SEARCH_TITLE" = "Поиск и обзор";
-"MODERN_SETTINGS_SEARCH_SUBTITLE" = "Измените, что отображается на вкладке поиска.";
+"MODERN_SETTINGS_SEARCH_SUBTITLE" = "История поиска, актуальные темы и популярные видео.";
 
 
 
@@ -39,7 +39,7 @@
 /*General*/
 
 "HIDE_WHO_TO_FOLLOW_TITLE" = "Без «Кого читать»";
-"HIDE_WHO_TO_FOLLOW_DETAIL" = "Убрать рекомендации из профилей.";
+"HIDE_WHO_TO_FOLLOW_DETAIL" = "Убрать рекомендации подписок.";
 
 "HIDE_TIMELINE_PROMPTS_TITLE" = "Без подсказок в ленте";
 "HIDE_TIMELINE_PROMPTS_DETAIL" = "Убрать баннеры вроде «Добавить контакты».";
@@ -74,7 +74,7 @@
 "SEND_SOUND_UNREADABLE" = "This file is not a sound that can be played.";
 
 "HIDE_BLUE_VERIFIED_TITLE" = "Скрыть галочки подтверждения Blue";
-"HIDE_BLUE_VERIFIED_DETAIL" = "Скрыть платную галочку подтверждения в твитах. Это не касается аккаунтов брендов или государственных аккаунтов.";
+"HIDE_BLUE_VERIFIED_DETAIL" = "Убрать галочки подтверждения Twitter Blue, оставив значки брендов и государственных аккаунтов.";
 
 "HIDE_VIEW_COUNT_TITLE" = "Скрыть просмотры";
 "HIDE_VIEW_COUNT_DETAIL" = "Не показывать количество просмотров под твитами.";
@@ -96,8 +96,8 @@
 "HIDE_GROK_CREATE_TITLE" = "Скрыть кнопки создания Grok";
 "HIDE_GROK_CREATE_DETAIL" = "Убирает возможность создавать и редактировать изображения и видео с помощью Grok.";
 
-"DISABLE_AUTO_TRANSLATE_TITLE" = "Отключить автоперевод";
-"DISABLE_AUTO_TRANSLATE_DETAIL" = "Не переводить посты и описания профилей автоматически.";
+"DISABLE_AUTO_TRANSLATE_TITLE" = "Автоперевод";
+"DISABLE_AUTO_TRANSLATE_DETAIL" = "Автоматически переводить твиты, описания профилей, примечания сообщества и уведомления.";
 
 "SQUARE_AVATARS_TITLE" = "Квадратные аватары";
 "SQUARE_AVATARS_DETAIL" = "Все пользователи будут с квадратными аватарами, как у брендов в старом Twitter.";
@@ -119,7 +119,7 @@
 "FOLLOW_CONFIRM_DETAIL" = "Спрашивать перед подпиской.";
 
 "COPY_PROFILE_INFO_TITLE" = "Копировать информацию профиля";
-"COPY_PROFILE_INFO_DETAIL" = "Копировать имя, био и другое одним нажатием.";
+"COPY_PROFILE_INFO_DETAIL" = "Добавляет в профили кнопку копирования.";
 
 "DISABLE_ARTICLES_TITLE" = "Скрыть вкладку Статьи";
 "DISABLE_ARTICLES_DETAIL" = "Спрятать вкладку «Статьи» в профилях.";
@@ -127,35 +127,35 @@
 "DISABLE_HIGHLIGHTS_TITLE" = "Скрыть вкладку Избранное";
 "DISABLE_HIGHLIGHTS_DETAIL" = "Спрятать вкладку «Избранное» в профилях.";
 
-"HIDE_FOLLOW_BUTTON_TITLE" = "Скрыть кнопку Подписаться";
-"HIDE_FOLLOW_BUTTON_DETAIL" = "Скрывает кнопку Подписаться в твитах.";
+"HIDE_FOLLOW_BUTTON_TITLE" = "Скрыть кнопку «Читать»";
+"HIDE_FOLLOW_BUTTON_DETAIL" = "Скрывает кнопку «Читать» в твитах.";
 
 "RESTORE_FOLLOW_BUTTON_TITLE" = "Скрыть кнопку Подписка";
 "RESTORE_FOLLOW_BUTTON_DETAIL" = "Скрывает кнопку Подписка в твитах и профилях.";
 
 /*Search*/
 "NO_HISTORY_TITLE" = "Без истории поиска";
-"NO_HISTORY_DETAIL" = "Twitter больше не будет сохранять твои запросы.";
+"NO_HISTORY_DETAIL" = "Не сохранять и не показывать недавние поисковые запросы.";
 
 "HIDE_TREND_VIDEOS_TITLE" = "Скрыть популярные видео";
 "HIDE_TREND_VIDEOS_DETAIL" = "Убрать видео из раздела поиска.";
 
 /*Photos and Videos*/
-"AUTO_HIGHEST_LOAD_TITLE" = "Высокое качество медиа";
-"AUTO_HIGHEST_LOAD_DETAIL" = "Загружать и показывать медиа в лучшем качестве.";
+"AUTO_HIGHEST_LOAD_TITLE" = "Высокое качество фото";
+"AUTO_HIGHEST_LOAD_DETAIL" = "Всегда показывать фото в максимальном разрешении.";
 
 "DISABLE_VIDEO_CAPTIONS_TITLE" = "Отключить субтитры видео";
 
-"FORCE_TWEET_FULL_FRAME_TITLE" = "Показывать большие изображения";
+"FORCE_TWEET_FULL_FRAME_TITLE" = "Изображения без обрезки";
 
-"RESTORE_VIDEO_TIMESTAMP_TITLE" = "Метка времени видео";
-"RESTORE_VIDEO_TIMESTAMP_DETAIL" = "Показывает метку времени в полноэкранном режиме.";
+"RESTORE_VIDEO_TIMESTAMP_TITLE" = "Время видео";
+"RESTORE_VIDEO_TIMESTAMP_DETAIL" = "Показывает прошедшее и общее время в полноэкранных видео вместо обратного отсчёта.";
 
 "DISABLE_IMMERSIVE_SCROLL_TITLE" = "Без прокрутки видеоленты";
 
 /*Twitter Blue*/
 "HIDE_PROMOTED_TITLE" = "Убрать рекламу";
-"HIDE_PROMOTED_DETAIL" = "Удалить всю рекламу из ленты.";
+"HIDE_PROMOTED_DETAIL" = "Удалить всю рекламу.";
 
 "UNDO_TWEET_TITLE" = "Отменить твит";
 
@@ -166,7 +166,7 @@
 "DIRECT_SAVE_DETAIL" = "Сохранённые видео будут в приложении Фото.";
 
 "HIDE_PREMIUM_OFFER_TITLE" = "Скрыть предложения Blue";
-"HIDE_PREMIUM_OFFER_DETAIL" = "Убрать кнопки «Подтвердить» и «Улучшить».";
+"HIDE_PREMIUM_OFFER_DETAIL" = "Убрать кнопки «Подтвердить подлинность» и «Приобрести».";
 
 "THEME_OPTION_TITLE" = "Изменить тему";
 
@@ -184,10 +184,10 @@
 "HIDE_CUSTOM_TIMELINES_DETAIL" = "Убирает кнопку «Добавить» из вкладок главной ленты.";
 
 
-"TAB_BAR_THEMING_TITLE" = "Классическая навигация";
+"TAB_BAR_THEMING_TITLE" = "Выбранная вкладка";
 "TAB_BAR_THEMING_DETAIL" = "Применяет ваш цвет к выбранной вкладке.";
 
-"DISABLE_RTL_TITLE" = "Левостороннее отображение";
+"DISABLE_RTL_TITLE" = "Текст слева направо";
 "DISABLE_RTL_DETAIL" = "Принудительно слева-направо, даже для RTL-языков.";
 
 "SHOW_SCROLL_INDICATOR_TITLE" = "Показывать полосу прокрутки";
@@ -222,7 +222,7 @@
 "COPY_PROFILE_INFO_MENU_OPTION_1" = "Скопировать био";
 "COPY_PROFILE_INFO_MENU_OPTION_2" = "Скопировать имя пользователя";
 "COPY_PROFILE_INFO_MENU_OPTION_3" = "Скопировать полное имя";
-"COPY_PROFILE_INFO_MENU_OPTION_4" = "Скопировать ссылку из био";
+"COPY_PROFILE_INFO_MENU_OPTION_4" = "Скопировать веб-сайт";
 "COPY_PROFILE_INFO_MENU_OPTION_5" = "Скопировать местоположение";
 
 /*Theme*/
@@ -260,7 +260,7 @@
 
 /*Custom fonts*/
 "INSTALL_IFONT_BUTTON_TITLE" = "iFont application";
-"FONT_SYSTEM_DEFAULT_SUBTITLE" = "System Default";
+"FONT_SYSTEM_DEFAULT_SUBTITLE" = "По умолчанию";
 "LIGHT_MODE_RESTART_TITLE" = "Back to light mode";
 "LIGHT_MODE_RESTART_MESSAGE" = "Your background color was reset to System. Restart Twitter to clear any leftover dark colors.";
 "CLOSE_APP_ACTION" = "Close app";

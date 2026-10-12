@@ -87,8 +87,10 @@ jobs:
           fi
 
       - name: Download IPA
+        env:
+          IPA_URL: ${{ inputs.ipa_url }}
         run: |
-          curl -fsSL -o App.ipa "${{ inputs.ipa_url }}"
+          curl -fsSL -o App.ipa "$IPA_URL"
           zip -T App.ipa
 
       # The deployment target follows the app's own minimum; a mismatch is flagged.
@@ -133,6 +135,13 @@ jobs:
           brew install make dpkg ldid
           echo "$(brew --prefix make)/libexec/gnubin" >> "$GITHUB_PATH"
 
+      - name: Install cyan
+        run: |
+          python3 -m venv /tmp/cyanenv
+          /tmp/cyanenv/bin/python -m pip install --upgrade pip
+          /tmp/cyanenv/bin/python -m pip install \
+            https://github.com/asdfzxcvbn/pyzule-rw/archive/main.zip
+
       # The ffmpeg stack is built from source once per SDK, submodule commit and build script.
       - name: Compute ffmpeg cache key
         id: ffmpeg-key
@@ -173,13 +182,6 @@ jobs:
           make clean package FINALPACKAGE=1
           ls -l packages
 
-      - name: Install cyan
-        run: |
-          python3 -m venv /tmp/cyanenv
-          /tmp/cyanenv/bin/python -m pip install --upgrade pip
-          /tmp/cyanenv/bin/python -m pip install \
-            https://github.com/asdfzxcvbn/pyzule-rw/archive/main.zip
-
       # The input IPA keeps its own signature, so nothing is re-signed; the app keeps its
       # extensions, which the plugin fix serves.
       - name: Inject
@@ -211,7 +213,7 @@ jobs:
             fi
             flags="$flags --resource-pack $pack"
           fi
-          ./rebrand.sh $flags out/PrimeFreeBird.ipa
+          bash rebrand.sh $flags out/PrimeFreeBird.ipa
 
       - name: Name files
         run: |

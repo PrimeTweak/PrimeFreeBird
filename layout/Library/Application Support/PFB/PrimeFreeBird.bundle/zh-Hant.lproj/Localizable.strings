@@ -10,10 +10,10 @@
 "MODERN_SETTINGS_LAYOUT_SUBTITLE" = "鎖定應用程式、保持導覽列顯示等。";
 
 "MODERN_SETTINGS_MEDIA_TITLE" = "媒體";
-"MODERN_SETTINGS_MEDIA_SUBTITLE" = "下載影片、啟用時間戳記等功能。";
+"MODERN_SETTINGS_MEDIA_SUBTITLE" = "下載、播放、畫質與版面配置。";
 
 "MODERN_SETTINGS_APPEARANCE_TITLE" = "外觀";
-"MODERN_SETTINGS_APPEARANCE_SUBTITLE" = "透過主題、自訂應用程式圖標、字型和其他選項，讓您的 Twitter 更具個人化。";
+"MODERN_SETTINGS_APPEARANCE_SUBTITLE" = "介面樣式、顏色與字體。";
 
 "MODERN_SETTINGS_TIMELINES_TITLE" = "時間軸";
 "MODERN_SETTINGS_TIMELINES_SUBTITLE" = "移除廣告、跟隨建議和時間軸上的其他多餘內容。";
@@ -26,7 +26,7 @@
 "MODERN_SETTINGS_TWEETS_SUBTITLE" = "調整推文行為，移除您不使用的功能。";
 
 "MODERN_SETTINGS_SEARCH_TITLE" = "搜尋與探索";
-"MODERN_SETTINGS_SEARCH_SUBTITLE" = "變更您在「搜尋」標籤頁中看見的內容。";
+"MODERN_SETTINGS_SEARCH_SUBTITLE" = "搜尋紀錄、趨勢與熱門影片。";
 
 
 
@@ -38,8 +38,8 @@
 
 /*General*/
 
-"HIDE_WHO_TO_FOLLOW_TITLE" = "不顯示「推薦關注」";
-"HIDE_WHO_TO_FOLLOW_DETAIL" = "在個人頁面中移除推薦帳戶。";
+"HIDE_WHO_TO_FOLLOW_TITLE" = "不顯示「建議跟隨」";
+"HIDE_WHO_TO_FOLLOW_DETAIL" = "移除跟隨建議。";
 
 "HIDE_TIMELINE_PROMPTS_TITLE" = "不顯示時間軸提示";
 "HIDE_TIMELINE_PROMPTS_DETAIL" = "移除「新增聯絡人」等橫幅。";
@@ -74,7 +74,7 @@
 "SEND_SOUND_UNREADABLE" = "This file is not a sound that can be played.";
 
 "HIDE_BLUE_VERIFIED_TITLE" = "隱藏 Blue 驗證徽章";
-"HIDE_BLUE_VERIFIED_DETAIL" = "在推文中隱藏付費驗證徽章。這不包含品牌或政府帳號。";
+"HIDE_BLUE_VERIFIED_DETAIL" = "移除 Twitter Blue 驗證徽章，保留品牌和政府帳號的徽章。";
 
 "HIDE_VIEW_COUNT_TITLE" = "隱藏觀看次數";
 "HIDE_VIEW_COUNT_DETAIL" = "不顯示推文下方的查看次數。";
@@ -96,8 +96,8 @@
 "HIDE_GROK_CREATE_TITLE" = "隱藏 Grok 建立按鈕";
 "HIDE_GROK_CREATE_DETAIL" = "移除使用 Grok 建立或編輯圖片和影片的選項。";
 
-"DISABLE_AUTO_TRANSLATE_TITLE" = "停用自動翻譯";
-"DISABLE_AUTO_TRANSLATE_DETAIL" = "不再自動翻譯貼文或簡介。";
+"DISABLE_AUTO_TRANSLATE_TITLE" = "自動翻譯";
+"DISABLE_AUTO_TRANSLATE_DETAIL" = "自動翻譯推文、簡介、社群備註和通知。";
 
 "SQUARE_AVATARS_TITLE" = "方形頭像";
 "SQUARE_AVATARS_DETAIL" = "將所有人的頭像都變成像品牌帳號一樣的方形，就像舊版 Twitter 那樣。";
@@ -106,7 +106,7 @@
 "REPLY_SORTING_DETAIL" = "停用推文對話中的回覆排序功能。";
 
 "RESTORE_REPLY_CONTEXT_TITLE" = "還原回覆上下文";
-"RESTORE_REPLY_CONTEXT_DETAIL" = "在推文下方顯示被回覆的使用者。";
+"RESTORE_REPLY_CONTEXT_DETAIL" = "在開啟的回覆內文上方顯示被回覆的使用者。";
 
 "SHOW_QUOTE_COUNTS_TITLE" = "Quote and Retweet counts";
 "SHOW_QUOTE_COUNTS_DETAIL" = "Show both numbers at the top of a Tweet's Quotes screen.";
@@ -119,12 +119,12 @@
 "FOLLOW_CONFIRM_DETAIL" = "跟隨前顯示確認視窗。";
 
 "COPY_PROFILE_INFO_TITLE" = "複製個人資料資訊";
-"COPY_PROFILE_INFO_DETAIL" = "一鍵複製用戶名稱、簡介等資訊。";
+"COPY_PROFILE_INFO_DETAIL" = "在個人資料中加入複製按鈕。";
 
 "DISABLE_ARTICLES_TITLE" = "隱藏「文章」分頁";
 "DISABLE_ARTICLES_DETAIL" = "在個人資料頁面隱藏文章分頁。";
 
-"DISABLE_HIGHLIGHTS_TITLE" = "隱藏「精選」分頁";
+"DISABLE_HIGHLIGHTS_TITLE" = "隱藏「精選內容」分頁";
 "DISABLE_HIGHLIGHTS_DETAIL" = "在個人頁面隱藏精選內容。";
 
 "HIDE_FOLLOW_BUTTON_TITLE" = "不顯示關注按鈕";
@@ -135,21 +135,21 @@
 
 /*Search*/
 "NO_HISTORY_TITLE" = "關閉搜尋紀錄";
-"NO_HISTORY_DETAIL" = "Twitter 將不再儲存你的搜尋內容。";
+"NO_HISTORY_DETAIL" = "不儲存也不顯示最近的搜尋紀錄。";
 
 "HIDE_TREND_VIDEOS_TITLE" = "隱藏熱門影片";
 "HIDE_TREND_VIDEOS_DETAIL" = "從搜尋選單中移除熱門影片。";
 
 /*Photos and Videos*/
-"AUTO_HIGHEST_LOAD_TITLE" = "高畫質媒體";
-"AUTO_HIGHEST_LOAD_DETAIL" = "一律以最高解析度載入照片與影片。";
+"AUTO_HIGHEST_LOAD_TITLE" = "高畫質照片";
+"AUTO_HIGHEST_LOAD_DETAIL" = "一律以最高解析度載入照片。";
 
 "DISABLE_VIDEO_CAPTIONS_TITLE" = "不顯示影片字幕";
 
-"FORCE_TWEET_FULL_FRAME_TITLE" = "顯示大圖";
+"FORCE_TWEET_FULL_FRAME_TITLE" = "顯示完整圖片";
 
 "RESTORE_VIDEO_TIMESTAMP_TITLE" = "顯示影片時間";
-"RESTORE_VIDEO_TIMESTAMP_DETAIL" = "在沉浸式播放器中顯示時間戳記。";
+"RESTORE_VIDEO_TIMESTAMP_DETAIL" = "在全螢幕影片上顯示已播放時間和總時長，而非倒數計時。";
 
 "DISABLE_IMMERSIVE_SCROLL_TITLE" = "停用影片動態捲動";
 
@@ -184,13 +184,13 @@
 "HIDE_CUSTOM_TIMELINES_DETAIL" = "從首頁時間軸分頁中移除新增按鈕。";
 
 
-"TAB_BAR_THEMING_TITLE" = "經典標籤圖示";
+"TAB_BAR_THEMING_TITLE" = "已選取的標籤";
 "TAB_BAR_THEMING_DETAIL" = "將您的主題顏色套用於目前選取的標籤項目。";
 
-"DISABLE_RTL_TITLE" = "使用左至右排版";
-"DISABLE_RTL_DETAIL" = "即使為 RTL 語言也強制使用 LTR 佈局。";
+"DISABLE_RTL_TITLE" = "文字由左至右";
+"DISABLE_RTL_DETAIL" = "即使是由右至左書寫的語言，文字也由左至右顯示。";
 
-"SHOW_SCROLL_INDICATOR_TITLE" = "總是顯示捲動條";
+"SHOW_SCROLL_INDICATOR_TITLE" = "顯示捲動條";
 
 "CUSTOM_FONTS_TITLE" = "自訂字體";
 "CUSTOM_FONTS_DETAIL" = "為 Twitter 選擇一種你喜歡的字體。";
@@ -221,8 +221,8 @@
 /*Copy profile info*/
 "COPY_PROFILE_INFO_MENU_OPTION_1" = "複製簡介";
 "COPY_PROFILE_INFO_MENU_OPTION_2" = "複製使用者名稱";
-"COPY_PROFILE_INFO_MENU_OPTION_3" = "複製完整使用者名稱";
-"COPY_PROFILE_INFO_MENU_OPTION_4" = "複製簡介連結";
+"COPY_PROFILE_INFO_MENU_OPTION_3" = "複製名稱";
+"COPY_PROFILE_INFO_MENU_OPTION_4" = "複製網站";
 "COPY_PROFILE_INFO_MENU_OPTION_5" = "複製地點";
 
 /*Theme*/
@@ -238,8 +238,8 @@
 "RESTORE_TAB_LABELS_TITLE" = "還原分頁標籤";
 "RESTORE_TAB_LABELS_DETAIL" = "像舊版 Twitter 一樣在標籤列圖示下方顯示標籤。";
 
-"COLOR_TWITTER_ICON_IN_TOP_BAR_TITLE" = "將 X 圖示上色";
-"COLOR_TWITTER_ICON_IN_TOP_BAR_DETAIL" = "將主題強調色套用至頂部導覽列的 X 圖示。";
+"COLOR_TWITTER_ICON_IN_TOP_BAR_TITLE" = "將 Twitter 圖示上色";
+"COLOR_TWITTER_ICON_IN_TOP_BAR_DETAIL" = "將主題強調色套用至頂部導覽列的 Twitter 小鳥圖示。";
 
 "REFRESH_PILL_TEXT" = "已發文";
 "REFRESH_PILL_LABEL_TITLE" = "在重新整理提示中加入標籤";
@@ -260,7 +260,7 @@
 
 /*Custom fonts*/
 "INSTALL_IFONT_BUTTON_TITLE" = "iFont application";
-"FONT_SYSTEM_DEFAULT_SUBTITLE" = "System Default";
+"FONT_SYSTEM_DEFAULT_SUBTITLE" = "預設";
 "LIGHT_MODE_RESTART_TITLE" = "Back to light mode";
 "LIGHT_MODE_RESTART_MESSAGE" = "Your background color was reset to System. Restart Twitter to clear any leftover dark colors.";
 "CLOSE_APP_ACTION" = "Close app";

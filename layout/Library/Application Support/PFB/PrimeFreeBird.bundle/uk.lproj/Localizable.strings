@@ -10,10 +10,10 @@
 "MODERN_SETTINGS_LAYOUT_SUBTITLE" = "Заблокуйте застосунок, залиште панель навігації видимою тощо.";
 
 "MODERN_SETTINGS_MEDIA_TITLE" = "Медіа";
-"MODERN_SETTINGS_MEDIA_SUBTITLE" = "Завантаження відео, часові мітки тощо.";
+"MODERN_SETTINGS_MEDIA_SUBTITLE" = "Завантаження, відтворення, якість і відображення.";
 
 "MODERN_SETTINGS_APPEARANCE_TITLE" = "Зовнішній вигляд";
-"MODERN_SETTINGS_APPEARANCE_SUBTITLE" = "Налаштуйте Twitter під себе: теми, власні іконки застосунку, шрифти тощо.";
+"MODERN_SETTINGS_APPEARANCE_SUBTITLE" = "Стиль інтерфейсу, кольори та шрифти.";
 
 "MODERN_SETTINGS_TIMELINES_TITLE" = "Стрічки";
 "MODERN_SETTINGS_TIMELINES_SUBTITLE" = "Приберіть рекламу, рекомендації підписок та інше зайве зі стрічки.";
@@ -26,7 +26,7 @@
 "MODERN_SETTINGS_TWEETS_SUBTITLE" = "Налаштуйте функціонал твітів.";
 
 "MODERN_SETTINGS_SEARCH_TITLE" = "Пошук і цікаве";
-"MODERN_SETTINGS_SEARCH_SUBTITLE" = "Змінюйте, що бачите на вкладці пошуку.";
+"MODERN_SETTINGS_SEARCH_SUBTITLE" = "Історія пошуку, тренди та трендові відео.";
 
 
 
@@ -74,7 +74,7 @@
 "SEND_SOUND_UNREADABLE" = "This file is not a sound that can be played.";
 
 "HIDE_BLUE_VERIFIED_TITLE" = "Приховати галочки підтвердження Blue";
-"HIDE_BLUE_VERIFIED_DETAIL" = "Приховати платну галочку підтвердження у твітах. Це не стосується облікових записів брендів чи державних установ.";
+"HIDE_BLUE_VERIFIED_DETAIL" = "Прибрати галочки підтвердження Twitter Blue, залишивши значки брендів і державних установ.";
 
 "HIDE_VIEW_COUNT_TITLE" = "Приховати перегляди";
 "HIDE_VIEW_COUNT_DETAIL" = "Не показувати кількість переглядів під твітами.";
@@ -96,8 +96,8 @@
 "HIDE_GROK_CREATE_TITLE" = "Приховати кнопки створення Grok";
 "HIDE_GROK_CREATE_DETAIL" = "Прибирає можливість створювати та редагувати зображення й відео за допомогою Grok.";
 
-"DISABLE_AUTO_TRANSLATE_TITLE" = "Вимкнути автопереклад";
-"DISABLE_AUTO_TRANSLATE_DETAIL" = "Не перекладати дописи й біографії автоматично.";
+"DISABLE_AUTO_TRANSLATE_TITLE" = "Автопереклад";
+"DISABLE_AUTO_TRANSLATE_DETAIL" = "Автоматично перекладати твіти, біографії, примітки та сповіщення.";
 
 "SQUARE_AVATARS_TITLE" = "Квадратні аватари";
 "SQUARE_AVATARS_DETAIL" = "Показує всіх із квадратними аватарами, як у брендів у старому Twitter.";
@@ -119,7 +119,7 @@
 "FOLLOW_CONFIRM_DETAIL" = "Запитувати перед тим, як почати читати.";
 
 "COPY_PROFILE_INFO_TITLE" = "Копіювати інформацію профілю";
-"COPY_PROFILE_INFO_DETAIL" = "Копіюйте біо, ім'я користувача та інше одним натисканням.";
+"COPY_PROFILE_INFO_DETAIL" = "Додає до профілів кнопку копіювання.";
 
 "DISABLE_ARTICLES_TITLE" = "Приховати Статті";
 "DISABLE_ARTICLES_DETAIL" = "Прибрати вкладку «Статті» в профілі.";
@@ -127,29 +127,29 @@
 "DISABLE_HIGHLIGHTS_TITLE" = "Приховати Вибране";
 "DISABLE_HIGHLIGHTS_DETAIL" = "Прибрати вкладку «Вибране».";
 
-"HIDE_FOLLOW_BUTTON_TITLE" = "Без кнопки «Стежити» у твітах";
-"HIDE_FOLLOW_BUTTON_DETAIL" = "Приховує кнопку «Стежити» у твітах.";
+"HIDE_FOLLOW_BUTTON_TITLE" = "Без кнопки «Читати» у твітах";
+"HIDE_FOLLOW_BUTTON_DETAIL" = "Приховує кнопку «Читати» у твітах.";
 
 "RESTORE_FOLLOW_BUTTON_TITLE" = "Без кнопки «Підписатися»";
 "RESTORE_FOLLOW_BUTTON_DETAIL" = "Приховує кнопку «Підписатися» у твітах і профілях.";
 
 /*Search*/
 "NO_HISTORY_TITLE" = "Вимкнути історію пошуку";
-"NO_HISTORY_DETAIL" = "Twitter не зберігатиме історію пошуку.";
+"NO_HISTORY_DETAIL" = "Не зберігати й не показувати нещодавні пошукові запити.";
 
 "HIDE_TREND_VIDEOS_TITLE" = "Приховати трендові відео";
 "HIDE_TREND_VIDEOS_DETAIL" = "Прибрати трендові відео з пошуку.";
 
 /*Photos and Videos*/
-"AUTO_HIGHEST_LOAD_TITLE" = "Якісні медіа";
-"AUTO_HIGHEST_LOAD_DETAIL" = "Завантажуйте та переглядайте медіа у найкращій якості.";
+"AUTO_HIGHEST_LOAD_TITLE" = "Фото у високій якості";
+"AUTO_HIGHEST_LOAD_DETAIL" = "Завжди показувати фото в найвищій роздільній здатності.";
 
 "DISABLE_VIDEO_CAPTIONS_TITLE" = "Прибрати субтитри під відео";
 
-"FORCE_TWEET_FULL_FRAME_TITLE" = "Великі зображення";
+"FORCE_TWEET_FULL_FRAME_TITLE" = "Зображення без обрізання";
 
 "RESTORE_VIDEO_TIMESTAMP_TITLE" = "Час у відео";
-"RESTORE_VIDEO_TIMESTAMP_DETAIL" = "Показує часову мітку в повноекранному режимі відео.";
+"RESTORE_VIDEO_TIMESTAMP_DETAIL" = "Показує час, що минув, і загальну тривалість у повноекранному режимі відео замість зворотного відліку.";
 
 "DISABLE_IMMERSIVE_SCROLL_TITLE" = "Без прокручування відеострічки";
 
@@ -166,7 +166,7 @@
 "DIRECT_SAVE_DETAIL" = "Відео зберігаються напряму у фотоальбом.";
 
 "HIDE_PREMIUM_OFFER_TITLE" = "Без пропозицій Twitter Blue";
-"HIDE_PREMIUM_OFFER_DETAIL" = "Прибрати кнопки «Отримати верифікацію» та «Передплатити Blue».";
+"HIDE_PREMIUM_OFFER_DETAIL" = "Прибрати кнопки «Підтвердити профіль» та «Покращити рівень».";
 
 "THEME_OPTION_TITLE" = "Змінити тему";
 
@@ -184,13 +184,13 @@
 "HIDE_CUSTOM_TIMELINES_DETAIL" = "Прибрати кнопку «Додати» з вкладок головної стрічки.";
 
 
-"TAB_BAR_THEMING_TITLE" = "Класична панель навігації";
+"TAB_BAR_THEMING_TITLE" = "Вибрана вкладка";
 "TAB_BAR_THEMING_DETAIL" = "Застосовує ваш акцентний колір до вибраного елемента навігації.";
 
-"DISABLE_RTL_TITLE" = "Примусити інтерфейс зліва направо (LTR)";
+"DISABLE_RTL_TITLE" = "Текст зліва направо";
 "DISABLE_RTL_DETAIL" = "Примусово використовувати LTR навіть для RTL-мов.";
 
-"SHOW_SCROLL_INDICATOR_TITLE" = "Завжди показувати індикатор прокрутки";
+"SHOW_SCROLL_INDICATOR_TITLE" = "Показувати індикатор прокрутки";
 
 "CUSTOM_FONTS_TITLE" = "Власні шрифти";
 "CUSTOM_FONTS_DETAIL" = "Виберіть шрифт для Twitter.";
@@ -222,7 +222,7 @@
 "COPY_PROFILE_INFO_MENU_OPTION_1" = "Копіювати біо";
 "COPY_PROFILE_INFO_MENU_OPTION_2" = "Копіювати ім’я користувача";
 "COPY_PROFILE_INFO_MENU_OPTION_3" = "Копіювати повне ім’я";
-"COPY_PROFILE_INFO_MENU_OPTION_4" = "Копіювати посилання з біо";
+"COPY_PROFILE_INFO_MENU_OPTION_4" = "Копіювати веб-сторінку";
 "COPY_PROFILE_INFO_MENU_OPTION_5" = "Копіювати місцезнаходження";
 
 /*Theme*/
@@ -260,7 +260,7 @@
 
 /*Custom fonts*/
 "INSTALL_IFONT_BUTTON_TITLE" = "iFont application";
-"FONT_SYSTEM_DEFAULT_SUBTITLE" = "System Default";
+"FONT_SYSTEM_DEFAULT_SUBTITLE" = "За замовчуванням";
 "LIGHT_MODE_RESTART_TITLE" = "Back to light mode";
 "LIGHT_MODE_RESTART_MESSAGE" = "Your background color was reset to System. Restart Twitter to clear any leftover dark colors.";
 "CLOSE_APP_ACTION" = "Close app";

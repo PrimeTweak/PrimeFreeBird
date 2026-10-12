@@ -10,10 +10,10 @@
 "MODERN_SETTINGS_LAYOUT_SUBTITLE" = "アプリをロックしたり、ナビゲーションバーを常に表示したりできます。";
 
 "MODERN_SETTINGS_MEDIA_TITLE" = "画像と動画";
-"MODERN_SETTINGS_MEDIA_SUBTITLE" = "動画のダウンロード、タイムスタンプの有効化など。";
+"MODERN_SETTINGS_MEDIA_SUBTITLE" = "ダウンロード、再生、画質、レイアウト。";
 
 "MODERN_SETTINGS_APPEARANCE_TITLE" = "外観";
-"MODERN_SETTINGS_APPEARANCE_SUBTITLE" = "テーマ、カスタムアプリアイコン、フォントなどでTwitterを自分好みにカスタマイズできます。";
+"MODERN_SETTINGS_APPEARANCE_SUBTITLE" = "インターフェイスのスタイル、カラー、フォント。";
 
 "MODERN_SETTINGS_TIMELINES_TITLE" = "タイムライン";
 "MODERN_SETTINGS_TIMELINES_SUBTITLE" = "広告、おすすめユーザー、その他タイムラインの不要な項目を削除できます。";
@@ -26,7 +26,7 @@
 "MODERN_SETTINGS_TWEETS_SUBTITLE" = "ツイートの外観を変更し、使用しない可能性のある機能を削除します。";
 
 "MODERN_SETTINGS_SEARCH_TITLE" = "探索と発見";
-"MODERN_SETTINGS_SEARCH_SUBTITLE" = "[検索] タブに表示される内容を変更できます。";
+"MODERN_SETTINGS_SEARCH_SUBTITLE" = "検索履歴、トレンド、トレンド動画。";
 
 
 
@@ -38,7 +38,7 @@
 
 /*General*/
 
-"HIDE_WHO_TO_FOLLOW_TITLE" = "「おすすめアカウント」を非表示";
+"HIDE_WHO_TO_FOLLOW_TITLE" = "「おすすめユーザー」を非表示";
 "HIDE_WHO_TO_FOLLOW_DETAIL" = "フォロー候補を非表示にします。";
 
 "HIDE_TIMELINE_PROMPTS_TITLE" = "タイムラインのプロンプトを非表示";
@@ -74,7 +74,7 @@
 "SEND_SOUND_UNREADABLE" = "This file is not a sound that can be played.";
 
 "HIDE_BLUE_VERIFIED_TITLE" = "Twitter Blueの確認済みチェックマークを非表示";
-"HIDE_BLUE_VERIFIED_DETAIL" = "ツイートの有料認証済みチェックマークを非表示にします。ブランドアカウントや政府アカウントは対象外です。";
+"HIDE_BLUE_VERIFIED_DETAIL" = "Twitter Blueの認証済みチェックマークを非表示にします。ブランドアカウントや政府アカウントのバッジはそのまま残ります。";
 
 "HIDE_VIEW_COUNT_TITLE" = "表示回数を非表示";
 "HIDE_VIEW_COUNT_DETAIL" = "ツイートの下にある表示回数を非表示にします。";
@@ -96,8 +96,8 @@
 "HIDE_GROK_CREATE_TITLE" = "Grokの作成ボタンを非表示";
 "HIDE_GROK_CREATE_DETAIL" = "Grokで画像や動画を作成・編集するオプションを削除します。";
 
-"DISABLE_AUTO_TRANSLATE_TITLE" = "自動翻訳を無効化";
-"DISABLE_AUTO_TRANSLATE_DETAIL" = "ポストやプロフィールを自動的に翻訳しません。";
+"DISABLE_AUTO_TRANSLATE_TITLE" = "自動翻訳";
+"DISABLE_AUTO_TRANSLATE_DETAIL" = "ツイート、プロフィール、コミュニティノート、通知を自動的に翻訳します。";
 
 "SQUARE_AVATARS_TITLE" = "正方形のプロフィール写真";
 "SQUARE_AVATARS_DETAIL" = "昔のTwitterのように、ブランドアカウントのような正方形のプロフィール写真を全員に適用します。";
@@ -106,7 +106,7 @@
 "REPLY_SORTING_DETAIL" = "ツイートのリプライにある並べ替え機能を無効にします。";
 
 "RESTORE_REPLY_CONTEXT_TITLE" = "返信コンテキストを復元";
-"RESTORE_REPLY_CONTEXT_DETAIL" = "ツイートの下に返信されている人を表示します。";
+"RESTORE_REPLY_CONTEXT_DETAIL" = "開いた返信の本文の上に、返信先の相手を表示します。";
 
 "SHOW_QUOTE_COUNTS_TITLE" = "Quote and Retweet counts";
 "SHOW_QUOTE_COUNTS_DETAIL" = "Show both numbers at the top of a Tweet's Quotes screen.";
@@ -119,7 +119,7 @@
 "FOLLOW_CONFIRM_DETAIL" = "誰かをフォローする際に確認ダイアログを表示します。";
 
 "COPY_PROFILE_INFO_TITLE" = "プロフィールの詳細をコピー";
-"COPY_PROFILE_INFO_DETAIL" = "ユーザー名、プロフィールなどをワンタップでコピーできるようにします。";
+"COPY_PROFILE_INFO_DETAIL" = "プロフィールにコピーボタンを追加します。";
 
 "DISABLE_ARTICLES_TITLE" = "記事タブを非表示";
 "DISABLE_ARTICLES_DETAIL" = "プロフィールから [記事] タブを非表示にします。";
@@ -135,21 +135,21 @@
 
 /*Search*/
 "NO_HISTORY_TITLE" = "検索履歴を残さない";
-"NO_HISTORY_DETAIL" = "Twitterは検索結果を保存しなくなります。";
+"NO_HISTORY_DETAIL" = "最近の検索を保存せず、表示もしません。";
 
 "HIDE_TREND_VIDEOS_TITLE" = "トレンド動画を非表示";
 "HIDE_TREND_VIDEOS_DETAIL" = "検索メニューからトレンド動画を非表示にします。";
 
 /*Photos and Videos*/
-"AUTO_HIGHEST_LOAD_TITLE" = "高画質メディア";
-"AUTO_HIGHEST_LOAD_DETAIL" = "写真や動画を常に可能な限り最高の解像度で読み込みます。";
+"AUTO_HIGHEST_LOAD_TITLE" = "高画質の写真";
+"AUTO_HIGHEST_LOAD_DETAIL" = "写真を常に可能な限り最高の解像度で読み込みます。";
 
 "DISABLE_VIDEO_CAPTIONS_TITLE" = "字幕を非表示";
 
-"FORCE_TWEET_FULL_FRAME_TITLE" = "大きな画像";
+"FORCE_TWEET_FULL_FRAME_TITLE" = "画像をトリミングしない";
 
-"RESTORE_VIDEO_TIMESTAMP_TITLE" = "動画のタイムスタンプ";
-"RESTORE_VIDEO_TIMESTAMP_DETAIL" = "没入型プレーヤー内にタイムスタンプを表示します。";
+"RESTORE_VIDEO_TIMESTAMP_TITLE" = "動画の再生時間";
+"RESTORE_VIDEO_TIMESTAMP_DETAIL" = "全画面表示の動画で、カウントダウンではなく経過時間と合計時間を表示します。";
 
 "DISABLE_IMMERSIVE_SCROLL_TITLE" = "動画フィードのスクロールを無効化";
 
@@ -184,13 +184,13 @@
 "HIDE_CUSTOM_TIMELINES_DETAIL" = "ホームタイムラインのタブから [追加] ボタンを削除します。";
 
 
-"TAB_BAR_THEMING_TITLE" = "新しいタブバー";
+"TAB_BAR_THEMING_TITLE" = "選択中のタブ";
 "TAB_BAR_THEMING_DETAIL" = "現在選択されているタブ項目にアクセントカラーを適用します。";
 
-"DISABLE_RTL_TITLE" = "左から右へのレイアウトを使用";
-"DISABLE_RTL_DETAIL" = "右から左に読む言語の場合でも、左から右へのレイアウトを強制します。";
+"DISABLE_RTL_TITLE" = "テキストを左から右に表示";
+"DISABLE_RTL_DETAIL" = "右から左に読む言語の場合でも、テキストを左から右に表示します。";
 
-"SHOW_SCROLL_INDICATOR_TITLE" = "スクロールバーを常に表示";
+"SHOW_SCROLL_INDICATOR_TITLE" = "スクロールバーを表示";
 
 "CUSTOM_FONTS_TITLE" = "カスタムフォント";
 "CUSTOM_FONTS_DETAIL" = "Twitterで使用するカスタムフォントを選択してください。";
@@ -260,7 +260,7 @@
 
 /*Custom fonts*/
 "INSTALL_IFONT_BUTTON_TITLE" = "iFont application";
-"FONT_SYSTEM_DEFAULT_SUBTITLE" = "System Default";
+"FONT_SYSTEM_DEFAULT_SUBTITLE" = "デフォルト";
 "LIGHT_MODE_RESTART_TITLE" = "Back to light mode";
 "LIGHT_MODE_RESTART_MESSAGE" = "Your background color was reset to System. Restart Twitter to clear any leftover dark colors.";
 "CLOSE_APP_ACTION" = "Close app";

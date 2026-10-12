@@ -94,16 +94,16 @@
 "HIDE_GROK_CREATE_DETAIL" = "Supprime les options de création ou de modification d'images et de vidéos avec Grok.";
 
 "DISABLE_AUTO_TRANSLATE_TITLE" = "Traduction automatique";
-"DISABLE_AUTO_TRANSLATE_DETAIL" = "Tweets, bios, notes et notifications.";
+"DISABLE_AUTO_TRANSLATE_DETAIL" = "Traduit automatiquement les Tweets, bios, notes et notifications.";
 
 "SQUARE_AVATARS_TITLE" = "Photos de profil carrées";
-"SQUARE_AVATARS_DETAIL" = "Utilise des carrés arrondis, comme l’ancien Twitter.";
+"SQUARE_AVATARS_DETAIL" = "Affiche les photos de profil en carrés arrondis, comme l’ancien Twitter.";
 
 "REPLY_SORTING_TITLE" = "Pas de tri des réponses";
 "REPLY_SORTING_DETAIL" = "Désactive le tri des réponses dans les conversations de Tweets.";
 
 "RESTORE_REPLY_CONTEXT_TITLE" = "Restaurer le contexte de réponse";
-"RESTORE_REPLY_CONTEXT_DETAIL" = "Affiche « En réponse à » sur les réponses ouvertes.";
+"RESTORE_REPLY_CONTEXT_DETAIL" = "Affiche « En réponse à » au-dessus du texte d’une réponse ouverte.";
 
 "SHOW_QUOTE_COUNTS_TITLE" = "Nombre de citations et de Retweets";
 "SHOW_QUOTE_COUNTS_DETAIL" = "Affiche les deux nombres en haut de l’écran des citations d’un Tweet.";
@@ -147,8 +147,8 @@
 
 "FORCE_TWEET_FULL_FRAME_TITLE" = "Images entières";
 
-"RESTORE_VIDEO_TIMESTAMP_TITLE" = "Temps des vidéos";
-"RESTORE_VIDEO_TIMESTAMP_DETAIL" = "Affiche le temps écoulé et la durée en plein écran.";
+"RESTORE_VIDEO_TIMESTAMP_TITLE" = "Temps écoulé des vidéos";
+"RESTORE_VIDEO_TIMESTAMP_DETAIL" = "Affiche le temps écoulé et la durée en plein écran, au lieu du compte à rebours.";
 
 "DISABLE_IMMERSIVE_SCROLL_TITLE" = "Pas de défilement des vidéos";
 
@@ -197,7 +197,7 @@
 "TAB_BAR_THEMING_DETAIL" = "Applique votre couleur d'accent à l'élément de navigation sélectionné.";
 
 "DISABLE_RTL_TITLE" = "Texte de gauche à droite";
-"DISABLE_RTL_DETAIL" = "Même dans les langues de droite à gauche.";
+"DISABLE_RTL_DETAIL" = "Même dans les langues qui s’écrivent de droite à gauche.";
 
 "SHOW_SCROLL_INDICATOR_TITLE" = "Barre de défilement";
 
@@ -248,7 +248,7 @@
 
 "REFRESH_PILL_TEXT" = "Posté";
 "REFRESH_PILL_LABEL_TITLE" = "Étiquette de la pastille";
-"REFRESH_PILL_LABEL_DETAIL" = "Rajoute l’étiquette à la pastille qui annonce les nouveaux Tweets.";
+"REFRESH_PILL_LABEL_DETAIL" = "Rajoute « Posté » à la pastille des nouveaux Tweets.";
 
 "RESTORE_TWITTER_NAMES_TITLE" = "Restaurer la terminologie Twitter";
 "RESTORE_TWITTER_NAMES_DETAIL" = "Remet l’oiseau et remplace « X » par « Twitter », « Post » par « Tweet », et ainsi de suite.";
@@ -276,7 +276,7 @@
 "NO_SCREENSHOT_DETECTION_DETAIL" = "Empêche Twitter d’ajouter un filigrane ou une invite de partage à vos captures d’écran.";
 "GENERAL_GROUP_BEHAVIOR" = "Comportement de l’app";
 "FORCE_FOLLOWING_TAB_TITLE" = "Mémoriser l’onglet d’accueil";
-"FORCE_FOLLOWING_TAB_DETAIL" = "Ne revient pas sur Pour vous après 12 heures.";
+"FORCE_FOLLOWING_TAB_DETAIL" = "Garde le dernier onglet choisi au lieu de revenir à Pour vous après 12 heures.";
 "NO_FOCUS_LOST_TITLE" = "Garder votre position";
 "NO_FOCUS_LOST_DETAIL" = "Le fil ne se recharge plus quand vous revenez d’une autre app.";
 "SHOW_SCROLL_INDICATOR_DETAIL" = "Affiche l'indicateur de position à droite pendant le défilement.";
@@ -309,7 +309,7 @@
 "FORCE_TWEET_FULL_FRAME_DETAIL" = "Affiche les photos en entier plutôt qu’en aperçus rognés.";
 "DISABLE_MEDIA_CAROUSEL_TITLE" = "Médias en grille";
 "DISABLE_MEDIA_CAROUSEL_DETAIL" = "Affiche les photos d’un Tweet en grille plutôt qu’en carrousel.";
-"DISABLE_IMMERSIVE_SCROLL_DETAIL" = "Reste sur la vidéo plein écran en cours.";
+"DISABLE_IMMERSIVE_SCROLL_DETAIL" = "Reste sur la vidéo plein écran : pas de passage automatique ni de balayage vers la suivante.";
 "HIDE_GROK_ANALYZE_DETAIL" = "Retire les boutons d'analyse et de question de Grok.";
 "HIDE_GROK_SIDEBAR_DETAIL" = "Retire le raccourci Grok de la barre latérale.";
 "HIDE_GROK_BOT_TITLE" = "Masquer Grok Bot";
@@ -451,7 +451,7 @@
 "LANGUAGES_FOOTER_OFF" = "Aucune langue cochée — toutes les langues atteignent votre fil.";
 "LANGUAGES_FOOTER_ON" = "Seules les langues cochées atteignent votre fil.\nLes Tweets sans langue détectée passent toujours.\nDécochez toutes les langues pour désactiver le filtre.";
 "LANGUAGES_TRANSLATE_TITLE" = "Traduction automatique";
-"LANGUAGES_TRANSLATE_DETAIL" = "Tweets, bios, notes et notifications.";
+"LANGUAGES_TRANSLATE_DETAIL" = "Traduit automatiquement les Tweets, bios, notes et notifications.";
 "LANGUAGES_OTHERS_TITLE" = "Autres langues";
 "LANGUAGES_OTHERS_NONE" = "Aucune";
 "MUTED_WORDS_ADD_PLACEHOLDER" = "Mot, expression ou @compte";
@@ -470,7 +470,7 @@
 "MUTED_WORDS_FOLLOWING_DETAIL" = "Les Tweets des comptes que vous suivez ne sont jamais filtrés.";
 "MUTED_WORDS_REPOSTS_TITLE" = "Inclure les Retweets";
 "MUTED_WORDS_REPOSTS_DETAIL" = "Filtre aussi les Retweets d’un mot ou d’un compte filtré.";
-"MUTED_WORDS_COUNT_FORMAT" = "Filtrés aujourd’hui : %ld";
+"MUTED_WORDS_COUNT_FORMAT" = "Tweets filtrés aujourd’hui : %ld";
 "MUTED_WORDS_DURATION_FOREVER" = "toujours";
 "MUTED_WORDS_DURATION_24H" = "24 heures";
 "MUTED_WORDS_DURATION_7D" = "7 jours";
@@ -484,7 +484,7 @@
 "SHOW_POLL_RESULTS_TITLE" = "Afficher les résultats";
 "SHOW_POLL_RESULTS_DETAIL" = "Ajoute à chaque choix sa part des votes, avant même d'avoir voté.";
 "TAP_TO_PAUSE_TITLE" = "Lecteur vidéo épuré";
-"TAP_TO_PAUSE_DETAIL" = "Barre minimale en plein écran ; touchez pour lire ou mettre en pause.";
+"TAP_TO_PAUSE_DETAIL" = "Touchez pour lire ou mettre en pause ; une barre minimale reste pendant la lecture.";
 "VIDEO_STARTS_MUTED_PILL_ON" = "Sans le son";
 "VIDEO_STARTS_MUTED_PILL_OFF" = "Avec le son";
 
@@ -570,7 +570,7 @@
 "COMPATIBILITY_REPORT_TITLE" = "Rapport";
 "COMPATIBILITY_REPORT_DETAIL" = "Pas encore vérifié";
 "SETTINGS_BACKUP_TITLE" = "Sauvegarde des réglages";
-"SETTINGS_BACKUP_DETAIL" = "Toutes les options, filtres et couleurs.";
+"SETTINGS_BACKUP_DETAIL" = "Exporte ou importe toutes les options, filtres et couleurs.";
 "EXPORT_SETTINGS_ACTION" = "Exporter…";
 "IMPORT_SETTINGS_ACTION" = "Importer…";
 "WEB_SESSION_LOGIN_TITLE" = "Se connecter sur le web";
@@ -608,7 +608,7 @@
 "CONFIRM_FOLLOW_ACTION" = "Suivre";
 "HIDE_NEW_TWEETS_PILL_TITLE" = "Cacher la pastille des nouveaux Tweets";
 "HIDE_NEW_TWEETS_PILL_DETAIL" = "Retire la pastille qui annonce les nouveaux Tweets en haut de votre fil.";
-"REFRESH_PILL_LABEL_DETAIL_HELD" = "Inutile tant que la pastille est masquée.";
+"REFRESH_PILL_LABEL_DETAIL_HELD" = "Inutile tant que la pastille des nouveaux Tweets est masquée.";
 
 /* ===== COMPATIBILITY: behaviors with no toggle ===== */
 "PREMIUM_UNLOCK_TITLE" = "Premium débloqué";
