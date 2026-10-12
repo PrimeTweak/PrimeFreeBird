@@ -1207,42 +1207,29 @@ static BOOL tourAttempt(NSString* step, NSString* part, dispatch_block_t body) {
 
 // MARK: - Probe measurements
 
-// Twitter's navigation object, through which its menus and links open screens: the
-// window's root controller holds it, or one of the controllers under it.
-static id tourAppNavigation(void) {
-    NSMutableArray<UIViewController*>* queue = [NSMutableArray array];
-    UIViewController* root = tourRootController();
-    if (root) {
-        [queue addObject:root];
-    }
-    for (NSUInteger i = 0; i < queue.count && i < 256; i++) {
-        id navigation = tourGetter(queue[i], @"appNavigation");
-        if (navigation) {
-            return navigation;
-        }
-        [queue addObjectsFromArray:queue[i].childViewControllers];
-    }
-    return nil;
-}
-
-// Runs one of the navigation's commands that take a source and a completion, with the
-// signature read in 12.31: no particular source, nothing to do on completion.
-static BOOL tourNavigate(NSString* command) {
-    id navigation = tourAppNavigation();
-    SEL selector = NSSelectorFromString(command);
+// Twitter's Lists page, built by its own class factory and pushed on the stack in front,
+// as the Tweet interactions screen is.
+static BOOL tourOpenListsPage(void) {
+    NSString* className = @"_TtC33TwitterListsFeatureImplementation37ListManagementContainerViewController";
+    Class screenClass = NSClassFromString(className);
+    SEL build = NSSelectorFromString(@"listManagementViewControllerWithAccount:");
     NSMethodSignature* signature =
-        [navigation respondsToSelector:selector] ? [navigation methodSignatureForSelector:selector] : nil;
-    BOOL usable = signature.numberOfArguments == 4 &&
-                  strcmp([signature getArgumentTypeAtIndex:2], @encode(long long)) == 0 &&
-                  strncmp([signature getArgumentTypeAtIndex:3], "@?", 2) == 0;
-    PFBCompatTourLog(@"[tour] navigation: %@ %@", command,
-                     usable ? [@"sent to " stringByAppendingString:NSStringFromClass([navigation class])]
-                            : (navigation ? @"not usable" : @"no navigation object"));
-    if (!usable) {
+        [screenClass respondsToSelector:build] ? [screenClass methodSignatureForSelector:build] : nil;
+    BOOL buildable = signature.numberOfArguments == 3 && signature.methodReturnType[0] == '@' &&
+                     [signature getArgumentTypeAtIndex:2][0] == '@';
+    id account = tourGetter(UIApplication.sharedApplication.delegate, @"_t1_currentAccount");
+    UINavigationController* stack = tourScreen().navigationController;
+    UIViewController* screen = buildable && account && stack
+                                   ? ((id (*)(id, SEL, id))objc_msgSend)(screenClass, build, account)
+                                   : nil;
+    if (![screen isKindOfClass:[UIViewController class]]) {
+        PFBCompatTourLog(@"[tour] lists: factory %@, account %@, stack %@, page %@", buildable ? @"usable" : @"not usable",
+                         account ? NSStringFromClass([account class]) : @"none", stack ? @"found" : @"none",
+                         screen ? NSStringFromClass([screen class]) : @"not built");
         return NO;
     }
-    ((void (*)(id, SEL, long long, dispatch_block_t))objc_msgSend)(navigation, selector, 0, ^{
-    });
+    [stack pushViewController:screen animated:NO];
+    PFBCompatTourLog(@"[tour] lists: %@ pushed on %@", NSStringFromClass([screen class]), NSStringFromClass([stack class]));
     return YES;
 }
 
@@ -1327,8 +1314,8 @@ static void tourProbeHomeTabs(void) {
 }
 
 // Home's Tweets with the most replies, most first, each with its count, read from its
-// first three screens. The Tweet the first Tweet step opens is left out: its
-// conversation is already loaded.
+// first three screens. Left out: the Tweet the first Tweet step opens, its conversation
+// already loaded, and Tweets with a link card, which a tap can open instead.
 static NSArray<NSArray<NSNumber*>*>* tourMostRepliedTweets(void) {
     NSInteger first = NSNotFound;
     NSInteger firstAuthor = NSNotFound;
@@ -1337,6 +1324,9 @@ static NSArray<NSArray<NSNumber*>*>* tourMostRepliedTweets(void) {
     UITableView* list = tourFrontList();
     for (NSInteger screen = 0; list && screen < 3; screen++) {
         for (UITableViewCell* cell in list.visibleCells) {
+            if (tourFindClass(cell, @"T1UnifiedCardView")) {
+                continue;
+            }
             id model = tourGetter(tourFindClass(cell, @"T1StandardStatusView"), @"viewModel");
             NSInteger statusID = tourIntegerGetter(model, @"statusID");
             NSInteger count = tourIntegerGetter(model, @"displayReplyCount");
@@ -1367,8 +1357,31 @@ static NSArray<NSArray<NSNumber*>*>* tourMostRepliedTweets(void) {
     return pairs;
 }
 
-static void tourOpenTweet(long long statusID) {
-    tourOpenLink([NSString stringWithFormat:@"twitter://status?status_id=%lld", statusID]);
+// A Tweet of Home opened the way a tap does, as the first Tweet step opens its own: its
+// row is looked for from the top, a screen at a time.
+static BOOL tourOpenHomeTweet(long long statusID) {
+    tourScrollHomeToTop();
+    UITableView* list = tourFrontList();
+    id<UITableViewDelegate> delegate = list.delegate;
+    if (![delegate respondsToSelector:@selector(tableView:didSelectRowAtIndexPath:)]) {
+        PFBCompatTourLog(@"[tour] replies: %@", list ? @"Home's list takes no row selection" : @"no list in front");
+        return NO;
+    }
+    for (NSInteger screen = 0; screen < 4; screen++) {
+        for (NSIndexPath* row in [list.indexPathsForVisibleRows sortedArrayUsingSelector:@selector(compare:)]) {
+            id model = tourGetter(tourFindClass([list cellForRowAtIndexPath:row], @"T1StandardStatusView"), @"viewModel");
+            if (tourIntegerGetter(model, @"statusID") == statusID) {
+                PFBCompatTourLog(@"[tour] replies: Tweet %lld opened from row %ld", statusID, (long)row.row);
+                [delegate tableView:list didSelectRowAtIndexPath:row];
+                return YES;
+            }
+        }
+        [list setContentOffset:CGPointMake(list.contentOffset.x, list.contentOffset.y + list.bounds.size.height * 0.8)
+                      animated:NO];
+        [list layoutIfNeeded];
+    }
+    PFBCompatTourLog(@"[tour] replies: Tweet %lld not found again on Home's first screens", statusID);
+    return NO;
 }
 
 // The sort Twitter says it applied to a conversation, read from its focal Tweet.
@@ -1979,8 +1992,8 @@ static NSArray<NSDictionary*>* tourAllSteps(void) {
                  tourSelectTab(0);
                })];
     }
-    // The probe's Lists: the page Twitter's navigation opens for them, then its first
-    // list, whose timeline says whether the reading marker can show there.
+    // The probe's Lists: Twitter's Lists page, then its first list, whose timeline says
+    // whether the reading marker can show there.
     __block NSInteger listLooks = 0;
     __block NSInteger listDetailLooks = 0;
     __block BOOL listOpened = NO;
@@ -1991,8 +2004,8 @@ static NSArray<NSDictionary*>* tourAllSteps(void) {
              listOpened = NO;
              listDone = NO;
              tourProbeHomeTabs();
-             if (!tourNavigate(@"showListManagementPageFromSource:completion:")) {
-                 PFBProbeNote(@"lists navigation", @"#1 lists: Twitter's navigation could not open the Lists page");
+             if (!tourOpenListsPage()) {
+                 PFBProbeNote(@"lists page", @"#1 lists: Twitter's Lists page could not be built");
              }
            }, ^BOOL(UIViewController* before, UIViewController* after) {
              NSString* name = tourScreenName(after);
@@ -2040,10 +2053,11 @@ static NSArray<NSDictionary*>* tourAllSteps(void) {
       NSArray<NSNumber*>* pick = replied.count > rank ? replied[rank] : replied.firstObject;
       replyFocal = pick ? pick[0].longLongValue : 0;
       replyCount = pick ? pick[1].integerValue : 0;
-      if (replyFocal) {
-          tourOpenTweet(replyFocal);
-      } else {
+      if (!replyFocal) {
           PFBProbeNote(@"replies none", @"#2 replies: no Tweet with a reply count on Home's first screens");
+      } else if (!tourOpenHomeTweet(replyFocal)) {
+          PFBProbeNote([NSString stringWithFormat:@"replies lost %lu", (unsigned long)rank],
+                       @"#2 replies: Tweet %lld not found again on Home", replyFocal);
       }
     };
     // Read at its top, then three times a little further down, then noted.
@@ -2110,9 +2124,9 @@ static NSArray<NSDictionary*>* tourAllSteps(void) {
            }, nil, ^{
              tourDismissPresented();
            })];
-    // PrimeFreeBird's settings reached the way a person does: Twitter's settings, the
-    // PrimeFreeBird row there, then the General page with its switches. Should that path
-    // fail, the page is shown directly, as before, and the probe says where it failed.
+    // PrimeFreeBird's settings reached the way a person does: Twitter's settings, opened by
+    // its own link, the PrimeFreeBird row there, then the General page with its switches.
+    // Should that path fail, the page is shown directly, as before, and the probe says where.
     __block NSInteger settingsLooks = 0;
     __block BOOL rowTapped = NO;
     __block BOOL pagePushed = NO;
@@ -2126,10 +2140,7 @@ static NSArray<NSDictionary*>* tourAllSteps(void) {
              settingsNoted = NO;
              settingsFallback = nil;
              settingsSeen = nil;
-             if (!tourNavigate(@"showSettingsWithSource:completion:")) {
-                 settingsFallback = @"Twitter's navigation could not open its settings";
-                 tourShowSettings();
-             }
+             tourOpenLink(@"twitter://settings");
            }, ^BOOL(UIViewController* before, UIViewController* after) {
              settingsLooks++;
              UIViewController* top = tourRootController();
