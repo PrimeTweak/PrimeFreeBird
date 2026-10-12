@@ -6,6 +6,7 @@
 
 #import "Support/HookHelpers.h"
 #import "Debug/PFBDebugger.h"
+#import "Debug/PFBProbe.h"
 
 // Declared once at file scope: two distant passes read the hidden-thread
 // list, and a block-scope extern is invisible to the second one.
@@ -1789,6 +1790,9 @@ void pfbReapplyTimelineFilter(void) {
     }
     %orig(filtered, keepPlace);
     PFBReadingRescanSoon(self);
+    if (PFBProbeTimelineWanted(self)) {
+        PFBProbeTimeline(self, PFBReadingIsHomeTimeline(self), PFBReadingIsFollowingTab(self));
+    }
 }
 
 - (void)updateSections:(NSArray*)sections
@@ -1806,6 +1810,9 @@ void pfbReapplyTimelineFilter(void) {
 - (void)viewWillAppear:(BOOL)animated {
     %orig;
     PFBReadingRescanSoon(self);
+    if (PFBProbeTimelineWanted(self)) {
+        PFBProbeTimeline(self, PFBReadingIsHomeTimeline(self), PFBReadingIsFollowingTab(self));
+    }
 }
 
 - (void)viewWillDisappear:(BOOL)animated {

@@ -2,6 +2,7 @@
 // follows FeatureSwitches.x, and the logic is hand-written.
 #import "Common/PFBCompatibility.h"
 #import "Debug/PFBDebugger.h"
+#import "Debug/PFBProbe.h"
 #import "Common/PFBSettings.h"
 #import "Common/PFBBundle.h"
 #import <ctype.h>
@@ -4075,6 +4076,7 @@ NSString* PFBCompatReportText(void) {
     if (journal) {
         [text appendFormat:@"\nLAST TOUR\n%@\n", journal];
     }
+    [text appendFormat:@"\n%@", PFBProbeReportText()];
     [text appendFormat:@"\n%@", PFBDebuggerReport()];
     return text;
 }

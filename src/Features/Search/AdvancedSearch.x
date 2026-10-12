@@ -3,6 +3,7 @@
 // drawn here at the settings gear's stroke, since no library glyph matches it.
 
 #import "Support/HookHelpers.h"
+#import "Debug/PFBProbe.h"
 #import "Features/Search/PFBAdvancedSearchViewController.h"
 #import <objc/runtime.h>
 #import <objc/message.h>
@@ -214,6 +215,18 @@ static BOOL pfbAdvIsFiltersItem(UIBarButtonItem* item) {
     return pfbAdvMaskAgreement(image) >= 0.85;
 }
 
+// What a matched item showed, for the probe: its glyph name, its label, and how much
+// its pixels agree with the sliders glyph.
+static NSString* pfbAdvMatchFacts(UIBarButtonItem* item) {
+    UIImage* image = pfbAdvItemImage(item);
+    NSString* label = item.accessibilityLabel ?: item.customView.accessibilityLabel;
+    return [NSString stringWithFormat:@"glyph %@, label %@, pixels %.2f", pfbAdvVectorName(image) ?: @"unnamed",
+                                      label ? [NSString stringWithFormat:@"“%@”", label] : @"none",
+                                      pfbAdvMaskAgreement(image)];
+}
+
+static BOOL pfbAdvIsSearchScreen(UIViewController* vc);
+
 // The color the bar's other items are drawn in: the label color on the results screen,
 // gray on Explore. The neighbor decides, and the Explore gray is the fallback.
 static UIColor* pfbAdvNeighbourTint(UINavigationItem* item, UIViewController* owner) {
@@ -303,6 +316,9 @@ static void pfbAdvReplaceFiltersInItem(UINavigationItem* item,
             continue;
         }
         if (match) {
+            PFBProbeAdvancedSearch(owner, item, pfbAdvIsSearchScreen(owner), ^NSString* {
+              return pfbAdvMatchFacts(entry);
+            });
             [rebuilt addObject:pfbAdvReplacementFor(owner)];
             replaced++;
         } else {
@@ -326,6 +342,9 @@ static void pfbAdvReplaceFiltersInItem(UINavigationItem* item,
                     continue;
                 }
                 if (match) {
+                    PFBProbeAdvancedSearch(owner, item, pfbAdvIsSearchScreen(owner), ^NSString* {
+                      return pfbAdvMatchFacts(entry);
+                    });
                     members[i] = pfbAdvReplacementFor(owner);
                     changed = YES;
                 }

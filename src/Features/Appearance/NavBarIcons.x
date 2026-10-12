@@ -4,6 +4,7 @@
 
 #import "Support/HookHelpers.h"
 #import "Debug/PFBDebugger.h"
+#import "Debug/PFBProbe.h"
 #import <QuartzCore/QuartzCore.h>
 
 static const void* kPFBGreyedImageKey = &kPFBGreyedImageKey;
@@ -754,6 +755,7 @@ static BOOL pfbIsChatBarGlyph(UIView* view) {
         %orig;
         return;
     }
+    PFBProbeBarIcon((UIView*)self, objc_getAssociatedObject(self, kPFBOriginalImageKey), image);
     // Twitter's own image is the source; repainting a repainted image would compound and go pale.
     if (objc_getAssociatedObject(self, kPFBOriginalImageKey)) {
         image = objc_getAssociatedObject(self, kPFBOriginalImageKey);
@@ -782,6 +784,7 @@ static BOOL pfbIsChatBarGlyph(UIView* view) {
         %orig;
         return;
     }
+    PFBProbeBarItem(image);
     UIImage* painted = PFBGreyGlyph(image, target);
     objc_setAssociatedObject(self, kPFBGreyedImageKey, painted,
                              OBJC_ASSOCIATION_RETAIN_NONATOMIC);

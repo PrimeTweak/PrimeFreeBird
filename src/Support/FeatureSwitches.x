@@ -3,6 +3,7 @@
 // the account feature gates.
 
 #import "Support/HookHelpers.h"
+#import "Debug/PFBProbe.h"
 #import "Sideload/PFBWebLoginViewController.h"
 #import "Debug/PFBDebugger.h"
 
@@ -361,9 +362,11 @@ static NSNumber* FeatureSwitchOverrideValueForKey(NSString* key) {
     if ([key isEqualToString:@"reply_sorting_enabled"]) {
         if ([PFBSettings boolForKey:@"reply_sorting"]) {
             PFBCOMPAT_ACTION(PFBCompat_reply_sorting, @"replies in order");
+            PFBProbeReplySortingRead(NO);
             return @NO;
         }
         PFBCOMPAT_OBSERVE(PFBCompat_reply_sorting, @"read by Twitter");
+        PFBProbeReplySortingRead(YES);
         return @YES;
     }
 

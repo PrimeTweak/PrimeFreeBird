@@ -10,6 +10,7 @@
 #import <sys/utsname.h>
 #import "Debug/PFBDebugOverlayWindow.h"
 #import "Debug/PFBDebugTrigger.h"
+#import "Debug/PFBProbe.h"
 
 // MARK: - gate
 
@@ -459,6 +460,13 @@ NSString* PFBDebuggerReport(void) {
 
 static PFBDebugOverlayWindow* gPFBOverlay;
 
+NSString* PFBProbeTriggerState(void) {
+    if (!gPFBOverlay) {
+        return @"absent";
+    }
+    return gPFBOverlay.hidden ? @"hidden" : @"shown";
+}
+
 static UIWindow* PFBActiveWindow(void) {
     for (UIScene* scene in UIApplication.sharedApplication.connectedScenes) {
         if (![scene isKindOfClass:[UIWindowScene class]]) {
@@ -610,14 +618,96 @@ static void PFBInstallTrigger(void) {
     [gPFBOverlay.rootViewController.view addSubview:button];
 }
 
+// MARK: - probe: the stethoscope at launch
+
+// Whether the launch put Twitter in front or left it in the background, and when.
+static NSString* gPFBProbeLaunchState = @"?";
+static CFTimeInterval gPFBProbeLaunchAt;
+
+static NSString* PFBProbeSceneStates(void) {
+    NSMutableArray<NSString*>* states = [NSMutableArray array];
+    for (UIScene* scene in UIApplication.sharedApplication.connectedScenes) {
+        switch (scene.activationState) {
+            case UISceneActivationStateForegroundActive:
+                [states addObject:@"foreground active"];
+                break;
+            case UISceneActivationStateForegroundInactive:
+                [states addObject:@"foreground inactive"];
+                break;
+            case UISceneActivationStateBackground:
+                [states addObject:@"background"];
+                break;
+            default:
+                [states addObject:@"unattached"];
+                break;
+        }
+    }
+    return states.count ? [states componentsJoinedByString:@", "] : @"no scene";
+}
+
+// One placement of the button: what it found, after which kind of launch.
+static void PFBProbeTriggerAttempt(NSString* when, BOOL placedBefore) {
+    NSString* outcome = placedBefore ? @"already placed"
+                                     : (gPFBOverlay ? @"placed"
+                                                    : [@"not placed, scenes: " stringByAppendingString:PFBProbeSceneStates()]);
+    NSString* key = [NSString stringWithFormat:@"stethoscope %@ %@ %@", gPFBProbeLaunchState, when,
+                                               gPFBOverlay ? @"placed" : @"missing"];
+    if (PFBProbeWants(key)) {
+        PFBProbeNote(key, @"#12 stethoscope %@ after a launch in the %@: %@", when, gPFBProbeLaunchState, outcome);
+    }
+    if (!placedBefore && gPFBOverlay && PFBCompatTourIsRunning()) {
+        PFBProbeNote(@"stethoscope placed during a tour", @"#11 stethoscope: placed while a tour runs, %@",
+                     gPFBOverlay.hidden ? @"hidden" : @"shown above it");
+    }
+}
+
+// The kind of launch, then, each time Twitter comes to the front once both placements
+// are past, whether the button is there.
+static void PFBProbeLaunch(void) {
+    UIApplicationState state = UIApplication.sharedApplication.applicationState;
+    gPFBProbeLaunchState = state == UIApplicationStateBackground ? @"background" : @"foreground";
+    gPFBProbeLaunchAt = CACurrentMediaTime();
+    PFBProbeNote([@"launch " stringByAppendingString:gPFBProbeLaunchState],
+                 @"#12 launch: Twitter started in the %@ (app state %ld, scenes: %@)", gPFBProbeLaunchState, (long)state,
+                 PFBProbeSceneStates());
+    [[NSNotificationCenter defaultCenter] addObserverForName:UIApplicationDidBecomeActiveNotification
+                                                      object:nil
+                                                       queue:NSOperationQueue.mainQueue
+                                                  usingBlock:^(__unused NSNotification* note) {
+                                                    CFTimeInterval since = CACurrentMediaTime() - gPFBProbeLaunchAt;
+                                                    if (since < 11.0) {
+                                                        return;
+                                                    }
+                                                    NSString* trigger = PFBProbeTriggerState();
+                                                    NSString* key = [NSString
+                                                        stringWithFormat:@"stethoscope activation %@ %@", gPFBProbeLaunchState,
+                                                                         gPFBOverlay ? @"present" : @"absent"];
+                                                    if (PFBProbeWants(key)) {
+                                                        PFBProbeNote(key,
+                                                                     @"#12 stethoscope when Twitter came to the front %.0f s "
+                                                                     @"after a launch in the %@: %@",
+                                                                     since, gPFBProbeLaunchState, trigger);
+                                                    }
+                                                  }];
+}
+
 void PFBDebuggerInstall(void) {
     if (!PFBDebugEnabled()) {
         return;
     }
+    PFBProbeLaunch();
     // The scene is not connected at launch, so the button is placed once the
     // first screen is up, and retried if it was not ready.
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(3.0 * NSEC_PER_SEC)),
-                   dispatch_get_main_queue(), ^{ PFBInstallTrigger(); });
+                   dispatch_get_main_queue(), ^{
+                     BOOL placed = gPFBOverlay != nil;
+                     PFBInstallTrigger();
+                     PFBProbeTriggerAttempt(@"3 s", placed);
+                   });
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(10.0 * NSEC_PER_SEC)),
-                   dispatch_get_main_queue(), ^{ PFBInstallTrigger(); });
+                   dispatch_get_main_queue(), ^{
+                     BOOL placed = gPFBOverlay != nil;
+                     PFBInstallTrigger();
+                     PFBProbeTriggerAttempt(@"10 s", placed);
+                   });
 }
