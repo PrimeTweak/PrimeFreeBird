@@ -2001,16 +2001,15 @@ static void tourConcludeStep(NSArray<NSDictionary*>* steps, NSUInteger index, NS
                    });
 }
 
-// One look at a step: done once its screen shows and it owes nothing, or when time is
-// up. Shown means the check passed or an owed proof arrived; a second way in, tried at
-// doorAt (negative until then), gets its own time.
+// One look at a step: done once its screen shows and it owes nothing, or when time is up.
+// Shown means the check passed or an owed proof arrived, counted after the check, which
+// can bring one. A second way in, tried at doorAt (negative until then), gets its own time.
 static void tourWatch(NSArray<NSDictionary*>* steps, NSUInteger index, NSMutableArray<NSString*>* results, BOOL full,
                       UIViewController* before, NSSet<NSString*>* owed, NSDate* start, NSTimeInterval doorAt) {
     NSDictionary* step = steps[index];
     NSString* name = step[@"name"];
     NSTimeInterval elapsed = -[start timeIntervalSinceNow];
     UIViewController* after = tourScreen();
-    NSSet<NSString*>* pending = PFBCompatStationPending(name);
     PFBTourCheck check = step[@"check"];
     __block BOOL shown = NO;
     if (!tourAttempt(name, @"check", ^{
@@ -2019,6 +2018,7 @@ static void tourWatch(NSArray<NSDictionary*>* steps, NSUInteger index, NSMutable
         tourConcludeStep(steps, index, results, full, NO, nil, @"stopped by an exception");
         return;
     }
+    NSSet<NSString*>* pending = PFBCompatStationPending(name);
     BOOL reached = shown || pending.count < owed.count;
     dispatch_block_t door = step[@"door"];
     if (!reached && doorAt < 0 && door && elapsed >= kPFBTourDoorRetry) {
