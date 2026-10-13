@@ -1239,13 +1239,14 @@ static BOOL pfbAllowsFullHDUpload(void) {
 // A conversation lists its replies in the order its request asks for. With the option
 // on, Twitter's Recent order is asked instead of the one it chose.
 
-// The order where a request carries it: raw, escaped inside a string, or percent-encoded.
+// The order where a request carries it, under either spelling of its key: raw, escaped
+// inside a string, or percent-encoded.
 static NSRegularExpression* pfbReplyOrderPattern(void) {
     static NSRegularExpression* pattern;
     static dispatch_once_t once;
     dispatch_once(&once, ^{
       pattern = [NSRegularExpression
-          regularExpressionWithPattern:@"(?:\\\\?\"|(?:%5C)?%22)rankingMode(?:\\\\?\"|(?:%5C)?%22)(?:%20|\\s)*(?::|%3A)(?:%20|\\s)*(?:\\\\?\"|(?:%5C)?%22)([A-Za-z]+)"
+          regularExpressionWithPattern:@"(?:\\\\?\"|(?:%5C)?%22)(?:rankingMode|ranking_mode)(?:\\\\?\"|(?:%5C)?%22)(?:%20|\\s)*(?::|%3A)(?:%20|\\s)*(?:\\\\?\"|(?:%5C)?%22)([A-Za-z]+)"
                                options:NSRegularExpressionCaseInsensitive
                                  error:nil];
     });
@@ -1271,6 +1272,24 @@ static NSString* pfbUTF8Text(NSData* data) {
     return data.length ? [[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding] : nil;
 }
 
+// The names a request's variables carry, or its query's own names when it has none.
+static NSString* pfbReplyOrderKeys(NSURLComponents* parts) {
+    NSMutableArray<NSString*>* names = [NSMutableArray array];
+    for (NSURLQueryItem* item in parts.queryItems) {
+        NSData* value = [item.name isEqualToString:@"variables"] ? [item.value dataUsingEncoding:NSUTF8StringEncoding]
+                                                                  : nil;
+        id variables = value.length ? [NSJSONSerialization JSONObjectWithData:value options:0 error:nil] : nil;
+        if ([variables isKindOfClass:[NSDictionary class]]) {
+            NSArray* keys = [((NSDictionary*)variables).allKeys sortedArrayUsingSelector:@selector(compare:)];
+            return [@"variables: " stringByAppendingString:[keys componentsJoinedByString:@", "]];
+        }
+        if (item.name) {
+            [names addObject:item.name];
+        }
+    }
+    return names.count ? [@"query: " stringByAppendingString:[names componentsJoinedByString:@", "]] : @"no query";
+}
+
 NSURLRequest* PFBReplyOrderRequest(NSURLRequest* request, NSData** body) {
     NSURL* url = [request isKindOfClass:[NSURLRequest class]] ? request.URL : nil;
     NSString* path = url.path;
@@ -1285,7 +1304,8 @@ NSURLRequest* PFBReplyOrderRequest(NSURLRequest* request, NSData** body) {
     if (!query && !sentBody) {
         static dispatch_once_t told;
         dispatch_once(&told, ^{
-          PFBDebugLog(@"[replies] a conversation request carries no reply order (%@)", request.HTTPMethod ?: @"GET");
+          PFBDebugLog(@"[replies] a conversation request carries no reply order (%@) \u00b7 %@",
+                      request.HTTPMethod ?: @"GET", pfbReplyOrderKeys(parts));
         });
         return request;
     }
