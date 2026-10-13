@@ -104,35 +104,64 @@ jobs:
             echo "::warning::X asks for iOS $app_min; the Makefile targets iOS $IOS_MIN."
           fi
 
-      # The installer ends by fetching SDKs unauthenticated, which can hit the rate limit after
-      # the clone has succeeded; that failure is tolerated and the clone is checked instead.
-      - name: Install Theos
+      # Theos and its iOS 16.5 SDK stay in the cache until either repository moves. A miss
+      # fetches both and saves them before the build, whose fleXD part links Xcode's SDK in.
+      - name: Compute Theos cache key
+        id: theos-key
         run: |
-          curl -fsSL https://raw.githubusercontent.com/theos/theos/master/bin/install-theos -o /tmp/install-theos
-          bash /tmp/install-theos || echo "installer exited non-zero (SDK fetch); verifying clone"
+          theos=$(git ls-remote https://github.com/theos/theos.git HEAD | cut -c1-12)
+          sdks=$(git ls-remote https://github.com/theos/sdks.git HEAD | cut -c1-12)
+          if [ -z "$theos" ] || [ -z "$sdks" ]; then
+            echo "::error::The latest Theos commits could not be read."
+            exit 1
+          fi
+          echo "key=theos-${{ runner.os }}-$theos-sdks-$sdks-ios16.5" >> "$GITHUB_OUTPUT"
+
+      - name: Restore Theos
+        id: theos-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: ~/theos
+          key: ${{ steps.theos-key.outputs.key }}
+
+      - name: Install Theos
+        if: ${{ steps.theos-cache.outputs.cache-hit != 'true' }}
+        run: |
+          git clone --quiet --recursive --depth 1 --shallow-submodules \
+            https://github.com/theos/theos.git "$HOME/theos"
+          git clone --quiet --depth 1 --filter=blob:none --sparse \
+            https://github.com/theos/sdks.git /tmp/theos-sdks
+          git -C /tmp/theos-sdks sparse-checkout set iPhoneOS16.5.sdk
+          mkdir -p "$HOME/theos/sdks"
+          mv /tmp/theos-sdks/iPhoneOS16.5.sdk "$HOME/theos/sdks/"
+
+      - name: Save Theos
+        if: ${{ steps.theos-cache.outputs.cache-hit != 'true' }}
+        uses: actions/cache/save@v4
+        with:
+          path: ~/theos
+          key: ${{ steps.theos-key.outputs.key }}
+
+      - name: Check Theos
+        run: |
           if [ ! -f "$HOME/theos/makefiles/common.mk" ]; then
-            echo "::error::Theos clone incomplete"; exit 1
+            echo "::error::Theos is incomplete."
+            exit 1
+          fi
+          if [ ! -f "$HOME/theos/sdks/iPhoneOS16.5.sdk/SDKSettings.plist" ]; then
+            echo "::error::The iOS 16.5 SDK is missing from Theos."
+            exit 1
           fi
           echo "THEOS=$HOME/theos" >> "$GITHUB_ENV"
+          ls -1 "$HOME/theos/sdks"
 
-      - name: Ensure iOS 16.5 SDK
-        run: |
-          if [ -d "$THEOS/sdks/iPhoneOS16.5.sdk" ]; then
-            echo "SDK already present"
-          else
-            curl -fsSL -H "Authorization: token ${{ github.token }}" \
-              -o /tmp/sdks.tar.gz \
-              https://codeload.github.com/theos/sdks/tar.gz/refs/heads/master
-            mkdir -p /tmp/sdks
-            tar -xzf /tmp/sdks.tar.gz -C /tmp/sdks --strip-components=1
-            mkdir -p "$THEOS/sdks"
-            mv /tmp/sdks/iPhoneOS16.5.sdk "$THEOS/sdks/"
-          fi
-          ls -1 "$THEOS/sdks"
-
+      # Homebrew installs from the runner's own formula list, without updating it first.
       - name: Install build tools
+        env:
+          HOMEBREW_NO_AUTO_UPDATE: 1
+          HOMEBREW_NO_INSTALL_CLEANUP: 1
         run: |
-          brew install make dpkg ldid
+          brew install make dpkg ldid xz
           echo "$(brew --prefix make)/libexec/gnubin" >> "$GITHUB_PATH"
 
       - name: Install cyan
