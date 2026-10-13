@@ -3,7 +3,6 @@
 // files must be PCM, since AudioServicesCreateSystemSoundID has no AAC decoder.
 
 #import "Support/HookHelpers.h"
-#import "Debug/PFBProbe.h"
 
 // Pull distance, in points below the resting position, past which the gesture counts
 // as a pull-to-refresh rather than an ordinary scroll. At rest the top of the feed
@@ -36,7 +35,6 @@ static void PFBPlayRefreshSound(NSString* file) {
 
 - (void)scrollViewDidEndDragging:(UIScrollView*)scrollView willDecelerate:(BOOL)decelerate {
     %orig;
-    PFBProbePullReleased(scrollView, scrollView.contentOffset.y < kPFBPullToRefreshThreshold);
     // contentOffset.y as the finger lifts: strongly negative means the list was
     // pulled below its top, which is the refresh intent.
     if (scrollView.contentOffset.y >= kPFBPullToRefreshThreshold) {
@@ -72,7 +70,6 @@ static char kPFBManualRefreshKey;
     if (status == 1 && !wasLoading && fromScrolling) {
         objc_setAssociatedObject(control, &kPFBManualRefreshKey, @YES,
                                  OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-        PFBProbeRefreshStarted();
         return;
     }
     if (status != 0 || !wasLoading) {

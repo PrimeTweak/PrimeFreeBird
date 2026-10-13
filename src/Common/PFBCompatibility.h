@@ -201,6 +201,8 @@ typedef NS_ENUM(NSInteger, PFBCompatPath) {
     PFBCompatPath_web_media,
     PFBCompatPath_tab_badges,
     PFBCompatPath_starts_muted,
+    PFBCompatPath_replies_by_date,
+    PFBCompatPath_native_filter_button,
     PFBCompatPathCount,
 };
 

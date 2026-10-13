@@ -10,10 +10,10 @@
 "MODERN_SETTINGS_LAYOUT_SUBTITLE" = "Zablokuj aplikację, zachowaj widoczny pasek nawigacji i wiele więcej.";
 
 "MODERN_SETTINGS_MEDIA_TITLE" = "Zdjęcia i wideo";
-"MODERN_SETTINGS_MEDIA_SUBTITLE" = "Pobieranie, odtwarzanie, jakość i układ.";
+"MODERN_SETTINGS_MEDIA_SUBTITLE" = "Pobieraj filmy, włącz znaczniki czasu i nie tylko.";
 
 "MODERN_SETTINGS_APPEARANCE_TITLE" = "Wygląd";
-"MODERN_SETTINGS_APPEARANCE_SUBTITLE" = "Styl interfejsu, kolory i czcionki.";
+"MODERN_SETTINGS_APPEARANCE_SUBTITLE" = "Uczyń Twittera naprawdę swoim dzięki motywom, własnym ikonom aplikacji, czcionkom i wielu innym opcjom.";
 
 "MODERN_SETTINGS_TIMELINES_TITLE" = "Osie czasu";
 "MODERN_SETTINGS_TIMELINES_SUBTITLE" = "Usuń reklamy, propozycje obserwowania i inne zbędne elementy z osi czasu.";
@@ -26,7 +26,7 @@
 "MODERN_SETTINGS_TWEETS_SUBTITLE" = "Zmień wygląd tweetów i usuń funkcje, których nie używasz.";
 
 "MODERN_SETTINGS_SEARCH_TITLE" = "Szukaj i odkrywaj";
-"MODERN_SETTINGS_SEARCH_SUBTITLE" = "Historia wyszukiwania, trendy i popularne filmy.";
+"MODERN_SETTINGS_SEARCH_SUBTITLE" = "Zmień to, co widzisz na karcie Szukaj.";
 
 
 
@@ -38,7 +38,7 @@
 
 /*General*/
 
-"HIDE_WHO_TO_FOLLOW_TITLE" = "Ukryj \"Warci obserwowania\"";
+"HIDE_WHO_TO_FOLLOW_TITLE" = "Bez \"Kogo obserwować\"";
 "HIDE_WHO_TO_FOLLOW_DETAIL" = "Usuń sugestie obserwowania.";
 
 "HIDE_TIMELINE_PROMPTS_TITLE" = "Bez monitów na osi czasu";
@@ -74,7 +74,7 @@
 "SEND_SOUND_UNREADABLE" = "This file is not a sound that can be played.";
 
 "HIDE_BLUE_VERIFIED_TITLE" = "Ukryj płatne odznaki Blue";
-"HIDE_BLUE_VERIFIED_DETAIL" = "Usuń odznaki Twitter Blue; odznaki marek i instytucji rządowych pozostają.";
+"HIDE_BLUE_VERIFIED_DETAIL" = "Ukryj płatne odznaki w Tweetach. Nie dotyczy kont marek i instytucji.";
 
 "HIDE_VIEW_COUNT_TITLE" = "Ukryj wyświetlenia";
 "HIDE_VIEW_COUNT_DETAIL" = "Nie pokazuj liczby wyświetleń pod Tweetami.";
@@ -96,17 +96,17 @@
 "HIDE_GROK_CREATE_TITLE" = "Ukryj przyciski tworzenia Grok";
 "HIDE_GROK_CREATE_DETAIL" = "Usuwa opcje tworzenia i edycji obrazów oraz filmów za pomocą Grok.";
 
-"DISABLE_AUTO_TRANSLATE_TITLE" = "Automatyczne tłumaczenie";
-"DISABLE_AUTO_TRANSLATE_DETAIL" = "Automatycznie tłumacz Tweety, opisy profili, Uwagi Społeczności i powiadomienia.";
+"DISABLE_AUTO_TRANSLATE_TITLE" = "Wyłącz automatyczne tłumaczenie";
+"DISABLE_AUTO_TRANSLATE_DETAIL" = "Nigdy nie tłumacz automatycznie wpisów ani opisów profili.";
 
 "SQUARE_AVATARS_TITLE" = "Kwadratowe zdjęcia profilowe";
 "SQUARE_AVATARS_DETAIL" = "Daje wszystkim kwadratowe zdjęcia profilowe jak konta marek, jak w starym Twitterze.";
 
-"REPLY_SORTING_TITLE" = "Bez sortowania odpowiedzi";
-"REPLY_SORTING_DETAIL" = "Wyłącz sortowanie odpowiedzi w rozmowach.";
+"REPLY_SORTING_TITLE" = "Odpowiedzi chronologicznie";
+"REPLY_SORTING_DETAIL" = "Sortuje odpowiedzi według daty zamiast trafności.";
 
 "RESTORE_REPLY_CONTEXT_TITLE" = "Przywróć kontekst odpowiedzi";
-"RESTORE_REPLY_CONTEXT_DETAIL" = "Pokazuje nad tekstem otwartej odpowiedzi, do kogo jest skierowana.";
+"RESTORE_REPLY_CONTEXT_DETAIL" = "Pokazuje osoby, którym odpowiadasz, pod Tweetami.";
 
 "SHOW_QUOTE_COUNTS_TITLE" = "Quote and Retweet counts";
 "SHOW_QUOTE_COUNTS_DETAIL" = "Show both numbers at the top of a Tweet's Quotes screen.";
@@ -119,37 +119,37 @@
 "FOLLOW_CONFIRM_DETAIL" = "Pytaj przed zaobserwowaniem kogoś.";
 
 "COPY_PROFILE_INFO_TITLE" = "Kopiuj dane profilu";
-"COPY_PROFILE_INFO_DETAIL" = "Dodaj przycisk kopiowania do profili.";
+"COPY_PROFILE_INFO_DETAIL" = "Kopiuj nazwy użytkowników, bio i więcej jednym stuknięciem.";
 
 "DISABLE_ARTICLES_TITLE" = "Bez karty Artykuły";
 "DISABLE_ARTICLES_DETAIL" = "Ukryj kartę Artykuły w profilach.";
 
-"DISABLE_HIGHLIGHTS_TITLE" = "Bez karty Najciekawsze";
-"DISABLE_HIGHLIGHTS_DETAIL" = "Ukryj kartę Najciekawsze w profilach.";
+"DISABLE_HIGHLIGHTS_TITLE" = "Bez karty Najważniejsze";
+"DISABLE_HIGHLIGHTS_DETAIL" = "Ukryj kartę Najważniejsze w profilach.";
 
 "HIDE_FOLLOW_BUTTON_TITLE" = "Bez przycisku Obserwuj w Tweetach";
-"HIDE_FOLLOW_BUTTON_DETAIL" = "Ukrywa przycisk Obserwuj w Tweetach.";
+"HIDE_FOLLOW_BUTTON_DETAIL" = "Ukrywa przycisk Obserwuj obok nazwy autora w Tweetach, ale nie ten na profilach.";
 
 "RESTORE_FOLLOW_BUTTON_TITLE" = "Bez przycisku Subskrybuj";
 "RESTORE_FOLLOW_BUTTON_DETAIL" = "Ukrywa przycisk Subskrybuj w Tweetach i profilach.";
 
 /*Search*/
 "NO_HISTORY_TITLE" = "Bez historii wyszukiwania";
-"NO_HISTORY_DETAIL" = "Nie zapisuj ani nie pokazuj ostatnich wyszukiwań.";
+"NO_HISTORY_DETAIL" = "Twitter przestanie zapisywać twoje wyszukiwania.";
 
 "HIDE_TREND_VIDEOS_TITLE" = "Bez popularnych filmów";
 "HIDE_TREND_VIDEOS_DETAIL" = "Usuń popularne filmy z menu wyszukiwania.";
 
 /*Photos and Videos*/
-"AUTO_HIGHEST_LOAD_TITLE" = "Zdjęcia w wysokiej jakości";
-"AUTO_HIGHEST_LOAD_DETAIL" = "Zawsze ładuj zdjęcia w najwyższej rozdzielczości.";
+"AUTO_HIGHEST_LOAD_TITLE" = "Multimedia w wysokiej jakości";
+"AUTO_HIGHEST_LOAD_DETAIL" = "Zawsze ładuj zdjęcia i filmy w najwyższej możliwej jakości.";
 
 "DISABLE_VIDEO_CAPTIONS_TITLE" = "Bez napisów wideo";
 
-"FORCE_TWEET_FULL_FRAME_TITLE" = "Obrazy bez przycinania";
+"FORCE_TWEET_FULL_FRAME_TITLE" = "Duże obrazy";
 
-"RESTORE_VIDEO_TIMESTAMP_TITLE" = "Czas odtwarzania wideo";
-"RESTORE_VIDEO_TIMESTAMP_DETAIL" = "Pokazuje czas, który upłynął, i całkowitą długość filmu w pełnoekranowym odtwarzaczu zamiast odliczania.";
+"RESTORE_VIDEO_TIMESTAMP_TITLE" = "Znacznik czasu wideo";
+"RESTORE_VIDEO_TIMESTAMP_DETAIL" = "Pokazuje znacznik czasu w pełnoekranowym odtwarzaczu.";
 
 "DISABLE_IMMERSIVE_SCROLL_TITLE" = "Bez przewijania filmów";
 
@@ -166,7 +166,7 @@
 "DIRECT_SAVE_DETAIL" = "Zapisywane filmy trafią prosto do aplikacji Zdjęcia.";
 
 "HIDE_PREMIUM_OFFER_TITLE" = "Bez zachęt do Twitter Blue";
-"HIDE_PREMIUM_OFFER_DETAIL" = "Usuń przyciski \"Uzyskaj weryfikację\" i \"Podnieś poziom\".";
+"HIDE_PREMIUM_OFFER_DETAIL" = "Usuń przyciski \"Uzyskaj weryfikację\" i \"Uaktualnij\".";
 
 "THEME_OPTION_TITLE" = "Zmień motyw";
 
@@ -184,13 +184,13 @@
 "HIDE_CUSTOM_TIMELINES_DETAIL" = "Usuwa przycisk Dodaj z kart osi czasu na ekranie głównym.";
 
 
-"TAB_BAR_THEMING_TITLE" = "Wybrana karta";
+"TAB_BAR_THEMING_TITLE" = "Klasyczny pasek kart";
 "TAB_BAR_THEMING_DETAIL" = "Nadaj kolorowi akcentu aktualnie wybranej karcie.";
 
-"DISABLE_RTL_TITLE" = "Tekst od lewej do prawej";
-"DISABLE_RTL_DETAIL" = "Wyświetlaj tekst od lewej do prawej, nawet w językach pisanych od prawej do lewej.";
+"DISABLE_RTL_TITLE" = "Używaj układu od lewej do prawej";
+"DISABLE_RTL_DETAIL" = "Wymuś układ od lewej do prawej nawet w językach pisanych od prawej do lewej.";
 
-"SHOW_SCROLL_INDICATOR_TITLE" = "Pokazuj pasek przewijania";
+"SHOW_SCROLL_INDICATOR_TITLE" = "Zawsze pokazuj pasek przewijania";
 
 "CUSTOM_FONTS_TITLE" = "Własne czcionki";
 "CUSTOM_FONTS_DETAIL" = "Wybierz własną czcionkę dla Twittera.";
@@ -221,8 +221,8 @@
 /*Copy profile info*/
 "COPY_PROFILE_INFO_MENU_OPTION_1" = "Kopiuj bio";
 "COPY_PROFILE_INFO_MENU_OPTION_2" = "Kopiuj nazwę użytkownika";
-"COPY_PROFILE_INFO_MENU_OPTION_3" = "Kopiuj nazwę";
-"COPY_PROFILE_INFO_MENU_OPTION_4" = "Kopiuj stronę internetową";
+"COPY_PROFILE_INFO_MENU_OPTION_3" = "Kopiuj pełną nazwę użytkownika";
+"COPY_PROFILE_INFO_MENU_OPTION_4" = "Kopiuj link w bio";
 "COPY_PROFILE_INFO_MENU_OPTION_5" = "Kopiuj lokalizację";
 
 /*Theme*/
@@ -260,7 +260,7 @@
 
 /*Custom fonts*/
 "INSTALL_IFONT_BUTTON_TITLE" = "iFont application";
-"FONT_SYSTEM_DEFAULT_SUBTITLE" = "Domyślna";
+"FONT_SYSTEM_DEFAULT_SUBTITLE" = "System Default";
 "LIGHT_MODE_RESTART_TITLE" = "Back to light mode";
 "LIGHT_MODE_RESTART_MESSAGE" = "Your background color was reset to System. Restart Twitter to clear any leftover dark colors.";
 "CLOSE_APP_ACTION" = "Close app";

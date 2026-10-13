@@ -13,7 +13,8 @@ extern void PFBMark(UIView* view, NSString* origin);
 // report. No-op when debugging is off.
 extern void PFBDebugLog(NSString* format, ...) NS_FORMAT_FUNCTION(1, 2);
 
-// Places the floating button when debug_tools is on. Called once at launch.
+// Places the floating button when debug_tools is on, and again whenever Twitter comes
+// to the front without it. Called once at launch.
 extern void PFBDebuggerInstall(void);
 
 // Builds the full report as a string: environment, hook health, decision log
@@ -30,7 +31,7 @@ extern void PFBDebuggerPresent(void);
 extern void PFBDebuggerCaptureAndPresent(void);
 
 // Hides the floating button while the diagnostics sheet is up, so it does not
-// sit on top of the report it produced.
+// sit on top of the report it produced. A button placed meanwhile starts hidden.
 extern void PFBDebuggerSetTriggerHidden(BOOL hidden);
 
 // True only when debugging is on. Call sites in hot paths test this before

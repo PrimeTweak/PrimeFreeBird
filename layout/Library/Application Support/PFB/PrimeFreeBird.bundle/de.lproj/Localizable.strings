@@ -10,10 +10,10 @@
 "MODERN_SETTINGS_LAYOUT_SUBTITLE" = "Sperre die App, halte die Navigationsleiste sichtbar und mehr.";
 
 "MODERN_SETTINGS_MEDIA_TITLE" = "Medien";
-"MODERN_SETTINGS_MEDIA_SUBTITLE" = "Downloads, Wiedergabe, Qualität und Layout.";
+"MODERN_SETTINGS_MEDIA_SUBTITLE" = "Videos herunterladen, Zeitstempel aktivieren u. v. m.";
 
 "MODERN_SETTINGS_APPEARANCE_TITLE" = "Aussehen";
-"MODERN_SETTINGS_APPEARANCE_SUBTITLE" = "Oberflächenstil, Farben und Schriftarten.";
+"MODERN_SETTINGS_APPEARANCE_SUBTITLE" = "Mach Twitter zu deinem eigenen mit Designs, eigenen App-Symbolen, Schriftarten und mehr.";
 
 "MODERN_SETTINGS_TIMELINES_TITLE" = "Timelines";
 "MODERN_SETTINGS_TIMELINES_SUBTITLE" = "Entferne Werbung, Folgen-Vorschläge und anderes Überflüssiges aus der Timeline.";
@@ -26,7 +26,7 @@
 "MODERN_SETTINGS_TWEETS_SUBTITLE" = "Ändere, wie Tweets funktionieren, und blende unnötige Funktionen aus.";
 
 "MODERN_SETTINGS_SEARCH_TITLE" = "Suchen und Entdecken";
-"MODERN_SETTINGS_SEARCH_SUBTITLE" = "Suchverlauf, Trends und trendende Videos.";
+"MODERN_SETTINGS_SEARCH_SUBTITLE" = "Ändere, was du im Suche-Tab siehst.";
 
 
 
@@ -74,7 +74,7 @@
 "SEND_SOUND_UNREADABLE" = "This file is not a sound that can be played.";
 
 "HIDE_BLUE_VERIFIED_TITLE" = "Blue-Verifizierungsabzeichen ausblenden";
-"HIDE_BLUE_VERIFIED_DETAIL" = "Entfernt die Verifizierungsabzeichen von Twitter Blue; die Abzeichen von Marken- und Regierungskonten bleiben erhalten.";
+"HIDE_BLUE_VERIFIED_DETAIL" = "Bezahltes Verifizierungsabzeichen bei Tweets ausblenden. Dies gilt nicht für Marken- oder Regierungskonten.";
 
 "HIDE_VIEW_COUNT_TITLE" = "Aufrufe ausblenden";
 "HIDE_VIEW_COUNT_DETAIL" = "Aufrufe unter Tweets nicht anzeigen.";
@@ -96,17 +96,17 @@
 "HIDE_GROK_CREATE_TITLE" = "Grok-Erstellungsbuttons ausblenden";
 "HIDE_GROK_CREATE_DETAIL" = "Entfernt die Optionen, Bilder und Videos mit Grok zu erstellen oder zu bearbeiten.";
 
-"DISABLE_AUTO_TRANSLATE_TITLE" = "Automatische Übersetzung";
-"DISABLE_AUTO_TRANSLATE_DETAIL" = "Tweets, Bios, Kollektive Anmerkungen und Mitteilungen automatisch übersetzen.";
+"DISABLE_AUTO_TRANSLATE_TITLE" = "Automatische Übersetzung deaktivieren";
+"DISABLE_AUTO_TRANSLATE_DETAIL" = "Beiträge und Bios nie automatisch übersetzen.";
 
 "SQUARE_AVATARS_TITLE" = "Quadratische Profilbilder";
 "SQUARE_AVATARS_DETAIL" = "Zeigt für alle Nutzer quadratische Profilbilder wie bei Marken im alten Twitter.";
 
-"REPLY_SORTING_TITLE" = "Keine Antwortsortierung";
-"REPLY_SORTING_DETAIL" = "Deaktiviert die Sortierung von Antworten in Tweet-Unterhaltungen.";
+"REPLY_SORTING_TITLE" = "Chronologische Antworten";
+"REPLY_SORTING_DETAIL" = "Sortiert Antworten nach Datum statt nach Relevanz.";
 
 "RESTORE_REPLY_CONTEXT_TITLE" = "Antwortkontext wiederherstellen";
-"RESTORE_REPLY_CONTEXT_DETAIL" = "Zeigt über dem Text einer geöffneten Antwort an, auf wen geantwortet wurde.";
+"RESTORE_REPLY_CONTEXT_DETAIL" = "Zeigt unter dem Tweet an, auf wen geantwortet wurde.";
 
 "SHOW_QUOTE_COUNTS_TITLE" = "Quote and Retweet counts";
 "SHOW_QUOTE_COUNTS_DETAIL" = "Show both numbers at the top of a Tweet's Quotes screen.";
@@ -119,7 +119,7 @@
 "FOLLOW_CONFIRM_DETAIL" = "Vor dem Folgen nachfragen.";
 
 "COPY_PROFILE_INFO_TITLE" = "Profildetails kopieren";
-"COPY_PROFILE_INFO_DETAIL" = "Fügt Profilen eine Kopieren-Schaltfläche hinzu.";
+"COPY_PROFILE_INFO_DETAIL" = "Benutzernamen, Bios und mehr mit einem Tipp kopieren.";
 
 "DISABLE_ARTICLES_TITLE" = "Kein Artikel-Tab";
 "DISABLE_ARTICLES_DETAIL" = "Blendet den Artikel-Tab in Profilen aus.";
@@ -128,28 +128,28 @@
 "DISABLE_HIGHLIGHTS_DETAIL" = "Blendet den Highlights-Tab in Profilen aus.";
 
 "HIDE_FOLLOW_BUTTON_TITLE" = "Keine Folgen-Schaltfläche bei Tweets";
-"HIDE_FOLLOW_BUTTON_DETAIL" = "Blendet die Folgen-Schaltfläche in Tweets aus.";
+"HIDE_FOLLOW_BUTTON_DETAIL" = "Blendet die Folgen-Schaltfläche neben dem Autorennamen in Tweets aus, nicht aber die in Profilen.";
 
 "RESTORE_FOLLOW_BUTTON_TITLE" = "Keine Abonnieren-Schaltfläche";
 "RESTORE_FOLLOW_BUTTON_DETAIL" = "Blendet die Abonnieren-Schaltfläche in Tweets und Profilen aus.";
 
 /*Search*/
 "NO_HISTORY_TITLE" = "Kein Suchverlauf";
-"NO_HISTORY_DETAIL" = "Letzte Suchanfragen weder speichern noch anzeigen.";
+"NO_HISTORY_DETAIL" = "Twitter wird deine Suchanfragen nicht mehr speichern.";
 
 "HIDE_TREND_VIDEOS_TITLE" = "Keine trendenden Videos";
 "HIDE_TREND_VIDEOS_DETAIL" = "Entferne die trendenden Videos aus dem Suchmenü.";
 
 /*Photos and Videos*/
-"AUTO_HIGHEST_LOAD_TITLE" = "Fotos in hoher Qualität";
-"AUTO_HIGHEST_LOAD_DETAIL" = "Fotos stets in höchster Auflösung laden.";
+"AUTO_HIGHEST_LOAD_TITLE" = "Hochqualitative Medien";
+"AUTO_HIGHEST_LOAD_DETAIL" = "Fotos und Videos stets in höchster verfügbarer Auflösung laden.";
 
 "DISABLE_VIDEO_CAPTIONS_TITLE" = "Keine Videountertitel";
 
-"FORCE_TWEET_FULL_FRAME_TITLE" = "Bilder ohne Zuschnitt";
+"FORCE_TWEET_FULL_FRAME_TITLE" = "Große Bilder";
 
-"RESTORE_VIDEO_TIMESTAMP_TITLE" = "Video-Zeitanzeige";
-"RESTORE_VIDEO_TIMESTAMP_DETAIL" = "Zeigt bei Vollbild-Videos die verstrichene Zeit und die Gesamtdauer statt des Countdowns an.";
+"RESTORE_VIDEO_TIMESTAMP_TITLE" = "Video-Zeitstempel";
+"RESTORE_VIDEO_TIMESTAMP_DETAIL" = "Zeigt Zeitstempel im Vollbild-Videoplayer an.";
 
 "DISABLE_IMMERSIVE_SCROLL_TITLE" = "Kein Video-Feed-Scrollen";
 
@@ -166,7 +166,7 @@
 "DIRECT_SAVE_DETAIL" = "Gespeicherte Videos werden direkt in deiner Fotos-App abgelegt.";
 
 "HIDE_PREMIUM_OFFER_TITLE" = "Keine Twitter-Blue-Hinweise";
-"HIDE_PREMIUM_OFFER_DETAIL" = "Entferne die Buttons „Lass dich verifizieren“ und „Upgrade“.";
+"HIDE_PREMIUM_OFFER_DETAIL" = "Entferne die Buttons „Verifiziert werden“ und „Upgrade“.";
 
 "THEME_OPTION_TITLE" = "Theme ändern";
 
@@ -184,13 +184,13 @@
 "HIDE_CUSTOM_TIMELINES_DETAIL" = "Entfernt die Hinzufügen-Schaltfläche aus den Timeline-Tabs der Startseite.";
 
 
-"TAB_BAR_THEMING_TITLE" = "Ausgewählter Tab";
+"TAB_BAR_THEMING_TITLE" = "Klassische Navigationsleiste";
 "TAB_BAR_THEMING_DETAIL" = "Wendet deine Akzentfarbe auf das gewählte Navigationselement an.";
 
-"DISABLE_RTL_TITLE" = "Text von links nach rechts";
-"DISABLE_RTL_DETAIL" = "Zeigt Text von links nach rechts an, selbst in Sprachen, die von rechts nach links gelesen werden.";
+"DISABLE_RTL_TITLE" = "Links-nach-rechts-Layout verwenden";
+"DISABLE_RTL_DETAIL" = "Erzwingt ein Links-nach-Rechts-Layout, selbst für Sprachen, die von rechts nach links gelesen werden.";
 
-"SHOW_SCROLL_INDICATOR_TITLE" = "Scrollleiste anzeigen";
+"SHOW_SCROLL_INDICATOR_TITLE" = "Scrollleiste immer anzeigen";
 
 "CUSTOM_FONTS_TITLE" = "Benutzerdefinierte Schriftarten";
 "CUSTOM_FONTS_DETAIL" = "Wähle eine benutzerdefinierte Schriftart für Twitter.";
@@ -221,8 +221,8 @@
 /*Copy profile info*/
 "COPY_PROFILE_INFO_MENU_OPTION_1" = "Bio kopieren";
 "COPY_PROFILE_INFO_MENU_OPTION_2" = "Benutzernamen kopieren";
-"COPY_PROFILE_INFO_MENU_OPTION_3" = "Namen kopieren";
-"COPY_PROFILE_INFO_MENU_OPTION_4" = "Webseite kopieren";
+"COPY_PROFILE_INFO_MENU_OPTION_3" = "Vollen Benutzernamen kopieren";
+"COPY_PROFILE_INFO_MENU_OPTION_4" = "Bio-Link kopieren";
 "COPY_PROFILE_INFO_MENU_OPTION_5" = "Ort kopieren";
 
 /*Theme*/
@@ -260,7 +260,7 @@
 
 /*Custom fonts*/
 "INSTALL_IFONT_BUTTON_TITLE" = "iFont application";
-"FONT_SYSTEM_DEFAULT_SUBTITLE" = "Standard";
+"FONT_SYSTEM_DEFAULT_SUBTITLE" = "System Default";
 "LIGHT_MODE_RESTART_TITLE" = "Back to light mode";
 "LIGHT_MODE_RESTART_MESSAGE" = "Your background color was reset to System. Restart Twitter to clear any leftover dark colors.";
 "CLOSE_APP_ACTION" = "Close app";

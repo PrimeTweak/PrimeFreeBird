@@ -1,9 +1,8 @@
 // Feature-switch overrides read by the app, the web login mounted in place of the
-// native login screens, the skipped notification-permission onboarding step, and
-// the account feature gates.
+// native login screens, the skipped notification-permission onboarding step, the
+// account feature gates, and the reply order conversation requests ask for.
 
 #import "Support/HookHelpers.h"
-#import "Debug/PFBProbe.h"
 #import "Sideload/PFBWebLoginViewController.h"
 #import "Debug/PFBDebugger.h"
 
@@ -358,16 +357,10 @@ static NSNumber* FeatureSwitchOverrideValueForKey(NSString* key) {
         PFBCOMPAT_OBSERVE(PFBCompat_bypass_age_verification, @"read by Twitter");
     }
 
-    // Conversation / tweet detail
+    // Conversation / tweet detail. With Chronological replies on, the sort control is
+    // hidden: it would name the order Twitter chose, not the one asked for below.
     if ([key isEqualToString:@"reply_sorting_enabled"]) {
-        if ([PFBSettings boolForKey:@"reply_sorting"]) {
-            PFBCOMPAT_ACTION(PFBCompat_reply_sorting, @"replies in order");
-            PFBProbeReplySortingRead(NO);
-            return @NO;
-        }
-        PFBCOMPAT_OBSERVE(PFBCompat_reply_sorting, @"read by Twitter");
-        PFBProbeReplySortingRead(YES);
-        return @YES;
+        return [PFBSettings boolForKey:@"reply_sorting"] ? @NO : @YES;
     }
 
     if ([key
@@ -1240,3 +1233,99 @@ static BOOL pfbAllowsFullHDUpload(void) {
 }
 
 %end
+
+// MARK: - Chronological replies
+
+// A conversation lists its replies in the order its request asks for. With the option
+// on, Twitter's Recent order is asked instead of the one it chose.
+
+// The order where a request carries it: raw, escaped inside a string, or percent-encoded.
+static NSRegularExpression* pfbReplyOrderPattern(void) {
+    static NSRegularExpression* pattern;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+      pattern = [NSRegularExpression
+          regularExpressionWithPattern:@"(?:\\\\?\"|(?:%5C)?%22)rankingMode(?:\\\\?\"|(?:%5C)?%22)(?:%20|\\s)*(?::|%3A)(?:%20|\\s)*(?:\\\\?\"|(?:%5C)?%22)([A-Za-z]+)"
+                               options:NSRegularExpressionCaseInsensitive
+                                 error:nil];
+    });
+    return pattern;
+}
+
+// The text with Recent as its order, replaced where it stands so everything else goes
+// out byte for byte; nil when the text carries no order.
+static NSString* pfbReplyOrderRecent(NSString* text) {
+    if (!text.length) {
+        return nil;
+    }
+    NSTextCheckingResult* match = [pfbReplyOrderPattern() firstMatchInString:text
+                                                                     options:0
+                                                                       range:NSMakeRange(0, text.length)];
+    if (!match) {
+        return nil;
+    }
+    return [text stringByReplacingCharactersInRange:[match rangeAtIndex:1] withString:@"Recency"];
+}
+
+static NSString* pfbUTF8Text(NSData* data) {
+    return data.length ? [[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding] : nil;
+}
+
+NSURLRequest* PFBReplyOrderRequest(NSURLRequest* request, NSData** body) {
+    NSURL* url = [request isKindOfClass:[NSURLRequest class]] ? request.URL : nil;
+    NSString* path = url.path;
+    if (![path.lastPathComponent isEqualToString:@"ConversationTimeline"] || ![path containsString:@"/graphql/"] ||
+        !PFBIsXDomain(url.host)) {
+        return request;
+    }
+    NSURLComponents* parts = [NSURLComponents componentsWithURL:url resolvingAgainstBaseURL:NO];
+    NSString* query = pfbReplyOrderRecent(parts.percentEncodedQuery);
+    // An upload task sends the body it is given, not the request's own.
+    NSString* sentBody = query ? nil : pfbReplyOrderRecent(pfbUTF8Text(body ? *body : request.HTTPBody));
+    if (!query && !sentBody) {
+        static dispatch_once_t told;
+        dispatch_once(&told, ^{
+          PFBDebugLog(@"[replies] a conversation request carries no reply order (%@)", request.HTTPMethod ?: @"GET");
+        });
+        return request;
+    }
+    if (![PFBSettings boolForKey:@"reply_sorting"]) {
+        PFBCOMPAT_OBSERVE(PFBCompat_reply_sorting, @"reply order found in a conversation request");
+        return request;
+    }
+    // An OAuth signature covers the request as signed: it goes out unchanged.
+    if ([[request valueForHTTPHeaderField:@"Authorization"] containsString:@"oauth_signature"]) {
+        static dispatch_once_t signedTold;
+        dispatch_once(&signedTold, ^{
+          PFBDebugLog(@"[replies] a conversation request signed with OAuth keeps Twitter's reply order");
+        });
+        return request;
+    }
+    NSMutableURLRequest* rewritten = [request mutableCopy];
+    if (query) {
+        @try {
+            parts.percentEncodedQuery = query;
+        } @catch (__unused NSException* exception) {
+            return request;
+        }
+        if (!parts.URL) {
+            return request;
+        }
+        rewritten.URL = parts.URL;
+    } else {
+        // The length of a changed body is the session's to count.
+        [rewritten setValue:nil forHTTPHeaderField:@"Content-Length"];
+        NSData* data = [sentBody dataUsingEncoding:NSUTF8StringEncoding];
+        if (body) {
+            *body = data;
+        } else {
+            rewritten.HTTPBody = data;
+        }
+    }
+    PFBCOMPAT_ACTION(PFBCompat_reply_sorting, @"replies asked by date");
+    static dispatch_once_t askedTold;
+    dispatch_once(&askedTold, ^{
+      PFBDebugLog(@"[replies] conversation asked in Recent order, in its %@", query ? @"address" : @"body");
+    });
+    return rewritten;
+}

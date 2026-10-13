@@ -10,10 +10,10 @@
 "MODERN_SETTINGS_LAYOUT_SUBTITLE" = "Lås appen, håll navigeringsfältet synligt och mer.";
 
 "MODERN_SETTINGS_MEDIA_TITLE" = "Foton och videor";
-"MODERN_SETTINGS_MEDIA_SUBTITLE" = "Nedladdningar, uppspelning, kvalitet och layout.";
+"MODERN_SETTINGS_MEDIA_SUBTITLE" = "Ladda ner videor, aktivera tidsstämplar med mera.";
 
 "MODERN_SETTINGS_APPEARANCE_TITLE" = "Utseende";
-"MODERN_SETTINGS_APPEARANCE_SUBTITLE" = "Gränssnittsstil, färger och typsnitt.";
+"MODERN_SETTINGS_APPEARANCE_SUBTITLE" = "Gör Twitter till ditt eget med teman, egna appikoner, typsnitt och mer.";
 
 "MODERN_SETTINGS_TIMELINES_TITLE" = "Flöden";
 "MODERN_SETTINGS_TIMELINES_SUBTITLE" = "Ta bort annonser, följförslag och annat skräp från flödet.";
@@ -38,8 +38,8 @@
 
 /*General*/
 
-"HIDE_WHO_TO_FOLLOW_TITLE" = "Dölj ’Hitta användare’";
-"HIDE_WHO_TO_FOLLOW_DETAIL" = "Ta bort förslag om vem du kan följa.";
+"HIDE_WHO_TO_FOLLOW_TITLE" = "Ingen ’Vem att följa’";
+"HIDE_WHO_TO_FOLLOW_DETAIL" = "Ta bort förslag om vem du kan följa från profiler.";
 
 "HIDE_TIMELINE_PROMPTS_TITLE" = "Inga uppmaningar i flödet";
 "HIDE_TIMELINE_PROMPTS_DETAIL" = "Ta bort banderoller som ’Lägg till kontakter’.";
@@ -74,7 +74,7 @@
 "SEND_SOUND_UNREADABLE" = "This file is not a sound that can be played.";
 
 "HIDE_BLUE_VERIFIED_TITLE" = "Dölj Blue-verifieringsbockar";
-"HIDE_BLUE_VERIFIED_DETAIL" = "Ta bort Twitter Blue-verifieringsbockar; varumärkes- och myndighetskonton behåller sina märken.";
+"HIDE_BLUE_VERIFIED_DETAIL" = "Dölj betald verifieringsbock på Tweets. Detta omfattar inte varumärkes- eller myndighetskonton.";
 
 "HIDE_VIEW_COUNT_TITLE" = "Dölj visningar";
 "HIDE_VIEW_COUNT_DETAIL" = "Visa inte visningar under Tweets.";
@@ -96,17 +96,17 @@
 "HIDE_GROK_CREATE_TITLE" = "Dölj Groks skapandeknappar";
 "HIDE_GROK_CREATE_DETAIL" = "Tar bort alternativen för att skapa eller redigera bilder och videor med Grok.";
 
-"DISABLE_AUTO_TRANSLATE_TITLE" = "Automatisk översättning";
-"DISABLE_AUTO_TRANSLATE_DETAIL" = "Översätt Tweets, biografier, gruppanmärkningar och notiser automatiskt.";
+"DISABLE_AUTO_TRANSLATE_TITLE" = "Inaktivera automatisk översättning";
+"DISABLE_AUTO_TRANSLATE_DETAIL" = "Översätt aldrig inlägg eller biografier automatiskt.";
 
 "SQUARE_AVATARS_TITLE" = "Fyrkantiga profilbilder";
 "SQUARE_AVATARS_DETAIL" = "Ge alla fyrkantiga profilbilder, precis som förr.";
 
-"REPLY_SORTING_TITLE" = "Ingen svarssortering";
-"REPLY_SORTING_DETAIL" = "Inaktivera funktionen för att sortera svar i konversationer.";
+"REPLY_SORTING_TITLE" = "Kronologiska svar";
+"REPLY_SORTING_DETAIL" = "Sorterar svar efter datum i stället för relevans.";
 
 "RESTORE_REPLY_CONTEXT_TITLE" = "Återställ svarssammanhang";
-"RESTORE_REPLY_CONTEXT_DETAIL" = "Visar vilka personer som besvaras, ovanför texten i ett svar du öppnar.";
+"RESTORE_REPLY_CONTEXT_DETAIL" = "Visar vilka personer som besvaras under Tweets.";
 
 "SHOW_QUOTE_COUNTS_TITLE" = "Quote and Retweet counts";
 "SHOW_QUOTE_COUNTS_DETAIL" = "Show both numbers at the top of a Tweet's Quotes screen.";
@@ -119,7 +119,7 @@
 "FOLLOW_CONFIRM_DETAIL" = "Fråga innan du följer någon.";
 
 "COPY_PROFILE_INFO_TITLE" = "Kopiera profilinfo";
-"COPY_PROFILE_INFO_DETAIL" = "Lägg till en kopieringsknapp i profiler.";
+"COPY_PROFILE_INFO_DETAIL" = "Kopiera användarnamn, biografier, och mer med ett tryck.";
 
 "DISABLE_ARTICLES_TITLE" = "Ingen Artiklar-flik";
 "DISABLE_ARTICLES_DETAIL" = "Dölj Artiklar-fliken i profiler.";
@@ -128,28 +128,28 @@
 "DISABLE_HIGHLIGHTS_DETAIL" = "Dölj Höjdpunkter-fliken i profiler.";
 
 "HIDE_FOLLOW_BUTTON_TITLE" = "Dölj 'Följ' knappen på Tweets";
-"HIDE_FOLLOW_BUTTON_DETAIL" = "Visar inte följknappen på Tweets.";
+"HIDE_FOLLOW_BUTTON_DETAIL" = "Döljer Följ-knappen bredvid författarens namn på Tweets, men inte den på profiler.";
 
 "RESTORE_FOLLOW_BUTTON_TITLE" = "Dölj 'Prenumerera' knappen";
 "RESTORE_FOLLOW_BUTTON_DETAIL" = "Vis inte prenumerationsknappen på Tweets.";
 
 /*Search*/
 "NO_HISTORY_TITLE" = "Ingen sökhistorik";
-"NO_HISTORY_DETAIL" = "Varken sparar eller visar senaste sökningar.";
+"NO_HISTORY_DETAIL" = "Twitter sparar inte längre dina sökningar.";
 
 "HIDE_TREND_VIDEOS_TITLE" = "Inga trendande videor";
 "HIDE_TREND_VIDEOS_DETAIL" = "Ta bort trendande videor från sökmenyn.";
 
 /*Photos and Videos*/
-"AUTO_HIGHEST_LOAD_TITLE" = "Foton i hög kvalitet";
-"AUTO_HIGHEST_LOAD_DETAIL" = "Läs alltid in foton i högsta upplösning.";
+"AUTO_HIGHEST_LOAD_TITLE" = "Högkvalitetsmedia";
+"AUTO_HIGHEST_LOAD_DETAIL" = "Ladda upp och visa media i bästa möjliga kvalitet.";
 
 "DISABLE_VIDEO_CAPTIONS_TITLE" = "Inga videoundertexter";
 
-"FORCE_TWEET_FULL_FRAME_TITLE" = "Obeskurna bilder";
+"FORCE_TWEET_FULL_FRAME_TITLE" = "Stora bilder";
 
-"RESTORE_VIDEO_TIMESTAMP_TITLE" = "Videotid";
-"RESTORE_VIDEO_TIMESTAMP_DETAIL" = "Visar förfluten och total tid på videor i helskärm i stället för nedräkningen.";
+"RESTORE_VIDEO_TIMESTAMP_TITLE" = "Video-tidsstämpel";
+"RESTORE_VIDEO_TIMESTAMP_DETAIL" = "Visar tidsstämpel på den uppslukande spelaren.";
 
 "DISABLE_IMMERSIVE_SCROLL_TITLE" = "Ingen videorullning";
 
@@ -184,13 +184,13 @@
 "HIDE_CUSTOM_TIMELINES_DETAIL" = "Ta bort Lägg till-knappen från flikarna på hemtidslinjen.";
 
 
-"TAB_BAR_THEMING_TITLE" = "Vald flik";
-"TAB_BAR_THEMING_DETAIL" = "Tillämpa accentfärg på den valda fliken.";
+"TAB_BAR_THEMING_TITLE" = "Klassiska flikikoner";
+"TAB_BAR_THEMING_DETAIL" = "Tillämpa accentfärg på den valda fliken. Omstart krävs.";
 
-"DISABLE_RTL_TITLE" = "Text från vänster till höger";
-"DISABLE_RTL_DETAIL" = "Visa text från vänster till höger, även på språk som skrivs från höger till vänster.";
+"DISABLE_RTL_TITLE" = "Vänster-till-höger-layout";
+"DISABLE_RTL_DETAIL" = "Tvinga LTR-layout, även för RTL-språk. Omstart krävs.";
 
-"SHOW_SCROLL_INDICATOR_TITLE" = "Visa rullningslisten";
+"SHOW_SCROLL_INDICATOR_TITLE" = "Visa alltid rullningslisten";
 
 "CUSTOM_FONTS_TITLE" = "Anpassade typsnitt";
 "CUSTOM_FONTS_DETAIL" = "Välj ett anpassat typsnitt för Twitter.";
@@ -260,7 +260,7 @@
 
 /*Custom fonts*/
 "INSTALL_IFONT_BUTTON_TITLE" = "iFont application";
-"FONT_SYSTEM_DEFAULT_SUBTITLE" = "Standard";
+"FONT_SYSTEM_DEFAULT_SUBTITLE" = "System Default";
 "LIGHT_MODE_RESTART_TITLE" = "Back to light mode";
 "LIGHT_MODE_RESTART_MESSAGE" = "Your background color was reset to System. Restart Twitter to clear any leftover dark colors.";
 "CLOSE_APP_ACTION" = "Close app";

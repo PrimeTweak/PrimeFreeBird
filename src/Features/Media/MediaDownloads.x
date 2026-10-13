@@ -2,7 +2,6 @@
 // image, and the download entry in the media long-press menu.
 
 #import "Support/HookHelpers.h"
-#import "Debug/PFBProbe.h"
 
 // MARK: - DM video download
 
@@ -39,11 +38,9 @@ static NSURL* gPFBLastVoiceURL = nil;
 %hook AVURLAsset
 
 - (id)initWithURL:(NSURL*)url options:(NSDictionary*)options {
-    BOOL voice = [url.path containsString:@"/decrypted-media-v2/"];
-    if (voice) {
+    if ([url.path containsString:@"/decrypted-media-v2/"]) {
         gPFBLastVoiceURL = url;
     }
-    PFBProbeAsset(url, voice);
     return %orig;
 }
 
@@ -80,7 +77,6 @@ static const void* kPFBVoiceInteractionKey = &kPFBVoiceInteractionKey;
 - (void)layoutSubviews {
     %orig;
     UIView* view = (UIView*)self;
-    PFBProbeVoiceView(gPFBLastVoiceURL != nil);
     BOOL enabled = [PFBSettings boolForKey:@"download_voice_messages"];
     if (!enabled) {
         PFBCOMPAT_OBSERVE(PFBCompat_download_voice_messages, @"voice note found");
@@ -100,7 +96,6 @@ static const void* kPFBVoiceInteractionKey = &kPFBVoiceInteractionKey;
 - (UIContextMenuConfiguration*)contextMenuInteraction:(UIContextMenuInteraction*)interaction
                        configurationForMenuAtLocation:(CGPoint)location {
     NSURL* voiceURL = gPFBLastVoiceURL;
-    PFBProbeVoiceMenu(voiceURL != nil);
     if (!voiceURL) {
         return nil;
     }

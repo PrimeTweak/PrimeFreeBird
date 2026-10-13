@@ -4,7 +4,6 @@
 #import "Support/HookHelpers.h"
 #import "Common/PFBCompatibility.h"
 #import "Debug/PFBDebugger.h"
-#import "Debug/PFBProbe.h"
 
 // Timeline items are removed from the section data before it reaches the data view
 // controller, so no empty cells are left behind. This covers every timeline surface,
@@ -142,22 +141,10 @@ static NSArray* FilteredSections(TFNItemsDataViewController* dataViewController,
     return modified ? filteredSections : sections;
 }
 
-// What a list holds before any filter, for the probe's view of Explore and search.
-static void ProbeSections(TFNItemsDataViewController* dataViewController, NSArray* sections) {
-    if (!PFBDebugIsRecording()) {
-        return;
-    }
-    NSString* location = [dataViewController respondsToSelector:@selector(adDisplayLocation)]
-                             ? dataViewController.adDisplayLocation
-                             : nil;
-    PFBProbeExploreSections(dataViewController, sections, location);
-}
-
 %hook TFNItemsDataViewController
 
 - (void)setSections:(NSArray*)sections
     restoreScrollPosition:(BOOL)restoreScrollPosition {
-    ProbeSections(self, sections);
     %orig(FilteredSections(self, sections), restoreScrollPosition);
 }
 
@@ -165,7 +152,6 @@ static void ProbeSections(TFNItemsDataViewController* dataViewController, NSArra
     reconfigureItemIdentifiers:(NSArray*)identifiers
               withRowAnimation:(long long)animation
                     completion:(id)completion {
-    ProbeSections(self, sections);
     %orig(FilteredSections(self, sections), identifiers, animation,
               completion);
 }
@@ -267,8 +253,6 @@ static void RemovePromotedImmersiveCards(id controller) {
     while (first < total && !ImmersiveCardIsPromoted((__bridge id)elements[first * 2])) {
         first++;
     }
-    int64_t navigatorBefore = *(int64_t*)((uint8_t*)(__bridge void*)navigator + ivar_getOffset(countIvar));
-    PFBProbeVideoFeed(total, navigatorBefore, loadedEnd, first, enabled);
     PFBCompatReach(PFBCompatPath_promoted_video_feed);
 
     if (!enabled || first == total) {
@@ -317,7 +301,6 @@ static void RemovePromotedImmersiveCards(id controller) {
     if (*navigatorCount == total) {
         *navigatorCount = kept;
     }
-    PFBProbeVideoFeedEdited(total, kept, navigatorBefore, *navigatorCount);
 
     // The cards are released once the list is consistent again.
     for (int64_t i = 0; i < droppedCount; i++) {

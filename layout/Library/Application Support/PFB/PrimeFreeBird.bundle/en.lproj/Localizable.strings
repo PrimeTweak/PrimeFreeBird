@@ -136,7 +136,7 @@
 "BYPASS_AGE_VERIFICATION_TITLE" = "Bypass age verification";
 "BYPASS_AGE_VERIFICATION_DETAIL" = "Skip the age check for sensitive content.";
 "REPLY_SORTING_TITLE" = "Chronological replies";
-"REPLY_SORTING_DETAIL" = "Show replies oldest-first instead of sorted by relevance.";
+"REPLY_SORTING_DETAIL" = "Sort replies by date instead of by relevance.";
 "RESTORE_REPLY_CONTEXT_TITLE" = "Restore reply context";
 "RESTORE_REPLY_CONTEXT_DETAIL" = "Show “Replying to” above the text of a reply you open.";
 "SHOW_QUOTE_COUNTS_TITLE" = "Quote and Retweet counts";
@@ -185,7 +185,7 @@
 "HIDE_BLUE_VERIFIED_TITLE" = "Hide paid checkmarks";
 "HIDE_BLUE_VERIFIED_DETAIL" = "Remove Twitter Blue checkmarks while keeping brand and government badges.";
 "HIDE_FOLLOW_BUTTON_TITLE" = "Hide Follow button";
-"HIDE_FOLLOW_BUTTON_DETAIL" = "Remove the Follow button shown on Tweets in your timeline.";
+"HIDE_FOLLOW_BUTTON_DETAIL" = "Remove the Follow button next to the author's name on Tweets, but not the one on profiles.";
 "HIDE_MESSAGE_BUTTON_TITLE" = "Hide Message button";
 "HIDE_MESSAGE_BUTTON_DETAIL" = "Remove the Message button shown beside a Tweet’s author.";
 /* Legacy key name: this row HIDES the Subscribe button. Do not rename the
@@ -239,7 +239,7 @@
 "IMPORT_SETTINGS_FAILED_TITLE" = "Import failed";
 "IMPORT_SETTINGS_FAILED_MESSAGE" = "This file is not a PrimeFreeBird settings backup.";
 "READING_LINE_TITLE" = "Reading marker";
-"READING_LINE_DETAIL" = "Marks where you were when new Tweets arrive above — on Following and your Lists.";
+"READING_LINE_DETAIL" = "Marks where you were when new Tweets arrive above — on Following.";
 /* Reply-in-web-view: the reply screen title + the web-session login/clear
    buttons (Lab) and their alerts. */
 "REPLY_WEBVIEW_TITLE" = "Reply";

@@ -10,10 +10,10 @@
 "MODERN_SETTINGS_LAYOUT_SUBTITLE" = "Uygulamayı kilitleyin, gezinme çubuğunu görünür tutun ve daha fazlası.";
 
 "MODERN_SETTINGS_MEDIA_TITLE" = "Medya";
-"MODERN_SETTINGS_MEDIA_SUBTITLE" = "İndirmeler, oynatma, kalite ve düzen.";
+"MODERN_SETTINGS_MEDIA_SUBTITLE" = "Videoları indir, zaman etiketlerini etkinleştir ve daha fazlası.";
 
 "MODERN_SETTINGS_APPEARANCE_TITLE" = "Görünüm";
-"MODERN_SETTINGS_APPEARANCE_SUBTITLE" = "Arayüz stili, renkler ve yazı tipleri.";
+"MODERN_SETTINGS_APPEARANCE_SUBTITLE" = "Temalar, özel uygulama simgeleri ve yazı tipleriyle Twitter'ı kişiselleştirin.";
 
 "MODERN_SETTINGS_TIMELINES_TITLE" = "Zaman akışları";
 "MODERN_SETTINGS_TIMELINES_SUBTITLE" = "Reklamları, takip önerilerini ve zaman akışındaki diğer gereksiz öğeleri kaldırın.";
@@ -26,7 +26,7 @@
 "MODERN_SETTINGS_TWEETS_SUBTITLE" = "Tweetlerin nasıl çalıştığını değiştirin, kullanmadığınız özellikleri kaldırın.";
 
 "MODERN_SETTINGS_SEARCH_TITLE" = "Arama ve keşfet";
-"MODERN_SETTINGS_SEARCH_SUBTITLE" = "Arama geçmişi, gündem ve trend videolar.";
+"MODERN_SETTINGS_SEARCH_SUBTITLE" = "Arama sekmesinde ne gördüğünüzü değiştirin.";
 
 
 
@@ -39,7 +39,7 @@
 /*General*/
 
 "HIDE_WHO_TO_FOLLOW_TITLE" = "‘Kimi takip etmeli’ yok";
-"HIDE_WHO_TO_FOLLOW_DETAIL" = "Takip önerilerini kaldır.";
+"HIDE_WHO_TO_FOLLOW_DETAIL" = "Profildeki takip önerilerini kaldır.";
 
 "HIDE_TIMELINE_PROMPTS_TITLE" = "Zaman akışında istem yok";
 "HIDE_TIMELINE_PROMPTS_DETAIL" = "'Kişileri ekle' gibi afişleri kaldır.";
@@ -74,7 +74,7 @@
 "SEND_SOUND_UNREADABLE" = "This file is not a sound that can be played.";
 
 "HIDE_BLUE_VERIFIED_TITLE" = "Blue onay rozetlerini gizle";
-"HIDE_BLUE_VERIFIED_DETAIL" = "Twitter Blue onay rozetlerini kaldır; marka ve devlet hesaplarının rozetleri korunur.";
+"HIDE_BLUE_VERIFIED_DETAIL" = "Tweet'lerdeki ücretli onay rozetini gizle. Bu, marka veya devlet hesaplarını kapsamaz.";
 
 "HIDE_VIEW_COUNT_TITLE" = "Görüntüleme sayısını gizle";
 "HIDE_VIEW_COUNT_DETAIL" = "Tweet altındaki görüntüleme sayılarını gösterme.";
@@ -96,17 +96,17 @@
 "HIDE_GROK_CREATE_TITLE" = "Grok oluşturma düğmelerini gizle";
 "HIDE_GROK_CREATE_DETAIL" = "Grok ile görsel ve video oluşturma veya düzenleme seçeneklerini kaldırır.";
 
-"DISABLE_AUTO_TRANSLATE_TITLE" = "Otomatik çeviri";
-"DISABLE_AUTO_TRANSLATE_DETAIL" = "Tweetleri, biyografileri, Topluluk Notlarını ve bildirimleri otomatik çevir.";
+"DISABLE_AUTO_TRANSLATE_TITLE" = "Otomatik çeviriyi devre dışı bırak";
+"DISABLE_AUTO_TRANSLATE_DETAIL" = "Gönderileri ve biyografileri asla otomatik çevirme.";
 
 "SQUARE_AVATARS_TITLE" = "Kare profil resimleri";
 "SQUARE_AVATARS_DETAIL" = "Herkese eski Twitter'daki gibi marka hesapları gibi kare profil resimleri verir.";
 
-"REPLY_SORTING_TITLE" = "Yanıt sıralaması yok";
-"REPLY_SORTING_DETAIL" = "Tweet yanıtlarında sıralama özelliğini devre dışı bırakır.";
+"REPLY_SORTING_TITLE" = "Kronolojik yanıtlar";
+"REPLY_SORTING_DETAIL" = "Yanıtları alaka düzeyi yerine tarihe göre sıralar.";
 
 "RESTORE_REPLY_CONTEXT_TITLE" = "Yanıt bağlamını geri yükle";
-"RESTORE_REPLY_CONTEXT_DETAIL" = "Açılan bir yanıtın metninin üstünde, kime yanıt verildiğini gösterir.";
+"RESTORE_REPLY_CONTEXT_DETAIL" = "Tweetlerin altında yanıt verilen kişileri gösterir.";
 
 "SHOW_QUOTE_COUNTS_TITLE" = "Quote and Retweet counts";
 "SHOW_QUOTE_COUNTS_DETAIL" = "Show both numbers at the top of a Tweet's Quotes screen.";
@@ -119,7 +119,7 @@
 "FOLLOW_CONFIRM_DETAIL" = "Birini takip etmeden önce onay iste.";
 
 "COPY_PROFILE_INFO_TITLE" = "Profil bilgilerini kopyala";
-"COPY_PROFILE_INFO_DETAIL" = "Profillere bir kopyalama düğmesi ekle.";
+"COPY_PROFILE_INFO_DETAIL" = "Kullanıcı adı, bio ve daha fazlasını tek dokunuşla kopyala.";
 
 "DISABLE_ARTICLES_TITLE" = "Makale sekmesini gizle";
 "DISABLE_ARTICLES_DETAIL" = "Profildeki ‘Makaleler’ sekmesini gizle.";
@@ -128,27 +128,27 @@
 "DISABLE_HIGHLIGHTS_DETAIL" = "Profildeki ‘Öne çıkanlar’ sekmesini gizle.";
 
 "HIDE_FOLLOW_BUTTON_TITLE" = "Tweetlerde Takip Et düğmesi yok";
-"HIDE_FOLLOW_BUTTON_DETAIL" = "Tweetlerdeki Takip Et düğmesini gizler.";
+"HIDE_FOLLOW_BUTTON_DETAIL" = "Tweetlerde yazar adının yanındaki Takip Et düğmesini gizler, profillerdekini değil.";
 
 "RESTORE_FOLLOW_BUTTON_TITLE" = "Abone ol düğmesi yok";
 "RESTORE_FOLLOW_BUTTON_DETAIL" = "Tweetlerde ve profillerde Abone ol düğmesini gizler.";
 
 /*Search*/
 "NO_HISTORY_TITLE" = "Arama geçmişi yok";
-"NO_HISTORY_DETAIL" = "Son aramaları kaydetme ve gösterme.";
+"NO_HISTORY_DETAIL" = "Twitter artık aramalarını kaydetmeyecek.";
 
 "HIDE_TREND_VIDEOS_TITLE" = "Trend videolar yok";
 "HIDE_TREND_VIDEOS_DETAIL" = "Arama menüsünden trend videoları kaldır.";
 
 /*Photos and Videos*/
-"AUTO_HIGHEST_LOAD_TITLE" = "Yüksek kaliteli fotoğraflar";
-"AUTO_HIGHEST_LOAD_DETAIL" = "Fotoğrafları her zaman en yüksek çözünürlükte görüntüle.";
+"AUTO_HIGHEST_LOAD_TITLE" = "Yüksek kaliteli medya";
+"AUTO_HIGHEST_LOAD_DETAIL" = "Medya dosyalarını en iyi kalitede yükle ve görüntüle.";
 
 "DISABLE_VIDEO_CAPTIONS_TITLE" = "Video altyazıları kapalı";
 
-"FORCE_TWEET_FULL_FRAME_TITLE" = "Kırpılmamış görseller";
+"FORCE_TWEET_FULL_FRAME_TITLE" = "Büyük görseller";
 
-"RESTORE_VIDEO_TIMESTAMP_TITLE" = "Video süre göstergesi";
+"RESTORE_VIDEO_TIMESTAMP_TITLE" = "Video zaman etiketi";
 "RESTORE_VIDEO_TIMESTAMP_DETAIL" = "Tam ekran oynatıcıda zaman bilgisini gösterir.";
 
 "DISABLE_IMMERSIVE_SCROLL_TITLE" = "Video akışında kaydırma yok";
@@ -166,7 +166,7 @@
 "DIRECT_SAVE_DETAIL" = "Kaydedilen videolar Fotoğraflar uygulamasına gider.";
 
 "HIDE_PREMIUM_OFFER_TITLE" = "Twitter Blue promosu yok";
-"HIDE_PREMIUM_OFFER_DETAIL" = "‘Hesabını doğrulat’ ve ‘Yükselt’ butonlarını gizle.";
+"HIDE_PREMIUM_OFFER_DETAIL" = "‘Doğrulan’ ve ‘Yükselt’ butonlarını gizle.";
 
 "THEME_OPTION_TITLE" = "Temayı değiştir";
 
@@ -184,13 +184,13 @@
 "HIDE_CUSTOM_TIMELINES_DETAIL" = "Ana zaman akışı sekmelerinden Ekle düğmesini kaldırır.";
 
 
-"TAB_BAR_THEMING_TITLE" = "Seçili sekme";
+"TAB_BAR_THEMING_TITLE" = "Klasik gezinme çubuğu";
 "TAB_BAR_THEMING_DETAIL" = "Seçilen gezinme öğesine vurgu renginizi uygular.";
 
-"DISABLE_RTL_TITLE" = "Soldan sağa metin";
-"DISABLE_RTL_DETAIL" = "Metni, sağdan sola yazılan dillerde bile soldan sağa göster.";
+"DISABLE_RTL_TITLE" = "Soldan sağa düzen";
+"DISABLE_RTL_DETAIL" = "RTL dillerde bile LTR düzenini zorla.";
 
-"SHOW_SCROLL_INDICATOR_TITLE" = "Kaydırma çubuğunu göster";
+"SHOW_SCROLL_INDICATOR_TITLE" = "Kaydırma çubuğunu her zaman göster";
 
 "CUSTOM_FONTS_TITLE" = "Özel yazı tipleri";
 "CUSTOM_FONTS_DETAIL" = "Twitter için özel bir yazı tipi seç.";
@@ -221,8 +221,8 @@
 /*Copy profile info*/
 "COPY_PROFILE_INFO_MENU_OPTION_1" = "Biyografiyi kopyala";
 "COPY_PROFILE_INFO_MENU_OPTION_2" = "Kullanıcı adını kopyala";
-"COPY_PROFILE_INFO_MENU_OPTION_3" = "İsmi kopyala";
-"COPY_PROFILE_INFO_MENU_OPTION_4" = "İnternet sitesini kopyala";
+"COPY_PROFILE_INFO_MENU_OPTION_3" = "Tam kullanıcı adını kopyala";
+"COPY_PROFILE_INFO_MENU_OPTION_4" = "Biyo linkini kopyala";
 "COPY_PROFILE_INFO_MENU_OPTION_5" = "Konumu kopyala";
 
 /*Theme*/
@@ -260,7 +260,7 @@
 
 /*Custom fonts*/
 "INSTALL_IFONT_BUTTON_TITLE" = "iFont application";
-"FONT_SYSTEM_DEFAULT_SUBTITLE" = "Varsayılan";
+"FONT_SYSTEM_DEFAULT_SUBTITLE" = "System Default";
 "LIGHT_MODE_RESTART_TITLE" = "Back to light mode";
 "LIGHT_MODE_RESTART_MESSAGE" = "Your background color was reset to System. Restart Twitter to clear any leftover dark colors.";
 "CLOSE_APP_ACTION" = "Close app";

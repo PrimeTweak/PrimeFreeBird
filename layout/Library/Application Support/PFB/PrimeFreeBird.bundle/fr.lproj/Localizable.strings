@@ -99,8 +99,8 @@
 "SQUARE_AVATARS_TITLE" = "Photos de profil carrées";
 "SQUARE_AVATARS_DETAIL" = "Affiche les photos de profil en carrés arrondis, comme l’ancien Twitter.";
 
-"REPLY_SORTING_TITLE" = "Pas de tri des réponses";
-"REPLY_SORTING_DETAIL" = "Désactive le tri des réponses dans les conversations de Tweets.";
+"REPLY_SORTING_TITLE" = "Réponses chronologiques";
+"REPLY_SORTING_DETAIL" = "Trie les réponses par date plutôt que par pertinence.";
 
 "RESTORE_REPLY_CONTEXT_TITLE" = "Restaurer le contexte de réponse";
 "RESTORE_REPLY_CONTEXT_DETAIL" = "Affiche « En réponse à » au-dessus du texte d’une réponse ouverte.";
@@ -125,7 +125,7 @@
 "DISABLE_HIGHLIGHTS_DETAIL" = "Cache l’onglet Tweets marquants.";
 
 "HIDE_FOLLOW_BUTTON_TITLE" = "Pas de bouton Suivre dans les Tweets";
-"HIDE_FOLLOW_BUTTON_DETAIL" = "Masque le bouton Suivre dans les Tweets.";
+"HIDE_FOLLOW_BUTTON_DETAIL" = "Masque le bouton Suivre à côté du nom de l'auteur sur les Tweets, mais pas celui des profils.";
 "HIDE_MESSAGE_BUTTON_TITLE" = "Pas de bouton Message dans les Tweets";
 "HIDE_MESSAGE_BUTTON_DETAIL" = "Masque le bouton Message à côté de l’auteur d’un Tweet.";
 
@@ -321,7 +321,7 @@
 "IMPORT_SETTINGS_FAILED_TITLE" = "Échec de l’importation";
 "IMPORT_SETTINGS_FAILED_MESSAGE" = "Ce fichier n’est pas une sauvegarde PrimeFreeBird.";
 "READING_LINE_TITLE" = "Repère de lecture";
-"READING_LINE_DETAIL" = "Marque où vous étiez quand de nouveaux Tweets arrivent au-dessus — sur Abonnements et vos Listes.";
+"READING_LINE_DETAIL" = "Marque où vous étiez quand de nouveaux Tweets arrivent au-dessus — sur Abonnements.";
 "INTERFACE_STYLE_DETAIL" = "Liquid Glass est le design translucide d’iOS 26. Standard garde l’aspect plat.";
 "INTERFACE_STYLE_STANDARD" = "Standard";
 "INTERFACE_STYLE_LIQUID_GLASS" = "Liquid Glass";

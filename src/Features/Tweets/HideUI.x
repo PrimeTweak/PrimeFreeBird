@@ -2,7 +2,6 @@
 // trending on Explore, the Subscribe and Follow buttons, and inline action buttons.
 
 #import "Support/HookHelpers.h"
-#import "Debug/PFBProbe.h"
 
 // MARK: - Hide Blue verified checkmark
 
@@ -243,7 +242,6 @@ extern void pfbNoteExploreAccessoryView(UIView* v);
 %hook TTAStatusAuthorView
 
 - (void)setFollowControlHidden:(BOOL)hidden {
-    PFBProbeFollowControl((UIView*)self, hidden);
     if (![PFBSettings boolForKey:@"hide_follow_button"]) {
         PFBCOMPAT_OBSERVE(PFBCompat_hide_follow_button, @"Follow button found");
         %orig(hidden);

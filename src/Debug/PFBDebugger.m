@@ -10,7 +10,6 @@
 #import <sys/utsname.h>
 #import "Debug/PFBDebugOverlayWindow.h"
 #import "Debug/PFBDebugTrigger.h"
-#import "Debug/PFBProbe.h"
 
 // MARK: - gate
 
@@ -82,6 +81,9 @@ void PFBDebugLog(NSString* format, ...) {
 
 // MARK: - environment
 
+// How the floating button got on screen this launch.
+static NSString* gPFBTriggerPlacement = @"not placed yet";
+
 static NSString* PFBEnvironmentBlock(void) {
     NSDictionary* info = [NSBundle mainBundle].infoDictionary;
     NSString* app = info[@"CFBundleShortVersionString"] ?: @"?";
@@ -104,9 +106,10 @@ static NSString* PFBEnvironmentBlock(void) {
     return [NSString stringWithFormat:
         @"PFB DIAG\n"
         @"Twitter %@ (%@) · iOS %@ · %@\n"
-        @"Interface: %@ · Liquid Glass %@\n",
+        @"Interface: %@ · Liquid Glass %@\n"
+        @"Stethoscope: %@\n",
         app, build, device.systemVersion, model,
-        style, liquidGlass ? @"ON" : @"OFF"];
+        style, liquidGlass ? @"ON" : @"OFF", gPFBTriggerPlacement];
 }
 
 // MARK: - hook health
@@ -459,13 +462,8 @@ NSString* PFBDebuggerReport(void) {
 // MARK: - floating trigger
 
 static PFBDebugOverlayWindow* gPFBOverlay;
-
-NSString* PFBProbeTriggerState(void) {
-    if (!gPFBOverlay) {
-        return @"absent";
-    }
-    return gPFBOverlay.hidden ? @"hidden" : @"shown";
-}
+// The state last asked for, which a button placed afterwards takes on.
+static BOOL gPFBTriggerHidden;
 
 static UIWindow* PFBActiveWindow(void) {
     for (UIScene* scene in UIApplication.sharedApplication.connectedScenes) {
@@ -491,6 +489,7 @@ static UIWindow* PFBActiveWindow(void) {
 }
 
 void PFBDebuggerSetTriggerHidden(BOOL hidden) {
+    gPFBTriggerHidden = hidden;
     gPFBOverlay.hidden = hidden;
 }
 
@@ -572,10 +571,9 @@ static CGPoint PFBTriggerCenter(UIWindowScene* scene) {
     return CGPointMake(size.width - 37.0, size.height - 189.0);
 }
 
-static void PFBInstallTrigger(void) {
-    if (gPFBOverlay) {
-        return;
-    }
+// Placed on the scene in front, and placed again when that is no longer the scene it
+// sits on, as when iOS replaced Twitter's screen while it was in the background.
+static void PFBInstallTrigger(NSString* moment) {
     UIWindowScene* scene = nil;
     for (UIScene* candidate in UIApplication.sharedApplication.connectedScenes) {
         if ([candidate isKindOfClass:[UIWindowScene class]] &&
@@ -584,8 +582,14 @@ static void PFBInstallTrigger(void) {
             break;
         }
     }
-    if (!scene) {
+    if (!scene || (gPFBOverlay && gPFBOverlay.windowScene == scene)) {
         return;
+    }
+    BOOL replaced = gPFBOverlay != nil;
+    gPFBOverlay.hidden = YES;
+    // A sheet that hid the button went with the old screen; only a tour still running keeps it hidden.
+    if (replaced) {
+        gPFBTriggerHidden = gPFBTriggerHidden && PFBCompatTourIsRunning();
     }
 
     gPFBOverlay = [[PFBDebugOverlayWindow alloc] initWithWindowScene:scene];
@@ -595,7 +599,9 @@ static void PFBInstallTrigger(void) {
     gPFBOverlay.rootViewController.view.backgroundColor = UIColor.clearColor;
     // Shown, never made key: making it key would put the report's own window
     // in front of the screen it is meant to describe.
-    gPFBOverlay.hidden = NO;
+    gPFBOverlay.hidden = gPFBTriggerHidden;
+    gPFBTriggerPlacement = replaced ? [NSString stringWithFormat:@"placed again %@, on a new screen", moment]
+                                    : [NSString stringWithFormat:@"placed %@", moment];
 
     UIButton* button = [UIButton buttonWithType:UIButtonTypeSystem];
     button.frame = CGRectMake(0, 0, 50, 50);
@@ -618,96 +624,41 @@ static void PFBInstallTrigger(void) {
     [gPFBOverlay.rootViewController.view addSubview:button];
 }
 
-// MARK: - probe: the stethoscope at launch
-
-// Whether the launch put Twitter in front or left it in the background, and when.
-static NSString* gPFBProbeLaunchState = @"?";
-static CFTimeInterval gPFBProbeLaunchAt;
-
-static NSString* PFBProbeSceneStates(void) {
-    NSMutableArray<NSString*>* states = [NSMutableArray array];
-    for (UIScene* scene in UIApplication.sharedApplication.connectedScenes) {
-        switch (scene.activationState) {
-            case UISceneActivationStateForegroundActive:
-                [states addObject:@"foreground active"];
-                break;
-            case UISceneActivationStateForegroundInactive:
-                [states addObject:@"foreground inactive"];
-                break;
-            case UISceneActivationStateBackground:
-                [states addObject:@"background"];
-                break;
-            default:
-                [states addObject:@"unattached"];
-                break;
-        }
-    }
-    return states.count ? [states componentsJoinedByString:@", "] : @"no scene";
-}
-
-// One placement of the button: what it found, after which kind of launch.
-static void PFBProbeTriggerAttempt(NSString* when, BOOL placedBefore) {
-    NSString* outcome = placedBefore ? @"already placed"
-                                     : (gPFBOverlay ? @"placed"
-                                                    : [@"not placed, scenes: " stringByAppendingString:PFBProbeSceneStates()]);
-    NSString* key = [NSString stringWithFormat:@"stethoscope %@ %@ %@", gPFBProbeLaunchState, when,
-                                               gPFBOverlay ? @"placed" : @"missing"];
-    if (PFBProbeWants(key)) {
-        PFBProbeNote(key, @"#12 stethoscope %@ after a launch in the %@: %@", when, gPFBProbeLaunchState, outcome);
-    }
-    if (!placedBefore && gPFBOverlay && PFBCompatTourIsRunning()) {
-        PFBProbeNote(@"stethoscope placed during a tour", @"#11 stethoscope: placed while a tour runs, %@",
-                     gPFBOverlay.hidden ? @"hidden" : @"shown above it");
-    }
-}
-
-// The kind of launch, then, each time Twitter comes to the front once both placements
-// are past, whether the button is there.
-static void PFBProbeLaunch(void) {
-    UIApplicationState state = UIApplication.sharedApplication.applicationState;
-    gPFBProbeLaunchState = state == UIApplicationStateBackground ? @"background" : @"foreground";
-    gPFBProbeLaunchAt = CACurrentMediaTime();
-    PFBProbeNote([@"launch " stringByAppendingString:gPFBProbeLaunchState],
-                 @"#12 launch: Twitter started in the %@ (app state %ld, scenes: %@)", gPFBProbeLaunchState, (long)state,
-                 PFBProbeSceneStates());
-    [[NSNotificationCenter defaultCenter] addObserverForName:UIApplicationDidBecomeActiveNotification
-                                                      object:nil
-                                                       queue:NSOperationQueue.mainQueue
-                                                  usingBlock:^(__unused NSNotification* note) {
-                                                    CFTimeInterval since = CACurrentMediaTime() - gPFBProbeLaunchAt;
-                                                    if (since < 11.0) {
-                                                        return;
-                                                    }
-                                                    NSString* trigger = PFBProbeTriggerState();
-                                                    NSString* key = [NSString
-                                                        stringWithFormat:@"stethoscope activation %@ %@", gPFBProbeLaunchState,
-                                                                         gPFBOverlay ? @"present" : @"absent"];
-                                                    if (PFBProbeWants(key)) {
-                                                        PFBProbeNote(key,
-                                                                     @"#12 stethoscope when Twitter came to the front %.0f s "
-                                                                     @"after a launch in the %@: %@",
-                                                                     since, gPFBProbeLaunchState, trigger);
-                                                    }
-                                                  }];
-}
-
 void PFBDebuggerInstall(void) {
     if (!PFBDebugEnabled()) {
         return;
     }
-    PFBProbeLaunch();
     // The scene is not connected at launch, so the button is placed once the
     // first screen is up, and retried if it was not ready.
+    BOOL background = UIApplication.sharedApplication.applicationState == UIApplicationStateBackground;
+    NSString* launch = background ? @"a launch in the background" : @"a launch in the foreground";
+    CFTimeInterval launchedAt = CACurrentMediaTime();
+    gPFBTriggerPlacement = [@"not placed yet, after " stringByAppendingString:launch];
+    static BOOL triesDone;
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(3.0 * NSEC_PER_SEC)),
                    dispatch_get_main_queue(), ^{
-                     BOOL placed = gPFBOverlay != nil;
-                     PFBInstallTrigger();
-                     PFBProbeTriggerAttempt(@"3 s", placed);
+                     PFBInstallTrigger([@"3 s after " stringByAppendingString:launch]);
                    });
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(10.0 * NSEC_PER_SEC)),
                    dispatch_get_main_queue(), ^{
-                     BOOL placed = gPFBOverlay != nil;
-                     PFBInstallTrigger();
-                     PFBProbeTriggerAttempt(@"10 s", placed);
+                     PFBInstallTrigger([@"10 s after " stringByAppendingString:launch]);
+                     triesDone = YES;
                    });
+    // A launch in the background ends both tries with no screen up: Twitter coming to the
+    // front places the button, a second later so the screen is laid out.
+    [[NSNotificationCenter defaultCenter]
+        addObserverForName:UIApplicationDidBecomeActiveNotification
+                    object:nil
+                     queue:NSOperationQueue.mainQueue
+                usingBlock:^(__unused NSNotification* note) {
+                  if (!triesDone) {
+                      return;
+                  }
+                  dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1.0 * NSEC_PER_SEC)),
+                                 dispatch_get_main_queue(), ^{
+                                   PFBInstallTrigger([NSString
+                                       stringWithFormat:@"when Twitter came to the front, %.0f s after %@",
+                                                        CACurrentMediaTime() - launchedAt, launch]);
+                                 });
+                }];
 }

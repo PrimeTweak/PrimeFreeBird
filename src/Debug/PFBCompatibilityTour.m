@@ -12,7 +12,6 @@
 #import "Support/HookHelpers.h"
 #import "Settings/PFBModernSettingsPageViewController.h"
 #import "Debug/PFBTourOverlayWindow.h"
-#import "Debug/PFBProbe.h"
 
 // Long enough for a screen and its first page of content to arrive.
 static const NSTimeInterval kPFBTourPause = 2.5;
@@ -106,10 +105,6 @@ NSString* PFBCompatTourJournalText(void) {
     NSString* text = [NSString stringWithContentsOfFile:tourJournalPath() encoding:NSUTF8StringEncoding error:nil];
     text = [text stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceAndNewlineCharacterSet];
     return text.length ? text : nil;
-}
-
-NSString* PFBProbeTourStep(void) {
-    return gPFBTourRunning ? gPFBTourStepLive : nil;
 }
 
 // Twitter's main window: the debugger's own overlay is often the key one.
@@ -1205,123 +1200,55 @@ static BOOL tourAttempt(NSString* step, NSString* part, dispatch_block_t body) {
     }
 }
 
-// MARK: - Probe measurements
+// MARK: - Options switched for one step
 
-// Twitter's Lists page, built by its own class factory and pushed on the stack in front,
-// as the Tweet interactions screen is.
-static BOOL tourOpenListsPage(void) {
-    NSString* className = @"_TtC33TwitterListsFeatureImplementation37ListManagementContainerViewController";
-    Class screenClass = NSClassFromString(className);
-    SEL build = NSSelectorFromString(@"listManagementViewControllerWithAccount:");
-    NSMethodSignature* signature =
-        [screenClass respondsToSelector:build] ? [screenClass methodSignatureForSelector:build] : nil;
-    BOOL buildable = signature.numberOfArguments == 3 && signature.methodReturnType[0] == '@' &&
-                     [signature getArgumentTypeAtIndex:2][0] == '@';
-    id account = tourGetter(UIApplication.sharedApplication.delegate, @"_t1_currentAccount");
-    UINavigationController* stack = tourScreen().navigationController;
-    UIViewController* screen = buildable && account && stack
-                                   ? ((id (*)(id, SEL, id))objc_msgSend)(screenClass, build, account)
-                                   : nil;
-    if (![screen isKindOfClass:[UIViewController class]]) {
-        PFBCompatTourLog(@"[tour] lists: factory %@, account %@, stack %@, page %@", buildable ? @"usable" : @"not usable",
-                         account ? NSStringFromClass([account class]) : @"none", stack ? @"found" : @"none",
-                         screen ? NSStringFromClass([screen class]) : @"not built");
-        return NO;
+// A step can switch an option for its own screen. What the person had stays on disk
+// until it is put back, so a tour Twitter closed gives it back at the next launch.
+static NSString* const kPFBTourSwitchedKey = @"pfb_compat_tour_switched";
+
+static void tourSwitchOption(NSString* key, BOOL value) {
+    NSUserDefaults* defaults = [NSUserDefaults standardUserDefaults];
+    NSDictionary* stored = [defaults dictionaryForKey:kPFBTourSwitchedKey];
+    NSMutableDictionary* saved = stored ? [stored mutableCopy] : [NSMutableDictionary dictionary];
+    if (!saved[key]) {
+        id had = [defaults objectForKey:key];
+        saved[key] = had ? @{@"value": had} : @{};
+        [defaults setObject:saved forKey:kPFBTourSwitchedKey];
     }
-    [stack pushViewController:screen animated:NO];
-    PFBCompatTourLog(@"[tour] lists: %@ pushed on %@", NSStringFromClass([screen class]), NSStringFromClass([stack class]));
-    return YES;
+    [defaults setBool:value forKey:key];
+    PFBCompatTourLog(@"[tour] %@ switched %@ for this step", key, value ? @"on" : @"off");
 }
 
-// The first list row of the Lists page, opened the way a tap does; when none is a
-// list, the rows seen go to the journal.
-static BOOL tourOpenFirstList(void) {
-    UITableView* list = tourFrontList() ?: (UITableView*)tourFindView(tourScreen().viewIfLoaded, ^BOOL(UIView* view) {
-      return [view isKindOfClass:[UITableView class]];
-    });
-    id<UITableViewDelegate> delegate = list.delegate;
-    NSMutableOrderedSet<NSString*>* seen = [NSMutableOrderedSet orderedSet];
-    for (NSIndexPath* row in [list.indexPathsForVisibleRows sortedArrayUsingSelector:@selector(compare:)]) {
-        NSString* name = NSStringFromClass([[list cellForRowAtIndexPath:row] class]);
-        [seen addObject:name];
-        if (![name containsString:@"ListDetailsTableViewCell"] ||
-            ![delegate respondsToSelector:@selector(tableView:didSelectRowAtIndexPath:)]) {
-            continue;
+// Every option a step switched goes back to what the person had; one never set stays unset.
+static void tourRestoreOptions(NSString* when) {
+    NSUserDefaults* defaults = [NSUserDefaults standardUserDefaults];
+    NSDictionary* saved = [defaults dictionaryForKey:kPFBTourSwitchedKey];
+    for (NSString* key in saved) {
+        NSDictionary* entry = [saved[key] isKindOfClass:[NSDictionary class]] ? saved[key] : nil;
+        if (entry[@"value"]) {
+            [defaults setObject:entry[@"value"] forKey:key];
+        } else {
+            [defaults removeObjectForKey:key];
         }
-        PFBCompatTourLog(@"[tour] lists: the list at row %ld of section %ld opened", (long)row.row, (long)row.section);
-        [delegate tableView:list didSelectRowAtIndexPath:row];
-        return YES;
+        PFBCompatTourLog(@"[tour] %@ put back %@, %@", key, [PFBSettings boolForKey:key] ? @"on" : @"off", when);
     }
-    PFBCompatTourLog(@"[tour] lists: no list row in %@ (rows: %@)", list ? NSStringFromClass([list class]) : @"no list",
-                     seen.count ? [seen.array componentsJoinedByString:@", "] : @"none");
-    return NO;
+    [defaults removeObjectForKey:kPFBTourSwitchedKey];
 }
 
-// The timeline in front: its controller, its scribe section and whether Home holds it,
-// which decide whether the reading marker can show there.
-static void tourProbeFrontTimeline(NSString* where) {
-    SEL scribed = NSSelectorFromString(@"scribeSection");
-    UIViewController* timeline = nil;
-    for (UIResponder* responder = tourFrontList().nextResponder; responder && !timeline;
-         responder = responder.nextResponder) {
-        if ([responder isKindOfClass:[UIViewController class]] && [responder respondsToSelector:scribed]) {
-            timeline = (UIViewController*)responder;
-        }
-    }
-    // A tall header can sit under the middle of the screen: the screen's own children then.
-    NSMutableArray<UIViewController*>* queue = [NSMutableArray array];
-    if (!timeline && tourScreen()) {
-        [queue addObject:tourScreen()];
-    }
-    for (NSUInteger i = 0; i < queue.count && i < 128 && !timeline; i++) {
-        if ([queue[i] respondsToSelector:scribed]) {
-            timeline = queue[i];
-        }
-        [queue addObjectsFromArray:queue[i].childViewControllers];
-    }
-    id section = tourGetter(timeline, @"scribeSection");
-    BOOL inHome = NO;
-    for (UIViewController* up = timeline; up; up = up.parentViewController) {
-        inHome = inHome || [NSStringFromClass([up class]) containsString:@"HomeTimelineContainerViewController"];
-    }
-    PFBProbeNote([@"front timeline " stringByAppendingString:where],
-                 @"#1 %@: timeline %@ · section “%@” · screen %@ · %@ · the reading marker %@", where,
-                 timeline ? NSStringFromClass([timeline class]) : @"none found",
-                 [section isKindOfClass:[NSString class]] ? section : @"none", tourScreenName(tourScreen()),
-                 inHome ? @"inside Home" : @"outside Home",
-                 inHome && [section isEqual:@"latest"] ? @"can show here" : @"never shows here");
-}
+// MARK: - Replies in date order
 
-// Home's tabs, and the sections of the timelines already loaded under them.
-static void tourProbeHomeTabs(void) {
-    id tabs = tourHomeTabs();
-    NSMutableArray<NSString*>* sections = [NSMutableArray array];
-    NSMutableArray<UIViewController*>* queue = [NSMutableArray array];
-    if ([tabs isKindOfClass:[UIViewController class]]) {
-        [queue addObject:tabs];
-    }
-    for (NSUInteger i = 0; i < queue.count && i < 128; i++) {
-        id section = tourGetter(queue[i], @"scribeSection");
-        if ([section isKindOfClass:[NSString class]]) {
-            [sections addObject:section];
-        }
-        [queue addObjectsFromArray:queue[i].childViewControllers];
-    }
-    PFBProbeNote(@"home tabs", @"#1 Home: %@ tabs, tab %@ shown · sections loaded: %@",
-                 tourIndexText(tourIntegerGetter(tabs, @"numberOfTabs")),
-                 tourIndexText(tourIntegerGetter(tabs, @"selectedIndex")),
-                 sections.count ? [sections componentsJoinedByString:@", "] : @"none");
-}
-
-// Home's Tweets with the most replies, most first, each with its count, read from its
-// first three screens. Left out: the Tweet the first Tweet step opens, its conversation
-// already loaded, and Tweets with a link card, which a tap can open instead.
-static NSArray<NSArray<NSNumber*>*>* tourMostRepliedTweets(void) {
+// Home's Tweet with the most replies, read from its first three screens, then the list
+// back at its top. Left out: the Tweet the first Tweet step opens, and Tweets with a link
+// card, which a tap can open instead. 0 when no Tweet shows a count.
+static long long tourMostRepliedTweet(void) {
     NSInteger first = NSNotFound;
     NSInteger firstAuthor = NSNotFound;
     tourFirstTweetIDs(&first, &firstAuthor);
-    NSMutableDictionary<NSNumber*, NSNumber*>* replies = [NSMutableDictionary dictionary];
+    long long best = 0;
+    NSInteger bestCount = -1;
+    tourScrollHomeToTop();
     UITableView* list = tourFrontList();
+    [list layoutIfNeeded];
     for (NSInteger screen = 0; list && screen < 3; screen++) {
         for (UITableViewCell* cell in list.visibleCells) {
             if (tourFindClass(cell, @"T1UnifiedCardView")) {
@@ -1336,25 +1263,22 @@ static NSArray<NSArray<NSNumber*>*>* tourMostRepliedTweets(void) {
             if (statusID == NSNotFound || statusID <= 0 || statusID == first || count == NSNotFound) {
                 continue;
             }
-            replies[@(statusID)] = @(count);
+            if (count > bestCount) {
+                best = statusID;
+                bestCount = count;
+            }
         }
         [list setContentOffset:CGPointMake(list.contentOffset.x, list.contentOffset.y + list.bounds.size.height * 0.8)
                       animated:NO];
         [list layoutIfNeeded];
     }
     tourScrollHomeToTop();
-    NSArray<NSNumber*>* ranked = [replies keysSortedByValueUsingComparator:^NSComparisonResult(NSNumber* a, NSNumber* b) {
-      return [b compare:a];
-    }];
-    NSMutableArray<NSArray<NSNumber*>*>* pairs = [NSMutableArray array];
-    for (NSNumber* statusID in ranked) {
-        [pairs addObject:@[ statusID, replies[statusID] ]];
+    if (best) {
+        PFBCompatTourLog(@"[tour] replies: Tweet %lld picked on Home, %ld replies", best, (long)bestCount);
+    } else {
+        PFBCompatTourLog(@"[tour] replies: no Tweet with a reply count on Home's first screens");
     }
-    PFBCompatTourLog(@"[tour] replies: %lu Tweets read on Home, most replies first: %@", (unsigned long)pairs.count,
-                     pairs.count ? [[ranked subarrayWithRange:NSMakeRange(0, MIN(ranked.count, (NSUInteger)3))]
-                                       componentsJoinedByString:@", "]
-                                 : @"none");
-    return pairs;
+    return best;
 }
 
 // A Tweet of Home opened the way a tap does, as the first Tweet step opens its own: its
@@ -1362,6 +1286,7 @@ static NSArray<NSArray<NSNumber*>*>* tourMostRepliedTweets(void) {
 static BOOL tourOpenHomeTweet(long long statusID) {
     tourScrollHomeToTop();
     UITableView* list = tourFrontList();
+    [list layoutIfNeeded];
     id<UITableViewDelegate> delegate = list.delegate;
     if (![delegate respondsToSelector:@selector(tableView:didSelectRowAtIndexPath:)]) {
         PFBCompatTourLog(@"[tour] replies: %@", list ? @"Home's list takes no row selection" : @"no list in front");
@@ -1371,7 +1296,6 @@ static BOOL tourOpenHomeTweet(long long statusID) {
         for (NSIndexPath* row in [list.indexPathsForVisibleRows sortedArrayUsingSelector:@selector(compare:)]) {
             id model = tourGetter(tourFindClass([list cellForRowAtIndexPath:row], @"T1StandardStatusView"), @"viewModel");
             if (tourIntegerGetter(model, @"statusID") == statusID) {
-                PFBCompatTourLog(@"[tour] replies: Tweet %lld opened from row %ld", statusID, (long)row.row);
                 [delegate tableView:list didSelectRowAtIndexPath:row];
                 return YES;
             }
@@ -1382,67 +1306,6 @@ static BOOL tourOpenHomeTweet(long long statusID) {
     }
     PFBCompatTourLog(@"[tour] replies: Tweet %lld not found again on Home's first screens", statusID);
     return NO;
-}
-
-// The sort Twitter says it applied to a conversation, read from its focal Tweet.
-static NSString* tourSortingState(id model) {
-    id state = tourGetter(model, @"replySortingState");
-    if (!state) {
-        return @"none";
-    }
-    NSMutableArray<NSString*>* modes = [NSMutableArray array];
-    if (tourBoolGetter(state, @"isSortedByRelevance")) {
-        [modes addObject:@"relevance"];
-    }
-    if (tourBoolGetter(state, @"isSortedByRecency")) {
-        [modes addObject:@"recency"];
-    }
-    if (tourBoolGetter(state, @"isSortedByLikes")) {
-        [modes addObject:@"likes"];
-    }
-    return modes.count ? [modes componentsJoinedByString:@"+"] : @"no mode set";
-}
-
-// Twitter's sort control, found by its own words on the screen or its bar: a label or a
-// button reading one of the sort choices, or a button whose menu offers them. The short
-// "Likes" is left out, since the focal Tweet's own counts can read the same.
-static NSString* tourSortControl(void) {
-    NSMutableSet<NSString*>* words = [NSMutableSet set];
-    for (NSString* key in @[
-             @"TIMELINE_SORT_REPLIES_BY_RELEVANT_SHORT_LABEL", @"TIMELINE_SORT_REPLIES_BY_RECENTS_SHORT_LABEL",
-             @"TIMELINE_SORT_REPLIES_BY_RELEVANT", @"TIMELINE_SORT_REPLIES_BY_RECENT", @"TIMELINE_SORT_REPLIES_BY_LIKED",
-             @"TIMELINE_SORT_REPLIES_TITLE"
-         ]) {
-        NSString* word = [[PFBBundle sharedBundle] localizedTwitterStringForKey:key];
-        if (word.length && ![word isEqualToString:key]) {
-            [words addObject:word];
-        }
-    }
-    UIView* root = tourScreen().navigationController.viewIfLoaded ?: tourWindow();
-    __block NSString* found = nil;
-    tourFindView(root, ^BOOL(UIView* view) {
-      if (view.hidden || !view.window) {
-          return NO;
-      }
-      NSString* text = [view isKindOfClass:[UILabel class]] ? ((UILabel*)view).text : nil;
-      if ([view isKindOfClass:[UIButton class]]) {
-          UIButton* button = (UIButton*)view;
-          text = button.currentTitle;
-          for (UIMenuElement* element in button.menu.children) {
-              if (element.title && [words containsObject:element.title]) {
-                  found = [NSString stringWithFormat:@"menu of %@ offering “%@”", NSStringFromClass([button class]),
-                                                     element.title];
-                  return YES;
-              }
-          }
-      }
-      if (text && [words containsObject:text]) {
-          found = [NSString stringWithFormat:@"“%@” in %@", text, NSStringFromClass([view.superview class])];
-          return YES;
-      }
-      return NO;
-    });
-    return found ?: @"none found";
 }
 
 // The view model of the Tweet a cell shows: the first view under it whose model has a
@@ -1460,10 +1323,10 @@ static id tourStatusModel(UIView* cell) {
     return found;
 }
 
-// One look at a conversation: its direct replies to the focal Tweet in their order on
-// screen, added after those already seen, and the sort its focal Tweet carries.
-static void tourReadReplies(long long focalID, NSMutableArray<NSNumber*>* order,
-                            NSMutableDictionary<NSString*, NSString*>* facts) {
+// The direct replies to the focal Tweet now on screen, in their order, added after
+// those already read. The focal author's own replies are left out: Twitter lists them
+// first whatever the order.
+static void tourReadReplies(long long focalID, NSInteger* focalAuthor, NSMutableArray<NSNumber*>* order) {
     UITableView* list = tourFrontList();
     for (NSIndexPath* row in [list.indexPathsForVisibleRows sortedArrayUsingSelector:@selector(compare:)]) {
         id model = tourStatusModel([list cellForRowAtIndexPath:row]);
@@ -1471,9 +1334,12 @@ static void tourReadReplies(long long focalID, NSMutableArray<NSNumber*>* order,
         if (statusID == NSNotFound) {
             continue;
         }
+        NSInteger author = tourIntegerGetter(model, @"fromUserID");
         if (statusID == focalID) {
-            facts[@"focal"] = @"found";
-            facts[@"sort"] = tourSortingState(model);
+            *focalAuthor = author;
+            continue;
+        }
+        if (author != NSNotFound && author == *focalAuthor) {
             continue;
         }
         if (tourIntegerGetter(model, @"inReplyToStatusID") == focalID && ![order containsObject:@(statusID)]) {
@@ -1482,10 +1348,10 @@ static void tourReadReplies(long long focalID, NSMutableArray<NSNumber*>* order,
     }
 }
 
-// The probe's note for one conversation: its Tweet, the sort Twitter applied, its sort
-// control, and its direct replies in screen order, timed by their IDs.
-static void tourNoteReplies(long long focalID, NSInteger replyCount, NSArray<NSNumber*>* order,
-                            NSDictionary<NSString*, NSString*>* facts) {
+// A Tweet ID grows with its creation time, so the replies read are in date order when
+// nearly every one is older than the one above it, or nearly every one newer. That
+// order proves the option; the counts go to the journal either way.
+static void tourJudgeReplies(long long focalID, NSArray<NSNumber*>* order) {
     NSInteger later = 0;
     NSInteger earlier = 0;
     for (NSUInteger i = 1; i < order.count; i++) {
@@ -1495,139 +1361,27 @@ static void tourNoteReplies(long long focalID, NSInteger replyCount, NSArray<NSN
             earlier++;
         }
     }
-    NSString* verdict = order.count < 2 ? @"too few to tell"
-                                        : (earlier == 0 ? @"oldest first" : (later == 0 ? @"newest first" : @"mixed"));
-    NSDateFormatter* clock = [NSDateFormatter new];
-    clock.dateFormat = @"dd HH:mm";
-    NSMutableArray<NSString*>* times = [NSMutableArray array];
-    for (NSNumber* reply in order) {
-        if (times.count == 12) {
-            break;
-        }
-        // An ID carries its creation time: milliseconds since Twitter's epoch, above bit 22.
-        NSTimeInterval created = (double)((reply.longLongValue >> 22) + 1288834974657LL) / 1000.0;
-        [times addObject:[clock stringFromDate:[NSDate dateWithTimeIntervalSince1970:created]]];
+    NSInteger pairs = later + earlier;
+    NSString* verdict = @"too few to tell";
+    if (pairs >= 5) {
+        verdict = earlier * 10 >= pairs * 9 ? @"newest first"
+                                            : (later * 10 >= pairs * 9 ? @"oldest first" : @"not in date order");
     }
-    BOOL on = [PFBSettings boolForKey:@"reply_sorting"];
-    PFBProbeNote([NSString stringWithFormat:@"replies %d", on],
-                 @"#2 replies, Chronological replies %@: Tweet %lld with %ld replies · focal Tweet %@ · sort applied %@ · "
-                 @"sort control %@ · %lu direct replies in screen order, times %@ · %ld later than the one above, %ld "
-                 @"earlier: %@",
-                 on ? @"on" : @"off", focalID, (long)replyCount, facts[@"focal"] ?: @"not found",
-                 facts[@"sort"] ?: @"not read", facts[@"control"] ?: @"not read", (unsigned long)order.count,
-                 times.count ? [times componentsJoinedByString:@", "] : @"none", (long)later, (long)earlier, verdict);
-}
-
-// The text a cell shows: its first two labels, or what it says to VoiceOver.
-static NSString* tourCellText(UIView* cell) {
-    NSMutableArray<NSString*>* texts = [NSMutableArray array];
-    tourFindView(cell, ^BOOL(UIView* view) {
-      NSString* text = [view isKindOfClass:[UILabel class]] && !view.hidden ? ((UILabel*)view).text : nil;
-      if (text.length) {
-          [texts addObject:text.length > 60 ? [[text substringToIndex:60] stringByAppendingString:@"…"] : text];
-      }
-      return texts.count >= 2;
-    });
-    NSString* spoken = cell.accessibilityLabel;
-    if (!texts.count && spoken.length) {
-        [texts addObject:spoken.length > 60 ? [[spoken substringToIndex:60] stringByAppendingString:@"…"] : spoken];
+    if ([verdict hasSuffix:@"first"]) {
+        PFBCompatReach(PFBCompatPath_replies_by_date);
     }
-    return texts.count ? [texts componentsJoinedByString:@" | "] : @"no text";
-}
-
-// The cells of the list in front: each class once, and each title once for the cells
-// that may head a module, so a module of trending videos shows with its title.
-static void tourProbeCells(NSString* where) {
-    UIScrollView* scroller = nil;
-    for (UIView* view = tourFrontView(); view && !scroller; view = view.superview) {
-        if ([view isKindOfClass:[UITableView class]] || [view isKindOfClass:[UICollectionView class]]) {
-            scroller = (UIScrollView*)view;
-        }
-    }
-    NSArray<UIView*>* cells = [scroller isKindOfClass:[UITableView class]]
-                                  ? (NSArray<UIView*>*)((UITableView*)scroller).visibleCells
-                                  : (NSArray<UIView*>*)((UICollectionView*)scroller).visibleCells;
-    cells = [cells sortedArrayUsingComparator:^NSComparisonResult(UIView* a, UIView* b) {
-      return a.frame.origin.y < b.frame.origin.y ? NSOrderedAscending : NSOrderedDescending;
-    }];
-    for (UIView* cell in cells) {
-        NSString* name = NSStringFromClass([cell class]);
-        NSString* text = tourCellText(cell);
-        BOOL heading = [name containsString:@"Header"] || [name containsString:@"Carousel"] ||
-                       [name containsString:@"Module"] || [name containsString:@"Video"];
-        NSString* key = heading ? [NSString stringWithFormat:@"cells %@ %@ %@", where, name, text]
-                                : [NSString stringWithFormat:@"cells %@ %@", where, name];
-        if (PFBProbeWants(key)) {
-            PFBProbeNote(key, @"#3 %@ cell %@: “%@”", where, name, text);
-        }
-    }
-}
-
-// The PrimeFreeBird row of Twitter's settings, found in the settings' own items, then
-// tapped the way a finger does. A failure goes to the journal when asked.
-static BOOL tourTapPFBRow(UIViewController* settings, BOOL report) {
-    NSArray* sections = tourGetter(settings, @"sections");
-    NSIndexPath* path = nil;
-    for (NSUInteger section = 0; !path && [sections isKindOfClass:[NSArray class]] && section < sections.count; section++) {
-        NSArray* items = sections[section];
-        for (NSUInteger row = 0; [items isKindOfClass:[NSArray class]] && row < items.count; row++) {
-            id title = tourGetter(items[row], @"title");
-            if ([title isKindOfClass:[NSString class]] && [title isEqualToString:@PFB_PRODUCT_NAME]) {
-                path = [NSIndexPath indexPathForRow:(NSInteger)row inSection:(NSInteger)section];
-                break;
-            }
-        }
-    }
-    UITableView* table = (UITableView*)tourFindView(settings.viewIfLoaded, ^BOOL(UIView* view) {
-      return [view isKindOfClass:[UITableView class]];
-    });
-    id<UITableViewDelegate> delegate = table.delegate;
-    if (!path || path.section >= table.numberOfSections || path.row >= [table numberOfRowsInSection:path.section] ||
-        ![delegate respondsToSelector:@selector(tableView:didSelectRowAtIndexPath:)]) {
-        if (report) {
-            PFBCompatTourLog(@"[tour] PFB settings: %@ row %@ in %@", @PFB_PRODUCT_NAME, path ? @"not tappable" : @"not found",
-                             NSStringFromClass([settings class]));
-        }
-        return NO;
-    }
-    PFBCompatTourLog(@"[tour] PFB settings: %@ row at %ld of section %ld tapped", @PFB_PRODUCT_NAME, (long)path.row,
-                     (long)path.section);
-    [delegate tableView:table didSelectRowAtIndexPath:path];
-    return YES;
-}
-
-// PrimeFreeBird's General page, pushed on the stack its settings opened in, as its own
-// row does.
-static BOOL tourPushGeneralPage(UIViewController* settingsRoot) {
-    UINavigationController* stack = settingsRoot.navigationController;
-    if (!stack) {
-        return NO;
-    }
-    id account = tourGetter(UIApplication.sharedApplication.delegate, @"_t1_currentAccount");
-    PFBModernSettingsPageViewController* page = [[PFBModernSettingsPageViewController alloc] initWithAccount:account
-                                                                                                pageKey:@"general"];
-    [stack pushViewController:page animated:NO];
-    return YES;
+    PFBCompatTourLog(@"[tour] replies: Tweet %lld, %lu direct replies read, %ld newer than the one above, %ld older: %@",
+                     focalID, (unsigned long)order.count, (long)later, (long)earlier, verdict);
 }
 
 // More of the front list, dragged a screen and a half at a time: each drag makes Twitter
-// load and file the next items, which is where content-bound proofs come from. On
-// Explore, the cells shown are noted before each drag and after the last one.
+// load and file the next items, which is where content-bound proofs come from.
 static void tourDeepScroll(NSString* step, NSInteger drags) {
     NSUInteger generation = gPFBTourGeneration;
-    BOOL census = [step isEqualToString:@"tab guide"];
-    for (NSInteger drag = 1; drag <= drags + (census ? 1 : 0); drag++) {
+    for (NSInteger drag = 1; drag <= drags; drag++) {
         dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1.2 * drag * NSEC_PER_SEC)),
                        dispatch_get_main_queue(), ^{
                          if (generation != gPFBTourGeneration || ![gPFBTourStepLive isEqualToString:step]) {
-                             return;
-                         }
-                         if (census) {
-                             tourAttempt(step, @"noting the cells", ^{
-                               tourProbeCells(@"Explore");
-                             });
-                         }
-                         if (drag > drags) {
                              return;
                          }
                          tourAttempt(step, @"scrolling further", ^{
@@ -1661,12 +1415,12 @@ static NSDictionary* tourStep(NSString* name, NSString* label, dispatch_block_t 
     return step;
 }
 
-// A step of the probe: it ends when its check passes, or after its own wait.
-static NSDictionary* tourProbeStep(NSString* name, NSString* label, NSTimeInterval wait, dispatch_block_t setup,
-                                   dispatch_block_t action, PFBTourCheck check, dispatch_block_t after) {
-    NSMutableDictionary* step = [tourStep(name, label, setup, action, check, nil, after) mutableCopy];
-    step[@"wait"] = @(wait);
-    return step;
+// A step whose check does a reading of its own: it ends when the check passes, or after
+// its wait, whatever proofs it owes.
+static NSDictionary* tourStepWaiting(NSTimeInterval wait, NSDictionary* step) {
+    NSMutableDictionary* waiting = [step mutableCopy];
+    waiting[@"wait"] = @(wait);
+    return waiting;
 }
 
 // Every step in order. Each brings the app where it needs it, so any subset runs on
@@ -1742,17 +1496,10 @@ static NSArray<NSDictionary*>* tourAllSteps(void) {
            }, ^BOOL(UIViewController* before, UIViewController* after) {
              return [tourScreenName(after) containsString:@"Profile"];
            }, nil, nil)];
-    __block NSInteger searchLooks = 0;
     [steps addObject:tourStep(@"search", @"Search", root, ^{
-             searchLooks = 0;
              tourOpenLink(@"twitter://search?query=twitter");
            }, ^BOOL(UIViewController* before, UIViewController* after) {
-             BOOL shown = [tourScreenName(after) containsString:@"Search"];
-             // The results' cells are noted once they have had time to arrive.
-             if (shown && ++searchLooks == 5) {
-                 tourProbeCells(@"search");
-             }
-             return shown;
+             return [tourScreenName(after) containsString:@"Search"];
            }, nil, nil)];
     __block BOOL barTapped = NO;
     // Runs on the screen the search step leaves open: a search link opened later in the tour,
@@ -1774,8 +1521,23 @@ static NSArray<NSDictionary*>* tourAllSteps(void) {
              UIView* typing = tourFirstResponder();
              PFBCompatTourLog(@"[tour] search field: screen %@, typing in %@", tourScreenName(tourScreen()),
                               typing ? NSStringFromClass([typing class]) : @"nothing");
-             tourProbeCells(@"search field");
              [tourWindow() endEditing:YES];
+             tourDismissPresented();
+             tourPopToRoot();
+             tourSelectTab(0);
+           })];
+    // Advanced search switched off for one search, whatever the setting says: Twitter's own
+    // filter button must be back in the search bar. Before the composer, after which a
+    // search link goes nowhere.
+    [steps addObject:tourStep(@"search off", @"Search, Advanced search off", ^{
+             root();
+             tourSwitchOption(@"advanced_search", NO);
+           }, ^{
+             tourOpenLink(@"twitter://search?query=twitter");
+           }, ^BOOL(UIViewController* before, UIViewController* after) {
+             return [tourScreenName(after) containsString:@"Search"];
+           }, nil, ^{
+             tourRestoreOptions(@"after the step");
              tourDismissPresented();
              tourPopToRoot();
              tourSelectTab(0);
@@ -1992,110 +1754,56 @@ static NSArray<NSDictionary*>* tourAllSteps(void) {
                  tourSelectTab(0);
                })];
     }
-    // The probe's Lists: Twitter's Lists page, then its first list, whose timeline says
-    // whether the reading marker can show there.
-    __block NSInteger listLooks = 0;
-    __block NSInteger listDetailLooks = 0;
-    __block BOOL listOpened = NO;
-    __block BOOL listDone = NO;
-    [steps addObject:tourProbeStep(@"lists", @"Lists", 9.0, home, ^{
-             listLooks = 0;
-             listDetailLooks = 0;
-             listOpened = NO;
-             listDone = NO;
-             tourProbeHomeTabs();
-             if (!tourOpenListsPage()) {
-                 PFBProbeNote(@"lists page", @"#1 lists: Twitter's Lists page could not be built");
-             }
-           }, ^BOOL(UIViewController* before, UIViewController* after) {
-             NSString* name = tourScreenName(after);
-             listLooks++;
-             // A second on the list once loaded, so its timeline is in place.
-             BOOL details = [name containsString:@"ListDetails"] && ![name containsString:@"Loading"];
-             if (!listDone && details && ++listDetailLooks == 4) {
-                 tourProbeFrontTimeline(@"first list");
-                 listDone = YES;
-             }
-             if (!listDone && !listOpened && [name containsString:@"ListManagement"] &&
-                 (listLooks == 4 || listLooks == 12)) {
-                 listOpened = tourOpenFirstList();
-                 if (!listOpened && listLooks == 12) {
-                     PFBProbeNote(@"lists none", @"#1 lists: the Lists page (%@) shows no list to open", name);
-                     listDone = YES;
-                 }
-             }
-             if (!listDone && listLooks == 20) {
-                 PFBProbeNote(@"lists lost", @"#1 lists: no list opened after 5 s, %@ in front", name);
-                 listDone = YES;
-             }
-             return listDone;
-           }, ^{
-             tourPopToRoot();
-           })];
-    // The probe's replies: Home's Tweet with the most replies, read as the option stands;
-    // then the next one, with Chronological replies switched for it alone. Two Tweets,
-    // so the second conversation cannot come from what the first one loaded.
-    __block NSArray<NSArray<NSNumber*>*>* replied = nil;
+    // Chronological replies switched on for one conversation, whatever the setting says:
+    // Home's Tweet with the most replies is opened, read at its top, then three times a
+    // little further down, and its replies judged by their IDs.
     __block long long replyFocal = 0;
-    __block NSInteger replyCount = 0;
+    __block NSInteger replyAuthor = NSNotFound;
     __block NSInteger replyLooks = 0;
-    __block BOOL replyNoted = NO;
+    __block BOOL repliesRead = NO;
     NSMutableArray<NSNumber*>* replyOrder = [NSMutableArray array];
-    NSMutableDictionary<NSString*, NSString*>* replyFacts = [NSMutableDictionary dictionary];
-    void (^openReplied)(NSUInteger) = ^(NSUInteger rank) {
-      replyLooks = 0;
-      replyNoted = NO;
-      [replyOrder removeAllObjects];
-      [replyFacts removeAllObjects];
-      if (replied.count <= rank) {
-          replied = tourMostRepliedTweets();
-      }
-      NSArray<NSNumber*>* pick = replied.count > rank ? replied[rank] : replied.firstObject;
-      replyFocal = pick ? pick[0].longLongValue : 0;
-      replyCount = pick ? pick[1].integerValue : 0;
-      if (!replyFocal) {
-          PFBProbeNote(@"replies none", @"#2 replies: no Tweet with a reply count on Home's first screens");
-      } else if (!tourOpenHomeTweet(replyFocal)) {
-          PFBProbeNote([NSString stringWithFormat:@"replies lost %lu", (unsigned long)rank],
-                       @"#2 replies: Tweet %lld not found again on Home", replyFocal);
-      }
-    };
-    // Read at its top, then three times a little further down, then noted.
-    PFBTourCheck readReplies = ^BOOL(UIViewController* before, UIViewController* after) {
-      if (replyNoted || !replyFocal || ![tourScreenName(after) containsString:@"Conversation"]) {
-          return replyNoted;
-      }
-      replyLooks++;
-      if (replyLooks == 5) {
-          replyFacts[@"control"] = tourSortControl();
-      }
-      if (replyLooks == 5 || replyLooks == 8 || replyLooks == 11 || replyLooks == 14) {
-          tourReadReplies(replyFocal, replyOrder, replyFacts);
-          UITableView* list = tourFrontList();
-          [list setContentOffset:CGPointMake(list.contentOffset.x, list.contentOffset.y + list.bounds.size.height * 0.7)
-                        animated:NO];
-          [list layoutIfNeeded];
-      }
-      if (replyLooks >= 15) {
-          tourNoteReplies(replyFocal, replyCount, replyOrder, replyFacts);
-          replyNoted = YES;
-      }
-      return replyNoted;
-    };
-    [steps addObject:tourProbeStep(@"replies", @"Replies", 8.0, home, ^{
-             openReplied(0);
-           }, readReplies, ^{
-             tourPopToRoot();
-           })];
-    [steps addObject:tourProbeStep(@"replies switched", @"Replies, option switched", 8.0, ^{
-             tourHomeFront();
-             PFBProbeSwitchReplySorting();
-           }, ^{
-             openReplied(1);
-           }, readReplies, ^{
-             PFBProbeRestoreReplySorting(@"after the step");
-             tourPopToRoot();
-           })];
+    [steps addObject:tourStepWaiting(8.0, tourStep(@"replies", @"Replies by date", ^{
+                                                     tourHomeFront();
+                                                     tourSwitchOption(@"reply_sorting", YES);
+                                                   }, ^{
+                                                     replyLooks = 0;
+                                                     replyAuthor = NSNotFound;
+                                                     repliesRead = NO;
+                                                     [replyOrder removeAllObjects];
+                                                     replyFocal = tourMostRepliedTweet();
+                                                     if (replyFocal) {
+                                                         tourOpenHomeTweet(replyFocal);
+                                                     }
+                                                   }, ^BOOL(UIViewController* before, UIViewController* after) {
+                                                     if (repliesRead || !replyFocal ||
+                                                         ![tourScreenName(after) containsString:@"Conversation"]) {
+                                                         return repliesRead;
+                                                     }
+                                                     replyLooks++;
+                                                     if (replyLooks == 5 || replyLooks == 8 || replyLooks == 11 ||
+                                                         replyLooks == 14) {
+                                                         tourReadReplies(replyFocal, &replyAuthor, replyOrder);
+                                                         UITableView* list = tourFrontList();
+                                                         [list setContentOffset:CGPointMake(list.contentOffset.x,
+                                                                                            list.contentOffset.y +
+                                                                                                list.bounds.size.height * 0.7)
+                                                                       animated:NO];
+                                                         [list layoutIfNeeded];
+                                                     }
+                                                     if (replyLooks >= 15) {
+                                                         tourJudgeReplies(replyFocal, replyOrder);
+                                                         repliesRead = YES;
+                                                     }
+                                                     return repliesRead;
+                                                   }, nil, ^{
+                                                     tourRestoreOptions(@"after the step");
+                                                     if (replyFocal && !repliesRead) {
+                                                         PFBCompatTourLog(@"[tour] replies: Tweet %lld, %lu direct "
+                                                                          @"replies read when the step ended, not judged",
+                                                                          replyFocal, (unsigned long)replyOrder.count);
+                                                     }
+                                                     tourPopToRoot();
+                                                   }))];
     [steps addObject:tourStep(@"side menu", @"Side menu", home, ^{
              tourOpenSideMenu();
            }, ^BOOL(UIViewController* before, UIViewController* after) {
@@ -2124,76 +1832,13 @@ static NSArray<NSDictionary*>* tourAllSteps(void) {
            }, nil, ^{
              tourDismissPresented();
            })];
-    // PrimeFreeBird's settings reached the way a person does: Twitter's settings, opened by
-    // its own link, the PrimeFreeBird row there, then the General page with its switches.
-    // Should that path fail, the page is shown directly, as before, and the probe says where.
-    __block NSInteger settingsLooks = 0;
-    __block BOOL rowTapped = NO;
-    __block BOOL pagePushed = NO;
-    __block BOOL settingsNoted = NO;
-    __block NSString* settingsFallback = nil;
-    __block NSString* settingsSeen = nil;
-    [steps addObject:tourProbeStep(@"PFB settings", @"PrimeFreeBird settings", 9.0, root, ^{
-             settingsLooks = 0;
-             rowTapped = NO;
-             pagePushed = NO;
-             settingsNoted = NO;
-             settingsFallback = nil;
-             settingsSeen = nil;
-             tourOpenLink(@"twitter://settings");
+    [steps addObject:tourStep(@"PFB settings", @"PrimeFreeBird settings", root, ^{
+             tourShowSettings();
            }, ^BOOL(UIViewController* before, UIViewController* after) {
-             settingsLooks++;
-             UIViewController* top = tourRootController();
-             UIViewController* page = tourFindController(top, @"PFBModernSettingsPageViewController");
-             if (page.viewIfLoaded.window) {
-                 if (!settingsNoted) {
-                     settingsNoted = YES;
-                     if (settingsFallback) {
-                         PFBProbeNote([@"settings fallback " stringByAppendingString:settingsFallback],
-                                      @"#6 PFB settings: %@; the General page was shown directly, as before", settingsFallback);
-                     } else {
-                         PFBProbeNote(@"settings path",
-                                      @"#6 PFB settings: reached through Twitter's settings (%@), its %@ row tapped, then "
-                                      @"the General page with its switches",
-                                      settingsSeen ?: @"?", @PFB_PRODUCT_NAME);
-                     }
-                 }
-                 return YES;
-             }
-             if (settingsFallback) {
-                 return NO;
-             }
-             UIViewController* pfbRoot = tourFindController(top, @"PFBModernSettingsViewController");
-             UIViewController* settings = tourFindController(top, @"T1GenericSettingsViewController");
-             BOOL settingsShown = settings.viewIfLoaded.window != nil;
-             if (settingsShown && !settingsSeen) {
-                 settingsSeen = NSStringFromClass([settings class]);
-             }
-             if (pfbRoot.viewIfLoaded.window) {
-                 if (!pagePushed) {
-                     pagePushed = tourPushGeneralPage(pfbRoot);
-                 }
-             } else if (settingsShown && !rowTapped && settingsLooks >= 2) {
-                 rowTapped = tourTapPFBRow(settings, settingsLooks == 11);
-             }
-             NSString* failure = nil;
-             if (!rowTapped && !settingsShown && settingsLooks >= 12) {
-                 failure = [NSString stringWithFormat:@"Twitter's settings did not open (%@ in front)", tourScreenName(after)];
-             } else if (!rowTapped && settingsLooks >= 12) {
-                 failure = [NSString stringWithFormat:@"no tappable %@ row in Twitter's settings", @PFB_PRODUCT_NAME];
-             } else if (settingsLooks >= 20) {
-                 failure = pagePushed ? @"the General page did not show"
-                                      : [NSString stringWithFormat:@"the %@ row opened nothing", @PFB_PRODUCT_NAME];
-             }
-             if (failure) {
-                 settingsFallback = failure;
-                 PFBCompatTourLog(@"[tour] PFB settings: %@, the page shown directly", failure);
-                 tourShowSettings();
-             }
-             return NO;
-           }, ^{
+             return tourFindController(tourRootController().presentedViewController,
+                                       @"PFBModernSettingsPageViewController") != nil;
+           }, nil, ^{
              tourDismissPresented();
-             tourPopToRoot();
            })];
     return steps;
 }
@@ -2219,14 +1864,12 @@ static void tourHideOverlay(void) {
 // Records the outcome for the report: each step's result in order, and why the tour
 // stopped early, if it did.
 static void tourConclude(NSMutableArray<NSString*>* results, BOOL full, NSString* stop) {
+    tourRestoreOptions(@"at the end of the tour");
     PFBCompatTourRecord(full, stop, results);
     tourJournalWrite([@"end: " stringByAppendingString:stop ?: @"completed"]);
     tourJournalClose();
     gPFBTourRunning = NO;
     tourHideOverlay();
-    if (PFBProbeWants(@"stethoscope shown")) {
-        PFBProbeNote(@"stethoscope hidden throughout", @"#11 stethoscope: hidden at the start of every step of the tour");
-    }
     PFBDebuggerSetTriggerHidden(NO);
 }
 
@@ -2421,9 +2064,6 @@ static void tourRun(NSArray<NSDictionary*>* steps, NSUInteger index, NSMutableAr
     NSString* name = step[@"name"];
     gPFBTourStepLive = name;
     tourShowStep(step[@"label"], index, steps.count);
-    if ([PFBProbeTriggerState() isEqualToString:@"shown"]) {
-        PFBProbeNote(@"stethoscope shown", @"#11 stethoscope: shown above the tour as %@ starts", name);
-    }
     NSSet<NSString*>* owed = PFBCompatStationPending(name);
     tourJournalWrite([NSString stringWithFormat:@"step %@ \u00b7 setup", name]);
     if (!tourAttempt(name, @"setup", step[@"setup"])) {
@@ -2463,7 +2103,6 @@ static void tourStart(BOOL full) {
     gPFBTourRunning = YES;
     NSUInteger generation = ++gPFBTourGeneration;
     PFBDebuggerSetTriggerHidden(YES);
-    PFBProbeNote(@"stethoscope at start", @"#11 stethoscope at the tour's start, once told to hide: %@", PFBProbeTriggerState());
     tourJournalClose();
     [[NSFileManager defaultManager] removeItemAtPath:tourJournalPath() error:nil];
     tourJournalWrite([NSString stringWithFormat:@"start: %@ \u00b7 %lu steps \u00b7 build %@", full ? @"full" : @"what is left",
@@ -2602,9 +2241,10 @@ static void tourRecoverStop(void) {
 }
 
 // Once the app is active after launch: a tour Twitter closed is recorded, then a tour
-// asked for before quitting runs, or a new Twitter binary asks whether to check it.
+// asked for before quitting runs, or a new Twitter binary asks whether to check it. The
+// options a step had switched are put back first, before Twitter reads them.
 void PFBCompatTourResumeAtLaunch(void) {
-    PFBProbeRestoreAtLaunch();
+    tourRestoreOptions(@"at launch, after a tour Twitter closed");
     __block id observer = [[NSNotificationCenter defaultCenter]
         addObserverForName:UIApplicationDidBecomeActiveNotification
                     object:nil

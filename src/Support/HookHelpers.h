@@ -102,6 +102,11 @@ void PFBSeedReplyWebViewCookies(WKWebView* webView, void (^done)(void));
 // subdomain, never a substring, so x.com.example.net does not pass.
 BOOL PFBIsXDomain(NSString* domainOrHost);
 
+// A conversation request asking Twitter's Recent order for its replies while
+// Chronological replies is on, its body included when an upload task sends that apart
+// (body may be NULL); any other request comes back as it was (FeatureSwitches.x).
+NSURLRequest* PFBReplyOrderRequest(NSURLRequest* request, NSData** body);
+
 // Whether a send sound is stored, and the name of the file it was imported from (SendSound.x).
 BOOL PFBSendSoundIsSet(void);
 NSString* PFBSendSoundName(void);

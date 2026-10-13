@@ -2,7 +2,6 @@
 // follows FeatureSwitches.x, and the logic is hand-written.
 #import "Common/PFBCompatibility.h"
 #import "Debug/PFBDebugger.h"
-#import "Debug/PFBProbe.h"
 #import "Common/PFBSettings.h"
 #import "Common/PFBBundle.h"
 #import <ctype.h>
@@ -186,6 +185,8 @@ static const PFBCompatPathMeta kPaths[] = {
     {PFBCompatPath_web_media, PFBCompat_web_session, "media uploads"},
     {PFBCompatPath_tab_badges, PFBCompat_enable_liquid_glass, "tab badges"},
     {PFBCompatPath_starts_muted, PFBCompat_tap_to_pause, "starts muted"},
+    {PFBCompatPath_replies_by_date, PFBCompat_reply_sorting, "replies by date"},
+    {PFBCompatPath_native_filter_button, PFBCompat_advanced_search, "Twitter's filter button when off"},
 };
 static const size_t kPathCount = sizeof(kPaths) / sizeof(kPaths[0]);
 
@@ -1616,6 +1617,9 @@ static const PFBCompatName kNames[] = {
     {PFBCompat_hide_grok_sidebar, "Support/FeatureSwitches.x", "currentAccount"},
     {PFBCompat_hide_grok_sidebar, "Support/FeatureSwitches.x", "provider"},
     {PFBCompat_hide_grok_sidebar, "Support/FeatureSwitches.x", "sharedHostViewController"},
+    {PFBCompat_reply_sorting, "Support/FeatureSwitches.x", "ConversationTimeline"},
+    {PFBCompat_reply_sorting, "Support/FeatureSwitches.x", "rankingMode"},
+    {PFBCompat_reply_sorting, "Support/FeatureSwitches.x", "Recency"},
     {PFBCompat_hide_message_button, "Features/Tweets/HideUI.x", "messageButton"},
     {PFBCompat_hide_promoted, "Features/Timelines/Ads.x", "cardNavigator"},
     {PFBCompat_hide_promoted, "Features/Timelines/Ads.x", "isPromoted"},
@@ -2140,6 +2144,8 @@ static const PFBCompatPathStation kPathStations[] = {
     {PFBCompatPath_post_count, "other profile"},
     {PFBCompatPath_verified_search, "search"},
     {PFBCompatPath_promoted_video_feed, "video full screen"},
+    {PFBCompatPath_replies_by_date, "replies"},
+    {PFBCompatPath_native_filter_button, "search off"},
 };
 static const size_t kPathStationCount = sizeof(kPathStations) / sizeof(kPathStations[0]);
 
@@ -2169,7 +2175,9 @@ static NSString* stationLabel(NSString* station) {
           @"other profile": @"another account's profile",
           @"composer": @"the composer",
           @"search field": @"the search field",
+          @"search off": @"search with Advanced search off",
           @"conversation": @"a conversation",
+          @"replies": @"a conversation with Chronological replies on",
           @"side menu": @"the side menu",
           @"dark mode": @"dark mode",
           @"web link": @"a web link",
@@ -4076,7 +4084,6 @@ NSString* PFBCompatReportText(void) {
     if (journal) {
         [text appendFormat:@"\nLAST TOUR\n%@\n", journal];
     }
-    [text appendFormat:@"\n%@", PFBProbeReportText()];
     [text appendFormat:@"\n%@", PFBDebuggerReport()];
     return text;
 }

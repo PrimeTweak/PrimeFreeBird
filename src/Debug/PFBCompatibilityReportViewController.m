@@ -8,7 +8,6 @@
 #import "Features/Appearance/ThemeColor/PFBPalette.h"
 #import <objc/runtime.h>
 #import "Debug/PFBTourChoicePopover.h"
-#import "Debug/PFBProbe.h"
 
 static id PFBCompatFontGroup(void) {
     return [PFBManager sharedFontGroup];
@@ -573,8 +572,6 @@ static NSString* const kPFBCompatUntestedOpenKey = @"pfb_compat_untested_open";
     if (PFBCompatTourIsRunning()) {
         return;
     }
-    PFBProbeNote(@"tour from report", @"#11 stethoscope: a %@ tour asked from the report, the stethoscope %@ meanwhile",
-                 full ? @"full" : @"remaining", PFBProbeTriggerState());
     void (^run)(void) = ^{
       if (full) {
           PFBCompatRunTour();
