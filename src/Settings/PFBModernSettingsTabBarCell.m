@@ -234,8 +234,8 @@
     Class TAEColorSettingsCls = objc_getClass("TAEColorSettings");
     id settings = [TAEColorSettingsCls sharedSettings];
     id colorPalette = [[settings currentColorPalette] colorPalette];
-    UIColor* ink = [colorPalette performSelector:@selector(textColor)];
-    UIColor* soft = [colorPalette performSelector:@selector(tabBarItemColor)];
+    UIColor* ink = [colorPalette performSelector:@selector(textColor)] ?: [UIColor labelColor];
+    UIColor* soft = [colorPalette performSelector:@selector(tabBarItemColor)] ?: [UIColor secondaryLabelColor];
 
     for (UIButton* tab in self.tabButtons) {
         NSString* name = objc_getAssociatedObject(tab, @"tabName") ?: @"";
@@ -245,7 +245,7 @@
             initWithString:name
                 attributes:@{
                   NSFontAttributeName :
-                      [fontGroup performSelector:@selector(subtext1BoldFont)],
+                      [fontGroup performSelector:@selector(subtext1BoldFont)] ?: [UIFont boldSystemFontOfSize:15.0],
                   NSForegroundColorAttributeName : hidden ? soft : ink
                 }];
         if (hidden) {

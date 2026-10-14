@@ -1,6 +1,7 @@
 // The Appearance page: accent color, dark mode style and tab bar editor entries.
 
 #import "Settings/Pages/PFBAppearanceSettingsViewController.h"
+#import <objc/message.h>
 #import "Common/PFBBundle.h"
 #import "Common/PFBSettings.h"
 #import "Support/TWHeaders.h"
@@ -142,7 +143,7 @@
 - (void)refreshTabViewsWithThemingInView:(UIView*)view {
     if ([view isKindOfClass:NSClassFromString(@"T1TabView")]) {
         if ([view respondsToSelector:@selector(_t1_updateImageViewAnimated:)]) {
-            [view performSelector:@selector(_t1_updateImageViewAnimated:) withObject:@(NO)];
+            ((void (*)(id, SEL, BOOL))objc_msgSend)(view, @selector(_t1_updateImageViewAnimated:), NO);
         }
         if ([view respondsToSelector:@selector(_t1_updateTitleLabel)]) {
             [view performSelector:@selector(_t1_updateTitleLabel)];

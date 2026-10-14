@@ -1,9 +1,16 @@
 #import "Support/HookHelpers.h"
 #import <QuartzCore/QuartzCore.h>
+#import <objc/runtime.h>
 #import "Sideload/PFBReplyWebViewState.h"
 #import "Sideload/PFBReplyWebViewController.h"
 #import "Sideload/PFBWeakScriptMessageHandler.h"
 #import "Sideload/PFBIconRelay.h"
+#import "Debug/PFBDebugger.h"
+#import "Debug/PFBProbe.h"
+
+// Probe: marks that the controller has appeared once, so a later appearance is told
+// apart as a return (F029).
+static const void* kPFBF029AppearedKey = &kPFBF029AppearedKey;
 
 // Injected into the reply webview: hooks fetch/XHR to capture the new post's ID from
 // the web CreateTweet response, since there's no native completion callback to read.
@@ -73,9 +80,9 @@ static NSString* const ReplyTapDismissScript =
     @"var t=document.querySelector('[data-testid=\"toolBar\"]');"
     @"if(b&&!b.contains(e.target)&&!(t&&t.contains(e.target))){"
     @"var a=document.activeElement;if(a&&a.blur){a.blur();}}},true);})();";
-// The web view is full height and never resized, with no manual insets: WKWebView's
-// own keyboard inset and focused-field reveal do the work, and native code only
-// forwards keyboard events. The reply box stays in flow with the tweet.
+// The web view is full height and never resized: WebKit applies its own keyboard
+// inset; native code forwards keyboard events and trims the scroll range under the
+// composer (pfbGeo). The reply box stays in flow with the tweet.
 static NSString* const ReplyBarPinScript =
     @"(function(){if(window.__pfbKbInit)return;window.__pfbKbInit=1;window.__pfbColl=[];"
     @"function findBox(){"
@@ -285,8 +292,8 @@ static void showPostSentAlert(NSString* statusID) {
     self.webView.customUserAgent = PFBMobileSafariUserAgent;
     [self.view addSubview:self.webView];
 
-    // FULL-HEIGHT web view, never resized: keyboard geometry goes through contentInset (see
-    // pfbKeyboardWillChangeFrame) so the web layout viewport stays constant — no reflow, no flash.
+    // Full-height web view, never resized, so the web layout viewport stays constant:
+    // no reflow, no flash.
     [NSLayoutConstraint activateConstraints:@[
         [self.webView.topAnchor constraintEqualToAnchor:self.view.safeAreaLayoutGuide.topAnchor],
         [self.webView.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor],
@@ -396,6 +403,16 @@ static void showPostSentAlert(NSString* statusID) {
 
 - (void)viewWillAppear:(BOOL)animated {
     [super viewWillAppear:animated];
+    // Probe: on a return (not the first appearance), whether the icon bar survived
+    // the screen that covered the reply (F029).
+    if (PFBProbeWants(@"04#F029 back")) {
+        if (objc_getAssociatedObject(self, kPFBF029AppearedKey)) {
+            PFBProbeNote(@"04#F029 back", @"04#F029 reply web view back: icon bar %@",
+                         gPFBIconBar ? @"present" : @"absent");
+        } else {
+            objc_setAssociatedObject(self, kPFBF029AppearedKey, @YES, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        }
+    }
     gPFBReplyWebViewActive = YES;
     gPFBReplyScroller = self.webView.scrollView;  // identity for the CALayer hook
     gPFBDidRequestFocus = NO;
@@ -409,9 +426,9 @@ static void showPostSentAlert(NSString* statusID) {
         name:UIKeyboardWillHideNotification object:nil];
 }
 
-// The web view stays full height with no manual contentInset: WKWebView applies its
-// own keyboard inset and focused-field reveal, and adding another doubles it. This
-// handler only forwards keyboard events to the page script.
+// The web view stays full height and WKWebView applies its own keyboard inset. This
+// handler forwards keyboard changes to the page script, arms the reveal-animation drop
+// while the keyboard rises, and clears the scroll-range trim when it goes down.
 - (void)pfbKeyboardWillChangeFrame:(NSNotification*)note {
     CGRect endFrame = [note.userInfo[UIKeyboardFrameEndUserInfoKey] CGRectValue];
     BOOL hiding = [note.name isEqualToString:UIKeyboardWillHideNotification];
@@ -444,6 +461,18 @@ static void showPostSentAlert(NSString* statusID) {
 }
 
 - (void)viewWillDisappear:(BOOL)animated {
+    // Probe: whether the reply is closing or only being covered, by what, and whether
+    // the icon bar is still up as it goes away; a closing has its own key (F029).
+    BOOL probeClosing = PFBDebugIsRecording() && (self.isBeingDismissed || self.navigationController.isBeingDismissed);
+    NSString* probeKey = probeClosing ? @"04#F029 hidden closing" : @"04#F029 hidden";
+    if (PFBProbeWants(probeKey)) {
+        UIViewController* cover = self.navigationController.presentedViewController;
+        PFBProbeNote(probeKey,
+                     @"04#F029 reply web view hidden: closing %@, covered by %@ (style %ld), icon bar %@",
+                     probeClosing ? @"yes" : @"no", cover ? PFBProbeClassName(cover) : @"none",
+                     (long)(cover ? cover.modalPresentationStyle : -1),
+                     gPFBIconBar ? @"present" : @"absent");
+    }
     gPFBReplyScroller = nil;
     gPFBSquelchUntil = 0;
     [super viewWillDisappear:animated];
@@ -491,9 +520,9 @@ static void showPostSentAlert(NSString* statusID) {
         return;
     }
 
-    // Compose page: hide the promo banners, then drop the cursor into the box. The
-    // box is pinned to the bottom only with the keyboard down; while typing it
-    // scrolls with the tweet, since pinning a focused field floats it.
+    // Compose page: hide the promo banners and report the compose box once it is ready
+    // (focus follows natively). The box is pinned to the bottom only with the keyboard
+    // down; while typing it scrolls with the tweet, since pinning a focused field floats it.
     [webView evaluateJavaScript:ReplyStyleScript completionHandler:nil];
     [webView evaluateJavaScript:ReplyTapDismissScript completionHandler:nil];
     [webView evaluateJavaScript:ReplyBarPinScript completionHandler:nil];

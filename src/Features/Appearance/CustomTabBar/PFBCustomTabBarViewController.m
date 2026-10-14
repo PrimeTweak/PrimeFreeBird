@@ -12,6 +12,99 @@
 #import "Support/Helpers.h"
 #import "Support/HookHelpers.h"
 #import "Support/T1Headers.h"
+#import "Debug/PFBProbe.h"
+
+// Defined in Theme.x: the -setVisibleTabEntries: calls so far, and the entries in and out
+// of the last one.
+extern void PFBTabEntriesProbeRead(NSUInteger* calls, NSUInteger* entriesIn, NSUInteger* entriesOut);
+
+// Probe: the live layout Save asks for (07#F045, 14a#F027): whether the request is sent,
+// how many times Twitter sets its tab entries within a second, with the entries in and
+// out before and after, and whether the settings are still on screen then.
+static void PFBLiveLayoutProbe(UIViewController* editor, UIViewController* tabNav, BOOL sent) {
+    if (!PFBProbeWants(@"07#F045 live layout") && !PFBProbeWants(@"14a#F027 live layout")) {
+        return;
+    }
+    if (!sent) {
+        NSString* line = [NSString stringWithFormat:@"live tab layout: recalculateVisiblePanels not sent, tab controller %@",
+                                                    tabNav ? @"found without it" : @"not found"];
+        PFBProbeNote(@"07#F045 live layout", @"07#F045 %@", line);
+        PFBProbeNote(@"14a#F027 live layout", @"14a#F027 %@", line);
+        return;
+    }
+    NSUInteger calls = 0;
+    NSUInteger entriesIn = 0;
+    NSUInteger entriesOut = 0;
+    PFBTabEntriesProbeRead(&calls, &entriesIn, &entriesOut);
+    // The settings page Save returns to, below the editor.
+    NSArray<UIViewController*>* stack = editor.navigationController.viewControllers;
+    NSUInteger index = [stack indexOfObject:editor];
+    __weak UIViewController* settings = index != NSNotFound && index > 0 ? stack[index - 1] : nil;
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+        if (!PFBProbeWants(@"07#F045 live layout") && !PFBProbeWants(@"14a#F027 live layout")) {
+            return;
+        }
+        NSUInteger callsAfter = 0;
+        NSUInteger inAfter = 0;
+        NSUInteger outAfter = 0;
+        PFBTabEntriesProbeRead(&callsAfter, &inAfter, &outAfter);
+        UIViewController* page = settings;
+        NSString* line = [NSString stringWithFormat:@"live tab layout: recalculateVisiblePanels sent by Save, setVisibleTabEntries: ran %lu time(s) in 1 s (in %lu -> %lu, out %lu -> %lu), PFB settings still in front: %@ (%@; front screen %@)",
+                                                    (unsigned long)(callsAfter - calls), (unsigned long)entriesIn,
+                                                    (unsigned long)inAfter, (unsigned long)entriesOut,
+                                                    (unsigned long)outAfter, page.viewIfLoaded.window ? @"yes" : @"no",
+                                                    PFBProbeClassName(page), PFBProbeFrontScreen()];
+        PFBProbeNote(@"07#F045 live layout", @"07#F045 %@", line);
+        PFBProbeNote(@"14a#F027 live layout", @"14a#F027 %@", line);
+    });
+}
+
+// Probe: a grid tap made while a preview icon is held in a drag, and the first move with
+// its indices, plus any move whose indices fall outside the pages (07#F051).
+static void PFBTapDuringDragProbe(UICollectionView* preview, NSArray<NSString*>* selected, NSString* page) {
+    if (!PFBProbeWants(@"07#F051 tap")) {
+        return;
+    }
+    for (UIGestureRecognizer* recognizer in preview.gestureRecognizers) {
+        if ([recognizer class] == [UILongPressGestureRecognizer class] &&
+            (recognizer.state == UIGestureRecognizerStateBegan ||
+             recognizer.state == UIGestureRecognizerStateChanged)) {
+            NSUInteger after = selected.count;
+            NSUInteger before = [selected containsObject:page] ? after - 1 : after + 1;
+            // The icon under the holding finger: Home (0) or none means no move was started.
+            NSIndexPath* held = [preview indexPathForItemAtPoint:[recognizer locationInView:preview]];
+            NSString* finger = held ? [NSString stringWithFormat:@"%ld", (long)held.item] : @"none";
+            PFBProbeNote(@"07#F051 tap", @"07#F051 tile tapped during a drag: %lu pages before, %lu after, finger on icon %@",
+                         (unsigned long)before, (unsigned long)after, finger);
+            return;
+        }
+    }
+}
+
+static void PFBMoveProbe(NSInteger source, NSInteger destination, NSUInteger count) {
+    if (PFBProbeWants(@"07#F051 move")) {
+        PFBProbeNote(@"07#F051 move", @"07#F051 move %ld -> %ld with %lu pages", (long)source, (long)destination,
+                     (unsigned long)count);
+    }
+    BOOL outside = source < 0 || destination < 0 || (NSUInteger)source >= count || (NSUInteger)destination >= count;
+    if (outside && PFBProbeWants(@"07#F051 outside")) {
+        PFBProbeNote(@"07#F051 outside", @"07#F051 move %ld -> %ld outside the %lu pages", (long)source,
+                     (long)destination, (unsigned long)count);
+    }
+}
+
+// Probe: the tabs the editor offers, as loadData builds them (06#F044).
+static void PFBEditorOffersProbe(NSArray<NSString*>* pages) {
+    if (!PFBProbeWants(@"06#F044 offers")) {
+        return;
+    }
+    NSMutableArray<NSString*>* parts = [NSMutableArray array];
+    for (NSString* page in pages) {
+        NSString* image = [PFBCustomTabBarUtility metadataForPage:page][PFBTabImageKey];
+        [parts addObject:[NSString stringWithFormat:@"%@ (%@)", page, image.length ? image : @"no image"]];
+    }
+    PFBProbeNote(@"06#F044 offers", @"06#F044 editor offers: %@", [parts componentsJoinedByString:@", "]);
+}
 
 // The floating compose button, hidden while the editor is on screen.
 @interface TFNFloatingActionButton : UIView
@@ -79,6 +172,18 @@ static NSString* const kGridFooterID = @"gridFooter";
     [super viewWillLayoutSubviews];
     [self.gridView.collectionViewLayout invalidateLayout];
     [self.previewView.collectionViewLayout invalidateLayout];
+}
+
+// The Restore button's border is a CGColor, set again when the appearance switches.
+- (void)traitCollectionDidChange:(UITraitCollection*)previousTraitCollection {
+    [super traitCollectionDidChange:previousTraitCollection];
+    CGColorRef border = [[UIColor systemGray4Color] resolvedColorWithTraitCollection:self.traitCollection].CGColor;
+    for (UICollectionReusableView* footer in
+         [self.gridView visibleSupplementaryViewsOfKind:UICollectionElementKindSectionFooter]) {
+        for (UIView* button in footer.subviews) {
+            button.layer.borderColor = border;
+        }
+    }
 }
 
 // Only a button on screen is hidden, so the editor never shows one Twitter or Hide
@@ -206,6 +311,8 @@ static NSString* const kGridFooterID = @"gridFooter";
         }
         [self.allPages addObject:entry[PFBTabPageKey]];
     }
+    // Probe: notes the tabs offered.
+    PFBEditorOffersProbe(self.allPages);
 
     NSArray<NSString*>* saved = [PFBCustomTabBarUtility visiblePageIDsInOrder];
     NSArray<NSString*>* source =
@@ -286,9 +393,13 @@ static UIViewController* findViewControllerOfClass(UIViewController* vc,
     }
 
     if (![tabNav respondsToSelector:@selector(recalculateVisiblePanels)]) {
+        // Probe: notes that nothing was asked.
+        PFBLiveLayoutProbe(self, tabNav, NO);
         return;
     }
 
+    // Probe: counts the tab entry updates this request brings within a second.
+    PFBLiveLayoutProbe(self, tabNav, YES);
     [(T1TabbedAppNavigationViewController*)tabNav recalculateVisiblePanels];
 }
 
@@ -432,7 +543,7 @@ static UIViewController* findViewControllerOfClass(UIViewController* vc,
     restore.titleLabel.font = PFBScaledFont([TwitterChirpFont(TwitterFontStyleRegular) fontWithSize:15]);
     // Pale gray text, matching the color theme's "Reset to default" row.
     [restore setTitleColor:[UIColor secondaryLabelColor] forState:UIControlStateNormal];
-    restore.backgroundColor = [UIColor systemBackgroundColor];
+    restore.backgroundColor = [UIColor clearColor];
     restore.layer.cornerRadius = 20;
     restore.layer.borderWidth = 1.0;
     restore.layer.borderColor = [UIColor systemGray4Color].CGColor;
@@ -473,6 +584,8 @@ static UIViewController* findViewControllerOfClass(UIViewController* vc,
 
     [self recomputeChanges];
     [self.gridView reloadItemsAtIndexPaths:@[indexPath]];
+    // Probe: notes this tap if a preview icon is being dragged.
+    PFBTapDuringDragProbe(self.previewView, self.selectedPages, page);
     [self.previewView reloadData];
 }
 
@@ -494,6 +607,8 @@ static UIViewController* findViewControllerOfClass(UIViewController* vc,
 - (void)collectionView:(UICollectionView*)collectionView
     moveItemAtIndexPath:(NSIndexPath*)sourceIndexPath
             toIndexPath:(NSIndexPath*)destinationIndexPath {
+    // Probe: notes the move before the pages are indexed.
+    PFBMoveProbe(sourceIndexPath.item, destinationIndexPath.item, self.selectedPages.count);
     NSString* page = self.selectedPages[sourceIndexPath.item];
     [self.selectedPages removeObjectAtIndex:sourceIndexPath.item];
     [self.selectedPages insertObject:page atIndex:destinationIndexPath.item];

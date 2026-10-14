@@ -6,7 +6,6 @@
 void PFBCompatStart(void);
 void PFBCompatTourResumeAtLaunch(void);
 void PFBAppLifecycleStart(void);
-void PFBRefreshSoundsStart(void);
 void PFBThemeStart(void);
 void PFBWebReplyStart(void);
 void PFBSendSoundStart(void);
@@ -15,7 +14,6 @@ void PFBSendSoundStart(void);
     PFBCompatStart();
     PFBCompatTourResumeAtLaunch();
     PFBAppLifecycleStart();
-    PFBRefreshSoundsStart();
     PFBThemeStart();
     PFBWebReplyStart();
     PFBSendSoundStart();

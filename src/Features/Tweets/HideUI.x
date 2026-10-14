@@ -1,5 +1,5 @@
 // Toggles that remove interface elements: the verified checkmark, search history,
-// trending on Explore, the Subscribe and Follow buttons, and inline action buttons.
+// trending on Explore, the Subscribe, Follow and Message buttons, and inline action buttons.
 
 #import "Support/HookHelpers.h"
 
@@ -162,15 +162,6 @@ static BOOL PFBVerifiedValue(id value) {
 %end
 
 // MARK: - Hide trending content on the Explore tab
-
-// Defined in ExploreTabs.x. YES only for the hide_explore_all switch, which takes
-// the whole Explore chrome. Choosing which tabs to keep is a separate switch that
-// leaves the bar in place.
-extern BOOL pfbShouldHideAllTrends(void);
-// Defined in ExploreTabs.x. Records the accessory view this guide vends, so the
-// tab filter only touches this bar (the segmented bar class is shared with
-// Notifications and search results).
-extern void pfbNoteExploreAccessoryView(UIView* v);
 
 // Trending content lives in the child URT chrome view controller, whose property
 // has no ObjC getter, so it is found among the children. The page tab strip

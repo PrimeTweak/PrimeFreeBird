@@ -3,9 +3,9 @@
   PrimeFreeBird
 */
 
-/* Toggles read <KEY>_TITLE and optional <KEY>_DETAIL; buttons name titleKey/subtitleKey;
-   headers are <PAGE>_GROUP_<NAME>; pages MODERN_SETTINGS_<PAGE>_TITLE (General uses _LAYOUT_).
-   A missing key shows as the raw key. */
+/* Toggles read <KEY>_TITLE (or their titleKey) and optional <KEY>_DETAIL; buttons name titleKey/subtitleKey;
+   headers are <PAGE>_GROUP_<NAME>; pages MODERN_SETTINGS_<PAGE>_TITLE (General uses _LAYOUT_,
+   Tools _LAB_, Compatibility COMPATIBILITY_TITLE). A missing key shows as the raw key. */
 
 /* ===== GENERAL — page ===== */
 "MODERN_SETTINGS_LAYOUT_TITLE" = "General";
@@ -71,7 +71,7 @@
 "DARK_MODE_STYLE_TITLE" = "Background color";
 "DARK_MODE_STYLE_SUBTITLE" = "Choose the background shade used in dark mode.";
 "TAB_BAR_THEMING_TITLE" = "Selected tab";
-"TAB_BAR_THEMING_DETAIL" = "Apply the accent color to the selected navigation item.";
+"TAB_BAR_THEMING_DETAIL" = "Apply the accent color to the selected tab and to the underline of the top tabs.";
 "COLOR_PFB_SWITCHES_TITLE" = "Switches";
 "COLOR_PFB_SWITCHES_DETAIL" = "Apply the accent color to the switches in these settings.";
 "COLOR_TWITTER_ICON_IN_TOP_BAR_TITLE" = "Twitter icon";
@@ -226,6 +226,8 @@
 "HIDE_GROK_BOT_DETAIL" = "Remove the “Try Grok Bot” row and the other Grok Bot promotions.";
 "HIDE_GROK_CREATE_TITLE" = "Hide creation tools";
 "HIDE_GROK_CREATE_DETAIL" = "Remove the options to create or edit media with Grok.";
+/* Legacy key name: this row TURNS ON auto-translation (the switch is inverted).
+   Do not rename the key — it is persisted in user defaults. */
 "DISABLE_AUTO_TRANSLATE_TITLE" = "Auto-translate";
 "DISABLE_AUTO_TRANSLATE_DETAIL" = "Translate Tweets, bios, notes and notifications automatically.";
 
@@ -244,7 +246,7 @@
    buttons (Lab) and their alerts. */
 "REPLY_WEBVIEW_TITLE" = "Reply";
 "WEB_SESSION_CLEAR_TITLE" = "Clear web session";
-"WEB_SESSION_CLEAR_CONFIRM" = "This deletes the saved web login. Until you sign in again, new Tweets, Spaces, mute lists, Grok, Twitter's web pages and replies in the web view no longer go through it.";
+"WEB_SESSION_CLEAR_CONFIRM" = "This deletes the saved web login. Until you sign in again, Twitter stops loading if your account was signed in through it; otherwise new Tweets, Spaces, mute lists, Grok, Twitter's web pages and replies in the web view no longer go through it.";
 "WEB_SESSION_CLEAR_ACTION" = "Delete";
 "OK_ACTION" = "OK";
 "CANCEL_ACTION" = "Cancel";
@@ -508,7 +510,7 @@
 "LAB_GROUP_BACKUP" = "Backup";
 "WEB_SESSION_NONE_TITLE" = "No web session";
 "WEB_SESSION_LIVE_DETAIL" = "Signed in on this device.";
-"WEB_SESSION_NONE_DETAIL" = "Sign in to use Reply in web view.";
+"WEB_SESSION_NONE_DETAIL" = "Sign in so new Tweets, Spaces, mute lists, Grok and Twitter's web pages go through the web session.";
 "WEB_SESSION_SIGN_IN_ACTION" = "Sign in";
 "REPLY_IN_WEBVIEW_DETAIL_HELD" = "Needs a web session — sign in above.";
 "SHOW_ACCOUNT_LOCATION_DETAIL_HELD" = "Needs a web session — sign in under Tools › Web session.";
@@ -526,11 +528,12 @@
 "EXPORT_SETTINGS_ACTION" = "Export…";
 "IMPORT_SETTINGS_ACTION" = "Import…";
 "WEB_SESSION_LOGIN_TITLE" = "Sign in on the web";
-"WEB_LOGIN_CONNECTING" = "Connecting to X…";
+"WEB_LOGIN_CONNECTING" = "Connecting to Twitter…";
 "WEB_LOGIN_TAGLINE" = "The feed, without the noise.";
 "WEB_LOGIN_SIGNING_IN" = "Signing you in…";
 "WEB_LOGIN_RETRY_ACTION" = "Retry";
 "WEB_LOGIN_LOAD_FAILED" = "Could not load the login page.\n\n%@";
+/* Copies of Twitter's own strings, read only when Twitter's string tables lack the key. */
 "TW_CANCEL_ACTION_LABEL" = "Cancel";
 "TW_CONTINUE_ACTION_LABEL" = "Continue";
 "TW_COMPOSITION_COMPLETE_SENDING_TWEET_TOAST_NOTIFICATION_MESSAGE" = "Your Tweet was sent.";

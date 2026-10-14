@@ -1,5 +1,5 @@
-// Native form for Twitter's web-only Advanced Search: builds an operator query
-// and launches it in the app's own search results.
+// Native form for the web's full Advanced Search (words, accounts, engagement, dates):
+// builds an operator query and launches it in the app's own search results.
 
 #import <UIKit/UIKit.h>
 

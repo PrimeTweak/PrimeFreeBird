@@ -1,5 +1,5 @@
 #import <UIKit/UIKit.h>
 
 @interface PFBTintedSwitch : UISwitch
-- (void)pfb_refreshTint;
+- (void)pfbRefreshTint;
 @end

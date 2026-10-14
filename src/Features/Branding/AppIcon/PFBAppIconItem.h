@@ -6,13 +6,13 @@ NS_ASSUME_NONNULL_BEGIN
 
 @interface PFBAppIconItem : NSObject
 
-/// the key used in Info.plist (and passed to setAlternateIconName:)
+// The icon's key in Info.plist, the name an alternate icon passes to setAlternateIconName:.
 @property (nonatomic, copy, readonly) NSString* bundleIconName;
 
-/// the array of filenames (without “.png”) from CFBundleIconFiles
+// The icon's file names from CFBundleIconFiles, without the .png extension.
 @property (nonatomic, copy, readonly) NSArray<NSString*>* bundleIconFiles;
 
-/// is this the primary (default) icon?
+// Whether this is the app's primary (default) icon.
 @property (nonatomic, assign, readonly) BOOL isPrimaryIcon;
 
 - (instancetype)initWithBundleIconName:(NSString*)iconName

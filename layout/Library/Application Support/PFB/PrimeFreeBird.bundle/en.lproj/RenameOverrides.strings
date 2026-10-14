@@ -1,4 +1,0 @@
-/* Exact overrides for Restore Twitter terminology, keyed by Twitter's localization keys: a listed
-   key returns its value as is and skips RenameWords.strings. Per language, no English fallback. */
-
-/* Example: "PAYMENTS_PROVIDER_X" = "X"; keeps the payments provider's real name. */

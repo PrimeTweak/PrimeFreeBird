@@ -4,8 +4,8 @@
 #import <LocalAuthentication/LocalAuthentication.h>
 #import "Support/HookHelpers.h"
 #import "Debug/PFBDebugger.h"
+#import "Debug/PFBProbe.h"
 #import "Support/TwitterChirpFont.h"
-extern void PFBInstallPasteboardObserver(void);
 
 // MARK: - Padlock helpers
 
@@ -167,6 +167,27 @@ static void askToUnlock(void) {
                       }];
 }
 
+// Probe (08#F037): how many times the launch bird is asked for in a launch, written once,
+// 10 s after launch.
+static void PFBProbeCountLaunchBird(void) {
+    if (PFBDebugIsRecording()) {
+        PFBProbeCount(@"08#F037 xLogo");
+    }
+}
+
+static void PFBProbeScheduleLaunchBird(void) {
+    if (!PFBProbeWants(@"08#F037 launch bird")) {
+        return;
+    }
+    double remaining = MAX(10.0 - PFBProbeSinceLaunch(), 0.0);
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(remaining * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+      if (PFBProbeWants(@"08#F037 launch bird")) {
+          PFBProbeNote(@"08#F037 launch bird", @"08#F037 launch bird: xLogo asked %lu\u00d7 in this launch",
+                       (unsigned long)PFBProbeCountValue(@"08#F037 xLogo"));
+      }
+    });
+}
+
 // MARK: - App Delegate hooks
 
 %hook T1AppDelegate
@@ -176,6 +197,8 @@ static void askToUnlock(void) {
     _Bool orig = %orig;
 
     [PFBManager cleanCache];
+    // Probe: the launch bird's count, written 10 s after launch.
+    PFBProbeScheduleLaunchBird();
     if ([PFBSettings boolForKey:@"flex_twitter"] && %c(FLEXManager)) {
         [[%c(FLEXManager) sharedManager] showExplorer];
         PFBCOMPAT_ACTION(PFBCompat_flex_twitter, @"explorer shown at launch");
@@ -317,6 +340,8 @@ static UIImage* launchBirdImage(CGFloat side) {
 
 + (UIImage*)imageNamed:(NSString*)name {
     if ([name isEqualToString:@"xLogo"]) {
+        // Probe: one more ask for the launch bird.
+        PFBProbeCountLaunchBird();
         UIImage* bird = launchBirdImage(180);
         if (bird) {
             PFBCOMPAT_ACTION(PFBCompat_launch_screen, @"bird shown");

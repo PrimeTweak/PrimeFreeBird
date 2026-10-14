@@ -1,11 +1,13 @@
 #import "Sideload/PFBLoginBridge.h"
 #import "Debug/PFBDebugger.h"
+#import "Debug/PFBProbe.h"
 #import "Support/HookHelpers.h"
 #import <objc/runtime.h>
 #import <objc/message.h>
 
-// The public unauthenticated bearer every client sends, split so it is not one
-// grep-able literal.
+// The public bearer that replaces the shell account's OAuth next to the session cookie;
+// requests rebuilt for the web carry the web client's own (WebCreateTweet.x). Split so
+// it is not one grep-able literal.
 static NSString* pfbBridgeBearer(void) {
     return [@"Bearer AAAAAAAAAAAAAAAAAAAAAFXzAwAAAAAAMHCxpeSDG1gLNLghVe8d74hl6k4%3D"
             stringByAppendingString:@"RUMF4xAQLsbeBhTSRrCiQpJtxoGWeyHrDb5te2jpGskWDFW82F"];
@@ -37,9 +39,33 @@ static BOOL pfbBridgeIsMediaUpload(NSURLRequest* req) {
            ([host hasPrefix:@"ton."] && [req.URL.path hasPrefix:@"/i/ton/data/"]);
 }
 
+// Probe: whether either of the two filter clauses that no longer seem to target a
+// 12.31 request ever matches during real use; host and path only, never the query
+// (F009). No allocation on the common path: the line is built only on a match.
+static void pfbProbeF009(NSURLRequest* req) {
+    if (!PFBDebugIsRecording()) {
+        return;
+    }
+    NSURL* url = req.URL;
+    if (![url.scheme isEqualToString:@"https"] || !PFBIsXDomain(url.host)) {
+        return;
+    }
+    BOOL jfapi = [url.absoluteString containsString:@"jfapi"];
+    if (jfapi && PFBProbeWants(@"04#F009 jfapi")) {
+        PFBProbeNote(@"04#F009 jfapi", @"04#F009 bridge jfapi: %@%@", url.host ?: @"", url.path ?: @"");
+    }
+    if (!jfapi && ![url.host.lowercaseString hasPrefix:@"api."] && [url.path hasPrefix:@"/i/api"] &&
+        !pfbBridgeCarriesAppOAuth(req) && PFBProbeWants(@"04#F009 iapi")) {
+        NSString* cookie = req.allHTTPHeaderFields[@"Cookie"] ?: @"";
+        PFBProbeNote(@"04#F009 iapi", @"04#F009 bridge /i/api: %@%@ cookie=%@", url.host ?: @"",
+                     url.path ?: @"", [cookie containsString:@"auth_token="] ? @"yes" : @"no");
+    }
+}
+
 // API hosts always, and any other X host (media upload included) once the request
 // carries the shell account's OAuth, so a new endpoint is covered without a host list.
 static BOOL pfbBridgeWantsRequest(NSURLRequest* req) {
+    pfbProbeF009(req);
     NSURL* url = req.URL;
     if (!pfbBridgeIsXHost(url)) {
         return NO;
@@ -50,9 +76,9 @@ static BOOL pfbBridgeWantsRequest(NSURLRequest* req) {
 
 #pragma mark - Read injection over the shared web session
 
-// Only CreateTweet is left to WebCreateTweet.x, which reroutes it to the web
-// endpoint with a per-operation x-client-transaction-id; injecting here would
-// clobber that reroute. Every other mutation authenticates by cookie like a read.
+// CreateTweet is left to WebCreateTweet.x, which rebuilds it with a per-operation
+// x-client-transaction-id that an injection here would clobber; the other requests it
+// rebuilds (mutes, Grok, Periscope) arrive already carrying the cookie and pass as is.
 static BOOL pfbBridgeIsCreateTweet(NSString* path) {
     return [path isKindOfClass:[NSString class]] &&
            [path.lastPathComponent isEqualToString:@"CreateTweet"];
@@ -73,6 +99,37 @@ static void pfbBridgeReadSharedSession(NSString** authToken, NSString** csrf) {
                 *csrf = cookie.value;
             }
         }
+    }
+
+    // Probe: at the first bridged request of the launch, whether both X hosts carry a session
+    // and whether the two agree; presence and equality only, never the token values (F040).
+    static BOOL probeF040Done = NO;
+    if (probeF040Done) {
+        return;
+    }
+    probeF040Done = YES;
+    if (PFBProbeWants(@"04#F040 session")) {
+        NSString *ax = nil, *at = nil, *cx = nil, *ct = nil;
+        for (NSHTTPCookie* cookie in [jar cookiesForURL:[NSURL URLWithString:@"https://x.com"]]) {
+            if ([cookie.name isEqualToString:@"auth_token"] && cookie.value.length) {
+                ax = cookie.value;
+            } else if ([cookie.name isEqualToString:@"ct0"] && cookie.value.length) {
+                cx = cookie.value;
+            }
+        }
+        for (NSHTTPCookie* cookie in [jar cookiesForURL:[NSURL URLWithString:@"https://twitter.com"]]) {
+            if ([cookie.name isEqualToString:@"auth_token"] && cookie.value.length) {
+                at = cookie.value;
+            } else if ([cookie.name isEqualToString:@"ct0"] && cookie.value.length) {
+                ct = cookie.value;
+            }
+        }
+        NSString* authSame = (ax.length && at.length) ? ([ax isEqualToString:at] ? @"yes" : @"no") : @"n.a.";
+        NSString* csrfSame = (cx.length && ct.length) ? ([cx isEqualToString:ct] ? @"yes" : @"no") : @"n.a.";
+        PFBProbeNote(@"04#F040 session",
+                     @"04#F040 bridge session: auth_token x.com=%@ twitter.com=%@ same=%@; ct0 x.com=%@ twitter.com=%@ same=%@",
+                     ax.length ? @"yes" : @"no", at.length ? @"yes" : @"no", authSame,
+                     cx.length ? @"yes" : @"no", ct.length ? @"yes" : @"no", csrfSame);
     }
 }
 
@@ -266,6 +323,7 @@ static void pfbBridgeShowRestartPrompt(void) {
     [alert addAction:[UIAlertAction actionWithTitle:[bundle localizedStringForKey:@"RESTART_NOW_ACTION"]
                                               style:UIAlertActionStyleDefault
                                             handler:^(UIAlertAction* action) {
+                                              PFBCompatSaveNow();
                                               [[NSUserDefaults standardUserDefaults] synchronize];
                                               exit(0);
                                             }]];

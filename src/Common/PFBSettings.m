@@ -394,7 +394,7 @@ static NSDictionary<NSString*, NSDictionary*>* PFBSettingsPages(void) {
                       @"tabKeys": PFBExploreTabKeys()}
                 ]
             },
-            @"grok": @{
+            @"messages": @{
                 @"titleKey": @"MODERN_SETTINGS_MESSAGES_TITLE",
                 @"subtitleKey": @"MODERN_SETTINGS_MESSAGES_SUBTITLE",
                 @"settings": @[
@@ -742,6 +742,9 @@ static NSDictionary* PFBKeylessDefaults(void) {
     dispatch_once(&once, ^{
         map = @{
             @"enable_liquid_glass": @YES,
+            // Picked from a menu rather than a row: 0 is the System style and the Default tab.
+            @"dark_mode_style": @0,
+            @"profile_initial_tab": @0,
             // Carried by a pill rather than a row of its own, so the registry
             // holds no default for it.
             @"video_starts_muted": @YES,

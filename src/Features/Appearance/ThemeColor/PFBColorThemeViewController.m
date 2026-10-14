@@ -11,9 +11,48 @@ extern void PFBWhitenNavigationBarConfirm(UINavigationBar* bar);
 #import "Support/TWHeaders.h"
 #import "Support/HookHelpers.h"
 #import "Features/Appearance/ThemeColor/PFBPalette.h"
+#import "Debug/PFBProbe.h"
+#import <QuartzCore/QuartzCore.h>
 extern void PFBBeginRawPaletteRead(void);
 extern void PFBEndRawPaletteRead(void);
-extern void PFBSyncAccentTheme(void);
+
+// Probe: the time one accent sync takes (06#F041): once when the screen is left and once
+// for a swatch tap; the color picker's syncs are summed and noted when the screen goes.
+static NSUInteger gPFBAccentSyncProbeCalls;
+static CFTimeInterval gPFBAccentSyncProbeTotal;
+static CFTimeInterval gPFBAccentSyncProbeMax;
+
+static CFTimeInterval PFBAccentSyncProbeStart(NSString* key) {
+    return PFBProbeWants(key) ? CACurrentMediaTime() : 0;
+}
+
+static void PFBAccentSyncProbeEnd(NSString* key, CFTimeInterval start, NSString* place) {
+    if (start <= 0) {
+        return;
+    }
+    PFBProbeNote(key, @"06#F041 accent sync: one call took %.1f ms (%@)",
+                 (CACurrentMediaTime() - start) * 1000.0, place);
+}
+
+static void PFBAccentPickerProbe(CFTimeInterval start) {
+    if (start <= 0) {
+        return;
+    }
+    CFTimeInterval took = CACurrentMediaTime() - start;
+    gPFBAccentSyncProbeCalls++;
+    gPFBAccentSyncProbeTotal += took;
+    gPFBAccentSyncProbeMax = MAX(gPFBAccentSyncProbeMax, took);
+}
+
+static void PFBAccentPickerProbeEnd(void) {
+    if (!gPFBAccentSyncProbeCalls || !PFBProbeWants(@"06#F041 picker")) {
+        return;
+    }
+    PFBProbeNote(@"06#F041 picker", @"06#F041 accent sync from the color picker: %lu calls, mean %.1f ms, max %.1f ms",
+                 (unsigned long)gPFBAccentSyncProbeCalls,
+                 gPFBAccentSyncProbeTotal / (double)gPFBAccentSyncProbeCalls * 1000.0,
+                 gPFBAccentSyncProbeMax * 1000.0);
+}
 
 // Mirrors PFBCurrentAccentColor's precedence (the custom override, then Twitter's own
 // option) so the default swatch shows selected before any change.
@@ -35,7 +74,9 @@ static NSString* const kAccentDisplayNames[kAccentOptionCount] = {@"Blue", @"Yel
 static UIColor* NativeAccentColor(NSUInteger option) {
     id palette =
         [[[objc_getClass("TAEColorSettings") sharedSettings] currentColorPalette] colorPalette];
-    UIColor* color = [palette primaryColorForOption:option];
+    UIColor* color = [palette respondsToSelector:@selector(primaryColorForOption:)]
+                         ? [palette primaryColorForOption:option]
+                         : nil;
     if (![color isKindOfClass:[UIColor class]]) {
         return nil;
     }
@@ -85,6 +126,7 @@ static NSInteger NearestAccentOption(UIColor* color) {
 @interface PFBColorThemeViewController () <UIColorPickerViewControllerDelegate>
 @property (nonatomic, strong) NSMutableArray<PFBColorSwatchControl*>* swatches;
 @property (nonatomic, strong) PFBColorSwatchControl* customSwatch;
+@property (nonatomic, strong) UIButton* resetButton;
 @end
 
 @implementation PFBColorThemeViewController
@@ -170,7 +212,7 @@ static NSInteger NearestAccentOption(UIColor* color) {
     // swatches it resets.
     resetButton.titleLabel.font = PFBScaledFont([TwitterChirpFont(TwitterFontStyleRegular) fontWithSize:15]);
     [resetButton setTitleColor:[UIColor secondaryLabelColor] forState:UIControlStateNormal];
-    resetButton.backgroundColor = [UIColor systemBackgroundColor];
+    resetButton.backgroundColor = [UIColor clearColor];
     resetButton.layer.cornerRadius = 20;
     resetButton.layer.borderWidth = 1.0;
     resetButton.layer.borderColor = [UIColor systemGray4Color].CGColor;
@@ -180,6 +222,7 @@ static NSInteger NearestAccentOption(UIColor* color) {
                     action:@selector(resetToDefaultColor)
           forControlEvents:UIControlEventTouchUpInside];
     [self.view addSubview:resetButton];
+    self.resetButton = resetButton;
 
     UILabel* resetHint = [UILabel new];
     resetHint.translatesAutoresizingMaskIntoConstraints = NO;
@@ -226,6 +269,13 @@ static NSInteger NearestAccentOption(UIColor* color) {
     ]];
 
     [self refreshSelection];
+}
+
+// The border is a CGColor, which does not follow a light or dark switch by itself.
+- (void)traitCollectionDidChange:(UITraitCollection*)previousTraitCollection {
+    [super traitCollectionDidChange:previousTraitCollection];
+    self.resetButton.layer.borderColor =
+        [[UIColor systemGray4Color] resolvedColorWithTraitCollection:self.traitCollection].CGColor;
 }
 
 // MARK: - Reset
@@ -281,7 +331,11 @@ static NSInteger NearestAccentOption(UIColor* color) {
 - (void)viewDidDisappear:(BOOL)animated {
     [super viewDidDisappear:animated];
     PFBThemeScreenLeave(self);
+    // Probe: times this sync, and notes the picker's syncs summed so far.
+    CFTimeInterval probeStart = PFBAccentSyncProbeStart(@"06#F041 leave");
     PFBSyncAccentTheme();
+    PFBAccentSyncProbeEnd(@"06#F041 leave", probeStart, @"leaving the Theme screen");
+    PFBAccentPickerProbeEnd();
 }
 
 // MARK: - Selection
@@ -313,7 +367,10 @@ static NSInteger NearestAccentOption(UIColor* color) {
     [[NSUserDefaults standardUserDefaults] setInteger:swatch.colorID
                                                forKey:@"pfb_color_theme_selectedColor"];
     changeTwitterColor(swatch.colorID);
+    // Probe: times this sync.
+    CFTimeInterval probeStart = PFBAccentSyncProbeStart(@"06#F041 swatch");
     PFBSyncAccentTheme();
+    PFBAccentSyncProbeEnd(@"06#F041 swatch", probeStart, @"a swatch tap");
 
     [self refreshSelection];
 }
@@ -345,7 +402,10 @@ static NSInteger NearestAccentOption(UIColor* color) {
     NSInteger nearest = NearestAccentOption(color);
     [NSUserDefaults.standardUserDefaults setInteger:nearest forKey:@"pfb_color_theme_selectedColor"];
     changeTwitterColor(nearest);
+    // Probe: times this sync.
+    CFTimeInterval probeStart = PFBProbeWants(@"06#F041 picker") ? CACurrentMediaTime() : 0;
     PFBSyncAccentTheme();
+    PFBAccentPickerProbe(probeStart);
     [self refreshSelection];
 }
 

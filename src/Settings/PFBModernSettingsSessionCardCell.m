@@ -1,7 +1,5 @@
-#import "Common/PFBCompatibility.h"
 #import "Support/PFBManager.h"
 #import "Features/Appearance/ThemeColor/PFBPalette.h"
-#import "Support/TwitterChirpFont.h"
 #import "Debug/PFBDebugger.h"
 #import "Settings/PFBModernSettingsSessionCardCell.h"
 

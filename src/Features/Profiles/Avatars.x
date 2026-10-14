@@ -98,6 +98,20 @@ void PFBApplySquareAvatarsSetting(void) {
         CGRectMake(0, 0, targetDimensions.width, targetDimensions.height);
     CGFloat cornerRadius =
         MIN(targetDimensions.width, targetDimensions.height) / 8.0;
+    // Aspect fill and fit keep the image's proportions, centered; other modes fill the target.
+    CGRect drawRect = imageRect;
+    CGSize source = self.size;
+    if (source.width > 0 && source.height > 0 &&
+        (targetContentMode == UIViewContentModeScaleAspectFill ||
+         targetContentMode == UIViewContentModeScaleAspectFit)) {
+        CGFloat scaleX = targetDimensions.width / source.width;
+        CGFloat scaleY = targetDimensions.height / source.height;
+        CGFloat scale = targetContentMode == UIViewContentModeScaleAspectFill ? MAX(scaleX, scaleY)
+                                                                              : MIN(scaleX, scaleY);
+        CGSize drawn = {source.width * scale, source.height * scale};
+        drawRect = CGRectMake((targetDimensions.width - drawn.width) / 2.0,
+                              (targetDimensions.height - drawn.height) / 2.0, drawn.width, drawn.height);
+    }
 
     UIGraphicsBeginImageContextWithOptions(targetDimensions, NO, self.scale);
     if (!UIGraphicsGetCurrentContext()) {
@@ -107,7 +121,7 @@ void PFBApplySquareAvatarsSetting(void) {
 
     [[UIBezierPath bezierPathWithRoundedRect:imageRect
                                 cornerRadius:cornerRadius] addClip];
-    [self drawInRect:imageRect];
+    [self drawInRect:drawRect];
 
     UIImage* roundedImage = UIGraphicsGetImageFromCurrentImageContext();
     UIGraphicsEndImageContext();

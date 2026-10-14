@@ -3,6 +3,7 @@
 
 #import "Support/HookHelpers.h"
 #import "Debug/PFBDebugger.h"
+#import "Debug/PFBProbe.h"
 
 // MARK: - Copy profile info
 
@@ -93,11 +94,12 @@ static void pfbReachCopyIDAndDate(UIView* row) {
 
     UIAction* (^copyAction)(NSString*, NSString*, NSString*) =
         ^(NSString* titleKey, NSString* iconName, NSString* value) {
+            UIImage* icon = [UIImage respondsToSelector:@selector(tfn_vectorImageNamed:fitsSize:fillColor:)]
+                                ? [UIImage tfn_vectorImageNamed:iconName fitsSize:CGSizeMake(16.0, 16.0) fillColor:UIColor.labelColor]
+                                : nil;
             UIAction* action =
                 [UIAction actionWithTitle:[[PFBBundle sharedBundle] localizedStringForKey:titleKey]
-                                    image:[UIImage tfn_vectorImageNamed:iconName
-                                                               fitsSize:CGSizeMake(16.0, 16.0)
-                                                              fillColor:UIColor.labelColor]
+                                    image:icon
                                identifier:nil
                                   handler:^(__kindof UIAction* act) {
                                       if (value.length) {
@@ -253,9 +255,9 @@ static void pfbMatchNeighbourStyle(UIButton* ours, UIView* neighbour) {
             [UIDeferredMenuElement elementWithUncachedProvider:actionsProvider];
         copyButton.menu = [UIMenu menuWithTitle:@"" children:@[deferred]];
 
-        UIImage* glyph = [UIImage tfn_vectorImageNamed:@"copy_stroke"
-                                                  fitsSize:CGSizeMake(20, 20)
-                                                 fillColor:nil];
+        UIImage* glyph = [UIImage respondsToSelector:@selector(tfn_vectorImageNamed:fitsSize:fillColor:)]
+                             ? [UIImage tfn_vectorImageNamed:@"copy_stroke" fitsSize:CGSizeMake(20, 20) fillColor:nil]
+                             : nil;
         [copyButton setImage:[glyph imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate]
                     forState:UIControlStateNormal];
 
@@ -295,8 +297,12 @@ static void pfbMatchNeighbourStyle(UIButton* ours, UIView* neighbour) {
 // MARK: - Show unrounded follower, following and post counts
 
 // Where the abbreviated count sits in text, with the full number to put there;
-// NSNotFound when the count is too small to be abbreviated.
+// NSNotFound when the count is too small to be abbreviated or the app's abbreviation
+// is unavailable.
 static NSRange pfbAbbreviatedCountRange(NSString* text, NSNumber* count, NSString** fullCount) {
+    if (![count respondsToSelector:@selector(tfs_twitterAbbreviated)]) {
+        return NSMakeRange(NSNotFound, 0);
+    }
     NSString* abbreviated = [count tfs_twitterAbbreviated];
     NSNumberFormatter* formatter = [[NSNumberFormatter alloc] init];
     formatter.numberStyle = NSNumberFormatterDecimalStyle;
@@ -358,9 +364,8 @@ static NSRange pfbAbbreviatedCountRange(NSString* text, NSNumber* count, NSStrin
 // one entry per tab. The index is never hardcoded: the wanted entry is looked up in
 // contentMainEntries, and a missing entry returns the original value.
 
-// The wanted tab, as the entry object itself. Each tab is a
-// T1ProfileContentMainEntry, and the provider keeps one per tab —
-// _photoEntry, _videoEntry and so on, straight from the class's ivars.
+// The wanted tab, as the entry object itself: each tab is a T1ProfileContentMainEntry
+// that the provider hands out through a getter per tab (photoEntry, videoEntry...).
 static id pfbWantedEntry(id provider) {
     NSString* name = nil;
     switch ([PFBSettings integerForKey:@"profile_initial_tab"]) {
@@ -371,7 +376,9 @@ static id pfbWantedEntry(id provider) {
         case 5: name = @"videoEntry"; break;
         case 6: name = @"repostsEntry"; break;
         default:
-            PFBCOMPAT_OBSERVE(PFBCompat_profile_initial_tab, @"profile tabs found");
+            if ([provider respondsToSelector:@selector(contentMainEntries)]) {
+                PFBCOMPAT_OBSERVE(PFBCompat_profile_initial_tab, @"profile tabs found");
+            }
             return nil;   // 0 leaves the choice to Twitter
     }
 
@@ -399,8 +406,31 @@ static id pfbWantedEntry(id provider) {
     // No identity check against contentMainEntries: the entry can exist without the
     // array holding that exact object. Whether a tab is on screen is answered by the
     // controller further down.
-    PFBCOMPAT_ACTION(PFBCompat_profile_initial_tab, @"chosen tab opened");
     return entry;
+}
+
+// Probe 10b#F025: whether the index the provider computes gives the chosen tab, once for each
+// outcome; when it does not, the first element shows what the tab list holds (10b#F001).
+static BOOL gPFBProbeLookupDone[2];
+
+static void pfbProbeTabLookup(id provider, NSArray* entries, NSUInteger index) {
+    NSUInteger found = index != NSNotFound ? 1 : 0;
+    // Without a tab list the index answers no lookup (a nil list gives 0).
+    if (gPFBProbeLookupDone[found] || ![entries isKindOfClass:[NSArray class]]) {
+        return;
+    }
+    gPFBProbeLookupDone[found] = YES;
+    NSString* key = found ? @"10b#F025 provider index" : @"10b#F025 provider no index";
+    if (!PFBProbeWants(key)) {
+        return;
+    }
+    if (found) {
+        PFBProbeNote(key, @"10b#F025 profile tab: provider gave the chosen tab (index %lu) on %@",
+                     (unsigned long)index, PFBProbeClassName(provider));
+        return;
+    }
+    PFBProbeNote(key, @"10b#F025 profile tab: chosen entry not in contentMainEntries (%lu entries, first %@) on %@",
+                 (unsigned long)entries.count, PFBProbeClassName(entries.firstObject), PFBProbeClassName(provider));
 }
 
 static NSInteger pfbProfileTabIndex(id provider, NSInteger fallback) {
@@ -411,6 +441,8 @@ static NSInteger pfbProfileTabIndex(id provider, NSInteger fallback) {
     NSArray* entries =
         ((id (*)(id, SEL))objc_msgSend)(provider, @selector(contentMainEntries));
     NSUInteger index = [entries indexOfObject:entry];
+    // Probe: notes whether this index gives the chosen tab, for 10b#F025.
+    pfbProbeTabLookup(provider, entries, index);
     return index == NSNotFound ? fallback : (NSInteger)index;
 }
 
@@ -419,6 +451,58 @@ static NSInteger pfbProfileTabIndex(id provider, NSInteger fallback) {
 // directly is what actually moves the profile.
 
 static const void* kPFBTabAppliedKey = &kPFBTabAppliedKey;
+
+// Probe 10b#F025 and 10b#F001: each appearance of a profile until its chosen tab is applied, once
+// per outcome, and, once per provider class, what its tab list holds when it holds something.
+static NSMapTable* gPFBProbeAppearances;
+
+static void pfbProbeProfileAppearance(id controller, id provider, id entry) {
+    if (!PFBDebugIsRecording() || !NSThread.isMainThread) {
+        return;
+    }
+    NSString* entriesKey = [@"10b#F001 entries " stringByAppendingString:PFBProbeClassName(provider)];
+    if (PFBProbeWants(entriesKey)) {
+        id entries = PFBProbeGetter(provider, @"contentMainEntries");
+        NSArray* list = [entries isKindOfClass:[NSArray class]] ? entries : nil;
+        // An empty list (a profile still loading) waits for a later appearance.
+        if (list.count || (entries && !list)) {
+            PFBProbeNote(entriesKey, @"10b#F001 profile tab: provider=%@ entries=%@ first=%@",
+                         PFBProbeClassName(provider), list ? [@(list.count) stringValue] : PFBProbeClassName(entries),
+                         PFBProbeClassName(list.firstObject));
+        }
+    }
+    if ([PFBSettings integerForKey:@"profile_initial_tab"] == 0) {
+        return;
+    }
+    if (!gPFBProbeAppearances) {
+        gPFBProbeAppearances = [NSMapTable weakToStrongObjectsMapTable];
+    }
+    NSUInteger appearance = [[gPFBProbeAppearances objectForKey:controller] unsignedIntegerValue] + 1;
+    [gPFBProbeAppearances setObject:@(appearance) forKey:controller];
+    NSString* key = [NSString stringWithFormat:@"10b#F025 appearance %@ %@", appearance == 1 ? @"first" : @"later",
+                                               entry ? @"found" : @"not yet"];
+    if (PFBProbeWants(key)) {
+        PFBProbeNote(key, @"10b#F025 profile tab: appearance %lu of %@ (provider %@), wanted entry %@",
+                     (unsigned long)appearance, PFBProbeClassName(controller), PFBProbeClassName(provider),
+                     entry ? @"found" : @"not yet");
+    }
+}
+
+static void pfbProbeProfileSelect(id controller) {
+    if (!PFBDebugIsRecording() || !NSThread.isMainThread) {
+        return;
+    }
+    NSUInteger appearance = [[gPFBProbeAppearances objectForKey:controller] unsignedIntegerValue];
+    NSString* key = appearance > 1 ? @"10b#F025 selected later" : @"10b#F025 selected first";
+    if (!PFBProbeWants(key)) {
+        return;
+    }
+    BOOL read = NO;
+    long long shown =
+        PFBProbeIntegerGetter(PFBProbeGetter(controller, @"segmentedViewController"), @"selectedIndex", &read);
+    PFBProbeNote(key, @"10b#F025 profile tab: chosen tab selected at appearance %lu, the profile showed tab %@",
+                 (unsigned long)appearance, read ? [@(shown) stringValue] : @"unread");
+}
 
 %hook T1ProfileViewController
 
@@ -438,6 +522,8 @@ static const void* kPFBTabAppliedKey = &kPFBTabAppliedKey;
         id provider = ((id (*)(id, SEL))objc_msgSend)(
             controller, @selector(currentDisplayContentProvider));
         id entry = pfbWantedEntry(provider);
+        // Probe: notes this appearance and the provider's tab list, for 10b#F025 and 10b#F001.
+        pfbProbeProfileAppearance(controller, provider, entry);
 
         if (!entry) {
             return;
@@ -453,18 +539,68 @@ static const void* kPFBTabAppliedKey = &kPFBTabAppliedKey;
         }
         objc_setAssociatedObject(controller, kPFBTabAppliedKey, @YES,
                                  OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        // Probe: notes the appearance that applies the chosen tab, for 10b#F025.
+        pfbProbeProfileSelect(controller);
         ((void (*)(id, SEL, id))objc_msgSend)(
             controller, @selector(_t1_selectMainEntry:), entry);
+        PFBCOMPAT_ACTION(PFBCompat_profile_initial_tab, @"chosen tab opened");
     } @catch (id exception) {
     }
 }
 
 %end
 
+// Probe 10b#F001: whether each hook of the provider is called on 12.31, once per method.
+static BOOL gPFBProbeProviderDone[3];
+
+static void pfbProbeProviderCall(NSUInteger hook, id provider, long long number, id entry) {
+    if (gPFBProbeProviderDone[hook]) {
+        return;
+    }
+    gPFBProbeProviderDone[hook] = YES;
+    NSString* const keys[] = {@"10b#F001 initialTabIndex", @"10b#F001 defaultMainContentEntry",
+                              @"10b#F001 setInitialTabIndex:"};
+    if (!PFBProbeWants(keys[hook])) {
+        return;
+    }
+    switch (hook) {
+        case 0:
+            PFBProbeNote(keys[0], @"10b#F001 profile tab: initialTabIndex on %@ orig=%lld", PFBProbeClassName(provider),
+                         number);
+            break;
+        case 1:
+            PFBProbeNote(keys[1], @"10b#F001 profile tab: defaultMainContentEntry on %@ orig=%@",
+                         PFBProbeClassName(provider), entry ? PFBProbeClassName(entry) : @"nil");
+            break;
+        default:
+            PFBProbeNote(keys[2], @"10b#F001 profile tab: setInitialTabIndex: %lld on %@", number,
+                         PFBProbeClassName(provider));
+            break;
+    }
+}
+
+// Probe 10b#F025: a chosen tab the provider gives through its default entry, noted once.
+static BOOL gPFBProbeProviderEntryDone;
+
+static void pfbProbeProviderEntry(id provider, id wanted) {
+    if (gPFBProbeProviderEntryDone || !wanted) {
+        return;
+    }
+    gPFBProbeProviderEntryDone = YES;
+    if (PFBProbeWants(@"10b#F025 provider entry")) {
+        PFBProbeNote(@"10b#F025 provider entry",
+                     @"10b#F025 profile tab: provider gave the chosen tab (entry %@) through defaultMainContentEntry "
+                     @"on %@",
+                     PFBProbeClassName(wanted), PFBProbeClassName(provider));
+    }
+}
+
 %hook T1ProfileDisplayContentProvider
 
 - (NSInteger)initialTabIndex {
     NSInteger original = %orig;
+    // Probe: notes the call for 10b#F001.
+    pfbProbeProviderCall(0, self, (long long)original, nil);
 
     @try {
         return pfbProfileTabIndex(self, original);
@@ -477,15 +613,22 @@ static const void* kPFBTabAppliedKey = &kPFBTabAppliedKey;
 // initialTabIndex is only an index derived from it.
 - (id)defaultMainContentEntry {
     id original = %orig;
+    // Probe: notes the call for 10b#F001.
+    pfbProbeProviderCall(1, self, 0, original);
 
     @try {
-        return pfbWantedEntry(self) ?: original;
+        id wanted = pfbWantedEntry(self);
+        // Probe: notes a chosen tab given here, for 10b#F025.
+        pfbProbeProviderEntry(self, wanted);
+        return wanted ?: original;
     } @catch (id exception) {
         return original;
     }
 }
 
 - (void)setInitialTabIndex:(NSInteger)index {
+    // Probe: notes the call for 10b#F001.
+    pfbProbeProviderCall(2, self, (long long)index, nil);
     NSInteger wanted = index;
 
     @try {

@@ -105,6 +105,7 @@
 // two of a pair must never both be active, even for an instant.
 - (void)applyTermRow {
     self.contentView.alpha = 1.0;
+    self.termLabel.textColor = [UIColor labelColor];
     self.kindLabel.hidden = NO;
     self.durationButton.hidden = NO;
     self.removeButton.hidden = NO;

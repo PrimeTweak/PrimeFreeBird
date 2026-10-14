@@ -18,35 +18,35 @@
 
 - **Liquid Glass, enabled** — the stock app opts out of iOS 26's redesign; this switches it back on, or keeps the flat look.
 - **No blurred edge** — the redesign makes iOS draw a strip under every bar; a switch puts the stock look back.
-- **Bar icons that match** — the settings gear, the search filters and the muted-words icon share one grey and keep it.
+- **Bar icons that match** — the settings gear, the search filters and the muted-words icon share one gray and keep it.
 
-## Colour theme
+## Color theme
 
-- **Any colour you want** — a *Custom accent colour* row opens the native iOS picker instead of a fixed set of presets.
-- **Applied everywhere** — the bird, links, @mentions, #hashtags, buttons and the settings switches all follow it.
+- **Any color you want** — a *Custom* swatch beside the six preset colors opens the native iOS picker.
+- **Applied everywhere** — the bird, links, @mentions, #hashtags and buttons follow it, and the settings switches too with *Switches* on.
 - **Predictable reset** — resetting returns to stock and stays there, across restarts and re-picks.
 - **Dark shades** — choose System, Dim, Gray or Blackout, and every surface follows: sheets, cells, the search field and the bars.
 
 ## Explore &amp; search
 
 - **Per-tab control** — hide any of For You, Trending, News, Sports or Entertainment, rather than the whole page.
-- **Advanced search** — X ships this form on the web only; here it is native, with results in Twitter's own search.
+- **Advanced search** — the web's full search form (words, accounts, engagement, dates), native, with results in Twitter's own search.
 
 ## Filters
 
-- **One list for everything** — a word, a phrase or an @account; the type is recognised from what you type.
+- **One list for everything** — a word, a phrase or an @account; the type is recognized from what you type.
 - **Filter by language** — keep only the languages you read; Tweets with no detected language always pass.
 - **Quick access from the feed** — an icon in the timeline's top bar adds or removes a filter without leaving your scroll.
 - **Filters that expire** — give a word 24 hours, 7 days or 30 days, or keep it for good.
 - **Precise by default** — whole-word matching, so "cat" never catches "concatenate".
-- **Scope you decide** — filter replies inside conversations too, spare the people you follow, and choose whether reposts count.
+- **Scope you decide** — filter replies inside conversations too, spare the people you follow, and choose whether Retweets count.
 - **A quiet tally** — the page keeps a small count of what it filtered out today.
 
 ## Timeline
 
-- **Unlimited timeline tabs** — pin far more lists and topics than X allows, and unlock advanced tabs like Ranked Following.
+- **Unlimited timeline tabs** — pin far more lists and topics than Twitter allows, and unlock advanced tabs like Ranked Following.
 - **Reading marker** — a line marks where you were when new Tweets arrive above, on Following and your Lists.
-- **Hide topics** — topic posts and the "Topics to follow" carousel both go.
+- **Hide topics** — topic Tweets and the "Topics to follow" carousel both go.
 - **Open in Following** — start on the Following tab instead of For You, and stay there.
 - **Preload media** — images and videos are ready the moment you scroll to them.
 - **Clean screenshots** — an on/off switch for Twitter's screenshot detection.
@@ -64,12 +64,12 @@
 
 - **Poll results before voting** — each option carries its share of the vote, so you can read a poll without joining it.
 - **Hide the Tweet button** — remove the compose button from the timeline.
-- **Classic compose button** — or bring back the feather on a coloured circle instead of the native "+".
+- **Classic compose button** — or bring back the feather on a colored circle instead of the native "+".
 
 ## Profiles
 
 - **Bios in full** — long bios open expanded, with no *Show more* to tap.
-- **Open profiles where you want** — land on Replies, Highlights, Articles, Media, Videos or Reposts instead of Posts.
+- **Open profiles where you want** — land on Replies, Highlights, Articles, Media, Videos or Retweets instead of Tweets.
 - **Hide the Videos tab** — alongside the existing switches for Articles and Highlights.
 - **Profile URL** — added to the copy-profile-details button.
 
@@ -82,9 +82,9 @@
 
 - **Grouped settings** — every page is split into labelled groups instead of one long list.
 - **Clean shared links** — tracking parameters stripped when you copy *or* share, profiles included.
-- **Full French localisation** — every string, including the new screens.
+- **French localization** — the settings and the new screens are in French, except the swatch names and the Compatibility tools.
 
-<sub>…on top of the full BHTwitter and NeoFreeBird toolkit.</sub>
+<sub>…on top of the BHTwitter and NeoFreeBird toolkit.</sub>
 
 # Build
 
@@ -93,7 +93,7 @@ Actions → **Build PrimeFreeBird** → Run workflow with the link to a decrypte
 - **Debug**: a test IPA, in the `debug` draft release, replaced at each build
 - **Release** (default branch only): the numbered version, with the IPA and debs, in a draft release to publish
 
-The icon pack is `branding/resource-pack.zip`. Until the repository has it, the build downloads the default pack; **Other icon pack link** tries another one.
+The icon pack is `branding/resource-pack.zip`; **Other icon pack link** uses another one.
 
 The version is `Version:` in `control`. Release notes are its section in `CHANGELOG.md`.
 
@@ -101,4 +101,4 @@ The version is `Version:` in `control`. Release notes are its section in `CHANGE
 
 - [**BHTwitter**](https://github.com/BandarHL/BHTwitter) by BandarHL — the foundation this is built on.
 - The [**NeoFreeBird**](https://github.com/NeoFreeBird) project — the base this fork tracks.
-- [**scar**](https://github.com/theacrat/scar) by theacrat — the fixes pipeline.
+- [**scar**](https://github.com/theacrat/scar) by theacrat — rebuilds the app's icon catalog for the icon pack.

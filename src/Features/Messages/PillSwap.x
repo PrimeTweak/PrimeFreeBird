@@ -3,6 +3,7 @@
 
 #import "Support/HookHelpers.h"
 #import "Debug/PFBDebugger.h"
+#import "Debug/PFBProbe.h"
 
 // A named subclass, so captures can identify the button. The bar's item wrapper
 // clamps its child to the standard bar-button box, so the capsule is drawn
@@ -126,6 +127,126 @@ static BOOL pfbSwapIsInbox(UIViewController* vc) {
     return NO;
 }
 
+// MARK: - Probe
+
+// Probe: a bar item named without its title: custom view class, action and menu.
+static NSString* pfbProbeSwapItem(UIBarButtonItem* item) {
+    if (!item) {
+        return @"none";
+    }
+    BOOL menu = item.menu != nil ||
+                ([item.customView isKindOfClass:[UIButton class]] && ((UIButton*)item.customView).menu != nil);
+    return [NSString stringWithFormat:@"%@, %@, has menu %@",
+                                      item.customView ? PFBProbeClassName(item.customView) : @"no custom view",
+                                      item.action ? NSStringFromSelector(item.action) : @"no action", menu ? @"yes" : @"no"];
+}
+
+// Probe: the screen in front of a navigation stack.
+static UIViewController* pfbProbeSwapTop(UIViewController* vc) {
+    return [vc isKindOfClass:[UINavigationController class]] ? ((UINavigationController*)vc).topViewController : vc;
+}
+
+// Probe: how a candidate stands to the pill's controller.
+static NSString* pfbProbeSwapRelation(UIViewController* vc, UIViewController* candidate) {
+    if (candidate == vc) {
+        return @"the pill's own controller";
+    }
+    if (![vc isKindOfClass:[UINavigationController class]]) {
+        return @"?";
+    }
+    UINavigationController* stack = (UINavigationController*)vc;
+    if (candidate == stack.topViewController) {
+        return @"top";
+    }
+    if (candidate.parentViewController == stack.topViewController) {
+        return @"child of top";
+    }
+    NSUInteger index = [stack.viewControllers indexOfObject:candidate];
+    return index == NSNotFound ? @"?"
+                               : [NSString stringWithFormat:@"stacked at depth %lu",
+                                                            (unsigned long)(stack.viewControllers.count - 1 - index)];
+}
+
+// Probe: the swap as installed, once per screen in front (at most 6).
+enum { kPFBProbeSwapScreenLimit = 6 };
+static BOOL gPFBProbeSwapDone;
+static __unsafe_unretained Class gPFBProbeSwapScreens[kPFBProbeSwapScreenLimit];
+static NSUInteger gPFBProbeSwapScreenCount;
+static void pfbProbeSwapTarget(UIView* pillView, UIViewController* vc, UINavigationItem* nav, UIBarButtonItem* original,
+                               UIBarButtonItemGroup* group) {
+    if (gPFBProbeSwapDone || !PFBDebugIsRecording()) {
+        return;
+    }
+    UIViewController* top = pfbProbeSwapTop(vc);
+    Class topClass = top ? [top class] : Nil;
+    for (NSUInteger i = 0; i < gPFBProbeSwapScreenCount; i++) {
+        if (gPFBProbeSwapScreens[i] == topClass) {
+            return;
+        }
+    }
+    gPFBProbeSwapScreens[gPFBProbeSwapScreenCount++] = topClass;
+    gPFBProbeSwapDone = gPFBProbeSwapScreenCount >= kPFBProbeSwapScreenLimit;
+    UIViewController* matched = nil;
+    UIViewController* holder = nil;
+    for (UIViewController* candidate in pfbSwapCandidates(vc)) {
+        if (!matched && [NSStringFromClass([candidate class]) containsString:@"Inbox"]) {
+            matched = candidate;
+        }
+        if (!holder && candidate.navigationItem == nav) {
+            holder = candidate;
+        }
+    }
+    NSString* hosts = original.customView ? ([pillView isDescendantOfView:original.customView] ? @"yes" : @"no") : @"?";
+    PFBProbeNote([@"10b#F029 swap " stringByAppendingString:PFBProbeClassName(top)],
+                 @"10b#F029 pill swap: pill view on %@, matched Inbox on %@ (%@) · original %@, holds the pill %@, "
+                 @"in %@ of %@",
+                 PFBProbeClassName(top), PFBProbeClassName(matched), matched ? pfbProbeSwapRelation(vc, matched) : @"-",
+                 pfbProbeSwapItem(original), hosts, group ? @"trailing group" : @"right items", PFBProbeClassName(holder));
+}
+
+// Probe: a pill view the swap leaves alone, once per screen in front (at most 6, over 300 passes).
+static BOOL gPFBProbeSwapAloneDone;
+static __unsafe_unretained Class gPFBProbeSwapAloneScreens[kPFBProbeSwapScreenLimit];
+static NSUInteger gPFBProbeSwapAloneCount;
+static NSUInteger gPFBProbeSwapAlonePasses;
+static void pfbProbeSwapLeftAlone(UIViewController* vc) {
+    if (gPFBProbeSwapAloneDone || !PFBDebugIsRecording()) {
+        return;
+    }
+    gPFBProbeSwapAloneDone = ++gPFBProbeSwapAlonePasses >= 300;
+    UIViewController* top = pfbProbeSwapTop(vc);
+    Class topClass = top ? [top class] : Nil;
+    for (NSUInteger i = 0; i < gPFBProbeSwapAloneCount; i++) {
+        if (gPFBProbeSwapAloneScreens[i] == topClass) {
+            return;
+        }
+    }
+    gPFBProbeSwapAloneScreens[gPFBProbeSwapAloneCount++] = topClass;
+    gPFBProbeSwapAloneDone = gPFBProbeSwapAloneDone || gPFBProbeSwapAloneCount >= kPFBProbeSwapScreenLimit;
+    PFBProbeNote([@"10b#F029 alone " stringByAppendingString:PFBProbeClassName(top)],
+                 @"10b#F029 pill view on %@: left alone", top ? PFBProbeClassName(top) : @"no controller");
+}
+
+// Probe: a single incoming item replaced on the armed navigation item, once per kind
+// (at most 4, over 200 replacements).
+static BOOL gPFBProbeSwapInterceptDone;
+static NSUInteger gPFBProbeSwapInterceptNotes;
+static NSUInteger gPFBProbeSwapInterceptPasses;
+static void pfbProbeSwapIntercepted(UIBarButtonItem* incoming, NSString* container) {
+    if (gPFBProbeSwapInterceptDone || !PFBDebugIsRecording() || !NSThread.isMainThread) {
+        return;
+    }
+    gPFBProbeSwapInterceptDone = ++gPFBProbeSwapInterceptPasses >= 200;
+    NSString* item = pfbProbeSwapItem(incoming);
+    NSString* key = [NSString stringWithFormat:@"10b#F029 intercepted %@ %@", container, item];
+    if (!PFBProbeWants(key)) {
+        return;
+    }
+    PFBProbeNote(key, @"10b#F029 pill swap: intercepted single item %@ in %@ on the armed item while %@ is shown", item,
+                 container, PFBProbeFrontScreen());
+    gPFBProbeSwapInterceptDone = gPFBProbeSwapInterceptDone || ++gPFBProbeSwapInterceptNotes >= 4;
+}
+
 // The checked entry of the menu is the truthful, localized label source
 // ("All" / "Requests" with Twitter's own wording).
 static NSString* pfbSwapCheckedTitle(UIMenu* menu) {
@@ -203,6 +324,7 @@ static NSArray<UIBarButtonItem*>* pfbSwapInterceptItems(UINavigationItem* nav,
     if (![PFBSettings boolForKey:@"enable_liquid_glass"]) {
         return items;
     }
+    pfbProbeSwapIntercepted(incoming, @"right items");
     gPFBSwapOriginal = incoming;
     pfbSwapRefreshLabelFromMenu();
     return @[gPFBSwapItem];
@@ -218,6 +340,7 @@ static void pfbSwapApply(UIView* pillView) {
 
     UIViewController* vc = pfbSwapOwningVC(pillView);
     if (!vc || !pfbSwapIsInbox(vc)) {
+        pfbProbeSwapLeftAlone(vc);
         return;
     }
 
@@ -397,6 +520,7 @@ static void pfbSwapApply(UIView* pillView) {
     // Install in the exact container the original occupied — and arm the
     // setter interception on this navigation item: from here on, stomps are
     // stopped before they reach the bar.
+    pfbProbeSwapTarget(pillView, vc, nav, original, group);
     objc_setAssociatedObject(nav, kPFBSwapNavKey, @YES,
                              OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     if (group) {
@@ -434,6 +558,7 @@ static void pfbSwapApply(UIView* pillView) {
             for (UIBarButtonItemGroup* group in groups) {
                 if (group.barButtonItems.count == 1 &&
                     group.barButtonItems.firstObject != gPFBSwapItem) {
+                    pfbProbeSwapIntercepted(group.barButtonItems.firstObject, @"trailing group");
                     gPFBSwapOriginal = group.barButtonItems.firstObject;
                     group.barButtonItems = @[gPFBSwapItem];
                     pfbSwapRefreshLabelFromMenu();

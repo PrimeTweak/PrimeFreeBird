@@ -11,6 +11,7 @@
 #import "Support/HookHelpers.h"
 #import "Common/PFBCompatibility.h"
 #import "Debug/PFBDebugger.h"
+#import "Debug/PFBProbe.h"
 #import "Support/FLEXHeaders.h"
 
 @interface PFBModernSettingsPageViewController ()
@@ -641,6 +642,11 @@ static NSURL* PFBAccountAvatarURL(TFNTwitterAccount* account) {
         [[NSUserDefaults standardUserDefaults]
             setBool:(inverted ? !sender.isOn : sender.isOn)
              forKey:key];
+        // Probe (14a#F009): marks the moment Hide Tweet button is switched on.
+        if (PFBDebugIsRecording() && [key isEqualToString:@"hide_tweet_button"] &&
+            (inverted ? !sender.isOn : sender.isOn)) {
+            PFBProbeMark(@"hide_tweet_button on");
+        }
         [self updateAndAnimateChangesForKey:key];
 
         [self reloadRowsHeldBy:key];
@@ -692,7 +698,6 @@ static NSURL* PFBAccountAvatarURL(TFNTwitterAccount* account) {
         // accent through again instead of waiting for those views to rebuild.
         if ([key isEqualToString:@"color_twitter_icon_in_top_bar"] ||
             [key isEqualToString:@"tab_bar_theming"]) {
-            extern void PFBSyncAccentTheme(void);
             PFBSyncAccentTheme();
         }
 
@@ -867,7 +872,8 @@ static NSURL* PFBAccountAvatarURL(TFNTwitterAccount* account) {
 // can present it.
 - (void)showSharingDomainPrompt:(NSDictionary*)data {
     NSUserDefaults* defaults = [NSUserDefaults standardUserDefaults];
-    NSString* currentHost = [defaults objectForKey:@"sharing_domain"];
+    id storedHost = [defaults objectForKey:@"sharing_domain"];
+    NSString* currentHost = [storedHost isKindOfClass:[NSString class]] ? storedHost : nil;
 
     UIAlertController* alert =
         [UIAlertController alertControllerWithTitle:[[PFBBundle sharedBundle]
@@ -883,11 +889,15 @@ static NSURL* PFBAccountAvatarURL(TFNTwitterAccount* account) {
         textField.autocorrectionType = UITextAutocorrectionTypeNo;
     }];
 
+    // The alert holds its actions: each handler lets go of it once the alert is answered.
+    __block UIAlertController* answered = alert;
     [alert addAction:[UIAlertAction
                          actionWithTitle:[[PFBBundle sharedBundle]
                                              localizedTwitterStringForKey:@"CANCEL_ACTION_LABEL"]
                                    style:UIAlertActionStyleCancel
-                                 handler:nil]];
+                                 handler:^(__unused UIAlertAction* action) {
+                                     answered = nil;
+                                 }]];
 
     [alert
         addAction:[UIAlertAction
@@ -896,7 +906,8 @@ static NSURL* PFBAccountAvatarURL(TFNTwitterAccount* account) {
                                 style:UIAlertActionStyleDefault
                               handler:^(UIAlertAction* action) {
                                   NSString* domain =
-                                      [self sharingDomainFromInput:alert.textFields.firstObject.text];
+                                      [self sharingDomainFromInput:answered.textFields.firstObject.text];
+                                  answered = nil;
 
                                   if (domain.length > 0) {
                                       [defaults setObject:domain forKey:@"sharing_domain"];
@@ -945,9 +956,9 @@ static NSURL* PFBAccountAvatarURL(TFNTwitterAccount* account) {
                          actionWithTitle:[bundle localizedTwitterStringForKey:@"OK_ACTION_LABEL"]
                                    style:UIAlertActionStyleDefault
                                  handler:^(UIAlertAction* action) {
-                                     // iOS gives an app no way to relaunch itself, so the
-                                     // remaining option is to quit cleanly and let the user tap
-                                     // the icon — same approach as the dark-style restart reminder.
+                                     // iOS gives an app no way to relaunch itself: the settings
+                                     // are saved, then the app quits and is reopened from its icon.
+                                     PFBCompatSaveNow();
                                      [[NSUserDefaults standardUserDefaults] synchronize];
                                      exit(0);
                                  }]];

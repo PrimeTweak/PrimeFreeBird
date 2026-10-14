@@ -3,6 +3,8 @@
 // timeline cells use. The video half sets Twitter's prefetcher in FeatureSwitches.x.
 
 #import "Support/HookHelpers.h"
+#import "Debug/PFBDebugger.h"
+#import "Debug/PFBProbe.h"
 
 typedef void (^PFBPreloadCompletion)(id result, NSError* error);
 
@@ -71,6 +73,65 @@ static NSURL* photoAddress(id media) {
     return nil;
 }
 
+// Probe: a photo preload that issued nothing, once per reason.
+static BOOL gPFBProbePreloadSkipDone[3];
+static void pfbProbePreloadNotIssued(NSUInteger reason) {
+    if (reason > 2 || gPFBProbePreloadSkipDone[reason] || !PFBDebugIsRecording()) {
+        return;
+    }
+    gPFBProbePreloadSkipDone[reason] = YES;
+    NSString* name = @[ @"url", @"class", @"operation" ][reason];
+    PFBProbeNote([@"10a#F045 not issued " stringByAppendingString:name], @"10a#F045 preload: not issued (%@)", name);
+}
+
+// Probe: the outcome of the photo preloads, from a completion handed to the operation only
+// while it is wanted: the first result, then a tally of the first 30.
+static const NSUInteger kPFBProbePreloadTally = 30;
+static BOOL gPFBProbePreloadDone;
+static BOOL gPFBProbePreloadIssued;
+static PFBPreloadCompletion pfbProbePreloadCompletion(void) {
+    if (gPFBProbePreloadDone || !PFBDebugIsRecording()) {
+        return nil;
+    }
+    if (!PFBProbeWants(@"10a#F045 tally")) {
+        gPFBProbePreloadDone = YES;
+        return nil;
+    }
+    return ^(id result, NSError* error) {
+        BOOL found = NO;
+        long long source = PFBProbeIntegerGetter(result, @"imageSource", &found);
+        if (PFBProbeWants(@"10a#F045 result")) {
+            NSString* failure = error ? [NSString stringWithFormat:@"%@ %ld", error.domain, (long)error.code] : @"none";
+            PFBProbeNote(@"10a#F045 result", @"10a#F045 preload: result=%@ error=%@ main=%@, image source %@",
+                         result ? PFBProbeClassName(result) : @"nil", failure, NSThread.isMainThread ? @"yes" : @"no",
+                         found ? [NSString stringWithFormat:@"%lld", source] : @"?");
+        }
+        if (result && !error) {
+            PFBProbeCount(@"10a#F045 loaded");
+        }
+        if (found && source >= 1 && source <= 3) {
+            PFBProbeCount(@"10a#F045 cached");
+        }
+        if (PFBProbeCount(@"10a#F045 results") == kPFBProbePreloadTally) {
+            PFBProbeNote(@"10a#F045 tally",
+                         @"10a#F045 preload: %lu results, %lu with an image and no error, %lu from a cache",
+                         (unsigned long)kPFBProbePreloadTally, (unsigned long)PFBProbeCountValue(@"10a#F045 loaded"),
+                         (unsigned long)PFBProbeCountValue(@"10a#F045 cached"));
+            gPFBProbePreloadDone = YES;
+        }
+    };
+}
+
+// Probe: the first operation issued with the probe's completion attached, or none issued.
+static void pfbProbePreloadIssue(BOOL issued, BOOL watched) {
+    if (!issued) {
+        pfbProbePreloadNotIssued(2);
+    } else if (watched && !gPFBProbePreloadIssued) {
+        gPFBProbePreloadIssued = YES;
+        PFBProbeNote(@"10a#F045 issued", @"10a#F045 preload: first photo fetch issued with a completion to watch");
+    }
+}
+
 static void fetchPhoto(TIPImagePipeline* pipeline, NSURL* address, NSString* identifier) {
     NSURLComponents* components = [NSURLComponents new];
     components.scheme = @"https";
@@ -82,13 +143,17 @@ static void fetchPhoto(TIPImagePipeline* pipeline, NSURL* address, NSString* ide
     ];
     Class requestClass = objc_getClass("TIPGenericImageFetchRequest");
     if (!components.URL || !requestClass) {
+        pfbProbePreloadNotIssued(requestClass ? 0 : 1);
         return;
     }
     TIPGenericImageFetchRequest* request = [[requestClass alloc] initWithImageURL:components.URL
                                                                          identifier:identifier
                                                                    targetDimensions:CGSizeZero
                                                                   targetContentMode:UIViewContentModeScaleAspectFill];
-    id operation = [pipeline operationWithRequest:request context:nil completion:nil];
+    // Probe: nil outside the measurement, as before.
+    PFBPreloadCompletion probeCompletion = pfbProbePreloadCompletion();
+    id operation = [pipeline operationWithRequest:request context:nil completion:probeCompletion];
+    pfbProbePreloadIssue(operation != nil, probeCompletion != nil);
     if (operation) {
         [pipeline fetchImageWithOperation:operation];
     }

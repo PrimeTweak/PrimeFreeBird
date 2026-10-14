@@ -65,9 +65,10 @@ static UIImage* AppIconIndicator(BOOL active, UIColor* accentColor) {
     } else {
         vectorName = @"circle";
     }
-    UIImage* image = [UIImage tfn_vectorImageNamed:vectorName
-                                          fitsSize:CGSizeMake(24, 24)
-                                         fillColor:fill];
+    UIImage* image = nil;
+    if ([UIImage respondsToSelector:@selector(tfn_vectorImageNamed:fitsSize:fillColor:)]) {
+        image = [UIImage tfn_vectorImageNamed:vectorName fitsSize:CGSizeMake(24, 24) fillColor:fill];
+    }
     if (!image) {
         UIImage* symbol = [UIImage
             systemImageNamed:(active ? @"checkmark.circle.fill" : @"circle")];

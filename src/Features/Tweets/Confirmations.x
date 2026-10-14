@@ -46,6 +46,24 @@ static void ShowConfirmation(PFBCompatOption option, NSString* detail, NSString*
 
 %end
 
+// Replies sent from the bar under a Tweet go through this rather than the
+// compose screen's send button, so the confirmation is wired here too.
+%hook T1PersistentComposeViewController
+
+- (void)_t1_sendReply {
+    if (![PFBSettings boolForKey:@"tweet_confirm"]) {
+        PFBCOMPAT_OBSERVE(PFBCompat_tweet_confirm, @"Tweet sent");
+        return %orig;
+    }
+    ShowConfirmation(PFBCompat_tweet_confirm, @"reply bar", @"CONFIRM_TWEET_TITLE", @"CONFIRM_TWEET_ACTION", ^{
+        %orig;
+    });
+}
+
+%end
+
+// MARK: - Follow confirm
+
 // The profile page uses this button, and it also drives unfollow, which Twitter
 // confirms on its own. Only a tap that will follow (state 0 = not following) is
 // confirmed here.
@@ -65,24 +83,6 @@ static void ShowConfirmation(PFBCompatOption option, NSString* detail, NSString*
 }
 
 %end
-
-// Replies sent from the bar under a Tweet go through this rather than the
-// compose screen's send button, so the confirmation is wired here too.
-%hook T1PersistentComposeViewController
-
-- (void)_t1_sendReply {
-    if (![PFBSettings boolForKey:@"tweet_confirm"]) {
-        PFBCOMPAT_OBSERVE(PFBCompat_tweet_confirm, @"Tweet sent");
-        return %orig;
-    }
-    ShowConfirmation(PFBCompat_tweet_confirm, @"reply bar", @"CONFIRM_TWEET_TITLE", @"CONFIRM_TWEET_ACTION", ^{
-        %orig;
-    });
-}
-
-%end
-
-// MARK: - Follow confirm
 
 %hook TUIFollowControl
 

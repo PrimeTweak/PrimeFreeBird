@@ -11,7 +11,7 @@
 - (NSURL*)initialURL;
 @end
 
-static void changeTwitterColor(NSInteger colorID) {
+static inline void changeTwitterColor(NSInteger colorID) {
     NSUserDefaults* defaults = [NSUserDefaults standardUserDefaults];
     TAEColorSettings* colorSettings =
         [objc_getClass("TAEColorSettings") sharedSettings];
@@ -20,7 +20,7 @@ static void changeTwitterColor(NSInteger colorID) {
                  forKey:@"T1ColorSettingsPrimaryColorOptionKey"];
     [colorSettings setPrimaryColorOption:colorID];
 }
-static UIImage* imageFromView(UIView* view) {
+static inline UIImage* imageFromView(UIView* view) {
     TAEColorSettings* colorSettings =
         [objc_getClass("TAEColorSettings") sharedSettings];
     bool opaque = [colorSettings.currentColorPalette isDark] ? true : false;
@@ -32,16 +32,17 @@ static UIImage* imageFromView(UIView* view) {
     return img;
 }
 
-static BOOL is_iPad() {
+static inline BOOL is_iPad() {
     if ([(NSString*)[UIDevice currentDevice].model hasPrefix:@"iPad"]) {
         return YES;
     }
     return NO;
 }
 
-// https://github.com/julioverne/MImport/blob/0275405812ff41ed2ca56e98f495fd05c38f41f2/mimporthook/MImport.xm#L59
-static UIViewController* _Nullable _topMostController(
-    UIViewController* _Nonnull cont) {
+// The controller shown above cont: the last one presented from it, or that one's visible
+// child when it is a navigation controller; nil when it is cont itself.
+static inline UIViewController* _Nullable _topMostController(
+    UIViewController* _Nullable cont) {
     UIViewController* topController = cont;
     while (topController.presentedViewController) {
         topController = topController.presentedViewController;
@@ -55,7 +56,7 @@ static UIViewController* _Nullable _topMostController(
     }
     return (topController != cont ? topController : nil);
 }
-static UIViewController* _Nonnull topMostController() {
+static inline UIViewController* _Nullable topMostController() {
     UIViewController* topController =
         [UIApplication sharedApplication].keyWindow.rootViewController;
     UIViewController* next = nil;

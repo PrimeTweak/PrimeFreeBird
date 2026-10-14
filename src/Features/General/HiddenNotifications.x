@@ -4,6 +4,8 @@
 
 #import "Support/HookHelpers.h"
 #import "Debug/PFBDebugger.h"
+#import "Debug/PFBProbe.h"
+#import <mach/mach_time.h>
 #import <QuartzCore/QuartzCore.h>
 #import "Support/TwitterChirpFont.h"
 #import "Features/General/PFBHiddenNotificationsViewController.h"
@@ -138,33 +140,6 @@ static id PFBNotifAsk(id target, SEL selector) {
     return ((id (*)(id, SEL))objc_msgSend)(target, selector);
 }
 
-static double PFBNotifAskNumber(id target, SEL selector) {
-    if (!target || ![target respondsToSelector:selector]) {
-        return 0;
-    }
-    NSMethodSignature* signature = [target methodSignatureForSelector:selector];
-    const char* type = signature.methodReturnType;
-    if (!type) {
-        return 0;
-    }
-    if (strcmp(type, "d") == 0) {
-        return ((double (*)(id, SEL))objc_msgSend)(target, selector);
-    }
-    if (strcmp(type, "q") == 0 || strcmp(type, "l") == 0) {
-        return (double)((long long (*)(id, SEL))objc_msgSend)(target, selector);
-    }
-    if (strcmp(type, "@") == 0) {
-        id value = ((id (*)(id, SEL))objc_msgSend)(target, selector);
-        if ([value isKindOfClass:[NSNumber class]]) {
-            return [(NSNumber*)value doubleValue];
-        }
-        if ([value isKindOfClass:[NSDate class]]) {
-            return [(NSDate*)value timeIntervalSince1970];
-        }
-    }
-    return 0;
-}
-
 static NSString* PFBNotifString(id value) {
     if ([value isKindOfClass:[NSString class]]) {
         return value;
@@ -178,10 +153,10 @@ static NSString* PFBNotifString(id value) {
     return nil;
 }
 
-// The runtime sweep: the first of the class's own zero-argument getters whose name
-// holds a wanted word and that yields a value. Used only when the candidate lists come
-// up empty; only the identity reader caches the result, per class.
-static SEL PFBNotifDiscover(id model, NSArray<NSString*>* wanted, char kind) {
+// The runtime sweep: the first of the class's own zero-argument object getters whose name
+// holds a wanted word and that yields a value. Used by the identity reader when its
+// candidate lists come up empty.
+static SEL PFBNotifDiscover(id model, NSArray<NSString*>* wanted) {
     unsigned int count = 0;
     Method* methods = class_copyMethodList([model class], &count);
     if (!methods) {
@@ -207,23 +182,12 @@ static SEL PFBNotifDiscover(id model, NSArray<NSString*>* wanted, char kind) {
         }
         char* returnType = method_copyReturnType(methods[i]);
         if (returnType) {
-            BOOL usable = (kind == '@') ? (returnType[0] == '@')
-                                        : (returnType[0] == 'd' || returnType[0] == 'q' ||
-                                           returnType[0] == 'l' || returnType[0] == '@');
+            BOOL usable = returnType[0] == '@';
             free(returnType);
             if (usable) {
                 // Confirm it actually yields something before adopting it.
-                if (kind == '@') {
-                    if (PFBNotifString(PFBNotifAsk(model, selector)).length) {
-                        winner = selector;
-                    }
-                } else {
-                    double value = PFBNotifAskNumber(model, selector);
-                    if (value > 1420000000 && value < 2050000000) {
-                        winner = selector;
-                    } else if (value > 1420000000000.0 && value < 2050000000000.0) {
-                        winner = selector;
-                    }
+                if (PFBNotifString(PFBNotifAsk(model, selector)).length) {
+                    winner = selector;
                 }
             }
         }
@@ -360,7 +324,7 @@ static NSString* PFBNotifIdentity(id model) {
         }
     }
     SEL found = PFBNotifDiscover(model, @[@"entryid", @"identifier", @"sortindex",
-                                          @"itemid", @"restid"], '@');
+                                          @"itemid", @"restid"]);
     if (found) {
         cache[className] = NSStringFromSelector(found);
         return PFBNotifString(PFBNotifAsk(model, found));
@@ -368,48 +332,222 @@ static NSString* PFBNotifIdentity(id model) {
     return nil;
 }
 
-static double PFBNotifDate(id model) {
-    NSArray<NSString*>* candidates = @[
-        @"timestamp", @"sortTimestamp", @"createdAt", @"date", @"sortDate",
-        @"timeInMs", @"createdAtMs", @"time"
-    ];
-    for (NSString* name in candidates) {
-        double value = PFBNotifAskNumber(model, NSSelectorFromString(name));
-        if (value > 1420000000 && value < 2050000000) {
-            return value;
-        }
-        if (value > 1420000000000.0 && value < 2050000000000.0) {
-            return value / 1000.0;
-        }
-    }
-    SEL found = PFBNotifDiscover(model, @[@"date", @"time", @"created", @"sort"], 'd');
-    if (found) {
-        double discovered = PFBNotifAskNumber(model, found);
-        return discovered > 1420000000000.0 ? discovered / 1000.0 : discovered;
-    }
-    return 0;
+// MARK: - Probe: the cost and the keys of the registry checks
+
+// Probe (10C#L-12, 10C#M-2): calls, total and longest time of the section filter, the cell
+// mask and the registry check, written once the filter and the mask both ran 300 times, or
+// at the end of a tour.
+typedef struct {
+    uint64_t calls;
+    uint64_t total;
+    uint64_t longest;
+} PFBProbeTimes;
+
+static int gPFBProbeTimingState;
+static PFBProbeTimes gPFBProbeFilterTimes;
+static PFBProbeTimes gPFBProbeMaskTimes;
+static PFBProbeTimes gPFBProbeIsHiddenTimes;
+static NSUInteger gPFBProbeFilterLongestItems;
+static Class gPFBProbeFilterCaller;
+static NSString* gPFBProbeFilterLongestOn;
+
+static void PFBNotifProbeTourEnded(void);
+
+// Probe: the end-of-tour line of this file, registered once.
+static void PFBNotifProbeArm(void) {
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+      [[NSNotificationCenter defaultCenter] addObserverForName:PFBProbeTourEndedNotification
+                                                        object:nil
+                                                         queue:nil
+                                                    usingBlock:^(__unused NSNotification* note) {
+                                                      PFBNotifProbeTourEnded();
+                                                    }];
+    });
 }
 
-static NSString* PFBNotifText(id model) {
-    NSArray<NSString*>* candidates = @[
-        @"text", @"message", @"displayText", @"bodyText", @"title",
-        @"formattedText", @"attributedText", @"summary", @"notificationText"
-    ];
-    for (NSString* name in candidates) {
-        NSString* value = PFBNotifString(PFBNotifAsk(model, NSSelectorFromString(name)));
-        if (value.length > 2) {
-            return value;
+// Probe: the start of a timed call, or 0 when nothing is timed.
+static uint64_t PFBProbeTimingBegin(void) {
+    if (gPFBProbeTimingState == 2) {
+        return 0;
+    }
+    if (gPFBProbeTimingState == 0) {
+        gPFBProbeTimingState = PFBProbeWants(@"10C#L-12 cost") ? 1 : 2;
+        if (gPFBProbeTimingState == 2) {
+            return 0;
+        }
+        PFBNotifProbeArm();
+    }
+    return NSThread.isMainThread ? mach_absolute_time() : 0;
+}
+
+// Probe: adds one timed call; YES when it is the longest so far.
+static BOOL PFBProbeTimesAdd(PFBProbeTimes* times, uint64_t start) {
+    uint64_t elapsed = mach_absolute_time() - start;
+    times->calls++;
+    times->total += elapsed;
+    if (elapsed <= times->longest) {
+        return NO;
+    }
+    times->longest = elapsed;
+    return YES;
+}
+
+static double PFBProbeMilliseconds(uint64_t ticks) {
+    static mach_timebase_info_data_t base;
+    if (!base.denom) {
+        mach_timebase_info(&base);
+    }
+    return (double)ticks * base.numer / base.denom / 1e6;
+}
+
+static double PFBProbeAverageMilliseconds(PFBProbeTimes times) {
+    return times.calls ? PFBProbeMilliseconds(times.total) / (double)times.calls : 0.0;
+}
+
+static void PFBProbeTimingWrite(NSString* moment) {
+    if (gPFBProbeTimingState != 1) {
+        return;
+    }
+    gPFBProbeTimingState = 2;
+    if (!PFBProbeWants(@"10C#L-12 cost")) {
+        return;
+    }
+    PFBProbeNote(@"10C#L-12 cost",
+                 @"10C#L-12/10C#M-2 hidden notifs (%@): registry %lu entries; filter max %.2f ms over %lu items "
+                 @"(largest on %@), avg %.3f ms over %llu calls; cell mask max %.2f ms, avg %.3f ms over %llu calls; "
+                 @"IsHidden avg %.1f us over %llu calls",
+                 moment, (unsigned long)PFBHiddenNotifs().count, PFBProbeMilliseconds(gPFBProbeFilterTimes.longest),
+                 (unsigned long)gPFBProbeFilterLongestItems, gPFBProbeFilterLongestOn ?: @"?",
+                 PFBProbeAverageMilliseconds(gPFBProbeFilterTimes), gPFBProbeFilterTimes.calls,
+                 PFBProbeMilliseconds(gPFBProbeMaskTimes.longest), PFBProbeAverageMilliseconds(gPFBProbeMaskTimes),
+                 gPFBProbeMaskTimes.calls, PFBProbeAverageMilliseconds(gPFBProbeIsHiddenTimes) * 1000.0,
+                 gPFBProbeIsHiddenTimes.calls);
+}
+
+// Probe: the controller whose section update the filter is timed for.
+static void PFBProbeFilterCaller(id controller) {
+    if (gPFBProbeTimingState == 1) {
+        gPFBProbeFilterCaller = object_getClass(controller);
+    }
+}
+
+// Probe: ends a timed filter call; the longest one is described by its items and controller.
+static void PFBProbeFilterTimed(uint64_t start, NSArray* sections) {
+    if (!start) {
+        return;
+    }
+    if (PFBProbeTimesAdd(&gPFBProbeFilterTimes, start)) {
+        NSUInteger items = 0;
+        for (id section in sections) {
+            if ([section respondsToSelector:@selector(items)]) {
+                id maybe = ((id (*)(id, SEL))objc_msgSend)(section, @selector(items));
+                items += [maybe isKindOfClass:[NSArray class]] ? ((NSArray*)maybe).count : 0;
+            }
+        }
+        gPFBProbeFilterLongestItems = items;
+        gPFBProbeFilterLongestOn = gPFBProbeFilterCaller ? NSStringFromClass(gPFBProbeFilterCaller) : @"?";
+    }
+    if (gPFBProbeFilterTimes.calls >= 300 && gPFBProbeMaskTimes.calls >= 300) {
+        PFBProbeTimingWrite(@"after 300 calls");
+    }
+}
+
+// Probe: ends a timed cell mask call.
+static void PFBProbeMaskTimed(uint64_t start) {
+    if (!start) {
+        return;
+    }
+    PFBProbeTimesAdd(&gPFBProbeMaskTimes, start);
+    if (gPFBProbeFilterTimes.calls >= 300 && gPFBProbeMaskTimes.calls >= 300) {
+        PFBProbeTimingWrite(@"after 300 calls");
+    }
+}
+
+// Probe: ends a timed registry check, whichever return ends it.
+static void PFBProbeIsHiddenTimed(uint64_t* start) {
+    if (*start) {
+        PFBProbeTimesAdd(&gPFBProbeIsHiddenTimes, *start);
+    }
+}
+
+// Probe: a full tour run to its end writes the timings gathered so far.
+static void PFBNotifProbeTourEnded(void) {
+    if ([PFBCompatTourLastRun() hasPrefix:@"Full tour"] && gPFBProbeFilterTimes.calls) {
+        PFBProbeTimingWrite(@"at the end of the tour");
+    }
+}
+
+// Probe (08#F028): the key a hidden row is matched by and, for an identity match, whether the
+// durable key held since the hide; once per case and per launch of the hide.
+static int gPFBProbeMatchState;
+static uint32_t gPFBProbeMatchSeen;
+
+static NSString* PFBProbeAge(double seconds) {
+    if (seconds < 120) {
+        return [NSString stringWithFormat:@"%.0f s", seconds];
+    }
+    if (seconds < 7200) {
+        return [NSString stringWithFormat:@"%.0f min", seconds / 60];
+    }
+    if (seconds < 172800) {
+        return [NSString stringWithFormat:@"%.0f h", seconds / 3600];
+    }
+    return [NSString stringWithFormat:@"%.0f d", seconds / 86400];
+}
+
+// path: 0 durable key, 1 identity in entry, 2 identity as key. registryKey nil: looked up.
+static void PFBProbeNotifMatched(NSUInteger path, NSDictionary* hidden, id entry, NSString* registryKey,
+                                 NSString* durableKey, id model) {
+    if (gPFBProbeMatchState == 2) {
+        return;
+    }
+    if (gPFBProbeMatchState == 0) {
+        gPFBProbeMatchState = PFBDebugIsRecording() ? 1 : 2;
+        if (gPFBProbeMatchState == 2) {
+            return;
         }
     }
-    SEL found = PFBNotifDiscover(model, @[@"text", @"title", @"message", @"body",
-                                          @"summary"], '@');
-    if (found) {
-        return PFBNotifString(PFBNotifAsk(model, found));
+    static NSString* const paths[] = {@"durable key", @"identity in entry", @"identity as key"};
+    double hiddenAt = [entry isKindOfClass:[NSDictionary class]] ? [((NSDictionary*)entry)[@"h"] doubleValue] : 0;
+    double now = [[NSDate date] timeIntervalSince1970];
+    BOOL thisLaunch = hiddenAt > 0 && hiddenAt >= now - PFBProbeSinceLaunch();
+    NSString* launch = thisLaunch ? @"this" : @"an earlier";
+    uint32_t pathBit = 1u << (path * 2 + (thisLaunch ? 0 : 1));
+    if (!(gPFBProbeMatchSeen & pathBit)) {
+        gPFBProbeMatchSeen |= pathBit;
+        NSString* key = [NSString stringWithFormat:@"08#F028 by %@ %@", paths[path], launch];
+        if (PFBProbeWants(key)) {
+            PFBProbeNote(key, @"08#F028 hidden row matched by %@ (entry hidden %@ ago, in %@ launch; registry %lu entries; row model %@)",
+                         paths[path], hiddenAt > 0 ? PFBProbeAge(now - hiddenAt) : @"?", launch,
+                         (unsigned long)hidden.count, PFBProbeClassName(model));
+        }
     }
-    return nil;
+    if (path > 0) {
+        NSString* stored = registryKey ?: [hidden allKeysForObject:entry].firstObject;
+        static NSString* const states[] = {@"absent at the hide", @"none now", @"unchanged", @"changed", @"unknown"};
+        NSUInteger state = 4;
+        if (stored) {
+            state = ![stored hasPrefix:@"dk:"] ? 0 : (!durableKey.length ? 1 : ([durableKey isEqualToString:stored] ? 2 : 3));
+        }
+        uint32_t stateBit = 1u << (8 + state * 2 + (thisLaunch ? 0 : 1));
+        if (!(gPFBProbeMatchSeen & stateBit)) {
+            gPFBProbeMatchSeen |= stateBit;
+            NSString* key = [NSString stringWithFormat:@"08#F028 durable %@ %@", states[state], launch];
+            if (PFBProbeWants(key)) {
+                PFBProbeNote(key, @"08#F028 durable key %@ since the hide (entry hidden %@ ago, in %@ launch)",
+                             states[state], hiddenAt > 0 ? PFBProbeAge(now - hiddenAt) : @"?", launch);
+            }
+        }
+    }
+    if ((gPFBProbeMatchSeen & 0x3F) == 0x3F) {
+        gPFBProbeMatchState = 2;
+    }
 }
 
 static BOOL PFBNotifIsHidden(id model) {
+    // Probe: times the check, whichever return ends it.
+    __attribute__((cleanup(PFBProbeIsHiddenTimed))) uint64_t probeStart = PFBProbeTimingBegin();
     if (!model) {
         return NO;
     }
@@ -419,6 +557,8 @@ static BOOL PFBNotifIsHidden(id model) {
     }
     NSString* durableKey = PFBNotifDurableKey(model);
     if (durableKey.length && hidden[durableKey] != nil) {
+        // Probe: the durable key matched.
+        PFBProbeNotifMatched(0, hidden, hidden[durableKey], durableKey, durableKey, model);
         return YES;
     }
     // Read once and reused below: this call walks the model.
@@ -433,9 +573,15 @@ static BOOL PFBNotifIsHidden(id model) {
             id session = entry[@"s"];
             if ([session isKindOfClass:[NSString class]] &&
                 [session isEqualToString:identity]) {
+                // Probe: the session identity stored in an entry matched.
+                PFBProbeNotifMatched(1, hidden, entry, nil, durableKey, model);
                 return YES;
             }
         }
+    }
+    // Probe: the identity matched as a registry key.
+    if (gPFBProbeMatchState != 2 && PFBDebugIsRecording() && identity.length && hidden[identity] != nil) {
+        PFBProbeNotifMatched(2, hidden, hidden[identity], identity, durableKey, model);
     }
     return identity.length && hidden[identity] != nil;
 }
@@ -586,17 +732,14 @@ static NSString* PFBHideNotifWithText(id model, NSString* cellText) {
         return nil;
     }
     NSMutableDictionary* current = [PFBHiddenNotifs() mutableCopy];
-    NSString* text = PFBNotifText(model) ?: (cellText ?: @"");
+    NSString* text = cellText ?: @"";
     if (text.length > 140) {
         text = [text substringToIndex:140];
     }
     // "d" is the notification's own date. The model has none, so it comes from
     // the age the cell displays; the countdown and the expiry date both read
     // "d" first and only fall back to "h", the moment it was hidden.
-    NSTimeInterval notifDate = PFBNotifDate(model);
-    if (notifDate <= 0) {
-        notifDate = PFBNotifDateFromDisplayedAge(cellText ?: text, [[NSDate date] timeIntervalSince1970]);
-    }
+    NSTimeInterval notifDate = PFBNotifDateFromDisplayedAge(cellText ?: @"", [[NSDate date] timeIntervalSince1970]);
     // One entry per notification: the registry is keyed by the durable key when
     // there is one, and the session identity rides inside the value so the filter
     // can match either.
@@ -869,8 +1012,7 @@ static void PFBNotifDropRow(id dataViewController, NSIndexPath* indexPath) {
         static BOOL saidNoModel;
         if (!saidNoModel) {
             saidNoModel = YES;
-            PFBDebugLog(@"[notifs] swipe: no model at row %ld/%ld - "
-                        @"section reading to revisit",
+            PFBDebugLog(@"[notifs] swipe: no model at row %ld/%ld - no action added",
                         (long)indexPath.section, (long)indexPath.row);
         }
         return original;
@@ -902,9 +1044,23 @@ static void PFBNotifDropRow(id dataViewController, NSIndexPath* indexPath) {
                           handler:^(__unused UIContextualAction* action,
                                     __unused UIView* sourceView,
                                     void (^completion)(BOOL)) {
-            NSString* hiddenKey = PFBHideNotifWithText(model, PFBNotifTextFromCell(tableView, indexPath));
+            // Rows can shift while the swipe is open: the row is found again by its notification.
+            NSString* identity = PFBNotifIdentity(model);
+            NSMutableArray<NSIndexPath*>* candidates = [NSMutableArray arrayWithObject:indexPath];
+            [candidates addObjectsFromArray:tableView.indexPathsForVisibleRows ?: @[]];
+            NSIndexPath* row = nil;
+            for (NSIndexPath* candidate in candidates) {
+                id current = PFBModelAtIndexPath(self, candidate) ?: PFBModelFromCell(tableView, candidate);
+                if (current && (current == model || [PFBNotifIdentity(current) isEqualToString:identity])) {
+                    row = candidate;
+                    break;
+                }
+            }
+            NSString* hiddenKey = PFBHideNotifWithText(model, row ? PFBNotifTextFromCell(tableView, row) : nil);
             completion(YES);
-            PFBNotifDropRow(self, indexPath);
+            if (row) {
+                PFBNotifDropRow(self, row);
+            }
             if (hiddenKey) {
                 PFBShowNotifToast(hiddenKey);
             }
@@ -935,6 +1091,8 @@ static void PFBNotifDropRow(id dataViewController, NSIndexPath* indexPath) {
 // pass through whole. An id in the registry can only belong to a hidden notification,
 // so the filter needs no scoping of its own.
 static NSArray* PFBFilterNotifSections(NSArray* sections) {
+    // Probe: times the filter, ended below when the registry holds entries.
+    uint64_t probeStart = PFBProbeTimingBegin();
     if (![PFBSettings boolForKey:@"hide_notifications"]) {
         return sections;
     }
@@ -975,6 +1133,8 @@ static NSArray* PFBFilterNotifSections(NSArray* sections) {
             [result addObject:section];  // immutable section: leave it whole
         }
     }
+    // Probe: the timed filter call ends.
+    PFBProbeFilterTimed(probeStart, sections);
     return changed ? result : sections;
 }
 
@@ -1113,6 +1273,57 @@ static void PFBNotifLayoutEmptyPanel(UIView* panel, UITableView* table) {
                              width, CGRectGetMaxY(body.frame));
 }
 
+// Probe (08#F027): the model classes of the rows on a screen the panel may cover: the first
+// pass over ten rows or more, and the first pass holding Tweet rows.
+static int gPFBProbeRowsState;
+static NSUInteger gPFBProbeRowsPasses;
+
+static NSCountedSet<NSString*>* PFBProbeRowsBegin(void) {
+    if (gPFBProbeRowsState == 2) {
+        return nil;
+    }
+    if (gPFBProbeRowsState == 0) {
+        gPFBProbeRowsState = (PFBProbeWants(@"08#F027 rows") || PFBProbeWants(@"08#F027 tweets")) ? 1 : 2;
+        if (gPFBProbeRowsState == 2) {
+            return nil;
+        }
+    }
+    return [NSCountedSet set];
+}
+
+static void PFBProbeRowsEnd(NSCountedSet<NSString*>* classes, NSInteger rows, NSInteger notifRows) {
+    if (!classes) {
+        return;
+    }
+    BOOL tweets = NO;
+    for (NSString* name in classes) {
+        tweets = tweets || (([name containsString:@"Status"] || [name containsString:@"Tweet"]) &&
+                            ![name containsString:@"Notification"]);
+    }
+    NSArray<NSString*>* names = [classes.allObjects sortedArrayUsingComparator:^NSComparisonResult(NSString* a, NSString* b) {
+      NSUInteger left = [classes countForObject:a];
+      NSUInteger right = [classes countForObject:b];
+      return left == right ? [a compare:b] : (left > right ? NSOrderedAscending : NSOrderedDescending);
+    }];
+    NSMutableArray<NSString*>* parts = [NSMutableArray array];
+    for (NSString* name in names) {
+        [parts addObject:[NSString stringWithFormat:@"%@ \u00d7%lu", name, (unsigned long)[classes countForObject:name]]];
+    }
+    NSString* histogram = parts.count ? [parts componentsJoinedByString:@", "] : @"no model read";
+    if (rows >= 10 && PFBProbeWants(@"08#F027 rows")) {
+        PFBProbeNote(@"08#F027 rows", @"08#F027 notifications list rows (%ld, %ld with a notification model): %@",
+                     (long)rows, (long)notifRows, histogram);
+    }
+    if (tweets && PFBProbeWants(@"08#F027 tweets")) {
+        PFBProbeNote(@"08#F027 tweets", @"08#F027 Tweet rows on the notifications list (%ld rows, %ld with a notification model): %@",
+                     (long)rows, (long)notifRows, histogram);
+    }
+    gPFBProbeRowsPasses++;
+    if (gPFBProbeRowsPasses >= 300 || (!PFBProbeWants(@"08#F027 rows") && !PFBProbeWants(@"08#F027 tweets"))) {
+        gPFBProbeRowsState = 2;
+    }
+}
+
 static void PFBNotifSyncEmptyState(id dataViewController) {
     if (!dataViewController) {
         return;
@@ -1141,6 +1352,8 @@ static void PFBNotifSyncEmptyState(id dataViewController) {
         // decided by how many rows carry a notification model.
         NSInteger rows = 0;
         NSInteger notifRows = 0;
+        // Probe: the model classes of the rows read below.
+        NSCountedSet<NSString*>* probeRows = PFBProbeRowsBegin();
         SEL itemSel = NSSelectorFromString(@"itemAtIndexPath:");
         BOOL canRead = [dataViewController respondsToSelector:itemSel];
         for (NSInteger s = 0; s < table.numberOfSections; s++) {
@@ -1154,12 +1367,16 @@ static void PFBNotifSyncEmptyState(id dataViewController) {
                 id item = ((id (*)(id, SEL, id))objc_msgSend)(dataViewController,
                                                              itemSel, path);
                 id model = item ? PFBUnwrapDataViewItem(item) : nil;
+                if (probeRows) {
+                    [probeRows addObject:model ? NSStringFromClass([model class]) : @"(no model)"];
+                }
                 if (model && [NSStringFromClass([model class])
                                  containsString:@"Notification"]) {
                     notifRows++;
                 }
             }
         }
+        PFBProbeRowsEnd(probeRows, rows, notifRows);
         UIView* existing = [table viewWithTag:kPFBNotifEmptyTag];
         NSUInteger hidden = PFBHiddenNotifs().count;
 
@@ -1244,8 +1461,28 @@ static void PFBNotifSyncEmptyState(id dataViewController) {
 
 static BOOL gPFBNotifSweeping;
 
+// Takes the empty-list panel off a notifications list at once, without the fade.
+static void PFBNotifRemoveEmptyPanel(id dataViewController) {
+    if (![objc_getAssociatedObject(dataViewController, kPFBNotifVerdictKey) isEqual:@YES]) {
+        return;
+    }
+    SEL tableSel = NSSelectorFromString(@"tableView");
+    if (![dataViewController respondsToSelector:tableSel]) {
+        return;
+    }
+    id table = ((id (*)(id, SEL))objc_msgSend)(dataViewController, tableSel);
+    if ([table isKindOfClass:[UITableView class]]) {
+        [[(UITableView*)table viewWithTag:kPFBNotifEmptyTag] removeFromSuperview];
+    }
+}
+
 static void PFBNotifSweep(id dataViewController) {
-    if (gPFBNotifSweeping || ![PFBSettings boolForKey:@"hide_notifications"] || !dataViewController) {
+    if (gPFBNotifSweeping || !dataViewController) {
+        return;
+    }
+    if (![PFBSettings boolForKey:@"hide_notifications"]) {
+        // Off, the list is Twitter's own again: a panel left from before goes.
+        PFBNotifRemoveEmptyPanel(dataViewController);
         return;
     }
     if (!PFBHiddenNotifs().count) {
@@ -1330,18 +1567,24 @@ static void PFBNotifSweepLater(id dataViewController) {
 %hook TFNItemsDataViewController
 
 - (void)setSections:(NSArray*)sections restoreScrollPosition:(BOOL)restore {
+    // Probe: the filter's timing is charged to this controller.
+    PFBProbeFilterCaller(self);
     %orig(PFBFilterNotifSections(sections), restore);
     // The list is in place: remove what is hidden.
     PFBNotifSweepLater(self);
 }
 
 - (void)setSections:(NSArray*)sections {
+    // Probe: the filter's timing is charged to this controller.
+    PFBProbeFilterCaller(self);
     %orig(PFBFilterNotifSections(sections));
     // The list is in place: remove what is hidden.
     PFBNotifSweepLater(self);
 }
 
 - (void)updateSections:(NSArray*)sections {
+    // Probe: the filter's timing is charged to this controller.
+    PFBProbeFilterCaller(self);
     %orig(PFBFilterNotifSections(sections));
     // The list is in place: remove what is hidden.
     PFBNotifSweepLater(self);
@@ -1352,12 +1595,16 @@ static void PFBNotifSweepLater(id dataViewController) {
 // return on a refresh.
 
 - (void)updateSections:(NSArray*)sections completion:(id)completion {
+    // Probe: the filter's timing is charged to this controller.
+    PFBProbeFilterCaller(self);
     %orig(PFBFilterNotifSections(sections), completion);
     // The list is in place: remove what is hidden.
     PFBNotifSweepLater(self);
 }
 
 - (void)updateSections:(NSArray*)sections withRowAnimation:(NSInteger)animation {
+    // Probe: the filter's timing is charged to this controller.
+    PFBProbeFilterCaller(self);
     %orig(PFBFilterNotifSections(sections), animation);
     // The list is in place: remove what is hidden.
     PFBNotifSweepLater(self);
@@ -1366,6 +1613,8 @@ static void PFBNotifSweepLater(id dataViewController) {
 - (void)updateSections:(NSArray*)sections
       withRowAnimation:(NSInteger)animation
             completion:(id)completion {
+    // Probe: the filter's timing is charged to this controller.
+    PFBProbeFilterCaller(self);
     %orig(PFBFilterNotifSections(sections), animation, completion);
     // The list is in place: remove what is hidden.
     PFBNotifSweepLater(self);
@@ -1375,6 +1624,8 @@ static void PFBNotifSweepLater(id dataViewController) {
 reconfigureItemIdentifiers:(id)identifiers
       withRowAnimation:(NSInteger)animation
             completion:(id)completion {
+    // Probe: the filter's timing is charged to this controller.
+    PFBProbeFilterCaller(self);
     %orig(PFBFilterNotifSections(sections), identifiers, animation, completion);
     // The list is in place: remove what is hidden.
     PFBNotifSweepLater(self);
@@ -1532,6 +1783,91 @@ UIImage* PFBFlatGlyph(UIImage* source, UIColor* colour) {
     return [painted imageWithRenderingMode:UIImageRenderingModeAlwaysOriginal];
 }
 
+// Probe (10C#L-5, 08#F022): whether Twitter's navigation update keeps an eye already placed,
+// and the style and ink a kept eye was drawn with against the bar's style and the gear's ink now.
+static char kPFBProbeEyePlacedKey;
+static char kPFBProbeEyeMadeKey;
+static int gPFBProbeEyeState;
+
+static BOOL PFBProbeEyeOpen(void) {
+    if (gPFBProbeEyeState == 0) {
+        gPFBProbeEyeState = PFBDebugIsRecording() ? 1 : 2;
+    }
+    return gPFBProbeEyeState == 1;
+}
+
+static NSString* PFBProbeStyleName(UIUserInterfaceStyle style) {
+    if (style == UIUserInterfaceStyleDark) {
+        return @"dark";
+    }
+    return style == UIUserInterfaceStyleLight ? @"light" : @"unspecified";
+}
+
+// Probe: marks the screen the eye is placed on, with the style and ink it is drawn with.
+static void PFBProbeEyePlaced(UIBarButtonItem* eye, UIViewController* viewController, UIColor* ink) {
+    if (!PFBProbeEyeOpen()) {
+        return;
+    }
+    UITraitCollection* traits = viewController.traitCollection;
+    objc_setAssociatedObject(viewController, &kPFBProbeEyePlacedKey, @YES, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    objc_setAssociatedObject(eye, &kPFBProbeEyeMadeKey,
+                             @{@"style": PFBProbeStyleName(traits.userInterfaceStyle), @"ink": PFBProbeColor(ink, traits)},
+                             OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+}
+
+// Probe: after Twitter's own update of a screen the eye was placed on, whether it is still there,
+// with the update's rightBarButtonItems: flag.
+static void PFBProbeEyeAfterUpdate(UIViewController* viewController, BOOL right) {
+    if (!PFBProbeEyeOpen() || !viewController || !objc_getAssociatedObject(viewController, &kPFBProbeEyePlacedKey)) {
+        return;
+    }
+    BOOL kept = NO;
+    for (UIBarButtonItem* existing in viewController.navigationItem.rightBarButtonItems) {
+        kept = kept || existing.tag == kPFBNotifBarItemTag;
+    }
+    NSString* key = kept ? (right ? @"10C#L-5 kept right" : @"10C#L-5 kept") : (right ? @"10C#L-5 dropped right" : @"10C#L-5 dropped");
+    if (PFBProbeWants(key)) {
+        PFBProbeNote(key,
+                     kept ? @"10C#L-5 eye: Twitter's navigation update kept the eye already placed (Hide notifications %@, rightBarButtonItems: %@)"
+                          : @"10C#L-5 eye: Twitter's navigation update set fresh items and dropped the eye already placed (Hide notifications %@, rightBarButtonItems: %@)",
+                     [PFBSettings boolForKey:@"hide_notifications"] ? @"on" : @"off", right ? @"YES" : @"NO");
+    }
+}
+
+// Probe: a kept eye, the style and ink it was made with against the bar's style and gear ink now.
+static void PFBProbeEyeKept(UIBarButtonItem* eye, UIViewController* viewController, UINavigationItem* item) {
+    if (!PFBProbeEyeOpen()) {
+        return;
+    }
+    NSDictionary* made = objc_getAssociatedObject(eye, &kPFBProbeEyeMadeKey);
+    UITraitCollection* traits = viewController.traitCollection;
+    NSString* now = PFBProbeStyleName(traits.userInterfaceStyle);
+    NSString* key = [NSString stringWithFormat:@"08#F022 %@ %@", made[@"style"] ?: @"?", now];
+    if (!PFBProbeWants(key)) {
+        return;
+    }
+    __block UIColor* gear = nil;
+    for (UIBarButtonItem* neighbour in item.rightBarButtonItems) {
+        if (neighbour == eye) {
+            continue;
+        }
+        if (neighbour.customView) {
+            PFBEnumerateSubviewsRecursively(neighbour.customView, ^(UIView* view) {
+              if (!gear && [view isKindOfClass:[UIImageView class]] && view.tintColor) {
+                  gear = view.tintColor;
+              }
+            });
+        } else if (neighbour.tintColor) {
+            gear = neighbour.tintColor;
+        }
+        if (gear) {
+            break;
+        }
+    }
+    PFBProbeNote(key, @"08#F022 eye kept, made under %@ (ink %@), bar now under %@ (gear ink %@)",
+                 made[@"style"] ?: @"?", made[@"ink"] ?: @"?", now, PFBProbeColor(gear, traits));
+}
+
 %hook T1TabNavigationController
 
 - (void)_t1_main_updateNavigationItemForViewController:(UIViewController*)viewController
@@ -1539,6 +1875,8 @@ UIImage* PFBFlatGlyph(UIImage* source, UIColor* colour) {
                            providingLeftBarButtonItems:(BOOL)left
                                  rightBarButtonItems:(BOOL)right {
     %orig;
+    // Probe: whether Twitter's update kept the eye placed earlier on this screen.
+    PFBProbeEyeAfterUpdate(viewController, right);
     if (![PFBSettings boolForKey:@"hide_notifications"] || !viewController) {
         return;
     }
@@ -1550,6 +1888,8 @@ UIImage* PFBFlatGlyph(UIImage* source, UIColor* colour) {
         UINavigationItem* item = viewController.navigationItem;
         for (UIBarButtonItem* existing in item.rightBarButtonItems) {
             if (existing.tag == kPFBNotifBarItemTag) {
+                // Probe: the kept eye's style and ink against the bar's now.
+                PFBProbeEyeKept(existing, viewController, item);
                 return;
             }
         }
@@ -1600,6 +1940,8 @@ UIImage* PFBFlatGlyph(UIImage* source, UIColor* colour) {
             [NSMutableArray arrayWithArray:item.rightBarButtonItems ?: @[]];
         [items addObject:ours];
         item.rightBarButtonItems = items;
+        // Probe: the screen the eye is placed on, with its style and ink.
+        PFBProbeEyePlaced(ours, viewController, ink);
     } @catch (id exception) {
         PFBDebugLog(@"[notifs] eye placement abandoned - no consequence");
     }
@@ -1642,6 +1984,8 @@ static UITableView* PFBNotifTableForCell(UIView* cell) {
 static const char* kPFBNotifMaskedKey = "pfbNotifMasked";
 
 static void PFBNotifMaskHiddenCell(UITableViewCell* cell) {
+    // Probe: times the mask, ended at the bottom.
+    uint64_t probeStart = PFBProbeTimingBegin();
     BOOL hide = NO;
     if ([PFBSettings boolForKey:@"hide_notifications"] && PFBHiddenNotifs().count) {
         @try {
@@ -1669,6 +2013,79 @@ static void PFBNotifMaskHiddenCell(UITableViewCell* cell) {
                                  OBJC_ASSOCIATION_RETAIN_NONATOMIC);
         cell.alpha = 1;
     }
+    // Probe: the timed mask call ends.
+    PFBProbeMaskTimed(probeStart);
+}
+
+// Probe (SC-4): the dismiss button's native state, and its state on cells already revealed
+// while Hide notifications is off: the first such layout, then a tally once the option is back on.
+static int gPFBProbeDismissState;
+static BOOL gPFBProbeDismissNativeDone;
+static BOOL gPFBProbeDismissOffDone;
+static BOOL gPFBProbeDismissTallyDone;
+static NSUInteger gPFBProbeDismissOffLayouts;
+static NSUInteger gPFBProbeDismissOffCrosses;
+
+static BOOL PFBProbeDismissOpen(void) {
+    if (gPFBProbeDismissState == 2) {
+        return NO;
+    }
+    if (gPFBProbeDismissState == 0) {
+        gPFBProbeDismissState = PFBDebugIsRecording() ? 1 : 2;
+        gPFBProbeDismissNativeDone = !PFBProbeWants(@"SC-4 native");
+        gPFBProbeDismissOffDone = !PFBProbeWants(@"SC-4 off");
+        gPFBProbeDismissTallyDone = !PFBProbeWants(@"SC-4 off tally");
+    }
+    if (gPFBProbeDismissNativeDone && gPFBProbeDismissOffDone && gPFBProbeDismissTallyDone) {
+        gPFBProbeDismissState = 2;
+    }
+    return gPFBProbeDismissState == 1;
+}
+
+static NSString* PFBProbeDismissText(UIView* cell, UIView* dismiss) {
+    return [NSString stringWithFormat:@"hidden=%d alpha=%.2f frame=%@ cross=%d window=%d", dismiss.hidden ? 1 : 0,
+                                      dismiss.alpha, NSStringFromCGRect(dismiss.frame),
+                                      objc_getAssociatedObject(dismiss, kPFBNotifGlyphKey) ? 1 : 0, cell.window ? 1 : 0];
+}
+
+// Probe: a cell revealed earlier, laid out with the option off.
+static void PFBProbeDismissWhileOff(UIView* cell) {
+    if (!PFBProbeDismissOpen() || gPFBProbeDismissTallyDone || !objc_getAssociatedObject(cell, kPFBNotifRevealedKey)) {
+        return;
+    }
+    id button = PFBProbeGetter(cell, @"dismissButton");
+    if (![button isKindOfClass:[UIView class]]) {
+        return;
+    }
+    UIView* dismiss = button;
+    gPFBProbeDismissOffLayouts++;
+    if (!dismiss.hidden && dismiss.alpha >= 0.5 && dismiss.frame.size.width >= 1.0 &&
+        objc_getAssociatedObject(dismiss, kPFBNotifGlyphKey) && cell.window) {
+        gPFBProbeDismissOffCrosses++;
+    }
+    if (!gPFBProbeDismissOffDone) {
+        gPFBProbeDismissOffDone = YES;
+        PFBProbeNote(@"SC-4 off", @"SC-4 notif X, option off: %@", PFBProbeDismissText(cell, dismiss));
+    }
+}
+
+// Probe: with the option on, the tally of the layouts seen while it was off, and the state of
+// a button not revealed yet.
+static void PFBProbeDismissWhileOn(UIView* cell, UIView* dismiss) {
+    if (!PFBProbeDismissOpen()) {
+        return;
+    }
+    if (gPFBProbeDismissOffLayouts && !gPFBProbeDismissTallyDone) {
+        gPFBProbeDismissTallyDone = YES;
+        PFBProbeNote(@"SC-4 off tally",
+                     @"SC-4 notif X, option off: %lu of %lu layouts of revealed cells still showed the cross "
+                     @"(hidden=0, alpha>=0.5, cross=1, in a window)",
+                     (unsigned long)gPFBProbeDismissOffCrosses, (unsigned long)gPFBProbeDismissOffLayouts);
+    }
+    if (!gPFBProbeDismissNativeDone && !objc_getAssociatedObject(cell, kPFBNotifRevealedKey)) {
+        gPFBProbeDismissNativeDone = YES;
+        PFBProbeNote(@"SC-4 native", @"SC-4 notif X native: %@", PFBProbeDismissText(cell, dismiss));
+    }
 }
 
 %hook T1URTTimelineNotificationCell
@@ -1682,6 +2099,8 @@ static void PFBNotifMaskHiddenCell(UITableViewCell* cell) {
     %orig;
     PFBNotifMaskHiddenCell((UITableViewCell*)self);
     if (![PFBSettings boolForKey:@"hide_notifications"]) {
+        // Probe: the state of a cross revealed earlier, with the option off.
+        PFBProbeDismissWhileOff((UIView*)self);
         return;
     }
     @try {
@@ -1690,6 +2109,8 @@ static void PFBNotifMaskHiddenCell(UITableViewCell* cell) {
             return;
         }
         UIView* dismiss = button;
+        // Probe: the button's state before it is changed below.
+        PFBProbeDismissWhileOn((UIView*)self, dismiss);
         // How the button is hidden cannot be established statically, so every
         // route is covered: hidden flag, alpha and a zero frame. The cell is
         // marked so the tap handler recognizes it.
@@ -1717,8 +2138,10 @@ static void PFBNotifMaskHiddenCell(UITableViewCell* cell) {
                                                                    weight:UIImageSymbolWeightSemibold];
                 cross = PFBTwitterGlyphFor(@"close", [UIImage systemImageNamed:@"xmark" withConfiguration:cfg]);
                 if (cross) {
-                    [button setImage:[cross imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate]
-                            forState:UIControlStateNormal];
+                    cross = [cross imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate];
+                    objc_setAssociatedObject(cross, kPFBNotifXmarkImageKey, @YES,
+                                             OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+                    [button setImage:cross forState:UIControlStateNormal];
                     button.tintColor = [UIColor secondaryLabelColor];
                     button.contentHorizontalAlignment = UIControlContentHorizontalAlignmentCenter;
                     button.contentVerticalAlignment = UIControlContentVerticalAlignmentCenter;
@@ -1735,7 +2158,7 @@ static void PFBNotifMaskHiddenCell(UITableViewCell* cell) {
                 }] forControlEvents:UIControlEventTouchDown];
                 [button addAction:[UIAction actionWithHandler:^(__unused UIAction* a) {
                     weakButton.tintColor = [UIColor secondaryLabelColor];
-                }] forControlEvents:UIControlEventTouchUpOutside | UIControlEventTouchCancel];
+                }] forControlEvents:UIControlEventTouchUpInside | UIControlEventTouchUpOutside | UIControlEventTouchCancel];
                 objc_setAssociatedObject(dismiss, kPFBNotifFeedbackKey, @YES,
                                          OBJC_ASSOCIATION_RETAIN_NONATOMIC);
             }

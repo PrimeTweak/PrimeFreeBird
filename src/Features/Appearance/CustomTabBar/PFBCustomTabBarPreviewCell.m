@@ -49,7 +49,7 @@
 }
 
 - (void)configureWithImageName:(NSString*)imageName {
-    if (imageName.length) {
+    if (imageName.length && [UIImage respondsToSelector:@selector(tfn_vectorImageNamed:fitsSize:fillColor:)]) {
         self.iconView.image =
             [UIImage tfn_vectorImageNamed:imageName
                                  fitsSize:CGSizeMake(24, 24)

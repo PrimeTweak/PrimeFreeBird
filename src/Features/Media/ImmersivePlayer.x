@@ -3,8 +3,10 @@
 // while a video plays.
 
 #import "Debug/PFBDebugger.h"
+#import "Debug/PFBProbe.h"
 #import "Support/HookHelpers.h"
 #import "Support/TwitterChirpFont.h"
+#import <stdatomic.h>
 
 // MARK: - Immersive Player Timestamp
 
@@ -20,7 +22,7 @@ static __weak UIView* gPFBActiveCard = nil;
 // When a card entered the window, read by the opening hold and the minimal bar.
 static const void* kPFBCardShownAtKey = &kPFBCardShownAtKey;
 // The app animates its overlay in over about six frames while the timeline is
-// still leaving, and the fold can only answer once those views exist. The bar
+// still leaving, and the chrome can only be raised once those views exist. The bar
 // alone is kept clear for that span: the card's visibility gates autoplay.
 static const NSTimeInterval kPFBBarRevealDelay = 0.3;
 // When the last tap landed. The player reports its state asynchronously and for a
@@ -168,9 +170,85 @@ static void pfbHoldThroughOpening(UIView* view) {
         });
 }
 
-static BOOL pfbFoldIfDue(UIView* card);
+static BOOL pfbRaiseChromeIfDue(UIView* card);
+
+// Probe: a one-byte ivar of a view, or -1 when it cannot be read.
+static NSInteger pfbProbeByte(UIView* view, const char* name) {
+    Ivar ivar = view ? class_getInstanceVariable(object_getClass(view), name) : NULL;
+    ptrdiff_t offset = ivar ? ivar_getOffset(ivar) : 0;
+    if (offset <= 0 || (size_t)offset >= class_getInstanceSize(object_getClass(view))) {
+        return -1;
+    }
+    return *((uint8_t*)(__bridge void*)view + offset);
+}
+
+// Probe: progressLabelMode around the first write of the build, then whether Twitter writes
+// it again on a bar already set; one line, at a rewrite or 30 s after the write.
+static BOOL gPFBProbeTimestampDone;
+static NSInteger gPFBProbeTimestampStart = -1;
+static NSString* gPFBProbeTimestampWrite;
+static NSUInteger gPFBProbeTimestampPasses;
+static const void* kPFBProbeTimestampKey = &kPFBProbeTimestampKey;
+
+static void pfbProbeTimestampVerdict(NSString* later) {
+    gPFBProbeTimestampDone = YES;
+    PFBProbeNote(@"SD-1 video time", @"SD-1 video time: %@; rewritten later: %@", gPFBProbeTimestampWrite ?: @"?", later);
+}
+
+// Called just before the write (before = YES) and just after it.
+static void pfbProbeTimestampWrite(UIView* controls, BOOL before) {
+    if (gPFBProbeTimestampDone || !PFBDebugIsRecording()) {
+        return;
+    }
+    NSInteger mode = pfbProbeByte(controls, "progressLabelMode");
+    if (before) {
+        gPFBProbeTimestampStart = mode;
+        return;
+    }
+    NSInteger applied = pfbProbeByte(controls, "hasAppliedDefaultProgressLabelMode");
+    objc_setAssociatedObject(controls, kPFBProbeTimestampKey, @[ @(mode), @(applied), @(CACurrentMediaTime()) ],
+                             OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    if (gPFBProbeTimestampWrite) {
+        return;
+    }
+    if (!PFBProbeWants(@"SD-1 video time")) {
+        gPFBProbeTimestampDone = YES;
+        return;
+    }
+    gPFBProbeTimestampWrite = [NSString stringWithFormat:@"start %ld -> wrote %ld, default applied %ld at the write",
+                                                         (long)gPFBProbeTimestampStart, (long)mode, (long)applied];
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(30.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+      if (!gPFBProbeTimestampDone && PFBProbeWants(@"SD-1 video time")) {
+          pfbProbeTimestampVerdict([NSString stringWithFormat:@"no (%lu later passes over 30 s)",
+                                                              (unsigned long)gPFBProbeTimestampPasses]);
+      }
+    });
+}
+
+// Probe: a later layout pass of a bar already set, compared with what was written there.
+static void pfbProbeTimestampPass(UIView* controls) {
+    if (gPFBProbeTimestampDone || !gPFBProbeTimestampWrite || !PFBDebugIsRecording()) {
+        return;
+    }
+    NSArray<NSNumber*>* written = objc_getAssociatedObject(controls, kPFBProbeTimestampKey);
+    if (written.count != 3) {
+        return;
+    }
+    gPFBProbeTimestampPasses++;
+    NSInteger mode = pfbProbeByte(controls, "progressLabelMode");
+    if (mode != written[0].integerValue) {
+        pfbProbeTimestampVerdict([NSString
+            stringWithFormat:@"yes (wrote %ld, now %ld, default applied %ld -> %ld, %.0f ms after the write)",
+                             (long)written[0].integerValue, (long)mode, (long)written[1].integerValue,
+                             (long)pfbProbeByte(controls, "hasAppliedDefaultProgressLabelMode"),
+                             (CACurrentMediaTime() - written[2].doubleValue) * 1000.0]);
+    } else if (gPFBProbeTimestampPasses >= 3000) {
+        pfbProbeTimestampVerdict(@"no (3000 later passes)");
+    }
+}
 
 static void pfbRestoreTimestamp(UIView* controls) {
+    pfbProbeTimestampPass(controls);
     BOOL enabled = [PFBSettings boolForKey:@"restore_video_timestamp"];
     if (controls && !enabled) {
         PFBCOMPAT_OBSERVE(PFBCompat_restore_video_timestamp, @"video controls found");
@@ -187,7 +265,9 @@ static void pfbRestoreTimestamp(UIView* controls) {
     objc_setAssociatedObject(controls, kPFBRestoredTimestampKey, @YES,
                              OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     uint8_t* mode = (uint8_t*)(__bridge void*)controls + ivar_getOffset(modeIvar);
+    pfbProbeTimestampWrite(controls, YES);
     *mode = *mode ? 0 : 1;
+    pfbProbeTimestampWrite(controls, NO);
     PFBCOMPAT_ACTION(PFBCompat_restore_video_timestamp, @"timestamp restored");
     // The mode is read while the controls build their configuration, so the
     // change needs one more pass to reach the label.
@@ -201,8 +281,8 @@ static void pfbRestoreTimestamp(UIView* controls) {
     pfbRestoreTimestamp((UIView*)self);
 }
 
-// The bar announcing its own arrival is the earliest the fold can possibly be
-// asked for — one turn of the run loop, before the frame that would show it.
+// The bar announcing its own arrival is the earliest the chrome can be raised:
+// one turn of the run loop, before the frame that would show it.
 - (void)didMoveToWindow {
     %orig;
     UIView* bar = (UIView*)self;
@@ -213,7 +293,7 @@ static void pfbRestoreTimestamp(UIView* controls) {
     // the presentation, not a bar that was asked for.
     pfbHoldThroughOpening(bar);
     dispatch_async(dispatch_get_main_queue(), ^{
-      pfbFoldIfDue(gPFBActiveCard);
+      pfbRaiseChromeIfDue(gPFBActiveCard);
     });
 }
 
@@ -230,6 +310,19 @@ static void pfbRestoreTimestamp(UIView* controls) {
 // silent switch, so the guards hold only while the full-screen player is up.
 static BOOL gPFBSoundAllowed = NO;
 static BOOL gPFBFullScreenShown = NO;
+
+// Probe: the tour's video sound passage reads the flag before its tap and puts it back after,
+// so the person's next full-screen video opens as it would have (PFBCompatibilityTour.m).
+BOOL pfbProbeSoundAllowed(void);
+void pfbProbeRestoreSoundAllowed(BOOL allowed);
+
+BOOL pfbProbeSoundAllowed(void) {
+    return gPFBSoundAllowed;
+}
+
+void pfbProbeRestoreSoundAllowed(BOOL allowed) {
+    gPFBSoundAllowed = allowed;
+}
 
 // Whether a video opens silent, as the reader chose.
 static BOOL pfbOpensMuted(void) {
@@ -282,6 +375,36 @@ static BOOL pfbInlineVideoHasSound(UIView* view) {
     return !((TAVPlayer*)player).isMuted && ((TAVPlayer*)player).volume > 0;
 }
 
+// Probe: Twitter's auto-unmute flag at a timeline tap, then the full-screen player's sound
+// 1.5 s later, once per pill state and clean player state.
+static void pfbProbeAutoUnmute(UIView* inlineVideo) {
+    if (!PFBDebugIsRecording()) {
+        return;
+    }
+    BOOL opensMuted = pfbOpensMuted();
+    BOOL clean = [PFBSettings boolForKey:@"tap_to_pause"];
+    NSString* key = [NSString stringWithFormat:@"10a#F034 %@ %@", opensMuted ? @"muted" : @"sound on",
+                                               clean ? @"clean on" : @"clean off"];
+    if (!PFBProbeWants(key)) {
+        return;
+    }
+    NSInteger flag = pfbProbeByte(inlineVideo, "isAutoUnmuteEnabled");
+    NSString* flagText = flag < 0 ? @"unreadable" : flag ? @"was set, cleared" : @"already off";
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1.5 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+      if (!PFBProbeWants(key)) {
+          return;
+      }
+      UIView* card = gPFBActiveCard;
+      TAVPlayer* player = card.window ? pfbVisibleCardPlayer(card) : nil;
+      NSString* sound = !player ? @"not found" : !player.isMuted && player.volume > 0 ? @"with sound" : @"muted";
+      PFBProbeNote(key,
+                   @"10a#F034 auto-unmute: video opened with the pill on %@, Clean video player %@, Twitter's "
+                   @"auto-unmute flag %@ · full-screen player %@ (isMuted %@, volume %.2f)",
+                   opensMuted ? @"Muted" : @"Sound on", clean ? @"on" : @"off", flagText, sound,
+                   player ? (player.isMuted ? @"yes" : @"no") : @"-", player ? (double)player.volume : 0.0);
+    });
+}
+
 %hook T1InlineVideoView
 
 - (void)didMoveToWindow {
@@ -290,6 +413,7 @@ static BOOL pfbInlineVideoHasSound(UIView* view) {
 }
 
 - (void)handleTapWithTapRecognizer:(UITapGestureRecognizer*)recognizer {
+    pfbProbeAutoUnmute((UIView*)self);
     pfbClearAutoUnmute((UIView*)self);
     // A video opened from the timeline starts in the chosen state, whatever the last
     // one was left as, unless it was already playing with its sound on.
@@ -305,6 +429,65 @@ static BOOL pfbInlineVideoHasSound(UIView* view) {
 
 %end
 
+// Probe: the controller presented in Twitter's window that holds the full-screen player, or nil;
+// the player is presented inside a navigation controller.
+static UIViewController* pfbProbeFullScreenController(void) {
+    for (UIViewController* shown = PFBProbeAppWindow().rootViewController; shown; shown = shown.presentedViewController) {
+        NSArray<UIViewController*>* stack =
+            [shown isKindOfClass:[UINavigationController class]] ? ((UINavigationController*)shown).viewControllers : @[ shown ];
+        for (UIViewController* controller in stack) {
+            if ([NSStringFromClass([controller class]) isEqualToString:@"T1ImmersiveFullScreenViewController"]) {
+                return shown;
+            }
+        }
+    }
+    return nil;
+}
+
+// Probe: the moment the full-screen player begins to leave, for the notes below.
+static void pfbProbeFullScreenLeaving(void) {
+    if (PFBDebugIsRecording()) {
+        PFBProbeMark(@"10a#F035 full screen leaving");
+    }
+}
+
+// Probe: a sound request held while no full-screen player is presented, once per build;
+// looked at most every 0.5 s, on the main thread.
+static BOOL gPFBProbeHeldDone;
+static CFTimeInterval gPFBProbeHeldLook;
+static atomic_bool gPFBProbeHeldPending;
+static void pfbProbeSoundHeld(NSString* door) {
+    if (gPFBProbeHeldDone || !PFBDebugIsRecording()) {
+        return;
+    }
+    if (!NSThread.isMainThread) {
+        if (!atomic_exchange(&gPFBProbeHeldPending, true)) {
+            dispatch_async(dispatch_get_main_queue(), ^{
+              atomic_store(&gPFBProbeHeldPending, false);
+              pfbProbeSoundHeld(door);
+            });
+        }
+        return;
+    }
+    CFTimeInterval now = CACurrentMediaTime();
+    if (now - gPFBProbeHeldLook < 0.5) {
+        return;
+    }
+    gPFBProbeHeldLook = now;
+    if (!PFBProbeWants(@"10a#F035 held")) {
+        gPFBProbeHeldDone = YES;
+        return;
+    }
+    if (pfbProbeFullScreenController()) {
+        return;
+    }
+    CFTimeInterval leaving = PFBProbeMarkAge(@"10a#F035 full screen leaving");
+    gPFBProbeHeldDone = YES;
+    PFBProbeNote(@"10a#F035 held", @"10a#F035 sound request held with no full-screen player up (%@, %@)", door,
+                 leaving >= 0 ? [NSString stringWithFormat:@"%.1f s after the full-screen player began to leave", leaving]
+                              : @"no full-screen player left in this launch");
+}
+
 // Every door the full-screen player's sound comes through. The mute flag is one of
 // two levers, the volume is the other, and playback covers a player born loud.
 %hook TAVPlayer
@@ -315,6 +498,7 @@ static BOOL pfbInlineVideoHasSound(UIView* view) {
 - (void)setIsMuted:(BOOL)muted {
     if (!muted && pfbHoldsSound()) {
         PFBCompatReach(PFBCompatPath_starts_muted);
+        pfbProbeSoundHeld(@"setIsMuted:");
         return;
     }
     %orig;
@@ -323,6 +507,7 @@ static BOOL pfbInlineVideoHasSound(UIView* view) {
 - (void)setVolume:(float)volume {
     if (volume > 0 && pfbHoldsSound()) {
         PFBCompatReach(PFBCompatPath_starts_muted);
+        pfbProbeSoundHeld(@"setVolume:");
         %orig(0);
         return;
     }
@@ -370,6 +555,7 @@ static BOOL pfbInlineVideoHasSound(UIView* view) {
 }
 
 - (void)viewWillDisappear:(BOOL)animated {
+    pfbProbeFullScreenLeaving();
     gPFBFullScreenShown = NO;
     %orig;
 }
@@ -455,8 +641,8 @@ static BOOL isImmersiveCardPan(id viewController,
 // The synthetic tap goes through Twitter's handler, which moves the bar and the
 // playback state, so the reconciler would measure a state its own tap changed.
 // One tap per card per cooldown breaks that loop.
-static const NSTimeInterval kPFBFoldCooldown = 0.5;
-static const void* kPFBLastFoldKey = &kPFBLastFoldKey;
+static const NSTimeInterval kPFBRaiseCooldown = 0.5;
+static const void* kPFBLastRaiseKey = &kPFBLastRaiseKey;
 
 static const void* kPFBPausedGlyphKey = &kPFBPausedGlyphKey;
 static const void* kPFBReconcilePendingKey = &kPFBReconcilePendingKey;
@@ -629,10 +815,9 @@ static UIView* pfbImmersiveControlsView(UIView* card) {
     UIView* controls = pfbFirstDescendantOfClass(root, controlsClass);
     return pfbViewCanBeSeen(controls) ? controls : nil;
 }
+
 // Built once per card and kept as an associated object. Touches pass through
 // it, so the card's own tap gesture stays the only thing handling them.
-
-
 static UIView* pfbPausedGlyph(UIView* card) {
     UIView* glyph = objc_getAssociatedObject(card, kPFBPausedGlyphKey);
     if (glyph) {
@@ -803,6 +988,55 @@ static void pfbStopMinimalTimer(UIView* card) {
                              OBJC_ASSOCIATION_RETAIN_NONATOMIC);
 }
 
+// Probe: the view a touch would reach at a point of the card, and what it carries.
+static NSString* pfbProbeHitAt(UIView* card, CGPoint point) {
+    UIView* hit = [card.window hitTest:[card convertPoint:point toView:nil] withEvent:nil];
+    if (!hit) {
+        return @"nothing";
+    }
+    NSUInteger above = 0;
+    for (UIView* view = hit.superview; view && view != card; view = view.superview) {
+        above += view.gestureRecognizers.count;
+    }
+    return [NSString stringWithFormat:@"%@ (in card %@, control %@, gestures %lu, %lu more above it up to the card)",
+                                      PFBProbeClassName(hit), hit == card || [hit isDescendantOfView:card] ? @"yes" : @"no",
+                                      [hit isKindOfClass:[UIControl class]] ? @"yes" : @"no",
+                                      (unsigned long)hit.gestureRecognizers.count, (unsigned long)above];
+}
+
+// Probe: the band of the sound button below the bar and what lies under it, once per
+// build, 0.6 s after the bar first shows.
+static BOOL gPFBProbeBandDone;
+static CFTimeInterval gPFBProbeBandSince;
+static void pfbProbeMinimalBand(UIView* card, UIView* bar, UIView* mute) {
+    if (gPFBProbeBandDone || !PFBDebugIsRecording()) {
+        return;
+    }
+    CFTimeInterval now = CACurrentMediaTime();
+    if (gPFBProbeBandSince <= 0) {
+        gPFBProbeBandSince = now;
+    }
+    if (now - gPFBProbeBandSince < 0.6 || !card.window) {
+        return;
+    }
+    gPFBProbeBandDone = YES;
+    if (!PFBProbeWants(@"10a#F041 band")) {
+        return;
+    }
+    CGRect muteInCard = [bar convertRect:mute.frame toView:card];
+    CGFloat barBottom = CGRectGetMaxY(bar.frame);
+    CGFloat muteBottom = CGRectGetMaxY(muteInCard);
+    NSString* under = @"none, the sound button ends inside the bar";
+    if (muteBottom > barBottom) {
+        CGFloat y = (barBottom + muteBottom) / 2.0;
+        under = [NSString stringWithFormat:@"at the middle %@ · at the sound button %@",
+                                           pfbProbeHitAt(card, CGPointMake(CGRectGetWidth(card.bounds) / 2.0, y)),
+                                           pfbProbeHitAt(card, CGPointMake(CGRectGetMidX(muteInCard), y))];
+    }
+    PFBProbeNote(@"10a#F041 band", @"10a#F041 minimal bar: bar %@, mute %@ in card, band %.1f pt; under the dead band: %@",
+                 NSStringFromCGRect(bar.frame), NSStringFromCGRect(muteInCard), MAX(0.0, muteBottom - barBottom), under);
+}
+
 // Laid out against the card, above the home indicator, and hidden as soon as
 // the app's own bar comes back or the card leaves the screen.
 static void pfbUpdateMinimalBar(UIView* card, TAVPlayer* player) {
@@ -841,7 +1075,10 @@ static void pfbUpdateMinimalBar(UIView* card, TAVPlayer* player) {
                                existing.alpha = 0.0;
                              }
                              completion:^(BOOL finished) {
-                               existing.hidden = YES;
+                               // A fade-in started meanwhile has set the alpha back.
+                               if (existing.alpha == 0.0) {
+                                   existing.hidden = YES;
+                               }
                              }];
         }
         pfbStopMinimalTimer(card);
@@ -921,7 +1158,7 @@ static void pfbUpdateMinimalBar(UIView* card, TAVPlayer* player) {
     BOOL muted = pfbCurrentMuted(card, player);
     UIImageSymbolConfiguration* symbol =
         [UIImageSymbolConfiguration configurationWithPointSize:15
-                                                        weight:UIFontWeightMedium];
+                                                        weight:UIImageSymbolWeightUnspecified];
     [mute setImage:PFBTwitterGlyphFor(muted ? @"sound_off" : @"sound",
                                       [UIImage systemImageNamed:muted ? @"speaker.slash.fill"
                                                                       : @"speaker.wave.2.fill"
@@ -930,6 +1167,7 @@ static void pfbUpdateMinimalBar(UIView* card, TAVPlayer* player) {
     mute.frame = CGRectMake(width - kPFBMinimalTextInset - kPFBMinimalMuteSize,
                             CGRectGetMidY(clock.frame) - kPFBMinimalMuteSize / 2.0,
                             kPFBMinimalMuteSize, kPFBMinimalMuteSize);
+    pfbProbeMinimalBand(card, bar, mute);
 
     if (bar.alpha < 1.0) {
         [UIView animateWithDuration:kPFBMinimalFade
@@ -1019,13 +1257,13 @@ static void pfbHandleScrubGesture(UIView* card, UILongPressGestureRecognizer* pr
 // its own tap, checked when the bar mounts and on a short repeat behind that.
 
 // Spacing and number of the checks behind the mount signal: about 3 s of watch.
-static const NSTimeInterval kPFBFoldTick = 0.05;
-static const NSInteger kPFBFoldAttempts = 60;
+static const NSTimeInterval kPFBRaiseTick = 0.05;
+static const NSInteger kPFBRaiseAttempts = 60;
 
 // Sends the card its own tap when the reader has paused and the app's chrome is
 // down, past the grace after a real tap and within the budget and cooldown.
 // Returns YES when there is nothing left to watch, NO to look again.
-static BOOL pfbFoldIfDue(UIView* card) {
+static BOOL pfbRaiseChromeIfDue(UIView* card) {
     if (!card || !card.window || ![PFBSettings boolForKey:@"tap_to_pause"]) {
         return YES;
     }
@@ -1038,9 +1276,9 @@ static BOOL pfbFoldIfDue(UIView* card) {
     if (gPFBSyntheticBudget <= 0) {
         return NO;
     }
-    NSTimeInterval lastFold = [objc_getAssociatedObject(card, kPFBLastFoldKey) doubleValue];
+    NSTimeInterval lastRaise = [objc_getAssociatedObject(card, kPFBLastRaiseKey) doubleValue];
     NSTimeInterval nowStamp = [NSDate timeIntervalSinceReferenceDate];
-    if (lastFold > 0 && nowStamp - lastFold < kPFBFoldCooldown) {
+    if (lastRaise > 0 && nowStamp - lastRaise < kPFBRaiseCooldown) {
         return NO;
     }
     Ivar recognizerIvar = class_getInstanceVariable(object_getClass(card), "singleTapRecognizer");
@@ -1048,7 +1286,7 @@ static BOOL pfbFoldIfDue(UIView* card) {
     if (!recognizer) {
         return YES;
     }
-    objc_setAssociatedObject(card, kPFBLastFoldKey, @(nowStamp), OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    objc_setAssociatedObject(card, kPFBLastRaiseKey, @(nowStamp), OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     gPFBSyntheticBudget--;
     PFBDebugLog(@"[loop] paused but the app's chrome is down - tapping (%ld left)",
                 (long)gPFBSyntheticBudget);
@@ -1064,33 +1302,78 @@ static BOOL pfbFoldIfDue(UIView* card) {
 
 // The safety net behind the mount signal: a card whose bar never announces
 // itself is still checked, until a check is final or the attempts run out.
-static void pfbFoldWhenReady(UIView* card, NSInteger attemptsLeft) {
-    if (attemptsLeft <= 0 || pfbFoldIfDue(card)) {
+static void pfbRaiseChromeWhenReady(UIView* card, NSInteger attemptsLeft) {
+    if (attemptsLeft <= 0 || pfbRaiseChromeIfDue(card)) {
         objc_setAssociatedObject(card, kPFBReconcilePendingKey, nil,
                                  OBJC_ASSOCIATION_RETAIN_NONATOMIC);
         return;
     }
     __weak UIView* weakCard = card;
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW,
-                                 (int64_t)(kPFBFoldTick * NSEC_PER_SEC)),
+                                 (int64_t)(kPFBRaiseTick * NSEC_PER_SEC)),
                    dispatch_get_main_queue(), ^{
                      UIView* strongCard = weakCard;
                      if (strongCard) {
-                         pfbFoldWhenReady(strongCard, attemptsLeft - 1);
+                         pfbRaiseChromeWhenReady(strongCard, attemptsLeft - 1);
                      }
                    });
 }
 
 // One chain per card at a time, started wherever the card first shows a sign of
 // life: entering the window, or its first playback state.
-static void pfbStartFoldWatch(UIView* card) {
+static void pfbStartRaiseWatch(UIView* card) {
     if (!card || ![PFBSettings boolForKey:@"tap_to_pause"] ||
         [objc_getAssociatedObject(card, kPFBReconcilePendingKey) boolValue]) {
         return;
     }
     objc_setAssociatedObject(card, kPFBReconcilePendingKey, @YES,
                              OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-    pfbFoldWhenReady(card, kPFBFoldAttempts);
+    pfbRaiseChromeWhenReady(card, kPFBRaiseAttempts);
+}
+
+// Probe: the share of a view inside its window, 0 to 1.
+static CGFloat pfbProbeOnScreen(UIView* view) {
+    CGRect shown = [view convertRect:view.bounds toView:nil];
+    CGRect visible = CGRectIntersection(shown, view.window.bounds);
+    CGFloat area = CGRectGetWidth(shown) * CGRectGetHeight(shown);
+    return area > 0 && !CGRectIsNull(visible) ? CGRectGetWidth(visible) * CGRectGetHeight(visible) / area : 0;
+}
+
+// Probe: a card mounting while another, paused card is still on screen, and a card
+// mounting less than 1 s after the full-screen player began to leave; each once per build.
+static BOOL gPFBProbeMountDone;
+static void pfbProbeCardMount(UIView* card) {
+    if (gPFBProbeMountDone || !PFBDebugIsRecording()) {
+        return;
+    }
+    BOOL pauseOpen = PFBProbeWants(@"10a#F035 pause cleared");
+    BOOL lateOpen = PFBProbeWants(@"10a#F035 late mount");
+    gPFBProbeMountDone = !pauseOpen && !lateOpen;
+    UIView* previous = gPFBActiveCard;
+    if (pauseOpen && gPFBWantPaused && previous && previous != card && previous.window) {
+        TAVPlayer* pausedPlayer = pfbVisibleCardPlayer(previous);
+        NSString* paused = !pausedPlayer ? @"none" : pausedPlayer.playbackState.timeControlStatus == 0 ? @"paused" : @"playing";
+        UIScrollView* list = nil;
+        for (UIView* view = card.superview; view && !list; view = view.superview) {
+            list = [view isKindOfClass:[UIScrollView class]] ? (UIScrollView*)view : nil;
+        }
+        NSString* motion = !list ? @"none" : list.isDragging ? @"dragging" : list.isDecelerating ? @"decelerating" : @"still";
+        PFBProbeNote(@"10a#F035 pause cleared",
+                     @"10a#F035 pause request cleared by another card mounting while the paused card is on screen "
+                     @"(%.0f ms after the pause tap; paused card %.0f%% on screen, its player %@; new card %.0f%% on "
+                     @"screen, list %@)",
+                     ([NSDate timeIntervalSinceReferenceDate] - gPFBLastUserTap) * 1000.0, pfbProbeOnScreen(previous) * 100.0,
+                     paused, pfbProbeOnScreen(card) * 100.0, motion);
+    }
+    CFTimeInterval leaving = PFBProbeMarkAge(@"10a#F035 full screen leaving");
+    if (lateOpen && leaving >= 0 && leaving < 1.0) {
+        UIViewController* player = pfbProbeFullScreenController();
+        PFBProbeNote(@"10a#F035 late mount",
+                     @"10a#F035 card mounted %.0f ms after the full-screen player began to leave: full-screen flag "
+                     @"set back to YES (was %@, player %@)",
+                     leaving * 1000.0, gPFBFullScreenShown ? @"YES" : @"NO",
+                     !player ? @"gone" : player.isBeingDismissed ? @"being dismissed" : @"still presented");
+    }
 }
 
 %hook _TtC14T1TwitterSwift17ImmersiveCardView
@@ -1135,9 +1418,12 @@ static void pfbStartFoldWatch(UIView* card) {
     if (gPFBWantPaused) {
         pfbReplayChromeAlphas(card);
     } else {
+        // The gate's own 0 goes through the recording setter, so the app's last request is put back: its intent is left as it is.
         for (UIView* view in [gPFBGatedViews allObjects]) {
             if (view.window == card.window) {
+                NSNumber* wanted = objc_getAssociatedObject(view, kPFBWantedAlphaKey);
                 view.alpha = 0.0;
+                objc_setAssociatedObject(view, kPFBWantedAlphaKey, wanted, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
             }
         }
     }
@@ -1145,7 +1431,7 @@ static void pfbStartFoldWatch(UIView* card) {
     // on a pause. On a resume the gate has already hidden the chrome and the
     // app's intent is left as it is - its next raise comes for free.
     if (gPFBWantPaused && !appChromeUp) {
-        objc_setAssociatedObject(card, kPFBLastFoldKey, @(gPFBLastUserTap),
+        objc_setAssociatedObject(card, kPFBLastRaiseKey, @(gPFBLastUserTap),
                                  OBJC_ASSOCIATION_RETAIN_NONATOMIC);
         gPFBSyntheticBudget--;
         %orig;
@@ -1160,7 +1446,7 @@ static void pfbStartFoldWatch(UIView* card) {
     }
     pfbShowPausedGlyph(card, gPFBWantPaused);
     pfbEnforcePlayback(card);
-    pfbStartFoldWatch(card);
+    pfbStartRaiseWatch(card);
 }
 %new
 - (void)pfbHandleScrub:(UILongPressGestureRecognizer*)press {
@@ -1174,6 +1460,7 @@ static void pfbStartFoldWatch(UIView* card) {
     UIView* card = (UIView*)self;
     pfbShowPausedGlyph(card, NO);
     if (card.window) {
+        pfbProbeCardMount(card);
         gPFBFullScreenShown = YES;
         if ([PFBSettings boolForKey:@"tap_to_pause"]) {
             PFBCOMPAT_ACTION(PFBCompat_tap_to_pause, @"clean player on a video");
@@ -1193,7 +1480,7 @@ static void pfbStartFoldWatch(UIView* card) {
             card, kPFBCardShownAtKey,
             @([NSDate timeIntervalSinceReferenceDate]),
             OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-        pfbStartFoldWatch(card);
+        pfbStartRaiseWatch(card);
     } else {
         if (gPFBActiveCard == card) {
             gPFBActiveCard = nil;
@@ -1225,7 +1512,7 @@ static void pfbStartFoldWatch(UIView* card) {
         return;
     }
     gPFBActiveCard = host;
-    pfbStartFoldWatch(host);
+    pfbStartRaiseWatch(host);
 }
 
 %end
@@ -1331,11 +1618,7 @@ static BOOL pfbChromeAlphaBlocked(UIView* view, CGFloat alpha) {
 }
 %end
 
-// scrubber, timer and playback buttons
-
-// The native timeline, its scrub label strip and the attribution line stay at
-// alpha 1 with the chrome folded, so the app's own bar shows through under the
-// minimal one. Same rule as every plugin above.
+// progress line, time labels, play button, attribution and bottom controls
 %hook _TtC14T1TwitterSwift32ImmersiveVideoTimelinePluginView
 - (void)setAlpha:(CGFloat)alpha {
     if (pfbChromeAlphaBlocked((UIView*)self, alpha)) {

@@ -4,6 +4,7 @@ Applies the theme pack and the "Twitter" name in one unpack; exits 0 untouched w
 nothing is asked, non-zero when a requested step fails. Helpers sit beside this file.
 """
 
+import hashlib
 import os
 import plistlib
 import shutil
@@ -18,9 +19,14 @@ from pathlib import Path
 BRANDING_DIR = Path(__file__).resolve().parent
 
 # Pinned scar release used for Assets.car work when no binary is available
-# locally (https://github.com/theacrat/scar).
+# locally (https://github.com/theacrat/scar), with each archive's SHA-256.
 SCAR_VERSION = "v0.1.0"
 SCAR_URL = "https://github.com/theacrat/scar/releases/download/{v}/scar-{v}-{triple}.tar.gz"
+SCAR_SHA256 = {
+    "aarch64-apple-darwin": "fde9b4937c057ff5672195367e48d95d3ea87df00302191693e866e0b1f7e1a4",
+    "x86_64-unknown-linux-musl": "5bc77c8fb5fba892cb54f577f4f9b3ae3e6d721a7ef4764f96f9052169f3d418",
+    "aarch64-unknown-linux-musl": "a4d6c21b2591d7054c62c376e2cb5a53a477be0839bc326402305b51fa66a9e0",
+}
 
 def err(message):
     print(f"Error: {message}", file=sys.stderr)
@@ -252,6 +258,8 @@ def _ensure_scar(workdir):
     tgz = workdir / "scar.tar.gz"
     try:
         urllib.request.urlretrieve(url, tgz)
+        if hashlib.sha256(tgz.read_bytes()).hexdigest() != SCAR_SHA256[triple]:
+            raise BrandingError(f"Branding: scar from {url} does not match its pinned SHA-256")
         with tarfile.open(tgz) as tf:
             tf.extract("scar", workdir)
     except (OSError, tarfile.TarError) as exc:
@@ -296,8 +304,8 @@ def apply_ipa_branding(ipa):
             _set_display_name_in_app(appdir)
         _bump_bundle_version(appdir)
 
-        # Repackage once. Use the zip binary (not zipfile) to preserve symlinks
-        # and permissions exactly as the original build produced them.
+        # Repackage once. The zip binary (not zipfile) keeps the files' permissions
+        # as they were unpacked.
         ipa = ipa.resolve()
         tmp_ipa = ipa.with_name(ipa.name + ".branding.tmp")
         if tmp_ipa.exists():

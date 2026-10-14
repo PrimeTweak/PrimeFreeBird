@@ -2,6 +2,25 @@
 
 #import "Features/Appearance/CustomTabBar/PFBCustomTabBarUtility.h"
 #import "Support/T1Headers.h"
+#import "Debug/PFBDebugger.h"
+#import "Debug/PFBProbe.h"
+
+// Defined in FeatureSwitches.x: the filter the tab editor applies to the tabs it offers.
+extern BOOL PFBPanelIsGenuinelyAvailable(long long panelID);
+
+// Probe: a tab Twitter builds without imageName, the glyph the panel falls back to, and
+// whether the editor would offer it (06#F044); once per tab.
+static void PFBTabWithoutImageProbe(NSString* page, long long panelID, NSString* glyph) {
+    if (!PFBDebugIsRecording()) {
+        return;
+    }
+    NSString* key = [@"06#F044 " stringByAppendingString:page];
+    if (!PFBProbeWants(key)) {
+        return;
+    }
+    PFBProbeNote(key, @"06#F044 tab %@ has no imageName (panel %lld), panel glyph %@, offered by the editor %@", page,
+                 panelID, glyph.length ? glyph : @"none", PFBPanelIsGenuinelyAvailable(panelID) ? @"yes" : @"no");
+}
 
 // The Home tab is the app's landing surface, so it is always kept visible and
 // pinned first.
@@ -73,6 +92,8 @@ static BOOL PFBRegistryEntryIsValid(id entry) {
             if ([identity respondsToSelector:@selector(iconImageNameForPanelID:)]) {
                 image = [identity iconImageNameForPanelID:tabView.panelID] ?: @"";
             }
+            // Probe: notes this tab and the glyph it falls back to.
+            PFBTabWithoutImageProbe(page, tabView.panelID, image);
         }
         NSDictionary* entry = @{
             PFBTabPageKey: page,

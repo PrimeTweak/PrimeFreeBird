@@ -104,6 +104,17 @@ static NSInteger PFBProfileTabCurrent(void) {
     if ([key isEqualToString:@"square_avatars"]) {
         PFBApplySquareAvatarsSetting();
     }
+    // The tab menu lists only the tabs shown, so its row is rebuilt when one is hidden or shown.
+    if (key.length && [PFBProfileTabHiders() containsObject:key]) {
+        NSUInteger row = [self.visibleToggles indexOfObjectPassingTest:^BOOL(NSDictionary* entry, __unused NSUInteger idx,
+                                                                             __unused BOOL* stop) {
+            return [entry[@"menu"] isEqualToString:@"profileTabMenu"];
+        }];
+        if (row != NSNotFound) {
+            [self.tableView reloadRowsAtIndexPaths:@[ [NSIndexPath indexPathForRow:(NSInteger)row inSection:0] ]
+                                  withRowAnimation:UITableViewRowAnimationNone];
+        }
+    }
 }
 
 @end

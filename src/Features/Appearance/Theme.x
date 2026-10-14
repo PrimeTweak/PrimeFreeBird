@@ -8,6 +8,7 @@
 #import "Support/HookHelpers.h"
 #import "Common/PFBBundle.h"
 #import "Debug/PFBDebugger.h"
+#import "Debug/PFBProbe.h"
 
 #import "Features/Appearance/ThemeColor/PFBDarkModeStyle.h"
 
@@ -74,7 +75,7 @@ static UIColor* PFBLogoAccent(UIColor* orig) {
 // Depth counter for the settings stack. The Done platter is one button shared by
 // the whole stack, and on pop the target's viewWillAppear fires before the
 // source's viewDidDisappear, so a flag would be clobbered mid-stack. >0 = visible.
-NSInteger PFBColorThemeScreenVisible;
+NSInteger PFBThemeScreenCount;
 
 // Each screen counts once: a cancelled swipe back calls viewWillAppear: again with no
 // viewDidDisappear: in between.
@@ -85,7 +86,7 @@ void PFBThemeScreenEnter(UIViewController* screen) {
         return;
     }
     objc_setAssociatedObject(screen, &kPFBThemeScreenCountedKey, @YES, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-    PFBColorThemeScreenVisible++;
+    PFBThemeScreenCount++;
 }
 
 void PFBThemeScreenLeave(UIViewController* screen) {
@@ -93,8 +94,8 @@ void PFBThemeScreenLeave(UIViewController* screen) {
         return;
     }
     objc_setAssociatedObject(screen, &kPFBThemeScreenCountedKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-    if (PFBColorThemeScreenVisible > 0) {
-        PFBColorThemeScreenVisible--;
+    if (PFBThemeScreenCount > 0) {
+        PFBThemeScreenCount--;
     }
 }
 
@@ -241,9 +242,9 @@ static UIImage* PFBBirdLogoImage(CGSize size) {
           CGContextRef c = ctx.CGContext;
           CGRect box = CGPDFPageGetBoxRect(page, kCGPDFCropBox);
           // Drawn a shade smaller than the box the bar hands over: the X it
-        // replaces reads narrower than a bird at the same nominal size.
-        CGFloat inset = 0.86;
-        CGFloat scale = MIN(size.width / box.size.width, size.height / box.size.height) * inset;
+          // replaces reads narrower than a bird at the same nominal size.
+          CGFloat inset = 0.86;
+          CGFloat scale = MIN(size.width / box.size.width, size.height / box.size.height) * inset;
           CGFloat drawnW = box.size.width * scale;
           CGFloat drawnH = box.size.height * scale;
           CGContextTranslateCTM(c, (size.width - drawnW) / 2.0,
@@ -297,10 +298,69 @@ static BOOL PFBSitsInTextTitle(UIView* view) {
     return NO;
 }
 
+static BOOL PFBIsTopBarContainer(UIView* view);
+
+// Probe: the screen a view shows on: the top of its navigation controller, or the
+// topmost parent of its own controller.
+static NSString* PFBScreenOfViewProbe(UIView* view) {
+    UIViewController* controller = PFBProbeControllerOfView(view);
+    if ([controller isKindOfClass:[UINavigationController class]]) {
+        controller = ((UINavigationController*)controller).topViewController;
+    }
+    return PFBProbeScreenName(controller);
+}
+
+// Probe: notes each distinct place the logo treatment reaches: the image view's four
+// nearest superviews below its top bar, the bar and the screen; 10 lines at most.
+static const void* kPFBLogoProbeKey = &kPFBLogoProbeKey;
+static int gPFBLogoProbeState;
+static NSUInteger gPFBLogoProbeLines;
+
+static void PFBLogoPathProbe(UIImageView* logoView) {
+    if (!NSThread.isMainThread) {
+        return;
+    }
+    if (gPFBLogoProbeState == 0) {
+        gPFBLogoProbeState = PFBDebugIsRecording() ? 1 : 2;
+    }
+    if (gPFBLogoProbeState != 1 || !logoView.window ||
+        objc_getAssociatedObject(logoView, kPFBLogoProbeKey)) {
+        return;
+    }
+    objc_setAssociatedObject(logoView, kPFBLogoProbeKey, @YES, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    NSMutableArray<NSString*>* path = [NSMutableArray array];
+    UIView* bar = nil;
+    UIView* node = logoView.superview;
+    for (NSInteger up = 0; node && up < 16; up++) {
+        if (PFBIsTopBarContainer(node)) {
+            bar = node;
+            break;
+        }
+        if (path.count < 4) {
+            [path addObject:NSStringFromClass([node class])];
+        }
+        node = node.superview;
+    }
+    NSString* place = [NSString stringWithFormat:@"%@ in %@ on %@", [path componentsJoinedByString:@" < "],
+                                                 PFBProbeClassName(bar), PFBScreenOfViewProbe(logoView)];
+    NSString* key = [@"10A#A8 " stringByAppendingString:place];
+    if (PFBProbeWants(key)) {
+        PFBProbeNote(key, @"10A#A8 logo treatment: %@, %.0fx%.0f", place, logoView.bounds.size.width,
+                     logoView.bounds.size.height);
+        if (++gPFBLogoProbeLines >= 10) {
+            gPFBLogoProbeState = 2;
+        }
+    }
+}
+
 static void PFBApplyLogoTint(UIImageView* logoView) {
     UIImage* current = logoView.image;
     if (!current || PFBSitsInTextTitle(logoView)) {
         return;
+    }
+    // Probe: notes where this treatment lands.
+    if (gPFBLogoProbeState != 2) {
+        PFBLogoPathProbe(logoView);
     }
     PFBRegisterLogoView(logoView);
     UIImage* original = objc_getAssociatedObject(logoView, kPFBLogoOriginalKey);
@@ -395,10 +455,10 @@ static void PFBReapplyTabBarAccent(void) {
                     if ([vc isKindOfClass:tabBarVCClass] &&
                         [vc respondsToSelector:@selector(tabViews)]) {
                         for (id tab in [vc valueForKey:@"tabViews"]) {
-                            if ([tab respondsToSelector:@selector(applyCurrentThemeToIcon)]) {
+                            if ([tab respondsToSelector:@selector(pfbApplyCurrentThemeToIcon)]) {
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Warc-performSelector-leaks"
-                                [tab performSelector:@selector(applyCurrentThemeToIcon)];
+                                [tab performSelector:@selector(pfbApplyCurrentThemeToIcon)];
 #pragma clang diagnostic pop
                             }
                         }
@@ -496,6 +556,41 @@ static char kPFBAppliedAccentKey;
 // re-applying until the timeline chrome is actually back on screen.
 static BOOL PFBAccentPending = NO;
 
+// Probe: notes the first UITabBar other than the glass bar and the first tab bar item
+// given an appearance (SA-4), and whether that appearance came from Twitter or from this
+// file's own reassignment below. The glass bar is skipped while it is built.
+static int gPFBTabBarProbeState;
+static BOOL gPFBTabBarProbeOwnWrite;
+static BOOL gPFBTabBarProbeBuilding;
+
+static BOOL PFBTabBarProbeOpen(void) {
+    if (!NSThread.isMainThread) {
+        return NO;
+    }
+    if (gPFBTabBarProbeState == 0) {
+        gPFBTabBarProbeState = PFBProbeWants(@"SA-4 bar") || PFBProbeWants(@"SA-4 item") ? 1 : 2;
+    }
+    return gPFBTabBarProbeState == 1 && !gPFBTabBarProbeBuilding;
+}
+
+static void PFBOtherTabBarProbe(UITabBar* bar, NSString* route, BOOL appearance) {
+    if (!PFBTabBarProbeOpen() || !PFBProbeWants(@"SA-4 bar")) {
+        return;
+    }
+    NSString* source = appearance ? (gPFBTabBarProbeOwnWrite ? @"no" : @"yes") : @"n/a";
+    PFBProbeNote(@"SA-4 bar", @"SA-4 tab bar: %@ under %@, via %@, appearance from Twitter %@, in a window %@",
+                 PFBProbeClassName(bar), PFBProbeClassName(PFBProbeControllerOfView(bar)), route, source,
+                 bar.window ? @"yes" : @"no");
+}
+
+static void PFBOtherTabBarItemProbe(UITabBarItem* item, NSString* route) {
+    if (!PFBTabBarProbeOpen() || !PFBProbeWants(@"SA-4 item")) {
+        return;
+    }
+    PFBProbeNote(@"SA-4 item", @"SA-4 tab bar item: %@ given an appearance via %@, front screen %@",
+                 PFBProbeClassName(item), route, PFBProbeFrontScreen());
+}
+
 static void PFBApplyTabBarAccent(UITabBar* bar) {
     BOOL active = [PFBSettings boolForKey:@"tab_bar_theming"] && PFBAccentIsActive();
     PFBCompatReach(PFBCompatPath_tab_bar);
@@ -529,6 +624,8 @@ static void PFBApplyTabBarAccent(UITabBar* bar) {
     }
     objc_setAssociatedObject(bar, &kPFBAppliedAccentKey, accent,
                              OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    // Probe: marks the two reassignments below as this file's own.
+    gPFBTabBarProbeOwnWrite = gPFBTabBarProbeState != 2;
     UITabBarAppearance* standard = bar.standardAppearance;
     if (standard) {
         bar.standardAppearance = standard;
@@ -537,8 +634,8 @@ static void PFBApplyTabBarAccent(UITabBar* bar) {
     if (scrollEdge) {
         bar.scrollEdgeAppearance = scrollEdge;
     }
+    gPFBTabBarProbeOwnWrite = NO;
 }
-
 
 // The resting color for the native bar's icons. Kept apart from tabItemColor,
 // which also drives the app's own bar: that one keeps its secondary gray for
@@ -1093,6 +1190,52 @@ static NSString* PFBRouteTabSelection(UIView* hostBar, NSArray<UIView*>* tabs,
     return nil;
 }
 
+// Probe: the last tap the glass bar routed (10A#A3), with the app's selection right after
+// the first route, and a second route of the same tab within a second of the tap.
+static int gPFBTapProbeState;
+static NSUInteger gPFBTapProbeIndex = NSNotFound;
+static CFTimeInterval gPFBTapProbeAt;
+
+static BOOL PFBTapProbeOpen(void) {
+    if (!NSThread.isMainThread) {
+        return NO;
+    }
+    if (gPFBTapProbeState == 0) {
+        gPFBTapProbeState = PFBProbeWants(@"10A#A3 tap") || PFBProbeWants(@"10A#A3 twice") ? 1 : 2;
+    }
+    return gPFBTapProbeState == 1;
+}
+
+static void PFBTapRoutedProbe(NSArray<UIView*>* tabs, NSUInteger index, NSString* rung, NSUInteger before) {
+    if (!PFBTapProbeOpen()) {
+        return;
+    }
+    gPFBTapProbeIndex = index;
+    gPFBTapProbeAt = CACurrentMediaTime();
+    // A tap on the tab already shown says nothing about how fast the app follows.
+    if (before != index && PFBProbeWants(@"10A#A3 tap")) {
+        NSUInteger appIndex = PFBSelectedTabIndex(tabs);
+        NSString* shown = appIndex == NSNotFound ? @"none" : [NSString stringWithFormat:@"%lu", (unsigned long)appIndex];
+        PFBProbeNote(@"10A#A3 tap", @"10A#A3 tap: index %lu, app index right after the route %@ (%@)",
+                     (unsigned long)index, shown, rung ?: @"not routed");
+    }
+}
+
+static void PFBRoutedAgainProbe(NSUInteger index) {
+    if (!PFBTapProbeOpen() || index != gPFBTapProbeIndex) {
+        return;
+    }
+    CFTimeInterval age = CACurrentMediaTime() - gPFBTapProbeAt;
+    if (age >= 1.0) {
+        return;
+    }
+    if (PFBProbeWants(@"10A#A3 twice")) {
+        PFBProbeNote(@"10A#A3 twice", @"10A#A3 tab routed twice: index %lu after %.0f ms", (unsigned long)index,
+                     age * 1000.0);
+    }
+    gPFBTapProbeState = PFBProbeWants(@"10A#A3 tap") ? 1 : 2;
+}
+
 @interface PFBTabBarBridge : NSObject <UITabBarDelegate>
 @property (nonatomic, weak) UIView* host;
 @end
@@ -1117,7 +1260,14 @@ static NSString* PFBRouteTabSelection(UIView* hostBar, NSArray<UIView*>* tabs,
                     (unsigned long)index, (unsigned long)tabs.count);
         return;
     }
+    // Probe: the app's tab before the route.
+    NSUInteger probeBefore =
+        gPFBTapProbeState != 2 && PFBTapProbeOpen() ? PFBSelectedTabIndex(tabs) : NSNotFound;
     NSString* rung = PFBRouteTabSelection(bar, tabs, index);
+    // Probe: keeps this tap and notes the app's selection right after the route.
+    if (gPFBTapProbeState != 2) {
+        PFBTapRoutedProbe(tabs, index, rung, probeBefore);
+    }
 
     // A miss is counted, not acted on: the bar is handed back after three in a
     // row, and any success clears the count.
@@ -1149,6 +1299,40 @@ static NSString* PFBRouteTabSelection(UIView* hostBar, NSArray<UIView*>* tabs,
 
 static void PFBApplyTabBarGlassBody(UIView* host);
 
+// Probe: the cost of the glass tab bar pass over its first 3000 calls, with the share
+// the scroll drives through -setTabBarCollapseRatio: (06#F034).
+static int gPFBGlassProbeState;
+static BOOL gPFBGlassProbeScrolling;
+static NSUInteger gPFBGlassProbeCalls;
+static NSUInteger gPFBGlassProbeScrollCalls;
+static CFTimeInterval gPFBGlassProbeTotal;
+static CFTimeInterval gPFBGlassProbeMax;
+
+static BOOL PFBGlassProbeOpen(void) {
+    if (gPFBGlassProbeState == 0) {
+        gPFBGlassProbeState = PFBProbeWants(@"06#F034 cost") ? 1 : 2;
+    }
+    return gPFBGlassProbeState == 1;
+}
+
+static void PFBGlassPassProbe(CFTimeInterval start) {
+    CFTimeInterval elapsed = CACurrentMediaTime() - start;
+    gPFBGlassProbeCalls++;
+    if (gPFBGlassProbeScrolling) {
+        gPFBGlassProbeScrollCalls++;
+    }
+    gPFBGlassProbeTotal += elapsed;
+    gPFBGlassProbeMax = MAX(gPFBGlassProbeMax, elapsed);
+    if (gPFBGlassProbeCalls < 3000) {
+        return;
+    }
+    gPFBGlassProbeState = 2;
+    PFBProbeNote(@"06#F034 cost", @"06#F034 glass tab bar pass: %lu calls (%lu while scrolling), mean %.0f us, max %.0f us, total %.1f ms",
+                 (unsigned long)gPFBGlassProbeCalls, (unsigned long)gPFBGlassProbeScrollCalls,
+                 gPFBGlassProbeTotal / (double)gPFBGlassProbeCalls * 1000000.0,
+                 gPFBGlassProbeMax * 1000000.0, gPFBGlassProbeTotal * 1000.0);
+}
+
 static void PFBApplyTabBarGlass(UIView* host) {
     // Never re-entered. This runs from layout passes, from the collapse ratio
     // on every scroll frame, and from the tab views' own updates; routing a
@@ -1158,8 +1342,101 @@ static void PFBApplyTabBarGlass(UIView* host) {
         return;
     }
     applying = YES;
+    // Probe: times this pass.
+    CFTimeInterval probeStart = gPFBGlassProbeState != 2 && PFBGlassProbeOpen() ? CACurrentMediaTime() : 0;
     PFBApplyTabBarGlassBody(host);
+    if (probeStart > 0) {
+        PFBGlassPassProbe(probeStart);
+    }
     applying = NO;
+}
+
+// Probe: the base glyph names a native bar's items were built from, compared with the
+// app's tabs for thirty seconds after each -setVisibleTabEntries:, and native bars built
+// after the first one of the launch (06#F040).
+static const void* kPFBTabIconsProbeKey = &kPFBTabIconsProbeKey;
+static int gPFBTabIconsProbeState;
+static BOOL gPFBTabIconsProbeStaleNoted;
+static BOOL gPFBTabIconsProbeRebuiltNoted;
+static NSUInteger gPFBTabIconsProbeBars;
+static CFTimeInterval gPFBTabEntriesProbeAt;
+
+static BOOL PFBTabIconsProbeOpen(void) {
+    if (!NSThread.isMainThread) {
+        return NO;
+    }
+    if (gPFBTabIconsProbeState == 0) {
+        gPFBTabIconsProbeStaleNoted = !PFBProbeWants(@"06#F040 stale");
+        gPFBTabIconsProbeRebuiltNoted = !PFBProbeWants(@"06#F040 rebuilt");
+        gPFBTabIconsProbeState = gPFBTabIconsProbeStaleNoted && gPFBTabIconsProbeRebuiltNoted ? 2 : 1;
+    }
+    return gPFBTabIconsProbeState == 1;
+}
+
+static void PFBTabIconsProbeSettle(void) {
+    if (gPFBTabIconsProbeStaleNoted && gPFBTabIconsProbeRebuiltNoted) {
+        gPFBTabIconsProbeState = 2;
+    }
+}
+
+// Each tab's glyph name without its _stroke suffix, as the items are built from it.
+static NSArray<NSString*>* PFBTabBaseNamesProbe(NSArray<UIView*>* tabs) {
+    NSMutableArray<NSString*>* names = [NSMutableArray array];
+    for (id tab in tabs) {
+        NSString* name = [tab respondsToSelector:@selector(imageName)] ? [tab imageName] : nil;
+        if ([name hasSuffix:@"_stroke"]) {
+            name = [name substringToIndex:name.length - 7];
+        }
+        [names addObject:name.length ? name : @"(none)"];
+    }
+    return names;
+}
+
+// The host of the first native bar of the launch.
+static __weak UIView* gPFBTabIconsProbeFirstHost;
+
+static void PFBNativeBarBuiltProbe(UIView* host) {
+    if (!PFBTabIconsProbeOpen() || gPFBTabIconsProbeRebuiltNoted) {
+        return;
+    }
+    if (++gPFBTabIconsProbeBars < 2) {
+        gPFBTabIconsProbeFirstHost = host;
+        return;
+    }
+    gPFBTabIconsProbeRebuiltNoted = YES;
+    if (PFBProbeWants(@"06#F040 rebuilt")) {
+        PFBProbeNote(@"06#F040 rebuilt", @"06#F040 native bar rebuilt for %@ (bar %lu of this launch)",
+                     host == gPFBTabIconsProbeFirstHost ? @"the same host" : @"a new host",
+                     (unsigned long)gPFBTabIconsProbeBars);
+    }
+    PFBTabIconsProbeSettle();
+}
+
+static void PFBTabItemsBuiltProbe(UITabBar* native, NSArray<UIView*>* tabs) {
+    if (!PFBTabIconsProbeOpen() || gPFBTabIconsProbeStaleNoted) {
+        return;
+    }
+    objc_setAssociatedObject(native, kPFBTabIconsProbeKey, PFBTabBaseNamesProbe(tabs),
+                             OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+}
+
+static void PFBTabIconsStaleProbe(UITabBar* native, NSArray<UIView*>* tabs) {
+    if (!PFBTabIconsProbeOpen() || gPFBTabIconsProbeStaleNoted ||
+        CACurrentMediaTime() - gPFBTabEntriesProbeAt > 30.0) {
+        gPFBTabEntriesProbeAt = 0;
+        return;
+    }
+    NSArray<NSString*>* built = objc_getAssociatedObject(native, kPFBTabIconsProbeKey);
+    NSArray<NSString*>* shown = built ? PFBTabBaseNamesProbe(tabs) : nil;
+    if (!built || [built isEqualToArray:shown]) {
+        return;
+    }
+    gPFBTabIconsProbeStaleNoted = YES;
+    if (PFBProbeWants(@"06#F040 stale")) {
+        PFBProbeNote(@"06#F040 stale", @"06#F040 native tab icons stale: built %@, app shows %@",
+                     [built componentsJoinedByString:@","], [shown componentsJoinedByString:@","]);
+    }
+    PFBTabIconsProbeSettle();
 }
 
 static void PFBApplyTabBarGlassBody(UIView* host) {
@@ -1192,17 +1469,24 @@ static void PFBApplyTabBarGlassBody(UIView* host) {
     if (!native) {
         PFBTabBarBridge* bridge = [[PFBTabBarBridge alloc] init];
         bridge.host = host;
+        // Probe: keeps the bar built here out of the SA-4 notes until it is marked.
+        gPFBTabBarProbeBuilding = gPFBTabBarProbeState != 2;
         native = [[UITabBar alloc] initWithFrame:parent.bounds];
         native.delegate = bridge;
         native.autoresizingMask =
             UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
         objc_setAssociatedObject(native, kPFBTabOursKey, @YES,
                                  OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        gPFBTabBarProbeBuilding = NO;
         objc_setAssociatedObject(host, kPFBTabBarKey, native,
                                  OBJC_ASSOCIATION_RETAIN_NONATOMIC);
         objc_setAssociatedObject(host, kPFBTabBridgeKey, bridge,
                                  OBJC_ASSOCIATION_RETAIN_NONATOMIC);
         PFBCOMPAT_ACTION(PFBCompat_enable_liquid_glass, @"native tab bar built");
+        // Probe: counts the native bars built in this launch.
+        if (gPFBTabIconsProbeState != 2) {
+            PFBNativeBarBuiltProbe(host);
+        }
     }
 
     // Items carry the app's own icons and titles, so the bar reads as Twitter's
@@ -1247,6 +1531,14 @@ static void PFBApplyTabBarGlassBody(UIView* host) {
             [items addObject:item];
         }
         native.items = items;
+        // Probe: keeps the glyph names these items were built from.
+        if (gPFBTabIconsProbeState != 2) {
+            PFBTabItemsBuiltProbe(native, tabs);
+        }
+    }
+    // Probe: compares them with the app's tabs shortly after a tab entries change.
+    if (gPFBTabIconsProbeState != 2 && gPFBTabEntriesProbeAt > 0) {
+        PFBTabIconsStaleProbe(native, tabs);
     }
     // Only the bar's tint pair, which the iOS 26 floating bar honors while ignoring
     // UITabBarAppearance: the accent when its toggle is on and a color is picked
@@ -1313,6 +1605,10 @@ static void PFBApplyTabBarGlassBody(UIView* host) {
                        (pushed == nil || shownIndex != pushed.unsignedIntegerValue);
 
     if (readerMoved) {
+        // Probe: notes a second route of a tab just tapped.
+        if (gPFBTapProbeState != 2) {
+            PFBRoutedAgainProbe(shownIndex);
+        }
         PFBRouteTabSelection(bar, tabs, shownIndex);
         objc_setAssociatedObject(host, kPFBTabPushedKey, @(shownIndex),
                                  OBJC_ASSOCIATION_RETAIN_NONATOMIC);
@@ -1619,6 +1915,8 @@ static void PFBShowRestartReminder(void) {
     [alert addAction:[UIAlertAction actionWithTitle:[bundle localizedStringForKey:@"CLOSE_APP_ACTION"]
                                               style:UIAlertActionStyleDestructive
                                             handler:^(UIAlertAction* action) {
+                                                PFBCompatSaveNow();
+                                                [[NSUserDefaults standardUserDefaults] synchronize];
                                                 exit(0);
                                             }]];
     [top presentViewController:alert animated:YES completion:nil];
@@ -1967,12 +2265,38 @@ static NSArray* orderedTabEntries(NSArray* entries) {
     return orderedEntries;
 }
 
+// Probe: counts the calls of -setVisibleTabEntries: and keeps the entries in and out of
+// the last one, read by the tab editor's live layout probe (07#F045, 14a#F027); stamps
+// the call for the 06#F040 comparison.
+static NSUInteger gPFBTabEntriesProbeCalls;
+static NSUInteger gPFBTabEntriesProbeIn;
+static NSUInteger gPFBTabEntriesProbeOut;
+
+static void PFBTabEntriesProbe(NSArray* entries, NSArray* shown) {
+    if (!PFBDebugIsRecording()) {
+        return;
+    }
+    gPFBTabEntriesProbeCalls++;
+    gPFBTabEntriesProbeIn = entries.count;
+    gPFBTabEntriesProbeOut = shown.count;
+    gPFBTabEntriesProbeAt = CACurrentMediaTime();
+}
+
+void PFBTabEntriesProbeRead(NSUInteger* calls, NSUInteger* entriesIn, NSUInteger* entriesOut) {
+    *calls = gPFBTabEntriesProbeCalls;
+    *entriesIn = gPFBTabEntriesProbeIn;
+    *entriesOut = gPFBTabEntriesProbeOut;
+}
+
 // The single ordered spine that feeds both the tab buttons and their content, so
 // filtering/reordering here keeps taps mapped to the right panel.
 %hook T1TabbedAppNavigationViewController
 
 - (void)setVisibleTabEntries:(NSArray*)entries {
-    %orig(orderedTabEntries(entries));
+    NSArray* shown = orderedTabEntries(entries);
+    %orig(shown);
+    // Probe: counts this call and its entries.
+    PFBTabEntriesProbe(entries, shown);
 }
 
 %end
@@ -1986,7 +2310,15 @@ static NSArray* orderedTabEntries(NSArray* entries) {
 - (void)setTabBarCollapseRatio:(double)ratio {
     // Fires while the timeline scrolls, the other path that brings the old bar
     // back without a host layout.
+    // Probe: marks the glass pass this call drives as one driven by the scroll.
+    BOOL probeScroll = gPFBGlassProbeState != 2;
+    if (probeScroll) {
+        gPFBGlassProbeScrolling = YES;
+    }
     PFBReapplyTabBarFrom(((UIViewController*)self).viewIfLoaded);
+    if (probeScroll) {
+        gPFBGlassProbeScrolling = NO;
+    }
     if (ratio > 0.0 && ![PFBSettings boolForKey:@"no_tab_bar_hiding"]) {
         PFBCOMPAT_OBSERVE(PFBCompat_no_tab_bar_hiding, @"tab bar hiding seen");
     }
@@ -2005,8 +2337,6 @@ static NSArray* orderedTabEntries(NSArray* entries) {
 // MARK: - Tab bar icon and label theming
 
 static BOOL updatingTabIconColor = NO;
-
-
 
 // Same trick as the logo: the color lives in the pixels, so no tint and no
 // vibrancy filter downstream can undo it. The untouched image is kept so the
@@ -2125,7 +2455,7 @@ static void PFBRestoreTabIcon(UIImageView* icon) {
 }
 
 %new
-- (void)applyCurrentThemeToIcon {
+- (void)pfbApplyCurrentThemeToIcon {
     [self _t1_updateImageViewAnimated:NO];
     [self _t1_updateTitleLabel];
 }
@@ -2197,7 +2527,6 @@ static UITabBarAppearance* PFBPatchedTabBarAppearance(UITabBarAppearance* appear
     }
     return patched;
 }
-
 
 // Inside the search title view the app lays its own search bar out with a
 // negative x on the results screen, which pushes the capsule under the back
@@ -2284,6 +2613,10 @@ static UITabBarAppearance* PFBPatchedTabBarAppearance(UITabBarAppearance* appear
 - (void)didMoveToWindow {
     %orig;
     if (!PFBIsOurGlassBar(self)) {
+        // Probe: notes the first bar met here.
+        if (gPFBTabBarProbeState != 2) {
+            PFBOtherTabBarProbe(self, @"didMoveToWindow", NO);
+        }
         PFBApplyTabBarAccent(self);
     }
 }
@@ -2305,6 +2638,10 @@ static UITabBarAppearance* PFBPatchedTabBarAppearance(UITabBarAppearance* appear
         %orig(appearance);
         return;
     }
+    // Probe: notes the first bar met here.
+    if (gPFBTabBarProbeState != 2) {
+        PFBOtherTabBarProbe(self, @"setStandardAppearance:", YES);
+    }
     %orig(PFBPatchedTabBarAppearance(appearance));
 }
 
@@ -2312,6 +2649,10 @@ static UITabBarAppearance* PFBPatchedTabBarAppearance(UITabBarAppearance* appear
     if (PFBIsOurGlassBar(self)) {
         %orig(appearance);
         return;
+    }
+    // Probe: notes the first bar met here.
+    if (gPFBTabBarProbeState != 2) {
+        PFBOtherTabBarProbe(self, @"setScrollEdgeAppearance:", YES);
     }
     %orig(PFBPatchedTabBarAppearance(appearance));
 }
@@ -2464,7 +2805,7 @@ static void PFBWhitenConfirmGlyphsIn(UIView* view, UINavigationBar* bar) {
 // Exposed so the theme screen can run a pass right after a pick (Twitter
 // re-bakes its glyph on the following runloop turn).
 void PFBWhitenNavigationBarConfirm(UINavigationBar* bar) {
-    if (bar && PFBColorThemeScreenVisible && PFBAccentIsActive()) {
+    if (bar && PFBThemeScreenCount && PFBAccentIsActive()) {
         PFBWhitenConfirmGlyphsIn(bar, bar);
     }
 }
@@ -2594,11 +2935,19 @@ static void PFBSettleBarBackdrop(UINavigationBar* bar) {
 // overrides bar-level — if Twitter or UIKit's UITab bridging uses this path,
 // the bar-level patcher never sees it. Patch here too.
 - (void)setStandardAppearance:(UITabBarAppearance*)appearance {
+    // Probe: notes the first item met here.
+    if (gPFBTabBarProbeState != 2) {
+        PFBOtherTabBarItemProbe(self, @"setStandardAppearance:");
+    }
     UITabBarAppearance* patched = PFBPatchedTabBarAppearance(appearance);
     %orig(patched);
 }
 
 - (void)setScrollEdgeAppearance:(UITabBarAppearance*)appearance {
+    // Probe: notes the first item met here.
+    if (gPFBTabBarProbeState != 2) {
+        PFBOtherTabBarItemProbe(self, @"setScrollEdgeAppearance:");
+    }
     UITabBarAppearance* patched = PFBPatchedTabBarAppearance(appearance);
     %orig(patched);
 }

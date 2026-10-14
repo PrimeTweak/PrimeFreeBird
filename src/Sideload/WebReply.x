@@ -25,8 +25,7 @@ static TFNTwitterStatus* statusFromObject(id object) {
     } @catch (__unused NSException* exception) {
     }
 
-    @
-    try {
+    @try {
         id status = [object valueForKey:@"status"];
         if ([status isKindOfClass:%c(TFNTwitterStatus)]) {
             return (TFNTwitterStatus*)status;

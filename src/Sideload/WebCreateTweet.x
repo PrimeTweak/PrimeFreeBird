@@ -4,7 +4,11 @@
 
 #import "Support/HookHelpers.h"
 #import "Debug/PFBDebugger.h"
+#import "Debug/PFBProbe.h"
 #import "Sideload/PFBWebSessionLoginViewController.h"
+#import <QuartzCore/QuartzCore.h>
+#import <os/lock.h>
+#import <stdatomic.h>
 
 // MARK: - Constants
 
@@ -57,6 +61,105 @@ static void refreshXTID(void);
 static void refreshXTIDFor(NSString* method, NSString* path);
 static id PFBAccountForAuthenticatedWebView(void);
 static void teardownWebHarvestWindow(void);
+
+// MARK: - Probe helpers
+
+// Probe: the queue a request is rewritten on, to tell a shared networking queue from
+// a private one (F021).
+static NSString* pfbProbeQueueLabel(void) {
+    if ([NSThread isMainThread]) {
+        return @"main";
+    }
+    const char* label = dispatch_queue_get_label(DISPATCH_CURRENT_QUEUE_LABEL);
+    if (label && label[0]) {
+        return [NSString stringWithUTF8String:label];
+    }
+    NSString* name = [NSOperationQueue currentQueue].name;
+    return name.length ? name : @"background";
+}
+
+// Probe: the helper web view's health (SG-1). Reloads, mint failures and failed navigations
+// are counted; a line at the first failure, and one more at a failure a minute or more later.
+static os_unfair_lock gPFBSG1Lock = OS_UNFAIR_LOCK_INIT;
+static NSUInteger gPFBSG1Loads = 0;
+static NSUInteger gPFBSG1MintFail = 0;
+static NSUInteger gPFBSG1FailedNav = 0;
+static NSString* gPFBSG1FirstFailure = nil;
+static CFTimeInterval gPFBSG1FirstAt = 0;
+
+static void pfbProbeSG1NoteLocked(void) {
+    BOOL later = CACurrentMediaTime() - gPFBSG1FirstAt >= 60.0;
+    NSString* key = later ? @"SG-1 helper still failing" : @"SG-1 helper";
+    if (!PFBProbeWants(key)) {
+        return;
+    }
+    PFBProbeNote(key,
+                 @"SG-1 web helper%@: loads %lu, mint failures %lu (first: %@), failed navigations %lu",
+                 later ? @" still failing a minute after the first failure" : @"",
+                 (unsigned long)gPFBSG1Loads, (unsigned long)gPFBSG1MintFail,
+                 gPFBSG1FirstFailure ?: @"-", (unsigned long)gPFBSG1FailedNav);
+}
+
+static void pfbProbeSG1RecordLoad(void) {
+    if (!PFBDebugIsRecording()) {
+        return;
+    }
+    os_unfair_lock_lock(&gPFBSG1Lock);
+    gPFBSG1Loads++;
+    os_unfair_lock_unlock(&gPFBSG1Lock);
+}
+
+static void pfbProbeSG1RecordMintFail(NSString* first) {
+    if (!PFBDebugIsRecording()) {
+        return;
+    }
+    os_unfair_lock_lock(&gPFBSG1Lock);
+    gPFBSG1MintFail++;
+    if (!gPFBSG1FirstFailure) {
+        gPFBSG1FirstFailure = [first copy];
+        gPFBSG1FirstAt = CACurrentMediaTime();
+    }
+    pfbProbeSG1NoteLocked();
+    os_unfair_lock_unlock(&gPFBSG1Lock);
+}
+
+static void pfbProbeSG1RecordFailedNav(void) {
+    if (!PFBDebugIsRecording()) {
+        return;
+    }
+    os_unfair_lock_lock(&gPFBSG1Lock);
+    gPFBSG1FailedNav++;
+    if (!gPFBSG1FirstFailure) {
+        gPFBSG1FirstFailure = @"navigation";
+        gPFBSG1FirstAt = CACurrentMediaTime();
+    }
+    pfbProbeSG1NoteLocked();
+    os_unfair_lock_unlock(&gPFBSG1Lock);
+}
+
+// Probe: whether the same transaction id goes out twice for a key; the id is held in
+// memory only (never logged), the key is method + path (F026).
+static void pfbProbeF026Reuse(NSString* key, NSString* xtid) {
+    if (!PFBDebugIsRecording() || key.length == 0 || xtid.length == 0) {
+        return;
+    }
+    static NSMutableDictionary<NSString*, NSString*>* last;
+    static os_unfair_lock lock = OS_UNFAIR_LOCK_INIT;
+    BOOL reused = NO;
+    os_unfair_lock_lock(&lock);
+    if (!last) {
+        last = [NSMutableDictionary dictionary];
+    }
+    reused = [last[key] isEqualToString:xtid];
+    last[key] = xtid;
+    os_unfair_lock_unlock(&lock);
+    if (reused) {
+        NSString* probeKey = [@"04#F026 reuse " stringByAppendingString:key];
+        if (PFBProbeWants(probeKey)) {
+            PFBProbeNote(probeKey, @"04#F026 transaction id reused for %@", key);
+        }
+    }
+}
 
 // MARK: - Small helpers
 
@@ -256,6 +359,9 @@ static void onHelperWebViewLoaded(WKWebView* webView);
 @end
 @implementation PFBWebHelperDelegate
 - (void)webView:(WKWebView*)webView didFinishNavigation:(__unused WKNavigation*)navigation {
+    // Probe: each load of a helper web view; a second load of the same view means WebKit
+    // reloaded it after its content process ended (SG-1).
+    pfbProbeSG1RecordLoad();
     onHelperWebViewLoaded(webView);
 }
 - (void)webView:(WKWebView*)webView
@@ -266,6 +372,13 @@ static void onHelperWebViewLoaded(WKWebView* webView);
     WebHelperWebView = nil;
     WebHelperReady = NO;
     WebHelperInFlight = NO;
+}
+// Probe: a navigation that fails after commit (SG-1). Logging only: the state is left
+// exactly as it was so WebKit's own content-process reload is not disturbed.
+- (void)webView:(__unused WKWebView*)webView
+    didFailNavigation:(__unused WKNavigation*)navigation
+            withError:(__unused NSError*)error {
+    pfbProbeSG1RecordFailedNav();
 }
 @end
 
@@ -326,6 +439,11 @@ static void refreshWebCookiesViaWebView(void) {
 
     dispatch_async(dispatch_get_main_queue(), ^{
         harvestSharedCookies();
+
+        // Probe: whether the helper page is ever built with no web session to seed it (F026).
+        if (WebAuthToken.length == 0 && PFBProbeWants(@"04#F026 nosession")) {
+            PFBProbeNote(@"04#F026 nosession", @"04#F026 helper page created without a web session");
+        }
 
         WKWebViewConfiguration* configuration = [[WKWebViewConfiguration alloc] init];
         configuration.mediaTypesRequiringUserActionForPlayback = WKAudiovisualMediaTypeAll;
@@ -434,15 +552,32 @@ static void refreshXTIDFor(NSString* method, NSString* path) {
                            arguments:@{@"method": verb, @"path": path}
                              inFrame:nil
                       inContentWorld:WKContentWorld.pageWorld
-                   completionHandler:^(id result, __unused NSError* error) {
+                   completionHandler:^(id result, NSError* error) {
                        BOOL ok = [result isKindOfClass:[NSString class]] &&
                                  [(NSString*)result length] > 10 &&
                                  ![(NSString*)result hasPrefix:@"ERR:"];
+                       BOOL cachedKept = NO;
                        @synchronized(WebXTIDLock) {
                            [WebXTIDMinting removeObject:key];
                            if (ok) {
                                WebXTIDByKey[key] = [result copy];
                            }
+                           cachedKept = WebXTIDByKey[key] != nil;
+                       }
+                       // Probe: a mint that yields no usable id, its reason, and whether a
+                       // stale id is left behind for the key (F026, SG-1). The id itself,
+                       // minted or not, is never logged.
+                       if (!ok && PFBDebugIsRecording()) {
+                           NSString* reason =
+                               ([result isKindOfClass:[NSString class]] && [(NSString*)result hasPrefix:@"ERR:"])
+                                   ? [(NSString*)result substringToIndex:MIN((NSUInteger)80, [(NSString*)result length])]
+                               : error ? [NSString stringWithFormat:@"%@ %ld", error.domain, (long)error.code]
+                                       : @"empty or short";
+                           if (PFBProbeWants(@"04#F026 mintfail")) {
+                               PFBProbeNote(@"04#F026 mintfail", @"04#F026 transaction id for %@ not minted: %@", key, reason);
+                           }
+                           pfbProbeSG1RecordMintFail([NSString stringWithFormat:@"%@, cached id kept %@", reason,
+                                                                                cachedKept ? @"yes" : @"no"]);
                        }
                    }];
     });
@@ -929,9 +1064,18 @@ static BOOL isGrokURL(NSURL* url) {
 // headers stripped. A fresh csrf token costs one request to x.com.
 static NSMutableURLRequest* webPathRequest(NSURLRequest* request, NSString* host, NSString* path,
                                            NSString* what, BOOL freshCsrf) {
+    // Probe: time the credential and transaction-id waits this send blocks on, and the
+    // queue it runs on (F021). Measured only while the measurement is open.
+    NSString* f021Key = PFBDebugIsRecording() ? [NSString stringWithFormat:@"04#F021 %@", what] : nil;
+    BOOL f021 = PFBProbeWants(f021Key);
+    CFTimeInterval f021Start = f021 ? CACurrentMediaTime() : 0;
+
     harvestSharedCookies();
     NSString *authToken = nil, *ct0 = nil;
-    if (!resolveCredsForRequest(request, &authToken, &ct0, freshCsrf)) {
+    CFTimeInterval f021Ct0Start = f021 ? CACurrentMediaTime() : 0;
+    BOOL resolved = resolveCredsForRequest(request, &authToken, &ct0, freshCsrf);
+    double f021Ct0Ms = f021 ? (CACurrentMediaTime() - f021Ct0Start) * 1000.0 : 0;
+    if (!resolved) {
         return nil;
     }
     BOOL own = ![authToken isEqualToString:WebAuthToken];
@@ -944,6 +1088,7 @@ static NSMutableURLRequest* webPathRequest(NSURLRequest* request, NSString* host
             refreshXTIDFor(method, path);
         }
     };
+    CFTimeInterval f021XtidStart = f021 ? CACurrentMediaTime() : 0;
     if (cachedXTID(key).length == 0 && !waitUntil(
                                             ^BOOL {
                                                 return cachedXTID(key).length > 0;
@@ -952,6 +1097,7 @@ static NSMutableURLRequest* webPathRequest(NSURLRequest* request, NSString* host
         // Nothing waits on the main thread: the id is minted for the next request.
         dispatch_async(dispatch_get_main_queue(), mint);
     }
+    double f021XtidMs = f021 ? (CACurrentMediaTime() - f021XtidStart) * 1000.0 : 0;
     NSURLComponents* web = [NSURLComponents new];
     web.scheme = @"https";
     web.host = host;
@@ -964,6 +1110,14 @@ static NSMutableURLRequest* webPathRequest(NSURLRequest* request, NSString* host
     NSString* xtid = cachedXTID(key);
     if (xtid.length) {
         [outgoing setValue:xtid forHTTPHeaderField:@"x-client-transaction-id"];
+        pfbProbeF026Reuse(key, xtid);
+    }
+    if (f021 && PFBProbeWants(f021Key)) {
+        NSString* ct0Source = ct0.length == 0 ? @"none" : (f021Ct0Ms > 40.0 ? @"fetched" : @"cached");
+        PFBProbeNote(f021Key,
+                     @"04#F021 %@ rewrite on %@: transaction id wait %.0f ms, ct0 %.0f ms (%@), total %.0f ms",
+                     what, pfbProbeQueueLabel(), f021XtidMs, f021Ct0Ms, ct0Source,
+                     (CACurrentMediaTime() - f021Start) * 1000.0);
     }
     PFBDebugLog(@"[webtweet] rewrote %@ -> web with %@ session (auth=%lu ct0=%lu xtid=%lu)", what,
                 own ? @"its own account's" : @"the shared", (unsigned long)authToken.length,
@@ -1015,12 +1169,19 @@ static NSMutableURLRequest* webRequestFromNativeSend(NSURLRequest* request) {
         return nil;
     }
 
+    // Probe: time the transaction-id and credential waits a Tweet blocks on, and the
+    // queue it runs on (F021). Measured only while the measurement is open.
+    BOOL f021 = PFBProbeWants(@"04#F021 CreateTweet");
+    CFTimeInterval f021Start = f021 ? CACurrentMediaTime() : 0;
+    double f021XtidMs = 0, f021Ct0Ms = 0;
+
     NSString* queryID = queryIDFromCreateTweetURL(request.URL);
     if (queryID.length && ![queryID isEqualToString:WebCreateTweetQueryID]) {
         WebCreateTweetQueryID = [queryID copy];
         [[NSUserDefaults standardUserDefaults] setObject:queryID forKey:WebQueryIDDefaultsKey];
     }
 
+    CFTimeInterval f021XtidStart = f021 ? CACurrentMediaTime() : 0;
     NSString* xtidForSend = xtidKey(@"POST", createTweetPath());
     if (cachedXTID(xtidForSend).length == 0) {
         waitUntil(
@@ -1041,8 +1202,13 @@ static NSMutableURLRequest* webRequestFromNativeSend(NSURLRequest* request) {
         }
     }
 
+    if (f021) {
+        f021XtidMs = (CACurrentMediaTime() - f021XtidStart) * 1000.0;
+    }
+
     harvestSharedCookies();
 
+    CFTimeInterval f021Ct0Start = f021 ? CACurrentMediaTime() : 0;
     NSString* postingUserID = postingUserIDFromRequest(request);
     NSString *authToken = nil, *ct0 = nil;
     if (postingUserID.length) {
@@ -1064,11 +1230,23 @@ static NSMutableURLRequest* webRequestFromNativeSend(NSURLRequest* request) {
         PFBDebugLog(@"[webtweet] reroute via %@ session", own ? @"its own account's" : @"the shared");
     }
 
+    if (f021) {
+        f021Ct0Ms = (CACurrentMediaTime() - f021Ct0Start) * 1000.0;
+    }
+
     NSMutableURLRequest* outgoing = [request mutableCopy];
     applyWebAuth(outgoing, authToken, ct0, postingUserID);
     NSString* xtid = cachedXTID(xtidForSend);
     [outgoing setValue:xtid forHTTPHeaderField:@"x-client-transaction-id"];
+    pfbProbeF026Reuse(xtidForSend, xtid);
     refreshXTID();
+    if (f021 && PFBProbeWants(@"04#F021 CreateTweet")) {
+        NSString* ct0Source = ct0.length == 0 ? @"none" : (f021Ct0Ms > 40.0 ? @"fetched" : @"cached");
+        PFBProbeNote(@"04#F021 CreateTweet",
+                     @"04#F021 CreateTweet rewrite on %@: transaction id wait %.0f ms, ct0 %.0f ms (%@), total %.0f ms",
+                     pfbProbeQueueLabel(), f021XtidMs, f021Ct0Ms, ct0Source,
+                     (CACurrentMediaTime() - f021Start) * 1000.0);
+    }
 
     // Tags the request as a Tweet for the task watcher, with the account whose ct0 a 4xx
     // drops; empty for an account sending with its own session.
@@ -1083,8 +1261,8 @@ static NSMutableURLRequest* webRequestFromNativeSend(NSURLRequest* request) {
 
 // MARK: - Task watcher
 
-// Watches a rewritten CreateTweet task: a 2xx proves the web session, a 4xx invalidates
-// the cached ct0 so the next send re-mints.
+// Watches a rewritten CreateTweet task: a 2xx proves the web session, and a 4xx drops
+// the cached credentials of the account the request was tagged with.
 @interface PFBCreateTweetWatcher : NSObject
 @property (nonatomic, copy) NSString* userID;
 @end
@@ -1313,12 +1491,81 @@ void PFBSeedReplyWebViewCookies(WKWebView* webView, void (^done)(void)) {
 
 %end
 
+// Probe: a request that reaches -resume still signed with the app's own OAuth and no
+// web-session cookie escaped the bridge and the web rewrite (M2), Grok being the known one.
+// Path end only, "<id>" for a numeric one; 8 endpoints per launch at most.
+static BOOL gPFBM2Done = NO;
+static atomic_uint gPFBM2Lines = 0;
+
+static void pfbProbeM2Resume(NSURLSessionTask* task, NSURLRequest* request) {
+    if (gPFBM2Done || !PFBDebugIsRecording() || task.state != NSURLSessionTaskStateSuspended) {
+        return;
+    }
+    NSString* auth = [request valueForHTTPHeaderField:@"Authorization"];
+    if (![auth isKindOfClass:[NSString class]] || ![auth containsString:@"oauth_token="]) {
+        return;
+    }
+    NSURL* url = request.URL;
+    if (![url.scheme isEqualToString:@"https"] || !PFBIsXDomain(url.host)) {
+        return;
+    }
+    if (![url.host.lowercaseString hasPrefix:@"api."] && ![url.path hasPrefix:@"/i/api"]) {
+        return;
+    }
+    NSString* cookie = [request valueForHTTPHeaderField:@"Cookie"] ?: @"";
+    if ([cookie containsString:@"auth_token="]) {
+        return;
+    }
+    NSString* last = url.path.lastPathComponent ?: @"?";
+    if (last.length && [[NSCharacterSet decimalDigitCharacterSet] characterIsMember:[last characterAtIndex:0]]) {
+        last = @"<id>";
+    }
+    NSString* key = [NSString stringWithFormat:@"10G#M2 resume %@", last];
+    if (!PFBProbeWants(key)) {
+        return;
+    }
+    if (atomic_fetch_add(&gPFBM2Lines, 1) >= 8) {
+        gPFBM2Done = YES;
+        return;
+    }
+    PFBProbeNote(key, @"10G#M2 resume: %@ %@ starts with the app's own sign-in, missed by the bridge%@",
+                 request.HTTPMethod ?: @"GET", last, isGrokURL(url) ? @" (Grok)" : @"");
+}
+
+// Probe: after the KVC swap on a Grok task, whether currentRequest actually carries the
+// web rewrite, by value rather than by the journal's pointer test (SG-2, P4). The auth
+// header values are compared but never logged; only same/different, the auth type and
+// the host go in the line.
+static void pfbProbeGrokSwap(NSURLSessionTask* task, NSURLRequest* outgoing) {
+    if (!PFBDebugIsRecording()) {
+        return;
+    }
+    NSURLRequest* current = task.currentRequest;
+    NSString* authType = [current valueForHTTPHeaderField:@"x-twitter-auth-type"];
+    if (PFBProbeWants(@"SG-2 grok")) {
+        PFBProbeNote(@"SG-2 grok", @"SG-2 grok task: %@, web request in place: %@ (auth type %@, host %@)",
+                     NSStringFromClass(object_getClass(task)),
+                     [authType isEqualToString:@"OAuth2Session"] ? @"yes" : @"no",
+                     authType.length ? authType : @"none", current.URL.host ?: @"?");
+    }
+    if (PFBProbeWants(@"10G#P4 grok")) {
+        NSString* curAuth = [current valueForHTTPHeaderField:@"Authorization"];
+        NSString* outAuth = [outgoing valueForHTTPHeaderField:@"Authorization"];
+        BOOL urlSame = current.URL && [current.URL isEqual:outgoing.URL];
+        BOOL authSame = (curAuth || outAuth) ? [curAuth isEqualToString:outAuth] : YES;
+        PFBProbeNote(@"10G#P4 grok", @"10G#P4 grok task: url=%@ auth=%@ pointer=%@ class=%@",
+                     urlSame ? @"same" : @"different", authSame ? @"same" : @"different",
+                     current == outgoing ? @"same" : @"different", NSStringFromClass(object_getClass(current)));
+    }
+}
+
 // Grok's translation task is created by a call none of the hooks above sees, so
 // it is rebuilt as it starts.
 %hook NSURLSessionTask
 
 - (void)resume {
     NSURLRequest* request = self.currentRequest ?: self.originalRequest;
+    pfbProbeM2Resume(self, request);
     if (self.state == NSURLSessionTaskStateSuspended && isGrokURL(request.URL)) {
         NSMutableURLRequest* outgoing = webRequestFromNativeSend(request);
         if (outgoing) {
@@ -1328,6 +1575,7 @@ void PFBSeedReplyWebViewCookies(WKWebView* webView, void (^done)(void)) {
             } @catch (__unused NSException* exception) {
             }
             PFBDebugLog(@"[webtweet] Grok task %@", self.currentRequest == outgoing ? @"rebuilt" : @"left as it was");
+            pfbProbeGrokSwap(self, outgoing);
         }
     }
     %orig;

@@ -1,4 +1,3 @@
-#import <UIKit/UIKit.h>
 #import "Debug/PFBTourOverlayWindow.h"
 
 @implementation PFBTourOverlayWindow

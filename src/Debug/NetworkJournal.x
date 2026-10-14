@@ -4,7 +4,86 @@
 
 #import <Foundation/Foundation.h>
 #import <objc/runtime.h>
+#import <stdatomic.h>
+#import "Common/PFBCompatibility.h"
 #import "Debug/PFBDebugger.h"
+#import "Debug/PFBProbe.h"
+
+// Probe: counts of wrapped sessions and of identity questions the proxy answered
+// differently from the real delegate (F-01). Written once at the end of the tour.
+static atomic_uint_fast64_t gPFBF01Sessions = 0;
+static atomic_uint_fast64_t gPFBF01Differ = 0;
+static atomic_uint gPFBF01Lines = 0;
+
+// Probe: counts one divergence; YES while it may still be looked at for a line: the first
+// 256 of a launch, until 8 lines are noted (F-01).
+static BOOL pfbProbeF01Count(void) {
+    return atomic_fetch_add(&gPFBF01Differ, 1) < 256 && atomic_load(&gPFBF01Lines) < 8;
+}
+
+// Probe: notes once per identity selector + argument when the proxy's own answer
+// differs from the real delegate's; the proxy keeps returning its own (unchanged).
+static void pfbProbeF01Divergence(NSString* sel, NSString* arg, BOOL mine, BOOL real,
+                                  id realDelegate) {
+    NSString* key = [NSString stringWithFormat:@"10F#F-01 %@ %@", sel, arg.length ? arg : @"?"];
+    if (!PFBProbeWants(key)) {
+        return;
+    }
+    atomic_fetch_add(&gPFBF01Lines, 1);
+    PFBProbeNote(key, @"10F#F-01 delegate proxy asked %@ %@: proxy says %d, real %@ says %d", sel,
+                 arg.length ? arg : @"?", mine ? 1 : 0, PFBProbeClassName(realDelegate), real ? 1 : 0);
+}
+
+// Probe: at the end of the tour, how many sessions were wrapped and how many
+// identity answers diverged.
+static void pfbProbeF01ArmTourEnd(void) {
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+        [[NSNotificationCenter defaultCenter] addObserverForName:PFBProbeTourEndedNotification
+                                                          object:nil
+                                                           queue:[NSOperationQueue mainQueue]
+                                                      usingBlock:^(__unused NSNotification* note) {
+            // After a full tour only: a cancelled or remaining-only tour leaves the summary open.
+            if (![PFBCompatTourLastRun() hasPrefix:@"Full tour"] || !PFBProbeWants(@"10F#F-01 summary")) {
+                return;
+            }
+            PFBProbeNote(@"10F#F-01 summary", @"10F#F-01 delegate proxy: %llu sessions wrapped, %llu differing answers",
+                         (unsigned long long)atomic_load(&gPFBF01Sessions),
+                         (unsigned long long)atomic_load(&gPFBF01Differ));
+        }];
+    });
+}
+
+// Probe: the tweet-creating operations, to see which ones reach the server without a
+// transaction id and how it answers (F034).
+static NSString* pfbProbeF034ErrorTag(NSData* body) {
+    if (!body.length) {
+        return @"none";
+    }
+    NSString* code = nil;
+    id parsed = [NSJSONSerialization JSONObjectWithData:body options:0 error:nil];
+    NSArray* errors = [parsed isKindOfClass:[NSDictionary class]] ? parsed[@"errors"] : nil;
+    NSDictionary* first = [errors isKindOfClass:[NSArray class]] && errors.count &&
+                                  [errors.firstObject isKindOfClass:[NSDictionary class]]
+                              ? errors.firstObject
+                              : nil;
+    id codeValue = first[@"code"];
+    if ([codeValue respondsToSelector:@selector(stringValue)]) {
+        code = [codeValue stringValue];
+    }
+    // Only the numeric code and a category go in the line; the server message text does not.
+    // A body without "errors" is no refusal, whatever words its data holds.
+    NSString* text = [[NSString alloc] initWithData:body encoding:NSUTF8StringEncoding].lowercaseString ?: @"";
+    if (!code.length && ![text containsString:@"\"errors\""]) {
+        return @"none";
+    }
+    NSString* category = [text containsString:@"automat"] ? @"automation"
+                         : ([text containsString:@"subscri"] || [text containsString:@"premium"] ||
+                            [text containsString:@"verified"])
+                             ? @"subscription"
+                             : (code.length ? @"other" : @"none");
+    return code.length ? [NSString stringWithFormat:@"%@ %@", code, category] : category;
+}
 
 static BOOL pfbRespIsTwitterAPI(NSString* url) {
     if (![url isKindOfClass:[NSString class]]) {
@@ -64,6 +143,54 @@ static char kPFBRespBodyKey;
 
 - (id)forwardingTargetForSelector:(SEL)sel {
     return self.pfbReal;
+}
+
+// Probe: identity questions are answered by NSObject (the proxy), not forwarded, so the
+// proxy's own answer is returned unchanged and only a divergence from the real delegate is
+// noted (F-01); the tweak's own wrap test and a comparison with itself are left out.
+- (BOOL)isKindOfClass:(Class)aClass {
+    BOOL mine = [super isKindOfClass:aClass];
+    if (PFBDebugIsRecording() && self.pfbReal && aClass != [PFBURLDelegateProxy class]) {
+        BOOL real = [self.pfbReal isKindOfClass:aClass];
+        if (mine != real && pfbProbeF01Count()) {
+            pfbProbeF01Divergence(@"isKindOfClass:", NSStringFromClass(aClass), mine, real, self.pfbReal);
+        }
+    }
+    return mine;
+}
+
+- (BOOL)isMemberOfClass:(Class)aClass {
+    BOOL mine = [super isMemberOfClass:aClass];
+    if (PFBDebugIsRecording() && self.pfbReal && aClass != [PFBURLDelegateProxy class]) {
+        BOOL real = [self.pfbReal isMemberOfClass:aClass];
+        if (mine != real && pfbProbeF01Count()) {
+            pfbProbeF01Divergence(@"isMemberOfClass:", NSStringFromClass(aClass), mine, real, self.pfbReal);
+        }
+    }
+    return mine;
+}
+
+- (BOOL)conformsToProtocol:(Protocol*)aProtocol {
+    BOOL mine = [super conformsToProtocol:aProtocol];
+    if (PFBDebugIsRecording() && self.pfbReal) {
+        BOOL real = [self.pfbReal conformsToProtocol:aProtocol];
+        if (mine != real && pfbProbeF01Count()) {
+            pfbProbeF01Divergence(@"conformsToProtocol:",
+                                  aProtocol ? NSStringFromProtocol(aProtocol) : @"?", mine, real, self.pfbReal);
+        }
+    }
+    return mine;
+}
+
+- (BOOL)isEqual:(id)object {
+    BOOL mine = [super isEqual:object];
+    if (PFBDebugIsRecording() && self.pfbReal && object != self) {
+        BOOL real = [self.pfbReal isEqual:object];
+        if (mine != real && pfbProbeF01Count()) {
+            pfbProbeF01Divergence(@"isEqual:", PFBProbeClassName(object), mine, real, self.pfbReal);
+        }
+    }
+    return mine;
 }
 
 - (void)URLSession:(NSURLSession*)session
@@ -139,6 +266,27 @@ static char kPFBRespBodyKey;
             }
             PFBDebugLog(@"[resp] write headers %@: %@", path, hdr);
         }
+        // Probe: only the exact CreateTweet is rerouted with a transaction id; the other
+        // tweet-creating operations are watched here to see whether the server refuses
+        // them without one (F034).
+        if (isWrite) {
+            NSString* op = path.lastPathComponent;
+            static NSSet<NSString*>* createOps;
+            static dispatch_once_t createOnce;
+            dispatch_once(&createOnce, ^{
+                createOps = [NSSet setWithObjects:@"CreateTweet", @"CreateNoteTweet",
+                                                  @"CreateScheduledTweet", @"CreateDraftTweet",
+                                                  @"CreateTweetWithUndo", nil];
+            });
+            if ([createOps containsObject:op]) {
+                NSString* key = [NSString stringWithFormat:@"04#F034 %@", op];
+                if (PFBProbeWants(key)) {
+                    BOOL hasXtid = [task.originalRequest valueForHTTPHeaderField:@"x-client-transaction-id"] != nil;
+                    PFBProbeNote(key, @"04#F034 %@: transaction id %@, http %ld, error %@", op,
+                                 hasXtid ? @"present" : @"absent", code, pfbProbeF034ErrorTag(acc));
+                }
+            }
+        }
         // Spaces asks for a Periscope token before it loads; logging the auth this
         // request carries (lengths only) shows whether the web session reached it.
         BOOL isAuth = [path containsString:@"periscope"] || [path containsString:@"/oauth/"];
@@ -166,6 +314,9 @@ static char kPFBRespBodyKey;
     if (PFBDebugIsRecording() && delegate && ![delegate isKindOfClass:[PFBURLDelegateProxy class]]) {
         PFBURLDelegateProxy* proxy = [PFBURLDelegateProxy new];
         proxy.pfbReal = delegate;
+        // Probe: count wrapped sessions and arm the end-of-tour summary (F-01).
+        atomic_fetch_add(&gPFBF01Sessions, 1);
+        pfbProbeF01ArmTourEnd();
         // The session retains its delegate, which keeps the proxy (and the real
         // delegate it holds) alive for the session's lifetime.
         return %orig(configuration, proxy, queue);

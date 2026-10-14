@@ -1,6 +1,5 @@
 #import "Common/PFBCompatibility.h"
 #import "Support/TwitterChirpFont.h"
-#import "Support/HookHelpers.h"
 #import "Debug/PFBTourChoicePopover.h"
 
 @implementation PFBTourChoicePopover

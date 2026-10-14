@@ -175,7 +175,7 @@ static UIImage* pfbLoginBirdImage(CGSize size) {
     bird.translatesAutoresizingMaskIntoConstraints = NO;
 
     UILabel* name = [[UILabel alloc] init];
-    name.text = @"PrimeFreeBird";
+    name.text = @PFB_PRODUCT_NAME;
     name.font = PFBScaledFont([TwitterChirpFont(TwitterFontStyleBold) fontWithSize:21]);
     name.textColor = [UIColor labelColor];
 
@@ -265,15 +265,12 @@ static UIImage* pfbLoginBirdImage(CGSize size) {
         @"if(m)return m[1];}"
         @"var b=document.querySelector('[data-testid=\"SideNav_AccountSwitcher_Button\"]');"
         @"if(b){var mm=(b.innerText||'').match(/@([A-Za-z0-9_]{1,15})/);if(mm)return mm[1];}"
-        @"var body=document.body?document.body.innerText:'';var at=body.match(/@([A-Za-z0-9_]{1,15})/);"
-        @"return 'diag:path='+location.pathname+' links='"
-        @"+document.querySelectorAll('a[href^=\"/\"]').length+' at='+(at?at[1]:'-');})();";
+        @"return '';})();";
     [self.webView evaluateJavaScript:js
                    completionHandler:^(id result, NSError* error) {
-                     NSString* raw = [result isKindOfClass:[NSString class]] ? result : nil;
-                     NSString* screen = [raw hasPrefix:@"diag:"] ? nil : raw;
-                     PFBDebugLog(@"[weblogin] handle probe attempt=%d -> %@", attempt,
-                                 raw.length ? raw : @"(none)");
+                     NSString* screen = [result isKindOfClass:[NSString class]] ? result : nil;
+                     PFBDebugLog(@"[weblogin] handle read attempt=%d -> %@", attempt,
+                                 screen.length ? screen : @"(none)");
                      if (screen.length || attempt >= 8) {
                          [PFBLoginBridge startWithAuthToken:authToken
                                                     csrf:csrf
@@ -422,7 +419,7 @@ static UIImage* pfbLoginBirdImage(CGSize size) {
           [self showSwitchingOverlay];
           // Seed the shared cookie jar with this session so the read injection and
           // WebCreateTweet.x (writes) both draw on the one session, and it survives
-          // relaunch. "Delete web session" wipes this same jar.
+          // relaunch. PFBClearWebSession wipes this same jar.
           NSHTTPCookieStorage* jar = [NSHTTPCookieStorage sharedHTTPCookieStorage];
           for (NSHTTPCookie* c in cookies) {
               NSString* domain = c.domain ?: @"";

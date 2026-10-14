@@ -1,4 +1,3 @@
-#import <CoreGraphics/CoreGraphics.h>
 #import "Debug/PFBDebugOverlayWindow.h"
 
 @implementation PFBDebugOverlayWindow

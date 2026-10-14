@@ -26,7 +26,7 @@
 
 @interface T1MediaAttachmentsViewCell : UICollectionViewCell
 @property (nonatomic, strong, readwrite) id attachment;
-@property (nonatomic, strong) UIButton* uploadButton;
+@property (nonatomic, strong) UIButton* pfbUploadButton;
 @end
 
 @interface T1MediaAttachmentsViewCell () <UINavigationControllerDelegate,
@@ -148,8 +148,8 @@
 
 // DM media message container (ChatConversation.MessageAttachmentView).
 @interface _TtC16ChatConversation21MessageAttachmentView : UIView
-@property (nonatomic, strong) UIContextMenuInteraction* downloadMenuInteraction;
-@property (nonatomic, strong) PFBDownloadInlineButton* downloadHandler;
+@property (nonatomic, strong) UIContextMenuInteraction* pfbDownloadMenuInteraction;
+@property (nonatomic, strong) PFBDownloadInlineButton* pfbDownloadHandler;
 @end
 
 @interface _TtC16ChatConversation21MessageAttachmentView () <
@@ -187,11 +187,13 @@
 @property (nonatomic, readonly) NSURL* rootURL;
 @end
 
-#pragma mark - Status & timeline text
+#pragma mark - Timeline trends
 
 @interface _TtC10TwitterURT25URTTimelineTrendViewModel : NSObject
 @property (nonatomic, readonly) NSDictionary* scribeItem;
 @end
+
+#pragma mark - Profile counts
 
 // Hooked for unrounded follower/following counts
 @interface T1ProfileFriendsFollowingViewModel : NSObject
@@ -201,6 +203,8 @@
                        highlighted:(_Bool)arg4;
 @end
 
+#pragma mark - Cards
+
 @interface TFCCardData : NSObject
 - (NSString*)stringForKey:(NSString*)key;
 - (NSString*)stringForKey:(NSString*)key defaultValue:(NSString*)value;
@@ -208,6 +212,8 @@
 - (NSNumber*)numberFromStringForKey:(NSString*)key;
 - (BOOL)boolForKey:(NSString*)key;
 @end
+
+#pragma mark - Video player
 
 @interface TAVPlaybackState : NSObject
 // AVPlayer semantics: 0 = paused, 1 = waiting to play, 2 = playing.

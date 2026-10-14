@@ -2,6 +2,7 @@
 // follows FeatureSwitches.x, and the logic is hand-written.
 #import "Common/PFBCompatibility.h"
 #import "Debug/PFBDebugger.h"
+#import "Debug/PFBProbe.h"
 #import "Common/PFBSettings.h"
 #import "Common/PFBBundle.h"
 #import <ctype.h>
@@ -958,6 +959,7 @@ static const PFBCompatReq kReqs[] = {
     {PFBCompat_reply_in_webview, "T1PersistentComposeViewController", "-persistentComposeViewDidTap:"},
     {PFBCompat_reply_in_webview, "T1StatusViewInlineActionTapEventHandler", "-performReplyActionWithAccount:event:controller:scribeContext:scribeElement:parameters:originalStatus:"},
     {PFBCompat_reply_in_webview, "CALayer", "-addAnimation:forKey:"},
+    {PFBCompat_reply_in_webview, "WKContentView", "-_elementDidFocus:userIsInteracting:blurPreviousNode:activityStateChanges:userObject:"},
     {PFBCompat_flex_twitter, "T1AppDelegate", "-application:didFinishLaunchingWithOptions:"},
     {PFBCompat_flex_twitter, "T1AppDelegate", "-applicationWillResignActive:"},
     {PFBCompat_web_session, "T1WebViewController", "-updateConfiguration:"},
@@ -1584,6 +1586,7 @@ static const PFBCompatName kNames[] = {
     {PFBCompatOptionCount, "Features/Appearance/NavBarIcons.x", "boolValue"},
     {PFBCompatOptionCount, "Features/Appearance/NavBarIcons.x", "hidesSharedBackground"},
     {PFBCompatOptionCount, "Features/Appearance/NavBarIcons.x", "title"},
+    {PFBCompat_bar_repairs, "Features/Appearance/NavBarIcons.x", "NavigationBarSettingsButton"},
     {PFBCompat_color_twitter_icon_in_top_bar, "Features/Appearance/Theme.x", "colorPalette"},
     {PFBCompat_color_twitter_icon_in_top_bar, "Features/Appearance/Theme.x", "currentColorPalette"},
     {PFBCompat_color_twitter_icon_in_top_bar, "Features/Appearance/Theme.x", "navigationBarLogoColor"},
@@ -1783,8 +1786,6 @@ static const PFBCompatName kNames[] = {
     {PFBCompat_muted_words, "Features/Timelines/Timeline.x", "status|tweet"},
     {PFBCompat_hide_threads, "Features/Tweets/HiddenThreads.x", "status|tweet|canonicalStatus"},
     {PFBCompat_hide_notifications, "Features/General/HiddenNotifications.x", "entryId|entryID|identifier|notificationId|notificationID|id|sortIndex|key|itemIdentifier|scribeItemImpressionID|scribeItemImpressionId"},
-    {PFBCompat_hide_notifications, "Features/General/HiddenNotifications.x", "timestamp|sortTimestamp|createdAt|date|sortDate|timeInMs|createdAtMs|time"},
-    {PFBCompat_hide_notifications, "Features/General/HiddenNotifications.x", "text|message|displayText|bodyText|title|formattedText|attributedText|summary|notificationText"},
     {PFBCompatOptionCount, "Features/Branding/AppIcon/PFBAppIconViewController.m", "SUBSCRIPTION_APP_ICON_SETTINGS_TITLE"},
     {PFBCompatOptionCount, "Features/Branding/AppIcon/PFBAppIconViewController.m", "SUBSCRIPTION_APP_ICON_SETTINGS_DETAIL"},
     {PFBCompatOptionCount, "Features/Appearance/CustomTabBar/PFBCustomTabBarViewController.m", "SUBSCRIPTION_TAB_CUSTOMIZATION_RESTORE_BUTTON_TITLE"},
@@ -1942,6 +1943,7 @@ static const PFBCompatDeclared kDeclared[] = {
     {"Support/TFNHeaders.h", "TFNHUD", "initWithText:"},
     {"Support/TFNHeaders.h", "TFNSettingsNavigationItem", "initWithTitle:detail:iconName:controllerFactory:"},
     {"Features/Branding/AppIcon/PFBAppIconCell.m", "TFNDynamicColorManager", "isHighContrastForObject:withDefault:"},
+    {"Features/Appearance/ThemeColor/PFBDarkModeStyle.x", "TFNSearchBar", "setSearchFieldBackgroundImage:forState:"},
 };
 enum { kDeclaredCount = sizeof(kDeclared) / sizeof(kDeclared[0]) };
 
@@ -2953,10 +2955,164 @@ static NSArray<NSString*>* scanMissingNames(NSArray<NSString*>* binaries) {
     return missing;
 }
 
+// MARK: - Probe: frameworks Twitter does not ship
+
+// Probe (10E#E-L9): whether a framework is one of Twitter 12.31's own, from its decrypted IPA;
+// a package product is matched by its name before the build hash.
+static BOOL PFBProbeTwitterShips(NSString* framework) {
+    static NSSet<NSString*>* shipped;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+      shipped = [NSSet setWithArray:@[
+          @"AppAuth", @"AppCheckCore", @"BrazeKit", @"C2PAC", @"CastleSDK", @"DeviceRisk", @"FBLPromises",
+          @"FirebaseAnalytics", @"FirebaseCore", @"FirebaseCoreExtension", @"FirebaseCoreInternal",
+          @"FirebaseCrashlytics", @"FirebaseInstallations", @"FirebaseRemoteConfigInterop", @"FirebaseSessions",
+          @"GTMAppAuth", @"GTMSessionFetcher", @"GoogleAppMeasurement", @"GoogleAppMeasurementIdentitySupport",
+          @"GoogleDataTransport", @"GoogleMobileAds", @"GoogleSignIn", @"GoogleUtilities", @"GrokBotMark",
+          @"IOSSecuritySuite_-5B594600D65C7EA3_PackageProduct", @"LHLSLib", @"LinkKit", @"LiveKitWebRTC", @"Lottie",
+          @"MobileIntelligence", @"NOZXBrotli", @"PalmAPISaas", @"Persona2", @"PinwheelSDK", @"PreludeCore",
+          @"Prelude_37DAFDA622105FD8_PackageProduct", @"Promises", @"SocureDocV",
+          @"SwiftProtobuf_7CEE9AB92C12BC6B_PackageProduct", @"SwiftUIIntrospect_2C5EC2718B657AE7_PackageProduct",
+          @"T1Twitter", @"TFSFeatureSwitchesUI", @"TwitterDiagnosticTools", @"TwitterLifecycleTools",
+          @"TwitterNotifications", @"TwitterSharedResources", @"TwitterText", @"UserMessagingPlatform",
+          @"VeryAILiveness", @"WebRTC", @"XAppLibraries", @"XChatSDK", @"XKotlin",
+          @"XPalmLiveness_-3FBD916C0EFD0C8_PackageProduct", @"XServiceLibraries", @"ZipUtilities", @"libbrotli",
+          @"nanopb"
+      ]];
+    });
+    if ([shipped containsObject:framework]) {
+        return YES;
+    }
+    if (![framework hasSuffix:@"_PackageProduct"]) {
+        return NO;
+    }
+    NSString* stem = [framework componentsSeparatedByString:@"_"].firstObject;
+    for (NSString* name in shipped) {
+        if ([name hasSuffix:@"_PackageProduct"] && [[name componentsSeparatedByString:@"_"].firstObject isEqualToString:stem]) {
+            return YES;
+        }
+    }
+    return NO;
+}
+
+// Probe (10E#E-L9): the frameworks of the app Twitter does not ship, the sheet names (kNames,
+// kClassSubstrings, kFlags) they hold, and those found nowhere else; read once, in the background.
+static void PFBProbeAddedFrameworks(void) {
+    if (!PFBProbeWants(@"10E#E-L9 frameworks")) {
+        return;
+    }
+    dispatch_async(dispatch_get_global_queue(QOS_CLASS_BACKGROUND, 0), ^{
+      NSString* frameworks = NSBundle.mainBundle.privateFrameworksPath;
+      Dl_info own;
+      NSString* ownPath = nil;
+      if (dladdr((const void*)&twitterBinaries, &own) && own.dli_fname) {
+          ownPath = [[NSString stringWithUTF8String:own.dli_fname] stringByResolvingSymlinksInPath];
+      }
+      NSMutableArray<NSString*>* added = [NSMutableArray array];
+      NSMutableArray<NSString*>* addedPaths = [NSMutableArray array];
+      NSUInteger total = 0;
+      NSArray<NSString*>* names = [[NSFileManager.defaultManager contentsOfDirectoryAtPath:frameworks error:nil]
+          sortedArrayUsingSelector:@selector(caseInsensitiveCompare:)];
+      for (NSString* name in names) {
+          if (![name.pathExtension isEqualToString:@"framework"]) {
+              continue;
+          }
+          NSString* folder = [frameworks stringByAppendingPathComponent:name];
+          NSString* path = [folder stringByAppendingPathComponent:name.stringByDeletingPathExtension];
+          if (ownPath && [[path stringByResolvingSymlinksInPath] isEqualToString:ownPath]) {
+              continue;
+          }
+          total++;
+          if (PFBProbeTwitterShips(name.stringByDeletingPathExtension)) {
+              continue;
+          }
+          id bundleID = [NSDictionary dictionaryWithContentsOfFile:[folder stringByAppendingPathComponent:@"Info.plist"]][@"CFBundleIdentifier"];
+          NSData* data = [NSData dataWithContentsOfFile:path options:NSDataReadingMappedIfSafe error:nil];
+          size_t size = 0;
+          BOOL encrypted = NO;
+          const char* strings = data ? textSection(data, "__objc_methname", &size, &encrypted) : NULL;
+          if (data && !strings && !encrypted) {
+              strings = textSection(data, "__cstring", &size, &encrypted);
+          }
+          BOOL readable = strings && !encrypted;
+          [added addObject:[NSString stringWithFormat:@"%@ (%@%@)", name.stringByDeletingPathExtension,
+                                                      [bundleID isKindOfClass:[NSString class]] ? bundleID : @"no bundle id",
+                                                      readable ? @"" : @", strings unreadable"]];
+          [addedPaths addObject:path];
+      }
+      if (!added.count) {
+          PFBProbeNote(@"10E#E-L9 frameworks",
+                       @"10E#E-L9 frameworks not shipped by Twitter: none (%lu frameworks, all in Twitter 12.31's list)",
+                       (unsigned long)total);
+          return;
+      }
+      // A scan that reads nothing returns nil: nothing of that kind is counted as held there.
+      NSArray<NSString*>* goneNames = scanMissingNames(addedPaths);
+      NSArray<NSString*>* goneFlags = scanMissingFlags(addedPaths);
+      NSSet<NSString*>* goneNameSet = [NSSet setWithArray:goneNames ?: @[]];
+      NSSet<NSString*>* goneFlagSet = [NSSet setWithArray:goneFlags ?: @[]];
+      NSMutableOrderedSet<NSString*>* there = [NSMutableOrderedSet orderedSet];
+      for (size_t i = 0; goneNames && i < kNameCount + kClassSubstringCount; i++) {
+          NSString* entry = [NSString stringWithUTF8String:i >= kNameCount ? kClassSubstrings[i - kNameCount].name
+                                                                            : kNames[i].name];
+          if (![goneNameSet containsObject:entry]) {
+              [there addObject:entry];
+          }
+      }
+      for (size_t i = 0; goneFlags && i < kFlagCount; i++) {
+          NSString* key = [NSString stringWithUTF8String:kFlags[i].key];
+          if (![goneFlagSet containsObject:key]) {
+              [there addObject:key];
+          }
+      }
+      NSString* onlyThere = @"none";
+      if (there.count) {
+          NSMutableArray<NSString*>* twitterOwn = [twitterBinaries() mutableCopy];
+          [twitterOwn removeObjectsInArray:addedPaths];
+          NSArray<NSString*>* goneNamesTwitter = scanMissingNames(twitterOwn);
+          NSArray<NSString*>* goneFlagsTwitter = scanMissingFlags(twitterOwn);
+          if (!goneNamesTwitter || !goneFlagsTwitter) {
+              onlyThere = @"unknown, Twitter's binaries not read";
+          } else {
+              NSMutableOrderedSet<NSString*>* only = [there mutableCopy];
+              [only intersectSet:[NSSet setWithArray:[goneNamesTwitter arrayByAddingObjectsFromArray:goneFlagsTwitter]]];
+              onlyThere = only.count ? [only.array componentsJoinedByString:@", "] : @"none";
+          }
+      }
+      NSArray<NSString*>* first = there.count > 10 ? [there.array subarrayWithRange:NSMakeRange(0, 10)] : there.array;
+      PFBProbeNote(@"10E#E-L9 frameworks",
+                   @"10E#E-L9 frameworks not shipped by Twitter: %@; sheet names they contain: %lu (%@); found only there: %@",
+                   [added componentsJoinedByString:@", "], (unsigned long)there.count,
+                   first.count ? [first componentsJoinedByString:@", "] : @"none", onlyThere);
+    });
+}
+
 // MARK: - Settings Twitter reads while the debugger records
 
 static os_unfair_lock gReadLock = OS_UNFAIR_LOCK_INIT;
 static NSMutableDictionary<NSString*, NSNumber*>* gSettingsRead;
+
+// Probe (14b#F020f): per switch key, whether Twitter read it in the first 60 s after launch (1),
+// later outside a tour (2) or during a tour (4); summed per option at the end of a tour.
+static os_unfair_lock gPFBProbeReadLock = OS_UNFAIR_LOCK_INIT;
+static NSMutableDictionary<NSString*, NSNumber*>* gPFBProbeReads;
+static atomic_int gPFBProbeReadsState;
+
+static void PFBProbeNoteSwitchRead(NSString* key) {
+    if (atomic_load_explicit(&gPFBProbeReadsState, memory_order_relaxed) == 2) {
+        return;
+    }
+    unsigned int moment = PFBProbeSinceLaunch() < 60 ? 1u : (PFBCompatTourIsRunning() ? 4u : 2u);
+    os_unfair_lock_lock(&gPFBProbeReadLock);
+    if (!gPFBProbeReads) {
+        gPFBProbeReads = [NSMutableDictionary dictionary];
+    }
+    unsigned int seen = gPFBProbeReads[key].unsignedIntValue;
+    if ((seen | moment) != seen) {
+        gPFBProbeReads[key] = @(seen | moment);
+    }
+    os_unfair_lock_unlock(&gPFBProbeReadLock);
+}
 
 void PFBCompatNoteSettingRead(NSString* key) {
     if (!PFBDebugIsRecording()) {
@@ -2968,6 +3124,8 @@ void PFBCompatNoteSettingRead(NSString* key) {
     }
     gSettingsRead[key] = @YES;
     os_unfair_lock_unlock(&gReadLock);
+    // Probe: when Twitter reads this switch.
+    PFBProbeNoteSwitchRead(key);
 }
 
 static NSDictionary<NSString*, NSNumber*>* PFBCompatSettingsRead(void) {
@@ -2975,6 +3133,98 @@ static NSDictionary<NSString*, NSNumber*>* PFBCompatSettingsRead(void) {
     NSDictionary<NSString*, NSNumber*>* read = [gSettingsRead copy] ?: @{};
     os_unfair_lock_unlock(&gReadLock);
     return read;
+}
+
+// Probe (14b#F020f): at the end of a full tour run to its end, each toggleable option backed by
+// switches, sorted by when Twitter read them, as keys read / keys of the option.
+static void PFBProbeSwitchReadsTourEnded(void) {
+    if (atomic_load_explicit(&gPFBProbeReadsState, memory_order_relaxed) != 1 ||
+        ![PFBCompatTourLastRun() hasPrefix:@"Full tour"]) {
+        return;
+    }
+    os_unfair_lock_lock(&gPFBProbeReadLock);
+    NSDictionary<NSString*, NSNumber*>* reads = [gPFBProbeReads copy] ?: @{};
+    os_unfair_lock_unlock(&gPFBProbeReadLock);
+    NSMutableArray<NSString*>* again = [NSMutableArray array];
+    NSMutableArray<NSString*>* later = [NSMutableArray array];
+    NSMutableArray<NSString*>* launchOnly = [NSMutableArray array];
+    NSMutableArray<NSString*>* never = [NSMutableArray array];
+    for (size_t m = 0; m < kMetaCount; m++) {
+        if (kMeta[m].alwaysOn) {
+            continue;
+        }
+        NSMutableSet<NSString*>* keys = [NSMutableSet set];
+        NSUInteger counts[3] = {0, 0, 0};
+        for (size_t i = 0; i < kFlagCount; i++) {
+            if (kFlags[i].option != kMeta[m].option) {
+                continue;
+            }
+            NSString* flag = [NSString stringWithUTF8String:kFlags[i].key];
+            if ([keys containsObject:flag]) {
+                continue;
+            }
+            [keys addObject:flag];
+            unsigned int moments = reads[flag].unsignedIntValue;
+            if (kFlags[i].prefix) {
+                for (NSString* read in reads) {
+                    moments |= [read hasPrefix:flag] ? reads[read].unsignedIntValue : 0u;
+                }
+            }
+            for (unsigned int bit = 0; bit < 3; bit++) {
+                counts[bit] += (moments >> bit) & 1u;
+            }
+        }
+        if (!keys.count) {
+            continue;
+        }
+        NSString* option = [NSString stringWithUTF8String:kMeta[m].key];
+        unsigned long total = (unsigned long)keys.count;
+        if (counts[2]) {
+            [again addObject:[NSString stringWithFormat:@"%@ %lu/%lu", option, (unsigned long)counts[2], total]];
+        } else if (counts[1]) {
+            [later addObject:[NSString stringWithFormat:@"%@ %lu/%lu", option, (unsigned long)counts[1], total]];
+        } else if (counts[0]) {
+            [launchOnly addObject:[NSString stringWithFormat:@"%@ %lu/%lu", option, (unsigned long)counts[0], total]];
+        } else {
+            [never addObject:option];
+        }
+    }
+    atomic_store_explicit(&gPFBProbeReadsState, 2, memory_order_relaxed);
+    if (PFBProbeWants(@"14b#F020f again")) {
+        PFBProbeNote(@"14b#F020f again",
+                     @"14b#F020f switches read again during the tour, after the first 60 s (keys read / keys of the option, tour ended %.0f s after launch): %@",
+                     PFBProbeSinceLaunch(), again.count ? [again componentsJoinedByString:@", "] : @"none");
+    }
+    if (PFBProbeWants(@"14b#F020f later")) {
+        PFBProbeNote(@"14b#F020f later", @"14b#F020f switches read after the first 60 s, but not during the tour: %@",
+                     later.count ? [later componentsJoinedByString:@", "] : @"none");
+    }
+    if (PFBProbeWants(@"14b#F020f launch")) {
+        PFBProbeNote(@"14b#F020f launch", @"14b#F020f options whose switches were read only during launch (first 60 s): %@",
+                     launchOnly.count ? [launchOnly componentsJoinedByString:@", "] : @"none");
+    }
+    if (PFBProbeWants(@"14b#F020f never")) {
+        PFBProbeNote(@"14b#F020f never", @"14b#F020f options whose switches were never read: %@",
+                     never.count ? [never componentsJoinedByString:@", "] : @"none");
+    }
+}
+
+// Probe (14b#F020f): waits for a tour while its lines are still to be noted, else stops the tally.
+static void PFBProbeSwitchReadsArm(void) {
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+      if (!PFBProbeWants(@"14b#F020f again")) {
+          atomic_store_explicit(&gPFBProbeReadsState, 2, memory_order_relaxed);
+          return;
+      }
+      atomic_store_explicit(&gPFBProbeReadsState, 1, memory_order_relaxed);
+      [[NSNotificationCenter defaultCenter] addObserverForName:PFBProbeTourEndedNotification
+                                                        object:nil
+                                                         queue:nil
+                                                    usingBlock:^(__unused NSNotification* note) {
+                                                      PFBProbeSwitchReadsTourEnded();
+                                                    }];
+    });
 }
 
 // MARK: - Leads: where a lost path may have moved
@@ -3015,10 +3265,11 @@ static NSArray<NSString*>* leadWords(NSString* name) {
     NSMutableString* word = [NSMutableString string];
     void (^flush)(void) = ^{
       NSString* lower = word.lowercaseString;
+      BOOL stop = leadStopWord(lower);
       if (lower.length > 4 && [lower hasSuffix:@"s"] && ![lower hasSuffix:@"ss"]) {
           lower = [lower substringToIndex:lower.length - 1];
       }
-      if (!leadStopWord(lower) && ![words containsObject:lower]) {
+      if (!stop && !leadStopWord(lower) && ![words containsObject:lower]) {
           [words addObject:lower];
       }
       [word setString:@""];
@@ -3209,9 +3460,13 @@ static NSDictionary<NSString*, NSArray<NSString*>*>* findLeads(NSArray<NSString*
                                                                 NSSet<NSString*>** settingsOut) {
     NSMutableArray<NSString*>* owners = [NSMutableArray array];
     NSMutableArray<NSString*>* names = [NSMutableArray array];
+    NSMutableIndexSet* members = [NSMutableIndexSet indexSet];
     for (NSString* path in lost) {
         NSRange space = [path rangeOfString:@" "];
         [owners addObject:path];
+        if (space.location != NSNotFound) {
+            [members addIndex:names.count];
+        }
         [names addObject:space.location == NSNotFound ? path : [path substringFromIndex:NSMaxRange(space)]];
         NSString* className = space.location == NSNotFound ? nil : [path substringToIndex:space.location];
         if (className && !objc_getClass(className.UTF8String)) {
@@ -3230,10 +3485,13 @@ static NSDictionary<NSString*, NSArray<NSString*>*>* findLeads(NSArray<NSString*
     NSMutableArray<NSMutableDictionary<NSString*, NSNumber*>*>* found = [NSMutableArray array];
     BOOL wantsSettings = NO;
     for (size_t i = 0; i < count; i++) {
-        NSArray<NSString*>* words = leadWords(names[i]);
+        // An ivar is searched by its own name, without the report's "ivar" label.
+        NSString* searched = [names[i] hasPrefix:@"ivar "] ? [names[i] substringFromIndex:5] : names[i];
+        NSArray<NSString*>* words = leadWords(searched);
         [wordLists addObject:words];
         [found addObject:[NSMutableDictionary dictionary]];
-        probes[i].pool = leadPool(names[i]);
+        // The member of a "Class member" path is a method or ivar name, whatever its underscores.
+        probes[i].pool = [members containsIndex:i] ? PFBLeadPoolSelectors : leadPool(names[i]);
         probes[i].lost = strdup(names[i].UTF8String);
         probes[i].lostLength = strlen(probes[i].lost);
         probes[i].wordCount = words.count;
@@ -3504,8 +3762,11 @@ static NSUInteger namesGone(PFBCompatOption option, NSSet<NSString*>* gone, NSSt
     NSMutableSet<NSString*>* counted = [NSMutableSet set];
     for (size_t i = 0; i < kNameCount + kClassSubstringCount; i++) {
         const PFBCompatName* row = i < kNameCount ? &kNames[i] : &kClassSubstrings[i - kNameCount];
+        if (row->option != option) {
+            continue;
+        }
         NSString* name = [NSString stringWithUTF8String:row->name];
-        if (row->option == option && [gone containsObject:name] && ![counted containsObject:name]) {
+        if ([gone containsObject:name] && ![counted containsObject:name]) {
             if (counted.count == 0) {
                 *first = name;
             }
@@ -3712,7 +3973,7 @@ static PFBCompatVerdict tourVerdict(const PFBCompatMeta* meta, NSString* key, BO
         }
     }
     if (missedAt && !absent) {
-        *detail = [NSString stringWithFormat:@"Shown: %@. No proof within 6 s", stationLabel(missedAt)];
+        *detail = [NSString stringWithFormat:@"Shown: %@. No proof", stationLabel(missedAt)];
         return PFBCompatVerdictNotTested;
     }
     if (planned.count == 0) {
@@ -3721,7 +3982,7 @@ static PFBCompatVerdict tourVerdict(const PFBCompatMeta* meta, NSString* key, BO
         *detail = [NSString stringWithFormat:@"No %@ during the check", absent];
     } else if (failedAt) {
         *detail = [NSString stringWithFormat:closedTwitter ? @"%@ closed Twitter during the check"
-                                                           : @"%@ was not reached during the check",
+                                                           : @"%@: not reached during the check",
                                              capitalizedFirst(stationLabel(failedAt))];
     } else {
         *detail = @"Not checked on this build yet";
@@ -3941,6 +4202,9 @@ static NSArray<NSString*>* lostPaths(NSArray<NSString*>* missingFlags, NSArray<N
 }
 
 static void scanThenJudge(void) {
+    // Probe: the added frameworks are read and the switch-read tally waits for a tour.
+    PFBProbeAddedFrameworks();
+    PFBProbeSwitchReadsArm();
     BOOL cached;
     @synchronized(gLock) {
         cached = gStore[@"flags"] != nil;
@@ -4084,6 +4348,7 @@ NSString* PFBCompatReportText(void) {
     if (journal) {
         [text appendFormat:@"\nLAST TOUR\n%@\n", journal];
     }
+    [text appendFormat:@"\n%@", PFBProbeReportText()];
     [text appendFormat:@"\n%@", PFBDebuggerReport()];
     return text;
 }
@@ -4120,4 +4385,8 @@ void PFBCompatStart(void) {
                    dispatch_get_main_queue(), ^{
                      scanThenJudge();
                    });
+}
+
+void PFBCompatSaveNow(void) {
+    save();
 }

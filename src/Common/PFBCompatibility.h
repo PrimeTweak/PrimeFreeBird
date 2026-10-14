@@ -144,6 +144,8 @@ FOUNDATION_EXPORT BOOL PFBCompatWantsDetail(PFBCompatOption option);
 FOUNDATION_EXPORT void PFBCompatSetDetail(PFBCompatOption option, NSString* detail);
 
 FOUNDATION_EXPORT void PFBCompatReset(void);
+// Writes the counts out now, for a path that ends the process itself.
+FOUNDATION_EXPORT void PFBCompatSaveNow(void);
 FOUNDATION_EXPORT void PFBCompatRefreshStatus(void);
 FOUNDATION_EXPORT NSArray<PFBCompatResult*>* PFBCompatResults(void);
 FOUNDATION_EXPORT NSString* PFBCompatReportText(void);

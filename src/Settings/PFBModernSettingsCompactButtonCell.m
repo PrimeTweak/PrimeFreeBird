@@ -1,6 +1,5 @@
 #import "Support/PFBManager.h"
 #import "Features/Appearance/ThemeColor/PFBPalette.h"
-#import "Support/TwitterChirpFont.h"
 #import "Settings/PFBSettingsCellStyle.h"
 #import "Settings/PFBModernSettingsCompactButtonCell.h"
 
@@ -134,6 +133,9 @@ UIColor* PFBSettingsSubtitleColor(void) {
 }
  
 - (void)updateChevronColor {
+    if (![UIImage respondsToSelector:@selector(tfn_vectorImageNamed:fitsSize:fillColor:)]) {
+        return;
+    }
     UIColor* chevronColor = [UIColor tertiaryLabelColor];
     self.chevronImageView.image = [UIImage tfn_vectorImageNamed:@"chevron_right"
                                                        fitsSize:CGSizeMake(18, 18)

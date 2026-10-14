@@ -91,7 +91,7 @@
             @"subtitle":
                 [[PFBBundle sharedBundle] localizedStringForKey:@"MODERN_SETTINGS_LAYOUT_SUBTITLE"],
             @"icon": @"settings_stroke",
-            @"action": @"showLayoutSettings"
+            @"action": @"showGeneralSettings"
         },
         @{
             @"title":
@@ -121,7 +121,7 @@
             @"subtitle":
                 [[PFBBundle sharedBundle] localizedStringForKey:@"MODERN_SETTINGS_MEDIA_SUBTITLE"],
             @"icon": @"media_tab_stroke",
-            @"action": @"showDownloadsSettings"
+            @"action": @"showMediaSettings"
         },
         @{
             @"title": [[PFBBundle sharedBundle] localizedStringForKey:@"MODERN_SETTINGS_PROFILES_TITLE"],
@@ -142,7 +142,7 @@
             @"subtitle":
                 [[PFBBundle sharedBundle] localizedStringForKey:@"MODERN_SETTINGS_MESSAGES_SUBTITLE"],
             @"icon": @"messages_stroke",
-            @"action": @"showGrokSettings"
+            @"action": @"showMessagesSettings"
         },
         @{
             @"title": [[PFBBundle sharedBundle] localizedStringForKey:@"MODERN_SETTINGS_BRANDING_TITLE"],
@@ -272,7 +272,7 @@
 
 #pragma mark - Navigation to Sub-pages
 
-- (void)showLayoutSettings {
+- (void)showGeneralSettings {
     PFBModernSettingsPageViewController* vc =
         [[PFBModernSettingsPageViewController alloc] initWithAccount:self.account
                                                           pageKey:@"general"];
@@ -298,14 +298,14 @@
     [self.navigationController pushViewController:vc animated:YES];
 }
 
-- (void)showGrokSettings {
+- (void)showMessagesSettings {
     PFBModernSettingsPageViewController* vc =
         [[PFBModernSettingsPageViewController alloc] initWithAccount:self.account
-                                                          pageKey:@"grok"];
+                                                          pageKey:@"messages"];
     [self.navigationController pushViewController:vc animated:YES];
 }
 
-- (void)showDownloadsSettings {
+- (void)showMediaSettings {
     PFBModernSettingsPageViewController* vc =
         [[PFBModernSettingsPageViewController alloc] initWithAccount:self.account
                                                           pageKey:@"media_downloads"];

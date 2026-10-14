@@ -4,18 +4,13 @@
 #import "Support/HookHelpers.h"
 #import "Features/General/PFBHiddenNotifCell.h"
 
-// The registry lives in HiddenNotifications.x; these are its public reads.
-extern NSArray<NSDictionary*>* PFBHiddenNotifList(void);
-extern void PFBUnhideNotif(NSString* notifID);
-extern void PFBUnhideAllNotifs(void);
-extern double PFBNotifDaysLeft(NSDictionary* entry);
-
 // MARK: - The screen
 
 @interface PFBHiddenNotificationsViewController ()
 @property (nonatomic, strong) UIView* pinnedBar;
 @property (nonatomic, strong) UIVisualEffectView* barMaterial;
 @property (nonatomic, strong) UILabel* pinnedCount;
+@property (nonatomic, strong) UIButton* clearButton;
 @property (nonatomic, strong) NSArray<NSDictionary*>* rows;
 @end
 
@@ -65,6 +60,12 @@ extern double PFBNotifDaysLeft(NSDictionary* entry);
         height = MAX(MIN(height + kPFBNotifBarHeight, 330), 90);
     }
     self.preferredContentSize = CGSizeMake(290, height);
+}
+
+// A CGColor does not follow the appearance by itself, so the border is set again.
+- (void)traitCollectionDidChange:(UITraitCollection*)previousTraitCollection {
+    [super traitCollectionDidChange:previousTraitCollection];
+    self.clearButton.layer.borderColor = [UIColor systemGray4Color].CGColor;
 }
 
 - (void)viewDidLayoutSubviews {
@@ -199,6 +200,7 @@ static const CGFloat kPFBNotifBarHeight = 57.0;
     clear.titleLabel.font = PFBScaledFont([TwitterChirpFont(TwitterFontStyleSemibold) fontWithSize:13.5]);
     clear.layer.borderWidth = 1.0;
     clear.layer.borderColor = [UIColor systemGray4Color].CGColor;
+    self.clearButton = clear;
     clear.layer.cornerRadius = 17.0;
     clear.layer.cornerCurve = kCACornerCurveContinuous;
     clear.translatesAutoresizingMaskIntoConstraints = NO;

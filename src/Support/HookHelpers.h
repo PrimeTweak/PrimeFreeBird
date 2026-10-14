@@ -36,6 +36,10 @@ void PFBApplySquareAvatarsSetting(void);
 // Custom theme color re-apply (Theme.x)
 void PFBApplySelectedThemeColor(void);
 
+// Pushes the accent through Twitter's palette again, so the surfaces that follow it
+// repaint (Theme.x).
+void PFBSyncAccentTheme(void);
+
 // The custom accent color read from its stored hex, active or not; nil when none is
 // stored or the value cannot be read (Theme.x).
 UIColor* PFBCustomAccentColor(void);
@@ -48,6 +52,35 @@ NSInteger pfbMutedHiddenCountToday(void);
 
 // Live pinned-tabs refresh when the hide setting is toggled (Timeline.x)
 void PFBApplyHideCustomTimelinesSetting(void);
+
+// What the blocked-Retweet filter saw first this launch, or nil (Timeline.x).
+NSString* PFBFirstRetweetSummary(void);
+
+// Runs the timeline filter again on the timelines already on screen (Timeline.x).
+void pfbReapplyTimelineFilter(void);
+
+// The hidden-conversation registry, and taking one entry out of it (HiddenThreads.x).
+NSArray<NSDictionary*>* PFBHiddenThreads(void);
+void PFBUnhideThread(NSString* threadID);
+// Whether a timeline item belongs to a hidden conversation (HiddenThreads.x).
+BOOL pfbThreadIsHidden(id viewModel);
+
+// YES only for hide_explore_all, which takes the whole Explore chrome (ExploreTabs.x).
+BOOL pfbShouldHideAllTrends(void);
+// Records the accessory view the Explore guide vends, so the tab filter touches only
+// that bar: the segmented bar class is shared with Notifications and search results.
+void pfbNoteExploreAccessoryView(UIView* v);
+
+// The hidden-notification registry, newest hidden first, unhiding one or all of it, and
+// the days an entry has left (HiddenNotifications.x).
+NSArray<NSDictionary*>* PFBHiddenNotifList(void);
+void PFBUnhideNotif(NSString* notifID);
+void PFBUnhideAllNotifs(void);
+double PFBNotifDaysLeft(NSDictionary* entry);
+
+// Removes tracking parameters from links copied to the pasteboard while
+// strip_url_tracking is on (Misc.x).
+void PFBInstallPasteboardObserver(void);
 
 // Whether the account genuinely has a panel's tab, ignoring the forced tab
 // gates (FeatureSwitches.x)
@@ -79,7 +112,7 @@ UIImageView* PFBTopBarLogoViewCurrent(void);
 // Whether a themed tab bar is switched on and an accent is active (Theme.x).
 BOOL PFBThemedTabBarWanted(void);
 
-// A copy of `source` painted in `color` through its own alpha, rendered as
+// A copy of `source` painted in `colour` through its own alpha, rendered as
 // AlwaysOriginal so no tint can change it afterwards (NavBarIcons.x).
 UIImage* PFBPaintedGlyph(UIImage* source, UIColor* colour);
 
@@ -132,7 +165,7 @@ void PFBThemeScreenLeave(UIViewController* screen);
 
 // Bar items of PrimeFreeBird's own screens carry this tag and keep UIKit's glass;
 // the app-wide flattening in NavBarIcons.x leaves them alone.
-static const NSInteger PFBNativeGlassTag = 0x4E4647;
+static const NSInteger PFBNativeGlassTag = 0x504647;
 
 // Tint laid on glass for legibility over busy content: the reply bar while the
 // keyboard is up, and the path tour's box.

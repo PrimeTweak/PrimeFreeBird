@@ -5,7 +5,7 @@
 
 @implementation PFBTintedSwitch
  
-- (void)pfb_refreshTint {
+- (void)pfbRefreshTint {
     UIColor* target = nil;
     if ([PFBSettings boolForKey:@"color_pfb_switches"]) {
         UIColor* accent = PFBCurrentAccentColor();
@@ -25,13 +25,13 @@
 - (void)didMoveToWindow {
     [super didMoveToWindow];
     if (self.window) {
-        [self pfb_refreshTint];
+        [self pfbRefreshTint];
     }
 }
  
 - (void)tintColorDidChange {
     [super tintColorDidChange];
-    [self pfb_refreshTint];
+    [self pfbRefreshTint];
 }
  
 @end

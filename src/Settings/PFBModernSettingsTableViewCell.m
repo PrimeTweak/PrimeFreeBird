@@ -123,6 +123,9 @@
  
 // Vector images bake in their fill color, so they are re-rendered on every theme change.
 - (void)updateIconColors {
+    if (![UIImage respondsToSelector:@selector(tfn_vectorImageNamed:fitsSize:fillColor:)]) {
+        return;
+    }
     NSString* iconName = objc_getAssociatedObject(self, @selector(iconName));
     if (iconName) {
         Class TAEColorSettingsCls = objc_getClass("TAEColorSettings");

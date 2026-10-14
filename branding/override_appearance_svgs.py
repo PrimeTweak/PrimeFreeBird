@@ -41,8 +41,8 @@ def main():
                 shutil.copyfile(os.path.join(sroot, f), path)
                 modified_bundles.add(broot)
 
-    # A replaced glyph breaks the bundle's own seal; dropping it lets the app's
-    # re-seal (cyan and the installer) cover the bundle through CodeResources.
+    # A replaced glyph breaks the bundle's own seal; dropping it lets the
+    # installer's re-seal of the app cover the bundle through CodeResources.
     for broot in sorted(modified_bundles):
         shutil.rmtree(os.path.join(broot, "_CodeSignature"), ignore_errors=True)
 

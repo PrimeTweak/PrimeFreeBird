@@ -81,7 +81,7 @@ void PFBMarkEmptiedModuleChrome(NSArray* items, NSMutableIndexSet* removed) {
 
 // Twitter's brand blue. Not iOS systemBlue, which is darker and belongs to
 // UIKit's own controls.
-UIColor* PFBTwitterBlueColor(void) {
+static UIColor* PFBTwitterBlueColor(void) {
     return [UIColor colorWithRed:0x1D / 255.0
                            green:0xA1 / 255.0
                             blue:0xF2 / 255.0

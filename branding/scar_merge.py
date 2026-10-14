@@ -66,7 +66,8 @@ def install(catalog, rend, master):
 
 
 def load_catalog(catalog):
-    manifest = json.load(open(os.path.join(catalog, "manifest.json")))
+    with open(os.path.join(catalog, "manifest.json")) as handle:
+        manifest = json.load(handle)
     facets = {f["name"]: f["attributes"].get("identifier") for f in manifest["facets"]}
     by_ident = {}
     for r in manifest["renditions"]:
@@ -188,7 +189,8 @@ def main():
                 for r in by_ident.get(facets[name], []):
                     install(catalog, r, path)
             print("new icon: %s" % stem)
-        json.dump(manifest, open(os.path.join(catalog, "manifest.json"), "w"), indent=2)
+        with open(os.path.join(catalog, "manifest.json"), "w") as handle:
+            json.dump(manifest, handle, indent=2)
 
     # 3. Drop stock alternates that got no replacement art, plus their
     #    -settings thumbnails, so the base app's icons don't linger in the
@@ -200,7 +202,8 @@ def main():
         manifest["facets"] = [f for f in manifest["facets"] if f["name"] not in drop]
         manifest["renditions"] = [r for r in manifest["renditions"]
                                   if r["key"].get("identifier") not in gone]
-        json.dump(manifest, open(os.path.join(catalog, "manifest.json"), "w"), indent=2)
+        with open(os.path.join(catalog, "manifest.json"), "w") as handle:
+            json.dump(manifest, handle, indent=2)
         print("dropped: %s" % ", ".join(sorted(drop)))
 
     run_scar(args.scar, "compile", catalog, "--out", args.out_car)

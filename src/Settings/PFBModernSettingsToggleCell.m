@@ -139,7 +139,10 @@
     [UIView animateWithDuration:0.24
         animations:apply
         completion:^(BOOL finished) {
-          self.pillButton.hidden = !visible;
+          // A newer fade or a reuse has set another alpha since: only the latest decides.
+          if (self.pillButton.alpha == (visible ? 1.0 : 0.0)) {
+              self.pillButton.hidden = !visible;
+          }
         }];
 }
  
@@ -158,7 +161,7 @@
                           forState:UIControlStateNormal];
     self.pillButton.backgroundColor =
         [colorPalette performSelector:@selector(faintBackgroundColor)];
-    [(PFBTintedSwitch*)self.toggleSwitch pfb_refreshTint];
+    [(PFBTintedSwitch*)self.toggleSwitch pfbRefreshTint];
 }
  
 - (void)traitCollectionDidChange:(UITraitCollection*)previousTraitCollection {

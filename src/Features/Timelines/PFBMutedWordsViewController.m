@@ -11,10 +11,6 @@
 #import "Features/Timelines/PFBMutedTermCell.h"
 #import "Features/Timelines/PFBMutedToggleCell.h"
 
-// The hidden-conversation registry lives with the code that fills it.
-extern NSArray<NSDictionary*>* PFBHiddenThreads(void);
-extern void PFBUnhideThread(NSString* threadID);
-
 // A language row's own height, so the switch is spaced like one more entry.
 static const CGFloat kPFBTranslateBarHeight = 51.0;
 // The popover's rounded corners cut into its bottom row, so its list sits a
@@ -46,7 +42,6 @@ static NSString* const kPFBMutedIncludeRepostsKey = @"pfb_muted_include_reposts"
 // frame, so only the rows between them move.
 @property (nonatomic, strong) UIView* pinnedHeader;
 @property (nonatomic, strong) UIView* pinnedBar;
-@property (nonatomic, strong) UISwitch* pinnedSwitch;
 @property (nonatomic, strong) UIVisualEffectView* headerMaterial;
 @property (nonatomic, strong) UIVisualEffectView* barMaterial;
 @property (nonatomic, assign) CGFloat pinnedHeaderHeight;
@@ -64,6 +59,10 @@ static NSString* const kPFBMutedIncludeRepostsKey = @"pfb_muted_include_reposts"
     // has no bar and no confirm check, so it would arm one it has no use for.
     if (!self.compact) {
         PFBThemeScreenEnter(self);
+    }
+    // Back from the language picker: the Other languages row lists what was picked there.
+    if (!self.compact && !self.othersOnly && self.mode == 1) {
+        [self.tableView reloadData];
     }
 }
 
@@ -314,7 +313,6 @@ static NSMutableArray<NSString*>* PFBKeptLanguageList(void) {
     ]];
     self.barMaterial = PFBMaterialBehind(bar);
     self.pinnedBar = bar;
-    self.pinnedSwitch = toggle;
 }
 
 // The rows start below the segment and end where the switch's bar begins, at the
@@ -544,7 +542,6 @@ static NSMutableArray<NSString*>* PFBKeptLanguageList(void) {
 - (void)translateChanged:(UISwitch*)sender {
     [[NSUserDefaults standardUserDefaults] setBool:!sender.isOn
                                             forKey:@"disable_auto_translate"];
-    self.pinnedSwitch.on = sender.isOn;
     [self.tableView reloadData];
 }
 
@@ -999,6 +996,7 @@ static NSMutableArray<NSString*>* PFBKeptLanguageList(void) {
         NSArray<NSDictionary*>* threads = PFBHiddenThreads();
         if (indexPath.row < (NSInteger)threads.count) {
             PFBUnhideThread(threads[(NSUInteger)indexPath.row][@"id"]);
+            pfbRefreshMutedWords();
         }
         [self updatePreferredSize];
         [tableView reloadData];
