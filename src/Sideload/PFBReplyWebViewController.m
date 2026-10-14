@@ -1,16 +1,9 @@
 #import "Support/HookHelpers.h"
 #import <QuartzCore/QuartzCore.h>
-#import <objc/runtime.h>
 #import "Sideload/PFBReplyWebViewState.h"
 #import "Sideload/PFBReplyWebViewController.h"
 #import "Sideload/PFBWeakScriptMessageHandler.h"
 #import "Sideload/PFBIconRelay.h"
-#import "Debug/PFBDebugger.h"
-#import "Debug/PFBProbe.h"
-
-// Probe: marks that the controller has appeared once, so a later appearance is told
-// apart as a return (F029).
-static const void* kPFBF029AppearedKey = &kPFBF029AppearedKey;
 
 // Injected into the reply webview: hooks fetch/XHR to capture the new post's ID from
 // the web CreateTweet response, since there's no native completion callback to read.
@@ -403,16 +396,6 @@ static void showPostSentAlert(NSString* statusID) {
 
 - (void)viewWillAppear:(BOOL)animated {
     [super viewWillAppear:animated];
-    // Probe: on a return (not the first appearance), whether the icon bar survived
-    // the screen that covered the reply (F029).
-    if (PFBProbeWants(@"04#F029 back")) {
-        if (objc_getAssociatedObject(self, kPFBF029AppearedKey)) {
-            PFBProbeNote(@"04#F029 back", @"04#F029 reply web view back: icon bar %@",
-                         gPFBIconBar ? @"present" : @"absent");
-        } else {
-            objc_setAssociatedObject(self, kPFBF029AppearedKey, @YES, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-        }
-    }
     gPFBReplyWebViewActive = YES;
     gPFBReplyScroller = self.webView.scrollView;  // identity for the CALayer hook
     gPFBDidRequestFocus = NO;
@@ -461,18 +444,6 @@ static void showPostSentAlert(NSString* statusID) {
 }
 
 - (void)viewWillDisappear:(BOOL)animated {
-    // Probe: whether the reply is closing or only being covered, by what, and whether
-    // the icon bar is still up as it goes away; a closing has its own key (F029).
-    BOOL probeClosing = PFBDebugIsRecording() && (self.isBeingDismissed || self.navigationController.isBeingDismissed);
-    NSString* probeKey = probeClosing ? @"04#F029 hidden closing" : @"04#F029 hidden";
-    if (PFBProbeWants(probeKey)) {
-        UIViewController* cover = self.navigationController.presentedViewController;
-        PFBProbeNote(probeKey,
-                     @"04#F029 reply web view hidden: closing %@, covered by %@ (style %ld), icon bar %@",
-                     probeClosing ? @"yes" : @"no", cover ? PFBProbeClassName(cover) : @"none",
-                     (long)(cover ? cover.modalPresentationStyle : -1),
-                     gPFBIconBar ? @"present" : @"absent");
-    }
     gPFBReplyScroller = nil;
     gPFBSquelchUntil = 0;
     [super viewWillDisappear:animated];

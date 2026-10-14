@@ -2,8 +2,6 @@
 
 #import "Support/HookHelpers.h"
 #import "Common/PFBCompatibility.h"
-#import "Debug/PFBDebugger.h"
-#import "Debug/PFBProbe.h"
 
 // MARK: - PrimeFreeBird settings entry
 
@@ -28,89 +26,6 @@ static BOOL settingsVCIsRoot(TFNItemsDataViewController* settingsVC) {
     }
 
     return NO;
-}
-
-// Probe: notes each distinct settings page met, up to 6, by its scribe page and whether it is
-// taken for the root, with the classes of its stack.
-static void PFBProbeSettingsPage(TFNItemsDataViewController* settingsVC) {
-    static NSUInteger noted;
-    if (!PFBDebugIsRecording() || noted >= 6) {
-        return;
-    }
-    id page = PFBProbeGetter(settingsVC, @"scribePage");
-    NSString* name = [page isKindOfClass:[NSString class]] ? page : @"none";
-    NSString* root = settingsVCIsRoot(settingsVC) ? @"yes" : @"no";
-    NSString* key = [NSString stringWithFormat:@"03#F051 page %@ root=%@", name, root];
-    if (!PFBProbeWants(key)) {
-        return;
-    }
-    noted++;
-    NSMutableArray<NSString*>* stack = [NSMutableArray array];
-    for (UIViewController* viewController in settingsVC.navigationController.viewControllers) {
-        if (stack.count < 8) {
-            [stack addObject:NSStringFromClass([viewController class])];
-        }
-    }
-    PFBProbeNote(key, @"03#F051 settings page %@: root=%@ stack [%@]", name, root, [stack componentsJoinedByString:@", "]);
-}
-
-// Probe: notes how Twitter shows its settings root, presented or pushed, once per way.
-static void PFBProbeSettingsRootShown(TFNItemsDataViewController* settingsVC) {
-    if (!PFBDebugIsRecording()) {
-        return;
-    }
-    UINavigationController* stack = settingsVC.navigationController;
-    UIViewController* presenter = stack.presentingViewController;
-    NSString* way = presenter ? [@"presented by " stringByAppendingString:NSStringFromClass([presenter class])]
-                              : [@"not presented, in " stringByAppendingString:PFBProbeClassName(stack)];
-    NSString* key = [@"02#F025 root " stringByAppendingString:way];
-    if (PFBProbeWants(key)) {
-        PFBProbeNote(key, @"02#F025 Twitter settings root: %@ (%lu screens in its stack)", way,
-                     (unsigned long)stack.viewControllers.count);
-    }
-}
-
-// Probe: 0.5 s after a settings root is tagged, notes its data view and, for rows 0 and 1, the cell
-// class and whether it answers the two separator setters, with the cell hook's call count; nothing
-// is noted while neither row is on screen, so a later appearance of the root reads them.
-static void PFBProbeSettingsSeparators(TFNItemsDataViewController* settingsVC) {
-    if (!PFBDebugIsRecording() || !PFBProbeWants(@"03#F007 settings root")) {
-        return;
-    }
-    __weak TFNItemsDataViewController* weakVC = settingsVC;
-    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.5 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
-        TFNItemsDataViewController* root = weakVC;
-        if (!root || !PFBProbeWants(@"03#F007 settings root")) {
-            return;
-        }
-        id view = PFBProbeGetter(root, @"tableViewIfLoaded");
-        UITableView* table = [view isKindOfClass:[UITableView class]] ? view : nil;
-        id other = table ? nil : PFBProbeGetter(root, @"collectionViewIfLoaded");
-        UICollectionView* grid = [other isKindOfClass:[UICollectionView class]] ? other : nil;
-        NSMutableArray<NSString*>* rows = [NSMutableArray array];
-        NSUInteger found = 0;
-        for (NSInteger row = 0; row < 2; row++) {
-            NSIndexPath* path = [NSIndexPath indexPathForRow:row inSection:0];
-            UIView* cell = nil;
-            if (table.numberOfSections > 0 && row < [table numberOfRowsInSection:0]) {
-                cell = [table cellForRowAtIndexPath:path];
-            } else if (grid.numberOfSections > 0 && row < [grid numberOfItemsInSection:0]) {
-                cell = [grid cellForItemAtIndexPath:path];
-            }
-            found += cell ? 1 : 0;
-            [rows addObject:[NSString stringWithFormat:@"row%ld %@ sep %@/top %@", (long)row, PFBProbeClassName(cell),
-                                                       [cell respondsToSelector:NSSelectorFromString(@"setSeparatorHidden:")]
-                                                           ? @"yes" : @"no",
-                                                       [cell respondsToSelector:NSSelectorFromString(@"setTopSeparatorHidden:")]
-                                                           ? @"yes" : @"no"]];
-        }
-        if (!found) {
-            return;
-        }
-        PFBProbeNote(@"03#F007 settings root", @"03#F007 settings root: data view %@; %@; separator hook reached %lu",
-                     PFBProbeClassName(table ?: (id)grid ?: view), [rows componentsJoinedByString:@"; "],
-                     (unsigned long)PFBProbeCountValue(@"03#F007 separator calls"));
-    });
 }
 
 static BOOL sectionsContainPrimeFreeBirdEntry(NSArray* sections) {
@@ -213,8 +128,6 @@ static void insertPrimeFreeBirdSettingsIfRoot(TFNItemsDataViewController* settin
     }
 
     objc_setAssociatedObject(settingsVC, SettingsRootKey, @YES, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-    PFBProbeSettingsRootShown(settingsVC);
-    PFBProbeSettingsSeparators(settingsVC);
 
     if (sectionsContainPrimeFreeBirdEntry(settingsVC.sections)) {
         return;
@@ -247,7 +160,6 @@ static NSArray* sectionsWithPrimeFreeBirdEntry(TFNItemsDataViewController* setti
     %orig;
     PFBThemeScreenEnter(self);
     insertPrimeFreeBirdSettingsIfRoot(self);
-    PFBProbeSettingsPage(self);
 }
 
 - (void)viewDidDisappear:(BOOL)animated {
@@ -255,22 +167,6 @@ static NSArray* sectionsWithPrimeFreeBirdEntry(TFNItemsDataViewController* setti
     PFBThemeScreenLeave(self);
 }
 %end
-
-// Probe: counts the separator code's calls, up to 50, and notes once per cell class
-// whether the cell it acts on answers the two setters.
-static BOOL gPFBProbeSeparatorDone;
-static void PFBProbeSeparatorSetters(UITableViewCell* cell) {
-    if (gPFBProbeSeparatorDone || !PFBDebugIsRecording()) {
-        return;
-    }
-    gPFBProbeSeparatorDone = PFBProbeCount(@"03#F007 separator calls") >= 50;
-    NSString* key = [@"03#F016 separator " stringByAppendingString:NSStringFromClass([cell class])];
-    if (PFBProbeWants(key)) {
-        PFBProbeNote(key, @"03#F016 settings separator: %@ setSeparatorHidden:%d setTopSeparatorHidden:%d",
-                     NSStringFromClass([cell class]), [cell respondsToSelector:NSSelectorFromString(@"setSeparatorHidden:")],
-                     [cell respondsToSelector:NSSelectorFromString(@"setTopSeparatorHidden:")]);
-    }
-}
 
 // Every sections rebuild runs through this transform right before setSections:,
 // so hooking it on the base class covers the settings root and its sub-pages.
@@ -281,10 +177,9 @@ static void PFBProbeSeparatorSetters(UITableViewCell* cell) {
 }
 
 // The injected row sits in Twitter's own settings table, so the separator under it
-// is drawn by Twitter's cell. TFNTextCell carries setSeparatorHidden: and
-// setTopSeparatorHidden:, used directly and reapplied on every vend.
+// is drawn by Twitter's cell. setSeparatorHidden: and setTopSeparatorHidden: go only
+// to a cell that answers them; none of Twitter 12.31's settings cells does.
 static void PFBHideRowSeparator(UITableViewCell* cell) {
-    PFBProbeSeparatorSetters(cell);
     SEL hide = @selector(setSeparatorHidden:);
     if ([cell respondsToSelector:hide]) {
         ((void (*)(id, SEL, BOOL))objc_msgSend)(cell, hide, YES);
@@ -440,52 +335,6 @@ static UIFont* PFBCustomFont(UIFont* original, BOOL bold) {
         PFBCOMPAT_ACTION(PFBCompat_custom_fonts, @"%@", customName);
     }
     return custom ?: original;
-}
-
-// Probe: notes how many installed families load by their family name, the form the regular
-// font is stored in, and how many through a family descriptor; run by the path tour.
-void PFBProbeFontLoading(void) {
-    if (!PFBDebugIsRecording() || !PFBProbeWants(@"SF-2 fonts")) {
-        return;
-    }
-    NSArray<NSString*>* families = [UIFont familyNames];
-    NSUInteger byName = 0;
-    NSUInteger byDescriptor = 0;
-    NSMutableArray<NSString*>* failing = [NSMutableArray array];
-    for (NSString* family in families) {
-        if ([UIFont fontWithName:family size:17]) {
-            byName++;
-        } else if (failing.count < 5) {
-            [failing addObject:family];
-        }
-        UIFontDescriptor* descriptor =
-            [UIFontDescriptor fontDescriptorWithFontAttributes:@{UIFontDescriptorFamilyAttribute: family}];
-        if ([[UIFont fontWithDescriptor:descriptor size:17].familyName isEqualToString:family]) {
-            byDescriptor++;
-        }
-    }
-    PFBProbeNote(@"SF-2 fonts",
-                 @"SF-2 fonts: %lu of %lu families load by family name, %lu of %lu by family descriptor; failing by name: %@",
-                 (unsigned long)byName, (unsigned long)families.count, (unsigned long)byDescriptor,
-                 (unsigned long)families.count, failing.count ? [failing componentsJoinedByString:@", "] : @"none");
-}
-
-// Probe: notes whether the custom fonts list the font picker's button reads is visible to the
-// app, and how many entries reading it the way the button's menu does gives; run by the path tour.
-void PFBProbeCustomFontsFile(void) {
-    if (!PFBDebugIsRecording() || !PFBProbeWants(@"10F#F-03 custom fonts list")) {
-        return;
-    }
-    NSString* path = @"/var/mobile/Library/Fonts/AddedFontCache.plist";
-    NSFileManager* files = [NSFileManager defaultManager];
-    NSData* data = [NSData dataWithContentsOfFile:path];
-    id list = data ? [NSPropertyListSerialization propertyListWithData:data options:NSPropertyListImmutable format:NULL error:nil]
-                   : nil;
-    NSString* contents = [list isKindOfClass:[NSDictionary class]]
-                             ? [NSString stringWithFormat:@"%lu entries", (unsigned long)((NSDictionary*)list).count]
-                             : (data ? @"not a dictionary" : @"no");
-    PFBProbeNote(@"10F#F-03 custom fonts list", @"10F#F-03 custom fonts list: exists %@, readable %@, read %@",
-                 [files fileExistsAtPath:path] ? @"yes" : @"no", [files isReadableFileAtPath:path] ? @"yes" : @"no", contents);
 }
 
 // Named-font construction (tweet body and most text styles) funnels through here.

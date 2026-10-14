@@ -3,8 +3,6 @@
 
 #import <CoreText/CoreText.h>
 #import "Support/HookHelpers.h"
-#import "Debug/PFBProbe.h"
-#import "Debug/PFBDebugger.h"
 
 // MARK: - Always open in Safari
 
@@ -15,42 +13,6 @@ static BOOL ShouldKeepBrowserURLInApp(NSURL* url) {
     return PFBIsXDomain(url.host) && ([path hasPrefix:@"/account/"] || [path hasPrefix:@"/i/flow/"]);
 }
 
-// Probe: which browser surface a tapped link actually reaches, with the two options'
-// states; a link that reaches neither hook went to Twitter's own XLinkWebView (F020).
-// Skipped during a tour; External browser on and off are noted apart.
-static void pfbProbeF020Path(NSString* which, NSString* key) {
-    if (!PFBDebugIsRecording() || PFBCompatTourIsRunning()) {
-        return;
-    }
-    BOOL external = [PFBSettings boolForKey:@"always_open_safari"];
-    NSString* stateKey = external ? [key stringByAppendingString:@" external"] : key;
-    if (!PFBProbeWants(stateKey)) {
-        return;
-    }
-    PFBProbeNote(stateKey, @"14a#F020 link through %@, External browser %@, New in-app browser %@", which,
-                 external ? @"on" : @"off", [PFBSettings boolForKey:@"new_inapp_webview"] ? @"on" : @"off");
-}
-
-// Probe: one second after the divert dismisses the plain Safari sheet, whether UIKit
-// left it on screen (a blank sheet over the app) or honoured the dismiss (M-6).
-static void pfbProbeM6AfterDivert(UIViewController* sheet, NSString* host) {
-    if (!PFBDebugIsRecording() || !PFBProbeWants(@"10C#M-6 safari")) {
-        return;
-    }
-    __weak UIViewController* weakSheet = sheet;
-    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1.0 * NSEC_PER_SEC)),
-                   dispatch_get_main_queue(), ^{
-        if (!PFBProbeWants(@"10C#M-6 safari")) {
-            return;
-        }
-        UIViewController* strongSheet = weakSheet;
-        BOOL stillUp = strongSheet && strongSheet.presentingViewController && strongSheet.viewIfLoaded.window;
-        PFBProbeNote(@"10C#M-6 safari", @"10C#M-6 Safari fallback: the in-app browser for %@ is %@",
-                     host.length ? host : @"?",
-                     stillUp ? @"still presented after its dismiss" : @"dismissed as asked");
-    });
-}
-
 // Every tapped link that resolves to the in-app Safari goes through this single
 // present funnel, so diverting here avoids presenting anything at all.
 %hook T1SafariViewController
@@ -58,7 +20,6 @@ static void pfbProbeM6AfterDivert(UIViewController* sheet, NSString* host) {
 - (void)tfnPresentedCustomPresentFromViewController:(UIViewController*)fromViewController
                                            animated:(BOOL)animated
                                          completion:(void (^)(void))completion {
-    pfbProbeF020Path(@"T1SafariViewController funnel", @"14a#F020 funnel");
     if (![PFBSettings boolForKey:@"always_open_safari"]) {
         PFBCOMPAT_OBSERVE(PFBCompat_always_open_safari, @"in-app browser opened");
         return %orig;
@@ -94,7 +55,6 @@ static void pfbProbeM6AfterDivert(UIViewController* sheet, NSString* host) {
 %hook SFSafariViewController
 
 - (void)viewWillAppear:(BOOL)animated {
-    pfbProbeF020Path(@"SFSafariViewController", @"14a#F020 sfsvc");
     if (![PFBSettings boolForKey:@"always_open_safari"]) {
         PFBCOMPAT_OBSERVE(PFBCompat_always_open_safari, @"in-app browser opened");
         return %orig;
@@ -117,8 +77,6 @@ static void pfbProbeM6AfterDivert(UIViewController* sheet, NSString* host) {
                                }
                              }];
     [self dismissViewControllerAnimated:NO completion:nil];
-    // Probe: watch whether the mid-transition dismiss leaves a blank sheet (M-6).
-    pfbProbeM6AfterDivert(self, url.host);
 }
 
 %end

@@ -5,11 +5,6 @@
 #import "Support/HookHelpers.h"
 #import "Sideload/PFBWebLoginViewController.h"
 #import "Debug/PFBDebugger.h"
-#import "Debug/PFBProbe.h"
-#import "Features/Appearance/CustomTabBar/PFBCustomTabBarUtility.h"
-#import <mach/mach_time.h>
-#import <os/lock.h>
-#import <stdatomic.h>
 
 // While set, -isSubscribedTo: (below) reports the account's genuine
 // subscription state instead of the forced premium tiers, so paths that need
@@ -47,168 +42,6 @@ static BOOL AccountIsGenuinelyPremium(void) {
     return premium;
 }
 
-// MARK: - Probe helpers
-
-// The genuine readers are defined lower down; the forced gates and the probe read
-// through them before their definitions.
-static BOOL genuineSwitchBool(NSString* key);
-static BOOL genuineTabGateFlag(id receiver, SEL selector);
-
-// Probe: the switch-override function's own cost, split main / other threads and
-// handled / unhandled, accumulated during the tour and summarised at its end (F024).
-static os_unfair_lock gPFBF024Lock = OS_UNFAIR_LOCK_INIT;
-static BOOL gPFBF024Done = NO;
-static CFTimeInterval gPFBF024TourStart = 0;
-static uint64_t gPFBF024MainCalls = 0, gPFBF024OtherCalls = 0, gPFBF024Unhandled = 0;
-static uint64_t gPFBF024MainNs = 0, gPFBF024OtherNs = 0, gPFBF024LongestNs = 0;
-static __thread int gPFBF024Depth = 0;
-
-// Probe: the distinct keys containing media_tab / mediatab that Twitter reads (E-M3).
-static os_unfair_lock gPFBEM3Lock = OS_UNFAIR_LOCK_INIT;
-static NSMutableSet<NSString*>* gPFBEM3Keys = nil;
-static BOOL gPFBEM3Done = NO;
-
-// Probe: the article web view gate's first read has been looked at (F020).
-static BOOL gPFBF020ArticleDone = NO;
-
-static double pfbProbeMachToNs(uint64_t ticks) {
-    static mach_timebase_info_data_t timebase;
-    static dispatch_once_t once;
-    dispatch_once(&once, ^{
-        mach_timebase_info(&timebase);
-    });
-    return (double)ticks * timebase.numer / timebase.denom;
-}
-
-static void pfbProbeEM3Key(NSString* key) {
-    if (gPFBEM3Done || ![key isKindOfClass:[NSString class]]) {
-        return;
-    }
-    if ([key rangeOfString:@"media_tab" options:NSCaseInsensitiveSearch].location == NSNotFound &&
-        [key rangeOfString:@"mediatab" options:NSCaseInsensitiveSearch].location == NSNotFound) {
-        return;
-    }
-    os_unfair_lock_lock(&gPFBEM3Lock);
-    if (!gPFBEM3Keys) {
-        gPFBEM3Keys = [NSMutableSet set];
-    }
-    [gPFBEM3Keys addObject:key];
-    os_unfair_lock_unlock(&gPFBEM3Lock);
-}
-
-static void pfbProbeF024Record(uint64_t ticks, BOOL handled) {
-    double ns = pfbProbeMachToNs(ticks);
-    BOOL main = [NSThread isMainThread];
-    os_unfair_lock_lock(&gPFBF024Lock);
-    if (gPFBF024TourStart == 0) {
-        gPFBF024TourStart = CACurrentMediaTime();
-    }
-    if (main) {
-        gPFBF024MainCalls++;
-        gPFBF024MainNs += (uint64_t)ns;
-    } else {
-        gPFBF024OtherCalls++;
-        gPFBF024OtherNs += (uint64_t)ns;
-    }
-    if (!handled) {
-        gPFBF024Unhandled++;
-    }
-    if ((uint64_t)ns > gPFBF024LongestNs) {
-        gPFBF024LongestNs = (uint64_t)ns;
-    }
-    os_unfair_lock_unlock(&gPFBF024Lock);
-}
-
-// Probe: a forced tab gate that answers YES where the genuine value is NO: during launch, or
-// later with the screen it was read on (F008). Bounded after launch: the first 300 forced
-// reads and 8 lines; a nested read is skipped.
-static BOOL gPFBF008Done = NO;
-static atomic_uint gPFBF008Reads = 0;
-static atomic_uint gPFBF008Lines = 0;
-static __thread BOOL gPFBF008Busy = NO;
-
-static void pfbProbeF008Gate(NSString* gate, BOOL (^genuine)(void)) {
-    if (gPFBF008Done || gPFBF008Busy) {
-        return;
-    }
-    BOOL early = PFBProbeSinceLaunch() < 15.0;
-    if (!early && (atomic_fetch_add(&gPFBF008Reads, 1) >= 300 || atomic_load(&gPFBF008Lines) >= 8)) {
-        gPFBF008Done = YES;
-        return;
-    }
-    gPFBF008Busy = YES;
-    NSString* where = early                   ? @"during launch"
-                      : NSThread.isMainThread ? [@"on " stringByAppendingString:PFBProbeFrontScreen()]
-                                              : @"off the main thread";
-    NSString* key = [NSString stringWithFormat:@"05#F008 %@ %@", gate, where];
-    if (PFBProbeWants(key) && !genuine()) {
-        if (!early) {
-            atomic_fetch_add(&gPFBF008Lines, 1);
-        }
-        PFBProbeNote(key, @"05#F008 %@ answered YES instead of NO %@", gate, where);
-    }
-    gPFBF008Busy = NO;
-}
-
-// Probe: arms the end-of-tour switch-override summary (F024) and the 60-second media
-// switch report (E-M3), once, at the first switch read while recording; a measurement
-// noted on an earlier launch of this build stays closed.
-static void pfbProbeFSArm(void) {
-    static dispatch_once_t once;
-    dispatch_once(&once, ^{
-        gPFBF024Done = !PFBProbeWants(@"05#F024 overrides");
-        gPFBEM3Done = !PFBProbeWants(@"10E#E-M3 media");
-        [[NSNotificationCenter defaultCenter] addObserverForName:PFBProbeTourEndedNotification
-                                                          object:nil
-                                                           queue:[NSOperationQueue mainQueue]
-                                                      usingBlock:^(__unused NSNotification* note) {
-            os_unfair_lock_lock(&gPFBF024Lock);
-            uint64_t calls = gPFBF024MainCalls + gPFBF024OtherCalls, unhandled = gPFBF024Unhandled;
-            double mainMs = (double)gPFBF024MainNs / 1e6, otherMs = (double)gPFBF024OtherNs / 1e6,
-                   longestUs = (double)gPFBF024LongestNs / 1e3;
-            CFTimeInterval start = gPFBF024TourStart;
-            gPFBF024Done = YES;
-            os_unfair_lock_unlock(&gPFBF024Lock);
-            if (!PFBProbeWants(@"05#F024 overrides")) {
-                return;
-            }
-            double tourSeconds = start > 0 ? (CACurrentMediaTime() - start) : 0;
-            double pct = tourSeconds > 0 ? (mainMs / (tourSeconds * 1000.0)) * 100.0 : 0;
-            PFBProbeNote(@"05#F024 overrides",
-                         @"05#F024 switch overrides during the tour: %llu calls (%llu unhandled), main thread %.1f ms over %.0f s (%.2f%%), other threads %.1f ms, longest call %.0f µs",
-                         (unsigned long long)calls, (unsigned long long)unhandled, mainMs, tourSeconds, pct,
-                         otherMs, longestUs);
-        }];
-        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(60 * NSEC_PER_SEC)),
-                       dispatch_get_main_queue(), ^{
-            gPFBEM3Done = YES;
-            if (!PFBProbeWants(@"10E#E-M3 media")) {
-                return;
-            }
-            os_unfair_lock_lock(&gPFBEM3Lock);
-            NSArray* keys = gPFBEM3Keys.count
-                                ? [gPFBEM3Keys.allObjects sortedArrayUsingSelector:@selector(compare:)]
-                                : nil;
-            os_unfair_lock_unlock(&gPFBEM3Lock);
-            BOOL mediaInEditor = NO;
-            for (NSDictionary* entry in [PFBCustomTabBarUtility availableTabs]) {
-                NSNumber* panelID = entry[PFBTabPanelIDKey];
-                if (panelID && !PFBPanelIsGenuinelyAvailable(panelID.longLongValue)) {
-                    continue;
-                }
-                NSString* page = [entry[PFBTabPageKey] isKindOfClass:[NSString class]] ? entry[PFBTabPageKey] : @"";
-                NSString* title = [entry[PFBTabTitleKey] isKindOfClass:[NSString class]] ? entry[PFBTabTitleKey] : @"";
-                if ([page.lowercaseString containsString:@"media"] || [title.lowercaseString containsString:@"media"]) {
-                    mediaInEditor = YES;
-                    break;
-                }
-            }
-            PFBProbeNote(@"10E#E-M3 media", @"10E#E-M3 media switches read: %@; Media in the editor: %@",
-                         keys.count ? [keys componentsJoinedByString:@", "] : @"none", mediaInEditor ? @"yes" : @"no");
-        });
-    });
-}
-
 // MARK: - Feature switch overrides
 
 // The Grok Bot promotion a switch drives, or PFBCompatPathCount for any other key.
@@ -237,7 +70,7 @@ static PFBCompatPath pfbGrokBotPath(NSString* key) {
     return PFBCompatPathCount;
 }
 
-static NSNumber* FeatureSwitchOverrideValueForKeyBody(NSString* key) {
+static NSNumber* FeatureSwitchOverrideValueForKey(NSString* key) {
     if (![key isKindOfClass:[NSString class]]) {
         return nil;
     }
@@ -621,11 +454,6 @@ static NSNumber* FeatureSwitchOverrideValueForKeyBody(NSString* key) {
         return @YES;
     }
 
-    // The Media tab reads its switch as an integer and shows on this sentinel.
-    if ([key isEqualToString:@"media_tab_enabled"]) {
-        return @99;
-    }
-
     // 0 hides the Communities tab, 1 is contextual-only; anything else shows it.
     if ([key isEqualToString:@"c9s_tab_visibility"]) {
         return @2;
@@ -634,11 +462,6 @@ static NSNumber* FeatureSwitchOverrideValueForKeyBody(NSString* key) {
     if (!ReportGenuineTabGates) {
         if ([key isEqualToString:@"subscriptions_premium_hub_enabled"] ||
             [key isEqualToString:@"recruiting_global_jobs_hub_enabled"]) {
-            // Probe: whether this gate is forced YES over a genuine NO, and on what screen (F008).
-            if (PFBDebugIsRecording() && !gPFBF008Done) {
-                pfbProbeF008Gate([key isEqualToString:@"subscriptions_premium_hub_enabled"] ? @"Premium" : @"Jobs",
-                                 ^BOOL { return genuineSwitchBool(key); });
-            }
             return @YES;
         }
     }
@@ -649,16 +472,7 @@ static NSNumber* FeatureSwitchOverrideValueForKeyBody(NSString* key) {
 
     // In-app article webview
     if ([key isEqualToString:@"ios_in_app_article_webview_enabled"]) {
-        BOOL on = [PFBSettings boolForKey:@"new_inapp_webview"];
-        // Probe: the value the article web view gate is answered with at its first read of the
-        // launch, to pair with the Misc.x browser-path lines (F020).
-        if (!gPFBF020ArticleDone) {
-            gPFBF020ArticleDone = YES;
-            if (PFBProbeWants(@"14a#F020 article")) {
-                PFBProbeNote(@"14a#F020 article", @"14a#F020 article web view asked, answered %@", on ? @"YES" : @"NO");
-            }
-        }
-        if (on) {
+        if ([PFBSettings boolForKey:@"new_inapp_webview"]) {
             PFBCOMPAT_ACTION(PFBCompat_new_inapp_webview, @"new browser on");
             return @YES;
         }
@@ -794,27 +608,6 @@ static NSNumber* FeatureSwitchOverrideValueForKeyBody(NSString* key) {
     }
 
     return nil;
-}
-
-// Probe wrapper: inert off, one boolean once the summary is written. While recording
-// during the tour it times the body only (never the probe), skipping nested re-entry
-// from the genuine readers, and notes which media switches pass through (E-M3, F024).
-static NSNumber* FeatureSwitchOverrideValueForKey(NSString* key) {
-    if (!PFBDebugIsRecording()) {
-        return FeatureSwitchOverrideValueForKeyBody(key);
-    }
-    pfbProbeFSArm();
-    pfbProbeEM3Key(key);
-    if (gPFBF024Done || gPFBF024Depth > 0 || !PFBCompatTourIsRunning()) {
-        return FeatureSwitchOverrideValueForKeyBody(key);
-    }
-    gPFBF024Depth++;
-    uint64_t start = mach_absolute_time();
-    NSNumber* result = FeatureSwitchOverrideValueForKeyBody(key);
-    uint64_t elapsed = mach_absolute_time() - start;
-    gPFBF024Depth--;
-    pfbProbeF024Record(elapsed, result != nil);
-    return result;
 }
 
 // Every feature switch facade bottoms out in TFSFeatureSwitches, but instances
@@ -960,18 +753,12 @@ static NSNumber* FeatureSwitchOverrideValueForKey(NSString* key) {
     if (ReportGenuineTabGates) {
         return %orig;
     }
-    if (PFBDebugIsRecording() && !gPFBF008Done) {
-        pfbProbeF008Gate(@"Community Notes home", ^BOOL { return genuineTabGateFlag(self, _cmd); });
-    }
     return YES;
 }
 
 - (BOOL)birdwatchHistoryIsEnabled {
     if (ReportGenuineTabGates) {
         return %orig;
-    }
-    if (PFBDebugIsRecording() && !gPFBF008Done) {
-        pfbProbeF008Gate(@"Community Notes history", ^BOOL { return genuineTabGateFlag(self, _cmd); });
     }
     return YES;
 }
@@ -1135,9 +922,6 @@ static BOOL pfbSkipsSensitiveWarnings(void) {
     if (ReportGenuineTabGates) {
         return %orig;
     }
-    if (PFBDebugIsRecording() && !gPFBF008Done) {
-        pfbProbeF008Gate(@"Money", ^BOOL { return genuineTabGateFlag(self, _cmd); });
-    }
     return YES;
 }
 
@@ -1283,16 +1067,6 @@ static __thread BOOL DashPanelIDQuery = NO;
 %hook T1DashContentController
 
 - (void)updateVisiblePanelIDs {
-    // Probe: which of the four forced panels the account genuinely holds, read once as
-    // the drawer rebuilds (F008).
-    if (PFBProbeWants(@"05#F008 panels")) {
-        PFBProbeNote(@"05#F008 panels",
-                     @"05#F008 panels genuine: Community Notes %@, Premium %@, Jobs %@, Money %@",
-                     PFBPanelIsGenuinelyAvailable(13) ? @"yes" : @"no",
-                     PFBPanelIsGenuinelyAvailable(15) ? @"yes" : @"no",
-                     PFBPanelIsGenuinelyAvailable(16) ? @"yes" : @"no",
-                     PFBPanelIsGenuinelyAvailable(17) ? @"yes" : @"no");
-    }
     DashPanelIDQuery = YES;
     %orig;
     DashPanelIDQuery = NO;

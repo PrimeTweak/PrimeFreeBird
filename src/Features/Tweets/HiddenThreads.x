@@ -3,9 +3,6 @@
 
 #import "Support/HookHelpers.h"
 #import "Support/TwitterChirpFont.h"
-#import "Debug/PFBDebugger.h"
-#import "Debug/PFBProbe.h"
-#import <mach/mach_time.h>
 
 static NSString* const kPFBHiddenThreadsKey = @"pfb_hidden_threads";
 static NSString* const kPFBThreadIDKey = @"id";
@@ -187,63 +184,6 @@ static BOOL PFBRespondsToStatusValue(id candidate) {
            [candidate respondsToSelector:@selector(statusID)];
 }
 
-// Probe 10b#F024: what the ivar scan finds, once per model class and caller, at most 12. The
-// caller is a button walk while gPFBProbeWalkDepth is set, the timeline otherwise.
-static NSUInteger gPFBProbeWalkDepth;
-static BOOL gPFBProbeScanDone;
-static NSUInteger gPFBProbeScanRuns;
-static NSUInteger gPFBProbeScanNoted;
-static NSMutableSet* gPFBProbeScanTimeline;
-static NSMutableSet* gPFBProbeScanMenu;
-
-static void pfbProbeStatusScan(id model, Ivar* ivars, unsigned int count, id found) {
-    if (gPFBProbeScanDone || !NSThread.isMainThread) {
-        return;
-    }
-    if (!PFBDebugIsRecording() || gPFBProbeScanNoted >= 12 || ++gPFBProbeScanRuns > 5000) {
-        gPFBProbeScanDone = YES;
-        gPFBProbeScanTimeline = nil;
-        gPFBProbeScanMenu = nil;
-        return;
-    }
-    if (!gPFBProbeScanTimeline) {
-        gPFBProbeScanTimeline = [NSMutableSet set];
-        gPFBProbeScanMenu = [NSMutableSet set];
-    }
-    Class modelClass = [model class];
-    NSMutableSet* seen = gPFBProbeWalkDepth ? gPFBProbeScanMenu : gPFBProbeScanTimeline;
-    if ([seen containsObject:modelClass]) {
-        return;
-    }
-    [seen addObject:modelClass];
-    // Only the ivars the scan itself read are read again, up to the one it took, and compared by
-    // address: no object is messaged here.
-    unsigned int objects = 0;
-    const char* foundName = NULL;
-    for (unsigned int i = 0; i < count; i++) {
-        const char* type = ivar_getTypeEncoding(ivars[i]);
-        if (!type || type[0] != '@') {
-            continue;
-        }
-        objects++;
-        if (found && !foundName) {
-            __unsafe_unretained id value = object_getIvar(model, ivars[i]);
-            if (value == found) {
-                foundName = ivar_getName(ivars[i]);
-            }
-        }
-    }
-    NSString* caller = gPFBProbeWalkDepth ? @"menu button" : @"timeline";
-    NSString* result = found ? [NSString stringWithFormat:@"found %s (%@)", foundName ?: "?", PFBProbeClassName(found)]
-                             : @"nothing";
-    NSString* key = [NSString stringWithFormat:@"10b#F024 %@ %@", NSStringFromClass(modelClass), caller];
-    if (PFBProbeWants(key)) {
-        gPFBProbeScanNoted++;
-        PFBProbeNote(key, @"10b#F024 status scan on %@ from the %@: %u object ivars, %@", NSStringFromClass(modelClass),
-                     caller, objects, result);
-    }
-}
-
 static id PFBStatusFromModel(id model) {
     if (!model) {
         return nil;
@@ -273,8 +213,6 @@ static id PFBStatusFromModel(id model) {
             found = value;
         }
     }
-    // Probe: notes what the scan found, for 10b#F024.
-    pfbProbeStatusScan(model, ivars, count, found);
     free(ivars);
     return found;
 }
@@ -536,123 +474,10 @@ static void PFBShowHiddenToast(NSString* threadID) {
 // The Tweet's menu is caught as it is set on its caret button (-[UIButton setMenu:]),
 // and the entry is appended to it.
 
-// Probe: milliseconds from mach_absolute_time ticks.
-static double pfbProbeMs(uint64_t ticks) {
-    static mach_timebase_info_data_t timebase;
-    if (!timebase.denom) {
-        mach_timebase_info(&timebase);
-    }
-    return (double)ticks * (double)timebase.numer / (double)timebase.denom / 1e6;
-}
-
-// Probe 10b#F023: the walks from a button up to its Tweet during the first full tour run to its
-// end, the exceptions they catch, their time, the entries added and the buttons that start them;
-// noted then or after 500 walks. A nested walk is counted for its caller only.
-static int gPFBProbeWalkState;   // 0 not read yet, 1 open, 2 closed
-static BOOL gPFBProbeWalkTimed;
-static struct {
-    NSUInteger walks, exceptions, entries;
-    uint64_t ticks, longest;
-} gPFBProbeWalk;
-static NSCountedSet* gPFBProbeWalkButtons;
-
-static void pfbProbeWalkNote(NSString* when) {
-    if (gPFBProbeWalkState != 1) {
-        return;
-    }
-    gPFBProbeWalkState = 2;
-    NSCountedSet* buttons = gPFBProbeWalkButtons;
-    NSArray* ranked = [buttons.allObjects sortedArrayUsingComparator:^NSComparisonResult(id a, id b) {
-      NSUInteger countA = [buttons countForObject:a];
-      NSUInteger countB = [buttons countForObject:b];
-      return countA > countB ? NSOrderedAscending : (countA < countB ? NSOrderedDescending : NSOrderedSame);
-    }];
-    NSMutableArray<NSString*>* top = [NSMutableArray array];
-    for (id buttonClass in ranked) {
-        if (top.count == 3) {
-            break;
-        }
-        [top addObject:[NSString stringWithFormat:@"%@ x%lu", NSStringFromClass((Class)buttonClass),
-                                                  (unsigned long)[buttons countForObject:buttonClass]]];
-    }
-    PFBProbeNote(@"10b#F023 menu walk",
-                 @"10b#F023 menu walk %@: %lu walks, %lu exceptions, %.1f ms in total, longest %.2f ms, entries "
-                 @"added %lu, buttons: %@",
-                 when, (unsigned long)gPFBProbeWalk.walks, (unsigned long)gPFBProbeWalk.exceptions,
-                 pfbProbeMs(gPFBProbeWalk.ticks), pfbProbeMs(gPFBProbeWalk.longest),
-                 (unsigned long)gPFBProbeWalk.entries, top.count ? [top componentsJoinedByString:@", "] : @"none");
-    gPFBProbeWalkButtons = nil;
-}
-
-// 0 when no probe needs the walk, 1 when it only counts for 10b#F024, else its start time.
-static uint64_t pfbProbeWalkBegin(UIView* button) {
-    if (gPFBProbeWalkState == 2 && gPFBProbeScanDone) {
-        return 0;
-    }
-    if (!PFBDebugIsRecording()) {
-        gPFBProbeWalkState = 2;
-        gPFBProbeScanDone = YES;
-        return 0;
-    }
-    if (gPFBProbeWalkState == 0) {
-        gPFBProbeWalkState = PFBProbeWants(@"10b#F023 menu walk") ? 1 : 2;
-        if (gPFBProbeWalkState == 1) {
-            gPFBProbeWalkButtons = [NSCountedSet set];
-            [[NSNotificationCenter defaultCenter] addObserverForName:PFBProbeTourEndedNotification
-                                                              object:nil
-                                                               queue:nil
-                                                          usingBlock:^(__unused NSNotification* note) {
-                                                            // A tour stopped early or not full is left out.
-                                                            if ([PFBCompatTourLastRun() hasPrefix:@"Full tour"]) {
-                                                                pfbProbeWalkNote(@"during the tour");
-                                                            } else if (gPFBProbeWalkState == 1) {
-                                                                memset(&gPFBProbeWalk, 0, sizeof(gPFBProbeWalk));
-                                                                [gPFBProbeWalkButtons removeAllObjects];
-                                                            }
-                                                          }];
-        }
-    }
-    gPFBProbeWalkDepth++;
-    if (gPFBProbeWalkState != 1 || gPFBProbeWalkDepth > 1 || !button || !PFBCompatTourIsRunning() ||
-        !NSThread.isMainThread) {
-        return 1;
-    }
-    [gPFBProbeWalkButtons addObject:[button class]];
-    gPFBProbeWalkTimed = YES;
-    return mach_absolute_time();
-}
-
-static void pfbProbeWalkEnd(uint64_t* start) {
-    if (!*start) {
-        return;
-    }
-    gPFBProbeWalkDepth--;
-    if (*start == 1) {
-        return;
-    }
-    uint64_t ticks = mach_absolute_time() - *start;
-    gPFBProbeWalkTimed = NO;
-    gPFBProbeWalk.walks++;
-    gPFBProbeWalk.ticks += ticks;
-    gPFBProbeWalk.longest = MAX(gPFBProbeWalk.longest, ticks);
-    if (gPFBProbeWalk.walks >= 500) {
-        pfbProbeWalkNote(@"after 500 walks");
-    }
-}
-
-static void pfbProbeWalkException(void) {
-    if (gPFBProbeWalkTimed) {
-        gPFBProbeWalk.exceptions++;
-    }
-}
-
 // From the caret button up to the Tweet it belongs to. The chain is walked at
 // the moment it is needed — when the menu is built, and again when the entry is
 // tapped — so nothing is cached and nothing can go stale.
 static id PFBStatusForButton(UIView* button) {
-    // Probe: times this walk for 10b#F023 and names it the scan's caller for 10b#F024; the
-    // cleanup runs on every return.
-    uint64_t probeWalk __attribute__((cleanup(pfbProbeWalkEnd))) = pfbProbeWalkBegin(button);
     UIView* node = button;
     NSInteger depth = 0;
     while (node && depth < 14) {
@@ -660,8 +485,6 @@ static id PFBStatusForButton(UIView* button) {
         @try {
             model = [node valueForKey:@"viewModel"];
         } @catch (__unused NSException* exception) {
-            // Probe: counts the exception for 10b#F023.
-            pfbProbeWalkException();
             model = nil;
         }
         id status = PFBStatusFromModel(model);
@@ -698,50 +521,6 @@ static BOOL PFBMenuBelongsToTweet(UIMenu* menu) {
         }
     }
     return NO;
-}
-
-// Probe 10B#B8: whether a Tweet's menu already holds the hide entry before it is appended, once
-// for each case; also counts the entries added during the tour for 10b#F023.
-static BOOL gPFBProbeEntryDone;
-static NSUInteger gPFBProbeEntryLooks;
-
-// Probe: the elements titled like the hide entry, submenus included.
-static NSUInteger pfbProbeEntryCount(NSArray<UIMenuElement*>* elements, NSString* title) {
-    NSUInteger held = 0;
-    for (UIMenuElement* element in elements) {
-        if ([element.title isEqualToString:title]) {
-            held++;
-        }
-        if ([element isKindOfClass:[UIMenu class]]) {
-            held += pfbProbeEntryCount(((UIMenu*)element).children, title);
-        }
-    }
-    return held;
-}
-
-static void pfbProbeHideEntry(UIMenu* menu, UIView* button, NSString* title) {
-    if (gPFBProbeWalkState == 1 && PFBCompatTourIsRunning()) {
-        gPFBProbeWalk.entries++;
-    }
-    if (gPFBProbeEntryDone) {
-        return;
-    }
-    if (!PFBDebugIsRecording() || ++gPFBProbeEntryLooks > 500) {
-        gPFBProbeEntryDone = YES;
-        return;
-    }
-    NSUInteger held = pfbProbeEntryCount(menu.children, title);
-    NSUInteger children = menu.children.count;
-    if (held && PFBProbeWants(@"10B#B8 twice")) {
-        PFBProbeNote(@"10B#B8 twice",
-                     @"10B#B8 hide entry: Tweet menu on %@ already holds the hide entry (%lu times, %lu children) "
-                     @"before the append: it would show twice",
-                     PFBProbeClassName(button), (unsigned long)held, (unsigned long)children);
-    } else if (!held && PFBProbeWants(@"10B#B8 normal")) {
-        PFBProbeNote(@"10B#B8 normal", @"10B#B8 hide entry: appended to a menu of %lu children with none yet",
-                     (unsigned long)children);
-    }
-    gPFBProbeEntryDone = !PFBProbeWants(@"10B#B8 twice") && !PFBProbeWants(@"10B#B8 normal");
 }
 
 %hook UIButton
@@ -786,8 +565,6 @@ static void pfbProbeHideEntry(UIMenu* menu, UIView* button, NSString* title) {
                   PFBShowHiddenToast(threadID);
                 }];
     PFBCOMPAT_ACTION(PFBCompat_hide_threads, @"hide entry in a Tweet menu");
-    // Probe: counts the hide entries the menu already holds, for 10B#B8 and 10b#F023.
-    pfbProbeHideEntry(menu, button, title);
     %orig([menu menuByReplacingChildren:[menu.children arrayByAddingObject:hide]]);
 }
 

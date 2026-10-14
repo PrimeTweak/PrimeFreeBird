@@ -2,6 +2,8 @@
 
 #import <UIKit/UIKit.h>
 
+@class T1TabView;
+
 NS_ASSUME_NONNULL_BEGIN
 
 // pageID of the Home tab, which is always kept visible and pinned first.
@@ -20,6 +22,10 @@ extern NSString* const PFBTabPanelIDKey; // T1 panel ID (NSNumber)
 // icons without hardcoding them. Called from the tab bar hook with the live tab
 // views.
 + (void)recordTabViews:(NSArray*)tabViews;
+
+// The glyph name of a tab: its imageName, or for a tab drawn from an avatar (Profile),
+// the glyph Twitter's own customization screen gives its panel. Nil when there is none.
++ (nullable NSString*)imageNameForTabView:(T1TabView*)tabView;
 
 // Every tab recorded so far, kept across launches and never pruned, in the
 // order first seen.

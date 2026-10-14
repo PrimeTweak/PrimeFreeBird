@@ -3,10 +3,8 @@
 // while a video plays.
 
 #import "Debug/PFBDebugger.h"
-#import "Debug/PFBProbe.h"
 #import "Support/HookHelpers.h"
 #import "Support/TwitterChirpFont.h"
-#import <stdatomic.h>
 
 // MARK: - Immersive Player Timestamp
 
@@ -15,6 +13,8 @@
 // view: the tap handler is not exposed to the runtime on this build.
 
 static const void* kPFBRestoredTimestampKey = &kPFBRestoredTimestampKey;
+// The mode showing the elapsed time; 0 is the countdown.
+static const uint8_t kPFBElapsedLabelMode = 1;
 
 // The card on screen, so the bar can reach it the moment it mounts. Weak, so a
 // card that goes away leaves nothing behind.
@@ -172,83 +172,7 @@ static void pfbHoldThroughOpening(UIView* view) {
 
 static BOOL pfbRaiseChromeIfDue(UIView* card);
 
-// Probe: a one-byte ivar of a view, or -1 when it cannot be read.
-static NSInteger pfbProbeByte(UIView* view, const char* name) {
-    Ivar ivar = view ? class_getInstanceVariable(object_getClass(view), name) : NULL;
-    ptrdiff_t offset = ivar ? ivar_getOffset(ivar) : 0;
-    if (offset <= 0 || (size_t)offset >= class_getInstanceSize(object_getClass(view))) {
-        return -1;
-    }
-    return *((uint8_t*)(__bridge void*)view + offset);
-}
-
-// Probe: progressLabelMode around the first write of the build, then whether Twitter writes
-// it again on a bar already set; one line, at a rewrite or 30 s after the write.
-static BOOL gPFBProbeTimestampDone;
-static NSInteger gPFBProbeTimestampStart = -1;
-static NSString* gPFBProbeTimestampWrite;
-static NSUInteger gPFBProbeTimestampPasses;
-static const void* kPFBProbeTimestampKey = &kPFBProbeTimestampKey;
-
-static void pfbProbeTimestampVerdict(NSString* later) {
-    gPFBProbeTimestampDone = YES;
-    PFBProbeNote(@"SD-1 video time", @"SD-1 video time: %@; rewritten later: %@", gPFBProbeTimestampWrite ?: @"?", later);
-}
-
-// Called just before the write (before = YES) and just after it.
-static void pfbProbeTimestampWrite(UIView* controls, BOOL before) {
-    if (gPFBProbeTimestampDone || !PFBDebugIsRecording()) {
-        return;
-    }
-    NSInteger mode = pfbProbeByte(controls, "progressLabelMode");
-    if (before) {
-        gPFBProbeTimestampStart = mode;
-        return;
-    }
-    NSInteger applied = pfbProbeByte(controls, "hasAppliedDefaultProgressLabelMode");
-    objc_setAssociatedObject(controls, kPFBProbeTimestampKey, @[ @(mode), @(applied), @(CACurrentMediaTime()) ],
-                             OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-    if (gPFBProbeTimestampWrite) {
-        return;
-    }
-    if (!PFBProbeWants(@"SD-1 video time")) {
-        gPFBProbeTimestampDone = YES;
-        return;
-    }
-    gPFBProbeTimestampWrite = [NSString stringWithFormat:@"start %ld -> wrote %ld, default applied %ld at the write",
-                                                         (long)gPFBProbeTimestampStart, (long)mode, (long)applied];
-    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(30.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
-      if (!gPFBProbeTimestampDone && PFBProbeWants(@"SD-1 video time")) {
-          pfbProbeTimestampVerdict([NSString stringWithFormat:@"no (%lu later passes over 30 s)",
-                                                              (unsigned long)gPFBProbeTimestampPasses]);
-      }
-    });
-}
-
-// Probe: a later layout pass of a bar already set, compared with what was written there.
-static void pfbProbeTimestampPass(UIView* controls) {
-    if (gPFBProbeTimestampDone || !gPFBProbeTimestampWrite || !PFBDebugIsRecording()) {
-        return;
-    }
-    NSArray<NSNumber*>* written = objc_getAssociatedObject(controls, kPFBProbeTimestampKey);
-    if (written.count != 3) {
-        return;
-    }
-    gPFBProbeTimestampPasses++;
-    NSInteger mode = pfbProbeByte(controls, "progressLabelMode");
-    if (mode != written[0].integerValue) {
-        pfbProbeTimestampVerdict([NSString
-            stringWithFormat:@"yes (wrote %ld, now %ld, default applied %ld -> %ld, %.0f ms after the write)",
-                             (long)written[0].integerValue, (long)mode, (long)written[1].integerValue,
-                             (long)pfbProbeByte(controls, "hasAppliedDefaultProgressLabelMode"),
-                             (CACurrentMediaTime() - written[2].doubleValue) * 1000.0]);
-    } else if (gPFBProbeTimestampPasses >= 3000) {
-        pfbProbeTimestampVerdict(@"no (3000 later passes)");
-    }
-}
-
 static void pfbRestoreTimestamp(UIView* controls) {
-    pfbProbeTimestampPass(controls);
     BOOL enabled = [PFBSettings boolForKey:@"restore_video_timestamp"];
     if (controls && !enabled) {
         PFBCOMPAT_OBSERVE(PFBCompat_restore_video_timestamp, @"video controls found");
@@ -265,9 +189,7 @@ static void pfbRestoreTimestamp(UIView* controls) {
     objc_setAssociatedObject(controls, kPFBRestoredTimestampKey, @YES,
                              OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     uint8_t* mode = (uint8_t*)(__bridge void*)controls + ivar_getOffset(modeIvar);
-    pfbProbeTimestampWrite(controls, YES);
-    *mode = *mode ? 0 : 1;
-    pfbProbeTimestampWrite(controls, NO);
+    *mode = kPFBElapsedLabelMode;
     PFBCOMPAT_ACTION(PFBCompat_restore_video_timestamp, @"timestamp restored");
     // The mode is read while the controls build their configuration, so the
     // change needs one more pass to reach the label.
@@ -302,27 +224,14 @@ static void pfbRestoreTimestamp(UIView* controls) {
 // MARK: - A tap opens a video, it does not wake the sound
 
 // The timeline's video view carries isAutoUnmuteEnabled, whose job is to let a
-// tap turn the sound on — the same tap that opens full screen. It is cleared on
-// the view before its handler runs; every other route to the sound is untouched.
+// tap turn the sound on — the same tap that opens full screen. While the clean
+// player opens videos muted it is cleared before the view's handler runs.
 
 // The full-screen player's sound is off unless the video had it on in the timeline or
 // the speaker on its bar turned it on. Timeline videos keep Twitter's speaker and the
 // silent switch, so the guards hold only while the full-screen player is up.
 static BOOL gPFBSoundAllowed = NO;
 static BOOL gPFBFullScreenShown = NO;
-
-// Probe: the tour's video sound passage reads the flag before its tap and puts it back after,
-// so the person's next full-screen video opens as it would have (PFBCompatibilityTour.m).
-BOOL pfbProbeSoundAllowed(void);
-void pfbProbeRestoreSoundAllowed(BOOL allowed);
-
-BOOL pfbProbeSoundAllowed(void) {
-    return gPFBSoundAllowed;
-}
-
-void pfbProbeRestoreSoundAllowed(BOOL allowed) {
-    gPFBSoundAllowed = allowed;
-}
 
 // Whether a video opens silent, as the reader chose.
 static BOOL pfbOpensMuted(void) {
@@ -345,6 +254,11 @@ static void pfbClearAutoUnmute(UIView* view) {
     Ivar flagIvar =
         class_getInstanceVariable(object_getClass(view), "isAutoUnmuteEnabled");
     if (!flagIvar) {
+        return;
+    }
+    // With "Sound on" or the clean player off, Twitter's own tap-to-sound stays.
+    if (![PFBSettings boolForKey:@"tap_to_pause"] || !pfbOpensMuted()) {
+        PFBCOMPAT_OBSERVE(PFBCompat_no_auto_unmute, @"auto-unmute left to Twitter");
         return;
     }
     uint8_t* flag = (uint8_t*)(__bridge void*)view + ivar_getOffset(flagIvar);
@@ -375,36 +289,6 @@ static BOOL pfbInlineVideoHasSound(UIView* view) {
     return !((TAVPlayer*)player).isMuted && ((TAVPlayer*)player).volume > 0;
 }
 
-// Probe: Twitter's auto-unmute flag at a timeline tap, then the full-screen player's sound
-// 1.5 s later, once per pill state and clean player state.
-static void pfbProbeAutoUnmute(UIView* inlineVideo) {
-    if (!PFBDebugIsRecording()) {
-        return;
-    }
-    BOOL opensMuted = pfbOpensMuted();
-    BOOL clean = [PFBSettings boolForKey:@"tap_to_pause"];
-    NSString* key = [NSString stringWithFormat:@"10a#F034 %@ %@", opensMuted ? @"muted" : @"sound on",
-                                               clean ? @"clean on" : @"clean off"];
-    if (!PFBProbeWants(key)) {
-        return;
-    }
-    NSInteger flag = pfbProbeByte(inlineVideo, "isAutoUnmuteEnabled");
-    NSString* flagText = flag < 0 ? @"unreadable" : flag ? @"was set, cleared" : @"already off";
-    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1.5 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
-      if (!PFBProbeWants(key)) {
-          return;
-      }
-      UIView* card = gPFBActiveCard;
-      TAVPlayer* player = card.window ? pfbVisibleCardPlayer(card) : nil;
-      NSString* sound = !player ? @"not found" : !player.isMuted && player.volume > 0 ? @"with sound" : @"muted";
-      PFBProbeNote(key,
-                   @"10a#F034 auto-unmute: video opened with the pill on %@, Clean video player %@, Twitter's "
-                   @"auto-unmute flag %@ · full-screen player %@ (isMuted %@, volume %.2f)",
-                   opensMuted ? @"Muted" : @"Sound on", clean ? @"on" : @"off", flagText, sound,
-                   player ? (player.isMuted ? @"yes" : @"no") : @"-", player ? (double)player.volume : 0.0);
-    });
-}
-
 %hook T1InlineVideoView
 
 - (void)didMoveToWindow {
@@ -413,7 +297,6 @@ static void pfbProbeAutoUnmute(UIView* inlineVideo) {
 }
 
 - (void)handleTapWithTapRecognizer:(UITapGestureRecognizer*)recognizer {
-    pfbProbeAutoUnmute((UIView*)self);
     pfbClearAutoUnmute((UIView*)self);
     // A video opened from the timeline starts in the chosen state, whatever the last
     // one was left as, unless it was already playing with its sound on.
@@ -429,65 +312,6 @@ static void pfbProbeAutoUnmute(UIView* inlineVideo) {
 
 %end
 
-// Probe: the controller presented in Twitter's window that holds the full-screen player, or nil;
-// the player is presented inside a navigation controller.
-static UIViewController* pfbProbeFullScreenController(void) {
-    for (UIViewController* shown = PFBProbeAppWindow().rootViewController; shown; shown = shown.presentedViewController) {
-        NSArray<UIViewController*>* stack =
-            [shown isKindOfClass:[UINavigationController class]] ? ((UINavigationController*)shown).viewControllers : @[ shown ];
-        for (UIViewController* controller in stack) {
-            if ([NSStringFromClass([controller class]) isEqualToString:@"T1ImmersiveFullScreenViewController"]) {
-                return shown;
-            }
-        }
-    }
-    return nil;
-}
-
-// Probe: the moment the full-screen player begins to leave, for the notes below.
-static void pfbProbeFullScreenLeaving(void) {
-    if (PFBDebugIsRecording()) {
-        PFBProbeMark(@"10a#F035 full screen leaving");
-    }
-}
-
-// Probe: a sound request held while no full-screen player is presented, once per build;
-// looked at most every 0.5 s, on the main thread.
-static BOOL gPFBProbeHeldDone;
-static CFTimeInterval gPFBProbeHeldLook;
-static atomic_bool gPFBProbeHeldPending;
-static void pfbProbeSoundHeld(NSString* door) {
-    if (gPFBProbeHeldDone || !PFBDebugIsRecording()) {
-        return;
-    }
-    if (!NSThread.isMainThread) {
-        if (!atomic_exchange(&gPFBProbeHeldPending, true)) {
-            dispatch_async(dispatch_get_main_queue(), ^{
-              atomic_store(&gPFBProbeHeldPending, false);
-              pfbProbeSoundHeld(door);
-            });
-        }
-        return;
-    }
-    CFTimeInterval now = CACurrentMediaTime();
-    if (now - gPFBProbeHeldLook < 0.5) {
-        return;
-    }
-    gPFBProbeHeldLook = now;
-    if (!PFBProbeWants(@"10a#F035 held")) {
-        gPFBProbeHeldDone = YES;
-        return;
-    }
-    if (pfbProbeFullScreenController()) {
-        return;
-    }
-    CFTimeInterval leaving = PFBProbeMarkAge(@"10a#F035 full screen leaving");
-    gPFBProbeHeldDone = YES;
-    PFBProbeNote(@"10a#F035 held", @"10a#F035 sound request held with no full-screen player up (%@, %@)", door,
-                 leaving >= 0 ? [NSString stringWithFormat:@"%.1f s after the full-screen player began to leave", leaving]
-                              : @"no full-screen player left in this launch");
-}
-
 // Every door the full-screen player's sound comes through. The mute flag is one of
 // two levers, the volume is the other, and playback covers a player born loud.
 %hook TAVPlayer
@@ -498,7 +322,6 @@ static void pfbProbeSoundHeld(NSString* door) {
 - (void)setIsMuted:(BOOL)muted {
     if (!muted && pfbHoldsSound()) {
         PFBCompatReach(PFBCompatPath_starts_muted);
-        pfbProbeSoundHeld(@"setIsMuted:");
         return;
     }
     %orig;
@@ -507,7 +330,6 @@ static void pfbProbeSoundHeld(NSString* door) {
 - (void)setVolume:(float)volume {
     if (volume > 0 && pfbHoldsSound()) {
         PFBCompatReach(PFBCompatPath_starts_muted);
-        pfbProbeSoundHeld(@"setVolume:");
         %orig(0);
         return;
     }
@@ -555,7 +377,6 @@ static void pfbProbeSoundHeld(NSString* door) {
 }
 
 - (void)viewWillDisappear:(BOOL)animated {
-    pfbProbeFullScreenLeaving();
     gPFBFullScreenShown = NO;
     %orig;
 }
@@ -988,55 +809,6 @@ static void pfbStopMinimalTimer(UIView* card) {
                              OBJC_ASSOCIATION_RETAIN_NONATOMIC);
 }
 
-// Probe: the view a touch would reach at a point of the card, and what it carries.
-static NSString* pfbProbeHitAt(UIView* card, CGPoint point) {
-    UIView* hit = [card.window hitTest:[card convertPoint:point toView:nil] withEvent:nil];
-    if (!hit) {
-        return @"nothing";
-    }
-    NSUInteger above = 0;
-    for (UIView* view = hit.superview; view && view != card; view = view.superview) {
-        above += view.gestureRecognizers.count;
-    }
-    return [NSString stringWithFormat:@"%@ (in card %@, control %@, gestures %lu, %lu more above it up to the card)",
-                                      PFBProbeClassName(hit), hit == card || [hit isDescendantOfView:card] ? @"yes" : @"no",
-                                      [hit isKindOfClass:[UIControl class]] ? @"yes" : @"no",
-                                      (unsigned long)hit.gestureRecognizers.count, (unsigned long)above];
-}
-
-// Probe: the band of the sound button below the bar and what lies under it, once per
-// build, 0.6 s after the bar first shows.
-static BOOL gPFBProbeBandDone;
-static CFTimeInterval gPFBProbeBandSince;
-static void pfbProbeMinimalBand(UIView* card, UIView* bar, UIView* mute) {
-    if (gPFBProbeBandDone || !PFBDebugIsRecording()) {
-        return;
-    }
-    CFTimeInterval now = CACurrentMediaTime();
-    if (gPFBProbeBandSince <= 0) {
-        gPFBProbeBandSince = now;
-    }
-    if (now - gPFBProbeBandSince < 0.6 || !card.window) {
-        return;
-    }
-    gPFBProbeBandDone = YES;
-    if (!PFBProbeWants(@"10a#F041 band")) {
-        return;
-    }
-    CGRect muteInCard = [bar convertRect:mute.frame toView:card];
-    CGFloat barBottom = CGRectGetMaxY(bar.frame);
-    CGFloat muteBottom = CGRectGetMaxY(muteInCard);
-    NSString* under = @"none, the sound button ends inside the bar";
-    if (muteBottom > barBottom) {
-        CGFloat y = (barBottom + muteBottom) / 2.0;
-        under = [NSString stringWithFormat:@"at the middle %@ · at the sound button %@",
-                                           pfbProbeHitAt(card, CGPointMake(CGRectGetWidth(card.bounds) / 2.0, y)),
-                                           pfbProbeHitAt(card, CGPointMake(CGRectGetMidX(muteInCard), y))];
-    }
-    PFBProbeNote(@"10a#F041 band", @"10a#F041 minimal bar: bar %@, mute %@ in card, band %.1f pt; under the dead band: %@",
-                 NSStringFromCGRect(bar.frame), NSStringFromCGRect(muteInCard), MAX(0.0, muteBottom - barBottom), under);
-}
-
 // Laid out against the card, above the home indicator, and hidden as soon as
 // the app's own bar comes back or the card leaves the screen.
 static void pfbUpdateMinimalBar(UIView* card, TAVPlayer* player) {
@@ -1145,7 +917,8 @@ static void pfbUpdateMinimalBar(UIView* card, TAVPlayer* player) {
     // track does.
     CGFloat gripTop = trackTop + trackHeight / 2.0 - kPFBMinimalGripHeight / 2.0;
     CGFloat barTop = MIN(trackTop, gripTop);
-    CGFloat barBottom = MAX(clockTop + clockHeight, trackTop + trackHeight);
+    // The sound button hangs below the clock, and the bar reaches down to its bottom.
+    CGFloat barBottom = MAX(MAX(clockTop + clockHeight, trackTop + trackHeight), floorY - kPFBMinimalClockLift + kPFBMinimalMuteSize / 2.0);
     bar.frame = CGRectMake(0, barTop, width, barBottom - barTop);
     track.frame = CGRectMake(0, trackTop - barTop, width, trackHeight);
     track.layer.cornerRadius = trackHeight / 2.0;
@@ -1167,7 +940,6 @@ static void pfbUpdateMinimalBar(UIView* card, TAVPlayer* player) {
     mute.frame = CGRectMake(width - kPFBMinimalTextInset - kPFBMinimalMuteSize,
                             CGRectGetMidY(clock.frame) - kPFBMinimalMuteSize / 2.0,
                             kPFBMinimalMuteSize, kPFBMinimalMuteSize);
-    pfbProbeMinimalBand(card, bar, mute);
 
     if (bar.alpha < 1.0) {
         [UIView animateWithDuration:kPFBMinimalFade
@@ -1331,51 +1103,6 @@ static void pfbStartRaiseWatch(UIView* card) {
     pfbRaiseChromeWhenReady(card, kPFBRaiseAttempts);
 }
 
-// Probe: the share of a view inside its window, 0 to 1.
-static CGFloat pfbProbeOnScreen(UIView* view) {
-    CGRect shown = [view convertRect:view.bounds toView:nil];
-    CGRect visible = CGRectIntersection(shown, view.window.bounds);
-    CGFloat area = CGRectGetWidth(shown) * CGRectGetHeight(shown);
-    return area > 0 && !CGRectIsNull(visible) ? CGRectGetWidth(visible) * CGRectGetHeight(visible) / area : 0;
-}
-
-// Probe: a card mounting while another, paused card is still on screen, and a card
-// mounting less than 1 s after the full-screen player began to leave; each once per build.
-static BOOL gPFBProbeMountDone;
-static void pfbProbeCardMount(UIView* card) {
-    if (gPFBProbeMountDone || !PFBDebugIsRecording()) {
-        return;
-    }
-    BOOL pauseOpen = PFBProbeWants(@"10a#F035 pause cleared");
-    BOOL lateOpen = PFBProbeWants(@"10a#F035 late mount");
-    gPFBProbeMountDone = !pauseOpen && !lateOpen;
-    UIView* previous = gPFBActiveCard;
-    if (pauseOpen && gPFBWantPaused && previous && previous != card && previous.window) {
-        TAVPlayer* pausedPlayer = pfbVisibleCardPlayer(previous);
-        NSString* paused = !pausedPlayer ? @"none" : pausedPlayer.playbackState.timeControlStatus == 0 ? @"paused" : @"playing";
-        UIScrollView* list = nil;
-        for (UIView* view = card.superview; view && !list; view = view.superview) {
-            list = [view isKindOfClass:[UIScrollView class]] ? (UIScrollView*)view : nil;
-        }
-        NSString* motion = !list ? @"none" : list.isDragging ? @"dragging" : list.isDecelerating ? @"decelerating" : @"still";
-        PFBProbeNote(@"10a#F035 pause cleared",
-                     @"10a#F035 pause request cleared by another card mounting while the paused card is on screen "
-                     @"(%.0f ms after the pause tap; paused card %.0f%% on screen, its player %@; new card %.0f%% on "
-                     @"screen, list %@)",
-                     ([NSDate timeIntervalSinceReferenceDate] - gPFBLastUserTap) * 1000.0, pfbProbeOnScreen(previous) * 100.0,
-                     paused, pfbProbeOnScreen(card) * 100.0, motion);
-    }
-    CFTimeInterval leaving = PFBProbeMarkAge(@"10a#F035 full screen leaving");
-    if (lateOpen && leaving >= 0 && leaving < 1.0) {
-        UIViewController* player = pfbProbeFullScreenController();
-        PFBProbeNote(@"10a#F035 late mount",
-                     @"10a#F035 card mounted %.0f ms after the full-screen player began to leave: full-screen flag "
-                     @"set back to YES (was %@, player %@)",
-                     leaving * 1000.0, gPFBFullScreenShown ? @"YES" : @"NO",
-                     !player ? @"gone" : player.isBeingDismissed ? @"being dismissed" : @"still presented");
-    }
-}
-
 %hook _TtC14T1TwitterSwift17ImmersiveCardView
 
 - (void)handleSingleTap:(UITapGestureRecognizer*)tap {
@@ -1460,7 +1187,6 @@ static void pfbProbeCardMount(UIView* card) {
     UIView* card = (UIView*)self;
     pfbShowPausedGlyph(card, NO);
     if (card.window) {
-        pfbProbeCardMount(card);
         gPFBFullScreenShown = YES;
         if ([PFBSettings boolForKey:@"tap_to_pause"]) {
             PFBCOMPAT_ACTION(PFBCompat_tap_to_pause, @"clean player on a video");

@@ -23,15 +23,15 @@
 "FORCE_FOLLOWING_TAB_TITLE" = "Remember Home tab";
 "FORCE_FOLLOWING_TAB_DETAIL" = "Keep Home on your last tab instead of going back to For you after 12 hours.";
 "NO_FOCUS_LOST_TITLE" = "Keep your place";
-"NO_FOCUS_LOST_DETAIL" = "Don't refresh the timeline when you come back from another app.";
+"NO_FOCUS_LOST_DETAIL" = "Don’t refresh the timeline when you come back from another app.";
 "NO_TAB_BAR_HIDING_TITLE" = "Fixed navigation bar";
-"NO_TAB_BAR_HIDING_DETAIL" = "Don't fade the navigation bar when you scroll.";
+"NO_TAB_BAR_HIDING_DETAIL" = "Don’t fade the navigation bar when you scroll.";
 "SHOW_SCROLL_INDICATOR_TITLE" = "Scroll bar";
 "SHOW_SCROLL_INDICATOR_DETAIL" = "Show the position indicator on the right while scrolling.";
 "DISABLE_RTL_TITLE" = "Left-to-right text";
 "DISABLE_RTL_DETAIL" = "Show text left to right, even in right-to-left languages.";
 "HIDE_PREMIUM_OFFER_TITLE" = "Hide Twitter Blue prompts";
-"HIDE_PREMIUM_OFFER_DETAIL" = "Remove the “Get Verified” and “Upgrade” buttons.";
+"HIDE_PREMIUM_OFFER_DETAIL" = "Remove the “Get verified” and “Upgrade” buttons.";
 
 /* ===== General › Links ===== */
 "GENERAL_GROUP_LINKS" = "Links";
@@ -42,7 +42,7 @@
 "ALWAYS_OPEN_SAFARI_TITLE" = "External browser";
 "ALWAYS_OPEN_SAFARI_DETAIL" = "Open links in Safari or your default browser.";
 "NEW_INAPP_WEBVIEW_TITLE" = "New in-app browser";
-"NEW_INAPP_WEBVIEW_DETAIL" = "Use Twitter's newer in-app browser for opening links.";
+"NEW_INAPP_WEBVIEW_DETAIL" = "Use Twitter’s newer in-app browser for opening links.";
 
 /* ===== APPEARANCE — page ===== */
 "MODERN_SETTINGS_APPEARANCE_TITLE" = "Appearance";
@@ -62,7 +62,7 @@
 "BOLD_FONTS_PICKER_OPTION_TITLE" = "Bold font";
 "FONT_SYSTEM_DEFAULT_SUBTITLE" = "Default";
 "DEFAULT_FONT_OPTION_TITLE" = "Reset to default font";
-"DEFAULT_FONT_CONFIRM_MESSAGE" = "Regular and bold go back to Twitter's font, and the recent fonts are cleared.";
+"DEFAULT_FONT_CONFIRM_MESSAGE" = "Regular and bold go back to Twitter’s font, and the recent fonts are cleared.";
 
 /* ===== Appearance › Colors ===== */
 "APPEARANCE_GROUP_COLORS" = "Colors";
@@ -110,7 +110,7 @@
 "RESTORE_REFRESH_SOUNDS_DETAIL" = "Play the classic sounds when you pull to refresh.";
 
 "HIDE_VERIFIED_TWEETS_TITLE" = "Hide verified Tweets";
-"HIDE_VERIFIED_TWEETS_DETAIL" = "Remove Tweets from verified accounts you don't follow. Profiles and search keep them.";
+"HIDE_VERIFIED_TWEETS_DETAIL" = "Remove Tweets from verified accounts you don’t follow. Profiles and search keep them.";
 "HIDE_BLOCKED_RETWEETS_TITLE" = "Hide blocked Retweets";
 "HIDE_BLOCKED_RETWEETS_DETAIL" = "Remove Retweets of accounts that have blocked you.";
 
@@ -140,7 +140,7 @@
 "RESTORE_REPLY_CONTEXT_TITLE" = "Restore reply context";
 "RESTORE_REPLY_CONTEXT_DETAIL" = "Show “Replying to” above the text of a reply you open.";
 "SHOW_QUOTE_COUNTS_TITLE" = "Quote and Retweet counts";
-"SHOW_QUOTE_COUNTS_DETAIL" = "Show both numbers at the top of a Tweet's Quotes screen.";
+"SHOW_QUOTE_COUNTS_DETAIL" = "Show both numbers at the top of a Tweet’s Quotes screen.";
 "SHOW_ACCOUNT_LOCATION_TITLE" = "Account location";
 "SHOW_ACCOUNT_LOCATION_DETAIL" = "Show the country an account is based in next to the time of an opened Tweet.";
 "QUOTE_COUNTS_TITLE_FORMAT" = "Quotes: %@ · Retweets: %@";
@@ -185,7 +185,7 @@
 "HIDE_BLUE_VERIFIED_TITLE" = "Hide paid checkmarks";
 "HIDE_BLUE_VERIFIED_DETAIL" = "Remove Twitter Blue checkmarks while keeping brand and government badges.";
 "HIDE_FOLLOW_BUTTON_TITLE" = "Hide Follow button";
-"HIDE_FOLLOW_BUTTON_DETAIL" = "Remove the Follow button next to the author's name on Tweets, but not the one on profiles.";
+"HIDE_FOLLOW_BUTTON_DETAIL" = "Remove the Follow button next to the author’s name on Tweets, but not the one on profiles.";
 "HIDE_MESSAGE_BUTTON_TITLE" = "Hide Message button";
 "HIDE_MESSAGE_BUTTON_DETAIL" = "Remove the Message button shown beside a Tweet’s author.";
 /* Legacy key name: this row HIDES the Subscribe button. Do not rename the
@@ -201,13 +201,13 @@
 "MODERN_SETTINGS_SEARCH_TITLE" = "Search";
 "MODERN_SETTINGS_SEARCH_SUBTITLE" = "Search history, trends, and trending videos.";
 "NO_HISTORY_TITLE" = "Disable search history";
-"NO_HISTORY_DETAIL" = "Don't save or show recent searches.";
+"NO_HISTORY_DETAIL" = "Don’t save or show recent searches.";
 "HIDE_TREND_VIDEOS_TITLE" = "Hide trending videos";
 "HIDE_TREND_VIDEOS_DETAIL" = "Remove trending videos from the search menu.";
 
 /* ===== MESSAGES ===== */
 "MODERN_SETTINGS_MESSAGES_TITLE" = "Messages";
-"MODERN_SETTINGS_MESSAGES_SUBTITLE" = "Typing, voice notes, and Grok's entry points.";
+"MODERN_SETTINGS_MESSAGES_SUBTITLE" = "Typing, voice notes, and Grok’s entry points.";
 "MESSAGES_GROUP_CHAT" = "Chat";
 "MESSAGES_GROUP_GROK" = "Grok";
 "HIDE_TYPING_INDICATOR_TITLE" = "Hide typing indicator";
@@ -219,7 +219,7 @@
 
 /* ===== GROK ===== */
 "HIDE_GROK_ANALYZE_TITLE" = "Hide analyze button";
-"HIDE_GROK_ANALYZE_DETAIL" = "Remove Grok's analyze and ask buttons.";
+"HIDE_GROK_ANALYZE_DETAIL" = "Remove Grok’s analyze and ask buttons.";
 "HIDE_GROK_SIDEBAR_TITLE" = "Hide sidebar shortcut";
 "HIDE_GROK_SIDEBAR_DETAIL" = "Remove the Grok shortcut from the sidebar.";
 "HIDE_GROK_BOT_TITLE" = "Hide Grok Bot";
@@ -229,7 +229,7 @@
 /* Legacy key name: this row TURNS ON auto-translation (the switch is inverted).
    Do not rename the key — it is persisted in user defaults. */
 "DISABLE_AUTO_TRANSLATE_TITLE" = "Auto-translate";
-"DISABLE_AUTO_TRANSLATE_DETAIL" = "Translate Tweets, bios, notes and notifications automatically.";
+"DISABLE_AUTO_TRANSLATE_DETAIL" = "Translate Tweets, bios, notes, and notifications automatically.";
 
 /* ===== LAB ===== */
 "MODERN_SETTINGS_LAB_TITLE" = "Tools";
@@ -246,7 +246,7 @@
    buttons (Lab) and their alerts. */
 "REPLY_WEBVIEW_TITLE" = "Reply";
 "WEB_SESSION_CLEAR_TITLE" = "Clear web session";
-"WEB_SESSION_CLEAR_CONFIRM" = "This deletes the saved web login. Until you sign in again, Twitter stops loading if your account was signed in through it; otherwise new Tweets, Spaces, mute lists, Grok, Twitter's web pages and replies in the web view no longer go through it.";
+"WEB_SESSION_CLEAR_CONFIRM" = "This deletes the saved web login. Until you sign in again, Twitter stops loading if your account was signed in through it; otherwise new Tweets, Spaces, mute lists, Grok, Twitter’s web pages, and replies in the web view no longer go through it.";
 "WEB_SESSION_CLEAR_ACTION" = "Delete";
 "OK_ACTION" = "OK";
 "CANCEL_ACTION" = "Cancel";
@@ -350,10 +350,10 @@
 "ADVSEARCH_REPLIES_SUB" = "Include replies and original Tweets.";
 "ADVSEARCH_LINKS" = "Links";
 "ADVSEARCH_LINKS_SUB" = "Include Tweets with links.";
-"ADVSEARCH_EX_ALL" = "Example: what's happening · contains both \"what's\" and \"happening\"";
-"ADVSEARCH_EX_EXACT" = "Example: happy hour · contains the exact phrase \"happy hour\"";
-"ADVSEARCH_EX_ANY" = "Example: cats dogs · contains either \"cats\" or \"dogs\" (or both)";
-"ADVSEARCH_EX_NONE" = "Example: cats dogs · does not contain \"cats\" and does not contain \"dogs\"";
+"ADVSEARCH_EX_ALL" = "Example: what’s happening · contains both “what’s” and “happening”";
+"ADVSEARCH_EX_EXACT" = "Example: happy hour · contains the exact phrase “happy hour”";
+"ADVSEARCH_EX_ANY" = "Example: cats dogs · contains either “cats” or “dogs” (or both)";
+"ADVSEARCH_EX_NONE" = "Example: cats dogs · does not contain “cats” and does not contain “dogs”";
 "ADVSEARCH_EX_TAGS" = "Example: #ThrowbackThursday · contains the hashtag #ThrowbackThursday";
 "ADVSEARCH_EX_FROM" = "Example: @NASA · sent from @NASA";
 "ADVSEARCH_EX_TO" = "Example: @NASA · sent in reply to @NASA";
@@ -382,7 +382,7 @@
 "TWEETS_GROUP_ACTIONS" = "Tweet actions";
 "TWEETS_GROUP_READING" = "Reading";
 "HIDE_TWEET_BUTTON_TITLE" = "Hide Tweet button";
-"HIDE_TWEET_BUTTON_DETAIL" = "Remove the compose button from the timeline.";
+"HIDE_TWEET_BUTTON_DETAIL" = "Remove the floating compose button.";
 "SEND_SOUND_TITLE" = "Send sound";
 "SEND_SOUND_DETAIL" = "A sound played when a Tweet is sent.";
 "SEND_SOUND_NONE" = "None";
@@ -417,17 +417,17 @@
 "LANGUAGES_FOOTER_OFF" = "No language checked — every language reaches your timeline.";
 "LANGUAGES_FOOTER_ON" = "Only the checked languages reach your timeline.\nTweets with no detected language always pass.\nUncheck every language to turn the filter off.";
 "LANGUAGES_TRANSLATE_TITLE" = "Auto-translate";
-"LANGUAGES_TRANSLATE_DETAIL" = "Translate Tweets, bios, notes and notifications automatically.";
+"LANGUAGES_TRANSLATE_DETAIL" = "Translate Tweets, bios, notes, and notifications automatically.";
 "LANGUAGES_OTHERS_TITLE" = "Other languages";
 "LANGUAGES_OTHERS_NONE" = "None";
-"MUTED_WORDS_ADD_PLACEHOLDER" = "Add a word, phrase or @account";
+"MUTED_WORDS_ADD_PLACEHOLDER" = "Add a word, phrase, or @account";
 "MUTED_WORDS_ADD_BUTTON" = "Add";
 "MUTED_WORDS_OPTIONS_HEADER" = "Options";
 "MUTED_WORDS_KIND_WORD" = "word";
 "MUTED_WORDS_KIND_PHRASE" = "phrase";
 "MUTED_WORDS_KIND_ACCOUNT" = "account";
 "MUTED_WORDS_WHOLE_TITLE" = "Whole words only";
-"MUTED_WORDS_WHOLE_DETAIL" = "Match \"cat\" as a word, not inside \"concatenate\".";
+"MUTED_WORDS_WHOLE_DETAIL" = "Match “cat” as a word, not inside “concatenate”.";
 "MUTED_WORDS_CONVERSATIONS_TITLE" = "Filter in conversations";
 "MUTED_WORDS_CONVERSATIONS_DETAIL" = "Apply the list to replies as well as the timeline.";
 
@@ -448,7 +448,7 @@
 "HIDE_SCROLL_EDGE_BLUR_DETAIL" = "Remove the blurred band iOS draws under the top bars.";
 
 "SHOW_POLL_RESULTS_TITLE" = "Show poll results";
-"SHOW_POLL_RESULTS_DETAIL" = "Add each option's share of the vote to its label, before you have voted.";
+"SHOW_POLL_RESULTS_DETAIL" = "Add each option’s share of the vote to its label, before you have voted.";
 "TAP_TO_PAUSE_TITLE" = "Clean video player";
 "TAP_TO_PAUSE_DETAIL" = "Tap to play or pause; a minimal bar stays while the video plays.";
 "VIDEO_STARTS_MUTED_PILL_ON" = "Muted";
@@ -471,7 +471,7 @@
 "DISABLE_VIDEOS_TAB_DETAIL" = "Remove the Videos tab from profiles.";
 
 "EXPAND_BIO_TITLE" = "Expand bios";
-"EXPAND_BIO_DETAIL" = "Show a profile's whole bio at once, without the Show more tap.";
+"EXPAND_BIO_DETAIL" = "Show a profile’s whole bio at once, without the Show more tap.";
 
 
 "PROFILE_TAB_REPOSTS" = "Retweets";
@@ -510,12 +510,12 @@
 "LAB_GROUP_BACKUP" = "Backup";
 "WEB_SESSION_NONE_TITLE" = "No web session";
 "WEB_SESSION_LIVE_DETAIL" = "Signed in on this device.";
-"WEB_SESSION_NONE_DETAIL" = "Sign in so new Tweets, Spaces, mute lists, Grok and Twitter's web pages go through the web session.";
+"WEB_SESSION_NONE_DETAIL" = "Sign in so new Tweets, Spaces, mute lists, Grok, and Twitter’s web pages go through the web session.";
 "WEB_SESSION_SIGN_IN_ACTION" = "Sign in";
 "REPLY_IN_WEBVIEW_DETAIL_HELD" = "Needs a web session — sign in above.";
 "SHOW_ACCOUNT_LOCATION_DETAIL_HELD" = "Needs a web session — sign in under Tools › Web session.";
 "FLEX_TWITTER_TITLE" = "FLEX explorer";
-"FLEX_TWITTER_DETAIL" = "Inspect the app's screens and data. For developers.";
+"FLEX_TWITTER_DETAIL" = "Inspect the app’s screens and data. For developers.";
 "COMPATIBILITY_TITLE" = "Compatibility";
 "COMPATIBILITY_DETAIL" = "Check every option still works after a Twitter update.";
 "COMPATIBILITY_GROUP_CHECKS" = "Monitoring";

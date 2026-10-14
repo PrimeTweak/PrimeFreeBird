@@ -3,8 +3,6 @@
 
 #import "Features/Search/PFBAdvancedSearchViewController.h"
 #import "Common/PFBBundle.h"
-#import "Debug/PFBDebugger.h"
-#import "Debug/PFBProbe.h"
 #import "Support/HookHelpers.h"
 #import "Support/TwitterChirpFont.h"
 #import <math.h>
@@ -57,149 +55,11 @@ static UIImage* pfbBakedTitleImage(NSString* title, UIFont* font) {
     return [drawn imageWithRenderingMode:UIImageRenderingModeAlwaysOriginal];
 }
 
-// Probe: the reader's text size against the form's fixed heights, from the fonts the cells
-// build and a compact date picker, read 2 s after the call; exported for AdvancedSearch.x (11#F028).
-void pfbAdvProbeTextRoom(void) {
-    if (!PFBProbeWants(@"11#F028 text size")) {
-        return;
-    }
-    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(2.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
-        if (!PFBProbeWants(@"11#F028 text size")) {
-            return;
-        }
-        UIFont* field = PFBScaledFont([TwitterChirpFont(TwitterFontStyleRegular) fontWithSize:16.5]);
-        UIFont* floating = PFBScaledFont([TwitterChirpFont(TwitterFontStyleRegular) fontWithSize:13]);
-        UIFont* header = PFBScaledFont([TwitterChirpFont(TwitterFontStyleBold) fontWithSize:20]);
-        UIDatePicker* picker = [[UIDatePicker alloc] init];
-        picker.datePickerMode = UIDatePickerModeDate;
-        picker.preferredDatePickerStyle = UIDatePickerStyleCompact;
-        CGSize fitted = [picker systemLayoutSizeFittingSize:UILayoutFittingCompressedSize];
-        PFBProbeNote(@"11#F028 text size",
-                     @"11#F028 text size %@: field %.1f of 24 pt, label %.1f of 18 pt free, header %.1f of 46 pt, date picker %.1f of 36 pt",
-                     UIApplication.sharedApplication.preferredContentSizeCategory, field.lineHeight, floating.lineHeight,
-                     header.lineHeight + 6.0, fitted.height);
-    });
-}
-
-// Probe: the color drawn on screen at a point of the window, as "r,g,b".
-static NSString* pfbAdvProbeColorAt(UIWindow* window, CGPoint point) {
-    UIGraphicsImageRendererFormat* format = [UIGraphicsImageRendererFormat preferredFormat];
-    format.scale = 1.0;
-    format.opaque = YES;
-    UIGraphicsImageRenderer* renderer = [[UIGraphicsImageRenderer alloc] initWithSize:CGSizeMake(1.0, 1.0)
-                                                                               format:format];
-    __block BOOL drawn = NO;
-    UIImage* pixel = [renderer imageWithActions:^(UIGraphicsImageRendererContext* context) {
-        CGContextTranslateCTM(context.CGContext, -point.x, -point.y);
-        drawn = [window drawViewHierarchyInRect:window.bounds afterScreenUpdates:NO];
-    }];
-    if (!drawn || !pixel.CGImage) {
-        return @"not drawn";
-    }
-    uint8_t rgba[4] = {0, 0, 0, 0};
-    CGColorSpaceRef space = CGColorSpaceCreateDeviceRGB();
-    CGContextRef bitmap = CGBitmapContextCreate(rgba, 1, 1, 8, 4, space, kCGImageAlphaPremultipliedLast);
-    CGColorSpaceRelease(space);
-    if (!bitmap) {
-        return @"unreadable";
-    }
-    CGContextDrawImage(bitmap, CGRectMake(0, 0, 1, 1), pixel.CGImage);
-    CGContextRelease(bitmap);
-    return [NSString stringWithFormat:@"%d,%d,%d", rgba[0], rgba[1], rgba[2]];
-}
-
-// Probe: a capsule behind the Search word: the first effect view or filled view among the
-// image view's ancestors below the bar, or their other subviews under its center.
-static NSString* pfbAdvProbeCapsule(UIImageView* shown, UINavigationBar* bar) {
-    CGPoint center = [shown convertPoint:CGPointMake(CGRectGetMidX(shown.bounds), CGRectGetMidY(shown.bounds))
-                                  toView:bar];
-    UIView* child = shown;
-    for (UIView* view = shown.superview; view && view != bar; view = view.superview) {
-        NSMutableArray<UIView*>* candidates = [NSMutableArray arrayWithObject:view];
-        for (UIView* sibling in view.subviews) {
-            if (sibling != child && !sibling.hidden &&
-                CGRectContainsPoint([sibling convertRect:sibling.bounds toView:bar], center)) {
-                [candidates addObject:sibling];
-            }
-        }
-        for (UIView* candidate in candidates) {
-            UIColor* fill = candidate.backgroundColor;
-            CGFloat alpha = fill ? CGColorGetAlpha([fill resolvedColorWithTraitCollection:bar.traitCollection].CGColor) *
-                                       candidate.alpha
-                                 : 0.0;
-            if ([candidate isKindOfClass:[UIVisualEffectView class]] || alpha > 0.05) {
-                return [NSString stringWithFormat:@"yes (%@, %@)", PFBProbeClassName(candidate),
-                                                  PFBProbeColor(fill, bar.traitCollection)];
-            }
-        }
-        child = view;
-    }
-    return @"no";
-}
-
-// Probe: how the Search item reads on the form's bar, once per interface style: its kind, the
-// bar's background, a capsule behind it and the color drawn behind the word (11#F026).
-static void pfbAdvProbeSearchItem(UIViewController* form, NSString* key, BOOL glass) {
-    UIBarButtonItem* item = form.navigationItem.rightBarButtonItem;
-    UINavigationBar* bar = form.navigationController.navigationBar;
-    UIWindow* window = bar.window;
-    if (!item || !window) {
-        return;
-    }
-    UIImage* baked = item.image;
-    __block UIImageView* shown = nil;
-    PFBEnumerateSubviewsRecursively(bar, ^(UIView* view) {
-        if (!shown && baked && [view isKindOfClass:[UIImageView class]]) {
-            UIImage* image = ((UIImageView*)view).image;
-            if (image == baked || (image && CGSizeEqualToSize(image.size, baked.size))) {
-                shown = (UIImageView*)view;
-            }
-        }
-    });
-    UITraitCollection* traits = bar.traitCollection;
-    UIColor* standard = (form.navigationItem.standardAppearance ?: bar.standardAppearance).backgroundColor;
-    UINavigationBarAppearance* edge = form.navigationItem.scrollEdgeAppearance ?: bar.scrollEdgeAppearance;
-    BOOL found = NO;
-    long long hidesShared = PFBProbeIntegerGetter(item, @"hidesSharedBackground", &found);
-    NSString* behind = shown ? pfbAdvProbeColorAt(window, [shown convertPoint:CGPointMake(3.0, CGRectGetMidY(shown.bounds))
-                                                                       toView:window])
-                             : @"no image view";
-    PFBProbeNote(key,
-                 @"11#F026 advanced search: %@, Search item %@, %@ bar, background %@, edge %@, capsule behind Search %@, shared background %@, drawn behind the word %@",
-                 glass ? @"Liquid Glass" : @"Standard", baked ? @"baked image" : @"title",
-                 traits.userInterfaceStyle == UIUserInterfaceStyleDark ? @"dark" : @"light",
-                 standard ? PFBProbeColor(standard, traits) : @"default",
-                 edge ? (edge.backgroundColor ? PFBProbeColor(edge.backgroundColor, traits) : @"default") : @"none",
-                 shown ? pfbAdvProbeCapsule(shown, bar) : @"unknown", found ? (hidesShared ? @"hidden" : @"shown") : @"n/a",
-                 behind);
-}
-
-// Probe: schedules the read above once the form's sheet has settled (11#F026).
-static void pfbAdvProbeSearchItemSoon(UIViewController* form) {
-    if (!PFBDebugIsRecording()) {
-        return;
-    }
-    BOOL glass = [PFBSettings boolForKey:@"enable_liquid_glass"];
-    NSString* key = glass ? @"11#F026 Liquid Glass" : @"11#F026 Standard";
-    if (!PFBProbeWants(key)) {
-        return;
-    }
-    __weak UIViewController* weakForm = form;
-    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
-        UIViewController* strongForm = weakForm;
-        if (strongForm.viewIfLoaded.window && PFBProbeWants(key)) {
-            pfbAdvProbeSearchItem(strongForm, key, glass);
-        }
-    });
-}
-
 @implementation PFBAdvancedSearchViewController
 
 - (void)viewWillAppear:(BOOL)animated {
     [super viewWillAppear:animated];
     PFBThemeScreenEnter(self);
-    pfbAdvProbeTextRoom();
-    pfbAdvProbeSearchItemSoon(self);
 }
 
 - (void)viewDidDisappear:(BOOL)animated {

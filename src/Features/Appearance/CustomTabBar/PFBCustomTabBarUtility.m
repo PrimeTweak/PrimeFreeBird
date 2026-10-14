@@ -2,25 +2,6 @@
 
 #import "Features/Appearance/CustomTabBar/PFBCustomTabBarUtility.h"
 #import "Support/T1Headers.h"
-#import "Debug/PFBDebugger.h"
-#import "Debug/PFBProbe.h"
-
-// Defined in FeatureSwitches.x: the filter the tab editor applies to the tabs it offers.
-extern BOOL PFBPanelIsGenuinelyAvailable(long long panelID);
-
-// Probe: a tab Twitter builds without imageName, the glyph the panel falls back to, and
-// whether the editor would offer it (06#F044); once per tab.
-static void PFBTabWithoutImageProbe(NSString* page, long long panelID, NSString* glyph) {
-    if (!PFBDebugIsRecording()) {
-        return;
-    }
-    NSString* key = [@"06#F044 " stringByAppendingString:page];
-    if (!PFBProbeWants(key)) {
-        return;
-    }
-    PFBProbeNote(key, @"06#F044 tab %@ has no imageName (panel %lld), panel glyph %@, offered by the editor %@", page,
-                 panelID, glyph.length ? glyph : @"none", PFBPanelIsGenuinelyAvailable(panelID) ? @"yes" : @"no");
-}
 
 // The Home tab is the app's landing surface, so it is always kept visible and
 // pinned first.
@@ -84,17 +65,7 @@ static BOOL PFBRegistryEntryIsValid(id entry) {
         }
 
         NSString* title = tabView.title.length ? tabView.title : page;
-        NSString* image = tabView.imageName ?: @"";
-        if (image.length == 0) {
-            // Avatar-drawn tabs (Profile) have no imageName; use the glyph the
-            // native customization screen resolves for the panel.
-            Class identity = NSClassFromString(@"T1PanelIdentity");
-            if ([identity respondsToSelector:@selector(iconImageNameForPanelID:)]) {
-                image = [identity iconImageNameForPanelID:tabView.panelID] ?: @"";
-            }
-            // Probe: notes this tab and the glyph it falls back to.
-            PFBTabWithoutImageProbe(page, tabView.panelID, image);
-        }
+        NSString* image = [self imageNameForTabView:tabView] ?: @"";
         NSDictionary* entry = @{
             PFBTabPageKey: page,
             PFBTabTitleKey: title,
@@ -123,6 +94,20 @@ static BOOL PFBRegistryEntryIsValid(id entry) {
         [[NSUserDefaults standardUserDefaults] setObject:[registry copy]
                                                   forKey:kRegistryKey];
     }
+}
+
++ (NSString*)imageNameForTabView:(T1TabView*)tabView {
+    NSString* image = tabView.imageName;
+    if (image.length) {
+        return image;
+    }
+    // Avatar-drawn tabs (Profile) have no imageName; use the glyph the
+    // native customization screen resolves for the panel.
+    Class identity = NSClassFromString(@"T1PanelIdentity");
+    if (![identity respondsToSelector:@selector(iconImageNameForPanelID:)]) {
+        return nil;
+    }
+    return [identity iconImageNameForPanelID:tabView.panelID];
 }
 
 + (NSArray<NSDictionary*>*)availableTabs {

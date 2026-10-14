@@ -3,8 +3,6 @@
 // drawn here at the settings gear's stroke, since no library glyph matches it.
 
 #import "Support/HookHelpers.h"
-#import "Debug/PFBDebugger.h"
-#import "Debug/PFBProbe.h"
 #import "Features/Search/PFBAdvancedSearchViewController.h"
 #import <objc/runtime.h>
 #import <objc/message.h>
@@ -91,18 +89,6 @@ static void pfbAdvPresentForm(UIViewController* owner) {
     [owner presentViewController:nav animated:YES completion:nil];
 }
 
-// Probe: the first tap on a replacement, with the state of the controller it opens over
-// (11#F032).
-static void pfbAdvProbeLaunch(UIViewController* owner) {
-    if (!PFBProbeWants(@"11#F032 launch")) {
-        return;
-    }
-    NSString* state = !owner ? @"gone" : (owner.presentedViewController ? @"presenting" : @"present");
-    PFBProbeNote(@"11#F032 launch",
-                 @"11#F032 advanced search: replacement tapped, owner %@ (%@, in a window %@), %@ in front", state,
-                 PFBProbeClassName(owner), owner.viewIfLoaded.window ? @"yes" : @"no", PFBProbeFrontScreen());
-}
-
 @interface PFBAdvSearchLauncher : NSObject
 @property (nonatomic, weak) UIViewController* owner;
 - (void)launch:(id)sender;
@@ -111,7 +97,6 @@ static void pfbAdvProbeLaunch(UIViewController* owner) {
 @implementation PFBAdvSearchLauncher
 - (void)launch:(id)sender {
     UIViewController* owner = self.owner;
-    pfbAdvProbeLaunch(owner);
     if (!owner || owner.presentedViewController) {
         return;
     }
@@ -208,60 +193,26 @@ static UIImage* pfbAdvItemImage(UIBarButtonItem* item) {
     return image;
 }
 
-// Probe: what recognized the last Filters item, read by the replacement notes below.
-static NSString* gPFBAdvProbeMatch = nil;
-
-// Probe: the first Filters item recognized in this build, with its vector name, label and
-// pixel agreement side by side; the tweak's own Explore button is noted apart (11#F023).
-static void pfbAdvProbeFiltersMatch(UIBarButtonItem* item, NSString* reason) {
-    if (!PFBDebugIsRecording()) {
-        return;
-    }
-    UIImage* image = pfbAdvItemImage(item);
-    NSString* name = pfbAdvVectorName(image);
-    NSString* label = item.accessibilityLabel ?: item.customView.accessibilityLabel;
-    if (label.length > 32) {
-        label = [label substringToIndex:32];
-    }
-    double agreement = pfbAdvMaskAgreement(image);
-    BOOL own = objc_getAssociatedObject(item, kPFBAdvSearchGreyKey) != nil;
-    NSString* detail = [reason isEqualToString:@"name"]    ? [@"vector " stringByAppendingString:name ?: @"?"]
-                       : [reason isEqualToString:@"label"] ? [@"label " stringByAppendingString:label ?: @"?"]
-                                                           : [NSString stringWithFormat:@"pixels %.2f", agreement];
-    gPFBAdvProbeMatch = own ? [detail stringByAppendingString:@" (the tweak's Explore button)"] : detail;
-    NSString* key = own ? @"11#F023 own button" : @"11#F023 filters item";
-    if (!PFBProbeWants(key)) {
-        return;
-    }
-    PFBProbeNote(key, @"11#F023 advsearch filters item%@: matched by %@ name=%@ label=%@ agreement=%.2f",
-                 own ? @" (the tweak's Explore button)" : @"", reason, name ?: @"nil", label ?: @"nil", agreement);
-}
-
 static BOOL pfbAdvIsFiltersItem(UIBarButtonItem* item) {
-    if (objc_getAssociatedObject(item, kPFBAdvReplacedKey)) {
+    if (objc_getAssociatedObject(item, kPFBAdvReplacedKey) ||
+        objc_getAssociatedObject(item, kPFBAdvSearchGreyKey)) {
         return NO;
     }
     NSSet* glyphs = [NSSet setWithObjects:@"settings_slider", @"filter_bars", nil];
     UIImage* image = pfbAdvItemImage(item);
     NSString* name = pfbAdvVectorName(image);
     if (name && [glyphs containsObject:name]) {
-        pfbAdvProbeFiltersMatch(item, @"name");
         return YES;
     }
     NSString* label = item.accessibilityLabel ?: item.customView.accessibilityLabel;
     NSSet* labels = [NSSet setWithObjects:@"Filters", @"Filter", @"Filtres", @"Filtre", nil];
     if (label && [labels containsObject:label]) {
-        pfbAdvProbeFiltersMatch(item, @"label");
         return YES;
     }
     // Neither a name nor a label: the pixels decide. The same vector drawn by
     // the app's Swift icon code and by its ObjC loader agrees almost entirely;
     // any other glyph in this bar agrees far less.
-    BOOL drawn = pfbAdvMaskAgreement(image) >= 0.85;
-    if (drawn) {
-        pfbAdvProbeFiltersMatch(item, @"pixels");
-    }
-    return drawn;
+    return pfbAdvMaskAgreement(image) >= 0.85;
 }
 
 // The color the bar's other items are drawn in: the label color on the results screen,
@@ -335,134 +286,6 @@ static BOOL pfbAdvIsOurs(UIBarButtonItem* entry) {
            objc_getAssociatedObject(entry, kPFBAdvSearchGreyKey) != nil;
 }
 
-// Probe: declared here for the probes below; defined with the scans further down.
-static BOOL pfbAdvIsSearchScreen(UIViewController* vc);
-
-// Probe: the controller whose navigation item this is, found in the loaded navigation stacks
-// of the app's windows (whose items exist already); nil when no stack holds it.
-static UIViewController* pfbAdvProbeHolderOf(UINavigationItem* item) {
-    NSMutableArray<UIViewController*>* queue = [NSMutableArray array];
-    for (UIScene* scene in UIApplication.sharedApplication.connectedScenes) {
-        if (![scene isKindOfClass:[UIWindowScene class]]) {
-            continue;
-        }
-        for (UIWindow* window in ((UIWindowScene*)scene).windows) {
-            if (window.rootViewController) {
-                [queue addObject:window.rootViewController];
-            }
-        }
-    }
-    NSMutableSet<UIViewController*>* seen = [NSMutableSet set];
-    for (NSUInteger i = 0; i < queue.count && i < 200; i++) {
-        UIViewController* controller = queue[i];
-        if ([seen containsObject:controller]) {
-            continue;
-        }
-        [seen addObject:controller];
-        if ([controller isKindOfClass:[UINavigationController class]] && controller.isViewLoaded) {
-            for (UIViewController* stacked in [(UINavigationController*)controller viewControllers]) {
-                if (stacked.navigationItem == item) {
-                    return stacked;
-                }
-            }
-        }
-        [queue addObjectsFromArray:controller.childViewControllers];
-        if (controller.presentedViewController) {
-            [queue addObject:controller.presentedViewController];
-        }
-    }
-    return nil;
-}
-
-static NSUInteger gPFBAdvProbeReplacedNotes = 0;
-
-// Probe: each Filters item replaced, once per screen in front and holder of the bar: whose
-// bar, whether a search screen was in front, and what recognized it (11#F032, 14b#F008).
-static void pfbAdvProbeReplaced(UINavigationItem* item, UIViewController* owner, NSString* place) {
-    if (!PFBDebugIsRecording() || gPFBAdvProbeReplacedNotes >= 8) {
-        return;
-    }
-    UIViewController* holder = pfbAdvProbeHolderOf(item);
-    NSString* key = [NSString stringWithFormat:@"11#F032 %@ %@", PFBProbeClassName(owner), PFBProbeClassName(holder)];
-    if (!PFBProbeWants(key)) {
-        return;
-    }
-    gPFBAdvProbeReplacedNotes++;
-    NSString* bar = holder == owner ? @"its own bar"
-                    : holder        ? [@"the bar of " stringByAppendingString:PFBProbeClassName(holder)]
-                                    : @"a bar outside the navigation stacks";
-    PFBProbeNote(key, @"11#F032/14b#F008 advanced search: a Filters item replaced in the %@ on %@ while %@ was in front (%@), matched by %@",
-                 place, bar, PFBProbeClassName(owner), pfbAdvIsSearchScreen(owner) ? @"search screen" : @"not a search screen",
-                 gPFBAdvProbeMatch ?: @"?");
-}
-
-// Probe: Twitter's Cancel found among the bar items, once per place (11#F033).
-static void pfbAdvProbeCancel(BOOL found, NSString* place, UIViewController* owner, NSUInteger count) {
-    if (!found || !PFBDebugIsRecording()) {
-        return;
-    }
-    NSString* key = [@"11#F033 " stringByAppendingString:place];
-    if (!PFBProbeWants(key)) {
-        return;
-    }
-    PFBProbeNote(key, @"11#F033 advanced search: Cancel arrives as a bar item in %@ of %@ (%lu items)", place,
-                 PFBProbeClassName(owner), (unsigned long)count);
-}
-
-static NSUInteger gPFBAdvProbeScreensNoted = 0;
-
-// Probe: what a search screen's navigation item holds when scanned, once per screen class: at
-// the first scan with a bar button, or its own item's fifth (3 s) scan if all were empty (11#F046, 14b#F033).
-static void pfbAdvProbeBarItems(UINavigationItem* item, UIViewController* owner) {
-    if (!PFBDebugIsRecording() || gPFBAdvProbeScreensNoted >= 3 || !pfbAdvIsSearchScreen(owner)) {
-        return;
-    }
-    NSString* key = [@"11#F046 " stringByAppendingString:PFBProbeClassName(owner)];
-    if (!PFBProbeWants(key)) {
-        return;
-    }
-    NSMutableArray<UIBarButtonItem*>* entries = [NSMutableArray arrayWithArray:item.rightBarButtonItems ?: @[]];
-    NSUInteger right = entries.count;
-    if (@available(iOS 16.0, *)) {
-        for (UIBarButtonItemGroup* group in item.trailingItemGroups) {
-            [entries addObjectsFromArray:group.barButtonItems ?: @[]];
-        }
-    }
-    BOOL own = item == owner.navigationItem;
-    NSUInteger scan = own ? PFBProbeCount(key) : PFBProbeCountValue(key);
-    if (entries.count == 0 && (!own || scan < 5)) {
-        return;
-    }
-    gPFBAdvProbeScreensNoted++;
-    NSString* matched = @"no";
-    NSMutableArray<NSString*>* kinds = [NSMutableArray array];
-    double best = 0;
-    for (UIBarButtonItem* entry in entries) {
-        if (kinds.count >= 8) {
-            break;
-        }
-        if (objc_getAssociatedObject(entry, kPFBAdvReplacedKey)) {
-            [kinds addObject:@"replacement"];
-            matched = @"yes (replaced on an earlier scan)";
-            continue;
-        }
-        gPFBAdvProbeMatch = nil;
-        if (pfbAdvIsFiltersItem(entry)) {
-            matched = [NSString stringWithFormat:@"yes (%@)", gPFBAdvProbeMatch ?: @"?"];
-        }
-        UIImage* image = pfbAdvItemImage(entry);
-        [kinds addObject:pfbAdvVectorName(image) ?: (image ? @"image" : (entry.title.length ? @"title" : @"other"))];
-        double agreement = pfbAdvMaskAgreement(image);
-        if (agreement > best) {
-            best = agreement;
-        }
-    }
-    PFBProbeNote(key, @"11#F046/14b#F033 search bar items: %lu right, %lu in groups on %@ (%@ item, own scan %lu); Filters item matched %@; items [%@], best pixels %.2f",
-                 (unsigned long)right, (unsigned long)(entries.count - right), PFBProbeClassName(owner),
-                 own ? @"its own" : @"another", (unsigned long)scan, matched, [kinds componentsJoinedByString:@", "],
-                 best);
-}
-
 // Works on the item that received the buttons rather than the top controller's:
 // an active search bar sets them on a different navigation item.
 static void pfbAdvReplaceFiltersInItem(UINavigationItem* item,
@@ -470,11 +293,9 @@ static void pfbAdvReplaceFiltersInItem(UINavigationItem* item,
     if (![PFBSettings boolForKey:@"advanced_search"] || !item || !owner) {
         return;
     }
-    pfbAdvProbeBarItems(item, owner);
     NSInteger replaced = 0;
     NSArray* right = item.rightBarButtonItems ?: @[];
     BOOL searching = pfbAdvGroupHasCancel(right);
-    pfbAdvProbeCancel(searching, @"right items", owner, right.count);
     NSMutableArray* rebuilt = [NSMutableArray arrayWithCapacity:right.count];
     for (UIBarButtonItem* entry in right) {
         BOOL match = pfbAdvIsFiltersItem(entry);
@@ -485,7 +306,6 @@ static void pfbAdvReplaceFiltersInItem(UINavigationItem* item,
         if (match) {
             [rebuilt addObject:pfbAdvReplacementFor(owner)];
             replaced++;
-            pfbAdvProbeReplaced(item, owner, @"right items");
         } else {
             [rebuilt addObject:entry];
         }
@@ -497,7 +317,6 @@ static void pfbAdvReplaceFiltersInItem(UINavigationItem* item,
         for (UIBarButtonItemGroup* group in item.trailingItemGroups) {
             NSMutableArray* members = [group.barButtonItems mutableCopy];
             BOOL groupSearching = pfbAdvGroupHasCancel(members);
-            pfbAdvProbeCancel(groupSearching, @"trailing group", owner, members.count);
             BOOL changed = NO;
             for (NSInteger i = (NSInteger)members.count - 1; i >= 0; i--) {
                 UIBarButtonItem* entry = members[i];
@@ -510,7 +329,6 @@ static void pfbAdvReplaceFiltersInItem(UINavigationItem* item,
                 if (match) {
                     members[i] = pfbAdvReplacementFor(owner);
                     changed = YES;
-                    pfbAdvProbeReplaced(item, owner, @"trailing group");
                 }
             }
             if (changed) {
@@ -583,43 +401,6 @@ static void pfbAdvRescanSoon(void) {
 }
 
 
-// Probe: Twitter's filter glyph in the search bar against the pixel test, once per build and
-// compared after the layout pass, so it is known even with no Filters bar item (11#F023).
-static BOOL gPFBAdvProbeGlyphDone = NO;
-static NSUInteger gPFBAdvProbeGlyphPasses = 0;
-
-static void pfbAdvProbeSearchBarGlyph(UIButton* button) {
-    if (gPFBAdvProbeGlyphDone) {
-        return;
-    }
-    if (!PFBProbeWants(@"11#F023 search bar glyph")) {
-        gPFBAdvProbeGlyphDone = YES;
-        return;
-    }
-    __block UIImage* image = button.configuration.image ?: button.currentImage;
-    if (!image) {
-        PFBEnumerateSubviewsRecursively(button, ^(UIView* view) {
-            if (!image && [view isKindOfClass:[UIImageView class]]) {
-                image = [(UIImageView*)view image];
-            }
-        });
-    }
-    if (!image && ++gPFBAdvProbeGlyphPasses < 50) {
-        return;
-    }
-    gPFBAdvProbeGlyphDone = YES;
-    UIImage* glyph = image;
-    NSString* label = button.accessibilityLabel;
-    if (label.length > 32) {
-        label = [label substringToIndex:32];
-    }
-    dispatch_async(dispatch_get_main_queue(), ^{
-        PFBProbeNote(@"11#F023 search bar glyph", @"11#F023 search bar filter button: image %@, name=%@ label=%@ agreement=%.2f",
-                     glyph ? @"found" : @"none after 50 passes", pfbAdvVectorName(glyph) ?: @"nil", label ?: @"nil",
-                     pfbAdvMaskAgreement(glyph));
-    });
-}
-
 // The app's own entry lives inside its search bar as a plain button, not as a
 // bar button item, so the bar button passes above never reach it.
 
@@ -659,7 +440,6 @@ static void pfbAdvCollapseNativeInSearchBar(UIView* bar) {
     if (![button isKindOfClass:[UIButton class]]) {
         return;
     }
-    pfbAdvProbeSearchBarGlyph(button);
     BOOL ours = objc_getAssociatedObject(button, kPFBAdvHiddenByTweakKey) != nil;
     if (hide) {
         // Only a button the app shows is taken over; one it hides itself is
@@ -708,109 +488,26 @@ static void pfbAdvCollapseNativeInSearchBar(UIView* bar) {
 
 %end
 
-// Probe: Explore's navigation item and its button, watched from the item setters until
-// the button is seen missing after one of them (11#F034).
-static BOOL gPFBAdvProbeExploreWatched = NO;
-static __weak UINavigationItem* gPFBAdvProbeExploreItem = nil;
-static __weak UIBarButtonItem* gPFBAdvProbeExploreButton = nil;
-
-static BOOL pfbAdvProbeItemHolds(UINavigationItem* item, UIBarButtonItem* button) {
-    if ([item.rightBarButtonItems indexOfObjectIdenticalTo:button] != NSNotFound) {
-        return YES;
-    }
-    if (@available(iOS 16.0, *)) {
-        for (UIBarButtonItemGroup* group in item.trailingItemGroups) {
-            if ([group.barButtonItems indexOfObjectIdenticalTo:button] != NSNotFound) {
-                return YES;
-            }
-        }
-        return [item.pinnedTrailingGroup.barButtonItems indexOfObjectIdenticalTo:button] != NSNotFound;
-    }
-    return NO;
-}
-
-static void pfbAdvProbeWatchExplore(UINavigationItem* item, UIBarButtonItem* button) {
-    if (!PFBProbeWants(@"11#F034 re-set")) {
-        return;
-    }
-    gPFBAdvProbeExploreItem = item;
-    gPFBAdvProbeExploreButton = button;
-    gPFBAdvProbeExploreWatched = YES;
-}
-
-// Probe: after a setter on Explore's item with the option on, whether the button is gone,
-// and how many of the new items are the tweak's Filters replacement (11#F034).
-static void pfbAdvProbeExploreItemSet(UINavigationItem* item, NSString* setter) {
-    if (!gPFBAdvProbeExploreWatched) {
-        return;
-    }
-    UIBarButtonItem* button = gPFBAdvProbeExploreButton;
-    if (item != gPFBAdvProbeExploreItem || !button || ![PFBSettings boolForKey:@"advanced_search"] ||
-        pfbAdvProbeItemHolds(item, button)) {
-        return;
-    }
-    gPFBAdvProbeExploreWatched = NO;
-    if (!PFBProbeWants(@"11#F034 re-set")) {
-        return;
-    }
-    NSArray<UIBarButtonItem*>* right = item.rightBarButtonItems ?: @[];
-    NSUInteger replacements = 0;
-    for (UIBarButtonItem* entry in right) {
-        if (objc_getAssociatedObject(entry, kPFBAdvReplacedKey)) {
-            replacements++;
-        }
-    }
-    PFBProbeNote(@"11#F034 re-set",
-                 @"11#F034 advanced search: Explore's bar items re-set without the button by %@ (%lu right items, %lu of them the tweak's Filters replacement)",
-                 setter, (unsigned long)right.count, (unsigned long)replacements);
-}
-
-// Probe: at each later appearance of Explore, whether its button is still on the bar; noted
-// at the first check, at the twentieth, and the first time it is missing (11#F034).
-static void pfbAdvProbeExploreButton(UINavigationItem* item, UIBarButtonItem* button) {
-    if (!PFBDebugIsRecording()) {
-        return;
-    }
-    pfbAdvProbeWatchExplore(item, button);
-    NSUInteger appearance = PFBProbeCount(@"11#F034 appearances");
-    BOOL inBar = pfbAdvProbeItemHolds(item, button);
-    NSString* key = !inBar ? @"11#F034 missing" : (appearance >= 20 ? @"11#F034 still in later" : @"11#F034 still in");
-    if (!PFBProbeWants(key)) {
-        return;
-    }
-    PFBProbeNote(key, @"11#F034 advanced search: Explore's button is %@ its bar at appearance %lu after the first (%lu right items)",
-                 inBar ? @"still in" : @"missing from", (unsigned long)appearance,
-                 (unsigned long)item.rightBarButtonItems.count);
-}
-
-// Probe: the advanced search form's text room, read a moment after Explore appears
-// (PFBAdvancedSearchViewController.m, 11#F028).
-extern void pfbAdvProbeTextRoom(void);
-
 %hook UINavigationItem
 
 - (void)setRightBarButtonItems:(NSArray<UIBarButtonItem*>*)items {
     %orig;
     pfbAdvRescanItemSoon(self);
-    pfbAdvProbeExploreItemSet(self, @"setRightBarButtonItems:");
 }
 
 - (void)setRightBarButtonItems:(NSArray<UIBarButtonItem*>*)items animated:(BOOL)animated {
     %orig;
     pfbAdvRescanItemSoon(self);
-    pfbAdvProbeExploreItemSet(self, @"setRightBarButtonItems:animated:");
 }
 
 - (void)setTrailingItemGroups:(NSArray<UIBarButtonItemGroup*>*)groups {
     %orig;
     pfbAdvRescanItemSoon(self);
-    pfbAdvProbeExploreItemSet(self, @"setTrailingItemGroups:");
 }
 
 - (void)setPinnedTrailingGroup:(UIBarButtonItemGroup*)group {
     %orig;
     pfbAdvRescanItemSoon(self);
-    pfbAdvProbeExploreItemSet(self, @"setPinnedTrailingGroup:");
 }
 
 %end
@@ -867,7 +564,6 @@ extern void pfbAdvProbeTextRoom(void);
 - (void)viewWillAppear:(BOOL)animated {
     %orig;
     @try {
-        pfbAdvProbeTextRoom();
         BOOL enabled = [PFBSettings boolForKey:@"advanced_search"];
         UIBarButtonItem* existingBtn =
             objc_getAssociatedObject(self, kPFBAdvSearchBtnKey);
@@ -892,7 +588,6 @@ extern void pfbAdvProbeTextRoom(void);
         PFBCOMPAT_ACTION(PFBCompat_advanced_search, @"Advanced search button in Explore");
         UIColor* grey = PFBBarIconGrey(((UIViewController*)self).traitCollection);
         if (existingBtn) {
-            pfbAdvProbeExploreButton(item, existingBtn);
             // A light/dark switch or a theme change resolves to another gray;
             // the glyph carries its color, so it is redrawn rather than
             // re-tinted.
@@ -929,7 +624,6 @@ extern void pfbAdvProbeTextRoom(void);
         item.rightBarButtonItems = [existing arrayByAddingObject:btn];
         objc_setAssociatedObject(self, kPFBAdvSearchBtnKey, btn,
                                  OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-        pfbAdvProbeWatchExplore(item, btn);
     } @catch (id e) {
     }
 }

@@ -622,6 +622,8 @@ static void PFBMigrateLegacyKeys(void) {
     PFBMigrateLegacyKeys();
     [self migrateUndoTweetToggle];
     [self migrateExploreTrendsSplit];
+    // Notes left by the measurement build; nothing reads them any more.
+    [[NSUserDefaults standardUserDefaults] removeObjectForKey:@"pfb_probe"];
 
     NSUserDefaults* defaults = [NSUserDefaults standardUserDefaults];
     if ([defaults boolForKey:@"pfb_key_migration_v1_done"]) {

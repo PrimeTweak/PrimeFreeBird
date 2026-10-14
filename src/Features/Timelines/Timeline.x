@@ -3,11 +3,9 @@
 // filter and poll results before voting.
 
 #import <QuartzCore/QuartzCore.h>
-#import <mach/mach_time.h>
 
 #import "Support/HookHelpers.h"
 #import "Debug/PFBDebugger.h"
-#import "Debug/PFBProbe.h"
 
 // MARK: - Hide custom timelines
 
@@ -477,6 +475,8 @@ static long long ItemInReplyToUserID(id viewModel) {
 // (0 unknown, 1 yes, 2 no).
 static const NSInteger kFollowedByCurrentAccountStateFollowing = 1;
 
+static BOOL PFBAuthorIsFollowed(id viewModel);
+
 static BOOL PFBShouldHideVerifiedItem(id viewModel, BOOL inConversation,
                                      long long conversationRootUserID,
                                      NSSet<NSNumber*>* authorRepliedToUserIDs) {
@@ -514,13 +514,8 @@ static BOOL PFBShouldHideVerifiedItem(id viewModel, BOOL inConversation,
         return NO;
     }
 
-    SEL followStateSelector = @selector(representedFromUserFollowedByCurrentAccountState);
-    if ([viewModel respondsToSelector:followStateSelector]) {
-        NSInteger followState =
-            ((NSInteger (*)(id, SEL))objc_msgSend)(viewModel, followStateSelector);
-        if (followState == kFollowedByCurrentAccountStateFollowing) {
-            return NO;
-        }
+    if (PFBAuthorIsFollowed(viewModel)) {
+        return NO;
     }
 
     return YES;
@@ -637,11 +632,8 @@ static id PFBTimelineObject(id object, NSString* name) {
 // then on its status/tweet child.
 static NSString* PFBStringFromSelectors(id object, BOOL descend) {
     if (!object) { return nil; }
-    SEL textSels[] = { @selector(fullText), @selector(tweetText), @selector(text),
-                       @selector(displayText), @selector(bodyText) };
-    for (size_t i = 0; i < sizeof(textSels) / sizeof(textSels[0]); i++) {
-        if (![object respondsToSelector:textSels[i]]) { continue; }
-        id value = ((id (*)(id, SEL))objc_msgSend)(object, textSels[i]);
+    for (NSString* name in @[ @"fullText", @"tweetText", @"text", @"displayText", @"bodyText" ]) {
+        id value = PFBTimelineObject(object, name);
         if ([value isKindOfClass:[NSString class]] && ((NSString*)value).length) {
             return (NSString*)value;
         }
@@ -651,11 +643,8 @@ static NSString* PFBStringFromSelectors(id object, BOOL descend) {
         }
     }
     if (!descend) { return nil; }
-    SEL childSels[] = { @selector(status), @selector(tweet) };
-    for (size_t i = 0; i < sizeof(childSels) / sizeof(childSels[0]); i++) {
-        if (![object respondsToSelector:childSels[i]]) { continue; }
-        id child = ((id (*)(id, SEL))objc_msgSend)(object, childSels[i]);
-        NSString* text = PFBStringFromSelectors(child, NO);
+    for (NSString* name in @[ @"status", @"tweet" ]) {
+        NSString* text = PFBStringFromSelectors(PFBTimelineObject(object, name), NO);
         if (text.length) { return text; }
     }
     return nil;
@@ -841,71 +830,6 @@ static BOOL PFBRetweetAuthorBlocksAccount(id viewModel, BOOL* checked) {
     return value == 1;
 }
 
-// Probe 09#F058-F061: what the list filter costs during the first full tour that runs to its end
-// and reaches search, noted then; the memo's flushes and misses are counted while a pass is timed,
-// and a pass that notes a probe line is counted, not timed.
-static int gPFBProbeFilterState;   // 0 not read yet, 1 open, 2 closed
-static BOOL gPFBProbeFilterTiming;
-static BOOL gPFBProbeFilterNoted;
-static struct {
-    NSUInteger calls, slow, search, items, itemsMax, flushes, misses;
-    uint64_t start, setup, setupLongest, loop, longest, searchTicks, searchLongest;
-} gPFBProbeFilter;
-
-static void pfbProbeMemoFlush(void) {
-    if (gPFBProbeFilterTiming) {
-        gPFBProbeFilter.flushes++;
-    }
-}
-
-static void pfbProbeMemoMiss(void) {
-    if (gPFBProbeFilterTiming) {
-        gPFBProbeFilter.misses++;
-    }
-}
-
-// Probe: an entry ID up to its first digit, the kind of entry it names.
-static NSString* pfbProbeEntryKind(NSString* entryID) {
-    if (!entryID.length) {
-        return @"none";
-    }
-    NSRange digit = [entryID rangeOfCharacterFromSet:NSCharacterSet.decimalDigitCharacterSet];
-    NSUInteger end = MIN(digit.location == NSNotFound ? entryID.length : digit.location, (NSUInteger)40);
-    return end ? [entryID substringToIndex:end] : @"digits only";
-}
-
-// Probe 14a#F018: the carousels a profile list carries, by component and entry kind, whatever
-// Hide who to follow says; at most 8 kinds.
-static BOOL gPFBProbeCarouselDone;
-static NSUInteger gPFBProbeCarouselLooks;
-static NSUInteger gPFBProbeCarouselNoted;
-
-static void pfbProbeProfileCarousel(id viewModel, NSString* className, BOOL inProfile, BOOL hideWhoToFollow) {
-    if (gPFBProbeCarouselDone) {
-        return;
-    }
-    if (!PFBDebugIsRecording()) {
-        gPFBProbeCarouselDone = YES;
-        return;
-    }
-    if (!inProfile || ![className isEqualToString:@"T1TwitterSwift.URTTimelineCarouselViewModel"]) {
-        return;
-    }
-    if (gPFBProbeCarouselNoted >= 8 || ++gPFBProbeCarouselLooks > 200) {
-        gPFBProbeCarouselDone = YES;
-        return;
-    }
-    NSString* component = ItemScribeComponent(viewModel) ?: @"none";
-    NSString* entry = pfbProbeEntryKind(ItemEntryID(viewModel));
-    NSString* key = [NSString stringWithFormat:@"14a#F018 %@ %@", component, entry];
-    if (PFBProbeWants(key)) {
-        gPFBProbeCarouselNoted++;
-        gPFBProbeFilterNoted = YES;
-        PFBProbeNote(key, @"14a#F018 profile carousel: component %@ · entry %@ · hide_who_to_follow %@",
-                     component, entry, hideWhoToFollow ? @"on" : @"off");
-    }
-}
-
 static BOOL ShouldHideTimelineItem(id item, BOOL hideWhoToFollow, BOOL hidePrompts,
                                    BOOL hideTopics, BOOL hideTopicsToFollow,
                                    BOOL hideVerified, BOOL hideBlockedRetweets,
@@ -922,8 +846,11 @@ static BOOL ShouldHideTimelineItem(id item, BOOL hideWhoToFollow, BOOL hidePromp
         return YES;
     }
 
-    // Reached with or without a muted word: the filter's path, proven either way.
-    PFBCOMPAT_OBSERVE(PFBCompat_muted_words, @"timeline filter reached");
+    // Proven once a Tweet's text and author are read, with or without a muted word.
+    if (PFBCompatNeedsObservation(PFBCompat_muted_words) && PFBStringFromSelectors(viewModel, YES).length &&
+        PFBHandleFromSelectors(viewModel, YES).length) {
+        PFBCOMPAT_OBSERVE(PFBCompat_muted_words, @"Tweet text and author read");
+    }
     if ((gPFBMutedWords.count || gPFBMutedHandles.count) &&
         (!inConversation || gPFBMutedInConversations) && PFBItemIsMuted(viewModel)) {
         PFBNoteMutedHidden();
@@ -984,8 +911,6 @@ static BOOL ShouldHideTimelineItem(id item, BOOL hideWhoToFollow, BOOL hidePromp
         return YES;
     }
 
-    // Probe: notes a profile carousel reaching this test, for 14a#F018.
-    pfbProbeProfileCarousel(viewModel, className, inProfile, hideWhoToFollow);
     if (hideWhoToFollow && inProfile &&
         [className isEqualToString:@"T1TwitterSwift.URTTimelineCarouselViewModel"]) {
         PFBCOMPAT_ACTION(PFBCompat_hide_who_to_follow, @"profile suggestions hidden");
@@ -1040,8 +965,6 @@ static BOOL MemoizedShouldHideTimelineItem(id item, BOOL hideWhoToFollow, BOOL h
     if (flags != cachedFlags || conversationRootUserID != cachedRootUserID ||
         repliedSetChanged || gPFBMutedSignature != cachedMutedSignature) {
         [cache removeAllObjects];
-        // Probe: counts the flush for 09#F059.
-        pfbProbeMemoFlush();
         cachedMutedSignature = gPFBMutedSignature;
         cachedFlags = flags;
         cachedRootUserID = conversationRootUserID;
@@ -1050,8 +973,6 @@ static BOOL MemoizedShouldHideTimelineItem(id item, BOOL hideWhoToFollow, BOOL h
 
     NSString* entryID = ItemEntryID(PFBUnwrapDataViewItem(item));
     if (!entryID) {
-        // Probe: counts the item judged without the memo, for 09#F058.
-        pfbProbeMemoMiss();
         return ShouldHideTimelineItem(item, hideWhoToFollow, hidePrompts, hideTopics,
                                       hideTopicsToFollow, hideVerified, hideBlockedRetweets, inConversation, inProfile,
                                       conversationRootUserID, authorRepliedToUserIDs);
@@ -1062,8 +983,6 @@ static BOOL MemoizedShouldHideTimelineItem(id item, BOOL hideWhoToFollow, BOOL h
         return cached.boolValue;
     }
 
-    // Probe: counts the miss for 09#F058.
-    pfbProbeMemoMiss();
     BOOL hide = ShouldHideTimelineItem(item, hideWhoToFollow, hidePrompts, hideTopics,
                                        hideTopicsToFollow, hideVerified, hideBlockedRetweets, inConversation, inProfile,
                                        conversationRootUserID, authorRepliedToUserIDs);
@@ -1643,13 +1562,10 @@ static void PFBReadingTrack(TFNItemsDataViewController* dataViewController) {
 static NSString* const kPFBLanguagesKey = @"pfb_filter_languages";
 
 static id PFBStatusForItem(id item) {
-    SEL reach[] = { @selector(status), @selector(tweet) };
-    for (NSUInteger index = 0; index < sizeof(reach) / sizeof(reach[0]); index++) {
-        if ([item respondsToSelector:reach[index]]) {
-            id value = ((id (*)(id, SEL))objc_msgSend)(item, reach[index]);
-            if (value) {
-                return value;
-            }
+    for (NSString* name in @[ @"status", @"tweet" ]) {
+        id value = PFBTimelineObject(item, name);
+        if (value) {
+            return value;
         }
     }
     return item;
@@ -1668,7 +1584,7 @@ static BOOL PFBItemLanguageAllowed(id item, NSSet<NSString*>* kept) {
     if (!kept.count) {
         return YES;
     }
-    NSString* language = PFBItemLanguage(item).lowercaseString;
+    NSString* language = PFBItemLanguage(PFBUnwrapDataViewItem(item)).lowercaseString;
     // Codes that name no language always pass: undetermined, no linguistic content, and
     // Twitter's tags for Tweets of media, hashtags, cashtags, mentions or very short text.
     static NSSet<NSString*>* languageless;
@@ -1717,121 +1633,8 @@ static BOOL PFBTimelineFiltersNeedObservation(void) {
            PFBCompatNeedsObservation(PFBCompat_filter_languages);
 }
 
-// Probe: milliseconds from mach_absolute_time ticks.
-static double pfbProbeMs(uint64_t ticks) {
-    static mach_timebase_info_data_t timebase;
-    if (!timebase.denom) {
-        mach_timebase_info(&timebase);
-    }
-    return (double)ticks * (double)timebase.numer / (double)timebase.denom / 1e6;
-}
-
-// Probe: a tour stopped early, not full or that never reached search leaves the line to the next tour.
-static void pfbProbeFilterTourEnded(void) {
-    if (gPFBProbeFilterState != 1 || !gPFBProbeFilter.start) {
-        return;
-    }
-    if (![PFBCompatTourLastRun() hasPrefix:@"Full tour"]) {
-        memset(&gPFBProbeFilter, 0, sizeof(gPFBProbeFilter));
-        return;
-    }
-    if (!gPFBProbeFilter.search) {
-        if (PFBProbeWants(@"09#F058 no search")) {
-            PFBProbeNote(@"09#F058 no search",
-                         @"09#F058 list filter: a tour ended with no pass in search, its %lu passes left out",
-                         (unsigned long)gPFBProbeFilter.calls);
-        }
-        memset(&gPFBProbeFilter, 0, sizeof(gPFBProbeFilter));
-        return;
-    }
-    gPFBProbeFilterState = 2;
-    double tour = pfbProbeMs(mach_absolute_time() - gPFBProbeFilter.start) / 1000.0;
-    double percentPerMs = tour > 0 ? 1.0 / (tour * 10.0) : 0.0;
-    double setup = pfbProbeMs(gPFBProbeFilter.setup);
-    double loop = pfbProbeMs(gPFBProbeFilter.loop);
-    double search = pfbProbeMs(gPFBProbeFilter.searchTicks);
-    PFBProbeNote(@"09#F058 list filter",
-                 @"09#F058/F059/F060/F061 Timeline list filter during the tour (%.0f s): %lu calls, setup %.1f ms "
-                 @"(%.2f%%, longest %.2f ms), loop %.1f ms (%.2f%%), longest %.2f ms, over 4 ms %lu, in search %lu "
-                 @"(%.1f ms, %.2f%%, longest %.2f ms), items up to %lu, memo flushes %lu, misses %lu of %lu items",
-                 tour, (unsigned long)gPFBProbeFilter.calls, setup, setup * percentPerMs,
-                 pfbProbeMs(gPFBProbeFilter.setupLongest), loop, loop * percentPerMs,
-                 pfbProbeMs(gPFBProbeFilter.longest), (unsigned long)gPFBProbeFilter.slow,
-                 (unsigned long)gPFBProbeFilter.search, search, search * percentPerMs,
-                 pfbProbeMs(gPFBProbeFilter.searchLongest), (unsigned long)gPFBProbeFilter.itemsMax,
-                 (unsigned long)gPFBProbeFilter.flushes, (unsigned long)gPFBProbeFilter.misses,
-                 (unsigned long)gPFBProbeFilter.items);
-}
-
-static uint64_t pfbProbeFilterClock(void) {
-    if (gPFBProbeFilterState == 2) {
-        return 0;
-    }
-    if (gPFBProbeFilterState == 0) {
-        if (!PFBProbeWants(@"09#F058 list filter")) {
-            gPFBProbeFilterState = 2;
-            return 0;
-        }
-        gPFBProbeFilterState = 1;
-        [[NSNotificationCenter defaultCenter] addObserverForName:PFBProbeTourEndedNotification
-                                                          object:nil
-                                                           queue:nil
-                                                      usingBlock:^(__unused NSNotification* note) {
-                                                        pfbProbeFilterTourEnded();
-                                                      }];
-    }
-    if (!PFBCompatTourIsRunning() || !NSThread.isMainThread) {
-        return 0;
-    }
-    if (!gPFBProbeFilter.start) {
-        gPFBProbeFilter.start = mach_absolute_time();
-    }
-    gPFBProbeFilterTiming = YES;
-    gPFBProbeFilterNoted = NO;
-    return mach_absolute_time();
-}
-
-static uint64_t pfbProbeFilterLoopClock(uint64_t start) {
-    return start ? mach_absolute_time() : 0;
-}
-
-static void pfbProbeFilterPass(uint64_t start, uint64_t loopStart, NSArray* sections, BOOL inSearch) {
-    if (!start) {
-        return;
-    }
-    uint64_t end = mach_absolute_time();
-    gPFBProbeFilterTiming = NO;
-    gPFBProbeFilter.calls++;
-    if (inSearch) {
-        gPFBProbeFilter.search++;
-    }
-    if (loopStart) {
-        NSUInteger items = PFBReadingItemCount(sections);
-        gPFBProbeFilter.items += items;
-        gPFBProbeFilter.itemsMax = MAX(gPFBProbeFilter.itemsMax, items);
-    }
-    if (gPFBProbeFilterNoted) {
-        return;
-    }
-    uint64_t total = end - start;
-    uint64_t setup = (loopStart ? loopStart : end) - start;
-    gPFBProbeFilter.setup += setup;
-    gPFBProbeFilter.setupLongest = MAX(gPFBProbeFilter.setupLongest, setup);
-    gPFBProbeFilter.loop += loopStart ? end - loopStart : 0;
-    gPFBProbeFilter.longest = MAX(gPFBProbeFilter.longest, total);
-    if (pfbProbeMs(total) > 4.0) {
-        gPFBProbeFilter.slow++;
-    }
-    if (inSearch) {
-        gPFBProbeFilter.searchTicks += total;
-        gPFBProbeFilter.searchLongest = MAX(gPFBProbeFilter.searchLongest, total);
-    }
-}
-
 static NSArray* FilteredTimelineSections(TFNItemsDataViewController* dataViewController,
                                          NSArray* sections) {
-    // Probe: times the setup and the loop of this pass apart, for 09#F058-F061.
-    uint64_t probeStart = pfbProbeFilterClock();
     BOOL hideWhoToFollow = [PFBSettings boolForKey:@"hide_who_to_follow"];
     BOOL hidePrompts = [PFBSettings boolForKey:@"hide_timeline_prompts"];
     BOOL hideTopics = [PFBSettings boolForKey:@"hide_topics"];
@@ -1860,7 +1663,6 @@ static NSArray* FilteredTimelineSections(TFNItemsDataViewController* dataViewCon
         !hideVerified && !hideBlockedRetweets && !inConversation && !keptLanguages.count &&
         !hasHiddenThreads && !inSearch &&
         !PFBTimelineFiltersNeedObservation()) {
-        pfbProbeFilterPass(probeStart, 0, sections, inSearch);
         return sections;
     }
 
@@ -1876,7 +1678,6 @@ static NSArray* FilteredTimelineSections(TFNItemsDataViewController* dataViewCon
     BOOL modified = NO;
     NSMutableArray* filteredSections = [NSMutableArray arrayWithCapacity:sections.count];
 
-    uint64_t probeLoop = pfbProbeFilterLoopClock(probeStart);
     for (id section in sections) {
         if (![section isKindOfClass:[NSArray class]]) {
             [filteredSections addObject:section];
@@ -1917,7 +1718,6 @@ static NSArray* FilteredTimelineSections(TFNItemsDataViewController* dataViewCon
         }
     }
 
-    pfbProbeFilterPass(probeStart, probeLoop, sections, inSearch);
     return modified ? [filteredSections copy] : sections;
 }
 
@@ -1956,68 +1756,11 @@ void pfbReapplyTimelineFilter(void) {
     }
 }
 
-// Probe 09#F049: the head a Following delivery brings against the list's own, as the reading
-// marker compares them, whatever reading_line says; once per kind of pair, at most 8.
-static BOOL gPFBProbeHeadsDone;
-static NSUInteger gPFBProbeHeadsCalls;
-static NSUInteger gPFBProbeHeadsNoted;
-
-// Probe: the first item with an entry ID, as PFBReadingFirstEntryID finds it.
-static id pfbProbeFirstEntryItem(NSArray* sections) {
-    for (id section in sections) {
-        if (![section isKindOfClass:[NSArray class]]) {
-            continue;
-        }
-        for (id item in (NSArray*)section) {
-            if (ItemEntryID(item).length) {
-                return item;
-            }
-        }
-    }
-    return nil;
-}
-
-static void pfbProbeFollowingHeads(TFNItemsDataViewController* dataViewController, NSArray* incoming) {
-    if (gPFBProbeHeadsDone) {
-        return;
-    }
-    if (!PFBDebugIsRecording() || gPFBProbeHeadsNoted >= 8 || ++gPFBProbeHeadsCalls > 20000) {
-        gPFBProbeHeadsDone = YES;
-        return;
-    }
-    if (!NSThread.isMainThread || !PFBReadingIsFollowingTab(dataViewController) ||
-        !PFBReadingIsHomeTimeline(dataViewController)) {
-        return;
-    }
-    id incomingItem = pfbProbeFirstEntryItem(incoming);
-    id listItem = pfbProbeFirstEntryItem(dataViewController.sections);
-    NSString* incomingHead = ItemEntryID(incomingItem);
-    NSString* listHead = ItemEntryID(listItem);
-    NSString* heads = @"differ";
-    if (!incomingHead.length || !listHead.length) {
-        heads = @"one missing";
-    } else if ([incomingHead isEqualToString:listHead]) {
-        heads = @"equal";
-    }
-    NSString* pair = [NSString stringWithFormat:@"incoming head %@ (%@), list head %@ (%@), heads %@",
-                                                pfbProbeEntryKind(incomingHead),
-                                                PFBProbeClassName(PFBUnwrapDataViewItem(incomingItem)),
-                                                pfbProbeEntryKind(listHead),
-                                                PFBProbeClassName(PFBUnwrapDataViewItem(listItem)), heads];
-    NSString* key = [@"09#F049 " stringByAppendingString:pair];
-    if (PFBProbeWants(key)) {
-        gPFBProbeHeadsNoted++;
-        PFBProbeNote(key, @"09#F049 Following delivery: %@", pair);
-    }
-}
-
 %hook TFNItemsDataViewController
 
 - (void)setSections:(NSArray*)sections restoreScrollPosition:(BOOL)restoreScrollPosition {
     BOOL keepPlace = restoreScrollPosition;
     NSArray* filtered = FilteredTimelineSections(self, sections);
-    // Probe: compares the delivery's head with the list's, for 09#F049.
-    pfbProbeFollowingHeads(self, filtered);
     if (PFBReadingIsHomeTimeline(self)) {
         // Every home controller is tracked, the algorithmic tab included: tracking is pure
         // registration, and each reading action gates itself on MarkerAllowed.
@@ -2044,8 +1787,6 @@ static void pfbProbeFollowingHeads(TFNItemsDataViewController* dataViewControlle
               withRowAnimation:(long long)animation
                     completion:(id)completion {
     NSArray* filtered = FilteredTimelineSections(self, sections);
-    // Probe: compares the delivery's head with the list's, for 09#F049.
-    pfbProbeFollowingHeads(self, filtered);
     if (PFBReadingMarkerAllowed(self)) {
         PFBReadingCaptureAnchor(self, filtered);
     }

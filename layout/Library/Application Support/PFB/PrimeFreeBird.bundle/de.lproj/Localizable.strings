@@ -5,26 +5,26 @@
 
 /* ===== GENERAL — page ===== */
 "MODERN_SETTINGS_LAYOUT_TITLE" = "Allgemein";
-"MODERN_SETTINGS_LAYOUT_SUBTITLE" = "Sperre die App, halte die Navigationsleiste sichtbar und mehr.";
+"MODERN_SETTINGS_LAYOUT_SUBTITLE" = "Sperre die App, steuere Links und passe an, wie sich Twitter verhält.";
 
 /* ===== General › Privacy ===== */
 "PADLOCK_TITLE" = "Twitter sperren";
 "PADLOCK_DETAIL" = "Face ID oder einen Code verlangen, um Twitter zu öffnen.";
 
 /* ===== General › App behavior ===== */
-"NO_TAB_BAR_HIDING_TITLE" = "Navigationsleiste sichtbar lassen";
+"NO_TAB_BAR_HIDING_TITLE" = "Feste Navigationsleiste";
 "NO_TAB_BAR_HIDING_DETAIL" = "Navigationsleiste beim Scrollen nicht ausblenden.";
-"SHOW_SCROLL_INDICATOR_TITLE" = "Scrollleiste anzeigen";
+"SHOW_SCROLL_INDICATOR_TITLE" = "Scrollleiste";
 "DISABLE_RTL_TITLE" = "Text von links nach rechts";
 "DISABLE_RTL_DETAIL" = "Zeigt Text von links nach rechts an, selbst in Sprachen, die von rechts nach links gelesen werden.";
-"HIDE_PREMIUM_OFFER_TITLE" = "Keine Twitter-Blue-Hinweise";
+"HIDE_PREMIUM_OFFER_TITLE" = "Twitter-Blue-Hinweise ausblenden";
 "HIDE_PREMIUM_OFFER_DETAIL" = "Entferne die Buttons „Lass dich verifizieren“ und „Upgrade“.";
 
 /* ===== General › Links ===== */
 "SHARING_DOMAIN_TITLE" = "Domain zum Teilen";
-"ALWAYS_OPEN_SAFARI_TITLE" = "Externen Browser verwenden";
+"ALWAYS_OPEN_SAFARI_TITLE" = "Externer Browser";
 "ALWAYS_OPEN_SAFARI_DETAIL" = "Links in Safari oder deinem Standardbrowser öffnen.";
-"NEW_INAPP_WEBVIEW_TITLE" = "Verbesserter In-App-Browser (Beta)";
+"NEW_INAPP_WEBVIEW_TITLE" = "Neuer In-App-Browser";
 "NEW_INAPP_WEBVIEW_DETAIL" = "Verwende Twitters neuen In-App-Browser zum Öffnen von Links.";
 
 /* ===== APPEARANCE — page ===== */
@@ -32,50 +32,50 @@
 "MODERN_SETTINGS_APPEARANCE_SUBTITLE" = "Oberflächenstil, Farben und Schriftarten.";
 
 /* ===== Appearance › Interface ===== */
-"CUSTOM_TAB_BAR_OPTION_TITLE" = "Navigationsleiste bearbeiten";
-"RESTORE_TAB_LABELS_TITLE" = "Navigationsbeschriftungen";
-"RESTORE_TAB_LABELS_DETAIL" = "Zeigt Beschriftungen unter Symbolen wie im alten Twitter an.";
+"CUSTOM_TAB_BAR_OPTION_TITLE" = "Navigationsleiste";
+"RESTORE_TAB_LABELS_TITLE" = "Tab-Beschriftungen";
+"RESTORE_TAB_LABELS_DETAIL" = "Zeigt Beschriftungen unter den Symbolen der Navigationsleiste an.";
 "CUSTOM_FONTS_TITLE" = "Benutzerdefinierte Schriftarten";
-"CUSTOM_FONTS_DETAIL" = "Wähle eine benutzerdefinierte Schriftart für Twitter.";
-"REGULAR_FONTS_PICKER_OPTION_TITLE" = "Eine Schriftart wählen";
-"BOLD_FONTS_PICKER_OPTION_TITLE" = "Eine fette Schriftart wählen";
+"CUSTOM_FONTS_DETAIL" = "Verwendet eine benutzerdefinierte Schriftart in ganz Twitter.";
+"REGULAR_FONTS_PICKER_OPTION_TITLE" = "Normale Schriftart";
+"BOLD_FONTS_PICKER_OPTION_TITLE" = "Fette Schriftart";
 "FONT_SYSTEM_DEFAULT_SUBTITLE" = "Standard";
 
 /* ===== Appearance › Colors ===== */
-"THEME_OPTION_TITLE" = "Theme ändern";
+"THEME_OPTION_TITLE" = "Designfarbe";
 "TAB_BAR_THEMING_TITLE" = "Ausgewählter Tab";
-"TAB_BAR_THEMING_DETAIL" = "Wendet deine Akzentfarbe auf das gewählte Navigationselement an.";
-"COLOR_TWITTER_ICON_IN_TOP_BAR_TITLE" = "Twitter-Symbol einfärben";
+"TAB_BAR_THEMING_DETAIL" = "Wendet die Akzentfarbe auf den ausgewählten Tab und die Unterstreichung der oberen Tabs an.";
+"COLOR_TWITTER_ICON_IN_TOP_BAR_TITLE" = "Twitter-Symbol";
 "COLOR_TWITTER_ICON_IN_TOP_BAR_DETAIL" = "Wendet die Akzentfarbe auf das Twitter-Symbol in der oberen Leiste an.";
 
 /* ===== BRANDING ===== */
 "MODERN_SETTINGS_BRANDING_TITLE" = "Branding";
-"MODERN_SETTINGS_BRANDING_SUBTITLE" = "Lege fest, wie viel vom Twitter-Branding wiederhergestellt wird.";
-"APP_ICON_TITLE" = "App-Symbol ändern";
+"MODERN_SETTINGS_BRANDING_SUBTITLE" = "Hol den Vogel, den Tweet-Button und die Twitter-Begriffe zurück.";
+"APP_ICON_TITLE" = "App-Symbol";
 "RESTORE_TWITTER_NAMES_TITLE" = "Twitter-Terminologie wiederherstellen";
-"RESTORE_TWITTER_NAMES_DETAIL" = "Ersetzt „X“ durch „Twitter“, „Post“ durch „Tweet“, „Repost“ durch „Retweet“ und so weiter in der gesamten App-Oberfläche.";
-"REFRESH_PILL_LABEL_TITLE" = "Beschriftung zur Aktualisierungspille hinzufügen";
-"REFRESH_PILL_LABEL_DETAIL" = "Fügt der Aktualisierungspille wieder die Beschriftung hinzu, wenn jemand tweetet.";
+"RESTORE_TWITTER_NAMES_DETAIL" = "Holt den Vogel zurück und ersetzt „X“ durch „Twitter“, „Post“ durch „Tweet“ und so weiter.";
+"REFRESH_PILL_LABEL_TITLE" = "Beschriftung der Aktualisierungspille";
+"REFRESH_PILL_LABEL_DETAIL" = "Fügt der Pille für neue Tweets wieder „Post gesendet“ hinzu.";
 
 /* ===== TIMELINES ===== */
 "MODERN_SETTINGS_TIMELINES_TITLE" = "Timelines";
-"MODERN_SETTINGS_TIMELINES_SUBTITLE" = "Entferne Werbung, Folgen-Vorschläge und anderes Überflüssiges aus der Timeline.";
-"HIDE_PROMOTED_TITLE" = "Keine Werbung";
-"HIDE_PROMOTED_DETAIL" = "Alle Werbeanzeigen entfernen.";
-"HIDE_WHO_TO_FOLLOW_TITLE" = "Keine „Wem folgen?“";
+"MODERN_SETTINGS_TIMELINES_SUBTITLE" = "Entferne Werbung, Vorschläge und Hinweise aus deiner Timeline.";
+"HIDE_PROMOTED_TITLE" = "Werbung ausblenden";
+"HIDE_PROMOTED_DETAIL" = "Entfernt gesponserte Tweets und Trends sowie Videowerbung.";
+"HIDE_WHO_TO_FOLLOW_TITLE" = "„Wem folgen?“ ausblenden";
 "HIDE_WHO_TO_FOLLOW_DETAIL" = "Folge-Empfehlungen entfernen.";
-"HIDE_TIMELINE_PROMPTS_TITLE" = "Keine Timeline-Hinweise";
+"HIDE_TIMELINE_PROMPTS_TITLE" = "Timeline-Hinweise ausblenden";
 "HIDE_TIMELINE_PROMPTS_DETAIL" = "Banner wie „Kontakte hinzufügen“ entfernen.";
 "HIDE_SPACES_TITLE" = "Spaces-Leiste ausblenden";
 "HIDE_CUSTOM_TIMELINES_TITLE" = "Benutzerdefinierte Timelines ausblenden";
-"HIDE_CUSTOM_TIMELINES_DETAIL" = "Entfernt die Hinzufügen-Schaltfläche aus den Timeline-Tabs der Startseite.";
+"HIDE_CUSTOM_TIMELINES_DETAIL" = "Entfernt angeheftete Listen und Communities sowie den Hinzufügen-Button aus den Tabs der Startseite.";
 
 /* ===== TWEETS ===== */
-"MODERN_SETTINGS_TWEETS_TITLE" = "Tweets und Antworten";
-"MODERN_SETTINGS_TWEETS_SUBTITLE" = "Ändere, wie Tweets funktionieren, und blende unnötige Funktionen aus.";
-"UNDO_TWEET_TITLE" = "Tweet zurücknehmen";
+"MODERN_SETTINGS_TWEETS_TITLE" = "Tweets";
+"MODERN_SETTINGS_TWEETS_SUBTITLE" = "Verfassen, Buttons und Anzeige der Antworten.";
+"UNDO_TWEET_TITLE" = "Tweet rückgängig machen";
 "TWEET_CONFIRM_TITLE" = "Tweets bestätigen";
-"TWEET_CONFIRM_DETAIL" = "Vor dem Posten eines Tweets nachfragen.";
+"TWEET_CONFIRM_DETAIL" = "Vor dem Senden eines Tweets nachfragen.";
 "LIKE_CONFIRM_TITLE" = "Likes bestätigen";
 "LIKE_CONFIRM_DETAIL" = "Vor dem Liken eines Tweets nachfragen.";
 "HIDE_VIEW_COUNT_TITLE" = "Aufrufe ausblenden";
@@ -84,70 +84,70 @@
 "HIDE_BOOKMARK_BUTTON_DETAIL" = "Entferne den Lesezeichen-Button aus Tweets.";
 "HIDE_DOWNVOTE_BUTTON_TITLE" = "Downvotes ausblenden";
 "HIDE_DOWNVOTE_BUTTON_DETAIL" = "Entferne den Downvote-Button aus Tweets.";
-"DISABLE_SENSITIVE_TWEET_WARNINGS_TITLE" = "Keine Warnungen wegen sensibler Inhalte";
+"DISABLE_SENSITIVE_TWEET_WARNINGS_TITLE" = "Warnungen vor sensiblen Inhalten ausblenden";
 "BYPASS_AGE_VERIFICATION_TITLE" = "Altersverifizierung umgehen";
 "BYPASS_AGE_VERIFICATION_DETAIL" = "Überspringt die Altersverifizierung für sensible Inhalte.";
 "REPLY_SORTING_TITLE" = "Chronologische Antworten";
 "REPLY_SORTING_DETAIL" = "Sortiert Antworten nach Datum statt nach Relevanz.";
 "RESTORE_REPLY_CONTEXT_TITLE" = "Antwortkontext wiederherstellen";
 "RESTORE_REPLY_CONTEXT_DETAIL" = "Zeigt über dem Text einer geöffneten Antwort an, auf wen geantwortet wurde.";
-"SHOW_QUOTE_COUNTS_TITLE" = "Quote and Retweet counts";
-"SHOW_QUOTE_COUNTS_DETAIL" = "Show both numbers at the top of a Tweet's Quotes screen.";
-"SHOW_ACCOUNT_LOCATION_TITLE" = "Account location";
-"SHOW_ACCOUNT_LOCATION_DETAIL" = "Show the country an account is based in next to the time of an opened Tweet.";
-"QUOTE_COUNTS_TITLE_FORMAT" = "Quotes: %@ · Retweets: %@";
+"SHOW_QUOTE_COUNTS_TITLE" = "Anzahl der Zitate und Retweets";
+"SHOW_QUOTE_COUNTS_DETAIL" = "Zeigt beide Zahlen oben im Zitate-Bildschirm eines Tweets.";
+"SHOW_ACCOUNT_LOCATION_TITLE" = "Standort des Accounts";
+"SHOW_ACCOUNT_LOCATION_DETAIL" = "Zeigt neben der Uhrzeit eines geöffneten Tweets das Land, in dem sich der Account befindet.";
+"QUOTE_COUNTS_TITLE_FORMAT" = "Zitate: %@ · Retweets: %@";
 
 /* ===== MEDIA ===== */
 "MODERN_SETTINGS_MEDIA_TITLE" = "Medien";
 "MODERN_SETTINGS_MEDIA_SUBTITLE" = "Downloads, Wiedergabe, Qualität und Layout.";
 "DOWNLOAD_VIDEOS_TITLE" = "Medien herunterladen";
-"DOWNLOAD_VIDEOS_DETAIL" = "Speichere Videos oder GIFs direkt aus Tweets.";
+"DOWNLOAD_VIDEOS_DETAIL" = "Speichert Videos und GIFs über das Menü bei langem Drücken auf Medien.";
 "DIRECT_SAVE_TITLE" = "In „Fotos“ speichern";
 "DIRECT_SAVE_DETAIL" = "Gespeicherte Videos werden direkt in deiner Fotos-App abgelegt.";
 "TWEET_TO_IMAGE_TITLE" = "Tweet als Bild speichern";
-"TWEET_TO_IMAGE_DETAIL" = "Halte die Teilen-Taste gedrückt, um Tweets als Bilder zu exportieren.";
-"DISABLE_VIDEO_CAPTIONS_TITLE" = "Keine Videountertitel";
+"TWEET_TO_IMAGE_DETAIL" = "Halte den Teilen-Button gedrückt, um Tweets als Bilder zu exportieren.";
+"DISABLE_VIDEO_CAPTIONS_TITLE" = "Videountertitel ausblenden";
 "AUTO_HIGHEST_LOAD_TITLE" = "Fotos in hoher Qualität";
 "AUTO_HIGHEST_LOAD_DETAIL" = "Fotos stets in höchster Auflösung laden.";
 "FORCE_TWEET_FULL_FRAME_TITLE" = "Bilder ohne Zuschnitt";
 "RESTORE_VIDEO_TIMESTAMP_TITLE" = "Video-Zeitanzeige";
 "RESTORE_VIDEO_TIMESTAMP_DETAIL" = "Zeigt bei Vollbild-Videos die verstrichene Zeit und die Gesamtdauer statt des Countdowns an.";
-"DISABLE_IMMERSIVE_SCROLL_TITLE" = "Kein Video-Feed-Scrollen";
+"DISABLE_IMMERSIVE_SCROLL_TITLE" = "Video-Autoscroll deaktivieren";
 
 /* ===== PROFILES ===== */
-"MODERN_SETTINGS_PROFILES_TITLE" = "Profil";
-"MODERN_SETTINGS_PROFILES_SUBTITLE" = "Passe an, was in Profilen angezeigt wird.";
+"MODERN_SETTINGS_PROFILES_TITLE" = "Profile";
+"MODERN_SETTINGS_PROFILES_SUBTITLE" = "Folgen-Buttons, Abzeichen und Profil-Tabs.";
 "FOLLOW_CONFIRM_TITLE" = "Folgen bestätigen";
 "FOLLOW_CONFIRM_DETAIL" = "Vor dem Folgen nachfragen.";
 "COPY_PROFILE_INFO_TITLE" = "Profildetails kopieren";
-"COPY_PROFILE_INFO_DETAIL" = "Fügt Profilen eine Kopieren-Schaltfläche hinzu.";
-"DISABLE_ARTICLES_TITLE" = "Kein Artikel-Tab";
+"COPY_PROFILE_INFO_DETAIL" = "Fügt Profilen einen Kopieren-Button hinzu.";
+"DISABLE_ARTICLES_TITLE" = "Artikel-Tab ausblenden";
 "DISABLE_ARTICLES_DETAIL" = "Blendet den Artikel-Tab in Profilen aus.";
-"DISABLE_HIGHLIGHTS_TITLE" = "Kein Highlights-Tab";
+"DISABLE_HIGHLIGHTS_TITLE" = "Highlights-Tab ausblenden";
 "DISABLE_HIGHLIGHTS_DETAIL" = "Blendet den Highlights-Tab in Profilen aus.";
 "HIDE_BLUE_VERIFIED_TITLE" = "Blue-Verifizierungsabzeichen ausblenden";
 "HIDE_BLUE_VERIFIED_DETAIL" = "Entfernt die Verifizierungsabzeichen von Twitter Blue; die Abzeichen von Marken- und Regierungskonten bleiben erhalten.";
-"HIDE_FOLLOW_BUTTON_TITLE" = "Keine Folgen-Schaltfläche bei Tweets";
-"HIDE_FOLLOW_BUTTON_DETAIL" = "Blendet die Folgen-Schaltfläche neben dem Autorennamen in Tweets aus, nicht aber die in Profilen.";
+"HIDE_FOLLOW_BUTTON_TITLE" = "Folgen-Button ausblenden";
+"HIDE_FOLLOW_BUTTON_DETAIL" = "Blendet den Folgen-Button neben dem Autorennamen in Tweets aus, nicht aber den in Profilen.";
 /* Legacy key name: this row HIDES the Subscribe button. Do not rename the
    key — it is persisted in user defaults. */
-"RESTORE_FOLLOW_BUTTON_TITLE" = "Keine Abonnieren-Schaltfläche";
-"RESTORE_FOLLOW_BUTTON_DETAIL" = "Blendet die Abonnieren-Schaltfläche in Tweets und Profilen aus.";
+"RESTORE_FOLLOW_BUTTON_TITLE" = "Abonnieren-Button ausblenden";
+"RESTORE_FOLLOW_BUTTON_DETAIL" = "Blendet den Abonnieren-Button in Tweets und Profilen aus.";
 "SQUARE_AVATARS_TITLE" = "Quadratische Profilbilder";
-"SQUARE_AVATARS_DETAIL" = "Zeigt für alle Nutzer quadratische Profilbilder wie bei Marken im alten Twitter.";
+"SQUARE_AVATARS_DETAIL" = "Zeigt Profilbilder als abgerundete Quadrate, wie im klassischen Twitter.";
 
 /* ===== SEARCH ===== */
-"MODERN_SETTINGS_SEARCH_TITLE" = "Suchen und Entdecken";
+"MODERN_SETTINGS_SEARCH_TITLE" = "Suche";
 "MODERN_SETTINGS_SEARCH_SUBTITLE" = "Suchverlauf, Trends und trendende Videos.";
-"NO_HISTORY_TITLE" = "Kein Suchverlauf";
+"NO_HISTORY_TITLE" = "Suchverlauf deaktivieren";
 "NO_HISTORY_DETAIL" = "Letzte Suchanfragen weder speichern noch anzeigen.";
-"HIDE_TREND_VIDEOS_TITLE" = "Keine trendenden Videos";
+"HIDE_TREND_VIDEOS_TITLE" = "Trendende Videos ausblenden";
 "HIDE_TREND_VIDEOS_DETAIL" = "Entferne die trendenden Videos aus dem Suchmenü.";
 
 /* ===== GROK ===== */
-"HIDE_GROK_ANALYZE_TITLE" = "Grok-Analyse-Schaltfläche ausblenden";
+"HIDE_GROK_ANALYZE_TITLE" = "Analyse-Button ausblenden";
 "HIDE_GROK_SIDEBAR_TITLE" = "Grok in der Seitenleiste ausblenden";
-"HIDE_GROK_CREATE_TITLE" = "Grok-Erstellungsbuttons ausblenden";
+"HIDE_GROK_CREATE_TITLE" = "Erstellungswerkzeuge ausblenden";
 "HIDE_GROK_CREATE_DETAIL" = "Entfernt die Optionen, Bilder und Videos mit Grok zu erstellen oder zu bearbeiten.";
 /* Legacy key name: this row TURNS ON auto-translation (the switch is inverted).
    Do not rename the key — it is persisted in user defaults. */
@@ -156,29 +156,29 @@
 
 /* ===== LAB ===== */
 "REPLY_IN_WEBVIEW_TITLE" = "In Webansicht antworten";
-"REPLY_IN_WEBVIEW_DETAIL" = "Öffnet das Antwortfeld in einer Webansicht, um Attestation zu umgehen.";
+"REPLY_IN_WEBVIEW_DETAIL" = "Antwortet über eine Webseite, wenn die App das Senden von Antworten verweigert.";
 
 /* ===== Theme color picker ===== */
-"THEME_SETTINGS_NAVIGATION_DETAIL" = "Wähle eine Themenfarbe, die nur du sehen kannst.";
-"THEME_SETTINGS_NAVIGATION_TITLE" = "Theme";
+"THEME_SETTINGS_NAVIGATION_DETAIL" = "Wähle eine Akzentfarbe. Nur du siehst sie.";
+"THEME_SETTINGS_NAVIGATION_TITLE" = "Design";
 
 /* ===== Navigation bar editor ===== */
-"CUSTOM_TAB_BAR_GRID_DETAIL" = "Tap a destination to add or remove it. Drag the bar below to reorder.";
-"CUSTOM_TAB_BAR_RESET_MESSAGE" = "Möchtest du die Navigationsleiste wirklich auf Standard zurücksetzen?";
-"CUSTOM_TAB_BAR_SETTINGS_NAVIGATION_TITLE" = "Benutzerdefinierte Navigation";
+"CUSTOM_TAB_BAR_GRID_DETAIL" = "Tippe auf ein Ziel, um es hinzuzufügen oder zu entfernen. Ziehe die Leiste unten, um die Reihenfolge zu ändern.";
+"CUSTOM_TAB_BAR_RESET_MESSAGE" = "Navigationsleiste auf das Standardlayout zurücksetzen.";
+"CUSTOM_TAB_BAR_SETTINGS_NAVIGATION_TITLE" = "Navigationsleiste";
 
 /* ===== Fonts picker ===== */
 "CUSTOM_FONTS_MENU_TITLE" = "\nSchriftart auswählen";
 "CUSTOM_FONTS_NAVIGATION_BUTTON_TITLE" = "Benutzerdefinierte Schriftarten";
 "CUSTOM_FONTS_TUT_ALERT_MESSAGE" = "Noch keine benutzerdefinierten Schriftarten. Installiere welche mit der iFont-App aus dem App Store.";
-"INSTALL_IFONT_BUTTON_TITLE" = "iFont application";
+"INSTALL_IFONT_BUTTON_TITLE" = "iFont laden";
 
 /* ===== Media & download flows ===== */
 "DOWNLOAD_AS_GIF_OPTION_TITLE" = "Als GIF herunterladen";
 "DOWNLOAD_AS_MP4_OPTION_TITLE" = "Als MP4 herunterladen";
 "DOWNLOAD_MENU_TITLE" = "\nVideoqualität auswählen";
 "DOWNLOAD_VIDEO_NUMBER_TITLE" = "Video %lu";
-"DOWNLOAD_ALL_VIDEOS_OPTION_TITLE" = "Download all videos";
+"DOWNLOAD_ALL_VIDEOS_OPTION_TITLE" = "Alle Videos herunterladen";
 
 /* ===== Profile actions ===== */
 "COPY_PROFILE_INFO_MENU_OPTION_1" = "Bio kopieren";
@@ -188,30 +188,31 @@
 "COPY_PROFILE_INFO_MENU_OPTION_5" = "Ort kopieren";
 
 /* ===== Padlock / authentication ===== */
-"PADLOCK_LOCKED_LABEL" = "Locked";
-"PADLOCK_REASON" = "Unlock Twitter";
+"PADLOCK_LOCKED_LABEL" = "Gesperrt";
+"PADLOCK_REASON" = "Twitter entsperren";
 
 /* ===== Alerts, confirmations & shared labels ===== */
-"LIGHT_MODE_RESTART_TITLE" = "Back to light mode";
-"LIGHT_MODE_RESTART_MESSAGE" = "Your background color was reset to System. Restart Twitter to clear any leftover dark colors.";
-"CLOSE_APP_ACTION" = "Close app";
+"LIGHT_MODE_RESTART_TITLE" = "Zurück zum hellen Modus";
+"LIGHT_MODE_RESTART_MESSAGE" = "Deine Hintergrundfarbe wurde auf System zurückgesetzt. Starte Twitter neu, um übrige dunkle Farben zu entfernen.";
+"CLOSE_APP_ACTION" = "App schließen";
 
 /* ===== Miscellaneous ===== */
 "FETCHING_PROGRESS_TITLE" = "Einen Moment…";
-"PFB_SETTINGS_DETAIL" = "Passe dein Twitter-Erlebnis an. Verstecke Werbung, aktiviere Blue-Funktionen und mehr.";
+"PFB_SETTINGS_DETAIL" = "Blende Werbung aus, hol den Vogel zurück und passe Twitter nach deinem Geschmack an.";
 "REFRESH_PILL_TEXT" = "Post gesendet";
-"UNKNOWN_ERROR" = "An unknown error occurred.";
-"PHOTOS_SAVE_FAILED_MESSAGE" = "Photos did not accept the file. In Settings, check that Twitter may add photos.";
+"UNKNOWN_ERROR" = "Ein unbekannter Fehler ist aufgetreten.";
+"PHOTOS_SAVE_FAILED_MESSAGE" = "Fotos hat die Datei nicht angenommen. Prüfe in den Einstellungen, ob Twitter Fotos hinzufügen darf.";
 
 /* ===== TWEETS: groups and options ===== */
-"SEND_SOUND_TITLE" = "Send sound";
-"SEND_SOUND_NONE" = "None";
-"SEND_SOUND_IMPORT_ACTION" = "Import…";
-"SEND_SOUND_REMOVE_ACTION" = "Remove";
-"SEND_SOUND_FAILED_TITLE" = "The sound was not imported";
-"SEND_SOUND_TOO_LONG" = "Choose a sound of 7 seconds or less.";
-"SEND_SOUND_UNREADABLE" = "This file is not a sound that can be played.";
+"HIDE_TWEET_BUTTON_DETAIL" = "Entfernt den schwebenden Button zum Verfassen.";
+"SEND_SOUND_TITLE" = "Sendeton";
+"SEND_SOUND_NONE" = "Keiner";
+"SEND_SOUND_IMPORT_ACTION" = "Importieren…";
+"SEND_SOUND_REMOVE_ACTION" = "Entfernen";
+"SEND_SOUND_FAILED_TITLE" = "Der Ton wurde nicht importiert";
+"SEND_SOUND_TOO_LONG" = "Wähle einen Ton von höchstens 7 Sekunden.";
+"SEND_SOUND_UNREADABLE" = "Diese Datei ist kein abspielbarer Ton.";
 
 /* Hidden notifications */
-"FLEX_TWITTER_TITLE" = "FLEX-Debug-Modus";
-"FLEX_TWITTER_DETAIL" = "FLEX verwenden, um Twitter zu debuggen.";
+"FLEX_TWITTER_TITLE" = "FLEX-Explorer";
+"FLEX_TWITTER_DETAIL" = "Untersucht die Bildschirme und Daten der App. Für Entwickler.";

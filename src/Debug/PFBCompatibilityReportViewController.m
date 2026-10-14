@@ -8,7 +8,6 @@
 #import "Features/Appearance/ThemeColor/PFBPalette.h"
 #import <objc/runtime.h>
 #import "Debug/PFBTourChoicePopover.h"
-#import "Debug/PFBProbe.h"
 
 static id PFBCompatFontGroup(void) {
     return [PFBManager sharedFontGroup];
@@ -68,23 +67,6 @@ static UIColor* PFBVerdictColor(PFBCompatVerdict verdict) {
         return [UIColor systemRedColor];
     }
     return verdict == PFBCompatVerdictNotTested ? [UIColor systemOrangeColor] : [UIColor systemGreenColor];
-}
-
-// Probe: notes how the report that starts a tour is shown: the controller presenting its
-// stack, if any, and how many screens the stack holds; once per presenter, alone or pushed.
-static void PFBProbeTourFromReport(UIViewController* report) {
-    if (!PFBDebugIsRecording()) {
-        return;
-    }
-    UINavigationController* stack = report.navigationController;
-    UIViewController* presenter = stack.presentingViewController;
-    NSString* name = presenter ? NSStringFromClass([presenter class]) : @"none";
-    NSString* note = [NSString stringWithFormat:@"02#F025 tour from the report %@ %@", name,
-                                                stack.viewControllers.count > 1 ? @"pushed" : @"alone"];
-    if (PFBProbeWants(note)) {
-        PFBProbeNote(note, @"02#F025 tour from the report: presenter %@, stack %lu screens", name,
-                     (unsigned long)stack.viewControllers.count);
-    }
 }
 
 // Whether the options without problems, and those not tested, are listed; both are
@@ -590,7 +572,6 @@ static NSString* const kPFBCompatUntestedOpenKey = @"pfb_compat_untested_open";
     if (PFBCompatTourIsRunning()) {
         return;
     }
-    PFBProbeTourFromReport(self);
     void (^run)(void) = ^{
       if (full) {
           PFBCompatRunTour();

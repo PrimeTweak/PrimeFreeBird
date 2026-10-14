@@ -1,88 +1,8 @@
 #import "Common/PFBBundle.h"
-#import "Debug/PFBProbe.h"
 #import "Features/Search/PFBAdvancedSearchStyle.h"
 #import "Support/HookHelpers.h"
 #import "Features/Search/PFBAdvDateCell.h"
 #import "Features/Search/PFBAdvField.h"
-
-// Probe: one opening of a date picker, from EditingDidBegin to EditingDidEnd: whether a value
-// arrived and whether the row is active afterwards (11#F038).
-static BOOL gPFBAdvProbeDateWatching = NO;
-static BOOL gPFBAdvProbeDateOpen = NO;
-static BOOL gPFBAdvProbeDateChanged = NO;
-static BOOL gPFBAdvProbeDateWasActive = NO;
-static NSDate* gPFBAdvProbeDateShown = nil;
-
-static BOOL pfbAdvProbeDateStored(PFBAdvDateCell* cell) {
-    NSString* key = cell.model.storeKey;
-    return key && [[NSUserDefaults standardUserDefaults] stringForKey:key] != nil;
-}
-
-static void pfbAdvProbeDateBegan(PFBAdvDateCell* cell) {
-    if (!cell) {
-        return;
-    }
-    gPFBAdvProbeDateOpen = YES;
-    gPFBAdvProbeDateChanged = NO;
-    gPFBAdvProbeDateWasActive = pfbAdvProbeDateStored(cell);
-    gPFBAdvProbeDateShown = cell.picker.date;
-}
-
-// Probe: notes the opening once the picker closes, a moment later, since a value can arrive
-// just after the close.
-static void pfbAdvProbeDateEnded(PFBAdvDateCell* cell) {
-    if (!cell || !gPFBAdvProbeDateOpen) {
-        return;
-    }
-    BOOL wasActive = gPFBAdvProbeDateWasActive;
-    NSDate* shown = gPFBAdvProbeDateShown;
-    __weak PFBAdvDateCell* weakCell = cell;
-    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.3 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
-        PFBAdvDateCell* strongCell = weakCell;
-        gPFBAdvProbeDateOpen = NO;
-        NSString* key = wasActive ? @"11#F038 date picker on a stored date" : @"11#F038 date picker";
-        if (!strongCell || !PFBProbeWants(key)) {
-            return;
-        }
-        BOOL sameDay = shown && [[NSCalendar currentCalendar] isDate:strongCell.picker.date inSameDayAsDate:shown];
-        PFBProbeNote(key, @"11#F038 date picker %@: opened and closed, value changed %@, row active %@ (row %@ when opened, %@ day at close, stored %@, alpha %.2f)",
-                     strongCell.model.labelKey ?: @"?", gPFBAdvProbeDateChanged ? @"yes" : @"no",
-                     strongCell.picker.alpha >= 1.0 ? @"yes" : @"no", wasActive ? @"active" : @"dimmed",
-                     sameDay ? @"same" : @"another", pfbAdvProbeDateStored(strongCell) ? @"yes" : @"no",
-                     strongCell.picker.alpha);
-    });
-}
-
-// Probe: watches the picker's opening and closing while the measurement is open (11#F038).
-static void pfbAdvProbeWatchDatePicker(PFBAdvDateCell* cell, UIDatePicker* picker) {
-    if (!PFBProbeWants(@"11#F038 date picker")) {
-        return;
-    }
-    gPFBAdvProbeDateWatching = YES;
-    __weak PFBAdvDateCell* weakCell = cell;
-    UIAction* began = [UIAction actionWithHandler:^(__kindof UIAction* action) {
-        pfbAdvProbeDateBegan(weakCell);
-    }];
-    UIAction* ended = [UIAction actionWithHandler:^(__kindof UIAction* action) {
-        pfbAdvProbeDateEnded(weakCell);
-    }];
-    [picker addAction:began forControlEvents:UIControlEventEditingDidBegin];
-    [picker addAction:ended forControlEvents:UIControlEventEditingDidEnd];
-}
-
-// Probe: a value from the picker; noted alone when no opening came before it (11#F038).
-static void pfbAdvProbeDateValue(void) {
-    if (!gPFBAdvProbeDateWatching) {
-        return;
-    }
-    if (gPFBAdvProbeDateOpen) {
-        gPFBAdvProbeDateChanged = YES;
-        return;
-    }
-    if (PFBProbeWants(@"11#F038 date picker events")) {
-        PFBProbeNote(@"11#F038 date picker events", @"11#F038 date picker: a value arrived with no EditingDidBegin before it");
-    }
-}
 
 @implementation PFBAdvDateCell
 
@@ -96,7 +16,6 @@ static void pfbAdvProbeDateValue(void) {
         [_picker addTarget:self
                       action:@selector(pfbDateChanged:)
             forControlEvents:UIControlEventValueChanged];
-        pfbAdvProbeWatchDatePicker(self, _picker);
 
         _clearButton = [UIButton buttonWithType:UIButtonTypeSystem];
         [_clearButton setImage:PFBTwitterGlyphFor(@"close_circle_fill", [UIImage systemImageNamed:@"xmark.circle.fill"])
@@ -169,7 +88,6 @@ static void pfbAdvProbeDateValue(void) {
 }
 
 - (void)pfbDateChanged:(UIDatePicker*)sender {
-    pfbAdvProbeDateValue();
     if (!self.model) { return; }
     NSString* s = [[PFBAdvDateCell pfbFormatter] stringFromDate:sender.date];
     [[NSUserDefaults standardUserDefaults] setObject:s

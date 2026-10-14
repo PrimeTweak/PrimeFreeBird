@@ -7,10 +7,6 @@
 .AppleDouble
 .LSOverride
 
-# Icon must end with two \r
-Icon
-
-
 # Thumbnails
 ._*
 
@@ -255,7 +251,7 @@ xcuserdata/
 classdump/
 autopush.sh
 
-packages/
+packages/*
 !packages/PUT_IPA_HERE
 
 deps/*/build/

@@ -6,8 +6,6 @@
 #import "Common/PFBBundle.h"
 #import "Common/PFBSettings.h"
 #import "Common/PFBCompatibility.h"
-#import "Debug/PFBDebugger.h"
-#import "Debug/PFBProbe.h"
 #import "FFmpegKitConfig.h"
 
 #pragma mark - Helpers
@@ -74,84 +72,6 @@ static void PFBSaveDownloads(NSArray<NSURL*>* files, BOOL gif) {
 @interface PFBDownloadInlineButton ()
 @property (nonatomic, strong) TFNHUD* hud;
 @end
-
-#pragma mark - Probe
-
-// Probe: downloads running across every instance and the HUDs they showed, on the main
-// thread; notes a HUD replaced while it still shows, and one left up once all have ended.
-static BOOL gPFBProbeHUDDone;
-static NSInteger gPFBProbeDownloadsRunning;
-static NSHashTable* gPFBProbeDownloadHUDs;
-static Class gPFBProbeHUDClass;
-
-// Probe: whether a HUD is on screen, from its own getter.
-static BOOL pfbProbeHUDShows(TFNHUD* hud) {
-    BOOL found = NO;
-    long long hidden = PFBProbeIntegerGetter(hud, @"isHidden", &found);
-    return found && !hidden;
-}
-
-// Probe: closed once both lines are noted.
-static void pfbProbeHUDCheckDone(void) {
-    gPFBProbeHUDDone = !PFBProbeWants(@"10a#F025 replaced") && !PFBProbeWants(@"10a#F025 left up");
-}
-
-static void pfbProbeHUDReplacing(TFNHUD* previous) {
-    if (gPFBProbeHUDDone || !previous || gPFBProbeDownloadsRunning <= 0 || !PFBDebugIsRecording() ||
-        !PFBProbeWants(@"10a#F025 replaced")) {
-        return;
-    }
-    if (pfbProbeHUDShows(previous)) {
-        PFBProbeNote(@"10a#F025 replaced",
-                     @"10a#F025 download HUD replaced while the previous one still shows (%ld download(s) running)",
-                     (long)gPFBProbeDownloadsRunning);
-        pfbProbeHUDCheckDone();
-    }
-}
-
-static BOOL pfbProbeDownloadStarted(TFNHUD* hud) {
-    if (gPFBProbeHUDDone || !PFBDebugIsRecording() || !NSThread.isMainThread) {
-        return NO;
-    }
-    if (!gPFBProbeDownloadHUDs) {
-        gPFBProbeDownloadHUDs = [NSHashTable weakObjectsHashTable];
-    }
-    if (hud) {
-        [gPFBProbeDownloadHUDs addObject:hud];
-        gPFBProbeHUDClass = [hud class];
-    }
-    gPFBProbeDownloadsRunning++;
-    return YES;
-}
-
-static void pfbProbeDownloadEnded(BOOL counted) {
-    if (!counted || !NSThread.isMainThread) {
-        return;
-    }
-    gPFBProbeDownloadsRunning = MAX(0, gPFBProbeDownloadsRunning - 1);
-    if (gPFBProbeDownloadsRunning > 0 || !PFBProbeWants(@"10a#F025 left up")) {
-        return;
-    }
-    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(3.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
-      if (gPFBProbeDownloadsRunning > 0 || !PFBProbeWants(@"10a#F025 left up")) {
-          return;
-      }
-      BOOL found = NO;
-      long long any = gPFBProbeHUDClass ? PFBProbeIntegerGetter(gPFBProbeHUDClass, @"isAnyHUDShowing", &found) : 0;
-      NSUInteger showing = 0;
-      for (TFNHUD* hud in gPFBProbeDownloadHUDs.allObjects) {
-          showing += pfbProbeHUDShows(hud) ? 1 : 0;
-      }
-      if (!(found && any) && showing == 0) {
-          return;
-      }
-      PFBProbeNote(@"10a#F025 left up",
-                   @"10a#F025 a download HUD is still on screen with no download running (any HUD showing %@, "
-                   @"download HUDs showing %lu)",
-                   found ? (any ? @"yes" : @"no") : @"?", (unsigned long)showing);
-      pfbProbeHUDCheckDone();
-    });
-}
 
 // The mp4 variant with the most pixels, from the WxH its URL carries.
 static NSURL* PFBLargestVideo(NSArray<NSURL*>* urls) {
@@ -231,7 +151,6 @@ static NSURL* PFBLargestMP4(TFSTwitterEntityMedia* media) {
                  activeRanges:nil];
 
         void (^showHUD)(NSString*) = ^(NSString* text) {
-            pfbProbeHUDReplacing(self.hud);
             self.hud = [[objc_getClass("TFNHUD") alloc] initWithText:text];
             [self.hud show];
         };
@@ -248,7 +167,6 @@ static NSURL* PFBLargestMP4(TFSTwitterEntityMedia* media) {
         void (^ffmpegDownload)(NSString*, NSString*, double, void (^)(NSURL*), void (^)(void)) = ^(
             NSString* args, NSString* ext, double durationMs, void (^collect)(NSURL*), void (^finished)(void)) {
             showHUD(downloadingText);
-            BOOL probeCounted = pfbProbeDownloadStarted(self.hud);
             // FFmpeg's own log lines stay out of the system log.
             [FFmpegKitConfig setLogRedirectionStrategy:LogRedirectionStrategyNeverPrintLogs];
             NSURL* outFile = [[NSURL fileURLWithPath:NSTemporaryDirectory()]
@@ -263,7 +181,6 @@ static NSURL* PFBLargestMP4(TFSTwitterEntityMedia* media) {
                     ReturnCode* returnCode = [session getReturnCode];
                     dispatch_async(dispatch_get_main_queue(), ^{
                         dismissHUD();
-                        pfbProbeDownloadEnded(probeCounted);
                         BOOL succeeded = [ReturnCode isSuccess:returnCode];
                         if (succeeded && finished) {
                             finished();

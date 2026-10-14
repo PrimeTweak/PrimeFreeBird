@@ -4,7 +4,6 @@
 
 #import "Support/HookHelpers.h"
 #import "Debug/PFBDebugger.h"
-#import "Debug/PFBProbe.h"
 #import <QuartzCore/QuartzCore.h>
 
 static NSString* const kPFBTabKeys[] = {
@@ -80,9 +79,6 @@ static BOOL gPFBSettingUnderline = NO;               // the underline is being s
 static BOOL gPFBInBarFilter = NO;                    // re-entrancy guard
 static BOOL gPFBSelfNav = NO;          // a pager move started here
 static NSUInteger gPFBAppliedMaskBits = 0xFFFF;   // last mask synced to the pager
-
-// Probe: notes a pager taken for Explore's; defined with the [explore] journal below.
-static void pfbProbePagerAdopted(UICollectionView* pager, NSInteger pages);
 
 void pfbNoteExploreAccessoryView(UIView* v) {
     gPFBExploreBar = v;
@@ -245,7 +241,6 @@ static void pfbSyncPagerToMask(void) {
 static void pfbCapturePagerAndRemap(UICollectionView* candidate) {
     if (!candidate) { return; }
     NSInteger total = gPFBPagerCandidateTotal ?: kPFBTabCount;
-    pfbProbePagerAdopted(candidate, total);
     gPFBPagerCV = candidate;
     gPFBPagerTotal = total;
     CGFloat pw = candidate.bounds.size.width;
@@ -269,42 +264,6 @@ static void pfbCapturePagerAndRemap(UICollectionView* candidate) {
 }
 
 // MARK: - bar filter + mask-change detection
-
-// Probe: whether the bar's collection and the pager would mirror in a right-to-left
-// language, noted once the pager is known or after 300 passes without it (SD-4).
-static BOOL gPFBProbeDirectionDone = NO;
-static NSUInteger gPFBProbeDirectionPasses = 0;
-
-static NSString* pfbProbeDirectionOf(UICollectionView* cv) {
-    if (!cv) {
-        return @"none";
-    }
-    UICollectionViewLayout* layout = cv.collectionViewLayout;
-    BOOL rtl = cv.effectiveUserInterfaceLayoutDirection == UIUserInterfaceLayoutDirectionRightToLeft;
-    BOOL developedRTL = layout.developmentLayoutDirection == UIUserInterfaceLayoutDirectionRightToLeft;
-    return [NSString stringWithFormat:@"%@/%ld/%@/%@ (developed %@)", rtl ? @"rtl" : @"ltr",
-                                      (long)cv.semanticContentAttribute, PFBProbeClassName(layout),
-                                      layout.flipsHorizontallyInOppositeLayoutDirection ? @"flips" : @"no flip",
-                                      developedRTL ? @"rtl" : @"ltr"];
-}
-
-static void pfbProbeTabsDirection(UICollectionView* barCV) {
-    if (gPFBProbeDirectionDone) {
-        return;
-    }
-    if (!PFBProbeWants(@"SD-4 explore tabs layout")) {
-        gPFBProbeDirectionDone = YES;
-        return;
-    }
-    UICollectionView* pager = gPFBPagerCV;
-    if (!pager && ++gPFBProbeDirectionPasses < 300) {
-        return;
-    }
-    gPFBProbeDirectionDone = YES;
-    BOOL appRTL = UIApplication.sharedApplication.userInterfaceLayoutDirection == UIUserInterfaceLayoutDirectionRightToLeft;
-    PFBProbeNote(@"SD-4 explore tabs layout", @"SD-4 explore tabs layout: bar %@; pager %@; app %@",
-                 pfbProbeDirectionOf(barCV), pfbProbeDirectionOf(pager), appRTL ? @"rtl" : @"ltr");
-}
 
 static void pfbApplyTabFilter(UIView* bar, UICollectionView* cv) {
     NSArray* cells = [cv.visibleCells sortedArrayUsingComparator:
@@ -385,90 +344,6 @@ static void pfbApplyTabFilter(UIView* bar, UICollectionView* cv) {
         gPFBAppliedMaskBits = bits;
         pfbSyncPagerToMask();
     }
-
-    pfbProbeTabsDirection(cv);
-}
-
-// Probe: after Choose Explore tabs is switched off, how many of the bar's tab cells are
-// still hidden or narrower than 1 pt once the bar's own layout is over (14b#F020d).
-static BOOL gPFBProbeTabsOffDone = NO;
-static BOOL gPFBProbeTabsOffQueued = NO;
-static NSUInteger gPFBProbeTabsOffTries = 0;
-
-static void pfbProbeTabsOffCount(UIView* bar) {
-    if (gPFBProbeTabsOffDone) {
-        return;
-    }
-    if (!PFBProbeWants(@"14b#F020d explore-off")) {
-        gPFBProbeTabsOffDone = YES;
-        return;
-    }
-    UICollectionView* cv = gPFBBarCV;
-    if (!bar || !cv || pfbGranularActive() || pfbFindCollection(bar, 0) != cv) {
-        return;
-    }
-    NSArray<UICollectionViewCell*>* cells = cv.visibleCells;
-    if (cells.count == 0) {
-        return;
-    }
-    gPFBProbeTabsOffDone = YES;
-    NSMutableArray<NSString*>* collapsed = [NSMutableArray array];
-    for (UICollectionViewCell* cell in cells) {
-        if (cell.hidden || cell.frame.size.width < 1.0) {
-            NSIndexPath* ip = [cv indexPathForCell:cell];
-            [collapsed addObject:ip ? [NSString stringWithFormat:@"%ld", (long)ip.item] : @"?"];
-        }
-    }
-    PFBProbeNote(@"14b#F020d explore-off",
-                 @"14b#F020d explore-off: %lu of %lu tab cells still hidden or under 1 pt wide after the bar's own layout%@",
-                 (unsigned long)collapsed.count, (unsigned long)cells.count,
-                 collapsed.count ? [NSString stringWithFormat:@" (items %@)", [collapsed componentsJoinedByString:@", "]] : @"");
-}
-
-static void pfbProbeTabsAfterOff(UIView* bar) {
-    if (gPFBProbeTabsOffDone || gPFBProbeTabsOffQueued) {
-        return;
-    }
-    if (!PFBDebugIsRecording()) {
-        gPFBProbeTabsOffDone = YES;
-        return;
-    }
-    if (!gPFBBarCV) {
-        return;
-    }
-    if (++gPFBProbeTabsOffTries > 20) {
-        gPFBProbeTabsOffDone = YES;
-        return;
-    }
-    gPFBProbeTabsOffQueued = YES;
-    __weak UIView* weakBar = bar;
-    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(50 * NSEC_PER_MSEC)), dispatch_get_main_queue(), ^{
-        gPFBProbeTabsOffQueued = NO;
-        pfbProbeTabsOffCount(weakBar);
-    });
-}
-
-// Probe: for the tour, with Choose Explore tabs switched off: one layout pass of the
-// Explore bar and its collection, then the count above (14b#F020d).
-void pfbProbeExploreTabsLayoutPass(void) {
-    if (gPFBProbeTabsOffDone || !PFBProbeWants(@"14b#F020d explore-off") || !NSThread.isMainThread ||
-        pfbGranularActive()) {
-        return;
-    }
-    UICollectionView* cv = gPFBBarCV;
-    UIView* bar = nil;
-    for (UIView* view = cv.superview; view && !bar; view = view.superview) {
-        if ([NSStringFromClass([view class]) isEqualToString:@"_TtC10TFNUISwift25LegacySegmentedTabBarView"]) {
-            bar = view;
-        }
-    }
-    if (!bar || !pfbIsExploreBar(bar)) {
-        return;
-    }
-    [bar setNeedsLayout];
-    [cv setNeedsLayout];
-    [bar layoutIfNeeded];
-    pfbProbeTabsOffCount(bar);
 }
 
 // MARK: - hooks: the bar, its controller and the pager
@@ -483,7 +358,6 @@ void pfbProbeExploreTabsLayoutPass(void) {
     if (!pfbIsExploreBar((UIView*)self)) { return; }
     if (!pfbGranularActive()) {
         PFBCOMPAT_OBSERVE(PFBCompat_choose_explore_tabs, @"Explore tabs found");
-        pfbProbeTabsAfterOff((UIView*)self);
         return;
     }
 
@@ -532,29 +406,6 @@ static void pfbJournalPagerSwap(UICollectionView* pager, NSInteger pages) {
                 (long)pages, owners, pfbOwners(gPFBExploreBar));
 }
 
-// Probe: each pager taken for Explore's, Explore's own included, once per owner chain, with
-// the owners of the tab bar and of the pager it replaces (11#F040).
-static NSUInteger gPFBProbePagerNotes = 0;
-
-static void pfbProbePagerAdopted(UICollectionView* pager, NSInteger pages) {
-    if (!PFBDebugIsRecording() || gPFBProbePagerNotes >= 8 || !NSThread.isMainThread) {
-        return;
-    }
-    NSString* owners = pfbOwners(pager);
-    NSString* key = [@"11#F040 " stringByAppendingString:owners];
-    if (!PFBProbeWants(key)) {
-        return;
-    }
-    gPFBProbePagerNotes++;
-    UICollectionView* previous = gPFBPagerCV;
-    NSString* before = previous ? pfbOwners(previous) : nil;
-    NSString* relation = !before                           ? @"no previous pager"
-                         : [before isEqualToString:owners] ? @"same owners as the previous pager"
-                                                           : [NSString stringWithFormat:@"other than the previous pager (%@)", before];
-    PFBProbeNote(key, @"11#F040 explore pager: %ld pages adopted, owned by %@, Explore bar owned by %@, %@", (long)pages,
-                 owners, pfbOwners(gPFBExploreBar), relation);
-}
-
 %hook _TtC10TFNUISwift26LegacyPagingViewController
 
 // The collection asks its data source how many pages exist. The answer is left
@@ -580,7 +431,6 @@ static void pfbProbePagerAdopted(UICollectionView* pager, NSInteger pages) {
         if (gPFBPagerCV) {
             pfbJournalPagerSwap(collectionView, n);
         }
-        pfbProbePagerAdopted(collectionView, n);
         gPFBPagerCV = collectionView;
     }
     gPFBPagerTotal = n;

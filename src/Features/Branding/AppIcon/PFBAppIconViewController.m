@@ -8,26 +8,6 @@
 #import "Support/TwitterChirpFont.h"
 #import "Features/Appearance/ThemeColor/PFBPalette.h"
 #import "Support/Helpers.h"
-#import "Debug/PFBDebugger.h"
-#import "Debug/PFBProbe.h"
-
-// Probe (11#F035): what iOS answers to an icon change and what alternateIconName reads right
-// after it, once per outcome.
-static void PFBProbeIconChanged(NSString* wanted, NSError* error) {
-    if (!PFBDebugIsRecording()) {
-        return;
-    }
-    NSString* answer = error ? [NSString stringWithFormat:@"%@/%ld", error.domain, (long)error.code] : @"none";
-    dispatch_async(dispatch_get_main_queue(), ^{
-      NSString* now = [UIApplication sharedApplication].alternateIconName;
-      BOOL follows = wanted ? [now isEqualToString:wanted] : now == nil;
-      NSString* key = [NSString stringWithFormat:@"11#F035 error %@ follows %@", error ? @"yes" : @"no", follows ? @"yes" : @"no"];
-      if (PFBProbeWants(key)) {
-          PFBProbeNote(key, @"11#F035 icon change to %@: error %@, alternateIconName now %@", wanted ?: @"primary", answer,
-                       now ?: @"nil");
-      }
-    });
-}
 
 // UIApplication's alternateIconName getter goes stale on sideloaded installs
 // (setting the icon works, but the getter keeps reporting an old name across
@@ -266,10 +246,7 @@ static NSString* AppIconDetailText(void) {
 
     // A block is always passed: nil name + nil handler crashes UIKit.
     [[UIApplication sharedApplication] setAlternateIconName:toSet
-                                          completionHandler:^(NSError* _Nullable error) {
-                                            // Probe: iOS's answer and the getter after it.
-                                            PFBProbeIconChanged(toSet, error);
-                                          }];
+                                          completionHandler:^(NSError* _Nullable error){}];
 }
 
 #pragma mark - Section header

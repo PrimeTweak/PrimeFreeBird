@@ -11,7 +11,6 @@
 #import "Support/HookHelpers.h"
 #import "Common/PFBCompatibility.h"
 #import "Debug/PFBDebugger.h"
-#import "Debug/PFBProbe.h"
 #import "Support/FLEXHeaders.h"
 
 @interface PFBModernSettingsPageViewController ()
@@ -642,11 +641,6 @@ static NSURL* PFBAccountAvatarURL(TFNTwitterAccount* account) {
         [[NSUserDefaults standardUserDefaults]
             setBool:(inverted ? !sender.isOn : sender.isOn)
              forKey:key];
-        // Probe (14a#F009): marks the moment Hide Tweet button is switched on.
-        if (PFBDebugIsRecording() && [key isEqualToString:@"hide_tweet_button"] &&
-            (inverted ? !sender.isOn : sender.isOn)) {
-            PFBProbeMark(@"hide_tweet_button on");
-        }
         [self updateAndAnimateChangesForKey:key];
 
         [self reloadRowsHeldBy:key];

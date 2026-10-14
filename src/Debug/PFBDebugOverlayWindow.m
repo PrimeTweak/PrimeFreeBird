@@ -7,4 +7,8 @@
     UIView* hit = [super hitTest:point withEvent:event];
     return hit == self || hit == self.rootViewController.view ? nil : hit;
 }
+
+- (BOOL)canBecomeKeyWindow {
+    return NO;
+}
 @end

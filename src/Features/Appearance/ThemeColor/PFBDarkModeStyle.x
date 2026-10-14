@@ -6,10 +6,6 @@
 #import "Features/Appearance/ThemeColor/PFBDarkModeStyle.h"
 #import "Common/PFBSettings.h"
 #import <objc/runtime.h>
-#import <pthread.h>
-#import <stdatomic.h>
-#import "Debug/PFBDebugger.h"
-#import "Debug/PFBProbe.h"
 #import "Support/TAEHeaders.h"
 
 @interface TFNSolidColorView : UIView
@@ -211,45 +207,9 @@ static UIColor* PFBReplacement(UIColor* incoming) {
 
 %end
 
-// Probe: notes the layer classes whose background is set off the main thread (10A#A15),
-// five at most, looking at 2000 such calls at most. Any thread.
-static _Atomic int gPFBLayerProbeState;
-static _Atomic unsigned gPFBLayerProbeLooks;
-static _Atomic unsigned gPFBLayerProbeLines;
-
-static void PFBLayerThreadProbe(CALayer* layer) {
-    int state = atomic_load_explicit(&gPFBLayerProbeState, memory_order_relaxed);
-    if (state == 0) {
-        state = PFBDebugIsRecording() ? 1 : 2;
-        atomic_store_explicit(&gPFBLayerProbeState, state, memory_order_relaxed);
-    }
-    if (state != 1) {
-        return;
-    }
-    if (atomic_fetch_add_explicit(&gPFBLayerProbeLooks, 1, memory_order_relaxed) >= 2000 ||
-        atomic_load_explicit(&gPFBLayerProbeLines, memory_order_relaxed) >= 5) {
-        atomic_store_explicit(&gPFBLayerProbeState, 2, memory_order_relaxed);
-        return;
-    }
-    NSString* layerName = NSStringFromClass([layer class]);
-    NSString* key = [@"10A#A15 " stringByAppendingString:layerName];
-    if (!PFBProbeWants(key)) {
-        return;
-    }
-    atomic_fetch_add_explicit(&gPFBLayerProbeLines, 1, memory_order_relaxed);
-    id delegate = layer.delegate;
-    const char* queue = dispatch_queue_get_label(DISPATCH_CURRENT_QUEUE_LABEL);
-    PFBProbeNote(key, @"10A#A15 CALayer background set off the main thread: layer %@, delegate %@, queue %s",
-                 layerName, PFBProbeClassName(delegate), queue && queue[0] ? queue : "unnamed");
-}
-
 %hook CALayer
 
 - (void)setBackgroundColor:(CGColorRef)color {
-    // Probe: notes a background set off the main thread.
-    if (atomic_load_explicit(&gPFBLayerProbeState, memory_order_relaxed) != 2 && !pthread_main_np()) {
-        PFBLayerThreadProbe(self);
-    }
     if (color) {
         UIColor* incoming = [UIColor colorWithCGColor:color];
         UIColor* replacement = PFBReplacement(incoming);
@@ -359,61 +319,6 @@ static void PFBFlattenSearchBarChrome(UIView* searchBar) {
     }
 }
 
-// Probe: once per screen (four at most), whatever the dark style, whether a search bar
-// sits in a navigation bar and how many of that bar's effect views PFBPaintBarOpaque
-// would reach, and how many of them sit inside a button (10A#A7). Read only.
-static NSUInteger gPFBSearchBarProbeLines;
-
-static void PFBEffectViewsProbe(UIView* view, UIView* bar, NSUInteger* total, NSUInteger* inButton,
-                                NSMutableString* first) {
-    if ([view isKindOfClass:[UIVisualEffectView class]]) {
-        (*total)++;
-        for (UIView* up = view.superview; up && up != bar; up = up.superview) {
-            NSString* name = NSStringFromClass([up class]);
-            if ([up isKindOfClass:[UIControl class]] || [name containsString:@"Button"]) {
-                (*inButton)++;
-                if (!first.length) {
-                    [first setString:name];
-                }
-                break;
-            }
-        }
-    }
-    for (UIView* subview in view.subviews) {
-        PFBEffectViewsProbe(subview, bar, total, inButton, first);
-    }
-}
-
-static void PFBSearchBarProbe(UIView* searchBar) {
-    if (!PFBDebugIsRecording() || gPFBSearchBarProbeLines >= 4 || !NSThread.isMainThread ||
-        !searchBar.window) {
-        return;
-    }
-    UIViewController* controller = PFBProbeControllerOfView(searchBar);
-    if ([controller isKindOfClass:[UINavigationController class]]) {
-        controller = ((UINavigationController*)controller).topViewController;
-    }
-    NSString* screen = PFBProbeScreenName(controller);
-    NSString* key = [@"10A#A7 " stringByAppendingString:screen];
-    if (!PFBProbeWants(key)) {
-        return;
-    }
-    UIView* bar = searchBar.superview;
-    while (bar && ![bar isKindOfClass:[UINavigationBar class]]) {
-        bar = bar.superview;
-    }
-    NSUInteger total = 0;
-    NSUInteger inButton = 0;
-    NSMutableString* first = [NSMutableString string];
-    if (bar) {
-        PFBEffectViewsProbe(bar, bar, &total, &inButton, first);
-    }
-    gPFBSearchBarProbeLines++;
-    PFBProbeNote(key, @"10A#A7 TFNSearchBar on %@: navigation bar %@; effect views under it %lu, inside a button %lu (first: %@)",
-                 screen, bar ? @"found" : @"none", (unsigned long)total, (unsigned long)inButton,
-                 first.length ? first : @"none");
-}
-
 %hook TFNSearchBar
 
 - (void)layoutSubviews {
@@ -424,8 +329,6 @@ static void PFBSearchBarProbe(UIView* searchBar) {
 
 - (void)didMoveToWindow {
     %orig;
-    // Probe: notes this search bar's screen and the effect views of its bar.
-    PFBSearchBarProbe((UIView*)self);
     PFBApplySearchPill((UISearchBar*)self);
     PFBFlattenSearchBarChrome((UIView*)self);
 }

@@ -10,7 +10,6 @@
 #import <sys/utsname.h>
 #import "Debug/PFBDebugOverlayWindow.h"
 #import "Debug/PFBDebugTrigger.h"
-#import "Debug/PFBProbe.h"
 
 // MARK: - gate
 
@@ -519,35 +518,11 @@ void PFBDebuggerPresent(void) {
 
 // MARK: - capture
 
-// Probe: notes which window is key when the stethoscope is tapped, with its level, once per
-// class; the tour's own call as it ends is noted by the tour.
-static void PFBProbeKeyWindowAtTap(void) {
-    CFTimeInterval sinceTour = PFBProbeMarkAge(@"02#F022 tour end");
-    if (sinceTour >= 0 && sinceTour < 1.0) {
-        return;
-    }
-    UIWindow* key = nil;
-    for (UIScene* scene in UIApplication.sharedApplication.connectedScenes) {
-        if (![scene isKindOfClass:[UIWindowScene class]]) {
-            continue;
-        }
-        for (UIWindow* window in ((UIWindowScene*)scene).windows) {
-            key = window.isKeyWindow ? window : key;
-        }
-    }
-    NSString* name = key ? NSStringFromClass([key class]) : @"none";
-    NSString* note = [@"02#F022 tap " stringByAppendingString:name];
-    if (PFBProbeWants(note)) {
-        PFBProbeNote(note, @"02#F022 key window at the stethoscope tap: %@ (level %.0f)", name, key ? key.windowLevel : 0.0);
-    }
-}
-
 // Captures the screen and the journal, then presents them; the floating button calls it.
 void PFBDebuggerCaptureAndPresent(void) {
     if (!PFBDebugEnabled()) {
         return;
     }
-    PFBProbeKeyWindowAtTap();
     UIWindow* window = PFBActiveWindow();
     if (!window) {
         return;

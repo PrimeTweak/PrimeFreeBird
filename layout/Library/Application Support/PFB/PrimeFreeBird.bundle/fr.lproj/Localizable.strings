@@ -25,9 +25,9 @@
 "SHOW_SCROLL_INDICATOR_TITLE" = "Barre de défilement";
 "SHOW_SCROLL_INDICATOR_DETAIL" = "Affiche l’indicateur de position à droite pendant le défilement.";
 "DISABLE_RTL_TITLE" = "Texte de gauche à droite";
-"DISABLE_RTL_DETAIL" = "Même dans les langues qui s’écrivent de droite à gauche.";
+"DISABLE_RTL_DETAIL" = "Affiche le texte de gauche à droite, même dans les langues qui s’écrivent de droite à gauche.";
 "HIDE_PREMIUM_OFFER_TITLE" = "Masquer les offres Twitter Blue";
-"HIDE_PREMIUM_OFFER_DETAIL" = "Retire les boutons et messages qui proposent Twitter Blue.";
+"HIDE_PREMIUM_OFFER_DETAIL" = "Retire les boutons « Obtenir la certification » et « Mettre à niveau ».";
 
 /* ===== General › Links ===== */
 "GENERAL_GROUP_LINKS" = "Liens";
@@ -154,7 +154,7 @@
 "TWEET_TO_IMAGE_DETAIL" = "Exporte un Tweet en image d’un appui long sur Partager.";
 "DISABLE_VIDEO_CAPTIONS_TITLE" = "Masquer les sous-titres vidéo";
 "DISABLE_VIDEO_CAPTIONS_DETAIL" = "Retire les sous-titres automatiques affichés sur les vidéos.";
-"AUTO_HIGHEST_LOAD_TITLE" = "Qualité max";
+"AUTO_HIGHEST_LOAD_TITLE" = "Photos haute qualité";
 "AUTO_HIGHEST_LOAD_DETAIL" = "Charge les photos en résolution maximale.";
 "ENABLE_IMAGE_PRELOADING_TITLE" = "Précharger les médias";
 "ENABLE_IMAGE_PRELOADING_DETAIL" = "Charge les photos et vidéos à l’avance pour un défilement plus fluide.";
@@ -220,7 +220,7 @@
 "HIDE_GROK_SIDEBAR_DETAIL" = "Retire le raccourci Grok de la barre latérale.";
 "HIDE_GROK_BOT_TITLE" = "Masquer Grok Bot";
 "HIDE_GROK_BOT_DETAIL" = "Retire la rangée « Try Grok Bot » et les autres promotions de Grok Bot.";
-"HIDE_GROK_CREATE_TITLE" = "Masquer les boutons de création Grok";
+"HIDE_GROK_CREATE_TITLE" = "Masquer les outils de création";
 "HIDE_GROK_CREATE_DETAIL" = "Retire les options de création ou de modification d’images et de vidéos avec Grok.";
 /* Legacy key name: this row TURNS ON auto-translation (the switch is inverted).
    Do not rename the key — it is persisted in user defaults. */
@@ -346,10 +346,10 @@
 "ADVSEARCH_REPLIES_SUB" = "Inclure les réponses et les Tweets originaux.";
 "ADVSEARCH_LINKS" = "Liens";
 "ADVSEARCH_LINKS_SUB" = "Inclure les Tweets avec des liens.";
-"ADVSEARCH_EX_ALL" = "Exemple : what's happening · contient à la fois \"what's\" et \"happening\"";
-"ADVSEARCH_EX_EXACT" = "Exemple : happy hour · contient l’expression exacte \"happy hour\"";
-"ADVSEARCH_EX_ANY" = "Exemple : cats dogs · contient \"cats\" ou \"dogs\" (ou les deux)";
-"ADVSEARCH_EX_NONE" = "Exemple : cats dogs · ne contient ni \"cats\" ni \"dogs\"";
+"ADVSEARCH_EX_ALL" = "Exemple : what’s happening · contient à la fois « what’s » et « happening »";
+"ADVSEARCH_EX_EXACT" = "Exemple : happy hour · contient l’expression exacte « happy hour »";
+"ADVSEARCH_EX_ANY" = "Exemple : cats dogs · contient « cats » ou « dogs » (ou les deux)";
+"ADVSEARCH_EX_NONE" = "Exemple : cats dogs · ne contient ni « cats » ni « dogs »";
 "ADVSEARCH_EX_TAGS" = "Exemple : #ThrowbackThursday · contient le hashtag #ThrowbackThursday";
 "ADVSEARCH_EX_FROM" = "Exemple : @NASA · publié par @NASA";
 "ADVSEARCH_EX_TO" = "Exemple : @NASA · en réponse à @NASA";
@@ -378,7 +378,7 @@
 "TWEETS_GROUP_ACTIONS" = "Actions sur les Tweets";
 "TWEETS_GROUP_READING" = "Lecture";
 "HIDE_TWEET_BUTTON_TITLE" = "Masquer le bouton Tweet";
-"HIDE_TWEET_BUTTON_DETAIL" = "Retire le bouton de rédaction du fil.";
+"HIDE_TWEET_BUTTON_DETAIL" = "Retire le bouton flottant de rédaction.";
 "SEND_SOUND_TITLE" = "Son d’envoi";
 "SEND_SOUND_DETAIL" = "Un son joué à l’envoi d’un Tweet.";
 "SEND_SOUND_NONE" = "Aucun";

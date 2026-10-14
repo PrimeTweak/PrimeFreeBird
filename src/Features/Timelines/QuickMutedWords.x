@@ -3,9 +3,6 @@
 
 #import "Support/HookHelpers.h"
 #import "Features/Timelines/PFBMutedWordsViewController.h"
-#import "Debug/PFBDebugger.h"
-#import "Debug/PFBProbe.h"
-#import <mach/mach_time.h>
 
 static const void* kPFBQuickMutedBtnKey = &kPFBQuickMutedBtnKey;
 
@@ -111,191 +108,6 @@ static UIImage* PFBFilterBarsGlyph(CGFloat side) {
     return drawn;
 }
 
-// Probe: milliseconds from mach_absolute_time ticks.
-static double pfbProbeMs(uint64_t ticks) {
-    static mach_timebase_info_data_t timebase;
-    if (!timebase.denom) {
-        mach_timebase_info(&timebase);
-    }
-    return (double)ticks * (double)timebase.numer / (double)timebase.denom / 1e6;
-}
-
-// Probe 09#F063: the time each layout pass of a bar takes during the first full tour run to its
-// end, noted then. A pass that notes a probe line is counted, not timed.
-static int gPFBProbeBarState;   // 0 not read yet, 1 open, 2 closed
-static BOOL gPFBProbeBarNoted;
-static BOOL gPFBProbeBarButtonPass;
-static struct {
-    NSUInteger passes, buttonPasses, timed;
-    uint64_t start, ticks, longest;
-} gPFBProbeBar;
-
-static void pfbProbeBarTourEnded(void) {
-    if (gPFBProbeBarState != 1 || !gPFBProbeBar.start) {
-        return;
-    }
-    // A tour stopped early or not full is left out; the next one is measured afresh.
-    if (![PFBCompatTourLastRun() hasPrefix:@"Full tour"]) {
-        memset(&gPFBProbeBar, 0, sizeof(gPFBProbeBar));
-        return;
-    }
-    gPFBProbeBarState = 2;
-    double tour = pfbProbeMs(mach_absolute_time() - gPFBProbeBar.start) / 1000.0;
-    double total = pfbProbeMs(gPFBProbeBar.ticks);
-    PFBProbeNote(@"09#F063 home bar",
-                 @"09#F063 layout during the tour (%.0f s): Home bar button %lu passes (%lu placing the button), "
-                 @"%.1f ms over %lu timed (%.2f%%), longest %.0f µs",
-                 tour, (unsigned long)gPFBProbeBar.passes, (unsigned long)gPFBProbeBar.buttonPasses, total,
-                 (unsigned long)gPFBProbeBar.timed, tour > 0 ? total / (tour * 10.0) : 0.0,
-                 pfbProbeMs(gPFBProbeBar.longest) * 1000.0);
-}
-
-static uint64_t pfbProbeBarPassBegin(void) {
-    if (gPFBProbeBarState == 2) {
-        return 0;
-    }
-    if (gPFBProbeBarState == 0) {
-        if (!PFBProbeWants(@"09#F063 home bar")) {
-            gPFBProbeBarState = 2;
-            return 0;
-        }
-        gPFBProbeBarState = 1;
-        [[NSNotificationCenter defaultCenter] addObserverForName:PFBProbeTourEndedNotification
-                                                          object:nil
-                                                           queue:nil
-                                                      usingBlock:^(__unused NSNotification* note) {
-                                                        pfbProbeBarTourEnded();
-                                                      }];
-    }
-    if (!PFBCompatTourIsRunning() || !NSThread.isMainThread) {
-        return 0;
-    }
-    if (!gPFBProbeBar.start) {
-        gPFBProbeBar.start = mach_absolute_time();
-    }
-    gPFBProbeBarNoted = NO;
-    gPFBProbeBarButtonPass = NO;
-    return mach_absolute_time();
-}
-
-static void pfbProbeBarPassEnd(uint64_t* start) {
-    if (!*start) {
-        return;
-    }
-    uint64_t ticks = mach_absolute_time() - *start;
-    gPFBProbeBar.passes++;
-    if (gPFBProbeBarButtonPass) {
-        gPFBProbeBar.buttonPasses++;
-    }
-    if (gPFBProbeBarNoted) {
-        return;
-    }
-    gPFBProbeBar.timed++;
-    gPFBProbeBar.ticks += ticks;
-    gPFBProbeBar.longest = MAX(gPFBProbeBar.longest, ticks);
-}
-
-// Probe 09#F021: the owners whose bar shows the button, once per build each, at most 8.
-static BOOL gPFBProbeOwnersDone;
-static Class gPFBProbeOwnerLast;
-static NSUInteger gPFBProbeOwnersNoted;
-
-static void pfbProbeBarOwner(UIViewController* owner) {
-    if (gPFBProbeOwnersDone || !owner) {
-        return;
-    }
-    Class ownerClass = [owner class];
-    if (ownerClass == gPFBProbeOwnerLast) {
-        return;
-    }
-    if (!PFBDebugIsRecording() || gPFBProbeOwnersNoted >= 8) {
-        gPFBProbeOwnersDone = YES;
-        return;
-    }
-    gPFBProbeOwnerLast = ownerClass;
-    NSString* name = NSStringFromClass(ownerClass);
-    NSString* key = [@"09#F021 " stringByAppendingString:name];
-    if (PFBProbeWants(key)) {
-        gPFBProbeOwnersNoted++;
-        gPFBProbeBarNoted = YES;
-        PFBProbeNote(key, @"09#F021 muted words button on the bar of %@", name);
-    }
-}
-
-// Probe 09#F038: the button's place against the avatar, once per layout direction, read once
-// per launch when the bar has settled: an avatar found, or the tenth pass placing the button.
-static BOOL gPFBProbeDirectionDone;
-static NSUInteger gPFBProbeDirectionPasses;
-
-// Probe: the square view furthest right in the bar's last quarter, the button aside: where a
-// mirrored bar would put the avatar.
-static UIView* pfbProbeRightSquare(UIView* view, UIView* bar, UIView* button) {
-    UIView* best = nil;
-    CGFloat bestMaxX = -CGFLOAT_MAX;
-    for (UIView* subview in view.subviews) {
-        if (subview == button) {
-            continue;
-        }
-        CGRect inBar = [subview convertRect:subview.bounds toView:bar];
-        CGFloat w = CGRectGetWidth(inBar);
-        if (w > 24.0 && w < 44.0 && fabs(w - CGRectGetHeight(inBar)) < 2.0 &&
-            CGRectGetMaxX(inBar) > CGRectGetWidth(bar.bounds) * 0.75 && CGRectGetMaxX(inBar) > bestMaxX) {
-            bestMaxX = CGRectGetMaxX(inBar);
-            best = subview;
-        }
-        UIView* deeper = pfbProbeRightSquare(subview, bar, button);
-        if (deeper) {
-            CGFloat deepMaxX = CGRectGetMaxX([deeper convertRect:deeper.bounds toView:bar]);
-            if (deepMaxX > bestMaxX) {
-                bestMaxX = deepMaxX;
-                best = deeper;
-            }
-        }
-    }
-    return best;
-}
-
-static NSString* pfbProbeSpan(CGRect frame) {
-    return [NSString stringWithFormat:@"%.0f-%.0f", CGRectGetMinX(frame), CGRectGetMaxX(frame)];
-}
-
-static void pfbProbeBarDirection(UIView* bar, UIButton* button, UIView* avatar) {
-    if (gPFBProbeDirectionDone || !NSThread.isMainThread) {
-        return;
-    }
-    if (!PFBDebugIsRecording()) {
-        gPFBProbeDirectionDone = YES;
-        return;
-    }
-    if (!avatar && ++gPFBProbeDirectionPasses < 10) {
-        return;
-    }
-    gPFBProbeDirectionDone = YES;
-    BOOL rtl = bar.effectiveUserInterfaceLayoutDirection == UIUserInterfaceLayoutDirectionRightToLeft;
-    NSString* key = rtl ? @"09#F038 RTL" : @"09#F038 LTR";
-    if (!PFBProbeWants(key)) {
-        return;
-    }
-    CGRect avatarFrame = avatar ? [avatar convertRect:avatar.bounds toView:bar] : CGRectNull;
-    UIView* right = pfbProbeRightSquare(bar, bar, button);
-    CGRect rightFrame = right ? [right convertRect:right.bounds toView:bar] : CGRectNull;
-    BOOL overlap = (avatar && CGRectIntersectsRect(button.frame, avatarFrame)) ||
-                   (right && CGRectIntersectsRect(button.frame, rightFrame));
-    gPFBProbeBarNoted = YES;
-    PFBProbeNote(key, @"09#F038 %@ bar width %.0f: avatar %@, right-side square %@, button %@, overlap %@",
-                 rtl ? @"RTL" : @"LTR", CGRectGetWidth(bar.bounds), avatar ? pfbProbeSpan(avatarFrame) : @"none",
-                 right ? pfbProbeSpan(rightFrame) : @"none", pfbProbeSpan(button.frame), overlap ? @"yes" : @"no");
-}
-
-// Probe: marks a pass that places the button, then notes for 09#F021 and 09#F038.
-static void pfbProbeBarButton(UIView* bar, UIViewController* owner, UIButton* button, UIView* avatar) {
-    if (gPFBProbeBarState == 1) {
-        gPFBProbeBarButtonPass = YES;
-    }
-    pfbProbeBarOwner(owner);
-    pfbProbeBarDirection(bar, button, avatar);
-}
-
 %hook TFNNavigationBar
 
 %new
@@ -327,8 +139,6 @@ static void pfbProbeBarButton(UIView* bar, UIViewController* owner, UIButton* bu
 // through a full-width SwiftUI platter that can cover or ignore them.
 - (void)layoutSubviews {
     %orig;
-    // Probe: times this pass for 09#F063; the cleanup runs on every return.
-    uint64_t probeStart __attribute__((cleanup(pfbProbeBarPassEnd))) = pfbProbeBarPassBegin();
 
     @try {
         UIView* bar = (UIView*)self;
@@ -377,10 +187,12 @@ static void pfbProbeBarButton(UIView* bar, UIViewController* owner, UIButton* bu
         [bar bringSubviewToFront:button];
 
         // Re-asserted every pass, not just at creation: on a cold launch the
-        // theme's window tint claims the icon until the first tab swipe.
+        // theme's window tint claims the icon until the first tab swipe. The icon
+        // is baked in its grey, so a new grey (light or dark) repaints it.
         UIColor* grey = PFBBarIconGrey(bar.traitCollection);
         if (![button.tintColor isEqual:grey]) {
             button.tintColor = grey;
+            [button setImage:PFBFlatGlyph(PFBFilterBarsGlyph(27.33), grey) forState:UIControlStateNormal];
         }
 
         // Aligned on the avatar rather than on the bar's box: the bar is taller
@@ -397,8 +209,6 @@ static void pfbProbeBarButton(UIView* bar, UIViewController* owner, UIButton* bu
         }
         button.frame = CGRectMake(CGRectGetWidth(bar.bounds) - side - inset,
                                   centerY - side / 2.0, side, side);
-        // Probe: notes the owner and the button's place, for 09#F021 and 09#F038.
-        pfbProbeBarButton(bar, owner, button, avatar);
     } @catch (id exception) {
     }
 }
