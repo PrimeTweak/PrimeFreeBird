@@ -93,6 +93,8 @@
 "RESTORE_REPLY_CONTEXT_DETAIL" = "開いた返信の本文の上に、返信先の相手を表示します。";
 "SHOW_QUOTE_COUNTS_TITLE" = "引用とリツイートの数";
 "SHOW_QUOTE_COUNTS_DETAIL" = "ツイートの引用画面の上部に両方の数を表示します。";
+"SHOW_TWEET_SOURCE_TITLE" = "投稿元アプリ";
+"SHOW_TWEET_SOURCE_DETAIL" = "開いたツイートの時刻の横に、送信に使われたアプリを表示します。";
 "SHOW_ACCOUNT_LOCATION_TITLE" = "アカウントの所在地";
 "SHOW_ACCOUNT_LOCATION_DETAIL" = "開いたツイートの時刻の横に、アカウントの所在国を表示します。";
 "QUOTE_COUNTS_TITLE_FORMAT" = "引用: %@ · リツイート: %@";
@@ -186,6 +188,12 @@
 "COPY_PROFILE_INFO_MENU_OPTION_3" = "名前をコピー";
 "COPY_PROFILE_INFO_MENU_OPTION_4" = "ウェブサイトをコピー";
 "COPY_PROFILE_INFO_MENU_OPTION_5" = "位置情報をコピー";
+"REMOVE_FOLLOWER_TITLE" = "このフォロワーを削除";
+"REMOVE_FOLLOWER_CONFIRM_TITLE" = "このフォロワーを削除しますか？";
+"REMOVE_FOLLOWER_CONFIRM_MESSAGE" = "%@さんをフォロワーから削除します。相手には通知されません。このユーザーは後でまたあなたをフォローできます。";
+"REMOVE_FOLLOWER_ACTION" = "削除";
+"REMOVE_FOLLOWER_DONE" = "フォロワーを削除しました";
+"REMOVE_FOLLOWER_FAILED" = "このフォロワーを削除できませんでした。もう一度お試しください。";
 
 /* ===== Padlock / authentication ===== */
 "PADLOCK_LOCKED_LABEL" = "ロック中";

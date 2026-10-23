@@ -91,6 +91,7 @@
 
 @interface T1ProfileHeaderViewController : UIViewController
 @property (retain, nonatomic) T1ProfileUserViewModel* viewModel;
+- (NSArray*)profileMoreActionsBaseActionItemsWithSender:(id)sender;
 @end
 
 #pragma mark - Status views
@@ -134,12 +135,17 @@
 // The line under an opened Tweet: its time, then its view count.
 @interface T1ConversationFooterItem : NSObject
 @property (nonatomic, copy) NSString* timeAgo;
+@property (nonatomic, strong) NSNumber* viewCount;
 @end
 
 @interface T1ConversationFooterTextView : UIView
 @property (nonatomic, readonly) id viewModel;
 @property (nonatomic, strong) T1ConversationFooterItem* footerItem;
 - (void)updateFooterTextView;
++ (CGSize)sizeForViewModel:(id)model
+                footerItem:(T1ConversationFooterItem*)item
+              maximumWidth:(CGFloat)width
+grokEditImageButtonConfiguration:(id)configuration;
 @end
 
 #pragma mark - Media views
@@ -181,6 +187,12 @@
                    sourceStatus:(id)sourceStatus
                 scribeComponent:(id)scribeComponent
                scribeParameters:(id)scribeParameters;
+- (id)updateConfiguration:(id)configuration;
+@end
+
+@interface TNUTalonUtilities : NSObject
++ (BOOL)sendTalonRequestForAnalytics:(NSURL*)url;
++ (id)verifyTalonURL:(NSURL*)url completion:(void (^)(NSInteger result))completion;
 @end
 
 @interface T1SafariViewController : SFSafariViewController

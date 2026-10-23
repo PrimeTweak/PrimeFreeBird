@@ -141,6 +141,8 @@
 "RESTORE_REPLY_CONTEXT_DETAIL" = "Show “Replying to” above the text of a reply you open.";
 "SHOW_QUOTE_COUNTS_TITLE" = "Quote and Retweet counts";
 "SHOW_QUOTE_COUNTS_DETAIL" = "Show both numbers at the top of a Tweet’s Quotes screen.";
+"SHOW_TWEET_SOURCE_TITLE" = "Tweet source";
+"SHOW_TWEET_SOURCE_DETAIL" = "Show the app an opened Tweet was sent from, next to its time.";
 "SHOW_ACCOUNT_LOCATION_TITLE" = "Account location";
 "SHOW_ACCOUNT_LOCATION_DETAIL" = "Show the country an account is based in next to the time of an opened Tweet.";
 "QUOTE_COUNTS_TITLE_FORMAT" = "Quotes: %@ · Retweets: %@";
@@ -375,6 +377,12 @@
 "COPY_PROFILE_INFO_MENU_OPTION_6" = "Copy profile URL";
 "COPY_PROFILE_INFO_MENU_OPTION_7" = "Copy user ID";
 "COPY_PROFILE_INFO_MENU_OPTION_8" = "Copy join date";
+"REMOVE_FOLLOWER_TITLE" = "Remove this follower";
+"REMOVE_FOLLOWER_CONFIRM_TITLE" = "Remove this follower?";
+"REMOVE_FOLLOWER_CONFIRM_MESSAGE" = "%@ will be removed from your followers and won’t be notified. They can follow you again later.";
+"REMOVE_FOLLOWER_ACTION" = "Remove";
+"REMOVE_FOLLOWER_DONE" = "Follower removed";
+"REMOVE_FOLLOWER_FAILED" = "Couldn’t remove this follower. Try again.";
 "UNROUNDED_COUNTS_TITLE" = "Unrounded counts";
 
 /* ===== TWEETS: groups and options ===== */
@@ -513,6 +521,7 @@
 "WEB_SESSION_NONE_DETAIL" = "Sign in so new Tweets, Spaces, mute lists, Grok, and Twitter’s web pages go through the web session.";
 "WEB_SESSION_SIGN_IN_ACTION" = "Sign in";
 "REPLY_IN_WEBVIEW_DETAIL_HELD" = "Needs a web session — sign in above.";
+"SHOW_TWEET_SOURCE_DETAIL_HELD" = "Needs a web session — sign in under Tools › Web session.";
 "SHOW_ACCOUNT_LOCATION_DETAIL_HELD" = "Needs a web session — sign in under Tools › Web session.";
 "FLEX_TWITTER_TITLE" = "FLEX explorer";
 "FLEX_TWITTER_DETAIL" = "Inspect the app’s screens and data. For developers.";

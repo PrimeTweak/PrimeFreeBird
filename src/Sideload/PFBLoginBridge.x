@@ -284,8 +284,16 @@ static void pfbBridgeMount(NSString* screen, long long uid, NSString* token, NSS
         PFBDebugLog(@"[bridge] account class/init absent");
         return;
     }
-    id account = ((id (*)(id, SEL, id, long long))objc_msgSend)(
-        [accountCls alloc], initSel, screen, uid);
+    // The ID goes in as the integer or the object the initializer takes.
+    Method init = class_getInstanceMethod(accountCls, initSel);
+    char* idType = init ? method_copyArgumentType(init, 3) : NULL;
+    id account = nil;
+    if (idType && idType[0] == '@') {
+        account = ((id (*)(id, SEL, id, id))objc_msgSend)([accountCls alloc], initSel, screen, @(uid));
+    } else if (idType && (idType[0] == 'q' || idType[0] == 'Q' || idType[0] == 'l' || idType[0] == 'L')) {
+        account = ((id (*)(id, SEL, id, long long))objc_msgSend)([accountCls alloc], initSel, screen, uid);
+    }
+    free(idType);
     SEL updSel = NSSelectorFromString(@"updateUserInfoAndCredentialsWithToken:secret:username:");
     if (account && [account respondsToSelector:updSel]) {
         ((void (*)(id, SEL, id, id, id))objc_msgSend)(account, updSel, token, secret, screen);

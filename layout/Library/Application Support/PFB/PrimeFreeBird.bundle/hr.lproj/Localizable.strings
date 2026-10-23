@@ -93,6 +93,8 @@
 "RESTORE_REPLY_CONTEXT_DETAIL" = "Prikazuje osobe na koje se odgovara, iznad teksta otvorenog odgovora.";
 "SHOW_QUOTE_COUNTS_TITLE" = "Broj citata i retweetova";
 "SHOW_QUOTE_COUNTS_DETAIL" = "Prikaži oba broja na vrhu zaslona citata tweeta.";
+"SHOW_TWEET_SOURCE_TITLE" = "Izvor tweeta";
+"SHOW_TWEET_SOURCE_DETAIL" = "Prikaži aplikaciju iz koje je tweet poslan pokraj vremena otvorenog tweeta.";
 "SHOW_ACCOUNT_LOCATION_TITLE" = "Država računa";
 "SHOW_ACCOUNT_LOCATION_DETAIL" = "Prikaži državu računa pokraj vremena otvorenog tweeta.";
 "QUOTE_COUNTS_TITLE_FORMAT" = "Citati: %@ · Retweetovi: %@";
@@ -186,6 +188,12 @@
 "COPY_PROFILE_INFO_MENU_OPTION_3" = "Kopiraj ime";
 "COPY_PROFILE_INFO_MENU_OPTION_4" = "Kopiraj web-mjesto";
 "COPY_PROFILE_INFO_MENU_OPTION_5" = "Kopiraj lokaciju";
+"REMOVE_FOLLOWER_TITLE" = "Ukloni ovog pratitelja";
+"REMOVE_FOLLOWER_CONFIRM_TITLE" = "Ukloniti ovog pratitelja?";
+"REMOVE_FOLLOWER_CONFIRM_MESSAGE" = "%@ te više neće pratiti i neće dobiti obavijest o tome. Kasnije te može ponovno početi pratiti.";
+"REMOVE_FOLLOWER_ACTION" = "Ukloni";
+"REMOVE_FOLLOWER_DONE" = "Pratitelj je uklonjen";
+"REMOVE_FOLLOWER_FAILED" = "Pratitelja nije moguće ukloniti. Pokušaj ponovno.";
 
 /* ===== Padlock / authentication ===== */
 "PADLOCK_LOCKED_LABEL" = "Zaključano";

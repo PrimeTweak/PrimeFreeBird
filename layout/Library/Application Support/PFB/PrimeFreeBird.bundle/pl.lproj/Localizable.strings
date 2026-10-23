@@ -93,6 +93,8 @@
 "RESTORE_REPLY_CONTEXT_DETAIL" = "Pokazuje nad tekstem otwartej odpowiedzi, do kogo jest skierowana.";
 "SHOW_QUOTE_COUNTS_TITLE" = "Liczba cytatów i Retweetów";
 "SHOW_QUOTE_COUNTS_DETAIL" = "Pokazuje obie liczby u góry ekranu cytatów Tweeta.";
+"SHOW_TWEET_SOURCE_TITLE" = "Źródło Tweeta";
+"SHOW_TWEET_SOURCE_DETAIL" = "Pokazuje obok godziny otwartego Tweeta aplikację, z której go wysłano.";
 "SHOW_ACCOUNT_LOCATION_TITLE" = "Kraj konta";
 "SHOW_ACCOUNT_LOCATION_DETAIL" = "Pokazuje kraj konta obok godziny otwartego Tweeta.";
 "QUOTE_COUNTS_TITLE_FORMAT" = "Cytaty: %@ · Retweety: %@";
@@ -186,6 +188,12 @@
 "COPY_PROFILE_INFO_MENU_OPTION_3" = "Kopiuj nazwę";
 "COPY_PROFILE_INFO_MENU_OPTION_4" = "Kopiuj stronę internetową";
 "COPY_PROFILE_INFO_MENU_OPTION_5" = "Kopiuj lokalizację";
+"REMOVE_FOLLOWER_TITLE" = "Usuń tego obserwującego";
+"REMOVE_FOLLOWER_CONFIRM_TITLE" = "Usunąć tego obserwującego?";
+"REMOVE_FOLLOWER_CONFIRM_MESSAGE" = "Użytkownik %@ zostanie usunięty z listy Twoich obserwujących i nie zostanie o tym powiadomiony. Później może znów zacząć Cię obserwować.";
+"REMOVE_FOLLOWER_ACTION" = "Usuń";
+"REMOVE_FOLLOWER_DONE" = "Usunięto obserwującego";
+"REMOVE_FOLLOWER_FAILED" = "Nie udało się usunąć tego obserwującego. Spróbuj ponownie.";
 
 /* ===== Padlock / authentication ===== */
 "PADLOCK_LOCKED_LABEL" = "Zablokowano";

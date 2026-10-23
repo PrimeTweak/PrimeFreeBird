@@ -97,6 +97,10 @@ BOOL PFBHasUsableWebCredentials(void);
 // A GET signed with the web session; nil without one or for a URL that is not
 // https on x.com (WebCreateTweet.x).
 NSMutableURLRequest* PFBWebSessionGETRequest(NSURL* url);
+// The current account's ID when the web session is that account's, else nil. Main thread.
+NSString* PFBWebSessionAccountID(void);
+// A POST to one of x.com's own operations, as the web client sends it. Off the main thread.
+NSMutableURLRequest* PFBWebSessionPOSTRequest(NSString* path, NSData* body);
 // Saves the web session cookies for PrimeFreeBird's own requests.
 void PFBStoreWebCookies(NSArray<NSHTTPCookie*>* cookies);
 // The web auth_token a request was signed with: a bridged account signs with its own

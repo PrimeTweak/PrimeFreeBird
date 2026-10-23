@@ -93,6 +93,8 @@
 "RESTORE_REPLY_CONTEXT_DETAIL" = "Zeigt über dem Text einer geöffneten Antwort an, auf wen geantwortet wurde.";
 "SHOW_QUOTE_COUNTS_TITLE" = "Anzahl der Zitate und Retweets";
 "SHOW_QUOTE_COUNTS_DETAIL" = "Zeigt beide Zahlen oben im Zitate-Bildschirm eines Tweets.";
+"SHOW_TWEET_SOURCE_TITLE" = "Tweet-Quelle";
+"SHOW_TWEET_SOURCE_DETAIL" = "Zeigt neben der Uhrzeit eines geöffneten Tweets die App, mit der er gesendet wurde.";
 "SHOW_ACCOUNT_LOCATION_TITLE" = "Standort des Accounts";
 "SHOW_ACCOUNT_LOCATION_DETAIL" = "Zeigt neben der Uhrzeit eines geöffneten Tweets das Land, in dem sich der Account befindet.";
 "QUOTE_COUNTS_TITLE_FORMAT" = "Zitate: %@ · Retweets: %@";
@@ -186,6 +188,12 @@
 "COPY_PROFILE_INFO_MENU_OPTION_3" = "Namen kopieren";
 "COPY_PROFILE_INFO_MENU_OPTION_4" = "Webseite kopieren";
 "COPY_PROFILE_INFO_MENU_OPTION_5" = "Ort kopieren";
+"REMOVE_FOLLOWER_TITLE" = "Diesen Follower entfernen";
+"REMOVE_FOLLOWER_CONFIRM_TITLE" = "Diesen Follower entfernen?";
+"REMOVE_FOLLOWER_CONFIRM_MESSAGE" = "%@ wird aus deinen Followern entfernt und erhält keine Mitteilung darüber. Er/sie kann dir später wieder folgen.";
+"REMOVE_FOLLOWER_ACTION" = "Entfernen";
+"REMOVE_FOLLOWER_DONE" = "Follower entfernt";
+"REMOVE_FOLLOWER_FAILED" = "Follower konnte nicht entfernt werden. Versuch es noch einmal.";
 
 /* ===== Padlock / authentication ===== */
 "PADLOCK_LOCKED_LABEL" = "Gesperrt";

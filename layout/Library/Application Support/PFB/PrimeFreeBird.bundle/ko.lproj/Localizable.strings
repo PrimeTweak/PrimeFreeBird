@@ -93,6 +93,8 @@
 "RESTORE_REPLY_CONTEXT_DETAIL" = "답글을 열면 본문 위에 누구에게 보낸 답글인지 표시합니다.";
 "SHOW_QUOTE_COUNTS_TITLE" = "인용 및 리트윗 수";
 "SHOW_QUOTE_COUNTS_DETAIL" = "트윗의 인용 화면 상단에 두 숫자를 모두 표시합니다.";
+"SHOW_TWEET_SOURCE_TITLE" = "트윗 출처";
+"SHOW_TWEET_SOURCE_DETAIL" = "열린 트윗의 시간 옆에 트윗을 보낸 앱을 표시합니다.";
 "SHOW_ACCOUNT_LOCATION_TITLE" = "계정 위치";
 "SHOW_ACCOUNT_LOCATION_DETAIL" = "열린 트윗의 시간 옆에 계정이 있는 국가를 표시합니다.";
 "QUOTE_COUNTS_TITLE_FORMAT" = "인용: %@ · 리트윗: %@";
@@ -186,6 +188,12 @@
 "COPY_PROFILE_INFO_MENU_OPTION_3" = "닉네임 복사";
 "COPY_PROFILE_INFO_MENU_OPTION_4" = "웹 사이트 복사";
 "COPY_PROFILE_INFO_MENU_OPTION_5" = "위치 복사";
+"REMOVE_FOLLOWER_TITLE" = "이 팔로워 삭제하기";
+"REMOVE_FOLLOWER_CONFIRM_TITLE" = "이 팔로워를 삭제할까요?";
+"REMOVE_FOLLOWER_CONFIRM_MESSAGE" = "%@ 님을 내 팔로워에서 삭제합니다. 해당 사용자에게는 알림이 전송되지 않으며, 나중에 다시 나를 팔로우할 수 있습니다.";
+"REMOVE_FOLLOWER_ACTION" = "삭제";
+"REMOVE_FOLLOWER_DONE" = "팔로워를 삭제했습니다";
+"REMOVE_FOLLOWER_FAILED" = "이 팔로워를 삭제하지 못했습니다. 다시 시도해 주세요.";
 
 /* ===== Padlock / authentication ===== */
 "PADLOCK_LOCKED_LABEL" = "잠김";

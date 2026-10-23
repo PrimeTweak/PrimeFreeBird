@@ -72,11 +72,21 @@ static NSString* userIDFromTwid(NSString* twid) {
     return digits.length ? digits : nil;
 }
 
+// The account's ID, read as the integer or the object the getter returns.
 static NSString* userIDStringForAccount(id account) {
-    if (!account || ![account respondsToSelector:@selector(userID)]) {
+    SEL getter = NSSelectorFromString(@"userID");
+    if (!account || ![account respondsToSelector:getter]) {
         return nil;
     }
-    long long uid = ((long long (*)(id, SEL))objc_msgSend)(account, @selector(userID));
+    NSMethodSignature* signature = [account methodSignatureForSelector:getter];
+    char type = signature ? signature.methodReturnType[0] : 0;
+    long long uid = 0;
+    if (type == 'q' || type == 'Q' || type == 'l' || type == 'L') {
+        uid = ((long long (*)(id, SEL))objc_msgSend)(account, getter);
+    } else if (type == '@') {
+        id value = ((id (*)(id, SEL))objc_msgSend)(account, getter);
+        uid = [value respondsToSelector:@selector(longLongValue)] ? [value longLongValue] : 0;
+    }
     return uid ? [@(uid) stringValue] : nil;
 }
 
@@ -1174,6 +1184,28 @@ NSMutableURLRequest* PFBWebSessionGETRequest(NSURL* url) {
     return request;
 }
 
+NSString* PFBWebSessionAccountID(void) {
+    if (!PFBHasUsableWebCredentials()) {
+        return nil;
+    }
+    NSString* session = userIDFromTwid(WebTwid);
+    NSString* current = userIDStringForAccount(PFBAccountForAuthenticatedWebView());
+    return session.length && [session isEqualToString:current] ? session : nil;
+}
+
+NSMutableURLRequest* PFBWebSessionPOSTRequest(NSString* path, NSData* body) {
+    if (!PFBHasUsableWebCredentials()) {
+        return nil;
+    }
+    NSMutableURLRequest* request =
+        [NSMutableURLRequest requestWithURL:[NSURL URLWithString:[@"https://x.com" stringByAppendingString:path]]];
+    request.HTTPMethod = @"POST";
+    request.HTTPBody = body;
+    request.timeoutInterval = 15.0;
+    [request setValue:@"application/json" forHTTPHeaderField:@"Content-Type"];
+    return webPathRequest(request, @"x.com", path, @"web operation", NO);
+}
+
 static UIViewController* webSessionTopController(void) {
     UIWindowScene* scene = activeWindowScene();
     UIWindow* keyWindow = nil;
@@ -1343,16 +1375,14 @@ void PFBSeedReplyWebViewCookies(WKWebView* webView, void (^done)(void)) {
 static const void* WebPageStoreKey = &WebPageStoreKey;
 static const void* WebPagePendingKey = &WebPagePendingKey;
 
-%hook T1WebViewController
-
-- (id)updateConfiguration:(id)configuration {
-    id result = %orig;
+static void PFBSeedWebPageStore(id controller, id configuration, id result) {
     WKWebViewConfiguration* config = [result isKindOfClass:[WKWebViewConfiguration class]] ? result : configuration;
-    NSURL* root = [self respondsToSelector:@selector(rootURL)] ? [(id)self rootURL] : nil;
+    NSURL* root = [controller respondsToSelector:@selector(rootURL)] ? [controller rootURL] : nil;
     harvestSharedCookies();
     if (WebAuthToken.length == 0 || !PFBIsXDomain(root.host) || ![config isKindOfClass:[WKWebViewConfiguration class]] ||
-        objc_getAssociatedObject(self, WebHarvestWebViewKey)) {
-        return result;
+        objc_getAssociatedObject(controller, WebHarvestWebViewKey) ||
+        objc_getAssociatedObject(config.websiteDataStore, WebPageStoreKey)) {
+        return;
     }
 
     WKWebsiteDataStore* store = [WKWebsiteDataStore nonPersistentDataStore];
@@ -1368,6 +1398,24 @@ static const void* WebPagePendingKey = &WebPagePendingKey;
             load();
         }
     });
+}
+
+%hook T1WebViewController
+
+- (id)updateConfiguration:(id)configuration {
+    id result = %orig;
+    PFBSeedWebPageStore(self, configuration, result);
+    return result;
+}
+
+%end
+
+// The preloaded web view answers this itself, without its parent's version.
+%hook _TtC14T1TwitterSwift26PreloadedWebviewController
+
+- (id)updateConfiguration:(id)configuration {
+    id result = %orig;
+    PFBSeedWebPageStore(self, configuration, result);
     return result;
 }
 

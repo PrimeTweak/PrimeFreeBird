@@ -98,6 +98,34 @@ static BOOL ShouldKeepBrowserURLInApp(NSURL* url) {
 
 %end
 
+// MARK: - t.co requests made in the background
+
+%hook TNUTalonUtilities
+
+// The request that counts a click on t.co; the link itself opens at its own address.
++ (BOOL)sendTalonRequestForAnalytics:(NSURL*)url {
+    PFBCompatReach(PFBCompatPath_tco_requests);
+    PFBCOMPAT_ACTION(PFBCompat_expand_tco_links, @"t.co click count not sent");
+    return NO;
+}
+
+// The t.co safety check is not sent: its answer is the one a link outside t.co gets.
++ (id)verifyTalonURL:(NSURL*)url completion:(void (^)(NSInteger result))completion {
+    if (![url.host.lowercaseString isEqualToString:@"t.co"]) {
+        return %orig;
+    }
+    if (completion) {
+        dispatch_async(dispatch_get_main_queue(), ^{
+          completion(0);
+        });
+    }
+    PFBCompatReach(PFBCompatPath_tco_requests);
+    PFBCOMPAT_ACTION(PFBCompat_expand_tco_links, @"t.co check not sent");
+    return nil;
+}
+
+%end
+
 // MARK: - Disable RTL
 
 // CoreText picks direction from the first strong directional character; forcing

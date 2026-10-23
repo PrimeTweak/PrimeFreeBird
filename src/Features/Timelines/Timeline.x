@@ -1633,6 +1633,53 @@ static BOOL PFBTimelineFiltersNeedObservation(void) {
            PFBCompatNeedsObservation(PFBCompat_filter_languages);
 }
 
+// Measurement: a section holding a module header or footer, or a Who to follow item, is
+// written to the log a few times per launch, around those items: each item's kind (H header,
+// F footer, W Who to follow, else its class) and a "-" when it is removed.
+static void PFBLogModuleSection(NSArray* items, NSIndexSet* removed, NSUInteger index, NSUInteger count) {
+    static NSUInteger calls;
+    static NSMutableSet<NSString*>* written;
+    if (calls++ > 400 || written.count >= 8) {
+        return;
+    }
+    NSMutableArray<NSString*>* kinds = [NSMutableArray arrayWithCapacity:items.count];
+    NSInteger first = -1, last = -1;
+    for (NSUInteger i = 0; i < items.count; i++) {
+        id model = PFBUnwrapDataViewItem(items[i]);
+        NSString* name = NSStringFromClass([model classForCoder]) ?: @"?";
+        NSString* kind = [name componentsSeparatedByString:@"."].lastObject;
+        if ([name isEqualToString:@"TwitterURT.URTModuleHeaderViewModel"]) {
+            kind = @"H";
+        } else if ([name isEqualToString:@"TwitterURT.URTModuleFooterViewModel"]) {
+            kind = @"F";
+        } else if ([ItemScribeComponent(model) isEqualToString:@"suggest_who_to_follow"] ||
+                   [ItemEntryID(model) containsString:@"who-to-follow"]) {
+            kind = @"W";
+        }
+        if (kind.length == 1) {
+            first = first < 0 ? (NSInteger)i : first;
+            last = (NSInteger)i;
+        }
+        [kinds addObject:[removed containsIndex:i] ? [kind stringByAppendingString:@"-"] : kind];
+    }
+    if (first < 0) {
+        return;
+    }
+    NSUInteger from = (NSUInteger)MAX((NSInteger)0, first - 2);
+    NSUInteger to = (NSUInteger)MIN((NSInteger)items.count - 1, last + 2);
+    NSString* line = [NSString stringWithFormat:@"section %lu/%lu, items %lu-%lu of %lu: %@",
+                                                (unsigned long)index + 1, (unsigned long)count,
+                                                (unsigned long)from + 1, (unsigned long)to + 1,
+                                                (unsigned long)items.count,
+                                                [[kinds subarrayWithRange:NSMakeRange(from, to - from + 1)]
+                                                    componentsJoinedByString:@" "]];
+    written = written ?: [NSMutableSet set];
+    if (![written containsObject:line]) {
+        [written addObject:line];
+        PFBDebugLog(@"[modules] %@", line);
+    }
+}
+
 static NSArray* FilteredTimelineSections(TFNItemsDataViewController* dataViewController,
                                          NSArray* sections) {
     BOOL hideWhoToFollow = [PFBSettings boolForKey:@"hide_who_to_follow"];
@@ -1678,7 +1725,9 @@ static NSArray* FilteredTimelineSections(TFNItemsDataViewController* dataViewCon
     BOOL modified = NO;
     NSMutableArray* filteredSections = [NSMutableArray arrayWithCapacity:sections.count];
 
+    NSUInteger sectionIndex = 0;
     for (id section in sections) {
+        NSUInteger thisSection = sectionIndex++;
         if (![section isKindOfClass:[NSArray class]]) {
             [filteredSections addObject:section];
             continue;
@@ -1703,12 +1752,14 @@ static NSArray* FilteredTimelineSections(TFNItemsDataViewController* dataViewCon
             }
         }
 
+        if (removed.count > 0) {
+            PFBMarkEmptiedModuleChrome(items, removed);
+        }
+        PFBLogModuleSection(items, removed, thisSection, sections.count);
         if (removed.count == 0) {
             [filteredSections addObject:section];
             continue;
         }
-
-        PFBMarkEmptiedModuleChrome(items, removed);
 
         modified = YES;
         NSMutableArray* keptItems = [items mutableCopy];

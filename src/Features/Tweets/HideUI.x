@@ -315,3 +315,40 @@ static BOOL PFBVerifiedValue(id value) {
 }
 
 %end
+
+// MARK: - Hide views in an opened Tweet's footer
+
+%hook T1ConversationFooterTextView
+
+// The footer is written and measured from its item's view count, so the count is taken
+// off the item for both and put back after.
+- (void)updateFooterTextView {
+    T1ConversationFooterItem* item =
+        [self respondsToSelector:@selector(footerItem)] ? self.footerItem : nil;
+    NSNumber* views = [item isKindOfClass:%c(T1ConversationFooterItem)] ? item.viewCount : nil;
+    if (!views || ![PFBSettings boolForKey:@"hide_view_count"]) {
+        %orig;
+        return;
+    }
+    item.viewCount = nil;
+    %orig;
+    item.viewCount = views;
+    PFBCompatReach(PFBCompatPath_views_footer);
+    PFBCOMPAT_ACTION(PFBCompat_hide_view_count, @"views count removed from an opened Tweet");
+}
+
++ (CGSize)sizeForViewModel:(id)model
+                footerItem:(T1ConversationFooterItem*)item
+              maximumWidth:(CGFloat)width
+grokEditImageButtonConfiguration:(id)configuration {
+    NSNumber* views = [item isKindOfClass:%c(T1ConversationFooterItem)] ? item.viewCount : nil;
+    if (!views || ![PFBSettings boolForKey:@"hide_view_count"]) {
+        return %orig;
+    }
+    item.viewCount = nil;
+    CGSize size = %orig;
+    item.viewCount = views;
+    return size;
+}
+
+%end

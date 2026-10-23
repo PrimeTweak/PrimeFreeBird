@@ -3,6 +3,7 @@
 
 #import "Support/HookHelpers.h"
 #import "Debug/PFBDebugger.h"
+#import "Support/TwitterChirpFont.h"
 
 // MARK: - Copy profile info
 
@@ -541,3 +542,228 @@ static const void* kPFBTabAppliedKey = &kPFBTabAppliedKey;
 }
 
 %end
+
+// MARK: - Remove this follower
+
+// x.com's own operation, sent with the web session. The web client names the follower
+// with target_user_id; an error naming another variable is followed once.
+static NSString* const kPFBRemoveFollowerQueryID = @"QpNfg0kpPRfjROQ_9eOLXA";
+static const NSInteger kPFBFollowerToastTag = 90313;
+
+// The profile's account follows the viewer, as the header's "Follows you" shows.
+static BOOL pfbProfileFollowsViewer(id viewModel) {
+    SEL getter = NSSelectorFromString(@"isFollowingViewer");
+    Method method = viewModel ? class_getInstanceMethod([viewModel class], getter) : NULL;
+    if (!method) {
+        return NO;
+    }
+    char type[8] = {0};
+    method_getReturnType(method, type, sizeof(type));
+    if (type[0] != 'B' && type[0] != 'c') {
+        return NO;
+    }
+    return ((BOOL (*)(id, SEL))objc_msgSend)(viewModel, getter);
+}
+
+// The variable an x.com error names, as in: Variable "$target_user_id" ...
+static NSString* pfbVariableNamed(id message) {
+    if (![message isKindOfClass:[NSString class]]) {
+        return nil;
+    }
+    NSString* text = message;
+    NSRegularExpression* pattern =
+        [NSRegularExpression regularExpressionWithPattern:@"Variable \"\\$([A-Za-z_]+)\"" options:0 error:nil];
+    NSTextCheckingResult* match = [pattern firstMatchInString:text options:0 range:NSMakeRange(0, text.length)];
+    return match ? [text substringWithRange:[match rangeAtIndex:1]] : nil;
+}
+
+static void pfbSendRemoveFollower(NSString* userID, NSString* variable, BOOL retried,
+                                  void (^done)(BOOL removed)) {
+    NSDictionary* payload = @{@"variables": @{variable: userID}, @"queryId": kPFBRemoveFollowerQueryID};
+    NSData* body = [NSJSONSerialization dataWithJSONObject:payload options:0 error:nil];
+    NSString* path = [NSString stringWithFormat:@"/i/api/graphql/%@/RemoveFollower", kPFBRemoveFollowerQueryID];
+    dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
+      NSMutableURLRequest* request = PFBWebSessionPOSTRequest(path, body);
+      if (!request) {
+          dispatch_async(dispatch_get_main_queue(), ^{
+            done(NO);
+          });
+          return;
+      }
+      [[[NSURLSession sharedSession]
+          dataTaskWithRequest:request
+            completionHandler:^(NSData* data, NSURLResponse* response, NSError* error) {
+                NSInteger status = [response isKindOfClass:[NSHTTPURLResponse class]]
+                                       ? ((NSHTTPURLResponse*)response).statusCode
+                                       : 0;
+                id json = data ? [NSJSONSerialization JSONObjectWithData:data options:0 error:nil] : nil;
+                id errors = [json isKindOfClass:[NSDictionary class]] ? json[@"errors"] : nil;
+                id first = [errors isKindOfClass:[NSArray class]] ? [errors firstObject] : nil;
+                id message = [first isKindOfClass:[NSDictionary class]] ? first[@"message"] : nil;
+                NSString* asked = pfbVariableNamed(message);
+                if (!retried && asked.length && ![asked isEqualToString:variable]) {
+                    PFBDebugLog(@"[follower] x.com names the follower $%@", asked);
+                    pfbSendRemoveFollower(userID, asked, YES, done);
+                    return;
+                }
+                BOOL removed = status == 200 && [json isKindOfClass:[NSDictionary class]] && !first;
+                PFBDebugLog(@"[follower] remove follower http=%ld%@%@", (long)status,
+                            [message isKindOfClass:[NSString class]] ? [@" " stringByAppendingString:message] : @"",
+                            error ? [@" " stringByAppendingString:error.localizedDescription] : @"");
+                dispatch_async(dispatch_get_main_queue(), ^{
+                  done(removed);
+                });
+            }] resume];
+    });
+}
+
+// The same capsule as the tweak's other confirmations, at the top of the window.
+static void pfbShowFollowerToast(UIWindow* window, NSString* text) {
+    if (!window) {
+        return;
+    }
+    [[window viewWithTag:kPFBFollowerToastTag] removeFromSuperview];
+    BOOL liquidGlass = [PFBSettings boolForKey:@"enable_liquid_glass"];
+    Class glassClass = NSClassFromString(@"UIGlassEffect");
+    UIVisualEffect* effect = liquidGlass && glassClass ? [[glassClass alloc] init] : nil;
+    if (!effect) {
+        effect = [UIBlurEffect effectWithStyle:UIBlurEffectStyleSystemThickMaterial];
+        liquidGlass = NO;
+    }
+    UIVisualEffectView* toast = [[UIVisualEffectView alloc] initWithEffect:effect];
+    toast.tag = kPFBFollowerToastTag;
+    toast.translatesAutoresizingMaskIntoConstraints = NO;
+    toast.layer.cornerRadius = 22.0;
+    toast.layer.cornerCurve = kCACornerCurveContinuous;
+    if (!liquidGlass) {
+        toast.clipsToBounds = YES;
+        toast.layer.borderWidth = 0.5;
+        toast.layer.borderColor = [UIColor separatorColor].CGColor;
+    }
+    [window addSubview:toast];
+    UIView* content = toast.contentView;
+    UIView* veil = [[UIView alloc] init];
+    veil.backgroundColor = [[UIColor systemBackgroundColor] colorWithAlphaComponent:0.80];
+    veil.userInteractionEnabled = NO;
+    veil.layer.cornerRadius = 22.0;
+    veil.layer.cornerCurve = kCACornerCurveContinuous;
+    veil.layer.masksToBounds = YES;
+    veil.translatesAutoresizingMaskIntoConstraints = NO;
+    [content addSubview:veil];
+    UILabel* label = [[UILabel alloc] init];
+    label.text = text;
+    label.font = PFBScaledFont([TwitterChirpFont(TwitterFontStyleRegular) fontWithSize:15]);
+    label.textColor = [UIColor labelColor];
+    label.translatesAutoresizingMaskIntoConstraints = NO;
+    [content addSubview:label];
+    [NSLayoutConstraint activateConstraints:@[
+        [veil.topAnchor constraintEqualToAnchor:content.topAnchor],
+        [veil.bottomAnchor constraintEqualToAnchor:content.bottomAnchor],
+        [veil.leadingAnchor constraintEqualToAnchor:content.leadingAnchor],
+        [veil.trailingAnchor constraintEqualToAnchor:content.trailingAnchor],
+        [toast.centerXAnchor constraintEqualToAnchor:window.centerXAnchor],
+        [toast.topAnchor constraintEqualToAnchor:window.safeAreaLayoutGuide.topAnchor constant:6],
+        [toast.heightAnchor constraintEqualToConstant:44],
+        [toast.leadingAnchor constraintGreaterThanOrEqualToAnchor:window.leadingAnchor constant:20],
+        [label.leadingAnchor constraintEqualToAnchor:content.leadingAnchor constant:18],
+        [label.trailingAnchor constraintEqualToAnchor:content.trailingAnchor constant:-18],
+        [label.centerYAnchor constraintEqualToAnchor:content.centerYAnchor],
+    ]];
+    toast.alpha = 0;
+    toast.transform = CGAffineTransformMakeTranslation(0.0, -8.0);
+    [UIView animateWithDuration:0.22
+                     animations:^{
+                       toast.alpha = 1;
+                       toast.transform = CGAffineTransformIdentity;
+                     }];
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(3.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+      [UIView animateWithDuration:0.22
+          animations:^{
+            toast.alpha = 0;
+            toast.transform = CGAffineTransformMakeTranslation(0.0, -8.0);
+          }
+          completion:^(BOOL finished) {
+            [toast removeFromSuperview];
+          }];
+    });
+}
+
+static void pfbConfirmRemoveFollower(UIViewController* from, NSString* userID, NSString* handle) {
+    UIWindow* window = from.view.window;
+    UIViewController* top = window.rootViewController ?: from;
+    while (top.presentedViewController && !top.presentedViewController.isBeingDismissed) {
+        top = top.presentedViewController;
+    }
+    PFBBundle* bundle = [PFBBundle sharedBundle];
+    NSString* message = [NSString stringWithFormat:[bundle localizedStringForKey:@"REMOVE_FOLLOWER_CONFIRM_MESSAGE"],
+                                                   [@"@" stringByAppendingString:handle]];
+    UIAlertController* alert =
+        [UIAlertController alertControllerWithTitle:[bundle localizedStringForKey:@"REMOVE_FOLLOWER_CONFIRM_TITLE"]
+                                            message:message
+                                     preferredStyle:UIAlertControllerStyleAlert];
+    [alert addAction:[UIAlertAction actionWithTitle:[bundle localizedStringForKey:@"CANCEL_ACTION"]
+                                              style:UIAlertActionStyleCancel
+                                            handler:nil]];
+    [alert addAction:[UIAlertAction actionWithTitle:[bundle localizedStringForKey:@"REMOVE_FOLLOWER_ACTION"]
+                                              style:UIAlertActionStyleDestructive
+                                            handler:^(UIAlertAction* action) {
+                                                pfbSendRemoveFollower(userID, @"target_user_id", NO, ^(BOOL removed) {
+                                                  if (removed) {
+                                                      PFBCOMPAT_ACTION(PFBCompat_remove_follower, @"follower removed");
+                                                  }
+                                                  pfbShowFollowerToast(window, [bundle localizedStringForKey:removed
+                                                                                            ? @"REMOVE_FOLLOWER_DONE"
+                                                                                            : @"REMOVE_FOLLOWER_FAILED"]);
+                                                });
+                                            }]];
+    [top presentViewController:alert animated:YES completion:nil];
+}
+
+%hook T1ProfileHeaderViewController
+
+// The profile's own menu gains the entry when its account follows the viewer and the
+// web session is the viewer's. It goes before the first destructive entry (Block).
+- (NSArray*)profileMoreActionsBaseActionItemsWithSender:(id)sender {
+    NSArray* items = %orig;
+    id viewModel = pfbGetterValue(self, @"viewModel");
+    PFBCOMPAT_OBSERVE(PFBCompat_remove_follower, @"profile menu built");
+    NSString* userID = pfbProfileUserID(viewModel);
+    id handle = pfbGetterValue(pfbProfileUser(viewModel), @"username");
+    if (![items isKindOfClass:[NSArray class]] || !userID || ![handle isKindOfClass:[NSString class]] ||
+        !pfbProfileFollowsViewer(viewModel) || !PFBWebSessionAccountID()) {
+        return items;
+    }
+    __weak UIViewController* weakSelf = (UIViewController*)self;
+    id entry = [%c(TFNActionItem)
+        actionItemWithTitle:[[PFBBundle sharedBundle] localizedStringForKey:@"REMOVE_FOLLOWER_TITLE"]
+                  imageName:@"follow_close_stroke"
+                     action:^{
+                       // The menu closes first; the confirmation follows it.
+                       dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.35 * NSEC_PER_SEC)),
+                                      dispatch_get_main_queue(), ^{
+                                        UIViewController* strong = weakSelf;
+                                        if (strong) {
+                                            pfbConfirmRemoveFollower(strong, userID, handle);
+                                        }
+                                      });
+                     }];
+    if (!entry) {
+        return items;
+    }
+    NSMutableArray* menu = [items mutableCopy];
+    NSUInteger at = menu.count;
+    for (NSUInteger i = 0; i < menu.count; i++) {
+        id item = menu[i];
+        if ([item respondsToSelector:@selector(isDestructive)] &&
+            ((BOOL (*)(id, SEL))objc_msgSend)(item, @selector(isDestructive))) {
+            at = i;
+            break;
+        }
+    }
+    [menu insertObject:entry atIndex:at];
+    PFBCOMPAT_ACTION(PFBCompat_remove_follower, @"entry added to the profile menu");
+    return [menu copy];
+}
+
+%end
+

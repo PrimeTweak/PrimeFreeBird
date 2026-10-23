@@ -93,6 +93,8 @@
 "RESTORE_REPLY_CONTEXT_DETAIL" = "يعرض لمن تم توجيه الرد، فوق نص الرد الذي تفتحه.";
 "SHOW_QUOTE_COUNTS_TITLE" = "عدد الاقتباسات وإعادات التغريد";
 "SHOW_QUOTE_COUNTS_DETAIL" = "عرض العددين أعلى شاشة اقتباسات التغريدة.";
+"SHOW_TWEET_SOURCE_TITLE" = "مصدر التغريدة";
+"SHOW_TWEET_SOURCE_DETAIL" = "عرض التطبيق الذي أُرسلت منه التغريدة بجانب وقت التغريدة المفتوحة.";
 "SHOW_ACCOUNT_LOCATION_TITLE" = "موقع الحساب";
 "SHOW_ACCOUNT_LOCATION_DETAIL" = "عرض البلد الذي يوجد فيه الحساب بجانب وقت التغريدة المفتوحة.";
 "QUOTE_COUNTS_TITLE_FORMAT" = "الاقتباسات: %@ · إعادات التغريد: %@";
@@ -186,6 +188,12 @@
 "COPY_PROFILE_INFO_MENU_OPTION_3" = "نسخ الاسم";
 "COPY_PROFILE_INFO_MENU_OPTION_4" = "نسخ الموقع الإلكتروني";
 "COPY_PROFILE_INFO_MENU_OPTION_5" = "نسخ الموقع";
+"REMOVE_FOLLOWER_TITLE" = "إزالة هذا المتابع";
+"REMOVE_FOLLOWER_CONFIRM_TITLE" = "هل تريد إزالة هذا المتابع؟";
+"REMOVE_FOLLOWER_CONFIRM_MESSAGE" = "ستتم إزالة %@ من متابِعيك ولن يتم إخطاره بذلك. ويمكنه متابعتك مرة أخرى لاحقًا.";
+"REMOVE_FOLLOWER_ACTION" = "إزالة";
+"REMOVE_FOLLOWER_DONE" = "تمت إزالة المتابع";
+"REMOVE_FOLLOWER_FAILED" = "تعذّرت إزالة هذا المتابع. حاول مرة أخرى.";
 
 /* ===== Padlock / authentication ===== */
 "PADLOCK_LOCKED_LABEL" = "مقفل";

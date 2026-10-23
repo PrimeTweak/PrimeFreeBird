@@ -1,23 +1,36 @@
-// Account location: the country an author's account is based in, read from x.com's
-// About this account with the web session and added after the time of an opened Tweet.
+// Footer of an opened Tweet: the app it was sent from and the country its account is based
+// in, both read from x.com with the web session and added after the time.
 
 #import "Support/HookHelpers.h"
 #import "Debug/PFBDebugger.h"
 
 static NSString* const kPFBAboutAccountURL =
     @"https://x.com/i/api/graphql/XRqGa7EeokUU5kppkh13EA/AboutAccountQuery?variables=";
-static NSString* const kPFBAccountLocationNote = @"PFBAccountLocationArrived";
-static const NSInteger kPFBAccountLocationTries = 3;
-
-// By handle: the country, or an empty string once x.com gave none. Main thread only.
-static NSCache<NSString*, NSString*>* gPFBLocations;
-static NSMutableSet<NSString*>* gPFBLocationsAsked;
-static NSMutableDictionary<NSString*, NSNumber*>* gPFBLocationFailures;
+static NSString* const kPFBFooterLabelNote = @"PFBFooterLabelArrived";
+static const NSInteger kPFBFooterLabelTries = 3;
 
 static const void* kPFBFooterTimeKey = &kPFBFooterTimeKey;
 static const void* kPFBFooterRefresherKey = &kPFBFooterRefresherKey;
-// Set once a country has been added to a footer, so the option turned off puts times back.
-static BOOL gPFBCountryShown;
+// Set once a label has been added to a footer, so the options turned off put times back.
+static BOOL gPFBLabelShown;
+
+// One kind of label by key, a handle or a Tweet ID: the answers (an empty string once
+// x.com gave none), the keys being asked and the failed tries. Main thread only.
+@interface PFBFooterLabels : NSObject
+@property (nonatomic, copy) NSString* name;
+@property (nonatomic, strong) NSCache<NSString*, NSString*>* answers;
+@property (nonatomic, strong) NSMutableSet<NSString*>* asked;
+@property (nonatomic, strong) NSMutableDictionary<NSString*, NSNumber*>* failures;
+@property (nonatomic) NSMutableURLRequest* (*request)(NSString* key);
+@property (nonatomic) NSString* (*label)(NSData* data, NSString* key);
+@property (nonatomic) BOOL refusalTold;
+@end
+
+@implementation PFBFooterLabels
+@end
+
+static PFBFooterLabels* gPFBCountries;
+static PFBFooterLabels* gPFBSources;
 
 // The handle without the @ or anything else a handle cannot hold.
 static NSString* PFBCleanHandle(id value) {
@@ -46,8 +59,43 @@ static NSString* PFBFooterHandle(T1ConversationFooterTextView* footer) {
     return PFBCleanHandle(((id (*)(id, SEL))objc_msgSend)(model, getter));
 }
 
+// The ID of the footer's own Tweet, read as the integer or the object the getter returns.
+static NSString* PFBFooterTweetID(T1ConversationFooterTextView* footer) {
+    id model = [footer respondsToSelector:@selector(viewModel)] ? footer.viewModel : nil;
+    SEL getter = @selector(statusID);
+    NSMethodSignature* signature =
+        [model respondsToSelector:getter] ? [model methodSignatureForSelector:getter] : nil;
+    char type = signature ? signature.methodReturnType[0] : 0;
+    long long value = 0;
+    if (type == 'q' || type == 'Q' || type == 'l' || type == 'L') {
+        value = ((long long (*)(id, SEL))objc_msgSend)(model, getter);
+    } else if (type == '@') {
+        id object = ((id (*)(id, SEL))objc_msgSend)(model, getter);
+        value = [object respondsToSelector:@selector(longLongValue)] ? [object longLongValue] : 0;
+    }
+    return value > 0 ? [NSString stringWithFormat:@"%lld", value] : nil;
+}
+
+// The About this account question for a handle.
+static NSMutableURLRequest* PFBCountryRequest(NSString* handle) {
+    NSData* variables =
+        [NSJSONSerialization dataWithJSONObject:@{@"screenName": handle} options:0 error:nil];
+    NSCharacterSet* plain =
+        [NSCharacterSet characterSetWithCharactersInString:
+                            @"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~"];
+    NSString* query = [[[NSString alloc] initWithData:variables encoding:NSUTF8StringEncoding]
+        stringByAddingPercentEncodingWithAllowedCharacters:plain];
+    NSMutableURLRequest* request =
+        PFBWebSessionGETRequest([NSURL URLWithString:[kPFBAboutAccountURL stringByAppendingString:query]]);
+    // The country comes back in the language Twitter shows.
+    NSString* language = [NSBundle mainBundle].preferredLocalizations.firstObject ?: @"en";
+    [request setValue:[language substringToIndex:MIN((NSUInteger)2, language.length)]
+        forHTTPHeaderField:@"x-twitter-client-language"];
+    return request;
+}
+
 // "Canada", or "Canada?" when x.com marks the place as uncertain; nil without a place.
-static NSString* PFBCountryFromAnswer(NSData* data) {
+static NSString* PFBCountryFromAnswer(NSData* data, NSString* handle) {
     id json = data ? [NSJSONSerialization JSONObjectWithData:data options:0 error:nil] : nil;
     for (NSString* key in @[@"data", @"user_result_by_screen_name", @"result", @"about_profile"]) {
         json = [json isKindOfClass:[NSDictionary class]] ? json[key] : nil;
@@ -61,98 +109,152 @@ static NSString* PFBCountryFromAnswer(NSData* data) {
     return doubtful ? [place stringByAppendingString:@"?"] : place;
 }
 
-static void PFBAskForCountry(NSString* handle);
+// The conversation of one Tweet, which carries the app it was sent from.
+static NSMutableURLRequest* PFBSourceRequest(NSString* tweetID) {
+    NSString* address = [NSString
+        stringWithFormat:@"https://x.com/i/api/2/timeline/conversation/%@.json?tweet_mode=extended&count=1",
+                         tweetID];
+    return PFBWebSessionGETRequest([NSURL URLWithString:address]);
+}
 
-// Main thread. A failed answer is asked again twice, then settled as no country.
-static void PFBSettleCountry(NSString* handle, NSString* country, BOOL failed) {
-    [gPFBLocationsAsked removeObject:handle];
+// The visible name in the source markup, as "Twitter for iPhone" in <a href=...>Twitter for iPhone</a>.
+static NSString* PFBSourceFromMarkup(id markup) {
+    if (![markup isKindOfClass:[NSString class]]) {
+        return nil;
+    }
+    NSRange open = [markup rangeOfString:@">"];
+    NSRange close = [markup rangeOfString:@"</a>"];
+    if (open.location == NSNotFound || close.location == NSNotFound || open.location + 1 >= close.location) {
+        return nil;
+    }
+    NSString* name = [[markup substringWithRange:NSMakeRange(open.location + 1, close.location - open.location - 1)]
+        stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+    return name.length ? name : nil;
+}
+
+// The app a Tweet was sent from, in either form x.com answers the conversation with.
+static NSString* PFBSourceFromAnswer(NSData* data, NSString* tweetID) {
+    id json = data ? [NSJSONSerialization JSONObjectWithData:data options:0 error:nil] : nil;
+    if (![json isKindOfClass:[NSDictionary class]]) {
+        return nil;
+    }
+    id tweets = json[@"globalObjects"];
+    tweets = [tweets isKindOfClass:[NSDictionary class]] ? tweets[@"tweets"] : nil;
+    id tweet = [tweets isKindOfClass:[NSDictionary class]] ? tweets[tweetID] : nil;
+    if ([tweet isKindOfClass:[NSDictionary class]]) {
+        return PFBSourceFromMarkup(tweet[@"source"]);
+    }
+    id conversation = json[@"data"];
+    conversation = [conversation isKindOfClass:[NSDictionary class]]
+                       ? conversation[@"threaded_conversation_with_injections_v2"]
+                       : nil;
+    id instructions = [conversation isKindOfClass:[NSDictionary class]] ? conversation[@"instructions"] : nil;
+    for (id instruction in [instructions isKindOfClass:[NSArray class]] ? instructions : @[]) {
+        id entries = [instruction isKindOfClass:[NSDictionary class]] ? instruction[@"entries"] : nil;
+        for (id entry in [entries isKindOfClass:[NSArray class]] ? entries : @[]) {
+            id result = entry;
+            for (NSString* key in @[@"content", @"itemContent", @"tweet_results", @"result"]) {
+                result = [result isKindOfClass:[NSDictionary class]] ? result[key] : nil;
+            }
+            id inner = [result isKindOfClass:[NSDictionary class]] ? result[@"tweet"] : nil;
+            id found = [inner isKindOfClass:[NSDictionary class]] ? inner : result;
+            if ([found isKindOfClass:[NSDictionary class]] && [found[@"rest_id"] isEqual:tweetID]) {
+                return PFBSourceFromMarkup(found[@"source"]);
+            }
+        }
+    }
+    return nil;
+}
+
+static void PFBAskForLabel(PFBFooterLabels* labels, NSString* key);
+
+// Main thread. A failed answer is asked again twice, then settled as no label.
+static void PFBSettleLabel(PFBFooterLabels* labels, NSString* key, NSString* label, BOOL failed) {
+    [labels.asked removeObject:key];
     if (failed) {
-        NSInteger failures = gPFBLocationFailures[handle].integerValue + 1;
-        gPFBLocationFailures[handle] = @(failures);
-        if (failures < kPFBAccountLocationTries) {
+        NSInteger failures = labels.failures[key].integerValue + 1;
+        labels.failures[key] = @(failures);
+        if (failures < kPFBFooterLabelTries) {
             dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1.5 * NSEC_PER_SEC)),
                            dispatch_get_main_queue(), ^{
-                             PFBAskForCountry(handle);
+                             PFBAskForLabel(labels, key);
                            });
             return;
         }
     }
-    [gPFBLocationFailures removeObjectForKey:handle];
-    [gPFBLocations setObject:country ?: @"" forKey:handle];
-    [[NSNotificationCenter defaultCenter] postNotificationName:kPFBAccountLocationNote
-                                                        object:handle];
+    [labels.failures removeObjectForKey:key];
+    [labels.answers setObject:label ?: @"" forKey:key];
+    [[NSNotificationCenter defaultCenter] postNotificationName:kPFBFooterLabelNote object:key];
 }
 
-// Main thread. One question per handle at a time, none once it is settled.
-static void PFBAskForCountry(NSString* handle) {
-    if ([gPFBLocations objectForKey:handle] || [gPFBLocationsAsked containsObject:handle]) {
+// Main thread. One question per key at a time, none once it is settled.
+static void PFBAskForLabel(PFBFooterLabels* labels, NSString* key) {
+    if ([labels.answers objectForKey:key] || [labels.asked containsObject:key]) {
         return;
     }
-    NSData* variables =
-        [NSJSONSerialization dataWithJSONObject:@{@"screenName": handle} options:0 error:nil];
-    NSCharacterSet* plain =
-        [NSCharacterSet characterSetWithCharactersInString:
-                            @"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~"];
-    NSString* query = [[[NSString alloc] initWithData:variables encoding:NSUTF8StringEncoding]
-        stringByAddingPercentEncodingWithAllowedCharacters:plain];
-    NSMutableURLRequest* request =
-        PFBWebSessionGETRequest([NSURL URLWithString:[kPFBAboutAccountURL stringByAppendingString:query]]);
+    NSMutableURLRequest* request = labels.request(key);
     if (!request) {
         static BOOL said;
         if (!said) {
             said = YES;
-            PFBDebugLog(@"[location] no web session: no country asked");
+            PFBDebugLog(@"[footer] no web session: no label asked");
         }
         return;
     }
-    // The country comes back in the language Twitter shows.
-    NSString* language = [NSBundle mainBundle].preferredLocalizations.firstObject ?: @"en";
-    [request setValue:[language substringToIndex:MIN((NSUInteger)2, language.length)]
-        forHTTPHeaderField:@"x-twitter-client-language"];
-    [gPFBLocationsAsked addObject:handle];
+    [labels.asked addObject:key];
+    NSString* (*parse)(NSData*, NSString*) = labels.label;
     [[[NSURLSession sharedSession]
         dataTaskWithRequest:request
           completionHandler:^(NSData* data, NSURLResponse* response, NSError* error) {
               NSInteger status = [response isKindOfClass:[NSHTTPURLResponse class]]
                                      ? ((NSHTTPURLResponse*)response).statusCode
                                      : 0;
-              NSString* country = status == 200 ? PFBCountryFromAnswer(data) : nil;
+              NSString* label = status == 200 ? parse(data, key) : nil;
               dispatch_async(dispatch_get_main_queue(), ^{
-                static BOOL refused;
-                if (status != 200 && !refused) {
-                    refused = YES;
-                    PFBDebugLog(@"[location] about-account http=%ld%@ for @%@", (long)status,
+                if (status != 200 && !labels.refusalTold) {
+                    labels.refusalTold = YES;
+                    PFBDebugLog(@"[footer] %@ http=%ld%@ for %@", labels.name, (long)status,
                                 error ? [@" " stringByAppendingString:error.localizedDescription] : @"",
-                                handle);
+                                key);
                 }
-                PFBSettleCountry(handle, country, status != 200);
+                PFBSettleLabel(labels, key, label, status != 200);
               });
           }] resume];
 }
 
-// The footer's time with the country after it. The time as Twitter wrote it is kept on
-// the item, so a second pass never adds the country twice.
-static BOOL PFBComposeFooterTime(T1ConversationFooterItem* item, NSString* country) {
+// The settled label for a key, asked for once while none is known.
+static NSString* PFBLabelFor(PFBFooterLabels* labels, NSString* key) {
+    NSString* label = [labels.answers objectForKey:key];
+    if (!label) {
+        PFBAskForLabel(labels, key);
+    }
+    return label;
+}
+
+// The footer's time with the labels after it. The time as Twitter wrote it is kept on
+// the item, so a second pass never adds a label twice.
+static void PFBComposeFooterTime(T1ConversationFooterItem* item, NSArray<NSString*>* labels) {
     NSString* current = item.timeAgo;
     if (!current.length) {
-        return NO;
+        return;
     }
     NSArray<NSString*>* pair = objc_getAssociatedObject(item, kPFBFooterTimeKey);
     NSString* original = [pair.lastObject isEqualToString:current] ? pair.firstObject : current;
-    NSString* composed =
-        country.length ? [NSString stringWithFormat:@"%@ · %@", original, country] : original;
+    NSMutableString* composed = [original mutableCopy];
+    for (NSString* label in labels) {
+        if (label.length) {
+            [composed appendFormat:@" · %@", label];
+            gPFBLabelShown = YES;
+        }
+    }
     if (![composed isEqualToString:current]) {
         [item setTimeAgo:composed];
     }
-    objc_setAssociatedObject(item, kPFBFooterTimeKey, @[original, composed],
+    objc_setAssociatedObject(item, kPFBFooterTimeKey, @[original, [composed copy]],
                              OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-    if (country.length) {
-        gPFBCountryShown = YES;
-    }
-    return country.length > 0;
 }
 
-// Puts back the time as Twitter wrote it on an item that still shows a country.
+// Puts back the time as Twitter wrote it on an item that still shows a label.
 static void PFBRestoreFooterTime(T1ConversationFooterItem* item) {
     NSArray<NSString*>* pair = item ? objc_getAssociatedObject(item, kPFBFooterTimeKey) : nil;
     if (!pair) {
@@ -164,10 +266,11 @@ static void PFBRestoreFooterTime(T1ConversationFooterItem* item) {
     objc_setAssociatedObject(item, kPFBFooterTimeKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
 }
 
-// Lives as long as its footer and redraws it when its author's country arrives.
+// Lives as long as its footer and redraws it when one of its labels arrives.
 @interface PFBFooterRefresher : NSObject
 @property (nonatomic, weak) T1ConversationFooterTextView* footer;
 @property (nonatomic, copy) NSString* handle;
+@property (nonatomic, copy) NSString* tweetID;
 @property (nonatomic, strong) id token;
 @end
 
@@ -181,20 +284,21 @@ static void PFBRestoreFooterTime(T1ConversationFooterItem* item) {
 
 @end
 
-static void PFBRefreshFooterOnArrival(T1ConversationFooterTextView* footer, NSString* handle) {
+static void PFBRefreshFooterOnArrival(T1ConversationFooterTextView* footer, NSString* handle,
+                                      NSString* tweetID) {
     PFBFooterRefresher* refresher = objc_getAssociatedObject(footer, kPFBFooterRefresherKey);
     if (!refresher) {
         refresher = [PFBFooterRefresher new];
         refresher.footer = footer;
         __weak PFBFooterRefresher* weakRefresher = refresher;
         refresher.token = [[NSNotificationCenter defaultCenter]
-            addObserverForName:kPFBAccountLocationNote
+            addObserverForName:kPFBFooterLabelNote
                         object:nil
                          queue:[NSOperationQueue mainQueue]
                     usingBlock:^(NSNotification* note) {
                         PFBFooterRefresher* strong = weakRefresher;
                         T1ConversationFooterTextView* view = strong.footer;
-                        if (view && [note.object isEqual:strong.handle]) {
+                        if (view && ([note.object isEqual:strong.handle] || [note.object isEqual:strong.tweetID])) {
                             [view updateFooterTextView];
                             [view setNeedsLayout];
                         }
@@ -203,38 +307,54 @@ static void PFBRefreshFooterOnArrival(T1ConversationFooterTextView* footer, NSSt
                                  OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     }
     refresher.handle = handle;
+    refresher.tweetID = tweetID;
 }
 
 %hook T1ConversationFooterTextView
 
-// The footer text is rebuilt from the item's time here, so the country goes in first.
+// The footer text is rebuilt from the item's time here, so the labels go in first.
 - (void)updateFooterTextView {
-    if (![PFBSettings boolForKey:@"show_account_location"]) {
-        if (gPFBCountryShown && [self respondsToSelector:@selector(footerItem)] &&
-            [self.footerItem isKindOfClass:%c(T1ConversationFooterItem)]) {
-            PFBRestoreFooterTime(self.footerItem);
-        }
-        PFBCOMPAT_OBSERVE(PFBCompat_show_account_location, @"Tweet footer found");
-        %orig;
-        return;
-    }
-    NSString* handle = PFBFooterHandle(self);
+    BOOL wantsSource = [PFBSettings boolForKey:@"show_tweet_source"];
+    BOOL wantsCountry = [PFBSettings boolForKey:@"show_account_location"];
     T1ConversationFooterItem* item =
         [self respondsToSelector:@selector(footerItem)] ? self.footerItem : nil;
-    if (!handle || ![item isKindOfClass:%c(T1ConversationFooterItem)]) {
+    if (![item isKindOfClass:%c(T1ConversationFooterItem)]) {
+        item = nil;
+    }
+    if (!wantsSource) {
+        PFBCOMPAT_OBSERVE(PFBCompat_show_tweet_source, @"Tweet footer found");
+    }
+    if (!wantsCountry) {
+        PFBCOMPAT_OBSERVE(PFBCompat_show_account_location, @"Tweet footer found");
+    }
+    if (!wantsSource && !wantsCountry) {
+        if (gPFBLabelShown && item) {
+            PFBRestoreFooterTime(item);
+        }
         %orig;
         return;
     }
-    PFBRefreshFooterOnArrival(self, handle);
-    NSString* country = [gPFBLocations objectForKey:handle];
-    if (!country) {
-        PFBAskForCountry(handle);
+    NSString* tweetID = wantsSource ? PFBFooterTweetID(self) : nil;
+    NSString* handle = wantsCountry ? PFBFooterHandle(self) : nil;
+    if (!item || (!tweetID && !handle)) {
+        %orig;
+        return;
     }
-    // With the option on, only a country shown proves it. Without a web session the
+    PFBRefreshFooterOnArrival(self, handle, tweetID);
+    NSString* source = tweetID ? PFBLabelFor(gPFBSources, tweetID) : nil;
+    NSString* country = handle ? PFBLabelFor(gPFBCountries, handle) : nil;
+    PFBComposeFooterTime(item, @[source ?: @"", country ?: @""]);
+    // With an option on, only its label shown proves it. Without a web session the
     // sheet counts the option as off, and the footer reached is its proof.
-    if (PFBComposeFooterTime(item, country)) {
+    BOOL session = PFBHasUsableWebCredentials();
+    if (source.length) {
+        PFBCOMPAT_ACTION(PFBCompat_show_tweet_source, @"source after the time");
+    } else if (wantsSource && !session) {
+        PFBCOMPAT_OBSERVE(PFBCompat_show_tweet_source, @"Tweet footer found");
+    }
+    if (country.length) {
         PFBCOMPAT_ACTION(PFBCompat_show_account_location, @"country after the time");
-    } else if (!PFBHasUsableWebCredentials()) {
+    } else if (wantsCountry && !session) {
         PFBCOMPAT_OBSERVE(PFBCompat_show_account_location, @"Tweet footer found");
     }
     %orig;
@@ -242,10 +362,21 @@ static void PFBRefreshFooterOnArrival(T1ConversationFooterTextView* footer, NSSt
 
 %end
 
+static PFBFooterLabels* PFBMakeFooterLabels(NSString* name, NSMutableURLRequest* (*request)(NSString*),
+                                            NSString* (*label)(NSData*, NSString*)) {
+    PFBFooterLabels* labels = [PFBFooterLabels new];
+    labels.name = name;
+    labels.answers = [NSCache new];
+    labels.answers.countLimit = 500;
+    labels.asked = [NSMutableSet set];
+    labels.failures = [NSMutableDictionary dictionary];
+    labels.request = request;
+    labels.label = label;
+    return labels;
+}
+
 %ctor {
-    gPFBLocations = [NSCache new];
-    gPFBLocations.countLimit = 500;
-    gPFBLocationsAsked = [NSMutableSet set];
-    gPFBLocationFailures = [NSMutableDictionary dictionary];
+    gPFBSources = PFBMakeFooterLabels(@"conversation", PFBSourceRequest, PFBSourceFromAnswer);
+    gPFBCountries = PFBMakeFooterLabels(@"about-account", PFBCountryRequest, PFBCountryFromAnswer);
     %init;
 }

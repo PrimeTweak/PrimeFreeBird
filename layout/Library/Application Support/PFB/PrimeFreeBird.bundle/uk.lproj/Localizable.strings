@@ -93,6 +93,8 @@
 "RESTORE_REPLY_CONTEXT_DETAIL" = "Показує «У відповідь» над текстом відкритої відповіді.";
 "SHOW_QUOTE_COUNTS_TITLE" = "Кількість цитат і ретвітів";
 "SHOW_QUOTE_COUNTS_DETAIL" = "Показує обидва числа вгорі екрана цитат твіту.";
+"SHOW_TWEET_SOURCE_TITLE" = "Джерело твіту";
+"SHOW_TWEET_SOURCE_DETAIL" = "Показує поруч із часом відкритого твіту додаток, з якого його надіслано.";
 "SHOW_ACCOUNT_LOCATION_TITLE" = "Країна профілю";
 "SHOW_ACCOUNT_LOCATION_DETAIL" = "Показує країну профілю поруч із часом відкритого твіту.";
 "QUOTE_COUNTS_TITLE_FORMAT" = "Цитати: %@ · Ретвіти: %@";
@@ -186,6 +188,12 @@
 "COPY_PROFILE_INFO_MENU_OPTION_3" = "Копіювати повне ім’я";
 "COPY_PROFILE_INFO_MENU_OPTION_4" = "Копіювати веб-сторінку";
 "COPY_PROFILE_INFO_MENU_OPTION_5" = "Копіювати місцезнаходження";
+"REMOVE_FOLLOWER_TITLE" = "Вилучити цього читача";
+"REMOVE_FOLLOWER_CONFIRM_TITLE" = "Вилучити цього читача?";
+"REMOVE_FOLLOWER_CONFIRM_MESSAGE" = "%@ буде вилучено зі списку ваших читачів, і цей користувач не отримає про це сповіщення. Пізніше він зможе знову почати читати вас.";
+"REMOVE_FOLLOWER_ACTION" = "Вилучити";
+"REMOVE_FOLLOWER_DONE" = "Читача вилучено";
+"REMOVE_FOLLOWER_FAILED" = "Не вдалося вилучити цього читача. Спробуйте ще раз.";
 
 /* ===== Padlock / authentication ===== */
 "PADLOCK_LOCKED_LABEL" = "Заблоковано";

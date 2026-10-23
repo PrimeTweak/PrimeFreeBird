@@ -93,6 +93,8 @@
 "RESTORE_REPLY_CONTEXT_DETAIL" = "Visar vilka personer som besvaras, ovanför texten i ett svar du öppnar.";
 "SHOW_QUOTE_COUNTS_TITLE" = "Antal citat och Retweets";
 "SHOW_QUOTE_COUNTS_DETAIL" = "Visa båda siffrorna överst på en Tweets citatskärm.";
+"SHOW_TWEET_SOURCE_TITLE" = "Tweetens källa";
+"SHOW_TWEET_SOURCE_DETAIL" = "Visa appen som Tweeten skickades från bredvid tiden på en öppnad Tweet.";
 "SHOW_ACCOUNT_LOCATION_TITLE" = "Kontots plats";
 "SHOW_ACCOUNT_LOCATION_DETAIL" = "Visa landet där ett konto har sin bas bredvid tiden på en öppnad Tweet.";
 "QUOTE_COUNTS_TITLE_FORMAT" = "Citat: %@ · Retweets: %@";
@@ -186,6 +188,12 @@
 "COPY_PROFILE_INFO_MENU_OPTION_3" = "Kopiera namn";
 "COPY_PROFILE_INFO_MENU_OPTION_4" = "Kopiera webbsida";
 "COPY_PROFILE_INFO_MENU_OPTION_5" = "Kopiera plats";
+"REMOVE_FOLLOWER_TITLE" = "Ta bort denna följare";
+"REMOVE_FOLLOWER_CONFIRM_TITLE" = "Ta bort denna följare?";
+"REMOVE_FOLLOWER_CONFIRM_MESSAGE" = "%@ tas bort från dina följare och får ingen notis om det. Hen kan följa dig igen senare.";
+"REMOVE_FOLLOWER_ACTION" = "Ta bort";
+"REMOVE_FOLLOWER_DONE" = "Följaren har tagits bort";
+"REMOVE_FOLLOWER_FAILED" = "Det gick inte att ta bort följaren. Försök igen.";
 
 /* ===== Padlock / authentication ===== */
 "PADLOCK_LOCKED_LABEL" = "Låst";

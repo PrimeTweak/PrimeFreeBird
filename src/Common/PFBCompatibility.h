@@ -66,6 +66,7 @@ typedef NS_ENUM(NSInteger, PFBCompatOption) {
     PFBCompat_follow_confirm,
     PFBCompat_expand_bio,
     PFBCompat_copy_profile_info,
+    PFBCompat_remove_follower,
     PFBCompat_disable_articles,
     PFBCompat_disable_highlights,
     PFBCompat_disable_videos_tab,
@@ -104,6 +105,7 @@ typedef NS_ENUM(NSInteger, PFBCompatOption) {
     PFBCompat_unrounded_counts,
     PFBCompat_show_quote_counts,
     PFBCompat_send_sound,
+    PFBCompat_show_tweet_source,
     PFBCompat_show_account_location,
     PFBCompat_custom_tab_bar,
     PFBCompat_premium_unlock,
@@ -205,6 +207,8 @@ typedef NS_ENUM(NSInteger, PFBCompatPath) {
     PFBCompatPath_starts_muted,
     PFBCompatPath_replies_by_date,
     PFBCompatPath_native_filter_button,
+    PFBCompatPath_views_footer,
+    PFBCompatPath_tco_requests,
     PFBCompatPathCount,
 };
 

@@ -358,6 +358,13 @@ static NSNumber* FeatureSwitchOverrideValueForKey(NSString* key) {
         PFBCOMPAT_OBSERVE(PFBCompat_bypass_age_verification, @"read by Twitter");
     }
 
+    // Full links: no click ID on promoted links, no card link fetched before a tap.
+    if ([key isEqualToString:@"ad_formats_click_id_enabled"] ||
+        [key isEqualToString:@"wcl_unified_cards_likely_open_link_prefetch_enabled"]) {
+        PFBCOMPAT_ACTION(PFBCompat_expand_tco_links, @"link tracking switch off");
+        return @NO;
+    }
+
     // Conversation / tweet detail. With Chronological replies on, the sort control is
     // hidden: it would name the order Twitter chose, not the one asked for below.
     if ([key isEqualToString:@"reply_sorting_enabled"]) {

@@ -137,6 +137,8 @@
 "RESTORE_REPLY_CONTEXT_DETAIL" = "Affiche « En réponse à » au-dessus du texte d’une réponse ouverte.";
 "SHOW_QUOTE_COUNTS_TITLE" = "Nombre de citations et de Retweets";
 "SHOW_QUOTE_COUNTS_DETAIL" = "Affiche les deux nombres en haut de l’écran des citations d’un Tweet.";
+"SHOW_TWEET_SOURCE_TITLE" = "Source du Tweet";
+"SHOW_TWEET_SOURCE_DETAIL" = "Affiche, à côté de l’heure d’un Tweet ouvert, l’app d’où il a été envoyé.";
 "SHOW_ACCOUNT_LOCATION_TITLE" = "Pays du compte";
 "SHOW_ACCOUNT_LOCATION_DETAIL" = "Affiche, à côté de l’heure d’un Tweet ouvert, le pays où son compte est basé.";
 "QUOTE_COUNTS_TITLE_FORMAT" = "Citations : %@ · Retweets : %@";
@@ -371,6 +373,12 @@
 "COPY_PROFILE_INFO_MENU_OPTION_6" = "Copier l’URL du profil";
 "COPY_PROFILE_INFO_MENU_OPTION_7" = "Copier l’identifiant";
 "COPY_PROFILE_INFO_MENU_OPTION_8" = "Copier la date d’inscription";
+"REMOVE_FOLLOWER_TITLE" = "Supprimer cet abonné";
+"REMOVE_FOLLOWER_CONFIRM_TITLE" = "Supprimer cet abonné ?";
+"REMOVE_FOLLOWER_CONFIRM_MESSAGE" = "Le compte %@ sera retiré de vos abonnés, sans que la personne soit prévenue. Elle pourra vous suivre de nouveau plus tard.";
+"REMOVE_FOLLOWER_ACTION" = "Retirer";
+"REMOVE_FOLLOWER_DONE" = "Abonné supprimé";
+"REMOVE_FOLLOWER_FAILED" = "Impossible de supprimer cet abonné. Réessayez.";
 "UNROUNDED_COUNTS_TITLE" = "Nombres exacts";
 
 /* ===== TWEETS: groups and options ===== */
@@ -509,6 +517,7 @@
 "WEB_SESSION_NONE_DETAIL" = "Connectez-vous pour que les nouveaux Tweets, les Spaces, les listes de comptes et de mots masqués, Grok et les pages web de Twitter passent par la session web.";
 "WEB_SESSION_SIGN_IN_ACTION" = "Se connecter";
 "REPLY_IN_WEBVIEW_DETAIL_HELD" = "Nécessite une session web — connectez-vous ci-dessus.";
+"SHOW_TWEET_SOURCE_DETAIL_HELD" = "Nécessite une session web — connectez-vous dans Outils › Session web.";
 "SHOW_ACCOUNT_LOCATION_DETAIL_HELD" = "Nécessite une session web — connectez-vous dans Outils › Session web.";
 "FLEX_TWITTER_TITLE" = "Explorateur FLEX";
 "FLEX_TWITTER_DETAIL" = "Permet d’inspecter les écrans et les données de l’app. Pour les développeurs.";

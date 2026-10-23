@@ -93,6 +93,8 @@
 "RESTORE_REPLY_CONTEXT_DETAIL" = "在打开的回复正文上方显示被回复的用户。";
 "SHOW_QUOTE_COUNTS_TITLE" = "引用和转推数";
 "SHOW_QUOTE_COUNTS_DETAIL" = "在推文的引用页面顶部显示这两个数字。";
+"SHOW_TWEET_SOURCE_TITLE" = "推文来源";
+"SHOW_TWEET_SOURCE_DETAIL" = "在打开的推文时间旁显示发送推文的应用。";
 "SHOW_ACCOUNT_LOCATION_TITLE" = "账号所在地";
 "SHOW_ACCOUNT_LOCATION_DETAIL" = "在打开的推文时间旁显示账号所在的国家。";
 "QUOTE_COUNTS_TITLE_FORMAT" = "引用：%@ · 转推：%@";
@@ -186,6 +188,12 @@
 "COPY_PROFILE_INFO_MENU_OPTION_3" = "复制名称";
 "COPY_PROFILE_INFO_MENU_OPTION_4" = "复制网站";
 "COPY_PROFILE_INFO_MENU_OPTION_5" = "复制位置";
+"REMOVE_FOLLOWER_TITLE" = "移除此关注者";
+"REMOVE_FOLLOWER_CONFIRM_TITLE" = "要移除此关注者吗？";
+"REMOVE_FOLLOWER_CONFIRM_MESSAGE" = "%@ 将从你的关注者中移除，并且不会收到通知。他们将来可以再次关注你。";
+"REMOVE_FOLLOWER_ACTION" = "移除";
+"REMOVE_FOLLOWER_DONE" = "已移除关注者";
+"REMOVE_FOLLOWER_FAILED" = "无法移除此关注者，请重试。";
 
 /* ===== Padlock / authentication ===== */
 "PADLOCK_LOCKED_LABEL" = "已锁定";

@@ -93,6 +93,8 @@
 "RESTORE_REPLY_CONTEXT_DETAIL" = "在開啟的回覆內文上方顯示被回覆的使用者。";
 "SHOW_QUOTE_COUNTS_TITLE" = "引用和轉推次數";
 "SHOW_QUOTE_COUNTS_DETAIL" = "在推文的引用畫面頂端顯示兩個數字。";
+"SHOW_TWEET_SOURCE_TITLE" = "推文來源";
+"SHOW_TWEET_SOURCE_DETAIL" = "在開啟的推文時間旁顯示發送推文的應用程式。";
 "SHOW_ACCOUNT_LOCATION_TITLE" = "帳戶所在地";
 "SHOW_ACCOUNT_LOCATION_DETAIL" = "在開啟的推文時間旁顯示帳戶所在的國家。";
 "QUOTE_COUNTS_TITLE_FORMAT" = "引用：%@ · 轉推：%@";
@@ -186,6 +188,12 @@
 "COPY_PROFILE_INFO_MENU_OPTION_3" = "複製名稱";
 "COPY_PROFILE_INFO_MENU_OPTION_4" = "複製網站";
 "COPY_PROFILE_INFO_MENU_OPTION_5" = "複製地點";
+"REMOVE_FOLLOWER_TITLE" = "移除此跟隨者";
+"REMOVE_FOLLOWER_CONFIRM_TITLE" = "要移除此跟隨者嗎？";
+"REMOVE_FOLLOWER_CONFIRM_MESSAGE" = "%@ 將從你的跟隨者中移除，而且不會收到通知。他們將來仍可再次跟隨你。";
+"REMOVE_FOLLOWER_ACTION" = "移除";
+"REMOVE_FOLLOWER_DONE" = "已移除跟隨者";
+"REMOVE_FOLLOWER_FAILED" = "無法移除此跟隨者，請再試一次。";
 
 /* ===== Padlock / authentication ===== */
 "PADLOCK_LOCKED_LABEL" = "已鎖定";

@@ -93,6 +93,8 @@
 "RESTORE_REPLY_CONTEXT_DETAIL" = "Показывает «В ответ» над текстом открытого ответа.";
 "SHOW_QUOTE_COUNTS_TITLE" = "Число цитат и ретвитов";
 "SHOW_QUOTE_COUNTS_DETAIL" = "Показывает оба числа вверху экрана цитат твита.";
+"SHOW_TWEET_SOURCE_TITLE" = "Источник твита";
+"SHOW_TWEET_SOURCE_DETAIL" = "Показывает рядом со временем открытого твита приложение, из которого он отправлен.";
 "SHOW_ACCOUNT_LOCATION_TITLE" = "Страна аккаунта";
 "SHOW_ACCOUNT_LOCATION_DETAIL" = "Показывает страну аккаунта рядом со временем открытого твита.";
 "QUOTE_COUNTS_TITLE_FORMAT" = "Цитаты: %@ · Ретвиты: %@";
@@ -186,6 +188,12 @@
 "COPY_PROFILE_INFO_MENU_OPTION_3" = "Скопировать полное имя";
 "COPY_PROFILE_INFO_MENU_OPTION_4" = "Скопировать веб-сайт";
 "COPY_PROFILE_INFO_MENU_OPTION_5" = "Скопировать местоположение";
+"REMOVE_FOLLOWER_TITLE" = "Удалить из читателей";
+"REMOVE_FOLLOWER_CONFIRM_TITLE" = "Удалить из читателей?";
+"REMOVE_FOLLOWER_CONFIRM_MESSAGE" = "%@ будет удален(а) из числа ваших читателей и не получит уведомления об этом. Позже этот пользователь сможет снова начать вас читать.";
+"REMOVE_FOLLOWER_ACTION" = "Удалить";
+"REMOVE_FOLLOWER_DONE" = "Удалено из читателей";
+"REMOVE_FOLLOWER_FAILED" = "Не удалось удалить из читателей. Повторите попытку.";
 
 /* ===== Padlock / authentication ===== */
 "PADLOCK_LOCKED_LABEL" = "Заблокировано";
