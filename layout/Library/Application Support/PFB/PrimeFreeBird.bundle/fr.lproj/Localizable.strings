@@ -373,6 +373,9 @@
 "COPY_PROFILE_INFO_MENU_OPTION_6" = "Copier l’URL du profil";
 "COPY_PROFILE_INFO_MENU_OPTION_7" = "Copier l’identifiant";
 "COPY_PROFILE_INFO_MENU_OPTION_8" = "Copier la date d’inscription";
+"REMOVE_FOLLOWERS_TITLE" = "Supprimer des abonnés";
+"REMOVE_FOLLOWERS_DETAIL" = "Ajoute « Supprimer cet abonné » au menu d’un profil qui vous suit.";
+"REMOVE_FOLLOWERS_DETAIL_HELD" = "Nécessite une session web — connectez-vous dans Outils › Session web.";
 "REMOVE_FOLLOWER_TITLE" = "Supprimer cet abonné";
 "REMOVE_FOLLOWER_CONFIRM_TITLE" = "Supprimer cet abonné ?";
 "REMOVE_FOLLOWER_CONFIRM_MESSAGE" = "Le compte %@ sera retiré de vos abonnés, sans que la personne soit prévenue. Elle pourra vous suivre de nouveau plus tard.";

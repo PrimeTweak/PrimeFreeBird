@@ -377,6 +377,9 @@
 "COPY_PROFILE_INFO_MENU_OPTION_6" = "Copy profile URL";
 "COPY_PROFILE_INFO_MENU_OPTION_7" = "Copy user ID";
 "COPY_PROFILE_INFO_MENU_OPTION_8" = "Copy join date";
+"REMOVE_FOLLOWERS_TITLE" = "Remove followers";
+"REMOVE_FOLLOWERS_DETAIL" = "Add “Remove this follower” to the menu of a profile that follows you.";
+"REMOVE_FOLLOWERS_DETAIL_HELD" = "Needs a web session — sign in under Tools › Web session.";
 "REMOVE_FOLLOWER_TITLE" = "Remove this follower";
 "REMOVE_FOLLOWER_CONFIRM_TITLE" = "Remove this follower?";
 "REMOVE_FOLLOWER_CONFIRM_MESSAGE" = "%@ will be removed from your followers and won’t be notified. They can follow you again later.";

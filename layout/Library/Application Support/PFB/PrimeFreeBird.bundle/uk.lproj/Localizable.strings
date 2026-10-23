@@ -188,6 +188,8 @@
 "COPY_PROFILE_INFO_MENU_OPTION_3" = "Копіювати повне ім’я";
 "COPY_PROFILE_INFO_MENU_OPTION_4" = "Копіювати веб-сторінку";
 "COPY_PROFILE_INFO_MENU_OPTION_5" = "Копіювати місцезнаходження";
+"REMOVE_FOLLOWERS_TITLE" = "Вилучення читачів";
+"REMOVE_FOLLOWERS_DETAIL" = "Додає «Вилучити цього читача» в меню профілю, який вас читає.";
 "REMOVE_FOLLOWER_TITLE" = "Вилучити цього читача";
 "REMOVE_FOLLOWER_CONFIRM_TITLE" = "Вилучити цього читача?";
 "REMOVE_FOLLOWER_CONFIRM_MESSAGE" = "%@ буде вилучено зі списку ваших читачів, і цей користувач не отримає про це сповіщення. Пізніше він зможе знову почати читати вас.";

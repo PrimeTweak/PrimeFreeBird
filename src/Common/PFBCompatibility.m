@@ -101,7 +101,7 @@ static const PFBCompatMeta kMeta[] = {
     {PFBCompat_follow_confirm, "follow_confirm", "FOLLOW_CONFIRM_TITLE", "MODERN_SETTINGS_PROFILES_TITLE"},
     {PFBCompat_expand_bio, "expand_bio", "EXPAND_BIO_TITLE", "MODERN_SETTINGS_PROFILES_TITLE"},
     {PFBCompat_copy_profile_info, "copy_profile_info", "COPY_PROFILE_INFO_TITLE", "MODERN_SETTINGS_PROFILES_TITLE"},
-    {PFBCompat_remove_follower, "remove_follower", "REMOVE_FOLLOWER_TITLE", "MODERN_SETTINGS_PROFILES_TITLE", YES},
+    {PFBCompat_remove_followers, "remove_followers", "REMOVE_FOLLOWERS_TITLE", "MODERN_SETTINGS_PROFILES_TITLE"},
     {PFBCompat_unrounded_counts, "unrounded_counts", "UNROUNDED_COUNTS_TITLE", "MODERN_SETTINGS_PROFILES_TITLE", YES},
     {PFBCompat_disable_articles, "disable_articles", "DISABLE_ARTICLES_TITLE", "MODERN_SETTINGS_PROFILES_TITLE"},
     {PFBCompat_disable_highlights, "disable_highlights", "DISABLE_HIGHLIGHTS_TITLE", "MODERN_SETTINGS_PROFILES_TITLE"},
@@ -758,11 +758,11 @@ static const PFBCompatReq kReqs[] = {
     {PFBCompat_expand_bio, "T1ProfileUserInfoView", "-isBioExpanded"},
     {PFBCompat_copy_profile_info, "XDSButtonRow", "-layoutSubviews"},
     {PFBCompat_unrounded_counts, "T1ProfileFriendsFollowingViewModel", "-_t1_followCountTextWithLabel:singularLabel:count:highlighted:"},
-    {PFBCompat_remove_follower, "T1ProfileHeaderViewController", "-profileMoreActionsBaseActionItemsWithSender:"},
-    {PFBCompat_remove_follower, "T1ProfileHeaderViewController", "-viewModel"},
-    {PFBCompat_remove_follower, "T1ProfileUserViewModel", "-isFollowingViewer"},
-    {PFBCompat_remove_follower, "TFNActionItem", "+actionItemWithTitle:imageName:action:"},
-    {PFBCompat_remove_follower, "TFNActionItem", "-isDestructive"},
+    {PFBCompat_remove_followers, "T1ProfileHeaderViewController", "-profileMoreActionsBaseActionItemsWithSender:"},
+    {PFBCompat_remove_followers, "T1ProfileHeaderViewController", "-viewModel"},
+    {PFBCompat_remove_followers, "T1ProfileUserViewModel", "-isFollowingViewer"},
+    {PFBCompat_remove_followers, "TFNActionItem", "+actionItemWithTitle:imageName:action:"},
+    {PFBCompat_remove_followers, "TFNActionItem", "-isDestructive"},
     {PFBCompat_unrounded_counts, "T1ProfileDisplayNormalMainContentProvider", "-_tweetsSubtitle"},
     {PFBCompat_disable_articles, "TFSFeatureSwitches", "-boolForKey:"},
     {PFBCompat_disable_articles, "TFSFeatureSwitches", "-hasNonDefaultValueForKey:"},
@@ -1748,11 +1748,11 @@ static const PFBCompatName kNames[] = {
     {PFBCompat_tap_to_pause, "Features/Media/ImmersivePlayer.x", "window"},
     {PFBCompat_tweet_to_image, "Features/Media/MediaDownloads.x", "eventHandler"},
     {PFBCompat_unrounded_counts, "Features/Profiles/Profile.x", "tweetCount"},
-    {PFBCompat_remove_follower, "Features/Profiles/Profile.x", "isFollowingViewer"},
-    {PFBCompat_remove_follower, "Features/Profiles/Profile.x", "userDataSource"},
-    {PFBCompat_remove_follower, "Features/Profiles/Profile.x", "userID"},
-    {PFBCompat_remove_follower, "Features/Profiles/Profile.x", "username"},
-    {PFBCompat_remove_follower, "Features/Profiles/Profile.x", "viewModel"},
+    {PFBCompat_remove_followers, "Features/Profiles/Profile.x", "isFollowingViewer"},
+    {PFBCompat_remove_followers, "Features/Profiles/Profile.x", "userDataSource"},
+    {PFBCompat_remove_followers, "Features/Profiles/Profile.x", "userID"},
+    {PFBCompat_remove_followers, "Features/Profiles/Profile.x", "username"},
+    {PFBCompat_remove_followers, "Features/Profiles/Profile.x", "viewModel"},
     {PFBCompat_voice_note_from_video, "Features/Media/MediaDownloads.x", "_removeButton"},
     {PFBCompat_hide_view_count, "Features/Tweets/HideUI.x", "TTAStatusInlineAnalyticsButton"},
     {PFBCompat_hide_view_count, "Features/Tweets/HideUI.x", "footerItem"},
@@ -2146,7 +2146,7 @@ static const PFBCompatContract kContract[] = {
     {PFBCompat_reply_in_webview, "Tweet buttons", NULL},
     {PFBCompat_flex_twitter, "launch", NULL},
     {PFBCompat_web_session, "", "a web session only proves itself by creating a Space"},
-    {PFBCompat_remove_follower, "", "the tour never opens a profile's menu"},
+    {PFBCompat_remove_followers, "", "the tour never opens a profile's menu"},
     {PFBCompat_premium_unlock, "launch", NULL},
     {PFBCompat_hide_upsells, "launch", NULL},
     {PFBCompat_edit_tweet, "launch", NULL},
@@ -3449,6 +3449,7 @@ static BOOL optionEnabled(const PFBCompatMeta* meta) {
             return PFBHasUsableWebCredentials();
         case PFBCompat_show_tweet_source:
         case PFBCompat_show_account_location:
+        case PFBCompat_remove_followers:
             return [PFBSettings boolForKey:key] && PFBHasUsableWebCredentials();
         default:
             return [PFBSettings boolForKey:key];

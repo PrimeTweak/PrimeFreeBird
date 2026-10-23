@@ -188,6 +188,8 @@
 "COPY_PROFILE_INFO_MENU_OPTION_3" = "Kopiuj nazwę";
 "COPY_PROFILE_INFO_MENU_OPTION_4" = "Kopiuj stronę internetową";
 "COPY_PROFILE_INFO_MENU_OPTION_5" = "Kopiuj lokalizację";
+"REMOVE_FOLLOWERS_TITLE" = "Usuwaj obserwujących";
+"REMOVE_FOLLOWERS_DETAIL" = "Dodaj „Usuń tego obserwującego” do menu profilu, który Cię obserwuje.";
 "REMOVE_FOLLOWER_TITLE" = "Usuń tego obserwującego";
 "REMOVE_FOLLOWER_CONFIRM_TITLE" = "Usunąć tego obserwującego?";
 "REMOVE_FOLLOWER_CONFIRM_MESSAGE" = "Użytkownik %@ zostanie usunięty z listy Twoich obserwujących i nie zostanie o tym powiadomiony. Później może znów zacząć Cię obserwować.";

@@ -1655,7 +1655,7 @@ static NSString* PFBMeasuredKind(id item, BOOL removed) {
 // Measurement: each removed Who to follow run with the three items around it, across
 // sections: H module header, F module footer, W Who to follow, else the item's class,
 // "-" when removed, "|" between sections, "^" and "$" at the timeline's ends.
-static void PFBMeasureWhoToFollow(NSArray* sections, NSArray<NSIndexSet*>* removedBySection) {
+static void PFBMeasureWhoToFollowRuns(NSArray* sections, NSArray<NSIndexSet*>* removedBySection) {
     static BOOL full;
     if (full) {
         return;
@@ -1699,6 +1699,143 @@ static void PFBMeasureWhoToFollow(NSArray* sections, NSArray<NSIndexSet*>* remov
           *stop = YES;
       }
     }];
+}
+
+static NSString* PFBMeasuredName(id object) {
+    return NSStringFromClass([object classForCoder]) ?: @"?";
+}
+
+static NSString* PFBMeasuredItem(id item) {
+    id model = PFBUnwrapDataViewItem(item);
+    NSString* entry = ItemEntryID(model) ?: @"-";
+    if (entry.length > 48) {
+        entry = [[entry substringToIndex:48] stringByAppendingString:@"\u2026"];
+    }
+    return [NSString stringWithFormat:@"%@[%@ %@]", PFBMeasuredKind(item, NO), entry, ItemScribeComponent(model) ?: @"-"];
+}
+
+// The cells drawn above and below it, by position, with their heights.
+static NSString* PFBMeasuredCells(UIScrollView* list, UIView* cell) {
+    NSArray<UIView*>* visible = [list respondsToSelector:@selector(visibleCells)]
+                                    ? ((NSArray * (*)(id, SEL)) objc_msgSend)(list, @selector(visibleCells))
+                                    : @[];
+    NSArray<UIView*>* ordered = [visible sortedArrayUsingComparator:^NSComparisonResult(UIView* a, UIView* b) {
+      return a.frame.origin.y < b.frame.origin.y ? NSOrderedAscending
+                                                 : (a.frame.origin.y > b.frame.origin.y ? NSOrderedDescending : NSOrderedSame);
+    }];
+    NSUInteger at = [ordered indexOfObjectIdenticalTo:cell];
+    if (at == NSNotFound) {
+        return @"cell not among the visible ones";
+    }
+    NSMutableArray<NSString*>* cells = [NSMutableArray array];
+    for (NSUInteger i = at > 2 ? at - 2 : 0; i < ordered.count && i <= at + 2; i++) {
+        [cells addObject:[NSString stringWithFormat:@"%@%@(%.0f)", i == at ? @"*" : @"", PFBMeasuredName(ordered[i]),
+                                                    ordered[i].frame.size.height]];
+    }
+    return [cells componentsJoinedByString:@" "];
+}
+
+// The items around the cell in the list that holds it: "*" marks the cell's own item.
+static NSString* PFBMeasuredNeighbors(UIView* cell) {
+    UIScrollView* list = nil;
+    for (UIView* view = cell.superview; view && !list; view = view.superview) {
+        if ([view isKindOfClass:[UITableView class]] || [view isKindOfClass:[UICollectionView class]]) {
+            list = (UIScrollView*)view;
+        }
+    }
+    NSIndexPath* path = nil;
+    if ([list isKindOfClass:[UITableView class]] && [cell isKindOfClass:[UITableViewCell class]]) {
+        path = [(UITableView*)list indexPathForCell:(UITableViewCell*)cell];
+    } else if ([list isKindOfClass:[UICollectionView class]] && [cell isKindOfClass:[UICollectionViewCell class]]) {
+        path = [(UICollectionView*)list indexPathForCell:(UICollectionViewCell*)cell];
+    }
+    UIResponder* responder = list;
+    Class itemsController = NSClassFromString(@"TFNItemsDataViewController");
+    while (responder && !(itemsController && [responder isKindOfClass:itemsController])) {
+        responder = responder.nextResponder;
+    }
+    if (!path || !responder) {
+        return [NSString stringWithFormat:@"outer list %@, %@", list ? PFBMeasuredName(list) : @"none",
+                                          responder ? PFBMeasuredName(responder) : @"no items controller"];
+    }
+    NSArray* sections = ((TFNItemsDataViewController*)responder).sections;
+    NSArray* section = (NSUInteger)path.section < sections.count && [sections[path.section] isKindOfClass:[NSArray class]]
+                           ? sections[path.section]
+                           : @[];
+    NSUInteger row = (NSUInteger)path.row;
+    NSMutableArray<NSString*>* around = [NSMutableArray array];
+    for (NSUInteger i = row > 3 ? row - 3 : 0; i < section.count && i <= row + 3; i++) {
+        [around addObject:[(i == row ? @"*" : @"") stringByAppendingString:PFBMeasuredItem(section[i])]];
+    }
+    return [NSString stringWithFormat:@"in %@ at %ld.%ld of %lu: %@ · cells %@", PFBMeasuredName(responder),
+                                      (long)path.section, (long)path.row, (unsigned long)section.count,
+                                      around.count ? [around componentsJoinedByString:@" "] : @"row outside its section",
+                                      PFBMeasuredCells(list, cell)];
+}
+
+// Measurement: a list made only of Who to follow accounts, read a second after it
+// empties: the screens and views that hold it, then the items around its cell.
+static void PFBMeasureWhoToFollowHost(TFNItemsDataViewController* listController, id firstItem) {
+    static BOOL full;
+    static BOOL pending;
+    if (full || pending) {
+        return;
+    }
+    pending = YES;
+    NSString* first = PFBMeasuredItem(firstItem);
+    __weak TFNItemsDataViewController* weakList = listController;
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+      pending = NO;
+      TFNItemsDataViewController* held = weakList;
+      if (!held) {
+          return;
+      }
+      NSMutableArray<NSString*>* screens = [NSMutableArray array];
+      for (UIViewController* controller = held; controller && screens.count < 6;
+           controller = controller.parentViewController) {
+          [screens addObject:PFBMeasuredName(controller)];
+      }
+      NSMutableArray<NSString*>* views = [NSMutableArray array];
+      UIView* cell = nil;
+      for (UIView* view = held.viewIfLoaded.superview; view && !cell && views.count < 14; view = view.superview) {
+          [views addObject:PFBMeasuredName(view)];
+          if ([view isKindOfClass:[UITableViewCell class]] || [view isKindOfClass:[UICollectionViewCell class]]) {
+              cell = view;
+          }
+      }
+      NSString* line = [NSString stringWithFormat:@"list %@ · first %@ · views %@%@ · %@",
+                                                  [screens componentsJoinedByString:@" < "], first,
+                                                  views.count ? [views componentsJoinedByString:@" < "] : @"none",
+                                                  held.viewIfLoaded.window ? @"" : @" (off screen)",
+                                                  cell ? PFBMeasuredNeighbors(cell) : @"no cell"];
+      if (!PFBCompatMeasure(@"modules-host", line, 4)) {
+          full = YES;
+      }
+    });
+}
+
+static void PFBMeasureWhoToFollow(TFNItemsDataViewController* listController, NSArray* sections,
+                                  NSArray<NSIndexSet*>* removedBySection) {
+    NSUInteger total = 0;
+    NSUInteger whoToFollow = 0;
+    id first = nil;
+    for (NSUInteger s = 0; s < sections.count && s < removedBySection.count; s++) {
+        NSArray* section = [sections[s] isKindOfClass:[NSArray class]] ? sections[s] : @[];
+        total += section.count;
+        NSIndexSet* removed = removedBySection[s];
+        if (removed.count == section.count && section.count) {
+            for (id item in section) {
+                if (PFBIsWhoToFollowModel(PFBUnwrapDataViewItem(item))) {
+                    whoToFollow++;
+                    first = first ?: item;
+                }
+            }
+        }
+    }
+    if (total && whoToFollow == total) {
+        PFBMeasureWhoToFollowHost(listController, first);
+    }
+    PFBMeasureWhoToFollowRuns(sections, removedBySection);
 }
 
 static NSArray* FilteredTimelineSections(TFNItemsDataViewController* dataViewController,
@@ -1791,7 +1928,7 @@ static NSArray* FilteredTimelineSections(TFNItemsDataViewController* dataViewCon
     }
 
     if (modified) {
-        PFBMeasureWhoToFollow(sections, removedBySection);
+        PFBMeasureWhoToFollow(dataViewController, sections, removedBySection);
     }
     return modified ? [filteredSections copy] : sections;
 }

@@ -188,6 +188,8 @@
 "COPY_PROFILE_INFO_MENU_OPTION_3" = "Namen kopieren";
 "COPY_PROFILE_INFO_MENU_OPTION_4" = "Webseite kopieren";
 "COPY_PROFILE_INFO_MENU_OPTION_5" = "Ort kopieren";
+"REMOVE_FOLLOWERS_TITLE" = "Follower entfernen";
+"REMOVE_FOLLOWERS_DETAIL" = "Fügt dem Menü eines Profils, das dir folgt, „Diesen Follower entfernen“ hinzu.";
 "REMOVE_FOLLOWER_TITLE" = "Diesen Follower entfernen";
 "REMOVE_FOLLOWER_CONFIRM_TITLE" = "Diesen Follower entfernen?";
 "REMOVE_FOLLOWER_CONFIRM_MESSAGE" = "%@ wird aus deinen Followern entfernt und erhält keine Mitteilung darüber. Er/sie kann dir später wieder folgen.";

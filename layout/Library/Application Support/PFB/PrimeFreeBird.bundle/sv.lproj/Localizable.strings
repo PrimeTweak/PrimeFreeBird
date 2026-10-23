@@ -188,6 +188,8 @@
 "COPY_PROFILE_INFO_MENU_OPTION_3" = "Kopiera namn";
 "COPY_PROFILE_INFO_MENU_OPTION_4" = "Kopiera webbsida";
 "COPY_PROFILE_INFO_MENU_OPTION_5" = "Kopiera plats";
+"REMOVE_FOLLOWERS_TITLE" = "Ta bort följare";
+"REMOVE_FOLLOWERS_DETAIL" = "Lägg till ”Ta bort denna följare” i menyn för en profil som följer dig.";
 "REMOVE_FOLLOWER_TITLE" = "Ta bort denna följare";
 "REMOVE_FOLLOWER_CONFIRM_TITLE" = "Ta bort denna följare?";
 "REMOVE_FOLLOWER_CONFIRM_MESSAGE" = "%@ tas bort från dina följare och får ingen notis om det. Hen kan följa dig igen senare.";

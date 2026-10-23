@@ -711,7 +711,7 @@ static void pfbConfirmRemoveFollower(UIViewController* from, NSString* userID, N
                                             handler:^(UIAlertAction* action) {
                                                 pfbSendRemoveFollower(userID, @"target_user_id", NO, ^(BOOL removed) {
                                                   if (removed) {
-                                                      PFBCOMPAT_ACTION(PFBCompat_remove_follower, @"follower removed");
+                                                      PFBCOMPAT_ACTION(PFBCompat_remove_followers, @"follower removed");
                                                   }
                                                   pfbShowFollowerToast(window, [bundle localizedStringForKey:removed
                                                                                             ? @"REMOVE_FOLLOWER_DONE"
@@ -723,12 +723,15 @@ static void pfbConfirmRemoveFollower(UIViewController* from, NSString* userID, N
 
 %hook T1ProfileHeaderViewController
 
-// The profile's own menu gains the entry when its account follows the viewer and the
-// web session is the viewer's. It goes before the first destructive entry (Block).
+// With the option on, the menu gains the entry when the profile follows the viewer and
+// the web session is the viewer's, before the first destructive entry (Block).
 - (NSArray*)profileMoreActionsBaseActionItemsWithSender:(id)sender {
     NSArray* items = %orig;
+    PFBCOMPAT_OBSERVE(PFBCompat_remove_followers, @"profile menu built");
+    if (![PFBSettings boolForKey:@"remove_followers"]) {
+        return items;
+    }
     id viewModel = pfbGetterValue(self, @"viewModel");
-    PFBCOMPAT_OBSERVE(PFBCompat_remove_follower, @"profile menu built");
     NSString* userID = pfbProfileUserID(viewModel);
     id handle = pfbGetterValue(pfbProfileUser(viewModel), @"username");
     if (![items isKindOfClass:[NSArray class]] || !userID || ![handle isKindOfClass:[NSString class]] ||
@@ -763,7 +766,7 @@ static void pfbConfirmRemoveFollower(UIViewController* from, NSString* userID, N
         }
     }
     [menu insertObject:entry atIndex:at];
-    PFBCOMPAT_ACTION(PFBCompat_remove_follower, @"entry added to the profile menu");
+    PFBCOMPAT_ACTION(PFBCompat_remove_followers, @"entry added to the profile menu");
     return [menu copy];
 }
 

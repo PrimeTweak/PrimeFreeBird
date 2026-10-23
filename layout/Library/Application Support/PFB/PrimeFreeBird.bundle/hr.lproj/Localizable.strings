@@ -188,6 +188,8 @@
 "COPY_PROFILE_INFO_MENU_OPTION_3" = "Kopiraj ime";
 "COPY_PROFILE_INFO_MENU_OPTION_4" = "Kopiraj web-mjesto";
 "COPY_PROFILE_INFO_MENU_OPTION_5" = "Kopiraj lokaciju";
+"REMOVE_FOLLOWERS_TITLE" = "Ukloni pratitelje";
+"REMOVE_FOLLOWERS_DETAIL" = "Dodaj „Ukloni ovog pratitelja” u izbornik profila koji te prati.";
 "REMOVE_FOLLOWER_TITLE" = "Ukloni ovog pratitelja";
 "REMOVE_FOLLOWER_CONFIRM_TITLE" = "Ukloniti ovog pratitelja?";
 "REMOVE_FOLLOWER_CONFIRM_MESSAGE" = "%@ te više neće pratiti i neće dobiti obavijest o tome. Kasnije te može ponovno početi pratiti.";

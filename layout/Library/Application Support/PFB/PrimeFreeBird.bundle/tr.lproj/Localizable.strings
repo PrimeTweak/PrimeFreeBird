@@ -188,6 +188,8 @@
 "COPY_PROFILE_INFO_MENU_OPTION_3" = "İsmi kopyala";
 "COPY_PROFILE_INFO_MENU_OPTION_4" = "İnternet sitesini kopyala";
 "COPY_PROFILE_INFO_MENU_OPTION_5" = "Konumu kopyala";
+"REMOVE_FOLLOWERS_TITLE" = "Takipçileri kaldır";
+"REMOVE_FOLLOWERS_DETAIL" = "Seni takip eden bir profilin menüsüne “Bu takipçiyi kaldır” seçeneğini ekle.";
 "REMOVE_FOLLOWER_TITLE" = "Bu takipçiyi kaldır";
 "REMOVE_FOLLOWER_CONFIRM_TITLE" = "Bu takipçi kaldırılsın mı?";
 "REMOVE_FOLLOWER_CONFIRM_MESSAGE" = "%@ takipçilerin arasından kaldırılacak ve bilgilendirilmeyecek. İlerleyen zamanlarda seni tekrar takip edebilir.";

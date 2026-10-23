@@ -188,6 +188,8 @@
 "COPY_PROFILE_INFO_MENU_OPTION_3" = "名前をコピー";
 "COPY_PROFILE_INFO_MENU_OPTION_4" = "ウェブサイトをコピー";
 "COPY_PROFILE_INFO_MENU_OPTION_5" = "位置情報をコピー";
+"REMOVE_FOLLOWERS_TITLE" = "フォロワーを削除";
+"REMOVE_FOLLOWERS_DETAIL" = "あなたをフォローしているプロフィールのメニューに「このフォロワーを削除」を追加します。";
 "REMOVE_FOLLOWER_TITLE" = "このフォロワーを削除";
 "REMOVE_FOLLOWER_CONFIRM_TITLE" = "このフォロワーを削除しますか？";
 "REMOVE_FOLLOWER_CONFIRM_MESSAGE" = "%@さんをフォロワーから削除します。相手には通知されません。このユーザーは後でまたあなたをフォローできます。";

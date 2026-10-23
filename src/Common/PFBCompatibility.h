@@ -66,7 +66,7 @@ typedef NS_ENUM(NSInteger, PFBCompatOption) {
     PFBCompat_follow_confirm,
     PFBCompat_expand_bio,
     PFBCompat_copy_profile_info,
-    PFBCompat_remove_follower,
+    PFBCompat_remove_followers,
     PFBCompat_disable_articles,
     PFBCompat_disable_highlights,
     PFBCompat_disable_videos_tab,

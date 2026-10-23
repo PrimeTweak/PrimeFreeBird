@@ -188,6 +188,8 @@
 "COPY_PROFILE_INFO_MENU_OPTION_3" = "نسخ الاسم";
 "COPY_PROFILE_INFO_MENU_OPTION_4" = "نسخ الموقع الإلكتروني";
 "COPY_PROFILE_INFO_MENU_OPTION_5" = "نسخ الموقع";
+"REMOVE_FOLLOWERS_TITLE" = "إزالة المتابعين";
+"REMOVE_FOLLOWERS_DETAIL" = "إضافة «إزالة هذا المتابع» إلى قائمة الملف الشخصي الذي يتابعك.";
 "REMOVE_FOLLOWER_TITLE" = "إزالة هذا المتابع";
 "REMOVE_FOLLOWER_CONFIRM_TITLE" = "هل تريد إزالة هذا المتابع؟";
 "REMOVE_FOLLOWER_CONFIRM_MESSAGE" = "ستتم إزالة %@ من متابِعيك ولن يتم إخطاره بذلك. ويمكنه متابعتك مرة أخرى لاحقًا.";

@@ -188,6 +188,8 @@
 "COPY_PROFILE_INFO_MENU_OPTION_3" = "Salin nama";
 "COPY_PROFILE_INFO_MENU_OPTION_4" = "Salin situs web";
 "COPY_PROFILE_INFO_MENU_OPTION_5" = "Salin lokasi";
+"REMOVE_FOLLOWERS_TITLE" = "Hapus pengikut";
+"REMOVE_FOLLOWERS_DETAIL" = "Tambahkan “Hapus pengikut ini” ke menu profil yang mengikuti Anda.";
 "REMOVE_FOLLOWER_TITLE" = "Hapus pengikut ini";
 "REMOVE_FOLLOWER_CONFIRM_TITLE" = "Hapus pengikut ini?";
 "REMOVE_FOLLOWER_CONFIRM_MESSAGE" = "%@ akan dihapus dari pengikut Anda dan tidak akan diberi tahu. Ia dapat mengikuti Anda lagi nantinya.";

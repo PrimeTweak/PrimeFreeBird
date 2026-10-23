@@ -188,6 +188,8 @@
 "COPY_PROFILE_INFO_MENU_OPTION_3" = "复制名称";
 "COPY_PROFILE_INFO_MENU_OPTION_4" = "复制网站";
 "COPY_PROFILE_INFO_MENU_OPTION_5" = "复制位置";
+"REMOVE_FOLLOWERS_TITLE" = "移除关注者";
+"REMOVE_FOLLOWERS_DETAIL" = "在关注你的个人资料菜单中添加“移除此关注者”。";
 "REMOVE_FOLLOWER_TITLE" = "移除此关注者";
 "REMOVE_FOLLOWER_CONFIRM_TITLE" = "要移除此关注者吗？";
 "REMOVE_FOLLOWER_CONFIRM_MESSAGE" = "%@ 将从你的关注者中移除，并且不会收到通知。他们将来可以再次关注你。";

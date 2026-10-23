@@ -192,6 +192,8 @@
 "COPY_PROFILE_INFO_MENU_OPTION_3" = "Copiar nombre";
 "COPY_PROFILE_INFO_MENU_OPTION_4" = "Copiar sitio web";
 "COPY_PROFILE_INFO_MENU_OPTION_5" = "Copiar ubicación";
+"REMOVE_FOLLOWERS_TITLE" = "Eliminar seguidores";
+"REMOVE_FOLLOWERS_DETAIL" = "Añade «Eliminar a este seguidor» al menú de un perfil que te sigue.";
 "REMOVE_FOLLOWER_TITLE" = "Eliminar a este seguidor";
 "REMOVE_FOLLOWER_CONFIRM_TITLE" = "¿Eliminar a este seguidor?";
 "REMOVE_FOLLOWER_CONFIRM_MESSAGE" = "%@ se eliminará de tus seguidores y no recibirá ninguna notificación. Puede volver a seguirte más adelante.";

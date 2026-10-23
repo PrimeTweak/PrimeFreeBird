@@ -188,6 +188,8 @@
 "COPY_PROFILE_INFO_MENU_OPTION_3" = "닉네임 복사";
 "COPY_PROFILE_INFO_MENU_OPTION_4" = "웹 사이트 복사";
 "COPY_PROFILE_INFO_MENU_OPTION_5" = "위치 복사";
+"REMOVE_FOLLOWERS_TITLE" = "팔로워 삭제";
+"REMOVE_FOLLOWERS_DETAIL" = "나를 팔로우하는 프로필의 메뉴에 ‘이 팔로워 삭제하기’를 추가합니다.";
 "REMOVE_FOLLOWER_TITLE" = "이 팔로워 삭제하기";
 "REMOVE_FOLLOWER_CONFIRM_TITLE" = "이 팔로워를 삭제할까요?";
 "REMOVE_FOLLOWER_CONFIRM_MESSAGE" = "%@ 님을 내 팔로워에서 삭제합니다. 해당 사용자에게는 알림이 전송되지 않으며, 나중에 다시 나를 팔로우할 수 있습니다.";

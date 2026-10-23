@@ -321,6 +321,12 @@ static NSDictionary<NSString*, NSDictionary*>* PFBSettingsPages(void) {
                         @"type": @"toggle"
                     },
                     @{
+                        @"key": @"remove_followers",
+                        @"default": @YES,
+                        @"blockedUnless": @"web_session",
+                        @"type": @"toggle"
+                    },
+                    @{
                         @"titleKey": @"PROFILE_INITIAL_TAB_TITLE",
                         @"menu": @"profileTabMenu",
                         @"type": @"compactButton"
