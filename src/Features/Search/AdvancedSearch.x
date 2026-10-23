@@ -412,7 +412,7 @@ static void pfbAdvCollapseNativeInSearchBar(UIView* bar) {
     static Ivar buttonIvar;
     static dispatch_once_t once;
     dispatch_once(&once, ^{
-        Class cls = objc_getClass("_TtC15TwitterSearchV211SearchBarV2");
+        Class cls = objc_getClass("_TtC15TwitterSearchV29SearchBar");
         flagIvar = class_getInstanceVariable(cls, "showsFilterButton");
         buttonIvar = class_getInstanceVariable(cls, "filterButton");
     });
@@ -475,7 +475,7 @@ static void pfbAdvCollapseNativeInSearchBar(UIView* bar) {
     }
 }
 
-%hook _TtC15TwitterSearchV211SearchBarV2
+%hook _TtC15TwitterSearchV29SearchBar
 
 - (void)layoutSubviews {
     UIView* bar = (UIView*)self;

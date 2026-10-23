@@ -37,6 +37,15 @@
 @property (nonatomic, assign, readonly) NSUInteger attachmentType;
 @end
 
+// Buttons under a Tweet: each adapter answers whether its button shows for a view model.
+@interface T1StandardStatusDownloadGrokImagineButtonViewAdapter : NSObject
+- (BOOL)shouldBeVisibleForViewModel:(id)viewModel;
+@end
+
+@interface T1StandardStatusGrokCreateOwnButtonAdapter : NSObject
+- (BOOL)shouldBeVisibleForViewModel:(id)viewModel;
+@end
+
 #pragma mark - Tab bar
 
 @interface T1PanelIdentity : NSObject
@@ -68,6 +77,7 @@
 
 @interface T1TabbedAppNavigationViewController : UIViewController
 - (void)setVisibleTabEntries:(NSArray<id<T1AppNavigationTabEntry>>*)entries;
+- (NSArray*)_t1_tabEntriesLimitedToBottomCapacity:(NSArray*)entries;
 // Recomputes the visible tab set at runtime (rebuilds buttons and content).
 - (void)recalculateVisiblePanels;
 @end

@@ -72,7 +72,7 @@ static void PFBSaveVoiceMessage(NSURL* sourceURL) {
 // the class is known to the compiler only by a forward declaration.
 static const void* kPFBVoiceInteractionKey = &kPFBVoiceInteractionKey;
 
-%hook _TtC16ChatConversation26MessageAttachmentAudioView
+%hook _TtC6ChatUI26MessageAttachmentAudioView
 
 - (void)layoutSubviews {
     %orig;

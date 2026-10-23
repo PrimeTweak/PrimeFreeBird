@@ -1773,8 +1773,29 @@ static NSString* PFBMeasuredNeighbors(UIView* cell) {
                                       PFBMeasuredCells(list, cell)];
 }
 
-// Measurement: a list made only of Who to follow accounts, read a second after it
-// empties: the screens and views that hold it, then the items around its cell.
+// Where a list sits: its screens, the views up to its cell, then that cell's neighbors.
+static NSString* PFBMeasuredPlace(TFNItemsDataViewController* list) {
+    NSMutableArray<NSString*>* screens = [NSMutableArray array];
+    for (UIViewController* controller = list; controller && screens.count < 6;
+         controller = controller.parentViewController) {
+        [screens addObject:PFBMeasuredName(controller)];
+    }
+    NSMutableArray<NSString*>* views = [NSMutableArray array];
+    UIView* cell = nil;
+    for (UIView* view = list.viewIfLoaded.superview; view && !cell && views.count < 14; view = view.superview) {
+        [views addObject:PFBMeasuredName(view)];
+        if ([view isKindOfClass:[UITableViewCell class]] || [view isKindOfClass:[UICollectionViewCell class]]) {
+            cell = view;
+        }
+    }
+    return [NSString stringWithFormat:@"list %@ · views %@%@ · %@", [screens componentsJoinedByString:@" < "],
+                                      views.count ? [views componentsJoinedByString:@" < "] : @"none",
+                                      list.viewIfLoaded.window ? @"" : @" (off screen)",
+                                      cell ? PFBMeasuredNeighbors(cell) : @"no cell"];
+}
+
+// Measurement: a list made only of Who to follow accounts, read as it empties and
+// again a second later. It is held for that second, so a short-lived list still reads.
 static void PFBMeasureWhoToFollowHost(TFNItemsDataViewController* listController, id firstItem) {
     static BOOL full;
     static BOOL pending;
@@ -1782,32 +1803,12 @@ static void PFBMeasureWhoToFollowHost(TFNItemsDataViewController* listController
         return;
     }
     pending = YES;
-    NSString* first = PFBMeasuredItem(firstItem);
-    __weak TFNItemsDataViewController* weakList = listController;
+    NSString* now = [NSString stringWithFormat:@"first %@ · now: %@", PFBMeasuredItem(firstItem),
+                                               PFBMeasuredPlace(listController)];
+    TFNItemsDataViewController* held = listController;
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
       pending = NO;
-      TFNItemsDataViewController* held = weakList;
-      if (!held) {
-          return;
-      }
-      NSMutableArray<NSString*>* screens = [NSMutableArray array];
-      for (UIViewController* controller = held; controller && screens.count < 6;
-           controller = controller.parentViewController) {
-          [screens addObject:PFBMeasuredName(controller)];
-      }
-      NSMutableArray<NSString*>* views = [NSMutableArray array];
-      UIView* cell = nil;
-      for (UIView* view = held.viewIfLoaded.superview; view && !cell && views.count < 14; view = view.superview) {
-          [views addObject:PFBMeasuredName(view)];
-          if ([view isKindOfClass:[UITableViewCell class]] || [view isKindOfClass:[UICollectionViewCell class]]) {
-              cell = view;
-          }
-      }
-      NSString* line = [NSString stringWithFormat:@"list %@ · first %@ · views %@%@ · %@",
-                                                  [screens componentsJoinedByString:@" < "], first,
-                                                  views.count ? [views componentsJoinedByString:@" < "] : @"none",
-                                                  held.viewIfLoaded.window ? @"" : @" (off screen)",
-                                                  cell ? PFBMeasuredNeighbors(cell) : @"no cell"];
+      NSString* line = [NSString stringWithFormat:@"%@ · 1 s later: %@", now, PFBMeasuredPlace(held)];
       if (!PFBCompatMeasure(@"modules-host", line, 4)) {
           full = YES;
       }

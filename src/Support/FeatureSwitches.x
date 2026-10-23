@@ -1156,6 +1156,46 @@ static BOOL pfbHidesGrokCreate(void) {
 
 %end
 
+// MARK: - Grok creation - buttons without a switch
+
+// The Imagine button under posts, the create-your-own button and the immersive
+// player's create-your-own pill read no switch: their own visibility is turned down.
+%hook T1StandardStatusDownloadGrokImagineButtonViewAdapter
+
+- (BOOL)shouldBeVisibleForViewModel:(id)viewModel {
+    PFBCompatReach(PFBCompatPath_grok_imagine_button);
+    if (pfbHidesGrokCreate()) {
+        return NO;
+    }
+    return %orig;
+}
+
+%end
+
+%hook T1StandardStatusGrokCreateOwnButtonAdapter
+
+- (BOOL)shouldBeVisibleForViewModel:(id)viewModel {
+    PFBCompatReach(PFBCompatPath_grok_create_own_button);
+    if (pfbHidesGrokCreate()) {
+        return NO;
+    }
+    return %orig;
+}
+
+%end
+
+%hook _TtC14T1TwitterSwift36ImmersiveShimmerPillButtonPluginView
+
+- (void)layoutSubviews {
+    %orig;
+    PFBCompatReach(PFBCompatPath_grok_create_own_pill);
+    if (pfbHidesGrokCreate()) {
+        ((UIView*)self).hidden = YES;
+    }
+}
+
+%end
+
 // MARK: - Sensitive media warnings
 
 %hook TFNTwitterStatus

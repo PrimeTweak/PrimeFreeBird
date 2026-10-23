@@ -209,6 +209,10 @@ typedef NS_ENUM(NSInteger, PFBCompatPath) {
     PFBCompatPath_native_filter_button,
     PFBCompatPath_views_footer,
     PFBCompatPath_tco_requests,
+    PFBCompatPath_tab_capacity,
+    PFBCompatPath_grok_imagine_button,
+    PFBCompatPath_grok_create_own_button,
+    PFBCompatPath_grok_create_own_pill,
     PFBCompatPathCount,
 };
 

@@ -1152,7 +1152,7 @@ static UIView* tourFirstResponder(void) {
 // keyboard that way. Twitter then lists recent searches, the list Disable search
 // history empties.
 static BOOL tourFocusSearchField(void) {
-    Class barClass = NSClassFromString(@"_TtC15TwitterSearchV211SearchBarV2");
+    Class barClass = NSClassFromString(@"_TtC15TwitterSearchV29SearchBar");
     UIView* root = tourScreen().navigationController.viewIfLoaded ?: tourWindow();
     UIView* bar = barClass ? tourFindView(root, ^BOOL(UIView* view) {
       return [view isKindOfClass:barClass] && !view.hidden && view.window;

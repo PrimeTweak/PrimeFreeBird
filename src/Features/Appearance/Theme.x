@@ -1986,6 +1986,13 @@ static NSArray* orderedTabEntries(NSArray* entries) {
     %orig(orderedTabEntries(entries));
 }
 
+// Twitter keeps only the first tabs the bar can hold (five on a phone); the chosen
+// tabs are picked before that cut, so it never drops one of them.
+- (NSArray*)_t1_tabEntriesLimitedToBottomCapacity:(NSArray*)entries {
+    PFBCompatReach(PFBCompatPath_tab_capacity);
+    return %orig(orderedTabEntries(entries));
+}
+
 %end
 
 // MARK: - Keep tab bar visible
