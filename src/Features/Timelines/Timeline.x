@@ -1633,51 +1633,72 @@ static BOOL PFBTimelineFiltersNeedObservation(void) {
            PFBCompatNeedsObservation(PFBCompat_filter_languages);
 }
 
-// Measurement: a section holding a module header or footer, or a Who to follow item, is
-// written to the log a few times per launch, around those items: each item's kind (H header,
-// F footer, W Who to follow, else its class) and a "-" when it is removed.
-static void PFBLogModuleSection(NSArray* items, NSIndexSet* removed, NSUInteger index, NSUInteger count) {
-    static NSUInteger calls;
-    static NSMutableSet<NSString*>* written;
-    if (calls++ > 400 || written.count >= 8) {
+static BOOL PFBIsWhoToFollowModel(id model) {
+    return [ItemScribeComponent(model) isEqualToString:@"suggest_who_to_follow"] ||
+           [ItemEntryID(model) containsString:@"who-to-follow"];
+}
+
+static NSString* PFBMeasuredKind(id item, BOOL removed) {
+    id model = PFBUnwrapDataViewItem(item);
+    NSString* name = NSStringFromClass([model classForCoder]) ?: @"?";
+    NSString* kind = [name componentsSeparatedByString:@"."].lastObject;
+    if ([name isEqualToString:@"TwitterURT.URTModuleHeaderViewModel"]) {
+        kind = @"H";
+    } else if ([name isEqualToString:@"TwitterURT.URTModuleFooterViewModel"]) {
+        kind = @"F";
+    } else if (PFBIsWhoToFollowModel(model)) {
+        kind = @"W";
+    }
+    return removed ? [kind stringByAppendingString:@"-"] : kind;
+}
+
+// Measurement: each removed Who to follow run with the three items around it, across
+// sections: H module header, F module footer, W Who to follow, else the item's class,
+// "-" when removed, "|" between sections, "^" and "$" at the timeline's ends.
+static void PFBMeasureWhoToFollow(NSArray* sections, NSArray<NSIndexSet*>* removedBySection) {
+    static BOOL full;
+    if (full) {
         return;
     }
-    NSMutableArray<NSString*>* kinds = [NSMutableArray arrayWithCapacity:items.count];
-    NSInteger first = -1, last = -1;
-    for (NSUInteger i = 0; i < items.count; i++) {
-        id model = PFBUnwrapDataViewItem(items[i]);
-        NSString* name = NSStringFromClass([model classForCoder]) ?: @"?";
-        NSString* kind = [name componentsSeparatedByString:@"."].lastObject;
-        if ([name isEqualToString:@"TwitterURT.URTModuleHeaderViewModel"]) {
-            kind = @"H";
-        } else if ([name isEqualToString:@"TwitterURT.URTModuleFooterViewModel"]) {
-            kind = @"F";
-        } else if ([ItemScribeComponent(model) isEqualToString:@"suggest_who_to_follow"] ||
-                   [ItemEntryID(model) containsString:@"who-to-follow"]) {
-            kind = @"W";
+    NSMutableArray* items = [NSMutableArray array];
+    NSMutableArray<NSNumber*>* sectionOf = [NSMutableArray array];
+    NSMutableIndexSet* removed = [NSMutableIndexSet indexSet];
+    NSMutableIndexSet* runs = [NSMutableIndexSet indexSet];
+    for (NSUInteger s = 0; s < sections.count && s < removedBySection.count; s++) {
+        NSArray* section = [sections[s] isKindOfClass:[NSArray class]] ? sections[s] : @[];
+        NSUInteger base = items.count;
+        [removedBySection[s] enumerateIndexesUsingBlock:^(NSUInteger i, BOOL* stop) {
+          if (i < section.count) {
+              [removed addIndex:base + i];
+              if (PFBIsWhoToFollowModel(PFBUnwrapDataViewItem(section[i]))) {
+                  [runs addIndex:base + i];
+              }
+          }
+        }];
+        [items addObjectsFromArray:section];
+        for (NSUInteger i = 0; i < section.count; i++) {
+            [sectionOf addObject:@(s)];
         }
-        if (kind.length == 1) {
-            first = first < 0 ? (NSInteger)i : first;
-            last = (NSInteger)i;
-        }
-        [kinds addObject:[removed containsIndex:i] ? [kind stringByAppendingString:@"-"] : kind];
     }
-    if (first < 0) {
-        return;
-    }
-    NSUInteger from = (NSUInteger)MAX((NSInteger)0, first - 2);
-    NSUInteger to = (NSUInteger)MIN((NSInteger)items.count - 1, last + 2);
-    NSString* line = [NSString stringWithFormat:@"section %lu/%lu, items %lu-%lu of %lu: %@",
-                                                (unsigned long)index + 1, (unsigned long)count,
-                                                (unsigned long)from + 1, (unsigned long)to + 1,
-                                                (unsigned long)items.count,
-                                                [[kinds subarrayWithRange:NSMakeRange(from, to - from + 1)]
-                                                    componentsJoinedByString:@" "]];
-    written = written ?: [NSMutableSet set];
-    if (![written containsObject:line]) {
-        [written addObject:line];
-        PFBDebugLog(@"[modules] %@", line);
-    }
+    [runs enumerateRangesUsingBlock:^(NSRange run, BOOL* stop) {
+      NSUInteger from = run.location > 3 ? run.location - 3 : 0;
+      NSUInteger to = MIN(NSMaxRange(run) + 3, items.count);
+      NSMutableArray<NSString*>* kinds = [NSMutableArray arrayWithObject:from == 0 ? @"^" : @"\u2026"];
+      for (NSUInteger f = from; f < to; f++) {
+          if (f > 0 && ![sectionOf[f] isEqualToNumber:sectionOf[f - 1]]) {
+              [kinds addObject:@"|"];
+          }
+          [kinds addObject:PFBMeasuredKind(items[f], [removed containsIndex:f])];
+      }
+      if (to < items.count && ![sectionOf[to] isEqualToNumber:sectionOf[to - 1]]) {
+          [kinds addObject:@"|"];
+      }
+      [kinds addObject:to == items.count ? @"$" : @"\u2026"];
+      if (!PFBCompatMeasure(@"modules", [kinds componentsJoinedByString:@" "], 8)) {
+          full = YES;
+          *stop = YES;
+      }
+    }];
 }
 
 static NSArray* FilteredTimelineSections(TFNItemsDataViewController* dataViewController,
@@ -1725,10 +1746,10 @@ static NSArray* FilteredTimelineSections(TFNItemsDataViewController* dataViewCon
     BOOL modified = NO;
     NSMutableArray* filteredSections = [NSMutableArray arrayWithCapacity:sections.count];
 
-    NSUInteger sectionIndex = 0;
+    NSMutableArray<NSIndexSet*>* removedBySection = [NSMutableArray arrayWithCapacity:sections.count];
     for (id section in sections) {
-        NSUInteger thisSection = sectionIndex++;
         if (![section isKindOfClass:[NSArray class]]) {
+            [removedBySection addObject:[NSIndexSet indexSet]];
             [filteredSections addObject:section];
             continue;
         }
@@ -1755,7 +1776,7 @@ static NSArray* FilteredTimelineSections(TFNItemsDataViewController* dataViewCon
         if (removed.count > 0) {
             PFBMarkEmptiedModuleChrome(items, removed);
         }
-        PFBLogModuleSection(items, removed, thisSection, sections.count);
+        [removedBySection addObject:removed];
         if (removed.count == 0) {
             [filteredSections addObject:section];
             continue;
@@ -1769,6 +1790,9 @@ static NSArray* FilteredTimelineSections(TFNItemsDataViewController* dataViewCon
         }
     }
 
+    if (modified) {
+        PFBMeasureWhoToFollow(sections, removedBySection);
+    }
     return modified ? [filteredSections copy] : sections;
 }
 

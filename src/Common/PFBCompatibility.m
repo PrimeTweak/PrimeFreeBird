@@ -2386,6 +2386,7 @@ static void prepare(void) {
               gStore[@"checkDue"] = twitterBinary();
           }
           gStore[@"tour"] = @{};
+          [gStore removeObjectForKey:@"measures"];
           gStore[@"identity"] = identity;
           gStore[@"since"] = [NSDate date];
           gStore[@"counts"] = @{};
@@ -2625,6 +2626,24 @@ void PFBCompatStationRecordCrash(NSString* station) {
         tour[@"crashed"] = crashed;
         gStore[@"tour"] = tour;
         writeStore();
+    }
+}
+
+BOOL PFBCompatMeasure(NSString* topic, NSString* line, NSUInteger cap) {
+    if (!topic.length || !line.length) {
+        return YES;
+    }
+    prepare();
+    @synchronized(gLock) {
+        NSMutableDictionary* measures = [storeDictionary(@"measures") mutableCopy];
+        NSArray* lines = [measures[topic] isKindOfClass:[NSArray class]] ? measures[topic] : @[];
+        if (lines.count < cap && ![lines containsObject:line]) {
+            lines = [lines arrayByAddingObject:line];
+            measures[topic] = lines;
+            gStore[@"measures"] = measures;
+            writeStore();
+        }
+        return lines.count < cap;
     }
 }
 
@@ -4039,6 +4058,7 @@ void PFBCompatReset(void) {
         gStore[@"earlier"] = @{};
         [gStore removeObjectForKey:@"earlierSince"];
         gStore[@"tour"] = @{};
+        [gStore removeObjectForKey:@"measures"];
         // Twitter's binaries are read again at the next launch, as on a new install.
         [gStore removeObjectForKey:@"flags"];
         for (size_t i = 0; i < PFBCompatPathCount; i++) {
@@ -4136,6 +4156,19 @@ NSString* PFBCompatReportText(void) {
     NSString* journal = PFBCompatTourJournalText();
     if (journal) {
         [text appendFormat:@"\nLAST TOUR\n%@\n", journal];
+    }
+    NSDictionary* measures;
+    @synchronized(gLock) {
+        measures = storeDictionary(@"measures");
+    }
+    if (measures.count) {
+        [text appendString:@"\nMEASUREMENTS\n"];
+        for (NSString* topic in [measures.allKeys sortedArrayUsingSelector:@selector(compare:)]) {
+            id lines = measures[topic];
+            for (id line in [lines isKindOfClass:[NSArray class]] ? lines : @[]) {
+                [text appendFormat:@"[%@] %@\n", topic, line];
+            }
+        }
     }
     [text appendFormat:@"\n%@", PFBDebuggerReport()];
     return text;

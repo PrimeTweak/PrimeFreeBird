@@ -602,14 +602,16 @@ static void pfbSendRemoveFollower(NSString* userID, NSString* variable, BOOL ret
                 id message = [first isKindOfClass:[NSDictionary class]] ? first[@"message"] : nil;
                 NSString* asked = pfbVariableNamed(message);
                 if (!retried && asked.length && ![asked isEqualToString:variable]) {
-                    PFBDebugLog(@"[follower] x.com names the follower $%@", asked);
+                    PFBCompatMeasure(@"follower", [NSString stringWithFormat:@"x.com names the follower $%@", asked], 6);
                     pfbSendRemoveFollower(userID, asked, YES, done);
                     return;
                 }
                 BOOL removed = status == 200 && [json isKindOfClass:[NSDictionary class]] && !first;
-                PFBDebugLog(@"[follower] remove follower http=%ld%@%@", (long)status,
-                            [message isKindOfClass:[NSString class]] ? [@" " stringByAppendingString:message] : @"",
-                            error ? [@" " stringByAppendingString:error.localizedDescription] : @"");
+                PFBCompatMeasure(@"follower",
+                                 [NSString stringWithFormat:@"remove follower http=%ld%@%@", (long)status,
+                                     [message isKindOfClass:[NSString class]] ? [@" " stringByAppendingString:message] : @"",
+                                     error ? [@" " stringByAppendingString:error.localizedDescription] : @""],
+                                 6);
                 dispatch_async(dispatch_get_main_queue(), ^{
                   done(removed);
                 });
