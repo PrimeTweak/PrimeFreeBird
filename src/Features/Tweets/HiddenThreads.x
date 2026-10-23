@@ -270,7 +270,7 @@ BOOL pfbThreadIsHidden(id viewModel) {
 
 // MARK: - The glyph
 
-// Drawn rather than taken from the system set, since the icons of the Tweet's menu
+// Drawn rather than taken from the system set, since the icons of the Tweet's pop-up menu
 // have a thin even stroke of their own. A speech bubble crossed by a stroke that
 // leaves a gap around itself so both shapes stay legible at this size.
 
@@ -585,13 +585,13 @@ static BOOL PFBMenuBelongsToTweet(UIMenu* menu) {
 // "About this post" tray, where an entry it does not know lands under "More". The
 // Tweet is held while its menu is built, for the one sheet made then.
 static id gPFBSheetStatus;
-static UITraitCollection* gPFBSheetTraits;
 
 // As in the pop-up menu, the entry is on every Tweet's menu and acts on a Tweet in a
-// conversation.
-static TFNActionItem* PFBHideActionItem(id status, UITraitCollection* traits) {
-    TFNActionItem* item = [%c(TFNActionItem)
+// conversation. Its icon is Twitter's crossed speech bubble, drawn like the sheet's own.
+static TFNActionItem* PFBHideActionItem(id status) {
+    return [%c(TFNActionItem)
         actionItemWithTitle:[[PFBBundle sharedBundle] localizedStringForKey:@"THREADS_HIDE_ACTION"]
+                  imageName:@"chat_bubble_strikethrough_stroke"
                      action:^{
                        NSString* threadID = PFBModelIsConversation(status) ? PFBThreadIDForModel(status) : nil;
                        if (!threadID.length) {
@@ -601,10 +601,6 @@ static TFNActionItem* PFBHideActionItem(id status, UITraitCollection* traits) {
                        PFBReloadList();
                        PFBShowHiddenToast(threadID);
                      }];
-    UIColor* colour = [UIColor labelColor];
-    colour = (traits ? [colour resolvedColorWithTraitCollection:traits] : nil) ?: colour;
-    [item setImage:PFBHideThreadGlyph(colour)];
-    return item;
 }
 
 %hook UIViewController
@@ -615,12 +611,9 @@ static TFNActionItem* PFBHideActionItem(id status, UITraitCollection* traits) {
                                 options:(unsigned long long)options
                               doneBlock:(id)doneBlock {
     id heldStatus = gPFBSheetStatus;
-    UITraitCollection* heldTraits = gPFBSheetTraits;
     gPFBSheetStatus = status;
-    gPFBSheetTraits = ((UIViewController*)self).traitCollection;
     id sheet = %orig;
     gPFBSheetStatus = heldStatus;
-    gPFBSheetTraits = heldTraits;
     return sheet;
 }
 
@@ -630,7 +623,6 @@ static TFNActionItem* PFBHideActionItem(id status, UITraitCollection* traits) {
 
 - (id)initWithActionItems:(NSArray*)items {
     id status = PFBStatusFromModel(gPFBSheetStatus);
-    UITraitCollection* traits = gPFBSheetTraits;
     gPFBSheetStatus = nil;
     if (!status || ![items isKindOfClass:[NSArray class]]) {
         return %orig;
@@ -640,7 +632,7 @@ static TFNActionItem* PFBHideActionItem(id status, UITraitCollection* traits) {
     if (![PFBSettings boolForKey:@"hide_threads"]) {
         return %orig;
     }
-    TFNActionItem* hide = PFBHideActionItem(status, traits);
+    TFNActionItem* hide = PFBHideActionItem(status);
     if (!hide) {
         return %orig;
     }

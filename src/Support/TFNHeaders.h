@@ -35,7 +35,6 @@
 + (instancetype)actionItemWithTitle:(NSString*)arg1
                           imageName:(NSString*)arg2
                              action:(void (^)(void))arg3;
-- (void)setImage:(UIImage*)image;
 @end
 
 @interface TFNAttributedTextModel : NSObject

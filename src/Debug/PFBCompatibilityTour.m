@@ -805,17 +805,29 @@ static void tourShowProfile(NSString* handle, long long userID) {
                      userID ? @"account ID" : @"handle");
 }
 
-// Twitter's settings, opened with its own command, the one its settings links end in.
-static void tourShowTwitterSettings(void) {
-    UIViewController* tabs = tourFindController(tourRootController(), @"T1TabbedAppNavigationViewController");
-    id navigation = tourGetter(tabs, @"appNavigation");
-    SEL show = NSSelectorFromString(@"showSettingsWithSource:completion:");
-    if (![navigation respondsToSelector:show]) {
-        PFBCompatTourLog(@"[tour] Twitter settings: no settings command (%@)",
-                         navigation ? NSStringFromClass([navigation class]) : @"no navigation");
+// A profile's "…" menu, built the way its button builds it, without showing it.
+static void tourBuildProfileMenu(UIViewController* profile) {
+    UIViewController* header = tourFindController(profile, @"T1ProfileHeaderViewController");
+    SEL build = NSSelectorFromString(@"profileMoreActionsBaseActionItemsWithSender:");
+    if (![header respondsToSelector:build]) {
+        PFBCompatTourLog(@"[tour] other profile: no profile menu (%@)",
+                         header ? NSStringFromClass([header class]) : @"no header");
         return;
     }
-    ((void (*)(id, SEL, long long, id))objc_msgSend)(navigation, show, 0, nil);
+    NSArray* items = ((NSArray* (*)(id, SEL, id))objc_msgSend)(header, build, header.view);
+    PFBCompatTourLog(@"[tour] other profile: profile menu built, %lu entries",
+                     (unsigned long)([items isKindOfClass:[NSArray class]] ? items.count : 0));
+}
+
+// Twitter's settings opened the way the side menu's "Settings and privacy" row does,
+// in the current tab.
+static void tourShowTwitterSettings(void) {
+    UIViewController* tabs = tourFindController(tourRootController(), @"T1TabbedAppNavigationViewController");
+    id presenter = tourGetter(tourGetter(tabs, @"dashContentController"), @"presenter");
+    if (!tourSend(presenter, @"showSettings")) {
+        PFBCompatTourLog(@"[tour] Twitter settings: no side menu action (%@)",
+                         presenter ? NSStringFromClass([presenter class]) : @"no presenter");
+    }
 }
 
 // Whether Twitter's tab bar and the Liquid Glass bar laid on it are hidden on the screen.
@@ -1815,11 +1827,13 @@ static NSArray<NSDictionary*>* tourAllSteps(void) {
              tourScrollHomeToTop();
            })];
     __block BOOL followRead = NO;
+    __block BOOL profileMenuBuilt = NO;
     __block NSInteger profileLooks = 0;
     __block NSString* profileHandle = nil;
     __block long long profileUserID = 0;
     [steps addObject:tourStep(@"other profile", @"Another profile", home, ^{
              followRead = NO;
+             profileMenuBuilt = NO;
              profileLooks = 0;
              id author = tourLongestBioAuthor();
              profileHandle = tourGetter(author, @"username") ?: tourAuthorHandle() ?: @"X";
@@ -1831,6 +1845,12 @@ static NSArray<NSDictionary*>* tourAllSteps(void) {
              BOOL profile = [tourScreenName(after) containsString:@"Profile"];
              if (profile && !followRead) {
                  followRead = tourCheckFollowButton(after);
+             }
+             if (profile && !profileMenuBuilt) {
+                 profileMenuBuilt = YES;
+                 tourAttempt(@"other profile", @"profile menu", ^{
+                   tourBuildProfileMenu(after);
+                 });
              }
              // Folded under the bar, the header shows the post count.
              if (profile && ++profileLooks == 6) {
@@ -1975,7 +1995,8 @@ static NSArray<NSDictionary*>* tourAllSteps(void) {
              tourDismissPresented();
            })];
     __block BOOL tabBarLogged = NO;
-    [steps addObject:tourStep(@"Twitter settings", @"Twitter settings", root, ^{
+    // Given the proof wait even when nothing is owed, so a slow opening still shows.
+    [steps addObject:tourStepWaiting(kPFBTourProofWait, tourStep(@"Twitter settings", @"Twitter settings", root, ^{
              tabBarLogged = NO;
              tourShowTwitterSettings();
            }, ^BOOL(UIViewController* before, UIViewController* after) {
@@ -1987,7 +2008,7 @@ static NSArray<NSDictionary*>* tourAllSteps(void) {
              return settings;
            }, nil, ^{
              tourPopToRoot();
-           })];
+           }))];
     [steps addObject:tourStep(@"PFB settings", @"PrimeFreeBird settings", root, ^{
              tourShowSettings();
            }, ^BOOL(UIViewController* before, UIViewController* after) {

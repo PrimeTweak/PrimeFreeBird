@@ -754,13 +754,23 @@ static NSNumber* FeatureSwitchOverrideValueForKey(NSString* key) {
 %end
 
 // Chat's switches come from this store, which never asks TFSFeatureSwitches. Only
-// the key named here gets the answer above.
+// the keys named here get the answers above.
+static BOOL pfbChatStoreKey(NSString* key) {
+    static NSSet<NSString*>* keys;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+      keys = [NSSet setWithArray:@[
+          @"xchat_cold_inbox_suggestions_enabled", @"xchat_voice_messages_transcription_enabled",
+          @"xchat_liquid_glass_convo_header_enabled"
+      ]];
+    });
+    return [keys containsObject:key];
+}
+
 %hook _TtC16XFeatureSwitches18FeatureSwitchStore
 
 - (BOOL)boolForKey:(NSString*)key {
-    NSNumber* override = [key isEqualToString:@"xchat_cold_inbox_suggestions_enabled"]
-                             ? FeatureSwitchOverrideValueForKey(key)
-                             : nil;
+    NSNumber* override = pfbChatStoreKey(key) ? FeatureSwitchOverrideValueForKey(key) : nil;
     return override ? override.boolValue : %orig;
 }
 
