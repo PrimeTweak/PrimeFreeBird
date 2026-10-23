@@ -309,6 +309,7 @@ static NSNumber* FeatureSwitchOverrideValueForKey(NSString* key) {
     // The "About this post" menu's Grok pills ("Ask Grok", "Is this true?",
     // "Explain this"): Twitter's own switch hides them when on, so it is forced on.
     if ([key isEqualToString:@"post_about_hide_grok_pills_enabled"]) {
+        PFBCompatReach(PFBCompatPath_grok_post_menu);
         if ([PFBSettings boolForKey:@"hide_grok_analyze"]) {
             PFBCOMPAT_ACTION(PFBCompat_hide_grok_analyze, @"Grok pills off in the post menu");
             return @YES;
@@ -319,6 +320,7 @@ static NSNumber* FeatureSwitchOverrideValueForKey(NSString* key) {
 
     // The same menu's summary of the post, above the pills, behind its own switch.
     if ([key isEqualToString:@"post_about_grok_features_enabled"]) {
+        PFBCompatReach(PFBCompatPath_grok_post_menu);
         if ([PFBSettings boolForKey:@"hide_grok_analyze"]) {
             PFBCOMPAT_ACTION(PFBCompat_hide_grok_analyze, @"Grok summary off in the post menu");
             return @NO;
@@ -327,7 +329,8 @@ static NSNumber* FeatureSwitchOverrideValueForKey(NSString* key) {
         return nil;
     }
 
-    // The "Suggested" list in an empty Chat inbox, behind Twitter's own switch.
+    // The "Suggested" list in an empty Chat inbox, behind Twitter's own switch, which
+    // Chat reads from its own store (hooked below).
     if ([key isEqualToString:@"xchat_cold_inbox_suggestions_enabled"]) {
         if ([PFBSettings boolForKey:@"hide_suggested_chats"]) {
             PFBCOMPAT_ACTION(PFBCompat_hide_suggested_chats, @"suggested chats off");
@@ -648,7 +651,7 @@ static NSNumber* FeatureSwitchOverrideValueForKey(NSString* key) {
     return nil;
 }
 
-// Every feature switch facade bottoms out in TFSFeatureSwitches, but instances
+// Every feature switch facade but Chat's bottoms out in TFSFeatureSwitches, but instances
 // can be wrapped in TFSInstrumentedFeatureSwitches, which implements its own
 // typed getters, so both classes need the same hooks.
 
@@ -746,6 +749,19 @@ static NSNumber* FeatureSwitchOverrideValueForKey(NSString* key) {
 
 - (BOOL)hasNonDefaultValueForKey:(NSString*)key {
     return FeatureSwitchOverrideValueForKey(key) ? YES : %orig;
+}
+
+%end
+
+// Chat's switches come from this store, which never asks TFSFeatureSwitches. Only
+// the key named here gets the answer above.
+%hook _TtC16XFeatureSwitches18FeatureSwitchStore
+
+- (BOOL)boolForKey:(NSString*)key {
+    NSNumber* override = [key isEqualToString:@"xchat_cold_inbox_suggestions_enabled"]
+                             ? FeatureSwitchOverrideValueForKey(key)
+                             : nil;
+    return override ? override.boolValue : %orig;
 }
 
 %end

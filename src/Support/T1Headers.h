@@ -76,6 +76,14 @@
 
 @interface T1TabBarViewController : UIViewController
 @property (copy, nonatomic) NSArray* tabViews;
+- (void)setTabBarHidden:(BOOL)hidden withDuration:(double)duration;
+- (void)_t1_layoutTabBar;
+- (void)_t1_updateTabBarHidden;
+@end
+
+// Asks the parents in turn; the tabbed navigation answers with its tab bar.
+@interface UIViewController (TFNTabBarIntegration)
+- (T1TabBarViewController*)tfn_tabBarIntegration;
 @end
 
 // Each entry backs one tab and owns its T1TabView; the app orders both the tab

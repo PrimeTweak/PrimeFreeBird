@@ -198,6 +198,9 @@ static const PFBCompatPathMeta kPaths[] = {
     {PFBCompatPath_grok_create_own_pill, PFBCompat_hide_grok_create, "immersive create-your-own pill"},
     {PFBCompatPath_threads_popup_menu, PFBCompat_hide_threads, "pop-up menu"},
     {PFBCompatPath_threads_post_menu, PFBCompat_hide_threads, "About this post menu"},
+    {PFBCompatPath_grok_post_menu, PFBCompat_hide_grok_analyze, "About this post menu"},
+    {PFBCompatPath_settings_tab_bar, PFBCompat_custom_tab_bar, "Twitter settings"},
+    {PFBCompatPath_native_bar_hidden, PFBCompat_enable_liquid_glass, "hidden with Twitter's bar"},
 };
 static const size_t kPathCount = sizeof(kPaths) / sizeof(kPaths[0]);
 
@@ -322,6 +325,9 @@ static const PFBCompatReq kReqs[] = {
     {PFBCompat_new_inapp_webview, "TFSInstrumentedFeatureSwitches", "-unsafePeekBoolForKey:"},
     {PFBCompat_new_inapp_webview, "TFSInstrumentedFeatureSwitches", "-unsafePeekIntegerForKey:"},
     {PFBCompat_custom_tab_bar, "T1DashContentController", "-updateVisiblePanelIDs"},
+    {PFBCompat_custom_tab_bar, "T1GenericSettingsViewController", "-viewWillAppear:"},
+    {PFBCompat_custom_tab_bar, "T1GenericSettingsViewController", "-viewWillDisappear:"},
+    {PFBCompat_custom_tab_bar, "T1TabBarViewController", "-setTabBarHidden:withDuration:"},
     {PFBCompat_custom_tab_bar, "T1TabView", "-scribePage"},
     {PFBCompat_custom_tab_bar, "T1TabbedAppNavigationViewController", "-recalculateVisiblePanels"},
     {PFBCompat_custom_tab_bar, "T1TabbedAppNavigationViewController", "-setVisibleTabEntries:"},
@@ -344,6 +350,7 @@ static const PFBCompatReq kReqs[] = {
     {PFBCompat_custom_tab_bar, "TFSInstrumentedFeatureSwitches", "-rawValueForKey:"},
     {PFBCompat_custom_tab_bar, "TFSInstrumentedFeatureSwitches", "-unsafePeekBoolForKey:"},
     {PFBCompat_custom_tab_bar, "TFSInstrumentedFeatureSwitches", "-unsafePeekIntegerForKey:"},
+    {PFBCompat_custom_tab_bar, "UIViewController", "-tfn_tabBarIntegration"},
     {PFBCompat_restore_tab_labels, "T1TabView", "-didMoveToWindow"},
     {PFBCompat_restore_tab_labels, "T1TabView", "-showsTitleInDisplayMode:"},
     {PFBCompat_restore_tab_labels, "T1TabBarHostView", "-layoutSubviews"},
@@ -393,6 +400,8 @@ static const PFBCompatReq kReqs[] = {
     {PFBCompat_enable_liquid_glass, "NSBundle", "-objectForInfoDictionaryKey:"},
     {PFBCompat_enable_liquid_glass, "T1PersistentComposeView", "-layoutSubviews"},
     {PFBCompat_enable_liquid_glass, "T1TabBarHostView", "-layoutSubviews"},
+    {PFBCompat_enable_liquid_glass, "T1TabBarViewController", "-_t1_layoutTabBar"},
+    {PFBCompat_enable_liquid_glass, "T1TabBarViewController", "-_t1_updateTabBarHidden"},
     {PFBCompat_enable_liquid_glass, "T1TabBarViewController", "-setTabBarCollapseRatio:"},
     {PFBCompat_enable_liquid_glass, "T1TabView", "-_t1_updateImageViewAnimated:"},
     {PFBCompat_enable_liquid_glass, "TFNCustomTabBar", "-layoutSubviews"},
@@ -885,6 +894,7 @@ static const PFBCompatReq kReqs[] = {
     {PFBCompat_hide_typing_indicator, "NSURLSession", "-webSocketTaskWithRequest:"},
     {PFBCompat_hide_typing_indicator, "NSURLSession", "-webSocketTaskWithURL:"},
     {PFBCompat_hide_typing_indicator, "NSURLSession", "-webSocketTaskWithURL:protocols:"},
+    {PFBCompat_hide_suggested_chats, "_TtC16XFeatureSwitches18FeatureSwitchStore", "-boolForKey:"},
     {PFBCompat_voice_transcription, "TFSFeatureSwitches", "-boolForKey:"},
     {PFBCompat_voice_transcription, "TFSFeatureSwitches", "-hasNonDefaultValueForKey:"},
     {PFBCompat_voice_transcription, "TFSFeatureSwitches", "-integerForKey:"},
@@ -1353,6 +1363,14 @@ static const PFBCompatName kNames[] = {
     {PFBCompatOptionCount, "Debug/PFBCompatibilityTour.m", "viewModel"},
     {PFBCompatOptionCount, "Debug/PFBCompatibilityTour.m", "fromUser"},
     {PFBCompatOptionCount, "Debug/PFBCompatibilityTour.m", "bio"},
+    {PFBCompatOptionCount, "Debug/PFBCompatibilityTour.m", "userID"},
+    {PFBCompatOptionCount, "Debug/PFBCompatibilityTour.m", "T1TabbedAppNavigationViewController"},
+    {PFBCompatOptionCount, "Debug/PFBCompatibilityTour.m", "appNavigation"},
+    {PFBCompatOptionCount, "Debug/PFBCompatibilityTour.m", "showProfileForUsername:orUserID:fromPanel:source:sourceNavigationMetadata:completion:"},
+    {PFBCompatOptionCount, "Debug/PFBCompatibilityTour.m", "showSettingsWithSource:completion:"},
+    {PFBCompatOptionCount, "Debug/PFBCompatibilityTour.m", "T1GenericSettingsViewController"},
+    {PFBCompatOptionCount, "Debug/PFBCompatibilityTour.m", "tfn_tabBarIntegration"},
+    {PFBCompatOptionCount, "Debug/PFBCompatibilityTour.m", "isTabBarHidden"},
     {PFBCompatOptionCount, "Debug/PFBCompatibilityTour.m", "T1ImmersiveViewController"},
     {PFBCompatOptionCount, "Debug/PFBCompatibilityTour.m", "T1ImmersiveFullScreenViewController"},
     {PFBCompatOptionCount, "Debug/PFBCompatibilityTour.m", "_canDockCurrentVideoToBottomSegment"},
@@ -1913,6 +1931,7 @@ static const PFBCompatDeclared kDeclared[] = {
     {"Support/T1Headers.h", "T1SafariViewController", "rootURL"},
     {"Support/T1Headers.h", "T1StandardStatusAttachmentViewAdapter", "attachmentType"},
     {"Support/T1Headers.h", "T1StandardStatusView", "eventHandler"},
+    {"Support/T1Headers.h", "T1TabBarViewController", "setTabBarHidden:withDuration:"},
     {"Support/T1Headers.h", "T1TabBarViewController", "tabViews"},
     {"Support/T1Headers.h", "T1TabView", "_t1_updateImageViewAnimated:"},
     {"Support/T1Headers.h", "T1TabView", "_t1_updateTitleLabel"},
@@ -1943,6 +1962,7 @@ static const PFBCompatDeclared kDeclared[] = {
     {"Support/T1Headers.h", "TTAStatusInlineActionsView", "viewModel"},
     {"Support/T1Headers.h", "TTMAssetVideoFile", "filePath"},
     {"Support/T1Headers.h", "TUIUpdateIndicator", "pillControl"},
+    {"Support/T1Headers.h", "UIViewController", "tfn_tabBarIntegration"},
     {"Support/T1Headers.h", "_TtC10TwitterURT25URTTimelineTrendViewModel", "scribeItem"},
     {"Support/T1Headers.h", "_TtC21TweetMediaAttachments14MultiMediaView", "inlineMediaInfos"},
     {"Support/TAEHeaders.h", "TAEColorSettings", "currentColorPalette"},
@@ -2214,6 +2234,7 @@ static const PFBCompatPathStation kPathStations[] = {
     {PFBCompatPath_promoted_video_feed, "video full screen"},
     {PFBCompatPath_replies_by_date, "replies"},
     {PFBCompatPath_native_filter_button, "search off"},
+    {PFBCompatPath_settings_tab_bar, "Twitter settings"},
 };
 static const size_t kPathStationCount = sizeof(kPathStations) / sizeof(kPathStations[0]);
 
@@ -2250,6 +2271,7 @@ static NSString* stationLabel(NSString* station) {
           @"side menu": @"the side menu",
           @"dark mode": @"dark mode",
           @"web link": @"a web link",
+          @"Twitter settings": @"Twitter's settings",
           @"PFB settings": @"the PFB settings",
       };
     });

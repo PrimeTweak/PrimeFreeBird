@@ -1322,6 +1322,13 @@ static void PFBApplyTabBarGlassBody(UIView* host) {
     if (!CGRectEqualToRect(native.frame, parent.bounds)) {
         native.frame = parent.bounds;
     }
+    // Twitter hides its own bar, never the view this one shares with it.
+    if (native.hidden != bar.hidden) {
+        native.hidden = bar.hidden;
+        if (bar.hidden) {
+            PFBCompatReach(PFBCompatPath_native_bar_hidden);
+        }
+    }
 
     // Selection, both ways. The slide gesture sets selectedItem without calling
     // the delegate, so the tap route alone never sees it. The chosen tab is
@@ -2016,6 +2023,17 @@ static NSArray* orderedTabEntries(NSArray* entries) {
     } else {
         %orig(ratio);
     }
+}
+
+// Both apply the bar's hidden state, which the native bar then follows.
+- (void)_t1_layoutTabBar {
+    %orig;
+    PFBReapplyTabBarFrom(((UIViewController*)self).viewIfLoaded);
+}
+
+- (void)_t1_updateTabBarHidden {
+    %orig;
+    PFBReapplyTabBarFrom(((UIViewController*)self).viewIfLoaded);
 }
 
 %end

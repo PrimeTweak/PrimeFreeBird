@@ -216,6 +216,9 @@ typedef NS_ENUM(NSInteger, PFBCompatPath) {
     PFBCompatPath_grok_create_own_pill,
     PFBCompatPath_threads_popup_menu,
     PFBCompatPath_threads_post_menu,
+    PFBCompatPath_grok_post_menu,
+    PFBCompatPath_settings_tab_bar,
+    PFBCompatPath_native_bar_hidden,
     PFBCompatPathCount,
 };
 

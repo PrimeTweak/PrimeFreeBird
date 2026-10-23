@@ -304,14 +304,16 @@ static void tourOpenFirstTweet(void) {
                 (unsigned long)rows.count, NSStringFromClass([list class]));
 }
 
-// Through the app delegate, the way a link opened from outside arrives.
-static void tourOpenLink(NSString* link) {
+// Through the app delegate, the way a link opened from outside arrives; YES when
+// Twitter takes it.
+static BOOL tourOpenLink(NSString* link) {
     UIApplication* app = UIApplication.sharedApplication;
     id<UIApplicationDelegate> delegate = app.delegate;
     NSURL* url = [NSURL URLWithString:link];
     if (url && [delegate respondsToSelector:@selector(application:openURL:options:)]) {
-        [delegate application:app openURL:url options:@{}];
+        return [delegate application:app openURL:url options:@{}];
     }
+    return NO;
 }
 
 static void tourOpenOwnProfile(void) {
@@ -739,10 +741,10 @@ static BOOL tourTableMenuDoor(UIView* video, NSString* pass) {
 
 // Among the Tweets of Home's first screens, the author with the longest bio, so the
 // profile opened has one long enough to clip; nil when no author can be read.
-static NSString* tourLongestBioHandle(void) {
+static id tourLongestBioAuthor(void) {
     id account = tourGetter(UIApplication.sharedApplication.delegate, @"_t1_currentAccount");
     NSString* own = tourGetter(account, @"username");
-    NSString* best = nil;
+    id best = nil;
     NSUInteger longest = 0;
     NSUInteger read = 0;
     UITableView* list = tourFrontList();
@@ -758,7 +760,7 @@ static NSString* tourLongestBioHandle(void) {
             read++;
             NSUInteger length = [bio isKindOfClass:[NSString class]] ? bio.length : 0;
             if (!best || length > longest) {
-                best = handle;
+                best = user;
                 longest = length;
             }
         }
@@ -770,6 +772,59 @@ static NSString* tourLongestBioHandle(void) {
     PFBCompatTourLog(@"[tour] other profile: %lu authors read, longest bio %lu characters", (unsigned long)read,
                      (unsigned long)longest);
     return best;
+}
+
+// A 64-bit integer a getter returns, read only when its signature says it returns one.
+static long long tourLongLongGetter(id object, NSString* name) {
+    SEL selector = NSSelectorFromString(name);
+    if (!object || ![object respondsToSelector:selector]) {
+        return 0;
+    }
+    NSMethodSignature* signature = [object methodSignatureForSelector:selector];
+    const char* type = signature.methodReturnType;
+    if (signature.numberOfArguments != 2 || (type[0] != 'q' && type[0] != 'Q')) {
+        return 0;
+    }
+    return ((long long (*)(id, SEL))objc_msgSend)(object, selector);
+}
+
+// Twitter's own profile command, with the account ID when known, as its own callers
+// send it: no panel, no source.
+static void tourShowProfile(NSString* handle, long long userID) {
+    UIViewController* tabs = tourFindController(tourRootController(), @"T1TabbedAppNavigationViewController");
+    id navigation = tourGetter(tabs, @"appNavigation");
+    SEL show = NSSelectorFromString(@"showProfileForUsername:orUserID:fromPanel:source:sourceNavigationMetadata:completion:");
+    if (![navigation respondsToSelector:show]) {
+        PFBCompatTourLog(@"[tour] other profile: no profile command (%@)",
+                         navigation ? NSStringFromClass([navigation class]) : @"no navigation");
+        return;
+    }
+    ((void (*)(id, SEL, NSString*, long long, long long, long long, id, id))objc_msgSend)(navigation, show, handle,
+                                                                                          userID, 0, 0, nil, nil);
+    PFBCompatTourLog(@"[tour] other profile: profile asked of %@ by %@", NSStringFromClass([navigation class]),
+                     userID ? @"account ID" : @"handle");
+}
+
+// Twitter's settings, opened with its own command, the one its settings links end in.
+static void tourShowTwitterSettings(void) {
+    UIViewController* tabs = tourFindController(tourRootController(), @"T1TabbedAppNavigationViewController");
+    id navigation = tourGetter(tabs, @"appNavigation");
+    SEL show = NSSelectorFromString(@"showSettingsWithSource:completion:");
+    if (![navigation respondsToSelector:show]) {
+        PFBCompatTourLog(@"[tour] Twitter settings: no settings command (%@)",
+                         navigation ? NSStringFromClass([navigation class]) : @"no navigation");
+        return;
+    }
+    ((void (*)(id, SEL, long long, id))objc_msgSend)(navigation, show, 0, nil);
+}
+
+// Whether Twitter's tab bar and the Liquid Glass bar laid on it are hidden on the screen.
+static void tourLogTabBar(UIViewController* screen) {
+    id tabBar = tourGetter(screen, @"tfn_tabBarIntegration");
+    UIView* native = tourFindClass(tourGetter(tabBar, @"view"), @"UITabBar");
+    PFBCompatTourLog(@"[tour] Twitter settings: tab bar %@, Liquid Glass bar %@",
+                     tabBar ? (tourBoolGetter(tabBar, @"isTabBarHidden") ? @"hidden" : @"shown") : @"none",
+                     native ? @"shown" : @"hidden or absent");
 }
 
 // The full-screen player's card swipe, asked the question UIKit asks as a swipe starts.
@@ -1761,12 +1816,17 @@ static NSArray<NSDictionary*>* tourAllSteps(void) {
            })];
     __block BOOL followRead = NO;
     __block NSInteger profileLooks = 0;
+    __block NSString* profileHandle = nil;
+    __block long long profileUserID = 0;
     [steps addObject:tourStep(@"other profile", @"Another profile", home, ^{
              followRead = NO;
              profileLooks = 0;
-             NSString* handle = tourLongestBioHandle() ?: tourAuthorHandle() ?: @"X";
-             PFBCompatTourLog(@"[tour] other profile: @%@", handle);
-             tourOpenLink([@"twitter://user?screen_name=" stringByAppendingString:handle]);
+             id author = tourLongestBioAuthor();
+             profileHandle = tourGetter(author, @"username") ?: tourAuthorHandle() ?: @"X";
+             profileUserID = tourLongLongGetter(author, @"userID");
+             PFBCompatTourLog(@"[tour] other profile: @%@", profileHandle);
+             BOOL taken = tourOpenLink([@"twitter://user?screen_name=" stringByAppendingString:profileHandle]);
+             PFBCompatTourLog(@"[tour] other profile: link %@", taken ? @"taken by Twitter" : @"refused by Twitter");
            }, ^BOOL(UIViewController* before, UIViewController* after) {
              BOOL profile = [tourScreenName(after) containsString:@"Profile"];
              if (profile && !followRead) {
@@ -1780,7 +1840,9 @@ static NSArray<NSDictionary*>* tourAllSteps(void) {
                  });
              }
              return profile;
-           }, nil, ^{
+           }, ^{
+             tourShowProfile(profileHandle, profileUserID);
+           }, ^{
              tourPopToRoot();
            })];
     __block BOOL sendRead = NO;
@@ -1911,6 +1973,20 @@ static NSArray<NSDictionary*>* tourAllSteps(void) {
              return tourFindController(tourRootController().presentedViewController, @"SFSafariViewController") != nil;
            }, nil, ^{
              tourDismissPresented();
+           })];
+    __block BOOL tabBarLogged = NO;
+    [steps addObject:tourStep(@"Twitter settings", @"Twitter settings", root, ^{
+             tabBarLogged = NO;
+             tourShowTwitterSettings();
+           }, ^BOOL(UIViewController* before, UIViewController* after) {
+             BOOL settings = [after isKindOfClass:NSClassFromString(@"T1GenericSettingsViewController")];
+             if (settings && !tabBarLogged) {
+                 tabBarLogged = YES;
+                 tourLogTabBar(after);
+             }
+             return settings;
+           }, nil, ^{
+             tourPopToRoot();
            })];
     [steps addObject:tourStep(@"PFB settings", @"PrimeFreeBird settings", root, ^{
              tourShowSettings();

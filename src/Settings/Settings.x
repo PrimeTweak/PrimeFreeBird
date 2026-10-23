@@ -1,4 +1,4 @@
-// The PrimeFreeBird entry in the app's settings, and the custom font picker.
+// The PrimeFreeBird entry in the app's settings, their tab bar, and the custom font picker.
 
 #import "Support/HookHelpers.h"
 #import "Common/PFBCompatibility.h"
@@ -155,11 +155,51 @@ static NSArray* sectionsWithPrimeFreeBirdEntry(TFNItemsDataViewController* setti
     return sectionsByInsertingEntry(settingsVC, sections);
 }
 
+// MARK: - Tab bar in the settings
+
+// Twitter 12.36 keeps its tab bar on screen in the settings. It is hidden with
+// Twitter's own call, which selecting a tab undoes.
+static void setSettingsTabBarHidden(UIViewController* settingsVC, BOOL hidden) {
+    T1TabBarViewController* tabBar = [settingsVC tfn_tabBarIntegration];
+    if (![tabBar respondsToSelector:@selector(setTabBarHidden:withDuration:)]) {
+        return;
+    }
+    PFBCompatReach(PFBCompatPath_settings_tab_bar);
+    [tabBar setTabBarHidden:hidden withDuration:0.0];
+    if (hidden) {
+        PFBCOMPAT_ACTION(PFBCompat_custom_tab_bar, @"tab bar hidden in Twitter settings");
+    }
+}
+
+// Leaving the settings, not covered by a screen pushed over them: no settings page
+// stays in the stack.
+static BOOL settingsVCLeavesSettings(UIViewController* settingsVC) {
+    UINavigationController* stack = settingsVC.navigationController;
+    if (!settingsVC.isMovingFromParentViewController && !settingsVC.isBeingDismissed &&
+        !stack.isBeingDismissed) {
+        return NO;
+    }
+    for (UIViewController* viewController in stack.viewControllers) {
+        if (viewController != settingsVC && isSettingsClass(viewController)) {
+            return NO;
+        }
+    }
+    return YES;
+}
+
 %hook T1GenericSettingsViewController
 - (void)viewWillAppear:(BOOL)animated {
     %orig;
     PFBThemeScreenEnter(self);
     insertPrimeFreeBirdSettingsIfRoot(self);
+    setSettingsTabBarHidden(self, YES);
+}
+
+- (void)viewWillDisappear:(BOOL)animated {
+    %orig;
+    if (settingsVCLeavesSettings(self)) {
+        setSettingsTabBarHidden(self, NO);
+    }
 }
 
 - (void)viewDidDisappear:(BOOL)animated {
