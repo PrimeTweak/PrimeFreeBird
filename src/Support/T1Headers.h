@@ -46,6 +46,15 @@
 - (BOOL)shouldBeVisibleForViewModel:(id)viewModel;
 @end
 
+// The Tweet's menu sheet, also shown as the "About this post" tray.
+@interface UIViewController (T1ModalProfileViewControllerPrivate)
+- (id)t1_actionsViewControllerForStatus:(id)status
+                                account:(id)account
+                                 source:(id)source
+                                options:(unsigned long long)options
+                              doneBlock:(id)doneBlock;
+@end
+
 #pragma mark - Tab bar
 
 @interface T1PanelIdentity : NSObject

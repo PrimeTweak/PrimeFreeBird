@@ -147,6 +147,8 @@
 "HIDE_TREND_VIDEOS_DETAIL" = "Убрать популярные видео из меню поиска.";
 
 /* ===== GROK ===== */
+"HIDE_SUGGESTED_CHATS_TITLE" = "Скрыть рекомендуемые чаты";
+"HIDE_SUGGESTED_CHATS_DETAIL" = "Убирает список «Рекомендуемые» из папки входящих чатов.";
 "HIDE_GROK_ANALYZE_TITLE" = "Скрыть кнопки анализа Grok";
 "HIDE_GROK_SIDEBAR_TITLE" = "Скрыть Grok в боковой панели";
 "HIDE_GROK_CREATE_TITLE" = "Скрыть инструменты создания";

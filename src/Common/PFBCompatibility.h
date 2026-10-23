@@ -81,6 +81,7 @@ typedef NS_ENUM(NSInteger, PFBCompatOption) {
     PFBCompat_hide_explore_all,
     PFBCompat_choose_explore_tabs,
     PFBCompat_hide_typing_indicator,
+    PFBCompat_hide_suggested_chats,
     PFBCompat_voice_transcription,
     PFBCompat_download_voice_messages,
     PFBCompat_voice_note_from_video,
@@ -213,6 +214,8 @@ typedef NS_ENUM(NSInteger, PFBCompatPath) {
     PFBCompatPath_grok_imagine_button,
     PFBCompatPath_grok_create_own_button,
     PFBCompatPath_grok_create_own_pill,
+    PFBCompatPath_threads_popup_menu,
+    PFBCompatPath_threads_post_menu,
     PFBCompatPathCount,
 };
 
@@ -238,6 +241,8 @@ FOUNDATION_EXPORT NSSet<NSString*>* PFBCompatStationPending(NSString* station);
 FOUNDATION_EXPORT BOOL PFBCompatStationLeft(NSString* station);
 // Whether a step showed its screen, and what it still missed then.
 FOUNDATION_EXPORT void PFBCompatStationRecord(NSString* station, BOOL reached, NSSet<NSString*>* missed);
+// A step whose screen had nothing to open, and why ("none in the inbox").
+FOUNDATION_EXPORT void PFBCompatStationRecordEmpty(NSString* station, NSString* why);
 // A step during which Twitter closed: left out of the tours until a new build.
 FOUNDATION_EXPORT void PFBCompatStationRecordCrash(NSString* station);
 FOUNDATION_EXPORT BOOL PFBCompatStationCrashed(NSString* station);

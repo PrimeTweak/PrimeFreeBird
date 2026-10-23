@@ -147,6 +147,8 @@
 "HIDE_TREND_VIDEOS_DETAIL" = "Ukloni popularne videozapise iz izbornika pretrage.";
 
 /* ===== GROK ===== */
+"HIDE_SUGGESTED_CHATS_TITLE" = "Sakrij predložene razgovore";
+"HIDE_SUGGESTED_CHATS_DETAIL" = "Uklanja popis „Predloženi” iz pristigle pošte razgovora.";
 "HIDE_GROK_ANALYZE_TITLE" = "Sakrij Grok gumb za analizu";
 "HIDE_GROK_SIDEBAR_TITLE" = "Sakrij Grok u bočnoj traci";
 "HIDE_GROK_CREATE_TITLE" = "Sakrij alate za stvaranje";

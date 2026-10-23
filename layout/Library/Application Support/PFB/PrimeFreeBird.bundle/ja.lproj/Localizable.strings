@@ -147,6 +147,8 @@
 "HIDE_TREND_VIDEOS_DETAIL" = "検索メニューからトレンド動画を非表示にします。";
 
 /* ===== GROK ===== */
+"HIDE_SUGGESTED_CHATS_TITLE" = "おすすめのチャットを非表示";
+"HIDE_SUGGESTED_CHATS_DETAIL" = "チャットの受信トレイから「おすすめ」のリストを取り除きます。";
 "HIDE_GROK_ANALYZE_TITLE" = "分析ボタンを非表示";
 "HIDE_GROK_SIDEBAR_TITLE" = "サイドバーのGrokを非表示";
 "HIDE_GROK_CREATE_TITLE" = "作成ツールを非表示";

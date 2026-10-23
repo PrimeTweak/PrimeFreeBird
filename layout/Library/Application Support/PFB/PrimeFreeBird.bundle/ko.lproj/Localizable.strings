@@ -147,6 +147,8 @@
 "HIDE_TREND_VIDEOS_DETAIL" = "검색 메뉴에서 트렌딩 비디오를 제거합니다.";
 
 /* ===== GROK ===== */
+"HIDE_SUGGESTED_CHATS_TITLE" = "추천 채팅 숨기기";
+"HIDE_SUGGESTED_CHATS_DETAIL" = "채팅 받은함에서 ‘추천’ 목록을 제거합니다.";
 "HIDE_GROK_ANALYZE_TITLE" = "Grok 분석 버튼 제거";
 "HIDE_GROK_SIDEBAR_TITLE" = "사이드바에서 Grok 제거";
 "HIDE_GROK_CREATE_TITLE" = "생성 도구 제거";

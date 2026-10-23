@@ -147,6 +147,8 @@
 "HIDE_TREND_VIDEOS_DETAIL" = "Ta bort trendande videor från sökmenyn.";
 
 /* ===== GROK ===== */
+"HIDE_SUGGESTED_CHATS_TITLE" = "Dölj föreslagna chattar";
+"HIDE_SUGGESTED_CHATS_DETAIL" = "Tar bort listan ”Föreslagna” från din chattinkorg.";
 "HIDE_GROK_ANALYZE_TITLE" = "Dölj Grok-analysknappar";
 "HIDE_GROK_SIDEBAR_TITLE" = "Dölj Grok i sidofältet";
 "HIDE_GROK_CREATE_TITLE" = "Dölj skapandeverktyg";

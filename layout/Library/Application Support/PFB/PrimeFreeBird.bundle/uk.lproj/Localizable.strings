@@ -147,6 +147,8 @@
 "HIDE_TREND_VIDEOS_DETAIL" = "Прибрати трендові відео з пошуку.";
 
 /* ===== GROK ===== */
+"HIDE_SUGGESTED_CHATS_TITLE" = "Приховати рекомендовані чати";
+"HIDE_SUGGESTED_CHATS_DETAIL" = "Прибирає список «Рекомендовані» зі скриньки вхідних чатів.";
 "HIDE_GROK_ANALYZE_TITLE" = "Приховати кнопки аналізу Grok";
 "HIDE_GROK_SIDEBAR_TITLE" = "Приховати Grok у бічній панелі";
 "HIDE_GROK_CREATE_TITLE" = "Приховати інструменти створення";

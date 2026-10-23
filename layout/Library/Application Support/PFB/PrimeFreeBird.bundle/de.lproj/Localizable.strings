@@ -147,6 +147,8 @@
 "HIDE_TREND_VIDEOS_DETAIL" = "Entferne die trendenden Videos aus dem Suchmenü.";
 
 /* ===== GROK ===== */
+"HIDE_SUGGESTED_CHATS_TITLE" = "Vorgeschlagene Chats ausblenden";
+"HIDE_SUGGESTED_CHATS_DETAIL" = "Entfernt die Liste „Vorgeschlagen“ aus deinem Chat-Posteingang.";
 "HIDE_GROK_ANALYZE_TITLE" = "Analyse-Button ausblenden";
 "HIDE_GROK_SIDEBAR_TITLE" = "Grok in der Seitenleiste ausblenden";
 "HIDE_GROK_CREATE_TITLE" = "Erstellungswerkzeuge ausblenden";

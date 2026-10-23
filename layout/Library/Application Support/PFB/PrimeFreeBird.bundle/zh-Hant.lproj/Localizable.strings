@@ -147,6 +147,8 @@
 "HIDE_TREND_VIDEOS_DETAIL" = "從搜尋選單中移除熱門影片。";
 
 /* ===== GROK ===== */
+"HIDE_SUGGESTED_CHATS_TITLE" = "隱藏推薦的聊天";
+"HIDE_SUGGESTED_CHATS_DETAIL" = "從聊天收件匣移除「推薦」清單。";
 "HIDE_GROK_ANALYZE_TITLE" = "隱藏 Grok 分析按鈕";
 "HIDE_GROK_SIDEBAR_TITLE" = "隱藏側邊欄中的 Grok";
 "HIDE_GROK_CREATE_TITLE" = "隱藏建立工具";

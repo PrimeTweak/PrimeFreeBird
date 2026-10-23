@@ -147,6 +147,8 @@
 "HIDE_TREND_VIDEOS_DETAIL" = "إخفاء الفيديوهات الرائجة من البحث.";
 
 /* ===== GROK ===== */
+"HIDE_SUGGESTED_CHATS_TITLE" = "إخفاء الدردشات المقترحة";
+"HIDE_SUGGESTED_CHATS_DETAIL" = "يزيل قائمة «مقترح» من صندوق وارد الدردشة.";
 "HIDE_GROK_ANALYZE_TITLE" = "إخفاء أزرار تحليل Grok";
 "HIDE_GROK_SIDEBAR_TITLE" = "إخفاء Grok من الشريط الجانبي";
 "HIDE_GROK_CREATE_TITLE" = "إخفاء أدوات الإنشاء";

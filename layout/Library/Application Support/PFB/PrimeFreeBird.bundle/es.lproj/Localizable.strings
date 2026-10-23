@@ -151,6 +151,8 @@
 "HIDE_TREND_VIDEOS_DETAIL" = "Quita videos de tendencia del menú de búsqueda.";
 
 /* ===== GROK ===== */
+"HIDE_SUGGESTED_CHATS_TITLE" = "Ocultar chats sugeridos";
+"HIDE_SUGGESTED_CHATS_DETAIL" = "Quita la lista «Sugeridos» de tu bandeja de Chat.";
 "HIDE_GROK_ANALYZE_TITLE" = "Ocultar botón de análisis Grok";
 "HIDE_GROK_SIDEBAR_TITLE" = "Ocultar Grok en la barra lateral";
 "HIDE_GROK_CREATE_TITLE" = "Ocultar herramientas de creación";

@@ -50,6 +50,9 @@ static BOOL gPFBTourRunning = NO;
 static NSUInteger gPFBTourGeneration;
 // The step whose screen is up; nil once it concludes, so its delayed parts stop with it.
 static NSString* gPFBTourStepLive;
+// Set by a step whose screen had nothing to open (an inbox with no conversation): the
+// step then concludes on that, not as reached or not reached.
+static NSString* gPFBTourStepEmpty;
 static UIWindow* gPFBTourOverlay;
 static UILabel* gPFBTourStepLabel;
 static NSFileHandle* gPFBTourJournal;
@@ -430,6 +433,16 @@ static UIView* tourFindView(UIView* root, BOOL (^match)(UIView* view)) {
         [queue addObjectsFromArray:view.subviews];
     }
     return nil;
+}
+
+// In a window, with neither the view nor any of its parents hidden or transparent.
+static BOOL tourOnScreen(UIView* view) {
+    for (UIView* level = view; level; level = level.superview) {
+        if (level.hidden || level.alpha < 0.01) {
+            return NO;
+        }
+    }
+    return view.window != nil;
 }
 
 static UIView* tourFindClass(UIView* root, NSString* className) {
@@ -962,8 +975,51 @@ static NSString* tourUnreadMark(UIView* cell) {
     return dot ? @"unread dot" : nil;
 }
 
-// The first conversation of the inbox known to be read, opened the way a tap does.
-static void tourOpenReadConversation(void) {
+// What an inbox row is, or nil for a conversation. Twitter shows its suggested accounts
+// in conversation rows too, each with a "Chat" button; a conversation row has a button
+// only for a call to join. A button with no readable title leaves its row unknown.
+static NSString* tourInboxRowKind(UIView* cell) {
+    Class conversation = NSClassFromString(@"_TtC20ChatConversationList24ConversationListItemCell");
+    if (!conversation) {
+        return nil;
+    }
+    if (![cell isKindOfClass:conversation]) {
+        return [NSStringFromClass([cell class]) componentsSeparatedByString:@"."].lastObject;
+    }
+    UIView* content = tourFindClass(cell, @"_TtC20ChatConversationList31ConversationListItemContentView");
+    Ivar ivar = content ? class_getInstanceVariable([content class], "accessoryButton") : NULL;
+    UIView* button = ivar ? object_getIvar(content, ivar) : nil;
+    if (![button isKindOfClass:[UIView class]] || !tourOnScreen(button)) {
+        return nil;
+    }
+    NSMutableString* title = [NSMutableString stringWithString:button.accessibilityLabel ?: @""];
+    tourFindView(button, ^BOOL(UIView* view) {
+      if ([view isKindOfClass:[UILabel class]]) {
+          [title appendString:((UILabel*)view).text ?: @""];
+      }
+      return NO;
+    });
+    NSString* chat = [[PFBBundle sharedBundle] localizedTwitterStringForKey:@"CHAT_COLD_INBOX_CHAT_BUTTON_TITLE"];
+    if (chat.length && [title containsString:chat]) {
+        return @"suggested account";
+    }
+    return title.length ? nil : @"untitled button";
+}
+
+// Each kind once, with its count when it repeats, in the order first seen.
+static NSString* tourCounted(NSArray<NSString*>* kinds) {
+    NSCountedSet* counts = [[NSCountedSet alloc] initWithArray:kinds];
+    NSMutableArray<NSString*>* parts = [NSMutableArray array];
+    for (NSString* kind in [NSOrderedSet orderedSetWithArray:kinds]) {
+        NSUInteger count = [counts countForObject:kind];
+        [parts addObject:count > 1 ? [NSString stringWithFormat:@"%lu %@", (unsigned long)count, kind] : kind];
+    }
+    return parts.count ? [parts componentsJoinedByString:@", "] : @"none";
+}
+
+// The first conversation of the inbox known to be read, opened the way a tap does. On
+// the last look, an inbox done loading that shows no conversation ends the step on that.
+static void tourOpenReadConversation(BOOL lastLook) {
     UIScrollView* list = nil;
     for (UIView* view = tourFrontView(); view && !list; view = view.superview) {
         if ([view isKindOfClass:[UITableView class]] || [view isKindOfClass:[UICollectionView class]]) {
@@ -980,7 +1036,17 @@ static void tourOpenReadConversation(void) {
                      NSStringFromClass([tourFrontView() class]), list ? NSStringFromClass([list class]) : @"none",
                      (unsigned long)cells.count);
     NSMutableArray<NSString*>* skipped = [NSMutableArray array];
+    NSMutableArray<NSString*>* others = [NSMutableArray array];
+    NSUInteger conversations = 0;
     for (UIView* cell in cells) {
+        NSString* kind = tourInboxRowKind(cell);
+        if (kind) {
+            [skipped addObject:kind];
+            [others addObject:kind];
+            conversations += [kind isEqualToString:@"untitled button"] ? 1 : 0;
+            continue;
+        }
+        conversations++;
         NSString* unread = tourUnreadMark(cell);
         if (unread) {
             [skipped addObject:unread];
@@ -1000,12 +1066,26 @@ static void tourOpenReadConversation(void) {
             return;
         }
         PFBCompatTourLog(@"[tour] conversation: opened row %lu (skipped: %@)", (unsigned long)skipped.count,
-                    skipped.count ? [skipped componentsJoinedByString:@", "] : @"none");
+                    tourCounted(skipped));
         return;
     }
-    PFBCompatTourLog(@"[tour] conversation: no conversation known to be read in %@ (%@)",
+    UIView* screen = tourScreen().view;
+    BOOL (^shown)(NSString*) = ^BOOL(NSString* part) {
+      return tourFindView(screen, ^BOOL(UIView* view) {
+               return [NSStringFromClass([view class]) containsString:part] && tourOnScreen(view);
+             }) != nil;
+    };
+    BOOL loading = [others containsObject:@"ConversationListLoadingCell"] || shown(@"ConversationListShimmerView");
+    BOOL emptyState = shown(@"EmptyState");
+    if (lastLook && conversations == 0 && !loading && (list || emptyState)) {
+        gPFBTourStepEmpty = @"none in the inbox";
+        PFBCompatTourLog(@"[tour] conversation: no conversation in the inbox (rows: %@%@)", tourCounted(others),
+                         emptyState ? @", empty state shown" : @"");
+        return;
+    }
+    PFBCompatTourLog(@"[tour] conversation: no conversation known to be read in %@ (%@%@)",
                 list ? NSStringFromClass([list class]) : @"no list",
-                skipped.count ? [skipped componentsJoinedByString:@", "] : @"no rows");
+                cells.count ? tourCounted(skipped) : @"no rows", loading ? @", still loading" : @"");
 }
 
 // The controller that shows the side menu, and whether it is open.
@@ -1723,10 +1803,8 @@ static NSArray<NSDictionary*>* tourAllSteps(void) {
     NSUInteger messages = [pages indexOfObject:@"messages"];
     if (messages != NSNotFound) {
         __block NSString* inbox = nil;
-        __block BOOL inboxEmpty = NO;
         [steps addObject:tourStep(@"conversation", @"Conversation", root, ^{
                  inbox = nil;
-                 inboxEmpty = NO;
                  tourSelectTab((NSInteger)messages);
                  NSUInteger generation = gPFBTourGeneration;
                  dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1.0 * NSEC_PER_SEC)),
@@ -1734,23 +1812,21 @@ static NSArray<NSDictionary*>* tourAllSteps(void) {
                                   if (generation == gPFBTourGeneration) {
                                       tourAttempt(@"conversation", @"opening a row", ^{
                                         inbox = tourScreenName(tourScreen());
-                                        tourOpenReadConversation();
+                                        tourOpenReadConversation(NO);
                                       });
                                   }
                                 });
                }, ^BOOL(UIViewController* before, UIViewController* after) {
                  NSString* name = tourScreenName(after);
-                 return inboxEmpty || (inbox && ![name isEqualToString:inbox] &&
-                                       ([name containsString:@"Conversation"] || [name containsString:@"Chat"]));
+                 BOOL opened = inbox && ![name isEqualToString:inbox] &&
+                               ([name containsString:@"Conversation"] || [name containsString:@"Chat"]);
+                 gPFBTourStepEmpty = opened ? nil : gPFBTourStepEmpty;
+                 return opened;
                }, ^{
-                 // Chat may still be loading its conversations after the first look; still
-                 // empty then, the inbox is the screen, with nothing to open.
+                 // Chat may still be loading its conversations after the first look; with
+                 // none by then, the step ends on an inbox with no conversation.
                  inbox = tourScreenName(tourScreen());
-                 tourOpenReadConversation();
-                 inboxEmpty = [NSStringFromClass([tourFrontView() class]) containsString:@"EmptyState"];
-                 if (inboxEmpty) {
-                     PFBCompatTourLog(@"[tour] conversation: Chat shows its empty state, no conversation to open");
-                 }
+                 tourOpenReadConversation(YES);
                }, ^{
                  tourPopToRoot();
                  tourSelectTab(0);
@@ -1989,12 +2065,21 @@ static void tourConcludeStep(NSArray<NSDictionary*>* steps, NSUInteger index, NS
     NSDictionary* step = steps[index];
     NSString* name = step[@"name"];
     gPFBTourStepLive = nil;
+    // Only a step that ran to its end (one with a pending set) ends on an empty screen.
+    NSString* empty = pending ? gPFBTourStepEmpty : nil;
+    gPFBTourStepEmpty = nil;
+    reached = reached && !empty;
     NSArray<NSString*>* missed = [pending.allObjects sortedArrayUsingSelector:@selector(compare:)];
-    NSString* outcome = !reached ? @"not reached"
-                                 : (missed.count ? [NSString stringWithFormat:@"missed %lu", (unsigned long)missed.count]
-                                                 : @"ok");
+    NSString* outcome = empty ?: (!reached ? @"not reached"
+                                           : (missed.count ? [NSString stringWithFormat:@"missed %lu",
+                                                                                        (unsigned long)missed.count]
+                                                           : @"ok"));
     [results addObject:[NSString stringWithFormat:@"%@ %@", name, outcome]];
-    PFBCompatStationRecord(name, reached, pending);
+    if (empty) {
+        PFBCompatStationRecordEmpty(name, empty);
+    } else {
+        PFBCompatStationRecord(name, reached, pending);
+    }
     PFBCompatTourLog(@"[tour] %@: %@ \u00b7 %@%@", name, outcome, detail,
                      reached && missed.count ? [@" \u00b7 missed: " stringByAppendingString:[missed componentsJoinedByString:@", "]]
                                              : @"");
@@ -2071,6 +2156,7 @@ static void tourRun(NSArray<NSDictionary*>* steps, NSUInteger index, NSMutableAr
     NSDictionary* step = steps[index];
     NSString* name = step[@"name"];
     gPFBTourStepLive = name;
+    gPFBTourStepEmpty = nil;
     tourShowStep(step[@"label"], index, steps.count);
     NSSet<NSString*>* owed = PFBCompatStationPending(name);
     tourJournalWrite([NSString stringWithFormat:@"step %@ \u00b7 setup", name]);

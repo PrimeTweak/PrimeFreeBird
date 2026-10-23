@@ -208,6 +208,8 @@
 "MODERN_SETTINGS_MESSAGES_SUBTITLE" = "Saisie, messages vocaux et points d’entrée de Grok.";
 "MESSAGES_GROUP_CHAT" = "Discussion";
 "MESSAGES_GROUP_GROK" = "Grok";
+"HIDE_SUGGESTED_CHATS_TITLE" = "Masquer les discussions suggérées";
+"HIDE_SUGGESTED_CHATS_DETAIL" = "Retire la liste « Suggérés » de la boîte de réception Chat.";
 "HIDE_TYPING_INDICATOR_TITLE" = "Masquer l’indicateur de saisie";
 "HIDE_TYPING_INDICATOR_DETAIL" = "N’indique plus à votre correspondant que vous écrivez.";
 "VOICE_TRANSCRIPTION_TITLE" = "Transcription des messages vocaux";

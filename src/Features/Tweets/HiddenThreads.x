@@ -509,18 +509,20 @@ static NSString* PFBPreviewForButton(UIView* button) {
     return PFBPreviewForModel(PFBStatusForButton(button));
 }
 
-static BOOL PFBMenuBelongsToTweet(UIMenu* menu) {
-    NSString* mark = [[PFBBundle sharedBundle]
-        localizedTwitterStringForKey:@"NOT_INTERESTED_IN_THIS_LABEL"];
-    if (!mark.length) {
+static BOOL PFBMenuHasEntry(UIMenu* menu, NSString* title) {
+    if (!title.length) {
         return NO;
     }
     for (UIMenuElement* element in menu.children) {
-        if ([element.title isEqualToString:mark]) {
+        if ([element.title isEqualToString:title]) {
             return YES;
         }
     }
     return NO;
+}
+
+static BOOL PFBMenuBelongsToTweet(UIMenu* menu) {
+    return PFBMenuHasEntry(menu, [[PFBBundle sharedBundle] localizedTwitterStringForKey:@"NOT_INTERESTED_IN_THIS_LABEL"]);
 }
 
 %hook UIButton
@@ -529,6 +531,7 @@ static BOOL PFBMenuBelongsToTweet(UIMenu* menu) {
     // A Tweet's menu reaching here is the path, whatever the toggle and the Tweet.
     if ([menu isKindOfClass:[UIMenu class]] && PFBCompatNeedsObservation(PFBCompat_hide_threads) &&
         (PFBMenuBelongsToTweet(menu) || PFBThreadIDForButton((UIView*)self).length)) {
+        PFBCompatReach(PFBCompatPath_threads_popup_menu);
         PFBCOMPAT_OBSERVE(PFBCompat_hide_threads, @"Tweet menu found");
     }
     if (![menu isKindOfClass:[UIMenu class]] ||
@@ -547,6 +550,12 @@ static BOOL PFBMenuBelongsToTweet(UIMenu* menu) {
     __weak UIView* weakButton = button;
     NSString* title =
         [[PFBBundle sharedBundle] localizedStringForKey:@"THREADS_HIDE_ACTION"];
+    // A menu made from the Tweet's menu sheet already carries the entry.
+    if (PFBMenuHasEntry(menu, title)) {
+        %orig;
+        return;
+    }
+    PFBCompatReach(PFBCompatPath_threads_popup_menu);
     UIColor* colour = [UIColor labelColor];
     colour = [colour resolvedColorWithTraitCollection:button.traitCollection] ?: colour;
     UIAction* hide = [UIAction
@@ -566,6 +575,77 @@ static BOOL PFBMenuBelongsToTweet(UIMenu* menu) {
                 }];
     PFBCOMPAT_ACTION(PFBCompat_hide_threads, @"hide entry in a Tweet menu");
     %orig([menu menuByReplacingChildren:[menu.children arrayByAddingObject:hide]]);
+}
+
+%end
+
+// MARK: - The entry in the Tweet's menu sheet
+
+// Twitter 12.36 builds a Tweet's menu as a sheet of action items and shows it as its
+// "About this post" tray, where an entry it does not know lands under "More". The
+// Tweet is held while its menu is built, for the one sheet made then.
+static id gPFBSheetStatus;
+static UITraitCollection* gPFBSheetTraits;
+
+// As in the pop-up menu, the entry is on every Tweet's menu and acts on a Tweet in a
+// conversation.
+static TFNActionItem* PFBHideActionItem(id status, UITraitCollection* traits) {
+    TFNActionItem* item = [%c(TFNActionItem)
+        actionItemWithTitle:[[PFBBundle sharedBundle] localizedStringForKey:@"THREADS_HIDE_ACTION"]
+                     action:^{
+                       NSString* threadID = PFBModelIsConversation(status) ? PFBThreadIDForModel(status) : nil;
+                       if (!threadID.length) {
+                           return;
+                       }
+                       PFBHideThread(threadID, PFBAuthorHandleForModel(status), PFBPreviewForModel(status));
+                       PFBReloadList();
+                       PFBShowHiddenToast(threadID);
+                     }];
+    UIColor* colour = [UIColor labelColor];
+    colour = (traits ? [colour resolvedColorWithTraitCollection:traits] : nil) ?: colour;
+    [item setImage:PFBHideThreadGlyph(colour)];
+    return item;
+}
+
+%hook UIViewController
+
+- (id)t1_actionsViewControllerForStatus:(id)status
+                                account:(id)account
+                                 source:(id)source
+                                options:(unsigned long long)options
+                              doneBlock:(id)doneBlock {
+    id heldStatus = gPFBSheetStatus;
+    UITraitCollection* heldTraits = gPFBSheetTraits;
+    gPFBSheetStatus = status;
+    gPFBSheetTraits = ((UIViewController*)self).traitCollection;
+    id sheet = %orig;
+    gPFBSheetStatus = heldStatus;
+    gPFBSheetTraits = heldTraits;
+    return sheet;
+}
+
+%end
+
+%hook TFNMenuSheetViewController
+
+- (id)initWithActionItems:(NSArray*)items {
+    id status = PFBStatusFromModel(gPFBSheetStatus);
+    UITraitCollection* traits = gPFBSheetTraits;
+    gPFBSheetStatus = nil;
+    if (!status || ![items isKindOfClass:[NSArray class]]) {
+        return %orig;
+    }
+    PFBCompatReach(PFBCompatPath_threads_post_menu);
+    PFBCOMPAT_OBSERVE(PFBCompat_hide_threads, @"Tweet menu found");
+    if (![PFBSettings boolForKey:@"hide_threads"]) {
+        return %orig;
+    }
+    TFNActionItem* hide = PFBHideActionItem(status, traits);
+    if (!hide) {
+        return %orig;
+    }
+    PFBCOMPAT_ACTION(PFBCompat_hide_threads, @"hide entry in a Tweet menu");
+    return %orig([items arrayByAddingObject:hide]);
 }
 
 %end

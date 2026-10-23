@@ -118,6 +118,7 @@ static const PFBCompatMeta kMeta[] = {
     {PFBCompat_hide_explore_all, "hide_explore_all", "HIDE_EXPLORE_ALL_TITLE", "MODERN_SETTINGS_SEARCH_TITLE"},
     {PFBCompat_choose_explore_tabs, "choose_explore_tabs", "CHOOSE_EXPLORE_TABS_TITLE", "MODERN_SETTINGS_SEARCH_TITLE"},
     {PFBCompat_hide_typing_indicator, "hide_typing_indicator", "HIDE_TYPING_INDICATOR_TITLE", "MODERN_SETTINGS_MESSAGES_TITLE"},
+    {PFBCompat_hide_suggested_chats, "hide_suggested_chats", "HIDE_SUGGESTED_CHATS_TITLE", "MODERN_SETTINGS_MESSAGES_TITLE"},
     {PFBCompat_voice_transcription, "voice_transcription", "VOICE_TRANSCRIPTION_TITLE", "MODERN_SETTINGS_MESSAGES_TITLE"},
     {PFBCompat_download_voice_messages, "download_voice_messages", "DOWNLOAD_VOICE_MESSAGES_TITLE", "MODERN_SETTINGS_MESSAGES_TITLE"},
     {PFBCompat_voice_note_from_video, "voice_note_from_video", "VOICE_NOTE_FROM_VIDEO_TITLE", "MODERN_SETTINGS_MESSAGES_TITLE"},
@@ -195,6 +196,8 @@ static const PFBCompatPathMeta kPaths[] = {
     {PFBCompatPath_grok_imagine_button, PFBCompat_hide_grok_create, "Imagine button under a post"},
     {PFBCompatPath_grok_create_own_button, PFBCompat_hide_grok_create, "create-your-own button"},
     {PFBCompatPath_grok_create_own_pill, PFBCompat_hide_grok_create, "immersive create-your-own pill"},
+    {PFBCompatPath_threads_popup_menu, PFBCompat_hide_threads, "pop-up menu"},
+    {PFBCompatPath_threads_post_menu, PFBCompat_hide_threads, "About this post menu"},
 };
 static const size_t kPathCount = sizeof(kPaths) / sizeof(kPaths[0]);
 
@@ -519,6 +522,8 @@ static const PFBCompatReq kReqs[] = {
     {PFBCompat_hide_who_to_follow, "TFSInstrumentedFeatureSwitches", "-unsafePeekIntegerForKey:"},
     {PFBCompat_hide_who_to_follow, "TFNItemsDataViewController", "-setSections:restoreScrollPosition:"},
     {PFBCompat_hide_who_to_follow, "TFNItemsDataViewController", "-updateSections:reconfigureItemIdentifiers:withRowAnimation:completion:"},
+    {PFBCompat_hide_who_to_follow, "_TtC14T1TwitterSwift28URTTimelineCarouselViewModel", "$clientEventInfo"},
+    {PFBCompat_hide_who_to_follow, "_TtCVOV10TFSURTCore16URTTimelineEntry7Content4Item15ClientEventInfo", "-component"},
     {PFBCompat_hide_topics_to_follow, "TFNItemsDataViewController", "-setSections:restoreScrollPosition:"},
     {PFBCompat_hide_topics_to_follow, "TFNItemsDataViewController", "-updateSections:reconfigureItemIdentifiers:withRowAnimation:completion:"},
     {PFBCompat_hide_timeline_prompts, "TFNItemsDataViewController", "-setSections:restoreScrollPosition:"},
@@ -594,6 +599,10 @@ static const PFBCompatReq kReqs[] = {
     {PFBCompat_hide_tweet_button, "TFNFloatingActionButton", "-layoutSubviews"},
     {PFBCompat_hide_tweet_button, "TFNFloatingActionButton", "-willMoveToWindow:"},
     {PFBCompat_hide_threads, "UIButton", "-setMenu:"},
+    {PFBCompat_hide_threads, "UIViewController", "-t1_actionsViewControllerForStatus:account:source:options:doneBlock:"},
+    {PFBCompat_hide_threads, "TFNMenuSheetViewController", "-initWithActionItems:"},
+    {PFBCompat_hide_threads, "TFNActionItem", "+actionItemWithTitle:action:"},
+    {PFBCompat_hide_threads, "TFNActionItem", "-setImage:"},
     {PFBCompat_hide_threads, "TFNItemsDataViewController", "-setSections:restoreScrollPosition:"},
     {PFBCompat_hide_threads, "TFNItemsDataViewController", "-updateSections:reconfigureItemIdentifiers:withRowAnimation:completion:"},
     {PFBCompat_like_confirm, "TTAStatusInlineActionsView", "-didTapInlineActionButton:"},
@@ -1133,6 +1142,9 @@ static const PFBCompatFlag kFlags[] = {
     {PFBCompat_hide_grok_create, "grok_ios_imagine_2_cta_enabled", NO},
     {PFBCompat_hide_grok_create, "grok_immersive_create_own_button_enabled", NO},
     {PFBCompat_hide_grok_create, "ios_button_layout_fix", YES},
+    {PFBCompat_hide_grok_analyze, "post_about_hide_grok_pills_enabled", NO},
+    {PFBCompat_hide_grok_analyze, "post_about_grok_features_enabled", NO},
+    {PFBCompat_hide_suggested_chats, "xchat_cold_inbox_suggestions_enabled", NO},
     {PFBCompat_hide_grok_analyze, "grok_ios_author_view_analyze_button_via_backend_enabled", NO},
     {PFBCompat_hide_grok_analyze, "grok_ios_profile_summary_enabled", NO},
     {PFBCompat_hide_grok_analyze, "grok_ask_grok_button_under_post_focal_enabled", NO},
@@ -1778,6 +1790,9 @@ static const PFBCompatName kNames[] = {
     {PFBCompat_hide_who_to_follow, "Features/Timelines/Timeline.x", "scribeComponent"},
     {PFBCompat_hide_topics_to_follow, "Features/Timelines/Timeline.x", "scribeComponent"},
     {PFBCompat_hide_who_to_follow, "Features/Timelines/Timeline.x", "entryID"},
+    {PFBCompat_hide_who_to_follow, "Features/Timelines/Timeline.x", "clientEventInfo"},
+    {PFBCompat_hide_who_to_follow, "Features/Timelines/Timeline.x", "component"},
+    {PFBCompat_hide_who_to_follow, "Features/Timelines/Timeline.x", "element"},
     {PFBCompat_hide_verified_tweets, "Features/Timelines/Timeline.x", "entryID"},
     {PFBCompat_remove_related_tweets, "Features/Timelines/Timeline.x", "entryID"},
     {PFBCompat_hide_trend_videos, "Features/Timelines/Ads.x", "adDisplayLocation"},
@@ -1836,6 +1851,10 @@ static const PFBCompatName kNames[] = {
     {PFBCompatOptionCount, "Sideload/PFBReplyWebViewController.m", "COMPOSITION_COMPLETE_SENDING_TWEET_TOAST_NOTIFICATION_MESSAGE"},
     {PFBCompatOptionCount, "Sideload/PFBReplyWebViewController.m", "DM_MESSAGE_ACTION_OPEN_GENERIC_TITLE"},
     {PFBCompatOptionCount, "Debug/PFBCompatibilityTour.m", "DM_INBOX_PILL_UNREAD_TITLE"},
+    {PFBCompatOptionCount, "Debug/PFBCompatibilityTour.m", "CHAT_COLD_INBOX_CHAT_BUTTON_TITLE"},
+    {PFBCompatOptionCount, "Debug/PFBCompatibilityTour.m", "_TtC20ChatConversationList24ConversationListItemCell"},
+    {PFBCompatOptionCount, "Debug/PFBCompatibilityTour.m", "_TtC20ChatConversationList31ConversationListItemContentView"},
+    {PFBCompatOptionCount, "Debug/PFBCompatibilityTour.m", "accessoryButton"},
     {PFBCompat_download_videos, "Features/Media/MediaDownloads.x", "DOWNLOAD_ACTIVITY_VIEW_LABEL"},
     {PFBCompat_download_videos, "Features/Media/PFBDownloadInlineButton.m", "DOWNLOAD_LIVE_ACTIVITY_DOWNLOADING"},
     {PFBCompat_download_videos, "Features/Media/PFBDownloadInlineButton.m", "ERROR_ALERT_TITLE"},
@@ -1862,6 +1881,9 @@ static const PFBCompatName kClassSubstrings[] = {
     {PFBCompat_bar_repairs, "Features/Appearance/NavBarIcons.x", "SelfSizingStackView"},
     {PFBCompat_enable_liquid_glass, "Features/Appearance/NavBarIcons.x", "SocialContext"},
     {PFBCompat_tab_bar_theming, "Features/Appearance/Theme.x", "CustomTabBar"},
+    {PFBCompatOptionCount, "Debug/PFBCompatibilityTour.m", "ConversationListLoadingCell"},
+    {PFBCompatOptionCount, "Debug/PFBCompatibilityTour.m", "ConversationListShimmerView"},
+    {PFBCompatOptionCount, "Debug/PFBCompatibilityTour.m", "EmptyState"},
 };
 enum { kClassSubstringCount = sizeof(kClassSubstrings) / sizeof(kClassSubstrings[0]) };
 
@@ -1933,6 +1955,7 @@ static const PFBCompatDeclared kDeclared[] = {
     {"Support/TAEHeaders.h", "TFNUIDefaultFontGroup", "heavyFontOfSize:"},
     {"Support/TFNHeaders.h", "TFNActionItem", "actionItemWithTitle:action:"},
     {"Support/TFNHeaders.h", "TFNActionItem", "actionItemWithTitle:imageName:action:"},
+    {"Support/TFNHeaders.h", "TFNActionItem", "setImage:"},
     {"Support/TFNHeaders.h", "TFNAttributedTextModel", "attributedString"},
     {"Support/TFNHeaders.h", "TFNAttributedTextModel", "initWithAttributedString:"},
     {"Support/TFNHeaders.h", "TFNDataViewController", "adDisplayLocation"},
@@ -2140,6 +2163,7 @@ static const PFBCompatContract kContract[] = {
     {PFBCompat_hide_explore_all, "tab guide", NULL},
     {PFBCompat_choose_explore_tabs, "tab guide", NULL},
     {PFBCompat_hide_typing_indicator, "conversation", NULL},
+    {PFBCompat_hide_suggested_chats, "tab messages", NULL},
     {PFBCompat_voice_transcription, "conversation", "voice note"},
     {PFBCompat_download_voice_messages, "conversation", "voice note"},
     {PFBCompat_hide_grok_analyze, "launch", NULL},
@@ -2202,6 +2226,7 @@ static NSString* stationLabel(NSString* station) {
           @"launch": @"the app's launch",
           @"tab guide": @"the Explore tab",
           @"tab ntab": @"the Notifications tab",
+          @"tab messages": @"the Chat tab",
           @"tab home": @"the Home timeline",
           @"pull": @"a pull to refresh",
           @"first Tweet": @"an opened Tweet",
@@ -2611,6 +2636,20 @@ void PFBCompatStationRecord(NSString* station, BOOL reached, NSSet<NSString*>* m
             @"reached": @(reached),
             @"missed": reached ? (missed.allObjects ?: @[]) : @[],
         };
+        tour[@"stations"] = stations;
+        gStore[@"tour"] = tour;
+        writeStore();
+    }
+}
+
+void PFBCompatStationRecordEmpty(NSString* station, NSString* why) {
+    prepare();
+    @synchronized(gLock) {
+        NSMutableDictionary* tour = mutableTour();
+        NSMutableDictionary* stations = [tour[@"stations"] isKindOfClass:[NSDictionary class]]
+                                            ? [tour[@"stations"] mutableCopy]
+                                            : [NSMutableDictionary dictionary];
+        stations[station] = @{@"reached": @NO, @"empty": why ?: @"", @"missed": @[]};
         tour[@"stations"] = stations;
         gStore[@"tour"] = tour;
         writeStore();
@@ -3780,6 +3819,7 @@ static PFBCompatVerdict tourVerdict(const PFBCompatMeta* meta, NSString* key, BO
     NSString* missedAt = nil;
     NSString* failedAt = nil;
     BOOL closedTwitter = NO;
+    NSString* emptyWhy = nil;
     for (NSString* station in planned) {
         NSDictionary* record = stations[station];
         if (![record isKindOfClass:[NSDictionary class]]) {
@@ -3787,7 +3827,9 @@ static PFBCompatVerdict tourVerdict(const PFBCompatMeta* meta, NSString* key, BO
         }
         if (![record[@"reached"] boolValue]) {
             failedAt = failedAt ?: station;
-            closedTwitter = closedTwitter || ([station isEqualToString:failedAt] && [record[@"crashed"] boolValue]);
+            BOOL first = [station isEqualToString:failedAt];
+            closedTwitter = closedTwitter || (first && [record[@"crashed"] boolValue]);
+            emptyWhy = emptyWhy ?: (first && [record[@"empty"] isKindOfClass:[NSString class]] ? record[@"empty"] : nil);
         } else if ([record[@"missed"] containsObject:key]) {
             missedAt = missedAt ?: station;
         }
@@ -3800,6 +3842,9 @@ static PFBCompatVerdict tourVerdict(const PFBCompatMeta* meta, NSString* key, BO
         *detail = capitalizedFirst(absent);
     } else if (missedAt) {
         *detail = [NSString stringWithFormat:@"No %@ during the check", absent];
+    } else if (failedAt && emptyWhy.length) {
+        *detail = [NSString stringWithFormat:@"%@: %@ during the check", capitalizedFirst(stationLabel(failedAt)),
+                                             emptyWhy];
     } else if (failedAt) {
         *detail = [NSString stringWithFormat:closedTwitter ? @"%@ closed Twitter during the check"
                                                            : @"%@: not reached during the check",

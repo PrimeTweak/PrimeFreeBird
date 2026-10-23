@@ -415,6 +415,11 @@ static NSDictionary<NSString*, NSDictionary*>* PFBSettingsPages(void) {
                         @"type": @"toggle"
                     },
                     @{
+                        @"key": @"hide_suggested_chats",
+                        @"default": @YES,
+                        @"type": @"toggle"
+                    },
+                    @{
                         @"key": @"voice_transcription",
                         @"default": @YES,
                         @"type": @"toggle"

@@ -147,6 +147,8 @@
 "HIDE_TREND_VIDEOS_DETAIL" = "Arama menüsünden trend videoları kaldır.";
 
 /* ===== GROK ===== */
+"HIDE_SUGGESTED_CHATS_TITLE" = "Önerilen sohbetleri gizle";
+"HIDE_SUGGESTED_CHATS_DETAIL" = "Sohbet gelen kutundan “Önerilen” listesini kaldırır.";
 "HIDE_GROK_ANALYZE_TITLE" = "Grok analiz düğmelerini gizle";
 "HIDE_GROK_SIDEBAR_TITLE" = "Kenar çubuğunda Grok’u gizle";
 "HIDE_GROK_CREATE_TITLE" = "Oluşturma araçlarını gizle";

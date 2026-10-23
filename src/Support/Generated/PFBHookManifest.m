@@ -179,6 +179,7 @@ const PFBHookRecord PFBHookRecords[] = {
     {"TFNItemsDataViewController", "updatedSections:forStyle:", "Settings/Settings.x"},
     {"TFNItemsDataViewController", "viewWillAppear:", "Features/Timelines/Timeline.x"},
     {"TFNItemsDataViewController", "viewWillDisappear:", "Features/Timelines/Timeline.x"},
+    {"TFNMenuSheetViewController", "initWithActionItems:", "Features/Tweets/HiddenThreads.x"},
     {"TFNMutableTwitterStatusDisplayAttributedTextModelFontOptions", "linkTextColor", "Features/Appearance/Theme.x"},
     {"TFNNavigationBar", "layoutSubviews", "Features/Timelines/QuickMutedWords.x"},
     {"TFNNavigationBar", "setFrame:", "Features/Appearance/NavBarIcons.x"},
@@ -317,6 +318,7 @@ const PFBHookRecord PFBHookRecords[] = {
     {"UITabBarItem", "setStandardAppearance:", "Features/Appearance/Theme.x"},
     {"UIView", "setAlpha:", "Features/Appearance/NavBarIcons.x"},
     {"UIView", "setBackgroundColor:", "Features/Appearance/ThemeColor/PFBDarkModeStyle.x"},
+    {"UIViewController", "t1_actionsViewControllerForStatus:account:source:options:doneBlock:", "Features/Tweets/HiddenThreads.x"},
     {"UIViewController", "viewDidAppear:", "Features/Appearance/Theme.x"},
     {"UIViewController", "viewDidAppear:", "Features/Search/AdvancedSearch.x"},
     {"UIViewController", "viewWillAppear:", "Features/Search/AdvancedSearch.x"},
@@ -417,6 +419,7 @@ const PFBRuntimeClassRecord PFBRuntimeClasses[] = {
     {"TAVPlayerView", "Features/Media/ImmersivePlayer.x"},
     {"TFNActionItem", "Features/Media/PFBDownloadInlineButton.m"},
     {"TFNActionItem", "Features/Profiles/Profile.x"},
+    {"TFNActionItem", "Features/Tweets/HiddenThreads.x"},
     {"TFNActionItem", "Settings/Settings.x"},
     {"TFNActiveTextItem", "Features/Media/PFBDownloadInlineButton.m"},
     {"TFNActiveTextItem", "Settings/Settings.x"},
@@ -475,5 +478,6 @@ const PFBRuntimeClassRecord PFBRuntimeClasses[] = {
     {"_TtC14T1TwitterSwift36ImmersiveGoogleNativeAdCardViewModel", "Features/Timelines/Ads.x"},
     {"_TtC15TwitterSearchV29SearchBar", "Debug/PFBCompatibilityTour.m"},
     {"_TtC15TwitterSearchV29SearchBar", "Features/Search/AdvancedSearch.x"},
+    {"_TtC20ChatConversationList24ConversationListItemCell", "Debug/PFBCompatibilityTour.m"},
 };
 const size_t PFBRuntimeClassCount = sizeof(PFBRuntimeClasses) / sizeof(PFBRuntimeClasses[0]);

@@ -306,6 +306,37 @@ static NSNumber* FeatureSwitchOverrideValueForKey(NSString* key) {
         return @YES;
     }
 
+    // The "About this post" menu's Grok pills ("Ask Grok", "Is this true?",
+    // "Explain this"): Twitter's own switch hides them when on, so it is forced on.
+    if ([key isEqualToString:@"post_about_hide_grok_pills_enabled"]) {
+        if ([PFBSettings boolForKey:@"hide_grok_analyze"]) {
+            PFBCOMPAT_ACTION(PFBCompat_hide_grok_analyze, @"Grok pills off in the post menu");
+            return @YES;
+        }
+        PFBCOMPAT_OBSERVE(PFBCompat_hide_grok_analyze, @"read by Twitter");
+        return nil;
+    }
+
+    // The same menu's summary of the post, above the pills, behind its own switch.
+    if ([key isEqualToString:@"post_about_grok_features_enabled"]) {
+        if ([PFBSettings boolForKey:@"hide_grok_analyze"]) {
+            PFBCOMPAT_ACTION(PFBCompat_hide_grok_analyze, @"Grok summary off in the post menu");
+            return @NO;
+        }
+        PFBCOMPAT_OBSERVE(PFBCompat_hide_grok_analyze, @"read by Twitter");
+        return nil;
+    }
+
+    // The "Suggested" list in an empty Chat inbox, behind Twitter's own switch.
+    if ([key isEqualToString:@"xchat_cold_inbox_suggestions_enabled"]) {
+        if ([PFBSettings boolForKey:@"hide_suggested_chats"]) {
+            PFBCOMPAT_ACTION(PFBCompat_hide_suggested_chats, @"suggested chats off");
+            return @NO;
+        }
+        PFBCOMPAT_OBSERVE(PFBCompat_hide_suggested_chats, @"read by Twitter");
+        return nil;
+    }
+
     // Which tab Home opens on: the choice natively survives 12 hours, then a new
     // session snaps back to For You. Answering NO removes the expiry; off, nothing
     // is answered and the native rule applies.

@@ -212,6 +212,8 @@
 "MODERN_SETTINGS_MESSAGES_SUBTITLE" = "Typing, voice notes, and Grok’s entry points.";
 "MESSAGES_GROUP_CHAT" = "Chat";
 "MESSAGES_GROUP_GROK" = "Grok";
+"HIDE_SUGGESTED_CHATS_TITLE" = "Hide suggested chats";
+"HIDE_SUGGESTED_CHATS_DETAIL" = "Remove the “Suggested” list from your Chat inbox.";
 "HIDE_TYPING_INDICATOR_TITLE" = "Hide typing indicator";
 "HIDE_TYPING_INDICATOR_DETAIL" = "Stop telling the other side that you are writing.";
 "VOICE_TRANSCRIPTION_TITLE" = "Voice transcripts";
