@@ -5,15 +5,15 @@
 
 /* ===== GENERAL — page ===== */
 "MODERN_SETTINGS_LAYOUT_TITLE" = "常规";
-"MODERN_SETTINGS_LAYOUT_SUBTITLE" = "锁定应用、管理链接，并调整 Twitter 的行为。";
+"MODERN_SETTINGS_LAYOUT_SUBTITLE" = "锁定应用、调整 Twitter 的行为，并管理链接。";
 
 /* ===== General › Privacy ===== */
 "PADLOCK_TITLE" = "锁定 Twitter";
 "PADLOCK_DETAIL" = "启用 Face ID 或密码解锁 Twitter。";
 
 /* ===== General › App behavior ===== */
-"NO_TAB_BAR_HIDING_TITLE" = "固定导航栏";
-"NO_TAB_BAR_HIDING_DETAIL" = "滚动时不淡出导航栏。";
+"NO_TAB_BAR_HIDING_TITLE" = "始终显示";
+"NO_TAB_BAR_HIDING_DETAIL" = "滚动时不淡出。";
 "SHOW_SCROLL_INDICATOR_TITLE" = "滚动条";
 "DISABLE_RTL_TITLE" = "文字从左到右";
 "DISABLE_RTL_DETAIL" = "即使是从右到左书写的语言，文字也从左到右显示。";
@@ -29,12 +29,12 @@
 
 /* ===== APPEARANCE — page ===== */
 "MODERN_SETTINGS_APPEARANCE_TITLE" = "外观";
-"MODERN_SETTINGS_APPEARANCE_SUBTITLE" = "界面样式、颜色和字体。";
+"MODERN_SETTINGS_APPEARANCE_SUBTITLE" = "样式、字体、颜色和导航栏。";
 
 /* ===== Appearance › Interface ===== */
-"CUSTOM_TAB_BAR_OPTION_TITLE" = "导航栏";
+"CUSTOM_TAB_BAR_OPTION_TITLE" = "标签页";
 "RESTORE_TAB_LABELS_TITLE" = "标签文字";
-"RESTORE_TAB_LABELS_DETAIL" = "在导航栏图标下方显示文字标签。";
+"RESTORE_TAB_LABELS_DETAIL" = "在图标下方显示标签。";
 "CUSTOM_FONTS_TITLE" = "自定义字体";
 "CUSTOM_FONTS_DETAIL" = "在整个 Twitter 中使用自定义字体。";
 "REGULAR_FONTS_PICKER_OPTION_TITLE" = "常规字体";
@@ -54,12 +54,12 @@
 "APP_ICON_TITLE" = "应用图标";
 "RESTORE_TWITTER_NAMES_TITLE" = "还原 Twitter 术语";
 "RESTORE_TWITTER_NAMES_DETAIL" = "找回小鸟，并将“X”替换为“Twitter”、“帖子”替换为“推文”等。";
-"REFRESH_PILL_LABEL_TITLE" = "刷新提示条标签";
-"REFRESH_PILL_LABEL_DETAIL" = "在新推文提示条上重新显示“已发帖”。";
+"REFRESH_PILL_LABEL_TITLE" = "新推文提示条文字";
+"REFRESH_PILL_LABEL_DETAIL" = "在新推文提示条的头像旁显示文字。";
 
 /* ===== TIMELINES ===== */
 "MODERN_SETTINGS_TIMELINES_TITLE" = "时间线";
-"MODERN_SETTINGS_TIMELINES_SUBTITLE" = "清除时间线中的广告、推荐和提示。";
+"MODERN_SETTINGS_TIMELINES_SUBTITLE" = "清除广告和推荐，并筛选你的时间线。";
 "HIDE_PROMOTED_TITLE" = "隐藏广告";
 "HIDE_PROMOTED_DETAIL" = "移除推广推文、趋势和视频广告。";
 "HIDE_WHO_TO_FOLLOW_TITLE" = "隐藏“推荐关注”";
@@ -72,24 +72,19 @@
 
 /* ===== TWEETS ===== */
 "MODERN_SETTINGS_TWEETS_TITLE" = "推文";
-"MODERN_SETTINGS_TWEETS_SUBTITLE" = "撰写、按钮和回复的显示方式。";
+"MODERN_SETTINGS_TWEETS_SUBTITLE" = "撰写、按钮、回复和敏感内容。";
 "UNDO_TWEET_TITLE" = "撤销推文";
 "TWEET_CONFIRM_TITLE" = "确认发推";
-"TWEET_CONFIRM_DETAIL" = "发布推文前进行确认。";
 "LIKE_CONFIRM_TITLE" = "确认喜欢";
-"LIKE_CONFIRM_DETAIL" = "喜欢推文前先询问。";
 "HIDE_VIEW_COUNT_TITLE" = "隐藏查看次数";
-"HIDE_VIEW_COUNT_DETAIL" = "不显示推文下方的查看次数。";
 "HIDE_BOOKMARK_BUTTON_TITLE" = "隐藏书签按钮";
-"HIDE_BOOKMARK_BUTTON_DETAIL" = "移除推文上的书签按钮。";
 "HIDE_DOWNVOTE_BUTTON_TITLE" = "隐藏点踩按钮";
-"HIDE_DOWNVOTE_BUTTON_DETAIL" = "移除推文上的点踩按钮。";
-"DISABLE_SENSITIVE_TWEET_WARNINGS_TITLE" = "隐藏敏感内容警告";
+"DISABLE_SENSITIVE_TWEET_WARNINGS_TITLE" = "隐藏警告";
 "BYPASS_AGE_VERIFICATION_TITLE" = "绕过年龄验证";
 "BYPASS_AGE_VERIFICATION_DETAIL" = "跳过敏感内容的年龄验证流程。";
 "REPLY_SORTING_TITLE" = "对回复排序";
-"RESTORE_REPLY_CONTEXT_TITLE" = "还原回复上下文";
-"RESTORE_REPLY_CONTEXT_DETAIL" = "在打开的回复正文上方显示被回复的用户。";
+"RESTORE_REPLY_CONTEXT_TITLE" = "“回复”提示行";
+"RESTORE_REPLY_CONTEXT_DETAIL" = "显示在打开的回复正文上方。";
 "SHOW_QUOTE_COUNTS_TITLE" = "引用和转推数";
 "SHOW_QUOTE_COUNTS_DETAIL" = "在推文的引用页面顶部显示这两个数字。";
 "SHOW_TWEET_SOURCE_TITLE" = "推文来源";
@@ -101,14 +96,14 @@
 /* ===== MEDIA ===== */
 "MODERN_SETTINGS_MEDIA_TITLE" = "媒体";
 "MODERN_SETTINGS_MEDIA_SUBTITLE" = "下载、播放、画质和布局。";
-"DOWNLOAD_VIDEOS_TITLE" = "下载媒体";
-"DOWNLOAD_VIDEOS_DETAIL" = "从媒体的长按菜单保存视频和 GIF。";
+"DOWNLOAD_VIDEOS_TITLE" = "视频和 GIF";
+"DOWNLOAD_VIDEOS_DETAIL" = "从媒体的长按菜单保存。";
 "DIRECT_SAVE_TITLE" = "保存至“照片”";
 "DIRECT_SAVE_DETAIL" = "视频会直接保存到你的“照片”应用中。";
 "TWEET_TO_IMAGE_TITLE" = "将推文保存为图片";
 "TWEET_TO_IMAGE_DETAIL" = "长按“分享”按钮可导出为图片。";
 "DISABLE_VIDEO_CAPTIONS_TITLE" = "隐藏视频字幕";
-"AUTO_HIGHEST_LOAD_TITLE" = "高质量图片";
+"AUTO_HIGHEST_LOAD_TITLE" = "全分辨率图片";
 "AUTO_HIGHEST_LOAD_DETAIL" = "始终以最高分辨率加载图片。";
 "FORCE_TWEET_FULL_FRAME_TITLE" = "完整显示图片";
 "RESTORE_VIDEO_TIMESTAMP_TITLE" = "视频播放时间";
@@ -119,12 +114,11 @@
 "MODERN_SETTINGS_PROFILES_TITLE" = "个人资料";
 "MODERN_SETTINGS_PROFILES_SUBTITLE" = "关注按钮、徽章和个人资料标签。";
 "FOLLOW_CONFIRM_TITLE" = "确认关注";
-"FOLLOW_CONFIRM_DETAIL" = "关注前弹出确认提示。";
 "COPY_PROFILE_INFO_TITLE" = "复制个人资料信息";
 "COPY_PROFILE_INFO_DETAIL" = "在个人资料中添加复制按钮。";
-"DISABLE_ARTICLES_TITLE" = "隐藏“文章”标签";
+"DISABLE_ARTICLES_TITLE" = "隐藏“文章”";
 "DISABLE_ARTICLES_DETAIL" = "在个人资料中隐藏“文章”标签。";
-"DISABLE_HIGHLIGHTS_TITLE" = "隐藏“亮点”标签";
+"DISABLE_HIGHLIGHTS_TITLE" = "隐藏“亮点”";
 "DISABLE_HIGHLIGHTS_DETAIL" = "在个人资料中隐藏“亮点”标签。";
 "HIDE_BLUE_VERIFIED_TITLE" = "隐藏 Blue 认证标记";
 "HIDE_BLUE_VERIFIED_DETAIL" = "移除 Twitter Blue 认证标记，保留品牌和政府账号的标记。";
@@ -139,11 +133,11 @@
 
 /* ===== SEARCH ===== */
 "MODERN_SETTINGS_SEARCH_TITLE" = "搜索";
-"MODERN_SETTINGS_SEARCH_SUBTITLE" = "搜索历史、趋势和热门视频。";
+"MODERN_SETTINGS_SEARCH_SUBTITLE" = "搜索历史、高级搜索和探索。";
 "NO_HISTORY_TITLE" = "关闭搜索历史";
 "NO_HISTORY_DETAIL" = "不保存也不显示最近的搜索记录。";
 "HIDE_TREND_VIDEOS_TITLE" = "隐藏热门视频";
-"HIDE_TREND_VIDEOS_DETAIL" = "从搜索菜单中移除热门视频。";
+"HIDE_TREND_VIDEOS_DETAIL" = "从搜索中移除热门视频行。";
 
 /* ===== GROK ===== */
 "HIDE_SUGGESTED_CHATS_TITLE" = "隐藏推荐的聊天";
@@ -158,28 +152,28 @@
 "DISABLE_AUTO_TRANSLATE_DETAIL" = "自动翻译推文、简介、社群附注和通知。";
 
 /* ===== LAB ===== */
-"REPLY_IN_WEBVIEW_TITLE" = "在网页视图中回复";
+"REPLY_IN_WEBVIEW_TITLE" = "在网页上回复";
 "REPLY_IN_WEBVIEW_DETAIL" = "当应用拒绝发送回复时，通过网页回复。";
 
 /* ===== Theme color picker ===== */
 "THEME_SETTINGS_NAVIGATION_DETAIL" = "选择强调色。只有你能看到。";
-"THEME_SETTINGS_NAVIGATION_TITLE" = "主题";
+"THEME_SETTINGS_NAVIGATION_TITLE" = "主题颜色";
 
 /* ===== Navigation bar editor ===== */
-"CUSTOM_TAB_BAR_GRID_DETAIL" = "轻点目标即可添加或移除。拖动下方的栏可调整顺序。";
-"CUSTOM_TAB_BAR_RESET_MESSAGE" = "将导航栏恢复为默认布局。";
-"CUSTOM_TAB_BAR_SETTINGS_NAVIGATION_TITLE" = "导航栏";
+"CUSTOM_TAB_BAR_GRID_DETAIL" = "轻点标签页即可添加或移除。按住下方栏中的图标，然后拖动以调整顺序。";
+"CUSTOM_TAB_BAR_RESET_MESSAGE" = "编辑器会恢复为 Twitter 的默认标签页。轻点“保存”即可保留。";
+"CUSTOM_TAB_BAR_SETTINGS_NAVIGATION_TITLE" = "标签页";
 
 /* ===== Fonts picker ===== */
 "CUSTOM_FONTS_MENU_TITLE" = "\n选择字体";
 "CUSTOM_FONTS_NAVIGATION_BUTTON_TITLE" = "自定义字体";
-"CUSTOM_FONTS_TUT_ALERT_MESSAGE" = "尚未安装字体。请从 App Store 安装 iFont 应用。";
+"CUSTOM_FONTS_TUT_ALERT_MESSAGE" = "请使用 App Store 中的 iFont 应用安装字体。";
 "INSTALL_IFONT_BUTTON_TITLE" = "获取 iFont";
 
 /* ===== Media & download flows ===== */
 "DOWNLOAD_AS_GIF_OPTION_TITLE" = "下载为 GIF";
 "DOWNLOAD_AS_MP4_OPTION_TITLE" = "下载为 MP4";
-"DOWNLOAD_MENU_TITLE" = "\n选择视频画质";
+"DOWNLOAD_MENU_TITLE" = "选择视频画质";
 "DOWNLOAD_VIDEO_NUMBER_TITLE" = "视频 %lu";
 "DOWNLOAD_ALL_VIDEOS_OPTION_TITLE" = "下载所有视频";
 
@@ -192,7 +186,7 @@
 "REMOVE_FOLLOWERS_TITLE" = "移除关注者";
 "REMOVE_FOLLOWERS_DETAIL" = "在关注你的个人资料菜单中添加“移除此关注者”。";
 "REMOVE_FOLLOWER_TITLE" = "移除此关注者";
-"REMOVE_FOLLOWER_CONFIRM_TITLE" = "要移除此关注者吗？";
+"REMOVE_FOLLOWER_CONFIRM_TITLE" = "移除此关注者";
 "REMOVE_FOLLOWER_CONFIRM_MESSAGE" = "%@ 将从你的关注者中移除，并且不会收到通知。他们将来可以再次关注你。";
 "REMOVE_FOLLOWER_ACTION" = "移除";
 "REMOVE_FOLLOWER_DONE" = "已移除关注者";
@@ -203,8 +197,8 @@
 "PADLOCK_REASON" = "解锁 Twitter";
 
 /* ===== Alerts, confirmations & shared labels ===== */
-"LIGHT_MODE_RESTART_TITLE" = "已回到浅色模式";
-"LIGHT_MODE_RESTART_MESSAGE" = "背景颜色已重置为“系统”。重启 Twitter 以清除残留的深色。";
+"RESTART_REQUIRED_ALERT_TITLE" = "重启 Twitter";
+"LIGHT_MODE_RESTART_MESSAGE" = "背景颜色已重置为“系统”。重启可清除残留的深色。";
 "CLOSE_APP_ACTION" = "关闭应用";
 
 /* ===== Miscellaneous ===== */

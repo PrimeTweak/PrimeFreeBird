@@ -22,7 +22,7 @@
 
     _expiry = [[PFBNotifPaddedLabel alloc] init];
     // Dimensions taken from the Muted words kindLabel: Chirp regular 12, text
-    // at 60 %, background at 7 %, radius 5. Regular rather than bold keeps the
+    // at 60%, background at 7%, radius 5. Regular rather than bold keeps the
     // pill quiet.
     _expiry.font = PFBScaledFont([TwitterChirpFont(TwitterFontStyleRegular) fontWithSize:12]);
     _expiry.textColor = [[UIColor labelColor] colorWithAlphaComponent:0.6];
@@ -52,7 +52,6 @@
                                                constant:14],
         (_snippetTop = [_snippet.topAnchor
             constraintEqualToAnchor:self.contentView.topAnchor constant:12]),
-        // The text runs to the trailing margin.
         [_snippet.trailingAnchor constraintEqualToAnchor:self.contentView.trailingAnchor
                                                constant:-14],
 
@@ -68,9 +67,9 @@
     return self;
 }
 
-// Empty state: the text stands alone, centered, with air above and below, using
-// the dimensions of the Hide thread screen. With rows, everything returns to
-// the normal two-line layout.
+// Empty state: the text stands alone, with air above and below, using the
+// dimensions of the Hide thread screen. With rows, everything returns to the
+// normal two-line layout.
 - (void)applyEmptyLayout:(BOOL)empty {
     if (!self.snippetBottom) {
         self.snippetBottom =

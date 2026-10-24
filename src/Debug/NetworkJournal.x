@@ -1,10 +1,10 @@
-// Network journal, while recording: failed API responses, account requests and media
-// uploads, read through a forwarding proxy on each new session's delegate and on each
-// account request's completion handler. Prefix [resp].
+// Network journal of failed API, account and media requests, while recording ([resp]).
 
 #import <Foundation/Foundation.h>
+#import <dlfcn.h>
 #import <objc/runtime.h>
 #import "Debug/PFBDebugger.h"
+#import "Debug/PFBProbe.h"
 
 static BOOL pfbRespIsTwitterAPI(NSString* url) {
     if (![url isKindOfClass:[NSString class]]) {
@@ -38,7 +38,10 @@ static void pfbRespLogAccount(NSString* method, NSString* path, NSURLResponse* r
                               NSError* error, NSString* body) {
     long code = [response isKindOfClass:[NSHTTPURLResponse class]]
                     ? ((NSHTTPURLResponse*)response).statusCode : -1;
-    NSString* shown = (code == 200 || !body.length) ? @"" : [@" body=" stringByAppendingString:body];
+    if ((code == 200 || code == 304) && !error && ![body containsString:@"\"errors\""]) {
+        return;
+    }
+    NSString* shown = body.length ? [@" body=" stringByAppendingString:body] : @"";
     PFBDebugLog(@"[resp] account %@ %@ http=%ld err=%ld%@", method ?: @"GET", path ?: @"?", code,
                 (long)error.code, shown);
 }
@@ -89,22 +92,12 @@ static char kPFBRespBodyKey;
 - (void)URLSession:(NSURLSession*)session
                 task:(NSURLSessionTask*)task
     didCompleteWithError:(NSError*)error {
-    // Media uploads: every failure, and the first success of each host.
+    // Media uploads: every failure.
     NSString* host = task.originalRequest.URL.host.lowercaseString;
     if (PFBDebugIsRecording() && pfbRespIsMediaHost(host)) {
         long code = [task.response isKindOfClass:[NSHTTPURLResponse class]]
                         ? ((NSHTTPURLResponse*)task.response).statusCode : -1;
-        static NSMutableSet<NSString*>* succeeded;
-        BOOL failed = code < 200 || code >= 300 || error;
-        BOOL first = NO;
-        @synchronized([PFBURLDelegateProxy class]) {
-            succeeded = succeeded ?: [NSMutableSet set];
-            first = !failed && ![succeeded containsObject:host];
-            if (first) {
-                [succeeded addObject:host];
-            }
-        }
-        if (failed || first) {
+        if (code < 200 || code >= 300 || error) {
             PFBDebugLog(@"[resp] media %@%@ http=%ld err=%ld", host, task.originalRequest.URL.path ?: @"",
                         code, (long)error.code);
         }
@@ -119,36 +112,14 @@ static char kPFBRespBodyKey;
         if (body.length > 200) {
             body = [body substringToIndex:200];
         }
-        // Failures are journaled, and account requests whatever their outcome. A healthy session
-        // answers 200, or 304 for an unchanged resource, dozens of times per minute.
+        // Failures only: a healthy session answers 200, or 304 for an unchanged resource,
+        // dozens of times per minute.
         NSString* path = task.originalRequest.URL.path ?: @"";
         if (pfbRespIsAccountPath(path)) {
             pfbRespLogAccount(task.originalRequest.HTTPMethod, path, task.response, error, body);
         } else if ((code != 200 && code != 304) || error || [body containsString:@"\"errors\""]) {
             PFBDebugLog(@"[resp] %@ http=%ld err=%ld body=%@", path.length ? path : @"?", code,
                         (long)error.code, body);
-        }
-        BOOL isWrite = [path containsString:@"Create"] || [path containsString:@"Favorite"] ||
-                       [path containsString:@"Retweet"] || [path containsString:@"Delete"] ||
-                       [path containsString:@"note_tweet"] || [path containsString:@"Unfavorite"];
-        if (isWrite) {
-            NSMutableString* hdr = [NSMutableString string];
-            NSDictionary* fields = task.originalRequest.allHTTPHeaderFields;
-            for (NSString* k in fields) {
-                [hdr appendFormat:@"%@=%lu ", k, (unsigned long)[fields[k] length]];
-            }
-            PFBDebugLog(@"[resp] write headers %@: %@", path, hdr);
-        }
-        // Spaces asks for a Periscope token before it loads; logging the auth this
-        // request carries (lengths only) shows whether the web session reached it.
-        BOOL isAuth = [path containsString:@"periscope"] || [path containsString:@"/oauth/"];
-        if (isAuth && code != 200) {
-            NSMutableString* hdr = [NSMutableString string];
-            NSDictionary* fields = task.originalRequest.allHTTPHeaderFields;
-            for (NSString* k in fields) {
-                [hdr appendFormat:@"%@=%lu ", k, (unsigned long)[fields[k] length]];
-            }
-            PFBDebugLog(@"[resp] auth headers %@ (http=%ld): %@", path, code, hdr);
         }
     }
     if ([self.pfbReal respondsToSelector:_cmd]) {
@@ -157,6 +128,53 @@ static char kPFBRespBodyKey;
 }
 
 @end
+
+// Measurement: the code that reads a session's delegate back while it is the proxy,
+// as an image and an offset in it, one line per call site.
+static void pfbProbeDelegateReader(void* caller) {
+    Dl_info info;
+    if (!PFBProbeNewCaller(caller) || !dladdr(caller, &info) || !info.dli_fname) {
+        return;
+    }
+    PFB_PROBE(@"session delegate read", 12, @"%@ +0x%lx",
+              [@(info.dli_fname) lastPathComponent], (unsigned long)((uintptr_t)caller - (uintptr_t)info.dli_fbase));
+}
+
+// The reads are caught in the -delegate the first proxied session actually runs, which a
+// hook on NSURLSession misses when a class of the session cluster has its own.
+static id (*pfbSessionDelegateOrig)(id, SEL);
+
+// Every session in the process runs it, so the delegate is compared by class, without a
+// message that a proxy delegate would forward.
+static id pfbSessionDelegate(id session, SEL cmd) {
+    id delegate = pfbSessionDelegateOrig(session, cmd);
+    if (delegate && object_getClass(delegate) == [PFBURLDelegateProxy class]) {
+        pfbProbeDelegateReader(__builtin_return_address(0));
+    }
+    return delegate;
+}
+
+static void pfbProbeDelegateReads(NSURLSession* session) {
+    if (!session) {
+        return;
+    }
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+      Class owner = object_getClass(session);
+      Method method = class_getInstanceMethod(owner, @selector(delegate));
+      if (!method) {
+          PFB_PROBE(@"session delegate read", 12, @"%@ has no -delegate", NSStringFromClass(owner));
+          return;
+      }
+      while (class_getSuperclass(owner) &&
+             class_getInstanceMethod(class_getSuperclass(owner), @selector(delegate)) == method) {
+          owner = class_getSuperclass(owner);
+      }
+      pfbSessionDelegateOrig = (id (*)(id, SEL))method_getImplementation(method);
+      method_setImplementation(method, (IMP)pfbSessionDelegate);
+      PFB_PROBE(@"session delegate read", 12, @"-delegate read in %@", NSStringFromClass(owner));
+    });
+}
 
 %hook NSURLSession
 
@@ -168,7 +186,9 @@ static char kPFBRespBodyKey;
         proxy.pfbReal = delegate;
         // The session retains its delegate, which keeps the proxy (and the real
         // delegate it holds) alive for the session's lifetime.
-        return %orig(configuration, proxy, queue);
+        NSURLSession* session = %orig(configuration, proxy, queue);
+        pfbProbeDelegateReads(session);
+        return session;
     }
     return %orig;
 }

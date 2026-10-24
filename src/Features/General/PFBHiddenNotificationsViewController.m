@@ -131,12 +131,8 @@
         ? text
         : [[PFBBundle sharedBundle] localizedStringForKey:@"HIDDEN_NOTIFS_UNTITLED"];
     cell.expiry.hidden = NO;
-    NSInteger days = (NSInteger)ceil(PFBNotifDaysLeft(row));
-    // The countdown alone, on the existing pill, so nothing is added to the
-    // layout.
-    NSString* format =
-        [[PFBBundle sharedBundle] localizedStringForKey:@"HIDDEN_NOTIFS_EXPIRES_IN"];
-    cell.expiry.text = [NSString stringWithFormat:format, (long)days];
+    // The days left, on the pill under the text.
+    cell.expiry.text = [[PFBBundle sharedBundle] daysLeftText:(NSInteger)ceil(PFBNotifDaysLeft(row))];
     return cell;
 }
 
@@ -254,10 +250,33 @@ static const CGFloat kPFBNotifBarHeight = 57.0;
     self.pinnedCount.text = [NSString stringWithFormat:format, (long)self.rows.count];
 }
 
+// Every hidden notification comes back at once, so the question comes first.
 - (void)clearAllTapped {
-    PFBUnhideAllNotifs();
-    // Nothing is left to manage: the bubble closes while the list refreshes behind it.
-    [self dismissViewControllerAnimated:YES completion:nil];
+    PFBBundle* bundle = [PFBBundle sharedBundle];
+    NSInteger count = (NSInteger)self.rows.count;
+    NSString* message = count == 1
+        ? [bundle localizedStringForKey:@"HIDDEN_NOTIFS_CLEAR_ONE_MESSAGE"]
+        : [NSString stringWithFormat:[bundle localizedStringForKey:@"HIDDEN_NOTIFS_CLEAR_ALL_MESSAGE"], (long)count];
+    UIAlertController* confirm =
+        [UIAlertController alertControllerWithTitle:[bundle localizedStringForKey:@"HIDDEN_NOTIFS_CLEAR_ALL_TITLE"]
+                                            message:message
+                                     preferredStyle:UIAlertControllerStyleAlert];
+    [confirm addAction:[UIAlertAction actionWithTitle:[bundle localizedStringForKey:@"CANCEL_ACTION"]
+                                                style:UIAlertActionStyleCancel
+                                              handler:nil]];
+    __weak typeof(self) weakSelf = self;
+    UIAlertAction* unhide =
+        [UIAlertAction actionWithTitle:[bundle localizedStringForKey:@"HIDDEN_NOTIFS_CLEAR_ALL"]
+                                 style:UIAlertActionStyleDefault
+                               handler:^(__unused UIAlertAction* action) {
+                                   PFBUnhideAllNotifs();
+                                   // Nothing is left to manage: the bubble closes while the
+                                   // list refreshes behind it.
+                                   [weakSelf dismissViewControllerAnimated:YES completion:nil];
+                               }];
+    [confirm addAction:unhide];
+    confirm.preferredAction = unhide;
+    [self presentViewController:confirm animated:YES completion:nil];
 }
 
 @end

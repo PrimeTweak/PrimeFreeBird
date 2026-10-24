@@ -21,8 +21,7 @@ sideloaded packages. Built directly from `upstream/`.
 ## ffmpeg-kit-next
 
 https://github.com/arthenica/ffmpeg-kit-next (v8.1.0), source of the
-libffmpegkit wrapper and the pin for the FFmpeg version below. Only needed
-when regenerating the prebuilt libraries.
+libffmpegkit wrapper and the pin for the FFmpeg version below.
 
 `build/` (headers at the top, libraries in `lib/`) holds the built stack:
 ffmpeg-kit-next 8.1.0 (FFmpeg n8.1.2), arm64 iOS, static only. Not tracked
@@ -35,9 +34,3 @@ GIF encode, mp4/gif mux), with TLS provided by the system SecureTransport
 backend instead of OpenSSL.
 The FFmpeg tag must stay in lockstep with the submodule (its vendored
 fftools sources compile against FFmpeg internals).
-
-## Machine prerequisites
-
-- **Theos** at `$THEOS`.
-- **Cephei / CepheiPrefs / CepheiUI** in `$THEOS/lib` (linked via `EXTRA_FRAMEWORKS`).
-- **cyan** (pyzule-rw) for the Inject step of the Build PrimeFreeBird workflow.

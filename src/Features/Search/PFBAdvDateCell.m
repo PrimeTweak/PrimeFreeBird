@@ -17,7 +17,7 @@
                       action:@selector(pfbDateChanged:)
             forControlEvents:UIControlEventValueChanged];
 
-        _clearButton = [UIButton buttonWithType:UIButtonTypeSystem];
+        _clearButton = [PFBHitButton buttonWithType:UIButtonTypeSystem];
         [_clearButton setImage:PFBTwitterGlyphFor(@"close_circle_fill", [UIImage systemImageNamed:@"xmark.circle.fill"])
                       forState:UIControlStateNormal];
         _clearButton.tintColor = [UIColor systemGray3Color];
@@ -81,7 +81,8 @@
         [[NSUserDefaults standardUserDefaults] stringForKey:model.storeKey];
     NSDate* date = stored ? [[PFBAdvDateCell pfbFormatter] dateFromString:stored]
                           : nil;
-    if (date) { self.picker.date = date; }
+    // Unset, the dimmed picker shows today, never a date left by another row.
+    self.picker.date = date ?: [NSDate date];
     BOOL active = (date != nil);
     self.picker.alpha = active ? 1.0 : 0.45;
     self.clearButton.hidden = !active;
@@ -99,8 +100,15 @@
 - (void)pfbClearDate {
     if (!self.model) { return; }
     [[NSUserDefaults standardUserDefaults] removeObjectForKey:self.model.storeKey];
+    self.picker.date = [NSDate date];
     self.picker.alpha = 0.45;
     self.clearButton.hidden = YES;
+}
+
+// The box is the floating label's container.
+- (void)traitCollectionDidChange:(UITraitCollection*)previousTraitCollection {
+    [super traitCollectionDidChange:previousTraitCollection];
+    PFBAdvRefreshBoxBorder(self.floatLabel.superview);
 }
 
 @end

@@ -8,8 +8,7 @@ FLEX_REPO := https://github.com/TimOliver/fleXD
 FLEX_TAG := 6.2.0
 FLEX_FETCHED := $(shell if [ ! -d "$(FLEX_ROOT)/Classes" ]; then \
 	rm -rf "$(FLEX_ROOT)"; \
-	git clone --quiet --depth 1 --branch "$(FLEX_TAG)" "$(FLEX_REPO)" "$(FLEX_ROOT)" >&2 \
-	|| git clone --quiet --depth 1 "$(FLEX_REPO)" "$(FLEX_ROOT)" >&2; fi; \
+	git clone --quiet --depth 1 --branch "$(FLEX_TAG)" "$(FLEX_REPO)" "$(FLEX_ROOT)" >&2; fi; \
 	[ -d "$(FLEX_ROOT)/Classes" ] && echo yes || echo no)
 ifneq ($(FLEX_FETCHED),yes)
 $(error fleXD could not be fetched into deps/flex/$(FLEX_ROOT))

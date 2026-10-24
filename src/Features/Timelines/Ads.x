@@ -1,17 +1,16 @@
-// Hides promoted posts, the premium offer and trend videos from the lists the
-// app builds (hide_promoted, hide_premium_offer, hide_trend_videos), and promoted
-// entries from the video feed's responses.
+// Hides ads, the premium offer and trending videos in timelines and the video feed.
 
 #import "Support/HookHelpers.h"
 #import "Common/PFBCompatibility.h"
 #import "Debug/PFBDebugger.h"
+#import "Debug/PFBProbe.h"
 
 // Timeline items are removed from the section data before it reaches the data view
 // controller, so no empty cells are left behind. This covers every timeline surface,
 // table view and diffable collection view alike.
 
 // The promoted state of a status item is only reachable through its Swift-side
-// `status` stored property, which is still registered as an ObjC ivar.
+// `status` stored property, which is registered as an ObjC ivar.
 static BOOL StatusItemIsPromoted(id item) {
     Ivar statusIvar = class_getInstanceVariable([item class], "status");
     if (!statusIvar) {
@@ -41,6 +40,44 @@ static BOOL ScribeItemIsPromoted(id item) {
            scribeItem[@"promoted_id"] != nil;
 }
 
+// Measurement: what the removed message prompts are, by scribe component and element,
+// layout and header text, one line per kind, each prompt read once.
+static id pfbProbeObject(id object, SEL selector) {
+    return PFBProbeReturnKind(object, selector) == '@' ? ((id (*)(id, SEL))objc_msgSend)(object, selector) : nil;
+}
+
+static NSString* pfbProbeText(id object, NSString* getter) {
+    SEL selector = NSSelectorFromString(getter);
+    char kind = PFBProbeReturnKind(object, selector);
+    if (kind == 'q' || kind == 'Q' || kind == 'l' || kind == 'L') {
+        return [NSString stringWithFormat:@"%lld", ((long long (*)(id, SEL))objc_msgSend)(object, selector)];
+    }
+    if (kind == 'i' || kind == 'I' || kind == 'c' || kind == 'C' || kind == 'B' || kind == 's' || kind == 'S') {
+        return [NSString stringWithFormat:@"%d", ((int (*)(id, SEL))objc_msgSend)(object, selector)];
+    }
+    id value = kind == '@' ? ((id (*)(id, SEL))objc_msgSend)(object, selector) : nil;
+    if (value && ![value isKindOfClass:[NSString class]]) {
+        value = pfbProbeObject(value, NSSelectorFromString(@"text")) ?: value;
+    }
+    if (![value isKindOfClass:[NSString class]]) {
+        return value ? NSStringFromClass([value class]) : @"-";
+    }
+    NSString* text = value;
+    return text.length > 40 ? [text substringWithRange:[text rangeOfComposedCharacterSequencesForRange:NSMakeRange(0, 40)]]
+                            : text;
+}
+
+static void pfbProbeMessagePrompt(id item) {
+    static char kPFBProbeReadKey;
+    if (objc_getAssociatedObject(item, &kPFBProbeReadKey)) {
+        return;
+    }
+    objc_setAssociatedObject(item, &kPFBProbeReadKey, @YES, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    PFB_PROBE(@"removed message prompts", 8, @"component '%@', element '%@', layout %@, header '%@'",
+              pfbProbeText(item, @"scribeComponent"), pfbProbeText(item, @"scribeElement"),
+              pfbProbeText(item, @"layoutType"), pfbProbeText(item, @"headerRichText"));
+}
+
 static BOOL ShouldHideItem(id item, NSString* location) {
     item = PFBUnwrapDataViewItem(item);
     NSString* className = NSStringFromClass([item classForCoder]);
@@ -55,13 +92,19 @@ static BOOL ShouldHideItem(id item, NSString* location) {
 
         if ([className
                 isEqualToString:@"TwitterURT.URTTimelineGoogleNativeAdViewModel"]) {
+            PFBCOMPAT_ACTION(PFBCompat_hide_promoted, @"Google ad");
             return YES;
         }
 
-        if (([className isEqualToString:@"TwitterURT.URTTimelineTrendViewModel"] ||
-             [className
-                 isEqualToString:@"TwitterURT.URTTimelineEventSummaryViewModel"]) &&
+        if ([className isEqualToString:@"TwitterURT.URTTimelineTrendViewModel"] &&
             (ScribeItemIsPromoted(item) || ItemHasPromotedContent(item))) {
+            PFBCOMPAT_ACTION(PFBCompat_hide_promoted, @"promoted trend");
+            return YES;
+        }
+
+        if ([className isEqualToString:@"TwitterURT.URTTimelineEventSummaryViewModel"] &&
+            (ScribeItemIsPromoted(item) || ItemHasPromotedContent(item))) {
+            PFBCOMPAT_ACTION(PFBCompat_hide_promoted, @"promoted event");
             return YES;
         }
     }
@@ -69,6 +112,7 @@ static BOOL ShouldHideItem(id item, NSString* location) {
     if ([PFBSettings boolForKey:@"hide_premium_offer"]) {
         if ([className isEqualToString:@"T1URTTimelineMessageItemViewModel"]) {
             PFBCOMPAT_ACTION(PFBCompat_hide_premium_offer, @"premium message hidden");
+            pfbProbeMessagePrompt(item);
             return YES;
         }
     }
@@ -214,7 +258,7 @@ static BOOL ImmersiveCardBufferIsKnown(uint8_t* buffer) {
     }
     if (!reported && PFBDebugIsRecording() && !(name && strstr(name, "EmptyArrayStorage"))) {
         reported = YES;
-        PFBDebugLog(@"[ads] video feed: list storage not recognised (%s)", name ?: "no name");
+        PFBDebugLog(@"[ads] video feed: list storage not recognized (%s)", name ?: "no name");
     }
     return NO;
 }
@@ -301,6 +345,8 @@ static void RemovePromotedImmersiveCards(id controller) {
     // The navigator holds its own count: left as it was, it would allow empty pages
     // past the last card.
     int64_t* navigatorCount = (int64_t*)((uint8_t*)(__bridge void*)navigator + ivar_getOffset(countIvar));
+    PFB_PROBE(@"video feed counts", 8, @"navigator %lld, list %lld, kept %lld, loaded up to %lld",
+              (long long)*navigatorCount, (long long)total, (long long)kept, (long long)loadedEnd);
     if (*navigatorCount == total) {
         *navigatorCount = kept;
     }

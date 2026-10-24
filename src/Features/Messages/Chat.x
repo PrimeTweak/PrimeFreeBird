@@ -1,5 +1,4 @@
-// Chat privacy: drops the typing-indicator frame from the chat websocket and
-// leaves the rest of the socket alone.
+// Hide typing indicator: drops the typing frame from the chat websocket.
 
 #import "Support/HookHelpers.h"
 #import <string.h>

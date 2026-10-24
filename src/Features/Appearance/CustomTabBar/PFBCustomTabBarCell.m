@@ -4,12 +4,7 @@
 #import <QuartzCore/QuartzCore.h>
 #import "Support/TwitterChirpFont.h"
 #import "Features/Appearance/CustomTabBar/CustomTabBarNativeColors.h"
-
-@interface UIImage (TFNAdditions)
-+ (id)tfn_vectorImageNamed:(id)arg1
-                  fitsSize:(struct CGSize)arg2
-                 fillColor:(id)arg3;
-@end
+#import "Support/TFNHeaders.h"
 
 @interface PFBCustomTabBarCell ()
 @property (nonatomic, strong) UIView* container;
@@ -130,7 +125,7 @@
         self.container.layer.shadowOffset = CGSizeMake(0.0, 2.0);
     }
 
-    if (self.imageName.length) {
+    if (self.imageName.length && [UIImage respondsToSelector:@selector(tfn_vectorImageNamed:fitsSize:fillColor:)]) {
         self.iconView.image = [UIImage tfn_vectorImageNamed:self.imageName
                                                    fitsSize:CGSizeMake(28, 28)
                                                   fillColor:iconColor];

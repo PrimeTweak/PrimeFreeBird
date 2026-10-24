@@ -13,7 +13,7 @@ static const CGFloat kPFBTourChoiceGlyph = 24.0;
 static const CGFloat kPFBTourChoiceSpacing = 14.0;
 
 static NSString* PFBTourChoiceTitle(BOOL full) {
-    return full ? @"Full tour" : @"Remaining";
+    return full ? @"All screens" : @"Remaining screens";
 }
 
 static UIFont* PFBTourChoiceFont(void) {
@@ -69,7 +69,7 @@ static UIFont* PFBTourChoiceFont(void) {
     self.view.backgroundColor = [UIColor clearColor];
 
     UILabel* title = [[UILabel alloc] init];
-    title.text = @"Check paths";
+    title.text = @"Check options";
     title.font = PFBScaledFont([TwitterChirpFont(TwitterFontStyleBold) fontWithSize:20]);
     title.textColor = [UIColor labelColor];
     title.accessibilityTraits = UIAccessibilityTraitHeader;

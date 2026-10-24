@@ -13,7 +13,6 @@
 
 @interface TFSTwitterEntityMedia : NSObject
 @property (readonly, nonatomic) TFSTwitterEntityMediaVideoInfo* videoInfo;
-@property (readonly, copy, nonatomic) NSString* mediaURL;
 @property (nonatomic, assign, readonly)
     NSInteger mediaType; // 1 = photo, 2 = GIF, 3 = video
 @end

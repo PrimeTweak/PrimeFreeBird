@@ -1,9 +1,7 @@
-// Profile options: copy profile info, hide the premium offer, unrounded follower
-// and post counts, a chosen opening tab, no Videos tab, expanded bios.
+// Profile options: copy, premium offer, counts, opening tab, Videos tab, bio, followers.
 
 #import "Support/HookHelpers.h"
 #import "Debug/PFBDebugger.h"
-#import "Support/TwitterChirpFont.h"
 
 // MARK: - Copy profile info
 
@@ -58,25 +56,24 @@ static NSString* pfbProfileJoinDate(T1ProfileUserViewModel* viewModel) {
     return [formatter stringFromDate:date];
 }
 
-// The view controller a view belongs to, from the responder chain.
-static UIViewController* pfbOwningController(UIView* view) {
-    UIResponder* responder = view;
-    while (responder && ![responder isKindOfClass:[UIViewController class]]) {
-        responder = responder.nextResponder;
-    }
-    return (UIViewController*)responder;
-}
-
 // The user ID and join date the copy menu offers, read whether or not the option is
 // on, so an update that loses either shows in the report.
 static void pfbReachCopyIDAndDate(UIView* row) {
     if (PFBCompatPathReached(PFBCompatPath_copy_id_and_date)) {
         return;
     }
-    id viewModel = pfbGetterValue(pfbOwningController(row), @"viewModel");
+    id viewModel = pfbGetterValue(PFBOwningController(row), @"viewModel");
     if (pfbProfileUserID(viewModel) && pfbProfileJoinDate(viewModel)) {
         PFBCompatReach(PFBCompatPath_copy_id_and_date);
     }
+}
+
+// The profile's address on the sharing domain when one is set, as shared links use it;
+// x.com otherwise. A restored backup can hold another type under the key.
+static NSString* pfbProfileAddress(NSString* username) {
+    id stored = [[NSUserDefaults standardUserDefaults] objectForKey:@"sharing_domain"];
+    NSString* host = [stored isKindOfClass:[NSString class]] && ((NSString*)stored).length > 0 ? stored : @"x.com";
+    return [NSString stringWithFormat:@"https://%@/%@", host, username];
 }
 
 @implementation PFBProfileCopyButtonProvider
@@ -118,10 +115,7 @@ static void pfbReachCopyIDAndDate(UIView* row) {
         copyAction(@"COPY_PROFILE_INFO_MENU_OPTION_1", @"news_stroke", bio),
         copyAction(@"COPY_PROFILE_INFO_MENU_OPTION_5", @"location_stroke", location),
         copyAction(@"COPY_PROFILE_INFO_MENU_OPTION_4", @"link", url),
-        copyAction(@"COPY_PROFILE_INFO_MENU_OPTION_6", @"link",
-                   username.length
-                       ? [NSString stringWithFormat:@"https://x.com/%@", username]
-                       : nil),
+        copyAction(@"COPY_PROFILE_INFO_MENU_OPTION_6", @"link", username.length ? pfbProfileAddress(username) : nil),
         copyAction(@"COPY_PROFILE_INFO_MENU_OPTION_7", @"bar_chart", pfbProfileUserID(viewModel)),
         copyAction(@"COPY_PROFILE_INFO_MENU_OPTION_8", @"calendar", pfbProfileJoinDate(viewModel)),
     ];
@@ -158,22 +152,22 @@ static UIView* pfbLeftmostRowButton(UIView* row) {
 }
 
 // Reads the neighbor's own look so the copy button matches it.
-static void pfbMatchNeighbourStyle(UIButton* ours, UIView* neighbour) {
-    ours.layer.cornerRadius = neighbour.layer.cornerRadius > 0
-        ? neighbour.layer.cornerRadius
-        : neighbour.bounds.size.height / 2.0;
+static void pfbMatchNeighborStyle(UIButton* ours, UIView* neighbor) {
+    ours.layer.cornerRadius = neighbor.layer.cornerRadius > 0
+        ? neighbor.layer.cornerRadius
+        : neighbor.bounds.size.height / 2.0;
     ours.layer.cornerCurve = kCACornerCurveContinuous;
-    ours.layer.borderWidth = neighbour.layer.borderWidth;
-    ours.layer.borderColor = neighbour.layer.borderColor;
-    if (neighbour.backgroundColor) {
-        ours.backgroundColor = neighbour.backgroundColor;
+    ours.layer.borderWidth = neighbor.layer.borderWidth;
+    ours.layer.borderColor = neighbor.layer.borderColor;
+    if (neighbor.backgroundColor) {
+        ours.backgroundColor = neighbor.backgroundColor;
     }
-    // The neighbour draws its thin gray ring in a subview, so copying the button's
-    // own borderWidth yields zero and the ring is drawn here instead. Derived from
-    // labelColor, never a semantic system fill, which Twitter reinterprets.
+    // The neighbor draws its thin gray ring in a subview, so that ring is copied;
+    // without one, a hairline is drawn from labelColor, never a semantic system
+    // fill, which Twitter reinterprets.
     if (ours.layer.borderWidth <= 0) {
         BOOL ringFound = NO;
-        for (UIView* node in neighbour.subviews) {
+        for (UIView* node in neighbor.subviews) {
             if (node.layer.borderWidth > 0 && node.layer.borderColor) {
                 ours.layer.borderWidth = node.layer.borderWidth;
                 ours.layer.borderColor = node.layer.borderColor;
@@ -189,7 +183,7 @@ static void pfbMatchNeighbourStyle(UIButton* ours, UIView* neighbour) {
     }
     // The neighbor's glyph carries the tint the row expects; the copy button's template
     // image then renders in the same color.
-    for (UIView* node in neighbour.subviews) {
+    for (UIView* node in neighbor.subviews) {
         for (UIView* deeper in node.subviews) {
             if ([deeper isKindOfClass:[UIImageView class]] && deeper.tintColor) {
                 ours.tintColor = deeper.tintColor;
@@ -209,6 +203,12 @@ static void pfbMatchNeighbourStyle(UIButton* ours, UIView* neighbour) {
     %orig;
 
     BOOL copyOn = [PFBSettings boolForKey:@"copy_profile_info"];
+    UIButton* placed = copyOn ? nil : objc_getAssociatedObject(self, &kPFBCopyButtonKey);
+    if (placed) {
+        // Turned off: a button placed earlier leaves the row.
+        [placed removeFromSuperview];
+        objc_setAssociatedObject(self, &kPFBCopyButtonKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    }
     if (!copyOn && !PFBCompatNeedsObservation(PFBCompat_copy_profile_info) &&
         PFBCompatPathReached(PFBCompatPath_copy_button) &&
         PFBCompatPathReached(PFBCompatPath_copy_id_and_date)) {
@@ -242,7 +242,7 @@ static void pfbMatchNeighbourStyle(UIButton* ours, UIView* neighbour) {
         PFBProfileCopyButtonProvider* provider = [PFBProfileCopyButtonProvider new];
         // The provider reads the profile through the header's view controller,
         // found once from the responder chain and held weakly.
-        provider.headerViewController = (id)pfbOwningController(row);
+        provider.headerViewController = (id)PFBOwningController(row);
         objc_setAssociatedObject(copyButton, &kCopyProviderKey, provider,
                                  OBJC_ASSOCIATION_RETAIN_NONATOMIC);
 
@@ -273,7 +273,7 @@ static void pfbMatchNeighbourStyle(UIButton* ours, UIView* neighbour) {
     CGRect slot = anchor.frame;
     slot.origin.x = CGRectGetMinX(anchor.frame) - CGRectGetWidth(anchor.frame) - 8.0;
     copyButton.frame = slot;
-    pfbMatchNeighbourStyle(copyButton, anchor);
+    pfbMatchNeighborStyle(copyButton, anchor);
     PFBMark(copyButton, @"Profile/copyButton");
 }
 
@@ -382,8 +382,8 @@ static id pfbWantedEntry(id provider) {
             return nil;   // 0 leaves the choice to Twitter
     }
 
-    // A tab hidden by one of PrimeFreeBird's own switches is refused here too, in case an
-    // old choice survives in the settings after the tab was switched off.
+    // A tab hidden by a Profiles switch (Highlights, Articles, Videos) is refused here
+    // too, in case the saved choice predates hiding it.
     NSString* hider = nil;
     switch ([PFBSettings integerForKey:@"profile_initial_tab"]) {
         case 2: hider = @"disable_highlights"; break;
@@ -526,9 +526,8 @@ static const void* kPFBTabAppliedKey = &kPFBTabAppliedKey;
 
 // MARK: - Expand bios
 
-// The inline bio truncation is _bioExpanded, exposed as isBioExpanded, not
-// _expandedBioButton, which belongs to the Premium long bio and opens a modal.
-// Forcing the getter is enough: the layout asks it whether to clip.
+// The inline bio truncation follows isBioExpanded, which the layout asks whether to
+// clip, so forcing the getter is enough.
 
 %hook T1ProfileUserInfoView
 
@@ -548,7 +547,6 @@ static const void* kPFBTabAppliedKey = &kPFBTabAppliedKey;
 // x.com's own operation, sent with the web session. The web client names the follower
 // with target_user_id; an error naming another variable is followed once.
 static NSString* const kPFBRemoveFollowerQueryID = @"QpNfg0kpPRfjROQ_9eOLXA";
-static const NSInteger kPFBFollowerToastTag = 90313;
 
 // The profile's account follows the viewer, as the header's "Follows you" shows.
 static BOOL pfbProfileFollowsViewer(id viewModel) {
@@ -613,77 +611,6 @@ static void pfbSendRemoveFollower(NSString* userID, NSString* variable, BOOL ret
     });
 }
 
-// The same capsule as the tweak's other confirmations, at the top of the window.
-static void pfbShowFollowerToast(UIWindow* window, NSString* text) {
-    if (!window) {
-        return;
-    }
-    [[window viewWithTag:kPFBFollowerToastTag] removeFromSuperview];
-    BOOL liquidGlass = [PFBSettings boolForKey:@"enable_liquid_glass"];
-    Class glassClass = NSClassFromString(@"UIGlassEffect");
-    UIVisualEffect* effect = liquidGlass && glassClass ? [[glassClass alloc] init] : nil;
-    if (!effect) {
-        effect = [UIBlurEffect effectWithStyle:UIBlurEffectStyleSystemThickMaterial];
-        liquidGlass = NO;
-    }
-    UIVisualEffectView* toast = [[UIVisualEffectView alloc] initWithEffect:effect];
-    toast.tag = kPFBFollowerToastTag;
-    toast.translatesAutoresizingMaskIntoConstraints = NO;
-    toast.layer.cornerRadius = 22.0;
-    toast.layer.cornerCurve = kCACornerCurveContinuous;
-    if (!liquidGlass) {
-        toast.clipsToBounds = YES;
-        toast.layer.borderWidth = 0.5;
-        toast.layer.borderColor = [UIColor separatorColor].CGColor;
-    }
-    [window addSubview:toast];
-    UIView* content = toast.contentView;
-    UIView* veil = [[UIView alloc] init];
-    veil.backgroundColor = [[UIColor systemBackgroundColor] colorWithAlphaComponent:0.80];
-    veil.userInteractionEnabled = NO;
-    veil.layer.cornerRadius = 22.0;
-    veil.layer.cornerCurve = kCACornerCurveContinuous;
-    veil.layer.masksToBounds = YES;
-    veil.translatesAutoresizingMaskIntoConstraints = NO;
-    [content addSubview:veil];
-    UILabel* label = [[UILabel alloc] init];
-    label.text = text;
-    label.font = PFBScaledFont([TwitterChirpFont(TwitterFontStyleRegular) fontWithSize:15]);
-    label.textColor = [UIColor labelColor];
-    label.translatesAutoresizingMaskIntoConstraints = NO;
-    [content addSubview:label];
-    [NSLayoutConstraint activateConstraints:@[
-        [veil.topAnchor constraintEqualToAnchor:content.topAnchor],
-        [veil.bottomAnchor constraintEqualToAnchor:content.bottomAnchor],
-        [veil.leadingAnchor constraintEqualToAnchor:content.leadingAnchor],
-        [veil.trailingAnchor constraintEqualToAnchor:content.trailingAnchor],
-        [toast.centerXAnchor constraintEqualToAnchor:window.centerXAnchor],
-        [toast.topAnchor constraintEqualToAnchor:window.safeAreaLayoutGuide.topAnchor constant:6],
-        [toast.heightAnchor constraintEqualToConstant:44],
-        [toast.leadingAnchor constraintGreaterThanOrEqualToAnchor:window.leadingAnchor constant:20],
-        [label.leadingAnchor constraintEqualToAnchor:content.leadingAnchor constant:18],
-        [label.trailingAnchor constraintEqualToAnchor:content.trailingAnchor constant:-18],
-        [label.centerYAnchor constraintEqualToAnchor:content.centerYAnchor],
-    ]];
-    toast.alpha = 0;
-    toast.transform = CGAffineTransformMakeTranslation(0.0, -8.0);
-    [UIView animateWithDuration:0.22
-                     animations:^{
-                       toast.alpha = 1;
-                       toast.transform = CGAffineTransformIdentity;
-                     }];
-    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(3.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
-      [UIView animateWithDuration:0.22
-          animations:^{
-            toast.alpha = 0;
-            toast.transform = CGAffineTransformMakeTranslation(0.0, -8.0);
-          }
-          completion:^(BOOL finished) {
-            [toast removeFromSuperview];
-          }];
-    });
-}
-
 static void pfbConfirmRemoveFollower(UIViewController* from, NSString* userID, NSString* handle) {
     UIWindow* window = from.view.window;
     UIViewController* top = window.rootViewController ?: from;
@@ -707,9 +634,11 @@ static void pfbConfirmRemoveFollower(UIViewController* from, NSString* userID, N
                                                   if (removed) {
                                                       PFBCOMPAT_ACTION(PFBCompat_remove_followers, @"follower removed");
                                                   }
-                                                  pfbShowFollowerToast(window, [bundle localizedStringForKey:removed
-                                                                                            ? @"REMOVE_FOLLOWER_DONE"
-                                                                                            : @"REMOVE_FOLLOWER_FAILED"]);
+                                                  PFBShowToast(window,
+                                                               [bundle localizedStringForKey:removed
+                                                                           ? @"REMOVE_FOLLOWER_DONE"
+                                                                           : @"REMOVE_FOLLOWER_FAILED"],
+                                                               nil);
                                                 });
                                             }]];
     [top presentViewController:alert animated:YES completion:nil];
@@ -732,8 +661,12 @@ static void pfbConfirmRemoveFollower(UIViewController* from, NSString* userID, N
         !pfbProfileFollowsViewer(viewModel) || !PFBWebSessionAccountID()) {
         return items;
     }
+    Class itemClass = %c(TFNActionItem);
+    if (![itemClass respondsToSelector:@selector(actionItemWithTitle:imageName:action:)]) {
+        return items;
+    }
     __weak UIViewController* weakSelf = (UIViewController*)self;
-    id entry = [%c(TFNActionItem)
+    id entry = [itemClass
         actionItemWithTitle:[[PFBBundle sharedBundle] localizedStringForKey:@"REMOVE_FOLLOWER_TITLE"]
                   imageName:@"follow_close_stroke"
                      action:^{

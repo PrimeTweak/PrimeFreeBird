@@ -1,33 +1,13 @@
-// The Compatibility report screen, drawn like the settings pages: Chirp fonts and the
-// app's palette. Row marks tell a verdict or, under Check, what the row reports.
+// The Compatibility report screen, drawn like the settings pages.
 #import "Common/PFBCompatibility.h"
 #import "Debug/PFBDebugger.h"
 #import "Support/TwitterChirpFont.h"
 #import "Support/HookHelpers.h"
 #import "Settings/PFBModernSettingsPageViewController.h"
+#import "Settings/PFBSettingsCellStyle.h"
 #import "Features/Appearance/ThemeColor/PFBPalette.h"
 #import <objc/runtime.h>
 #import "Debug/PFBTourChoicePopover.h"
-
-static id PFBCompatFontGroup(void) {
-    return [PFBManager sharedFontGroup];
-}
-
-static UIFont* PFBCompatTitleFont(void) {
-    return [PFBCompatFontGroup() performSelector:@selector(bodyBoldFont)];
-}
-
-static UIFont* PFBCompatDetailFont(void) {
-    return [PFBCompatFontGroup() performSelector:@selector(subtext2Font)];
-}
-
-// The palette's secondary text color, as the settings rows use it.
-static UIColor* PFBCompatSecondaryColor(void) {
-    Class settingsClass = objc_getClass("TAEColorSettings");
-    id palette = [[[settingsClass sharedSettings] currentColorPalette] colorPalette];
-    UIColor* color = [palette performSelector:@selector(tabBarItemColor)];
-    return color ?: [UIColor secondaryLabelColor];
-}
 
 // An orange dark enough to read on a light page; the system orange on a dark one.
 static UIColor* PFBCompatWarningTextColor(void) {
@@ -55,11 +35,11 @@ static UIImage* PFBVerdictImage(PFBCompatVerdict verdict) {
     return PFBRowSymbol(name);
 }
 
-// "5 screens" still owing proofs on this build, or that none is left.
+// "5 screens" still to check on this build, or that none is left.
 static NSString* PFBCompatScreensLeftText(void) {
     NSUInteger screens = PFBCompatTourScreens(NO);
     return screens ? [NSString stringWithFormat:@"%lu screen%@", (unsigned long)screens, screens == 1 ? @"" : @"s"]
-                   : @"All proven";
+                   : @"Nothing left to check";
 }
 
 static UIColor* PFBVerdictColor(PFBCompatVerdict verdict) {
@@ -96,7 +76,7 @@ static NSString* const kPFBCompatUntestedOpenKey = @"pfb_compat_untested_open";
                                              selector:@selector(compatDidChange:)
                                                  name:PFBCompatDidChangeNotification
                                                object:nil];
-    self.title = @"Report";
+    self.title = [[PFBBundle sharedBundle] localizedStringForKey:@"COMPATIBILITY_REPORT_TITLE"];
     self.view.backgroundColor = [PFBPalette currentBackgroundColor];
     self.tableView.backgroundColor = [PFBPalette currentBackgroundColor];
     self.tableView.separatorStyle = UITableViewCellSeparatorStyleNone;
@@ -112,7 +92,7 @@ static NSString* const kPFBCompatUntestedOpenKey = @"pfb_compat_untested_open";
                                                               style:UIBarButtonItemStylePlain
                                                              target:self
                                                              action:@selector(showTourChoice:)];
-    tours.accessibilityLabel = @"Check paths";
+    tours.accessibilityLabel = @"Check options";
     tours.tag = PFBNativeGlassTag;
     self.navigationItem.rightBarButtonItems = @[ copy, tours ];
     _listOpen = [[NSUserDefaults standardUserDefaults] boolForKey:kPFBCompatListOpenKey];
@@ -240,7 +220,7 @@ static NSString* const kPFBCompatUntestedOpenKey = @"pfb_compat_untested_open";
         title = [NSString stringWithFormat:@"%ld problem%@ with Twitter %@", (long)broken,
                                            broken == 1 ? @"" : @"s", version];
     } else if (state == PFBCompatReadPending) {
-        tone = PFBCompatSecondaryColor();
+        tone = PFBSettingsSubtitleColor();
         symbol = nil;
         title = [NSString stringWithFormat:@"Checking Twitter %@", version];
     } else if (PFBCompatCheckIsDue()) {
@@ -287,8 +267,8 @@ static NSString* const kPFBCompatUntestedOpenKey = @"pfb_compat_untested_open";
     UILabel* subline = [[UILabel alloc] init];
     subline.text = [NSString stringWithFormat:@"iOS %@ \u00b7 %lu options", UIDevice.currentDevice.systemVersion,
                                               (unsigned long)optionCount];
-    subline.font = PFBCompatDetailFont();
-    subline.textColor = PFBCompatSecondaryColor();
+    subline.font = PFBSettingsDetailFont();
+    subline.textColor = PFBSettingsSubtitleColor();
     subline.textAlignment = NSTextAlignmentCenter;
     subline.translatesAutoresizingMaskIntoConstraints = NO;
 
@@ -312,7 +292,7 @@ static NSString* const kPFBCompatUntestedOpenKey = @"pfb_compat_untested_open";
     if (statusLine) {
         UIView* icon;
         UILabel* status = [[UILabel alloc] init];
-        status.font = PFBCompatDetailFont();
+        status.font = PFBSettingsDetailFont();
         if (state == PFBCompatReadPending) {
             UIActivityIndicatorView* small =
                 [[UIActivityIndicatorView alloc] initWithActivityIndicatorStyle:UIActivityIndicatorViewStyleMedium];
@@ -320,7 +300,7 @@ static NSString* const kPFBCompatUntestedOpenKey = @"pfb_compat_untested_open";
             [small startAnimating];
             icon = small;
             status.text = @"Checking Twitter\u2019s settings\u2026";
-            status.textColor = PFBCompatSecondaryColor();
+            status.textColor = PFBSettingsSubtitleColor();
         } else {
             UIImageView* warning =
                 [[UIImageView alloc] initWithImage:[UIImage systemImageNamed:@"exclamationmark.circle.fill"]];
@@ -407,15 +387,15 @@ static NSString* const kPFBCompatUntestedOpenKey = @"pfb_compat_untested_open";
                                                        reuseIdentifier:@"check"];
         cell.backgroundColor = [PFBPalette currentBackgroundColor];
         cell.textLabel.text = last ? @"Last tour" : @"Remaining";
-        cell.textLabel.font = PFBCompatTitleFont();
+        cell.textLabel.font = PFBSettingsTitleFont();
         cell.textLabel.textColor = [UIColor labelColor];
         cell.detailTextLabel.text = last ? (PFBCompatTourLastRun() ?: @"No tour on this build yet")
                                          : PFBCompatScreensLeftText();
         cell.detailTextLabel.numberOfLines = 0;
-        cell.detailTextLabel.font = PFBCompatDetailFont();
-        cell.detailTextLabel.textColor = PFBCompatSecondaryColor();
+        cell.detailTextLabel.font = PFBSettingsDetailFont();
+        cell.detailTextLabel.textColor = PFBSettingsSubtitleColor();
         cell.imageView.image = PFBRowSymbol(last ? @"clock" : @"scope");
-        cell.imageView.tintColor = PFBCompatSecondaryColor();
+        cell.imageView.tintColor = PFBSettingsSubtitleColor();
         cell.selectionStyle = UITableViewCellSelectionStyleNone;
         return cell;
     }
@@ -424,7 +404,7 @@ static NSString* const kPFBCompatUntestedOpenKey = @"pfb_compat_untested_open";
                                                        reuseIdentifier:@"action"];
         cell.backgroundColor = [PFBPalette currentBackgroundColor];
         cell.textLabel.text = @"Start over";
-        cell.textLabel.font = PFBCompatTitleFont();
+        cell.textLabel.font = PFBSettingsTitleFont();
         cell.textLabel.textColor = [UIColor systemRedColor];
         return cell;
     }
@@ -451,12 +431,12 @@ static NSString* const kPFBCompatUntestedOpenKey = @"pfb_compat_untested_open";
     cell.textLabel.text = (issue && !result.internal && !result.enabled)
                               ? [result.title stringByAppendingString:@" \u00b7 Off"]
                               : result.title;
-    cell.textLabel.font = PFBCompatTitleFont();
+    cell.textLabel.font = PFBSettingsTitleFont();
     cell.textLabel.textColor = [UIColor labelColor];
     cell.detailTextLabel.text = (issue || result.internal) ? result.detail : (result.enabled ? (result.alwaysOn ? @"Always on" : @"On") : @"Off");
     cell.detailTextLabel.numberOfLines = issue ? 0 : 1;
-    cell.detailTextLabel.font = PFBCompatDetailFont();
-    cell.detailTextLabel.textColor = PFBCompatSecondaryColor();
+    cell.detailTextLabel.font = PFBSettingsDetailFont();
+    cell.detailTextLabel.textColor = PFBSettingsSubtitleColor();
     cell.imageView.image = PFBVerdictImage(result.verdict);
     cell.imageView.tintColor = PFBVerdictColor(result.verdict);
     cell.selectionStyle = UITableViewCellSelectionStyleNone;
@@ -470,7 +450,7 @@ static NSString* const kPFBCompatUntestedOpenKey = @"pfb_compat_untested_open";
                                                    reuseIdentifier:@"summary"];
     cell.backgroundColor = [PFBPalette currentBackgroundColor];
     cell.textLabel.text = text;
-    cell.textLabel.font = PFBCompatTitleFont();
+    cell.textLabel.font = PFBSettingsTitleFont();
     cell.textLabel.textColor = [UIColor labelColor];
     cell.imageView.image = PFBRowSymbol(symbol);
     cell.imageView.tintColor = tint;
@@ -515,7 +495,7 @@ static NSString* const kPFBCompatUntestedOpenKey = @"pfb_compat_untested_open";
 - (void)confirmStartOver {
     UIAlertController* alert = [UIAlertController
         alertControllerWithTitle:@"Start over"
-                         message:@"Clears everything counted and closes Twitter. Reopen it and every path is "
+                         message:@"Clears everything counted and closes Twitter. Reopen it and every option is "
                                  @"checked on its own, then this report opens. Your settings are kept."
                   preferredStyle:UIAlertControllerStyleAlert];
     [alert addAction:[UIAlertAction actionWithTitle:@"Cancel" style:UIAlertActionStyleCancel handler:nil]];

@@ -1,7 +1,7 @@
 #import <QuartzCore/QuartzCore.h>
-#import "Support/PFBManager.h"
 #import "Common/PFBSettings.h"
 #import "Features/Appearance/ThemeColor/PFBPalette.h"
+#import "Settings/PFBSettingsCellStyle.h"
 #import "Settings/PFBModernSettingsTabBarCell.h"
 #import "Settings/PFBTabFlowView.h"
 
@@ -169,11 +169,7 @@
                        self.countLabel.alpha = 0.0;
                        self.countLabel.transform = CGAffineTransformMakeScale(0.85, 0.85);
                      }];
-    Class TAEColorSettingsCls = objc_getClass("TAEColorSettings");
-    id colorPalette =
-        [[[TAEColorSettingsCls sharedSettings] currentColorPalette] colorPalette];
-    self.hintLabel.textColor =
-        [colorPalette performSelector:@selector(alertColor)];
+    self.hintLabel.textColor = PFBSettingsAlertColor();
 
     CAKeyframeAnimation* nudge =
         [CAKeyframeAnimation animationWithKeyPath:@"transform.translation.x"];
@@ -209,33 +205,25 @@
 }
 
 - (void)applyTheme {
-    id fontGroup = [PFBManager sharedFontGroup];
-    Class TAEColorSettingsCls = objc_getClass("TAEColorSettings");
-    id settings = [TAEColorSettingsCls sharedSettings];
-    id colorPalette = [[settings currentColorPalette] colorPalette];
-    UIColor* soft = [colorPalette performSelector:@selector(tabBarItemColor)];
-    UIColor* faint = [colorPalette performSelector:@selector(faintBackgroundColor)];
-    UIColor* divider = [colorPalette performSelector:@selector(dividerColor)];
+    UIColor* soft = PFBSettingsSubtitleColor();
 
-    self.box.backgroundColor = faint;
-    self.rule.backgroundColor = divider;
-    self.captionLabel.font = [fontGroup performSelector:@selector(subtext3BoldFont)];
+    self.box.backgroundColor = PFBSettingsFaintColor();
+    self.rule.backgroundColor = PFBSettingsDividerColor();
+    self.captionLabel.font =
+        PFBFontGroupFont(@selector(subtext3BoldFont), [UIFont systemFontOfSize:12 weight:UIFontWeightBold]);
     self.captionLabel.textColor = soft;
-    self.hintLabel.font = [fontGroup performSelector:@selector(subtext2Font)];
+    self.hintLabel.font = PFBSettingsDetailFont();
     self.hintLabel.textColor = soft;
-    self.countLabel.font = [fontGroup performSelector:@selector(subtext2BoldFont)];
+    self.countLabel.font =
+        PFBFontGroupFont(@selector(subtext2BoldFont), [UIFont systemFontOfSize:13 weight:UIFontWeightBold]);
     self.countLabel.textColor = soft;
     self.countLabel.backgroundColor = [PFBPalette currentBackgroundColor];
     [self refreshTabs];
 }
 
 - (void)refreshTabs {
-    id fontGroup = [PFBManager sharedFontGroup];
-    Class TAEColorSettingsCls = objc_getClass("TAEColorSettings");
-    id settings = [TAEColorSettingsCls sharedSettings];
-    id colorPalette = [[settings currentColorPalette] colorPalette];
-    UIColor* ink = [colorPalette performSelector:@selector(textColor)] ?: [UIColor labelColor];
-    UIColor* soft = [colorPalette performSelector:@selector(tabBarItemColor)] ?: [UIColor secondaryLabelColor];
+    UIColor* ink = PFBSettingsTextColor();
+    UIColor* soft = PFBSettingsSubtitleColor();
 
     for (UIButton* tab in self.tabButtons) {
         NSString* name = objc_getAssociatedObject(tab, @"tabName") ?: @"";
@@ -244,8 +232,7 @@
         NSMutableAttributedString* label = [[NSMutableAttributedString alloc]
             initWithString:name
                 attributes:@{
-                  NSFontAttributeName :
-                      [fontGroup performSelector:@selector(subtext1BoldFont)] ?: [UIFont boldSystemFontOfSize:15.0],
+                  NSFontAttributeName : PFBSettingsActionFont(),
                   NSForegroundColorAttributeName : hidden ? soft : ink
                 }];
         if (hidden) {
@@ -261,6 +248,12 @@
         tab.contentEdgeInsets = UIEdgeInsetsMake(0, 8, 0, 8);
     }
     [self setNeedsLayout];
+}
+
+// Palette colors are fixed values: they are read again when light and dark switch.
+- (void)traitCollectionDidChange:(UITraitCollection*)previousTraitCollection {
+    [super traitCollectionDidChange:previousTraitCollection];
+    [self applyTheme];
 }
 
 @end

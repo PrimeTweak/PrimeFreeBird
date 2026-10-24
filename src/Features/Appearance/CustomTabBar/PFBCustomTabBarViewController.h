@@ -1,5 +1,4 @@
-// The tab editor: a grid of every available tab above a drag-reorderable preview
-// row, cloned from the app's native tab-customization screen.
+// The tab editor: a grid of every available tab above a reorderable preview row.
 
 #import <UIKit/UIKit.h>
 

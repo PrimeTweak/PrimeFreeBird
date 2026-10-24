@@ -1,8 +1,8 @@
-// Footer of an opened Tweet: the app it was sent from and the country its account is based
-// in, both read from x.com with the web session and added after the time.
+// Tweet source and account location, added after the time in an opened Tweet's footer.
 
 #import "Support/HookHelpers.h"
 #import "Debug/PFBDebugger.h"
+#import "Debug/PFBProbe.h"
 
 static NSString* const kPFBAboutAccountURL =
     @"https://x.com/i/api/graphql/XRqGa7EeokUU5kppkh13EA/AboutAccountQuery?variables=";
@@ -301,6 +301,11 @@ static void PFBRefreshFooterOnArrival(T1ConversationFooterTextView* footer, NSSt
                         if (view && ([note.object isEqual:strong.handle] || [note.object isEqual:strong.tweetID])) {
                             [view updateFooterTextView];
                             [view setNeedsLayout];
+                            // Measurement: the height the footer needs once the label is in,
+                            // against the height it was given.
+                            CGFloat needed = [view sizeThatFits:CGSizeMake(view.bounds.size.width, CGFLOAT_MAX)].height;
+                            PFB_PROBE(@"late footer labels", 6, @"needs %.0f pt, given %.0f pt: %@", needed,
+                                      view.bounds.size.height, needed > view.bounds.size.height + 1.0 ? @"cut" : @"fits");
                         }
                     }];
         objc_setAssociatedObject(footer, kPFBFooterRefresherKey, refresher,

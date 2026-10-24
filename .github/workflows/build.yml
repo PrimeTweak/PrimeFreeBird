@@ -24,7 +24,7 @@ on:
         type: boolean
         default: true
       icon_pack_url:
-        description: "Other icon pack link (.zip). https://files.catbox.moe/p63f20.zip"
+        description: "Other icon pack link (.zip)"
         type: string
         default: ""
 
@@ -46,8 +46,15 @@ jobs:
         with:
           submodules: recursive
 
+      # Both links are masked in the log. The runner decodes %25, %0D and %0A in a mask,
+      # so they are encoded first.
       - name: Hide sensitive inputs
-        uses: levibostian/action-hide-sensitive-inputs@v1
+        run: |
+          for input in ipa_url icon_pack_url; do
+            value=$(jq -r --arg input "$input" \
+              '.inputs[$input] // "" | gsub("%"; "%25") | gsub("\r"; "%0D") | gsub("\n"; "%0A")' "$GITHUB_EVENT_PATH")
+            if [ -n "$value" ]; then echo "::add-mask::$value"; fi
+          done
 
       - name: Read version
         run: |
@@ -93,7 +100,7 @@ jobs:
           curl -fsSL -o App.ipa "$IPA_URL"
           zip -T App.ipa
 
-      # The deployment target follows the app's own minimum; a mismatch is flagged.
+      # X's version names the files; an app minimum iOS other than the Makefile's is flagged.
       - name: Read X version
         run: |
           plist=$(unzip -Z1 App.ipa | grep -E '^Payload/[^/]+\.app/Info\.plist$' | head -1)
@@ -105,7 +112,7 @@ jobs:
           fi
 
       # Theos and its iOS 16.5 SDK stay in the cache until either repository moves. A miss
-      # fetches both and saves them before the build, whose fleXD part links Xcode's SDK in.
+      # fetches both and saves them before the FLEX build links Xcode's SDK into Theos.
       - name: Compute Theos cache key
         id: theos-key
         run: |
@@ -161,7 +168,7 @@ jobs:
           HOMEBREW_NO_AUTO_UPDATE: 1
           HOMEBREW_NO_INSTALL_CLEANUP: 1
         run: |
-          brew install make dpkg ldid xz
+          brew install make ldid xz
           echo "$(brew --prefix make)/libexec/gnubin" >> "$GITHUB_PATH"
 
       - name: Install cyan
@@ -181,20 +188,15 @@ jobs:
         id: ffmpeg-cache
         uses: actions/cache@v4
         with:
-          path: |
-            ffmpeg-build
-            deps/ffmpeg-kit-next/build
+          path: deps/ffmpeg-kit-next/build
           key: ${{ steps.ffmpeg-key.outputs.key }}
 
       - name: Build ffmpeg stack
         if: ${{ steps.ffmpeg-cache.outputs.cache-hit != 'true' }}
         run: deps/ffmpeg-kit-next/build-ffmpeg.sh
-        env:
-          BUILD_DIR: ${{ github.workspace }}/ffmpeg-build
 
       - name: Build dylib
         run: |
-          make clean || true
           make FINALPACKAGE=1 SIDELOADED=1
           mkdir -p dylib
           for lib in PrimeFreeBird libpfbFLEX zxPluginsInject; do
@@ -211,8 +213,8 @@ jobs:
           make clean package FINALPACKAGE=1
           ls -l packages
 
-      # The input IPA keeps its own signature, so nothing is re-signed; the app keeps its
-      # extensions, which the plugin fix serves.
+      # cyan re-signs the app binary ad hoc with its own entitlements, removes the device
+      # list (-u) and the watch app (-w), and keeps the extensions the plugin fix serves.
       - name: Inject
         run: |
           mkdir -p out
@@ -221,22 +223,20 @@ jobs:
                "layout/Library/Application Support/PFB/PrimeFreeBird.bundle"
 
       # The icon pack is the repository's branding/resource-pack.zip, unless another link
-      # is given; the default link serves only while the repository has none.
+      # is given.
       - name: Brand as Twitter
         if: ${{ inputs.twitter_branding || inputs.icon_pack }}
         env:
           PACK_URL: ${{ inputs.icon_pack_url }}
-          DEFAULT_PACK_URL: https://files.catbox.moe/p63f20.zip
         run: |
           flags=""
           if [ "${{ inputs.twitter_branding }}" = "true" ]; then flags="--twitter-branding"; fi
           if [ "${{ inputs.icon_pack }}" = "true" ]; then
             pack=branding/resource-pack.zip
-            if [ -n "$PACK_URL" ] || [ ! -f "$pack" ]; then
-              url="${PACK_URL:-$DEFAULT_PACK_URL}"
+            if [ -n "$PACK_URL" ]; then
               pack=resource-pack.zip
-              if ! curl -fsSL --retry 3 --retry-delay 10 --retry-all-errors --connect-timeout 20 -o "$pack" "$url"; then
-                echo "::error::Icon pack not downloaded from $url. Untick Apply icon pack to build without it, or add the pack as branding/resource-pack.zip."
+              if ! curl -fsSL --retry 3 --retry-delay 10 --retry-all-errors --connect-timeout 20 -o "$pack" "$PACK_URL"; then
+                echo "::error::Icon pack not downloaded from $PACK_URL. Clear Other icon pack link to use the repository's pack, or untick Apply icon pack."
                 exit 1
               fi
             fi

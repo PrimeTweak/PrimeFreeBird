@@ -57,7 +57,6 @@
     }
 }
 + (id)sharedFontGroup {
-    // Twitter's shared font group.
     return [objc_getClass("TFNUIDefaultFontGroup") sharedFontGroup];
 }
 + (UIFont*)menuTitleFont {

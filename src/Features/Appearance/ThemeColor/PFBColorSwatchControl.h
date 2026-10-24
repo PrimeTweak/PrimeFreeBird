@@ -1,5 +1,4 @@
-// A pill-style accent color option: a colored capsule with the color name and
-// a radio checkmark below it.
+// A pill-style accent color option: a colored capsule above a radio check.
 
 #import <UIKit/UIKit.h>
 

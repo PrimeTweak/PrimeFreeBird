@@ -163,7 +163,18 @@ static UIImage* AppIconThumbnail(PFBAppIconItem* item, UITraitCollection* tc) {
 
 - (void)viewWillAppear:(BOOL)animated {
     [super viewWillAppear:animated];
+    [self applyAppearance];
+}
 
+// The palette background and the cells' borders and art follow light and dark.
+- (void)traitCollectionDidChange:(UITraitCollection*)previousTraitCollection {
+    [super traitCollectionDidChange:previousTraitCollection];
+    if (previousTraitCollection.userInterfaceStyle != self.traitCollection.userInterfaceStyle) {
+        [self applyAppearance];
+    }
+}
+
+- (void)applyAppearance {
     self.view.backgroundColor = [PFBPalette currentBackgroundColor];
     self.appIconCollectionView.backgroundColor = [PFBPalette currentBackgroundColor];
     self.loadingView.backgroundColor = [PFBPalette currentBackgroundColor];
@@ -284,14 +295,20 @@ static UIImage* AppIconThumbnail(PFBAppIconItem* item, UITraitCollection* tc) {
 
     NSString* toSet = item.isPrimaryIcon ? nil : item.bundleIconName;
 
-    [[NSUserDefaults standardUserDefaults]
-        setObject:(toSet ?: kPrimaryIconSentinel)
-           forKey:kLastSelectedIconKey];
-    [cv reloadData];
-
-    // A block is always passed: nil name + nil handler crashes UIKit.
+    // The choice is kept once iOS has applied it, so an icon it refuses is never checked.
+    __weak UICollectionView* weakList = cv;
     [[UIApplication sharedApplication] setAlternateIconName:toSet
-                                          completionHandler:^(NSError* _Nullable error){}];
+                                          completionHandler:^(NSError* _Nullable error) {
+                                              if (error) {
+                                                  return;
+                                              }
+                                              dispatch_async(dispatch_get_main_queue(), ^{
+                                                  [[NSUserDefaults standardUserDefaults]
+                                                      setObject:(toSet ?: kPrimaryIconSentinel)
+                                                         forKey:kLastSelectedIconKey];
+                                                  [weakList reloadData];
+                                              });
+                                          }];
 }
 
 #pragma mark - Section header

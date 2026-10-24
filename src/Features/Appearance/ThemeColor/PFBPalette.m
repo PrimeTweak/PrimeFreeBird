@@ -1,20 +1,9 @@
 // Color helpers around the app's active palette.
 
 #import "Features/Appearance/ThemeColor/PFBPalette.h"
+#import <objc/message.h>
 #import <objc/runtime.h>
-
-@protocol AEColorPalette <NSObject>
-- (UIColor*)backgroundColor;
-@end
-
-@interface TAETwitterColorPaletteSettingInfo : NSObject
-- (id<AEColorPalette>)colorPalette;
-@end
-
-@interface TAEColorSettings : NSObject
-+ (instancetype)sharedSettings;
-- (TAETwitterColorPaletteSettingInfo*)currentColorPalette;
-@end
+#import "Support/TAEHeaders.h"
 
 @implementation PFBPalette
 
@@ -33,17 +22,14 @@
 }
 
 + (UIColor*)currentBackgroundColor {
+    return [self colorFor:@selector(backgroundColor) fallback:[UIColor systemBackgroundColor]];
+}
+
++ (UIColor*)colorFor:(SEL)getter fallback:(UIColor*)fallback {
     TAETwitterColorPaletteSettingInfo* info = [self currentPaletteInfo];
-    if ([info respondsToSelector:@selector(colorPalette)]) {
-        id<AEColorPalette> palette = [info colorPalette];
-        if ([palette respondsToSelector:@selector(backgroundColor)]) {
-            UIColor* background = [palette backgroundColor];
-            if (background) {
-                return background;
-            }
-        }
-    }
-    return [UIColor systemBackgroundColor];
+    id palette = [info respondsToSelector:@selector(colorPalette)] ? [info colorPalette] : nil;
+    id color = [palette respondsToSelector:getter] ? ((id (*)(id, SEL))objc_msgSend)(palette, getter) : nil;
+    return [color isKindOfClass:[UIColor class]] ? color : fallback;
 }
 
 @end

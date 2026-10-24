@@ -1,5 +1,4 @@
-// Toggles that remove interface elements: the verified checkmark, search history,
-// trending on Explore, the Subscribe, Follow and Message buttons, and inline action buttons.
+// Options that hide interface elements: checkmarks, search history, Explore and buttons.
 
 #import "Support/HookHelpers.h"
 
@@ -49,8 +48,8 @@ static BOOL PFBVerifiedValue(id value) {
 
 %end
 
-// Reaches into the wrapped user's storage directly instead of through its
-// getter.
+// This wrapper reads the user's stored flags directly, past the user hooks above, so it
+// is hooked as well.
 %hook TFSTwitterUserSource
 
 - (id)isBlueVerified {
@@ -100,36 +99,12 @@ static BOOL PFBVerifiedValue(id value) {
 
 - (BOOL)isFromUserBlueVerified {
     BOOL verified = %orig;
-    if (PFBRawVerifiedDepth > 0) {
-        return verified;
-    }
-    if (![PFBSettings boolForKey:@"hide_blue_verified"]) {
-        if (verified) {
-            PFBCOMPAT_OBSERVE(PFBCompat_hide_blue_verified, @"verified author seen");
-        }
-        return verified;
-    }
-    if (verified) {
-        PFBCOMPAT_ACTION(PFBCompat_hide_blue_verified, @"checkmark hidden");
-    }
-    return NO;
+    return PFBHidesVerifiedFlag(verified) ? NO : verified;
 }
 
 - (BOOL)isFromUserVerified {
     BOOL verified = %orig;
-    if (PFBRawVerifiedDepth > 0) {
-        return verified;
-    }
-    if (![PFBSettings boolForKey:@"hide_blue_verified"]) {
-        if (verified) {
-            PFBCOMPAT_OBSERVE(PFBCompat_hide_blue_verified, @"verified author seen");
-        }
-        return verified;
-    }
-    if (verified) {
-        PFBCOMPAT_ACTION(PFBCompat_hide_blue_verified, @"checkmark hidden");
-    }
-    return NO;
+    return PFBHidesVerifiedFlag(verified) ? NO : verified;
 }
 
 %end
@@ -167,6 +142,8 @@ static BOOL PFBVerifiedValue(id value) {
 // has no ObjC getter, so it is found among the children. The page tab strip
 // arrives separately through tfn_navigationBarAccessoryView.
 
+static char kPFBExploreContentHiddenKey;
+
 %hook _TtC14T1TwitterSwift28GuideContainerViewController
 
 - (void)viewDidLoad {
@@ -181,8 +158,23 @@ static BOOL PFBVerifiedValue(id value) {
             if ([child isKindOfClass:
                            %c(_TtC14T1TwitterSwift23URTChromeViewController)]) {
                 child.view.hidden = YES;
+                objc_setAssociatedObject(child, &kPFBExploreContentHiddenKey, @YES, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
                 PFBCOMPAT_ACTION(PFBCompat_hide_explore_all, @"Explore content hidden");
             }
+        }
+    }
+}
+
+// Turned off, the content hidden when Explore loaded comes back on the next visit.
+- (void)viewWillAppear:(BOOL)animated {
+    %orig;
+    if (pfbShouldHideAllTrends()) {
+        return;
+    }
+    for (UIViewController* child in [(UIViewController*)self childViewControllers]) {
+        if (objc_getAssociatedObject(child, &kPFBExploreContentHiddenKey)) {
+            objc_setAssociatedObject(child, &kPFBExploreContentHiddenKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+            child.view.hidden = NO;
         }
     }
 }
@@ -230,6 +222,8 @@ static BOOL PFBVerifiedValue(id value) {
 // author row through TTAStatusAuthorView, so forcing the flag here covers every
 // surface.
 
+static char kPFBMessageButtonHiddenKey;
+
 %hook TTAStatusAuthorView
 
 - (void)setFollowControlHidden:(BOOL)hidden {
@@ -245,7 +239,8 @@ static BOOL PFBVerifiedValue(id value) {
 }
 
 // The Message button beside the author, hidden again on every layout since the row
-// is reconfigured in place.
+// is reconfigured in place. A button hidden here is marked, and given back once the
+// option is off.
 - (void)layoutSubviews {
     %orig;
     UIView* row = (UIView*)self;
@@ -257,6 +252,11 @@ static BOOL PFBVerifiedValue(id value) {
         return;
     }
     if (![PFBSettings boolForKey:@"hide_message_button"]) {
+        if (objc_getAssociatedObject(button, &kPFBMessageButtonHiddenKey)) {
+            objc_setAssociatedObject(button, &kPFBMessageButtonHiddenKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+            button.hidden = NO;
+            button.userInteractionEnabled = YES;
+        }
         PFBCOMPAT_OBSERVE(PFBCompat_hide_message_button, @"Message button found");
         return;
     }
@@ -265,6 +265,7 @@ static BOOL PFBVerifiedValue(id value) {
     }
     button.hidden = YES;
     button.userInteractionEnabled = NO;
+    objc_setAssociatedObject(button, &kPFBMessageButtonHiddenKey, @YES, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     PFBCOMPAT_ACTION(PFBCompat_hide_message_button, @"Message button hidden");
 }
 %end

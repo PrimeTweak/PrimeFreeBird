@@ -15,9 +15,6 @@ NSString* const PFBTabPanelIDKey = @"panelID";
 static NSString* const kVisibleKey = @"pfb_tabs_visible";
 static NSString* const kRegistryKey = @"pfb_tab_registry";
 
-// Legacy list of hidden tabs; removed whenever the selection is saved or reset.
-static NSString* const kLegacyHiddenKey = @"pfb_tabs_hidden";
-
 // A saved entry is kept only when its fields have the types the editor reads.
 static BOOL PFBRegistryEntryIsValid(id entry) {
     if (![entry isKindOfClass:[NSDictionary class]] ||
@@ -59,12 +56,16 @@ static BOOL PFBRegistryEntryIsValid(id entry) {
     BOOL changed = NO;
 
     for (T1TabView* tabView in tabViews) {
+        // Each getter is asked first, so a tab Twitter describes another way is skipped.
+        if (![tabView respondsToSelector:@selector(scribePage)] || ![tabView respondsToSelector:@selector(panelID)]) {
+            continue;
+        }
         NSString* page = tabView.scribePage;
         if (page.length == 0) {
             continue;
         }
 
-        NSString* title = tabView.title.length ? tabView.title : page;
+        NSString* title = [tabView respondsToSelector:@selector(title)] && tabView.title.length ? tabView.title : page;
         NSString* image = [self imageNameForTabView:tabView] ?: @"";
         NSDictionary* entry = @{
             PFBTabPageKey: page,
@@ -97,14 +98,15 @@ static BOOL PFBRegistryEntryIsValid(id entry) {
 }
 
 + (NSString*)imageNameForTabView:(T1TabView*)tabView {
-    NSString* image = tabView.imageName;
+    NSString* image = [tabView respondsToSelector:@selector(imageName)] ? tabView.imageName : nil;
     if (image.length) {
         return image;
     }
     // Avatar-drawn tabs (Profile) have no imageName; use the glyph the
     // native customization screen resolves for the panel.
     Class identity = NSClassFromString(@"T1PanelIdentity");
-    if (![identity respondsToSelector:@selector(iconImageNameForPanelID:)]) {
+    if (![identity respondsToSelector:@selector(iconImageNameForPanelID:)] ||
+        ![tabView respondsToSelector:@selector(panelID)]) {
         return nil;
     }
     return [identity iconImageNameForPanelID:tabView.panelID];
@@ -141,13 +143,11 @@ static BOOL PFBRegistryEntryIsValid(id entry) {
 
 + (void)setVisiblePageIDs:(NSArray<NSString*>*)visible {
     [[NSUserDefaults standardUserDefaults] setObject:visible forKey:kVisibleKey];
-    [[NSUserDefaults standardUserDefaults] removeObjectForKey:kLegacyHiddenKey];
     [[NSUserDefaults standardUserDefaults] synchronize];
 }
 
 + (void)resetSelection {
     [[NSUserDefaults standardUserDefaults] removeObjectForKey:kVisibleKey];
-    [[NSUserDefaults standardUserDefaults] removeObjectForKey:kLegacyHiddenKey];
     [[NSUserDefaults standardUserDefaults] synchronize];
 }
 

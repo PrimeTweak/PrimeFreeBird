@@ -1,7 +1,13 @@
-// Download entries: DM videos and voice messages, custom voice uploads, tweet to
-// image, and the download entry in the media long-press menu.
+// Downloads: chat videos and voice notes, voice from a video, Tweet to image, media menu.
 
 #import "Support/HookHelpers.h"
+#import "Debug/PFBProbe.h"
+
+// The glyph of the three download entries: Twitter's, or the closest system symbol.
+static UIImage* PFBDownloadGlyph(void) {
+    return PFBTwitterGlyphFor(@"arrow_down_circle_stroke",
+                              [UIImage systemImageNamed:@"arrow.down.circle"]);
+}
 
 // MARK: - DM video download
 
@@ -34,17 +40,47 @@ static NSArray* DMVideoEntities(UIView* attachmentView) {
 // asset opened to play it. The last one seen is taken as the one under the finger.
 
 static NSURL* gPFBLastVoiceURL = nil;
+// Measurement: when the last voice file was opened, read by the Save measurement.
+static NSTimeInterval gPFBProbeVoiceAt = 0;
 
 %hook AVURLAsset
 
 - (id)initWithURL:(NSURL*)url options:(NSDictionary*)options {
     if ([url.path containsString:@"/decrypted-media-v2/"]) {
+        PFBCompatReach(PFBCompatPath_played_voice_note);
+        PFB_PROBE(@"voice file opened", 2, @"on the %@ thread",
+                  [NSThread isMainThread] ? @"main" : @"background");
+        gPFBProbeVoiceAt = [NSDate timeIntervalSinceReferenceDate];
         gPFBLastVoiceURL = url;
     }
     return %orig;
 }
 
 %end
+
+// Measurement: on Save, the voice note pressed, told apart by its place and its text,
+// and the file exported; the audio view's stored properties once, for a direct read.
+static void pfbProbeVoiceSave(UIView* pressed, NSURL* exported) {
+    __block NSString* text = nil;
+    PFBEnumerateSubviewsRecursively(pressed, ^(UIView* view) {
+      if (!text && [view isKindOfClass:[UILabel class]] && ((UILabel*)view).text.length) {
+          text = ((UILabel*)view).text;
+      }
+    });
+    CGRect inWindow = [pressed convertRect:pressed.bounds toView:nil];
+    PFB_PROBE(@"voice note saves", 8, @"pressed at y %.0f ('%@'), exported %@ opened %.0f s earlier", inWindow.origin.y,
+              text ?: @"", exported.lastPathComponent ?: @"?",
+              [NSDate timeIntervalSinceReferenceDate] - gPFBProbeVoiceAt);
+    unsigned int count = 0;
+    Ivar* ivars = class_copyIvarList(object_getClass(pressed), &count);
+    NSMutableArray<NSString*>* names = [NSMutableArray array];
+    for (unsigned int i = 0; i < count && i < 24; i++) {
+        [names addObject:@(ivar_getName(ivars[i]))];
+    }
+    free(ivars);
+    PFB_PROBE(@"voice note view", 1, @"%@: %@", NSStringFromClass(object_getClass(pressed)),
+              [names componentsJoinedByString:@", "]);
+}
 
 // The file is already on disk and already decrypted; copying it out under a
 // fresh name is enough to hand it to the share sheet.
@@ -95,8 +131,9 @@ static const void* kPFBVoiceInteractionKey = &kPFBVoiceInteractionKey;
 %new
 - (UIContextMenuConfiguration*)contextMenuInteraction:(UIContextMenuInteraction*)interaction
                        configurationForMenuAtLocation:(CGPoint)location {
+    // The interaction stays on views laid out while the option was on; off, it opens nothing.
     NSURL* voiceURL = gPFBLastVoiceURL;
-    if (!voiceURL) {
+    if (!voiceURL || ![PFBSettings boolForKey:@"download_voice_messages"]) {
         return nil;
     }
     return [UIContextMenuConfiguration
@@ -108,9 +145,10 @@ static const void* kPFBVoiceInteractionKey = &kPFBVoiceInteractionKey;
                            actionWithTitle:[[PFBBundle sharedBundle]
                                                localizedTwitterStringForKey:
                                                    @"DOWNLOAD_ACTIVITY_VIEW_LABEL"]
-                                     image:PFBTwitterGlyphFor(@"arrow_down_circle_stroke", [UIImage systemImageNamed:@"square.and.arrow.down"])
+                                     image:PFBDownloadGlyph()
                                 identifier:nil
                                    handler:^(__kindof UIAction* _Nonnull action) {
+                                     pfbProbeVoiceSave((UIView*)self, voiceURL);
                                      PFBSaveVoiceMessage(voiceURL);
                                    }];
                        return [UIMenu menuWithTitle:@"" children:@[ saveAction ]];
@@ -129,7 +167,6 @@ static const void* kPFBVoiceInteractionKey = &kPFBVoiceInteractionKey;
     if (enabled && self.pfbDownloadMenuInteraction == nil) {
         self.pfbDownloadMenuInteraction = [[UIContextMenuInteraction alloc] initWithDelegate:self];
         [self addInteraction:self.pfbDownloadMenuInteraction];
-        PFBCOMPAT_ACTION(PFBCompat_download_videos, @"save menu on chat media");
     } else if (!enabled) {
         PFBCOMPAT_OBSERVE(PFBCompat_download_videos, @"chat media found");
     }
@@ -137,11 +174,15 @@ static const void* kPFBVoiceInteractionKey = &kPFBVoiceInteractionKey;
 %new
 - (UIContextMenuConfiguration*)contextMenuInteraction:(UIContextMenuInteraction*)interaction
                        configurationForMenuAtLocation:(CGPoint)location {
+    if (![PFBSettings boolForKey:@"download_videos"]) {
+        return nil;
+    }
     NSArray* videoEntities = DMVideoEntities(self);
     if (videoEntities.count == 0) {
         return nil;
     }
 
+    PFBCOMPAT_ACTION(PFBCompat_download_videos, @"save menu on chat media");
     return [UIContextMenuConfiguration
         configurationWithIdentifier:nil
                     previewProvider:nil
@@ -151,7 +192,7 @@ static const void* kPFBVoiceInteractionKey = &kPFBVoiceInteractionKey;
                              actionWithTitle:
                                  [[PFBBundle sharedBundle]
                                      localizedTwitterStringForKey:@"DOWNLOAD_ACTIVITY_VIEW_LABEL"]
-                                       image:PFBTwitterGlyphFor(@"arrow_down_circle_stroke", [UIImage systemImageNamed:@"square.and.arrow.down"])
+                                       image:PFBDownloadGlyph()
                                   identifier:nil
                                      handler:^(__kindof UIAction* _Nonnull action) {
                                          if (self.pfbDownloadHandler == nil) {
@@ -188,17 +229,18 @@ static const void* kPFBVoiceInteractionKey = &kPFBVoiceInteractionKey;
             return;
         }
 
-        self.pfbUploadButton = [UIButton buttonWithType:UIButtonTypeCustom];
-        UIImageSymbolConfiguration* smallConfig =
-            [UIImageSymbolConfiguration configurationWithScale:UIImageSymbolScaleSmall];
-        UIImage* arrowUpImage = [UIImage systemImageNamed:@"arrow.up" withConfiguration:smallConfig];
-        [self.pfbUploadButton setImage:arrowUpImage forState:UIControlStateNormal];
+        // Twitter's video glyph in white on the dark circle, like the remove button beside it.
+        self.pfbUploadButton = [PFBHitButton buttonWithType:UIButtonTypeCustom];
+        UIImage* videoGlyph = PFBTwitterGlyphFor(@"camera_video_stroke", [UIImage systemImageNamed:@"video"]);
+        [self.pfbUploadButton setImage:videoGlyph forState:UIControlStateNormal];
         [self.pfbUploadButton addTarget:self
                                  action:@selector(pfbHandleUploadButton:)
                        forControlEvents:UIControlEventTouchUpInside];
-        [self.pfbUploadButton setTintColor:UIColor.labelColor];
+        [self.pfbUploadButton setTintColor:[UIColor whiteColor]];
         [self.pfbUploadButton setBackgroundColor:[UIColor blackColor]];
-        [self.pfbUploadButton.layer setCornerRadius:29 / 2];
+        [self.pfbUploadButton.layer setCornerRadius:29 / 2.0];
+        self.pfbUploadButton.accessibilityLabel =
+            [[PFBBundle sharedBundle] localizedStringForKey:@"VOICE_NOTE_FROM_VIDEO_BUTTON"];
         [self.pfbUploadButton setTranslatesAutoresizingMaskIntoConstraints:false];
 
         [self addSubview:self.pfbUploadButton];
@@ -297,7 +339,7 @@ static const void* kPFBVoiceInteractionKey = &kPFBVoiceInteractionKey;
             [topMostController() presentViewController:acVC
                                               animated:true
                                             completion:^{
-                                              PFBCOMPAT_ACTION(PFBCompat_tweet_to_image, @"Tweet saved as image");
+                                              PFBCOMPAT_ACTION(PFBCompat_tweet_to_image, @"Tweet image offered");
                                             }];
             return;
         }
@@ -395,15 +437,9 @@ static NSArray* PFBVMDFreshVideoEntities(void) {
 }
 
 // The title comes from Twitter's own strings, so it matches the native entry; the bundled
-// TW_ copy covers a miss. The lookup returns the key itself when both miss, hence the
-// explicit fallback.
+// TW_ copy covers a miss.
 static NSString* PFBVMDMenuTitle(void) {
-    NSString* key = @"DOWNLOAD_VIDEO_ACTIVITY_VIEW_LABEL";
-    NSString* title = [[PFBBundle sharedBundle] localizedTwitterStringForKey:key];
-    if (title.length == 0 || [title isEqualToString:key]) {
-        return @"Download Video";
-    }
-    return title;
+    return [[PFBBundle sharedBundle] localizedTwitterStringForKey:@"DOWNLOAD_VIDEO_ACTIVITY_VIEW_LABEL"];
 }
 
 // A download entry by its title: the added one, which the app's video entry also shows,
@@ -432,19 +468,6 @@ static BOOL PFBVMDAlreadyHasOurs(NSArray* children) {
         }
     }
     return NO;
-}
-
-static UIImage* PFBVMDGlyph(void) {
-    UIImage* glyph = nil;
-    if ([UIImage respondsToSelector:@selector(tfn_vectorImageNamed:fitsSize:fillColor:)]) {
-        glyph = [UIImage tfn_vectorImageNamed:@"arrow_down_circle_stroke"
-                                     fitsSize:CGSizeMake(24.0, 24.0)
-                                    fillColor:[UIColor labelColor]];
-    }
-    if (!glyph) {
-        glyph = [UIImage systemImageNamed:@"arrow.down.circle"];
-    }
-    return glyph;
 }
 
 // The app's own download entries leave a menu that holds the added entry, so one entry
@@ -498,13 +521,22 @@ static NSArray* PFBVMDMenuChildren(NSArray* children) {
     PFBCOMPAT_ACTION(PFBCompat_download_videos, @"download entry in a video menu");
 
     UIAction* action = [UIAction actionWithTitle:PFBVMDMenuTitle()
-                                           image:PFBVMDGlyph()
+                                           image:PFBDownloadGlyph()
                                       identifier:kPFBVMDActionIdentifier
                                          handler:^(UIAction* sender) {
         [downloader presentDownloadOptionsForMediaEntities:mediaEntities];
     }];
     NSMutableArray* augmented = [PFBVMDWithoutNativeDownload(children) mutableCopy];
     [augmented insertObject:action atIndex:augmented.count ? augmented.count - 1 : 0];
+    // Measurement: the menus that receive the entry, by the titles they already hold.
+    NSMutableArray<NSString*>* titles = [NSMutableArray array];
+    for (id element in children) {
+        if (titles.count < 4 && [element isKindOfClass:[UIMenuElement class]]) {
+            [titles addObject:((UIMenuElement*)element).title ?: @""];
+        }
+    }
+    PFB_PROBE(@"download entry menus", 8, @"%.0f s after a share sheet, menu with '%@'",
+              [NSDate timeIntervalSinceReferenceDate] - gPFBVMDStatusTime, [titles componentsJoinedByString:@"', '"]);
     return augmented;
 }
 

@@ -1,5 +1,4 @@
-// The Advanced Search form, styled after x.com/search-advanced: bordered fields
-// with floating labels, example lines, filter toggles, language menu, date pickers.
+// The Advanced Search form, styled after the web's: bordered fields, toggles, dates.
 
 #import "Features/Search/PFBAdvancedSearchViewController.h"
 #import "Common/PFBBundle.h"
@@ -20,11 +19,11 @@
 @property (nonatomic, strong) NSArray<NSString*>* sectionKeys;
 @property (nonatomic, strong) NSArray<NSArray<PFBAdvField*>*>* sections;
 @property (nonatomic, strong) NSArray<NSString*>* languageCodes;
+@property (nonatomic, weak) UIButton* clearButton;
 @end
 
-// A glyph escapes the glass material's wash by being baked: opaque pixels handed
-// over as AlwaysOriginal. A title has no such escape, since the label is drawn by
-// the button, so the word is baked into a bitmap and passed as an image.
+// A bar button tints a title with the glass material but leaves an original image as
+// drawn, so the title is drawn into an image.
 static UIImage* pfbBakedTitleImage(NSString* title, UIFont* font) {
     if (title.length == 0 || !font) {
         return nil;
@@ -65,6 +64,13 @@ static UIImage* pfbBakedTitleImage(NSString* title, UIFont* font) {
 - (void)viewDidDisappear:(BOOL)animated {
     [super viewDidDisappear:animated];
     PFBThemeScreenLeave(self);
+}
+
+// A layer border keeps the CGColor it was given: the Clear pill's gray is set again.
+- (void)traitCollectionDidChange:(UITraitCollection*)previousTraitCollection {
+    [super traitCollectionDidChange:previousTraitCollection];
+    self.clearButton.layer.borderColor =
+        [[UIColor systemGray4Color] resolvedColorWithTraitCollection:self.traitCollection].CGColor;
 }
 
 - (instancetype)init {
@@ -134,36 +140,33 @@ static UIImage* pfbBakedTitleImage(NSString* title, UIFont* font) {
         ],
     ];
 
-    // A system Done bar button gives one native Liquid Glass capsule, where a custom
-    // view would be wrapped in a second one. With Liquid Glass on, NavBarIcons.x tints
-    // Done items system blue; otherwise the button inherits the window tint.
+    // With Liquid Glass, a system Done bar button gives one native capsule, where a
+    // custom view would be wrapped in a second one, and NavBarIcons.x tints it system
+    // blue under the white title. Without it nothing backs the title: plain text in the
+    // label color.
     NSString* searchTitle = [bundle localizedStringForKey:@"ADVSEARCH_SEARCH"];
     UIFont* searchFont = PFBScaledFont([TwitterChirpFont(TwitterFontStyleBold) fontWithSize:15]);
-    UIImage* bakedTitle = pfbBakedTitleImage(searchTitle, searchFont);
+    UIImage* bakedTitle = [PFBSettings boolForKey:@"enable_liquid_glass"]
+                              ? pfbBakedTitleImage(searchTitle, searchFont)
+                              : nil;
     if (bakedTitle) {
         self.navigationItem.rightBarButtonItem = [[UIBarButtonItem alloc]
             initWithImage:bakedTitle
                     style:UIBarButtonItemStyleDone
                    target:self
                    action:@selector(pfbRunSearch)];
-        // The word is a picture now, so VoiceOver is told what it says.
+        // The title is drawn as an image, so VoiceOver gets it as the label.
         self.navigationItem.rightBarButtonItem.accessibilityLabel = searchTitle;
     } else {
-        // Only reachable if the bitmap could not be drawn at all; a bar button
-        // with no image would simply be invisible, so the plain title stands in.
-        self.navigationItem.rightBarButtonItem = [[UIBarButtonItem alloc]
-            initWithTitle:searchTitle
-                    style:UIBarButtonItemStyleDone
-                   target:self
-                   action:@selector(pfbRunSearch)];
-        NSDictionary* chirpButton = @{
-            NSFontAttributeName : searchFont,
-            NSForegroundColorAttributeName : [UIColor whiteColor]
-        };
-        [self.navigationItem.rightBarButtonItem setTitleTextAttributes:chirpButton
-                                                              forState:UIControlStateNormal];
-        [self.navigationItem.rightBarButtonItem setTitleTextAttributes:chirpButton
-                                                              forState:UIControlStateHighlighted];
+        UIBarButtonItem* search = [[UIBarButtonItem alloc] initWithTitle:searchTitle
+                                                                   style:UIBarButtonItemStyleDone
+                                                                  target:self
+                                                                  action:@selector(pfbRunSearch)];
+        NSDictionary* attributes =
+            @{NSFontAttributeName : searchFont, NSForegroundColorAttributeName : [UIColor labelColor]};
+        [search setTitleTextAttributes:attributes forState:UIControlStateNormal];
+        [search setTitleTextAttributes:attributes forState:UIControlStateHighlighted];
+        self.navigationItem.rightBarButtonItem = search;
     }
 
     if (self.presentingViewController) {
@@ -193,6 +196,7 @@ static UIImage* pfbBakedTitleImage(NSString* title, UIFont* font) {
     clear.layer.borderWidth = 1.0;
     clear.layer.borderColor = [UIColor systemGray4Color].CGColor;
     clear.layer.cornerRadius = 22.0;
+    self.clearButton = clear;
     [clear addTarget:self
                   action:@selector(pfbClearAll)
         forControlEvents:UIControlEventTouchUpInside];
@@ -368,7 +372,26 @@ static BOOL PFBAdvFilterOn(NSString* key) {
                                                       completion:nil];
 }
 
+// Every field and filter of the form is emptied, so the question comes first.
 - (void)pfbClearAll {
+    PFBBundle* bundle = [PFBBundle sharedBundle];
+    UIAlertController* confirm =
+        [UIAlertController alertControllerWithTitle:[bundle localizedStringForKey:@"ADVSEARCH_CLEAR"]
+                                            message:[bundle localizedStringForKey:@"ADVSEARCH_CLEAR_CONFIRM_MESSAGE"]
+                                     preferredStyle:UIAlertControllerStyleAlert];
+    [confirm addAction:[UIAlertAction actionWithTitle:[bundle localizedStringForKey:@"CANCEL_ACTION"]
+                                                style:UIAlertActionStyleCancel
+                                              handler:nil]];
+    __weak typeof(self) weakSelf = self;
+    [confirm addAction:[UIAlertAction actionWithTitle:[bundle localizedStringForKey:@"ADVSEARCH_CLEAR_ACTION"]
+                                                style:UIAlertActionStyleDestructive
+                                              handler:^(__unused UIAlertAction* action) {
+                                                  [weakSelf pfbEmptyForm];
+                                              }]];
+    [self presentViewController:confirm animated:YES completion:nil];
+}
+
+- (void)pfbEmptyForm {
     NSUserDefaults* d = [NSUserDefaults standardUserDefaults];
     for (NSArray<PFBAdvField*>* section in self.sections) {
         for (PFBAdvField* f in section) {
@@ -506,8 +529,7 @@ static NSString* PFBAdvValue(NSString* key) {
     if (!query) {
         PFBBundle* bundle = [PFBBundle sharedBundle];
         UIAlertController* alert = [UIAlertController
-            alertControllerWithTitle:[bundle localizedStringForKey:
-                                                 @"ADVANCED_SEARCH_TITLE"]
+            alertControllerWithTitle:[bundle localizedStringForKey:@"ADVSEARCH_EMPTY_TITLE"]
                              message:[bundle localizedStringForKey:errorKey]
                       preferredStyle:UIAlertControllerStyleAlert];
         [alert addAction:[UIAlertAction actionWithTitle:[bundle localizedStringForKey:@"OK_ACTION"]
@@ -540,10 +562,10 @@ static NSString* PFBAdvValue(NSString* key) {
     };
     UIViewController* presenter = self.presentingViewController;
     if (presenter) {
-        [presenter dismissViewControllerAnimated:YES completion:nil];
+        [presenter dismissViewControllerAnimated:YES completion:launch];
+    } else {
+        launch();
     }
-    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(300 * NSEC_PER_MSEC)),
-                   dispatch_get_main_queue(), launch);
 }
 
 @end

@@ -1,30 +1,24 @@
-// Granular Explore tabs: hides the chosen tabs from the segmented bar, packs the
-// survivors, places the underline itself and keeps the pager off hidden pages.
-// Keys hide_tab_* map to indices 0-4; ON hides; unknown indices are kept.
+// Choose Explore tabs: hides the chosen tabs and keeps the pager off their pages.
 
 #import "Support/HookHelpers.h"
 #import "Debug/PFBDebugger.h"
+#import "Debug/PFBProbe.h"
 #import <QuartzCore/QuartzCore.h>
-
-static NSString* const kPFBTabKeys[] = {
-    @"hide_tab_foryou",
-    @"hide_tab_trending",
-    @"hide_tab_news",
-    @"hide_tab_sports",
-    @"hide_tab_entertainment",
-};
-static const NSInteger kPFBTabCount = 5;
 
 // MARK: - shared predicates
 
+static NSInteger pfbTabCount(void) {
+    return (NSInteger)PFBExploreTabKeys().count;
+}
+
 static BOOL pfbTabHidden(NSInteger idx) {
-    if (idx < 0 || idx >= kPFBTabCount) { return NO; }
-    return [PFBSettings boolForKey:kPFBTabKeys[idx]];
+    if (idx < 0 || idx >= pfbTabCount()) { return NO; }
+    return [PFBSettings boolForKey:PFBExploreTabKeys()[idx]];
 }
 
 static BOOL pfbAnyTabHidden(void) {
-    for (NSInteger i = 0; i < kPFBTabCount; i++) {
-        if ([PFBSettings boolForKey:kPFBTabKeys[i]]) { return YES; }
+    for (NSString* key in PFBExploreTabKeys()) {
+        if ([PFBSettings boolForKey:key]) { return YES; }
     }
     return NO;
 }
@@ -57,7 +51,7 @@ static NSInteger pfbNearestKeptAbs(NSInteger cur, NSInteger total) {
 // Bitmask of the current hidden set — cheap change detection.
 static NSUInteger pfbMaskBits(void) {
     NSUInteger bits = 0;
-    for (NSInteger i = 0; i < kPFBTabCount; i++) {
+    for (NSInteger i = 0; i < pfbTabCount(); i++) {
         if (pfbTabHidden(i)) { bits |= (1u << i); }
     }
     return bits;
@@ -74,7 +68,7 @@ static NSInteger gPFBPagerTotal = 0;                 // absolute page count (%or
 static __weak UICollectionView* gPFBPagerCandidate = nil;
 static NSInteger gPFBPagerCandidateTotal = 0;
 static __weak UICollectionView* gPFBBarCV = nil;     // the bar's inner collection
-static __weak CALayer* gPFBHighlightLayer = nil;     // underline layer (lockdown)
+static __weak CALayer* gPFBHighlightLayer = nil;     // the underline's layer
 static BOOL gPFBSettingUnderline = NO;               // the underline is being set here
 static BOOL gPFBInBarFilter = NO;                    // re-entrancy guard
 static BOOL gPFBSelfNav = NO;          // a pager move started here
@@ -151,7 +145,7 @@ static void pfbPositionUnderline(UIView* root, UICollectionView* cv) {
     gPFBHighlightLayer = hl.layer;
     CGFloat pw = pager.bounds.size.width;
     if (pw < 1.0) { return; }
-    NSInteger total = gPFBPagerTotal ?: kPFBTabCount;
+    NSInteger total = gPFBPagerTotal ?: pfbTabCount();
     if (total < 1) { return; }
     // The page index is the tab's own index, so the offset points straight at
     // a cell. Mid-swipe it can point at a hidden one; the underline then rides
@@ -196,13 +190,13 @@ static void pfbPositionUnderline(UIView* root, UICollectionView* cv) {
     if (!have1) { f1 = f0; }
     CGFloat c0 = f0.origin.x + f0.size.width / 2.0;
     CGFloat c1 = f1.origin.x + f1.size.width / 2.0;
-    CGFloat centreInRoot = c0 + (c1 - c0) * t;
+    CGFloat centerInRoot = c0 + (c1 - c0) * t;
     CGFloat width = f0.size.width + (f1.size.width - f0.size.width) * t;
     if (width < 40.0) { width = 40.0; }
     CGRect local = hl.frame;
-    CGPoint centreInSuper =
-        [hl.superview convertPoint:CGPointMake(centreInRoot, 0) fromView:root];
-    local.origin.x = centreInSuper.x - width / 2.0;
+    CGPoint centerInSuper =
+        [hl.superview convertPoint:CGPointMake(centerInRoot, 0) fromView:root];
+    local.origin.x = centerInSuper.x - width / 2.0;
     local.size.width = width;
     gPFBSettingUnderline = YES;
     [UIView performWithoutAnimation:^{ hl.frame = local; }];
@@ -218,7 +212,7 @@ static void pfbSyncPagerToMask(void) {
     UICollectionView* cv = gPFBPagerCV;
     if (!cv || !pfbPagerScopeOK(cv)) { return; }
     CGFloat pw = cv.bounds.size.width;
-    NSInteger total = gPFBPagerTotal ?: kPFBTabCount;
+    NSInteger total = gPFBPagerTotal ?: pfbTabCount();
     if (pw >= 1.0 && total >= 1) {
         NSInteger page = (NSInteger)llround(cv.contentOffset.x / pw);
         if (page >= 0 && page <= total - 1 && pfbTabHidden(page)) {
@@ -240,7 +234,7 @@ static void pfbSyncPagerToMask(void) {
 // tab is hidden so a session never starts on one.
 static void pfbCapturePagerAndRemap(UICollectionView* candidate) {
     if (!candidate) { return; }
-    NSInteger total = gPFBPagerCandidateTotal ?: kPFBTabCount;
+    NSInteger total = gPFBPagerCandidateTotal ?: pfbTabCount();
     gPFBPagerCV = candidate;
     gPFBPagerTotal = total;
     CGFloat pw = candidate.bounds.size.width;
@@ -265,13 +259,14 @@ static void pfbCapturePagerAndRemap(UICollectionView* candidate) {
 
 // MARK: - bar filter + mask-change detection
 
-static void pfbApplyTabFilter(UIView* bar, UICollectionView* cv) {
+// Returns whether a visible tab was hidden.
+static BOOL pfbApplyTabFilter(UIView* bar, UICollectionView* cv) {
     NSArray* cells = [cv.visibleCells sortedArrayUsingComparator:
         ^NSComparisonResult(UICollectionViewCell* a, UICollectionViewCell* b) {
             return [@([cv indexPathForCell:a].item)
                     compare:@([cv indexPathForCell:b].item)];
         }];
-    if (cells.count == 0) { return; }
+    if (cells.count == 0) { return NO; }
 
     CGFloat leading = CGFLOAT_MAX;
     CGFloat spacing = 0.0;
@@ -301,6 +296,7 @@ static void pfbApplyTabFilter(UIView* bar, UICollectionView* cv) {
     CGFloat cursor = (cv.bounds.size.width - keptWidth) / 2.0;
     if (cursor < leading) { cursor = leading; }
 
+    BOOL hid = NO;
     for (UICollectionViewCell* cell in cells) {
         NSIndexPath* ip = [cv indexPathForCell:cell];
         NSInteger idx = ip ? ip.item : -1;
@@ -310,6 +306,7 @@ static void pfbApplyTabFilter(UIView* bar, UICollectionView* cv) {
             f.size.width = 0.0;
             cell.frame = f;
             cell.hidden = YES;
+            hid = YES;
         } else {
             CGRect f = cell.frame;
             f.origin.x = cursor;
@@ -323,7 +320,7 @@ static void pfbApplyTabFilter(UIView* bar, UICollectionView* cv) {
     // on every layout pass.
     pfbPositionUnderline(bar, cv);
 
-    // The bar's inner collection is the anchor for the persistent filter hook.
+    // The collection view layout hook below re-applies the filter to this collection.
     gPFBBarCV = cv;
 
     // The bar is provably live right here, so a candidate remembered before it
@@ -344,11 +341,50 @@ static void pfbApplyTabFilter(UIView* bar, UICollectionView* cv) {
         gPFBAppliedMaskBits = bits;
         pfbSyncPagerToMask();
     }
+    return hid;
+}
+
+// Measurement: the Explore tabs as served, by index and title, once per launch; after 30
+// passes with tabs on screen and fewer than two titles read, that count is recorded instead.
+static void pfbProbeExploreTabs(UIView* bar) {
+    static BOOL done;
+    static NSUInteger untitledPasses;
+    UICollectionView* cv = done ? nil : pfbFindCollection(bar, 0);
+    if (!cv || cv.numberOfSections == 0) {
+        return;
+    }
+    NSMutableDictionary<NSNumber*, NSString*>* titles = [NSMutableDictionary dictionary];
+    for (UICollectionViewCell* cell in cv.visibleCells) {
+        NSIndexPath* ip = [cv indexPathForCell:cell];
+        __block NSString* title = nil;
+        PFBEnumerateSubviewsRecursively(cell, ^(UIView* view) {
+          if (!title && [view isKindOfClass:[UILabel class]] && ((UILabel*)view).text.length) {
+              title = ((UILabel*)view).text;
+          }
+        });
+        if (ip && title) {
+            titles[@(ip.item)] = title;
+        }
+    }
+    if (titles.count < 2) {
+        if (cv.visibleCells.count >= 2 && ++untitledPasses >= 30) {
+            done = YES;
+            PFB_PROBE(@"Explore tabs", 4, @"%ld tabs, %lu of %lu cells on screen with a title read",
+                      (long)[cv numberOfItemsInSection:0], (unsigned long)titles.count,
+                      (unsigned long)cv.visibleCells.count);
+        }
+        return;
+    }
+    done = YES;
+    NSMutableArray<NSString*>* parts = [NSMutableArray array];
+    for (NSNumber* index in [titles.allKeys sortedArrayUsingSelector:@selector(compare:)]) {
+        [parts addObject:[NSString stringWithFormat:@"%@ %@", index, titles[index]]];
+    }
+    PFB_PROBE(@"Explore tabs", 4, @"%ld tabs, shown: %@", (long)[cv numberOfItemsInSection:0],
+              [parts componentsJoinedByString:@", "]);
 }
 
 // MARK: - hooks: the bar, its controller and the pager
-
-// These two classes carry a Legacy prefix; the hooks bind to those names.
 
 %hook _TtC10TFNUISwift25LegacySegmentedTabBarView
 
@@ -356,6 +392,7 @@ static void pfbApplyTabFilter(UIView* bar, UICollectionView* cv) {
     %orig;
 
     if (!pfbIsExploreBar((UIView*)self)) { return; }
+    pfbProbeExploreTabs((UIView*)self);
     if (!pfbGranularActive()) {
         PFBCOMPAT_OBSERVE(PFBCompat_choose_explore_tabs, @"Explore tabs found");
         return;
@@ -364,8 +401,9 @@ static void pfbApplyTabFilter(UIView* bar, UICollectionView* cv) {
     UICollectionView* cv = pfbFindCollection((UIView*)self, 0);
     if (!cv) { return; }
 
-    pfbApplyTabFilter((UIView*)self, cv);
-    PFBCOMPAT_ACTION(PFBCompat_choose_explore_tabs, @"chosen tabs kept");
+    if (pfbApplyTabFilter((UIView*)self, cv)) {
+        PFBCOMPAT_ACTION(PFBCompat_choose_explore_tabs, @"chosen tabs kept");
+    }
 
     __weak UIView* wself = (UIView*)self;
     __weak UICollectionView* wcv = cv;
@@ -423,12 +461,14 @@ static void pfbJournalPagerSwap(UICollectionView* pager, NSInteger pages) {
         gPFBPagerCandidate = collectionView;
         gPFBPagerCandidateTotal = n;
     }
-    // Once captured, the pager keeps that identity for its whole life: the
-    // bar's window is never re-tested, so a transient weak-nil there cannot
-    // change what this collection is taken to be mid-session.
+    // Once captured, the pager is not tested again, so a moment without the bar cannot
+    // drop it; another collection replaces it only when it passes the scope test.
     if (collectionView != gPFBPagerCV) {
         if (!pfbPagerScopeOK(collectionView)) { return n; }
         if (gPFBPagerCV) {
+            // Measurement: the same finding as the journal line, kept for the report.
+            PFB_PROBE(@"Explore pager", 4, @"another pager taken as Explore's: %ld pages, owned by %@; the tab bar by %@",
+                      (long)n, pfbOwners(collectionView), pfbOwners(gPFBExploreBar));
             pfbJournalPagerSwap(collectionView, n);
         }
         gPFBPagerCV = collectionView;
@@ -462,7 +502,7 @@ static void pfbJournalPagerSwap(UICollectionView* pager, NSInteger pages) {
     }
     UICollectionView* pager = gPFBPagerCV;
     CGFloat pw = pager.bounds.size.width;
-    NSInteger total = gPFBPagerTotal ?: kPFBTabCount;
+    NSInteger total = gPFBPagerTotal ?: pfbTabCount();
     if (pw < 1.0 || !target) {
         return;
     }
@@ -580,9 +620,8 @@ static void pfbJournalPagerSwap(UICollectionView* pager, NSInteger pages) {
 
 // MARK: - underline animation squelch
 
-// The bar animates the underline toward the cell frames of its own layout, not the
-// packed ones installed here, so those animations are dropped. The placement above
-// is a dead set inside performWithoutAnimation and never enters here.
+// The bar animates the underline toward its own cell frames, not the packed ones placed
+// here, so those animations are dropped. The placement above runs without animation.
 %hook CALayer
 
 - (void)addAnimation:(id)anim forKey:(id)key {

@@ -41,4 +41,10 @@
         model.exampleKey ? [bundle localizedStringForKey:model.exampleKey] : @"";
 }
 
+// The box is the floating label's container.
+- (void)traitCollectionDidChange:(UITraitCollection*)previousTraitCollection {
+    [super traitCollectionDidChange:previousTraitCollection];
+    PFBAdvRefreshBoxBorder(self.floatLabel.superview);
+}
+
 @end

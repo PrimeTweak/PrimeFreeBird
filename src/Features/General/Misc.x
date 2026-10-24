@@ -1,8 +1,8 @@
-// Assorted options: always open in Safari, full links without t.co or click IDs, RTL
-// disabled, clean links, no screenshot detection, and Keep your place's return report.
+// Links, left-to-right text, screenshot detection and Keep your place's return report.
 
 #import <CoreText/CoreText.h>
 #import "Support/HookHelpers.h"
+#import "Debug/PFBProbe.h"
 
 // MARK: - Always open in Safari
 
@@ -25,7 +25,8 @@ static BOOL ShouldKeepBrowserURLInApp(NSURL* url) {
         return %orig;
     }
 
-    NSURL* url = [self rootURL] ?: [self initialURL];
+    // initialURL is Safari's private getter: asked first, a missing one leaves the link in the app.
+    NSURL* url = [self rootURL] ?: ([self respondsToSelector:@selector(initialURL)] ? [self initialURL] : nil);
     if (url == nil || ShouldKeepBrowserURLInApp(url)) {
         return %orig;
     }
@@ -50,8 +51,8 @@ static BOOL ShouldKeepBrowserURLInApp(NSURL* url) {
 
 %end
 
-// Fallback for the plain SFSafariViewController surfaces (help pages, Grok,
-// XLinkWebView), which don't go through the T1SafariViewController funnel.
+// Fallback for links shown in a plain SFSafariViewController, which don't go through
+// the T1SafariViewController funnel.
 %hook SFSafariViewController
 
 - (void)viewWillAppear:(BOOL)animated {
@@ -60,7 +61,7 @@ static BOOL ShouldKeepBrowserURLInApp(NSURL* url) {
         return %orig;
     }
 
-    NSURL* url = [self initialURL];
+    NSURL* url = [self respondsToSelector:@selector(initialURL)] ? [self initialURL] : nil;
     if (url == nil || ShouldKeepBrowserURLInApp(url)) {
         return %orig;
     }
@@ -77,6 +78,50 @@ static BOOL ShouldKeepBrowserURLInApp(NSURL* url) {
                                }
                              }];
     [self dismissViewControllerAnimated:NO completion:nil];
+    // Measurement: whether the sheet is still up once Twitter is back in front.
+    __weak UIViewController* weakSelf = self;
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1.5 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+      UIViewController* sheet = weakSelf;
+      PFB_PROBE(@"browser after Safari", 4, @"browser sheet %@",
+                sheet.presentingViewController || sheet.viewIfLoaded.window ? @"still on screen" : @"gone");
+    });
+}
+
+%end
+
+// Measurement: the browser a link opens in, with both browser options and whether the
+// check is running, one line per kind.
+static void pfbProbeBrowserShown(UIViewController* controller) {
+    static NSArray<Class>* browsers;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+      NSMutableArray<Class>* found = [NSMutableArray array];
+      for (NSString* name in @[ @"SFSafariViewController", @"T1WebViewController", @"T1XLinkViewController",
+                                @"_TtC14T1TwitterSwift12XLinkWebView", @"T1XArticleWebViewContainer" ]) {
+          Class browser = NSClassFromString(name);
+          if (browser) {
+              [found addObject:browser];
+          }
+      }
+      browsers = found.copy;
+    });
+    for (Class browser in browsers) {
+        if ([controller isKindOfClass:browser]) {
+            PFB_PROBE(@"browser opened", 8, @"%@, External browser %@, New in-app browser %@%@",
+                      NSStringFromClass([controller class]),
+                      [PFBSettings boolForKey:@"always_open_safari"] ? @"on" : @"off",
+                      [PFBSettings boolForKey:@"new_inapp_webview"] ? @"on" : @"off",
+                      PFBCompatTourIsRunning() ? @", during the check" : @"");
+            return;
+        }
+    }
+}
+
+%hook UIViewController
+
+- (void)viewDidAppear:(BOOL)animated {
+    %orig;
+    pfbProbeBrowserShown(self);
 }
 
 %end
@@ -337,7 +382,7 @@ static BOOL PFBKeepLeftToRight(BOOL rightToLeft) {
 
 // Shared and copied links: UIPasteboardChangedNotification catches every copy path,
 // guarded against re-triggering. strip_url_tracking removes s, t, ref_src and ref_url;
-// sharing_domain applies independently.
+// the share builders apply sharing_domain on their own, copies only with Clean links on.
 
 static NSString* PFBProcessSharedURL(NSString* urlString) {
     if (urlString.length == 0) {
@@ -353,7 +398,6 @@ static NSString* PFBProcessSharedURL(NSString* urlString) {
     if (![PFBSettings boolForKey:@"strip_url_tracking"] && c.queryItems.count > 0) {
         PFBCOMPAT_OBSERVE(PFBCompat_strip_url_tracking, @"tracked link seen");
     }
-    // Strips tracking params when the option is on.
     if ([PFBSettings boolForKey:@"strip_url_tracking"] && c.queryItems.count > 0) {
         static NSSet* tracking = nil;
         static dispatch_once_t trackingOnce;
@@ -604,25 +648,25 @@ static BOOL PFBScreenshotSuppressed(void) {
 // (2) Watermark suppression, gated.
 @class TFSAccountFeatureSwitches;
 
-// The answer to Twitter's custom screenshot gates: NO while screenshot detection is
-// disabled, counted as the option acting; otherwise YES, with the read noted.
-static BOOL PFBCustomScreenshotsAllowed(void) {
+// Whether Twitter's custom screenshot gates are refused: YES while screenshot detection
+// is disabled, counted as the option acting; otherwise Twitter's own answer stands.
+static BOOL PFBCustomScreenshotsRefused(void) {
     if (PFBScreenshotSuppressed()) {
         PFBCOMPAT_ACTION(PFBCompat_no_screenshot_detection, @"screenshot card off");
-        return NO;
+        return YES;
     }
     PFBCOMPAT_OBSERVE(PFBCompat_no_screenshot_detection, @"read by Twitter");
-    return YES;
+    return NO;
 }
 
 %hook TFSAccountFeatureSwitches
 
 - (BOOL)isCustomScreenshotsEnabled {
-    return PFBCustomScreenshotsAllowed();
+    return PFBCustomScreenshotsRefused() ? NO : %orig;
 }
 
 - (BOOL)isCustomScreenshotsOnHTLEnabled {
-    return PFBCustomScreenshotsAllowed();
+    return PFBCustomScreenshotsRefused() ? NO : %orig;
 }
 
 %end

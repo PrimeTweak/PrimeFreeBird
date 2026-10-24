@@ -1,10 +1,10 @@
-// The settings model: every option with its page, type and default; defaults for
-// keys without a row; migrations of renamed keys.
+// Settings registry: every page's rows and defaults, and the migrations of legacy keys.
 
 #import <Foundation/Foundation.h>
 
 // The settings registry: each page's rows (headers, toggles, buttons) with their
-// defaults, and the page titles. Keys set from a page of their own have no row.
+// defaults, and the page titles. A key set from a picker, a menu, a pill or the
+// Explore bar has no row of its own.
 @interface PFBSettings : NSObject
 
 + (NSArray<NSDictionary*>*)settingsForPage:(NSString*)pageKey;

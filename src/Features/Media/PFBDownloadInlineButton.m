@@ -9,25 +9,6 @@
 #import "FFmpegKitConfig.h"
 
 #pragma mark - Helpers
-static UIWindow* KeyWindow(void) {
-    for (UIScene* scene in UIApplication.sharedApplication.connectedScenes) {
-        if (scene.activationState != UISceneActivationStateForegroundActive ||
-            ![scene isKindOfClass:UIWindowScene.class])
-            continue;
-        for (UIWindow* window in ((UIWindowScene*)scene).windows) {
-            if (window.isKeyWindow)
-                return window;
-        }
-    }
-    return UIApplication.sharedApplication.windows.firstObject;
-}
-
-static UIViewController* TopMostController(void) {
-    UIViewController* top = KeyWindow().rootViewController;
-    while (top.presentedViewController)
-        top = top.presentedViewController;
-    return top;
-}
 
 // An alert under Twitter's error title, with the bundled message for the key.
 static void PFBShowDownloadFailure(NSString* messageKey) {
@@ -39,7 +20,7 @@ static void PFBShowDownloadFailure(NSString* messageKey) {
     [alert addAction:[UIAlertAction actionWithTitle:[bundle localizedTwitterStringForKey:@"OK_ACTION_LABEL"]
                                               style:UIAlertActionStyleDefault
                                             handler:nil]];
-    [TopMostController() presentViewController:alert animated:YES completion:nil];
+    [topMostController() presentViewController:alert animated:YES completion:nil];
 }
 
 // Hands the files to Photos. Once Photos has answered for all of them: the success haptic
@@ -138,17 +119,21 @@ static NSURL* PFBLargestMP4(TFSTwitterEntityMedia* media) {
 #pragma mark - Download handler
 - (void)presentDownloadOptionsForMediaEntities:(NSArray*)mediaEntities {
     @try {
-        NSAttributedString* titleString = [[NSAttributedString alloc]
-            initWithString:[[PFBBundle sharedBundle]
-                               localizedStringForKey:@"DOWNLOAD_MENU_TITLE"]
-                attributes:@{
-                    NSFontAttributeName: [PFBManager menuTitleFont],
-                    NSForegroundColorAttributeName: UIColor.labelColor
-                }];
-        TFNActiveTextItem* title = [[objc_getClass("TFNActiveTextItem") alloc]
-            initWithTextModel:[[objc_getClass("TFNAttributedTextModel") alloc]
-                                  initWithAttributedString:titleString]
-                 activeRanges:nil];
+        // The first item of a sheet is its title; the leading line break spaces it from
+        // the sheet's top edge.
+        TFNActiveTextItem* (^sheetTitle)(NSString*) = ^TFNActiveTextItem*(NSString* key) {
+            NSString* text = [@"\n" stringByAppendingString:[[PFBBundle sharedBundle] localizedStringForKey:key]];
+            NSAttributedString* titleString = [[NSAttributedString alloc]
+                initWithString:text
+                    attributes:@{
+                        NSFontAttributeName: [PFBManager menuTitleFont],
+                        NSForegroundColorAttributeName: UIColor.labelColor
+                    }];
+            return [[objc_getClass("TFNActiveTextItem") alloc]
+                initWithTextModel:[[objc_getClass("TFNAttributedTextModel") alloc]
+                                      initWithAttributedString:titleString]
+                     activeRanges:nil];
+        };
 
         void (^showHUD)(NSString*) = ^(NSString* text) {
             self.hud = [[objc_getClass("TFNHUD") alloc] initWithText:text];
@@ -158,10 +143,9 @@ static NSURL* PFBLargestMP4(TFSTwitterEntityMedia* media) {
             [self.hud hide];
         };
 
-        // Every download runs through FFmpeg: mp4s stream-copied, GIFs palette-encoded, HLS-only
-        // resolutions re-encoded with VideoToolbox; progress is processed time over probed duration.
-        // With a collect block the file is handed over instead of saved, nil on failure;
-        // finished runs only once FFmpeg has succeeded.
+        // Every download runs through FFmpeg (mp4s copied, GIFs palette-encoded, HLS-only sizes
+        // re-encoded); progress is processed time over probed duration. A collect block gets the
+        // file instead of a save, nil on failure; finished runs only after FFmpeg succeeds.
         NSString* downloadingText = [[PFBBundle sharedBundle]
             localizedTwitterStringForKey:@"DOWNLOAD_LIVE_ACTIVITY_DOWNLOADING"];
         void (^ffmpegDownload)(NSString*, NSString*, double, void (^)(NSURL*), void (^)(void)) = ^(
@@ -277,8 +261,8 @@ static NSURL* PFBLargestMP4(TFSTwitterEntityMedia* media) {
         // videoInfo.variants backs both video and GIF; photos carry none. Probing
         // the playlist supplies the duration and any HLS-only resolutions. mp4
         // variants win at equal resolution, and media without a playlist skips it.
-        void (^buildVariantItems)(TFSTwitterEntityMedia*, void (^)(NSArray*)) = ^(
-            TFSTwitterEntityMedia* media, void (^done)(NSArray*)) {
+        void (^buildVariantItems)(TFSTwitterEntityMedia*, void (^)(NSString*, NSArray*)) = ^(
+            TFSTwitterEntityMedia* media, void (^done)(NSString*, NSArray*)) {
             NSMutableArray<NSURL*>* mp4URLs = [NSMutableArray new];
             NSURL* m3u8URL = nil;
             for (TFSTwitterEntityMediaVideoVariant* variant in media.videoInfo
@@ -303,7 +287,7 @@ static NSURL* PFBLargestMP4(TFSTwitterEntityMedia* media) {
                     ffmpegDownload([NSString stringWithFormat:@"-i %@ -c copy",
                                                               PFBLargestVideo(mp4URLs).absoluteString],
                                    @"mp4", 0, nil, ^{
-                                       PFBCOMPAT_ACTION(PFBCompat_download_highest_quality, @"best quality saved");
+                                       PFBCOMPAT_ACTION(PFBCompat_download_highest_quality, @"best quality downloaded");
                                    });
                     return;
                 }
@@ -313,6 +297,8 @@ static NSURL* PFBLargestMP4(TFSTwitterEntityMedia* media) {
                 PFBCOMPAT_OBSERVE(PFBCompat_download_highest_quality, @"HLS only, resolutions offered");
             }
 
+            // A GIF offers two formats, a video its qualities.
+            NSString* titleKey = media.mediaType == 2 ? @"DOWNLOAD_PICK_FORMAT_TITLE" : @"DOWNLOAD_MENU_TITLE";
             NSMutableArray* items = [NSMutableArray new];
             NSMutableSet<NSString*>* offered = [NSMutableSet new];
             void (^appendMP4Items)(double) = ^(double durationMs) {
@@ -331,7 +317,7 @@ static NSURL* PFBLargestMP4(TFSTwitterEntityMedia* media) {
 
             if (!m3u8URL) {
                 appendMP4Items(0);
-                done(items);
+                done(titleKey, items);
                 return;
             }
 
@@ -358,7 +344,7 @@ static NSURL* PFBLargestMP4(TFSTwitterEntityMedia* media) {
                         [offered addObject:resolution];
                         [items addObject:makeHLSItem(m3u8URL, resolution, durationMs)];
                     }
-                    done(items);
+                    done(titleKey, items);
                 });
             });
         };
@@ -374,14 +360,19 @@ static NSURL* PFBLargestMP4(TFSTwitterEntityMedia* media) {
             }
         }
 
-        void (^presentSheet)(NSArray*) = ^(NSArray* items) {
-            NSMutableArray* actions = [NSMutableArray arrayWithObject:title];
+        void (^presentSheet)(NSString*, NSArray*) = ^(NSString* titleKey, NSArray* items) {
+            // A video with no playable file would open a title and nothing to choose.
+            if (items.count == 0) {
+                PFBShowDownloadFailure(@"UNKNOWN_ERROR");
+                return;
+            }
+            NSMutableArray* actions = [NSMutableArray arrayWithObject:sheetTitle(titleKey)];
             [actions addObjectsFromArray:items];
 
             TFNMenuSheetViewController* sheet =
                 [[objc_getClass("TFNMenuSheetViewController") alloc]
                     initWithActionItems:actions.copy];
-            [sheet tfnPresentedCustomPresentFromViewController:TopMostController()
+            [sheet tfnPresentedCustomPresentFromViewController:topMostController()
                                                       animated:YES
                                                     completion:nil];
         };
@@ -457,27 +448,12 @@ static NSURL* PFBLargestMP4(TFSTwitterEntityMedia* media) {
                                                       action:downloadAll]
                              atIndex:0];
             }
-            presentSheet(groups);
+            presentSheet(@"DOWNLOAD_PICK_VIDEO_TITLE", groups);
         } else {
             buildVariantItems(videoEntities.firstObject, presentSheet);
         }
     } @catch (__unused NSException* ex) {
-        UIAlertController* alert = [UIAlertController
-            alertControllerWithTitle:
-                [[PFBBundle sharedBundle]
-                    localizedTwitterStringForKey:@"ERROR_ALERT_TITLE"]
-                             message:[[PFBBundle sharedBundle]
-                                         localizedStringForKey:@"UNKNOWN_ERROR"]
-                      preferredStyle:UIAlertControllerStyleAlert];
-        [alert addAction:[UIAlertAction
-                             actionWithTitle:[[PFBBundle sharedBundle]
-                                                 localizedTwitterStringForKey:
-                                                     @"OK_ACTION_LABEL"]
-                                       style:UIAlertActionStyleDefault
-                                     handler:nil]];
-        [TopMostController() presentViewController:alert
-                                          animated:YES
-                                        completion:nil];
+        PFBShowDownloadFailure(@"UNKNOWN_ERROR");
     }
 }
 

@@ -44,14 +44,14 @@
  
     self.titleLabel = [[UILabel alloc] init];
     self.titleLabel.translatesAutoresizingMaskIntoConstraints = NO;
-    id fontGroup = [PFBManager sharedFontGroup];
-    self.titleLabel.font = [fontGroup performSelector:@selector(bodyBoldFont)];
+    self.titleLabel.numberOfLines = 0;
+    self.titleLabel.font = PFBSettingsTitleFont();
     self.titleLabel.textColor = [UIColor labelColor];
     [self.contentView addSubview:self.titleLabel];
  
     self.subtitleLabel = [[UILabel alloc] init];
     self.subtitleLabel.translatesAutoresizingMaskIntoConstraints = NO;
-    self.subtitleLabel.font = [fontGroup performSelector:@selector(subtext2Font)];
+    self.subtitleLabel.font = PFBSettingsDetailFont();
     [self updateSubtitleColor];
     self.subtitleLabel.numberOfLines = 0;
     [self.contentView addSubview:self.subtitleLabel];
@@ -128,14 +128,9 @@
     }
     NSString* iconName = objc_getAssociatedObject(self, @selector(iconName));
     if (iconName) {
-        Class TAEColorSettingsCls = objc_getClass("TAEColorSettings");
-        id settings = [TAEColorSettingsCls sharedSettings];
-        id currentPalette = [settings currentColorPalette];
-        id colorPalette = [currentPalette colorPalette];
-        UIColor* iconColor = [colorPalette performSelector:@selector(tabBarItemColor)];
         self.iconImageView.image = [UIImage tfn_vectorImageNamed:iconName
                                                         fitsSize:CGSizeMake(20, 20)
-                                                       fillColor:iconColor];
+                                                       fillColor:PFBSettingsSubtitleColor()];
     }
     UIColor* chevronColor = [UIColor tertiaryLabelColor];
     self.chevronImageView.image = [UIImage tfn_vectorImageNamed:@"chevron_right"
@@ -151,13 +146,13 @@
 - (void)traitCollectionDidChange:(UITraitCollection*)previousTraitCollection {
     [super traitCollectionDidChange:previousTraitCollection];
     self.backgroundColor = [PFBPalette currentBackgroundColor];
+    pfbApplySelectedBackground(self);
     [self updateIconColors];
     [self updateSubtitleColor];
     if (previousTraitCollection.preferredContentSizeCategory !=
         self.traitCollection.preferredContentSizeCategory) {
-        id fontGroup = [PFBManager sharedFontGroup];
-        self.titleLabel.font = [fontGroup performSelector:@selector(bodyBoldFont)];
-        self.subtitleLabel.font = [fontGroup performSelector:@selector(subtext2Font)];
+        self.titleLabel.font = PFBSettingsTitleFont();
+        self.subtitleLabel.font = PFBSettingsDetailFont();
     }
 }
  

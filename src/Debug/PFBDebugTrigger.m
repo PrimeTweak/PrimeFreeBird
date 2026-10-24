@@ -19,14 +19,14 @@
 - (void)dragged:(UIPanGestureRecognizer*)pan {
     UIView* button = pan.view;
     CGPoint delta = [pan translationInView:button.superview];
-    CGPoint centre = button.center;
-    centre.x += delta.x;
-    centre.y += delta.y;
+    CGPoint center = button.center;
+    center.x += delta.x;
+    center.y += delta.y;
     CGRect bounds = button.superview.bounds;
     CGFloat inset = button.bounds.size.width / 2 + 4;
-    centre.x = MAX(inset, MIN(bounds.size.width - inset, centre.x));
-    centre.y = MAX(inset, MIN(bounds.size.height - inset, centre.y));
-    button.center = centre;
+    center.x = MAX(inset, MIN(bounds.size.width - inset, center.x));
+    center.y = MAX(inset, MIN(bounds.size.height - inset, center.y));
+    button.center = center;
     [pan setTranslation:CGPointZero inView:button.superview];
 }
 

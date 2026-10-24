@@ -8,4 +8,8 @@
 // TAEColorPalette so it always matches the app chrome.
 + (UIColor*)currentBackgroundColor;
 
+// A color of the active palette by its getter, or the fallback when the palette does not
+// answer it.
++ (UIColor*)colorFor:(SEL)getter fallback:(UIColor*)fallback;
+
 @end

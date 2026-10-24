@@ -1,6 +1,4 @@
-// Preload media, photo half: the rows Twitter's own look-ahead is about to show
-// have their photos fetched into its image cache, under the identifier the
-// timeline cells use. The video half sets Twitter's prefetcher in FeatureSwitches.x.
+// Preload media, photo half: photos of the rows ahead go into Twitter's image cache.
 
 #import "Support/HookHelpers.h"
 

@@ -43,15 +43,9 @@
     subtitleLabel.numberOfLines = 0;
     subtitleLabel.textAlignment = NSTextAlignmentLeft;
 
-    id fontGroup = [PFBManager sharedFontGroup];
-    subtitleLabel.font = [fontGroup performSelector:@selector(subtext2Font)];
+    subtitleLabel.font = PFBSettingsDetailFont();
 
-    Class TAEColorSettingsCls = objc_getClass("TAEColorSettings");
-    id settings = [TAEColorSettingsCls sharedSettings];
-    id currentPalette = [settings currentColorPalette];
-    id colorPalette = [currentPalette colorPalette];
-    UIColor* subtitleColor = [colorPalette performSelector:@selector(tabBarItemColor)];
-    subtitleLabel.textColor = subtitleColor;
+    subtitleLabel.textColor = PFBSettingsSubtitleColor();
 
     [headerView addSubview:subtitleLabel];
 
@@ -180,10 +174,10 @@
 
 - (void)setupNavigationBar {
     self.view.backgroundColor = [PFBPalette currentBackgroundColor];
-    if (self.account) {
-        self.navigationItem.titleView = [objc_getClass("TFNTitleView")
-            titleViewWithTitle:@PFB_PRODUCT_NAME
-                      subtitle:self.account.displayUsername];
+    Class titleViewClass = objc_getClass("TFNTitleView");
+    if (self.account && [titleViewClass respondsToSelector:@selector(titleViewWithTitle:subtitle:)]) {
+        self.navigationItem.titleView = [titleViewClass titleViewWithTitle:@PFB_PRODUCT_NAME
+                                                                  subtitle:self.account.displayUsername];
     } else {
         self.title = @PFB_PRODUCT_NAME;
     }
@@ -205,9 +199,8 @@
     [self.tableView registerClass:[PFBModernSettingsTableViewCell class]
            forCellReuseIdentifier:@"SettingsCell"];
 
-    // Footer: PrimeFreeBird's name and version, then the credit to the original work. The
-    // text starts right under the list's own bottom spacing, so it falls on the rhythm of
-    // the rows, with room left below it.
+    // Footer: the product name and version, then the credit to the original work, with
+    // 16 pt of room below.
     UILabel* creditLabel = [[UILabel alloc] init];
     creditLabel.numberOfLines = 0;
     creditLabel.textAlignment = NSTextAlignmentCenter;

@@ -13,7 +13,7 @@
 
 // MARK: - gate
 
-static BOOL PFBDebugEnabled(void) {
+BOOL PFBDebugIsRecording(void) {
     static BOOL enabled;
     static dispatch_once_t once;
     dispatch_once(&once, ^{
@@ -22,16 +22,12 @@ static BOOL PFBDebugEnabled(void) {
     return enabled;
 }
 
-BOOL PFBDebugIsRecording(void) {
-    return PFBDebugEnabled();
-}
-
 // MARK: - marks
 
 static char kPFBMarkKey;
 
 void PFBMark(UIView* view, NSString* origin) {
-    if (!PFBDebugEnabled() || !view || !origin.length) {
+    if (!PFBDebugIsRecording() || !view || !origin.length) {
         return;
     }
     objc_setAssociatedObject(view, &kPFBMarkKey, origin, OBJC_ASSOCIATION_COPY_NONATOMIC);
@@ -54,7 +50,7 @@ static NSMutableArray<NSString*>* PFBDecisionRing(void) {
 }
 
 void PFBDebugLog(NSString* format, ...) {
-    if (!PFBDebugEnabled() || !format) {
+    if (!PFBDebugIsRecording() || !format) {
         return;
     }
     va_list args;
@@ -253,9 +249,8 @@ static NSString* PFBHealthBlock(void) {
 
 // MARK: - view capture
 
-// The color actually painted in an image, since an AlwaysOriginal image carries
-// its own pixels and the view's tint says nothing about what is drawn. ink is the
-// average of the non-transparent pixels; cover is the effective ancestor alpha.
+// The average color of an image's non-transparent pixels: an AlwaysOriginal image
+// carries its own pixels, so the view's tint says nothing about what is drawn.
 static NSString* PFBImageInk(UIImage* image) {
     if (!image) {
         return nil;
@@ -301,8 +296,8 @@ static NSString* PFBImageInk(UIImage* image) {
             MIN(r / n, 1.0) * 255, MIN(g / n, 1.0) * 255, MIN(b / n, 1.0) * 255];
 }
 
-// Effective visibility: alpha multiplied down the chain, and the first ancestor
-// that clips this view out of its own bounds.
+// Effective visibility: the first hidden view up the chain, else the first ancestor
+// that clips this view out of its bounds, else the product of the alphas below 1.
 static NSString* PFBViewCover(UIView* view) {
     CGFloat alpha = 1.0;
     NSString* clipper = nil;
@@ -333,16 +328,16 @@ static NSString* PFBViewCover(UIView* view) {
     return nil;
 }
 
-static NSString* PFBColourText(UIColor* colour) {
-    if (!colour) {
+static NSString* PFBColorText(UIColor* color) {
+    if (!color) {
         return @"nil";
     }
     CGFloat r = 0, g = 0, b = 0, a = 0;
-    if ([colour getRed:&r green:&g blue:&b alpha:&a]) {
+    if ([color getRed:&r green:&g blue:&b alpha:&a]) {
         return [NSString stringWithFormat:@"rgba(%.0f,%.0f,%.0f,%.2f)", r*255, g*255, b*255, a];
     }
     CGFloat w = 0;
-    if ([colour getWhite:&w alpha:&a]) {
+    if ([color getWhite:&w alpha:&a]) {
         return [NSString stringWithFormat:@"white(%.2f,%.2f)", w, a];
     }
     return @"?";
@@ -365,11 +360,11 @@ static void PFBCaptureView(UIView* view, NSInteger depth, NSMutableString* out) 
 
     // Only note colors and effects that are actually set, to keep it readable.
     if (view.backgroundColor) {
-        [line appendFormat:@" bg=%@", PFBColourText(view.backgroundColor)];
+        [line appendFormat:@" bg=%@", PFBColorText(view.backgroundColor)];
     }
     if (view.layer.backgroundColor) {
         [line appendFormat:@" layer=%@",
-            PFBColourText([UIColor colorWithCGColor:view.layer.backgroundColor])];
+            PFBColorText([UIColor colorWithCGColor:view.layer.backgroundColor])];
     }
     if (view.alpha < 0.999) {
         [line appendFormat:@" alpha=%.2f", view.alpha];
@@ -394,7 +389,7 @@ static void PFBCaptureView(UIView* view, NSInteger depth, NSMutableString* out) 
         [line appendFormat:@" img=%@ mode=%ld",
             image ? NSStringFromCGSize(image.size) : @"nil",
             image ? (long)image.renderingMode : -1L];
-        [line appendFormat:@" tint=%@", PFBColourText(view.tintColor)];
+        [line appendFormat:@" tint=%@", PFBColorText(view.tintColor)];
         NSString* ink = PFBImageInk(image);
         if (ink) {
             [line appendFormat:@" ink=%@", ink];
@@ -518,9 +513,9 @@ void PFBDebuggerPresent(void) {
 
 // MARK: - capture
 
-// Captures the screen and the journal, then presents them; the floating button calls it.
+// Captures the frontmost screen's view hierarchy, then presents the report.
 void PFBDebuggerCaptureAndPresent(void) {
-    if (!PFBDebugEnabled()) {
+    if (!PFBDebugIsRecording()) {
         return;
     }
     UIWindow* window = PFBActiveWindow();
@@ -572,7 +567,7 @@ static CGPoint PFBTriggerCenter(UIWindowScene* scene) {
 }
 
 // Placed on the scene in front, and placed again when that is no longer the scene it
-// sits on, as when iOS replaced Twitter's screen while it was in the background.
+// sits on, as when iOS replaces Twitter's scene while it is in the background.
 static void PFBInstallTrigger(NSString* moment) {
     UIWindowScene* scene = nil;
     for (UIScene* candidate in UIApplication.sharedApplication.connectedScenes) {
@@ -625,7 +620,7 @@ static void PFBInstallTrigger(NSString* moment) {
 }
 
 void PFBDebuggerInstall(void) {
-    if (!PFBDebugEnabled()) {
+    if (!PFBDebugIsRecording()) {
         return;
     }
     // The scene is not connected at launch, so the button is placed once the

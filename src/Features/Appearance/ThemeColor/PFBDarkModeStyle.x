@@ -1,6 +1,4 @@
-// Dark mode styles (Dim #15202b, Gray, Pure black), applied by intercepting the
-// backgrounds directly rather than recolouring palette getters, which the
-// navigation chrome ignores.
+// Dark mode background styles, applied by replacing backgrounds as they are set.
 
 #import "Common/PFBCompatibility.h"
 #import "Features/Appearance/ThemeColor/PFBDarkModeStyle.h"
@@ -209,16 +207,16 @@ static UIColor* PFBReplacement(UIColor* incoming) {
 
 %hook CALayer
 
+// Every layer background in the app passes here: outside a dark style it goes straight
+// through, without a UIColor built for it.
 - (void)setBackgroundColor:(CGColorRef)color {
-    if (color) {
-        UIColor* incoming = [UIColor colorWithCGColor:color];
-        UIColor* replacement = PFBReplacement(incoming);
-        if (replacement) {
-            %orig(replacement.CGColor);
-            return;
-        }
+    if (!color || [PFBDarkModeStyle selectedStyle] == PFBDarkModeStyleSystem ||
+        ![PFBDarkModeStyle isDarkModeActive]) {
+        %orig(color);
+        return;
     }
-    %orig(color);
+    UIColor* replacement = PFBReplacement([UIColor colorWithCGColor:color]);
+    %orig(replacement ? replacement.CGColor : color);
 }
 
 %end
@@ -290,8 +288,8 @@ static BOOL PFBIsSearchFieldBackground(UIView* view) {
 }
 
 // A bar carrying a search field is drawn with a blur, so no color setter reaches
-// it and it stays in Twitter's gray beside a recoloured page. Flattened here from
-// the search field upward; a bar without one is never touched.
+// it and it stays in Twitter's gray beside a recolored page. The navigation bar
+// holding the search field is flattened; a bar without one is never touched.
 static void PFBPaintBarOpaque(UIView* view, UIColor* shade) {
     if ([view isKindOfClass:[UIVisualEffectView class]]) {
         ((UIVisualEffectView*)view).effect = nil;

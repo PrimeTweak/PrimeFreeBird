@@ -9,8 +9,6 @@
 - (void)configureWithTitle:(NSString*)title subtitle:(NSString*)subtitle detail:(NSString*)detail;
 // A row that only shows its value has no chevron.
 - (void)setShowsChevron:(BOOL)showsChevron;
+// A row that opens a menu in place shows the up-down chevron instead of the right one.
+- (void)setOpensMenu:(BOOL)opensMenu;
 @end
-
-// The subtitle color of the settings cells: the tab bar item color of Twitter's
-// current palette.
-UIColor* PFBSettingsSubtitleColor(void);

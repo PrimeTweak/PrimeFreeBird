@@ -16,7 +16,7 @@ static NSArray<NSString*>* PFBBackupExtraKeys(void) {
         @"pfb_color_theme_selectedColor", @"pfb_color_reset_done",
         @"pfb_font_1", @"pfb_font_2",
         @"pfb_advs_lang",
-        @"pfb_muted_words", @"pfb_muted_expiry", @"pfb_muted_whole_words",
+        @"pfb_muted_words", @"pfb_muted_expiry", @"pfb_muted_span", @"pfb_muted_whole_words",
         @"pfb_muted_in_conversations", @"pfb_muted_skip_following",
         @"pfb_muted_include_reposts", @"pfb_filter_languages",
         @"pfb_tabs_visible", @"pfb_tab_registry",
@@ -82,37 +82,48 @@ static BOOL PFBValueIsPortable(id value) {
                                              error:NULL];
 }
 
-+ (NSInteger)importData:(NSData*)data {
++ (NSDictionary*)settingsInData:(NSData*)data {
     if (!data) {
-        return -1;
+        return nil;
     }
     id payload = [NSJSONSerialization JSONObjectWithData:data
                                                  options:0
                                                    error:NULL];
     if (![payload isKindOfClass:[NSDictionary class]] ||
+        ![payload[@"format"] isKindOfClass:[NSString class]] ||
         ![kPFBBackupFormat isEqualToString:payload[@"format"]] ||
         (payload[@"version"] && ![payload[@"version"] respondsToSelector:@selector(integerValue)]) ||
         [payload[@"version"] integerValue] > kPFBBackupVersion) {
-        return -1;
+        return nil;
     }
     NSDictionary* settings = payload[@"settings"];
-    if (![settings isKindOfClass:[NSDictionary class]]) {
-        return -1;
-    }
+    return [settings isKindOfClass:[NSDictionary class]] ? settings : nil;
+}
+
++ (void)applySettings:(NSDictionary*)settings {
     NSUserDefaults* defaults = [NSUserDefaults standardUserDefaults];
-    NSSet<NSString*>* known = [NSSet setWithArray:PFBBackupKeys()];
-    NSInteger applied = 0;
+    NSMutableDictionary* incoming = [NSMutableDictionary dictionary];
     for (NSString* storedKey in settings) {
-        // A backup saved before the PFB prefix names its keys the old way.
+        if (![storedKey isKindOfClass:[NSString class]]) {
+            continue;
+        }
+        // A backup may name its keys with a legacy prefix.
         NSString* key = PFBCurrentKeyForLegacyKey(storedKey) ?: storedKey;
         // Muted terms are the user's own words, never key names to rename.
-        id value = [key isEqualToString:@"pfb_muted_expiry"] ? settings[storedKey] : PFBValueWithCurrentKeys(settings[storedKey]);
-        if ([known containsObject:key] && PFBValueIsPortable(value)) {
-            [defaults setObject:value forKey:key];
-            applied++;
+        BOOL keyedByTerm = [key isEqualToString:@"pfb_muted_expiry"] || [key isEqualToString:@"pfb_muted_span"];
+        id value = keyedByTerm ? settings[storedKey] : PFBValueWithCurrentKeys(settings[storedKey]);
+        if (PFBValueIsPortable(value)) {
+            incoming[key] = value;
         }
     }
-    return applied;
+    for (NSString* key in PFBBackupKeys()) {
+        id value = incoming[key];
+        if (value) {
+            [defaults setObject:value forKey:key];
+        } else {
+            [defaults removeObjectForKey:key];
+        }
+    }
 }
 
 @end

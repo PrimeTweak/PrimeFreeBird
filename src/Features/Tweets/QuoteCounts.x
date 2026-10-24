@@ -1,5 +1,4 @@
-// Quote and Retweet counts: both numbers, in full, as the title of the screen a
-// Tweet's Quotes, Retweets and Likes counts open.
+// Quote and Retweet counts in full, as the title of a Tweet's interactions screen.
 
 #import "Support/HookHelpers.h"
 #import "Debug/PFBDebugger.h"

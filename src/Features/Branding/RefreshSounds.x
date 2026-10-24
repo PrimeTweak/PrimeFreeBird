@@ -1,16 +1,10 @@
-// Restores the classic pull-to-refresh sounds: the psst on release, detected through
-// the scroll delegate, and the pop once the refresh that pull started completes. The
-// files must be PCM, since AudioServicesCreateSystemSoundID has no AAC decoder.
+// Classic pull-to-refresh sounds: a psst on release, a pop when that refresh ends.
 
 #import "Support/HookHelpers.h"
 
-// Pull distance, in points below the resting position, past which the gesture counts
-// as a pull-to-refresh rather than an ordinary scroll. At rest the top of the feed
-// can already sit slightly negative, and a real pull reaches far below -100.
-static const CGFloat kPFBPullToRefreshThreshold = -100.0;
-
-// Each sound is loaded once; a file that fails to load stays silent.
-static void PFBPlayRefreshSound(NSString* file) {
+// Each sound is loaded once; a file that fails to load stays silent. Files must be
+// PCM: AudioServicesCreateSystemSoundID has no AAC decoder. Returns whether it played.
+static BOOL PFBPlayRefreshSound(NSString* file) {
     static NSMutableDictionary<NSString*, NSNumber*>* sounds;
     if (!sounds) {
         sounds = [NSMutableDictionary dictionary];
@@ -26,39 +20,43 @@ static void PFBPlayRefreshSound(NSString* file) {
         sound = @(created);
         sounds[file] = sound;
     }
-    if (sound.unsignedIntValue) {
-        AudioServicesPlaySystemSound(sound.unsignedIntValue);
+    if (!sound.unsignedIntValue) {
+        return NO;
     }
+    AudioServicesPlaySystemSound(sound.unsignedIntValue);
+    return YES;
 }
+
+// A pull commits a refresh by moving the control to status 1, before the finger lifts,
+// and its return to 0 means the new posts are in. The psst waits for the lift; the pop
+// answers only the refreshes a pull started.
+static char kPFBManualRefreshKey;
+static char kPFBPsstPendingKey;
+
+// The contentOffset.y below which a lifted finger leaves the list pulled past its top.
+static const CGFloat kPFBPullToRefreshThreshold = -100.0;
 
 %hook TFNItemsDataViewController
 
 - (void)scrollViewDidEndDragging:(UIScrollView*)scrollView willDecelerate:(BOOL)decelerate {
     %orig;
-    // contentOffset.y as the finger lifts: strongly negative means the list was
-    // pulled below its top, which is the refresh intent.
-    if (scrollView.contentOffset.y >= kPFBPullToRefreshThreshold) {
+    UIControl* control = [self respondsToSelector:@selector(pullToLoadTopControl)] ? self.pullToLoadTopControl : nil;
+    if (!control || ![objc_getAssociatedObject(control, &kPFBPsstPendingKey) boolValue] ||
+        scrollView.contentOffset.y >= kPFBPullToRefreshThreshold) {
         return;
     }
+    objc_setAssociatedObject(control, &kPFBPsstPendingKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     PFBCompatReach(PFBCompatPath_pull_sound);
     if (![PFBSettings boolForKey:@"restore_refresh_sounds"]) {
         PFBCOMPAT_OBSERVE(PFBCompat_restore_refresh_sounds, @"pull to refresh seen");
         return;
     }
-    PFBPlayRefreshSound(@"psst2.caf");
-    PFBCOMPAT_ACTION(PFBCompat_restore_refresh_sounds, @"sound played");
+    if (PFBPlayRefreshSound(@"psst2.caf")) {
+        PFBCOMPAT_ACTION(PFBCompat_restore_refresh_sounds, @"sound played");
+    }
 }
 
 %end
-
-// A pull commits a refresh by moving the control to status 1, and its return to 0
-// means the new posts are in. The pop answers only the refreshes a pull started.
-static char kPFBManualRefreshKey;
-
-// The control's loading state, read by name.
-@protocol PFBRefreshControlLoading
-@property (nonatomic, readonly) BOOL loading;
-@end
 
 %hook TFNPullToRefreshControl
 - (void)_setStatus:(unsigned long long)status fromScrolling:(BOOL)fromScrolling {
@@ -70,6 +68,8 @@ static char kPFBManualRefreshKey;
     if (status == 1 && !wasLoading && fromScrolling) {
         objc_setAssociatedObject(control, &kPFBManualRefreshKey, @YES,
                                  OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        objc_setAssociatedObject(control, &kPFBPsstPendingKey, @YES,
+                                 OBJC_ASSOCIATION_RETAIN_NONATOMIC);
         return;
     }
     if (status != 0 || !wasLoading) {
@@ -77,6 +77,7 @@ static char kPFBManualRefreshKey;
     }
     BOOL manual = [objc_getAssociatedObject(control, &kPFBManualRefreshKey) boolValue];
     objc_setAssociatedObject(control, &kPFBManualRefreshKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    objc_setAssociatedObject(control, &kPFBPsstPendingKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     if (!manual) {
         return;
     }
@@ -85,7 +86,8 @@ static char kPFBManualRefreshKey;
         PFBCOMPAT_OBSERVE(PFBCompat_restore_refresh_sounds, @"refresh end seen");
         return;
     }
-    PFBPlayRefreshSound(@"pop.caf");
-    PFBCOMPAT_ACTION(PFBCompat_restore_refresh_sounds, @"pop played");
+    if (PFBPlayRefreshSound(@"pop.caf")) {
+        PFBCOMPAT_ACTION(PFBCompat_restore_refresh_sounds, @"pop played");
+    }
 }
 %end

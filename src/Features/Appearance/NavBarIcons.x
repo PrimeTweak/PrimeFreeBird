@@ -1,15 +1,14 @@
-// Navigation bars and their glyphs: bar buttons off UIKit's shared glass, the Done item
-// styled, gear, back-arrow and chat-bar glyphs repainted, the reply bar's glass, the inbox
-// pill held opaque, logo and tab icons free of vibrancy, avatars as pictures, the damper.
+// Navigation bar repairs: glyph colors, button glass, reply bar glass, height damping.
 
 #import "Support/HookHelpers.h"
 #import "Debug/PFBDebugger.h"
+#import "Debug/PFBProbe.h"
 #import <QuartzCore/QuartzCore.h>
 
-static const void* kPFBGreyedImageKey = &kPFBGreyedImageKey;
+static const void* kPFBGrayedImageKey = &kPFBGrayedImageKey;
 // Holds the color forced on a taken-over view, so any image set later goes
 // through the same repaint.
-static const void* kPFBGreyTargetKey = &kPFBGreyTargetKey;
+static const void* kPFBGrayTargetKey = &kPFBGrayTargetKey;
 // The untouched glyph. Repainting is not idempotent — a color at 60% opacity
 // laid over a color already at 60% lands at 36% — so every repaint starts
 // from this original.
@@ -22,71 +21,37 @@ static const void* kPFBPaintedFlagKey = &kPFBPaintedFlagKey;
 // alpha, the layer's opacity and the animation.
 static const void* kPFBNoFadeKey = &kPFBNoFadeKey;
 
-// One gray for every added or recolored icon: the label color at 60%, resolved
-// to a concrete value so nothing can re-resolve it later.
-static UIColor* PFBBarIconGrey(UITraitCollection* traits) {
-    UIColor* grey = [[UIColor labelColor] colorWithAlphaComponent:0.6];
-    if (traits && [grey respondsToSelector:@selector(resolvedColorWithTraitCollection:)]) {
-        return [grey resolvedColorWithTraitCollection:traits] ?: grey;
+UIImage* PFBPaintedGlyph(UIImage* source, UIColor* color) {
+    UIImage* painted = PFBFlatGlyph(source, color);
+    if (painted != source) {
+        objc_setAssociatedObject(painted, kPFBPaintedFlagKey, @YES,
+                                 OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     }
-    return grey;
-}
-
-// Repaints a glyph into a flat bitmap of the given color.
-static UIImage* PFBGreyGlyph(UIImage* source, UIColor* colour) {
-    if (!source || !colour) {
-        return source;
-    }
-    CGSize size = source.size;
-    if (size.width < 1.0 || size.height < 1.0) {
-        return source;
-    }
-    UIGraphicsImageRendererFormat* format = [UIGraphicsImageRendererFormat preferredFormat];
-    format.opaque = NO;
-    format.scale = source.scale;
-    UIGraphicsImageRenderer* renderer =
-        [[UIGraphicsImageRenderer alloc] initWithSize:size format:format];
-    UIImage* painted = [renderer
-        imageWithActions:^(UIGraphicsImageRendererContext* context) {
-            CGRect rect = CGRectMake(0.0, 0.0, size.width, size.height);
-            [source drawInRect:rect];
-            CGContextSetBlendMode(context.CGContext, kCGBlendModeSourceIn);
-            [colour setFill];
-            CGContextFillRect(context.CGContext, rect);
-        }];
-    UIImage* result = [painted imageWithRenderingMode:UIImageRenderingModeAlwaysOriginal];
-    objc_setAssociatedObject(result, kPFBPaintedFlagKey, @YES,
-                             OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-    return result;
-}
-
-// The same painter, exported for the other files.
-UIImage* PFBPaintedGlyph(UIImage* source, UIColor* colour) {
-    return PFBGreyGlyph(source, colour);
+    return painted;
 }
 
 // Replaces the image of every image view under a view. The result
 // is remembered so the work happens once, and happens again only if Twitter
 // puts its own image back or the color changes.
-static void pfbRepaintGlyphs(UIView* view, UIColor* colour) {
+static void pfbRepaintGlyphs(UIView* view, UIColor* color) {
     for (UIView* subview in view.subviews) {
         if ([subview isKindOfClass:[UIImageView class]]) {
             UIImageView* imageView = (UIImageView*)subview;
             UIImage* current = imageView.image;
-            UIImage* ours = objc_getAssociatedObject(imageView, kPFBGreyedImageKey);
+            UIImage* ours = objc_getAssociatedObject(imageView, kPFBGrayedImageKey);
             // Repaint when the image changed or when the color did. At launch the
             // trait collection is unsettled, so labelColor resolves differently and
             // the first paint comes out pale.
-            UIColor* usedColour = objc_getAssociatedObject(imageView, kPFBGreyTargetKey);
-            BOOL colourChanged = usedColour && ![usedColour isEqual:colour];
+            UIColor* usedColor = objc_getAssociatedObject(imageView, kPFBGrayTargetKey);
+            BOOL colorChanged = usedColor && ![usedColor isEqual:color];
             BOOL alreadyOurs =
                 objc_getAssociatedObject(current, kPFBPaintedFlagKey) != nil;
 
             // The painted flag says the image was repainted, not that it was repainted for
             // this view: a glyph baked elsewhere carries it too, so the recorded image is compared.
-            if (current && alreadyOurs && ours && current != ours && !colourChanged) {
+            if (current && alreadyOurs && ours && current != ours && !colorChanged) {
                 imageView.image = ours;
-            } else if (current && ((!alreadyOurs && current != ours) || colourChanged)) {
+            } else if (current && ((!alreadyOurs && current != ours) || colorChanged)) {
                 // Remembers the original only when this image is not a repainted one; a repaint
                 // in an older color is painted again from it.
                 UIImage* source = current;
@@ -98,16 +63,16 @@ static void pfbRepaintGlyphs(UIView* view, UIColor* colour) {
                     objc_setAssociatedObject(imageView, kPFBOriginalImageKey, current,
                                              OBJC_ASSOCIATION_RETAIN_NONATOMIC);
                 }
-                UIImage* painted = PFBGreyGlyph(source, colour);
-                objc_setAssociatedObject(imageView, kPFBGreyTargetKey, colour,
+                UIImage* painted = PFBPaintedGlyph(source, color);
+                objc_setAssociatedObject(imageView, kPFBGrayTargetKey, color,
                                          OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-                objc_setAssociatedObject(imageView, kPFBGreyedImageKey, painted,
+                objc_setAssociatedObject(imageView, kPFBGrayedImageKey, painted,
                                          OBJC_ASSOCIATION_RETAIN_NONATOMIC);
                 imageView.image = painted;
                 PFBCOMPAT_ACTION(PFBCompat_bar_repairs, @"settings gear repainted");
             }
         }
-        pfbRepaintGlyphs(subview, colour);
+        pfbRepaintGlyphs(subview, color);
     }
 }
 
@@ -136,7 +101,7 @@ static BOOL pfbLooksLikeSettingsButton(UIView* view) {
 
 // A navigation transition fades the bar. Refusing that fade leaves the
 // transition unable to settle, and the bar oscillates between the two
-// screens' heights. Fades pass through for its duration.
+// screens' heights. Fades pass through for 0.8 s after each push or pop.
 static NSTimeInterval gPFBFadeWindowUntil = 0;
 
 static BOOL pfbFadesAllowed(void) {
@@ -165,7 +130,7 @@ static void pfbPinOpaque(UIView* view) {
                              OBJC_ASSOCIATION_RETAIN_NONATOMIC);
 }
 
-// The gear and everything inside it.
+// A view and everything inside it, held at full opacity.
 static void pfbForceOpaque(UIView* view) {
     pfbPinOpaque(view);
     for (UIView* subview in view.subviews) {
@@ -174,8 +139,8 @@ static void pfbForceOpaque(UIView* view) {
 }
 
 // The container holding the bar and the tab strip, reached from the bar upwards.
-// The walk stops before the first view tall enough to be the screen itself, so
-// only the header band is held.
+// The walk stops at the first view taller than half the window, so only the
+// header band is held.
 static void pfbPinHeaderOpacity(UIView* bar) {
     UIWindow* window = bar.window;
     if (!window) {
@@ -237,25 +202,10 @@ static BOOL pfbControllerIsNotifications(UIViewController* controller) {
     return NO;
 }
 
-static UIViewController* pfbBarOwningController(UIView* view) {
-    UIResponder* responder = view;
-    while ((responder = responder.nextResponder)) {
-        if (![responder isKindOfClass:[UIViewController class]]) {
-            continue;
-        }
-        UIViewController* controller = (UIViewController*)responder;
-        if ([controller isKindOfClass:[UINavigationController class]]) {
-            return ((UINavigationController*)controller).topViewController ?: controller;
-        }
-        return controller;
-    }
-    return nil;
-}
-
 // On Notifications the gear is a bar button item, so its image is repainted
 // directly. The caller has established the bar; icon-only items are picked here,
 // so a text button is never touched.
-static void pfbRepaintNotificationsGear(UIView* bar, UIColor* colour) {
+static void pfbRepaintNotificationsGear(UIView* bar, UIColor* color) {
     // The item has no view of its own, so the fade is removed from whatever
     // renders it: the icon buttons on the right of this bar.
     for (UIView* subview in bar.subviews) {
@@ -272,21 +222,21 @@ static void pfbRepaintNotificationsGear(UIView* bar, UIColor* colour) {
         if (button.title.length > 0 || !button.image) {
             continue;
         }
-        UIImage* ours = objc_getAssociatedObject(button, kPFBGreyedImageKey);
-        UIColor* usedColour = objc_getAssociatedObject(button, kPFBGreyTargetKey);
-        BOOL colourChanged = usedColour && ![usedColour isEqual:colour];
+        UIImage* ours = objc_getAssociatedObject(button, kPFBGrayedImageKey);
+        UIColor* usedColor = objc_getAssociatedObject(button, kPFBGrayTargetKey);
+        BOOL colorChanged = usedColor && ![usedColor isEqual:color];
         BOOL alreadyOurs =
             objc_getAssociatedObject(button.image, kPFBPaintedFlagKey) != nil;
 
         // The painted flag says the image was repainted, not that it was repainted for this
         // button. A repainted image other than the recorded one came from another path, so
         // the recorded one is put back.
-        if (alreadyOurs && ours && button.image != ours && !colourChanged) {
+        if (alreadyOurs && ours && button.image != ours && !colorChanged) {
             button.image = ours;
             continue;
         }
         // Twitter's own image, or a repaint in an older color, is painted from the original.
-        if ((!alreadyOurs && button.image != ours) || colourChanged) {
+        if ((!alreadyOurs && button.image != ours) || colorChanged) {
             UIImage* original =
                 objc_getAssociatedObject(button, kPFBOriginalImageKey);
             UIImage* source = original ?: button.image;
@@ -294,10 +244,10 @@ static void pfbRepaintNotificationsGear(UIView* bar, UIColor* colour) {
                 objc_setAssociatedObject(button, kPFBOriginalImageKey, button.image,
                                          OBJC_ASSOCIATION_RETAIN_NONATOMIC);
             }
-            UIImage* painted = PFBGreyGlyph(source, colour);
-            objc_setAssociatedObject(button, kPFBGreyTargetKey, colour,
+            UIImage* painted = PFBPaintedGlyph(source, color);
+            objc_setAssociatedObject(button, kPFBGrayTargetKey, color,
                                      OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-            objc_setAssociatedObject(button, kPFBGreyedImageKey, painted,
+            objc_setAssociatedObject(button, kPFBGrayedImageKey, painted,
                                      OBJC_ASSOCIATION_RETAIN_NONATOMIC);
             button.image = painted;
             PFBCOMPAT_ACTION(PFBCompat_bar_repairs, @"Notifications gear repainted");
@@ -413,8 +363,8 @@ static BOOL pfbBarGlassPass(UIView* bar, BOOL apply) {
         BOOL flat =
             [current respondsToSelector:@selector(boolValue)] && [current boolValue];
 
-        // A marked item built here keeps the plain capsule iOS gives it, with no color of
-        // its own: the cancel control of a sheet reads as chrome, not as the primary action.
+        // An item marked pfbKeepsBarGlass keeps the plain capsule iOS gives it, with no
+        // color of its own: a sheet's Cancel reads as chrome, not as the primary action.
         if (objc_getAssociatedObject(button, @selector(pfbKeepsBarGlass))) {
             if (flat) {
                 owed = YES;
@@ -552,7 +502,7 @@ static void pfbFlattenItemsNow(NSArray<UIBarButtonItem*>* items) {
             pfbQueueBarGlassPass(bar);
         }
 
-        UIColor* grey = PFBBarIconGrey(bar.traitCollection);
+        UIColor* gray = PFBBarIconGray(bar.traitCollection);
 
         // Explore is recognized by the button, Notifications by the screen.
         // Anything else is left exactly as Twitter draws it — the header is
@@ -561,7 +511,7 @@ static void pfbFlattenItemsNow(NSArray<UIBarButtonItem*>* items) {
         BOOL notifications =
             settingsButton
                 ? NO
-                : pfbControllerIsNotifications(pfbBarOwningController(bar));
+                : pfbControllerIsNotifications(PFBOwningTopController(bar));
         if (!settingsButton && !notifications) {
             return;
         }
@@ -569,11 +519,11 @@ static void pfbFlattenItemsNow(NSArray<UIBarButtonItem*>* items) {
         pfbPinHeaderOpacity(bar);
 
         if (settingsButton) {
-            pfbRepaintGlyphs(settingsButton, grey);
+            pfbRepaintGlyphs(settingsButton, gray);
             pfbForceOpaque(settingsButton);
             return;
         }
-        pfbRepaintNotificationsGear(bar, grey);
+        pfbRepaintNotificationsGear(bar, gray);
     } @catch (id exception) {
         static BOOL reported;
         if (!reported && PFBDebugIsRecording()) {
@@ -587,18 +537,18 @@ static void pfbFlattenItemsNow(NSArray<UIBarButtonItem*>* items) {
 
 // The color a bar glyph should carry: the text color, resolved for the
 // current appearance.
-static UIColor* pfbBarGlyphColour(UIView* view) {
-    UIColor* colour = [UIColor labelColor];
-    if (view && [colour respondsToSelector:@selector(resolvedColorWithTraitCollection:)]) {
-        return [colour resolvedColorWithTraitCollection:view.traitCollection] ?: colour;
+static UIColor* pfbBarGlyphColor(UIView* view) {
+    UIColor* color = [UIColor labelColor];
+    if (view && [color respondsToSelector:@selector(resolvedColorWithTraitCollection:)]) {
+        return [color resolvedColorWithTraitCollection:view.traitCollection] ?: color;
     }
-    return colour;
+    return color;
 }
 
 // The button's own chain, four levels at most, and never past the button. Above it
 // sits the platter host every item of the bar draws from, so a tint written there
 // fills the glass capsule of the siblings too.
-static void pfbTintGlyphChain(UIView* view, UIColor* colour) {
+static void pfbTintGlyphChain(UIView* view, UIColor* color) {
     UIView* node = view;
     NSInteger depth = 0;
     while (node && depth < 4) {
@@ -608,8 +558,8 @@ static void pfbTintGlyphChain(UIView* view, UIColor* colour) {
             [name containsString:@"ItemWrapperView"]) {
             return;
         }
-        if (![node.tintColor isEqual:colour]) {
-            node.tintColor = colour;
+        if (![node.tintColor isEqual:color]) {
+            node.tintColor = color;
         }
         node = node.superview;
         depth++;
@@ -674,6 +624,34 @@ static BOOL pfbIsChatBarGlyph(UIView* view) {
     return inHolder && pfbIsChatConversationBar(view);
 }
 
+// Measurement: chat-bar glyphs baked outside any navigation bar, with their first
+// ancestors, one line per chain.
+static void pfbProbeChatGlyphOutsideBar(UIView* view) {
+    static NSMutableSet<NSString*>* seen;
+    if (!view.window || seen.count >= 8) {
+        return;
+    }
+    for (UIView* up = view.superview; up; up = up.superview) {
+        if ([up isKindOfClass:[UINavigationBar class]]) {
+            return;
+        }
+    }
+    NSMutableArray<NSString*>* chain = [NSMutableArray array];
+    UIView* up = view.superview;
+    for (NSInteger i = 0; up && i < 5; i++, up = up.superview) {
+        [chain addObject:NSStringFromClass([up class])];
+    }
+    NSString* line = [chain componentsJoinedByString:@" < "];
+    if (!seen) {
+        seen = [NSMutableSet set];
+    }
+    if ([seen containsObject:line]) {
+        return;
+    }
+    [seen addObject:line];
+    PFB_PROBE(@"chat glyph outside the bar", 6, @"%@", line);
+}
+
 %hook UIImageView
 
 - (void)didMoveToWindow {
@@ -681,20 +659,21 @@ static BOOL pfbIsChatBarGlyph(UIView* view) {
     if (!((UIView*)self).window) {
         return;
     }
-    // Cold-start belt for the conversation bar: on the first conversation after a
-    // relaunch, setImage: fires before the button is attached and the retry cannot
-    // read the chain. Here the chain is complete by definition.
+    // On the first conversation after launch, setImage: runs before the button is
+    // attached, when its chain cannot be read; in a window the chain is complete.
     UIImage* chatImage = self.image;
     if (chatImage &&
         chatImage.renderingMode != UIImageRenderingModeAlwaysOriginal &&
         (pfbIsChatBarGlyph((UIView*)self) ||
          pfbIsBackArrowGlyph((UIView*)self))) {
-        UIColor* colour = pfbBarGlyphColour((UIView*)self);
-        UIImage* baked = PFBGreyGlyph(chatImage, colour);
+        if (!pfbIsBackArrowGlyph((UIView*)self)) {
+            pfbProbeChatGlyphOutsideBar((UIView*)self);
+        }
+        UIColor* color = pfbBarGlyphColor((UIView*)self);
+        UIImage* baked = PFBPaintedGlyph(chatImage, color);
         if (baked) {
-            PFBMark((UIView*)self, @"NavBarIcons/chatBarGlyph -> baked (window)");
             PFBCOMPAT_ACTION(PFBCompat_bar_repairs, @"bar glyph baked");
-            pfbTintGlyphChain((UIView*)self, colour);
+            pfbTintGlyphChain((UIView*)self, color);
             self.image = baked;  // AlwaysOriginal: re-enters the setter and passes through
         }
     }
@@ -704,51 +683,39 @@ static BOOL pfbIsChatBarGlyph(UIView* view) {
 // set: a view taken over is repainted in its color, a chat-bar or back-arrow glyph
 // is baked in the label color, and any other image passes through.
 - (void)setImage:(UIImage*)image {
-    UIColor* target = objc_getAssociatedObject(self, kPFBGreyTargetKey);
+    UIColor* target = objc_getAssociatedObject(self, kPFBGrayTargetKey);
     if (!target || !image) {
         // Not "== AlwaysTemplate": a bar glyph usually arrives in automatic mode,
         // which a bar button draws as a template all the same, so anything not
-        // already original is claimed. Correcting the mode provokes no layout.
+        // already original is claimed.
         if (image.renderingMode != UIImageRenderingModeAlwaysOriginal) {
             BOOL backArrow = pfbIsBackArrowGlyph((UIView*)self);
             if (pfbIsChatBarGlyph((UIView*)self) || backArrow) {
+                if (!backArrow) {
+                    pfbProbeChatGlyphOutsideBar((UIView*)self);
+                }
                 // Baked at the setter: whoever writes last, the pixels that
                 // land carry the color. A mode change alone leaves an alpha mask,
                 // which a bar button re-tints per its own contrast rule.
-                UIColor* colour = pfbBarGlyphColour((UIView*)self);
-                UIImage* baked = PFBGreyGlyph(image, colour);
+                UIColor* color = pfbBarGlyphColor((UIView*)self);
+                UIImage* baked = PFBPaintedGlyph(image, color);
                 PFBMark((UIView*)self, backArrow ? @"NavBarIcons/backArrow -> baked"
                                                  : @"NavBarIcons/chatBarGlyph -> baked");
-                // Belt for the one frame a freshly created button can show
-                // before its first baked image lands: with the button's own
-                // chain tinted, even a frame treated as a template is right.
-                pfbTintGlyphChain((UIView*)self, colour);
+                // A new button can show one frame before its first baked image
+                // lands; with the button's own chain tinted, that frame is right
+                // even when drawn as a template.
+                pfbTintGlyphChain((UIView*)self, color);
                 PFBCOMPAT_ACTION(PFBCompat_bar_repairs, @"bar glyph baked");
                 %orig(baked ?: image);
                 return;
             }
-            // A bar button is given its image before it is placed in the bar, so
-            // the ancestors that name it do not exist yet. The question is asked
-            // again on the next run-loop turn, outside any layout pass.
-            if (!((UIView*)self).superview) {
-                __weak UIImageView* weakView = (UIImageView*)self;
-                dispatch_async(dispatch_get_main_queue(), ^{
-                  UIImageView* view = weakView;
-                  UIImage* current = view.image;
-                  if (!view || !current ||
-                      current.renderingMode == UIImageRenderingModeAlwaysOriginal ||
-                      (!pfbIsChatBarGlyph(view) && !pfbIsBackArrowGlyph(view))) {
-                      return;
-                  }
-                  view.image =
-                      [current imageWithRenderingMode:UIImageRenderingModeAlwaysOriginal];
-                });
-            }
+            // A glyph set before its button is attached cannot name its bar yet;
+            // didMoveToWindow bakes it once the chain is complete.
         }
         %orig;
         return;
     }
-    UIImage* ours = objc_getAssociatedObject(self, kPFBGreyedImageKey);
+    UIImage* ours = objc_getAssociatedObject(self, kPFBGrayedImageKey);
     if (image == ours ||
         objc_getAssociatedObject(image, kPFBPaintedFlagKey) != nil) {
         %orig;
@@ -760,8 +727,8 @@ static BOOL pfbIsChatBarGlyph(UIView* view) {
     }
     objc_setAssociatedObject(self, kPFBOriginalImageKey, image,
                              OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-    UIImage* painted = PFBGreyGlyph(image, target);
-    objc_setAssociatedObject(self, kPFBGreyedImageKey, painted,
+    UIImage* painted = PFBPaintedGlyph(image, target);
+    objc_setAssociatedObject(self, kPFBGrayedImageKey, painted,
                              OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     %orig(painted);
 }
@@ -771,19 +738,19 @@ static BOOL pfbIsChatBarGlyph(UIView* view) {
 %hook UIBarButtonItem
 
 - (void)setImage:(UIImage*)image {
-    UIColor* target = objc_getAssociatedObject(self, kPFBGreyTargetKey);
+    UIColor* target = objc_getAssociatedObject(self, kPFBGrayTargetKey);
     if (!target || !image) {
         %orig;
         return;
     }
-    UIImage* ours = objc_getAssociatedObject(self, kPFBGreyedImageKey);
+    UIImage* ours = objc_getAssociatedObject(self, kPFBGrayedImageKey);
     if (image == ours ||
         objc_getAssociatedObject(image, kPFBPaintedFlagKey) != nil) {
         %orig;
         return;
     }
-    UIImage* painted = PFBGreyGlyph(image, target);
-    objc_setAssociatedObject(self, kPFBGreyedImageKey, painted,
+    UIImage* painted = PFBPaintedGlyph(image, target);
+    objc_setAssociatedObject(self, kPFBGrayedImageKey, painted,
                              OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     %orig(painted);
 }
@@ -834,7 +801,7 @@ static BOOL pfbIsRightHandGlyphButton(UIView* button) {
 // before its image view exists on Notifications, so nothing is marked and the
 // interception never arms.
 %new
-- (void)pfbGreySettingsGlyphIfNeeded {
+- (void)pfbGraySettingsGlyphIfNeeded {
     @try {
         UIView* button = (UIView*)self;
         if (!button.window) {
@@ -844,12 +811,12 @@ static BOOL pfbIsRightHandGlyphButton(UIView* button) {
         // Explore, or the screen is Notifications, where no view carries that
         // identifier and every icon on the right of the bar is treated.
         BOOL wanted = pfbLooksLikeSettingsButton(button) ||
-                      (pfbControllerIsNotifications(pfbBarOwningController(button)) &&
+                      (pfbControllerIsNotifications(PFBOwningTopController(button)) &&
                        pfbIsRightHandGlyphButton(button));
         if (!wanted) {
             return;
         }
-        pfbRepaintGlyphs(button, PFBBarIconGrey(button.traitCollection));
+        pfbRepaintGlyphs(button, PFBBarIconGray(button.traitCollection));
         pfbForceOpaque(button);
     } @catch (id exception) {
         static BOOL reported;
@@ -862,12 +829,12 @@ static BOOL pfbIsRightHandGlyphButton(UIView* button) {
 
 - (void)didMoveToWindow {
     %orig;
-    [self pfbGreySettingsGlyphIfNeeded];
+    [self pfbGraySettingsGlyphIfNeeded];
 }
 
 - (void)layoutSubviews {
     %orig;
-    [self pfbGreySettingsGlyphIfNeeded];
+    [self pfbGraySettingsGlyphIfNeeded];
 }
 
 %end
@@ -891,17 +858,19 @@ static BOOL pfbIsRightHandGlyphButton(UIView* button) {
 
 // True of the inbox filter pill or anything inside it. Tighter than the bar
 // test below: the avatar in the same bar fades legitimately, and only this
-// control must be held. Class name only, no message to a Swift class.
+// control must be held. The class is resolved once and compared by pointer.
 static BOOL pfbViewSitsInInboxPill(UIView* view) {
-    UIView* node = view;
-    NSInteger depth = 0;
-    while (node && depth < 6) {
-        if ([NSStringFromClass([node classForCoder])
-                isEqualToString:@"_TtC10TFNUISwift34NavigationBarMenuBarButtonItemView"]) {
+    static Class pillClass;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+        pillClass = NSClassFromString(@"_TtC10TFNUISwift34NavigationBarMenuBarButtonItemView");
+    });
+    UIView* node = pillClass ? view : nil;
+    for (NSInteger depth = 0; node && depth < 6; depth++) {
+        if (object_getClass(node) == pillClass) {
             return YES;
         }
         node = node.superview;
-        depth++;
     }
     return NO;
 }
@@ -943,15 +912,16 @@ static BOOL PFBViewSitsInXTabBar(UIView* view) {
     // tint is set; refusing it and dropping the filter keeps the chosen color. The
     // same holds for the tab bar's icons while a themed tab bar is wanted.
     if (ownerIsView && [key hasPrefix:@"filters."] &&
-        (owner == (UIView*)PFBTopBarLogoViewCurrent() || PFBViewSitsInXTabBar(owner))) {
+        ((owner == (UIView*)PFBTopBarLogoViewCurrent() && PFBTintedLogoWanted()) ||
+         PFBViewSitsInXTabBar(owner))) {
         self.filters = nil;
         return;
     }
 
-    // Every animation on this one control is refused, not just opacity: the fade
-    // never announces itself as an opacity change. Its neighbours in the same bar
-    // are untouched.
-    if (ownerIsView && pfbViewSitsInInboxPill(owner)) {
+    // Under Liquid Glass every animation on this one control is refused, not just
+    // opacity: the fade never announces itself as an opacity change. Its neighbors
+    // in the same bar are untouched.
+    if (ownerIsView && pfbViewSitsInInboxPill(owner) && [PFBSettings boolForKey:@"enable_liquid_glass"]) {
         return;
     }
 
@@ -1073,7 +1043,7 @@ static CGFloat pfbReplyInset(void) {
 }
 
 // The bar sits flush on the tab bar. The capsule is lifted off its bottom edge
-// so the two read as two floating pieces rather than one two-storey block.
+// so the two read as two floating pieces rather than one two-story block.
 static const CGFloat kPFBReplyGlassGap = 8.0;
 static const CGFloat kPFBReplyGlassRadius = 26.0;
 
@@ -1086,9 +1056,23 @@ static const CGFloat kPFBReplyTextPad = 12.0;
 // The app lays its content across the bar's full box while the capsule is inset
 // and shorter, so text and buttons hang over the edges. Any child that reaches
 // near the full width is brought inside the capsule, on both axes.
-static void pfbInsetReplyContent(UIView* bar, CGFloat inset, CGFloat gap) {
+// Measurement: a child still at the y set on the last pass is moved up again; one line
+// per such move, with its y before and after.
+static char kPFBProbeReplyYKey;
+
+static void pfbProbeReplyDrift(UIView* sub, CGFloat entryY, CGFloat newY) {
+    NSNumber* last = objc_getAssociatedObject(sub, &kPFBProbeReplyYKey);
+    objc_setAssociatedObject(sub, &kPFBProbeReplyYKey, @(newY), OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    if (!last || fabs(last.doubleValue - entryY) > 0.01 || newY >= entryY) {
+        return;
+    }
+    PFB_PROBE(@"reply bar drift", 6, @"%@: still at y %.1f from the last pass, moved to %.1f",
+              NSStringFromClass([sub class]), entryY, newY);
+}
+
+static void pfbInsetReplyContent(UIView* bar, CGFloat inset) {
     CGFloat wanted = bar.bounds.size.width - inset * 2.0;
-    CGFloat capsule = bar.bounds.size.height - gap;
+    CGFloat capsule = bar.bounds.size.height - kPFBReplyGlassGap;
     if (wanted <= 0.0 || capsule <= 0.0) {
         return;
     }
@@ -1104,7 +1088,7 @@ static void pfbInsetReplyContent(UIView* bar, CGFloat inset, CGFloat gap) {
         // The capsule loses the gap at its bottom, so the whole stack moves up
         // by half of it to keep even margins. Relative order is preserved; only
         // a child that would still overrun the capsule is clamped.
-        frame.origin.y = MAX(frame.origin.y - gap / 2.0, 0.0);
+        frame.origin.y = MAX(frame.origin.y - kPFBReplyGlassGap / 2.0, 0.0);
         if (CGRectGetMaxY(frame) > capsule) {
             if (frame.size.height >= capsule) {
                 frame.origin.y = 0.0;
@@ -1113,6 +1097,7 @@ static void pfbInsetReplyContent(UIView* bar, CGFloat inset, CGFloat gap) {
                 frame.origin.y = capsule - frame.size.height;
             }
         }
+        pfbProbeReplyDrift(sub, sub.frame.origin.y, frame.origin.y);
         if (!CGRectEqualToRect(sub.frame, frame)) {
             sub.frame = frame;
         }
@@ -1175,6 +1160,7 @@ static void pfbClearReplyBackdrop(UIView* bar) {
 }
 
 static void pfbGlassifyReplyBar(UIView* bar) {
+    PFBCompatReach(PFBCompatPath_reply_bar);
     UIView* glass = [bar viewWithTag:kPFBReplyGlassTag];
     if (![PFBSettings boolForKey:@"enable_liquid_glass"]) {
         [glass removeFromSuperview];
@@ -1232,7 +1218,7 @@ static void pfbGlassifyReplyBar(UIView* bar) {
     pfbHideReplyHairlines(bar, 0);
     pfbClearReplyBackdrop(bar);
     pfbClearReplyFieldFill(bar);
-    pfbInsetReplyContent(bar, inset, kPFBReplyGlassGap);
+    pfbInsetReplyContent(bar, inset);
 }
 
 // The keyboard sets the focused state, and the width change is run inside the

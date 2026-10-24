@@ -5,15 +5,15 @@
 
 /* ===== GENERAL — page ===== */
 "MODERN_SETTINGS_LAYOUT_TITLE" = "Umum";
-"MODERN_SETTINGS_LAYOUT_SUBTITLE" = "Kunci aplikasi, kelola tautan, dan atur perilaku Twitter.";
+"MODERN_SETTINGS_LAYOUT_SUBTITLE" = "Kunci aplikasi, atur perilaku Twitter, dan kelola tautan.";
 
 /* ===== General › Privacy ===== */
 "PADLOCK_TITLE" = "Kunci Twitter";
 "PADLOCK_DETAIL" = "Butuh Face ID atau kode untuk membuka Twitter.";
 
 /* ===== General › App behavior ===== */
-"NO_TAB_BAR_HIDING_TITLE" = "Bilah navigasi tetap";
-"NO_TAB_BAR_HIDING_DETAIL" = "Jangan sembunyikan bilah navigasi saat menggulir.";
+"NO_TAB_BAR_HIDING_TITLE" = "Selalu terlihat";
+"NO_TAB_BAR_HIDING_DETAIL" = "Jangan sembunyikan bilah saat menggulir.";
 "SHOW_SCROLL_INDICATOR_TITLE" = "Bilah gulir";
 "DISABLE_RTL_TITLE" = "Teks kiri-ke-kanan";
 "DISABLE_RTL_DETAIL" = "Tampilkan teks dari kiri ke kanan, bahkan untuk bahasa yang ditulis dari kanan ke kiri.";
@@ -29,12 +29,12 @@
 
 /* ===== APPEARANCE — page ===== */
 "MODERN_SETTINGS_APPEARANCE_TITLE" = "Tampilan";
-"MODERN_SETTINGS_APPEARANCE_SUBTITLE" = "Gaya antarmuka, warna, dan font.";
+"MODERN_SETTINGS_APPEARANCE_SUBTITLE" = "Gaya, font, warna, dan bilah navigasi.";
 
 /* ===== Appearance › Interface ===== */
-"CUSTOM_TAB_BAR_OPTION_TITLE" = "Bilah navigasi";
+"CUSTOM_TAB_BAR_OPTION_TITLE" = "Tab";
 "RESTORE_TAB_LABELS_TITLE" = "Label tab";
-"RESTORE_TAB_LABELS_DETAIL" = "Tampilkan label di bawah ikon di bilah navigasi.";
+"RESTORE_TAB_LABELS_DETAIL" = "Tampilkan label di bawah ikon.";
 "CUSTOM_FONTS_TITLE" = "Font khusus";
 "CUSTOM_FONTS_DETAIL" = "Gunakan font khusus di seluruh Twitter.";
 "REGULAR_FONTS_PICKER_OPTION_TITLE" = "Font reguler";
@@ -54,12 +54,12 @@
 "APP_ICON_TITLE" = "Ikon aplikasi";
 "RESTORE_TWITTER_NAMES_TITLE" = "Pulihkan terminologi Twitter";
 "RESTORE_TWITTER_NAMES_DETAIL" = "Kembalikan burung, dan ganti 'X' dengan 'Twitter', 'postingan' dengan 'Tweet', dan seterusnya.";
-"REFRESH_PILL_LABEL_TITLE" = "Label pill segarkan";
-"REFRESH_PILL_LABEL_DETAIL" = "Kembalikan 'Telah diposting' ke pill Tweet baru.";
+"REFRESH_PILL_LABEL_TITLE" = "Teks pill Tweet baru";
+"REFRESH_PILL_LABEL_DETAIL" = "Tampilkan kata di samping avatar pada pill Tweet baru.";
 
 /* ===== TIMELINES ===== */
 "MODERN_SETTINGS_TIMELINES_TITLE" = "Linimasa";
-"MODERN_SETTINGS_TIMELINES_SUBTITLE" = "Hapus iklan, saran, dan ajakan dari linimasa Anda.";
+"MODERN_SETTINGS_TIMELINES_SUBTITLE" = "Hapus iklan dan saran, serta saring linimasa Anda.";
 "HIDE_PROMOTED_TITLE" = "Sembunyikan iklan";
 "HIDE_PROMOTED_DETAIL" = "Hapus Tweet dan tren yang dipromosikan, serta iklan video.";
 "HIDE_WHO_TO_FOLLOW_TITLE" = "Sembunyikan 'Untuk diikuti'";
@@ -72,24 +72,19 @@
 
 /* ===== TWEETS ===== */
 "MODERN_SETTINGS_TWEETS_TITLE" = "Tweet";
-"MODERN_SETTINGS_TWEETS_SUBTITLE" = "Menulis, tombol, dan cara balasan ditampilkan.";
+"MODERN_SETTINGS_TWEETS_SUBTITLE" = "Menulis, tombol, balasan, dan konten sensitif.";
 "UNDO_TWEET_TITLE" = "Batalkan Tweet";
 "TWEET_CONFIRM_TITLE" = "Konfirmasi Tweet";
-"TWEET_CONFIRM_DETAIL" = "Minta konfirmasi sebelum mengirim Tweet.";
 "LIKE_CONFIRM_TITLE" = "Konfirmasi suka";
-"LIKE_CONFIRM_DETAIL" = "Minta konfirmasi sebelum menyukai Tweet.";
-"HIDE_VIEW_COUNT_TITLE" = "Sembunyikan penayangan";
-"HIDE_VIEW_COUNT_DETAIL" = "Hapus jumlah penayangan di bawah Tweet.";
-"HIDE_BOOKMARK_BUTTON_TITLE" = "Sembunyikan markah";
-"HIDE_BOOKMARK_BUTTON_DETAIL" = "Hapus tombol Markah dari Tweet.";
-"HIDE_DOWNVOTE_BUTTON_TITLE" = "Sembunyikan downvote";
-"HIDE_DOWNVOTE_BUTTON_DETAIL" = "Hapus tombol downvote dari Tweet.";
-"DISABLE_SENSITIVE_TWEET_WARNINGS_TITLE" = "Sembunyikan peringatan konten sensitif";
+"HIDE_VIEW_COUNT_TITLE" = "Sembunyikan jumlah penayangan";
+"HIDE_BOOKMARK_BUTTON_TITLE" = "Sembunyikan tombol markah";
+"HIDE_DOWNVOTE_BUTTON_TITLE" = "Sembunyikan tombol downvote";
+"DISABLE_SENSITIVE_TWEET_WARNINGS_TITLE" = "Sembunyikan peringatan";
 "BYPASS_AGE_VERIFICATION_TITLE" = "Lewati verifikasi usia";
 "BYPASS_AGE_VERIFICATION_DETAIL" = "Lewati proses verifikasi usia untuk konten sensitif.";
 "REPLY_SORTING_TITLE" = "Mengurutkan balasan";
-"RESTORE_REPLY_CONTEXT_TITLE" = "Pulihkan konteks balasan";
-"RESTORE_REPLY_CONTEXT_DETAIL" = "Menampilkan kepada siapa balasan ditujukan, di atas teks balasan yang Anda buka.";
+"RESTORE_REPLY_CONTEXT_TITLE" = "Baris 'Membalas'";
+"RESTORE_REPLY_CONTEXT_DETAIL" = "Ditampilkan di atas teks balasan yang Anda buka.";
 "SHOW_QUOTE_COUNTS_TITLE" = "Jumlah kutipan dan Retweet";
 "SHOW_QUOTE_COUNTS_DETAIL" = "Tampilkan kedua angka di bagian atas layar Kutipan sebuah Tweet.";
 "SHOW_TWEET_SOURCE_TITLE" = "Sumber Tweet";
@@ -101,14 +96,14 @@
 /* ===== MEDIA ===== */
 "MODERN_SETTINGS_MEDIA_TITLE" = "Media";
 "MODERN_SETTINGS_MEDIA_SUBTITLE" = "Unduhan, pemutaran, kualitas, dan tata letak.";
-"DOWNLOAD_VIDEOS_TITLE" = "Unduh media";
-"DOWNLOAD_VIDEOS_DETAIL" = "Simpan video dan GIF dari menu tekan lama pada media.";
+"DOWNLOAD_VIDEOS_TITLE" = "Video dan GIF";
+"DOWNLOAD_VIDEOS_DETAIL" = "Simpan dari menu tekan lama pada media.";
 "DIRECT_SAVE_TITLE" = "Simpan ke Foto";
 "DIRECT_SAVE_DETAIL" = "Video disimpan langsung ke aplikasi Foto.";
 "TWEET_TO_IMAGE_TITLE" = "Simpan Tweet sebagai gambar";
 "TWEET_TO_IMAGE_DETAIL" = "Tekan lama tombol bagikan untuk ekspor ke gambar.";
 "DISABLE_VIDEO_CAPTIONS_TITLE" = "Sembunyikan subtitle video";
-"AUTO_HIGHEST_LOAD_TITLE" = "Foto kualitas tinggi";
+"AUTO_HIGHEST_LOAD_TITLE" = "Foto resolusi penuh";
 "AUTO_HIGHEST_LOAD_DETAIL" = "Selalu muat foto dalam resolusi tertinggi.";
 "FORCE_TWEET_FULL_FRAME_TITLE" = "Gambar tidak dipangkas";
 "RESTORE_VIDEO_TIMESTAMP_TITLE" = "Waktu video";
@@ -119,12 +114,11 @@
 "MODERN_SETTINGS_PROFILES_TITLE" = "Profil";
 "MODERN_SETTINGS_PROFILES_SUBTITLE" = "Tombol Ikuti, lencana, dan tab profil.";
 "FOLLOW_CONFIRM_TITLE" = "Konfirmasi mengikuti";
-"FOLLOW_CONFIRM_DETAIL" = "Minta konfirmasi sebelum mengikuti akun.";
 "COPY_PROFILE_INFO_TITLE" = "Salin info profil";
 "COPY_PROFILE_INFO_DETAIL" = "Tambahkan tombol salin ke profil.";
-"DISABLE_ARTICLES_TITLE" = "Sembunyikan tab Artikel";
+"DISABLE_ARTICLES_TITLE" = "Sembunyikan Artikel";
 "DISABLE_ARTICLES_DETAIL" = "Sembunyikan tab Artikel di profil.";
-"DISABLE_HIGHLIGHTS_TITLE" = "Sembunyikan tab Sorotan";
+"DISABLE_HIGHLIGHTS_TITLE" = "Sembunyikan Sorotan";
 "DISABLE_HIGHLIGHTS_DETAIL" = "Sembunyikan tab Sorotan di profil.";
 "HIDE_BLUE_VERIFIED_TITLE" = "Sembunyikan lencana verifikasi Blue";
 "HIDE_BLUE_VERIFIED_DETAIL" = "Hapus lencana verifikasi Twitter Blue; lencana akun merek dan pemerintah tetap ditampilkan.";
@@ -139,11 +133,11 @@
 
 /* ===== SEARCH ===== */
 "MODERN_SETTINGS_SEARCH_TITLE" = "Pencarian";
-"MODERN_SETTINGS_SEARCH_SUBTITLE" = "Riwayat pencarian, tren, dan video trending.";
+"MODERN_SETTINGS_SEARCH_SUBTITLE" = "Riwayat pencarian, pencarian lanjutan, dan Jelajahi.";
 "NO_HISTORY_TITLE" = "Nonaktifkan riwayat pencarian";
 "NO_HISTORY_DETAIL" = "Jangan simpan atau tampilkan pencarian terbaru.";
 "HIDE_TREND_VIDEOS_TITLE" = "Sembunyikan video trending";
-"HIDE_TREND_VIDEOS_DETAIL" = "Hapus video trending dari menu pencarian.";
+"HIDE_TREND_VIDEOS_DETAIL" = "Hapus baris video trending dari pencarian.";
 
 /* ===== GROK ===== */
 "HIDE_SUGGESTED_CHATS_TITLE" = "Sembunyikan chat yang disarankan";
@@ -158,28 +152,28 @@
 "DISABLE_AUTO_TRANSLATE_DETAIL" = "Terjemahkan Tweet, bio, Catatan Komunitas, dan notifikasi secara otomatis.";
 
 /* ===== LAB ===== */
-"REPLY_IN_WEBVIEW_TITLE" = "Balas di web view";
+"REPLY_IN_WEBVIEW_TITLE" = "Balas di web";
 "REPLY_IN_WEBVIEW_DETAIL" = "Balas melalui halaman web saat aplikasi menolak mengirim balasan.";
 
 /* ===== Theme color picker ===== */
 "THEME_SETTINGS_NAVIGATION_DETAIL" = "Pilih warna aksen. Hanya Anda yang dapat melihatnya.";
-"THEME_SETTINGS_NAVIGATION_TITLE" = "Tema";
+"THEME_SETTINGS_NAVIGATION_TITLE" = "Warna tema";
 
 /* ===== Navigation bar editor ===== */
-"CUSTOM_TAB_BAR_GRID_DETAIL" = "Ketuk tujuan untuk menambahkan atau menghapusnya. Seret bilah di bawah untuk mengubah urutan.";
-"CUSTOM_TAB_BAR_RESET_MESSAGE" = "Kembalikan bilah navigasi ke tata letak default.";
-"CUSTOM_TAB_BAR_SETTINGS_NAVIGATION_TITLE" = "Bilah navigasi";
+"CUSTOM_TAB_BAR_GRID_DETAIL" = "Ketuk tab untuk menambahkan atau menghapusnya. Sentuh lama ikon di bilah bawah, lalu seret untuk mengubah urutan.";
+"CUSTOM_TAB_BAR_RESET_MESSAGE" = "Editor kembali ke tab default Twitter. Ketuk Simpan untuk mempertahankannya.";
+"CUSTOM_TAB_BAR_SETTINGS_NAVIGATION_TITLE" = "Tab";
 
 /* ===== Fonts picker ===== */
 "CUSTOM_FONTS_MENU_TITLE" = "\nPilih font";
 "CUSTOM_FONTS_NAVIGATION_BUTTON_TITLE" = "Font khusus";
-"CUSTOM_FONTS_TUT_ALERT_MESSAGE" = "Belum ada font khusus. Instal iFont dari App Store.";
+"CUSTOM_FONTS_TUT_ALERT_MESSAGE" = "Instal font dengan aplikasi iFont dari App Store.";
 "INSTALL_IFONT_BUTTON_TITLE" = "Dapatkan iFont";
 
 /* ===== Media & download flows ===== */
 "DOWNLOAD_AS_GIF_OPTION_TITLE" = "Unduh sebagai GIF";
 "DOWNLOAD_AS_MP4_OPTION_TITLE" = "Unduh sebagai MP4";
-"DOWNLOAD_MENU_TITLE" = "\nPilih kualitas video";
+"DOWNLOAD_MENU_TITLE" = "Pilih kualitas video";
 "DOWNLOAD_VIDEO_NUMBER_TITLE" = "Video %lu";
 "DOWNLOAD_ALL_VIDEOS_OPTION_TITLE" = "Unduh semua video";
 
@@ -192,7 +186,7 @@
 "REMOVE_FOLLOWERS_TITLE" = "Hapus pengikut";
 "REMOVE_FOLLOWERS_DETAIL" = "Tambahkan “Hapus pengikut ini” ke menu profil yang mengikuti Anda.";
 "REMOVE_FOLLOWER_TITLE" = "Hapus pengikut ini";
-"REMOVE_FOLLOWER_CONFIRM_TITLE" = "Hapus pengikut ini?";
+"REMOVE_FOLLOWER_CONFIRM_TITLE" = "Hapus pengikut ini";
 "REMOVE_FOLLOWER_CONFIRM_MESSAGE" = "%@ akan dihapus dari pengikut Anda dan tidak akan diberi tahu. Ia dapat mengikuti Anda lagi nantinya.";
 "REMOVE_FOLLOWER_ACTION" = "Hapus";
 "REMOVE_FOLLOWER_DONE" = "Pengikut dihapus";
@@ -203,8 +197,8 @@
 "PADLOCK_REASON" = "Buka kunci Twitter";
 
 /* ===== Alerts, confirmations & shared labels ===== */
-"LIGHT_MODE_RESTART_TITLE" = "Kembali ke mode terang";
-"LIGHT_MODE_RESTART_MESSAGE" = "Warna latar belakang Anda dikembalikan ke Sistem. Mulai ulang Twitter untuk menghapus sisa warna gelap.";
+"RESTART_REQUIRED_ALERT_TITLE" = "Mulai ulang Twitter";
+"LIGHT_MODE_RESTART_MESSAGE" = "Warna latar belakang Anda dikembalikan ke Sistem. Memulai ulang akan menghapus sisa warna gelap.";
 "CLOSE_APP_ACTION" = "Tutup aplikasi";
 
 /* ===== Miscellaneous ===== */

@@ -1,9 +1,9 @@
-// Launch-time hooks: the padlock, app-delegate lifecycle, the classic launch
-// animation and the Liquid Glass declaration.
+// Launch-time hooks: the padlock, the classic launch animation and the Liquid Glass opt-in.
 
 #import <LocalAuthentication/LocalAuthentication.h>
 #import "Support/HookHelpers.h"
 #import "Debug/PFBDebugger.h"
+#import "Debug/PFBProbe.h"
 #import "Support/TwitterChirpFont.h"
 
 // MARK: - Padlock helpers
@@ -37,7 +37,7 @@ static UIWindow* activeKeyWindow(void) {
 }
 
 // The padlock's own window, above the app with its sheets, the debugger and FLEX, so
-// nothing the app presents while locked shows over it. One per scene, built once.
+// nothing the app presents while locked shows over it. Rebuilt only for another scene.
 static UIWindow* gPadlockWindow = nil;
 
 static UIWindow* padlockWindowForScene(UIWindowScene* scene) {
@@ -141,11 +141,13 @@ static void askToUnlock(void) {
     NSError* unavailable = nil;
     if (![context canEvaluatePolicy:LAPolicyDeviceOwnerAuthentication error:&unavailable]) {
         PFBDebugLog(@"[padlock] nothing to ask, the app opens: %@", unavailable.localizedDescription);
+        PFBCOMPAT_OBSERVE(PFBCompat_padlock, @"no passcode to ask for");
         setAuthenticated(YES);
         removePadlockOverlay();
         return;
     }
     padlockAsking = YES;
+    PFBCOMPAT_ACTION(PFBCompat_padlock, @"unlock asked");
     [context evaluatePolicy:LAPolicyDeviceOwnerAuthentication
             localizedReason:[[PFBBundle sharedBundle] localizedStringForKey:@"PADLOCK_REASON"]
                       reply:^(BOOL success, NSError* error) {
@@ -166,6 +168,23 @@ static void askToUnlock(void) {
                       }];
 }
 
+// Measurement: which of the app's ways of announcing a departure actually arrive, the
+// delegate call, the application notification and the scene notification.
+static void pfbProbeLeavingSignals(void) {
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+      NSNotificationCenter* center = [NSNotificationCenter defaultCenter];
+      [center addObserverForName:UIApplicationWillResignActiveNotification object:nil queue:nil
+                      usingBlock:^(__unused NSNotification* note) {
+                        PFB_PROBE(@"leaving the app", 4, @"application notification arrived");
+                      }];
+      [center addObserverForName:UISceneWillDeactivateNotification object:nil queue:nil
+                      usingBlock:^(__unused NSNotification* note) {
+                        PFB_PROBE(@"leaving the app", 4, @"scene notification arrived");
+                      }];
+    });
+}
+
 // MARK: - App Delegate hooks
 
 %hook T1AppDelegate
@@ -183,6 +202,7 @@ static void askToUnlock(void) {
     }
     // The debugger places its floating button only when debug_tools is on.
     PFBDebuggerInstall();
+    pfbProbeLeavingSignals();
 
     dispatch_async(dispatch_get_main_queue(), ^{
         PFBApplySelectedThemeColor();
@@ -210,7 +230,6 @@ static void askToUnlock(void) {
             showPadlockOverlay();
         } else {
             showPadlockOverlay();
-            PFBCOMPAT_ACTION(PFBCompat_padlock, @"unlock asked");
             dispatch_async(dispatch_get_main_queue(), ^{
                 askToUnlock();
             });
@@ -222,6 +241,8 @@ static void askToUnlock(void) {
 
 - (void)applicationWillResignActive:(__unsafe_unretained id)arg1 {
     %orig;
+    PFBCompatReach(PFBCompatPath_leaving_app);
+    PFB_PROBE(@"leaving the app", 4, @"app delegate called");
 
     if ([PFBSettings boolForKey:@"padlock"]) {
         // Cover the UI (and the app-switcher snapshot) and mark unauthenticated so
@@ -286,37 +307,12 @@ static void applySplashBrandColors(UIView* view) {
     });
 }
 
-// Renders the bundled white bird from its PDF (same technique as the settings bird).
-static UIImage* launchBirdImage(CGFloat side) {
-    NSURL* url = [[PFBBundle sharedBundle] pathForFile:@"LaunchTwitterBird.pdf"];
-    if (!url) {
-        return nil;
-    }
-    CGPDFDocumentRef pdf = CGPDFDocumentCreateWithURL((__bridge CFURLRef)url);
-    if (!pdf) {
-        return nil;
-    }
-    CGPDFPageRef page = CGPDFDocumentGetPage(pdf, 1);
-    UIGraphicsImageRendererFormat* fmt = [UIGraphicsImageRendererFormat preferredFormat];
-    fmt.opaque = NO;
-    UIGraphicsImageRenderer* renderer =
-        [[UIGraphicsImageRenderer alloc] initWithSize:CGSizeMake(side, side) format:fmt];
-    UIImage* image = [renderer imageWithActions:^(UIGraphicsImageRendererContext* ctx) {
-        CGContextRef c = ctx.CGContext;
-        CGContextTranslateCTM(c, 0, side);
-        CGContextScaleCTM(c, side / 24.0, -side / 24.0);
-        CGContextDrawPDFPage(c, page);
-    }];
-    CGPDFDocumentRelease(pdf);
-    return image;
-}
-
-// Replaces Twitter's launch "xLogo" with the bundled bird.
+// Replaces Twitter's launch "xLogo" with the bundled white bird.
 %hook UIImage
 
 + (UIImage*)imageNamed:(NSString*)name {
     if ([name isEqualToString:@"xLogo"]) {
-        UIImage* bird = launchBirdImage(180);
+        UIImage* bird = PFBBundlePDFImage(@"LaunchTwitterBird.pdf", CGSizeMake(180, 180), 1.0);
         if (bird) {
             PFBCOMPAT_ACTION(PFBCompat_launch_screen, @"bird shown");
             return bird;
@@ -388,9 +384,8 @@ static void paintWindowForSplash(UIView* view) {
 
 // MARK: - Liquid Glass
 
-// Twitter carries its own gate for the iOS 26 design, and it is unreachable: the
-// app resets it at every launch, the same millisecond it reads the feature switch,
-// and its own answer stays NO whatever the gate holds.
+// The iOS 26 design follows enable_liquid_glass through UIDesignRequiresCompatibility:
+// Twitter's own switch for it is reset at every launch and always answers NO.
 %hook NSBundle
 - (id)objectForInfoDictionaryKey:(NSString*)key {
     if ([key isEqualToString:@"UIDesignRequiresCompatibility"] &&

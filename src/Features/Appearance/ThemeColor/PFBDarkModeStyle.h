@@ -1,4 +1,4 @@
-// Dark mode style selector: System, Dim, Gray, Pure black.
+// Dark mode background styles: System, Dim, Gray, Pure black.
 
 #import <UIKit/UIKit.h>
 

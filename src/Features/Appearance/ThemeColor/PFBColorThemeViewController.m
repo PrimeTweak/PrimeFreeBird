@@ -14,23 +14,23 @@ extern void PFBWhitenNavigationBarConfirm(UINavigationBar* bar);
 extern void PFBBeginRawPaletteRead(void);
 extern void PFBEndRawPaletteRead(void);
 
-// Mirrors PFBCurrentAccentColor's precedence (the custom override, then Twitter's own
-// option) so the default swatch shows selected before any change.
+// Mirrors PFBCurrentAccentColor's precedence: the stored pick, then Twitter's own option.
 static NSInteger CurrentSelectedColorOption(void) {
     NSUserDefaults* defaults = [NSUserDefaults standardUserDefaults];
     if ([defaults objectForKey:@"pfb_color_theme_selectedColor"]) {
         return [defaults integerForKey:@"pfb_color_theme_selectedColor"];
     }
     // 0 means "no explicit pick": Twitter sits on its own default, so no swatch
-    // is highlighted and the window tint is left alone.
+    // is highlighted.
     return [defaults integerForKey:@"T1ColorSettingsPrimaryColorOptionKey"];
 }
 
 enum { kAccentOptionCount = 6 };
 
-// Human-readable names shown inside the pills.
-static NSString* const kAccentDisplayNames[kAccentOptionCount] = {@"Blue", @"Yellow", @"Red",
-                                                                  @"Purple", @"Orange", @"Green"};
+// The names inside the pills, in Twitter's words from its own color settings.
+static NSString* const kAccentNameKeys[kAccentOptionCount] = {
+    @"SETTINGS_DISPLAY_COLOR_BLUE",   @"SETTINGS_DISPLAY_COLOR_YELLOW", @"SETTINGS_DISPLAY_COLOR_RED",
+    @"SETTINGS_DISPLAY_COLOR_PURPLE", @"SETTINGS_DISPLAY_COLOR_ORANGE", @"SETTINGS_DISPLAY_COLOR_GREEN"};
 static UIColor* NativeAccentColor(NSUInteger option) {
     id palette =
         [[[objc_getClass("TAEColorSettings") sharedSettings] currentColorPalette] colorPalette];
@@ -107,7 +107,7 @@ static NSInteger NearestAccentOption(UIColor* color) {
     detail.textColor = [UIColor secondaryLabelColor];
     detail.numberOfLines = 0;
     [self.view addSubview:detail];
-// 3×2 grid of color pills (Blue/Yellow/Red · Purple/Orange/Green).
+    // Two rows of three color pills (Blue/Yellow/Red, Purple/Orange/Green).
     UIStackView* grid = [[UIStackView alloc] init];
     grid.translatesAutoresizingMaskIntoConstraints = NO;
     grid.axis = UILayoutConstraintAxisVertical;
@@ -130,9 +130,10 @@ static NSInteger NearestAccentOption(UIColor* color) {
         swatch.translatesAutoresizingMaskIntoConstraints = NO;
         swatch.colorID = option;
         swatch.isAccessibilityElement = YES;
-        swatch.accessibilityLabel = kAccentDisplayNames[option - 1];
+        NSString* name = [[PFBBundle sharedBundle] localizedTwitterStringForKey:kAccentNameKeys[option - 1]];
+        swatch.accessibilityLabel = name;
         [swatch setSwatchColor:NativeAccentColor(option)];
-        [swatch setSwatchName:kAccentDisplayNames[option - 1]];
+        [swatch setSwatchName:name];
         [swatch addTarget:self
                      action:@selector(swatchTapped:)
            forControlEvents:UIControlEventTouchUpInside];
@@ -148,8 +149,9 @@ static NSInteger NearestAccentOption(UIColor* color) {
     customSwatch.translatesAutoresizingMaskIntoConstraints = NO;
     customSwatch.colorID = -1;
     customSwatch.isAccessibilityElement = YES;
-    customSwatch.accessibilityLabel = @"Custom";
-    [customSwatch setSwatchName:@"Custom"];
+    NSString* customName = [[PFBBundle sharedBundle] localizedStringForKey:@"THEME_CUSTOM_NAME"];
+    customSwatch.accessibilityLabel = customName;
+    [customSwatch setSwatchName:customName];
     [customSwatch addTarget:self
                      action:@selector(openColorPicker)
            forControlEvents:UIControlEventTouchUpInside];
@@ -179,7 +181,7 @@ static NSInteger NearestAccentOption(UIColor* color) {
     resetButton.contentHorizontalAlignment = UIControlContentHorizontalAlignmentCenter;
     resetButton.clipsToBounds = YES;
     [resetButton addTarget:self
-                    action:@selector(resetToDefaultColor)
+                    action:@selector(confirmResetToDefaultColor)
           forControlEvents:UIControlEventTouchUpInside];
     [self.view addSubview:resetButton];
     self.resetButton = resetButton;
@@ -239,6 +241,25 @@ static NSInteger NearestAccentOption(UIColor* color) {
 }
 
 // MARK: - Reset
+
+// The reset also turns off Selected tab, Switches and Twitter icon, so it asks first.
+- (void)confirmResetToDefaultColor {
+    PFBBundle* bundle = [PFBBundle sharedBundle];
+    UIAlertController* confirm =
+        [UIAlertController alertControllerWithTitle:[bundle localizedStringForKey:@"THEME_RESET_CONFIRM_TITLE"]
+                                            message:[bundle localizedStringForKey:@"THEME_RESET_CONFIRM_MESSAGE"]
+                                     preferredStyle:UIAlertControllerStyleAlert];
+    [confirm addAction:[UIAlertAction actionWithTitle:[bundle localizedStringForKey:@"CANCEL_ACTION"]
+                                                style:UIAlertActionStyleCancel
+                                              handler:nil]];
+    __weak typeof(self) weakSelf = self;
+    [confirm addAction:[UIAlertAction actionWithTitle:[bundle localizedStringForKey:@"THEME_RESET_ACTION"]
+                                                style:UIAlertActionStyleDestructive
+                                              handler:^(__unused UIAlertAction* action) {
+                                                  [weakSelf resetToDefaultColor];
+                                              }]];
+    [self presentViewController:confirm animated:YES completion:nil];
+}
 
 - (void)resetToDefaultColor {
     NSUserDefaults* defaults = NSUserDefaults.standardUserDefaults;
@@ -340,8 +361,14 @@ static NSInteger NearestAccentOption(UIColor* color) {
     [self presentViewController:picker animated:YES completion:nil];
 }
 
-- (void)colorPickerViewControllerDidSelectColor:(UIColorPickerViewController*)viewController {
-    UIColor* color = viewController.selectedColor;
+// Called on every step of a drag and once more on release; only the released color is
+// applied, since each application pushes the accent through the whole app.
+- (void)colorPickerViewController:(UIColorPickerViewController*)viewController
+                   didSelectColor:(UIColor*)color
+                     continuously:(BOOL)continuously {
+    if (continuously) {
+        return;
+    }
     CGFloat r = 0, g = 0, b = 0, a = 0;
     [color getRed:&r green:&g blue:&b alpha:&a];
     // A wide-gamut pick comes back in extended sRGB, outside 0 to 1; the hex holds sRGB.

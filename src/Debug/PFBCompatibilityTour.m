@@ -1,6 +1,4 @@
-// Path tour: shows Twitter's own screens one after another so the report proves the
-// paths they carry, whatever the toggles say. Each step waits for the proofs its
-// screen owes, then notes whether the screen came up and what it still missed.
+// Path tour: opens Twitter's screens in turn so the report proves the paths they carry.
 
 #import <UIKit/UIKit.h>
 #import <SafariServices/SafariServices.h>
@@ -27,13 +25,13 @@ static const NSTimeInterval kPFBTourPoll = 0.25;
 // When a step's first way in has shown nothing, its second one is tried.
 static const NSTimeInterval kPFBTourDoorRetry = 2.5;
 
-// Left to the app between a step's clean-up and the next step.
+// Left to the app after a step's setup and after its clean-up.
 static const NSTimeInterval kPFBTourSettle = 0.4;
 
 // Average duration of one step, for the duration the launch alert announces.
 static const NSTimeInterval kPFBTourSecondsPerStep = 3.6;
 
-// How far down Home is searched for a Tweet carrying a video or photos.
+// How many screens down Home is searched for a view of a given class.
 static const NSInteger kPFBTourScreensDown = 6;
 
 // Well past the refresh threshold, released the way a finger lets go.
@@ -98,9 +96,10 @@ void PFBCompatTourLog(NSString* format, ...) {
     va_start(arguments, format);
     NSString* line = [[NSString alloc] initWithFormat:format arguments:arguments];
     va_end(arguments);
-    PFBDebugLog(@"%@", line);
     if (gPFBTourRunning) {
         tourJournalWrite(line);
+    } else {
+        PFBDebugLog(@"%@", line);
     }
 }
 
@@ -218,33 +217,23 @@ static id tourGetter(id object, NSString* name) {
     return ((id (*)(id, SEL))objc_msgSend)(object, selector);
 }
 
-// A finger's release commits a refresh: status 1 marked as coming from scrolling,
-// then the value-changed action. The control is read from the list's controller up
-// the responder chain, since the list's delegate can be a relaying proxy.
+// A pull past the threshold commits a refresh before the finger lifts: status 1 marked
+// as coming from scrolling, then the value-changed action. The control is read from the
+// list's controller up the responder chain, since the list's delegate can be a relaying proxy.
 static void tourCommitRefresh(UITableView* list) {
-    id delegate = list.delegate;
-    NSString* delegateName = delegate ? NSStringFromClass(object_getClass(delegate)) : @"none";
-    NSString* delegateGives = tourGetter(delegate, @"pullToLoadTopControl") ? @"gives" : @"hides";
-    UIResponder* owner = nil;
     id control = nil;
     for (UIResponder* responder = list.nextResponder; responder && !control;
          responder = responder.nextResponder) {
         control = tourGetter(responder, @"pullToLoadTopControl");
-        owner = responder;
     }
     SEL status = NSSelectorFromString(@"_setStatus:fromScrolling:");
     if (![control isKindOfClass:[UIControl class]] || ![control respondsToSelector:status]) {
-        PFBCompatTourLog(@"[tour] refresh: delegate %@ %@ the control; none usable up the chain (%@)",
-                    delegateName, delegateGives,
-                    control ? NSStringFromClass([control class]) : @"none");
+        PFBCompatTourLog(@"[tour] refresh: no usable control up the chain (%@)",
+                         control ? NSStringFromClass([control class]) : @"none");
         return;
     }
     ((void (*)(id, SEL, unsigned long long, BOOL))objc_msgSend)(control, status, 1, YES);
     [(UIControl*)control sendActionsForControlEvents:UIControlEventValueChanged];
-    PFBCompatTourLog(@"[tour] refresh: delegate %@ %@ the control; %@ holds %@, set to status 1 "
-                @"(pull), value changed sent",
-                delegateName, delegateGives, NSStringFromClass([owner class]),
-                NSStringFromClass([control class]));
 }
 
 static void tourPull(void) {
@@ -259,11 +248,11 @@ static void tourPull(void) {
     if ([delegate respondsToSelector:@selector(scrollViewDidScroll:)]) {
         [delegate scrollViewDidScroll:list];
     }
+    tourCommitRefresh(list);
     if ([delegate respondsToSelector:@selector(scrollViewDidEndDragging:willDecelerate:)]) {
         [delegate scrollViewDidEndDragging:list willDecelerate:NO];
     }
     [list setContentOffset:rest animated:YES];
-    tourCommitRefresh(list);
 }
 
 // The first Tweet row the list shows, selected the way a tap does; when none can be
@@ -280,7 +269,6 @@ static void tourOpenFirstTweet(void) {
     // A Tweet with a link card can open the link rather than its conversation.
     NSArray<NSIndexPath*>* rows = [list.indexPathsForVisibleRows sortedArrayUsingSelector:@selector(compare:)];
     NSIndexPath* carded = nil;
-    NSUInteger passed = 0;
     for (NSIndexPath* row in rows) {
         UITableViewCell* cell = [list cellForRowAtIndexPath:row];
         if (!statusCell || ![cell isKindOfClass:statusCell]) {
@@ -288,11 +276,8 @@ static void tourOpenFirstTweet(void) {
         }
         if (tourFindClass(cell, @"T1UnifiedCardView")) {
             carded = carded ?: row;
-            passed++;
             continue;
         }
-        PFBCompatTourLog(@"[tour] first Tweet: row %ld opened, %lu with a link card passed", (long)row.row,
-                         (unsigned long)passed);
         [delegate tableView:list didSelectRowAtIndexPath:row];
         return;
     }
@@ -387,10 +372,6 @@ static void tourShowHomeTab(id tabs, NSInteger index) {
         return;
     }
     ((void (*)(id, SEL, NSInteger, BOOL))objc_msgSend)(tabs, select, index, NO);
-}
-
-static NSString* tourIndexText(NSInteger index) {
-    return index == NSNotFound ? @"?" : [NSString stringWithFormat:@"%ld", (long)index];
 }
 
 // MARK: - Finding things on screen
@@ -643,9 +624,6 @@ static BOOL tourCheckTweetButtons(void) {
                                                        ? @"share long press wired"
                                                        : @"share button shown");
     }
-    PFBCompatTourLog(@"[tour] Tweet buttons: like %@, reply %@, share %@, relay %@ \u00b7 controls: %@", like ? @"found" : @"none",
-                reply ? @"found" : @"none", share ? @"found" : @"none", relays ? @"present" : @"missing",
-                seen.count ? [seen componentsJoinedByString:@"; "] : @"none readable");
     return YES;
 }
 
@@ -654,11 +632,7 @@ static BOOL tourCheckTweetButtons(void) {
 static UIControl* tourOpenTweetMenu(void) {
     UIView* author = tourHomeViewOfClass(@"TTAStatusAuthorView");
     id caret = tourGetter(author, @"caretButton");
-    BOOL armed = [caret isKindOfClass:[UIButton class]] && ((UIButton*)caret).menu != nil;
-    BOOL tapped = tourSend(author, @"_didTapCaret");
-    PFBCompatTourLog(@"[tour] Tweet menu: author row %@, caret %@, menu before the tap %@, tap %@",
-                author ? @"found" : @"none", caret ? NSStringFromClass([caret class]) : @"none",
-                armed ? @"armed" : @"none", tapped ? @"sent" : @"not possible");
+    tourSend(author, @"_didTapCaret");
     return [caret isKindOfClass:[UIControl class]] ? caret : nil;
 }
 
@@ -678,7 +652,6 @@ static UIView* tourOpenVideo(void) {
         return video;
     }
     ((void (*)(id, SEL, id))objc_msgSend)(video, open, tap);
-    PFBCompatTourLog(@"[tour] video full screen: tap sent to %@", NSStringFromClass([video class]));
     return video;
 }
 
@@ -692,7 +665,6 @@ static void tourTapMedia(UIView* media, NSString* step) {
         return;
     }
     ((void (*)(id, SEL, NSUInteger))objc_msgSend)(forward, open, 0);
-    PFBCompatTourLog(@"[tour] %@: first item tapped through %@", step, NSStringFromClass([forward class]));
 }
 
 // The full-screen player's double tap is the like Confirm likes guards there.
@@ -730,13 +702,6 @@ static BOOL tourTableMenuDoor(UIView* video, NSString* pass) {
         provider = nil;
     }
     UIMenu* menu = provider ? provider(@[]) : nil;
-    NSMutableArray<NSString*>* titles = [NSMutableArray array];
-    for (UIMenuElement* element in menu.children) {
-        [titles addObject:element.title.length ? element.title : @"?"];
-    }
-    PFBCompatTourLog(@"[tour] video long press: %@ %@ from %@, %lu entries: %@",
-                     configuration ? @"menu built" : @"no menu", pass, NSStringFromClass([delegate class]),
-                     (unsigned long)menu.children.count, [titles componentsJoinedByString:@" | "]);
     return menu.children.count > 0;
 }
 
@@ -747,7 +712,6 @@ static id tourLongestBioAuthor(void) {
     NSString* own = tourGetter(account, @"username");
     id best = nil;
     NSUInteger longest = 0;
-    NSUInteger read = 0;
     UITableView* list = tourFrontList();
     for (NSInteger screen = 0; list && screen < 3; screen++) {
         for (UITableViewCell* cell in list.visibleCells) {
@@ -758,7 +722,6 @@ static id tourLongestBioAuthor(void) {
                 [handle caseInsensitiveCompare:[own isKindOfClass:[NSString class]] ? own : @""] == NSOrderedSame) {
                 continue;
             }
-            read++;
             NSUInteger length = [bio isKindOfClass:[NSString class]] ? bio.length : 0;
             if (!best || length > longest) {
                 best = user;
@@ -770,8 +733,6 @@ static id tourLongestBioAuthor(void) {
         [list layoutIfNeeded];
     }
     tourScrollHomeToTop();
-    PFBCompatTourLog(@"[tour] other profile: %lu authors read, longest bio %lu characters", (unsigned long)read,
-                     (unsigned long)longest);
     return best;
 }
 
@@ -802,8 +763,6 @@ static void tourShowProfile(NSString* handle, long long userID) {
     }
     ((void (*)(id, SEL, NSString*, long long, long long, long long, id, id))objc_msgSend)(navigation, show, handle,
                                                                                           userID, 0, 0, nil, nil);
-    PFBCompatTourLog(@"[tour] other profile: profile asked of %@ by %@", NSStringFromClass([navigation class]),
-                     userID ? @"account ID" : @"handle");
 }
 
 // A profile's "…" menu, built the way its button builds it, without showing it.
@@ -815,9 +774,7 @@ static void tourBuildProfileMenu(UIViewController* profile) {
                          header ? NSStringFromClass([header class]) : @"no header");
         return;
     }
-    NSArray* items = ((NSArray* (*)(id, SEL, id))objc_msgSend)(header, build, header.view);
-    PFBCompatTourLog(@"[tour] other profile: profile menu built, %lu entries",
-                     (unsigned long)([items isKindOfClass:[NSArray class]] ? items.count : 0));
+    ((NSArray* (*)(id, SEL, id))objc_msgSend)(header, build, header.view);
 }
 
 // Twitter's settings opened the way the side menu's "Settings and privacy" row does,
@@ -831,30 +788,18 @@ static void tourShowTwitterSettings(void) {
     }
 }
 
-// Whether Twitter's tab bar and the Liquid Glass bar laid on it are hidden on the screen.
-static void tourLogTabBar(UIViewController* screen) {
-    id tabBar = tourGetter(screen, @"tfn_tabBarIntegration");
-    UIView* native = tourFindClass(tourGetter(tabBar, @"view"), @"UITabBar");
-    PFBCompatTourLog(@"[tour] Twitter settings: tab bar %@, Liquid Glass bar %@",
-                     tabBar ? (tourBoolGetter(tabBar, @"isTabBarHidden") ? @"hidden" : @"shown") : @"none",
-                     native ? @"shown" : @"hidden or absent");
-}
-
 // The full-screen player's card swipe, asked the question UIKit asks as a swipe starts.
 static void tourAskCardSwipe(void) {
     UIViewController* player = tourFindController(tourRootController(), @"T1ImmersiveViewController");
     Class cls = [player class];
-    Ivar ivar = cls ? (class_getInstanceVariable(cls, "panRecognizer")
-                           ?: class_getInstanceVariable(cls, "$__lazy_storage_$_panRecognizer"))
-                    : NULL;
+    Ivar ivar = cls ? class_getInstanceVariable(cls, "$__lazy_storage_$_panRecognizer") : NULL;
     id pan = ivar ? object_getIvar(player, ivar) : nil;
     if (![pan isKindOfClass:[UIGestureRecognizer class]] ||
         ![player respondsToSelector:@selector(gestureRecognizerShouldBegin:)]) {
         PFBCompatTourLog(@"[tour] video full screen: card swipe %@", player ? @"not found" : @"no full-screen player");
         return;
     }
-    BOOL allowed = [(id<UIGestureRecognizerDelegate>)player gestureRecognizerShouldBegin:pan];
-    PFBCompatTourLog(@"[tour] video full screen: card swipe %@", allowed ? @"allowed" : @"blocked");
+    [(id<UIGestureRecognizerDelegate>)player gestureRecognizerShouldBegin:pan];
 }
 
 // Whether the full-screen video may shrink into the bottom player, asked the way
@@ -867,8 +812,7 @@ static void tourAskDocking(void) {
                          player ? @"question absent" : @"no full-screen player");
         return;
     }
-    BOOL allowed = ((BOOL (*)(id, SEL))objc_msgSend)(player, question);
-    PFBCompatTourLog(@"[tour] video full screen: docking %@", allowed ? @"allowed" : @"refused");
+    ((BOOL (*)(id, SEL))objc_msgSend)(player, question);
 }
 
 // The handle of the first author on Home who is not the account itself.
@@ -910,8 +854,6 @@ static BOOL tourCheckFollowButton(UIViewController* profile) {
     NSMutableArray<NSString*>* seen = [NSMutableArray array];
     BOOL wired = tourWired(button, @"buttonTapped", seen);
     PFBCompatObserve(PFBCompat_follow_confirm, wired ? @"Follow button wired" : @"Follow button of the hooked class shown");
-    PFBCompatTourLog(@"[tour] other profile: Follow button %@ \u00b7 controls: %@", wired ? @"wired" : @"not read",
-                seen.count ? [seen componentsJoinedByString:@"; "] : @"none readable");
     return YES;
 }
 
@@ -935,8 +877,6 @@ static BOOL tourCheckReplyBar(void) {
     if ([bar respondsToSelector:NSSelectorFromString(@"_t1_sendReply")] && (wired || send)) {
         PFBCompatObserve(PFBCompat_tweet_confirm, wired ? @"reply send button wired" : @"reply bar of the hooked class shown");
     }
-    PFBCompatTourLog(@"[tour] first Tweet: reply bar relay %@, send button %@ (%@)", relay ? NSStringFromClass([relay class]) : @"none",
-                send ? NSStringFromClass([send class]) : @"none", actions.count ? [actions componentsJoinedByString:@" "] : @"no actions read");
     return YES;
 }
 
@@ -954,8 +894,6 @@ static void tourCheckSendButton(UIViewController* composer) {
     if ([composer respondsToSelector:send]) {
         PFBCompatObserve(PFBCompat_tweet_confirm, wired ? @"send button wired" : @"composer of the hooked class shown");
     }
-    PFBCompatTourLog(@"[tour] composer: send button %@ \u00b7 controls: %@", wired ? @"wired" : @"not read",
-                seen.count ? [seen componentsJoinedByString:@"; "] : @"none readable");
 }
 
 // The Tweet the first Tweet step opens, the first the front list shows without a link
@@ -1007,8 +945,6 @@ static void tourShowTweetInteractions(void) {
     UIViewController* screen = ((id (*)(id, SEL, id, long long, long long, long long))objc_msgSend)(
         screenClass, build, account, statusID, authorID, 1);
     [stack pushViewController:screen animated:NO];
-    PFBCompatTourLog(@"[tour] Tweet interactions: Tweet %ld on its Quotes tab, pushed on %@", (long)statusID,
-                     NSStringFromClass([stack class]));
 }
 
 // The first Tweet's edit history, built by the factory its "Last edited" link uses,
@@ -1036,10 +972,8 @@ static void tourBuildEditHistory(void) {
                          found ? @"read" : @"not found", account ? NSStringFromClass([account class]) : @"none");
         return;
     }
-    id history = ((id (*)(id, SEL, id, unsigned long long, id))objc_msgSend)(factory, build, account,
-                                                                            (unsigned long long)statusID, scribe);
-    PFBCompatTourLog(@"[tour] edit history: built (%@)",
-                     history ? NSStringFromClass([history class]) : @"none");
+    ((id (*)(id, SEL, id, unsigned long long, id))objc_msgSend)(factory, build, account,
+                                                                (unsigned long long)statusID, scribe);
 }
 
 // Why a conversation row may be unread, or nil when it reads as read. Opening an
@@ -1131,9 +1065,6 @@ static void tourOpenReadConversation(BOOL lastLook) {
     cells = [cells sortedArrayUsingComparator:^NSComparisonResult(UIView* a, UIView* b) {
       return a.frame.origin.y < b.frame.origin.y ? NSOrderedAscending : NSOrderedDescending;
     }];
-    PFBCompatTourLog(@"[tour] conversation: front view %@, list %@ with %lu visible rows",
-                     NSStringFromClass([tourFrontView() class]), list ? NSStringFromClass([list class]) : @"none",
-                     (unsigned long)cells.count);
     NSMutableArray<NSString*>* skipped = [NSMutableArray array];
     NSMutableArray<NSString*>* others = [NSMutableArray array];
     NSUInteger conversations = 0;
@@ -1164,8 +1095,6 @@ static void tourOpenReadConversation(BOOL lastLook) {
             PFBCompatTourLog(@"[tour] conversation: %@ takes no selection", NSStringFromClass([list class]));
             return;
         }
-        PFBCompatTourLog(@"[tour] conversation: opened row %lu (skipped: %@)", (unsigned long)skipped.count,
-                    tourCounted(skipped));
         return;
     }
     UIView* screen = tourScreen().view;
@@ -1187,7 +1116,7 @@ static void tourOpenReadConversation(BOOL lastLook) {
                 cells.count ? tourCounted(skipped) : @"no rows", loading ? @", still loading" : @"");
 }
 
-// The controller that shows the side menu, and whether it is open.
+// The controller that shows the side menu.
 static id tourSideMenuOwner(void) {
     UIViewController* split = tourFindController(tourRootController(), @"T1AppSplitViewController");
     return [split respondsToSelector:NSSelectorFromString(@"presentDashFromViewController:animated:completion:")] ? split
@@ -1220,11 +1149,10 @@ static void tourOpenWebLink(void) {
     NSURL* url = [NSURL URLWithString:@"https://example.com"];
     SFSafariViewController* browser = [[SFSafariViewController alloc] initWithURL:url];
     [tourTopController() presentViewController:browser animated:NO completion:nil];
-    PFBCompatTourLog(@"[tour] web link: in-app browser presented over %@", tourScreenName(tourScreen()));
 }
 
-// Whether a class method runs code of this tweak, that is, the tweak's hook is the one
-// Twitter reaches.
+// Whether a class method's code lives in this library: the hook installed here is the
+// one Twitter reaches.
 static BOOL tourHookedHere(Class cls, SEL selector) {
     Method method = cls ? class_getClassMethod(cls, selector) : NULL;
     Dl_info here = {0};
@@ -1234,15 +1162,13 @@ static BOOL tourHookedHere(Class cls, SEL selector) {
 }
 
 // Twitter's t.co click count, safety check and click ID, asked for a t.co link the way
-// Twitter asks them, and only while the tweak's hooks are in place: their answer comes
-// back, nothing is sent.
+// Twitter asks them, only while the hooks installed here answer them: nothing is sent.
 static void tourAskTcoRequests(void) {
     NSURL* link = [NSURL URLWithString:@"https://t.co/pfbtour"];
     Class clickIDs = NSClassFromString(@"T1TwitterClickIDHandler");
     SEL append = NSSelectorFromString(@"URLByAppendingTwitterClickIDIfNecessary:status:account:scribePage:scribeComponent:");
     if (tourHookedHere(clickIDs, append)) {
-        id kept = ((id (*)(id, SEL, id, id, id, id, id))objc_msgSend)(clickIDs, append, link, nil, nil, nil, nil);
-        PFBCompatTourLog(@"[tour] t.co check: click ID %@", [kept isEqual:link] ? @"not added" : @"added");
+        ((id (*)(id, SEL, id, id, id, id, id))objc_msgSend)(clickIDs, append, link, nil, nil, nil, nil);
     } else {
         PFBCompatTourLog(@"[tour] t.co check: click ID not asked, not hooked");
     }
@@ -1256,10 +1182,8 @@ static void tourAskTcoRequests(void) {
                          countHooked ? @"hooked" : @"not hooked", checkHooked ? @"hooked" : @"not hooked");
         return;
     }
-    BOOL sent = ((BOOL (*)(id, SEL, id))objc_msgSend)(talon, count, link);
+    ((BOOL (*)(id, SEL, id))objc_msgSend)(talon, count, link);
     ((id (*)(id, SEL, id, id))objc_msgSend)(talon, check, link, nil);
-    PFBCompatTourLog(@"[tour] t.co check: click count %@, safety check answered by the tweak",
-                     sent ? @"sent" : @"not sent");
 }
 
 // Twitter's own color settings: its palette decides dark mode, not the window's style.
@@ -1322,44 +1246,6 @@ static void tourRestorePaletteNamed(NSString* name) {
     }
 }
 
-// The action names a gesture recognizer's description lists for its targets.
-static NSString* tourActionNames(UIGestureRecognizer* recognizer) {
-    NSString* text = recognizer.description;
-    NSCharacterSet* stops = [NSCharacterSet characterSetWithCharactersInString:@", )>"];
-    NSMutableArray<NSString*>* names = [NSMutableArray array];
-    NSRange rest = NSMakeRange(0, text.length);
-    for (;;) {
-        NSRange mark = [text rangeOfString:@"action=" options:0 range:rest];
-        if (mark.location == NSNotFound) {
-            break;
-        }
-        NSUInteger start = NSMaxRange(mark);
-        NSRange stop = [text rangeOfCharacterFromSet:stops options:0 range:NSMakeRange(start, text.length - start)];
-        NSUInteger end = stop.location == NSNotFound ? text.length : stop.location;
-        [names addObject:[text substringWithRange:NSMakeRange(start, end - start)]];
-        rest = NSMakeRange(end, text.length - end);
-    }
-    return names.count ? [names componentsJoinedByString:@" "] : @"no action";
-}
-
-// What each view from a media view up to its cell carries: interactions and gestures.
-static void tourDescribeChain(NSString* step, UIView* from, UIView* upTo) {
-    for (UIView* view = from; view && view != upTo.superview; view = view.superview) {
-        NSMutableArray<NSString*>* parts = [NSMutableArray array];
-        for (id<UIInteraction> interaction in view.interactions) {
-            [parts addObject:NSStringFromClass([interaction class])];
-        }
-        for (UIGestureRecognizer* recognizer in view.gestureRecognizers) {
-            [parts addObject:[NSString stringWithFormat:@"%@ (%@)", NSStringFromClass([recognizer class]),
-                                                        tourActionNames(recognizer)]];
-        }
-        if (parts.count) {
-            PFBCompatTourLog(@"[tour] %@: %@ carries %@", step, NSStringFromClass([view class]),
-                             [parts componentsJoinedByString:@", "]);
-        }
-    }
-}
-
 static UIView* tourFirstResponder(void) {
     return tourFindView(tourWindow(), ^BOOL(UIView* view) {
       return view.isFirstResponder;
@@ -1386,9 +1272,6 @@ static BOOL tourFocusSearchField(void) {
     if (!tapped) {
         [field becomeFirstResponder];
     }
-    PFBCompatTourLog(@"[tour] search field: bar found, focus tap %@, field %@, keyboard %@",
-                     tapped ? @"sent" : @"not possible", field ? NSStringFromClass([field class]) : @"none",
-                     field.isFirstResponder ? @"up" : @"not up yet");
     return YES;
 }
 
@@ -1737,13 +1620,9 @@ static NSArray<NSDictionary*>* tourAllSteps(void) {
              return [tourFirstResponder() isKindOfClass:[UITextField class]];
            }, ^{
              if (![tourScreenName(tourScreen()) containsString:@"Search"]) {
-                 PFBCompatTourLog(@"[tour] search field: no search screen after 2.5 s, link opened again");
                  tourOpenLink(@"twitter://search?query=news");
              }
            }, ^{
-             UIView* typing = tourFirstResponder();
-             PFBCompatTourLog(@"[tour] search field: screen %@, typing in %@", tourScreenName(tourScreen()),
-                              typing ? NSStringFromClass([typing class]) : @"nothing");
              [tourWindow() endEditing:YES];
              tourDismissPresented();
              tourPopToRoot();
@@ -1798,9 +1677,6 @@ static NSArray<NSDictionary*>* tourAllSteps(void) {
              return tourIntegerGetter(homeTabs, @"selectedIndex") == 1;
            }, nil, ^{
              NSInteger shown = tourIntegerGetter(homeTabs, @"selectedIndex");
-             PFBCompatTourLog(@"[tour] following timeline: %@ \u00b7 tab %@ shown, was %@ \u00b7 first retweet: %@",
-                         homeTabs ? NSStringFromClass([homeTabs class]) : @"no Home tabs", tourIndexText(shown),
-                         tourIndexText(homeTabShown), PFBFirstRetweetSummary() ?: @"none examined");
              if (homeTabShown != NSNotFound && homeTabShown != shown) {
                  tourShowHomeTab(homeTabs, homeTabShown);
              }
@@ -1810,8 +1686,6 @@ static NSArray<NSDictionary*>* tourAllSteps(void) {
              UITableView* list = tourFrontList();
              scrollStart = list.contentOffset.y;
              tourDrag(list, list.bounds.size.height * 1.5);
-             PFBCompatTourLog(@"[tour] scroll: %@ dragged from %.0f to %.0f", list ? NSStringFromClass([list class]) : @"no list",
-                              scrollStart, list.contentOffset.y);
              tourDeepScroll(@"scroll", 3);
            }, ^BOOL(UIViewController* before, UIViewController* after) {
              UITableView* list = tourFrontList();
@@ -1867,7 +1741,6 @@ static NSArray<NSDictionary*>* tourAllSteps(void) {
     [steps addObject:tourStep(@"video long press", @"Video menu", home, ^{
              menuBuilt = NO;
              UIView* pressed = tourHomeViewOfClass(@"T1InlineVideoView");
-             tourDescribeChain(@"video long press", pressed, tourAncestor(pressed, @"T1StatusCell") ?: pressed.superview);
              menuBuilt = tourTableMenuDoor(pressed, @"first");
              // Twitter's share sheet names the Tweet a moment after an ask; the asks that
              // follow find it, as the menu of a real long press does.
@@ -1916,7 +1789,6 @@ static NSArray<NSDictionary*>* tourAllSteps(void) {
              id author = tourLongestBioAuthor();
              profileHandle = tourGetter(author, @"username") ?: tourAuthorHandle() ?: @"X";
              profileUserID = tourLongLongGetter(author, @"userID");
-             PFBCompatTourLog(@"[tour] other profile: @%@", profileHandle);
              BOOL taken = tourOpenLink([@"twitter://user?screen_name=" stringByAppendingString:profileHandle]);
              PFBCompatTourLog(@"[tour] other profile: link %@", taken ? @"taken by Twitter" : @"refused by Twitter");
            }, ^BOOL(UIViewController* before, UIViewController* after) {
@@ -2079,18 +1951,11 @@ static NSArray<NSDictionary*>* tourAllSteps(void) {
            }, ^BOOL(UIViewController* before, UIViewController* after) {
              return PFBCompatPathReached(PFBCompatPath_tco_requests) || PFBCompatPathReached(PFBCompatPath_click_ids);
            }, nil, nil)];
-    __block BOOL tabBarLogged = NO;
     // Given the proof wait even when nothing is owed, so a slow opening still shows.
     [steps addObject:tourStepWaiting(kPFBTourProofWait, tourStep(@"Twitter settings", @"Twitter settings", root, ^{
-             tabBarLogged = NO;
              tourShowTwitterSettings();
            }, ^BOOL(UIViewController* before, UIViewController* after) {
-             BOOL settings = [after isKindOfClass:NSClassFromString(@"T1GenericSettingsViewController")];
-             if (settings && !tabBarLogged) {
-                 tabBarLogged = YES;
-                 tourLogTabBar(after);
-             }
-             return settings;
+             return [after isKindOfClass:NSClassFromString(@"T1GenericSettingsViewController")];
            }, nil, ^{
              tourPopToRoot();
            }))];
@@ -2149,8 +2014,8 @@ static void tourCancel(NSArray<NSDictionary*>* steps, NSMutableArray<NSString*>*
         tourAttempt(current[@"name"], @"clean-up", current[@"after"]);
     }
     gPFBTourStepLive = nil;
-    PFBCompatTourLog(@"[tour] cancelled at %@", current[@"name"]);
-    tourConclude(results, full, [@"cancelled at " stringByAppendingString:current[@"name"]]);
+    PFBCompatTourLog(@"[tour] canceled at %@", current[@"name"]);
+    tourConclude(results, full, [@"canceled at " stringByAppendingString:current[@"name"]]);
 }
 
 // A box over the app while the tour runs, in its own window: it says what is
@@ -2173,7 +2038,7 @@ static void tourShowOverlay(NSArray<NSDictionary*>* steps, NSMutableArray<NSStri
         [[UIActivityIndicatorView alloc] initWithActivityIndicatorStyle:UIActivityIndicatorViewStyleMedium];
     [spinner startAnimating];
     UILabel* title = [UILabel new];
-    title.text = @"Check every path";
+    title.text = @"Check every option";
     title.font = [TwitterChirpFont(TwitterFontStyleBold) fontWithSize:17.0];
     title.textColor = UIColor.labelColor;
     UILabel* step = [UILabel new];
@@ -2297,7 +2162,6 @@ static void tourWatch(NSArray<NSDictionary*>* steps, NSUInteger index, NSMutable
     BOOL reached = shown || pending.count < owed.count;
     dispatch_block_t door = step[@"door"];
     if (!reached && doorAt < 0 && door && elapsed >= kPFBTourDoorRetry) {
-        PFBCompatTourLog(@"[tour] %@: nothing shown after %.1f s, trying the second way in", name, elapsed);
         tourJournalWrite([NSString stringWithFormat:@"step %@ \u00b7 second way in", name]);
         if (!tourAttempt(name, @"second way in", door)) {
             tourConcludeStep(steps, index, results, full, NO, nil, @"stopped by an exception");
@@ -2443,7 +2307,7 @@ static void tourAskAtLaunch(void) {
     NSString* version = NSBundle.mainBundle.infoDictionary[@"CFBundleShortVersionString"] ?: @"";
     NSUInteger screens = tourSteps(YES).count;
     UIAlertController* alert = [UIAlertController
-        alertControllerWithTitle:[NSString stringWithFormat:@"Twitter %@ installed", version]
+        alertControllerWithTitle:[NSString stringWithFormat:@"Check Twitter %@", version]
                          message:[NSString stringWithFormat:@"Check every option on this version. The tour opens "
                                                             @"%lu screens on its own, %@. Cancel stops it at "
                                                             @"any time.",

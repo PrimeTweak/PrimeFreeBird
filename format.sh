@@ -1,8 +1,7 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-# clang-format for Logos: .x directives are swapped for ObjC placeholders and back,
-# so hook bodies format like methods. Usage: format.sh [--check] [files...] (default src/)
+# clang-format for Logos sources. Usage: format.sh [--check] [files...] (default src/)
 
 cd "$(dirname "$0")"
 style="file:$(pwd)/.clang-format"

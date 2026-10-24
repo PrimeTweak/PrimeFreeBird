@@ -1,5 +1,4 @@
-// The tab editor: a grid of every available tab above a drag-reorderable preview
-// row, cloned from the app's native tab-customization screen.
+// The tab editor: a grid of every available tab above a reorderable preview row.
 
 #import "Features/Appearance/CustomTabBar/PFBCustomTabBarViewController.h"
 #import <objc/runtime.h>
@@ -12,6 +11,7 @@
 #import "Support/Helpers.h"
 #import "Support/HookHelpers.h"
 #import "Support/T1Headers.h"
+#import "Debug/PFBDebugger.h"
 
 // The floating compose button, hidden while the editor is on screen.
 @interface TFNFloatingActionButton : UIView
@@ -34,6 +34,10 @@ static NSString* const kGridFooterID = @"gridFooter";
 @property (nonatomic, strong) NSMutableArray<NSString*>* selectedPages;
 @property (nonatomic, strong) NSArray<NSString*>* originalSelection;
 @property (nonatomic, assign) BOOL hasChanges;
+// The grid's instructions, which a refused tap replaces for a moment.
+@property (nonatomic, weak) UILabel* headerLabel;
+// The swipe back's state before the editor held it while changes are pending.
+@property (nonatomic, assign) BOOL popGestureWasEnabled;
 // The compose buttons the editor hid, shown again when it leaves.
 @property (nonatomic, strong) NSHashTable<UIView*>* hiddenComposeButtons;
 @end
@@ -53,10 +57,21 @@ static NSString* const kGridFooterID = @"gridFooter";
     [self setupSaveButton];
     [self loadData];
     [self updateSaveButtonState];
+
+    // Leaving with unsaved picks asks first: the back button runs this action instead
+    // of going back.
+    if (@available(iOS 16.0, *)) {
+        __weak typeof(self) weakSelf = self;
+        self.navigationItem.backAction = [UIAction actionWithHandler:^(__unused UIAction* action) {
+            [weakSelf leaveEditor];
+        }];
+    }
 }
 
 - (void)viewWillAppear:(BOOL)animated {
     [super viewWillAppear:animated];
+    self.popGestureWasEnabled = self.navigationController.interactivePopGestureRecognizer.enabled;
+    [self updateSaveButtonState];
 
     // Hide the floating compose button so it doesn't overlap the editor.
     self.hiddenComposeButtons = [NSHashTable weakObjectsHashTable];
@@ -67,6 +82,7 @@ static NSString* const kGridFooterID = @"gridFooter";
 
 - (void)viewWillDisappear:(BOOL)animated {
     [super viewWillDisappear:animated];
+    self.navigationController.interactivePopGestureRecognizer.enabled = self.popGestureWasEnabled;
     for (UIView* button in self.hiddenComposeButtons) {
         if ([button respondsToSelector:@selector(showAnimated:completion:)]) {
             [(TFNFloatingActionButton*)button showAnimated:YES completion:nil];
@@ -93,8 +109,8 @@ static NSString* const kGridFooterID = @"gridFooter";
     }
 }
 
-// Only a button on screen is hidden, so the editor never shows one Twitter or Hide
-// Tweet button keeps out of sight.
+// Only a visible button is hidden, so leaving the editor never reveals one that
+// Twitter or the Hide Tweet button option keeps out of sight.
 - (void)findAndHideFloatingActionButtonInView:(UIView*)view {
     if ([view isKindOfClass:NSClassFromString(@"TFNFloatingActionButton")]) {
         if (!view.hidden && view.alpha > 0.01 &&
@@ -220,9 +236,17 @@ static NSString* const kGridFooterID = @"gridFooter";
     }
 
     NSArray<NSString*>* saved = [PFBCustomTabBarUtility visiblePageIDsInOrder];
-    NSArray<NSString*>* source =
-        saved ?: [PFBCustomTabBarUtility defaultVisiblePageIDs];
+    [self selectPages:saved ?: [PFBCustomTabBarUtility defaultVisiblePageIDs]];
 
+    self.originalSelection = [self.selectedPages copy];
+    self.hasChanges = NO;
+
+    [self.gridView reloadData];
+    [self.previewView reloadData];
+}
+
+// The pages of the list the account has, in its order, Home first.
+- (void)selectPages:(NSArray<NSString*>*)source {
     self.selectedPages = [NSMutableArray array];
     for (NSString* page in source) {
         if ([self.allPages containsObject:page] &&
@@ -231,12 +255,6 @@ static NSString* const kGridFooterID = @"gridFooter";
         }
     }
     [self pinHomeFirst];
-
-    self.originalSelection = [self.selectedPages copy];
-    self.hasChanges = NO;
-
-    [self.gridView reloadData];
-    [self.previewView reloadData];
 }
 
 - (void)pinHomeFirst {
@@ -251,8 +269,35 @@ static NSString* const kGridFooterID = @"gridFooter";
     [self updateSaveButtonState];
 }
 
+// Pending changes also hold the swipe back, so they are never dropped without the question.
 - (void)updateSaveButtonState {
     self.navigationItem.rightBarButtonItem.enabled = self.hasChanges;
+    if (self.viewIfLoaded.window) {
+        self.navigationController.interactivePopGestureRecognizer.enabled =
+            self.popGestureWasEnabled && !self.hasChanges;
+    }
+}
+
+- (void)leaveEditor {
+    if (!self.hasChanges) {
+        [self.navigationController popViewControllerAnimated:YES];
+        return;
+    }
+    PFBBundle* bundle = [PFBBundle sharedBundle];
+    UIAlertController* alert =
+        [UIAlertController alertControllerWithTitle:[bundle localizedStringForKey:@"CUSTOM_TAB_BAR_DISCARD_TITLE"]
+                                            message:[bundle localizedStringForKey:@"CUSTOM_TAB_BAR_DISCARD_MESSAGE"]
+                                     preferredStyle:UIAlertControllerStyleAlert];
+    [alert addAction:[UIAlertAction actionWithTitle:[bundle localizedTwitterStringForKey:@"CANCEL_ACTION_LABEL"]
+                                              style:UIAlertActionStyleCancel
+                                            handler:nil]];
+    __weak typeof(self) weakSelf = self;
+    [alert addAction:[UIAlertAction actionWithTitle:[bundle localizedStringForKey:@"CUSTOM_TAB_BAR_DISCARD_ACTION"]
+                                              style:UIAlertActionStyleDestructive
+                                            handler:^(__unused UIAlertAction* action) {
+                                                [weakSelf.navigationController popViewControllerAnimated:YES];
+                                            }]];
+    [self presentViewController:alert animated:YES completion:nil];
 }
 
 #pragma mark - Save / Reset
@@ -283,25 +328,41 @@ static UIViewController* findViewControllerOfClass(UIViewController* vc,
     return findViewControllerOfClass(vc.presentedViewController, cls);
 }
 
-- (void)applyLiveLayout {
+- (UIViewController*)tabNavigationController {
     Class navClass = objc_getClass("T1TabbedAppNavigationViewController");
     if (!navClass) {
-        return;
+        return nil;
     }
-
-    UIViewController* tabNav = nil;
     for (UIWindow* window in UIApplication.sharedApplication.windows) {
-        tabNav = findViewControllerOfClass(window.rootViewController, navClass);
+        UIViewController* tabNav = findViewControllerOfClass(window.rootViewController, navClass);
         if (tabNav) {
-            break;
+            return tabNav;
         }
     }
+    return nil;
+}
 
+- (void)applyLiveLayout {
+    UIViewController* tabNav = [self tabNavigationController];
     if (![tabNav respondsToSelector:@selector(recalculateVisiblePanels)]) {
         return;
     }
 
     [(T1TabbedAppNavigationViewController*)tabNav recalculateVisiblePanels];
+}
+
+// How many tabs Twitter's bar shows; 0 when it does not limit them or the count is unread.
+- (NSInteger)barCapacity {
+    UIViewController* tabNav = [self tabNavigationController];
+    if (![tabNav respondsToSelector:@selector(limitsBottomTabCount)] ||
+        ![tabNav respondsToSelector:@selector(_t1_bottomTabItemCapacity)]) {
+        return 0;
+    }
+    T1TabbedAppNavigationViewController* navigation = (T1TabbedAppNavigationViewController*)tabNav;
+    BOOL limits = [navigation limitsBottomTabCount];
+    NSInteger capacity = [navigation _t1_bottomTabItemCapacity];
+    PFBDebugLog(@"[tabbar] editor capacity %ld, limited %d", (long)capacity, limits);
+    return limits && capacity >= 2 ? capacity : 0;
 }
 
 - (void)persistChanges {
@@ -314,33 +375,48 @@ static UIViewController* findViewControllerOfClass(UIViewController* vc,
     [self updateSaveButtonState];
 }
 
+// Restore puts Twitter's default tabs in the editor only; Save keeps them, as it keeps any pick.
 - (void)restoreTapped {
+    PFBBundle* bundle = [PFBBundle sharedBundle];
     UIAlertController* alert = [UIAlertController
-        alertControllerWithTitle:
-            [[PFBBundle sharedBundle]
-                localizedTwitterStringForKey:
-                    @"SUBSCRIPTION_TAB_CUSTOMIZATION_RESTORE_BUTTON_TITLE"]
-                         message:[[PFBBundle sharedBundle]
-                                     localizedStringForKey:
-                                         @"CUSTOM_TAB_BAR_RESET_MESSAGE"]
+        alertControllerWithTitle:[bundle localizedTwitterStringForKey:@"SUBSCRIPTION_TAB_CUSTOMIZATION_RESTORE_BUTTON_TITLE"]
+                         message:[bundle localizedStringForKey:@"CUSTOM_TAB_BAR_RESET_MESSAGE"]
                   preferredStyle:UIAlertControllerStyleAlert];
-    [alert addAction:[UIAlertAction
-                         actionWithTitle:[[PFBBundle sharedBundle]
-                                             localizedTwitterStringForKey:
-                                                 @"CONTINUE_ACTION_LABEL"]
-                                   style:UIAlertActionStyleDestructive
-                                 handler:^(UIAlertAction* _Nonnull action) {
-                                     [PFBCustomTabBarUtility resetSelection];
-                                     [self loadData];
-                                     [self recomputeChanges];
-                                 }]];
-    [alert
-        addAction:[UIAlertAction actionWithTitle:[[PFBBundle sharedBundle]
-                                                     localizedTwitterStringForKey:
-                                                         @"CANCEL_ACTION_LABEL"]
-                                           style:UIAlertActionStyleCancel
-                                         handler:nil]];
+    [alert addAction:[UIAlertAction actionWithTitle:[bundle localizedTwitterStringForKey:@"CANCEL_ACTION_LABEL"]
+                                              style:UIAlertActionStyleCancel
+                                            handler:nil]];
+    __weak typeof(self) weakSelf = self;
+    UIAlertAction* restore =
+        [UIAlertAction actionWithTitle:[bundle localizedStringForKey:@"CUSTOM_TAB_BAR_RESTORE_ACTION"]
+                                 style:UIAlertActionStyleDefault
+                               handler:^(__unused UIAlertAction* action) {
+                                   [weakSelf selectPages:[PFBCustomTabBarUtility defaultVisiblePageIDs]];
+                                   [weakSelf recomputeChanges];
+                                   [weakSelf.gridView reloadData];
+                                   [weakSelf.previewView reloadData];
+                               }];
+    [alert addAction:restore];
+    alert.preferredAction = restore;
     [self presentViewController:alert animated:YES completion:nil];
+}
+
+// The refusal takes the instructions' place in the alert color for a moment, and the
+// tile shakes, as the Explore bar of the settings does.
+- (void)refuseTileAtIndexPath:(NSIndexPath*)indexPath withMessage:(NSString*)message {
+    UILabel* header = self.headerLabel;
+    header.text = message;
+    header.textColor = [UIColor systemRedColor];
+    CAKeyframeAnimation* nudge = [CAKeyframeAnimation animationWithKeyPath:@"transform.translation.x"];
+    nudge.values = @[ @0, @(-4), @4, @(-2), @0 ];
+    nudge.duration = 0.32;
+    [[self.gridView cellForItemAtIndexPath:indexPath].layer addAnimation:nudge forKey:@"pfbRefuse"];
+    NSString* instructions = [[PFBBundle sharedBundle] localizedStringForKey:@"CUSTOM_TAB_BAR_GRID_DETAIL"];
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1.8 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+        if ([header.text isEqualToString:message]) {
+            header.text = instructions;
+            header.textColor = [UIColor secondaryLabelColor];
+        }
+    });
 }
 
 #pragma mark - Reordering (preview row)
@@ -426,6 +502,7 @@ static UIViewController* findViewControllerOfClass(UIViewController* vc,
         label.text = [[PFBBundle sharedBundle]
             localizedStringForKey:@"CUSTOM_TAB_BAR_GRID_DETAIL"];
         [header addSubview:label];
+        self.headerLabel = label;
         return header;
     }
 
@@ -440,9 +517,8 @@ static UIViewController* findViewControllerOfClass(UIViewController* vc,
             @"SUBSCRIPTION_TAB_CUSTOMIZATION_RESTORE_BUTTON_TITLE"];
     UIButton* restore = [UIButton buttonWithType:UIButtonTypeSystem];
     [restore setTitle:title forState:UIControlStateNormal];
-    // Same quiet style as the theme picker's "Reset to default" pill.
+    // Same quiet outlined pill as the theme picker's "Reset to default" button.
     restore.titleLabel.font = PFBScaledFont([TwitterChirpFont(TwitterFontStyleRegular) fontWithSize:15]);
-    // Pale gray text, matching the color theme's "Reset to default" row.
     [restore setTitleColor:[UIColor secondaryLabelColor] forState:UIControlStateNormal];
     restore.backgroundColor = [UIColor clearColor];
     restore.layer.cornerRadius = 20;
@@ -480,6 +556,14 @@ static UIViewController* findViewControllerOfClass(UIViewController* vc,
     if ([self.selectedPages containsObject:page]) {
         [self.selectedPages removeObject:page];
     } else {
+        // Twitter shows only the tabs its bar holds: a pick beyond that would be saved and
+        // never seen.
+        NSInteger capacity = [self barCapacity];
+        if (capacity > 0 && (NSInteger)self.selectedPages.count >= capacity) {
+            NSString* format = [[PFBBundle sharedBundle] localizedStringForKey:@"CUSTOM_TAB_BAR_FULL_FORMAT"];
+            [self refuseTileAtIndexPath:indexPath withMessage:[NSString stringWithFormat:format, (long)capacity]];
+            return;
+        }
         [self.selectedPages addObject:page];
     }
 

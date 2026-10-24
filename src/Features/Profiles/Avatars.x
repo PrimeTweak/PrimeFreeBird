@@ -3,8 +3,8 @@
 #import "Support/HookHelpers.h"
 
 // Style 2 is the circular default and style 3 the rounded square the app uses for
-// organization accounts. Coercing the style leaves masking, corner radius, shadow
-// layers and the image pipeline to the views themselves.
+// organization accounts. The views mask and round themselves from the style; the
+// circular shadow layer and pre-clipped images are handled below.
 
 @interface TFNAvatarImageView : UIView
 @property (nonatomic) NSInteger style;
@@ -40,7 +40,7 @@ void PFBApplySquareAvatarsSetting(void) {
 
     for (UIWindow* window in UIApplication.sharedApplication.windows) {
         PFBEnumerateSubviewsRecursively(window, ^(UIView* view) {
-            if (![view isKindOfClass:avatarClass]) {
+            if (![view isKindOfClass:avatarClass] || ![view respondsToSelector:@selector(style)]) {
                 return;
             }
 
@@ -74,7 +74,12 @@ void PFBApplySquareAvatarsSetting(void) {
 
 + (NSInteger)avatarImageViewStyleWithProfileImageShape:(NSInteger)shape
                                           identityType:(NSInteger)identityType {
-    return [PFBSettings boolForKey:@"square_avatars"] ? 3 : %orig;
+    if (![PFBSettings boolForKey:@"square_avatars"]) {
+        PFBCOMPAT_OBSERVE(PFBCompat_square_avatars, @"avatar style read");
+        return %orig;
+    }
+    PFBCOMPAT_ACTION(PFBCompat_square_avatars, @"square style given");
+    return 3;
 }
 
 %end
@@ -125,6 +130,9 @@ void PFBApplySquareAvatarsSetting(void) {
 
     UIImage* roundedImage = UIGraphicsGetImageFromCurrentImageContext();
     UIGraphicsEndImageContext();
+    if (roundedImage) {
+        PFBCOMPAT_ACTION(PFBCompat_square_avatars, @"avatar image squared");
+    }
 
     return roundedImage ?: self;
 }

@@ -1,8 +1,6 @@
-// Hide a conversation by its root identifier, from every list at once, through an
-// entry added to the Tweet's menu.
+// Hide conversations: a Tweet menu entry that hides a conversation from every list.
 
 #import "Support/HookHelpers.h"
-#import "Support/TwitterChirpFont.h"
 
 static NSString* const kPFBHiddenThreadsKey = @"pfb_hidden_threads";
 static NSString* const kPFBThreadIDKey = @"id";
@@ -140,8 +138,7 @@ static NSString* PFBStringValue(id value) {
     return nil;
 }
 
-// The conversation's own identifier when the model carries one; the Tweet's own
-// when it does not, which is the case for a root that has replies.
+// An identifier as text, whether the model answers with a string or a number.
 static NSString* PFBIdentifierValue(id model, SEL selector) {
     NSString* text = PFBStringValue(PFBAsk(model, selector));
     if (text.length) {
@@ -250,14 +247,16 @@ static NSString* PFBPreviewForModel(id model) {
     NSString* flat = [[text componentsSeparatedByCharactersInSet:
                                 [NSCharacterSet newlineCharacterSet]]
         componentsJoinedByString:@" "];
-    return flat.length > 90 ? [[flat substringToIndex:90]
-                                 stringByAppendingString:@"…"]
-                            : flat;
+    if (flat.length <= 90) {
+        return flat;
+    }
+    // Cut before the character that holds unit 90, never inside an emoji.
+    NSUInteger cut = [flat rangeOfComposedCharacterSequenceAtIndex:90].location;
+    return [[flat substringToIndex:cut] stringByAppendingString:@"…"];
 }
 
-// Read by the timeline predicate, which owns the decision to drop an entry.
-// The toggle gates the whole feature: off, nothing is treated as hidden, so the
-// list the user built is kept on disk but not removed from the timeline.
+// Read by the timeline filter, which decides whether an entry is dropped. With the
+// option off nothing counts as hidden: the list stays saved and its conversations show.
 BOOL pfbThreadIsHidden(id viewModel) {
     if (![PFBSettings boolForKey:@"hide_threads"]) {
         return NO;
@@ -274,7 +273,7 @@ BOOL pfbThreadIsHidden(id viewModel) {
 // have a thin even stroke of their own. A speech bubble crossed by a stroke that
 // leaves a gap around itself so both shapes stay legible at this size.
 
-static UIImage* PFBHideThreadGlyph(UIColor* colour) {
+static UIImage* PFBHideThreadGlyph(UIColor* color) {
     CGFloat side = kPFBHideGlyphSide;
     UIGraphicsImageRendererFormat* format =
         [UIGraphicsImageRendererFormat preferredFormat];
@@ -286,7 +285,7 @@ static UIImage* PFBHideThreadGlyph(UIColor* colour) {
         imageWithActions:^(UIGraphicsImageRendererContext* _Nonnull context) {
           CGContextRef ctx = context.CGContext;
           CGFloat line = 1.6;
-          [colour setStroke];
+          [color setStroke];
           CGContextSetLineWidth(ctx, line);
           CGContextSetLineCap(ctx, kCGLineCapRound);
           CGContextSetLineJoin(ctx, kCGLineJoinRound);
@@ -314,159 +313,28 @@ static UIImage* PFBHideThreadGlyph(UIColor* colour) {
           [slash stroke];
           CGContextSetBlendMode(ctx, kCGBlendModeNormal);
           slash.lineWidth = line;
-          [colour setStroke];
+          [color setStroke];
           [slash stroke];
         }];
     return [drawn imageWithRenderingMode:UIImageRenderingModeAlwaysOriginal];
 }
 
-// Refreshing the muted words folds the hidden conversations into the timeline's memo
-// signature. Reloading the table does nothing: the filter runs when sections are
-// handed to the data view controller, so Timeline.x replays that hand-over.
+// Refreshing the muted words makes the timeline filter see the changed list. Reloading
+// the table is not enough: the filter runs when sections are handed to the data view
+// controller, so Timeline.x replays that hand-over.
 static void PFBReloadList(void) {
     pfbRefreshMutedWords();
     pfbReapplyTimelineFilter();
 }
 
-// MARK: - The confirmation strip
+// MARK: - The confirmation
 
-// Built here end to end, since the app's own strip draws its label white with no
-// way to change it. Placed where the app puts its own: a capsule at the top, over
-// the header, with the text in the system label color.
-
-static const NSInteger kPFBToastTag = 90312;
-
-static void PFBDismissToast(UIView* toast) {
-    [UIView animateWithDuration:0.22
-        animations:^{
-          toast.alpha = 0;
-          toast.transform = CGAffineTransformMakeTranslation(0.0, -8.0);
-        }
-        completion:^(BOOL finished) {
-          [toast removeFromSuperview];
-        }];
-}
-
+// Its Undo brings the conversation back.
 static void PFBShowHiddenToast(NSString* threadID) {
-    UIWindow* window = nil;
-    for (UIScene* scene in UIApplication.sharedApplication.connectedScenes) {
-        if (![scene isKindOfClass:[UIWindowScene class]]) {
-            continue;
-        }
-        for (UIWindow* candidate in ((UIWindowScene*)scene).windows) {
-            if (candidate.isKeyWindow) {
-                window = candidate;
-            }
-        }
-    }
-    if (!window) {
-        return;
-    }
-    [[window viewWithTag:kPFBToastTag] removeFromSuperview];
-
-    // Under Liquid Glass the capsule is real glass, which draws its own rounded
-    // shape and edge. Under the standard interface it is the frosted material,
-    // clipped to a rounded rect with a hairline border.
-    BOOL liquidGlass = [PFBSettings boolForKey:@"enable_liquid_glass"];
-    Class glassClass = NSClassFromString(@"UIGlassEffect");
-    UIVisualEffect* effect = nil;
-    if (liquidGlass && glassClass) {
-        effect = [[glassClass alloc] init];
-    }
-    if (!effect) {
-        effect = [UIBlurEffect effectWithStyle:UIBlurEffectStyleSystemThickMaterial];
-        liquidGlass = NO;
-    }
-    UIVisualEffectView* toast = [[UIVisualEffectView alloc] initWithEffect:effect];
-    toast.tag = kPFBToastTag;
-    toast.translatesAutoresizingMaskIntoConstraints = NO;
-    if (!liquidGlass) {
-        // Real glass shapes itself; the material capsule needs the corners and
-        // the border drawn on.
-        toast.clipsToBounds = YES;
-        toast.layer.cornerRadius = 22.0;
-        toast.layer.cornerCurve = kCACornerCurveContinuous;
-        toast.layer.borderWidth = 0.5;
-        toast.layer.borderColor = [UIColor separatorColor].CGColor;
-    } else {
-        // The glass rounds its own corners once told the radius; nothing is
-        // clipped, so its shadow and edge treatment survive.
-        toast.layer.cornerRadius = 22.0;
-        toast.layer.cornerCurve = kCACornerCurveContinuous;
-    }
-    [window addSubview:toast];
-
-    UIView* content = toast.contentView;
-
-    // The same veil as the hidden-notification toast: pure glass lets the timeline
-    // read through the words, and 80 % of the background color keeps the material
-    // visible. The rounded corners and masksToBounds are not optional.
-    UIView* veil = [[UIView alloc] init];
-    veil.backgroundColor = [[UIColor systemBackgroundColor] colorWithAlphaComponent:0.80];
-    veil.userInteractionEnabled = NO;    // Undo must stay tappable
-    veil.layer.cornerRadius = 22.0;      // exactly the capsule's radius above
-    veil.layer.cornerCurve = kCACornerCurveContinuous;
-    veil.layer.masksToBounds = YES;
-    veil.translatesAutoresizingMaskIntoConstraints = NO;
-    [content addSubview:veil];           // BEFORE the label, so it sits behind
-    [NSLayoutConstraint activateConstraints:@[
-        [veil.topAnchor constraintEqualToAnchor:content.topAnchor],
-        [veil.bottomAnchor constraintEqualToAnchor:content.bottomAnchor],
-        [veil.leadingAnchor constraintEqualToAnchor:content.leadingAnchor],
-        [veil.trailingAnchor constraintEqualToAnchor:content.trailingAnchor],
-    ]];
-
-    UILabel* label = [[UILabel alloc] init];
-    label.text = [[PFBBundle sharedBundle] localizedStringForKey:@"THREADS_HIDDEN_TOAST"];
-    label.font = PFBScaledFont([TwitterChirpFont(TwitterFontStyleRegular) fontWithSize:15]);
-    label.textColor = [UIColor labelColor];
-    label.translatesAutoresizingMaskIntoConstraints = NO;
-    [content addSubview:label];
-
-    UIButton* undo = [UIButton buttonWithType:UIButtonTypeSystem];
-    [undo setTitle:[[PFBBundle sharedBundle] localizedStringForKey:@"THREADS_UNDO"]
-          forState:UIControlStateNormal];
-    [undo setTitleColor:PFBCurrentAccentColor() forState:UIControlStateNormal];
-    undo.titleLabel.font = PFBScaledFont([TwitterChirpFont(TwitterFontStyleSemibold) fontWithSize:15]);
-    undo.translatesAutoresizingMaskIntoConstraints = NO;
-    // Weak: the toast holds the button, which holds this action.
-    __weak UIVisualEffectView* weakToast = toast;
-    [undo addAction:[UIAction actionWithHandler:^(__unused UIAction* action) {
-              PFBUnhideThread(threadID);
-              pfbRefreshMutedWords();
-              pfbReapplyTimelineFilter();
-              PFBDismissToast(weakToast);
-            }]
-        forControlEvents:UIControlEventTouchUpInside];
-    [content addSubview:undo];
-
-    [NSLayoutConstraint activateConstraints:@[
-        [toast.centerXAnchor constraintEqualToAnchor:window.centerXAnchor],
-        [toast.topAnchor constraintEqualToAnchor:window.safeAreaLayoutGuide.topAnchor
-                                        constant:6],
-        [toast.heightAnchor constraintEqualToConstant:44],
-        [toast.leadingAnchor constraintGreaterThanOrEqualToAnchor:window.leadingAnchor
-                                                        constant:20],
-        [label.leadingAnchor constraintEqualToAnchor:content.leadingAnchor constant:18],
-        [label.centerYAnchor constraintEqualToAnchor:content.centerYAnchor],
-        [undo.leadingAnchor constraintEqualToAnchor:label.trailingAnchor constant:14],
-        [undo.trailingAnchor constraintEqualToAnchor:content.trailingAnchor constant:-18],
-        [undo.centerYAnchor constraintEqualToAnchor:content.centerYAnchor],
-    ]];
-
-    toast.alpha = 0;
-    toast.transform = CGAffineTransformMakeTranslation(0.0, -8.0);
-    [UIView animateWithDuration:0.22
-                     animations:^{
-                       toast.alpha = 1;
-                       toast.transform = CGAffineTransformIdentity;
-                     }];
-    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(4.0 * NSEC_PER_SEC)),
-                   dispatch_get_main_queue(), ^{
-                     if (toast.superview) {
-                         PFBDismissToast(toast);
-                     }
-                   });
+    PFBShowToast(nil, [[PFBBundle sharedBundle] localizedStringForKey:@"THREADS_HIDDEN_TOAST"], ^{
+        PFBUnhideThread(threadID);
+        PFBReloadList();
+    });
 }
 
 // MARK: - The entry in the Tweet's own menu
@@ -556,11 +424,11 @@ static BOOL PFBMenuBelongsToTweet(UIMenu* menu) {
         return;
     }
     PFBCompatReach(PFBCompatPath_threads_popup_menu);
-    UIColor* colour = [UIColor labelColor];
-    colour = [colour resolvedColorWithTraitCollection:button.traitCollection] ?: colour;
+    UIColor* color = [UIColor labelColor];
+    color = [color resolvedColorWithTraitCollection:button.traitCollection] ?: color;
     UIAction* hide = [UIAction
         actionWithTitle:title
-                  image:PFBHideThreadGlyph(colour)
+                  image:PFBHideThreadGlyph(color)
              identifier:nil
                 handler:^(__unused UIAction* action) {
                   UIView* source = weakButton;
@@ -581,15 +449,19 @@ static BOOL PFBMenuBelongsToTweet(UIMenu* menu) {
 
 // MARK: - The entry in the Tweet's menu sheet
 
-// Twitter 12.36 builds a Tweet's menu as a sheet of action items and shows it as its
-// "About this post" tray, where an entry it does not know lands under "More". The
-// Tweet is held while its menu is built, for the one sheet made then.
+// A Tweet's menu is built as a sheet of action items and shown as the "About this post"
+// tray, where an entry Twitter does not know lands under "More". The Tweet is held
+// while its menu is built, for the one sheet made then.
 static id gPFBSheetStatus;
 
 // As in the pop-up menu, the entry is on every Tweet's menu and acts on a Tweet in a
-// conversation. Its icon is Twitter's crossed speech bubble, drawn like the sheet's own.
+// conversation. Its icon is Twitter's own crossed speech bubble.
 static TFNActionItem* PFBHideActionItem(id status) {
-    return [%c(TFNActionItem)
+    Class itemClass = %c(TFNActionItem);
+    if (![itemClass respondsToSelector:@selector(actionItemWithTitle:imageName:action:)]) {
+        return nil;
+    }
+    return [itemClass
         actionItemWithTitle:[[PFBBundle sharedBundle] localizedStringForKey:@"THREADS_HIDE_ACTION"]
                   imageName:@"chat_bubble_strikethrough_stroke"
                      action:^{

@@ -1,5 +1,4 @@
-// Send sound: an imported sound, kept as a 16-bit PCM CAF file, plays once for each
-// Tweet or thread handed to Twitter's outbox for sending.
+// Send sound: an imported sound played once for each Tweet or thread handed to the outbox.
 
 #import "Support/HookHelpers.h"
 #import "Debug/PFBDebugger.h"

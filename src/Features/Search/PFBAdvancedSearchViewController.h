@@ -1,5 +1,4 @@
-// Native form for the web's full Advanced Search (words, accounts, engagement, dates):
-// builds an operator query and launches it in the app's own search results.
+// Advanced Search form: builds an operator query and opens it in search results.
 
 #import <UIKit/UIKit.h>
 

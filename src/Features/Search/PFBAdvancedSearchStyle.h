@@ -9,6 +9,11 @@ static inline UIColor* PFBAdvBlue(void) {
                             blue:0xF0 / 255.0
                            alpha:1.0];
 }
+// Sets the gray border of a form box again. A layer border keeps the CGColor it was
+// given, so its owner calls this when the appearance changes.
+static inline void PFBAdvRefreshBoxBorder(UIView* box) {
+    box.layer.borderColor = [[UIColor systemGray3Color] resolvedColorWithTraitCollection:box.traitCollection].CGColor;
+}
 // Builds the web form's bordered box with a floating label, hosting an
 // arbitrary content view, plus the gray example line underneath.
 static inline UILabel* PFBAdvInstallBox(UITableViewCell* cell,

@@ -1,5 +1,4 @@
-// The tab-bar preview cell of the tab editor, mirroring the native
-// TabCustomizationSelectedItemCell.
+// The tab-bar preview cell of the tab editor.
 
 #import <UIKit/UIKit.h>
 

@@ -1,6 +1,8 @@
 // Access to the app's Chirp font faces.
 
+#import <CoreText/CoreText.h>
 #import <UIKit/UIKit.h>
+#import <objc/message.h>
 #import <objc/runtime.h>
 #import "Support/TAEHeaders.h"
 
@@ -13,6 +15,26 @@ typedef NS_ENUM(NSInteger, TwitterFontStyle) {
 // Scales a font with the reader's text size, as Twitter's own screens do.
 static inline UIFont* PFBScaledFont(UIFont* font) {
     return font ? [[UIFontMetrics defaultMetrics] scaledFontForFont:font] : nil;
+}
+
+// A font of Twitter's default font group by its getter, or the fallback when the group does
+// not answer it.
+static inline UIFont* PFBFontGroupFont(SEL getter, UIFont* fallback) {
+    Class groupClass = objc_getClass("TFNUIDefaultFontGroup");
+    id group = [groupClass respondsToSelector:@selector(sharedFontGroup)] ? [groupClass sharedFontGroup] : nil;
+    id font = [group respondsToSelector:getter] ? ((id (*)(id, SEL))objc_msgSend)(group, getter) : nil;
+    return [font isKindOfClass:[UIFont class]] ? font : fallback;
+}
+
+// The same font with digits of equal width, so counters and timers hold still as they run.
+static inline UIFont* PFBTabularDigitsFont(UIFont* font) {
+    UIFontDescriptor* descriptor = [font.fontDescriptor fontDescriptorByAddingAttributes:@{
+        UIFontDescriptorFeatureSettingsAttribute: @[ @{
+            UIFontFeatureTypeIdentifierKey: @(kNumberSpacingType),
+            UIFontFeatureSelectorIdentifierKey: @(kMonospacedNumbersSelector)
+        } ]
+    }];
+    return [UIFont fontWithDescriptor:descriptor size:font.pointSize];
 }
 
 // A Chirp face from Twitter's own font group (TFNUIDefaultFontGroup) rather than

@@ -12,7 +12,7 @@
         self.userInteractionEnabled = NO;
         self.backgroundColor = [PFBPalette currentBackgroundColor];
 
-        // Same margin neutralisation as PFBModernSettingsTableViewCell, so the
+        // Same margin neutralization as PFBModernSettingsTableViewCell, so the
         // header's contentView starts at the rows' origin and its inset lines up.
         self.contentView.preservesSuperviewLayoutMargins = NO;
         self.contentView.layoutMargins = UIEdgeInsetsZero;
@@ -44,6 +44,12 @@
 
 - (void)configureWithTitle:(NSString*)title {
     self.headerLabel.text = title;
+}
+
+// The palette background is a fixed value: it is read again when light and dark switch.
+- (void)traitCollectionDidChange:(UITraitCollection*)previousTraitCollection {
+    [super traitCollectionDidChange:previousTraitCollection];
+    self.backgroundColor = [PFBPalette currentBackgroundColor];
 }
 
 @end

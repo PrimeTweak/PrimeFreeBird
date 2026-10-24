@@ -1,12 +1,11 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-# Builds FFmpeg and the libffmpegkit wrapper into build/ for iOS arm64 (Xcode on macOS,
-# Theos on Linux), with system TLS instead of OpenSSL. FFMPEG_TAG must match the
-# submodule's scripts/source.sh.
+# Builds FFmpeg and the libffmpegkit wrapper into build/ for iOS arm64, with system TLS.
 
 MIN_IOS=14.0
 
+# Must match the submodule's scripts/source.sh.
 FFMPEG_TAG=n8.1.2
 
 KIT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -24,7 +23,7 @@ if [[ "$(uname)" == "Darwin" ]]; then
     NM_BIN="$(xcrun -f nm)"
 else
     JOBS="$(nproc)"
-    THEOS="${THEOS:-/home/thea/theos}"
+    THEOS="${THEOS:?set THEOS to the Theos folder}"
     TOOLCHAIN="$THEOS/toolchain/linux/iphone/bin"
     SDK="${SDK:-$(ls -d "$THEOS"/sdks/iPhoneOS*.sdk 2>/dev/null | sort -V | tail -1)}"
     CC_BIN="$TOOLCHAIN/clang"
@@ -126,10 +125,9 @@ done
 # --- Install ----------------------------------------------------------------
 
 rm -rf "$OUT_DIR"
-mkdir -p "$OUT_DIR/lib/pkgconfig"
+mkdir -p "$OUT_DIR/lib"
 cp "$KIT_SRC"/*.h "$OUT_DIR/"
 cp -r "$FFMPEG_PREFIX"/include/* "$OUT_DIR/"
 cp "$FFMPEG_PREFIX"/lib/*.a "$KIT_BUILD/libffmpegkit.a" "$OUT_DIR/lib/"
-cp "$FFMPEG_PREFIX"/lib/pkgconfig/*.pc "$OUT_DIR/lib/pkgconfig/"
 
 echo "Done. Headers and libraries installed in $OUT_DIR."

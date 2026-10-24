@@ -3,17 +3,10 @@
 #import "Settings/PFBSettingsCellStyle.h"
 #import "Settings/PFBModernSettingsCompactButtonCell.h"
 
-UIColor* PFBSettingsSubtitleColor(void) {
-    Class TAEColorSettingsCls = objc_getClass("TAEColorSettings");
-    id settings = [TAEColorSettingsCls sharedSettings];
-    id currentPalette = [settings currentColorPalette];
-    id colorPalette = [currentPalette colorPalette];
-    return [colorPalette performSelector:@selector(tabBarItemColor)];
-}
-
 @interface PFBModernSettingsCompactButtonCell ()
 @property (nonatomic, strong) NSArray<NSLayoutConstraint*>* singleLine;
 @property (nonatomic, strong) NSArray<NSLayoutConstraint*>* withDetail;
+@property (nonatomic, assign) BOOL opensMenu;
 @end
 
 @implementation PFBModernSettingsCompactButtonCell
@@ -31,16 +24,15 @@ UIColor* PFBSettingsSubtitleColor(void) {
 - (void)setupViews {
     self.titleLabel = [[UILabel alloc] init];
     self.titleLabel.translatesAutoresizingMaskIntoConstraints = NO;
-    id fontGroup = [PFBManager sharedFontGroup];
-    self.titleLabel.font = [fontGroup performSelector:@selector(bodyBoldFont)];
+    self.titleLabel.numberOfLines = 0;
+    self.titleLabel.font = PFBSettingsTitleFont();
     self.titleLabel.textColor = [UIColor labelColor];
     [self.contentView addSubview:self.titleLabel];
  
     self.subtitleLabel = [[UILabel alloc] init];
     self.subtitleLabel.translatesAutoresizingMaskIntoConstraints = NO;
-    self.subtitleLabel.font = [fontGroup performSelector:@selector(subtext2Font)];
+    self.subtitleLabel.font = PFBSettingsDetailFont();
     self.subtitleLabel.textAlignment = NSTextAlignmentRight;
-    [self updateSubtitleColor];
     [self.contentView addSubview:self.subtitleLabel];
 
     self.detailLabel = [[UILabel alloc] init];
@@ -110,12 +102,18 @@ UIColor* PFBSettingsSubtitleColor(void) {
     // Rows are recycled: a described or chevron-less row must not pass that on.
     [self configureWithTitle:nil subtitle:nil detail:nil];
     [self setShowsChevron:YES];
+    [self setOpensMenu:NO];
     self.selectionStyle = UITableViewCellSelectionStyleDefault;
 }
 
 // The chevron's place is kept, so a value without one lines up with the others.
 - (void)setShowsChevron:(BOOL)showsChevron {
     self.chevronImageView.hidden = !showsChevron;
+}
+
+- (void)setOpensMenu:(BOOL)opensMenu {
+    _opensMenu = opensMenu;
+    [self updateChevronColor];
 }
 
 - (void)configureWithTitle:(NSString*)title subtitle:(NSString*)subtitle detail:(NSString*)detail {
@@ -132,11 +130,22 @@ UIColor* PFBSettingsSubtitleColor(void) {
                                                         forAxis:UILayoutConstraintAxisHorizontal];
 }
  
+// A row that opens a menu in place shows the up-down chevron of UIKit's pop-up buttons; a
+// row that leads to a screen shows Twitter's right chevron.
 - (void)updateChevronColor {
+    UIColor* chevronColor = [UIColor tertiaryLabelColor];
+    if (self.opensMenu) {
+        UIImageSymbolConfiguration* config =
+            [UIImageSymbolConfiguration configurationWithPointSize:12 weight:UIImageSymbolWeightSemibold];
+        self.chevronImageView.contentMode = UIViewContentModeCenter;
+        self.chevronImageView.tintColor = chevronColor;
+        self.chevronImageView.image = [UIImage systemImageNamed:@"chevron.up.chevron.down" withConfiguration:config];
+        return;
+    }
+    self.chevronImageView.contentMode = UIViewContentModeScaleAspectFit;
     if (![UIImage respondsToSelector:@selector(tfn_vectorImageNamed:fitsSize:fillColor:)]) {
         return;
     }
-    UIColor* chevronColor = [UIColor tertiaryLabelColor];
     self.chevronImageView.image = [UIImage tfn_vectorImageNamed:@"chevron_right"
                                                        fitsSize:CGSizeMake(18, 18)
                                                       fillColor:chevronColor];
@@ -151,13 +160,13 @@ UIColor* PFBSettingsSubtitleColor(void) {
 - (void)traitCollectionDidChange:(UITraitCollection*)previousTraitCollection {
     [super traitCollectionDidChange:previousTraitCollection];
     self.backgroundColor = [PFBPalette currentBackgroundColor];
+    pfbApplySelectedBackground(self);
     [self updateChevronColor];
     [self updateSubtitleColor];
     if (previousTraitCollection.preferredContentSizeCategory !=
         self.traitCollection.preferredContentSizeCategory) {
-        id fontGroup = [PFBManager sharedFontGroup];
-        self.titleLabel.font = [fontGroup performSelector:@selector(bodyBoldFont)];
-        self.subtitleLabel.font = [fontGroup performSelector:@selector(subtext2Font)];
+        self.titleLabel.font = PFBSettingsTitleFont();
+        self.subtitleLabel.font = PFBSettingsDetailFont();
         self.detailLabel.font = self.subtitleLabel.font;
     }
 }

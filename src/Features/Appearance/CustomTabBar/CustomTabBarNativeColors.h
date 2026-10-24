@@ -1,5 +1,4 @@
-// The native tab-customization color tokens, with system fallbacks when a
-// selector disappears after an app update.
+// The native tab-customization color tokens, with system fallbacks.
 
 #import <UIKit/UIKit.h>
 

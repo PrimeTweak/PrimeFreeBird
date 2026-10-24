@@ -1,5 +1,5 @@
-#import "Support/PFBManager.h"
 #import "Features/Appearance/ThemeColor/PFBPalette.h"
+#import "Settings/PFBSettingsCellStyle.h"
 #import "Settings/PFBModernSettingsButtonPairCell.h"
 
 @interface PFBModernSettingsButtonPairCell ()
@@ -75,16 +75,12 @@
 }
 
 - (void)applyTheme {
-    id fontGroup = [PFBManager sharedFontGroup];
-    Class TAEColorSettingsCls = objc_getClass("TAEColorSettings");
-    id colorPalette =
-        [[[TAEColorSettingsCls sharedSettings] currentColorPalette] colorPalette];
     self.backgroundColor = [PFBPalette currentBackgroundColor];
-    UIFont* font = [fontGroup performSelector:@selector(bodyBoldFont)];
-    UIColor* ink = [colorPalette performSelector:@selector(textColor)];
-    UIColor* soft = [colorPalette performSelector:@selector(tabBarItemColor)];
-    UIColor* faint = [colorPalette performSelector:@selector(faintBackgroundColor)];
-    UIColor* alert = [colorPalette performSelector:@selector(alertColor)];
+    UIFont* font = PFBSettingsTitleFont();
+    UIColor* ink = PFBSettingsTextColor();
+    UIColor* soft = PFBSettingsSubtitleColor();
+    UIColor* faint = PFBSettingsFaintColor();
+    UIColor* alert = PFBSettingsAlertColor();
     for (UIButton* button in @[ self.firstButton, self.secondButton ]) {
         button.titleLabel.font = font;
         button.backgroundColor = faint;
@@ -93,6 +89,12 @@
     // The session card's colors for its destructive button.
     [self.secondButton setTitleColor:self.secondDestructive ? alert : ink forState:UIControlStateNormal];
     [self.secondButton setTitleColor:soft forState:UIControlStateDisabled];
+}
+
+// Palette colors are fixed values: they are read again when light and dark switch.
+- (void)traitCollectionDidChange:(UITraitCollection*)previousTraitCollection {
+    [super traitCollectionDidChange:previousTraitCollection];
+    [self applyTheme];
 }
 
 @end

@@ -11,7 +11,6 @@
 #import "Support/HookHelpers.h"
 #import "Common/PFBCompatibility.h"
 #import "Debug/PFBDebugger.h"
-#import "Support/FLEXHeaders.h"
 
 @interface PFBModernSettingsPageViewController ()
 @property (nonatomic, copy) NSString* registryPageKey;
@@ -199,9 +198,7 @@ static NSURL* PFBAccountAvatarURL(TFNTwitterAccount* account) {
         NSString* hiddenWhen = toggleData[@"hiddenWhen"];
         BOOL show = YES;
         if (parentKey) {
-            // The parent's own state, declared default included. Reading the
-            // CHILD's default here would decide a parent's state from a row that
-            // is not the parent.
+            // The parent's own state, its declared default included.
             show = [PFBSettings boolForKey:parentKey];
         }
         if (show && hiddenWhen && [PFBSettings boolForKey:hiddenWhen]) {
@@ -274,9 +271,11 @@ static NSURL* PFBAccountAvatarURL(TFNTwitterAccount* account) {
                            detail:[bundle localizedStringForKey:
                                               signedIn ? @"WEB_SESSION_LIVE_DETAIL"
                                                        : @"WEB_SESSION_NONE_DETAIL"]
-                     primaryTitle:[bundle localizedStringForKey:@"WEB_SESSION_SIGN_IN_ACTION"]
+                     primaryTitle:[bundle localizedStringForKey:signedIn ? @"WEB_SESSION_SIGN_IN_AGAIN_ACTION"
+                                                                         : @"WEB_SESSION_SIGN_IN_ACTION"]
                  destructiveTitle:[bundle localizedStringForKey:@"WEB_SESSION_CLEAR_ACTION"]];
-        [cell loadAvatarFromURL:PFBAccountAvatarURL(self.account)];
+        // Signed out, the card downloads no photo.
+        [cell loadAvatarFromURL:signedIn ? PFBAccountAvatarURL(self.account) : nil];
         [cell addPrimaryTarget:self action:@selector(sessionSignInTapped:)];
         [cell addDestructiveTarget:self action:@selector(sessionClearTapped:)];
         return cell;
@@ -323,6 +322,8 @@ static NSURL* PFBAccountAvatarURL(TFNTwitterAccount* account) {
         }
         NSString* key = toggleData[@"key"];
         [cell configureWithTitle:title subtitle:subtitle detail:key ? [self localizedDetailForKey:key] : nil];
+        // A row that asks for its value in place leads to no screen.
+        [cell setShowsChevron:![toggleData[@"opensPrompt"] boolValue]];
         [self attachMenuIfNeeded:cell entry:toggleData];
         return cell;
     } else if ([type isEqualToString:@"button"]) {
@@ -361,8 +362,7 @@ static NSURL* PFBAccountAvatarURL(TFNTwitterAccount* account) {
                                                                          forIndexPath:indexPath];
         NSString* key = toggleData[@"key"];
         NSString* title = [self localizedTitleForEntry:toggleData];
-        BOOL isEnabled = [[[NSUserDefaults standardUserDefaults] objectForKey:key]
-                              ?: toggleData[@"default"] boolValue];
+        BOOL isEnabled = [PFBSettings boolForKey:key];
         // A row is held while another option is on, or while it waits; one that waits
         // still turns off, so it never stays on out of reach.
         BOOL waiting = [self rowIsWaiting:toggleData];
@@ -431,7 +431,11 @@ static NSURL* PFBAccountAvatarURL(TFNTwitterAccount* account) {
     UIButton* button = [cell.contentView viewWithTag:kMenuButtonTag];
     NSString* provider = entry[@"menu"];
     SEL selector = provider ? NSSelectorFromString(provider) : NULL;
-    if (!selector || ![self respondsToSelector:selector]) {
+    BOOL opensMenu = selector && [self respondsToSelector:selector];
+    if ([cell isKindOfClass:[PFBModernSettingsCompactButtonCell class]]) {
+        [(PFBModernSettingsCompactButtonCell*)cell setOpensMenu:opensMenu];
+    }
+    if (!opensMenu) {
         [button removeFromSuperview];
         return;
     }
@@ -483,13 +487,8 @@ static NSURL* PFBAccountAvatarURL(TFNTwitterAccount* account) {
     label.translatesAutoresizingMaskIntoConstraints = NO;
     label.text = [[PFBBundle sharedBundle] localizedStringForKey:[self pageSubtitleKey]];
     label.numberOfLines = 0;
-    id fontGroup = [PFBManager sharedFontGroup];
-    label.font = [fontGroup performSelector:@selector(subtext2Font)];
-    Class TAEColorSettingsCls = objc_getClass("TAEColorSettings");
-    id settings = [TAEColorSettingsCls sharedSettings];
-    id colorPalette = [[settings currentColorPalette] colorPalette];
-    UIColor* subtitleColor = [colorPalette performSelector:@selector(tabBarItemColor)];
-    label.textColor = subtitleColor;
+    label.font = PFBSettingsDetailFont();
+    label.textColor = PFBSettingsSubtitleColor();
     [header addSubview:label];
     [NSLayoutConstraint activateConstraints:@[
         [label.leadingAnchor constraintEqualToAnchor:header.leadingAnchor
@@ -514,8 +513,7 @@ static NSURL* PFBAccountAvatarURL(TFNTwitterAccount* account) {
 // the conditions are named, so the registry stays declarative.
 - (BOOL)rowIsWaiting:(NSDictionary*)entry {
     NSString* requires = entry[@"blockedUnless"];
-    return requires && !([requires isEqualToString:@"web_session"] ? PFBHasUsableWebCredentials()
-                                                                   : [PFBSettings boolForKey:requires]);
+    return [requires isEqualToString:@"web_session"] && !PFBHasUsableWebCredentials();
 }
 
 // A row another option holds must redraw the moment that option moves,
@@ -695,7 +693,8 @@ static NSURL* PFBAccountAvatarURL(TFNTwitterAccount* account) {
             PFBSyncAccentTheme();
         }
 
-        if ([key isEqualToString:@"restore_tweet_button"]) {
+        // Record activity is read once, at launch.
+        if ([key isEqualToString:@"restore_tweet_button"] || [key isEqualToString:@"debug_tools"]) {
             [self showRestartRequiredAlert];
         }
         // Only on the way on: turning one of these off gives the app back its
@@ -775,41 +774,48 @@ static NSURL* PFBAccountAvatarURL(TFNTwitterAccount* account) {
     if (scoped) {
         [url stopAccessingSecurityScopedResource];
     }
-    NSInteger applied = [PFBSettingsBackup importData:data];
+    NSDictionary* settings = [PFBSettingsBackup settingsInData:data];
     PFBBundle* bundle = [PFBBundle sharedBundle];
-    NSString* title;
-    NSString* message;
-    if (applied < 0) {
-        title = [bundle localizedStringForKey:@"IMPORT_SETTINGS_FAILED_TITLE"];
-        message = [bundle localizedStringForKey:@"IMPORT_SETTINGS_FAILED_MESSAGE"];
-    } else {
-        title = [bundle localizedStringForKey:@"IMPORT_SETTINGS_DONE_TITLE"];
-        message = [NSString
-            stringWithFormat:
-                [bundle localizedStringForKey:@"IMPORT_SETTINGS_DONE_MESSAGE"],
-                (unsigned long)applied];
-        // The same pair Theme.x listens to after a live color change, so the
-        // restored accent repaints without waiting for the restart.
-        NSNotificationCenter* center = [NSNotificationCenter defaultCenter];
-        [center postNotificationName:@"TFNDynamicColorsWillReloadNotification"
-                              object:nil];
-        [center postNotificationName:@"TFNDynamicColorsDidReloadNotification"
-                              object:nil];
-        [center postNotificationName:
-                    @"TAEColorSettingsDidChangeUserDefaultsNotification"
-                              object:nil];
-        [self.tableView reloadData];
+    if (!settings) {
+        UIAlertController* failed = [UIAlertController
+            alertControllerWithTitle:[bundle localizedStringForKey:@"IMPORT_SETTINGS_FAILED_TITLE"]
+                             message:[bundle localizedStringForKey:@"IMPORT_SETTINGS_FAILED_MESSAGE"]
+                      preferredStyle:UIAlertControllerStyleAlert];
+        [failed addAction:[UIAlertAction actionWithTitle:[bundle localizedStringForKey:@"OK_ACTION"]
+                                                   style:UIAlertActionStyleDefault
+                                                 handler:nil]];
+        [self presentViewController:failed animated:YES completion:nil];
+        return;
     }
-    UIAlertController* alert =
-        [UIAlertController alertControllerWithTitle:title
-                                            message:message
-                                     preferredStyle:UIAlertControllerStyleAlert];
-    [alert
-        addAction:[UIAlertAction
-                      actionWithTitle:[bundle localizedStringForKey:@"OK_ACTION"]
-                                style:UIAlertActionStyleDefault
-                              handler:nil]];
-    [self presentViewController:alert animated:YES completion:nil];
+    __weak typeof(self) weakSelf = self;
+    UIAlertController* confirm = [UIAlertController
+        alertControllerWithTitle:[bundle localizedStringForKey:@"IMPORT_SETTINGS_CONFIRM_TITLE"]
+                         message:[bundle localizedStringForKey:@"IMPORT_SETTINGS_CONFIRM_MESSAGE"]
+                  preferredStyle:UIAlertControllerStyleAlert];
+    [confirm addAction:[UIAlertAction actionWithTitle:[bundle localizedStringForKey:@"CANCEL_ACTION"]
+                                                style:UIAlertActionStyleCancel
+                                              handler:nil]];
+    [confirm addAction:[UIAlertAction actionWithTitle:[bundle localizedStringForKey:@"IMPORT_SETTINGS_CONFIRM_ACTION"]
+                                                style:UIAlertActionStyleDestructive
+                                              handler:^(__unused UIAlertAction* action) {
+                                                  [weakSelf applyImportedSettings:settings];
+                                              }]];
+    [self presentViewController:confirm animated:YES completion:nil];
+}
+
+- (void)applyImportedSettings:(NSDictionary*)settings {
+    [PFBSettingsBackup applySettings:settings];
+    // The notifications Theme.x posts after a live color change, so the restored
+    // accent repaints without waiting for the restart.
+    NSNotificationCenter* center = [NSNotificationCenter defaultCenter];
+    [center postNotificationName:@"TFNDynamicColorsWillReloadNotification" object:nil];
+    [center postNotificationName:@"TFNDynamicColorsDidReloadNotification" object:nil];
+    [center postNotificationName:@"TAEColorSettingsDidChangeUserDefaultsNotification" object:nil];
+    [self updateVisibleToggles];
+    [self.tableView reloadData];
+    PFBBundle* bundle = [PFBBundle sharedBundle];
+    [self presentRestartAlertWithTitle:[bundle localizedStringForKey:@"IMPORT_SETTINGS_DONE_TITLE"]
+                               message:[bundle localizedStringForKey:@"IMPORT_SETTINGS_DONE_MESSAGE"]];
 }
 
 // MARK: - Web session
@@ -825,6 +831,11 @@ static NSURL* PFBAccountAvatarURL(TFNTwitterAccount* account) {
                   preferredStyle:UIAlertControllerStyleAlert];
     [confirm addAction:[UIAlertAction
                            actionWithTitle:[[PFBBundle sharedBundle]
+                                               localizedStringForKey:@"CANCEL_ACTION"]
+                                     style:UIAlertActionStyleCancel
+                                   handler:nil]];
+    [confirm addAction:[UIAlertAction
+                           actionWithTitle:[[PFBBundle sharedBundle]
                                                localizedStringForKey:@"WEB_SESSION_CLEAR_ACTION"]
                                      style:UIAlertActionStyleDestructive
                                    handler:^(__unused UIAlertAction* action) {
@@ -835,11 +846,6 @@ static NSURL* PFBAccountAvatarURL(TFNTwitterAccount* account) {
                                        [weakSelf updateVisibleToggles];
                                        [weakSelf.tableView reloadData];
                                    }]];
-    [confirm addAction:[UIAlertAction
-                           actionWithTitle:[[PFBBundle sharedBundle]
-                                               localizedStringForKey:@"CANCEL_ACTION"]
-                                     style:UIAlertActionStyleCancel
-                                   handler:nil]];
     [self presentViewController:confirm animated:YES completion:nil];
 }
 
@@ -872,7 +878,8 @@ static NSURL* PFBAccountAvatarURL(TFNTwitterAccount* account) {
     UIAlertController* alert =
         [UIAlertController alertControllerWithTitle:[[PFBBundle sharedBundle]
                                                         localizedStringForKey:@"SHARING_DOMAIN_TITLE"]
-                                            message:nil
+                                            message:[[PFBBundle sharedBundle]
+                                                        localizedStringForKey:@"SHARING_DOMAIN_PROMPT_MESSAGE"]
                                      preferredStyle:UIAlertControllerStyleAlert];
 
     [alert addTextFieldWithConfigurationHandler:^(UITextField* textField) {
@@ -938,24 +945,29 @@ static NSURL* PFBAccountAvatarURL(TFNTwitterAccount* account) {
 
 - (void)showRestartRequiredAlert {
     PFBBundle* bundle = [PFBBundle sharedBundle];
-    UIAlertController* alert = [UIAlertController
-        alertControllerWithTitle:[bundle localizedStringForKey:@"RESTART_REQUIRED_ALERT_TITLE"]
-                         message:[bundle localizedStringForKey:@"RESTART_REQUIRED_ALERT_MESSAGE"]
-                  preferredStyle:UIAlertControllerStyleAlert];
-    [alert addAction:[UIAlertAction
-                         actionWithTitle:[bundle localizedStringForKey:@"RESTART_LATER_ACTION"]
-                                   style:UIAlertActionStyleCancel
-                                 handler:nil]];
-    [alert addAction:[UIAlertAction
-                         actionWithTitle:[bundle localizedTwitterStringForKey:@"OK_ACTION_LABEL"]
-                                   style:UIAlertActionStyleDefault
-                                 handler:^(UIAlertAction* action) {
-                                     // iOS gives an app no way to relaunch itself: the settings
-                                     // are saved, then the app quits and is reopened from its icon.
-                                     PFBCompatSaveNow();
-                                     [[NSUserDefaults standardUserDefaults] synchronize];
-                                     exit(0);
-                                 }]];
+    [self presentRestartAlertWithTitle:[bundle localizedStringForKey:@"RESTART_REQUIRED_ALERT_TITLE"]
+                               message:[bundle localizedStringForKey:@"RESTART_REQUIRED_ALERT_MESSAGE"]];
+}
+
+// Later keeps Twitter open; Close app saves the settings and quits, since iOS gives an
+// app no way to relaunch itself: it is reopened from its icon.
+- (void)presentRestartAlertWithTitle:(NSString*)title message:(NSString*)message {
+    PFBBundle* bundle = [PFBBundle sharedBundle];
+    UIAlertController* alert = [UIAlertController alertControllerWithTitle:title
+                                                                    message:message
+                                                             preferredStyle:UIAlertControllerStyleAlert];
+    [alert addAction:[UIAlertAction actionWithTitle:[bundle localizedStringForKey:@"RESTART_LATER_ACTION"]
+                                              style:UIAlertActionStyleCancel
+                                            handler:nil]];
+    UIAlertAction* close = [UIAlertAction actionWithTitle:[bundle localizedStringForKey:@"CLOSE_APP_ACTION"]
+                                                    style:UIAlertActionStyleDefault
+                                                  handler:^(__unused UIAlertAction* action) {
+                                                      PFBCompatSaveNow();
+                                                      [[NSUserDefaults standardUserDefaults] synchronize];
+                                                      exit(0);
+                                                  }];
+    [alert addAction:close];
+    alert.preferredAction = close;
     [self presentViewController:alert animated:YES completion:nil];
 }
 
@@ -1042,7 +1054,6 @@ static NSURL* PFBAccountAvatarURL(TFNTwitterAccount* account) {
 
 // MARK: - Diagnostics
 
-// Opens the Compatibility page.
 - (void)showCompatibility:(NSDictionary*)sender {
     [self.navigationController
         pushViewController:[[PFBModernSettingsPageViewController alloc] initWithAccount:self.account

@@ -20,6 +20,10 @@
 void PFBEnumerateSubviewsRecursively(UIView* view,
                                   void (^block)(UIView* currentView));
 
+// Depth-first walk that also enters hidden and transparent views, down to maxDepth
+// levels below view (HookHelpers.m)
+void PFBWalkAllSubviews(UIView* view, NSInteger maxDepth, void (^block)(UIView* currentView));
+
 // TFNDataViewItem unwrapping for timeline section filtering (HookHelpers.m)
 id PFBUnwrapDataViewItem(id item);
 
@@ -52,9 +56,6 @@ NSInteger pfbMutedHiddenCountToday(void);
 
 // Live pinned-tabs refresh when the hide setting is toggled (Timeline.x)
 void PFBApplyHideCustomTimelinesSetting(void);
-
-// What the blocked-Retweet filter saw first this launch, or nil (Timeline.x).
-NSString* PFBFirstRetweetSummary(void);
 
 // Runs the timeline filter again on the timelines already on screen (Timeline.x).
 void pfbReapplyTimelineFilter(void);
@@ -115,17 +116,41 @@ UIImageView* PFBTopBarLogoViewCurrent(void);
 
 // Whether a themed tab bar is switched on and an accent is active (Theme.x).
 BOOL PFBThemedTabBarWanted(void);
+// Whether the top bar logo takes the accent: Twitter icon on and an accent active (Theme.x).
+BOOL PFBTintedLogoWanted(void);
 
-// A copy of `source` painted in `colour` through its own alpha, rendered as
-// AlwaysOriginal so no tint can change it afterwards (NavBarIcons.x).
-UIImage* PFBPaintedGlyph(UIImage* source, UIColor* colour);
+// A copy of `source` painted in `color` through its own alpha, rendered as
+// AlwaysOriginal so no tint can change it afterwards.
+UIImage* PFBFlatGlyph(UIImage* source, UIColor* color);
 
-// The same repaint, without the mark PFBPaintedGlyph leaves on its result
-// (HiddenNotifications.x).
-UIImage* PFBFlatGlyph(UIImage* source, UIColor* colour);
+// The same repaint, marked so the top bar repairs know the image is already theirs
+// (NavBarIcons.x).
+UIImage* PFBPaintedGlyph(UIImage* source, UIColor* color);
+
+// The gray of the icons added to the top bars, resolved to a fixed color for the traits.
+UIColor* PFBBarIconGray(UITraitCollection* traits);
+
+// A one-page PDF of the bundle drawn centered in `size`, at `fill` of the largest size
+// that fits (1 fills it), in the PDF's own colors; nil when it cannot be read.
+UIImage* PFBBundlePDFImage(NSString* file, CGSize size, CGFloat fill);
+
+// A capsule at the top of the window (nil: the key window) with the text, and an Undo
+// that runs `undo` when one is given. It replaces the capsule shown before it and leaves
+// after a few seconds.
+void PFBShowToast(UIWindow* window, NSString* text, void (^undo)(void));
+
+// A button whose touch area reaches 44 × 44 points around its center, Apple's minimum,
+// while its glyph keeps its own size.
+@interface PFBHitButton : UIButton
+@end
+
+// The first view controller up a view's responder chain, or nil.
+UIViewController* PFBOwningController(UIView* view);
+// The same, with a navigation controller replaced by its top controller.
+UIViewController* PFBOwningTopController(UIView* view);
 
 // Present the interactive "Log in to Web Session" screen. The completion fires with
-// YES once cookies were harvested and stored, NO if the user cancelled.
+// YES once cookies were harvested and stored, NO if the user canceled.
 void PFBPresentWebSessionLogin(void (^completion)(BOOL success));
 
 // Wipes the stored web session: the tokens in memory, and X's and Twitter's cookies and
@@ -148,8 +173,7 @@ void PFBSendSoundImport(NSURL* source, void (^completion)(NSString* failureKey))
 // Deletes the stored send sound and its name.
 void PFBSendSoundRemove(void);
 
-// Sort replies as stored: a switch turned on before the menu existed reads as Recent
-// (ReplySorting.x).
+// Sort replies as stored; a stored YES (1) reads as Recent (ReplySorting.x).
 typedef NS_ENUM(NSInteger, PFBReplySortChoice) {
     PFBReplySortOff = 0,
     PFBReplySortRecent = 1,
@@ -157,8 +181,8 @@ typedef NS_ENUM(NSInteger, PFBReplySortChoice) {
     PFBReplySortRelevant = 3,
 };
 
-// Retweets as stored: a switch turned on before the menu existed reads as "not from
-// accounts that blocked you" (Timeline.x).
+// Retweets as stored; a stored YES (1) reads as "Not from accounts that blocked you"
+// (Timeline.x).
 typedef NS_ENUM(NSInteger, PFBRetweetsChoice) {
     PFBRetweetsAll = 0,
     PFBRetweetsNotFromBlockers = 1,

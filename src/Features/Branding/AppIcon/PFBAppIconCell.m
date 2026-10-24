@@ -2,15 +2,10 @@
 
 #import "Features/Branding/AppIcon/PFBAppIconCell.h"
 #import <QuartzCore/QuartzCore.h>
+#import "Support/TFNHeaders.h"
 
 // The native cell rounds the icon to width / 4.491 (~22.27%).
 static const CGFloat kAppIconCornerDivisor = 4.491;
-
-@interface UIImage (TFNAdditions)
-+ (id)tfn_vectorImageNamed:(id)arg1
-                  fitsSize:(struct CGSize)arg2
-                 fillColor:(id)arg3;
-@end
 
 @interface UIColor (NativeTokens)
 + (id)tfnuiColors;

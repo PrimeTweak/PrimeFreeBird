@@ -991,7 +991,7 @@ static NSMutableURLRequest* webRequestFromNativeSend(NSURLRequest* request) {
     if (isPeriscopeAuthURL(request.URL)) {
         NSMutableURLRequest* outgoing = webPathRequest(request, @"x.com", PeriscopeWebPath, @"periscope token", YES);
         if (outgoing) {
-            PFBCOMPAT_ACTION(PFBCompat_web_session, @"Spaces signed in with the web session");
+            PFBCOMPAT_ACTION(PFBCompat_web_session, @"Spaces sign-in rerouted to the web session");
         } else {
             PFBCOMPAT_OBSERVE(PFBCompat_web_session, @"Spaces sign-in seen, no web session");
         }
@@ -1004,7 +1004,7 @@ static NSMutableURLRequest* webRequestFromNativeSend(NSURLRequest* request) {
         NSMutableURLRequest* outgoing = webPathRequest(request, @"x.com", webPath, @"mute list", NO);
         if (outgoing) {
             PFBCompatReach(PFBCompatPath_web_mutes);
-            PFBCOMPAT_ACTION(PFBCompat_web_session, @"mute list sent through the web session");
+            PFBCOMPAT_ACTION(PFBCompat_web_session, @"mute list rerouted to the web session");
         } else {
             PFBCOMPAT_OBSERVE(PFBCompat_web_session, @"mute list seen, no web session");
         }
@@ -1015,7 +1015,7 @@ static NSMutableURLRequest* webRequestFromNativeSend(NSURLRequest* request) {
         NSMutableURLRequest* outgoing = webPathRequest(request, host, request.URL.path, @"Grok request", NO);
         if (outgoing) {
             PFBCompatReach(PFBCompatPath_web_grok);
-            PFBCOMPAT_ACTION(PFBCompat_web_session, @"Grok request sent through the web session");
+            PFBCOMPAT_ACTION(PFBCompat_web_session, @"Grok request rerouted to the web session");
         } else {
             PFBCOMPAT_OBSERVE(PFBCompat_web_session, @"Grok request seen, no web session");
         }
@@ -1434,7 +1434,7 @@ static NSURLRequest* webPageRequest(NSURLRequest* request) {
             page.URL = target;
             [page setValue:nil forHTTPHeaderField:@"Authorization"];
             PFBCompatReach(PFBCompatPath_web_pages);
-            PFBCOMPAT_ACTION(PFBCompat_web_session, @"Twitter web page opened with the web session");
+            PFBCOMPAT_ACTION(PFBCompat_web_session, @"Twitter web page rerouted to the web session");
             PFBDebugLog(@"[webtweet] web page loaded directly: %@%@", target.host, target.path);
             return page;
         }

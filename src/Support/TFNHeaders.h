@@ -6,8 +6,7 @@
 @class TFNTwitterAccountModel;
 
 @interface TFNTwitterAccount : NSObject
-@property (nonatomic, strong) NSString* username;
-@property (nonatomic, strong) NSString* displayUsername;
+@property (readonly, nonatomic) NSString* displayUsername;
 @property (readonly, nonatomic) TFNTwitterAccountModel* model;
 @end
 
@@ -19,15 +18,13 @@
 @end
 
 @interface TFNDataViewController : UIViewController
-@property (readonly, nonatomic) TFNTableView* tableView;
 @property (readonly, nonatomic) NSString* adDisplayLocation;
+// The list's pull-to-refresh control.
+@property (retain, nonatomic) UIControl* pullToLoadTopControl;
 @end
 
 @interface TFNItemsDataViewController : TFNDataViewController
 @property (copy, nonatomic) NSArray* sections;
-@end
-
-@interface TFNNavigationController : UINavigationController
 @end
 
 @interface TFNActionItem : NSObject
@@ -43,7 +40,6 @@
 @end
 
 @interface TFNAttributedTextView : UIView
-- (void)setTextModel:(id)model;
 @end
 
 @interface TFNActiveTextItem : NSObject
@@ -77,8 +73,8 @@
 @interface TFNTwitterStatus : NSObject
 @property (readonly, nonatomic) _Bool isPromoted;
 @property (readonly, nonatomic) TFSTwitterEntitySet* entities;
-@property (nonatomic, copy) NSString* fromUserName;
-@property (nonatomic, assign) NSInteger statusID;
+@property (readonly, copy, nonatomic) NSString* fromUserName;
+@property (readonly, nonatomic) NSInteger statusID;
 @property (readonly, nonatomic) long long quoteCount;
 @property (readonly, nonatomic) long long retweetCount;
 @end
@@ -114,15 +110,10 @@
 + (id)tfn_vectorImageNamed:(id)arg1
                   fitsSize:(struct CGSize)arg2
                  fillColor:(id)arg3;
-+ (id)tfn_vectorImageNamed:(id)arg1
-    highContrastVariantNamed:(id)arg2
-                    fitsSize:(struct CGSize)arg3
-                   fillColor:(id)arg4;
-+ (id)tfn_vectorImageNamed:(id)arg1 height:(double)arg2 fillColor:(id)arg3;
 @end
 
 @interface TFNBarButtonItemButton : UIButton
 // Added in src/Features/Appearance/NavBarIcons.x; declared so the compiler knows the
 // selector when it is sent to self.
-- (void)pfbGreySettingsGlyphIfNeeded;
+- (void)pfbGraySettingsGlyphIfNeeded;
 @end

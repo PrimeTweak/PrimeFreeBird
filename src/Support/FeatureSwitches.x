@@ -380,6 +380,7 @@ static NSNumber* FeatureSwitchOverrideValueForKey(NSString* key) {
             return @NO;
         }
         PFBCOMPAT_OBSERVE(PFBCompat_bypass_age_verification, @"read by Twitter");
+        return nil;
     }
 
     // Full links: no click ID or DoubleClick redirect on promoted links, no card link

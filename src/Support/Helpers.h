@@ -1,5 +1,4 @@
-// Helpers shared across files: Twitter's color option, a view snapshot, the iPad test,
-// the top view controller, the accent colors and Safari's private initialURL.
+// Shared helpers: color option, view snapshot, iPad test, top controller and accents.
 
 #import <SafariServices/SafariServices.h>
 #import <UIKit/UIKit.h>

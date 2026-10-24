@@ -5,15 +5,15 @@
 
 /* ===== GENERAL — page ===== */
 "MODERN_SETTINGS_LAYOUT_TITLE" = "一般";
-"MODERN_SETTINGS_LAYOUT_SUBTITLE" = "アプリのロック、リンクの管理、Twitterの動作の調整ができます。";
+"MODERN_SETTINGS_LAYOUT_SUBTITLE" = "アプリのロック、Twitterの動作の調整、リンクの管理ができます。";
 
 /* ===== General › Privacy ===== */
 "PADLOCK_TITLE" = "Twitterをロック";
 "PADLOCK_DETAIL" = "Twitterを開くためにFace IDまたはパスコード認証を必要とします。";
 
 /* ===== General › App behavior ===== */
-"NO_TAB_BAR_HIDING_TITLE" = "ナビゲーションバーを固定";
-"NO_TAB_BAR_HIDING_DETAIL" = "スクロールしてもナビゲーションバーが消えないようにします。";
+"NO_TAB_BAR_HIDING_TITLE" = "常に表示";
+"NO_TAB_BAR_HIDING_DETAIL" = "スクロールしてもバーが消えないようにします。";
 "SHOW_SCROLL_INDICATOR_TITLE" = "スクロールバー";
 "DISABLE_RTL_TITLE" = "テキストを左から右に表示";
 "DISABLE_RTL_DETAIL" = "右から左に読む言語の場合でも、テキストを左から右に表示します。";
@@ -29,12 +29,12 @@
 
 /* ===== APPEARANCE — page ===== */
 "MODERN_SETTINGS_APPEARANCE_TITLE" = "外観";
-"MODERN_SETTINGS_APPEARANCE_SUBTITLE" = "インターフェイスのスタイル、カラー、フォント。";
+"MODERN_SETTINGS_APPEARANCE_SUBTITLE" = "スタイル、フォント、カラー、ナビゲーションバー。";
 
 /* ===== Appearance › Interface ===== */
-"CUSTOM_TAB_BAR_OPTION_TITLE" = "ナビゲーションバー";
+"CUSTOM_TAB_BAR_OPTION_TITLE" = "タブ";
 "RESTORE_TAB_LABELS_TITLE" = "タブのラベル";
-"RESTORE_TAB_LABELS_DETAIL" = "ナビゲーションバーのアイコンの下にラベルを表示します。";
+"RESTORE_TAB_LABELS_DETAIL" = "アイコンの下にラベルを表示します。";
 "CUSTOM_FONTS_TITLE" = "カスタムフォント";
 "CUSTOM_FONTS_DETAIL" = "Twitter全体でカスタムフォントを使用します。";
 "REGULAR_FONTS_PICKER_OPTION_TITLE" = "標準フォント";
@@ -54,12 +54,12 @@
 "APP_ICON_TITLE" = "アプリアイコン";
 "RESTORE_TWITTER_NAMES_TITLE" = "Twitter用語を復元";
 "RESTORE_TWITTER_NAMES_DETAIL" = "鳥を復元し、「X」を「Twitter」、「ポスト」を「ツイート」などに置き換えます。";
-"REFRESH_PILL_LABEL_TITLE" = "更新ピルのラベル";
-"REFRESH_PILL_LABEL_DETAIL" = "新しいツイートのピルに「新しいポスト」を再び表示します。";
+"REFRESH_PILL_LABEL_TITLE" = "新しいツイートのピルのテキスト";
+"REFRESH_PILL_LABEL_DETAIL" = "新しいツイートのピルでアイコンの横に文字を表示します。";
 
 /* ===== TIMELINES ===== */
 "MODERN_SETTINGS_TIMELINES_TITLE" = "タイムライン";
-"MODERN_SETTINGS_TIMELINES_SUBTITLE" = "タイムラインから広告、おすすめ、プロンプトを削除します。";
+"MODERN_SETTINGS_TIMELINES_SUBTITLE" = "広告とおすすめを削除し、タイムラインをフィルターします。";
 "HIDE_PROMOTED_TITLE" = "広告を非表示";
 "HIDE_PROMOTED_DETAIL" = "プロモーションのツイート、トレンド、動画広告を非表示にします。";
 "HIDE_WHO_TO_FOLLOW_TITLE" = "「おすすめユーザー」を非表示";
@@ -72,24 +72,19 @@
 
 /* ===== TWEETS ===== */
 "MODERN_SETTINGS_TWEETS_TITLE" = "ツイート";
-"MODERN_SETTINGS_TWEETS_SUBTITLE" = "作成、ボタン、返信の表示方法。";
+"MODERN_SETTINGS_TWEETS_SUBTITLE" = "作成、ボタン、返信、センシティブな内容。";
 "UNDO_TWEET_TITLE" = "ツイートの取り消し";
 "TWEET_CONFIRM_TITLE" = "ツイートの確認";
-"TWEET_CONFIRM_DETAIL" = "ツイートする前に確認ダイアログを表示します。";
 "LIKE_CONFIRM_TITLE" = "いいねの確認";
-"LIKE_CONFIRM_DETAIL" = "ツイートに「いいね」する前に確認ダイアログを表示します。";
 "HIDE_VIEW_COUNT_TITLE" = "表示回数を非表示";
-"HIDE_VIEW_COUNT_DETAIL" = "ツイートの下にある表示回数を非表示にします。";
-"HIDE_BOOKMARK_BUTTON_TITLE" = "ブックマークを非表示";
-"HIDE_BOOKMARK_BUTTON_DETAIL" = "ツイートからブックマークボタンを非表示にします。";
-"HIDE_DOWNVOTE_BUTTON_TITLE" = "ダウンボートを非表示";
-"HIDE_DOWNVOTE_BUTTON_DETAIL" = "ツイートからダウンボートボタンを非表示にします。";
-"DISABLE_SENSITIVE_TWEET_WARNINGS_TITLE" = "センシティブな内容の警告を非表示";
+"HIDE_BOOKMARK_BUTTON_TITLE" = "ブックマークボタンを非表示";
+"HIDE_DOWNVOTE_BUTTON_TITLE" = "ダウンボートボタンを非表示";
+"DISABLE_SENSITIVE_TWEET_WARNINGS_TITLE" = "警告を非表示";
 "BYPASS_AGE_VERIFICATION_TITLE" = "年齢確認をスキップ";
 "BYPASS_AGE_VERIFICATION_DETAIL" = "センシティブな内容の年齢確認をスキップします。";
 "REPLY_SORTING_TITLE" = "返信を並べ替え";
-"RESTORE_REPLY_CONTEXT_TITLE" = "返信コンテキストを復元";
-"RESTORE_REPLY_CONTEXT_DETAIL" = "開いた返信の本文の上に、返信先の相手を表示します。";
+"RESTORE_REPLY_CONTEXT_TITLE" = "「返信先」の行";
+"RESTORE_REPLY_CONTEXT_DETAIL" = "開いた返信の本文の上に表示されます。";
 "SHOW_QUOTE_COUNTS_TITLE" = "引用とリツイートの数";
 "SHOW_QUOTE_COUNTS_DETAIL" = "ツイートの引用画面の上部に両方の数を表示します。";
 "SHOW_TWEET_SOURCE_TITLE" = "投稿元アプリ";
@@ -101,14 +96,14 @@
 /* ===== MEDIA ===== */
 "MODERN_SETTINGS_MEDIA_TITLE" = "メディア";
 "MODERN_SETTINGS_MEDIA_SUBTITLE" = "ダウンロード、再生、画質、レイアウト。";
-"DOWNLOAD_VIDEOS_TITLE" = "メディアをダウンロード";
-"DOWNLOAD_VIDEOS_DETAIL" = "メディアの長押しメニューから動画とGIFを保存します。";
+"DOWNLOAD_VIDEOS_TITLE" = "動画とGIF";
+"DOWNLOAD_VIDEOS_DETAIL" = "メディアの長押しメニューから保存します。";
 "DIRECT_SAVE_TITLE" = "写真に保存";
 "DIRECT_SAVE_DETAIL" = "保存した動画を「写真」アプリに直接保存します。";
 "TWEET_TO_IMAGE_TITLE" = "ツイートを画像として保存";
 "TWEET_TO_IMAGE_DETAIL" = "「共有」を長押しすると、ツイートを画像としてエクスポートできます。";
 "DISABLE_VIDEO_CAPTIONS_TITLE" = "字幕を非表示";
-"AUTO_HIGHEST_LOAD_TITLE" = "高画質の写真";
+"AUTO_HIGHEST_LOAD_TITLE" = "フル解像度の写真";
 "AUTO_HIGHEST_LOAD_DETAIL" = "写真を常に可能な限り最高の解像度で読み込みます。";
 "FORCE_TWEET_FULL_FRAME_TITLE" = "画像をトリミングしない";
 "RESTORE_VIDEO_TIMESTAMP_TITLE" = "動画の再生時間";
@@ -119,12 +114,11 @@
 "MODERN_SETTINGS_PROFILES_TITLE" = "プロフィール";
 "MODERN_SETTINGS_PROFILES_SUBTITLE" = "フォローボタン、バッジ、プロフィールのタブ。";
 "FOLLOW_CONFIRM_TITLE" = "フォローの確認";
-"FOLLOW_CONFIRM_DETAIL" = "誰かをフォローする際に確認ダイアログを表示します。";
 "COPY_PROFILE_INFO_TITLE" = "プロフィールの詳細をコピー";
 "COPY_PROFILE_INFO_DETAIL" = "プロフィールにコピーボタンを追加します。";
-"DISABLE_ARTICLES_TITLE" = "記事タブを非表示";
+"DISABLE_ARTICLES_TITLE" = "記事を非表示";
 "DISABLE_ARTICLES_DETAIL" = "プロフィールから「記事」タブを非表示にします。";
-"DISABLE_HIGHLIGHTS_TITLE" = "ハイライトタブを非表示";
+"DISABLE_HIGHLIGHTS_TITLE" = "ハイライトを非表示";
 "DISABLE_HIGHLIGHTS_DETAIL" = "プロフィールから「ハイライト」タブを非表示にします。";
 "HIDE_BLUE_VERIFIED_TITLE" = "Twitter Blueの認証済みチェックマークを非表示";
 "HIDE_BLUE_VERIFIED_DETAIL" = "Twitter Blueの認証済みチェックマークを非表示にします。ブランドアカウントや政府アカウントのバッジはそのまま残ります。";
@@ -139,11 +133,11 @@
 
 /* ===== SEARCH ===== */
 "MODERN_SETTINGS_SEARCH_TITLE" = "検索";
-"MODERN_SETTINGS_SEARCH_SUBTITLE" = "検索履歴、トレンド、トレンド動画。";
+"MODERN_SETTINGS_SEARCH_SUBTITLE" = "検索履歴、高度な検索、話題を検索。";
 "NO_HISTORY_TITLE" = "検索履歴を残さない";
 "NO_HISTORY_DETAIL" = "最近の検索を保存せず、表示もしません。";
 "HIDE_TREND_VIDEOS_TITLE" = "トレンド動画を非表示";
-"HIDE_TREND_VIDEOS_DETAIL" = "検索メニューからトレンド動画を非表示にします。";
+"HIDE_TREND_VIDEOS_DETAIL" = "検索からトレンド動画の行を非表示にします。";
 
 /* ===== GROK ===== */
 "HIDE_SUGGESTED_CHATS_TITLE" = "おすすめのチャットを非表示";
@@ -158,28 +152,28 @@
 "DISABLE_AUTO_TRANSLATE_DETAIL" = "ツイート、自己紹介、コミュニティノート、通知を自動的に翻訳します。";
 
 /* ===== LAB ===== */
-"REPLY_IN_WEBVIEW_TITLE" = "ウェブビューで返信";
+"REPLY_IN_WEBVIEW_TITLE" = "ウェブで返信";
 "REPLY_IN_WEBVIEW_DETAIL" = "アプリが返信の送信を拒否するとき、ウェブページ経由で返信します。";
 
 /* ===== Theme color picker ===== */
 "THEME_SETTINGS_NAVIGATION_DETAIL" = "アクセントカラーを選択します。あなただけに表示されます。";
-"THEME_SETTINGS_NAVIGATION_TITLE" = "テーマ";
+"THEME_SETTINGS_NAVIGATION_TITLE" = "テーマカラー";
 
 /* ===== Navigation bar editor ===== */
-"CUSTOM_TAB_BAR_GRID_DETAIL" = "項目をタップして追加または削除します。下のバーをドラッグして並べ替えます。";
-"CUSTOM_TAB_BAR_RESET_MESSAGE" = "ナビゲーションバーをデフォルトの配置に戻します。";
-"CUSTOM_TAB_BAR_SETTINGS_NAVIGATION_TITLE" = "ナビゲーションバー";
+"CUSTOM_TAB_BAR_GRID_DETAIL" = "タブをタップして追加または削除します。下のバーのアイコンを長押ししてから、ドラッグして並べ替えます。";
+"CUSTOM_TAB_BAR_RESET_MESSAGE" = "エディターがTwitterのデフォルトのタブに戻ります。保持するには「保存」をタップしてください。";
+"CUSTOM_TAB_BAR_SETTINGS_NAVIGATION_TITLE" = "タブ";
 
 /* ===== Fonts picker ===== */
 "CUSTOM_FONTS_MENU_TITLE" = "\nフォントを選択";
 "CUSTOM_FONTS_NAVIGATION_BUTTON_TITLE" = "カスタムフォント";
-"CUSTOM_FONTS_TUT_ALERT_MESSAGE" = "カスタムフォントはまだありません。App StoreからiFontアプリをダウンロードしてインストールしてください。";
+"CUSTOM_FONTS_TUT_ALERT_MESSAGE" = "App StoreのiFontアプリでフォントをインストールしてください。";
 "INSTALL_IFONT_BUTTON_TITLE" = "iFontを入手";
 
 /* ===== Media & download flows ===== */
 "DOWNLOAD_AS_GIF_OPTION_TITLE" = "GIFとしてダウンロード";
 "DOWNLOAD_AS_MP4_OPTION_TITLE" = "MP4としてダウンロード";
-"DOWNLOAD_MENU_TITLE" = "\n動画の画質を選択";
+"DOWNLOAD_MENU_TITLE" = "動画の画質を選択";
 "DOWNLOAD_VIDEO_NUMBER_TITLE" = "動画 %lu";
 "DOWNLOAD_ALL_VIDEOS_OPTION_TITLE" = "すべての動画をダウンロード";
 
@@ -192,7 +186,7 @@
 "REMOVE_FOLLOWERS_TITLE" = "フォロワーを削除";
 "REMOVE_FOLLOWERS_DETAIL" = "あなたをフォローしているプロフィールのメニューに「このフォロワーを削除」を追加します。";
 "REMOVE_FOLLOWER_TITLE" = "このフォロワーを削除";
-"REMOVE_FOLLOWER_CONFIRM_TITLE" = "このフォロワーを削除しますか？";
+"REMOVE_FOLLOWER_CONFIRM_TITLE" = "このフォロワーを削除";
 "REMOVE_FOLLOWER_CONFIRM_MESSAGE" = "%@さんをフォロワーから削除します。相手には通知されません。このユーザーは後でまたあなたをフォローできます。";
 "REMOVE_FOLLOWER_ACTION" = "削除";
 "REMOVE_FOLLOWER_DONE" = "フォロワーを削除しました";
@@ -203,8 +197,8 @@
 "PADLOCK_REASON" = "Twitterのロックを解除";
 
 /* ===== Alerts, confirmations & shared labels ===== */
-"LIGHT_MODE_RESTART_TITLE" = "ライトモードに戻りました";
-"LIGHT_MODE_RESTART_MESSAGE" = "背景色が「システム」にリセットされました。残った暗い色を消すにはTwitterを再起動してください。";
+"RESTART_REQUIRED_ALERT_TITLE" = "Twitterを再起動";
+"LIGHT_MODE_RESTART_MESSAGE" = "背景色が「システム」にリセットされました。再起動すると残った暗い色が消えます。";
 "CLOSE_APP_ACTION" = "アプリを閉じる";
 
 /* ===== Miscellaneous ===== */

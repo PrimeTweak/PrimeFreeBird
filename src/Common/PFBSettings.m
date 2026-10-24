@@ -1,11 +1,16 @@
-// The settings model: every option with its page, type and default; defaults for
-// keys without a row; migrations of renamed keys.
+// Settings registry: every page's rows and defaults, and the migrations of legacy keys.
 
 #import "Common/PFBSettings.h"
 #import "Support/PFBManager.h"
 
 NSArray<NSString*>* PFBExploreTabKeys(void) {
-    return @[ @"hide_tab_foryou", @"hide_tab_trending", @"hide_tab_news", @"hide_tab_sports", @"hide_tab_entertainment" ];
+    static NSArray<NSString*>* keys;
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        keys = @[ @"hide_tab_foryou", @"hide_tab_trending", @"hide_tab_news", @"hide_tab_sports",
+                  @"hide_tab_entertainment" ];
+    });
+    return keys;
 }
 
 static NSDictionary<NSString*, NSDictionary*>* PFBSettingsPages(void) {
@@ -21,18 +26,16 @@ static NSDictionary<NSString*, NSDictionary*>* PFBSettingsPages(void) {
                     @{@"key": @"padlock", @"default": @NO},
                     @{@"key": @"no_screenshot_detection", @"default": @YES},
                     @{@"type": @"header", @"titleKey": @"GENERAL_GROUP_BEHAVIOR"},
-                    @{@"key": @"force_following_tab", @"default": @YES},
-                    @{@"key": @"no_focus_lost", @"default": @NO},
-                    @{@"key": @"no_tab_bar_hiding", @"default": @YES},
                     @{@"key": @"show_scroll_indicator", @"default": @NO},
                     @{@"key": @"disable_rtl", @"default": @NO},
                     @{@"key": @"hide_premium_offer", @"default": @YES},
-                    @{@"key": @"hide_notifications", @"default": @YES, @"type": @"toggle"},
+                    @{@"key": @"hide_notifications", @"default": @YES},
                     @{@"type": @"header", @"titleKey": @"GENERAL_GROUP_LINKS"},
                     @{
                         @"type": @"compactButton",
                         @"key": @"sharing_domain",
                         @"action": @"showSharingDomainPrompt:",
+                        @"opensPrompt": @YES,
                         @"prefKeyForSubtitle": @"sharing_domain",
                         @"subtitleDefault": @"x.com"
                     },
@@ -48,19 +51,13 @@ static NSDictionary<NSString*, NSDictionary*>* PFBSettingsPages(void) {
                     @{@"type": @"header",
                       @"titleKey": @"APPEARANCE_GROUP_INTERFACE"},
                     @{
-                        @"titleKey": @"INTERFACE_STYLE_TITLE",
+                        @"titleKey": @"INTERFACE_STYLE_ROW_TITLE",
                         @"subtitleKey": @"INTERFACE_STYLE_SUBTITLE",
                         @"action": @"showInterfaceStylePicker:",
                         @"type": @"button"
                     },
-                    @{
-                        @"titleKey": @"CUSTOM_TAB_BAR_OPTION_TITLE",
-                        @"subtitleKey": @"CUSTOM_TAB_BAR_OPTION_SUBTITLE",
-                        @"action": @"showCustomTabBarVC:",
-                        @"type": @"button"
-                    },
-                    @{@"key": @"restore_tab_labels",
-                      @"default": @NO},
+                    @{@"key": @"hide_scroll_edge_blur",
+                      @"default": @YES},
                     @{@"key": @"custom_fonts",
                       @"default": @NO},
                     @{
@@ -106,11 +103,20 @@ static NSDictionary<NSString*, NSDictionary*>* PFBSettingsPages(void) {
                     @{@"key": @"tab_bar_theming",
                       @"default": @YES},
                     @{@"key": @"color_pfb_switches",
-                        @"default": @NO,
-                        @"type": @"toggle"},
+                        @"default": @NO},
                     @{@"key": @"color_twitter_icon_in_top_bar",
-                        @"default": @([PFBManager isTwitterBranded]),
-                        @"type": @"toggle"}
+                        @"default": @([PFBManager isTwitterBranded])},
+                    @{@"type": @"header",
+                      @"titleKey": @"APPEARANCE_GROUP_NAVIGATION"},
+                    @{
+                        @"titleKey": @"CUSTOM_TAB_BAR_OPTION_TITLE",
+                        @"subtitleKey": @"CUSTOM_TAB_BAR_OPTION_SUBTITLE",
+                        @"action": @"showCustomTabBarVC:",
+                        @"type": @"button"
+                    },
+                    @{@"key": @"restore_tab_labels",
+                      @"default": @NO},
+                    @{@"key": @"no_tab_bar_hiding", @"default": @YES}
                 ]
             },
             @"timelines": @{
@@ -119,24 +125,24 @@ static NSDictionary<NSString*, NSDictionary*>* PFBSettingsPages(void) {
                 @"settings": @[
                     @{@"type": @"header", @"titleKey": @"TIMELINES_GROUP_SUGGESTIONS"},
                     @{@"key": @"hide_promoted",
-                      @"default": @YES,
-                      @"type": @"toggle"},
+                      @"default": @YES},
                     @{@"key": @"hide_who_to_follow",
-                      @"default": @YES,
-                      @"type": @"toggle"},
+                      @"default": @YES},
                     @{@"key": @"hide_topics_to_follow",
-                      @"default": @YES,
-                      @"type": @"toggle"},
+                      @"default": @YES},
                     @{@"key": @"hide_timeline_prompts",
-                      @"default": @YES,
-                      @"type": @"toggle"},
+                      @"default": @YES},
                     @{@"type": @"header", @"titleKey": @"TIMELINES_GROUP_CONTENT"},
+                    @{
+                        @"type": @"button",
+                        @"titleKey": @"FILTERS_TITLE",
+                        @"subtitleKey": @"FILTERS_DETAIL",
+                        @"action": @"showMutedWords:"
+                    },
                     @{@"key": @"hide_topics",
-                      @"default": @NO,
-                      @"type": @"toggle"},
+                      @"default": @NO},
                     @{@"key": @"hide_verified_tweets",
-                      @"default": @NO,
-                      @"type": @"toggle"},
+                      @"default": @NO},
                     @{
                         @"type": @"compactButton",
                         @"key": @"hide_blocked_retweets",
@@ -145,34 +151,22 @@ static NSDictionary<NSString*, NSDictionary*>* PFBSettingsPages(void) {
                         @"menu": @"retweetsMenu"
                     },
                     @{@"key": @"hide_quote_tweets",
-                      @"default": @NO,
-                      @"type": @"toggle"},
+                      @"default": @NO},
+                    @{@"type": @"header", @"titleKey": @"TIMELINES_GROUP_REFRESH"},
+                    @{@"key": @"force_following_tab", @"default": @YES},
+                    @{@"key": @"no_focus_lost", @"default": @NO},
                     @{@"key": @"reading_line",
-                      @"default": @NO,
-                      @"type": @"toggle"},
-                    @{
-                        @"type": @"button",
-                        @"titleKey": @"FILTERS_TITLE",
-                        @"subtitleKey": @"FILTERS_DETAIL",
-                        @"action": @"showMutedWords:"
-                    },
-                    @{@"type": @"header", @"titleKey": @"TIMELINES_GROUP_BARS"},
+                      @"default": @NO},
+                    @{@"type": @"header", @"titleKey": @"TIMELINES_GROUP_HEADER"},
                     @{@"key": @"hide_spaces",
-                      @"default": @YES,
-                      @"type": @"toggle"},
+                      @"default": @YES},
                     @{@"key": @"hide_new_tweets_pill",
-                      @"default": @NO,
-                      @"type": @"toggle"},
-                    @{@"key": @"hide_scroll_edge_blur",
-                      @"default": @YES,
-                      @"type": @"toggle"},
+                      @"default": @NO},
                     @{@"key": @"hide_custom_timelines",
-                      @"default": @YES,
-                      @"type": @"toggle"},
+                      @"default": @YES},
                     @{@"key": @"unlimited_timeline_tabs",
                       @"disabledWhen": @"hide_custom_timelines",
-                      @"default": @YES,
-                      @"type": @"toggle"}
+                      @"default": @YES}
                 ]
             },
             @"tweets": @{
@@ -188,11 +182,9 @@ static NSDictionary<NSString*, NSDictionary*>* PFBSettingsPages(void) {
                         @"menu": @"undoTimeoutMenu"
                     },
                     @{@"key": @"tweet_confirm",
-                      @"default": @YES,
-                      @"type": @"toggle"},
+                      @"default": @YES},
                     @{@"key": @"hide_tweet_button",
-                      @"default": @NO,
-                      @"type": @"toggle"},
+                      @"default": @NO},
                     @{
                         @"key": @"send_sound",
                         @"type": @"button",
@@ -209,32 +201,20 @@ static NSDictionary<NSString*, NSDictionary*>* PFBSettingsPages(void) {
                     },
                     @{@"type": @"header", @"titleKey": @"TWEETS_GROUP_ACTIONS"},
                     @{@"key": @"hide_threads",
-                      @"default": @YES,
-                      @"type": @"toggle"},
+                      @"default": @YES},
                     @{@"key": @"like_confirm",
-                      @"default": @YES,
-                      @"type": @"toggle"},
+                      @"default": @YES},
                     @{@"key": @"hide_view_count",
-                      @"default": @YES,
-                      @"type": @"toggle"},
+                      @"default": @YES},
                     @{@"key": @"hide_bookmark_button",
-                      @"default": @NO,
-                      @"type": @"toggle"},
+                      @"default": @NO},
                     @{@"key": @"hide_downvote_button",
-                      @"default": @NO,
-                      @"type": @"toggle"},
+                      @"default": @NO},
                     @{@"type": @"header", @"titleKey": @"TWEETS_GROUP_READING"},
                     @{
                         @"key": @"show_poll_results",
-                        @"default": @YES,
-                        @"type": @"toggle"
+                        @"default": @YES
                     },
-                    @{@"key": @"disable_sensitive_tweet_warnings",
-                      @"default": @YES,
-                      @"type": @"toggle"},
-                    @{@"key": @"bypass_age_verification",
-                      @"default": @YES,
-                      @"type": @"toggle"},
                     @{
                         @"type": @"compactButton",
                         @"key": @"reply_sorting",
@@ -243,19 +223,20 @@ static NSDictionary<NSString*, NSDictionary*>* PFBSettingsPages(void) {
                         @"menu": @"replySortingMenu"
                     },
                     @{@"key": @"restore_reply_context",
-                      @"default": @YES,
-                      @"type": @"toggle"},
+                      @"default": @YES},
                     @{@"key": @"show_quote_counts",
-                      @"default": @YES,
-                      @"type": @"toggle"},
+                      @"default": @YES},
                     @{@"key": @"show_tweet_source",
                       @"default": @NO,
-                      @"blockedUnless": @"web_session",
-                      @"type": @"toggle"},
+                      @"blockedUnless": @"web_session"},
                     @{@"key": @"show_account_location",
                       @"default": @NO,
-                      @"blockedUnless": @"web_session",
-                      @"type": @"toggle"}
+                      @"blockedUnless": @"web_session"},
+                    @{@"type": @"header", @"titleKey": @"TWEETS_GROUP_SENSITIVE"},
+                    @{@"key": @"disable_sensitive_tweet_warnings",
+                      @"default": @YES},
+                    @{@"key": @"bypass_age_verification",
+                      @"default": @YES}
                 ]
             },
             @"media_downloads": @{
@@ -264,55 +245,41 @@ static NSDictionary<NSString*, NSDictionary*>* PFBSettingsPages(void) {
                 @"settings": @[
                     @{@"type": @"header", @"titleKey": @"MEDIA_GROUP_DOWNLOADS"},
                     @{@"key": @"download_videos",
-                      @"default": @YES,
-                      @"type": @"toggle"},
+                      @"default": @YES},
                     @{@"key": @"download_highest_quality",
                       @"default": @NO,
-                      @"parentKey": @"download_videos",
-                      @"type": @"toggle"},
+                      @"parentKey": @"download_videos"},
                     @{@"key": @"direct_save",
                       @"default": @NO,
-                      @"parentKey": @"download_videos",
-                      @"type": @"toggle"},
+                      @"parentKey": @"download_videos"},
                     @{@"key": @"tweet_to_image",
-                      @"default": @YES,
-                      @"type": @"toggle"},
+                      @"default": @YES},
                     @{@"type": @"header", @"titleKey": @"MEDIA_GROUP_PLAYBACK"},
                     @{
                         @"key": @"tap_to_pause",
                         @"default": @YES,
-                        @"pillKey": @"video_starts_muted",
-                        @"type": @"toggle"
+                        @"pillKey": @"video_starts_muted"
                     },
                     @{@"key": @"restore_video_timestamp",
-                      @"default": @YES,
-                      @"type": @"toggle"},
+                      @"default": @YES},
                     @{@"key": @"disable_video_captions",
-                      @"default": @YES,
-                      @"type": @"toggle"},
+                      @"default": @YES},
                     @{@"key": @"disable_immersive_scroll",
-                      @"default": @YES,
-                      @"type": @"toggle"},
+                      @"default": @YES},
                     @{@"key": @"disable_video_docking",
-                      @"default": @YES,
-                      @"type": @"toggle"},
+                      @"default": @YES},
                     @{@"type": @"header", @"titleKey": @"MEDIA_GROUP_QUALITY"},
                     @{@"key": @"auto_highest_load",
-                      @"default": @YES,
-                      @"type": @"toggle"},
+                      @"default": @YES},
                     @{@"key": @"enable_image_preloading",
-                      @"default": @YES,
-                      @"type": @"toggle"},
+                      @"default": @YES},
                     @{@"key": @"upload_full_hd_videos",
-                      @"default": @YES,
-                      @"type": @"toggle"},
+                      @"default": @YES},
                     @{@"type": @"header", @"titleKey": @"MEDIA_GROUP_LAYOUT"},
                     @{@"key": @"force_tweet_full_frame",
-                      @"default": @YES,
-                      @"type": @"toggle"},
+                      @"default": @YES},
                     @{@"key": @"disable_media_carousel",
-                      @"default": @NO,
-                      @"type": @"toggle"}
+                      @"default": @NO}
                 ]
             },
             @"profiles": @{
@@ -321,67 +288,55 @@ static NSDictionary<NSString*, NSDictionary*>* PFBSettingsPages(void) {
                 @"settings": @[
                     @{@"type": @"header", @"titleKey": @"PROFILES_GROUP_BEHAVIOR"},
                     @{@"key": @"follow_confirm",
-                      @"default": @YES,
-                      @"type": @"toggle"},
+                      @"default": @YES},
                     @{@"key": @"expand_bio",
-                      @"default": @YES,
-                      @"type": @"toggle"},
+                      @"default": @YES},
                     @{
                         @"key": @"copy_profile_info",
-                        @"default": @YES,
-                        @"type": @"toggle"
+                        @"default": @YES
                     },
                     @{
                         @"key": @"remove_followers",
                         @"default": @YES,
-                        @"blockedUnless": @"web_session",
-                        @"type": @"toggle"
+                        @"blockedUnless": @"web_session"
                     },
+                    @{@"type": @"header", @"titleKey": @"PROFILES_GROUP_TABS"},
                     @{
                         @"titleKey": @"PROFILE_INITIAL_TAB_TITLE",
                         @"menu": @"profileTabMenu",
                         @"type": @"compactButton"
                     },
-                    @{@"type": @"header", @"titleKey": @"PROFILES_GROUP_TABS"},
                     @{
                         @"key": @"disable_articles",
-                        @"default": @NO,
-                        @"type": @"toggle"
+                        @"default": @NO
                     },
                     @{
                         @"key": @"disable_highlights",
-                        @"default": @YES,
-                        @"type": @"toggle"
+                        @"default": @YES
                     },
                     @{
                         @"key": @"disable_videos_tab",
-                        @"default": @NO,
-                        @"type": @"toggle"
+                        @"default": @NO
                     },
                     @{@"type": @"header", @"titleKey": @"PROFILES_GROUP_APPEARANCE"},
                     @{
                         @"key": @"hide_blue_verified",
-                        @"default": @NO,
-                        @"type": @"toggle"
+                        @"default": @NO
                     },
                     @{
                         @"key": @"hide_follow_button",
-                        @"default": @NO,
-                        @"type": @"toggle"
+                        @"default": @NO
                     },
                     @{
                         @"key": @"hide_message_button",
-                        @"default": @NO,
-                        @"type": @"toggle"
+                        @"default": @NO
                     },
                     @{
                         @"key": @"restore_follow_button",
-                        @"default": @YES,
-                        @"type": @"toggle"
+                        @"default": @YES
                     },
                     @{@"key": @"square_avatars",
-                      @"default": @NO,
-                      @"type": @"toggle"}
+                      @"default": @NO}
                 ]
             },
             @"search": @{
@@ -390,22 +345,17 @@ static NSDictionary<NSString*, NSDictionary*>* PFBSettingsPages(void) {
                 @"settings": @[
                     @{@"type": @"header", @"titleKey": @"SEARCH_GROUP_SEARCHING"},
                     @{@"key": @"no_history",
-                      @"default": @YES,
-                      @"type": @"toggle"},
+                      @"default": @YES},
                     @{@"key": @"advanced_search",
-                      @"default": @YES,
-                      @"type": @"toggle"},
-                    @{@"type": @"header", @"titleKey": @"SEARCH_GROUP_TRENDS"},
+                      @"default": @YES},
+                    @{@"type": @"header", @"titleKey": @"SEARCH_GROUP_EXPLORE"},
                     @{@"key": @"hide_trend_videos",
-                      @"default": @NO,
-                      @"type": @"toggle"},
+                      @"default": @NO},
                     @{@"key": @"hide_explore_all",
-                      @"default": @NO,
-                      @"type": @"toggle"},
+                      @"default": @NO},
                     @{@"key": @"choose_explore_tabs",
                       @"default": @YES,
-                      @"disabledWhen": @"hide_explore_all",
-                      @"type": @"toggle"},
+                      @"disabledWhen": @"hide_explore_all"},
                     @{@"type": @"tabBar",
                       @"key": @"explore_tabs",
                       @"parentKey": @"choose_explore_tabs",
@@ -422,55 +372,45 @@ static NSDictionary<NSString*, NSDictionary*>* PFBSettingsPages(void) {
                     @{@"type": @"header", @"titleKey": @"MESSAGES_GROUP_CHAT"},
                     @{
                         @"key": @"hide_typing_indicator",
-                        @"default": @YES,
-                        @"type": @"toggle"
+                        @"default": @YES
                     },
                     @{
                         @"key": @"hide_suggested_chats",
-                        @"default": @YES,
-                        @"type": @"toggle"
+                        @"default": @YES
                     },
                     @{
                         @"key": @"voice_transcription",
-                        @"default": @YES,
-                        @"type": @"toggle"
+                        @"default": @YES
                     },
                     @{
                         @"key": @"download_voice_messages",
-                        @"default": @YES,
-                        @"type": @"toggle"
+                        @"default": @YES
                     },
                     @{
                         @"key": @"voice_note_from_video",
-                        @"default": @NO,
-                        @"type": @"toggle"
+                        @"default": @NO
                     },
                     @{@"type": @"header", @"titleKey": @"MESSAGES_GROUP_GROK"},
                     @{
                         @"key": @"hide_grok_analyze",
-                        @"default": @YES,
-                        @"type": @"toggle"
+                        @"default": @YES
                     },
                     @{
                         @"key": @"hide_grok_sidebar",
-                        @"default": @YES,
-                        @"type": @"toggle"
+                        @"default": @YES
                     },
                     @{
                         @"key": @"hide_grok_bot",
-                        @"default": @YES,
-                        @"type": @"toggle"
+                        @"default": @YES
                     },
                     @{
                         @"key": @"hide_grok_create",
-                        @"default": @YES,
-                        @"type": @"toggle"
+                        @"default": @YES
                     },
                     @{
                         @"key": @"disable_auto_translate",
                         @"default": @NO,
-                        @"inverted": @YES,
-                        @"type": @"toggle"
+                        @"inverted": @YES
                     }
                 ]
             },
@@ -487,24 +427,20 @@ static NSDictionary<NSString*, NSDictionary*>* PFBSettingsPages(void) {
                     },
                     @{
                         @"key": @"restore_twitter_names",
-                        @"default": @([PFBManager isTwitterBranded]),
-                        @"type": @"toggle"
+                        @"default": @([PFBManager isTwitterBranded])
                     },
                     @{
                         @"key": @"refresh_pill_label",
                         @"default": @([PFBManager isTwitterBranded]),
-                        @"disabledWhen": @"hide_new_tweets_pill",
-                        @"type": @"toggle"
+                        @"disabledWhen": @"hide_new_tweets_pill"
                     },
                     @{
                         @"key": @"restore_tweet_button",
-                        @"default": @([PFBManager isTwitterBranded]),
-                        @"type": @"toggle"
+                        @"default": @([PFBManager isTwitterBranded])
                     },
                     @{
                         @"key": @"restore_refresh_sounds",
-                        @"default": @NO,
-                        @"type": @"toggle"
+                        @"default": @NO
                     }
                 ]
             },
@@ -515,7 +451,6 @@ static NSDictionary<NSString*, NSDictionary*>* PFBSettingsPages(void) {
                     @{@"type": @"header", @"titleKey": @"COMPATIBILITY_GROUP_CHECKS"},
                     @{@"key": @"debug_tools",
                       @"default": @NO,
-                      @"type": @"toggle",
                       @"titleKey": @"COMPATIBILITY_RECORD_TITLE"},
                     @{
                         @"key": @"compatibility_report",
@@ -535,8 +470,7 @@ static NSDictionary<NSString*, NSDictionary*>* PFBSettingsPages(void) {
                     @{@"type": @"sessionCard", @"key": @"web_session_card"},
                     @{@"key": @"reply_in_webview",
                       @"default": @NO,
-                      @"blockedUnless": @"web_session",
-                      @"type": @"toggle"},
+                      @"blockedUnless": @"web_session"},
 
                     @{@"type": @"header", @"titleKey": @"LAB_GROUP_BACKUP"},
                     @{
@@ -562,7 +496,7 @@ static NSDictionary<NSString*, NSDictionary*>* PFBSettingsPages(void) {
                         @"subtitleKey": @"COMPATIBILITY_DETAIL",
                         @"action": @"showCompatibility:"
                     },
-                    @{@"key": @"flex_twitter", @"default": @NO, @"type": @"toggle"}
+                    @{@"key": @"flex_twitter", @"default": @NO}
                 ]
             },
         };
@@ -589,7 +523,8 @@ static NSDictionary<NSString*, NSDictionary*>* PFBSettingsIndex(void) {
     return index;
 }
 
-// Keys stored before the PFB prefix, renamed the way the code names them now.
+// A legacy key's current name, or nil: color_nfb_switches becomes color_pfb_switches,
+// and pfb_ replaces the bhtwitter_, nfb_ and bh_ prefixes.
 NSString* PFBCurrentKeyForLegacyKey(NSString* key) {
     if ([key isEqualToString:@"color_nfb_switches"]) {
         return @"color_pfb_switches";
@@ -642,8 +577,8 @@ static void PFBMigrateLegacyKeys(void) {
 
 #pragma mark - Migration
 
-// Runs the key migrations before any setting is read. The renames below run once,
-// so existing installs keep the settings saved under the old key names.
+// Runs the key migrations before any setting is read. The renames below run once and
+// carry each value stored under a legacy name over to its current key.
 + (void)load {
     PFBMigrateLegacyKeys();
     [self migrateUndoTweetToggle];
@@ -676,8 +611,8 @@ static void PFBMigrateLegacyKeys(void) {
         @"tweet_url_host": @"sharing_domain",
     };
 
-    // These old names double as Twitter's own feature-switch keys, so copy the
-    // value across but leave the original in place rather than risk removing it.
+    // These legacy names double as Twitter's own feature-switch keys: the value is
+    // copied across and the original key is left in place.
     NSSet<NSString*>* sharedWithTwitter = [NSSet setWithArray:@[
         @"reply_sorting_enabled",
         @"ios_in_app_article_webview_enabled",
@@ -759,8 +694,8 @@ static void PFBMigrateLegacyKeys(void) {
     return key ? PFBSettingsIndex()[key] : nil;
 }
 
-// Defaults for options set from a page of their own, which have no row in the
-// registry. Without an entry here settingForKey: returns nil and the fallback reads
+// Defaults for keys no registry row carries as its own: set from a keyless row, a pill or
+// the Explore bar. Without an entry here settingForKey: returns nil and the fallback reads
 // @"default" from nil, yielding NO or 0 by accident rather than by decision.
 static NSDictionary* PFBKeylessDefaults(void) {
     static NSDictionary* map = nil;
@@ -768,7 +703,7 @@ static NSDictionary* PFBKeylessDefaults(void) {
     dispatch_once(&once, ^{
         map = @{
             @"enable_liquid_glass": @YES,
-            // Picked from a menu rather than a row: 0 is the System style and the Default tab.
+            // Picked from a keyless row: 0 is the System style and the Default tab.
             @"dark_mode_style": @0,
             @"profile_initial_tab": @0,
             // Carried by a pill rather than a row of its own, so the registry
@@ -790,9 +725,11 @@ static NSDictionary* PFBKeylessDefaults(void) {
     return row ?: PFBKeylessDefaults()[key];
 }
 
+// A stored value that cannot be read as a flag or a number, such as an array restored from
+// a malformed backup, counts as unset.
 + (BOOL)boolForKey:(NSString*)key {
     id value = [[NSUserDefaults standardUserDefaults] objectForKey:key];
-    if (value != nil) {
+    if ([value respondsToSelector:@selector(boolValue)]) {
         return [value boolValue];
     }
     return [[self declaredDefaultForKey:key] boolValue];
@@ -800,7 +737,7 @@ static NSDictionary* PFBKeylessDefaults(void) {
 
 + (NSInteger)integerForKey:(NSString*)key {
     id value = [[NSUserDefaults standardUserDefaults] objectForKey:key];
-    if (value != nil) {
+    if ([value respondsToSelector:@selector(integerValue)]) {
         return [value integerValue];
     }
     return [[self declaredDefaultForKey:key] integerValue];

@@ -46,7 +46,7 @@
         [_durationButton setContentHuggingPriority:UILayoutPriorityRequired
                                            forAxis:UILayoutConstraintAxisHorizontal];
 
-        _removeButton = [UIButton buttonWithType:UIButtonTypeSystem];
+        _removeButton = [PFBHitButton buttonWithType:UIButtonTypeSystem];
         [_removeButton setImage:PFBTwitterGlyphFor(@"close_circle_fill", [UIImage systemImageNamed:@"xmark.circle.fill"])
                        forState:UIControlStateNormal];
         _removeButton.tintColor = [[UIColor labelColor] colorWithAlphaComponent:0.25];

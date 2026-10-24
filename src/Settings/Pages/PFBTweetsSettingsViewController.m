@@ -59,6 +59,7 @@ static NSArray<NSArray*>* PFBReplySortingChoices(void) {
                           detail:[self localizedDetailForKey:@"send_sound"]];
         [cell setShowsChevron:NO];
         cell.selectionStyle = UITableViewCellSelectionStyleNone;
+        [self attachMenuIfNeeded:cell entry:settingData];
         return cell;
     }
     if ([settingData[@"key"] isEqualToString:@"send_sound_actions"]) {
@@ -102,7 +103,8 @@ static NSArray<NSArray*>* PFBReplySortingChoices(void) {
         action.state = seconds.integerValue == current ? UIMenuElementStateOn : UIMenuElementStateOff;
         [actions addObject:action];
     }
-    return [UIMenu menuWithTitle:@"" children:actions];
+    return [UIMenu menuWithTitle:[[PFBBundle sharedBundle] localizedStringForKey:@"UNDO_TWEET_TITLE"]
+                        children:actions];
 }
 
 - (NSString*)replySortingSubtitle {
@@ -155,8 +157,22 @@ static NSArray<NSArray*>* PFBReplySortingChoices(void) {
 }
 
 - (void)removeSendSound:(UIButton*)sender {
-    PFBSendSoundRemove();
-    [self reloadSendSoundRows];
+    PFBBundle* bundle = [PFBBundle sharedBundle];
+    UIAlertController* confirm =
+        [UIAlertController alertControllerWithTitle:[bundle localizedStringForKey:@"SEND_SOUND_REMOVE_CONFIRM_TITLE"]
+                                            message:[bundle localizedStringForKey:@"SEND_SOUND_REMOVE_CONFIRM_MESSAGE"]
+                                     preferredStyle:UIAlertControllerStyleAlert];
+    [confirm addAction:[UIAlertAction actionWithTitle:[bundle localizedStringForKey:@"CANCEL_ACTION"]
+                                                style:UIAlertActionStyleCancel
+                                              handler:nil]];
+    __weak typeof(self) weakSelf = self;
+    [confirm addAction:[UIAlertAction actionWithTitle:[bundle localizedStringForKey:@"SEND_SOUND_REMOVE_ACTION"]
+                                                style:UIAlertActionStyleDestructive
+                                              handler:^(__unused UIAlertAction* action) {
+                                                  PFBSendSoundRemove();
+                                                  [weakSelf reloadSendSoundRows];
+                                              }]];
+    [self presentViewController:confirm animated:YES completion:nil];
 }
 
 // The sound picker's file becomes the send sound; any other picker is the settings import.

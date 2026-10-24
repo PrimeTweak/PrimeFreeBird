@@ -6,9 +6,6 @@
 #import <WebKit/WebKit.h>
 #import "Support/TFNHeaders.h"
 
-@interface T1AppDelegate : UIResponder <UIApplicationDelegate>
-@end
-
 // The "new posts" pill shown at the top of the timeline
 @interface TUIUpdateIndicator : UIViewController
 @property (nonatomic, strong) TFNPillControl* pillControl;
@@ -37,24 +34,6 @@
 @property (nonatomic, assign, readonly) NSUInteger attachmentType;
 @end
 
-// Buttons under a Tweet: each adapter answers whether its button shows for a view model.
-@interface T1StandardStatusDownloadGrokImagineButtonViewAdapter : NSObject
-- (BOOL)shouldBeVisibleForViewModel:(id)viewModel;
-@end
-
-@interface T1StandardStatusGrokCreateOwnButtonAdapter : NSObject
-- (BOOL)shouldBeVisibleForViewModel:(id)viewModel;
-@end
-
-// The Tweet's menu sheet, also shown as the "About this post" tray.
-@interface UIViewController (T1ModalProfileViewControllerPrivate)
-- (id)t1_actionsViewControllerForStatus:(id)status
-                                account:(id)account
-                                 source:(id)source
-                                options:(unsigned long long)options
-                              doneBlock:(id)doneBlock;
-@end
-
 #pragma mark - Tab bar
 
 @interface T1PanelIdentity : NSObject
@@ -77,8 +56,6 @@
 @interface T1TabBarViewController : UIViewController
 @property (copy, nonatomic) NSArray* tabViews;
 - (void)setTabBarHidden:(BOOL)hidden withDuration:(double)duration;
-- (void)_t1_layoutTabBar;
-- (void)_t1_updateTabBarHidden;
 @end
 
 // Asks the parents in turn; the tabbed navigation answers with its tab bar.
@@ -93,17 +70,18 @@
 @end
 
 @interface T1TabbedAppNavigationViewController : UIViewController
-- (void)setVisibleTabEntries:(NSArray<id<T1AppNavigationTabEntry>>*)entries;
-- (NSArray*)_t1_tabEntriesLimitedToBottomCapacity:(NSArray*)entries;
 // Recomputes the visible tab set at runtime (rebuilds buttons and content).
 - (void)recalculateVisiblePanels;
+// Whether the bottom bar shows only the tabs that fit, and how many fit.
+- (BOOL)limitsBottomTabCount;
+- (NSInteger)_t1_bottomTabItemCapacity;
 @end
 
 #pragma mark - Settings
 
 // T1GenericSettingsViewController backs the settings root and its sub-pages.
 @interface T1GenericSettingsViewController : TFNItemsDataViewController
-@property (nonatomic, strong) TFNTwitterAccount* account;
+@property (readonly, nonatomic) TFNTwitterAccount* account;
 @end
 
 #pragma mark - Profile
@@ -118,15 +96,11 @@
 
 @interface T1ProfileHeaderViewController : UIViewController
 @property (retain, nonatomic) T1ProfileUserViewModel* viewModel;
-- (NSArray*)profileMoreActionsBaseActionItemsWithSender:(id)sender;
 @end
 
 #pragma mark - Status views
 
 @interface TTAStatusInlineShareButton : UIView
-@end
-
-@interface TTAStatusInlineReplyButton : UIView
 @end
 
 @interface T1PersistentComposeViewController : UIViewController
@@ -136,23 +110,12 @@
 @protocol TTACoreStatusViewEventHandler <NSObject>
 @end
 
-@interface T1StatusCell : UITableViewCell <TTACoreStatusViewEventHandler>
-@end
-
 @interface TTAStatusInlineActionsView : UIView
 @property (readonly, nonatomic) id viewModel;
 @end
 
 @interface T1StandardStatusView : UIView
 @property (nonatomic) __weak id<TTACoreStatusViewEventHandler> eventHandler;
-@end
-
-@interface T1ConversationFocalStatusView : UIView
-@property (nonatomic) __weak id<TTACoreStatusViewEventHandler> eventHandler;
-@property (nonatomic, readonly) id viewModel;
-@end
-
-@interface T1TweetComposeViewController : UIViewController
 @end
 
 // The screen a Tweet's Quotes, Retweets and Likes counts open.
@@ -169,10 +132,6 @@
 @property (nonatomic, readonly) id viewModel;
 @property (nonatomic, strong) T1ConversationFooterItem* footerItem;
 - (void)updateFooterTextView;
-+ (CGSize)sizeForViewModel:(id)model
-                footerItem:(T1ConversationFooterItem*)item
-              maximumWidth:(CGFloat)width
-grokEditImageButtonConfiguration:(id)configuration;
 @end
 
 #pragma mark - Media views
@@ -214,12 +173,6 @@ grokEditImageButtonConfiguration:(id)configuration;
                    sourceStatus:(id)sourceStatus
                 scribeComponent:(id)scribeComponent
                scribeParameters:(id)scribeParameters;
-- (id)updateConfiguration:(id)configuration;
-@end
-
-@interface TNUTalonUtilities : NSObject
-+ (BOOL)sendTalonRequestForAnalytics:(NSURL*)url;
-+ (id)verifyTalonURL:(NSURL*)url completion:(void (^)(NSInteger result))completion;
 @end
 
 @interface T1SafariViewController : SFSafariViewController
@@ -232,21 +185,10 @@ grokEditImageButtonConfiguration:(id)configuration;
 @property (nonatomic, readonly) NSDictionary* scribeItem;
 @end
 
-#pragma mark - Profile counts
-
-// Hooked for unrounded follower/following counts
-@interface T1ProfileFriendsFollowingViewModel : NSObject
-- (id)_t1_followCountTextWithLabel:(id)arg1
-                     singularLabel:(id)arg2
-                             count:(id)arg3
-                       highlighted:(_Bool)arg4;
-@end
-
 #pragma mark - Cards
 
 @interface TFCCardData : NSObject
 - (NSString*)stringForKey:(NSString*)key;
-- (NSString*)stringForKey:(NSString*)key defaultValue:(NSString*)value;
 - (NSNumber*)numberForKey:(NSString*)key;
 - (NSNumber*)numberFromStringForKey:(NSString*)key;
 - (BOOL)boolForKey:(NSString*)key;
@@ -268,13 +210,9 @@ grokEditImageButtonConfiguration:(id)configuration;
 @property (nonatomic) BOOL isMuted;
 // The other half of the audio state, and the one the timeline handover raises.
 @property (nonatomic) float volume;
-- (void)play;
 - (void)pause;
 - (void)playOrReplay;
 - (void)seekToTime:(CMTime)time;
-@end
-
-@interface _TtC14T1TwitterSwift22ImmersiveVideoPageView : UIView
 @end
 
 @interface _TtC14T1TwitterSwift17ImmersiveCardView : UIView

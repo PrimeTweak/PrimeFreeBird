@@ -1,5 +1,4 @@
-// The built-in debugger: hook health, a decision journal and a capture of the
-// screen state. Inert unless debug_tools is on.
+// The built-in debugger: hook health, a decision journal and a capture of the screen.
 
 #import <UIKit/UIKit.h>
 

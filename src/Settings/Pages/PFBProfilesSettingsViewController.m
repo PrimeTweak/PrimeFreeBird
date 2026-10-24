@@ -51,7 +51,7 @@ static NSInteger PFBProfileTabCurrent(void) {
     return @"profiles";
 }
 
-// The tab row reads like Undo Tweet's: its title and description, the chosen tab and a chevron.
+// The tab row reads like Undo Tweet's: its title, the chosen tab and the menu chevron.
 - (UITableViewCell*)tableView:(UITableView*)tableView
         cellForRowAtIndexPath:(NSIndexPath*)indexPath {
     NSDictionary* settingData = self.visibleToggles[indexPath.row];

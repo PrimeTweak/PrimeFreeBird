@@ -1,8 +1,8 @@
-// The inbox "All" pill rebuilt as a plain UIBarButtonItem, so the app's SwiftUI
-// rebuild never flashes it. Same look, same native menu.
+// The inbox "All" pill as a plain bar button with the native menu, so it never flashes.
 
 #import "Support/HookHelpers.h"
 #import "Debug/PFBDebugger.h"
+#import "Debug/PFBProbe.h"
 
 // A named subclass, so captures can identify the button. The bar's item wrapper
 // clamps its child to the standard bar-button box, so the capsule is drawn
@@ -73,25 +73,13 @@
 }
 @end
 
-// The replacement item (built once, reused across stomps) and the latest original from
-// Twitter (strong: it left the bar, but its menu must stay alive for the replacement).
+// The replacement item (built once, reused each time Twitter sets its items again) and
+// the latest original from Twitter (strong: it left the bar, but its menu must stay
+// alive for the replacement).
 static UIBarButtonItem*  gPFBSwapItem;
 static UIBarButtonItem*  gPFBSwapOriginal;
 static UIMenu*           gPFBSwapMenu;   // harvested from the live control; outlives it
 static const char*       kPFBSwapNavKey = "pfbSwapNav";
-
-static UIViewController* pfbSwapOwningVC(UIView* view) {
-    UIResponder* responder = view;
-    NSInteger hops = 0;
-    while (responder && hops < 40) {
-        if ([responder isKindOfClass:[UIViewController class]]) {
-            return (UIViewController*)responder;
-        }
-        responder = responder.nextResponder;
-        hops++;
-    }
-    return nil;
-}
 
 // A bar button's responder chain stops at the navigation controller; the items
 // live one level down (the chat view controller holds the trailing item).
@@ -146,7 +134,7 @@ static NSString* pfbSwapCheckedTitle(UIMenu* menu) {
 }
 
 // Native paddings: content sits at x=10 in a row 20 pt wider than it, centered in
-// 40 pt of height (stack 37.33x16 at {10, 12} inside 57.33x40).
+// 40 pt of height.
 static void pfbSwapLayoutButton(void) {
     PFBInboxPillButton* button = (PFBInboxPillButton*)gPFBSwapItem.customView;
     UILabel* label = (UILabel*)[button viewWithTag:1];
@@ -168,8 +156,8 @@ static void pfbSwapLayoutButton(void) {
     [button layoutIfNeeded];
 }
 
-// Belt for the label after a menu pick: the stomp normally carries the new
-// state, this re-read covers a bridge that would not stomp.
+// Re-reads the label after a menu pick: Twitter setting its items again normally
+// carries the new state, and this covers the case where it does not.
 static void pfbSwapRefreshLabelFromMenu(void) {
     UIMenu* live = gPFBSwapOriginal.menu ?: gPFBSwapMenu;
     if (!gPFBSwapItem || !live) {
@@ -187,9 +175,17 @@ static void pfbSwapRefreshLabelFromMenu(void) {
     }
 }
 
-// After the bootstrap the stomp is intercepted at the setter, before anything reaches
-// the bar: the incoming item is read (fresh menu, fresh checked state) and the replacement
-// goes through in its place, so nothing re-hosts.
+// Measurement: the items the pill replaces, told apart by title, menu, view and glyph.
+static void pfbProbeSwapped(NSString* where, UIBarButtonItem* item) {
+    NSString* glyph = item.image ? objc_getAssociatedObject(item.image, @selector(tfn_vectorImageNamed:fitsSize:fillColor:)) : nil;
+    PFB_PROBE(@"inbox pill swaps", 10, @"%@: title '%@', menu %@, view %@, glyph %@", where, item.title ?: @"",
+              item.menu ? @"yes" : @"no", item.customView ? NSStringFromClass([item.customView class]) : @"none",
+              glyph ?: @"none");
+}
+
+// Once the replacement is in place, Twitter's next item is caught at the setter before
+// it reaches the bar: its menu and checked state are read and the replacement goes
+// through in its place, so the bar does not rebuild.
 static NSArray<UIBarButtonItem*>* pfbSwapInterceptItems(UINavigationItem* nav,
                                                         NSArray<UIBarButtonItem*>* items) {
     if (!gPFBSwapItem || items.count != 1 ||
@@ -203,6 +199,7 @@ static NSArray<UIBarButtonItem*>* pfbSwapInterceptItems(UINavigationItem* nav,
     if (![PFBSettings boolForKey:@"enable_liquid_glass"]) {
         return items;
     }
+    pfbProbeSwapped(@"setter", incoming);
     gPFBSwapOriginal = incoming;
     pfbSwapRefreshLabelFromMenu();
     return @[gPFBSwapItem];
@@ -216,7 +213,7 @@ static void pfbSwapApply(UIView* pillView) {
         return;  // the standard interface keeps the native pill
     }
 
-    UIViewController* vc = pfbSwapOwningVC(pillView);
+    UIViewController* vc = PFBOwningController(pillView);
     if (!vc || !pfbSwapIsInbox(vc)) {
         return;
     }
@@ -267,6 +264,7 @@ static void pfbSwapApply(UIView* pillView) {
     if (!original) {
         return;  // items not attached yet; the next layout retries
     }
+    pfbProbeSwapped([NSString stringWithFormat:@"first swap in %@", NSStringFromClass([vc class])], original);
 
     // The native content, read live from the original pill (stack -> label + chevron).
     UIStackView* stack = nil;
@@ -354,7 +352,6 @@ static void pfbSwapApply(UIView* pillView) {
                 NSSelectorFromString(@"setHidesSharedBackground:")]) {
             [gPFBSwapItem setValue:@YES forKey:@"hidesSharedBackground"];
         }
-        PFBMark(button, @"PillSwap/custom button - identical to native");
     } else {
         button = (PFBInboxPillButton*)gPFBSwapItem.customView;
         label = (UILabel*)[button viewWithTag:1];
@@ -379,7 +376,7 @@ static void pfbSwapApply(UIView* pillView) {
     pfbSwapLayoutButton();
 
     // The same native menu, read fresh at every opening so the checkmarks
-    // are always current; each opening arms the 2 s label belt.
+    // are always current; each opening re-reads the label 2 s later.
     gPFBSwapOriginal = original;
     button.menu = [UIMenu menuWithChildren:@[
         [UIDeferredMenuElement elementWithUncachedProvider:
@@ -394,9 +391,9 @@ static void pfbSwapApply(UIView* pillView) {
         }]
     ]];
 
-    // Install in the exact container the original occupied — and arm the
-    // setter interception on this navigation item: from here on, stomps are
-    // stopped before they reach the bar.
+    // Installed in the container the original occupied, and the navigation item is
+    // marked so that Twitter's later items are caught at the setter before they
+    // reach the bar.
     objc_setAssociatedObject(nav, kPFBSwapNavKey, @YES,
                              OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     if (group) {
@@ -434,6 +431,7 @@ static void pfbSwapApply(UIView* pillView) {
             for (UIBarButtonItemGroup* group in groups) {
                 if (group.barButtonItems.count == 1 &&
                     group.barButtonItems.firstObject != gPFBSwapItem) {
+                    pfbProbeSwapped(@"group setter", group.barButtonItems.firstObject);
                     gPFBSwapOriginal = group.barButtonItems.firstObject;
                     group.barButtonItems = @[gPFBSwapItem];
                     pfbSwapRefreshLabelFromMenu();
@@ -449,8 +447,8 @@ static void pfbSwapApply(UIView* pillView) {
 // The inbox filter pill, a TFNUISwift class.
 %hook _TtC10TFNUISwift34NavigationBarMenuBarButtonItemView
 
-// The original's view appearing is the stomp signal: SwiftUI has put its item back,
-// so the replacement goes back in, about 1 ms after the view lands.
+// The original's view appearing means SwiftUI has put its item back, so the
+// replacement goes back in.
 - (void)didMoveToWindow {
     %orig;
     if (((UIView*)self).window) {

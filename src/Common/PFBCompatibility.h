@@ -1,6 +1,4 @@
-// Compatibility report: every option counts what it does and which of its paths ran,
-// kept across PrimeFreeBird builds of one Twitter version, and the report checks that
-// Twitter still has what each option relies on.
+// Compatibility sheet: options, paths and their proofs, the tour, and the report.
 #import <UIKit/UIKit.h>
 #import "Common/PFBCompatResult.h"
 
@@ -225,6 +223,20 @@ typedef NS_ENUM(NSInteger, PFBCompatPath) {
     PFBCompatPath_opened_links,
     PFBCompatPath_home_retweets,
     PFBCompatPath_reply_order_set,
+    PFBCompatPath_reply_order_request,
+    PFBCompatPath_feather,
+    PFBCompatPath_search_bar_frame,
+    PFBCompatPath_bar_backdrop,
+    PFBCompatPath_window_tint,
+    PFBCompatPath_reply_bar,
+    PFBCompatPath_home_bar_button,
+    PFBCompatPath_eye_button,
+    PFBCompatPath_notification_swipe,
+    PFBCompatPath_controls_hold,
+    PFBCompatPath_played_voice_note,
+    PFBCompatPath_interface_text,
+    PFBCompatPath_results_filters_button,
+    PFBCompatPath_leaving_app,
     PFBCompatPathCount,
 };
 

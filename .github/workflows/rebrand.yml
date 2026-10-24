@@ -19,7 +19,7 @@ on:
         required: false
         type: boolean
       resource_pack_url:
-        description: "Other icon pack link (.zip). https://files.catbox.moe/p63f20.zip"
+        description: "Other icon pack link (.zip)"
         default: ""
         required: false
         type: string
@@ -45,34 +45,41 @@ jobs:
           path: main
           ref: ${{ github.event.inputs.commit_id || github.ref }}
 
+      # Both links are masked in the log. The runner decodes %25, %0D and %0A in a mask,
+      # so they are encoded first.
+      - name: Hide sensitive inputs
+        run: |
+          for input in ipa_url resource_pack_url; do
+            value=$(jq -r --arg input "$input" \
+              '.inputs[$input] // "" | gsub("%"; "%25") | gsub("\r"; "%0D") | gsub("\n"; "%0A")' "$GITHUB_EVENT_PATH")
+            if [ -n "$value" ]; then echo "::add-mask::$value"; fi
+          done
+
       - name: Download IPA
         id: ipa
         run: |
           IPA_EXT=ipa
           case "${IPA_URL%%\?*}" in *.tipa) IPA_EXT=tipa ;; esac
           echo "ext=${IPA_EXT}" >> "$GITHUB_OUTPUT"
-          wget "$IPA_URL" --no-verbose -O "main/packages/X-rebranded.${IPA_EXT}"
+          wget -q "$IPA_URL" -O "main/packages/X-rebranded.${IPA_EXT}"
         env:
           IPA_URL: ${{ inputs.ipa_url }}
 
-      # The repository's branding/resource-pack.zip, unless another link is given; the
-      # default link serves only while the repository has none.
+      # The repository's branding/resource-pack.zip, unless another link is given.
       - name: Prepare Image Pack
         if: inputs.icon_pack
         run: |
-          if [ -z "$IMAGE_URL" ] && [ -f main/branding/resource-pack.zip ]; then
+          if [ -z "$IMAGE_URL" ]; then
             cp main/branding/resource-pack.zip main/resource-pack.zip
             exit 0
           fi
-          url="${IMAGE_URL:-$DEFAULT_IMAGE_URL}"
-          if ! wget "$url" --no-verbose --tries=4 --waitretry=10 --timeout=20 --retry-connrefused -O main/resource-pack.zip; then
+          if ! wget "$IMAGE_URL" --quiet --tries=4 --waitretry=10 --timeout=20 --retry-connrefused -O main/resource-pack.zip; then
             rm -f main/resource-pack.zip
-            echo "::error::Icon pack not downloaded from $url. Untick Apply icon pack to rebrand without it, or add the pack as branding/resource-pack.zip."
+            echo "::error::Icon pack not downloaded from $IMAGE_URL. Clear Other icon pack link to use the repository's pack, or untick Apply icon pack."
             exit 1
           fi
         env:
           IMAGE_URL: ${{ inputs.resource_pack_url }}
-          DEFAULT_IMAGE_URL: https://files.catbox.moe/p63f20.zip
 
       - name: Rebrand IPA
         run: |

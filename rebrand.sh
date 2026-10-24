@@ -1,8 +1,7 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-# PrimeFreeBird rebrander: applies name/icon branding to an already built IPA.
-# Usage: rebrand.sh [-t | --twitter-branding] [--resource-pack ZIP] [-o OUTPUT] IPA
+# Applies the Twitter name and the icon pack to an already built IPA.
 
 is_tty=0
 if [[ -t 1 ]]; then is_tty=1; fi
@@ -23,15 +22,13 @@ die() { err "$1"; exit 1; }
 
 usage() {
   cat <<EOF
-Usage: $(basename "$0") [-t | --twitter-branding] [--resource-pack ZIP] [-o OUTPUT] IPA
-TL;DR: You need to select at least one branding option and a built .ipa/.tipa.
+Usage: $(basename "$0") [-t | --twitter-branding] [--resource-pack ZIP] IPA
 
 Branding (at least one required):
   -t, --twitter-branding  Sets the app's display name to Twitter
-  --resource-pack ZIP     Apply a theme pack ZIP
+  --resource-pack ZIP     Apply an icon pack ZIP
 
 Options:
-  -o, --output PATH       Write a rebranded copy to PATH instead of rebranding in place
   -h, --help              Show this help
 EOF
 }
@@ -44,7 +41,6 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 TWITTER_BRANDING=0
 RESOURCE_PACK=""
-OUTPUT=""
 IPA=""
 
 set_ipa() {
@@ -61,22 +57,8 @@ while [[ $# -gt 0 ]]; do
       [[ $# -ge 2 ]] || die "--resource-pack requires a path argument."
       RESOURCE_PACK="$2"; shift 2
       ;;
-    --resource-pack=*)
-      RESOURCE_PACK="${1#*=}"; shift
-      ;;
-    -o|--output)
-      [[ $# -ge 2 ]] || die "--output requires a path argument."
-      OUTPUT="$2"; shift 2
-      ;;
-    --output=*)
-      OUTPUT="${1#*=}"; shift
-      ;;
     -h|--help)
       usage; exit 0
-      ;;
-    --)
-      shift
-      while [[ $# -gt 0 ]]; do set_ipa "$1"; shift; done
       ;;
     -*)
       die "Unknown option: $1"
@@ -98,11 +80,6 @@ fi
 
 if [[ -n "$RESOURCE_PACK" && ! -f "$RESOURCE_PACK" ]]; then
   die "--resource-pack file not found: $RESOURCE_PACK"
-fi
-
-if [[ -n "$OUTPUT" ]]; then
-  cp -f "$IPA" "$OUTPUT"
-  IPA="$OUTPUT"
 fi
 
 say "Rebranding $(basename "$IPA")."

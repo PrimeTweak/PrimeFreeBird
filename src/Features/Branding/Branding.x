@@ -1,8 +1,7 @@
-// Twitter's terminology in localized and server-composed strings, the new Tweets pill
-// (labeled or hidden), the compose button (classic style or hidden), the confirm glyph
-// kept white on the color screen, and each vector image tagged with its name.
+// Branding: Twitter terminology, the new Tweets pill and the classic compose button.
 
 #import "Support/HookHelpers.h"
+#import "Debug/PFBProbe.h"
 
 // Defined in Theme.x.
 extern UIImage* PFBWhiteBakedGlyph(UIImage* image);
@@ -86,7 +85,7 @@ static NSRegularExpression* RenameRegex(void) {
                                error:nil];
 }
 
-// Applies the capitalisation style of `token` (all-caps or leading-capital) to
+// Applies the capitalization style of `token` (all-caps or leading-capital) to
 // `base`.
 static NSString* MatchCapitalisation(NSString* token, NSString* base) {
     if (token.length == 0 || base.length == 0) {
@@ -138,7 +137,7 @@ static NSArray<NSDictionary*>* RenameEdits(NSString* input) {
         }
         NSString* token = [input substringWithRange:match.range];
         // Exact key wins; otherwise fall back to the lowercase key and copy the
-        // token's capitalisation. A lowercase hit on an uppercase-only key is left
+        // token's capitalization. A lowercase hit on an uppercase-only key is left
         // alone.
         NSString* repl = wordMap[token];
         if (!repl) {
@@ -157,7 +156,7 @@ static NSArray<NSDictionary*>* RenameEdits(NSString* input) {
 }
 
 static NSString* RestoreTwitterTerminology(NSString* input) {
-    // Memoise: labels re-set the same handful of strings over and over.
+    // Memoized: labels re-set the same handful of strings over and over.
     static NSCache<NSString*, NSString*>* cache = nil;
     static dispatch_once_t onceToken;
     dispatch_once(&onceToken, ^{
@@ -213,7 +212,7 @@ NSString* PFBTwitterTerminology(NSString* text) {
 // MARK: - Rename localized strings
 
 // Every UI string routes through this Foundation method, so the rename applies
-// broadly. PrimeFreeBird's own bundles are skipped so their strings are not reprocessed.
+// broadly. PFBBundle's own bundles are skipped so their strings are not reprocessed.
 %hook NSBundle
 - (NSString*)localizedStringForKey:(NSString*)key
                              value:(NSString*)value
@@ -273,12 +272,61 @@ static BOOL PFBTextViewHoldsOwnWords(UIView* view) {
     return NO;
 }
 
+// Measurement: after a rename that changes the length, the tappable ranges the view holds
+// on the next turn, checked against the renamed text; one line per case.
+static void pfbProbeRenamedRanges(UIView* view, NSString* source, NSString* renamed) {
+    static NSUInteger checks;
+    SEL rangesGetter = NSSelectorFromString(@"activeRanges");
+    if (checks >= 30 || source.length == renamed.length || PFBProbeReturnKind(view, rangesGetter) != '@') {
+        return;
+    }
+    checks++;
+    __weak UIView* weakView = view;
+    dispatch_async(dispatch_get_main_queue(), ^{
+      UIView* strongView = weakView;
+      id ranges = strongView ? ((id (*)(id, SEL))objc_msgSend)(strongView, rangesGetter) : nil;
+      if (![ranges isKindOfClass:[NSArray class]] || ![ranges count]) {
+          return;
+      }
+      SEL displayGetter = NSSelectorFromString(@"displayString");
+      NSUInteger off = 0;
+      NSString* example = @"";
+      for (id range in ranges) {
+          NSMethodSignature* signature = [range respondsToSelector:@selector(rangeValue)]
+                                             ? [range methodSignatureForSelector:@selector(rangeValue)]
+                                             : nil;
+          if (!signature || strcmp(signature.methodReturnType, @encode(NSRange)) != 0) {
+              continue;
+          }
+          NSRange r = [range rangeValue];
+          BOOL inRenamed = r.location <= renamed.length && r.length <= renamed.length - r.location;
+          BOOL inSource = r.location <= source.length && r.length <= source.length - r.location;
+          NSString* shown = inRenamed ? [renamed substringWithRange:r] : @"(past the end)";
+          id meant = PFBProbeReturnKind(range, displayGetter) == '@'
+                         ? ((id (*)(id, SEL))objc_msgSend)(range, displayGetter)
+                         : nil;
+          if (![meant isKindOfClass:[NSString class]] || !((NSString*)meant).length) {
+              meant = inSource ? [source substringWithRange:r] : @"?";
+          }
+          if (![shown isEqualToString:meant]) {
+              off++;
+              if (!example.length) {
+                  example = [NSString stringWithFormat:@", e.g. '%@' covers '%@'", meant, shown];
+              }
+          }
+      }
+      PFB_PROBE(@"renamed text ranges", 6, @"length %lu -> %lu, %lu tappable ranges, %lu off their text%@",
+                (unsigned long)source.length, (unsigned long)renamed.length, (unsigned long)[ranges count],
+                (unsigned long)off, example);
+    });
+}
+
 // TFNAttributedTextView renders text carrying no localization key, out of the NSBundle
 // hook's reach. The new string is set on the model received, which keeps its line limit
 // and its trailing "more" text.
 %hook TFNAttributedTextView
 - (void)setTextModel:(TFNAttributedTextModel*)model {
-    NSAttributedString* source = model.attributedString;
+    NSAttributedString* source = [model respondsToSelector:@selector(attributedString)] ? model.attributedString : nil;
     if (source.length == 0) {
         %orig(model);
         return;
@@ -293,6 +341,7 @@ static BOOL PFBTextViewHoldsOwnWords(UIView* view) {
         if (renamed != source) {
             [model setAttributedString:renamed];
             PFBCOMPAT_ACTION(PFBCompat_restore_twitter_names, @"text renamed");
+            pfbProbeRenamedRanges(self, source.string, renamed.string);
         }
     }
     %orig(model);
@@ -331,11 +380,14 @@ static NSString* PillLabelText(void) {
 - (void)_recreatePillControlForContentNotification:(id)notification
                                       hideOnScroll:(BOOL)hideOnScroll {
     %orig;
+    TFNPillControl* pill = [self respondsToSelector:@selector(pillControl)] ? self.pillControl : nil;
 
     // A pill built by another path is hidden before it can be seen.
     if ([PFBSettings boolForKey:@"hide_new_tweets_pill"]) {
-        self.pillControl.hidden = YES;
-        PFBCOMPAT_ACTION(PFBCompat_hide_new_tweets_pill, @"new Tweets pill hidden");
+        if (pill) {
+            pill.hidden = YES;
+            PFBCOMPAT_ACTION(PFBCompat_hide_new_tweets_pill, @"new Tweets pill hidden");
+        }
         return;
     }
 
@@ -344,7 +396,9 @@ static NSString* PillLabelText(void) {
         return;
     }
 
-    TFNPillControl* pill = self.pillControl;
+    if (![pill respondsToSelector:@selector(text)] || ![pill respondsToSelector:@selector(setText:)]) {
+        return;
+    }
     NSString* current = [pill.text
         stringByTrimmingCharactersInSet:[NSCharacterSet
                                             whitespaceAndNewlineCharacterSet]];
@@ -373,12 +427,9 @@ static UIColor* PFBTwitterBlue(void) {
                            alpha:1.0];
 }
 
-static BOOL isComposePlusGlyph(NSString* name) {
-    if (![name isKindOfClass:[NSString class]]) {
-        return NO;
-    }
-    // "plus" is the pre-Liquid-Glass compose glyph; the redesign draws the FAB
-    // with one of the compose vectors instead, so those are remapped as well.
+// "plus" is the pre-Liquid-Glass compose glyph; the redesign draws the FAB with one
+// of the compose vectors instead, so those are remapped as well.
+static BOOL isComposeGlyphName(id name) {
     static NSSet<NSString*>* composeGlyphs = nil;
     static dispatch_once_t once;
     dispatch_once(&once, ^{
@@ -386,12 +437,28 @@ static BOOL isComposePlusGlyph(NSString* name) {
             @"plus", @"compose", @"alt_compose", @"alt_compose_plus", @"compose_square"
         ]];
     });
-    return [composeGlyphs containsObject:name] && [PFBSettings boolForKey:@"restore_tweet_button"];
+    return [name isKindOfClass:[NSString class]] && [composeGlyphs containsObject:name];
 }
 
-// Every vector the app loads by name keeps that name on the image, under the
-// loader's own selector as the key so any file can read it back without a
-// shared declaration. It is how a bar button is told apart by what it shows.
+static BOOL isComposePlusGlyph(NSString* name) {
+    return isComposeGlyphName(name) && [PFBSettings boolForKey:@"restore_tweet_button"];
+}
+
+// Set on each feather the remap returns, so the button can tell it received one.
+static char kPFBFeatherKey;
+static BOOL gPFBFeatherHandedOut;
+
+static id PFBRemappedFeather(id image) {
+    if (image) {
+        objc_setAssociatedObject(image, &kPFBFeatherKey, @YES, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        gPFBFeatherHandedOut = YES;
+    }
+    return image;
+}
+
+// Every vector the app loads by name keeps that name on the image, keyed by the
+// tfn_vectorImageNamed:fitsSize:fillColor: selector so any file can read it back
+// without a shared declaration. It is how a bar button is told apart by what it shows.
 static id PFBNamedVector(id image, id name) {
     if (image && [name isKindOfClass:[NSString class]]) {
         objc_setAssociatedObject(image, @selector(tfn_vectorImageNamed:fitsSize:fillColor:),
@@ -404,7 +471,7 @@ static id PFBNamedVector(id image, id name) {
 
 + (id)tfn_vectorImageNamed:(id)name fitsSize:(CGSize)size fillColor:(id)color {
     if (isComposePlusGlyph(name)) {
-        return %orig(@"feather", size, [UIColor whiteColor]);
+        return PFBRemappedFeather(%orig(@"feather", size, [UIColor whiteColor]));
     }
     return PFBNamedVector(%orig(name, size, color), name);
 }
@@ -414,22 +481,22 @@ static id PFBNamedVector(id image, id name) {
                     fitsSize:(CGSize)size
                    fillColor:(id)color {
     if (isComposePlusGlyph(name)) {
-        return %orig(@"feather", variant, size, [UIColor whiteColor]);
+        return PFBRemappedFeather(%orig(@"feather", variant, size, [UIColor whiteColor]));
     }
     return PFBNamedVector(%orig(name, variant, size, color), name);
 }
 
 + (id)tfn_vectorImageNamed:(id)name height:(double)height fillColor:(id)color {
     if (isComposePlusGlyph(name)) {
-        return %orig(@"feather", height, [UIColor whiteColor]);
+        return PFBRemappedFeather(%orig(@"feather", height, [UIColor whiteColor]));
     }
     return PFBNamedVector(%orig(name, height, color), name);
 }
 
 %end
 
-// The compose FAB is a plain UIView subclass, so style it directly: blue
-// disc, white glyphs, and any internal chrome (gray disc, blur) neutralised.
+// The compose FAB is a plain UIView subclass, so it is styled directly: blue
+// disc, white glyphs, and any internal chrome (gray disc, blur) neutralized.
 @interface TFNFloatingActionButton : UIView
 @end
 
@@ -512,9 +579,33 @@ static UIColor* PFBFABBlueColor(void) {
     return PFBTwitterBlue();
 }
 
+// The feather path is reached when the button's glyph is a remapped feather, or with
+// the option off, a compose glyph the remap would replace.
+static void pfbNoteFABGlyph(UIImage* image) {
+    if (image && objc_getAssociatedObject(image, &kPFBFeatherKey)) {
+        PFBCompatReach(PFBCompatPath_feather);
+        PFBCOMPAT_ACTION(PFBCompat_restore_tweet_button, @"feather placed");
+    }
+}
+
+static void pfbNoteComposeGlyph(UIView* fab) {
+    if (PFBCompatPathReached(PFBCompatPath_feather)) {
+        return;
+    }
+    // Hide Tweet button hides the button itself, so the walk enters hidden views.
+    PFBWalkAllSubviews(fab, 8, ^(UIView* sub) {
+        UIImage* image = [sub isKindOfClass:[UIImageView class]] ? ((UIImageView*)sub).image : nil;
+        if (image && isComposeGlyphName(objc_getAssociatedObject(
+                         image, @selector(tfn_vectorImageNamed:fitsSize:fillColor:)))) {
+            PFBCompatReach(PFBCompatPath_feather);
+        }
+    });
+}
+
 static void styleComposeFAB(UIView* fab) {
     if (![PFBSettings boolForKey:@"restore_tweet_button"]) {
         PFBCOMPAT_OBSERVE(PFBCompat_restore_tweet_button, @"Tweet button found");
+        pfbNoteComposeGlyph(fab);
         return;
     }
     PFBCOMPAT_ACTION(PFBCompat_restore_tweet_button, @"Tweet button restyled");
@@ -545,6 +636,7 @@ static void styleComposeFAB(UIView* fab) {
             if (!alreadyTagged && imageView.image) {
                 // First encounter: bake what is already there; every later
                 // assignment goes through the setter hook and arrives baked.
+                pfbNoteFABGlyph(imageView.image);
                 imageView.image = PFBWhiteBakedGlyph(imageView.image);
             }
             if (![imageView.tintColor isEqual:[UIColor whiteColor]]) {
@@ -683,6 +775,28 @@ static void pfbApplyComposeFABVisibility(UIView* fab) {
 
 %end
 
+// Measurement: remapped feathers that land outside the Tweet button, with the view and
+// the screen that hold them, one line per place.
+static void pfbProbeStrayFeather(UIImageView* view, UIImage* image, UIWindow* window) {
+    static NSMutableSet<NSString*>* seen;
+    if (!gPFBFeatherHandedOut || !image || seen.count >= 10 || !objc_getAssociatedObject(image, &kPFBFeatherKey) ||
+        !(window ?: view.window)) {
+        return;
+    }
+    UIViewController* owner = PFBOwningTopController(view);
+    NSString* line = [NSString stringWithFormat:@"%@ in %@",
+                                                view.superview ? NSStringFromClass([view.superview class]) : @"no superview",
+                                                owner ? NSStringFromClass([owner class]) : @"no controller"];
+    if (!seen) {
+        seen = [NSMutableSet set];
+    }
+    if ([seen containsObject:line]) {
+        return;
+    }
+    [seen addObject:line];
+    PFB_PROBE(@"feather outside the Tweet button", 8, @"%@", line);
+}
+
 // Twitter swaps the glyph image on an existing image view during tab transitions,
 // which the subview hook above does not cover. Only the FAB's glyphs and the
 // navigation bar's confirm glyph are touched.
@@ -705,6 +819,7 @@ static void pfbApplyComposeFABVisibility(UIView* fab) {
             objc_setAssociatedObject(self, &kPFBFABGlyphKey, @YES,
                                      OBJC_ASSOCIATION_RETAIN_NONATOMIC);
             if (self.image) {
+                pfbNoteFABGlyph(self.image);
                 self.image = PFBWhiteBakedGlyph(self.image);
             }
             self.tintColor = [UIColor whiteColor];
@@ -713,6 +828,7 @@ static void pfbApplyComposeFABVisibility(UIView* fab) {
         ancestor = ancestor.superview;
         depth++;
     }
+    pfbProbeStrayFeather(self, self.image, newWindow);
 }
 
 - (void)setImage:(UIImage*)image {
@@ -720,10 +836,13 @@ static void pfbApplyComposeFABVisibility(UIView* fab) {
     // A template glyph is only white while its tint survives; a baked one has
     // nothing left to lose.
     if (image && objc_getAssociatedObject(self, &kPFBFABGlyphKey)) {
+        pfbNoteFABGlyph(image);
         image = PFBWhiteBakedGlyph(image);
     } else if (image && objc_getAssociatedObject(self, &PFBConfirmGlyphTag) && PFBThemeScreenCount &&
                PFBAccentIsActive()) {
         image = PFBWhiteBakedGlyph(image);
+    } else if (gPFBFeatherHandedOut && image) {
+        pfbProbeStrayFeather(self, image, nil);
     }
     %orig(image);
 }
@@ -750,9 +869,9 @@ static void pfbApplyComposeFABVisibility(UIView* fab) {
             %orig;
             return;
         }
-        // The per-transition re-install triggers the animated rebuild —
-        // swallow it when nothing changes. No in-place mutation here:
-        // self.effect returns a copy, so mutating it is a no-op.
+        // The per-transition re-install triggers the animated rebuild, so an
+        // effect of the same class as the current one is swallowed. No in-place
+        // mutation here: self.effect returns a copy, so mutating it is a no-op.
         UIVisualEffect* current = self.effect;
         if (current && [current class] == [effect class]) {
             return;

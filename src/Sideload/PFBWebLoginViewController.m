@@ -11,41 +11,11 @@
 static NSString* const kPFBAuthCookie = @"auth_token";
 static NSString* const kPFBCsrfCookie = @"ct0";
 
-// The bird rendered from the bundled PDF (the same source as the nav-bar logo), so the
-// login header carries the app's branding instead of an SF Symbol. Template mode lets
-// the header tint it.
+// The bird of the bundled PDF, the same as the top bar's, so the login header carries
+// the app's branding. Template mode lets the header tint it.
 static UIImage* pfbLoginBirdImage(CGSize size) {
-    NSURL* url = [[PFBBundle sharedBundle] pathForFile:@"LaunchTwitterBird.pdf"];
-    if (!url || size.width < 1 || size.height < 1) {
-        return nil;
-    }
-    CGPDFDocumentRef pdf = CGPDFDocumentCreateWithURL((__bridge CFURLRef)url);
-    if (!pdf) {
-        return nil;
-    }
-    UIImage* rendered = nil;
-    CGPDFPageRef page = CGPDFDocumentGetPage(pdf, 1);
-    if (page) {
-        UIGraphicsImageRendererFormat* fmt = [UIGraphicsImageRendererFormat preferredFormat];
-        fmt.opaque = NO;
-        UIGraphicsImageRenderer* renderer =
-            [[UIGraphicsImageRenderer alloc] initWithSize:size format:fmt];
-        rendered = [renderer imageWithActions:^(UIGraphicsImageRendererContext* ctx) {
-          CGContextRef c = ctx.CGContext;
-          CGRect box = CGPDFPageGetBoxRect(page, kCGPDFCropBox);
-          CGFloat scale = MIN(size.width / box.size.width, size.height / box.size.height);
-          CGFloat drawnW = box.size.width * scale;
-          CGFloat drawnH = box.size.height * scale;
-          CGContextTranslateCTM(c, (size.width - drawnW) / 2.0,
-                                size.height - (size.height - drawnH) / 2.0);
-          CGContextScaleCTM(c, 1, -1);
-          CGContextScaleCTM(c, scale, scale);
-          CGContextDrawPDFPage(c, page);
-        }];
-        rendered = [rendered imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate];
-    }
-    CGPDFDocumentRelease(pdf);
-    return rendered;
+    return [PFBBundlePDFImage(@"LaunchTwitterBird.pdf", size, 1.0)
+        imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate];
 }
 
 @interface PFBWebLoginViewController () <WKNavigationDelegate>
@@ -214,7 +184,7 @@ static UIImage* pfbLoginBirdImage(CGSize size) {
     ]];
 
     if (!self.asRoot) {
-        UIButton* close = [UIButton buttonWithType:UIButtonTypeSystem];
+        UIButton* close = [PFBHitButton buttonWithType:UIButtonTypeSystem];
         [close setImage:PFBTwitterGlyphFor(@"close", [UIImage systemImageNamed:@"xmark"]) forState:UIControlStateNormal];
         close.tintColor = [UIColor secondaryLabelColor];
         close.translatesAutoresizingMaskIntoConstraints = NO;

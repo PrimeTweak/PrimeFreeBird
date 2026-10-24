@@ -142,15 +142,28 @@
 }
 
 - (void)textFieldDidBeginEditing:(UITextField*)textField {
-    self.box.layer.borderColor = PFBAdvBlue().CGColor;
-    self.box.layer.borderWidth = 2.0;
+    [self pfbApplyBorderFocused:YES];
     [self pfbApplyFloatAnimated:YES];
 }
 
 - (void)textFieldDidEndEditing:(UITextField*)textField {
-    self.box.layer.borderColor = [UIColor systemGray3Color].CGColor;
-    self.box.layer.borderWidth = 1.0;
+    [self pfbApplyBorderFocused:NO];
     [self pfbApplyFloatAnimated:YES];
+}
+
+// The blue ring while the field is edited, the gray border otherwise.
+- (void)pfbApplyBorderFocused:(BOOL)focused {
+    if (focused) {
+        self.box.layer.borderColor = PFBAdvBlue().CGColor;
+    } else {
+        PFBAdvRefreshBoxBorder(self.box);
+    }
+    self.box.layer.borderWidth = focused ? 2.0 : 1.0;
+}
+
+- (void)traitCollectionDidChange:(UITraitCollection*)previousTraitCollection {
+    [super traitCollectionDidChange:previousTraitCollection];
+    [self pfbApplyBorderFocused:self.field.isFirstResponder];
 }
 
 - (BOOL)textFieldShouldReturn:(UITextField*)textField {

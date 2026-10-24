@@ -1,8 +1,5 @@
 #!/usr/bin/env python3
-"""Writes src/Support/Generated/PFBHookManifest.m for the debugger and the Compatibility sheet:
-every hooked method and every class named literally in %c(), objc_getClass or NSClassFromString,
-with each file relying on it. PrimeFreeBird's own classes are skipped. Run from the repo root.
-"""
+"""Writes the hook manifest: the classes and %hook methods each .x and .m file relies on."""
 
 import os
 import re
@@ -21,7 +18,7 @@ METHOD_RE = re.compile(r'^\s*[-+]\s*\([^)]*\)\s*([A-Za-z_][A-Za-z0-9_]*)')
 
 
 def full_selector(signature):
-    # Every parenthesised type goes, innermost first so block types unwind too.
+    # Every parenthesized type goes, innermost first so block types unwind too.
     body = re.sub(r'^\s*[-+]\s*', '', signature)
     while True:
         stripped = re.sub(r'\([^()]*\)', ' ', body)
@@ -55,11 +52,11 @@ def parse():
     # method still counts); class resolved by name -> the files resolving it
     hooks = {}
     byname = {}
-    # Classes implemented in src/, and FLEX, Cephei and Preferences ones by prefix, ship with
+    # Classes implemented in src/, and FLEX's and Cephei's HBForce ones by prefix, ship with
     # PrimeFreeBird rather than Twitter, so they are not checked against the app. An
     # @interface alone only redeclares a class of the app; categories never count.
     own_classes = set()
-    own_prefixes = ("FLEX", "HBForce", "Cephei", "PS")
+    own_prefixes = ("FLEX", "HBForce")
     implementation_re = re.compile(r'^@implementation\s+([A-Za-z_][A-Za-z0-9_]*)\s*(?:\{.*)?$')
 
     for path in source_files():

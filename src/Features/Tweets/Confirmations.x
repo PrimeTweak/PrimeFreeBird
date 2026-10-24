@@ -1,7 +1,7 @@
-// Confirmation alerts before tweeting, following and liking, and the undo window
-// after a tweet.
+// Confirmation alerts before posting, following and liking, and the Undo Tweet delay.
 
 #import "Support/HookHelpers.h"
+#import "Debug/PFBProbe.h"
 
 // Asks before an action, with a title that names it and a button that does it. The
 // option's proof is counted once the alert is on screen.
@@ -30,8 +30,8 @@ static void ShowConfirmation(PFBCompatOption option, NSString* detail, NSString*
 
 // MARK: - Tweet confirm
 
-// All send paths funnel through this. Some callers send no argument, so the
-// button register can hold garbage and must not be retained.
+// The compose screen's send paths funnel through this. Some callers send no argument,
+// so the button register can hold garbage and must not be retained.
 %hook T1TweetComposeViewController
 
 - (void)_t1_didTapSendButton:(__unsafe_unretained UIButton*)sendButton {
@@ -112,8 +112,8 @@ static BOOL PFBShowsAsLiked(id viewModel) {
     return ((BOOL (*)(id, SEL))objc_msgSend)(viewModel, liked);
 }
 
-// didTap on every inline action button routes through this delegate method,
-// so only intercept the favorite button. Taking a like back is not asked about.
+// Every inline action button's tap goes through this method, so only the like button
+// is intercepted. Taking a like back is not asked about.
 %hook TTAStatusInlineActionsView
 
 - (void)didTapInlineActionButton:(UIView*)button {
@@ -135,10 +135,40 @@ static BOOL PFBShowsAsLiked(id viewModel) {
 
 %end
 
+// Measurement: the double-tap view's stored properties with their encodings, and what its
+// viewModel is and answers when it is an object; once.
+static void pfbProbeDoubleTapModel(UIView* plugin) {
+    static BOOL done;
+    if (done) {
+        return;
+    }
+    done = YES;
+    unsigned int count = 0;
+    Ivar* ivars = class_copyIvarList(object_getClass(plugin), &count);
+    NSMutableArray<NSString*>* names = [NSMutableArray array];
+    for (unsigned int i = 0; i < count && i < 24; i++) {
+        [names addObject:[NSString stringWithFormat:@"%s(%s)", ivar_getName(ivars[i]), ivar_getTypeEncoding(ivars[i]) ?: ""]];
+    }
+    free(ivars);
+    // Read only through an object getter: a stored Swift value is not an object.
+    SEL getter = NSSelectorFromString(@"viewModel");
+    id model = PFBProbeReturnKind(plugin, getter) == '@' ? ((id (*)(id, SEL))objc_msgSend)(plugin, getter) : nil;
+    NSMutableArray<NSString*>* answers = [NSMutableArray array];
+    for (NSString* name in @[ @"displayAsFavorited", @"isFavorited", @"favorited", @"status", @"tweet" ]) {
+        if ([model respondsToSelector:NSSelectorFromString(name)]) {
+            [answers addObject:name];
+        }
+    }
+    PFB_PROBE(@"double tap like", 2, @"%@: %@; viewModel %@ answering %@", NSStringFromClass(object_getClass(plugin)),
+              [names componentsJoinedByString:@", "], model ? NSStringFromClass([model class]) : @"not an object",
+              answers.count ? [answers componentsJoinedByString:@", "] : @"none");
+}
+
 // Double tap to like in the immersive video player; the gesture never unlikes.
 %hook _TtC14T1TwitterSwift32ImmersiveDoubleTapLikePluginView
 
 - (void)handleDoubleTap:(id)gesture {
+    pfbProbeDoubleTapModel((UIView*)self);
     if (![PFBSettings boolForKey:@"like_confirm"]) {
         return %orig;
     }

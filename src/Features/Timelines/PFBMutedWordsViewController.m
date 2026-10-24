@@ -1,6 +1,4 @@
-// The muted-words list lives in NSUserDefaults as plain strings: an "@" prefix
-// means an account, a space a phrase, anything else a word. Timeline.x reads the
-// same keys and reloads through pfbRefreshMutedWords().
+// The Filters screen: muted words and accounts, kept languages, hidden conversations.
 
 #import "Features/Timelines/PFBMutedWordsViewController.h"
 #import "Common/PFBBundle.h"
@@ -19,10 +17,14 @@ static const CGFloat kPFBTranslateBarHeight = 51.0;
 static const CGFloat kPFBCompactRowMargin = 14.0;
 static const NSInteger kPFBTickTag = 7701;
 
+// Plain strings: an "@" prefix marks an account, a space a phrase, anything else a
+// word. Timeline.x reads the same keys and reloads through pfbRefreshMutedWords().
 static NSString* const kPFBMutedWordsKey = @"pfb_muted_words";
 static NSString* const kPFBMutedWholeWordsKey = @"pfb_muted_whole_words";
 static NSString* const kPFBMutedInConversationsKey = @"pfb_muted_in_conversations";
 static NSString* const kPFBMutedExpiryKey = @"pfb_muted_expiry";
+// The span picked for each timed term, so its menu checks that span whatever time is left.
+static NSString* const kPFBMutedSpanKey = @"pfb_muted_span";
 static NSString* const kPFBMutedSkipFollowingKey = @"pfb_muted_skip_following";
 static NSString* const kPFBMutedIncludeRepostsKey = @"pfb_muted_include_reposts";
 
@@ -32,8 +34,8 @@ static NSString* const kPFBMutedIncludeRepostsKey = @"pfb_muted_include_reposts"
                                        UIPopoverPresentationControllerDelegate>
 @property (nonatomic, strong) NSMutableArray<NSString*>* terms;
 @property (nonatomic, assign) BOOL compact;
-// 0 shows the muted terms, 1 shows the language list. The segmented control
-// above the table drives it, in both presentations.
+// 0 shows the muted terms, 1 the languages, 2 the hidden conversations. The
+// segmented control above the table drives it, in both presentations.
 @property (nonatomic, assign) NSInteger mode;
 @property (nonatomic, strong) NSArray<NSString*>* languageCodes;
 // The pushed screen that holds every language the two shortlists leave out.
@@ -178,14 +180,14 @@ static NSMutableArray<NSString*>* PFBKeptLanguageList(void) {
     }
     // A self-sizing footer needs an estimate, or the table collapses it.
     self.tableView.estimatedSectionFooterHeight = 44.0;
+    [self.tableView registerClass:[PFBMutedAddCell class] forCellReuseIdentifier:@"add"];
+    [self.tableView registerClass:[PFBMutedToggleCell class] forCellReuseIdentifier:@"opt"];
+    [self.tableView registerClass:[PFBMutedTermCell class] forCellReuseIdentifier:@"term"];
     self.languageCodes = PFBLanguageCatalog();
     if (!self.othersOnly) {
         [self installModeControl];
     }
     [self updatePreferredSize];
-    [self.tableView registerClass:[PFBMutedAddCell class] forCellReuseIdentifier:@"add"];
-    [self.tableView registerClass:[PFBMutedToggleCell class] forCellReuseIdentifier:@"opt"];
-    [self.tableView registerClass:[PFBMutedTermCell class] forCellReuseIdentifier:@"term"];
 }
 
 // MARK: mode
@@ -362,8 +364,8 @@ static NSMutableArray<NSString*>* PFBKeptLanguageList(void) {
 }
 
 - (BOOL)rowIsTranslate:(NSInteger)row {
-    return !self.othersOnly &&
-           row == (NSInteger)[self visibleLanguages].count + (self.compact ? 0 : 1);
+    return !self.othersOnly && !self.compact &&
+           row == (NSInteger)[self visibleLanguages].count + 1;
 }
 
 // Rows of the popover clear the corner curve; the full screen keeps its own.
@@ -411,14 +413,25 @@ static NSMutableArray<NSString*>* PFBKeptLanguageList(void) {
     return [value respondsToSelector:@selector(doubleValue)] ? [value doubleValue] : 0.0;
 }
 
-- (void)setExpiry:(NSTimeInterval)deadline forTerm:(NSString*)term {
+- (NSMutableDictionary*)spanMap {
+    return [([[NSUserDefaults standardUserDefaults] dictionaryForKey:kPFBMutedSpanKey]
+                 ?: @{}) mutableCopy];
+}
+
+// A deadline of 0 means forever, which has no span.
+- (void)setExpiry:(NSTimeInterval)deadline span:(NSTimeInterval)span forTerm:(NSString*)term {
     NSMutableDictionary* map = [self expiryMap];
+    NSMutableDictionary* spans = [self spanMap];
     if (deadline <= 0) {
         [map removeObjectForKey:term];
+        [spans removeObjectForKey:term];
     } else {
         map[term] = @(deadline);
+        spans[term] = @(span);
     }
-    [[NSUserDefaults standardUserDefaults] setObject:map forKey:kPFBMutedExpiryKey];
+    NSUserDefaults* defaults = [NSUserDefaults standardUserDefaults];
+    [defaults setObject:map forKey:kPFBMutedExpiryKey];
+    [defaults setObject:spans forKey:kPFBMutedSpanKey];
     pfbRefreshMutedWords();
 }
 
@@ -428,6 +441,7 @@ static NSMutableArray<NSString*>* PFBKeptLanguageList(void) {
     if (map.count == 0) {
         return;
     }
+    NSMutableDictionary* spans = [self spanMap];
     NSTimeInterval now = [[NSDate date] timeIntervalSince1970];
     NSMutableArray* alive = [NSMutableArray array];
     BOOL changed = NO;
@@ -437,6 +451,7 @@ static NSMutableArray<NSString*>* PFBKeptLanguageList(void) {
             [value respondsToSelector:@selector(doubleValue)] ? [value doubleValue] : 0.0;
         if (deadline > 0 && deadline <= now) {
             [map removeObjectForKey:term];
+            [spans removeObjectForKey:term];
             changed = YES;
             continue;
         }
@@ -449,10 +464,11 @@ static NSMutableArray<NSString*>* PFBKeptLanguageList(void) {
     NSUserDefaults* d = [NSUserDefaults standardUserDefaults];
     [d setObject:self.terms forKey:kPFBMutedWordsKey];
     [d setObject:map forKey:kPFBMutedExpiryKey];
+    [d setObject:spans forKey:kPFBMutedSpanKey];
     pfbRefreshMutedWords();
 }
 
-// "forever", or how many days are left.
+// "Forever", or how many days are left.
 - (NSString*)durationLabelForTerm:(NSString*)term {
     PFBBundle* bundle = [PFBBundle sharedBundle];
     NSTimeInterval deadline = [self expiryForTerm:term];
@@ -460,18 +476,13 @@ static NSMutableArray<NSString*>* PFBKeptLanguageList(void) {
         return [bundle localizedStringForKey:@"MUTED_WORDS_DURATION_FOREVER"];
     }
     NSTimeInterval remaining = deadline - [[NSDate date] timeIntervalSince1970];
-    NSInteger days = (NSInteger)ceil(remaining / 86400.0);
-    if (days < 1) {
-        days = 1;
-    }
-    return [NSString stringWithFormat:
-                         [bundle localizedStringForKey:@"MUTED_WORDS_EXPIRES_FORMAT"],
-                         (long)days];
+    return [bundle daysLeftText:MAX((NSInteger)ceil(remaining / 86400.0), 1)];
 }
 
 - (UIMenu*)durationMenuForTerm:(NSString*)term {
     PFBBundle* bundle = [PFBBundle sharedBundle];
     NSTimeInterval current = [self expiryForTerm:term];
+    id picked = [self spanMap][term];
     __weak typeof(self) weakSelf = self;
     NSArray* options = @[ @[ @"MUTED_WORDS_DURATION_24H", @(86400.0) ],
                           @[ @"MUTED_WORDS_DURATION_7D", @(604800.0) ],
@@ -489,13 +500,19 @@ static NSMutableArray<NSString*>* PFBKeptLanguageList(void) {
                             (span <= 0)
                                 ? 0.0
                                 : [[NSDate date] timeIntervalSince1970] + span;
-                        [weakSelf setExpiry:deadline forTerm:term];
+                        [weakSelf setExpiry:deadline span:span forTerm:term];
                         [weakSelf.tableView reloadData];
                     }];
-        BOOL selected = (span <= 0) ? (current <= 0)
-                                    : (current > 0 &&
-                                       fabs((current - [[NSDate date] timeIntervalSince1970]) -
-                                            span) < 86400.0);
+        // A term timed before spans were kept is matched by its time left.
+        BOOL selected;
+        if (span <= 0) {
+            selected = current <= 0;
+        } else if ([picked respondsToSelector:@selector(doubleValue)]) {
+            selected = current > 0 && fabs([picked doubleValue] - span) < 1.0;
+        } else {
+            selected = current > 0 &&
+                       fabs((current - [[NSDate date] timeIntervalSince1970]) - span) < 86400.0;
+        }
         action.state = selected ? UIMenuElementStateOn : UIMenuElementStateOff;
         [actions addObject:action];
     }
@@ -527,8 +544,7 @@ static NSMutableArray<NSString*>* PFBKeptLanguageList(void) {
     // A new term starts with no deadline, even one a removed term left under its name.
     NSMutableDictionary* map = [self expiryMap];
     if (map[raw]) {
-        [map removeObjectForKey:raw];
-        [[NSUserDefaults standardUserDefaults] setObject:map forKey:kPFBMutedExpiryKey];
+        [self setExpiry:0 span:0 forTerm:raw];
     }
     [self.terms insertObject:raw atIndex:0];
     field.text = @"";
@@ -622,7 +638,8 @@ static NSMutableArray<NSString*>* PFBKeptLanguageList(void) {
     return 46.0;
 }
 
-// How much the filter actually did today, under the list.
+// The note under each list: the hidden conversations, the language filter's state,
+// or how many Tweets the words filtered today.
 - (NSString*)tableView:(UITableView*)tableView
     titleForFooterInSection:(NSInteger)section {
     if (self.mode == 2) {
@@ -718,7 +735,7 @@ static NSMutableArray<NSString*>* PFBKeptLanguageList(void) {
         // author was resolved. Empty it would leave a gray box, so the row shows the
         // preview alone.
         [cell applyThreadRowWithMargin:[self rowMargin] showBadge:who.length > 0];
-        cell.kindLabel.text = who;
+        cell.kindLabel.text = who.length ? [NSString stringWithFormat:@"  %@  ", who] : who;
         cell.termLabel.text =
             preview.length ? preview
                            : [bundle localizedStringForKey:@"THREADS_NO_PREVIEW"];
@@ -783,7 +800,7 @@ static NSMutableArray<NSString*>* PFBKeptLanguageList(void) {
                 [bundle localizedStringForKey:@"LANGUAGES_OTHERS_TITLE"];
             cell.textLabel.textColor = [UIColor labelColor];
             cell.detailTextLabel.text =
-                picked.count ? [picked componentsJoinedByString:@", "]
+                picked.count ? [NSListFormatter localizedStringByJoiningStrings:picked]
                              : [bundle localizedStringForKey:@"LANGUAGES_OTHERS_NONE"];
             cell.detailTextLabel.textColor = [UIColor secondaryLabelColor];
             cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
@@ -796,9 +813,7 @@ static NSMutableArray<NSString*>* PFBKeptLanguageList(void) {
         BOOL kept = [PFBKeptLanguageList() containsObject:code];
         cell.textLabel.text = PFBLanguageName(code);
         cell.detailTextLabel.text = nil;
-        cell.textLabel.textColor =
-            kept ? [UIColor labelColor]
-                 : [[UIColor labelColor] colorWithAlphaComponent:0.45];
+        cell.textLabel.textColor = [UIColor labelColor];
         // Placed by constraint rather than as an accessory: the system gives an
         // accessory its own inset, which leaves this column adrift from the switch
         // pinned below the list.
@@ -863,7 +878,6 @@ static NSMutableArray<NSString*>* PFBKeptLanguageList(void) {
                                                        @"MUTED_WORDS_KIND_WORD"]];
             example.durationButton.hidden = YES;
             example.removeButton.hidden = YES;
-            // Dimmed on purpose: it shows the shape of a filter, not a real one.
             example.contentView.alpha = 0.38;
             return example;
         }

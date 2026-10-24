@@ -3,6 +3,10 @@
 #import "Features/Timelines/PFBMutedWordsStyle.h"
 #import "Features/Timelines/PFBMutedAddCell.h"
 
+@interface PFBMutedAddCell ()
+@property (nonatomic, strong) UIView* box;
+@end
+
 @implementation PFBMutedAddCell
 
 - (instancetype)initWithStyle:(UITableViewCellStyle)style
@@ -12,9 +16,10 @@
         self.selectionStyle = UITableViewCellSelectionStyleNone;
         self.backgroundColor = [UIColor clearColor];
 
-        // Bordered box, 1px systemGray3, radius 6 — the exact box the advanced
+        // Bordered box, 1 pt systemGray3, radius 6 — the exact box the advanced
         // search screen uses, so the two screens read as one design.
         UIView* box = [[UIView alloc] init];
+        _box = box;
         box.layer.borderWidth = 1.0;
         box.layer.borderColor = [UIColor systemGray3Color].CGColor;
         box.layer.cornerRadius = 6.0;
@@ -90,6 +95,13 @@
     [super tintColorDidChange];
     self.addButton.backgroundColor =
         PFBCurrentAccentColor() ?: (self.tintColor ?: [UIColor systemBlueColor]);
+}
+
+// A layer border keeps the CGColor it was given: the gray is resolved again for the new
+// appearance.
+- (void)traitCollectionDidChange:(UITraitCollection*)previousTraitCollection {
+    [super traitCollectionDidChange:previousTraitCollection];
+    self.box.layer.borderColor = [[UIColor systemGray3Color] resolvedColorWithTraitCollection:self.traitCollection].CGColor;
 }
 
 @end

@@ -1,7 +1,7 @@
-// A muted-words shortcut in the Home timeline's top bar, added only to the bar the
-// Home timeline owns; if that owner cannot be identified, no button appears.
+// A muted-words button in the Home timeline's top bar.
 
 #import "Support/HookHelpers.h"
+#import "Debug/PFBProbe.h"
 #import "Features/Timelines/PFBMutedWordsViewController.h"
 
 static const void* kPFBQuickMutedBtnKey = &kPFBQuickMutedBtnKey;
@@ -34,20 +34,18 @@ static UIView* pfbFindAvatarView(UIView* view, UIView* bar) {
     return best;
 }
 
-static UIViewController* pfbOwningViewController(UIView* view) {
-    UIResponder* responder = view;
-    while ((responder = responder.nextResponder)) {
-        if (![responder isKindOfClass:[UIViewController class]]) {
-            continue;
-        }
-        UIViewController* controller = (UIViewController*)responder;
-        if ([controller isKindOfClass:[UINavigationController class]]) {
-            UIViewController* top = ((UINavigationController*)controller).topViewController;
-            return top ?: controller;
-        }
-        return controller;
+// Measurement: the screens whose bar receives the button, one line per screen class.
+static void pfbProbeQuickButtonOwner(UIViewController* owner) {
+    static NSMutableSet<Class>* seen;
+    Class kind = [owner class];
+    if (!seen) {
+        seen = [NSMutableSet set];
     }
-    return nil;
+    if (seen.count >= 12 || [seen containsObject:kind]) {
+        return;
+    }
+    [seen addObject:kind];
+    PFB_PROBE(@"Home bar button screens", 10, @"%@", NSStringFromClass(kind));
 }
 
 static BOOL pfbControllerIsHome(UIViewController* owner) {
@@ -55,25 +53,12 @@ static BOOL pfbControllerIsHome(UIViewController* owner) {
         return NO;
     }
     NSString* name = NSStringFromClass([owner class]);
-    // PrimeFreeBird's own pages, its Timelines settings among them, are never Home.
+    // Classes with the PFB prefix, the Timelines settings among them, are never Home.
     if ([name hasPrefix:@"PFB"]) {
         return NO;
     }
     return [name containsString:@"Home"] || [name containsString:@"Timelines"] ||
            [name containsString:@"TimelineContainer"];
-}
-
-// One gray for every icon added here, frozen to a static color. The gear is dimmed
-// to 60 % because its glyph refuses to be tinted, so these icons use the label
-// color at the same 60 %. Resolving it here also keeps the window tint off it.
-static UIColor* PFBBarIconGrey(UITraitCollection* traits) {
-    // Resolved to a concrete color: Twitter's vector renderer turns a dynamic one
-    // black, and the theme would claim it later.
-    UIColor* grey = [[UIColor labelColor] colorWithAlphaComponent:0.6];
-    if (traits && [grey respondsToSelector:@selector(resolvedColorWithTraitCollection:)]) {
-        return [grey resolvedColorWithTraitCollection:traits] ?: grey;
-    }
-    return grey;
 }
 
 // Twitter's filter_bars geometry, drawn at the settings gear's weight: three bars
@@ -83,9 +68,11 @@ static const CGFloat kPFBBarGeometry[3][3] = {
     {3.0, 21.0, 7.0}, {6.0, 18.0, 12.5}, {9.0, 15.0, 18.0}
 };
 
-static UIImage* PFBFilterBarsGlyph(CGFloat side) {
+static UIImage* PFBFilterBarsGlyph(void) {
     const CGFloat kUnit = 24.0;
     const CGFloat kThickness = 2.07;
+    // The settings gear's side in the same bar.
+    const CGFloat side = 27.33;
     CGFloat scale = side / kUnit;
     UIGraphicsImageRendererFormat* format =
         [UIGraphicsImageRendererFormat preferredFormat];
@@ -113,7 +100,7 @@ static UIImage* PFBFilterBarsGlyph(CGFloat side) {
 %new
 - (void)pfbShowQuickMutedWords:(id)sender {
     UIView* bar = (UIView*)self;
-    UIViewController* owner = pfbOwningViewController(bar);
+    UIViewController* owner = PFBOwningTopController(bar);
     if (!owner) {
         return;
     }
@@ -151,7 +138,7 @@ static UIImage* PFBFilterBarsGlyph(CGFloat side) {
         // Three states, not two, because TFNNavigationBar is reused across screens.
         // Owner known and home: create or maintain. Owner known and not home:
         // remove. Owner unknown, the chain being incomplete: change nothing.
-        UIViewController* owner = pfbOwningViewController(bar);
+        UIViewController* owner = PFBOwningTopController(bar);
         if (owner) {
             if (!pfbControllerIsHome(owner)) {
                 if (button) {
@@ -161,6 +148,7 @@ static UIImage* PFBFilterBarsGlyph(CGFloat side) {
                 }
                 return;
             }
+            pfbProbeQuickButtonOwner(owner);
         } else if (!button) {
             return;
         }
@@ -168,13 +156,13 @@ static UIImage* PFBFilterBarsGlyph(CGFloat side) {
             // Twitter's filter_bars shape drawn at the gear's weight, repainted
             // through the same path so the color survives the window tint. Drawing
             // the shape here cannot come back empty, so no symbol fallback.
-            UIImage* icon = PFBFlatGlyph(PFBFilterBarsGlyph(27.33),
-                                         PFBBarIconGrey(bar.traitCollection));
+            UIImage* icon = PFBFlatGlyph(PFBFilterBarsGlyph(),
+                                         PFBBarIconGray(bar.traitCollection));
             button = [UIButton buttonWithType:UIButtonTypeSystem];
             [button setImage:icon forState:UIControlStateNormal];
 
             button.contentMode = UIViewContentModeCenter;
-            button.accessibilityLabel = [[PFBBundle sharedBundle] localizedStringForKey:@"QUICK_MUTED_WORDS_LABEL"];
+            button.accessibilityLabel = [[PFBBundle sharedBundle] localizedStringForKey:@"FILTERS_TITLE"];
             [button addTarget:self
                           action:@selector(pfbShowQuickMutedWords:)
                 forControlEvents:UIControlEventTouchUpInside];
@@ -188,11 +176,11 @@ static UIImage* PFBFilterBarsGlyph(CGFloat side) {
 
         // Re-asserted every pass, not just at creation: on a cold launch the
         // theme's window tint claims the icon until the first tab swipe. The icon
-        // is baked in its grey, so a new grey (light or dark) repaints it.
-        UIColor* grey = PFBBarIconGrey(bar.traitCollection);
-        if (![button.tintColor isEqual:grey]) {
-            button.tintColor = grey;
-            [button setImage:PFBFlatGlyph(PFBFilterBarsGlyph(27.33), grey) forState:UIControlStateNormal];
+        // is baked in its gray, so a new gray (light or dark) repaints it.
+        UIColor* gray = PFBBarIconGray(bar.traitCollection);
+        if (![button.tintColor isEqual:gray]) {
+            button.tintColor = gray;
+            [button setImage:PFBFlatGlyph(PFBFilterBarsGlyph(), gray) forState:UIControlStateNormal];
         }
 
         // Aligned on the avatar rather than on the bar's box: the bar is taller
@@ -209,6 +197,7 @@ static UIImage* PFBFilterBarsGlyph(CGFloat side) {
         }
         button.frame = CGRectMake(CGRectGetWidth(bar.bounds) - side - inset,
                                   centerY - side / 2.0, side, side);
+        PFBCompatReach(PFBCompatPath_home_bar_button);
     } @catch (id exception) {
     }
 }

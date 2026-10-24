@@ -1,5 +1,5 @@
-#import "Support/PFBManager.h"
 #import "Features/Appearance/ThemeColor/PFBPalette.h"
+#import "Settings/PFBSettingsCellStyle.h"
 #import "Settings/PFBModernSettingsToggleCell.h"
 #import "Settings/PFBTintedSwitch.h"
 
@@ -18,6 +18,7 @@
         self.backgroundColor = [PFBPalette currentBackgroundColor];
         self.titleLabel = [UILabel new];
         self.titleLabel.translatesAutoresizingMaskIntoConstraints = NO;
+        self.titleLabel.numberOfLines = 0;
         [self.contentView addSubview:self.titleLabel];
         self.subtitleLabel = [UILabel new];
         self.subtitleLabel.numberOfLines = 0;
@@ -82,11 +83,11 @@
     self.subtitleLabel.text = subtitle;
 }
  
+// Held, the title and the switch dim; the line under them, which says why, stays readable.
 - (void)setRowEnabled:(BOOL)enabled {
     self.toggleSwitch.enabled = enabled;
     CGFloat alpha = enabled ? 1.0 : 0.4;
     self.titleLabel.alpha = alpha;
-    self.subtitleLabel.alpha = alpha;
     self.toggleSwitch.alpha = alpha;
     self.userInteractionEnabled = enabled;
 }
@@ -147,20 +148,13 @@
 }
  
 - (void)applyTheme {
-    id fontGroup = [PFBManager sharedFontGroup];
-    self.titleLabel.font = [fontGroup performSelector:@selector(bodyBoldFont)];
-    self.subtitleLabel.font = [fontGroup performSelector:@selector(subtext2Font)];
-    Class TAEColorSettingsCls = objc_getClass("TAEColorSettings");
-    id settings = [TAEColorSettingsCls sharedSettings];
-    id colorPalette = [[settings currentColorPalette] colorPalette];
-    self.titleLabel.textColor = [colorPalette performSelector:@selector(textColor)];
-    self.subtitleLabel.textColor = [colorPalette performSelector:@selector(tabBarItemColor)];
-    self.pillButton.titleLabel.font =
-        [fontGroup performSelector:@selector(subtext1BoldFont)];
-    [self.pillButton setTitleColor:[colorPalette performSelector:@selector(textColor)]
-                          forState:UIControlStateNormal];
-    self.pillButton.backgroundColor =
-        [colorPalette performSelector:@selector(faintBackgroundColor)];
+    self.titleLabel.font = PFBSettingsTitleFont();
+    self.subtitleLabel.font = PFBSettingsDetailFont();
+    self.titleLabel.textColor = PFBSettingsTextColor();
+    self.subtitleLabel.textColor = PFBSettingsSubtitleColor();
+    self.pillButton.titleLabel.font = PFBSettingsActionFont();
+    [self.pillButton setTitleColor:PFBSettingsTextColor() forState:UIControlStateNormal];
+    self.pillButton.backgroundColor = PFBSettingsFaintColor();
     [(PFBTintedSwitch*)self.toggleSwitch pfbRefreshTint];
 }
  

@@ -1,4 +1,4 @@
-// PrimeFreeBird's resource bundle and localized strings.
+// Resource bundle and localized strings, Twitter's own with a bundled fallback.
 
 #import "Common/PFBBundle.h"
 
@@ -66,7 +66,8 @@ static NSString* const kPFBMissingString = @"<PFB missing string>";
         NSMutableArray<NSBundle*>* found = [NSMutableArray array];
         for (NSString* name in @[
                  @"T1Strings_T1Strings.bundle", @"TwitterSharedStrings_TwitterSharedStrings.bundle",
-                 @"ChatCore_ChatStrings.bundle", @"LiveActivities_LiveActivityStrings.bundle"
+                 @"ChatCore_ChatStrings.bundle", @"LiveActivities_LiveActivityStrings.bundle",
+                 @"XSettings_XSettingsStrings.bundle"
              ]) {
             NSBundle* table =
                 [NSBundle bundleWithPath:[NSBundle.mainBundle.bundlePath stringByAppendingPathComponent:name]];
@@ -86,6 +87,13 @@ static NSString* const kPFBMissingString = @"<PFB missing string>";
     NSString* fallback = [self localizedStringForKey:prefixed];
     return fallback.length == 0 || [fallback isEqualToString:prefixed] ? key : fallback;
 }
+- (NSString*)daysLeftText:(NSInteger)days {
+    if (days == 1) {
+        return [self localizedStringForKey:@"DAYS_LEFT_ONE"];
+    }
+    return [NSString stringWithFormat:[self localizedStringForKey:@"DAYS_LEFT_FORMAT"], (long)days];
+}
+
 - (NSURL*)pathForFile:(NSString*)fileName {
     return [self.mainBundle URLForResource:fileName withExtension:nil];
 }

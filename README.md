@@ -24,7 +24,6 @@
 
 - **Any color you want** — a *Custom* swatch beside the six preset colors opens the native iOS picker.
 - **Applied everywhere** — the bird, links, @mentions, #hashtags and buttons follow it, and the settings switches too with *Switches* on.
-- **Predictable reset** — resetting returns to stock and stays there, across restarts and re-picks.
 - **Dark shades** — choose System, Dim, Gray or Blackout, and every surface follows: sheets, cells, the search field and the bars.
 
 ## Explore &amp; search
@@ -45,9 +44,9 @@
 ## Timeline
 
 - **Unlimited timeline tabs** — pin far more lists and topics than Twitter allows, and unlock advanced tabs like Ranked Following.
-- **Reading marker** — a line marks where you were when new Tweets arrive above, on Following and your Lists.
+- **Reading marker** — marks where you were when new Tweets arrive above, on Following.
 - **Hide topics** — topic Tweets and the "Topics to follow" carousel both go.
-- **Open in Following** — start on the Following tab instead of For You, and stay there.
+- **Remember Home tab** — Home stays on the tab you last picked instead of going back to For You after 12 hours.
 - **Preload media** — images and videos are ready the moment you scroll to them.
 - **Clean screenshots** — an on/off switch for Twitter's screenshot detection.
 
@@ -80,11 +79,9 @@
 
 ## Elsewhere
 
-- **Grouped settings** — every page is split into labelled groups instead of one long list.
+- **Grouped settings** — every page is split into labeled groups instead of one long list.
 - **Clean links** — tracking parameters stripped from links you open, copy *or* share, profiles included.
 - **French localization** — the settings and the new screens are in French, except the swatch names and the Compatibility tools.
-
-<sub>…on top of the BHTwitter and NeoFreeBird toolkit.</sub>
 
 # Build
 

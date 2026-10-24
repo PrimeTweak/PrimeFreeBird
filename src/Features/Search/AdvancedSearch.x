@@ -1,14 +1,14 @@
-// A Filters button in the Explore bar that opens the native Advanced Search form,
-// with the app's own filter button collapsed inside the search bar. The glyph is
-// drawn here at the settings gear's stroke, since no library glyph matches it.
+// Advanced search: a Filters button on Explore and search results that opens the search form.
 
 #import "Support/HookHelpers.h"
 #import "Features/Search/PFBAdvancedSearchViewController.h"
 #import <objc/runtime.h>
 #import <objc/message.h>
+#import "Debug/PFBProbe.h"
 
 static const void* kPFBAdvSearchBtnKey = &kPFBAdvSearchBtnKey;
-static const void* kPFBAdvSearchGreyKey = &kPFBAdvSearchGreyKey;
+static const void* kPFBAdvSearchGrayKey = &kPFBAdvSearchGrayKey;
+static const void* kPFBAdvStyleWatchKey = &kPFBAdvStyleWatchKey;
 static const void* kPFBAdvHiddenByTweakKey = &kPFBAdvHiddenByTweakKey;
 static const void* kPFBAdvFlagBackupKey = &kPFBAdvFlagBackupKey;
 
@@ -17,10 +17,9 @@ static const void* kPFBAdvFlagBackupKey = &kPFBAdvFlagBackupKey;
 // read as two settings. A block cannot capture a local C array.
 static const CGFloat kPFBSliderGeometry[2][2] = {{8.0, 14.0}, {16.0, 10.0}};
 
-// The glyph is drawn in its final color and returned as an original image, so
-// no tint can reach it: a template would inherit the bar's accent between its
-// creation and the first pass of the gray sweep next door.
-static UIImage* PFBSlidersGlyph(CGFloat side, UIColor* colour) {
+// Drawn in its final color and returned as an original image, so the bar's accent
+// tint never reaches it.
+static UIImage* PFBSlidersGlyph(CGFloat side, UIColor* color) {
     const CGFloat kUnit = 24.0;
     // Stroke on the 24-unit grid, lighter than the gear's nominal weight: the gear's glyph
     // stands taller, so an equal stroke would read heavier here.
@@ -40,7 +39,7 @@ static UIImage* PFBSlidersGlyph(CGFloat side, UIColor* colour) {
     UIImage* drawn = [renderer
         imageWithActions:^(UIGraphicsImageRendererContext* context) {
             CGContextRef ctx = context.CGContext;
-            [(colour ?: [UIColor blackColor]) setStroke];
+            [(color ?: [UIColor blackColor]) setStroke];
             CGContextSetLineWidth(ctx, kThickness * scale);
             // Round caps and joins, as the app's own glyphs are drawn.
             CGContextSetLineCap(ctx, kCGLineCapRound);
@@ -66,19 +65,33 @@ static UIImage* PFBSlidersGlyph(CGFloat side, UIColor* colour) {
     return [drawn imageWithRenderingMode:UIImageRenderingModeAlwaysOriginal];
 }
 
-static UIColor* PFBBarIconGrey(UITraitCollection* traits) {
-    UIColor* grey = [[UIColor labelColor] colorWithAlphaComponent:0.6];
-    if (traits && [grey respondsToSelector:@selector(resolvedColorWithTraitCollection:)]) {
-        return [grey resolvedColorWithTraitCollection:traits] ?: grey;
+// 27.33 points, not the gear's 24: the sliders cover 18 of their 24 units against the
+// gear's 20.5, so they need the wider canvas to reach the same width on screen.
+static const CGFloat kPFBFiltersSide = 27.33;
+
+// The Filters button in the bar's gray, flat like the settings gear: iOS 26 gives bar
+// buttons a shared glass capsule, and the property opting out is reached through the
+// runtime, since the build SDK predates it.
+static UIBarButtonItem* PFBFiltersButton(id target, SEL action, UIColor* gray) {
+    UIBarButtonItem* btn = [[UIBarButtonItem alloc] initWithImage:PFBSlidersGlyph(kPFBFiltersSide, gray)
+                                                            style:UIBarButtonItemStylePlain
+                                                           target:target
+                                                           action:action];
+    // The color lives in the image; the tint matches it so a highlighted state derived
+    // from the tint stays the same gray.
+    btn.tintColor = gray;
+    btn.accessibilityLabel = [[PFBBundle sharedBundle] localizedStringForKey:@"ADVANCED_SEARCH_TITLE"];
+    if ([btn respondsToSelector:@selector(setHidesSharedBackground:)]) {
+        ((void (*)(id, SEL, BOOL))objc_msgSend)(btn, @selector(setHidesSharedBackground:), YES);
     }
-    return grey;
+    return btn;
 }
 
 // MARK: - the app's own Filters button
 
 // Every search results screen carries a sliders button opening the native Filters
-// tray, drawn with the same glyph as this form's on Explore, so the native item is
-// replaced. It is told apart by the vector it shows, or by its accessibility label.
+// tray, drawn with the same glyph as the Explore button, so it is replaced. It is told
+// apart by its vector name, its accessibility label or its pixels.
 
 // Presents the Advanced Search form as a page sheet over the given controller.
 static void pfbAdvPresentForm(UIViewController* owner) {
@@ -195,7 +208,7 @@ static UIImage* pfbAdvItemImage(UIBarButtonItem* item) {
 
 static BOOL pfbAdvIsFiltersItem(UIBarButtonItem* item) {
     if (objc_getAssociatedObject(item, kPFBAdvReplacedKey) ||
-        objc_getAssociatedObject(item, kPFBAdvSearchGreyKey)) {
+        objc_getAssociatedObject(item, kPFBAdvSearchGrayKey)) {
         return NO;
     }
     NSSet* glyphs = [NSSet setWithObjects:@"settings_slider", @"filter_bars", nil];
@@ -205,19 +218,18 @@ static BOOL pfbAdvIsFiltersItem(UIBarButtonItem* item) {
         return YES;
     }
     NSString* label = item.accessibilityLabel ?: item.customView.accessibilityLabel;
-    NSSet* labels = [NSSet setWithObjects:@"Filters", @"Filter", @"Filtres", @"Filtre", nil];
+    NSSet* labels = [NSSet setWithObjects:@"Filters", @"Filter", nil];
     if (label && [labels containsObject:label]) {
         return YES;
     }
-    // Neither a name nor a label: the pixels decide. The same vector drawn by
-    // the app's Swift icon code and by its ObjC loader agrees almost entirely;
-    // any other glyph in this bar agrees far less.
+    // Neither a name nor a label: the pixels decide. The sliders glyph matches the
+    // reference drawn from the app's own vector almost entirely; other glyphs far less.
     return pfbAdvMaskAgreement(image) >= 0.85;
 }
 
 // The color the bar's other items are drawn in: the label color on the results screen,
 // gray on Explore. The neighbor decides, and the Explore gray is the fallback.
-static UIColor* pfbAdvNeighbourTint(UINavigationItem* item, UIViewController* owner) {
+static UIColor* pfbAdvNeighborTint(UINavigationItem* item, UIViewController* owner) {
     NSMutableArray<UIBarButtonItem*>* candidates = [NSMutableArray array];
     [candidates addObjectsFromArray:item.rightBarButtonItems ?: @[]];
     if (@available(iOS 16.0, *)) {
@@ -243,22 +255,14 @@ static UIColor* pfbAdvNeighbourTint(UINavigationItem* item, UIViewController* ow
             return tint;
         }
     }
-    return PFBBarIconGrey(owner.traitCollection);
+    return PFBBarIconGray(owner.traitCollection);
 }
 
 static UIBarButtonItem* pfbAdvReplacementFor(UIViewController* owner) {
-    UIColor* grey = pfbAdvNeighbourTint(owner.navigationItem, owner);
+    UIColor* gray = pfbAdvNeighborTint(owner.navigationItem, owner);
     PFBAdvSearchLauncher* launcher = [PFBAdvSearchLauncher new];
     launcher.owner = owner;
-    UIBarButtonItem* btn = [[UIBarButtonItem alloc] initWithImage:PFBSlidersGlyph(27.33, grey)
-                                                            style:UIBarButtonItemStylePlain
-                                                           target:launcher
-                                                           action:@selector(launch:)];
-    btn.tintColor = grey;
-    btn.accessibilityLabel = [[PFBBundle sharedBundle] localizedStringForKey:@"ADVANCED_SEARCH_TITLE"];
-    if ([btn respondsToSelector:@selector(setHidesSharedBackground:)]) {
-        ((void (*)(id, SEL, BOOL))objc_msgSend)(btn, @selector(setHidesSharedBackground:), YES);
-    }
+    UIBarButtonItem* btn = PFBFiltersButton(launcher, @selector(launch:), gray);
     // The item holds its launcher; the launcher only holds the owner weakly.
     objc_setAssociatedObject(btn, kPFBAdvLauncherKey, launcher, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     objc_setAssociatedObject(btn, kPFBAdvReplacedKey, @YES, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
@@ -283,7 +287,28 @@ static BOOL pfbAdvGroupHasCancel(NSArray<UIBarButtonItem*>* items) {
 
 static BOOL pfbAdvIsOurs(UIBarButtonItem* entry) {
     return objc_getAssociatedObject(entry, kPFBAdvReplacedKey) != nil ||
-           objc_getAssociatedObject(entry, kPFBAdvSearchGreyKey) != nil;
+           objc_getAssociatedObject(entry, kPFBAdvSearchGrayKey) != nil;
+}
+
+static BOOL pfbAdvIsSearchScreen(UIViewController* vc);
+
+// Measurement: the screens other than search where the Filters button is replaced,
+// one line per screen class.
+static void pfbProbeReplacedOutsideSearch(UIViewController* owner) {
+    if (pfbAdvIsSearchScreen(owner)) {
+        return;
+    }
+    PFB_PROBE(@"Filters replaced outside search", 6, @"%@", NSStringFromClass([owner class]));
+}
+
+// Measurement: who calls the three group setters, by the image that sent the message.
+static void pfbProbeGroupSetter(NSString* setter, void* caller) {
+    if (!PFBProbeNewCaller(caller)) {
+        return;
+    }
+    Dl_info info;
+    NSString* from = dladdr(caller, &info) && info.dli_fname ? [@(info.dli_fname) lastPathComponent] : @"?";
+    PFB_PROBE(@"bar group setters", 9, @"%@ sent from %@", setter, from);
 }
 
 // Works on the item that received the buttons rather than the top controller's:
@@ -294,6 +319,7 @@ static void pfbAdvReplaceFiltersInItem(UINavigationItem* item,
         return;
     }
     NSInteger replaced = 0;
+    BOOL swapped = NO;
     NSArray* right = item.rightBarButtonItems ?: @[];
     BOOL searching = pfbAdvGroupHasCancel(right);
     NSMutableArray* rebuilt = [NSMutableArray arrayWithCapacity:right.count];
@@ -306,6 +332,7 @@ static void pfbAdvReplaceFiltersInItem(UINavigationItem* item,
         if (match) {
             [rebuilt addObject:pfbAdvReplacementFor(owner)];
             replaced++;
+            swapped = YES;
         } else {
             [rebuilt addObject:entry];
         }
@@ -329,12 +356,18 @@ static void pfbAdvReplaceFiltersInItem(UINavigationItem* item,
                 if (match) {
                     members[i] = pfbAdvReplacementFor(owner);
                     changed = YES;
+                    swapped = YES;
                 }
             }
             if (changed) {
                 group.barButtonItems = members;
             }
         }
+    }
+    if (swapped) {
+        PFBCompatReach(PFBCompatPath_results_filters_button);
+        PFBCOMPAT_ACTION(PFBCompat_advanced_search, @"Filters button replaced in search results");
+        pfbProbeReplacedOutsideSearch(owner);
     }
 }
 
@@ -344,9 +377,8 @@ static BOOL pfbAdvIsSearchScreen(UIViewController* vc) {
            ![vc isKindOfClass:[PFBAdvancedSearchViewController class]];
 }
 
-// The item is set on the container after the results land, well after the container
-// appeared, so the setters are the moment. The owner is the search screen at the top
-// of the stack, and the scan runs once the setter has returned.
+// The controller on screen: the last one presented, then the visible child of
+// navigation and tab controllers.
 static UIViewController* pfbAdvTopViewController(void) {
     UIWindow* window = nil;
     for (id scene in UIApplication.sharedApplication.connectedScenes) {
@@ -423,8 +455,8 @@ static void pfbAdvCollapseNativeInSearchBar(UIView* bar) {
     BOOL* flag = (BOOL*)((char*)(__bridge void*)bar + ivar_getOffset(flagIvar));
     NSNumber* backup = objc_getAssociatedObject(bar, kPFBAdvFlagBackupKey);
     if (hide) {
-        // The app may raise the flag after the first pass; the latest value it
-        // set is the one to give back.
+        // The app may raise the flag after the first pass; the first value and any
+        // later raise are kept, to be given back when the option is off.
         if (!backup || *flag) {
             objc_setAssociatedObject(bar, kPFBAdvFlagBackupKey, @(*flag),
                                      OBJC_ASSOCIATION_RETAIN_NONATOMIC);
@@ -502,11 +534,13 @@ static void pfbAdvCollapseNativeInSearchBar(UIView* bar) {
 
 - (void)setTrailingItemGroups:(NSArray<UIBarButtonItemGroup*>*)groups {
     %orig;
+    pfbProbeGroupSetter(@"setTrailingItemGroups:", __builtin_return_address(0));
     pfbAdvRescanItemSoon(self);
 }
 
 - (void)setPinnedTrailingGroup:(UIBarButtonItemGroup*)group {
     %orig;
+    pfbProbeGroupSetter(@"setPinnedTrailingGroup:", __builtin_return_address(0));
     pfbAdvRescanItemSoon(self);
 }
 
@@ -518,6 +552,7 @@ static void pfbAdvCollapseNativeInSearchBar(UIView* bar) {
 
 - (void)setBarButtonItems:(NSArray<UIBarButtonItem*>*)items {
     %orig;
+    pfbProbeGroupSetter(@"setBarButtonItems:", __builtin_return_address(0));
     pfbAdvRescanSoon();
 }
 
@@ -554,6 +589,37 @@ static void pfbAdvCollapseNativeInSearchBar(UIView* bar) {
 
 %end
 
+// Draws the Explore Filters glyph, and its tint, in the gray of the owner's appearance.
+static void pfbAdvPaintExploreButton(UIViewController* owner, UIBarButtonItem* button) {
+    UIColor* gray = PFBBarIconGray(owner.traitCollection);
+    UIColor* painted = objc_getAssociatedObject(button, kPFBAdvSearchGrayKey);
+    if (painted && [painted isEqual:gray]) {
+        return;
+    }
+    button.image = PFBSlidersGlyph(kPFBFiltersSide, gray);
+    button.tintColor = gray;
+    objc_setAssociatedObject(button, kPFBAdvSearchGrayKey, gray, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+}
+
+// A light/dark switch while Explore is on screen repaints the glyph at once. The
+// registration API is newer than the SDK, so it is called by name, once per controller.
+static void pfbAdvWatchExploreStyle(UIViewController* owner) {
+    SEL registerSelector = NSSelectorFromString(@"registerForTraitChanges:withHandler:");
+    Class styleTrait = NSClassFromString(@"UITraitUserInterfaceStyle");
+    if (objc_getAssociatedObject(owner, kPFBAdvStyleWatchKey) || !styleTrait ||
+        ![owner respondsToSelector:registerSelector]) {
+        return;
+    }
+    void (^handler)(id, UITraitCollection*) = ^(id environment, __unused UITraitCollection* previous) {
+        UIBarButtonItem* button = objc_getAssociatedObject(environment, kPFBAdvSearchBtnKey);
+        if (button && [environment isKindOfClass:[UIViewController class]]) {
+            pfbAdvPaintExploreButton(environment, button);
+        }
+    };
+    id registration = ((id (*)(id, SEL, NSArray*, id))objc_msgSend)(owner, registerSelector, @[ styleTrait ], handler);
+    objc_setAssociatedObject(owner, kPFBAdvStyleWatchKey, registration ?: @YES, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+}
+
 %hook _TtC14T1TwitterSwift28GuideContainerViewController
 
 %new
@@ -585,45 +651,29 @@ static void pfbAdvCollapseNativeInSearchBar(UIView* bar) {
             }
             return;
         }
-        PFBCOMPAT_ACTION(PFBCompat_advanced_search, @"Advanced search button in Explore");
-        UIColor* grey = PFBBarIconGrey(((UIViewController*)self).traitCollection);
-        if (existingBtn) {
-            // A light/dark switch or a theme change resolves to another gray;
-            // the glyph carries its color, so it is redrawn rather than
-            // re-tinted.
-            UIColor* painted = objc_getAssociatedObject(existingBtn, kPFBAdvSearchGreyKey);
-            if (!painted || ![painted isEqual:grey]) {
-                existingBtn.image = PFBSlidersGlyph(27.33, grey);
-                objc_setAssociatedObject(existingBtn, kPFBAdvSearchGreyKey, grey,
-                                         OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-            }
-            return;
+        UIViewController* owner = (UIViewController*)self;
+        UIBarButtonItem* btn = existingBtn;
+        if (btn) {
+            // A theme change resolves to another gray; the glyph carries its color, so it
+            // is redrawn rather than re-tinted.
+            pfbAdvPaintExploreButton(owner, btn);
+        } else {
+            UIColor* gray = PFBBarIconGray(owner.traitCollection);
+            btn = PFBFiltersButton(self, @selector(pfbShowAdvancedSearch), gray);
+            objc_setAssociatedObject(btn, kPFBAdvSearchGrayKey, gray,
+                                     OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+            objc_setAssociatedObject(self, kPFBAdvSearchBtnKey, btn,
+                                     OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+            pfbAdvWatchExploreStyle(owner);
         }
-        // 27.33 points, not the gear's 24: this shape covers 18 of its 24
-        // units against the gear's 20.5, so it needs the wider canvas to
-        // reach the same width on screen.
-        UIImage* icon = PFBSlidersGlyph(27.33, grey);
-        UIBarButtonItem* btn =
-            [[UIBarButtonItem alloc] initWithImage:icon
-                                             style:UIBarButtonItemStylePlain
-                                            target:self
-                                            action:@selector(pfbShowAdvancedSearch)];
-        // The color lives in the image; the tint is set to match so that a
-        // highlighted state derived from it stays the same gray.
-        btn.tintColor = grey;
-        objc_setAssociatedObject(btn, kPFBAdvSearchGreyKey, grey,
-                                 OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-        // Matches Twitter's own settings gear, which sits flat in this bar: iOS 26
-        // gives bar buttons a shared glass capsule and opting out is one property.
-        // Reached through the runtime, since it exists on the iOS 26 SDK only.
-        if ([btn respondsToSelector:@selector(setHidesSharedBackground:)]) {
-            ((void (*)(id, SEL, BOOL))objc_msgSend)(
-                btn, @selector(setHidesSharedBackground:), YES);
+        // Twitter may have replaced the right items since: the button is put back.
+        if (![item.rightBarButtonItems containsObject:btn]) {
+            NSArray* existing = item.rightBarButtonItems ?: @[];
+            item.rightBarButtonItems = [existing arrayByAddingObject:btn];
         }
-        NSArray* existing = item.rightBarButtonItems ?: @[];
-        item.rightBarButtonItems = [existing arrayByAddingObject:btn];
-        objc_setAssociatedObject(self, kPFBAdvSearchBtnKey, btn,
-                                 OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        if ([item.rightBarButtonItems containsObject:btn]) {
+            PFBCOMPAT_ACTION(PFBCompat_advanced_search, @"Advanced search button in Explore");
+        }
     } @catch (id e) {
     }
 }

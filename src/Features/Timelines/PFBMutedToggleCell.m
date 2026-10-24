@@ -1,4 +1,4 @@
-#import "Support/PFBManager.h"
+#import "Settings/PFBSettingsCellStyle.h"
 #import "Features/Timelines/PFBMutedWordsStyle.h"
 #import "Features/Timelines/PFBMutedToggleCell.h"
 
@@ -51,14 +51,10 @@
 // sizes and system grays. Re-applied on trait changes, since a palette color does
 // not follow light and dark on its own.
 - (void)applyTheme {
-    id fontGroup = [PFBManager sharedFontGroup];
-    self.titleLabel2.font = [fontGroup performSelector:@selector(bodyBoldFont)];
-    self.subtitleLabel.font = [fontGroup performSelector:@selector(subtext2Font)];
-    Class TAEColorSettingsCls = objc_getClass("TAEColorSettings");
-    id settings = [TAEColorSettingsCls sharedSettings];
-    id colorPalette = [[settings currentColorPalette] colorPalette];
-    self.titleLabel2.textColor = [colorPalette performSelector:@selector(textColor)];
-    self.subtitleLabel.textColor = [colorPalette performSelector:@selector(tabBarItemColor)];
+    self.titleLabel2.font = PFBSettingsTitleFont();
+    self.subtitleLabel.font = PFBSettingsDetailFont();
+    self.titleLabel2.textColor = PFBSettingsTextColor();
+    self.subtitleLabel.textColor = PFBSettingsSubtitleColor();
 }
 
 - (void)traitCollectionDidChange:(UITraitCollection*)previousTraitCollection {

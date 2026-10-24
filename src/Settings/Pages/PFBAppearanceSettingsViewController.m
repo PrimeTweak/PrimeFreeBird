@@ -1,4 +1,4 @@
-// The Appearance page: accent color, dark mode style and tab bar editor entries.
+// The Appearance page: interface style, fonts, accent color, dark mode style and the tab bar editor.
 
 #import "Settings/Pages/PFBAppearanceSettingsViewController.h"
 #import <objc/message.h>
@@ -115,7 +115,6 @@
                     [[NSUserDefaults standardUserDefaults] setBool:nowEnabled
                                                             forKey:@"enable_liquid_glass"];
                     [[NSUserDefaults standardUserDefaults] synchronize];
-                    // Only prompt for a restart when the mode actually changed.
                     if (wasEnabled != nowEnabled) {
                         [page showRestartRequiredAlert];
                     }
@@ -132,17 +131,19 @@
 
 #pragma mark - Tab Bar Refresh
 
-- (void)refreshAllTabViewsWithTheming {
+- (void)refreshAllTabViewsWithImages:(BOOL)images {
     for (UIWindow* window in [UIApplication sharedApplication].windows) {
         if (window.isKeyWindow && window.rootViewController) {
-            [self refreshTabViewsWithThemingInView:window.rootViewController.view];
+            [self refreshTabViewsInView:window.rootViewController.view images:images];
         }
     }
 }
 
-- (void)refreshTabViewsWithThemingInView:(UIView*)view {
+// Every tab of the bar redraws its label and layout; with `images`, its image and its
+// minimized badge too.
+- (void)refreshTabViewsInView:(UIView*)view images:(BOOL)images {
     if ([view isKindOfClass:NSClassFromString(@"T1TabView")]) {
-        if ([view respondsToSelector:@selector(_t1_updateImageViewAnimated:)]) {
+        if (images && [view respondsToSelector:@selector(_t1_updateImageViewAnimated:)]) {
             ((void (*)(id, SEL, BOOL))objc_msgSend)(view, @selector(_t1_updateImageViewAnimated:), NO);
         }
         if ([view respondsToSelector:@selector(_t1_updateTitleLabel)]) {
@@ -154,7 +155,7 @@
         if ([view respondsToSelector:@selector(_t1_layoutBadgeViewMaximized)]) {
             [view performSelector:@selector(_t1_layoutBadgeViewMaximized)];
         }
-        if ([view respondsToSelector:@selector(_t1_layoutBadgeViewMinimized)]) {
+        if (images && [view respondsToSelector:@selector(_t1_layoutBadgeViewMinimized)]) {
             [view performSelector:@selector(_t1_layoutBadgeViewMinimized)];
         }
 
@@ -168,40 +169,7 @@
     }
 
     for (UIView* subview in view.subviews) {
-        [self refreshTabViewsWithThemingInView:subview];
-    }
-}
-
-- (void)refreshAllTabViews {
-    for (UIWindow* window in [UIApplication sharedApplication].windows) {
-        if (window.isKeyWindow && window.rootViewController) {
-            [self refreshTabViewsInView:window.rootViewController.view];
-        }
-    }
-}
-
-- (void)refreshTabViewsInView:(UIView*)view {
-    if ([view isKindOfClass:NSClassFromString(@"T1TabView")]) {
-        if ([view respondsToSelector:@selector(_t1_updateTitleLabel)]) {
-            [view performSelector:@selector(_t1_updateTitleLabel)];
-        }
-        if ([view respondsToSelector:@selector(_t1_layoutForTabBar)]) {
-            [view performSelector:@selector(_t1_layoutForTabBar)];
-        }
-        if ([view respondsToSelector:@selector(_t1_layoutBadgeViewMaximized)]) {
-            [view performSelector:@selector(_t1_layoutBadgeViewMaximized)];
-        }
-
-        if (![PFBSettings boolForKey:@"tab_bar_theming"] && [view respondsToSelector:@selector(titleLabel)]) {
-            UILabel* titleLabel = [view valueForKey:@"titleLabel"];
-            if (titleLabel) {
-                titleLabel.textColor = nil;
-            }
-        }
-    }
-
-    for (UIView* subview in view.subviews) {
-        [self refreshTabViewsInView:subview];
+        [self refreshTabViewsInView:subview images:images];
     }
 }
 
@@ -210,11 +178,11 @@
     NSString* key = objc_getAssociatedObject(sender, @"prefKey");
     if ([key isEqualToString:@"tab_bar_theming"]) {
         dispatch_async(dispatch_get_main_queue(), ^{
-            [self refreshAllTabViewsWithTheming];
+            [self refreshAllTabViewsWithImages:YES];
         });
     } else if ([key isEqualToString:@"restore_tab_labels"]) {
         dispatch_async(dispatch_get_main_queue(), ^{
-            [self refreshAllTabViews];
+            [self refreshAllTabViewsWithImages:NO];
         });
     }
 }

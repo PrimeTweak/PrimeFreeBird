@@ -1,11 +1,9 @@
-// Timeline options: hidden custom timelines, full-frame images, no Spaces bar, the
-// scroll edge effect, hidden prompts, muted words, the reading marker, the language
-// filter and poll results before voting.
+// Timeline options: content filters, muted words, languages, reading marker, bars, polls.
 
 #import <QuartzCore/QuartzCore.h>
 
 #import "Support/HookHelpers.h"
-#import "Debug/PFBDebugger.h"
+#import "Debug/PFBProbe.h"
 
 // MARK: - Hide custom timelines
 
@@ -38,24 +36,19 @@ void PFBApplyHideCustomTimelinesSetting(void) {
 
 // The trailing accessory is only reconfigured while the strip is showing, so a
 // button built before hiding mid-session survives; sync its visibility here. The
-// button is a Swift ivar with no accessor: KVC first, the ivar list if it throws.
+// button is a Swift ivar with no accessor or type encoding, read from the ivar list.
 static void SyncHomeAddTabButton(id container, BOOL hidden) {
     UIView* button = nil;
-
-    @try {
-        button = [container valueForKey:@"addTabButton"];
-    } @catch (__unused NSException* exception) {
-        unsigned int ivarCount = 0;
-        Ivar* ivars = class_copyIvarList([container class], &ivarCount);
-        for (unsigned int i = 0; i < ivarCount; i++) {
-            const char* name = ivar_getName(ivars[i]);
-            if (name && strstr(name, "addTabButton")) {
-                button = object_getIvar(container, ivars[i]);
-                break;
-            }
+    unsigned int ivarCount = 0;
+    Ivar* ivars = class_copyIvarList([container class], &ivarCount);
+    for (unsigned int i = 0; i < ivarCount; i++) {
+        const char* name = ivar_getName(ivars[i]);
+        if (name && strstr(name, "addTabButton")) {
+            button = object_getIvar(container, ivars[i]);
+            break;
         }
-        free(ivars);
     }
+    free(ivars);
 
     if ([button isKindOfClass:[UIView class]]) {
         button.hidden = hidden;
@@ -68,11 +61,18 @@ static void SyncHomeAddTabButton(id container, BOOL hidden) {
 
 - (void)pinnedTimelinesRepository:(id)repository
     didChangeWithPinnedTimelineModels:(NSArray*)models {
+    // Another repository, another account: the list kept belongs to the one before.
+    if (repository != PinnedTimelinesRepository) {
+        LastPinnedTimelineModels = nil;
+    }
     PinnedTimelinesRepository = repository;
+    BOOL hide = [PFBSettings boolForKey:@"hide_custom_timelines"];
     if (models.count > 0) {
         LastPinnedTimelineModels = [models copy];
+    } else if (!hide) {
+        // Empty while nothing is hidden: the user removed every pin.
+        LastPinnedTimelineModels = nil;
     }
-    BOOL hide = [PFBSettings boolForKey:@"hide_custom_timelines"];
     if (hide && models.count > 0) {
         PFBCOMPAT_ACTION(PFBCompat_hide_custom_timelines, @"pinned tabs hidden");
     }
@@ -130,8 +130,9 @@ static void SyncHomeAddTabButton(id container, BOOL hidden) {
 
 // MARK: - Hide the Spaces bar
 
-// The bar is still the repurposed Fleets line; both home timeline implementations
-// share this visibility gate, re-evaluated on every content or settings update.
+// Twitter draws the Spaces bar with its Fleet line classes; both home timeline
+// implementations share this visibility gate, re-evaluated on every content or
+// settings update.
 %hook T1FleetLineHeaderController
 
 - (BOOL)_t1_shouldShowFleetLine {
@@ -206,7 +207,7 @@ static void pfbApplyFleetVisibility(UIView* view) {
 // MARK: - Scroll edge effect
 
 // Opting back into the iOS 26 design makes iOS draw a scroll edge effect under
-// every bar. This option switches that effect off wherever it appears.
+// every bar. This option switches that effect off, except on modal screens.
 
 static void PFBReadingLayoutTick(UIScrollView* scrollView);
 
@@ -255,21 +256,11 @@ static void pfbApplyEdgeEffect(UIScrollView* scrollView, BOOL hide) {
 
 %hook UIScrollView
 
-static UIViewController* pfbOwningController(UIView* view) {
-    UIResponder* responder = view;
-    while ((responder = responder.nextResponder)) {
-        if ([responder isKindOfClass:[UIViewController class]]) {
-            return (UIViewController*)responder;
-        }
-    }
-    return nil;
-}
-
 // Modal screens are left alone: hiding the effect on Twitter's own settings sheet breaks
 // its content inset and slides the list up under the title. The timeline tabs are never
 // presented modally.
 static BOOL pfbScrollViewIsModal(UIScrollView* scrollView) {
-    UIViewController* owner = pfbOwningController(scrollView);
+    UIViewController* owner = PFBOwningController(scrollView);
     return owner != nil && owner.presentingViewController != nil;
 }
 
@@ -324,7 +315,7 @@ static BOOL pfbScrollViewIsModal(UIScrollView* scrollView) {
 %end
 
 
-// MARK: - Hide "Discover more", who-to-follow and prompts
+// MARK: - Timeline item filters
 
 // Resolves the class by name so mangled Swift names work; NSStringFromClass
 // would only ever produce the demangled dotted form.
@@ -401,25 +392,13 @@ static NSString* ItemScribeComponent(id viewModel) {
     return [component isKindOfClass:[NSString class]] ? component : nil;
 }
 
-// A carousel module's own scribe component, from its client event info. The first
-// ones met are measured, so the report shows how Twitter marks its carousels.
+// A carousel module's own scribe component, from its client event info.
 static NSString* CarouselScribeComponent(id viewModel) {
-    static BOOL measured;
     Ivar ivar = class_getInstanceVariable([viewModel class], "clientEventInfo");
     id info = ivar ? object_getIvar(viewModel, ivar) : nil;
-    NSString* (^read)(NSString*) = ^NSString*(NSString* name) {
-      SEL selector = NSSelectorFromString(name);
-      id value = [info respondsToSelector:selector] ? ((id (*)(id, SEL))objc_msgSend)(info, selector) : nil;
-      return [value isKindOfClass:[NSString class]] ? value : nil;
-    };
-    NSString* component = read(@"component");
-    if (!measured) {
-        NSString* line = [NSString stringWithFormat:@"component %@ · element %@ · info %@",
-                                                    component ?: @"none", read(@"element") ?: @"none",
-                                                    info ? NSStringFromClass([info class]) : @"none"];
-        measured = !PFBCompatMeasure(@"carousel", line, 4);
-    }
-    return component;
+    SEL selector = NSSelectorFromString(@"component");
+    id value = [info respondsToSelector:selector] ? ((id (*)(id, SEL))objc_msgSend)(info, selector) : nil;
+    return [value isKindOfClass:[NSString class]] ? value : nil;
 }
 
 // Tweets a topic brought in carry Twitter's own label for it, "From <topic>" in
@@ -461,6 +440,10 @@ static BOOL ItemRespondsAndInvokesBOOL(id viewModel, SEL selector) {
         return NO;
     }
     return ((BOOL (*)(id, SEL))objc_msgSend)(viewModel, selector);
+}
+
+static BOOL ItemIsBookmarked(id viewModel) {
+    return ItemRespondsAndInvokesBOOL(viewModel, @selector(displayAsBookmarked));
 }
 
 // Set when a reply is only on the feed because a followed account replied to
@@ -515,9 +498,7 @@ static BOOL PFBShouldHideVerifiedItem(id viewModel, BOOL inConversation,
     }
 
     // A bookmarked Tweet stays.
-    SEL bookmarkedSelector = @selector(displayAsBookmarked);
-    if ([viewModel respondsToSelector:bookmarkedSelector] &&
-        ((BOOL (*)(id, SEL))objc_msgSend)(viewModel, bookmarkedSelector)) {
+    if (ItemIsBookmarked(viewModel)) {
         return NO;
     }
 
@@ -564,6 +545,9 @@ static BOOL gPFBMutedIncludeReposts = NO;
 static NSInteger gPFBMutedHiddenToday = 0;
 static NSInteger gPFBMutedFlushCounter = 0;
 static NSString* gPFBMutedCountDay = nil;
+static CFAbsoluteTime gPFBMutedDayEnd = 0;
+static NSMutableSet<NSString*>* gPFBMutedCountedIDs = nil;
+static NSTimeInterval gPFBMutedNextExpiry = 0;   // 1970-based; 0 while no term expires
 static NSUInteger gPFBMutedSignature = 0;
 static BOOL gPFBMutedLoaded = NO;
 
@@ -576,13 +560,17 @@ void pfbRefreshMutedWords(void) {
     NSMutableArray* words = [NSMutableArray array];
     NSMutableArray* handles = [NSMutableArray array];
     NSUInteger signature = 1;
+    NSTimeInterval nextExpiry = 0;
     for (id entry in raw) {
         if (![entry isKindOfClass:[NSString class]]) { continue; }
         NSString* original = (NSString*)entry;
         id deadline = expiry[original];
-        if ([deadline respondsToSelector:@selector(doubleValue)] &&
-            [deadline doubleValue] > 0 && [deadline doubleValue] <= now) {
+        double when = [deadline respondsToSelector:@selector(doubleValue)] ? [deadline doubleValue] : 0;
+        if (when > 0 && when <= now) {
             continue;   // expired: ignored until the editor prunes it
+        }
+        if (when > 0 && (nextExpiry == 0 || when < nextExpiry)) {
+            nextExpiry = when;
         }
         NSString* term = [[original
             stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceCharacterSet]]
@@ -610,20 +598,7 @@ void pfbRefreshMutedWords(void) {
             ? YES
             : [d boolForKey:@"pfb_muted_skip_following"];
     gPFBMutedIncludeReposts = [d boolForKey:@"pfb_muted_include_reposts"];
-
-    // Daily counter: kept in memory and flushed sparingly, so the hot path
-    // never touches NSUserDefaults.
-    NSString* today = [NSString stringWithFormat:@"%ld",
-                                                 (long)(now / 86400.0)];
-    NSString* storedDay = [d stringForKey:@"pfb_muted_count_day"];
-    if ([storedDay isEqualToString:today]) {
-        gPFBMutedHiddenToday = [d integerForKey:@"pfb_muted_hidden_count"];
-    } else {
-        gPFBMutedHiddenToday = 0;
-        [d setObject:today forKey:@"pfb_muted_count_day"];
-        [d setInteger:0 forKey:@"pfb_muted_hidden_count"];
-    }
-    gPFBMutedCountDay = today;
+    gPFBMutedNextExpiry = nextExpiry;
 
     // Hidden conversations share this memo, signed by their ids: a count alone stays
     // the same when one is unhidden and another hidden, and the timeline would keep
@@ -639,8 +614,13 @@ void pfbRefreshMutedWords(void) {
     gPFBMutedLoaded = YES;
 }
 
+// The rules load once, and again as soon as a timed term reaches its deadline.
 static void PFBEnsureMutedLoaded(void) {
-    if (!gPFBMutedLoaded) { pfbRefreshMutedWords(); }
+    if (!gPFBMutedLoaded ||
+        (gPFBMutedNextExpiry > 0 &&
+         CFAbsoluteTimeGetCurrent() + kCFAbsoluteTimeIntervalSince1970 >= gPFBMutedNextExpiry)) {
+        pfbRefreshMutedWords();
+    }
 }
 
 // The object a getter returns, read only when its signature says it returns one.
@@ -696,8 +676,17 @@ static NSString* PFBHandleFromSelectors(id object, BOOL descend) {
     return nil;
 }
 
+// Scripts written without spaces between words (Thai, Lao, Khmer, kana, Han): a
+// neighbor in one of them says nothing about a word's end, so it counts as a boundary.
+static BOOL PFBIsUnspacedScript(unichar c) {
+    return (c >= 0x0E00 && c <= 0x0EFF) || (c >= 0x1780 && c <= 0x17FF) ||
+           (c >= 0x3040 && c <= 0x30FF) || (c >= 0x31F0 && c <= 0x31FF) ||
+           (c >= 0x3400 && c <= 0x4DBF) || (c >= 0x4E00 && c <= 0x9FFF) ||
+           (c >= 0xF900 && c <= 0xFAFF) || (c >= 0xFF66 && c <= 0xFF9F);
+}
+
 // Whole-word matching without a regex: find the needle, then require that
-// neither neighbouring character is alphanumeric.
+// neither neighboring character is alphanumeric.
 static BOOL PFBHaystackContainsTerm(NSString* haystack, NSString* term, BOOL wholeWords) {
     NSRange search = NSMakeRange(0, haystack.length);
     while (search.length > 0) {
@@ -708,12 +697,13 @@ static BOOL PFBHaystackContainsTerm(NSString* haystack, NSString* term, BOOL who
         BOOL leftOK = YES;
         BOOL rightOK = YES;
         if (found.location > 0) {
-            leftOK = ![alnum characterIsMember:
-                                 [haystack characterAtIndex:found.location - 1]];
+            unichar left = [haystack characterAtIndex:found.location - 1];
+            leftOK = ![alnum characterIsMember:left] || PFBIsUnspacedScript(left);
         }
         NSUInteger after = found.location + found.length;
         if (after < haystack.length) {
-            rightOK = ![alnum characterIsMember:[haystack characterAtIndex:after]];
+            unichar right = [haystack characterAtIndex:after];
+            rightOK = ![alnum characterIsMember:right] || PFBIsUnspacedScript(right);
         }
         if (leftOK && rightOK) { return YES; }
         NSUInteger next = found.location + 1;
@@ -723,14 +713,49 @@ static BOOL PFBHaystackContainsTerm(NSString* haystack, NSString* term, BOOL who
     return NO;
 }
 
-// Read by the muted-words editor to show "N posts filtered today".
+// "Tweets filtered today" follows the local day: past the next local midnight the count
+// starts over. The count is kept in memory and saved sparingly, so the hot path rarely
+// touches NSUserDefaults.
+static void PFBMutedRollDay(void) {
+    CFAbsoluteTime now = CFAbsoluteTimeGetCurrent();
+    if (gPFBMutedCountDay && now < gPFBMutedDayEnd) {
+        return;
+    }
+    NSCalendar* calendar = [NSCalendar currentCalendar];
+    NSDate* start = [calendar startOfDayForDate:[NSDate date]];
+    NSDate* end = [calendar dateByAddingUnit:NSCalendarUnitDay value:1 toDate:start options:0];
+    gPFBMutedDayEnd = end ? end.timeIntervalSinceReferenceDate : now + 3600.0;
+    NSString* today = [NSString stringWithFormat:@"%.0f", start.timeIntervalSince1970];
+    if ([today isEqualToString:gPFBMutedCountDay]) {
+        return;
+    }
+    // The saved count holds only for its own day: kept after a relaunch that day.
+    NSUserDefaults* d = [NSUserDefaults standardUserDefaults];
+    BOOL sameDay = !gPFBMutedCountDay && [[d stringForKey:@"pfb_muted_count_day"] isEqualToString:today];
+    gPFBMutedHiddenToday = sameDay ? [d integerForKey:@"pfb_muted_hidden_count"] : 0;
+    if (!sameDay) {
+        [d setObject:today forKey:@"pfb_muted_count_day"];
+        [d setInteger:0 forKey:@"pfb_muted_hidden_count"];
+    }
+    gPFBMutedCountedIDs = [NSMutableSet set];
+    gPFBMutedCountDay = today;
+}
+
+// Read by the muted-words editor for its "Tweets filtered today" footer.
 NSInteger pfbMutedHiddenCountToday(void) {
     PFBEnsureMutedLoaded();
+    PFBMutedRollDay();
     return gPFBMutedHiddenToday;
 }
 
-static void PFBNoteMutedHidden(void) {
+// Each Tweet counts once a day, however often the timeline is filtered again.
+static void PFBNoteMutedHidden(NSString* entryID) {
     PFBCOMPAT_ACTION(PFBCompat_muted_words, @"muted post hidden");
+    PFBMutedRollDay();
+    if (!entryID || [gPFBMutedCountedIDs containsObject:entryID]) {
+        return;
+    }
+    [gPFBMutedCountedIDs addObject:entryID];
     gPFBMutedHiddenToday++;
     // Persist every so often rather than on every hidden post.
     if (++gPFBMutedFlushCounter >= 25) {
@@ -812,29 +837,6 @@ static BOOL PFBItemIsMuted(id viewModel) {
     return NO;
 }
 
-static NSString* gPFBFirstRetweet;
-
-// The first retweet of the launch, logged once and kept, with each link of the chain
-// it reached, for the path tour to report.
-static void PFBLogFirstRetweet(id author, id relationship, char type, NSInteger value) {
-    static dispatch_once_t once;
-    dispatch_once(&once, ^{
-        NSString* state = (type == 'q' || type == 'l')
-                              ? [NSString stringWithFormat:@"%ld", (long)value]
-                              : (type ? [NSString stringWithFormat:@"typed '%c'", type] : @"missing");
-        gPFBFirstRetweet = [NSString
-            stringWithFormat:@"author %@ · relationship %@ · blocking state %@",
-                             author ? NSStringFromClass([author class]) : @"none",
-                             relationship ? NSStringFromClass([relationship class]) : @"none", state];
-        PFBDebugLog(@"[filter] first retweet: %@", gPFBFirstRetweet);
-    });
-}
-
-// What the blocked-retweet filter saw first this launch; nil until a retweet comes by.
-NSString* PFBFirstRetweetSummary(void) {
-    return gPFBFirstRetweet;
-}
-
 // Whether a retweet's original author blocks this account (state 1). *checked is
 // set once the whole chain answered, so a missing link is told from "not blocking".
 static BOOL PFBRetweetAuthorBlocksAccount(id viewModel, BOOL* checked) {
@@ -849,13 +851,10 @@ static BOOL PFBRetweetAuthorBlocksAccount(id viewModel, BOOL* checked) {
                     ? [relationship methodSignatureForSelector:state].methodReturnType[0]
                     : 0;
     if (type != 'q' && type != 'l') {
-        PFBLogFirstRetweet(author, relationship, type, 0);
         return NO;
     }
     *checked = YES;
-    NSInteger value = ((NSInteger (*)(id, SEL))objc_msgSend)(relationship, state);
-    PFBLogFirstRetweet(author, relationship, type, value);
-    return value == 1;
+    return ((NSInteger (*)(id, SEL))objc_msgSend)(relationship, state) == 1;
 }
 
 // The signed-in account's user ID; 0 when it cannot be read.
@@ -886,22 +885,36 @@ static long long ItemFromUserID(id viewModel) {
     return ((long long (*)(id, SEL))objc_msgSend)(viewModel, selector);
 }
 
-// A Retweet or a quote Tweet, per the getter, posted by someone else: the account's own stay.
-static BOOL PFBItemIsOthers(id viewModel, NSString* getter) {
+// A Retweet or a quote Tweet, per the getter, posted by someone else than the signed-in
+// account (0 when unknown): the account's own stay.
+static BOOL PFBItemIsOthers(id viewModel, NSString* getter, long long account) {
     if (!ItemRespondsAndInvokesBOOL(viewModel, NSSelectorFromString(getter))) {
         return NO;
     }
-    long long account = PFBCurrentAccountUserID();
     return account == 0 || ItemFromUserID(viewModel) != account;
 }
 
-static BOOL ShouldHideTimelineItem(id item, BOOL hideWhoToFollow, BOOL hidePrompts,
-                                   BOOL hideTopics, BOOL hideTopicsToFollow,
-                                   BOOL hideVerified, BOOL hideBlockedRetweets,
-                                   BOOL hideAllRetweets, BOOL hideQuoteTweets, BOOL inHome,
-                                   BOOL inConversation, BOOL inProfile,
-                                   long long conversationRootUserID,
-                                   NSSet<NSNumber*>* authorRepliedToUserIDs) {
+// What a filtering pass knows of its list and of the options, read once per pass.
+typedef struct {
+    BOOL hideWhoToFollow;
+    BOOL hidePrompts;
+    BOOL hideTopics;
+    BOOL hideTopicsToFollow;
+    BOOL hideVerified;
+    BOOL hideBlockedRetweets;
+    BOOL hideAllRetweets;
+    BOOL hideQuoteTweets;
+    BOOL hideThreads;
+    BOOL applyMuted;
+    BOOL inHome;
+    BOOL inConversation;
+    BOOL inProfile;
+    long long accountUserID;
+    long long conversationRootUserID;
+    __unsafe_unretained NSSet<NSNumber*>* authorRepliedToUserIDs;
+} PFBTimelinePass;
+
+static BOOL ShouldHideTimelineItem(id item, const PFBTimelinePass* pass) {
     id viewModel = PFBUnwrapDataViewItem(item);
     NSString* className = NSStringFromClass([viewModel classForCoder]);
 
@@ -917,95 +930,94 @@ static BOOL ShouldHideTimelineItem(id item, BOOL hideWhoToFollow, BOOL hidePromp
         PFBHandleFromSelectors(viewModel, YES).length) {
         PFBCOMPAT_OBSERVE(PFBCompat_muted_words, @"Tweet text and author read");
     }
-    if ((gPFBMutedWords.count || gPFBMutedHandles.count) &&
-        (!inConversation || gPFBMutedInConversations) && PFBItemIsMuted(viewModel)) {
-        PFBNoteMutedHidden();
+    if (pass->applyMuted && PFBItemIsMuted(viewModel)) {
+        PFBNoteMutedHidden(ItemEntryID(viewModel));
         return YES;
     }
 
-    if (hideVerified && PFBShouldHideVerifiedItem(viewModel, inConversation, conversationRootUserID,
-                                                 authorRepliedToUserIDs)) {
+    if (pass->hideVerified && PFBShouldHideVerifiedItem(viewModel, pass->inConversation, pass->conversationRootUserID,
+                                                       pass->authorRepliedToUserIDs)) {
         PFBCOMPAT_ACTION(PFBCompat_hide_verified_tweets, @"verified Tweet hidden");
         return YES;
     }
 
-    if (hideBlockedRetweets || PFBCompatNeedsObservation(PFBCompat_hide_blocked_retweets)) {
+    if (pass->hideBlockedRetweets || PFBCompatNeedsObservation(PFBCompat_hide_blocked_retweets)) {
         BOOL checked = NO;
         BOOL blocking = PFBRetweetAuthorBlocksAccount(viewModel, &checked);
         if (checked) {
             PFBCOMPAT_OBSERVE(PFBCompat_hide_blocked_retweets, @"retweet checked");
         }
-        if (blocking && hideBlockedRetweets) {
+        if (blocking && pass->hideBlockedRetweets) {
             PFBCOMPAT_ACTION(PFBCompat_hide_blocked_retweets, @"blocked retweet hidden");
             return YES;
         }
     }
 
-    // Retweets set to None: every other Retweet leaves the Home timelines.
-    if (inHome && (hideAllRetweets || !PFBCompatPathReached(PFBCompatPath_home_retweets)) &&
-        PFBItemIsOthers(viewModel, @"isRetweet")) {
+    // Retweets set to None: Retweets by other accounts leave the Home timelines.
+    if (pass->inHome && (pass->hideAllRetweets || !PFBCompatPathReached(PFBCompatPath_home_retweets)) &&
+        PFBItemIsOthers(viewModel, @"isRetweet", pass->accountUserID)) {
         PFBCompatReach(PFBCompatPath_home_retweets);
-        if (hideAllRetweets) {
+        if (pass->hideAllRetweets) {
             PFBCOMPAT_ACTION(PFBCompat_hide_blocked_retweets, @"Retweet hidden");
             return YES;
         }
     }
 
     // Quote Tweets of others leave the Home timelines; a reply shown for its context stays.
-    if (inHome && (hideQuoteTweets || PFBCompatNeedsObservation(PFBCompat_hide_quote_tweets)) &&
-        !ItemIsReplyWithSocialContext(viewModel) && PFBItemIsOthers(viewModel, @"isQuoteStatus")) {
-        if (hideQuoteTweets) {
+    if (pass->inHome && (pass->hideQuoteTweets || PFBCompatNeedsObservation(PFBCompat_hide_quote_tweets)) &&
+        !ItemIsReplyWithSocialContext(viewModel) &&
+        PFBItemIsOthers(viewModel, @"isQuoteStatus", pass->accountUserID)) {
+        if (pass->hideQuoteTweets) {
             PFBCOMPAT_ACTION(PFBCompat_hide_quote_tweets, @"quote Tweet hidden");
             return YES;
         }
         PFBCOMPAT_OBSERVE(PFBCompat_hide_quote_tweets, @"quote Tweet found");
     }
 
-    if (!hidePrompts && [className isEqualToString:@"TwitterURT.URTTimelinePromptViewModel"]) {
+    if (!pass->hidePrompts && [className isEqualToString:@"TwitterURT.URTTimelinePromptViewModel"]) {
         PFBCOMPAT_OBSERVE(PFBCompat_hide_timeline_prompts, @"prompt found");
     }
-    if (!hideTopics && ItemIsTopicPost(viewModel)) {
+    if (!pass->hideTopics && ItemIsTopicPost(viewModel)) {
         PFBCOMPAT_OBSERVE(PFBCompat_hide_topics, @"topic label found");
     }
-    if (!hideTopicsToFollow && [ItemScribeComponent(viewModel) isEqualToString:@"suggest_topics_module"]) {
+    if (!pass->hideTopicsToFollow && [ItemScribeComponent(viewModel) isEqualToString:@"suggest_topics_module"]) {
         PFBCOMPAT_OBSERVE(PFBCompat_hide_topics_to_follow, @"topic suggestions found");
     }
-    if (!hideVerified && PFBCompatNeedsObservation(PFBCompat_hide_verified_tweets) &&
-        PFBShouldHideVerifiedItem(viewModel, inConversation, conversationRootUserID,
-                                                 authorRepliedToUserIDs)) {
+    if (!pass->hideVerified && PFBCompatNeedsObservation(PFBCompat_hide_verified_tweets) &&
+        PFBShouldHideVerifiedItem(viewModel, pass->inConversation, pass->conversationRootUserID,
+                                  pass->authorRepliedToUserIDs)) {
         PFBCOMPAT_OBSERVE(PFBCompat_hide_verified_tweets, @"verified Tweet found");
     }
-    if (hidePrompts && [className isEqualToString:@"TwitterURT.URTTimelinePromptViewModel"]) {
+    if (pass->hidePrompts && [className isEqualToString:@"TwitterURT.URTTimelinePromptViewModel"]) {
         PFBCOMPAT_ACTION(PFBCompat_hide_timeline_prompts, @"prompt hidden");
         return YES;
     }
 
-    if (hideTopics && ItemIsTopicPost(viewModel)) {
+    if (pass->hideTopics && ItemIsTopicPost(viewModel)) {
         PFBCOMPAT_ACTION(PFBCompat_hide_topics, @"topic Tweet hidden");
         return YES;
     }
 
     // Topic suggestions arrive as a module marked like Who to follow's.
-    if (hideTopicsToFollow && [ItemScribeComponent(viewModel) isEqualToString:@"suggest_topics_module"]) {
+    if (pass->hideTopicsToFollow && [ItemScribeComponent(viewModel) isEqualToString:@"suggest_topics_module"]) {
         PFBCOMPAT_ACTION(PFBCompat_hide_topics_to_follow, @"topic suggestions hidden");
         return YES;
     }
 
-    if (hideWhoToFollow && [ItemScribeComponent(viewModel)
-                               isEqualToString:@"suggest_who_to_follow"]) {
+    if (pass->hideWhoToFollow && [ItemScribeComponent(viewModel) isEqualToString:@"suggest_who_to_follow"]) {
         PFBCOMPAT_ACTION(PFBCompat_hide_who_to_follow, @"who-to-follow module hidden");
         return YES;
     }
 
-    if (hideWhoToFollow && inProfile &&
+    if (pass->hideWhoToFollow && pass->inProfile &&
         [className isEqualToString:@"T1TwitterSwift.URTTimelineCarouselViewModel"]) {
         PFBCOMPAT_ACTION(PFBCompat_hide_who_to_follow, @"profile suggestions hidden");
         return YES;
     }
 
-    // Elsewhere a carousel is one item whose accounts only its own list holds: it is
-    // Who to follow when Twitter marks the module itself so.
-    if (hideWhoToFollow && [className isEqualToString:@"T1TwitterSwift.URTTimelineCarouselViewModel"] &&
+    // Outside a profile, a carousel is one item holding its own accounts: it goes only
+    // when Twitter marks the module itself as Who to follow.
+    if (pass->hideWhoToFollow && [className isEqualToString:@"T1TwitterSwift.URTTimelineCarouselViewModel"] &&
         [CarouselScribeComponent(viewModel) isEqualToString:@"suggest_who_to_follow"]) {
         PFBCOMPAT_ACTION(PFBCompat_hide_who_to_follow, @"who-to-follow carousel hidden");
         return YES;
@@ -1017,12 +1029,12 @@ static BOOL ShouldHideTimelineItem(id item, BOOL hideWhoToFollow, BOOL hidePromp
         return NO;
     }
 
-    if (inConversation && [entryID hasPrefix:@"tweetdetailrelatedtweets"]) {
+    if (pass->inConversation && [entryID hasPrefix:@"tweetdetailrelatedtweets"]) {
         PFBCOMPAT_ACTION(PFBCompat_remove_related_tweets, @"related Tweets removed");
         return YES;
     }
 
-    if (hideWhoToFollow && [entryID containsString:@"who-to-follow"]) {
+    if (pass->hideWhoToFollow && [entryID containsString:@"who-to-follow"]) {
         PFBCOMPAT_ACTION(PFBCompat_hide_who_to_follow, @"who-to-follow entry hidden");
         return YES;
     }
@@ -1030,18 +1042,14 @@ static BOOL ShouldHideTimelineItem(id item, BOOL hideWhoToFollow, BOOL hidePromp
     return NO;
 }
 
-// More efficient than calling ShouldHideTimelineItem() repeatedly, which slows
-// the app down a lot when hide-verified scans every reply.
-static BOOL MemoizedShouldHideTimelineItem(id item, BOOL hideWhoToFollow, BOOL hidePrompts,
-                                           BOOL hideTopics, BOOL hideTopicsToFollow,
-                                           BOOL hideVerified, BOOL hideBlockedRetweets,
-                                           BOOL hideAllRetweets, BOOL hideQuoteTweets, BOOL inHome,
-                                           BOOL inConversation, BOOL inProfile,
-                                           long long conversationRootUserID,
-                                           NSSet<NSNumber*>* authorRepliedToUserIDs) {
+// Verdicts are kept per entry: evaluating every item again on each pass slows the app
+// down a lot when hide verified scans every reply. A verdict also depends on whether the
+// author is followed and the Tweet bookmarked, so both are part of its key.
+static BOOL MemoizedShouldHideTimelineItem(id item, const PFBTimelinePass* pass) {
     static NSCache<NSString*, NSNumber*>* cache;
     static NSUInteger cachedFlags = NSUIntegerMax;
     static NSUInteger cachedMutedSignature = NSUIntegerMax;
+    static long long cachedAccountUserID = 0;
     static long long cachedRootUserID = 0;
     static NSSet<NSNumber*>* cachedAuthorRepliedToUserIDs;
     static dispatch_once_t onceToken;
@@ -1050,41 +1058,40 @@ static BOOL MemoizedShouldHideTimelineItem(id item, BOOL hideWhoToFollow, BOOL h
         cache.countLimit = 4000;
     });
 
-    NSUInteger flags = (hideWhoToFollow << 0) | (hidePrompts << 1) | (hideTopics << 2) |
-                       (hideTopicsToFollow << 3) | (hideVerified << 4) |
-                       (inConversation << 5) | (inProfile << 6) |
-                       (hideBlockedRetweets << 7) | (hideAllRetweets << 8) |
-                       (hideQuoteTweets << 9) | (inHome << 10);
-    BOOL repliedSetChanged = authorRepliedToUserIDs != cachedAuthorRepliedToUserIDs &&
-                             ![authorRepliedToUserIDs isEqualToSet:cachedAuthorRepliedToUserIDs];
-    PFBEnsureMutedLoaded();
-    if (flags != cachedFlags || conversationRootUserID != cachedRootUserID ||
-        repliedSetChanged || gPFBMutedSignature != cachedMutedSignature) {
+    NSUInteger flags = (pass->hideWhoToFollow << 0) | (pass->hidePrompts << 1) | (pass->hideTopics << 2) |
+                       (pass->hideTopicsToFollow << 3) | (pass->hideVerified << 4) |
+                       (pass->inConversation << 5) | (pass->inProfile << 6) |
+                       (pass->hideBlockedRetweets << 7) | (pass->hideAllRetweets << 8) |
+                       (pass->hideQuoteTweets << 9) | (pass->inHome << 10) |
+                       (pass->hideThreads << 11) | (pass->applyMuted << 12);
+    NSSet<NSNumber*>* replied = pass->authorRepliedToUserIDs;
+    BOOL repliedSetChanged = replied != cachedAuthorRepliedToUserIDs &&
+                             ![replied isEqualToSet:cachedAuthorRepliedToUserIDs];
+    if (flags != cachedFlags || pass->conversationRootUserID != cachedRootUserID ||
+        pass->accountUserID != cachedAccountUserID || repliedSetChanged ||
+        gPFBMutedSignature != cachedMutedSignature) {
         [cache removeAllObjects];
         cachedMutedSignature = gPFBMutedSignature;
         cachedFlags = flags;
-        cachedRootUserID = conversationRootUserID;
-        cachedAuthorRepliedToUserIDs = authorRepliedToUserIDs;
+        cachedRootUserID = pass->conversationRootUserID;
+        cachedAccountUserID = pass->accountUserID;
+        cachedAuthorRepliedToUserIDs = replied;
     }
 
-    NSString* entryID = ItemEntryID(PFBUnwrapDataViewItem(item));
+    id viewModel = PFBUnwrapDataViewItem(item);
+    NSString* entryID = ItemEntryID(viewModel);
     if (!entryID) {
-        return ShouldHideTimelineItem(item, hideWhoToFollow, hidePrompts, hideTopics,
-                                      hideTopicsToFollow, hideVerified, hideBlockedRetweets, hideAllRetweets,
-                                      hideQuoteTweets, inHome, inConversation, inProfile,
-                                      conversationRootUserID, authorRepliedToUserIDs);
+        return ShouldHideTimelineItem(item, pass);
     }
-
-    NSNumber* cached = [cache objectForKey:entryID];
+    NSString* key = [NSString stringWithFormat:@"%@|%ld|%d", entryID, (long)PFBAuthorFollowState(viewModel),
+                                               ItemIsBookmarked(viewModel)];
+    NSNumber* cached = [cache objectForKey:key];
     if (cached) {
         return cached.boolValue;
     }
 
-    BOOL hide = ShouldHideTimelineItem(item, hideWhoToFollow, hidePrompts, hideTopics,
-                                       hideTopicsToFollow, hideVerified, hideBlockedRetweets, hideAllRetweets,
-                                       hideQuoteTweets, inHome, inConversation, inProfile,
-                                       conversationRootUserID, authorRepliedToUserIDs);
-    [cache setObject:@(hide) forKey:entryID];
+    BOOL hide = ShouldHideTimelineItem(item, pass);
+    [cache setObject:@(hide) forKey:key];
     return hide;
 }
 
@@ -1148,9 +1155,9 @@ static const void* kPFBReadingTopAtCaptureKey = &kPFBReadingTopAtCaptureKey;
 static const void* kPFBReadingRetiredKey = &kPFBReadingRetiredKey;
 static const void* kPFBReadingMissCountKey = &kPFBReadingMissCountKey;
 
-// The wash covers the Tweet's header and fades out before the media: solid
-// for the first points, gone by the reach. Low enough to read through, high
-// enough to spot at a glance.
+// The wash covers the Tweet's header and fades out before the media: solid for
+// the first 34 points, gone by 110. Light enough to read through, strong enough
+// to spot at a glance.
 static const CGFloat kPFBReadingMarkerAlpha = 0.18;
 static const CGFloat kPFBReadingFadeSolid = 34.0;
 static const CGFloat kPFBReadingFadeReach = 110.0;
@@ -1241,6 +1248,14 @@ static BOOL PFBListCellFrame(UIScrollView* scrollView, NSIndexPath* path,
         }
     }
     if ([scrollView respondsToSelector:@selector(layoutAttributesForItemAtIndexPath:)]) {
+        // The same check as for a table: the data can run ahead of the collection's items.
+        if ([scrollView isKindOfClass:[UICollectionView class]]) {
+            UICollectionView* collection = (UICollectionView*)scrollView;
+            if (path.section >= collection.numberOfSections ||
+                path.item >= [collection numberOfItemsInSection:path.section]) {
+                return NO;
+            }
+        }
         id attributes = ((id (*)(id, SEL, id))objc_msgSend)(
             scrollView, @selector(layoutAttributesForItemAtIndexPath:), path);
         if (attributes && [attributes respondsToSelector:@selector(frame)]) {
@@ -1258,8 +1273,8 @@ static BOOL PFBReadingIsHomeTimeline(TFNItemsDataViewController* dataViewControl
         @"_TtC32TwitterHomeFeatureImplementation35HomeTimelineContainerViewController");
 }
 
-// The topmost visible row's entry ID; nil when the table or the item cannot
-// be resolved. Sections that are not item arrays are opaque and skipped.
+// The topmost visible row's entry ID; nil when the table, its section or the item
+// cannot be resolved.
 static NSString* PFBReadingTopVisibleEntryID(TFNItemsDataViewController* dataViewController) {
     UIScrollView* list = PFBListScrollView(dataViewController);
     NSIndexPath* top = PFBListVisibleIndexPaths(list).firstObject;
@@ -1432,8 +1447,8 @@ static void PFBReadingCaptureAnchor(TFNItemsDataViewController* dataViewControll
         return;
     }
     // A controller with no anchor is new or just relaunched, and claiming the head
-    // would bury the one on disk. The stored anchors are tried first; with nothing
-    // stored the head becomes the first boundary.
+    // would bury the one on disk. The stored anchors are tried first; the head becomes
+    // the boundary when none is stored, or none matches once the list holds 10 items.
     if (!objc_getAssociatedObject(dataViewController, kPFBReadingAnchorIDKey)) {
         if (PFBReadingStoreRestore(dataViewController)) {
             return;
@@ -1478,13 +1493,13 @@ static void PFBReadingCaptureAnchor(TFNItemsDataViewController* dataViewControll
 
 // One row's true geometry. The rendered cell is authoritative on screen, since
 // data sections and table rows do not always map one-to-one. Off screen the
-// computed rect only decides visibility.
-static void PFBReadingPlaceMarker(UIScrollView* table, UIView* marker,
+// computed rect only decides visibility. Returns whether the marker is shown.
+static BOOL PFBReadingPlaceMarker(UIScrollView* table, UIView* marker,
                                   NSIndexPath* path) {
     CGRect rowRect;
     if (!PFBListCellFrame(table, path, &rowRect)) {
         marker.hidden = YES;
-        return;
+        return NO;
     }
     UIColor* accent = PFBCurrentAccentColor() ?: [UIColor systemBlueColor];
     CGFloat reach = MIN(CGRectGetHeight(rowRect), kPFBReadingFadeReach);
@@ -1514,6 +1529,7 @@ static void PFBReadingPlaceMarker(UIScrollView* table, UIView* marker,
     }
     marker.hidden = NO;
     [table bringSubviewToFront:marker];
+    return YES;
 }
 
 // Places or hides the marker for the current data. The row rect is content-space,
@@ -1530,8 +1546,8 @@ static void PFBReadingPositionMarker(TFNItemsDataViewController* dataViewControl
     // against this list on every pass until one matches.
     if (allowed &&
         !objc_getAssociatedObject(dataViewController, kPFBReadingAnchorIDKey)) {
-        // Retried while the list still has nothing to match against: a fixed
-        // number of attempts runs out before the first page arrives.
+        // Tried on every pass once the list holds items: a fixed number of attempts
+        // would run out before the first page arrives.
         if (PFBReadingItemCount(dataViewController.sections) > 0) {
             PFBReadingStoreRestore(dataViewController);
         }
@@ -1543,9 +1559,6 @@ static void PFBReadingPositionMarker(TFNItemsDataViewController* dataViewControl
                             : nil;
     objc_setAssociatedObject(table, kPFBReadingAnchorPathKey, path,
                              OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-    if (path) {
-        PFBCOMPAT_ACTION(PFBCompat_reading_line, @"marker placed");
-    }
     if (!path) {
         // A replaced list has a new first item as well as a missing anchor; an
         // anchor that fell out of a list whose head is unchanged is a loading
@@ -1598,7 +1611,9 @@ static void PFBReadingPositionMarker(TFNItemsDataViewController* dataViewControl
         objc_setAssociatedObject(table, kPFBReadingMarkerViewKey, marker,
                                  OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     }
-    PFBReadingPlaceMarker(table, marker, path);
+    if (PFBReadingPlaceMarker(table, marker, path)) {
+        PFBCOMPAT_ACTION(PFBCompat_reading_line, @"marker placed");
+    }
 }
 
 // Row heights settle after the reload, so the scan waits one runloop turn.
@@ -1615,7 +1630,7 @@ static void PFBReadingRescanSoon(TFNItemsDataViewController* dataViewController)
     });
 }
 
-// Self-sizing rows shift their rects as cells realise, so the tick keeps the wash
+// Self-sizing rows shift their rects as cells realize, so the tick keeps the wash
 // on its row from the cached index path. A row with no measurable rect at first
 // placement is retried here.
 static void PFBReadingLayoutTick(UIScrollView* scrollView) {
@@ -1690,7 +1705,7 @@ static BOOL PFBItemLanguageAllowed(id item, NSSet<NSString*>* kept) {
     static dispatch_once_t once;
     dispatch_once(&once, ^{
         languageless = [NSSet setWithArray:@[ @"und", @"zxx", @"qme", @"qht", @"qct", @"qam", @"qst" ]];
-        // Twitter still files Indonesian and Hebrew under their former codes.
+        // Twitter files Indonesian and Hebrew under the codes "in" and "iw".
         legacy = @{@"in": @"id", @"iw": @"he"};
     });
     if (!language.length || [languageless containsObject:language]) {
@@ -1734,47 +1749,55 @@ static BOOL PFBTimelineFiltersNeedObservation(void) {
 
 static NSArray* FilteredTimelineSections(TFNItemsDataViewController* dataViewController,
                                          NSArray* sections) {
-    BOOL hideWhoToFollow = [PFBSettings boolForKey:@"hide_who_to_follow"];
-    BOOL hidePrompts = [PFBSettings boolForKey:@"hide_timeline_prompts"];
-    BOOL hideTopics = [PFBSettings boolForKey:@"hide_topics"];
-    BOOL hideTopicsToFollow = [PFBSettings boolForKey:@"hide_topics_to_follow"];
-    BOOL inConversation =
-        IsInHierarchyOfClass(dataViewController, @"T1ConversationContainerViewController");
-    BOOL inProfile = IsInHierarchyOfClass(dataViewController, @"T1ProfileViewController");
-    // A search is opened on purpose, like a profile: its results keep verified Tweets.
-    BOOL inSearch = IsInHierarchyOfClass(dataViewController, @"TTSSearchContainerViewControllerV2") ||
-                    IsInHierarchyOfClass(dataViewController, @"TTSSearchContainerViewController");
+    PFBTimelinePass pass = {0};
+    pass.hideWhoToFollow = [PFBSettings boolForKey:@"hide_who_to_follow"];
+    pass.hidePrompts = [PFBSettings boolForKey:@"hide_timeline_prompts"];
+    pass.hideTopics = [PFBSettings boolForKey:@"hide_topics"];
+    pass.hideTopicsToFollow = [PFBSettings boolForKey:@"hide_topics_to_follow"];
+    pass.hideThreads = [PFBSettings boolForKey:@"hide_threads"];
+    pass.inConversation = IsInHierarchyOfClass(dataViewController, @"T1ConversationContainerViewController");
+    pass.inProfile = IsInHierarchyOfClass(dataViewController, @"T1ProfileViewController");
+    // A search is opened on purpose, like a profile: verified Tweets, muted words and
+    // @accounts, and other languages all stay in its results.
+    BOOL inSearch = IsInHierarchyOfClass(dataViewController, @"TTSSearchContainerViewController");
 
     // An edit history lists one Tweet's own versions: it keeps them all.
-    BOOL hideVerified = [PFBSettings boolForKey:@"hide_verified_tweets"] && !inProfile && !inSearch &&
+    pass.hideVerified = [PFBSettings boolForKey:@"hide_verified_tweets"] && !pass.inProfile && !inSearch &&
                         !IsInEditHistory(dataViewController);
-    BOOL hideBlockedRetweets = [PFBSettings boolForKey:@"hide_blocked_retweets"];
-    // Every other Retweet, and quote Tweets, leave only the Home timelines.
-    BOOL inHome = PFBReadingIsHomeTimeline(dataViewController);
-    BOOL hideAllRetweets = inHome && [PFBSettings integerForKey:@"hide_blocked_retweets"] == PFBRetweetsNone;
-    BOOL hideQuoteTweets = inHome && [PFBSettings boolForKey:@"hide_quote_tweets"];
-    // The language filter belongs to the timelines, not to a conversation or a
-    // profile opened on purpose.
+    pass.hideBlockedRetweets = [PFBSettings integerForKey:@"hide_blocked_retweets"] != PFBRetweetsAll;
+    // Retweets set to None and Hide quote Tweets act on the Home timelines only.
+    pass.inHome = PFBReadingIsHomeTimeline(dataViewController);
+    pass.hideAllRetweets = pass.inHome && [PFBSettings integerForKey:@"hide_blocked_retweets"] == PFBRetweetsNone;
+    pass.hideQuoteTweets = pass.inHome && [PFBSettings boolForKey:@"hide_quote_tweets"];
+    PFBEnsureMutedLoaded();
+    pass.applyMuted = (gPFBMutedWords.count || gPFBMutedHandles.count) && !pass.inProfile && !inSearch &&
+                      (!pass.inConversation || gPFBMutedInConversations);
+    // The language filter belongs to the timelines, not to a conversation, a profile
+    // or a search opened on purpose.
     NSSet<NSString*>* keptLanguages =
-        (inConversation || inProfile) ? nil : PFBKeptLanguages();
+        (pass.inConversation || pass.inProfile || inSearch) ? nil : PFBKeptLanguages();
 
     // Hidden conversations open this pass like any other option; otherwise, with
     // no option on, the loop below would be skipped and every hidden thread kept.
     BOOL hasHiddenThreads = PFBHiddenThreads().count > 0;
 
-    if (!hideWhoToFollow && !hidePrompts && !hideTopics && !hideTopicsToFollow &&
-        !hideVerified && !hideBlockedRetweets && !hideQuoteTweets && !inConversation && !keptLanguages.count &&
-        !hasHiddenThreads && !inSearch && !(inHome && !PFBCompatPathReached(PFBCompatPath_home_retweets)) &&
+    if (!pass.hideWhoToFollow && !pass.hidePrompts && !pass.hideTopics && !pass.hideTopicsToFollow &&
+        !pass.hideVerified && !pass.hideBlockedRetweets && !pass.hideQuoteTweets && !pass.applyMuted &&
+        !pass.inConversation && !keptLanguages.count && !hasHiddenThreads && !inSearch &&
+        !(pass.inHome && !PFBCompatPathReached(PFBCompatPath_home_retweets)) &&
         !PFBTimelineFiltersNeedObservation()) {
         return sections;
     }
 
-    long long conversationRootUserID =
-        (hideVerified && inConversation) ? ConversationRootUserID(sections) : 0;
+    // Read once per pass: the memo starts over when another account is signed in.
+    pass.accountUserID = PFBCurrentAccountUserID();
+    pass.conversationRootUserID =
+        (pass.hideVerified && pass.inConversation) ? ConversationRootUserID(sections) : 0;
     NSSet<NSNumber*>* authorRepliedToUserIDs =
-        (hideVerified && inConversation)
-            ? ConversationAuthorRepliedToUserIDs(sections, conversationRootUserID)
+        (pass.hideVerified && pass.inConversation)
+            ? ConversationAuthorRepliedToUserIDs(sections, pass.conversationRootUserID)
             : nil;
+    pass.authorRepliedToUserIDs = authorRepliedToUserIDs;
 
     // Modules can share a section with unrelated items, so filtering is per item;
     // a purely filtered section (like the Discover More one) empties and is dropped.
@@ -1791,15 +1814,11 @@ static NSArray* FilteredTimelineSections(TFNItemsDataViewController* dataViewCon
         NSMutableIndexSet* removed = [NSMutableIndexSet indexSet];
 
         for (NSUInteger i = 0; i < items.count; i++) {
-            if (!keptLanguages.count && !inConversation && !inProfile &&
+            if (!keptLanguages.count && !pass.inConversation && !pass.inProfile && !inSearch &&
                 PFBCompatNeedsObservation(PFBCompat_filter_languages) && PFBItemLanguage(items[i]).length) {
                 PFBCOMPAT_OBSERVE(PFBCompat_filter_languages, @"language read");
             }
-            if (MemoizedShouldHideTimelineItem(items[i], hideWhoToFollow, hidePrompts, hideTopics,
-                                               hideTopicsToFollow, hideVerified, hideBlockedRetweets,
-                                               hideAllRetweets, hideQuoteTweets, inHome,
-                                               inConversation, inProfile, conversationRootUserID,
-                                               authorRepliedToUserIDs) ||
+            if (MemoizedShouldHideTimelineItem(items[i], &pass) ||
                 !PFBItemLanguageAllowed(items[i], keptLanguages)) {
                 [removed addIndex:i];
             } else if (inSearch && PFBShouldHideVerifiedItem(PFBUnwrapDataViewItem(items[i]), NO, 0, nil)) {
@@ -1860,12 +1879,43 @@ void pfbReapplyTimelineFilter(void) {
     }
 }
 
+// Measurement: on Following, how often the first item carries no entry ID while the item
+// it wraps has one, as a module row does; one line per kind and a count every 50 lists.
+static void pfbProbeFollowingHead(TFNItemsDataViewController* dataViewController, NSArray* sections) {
+    static NSUInteger lists, wrappedFirst;
+    if (lists >= 500 || !PFBReadingIsFollowingTab(dataViewController)) {
+        return;
+    }
+    id first = nil;
+    for (id section in sections) {
+        if ([section isKindOfClass:[NSArray class]] && ((NSArray*)section).count) {
+            first = ((NSArray*)section).firstObject;
+            break;
+        }
+    }
+    if (!first) {
+        return;
+    }
+    lists++;
+    id inner = PFBUnwrapDataViewItem(first);
+    if (!ItemEntryID(first).length && ItemEntryID(inner).length) {
+        wrappedFirst++;
+        PFB_PROBE(@"Following head", 8, @"first item %@ has no entry ID, the %@ it wraps has one",
+                  NSStringFromClass([first class]), NSStringFromClass([inner class]));
+    }
+    if (lists % 50 == 0) {
+        PFB_PROBE(@"Following head", 8, @"%lu lists, %lu with a wrapped item first", (unsigned long)lists,
+                  (unsigned long)wrappedFirst);
+    }
+}
+
 %hook TFNItemsDataViewController
 
 - (void)setSections:(NSArray*)sections restoreScrollPosition:(BOOL)restoreScrollPosition {
     BOOL keepPlace = restoreScrollPosition;
     NSArray* filtered = FilteredTimelineSections(self, sections);
     if (PFBReadingIsHomeTimeline(self)) {
+        pfbProbeFollowingHead(self, filtered);
         // Every home controller is tracked, the algorithmic tab included: tracking is pure
         // registration, and each reading action gates itself on MarkerAllowed.
         // The registry is read when the app backgrounds, to capture each anchor.
@@ -1984,9 +2034,8 @@ static NSString* pfbPollTitleWithPercentage(TFCCardData* cardData,
         return title;
     }
     PFBCOMPAT_ACTION(PFBCompat_show_poll_results, @"results shown");
-    return [NSString
-        stringWithFormat:@"%@ (%@)", title,
-                         pfbPollPercentageString((double)votes / (double)total)];
+    NSString* format = [[PFBBundle sharedBundle] localizedStringForKey:@"POLL_RESULT_FORMAT"];
+    return [NSString stringWithFormat:format, title, pfbPollPercentageString((double)votes / (double)total)];
 }
 
 %hook TFCCardData

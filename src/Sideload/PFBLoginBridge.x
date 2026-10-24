@@ -256,19 +256,21 @@ static void pfbBridgeShowRestartPrompt(void) {
     }
     PFBBundle* bundle = [PFBBundle sharedBundle];
     UIAlertController* alert = [UIAlertController
-        alertControllerWithTitle:[bundle localizedStringForKey:@"LOGIN_RESTART_TITLE"]
+        alertControllerWithTitle:[bundle localizedStringForKey:@"RESTART_REQUIRED_ALERT_TITLE"]
                          message:[bundle localizedStringForKey:@"LOGIN_RESTART_MESSAGE"]
                   preferredStyle:UIAlertControllerStyleAlert];
     [alert addAction:[UIAlertAction actionWithTitle:[bundle localizedStringForKey:@"RESTART_LATER_ACTION"]
                                               style:UIAlertActionStyleCancel
                                             handler:nil]];
-    [alert addAction:[UIAlertAction actionWithTitle:[bundle localizedStringForKey:@"RESTART_NOW_ACTION"]
-                                              style:UIAlertActionStyleDefault
-                                            handler:^(UIAlertAction* action) {
-                                              PFBCompatSaveNow();
-                                              [[NSUserDefaults standardUserDefaults] synchronize];
-                                              exit(0);
-                                            }]];
+    UIAlertAction* close = [UIAlertAction actionWithTitle:[bundle localizedStringForKey:@"CLOSE_APP_ACTION"]
+                                                    style:UIAlertActionStyleDefault
+                                                  handler:^(__unused UIAlertAction* action) {
+                                                      PFBCompatSaveNow();
+                                                      [[NSUserDefaults standardUserDefaults] synchronize];
+                                                      exit(0);
+                                                  }];
+    [alert addAction:close];
+    alert.preferredAction = close;
     [top presentViewController:alert animated:YES completion:nil];
 }
 

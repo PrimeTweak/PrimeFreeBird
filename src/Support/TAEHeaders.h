@@ -6,14 +6,28 @@
 @interface TFNUIDefaultFontGroup : NSObject
 + (instancetype)sharedFontGroup;
 - (UIFont*)headline2BoldFont;
+// The ramp of the settings rows.
+- (UIFont*)bodyBoldFont;
+- (UIFont*)subtext1BoldFont;
+- (UIFont*)subtext2Font;
+- (UIFont*)subtext2BoldFont;
+- (UIFont*)subtext3BoldFont;
 // Three of the five root builders every named font getter dispatches through.
 - (UIFont*)fontOfSize:(CGFloat)size;
 - (UIFont*)boldFontOfSize:(CGFloat)size;
 - (UIFont*)heavyFontOfSize:(CGFloat)size;
 @end
 
-@protocol TAEColorPalette
+@protocol TAEColorPalette <NSObject>
 - (UIColor*)primaryColorForOption:(NSUInteger)colorOption;
+- (UIColor*)backgroundColor;
+// The colors of the settings rows.
+- (UIColor*)textColor;
+- (UIColor*)tabBarItemColor;
+- (UIColor*)faintBackgroundColor;
+- (UIColor*)alertColor;
+- (UIColor*)dividerColor;
+- (UIColor*)primaryColor;
 @end
 
 @interface TAETwitterColorPaletteSettingInfo : NSObject

@@ -1,5 +1,4 @@
-// Entry point: starts, in their established order, the parts that need work at launch.
-// Hooks install themselves.
+// Entry point: starts, in order, the parts that need work at launch.
 
 #import <Foundation/Foundation.h>
 

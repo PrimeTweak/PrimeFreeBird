@@ -12,7 +12,7 @@ extern NSString* const PFBCustomTabBarHomePageID;
 // Registry keys for a captured tab's metadata.
 extern NSString* const PFBTabPageKey; // scribePage identifier
 extern NSString* const
-    PFBTabTitleKey;                      // display title (already localised by the app)
+    PFBTabTitleKey;                      // display title (already localized by the app)
 extern NSString* const PFBTabImageKey;   // vector image name
 extern NSString* const PFBTabPanelIDKey; // T1 panel ID (NSNumber)
 
