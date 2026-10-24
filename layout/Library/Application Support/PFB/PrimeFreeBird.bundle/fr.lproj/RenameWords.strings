@@ -23,3 +23,9 @@
 "repostant" = "retweetant";
 "Premium" = "Blue";
 "X" = "Twitter";
+
+/* Whole phrases where "publication" names a Tweet; the word alone also means publishing. */
+"À propos de cette publication" = "À propos de ce Tweet";
+"Citation d'une publication" = "Citation d'un Tweet";
+"a épinglé une publication" = "a épinglé un Tweet";
+"Mettez vos meilleures publications" = "Mettez vos meilleurs Tweets";

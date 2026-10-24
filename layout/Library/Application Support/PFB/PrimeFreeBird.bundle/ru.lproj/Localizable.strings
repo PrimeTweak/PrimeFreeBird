@@ -87,8 +87,7 @@
 "DISABLE_SENSITIVE_TWEET_WARNINGS_TITLE" = "Скрыть предупреждения о деликатном контенте";
 "BYPASS_AGE_VERIFICATION_TITLE" = "Обойти проверку возраста";
 "BYPASS_AGE_VERIFICATION_DETAIL" = "Пропускает проверку возраста для деликатного контента.";
-"REPLY_SORTING_TITLE" = "Ответы по хронологии";
-"REPLY_SORTING_DETAIL" = "Сортирует ответы по дате, а не по релевантности.";
+"REPLY_SORTING_TITLE" = "Упорядочить ответы";
 "RESTORE_REPLY_CONTEXT_TITLE" = "Вернуть контекст ответа";
 "RESTORE_REPLY_CONTEXT_DETAIL" = "Показывает «В ответ» над текстом открытого ответа.";
 "SHOW_QUOTE_COUNTS_TITLE" = "Число цитат и ретвитов";

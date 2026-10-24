@@ -123,6 +123,7 @@ typedef NS_ENUM(NSInteger, PFBCompatOption) {
     PFBCompat_bar_repairs,
     PFBCompat_no_auto_unmute,
     PFBCompat_filter_languages,
+    PFBCompat_hide_quote_tweets,
     PFBCompatOptionCount,
 };
 
@@ -214,6 +215,16 @@ typedef NS_ENUM(NSInteger, PFBCompatPath) {
     PFBCompatPath_grok_post_menu,
     PFBCompatPath_settings_tab_bar,
     PFBCompatPath_native_bar_hidden,
+    PFBCompatPath_rtl_checks,
+    PFBCompatPath_click_ids,
+    PFBCompatPath_ad_redirect,
+    PFBCompatPath_video_feed_response,
+    PFBCompatPath_video_feed_ads,
+    PFBCompatPath_counter_digits,
+    PFBCompatPath_return_report,
+    PFBCompatPath_opened_links,
+    PFBCompatPath_home_retweets,
+    PFBCompatPath_reply_order_set,
     PFBCompatPathCount,
 };
 

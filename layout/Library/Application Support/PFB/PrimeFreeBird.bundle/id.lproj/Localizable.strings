@@ -87,8 +87,7 @@
 "DISABLE_SENSITIVE_TWEET_WARNINGS_TITLE" = "Sembunyikan peringatan konten sensitif";
 "BYPASS_AGE_VERIFICATION_TITLE" = "Lewati verifikasi usia";
 "BYPASS_AGE_VERIFICATION_DETAIL" = "Lewati proses verifikasi usia untuk konten sensitif.";
-"REPLY_SORTING_TITLE" = "Balasan kronologis";
-"REPLY_SORTING_DETAIL" = "Mengurutkan balasan berdasarkan tanggal, bukan relevansi.";
+"REPLY_SORTING_TITLE" = "Mengurutkan balasan";
 "RESTORE_REPLY_CONTEXT_TITLE" = "Pulihkan konteks balasan";
 "RESTORE_REPLY_CONTEXT_DETAIL" = "Menampilkan kepada siapa balasan ditujukan, di atas teks balasan yang Anda buka.";
 "SHOW_QUOTE_COUNTS_TITLE" = "Jumlah kutipan dan Retweet";

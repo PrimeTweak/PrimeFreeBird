@@ -87,8 +87,7 @@
 "DISABLE_SENSITIVE_TWEET_WARNINGS_TITLE" = "Warnungen vor sensiblen Inhalten ausblenden";
 "BYPASS_AGE_VERIFICATION_TITLE" = "Altersverifizierung umgehen";
 "BYPASS_AGE_VERIFICATION_DETAIL" = "Überspringt die Altersverifizierung für sensible Inhalte.";
-"REPLY_SORTING_TITLE" = "Chronologische Antworten";
-"REPLY_SORTING_DETAIL" = "Sortiert Antworten nach Datum statt nach Relevanz.";
+"REPLY_SORTING_TITLE" = "Antwortsortierung";
 "RESTORE_REPLY_CONTEXT_TITLE" = "Antwortkontext wiederherstellen";
 "RESTORE_REPLY_CONTEXT_DETAIL" = "Zeigt über dem Text einer geöffneten Antwort an, auf wen geantwortet wurde.";
 "SHOW_QUOTE_COUNTS_TITLE" = "Anzahl der Zitate und Retweets";

@@ -137,7 +137,14 @@ static NSDictionary<NSString*, NSDictionary*>* PFBSettingsPages(void) {
                     @{@"key": @"hide_verified_tweets",
                       @"default": @NO,
                       @"type": @"toggle"},
-                    @{@"key": @"hide_blocked_retweets",
+                    @{
+                        @"type": @"compactButton",
+                        @"key": @"hide_blocked_retweets",
+                        @"default": @0,
+                        @"titleKey": @"HIDE_BLOCKED_RETWEETS_TITLE",
+                        @"menu": @"retweetsMenu"
+                    },
+                    @{@"key": @"hide_quote_tweets",
                       @"default": @NO,
                       @"type": @"toggle"},
                     @{@"key": @"reading_line",
@@ -228,9 +235,13 @@ static NSDictionary<NSString*, NSDictionary*>* PFBSettingsPages(void) {
                     @{@"key": @"bypass_age_verification",
                       @"default": @YES,
                       @"type": @"toggle"},
-                    @{@"key": @"reply_sorting",
-                      @"default": @NO,
-                      @"type": @"toggle"},
+                    @{
+                        @"type": @"compactButton",
+                        @"key": @"reply_sorting",
+                        @"default": @0,
+                        @"titleKey": @"REPLY_SORTING_TITLE",
+                        @"menu": @"replySortingMenu"
+                    },
                     @{@"key": @"restore_reply_context",
                       @"default": @YES,
                       @"type": @"toggle"},

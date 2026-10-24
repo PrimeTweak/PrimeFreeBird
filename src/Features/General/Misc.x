@@ -1,5 +1,5 @@
-// Assorted options: always open in Safari, expanded t.co links, RTL disabled,
-// clean shared links, and no screenshot detection.
+// Assorted options: always open in Safari, full links without t.co or click IDs, RTL
+// disabled, clean links, no screenshot detection, and Keep your place's return report.
 
 #import <CoreText/CoreText.h>
 #import "Support/HookHelpers.h"
@@ -126,10 +126,74 @@ static BOOL ShouldKeepBrowserURLInApp(NSURL* url) {
 
 %end
 
+// MARK: - Click IDs and ad redirects
+
+// Twitter can add a click ID to a link it opens, or send an ad's link through a
+// redirect: the link keeps its own address instead.
+%hook T1TwitterClickIDHandler
+
++ (NSURL*)URLByAppendingTwitterClickIDIfNecessary:(NSURL*)url
+                                           status:(id)status
+                                          account:(id)account
+                                       scribePage:(id)scribePage
+                                  scribeComponent:(id)scribeComponent {
+    PFBCompatReach(PFBCompatPath_click_ids);
+    PFBCOMPAT_ACTION(PFBCompat_expand_tco_links, @"click ID not added to a link");
+    return url;
+}
+
+%end
+
+%hook T1UnifiedCardBrowserDestinationHandlerHelper
+
+- (NSURL*)urlByAppendingTwitterClickIDToUrl:(NSURL*)url scribeComponent:(id)scribeComponent {
+    PFBCompatReach(PFBCompatPath_click_ids);
+    PFBCOMPAT_ACTION(PFBCompat_expand_tco_links, @"click ID not added to a card link");
+    return url;
+}
+
+%end
+
+%hook T1UnifiedCardXLinkDestinationHandlerHelper
+
+- (NSURL*)urlByAppendingTwitterClickIDToUrl:(NSURL*)url scribeComponent:(id)scribeComponent {
+    PFBCompatReach(PFBCompatPath_click_ids);
+    PFBCOMPAT_ACTION(PFBCompat_expand_tco_links, @"click ID not added to a card link");
+    return url;
+}
+
+%end
+
+%hook TUCJobDetailsComponentModel
+
++ (id)conditionallyApplyPromotedContentClickID:(id)clickID toDestination:(id)destination {
+    PFBCompatReach(PFBCompatPath_click_ids);
+    PFBCOMPAT_ACTION(PFBCompat_expand_tco_links, @"click ID not added to a job link");
+    return destination;
+}
+
+%end
+
+%hook TFNTwitterAdsTPMIdSyncManager
+
+- (BOOL)shouldCreateRedirectURLForURL:(NSURL*)url {
+    PFBCompatReach(PFBCompatPath_ad_redirect);
+    PFBCOMPAT_ACTION(PFBCompat_expand_tco_links, @"ad redirect not made");
+    return NO;
+}
+
+- (NSURL*)createRedirectURLForURLIfNeeded:(NSURL*)url {
+    PFBCompatReach(PFBCompatPath_ad_redirect);
+    PFBCOMPAT_ACTION(PFBCompat_expand_tco_links, @"ad redirect not made");
+    return url;
+}
+
+%end
+
 // MARK: - Disable RTL
 
-// CoreText picks direction from the first strong directional character; forcing
-// LTR on the render input's paragraph style is the only reliable override.
+// CoreText picks direction from the first strong directional character, so the render
+// input's paragraph style is set to left to right.
 
 // CTParagraphStyle is immutable with no mutable counterpart, so forcing the
 // writing direction means rebuilding the style with its specifiers copied over.
@@ -217,11 +281,63 @@ static CTParagraphStyleRef CreateLTRParagraphStyle(CTParagraphStyleRef original)
 
 %end
 
-// MARK: - Clean shared/copied links
+// Before laying a text out, Twitter asks whether it reads right to left, to align and
+// cut it. Off: right-to-left text is noted; on: left to right is answered.
+static BOOL PFBKeepLeftToRight(BOOL rightToLeft) {
+    PFBCompatReach(PFBCompatPath_rtl_checks);
+    if (!rightToLeft) {
+        return NO;
+    }
+    if (![PFBSettings boolForKey:@"disable_rtl"]) {
+        PFBCOMPAT_OBSERVE(PFBCompat_disable_rtl, @"right-to-left text found");
+        return YES;
+    }
+    PFBCOMPAT_ACTION(PFBCompat_disable_rtl, @"right-to-left text kept left to right");
+    return NO;
+}
 
-// Observes UIPasteboardChangedNotification so every copy path is caught, guarded against
-// re-triggering. strip_url_tracking removes s, t, ref_src and ref_url; sharing_domain
-// applies independently.
+%hook NSString
+
+- (BOOL)tfs_plainTextShouldBeRenderedFromRight {
+    BOOL rightToLeft = %orig;
+    return PFBKeepLeftToRight(rightToLeft);
+}
+
+- (BOOL)tfs_statusTextShouldBeRenderedFromRight {
+    BOOL rightToLeft = %orig;
+    return PFBKeepLeftToRight(rightToLeft);
+}
+
+- (BOOL)tfs_labelTextShouldBeRenderedFromRight {
+    BOOL rightToLeft = %orig;
+    return PFBKeepLeftToRight(rightToLeft);
+}
+
+%end
+
+%hook TFNTwitterDisplayTextModel
+
+- (BOOL)_tfn_shouldBeRenderedFromRight {
+    BOOL rightToLeft = %orig;
+    return PFBKeepLeftToRight(rightToLeft);
+}
+
+%end
+
+%hook TFNTwitterStatus
+
+- (BOOL)shouldBeRenderedFromRight {
+    BOOL rightToLeft = %orig;
+    return PFBKeepLeftToRight(rightToLeft);
+}
+
+%end
+
+// MARK: - Clean links
+
+// Shared and copied links: UIPasteboardChangedNotification catches every copy path,
+// guarded against re-triggering. strip_url_tracking removes s, t, ref_src and ref_url;
+// sharing_domain applies independently.
 
 static NSString* PFBProcessSharedURL(NSString* urlString) {
     if (urlString.length == 0) {
@@ -336,6 +452,116 @@ void PFBInstallPasteboardObserver(void) {
         }];
     });
 }
+
+// Opened links: query parameters that only tell a site where the click came from. "si"
+// is a share ID on the hosts listed with it and can mean anything elsewhere.
+static BOOL PFBIsTrackingParameter(NSString* name, NSString* host) {
+    static NSSet<NSString*>* names;
+    static NSSet<NSString*>* shareIDHosts;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+        names = [NSSet setWithArray:@[
+            @"fbclid", @"gclid", @"gclsrc", @"dclid", @"gbraid", @"wbraid", @"msclkid", @"twclid", @"ttclid",
+            @"li_fat_id", @"igshid", @"igsh", @"mc_cid", @"mc_eid", @"_hsenc", @"_hsmi", @"mkt_tok", @"yclid",
+            @"ref_src"
+        ]];
+        shareIDHosts = [NSSet setWithArray:@[
+            @"youtube.com", @"m.youtube.com", @"music.youtube.com", @"youtu.be", @"open.spotify.com"
+        ]];
+    });
+    NSString* lowercaseName = name.lowercaseString;
+    if ([lowercaseName hasPrefix:@"utm_"] || [names containsObject:lowercaseName]) {
+        return YES;
+    }
+    NSString* lowercaseHost = host.lowercaseString;
+    if ([lowercaseHost hasPrefix:@"www."]) {
+        lowercaseHost = [lowercaseHost substringFromIndex:4];
+    }
+    return [lowercaseName isEqualToString:@"si"] && [shareIDHosts containsObject:lowercaseHost];
+}
+
+// The web link without its tracking parameters, or the same object when it has none. The
+// percent-encoded items keep the other parameters byte for byte.
+static NSURL* PFBURLWithoutTracking(NSURL* url) {
+    NSString* scheme = [url isKindOfClass:[NSURL class]] ? url.scheme.lowercaseString : nil;
+    if (![scheme isEqualToString:@"https"] && ![scheme isEqualToString:@"http"]) {
+        return url;
+    }
+    NSURLComponents* components = [NSURLComponents componentsWithURL:url resolvingAgainstBaseURL:NO];
+    NSArray<NSURLQueryItem*>* items = components.percentEncodedQueryItems;
+    if (items.count == 0) {
+        return url;
+    }
+    NSMutableArray<NSURLQueryItem*>* kept = [NSMutableArray arrayWithCapacity:items.count];
+    for (NSURLQueryItem* item in items) {
+        if (!PFBIsTrackingParameter(item.name.stringByRemovingPercentEncoding ?: item.name, components.host)) {
+            [kept addObject:item];
+        }
+    }
+    if (kept.count == items.count) {
+        return url;
+    }
+    components.percentEncodedQueryItems = kept.count > 0 ? kept : nil;
+    return components.URL ?: url;
+}
+
+// The link as it leaves for the browser: without its tracking parameters when the option
+// is on. Off, a tracked link is only noted.
+static NSURL* PFBOpenedURL(NSURL* url) {
+    PFBCompatReach(PFBCompatPath_opened_links);
+    NSURL* cleanURL = PFBURLWithoutTracking(url);
+    if (cleanURL == url) {
+        return url;
+    }
+    if (![PFBSettings boolForKey:@"strip_url_tracking"]) {
+        PFBCOMPAT_OBSERVE(PFBCompat_strip_url_tracking, @"tracked link opened");
+        return url;
+    }
+    PFBCOMPAT_ACTION(PFBCompat_strip_url_tracking, @"tracking removed from an opened link");
+    return cleanURL;
+}
+
+// Every tapped link, in a Tweet, a card or a bio, passes one of these two builders, and the
+// browser they prepare keeps the link they were given.
+%hook T1ViewControllerNavigationHelper
+
++ (id)_t1_handlerForURL:(NSURL*)url
+             expandedURL:(NSURL*)expandedURL
+                 account:(id)account
+           scribeContext:(id)scribeContext
+    sourceViewController:(id)sourceViewController {
+    return %orig(PFBOpenedURL(url), PFBOpenedURL(expandedURL), account, scribeContext, sourceViewController);
+}
+
+// Twitter looks the link up among the Tweet's own by its address; a cleaned one matches
+// none, and the browser opens the cleaned link.
++ (id)_t1_handlerForURL:(NSURL*)url
+                  account:(id)account
+            scribeContext:(id)scribeContext
+         fromSourceStatus:(id)status
+    applyAdURLTransforms:(BOOL)applyAdURLTransforms
+     sourceViewController:(id)sourceViewController {
+    return %orig(PFBOpenedURL(url), account, scribeContext, status, applyAdURLTransforms, sourceViewController);
+}
+
+%end
+
+// MARK: - Keep your place
+
+// Back in the app, each Twitter screen on show reports itself as seen again. With Keep
+// your place on, that report is not sent.
+%hook T1ViewControllerScribeEventObserver
+
+- (void)viewControllerApplicationDidBecomeActive:(id)viewController {
+    PFBCompatReach(PFBCompatPath_return_report);
+    if (![PFBSettings boolForKey:@"no_focus_lost"]) {
+        PFBCOMPAT_OBSERVE(PFBCompat_no_focus_lost, @"return report sent");
+        return %orig;
+    }
+    PFBCOMPAT_ACTION(PFBCompat_no_focus_lost, @"return report not sent");
+}
+
+%end
 
 // MARK: - Disable screenshot detection
 

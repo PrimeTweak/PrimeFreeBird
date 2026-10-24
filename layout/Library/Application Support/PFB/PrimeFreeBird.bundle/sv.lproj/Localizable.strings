@@ -87,8 +87,7 @@
 "DISABLE_SENSITIVE_TWEET_WARNINGS_TITLE" = "Dölj varningar för känsligt innehåll";
 "BYPASS_AGE_VERIFICATION_TITLE" = "Kringgå åldersverifiering";
 "BYPASS_AGE_VERIFICATION_DETAIL" = "Hoppar över åldersverifieringen för känsligt innehåll.";
-"REPLY_SORTING_TITLE" = "Kronologiska svar";
-"REPLY_SORTING_DETAIL" = "Sorterar svar efter datum i stället för relevans.";
+"REPLY_SORTING_TITLE" = "Sortera svar";
 "RESTORE_REPLY_CONTEXT_TITLE" = "Återställ svarssammanhang";
 "RESTORE_REPLY_CONTEXT_DETAIL" = "Visar vilka personer som besvaras, ovanför texten i ett svar du öppnar.";
 "SHOW_QUOTE_COUNTS_TITLE" = "Antal citat och Retweets";

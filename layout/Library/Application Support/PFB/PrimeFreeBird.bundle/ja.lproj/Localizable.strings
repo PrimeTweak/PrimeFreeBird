@@ -87,8 +87,7 @@
 "DISABLE_SENSITIVE_TWEET_WARNINGS_TITLE" = "センシティブな内容の警告を非表示";
 "BYPASS_AGE_VERIFICATION_TITLE" = "年齢確認をスキップ";
 "BYPASS_AGE_VERIFICATION_DETAIL" = "センシティブな内容の年齢確認をスキップします。";
-"REPLY_SORTING_TITLE" = "返信を時系列で表示";
-"REPLY_SORTING_DETAIL" = "返信を関連性ではなく日付順に並べ替えます。";
+"REPLY_SORTING_TITLE" = "返信を並べ替え";
 "RESTORE_REPLY_CONTEXT_TITLE" = "返信コンテキストを復元";
 "RESTORE_REPLY_CONTEXT_DETAIL" = "開いた返信の本文の上に、返信先の相手を表示します。";
 "SHOW_QUOTE_COUNTS_TITLE" = "引用とリツイートの数";

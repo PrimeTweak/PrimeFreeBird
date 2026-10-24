@@ -139,11 +139,6 @@ void PFBSeedReplyWebViewCookies(WKWebView* webView, void (^done)(void));
 // subdomain, never a substring, so x.com.example.net does not pass.
 BOOL PFBIsXDomain(NSString* domainOrHost);
 
-// A conversation request asking Twitter's Recent order for its replies while
-// Chronological replies is on, its body included when an upload task sends that apart
-// (body may be NULL); any other request comes back as it was (FeatureSwitches.x).
-NSURLRequest* PFBReplyOrderRequest(NSURLRequest* request, NSData** body);
-
 // Whether a send sound is stored, and the name of the file it was imported from (SendSound.x).
 BOOL PFBSendSoundIsSet(void);
 NSString* PFBSendSoundName(void);
@@ -152,6 +147,23 @@ NSString* PFBSendSoundName(void);
 void PFBSendSoundImport(NSURL* source, void (^completion)(NSString* failureKey));
 // Deletes the stored send sound and its name.
 void PFBSendSoundRemove(void);
+
+// Sort replies as stored: a switch turned on before the menu existed reads as Recent
+// (ReplySorting.x).
+typedef NS_ENUM(NSInteger, PFBReplySortChoice) {
+    PFBReplySortOff = 0,
+    PFBReplySortRecent = 1,
+    PFBReplySortLiked = 2,
+    PFBReplySortRelevant = 3,
+};
+
+// Retweets as stored: a switch turned on before the menu existed reads as "not from
+// accounts that blocked you" (Timeline.x).
+typedef NS_ENUM(NSInteger, PFBRetweetsChoice) {
+    PFBRetweetsAll = 0,
+    PFBRetweetsNotFromBlockers = 1,
+    PFBRetweetsNone = 2,
+};
 
 // Text filled in after a lookup, such as a plural format, in Twitter's terminology when
 // Restore Twitter terminology is on (Branding.x).

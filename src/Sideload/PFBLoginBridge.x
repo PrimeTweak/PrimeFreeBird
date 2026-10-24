@@ -192,45 +192,43 @@ static NSURLRequest* pfbBridgeInject(NSURLRequest* req) {
 
 - (NSURLSessionDataTask*)dataTaskWithRequest:(NSURLRequest*)request
                            completionHandler:(void (^)(NSData*, NSURLResponse*, NSError*))handler {
-    NSURLRequest* sent = PFBReplyOrderRequest(pfbBridgeInject(request), NULL);
+    NSURLRequest* sent = pfbBridgeInject(request);
     return pfbBridgeWatchUpload(%orig(sent, handler), sent);
 }
 
 - (NSURLSessionDataTask*)dataTaskWithRequest:(NSURLRequest*)request {
-    NSURLRequest* sent = PFBReplyOrderRequest(pfbBridgeInject(request), NULL);
+    NSURLRequest* sent = pfbBridgeInject(request);
     return pfbBridgeWatchUpload(%orig(sent), sent);
 }
 
 - (NSURLSessionUploadTask*)uploadTaskWithRequest:(NSURLRequest*)request
                                         fromData:(NSData*)bodyData {
-    NSData* data = bodyData;
-    NSURLRequest* sent = PFBReplyOrderRequest(pfbBridgeInject(request), &data);
-    return pfbBridgeWatchUpload(%orig(sent, data), sent);
+    NSURLRequest* sent = pfbBridgeInject(request);
+    return pfbBridgeWatchUpload(%orig(sent, bodyData), sent);
 }
 
 - (NSURLSessionUploadTask*)uploadTaskWithRequest:(NSURLRequest*)request
                                         fromData:(NSData*)bodyData
                                completionHandler:(void (^)(NSData*, NSURLResponse*, NSError*))handler {
-    NSData* data = bodyData;
-    NSURLRequest* sent = PFBReplyOrderRequest(pfbBridgeInject(request), &data);
-    return pfbBridgeWatchUpload(%orig(sent, data, handler), sent);
+    NSURLRequest* sent = pfbBridgeInject(request);
+    return pfbBridgeWatchUpload(%orig(sent, bodyData, handler), sent);
 }
 
 - (NSURLSessionUploadTask*)uploadTaskWithRequest:(NSURLRequest*)request
                                         fromFile:(NSURL*)fileURL {
-    NSURLRequest* sent = PFBReplyOrderRequest(pfbBridgeInject(request), NULL);
+    NSURLRequest* sent = pfbBridgeInject(request);
     return pfbBridgeWatchUpload(%orig(sent, fileURL), sent);
 }
 
 - (NSURLSessionUploadTask*)uploadTaskWithRequest:(NSURLRequest*)request
                                         fromFile:(NSURL*)fileURL
                                completionHandler:(void (^)(NSData*, NSURLResponse*, NSError*))handler {
-    NSURLRequest* sent = PFBReplyOrderRequest(pfbBridgeInject(request), NULL);
+    NSURLRequest* sent = pfbBridgeInject(request);
     return pfbBridgeWatchUpload(%orig(sent, fileURL, handler), sent);
 }
 
 - (NSURLSessionUploadTask*)uploadTaskWithStreamedRequest:(NSURLRequest*)request {
-    NSURLRequest* sent = PFBReplyOrderRequest(pfbBridgeInject(request), NULL);
+    NSURLRequest* sent = pfbBridgeInject(request);
     return pfbBridgeWatchUpload(%orig(sent), sent);
 }
 

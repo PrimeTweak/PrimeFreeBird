@@ -48,11 +48,51 @@ static NSString* AppIconDetailText(void) {
         localizedTwitterStringForKey:@"SUBSCRIPTION_APP_ICON_SETTINGS_DETAIL"];
 }
 
+// Thumbnails are "<name>-settings" in the asset catalog ("Icon-<Name>-settings"
+// for the primary icon), falling back to the icon art itself.
+static UIImage* AppIconThumbnail(PFBAppIconItem* item, UITraitCollection* tc) {
+    NSBundle* bundle = [NSBundle mainBundle];
+
+    NSString* settingsName;
+    if (item.isPrimaryIcon) {
+        NSString* base = item.bundleIconName;
+        if ([base hasSuffix:@"AppIcon"]) {
+            base = [base substringToIndex:base.length - @"AppIcon".length];
+        }
+        settingsName = [NSString stringWithFormat:@"Icon-%@-settings", base];
+    } else {
+        settingsName = [item.bundleIconName stringByAppendingString:@"-settings"];
+    }
+
+    UIImage* img = [UIImage imageNamed:settingsName
+                              inBundle:bundle
+         compatibleWithTraitCollection:tc];
+    if (!img && item.bundleIconName) {
+        img = [UIImage imageNamed:item.bundleIconName
+                                 inBundle:bundle
+            compatibleWithTraitCollection:tc];
+    }
+    if (!img) {
+        for (NSString* file in [item.bundleIconFiles reverseObjectEnumerator]) {
+            img = [UIImage imageNamed:file
+                                     inBundle:bundle
+                compatibleWithTraitCollection:tc];
+            if (img)
+                break;
+        }
+    }
+    return img;
+}
+
 @interface PFBAppIconViewController () <UICollectionViewDelegate,
                                      UICollectionViewDataSource,
                                      UICollectionViewDelegateFlowLayout>
 @property (nonatomic, strong) UICollectionView* appIconCollectionView;
 @property (nonatomic, copy) NSArray<PFBAppIconItem*>* icons;
+@property (nonatomic, copy) NSArray<UIImage*>* thumbnails;
+@property (nonatomic) UIUserInterfaceStyle thumbnailStyle;
+@property (nonatomic, strong) UIView* loadingView;
+@property (nonatomic, strong) UIActivityIndicatorView* loadingIndicator;
 @end
 
 @implementation PFBAppIconViewController
@@ -98,6 +138,26 @@ static NSString* AppIconDetailText(void) {
             constraintEqualToAnchor:self.view.bottomAnchor],
     ]];
 
+    self.loadingView = [UIView new];
+    self.loadingView.translatesAutoresizingMaskIntoConstraints = NO;
+    self.loadingView.backgroundColor = [PFBPalette currentBackgroundColor];
+    [self.view addSubview:self.loadingView];
+
+    self.loadingIndicator = [[UIActivityIndicatorView alloc]
+        initWithActivityIndicatorStyle:UIActivityIndicatorViewStyleMedium];
+    self.loadingIndicator.translatesAutoresizingMaskIntoConstraints = NO;
+    [self.loadingView addSubview:self.loadingIndicator];
+
+    [NSLayoutConstraint activateConstraints:@[
+        [self.loadingView.topAnchor constraintEqualToAnchor:self.view.topAnchor],
+        [self.loadingView.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor],
+        [self.loadingView.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor],
+        [self.loadingView.bottomAnchor constraintEqualToAnchor:self.view.bottomAnchor],
+        [self.loadingIndicator.centerXAnchor constraintEqualToAnchor:self.loadingView.centerXAnchor],
+        [self.loadingIndicator.centerYAnchor constraintEqualToAnchor:self.loadingView.centerYAnchor],
+    ]];
+    [self.loadingIndicator startAnimating];
+
     [self loadAppIcons];
 }
 
@@ -106,87 +166,72 @@ static NSString* AppIconDetailText(void) {
 
     self.view.backgroundColor = [PFBPalette currentBackgroundColor];
     self.appIconCollectionView.backgroundColor = [PFBPalette currentBackgroundColor];
+    self.loadingView.backgroundColor = [PFBPalette currentBackgroundColor];
     [self.appIconCollectionView reloadData];
 }
 
 #pragma mark - Icon data
 
-// Icons come from Info.plist so the picker matches whatever the build ships;
-// the primary icon is listed first so it can be restored. Like the native
-// picker, icons whose preview art is missing are dropped.
+// Icons come from Info.plist, the primary first so it can be restored; those whose preview
+// art is missing are dropped, as in the native picker. The art loads off the main thread,
+// under a spinner, so a large icon pack does not hold the app.
 - (void)loadAppIcons {
-    NSDictionary* iconsDict =
-        [[NSBundle mainBundle] objectForInfoDictionaryKey:@"CFBundleIcons"];
+    UITraitCollection* traits = self.traitCollection;
+    __weak typeof(self) weakSelf = self;
+    dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
+        NSDictionary* iconsDict =
+            [[NSBundle mainBundle] objectForInfoDictionaryKey:@"CFBundleIcons"];
 
-    NSMutableArray<PFBAppIconItem*>* items = [NSMutableArray new];
-
-    NSDictionary* primary = iconsDict[@"CFBundlePrimaryIcon"];
-    if ([primary isKindOfClass:[NSDictionary class]]) {
-        PFBAppIconItem* item = [[PFBAppIconItem alloc]
-            initWithBundleIconName:primary[@"CFBundleIconName"]
-                     iconFileNames:primary[@"CFBundleIconFiles"]
-                     isPrimaryIcon:YES];
-        if ([self thumbnailForItem:item]) {
-            [items addObject:item];
-        }
-    }
-
-    NSDictionary* alternates = iconsDict[@"CFBundleAlternateIcons"];
-    if ([alternates isKindOfClass:[NSDictionary class]]) {
-        NSArray<NSString*>* sortedKeys = [alternates.allKeys
-            sortedArrayUsingSelector:@selector(caseInsensitiveCompare:)];
-        for (NSString* key in sortedKeys) {
-            NSDictionary* alt = alternates[key];
-            NSString* name = alt[@"CFBundleIconName"] ?: key;
-            PFBAppIconItem* item = [[PFBAppIconItem alloc]
-                initWithBundleIconName:name
-                         iconFileNames:alt[@"CFBundleIconFiles"]
-                         isPrimaryIcon:NO];
-            if ([self thumbnailForItem:item]) {
+        NSMutableArray<PFBAppIconItem*>* items = [NSMutableArray new];
+        NSMutableArray<UIImage*>* thumbnails = [NSMutableArray new];
+        void (^keep)(PFBAppIconItem*) = ^(PFBAppIconItem* item) {
+            UIImage* thumbnail = AppIconThumbnail(item, traits);
+            if (thumbnail) {
                 [items addObject:item];
+                [thumbnails addObject:thumbnail];
+            }
+        };
+
+        NSDictionary* primary = iconsDict[@"CFBundlePrimaryIcon"];
+        if ([primary isKindOfClass:[NSDictionary class]]) {
+            keep([[PFBAppIconItem alloc] initWithBundleIconName:primary[@"CFBundleIconName"]
+                                                  iconFileNames:primary[@"CFBundleIconFiles"]
+                                                  isPrimaryIcon:YES]);
+        }
+
+        NSDictionary* alternates = iconsDict[@"CFBundleAlternateIcons"];
+        if ([alternates isKindOfClass:[NSDictionary class]]) {
+            NSArray<NSString*>* sortedKeys = [alternates.allKeys
+                sortedArrayUsingSelector:@selector(caseInsensitiveCompare:)];
+            for (NSString* key in sortedKeys) {
+                NSDictionary* alt = alternates[key];
+                keep([[PFBAppIconItem alloc] initWithBundleIconName:alt[@"CFBundleIconName"] ?: key
+                                                      iconFileNames:alt[@"CFBundleIconFiles"]
+                                                      isPrimaryIcon:NO]);
             }
         }
-    }
 
-    self.icons = items;
-    [self.appIconCollectionView reloadData];
+        dispatch_async(dispatch_get_main_queue(), ^{
+            PFBAppIconViewController* controller = weakSelf;
+            if (!controller) {
+                return;
+            }
+            controller.icons = items;
+            controller.thumbnails = thumbnails;
+            controller.thumbnailStyle = traits.userInterfaceStyle;
+            [controller.loadingIndicator stopAnimating];
+            controller.loadingView.hidden = YES;
+            [controller.appIconCollectionView reloadData];
+        });
+    });
 }
 
-// Thumbnails are "<name>-settings" in the asset catalog ("Icon-<Name>-settings"
-// for the primary icon), falling back to the icon art itself.
-- (UIImage*)thumbnailForItem:(PFBAppIconItem*)item {
-    UITraitCollection* tc = self.traitCollection;
-    NSBundle* bundle = [NSBundle mainBundle];
-
-    NSString* settingsName;
-    if (item.isPrimaryIcon) {
-        NSString* base = item.bundleIconName;
-        if ([base hasSuffix:@"AppIcon"]) {
-            base = [base substringToIndex:base.length - @"AppIcon".length];
-        }
-        settingsName = [NSString stringWithFormat:@"Icon-%@-settings", base];
-    } else {
-        settingsName = [item.bundleIconName stringByAppendingString:@"-settings"];
+// The art read while loading, or read again for an appearance changed since.
+- (UIImage*)thumbnailAtIndex:(NSInteger)index {
+    if (self.traitCollection.userInterfaceStyle == self.thumbnailStyle) {
+        return self.thumbnails[(NSUInteger)index];
     }
-
-    UIImage* img = [UIImage imageNamed:settingsName
-                              inBundle:bundle
-         compatibleWithTraitCollection:tc];
-    if (!img && item.bundleIconName) {
-        img = [UIImage imageNamed:item.bundleIconName
-                                 inBundle:bundle
-            compatibleWithTraitCollection:tc];
-    }
-    if (!img) {
-        for (NSString* file in [item.bundleIconFiles reverseObjectEnumerator]) {
-            img = [UIImage imageNamed:file
-                                     inBundle:bundle
-                compatibleWithTraitCollection:tc];
-            if (img)
-                break;
-        }
-    }
-    return img;
+    return AppIconThumbnail(self.icons[(NSUInteger)index], self.traitCollection);
 }
 
 - (BOOL)isItemActive:(PFBAppIconItem*)item {
@@ -219,7 +264,7 @@ static NSString* AppIconDetailText(void) {
                                       forIndexPath:ip];
     PFBAppIconItem* item = self.icons[ip.row];
 
-    [cell configureWithImage:[self thumbnailForItem:item]
+    [cell configureWithImage:[self thumbnailAtIndex:ip.row]
                       active:[self isItemActive:item]
                  accentColor:PFBCurrentAccentColor()];
 

@@ -1233,10 +1233,19 @@ static BOOL tourHookedHere(Class cls, SEL selector) {
            dladdr((const void*)method_getImplementation(method), &there) && here.dli_fbase == there.dli_fbase;
 }
 
-// Twitter's t.co click count and safety check, asked for a t.co link the way Twitter asks
-// them, and only while the tweak's hooks are in place: their answer comes back, nothing
-// is sent.
+// Twitter's t.co click count, safety check and click ID, asked for a t.co link the way
+// Twitter asks them, and only while the tweak's hooks are in place: their answer comes
+// back, nothing is sent.
 static void tourAskTcoRequests(void) {
+    NSURL* link = [NSURL URLWithString:@"https://t.co/pfbtour"];
+    Class clickIDs = NSClassFromString(@"T1TwitterClickIDHandler");
+    SEL append = NSSelectorFromString(@"URLByAppendingTwitterClickIDIfNecessary:status:account:scribePage:scribeComponent:");
+    if (tourHookedHere(clickIDs, append)) {
+        id kept = ((id (*)(id, SEL, id, id, id, id, id))objc_msgSend)(clickIDs, append, link, nil, nil, nil, nil);
+        PFBCompatTourLog(@"[tour] t.co check: click ID %@", [kept isEqual:link] ? @"not added" : @"added");
+    } else {
+        PFBCompatTourLog(@"[tour] t.co check: click ID not asked, not hooked");
+    }
     Class talon = NSClassFromString(@"TNUTalonUtilities");
     SEL count = NSSelectorFromString(@"sendTalonRequestForAnalytics:");
     SEL check = NSSelectorFromString(@"verifyTalonURL:completion:");
@@ -1247,7 +1256,6 @@ static void tourAskTcoRequests(void) {
                          countHooked ? @"hooked" : @"not hooked", checkHooked ? @"hooked" : @"not hooked");
         return;
     }
-    NSURL* link = [NSURL URLWithString:@"https://t.co/pfbtour"];
     BOOL sent = ((BOOL (*)(id, SEL, id))objc_msgSend)(talon, count, link);
     ((id (*)(id, SEL, id, id))objc_msgSend)(talon, check, link, nil);
     PFBCompatTourLog(@"[tour] t.co check: click count %@, safety check answered by the tweak",
@@ -1984,9 +1992,9 @@ static NSArray<NSDictionary*>* tourAllSteps(void) {
                  tourSelectTab(0);
                })];
     }
-    // Chronological replies switched on for one conversation, whatever the setting says:
-    // Home's Tweet with the most replies is opened, read at its top, then three times a
-    // little further down, and its replies judged by their IDs.
+    // Sort replies on Most recent for one conversation, whatever the setting says (on reads
+    // as Most recent): Home's Tweet with the most replies is opened, read at its top, then
+    // three times a little further down, and its replies judged by their IDs.
     __block long long replyFocal = 0;
     __block NSInteger replyAuthor = NSNotFound;
     __block NSInteger replyLooks = 0;
@@ -2069,7 +2077,7 @@ static NSArray<NSDictionary*>* tourAllSteps(void) {
                tourAskTcoRequests();
              });
            }, ^BOOL(UIViewController* before, UIViewController* after) {
-             return PFBCompatPathReached(PFBCompatPath_tco_requests);
+             return PFBCompatPathReached(PFBCompatPath_tco_requests) || PFBCompatPathReached(PFBCompatPath_click_ids);
            }, nil, nil)];
     __block BOOL tabBarLogged = NO;
     // Given the proof wait even when nothing is owed, so a slow opening still shows.

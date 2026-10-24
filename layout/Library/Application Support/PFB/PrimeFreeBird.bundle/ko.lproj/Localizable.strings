@@ -87,8 +87,7 @@
 "DISABLE_SENSITIVE_TWEET_WARNINGS_TITLE" = "민감한 콘텐츠 경고 제거";
 "BYPASS_AGE_VERIFICATION_TITLE" = "연령 확인 우회";
 "BYPASS_AGE_VERIFICATION_DETAIL" = "민감한 콘텐츠에 대한 연령 확인 절차를 건너뜁니다.";
-"REPLY_SORTING_TITLE" = "답글을 시간순으로 정렬";
-"REPLY_SORTING_DETAIL" = "답글을 관련성 대신 날짜순으로 정렬합니다.";
+"REPLY_SORTING_TITLE" = "답글 정렬하기";
 "RESTORE_REPLY_CONTEXT_TITLE" = "답글 대상 표시 복원";
 "RESTORE_REPLY_CONTEXT_DETAIL" = "답글을 열면 본문 위에 누구에게 보낸 답글인지 표시합니다.";
 "SHOW_QUOTE_COUNTS_TITLE" = "인용 및 리트윗 수";

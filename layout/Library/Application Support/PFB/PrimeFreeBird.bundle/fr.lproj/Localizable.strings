@@ -33,8 +33,8 @@
 "GENERAL_GROUP_LINKS" = "Liens";
 "SHARING_DOMAIN_TITLE" = "Domaine de partage";
 "SHARING_DOMAIN_DETAIL" = "L’adresse utilisée dans les liens que vous partagez.";
-"STRIP_URL_TRACKING_TITLE" = "Liens partagés propres";
-"STRIP_URL_TRACKING_DETAIL" = "Retire les paramètres de suivi des liens que vous partagez ou copiez.";
+"STRIP_URL_TRACKING_TITLE" = "Liens propres";
+"STRIP_URL_TRACKING_DETAIL" = "Retire les paramètres de suivi des liens que vous ouvrez, partagez ou copiez.";
 "ALWAYS_OPEN_SAFARI_TITLE" = "Navigateur externe";
 "ALWAYS_OPEN_SAFARI_DETAIL" = "Ouvre les liens dans Safari ou votre navigateur par défaut.";
 "NEW_INAPP_WEBVIEW_TITLE" = "Nouveau navigateur intégré";
@@ -106,9 +106,14 @@
 "RESTORE_REFRESH_SOUNDS_DETAIL" = "Joue les sons classiques quand vous tirez pour actualiser.";
 
 "HIDE_VERIFIED_TWEETS_TITLE" = "Masquer les Tweets certifiés";
-"HIDE_VERIFIED_TWEETS_DETAIL" = "Retire les Tweets des comptes certifiés que vous ne suivez pas. Les profils et la recherche les gardent.";
-"HIDE_BLOCKED_RETWEETS_TITLE" = "Masquer les Retweets bloqués";
-"HIDE_BLOCKED_RETWEETS_DETAIL" = "Retire les Retweets des comptes qui vous ont bloqué.";
+"HIDE_VERIFIED_TWEETS_DETAIL" = "Retire les Tweets des comptes certifiés que vous ne suivez pas, sauf ceux que vous avez mis en signet. Les profils et la recherche les gardent.";
+"HIDE_BLOCKED_RETWEETS_TITLE" = "Retweets";
+"HIDE_BLOCKED_RETWEETS_DETAIL" = "Choisit les Retweets affichés dans vos fils. Les vôtres restent toujours.";
+"RETWEETS_SHOW_ALL" = "Tous";
+"RETWEETS_HIDE_BLOCKED" = "Sauf des comptes qui vous ont bloqué";
+"RETWEETS_HIDE_ALL" = "Aucun";
+"HIDE_QUOTE_TWEETS_TITLE" = "Masquer les citations";
+"HIDE_QUOTE_TWEETS_DETAIL" = "Retire de vos fils les Tweets qui en citent un autre. Les vôtres restent.";
 
 /* ===== TWEETS ===== */
 "MODERN_SETTINGS_TWEETS_TITLE" = "Tweets";
@@ -131,8 +136,8 @@
 "DISABLE_SENSITIVE_TWEET_WARNINGS_DETAIL" = "Affiche les photos et vidéos sensibles sans l’écran d’avertissement.";
 "BYPASS_AGE_VERIFICATION_TITLE" = "Contourner la vérification d’âge";
 "BYPASS_AGE_VERIFICATION_DETAIL" = "Ignore la vérification d’âge pour le contenu sensible.";
-"REPLY_SORTING_TITLE" = "Réponses chronologiques";
-"REPLY_SORTING_DETAIL" = "Trie les réponses par date plutôt que par pertinence.";
+"REPLY_SORTING_TITLE" = "Trier les réponses";
+"REPLY_SORTING_DETAIL" = "L’ordre d’ouverture des réponses. Le bouton de tri de Twitter reste.";
 "RESTORE_REPLY_CONTEXT_TITLE" = "Restaurer le contexte de réponse";
 "RESTORE_REPLY_CONTEXT_DETAIL" = "Affiche « En réponse à » au-dessus du texte d’une réponse ouverte.";
 "SHOW_QUOTE_COUNTS_TITLE" = "Nombre de citations et de Retweets";
@@ -561,6 +566,10 @@
 "TW_SUBSCRIPTION_APP_ICON_SETTINGS_TITLE" = "Icône de l'application";
 "TW_SUBSCRIPTION_TAB_CUSTOMIZATION_RESTORE_BUTTON_TITLE" = "Restaurer";
 "TW_SUBSCRIPTION_UNDO_SEND_DURATION_LABEL" = "%ld secondes";
+"TW_TIMELINE_SORT_REPLIES_BY_LIKED" = "Réponses les plus aimées";
+"TW_TIMELINE_SORT_REPLIES_BY_RECENT" = "Réponses les plus récentes";
+"TW_TIMELINE_SORT_REPLIES_BY_RELEVANT" = "Les réponses les plus pertinentes";
+"TW_TIMELINE_SORT_REPLIES_TITLE" = "Trier les réponses";
 "MEDIA_GROUP_LAYOUT" = "Mise en page";
 "BRANDING_GROUP_CLASSIC" = "Twitter classique";
 "VOICE_NOTE_FROM_VIDEO_TITLE" = "Message vocal depuis une vidéo";

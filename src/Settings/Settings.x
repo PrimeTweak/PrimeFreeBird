@@ -1,5 +1,6 @@
 // The PrimeFreeBird entry in the app's settings, their tab bar, and the custom font picker.
 
+#import <CoreText/CoreText.h>
 #import "Support/HookHelpers.h"
 #import "Common/PFBCompatibility.h"
 
@@ -401,10 +402,23 @@ static UIFont* PFBCustomFont(UIFont* original, BOOL bold) {
     BOOL bold = (original.fontDescriptor.symbolicTraits & UIFontDescriptorTraitBold) != 0;
     return PFBCustomFont(original, bold);
 }
+// Counters and timers ask for digits of equal width so they hold still as they change;
+// the custom font keeps them where it has such digits.
 + (UIFont*)tabularDigitsFontOfSize:(CGFloat)size weight:(CGFloat)weight {
     UIFont* original = %orig;
+    PFBCompatReach(PFBCompatPath_counter_digits);
     BOOL bold = (original.fontDescriptor.symbolicTraits & UIFontDescriptorTraitBold) != 0;
-    return PFBCustomFont(original, bold);
+    UIFont* custom = PFBCustomFont(original, bold);
+    if (custom == original) {
+        return original;
+    }
+    UIFontDescriptor* descriptor = [custom.fontDescriptor fontDescriptorByAddingAttributes:@{
+        UIFontDescriptorFeatureSettingsAttribute: @[ @{
+            UIFontFeatureTypeIdentifierKey: @(kNumberSpacingType),
+            UIFontFeatureSelectorIdentifierKey: @(kMonospacedNumbersSelector)
+        } ]
+    }];
+    return [UIFont fontWithDescriptor:descriptor size:custom.pointSize];
 }
 %end
 

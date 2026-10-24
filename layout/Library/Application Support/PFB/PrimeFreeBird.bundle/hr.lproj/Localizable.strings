@@ -87,8 +87,7 @@
 "DISABLE_SENSITIVE_TWEET_WARNINGS_TITLE" = "Sakrij upozorenja na osjetljiv sadržaj";
 "BYPASS_AGE_VERIFICATION_TITLE" = "Zaobiđi provjeru dobi";
 "BYPASS_AGE_VERIFICATION_DETAIL" = "Preskače provjeru dobi za osjetljiv sadržaj.";
-"REPLY_SORTING_TITLE" = "Kronološki odgovori";
-"REPLY_SORTING_DETAIL" = "Sortira odgovore po datumu umjesto po relevantnosti.";
+"REPLY_SORTING_TITLE" = "Sortiranje odgovora";
 "RESTORE_REPLY_CONTEXT_TITLE" = "Vrati kontekst odgovora";
 "RESTORE_REPLY_CONTEXT_DETAIL" = "Prikazuje osobe na koje se odgovara, iznad teksta otvorenog odgovora.";
 "SHOW_QUOTE_COUNTS_TITLE" = "Broj citata i retweetova";

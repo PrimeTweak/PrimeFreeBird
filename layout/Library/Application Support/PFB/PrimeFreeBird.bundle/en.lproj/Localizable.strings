@@ -37,8 +37,8 @@
 "GENERAL_GROUP_LINKS" = "Links";
 "SHARING_DOMAIN_TITLE" = "Sharing domain";
 "SHARING_DOMAIN_DETAIL" = "The address used in links you share.";
-"STRIP_URL_TRACKING_TITLE" = "Clean shared links";
-"STRIP_URL_TRACKING_DETAIL" = "Remove tracking parameters from links you share or copy.";
+"STRIP_URL_TRACKING_TITLE" = "Clean links";
+"STRIP_URL_TRACKING_DETAIL" = "Remove tracking parameters from links you open, share or copy.";
 "ALWAYS_OPEN_SAFARI_TITLE" = "External browser";
 "ALWAYS_OPEN_SAFARI_DETAIL" = "Open links in Safari or your default browser.";
 "NEW_INAPP_WEBVIEW_TITLE" = "New in-app browser";
@@ -110,9 +110,14 @@
 "RESTORE_REFRESH_SOUNDS_DETAIL" = "Play the classic sounds when you pull to refresh.";
 
 "HIDE_VERIFIED_TWEETS_TITLE" = "Hide verified Tweets";
-"HIDE_VERIFIED_TWEETS_DETAIL" = "Remove Tweets from verified accounts you don’t follow. Profiles and search keep them.";
-"HIDE_BLOCKED_RETWEETS_TITLE" = "Hide blocked Retweets";
-"HIDE_BLOCKED_RETWEETS_DETAIL" = "Remove Retweets of accounts that have blocked you.";
+"HIDE_VERIFIED_TWEETS_DETAIL" = "Remove Tweets from verified accounts you don’t follow, unless you bookmarked them. Profiles and search keep them.";
+"HIDE_BLOCKED_RETWEETS_TITLE" = "Retweets";
+"HIDE_BLOCKED_RETWEETS_DETAIL" = "Choose which Retweets your timelines show. Yours always stay.";
+"RETWEETS_SHOW_ALL" = "All";
+"RETWEETS_HIDE_BLOCKED" = "Not from accounts that blocked you";
+"RETWEETS_HIDE_ALL" = "None";
+"HIDE_QUOTE_TWEETS_TITLE" = "Hide quote Tweets";
+"HIDE_QUOTE_TWEETS_DETAIL" = "Remove Tweets that quote another one from your timelines. Yours stay.";
 
 /* ===== TWEETS ===== */
 "MODERN_SETTINGS_TWEETS_TITLE" = "Tweets";
@@ -135,8 +140,8 @@
 "DISABLE_SENSITIVE_TWEET_WARNINGS_DETAIL" = "Show sensitive photos and videos without the warning screen.";
 "BYPASS_AGE_VERIFICATION_TITLE" = "Bypass age verification";
 "BYPASS_AGE_VERIFICATION_DETAIL" = "Skip the age check for sensitive content.";
-"REPLY_SORTING_TITLE" = "Chronological replies";
-"REPLY_SORTING_DETAIL" = "Sort replies by date instead of by relevance.";
+"REPLY_SORTING_TITLE" = "Sort replies";
+"REPLY_SORTING_DETAIL" = "The order replies open in. Twitter’s sort button stays.";
 "RESTORE_REPLY_CONTEXT_TITLE" = "Restore reply context";
 "RESTORE_REPLY_CONTEXT_DETAIL" = "Show “Replying to” above the text of a reply you open.";
 "SHOW_QUOTE_COUNTS_TITLE" = "Quote and Retweet counts";
@@ -565,6 +570,10 @@
 "TW_SUBSCRIPTION_APP_ICON_SETTINGS_TITLE" = "App icon";
 "TW_SUBSCRIPTION_TAB_CUSTOMIZATION_RESTORE_BUTTON_TITLE" = "Restore";
 "TW_SUBSCRIPTION_UNDO_SEND_DURATION_LABEL" = "%ld seconds";
+"TW_TIMELINE_SORT_REPLIES_BY_LIKED" = "Most liked replies";
+"TW_TIMELINE_SORT_REPLIES_BY_RECENT" = "Most recent replies";
+"TW_TIMELINE_SORT_REPLIES_BY_RELEVANT" = "Most relevant replies";
+"TW_TIMELINE_SORT_REPLIES_TITLE" = "Sort replies";
 "MEDIA_GROUP_LAYOUT" = "Layout";
 "BRANDING_GROUP_CLASSIC" = "Classic Twitter";
 "VOICE_NOTE_FROM_VIDEO_TITLE" = "Voice note from a video";

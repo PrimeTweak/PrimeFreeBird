@@ -7,6 +7,16 @@
 #import "Support/HookHelpers.h"
 #import "Settings/PFBModernSettingsCells.h"
 
+// Off, then Twitter's three orders under its own names, in the order its menu lists them.
+static NSArray<NSArray*>* PFBReplySortingChoices(void) {
+    return @[
+        @[ @(PFBReplySortOff), @"GENERIC_OFF_LABEL" ],
+        @[ @(PFBReplySortRelevant), @"TIMELINE_SORT_REPLIES_BY_RELEVANT" ],
+        @[ @(PFBReplySortRecent), @"TIMELINE_SORT_REPLIES_BY_RECENT" ],
+        @[ @(PFBReplySortLiked), @"TIMELINE_SORT_REPLIES_BY_LIKED" ],
+    ];
+}
+
 @implementation PFBTweetsSettingsViewController
 
 - (NSString*)pageKey {
@@ -24,6 +34,17 @@
         [cell configureWithTitle:title
                         subtitle:[self undoTimeoutSubtitle]
                           detail:[self localizedDetailForKey:@"undo_tweet_timeout"]];
+        [self attachMenuIfNeeded:cell entry:settingData];
+        return cell;
+    }
+    if ([settingData[@"key"] isEqualToString:@"reply_sorting"]) {
+        PFBModernSettingsCompactButtonCell* cell =
+            [tableView dequeueReusableCellWithIdentifier:@"CompactButtonCell"
+                                            forIndexPath:indexPath];
+        NSString* title = [[PFBBundle sharedBundle] localizedStringForKey:settingData[@"titleKey"]];
+        [cell configureWithTitle:title
+                        subtitle:[self replySortingSubtitle]
+                          detail:[self localizedDetailForKey:@"reply_sorting"]];
         [self attachMenuIfNeeded:cell entry:settingData];
         return cell;
     }
@@ -82,6 +103,38 @@
         [actions addObject:action];
     }
     return [UIMenu menuWithTitle:@"" children:actions];
+}
+
+- (NSString*)replySortingSubtitle {
+    NSInteger current = [PFBSettings integerForKey:@"reply_sorting"];
+    for (NSArray* choice in PFBReplySortingChoices()) {
+        if ([choice[0] integerValue] == current) {
+            return [[PFBBundle sharedBundle] localizedTwitterStringForKey:choice[1]];
+        }
+    }
+    return [[PFBBundle sharedBundle] localizedTwitterStringForKey:@"GENERIC_OFF_LABEL"];
+}
+
+- (UIMenu*)replySortingMenu {
+    PFBBundle* bundle = [PFBBundle sharedBundle];
+    NSInteger current = [PFBSettings integerForKey:@"reply_sorting"];
+    NSMutableArray<UIAction*>* actions = [NSMutableArray array];
+    __weak typeof(self) weakSelf = self;
+    for (NSArray* choice in PFBReplySortingChoices()) {
+        NSInteger value = [choice[0] integerValue];
+        UIAction* action = [UIAction actionWithTitle:[bundle localizedTwitterStringForKey:choice[1]]
+                                               image:nil
+                                          identifier:nil
+                                             handler:^(__unused UIAction* chosen) {
+                                                 [[NSUserDefaults standardUserDefaults] setInteger:value
+                                                                                            forKey:@"reply_sorting"];
+                                                 [weakSelf.tableView reloadData];
+                                             }];
+        action.state = value == current ? UIMenuElementStateOn : UIMenuElementStateOff;
+        [actions addObject:action];
+    }
+    return [UIMenu menuWithTitle:[bundle localizedTwitterStringForKey:@"TIMELINE_SORT_REPLIES_TITLE"]
+                        children:actions];
 }
 
 // MARK: - Send sound

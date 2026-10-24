@@ -72,7 +72,7 @@
 "RESTORE_REFRESH_SOUNDS_TITLE" = "Sonidos al actualizar";
 
 "HIDE_VERIFIED_TWEETS_TITLE" = "Ocultar Tweets verificados";
-"HIDE_VERIFIED_TWEETS_DETAIL" = "Quita los Tweets de cuentas verificadas que no sigues. Los perfiles y la búsqueda los conservan.";
+"HIDE_VERIFIED_TWEETS_DETAIL" = "Quita los Tweets de cuentas verificadas que no sigues, salvo los que tienes en Guardados. Los perfiles y la búsqueda los conservan.";
 
 /* ===== TWEETS ===== */
 "MODERN_SETTINGS_TWEETS_TITLE" = "Tweets";
@@ -91,8 +91,8 @@
 "DISABLE_SENSITIVE_TWEET_WARNINGS_TITLE" = "Ocultar advertencias de contenido delicado";
 "BYPASS_AGE_VERIFICATION_TITLE" = "Omitir verificación de edad";
 "BYPASS_AGE_VERIFICATION_DETAIL" = "Omite la verificación de edad para contenido delicado.";
-"REPLY_SORTING_TITLE" = "Respuestas cronológicas";
-"REPLY_SORTING_DETAIL" = "Ordena las respuestas por fecha en lugar de por relevancia.";
+"REPLY_SORTING_TITLE" = "Organizar respuestas";
+"REPLY_SORTING_DETAIL" = "El orden en que se abren las respuestas. Se mantiene el botón de Twitter para ordenarlas.";
 "RESTORE_REPLY_CONTEXT_TITLE" = "Restaurar contexto de respuesta";
 "RESTORE_REPLY_CONTEXT_DETAIL" = "Muestra a quién se está respondiendo, encima del texto de una respuesta que abres.";
 "SHOW_QUOTE_COUNTS_TITLE" = "Número de citas y Retweets";

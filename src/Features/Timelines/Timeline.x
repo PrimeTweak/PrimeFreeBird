@@ -514,6 +514,13 @@ static BOOL PFBShouldHideVerifiedItem(id viewModel, BOOL inConversation,
         return NO;
     }
 
+    // A bookmarked Tweet stays.
+    SEL bookmarkedSelector = @selector(displayAsBookmarked);
+    if ([viewModel respondsToSelector:bookmarkedSelector] &&
+        ((BOOL (*)(id, SEL))objc_msgSend)(viewModel, bookmarkedSelector)) {
+        return NO;
+    }
+
     if (inConversation) {
         if (!ItemIsConversationThreadReply(viewModel)) {
             return NO;
@@ -851,9 +858,47 @@ static BOOL PFBRetweetAuthorBlocksAccount(id viewModel, BOOL* checked) {
     return value == 1;
 }
 
+// The signed-in account's user ID; 0 when it cannot be read.
+static long long PFBCurrentAccountUserID(void) {
+    Class hostClass = objc_getClass("T1HostViewController");
+    if (![(id)hostClass respondsToSelector:@selector(sharedHostViewController)]) {
+        return 0;
+    }
+    id host = ((id (*)(id, SEL))objc_msgSend)((id)hostClass, @selector(sharedHostViewController));
+    id account = [host respondsToSelector:@selector(currentAccount)]
+                     ? ((id (*)(id, SEL))objc_msgSend)(host, @selector(currentAccount))
+                     : nil;
+    SEL userID = NSSelectorFromString(@"userID");
+    if (![account respondsToSelector:userID] ||
+        [account methodSignatureForSelector:userID].methodReturnType[0] != 'q') {
+        return 0;
+    }
+    return ((long long (*)(id, SEL))objc_msgSend)(account, userID);
+}
+
+// Who posted the item, the retweeter for a Retweet; 0 when it cannot be read.
+static long long ItemFromUserID(id viewModel) {
+    SEL selector = NSSelectorFromString(@"fromUserID");
+    if (![viewModel respondsToSelector:selector] ||
+        [viewModel methodSignatureForSelector:selector].methodReturnType[0] != 'q') {
+        return 0;
+    }
+    return ((long long (*)(id, SEL))objc_msgSend)(viewModel, selector);
+}
+
+// A Retweet or a quote Tweet, per the getter, posted by someone else: the account's own stay.
+static BOOL PFBItemIsOthers(id viewModel, NSString* getter) {
+    if (!ItemRespondsAndInvokesBOOL(viewModel, NSSelectorFromString(getter))) {
+        return NO;
+    }
+    long long account = PFBCurrentAccountUserID();
+    return account == 0 || ItemFromUserID(viewModel) != account;
+}
+
 static BOOL ShouldHideTimelineItem(id item, BOOL hideWhoToFollow, BOOL hidePrompts,
                                    BOOL hideTopics, BOOL hideTopicsToFollow,
                                    BOOL hideVerified, BOOL hideBlockedRetweets,
+                                   BOOL hideAllRetweets, BOOL hideQuoteTweets, BOOL inHome,
                                    BOOL inConversation, BOOL inProfile,
                                    long long conversationRootUserID,
                                    NSSet<NSNumber*>* authorRepliedToUserIDs) {
@@ -894,6 +939,26 @@ static BOOL ShouldHideTimelineItem(id item, BOOL hideWhoToFollow, BOOL hidePromp
             PFBCOMPAT_ACTION(PFBCompat_hide_blocked_retweets, @"blocked retweet hidden");
             return YES;
         }
+    }
+
+    // Retweets set to None: every other Retweet leaves the Home timelines.
+    if (inHome && (hideAllRetweets || !PFBCompatPathReached(PFBCompatPath_home_retweets)) &&
+        PFBItemIsOthers(viewModel, @"isRetweet")) {
+        PFBCompatReach(PFBCompatPath_home_retweets);
+        if (hideAllRetweets) {
+            PFBCOMPAT_ACTION(PFBCompat_hide_blocked_retweets, @"Retweet hidden");
+            return YES;
+        }
+    }
+
+    // Quote Tweets of others leave the Home timelines; a reply shown for its context stays.
+    if (inHome && (hideQuoteTweets || PFBCompatNeedsObservation(PFBCompat_hide_quote_tweets)) &&
+        !ItemIsReplyWithSocialContext(viewModel) && PFBItemIsOthers(viewModel, @"isQuoteStatus")) {
+        if (hideQuoteTweets) {
+            PFBCOMPAT_ACTION(PFBCompat_hide_quote_tweets, @"quote Tweet hidden");
+            return YES;
+        }
+        PFBCOMPAT_OBSERVE(PFBCompat_hide_quote_tweets, @"quote Tweet found");
     }
 
     if (!hidePrompts && [className isEqualToString:@"TwitterURT.URTTimelinePromptViewModel"]) {
@@ -970,6 +1035,7 @@ static BOOL ShouldHideTimelineItem(id item, BOOL hideWhoToFollow, BOOL hidePromp
 static BOOL MemoizedShouldHideTimelineItem(id item, BOOL hideWhoToFollow, BOOL hidePrompts,
                                            BOOL hideTopics, BOOL hideTopicsToFollow,
                                            BOOL hideVerified, BOOL hideBlockedRetweets,
+                                           BOOL hideAllRetweets, BOOL hideQuoteTweets, BOOL inHome,
                                            BOOL inConversation, BOOL inProfile,
                                            long long conversationRootUserID,
                                            NSSet<NSNumber*>* authorRepliedToUserIDs) {
@@ -987,7 +1053,8 @@ static BOOL MemoizedShouldHideTimelineItem(id item, BOOL hideWhoToFollow, BOOL h
     NSUInteger flags = (hideWhoToFollow << 0) | (hidePrompts << 1) | (hideTopics << 2) |
                        (hideTopicsToFollow << 3) | (hideVerified << 4) |
                        (inConversation << 5) | (inProfile << 6) |
-                       (hideBlockedRetweets << 7);
+                       (hideBlockedRetweets << 7) | (hideAllRetweets << 8) |
+                       (hideQuoteTweets << 9) | (inHome << 10);
     BOOL repliedSetChanged = authorRepliedToUserIDs != cachedAuthorRepliedToUserIDs &&
                              ![authorRepliedToUserIDs isEqualToSet:cachedAuthorRepliedToUserIDs];
     PFBEnsureMutedLoaded();
@@ -1003,7 +1070,8 @@ static BOOL MemoizedShouldHideTimelineItem(id item, BOOL hideWhoToFollow, BOOL h
     NSString* entryID = ItemEntryID(PFBUnwrapDataViewItem(item));
     if (!entryID) {
         return ShouldHideTimelineItem(item, hideWhoToFollow, hidePrompts, hideTopics,
-                                      hideTopicsToFollow, hideVerified, hideBlockedRetweets, inConversation, inProfile,
+                                      hideTopicsToFollow, hideVerified, hideBlockedRetweets, hideAllRetweets,
+                                      hideQuoteTweets, inHome, inConversation, inProfile,
                                       conversationRootUserID, authorRepliedToUserIDs);
     }
 
@@ -1013,7 +1081,8 @@ static BOOL MemoizedShouldHideTimelineItem(id item, BOOL hideWhoToFollow, BOOL h
     }
 
     BOOL hide = ShouldHideTimelineItem(item, hideWhoToFollow, hidePrompts, hideTopics,
-                                       hideTopicsToFollow, hideVerified, hideBlockedRetweets, inConversation, inProfile,
+                                       hideTopicsToFollow, hideVerified, hideBlockedRetweets, hideAllRetweets,
+                                       hideQuoteTweets, inHome, inConversation, inProfile,
                                        conversationRootUserID, authorRepliedToUserIDs);
     [cache setObject:@(hide) forKey:entryID];
     return hide;
@@ -1659,6 +1728,7 @@ static BOOL PFBTimelineFiltersNeedObservation(void) {
            PFBCompatNeedsObservation(PFBCompat_hide_topics_to_follow) ||
            PFBCompatNeedsObservation(PFBCompat_hide_verified_tweets) ||
            PFBCompatNeedsObservation(PFBCompat_hide_blocked_retweets) ||
+           PFBCompatNeedsObservation(PFBCompat_hide_quote_tweets) ||
            PFBCompatNeedsObservation(PFBCompat_filter_languages);
 }
 
@@ -1679,6 +1749,10 @@ static NSArray* FilteredTimelineSections(TFNItemsDataViewController* dataViewCon
     BOOL hideVerified = [PFBSettings boolForKey:@"hide_verified_tweets"] && !inProfile && !inSearch &&
                         !IsInEditHistory(dataViewController);
     BOOL hideBlockedRetweets = [PFBSettings boolForKey:@"hide_blocked_retweets"];
+    // Every other Retweet, and quote Tweets, leave only the Home timelines.
+    BOOL inHome = PFBReadingIsHomeTimeline(dataViewController);
+    BOOL hideAllRetweets = inHome && [PFBSettings integerForKey:@"hide_blocked_retweets"] == PFBRetweetsNone;
+    BOOL hideQuoteTweets = inHome && [PFBSettings boolForKey:@"hide_quote_tweets"];
     // The language filter belongs to the timelines, not to a conversation or a
     // profile opened on purpose.
     NSSet<NSString*>* keptLanguages =
@@ -1689,8 +1763,8 @@ static NSArray* FilteredTimelineSections(TFNItemsDataViewController* dataViewCon
     BOOL hasHiddenThreads = PFBHiddenThreads().count > 0;
 
     if (!hideWhoToFollow && !hidePrompts && !hideTopics && !hideTopicsToFollow &&
-        !hideVerified && !hideBlockedRetweets && !inConversation && !keptLanguages.count &&
-        !hasHiddenThreads && !inSearch &&
+        !hideVerified && !hideBlockedRetweets && !hideQuoteTweets && !inConversation && !keptLanguages.count &&
+        !hasHiddenThreads && !inSearch && !(inHome && !PFBCompatPathReached(PFBCompatPath_home_retweets)) &&
         !PFBTimelineFiltersNeedObservation()) {
         return sections;
     }
@@ -1723,6 +1797,7 @@ static NSArray* FilteredTimelineSections(TFNItemsDataViewController* dataViewCon
             }
             if (MemoizedShouldHideTimelineItem(items[i], hideWhoToFollow, hidePrompts, hideTopics,
                                                hideTopicsToFollow, hideVerified, hideBlockedRetweets,
+                                               hideAllRetweets, hideQuoteTweets, inHome,
                                                inConversation, inProfile, conversationRootUserID,
                                                authorRepliedToUserIDs) ||
                 !PFBItemLanguageAllowed(items[i], keptLanguages)) {

@@ -87,8 +87,7 @@
 "DISABLE_SENSITIVE_TWEET_WARNINGS_TITLE" = "Hassas içerik uyarılarını gizle";
 "BYPASS_AGE_VERIFICATION_TITLE" = "Yaş doğrulamasını atla";
 "BYPASS_AGE_VERIFICATION_DETAIL" = "Hassas içerik için yaş doğrulama akışını atlar.";
-"REPLY_SORTING_TITLE" = "Kronolojik yanıtlar";
-"REPLY_SORTING_DETAIL" = "Yanıtları alaka düzeyi yerine tarihe göre sıralar.";
+"REPLY_SORTING_TITLE" = "Yanıtları sıralama";
 "RESTORE_REPLY_CONTEXT_TITLE" = "Yanıt bağlamını geri yükle";
 "RESTORE_REPLY_CONTEXT_DETAIL" = "Açılan bir yanıtın metninin üstünde, kime yanıt verildiğini gösterir.";
 "SHOW_QUOTE_COUNTS_TITLE" = "Alıntı ve Retweet sayıları";

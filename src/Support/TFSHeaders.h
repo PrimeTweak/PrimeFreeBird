@@ -35,6 +35,13 @@
 @property (readonly, nonatomic) NSInteger superFollowingState;
 @end
 
+// A conversation's reply order.
+@interface TFSReplySortingState : NSObject
+- (void)sortByLikes;
+- (void)sortByRecency;
+- (void)sortByRelevance;
+@end
+
 @interface NSNumber (TFSTwitter)
 - (NSString*)tfs_twitterAbbreviated;
 @end

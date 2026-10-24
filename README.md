@@ -81,7 +81,7 @@
 ## Elsewhere
 
 - **Grouped settings** — every page is split into labelled groups instead of one long list.
-- **Clean shared links** — tracking parameters stripped when you copy *or* share, profiles included.
+- **Clean links** — tracking parameters stripped from links you open, copy *or* share, profiles included.
 - **French localization** — the settings and the new screens are in French, except the swatch names and the Compatibility tools.
 
 <sub>…on top of the BHTwitter and NeoFreeBird toolkit.</sub>

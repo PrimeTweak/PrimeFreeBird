@@ -87,8 +87,7 @@
 "DISABLE_SENSITIVE_TWEET_WARNINGS_TITLE" = "Ukryj ostrzeżenia o nieodpowiednich treściach";
 "BYPASS_AGE_VERIFICATION_TITLE" = "Pomijaj weryfikację wieku";
 "BYPASS_AGE_VERIFICATION_DETAIL" = "Pomija weryfikację wieku dla nieodpowiednich treści.";
-"REPLY_SORTING_TITLE" = "Odpowiedzi chronologicznie";
-"REPLY_SORTING_DETAIL" = "Sortuje odpowiedzi według daty zamiast trafności.";
+"REPLY_SORTING_TITLE" = "Sortuj odpowiedzi";
 "RESTORE_REPLY_CONTEXT_TITLE" = "Przywróć kontekst odpowiedzi";
 "RESTORE_REPLY_CONTEXT_DETAIL" = "Pokazuje nad tekstem otwartej odpowiedzi, do kogo jest skierowana.";
 "SHOW_QUOTE_COUNTS_TITLE" = "Liczba cytatów i Retweetów";

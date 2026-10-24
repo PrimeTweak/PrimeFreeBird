@@ -87,8 +87,7 @@
 "DISABLE_SENSITIVE_TWEET_WARNINGS_TITLE" = "إخفاء تحذيرات المحتوى الحساس";
 "BYPASS_AGE_VERIFICATION_TITLE" = "تجاوز التحقق من العمر";
 "BYPASS_AGE_VERIFICATION_DETAIL" = "تخطي عملية التحقق من العمر للمحتوى الحساس.";
-"REPLY_SORTING_TITLE" = "ردود بترتيب زمني";
-"REPLY_SORTING_DETAIL" = "ترتيب الردود حسب التاريخ بدلاً من الصلة.";
+"REPLY_SORTING_TITLE" = "فرز الردود";
 "RESTORE_REPLY_CONTEXT_TITLE" = "استعادة سياق الرد";
 "RESTORE_REPLY_CONTEXT_DETAIL" = "يعرض لمن تم توجيه الرد، فوق نص الرد الذي تفتحه.";
 "SHOW_QUOTE_COUNTS_TITLE" = "عدد الاقتباسات وإعادات التغريد";

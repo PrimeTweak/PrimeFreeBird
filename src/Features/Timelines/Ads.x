@@ -1,5 +1,6 @@
 // Hides promoted posts, the premium offer and trend videos from the lists the
-// app builds (hide_promoted, hide_premium_offer, hide_trend_videos).
+// app builds (hide_promoted, hide_premium_offer, hide_trend_videos), and promoted
+// entries from the video feed's responses.
 
 #import "Support/HookHelpers.h"
 #import "Common/PFBCompatibility.h"
@@ -332,6 +333,93 @@ static void RemovePromotedImmersiveCards(id controller) {
     }
     RemovePromotedImmersiveCards(responder);
     %orig;
+}
+
+%end
+
+// MARK: - Video feed responses
+
+// The video feed's pages arrive through these two GraphQL requests.
+static BOOL IsVideoFeedResponse(NSURLRequest* request) {
+    NSURL* url = [request isKindOfClass:[NSURLRequest class]] ? request.URL : nil;
+    NSString* operation = url.path.lastPathComponent;
+    return ([operation isEqualToString:@"ImmersiveViewerExploreMixerTimeline"] ||
+            [operation isEqualToString:@"ImmersiveProfileViewer"]) &&
+           [url.path containsString:@"/graphql/"] && PFBIsXDomain(url.host);
+}
+
+// The JSON without its promoted Tweet entries, at any depth; removed counts them. A part
+// holding none is returned as it was, so a page without ads is not copied.
+static id WithoutPromotedEntries(id node, NSUInteger* removed) {
+    if ([node isKindOfClass:[NSArray class]]) {
+        NSArray* values = node;
+        NSMutableArray* kept = nil;
+        for (NSUInteger i = 0; i < values.count; i++) {
+            id value = values[i];
+            id entryID = [value isKindOfClass:[NSDictionary class]] ? value[@"entry_id"] : nil;
+            BOOL promoted = [entryID isKindOfClass:[NSString class]] && [entryID hasPrefix:@"promoted-tweet-"];
+            id cleaned = promoted ? nil : WithoutPromotedEntries(value, removed);
+            if (!kept && cleaned != value) {
+                kept = [[values subarrayWithRange:NSMakeRange(0, i)] mutableCopy];
+            }
+            if (promoted) {
+                (*removed)++;
+            } else if (kept) {
+                [kept addObject:cleaned];
+            }
+        }
+        return kept ?: values;
+    }
+    if ([node isKindOfClass:[NSDictionary class]]) {
+        NSDictionary* fields = node;
+        NSMutableDictionary* copy = nil;
+        for (id key in fields) {
+            id cleaned = WithoutPromotedEntries(fields[key], removed);
+            if (cleaned != fields[key]) {
+                copy = copy ?: [fields mutableCopy];
+                copy[key] = cleaned;
+            }
+        }
+        return copy ?: fields;
+    }
+    return node;
+}
+
+// The cards above are removed once Twitter has read a page; here the promoted entries
+// leave the page before Twitter reads it. Off, a page is read only to note its ads.
+%hook TNLResponseInfo
+
+- (instancetype)initWithFinalURLRequest:(NSURLRequest*)request
+                            URLResponse:(NSURLResponse*)response
+                                 source:(NSInteger)source
+                                   data:(NSData*)data
+                     temporarySavedFile:(id)temporarySavedFile {
+    if (data.length == 0 || !IsVideoFeedResponse(request)) {
+        return %orig;
+    }
+    PFBCompatReach(PFBCompatPath_video_feed_response);
+    BOOL enabled = [PFBSettings boolForKey:@"hide_promoted"];
+    if (!enabled && !PFBCompatNeedsObservation(PFBCompat_hide_promoted) &&
+        PFBCompatPathReached(PFBCompatPath_video_feed_ads)) {
+        return %orig;
+    }
+    id json = [NSJSONSerialization JSONObjectWithData:data options:0 error:nil];
+    NSUInteger removed = 0;
+    id filtered = json ? WithoutPromotedEntries(json, &removed) : nil;
+    if (removed == 0) {
+        return %orig;
+    }
+    PFBCompatReach(PFBCompatPath_video_feed_ads);
+    if (!enabled) {
+        PFBCOMPAT_OBSERVE(PFBCompat_hide_promoted, @"ad found in a video feed response");
+        return %orig;
+    }
+    NSData* cleaned = [NSJSONSerialization dataWithJSONObject:filtered options:0 error:nil];
+    if (!cleaned) {
+        return %orig;
+    }
+    PFBCOMPAT_ACTION(PFBCompat_hide_promoted, @"ad removed from a video feed response");
+    return %orig(request, response, source, cleaned, temporarySavedFile);
 }
 
 %end
