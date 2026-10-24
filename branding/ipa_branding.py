@@ -1,8 +1,5 @@
 #!/usr/bin/env python3
-"""Brands a built .ipa/.tipa: RESOURCE_PACK=... TWITTER_BRANDING=1 ipa_branding.py <ipa>.
-Applies the theme pack and the "Twitter" name in one unpack; exits 0 untouched when
-nothing is asked, non-zero when a requested step fails. Helpers sit beside this file.
-"""
+"""Applies the icon pack (RESOURCE_PACK) and the Twitter name (TWITTER_BRANDING=1) to a built IPA."""
 
 import hashlib
 import os
@@ -18,8 +15,8 @@ from pathlib import Path
 
 BRANDING_DIR = Path(__file__).resolve().parent
 
-# Pinned scar release used for Assets.car work when no binary is available
-# locally (https://github.com/theacrat/scar), with each archive's SHA-256.
+# Pinned scar release used for Assets.car work (https://github.com/theacrat/scar),
+# with each archive's SHA-256.
 SCAR_VERSION = "v0.1.0"
 SCAR_URL = "https://github.com/theacrat/scar/releases/download/{v}/scar-{v}-{triple}.tar.gz"
 SCAR_SHA256 = {
@@ -86,22 +83,14 @@ def _bump_bundle_version(appdir):
     """Gives CFBundleVersion a fresh value on every run: iOS keeps a launch-screen
     snapshot per build and would otherwise flash the old one over new assets.
     """
-    plist = appdir / "Info.plist"
-    if not plist.is_file():
-        raise BrandingError("Branding: could not locate app Info.plist")
-
-    with open(plist, "rb") as f:
-        data = plistlib.load(f)
-    data["CFBundleVersion"] = str(int(time.time()))
-    with open(plist, "wb") as f:
-        plistlib.dump(data, f, fmt=plistlib.FMT_BINARY)
+    _patch_info_plist(appdir, lambda data: data.update(CFBundleVersion=str(int(time.time()))))
 
 
 # --- resource pack ----------------------------------------------------------
 
 def _apply_resource_pack_to_app(appdir, workdir, zip_path):
     """Overlays a pack zip onto the app: icons/ (or loose images) go into Assets.car,
-    svgs/ over matching TwitterAppearance glyphs, other root files over the app's own.
+    other root files over the app's own.
     """
     zip_path = Path(zip_path)
     if not zip_path.is_file():
@@ -119,18 +108,14 @@ def _apply_resource_pack_to_app(appdir, workdir, zip_path):
 
     icons_dir = pack / "icons"
     if not icons_dir.is_dir():
-        icons_dir = pack  # back-compat: flat zip
-    svgs_dir = pack / "svgs"
+        icons_dir = pack  # a flat zip keeps its icons at the root
 
     have_icons = _find(
         icons_dir,
         lambda p: p.suffix.lower() in (".png", ".jpg", ".jpeg") and not _is_apple_double(p),
     )
-    have_svgs = svgs_dir.is_dir() and _find(
-        svgs_dir, lambda p: p.suffix.lower() == ".svg" and not _is_apple_double(p)
-    )
     # Non-image files at the pack root overwrite the same-named file in the app
-    # root. (Root images belong to the flat-zip icons back-compat path.)
+    # root; root images are the icons of a flat zip.
     root_files = [
         p for p in pack.iterdir()
         if p.is_file()
@@ -139,10 +124,8 @@ def _apply_resource_pack_to_app(appdir, workdir, zip_path):
     ]
     have_root = bool(root_files)
 
-    if not (have_icons or have_svgs or have_root):
-        raise BrandingError(
-            "Branding: image pack has no icons/ images, svgs/ glyphs, or root files"
-        )
+    if not (have_icons or have_root):
+        raise BrandingError("Branding: image pack has no icons/ images or root files")
 
     # --- icons/: merge into Assets.car ---
     if have_icons:
@@ -163,27 +146,19 @@ def _apply_resource_pack_to_app(appdir, workdir, zip_path):
         # The merged catalog directory holds the final decoded art.
         catalog = workdir / "catalog"
 
-        if plist.is_file():
-            if not _run([
-                sys.executable, str(BRANDING_DIR / "update_bundle_icons.py"),
-                str(plist), str(catalog),
-            ]):
-                raise BrandingError("Branding: failed to update CFBundleIcons")
+        if not _run([
+            sys.executable, str(BRANDING_DIR / "update_bundle_icons.py"),
+            str(plist), str(catalog),
+        ]):
+            raise BrandingError("Branding: failed to update CFBundleIcons")
 
         # Sync the loose fallback icons in the app root (used by SpringBoard) to
         # the rebuilt catalog, else the home-screen icon stays stale.
-        _run([
+        if not _run([
             sys.executable, str(BRANDING_DIR / "overwrite_loose_icons.py"),
             str(appdir), str(catalog),
-        ])
-
-    # --- svgs/: override TwitterAppearance vector glyphs ---
-    if have_svgs:
-        if not _run([
-            sys.executable, str(BRANDING_DIR / "override_appearance_svgs.py"),
-            str(appdir), str(svgs_dir),
         ]):
-            raise BrandingError("Branding: failed to override TwitterAppearance glyphs")
+            raise BrandingError("Branding: failed to sync the home-screen icons")
 
     # --- root files (e.g. LaunchScreen.nib): overwrite the same file in app root ---
     if have_root:
@@ -237,23 +212,10 @@ def _scar_triple():
 
 
 def _ensure_scar(workdir):
-    """Locate the scar binary: $PFB_SCAR, then PATH, then download the pinned
-    release build for this platform."""
-    env = os.environ.get("PFB_SCAR")
-    if env:
-        if Path(env).is_file():
-            return Path(env)
-        raise BrandingError(f"Branding: PFB_SCAR points to a missing file: {env}")
-    found = shutil.which("scar")
-    if found:
-        return Path(found)
-
+    """Download the pinned scar release build for this platform."""
     triple = _scar_triple()
     if not triple:
-        raise BrandingError(
-            "Branding: no scar release build for this platform; install scar "
-            "(https://github.com/theacrat/scar) and put it in PATH or PFB_SCAR"
-        )
+        raise BrandingError("Branding: no pinned scar release build for this platform")
     url = SCAR_URL.format(v=SCAR_VERSION, triple=triple)
     tgz = workdir / "scar.tar.gz"
     try:

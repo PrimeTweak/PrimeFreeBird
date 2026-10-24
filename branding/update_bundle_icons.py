@@ -1,8 +1,5 @@
 #!/usr/bin/env python3
-"""Usage: update_bundle_icons.py <Info.plist> <catalog_dir>
-Rewrites CFBundleIcons and CFBundleIcons~ipad so they name the icons actually present
-in scar_merge.py's decompiled catalog.
-"""
+"""Rewrites CFBundleIcons and CFBundleIcons~ipad to name the icons in the rebuilt catalog."""
 
 import json
 import os

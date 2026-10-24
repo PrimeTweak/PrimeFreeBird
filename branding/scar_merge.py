@@ -1,8 +1,5 @@
 #!/usr/bin/env python3
-"""Usage: scar_merge.py <app_Assets.car> <overlay_dir> <out.car> --workdir DIR [--scar BIN]
-Rebuilds Assets.car with scar: an image named like an asset replaces all its renditions,
-one named like a rendition replaces only it, any other becomes a new alternate icon.
-"""
+"""Rebuilds Assets.car with scar from the pack's images; unmatched ones become alternate icons."""
 
 import argparse
 import json
@@ -90,7 +87,7 @@ def main():
     ap.add_argument("overlay_dir")
     ap.add_argument("out_car")
     ap.add_argument("--workdir", required=True)
-    ap.add_argument("--scar", default=os.environ.get("PFB_SCAR", "scar"))
+    ap.add_argument("--scar", required=True)
     args = ap.parse_args()
 
     catalog = os.path.join(args.workdir, "catalog")

@@ -1,8 +1,5 @@
 #!/usr/bin/env python3
-"""Usage: overwrite_loose_icons.py <app_dir> <catalog_dir>
-Overwrites the loose home-screen icon PNGs at the app root with the matching rendition
-from scar_merge.py's work folder, by asset name and pixel size, so they follow the pack.
-"""
+"""Overwrites the loose home-screen icon PNGs at the app root with the rebuilt catalog's art."""
 
 import json
 import os
@@ -57,7 +54,7 @@ def main():
 
     skipped = []
     for f in os.listdir(app_dir):
-        if f.startswith("._") or not f.lower().endswith((".png", ".jpg", ".jpeg")):
+        if f.startswith("._") or not f.lower().endswith(".png"):
             continue
         fp = os.path.join(app_dir, f)
         if not os.path.isfile(fp):
