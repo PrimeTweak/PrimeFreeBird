@@ -163,8 +163,6 @@ typedef struct {
 // Every path of an option that acts in more than one place.
 static const PFBCompatPathMeta kPaths[] = {
     {PFBCompatPath_grok_bot_upsells, PFBCompat_hide_grok_bot, "upsells"},
-    {PFBCompatPath_grok_bot_post_banner, PFBCompat_hide_grok_bot, "post banner"},
-    {PFBCompatPath_grok_bot_reply_banner, PFBCompat_hide_grok_bot, "reply banner"},
     {PFBCompatPath_tab_bar, PFBCompat_tab_bar_theming, "tab bar"},
     {PFBCompatPath_native_tab_bar, PFBCompat_tab_bar_theming, "native tab bar"},
     {PFBCompatPath_top_tab_underline, PFBCompat_tab_bar_theming, "top tab underline"},
@@ -1030,10 +1028,6 @@ static const PFBCompatReq kReqs[] = {
     {PFBCompat_expand_tco_links, "TFSTwitterEntityURL", "-expandedURL"},
     {PFBCompat_expand_tco_links, "TNUTalonUtilities", "+sendTalonRequestForAnalytics:"},
     {PFBCompat_expand_tco_links, "TNUTalonUtilities", "+verifyTalonURL:completion:"},
-    {PFBCompat_expand_tco_links, "NSURL", "-tfs_isTalonLink"},
-    {PFBCompat_expand_tco_links, "T1SafariViewController", "-_t1_verifyTalonURLIfNecessary"},
-    {PFBCompat_expand_tco_links, "T1SafariViewController", "-verifiableTalonURL"},
-    {PFBCompat_expand_tco_links, "T1SafariViewController", "-rootURL"},
     {PFBCompat_remove_related_tweets, "TFNItemsDataViewController", "-setSections:restoreScrollPosition:"},
     {PFBCompat_keep_reading_position, "TFNItemsDataViewController", "-setSections:restoreScrollPosition:"},
     {PFBCompat_settings_entry, "T1GenericSettingsViewController", "-viewWillAppear:"},
@@ -1395,6 +1389,9 @@ static const PFBCompatName kNames[] = {
     {PFBCompatOptionCount, "Debug/PFBCompatibilityTour.m", "viewControllerWithAccount:tweetID:scribeContext:"},
     {PFBCompatOptionCount, "Debug/PFBCompatibilityTour.m", "TFSTwitterScribeContext"},
     {PFBCompatOptionCount, "Debug/PFBCompatibilityTour.m", "scribeContextWithPage:"},
+    {PFBCompatOptionCount, "Debug/PFBCompatibilityTour.m", "TNUTalonUtilities"},
+    {PFBCompatOptionCount, "Debug/PFBCompatibilityTour.m", "sendTalonRequestForAnalytics:"},
+    {PFBCompatOptionCount, "Debug/PFBCompatibilityTour.m", "verifyTalonURL:completion:"},
     {PFBCompatOptionCount, "Debug/PFBCompatibilityReportViewController.m", "bodyBoldFont"},
     {PFBCompatOptionCount, "Debug/PFBCompatibilityReportViewController.m", "colorPalette"},
     {PFBCompatOptionCount, "Debug/PFBCompatibilityReportViewController.m", "currentColorPalette"},
@@ -1935,8 +1932,6 @@ static const PFBCompatDeclared kDeclared[] = {
     {"Support/T1Headers.h", "T1ProfileUserViewModel", "url"},
     {"Support/T1Headers.h", "T1ProfileUserViewModel", "username"},
     {"Support/T1Headers.h", "T1SafariViewController", "rootURL"},
-    {"Support/T1Headers.h", "T1SafariViewController", "verifiableTalonURL"},
-    {"Support/T1Headers.h", "T1SafariViewController", "_t1_verifyTalonURLIfNecessary"},
     {"Support/T1Headers.h", "T1StandardStatusAttachmentViewAdapter", "attachmentType"},
     {"Support/T1Headers.h", "T1StandardStatusView", "eventHandler"},
     {"Support/T1Headers.h", "T1TabBarViewController", "setTabBarHidden:withDuration:"},
@@ -2027,7 +2022,6 @@ static const PFBCompatDeclared kDeclared[] = {
     {"Support/TAEHeaders.h", "TFNUIDefaultFontGroup", "boldFontOfSize:"},
     {"Support/TAEHeaders.h", "TFNUIDefaultFontGroup", "sharedFontGroup"},
     {"Support/TFSHeaders.h", "NSNumber", "tfs_twitterAbbreviated"},
-    {"Support/TFSHeaders.h", "NSURL", "tfs_isTalonLink"},
     {"Support/T1Headers.h", "T1PanelIdentity", "iconImageNameForPanelID:"},
     {"Support/T1Headers.h", "T1WebViewController", "initWithRootURL:account:shouldAuthenticate:shouldPresentAsNativePage:sourceStatus:scribeComponent:scribeParameters:"},
     {"Support/TFNHeaders.h", "TFNActiveTextItem", "initWithTextModel:activeRanges:"},
@@ -2243,6 +2237,7 @@ static const PFBCompatPathStation kPathStations[] = {
     {PFBCompatPath_promoted_video_feed, "video full screen"},
     {PFBCompatPath_replies_by_date, "replies"},
     {PFBCompatPath_native_filter_button, "search off"},
+    {PFBCompatPath_tco_requests, "t.co check"},
     {PFBCompatPath_settings_tab_bar, "Twitter settings"},
 };
 static const size_t kPathStationCount = sizeof(kPathStations) / sizeof(kPathStations[0]);
@@ -2281,6 +2276,7 @@ static NSString* stationLabel(NSString* station) {
           @"side menu": @"the side menu",
           @"dark mode": @"dark mode",
           @"web link": @"a web link",
+          @"t.co check": @"the tweak's t.co block",
           @"Twitter settings": @"Twitter's settings",
           @"PFB settings": @"the PFB settings",
       };

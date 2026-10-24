@@ -79,7 +79,7 @@ static void pfbBridgeReadSharedSession(NSString** authToken, NSString** csrf) {
 
 // Once per launch and per answer, while the journal records: which session a request
 // signed for another account than the shared session's goes out with.
-static void pfbBridgeProbeAccount(NSString* line) {
+static void pfbBridgeLogAccount(NSString* line) {
     static NSMutableSet<NSString*>* said;
     static dispatch_once_t once;
     if (!PFBDebugIsRecording()) {
@@ -170,7 +170,7 @@ static NSURLRequest* pfbBridgeInject(NSURLRequest* req) {
         // fetched. Until then the request may be refused, but never sent as another account.
         authToken = own;
         csrf = PFBWebCt0ForAuthToken(own, YES);
-        pfbBridgeProbeAccount(csrf.length
+        pfbBridgeLogAccount(csrf.length
             ? @"[bridge] a request signed for another account went with its own web session"
             : @"[bridge] a request signed for another account went with its own web session, csrf pending");
     }

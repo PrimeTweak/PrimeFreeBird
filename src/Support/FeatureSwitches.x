@@ -44,34 +44,24 @@ static BOOL AccountIsGenuinelyPremium(void) {
 
 // MARK: - Feature switch overrides
 
-// Whether a switch drives a Grok Bot promotion, and the path it proves. Twitter reads
-// the switch of a placement (side menu row, home header and hero, presets, tab icon)
-// only once the upsells switch is on, so those prove nothing of their own.
-static BOOL pfbGrokBotSwitch(NSString* key, PFBCompatPath* path) {
+// Whether a switch drives a Grok Bot promotion. Twitter reads a placement's switch only
+// once the upsells switch is on, and the banners' only for the Ask Grok button under a
+// post, so the upsells switch alone proves the option.
+static BOOL pfbIsGrokBotSwitch(NSString* key) {
     if (![key hasPrefix:@"grok_ios_grok_bot_"]) {
         return NO;
     }
-    static NSDictionary<NSString*, NSNumber*>* paths;
+    static NSSet<NSString*>* keys;
     static dispatch_once_t once;
     dispatch_once(&once, ^{
-      NSNumber* none = @(PFBCompatPathCount);
-      paths = @{
-          @"grok_ios_grok_bot_upsells_enabled": @(PFBCompatPath_grok_bot_upsells),
-          @"grok_ios_grok_bot_post_cta_enabled": @(PFBCompatPath_grok_bot_post_banner),
-          @"grok_ios_grok_bot_reply_cta_enabled": @(PFBCompatPath_grok_bot_reply_banner),
-          @"grok_ios_grok_bot_sidebar_enabled": none,
-          @"grok_ios_grok_bot_home_header_enabled": none,
-          @"grok_ios_grok_bot_home_hero_enabled": none,
-          @"grok_ios_grok_bot_preset_enabled": none,
-          @"grok_ios_grok_bot_tab_icon_enabled": none,
-      };
+      keys = [NSSet setWithArray:@[
+          @"grok_ios_grok_bot_upsells_enabled", @"grok_ios_grok_bot_sidebar_enabled",
+          @"grok_ios_grok_bot_home_header_enabled", @"grok_ios_grok_bot_home_hero_enabled",
+          @"grok_ios_grok_bot_preset_enabled", @"grok_ios_grok_bot_tab_icon_enabled",
+          @"grok_ios_grok_bot_post_cta_enabled", @"grok_ios_grok_bot_reply_cta_enabled"
+      ]];
     });
-    NSNumber* found = paths[key];
-    if (!found) {
-        return NO;
-    }
-    *path = (PFBCompatPath)found.integerValue;
-    return YES;
+    return [keys containsObject:key];
 }
 
 static NSNumber* FeatureSwitchOverrideValueForKey(NSString* key) {
@@ -96,10 +86,9 @@ static NSNumber* FeatureSwitchOverrideValueForKey(NSString* key) {
 
     // Grok Bot, a separate app, is promoted from the side menu, the home timeline, the
     // presets, the tab icon and banners under posts and replies, each behind its own switch.
-    PFBCompatPath grokBotPath = PFBCompatPathCount;
-    if (pfbGrokBotSwitch(key, &grokBotPath)) {
-        if (grokBotPath != PFBCompatPathCount) {
-            PFBCompatReach(grokBotPath);
+    if (pfbIsGrokBotSwitch(key)) {
+        if ([key isEqualToString:@"grok_ios_grok_bot_upsells_enabled"]) {
+            PFBCompatReach(PFBCompatPath_grok_bot_upsells);
         }
         if ([PFBSettings boolForKey:@"hide_grok_bot"]) {
             PFBCOMPAT_ACTION(PFBCompat_hide_grok_bot, @"Grok Bot promotion off");

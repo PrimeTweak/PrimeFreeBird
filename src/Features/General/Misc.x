@@ -83,38 +83,6 @@ static BOOL ShouldKeepBrowserURLInApp(NSURL* url) {
 
 // MARK: - Expand t.co links
 
-// Measured for the report: where t.co links still reach Twitter. Each kind keeps its
-// first lines, and a line is written once.
-static void PFBMeasureTco(NSString* topic, NSString* line) {
-    static NSMutableSet<NSString*>* done;
-    static dispatch_once_t once;
-    dispatch_once(&once, ^{
-      done = [NSMutableSet set];
-    });
-    NSString* entry = [NSString stringWithFormat:@"%@ %@", topic, line];
-    @synchronized(done) {
-        if ([done containsObject:topic] || [done containsObject:entry]) {
-            return;
-        }
-        [done addObject:entry];
-        if (!PFBCompatMeasure(topic, line, 6)) {
-            [done addObject:topic];
-        }
-    }
-}
-
-// Where a link leads, named without its address.
-static NSString* PFBTcoKind(NSURL* url) {
-    NSString* host = url.host.lowercaseString;
-    if ([host isEqualToString:@"t.co"]) {
-        return @"a t.co link";
-    }
-    if (PFBIsXDomain(host)) {
-        return @"an x.com page";
-    }
-    return host.length ? @"another site" : @"no address";
-}
-
 %hook TFSTwitterEntityURL
 
 - (NSString*)url {
@@ -125,36 +93,7 @@ static NSString* PFBTcoKind(NSURL* url) {
         PFBCOMPAT_ACTION(PFBCompat_expand_tco_links, @"link expanded");
         return expandedURL;
     }
-    NSString* url = %orig;
-    if ([url hasPrefix:@"https://t.co/"] || [url hasPrefix:@"http://t.co/"]) {
-        PFBMeasureTco(@"tco-kept", @"a post link left on t.co");
-    }
-    return url;
-}
-
-%end
-
-%hook NSURL
-
-// Twitter's own test for a t.co link, before it counts or checks one.
-- (BOOL)tfs_isTalonLink {
-    BOOL talon = %orig;
-    if (talon) {
-        PFBMeasureTco(@"tco-link", @"a t.co link met by Twitter");
-    }
-    return talon;
-}
-
-%end
-
-%hook T1SafariViewController
-
-// The browser checks a t.co link it holds as it loads.
-- (void)_t1_verifyTalonURLIfNecessary {
-    PFBMeasureTco(@"tco-browser", [NSString stringWithFormat:@"opened %@ \u00b7 t.co link to check: %@",
-                                                            PFBTcoKind(self.rootURL),
-                                                            self.verifiableTalonURL ? @"yes" : @"none"]);
-    %orig;
+    return %orig;
 }
 
 %end
@@ -165,7 +104,6 @@ static NSString* PFBTcoKind(NSURL* url) {
 
 // The request that counts a click on t.co; the link itself opens at its own address.
 + (BOOL)sendTalonRequestForAnalytics:(NSURL*)url {
-    PFBMeasureTco(@"tco-request", [NSString stringWithFormat:@"click count asked for %@", PFBTcoKind(url)]);
     PFBCompatReach(PFBCompatPath_tco_requests);
     PFBCOMPAT_ACTION(PFBCompat_expand_tco_links, @"t.co click count not sent");
     return NO;
@@ -173,7 +111,6 @@ static NSString* PFBTcoKind(NSURL* url) {
 
 // The t.co safety check is not sent: its answer is the one a link outside t.co gets.
 + (id)verifyTalonURL:(NSURL*)url completion:(void (^)(NSInteger result))completion {
-    PFBMeasureTco(@"tco-request", [NSString stringWithFormat:@"safety check asked for %@", PFBTcoKind(url)]);
     if (![url.host.lowercaseString isEqualToString:@"t.co"]) {
         return %orig;
     }

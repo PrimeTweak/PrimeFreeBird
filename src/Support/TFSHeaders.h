@@ -38,7 +38,3 @@
 @interface NSNumber (TFSTwitter)
 - (NSString*)tfs_twitterAbbreviated;
 @end
-
-@interface NSURL (TFSAdditions)
-- (BOOL)tfs_isTalonLink;
-@end

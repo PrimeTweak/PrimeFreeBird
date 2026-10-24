@@ -4,6 +4,7 @@
 
 #import <UIKit/UIKit.h>
 #import <SafariServices/SafariServices.h>
+#import <dlfcn.h>
 #import <objc/message.h>
 #import "Common/PFBCompatibility.h"
 #import "Debug/PFBDebugger.h"
@@ -1222,6 +1223,37 @@ static void tourOpenWebLink(void) {
     PFBCompatTourLog(@"[tour] web link: in-app browser presented over %@", tourScreenName(tourScreen()));
 }
 
+// Whether a class method runs code of this tweak, that is, the tweak's hook is the one
+// Twitter reaches.
+static BOOL tourHookedHere(Class cls, SEL selector) {
+    Method method = cls ? class_getClassMethod(cls, selector) : NULL;
+    Dl_info here = {0};
+    Dl_info there = {0};
+    return method && dladdr((const void*)&tourHookedHere, &here) &&
+           dladdr((const void*)method_getImplementation(method), &there) && here.dli_fbase == there.dli_fbase;
+}
+
+// Twitter's t.co click count and safety check, asked for a t.co link the way Twitter asks
+// them, and only while the tweak's hooks are in place: their answer comes back, nothing
+// is sent.
+static void tourAskTcoRequests(void) {
+    Class talon = NSClassFromString(@"TNUTalonUtilities");
+    SEL count = NSSelectorFromString(@"sendTalonRequestForAnalytics:");
+    SEL check = NSSelectorFromString(@"verifyTalonURL:completion:");
+    BOOL countHooked = tourHookedHere(talon, count);
+    BOOL checkHooked = tourHookedHere(talon, check);
+    if (!countHooked || !checkHooked) {
+        PFBCompatTourLog(@"[tour] t.co check: not asked, click count %@, safety check %@",
+                         countHooked ? @"hooked" : @"not hooked", checkHooked ? @"hooked" : @"not hooked");
+        return;
+    }
+    NSURL* link = [NSURL URLWithString:@"https://t.co/pfbtour"];
+    BOOL sent = ((BOOL (*)(id, SEL, id))objc_msgSend)(talon, count, link);
+    ((id (*)(id, SEL, id, id))objc_msgSend)(talon, check, link, nil);
+    PFBCompatTourLog(@"[tour] t.co check: click count %@, safety check answered by the tweak",
+                     sent ? @"sent" : @"not sent");
+}
+
 // Twitter's own color settings: its palette decides dark mode, not the window's style.
 static id tourColorSettings(void) {
     Class settings = NSClassFromString(@"TAEColorSettings");
@@ -2032,6 +2064,13 @@ static NSArray<NSDictionary*>* tourAllSteps(void) {
            }, nil, ^{
              tourDismissPresented();
            })];
+    [steps addObject:tourStep(@"t.co check", @"t.co block", root, ^{
+             tourAttempt(@"t.co check", @"asking", ^{
+               tourAskTcoRequests();
+             });
+           }, ^BOOL(UIViewController* before, UIViewController* after) {
+             return PFBCompatPathReached(PFBCompatPath_tco_requests);
+           }, nil, nil)];
     __block BOOL tabBarLogged = NO;
     // Given the proof wait even when nothing is owed, so a slow opening still shows.
     [steps addObject:tourStepWaiting(kPFBTourProofWait, tourStep(@"Twitter settings", @"Twitter settings", root, ^{
