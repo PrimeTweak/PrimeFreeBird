@@ -224,6 +224,8 @@ grokEditImageButtonConfiguration:(id)configuration;
 
 @interface T1SafariViewController : SFSafariViewController
 @property (nonatomic, readonly) NSURL* rootURL;
+@property (nonatomic, readonly) NSURL* verifiableTalonURL;
+- (void)_t1_verifyTalonURLIfNecessary;
 @end
 
 #pragma mark - Timeline trends

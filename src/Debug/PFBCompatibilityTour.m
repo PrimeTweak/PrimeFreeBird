@@ -1010,6 +1010,37 @@ static void tourShowTweetInteractions(void) {
                      NSStringFromClass([stack class]));
 }
 
+// The first Tweet's edit history, built by the factory its "Last edited" link uses,
+// without showing it.
+static void tourBuildEditHistory(void) {
+    id account = tourGetter(UIApplication.sharedApplication.delegate, @"_t1_currentAccount");
+    Class factory = NSClassFromString(@"T1EditHistoryViewControllerFactory");
+    SEL build = NSSelectorFromString(@"viewControllerWithAccount:tweetID:scribeContext:");
+    NSMethodSignature* signature = [factory respondsToSelector:build] ? [factory methodSignatureForSelector:build] : nil;
+    BOOL buildable = signature.numberOfArguments == 5 && signature.methodReturnType[0] == '@' &&
+                     [signature getArgumentTypeAtIndex:2][0] == '@' &&
+                     strcmp([signature getArgumentTypeAtIndex:3], @encode(unsigned long long)) == 0 &&
+                     [signature getArgumentTypeAtIndex:4][0] == '@';
+    Class scribeClass = NSClassFromString(@"TFSTwitterScribeContext");
+    SEL makeScribe = NSSelectorFromString(@"scribeContextWithPage:");
+    id scribe = [scribeClass respondsToSelector:makeScribe]
+                    ? ((id (*)(id, SEL, id))objc_msgSend)(scribeClass, makeScribe, @"tweet")
+                    : nil;
+    NSInteger statusID = NSNotFound;
+    NSInteger authorID = NSNotFound;
+    BOOL found = tourFirstTweetIDs(&statusID, &authorID);
+    if (!buildable || !scribe || !found || ![account isKindOfClass:NSClassFromString(@"TFNTwitterAccount")]) {
+        PFBCompatTourLog(@"[tour] edit history: factory %@, scribe %@, Tweet %@, account %@",
+                         buildable ? @"usable" : @"not usable", scribe ? @"made" : @"not made",
+                         found ? @"read" : @"not found", account ? NSStringFromClass([account class]) : @"none");
+        return;
+    }
+    id history = ((id (*)(id, SEL, id, unsigned long long, id))objc_msgSend)(factory, build, account,
+                                                                            (unsigned long long)statusID, scribe);
+    PFBCompatTourLog(@"[tour] edit history: built (%@)",
+                     history ? NSStringFromClass([history class]) : @"none");
+}
+
 // Why a conversation row may be unread, or nil when it reads as read. Opening an
 // unread one would send a read receipt, so a row that says nothing is left alone too.
 static NSString* tourUnreadMark(UIView* cell) {
@@ -1636,6 +1667,13 @@ static NSArray<NSDictionary*>* tourAllSteps(void) {
            }, nil, ^{
              tourPopToRoot();
            })];
+    [steps addObject:tourStep(@"edit history", @"Edit history", home, ^{
+             tourAttempt(@"edit history", @"building it", ^{
+               tourBuildEditHistory();
+             });
+           }, ^BOOL(UIViewController* before, UIViewController* after) {
+             return PFBCompatPathReached(PFBCompatPath_verified_edit_history);
+           }, nil, nil)];
     [steps addObject:tourStep(@"own profile", @"Your profile", root, ^{
              tourOpenOwnProfile();
            }, ^BOOL(UIViewController* before, UIViewController* after) {

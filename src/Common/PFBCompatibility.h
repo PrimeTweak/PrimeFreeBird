@@ -180,12 +180,9 @@ FOUNDATION_EXPORT void PFBCompatObserve(PFBCompatOption option, NSString* detail
 // Paths of options that act in more than one place. Each is noted when reached,
 // whether the option is on or off, and the report names the ones not seen.
 typedef NS_ENUM(NSInteger, PFBCompatPath) {
-    PFBCompatPath_grok_bot_sidebar,
     PFBCompatPath_grok_bot_upsells,
-    PFBCompatPath_grok_bot_home_header,
-    PFBCompatPath_grok_bot_home_hero,
-    PFBCompatPath_grok_bot_preset,
-    PFBCompatPath_grok_bot_tab_icon,
+    PFBCompatPath_grok_bot_post_banner,
+    PFBCompatPath_grok_bot_reply_banner,
     PFBCompatPath_tab_bar,
     PFBCompatPath_native_tab_bar,
     PFBCompatPath_top_tab_underline,

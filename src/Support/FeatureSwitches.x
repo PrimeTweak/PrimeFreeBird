@@ -44,30 +44,34 @@ static BOOL AccountIsGenuinelyPremium(void) {
 
 // MARK: - Feature switch overrides
 
-// The Grok Bot promotion a switch drives, or PFBCompatPathCount for any other key.
-static PFBCompatPath pfbGrokBotPath(NSString* key) {
+// Whether a switch drives a Grok Bot promotion, and the path it proves. Twitter reads
+// the switch of a placement (side menu row, home header and hero, presets, tab icon)
+// only once the upsells switch is on, so those prove nothing of their own.
+static BOOL pfbGrokBotSwitch(NSString* key, PFBCompatPath* path) {
     if (![key hasPrefix:@"grok_ios_grok_bot_"]) {
-        return PFBCompatPathCount;
+        return NO;
     }
-    if ([key isEqualToString:@"grok_ios_grok_bot_sidebar_enabled"]) {
-        return PFBCompatPath_grok_bot_sidebar;
+    static NSDictionary<NSString*, NSNumber*>* paths;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+      NSNumber* none = @(PFBCompatPathCount);
+      paths = @{
+          @"grok_ios_grok_bot_upsells_enabled": @(PFBCompatPath_grok_bot_upsells),
+          @"grok_ios_grok_bot_post_cta_enabled": @(PFBCompatPath_grok_bot_post_banner),
+          @"grok_ios_grok_bot_reply_cta_enabled": @(PFBCompatPath_grok_bot_reply_banner),
+          @"grok_ios_grok_bot_sidebar_enabled": none,
+          @"grok_ios_grok_bot_home_header_enabled": none,
+          @"grok_ios_grok_bot_home_hero_enabled": none,
+          @"grok_ios_grok_bot_preset_enabled": none,
+          @"grok_ios_grok_bot_tab_icon_enabled": none,
+      };
+    });
+    NSNumber* found = paths[key];
+    if (!found) {
+        return NO;
     }
-    if ([key isEqualToString:@"grok_ios_grok_bot_upsells_enabled"]) {
-        return PFBCompatPath_grok_bot_upsells;
-    }
-    if ([key isEqualToString:@"grok_ios_grok_bot_home_header_enabled"]) {
-        return PFBCompatPath_grok_bot_home_header;
-    }
-    if ([key isEqualToString:@"grok_ios_grok_bot_home_hero_enabled"]) {
-        return PFBCompatPath_grok_bot_home_hero;
-    }
-    if ([key isEqualToString:@"grok_ios_grok_bot_preset_enabled"]) {
-        return PFBCompatPath_grok_bot_preset;
-    }
-    if ([key isEqualToString:@"grok_ios_grok_bot_tab_icon_enabled"]) {
-        return PFBCompatPath_grok_bot_tab_icon;
-    }
-    return PFBCompatPathCount;
+    *path = (PFBCompatPath)found.integerValue;
+    return YES;
 }
 
 static NSNumber* FeatureSwitchOverrideValueForKey(NSString* key) {
@@ -90,11 +94,13 @@ static NSNumber* FeatureSwitchOverrideValueForKey(NSString* key) {
         return [PFBSettings boolForKey:@"enable_liquid_glass"] ? @YES : nil;
     }
 
-    // Grok Bot, a separate app, is promoted from the side menu row, the home header
-    // and hero, the presets, the tab icon and the upsells, each behind its own switch.
-    PFBCompatPath grokBotPath = pfbGrokBotPath(key);
-    if (grokBotPath != PFBCompatPathCount) {
-        PFBCompatReach(grokBotPath);
+    // Grok Bot, a separate app, is promoted from the side menu, the home timeline, the
+    // presets, the tab icon and banners under posts and replies, each behind its own switch.
+    PFBCompatPath grokBotPath = PFBCompatPathCount;
+    if (pfbGrokBotSwitch(key, &grokBotPath)) {
+        if (grokBotPath != PFBCompatPathCount) {
+            PFBCompatReach(grokBotPath);
+        }
         if ([PFBSettings boolForKey:@"hide_grok_bot"]) {
             PFBCOMPAT_ACTION(PFBCompat_hide_grok_bot, @"Grok Bot promotion off");
             return @NO;
@@ -247,10 +253,9 @@ static NSNumber* FeatureSwitchOverrideValueForKey(NSString* key) {
         return @YES;
     }
 
-    // Grok creation surfaces: composer buttons, imagine menus and CTAs, Edit with
-    // Grok on photo posts, and the immersive player's create-your-own button.
+    // Grok creation surfaces: the composer's Grok and Imagine entries, Imagine menus on
+    // media, Edit with Grok on photo posts and the Imagine call to action.
     if ([key isEqualToString:@"ios_composer_grok_button_enabled"] ||
-        [key isEqualToString:@"grok_imagine_composer_enabled"] ||
         [key isEqualToString:@"grok_composer_imagine_is_enabled"] ||
         [key isEqualToString:
                  @"grok_composer_attachment_imagine_menu_is_enabled"] ||
@@ -259,11 +264,7 @@ static NSNumber* FeatureSwitchOverrideValueForKey(NSString* key) {
         [key
             isEqualToString:@"grok_timeline_slideshow_imagine_menu_is_enabled"] ||
         [key isEqualToString:@"grok_ios_edit_photo_post_button_enabled"] ||
-        [key isEqualToString:@"grok_ios_imagine_cta_focal_enabled"] ||
-        [key isEqualToString:@"grok_ios_imagine_cta_reply_enabled"] ||
-        [key isEqualToString:@"grok_ios_imagine_cta_timeline_enabled"] ||
-        [key isEqualToString:@"grok_ios_imagine_2_cta_enabled"] ||
-        [key isEqualToString:@"grok_immersive_create_own_button_enabled"]) {
+        [key isEqualToString:@"grok_ios_imagine_2_cta_enabled"]) {
         if ([PFBSettings boolForKey:@"hide_grok_create"]) {
             PFBCOMPAT_ACTION(PFBCompat_hide_grok_create, @"Grok creation tool off");
             return @NO;
