@@ -26,6 +26,11 @@
         [self.contentView addSubview:self.subtitleLabel];
         self.toggleSwitch = [PFBTintedSwitch new];
         self.toggleSwitch.translatesAutoresizingMaskIntoConstraints = NO;
+        // The switch keeps its size; a title or description too long for the row wraps.
+        [self.toggleSwitch setContentCompressionResistancePriority:UILayoutPriorityRequired
+                                                           forAxis:UILayoutConstraintAxisHorizontal];
+        [self.toggleSwitch setContentHuggingPriority:UILayoutPriorityRequired
+                                             forAxis:UILayoutConstraintAxisHorizontal];
         [self.contentView addSubview:self.toggleSwitch];
         self.pillButton = [UIButton buttonWithType:UIButtonTypeSystem];
         self.pillButton.translatesAutoresizingMaskIntoConstraints = NO;

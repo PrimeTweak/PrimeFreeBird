@@ -589,15 +589,17 @@ static void pfbAdvCollapseNativeInSearchBar(UIView* bar) {
 
 %end
 
-// Draws the Explore Filters glyph, and its tint, in the gray of the owner's appearance.
+// Draws the Explore Filters glyph in the gray of the owner's appearance.
 static void pfbAdvPaintExploreButton(UIViewController* owner, UIBarButtonItem* button) {
     UIColor* gray = PFBBarIconGray(owner.traitCollection);
     UIColor* painted = objc_getAssociatedObject(button, kPFBAdvSearchGrayKey);
     if (painted && [painted isEqual:gray]) {
         return;
     }
-    button.image = PFBSlidersGlyph(kPFBFiltersSide, gray);
-    button.tintColor = gray;
+    PFBBarGlyphButton* view = (PFBBarGlyphButton*)button.customView;
+    if ([view isKindOfClass:[PFBBarGlyphButton class]]) {
+        view.glyph = PFBSlidersGlyph(kPFBFiltersSide, gray);
+    }
     objc_setAssociatedObject(button, kPFBAdvSearchGrayKey, gray, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
 }
 
@@ -642,6 +644,7 @@ static void pfbAdvWatchExploreStyle(UIViewController* owner) {
             // Toggle off: the Filters button a previous appearance added is removed, so the
             // setting applies live on the next visit.
             if (existingBtn) {
+                PFBBarUnpairNeighbor(existingBtn, item.rightBarButtonItems);
                 NSMutableArray* items =
                     [item.rightBarButtonItems mutableCopy] ?: [NSMutableArray array];
                 [items removeObject:existingBtn];
@@ -659,7 +662,11 @@ static void pfbAdvWatchExploreStyle(UIViewController* owner) {
             pfbAdvPaintExploreButton(owner, btn);
         } else {
             UIColor* gray = PFBBarIconGray(owner.traitCollection);
-            btn = PFBFiltersButton(self, @selector(pfbShowAdvancedSearch), gray);
+            // Paired with the gear beside it below, as the Notifications eye is.
+            btn = PFBBarGlyphItem(
+                PFBSlidersGlyph(kPFBFiltersSide, gray),
+                [[PFBBundle sharedBundle] localizedStringForKey:@"ADVANCED_SEARCH_TITLE"],
+                self, @selector(pfbShowAdvancedSearch));
             objc_setAssociatedObject(btn, kPFBAdvSearchGrayKey, gray,
                                      OBJC_ASSOCIATION_RETAIN_NONATOMIC);
             objc_setAssociatedObject(self, kPFBAdvSearchBtnKey, btn,
@@ -672,6 +679,7 @@ static void pfbAdvWatchExploreStyle(UIViewController* owner) {
             item.rightBarButtonItems = [existing arrayByAddingObject:btn];
         }
         if ([item.rightBarButtonItems containsObject:btn]) {
+            PFBBarPairWithNeighbor(btn, item.rightBarButtonItems, @"Explore");
             PFBCOMPAT_ACTION(PFBCompat_advanced_search, @"Advanced search button in Explore");
         }
     } @catch (id e) {

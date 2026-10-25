@@ -7,7 +7,8 @@
 #import "Features/Timelines/PFBMutedWordsStyle.h"
 #import "Features/Timelines/PFBMutedAddCell.h"
 #import "Features/Timelines/PFBMutedTermCell.h"
-#import "Features/Timelines/PFBMutedToggleCell.h"
+#import "Settings/PFBModernSettingsToggleCell.h"
+#import "Settings/PFBTintedSwitch.h"
 
 // A language row's own height, so the switch is spaced like one more entry.
 static const CGFloat kPFBTranslateBarHeight = 51.0;
@@ -181,7 +182,7 @@ static NSMutableArray<NSString*>* PFBKeptLanguageList(void) {
     // A self-sizing footer needs an estimate, or the table collapses it.
     self.tableView.estimatedSectionFooterHeight = 44.0;
     [self.tableView registerClass:[PFBMutedAddCell class] forCellReuseIdentifier:@"add"];
-    [self.tableView registerClass:[PFBMutedToggleCell class] forCellReuseIdentifier:@"opt"];
+    [self.tableView registerClass:[PFBModernSettingsToggleCell class] forCellReuseIdentifier:@"opt"];
     [self.tableView registerClass:[PFBMutedTermCell class] forCellReuseIdentifier:@"term"];
     self.languageCodes = PFBLanguageCatalog();
     if (!self.othersOnly) {
@@ -278,7 +279,7 @@ static NSMutableArray<NSString*>* PFBKeptLanguageList(void) {
     label.textColor = [UIColor labelColor];
     label.translatesAutoresizingMaskIntoConstraints = NO;
 
-    UISwitch* toggle = [[UISwitch alloc] init];
+    UISwitch* toggle = [PFBTintedSwitch new];
     toggle.on =
         ![[NSUserDefaults standardUserDefaults] boolForKey:@"disable_auto_translate"];
     [toggle addTarget:self
@@ -747,22 +748,21 @@ static NSMutableArray<NSString*>* PFBKeptLanguageList(void) {
         UIColor* accent = PFBCurrentAccentColor() ?: self.view.tintColor;
 
         if ([self rowIsTranslate:indexPath.row]) {
-            PFBMutedToggleCell* cell =
+            PFBModernSettingsToggleCell* cell =
                 [tableView dequeueReusableCellWithIdentifier:@"opt"
                                                 forIndexPath:indexPath];
-            cell.titleLabel2.text =
-                [bundle localizedStringForKey:@"LANGUAGES_TRANSLATE_TITLE"];
-            cell.subtitleLabel.text =
-                [bundle localizedStringForKey:@"LANGUAGES_TRANSLATE_DETAIL"];
-            cell.toggle.tag = NSIntegerMax;
-            cell.toggle.on =
+            cell.backgroundColor = [UIColor clearColor];
+            [cell configureWithTitle:[bundle localizedStringForKey:@"LANGUAGES_TRANSLATE_TITLE"]
+                            subtitle:[bundle localizedStringForKey:@"LANGUAGES_TRANSLATE_DETAIL"]];
+            cell.toggleSwitch.tag = NSIntegerMax;
+            cell.toggleSwitch.on =
                 ![[NSUserDefaults standardUserDefaults] boolForKey:@"disable_auto_translate"];
-            [cell.toggle removeTarget:nil
-                               action:NULL
-                     forControlEvents:UIControlEventValueChanged];
-            [cell.toggle addTarget:self
-                            action:@selector(translateChanged:)
-                  forControlEvents:UIControlEventValueChanged];
+            [cell.toggleSwitch removeTarget:nil
+                                     action:NULL
+                           forControlEvents:UIControlEventValueChanged];
+            [cell.toggleSwitch addTarget:self
+                                  action:@selector(translateChanged:)
+                        forControlEvents:UIControlEventValueChanged];
             return cell;
         }
 
@@ -904,8 +904,9 @@ static NSMutableArray<NSString*>* PFBKeptLanguageList(void) {
         return cell;
     }
 
-    PFBMutedToggleCell* cell = [tableView dequeueReusableCellWithIdentifier:@"opt"
-                                                              forIndexPath:indexPath];
+    PFBModernSettingsToggleCell* cell = [tableView dequeueReusableCellWithIdentifier:@"opt"
+                                                                       forIndexPath:indexPath];
+    cell.backgroundColor = [UIColor clearColor];
     struct {
         __unsafe_unretained NSString* titleKey;
         __unsafe_unretained NSString* detailKey;
@@ -925,17 +926,17 @@ static NSMutableArray<NSString*>* PFBKeptLanguageList(void) {
     if (index >= sizeof(options) / sizeof(options[0])) {
         index = 0;
     }
-    cell.titleLabel2.text = [bundle localizedStringForKey:options[index].titleKey];
-    cell.subtitleLabel.text = [bundle localizedStringForKey:options[index].detailKey];
-    cell.toggle.tag = (NSInteger)index;
+    [cell configureWithTitle:[bundle localizedStringForKey:options[index].titleKey]
+                    subtitle:[bundle localizedStringForKey:options[index].detailKey]];
+    cell.toggleSwitch.tag = (NSInteger)index;
     NSUserDefaults* d = [NSUserDefaults standardUserDefaults];
-    cell.toggle.on = ([d objectForKey:options[index].prefKey] == nil)
-                         ? options[index].defaultOn
-                         : [d boolForKey:options[index].prefKey];
-    [cell.toggle removeTarget:nil action:NULL forControlEvents:UIControlEventValueChanged];
-    [cell.toggle addTarget:self
-                    action:@selector(toggleChanged:)
-          forControlEvents:UIControlEventValueChanged];
+    cell.toggleSwitch.on = ([d objectForKey:options[index].prefKey] == nil)
+                               ? options[index].defaultOn
+                               : [d boolForKey:options[index].prefKey];
+    [cell.toggleSwitch removeTarget:nil action:NULL forControlEvents:UIControlEventValueChanged];
+    [cell.toggleSwitch addTarget:self
+                          action:@selector(toggleChanged:)
+                forControlEvents:UIControlEventValueChanged];
     return cell;
 }
 

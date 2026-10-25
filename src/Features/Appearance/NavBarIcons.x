@@ -1,4 +1,5 @@
-// Navigation bar repairs: glyph colors, button glass, reply bar glass, height damping.
+// Navigation bar repairs: glyph colors, button glass, icons beside the gear, reply bar
+// glass, height damping.
 
 #import "Support/HookHelpers.h"
 #import "Debug/PFBDebugger.h"
@@ -20,6 +21,11 @@ static const void* kPFBPaintedFlagKey = &kPFBPaintedFlagKey;
 // is too late, so every route that could lower it is refused as it is used: the
 // alpha, the layer's opacity and the animation.
 static const void* kPFBNoFadeKey = &kPFBNoFadeKey;
+
+@interface PFBBarGlyphButton ()
+- (void)pfbPairWith:(UIView*)neighbor screen:(NSString*)screen;
+- (void)pfbPaintIn:(UIColor*)color;
+@end
 
 UIImage* PFBPaintedGlyph(UIImage* source, UIColor* color) {
     UIImage* painted = PFBFlatGlyph(source, color);
@@ -219,6 +225,10 @@ static void pfbRepaintNotificationsGear(UIView* bar, UIColor* color) {
     }
     UINavigationItem* item = ((id (*)(id, SEL))objc_msgSend)(bar, @selector(topItem));
     for (UIBarButtonItem* button in item.rightBarButtonItems) {
+        if ([button.customView isKindOfClass:[PFBBarGlyphButton class]]) {
+            [(PFBBarGlyphButton*)button.customView pfbPaintIn:color];
+            continue;
+        }
         if (button.title.length > 0 || !button.image) {
             continue;
         }
@@ -792,6 +802,246 @@ static BOOL pfbIsRightHandGlyphButton(UIView* button) {
     return CGRectGetMidX(inBar) > CGRectGetWidth(bar.bounds) * 0.6;
 }
 
+// MARK: - icons beside a Twitter glyph button
+
+// Holds a view without keeping it alive, for an association.
+@interface PFBWeakView : NSObject
+@property (nonatomic, weak) UIView* view;
+@end
+
+@implementation PFBWeakView
+@end
+
+// On a Twitter glyph button: the PFBBarGlyphButton laid out again after it.
+static const void* kPFBBarPartnerKey = &kPFBBarPartnerKey;
+// On a Twitter bar item: set when it was asked to share the bar's background.
+static const void* kPFBBarSharedKey = &kPFBBarSharedKey;
+
+// Where a button draws its glyph, in its own coordinates: its first image view, narrowed
+// to the drawn image where the view is wider. CGRectNull when there is none.
+static CGRect pfbGlyphRectIn(UIView* button) {
+    __block UIImageView* found = nil;
+    PFBEnumerateSubviewsRecursively(button, ^(UIView* view) {
+        if (!found && [view isKindOfClass:[UIImageView class]] &&
+            ((UIImageView*)view).image && CGRectGetWidth(view.bounds) >= 1.0) {
+            found = (UIImageView*)view;
+        }
+    });
+    if (!found) {
+        return CGRectNull;
+    }
+    CGRect frame = [found convertRect:found.bounds toView:button];
+    CGSize image = found.image.size;
+    UIViewContentMode mode = found.contentMode;
+    CGFloat drawn = CGRectGetWidth(frame);
+    if (mode == UIViewContentModeScaleAspectFit && image.height > 0.0) {
+        drawn = MIN(drawn, CGRectGetHeight(frame) * image.width / image.height);
+    } else if (mode >= UIViewContentModeCenter) {
+        drawn = MIN(drawn, image.width);
+    }
+    CGFloat slack = CGRectGetWidth(frame) - drawn;
+    BOOL left = mode == UIViewContentModeLeft || mode == UIViewContentModeTopLeft ||
+                mode == UIViewContentModeBottomLeft;
+    BOOL right = mode == UIViewContentModeRight || mode == UIViewContentModeTopRight ||
+                 mode == UIViewContentModeBottomRight;
+    frame.origin.x += left ? 0.0 : (right ? slack : slack / 2.0);
+    frame.size.width = drawn;
+    return frame;
+}
+
+@implementation PFBBarGlyphButton {
+    UIImageView* _glyphView;
+    UIImage* _source;
+    UIColor* _paintedColor;
+    __weak UIView* _neighbor;
+    NSString* _screen;
+    NSString* _lastLine;
+}
+
+- (instancetype)initWithFrame:(CGRect)frame {
+    self = [super initWithFrame:frame];
+    if (self) {
+        _glyphView = [[UIImageView alloc] init];
+        _glyphView.userInteractionEnabled = NO;
+        [self addSubview:_glyphView];
+        self.isAccessibilityElement = YES;
+        self.accessibilityTraits = UIAccessibilityTraitButton;
+    }
+    return self;
+}
+
+- (UIImage*)glyph {
+    return _glyphView.image;
+}
+
+- (void)setGlyph:(UIImage*)glyph {
+    _source = glyph;
+    _paintedColor = nil;
+    _glyphView.image = glyph;
+    self.largeContentImage = glyph;
+    [self setNeedsLayout];
+}
+
+// The glyph last given, painted in `color`, once per color.
+- (void)pfbPaintIn:(UIColor*)color {
+    if (!color || !_source || [color isEqual:_paintedColor]) {
+        return;
+    }
+    _paintedColor = color;
+    _glyphView.image = PFBPaintedGlyph(_source, color);
+}
+
+- (CGRect)glyphFrame {
+    return _glyphView.frame;
+}
+
+- (CGSize)intrinsicContentSize {
+    return CGSizeMake(44.0, 44.0);
+}
+
+// Pressed or disabled, the glyph dims to the alpha of Twitter's own bar buttons.
+- (void)setHighlighted:(BOOL)highlighted {
+    [super setHighlighted:highlighted];
+    _glyphView.alpha = (highlighted || !self.enabled) ? 0.35 : 1.0;
+}
+
+- (void)setEnabled:(BOOL)enabled {
+    [super setEnabled:enabled];
+    _glyphView.alpha = (self.highlighted || !enabled) ? 0.35 : 1.0;
+}
+
+- (void)pfbPairWith:(UIView*)neighbor screen:(NSString*)screen {
+    _neighbor = neighbor;
+    _screen = [screen copy];
+    [self setNeedsLayout];
+}
+
+// The neighbor's glyph can only be measured once both buttons are on screen.
+- (void)didMoveToWindow {
+    [super didMoveToWindow];
+    [self setNeedsLayout];
+}
+
+// Centered in its slot when the neighbor's slot hugs its glyph; otherwise moved toward
+// the neighbor by the empty part of that slot, up to the edge of its own.
+- (void)layoutSubviews {
+    [super layoutSubviews];
+    CGSize box = self.bounds.size;
+    CGSize size = _glyphView.image.size;
+    CGFloat room = MAX(0.0, (box.width - size.width) / 2.0);
+    CGFloat shift = 0.0;
+    UIView* neighbor = _neighbor;
+    BOOL shown = neighbor.window && neighbor.window == self.window;
+    CGRect glyph = shown ? pfbGlyphRectIn(neighbor) : CGRectNull;
+    if (!CGRectIsNull(glyph)) {
+        CGFloat mine = [self convertPoint:CGPointMake(box.width / 2.0, 0.0) toView:nil].x;
+        CGFloat theirs =
+            [neighbor convertPoint:CGPointMake(CGRectGetMidX(neighbor.bounds), 0.0) toView:nil].x;
+        BOOL towardRight = theirs > mine;
+        CGFloat empty = MAX(0.0, towardRight
+                                     ? CGRectGetMinX(glyph)
+                                     : CGRectGetWidth(neighbor.bounds) - CGRectGetMaxX(glyph));
+        shift = MIN(empty, room) * (towardRight ? 1.0 : -1.0);
+    }
+    CGFloat scale = MAX(1.0, self.traitCollection.displayScale);
+    CGFloat x = round((room + shift) * scale) / scale;
+    CGFloat y = round((box.height - size.height) / 2.0 * scale) / scale;
+    _glyphView.frame = CGRectMake(x, y, size.width, size.height);
+    if (!CGRectIsNull(glyph)) {
+        CGFloat ours = [self convertPoint:CGPointMake(CGRectGetMidX(_glyphView.frame), 0.0) toView:nil].x;
+        CGFloat theirs = [neighbor convertPoint:CGPointMake(CGRectGetMidX(glyph), 0.0) toView:nil].x;
+        [self pfbNote:[NSString stringWithFormat:@"neighbor slot %.0f pt, glyph moved %.0f pt, glyph centers %.0f pt apart",
+                                                 CGRectGetWidth(neighbor.bounds), fabs(shift), fabs(theirs - ours)]];
+    } else if (shown) {
+        [self pfbNote:@"neighbor's glyph not found"];
+    }
+}
+
+// One line per change, under MEASUREMENTS.
+- (void)pfbNote:(NSString*)text {
+    NSString* line = [NSString stringWithFormat:@"%@: %@", _screen ?: @"?", text];
+    if ([line isEqualToString:_lastLine]) {
+        return;
+    }
+    _lastLine = line;
+    PFB_PROBE(@"bar icons", 12, @"%@", line);
+}
+
+@end
+
+UIBarButtonItem* PFBBarGlyphItem(UIImage* glyph, NSString* label, id target, SEL action) {
+    PFBBarGlyphButton* button =
+        [[PFBBarGlyphButton alloc] initWithFrame:CGRectMake(0.0, 0.0, 44.0, 44.0)];
+    button.glyph = glyph;
+    button.accessibilityLabel = label;
+    button.showsLargeContentViewer = YES;
+    button.largeContentTitle = label;
+    [button addTarget:target action:action forControlEvents:UIControlEventTouchUpInside];
+    UIBarButtonItem* item = [[UIBarButtonItem alloc] initWithCustomView:button];
+    item.accessibilityLabel = label;
+    SEL hideShared = pfbHideSharedSelector();
+    if ([item respondsToSelector:hideShared]) {
+        ((void (*)(id, SEL, BOOL))objc_msgSend)(item, hideShared, YES);
+    }
+    return item;
+}
+
+void PFBBarPairWithNeighbor(UIBarButtonItem* ours, NSArray<UIBarButtonItem*>* items, NSString* screen) {
+    PFBBarGlyphButton* button = (PFBBarGlyphButton*)ours.customView;
+    if (![button isKindOfClass:[PFBBarGlyphButton class]]) {
+        return;
+    }
+    // The first item further out, past any spaces Twitter inserts between items.
+    NSUInteger index = [items indexOfObjectIdenticalTo:ours];
+    UIBarButtonItem* neighbor = nil;
+    for (NSUInteger i = (index == NSNotFound ? 0 : index); i > 0 && !neighbor; i--) {
+        UIBarButtonItem* candidate = items[i - 1];
+        if (candidate.customView || candidate.image || candidate.title.length > 0) {
+            neighbor = candidate;
+        }
+    }
+    UIView* view = neighbor.customView;
+    if (![view isKindOfClass:[UIButton class]]) {
+        [button pfbPairWith:nil screen:screen];
+        PFB_PROBE(@"bar icons", 12, @"%@: no glyph button beside the icon", screen);
+        return;
+    }
+    PFBWeakView* partner = [PFBWeakView new];
+    partner.view = button;
+    objc_setAssociatedObject(view, kPFBBarPartnerKey, partner, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    [button pfbPairWith:view screen:screen];
+
+    // Only while its shared background is hidden, so sharing it draws nothing.
+    id hidden = nil;
+    @try {
+        hidden = [neighbor valueForKey:@"hidesSharedBackground"];
+    } @catch (id exception) {
+    }
+    SEL shares = NSSelectorFromString(@"setSharesBackground:");
+    BOOL asked = [hidden respondsToSelector:@selector(boolValue)] && [hidden boolValue] &&
+                 [neighbor respondsToSelector:shares];
+    if (asked) {
+        ((void (*)(id, SEL, BOOL))objc_msgSend)(neighbor, shares, YES);
+        objc_setAssociatedObject(neighbor, kPFBBarSharedKey, @YES, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    }
+    PFB_PROBE(@"bar icons", 12, @"%@: neighbor %@", screen,
+              asked ? @"asked to share the bar's background"
+                    : @"left as it was (background shown, or no such setting)");
+}
+
+void PFBBarUnpairNeighbor(UIBarButtonItem* ours, NSArray<UIBarButtonItem*>* items) {
+    for (UIBarButtonItem* item in items) {
+        if (item == ours || !objc_getAssociatedObject(item, kPFBBarSharedKey)) {
+            continue;
+        }
+        SEL shares = NSSelectorFromString(@"setSharesBackground:");
+        if ([item respondsToSelector:shares]) {
+            ((void (*)(id, SEL, BOOL))objc_msgSend)(item, shares, NO);
+        }
+        objc_setAssociatedObject(item, kPFBBarSharedKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    }
+}
+
 // The same treatment as Explore, reached from the other side: Notifications
 // builds its bar differently, so the gear is not found in the bar's subtree, but
 // the button class is the one Twitter uses everywhere.
@@ -835,6 +1085,9 @@ static BOOL pfbIsRightHandGlyphButton(UIView* button) {
 - (void)layoutSubviews {
     %orig;
     [self pfbGraySettingsGlyphIfNeeded];
+    // An icon paired with this button follows its glyph.
+    PFBWeakView* partner = objc_getAssociatedObject(self, kPFBBarPartnerKey);
+    [partner.view setNeedsLayout];
 }
 
 %end

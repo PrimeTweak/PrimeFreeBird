@@ -6,6 +6,8 @@
 @interface PFBModernSettingsCompactButtonCell ()
 @property (nonatomic, strong) NSArray<NSLayoutConstraint*>* singleLine;
 @property (nonatomic, strong) NSArray<NSLayoutConstraint*>* withDetail;
+@property (nonatomic, strong) NSLayoutConstraint* valueToChevron;
+@property (nonatomic, strong) NSLayoutConstraint* valueToEdge;
 @property (nonatomic, assign) BOOL opensMenu;
 @end
 
@@ -70,6 +72,12 @@
                                                                    constant:-16],
     ];
     [NSLayoutConstraint activateConstraints:self.singleLine];
+    // The value and its chevron sit on the title's line, as a switch does; without a
+    // chevron the value ends where the switches do.
+    self.valueToChevron = [self.subtitleLabel.trailingAnchor constraintEqualToAnchor:self.chevronImageView.leadingAnchor
+                                                                            constant:-16];
+    self.valueToEdge = [self.subtitleLabel.trailingAnchor constraintEqualToAnchor:self.contentView.trailingAnchor
+                                                                         constant:-10];
     [NSLayoutConstraint activateConstraints:@[
         [self.titleLabel.leadingAnchor constraintEqualToAnchor:self.contentView.leadingAnchor
                                                       constant:10],
@@ -79,13 +87,12 @@
         [self.subtitleLabel.leadingAnchor
             constraintGreaterThanOrEqualToAnchor:self.titleLabel.trailingAnchor
                                         constant:16],
-        [self.subtitleLabel.trailingAnchor constraintEqualToAnchor:self.chevronImageView.leadingAnchor
-                                                          constant:-16],
-        [self.subtitleLabel.centerYAnchor constraintEqualToAnchor:self.contentView.centerYAnchor],
+        self.valueToChevron,
+        [self.subtitleLabel.centerYAnchor constraintEqualToAnchor:self.titleLabel.centerYAnchor],
  
         [self.chevronImageView.trailingAnchor constraintEqualToAnchor:self.contentView.trailingAnchor
                                                              constant:-10],
-        [self.chevronImageView.centerYAnchor constraintEqualToAnchor:self.contentView.centerYAnchor],
+        [self.chevronImageView.centerYAnchor constraintEqualToAnchor:self.titleLabel.centerYAnchor],
         [self.chevronImageView.widthAnchor constraintEqualToConstant:18],
         [self.chevronImageView.heightAnchor constraintEqualToConstant:18]
     ]];
@@ -106,9 +113,11 @@
     self.selectionStyle = UITableViewCellSelectionStyleDefault;
 }
 
-// The chevron's place is kept, so a value without one lines up with the others.
 - (void)setShowsChevron:(BOOL)showsChevron {
     self.chevronImageView.hidden = !showsChevron;
+    self.valueToEdge.active = NO;
+    self.valueToChevron.active = showsChevron;
+    self.valueToEdge.active = !showsChevron;
 }
 
 - (void)setOpensMenu:(BOOL)opensMenu {

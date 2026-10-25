@@ -144,6 +144,25 @@ void PFBShowToast(UIWindow* window, NSString* text, void (^undo)(void));
 @interface PFBHitButton : UIButton
 @end
 
+// An icon placed beside one of Twitter's bar glyph buttons. Its glyph moves toward that
+// button by the empty part of the button's slot, as far as its own slot allows (NavBarIcons.x).
+@interface PFBBarGlyphButton : UIControl
+@property (nonatomic, strong) UIImage* glyph;
+@property (nonatomic, readonly) CGRect glyphFrame;
+@end
+
+// A bar item drawn as `glyph`, off the shared glass, sending `action` to `target` with its
+// PFBBarGlyphButton as the sender (NavBarIcons.x).
+UIBarButtonItem* PFBBarGlyphItem(UIImage* glyph, NSString* label, id target, SEL action);
+
+// Pairs `ours` with the glyph button just outside it among `items`, which is asked to share
+// the bar's background as Twitter's items did before its glass chrome (NavBarIcons.x).
+void PFBBarPairWithNeighbor(UIBarButtonItem* ours, NSArray<UIBarButtonItem*>* items, NSString* screen);
+
+// Gives back Twitter's own setting to every item among `items` asked to share the bar's
+// background, before `ours` leaves the bar (NavBarIcons.x).
+void PFBBarUnpairNeighbor(UIBarButtonItem* ours, NSArray<UIBarButtonItem*>* items);
+
 // The first view controller up a view's responder chain, or nil.
 UIViewController* PFBOwningController(UIView* view);
 // The same, with a navigation controller replaced by its top controller.

@@ -32,7 +32,7 @@
 "MODERN_SETTINGS_APPEARANCE_SUBTITLE" = "Stil, fontovi, boje i navigacijska traka.";
 
 /* ===== Appearance › Interface ===== */
-"CUSTOM_TAB_BAR_OPTION_TITLE" = "Kartice";
+"CUSTOM_TAB_BAR_OPTION_TITLE" = "Prilagodi kartice";
 "RESTORE_TAB_LABELS_TITLE" = "Oznake kartica";
 "RESTORE_TAB_LABELS_DETAIL" = "Prikaži oznake ispod ikona.";
 "CUSTOM_FONTS_TITLE" = "Prilagođeni fontovi";

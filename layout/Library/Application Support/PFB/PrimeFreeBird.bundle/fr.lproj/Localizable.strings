@@ -41,8 +41,7 @@
 
 /* ===== Appearance › Interface ===== */
 "APPEARANCE_GROUP_INTERFACE" = "Interface";
-"INTERFACE_STYLE_ROW_TITLE" = "Style";
-"INTERFACE_STYLE_TITLE" = "Style d’interface";
+"INTERFACE_STYLE_TITLE" = "Style visuel";
 "INTERFACE_STYLE_SUBTITLE" = "Choisissez entre Standard et Liquid Glass.";
 "HIDE_SCROLL_EDGE_BLUR_TITLE" = "Masquer le flou des barres";
 "HIDE_SCROLL_EDGE_BLUR_DETAIL" = "La bande floue qu’iOS dessine sous les barres du haut pendant le défilement.";
@@ -67,7 +66,7 @@
 "COLOR_TWITTER_ICON_IN_TOP_BAR_TITLE" = "Icône Twitter";
 "COLOR_TWITTER_ICON_IN_TOP_BAR_DETAIL" = "Applique la couleur d’accent à l’icône Twitter dans la barre du haut.";
 "APPEARANCE_GROUP_NAVIGATION" = "Barre de navigation";
-"CUSTOM_TAB_BAR_OPTION_TITLE" = "Onglets";
+"CUSTOM_TAB_BAR_OPTION_TITLE" = "Personnaliser les onglets";
 "CUSTOM_TAB_BAR_OPTION_SUBTITLE" = "Choisissez les onglets affichés et leur ordre.";
 "RESTORE_TAB_LABELS_TITLE" = "Étiquettes des onglets";
 "RESTORE_TAB_LABELS_DETAIL" = "Affiche les étiquettes sous les icônes.";

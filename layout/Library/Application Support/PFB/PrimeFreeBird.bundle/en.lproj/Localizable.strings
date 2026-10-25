@@ -45,8 +45,7 @@
 
 /* ===== Appearance › Interface ===== */
 "APPEARANCE_GROUP_INTERFACE" = "Interface";
-"INTERFACE_STYLE_ROW_TITLE" = "Style";
-"INTERFACE_STYLE_TITLE" = "Interface style";
+"INTERFACE_STYLE_TITLE" = "Visual style";
 "INTERFACE_STYLE_SUBTITLE" = "Choose between the Standard look and the Liquid Glass design.";
 "HIDE_SCROLL_EDGE_BLUR_TITLE" = "Hide top bar blur";
 "HIDE_SCROLL_EDGE_BLUR_DETAIL" = "The blurred band iOS draws under the top bars as you scroll.";
@@ -71,7 +70,7 @@
 "COLOR_TWITTER_ICON_IN_TOP_BAR_TITLE" = "Twitter icon";
 "COLOR_TWITTER_ICON_IN_TOP_BAR_DETAIL" = "Apply the accent color to the bird in the top bar.";
 "APPEARANCE_GROUP_NAVIGATION" = "Navigation bar";
-"CUSTOM_TAB_BAR_OPTION_TITLE" = "Tabs";
+"CUSTOM_TAB_BAR_OPTION_TITLE" = "Customize tabs";
 "CUSTOM_TAB_BAR_OPTION_SUBTITLE" = "Choose which tabs appear and in what order.";
 "RESTORE_TAB_LABELS_TITLE" = "Tab labels";
 "RESTORE_TAB_LABELS_DETAIL" = "Show labels under the icons.";

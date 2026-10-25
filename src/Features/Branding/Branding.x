@@ -417,8 +417,9 @@ static NSString* PillLabelText(void) {
 
 // MARK: - Classic compose button
 
-// Two pieces restore the bird-era Tweet button: the compose glyph is remapped to
-// the feather in white, and the FAB is painted Twitter blue, or the picked accent.
+// Two pieces restore the bird-era Tweet button: the compose glyph is swapped for the
+// feather in white where the button loads it, and the FAB is painted Twitter blue, or
+// the picked accent.
 
 static UIColor* PFBTwitterBlue(void) {
     return [UIColor colorWithRed:0x1D / 255.0
@@ -427,8 +428,8 @@ static UIColor* PFBTwitterBlue(void) {
                            alpha:1.0];
 }
 
-// "plus" is the pre-Liquid-Glass compose glyph; the redesign draws the FAB with one
-// of the compose vectors instead, so those are remapped as well.
+// "plus" is the pre-Liquid-Glass compose glyph; the redesign draws the button with one
+// of the compose vectors instead, so both kinds count.
 static BOOL isComposeGlyphName(id name) {
     static NSSet<NSString*>* composeGlyphs = nil;
     static dispatch_once_t once;
@@ -440,20 +441,18 @@ static BOOL isComposeGlyphName(id name) {
     return [name isKindOfClass:[NSString class]] && [composeGlyphs containsObject:name];
 }
 
-static BOOL isComposePlusGlyph(NSString* name) {
-    return isComposeGlyphName(name) && [PFBSettings boolForKey:@"restore_tweet_button"];
-}
+// The button's item view loads its glyph by name on the main thread, inside
+// _tfn_updateIcon; a compose glyph loaded there is noted, and swapped for the feather
+// with the option on. Other screens keep their compose and plus glyphs.
+static BOOL gPFBButtonIconLoading;
+static BOOL gPFBButtonComposeGlyph;
 
-// Set on each feather the remap returns, so the button can tell it received one.
-static char kPFBFeatherKey;
-static BOOL gPFBFeatherHandedOut;
-
-static id PFBRemappedFeather(id image) {
-    if (image) {
-        objc_setAssociatedObject(image, &kPFBFeatherKey, @YES, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-        gPFBFeatherHandedOut = YES;
+static BOOL pfbSwapsForFeather(id name) {
+    if (!gPFBButtonIconLoading || ![NSThread isMainThread] || !isComposeGlyphName(name)) {
+        return NO;
     }
-    return image;
+    gPFBButtonComposeGlyph = YES;
+    return [PFBSettings boolForKey:@"restore_tweet_button"];
 }
 
 // Every vector the app loads by name keeps that name on the image, keyed by the
@@ -470,9 +469,6 @@ static id PFBNamedVector(id image, id name) {
 %hook UIImage
 
 + (id)tfn_vectorImageNamed:(id)name fitsSize:(CGSize)size fillColor:(id)color {
-    if (isComposePlusGlyph(name)) {
-        return PFBRemappedFeather(%orig(@"feather", size, [UIColor whiteColor]));
-    }
     return PFBNamedVector(%orig(name, size, color), name);
 }
 
@@ -480,17 +476,38 @@ static id PFBNamedVector(id image, id name) {
     highContrastVariantNamed:(id)variant
                     fitsSize:(CGSize)size
                    fillColor:(id)color {
-    if (isComposePlusGlyph(name)) {
-        return PFBRemappedFeather(%orig(@"feather", variant, size, [UIColor whiteColor]));
-    }
     return PFBNamedVector(%orig(name, variant, size, color), name);
 }
 
 + (id)tfn_vectorImageNamed:(id)name height:(double)height fillColor:(id)color {
-    if (isComposePlusGlyph(name)) {
-        return PFBRemappedFeather(%orig(@"feather", height, [UIColor whiteColor]));
+    if (pfbSwapsForFeather(name)) {
+        return %orig(@"feather", height, [UIColor whiteColor]);
     }
     return PFBNamedVector(%orig(name, height, color), name);
+}
+
+%end
+
+@interface TFNExpandingButtonItemView : UIView
+- (void)_tfn_updateIcon;
+@end
+
+%hook TFNExpandingButtonItemView
+
+- (void)_tfn_updateIcon {
+    gPFBButtonIconLoading = YES;
+    gPFBButtonComposeGlyph = NO;
+    %orig;
+    gPFBButtonIconLoading = NO;
+    if (!gPFBButtonComposeGlyph) {
+        return;
+    }
+    PFBCompatReach(PFBCompatPath_feather);
+    if ([PFBSettings boolForKey:@"restore_tweet_button"]) {
+        PFBCOMPAT_ACTION(PFBCompat_restore_tweet_button, @"feather placed");
+    } else {
+        PFBCOMPAT_OBSERVE(PFBCompat_restore_tweet_button, @"Tweet button glyph read");
+    }
 }
 
 %end
@@ -579,33 +596,9 @@ static UIColor* PFBFABBlueColor(void) {
     return PFBTwitterBlue();
 }
 
-// The feather path is reached when the button's glyph is a remapped feather, or with
-// the option off, a compose glyph the remap would replace.
-static void pfbNoteFABGlyph(UIImage* image) {
-    if (image && objc_getAssociatedObject(image, &kPFBFeatherKey)) {
-        PFBCompatReach(PFBCompatPath_feather);
-        PFBCOMPAT_ACTION(PFBCompat_restore_tweet_button, @"feather placed");
-    }
-}
-
-static void pfbNoteComposeGlyph(UIView* fab) {
-    if (PFBCompatPathReached(PFBCompatPath_feather)) {
-        return;
-    }
-    // Hide Tweet button hides the button itself, so the walk enters hidden views.
-    PFBWalkAllSubviews(fab, 8, ^(UIView* sub) {
-        UIImage* image = [sub isKindOfClass:[UIImageView class]] ? ((UIImageView*)sub).image : nil;
-        if (image && isComposeGlyphName(objc_getAssociatedObject(
-                         image, @selector(tfn_vectorImageNamed:fitsSize:fillColor:)))) {
-            PFBCompatReach(PFBCompatPath_feather);
-        }
-    });
-}
-
 static void styleComposeFAB(UIView* fab) {
     if (![PFBSettings boolForKey:@"restore_tweet_button"]) {
         PFBCOMPAT_OBSERVE(PFBCompat_restore_tweet_button, @"Tweet button found");
-        pfbNoteComposeGlyph(fab);
         return;
     }
     PFBCOMPAT_ACTION(PFBCompat_restore_tweet_button, @"Tweet button restyled");
@@ -636,7 +629,6 @@ static void styleComposeFAB(UIView* fab) {
             if (!alreadyTagged && imageView.image) {
                 // First encounter: bake what is already there; every later
                 // assignment goes through the setter hook and arrives baked.
-                pfbNoteFABGlyph(imageView.image);
                 imageView.image = PFBWhiteBakedGlyph(imageView.image);
             }
             if (![imageView.tintColor isEqual:[UIColor whiteColor]]) {
@@ -775,28 +767,6 @@ static void pfbApplyComposeFABVisibility(UIView* fab) {
 
 %end
 
-// Measurement: remapped feathers that land outside the Tweet button, with the view and
-// the screen that hold them, one line per place.
-static void pfbProbeStrayFeather(UIImageView* view, UIImage* image, UIWindow* window) {
-    static NSMutableSet<NSString*>* seen;
-    if (!gPFBFeatherHandedOut || !image || seen.count >= 10 || !objc_getAssociatedObject(image, &kPFBFeatherKey) ||
-        !(window ?: view.window)) {
-        return;
-    }
-    UIViewController* owner = PFBOwningTopController(view);
-    NSString* line = [NSString stringWithFormat:@"%@ in %@",
-                                                view.superview ? NSStringFromClass([view.superview class]) : @"no superview",
-                                                owner ? NSStringFromClass([owner class]) : @"no controller"];
-    if (!seen) {
-        seen = [NSMutableSet set];
-    }
-    if ([seen containsObject:line]) {
-        return;
-    }
-    [seen addObject:line];
-    PFB_PROBE(@"feather outside the Tweet button", 8, @"%@", line);
-}
-
 // Twitter swaps the glyph image on an existing image view during tab transitions,
 // which the subview hook above does not cover. Only the FAB's glyphs and the
 // navigation bar's confirm glyph are touched.
@@ -819,7 +789,6 @@ static void pfbProbeStrayFeather(UIImageView* view, UIImage* image, UIWindow* wi
             objc_setAssociatedObject(self, &kPFBFABGlyphKey, @YES,
                                      OBJC_ASSOCIATION_RETAIN_NONATOMIC);
             if (self.image) {
-                pfbNoteFABGlyph(self.image);
                 self.image = PFBWhiteBakedGlyph(self.image);
             }
             self.tintColor = [UIColor whiteColor];
@@ -828,7 +797,6 @@ static void pfbProbeStrayFeather(UIImageView* view, UIImage* image, UIWindow* wi
         ancestor = ancestor.superview;
         depth++;
     }
-    pfbProbeStrayFeather(self, self.image, newWindow);
 }
 
 - (void)setImage:(UIImage*)image {
@@ -836,13 +804,10 @@ static void pfbProbeStrayFeather(UIImageView* view, UIImage* image, UIWindow* wi
     // A template glyph is only white while its tint survives; a baked one has
     // nothing left to lose.
     if (image && objc_getAssociatedObject(self, &kPFBFABGlyphKey)) {
-        pfbNoteFABGlyph(image);
         image = PFBWhiteBakedGlyph(image);
     } else if (image && objc_getAssociatedObject(self, &PFBConfirmGlyphTag) && PFBThemeScreenCount &&
                PFBAccentIsActive()) {
         image = PFBWhiteBakedGlyph(image);
-    } else if (gPFBFeatherHandedOut && image) {
-        pfbProbeStrayFeather(self, image, nil);
     }
     %orig(image);
 }

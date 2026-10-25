@@ -32,7 +32,7 @@
 "MODERN_SETTINGS_APPEARANCE_SUBTITLE" = "Стиль, шрифты, цвета и панель навигации.";
 
 /* ===== Appearance › Interface ===== */
-"CUSTOM_TAB_BAR_OPTION_TITLE" = "Вкладки";
+"CUSTOM_TAB_BAR_OPTION_TITLE" = "Настроить вкладки";
 "RESTORE_TAB_LABELS_TITLE" = "Подписи вкладок";
 "RESTORE_TAB_LABELS_DETAIL" = "Показывает подписи под значками.";
 "CUSTOM_FONTS_TITLE" = "Пользовательские шрифты";

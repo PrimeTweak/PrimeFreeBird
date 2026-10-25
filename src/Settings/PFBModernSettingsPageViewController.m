@@ -693,7 +693,8 @@ static NSURL* PFBAccountAvatarURL(TFNTwitterAccount* account) {
             PFBSyncAccentTheme();
         }
 
-        // Record activity is read once, at launch.
+        // Neither applies at once: Record activity is read at launch, and the Tweet
+        // button keeps its glyph until it loads its icon again.
         if ([key isEqualToString:@"restore_tweet_button"] || [key isEqualToString:@"debug_tools"]) {
             [self showRestartRequiredAlert];
         }

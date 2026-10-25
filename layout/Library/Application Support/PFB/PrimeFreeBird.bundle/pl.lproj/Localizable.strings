@@ -32,7 +32,7 @@
 "MODERN_SETTINGS_APPEARANCE_SUBTITLE" = "Styl, czcionki, kolory i pasek nawigacji.";
 
 /* ===== Appearance › Interface ===== */
-"CUSTOM_TAB_BAR_OPTION_TITLE" = "Karty";
+"CUSTOM_TAB_BAR_OPTION_TITLE" = "Dostosuj karty";
 "RESTORE_TAB_LABELS_TITLE" = "Etykiety kart";
 "RESTORE_TAB_LABELS_DETAIL" = "Pokazuje etykiety pod ikonami.";
 "CUSTOM_FONTS_TITLE" = "Własne czcionki";

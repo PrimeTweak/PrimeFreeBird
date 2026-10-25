@@ -32,7 +32,7 @@
 "MODERN_SETTINGS_APPEARANCE_SUBTITLE" = "Stil, typsnitt, färger och navigeringsfält.";
 
 /* ===== Appearance › Interface ===== */
-"CUSTOM_TAB_BAR_OPTION_TITLE" = "Flikar";
+"CUSTOM_TAB_BAR_OPTION_TITLE" = "Anpassa flikar";
 "RESTORE_TAB_LABELS_TITLE" = "Fliketiketter";
 "RESTORE_TAB_LABELS_DETAIL" = "Visa etiketter under ikonerna.";
 "CUSTOM_FONTS_TITLE" = "Anpassade typsnitt";

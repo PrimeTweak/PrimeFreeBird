@@ -172,6 +172,7 @@ const PFBHookRecord PFBHookRecords[] = {
     {"TFNCircularAvatarShadowLayer", "setHidden:", "Features/Profiles/Avatars.x"},
     {"TFNCustomTabBar", "layoutSubviews", "Features/Appearance/Theme.x"},
     {"TFNDismissButton", "layoutSubviews", "Features/General/HiddenNotifications.x"},
+    {"TFNExpandingButtonItemView", "_tfn_updateIcon", "Features/Branding/Branding.x"},
     {"TFNFloatingActionButton", "didAddSubview:", "Features/Branding/Branding.x"},
     {"TFNFloatingActionButton", "didMoveToWindow", "Features/Branding/Branding.x"},
     {"TFNFloatingActionButton", "layoutSubviews", "Features/Branding/Branding.x"},

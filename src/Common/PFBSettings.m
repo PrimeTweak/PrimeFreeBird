@@ -26,9 +26,9 @@ static NSDictionary<NSString*, NSDictionary*>* PFBSettingsPages(void) {
                     @{@"key": @"padlock", @"default": @NO},
                     @{@"key": @"no_screenshot_detection", @"default": @YES},
                     @{@"type": @"header", @"titleKey": @"GENERAL_GROUP_BEHAVIOR"},
+                    @{@"key": @"hide_premium_offer", @"default": @YES},
                     @{@"key": @"show_scroll_indicator", @"default": @NO},
                     @{@"key": @"disable_rtl", @"default": @NO},
-                    @{@"key": @"hide_premium_offer", @"default": @YES},
                     @{@"key": @"hide_notifications", @"default": @YES},
                     @{@"type": @"header", @"titleKey": @"GENERAL_GROUP_LINKS"},
                     @{
@@ -51,7 +51,7 @@ static NSDictionary<NSString*, NSDictionary*>* PFBSettingsPages(void) {
                     @{@"type": @"header",
                       @"titleKey": @"APPEARANCE_GROUP_INTERFACE"},
                     @{
-                        @"titleKey": @"INTERFACE_STYLE_ROW_TITLE",
+                        @"titleKey": @"INTERFACE_STYLE_TITLE",
                         @"subtitleKey": @"INTERFACE_STYLE_SUBTITLE",
                         @"action": @"showInterfaceStylePicker:",
                         @"type": @"button"

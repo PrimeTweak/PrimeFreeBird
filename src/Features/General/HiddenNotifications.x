@@ -1149,7 +1149,7 @@ reconfigureItemIdentifiers:(id)identifiers
 // T1TabNavigationController hook below places on the notifications screen.
 @interface PFBNotifQuickPresenter : NSObject
 + (instancetype)shared;
-- (void)present:(UIButton*)sender;
+- (void)present:(PFBBarGlyphButton*)sender;
 @end
 
 @implementation PFBNotifQuickPresenter
@@ -1163,10 +1163,8 @@ reconfigureItemIdentifiers:(id)identifiers
     return instance;
 }
 
-// The sender can be a UIBarButtonItem, which is not a view: it answers neither
-// -bounds nor -nextResponder. Both kinds are handled here, and the host
-// controller does not come from the sender.
-- (void)present:(id)sender {
+// The arrow points at the eye's glyph; the host controller does not come from the sender.
+- (void)present:(PFBBarGlyphButton*)sender {
     @try {
         UIViewController* controller =
             [[PFBHiddenNotificationsViewController alloc] initCompact];
@@ -1180,33 +1178,8 @@ reconfigureItemIdentifiers:(id)identifiers
         controller.modalPresentationStyle = UIModalPresentationPopover;
         UIPopoverPresentationController* popover =
             controller.popoverPresentationController;
-        // A real view means a real arrow, pinned to the icon, which is what
-        // anchoring on sourceView gives.
-        if ([sender isKindOfClass:[UIView class]]) {
-            popover.sourceView = sender;
-            popover.sourceRect = ((UIView*)sender).bounds;
-        } else if ([sender isKindOfClass:[UIBarButtonItem class]]) {
-            UIBarButtonItem* item = (UIBarButtonItem*)sender;
-            UIView* anchor = item.customView;
-            if (!anchor) {
-                // An image item has no customView, and barButtonItem anchoring
-                // draws no arrow inside this bar; its rendered view carries the
-                // on-screen rect the arrow needs.
-                @try {
-                    UIView* rendered = [item valueForKey:@"view"];
-                    if ([rendered isKindOfClass:[UIView class]]) {
-                        anchor = rendered;
-                    }
-                } @catch (id exception) {
-                }
-            }
-            if (anchor) {
-                popover.sourceView = anchor;
-                popover.sourceRect = anchor.bounds;
-            } else {
-                popover.barButtonItem = item;
-            }
-        }
+        popover.sourceView = sender;
+        popover.sourceRect = sender.glyphFrame;
         popover.permittedArrowDirections = UIPopoverArrowDirectionUp;
         popover.delegate = (id)self;
 
@@ -1254,8 +1227,7 @@ reconfigureItemIdentifiers:(id)identifiers
 // MARK: - the eye
 
 // Placed by the T1TabNavigationController hook below, when the screen's bar items
-// are built. The glass is painted on UIKit's per-item wrapper, not on the glyph's
-// own view, so the item is asked to hide its shared background.
+// are built, as a PFBBarGlyphItem paired with the gear beside it.
 
 static const NSInteger kPFBNotifBarItemTag = 90314;
 static const CGFloat kPFBNotifEyeSide = 24.0;
@@ -1283,6 +1255,7 @@ static const CGFloat kPFBNotifEyeSide = 24.0;
         UINavigationItem* item = viewController.navigationItem;
         for (UIBarButtonItem* existing in item.rightBarButtonItems) {
             if (existing.tag == kPFBNotifBarItemTag) {
+                PFBBarPairWithNeighbor(existing, item.rightBarButtonItems, @"Notifications");
                 return;
             }
         }
@@ -1295,44 +1268,19 @@ static const CGFloat kPFBNotifEyeSide = 24.0;
         if (!glyph) {
             glyph = [UIImage systemImageNamed:@"eye.slash"];
         }
-        // The color is read from the neighboring gear, as the search filters
-        // button does, so the two glyphs are drawn in the same ink.
-        __block UIColor* ink = nil;
-        for (UIBarButtonItem* neighbor in item.rightBarButtonItems) {
-            if (neighbor.customView) {
-                PFBEnumerateSubviewsRecursively(neighbor.customView, ^(UIView* view) {
-                  if (!ink && [view isKindOfClass:[UIImageView class]] && view.tintColor) {
-                      ink = view.tintColor;
-                  }
-                });
-            } else if (neighbor.tintColor) {
-                ink = neighbor.tintColor;
-            }
-            if (ink) {
-                break;
-            }
-        }
-        if (!ink) {
-            ink = PFBBarIconGray(viewController.traitCollection);
-        }
-        // An image item, the same kind as the search filters button: the bar
-        // gives both the same box and the same spacing next to the gear.
-        UIBarButtonItem* ours = [[UIBarButtonItem alloc]
-            initWithImage:PFBFlatGlyph(glyph, ink)
-                    style:UIBarButtonItemStylePlain
-                   target:[PFBNotifQuickPresenter shared]
-                   action:@selector(present:)];
-        ours.tintColor = ink;
-        ours.accessibilityLabel = [[PFBBundle sharedBundle] localizedStringForKey:@"HIDDEN_NOTIFS_TITLE"];
+        // In the gray of the bar's icons, which the Notifications bar pass repaints
+        // when it changes (NavBarIcons.x). The same kind of item as the Explore
+        // filters button, so both sit the same way beside the gear.
+        UIBarButtonItem* ours = PFBBarGlyphItem(
+            PFBFlatGlyph(glyph, PFBBarIconGray(viewController.traitCollection)),
+            [[PFBBundle sharedBundle] localizedStringForKey:@"HIDDEN_NOTIFS_TITLE"],
+            [PFBNotifQuickPresenter shared], @selector(present:));
         ours.tag = kPFBNotifBarItemTag;
-        SEL hideShared = NSSelectorFromString(@"setHidesSharedBackground:");
-        if ([ours respondsToSelector:hideShared]) {
-            ((void (*)(id, SEL, BOOL))objc_msgSend)(ours, hideShared, YES);
-        }
         NSMutableArray<UIBarButtonItem*>* items =
             [NSMutableArray arrayWithArray:item.rightBarButtonItems ?: @[]];
         [items addObject:ours];
         item.rightBarButtonItems = items;
+        PFBBarPairWithNeighbor(ours, item.rightBarButtonItems, @"Notifications");
         PFBCOMPAT_ACTION(PFBCompat_hide_notifications, @"eye placed");
     } @catch (id exception) {
         PFBDebugLog(@"[notifs] eye placement abandoned - no consequence");

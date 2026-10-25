@@ -32,7 +32,7 @@
 "MODERN_SETTINGS_APPEARANCE_SUBTITLE" = "스타일, 글꼴, 색상, 내비게이션 바.";
 
 /* ===== Appearance › Interface ===== */
-"CUSTOM_TAB_BAR_OPTION_TITLE" = "탭";
+"CUSTOM_TAB_BAR_OPTION_TITLE" = "탭 사용자화";
 "RESTORE_TAB_LABELS_TITLE" = "탭 라벨";
 "RESTORE_TAB_LABELS_DETAIL" = "아이콘 아래에 라벨을 표시합니다.";
 "CUSTOM_FONTS_TITLE" = "사용자 지정 글꼴";
