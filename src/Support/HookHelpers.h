@@ -120,7 +120,7 @@ BOOL PFBThemedTabBarWanted(void);
 BOOL PFBTintedLogoWanted(void);
 
 // A copy of `source` painted in `color` through its own alpha, rendered as
-// AlwaysOriginal so no tint can change it afterwards.
+// AlwaysOriginal so no tint can change it afterward.
 UIImage* PFBFlatGlyph(UIImage* source, UIColor* color);
 
 // The same repaint, marked so the top bar repairs know the image is already theirs
@@ -155,13 +155,9 @@ void PFBShowToast(UIWindow* window, NSString* text, void (^undo)(void));
 // PFBBarGlyphButton as the sender (NavBarIcons.x).
 UIBarButtonItem* PFBBarGlyphItem(UIImage* glyph, NSString* label, id target, SEL action);
 
-// Pairs `ours` with the glyph button just outside it among `items`, which is asked to share
-// the bar's background as Twitter's items did before its glass chrome (NavBarIcons.x).
+// Pairs `ours` with the glyph button just outside it among `items`; the compatibility
+// report notes, under `screen`, how far apart their glyphs land (NavBarIcons.x).
 void PFBBarPairWithNeighbor(UIBarButtonItem* ours, NSArray<UIBarButtonItem*>* items, NSString* screen);
-
-// Gives back Twitter's own setting to every item among `items` asked to share the bar's
-// background, before `ours` leaves the bar (NavBarIcons.x).
-void PFBBarUnpairNeighbor(UIBarButtonItem* ours, NSArray<UIBarButtonItem*>* items);
 
 // The first view controller up a view's responder chain, or nil.
 UIViewController* PFBOwningController(UIView* view);

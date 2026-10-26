@@ -225,8 +225,8 @@ NSString* PFBTwitterTerminology(NSString* text) {
         }
         return result;
     }
-    PFBBundle* tweak = [PFBBundle sharedBundle];
-    if (self == tweak.mainBundle || self == tweak.englishBundle) {
+    PFBBundle* own = [PFBBundle sharedBundle];
+    if (self == own.mainBundle || self == own.englishBundle) {
         return result;
     }
 
@@ -666,7 +666,7 @@ void PFBRestyleComposeFAB(void) {
     void (^run)(void) = ^{
         // The cached handle is only a fast path: with the settings screen pushed,
         // the timeline's views are detached and the FAB is often rebuilt, so a stale
-        // reference is normal. The live hierarchy is swept afterwards.
+        // reference is normal. The live hierarchy is swept afterward.
         UIView* known = PFBComposeFABView;
         if (known) {
             styleComposeFAB(known);

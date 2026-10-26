@@ -252,8 +252,12 @@ FOUNDATION_EXPORT void PFBCompatRunTourLeft(void);
 FOUNDATION_EXPORT BOOL PFBCompatTourIsRunning(void);
 // The screens a full tour shows, or those still owing proofs on this build.
 FOUNDATION_EXPORT NSUInteger PFBCompatTourScreens(BOOL full);
-// The last tour in one line for the report, or nil when none has run on this build.
-FOUNDATION_EXPORT NSString* PFBCompatTourLastRun(void);
+// When this build's last tour ran, or nil before the first; stopped tells whether it
+// ended early.
+FOUNDATION_EXPORT NSDate* PFBCompatTourLastDate(BOOL* stopped);
+// When this build started counting, or with earlierBuilds, when the earlier builds of the
+// same Twitter did; nil when unknown or when there were none.
+FOUNDATION_EXPORT NSDate* PFBCompatCountingSince(BOOL earlierBuilds);
 // Asks for a tour at the next launch, as a new install would need one.
 FOUNDATION_EXPORT void PFBCompatScheduleTourAtLaunch(void);
 

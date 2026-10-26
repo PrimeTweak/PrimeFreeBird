@@ -146,11 +146,6 @@ static BOOL PFBRegistryEntryIsValid(id entry) {
     [[NSUserDefaults standardUserDefaults] synchronize];
 }
 
-+ (void)resetSelection {
-    [[NSUserDefaults standardUserDefaults] removeObjectForKey:kVisibleKey];
-    [[NSUserDefaults standardUserDefaults] synchronize];
-}
-
 + (NSArray<NSString*>*)defaultVisiblePageIDs {
     return @[@"home", @"guide", @"ntab", @"messages"];
 }

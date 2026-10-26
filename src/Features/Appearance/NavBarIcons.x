@@ -17,7 +17,7 @@ static const void* kPFBOriginalImageKey = &kPFBOriginalImageKey;
 // Marks a repainted image. Two paths repaint on Notifications, and without the mark
 // each treats the other's result as unpainted; the mark travels with the image.
 static const void* kPFBPaintedFlagKey = &kPFBPaintedFlagKey;
-// Marks a layer that must never render at partial opacity. Correcting afterwards
+// Marks a layer that must never render at partial opacity. Correcting afterward
 // is too late, so every route that could lower it is refused as it is used: the
 // alpha, the layer's opacity and the animation.
 static const void* kPFBNoFadeKey = &kPFBNoFadeKey;
@@ -25,6 +25,7 @@ static const void* kPFBNoFadeKey = &kPFBNoFadeKey;
 @interface PFBBarGlyphButton ()
 - (void)pfbPairWith:(UIView*)neighbor screen:(NSString*)screen;
 - (void)pfbPaintIn:(UIColor*)color;
+- (void)pfbNote:(NSString*)text;
 @end
 
 UIImage* PFBPaintedGlyph(UIImage* source, UIColor* color) {
@@ -144,7 +145,7 @@ static void pfbForceOpaque(UIView* view) {
     }
 }
 
-// The container holding the bar and the tab strip, reached from the bar upwards.
+// The container holding the bar and the tab strip, reached from the bar upward.
 // The walk stops at the first view taller than half the window, so only the
 // header band is held.
 static void pfbPinHeaderOpacity(UIView* bar) {
@@ -814,8 +815,6 @@ static BOOL pfbIsRightHandGlyphButton(UIView* button) {
 
 // On a Twitter glyph button: the PFBBarGlyphButton laid out again after it.
 static const void* kPFBBarPartnerKey = &kPFBBarPartnerKey;
-// On a Twitter bar item: set when it was asked to share the bar's background.
-static const void* kPFBBarSharedKey = &kPFBBarSharedKey;
 
 // Where a button draws its glyph, in its own coordinates: its first image view, narrowed
 // to the drawn image where the view is wider. CGRectNull when there is none.
@@ -855,7 +854,10 @@ static CGRect pfbGlyphRectIn(UIView* button) {
     UIColor* _paintedColor;
     __weak UIView* _neighbor;
     NSString* _screen;
-    NSString* _lastLine;
+    NSString* _lastNote;
+    // The spacing last noted, in whole points; -1 before the first note.
+    NSInteger _notedGap;
+    NSInteger _notedSlot;
 }
 
 - (instancetype)initWithFrame:(CGRect)frame {
@@ -866,6 +868,8 @@ static CGRect pfbGlyphRectIn(UIView* button) {
         [self addSubview:_glyphView];
         self.isAccessibilityElement = YES;
         self.accessibilityTraits = UIAccessibilityTraitButton;
+        _notedGap = -1;
+        _notedSlot = -1;
     }
     return self;
 }
@@ -916,7 +920,7 @@ static CGRect pfbGlyphRectIn(UIView* button) {
     [self setNeedsLayout];
 }
 
-// The neighbor's glyph can only be measured once both buttons are on screen.
+// The neighbor's glyph can only be located once both buttons are on screen.
 - (void)didMoveToWindow {
     [super didMoveToWindow];
     [self setNeedsLayout];
@@ -950,21 +954,28 @@ static CGRect pfbGlyphRectIn(UIView* button) {
     if (!CGRectIsNull(glyph)) {
         CGFloat ours = [self convertPoint:CGPointMake(CGRectGetMidX(_glyphView.frame), 0.0) toView:nil].x;
         CGFloat theirs = [neighbor convertPoint:CGPointMake(CGRectGetMidX(glyph), 0.0) toView:nil].x;
-        [self pfbNote:[NSString stringWithFormat:@"neighbor slot %.0f pt, glyph moved %.0f pt, glyph centers %.0f pt apart",
-                                                 CGRectGetWidth(neighbor.bounds), fabs(shift), fabs(theirs - ours)]];
+        NSInteger gap = (NSInteger)lround(fabs(theirs - ours));
+        NSInteger slot = (NSInteger)lround(CGRectGetWidth(neighbor.bounds));
+        // Formatted only when a value changes: the bar lays out far more often than that.
+        if (gap != _notedGap || slot != _notedSlot) {
+            _notedGap = gap;
+            _notedSlot = slot;
+            [self pfbNote:[NSString stringWithFormat:@"icon and gear centers %ld pt apart, gear slot %ld pt",
+                                                     (long)gap, (long)slot]];
+        }
     } else if (shown) {
-        [self pfbNote:@"neighbor's glyph not found"];
+        [self pfbNote:@"the gear's glyph was not found"];
     }
 }
 
-// One line per change, under MEASUREMENTS.
+// One line per change, under MEASUREMENTS in the compatibility report, until the topic is full.
 - (void)pfbNote:(NSString*)text {
-    NSString* line = [NSString stringWithFormat:@"%@: %@", _screen ?: @"?", text];
-    if ([line isEqualToString:_lastLine]) {
+    static BOOL full;
+    if (full || [text isEqualToString:_lastNote]) {
         return;
     }
-    _lastLine = line;
-    PFB_PROBE(@"bar icons", 12, @"%@", line);
+    _lastNote = [text copy];
+    full = !PFBCompatMeasure(@"bar icons", [NSString stringWithFormat:@"%@: %@", _screen ?: @"?", text], 12);
 }
 
 @end
@@ -1003,43 +1014,13 @@ void PFBBarPairWithNeighbor(UIBarButtonItem* ours, NSArray<UIBarButtonItem*>* it
     UIView* view = neighbor.customView;
     if (![view isKindOfClass:[UIButton class]]) {
         [button pfbPairWith:nil screen:screen];
-        PFB_PROBE(@"bar icons", 12, @"%@: no glyph button beside the icon", screen);
+        [button pfbNote:@"no button beside the icon"];
         return;
     }
     PFBWeakView* partner = [PFBWeakView new];
     partner.view = button;
     objc_setAssociatedObject(view, kPFBBarPartnerKey, partner, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     [button pfbPairWith:view screen:screen];
-
-    // Only while its shared background is hidden, so sharing it draws nothing.
-    id hidden = nil;
-    @try {
-        hidden = [neighbor valueForKey:@"hidesSharedBackground"];
-    } @catch (id exception) {
-    }
-    SEL shares = NSSelectorFromString(@"setSharesBackground:");
-    BOOL asked = [hidden respondsToSelector:@selector(boolValue)] && [hidden boolValue] &&
-                 [neighbor respondsToSelector:shares];
-    if (asked) {
-        ((void (*)(id, SEL, BOOL))objc_msgSend)(neighbor, shares, YES);
-        objc_setAssociatedObject(neighbor, kPFBBarSharedKey, @YES, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-    }
-    PFB_PROBE(@"bar icons", 12, @"%@: neighbor %@", screen,
-              asked ? @"asked to share the bar's background"
-                    : @"left as it was (background shown, or no such setting)");
-}
-
-void PFBBarUnpairNeighbor(UIBarButtonItem* ours, NSArray<UIBarButtonItem*>* items) {
-    for (UIBarButtonItem* item in items) {
-        if (item == ours || !objc_getAssociatedObject(item, kPFBBarSharedKey)) {
-            continue;
-        }
-        SEL shares = NSSelectorFromString(@"setSharesBackground:");
-        if ([item respondsToSelector:shares]) {
-            ((void (*)(id, SEL, BOOL))objc_msgSend)(item, shares, NO);
-        }
-        objc_setAssociatedObject(item, kPFBBarSharedKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-    }
 }
 
 // The same treatment as Explore, reached from the other side: Notifications
@@ -1306,9 +1287,6 @@ static const void* kPFBReplyTintKey = &kPFBReplyTintKey;
 // carries its own text inset, so it gets the same padding to line up with it.
 static const CGFloat kPFBReplyTextPad = 12.0;
 
-// The app lays its content across the bar's full box while the capsule is inset
-// and shorter, so text and buttons hang over the edges. Any child that reaches
-// near the full width is brought inside the capsule, on both axes.
 // Measurement: a child still at the y set on the last pass is moved up again; one line
 // per such move, with its y before and after.
 static char kPFBProbeReplyYKey;
@@ -1323,6 +1301,9 @@ static void pfbProbeReplyDrift(UIView* sub, CGFloat entryY, CGFloat newY) {
               NSStringFromClass([sub class]), entryY, newY);
 }
 
+// The app lays its content across the bar's full box while the capsule is inset
+// and shorter, so text and buttons hang over the edges. Any child that reaches
+// near the full width is brought inside the capsule, on both axes.
 static void pfbInsetReplyContent(UIView* bar, CGFloat inset) {
     CGFloat wanted = bar.bounds.size.width - inset * 2.0;
     CGFloat capsule = bar.bounds.size.height - kPFBReplyGlassGap;

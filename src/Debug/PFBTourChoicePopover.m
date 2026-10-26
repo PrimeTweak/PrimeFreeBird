@@ -1,59 +1,63 @@
 #import "Common/PFBCompatibility.h"
 #import "Support/TwitterChirpFont.h"
+#import "Settings/PFBSettingsCellStyle.h"
 #import "Debug/PFBTourChoicePopover.h"
 
 @implementation PFBTourChoicePopover
 
-static const CGFloat kPFBTourChoiceRowHeight = 52.0;
 static const CGFloat kPFBTourChoiceTop = 18.0;
-static const CGFloat kPFBTourChoiceGap = 6.0;
+static const CGFloat kPFBTourChoiceGap = 4.0;
 static const CGFloat kPFBTourChoiceBottom = 6.0;
 static const CGFloat kPFBTourChoiceInset = 20.0;
-static const CGFloat kPFBTourChoiceGlyph = 24.0;
-static const CGFloat kPFBTourChoiceSpacing = 14.0;
+// Above a choice's title and below its line.
+static const CGFloat kPFBTourChoicePad = 11.0;
+static const CGFloat kPFBTourChoiceLineGap = 2.0;
 
 static NSString* PFBTourChoiceTitle(BOOL full) {
     return full ? @"All screens" : @"Remaining screens";
 }
 
-static UIFont* PFBTourChoiceFont(void) {
-    return PFBScaledFont([TwitterChirpFont(TwitterFontStyleRegular) fontWithSize:17]);
+// What a tour covers: every screen, or those still to check.
+static NSString* PFBTourChoiceLine(BOOL full) {
+    NSUInteger screens = PFBCompatTourScreens(full);
+    if (full) {
+        return [NSString stringWithFormat:@"%lu screen%@", (unsigned long)screens, screens == 1 ? @"" : @"s"];
+    }
+    return screens ? [NSString stringWithFormat:@"%lu left", (unsigned long)screens] : @"Nothing left";
 }
 
-// A plain glyph in the text color, like Twitter's own menu rows.
+static UILabel* PFBTourChoiceLabel(NSString* text, UIFont* font, UIColor* color) {
+    UILabel* label = [[UILabel alloc] init];
+    label.text = text;
+    label.font = font;
+    label.textColor = color;
+    label.userInteractionEnabled = NO;
+    label.translatesAutoresizingMaskIntoConstraints = NO;
+    return label;
+}
+
+// A choice drawn as the report's rows draw theirs: the title in bold, what it covers in gray.
 - (UIButton*)rowForFullTour:(BOOL)full enabled:(BOOL)enabled {
     UIButton* row = [UIButton buttonWithType:UIButtonTypeCustom];
     row.tag = full;
     row.enabled = enabled;
     row.accessibilityLabel = PFBTourChoiceTitle(full);
+    row.accessibilityValue = PFBTourChoiceLine(full);
     row.translatesAutoresizingMaskIntoConstraints = NO;
 
-    UIImageSymbolConfiguration* glyphSize =
-        [UIImageSymbolConfiguration configurationWithPointSize:18.0 weight:UIImageSymbolWeightRegular];
-    UIImageView* glyph =
-        [[UIImageView alloc] initWithImage:[UIImage systemImageNamed:(full ? @"map" : @"scope")
-                                                    withConfiguration:glyphSize]];
-    glyph.contentMode = UIViewContentModeCenter;
-    glyph.tintColor = enabled ? [UIColor labelColor] : [UIColor tertiaryLabelColor];
-    glyph.userInteractionEnabled = NO;
-    glyph.translatesAutoresizingMaskIntoConstraints = NO;
-
-    UILabel* label = [[UILabel alloc] init];
-    label.text = row.accessibilityLabel;
-    label.font = PFBTourChoiceFont();
-    label.textColor = enabled ? [UIColor labelColor] : [UIColor secondaryLabelColor];
-    label.userInteractionEnabled = NO;
-    label.translatesAutoresizingMaskIntoConstraints = NO;
-    [row addSubview:glyph];
-    [row addSubview:label];
+    UILabel* title = PFBTourChoiceLabel(PFBTourChoiceTitle(full), PFBSettingsTitleFont(),
+                                        enabled ? [UIColor labelColor] : PFBSettingsSubtitleColor());
+    UILabel* line = PFBTourChoiceLabel(PFBTourChoiceLine(full), PFBSettingsDetailFont(), PFBSettingsSubtitleColor());
+    [row addSubview:title];
+    [row addSubview:line];
     [NSLayoutConstraint activateConstraints:@[
-        [row.heightAnchor constraintEqualToConstant:kPFBTourChoiceRowHeight],
-        [glyph.leadingAnchor constraintEqualToAnchor:row.leadingAnchor constant:kPFBTourChoiceInset],
-        [glyph.centerYAnchor constraintEqualToAnchor:row.centerYAnchor],
-        [glyph.widthAnchor constraintEqualToConstant:kPFBTourChoiceGlyph],
-        [label.leadingAnchor constraintEqualToAnchor:glyph.trailingAnchor constant:kPFBTourChoiceSpacing],
-        [label.trailingAnchor constraintLessThanOrEqualToAnchor:row.trailingAnchor constant:-kPFBTourChoiceInset],
-        [label.centerYAnchor constraintEqualToAnchor:row.centerYAnchor],
+        [title.topAnchor constraintEqualToAnchor:row.topAnchor constant:kPFBTourChoicePad],
+        [title.leadingAnchor constraintEqualToAnchor:row.leadingAnchor constant:kPFBTourChoiceInset],
+        [title.trailingAnchor constraintLessThanOrEqualToAnchor:row.trailingAnchor constant:-kPFBTourChoiceInset],
+        [line.topAnchor constraintEqualToAnchor:title.bottomAnchor constant:kPFBTourChoiceLineGap],
+        [line.leadingAnchor constraintEqualToAnchor:title.leadingAnchor],
+        [line.trailingAnchor constraintLessThanOrEqualToAnchor:row.trailingAnchor constant:-kPFBTourChoiceInset],
+        [line.bottomAnchor constraintEqualToAnchor:row.bottomAnchor constant:-kPFBTourChoicePad],
     ]];
     [row addTarget:self action:@selector(rowTouched:) forControlEvents:UIControlEventTouchDown | UIControlEventTouchDragEnter];
     [row addTarget:self
@@ -83,7 +87,6 @@ static UIFont* PFBTourChoiceFont(void) {
         [self.view addSubview:view];
     }
     UILayoutGuide* area = self.view.safeAreaLayoutGuide;
-    CGFloat textStart = kPFBTourChoiceInset + kPFBTourChoiceGlyph + kPFBTourChoiceSpacing;
     [NSLayoutConstraint activateConstraints:@[
         [title.topAnchor constraintEqualToAnchor:area.topAnchor constant:kPFBTourChoiceTop],
         [title.leadingAnchor constraintEqualToAnchor:area.leadingAnchor constant:kPFBTourChoiceInset],
@@ -95,18 +98,22 @@ static UIFont* PFBTourChoiceFont(void) {
         [left.leadingAnchor constraintEqualToAnchor:area.leadingAnchor],
         [left.trailingAnchor constraintEqualToAnchor:area.trailingAnchor],
         [divider.topAnchor constraintEqualToAnchor:full.bottomAnchor],
-        [divider.leadingAnchor constraintEqualToAnchor:area.leadingAnchor constant:textStart],
+        [divider.leadingAnchor constraintEqualToAnchor:area.leadingAnchor constant:kPFBTourChoiceInset],
         [divider.trailingAnchor constraintEqualToAnchor:area.trailingAnchor],
         [divider.heightAnchor constraintEqualToConstant:1.0 / UIScreen.mainScreen.scale],
     ]];
-    // Sized to its content: the widest of the title and the two rows, with even margins.
-    CGFloat rows = MAX([PFBTourChoiceTitle(YES) sizeWithAttributes:@{NSFontAttributeName : PFBTourChoiceFont()}].width,
-                       [PFBTourChoiceTitle(NO) sizeWithAttributes:@{NSFontAttributeName : PFBTourChoiceFont()}].width);
-    CGFloat width = MAX([title.text sizeWithAttributes:@{NSFontAttributeName : title.font}].width + 2.0 * kPFBTourChoiceInset,
-                        textStart + rows + kPFBTourChoiceInset);
-    CGFloat height = kPFBTourChoiceTop + ceil(title.font.lineHeight) + kPFBTourChoiceGap +
-                     2.0 * kPFBTourChoiceRowHeight + kPFBTourChoiceBottom;
-    self.preferredContentSize = CGSizeMake(ceil(MAX(width, 220.0)), height);
+    // Sized to its content: the widest of the title and the choices, with even margins.
+    UIFont* rowFont = PFBSettingsTitleFont();
+    UIFont* lineFont = PFBSettingsDetailFont();
+    CGFloat widest = [title.text sizeWithAttributes:@{NSFontAttributeName : title.font}].width;
+    for (NSNumber* tour in @[ @YES, @NO ]) {
+        widest = MAX(widest, [PFBTourChoiceTitle(tour.boolValue) sizeWithAttributes:@{NSFontAttributeName : rowFont}].width);
+        widest = MAX(widest, [PFBTourChoiceLine(tour.boolValue) sizeWithAttributes:@{NSFontAttributeName : lineFont}].width);
+    }
+    CGFloat rowHeight = 2.0 * kPFBTourChoicePad + ceil(rowFont.lineHeight) + kPFBTourChoiceLineGap + ceil(lineFont.lineHeight);
+    CGFloat height = kPFBTourChoiceTop + ceil(title.font.lineHeight) + kPFBTourChoiceGap + 2.0 * rowHeight +
+                     kPFBTourChoiceBottom;
+    self.preferredContentSize = CGSizeMake(ceil(MAX(widest + 2.0 * kPFBTourChoiceInset, 220.0)), ceil(height));
 }
 
 - (void)rowTouched:(UIButton*)row {

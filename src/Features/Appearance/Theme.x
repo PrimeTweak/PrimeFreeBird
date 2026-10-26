@@ -2716,9 +2716,6 @@ static void pfbProbeLogoOwner(UINavigationBar* bar, UIImageView* logo) {
 
 %end
 
-// Twitter bakes the tab icon's color into the image itself, and a baked image
-// ignores tintColor and UITabBarAppearance. Templating the images as they are
-// installed makes them tint-driven, in both directions.
 // Measurement: the item hooks that change something, with the image that sent the
 // message, one line per hook and caller.
 static void pfbProbeTabItemHook(NSString* hook, void* caller) {
@@ -2730,6 +2727,9 @@ static void pfbProbeTabItemHook(NSString* hook, void* caller) {
     PFB_PROBE(@"UITabBarItem hooks", 10, @"%@ acted, sent from %@", hook, from);
 }
 
+// Twitter bakes the tab icon's color into the image itself, and a baked image
+// ignores tintColor and UITabBarAppearance. Templating the images as they are
+// installed makes them tint-driven, in both directions.
 %hook UITabBarItem
 
 - (id)initWithTitle:(NSString*)title image:(UIImage*)image tag:(NSInteger)tag {

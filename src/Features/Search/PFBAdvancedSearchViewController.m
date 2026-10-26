@@ -140,10 +140,9 @@ static UIImage* pfbBakedTitleImage(NSString* title, UIFont* font) {
         ],
     ];
 
-    // With Liquid Glass, a system Done bar button gives one native capsule, where a
-    // custom view would be wrapped in a second one, and NavBarIcons.x tints it system
-    // blue under the white title. Without it nothing backs the title: plain text in the
-    // label color.
+    // With Liquid Glass, a system Done button gives one native capsule, which NavBarIcons.x
+    // tints system blue under the white title; a custom view would get a second capsule.
+    // Without it, the title is plain text in the label color.
     NSString* searchTitle = [bundle localizedStringForKey:@"ADVSEARCH_SEARCH"];
     UIFont* searchFont = PFBScaledFont([TwitterChirpFont(TwitterFontStyleBold) fontWithSize:15]);
     UIImage* bakedTitle = [PFBSettings boolForKey:@"enable_liquid_glass"]

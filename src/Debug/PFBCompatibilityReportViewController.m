@@ -1,12 +1,11 @@
-// The Compatibility report screen, drawn like the settings pages.
+// The Compatibility report screen and its option lists, drawn like the settings pages.
 #import "Common/PFBCompatibility.h"
 #import "Debug/PFBDebugger.h"
 #import "Support/TwitterChirpFont.h"
 #import "Support/HookHelpers.h"
 #import "Settings/PFBModernSettingsPageViewController.h"
-#import "Settings/PFBSettingsCellStyle.h"
+#import "Settings/PFBModernSettingsCells.h"
 #import "Features/Appearance/ThemeColor/PFBPalette.h"
-#import <objc/runtime.h>
 #import "Debug/PFBTourChoicePopover.h"
 
 // An orange dark enough to read on a light page; the system orange on a dark one.
@@ -18,52 +17,327 @@ static UIColor* PFBCompatWarningTextColor(void) {
     }];
 }
 
-// One size for every row's symbol, so the summary row lines up with the options.
-static UIImage* PFBRowSymbol(NSString* name) {
-    UIImageSymbolConfiguration* config =
-        [UIImageSymbolConfiguration configurationWithPointSize:19.0 weight:UIImageSymbolWeightRegular];
-    return [UIImage systemImageNamed:name withConfiguration:config];
+typedef NS_ENUM(NSInteger, PFBReportRowKind) {
+    PFBReportRowHeader,
+    PFBReportRowList,
+    PFBReportRowOption,
+    PFBReportRowTour,
+    PFBReportRowStartOver,
+    PFBReportRowNote,
+};
+
+// One row of the report or of one of its lists.
+@interface PFBReportRow : NSObject
+@property (nonatomic) PFBReportRowKind kind;
+@property (nonatomic, copy) NSString* title;
+@property (nonatomic, copy) NSString* value;
+@property (nonatomic, copy) NSString* detail;
+// Whether a tap does something: a list with options in it, a tour with screens to show.
+@property (nonatomic) BOOL enabled;
+// The verdict a list row opens, and whether a tour row runs the whole tour.
+@property (nonatomic) PFBCompatVerdict verdict;
+@property (nonatomic) BOOL full;
+@end
+
+@implementation PFBReportRow
+@end
+
+static PFBReportRow* PFBReportRowMake(PFBReportRowKind kind, NSString* title, NSString* value, NSString* detail) {
+    PFBReportRow* row = [PFBReportRow new];
+    row.kind = kind;
+    row.title = title;
+    row.value = value;
+    row.detail = detail;
+    return row;
 }
 
-static UIImage* PFBVerdictImage(PFBCompatVerdict verdict) {
-    NSString* name = @"checkmark.circle";
-    if (verdict == PFBCompatVerdictBroken) {
-        name = @"xmark.circle";
-    } else if (verdict == PFBCompatVerdictNotTested) {
-        name = @"minus.circle";
+// An option with a problem carries its reason under its name, and Off when it is off; a
+// working option shows its state on the right.
+static PFBReportRow* PFBReportOptionRow(PFBCompatResult* result) {
+    BOOL working = result.verdict == PFBCompatVerdictOK;
+    NSString* state = result.enabled ? (result.alwaysOn ? @"Always on" : @"On") : @"Off";
+    NSString* value = result.internal ? nil : (working ? state : (result.enabled ? nil : @"Off"));
+    NSString* detail = (!working || result.internal) ? result.detail : nil;
+    return PFBReportRowMake(PFBReportRowOption, result.title, value, detail);
+}
+
+// "today", or the day as "Oct 23", with its year when it is not this one.
+static NSString* PFBReportDay(NSDate* date) {
+    NSCalendar* calendar = [NSCalendar currentCalendar];
+    if ([calendar isDateInToday:date]) {
+        return @"today";
     }
-    return PFBRowSymbol(name);
+    BOOL thisYear = [calendar component:NSCalendarUnitYear fromDate:date] ==
+                    [calendar component:NSCalendarUnitYear fromDate:[NSDate date]];
+    NSDateFormatter* formatter = [NSDateFormatter new];
+    formatter.locale = [NSLocale localeWithLocaleIdentifier:@"en_US"];
+    formatter.dateFormat = thisYear ? @"MMM d" : @"MMM d, yyyy";
+    return [formatter stringFromDate:date];
 }
 
-// "5 screens" still to check on this build, or that none is left.
-static NSString* PFBCompatScreensLeftText(void) {
-    NSUInteger screens = PFBCompatTourScreens(NO);
-    return screens ? [NSString stringWithFormat:@"%lu screen%@", (unsigned long)screens, screens == 1 ? @"" : @"s"]
-                   : @"Nothing left to check";
-}
-
-static UIColor* PFBVerdictColor(PFBCompatVerdict verdict) {
-    if (verdict == PFBCompatVerdictBroken) {
-        return [UIColor systemRedColor];
+// "4 left. Last check today at 09:47.", or what stands for either part.
+static NSString* PFBReportRemainingText(NSUInteger left) {
+    NSString* head = left ? [NSString stringWithFormat:@"%lu left.", (unsigned long)left] : @"Nothing left to check.";
+    BOOL stopped = NO;
+    NSDate* last = PFBCompatTourLastDate(&stopped);
+    if (!last) {
+        return [head stringByAppendingString:@" No check on this build yet."];
     }
-    return verdict == PFBCompatVerdictNotTested ? [UIColor systemOrangeColor] : [UIColor systemGreenColor];
+    NSDateFormatter* time = [NSDateFormatter new];
+    time.locale = [NSLocale localeWithLocaleIdentifier:@"en_US_POSIX"];
+    time.dateFormat = @"HH:mm";
+    return [NSString stringWithFormat:@"%@ Last check %@%@ at %@.", head, stopped ? @"stopped " : @"",
+                                      PFBReportDay(last), [time stringFromDate:last]];
 }
 
-// Whether the options without problems, and those not tested, are listed; both are
-// folded on a fresh install.
-static NSString* const kPFBCompatListOpenKey = @"pfb_compat_list_open";
-static NSString* const kPFBCompatUntestedOpenKey = @"pfb_compat_untested_open";
+// "Check all 30 screens again.", without "again" before this build's first tour.
+static NSString* PFBReportAllScreensText(NSUInteger screens) {
+    return [NSString stringWithFormat:@"Check all %lu screen%@%@.", (unsigned long)screens, screens == 1 ? @"" : @"s",
+                                      PFBCompatTourLastDate(NULL) ? @" again" : @""];
+}
+
+// "Counting since Oct 23 · this build since Oct 25.", one date when both are the same day.
+static NSString* PFBReportHistoryText(void) {
+    NSDate* build = PFBCompatCountingSince(NO);
+    if (!build) {
+        return nil;
+    }
+    NSDate* earlier = PFBCompatCountingSince(YES);
+    NSString* buildDay = PFBReportDay(build);
+    NSString* earlierDay = earlier ? PFBReportDay(earlier) : nil;
+    if (!earlierDay || [earlierDay isEqualToString:buildDay]) {
+        return [NSString stringWithFormat:@"Counting since %@.", buildDay];
+    }
+    return [NSString stringWithFormat:@"Counting since %@ · this build since %@.", earlierDay, buildDay];
+}
+
+// A gray note under a row, as at the foot of the settings pages' lists.
+@interface PFBReportNoteCell : UITableViewCell
+@property (nonatomic, strong) UILabel* noteLabel;
+@end
+
+@implementation PFBReportNoteCell
+
+- (instancetype)initWithStyle:(UITableViewCellStyle)style reuseIdentifier:(NSString*)reuseIdentifier {
+    self = [super initWithStyle:style reuseIdentifier:reuseIdentifier];
+    if (self) {
+        self.selectionStyle = UITableViewCellSelectionStyleNone;
+        self.contentView.preservesSuperviewLayoutMargins = NO;
+        self.contentView.layoutMargins = UIEdgeInsetsZero;
+        _noteLabel = [UILabel new];
+        _noteLabel.translatesAutoresizingMaskIntoConstraints = NO;
+        _noteLabel.numberOfLines = 0;
+        [self.contentView addSubview:_noteLabel];
+        [NSLayoutConstraint activateConstraints:@[
+            [_noteLabel.leadingAnchor constraintEqualToAnchor:self.contentView.leadingAnchor constant:10],
+            [_noteLabel.trailingAnchor constraintEqualToAnchor:self.contentView.trailingAnchor constant:-10],
+            [_noteLabel.topAnchor constraintEqualToAnchor:self.contentView.topAnchor constant:2],
+            [_noteLabel.bottomAnchor constraintEqualToAnchor:self.contentView.bottomAnchor constant:-24],
+        ]];
+        [self applyTheme];
+    }
+    return self;
+}
+
+- (void)applyTheme {
+    self.backgroundColor = [PFBPalette currentBackgroundColor];
+    self.noteLabel.font = PFBSettingsDetailFont();
+    self.noteLabel.textColor = PFBSettingsSubtitleColor();
+}
+
+// The palette is read again when light and dark switch, as the settings cells do.
+- (void)traitCollectionDidChange:(UITraitCollection*)previousTraitCollection {
+    [super traitCollectionDidChange:previousTraitCollection];
+    [self applyTheme];
+}
+
+@end
+
+// The settings pages' table: their cells, no separators, the palette's background.
+static void PFBReportSetUpTable(UITableView* table) {
+    table.backgroundColor = [PFBPalette currentBackgroundColor];
+    table.separatorStyle = UITableViewCellSeparatorStyleNone;
+    table.sectionHeaderTopPadding = 0.0;
+    table.rowHeight = UITableViewAutomaticDimension;
+    table.estimatedRowHeight = 80.0;
+    [table registerClass:[PFBModernSettingsHeaderCell class] forCellReuseIdentifier:@"HeaderCell"];
+    [table registerClass:[PFBModernSettingsCompactButtonCell class] forCellReuseIdentifier:@"CompactButtonCell"];
+    [table registerClass:[PFBModernSettingsTableViewCell class] forCellReuseIdentifier:@"ButtonCell"];
+    [table registerClass:[PFBReportNoteCell class] forCellReuseIdentifier:@"NoteCell"];
+}
+
+// The settings cell that draws a row; every state is set again, as cells are recycled.
+static UITableViewCell* PFBReportCell(UITableView* table, NSIndexPath* indexPath, PFBReportRow* row) {
+    if (row.kind == PFBReportRowHeader) {
+        PFBModernSettingsHeaderCell* cell = [table dequeueReusableCellWithIdentifier:@"HeaderCell"
+                                                                         forIndexPath:indexPath];
+        [cell configureWithTitle:row.title];
+        return cell;
+    }
+    if (row.kind == PFBReportRowNote) {
+        PFBReportNoteCell* cell = [table dequeueReusableCellWithIdentifier:@"NoteCell" forIndexPath:indexPath];
+        cell.noteLabel.text = row.detail;
+        return cell;
+    }
+    UITableViewCellSelectionStyle selection =
+        row.enabled ? UITableViewCellSelectionStyleDefault : UITableViewCellSelectionStyleNone;
+    if (row.kind == PFBReportRowList || row.kind == PFBReportRowOption) {
+        PFBModernSettingsCompactButtonCell* cell =
+            [table dequeueReusableCellWithIdentifier:@"CompactButtonCell" forIndexPath:indexPath];
+        [cell configureWithTitle:row.title subtitle:row.value detail:row.detail];
+        [cell setShowsChevron:row.kind == PFBReportRowList && row.enabled];
+        cell.selectionStyle = selection;
+        return cell;
+    }
+    PFBModernSettingsTableViewCell* cell = [table dequeueReusableCellWithIdentifier:@"ButtonCell"
+                                                                        forIndexPath:indexPath];
+    [cell configureWithTitle:row.title subtitle:row.detail iconName:nil];
+    [cell setShowsChevron:NO];
+    UIColor* ink = row.enabled ? [UIColor labelColor] : PFBSettingsSubtitleColor();
+    cell.titleLabel.textColor = row.kind == PFBReportRowStartOver ? [UIColor systemRedColor] : ink;
+    cell.selectionStyle = selection;
+    return cell;
+}
+
+// One verdict's options on a page of their own: those not tested, or those working under
+// their settings pages. The internal checks stay in the copied report.
+@interface PFBCompatibilityListViewController : UITableViewController
+- (instancetype)initWithVerdict:(PFBCompatVerdict)verdict title:(NSString*)title note:(NSString*)note;
+@end
+
+@implementation PFBCompatibilityListViewController {
+    PFBCompatVerdict _verdict;
+    NSString* _note;
+    NSArray<PFBReportRow*>* _rows;
+}
+
+- (instancetype)initWithVerdict:(PFBCompatVerdict)verdict title:(NSString*)title note:(NSString*)note {
+    self = [super initWithStyle:UITableViewStyleGrouped];
+    if (self) {
+        _verdict = verdict;
+        _note = [note copy];
+        self.title = title;
+    }
+    return self;
+}
+
+- (void)viewDidLoad {
+    [super viewDidLoad];
+    self.view.backgroundColor = [PFBPalette currentBackgroundColor];
+    PFBReportSetUpTable(self.tableView);
+    [[NSNotificationCenter defaultCenter] addObserver:self
+                                             selector:@selector(compatDidChange:)
+                                                 name:PFBCompatDidChangeNotification
+                                               object:nil];
+}
+
+- (void)compatDidChange:(NSNotification*)note {
+    dispatch_async(dispatch_get_main_queue(), ^{
+        [self rebuild];
+        [self.tableView reloadData];
+    });
+}
+
+- (void)viewWillAppear:(BOOL)animated {
+    [super viewWillAppear:animated];
+    PFBDebuggerSetTriggerHidden(YES);
+    [self rebuild];
+    [self.tableView reloadData];
+}
+
+// Left together with the report, by closing the sheet or going back past it, the list
+// refreshes the status and the settings page below, as the report would.
+- (void)viewWillDisappear:(BOOL)animated {
+    [super viewWillDisappear:animated];
+    PFBDebuggerSetTriggerHidden(NO);
+    UINavigationController* navigation = self.navigationController;
+    BOOL reportStays = NO;
+    for (UIViewController* controller in navigation.viewControllers) {
+        reportStays = reportStays || [controller isKindOfClass:[PFBCompatibilityReportViewController class]];
+    }
+    if (reportStays && !navigation.isBeingDismissed) {
+        return;
+    }
+    PFBCompatRefreshStatus();
+    UIViewController* below = navigation.viewControllers.lastObject;
+    if ([below isKindOfClass:[PFBModernSettingsPageViewController class]]) {
+        [((PFBModernSettingsPageViewController*)below).tableView reloadData];
+    }
+}
+
+// The page is drawn again with the palette when light and dark switch.
+- (void)traitCollectionDidChange:(UITraitCollection*)previousTraitCollection {
+    [super traitCollectionDidChange:previousTraitCollection];
+    if ([self.traitCollection hasDifferentColorAppearanceComparedToTraitCollection:previousTraitCollection]) {
+        self.tableView.backgroundColor = [PFBPalette currentBackgroundColor];
+        [self.tableView reloadData];
+    }
+}
+
+- (void)rebuild {
+    NSMutableArray<PFBReportRow*>* rows = [NSMutableArray array];
+    NSString* section = nil;
+    for (PFBCompatResult* result in PFBCompatResults()) {
+        if (result.verdict != _verdict || result.internal) {
+            continue;
+        }
+        // Working options sit under their settings page, as in the copied report.
+        if (_verdict == PFBCompatVerdictOK && ![result.section isEqualToString:section]) {
+            section = result.section;
+            [rows addObject:PFBReportRowMake(PFBReportRowHeader, section, nil, nil)];
+        }
+        [rows addObject:PFBReportOptionRow(result)];
+    }
+    _rows = rows;
+}
+
+- (NSInteger)tableView:(UITableView*)tableView numberOfRowsInSection:(NSInteger)section {
+    return (NSInteger)_rows.count;
+}
+
+- (UITableViewCell*)tableView:(UITableView*)tableView cellForRowAtIndexPath:(NSIndexPath*)indexPath {
+    return PFBReportCell(tableView, indexPath, _rows[(NSUInteger)indexPath.row]);
+}
+
+- (BOOL)tableView:(UITableView*)tableView shouldHighlightRowAtIndexPath:(NSIndexPath*)indexPath {
+    return NO;
+}
+
+// The page's description, drawn as the settings pages draw theirs.
+- (UIView*)tableView:(UITableView*)tableView viewForHeaderInSection:(NSInteger)section {
+    UIView* header = [[UIView alloc] initWithFrame:CGRectMake(0, 0, tableView.frame.size.width, 0)];
+    UILabel* label = [[UILabel alloc] init];
+    label.translatesAutoresizingMaskIntoConstraints = NO;
+    label.text = _note;
+    label.numberOfLines = 0;
+    label.font = PFBSettingsDetailFont();
+    label.textColor = PFBSettingsSubtitleColor();
+    [header addSubview:label];
+    [NSLayoutConstraint activateConstraints:@[
+        [label.leadingAnchor constraintEqualToAnchor:header.leadingAnchor constant:10],
+        [label.trailingAnchor constraintEqualToAnchor:header.trailingAnchor constant:-10],
+        [label.topAnchor constraintEqualToAnchor:header.topAnchor constant:8],
+        [label.bottomAnchor constraintEqualToAnchor:header.bottomAnchor constant:-8],
+    ]];
+    return header;
+}
+
+- (CGFloat)tableView:(UITableView*)tableView heightForHeaderInSection:(NSInteger)section {
+    return UITableViewAutomaticDimension;
+}
+
+- (CGFloat)tableView:(UITableView*)tableView estimatedHeightForHeaderInSection:(NSInteger)section {
+    return 44.0;
+}
+
+- (CGFloat)tableView:(UITableView*)tableView heightForFooterInSection:(NSInteger)section {
+    return CGFLOAT_MIN;
+}
+
+@end
 
 @implementation PFBCompatibilityReportViewController {
-    NSMutableArray<NSString*>* _sections;
-    NSMutableArray<NSMutableArray<PFBCompatResult*>*>* _rows;
-    NSInteger _okLabelSection;
-    NSInteger _untestedSection;
-    NSInteger _checkSection;
-    BOOL _listOpen;
-    BOOL _untestedOpen;
-    NSString* _summaryText;
-    NSString* _untestedText;
+    NSArray<PFBReportRow*>* _rows;
 }
 
 - (instancetype)initWithStyle:(UITableViewStyle)style {
@@ -78,11 +352,7 @@ static NSString* const kPFBCompatUntestedOpenKey = @"pfb_compat_untested_open";
                                                object:nil];
     self.title = [[PFBBundle sharedBundle] localizedStringForKey:@"COMPATIBILITY_REPORT_TITLE"];
     self.view.backgroundColor = [PFBPalette currentBackgroundColor];
-    self.tableView.backgroundColor = [PFBPalette currentBackgroundColor];
-    self.tableView.separatorStyle = UITableViewCellSeparatorStyleNone;
-    self.tableView.sectionHeaderTopPadding = 0.0;
-    self.tableView.rowHeight = UITableViewAutomaticDimension;
-    self.tableView.estimatedRowHeight = 64.0;
+    PFBReportSetUpTable(self.tableView);
     UIBarButtonItem* copy = [[UIBarButtonItem alloc] initWithTitle:@"Copy"
                                                              style:UIBarButtonItemStylePlain
                                                             target:self
@@ -95,8 +365,6 @@ static NSString* const kPFBCompatUntestedOpenKey = @"pfb_compat_untested_open";
     tours.accessibilityLabel = @"Check options";
     tours.tag = PFBNativeGlassTag;
     self.navigationItem.rightBarButtonItems = @[ copy, tours ];
-    _listOpen = [[NSUserDefaults standardUserDefaults] boolForKey:kPFBCompatListOpenKey];
-    _untestedOpen = [[NSUserDefaults standardUserDefaults] boolForKey:kPFBCompatUntestedOpenKey];
 }
 
 // Twitter's binaries may finish reading while the report is open: it redraws then.
@@ -111,7 +379,7 @@ static NSString* const kPFBCompatUntestedOpenKey = @"pfb_compat_untested_open";
     [super viewWillAppear:animated];
     // The stethoscope leads here: it steps aside while the report is on screen.
     PFBDebuggerSetTriggerHidden(YES);
-    // Opened as a sheet, the report closes with a check, as in the other Prime tweaks.
+    // Opened as a sheet, the report gets a check button that closes it.
     if (self.navigationController.presentingViewController &&
         self.navigationController.viewControllers.firstObject == self &&
         !self.navigationItem.leftBarButtonItem) {
@@ -130,12 +398,16 @@ static NSString* const kPFBCompatUntestedOpenKey = @"pfb_compat_untested_open";
     [self.tableView reloadData];
 }
 
-// The page underneath shows the status on its Report row; it redraws on return.
+// The page underneath shows the status on its Report row; it redraws on return. Covered by
+// one of its own lists, the report has not left.
 - (void)viewWillDisappear:(BOOL)animated {
     [super viewWillDisappear:animated];
     PFBDebuggerSetTriggerHidden(NO);
-    PFBCompatRefreshStatus();
     NSArray* stack = self.navigationController.viewControllers;
+    if (self.navigationController.topViewController != self && [stack containsObject:self]) {
+        return;
+    }
+    PFBCompatRefreshStatus();
     NSUInteger index = [stack indexOfObject:self];
     UIViewController* below = (index != NSNotFound && index > 0) ? stack[index - 1] : stack.lastObject;
     if ([below isKindOfClass:[PFBModernSettingsPageViewController class]]) {
@@ -143,61 +415,70 @@ static NSString* const kPFBCompatUntestedOpenKey = @"pfb_compat_untested_open";
     }
 }
 
+// The page and its header are drawn again with the palette when light and dark switch.
+- (void)traitCollectionDidChange:(UITraitCollection*)previousTraitCollection {
+    [super traitCollectionDidChange:previousTraitCollection];
+    if ([self.traitCollection hasDifferentColorAppearanceComparedToTraitCollection:previousTraitCollection]) {
+        self.tableView.backgroundColor = [PFBPalette currentBackgroundColor];
+        [self rebuild];
+        [self.tableView reloadData];
+    }
+}
+
+// The problems first, then the options by verdict, the tours and the history.
 - (void)rebuild {
-    _sections = [NSMutableArray array];
-    _rows = [NSMutableArray array];
-    _untestedSection = -1;
     NSArray<PFBCompatResult*>* results = PFBCompatResults();
-    NSMutableArray<PFBCompatResult*>* broken = [NSMutableArray array];
-    NSMutableArray<PFBCompatResult*>* notTested = [NSMutableArray array];
-    NSUInteger okOptions = 0;
+    NSMutableArray<PFBReportRow*>* broken = [NSMutableArray array];
+    NSUInteger notTested = 0;
+    NSUInteger working = 0;
     for (PFBCompatResult* result in results) {
         if (result.verdict == PFBCompatVerdictBroken) {
-            [broken addObject:result];
+            [broken addObject:PFBReportOptionRow(result)];
         } else if (result.verdict == PFBCompatVerdictNotTested) {
-            [notTested addObject:result];
+            notTested++;
         } else if (!result.internal) {
-            okOptions++;
+            working++;
         }
     }
+    NSMutableArray<PFBReportRow*>* rows = [NSMutableArray array];
     if (broken.count > 0) {
-        [_sections addObject:@"Broken"];
-        [_rows addObject:broken];
+        [rows addObject:PFBReportRowMake(PFBReportRowHeader, @"Broken", nil, nil)];
+        [rows addObjectsFromArray:broken];
     }
-    if (notTested.count > 0) {
-        _untestedSection = (NSInteger)_sections.count;
-        _untestedText = [NSString stringWithFormat:@"%lu option%@ not tested", (unsigned long)notTested.count,
-                                                   notTested.count == 1 ? @"" : @"s"];
-        [_sections addObject:@"Not tested"];
-        [_rows addObject:_untestedOpen ? notTested : [NSMutableArray array]];
+    [rows addObject:PFBReportRowMake(PFBReportRowHeader, @"Options", nil, nil)];
+    PFBReportRow* untestedRow = PFBReportRowMake(PFBReportRowList, @"Not tested", @(notTested).stringValue,
+                                                 @"Not seen yet during the checks.");
+    untestedRow.verdict = PFBCompatVerdictNotTested;
+    untestedRow.enabled = notTested > 0;
+    [rows addObject:untestedRow];
+    PFBReportRow* workingRow = PFBReportRowMake(PFBReportRowList, @"Working", @(working).stringValue,
+                                                @"Seen working on this build.");
+    workingRow.verdict = PFBCompatVerdictOK;
+    workingRow.enabled = working > 0;
+    [rows addObject:workingRow];
+
+    [rows addObject:PFBReportRowMake(PFBReportRowHeader, @"Screens", nil, nil)];
+    NSUInteger left = PFBCompatTourScreens(NO);
+    PFBReportRow* remaining =
+        PFBReportRowMake(PFBReportRowTour, @"Remaining screens", nil, PFBReportRemainingText(left));
+    remaining.enabled = left > 0;
+    [rows addObject:remaining];
+    PFBReportRow* all =
+        PFBReportRowMake(PFBReportRowTour, @"All screens", nil, PFBReportAllScreensText(PFBCompatTourScreens(YES)));
+    all.enabled = YES;
+    all.full = YES;
+    [rows addObject:all];
+
+    [rows addObject:PFBReportRowMake(PFBReportRowHeader, @"History", nil, nil)];
+    PFBReportRow* startOver = PFBReportRowMake(PFBReportRowStartOver, @"Start over", nil,
+                                               @"Clear the counts and close Twitter. Settings are kept.");
+    startOver.enabled = YES;
+    [rows addObject:startOver];
+    NSString* history = PFBReportHistoryText();
+    if (history) {
+        [rows addObject:PFBReportRowMake(PFBReportRowNote, nil, nil, history)];
     }
-    // The problems lead; every other option follows under its settings section.
-    BOOL issues = broken.count + notTested.count > 0;
-    _okLabelSection = (NSInteger)_sections.count;
-    PFBCompatReadState state = PFBCompatReadStatus();
-    NSString* tail = state == PFBCompatReadPending ? @" so far" : (state == PFBCompatReadFailed ? @" on the other checks" : @"");
-    _summaryText = [NSString stringWithFormat:@"%lu %@option%@ OK%@", (unsigned long)okOptions,
-                                               issues ? @"other " : @"", okOptions == 1 ? @"" : @"s", tail];
-    [_sections addObject:@"Working"];
-    [_rows addObject:[NSMutableArray array]];
-    // The list stays folded until opened; the choice is kept.
-    for (PFBCompatResult* result in _listOpen ? results : @[]) {
-        if (result.verdict != PFBCompatVerdictOK) {
-            continue;
-        }
-        if ((NSInteger)_sections.count - 1 == _okLabelSection ||
-            ![_sections.lastObject isEqualToString:result.section]) {
-            [_sections addObject:result.section];
-            [_rows addObject:[NSMutableArray array]];
-        }
-        [_rows.lastObject addObject:result];
-    }
-    // The last tour and what is left, for reading; the tours start from the menu.
-    _checkSection = (NSInteger)_sections.count;
-    [_sections addObject:@"Check"];
-    [_rows addObject:[NSMutableArray array]];
-    [_sections addObject:@"History"];
-    [_rows addObject:[NSMutableArray array]];
+    _rows = rows;
     self.tableView.tableHeaderView = [self summaryHeaderFor:results];
 }
 
@@ -265,7 +546,7 @@ static NSString* const kPFBCompatUntestedOpenKey = @"pfb_compat_untested_open";
     headline.translatesAutoresizingMaskIntoConstraints = NO;
 
     UILabel* subline = [[UILabel alloc] init];
-    subline.text = [NSString stringWithFormat:@"iOS %@ \u00b7 %lu options", UIDevice.currentDevice.systemVersion,
+    subline.text = [NSString stringWithFormat:@"iOS %@ · %lu options", UIDevice.currentDevice.systemVersion,
                                               (unsigned long)optionCount];
     subline.font = PFBSettingsDetailFont();
     subline.textColor = PFBSettingsSubtitleColor();
@@ -299,7 +580,7 @@ static NSString* const kPFBCompatUntestedOpenKey = @"pfb_compat_untested_open";
             small.transform = CGAffineTransformMakeScale(0.7, 0.7);
             [small startAnimating];
             icon = small;
-            status.text = @"Checking Twitter\u2019s settings\u2026";
+            status.text = @"Checking Twitter’s settings…";
             status.textColor = PFBSettingsSubtitleColor();
         } else {
             UIImageView* warning =
@@ -307,7 +588,7 @@ static NSString* const kPFBCompatUntestedOpenKey = @"pfb_compat_untested_open";
             warning.tintColor = [UIColor systemOrangeColor];
             warning.contentMode = UIViewContentModeScaleAspectFit;
             icon = warning;
-            status.text = @"Twitter\u2019s settings could not be read";
+            status.text = @"Twitter’s settings could not be read";
             status.textColor = PFBCompatWarningTextColor();
         }
         UIStackView* line = [[UIStackView alloc] initWithArrangedSubviews:@[ icon, status ]];
@@ -328,166 +609,45 @@ static NSString* const kPFBCompatUntestedOpenKey = @"pfb_compat_untested_open";
 }
 
 - (NSInteger)numberOfSectionsInTableView:(UITableView*)tableView {
-    return _sections.count;
+    return 1;
 }
 
 - (NSInteger)tableView:(UITableView*)tableView numberOfRowsInSection:(NSInteger)section {
-    if (section == _checkSection) {
-        return 2;  // Last tour, Remaining
-    }
-    if (section == _okLabelSection) {
-        return 1;
-    }
-    if (section == _untestedSection) {
-        return 1 + (NSInteger)_rows[section].count;
-    }
-    if (section == (NSInteger)_sections.count - 1) {
-        return 1;  // History: Start over
-    }
-    return _rows[section].count;
-}
-
-// Section titles drawn like the settings pages' headers: Chirp bold, 20 pt.
-- (UIView*)tableView:(UITableView*)tableView viewForHeaderInSection:(NSInteger)section {
-    UIView* container = [[UIView alloc] init];
-    container.backgroundColor = [PFBPalette currentBackgroundColor];
-    UILabel* label = [[UILabel alloc] init];
-    label.text = _sections[section];
-    label.translatesAutoresizingMaskIntoConstraints = NO;
-    label.font = PFBScaledFont([TwitterChirpFont(TwitterFontStyleBold) fontWithSize:20]);
-    label.textColor = [UIColor labelColor];
-    [container addSubview:label];
-    [NSLayoutConstraint activateConstraints:@[
-        [label.leadingAnchor constraintEqualToAnchor:container.leadingAnchor constant:16.0],
-        [label.trailingAnchor constraintEqualToAnchor:container.trailingAnchor constant:-16.0],
-        [label.bottomAnchor constraintEqualToAnchor:container.bottomAnchor constant:-6.0],
-    ]];
-    return container;
-}
-
-- (CGFloat)tableView:(UITableView*)tableView heightForHeaderInSection:(NSInteger)section {
-    return 52.0;
-}
-
-// The same gap under every section, so each title sits as far from the rows above.
-- (CGFloat)tableView:(UITableView*)tableView heightForFooterInSection:(NSInteger)section {
-    return 12.0;
-}
-
-- (UIView*)tableView:(UITableView*)tableView viewForFooterInSection:(NSInteger)section {
-    UIView* spacer = [[UIView alloc] init];
-    spacer.backgroundColor = [PFBPalette currentBackgroundColor];
-    return spacer;
+    return (NSInteger)_rows.count;
 }
 
 - (UITableViewCell*)tableView:(UITableView*)tableView cellForRowAtIndexPath:(NSIndexPath*)indexPath {
-    if (indexPath.section == _checkSection) {
-        BOOL last = indexPath.row == 0;
-        UITableViewCell* cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleSubtitle
-                                                       reuseIdentifier:@"check"];
-        cell.backgroundColor = [PFBPalette currentBackgroundColor];
-        cell.textLabel.text = last ? @"Last tour" : @"Remaining";
-        cell.textLabel.font = PFBSettingsTitleFont();
-        cell.textLabel.textColor = [UIColor labelColor];
-        cell.detailTextLabel.text = last ? (PFBCompatTourLastRun() ?: @"No tour on this build yet")
-                                         : PFBCompatScreensLeftText();
-        cell.detailTextLabel.numberOfLines = 0;
-        cell.detailTextLabel.font = PFBSettingsDetailFont();
-        cell.detailTextLabel.textColor = PFBSettingsSubtitleColor();
-        cell.imageView.image = PFBRowSymbol(last ? @"clock" : @"scope");
-        cell.imageView.tintColor = PFBSettingsSubtitleColor();
-        cell.selectionStyle = UITableViewCellSelectionStyleNone;
-        return cell;
-    }
-    if (indexPath.section == (NSInteger)_sections.count - 1) {
-        UITableViewCell* cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleDefault
-                                                       reuseIdentifier:@"action"];
-        cell.backgroundColor = [PFBPalette currentBackgroundColor];
-        cell.textLabel.text = @"Start over";
-        cell.textLabel.font = PFBSettingsTitleFont();
-        cell.textLabel.textColor = [UIColor systemRedColor];
-        return cell;
-    }
-    if (indexPath.section == _okLabelSection) {
-        return [self summaryCellWithText:_summaryText
-                                  symbol:@"checkmark.circle.fill"
-                                    tint:[UIColor systemGreenColor]
-                                    open:_listOpen];
-    }
-    if (indexPath.section == _untestedSection && indexPath.row == 0) {
-        return [self summaryCellWithText:_untestedText
-                                  symbol:@"minus.circle.fill"
-                                    tint:[UIColor systemOrangeColor]
-                                    open:_untestedOpen];
-    }
-    NSInteger row = indexPath.section == _untestedSection ? indexPath.row - 1 : indexPath.row;
-    PFBCompatResult* result = _rows[indexPath.section][row];
-    BOOL issue = result.verdict != PFBCompatVerdictOK;
-    // A problem carries its reason under the name; the rest show On or Off on the right.
-    UITableViewCell* cell =
-        [[UITableViewCell alloc] initWithStyle:(issue ? UITableViewCellStyleSubtitle : UITableViewCellStyleValue1)
-                               reuseIdentifier:(issue ? @"issue" : @"row")];
-    cell.backgroundColor = [PFBPalette currentBackgroundColor];
-    cell.textLabel.text = (issue && !result.internal && !result.enabled)
-                              ? [result.title stringByAppendingString:@" \u00b7 Off"]
-                              : result.title;
-    cell.textLabel.font = PFBSettingsTitleFont();
-    cell.textLabel.textColor = [UIColor labelColor];
-    cell.detailTextLabel.text = (issue || result.internal) ? result.detail : (result.enabled ? (result.alwaysOn ? @"Always on" : @"On") : @"Off");
-    cell.detailTextLabel.numberOfLines = issue ? 0 : 1;
-    cell.detailTextLabel.font = PFBSettingsDetailFont();
-    cell.detailTextLabel.textColor = PFBSettingsSubtitleColor();
-    cell.imageView.image = PFBVerdictImage(result.verdict);
-    cell.imageView.tintColor = PFBVerdictColor(result.verdict);
-    cell.selectionStyle = UITableViewCellSelectionStyleNone;
-    return cell;
+    return PFBReportCell(tableView, indexPath, _rows[(NSUInteger)indexPath.row]);
 }
 
-// A summary row: the options' verdict mark, their count, and a chevron that folds them.
-- (UITableViewCell*)summaryCellWithText:(NSString*)text symbol:(NSString*)symbol tint:(UIColor*)tint open:(BOOL)open {
-    // Same symbol size, column and title font as the option rows below it.
-    UITableViewCell* cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleValue1
-                                                   reuseIdentifier:@"summary"];
-    cell.backgroundColor = [PFBPalette currentBackgroundColor];
-    cell.textLabel.text = text;
-    cell.textLabel.font = PFBSettingsTitleFont();
-    cell.textLabel.textColor = [UIColor labelColor];
-    cell.imageView.image = PFBRowSymbol(symbol);
-    cell.imageView.tintColor = tint;
-    UIImageSymbolConfiguration* chevronSize =
-        [UIImageSymbolConfiguration configurationWithPointSize:13.0 weight:UIImageSymbolWeightSemibold];
-    UIImageView* chevron =
-        [[UIImageView alloc] initWithImage:[UIImage systemImageNamed:(open ? @"chevron.down" : @"chevron.right")
-                                                   withConfiguration:chevronSize]];
-    chevron.tintColor = [UIColor tertiaryLabelColor];
-    cell.accessoryView = chevron;
-    cell.accessibilityTraits |= UIAccessibilityTraitButton;
-    cell.accessibilityValue = open ? @"Expanded" : @"Collapsed";
-    return cell;
+- (CGFloat)tableView:(UITableView*)tableView heightForHeaderInSection:(NSInteger)section {
+    return CGFLOAT_MIN;
+}
+
+- (CGFloat)tableView:(UITableView*)tableView heightForFooterInSection:(NSInteger)section {
+    return CGFLOAT_MIN;
+}
+
+- (BOOL)tableView:(UITableView*)tableView shouldHighlightRowAtIndexPath:(NSIndexPath*)indexPath {
+    return _rows[(NSUInteger)indexPath.row].enabled;
 }
 
 - (void)tableView:(UITableView*)tableView didSelectRowAtIndexPath:(NSIndexPath*)indexPath {
     [tableView deselectRowAtIndexPath:indexPath animated:YES];
-    BOOL untestedSummary = indexPath.section == _untestedSection && indexPath.row == 0;
-    if (indexPath.section == _okLabelSection || untestedSummary) {
-        if (untestedSummary) {
-            _untestedOpen = !_untestedOpen;
-            [[NSUserDefaults standardUserDefaults] setBool:_untestedOpen forKey:kPFBCompatUntestedOpenKey];
-        } else {
-            _listOpen = !_listOpen;
-            [[NSUserDefaults standardUserDefaults] setBool:_listOpen forKey:kPFBCompatListOpenKey];
-        }
-        [self rebuild];
-        [UIView transitionWithView:tableView
-                          duration:0.2
-                           options:UIViewAnimationOptionTransitionCrossDissolve
-                        animations:^{
-                            [tableView reloadData];
-                        }
-                        completion:nil];
+    PFBReportRow* row = _rows[(NSUInteger)indexPath.row];
+    if (!row.enabled) {
         return;
     }
-    if (indexPath.section == (NSInteger)_sections.count - 1) {
+    if (row.kind == PFBReportRowList) {
+        NSString* note = row.verdict == PFBCompatVerdictOK
+                             ? @"Options seen working on this build."
+                             : @"Options not seen yet during the checks. The next tour or normal use proves them.";
+        PFBCompatibilityListViewController* list =
+            [[PFBCompatibilityListViewController alloc] initWithVerdict:row.verdict title:row.title note:note];
+        [self.navigationController pushViewController:list animated:YES];
+    } else if (row.kind == PFBReportRowTour) {
+        [self startTour:row.full];
+    } else if (row.kind == PFBReportRowStartOver) {
         [self confirmStartOver];
     }
 }

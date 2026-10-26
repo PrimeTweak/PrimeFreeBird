@@ -42,9 +42,6 @@ extern NSString* const PFBTabPanelIDKey; // T1 panel ID (NSNumber)
 // Persists the editor's selection; every other tab is hidden.
 + (void)setVisiblePageIDs:(NSArray<NSString*>*)visible;
 
-// Clears the user's selection, reverting to the default layout.
-+ (void)resetSelection;
-
 // The tabs shown until the user customizes the bar: Home, Search, Notifications
 // and Chats. Everything else the app offers is available in the editor but
 // hidden.

@@ -9,7 +9,7 @@
 static const void* kPFBAdvSearchBtnKey = &kPFBAdvSearchBtnKey;
 static const void* kPFBAdvSearchGrayKey = &kPFBAdvSearchGrayKey;
 static const void* kPFBAdvStyleWatchKey = &kPFBAdvStyleWatchKey;
-static const void* kPFBAdvHiddenByTweakKey = &kPFBAdvHiddenByTweakKey;
+static const void* kPFBAdvTakenOverKey = &kPFBAdvTakenOverKey;
 static const void* kPFBAdvFlagBackupKey = &kPFBAdvFlagBackupKey;
 
 // Rows of Twitter's filter glyph on a 24-point grid: {center y, handle center x}.
@@ -17,9 +17,16 @@ static const void* kPFBAdvFlagBackupKey = &kPFBAdvFlagBackupKey;
 // read as two settings. A block cannot capture a local C array.
 static const CGFloat kPFBSliderGeometry[2][2] = {{8.0, 14.0}, {16.0, 10.0}};
 
-// Drawn in its final color and returned as an original image, so the bar's accent
-// tint never reaches it.
-static UIImage* PFBSlidersGlyph(CGFloat side, UIColor* color) {
+// The sliders' 24-unit grid spans 27.33 points, not the gear's 24: they cover 18 of their
+// units against the gear's 20.5, so they need the larger scale to reach its width on screen.
+static const CGFloat kPFBFiltersSide = 27.33;
+// The Explore button's canvas: the 24 points of the gear and the eye, so its glyph lines
+// up in its slot as theirs do. Only transparent margin is cut.
+static const CGFloat kPFBExploreGlyphSide = 24.0;
+
+// Drawn in its final color, centered on a `canvas`-point square, and returned as an
+// original image, so the bar's accent tint never reaches it.
+static UIImage* PFBSlidersGlyph(CGFloat canvas, UIColor* color) {
     const CGFloat kUnit = 24.0;
     // Stroke on the 24-unit grid, lighter than the gear's nominal weight: the gear's glyph
     // stands taller, so an equal stroke would read heavier here.
@@ -28,17 +35,19 @@ static UIImage* PFBSlidersGlyph(CGFloat side, UIColor* color) {
     // the ring; a smaller radius closes the ring into a dot.
     const CGFloat kHandleRadius = 2.8;
     const CGFloat kInset = 3.0;
-    CGFloat scale = side / kUnit;
+    CGFloat scale = kPFBFiltersSide / kUnit;
     CGFloat half = kThickness / 2.0;
+    CGFloat offset = (canvas - kPFBFiltersSide) / 2.0;
     UIGraphicsImageRendererFormat* format =
         [UIGraphicsImageRendererFormat preferredFormat];
     format.opaque = NO;
     UIGraphicsImageRenderer* renderer =
-        [[UIGraphicsImageRenderer alloc] initWithSize:CGSizeMake(side, side)
+        [[UIGraphicsImageRenderer alloc] initWithSize:CGSizeMake(canvas, canvas)
                                                format:format];
     UIImage* drawn = [renderer
         imageWithActions:^(UIGraphicsImageRendererContext* context) {
             CGContextRef ctx = context.CGContext;
+            CGContextTranslateCTM(ctx, offset, offset);
             [(color ?: [UIColor blackColor]) setStroke];
             CGContextSetLineWidth(ctx, kThickness * scale);
             // Round caps and joins, as the app's own glyphs are drawn.
@@ -64,10 +73,6 @@ static UIImage* PFBSlidersGlyph(CGFloat side, UIColor* color) {
         }];
     return [drawn imageWithRenderingMode:UIImageRenderingModeAlwaysOriginal];
 }
-
-// 27.33 points, not the gear's 24: the sliders cover 18 of their 24 units against the
-// gear's 20.5, so they need the wider canvas to reach the same width on screen.
-static const CGFloat kPFBFiltersSide = 27.33;
 
 // The Filters button in the bar's gray, flat like the settings gear: iOS 26 gives bar
 // buttons a shared glass capsule, and the property opting out is reached through the
@@ -472,12 +477,12 @@ static void pfbAdvCollapseNativeInSearchBar(UIView* bar) {
     if (![button isKindOfClass:[UIButton class]]) {
         return;
     }
-    BOOL ours = objc_getAssociatedObject(button, kPFBAdvHiddenByTweakKey) != nil;
+    BOOL ours = objc_getAssociatedObject(button, kPFBAdvTakenOverKey) != nil;
     if (hide) {
         // Only a button the app shows is taken over; one it hides itself is
         // left alone so it is never un-hidden on release.
         if (!ours && !button.hidden) {
-            objc_setAssociatedObject(button, kPFBAdvHiddenByTweakKey, @YES,
+            objc_setAssociatedObject(button, kPFBAdvTakenOverKey, @YES,
                                      OBJC_ASSOCIATION_RETAIN_NONATOMIC);
             ours = YES;
             PFBCOMPAT_ACTION(PFBCompat_advanced_search, @"Twitter's filter button hidden in search");
@@ -494,7 +499,7 @@ static void pfbAdvCollapseNativeInSearchBar(UIView* bar) {
             }
         }
     } else if (ours) {
-        objc_setAssociatedObject(button, kPFBAdvHiddenByTweakKey, nil,
+        objc_setAssociatedObject(button, kPFBAdvTakenOverKey, nil,
                                  OBJC_ASSOCIATION_RETAIN_NONATOMIC);
         button.hidden = NO;
         button.alpha = 1.0;
@@ -598,7 +603,7 @@ static void pfbAdvPaintExploreButton(UIViewController* owner, UIBarButtonItem* b
     }
     PFBBarGlyphButton* view = (PFBBarGlyphButton*)button.customView;
     if ([view isKindOfClass:[PFBBarGlyphButton class]]) {
-        view.glyph = PFBSlidersGlyph(kPFBFiltersSide, gray);
+        view.glyph = PFBSlidersGlyph(kPFBExploreGlyphSide, gray);
     }
     objc_setAssociatedObject(button, kPFBAdvSearchGrayKey, gray, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
 }
@@ -644,7 +649,6 @@ static void pfbAdvWatchExploreStyle(UIViewController* owner) {
             // Toggle off: the Filters button a previous appearance added is removed, so the
             // setting applies live on the next visit.
             if (existingBtn) {
-                PFBBarUnpairNeighbor(existingBtn, item.rightBarButtonItems);
                 NSMutableArray* items =
                     [item.rightBarButtonItems mutableCopy] ?: [NSMutableArray array];
                 [items removeObject:existingBtn];
@@ -664,7 +668,7 @@ static void pfbAdvWatchExploreStyle(UIViewController* owner) {
             UIColor* gray = PFBBarIconGray(owner.traitCollection);
             // Paired with the gear beside it below, as the Notifications eye is.
             btn = PFBBarGlyphItem(
-                PFBSlidersGlyph(kPFBFiltersSide, gray),
+                PFBSlidersGlyph(kPFBExploreGlyphSide, gray),
                 [[PFBBundle sharedBundle] localizedStringForKey:@"ADVANCED_SEARCH_TITLE"],
                 self, @selector(pfbShowAdvancedSearch));
             objc_setAssociatedObject(btn, kPFBAdvSearchGrayKey, gray,

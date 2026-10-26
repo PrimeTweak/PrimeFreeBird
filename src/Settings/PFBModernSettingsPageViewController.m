@@ -468,7 +468,7 @@ static NSURL* PFBAccountAvatarURL(TFNTwitterAccount* account) {
             SEL action = NSSelectorFromString(actionName);
             if ([self respondsToSelector:action]) {
                 // Pass the row's indexPath so value-editing actions can reload
-                // their own row afterwards (e.g. the sharing domain prompt).
+                // their own row afterward (e.g. the sharing domain prompt).
                 NSMutableDictionary* payload = [data mutableCopy];
                 payload[@"indexPath"] = indexPath;
 #pragma clang diagnostic push

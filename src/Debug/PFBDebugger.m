@@ -457,7 +457,7 @@ NSString* PFBDebuggerReport(void) {
 // MARK: - floating trigger
 
 static PFBDebugOverlayWindow* gPFBOverlay;
-// The state last asked for, which a button placed afterwards takes on.
+// The state last asked for, which a button placed afterward takes on.
 static BOOL gPFBTriggerHidden;
 
 static UIWindow* PFBActiveWindow(void) {

@@ -1546,7 +1546,6 @@ static const PFBCompatName kNames[] = {
     {PFBCompatOptionCount, "Debug/PFBCompatibilityTour.m", "verifyTalonURL:completion:"},
     {PFBCompatOptionCount, "Debug/PFBCompatibilityTour.m", "T1TwitterClickIDHandler"},
     {PFBCompatOptionCount, "Debug/PFBCompatibilityTour.m", "URLByAppendingTwitterClickIDIfNecessary:status:account:scribePage:scribeComponent:"},
-    {PFBCompatOptionCount, "Debug/PFBCompatibilityReportViewController.m", "imageView"},
     {PFBCompatOptionCount, "Debug/PFBCompatibilityReportViewController.m", "tableView"},
     {PFBCompatOptionCount, "Debug/PFBCompatibilityReportViewController.m", "title"},
     {PFBCompatOptionCount, "Debug/PFBTourChoicePopover.m", "title"},
@@ -1589,7 +1588,6 @@ static const PFBCompatName kNames[] = {
     {PFBCompatOptionCount, "Features/Media/MediaDownloads.x", "inlineMediaInfos"},
     {PFBCompatOptionCount, "Features/Media/MediaDownloads.x", "status"},
     {PFBCompatOptionCount, "Features/Appearance/NavBarIcons.x", "setHidesSharedBackground:"},
-    {PFBCompatOptionCount, "Features/Appearance/NavBarIcons.x", "setSharesBackground:"},
     {PFBCompatOptionCount, "Features/Appearance/NavBarIcons.x", "setTintColor:"},
     {PFBCompatOptionCount, "Features/Messages/PillSwap.x", "hidesSharedBackground"},
     {PFBCompatOptionCount, "Features/Messages/PillSwap.x", "menu"},
@@ -2421,16 +2419,16 @@ static NSString* imageUUID(const struct mach_header_64* header) {
 }
 
 // The start of this dylib's own UUID: a rebuild counts as a new install.
-static NSString* tweakBuild(void) {
+static NSString* dylibBuild(void) {
     Dl_info info;
-    if (!dladdr((const void*)&tweakBuild, &info) || !info.dli_fbase) {
+    if (!dladdr((const void*)&dylibBuild, &info) || !info.dli_fbase) {
         return @"?";
     }
     return imageUUID((const struct mach_header_64*)info.dli_fbase);
 }
 
 NSString* PFBCompatBuildID(void) {
-    return tweakBuild();
+    return dylibBuild();
 }
 
 // Twitter's own binary: the build number the install pipeline writes changes with
@@ -2492,7 +2490,7 @@ static void prepare(void) {
       gTwitterVersion = info[@"CFBundleShortVersionString"] ?: @"?";
       NSString* twitter = [NSString stringWithFormat:@"%@ (%@)", gTwitterVersion,
                                                      info[@"CFBundleVersion"] ?: @"?"];
-      NSString* identity = [NSString stringWithFormat:@"%@ \u00b7 %@", twitter, tweakBuild()];
+      NSString* identity = [NSString stringWithFormat:@"%@ \u00b7 %@", twitter, dylibBuild()];
       NSDictionary* saved = [[NSUserDefaults standardUserDefaults] dictionaryForKey:kStoreKey];
       gStore = saved ? [saved mutableCopy] : [NSMutableDictionary dictionary];
       if (![gStore[@"identity"] isEqual:identity]) {
@@ -2834,29 +2832,19 @@ static NSDictionary* lastTour(void) {
 
 static NSString* tourTime(NSDictionary* last) {
     NSDateFormatter* formatter = [NSDateFormatter new];
+    formatter.locale = [NSLocale localeWithLocaleIdentifier:@"en_US_POSIX"];
     formatter.dateFormat = @"HH:mm";
     id at = last[@"at"];
     return [at isKindOfClass:[NSDate class]] ? [formatter stringFromDate:at] : @"?";
 }
 
-NSString* PFBCompatTourLastRun(void) {
+NSDate* PFBCompatTourLastDate(BOOL* stopped) {
     NSDictionary* last = lastTour();
-    if (!last) {
-        return nil;
+    id at = last[@"at"];
+    if (stopped) {
+        *stopped = [last[@"stop"] isKindOfClass:[NSString class]];
     }
-    NSArray* results = [last[@"results"] isKindOfClass:[NSArray class]] ? last[@"results"] : @[];
-    NSUInteger reached = 0;
-    for (NSString* result in results) {
-        reached += [result isKindOfClass:[NSString class]] && ![result hasSuffix:@" not reached"] ? 1 : 0;
-    }
-    NSString* stop = [last[@"stop"] isKindOfClass:[NSString class]] ? last[@"stop"] : nil;
-    if (stop) {
-        return [NSString stringWithFormat:@"Stopped at %@ (%@) \u00b7 %lu of %lu screens reached", tourTime(last), stop,
-                                          (unsigned long)reached, (unsigned long)results.count];
-    }
-    return [NSString stringWithFormat:@"%@ at %@ \u00b7 %lu of %lu screens reached",
-                                      [last[@"full"] boolValue] ? @"All screens" : @"Remaining screens", tourTime(last),
-                                      (unsigned long)reached, (unsigned long)results.count];
+    return [at isKindOfClass:[NSDate class]] ? at : nil;
 }
 
 // MARK: - Twitter's feature switches, read from its binaries
@@ -3797,7 +3785,7 @@ static void appendInternals(NSMutableArray<PFBCompatResult*>* results, NSSet<NSS
     [files addObjectsFromArray:names.allKeys];
     for (NSString* file in [files.allObjects sortedArrayUsingSelector:@selector(caseInsensitiveCompare:)]) {
         PFBCompatResult* row = [PFBCompatResult new];
-        row.section = @"Tweak internals";
+        row.section = @"Internals";
         row.title = file;
         row.internal = YES;
         NSInteger hookTotal = hooks[file].integerValue;
@@ -4216,6 +4204,15 @@ void PFBCompatReset(void) {
         writeStore();
     }
     PFBCompatRefreshStatus();
+}
+
+NSDate* PFBCompatCountingSince(BOOL earlierBuilds) {
+    prepare();
+    id date;
+    @synchronized(gLock) {
+        date = gStore[earlierBuilds ? @"earlierSince" : @"since"];
+    }
+    return [date isKindOfClass:[NSDate class]] ? date : nil;
 }
 
 static NSString* PFBCompatInstallText(void) {

@@ -654,9 +654,6 @@ static void PFBNotifDropRow(id dataViewController, NSIndexPath* indexPath) {
 
 // MARK: - Keeping them out of the list
 
-// Drops hidden items from sections that expose -items and -setItems:; other sections
-// pass through whole. An id in the registry can only belong to a hidden notification,
-// so the filter needs no scoping of its own.
 // Measurement: the classes of the elements lists receive as sections, and whether they
 // answer items and setItems:, one line per class.
 static void pfbProbeSectionClasses(NSArray* sections) {
@@ -682,6 +679,9 @@ static void pfbProbeSectionClasses(NSArray* sections) {
     }
 }
 
+// Drops hidden items from sections that expose -items and -setItems:; other sections
+// pass through whole. An id in the registry can only belong to a hidden notification,
+// so the filter needs no scoping of its own.
 static NSArray* PFBFilterNotifSections(NSArray* sections) {
     pfbProbeSectionClasses(sections);
     if (![PFBSettings boolForKey:@"hide_notifications"]) {

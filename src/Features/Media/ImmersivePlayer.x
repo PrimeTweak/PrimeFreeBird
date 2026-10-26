@@ -1164,7 +1164,7 @@ static void pfbStartRaiseWatch(UIView* card) {
         }
     }
     // A synthetic tap is the loop asking the app to raise its chrome: it goes
-    // straight through. Playback is held afterwards by the caller.
+    // straight through. Playback is held afterward by the caller.
     if (gPFBSyntheticToggle || ![PFBSettings boolForKey:@"tap_to_pause"]) {
         if (!gPFBSyntheticToggle) {
             PFBCOMPAT_OBSERVE(PFBCompat_tap_to_pause, @"tap on a video");
