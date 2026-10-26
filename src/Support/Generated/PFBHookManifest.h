@@ -17,3 +17,11 @@ typedef struct {
 
 extern const PFBRuntimeClassRecord PFBRuntimeClasses[];
 extern const size_t PFBRuntimeClassCount;
+
+typedef struct {
+    const char* key;          // the option's key in the compatibility store
+    const char* fingerprint;  // the code of the files naming the option, hashed
+} PFBOptionFingerprint;
+
+extern const PFBOptionFingerprint PFBOptionFingerprints[];
+extern const size_t PFBOptionFingerprintCount;

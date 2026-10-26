@@ -4,6 +4,7 @@
 #import <SafariServices/SafariServices.h>
 #import <dlfcn.h>
 #import <objc/message.h>
+#import <stdatomic.h>
 #import "Common/PFBCompatibility.h"
 #import "Debug/PFBDebugger.h"
 #import "Features/Appearance/CustomTabBar/PFBCustomTabBarUtility.h"
@@ -492,23 +493,45 @@ static BOOL tourBoolGetter(id object, NSString* name) {
     return ((BOOL (*)(id, SEL))objc_msgSend)(object, selector);
 }
 
-// A view of the class in the Home list's visible Tweets, looking a screen further down
-// each time none shows one. The list stays where the view was found.
-static UIView* tourHomeViewOfClass(NSString* className) {
+// A view of one of the classes, the first preferred, in the Home list's visible Tweets,
+// looking a screen further down each time none shows one. The list stays where it was found.
+static UIView* tourHomeViewOfClasses(NSArray<NSString*>* classNames) {
     UITableView* list = tourFrontList();
     for (NSInteger screen = 0; list && screen <= kPFBTourScreensDown; screen++) {
-        for (UITableViewCell* cell in list.visibleCells) {
-            UIView* found = tourFindClass(cell, className);
-            if (found.window) {
-                return found;
+        for (NSString* className in classNames) {
+            for (UITableViewCell* cell in list.visibleCells) {
+                UIView* found = tourFindClass(cell, className);
+                if (found.window) {
+                    return found;
+                }
             }
         }
         CGPoint offset = list.contentOffset;
         [list setContentOffset:CGPointMake(offset.x, offset.y + list.bounds.size.height * 0.8) animated:NO];
         [list layoutIfNeeded];
     }
-    PFBCompatTourLog(@"[tour] no %@ within %ld screens of Home", className, (long)kPFBTourScreensDown + 1);
+    PFBCompatTourLog(@"[tour] no %@ within %ld screens of Home", [classNames componentsJoinedByString:@" or "],
+                     (long)kPFBTourScreensDown + 1);
     return nil;
+}
+
+static UIView* tourHomeViewOfClass(NSString* className) {
+    return tourHomeViewOfClasses(@[ className ]);
+}
+
+static BOOL tourIsKind(UIView* view, NSString* className) {
+    Class cls = NSClassFromString(className);
+    return cls && [view isKindOfClass:cls];
+}
+
+// The first video on Home: its player, or the preview Twitter shows in its place until the
+// player loads. The journal names which of the two was found.
+static UIView* tourHomeVideo(NSString* step) {
+    UIView* video = tourHomeViewOfClasses(@[ @"T1InlineVideoView", @"T1InlineVideoFacadeView" ]);
+    if (video) {
+        PFBCompatTourLog(@"[tour] %@: %@ found", step, tourIsKind(video, @"T1InlineVideoView") ? @"player" : @"preview");
+    }
+    return video;
 }
 
 static void tourScrollHomeToTop(void) {
@@ -518,21 +541,67 @@ static void tourScrollHomeToTop(void) {
     }
 }
 
-// A finger's drag down the list, in steps, as its delegate would hear it.
+// The list the tour is dragging. It says a finger holds it until the drag ends: Twitter
+// folds its bars only under a finger, or while a list still glides.
+static _Atomic(void*) gPFBTourFingerList;
+static BOOL (*gPFBTourIsTracking)(id, SEL);
+static BOOL (*gPFBTourIsDragging)(id, SEL);
+
+static BOOL tourIsTracking(UIScrollView* list, SEL selector) {
+    return (__bridge void*)list == atomic_load_explicit(&gPFBTourFingerList, memory_order_relaxed) ||
+           gPFBTourIsTracking(list, selector);
+}
+
+static BOOL tourIsDragging(UIScrollView* list, SEL selector) {
+    return (__bridge void*)list == atomic_load_explicit(&gPFBTourFingerList, memory_order_relaxed) ||
+           gPFBTourIsDragging(list, selector);
+}
+
+// Set up at the tour's first drag; every other list still answers for itself.
+static BOOL tourFingerReady(void) {
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+      Method tracking = class_getInstanceMethod([UIScrollView class], @selector(isTracking));
+      Method dragging = class_getInstanceMethod([UIScrollView class], @selector(isDragging));
+      if (tracking && dragging) {
+          gPFBTourIsTracking = (BOOL (*)(id, SEL))method_getImplementation(tracking);
+          gPFBTourIsDragging = (BOOL (*)(id, SEL))method_getImplementation(dragging);
+          method_setImplementation(tracking, (IMP)tourIsTracking);
+          method_setImplementation(dragging, (IMP)tourIsDragging);
+      }
+    });
+    return gPFBTourIsTracking && gPFBTourIsDragging;
+}
+
+// A finger's drag down the list, in steps, as its delegate would hear it, with the list
+// held by the finger for the whole drag. The journal says once per tour whether it was.
 static void tourDrag(UITableView* list, CGFloat distance) {
+    static NSUInteger toldGeneration;
     id<UITableViewDelegate> delegate = list.delegate;
-    if ([delegate respondsToSelector:@selector(scrollViewWillBeginDragging:)]) {
-        [delegate scrollViewWillBeginDragging:list];
+    if (tourFingerReady()) {
+        atomic_store_explicit(&gPFBTourFingerList, (__bridge void*)list, memory_order_relaxed);
     }
-    CGPoint start = list.contentOffset;
-    for (NSInteger i = 1; i <= 6; i++) {
-        [list setContentOffset:CGPointMake(start.x, start.y + distance * i / 6.0) animated:NO];
-        if ([delegate respondsToSelector:@selector(scrollViewDidScroll:)]) {
-            [delegate scrollViewDidScroll:list];
+    @try {
+        if (list && toldGeneration != gPFBTourGeneration) {
+            toldGeneration = gPFBTourGeneration;
+            PFBCompatTourLog(@"[tour] drag: %@", list.isDragging ? @"the list says a finger holds it"
+                                                                 : @"the list answers on its own");
         }
-    }
-    if ([delegate respondsToSelector:@selector(scrollViewDidEndDragging:willDecelerate:)]) {
-        [delegate scrollViewDidEndDragging:list willDecelerate:NO];
+        if ([delegate respondsToSelector:@selector(scrollViewWillBeginDragging:)]) {
+            [delegate scrollViewWillBeginDragging:list];
+        }
+        CGPoint start = list.contentOffset;
+        for (NSInteger i = 1; i <= 6; i++) {
+            [list setContentOffset:CGPointMake(start.x, start.y + distance * i / 6.0) animated:NO];
+            if ([delegate respondsToSelector:@selector(scrollViewDidScroll:)]) {
+                [delegate scrollViewDidScroll:list];
+            }
+        }
+        if ([delegate respondsToSelector:@selector(scrollViewDidEndDragging:willDecelerate:)]) {
+            [delegate scrollViewDidEndDragging:list willDecelerate:NO];
+        }
+    } @finally {
+        atomic_store_explicit(&gPFBTourFingerList, NULL, memory_order_relaxed);
     }
 }
 
@@ -636,10 +705,27 @@ static UIControl* tourOpenTweetMenu(void) {
     return [caret isKindOfClass:[UIControl class]] ? caret : nil;
 }
 
-// The first video on Home, opened full screen through its own tap handler, with the
-// tap recognizer it expects. Returns the video, for the second way in.
+// The media view around a Tweet's video or photos, tapped at its first item: the route
+// a tap on the media takes.
+static void tourTapMedia(UIView* media, NSString* step) {
+    UIView* forward = tourAncestor(media, @"T1StatusPhotoVideoForwardView");
+    SEL open = NSSelectorFromString(@"_t1_mediaTapActionAtIndex:");
+    if (![forward respondsToSelector:open]) {
+        PFBCompatTourLog(@"[tour] %@: %@", step, media ? @"no media view around it" : @"nothing to tap");
+        return;
+    }
+    ((void (*)(id, SEL, NSUInteger))objc_msgSend)(forward, open, 0);
+}
+
+// The first video on Home, opened full screen: a player through its own tap handler, with
+// the tap recognizer it expects; a preview through the media view around it. Returns the
+// video, for the second way in.
 static UIView* tourOpenVideo(void) {
-    UIView* video = tourHomeViewOfClass(@"T1InlineVideoView");
+    UIView* video = tourHomeVideo(@"video full screen");
+    if (video && !tourIsKind(video, @"T1InlineVideoView")) {
+        tourTapMedia(video, @"video full screen");
+        return video;
+    }
     UIGestureRecognizer* tap = tourGesture(video, @"handleTapWithTapRecognizer:");
     for (UIGestureRecognizer* recognizer in video.gestureRecognizers) {
         if (!tap && [recognizer isKindOfClass:[UITapGestureRecognizer class]]) {
@@ -653,18 +739,6 @@ static UIView* tourOpenVideo(void) {
     }
     ((void (*)(id, SEL, id))objc_msgSend)(video, open, tap);
     return video;
-}
-
-// The media view around a Tweet's video or photos, tapped at its first item: the route
-// a tap on the media takes.
-static void tourTapMedia(UIView* media, NSString* step) {
-    UIView* forward = tourAncestor(media, @"T1StatusPhotoVideoForwardView");
-    SEL open = NSSelectorFromString(@"_t1_mediaTapActionAtIndex:");
-    if (![forward respondsToSelector:open]) {
-        PFBCompatTourLog(@"[tour] %@: %@", step, media ? @"no media view around it" : @"nothing to tap");
-        return;
-    }
-    ((void (*)(id, SEL, NSUInteger))objc_msgSend)(forward, open, 0);
 }
 
 // The full-screen player's double tap is the like Confirm likes guards there.
@@ -1740,11 +1814,13 @@ static NSArray<NSDictionary*>* tourAllSteps(void) {
     __block BOOL menuBuilt = NO;
     [steps addObject:tourStep(@"video long press", @"Video menu", home, ^{
              menuBuilt = NO;
-             UIView* pressed = tourHomeViewOfClass(@"T1InlineVideoView");
+             UIView* pressed = tourHomeVideo(@"video long press");
              menuBuilt = tourTableMenuDoor(pressed, @"first");
              // Twitter's share sheet names the Tweet a moment after an ask; the asks that
-             // follow find it, as the menu of a real long press does.
+             // follow find it, as the menu of a real long press does, on the video the row
+             // shows then, a preview having become its player.
              __weak UIView* weakPressed = pressed;
+             __weak UITableViewCell* weakRow = (UITableViewCell*)tourAncestor(pressed, @"UITableViewCell");
              NSUInteger generation = gPFBTourGeneration;
              for (NSInteger ask = 1; ask <= 2; ask++) {
                  dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.6 * ask * NSEC_PER_SEC)),
@@ -1752,7 +1828,10 @@ static NSArray<NSDictionary*>* tourAllSteps(void) {
                                   if (generation == gPFBTourGeneration &&
                                       [gPFBTourStepLive isEqualToString:@"video long press"]) {
                                       tourAttempt(@"video long press", @"asking the menu again", ^{
-                                        menuBuilt = tourTableMenuDoor(weakPressed, ask == 1 ? @"again" : @"a third time") || menuBuilt;
+                                        UIView* shown = tourFindClass(weakRow, @"T1InlineVideoView")
+                                                            ?: tourFindClass(weakRow, @"T1InlineVideoFacadeView")
+                                                            ?: weakPressed;
+                                        menuBuilt = tourTableMenuDoor(shown, ask == 1 ? @"again" : @"a third time") || menuBuilt;
                                       });
                                   }
                                 });
@@ -1970,7 +2049,7 @@ static NSArray<NSDictionary*>* tourAllSteps(void) {
     return steps;
 }
 
-// The steps a tour takes: all, or those whose screen still owes a proof on this build.
+// The steps a tour takes: all, or those whose screen still owes a proof.
 // A step that closed Twitter is left out until a new build.
 static NSArray<NSDictionary*>* tourSteps(BOOL full) {
     NSArray<NSDictionary*>* steps = tourAllSteps();
@@ -2093,7 +2172,7 @@ static void tourFinish(NSMutableArray<NSString*>* results, BOOL full) {
     NSSet<NSString*>* launch = PFBCompatStationPending(@"launch");
     PFBCompatStationRecord(@"launch", YES, launch);
     if (launch.count) {
-        PFBCompatTourLog(@"[tour] launch: missed %@",
+        PFBCompatTourLog(@"[tour] launch: not seen: %@",
                          [[launch.allObjects sortedArrayUsingSelector:@selector(compare:)] componentsJoinedByString:@", "]);
     }
     tourConclude(results, full, nil);
@@ -2116,9 +2195,10 @@ static void tourConcludeStep(NSArray<NSDictionary*>* steps, NSUInteger index, NS
     NSString* empty = pending ? gPFBTourStepEmpty : nil;
     gPFBTourStepEmpty = nil;
     reached = reached && !empty;
+    // A screen reached with options still unproven says how many did not see their situation.
     NSArray<NSString*>* missed = [pending.allObjects sortedArrayUsingSelector:@selector(compare:)];
     NSString* outcome = empty ?: (!reached ? @"not reached"
-                                           : (missed.count ? [NSString stringWithFormat:@"missed %lu",
+                                           : (missed.count ? [NSString stringWithFormat:@"reached (%lu not seen)",
                                                                                         (unsigned long)missed.count]
                                                            : @"ok"));
     [results addObject:[NSString stringWithFormat:@"%@ %@", name, outcome]];
@@ -2128,7 +2208,7 @@ static void tourConcludeStep(NSArray<NSDictionary*>* steps, NSUInteger index, NS
         PFBCompatStationRecord(name, reached, pending);
     }
     PFBCompatTourLog(@"[tour] %@: %@ \u00b7 %@%@", name, outcome, detail,
-                     reached && missed.count ? [@" \u00b7 missed: " stringByAppendingString:[missed componentsJoinedByString:@", "]]
+                     reached && missed.count ? [@" \u00b7 not seen: " stringByAppendingString:[missed componentsJoinedByString:@", "]]
                                              : @"");
     tourJournalWrite([NSString stringWithFormat:@"result: %@ \u00b7 %@", name, outcome]);
     tourAttempt(name, @"clean-up", step[@"after"]);
@@ -2237,7 +2317,7 @@ static void tourStart(BOOL full) {
     }
     NSArray<NSDictionary*>* steps = tourSteps(full);
     if (steps.count == 0) {
-        PFBDebugLog(@"[tour] nothing left to prove on this build");
+        PFBDebugLog(@"[tour] nothing left to prove");
         return;
     }
     gPFBTourRunning = YES;
@@ -2287,7 +2367,7 @@ BOOL PFBCompatTourIsRunning(void) {
 
 // MARK: - Planning a tour
 
-// The screens a tour would show: all of them, or those with proofs still owed on this build.
+// The screens a tour would show: all of them, or those with proofs still owed.
 NSUInteger PFBCompatTourScreens(BOOL full) {
     return tourSteps(full).count;
 }

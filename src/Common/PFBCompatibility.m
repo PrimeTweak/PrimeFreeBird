@@ -1479,6 +1479,7 @@ static const PFBCompatName kNames[] = {
     {PFBCompatOptionCount, "Debug/PFBCompatibilityTour.m", "caretButton"},
     {PFBCompatOptionCount, "Debug/PFBCompatibilityTour.m", "_didTapCaret"},
     {PFBCompatOptionCount, "Debug/PFBCompatibilityTour.m", "T1InlineVideoView"},
+    {PFBCompatOptionCount, "Debug/PFBCompatibilityTour.m", "T1InlineVideoFacadeView"},
     {PFBCompatOptionCount, "Debug/PFBCompatibilityTour.m", "handleTapWithTapRecognizer:"},
     {PFBCompatOptionCount, "Debug/PFBCompatibilityTour.m", "_TtC14T1TwitterSwift32ImmersiveDoubleTapLikePluginView"},
     {PFBCompatOptionCount, "Debug/PFBCompatibilityTour.m", "handleDoubleTap:"},
@@ -2448,37 +2449,95 @@ static void writeStore(void) {
     [[NSUserDefaults standardUserDefaults] setObject:[gStore copy] forKey:kStoreKey];
 }
 
-// Caller holds gLock or runs the one-time load. Adds this build's evidence to what
-// earlier builds of the same Twitter version proved.
+// This build's fingerprint of each option's code, by option key.
+static NSDictionary<NSString*, NSString*>* currentFingerprints(void) {
+    static NSDictionary<NSString*, NSString*>* prints;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+      NSMutableDictionary<NSString*, NSString*>* table = [NSMutableDictionary dictionary];
+      for (size_t i = 0; i < PFBOptionFingerprintCount; i++) {
+          table[[NSString stringWithUTF8String:PFBOptionFingerprints[i].key]] =
+              [NSString stringWithUTF8String:PFBOptionFingerprints[i].fingerprint];
+      }
+      prints = table;
+    });
+    return prints;
+}
+
+// Caller holds gLock or runs the one-time load. Adds the last build's evidence to what
+// earlier builds of the same Twitter version proved, option by option: an option whose
+// code changed keeps only the evidence of its new code.
 static void foldIntoEarlier(void) {
+    NSArray<NSString*>* kinds = @[ @"counts", @"details", @"observed", @"paths" ];
+    // Fingerprints written by another build than the one folded leave every origin unknown.
+    BOOL printsOfLast = [gStore[@"fingerprintsOf"] isEqual:gStore[@"identity"]];
+    NSDictionary* lastPrints = printsOfLast ? storeDictionary(@"fingerprints") : @{};
+    NSMutableDictionary* earlierPrints =
+        printsOfLast ? [storeDictionary(@"earlierFingerprints") mutableCopy] : [NSMutableDictionary dictionary];
     NSMutableDictionary* earlier = [storeDictionary(@"earlier") mutableCopy];
-    for (NSString* kind in @[ @"counts", @"details", @"observed", @"paths" ]) {
-        NSMutableDictionary* kept = [earlier[kind] isKindOfClass:[NSDictionary class]]
-                                        ? [earlier[kind] mutableCopy] : [NSMutableDictionary dictionary];
-        NSDictionary* current = storeDictionary(kind);
-        for (NSString* key in current) {
-            id value = current[key];
+    NSMutableDictionary<NSString*, NSMutableDictionary*>* kept = [NSMutableDictionary dictionary];
+    NSMutableSet<NSString*>* keys = [NSMutableSet set];
+    for (NSString* kind in kinds) {
+        kept[kind] = [earlier[kind] isKindOfClass:[NSDictionary class]] ? [earlier[kind] mutableCopy]
+                                                                          : [NSMutableDictionary dictionary];
+        [keys addObjectsFromArray:storeDictionary(kind).allKeys];
+    }
+    for (NSString* key in keys) {
+        id last = lastPrints[key];
+        if (![last isKindOfClass:[NSString class]]) {
+            // A build from before the fingerprints: its evidence joins, of unknown code.
+            [earlierPrints removeObjectForKey:key];
+        } else if (![last isEqual:earlierPrints[key]]) {
+            for (NSString* kind in kinds) {
+                [kept[kind] removeObjectForKey:key];
+            }
+            earlierPrints[key] = last;
+        }
+        for (NSString* kind in kinds) {
+            id value = storeDictionary(kind)[key];
+            if (!value) {
+                continue;
+            }
             if ([kind isEqualToString:@"counts"]) {
-                kept[key] = @([kept[key] unsignedLongLongValue] + [value unsignedLongLongValue]);
+                kept[kind][key] = @([kept[kind][key] unsignedLongLongValue] + [value unsignedLongLongValue]);
             } else if ([kind isEqualToString:@"paths"] && [value isKindOfClass:[NSArray class]]) {
                 NSMutableOrderedSet* names = [NSMutableOrderedSet orderedSetWithArray:
-                    [kept[key] isKindOfClass:[NSArray class]] ? kept[key] : @[]];
+                    [kept[kind][key] isKindOfClass:[NSArray class]] ? kept[kind][key] : @[]];
                 [names addObjectsFromArray:value];
-                kept[key] = names.array;
-            } else if (!kept[key]) {
-                kept[key] = value;
+                kept[kind][key] = names.array;
+            } else if (!kept[kind][key]) {
+                kept[kind][key] = value;
             }
         }
-        earlier[kind] = kept;
+    }
+    for (NSString* kind in kinds) {
+        earlier[kind] = kept[kind];
     }
     gStore[@"earlier"] = earlier;
+    gStore[@"earlierFingerprints"] = earlierPrints;
     if (![gStore[@"earlierSince"] isKindOfClass:[NSDate class]]) {
         gStore[@"earlierSince"] = [gStore[@"since"] isKindOfClass:[NSDate class]] ? gStore[@"since"] : [NSDate date];
     }
 }
 
+typedef NS_ENUM(NSInteger, PFBEarlierCode) {
+    PFBEarlierCodeUnknown,
+    PFBEarlierCodeSame,
+    PFBEarlierCodeOlder,
+};
+
+// Caller holds gLock. Whether the code behind an option's earlier evidence is this build's.
+static PFBEarlierCode earlierCode(NSString* key) {
+    id then = storeDictionary(@"earlierFingerprints")[key];
+    if (![then isKindOfClass:[NSString class]]) {
+        return PFBEarlierCodeUnknown;
+    }
+    return [then isEqualToString:currentFingerprints()[key] ?: @""] ? PFBEarlierCodeSame : PFBEarlierCodeOlder;
+}
+
 // Loads what was counted before. A rebuild on the same Twitter keeps what earlier builds
-// proved, shown apart until seen again; a new Twitter version starts clean.
+// proved, which still counts for each option whose code is unchanged; a new Twitter version
+// starts clean.
 static void prepare(void) {
     static dispatch_once_t once;
     dispatch_once(&once, ^{
@@ -2506,8 +2565,11 @@ static void prepare(void) {
           } else {
               gStore[@"earlier"] = @{};
               [gStore removeObjectForKey:@"earlierSince"];
+              [gStore removeObjectForKey:@"earlierFingerprints"];
               gStore[@"checkDue"] = twitterBinary();
           }
+          gStore[@"fingerprints"] = currentFingerprints();
+          gStore[@"fingerprintsOf"] = identity;
           gStore[@"tour"] = @{};
           [gStore removeObjectForKey:@"measures"];
           gStore[@"identity"] = identity;
@@ -2650,7 +2712,15 @@ static void save(void) {
 
 // MARK: - Tour stations
 
-// Acted or noted on this build, whether the proof is saved yet or still in memory.
+// Caller holds gLock. Acted or noted, in stored evidence (this build's or the earlier one).
+static BOOL evidenceProves(NSDictionary* store, NSString* key) {
+    NSDictionary* counts = [store[@"counts"] isKindOfClass:[NSDictionary class]] ? store[@"counts"] : @{};
+    NSDictionary* observed = [store[@"observed"] isKindOfClass:[NSDictionary class]] ? store[@"observed"] : @{};
+    return [counts[key] unsignedLongLongValue] > 0 || [observed[key] isKindOfClass:[NSString class]];
+}
+
+// Acted or noted on this build, whether the proof is saved yet or still in memory, or on
+// earlier builds of this Twitter with the option's code unchanged.
 static BOOL optionProven(PFBCompatOption option) {
     if ((size_t)option >= PFBCompatOptionCount) {
         return NO;
@@ -2666,8 +2736,8 @@ static BOOL optionProven(PFBCompatOption option) {
     }
     NSString* name = [NSString stringWithUTF8String:key];
     @synchronized(gLock) {
-        return [storeDictionary(@"counts")[name] unsignedLongLongValue] > 0 ||
-               [storeDictionary(@"observed")[name] isKindOfClass:[NSString class]];
+        return evidenceProves(gStore, name) ||
+               (earlierCode(name) == PFBEarlierCodeSame && evidenceProves(storeDictionary(@"earlier"), name));
     }
 }
 
@@ -2680,10 +2750,16 @@ static BOOL pathProven(const PFBCompatPathMeta* meta) {
         return NO;
     }
     NSString* key = [NSString stringWithUTF8String:owner];
+    NSString* name = [NSString stringWithUTF8String:meta->name];
     @synchronized(gLock) {
         id seen = storeDictionary(@"paths")[key];
-        return [seen isKindOfClass:[NSArray class]] &&
-               [seen containsObject:[NSString stringWithUTF8String:meta->name]];
+        if ([seen isKindOfClass:[NSArray class]] && [seen containsObject:name]) {
+            return YES;
+        }
+        id earlierPaths = storeDictionary(@"earlier")[@"paths"];
+        id earlierSeen = [earlierPaths isKindOfClass:[NSDictionary class]] ? earlierPaths[key] : nil;
+        return earlierCode(key) == PFBEarlierCodeSame && [earlierSeen isKindOfClass:[NSArray class]] &&
+               [earlierSeen containsObject:name];
     }
 }
 
@@ -2836,15 +2912,6 @@ static NSString* tourTime(NSDictionary* last) {
     formatter.dateFormat = @"HH:mm";
     id at = last[@"at"];
     return [at isKindOfClass:[NSDate class]] ? [formatter stringFromDate:at] : @"?";
-}
-
-NSDate* PFBCompatTourLastDate(BOOL* stopped) {
-    NSDictionary* last = lastTour();
-    id at = last[@"at"];
-    if (stopped) {
-        *stopped = [last[@"stop"] isKindOfClass:[NSString class]];
-    }
-    return [at isKindOfClass:[NSDate class]] ? at : nil;
 }
 
 // MARK: - Twitter's feature switches, read from its binaries
@@ -3815,11 +3882,14 @@ static void appendInternals(NSMutableArray<PFBCompatResult*>* results, NSSet<NSS
     }
 }
 
-// "paths 1/2, not seen yet: X" for an option acting through several paths.
+// "paths 1/2, not seen yet: X" for an option acting through several paths. Paths seen on
+// earlier builds count only when the option's code is unchanged.
 static NSString* pathsNote(PFBCompatOption option, NSString* key, NSDictionary* stored,
-                           NSDictionary* earlierStored) {
+                           NSDictionary* earlierStored, PFBEarlierCode code) {
     NSArray* saved = [stored[key] isKindOfClass:[NSArray class]] ? stored[key] : @[];
-    NSArray* earlier = [earlierStored[key] isKindOfClass:[NSArray class]] ? earlierStored[key] : @[];
+    NSArray* earlier = code == PFBEarlierCodeSame && [earlierStored[key] isKindOfClass:[NSArray class]]
+                           ? earlierStored[key]
+                           : @[];
     NSMutableArray<NSString*>* missing = [NSMutableArray array];
     NSUInteger total = 0;
     NSUInteger fromEarlier = 0;
@@ -3852,20 +3922,25 @@ static NSString* pathsNote(PFBCompatOption option, NSString* key, NSDictionary* 
                          : note;
 }
 
-// What earlier builds of this Twitter version proved for an option, or nil.
-static NSString* earlierEvidence(NSDictionary* earlier, NSString* key) {
+// What earlier builds of this Twitter version proved for an option, or nil; "older code"
+// when the option's code changed since, "code not compared" when that is unknown.
+static NSString* earlierEvidence(NSDictionary* earlier, NSString* key, PFBEarlierCode code) {
     NSDictionary* counts = [earlier[@"counts"] isKindOfClass:[NSDictionary class]] ? earlier[@"counts"] : @{};
     NSDictionary* details = [earlier[@"details"] isKindOfClass:[NSDictionary class]] ? earlier[@"details"] : @{};
     NSDictionary* observed = [earlier[@"observed"] isKindOfClass:[NSDictionary class]] ? earlier[@"observed"] : @{};
+    NSString* origin = code == PFBEarlierCodeSame    ? @"earlier build"
+                       : code == PFBEarlierCodeOlder ? @"earlier build, older code"
+                                                     : @"earlier build, code not compared";
     unsigned long long done = [counts[key] unsignedLongLongValue];
     if (done > 0) {
         id detail = details[key];
-        return [NSString stringWithFormat:@"earlier build \u00b7 %llu\u00d7 \u00b7 %@", done,
+        return [NSString stringWithFormat:@"%@ \u00b7 %llu\u00d7 \u00b7 %@", origin, done,
                                           [detail isKindOfClass:[NSString class]] ? detail : @"-"];
     }
     id seen = observed[key];
-    return [seen isKindOfClass:[NSString class]] ? [@"earlier build \u00b7 ready \u00b7 " stringByAppendingString:seen]
-                                                 : nil;
+    return [seen isKindOfClass:[NSString class]]
+               ? [NSString stringWithFormat:@"%@ \u00b7 ready \u00b7 %@", origin, seen]
+               : nil;
 }
 
 static NSString* capitalizedFirst(NSString* text) {
@@ -3944,6 +4019,7 @@ NSArray<PFBCompatResult*>* PFBCompatResults(void) {
     NSDictionary* observed;
     NSDictionary* paths;
     NSDictionary* earlier;
+    NSMutableDictionary<NSString*, NSNumber*>* earlierCodes = [NSMutableDictionary dictionary];
     NSDictionary* stations;
     NSSet<NSString*>* missingFlags;
     NSSet<NSString*>* missingNames;
@@ -3955,6 +4031,10 @@ NSArray<PFBCompatResult*>* PFBCompatResults(void) {
         observed = storeDictionary(@"observed");
         paths = storeDictionary(@"paths");
         earlier = storeDictionary(@"earlier");
+        for (size_t i = 0; i < kMetaCount; i++) {
+            NSString* key = [NSString stringWithUTF8String:kMeta[i].key];
+            earlierCodes[key] = @(earlierCode(key));
+        }
         id storedStations = storeDictionary(@"tour")[@"stations"];
         stations = [storedStations isKindOfClass:[NSDictionary class]] ? storedStations : @{};
         NSArray* missing = storeDictionary(@"flags")[@"missing"];
@@ -3997,7 +4077,8 @@ NSArray<PFBCompatResult*>* PFBCompatResults(void) {
         result.enabled = optionEnabled(meta);
         result.alwaysOn = meta->alwaysOn;
         id seen = observed[key] ?: pendingObservation(meta->option, NO);
-        NSString* earlierText = earlierEvidence(earlier, key);
+        PFBEarlierCode code = (PFBEarlierCode)earlierCodes[key].integerValue;
+        NSString* earlierText = earlierEvidence(earlier, key, code);
         if (done > 0) {
             id detail = details[key];
             result.evidence = [NSString stringWithFormat:@"%llu\u00d7 \u00b7 %@", (unsigned long long)done,
@@ -4010,7 +4091,7 @@ NSArray<PFBCompatResult*>* PFBCompatResults(void) {
             result.evidence = @"not seen yet";
         }
         NSDictionary* earlierPaths = [earlier[@"paths"] isKindOfClass:[NSDictionary class]] ? earlier[@"paths"] : @{};
-        NSString* pathNote = pathsNote(meta->option, key, paths, earlierPaths);
+        NSString* pathNote = pathsNote(meta->option, key, paths, earlierPaths, code);
         if (pathNote) {
             result.evidence = [NSString stringWithFormat:@"%@ \u00b7 %@", result.evidence, pathNote];
         }
@@ -4039,7 +4120,8 @@ NSArray<PFBCompatResult*>* PFBCompatResults(void) {
             lostPath = classGone;
         } else {
             NSString* judged = nil;
-            BOOL proven = done > 0 || [seen isKindOfClass:[NSString class]];
+            BOOL proven = done > 0 || [seen isKindOfClass:[NSString class]] ||
+                          (code == PFBEarlierCodeSame && earlierText != nil);
             result.verdict = tourVerdict(meta, key, proven, stations, &judged);
             result.detail = judged;
             // A part of the path lost while the option still acts is named, not judged.
@@ -4193,6 +4275,7 @@ void PFBCompatReset(void) {
         gStore[@"paths"] = @{};
         gStore[@"earlier"] = @{};
         [gStore removeObjectForKey:@"earlierSince"];
+        [gStore removeObjectForKey:@"earlierFingerprints"];
         gStore[@"tour"] = @{};
         [gStore removeObjectForKey:@"measures"];
         // Twitter's binaries are read again at the next launch, as on a new install.

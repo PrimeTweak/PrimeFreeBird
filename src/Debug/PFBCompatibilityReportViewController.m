@@ -21,9 +21,8 @@ typedef NS_ENUM(NSInteger, PFBReportRowKind) {
     PFBReportRowHeader,
     PFBReportRowList,
     PFBReportRowOption,
-    PFBReportRowTour,
-    PFBReportRowStartOver,
-    PFBReportRowNote,
+    PFBReportRowClearAll,
+    PFBReportRowHistory,
 };
 
 // One row of the report or of one of its lists.
@@ -32,11 +31,10 @@ typedef NS_ENUM(NSInteger, PFBReportRowKind) {
 @property (nonatomic, copy) NSString* title;
 @property (nonatomic, copy) NSString* value;
 @property (nonatomic, copy) NSString* detail;
-// Whether a tap does something: a list with options in it, a tour with screens to show.
+// Whether a tap does something: a list with options in it, or Clear all.
 @property (nonatomic) BOOL enabled;
-// The verdict a list row opens, and whether a tour row runs the whole tour.
+// The verdict a list row opens.
 @property (nonatomic) PFBCompatVerdict verdict;
-@property (nonatomic) BOOL full;
 @end
 
 @implementation PFBReportRow
@@ -52,12 +50,16 @@ static PFBReportRow* PFBReportRowMake(PFBReportRowKind kind, NSString* title, NS
 }
 
 // An option with a problem carries its reason under its name, and Off when it is off; a
-// working option shows its state on the right.
+// working option shows its state on the right. A not tested one adds what was seen before,
+// as the copied report does.
 static PFBReportRow* PFBReportOptionRow(PFBCompatResult* result) {
     BOOL working = result.verdict == PFBCompatVerdictOK;
     NSString* state = result.enabled ? (result.alwaysOn ? @"Always on" : @"On") : @"Off";
     NSString* value = result.internal ? nil : (working ? state : (result.enabled ? nil : @"Off"));
     NSString* detail = (!working || result.internal) ? result.detail : nil;
+    if (result.verdict == PFBCompatVerdictNotTested && result.evidence.length) {
+        detail = detail.length ? [NSString stringWithFormat:@"%@ \u00b7 %@", detail, result.evidence] : result.evidence;
+    }
     return PFBReportRowMake(PFBReportRowOption, result.title, value, detail);
 }
 
@@ -75,27 +77,6 @@ static NSString* PFBReportDay(NSDate* date) {
     return [formatter stringFromDate:date];
 }
 
-// "4 left. Last check today at 09:47.", or what stands for either part.
-static NSString* PFBReportRemainingText(NSUInteger left) {
-    NSString* head = left ? [NSString stringWithFormat:@"%lu left.", (unsigned long)left] : @"Nothing left to check.";
-    BOOL stopped = NO;
-    NSDate* last = PFBCompatTourLastDate(&stopped);
-    if (!last) {
-        return [head stringByAppendingString:@" No check on this build yet."];
-    }
-    NSDateFormatter* time = [NSDateFormatter new];
-    time.locale = [NSLocale localeWithLocaleIdentifier:@"en_US_POSIX"];
-    time.dateFormat = @"HH:mm";
-    return [NSString stringWithFormat:@"%@ Last check %@%@ at %@.", head, stopped ? @"stopped " : @"",
-                                      PFBReportDay(last), [time stringFromDate:last]];
-}
-
-// "Check all 30 screens again.", without "again" before this build's first tour.
-static NSString* PFBReportAllScreensText(NSUInteger screens) {
-    return [NSString stringWithFormat:@"Check all %lu screen%@%@.", (unsigned long)screens, screens == 1 ? @"" : @"s",
-                                      PFBCompatTourLastDate(NULL) ? @" again" : @""];
-}
-
 // "Counting since Oct 23 · this build since Oct 25.", one date when both are the same day.
 static NSString* PFBReportHistoryText(void) {
     NSDate* build = PFBCompatCountingSince(NO);
@@ -111,48 +92,6 @@ static NSString* PFBReportHistoryText(void) {
     return [NSString stringWithFormat:@"Counting since %@ · this build since %@.", earlierDay, buildDay];
 }
 
-// A gray note under a row, as at the foot of the settings pages' lists.
-@interface PFBReportNoteCell : UITableViewCell
-@property (nonatomic, strong) UILabel* noteLabel;
-@end
-
-@implementation PFBReportNoteCell
-
-- (instancetype)initWithStyle:(UITableViewCellStyle)style reuseIdentifier:(NSString*)reuseIdentifier {
-    self = [super initWithStyle:style reuseIdentifier:reuseIdentifier];
-    if (self) {
-        self.selectionStyle = UITableViewCellSelectionStyleNone;
-        self.contentView.preservesSuperviewLayoutMargins = NO;
-        self.contentView.layoutMargins = UIEdgeInsetsZero;
-        _noteLabel = [UILabel new];
-        _noteLabel.translatesAutoresizingMaskIntoConstraints = NO;
-        _noteLabel.numberOfLines = 0;
-        [self.contentView addSubview:_noteLabel];
-        [NSLayoutConstraint activateConstraints:@[
-            [_noteLabel.leadingAnchor constraintEqualToAnchor:self.contentView.leadingAnchor constant:10],
-            [_noteLabel.trailingAnchor constraintEqualToAnchor:self.contentView.trailingAnchor constant:-10],
-            [_noteLabel.topAnchor constraintEqualToAnchor:self.contentView.topAnchor constant:2],
-            [_noteLabel.bottomAnchor constraintEqualToAnchor:self.contentView.bottomAnchor constant:-24],
-        ]];
-        [self applyTheme];
-    }
-    return self;
-}
-
-- (void)applyTheme {
-    self.backgroundColor = [PFBPalette currentBackgroundColor];
-    self.noteLabel.font = PFBSettingsDetailFont();
-    self.noteLabel.textColor = PFBSettingsSubtitleColor();
-}
-
-// The palette is read again when light and dark switch, as the settings cells do.
-- (void)traitCollectionDidChange:(UITraitCollection*)previousTraitCollection {
-    [super traitCollectionDidChange:previousTraitCollection];
-    [self applyTheme];
-}
-
-@end
-
 // The settings pages' table: their cells, no separators, the palette's background.
 static void PFBReportSetUpTable(UITableView* table) {
     table.backgroundColor = [PFBPalette currentBackgroundColor];
@@ -163,7 +102,6 @@ static void PFBReportSetUpTable(UITableView* table) {
     [table registerClass:[PFBModernSettingsHeaderCell class] forCellReuseIdentifier:@"HeaderCell"];
     [table registerClass:[PFBModernSettingsCompactButtonCell class] forCellReuseIdentifier:@"CompactButtonCell"];
     [table registerClass:[PFBModernSettingsTableViewCell class] forCellReuseIdentifier:@"ButtonCell"];
-    [table registerClass:[PFBReportNoteCell class] forCellReuseIdentifier:@"NoteCell"];
 }
 
 // The settings cell that draws a row; every state is set again, as cells are recycled.
@@ -172,11 +110,6 @@ static UITableViewCell* PFBReportCell(UITableView* table, NSIndexPath* indexPath
         PFBModernSettingsHeaderCell* cell = [table dequeueReusableCellWithIdentifier:@"HeaderCell"
                                                                          forIndexPath:indexPath];
         [cell configureWithTitle:row.title];
-        return cell;
-    }
-    if (row.kind == PFBReportRowNote) {
-        PFBReportNoteCell* cell = [table dequeueReusableCellWithIdentifier:@"NoteCell" forIndexPath:indexPath];
-        cell.noteLabel.text = row.detail;
         return cell;
     }
     UITableViewCellSelectionStyle selection =
@@ -193,8 +126,7 @@ static UITableViewCell* PFBReportCell(UITableView* table, NSIndexPath* indexPath
                                                                         forIndexPath:indexPath];
     [cell configureWithTitle:row.title subtitle:row.detail iconName:nil];
     [cell setShowsChevron:NO];
-    UIColor* ink = row.enabled ? [UIColor labelColor] : PFBSettingsSubtitleColor();
-    cell.titleLabel.textColor = row.kind == PFBReportRowStartOver ? [UIColor systemRedColor] : ink;
+    cell.titleLabel.textColor = row.kind == PFBReportRowClearAll ? [UIColor systemRedColor] : [UIColor labelColor];
     cell.selectionStyle = selection;
     return cell;
 }
@@ -425,7 +357,7 @@ static UITableViewCell* PFBReportCell(UITableView* table, NSIndexPath* indexPath
     }
 }
 
-// The problems first, then the options by verdict, the tours and the history.
+// The problems first, then the options by verdict, then the counts.
 - (void)rebuild {
     NSArray<PFBCompatResult*>* results = PFBCompatResults();
     NSMutableArray<PFBReportRow*>* broken = [NSMutableArray array];
@@ -447,7 +379,7 @@ static UITableViewCell* PFBReportCell(UITableView* table, NSIndexPath* indexPath
     }
     [rows addObject:PFBReportRowMake(PFBReportRowHeader, @"Options", nil, nil)];
     PFBReportRow* untestedRow = PFBReportRowMake(PFBReportRowList, @"Not tested", @(notTested).stringValue,
-                                                 @"Not seen yet during the checks.");
+                                                 @"Not seen yet during the check.");
     untestedRow.verdict = PFBCompatVerdictNotTested;
     untestedRow.enabled = notTested > 0;
     [rows addObject:untestedRow];
@@ -457,26 +389,14 @@ static UITableViewCell* PFBReportCell(UITableView* table, NSIndexPath* indexPath
     workingRow.enabled = working > 0;
     [rows addObject:workingRow];
 
-    [rows addObject:PFBReportRowMake(PFBReportRowHeader, @"Screens", nil, nil)];
-    NSUInteger left = PFBCompatTourScreens(NO);
-    PFBReportRow* remaining =
-        PFBReportRowMake(PFBReportRowTour, @"Remaining screens", nil, PFBReportRemainingText(left));
-    remaining.enabled = left > 0;
-    [rows addObject:remaining];
-    PFBReportRow* all =
-        PFBReportRowMake(PFBReportRowTour, @"All screens", nil, PFBReportAllScreensText(PFBCompatTourScreens(YES)));
-    all.enabled = YES;
-    all.full = YES;
-    [rows addObject:all];
-
-    [rows addObject:PFBReportRowMake(PFBReportRowHeader, @"History", nil, nil)];
-    PFBReportRow* startOver = PFBReportRowMake(PFBReportRowStartOver, @"Start over", nil,
-                                               @"Clear the counts and close Twitter. Settings are kept.");
-    startOver.enabled = YES;
-    [rows addObject:startOver];
+    [rows addObject:PFBReportRowMake(PFBReportRowHeader, @"Data", nil, nil)];
+    PFBReportRow* clearAll = PFBReportRowMake(PFBReportRowClearAll, @"Clear all", nil,
+                                              @"Clear the counts and close Twitter. Settings are kept.");
+    clearAll.enabled = YES;
+    [rows addObject:clearAll];
     NSString* history = PFBReportHistoryText();
     if (history) {
-        [rows addObject:PFBReportRowMake(PFBReportRowNote, nil, nil, history)];
+        [rows addObject:PFBReportRowMake(PFBReportRowHistory, @"History", nil, history)];
     }
     _rows = rows;
     self.tableView.tableHeaderView = [self summaryHeaderFor:results];
@@ -639,27 +559,28 @@ static UITableViewCell* PFBReportCell(UITableView* table, NSIndexPath* indexPath
         return;
     }
     if (row.kind == PFBReportRowList) {
+        NSString* version = NSBundle.mainBundle.infoDictionary[@"CFBundleShortVersionString"] ?: @"";
         NSString* note = row.verdict == PFBCompatVerdictOK
-                             ? @"Options seen working on this build."
-                             : @"Options not seen yet during the checks. The next tour or normal use proves them.";
+                             ? [NSString stringWithFormat:@"Options seen working on Twitter %@.", version]
+                             : [NSString stringWithFormat:@"Options not seen yet on Twitter %@, or not since their code "
+                                                          @"changed. The next tour or normal use proves them.",
+                                                          version];
         PFBCompatibilityListViewController* list =
             [[PFBCompatibilityListViewController alloc] initWithVerdict:row.verdict title:row.title note:note];
         [self.navigationController pushViewController:list animated:YES];
-    } else if (row.kind == PFBReportRowTour) {
-        [self startTour:row.full];
-    } else if (row.kind == PFBReportRowStartOver) {
-        [self confirmStartOver];
+    } else if (row.kind == PFBReportRowClearAll) {
+        [self confirmClearAll];
     }
 }
 
-- (void)confirmStartOver {
+- (void)confirmClearAll {
     UIAlertController* alert = [UIAlertController
-        alertControllerWithTitle:@"Start over"
+        alertControllerWithTitle:@"Clear all"
                          message:@"Clears everything counted and closes Twitter. Reopen it and every option is "
                                  @"checked on its own, then this report opens. Your settings are kept."
                   preferredStyle:UIAlertControllerStyleAlert];
     [alert addAction:[UIAlertAction actionWithTitle:@"Cancel" style:UIAlertActionStyleCancel handler:nil]];
-    [alert addAction:[UIAlertAction actionWithTitle:@"Start over"
+    [alert addAction:[UIAlertAction actionWithTitle:@"Clear all"
                                               style:UIAlertActionStyleDestructive
                                             handler:^(__unused UIAlertAction* action) {
                                                 // No app can relaunch itself: quitting cleanly makes the next

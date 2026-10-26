@@ -246,22 +246,19 @@ FOUNDATION_EXPORT BOOL PFBCompatPathReached(PFBCompatPath path);
 // Shows Twitter's own screens one after another so the report proves the paths they
 // carry, whatever the toggles say, then opens the report.
 FOUNDATION_EXPORT void PFBCompatRunTour(void);
-// The same tour, limited to the screens whose options this build has not proven yet.
+// The same tour, limited to the screens whose options are not proven yet.
 FOUNDATION_EXPORT void PFBCompatRunTourLeft(void);
 // While a tour drives the app, hooks keep it inside Twitter.
 FOUNDATION_EXPORT BOOL PFBCompatTourIsRunning(void);
-// The screens a full tour shows, or those still owing proofs on this build.
+// The screens a full tour shows, or those still owing proofs.
 FOUNDATION_EXPORT NSUInteger PFBCompatTourScreens(BOOL full);
-// When this build's last tour ran, or nil before the first; stopped tells whether it
-// ended early.
-FOUNDATION_EXPORT NSDate* PFBCompatTourLastDate(BOOL* stopped);
 // When this build started counting, or with earlierBuilds, when the earlier builds of the
 // same Twitter did; nil when unknown or when there were none.
 FOUNDATION_EXPORT NSDate* PFBCompatCountingSince(BOOL earlierBuilds);
 // Asks for a tour at the next launch, as a new install would need one.
 FOUNDATION_EXPORT void PFBCompatScheduleTourAtLaunch(void);
 
-// A tour step's pending proofs on this build: option keys, and "path:" plus a path name.
+// A tour step's pending proofs: option keys, and "path:" plus a path name.
 FOUNDATION_EXPORT NSSet<NSString*>* PFBCompatStationPending(NSString* station);
 FOUNDATION_EXPORT BOOL PFBCompatStationLeft(NSString* station);
 // Whether a step showed its screen, and what it still missed then.
