@@ -93,6 +93,12 @@ void PFBMaybeHandleHarvestWebView(__unsafe_unretained id webViewController);
 
 // The mobile Safari user agent presented by the web views and web requests (HookHelpers.m).
 FOUNDATION_EXPORT NSString* const PFBMobileSafariUserAgent;
+
+// Twitter's own Liquid Glass: whether its second gate value is given at this launch,
+// and how many launches before it in a row ended early with it given (AppLifecycle.x).
+FOUNDATION_EXPORT NSString* const PFBNativeGlassEarlyExitsKey;
+FOUNDATION_EXPORT BOOL PFBNativeGlassAsked(void);
+FOUNDATION_EXPORT NSInteger PFBNativeGlassEarlyExits(void);
 // YES when a usable web session (auth_token + ct0) is available (WebCreateTweet.x).
 BOOL PFBHasUsableWebCredentials(void);
 // A GET signed with the web session; nil without one or for a URL that is not

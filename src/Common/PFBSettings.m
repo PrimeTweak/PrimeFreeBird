@@ -703,6 +703,8 @@ static NSDictionary* PFBKeylessDefaults(void) {
     dispatch_once(&once, ^{
         map = @{
             @"enable_liquid_glass": @YES,
+            // No row shows it: the rebuilt glass tab bar stays off.
+            @"custom_glass_tab_bar": @NO,
             // Picked from a keyless row: 0 is the System style and the Default tab.
             @"dark_mode_style": @0,
             @"profile_initial_tab": @0,

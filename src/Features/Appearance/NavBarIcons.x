@@ -1537,7 +1537,7 @@ static void pfbQueueFadeRepair(UIView* bar) {
 // picture is drawn as a flat disc of it. The rendering mode is corrected on this
 // class alone; nothing is repainted and no view is walked.
 
-%hook T1AvatarImageView
+%hook AvatarImageView
 
 - (void)setImage:(UIImage*)image {
     if (image.renderingMode == UIImageRenderingModeAlwaysTemplate) {

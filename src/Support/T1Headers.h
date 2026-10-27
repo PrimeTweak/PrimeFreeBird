@@ -41,7 +41,6 @@
 @end
 
 @interface T1TabView : UIView
-@property (readonly, nonatomic) UILabel* titleLabel;
 @property (readonly, nonatomic) UIImageView* imageView;
 @property (readonly, nonatomic) long long panelID;
 @property (copy, nonatomic) NSString* scribePage;
@@ -49,8 +48,10 @@
 @property (readonly, nonatomic) NSString* imageName;
 @property (retain, nonatomic) UIColor* iconColor;
 @property (readonly, nonatomic, getter=isSelected) BOOL selected;
-- (void)_t1_updateTitleLabel;
 - (void)_t1_updateImageViewAnimated:(BOOL)animated;
+- (void)_t1_layoutForTabBar;
+- (void)_t1_layoutBadgeViewMaximized;
+@property (readonly, nonatomic) UIView* badgeView;
 @end
 
 @interface T1TabBarViewController : UIViewController
@@ -72,8 +73,7 @@
 @interface T1TabbedAppNavigationViewController : UIViewController
 // Recomputes the visible tab set at runtime (rebuilds buttons and content).
 - (void)recalculateVisiblePanels;
-// Whether the bottom bar shows only the tabs that fit, and how many fit.
-- (BOOL)limitsBottomTabCount;
+// How many tabs the bottom bar shows.
 - (NSInteger)_t1_bottomTabItemCapacity;
 @end
 

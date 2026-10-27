@@ -169,6 +169,8 @@ static void askToUnlock(void) {
 
 // MARK: - App Delegate hooks
 
+static void PFBNativeGlassSettle(void);
+
 %hook T1AppDelegate
 
 - (_Bool)application:(__unsafe_unretained UIApplication*)application
@@ -195,6 +197,7 @@ static void askToUnlock(void) {
 - (void)applicationDidBecomeActive:(__unsafe_unretained id)arg1 {
     %orig;
 
+    PFBNativeGlassSettle();
     PFBInstallPasteboardObserver();
 
     PFBApplySelectedThemeColor();
@@ -364,8 +367,8 @@ static void paintWindowForSplash(UIView* view) {
 
 // MARK: - Liquid Glass
 
-// The iOS 26 design follows enable_liquid_glass through UIDesignRequiresCompatibility:
-// Twitter's own switch for it is reset at every launch and always answers NO.
+// The iOS 26 design follows enable_liquid_glass through UIDesignRequiresCompatibility,
+// which Twitter's own Liquid Glass also reads.
 %hook NSBundle
 - (id)objectForInfoDictionaryKey:(NSString*)key {
     if ([key isEqualToString:@"UIDesignRequiresCompatibility"] &&
@@ -384,6 +387,58 @@ static void paintWindowForSplash(UIView* view) {
 }
 %end
 
+// Twitter's own Liquid Glass opens only when its switch and a second account value
+// agree. The value is given under Liquid Glass, unless two launches in a row ended
+// within 10 s; choosing Liquid Glass again in the settings clears that count.
+static BOOL gPFBNativeGlassAsked;
+static NSInteger gPFBNativeGlassExitsAtLaunch;
+NSString* const PFBNativeGlassEarlyExitsKey = @"native_glass_early_exits";
+
+// Counted when the value is first given in a launch, which only a launch that builds
+// its screens reaches, and written at once so that an exit right after keeps it.
+static void PFBNativeGlassCountLaunch(void) {
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+      NSUserDefaults* defaults = [NSUserDefaults standardUserDefaults];
+      [defaults setInteger:gPFBNativeGlassExitsAtLaunch + 1 forKey:PFBNativeGlassEarlyExitsKey];
+      [defaults synchronize];
+    });
+}
+
+// The count clears 10 s after the first activation, or as soon as the app leaves the
+// screen, which an exit during launch never reaches.
+static void PFBNativeGlassSettle(void) {
+    static dispatch_once_t once;
+    if (!gPFBNativeGlassAsked) {
+        return;
+    }
+    dispatch_once(&once, ^{
+      dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(10 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+        [[NSUserDefaults standardUserDefaults] removeObjectForKey:PFBNativeGlassEarlyExitsKey];
+      });
+    });
+}
+
+BOOL PFBNativeGlassAsked(void) {
+    return gPFBNativeGlassAsked;
+}
+
+NSInteger PFBNativeGlassEarlyExits(void) {
+    return gPFBNativeGlassExitsAtLaunch;
+}
+
+%hook TFNTwitterAccount
+- (BOOL)isDummyTest1FeatureEnabled {
+    if (gPFBNativeGlassAsked) {
+        PFBNativeGlassCountLaunch();
+        PFBCOMPAT_ACTION(PFBCompat_enable_liquid_glass, @"native glass gate value given");
+        return YES;
+    }
+    PFBCOMPAT_OBSERVE(PFBCompat_enable_liquid_glass, @"native glass gate read");
+    return %orig;
+}
+%end
+
 void PFBAppLifecycleStart(void) {
     // enable_liquid_glass is read straight from NSUserDefaults, here and in the
     // NSBundle hook, so its YES default is seeded when the key is absent.
@@ -393,4 +448,16 @@ void PFBAppLifecycleStart(void) {
     }
     BOOL glassEnabled = [defaults boolForKey:@"enable_liquid_glass"];
     [defaults setBool:glassEnabled forKey:@"com.apple.SwiftUI.IgnoreSolariumOptOut"];
+
+    gPFBNativeGlassExitsAtLaunch = [defaults integerForKey:PFBNativeGlassEarlyExitsKey];
+    gPFBNativeGlassAsked = glassEnabled && gPFBNativeGlassExitsAtLaunch < 2;
+    if (gPFBNativeGlassAsked) {
+        [[NSNotificationCenter defaultCenter] addObserverForName:UIApplicationDidEnterBackgroundNotification
+                                                          object:nil
+                                                           queue:nil
+                                                      usingBlock:^(__unused NSNotification* note) {
+                                                        [[NSUserDefaults standardUserDefaults]
+                                                            removeObjectForKey:PFBNativeGlassEarlyExitsKey];
+                                                      }];
+    }
 }

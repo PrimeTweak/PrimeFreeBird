@@ -45,7 +45,7 @@ static BOOL ShouldHideItem(id item, NSString* location) {
 
     if ([PFBSettings boolForKey:@"hide_promoted"]) {
         if ([item
-                isKindOfClass:objc_getClass("T1URTTimelineStatusItemViewModel")] &&
+                isKindOfClass:objc_getClass("URTTimelineStatusItemViewModel")] &&
             StatusItemIsPromoted(item)) {
             PFBCOMPAT_ACTION(PFBCompat_hide_promoted, @"promoted tweet");
             return YES;
@@ -71,7 +71,7 @@ static BOOL ShouldHideItem(id item, NSString* location) {
     }
 
     if ([PFBSettings boolForKey:@"hide_premium_offer"]) {
-        if ([className isEqualToString:@"T1URTTimelineMessageItemViewModel"]) {
+        if ([className isEqualToString:@"URTTimelineMessageItemViewModel"]) {
             PFBCOMPAT_ACTION(PFBCompat_hide_premium_offer, @"premium message hidden");
             return YES;
         }

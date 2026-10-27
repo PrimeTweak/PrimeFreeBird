@@ -520,9 +520,9 @@ static const void* kPFBTabOriginalKey = &kPFBTabOriginalKey;
 static const void* kPFBTabBakedKey = &kPFBTabBakedKey;
 static const void* kPFBTabColorKey = &kPFBTabColorKey;
 
-// Twitter has no native Liquid Glass tab-bar path, so the bar is rebuilt: a real
-// UITabBar outside any UITabBarController still gets the iOS 26 treatment. It
-// must be the real control; a decorative copy loses the slide gesture.
+// A real UITabBar outside any UITabBarController still gets the iOS 26 treatment, so
+// the app's bar can be covered by one. It must be the real control; a decorative
+// copy loses the slide gesture.
 static const void* kPFBTabBarKey = &kPFBTabBarKey;
 static const void* kPFBTabHiddenKey = &kPFBTabHiddenKey;
 static const void* kPFBTabBridgeKey = &kPFBTabBridgeKey;
@@ -1064,6 +1064,12 @@ static void PFBRouteTabSelection(UIView* hostBar, NSArray<UIView*>* tabs, NSUInt
 
 static void PFBApplyTabBarGlassBody(UIView* host);
 
+// The rebuilt glass bar is drawn only with custom_glass_tab_bar on, which no settings
+// row shows: Twitter's own Liquid Glass bar is the one asked for.
+static BOOL PFBCustomGlassBarWanted(void) {
+    return [PFBSettings boolForKey:@"enable_liquid_glass"] && [PFBSettings boolForKey:@"custom_glass_tab_bar"];
+}
+
 static void PFBApplyTabBarGlass(UIView* host) {
     // Never re-entered. This runs from layout passes, from the collapse ratio
     // on every scroll frame, and from the tab views' own updates; routing a
@@ -1080,7 +1086,7 @@ static void PFBApplyTabBarGlass(UIView* host) {
 static void PFBApplyTabBarGlassBody(UIView* host) {
     UITabBar* native = objc_getAssociatedObject(host, kPFBTabBarKey);
 
-    if (![PFBSettings boolForKey:@"enable_liquid_glass"]) {
+    if (!PFBCustomGlassBarWanted()) {
         // Observed once the app's bar and its tabs are found, as the glass style needs both.
         if (PFBCompatNeedsObservation(PFBCompat_enable_liquid_glass)) {
             UIView* appBar = PFBCustomTabBar(host);
@@ -1982,6 +1988,84 @@ static void PFBRestoreTabIcon(UIImageView* icon) {
     }
 }
 
+// MARK: - Tab labels
+
+// Twitter's tab views keep their title without drawing it, so a label is drawn here in
+// Twitter's tab font and colors, under the icon.
+static const void* kPFBTabLabelKey = &kPFBTabLabelKey;
+
+static UIFont* PFBTabLabelFont(void) {
+    SEL twitterFont = NSSelectorFromString(@"xdsDeprecated_customFontOfSize:weight:scalesWithDynamicType:");
+    UIFont* font = nil;
+    if ([UIFont respondsToSelector:twitterFont]) {
+        font = ((UIFont * (*)(id, SEL, CGFloat, NSInteger, BOOL))objc_msgSend)([UIFont class], twitterFont, 12.0, 1, NO);
+    }
+    return [font isKindOfClass:[UIFont class]] ? font : [UIFont systemFontOfSize:12.0 weight:UIFontWeightMedium];
+}
+
+// The accent of Selected tab when it is on, otherwise Twitter's primary color for the
+// selected tab and its text color for the others.
+static UIColor* PFBTabLabelColor(T1TabView* tab) {
+    if ([PFBSettings boolForKey:@"tab_bar_theming"]) {
+        return tabItemColor(tab.selected);
+    }
+    SEL palette = NSSelectorFromString(@"twitterColors");
+    id colors = [UIColor respondsToSelector:palette] ? ((id (*)(id, SEL))objc_msgSend)([UIColor class], palette) : nil;
+    SEL pick = NSSelectorFromString(tab.selected ? @"primaryColor" : @"textColor");
+    id color = [colors respondsToSelector:pick] ? ((id (*)(id, SEL))objc_msgSend)(colors, pick) : nil;
+    if ([color isKindOfClass:[UIColor class]]) {
+        return color;
+    }
+    return tab.selected ? [UIColor systemBlueColor] : [UIColor labelColor];
+}
+
+static void PFBColorTabLabel(T1TabView* tab) {
+    UILabel* label = objc_getAssociatedObject(tab, kPFBTabLabelKey);
+    if (label) {
+        label.textColor = PFBTabLabelColor(tab);
+    }
+}
+
+// 14 pt tall, its top 17 pt above the tab's bottom edge, and the icon raised by half
+// the label's height less 2 pt. Under a rebuilt glass bar the bar shows the titles.
+static void PFBLayoutTabLabel(T1TabView* tab) {
+    UILabel* label = objc_getAssociatedObject(tab, kPFBTabLabelKey);
+    NSString* title = tab.title;
+    BOOL drawn = title.length > 0 && !PFBHostHasNativeBar(tab);
+    if (!drawn || ![PFBSettings boolForKey:@"restore_tab_labels"]) {
+        if (label) {
+            [label removeFromSuperview];
+            objc_setAssociatedObject(tab, kPFBTabLabelKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        }
+        if (drawn) {
+            PFBCOMPAT_OBSERVE(PFBCompat_restore_tab_labels, @"tab laid out");
+        }
+        return;
+    }
+    if (!label) {
+        label = [[UILabel alloc] init];
+        label.backgroundColor = [UIColor clearColor];
+        label.isAccessibilityElement = NO;
+        label.textAlignment = NSTextAlignmentCenter;
+        label.font = PFBTabLabelFont();
+        objc_setAssociatedObject(tab, kPFBTabLabelKey, label, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        [tab addSubview:label];
+    }
+    if (![label.text isEqualToString:title]) {
+        label.text = title;
+    }
+    label.textColor = PFBTabLabelColor(tab);
+    CGRect bounds = tab.bounds;
+    CGFloat scale = tab.window.screen.scale;
+    if (scale <= 0.0) {
+        scale = [UIScreen mainScreen].scale;
+    }
+    CGFloat top = round((CGRectGetMaxY(bounds) - 17.0) * scale) / scale;
+    label.frame = CGRectMake(1.0, top, MAX(CGRectGetWidth(bounds) - 2.0, 0.0), 14.0);
+    tab.imageView.center = CGPointMake(0.0, 2.0 - 14.0 / 2.0);
+    PFBCOMPAT_ACTION(PFBCompat_restore_tab_labels, @"label drawn under the icon");
+}
+
 %hook T1TabView
 
 - (void)_t1_updateImageViewAnimated:(BOOL)animated {
@@ -2024,37 +2108,23 @@ static void PFBRestoreTabIcon(UIImageView* icon) {
     }
 }
 
-- (void)_t1_updateTitleLabel {
+// Twitter centers the icon first; the label and the raised icon follow.
+- (void)_t1_layoutForTabBar {
     %orig;
-
-    if ([PFBSettings boolForKey:@"tab_bar_theming"]) {
-        self.titleLabel.textColor = tabItemColor(self.selected);
-    }
+    PFBLayoutTabLabel(self);
 }
 
-- (BOOL)showsTitleInDisplayMode:(long long)displayMode {
-    if ([PFBSettings boolForKey:@"restore_tab_labels"]) {
-        PFBCOMPAT_ACTION(PFBCompat_restore_tab_labels, @"tab label shown");
-        return YES;
-    }
-    PFBCOMPAT_OBSERVE(PFBCompat_restore_tab_labels, @"read by Twitter");
-    return %orig;
+- (void)setSelected:(BOOL)selected {
+    %orig;
+    PFBColorTabLabel(self);
 }
 
-// A restored label keeps the geometry computed while it was still hidden, and on
-// a cold launch nothing forces a fresh layout. Twitter's own tab layout is re-run
-// as each tab enters a window.
-- (void)didMoveToWindow {
+// The count badge rises with the icon when a label is drawn.
+- (void)_t1_layoutBadgeViewMaximized {
     %orig;
-
-    if (!self.window || ![PFBSettings boolForKey:@"restore_tab_labels"]) {
-        return;
-    }
-    if ([self respondsToSelector:@selector(_t1_layoutForTabBar)]) {
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Warc-performSelector-leaks"
-        [self performSelector:@selector(_t1_layoutForTabBar)];
-#pragma clang diagnostic pop
+    if (objc_getAssociatedObject(self, kPFBTabLabelKey)) {
+        UIView* badge = self.badgeView;
+        badge.center = CGPointMake(badge.center.x, badge.center.y - 5.0);
     }
 }
 
@@ -2074,9 +2144,7 @@ static void PFBRestoreTabIcon(UIImageView* icon) {
     if ([self respondsToSelector:@selector(_t1_updateImageViewAnimated:)]) {
         [self _t1_updateImageViewAnimated:NO];
     }
-    if ([self respondsToSelector:@selector(_t1_updateTitleLabel)]) {
-        [self _t1_updateTitleLabel];
-    }
+    PFBColorTabLabel(self);
 }
 
 %end

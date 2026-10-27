@@ -119,14 +119,7 @@ static NSNumber* FeatureSwitchOverrideValueForKey(NSString* key) {
     BOOL hideCustomTimelines = [PFBSettings boolForKey:@"hide_custom_timelines"];
     BOOL unlimitedTabs = [PFBSettings boolForKey:@"unlimited_timeline_tabs"];
     if ([key isEqualToString:@"hometimeline_pinned_tabs_topics_enabled"] ||
-        [key isEqualToString:
-                 @"hometimeline_pinned_tabs_generic_timelines_enabled"] ||
-        [key isEqualToString:
-                 @"hometimeline_pinned_tabs_sticky_warm_start_enabled"] ||
-        [key isEqualToString:@"ranked_following_home_timeline_tab_enabled"] ||
-        [key
-            isEqualToString:
-                @"super_follow_subscriptions_home_timeline_tab_sticky_enabled"]) {
+        [key isEqualToString:@"hometimeline_pinned_tabs_generic_timelines_enabled"]) {
         if (hideCustomTimelines) {
             PFBCOMPAT_ACTION(PFBCompat_hide_custom_timelines, @"pinned tab gate off");
             PFBCOMPAT_OBSERVE(PFBCompat_unlimited_timeline_tabs, @"read by Twitter, Hide custom timelines answers first");
@@ -155,17 +148,6 @@ static NSNumber* FeatureSwitchOverrideValueForKey(NSString* key) {
             return @100;
         }
         PFBCOMPAT_OBSERVE(PFBCompat_unlimited_timeline_tabs, @"read by Twitter");
-        return nil;
-    }
-
-    // Gates the add-tab (+) accessory button on the home tab bar.
-    if ([key isEqualToString:
-                 @"hometimeline_pinned_tabs_pinned_trailing_accessory_enabled"]) {
-        if (hideCustomTimelines) {
-            PFBCOMPAT_ACTION(PFBCompat_hide_custom_timelines, @"add-tab button off");
-            return @NO;
-        }
-        PFBCOMPAT_OBSERVE(PFBCompat_hide_custom_timelines, @"read by Twitter");
         return nil;
     }
 

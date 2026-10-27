@@ -8,6 +8,8 @@
 @interface TFNTwitterAccount : NSObject
 @property (readonly, nonatomic) NSString* displayUsername;
 @property (readonly, nonatomic) TFNTwitterAccountModel* model;
+// The second value Twitter's own Liquid Glass gate asks for.
+- (BOOL)isDummyTest1FeatureEnabled;
 @end
 
 @interface TFNTableView : UITableView

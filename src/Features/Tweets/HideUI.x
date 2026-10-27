@@ -78,20 +78,6 @@ static BOOL PFBVerifiedValue(id value) {
 
 %end
 
-%hook TFSDirectMessageUser
-
-- (id)isBlueVerified {
-    id verified = %orig;
-    return PFBHidesVerifiedFlag(PFBVerifiedValue(verified)) ? nil : verified;
-}
-
-- (BOOL)verified {
-    BOOL verified = %orig;
-    return PFBHidesVerifiedFlag(verified) ? NO : verified;
-}
-
-%end
-
 // Status view models cache these flags at init, beyond the user model hooks;
 // the author row badge reads isFromUserVerified, and other view models forward
 // here.

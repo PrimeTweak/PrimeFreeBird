@@ -5,6 +5,7 @@
 #import "Common/PFBBundle.h"
 #import "Common/PFBSettings.h"
 #import "Support/TWHeaders.h"
+#import "Support/HookHelpers.h"
 #import "Features/Appearance/ThemeColor/PFBColorThemeViewController.h"
 #import "Features/Appearance/CustomTabBar/PFBCustomTabBarViewController.h"
 
@@ -114,6 +115,9 @@
                     BOOL nowEnabled = (i == 1);
                     [[NSUserDefaults standardUserDefaults] setBool:nowEnabled
                                                             forKey:@"enable_liquid_glass"];
+                    if (nowEnabled) {
+                        [[NSUserDefaults standardUserDefaults] removeObjectForKey:PFBNativeGlassEarlyExitsKey];
+                    }
                     [[NSUserDefaults standardUserDefaults] synchronize];
                     if (wasEnabled != nowEnabled) {
                         [page showRestartRequiredAlert];
@@ -146,9 +150,6 @@
         if (images && [view respondsToSelector:@selector(_t1_updateImageViewAnimated:)]) {
             ((void (*)(id, SEL, BOOL))objc_msgSend)(view, @selector(_t1_updateImageViewAnimated:), NO);
         }
-        if ([view respondsToSelector:@selector(_t1_updateTitleLabel)]) {
-            [view performSelector:@selector(_t1_updateTitleLabel)];
-        }
         if ([view respondsToSelector:@selector(_t1_layoutForTabBar)]) {
             [view performSelector:@selector(_t1_layoutForTabBar)];
         }
@@ -159,13 +160,6 @@
             [view performSelector:@selector(_t1_layoutBadgeViewMinimized)];
         }
 
-        // Clearing the override lets the label fall back to its default color.
-        if (![PFBSettings boolForKey:@"tab_bar_theming"] && [view respondsToSelector:@selector(titleLabel)]) {
-            UILabel* titleLabel = [view valueForKey:@"titleLabel"];
-            if (titleLabel) {
-                titleLabel.textColor = nil;
-            }
-        }
     }
 
     for (UIView* subview in view.subviews) {

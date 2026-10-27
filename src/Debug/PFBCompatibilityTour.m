@@ -192,11 +192,70 @@ static id tourTabSwitcher(void) {
 
 static NSInteger tourIntegerGetter(id object, NSString* name);
 static UIView* tourFindClass(UIView* root, NSString* className);
+static id tourGetter(id object, NSString* name);
+
+// Twitter's app navigation object, answered by its tabbed controller in either design.
+static id tourAppNavigation(void) {
+    NSMutableArray<UIViewController*>* queue = [NSMutableArray array];
+    UIViewController* root = tourWindow().rootViewController;
+    if (root) {
+        [queue addObject:root];
+    }
+    for (NSUInteger i = 0; i < queue.count && i < 512; i++) {
+        id navigation = tourGetter(queue[i], @"appNavigation");
+        if (navigation) {
+            return navigation;
+        }
+        [queue addObjectsFromArray:queue[i].childViewControllers];
+    }
+    return nil;
+}
+
+// Without a tab bar controller to ask, as under Twitter's own Liquid Glass, the app
+// navigation takes a panel: the one recorded for the page at that place when the
+// navigation lists it, otherwise the panel at that place in its own list.
+static void tourSelectPanel(NSInteger index) {
+    static NSUInteger toldGeneration;
+    id navigation = tourAppNavigation();
+    NSArray* panels = tourGetter(navigation, @"visiblePanelIDs");
+    SEL set = NSSelectorFromString(@"setCurrentPanel:animated:completion:");
+    NSArray<NSString*>* pages =
+        [PFBCustomTabBarUtility visiblePageIDsInOrder] ?: [PFBCustomTabBarUtility defaultVisiblePageIDs];
+    id recorded = index >= 0 && index < (NSInteger)pages.count
+                      ? [PFBCustomTabBarUtility metadataForPage:pages[(NSUInteger)index]][PFBTabPanelIDKey]
+                      : nil;
+    id panel = nil;
+    if ([panels isKindOfClass:[NSArray class]]) {
+        if ([recorded isKindOfClass:[NSNumber class]] && [panels containsObject:recorded]) {
+            panel = recorded;
+        } else if (index >= 0 && index < (NSInteger)panels.count) {
+            panel = panels[(NSUInteger)index];
+        }
+    }
+    BOOL usable = [panel respondsToSelector:@selector(longLongValue)] && [navigation respondsToSelector:set];
+    if (toldGeneration != gPFBTourGeneration) {
+        toldGeneration = gPFBTourGeneration;
+        PFBCompatTourLog(@"[tour] tabs: %@ through %@", usable ? @"panels" : @"no way to switch",
+                         navigation ? NSStringFromClass([navigation class]) : @"no app navigation");
+    }
+    if (!usable) {
+        return;
+    }
+    long long value = [panel longLongValue];
+    if (tourIntegerGetter(navigation, @"currentPanelID") == value) {
+        return;
+    }
+    ((void (*)(id, SEL, long long, BOOL, id))objc_msgSend)(navigation, set, value, NO, nil);
+}
 
 // Selecting the tab already in front would make Twitter scroll it back to the top.
 static void tourSelectTab(NSInteger index) {
     id switcher = tourTabSwitcher();
-    if (!switcher || tourIntegerGetter(switcher, @"selectedTabIndex") == index) {
+    if (!switcher) {
+        tourSelectPanel(index);
+        return;
+    }
+    if (tourIntegerGetter(switcher, @"selectedTabIndex") == index) {
         return;
     }
     ((void (*)(id, SEL, NSInteger))objc_msgSend)(switcher, NSSelectorFromString(@"selectTabAtIndex:"), index);
@@ -870,8 +929,7 @@ static long long tourLongLongGetter(id object, NSString* name) {
 // Twitter's own profile command, with the account ID when known, as its own callers
 // send it: no panel, no source.
 static void tourShowProfile(NSString* handle, long long userID) {
-    UIViewController* tabs = tourFindController(tourRootController(), @"T1TabbedAppNavigationViewController");
-    id navigation = tourGetter(tabs, @"appNavigation");
+    id navigation = tourAppNavigation();
     SEL show = NSSelectorFromString(@"showProfileForUsername:orUserID:fromPanel:source:sourceNavigationMetadata:completion:");
     if (![navigation respondsToSelector:show]) {
         PFBCompatTourLog(@"[tour] other profile: no profile command (%@)",

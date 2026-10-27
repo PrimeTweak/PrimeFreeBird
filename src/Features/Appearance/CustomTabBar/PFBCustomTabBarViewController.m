@@ -351,18 +351,15 @@ static UIViewController* findViewControllerOfClass(UIViewController* vc,
     [(T1TabbedAppNavigationViewController*)tabNav recalculateVisiblePanels];
 }
 
-// How many tabs Twitter's bar shows; 0 when it does not limit them or the count is unread.
+// How many tabs Twitter's bar shows; 0 when the count is unread.
 - (NSInteger)barCapacity {
     UIViewController* tabNav = [self tabNavigationController];
-    if (![tabNav respondsToSelector:@selector(limitsBottomTabCount)] ||
-        ![tabNav respondsToSelector:@selector(_t1_bottomTabItemCapacity)]) {
+    if (![tabNav respondsToSelector:@selector(_t1_bottomTabItemCapacity)]) {
         return 0;
     }
-    T1TabbedAppNavigationViewController* navigation = (T1TabbedAppNavigationViewController*)tabNav;
-    BOOL limits = [navigation limitsBottomTabCount];
-    NSInteger capacity = [navigation _t1_bottomTabItemCapacity];
-    PFBDebugLog(@"[tabbar] editor capacity %ld, limited %d", (long)capacity, limits);
-    return limits && capacity >= 2 ? capacity : 0;
+    NSInteger capacity = [(T1TabbedAppNavigationViewController*)tabNav _t1_bottomTabItemCapacity];
+    PFBDebugLog(@"[tabbar] editor capacity %ld", (long)capacity);
+    return capacity >= 2 ? capacity : 0;
 }
 
 - (void)persistChanges {
