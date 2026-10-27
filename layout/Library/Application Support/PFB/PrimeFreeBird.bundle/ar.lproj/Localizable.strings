@@ -167,8 +167,6 @@
 /* ===== Fonts picker ===== */
 "CUSTOM_FONTS_MENU_TITLE" = "\nاختيار خط";
 "CUSTOM_FONTS_NAVIGATION_BUTTON_TITLE" = "خطوط مخصصة";
-"CUSTOM_FONTS_TUT_ALERT_MESSAGE" = "ثبّت الخطوط باستخدام تطبيق iFont من App Store.";
-"INSTALL_IFONT_BUTTON_TITLE" = "احصل على iFont";
 
 /* ===== Media & download flows ===== */
 "DOWNLOAD_AS_GIF_OPTION_TITLE" = "التحميل بصيغة GIF";

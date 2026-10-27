@@ -167,8 +167,6 @@
 /* ===== Fonts picker ===== */
 "CUSTOM_FONTS_MENU_TITLE" = "\nYazı tipi seç";
 "CUSTOM_FONTS_NAVIGATION_BUTTON_TITLE" = "Özel yazı tipleri";
-"CUSTOM_FONTS_TUT_ALERT_MESSAGE" = "Yazı tiplerini App Store’daki iFont uygulamasıyla yükle.";
-"INSTALL_IFONT_BUTTON_TITLE" = "iFont’u al";
 
 /* ===== Media & download flows ===== */
 "DOWNLOAD_AS_GIF_OPTION_TITLE" = "GIF olarak indir";

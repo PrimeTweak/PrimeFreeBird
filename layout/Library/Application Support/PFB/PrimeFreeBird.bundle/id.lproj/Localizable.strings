@@ -167,8 +167,6 @@
 /* ===== Fonts picker ===== */
 "CUSTOM_FONTS_MENU_TITLE" = "\nPilih font";
 "CUSTOM_FONTS_NAVIGATION_BUTTON_TITLE" = "Font khusus";
-"CUSTOM_FONTS_TUT_ALERT_MESSAGE" = "Instal font dengan aplikasi iFont dari App Store.";
-"INSTALL_IFONT_BUTTON_TITLE" = "Dapatkan iFont";
 
 /* ===== Media & download flows ===== */
 "DOWNLOAD_AS_GIF_OPTION_TITLE" = "Unduh sebagai GIF";

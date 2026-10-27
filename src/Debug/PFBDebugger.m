@@ -503,12 +503,9 @@ void PFBDebuggerPresent(void) {
             isKindOfClass:[PFBCompatibilityReportViewController class]]) {
         return;
     }
-    PFBCompatibilityReportViewController* screen =
-        [[PFBCompatibilityReportViewController alloc] initWithStyle:UITableViewStyleGrouped];
-    UINavigationController* nav =
-        [[UINavigationController alloc] initWithRootViewController:screen];
-    nav.modalPresentationStyle = UIModalPresentationPageSheet;
-    [host presentViewController:nav animated:YES completion:nil];
+    [host presentViewController:[PFBCompatibilityReportViewController sheetFor:window]
+                       animated:YES
+                     completion:nil];
 }
 
 // MARK: - capture

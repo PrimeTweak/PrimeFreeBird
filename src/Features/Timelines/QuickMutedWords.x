@@ -1,7 +1,6 @@
 // A muted-words button in the Home timeline's top bar.
 
 #import "Support/HookHelpers.h"
-#import "Debug/PFBProbe.h"
 #import "Features/Timelines/PFBMutedWordsViewController.h"
 
 static const void* kPFBQuickMutedBtnKey = &kPFBQuickMutedBtnKey;
@@ -32,20 +31,6 @@ static UIView* pfbFindAvatarView(UIView* view, UIView* bar) {
         }
     }
     return best;
-}
-
-// Measurement: the screens whose bar receives the button, one line per screen class.
-static void pfbProbeQuickButtonOwner(UIViewController* owner) {
-    static NSMutableSet<Class>* seen;
-    Class kind = [owner class];
-    if (!seen) {
-        seen = [NSMutableSet set];
-    }
-    if (seen.count >= 12 || [seen containsObject:kind]) {
-        return;
-    }
-    [seen addObject:kind];
-    PFB_PROBE(@"Home bar button screens", 10, @"%@", NSStringFromClass(kind));
 }
 
 static BOOL pfbControllerIsHome(UIViewController* owner) {
@@ -148,7 +133,6 @@ static UIImage* PFBFilterBarsGlyph(void) {
                 }
                 return;
             }
-            pfbProbeQuickButtonOwner(owner);
         } else if (!button) {
             return;
         }

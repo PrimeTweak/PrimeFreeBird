@@ -3,7 +3,6 @@
 #import <QuartzCore/QuartzCore.h>
 
 #import "Support/HookHelpers.h"
-#import "Debug/PFBProbe.h"
 
 // MARK: - Hide custom timelines
 
@@ -1879,43 +1878,12 @@ void pfbReapplyTimelineFilter(void) {
     }
 }
 
-// Measurement: on Following, how often the first item carries no entry ID while the item
-// it wraps has one, as a module row does; one line per kind and a count every 50 lists.
-static void pfbProbeFollowingHead(TFNItemsDataViewController* dataViewController, NSArray* sections) {
-    static NSUInteger lists, wrappedFirst;
-    if (lists >= 500 || !PFBReadingIsFollowingTab(dataViewController)) {
-        return;
-    }
-    id first = nil;
-    for (id section in sections) {
-        if ([section isKindOfClass:[NSArray class]] && ((NSArray*)section).count) {
-            first = ((NSArray*)section).firstObject;
-            break;
-        }
-    }
-    if (!first) {
-        return;
-    }
-    lists++;
-    id inner = PFBUnwrapDataViewItem(first);
-    if (!ItemEntryID(first).length && ItemEntryID(inner).length) {
-        wrappedFirst++;
-        PFB_PROBE(@"Following head", 8, @"first item %@ has no entry ID, the %@ it wraps has one",
-                  NSStringFromClass([first class]), NSStringFromClass([inner class]));
-    }
-    if (lists % 50 == 0) {
-        PFB_PROBE(@"Following head", 8, @"%lu lists, %lu with a wrapped item first", (unsigned long)lists,
-                  (unsigned long)wrappedFirst);
-    }
-}
-
 %hook TFNItemsDataViewController
 
 - (void)setSections:(NSArray*)sections restoreScrollPosition:(BOOL)restoreScrollPosition {
     BOOL keepPlace = restoreScrollPosition;
     NSArray* filtered = FilteredTimelineSections(self, sections);
     if (PFBReadingIsHomeTimeline(self)) {
-        pfbProbeFollowingHead(self, filtered);
         // Every home controller is tracked, the algorithmic tab included: tracking is pure
         // registration, and each reading action gates itself on MarkerAllowed.
         // The registry is read when the app backgrounds, to capture each anchor.

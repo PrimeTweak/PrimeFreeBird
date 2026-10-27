@@ -167,8 +167,6 @@
 /* ===== Fonts picker ===== */
 "CUSTOM_FONTS_MENU_TITLE" = "\n글꼴 선택";
 "CUSTOM_FONTS_NAVIGATION_BUTTON_TITLE" = "사용자 지정 글꼴";
-"CUSTOM_FONTS_TUT_ALERT_MESSAGE" = "App Store의 iFont 앱으로 글꼴을 설치하세요.";
-"INSTALL_IFONT_BUTTON_TITLE" = "iFont 받기";
 
 /* ===== Media & download flows ===== */
 "DOWNLOAD_AS_GIF_OPTION_TITLE" = "GIF로 다운로드";

@@ -2,7 +2,6 @@
 
 #import <CoreText/CoreText.h>
 #import "Support/HookHelpers.h"
-#import "Debug/PFBProbe.h"
 
 // MARK: - Always open in Safari
 
@@ -78,50 +77,6 @@ static BOOL ShouldKeepBrowserURLInApp(NSURL* url) {
                                }
                              }];
     [self dismissViewControllerAnimated:NO completion:nil];
-    // Measurement: whether the sheet is still up once Twitter is back in front.
-    __weak UIViewController* weakSelf = self;
-    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1.5 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
-      UIViewController* sheet = weakSelf;
-      PFB_PROBE(@"browser after Safari", 4, @"browser sheet %@",
-                sheet.presentingViewController || sheet.viewIfLoaded.window ? @"still on screen" : @"gone");
-    });
-}
-
-%end
-
-// Measurement: the browser a link opens in, with both browser options and whether the
-// check is running, one line per kind.
-static void pfbProbeBrowserShown(UIViewController* controller) {
-    static NSArray<Class>* browsers;
-    static dispatch_once_t once;
-    dispatch_once(&once, ^{
-      NSMutableArray<Class>* found = [NSMutableArray array];
-      for (NSString* name in @[ @"SFSafariViewController", @"T1WebViewController", @"T1XLinkViewController",
-                                @"_TtC14T1TwitterSwift12XLinkWebView", @"T1XArticleWebViewContainer" ]) {
-          Class browser = NSClassFromString(name);
-          if (browser) {
-              [found addObject:browser];
-          }
-      }
-      browsers = found.copy;
-    });
-    for (Class browser in browsers) {
-        if ([controller isKindOfClass:browser]) {
-            PFB_PROBE(@"browser opened", 8, @"%@, External browser %@, New in-app browser %@%@",
-                      NSStringFromClass([controller class]),
-                      [PFBSettings boolForKey:@"always_open_safari"] ? @"on" : @"off",
-                      [PFBSettings boolForKey:@"new_inapp_webview"] ? @"on" : @"off",
-                      PFBCompatTourIsRunning() ? @", during the check" : @"");
-            return;
-        }
-    }
-}
-
-%hook UIViewController
-
-- (void)viewDidAppear:(BOOL)animated {
-    %orig;
-    pfbProbeBrowserShown(self);
 }
 
 %end

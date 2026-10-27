@@ -132,6 +132,9 @@ typedef NS_ENUM(NSInteger, PFBCompatReadState) {
 };
 
 @interface PFBCompatibilityReportViewController : UITableViewController
+// The report in a navigation of its own, for the stethoscope's sheet: as tall as the page
+// in front of it, up to the screen's.
++ (UINavigationController*)sheetFor:(UIWindow*)window;
 @end
 
 // Posted on the main queue whenever the verdicts may have changed.

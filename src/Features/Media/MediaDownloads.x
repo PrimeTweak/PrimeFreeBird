@@ -1,7 +1,6 @@
 // Downloads: chat videos and voice notes, voice from a video, Tweet to image, media menu.
 
 #import "Support/HookHelpers.h"
-#import "Debug/PFBProbe.h"
 
 // The glyph of the three download entries: Twitter's, or the closest system symbol.
 static UIImage* PFBDownloadGlyph(void) {
@@ -40,47 +39,18 @@ static NSArray* DMVideoEntities(UIView* attachmentView) {
 // asset opened to play it. The last one seen is taken as the one under the finger.
 
 static NSURL* gPFBLastVoiceURL = nil;
-// Measurement: when the last voice file was opened, read by the Save measurement.
-static NSTimeInterval gPFBProbeVoiceAt = 0;
 
 %hook AVURLAsset
 
 - (id)initWithURL:(NSURL*)url options:(NSDictionary*)options {
     if ([url.path containsString:@"/decrypted-media-v2/"]) {
         PFBCompatReach(PFBCompatPath_played_voice_note);
-        PFB_PROBE(@"voice file opened", 2, @"on the %@ thread",
-                  [NSThread isMainThread] ? @"main" : @"background");
-        gPFBProbeVoiceAt = [NSDate timeIntervalSinceReferenceDate];
         gPFBLastVoiceURL = url;
     }
     return %orig;
 }
 
 %end
-
-// Measurement: on Save, the voice note pressed, told apart by its place and its text,
-// and the file exported; the audio view's stored properties once, for a direct read.
-static void pfbProbeVoiceSave(UIView* pressed, NSURL* exported) {
-    __block NSString* text = nil;
-    PFBEnumerateSubviewsRecursively(pressed, ^(UIView* view) {
-      if (!text && [view isKindOfClass:[UILabel class]] && ((UILabel*)view).text.length) {
-          text = ((UILabel*)view).text;
-      }
-    });
-    CGRect inWindow = [pressed convertRect:pressed.bounds toView:nil];
-    PFB_PROBE(@"voice note saves", 8, @"pressed at y %.0f ('%@'), exported %@ opened %.0f s earlier", inWindow.origin.y,
-              text ?: @"", exported.lastPathComponent ?: @"?",
-              [NSDate timeIntervalSinceReferenceDate] - gPFBProbeVoiceAt);
-    unsigned int count = 0;
-    Ivar* ivars = class_copyIvarList(object_getClass(pressed), &count);
-    NSMutableArray<NSString*>* names = [NSMutableArray array];
-    for (unsigned int i = 0; i < count && i < 24; i++) {
-        [names addObject:@(ivar_getName(ivars[i]))];
-    }
-    free(ivars);
-    PFB_PROBE(@"voice note view", 1, @"%@: %@", NSStringFromClass(object_getClass(pressed)),
-              [names componentsJoinedByString:@", "]);
-}
 
 // The file is already on disk and already decrypted; copying it out under a
 // fresh name is enough to hand it to the share sheet.
@@ -148,7 +118,6 @@ static const void* kPFBVoiceInteractionKey = &kPFBVoiceInteractionKey;
                                      image:PFBDownloadGlyph()
                                 identifier:nil
                                    handler:^(__kindof UIAction* _Nonnull action) {
-                                     pfbProbeVoiceSave((UIView*)self, voiceURL);
                                      PFBSaveVoiceMessage(voiceURL);
                                    }];
                        return [UIMenu menuWithTitle:@"" children:@[ saveAction ]];
@@ -528,15 +497,6 @@ static NSArray* PFBVMDMenuChildren(NSArray* children) {
     }];
     NSMutableArray* augmented = [PFBVMDWithoutNativeDownload(children) mutableCopy];
     [augmented insertObject:action atIndex:augmented.count ? augmented.count - 1 : 0];
-    // Measurement: the menus that receive the entry, by the titles they already hold.
-    NSMutableArray<NSString*>* titles = [NSMutableArray array];
-    for (id element in children) {
-        if (titles.count < 4 && [element isKindOfClass:[UIMenuElement class]]) {
-            [titles addObject:((UIMenuElement*)element).title ?: @""];
-        }
-    }
-    PFB_PROBE(@"download entry menus", 8, @"%.0f s after a share sheet, menu with '%@'",
-              [NSDate timeIntervalSinceReferenceDate] - gPFBVMDStatusTime, [titles componentsJoinedByString:@"', '"]);
     return augmented;
 }
 

@@ -167,8 +167,6 @@
 /* ===== Fonts picker ===== */
 "CUSTOM_FONTS_MENU_TITLE" = "\nWybierz czcionkę";
 "CUSTOM_FONTS_NAVIGATION_BUTTON_TITLE" = "Własne czcionki";
-"CUSTOM_FONTS_TUT_ALERT_MESSAGE" = "Zainstaluj czcionki aplikacją iFont z App Store.";
-"INSTALL_IFONT_BUTTON_TITLE" = "Pobierz iFont";
 
 /* ===== Media & download flows ===== */
 "DOWNLOAD_AS_GIF_OPTION_TITLE" = "Pobierz jako GIF";

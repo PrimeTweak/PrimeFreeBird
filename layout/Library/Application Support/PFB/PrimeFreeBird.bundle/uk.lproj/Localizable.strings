@@ -167,8 +167,6 @@
 /* ===== Fonts picker ===== */
 "CUSTOM_FONTS_MENU_TITLE" = "\nОберіть шрифт";
 "CUSTOM_FONTS_NAVIGATION_BUTTON_TITLE" = "Власні шрифти";
-"CUSTOM_FONTS_TUT_ALERT_MESSAGE" = "Встановіть шрифти за допомогою додатка iFont з App Store.";
-"INSTALL_IFONT_BUTTON_TITLE" = "Завантажити iFont";
 
 /* ===== Media & download flows ===== */
 "DOWNLOAD_AS_GIF_OPTION_TITLE" = "Завантажити як GIF";

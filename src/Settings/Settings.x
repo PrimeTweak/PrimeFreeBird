@@ -3,7 +3,6 @@
 #import "Support/HookHelpers.h"
 #import "Support/TwitterChirpFont.h"
 #import "Common/PFBCompatibility.h"
-#import "Debug/PFBProbe.h"
 
 // MARK: - PrimeFreeBird settings entry
 
@@ -214,23 +213,16 @@ static BOOL settingsVCLeavesSettings(UIViewController* settingsVC) {
 
 // MARK: - Change font
 
-// Measurement: whether the fonts list iFont keeps can be read from the app, the file's
-// presence, readability and font count; once at launch and at each Custom fonts tap.
-static void pfbProbeFontCache(NSString* when) {
-    NSString* path = @"/var/mobile/Library/Fonts/AddedFontCache.plist";
-    NSFileManager* files = [NSFileManager defaultManager];
-    NSData* data = [NSData dataWithContentsOfFile:path];
-    id list = data ? [NSPropertyListSerialization propertyListWithData:data options:NSPropertyListImmutable
-                                                                format:NULL error:nil]
-                   : nil;
-    PFB_PROBE(@"custom fonts file", 4, @"%@: exists %@, readable %@, %lu bytes, %lu fonts", when,
-              [files fileExistsAtPath:path] ? @"yes" : @"no", [files isReadableFileAtPath:path] ? @"yes" : @"no",
-              (unsigned long)data.length, (unsigned long)([list isKindOfClass:[NSDictionary class]] ? [list count] : 0));
-}
+// The fonts installed with iFont, listed in a file outside the app. A sideloaded app
+// cannot read it, and the font picker then gets no Custom fonts button.
+static NSString* const kPFBAddedFontsPath = @"/var/mobile/Library/Fonts/AddedFontCache.plist";
 
 %hook UIFontPickerViewController
 - (void)viewWillAppear:(BOOL)arg1 {
     %orig(arg1);
+    if (![[NSFileManager defaultManager] isReadableFileAtPath:kPFBAddedFontsPath]) {
+        return;
+    }
     self.navigationItem.rightBarButtonItem = [[UIBarButtonItem alloc]
         initWithTitle:[[PFBBundle sharedBundle]
                           localizedStringForKey:@"CUSTOM_FONTS_NAVIGATION_BUTTON_TITLE"]
@@ -240,84 +232,63 @@ static void pfbProbeFontCache(NSString* when) {
 }
 %new
 - (void)customFontsHandler {
-    pfbProbeFontCache(@"on Custom fonts");
-    if ([[NSFileManager defaultManager]
-            fileExistsAtPath:@"/var/mobile/Library/Fonts/AddedFontCache.plist"]) {
-        NSAttributedString* AttString = [[NSAttributedString alloc]
-            initWithString:[[PFBBundle sharedBundle] localizedStringForKey:@"CUSTOM_FONTS_MENU_TITLE"]
-                attributes:@{
-                    NSFontAttributeName: [PFBManager menuTitleFont],
-                    NSForegroundColorAttributeName: UIColor.labelColor
-                }];
-        TFNActiveTextItem* title =
-            [[%c(TFNActiveTextItem) alloc] initWithTextModel:[[%c(TFNAttributedTextModel) alloc]
-                                                                     initWithAttributedString:AttString]
-                                                    activeRanges:nil];
-
-        NSMutableArray* actions = [[NSMutableArray alloc] init];
-        [actions addObject:title];
-
-        NSDictionary* plistDictionary = [NSPropertyListSerialization
-            propertyListWithData:
-                [NSData dataWithContentsOfURL:
-                            [NSURL fileURLWithPath:@"/var/mobile/Library/Fonts/AddedFontCache.plist"]]
-                         options:NSPropertyListImmutable
-                          format:NULL
-                           error:nil];
-        [plistDictionary enumerateKeysAndObjectsUsingBlock:^(id _Nonnull key, id _Nonnull obj,
-                                                             BOOL* _Nonnull stop) {
-            @try {
-                NSString* fontName = ((NSArray*)[obj valueForKey:@"psNames"]).firstObject;
-                if (![fontName isKindOfClass:[NSString class]] || fontName.length == 0) {
-                    return;
-                }
-                TFNActionItem* fontAction = [%c(TFNActionItem)
-                    actionItemWithTitle:fontName
-                                 action:^{
-                                     if (self.configuration.includeFaces) {
-                                         [self setSelectedFontDescriptor:[UIFontDescriptor
-                                                                             fontDescriptorWithFontAttributes:@{
-                                                                                 UIFontDescriptorNameAttribute:
-                                                                                     fontName
-                                                                             }]];
-                                     } else {
-                                         [self setSelectedFontDescriptor:[UIFontDescriptor
-                                                                             fontDescriptorWithFontAttributes:@{
-                                                                                 UIFontDescriptorFamilyAttribute:
-                                                                                     fontName
-                                                                             }]];
-                                     }
-                                     [self.delegate fontPickerViewControllerDidPickFont:self];
-                                 }];
-                [actions addObject:fontAction];
-            } @catch (NSException* exception) {
-            }
-        }];
-
-        TFNMenuSheetViewController* alert = [[%c(TFNMenuSheetViewController) alloc]
-            initWithActionItems:[NSArray arrayWithArray:actions]];
-        [alert tfnPresentedCustomPresentFromViewController:self animated:YES completion:nil];
-    } else {
-        PFBBundle* bundle = [PFBBundle sharedBundle];
-        UIAlertController* errAlert = [UIAlertController
-            alertControllerWithTitle:[bundle localizedStringForKey:@"CUSTOM_FONTS_TUT_ALERT_TITLE"]
-                             message:[bundle localizedStringForKey:@"CUSTOM_FONTS_TUT_ALERT_MESSAGE"]
-                      preferredStyle:UIAlertControllerStyleAlert];
-        [errAlert addAction:[UIAlertAction actionWithTitle:[bundle localizedStringForKey:@"CANCEL_ACTION"]
-                                                     style:UIAlertActionStyleCancel
-                                                   handler:nil]];
-        UIAlertAction* getApp = [UIAlertAction
-            actionWithTitle:[bundle localizedStringForKey:@"INSTALL_IFONT_BUTTON_TITLE"]
-                      style:UIAlertActionStyleDefault
-                    handler:^(__unused UIAlertAction* action) {
-                        NSURL* store = [NSURL
-                            URLWithString:@"https://apps.apple.com/sa/app/ifont-find-install-any-font/id1173222289"];
-                        [[UIApplication sharedApplication] openURL:store options:@{} completionHandler:nil];
-                    }];
-        [errAlert addAction:getApp];
-        errAlert.preferredAction = getApp;
-        [self presentViewController:errAlert animated:YES completion:nil];
+    NSData* data = [NSData dataWithContentsOfFile:kPFBAddedFontsPath];
+    NSDictionary* plistDictionary =
+        data ? [NSPropertyListSerialization propertyListWithData:data
+                                                         options:NSPropertyListImmutable
+                                                          format:NULL
+                                                           error:nil]
+             : nil;
+    if (![plistDictionary isKindOfClass:[NSDictionary class]]) {
+        return;
     }
+    NSAttributedString* AttString = [[NSAttributedString alloc]
+        initWithString:[[PFBBundle sharedBundle] localizedStringForKey:@"CUSTOM_FONTS_MENU_TITLE"]
+            attributes:@{
+                NSFontAttributeName: [PFBManager menuTitleFont],
+                NSForegroundColorAttributeName: UIColor.labelColor
+            }];
+    TFNActiveTextItem* title =
+        [[%c(TFNActiveTextItem) alloc] initWithTextModel:[[%c(TFNAttributedTextModel) alloc]
+                                                                 initWithAttributedString:AttString]
+                                                activeRanges:nil];
+
+    NSMutableArray* actions = [[NSMutableArray alloc] init];
+    [actions addObject:title];
+
+    [plistDictionary enumerateKeysAndObjectsUsingBlock:^(id _Nonnull key, id _Nonnull obj,
+                                                         BOOL* _Nonnull stop) {
+        @try {
+            NSString* fontName = ((NSArray*)[obj valueForKey:@"psNames"]).firstObject;
+            if (![fontName isKindOfClass:[NSString class]] || fontName.length == 0) {
+                return;
+            }
+            TFNActionItem* fontAction = [%c(TFNActionItem)
+                actionItemWithTitle:fontName
+                             action:^{
+                                 if (self.configuration.includeFaces) {
+                                     [self setSelectedFontDescriptor:[UIFontDescriptor
+                                                                         fontDescriptorWithFontAttributes:@{
+                                                                             UIFontDescriptorNameAttribute:
+                                                                                 fontName
+                                                                         }]];
+                                 } else {
+                                     [self setSelectedFontDescriptor:[UIFontDescriptor
+                                                                         fontDescriptorWithFontAttributes:@{
+                                                                             UIFontDescriptorFamilyAttribute:
+                                                                                 fontName
+                                                                         }]];
+                                 }
+                                 [self.delegate fontPickerViewControllerDidPickFont:self];
+                             }];
+            [actions addObject:fontAction];
+        } @catch (NSException* exception) {
+        }
+    }];
+
+    TFNMenuSheetViewController* alert = [[%c(TFNMenuSheetViewController) alloc]
+        initWithActionItems:[NSArray arrayWithArray:actions]];
+    [alert tfnPresentedCustomPresentFromViewController:self animated:YES completion:nil];
 }
 %end
 
@@ -392,11 +363,3 @@ static UIFont* PFBCustomFont(UIFont* original, BOOL bold) {
     return YES;
 }
 %end
-
-%ctor {
-    %init;
-    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(8 * NSEC_PER_SEC)),
-                   dispatch_get_global_queue(QOS_CLASS_UTILITY, 0), ^{
-                     pfbProbeFontCache(@"at launch");
-                   });
-}

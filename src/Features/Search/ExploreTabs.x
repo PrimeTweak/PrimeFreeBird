@@ -2,7 +2,6 @@
 
 #import "Support/HookHelpers.h"
 #import "Debug/PFBDebugger.h"
-#import "Debug/PFBProbe.h"
 #import <QuartzCore/QuartzCore.h>
 
 // MARK: - shared predicates
@@ -344,46 +343,6 @@ static BOOL pfbApplyTabFilter(UIView* bar, UICollectionView* cv) {
     return hid;
 }
 
-// Measurement: the Explore tabs as served, by index and title, once per launch; after 30
-// passes with tabs on screen and fewer than two titles read, that count is recorded instead.
-static void pfbProbeExploreTabs(UIView* bar) {
-    static BOOL done;
-    static NSUInteger untitledPasses;
-    UICollectionView* cv = done ? nil : pfbFindCollection(bar, 0);
-    if (!cv || cv.numberOfSections == 0) {
-        return;
-    }
-    NSMutableDictionary<NSNumber*, NSString*>* titles = [NSMutableDictionary dictionary];
-    for (UICollectionViewCell* cell in cv.visibleCells) {
-        NSIndexPath* ip = [cv indexPathForCell:cell];
-        __block NSString* title = nil;
-        PFBEnumerateSubviewsRecursively(cell, ^(UIView* view) {
-          if (!title && [view isKindOfClass:[UILabel class]] && ((UILabel*)view).text.length) {
-              title = ((UILabel*)view).text;
-          }
-        });
-        if (ip && title) {
-            titles[@(ip.item)] = title;
-        }
-    }
-    if (titles.count < 2) {
-        if (cv.visibleCells.count >= 2 && ++untitledPasses >= 30) {
-            done = YES;
-            PFB_PROBE(@"Explore tabs", 4, @"%ld tabs, %lu of %lu cells on screen with a title read",
-                      (long)[cv numberOfItemsInSection:0], (unsigned long)titles.count,
-                      (unsigned long)cv.visibleCells.count);
-        }
-        return;
-    }
-    done = YES;
-    NSMutableArray<NSString*>* parts = [NSMutableArray array];
-    for (NSNumber* index in [titles.allKeys sortedArrayUsingSelector:@selector(compare:)]) {
-        [parts addObject:[NSString stringWithFormat:@"%@ %@", index, titles[index]]];
-    }
-    PFB_PROBE(@"Explore tabs", 4, @"%ld tabs, shown: %@", (long)[cv numberOfItemsInSection:0],
-              [parts componentsJoinedByString:@", "]);
-}
-
 // MARK: - hooks: the bar, its controller and the pager
 
 %hook _TtC10TFNUISwift25LegacySegmentedTabBarView
@@ -392,7 +351,6 @@ static void pfbProbeExploreTabs(UIView* bar) {
     %orig;
 
     if (!pfbIsExploreBar((UIView*)self)) { return; }
-    pfbProbeExploreTabs((UIView*)self);
     if (!pfbGranularActive()) {
         PFBCOMPAT_OBSERVE(PFBCompat_choose_explore_tabs, @"Explore tabs found");
         return;
@@ -466,9 +424,6 @@ static void pfbJournalPagerSwap(UICollectionView* pager, NSInteger pages) {
     if (collectionView != gPFBPagerCV) {
         if (!pfbPagerScopeOK(collectionView)) { return n; }
         if (gPFBPagerCV) {
-            // Measurement: the same finding as the journal line, kept for the report.
-            PFB_PROBE(@"Explore pager", 4, @"another pager taken as Explore's: %ld pages, owned by %@; the tab bar by %@",
-                      (long)n, pfbOwners(collectionView), pfbOwners(gPFBExploreBar));
             pfbJournalPagerSwap(collectionView, n);
         }
         gPFBPagerCV = collectionView;

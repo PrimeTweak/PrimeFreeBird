@@ -1,7 +1,6 @@
 // Branding: Twitter terminology, the new Tweets pill and the classic compose button.
 
 #import "Support/HookHelpers.h"
-#import "Debug/PFBProbe.h"
 
 // Defined in Theme.x.
 extern UIImage* PFBWhiteBakedGlyph(UIImage* image);
@@ -272,55 +271,6 @@ static BOOL PFBTextViewHoldsOwnWords(UIView* view) {
     return NO;
 }
 
-// Measurement: after a rename that changes the length, the tappable ranges the view holds
-// on the next turn, checked against the renamed text; one line per case.
-static void pfbProbeRenamedRanges(UIView* view, NSString* source, NSString* renamed) {
-    static NSUInteger checks;
-    SEL rangesGetter = NSSelectorFromString(@"activeRanges");
-    if (checks >= 30 || source.length == renamed.length || PFBProbeReturnKind(view, rangesGetter) != '@') {
-        return;
-    }
-    checks++;
-    __weak UIView* weakView = view;
-    dispatch_async(dispatch_get_main_queue(), ^{
-      UIView* strongView = weakView;
-      id ranges = strongView ? ((id (*)(id, SEL))objc_msgSend)(strongView, rangesGetter) : nil;
-      if (![ranges isKindOfClass:[NSArray class]] || ![ranges count]) {
-          return;
-      }
-      SEL displayGetter = NSSelectorFromString(@"displayString");
-      NSUInteger off = 0;
-      NSString* example = @"";
-      for (id range in ranges) {
-          NSMethodSignature* signature = [range respondsToSelector:@selector(rangeValue)]
-                                             ? [range methodSignatureForSelector:@selector(rangeValue)]
-                                             : nil;
-          if (!signature || strcmp(signature.methodReturnType, @encode(NSRange)) != 0) {
-              continue;
-          }
-          NSRange r = [range rangeValue];
-          BOOL inRenamed = r.location <= renamed.length && r.length <= renamed.length - r.location;
-          BOOL inSource = r.location <= source.length && r.length <= source.length - r.location;
-          NSString* shown = inRenamed ? [renamed substringWithRange:r] : @"(past the end)";
-          id meant = PFBProbeReturnKind(range, displayGetter) == '@'
-                         ? ((id (*)(id, SEL))objc_msgSend)(range, displayGetter)
-                         : nil;
-          if (![meant isKindOfClass:[NSString class]] || !((NSString*)meant).length) {
-              meant = inSource ? [source substringWithRange:r] : @"?";
-          }
-          if (![shown isEqualToString:meant]) {
-              off++;
-              if (!example.length) {
-                  example = [NSString stringWithFormat:@", e.g. '%@' covers '%@'", meant, shown];
-              }
-          }
-      }
-      PFB_PROBE(@"renamed text ranges", 6, @"length %lu -> %lu, %lu tappable ranges, %lu off their text%@",
-                (unsigned long)source.length, (unsigned long)renamed.length, (unsigned long)[ranges count],
-                (unsigned long)off, example);
-    });
-}
-
 // TFNAttributedTextView renders text carrying no localization key, out of the NSBundle
 // hook's reach. The new string is set on the model received, which keeps its line limit
 // and its trailing "more" text.
@@ -341,7 +291,6 @@ static void pfbProbeRenamedRanges(UIView* view, NSString* source, NSString* rena
         if (renamed != source) {
             [model setAttributedString:renamed];
             PFBCOMPAT_ACTION(PFBCompat_restore_twitter_names, @"text renamed");
-            pfbProbeRenamedRanges(self, source.string, renamed.string);
         }
     }
     %orig(model);

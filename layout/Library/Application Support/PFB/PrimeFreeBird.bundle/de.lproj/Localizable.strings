@@ -167,8 +167,6 @@
 /* ===== Fonts picker ===== */
 "CUSTOM_FONTS_MENU_TITLE" = "\nSchriftart auswählen";
 "CUSTOM_FONTS_NAVIGATION_BUTTON_TITLE" = "Benutzerdefinierte Schriftarten";
-"CUSTOM_FONTS_TUT_ALERT_MESSAGE" = "Installiere Schriftarten mit der iFont-App aus dem App Store.";
-"INSTALL_IFONT_BUTTON_TITLE" = "iFont laden";
 
 /* ===== Media & download flows ===== */
 "DOWNLOAD_AS_GIF_OPTION_TITLE" = "Als GIF herunterladen";

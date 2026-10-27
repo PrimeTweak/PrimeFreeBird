@@ -573,36 +573,79 @@ static BOOL tourFingerReady(void) {
     return gPFBTourIsTracking && gPFBTourIsDragging;
 }
 
-// A finger's drag down the list, in steps, as its delegate would hear it, with the list
-// held by the finger for the whole drag. The journal says once per tour whether it was.
-static void tourDrag(UITableView* list, CGFloat distance) {
+// A drag glides over this many frames, about 0.4 s: a step per frame, as under a finger.
+static const NSInteger kPFBTourDragSteps = 24;
+static const NSTimeInterval kPFBTourDragFrame = 1.0 / 60.0;
+// Bumped at each drag, so a drag still gliding stops once another one starts.
+static NSUInteger gPFBTourDragToken;
+
+// One frame of a drag: the list moves a step from where it is and UIKit tells its
+// delegate. After the last step, or once something else moved the list, the finger lets
+// go and done runs; a stopped tour, a list gone or a newer drag ends it without done.
+static void tourDragFrame(UITableView* list, CGFloat delta, NSInteger remaining, CGFloat last, NSUInteger token,
+                          NSUInteger generation, dispatch_block_t done) {
+    if (token != gPFBTourDragToken) {
+        return;
+    }
+    BOOL live = generation == gPFBTourGeneration && list.window != nil;
+    // A move of over a quarter screen the drag did not make, a step's clean-up for one, ends it.
+    BOOL moving = live && fabs(list.contentOffset.y - last) < list.bounds.size.height / 4.0;
+    CGPoint offset = list.contentOffset;
+    @try {
+        if (moving) {
+            offset.y += delta;
+            [list setContentOffset:offset animated:NO];
+        }
+        if (!moving || remaining == 1) {
+            id<UITableViewDelegate> delegate = list.delegate;
+            if ([delegate respondsToSelector:@selector(scrollViewDidEndDragging:willDecelerate:)]) {
+                [delegate scrollViewDidEndDragging:list willDecelerate:NO];
+            }
+        }
+    } @catch (id exception) {
+        PFBCompatTourLog(@"[tour] drag: exception with %ld steps left: %@", (long)remaining, exception);
+        live = moving = NO;
+    }
+    if (moving && remaining > 1) {
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(kPFBTourDragFrame * NSEC_PER_SEC)),
+                       dispatch_get_main_queue(), ^{
+                         tourDragFrame(list, delta, remaining - 1, offset.y, token, generation, done);
+                       });
+        return;
+    }
+    atomic_store_explicit(&gPFBTourFingerList, NULL, memory_order_relaxed);
+    if (live && done) {
+        done();
+    }
+}
+
+// A finger's drag down the list, held by the finger until it lets go. The journal says
+// once per tour whether the list took the finger.
+static void tourDrag(UITableView* list, CGFloat distance, dispatch_block_t done) {
     static NSUInteger toldGeneration;
-    id<UITableViewDelegate> delegate = list.delegate;
+    if (!list) {
+        return;
+    }
+    NSUInteger token = ++gPFBTourDragToken;
     if (tourFingerReady()) {
         atomic_store_explicit(&gPFBTourFingerList, (__bridge void*)list, memory_order_relaxed);
     }
     @try {
-        if (list && toldGeneration != gPFBTourGeneration) {
+        if (toldGeneration != gPFBTourGeneration) {
             toldGeneration = gPFBTourGeneration;
             PFBCompatTourLog(@"[tour] drag: %@", list.isDragging ? @"the list says a finger holds it"
                                                                  : @"the list answers on its own");
         }
+        id<UITableViewDelegate> delegate = list.delegate;
         if ([delegate respondsToSelector:@selector(scrollViewWillBeginDragging:)]) {
             [delegate scrollViewWillBeginDragging:list];
         }
-        CGPoint start = list.contentOffset;
-        for (NSInteger i = 1; i <= 6; i++) {
-            [list setContentOffset:CGPointMake(start.x, start.y + distance * i / 6.0) animated:NO];
-            if ([delegate respondsToSelector:@selector(scrollViewDidScroll:)]) {
-                [delegate scrollViewDidScroll:list];
-            }
-        }
-        if ([delegate respondsToSelector:@selector(scrollViewDidEndDragging:willDecelerate:)]) {
-            [delegate scrollViewDidEndDragging:list willDecelerate:NO];
-        }
-    } @finally {
+    } @catch (id exception) {
         atomic_store_explicit(&gPFBTourFingerList, NULL, memory_order_relaxed);
+        @throw;
     }
+    tourDragFrame(list, distance / kPFBTourDragSteps, kPFBTourDragSteps, list.contentOffset.y, token,
+                  gPFBTourGeneration, done);
 }
 
 // The action names a control sends on a tap, whatever its target.
@@ -1559,7 +1602,7 @@ static void tourDeepScroll(NSString* step, NSInteger drags) {
                          }
                          tourAttempt(step, @"scrolling further", ^{
                            UITableView* list = tourFrontList();
-                           tourDrag(list, list.bounds.size.height * 1.5);
+                           tourDrag(list, list.bounds.size.height * 1.5, nil);
                          });
                        });
     }
@@ -1721,8 +1764,13 @@ static NSArray<NSDictionary*>* tourAllSteps(void) {
     [steps addObject:tourStep(@"refresh end", @"Refresh end", home, ^{
              // Posts that arrive while the list is away from its top come with the pill.
              UITableView* list = tourFrontList();
-             tourDrag(list, list.bounds.size.height * 1.5);
-             tourPull();
+             tourDrag(list, list.bounds.size.height * 1.5, ^{
+               if ([gPFBTourStepLive isEqualToString:@"refresh end"]) {
+                   tourAttempt(@"refresh end", @"pulling", ^{
+                     tourPull();
+                   });
+               }
+             });
            }, ^BOOL(UIViewController* before, UIViewController* after) {
              return PFBCompatPathReached(PFBCompatPath_refresh_end_sound);
            }, nil, ^{
@@ -1759,7 +1807,7 @@ static NSArray<NSDictionary*>* tourAllSteps(void) {
     [steps addObject:tourStep(@"scroll", @"Scroll", home, ^{
              UITableView* list = tourFrontList();
              scrollStart = list.contentOffset.y;
-             tourDrag(list, list.bounds.size.height * 1.5);
+             tourDrag(list, list.bounds.size.height * 1.5, nil);
              tourDeepScroll(@"scroll", 3);
            }, ^BOOL(UIViewController* before, UIViewController* after) {
              UITableView* list = tourFrontList();
@@ -1885,7 +1933,7 @@ static NSArray<NSDictionary*>* tourAllSteps(void) {
              if (profile && ++profileLooks == 6) {
                  tourAttempt(@"other profile", @"folding the header", ^{
                    UITableView* list = tourFrontList();
-                   tourDrag(list, list.bounds.size.height * 0.8);
+                   tourDrag(list, list.bounds.size.height * 0.8, nil);
                  });
              }
              return profile;

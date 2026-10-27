@@ -167,8 +167,6 @@
 /* ===== Fonts picker ===== */
 "CUSTOM_FONTS_MENU_TITLE" = "\nOdaberi font";
 "CUSTOM_FONTS_NAVIGATION_BUTTON_TITLE" = "Prilagođeni fontovi";
-"CUSTOM_FONTS_TUT_ALERT_MESSAGE" = "Instaliraj fontove aplikacijom iFont iz App Storea.";
-"INSTALL_IFONT_BUTTON_TITLE" = "Preuzmi iFont";
 
 /* ===== Media & download flows ===== */
 "DOWNLOAD_AS_GIF_OPTION_TITLE" = "Preuzmi kao GIF";

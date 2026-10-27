@@ -2,7 +2,6 @@
 
 #import "Support/HookHelpers.h"
 #import "Debug/PFBDebugger.h"
-#import "Debug/PFBProbe.h"
 
 // A named subclass, so captures can identify the button. The bar's item wrapper
 // clamps its child to the standard bar-button box, so the capsule is drawn
@@ -175,14 +174,6 @@ static void pfbSwapRefreshLabelFromMenu(void) {
     }
 }
 
-// Measurement: the items the pill replaces, told apart by title, menu, view and glyph.
-static void pfbProbeSwapped(NSString* where, UIBarButtonItem* item) {
-    NSString* glyph = item.image ? objc_getAssociatedObject(item.image, @selector(tfn_vectorImageNamed:fitsSize:fillColor:)) : nil;
-    PFB_PROBE(@"inbox pill swaps", 10, @"%@: title '%@', menu %@, view %@, glyph %@", where, item.title ?: @"",
-              item.menu ? @"yes" : @"no", item.customView ? NSStringFromClass([item.customView class]) : @"none",
-              glyph ?: @"none");
-}
-
 // Once the replacement is in place, Twitter's next item is caught at the setter before
 // it reaches the bar: its menu and checked state are read and the replacement goes
 // through in its place, so the bar does not rebuild.
@@ -199,7 +190,6 @@ static NSArray<UIBarButtonItem*>* pfbSwapInterceptItems(UINavigationItem* nav,
     if (![PFBSettings boolForKey:@"enable_liquid_glass"]) {
         return items;
     }
-    pfbProbeSwapped(@"setter", incoming);
     gPFBSwapOriginal = incoming;
     pfbSwapRefreshLabelFromMenu();
     return @[gPFBSwapItem];
@@ -264,7 +254,6 @@ static void pfbSwapApply(UIView* pillView) {
     if (!original) {
         return;  // items not attached yet; the next layout retries
     }
-    pfbProbeSwapped([NSString stringWithFormat:@"first swap in %@", NSStringFromClass([vc class])], original);
 
     // The native content, read live from the original pill (stack -> label + chevron).
     UIStackView* stack = nil;
@@ -431,7 +420,6 @@ static void pfbSwapApply(UIView* pillView) {
             for (UIBarButtonItemGroup* group in groups) {
                 if (group.barButtonItems.count == 1 &&
                     group.barButtonItems.firstObject != gPFBSwapItem) {
-                    pfbProbeSwapped(@"group setter", group.barButtonItems.firstObject);
                     gPFBSwapOriginal = group.barButtonItems.firstObject;
                     group.barButtonItems = @[gPFBSwapItem];
                     pfbSwapRefreshLabelFromMenu();

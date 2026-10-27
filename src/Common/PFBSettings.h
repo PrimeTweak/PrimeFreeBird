@@ -24,5 +24,5 @@
 FOUNDATION_EXPORT NSString* PFBCurrentKeyForLegacyKey(NSString* key);
 // The value with its dictionary keys renamed the same way.
 FOUNDATION_EXPORT id PFBValueWithCurrentKeys(id value);
-// The Explore tab keys, in the bar's order (For You, Trending, News, Sports, Entertainment).
+// The Explore tab keys, in the bar's order (Explore, Trending, News, Sports, Entertainment).
 FOUNDATION_EXPORT NSArray<NSString*>* PFBExploreTabKeys(void);

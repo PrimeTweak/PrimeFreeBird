@@ -3,7 +3,6 @@
 
 #import "Support/HookHelpers.h"
 #import "Debug/PFBDebugger.h"
-#import "Debug/PFBProbe.h"
 #import <QuartzCore/QuartzCore.h>
 
 static const void* kPFBGrayedImageKey = &kPFBGrayedImageKey;
@@ -635,34 +634,6 @@ static BOOL pfbIsChatBarGlyph(UIView* view) {
     return inHolder && pfbIsChatConversationBar(view);
 }
 
-// Measurement: chat-bar glyphs baked outside any navigation bar, with their first
-// ancestors, one line per chain.
-static void pfbProbeChatGlyphOutsideBar(UIView* view) {
-    static NSMutableSet<NSString*>* seen;
-    if (!view.window || seen.count >= 8) {
-        return;
-    }
-    for (UIView* up = view.superview; up; up = up.superview) {
-        if ([up isKindOfClass:[UINavigationBar class]]) {
-            return;
-        }
-    }
-    NSMutableArray<NSString*>* chain = [NSMutableArray array];
-    UIView* up = view.superview;
-    for (NSInteger i = 0; up && i < 5; i++, up = up.superview) {
-        [chain addObject:NSStringFromClass([up class])];
-    }
-    NSString* line = [chain componentsJoinedByString:@" < "];
-    if (!seen) {
-        seen = [NSMutableSet set];
-    }
-    if ([seen containsObject:line]) {
-        return;
-    }
-    [seen addObject:line];
-    PFB_PROBE(@"chat glyph outside the bar", 6, @"%@", line);
-}
-
 %hook UIImageView
 
 - (void)didMoveToWindow {
@@ -677,9 +648,6 @@ static void pfbProbeChatGlyphOutsideBar(UIView* view) {
         chatImage.renderingMode != UIImageRenderingModeAlwaysOriginal &&
         (pfbIsChatBarGlyph((UIView*)self) ||
          pfbIsBackArrowGlyph((UIView*)self))) {
-        if (!pfbIsBackArrowGlyph((UIView*)self)) {
-            pfbProbeChatGlyphOutsideBar((UIView*)self);
-        }
         UIColor* color = pfbBarGlyphColor((UIView*)self);
         UIImage* baked = PFBPaintedGlyph(chatImage, color);
         if (baked) {
@@ -702,9 +670,6 @@ static void pfbProbeChatGlyphOutsideBar(UIView* view) {
         if (image.renderingMode != UIImageRenderingModeAlwaysOriginal) {
             BOOL backArrow = pfbIsBackArrowGlyph((UIView*)self);
             if (pfbIsChatBarGlyph((UIView*)self) || backArrow) {
-                if (!backArrow) {
-                    pfbProbeChatGlyphOutsideBar((UIView*)self);
-                }
                 // Baked at the setter: whoever writes last, the pixels that
                 // land carry the color. A mode change alone leaves an alpha mask,
                 // which a bar button re-tints per its own contrast rule.
@@ -1287,20 +1252,6 @@ static const void* kPFBReplyTintKey = &kPFBReplyTintKey;
 // carries its own text inset, so it gets the same padding to line up with it.
 static const CGFloat kPFBReplyTextPad = 12.0;
 
-// Measurement: a child still at the y set on the last pass is moved up again; one line
-// per such move, with its y before and after.
-static char kPFBProbeReplyYKey;
-
-static void pfbProbeReplyDrift(UIView* sub, CGFloat entryY, CGFloat newY) {
-    NSNumber* last = objc_getAssociatedObject(sub, &kPFBProbeReplyYKey);
-    objc_setAssociatedObject(sub, &kPFBProbeReplyYKey, @(newY), OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-    if (!last || fabs(last.doubleValue - entryY) > 0.01 || newY >= entryY) {
-        return;
-    }
-    PFB_PROBE(@"reply bar drift", 6, @"%@: still at y %.1f from the last pass, moved to %.1f",
-              NSStringFromClass([sub class]), entryY, newY);
-}
-
 // The app lays its content across the bar's full box while the capsule is inset
 // and shorter, so text and buttons hang over the edges. Any child that reaches
 // near the full width is brought inside the capsule, on both axes.
@@ -1331,7 +1282,6 @@ static void pfbInsetReplyContent(UIView* bar, CGFloat inset) {
                 frame.origin.y = capsule - frame.size.height;
             }
         }
-        pfbProbeReplyDrift(sub, sub.frame.origin.y, frame.origin.y);
         if (!CGRectEqualToRect(sub.frame, frame)) {
             sub.frame = frame;
         }

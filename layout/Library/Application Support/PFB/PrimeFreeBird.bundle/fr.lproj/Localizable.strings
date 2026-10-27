@@ -286,9 +286,6 @@
 /* ===== Fonts picker ===== */
 "CUSTOM_FONTS_MENU_TITLE" = "\nChoisir une police";
 "CUSTOM_FONTS_NAVIGATION_BUTTON_TITLE" = "Polices personnalisées";
-"CUSTOM_FONTS_TUT_ALERT_TITLE" = "Aucune police personnalisée";
-"CUSTOM_FONTS_TUT_ALERT_MESSAGE" = "Installez des polices avec l’app iFont de l’App Store.";
-"INSTALL_IFONT_BUTTON_TITLE" = "Obtenir iFont";
 
 /* ===== Media & download flows ===== */
 "DOWNLOAD_AS_GIF_OPTION_TITLE" = "Télécharger en GIF";
@@ -524,7 +521,7 @@
 "EXPLORE_TABS_HINT" = "Touchez un onglet pour le retirer ou le remettre.";
 "EXPLORE_TABS_HIDDEN_COUNT" = "Masqués : %lu";
 "EXPLORE_TABS_NONE_HIDDEN" = "Aucun masqué";
-"HIDE_TAB_FORYOU_TAB_NAME" = "Pour vous";
+"HIDE_TAB_FORYOU_TAB_NAME" = "Explorer";
 "HIDE_TAB_TRENDING_TAB_NAME" = "Tendances";
 "HIDE_TAB_NEWS_TAB_NAME" = "Actualités";
 "HIDE_TAB_SPORTS_TAB_NAME" = "Sport";

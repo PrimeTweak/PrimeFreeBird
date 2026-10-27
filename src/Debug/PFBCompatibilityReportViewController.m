@@ -131,6 +131,47 @@ static UITableViewCell* PFBReportCell(UITableView* table, NSIndexPath* indexPath
     return cell;
 }
 
+// The height a page needs in the stethoscope's sheet: its bar and its table's content.
+static CGFloat PFBReportPageHeight(UIViewController* page) {
+    if (![page isKindOfClass:[UITableViewController class]] || !page.isViewLoaded) {
+        return 0.0;
+    }
+    UITableView* table = ((UITableViewController*)page).tableView;
+    return ceil(table.adjustedContentInset.top + table.contentSize.height);
+}
+
+// On the stethoscope's navigation: the height its sheet takes, and the most it can take.
+static const void* kPFBReportFittedKey = &kPFBReportFittedKey;
+static const void* kPFBReportMostKey = &kPFBReportMostKey;
+
+// The stethoscope's sheet takes the height of the page in front again when it changed, up
+// to the most it can take. Pushed in the settings, the report has no sheet of its own.
+static void PFBReportFitSheet(UIViewController* page) {
+    UINavigationController* navigation = page.navigationController;
+    if (navigation.topViewController != page || !navigation.presentingViewController ||
+        ![navigation.viewControllers.firstObject isKindOfClass:[PFBCompatibilityReportViewController class]]) {
+        return;
+    }
+    if (@available(iOS 16.0, *)) {
+        NSNumber* most = objc_getAssociatedObject(navigation, kPFBReportMostKey);
+        CGFloat height = MIN(PFBReportPageHeight(page), most ? most.doubleValue : navigation.view.window.bounds.size.height);
+        NSNumber* fitted = objc_getAssociatedObject(navigation, kPFBReportFittedKey);
+        if (height <= 0.0 || (fitted && fabs(fitted.doubleValue - height) < 1.0)) {
+            return;
+        }
+        objc_setAssociatedObject(navigation, kPFBReportFittedKey, @(height), OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        UISheetPresentationController* sheet = navigation.sheetPresentationController;
+        // While the sheet comes up, the height joins its opening rather than following it.
+        if (navigation.isBeingPresented) {
+            [sheet invalidateDetents];
+            return;
+        }
+        [sheet animateChanges:^{
+          [sheet invalidateDetents];
+        }];
+    }
+}
+
 // One verdict's options on a page of their own: those not tested, or those working under
 // their settings pages. The internal checks stay in the copied report.
 @interface PFBCompatibilityListViewController : UITableViewController
@@ -206,6 +247,11 @@ static UITableViewCell* PFBReportCell(UITableView* table, NSIndexPath* indexPath
     }
 }
 
+- (void)viewDidLayoutSubviews {
+    [super viewDidLayoutSubviews];
+    PFBReportFitSheet(self);
+}
+
 - (void)rebuild {
     NSMutableArray<PFBReportRow*>* rows = [NSMutableArray array];
     NSString* section = nil;
@@ -272,6 +318,41 @@ static UITableViewCell* PFBReportCell(UITableView* table, NSIndexPath* indexPath
     NSArray<PFBReportRow*>* _rows;
 }
 
++ (UINavigationController*)sheetFor:(UIWindow*)window {
+    PFBCompatibilityReportViewController* report = [[self alloc] initWithStyle:UITableViewStyleGrouped];
+    UINavigationController* navigation = [[UINavigationController alloc] initWithRootViewController:report];
+    navigation.modalPresentationStyle = UIModalPresentationPageSheet;
+    if (@available(iOS 16.0, *)) {
+        __weak UINavigationController* weakNavigation = navigation;
+        UISheetPresentationControllerDetent* fitted = [UISheetPresentationControllerDetent
+            customDetentWithIdentifier:@"PFBReportFitted"
+                              resolver:^CGFloat(id<UISheetPresentationControllerDetentResolutionContext> context) {
+                                UINavigationController* sheetNavigation = weakNavigation;
+                                if (!sheetNavigation) {
+                                    return context.maximumDetentValue;
+                                }
+                                objc_setAssociatedObject(sheetNavigation, kPFBReportMostKey,
+                                                         @(context.maximumDetentValue),
+                                                         OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+                                CGFloat height =
+                                    [objc_getAssociatedObject(sheetNavigation, kPFBReportFittedKey) doubleValue];
+                                return height > 0.0 ? MIN(height, context.maximumDetentValue)
+                                                    : context.maximumDetentValue;
+                              }];
+        navigation.sheetPresentationController.detents = @[ fitted ];
+        // Sized once at the window's width before it opens, from a bar and the page's table,
+        // so the sheet comes up at about the page's height.
+        [report loadViewIfNeeded];
+        report.view.frame = window.bounds;
+        [report.tableView layoutIfNeeded];
+        CGFloat bar = [navigation.navigationBar sizeThatFits:window.bounds.size].height;
+        objc_setAssociatedObject(navigation, kPFBReportFittedKey,
+                                 @(MIN(ceil(bar + report.tableView.contentSize.height), window.bounds.size.height)),
+                                 OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    }
+    return navigation;
+}
+
 - (instancetype)initWithStyle:(UITableViewStyle)style {
     return [super initWithStyle:UITableViewStyleGrouped];
 }
@@ -297,6 +378,7 @@ static UITableViewCell* PFBReportCell(UITableView* table, NSIndexPath* indexPath
     tours.accessibilityLabel = @"Check options";
     tours.tag = PFBNativeGlassTag;
     self.navigationItem.rightBarButtonItems = @[ copy, tours ];
+    [self rebuild];
 }
 
 // Twitter's binaries may finish reading while the report is open: it redraws then.
@@ -355,6 +437,11 @@ static UITableViewCell* PFBReportCell(UITableView* table, NSIndexPath* indexPath
         [self rebuild];
         [self.tableView reloadData];
     }
+}
+
+- (void)viewDidLayoutSubviews {
+    [super viewDidLayoutSubviews];
+    PFBReportFitSheet(self);
 }
 
 // The problems first, then the options by verdict, then the counts.

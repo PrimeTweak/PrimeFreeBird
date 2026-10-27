@@ -2,7 +2,6 @@
 
 #import "Support/HookHelpers.h"
 #import "Debug/PFBDebugger.h"
-#import "Debug/PFBProbe.h"
 #import "Support/TwitterChirpFont.h"
 #import "Features/General/PFBHiddenNotificationsViewController.h"
 
@@ -654,82 +653,6 @@ static void PFBNotifDropRow(id dataViewController, NSIndexPath* indexPath) {
 
 // MARK: - Keeping them out of the list
 
-// Measurement: the classes of the elements lists receive as sections, and whether they
-// answer items and setItems:, one line per class.
-static void pfbProbeSectionClasses(NSArray* sections) {
-    static NSMutableSet<Class>* seen;
-    static dispatch_once_t once;
-    dispatch_once(&once, ^{
-      seen = [NSMutableSet set];
-    });
-    for (NSUInteger i = 0; i < MIN(sections.count, (NSUInteger)3); i++) {
-        id element = sections[i];
-        BOOL fresh;
-        @synchronized(seen) {
-            fresh = seen.count < 12 && ![seen containsObject:[element class]];
-            if (fresh) {
-                [seen addObject:[element class]];
-            }
-        }
-        if (fresh) {
-            PFB_PROBE(@"list sections", 8, @"%@: items %@, setItems: %@", NSStringFromClass([element class]),
-                      [element respondsToSelector:@selector(items)] ? @"yes" : @"no",
-                      [element respondsToSelector:NSSelectorFromString(@"setItems:")] ? @"yes" : @"no");
-        }
-    }
-}
-
-// Drops hidden items from sections that expose -items and -setItems:; other sections
-// pass through whole. An id in the registry can only belong to a hidden notification,
-// so the filter needs no scoping of its own.
-static NSArray* PFBFilterNotifSections(NSArray* sections) {
-    pfbProbeSectionClasses(sections);
-    if (![PFBSettings boolForKey:@"hide_notifications"]) {
-        return sections;
-    }
-    if (!PFBHiddenNotifs().count) {
-        return sections;
-    }
-    NSMutableArray* result = [NSMutableArray arrayWithCapacity:sections.count];
-    BOOL changed = NO;
-    for (id section in sections) {
-        NSArray* items = nil;
-        if ([section respondsToSelector:@selector(items)]) {
-            id maybe = ((id (*)(id, SEL))objc_msgSend)(section, @selector(items));
-            if ([maybe isKindOfClass:[NSArray class]]) {
-                items = maybe;
-            }
-        }
-        if (!items.count) {
-            [result addObject:section];
-            continue;
-        }
-        NSMutableArray* kept = [NSMutableArray arrayWithCapacity:items.count];
-        for (id item in items) {
-            if (PFBNotifIsHidden(PFBUnwrapDataViewItem(item))) {
-                changed = YES;
-                continue;
-            }
-            [kept addObject:item];
-        }
-        if (kept.count == items.count) {
-            [result addObject:section];
-            continue;
-        }
-        SEL setItems = NSSelectorFromString(@"setItems:");
-        if ([section respondsToSelector:setItems]) {
-            ((void (*)(id, SEL, id))objc_msgSend)(section, setItems, kept);
-            [result addObject:section];
-        } else {
-            [result addObject:section];  // immutable section: leave it whole
-        }
-    }
-    return changed ? result : sections;
-}
-
-// Sections that hide their items from Objective-C pass the filter whole; the rows of
-// TFNItemsDataViewController are walked after each content replacement and deleted.
-
 // Which screens the sweep may touch, decided by observation rather than by class
 // name. One notification model keeps a controller, several without drops it, and
 // the home timeline is then never walked again.
@@ -1093,43 +1016,43 @@ static void PFBNotifSweepLater(id dataViewController) {
 }
 
 // T1URTViewController inherits -sections and -setSections: from
-// TFNItemsDataViewController, so the hooks sit there. Each entry point filters the
-// sections it receives, then sweeps the list once it is in place.
+// TFNItemsDataViewController, so the hooks sit there. Each content replacement is
+// followed by a sweep of the list once it is in place.
 %hook TFNItemsDataViewController
 
 - (void)setSections:(NSArray*)sections restoreScrollPosition:(BOOL)restore {
-    %orig(PFBFilterNotifSections(sections), restore);
+    %orig;
     PFBNotifSweepLater(self);
 }
 
 - (void)setSections:(NSArray*)sections {
-    %orig(PFBFilterNotifSections(sections));
+    %orig;
     PFBNotifSweepLater(self);
 }
 
 - (void)updateSections:(NSArray*)sections {
-    %orig(PFBFilterNotifSections(sections));
+    %orig;
     PFBNotifSweepLater(self);
 }
 
-// The four below complete the filter: these are the content-replacement entry
-// points TFNItemsDataViewController implements. Covering fewer lets hidden rows
-// return on a refresh.
+// The four below complete the set: these are the content-replacement entry points
+// TFNItemsDataViewController implements. Covering fewer lets hidden rows return on a
+// refresh.
 
 - (void)updateSections:(NSArray*)sections completion:(id)completion {
-    %orig(PFBFilterNotifSections(sections), completion);
+    %orig;
     PFBNotifSweepLater(self);
 }
 
 - (void)updateSections:(NSArray*)sections withRowAnimation:(NSInteger)animation {
-    %orig(PFBFilterNotifSections(sections), animation);
+    %orig;
     PFBNotifSweepLater(self);
 }
 
 - (void)updateSections:(NSArray*)sections
       withRowAnimation:(NSInteger)animation
             completion:(id)completion {
-    %orig(PFBFilterNotifSections(sections), animation, completion);
+    %orig;
     PFBNotifSweepLater(self);
 }
 
@@ -1137,7 +1060,7 @@ static void PFBNotifSweepLater(id dataViewController) {
 reconfigureItemIdentifiers:(id)identifiers
       withRowAnimation:(NSInteger)animation
             completion:(id)completion {
-    %orig(PFBFilterNotifSections(sections), identifiers, animation, completion);
+    %orig;
     PFBNotifSweepLater(self);
 }
 

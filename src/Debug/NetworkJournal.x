@@ -1,10 +1,8 @@
 // Network journal of failed API, account and media requests, while recording ([resp]).
 
 #import <Foundation/Foundation.h>
-#import <dlfcn.h>
 #import <objc/runtime.h>
 #import "Debug/PFBDebugger.h"
-#import "Debug/PFBProbe.h"
 
 static BOOL pfbRespIsTwitterAPI(NSString* url) {
     if (![url isKindOfClass:[NSString class]]) {
@@ -129,53 +127,6 @@ static char kPFBRespBodyKey;
 
 @end
 
-// Measurement: the code that reads a session's delegate back while it is the proxy,
-// as an image and an offset in it, one line per call site.
-static void pfbProbeDelegateReader(void* caller) {
-    Dl_info info;
-    if (!PFBProbeNewCaller(caller) || !dladdr(caller, &info) || !info.dli_fname) {
-        return;
-    }
-    PFB_PROBE(@"session delegate read", 12, @"%@ +0x%lx",
-              [@(info.dli_fname) lastPathComponent], (unsigned long)((uintptr_t)caller - (uintptr_t)info.dli_fbase));
-}
-
-// The reads are caught in the -delegate the first proxied session actually runs, which a
-// hook on NSURLSession misses when a class of the session cluster has its own.
-static id (*pfbSessionDelegateOrig)(id, SEL);
-
-// Every session in the process runs it, so the delegate is compared by class, without a
-// message that a proxy delegate would forward.
-static id pfbSessionDelegate(id session, SEL cmd) {
-    id delegate = pfbSessionDelegateOrig(session, cmd);
-    if (delegate && object_getClass(delegate) == [PFBURLDelegateProxy class]) {
-        pfbProbeDelegateReader(__builtin_return_address(0));
-    }
-    return delegate;
-}
-
-static void pfbProbeDelegateReads(NSURLSession* session) {
-    if (!session) {
-        return;
-    }
-    static dispatch_once_t once;
-    dispatch_once(&once, ^{
-      Class owner = object_getClass(session);
-      Method method = class_getInstanceMethod(owner, @selector(delegate));
-      if (!method) {
-          PFB_PROBE(@"session delegate read", 12, @"%@ has no -delegate", NSStringFromClass(owner));
-          return;
-      }
-      while (class_getSuperclass(owner) &&
-             class_getInstanceMethod(class_getSuperclass(owner), @selector(delegate)) == method) {
-          owner = class_getSuperclass(owner);
-      }
-      pfbSessionDelegateOrig = (id (*)(id, SEL))method_getImplementation(method);
-      method_setImplementation(method, (IMP)pfbSessionDelegate);
-      PFB_PROBE(@"session delegate read", 12, @"-delegate read in %@", NSStringFromClass(owner));
-    });
-}
-
 %hook NSURLSession
 
 + (NSURLSession*)sessionWithConfiguration:(NSURLSessionConfiguration*)configuration
@@ -186,9 +137,7 @@ static void pfbProbeDelegateReads(NSURLSession* session) {
         proxy.pfbReal = delegate;
         // The session retains its delegate, which keeps the proxy (and the real
         // delegate it holds) alive for the session's lifetime.
-        NSURLSession* session = %orig(configuration, proxy, queue);
-        pfbProbeDelegateReads(session);
-        return session;
+        return %orig(configuration, proxy, queue);
     }
     return %orig;
 }

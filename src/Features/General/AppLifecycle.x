@@ -3,7 +3,6 @@
 #import <LocalAuthentication/LocalAuthentication.h>
 #import "Support/HookHelpers.h"
 #import "Debug/PFBDebugger.h"
-#import "Debug/PFBProbe.h"
 #import "Support/TwitterChirpFont.h"
 
 // MARK: - Padlock helpers
@@ -168,23 +167,6 @@ static void askToUnlock(void) {
                       }];
 }
 
-// Measurement: which of the app's ways of announcing a departure actually arrive, the
-// delegate call, the application notification and the scene notification.
-static void pfbProbeLeavingSignals(void) {
-    static dispatch_once_t once;
-    dispatch_once(&once, ^{
-      NSNotificationCenter* center = [NSNotificationCenter defaultCenter];
-      [center addObserverForName:UIApplicationWillResignActiveNotification object:nil queue:nil
-                      usingBlock:^(__unused NSNotification* note) {
-                        PFB_PROBE(@"leaving the app", 4, @"application notification arrived");
-                      }];
-      [center addObserverForName:UISceneWillDeactivateNotification object:nil queue:nil
-                      usingBlock:^(__unused NSNotification* note) {
-                        PFB_PROBE(@"leaving the app", 4, @"scene notification arrived");
-                      }];
-    });
-}
-
 // MARK: - App Delegate hooks
 
 %hook T1AppDelegate
@@ -202,7 +184,6 @@ static void pfbProbeLeavingSignals(void) {
     }
     // The debugger places its floating button only when debug_tools is on.
     PFBDebuggerInstall();
-    pfbProbeLeavingSignals();
 
     dispatch_async(dispatch_get_main_queue(), ^{
         PFBApplySelectedThemeColor();
@@ -242,7 +223,6 @@ static void pfbProbeLeavingSignals(void) {
 - (void)applicationWillResignActive:(__unsafe_unretained id)arg1 {
     %orig;
     PFBCompatReach(PFBCompatPath_leaving_app);
-    PFB_PROBE(@"leaving the app", 4, @"app delegate called");
 
     if ([PFBSettings boolForKey:@"padlock"]) {
         // Cover the UI (and the app-switcher snapshot) and mark unauthenticated so

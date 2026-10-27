@@ -3,7 +3,6 @@
 #import "Support/HookHelpers.h"
 #import "Common/PFBCompatibility.h"
 #import "Debug/PFBDebugger.h"
-#import "Debug/PFBProbe.h"
 
 // Timeline items are removed from the section data before it reaches the data view
 // controller, so no empty cells are left behind. This covers every timeline surface,
@@ -40,44 +39,6 @@ static BOOL ScribeItemIsPromoted(id item) {
            scribeItem[@"promoted_id"] != nil;
 }
 
-// Measurement: what the removed message prompts are, by scribe component and element,
-// layout and header text, one line per kind, each prompt read once.
-static id pfbProbeObject(id object, SEL selector) {
-    return PFBProbeReturnKind(object, selector) == '@' ? ((id (*)(id, SEL))objc_msgSend)(object, selector) : nil;
-}
-
-static NSString* pfbProbeText(id object, NSString* getter) {
-    SEL selector = NSSelectorFromString(getter);
-    char kind = PFBProbeReturnKind(object, selector);
-    if (kind == 'q' || kind == 'Q' || kind == 'l' || kind == 'L') {
-        return [NSString stringWithFormat:@"%lld", ((long long (*)(id, SEL))objc_msgSend)(object, selector)];
-    }
-    if (kind == 'i' || kind == 'I' || kind == 'c' || kind == 'C' || kind == 'B' || kind == 's' || kind == 'S') {
-        return [NSString stringWithFormat:@"%d", ((int (*)(id, SEL))objc_msgSend)(object, selector)];
-    }
-    id value = kind == '@' ? ((id (*)(id, SEL))objc_msgSend)(object, selector) : nil;
-    if (value && ![value isKindOfClass:[NSString class]]) {
-        value = pfbProbeObject(value, NSSelectorFromString(@"text")) ?: value;
-    }
-    if (![value isKindOfClass:[NSString class]]) {
-        return value ? NSStringFromClass([value class]) : @"-";
-    }
-    NSString* text = value;
-    return text.length > 40 ? [text substringWithRange:[text rangeOfComposedCharacterSequencesForRange:NSMakeRange(0, 40)]]
-                            : text;
-}
-
-static void pfbProbeMessagePrompt(id item) {
-    static char kPFBProbeReadKey;
-    if (objc_getAssociatedObject(item, &kPFBProbeReadKey)) {
-        return;
-    }
-    objc_setAssociatedObject(item, &kPFBProbeReadKey, @YES, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-    PFB_PROBE(@"removed message prompts", 8, @"component '%@', element '%@', layout %@, header '%@'",
-              pfbProbeText(item, @"scribeComponent"), pfbProbeText(item, @"scribeElement"),
-              pfbProbeText(item, @"layoutType"), pfbProbeText(item, @"headerRichText"));
-}
-
 static BOOL ShouldHideItem(id item, NSString* location) {
     item = PFBUnwrapDataViewItem(item);
     NSString* className = NSStringFromClass([item classForCoder]);
@@ -112,7 +73,6 @@ static BOOL ShouldHideItem(id item, NSString* location) {
     if ([PFBSettings boolForKey:@"hide_premium_offer"]) {
         if ([className isEqualToString:@"T1URTTimelineMessageItemViewModel"]) {
             PFBCOMPAT_ACTION(PFBCompat_hide_premium_offer, @"premium message hidden");
-            pfbProbeMessagePrompt(item);
             return YES;
         }
     }
@@ -345,8 +305,6 @@ static void RemovePromotedImmersiveCards(id controller) {
     // The navigator holds its own count: left as it was, it would allow empty pages
     // past the last card.
     int64_t* navigatorCount = (int64_t*)((uint8_t*)(__bridge void*)navigator + ivar_getOffset(countIvar));
-    PFB_PROBE(@"video feed counts", 8, @"navigator %lld, list %lld, kept %lld, loaded up to %lld",
-              (long long)*navigatorCount, (long long)total, (long long)kept, (long long)loadedEnd);
     if (*navigatorCount == total) {
         *navigatorCount = kept;
     }

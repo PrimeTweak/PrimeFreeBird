@@ -4,7 +4,6 @@
 #import <mach-o/loader.h>
 #import <mach/mach.h>
 #import "Support/HookHelpers.h"
-#import "Debug/PFBProbe.h"
 
 // Twitter's reply orders, as its sorting state and a conversation's requests store them.
 enum {
@@ -75,20 +74,6 @@ static BOOL PFBRequestOrderFields(Class* transformerClass, ptrdiff_t* slot, ptrd
     return slotOffset >= 0;
 }
 
-// Measurement: each new sorting state, as a pick recognized in Twitter's menu or by the
-// code that made it, as an image and an offset in it.
-static void pfbProbeSortingState(NSString* path, void* caller) {
-    if (PFBMenuActionDepth > 0) {
-        PFB_PROBE(@"reply sort picks", 6, @"pick in Twitter's menu recognized (%@)", path);
-        return;
-    }
-    Dl_info info;
-    if (dladdr(caller, &info) && info.dli_fname) {
-        PFB_PROBE(@"reply sort picks", 6, @"state made by %@ +0x%lx (%@)", [@(info.dli_fname) lastPathComponent],
-                  (unsigned long)((uintptr_t)caller - (uintptr_t)info.dli_fbase), path);
-    }
-}
-
 // The order a new sorting state starts with; NO keeps Twitter's, as for a pick in its menu.
 static BOOL PFBOpeningReplyOrder(uint8_t* order) {
     return PFBMenuActionDepth == 0 && PFBRequestOrderFields(NULL, NULL, NULL) && PFBPreferredReplyOrder(order);
@@ -116,7 +101,6 @@ static BOOL PFBOpeningReplyOrder(uint8_t* order) {
 
 - (instancetype)init {
     self = %orig;
-    pfbProbeSortingState(@"init", __builtin_return_address(0));
     uint8_t order;
     if (!self || !PFBOpeningReplyOrder(&order)) {
         return self;
@@ -184,7 +168,6 @@ static PFBReplySortingInit gReplySortingInit;
 __attribute__((swiftcall)) static void* PFBReplySortingInitHook(uint8_t order,
                                                                void* __attribute__((swift_context)) state) {
     PFBCompatReach(PFBCompatPath_reply_order_set);
-    pfbProbeSortingState(@"Swift init", __builtin_return_address(0));
     uint8_t preferred;
     return gReplySortingInit(PFBOpeningReplyOrder(&preferred) ? preferred : order, state);
 }

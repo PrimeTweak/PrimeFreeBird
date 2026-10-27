@@ -4,7 +4,6 @@
 #import "Features/Search/PFBAdvancedSearchViewController.h"
 #import <objc/runtime.h>
 #import <objc/message.h>
-#import "Debug/PFBProbe.h"
 
 static const void* kPFBAdvSearchBtnKey = &kPFBAdvSearchBtnKey;
 static const void* kPFBAdvSearchGrayKey = &kPFBAdvSearchGrayKey;
@@ -295,27 +294,6 @@ static BOOL pfbAdvIsOurs(UIBarButtonItem* entry) {
            objc_getAssociatedObject(entry, kPFBAdvSearchGrayKey) != nil;
 }
 
-static BOOL pfbAdvIsSearchScreen(UIViewController* vc);
-
-// Measurement: the screens other than search where the Filters button is replaced,
-// one line per screen class.
-static void pfbProbeReplacedOutsideSearch(UIViewController* owner) {
-    if (pfbAdvIsSearchScreen(owner)) {
-        return;
-    }
-    PFB_PROBE(@"Filters replaced outside search", 6, @"%@", NSStringFromClass([owner class]));
-}
-
-// Measurement: who calls the three group setters, by the image that sent the message.
-static void pfbProbeGroupSetter(NSString* setter, void* caller) {
-    if (!PFBProbeNewCaller(caller)) {
-        return;
-    }
-    Dl_info info;
-    NSString* from = dladdr(caller, &info) && info.dli_fname ? [@(info.dli_fname) lastPathComponent] : @"?";
-    PFB_PROBE(@"bar group setters", 9, @"%@ sent from %@", setter, from);
-}
-
 // Works on the item that received the buttons rather than the top controller's:
 // an active search bar sets them on a different navigation item.
 static void pfbAdvReplaceFiltersInItem(UINavigationItem* item,
@@ -372,7 +350,6 @@ static void pfbAdvReplaceFiltersInItem(UINavigationItem* item,
     if (swapped) {
         PFBCompatReach(PFBCompatPath_results_filters_button);
         PFBCOMPAT_ACTION(PFBCompat_advanced_search, @"Filters button replaced in search results");
-        pfbProbeReplacedOutsideSearch(owner);
     }
 }
 
@@ -427,16 +404,11 @@ static void pfbAdvRescanItemSoon(UINavigationItem* item) {
       if (pfbAdvIsSearchScreen(top)) {
           pfbAdvReplaceFiltersInItem(top.navigationItem, top);
       }
-      if (item && item != top.navigationItem) {
+      if (item != top.navigationItem) {
           pfbAdvReplaceFiltersInItem(item, top);
       }
     });
 }
-
-static void pfbAdvRescanSoon(void) {
-    pfbAdvRescanItemSoon(nil);
-}
-
 
 // The app's own entry lives inside its search bar as a plain button, not as a
 // bar button item, so the bar button passes above never reach it.
@@ -539,26 +511,12 @@ static void pfbAdvCollapseNativeInSearchBar(UIView* bar) {
 
 - (void)setTrailingItemGroups:(NSArray<UIBarButtonItemGroup*>*)groups {
     %orig;
-    pfbProbeGroupSetter(@"setTrailingItemGroups:", __builtin_return_address(0));
     pfbAdvRescanItemSoon(self);
 }
 
 - (void)setPinnedTrailingGroup:(UIBarButtonItemGroup*)group {
     %orig;
-    pfbProbeGroupSetter(@"setPinnedTrailingGroup:", __builtin_return_address(0));
     pfbAdvRescanItemSoon(self);
-}
-
-%end
-
-// A group already on the bar can have its items swapped without any setter on the
-// navigation item firing, so the swap is caught on the group itself.
-%hook UIBarButtonItemGroup
-
-- (void)setBarButtonItems:(NSArray<UIBarButtonItem*>*)items {
-    %orig;
-    pfbProbeGroupSetter(@"setBarButtonItems:", __builtin_return_address(0));
-    pfbAdvRescanSoon();
 }
 
 %end

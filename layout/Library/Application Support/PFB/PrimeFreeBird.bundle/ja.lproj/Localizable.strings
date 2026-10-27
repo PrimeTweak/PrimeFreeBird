@@ -167,8 +167,6 @@
 /* ===== Fonts picker ===== */
 "CUSTOM_FONTS_MENU_TITLE" = "\nフォントを選択";
 "CUSTOM_FONTS_NAVIGATION_BUTTON_TITLE" = "カスタムフォント";
-"CUSTOM_FONTS_TUT_ALERT_MESSAGE" = "App StoreのiFontアプリでフォントをインストールしてください。";
-"INSTALL_IFONT_BUTTON_TITLE" = "iFontを入手";
 
 /* ===== Media & download flows ===== */
 "DOWNLOAD_AS_GIF_OPTION_TITLE" = "GIFとしてダウンロード";

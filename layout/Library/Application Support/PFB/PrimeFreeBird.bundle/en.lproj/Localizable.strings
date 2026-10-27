@@ -290,9 +290,6 @@
 /* ===== Fonts picker ===== */
 "CUSTOM_FONTS_MENU_TITLE" = "\nChoose a font";
 "CUSTOM_FONTS_NAVIGATION_BUTTON_TITLE" = "Custom fonts";
-"CUSTOM_FONTS_TUT_ALERT_TITLE" = "No custom fonts";
-"CUSTOM_FONTS_TUT_ALERT_MESSAGE" = "Install fonts with the iFont app from the App Store.";
-"INSTALL_IFONT_BUTTON_TITLE" = "Get iFont";
 
 /* ===== Media & download flows ===== */
 "DOWNLOAD_AS_GIF_OPTION_TITLE" = "Download as GIF";
@@ -528,7 +525,7 @@
 "EXPLORE_TABS_HINT" = "Tap a tab to remove or restore it.";
 "EXPLORE_TABS_HIDDEN_COUNT" = "%lu hidden";
 "EXPLORE_TABS_NONE_HIDDEN" = "None hidden";
-"HIDE_TAB_FORYOU_TAB_NAME" = "For You";
+"HIDE_TAB_FORYOU_TAB_NAME" = "Explore";
 "HIDE_TAB_TRENDING_TAB_NAME" = "Trending";
 "HIDE_TAB_NEWS_TAB_NAME" = "News";
 "HIDE_TAB_SPORTS_TAB_NAME" = "Sports";

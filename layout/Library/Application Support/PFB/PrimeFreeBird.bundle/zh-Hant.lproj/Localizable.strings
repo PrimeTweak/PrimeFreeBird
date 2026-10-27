@@ -167,8 +167,6 @@
 /* ===== Fonts picker ===== */
 "CUSTOM_FONTS_MENU_TITLE" = "\n選擇字體";
 "CUSTOM_FONTS_NAVIGATION_BUTTON_TITLE" = "自訂字體";
-"CUSTOM_FONTS_TUT_ALERT_MESSAGE" = "請使用 App Store 的 iFont App 安裝字體。";
-"INSTALL_IFONT_BUTTON_TITLE" = "取得 iFont";
 
 /* ===== Media & download flows ===== */
 "DOWNLOAD_AS_GIF_OPTION_TITLE" = "下載為 GIF";

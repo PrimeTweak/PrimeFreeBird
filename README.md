@@ -28,7 +28,7 @@
 
 ## Explore &amp; search
 
-- **Per-tab control** — hide any of For You, Trending, News, Sports or Entertainment, rather than the whole page.
+- **Per-tab control** — hide any of Explore, Trending, News, Sports or Entertainment, rather than the whole page.
 - **Advanced search** — the web's full search form (words, accounts, engagement, dates), native, with results in Twitter's own search.
 
 ## Filters

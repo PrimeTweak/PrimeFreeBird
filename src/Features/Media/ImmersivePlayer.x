@@ -1,7 +1,6 @@
 // Full-screen video: tap to pause, minimal bar, timestamp, no docking, no auto-scroll.
 
 #import "Debug/PFBDebugger.h"
-#import "Debug/PFBProbe.h"
 #import "Support/HookHelpers.h"
 #import "Support/TwitterChirpFont.h"
 
@@ -242,39 +241,6 @@ static void pfbRestoreTimestamp(UIView* controls) {
 static BOOL gPFBSoundAllowed = NO;
 static BOOL gPFBFullScreenShown = NO;
 
-// Measurement: the sound guard flag once the full-screen player is leaving or gone, and
-// cards that mount outside it or while it leaves.
-static BOOL gPFBProbeLeaving = NO;
-
-static void pfbProbeSoundFlag(NSString* finding) {
-    if (gPFBFullScreenShown && gPFBProbeLeaving) {
-        PFB_PROBE(@"sound guard after closing", 6, @"%@, Muted %@, clean player %@", finding,
-                  [PFBSettings boolForKey:@"video_starts_muted"] ? @"on" : @"off",
-                  [PFBSettings boolForKey:@"tap_to_pause"] ? @"on" : @"off");
-    }
-}
-
-static void pfbProbeCardMount(UIView* card) {
-    UIViewController* owner = PFBOwningController(card);
-    Class fullScreen = NSClassFromString(@"T1ImmersiveFullScreenViewController");
-    UIViewController* holder = owner;
-    while (holder && !(fullScreen && [holder isKindOfClass:fullScreen])) {
-        holder = holder.parentViewController;
-    }
-    if (!holder) {
-        PFB_PROBE(@"sound guard after closing", 6, @"card mounted outside the full-screen player, in %@",
-                  owner ? NSStringFromClass([owner class]) : @"no controller");
-        return;
-    }
-    BOOL leaving = holder.isBeingDismissed || holder.isMovingFromParentViewController ||
-                   holder.parentViewController.isBeingDismissed || holder.navigationController.isBeingDismissed;
-    if (leaving) {
-        PFB_PROBE(@"sound guard after closing", 6, @"card mounted while the full-screen player was leaving");
-    } else {
-        gPFBProbeLeaving = NO;
-    }
-}
-
 // Whether a video opens silent, as the reader chose.
 static BOOL pfbOpensMuted(void) {
     return [PFBSettings boolForKey:@"video_starts_muted"];
@@ -362,7 +328,6 @@ static BOOL pfbInlineVideoHasSound(UIView* view) {
 - (void)setIsMuted:(BOOL)muted {
     if (!muted && pfbHoldsSound()) {
         PFBCompatReach(PFBCompatPath_starts_muted);
-        pfbProbeSoundFlag(@"sound held after the full-screen player closed");
         return;
     }
     %orig;
@@ -409,23 +374,17 @@ static BOOL pfbInlineVideoHasSound(UIView* view) {
 
 - (void)viewDidAppear:(BOOL)animated {
     gPFBFullScreenShown = YES;
-    gPFBProbeLeaving = NO;
     %orig;
 }
 
 - (void)dismissAnimationCancelled {
     gPFBFullScreenShown = YES;
-    gPFBProbeLeaving = NO;
     %orig;
 }
 
 - (void)viewWillDisappear:(BOOL)animated {
     gPFBFullScreenShown = NO;
-    gPFBProbeLeaving = YES;
     %orig;
-    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(2 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
-      pfbProbeSoundFlag(@"flag still set 2 s after closing");
-    });
 }
 
 // Closing a full-screen video and a notification opened over it both ask this
@@ -1232,7 +1191,6 @@ static void pfbStartRaiseWatch(UIView* card) {
     UIView* card = (UIView*)self;
     pfbShowPausedGlyph(card, NO);
     if (card.window) {
-        pfbProbeCardMount(card);
         gPFBFullScreenShown = YES;
         if ([PFBSettings boolForKey:@"tap_to_pause"]) {
             PFBCOMPAT_ACTION(PFBCompat_tap_to_pause, @"clean player on a video");
@@ -1278,17 +1236,7 @@ static void pfbStartRaiseWatch(UIView* card) {
         host = host.superview;
     }
     if (host) {
-        // Measurement: an update from a page that is not the one shown, and what it
-        // does to the minimal bar, which exists only with the clean player on.
-        UIView* before = objc_getAssociatedObject(host, kPFBMinimalBarKey);
-        BOOL shownBefore = before && !before.hidden;
-        BOOL otherPage = [PFBSettings boolForKey:@"tap_to_pause"] && page != pfbVisibleVideoPage(host);
         pfbUpdateMinimalBar(host, pfbImmersivePagePlayer(page));
-        if (otherPage) {
-            UIView* after = objc_getAssociatedObject(host, kPFBMinimalBarKey);
-            PFB_PROBE(@"minimal bar updates", 4, @"update from a page not shown: bar %@ before, %@ after",
-                      shownBefore ? @"shown" : @"hidden", after && !after.hidden ? @"shown" : @"hidden");
-        }
     } else if (gPFBActiveCard.window) {
         // A page outside any card leaves the card on screen as the active one.
         return;
