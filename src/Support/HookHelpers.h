@@ -232,6 +232,11 @@ void PFBThemeScreenLeave(UIViewController* screen);
 void PFBRestyleGlassTabBars(void);
 void PFBGlassTabBarHideForSettings(BOOL hidden);
 
+// Reapplies each glass stack's configuration so an Always visible change takes effect now
+// (GlassTabBar.x), and how many times the bar has been pinned, for the probe.
+void PFBGlassRefreshAlwaysVisible(void);
+NSUInteger PFBGlassAlwaysVisiblePinCount(void);
+
 // Bar items of PrimeFreeBird's own screens carry this tag and keep UIKit's glass;
 // the app-wide flattening in NavBarIcons.x leaves them alone.
 static const NSInteger PFBNativeGlassTag = 0x504647;

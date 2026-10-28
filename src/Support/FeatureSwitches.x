@@ -1157,25 +1157,18 @@ static NSArray* PFBDashPanelIDs(NSArray* panelIDs) {
 - (NSArray*)visiblePanelIDs;
 @end
 
-// Twitter's native glass navigation lists the panels of its tab bar, which Customize tabs
-// orders. The drawer reads the same list, so the panels the bar leaves out get a row there.
+// Twitter's native glass navigation answers the drawer itself. Its list also gives the
+// Customize tabs editor Twitter's panels; the glass bar is built from Twitter's own tab
+// settings, not from this list.
 %hook _TtC14T1TwitterSwift20XTabbedAppNavigation
 
 - (NSArray*)visiblePanelIDs {
     NSArray* panelIDs = %orig;
     if (DashPanelIDQuery) {
-        return PFBDashPanelIDs([PFBCustomTabBarUtility panelIDsInOrderFromPanelIDs:panelIDs]);
+        return PFBDashPanelIDs(panelIDs);
     }
-    PFBCompatReach(PFBCompatPath_glass_tabs);
     [PFBCustomTabBarUtility recordPanelIDs:panelIDs];
-    NSArray* shown = [PFBCustomTabBarUtility panelIDsInOrderFromPanelIDs:panelIDs];
-    if (shown != panelIDs) {
-        PFBCOMPAT_ACTION(PFBCompat_custom_tab_bar, @"%@ tabs on the glass bar",
-                         [PFBCustomTabBarUtility visiblePageIDsInOrder] ? @"saved" : @"default");
-    } else {
-        PFBCOMPAT_OBSERVE(PFBCompat_custom_tab_bar, @"glass tabs kept as Twitter's");
-    }
-    return shown;
+    return panelIDs;
 }
 
 %end
