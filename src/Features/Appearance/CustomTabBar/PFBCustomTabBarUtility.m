@@ -1,7 +1,18 @@
 // Registry and helpers of the custom tab bar: panel ids, images, order.
 
 #import "Features/Appearance/CustomTabBar/PFBCustomTabBarUtility.h"
+#import <objc/message.h>
+#import "Support/HookHelpers.h"
+#import "Features/Appearance/CustomTabBar/PFBCustomTabBarViewController.h"
 #import "Support/T1Headers.h"
+
+// Twitter's own tab editor and what building it takes.
+@protocol PFBNativeTabEditorMessages <NSObject>
+@optional
+- (id)appNavigation;
+- (instancetype)initWithAccount:(id)account scribeContext:(id)context;
++ (id)scribeContextWithPage:(NSString*)page;
+@end
 
 // The Home tab is the app's landing surface, so it is always kept visible and
 // pinned first.
@@ -30,6 +41,42 @@ static BOOL PFBRegistryEntryIsValid(id entry) {
 }
 
 @implementation PFBCustomTabBarUtility
+
+#pragma mark - Editor routing
+
++ (BOOL)usesNativeEditor {
+    id host = [NSClassFromString(@"T1HostViewController") sharedHostViewController];
+    if ([host respondsToSelector:@selector(appNavigation)]) {
+        id navigation = ((id (*)(id, SEL))objc_msgSend)(host, @selector(appNavigation));
+        if (navigation) {
+            Class nativeNavigation = NSClassFromString(@"_TtC14T1TwitterSwift20XTabbedAppNavigation");
+            return nativeNavigation && [navigation isKindOfClass:nativeNavigation];
+        }
+    }
+    return PFBNativeGlassAsked();
+}
+
++ (UIViewController*)editorForAccount:(id)account {
+    if (![self usesNativeEditor]) {
+        return [[PFBCustomTabBarViewController alloc] init];
+    }
+    Class editorClass = NSClassFromString(@"T1TabCustomizationViewController");
+    Class contextClass = NSClassFromString(@"TFSTwitterScribeContext");
+    if (![editorClass isSubclassOfClass:[UIViewController class]] ||
+        ![editorClass instancesRespondToSelector:@selector(initWithAccount:scribeContext:)] ||
+        ![contextClass respondsToSelector:@selector(scribeContextWithPage:)]) {
+        return nil;
+    }
+    if (!account) {
+        account = [[NSClassFromString(@"T1HostViewController") sharedHostViewController] currentAccount];
+    }
+    id context = ((id (*)(id, SEL, id))objc_msgSend)(contextClass, @selector(scribeContextWithPage:), @"settings");
+    if (!account || !context) {
+        return nil;
+    }
+    return (UIViewController*)[(id<PFBNativeTabEditorMessages>)[editorClass alloc] initWithAccount:account
+                                                                                    scribeContext:context];
+}
 
 #pragma mark - Live capture
 
@@ -206,25 +253,6 @@ static NSDictionary* PFBEntryForPanel(NSArray<NSDictionary*>* registry, long lon
     if (changed) {
         [[NSUserDefaults standardUserDefaults] setObject:[registry copy] forKey:kRegistryKey];
     }
-}
-
-+ (NSArray<NSString*>*)chosenTabNames {
-    Class identity = NSClassFromString(@"T1PanelIdentity");
-    NSMutableArray<NSString*>* names = [NSMutableArray array];
-    for (NSString* page in [self visiblePageIDsInOrder] ?: [self defaultVisiblePageIDs]) {
-        NSDictionary* entry = [self metadataForPage:page];
-        id panel = entry[PFBTabPanelIDKey];
-        NSString* name = [panel isKindOfClass:[NSNumber class]] && [identity respondsToSelector:@selector(localizedNameForPanelID:)]
-                             ? [identity localizedNameForPanelID:[panel longLongValue]]
-                             : nil;
-        if (!name.length) {
-            name = entry[PFBTabTitleKey];
-        }
-        if ([name isKindOfClass:[NSString class]] && name.length) {
-            [names addObject:name];
-        }
-    }
-    return names;
 }
 
 @end

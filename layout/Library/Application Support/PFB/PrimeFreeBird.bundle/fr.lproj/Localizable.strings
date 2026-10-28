@@ -98,6 +98,8 @@
 "HIDE_TOPICS_TO_FOLLOW_DETAIL" = "Retire les cartes qui suggèrent des sujets à suivre.";
 "HIDE_TIMELINE_PROMPTS_TITLE" = "Masquer les invites du fil";
 "HIDE_TIMELINE_PROMPTS_DETAIL" = "Retire les bannières comme « Ajouter des contacts ».";
+"HIDE_VIDEOS_FOR_YOU_TITLE" = "Masquer « Vidéos pour vous »";
+"HIDE_VIDEOS_FOR_YOU_DETAIL" = "Retire la rangée « Vidéos pour vous » de vos fils.";
 "HIDE_SPACES_TITLE" = "Masquer la barre Spaces";
 "HIDE_CUSTOM_TIMELINES_TITLE" = "Masquer les fils personnalisés";
 "HIDE_CUSTOM_TIMELINES_DETAIL" = "Retire des onglets d’accueil les Listes et Communautés épinglées, et le bouton Ajouter.";
@@ -241,6 +243,11 @@
 "IMPORT_SETTINGS_CONFIRM_TITLE" = "Importer les réglages";
 "IMPORT_SETTINGS_CONFIRM_MESSAGE" = "Les options, filtres et couleurs du fichier remplacent les vôtres ; les options qu’il ne contient pas reviennent à leur valeur par défaut.";
 "IMPORT_SETTINGS_CONFIRM_ACTION" = "Importer";
+"RESET_SETTINGS_CONFIRM_TITLE" = "Réinitialiser les réglages";
+"RESET_SETTINGS_CONFIRM_MESSAGE" = "Options, filtres, couleurs, onglets, son d’envoi, icône de l’app, notifications et conversations masquées : tout revient comme à l’installation. La session web reste.";
+"RESET_SETTINGS_CONFIRM_ACTION" = "Réinitialiser";
+"RESET_SETTINGS_DONE_TITLE" = "Réglages réinitialisés";
+"RESET_SETTINGS_DONE_MESSAGE" = "Redémarrez Twitter pour terminer.";
 /* Reply-in-web-view: the reply screen title + the web-session login/clear
    buttons (Lab) and their alerts. */
 "REPLY_WEBVIEW_TITLE" = "Répondre";
@@ -556,6 +563,7 @@
 "SETTINGS_BACKUP_DETAIL" = "Exporte ou importe toutes les options, filtres et couleurs.";
 "EXPORT_SETTINGS_ACTION" = "Exporter…";
 "IMPORT_SETTINGS_ACTION" = "Importer…";
+"RESET_SETTINGS_TITLE" = "Réinitialiser les réglages";
 "WEB_SESSION_LOGIN_TITLE" = "Se connecter sur le web";
 "WEB_LOGIN_CONNECTING" = "Connexion à Twitter…";
 "WEB_LOGIN_TAGLINE" = "Le fil, sans le bruit.";

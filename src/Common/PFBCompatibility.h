@@ -25,6 +25,7 @@ typedef NS_ENUM(NSInteger, PFBCompatOption) {
     PFBCompat_hide_who_to_follow,
     PFBCompat_hide_topics_to_follow,
     PFBCompat_hide_timeline_prompts,
+    PFBCompat_hide_videos_for_you,
     PFBCompat_hide_topics,
     PFBCompat_hide_verified_tweets,
     PFBCompat_hide_blocked_retweets,
@@ -243,6 +244,9 @@ typedef NS_ENUM(NSInteger, PFBCompatPath) {
     PFBCompatPath_glass_tab_bar,
     PFBCompatPath_glass_tweet_button,
     PFBCompatPath_glass_tabs,
+    PFBCompatPath_glass_bottom_reserve,
+    PFBCompatPath_native_tab_editor,
+    PFBCompatPath_navigation_bar_text,
     PFBCompatPathCount,
 };
 

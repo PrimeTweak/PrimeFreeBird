@@ -102,6 +102,8 @@
 "HIDE_TOPICS_TO_FOLLOW_DETAIL" = "Remove the cards that suggest topics to follow.";
 "HIDE_TIMELINE_PROMPTS_TITLE" = "Hide timeline prompts";
 "HIDE_TIMELINE_PROMPTS_DETAIL" = "Remove banners like “Add contacts”.";
+"HIDE_VIDEOS_FOR_YOU_TITLE" = "Hide “Videos for you”";
+"HIDE_VIDEOS_FOR_YOU_DETAIL" = "Remove the “Videos for you” row from your timelines.";
 "HIDE_SPACES_TITLE" = "Hide Spaces bar";
 "HIDE_CUSTOM_TIMELINES_TITLE" = "Hide custom timelines";
 "HIDE_CUSTOM_TIMELINES_DETAIL" = "Remove pinned Lists and Communities from the Home tabs, and the Add button.";
@@ -245,6 +247,11 @@
 "IMPORT_SETTINGS_CONFIRM_TITLE" = "Import settings";
 "IMPORT_SETTINGS_CONFIRM_MESSAGE" = "The file’s options, filters and colors replace yours; options it doesn’t hold go back to their default.";
 "IMPORT_SETTINGS_CONFIRM_ACTION" = "Import";
+"RESET_SETTINGS_CONFIRM_TITLE" = "Reset settings";
+"RESET_SETTINGS_CONFIRM_MESSAGE" = "Options, filters, colors, tabs, the send sound, the app icon, and hidden notifications and conversations all go back to how they were at install. The web session stays.";
+"RESET_SETTINGS_CONFIRM_ACTION" = "Reset";
+"RESET_SETTINGS_DONE_TITLE" = "Settings reset";
+"RESET_SETTINGS_DONE_MESSAGE" = "Restart Twitter to finish.";
 /* Reply-in-web-view: the reply screen title + the web-session login/clear
    buttons (Lab) and their alerts. */
 "REPLY_WEBVIEW_TITLE" = "Reply";
@@ -560,6 +567,7 @@
 "SETTINGS_BACKUP_DETAIL" = "Export or import every option, filter, and color.";
 "EXPORT_SETTINGS_ACTION" = "Export…";
 "IMPORT_SETTINGS_ACTION" = "Import…";
+"RESET_SETTINGS_TITLE" = "Reset settings";
 "WEB_SESSION_LOGIN_TITLE" = "Sign in on the web";
 "WEB_LOGIN_CONNECTING" = "Connecting to Twitter…";
 "WEB_LOGIN_TAGLINE" = "The feed, without the noise.";

@@ -1,15 +1,12 @@
-// Measures what is still unknown under Twitter's own Liquid Glass: whether the tab bar still
-// collapses with Always visible on, how the taller bar for Tab labels lays out, and how
-// Twitter gates and saves its own tab list, which Customize tabs needs.
-//
-// Each scroll goes to MEASUREMENTS, and a full summary once Home is up and signed in, and
-// again whenever the stethoscope captures: both see a populated bar and account, where a timer
-// would not. The hooks are installed after every other file's, so each call is charged to its sender.
+// Measures Twitter's own Liquid Glass bar: its collapse with Always visible, the taller bar and
+// the chrome above it, and the tabs kept from Twitter's editor. Scrolls go to MEASUREMENTS; a
+// summary follows once Home is up and signed in, and again at each stethoscope capture.
 
 #import <mach-o/loader.h>
 #import <pthread.h>
 #import "Support/HookHelpers.h"
 #import "Common/PFBCompatibility.h"
+#import "Features/Appearance/CustomTabBar/PFBNativeTabSelectionStore.h"
 
 // The methods called or hooked below that no header declares.
 @interface T1HostViewController (PFBGlassChromeProbe)
@@ -37,15 +34,6 @@
 
 @interface _TtCC11XNavigation14CollapseEngine14ScrollObserver : NSObject
 - (void)handlePan:(UIGestureRecognizer*)recognizer;
-@end
-
-@interface T1TabCustomizationConfig : NSObject
-- (instancetype)initWithAccount:(id)account;
-- (BOOL)isTabCustomizationEnabled;
-@end
-
-@interface TFSFeatureSwitches : NSObject
-- (id)rawValueForKey:(NSString*)key;
 @end
 
 static NSString* const kPFBProbeTopic = @"glass probe";
@@ -540,45 +528,21 @@ static NSString* PFBProbeFirstTabText(void) {
                                       content ? [NSString stringWithFormat:@"%.0f", content.adjustedContentInset.bottom] : @"none"];
 }
 
-// The bar docked above the tab bar (the reply or quick-post bar), found by place: the short,
-// wide view whose bottom sits just over the tab bar. Its gap to the tab bar top is what reads
-// too tight on a reply screen; the class names what to measure next.
-static NSString* PFBProbeReplyBarText(void) {
+// Twitter's accessory over the bar: the compose button, or on a Tweet the reply bar it widens
+// into. Its gap to the bar top is the one that read too tight.
+static NSString* PFBProbeAccessoryText(void) {
     UIView* bar = gProbeBar;
-    UIWindow* window = bar.window;
-    if (!bar || !window) {
+    UIView* accessory = gProbeAccessory;
+    if (!bar.window) {
         return @"no bar";
     }
-    CGRect barWin = [bar convertRect:bar.bounds toView:nil];
-    CGFloat barTop = CGRectGetMinY(barWin);
-    __block UIView* found = nil;
-    __block CGRect foundWin = CGRectZero;
-    PFBWalkAllSubviews(window, 10, ^(UIView* view) {
-      if (view == bar || view == gProbeAccessory || [bar isDescendantOfView:view] || [view isDescendantOfView:bar] ||
-          (gProbeAccessory && [view isDescendantOfView:gProbeAccessory])) {
-          return;
-      }
-      CGRect frame = [view convertRect:view.bounds toView:nil];
-      // Short and wide, horizontally over the bar, its bottom just above the bar top.
-      if (CGRectGetHeight(frame) < 20.0 || CGRectGetHeight(frame) > 100.0 ||
-          CGRectGetWidth(frame) < CGRectGetWidth(barWin) * 0.6 ||
-          CGRectGetMaxX(frame) < CGRectGetMinX(barWin) + 20.0 || CGRectGetMinX(frame) > CGRectGetMaxX(barWin) - 20.0) {
-          return;
-      }
-      CGFloat bottom = CGRectGetMaxY(frame);
-      if (bottom > barTop + 2.0 || bottom < barTop - 160.0) {
-          return;
-      }
-      if (!found || bottom > CGRectGetMaxY(foundWin)) {
-          found = view;
-          foundWin = frame;
-      }
-    });
-    if (!found) {
-        return @"none above the bar";
+    if (!accessory.window) {
+        return @"none on screen";
     }
-    return [NSString stringWithFormat:@"%@ %@ · gap to bar top %.0f", PFBProbeName([found class]),
-                                      PFBProbeRectText(foundWin), barTop - CGRectGetMaxY(foundWin)];
+    CGRect barFrame = [bar convertRect:bar.bounds toView:nil];
+    CGRect frame = [accessory convertRect:accessory.bounds toView:nil];
+    return [NSString stringWithFormat:@"%@ · gap to bar top %.0f", PFBProbeRectText(frame),
+                                      CGRectGetMinY(barFrame) - CGRectGetMaxY(frame)];
 }
 
 static id PFBProbeAppNavigation(void) {
@@ -677,20 +641,11 @@ static NSString* PFBProbeSavedKeysText(void) {
     return found.count ? [found componentsJoinedByString:@" | "] : @"none";
 }
 
-// Twitter's own gate for its saved tabs, asked as its tab settings ask it, with the feature
-// switches it reads meanwhile; and the switches named subscriptions_ read anywhere else.
-static BOOL gProbeInGate;
-static NSMutableOrderedSet<NSString*>* gProbeGateReads;
+// The switches named subscriptions_ Twitter reads, with PrimeFreeBird's answers.
 static NSMutableOrderedSet<NSString*>* gProbeSubscriptionReads;
 
 static void PFBProbeNoteSwitchRead(NSString* key, NSString* value) {
     if (gProbeStart <= 0 || !pthread_main_np() || ![key isKindOfClass:[NSString class]]) {
-        return;
-    }
-    if (gProbeInGate) {
-        if (gProbeGateReads.count < 24) {
-            [gProbeGateReads addObject:[NSString stringWithFormat:@"%@=%@", key, value ?: @"nil"]];
-        }
         return;
     }
     if (!gProbeSubscriptionReads) {
@@ -730,23 +685,6 @@ static NSString* PFBProbeCustomizeTabsText(void) {
         return @"no account";
     }
     NSMutableArray<NSString*>* parts = [NSMutableArray array];
-    Class configClass = NSClassFromString(@"T1TabCustomizationConfig");
-    if ([configClass instancesRespondToSelector:@selector(initWithAccount:)] &&
-        [configClass instancesRespondToSelector:@selector(isTabCustomizationEnabled)]) {
-        T1TabCustomizationConfig* config = [(T1TabCustomizationConfig*)[configClass alloc] initWithAccount:account];
-        gProbeGateReads = [NSMutableOrderedSet orderedSet];
-        gProbeInGate = YES;
-        BOOL open = NO;
-        @try {
-            open = [config isTabCustomizationEnabled];
-        } @finally {
-            gProbeInGate = NO;
-        }
-        [parts addObject:[NSString stringWithFormat:@"Twitter's gate %@, switches it read [%@]", open ? @"open" : @"closed",
-                                                    [gProbeGateReads.array componentsJoinedByString:@", "]]];
-    } else {
-        [parts addObject:@"Twitter's gate missing"];
-    }
     SEL premium = NSSelectorFromString(@"isPremiumTierUser");
     if ([account respondsToSelector:premium]) {
         [parts addObject:[NSString stringWithFormat:@"premium as asked %@",
@@ -791,6 +729,13 @@ static NSString* PFBProbeCustomizeTabsText(void) {
     [parts addObject:[NSString stringWithFormat:@"account store %@ (%lu keys): %@", store ? @"found" : @"none",
                                                 (unsigned long)([saved isKindOfClass:[NSDictionary class]] ? saved.count : 0),
                                                 keys.count ? [keys componentsJoinedByString:@" | "] : @"no tab key"]];
+    // The selection kept from Twitter's own tab editor for this account.
+    id kept = [[NSUserDefaults standardUserDefaults] objectForKey:PFBNativeTabSelectionsKey];
+    id mine = [kept isKindOfClass:[NSDictionary class]] && accountID ? kept[accountID] : nil;
+    [parts addObject:[NSString stringWithFormat:@"kept selection %@",
+                                                [mine isKindOfClass:[NSDictionary class]] && [mine count]
+                                                    ? [[mine allKeys] componentsJoinedByString:@", "]
+                                                    : @"none"]];
     [parts addObject:[NSString stringWithFormat:@"subscriptions_ switches read [%@]",
                                                 [gProbeSubscriptionReads.array componentsJoinedByString:@", "]]];
     return [parts componentsJoinedByString:@" · "];
@@ -1203,7 +1148,7 @@ static void PFBProbePersist(NSString* moment) {
                                        PFBProbeCustomizeTabsText(), PFBProbePanelNamesText(panels)],
             [NSString stringWithFormat:@"%@: bar parts %@ · first tab %@", moment, PFBProbePartsText(),
                                        PFBProbeFirstTabText()],
-            [NSString stringWithFormat:@"%@: reply bar %@", moment, PFBProbeReplyBarText()],
+            [NSString stringWithFormat:@"%@: accessory %@", moment, PFBProbeAccessoryText()],
         ] mutableCopy];
         for (NSInteger i = 0; i < PFBProbePartCount; i++) {
             [lines addObject:[NSString stringWithFormat:@"%@: writes to the %@: %@", moment, kPFBProbePartNames[i],
@@ -1221,9 +1166,22 @@ static void PFBProbePersist(NSString* moment) {
 // it sees a populated state. The stethoscope captures again later; this is the unattended one.
 static BOOL gProbeHomeCaptured;
 
+// The first resting tab has its glyph laid out, so the summary reads a drawn bar.
+static BOOL PFBProbeFirstTabLaidOut(void) {
+    UIView* item = gProbeBar ? PFBProbeRestingItems(gProbeBar).firstObject : nil;
+    for (UIView* sub in item.subviews) {
+        for (UIView* inner in sub.subviews) {
+            if ([inner isKindOfClass:[UIImageView class]]) {
+                return CGRectGetWidth(inner.bounds) > 0.0;
+            }
+        }
+    }
+    return NO;
+}
+
 static void PFBProbeMaybeCaptureOnHome(void) {
     if (gProbeHomeCaptured || !gProbeBar || !PFBProbeOnScreen(gProbeBar) || !PFBProbeOnHome() ||
-        !PFBProbeCurrentAccount()) {
+        !PFBProbeCurrentAccount() || !PFBProbeFirstTabLaidOut()) {
         return;
     }
     gProbeHomeCaptured = YES;
@@ -1313,6 +1271,10 @@ static void PFBProbeStart(void) {
 - (void)layoutSubviews {
     %orig;
     PFBProbeCount(@"tab layout", NULL, nil);
+    @try {
+        PFBProbeMaybeCaptureOnHome();
+    } @catch (__unused id exception) {
+    }
 }
 
 %end
@@ -1392,38 +1354,13 @@ static void PFBProbeStart(void) {
 
 %end
 
-// The switches Twitter's tab gate reads, and those named subscriptions_ read elsewhere, as
-// Twitter receives them: PrimeFreeBird's answers included.
+// The switches named subscriptions_, as Twitter receives them: PrimeFreeBird's answers included.
 %hook TFSFeatureSwitches
 
 - (BOOL)boolForKey:(NSString*)key {
     BOOL value = %orig;
-    if (gProbeInGate || [key hasPrefix:@"subscriptions_"]) {
+    if ([key hasPrefix:@"subscriptions_"]) {
         PFBProbeNoteSwitchRead(key, value ? @"YES" : @"NO");
-    }
-    return value;
-}
-
-- (NSInteger)integerForKey:(NSString*)key {
-    NSInteger value = %orig;
-    if (gProbeInGate) {
-        PFBProbeNoteSwitchRead(key, [NSString stringWithFormat:@"%ld", (long)value]);
-    }
-    return value;
-}
-
-- (NSNumber*)numberForKey:(NSString*)key {
-    NSNumber* value = %orig;
-    if (gProbeInGate) {
-        PFBProbeNoteSwitchRead(key, [value description]);
-    }
-    return value;
-}
-
-- (id)rawValueForKey:(NSString*)key {
-    id value = %orig;
-    if (gProbeInGate) {
-        PFBProbeNoteSwitchRead(key, PFBProbeShort(value, 40));
     }
     return value;
 }
@@ -1434,32 +1371,8 @@ static void PFBProbeStart(void) {
 
 - (BOOL)boolForKey:(NSString*)key {
     BOOL value = %orig;
-    if (gProbeInGate || [key hasPrefix:@"subscriptions_"]) {
+    if ([key hasPrefix:@"subscriptions_"]) {
         PFBProbeNoteSwitchRead(key, value ? @"YES" : @"NO");
-    }
-    return value;
-}
-
-- (NSInteger)integerForKey:(NSString*)key {
-    NSInteger value = %orig;
-    if (gProbeInGate) {
-        PFBProbeNoteSwitchRead(key, [NSString stringWithFormat:@"%ld", (long)value]);
-    }
-    return value;
-}
-
-- (NSNumber*)numberForKey:(NSString*)key {
-    NSNumber* value = %orig;
-    if (gProbeInGate) {
-        PFBProbeNoteSwitchRead(key, [value description]);
-    }
-    return value;
-}
-
-- (id)rawValueForKey:(NSString*)key {
-    id value = %orig;
-    if (gProbeInGate) {
-        PFBProbeNoteSwitchRead(key, PFBProbeShort(value, 40));
     }
     return value;
 }

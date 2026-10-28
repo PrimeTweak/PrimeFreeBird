@@ -371,4 +371,26 @@ static UIImage* AppIconThumbnail(PFBAppIconItem* item, UITraitCollection* tc) {
     return CGSizeMake(width, width + 38.0);
 }
 
+#pragma mark - Reset
+
++ (void)restorePrimaryIconThen:(void (^)(void))done {
+    UIApplication* application = [UIApplication sharedApplication];
+    NSUserDefaults* defaults = [NSUserDefaults standardUserDefaults];
+    NSString* current = [defaults stringForKey:kLastSelectedIconKey] ?: application.alternateIconName;
+    if (!application.supportsAlternateIcons || !current.length || [current isEqualToString:kPrimaryIconSentinel]) {
+        [defaults removeObjectForKey:kLastSelectedIconKey];
+        done();
+        return;
+    }
+    [application setAlternateIconName:nil
+                    completionHandler:^(NSError* _Nullable error) {
+                        dispatch_async(dispatch_get_main_queue(), ^{
+                            if (!error) {
+                                [[NSUserDefaults standardUserDefaults] removeObjectForKey:kLastSelectedIconKey];
+                            }
+                            done();
+                        });
+                    }];
+}
+
 @end

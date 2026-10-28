@@ -38,14 +38,26 @@
     [self.navigationController pushViewController:themeVC animated:YES];
 }
 
+// Twitter's own tab editor under its Liquid Glass navigation, which brings its own title and
+// account line; PrimeFreeBird's editor otherwise.
 - (void)showCustomTabBarVC:(NSDictionary*)sender {
-    UIViewController* customTabBarVC = [[PFBCustomTabBarViewController alloc] init];
-    if (self.account) {
+    PFBBundle* bundle = [PFBBundle sharedBundle];
+    UIViewController* customTabBarVC = [PFBCustomTabBarUtility editorForAccount:self.account];
+    if (!customTabBarVC) {
+        UIAlertController* alert =
+            [UIAlertController alertControllerWithTitle:[bundle localizedStringForKey:@"CUSTOM_TAB_BAR_SETTINGS_NAVIGATION_TITLE"]
+                                                message:[bundle localizedStringForKey:@"UNKNOWN_ERROR"]
+                                         preferredStyle:UIAlertControllerStyleAlert];
+        [alert addAction:[UIAlertAction actionWithTitle:[bundle localizedStringForKey:@"OK_ACTION"]
+                                                  style:UIAlertActionStyleCancel
+                                                handler:nil]];
+        [self presentViewController:alert animated:YES completion:nil];
+        return;
+    }
+    if (self.account && [customTabBarVC isKindOfClass:[PFBCustomTabBarViewController class]]) {
         [customTabBarVC.navigationItem
             setTitleView:[objc_getClass("TFNTitleView")
-                             titleViewWithTitle:[[PFBBundle sharedBundle]
-                                                    localizedStringForKey:
-                                                        @"CUSTOM_TAB_BAR_SETTINGS_NAVIGATION_TITLE"]
+                             titleViewWithTitle:[bundle localizedStringForKey:@"CUSTOM_TAB_BAR_SETTINGS_NAVIGATION_TITLE"]
                                        subtitle:self.account.displayUsername]];
     }
     [self.navigationController pushViewController:customTabBarVC animated:YES];

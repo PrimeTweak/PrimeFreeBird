@@ -132,6 +132,8 @@ static NSDictionary<NSString*, NSDictionary*>* PFBSettingsPages(void) {
                       @"default": @YES},
                     @{@"key": @"hide_timeline_prompts",
                       @"default": @YES},
+                    @{@"key": @"hide_videos_for_you",
+                      @"default": @NO},
                     @{@"type": @"header", @"titleKey": @"TIMELINES_GROUP_CONTENT"},
                     @{
                         @"type": @"button",
@@ -486,6 +488,13 @@ static NSDictionary<NSString*, NSDictionary*>* PFBSettingsPages(void) {
                         @"secondKey": @"IMPORT_SETTINGS_ACTION",
                         @"firstAction": @"showExportSettings:",
                         @"secondAction": @"showImportSettings:"
+                    },
+                    @{
+                        @"type": @"button",
+                        @"key": @"reset_settings",
+                        @"titleKey": @"RESET_SETTINGS_TITLE",
+                        @"action": @"resetSettings:",
+                        @"destructive": @YES
                     },
 
                     @{@"type": @"header", @"titleKey": @"LAB_GROUP_TOOLS"},

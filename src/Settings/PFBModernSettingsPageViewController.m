@@ -7,6 +7,7 @@
 #import "Features/Timelines/PFBMutedWordsViewController.h"
 #import "Features/Branding/AppIcon/PFBAppIconViewController.h"
 #import "Common/PFBSettingsBackup.h"
+#import "Features/Appearance/CustomTabBar/PFBNativeTabSelectionStore.h"
 #import "Features/Appearance/ThemeColor/PFBPalette.h"
 #import "Support/HookHelpers.h"
 #import "Common/PFBCompatibility.h"
@@ -814,17 +815,65 @@ static NSURL* PFBAccountAvatarURL(TFNTwitterAccount* account) {
 
 - (void)applyImportedSettings:(NSDictionary*)settings {
     [PFBSettingsBackup applySettings:settings];
-    // The notifications Theme.x posts after a live color change, so the restored
-    // accent repaints without waiting for the restart.
+    [self showRestoredSettings];
+    PFBBundle* bundle = [PFBBundle sharedBundle];
+    [self presentRestartAlertWithTitle:[bundle localizedStringForKey:@"IMPORT_SETTINGS_DONE_TITLE"]
+                               message:[bundle localizedStringForKey:@"IMPORT_SETTINGS_DONE_MESSAGE"]];
+}
+
+// The notifications Theme.x posts after a live color change, so the restored accent
+// repaints without waiting for the restart, then the rows with their new values.
+- (void)showRestoredSettings {
     NSNotificationCenter* center = [NSNotificationCenter defaultCenter];
     [center postNotificationName:@"TFNDynamicColorsWillReloadNotification" object:nil];
     [center postNotificationName:@"TFNDynamicColorsDidReloadNotification" object:nil];
     [center postNotificationName:@"TAEColorSettingsDidChangeUserDefaultsNotification" object:nil];
     [self updateVisibleToggles];
     [self.tableView reloadData];
+}
+
+- (void)resetSettings:(NSDictionary*)sender {
     PFBBundle* bundle = [PFBBundle sharedBundle];
-    [self presentRestartAlertWithTitle:[bundle localizedStringForKey:@"IMPORT_SETTINGS_DONE_TITLE"]
-                               message:[bundle localizedStringForKey:@"IMPORT_SETTINGS_DONE_MESSAGE"]];
+    __weak typeof(self) weakSelf = self;
+    UIAlertController* confirm = [UIAlertController
+        alertControllerWithTitle:[bundle localizedStringForKey:@"RESET_SETTINGS_CONFIRM_TITLE"]
+                         message:[bundle localizedStringForKey:@"RESET_SETTINGS_CONFIRM_MESSAGE"]
+                  preferredStyle:UIAlertControllerStyleAlert];
+    [confirm addAction:[UIAlertAction actionWithTitle:[bundle localizedStringForKey:@"CANCEL_ACTION"]
+                                                style:UIAlertActionStyleCancel
+                                              handler:nil]];
+    [confirm addAction:[UIAlertAction actionWithTitle:[bundle localizedStringForKey:@"RESET_SETTINGS_CONFIRM_ACTION"]
+                                                style:UIAlertActionStyleDestructive
+                                              handler:^(__unused UIAlertAction* action) {
+                                                  [weakSelf applyResetSettings];
+                                              }]];
+    [self presentViewController:confirm animated:YES completion:nil];
+}
+
+// As on a new install: no stored option, filter, color, tab, send sound, hidden notification
+// or hidden conversation, and Twitter's own accent option and the app icon back to Twitter's.
+- (void)applyResetSettings {
+    [PFBSettingsBackup applySettings:@{}];
+    PFBSendSoundRemove();
+    [[PFBNativeTabSelectionStore sharedStore] removeAllSelections];
+    NSUserDefaults* defaults = [NSUserDefaults standardUserDefaults];
+    for (NSString* key in @[ @"pfb_hidden_notifs", @"pfb_hidden_threads", @"T1ColorSettingsPrimaryColorOptionKey" ]) {
+        [defaults removeObjectForKey:key];
+    }
+    // Visual style is also read straight from the defaults, which a launch seeds with its default.
+    [defaults setBool:[PFBSettings boolForKey:@"enable_liquid_glass"] forKey:@"enable_liquid_glass"];
+    TAEColorSettings* colorSettings = [objc_getClass("TAEColorSettings") sharedSettings];
+    if ([colorSettings respondsToSelector:@selector(setPrimaryColorOption:)]) {
+        [colorSettings setPrimaryColorOption:0];
+    }
+    [self showRestoredSettings];
+    // iOS shows its own alert when the icon changes, so the icon goes back once this one is answered.
+    PFBBundle* bundle = [PFBBundle sharedBundle];
+    [self presentRestartAlertWithTitle:[bundle localizedStringForKey:@"RESET_SETTINGS_DONE_TITLE"]
+                               message:[bundle localizedStringForKey:@"RESET_SETTINGS_DONE_MESSAGE"]
+                              answered:^(void (^done)(void)) {
+                                  [PFBAppIconViewController restorePrimaryIconThen:done];
+                              }];
 }
 
 // MARK: - Web session
@@ -958,22 +1007,41 @@ static NSURL* PFBAccountAvatarURL(TFNTwitterAccount* account) {
                                message:[bundle localizedStringForKey:@"RESTART_REQUIRED_ALERT_MESSAGE"]];
 }
 
-// Later keeps Twitter open; Close app saves the settings and quits, since iOS gives an
-// app no way to relaunch itself: it is reopened from its icon.
 - (void)presentRestartAlertWithTitle:(NSString*)title message:(NSString*)message {
+    [self presentRestartAlertWithTitle:title message:message answered:nil];
+}
+
+// Later keeps Twitter open; Close app saves the settings and quits, since iOS gives an
+// app no way to relaunch itself: it is reopened from its icon. answered runs first on
+// either button, and Close app waits for it to call back.
+- (void)presentRestartAlertWithTitle:(NSString*)title
+                             message:(NSString*)message
+                            answered:(void (^)(void (^done)(void)))answered {
     PFBBundle* bundle = [PFBBundle sharedBundle];
     UIAlertController* alert = [UIAlertController alertControllerWithTitle:title
                                                                     message:message
                                                              preferredStyle:UIAlertControllerStyleAlert];
     [alert addAction:[UIAlertAction actionWithTitle:[bundle localizedStringForKey:@"RESTART_LATER_ACTION"]
                                               style:UIAlertActionStyleCancel
-                                            handler:nil]];
+                                            handler:^(__unused UIAlertAction* action) {
+                                                if (answered) {
+                                                    answered(^{
+                                                    });
+                                                }
+                                            }]];
     UIAlertAction* close = [UIAlertAction actionWithTitle:[bundle localizedStringForKey:@"CLOSE_APP_ACTION"]
                                                     style:UIAlertActionStyleDefault
                                                   handler:^(__unused UIAlertAction* action) {
-                                                      PFBCompatSaveNow();
-                                                      [[NSUserDefaults standardUserDefaults] synchronize];
-                                                      exit(0);
+                                                      void (^quit)(void) = ^{
+                                                          PFBCompatSaveNow();
+                                                          [[NSUserDefaults standardUserDefaults] synchronize];
+                                                          exit(0);
+                                                      };
+                                                      if (answered) {
+                                                          answered(quit);
+                                                      } else {
+                                                          quit();
+                                                      }
                                                   }];
     [alert addAction:close];
     alert.preferredAction = close;

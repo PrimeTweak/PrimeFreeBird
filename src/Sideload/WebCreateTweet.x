@@ -19,7 +19,8 @@ static NSString* WebCreateTweetQueryID = @"vwzfnq1lLOa1Nfx7htM2mw";
 // MARK: - Session state
 
 // Latest cookies harvested from the app's web session (the account currently signed in
-// on the web). auth_multi carries the auth_token of every other signed-in account.
+// on the web). auth_multi carries the auth_token of every other signed-in account. These
+// four and the CreateTweet query ID are read and written under accountCacheLock().
 static NSString* WebCT0 = nil;
 static NSString* WebAuthToken = nil;
 static NSString* WebTwid = nil;
@@ -163,6 +164,25 @@ static NSObject* accountCacheLock(void) {
     return WebAccountCookiesLock;
 }
 
+// The shared session's cookies, read together, so a reader never pairs one session's
+// token with another's csrf.
+static void sharedSession(NSString** authToken, NSString** ct0, NSString** twid, NSString** authMulti) {
+    @synchronized(accountCacheLock()) {
+        if (authToken) {
+            *authToken = WebAuthToken;
+        }
+        if (ct0) {
+            *ct0 = WebCT0;
+        }
+        if (twid) {
+            *twid = WebTwid;
+        }
+        if (authMulti) {
+            *authMulti = WebAuthMulti;
+        }
+    }
+}
+
 static void cacheTokenCt0(NSString* authToken, NSString* ct0) {
     if (authToken.length == 0) {
         return;
@@ -207,11 +227,14 @@ static NSDictionary* cachedAccountPair(NSString* userID) {
     }
 }
 
+// A batch becomes the shared session only when it holds a whole one, an auth_token with
+// its ct0 and the twid naming its account, committed at once.
 void PFBStoreWebCookies(NSArray<NSHTTPCookie*>* cookies) {
     if (![cookies isKindOfClass:[NSArray class]]) {
         return;
     }
 
+    NSString *authToken = nil, *ct0 = nil, *twid = nil, *authMulti = nil;
     for (NSHTTPCookie* cookie in cookies) {
         NSString* domain = cookie.domain ?: @"";
         if (!PFBIsXDomain(domain)) {
@@ -222,25 +245,32 @@ void PFBStoreWebCookies(NSArray<NSHTTPCookie*>* cookies) {
         }
 
         if ([cookie.name isEqualToString:@"ct0"]) {
-            WebCT0 = [cookie.value copy];
+            ct0 = [cookie.value copy];
         } else if ([cookie.name isEqualToString:@"auth_token"]) {
-            WebAuthToken = [cookie.value copy];
+            authToken = [cookie.value copy];
         } else if ([cookie.name isEqualToString:@"twid"]) {
-            WebTwid = [cookie.value copy];
+            twid = [cookie.value copy];
         } else if ([cookie.name isEqualToString:@"auth_multi"]) {
-            WebAuthMulti = [cookie.value copy];
+            authMulti = [cookie.value copy];
         }
     }
 
-    if (WebAuthToken.length && WebCT0.length) {
-        cacheTokenCt0(WebAuthToken, WebCT0);
+    NSString* userID = userIDFromTwid(twid);
+    if (userID.length == 0 || authToken.length == 0 || ct0.length == 0) {
+        return;
     }
-    NSString* userID = userIDFromTwid(WebTwid);
-    if (userID.length && WebAuthToken.length && WebCT0.length) {
+    @synchronized(accountCacheLock()) {
+        WebAuthToken = authToken;
+        WebCT0 = ct0;
+        WebTwid = twid;
+        if (authMulti.length) {
+            WebAuthMulti = authMulti;
+        }
+        cacheTokenCt0(authToken, ct0);
         cacheAccountPair(userID, @{
-            @"auth_token": WebAuthToken,
-            @"ct0": WebCT0,
-            @"twid": WebTwid,
+            @"auth_token": authToken,
+            @"ct0": ct0,
+            @"twid": twid,
         });
     }
 }
@@ -284,8 +314,9 @@ static PFBWebHelperDelegate* WebHelperDelegateInstance = nil;
 // Seed the helper webview's cookie store with the harvested session cookies so it loads
 // authenticated.
 static void seedSessionCookies(WKHTTPCookieStore* store, void (^done)(void)) {
-    NSDictionary* pairs =
-        @{@"auth_token": WebAuthToken ?: @"", @"ct0": WebCT0 ?: @"", @"twid": WebTwid ?: @""};
+    NSString *authToken = nil, *ct0 = nil, *twid = nil;
+    sharedSession(&authToken, &ct0, &twid, NULL);
+    NSDictionary* pairs = @{@"auth_token": authToken ?: @"", @"ct0": ct0 ?: @"", @"twid": twid ?: @""};
 
     NSMutableArray<NSHTTPCookie*>* cookies = [NSMutableArray array];
     for (NSString* name in pairs) {
@@ -414,7 +445,9 @@ static NSString* cachedXTID(NSString* key) {
 }
 
 static NSString* createTweetPath(void) {
-    return [NSString stringWithFormat:@"/graphql/%@/CreateTweet", WebCreateTweetQueryID];
+    @synchronized(accountCacheLock()) {
+        return [NSString stringWithFormat:@"/graphql/%@/CreateTweet", WebCreateTweetQueryID];
+    }
 }
 
 // Mints in the page, where X's own generator runs; one request per key at a time.
@@ -575,7 +608,9 @@ void PFBPrewarmWebCookiesIfNeeded(void) {
     NSString* savedQueryID =
         [[NSUserDefaults standardUserDefaults] stringForKey:WebQueryIDDefaultsKey];
     if (savedQueryID.length) {
-        WebCreateTweetQueryID = [savedQueryID copy];
+        @synchronized(accountCacheLock()) {
+            WebCreateTweetQueryID = [savedQueryID copy];
+        }
     }
 
     refreshWebCookiesViaWebView();
@@ -597,15 +632,17 @@ static NSString* authTokenForUserID(NSString* userID) {
         return nil;
     }
 
-    NSString* primaryUID = userIDFromTwid(WebTwid);
-    if ([primaryUID isEqualToString:userID] && WebAuthToken.length) {
-        return WebAuthToken;
+    NSString *sharedToken = nil, *sharedTwid = nil, *authMulti = nil;
+    sharedSession(&sharedToken, NULL, &sharedTwid, &authMulti);
+    NSString* primaryUID = userIDFromTwid(sharedTwid);
+    if ([primaryUID isEqualToString:userID] && sharedToken.length) {
+        return sharedToken;
     }
 
-    if (WebAuthMulti.length == 0) {
+    if (authMulti.length == 0) {
         return nil;
     }
-    NSString* decoded = [WebAuthMulti stringByRemovingPercentEncoding] ?: WebAuthMulti;
+    NSString* decoded = [authMulti stringByRemovingPercentEncoding] ?: authMulti;
     decoded = [decoded
         stringByTrimmingCharactersInSet:[NSCharacterSet characterSetWithCharactersInString:@"\""]];
     NSCharacterSet* separators = [NSCharacterSet characterSetWithCharactersInString:@"|,"];
@@ -696,7 +733,11 @@ static NSString* fetchCt0Sync(NSString* authToken, NSString* expectedUserID) {
                     [fetcher captureFromResponse:response];
                     dispatch_semaphore_signal(done);
                 }] resume];
-    dispatch_semaphore_wait(done, dispatch_time(DISPATCH_TIME_NOW, (int64_t)(15 * NSEC_PER_SEC)));
+    // A fetch still running at the deadline is cancelled and its answer ignored.
+    if (dispatch_semaphore_wait(done, dispatch_time(DISPATCH_TIME_NOW, (int64_t)(15 * NSEC_PER_SEC)))) {
+        [session invalidateAndCancel];
+        return nil;
+    }
     [session finishTasksAndInvalidate];
 
     if (fetcher.loggedOut) {
@@ -757,26 +798,30 @@ NSString* PFBWebCt0ForAuthToken(NSString* authToken, BOOL mint) {
 }
 
 // The token and csrf a request goes out with: its own account's session when it was
-// signed with one, else the shared session. NO when no ct0 can be had in time.
+// signed with one, else the shared session, whose account comes back in outSharedUserID
+// (nil for its own). NO when no ct0 can be had in time.
 static BOOL resolveCredsForRequest(NSURLRequest* request, NSString** outAuthToken, NSString** outCt0,
-                                   BOOL freshCsrf) {
+                                   NSString** outSharedUserID, BOOL freshCsrf) {
+    NSString *sharedToken = nil, *sharedTwid = nil;
+    sharedSession(&sharedToken, NULL, &sharedTwid, NULL);
     // Nothing goes through the web without a signed-in session.
-    if (WebAuthToken.length == 0) {
+    if (sharedToken.length == 0) {
         return NO;
     }
     NSString* own = PFBWebAuthTokenOfRequest(request);
-    if ([own isEqualToString:WebAuthToken]) {
+    if ([own isEqualToString:sharedToken]) {
         own = nil;
     }
-    NSString* authToken = own ?: WebAuthToken;
-    NSString* ct0 = freshCsrf ? fetchCt0Sync(authToken, own ? nil : userIDFromTwid(WebTwid)) : nil;
+    NSString* authToken = own ?: sharedToken;
+    NSString* sharedUserID = own ? nil : userIDFromTwid(sharedTwid);
+    NSString* ct0 = freshCsrf ? fetchCt0Sync(authToken, sharedUserID) : nil;
     if (ct0.length) {
         cacheTokenCt0(authToken, ct0);
     } else {
         ct0 = PFBWebCt0ForAuthToken(authToken, NO);
     }
     if (ct0.length == 0) {
-        ct0 = fetchCt0Sync(authToken, own ? nil : userIDFromTwid(WebTwid));
+        ct0 = fetchCt0Sync(authToken, sharedUserID);
         cacheTokenCt0(authToken, ct0);
     }
     if (ct0.length == 0) {
@@ -784,6 +829,7 @@ static BOOL resolveCredsForRequest(NSURLRequest* request, NSString** outAuthToke
     }
     *outAuthToken = authToken;
     *outCt0 = ct0;
+    *outSharedUserID = sharedUserID;
     return YES;
 }
 
@@ -940,11 +986,11 @@ static BOOL isGrokURL(NSURL* url) {
 static NSMutableURLRequest* webPathRequest(NSURLRequest* request, NSString* host, NSString* path,
                                            NSString* what, BOOL freshCsrf) {
     harvestSharedCookies();
-    NSString *authToken = nil, *ct0 = nil;
-    if (!resolveCredsForRequest(request, &authToken, &ct0, freshCsrf)) {
+    NSString *authToken = nil, *ct0 = nil, *sharedUserID = nil;
+    if (!resolveCredsForRequest(request, &authToken, &ct0, &sharedUserID, freshCsrf)) {
         return nil;
     }
-    BOOL own = ![authToken isEqualToString:WebAuthToken];
+    BOOL own = sharedUserID == nil;
     NSString* method = (request.HTTPMethod ?: @"GET").uppercaseString;
     NSString* key = xtidKey(method, path);
     void (^mint)(void) = ^{
@@ -970,7 +1016,7 @@ static NSMutableURLRequest* webPathRequest(NSURLRequest* request, NSString* host
         [NSURLComponents componentsWithURL:request.URL resolvingAgainstBaseURL:NO].percentEncodedQuery;
     NSMutableURLRequest* outgoing = [request mutableCopy];
     outgoing.URL = web.URL;
-    applyWebAuth(outgoing, authToken, ct0, own ? nil : userIDFromTwid(WebTwid));
+    applyWebAuth(outgoing, authToken, ct0, sharedUserID);
     NSString* xtid = cachedXTID(key);
     if (xtid.length) {
         [outgoing setValue:xtid forHTTPHeaderField:@"x-client-transaction-id"];
@@ -1026,8 +1072,14 @@ static NSMutableURLRequest* webRequestFromNativeSend(NSURLRequest* request) {
     }
 
     NSString* queryID = queryIDFromCreateTweetURL(request.URL);
-    if (queryID.length && ![queryID isEqualToString:WebCreateTweetQueryID]) {
-        WebCreateTweetQueryID = [queryID copy];
+    BOOL newQueryID = NO;
+    @synchronized(accountCacheLock()) {
+        if (queryID.length && ![queryID isEqualToString:WebCreateTweetQueryID]) {
+            WebCreateTweetQueryID = [queryID copy];
+            newQueryID = YES;
+        }
+    }
+    if (newQueryID) {
         [[NSUserDefaults standardUserDefaults] setObject:queryID forKey:WebQueryIDDefaultsKey];
     }
 
@@ -1064,13 +1116,14 @@ static NSMutableURLRequest* webRequestFromNativeSend(NSURLRequest* request) {
     } else {
         // A bridged account signs with its own session's auth_token: the Tweet goes out
         // with that session, and with the shared one only for an unreadable signature.
-        if (!resolveCredsForRequest(request, &authToken, &ct0, YES)) {
+        NSString* sharedUserID = nil;
+        if (!resolveCredsForRequest(request, &authToken, &ct0, &sharedUserID, YES)) {
             PFBDebugLog(@"[webtweet] no reroute: no session or no ct0 for the poster");
             PFBCOMPAT_OBSERVE(PFBCompat_web_session, @"Tweet seen, no web session");
             return nil;
         }
-        BOOL own = ![authToken isEqualToString:WebAuthToken];
-        postingUserID = own ? nil : userIDFromTwid(WebTwid);
+        BOOL own = sharedUserID == nil;
+        postingUserID = sharedUserID;
         PFBDebugLog(@"[webtweet] reroute via %@ session", own ? @"its own account's" : @"the shared");
     }
 
@@ -1080,8 +1133,8 @@ static NSMutableURLRequest* webRequestFromNativeSend(NSURLRequest* request) {
     [outgoing setValue:xtid forHTTPHeaderField:@"x-client-transaction-id"];
     refreshXTID();
 
-    // Tags the request as a Tweet for the task watcher, with the account whose ct0 a 4xx
-    // drops; empty for an account sending with its own session.
+    // Tags the request as a Tweet for the task watcher, with the account whose credentials a
+    // 401 or 403 drops; empty for an account sending with its own session.
     objc_setAssociatedObject(outgoing, WebPostingUIDKey, postingUserID.length ? postingUserID : @"",
                              OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     PFBDebugLog(@"[webtweet] rewrote CreateTweet -> web (auth=%lu ct0=%lu xtid=%lu)",
@@ -1093,7 +1146,7 @@ static NSMutableURLRequest* webRequestFromNativeSend(NSURLRequest* request) {
 
 // MARK: - Task watcher
 
-// Watches a rewritten CreateTweet task: a 2xx proves the web session, and a 4xx drops
+// Watches a rewritten CreateTweet task: a 2xx proves the web session, and a 401 or 403 drops
 // the cached credentials of the account the request was tagged with.
 @interface PFBCreateTweetWatcher : NSObject
 @property (nonatomic, copy) NSString* userID;
@@ -1122,8 +1175,20 @@ static NSMutableURLRequest* webRequestFromNativeSend(NSURLRequest* request) {
     if (code >= 200 && code < 300) {
         PFBCOMPAT_ACTION(PFBCompat_web_session, @"Tweet sent through the web session");
     }
-    if (code >= 400 && code < 500 && keepAlive.userID.length) {
-        cacheAccountPair(keepAlive.userID, nil);
+    // Only a refused session drops the credentials, and only those the Tweet went out with:
+    // a rate limit or a refused Tweet keeps them, and so does a pair replaced since.
+    if ((code == 401 || code == 403) && keepAlive.userID.length) {
+        NSString* sentCt0 = [task.originalRequest valueForHTTPHeaderField:@"x-csrf-token"];
+        NSArray* sentCookies =
+            [[task.originalRequest valueForHTTPHeaderField:@"Cookie"] componentsSeparatedByString:@"; "];
+        @synchronized(accountCacheLock()) {
+            NSDictionary* pair = cachedAccountPair(keepAlive.userID);
+            NSString* authToken = pair[@"auth_token"];
+            if (authToken.length && [pair[@"ct0"] isEqualToString:sentCt0] &&
+                [sentCookies containsObject:[@"auth_token=" stringByAppendingString:authToken]]) {
+                cacheAccountPair(keepAlive.userID, nil);
+            }
+        }
     }
 }
 @end
@@ -1169,7 +1234,9 @@ static id PFBAccountForAuthenticatedWebView(void) {
 // Harvests the shared cookie jar first, so a session opened elsewhere counts.
 BOOL PFBHasUsableWebCredentials(void) {
     harvestSharedCookies();
-    return WebAuthToken.length > 0 && WebCT0.length > 0;
+    NSString *authToken = nil, *ct0 = nil;
+    sharedSession(&authToken, &ct0, NULL, NULL);
+    return authToken.length > 0 && ct0.length > 0;
 }
 
 NSMutableURLRequest* PFBWebSessionGETRequest(NSURL* url) {
@@ -1177,10 +1244,12 @@ NSMutableURLRequest* PFBWebSessionGETRequest(NSURL* url) {
         !PFBHasUsableWebCredentials()) {
         return nil;
     }
+    NSString *authToken = nil, *ct0 = nil;
+    sharedSession(&authToken, &ct0, NULL, NULL);
     NSMutableURLRequest* request = [NSMutableURLRequest requestWithURL:url];
     request.HTTPMethod = @"GET";
     request.timeoutInterval = 10.0;
-    applyWebAuth(request, WebAuthToken, WebCT0, nil);
+    applyWebAuth(request, authToken, ct0, nil);
     return request;
 }
 
@@ -1188,7 +1257,9 @@ NSString* PFBWebSessionAccountID(void) {
     if (!PFBHasUsableWebCredentials()) {
         return nil;
     }
-    NSString* session = userIDFromTwid(WebTwid);
+    NSString* twid = nil;
+    sharedSession(NULL, NULL, &twid, NULL);
+    NSString* session = userIDFromTwid(twid);
     NSString* current = userIDStringForAccount(PFBAccountForAuthenticatedWebView());
     return session.length && [session isEqualToString:current] ? session : nil;
 }
@@ -1248,15 +1319,12 @@ void PFBPresentWebSessionLogin(void (^completion)(BOOL success)) {
 }
 
 void PFBClearWebSession(void) {
-    WebCT0 = nil;
-    WebAuthToken = nil;
-    WebTwid = nil;
-    WebAuthMulti = nil;
-
-    if (WebAccountCookiesLock) {
-        @synchronized(WebAccountCookiesLock) {
-            [WebAccountCookies removeAllObjects];
-        }
+    @synchronized(accountCacheLock()) {
+        WebCT0 = nil;
+        WebAuthToken = nil;
+        WebTwid = nil;
+        WebAuthMulti = nil;
+        [WebAccountCookies removeAllObjects];
     }
 
     NSHTTPCookieStorage* jar = [NSHTTPCookieStorage sharedHTTPCookieStorage];
@@ -1379,7 +1447,9 @@ static void PFBSeedWebPageStore(id controller, id configuration, id result) {
     WKWebViewConfiguration* config = [result isKindOfClass:[WKWebViewConfiguration class]] ? result : configuration;
     NSURL* root = [controller respondsToSelector:@selector(rootURL)] ? [controller rootURL] : nil;
     harvestSharedCookies();
-    if (WebAuthToken.length == 0 || !PFBIsXDomain(root.host) || ![config isKindOfClass:[WKWebViewConfiguration class]] ||
+    NSString* authToken = nil;
+    sharedSession(&authToken, NULL, NULL, NULL);
+    if (authToken.length == 0 || !PFBIsXDomain(root.host) || ![config isKindOfClass:[WKWebViewConfiguration class]] ||
         objc_getAssociatedObject(controller, WebHarvestWebViewKey) ||
         objc_getAssociatedObject(config.websiteDataStore, WebPageStoreKey)) {
         return;

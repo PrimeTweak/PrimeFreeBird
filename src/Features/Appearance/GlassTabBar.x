@@ -1,6 +1,6 @@
-// Twitter's own Liquid Glass tab bar, drawn in three rows: resting, the row seen through the
-// lens over the selected tab, and the row the lens carries while dragged. Selected tab colors
-// the lens rows; Tab labels names the tabs on a taller bar; Always visible keeps it from collapsing.
+// Twitter's own Liquid Glass tab bar, drawn in three rows (resting, seen through the lens, carried
+// by the lens). Selected tab colors the lens rows; Tab labels names the tabs on a taller bar with a
+// matching bottom reserve; Always visible keeps it up.
 
 #import "Support/HookHelpers.h"
 
@@ -297,9 +297,7 @@ static void PFBGlassLiftBadges(UIView* bar) {
     });
 }
 
-// Customize tabs will prove itself on the bar Twitter draws: its tabs must be the chosen ones,
-// in their order. Nothing drives the glass bar yet, so this only measures the two lists; a match
-// is not counted as working, since the tabs would match on their own. Each new set is logged once.
+// The tabs of the bar Twitter draws, which Twitter's own editor sets, logged once per new set.
 static void PFBGlassCheckChosenTabs(UIView* bar) {
     static NSArray<NSString*>* checked;
     static CFTimeInterval lastLook;
@@ -314,12 +312,8 @@ static void PFBGlassCheckChosenTabs(UIView* bar) {
     }
     checked = shown;
     PFBCompatReach(PFBCompatPath_glass_tabs);
-    NSArray<NSString*>* chosen = [PFBCustomTabBarUtility chosenTabNames];
     PFBCompatMeasure(@"customize tabs",
-                     [NSString stringWithFormat:@"glass bar [%@] · chosen [%@] · %@", [shown componentsJoinedByString:@", "],
-                                                [chosen componentsJoinedByString:@", "],
-                                                [shown isEqualToArray:chosen] ? @"match" : @"differ"],
-                     6);
+                     [NSString stringWithFormat:@"glass bar [%@]", [shown componentsJoinedByString:@", "]], 6);
 }
 
 static void PFBGlassForEachWindow(void (^block)(UIWindow* window)) {
@@ -333,10 +327,106 @@ static void PFBGlassForEachWindow(void (^block)(UIWindow* window)) {
     }
 }
 
+// MARK: - Bottom chrome reserve
+
+// XNavigation keeps the bar's bottom reserve as a static: the margin under the bar plus its
+// height, 20 + 62 = 82 pt, read for the lists' bottom inset and the accessory above the bar.
+// Tab labels makes the bar taller, so the reserve grows by the same amount.
+typedef struct {
+    double* reserve;
+    double original;
+} PFBGlassReserve;
+
+// The reserve and Twitter's own value for it, found by their exported names. reserve is NULL
+// until Twitter has set the statics, or when they no longer add up to margin plus bar height.
+static PFBGlassReserve PFBGlassChromeReserve(void) {
+    static double* reserve;
+    static const double* margin;
+    static const double* height;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+      reserve = (double*)dlsym(RTLD_DEFAULT,
+                               "$s11XNavigation13TabBarMetricsO13restingExtent12CoreGraphics7CGFloatVvpZ");
+      margin = (const double*)dlsym(RTLD_DEFAULT,
+                                    "$s11XNavigation13TabBarMetricsO14barBottomInset12CoreGraphics7CGFloatVvpZ");
+      height = (const double*)dlsym(RTLD_DEFAULT,
+                                    "$s11XNavigation13TabBarMetricsO14expandedHeight12CoreGraphics7CGFloatVvpZ");
+      if (!reserve || !margin || !height) {
+          PFBCompatMeasure(@"bottom reserve", @"Twitter's tab bar metrics not found", 2);
+      }
+    });
+    PFBGlassReserve found = {NULL, 0.0};
+    if (!reserve || !margin || !height || *margin <= 0.0 || *height <= 0.0) {
+        return found;
+    }
+    double original = *margin + *height;
+    if (*reserve == original || *reserve == original + kPFBGlassExtraHeight) {
+        found.reserve = reserve;
+        found.original = original;
+    }
+    return found;
+}
+
+// Sets the reserve for the bar's height: Twitter's own with Tab labels off, the bar's extra
+// height more with it on. Readers take it on their next layout.
+static PFBGlassReserve PFBGlassApplyChromeReserve(void) {
+    PFBGlassReserve found = PFBGlassChromeReserve();
+    if (!found.reserve) {
+        return found;
+    }
+    PFBCompatReach(PFBCompatPath_glass_bottom_reserve);
+    double wanted = found.original + ([PFBSettings boolForKey:@"restore_tab_labels"] ? kPFBGlassExtraHeight : 0.0);
+    if (*found.reserve != wanted) {
+        *found.reserve = wanted;
+        if (wanted != found.original) {
+            PFBCOMPAT_ACTION(PFBCompat_restore_tab_labels, @"bottom reserve widened for the taller bar");
+        }
+    }
+    return found;
+}
+
+// A stack's collapse engine copies the reserve when it is made, and Twitter copies it into the
+// hide travel: an engine made before the reserve changed is brought in line. Only Twitter's own
+// values, with or without the extra height, are replaced.
+static void PFBGlassSyncEngineReserve(UINavigationController* stack, PFBGlassReserve found) {
+    static Class engineClass;
+    static ptrdiff_t engineOffset = -1;
+    static ptrdiff_t fields[2] = {-1, -1};
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+      engineClass = NSClassFromString(@"_TtC11XNavigation14CollapseEngine");
+      Ivar engine = class_getInstanceVariable(NSClassFromString(@"XNAVNavigationController"),
+                                              "$__lazy_storage_$_collapseEngine");
+      Ivar extent = engineClass ? class_getInstanceVariable(engineClass, "bottomChromeExtent") : NULL;
+      Ivar travel = engineClass ? class_getInstanceVariable(engineClass, "hiddenBarTravel") : NULL;
+      if (engine && extent && travel) {
+          engineOffset = ivar_getOffset(engine);
+          fields[0] = ivar_getOffset(extent);
+          fields[1] = ivar_getOffset(travel);
+      }
+    });
+    if (!found.reserve || engineOffset < 0 || !stack) {
+        return;
+    }
+    void* engine = NULL;
+    memcpy(&engine, (const uint8_t*)(__bridge void*)stack + engineOffset, sizeof(engine));
+    if (!engine || object_getClass((__bridge id)engine) != engineClass) {
+        return;
+    }
+    double wanted = *found.reserve;
+    for (NSUInteger i = 0; i < 2; i++) {
+        double* value = (double*)((uint8_t*)engine + fields[i]);
+        if (*value != wanted && (*value == found.original || *value == found.original + kPFBGlassExtraHeight)) {
+            *value = wanted;
+        }
+    }
+}
+
 // Every glass tab styled again now: a setting changed while the bar is on screen
 // otherwise waits for Twitter's next layout of the tabs. The bar takes its new height too.
 void PFBRestyleGlassTabBars(void) {
     PFBGlassFindClasses();
+    PFBGlassApplyChromeReserve();
     if (!gPFBGlassBarClass) {
         return;
     }
@@ -585,6 +675,10 @@ void PFBGlassRefreshAlwaysVisible(void) {
 %hook XNAVNavigationController
 
 - (void)viewWillLayoutSubviews {
+    @try {
+        PFBGlassSyncEngineReserve((UINavigationController*)self, PFBGlassApplyChromeReserve());
+    } @catch (__unused id exception) {
+    }
     %orig;
     @try {
         PFBGlassPinTabBar((UINavigationController*)self);

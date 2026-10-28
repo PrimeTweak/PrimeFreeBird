@@ -18,6 +18,14 @@ extern NSString* const PFBTabPanelIDKey; // T1 panel ID (NSNumber)
 
 @interface PFBCustomTabBarUtility : NSObject
 
+// Whether Twitter's own Liquid Glass navigation runs, whose bar only Twitter's own tab editor
+// customizes.
++ (BOOL)usesNativeEditor;
+
+// The tab editor for the account (the current one when nil): Twitter's own under its Liquid
+// Glass navigation, PrimeFreeBird's otherwise; nil when Twitter's cannot be built.
++ (nullable UIViewController*)editorForAccount:(nullable id)account;
+
 // Records the tabs the app builds so the editor can display real titles and
 // icons without hardcoding them. Called from the tab bar hook with the live tab
 // views.
@@ -50,10 +58,6 @@ extern NSString* const PFBTabPanelIDKey; // T1 panel ID (NSNumber)
 // Twitter's own Liquid Glass bar lists panels, not tab views: each panel without an
 // entry is recorded with Twitter's name and glyph for it, Twitter's first one as Home.
 + (void)recordPanelIDs:(NSArray*)panelIDs;
-
-// The names of the chosen tabs in order, or of the default set until the bar is
-// customized, as Twitter names each panel.
-+ (NSArray<NSString*>*)chosenTabNames;
 
 @end
 

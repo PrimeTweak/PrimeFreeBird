@@ -301,6 +301,17 @@ static NSNumber* FeatureSwitchOverrideValueForKey(NSString* key) {
         return nil;
     }
 
+    // Ask Grok inside a chat and in the menu of selected text, each behind its own switch.
+    if ([key isEqualToString:@"xchat_ask_grok_enabled"] ||
+        [key isEqualToString:@"grok_explain_text_selection_ask_grok_enabled"]) {
+        if ([PFBSettings boolForKey:@"hide_grok_analyze"]) {
+            PFBCOMPAT_ACTION(PFBCompat_hide_grok_analyze, @"Ask Grok off in chats and selected text");
+            return @NO;
+        }
+        PFBCOMPAT_OBSERVE(PFBCompat_hide_grok_analyze, @"read by Twitter");
+        return nil;
+    }
+
     // The "Suggested" list in an empty Chat inbox, behind Twitter's own switch, which
     // Chat reads from its own store (hooked below).
     if ([key isEqualToString:@"xchat_cold_inbox_suggestions_enabled"]) {
@@ -735,7 +746,7 @@ static BOOL pfbChatStoreKey(NSString* key) {
     dispatch_once(&once, ^{
       keys = [NSSet setWithArray:@[
           @"xchat_cold_inbox_suggestions_enabled", @"xchat_voice_messages_transcription_enabled",
-          @"xchat_liquid_glass_convo_header_enabled"
+          @"xchat_liquid_glass_convo_header_enabled", @"xchat_ask_grok_enabled"
       ]];
     });
     return [keys containsObject:key];
@@ -961,6 +972,23 @@ static BOOL pfbSkipsSensitiveWarnings(void) {
         return %orig;
     }
     return YES;
+}
+
+%end
+
+// The profile's Pay button asks for the viewer's Money access: it gets the real answer,
+// so the gate forced above only offers the Money tab.
+%hook T1ProfileUserViewModel
+
+- (BOOL)hasAccessToPayments {
+    BOOL saved = ReportGenuineTabGates;
+    ReportGenuineTabGates = YES;
+    BOOL access = %orig;
+    ReportGenuineTabGates = saved;
+    if (!access) {
+        PFBCOMPAT_ACTION(PFBCompat_custom_tab_bar, @"profile Pay button follows the real Money access");
+    }
+    return access;
 }
 
 %end

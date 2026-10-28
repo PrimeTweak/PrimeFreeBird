@@ -358,6 +358,97 @@ static UIFont* PFBCustomFont(UIFont* original, BOOL bold) {
 }
 %end
 
+// Text attributes with their font in the custom one at the same size, or nil when nothing
+// changes. A missing font stands for UIKit's 17 pt default.
+static NSDictionary* PFBAttributesWithCustomFont(NSDictionary* attributes, BOOL bold) {
+    UIFont* original = attributes[NSFontAttributeName];
+    if (![original isKindOfClass:[UIFont class]]) {
+        original = [UIFont systemFontOfSize:17.0 weight:bold ? UIFontWeightSemibold : UIFontWeightRegular];
+    }
+    UIFont* custom = PFBCustomFont(original, bold);
+    if (custom == original) {
+        return nil;
+    }
+    NSMutableDictionary* updated = attributes ? [attributes mutableCopy] : [NSMutableDictionary dictionary];
+    updated[NSFontAttributeName] = custom;
+    return updated;
+}
+
+// A bar button appearance whose titles use the custom font in every state, or nil.
+static UIBarButtonItemAppearance* PFBButtonAppearanceWithFont(UIBarButtonItemAppearance* original, BOOL bold) {
+    if (!original) {
+        return nil;
+    }
+    UIBarButtonItemAppearance* appearance = [original copy];
+    BOOL changed = NO;
+    for (UIBarButtonItemStateAppearance* state in
+         @[ appearance.normal, appearance.highlighted, appearance.disabled, appearance.focused ]) {
+        NSDictionary* attributes = PFBAttributesWithCustomFont(state.titleTextAttributes, bold);
+        if (attributes) {
+            state.titleTextAttributes = attributes;
+            changed = YES;
+        }
+    }
+    return changed ? appearance : nil;
+}
+
+// A navigation bar appearance with the custom bold font on its title and Done button and
+// the regular one on its other buttons, or nil when nothing changes.
+static UINavigationBarAppearance* PFBBarAppearanceWithFonts(UINavigationBarAppearance* original) {
+    if (!original) {
+        return nil;
+    }
+    UINavigationBarAppearance* appearance = [original copy];
+    BOOL changed = NO;
+    NSDictionary* title = PFBAttributesWithCustomFont(appearance.titleTextAttributes, YES);
+    if (title) {
+        appearance.titleTextAttributes = title;
+        changed = YES;
+    }
+    UIBarButtonItemAppearance* done = PFBButtonAppearanceWithFont(appearance.doneButtonAppearance, YES);
+    if (done) {
+        appearance.doneButtonAppearance = done;
+        changed = YES;
+    }
+    UIBarButtonItemAppearance* buttons = PFBButtonAppearanceWithFont(appearance.buttonAppearance, NO);
+    if (buttons) {
+        appearance.buttonAppearance = buttons;
+        changed = YES;
+    }
+    UIBarButtonItemAppearance* back = PFBButtonAppearanceWithFont(appearance.backButtonAppearance, NO);
+    if (back) {
+        appearance.backButtonAppearance = back;
+        changed = YES;
+    }
+    return changed ? appearance : nil;
+}
+
+// Each navigation bar of Twitter's own navigation takes its title and button fonts from
+// these appearances, set once its controller has loaded.
+%hook XNAVNavigationController
+- (void)viewDidLoad {
+    %orig;
+    PFBCompatReach(PFBCompatPath_navigation_bar_text);
+    UINavigationBar* bar = ((UINavigationController*)self).navigationBar;
+    UINavigationBarAppearance* standard = PFBBarAppearanceWithFonts(bar.standardAppearance);
+    if (standard) {
+        bar.standardAppearance = standard;
+    }
+    UINavigationBarAppearance* scrollEdge = PFBBarAppearanceWithFonts(bar.scrollEdgeAppearance);
+    if (scrollEdge) {
+        bar.scrollEdgeAppearance = scrollEdge;
+    }
+    UINavigationBarAppearance* compact = PFBBarAppearanceWithFonts(bar.compactAppearance);
+    if (compact) {
+        bar.compactAppearance = compact;
+    }
+    UINavigationBarAppearance* compactEdge = PFBBarAppearanceWithFonts(bar.compactScrollEdgeAppearance);
+    if (compactEdge) {
+        bar.compactScrollEdgeAppearance = compactEdge;
+    }
+}
+%end
+
 // Cephei blocks HBPreferences access from app processes unless this opt-in
 // returns YES.
 %hook HBForceCepheiPrefs

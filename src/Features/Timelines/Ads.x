@@ -1,4 +1,5 @@
-// Hides ads, the premium offer and trending videos in timelines and the video feed.
+// Hides ads, the premium offer, trending videos and Videos for you in timelines and the
+// video feed.
 
 #import "Support/HookHelpers.h"
 #import "Common/PFBCompatibility.h"
@@ -341,32 +342,38 @@ static void RemovePromotedImmersiveCards(id controller) {
 
 %end
 
-// MARK: - Video feed responses
+// MARK: - Timeline responses
 
-// The video feed's pages arrive through these two GraphQL requests.
-static BOOL IsVideoFeedResponse(NSURLRequest* request) {
+// The GraphQL operation a response answers, or nil for any other request.
+static NSString* GraphQLOperation(NSURLRequest* request) {
     NSURL* url = [request isKindOfClass:[NSURLRequest class]] ? request.URL : nil;
-    NSString* operation = url.path.lastPathComponent;
-    return ([operation isEqualToString:@"ImmersiveViewerExploreMixerTimeline"] ||
-            [operation isEqualToString:@"ImmersiveProfileViewer"]) &&
-           [url.path containsString:@"/graphql/"] && PFBIsXDomain(url.host);
+    if (![url.path containsString:@"/graphql/"] || !PFBIsXDomain(url.host)) {
+        return nil;
+    }
+    return url.path.lastPathComponent;
 }
 
-// The JSON without its promoted Tweet entries, at any depth; removed counts them. A part
-// holding none is returned as it was, so a page without ads is not copied.
-static id WithoutPromotedEntries(id node, NSUInteger* removed) {
+// The video feed's pages arrive through these two operations.
+static BOOL IsVideoFeedOperation(NSString* operation) {
+    return [operation isEqualToString:@"ImmersiveViewerExploreMixerTimeline"] ||
+           [operation isEqualToString:@"ImmersiveProfileViewer"];
+}
+
+// The JSON without the entries whose ID starts with prefix, at any depth; removed counts
+// them. A part holding none is returned as it was, so a page without them is not copied.
+static id WithoutEntries(id node, NSString* prefix, NSUInteger* removed) {
     if ([node isKindOfClass:[NSArray class]]) {
         NSArray* values = node;
         NSMutableArray* kept = nil;
         for (NSUInteger i = 0; i < values.count; i++) {
             id value = values[i];
             id entryID = [value isKindOfClass:[NSDictionary class]] ? value[@"entry_id"] : nil;
-            BOOL promoted = [entryID isKindOfClass:[NSString class]] && [entryID hasPrefix:@"promoted-tweet-"];
-            id cleaned = promoted ? nil : WithoutPromotedEntries(value, removed);
+            BOOL matched = [entryID isKindOfClass:[NSString class]] && [entryID hasPrefix:prefix];
+            id cleaned = matched ? nil : WithoutEntries(value, prefix, removed);
             if (!kept && cleaned != value) {
                 kept = [[values subarrayWithRange:NSMakeRange(0, i)] mutableCopy];
             }
-            if (promoted) {
+            if (matched) {
                 (*removed)++;
             } else if (kept) {
                 [kept addObject:cleaned];
@@ -378,7 +385,7 @@ static id WithoutPromotedEntries(id node, NSUInteger* removed) {
         NSDictionary* fields = node;
         NSMutableDictionary* copy = nil;
         for (id key in fields) {
-            id cleaned = WithoutPromotedEntries(fields[key], removed);
+            id cleaned = WithoutEntries(fields[key], prefix, removed);
             if (cleaned != fields[key]) {
                 copy = copy ?: [fields mutableCopy];
                 copy[key] = cleaned;
@@ -391,6 +398,61 @@ static id WithoutPromotedEntries(id node, NSUInteger* removed) {
 
 // The cards above are removed once Twitter has read a page; here the promoted entries
 // leave the page before Twitter reads it. Off, a page is read only to note its ads.
+static NSData* VideoFeedPageWithoutAds(NSData* data) {
+    PFBCompatReach(PFBCompatPath_video_feed_response);
+    BOOL enabled = [PFBSettings boolForKey:@"hide_promoted"];
+    if (!enabled && !PFBCompatNeedsObservation(PFBCompat_hide_promoted) &&
+        PFBCompatPathReached(PFBCompatPath_video_feed_ads)) {
+        return nil;
+    }
+    id json = [NSJSONSerialization JSONObjectWithData:data options:0 error:nil];
+    NSUInteger removed = 0;
+    id filtered = json ? WithoutEntries(json, @"promoted-tweet-", &removed) : nil;
+    if (removed == 0) {
+        return nil;
+    }
+    PFBCompatReach(PFBCompatPath_video_feed_ads);
+    if (!enabled) {
+        PFBCOMPAT_OBSERVE(PFBCompat_hide_promoted, @"ad found in a video feed response");
+        return nil;
+    }
+    NSData* cleaned = [NSJSONSerialization dataWithJSONObject:filtered options:0 error:nil];
+    if (cleaned) {
+        PFBCOMPAT_ACTION(PFBCompat_hide_promoted, @"ad removed from a video feed response");
+    }
+    return cleaned;
+}
+
+// Twitter splits the "Videos for you" entry into the row's header, videos and footer once
+// it has read the page, so the entry leaves the page before. Off, pages are only scanned
+// until one holding the row is noted.
+static NSData* PageWithoutVideosForYou(NSData* data, NSString* operation) {
+    BOOL enabled = [PFBSettings boolForKey:@"hide_videos_for_you"];
+    if (!enabled && !PFBCompatNeedsObservation(PFBCompat_hide_videos_for_you)) {
+        return nil;
+    }
+    static NSData* marker;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+      marker = [@"video-carousel-" dataUsingEncoding:NSUTF8StringEncoding];
+    });
+    if ([data rangeOfData:marker options:0 range:NSMakeRange(0, data.length)].location == NSNotFound) {
+        return nil;
+    }
+    if (!enabled) {
+        PFBCOMPAT_OBSERVE(PFBCompat_hide_videos_for_you, @"row found in %@", operation);
+        return nil;
+    }
+    id json = [NSJSONSerialization JSONObjectWithData:data options:0 error:nil];
+    NSUInteger removed = 0;
+    id filtered = json ? WithoutEntries(json, @"video-carousel-", &removed) : nil;
+    NSData* cleaned = removed ? [NSJSONSerialization dataWithJSONObject:filtered options:0 error:nil] : nil;
+    if (cleaned) {
+        PFBCOMPAT_ACTION(PFBCompat_hide_videos_for_you, @"row removed from %@", operation);
+    }
+    return cleaned;
+}
+
 %hook TNLResponseInfo
 
 - (instancetype)initWithFinalURLRequest:(NSURLRequest*)request
@@ -398,32 +460,18 @@ static id WithoutPromotedEntries(id node, NSUInteger* removed) {
                                  source:(NSInteger)source
                                    data:(NSData*)data
                      temporarySavedFile:(id)temporarySavedFile {
-    if (data.length == 0 || !IsVideoFeedResponse(request)) {
+    NSString* operation = data.length ? GraphQLOperation(request) : nil;
+    if (!operation) {
         return %orig;
     }
-    PFBCompatReach(PFBCompatPath_video_feed_response);
-    BOOL enabled = [PFBSettings boolForKey:@"hide_promoted"];
-    if (!enabled && !PFBCompatNeedsObservation(PFBCompat_hide_promoted) &&
-        PFBCompatPathReached(PFBCompatPath_video_feed_ads)) {
+    NSData* page = PageWithoutVideosForYou(data, operation) ?: data;
+    if (IsVideoFeedOperation(operation)) {
+        page = VideoFeedPageWithoutAds(page) ?: page;
+    }
+    if (page == data) {
         return %orig;
     }
-    id json = [NSJSONSerialization JSONObjectWithData:data options:0 error:nil];
-    NSUInteger removed = 0;
-    id filtered = json ? WithoutPromotedEntries(json, &removed) : nil;
-    if (removed == 0) {
-        return %orig;
-    }
-    PFBCompatReach(PFBCompatPath_video_feed_ads);
-    if (!enabled) {
-        PFBCOMPAT_OBSERVE(PFBCompat_hide_promoted, @"ad found in a video feed response");
-        return %orig;
-    }
-    NSData* cleaned = [NSJSONSerialization dataWithJSONObject:filtered options:0 error:nil];
-    if (!cleaned) {
-        return %orig;
-    }
-    PFBCOMPAT_ACTION(PFBCompat_hide_promoted, @"ad removed from a video feed response");
-    return %orig(request, response, source, cleaned, temporarySavedFile);
+    return %orig(request, response, source, page, temporarySavedFile);
 }
 
 %end
