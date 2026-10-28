@@ -393,8 +393,51 @@ static void pfbAdvReplaceFilters(UIViewController* owner) {
     pfbAdvReplaceFiltersInItem(owner.navigationItem, owner);
 }
 
-// The navigation item that just received the buttons is passed straight in, so
-// a search bar setting them on its own item is covered too.
+static UIViewController* pfbAdvOwnerIn(UIViewController* vc, UINavigationItem* item, NSInteger depth) {
+    if (!vc || depth > 24) {
+        return nil;
+    }
+    if (vc.navigationItem == item) {
+        return vc;
+    }
+    for (UIViewController* child in vc.childViewControllers) {
+        UIViewController* found = pfbAdvOwnerIn(child, item, depth + 1);
+        if (found) {
+            return found;
+        }
+    }
+    return pfbAdvOwnerIn(vc.presentedViewController, item, depth + 1);
+}
+
+// The screen whose navigation item this is, among the screens of every window.
+static UIViewController* pfbAdvOwnerOfItem(UINavigationItem* item) {
+    for (UIScene* scene in UIApplication.sharedApplication.connectedScenes) {
+        if (![scene isKindOfClass:[UIWindowScene class]]) {
+            continue;
+        }
+        for (UIWindow* window in ((UIWindowScene*)scene).windows) {
+            UIViewController* found = pfbAdvOwnerIn(window.rootViewController, item, 0);
+            if (found) {
+                return found;
+            }
+        }
+    }
+    return nil;
+}
+
+static BOOL pfbAdvIsOnSearchScreen(UIViewController* vc) {
+    for (UIViewController* node = vc; node; node = node.parentViewController) {
+        if (pfbAdvIsSearchScreen(node)) {
+            return YES;
+        }
+    }
+    return NO;
+}
+
+// The navigation item that just received the buttons is passed straight in, so a search
+// bar setting them on its own item is covered too. That item must sit on a search screen:
+// under Twitter's own Liquid Glass the top found is a container, and Chat's own button
+// passes for the Filters glyph.
 static void pfbAdvRescanItemSoon(UINavigationItem* item) {
     dispatch_async(dispatch_get_main_queue(), ^{
       UIViewController* top = pfbAdvTopViewController();
@@ -404,8 +447,12 @@ static void pfbAdvRescanItemSoon(UINavigationItem* item) {
       if (pfbAdvIsSearchScreen(top)) {
           pfbAdvReplaceFiltersInItem(top.navigationItem, top);
       }
-      if (item != top.navigationItem) {
-          pfbAdvReplaceFiltersInItem(item, top);
+      if (item == top.navigationItem) {
+          return;
+      }
+      UIViewController* owner = pfbAdvOwnerOfItem(item);
+      if (owner && pfbAdvIsOnSearchScreen(owner)) {
+          pfbAdvReplaceFiltersInItem(item, owner);
       }
     });
 }

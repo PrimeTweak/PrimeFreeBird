@@ -135,13 +135,15 @@ static UIView* pfbFindHighlightBar(UIView* v, int depth) {
     return nil;
 }
 
-// Whether the Explore bar is on screen in the same window as this scroll view.
-// The accessory bar lives in the navigation chrome, and off-screen tabs have a
-// nil window, so Home's pager of the same class does not pass.
+// Whether this scroll view is Explore's pager: on screen with the Explore bar, inside the
+// screen that owns the bar. Under Twitter's own Liquid Glass every tab's screen stays in
+// the window, so the window alone would let Home's pager of the same class pass.
 static BOOL pfbPagerScopeOK(UIScrollView* sv) {
     UIView* root = gPFBExploreBar;
     if (!root || !sv) { return NO; }
-    return root.window != nil && root.window == sv.window;
+    if (root.window == nil || root.window != sv.window) { return NO; }
+    UIView* screen = PFBOwningController(root).viewIfLoaded;
+    return !screen || [sv isDescendantOfView:screen];
 }
 
 // The underline is placed here: position and width are interpolated between the
@@ -240,6 +242,8 @@ static void pfbSyncPagerToMask(void) {
     });
 }
 
+static void pfbMeasurePagerTaken(UICollectionView* pager, NSInteger pages);
+
 // Adopts the pager once the bar is provably live, and steps off a page whose
 // tab is hidden so a session never starts on one.
 static void pfbCapturePagerAndRemap(UICollectionView* candidate) {
@@ -247,6 +251,7 @@ static void pfbCapturePagerAndRemap(UICollectionView* candidate) {
     NSInteger total = gPFBPagerCandidateTotal ?: pfbTabCount();
     gPFBPagerCV = candidate;
     gPFBPagerTotal = total;
+    pfbMeasurePagerTaken(candidate, total);
     CGFloat pw = candidate.bounds.size.width;
     if (pw >= 1.0) {
         NSInteger page = (NSInteger)llround(candidate.contentOffset.x / pw);
@@ -337,8 +342,7 @@ static BOOL pfbApplyTabFilter(UIView* bar, UICollectionView* cv) {
     // existed can now be adopted.
     if (!gPFBPagerCV) {
         UICollectionView* cand = gPFBPagerCandidate;
-        if (cand && cand != cv && bar.window != nil
-            && cand.window == bar.window) {
+        if (cand && cand != cv && pfbPagerScopeOK(cand)) {
             pfbCapturePagerAndRemap(cand);
             gPFBAppliedMaskBits = pfbMaskBits();
         }
@@ -403,6 +407,42 @@ static NSString* pfbOwners(UIView* view) {
     return names.count ? [names componentsJoinedByString:@" in "] : @"none";
 }
 
+// The pager taken for Explore's and where a swipe left the underline, a few lines per
+// build in the report's measurements, each under its own topic.
+static void pfbMeasurePagerTaken(UICollectionView* pager, NSInteger pages) {
+    PFBCompatMeasure(@"explore pager",
+                     [NSString stringWithFormat:@"pager taken: %ld pages, owned by %@; the tab bar by %@", (long)pages,
+                                                pfbOwners(pager), pfbOwners(gPFBExploreBar)],
+                     4);
+}
+
+static void pfbMeasureSwipeEnd(void) {
+    UICollectionView* pager = gPFBPagerCV;
+    UICollectionView* cv = gPFBBarCV;
+    UIView* root = gPFBExploreBar;
+    UIView* hl = root ? pfbFindHighlightBar(root, 0) : nil;
+    CGFloat pw = pager.bounds.size.width;
+    if (!pager || !cv || !hl || pw < 1.0) { return; }
+    CGFloat underline = CGRectGetMidX([root convertRect:hl.frame fromView:hl.superview]);
+    NSInteger under = -1;
+    CGFloat nearest = CGFLOAT_MAX;
+    for (UICollectionViewCell* cell in cv.visibleCells) {
+        NSIndexPath* ip = [cv indexPathForCell:cell];
+        if (!ip || cell.hidden) { continue; }
+        CGFloat distance = fabs(CGRectGetMidX([root convertRect:cell.frame fromView:cell.superview]) - underline);
+        if (distance < nearest) {
+            nearest = distance;
+            under = ip.item;
+        }
+    }
+    NSIndexPath* picked = cv.indexPathsForSelectedItems.firstObject;
+    PFBCompatMeasure(@"explore swipes",
+                     [NSString stringWithFormat:@"swipe end: page %ld of %ld, bar selection %@, underline under tab %ld",
+                                                (long)llround(pager.contentOffset.x / pw), (long)gPFBPagerTotal,
+                                                picked ? [@(picked.item) stringValue] : @"none", (long)under],
+                     8);
+}
+
 // Once per launch and per owner, while the journal records: a second pager taken for
 // Explore's, with the screens that own it and the tab bar.
 static void pfbJournalPagerSwap(UICollectionView* pager, NSInteger pages) {
@@ -441,6 +481,7 @@ static void pfbJournalPagerSwap(UICollectionView* pager, NSInteger pages) {
             pfbJournalPagerSwap(collectionView, n);
         }
         gPFBPagerCV = collectionView;
+        pfbMeasurePagerTaken(collectionView, n);
     }
     gPFBPagerTotal = n;
     // The pager keeps all its pages: handing it the kept count puts its page
@@ -499,6 +540,7 @@ static void pfbJournalPagerSwap(UICollectionView* pager, NSInteger pages) {
     if (!pfbGranularActive()
         || (UICollectionView*)scrollView != gPFBPagerCV) { return; }
     pfbPositionUnderline(gPFBExploreBar, gPFBBarCV);
+    pfbMeasureSwipeEnd();
 }
 
 - (void)scrollViewDidEndScrollingAnimation:(id)scrollView {
