@@ -38,6 +38,8 @@
 
 @interface T1PanelIdentity : NSObject
 + (NSString*)iconImageNameForPanelID:(long long)panelID;
++ (NSString*)localizedNameForPanelID:(long long)panelID;
++ (NSString*)stringForPanelID:(long long)panelID;
 @end
 
 @interface T1TabView : UIView

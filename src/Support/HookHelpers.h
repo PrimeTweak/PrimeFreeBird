@@ -227,6 +227,11 @@ void PFBEndRawVerifiedRead(void);
 void PFBThemeScreenEnter(UIViewController* screen);
 void PFBThemeScreenLeave(UIViewController* screen);
 
+// Twitter's own Liquid Glass tab bar (GlassTabBar.x): its tabs styled again at once, and
+// its chrome hidden while a settings screen is open.
+void PFBRestyleGlassTabBars(void);
+void PFBGlassTabBarHideForSettings(BOOL hidden);
+
 // Bar items of PrimeFreeBird's own screens carry this tag and keep UIKit's glass;
 // the app-wide flattening in NavBarIcons.x leaves them alone.
 static const NSInteger PFBNativeGlassTag = 0x504647;
