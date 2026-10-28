@@ -692,6 +692,10 @@ static NSURL* PFBAccountAvatarURL(TFNTwitterAccount* account) {
             [key isEqualToString:@"tab_bar_theming"]) {
             PFBSyncAccentTheme();
         }
+        // Twitter's glass tabs show the names at once rather than at their next layout.
+        if ([key isEqualToString:@"restore_tab_labels"]) {
+            PFBRestyleGlassTabBars();
+        }
 
         // Neither applies at once: Record activity is read at launch, and the Tweet
         // button keeps its glyph until it loads its icon again.

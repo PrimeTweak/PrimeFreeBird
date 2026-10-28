@@ -149,8 +149,10 @@ static NSArray* sectionsWithPrimeFreeBirdEntry(TFNItemsDataViewController* setti
 // MARK: - Tab bar in the settings
 
 // Twitter keeps its tab bar on screen in the settings. It is hidden with
-// Twitter's own call, which selecting a tab undoes.
+// Twitter's own call, which selecting a tab undoes. Under Twitter's own Liquid
+// Glass no tab bar controller holds the bar, so its chrome is hidden instead.
 static void setSettingsTabBarHidden(UIViewController* settingsVC, BOOL hidden) {
+    PFBGlassTabBarHideForSettings(hidden);
     T1TabBarViewController* tabBar = [settingsVC respondsToSelector:@selector(tfn_tabBarIntegration)]
                                          ? [settingsVC tfn_tabBarIntegration]
                                          : nil;
