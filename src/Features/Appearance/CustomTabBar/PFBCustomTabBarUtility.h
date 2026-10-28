@@ -47,6 +47,17 @@ extern NSString* const PFBTabPanelIDKey; // T1 panel ID (NSNumber)
 // hidden.
 + (NSArray<NSString*>*)defaultVisiblePageIDs;
 
+// Twitter's own Liquid Glass bar lists panels, not tab views: each panel without an
+// entry is recorded with Twitter's name and glyph for it, Twitter's first one as Home.
++ (void)recordPanelIDs:(NSArray*)panelIDs;
+
+// Twitter's panels in the chosen order, or in the default set until the bar is
+// customized; Twitter's own list when that set does not fully resolve.
++ (NSArray*)panelIDsInOrderFromPanelIDs:(NSArray*)panelIDs;
+
+// Asks Twitter's glass navigation to list its panels again, so the bar can follow a save.
++ (void)refreshGlassBar;
+
 @end
 
 NS_ASSUME_NONNULL_END

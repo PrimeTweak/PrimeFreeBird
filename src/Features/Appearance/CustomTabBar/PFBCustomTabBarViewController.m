@@ -345,6 +345,8 @@ static UIViewController* findViewControllerOfClass(UIViewController* vc,
 - (void)applyLiveLayout {
     UIViewController* tabNav = [self tabNavigationController];
     if (![tabNav respondsToSelector:@selector(recalculateVisiblePanels)]) {
+        // Twitter's own Liquid Glass has no tab view controller: its navigation lists again.
+        [PFBCustomTabBarUtility refreshGlassBar];
         return;
     }
 

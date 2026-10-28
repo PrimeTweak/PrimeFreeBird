@@ -1,5 +1,6 @@
 // Registry and helpers of the custom tab bar: panel ids, images, order.
 
+#import <objc/message.h>
 #import "Features/Appearance/CustomTabBar/PFBCustomTabBarUtility.h"
 #import "Support/T1Headers.h"
 
@@ -148,6 +149,97 @@ static BOOL PFBRegistryEntryIsValid(id entry) {
 
 + (NSArray<NSString*>*)defaultVisiblePageIDs {
     return @[@"home", @"guide", @"ntab", @"messages"];
+}
+
+#pragma mark - Twitter's glass bar
+
+static NSDictionary* PFBEntryForPanel(NSArray<NSDictionary*>* registry, long long panelID) {
+    for (NSDictionary* entry in registry) {
+        id value = entry[PFBTabPanelIDKey];
+        if ([value isKindOfClass:[NSNumber class]] && [value longLongValue] == panelID) {
+            return entry;
+        }
+    }
+    return nil;
+}
+
++ (void)recordPanelIDs:(NSArray*)panelIDs {
+    if (![panelIDs isKindOfClass:[NSArray class]]) {
+        return;
+    }
+    Class identity = NSClassFromString(@"T1PanelIdentity");
+    NSMutableArray<NSDictionary*>* registry = [self registry];
+    BOOL changed = NO;
+    for (NSUInteger index = 0; index < panelIDs.count; index++) {
+        id panel = panelIDs[index];
+        if (![panel isKindOfClass:[NSNumber class]] || PFBEntryForPanel(registry, [panel longLongValue])) {
+            continue;
+        }
+        long long panelID = [panel longLongValue];
+        // Twitter lists Home first; the editor keeps Home under its own page.
+        NSString* page = nil;
+        if (index == 0 && ![self metadataForPage:PFBCustomTabBarHomePageID]) {
+            page = PFBCustomTabBarHomePageID;
+        } else if ([identity respondsToSelector:@selector(stringForPanelID:)]) {
+            page = [identity stringForPanelID:panelID];
+        }
+        if (!page.length) {
+            page = [NSString stringWithFormat:@"panel %lld", panelID];
+        }
+        // A page another panel already holds would merge the two in the editor.
+        if ([self metadataForPage:page]) {
+            continue;
+        }
+        NSString* title = [identity respondsToSelector:@selector(localizedNameForPanelID:)]
+                              ? [identity localizedNameForPanelID:panelID]
+                              : nil;
+        NSString* image = [identity respondsToSelector:@selector(iconImageNameForPanelID:)]
+                              ? [identity iconImageNameForPanelID:panelID]
+                              : nil;
+        [registry addObject:@{
+            PFBTabPageKey: page,
+            PFBTabTitleKey: title.length ? title : page,
+            PFBTabImageKey: image ?: @"",
+            PFBTabPanelIDKey: @(panelID)
+        }];
+        changed = YES;
+    }
+    if (changed) {
+        [[NSUserDefaults standardUserDefaults] setObject:[registry copy] forKey:kRegistryKey];
+    }
+}
+
++ (NSArray*)panelIDsInOrderFromPanelIDs:(NSArray*)panelIDs {
+    if (![panelIDs isKindOfClass:[NSArray class]] || panelIDs.count == 0) {
+        return panelIDs;
+    }
+    NSArray<NSString*>* saved = [self visiblePageIDsInOrder];
+    NSMutableArray* shown = [NSMutableArray array];
+    for (NSString* page in saved ?: [self defaultVisiblePageIDs]) {
+        id panel = [self metadataForPage:page][PFBTabPanelIDKey];
+        BOOL offered = [panel isKindOfClass:[NSNumber class]] && [panelIDs containsObject:panel];
+        if (offered && ![shown containsObject:panel]) {
+            [shown addObject:panel];
+        } else if (!offered && !saved) {
+            // Until the bar is customized, a default tab Twitter does not offer keeps
+            // Twitter's own tabs rather than a partial set.
+            return panelIDs;
+        }
+    }
+    return shown.count ? shown : panelIDs;
+}
+
++ (void)refreshGlassBar {
+    Class hostClass = NSClassFromString(@"T1HostViewController");
+    Class glassClass = NSClassFromString(@"_TtC14T1TwitterSwift20XTabbedAppNavigation");
+    SEL appNavigation = NSSelectorFromString(@"appNavigation");
+    SEL recalculate = NSSelectorFromString(@"recalculateVisiblePanels");
+    id host = [hostClass respondsToSelector:@selector(sharedHostViewController)] ? [hostClass sharedHostViewController] : nil;
+    id navigation = [host respondsToSelector:appNavigation] ? ((id (*)(id, SEL))objc_msgSend)(host, appNavigation) : nil;
+    if (!glassClass || ![navigation isKindOfClass:glassClass] || ![navigation respondsToSelector:recalculate]) {
+        return;
+    }
+    ((void (*)(id, SEL))objc_msgSend)(navigation, recalculate);
 }
 
 @end
