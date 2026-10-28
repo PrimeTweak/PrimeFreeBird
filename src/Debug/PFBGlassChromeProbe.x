@@ -1,6 +1,6 @@
-// Measures what is still unknown under Twitter's own Liquid Glass: the tab bar's parts once
-// it has collapsed on Home and which code places each part (Always visible, a taller bar for
-// Tab labels), and what Customize tabs makes of Twitter's panels.
+// Measures what is still unknown under Twitter's own Liquid Glass: whether the tab bar still
+// collapses with Always visible on, how the taller bar for Tab labels lays out, and how
+// Twitter gates and saves its own tab list, which Customize tabs needs.
 //
 // Each scroll and a summary at 25 s and 60 s go to MEASUREMENTS, which the stethoscope
 // copies with the Compatibility report. The hooks are installed after every other file's,
@@ -11,7 +11,7 @@
 #import "Support/HookHelpers.h"
 #import "Common/PFBCompatibility.h"
 
-// The methods called below that no header declares.
+// The methods called or hooked below that no header declares.
 @interface T1HostViewController (PFBGlassChromeProbe)
 - (id)appNavigation;
 @end
@@ -37,6 +37,15 @@
 
 @interface _TtCC11XNavigation14CollapseEngine14ScrollObserver : NSObject
 - (void)handlePan:(UIGestureRecognizer*)recognizer;
+@end
+
+@interface T1TabCustomizationConfig : NSObject
+- (instancetype)initWithAccount:(id)account;
+- (BOOL)isTabCustomizationEnabled;
+@end
+
+@interface TFSFeatureSwitches : NSObject
+- (id)rawValueForKey:(NSString*)key;
 @end
 
 static NSString* const kPFBProbeTopic = @"glass probe";
@@ -239,19 +248,23 @@ static NSString* PFBProbeHex(id object, const char* name, NSUInteger length) {
     return hex;
 }
 
-// An instance variable read as a double: NAN when it has no room for one or reads absurd.
-static double PFBProbeDouble(id object, const char* name) {
+// The index-th double of an instance variable: NAN when it has no room for one or reads absurd.
+static double PFBProbeDoubleAt(id object, const char* name, NSUInteger index) {
     Ivar ivar = object ? class_getInstanceVariable(object_getClass(object), name) : NULL;
     if (!ivar) {
         return NAN;
     }
-    ptrdiff_t offset = ivar_getOffset(ivar);
+    ptrdiff_t offset = ivar_getOffset(ivar) + (ptrdiff_t)(index * sizeof(double));
     if (offset <= 0 || (size_t)offset + sizeof(double) > class_getInstanceSize(object_getClass(object))) {
         return NAN;
     }
     double value = 0;
     memcpy(&value, (const uint8_t*)(__bridge void*)object + offset, sizeof(double));
     return isfinite(value) && fabs(value) < 100000.0 ? value : NAN;
+}
+
+static double PFBProbeDouble(id object, const char* name) {
+    return PFBProbeDoubleAt(object, name, 0);
 }
 
 // An instance variable holding an object, read without retaining it twice.
@@ -485,6 +498,48 @@ static NSString* PFBProbeWritesText(NSInteger index) {
     return writes.count ? [writes componentsJoinedByString:@" · "] : @"none";
 }
 
+// The first resting tab's glyph and name in the bar, where the bar and the compose button sit
+// on screen, and the bottom inset of the screen's scrolling content: the taller bar's control.
+static NSString* PFBProbeFirstTabText(void) {
+    UIView* bar = gProbeBar;
+    UIView* item = bar ? PFBProbeRestingItems(bar).firstObject : nil;
+    if (!item) {
+        return @"none";
+    }
+    UIView* glyph = nil;
+    UILabel* name = nil;
+    for (UIView* sub in item.subviews) {
+        if ([sub isKindOfClass:[UILabel class]]) {
+            name = (UILabel*)sub;
+        }
+        for (UIView* inner in sub.subviews) {
+            if (!glyph && [inner isKindOfClass:[UIImageView class]]) {
+                glyph = inner;
+            }
+        }
+    }
+    __block UIScrollView* content = nil;
+    UIView* screenView = gProbeScreen.viewIfLoaded;
+    if (screenView) {
+        PFBWalkAllSubviews(screenView, 6, ^(UIView* view) {
+          if (!content && [view isKindOfClass:[UIScrollView class]] &&
+              CGRectGetHeight(view.bounds) > CGRectGetHeight(screenView.bounds) * 0.5) {
+              content = (UIScrollView*)view;
+          }
+        });
+    }
+    UIView* accessory = gProbeAccessory;
+    return [NSString stringWithFormat:@"glyph %@ · name %@ · bar on screen %@ · accessory on screen %@ · "
+                                      @"content inset bottom %@",
+                                      glyph ? PFBProbeRectText([glyph convertRect:glyph.bounds toView:bar]) : @"none",
+                                      name ? [NSString stringWithFormat:@"%@ font %.1f", PFBProbeRectText([name convertRect:name.bounds toView:bar]),
+                                                                        name.font.pointSize]
+                                           : @"none",
+                                      PFBProbeRectText([bar convertRect:bar.bounds toView:nil]),
+                                      accessory.window ? PFBProbeRectText([accessory convertRect:accessory.bounds toView:nil]) : @"none",
+                                      content ? [NSString stringWithFormat:@"%.0f", content.adjustedContentInset.bottom] : @"none"];
+}
+
 static id PFBProbeAppNavigation(void) {
     Class hostClass = NSClassFromString(@"T1HostViewController");
     T1HostViewController* host =
@@ -541,6 +596,141 @@ static NSString* PFBProbeSavedKeysText(void) {
         }
     }
     return found.count ? [found componentsJoinedByString:@" | "] : @"none";
+}
+
+// Twitter's own gate for its saved tabs, asked as its tab settings ask it, with the feature
+// switches it reads meanwhile; and the switches named subscriptions_ read anywhere else.
+static BOOL gProbeInGate;
+static NSMutableOrderedSet<NSString*>* gProbeGateReads;
+static NSMutableOrderedSet<NSString*>* gProbeSubscriptionReads;
+
+static void PFBProbeNoteSwitchRead(NSString* key, NSString* value) {
+    if (gProbeStart <= 0 || !pthread_main_np() || ![key isKindOfClass:[NSString class]]) {
+        return;
+    }
+    if (gProbeInGate) {
+        if (gProbeGateReads.count < 24) {
+            [gProbeGateReads addObject:[NSString stringWithFormat:@"%@=%@", key, value ?: @"nil"]];
+        }
+        return;
+    }
+    if (!gProbeSubscriptionReads) {
+        gProbeSubscriptionReads = [NSMutableOrderedSet orderedSet];
+    }
+    // The string is built only until the cap, not on every read for the rest of the session.
+    if (gProbeSubscriptionReads.count < 16) {
+        [gProbeSubscriptionReads addObject:[NSString stringWithFormat:@"%@=%@", key, value ?: @"nil"]];
+    }
+}
+
+static id PFBProbeSend(id target, NSString* name) {
+    SEL selector = NSSelectorFromString(name);
+    return [target respondsToSelector:selector] ? ((id (*)(id, SEL))objc_msgSend)(target, selector) : nil;
+}
+
+static NSString* PFBProbeShort(id value, NSUInteger length) {
+    NSString* text = [[[value description] componentsSeparatedByCharactersInSet:NSCharacterSet.newlineCharacterSet]
+        componentsJoinedByString:@" "];
+    return text.length > length ? [[text substringToIndex:length] stringByAppendingString:@"…"] : (text ?: @"nil");
+}
+
+// A saved value, a property list decoded when it is one.
+static NSString* PFBProbeSavedValueText(id value) {
+    if ([value isKindOfClass:[NSData class]]) {
+        NSData* data = (NSData*)value;
+        id list = [NSPropertyListSerialization propertyListWithData:data options:0 format:NULL error:NULL];
+        return [NSString stringWithFormat:@"data %lu bytes%@", (unsigned long)data.length,
+                                          list ? [@", reads " stringByAppendingString:PFBProbeShort(list, 160)] : @""];
+    }
+    return [NSString stringWithFormat:@"%@ %@", PFBProbeName([value class]), PFBProbeShort(value, 120)];
+}
+
+static NSString* PFBProbeCustomizeTabsText(void) {
+    Class hostClass = NSClassFromString(@"T1HostViewController");
+    T1HostViewController* host =
+        [hostClass respondsToSelector:@selector(sharedHostViewController)] ? [hostClass sharedHostViewController] : nil;
+    id account = [host respondsToSelector:@selector(currentAccount)] ? [host currentAccount] : nil;
+    if (!account) {
+        return @"no account";
+    }
+    NSMutableArray<NSString*>* parts = [NSMutableArray array];
+    Class configClass = NSClassFromString(@"T1TabCustomizationConfig");
+    if ([configClass instancesRespondToSelector:@selector(initWithAccount:)] &&
+        [configClass instancesRespondToSelector:@selector(isTabCustomizationEnabled)]) {
+        T1TabCustomizationConfig* config = [(T1TabCustomizationConfig*)[configClass alloc] initWithAccount:account];
+        gProbeGateReads = [NSMutableOrderedSet orderedSet];
+        gProbeInGate = YES;
+        BOOL open = NO;
+        @try {
+            open = [config isTabCustomizationEnabled];
+        } @finally {
+            gProbeInGate = NO;
+        }
+        [parts addObject:[NSString stringWithFormat:@"Twitter's gate %@, switches it read [%@]", open ? @"open" : @"closed",
+                                                    [gProbeGateReads.array componentsJoinedByString:@", "]]];
+    } else {
+        [parts addObject:@"Twitter's gate missing"];
+    }
+    SEL premium = NSSelectorFromString(@"isPremiumTierUser");
+    if ([account respondsToSelector:premium]) {
+        [parts addObject:[NSString stringWithFormat:@"premium as asked %@",
+                                                    ((BOOL (*)(id, SEL))objc_msgSend)(account, premium) ? @"yes" : @"no"]];
+    }
+    // The account's subscription claims, which Twitter's availability checks.
+    NSArray* claims = PFBProbeSend(PFBProbeSend(account, @"accountUserDetails"), @"subscriptionClaims");
+    NSMutableArray<NSString*>* claimTexts = [NSMutableArray array];
+    for (id claim in [claims isKindOfClass:[NSArray class]] ? claims : @[]) {
+        if (claimTexts.count >= 4) {
+            break;
+        }
+        [claimTexts addObject:[NSString stringWithFormat:@"%@ %@", PFBProbeShort(PFBProbeSend(claim, @"restId"), 30),
+                                                         PFBProbeShort(PFBProbeSend(claim, @"encode"), 160)]];
+    }
+    [parts addObject:[NSString stringWithFormat:@"claims %lu [%@]", (unsigned long)([claims isKindOfClass:[NSArray class]] ? claims.count : 0),
+                                                [claimTexts componentsJoinedByString:@" | "]]];
+    // The account's own store, where Twitter saves its tab list.
+    Class storeClass = NSClassFromString(@"TFSAccountUserDefaults");
+    SEL shared = NSSelectorFromString(@"sharedAccountUserDefaultsForAccountID:");
+    id accountID = PFBProbeSend(account, @"accountID");
+    id store = [storeClass respondsToSelector:shared] && accountID
+                   ? ((id (*)(id, SEL, id))objc_msgSend)(storeClass, shared, accountID)
+                   : nil;
+    NSDictionary* saved = PFBProbeSend(store, @"dictionary");
+    NSMutableArray<NSString*>* keys = [NSMutableArray array];
+    if ([saved isKindOfClass:[NSDictionary class]]) {
+        NSMutableArray<NSString*>* names = [NSMutableArray array];
+        for (id key in saved) {
+            if ([key isKindOfClass:[NSString class]]) {
+                [names addObject:key];
+            }
+        }
+        for (NSString* key in [names sortedArrayUsingSelector:@selector(compare:)]) {
+            NSString* lower = key.lowercaseString;
+            if (keys.count < 8 && ([lower containsString:@"navigation"] || [lower containsString:@"tab_"] ||
+                                   [lower containsString:@"tab-"] || [lower containsString:@"panel"])) {
+                [keys addObject:[NSString stringWithFormat:@"%@ = %@", key, PFBProbeSavedValueText(saved[key])]];
+            }
+        }
+    }
+    [parts addObject:[NSString stringWithFormat:@"account store %@ (%lu keys): %@", store ? @"found" : @"none",
+                                                (unsigned long)([saved isKindOfClass:[NSDictionary class]] ? saved.count : 0),
+                                                keys.count ? [keys componentsJoinedByString:@" | "] : @"no tab key"]];
+    [parts addObject:[NSString stringWithFormat:@"subscriptions_ switches read [%@]",
+                                                [gProbeSubscriptionReads.array componentsJoinedByString:@", "]]];
+    return [parts componentsJoinedByString:@" · "];
+}
+
+// Twitter's names for the panels its navigation lists, to match the bar's VoiceOver names.
+static NSString* PFBProbePanelNamesText(NSArray* panels) {
+    Class identity = NSClassFromString(@"T1PanelIdentity");
+    NSMutableArray<NSString*>* names = [NSMutableArray array];
+    for (id panel in [panels isKindOfClass:[NSArray class]] ? panels : @[]) {
+        NSString* name = [panel isKindOfClass:[NSNumber class]] && [identity respondsToSelector:@selector(localizedNameForPanelID:)]
+                             ? [identity localizedNameForPanelID:[panel longLongValue]]
+                             : nil;
+        [names addObject:name.length ? name : @"?"];
+    }
+    return [NSString stringWithFormat:@"[%@]", [names componentsJoinedByString:@", "]];
 }
 
 // MARK: - How each screen declares its bars
@@ -680,8 +870,9 @@ static NSString* PFBProbeRangeText(PFBProbeRange range) {
     PFBProbeRange barWidth, barY, containerWidth, containerScale, platterWidth, platterX, maskWidth;
     PFBProbeRange rowSpan, lowestTabAlpha, lowestTabScale, pillWidth, pillX;
     PFBProbeRange accessoryX, accessoryY, accessoryAlpha, topY;
-    PFBProbeRange applied, progress, extent, opacity, slide, travel;
+    PFBProbeRange applied, progress, tabProgress, pendingTab, extent, opacity, slide, travel;
 }
+@property(nonatomic, strong) NSMutableOrderedSet<NSString*>* modes;
 @property(nonatomic, copy) NSString* screen;
 @property(nonatomic) CFTimeInterval began;
 @property(nonatomic) CFTimeInterval lastPan;
@@ -717,8 +908,9 @@ static NSString* PFBProbeScrollText(PFBProbeScrollWindow* w) {
         stringWithFormat:@"scroll on %@: %lu pans, %lu samples · bar width %@, y %@ · container width %@, scale %@ · "
                          @"platter width %@, x %@, mask width %@ · row span %@, lowest tab alpha %@ (%lu faded), "
                          @"lowest tab scale %@ · pill width %@, x %@ · accessory x %@, y %@, alpha %@ · top bar y %@ · "
-                         @"appliedCollapse %@ (narrowest %@) · engine progress %@ (narrowest %@), bottom extent %@, "
-                         @"opacity %@, slide %@, hidden travel %@ · layouts bar %lu, tabs %lu",
+                         @"appliedCollapse %@ (narrowest %@) · engine progress %@ (narrowest %@), tab bar %@, "
+                         @"pending tab %@, bottom extent %@, opacity %@, slide %@, hidden travel %@ · stack modes [%@] · "
+                         @"pins %lu · layouts bar %lu, tabs %lu",
                          w.screen, (unsigned long)w.pans, (unsigned long)w.samples, PFBProbeRangeText(w->barWidth),
                          PFBProbeRangeText(w->barY), PFBProbeRangeText(w->containerWidth),
                          PFBProbeRangeText(w->containerScale), PFBProbeRangeText(w->platterWidth),
@@ -728,8 +920,12 @@ static NSString* PFBProbeScrollText(PFBProbeScrollWindow* w) {
                          PFBProbeRangeText(w->pillX), PFBProbeRangeText(w->accessoryX), PFBProbeRangeText(w->accessoryY),
                          PFBProbeRangeText(w->accessoryAlpha), PFBProbeRangeText(w->topY), PFBProbeRangeText(w->applied),
                          w.peakApplied ?: @"none", PFBProbeRangeText(w->progress), w.peakProgress ?: @"none",
+                         PFBProbeRangeText(w->tabProgress), PFBProbeRangeText(w->pendingTab),
                          PFBProbeRangeText(w->extent), PFBProbeRangeText(w->opacity), PFBProbeRangeText(w->slide),
-                         PFBProbeRangeText(w->travel), (unsigned long)barLayouts, (unsigned long)tabLayouts];
+                         PFBProbeRangeText(w->travel),
+                         w.modes.count ? [w.modes.array componentsJoinedByString:@" "] : @"none",
+                         (unsigned long)PFBGlassAlwaysVisiblePinCount(), (unsigned long)barLayouts,
+                         (unsigned long)tabLayouts];
 }
 
 static double PFBProbeScaleOf(UIView* view) {
@@ -832,6 +1028,14 @@ static id PFBProbeEngine(void) {
     PFBProbeWiden(&w->applied, applied);
     id engine = PFBProbeEngine();
     PFBProbeWiden(&w->progress, PFBProbeDouble(engine, "collapseProgress"));
+    PFBProbeWiden(&w->tabProgress, PFBProbeDoubleAt(engine, "collapseProgress", 1));
+    // The tab bar's pending target, where the engine lands the chrome when it holds one.
+    PFBProbeWiden(&w->pendingTab, PFBProbeDoubleAt(engine, "pendingTarget", 1));
+    // The stack's collapse mode: the top bar's byte, then the tab bar's (Always visible).
+    UINavigationController* stack = gProbeScreen.navigationController;
+    if (stack && w.modes.count < 6) {
+        [w.modes addObject:PFBProbeHex(stack, "appliedConfiguration", 2)];
+    }
     PFBProbeWiden(&w->extent, PFBProbeDouble(engine, "bottomChromeExtent"));
     PFBProbeWiden(&w->opacity, PFBProbeDouble(engine, "bottomChromeOpacity"));
     PFBProbeWiden(&w->slide, PFBProbeDouble(engine, "bottomChromeSlide"));
@@ -866,6 +1070,7 @@ static void PFBProbeNotePan(void) {
     if (!gProbeSampler.window) {
         PFBProbeScrollWindow* w = [PFBProbeScrollWindow new];
         w.began = now;
+        w.modes = [NSMutableOrderedSet orderedSet];
         UIViewController* screen = gProbeScreen;
         w.screen = screen ? PFBProbeName([screen class]) : @"?";
         w.barLayoutsBefore = gProbeTallies[@"bar layout"].total;
@@ -913,11 +1118,15 @@ static void PFBProbePersist(NSString* moment) {
                                        gProbeTabEvents.count ? [gProbeTabEvents componentsJoinedByString:@" | "] : @"none",
                                        PFBProbeTallyText(@"visible panels"), PFBProbeTallyText(@"recalculate"),
                                        PFBProbeTallyText(@"recalculate with")],
-            [NSString stringWithFormat:@"%@: screens %@ · scrolls %lu, the bar shrank in %lu", moment,
+            [NSString stringWithFormat:@"%@: screens %@ · scrolls %lu, the bar shrank in %lu · pins %lu", moment,
                                        screens.count ? [screens componentsJoinedByString:@" | "] : @"none",
-                                       (unsigned long)gProbeScrollWindows, (unsigned long)gProbeShrunkWindows],
+                                       (unsigned long)gProbeScrollWindows, (unsigned long)gProbeShrunkWindows,
+                                       (unsigned long)PFBGlassAlwaysVisiblePinCount()],
             [NSString stringWithFormat:@"%@: saved keys %@", moment, PFBProbeSavedKeysText()],
-            [NSString stringWithFormat:@"%@: bar parts %@", moment, PFBProbePartsText()],
+            [NSString stringWithFormat:@"%@: customize tabs %@ · Twitter's names for its panels %@", moment,
+                                       PFBProbeCustomizeTabsText(), PFBProbePanelNamesText(panels)],
+            [NSString stringWithFormat:@"%@: bar parts %@ · first tab %@", moment, PFBProbePartsText(),
+                                       PFBProbeFirstTabText()],
         ] mutableCopy];
         for (NSInteger i = 0; i < PFBProbePartCount; i++) {
             [lines addObject:[NSString stringWithFormat:@"%@: writes to the %@: %@", moment, kPFBProbePartNames[i],
@@ -1094,6 +1303,80 @@ static void PFBProbeStart(void) {
                           [NSString stringWithFormat:@"%.0f,%.0f", position.x, position.y]);
     }
     %orig;
+}
+
+%end
+
+// The switches Twitter's tab gate reads, and those named subscriptions_ read elsewhere, as
+// Twitter receives them: PrimeFreeBird's answers included.
+%hook TFSFeatureSwitches
+
+- (BOOL)boolForKey:(NSString*)key {
+    BOOL value = %orig;
+    if (gProbeInGate || [key hasPrefix:@"subscriptions_"]) {
+        PFBProbeNoteSwitchRead(key, value ? @"YES" : @"NO");
+    }
+    return value;
+}
+
+- (NSInteger)integerForKey:(NSString*)key {
+    NSInteger value = %orig;
+    if (gProbeInGate) {
+        PFBProbeNoteSwitchRead(key, [NSString stringWithFormat:@"%ld", (long)value]);
+    }
+    return value;
+}
+
+- (NSNumber*)numberForKey:(NSString*)key {
+    NSNumber* value = %orig;
+    if (gProbeInGate) {
+        PFBProbeNoteSwitchRead(key, [value description]);
+    }
+    return value;
+}
+
+- (id)rawValueForKey:(NSString*)key {
+    id value = %orig;
+    if (gProbeInGate) {
+        PFBProbeNoteSwitchRead(key, PFBProbeShort(value, 40));
+    }
+    return value;
+}
+
+%end
+
+%hook TFSInstrumentedFeatureSwitches
+
+- (BOOL)boolForKey:(NSString*)key {
+    BOOL value = %orig;
+    if (gProbeInGate || [key hasPrefix:@"subscriptions_"]) {
+        PFBProbeNoteSwitchRead(key, value ? @"YES" : @"NO");
+    }
+    return value;
+}
+
+- (NSInteger)integerForKey:(NSString*)key {
+    NSInteger value = %orig;
+    if (gProbeInGate) {
+        PFBProbeNoteSwitchRead(key, [NSString stringWithFormat:@"%ld", (long)value]);
+    }
+    return value;
+}
+
+- (NSNumber*)numberForKey:(NSString*)key {
+    NSNumber* value = %orig;
+    if (gProbeInGate) {
+        PFBProbeNoteSwitchRead(key, [value description]);
+    }
+    return value;
+}
+
+- (id)rawValueForKey:(NSString*)key {
+    id value = %orig;
+    if (gProbeInGate) {
+        PFBProbeNoteSwitchRead(key, PFBProbeShort(value, 40));
+    }
+    return value;
 }
 
 %end
