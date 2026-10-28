@@ -696,6 +696,10 @@ static NSURL* PFBAccountAvatarURL(TFNTwitterAccount* account) {
         if ([key isEqualToString:@"restore_tab_labels"]) {
             PFBRestyleGlassTabBars();
         }
+        // Keeping or releasing the glass bar takes effect without leaving the settings.
+        if ([key isEqualToString:@"no_tab_bar_hiding"]) {
+            PFBGlassRefreshAlwaysVisible();
+        }
 
         // Neither applies at once: Record activity is read at launch, and the Tweet
         // button keeps its glyph until it loads its icon again.
