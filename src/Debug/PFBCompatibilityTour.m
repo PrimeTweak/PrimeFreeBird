@@ -29,9 +29,6 @@ static const NSTimeInterval kPFBTourDoorRetry = 2.5;
 // Left to the app after a step's setup and after its clean-up.
 static const NSTimeInterval kPFBTourSettle = 0.4;
 
-// Average duration of one step, for the duration the launch alert announces.
-static const NSTimeInterval kPFBTourSecondsPerStep = 3.6;
-
 // How many screens down Home is searched for a view of a given class.
 static const NSInteger kPFBTourScreensDown = 6;
 
@@ -754,17 +751,6 @@ static UIGestureRecognizer* tourGesture(UIView* root, NSString* action) {
       return NO;
     });
     return found;
-}
-
-// "about 25 s" or "about 1 min 30" for a number of steps.
-static NSString* tourDuration(NSUInteger steps) {
-    NSUInteger seconds = (NSUInteger)(steps * kPFBTourSecondsPerStep / 5.0 + 0.5) * 5;
-    if (seconds < 60) {
-        return [NSString stringWithFormat:@"about %lu s", (unsigned long)MAX(seconds, (NSUInteger)5)];
-    }
-    NSUInteger rest = seconds % 60;
-    return rest ? [NSString stringWithFormat:@"about %lu min %lu", (unsigned long)(seconds / 60), (unsigned long)rest]
-                : [NSString stringWithFormat:@"about %lu min", (unsigned long)(seconds / 60)];
 }
 
 // MARK: - Step checks
@@ -2484,32 +2470,6 @@ void PFBCompatScheduleTourAtLaunch(void) {
     [[NSUserDefaults standardUserDefaults] setBool:YES forKey:kPFBTourPendingKey];
 }
 
-// On a new Twitter binary, once per launch until a full tour has run on it.
-static void tourAskAtLaunch(void) {
-    UIViewController* top = tourTopController();
-    if (gPFBTourRunning || !top) {
-        return;
-    }
-    NSString* version = NSBundle.mainBundle.infoDictionary[@"CFBundleShortVersionString"] ?: @"";
-    NSUInteger screens = tourSteps(YES).count;
-    UIAlertController* alert = [UIAlertController
-        alertControllerWithTitle:[NSString stringWithFormat:@"Check Twitter %@", version]
-                         message:[NSString stringWithFormat:@"Check every option on this version. The tour opens "
-                                                            @"%lu screens on its own, %@. Cancel stops it at "
-                                                            @"any time.",
-                                                            (unsigned long)screens, tourDuration(screens)]
-                  preferredStyle:UIAlertControllerStyleAlert];
-    [alert addAction:[UIAlertAction actionWithTitle:@"Later" style:UIAlertActionStyleCancel handler:nil]];
-    UIAlertAction* now = [UIAlertAction actionWithTitle:@"Check now"
-                                                  style:UIAlertActionStyleDefault
-                                                handler:^(__unused UIAlertAction* action) {
-                                                  PFBCompatRunTour();
-                                                }];
-    [alert addAction:now];
-    alert.preferredAction = now;
-    [top presentViewController:alert animated:YES completion:nil];
-}
-
 // A journal without its end line means Twitter closed during the tour. On the same
 // build, the step then running is recorded as having closed Twitter; a palette it
 // switched comes back either way.
@@ -2567,8 +2527,8 @@ static void tourRecoverStop(void) {
 }
 
 // Once the app is active after launch: a tour Twitter closed is recorded, then a tour
-// asked for before quitting runs, or a new Twitter binary asks whether to check it. The
-// options a step had switched are put back first, before Twitter reads them.
+// asked for before quitting runs. The options a step had switched are put back first,
+// before Twitter reads them.
 void PFBCompatTourResumeAtLaunch(void) {
     tourRestoreOptions(@"at launch, after a tour Twitter closed");
     __block id observer = [[NSNotificationCenter defaultCenter]
@@ -2581,13 +2541,12 @@ void PFBCompatTourResumeAtLaunch(void) {
                   tourRecoverStop();
                   BOOL scheduled = [[NSUserDefaults standardUserDefaults] boolForKey:kPFBTourPendingKey];
                   [[NSUserDefaults standardUserDefaults] removeObjectForKey:kPFBTourPendingKey];
+                  if (!scheduled) {
+                      return;
+                  }
                   dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(kPFBTourLaunchDelay * NSEC_PER_SEC)),
                                  dispatch_get_main_queue(), ^{
-                                   if (scheduled) {
-                                       PFBCompatRunTour();
-                                   } else if (PFBCompatCheckIsDue()) {
-                                       tourAskAtLaunch();
-                                   }
+                                   PFBCompatRunTour();
                                  });
                 }];
 }
