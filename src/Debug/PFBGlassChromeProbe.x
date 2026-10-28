@@ -1,5 +1,6 @@
-// Measures what is still unknown under Twitter's own Liquid Glass: what shrinks the tab
-// bar while Home scrolls (Always visible) and what builds its tabs (Customize tabs).
+// Measures what is still unknown under Twitter's own Liquid Glass: the tab bar's parts once
+// it has collapsed on Home and which code places each part (Always visible, a taller bar for
+// Tab labels), and what Customize tabs makes of Twitter's panels.
 //
 // Each scroll and a summary at 25 s and 60 s go to MEASUREMENTS, which the stethoscope
 // copies with the Compatibility report. The hooks are installed after every other file's,
@@ -282,6 +283,51 @@ static Class gProbeItemClass;
 static Class gProbePortalClass;
 static Class gProbeCarriedClass;
 static Class gProbePillClass;
+static Class gProbeBadgesClass;
+
+// A view of the bar by class, place in the bar, and what hides or clips it.
+static NSString* PFBProbeViewText(UIView* view, UIView* bar) {
+    CGRect frame = [view convertRect:view.bounds toView:bar];
+    NSMutableString* text = [NSMutableString stringWithFormat:@"%@ %.0f,%.0f %.0fx%.0f", PFBProbeName([view class]),
+                                                               frame.origin.x, frame.origin.y, frame.size.width,
+                                                               frame.size.height];
+    if (view.alpha < 0.99) {
+        [text appendFormat:@" alpha %.2f", view.alpha];
+    }
+    if (view.hidden) {
+        [text appendString:@" hidden"];
+    }
+    if (view.clipsToBounds) {
+        [text appendString:@" clips"];
+    }
+    if (view.layer.mask) {
+        CGRect mask = view.layer.mask.frame;
+        [text appendFormat:@" mask %.0f,%.0f %.0fx%.0f", mask.origin.x, mask.origin.y, mask.size.width, mask.size.height];
+    }
+    return text;
+}
+
+// Each part of the bar, with the tabs a part holds: where each sits and whether it shows.
+static NSString* PFBProbeCollapsedText(UIView* bar) {
+    NSMutableArray<NSString*>* parts = [NSMutableArray array];
+    for (UIView* child in [bar.subviews.firstObject subviews]) {
+        NSMutableString* part = [PFBProbeViewText(child, bar) mutableCopy];
+        NSMutableArray<NSString*>* tabs = [NSMutableArray array];
+        PFBWalkAllSubviews(child, 2, ^(UIView* view) {
+          if (gProbeItemClass && [view isKindOfClass:gProbeItemClass]) {
+              CGRect frame = [view convertRect:view.bounds toView:bar];
+              [tabs addObject:[NSString stringWithFormat:@"x%.0f w%.0f%@%@", frame.origin.x, frame.size.width,
+                                                         view.alpha < 0.99 ? [NSString stringWithFormat:@" a%.2f", view.alpha] : @"",
+                                                         view.hidden ? @" hidden" : @""]];
+          }
+        });
+        if (tabs.count) {
+            [part appendFormat:@" [%@]", [tabs componentsJoinedByString:@", "]];
+        }
+        [parts addObject:part];
+    }
+    return [parts componentsJoinedByString:@" | "];
+}
 
 static BOOL PFBProbeOnScreen(UIView* view) {
     UIWindow* window = view.window;
@@ -320,6 +366,123 @@ static NSString* PFBProbeTabsText(UIView* bar) {
         [names addObject:item.accessibilityLabel.length ? item.accessibilityLabel : @"?"];
     }
     return [NSString stringWithFormat:@"[%@]", [names componentsJoinedByString:@", "]];
+}
+
+// MARK: - Who places the bar's parts
+
+// The parts whose geometry writes are counted. The hooks compare addresses, and only a match
+// is checked against the weak copy, so a freed part's address taken by a new object is not
+// counted. Each part is taken again from the bar on each of its layouts and each sample.
+enum {
+    PFBProbeBarPart,
+    PFBProbePlatterPart,
+    PFBProbePillPart,
+    PFBProbeLensPart,
+    PFBProbeRowPart,
+    PFBProbeTabPart,
+    PFBProbePortalPart,
+    PFBProbeCarriedPart,
+    PFBProbeBadgesPart,
+    PFBProbeAccessoryPart,
+    PFBProbePartCount
+};
+static NSString* const kPFBProbePartNames[PFBProbePartCount] = {@"bar", @"platter", @"pill", @"lens", @"row",
+                                                                @"tab", @"portal", @"carried row", @"badges",
+                                                                @"accessory"};
+static __unsafe_unretained UIView* gProbeParts[PFBProbePartCount];
+static __weak UIView* gProbePartRefs[PFBProbePartCount];
+static __unsafe_unretained CALayer* gProbePlatterLayer;
+static __weak CALayer* gProbePlatterLayerRef;
+static BOOL gProbeWatching;
+
+// The first direct child of the bar's container that is of a class.
+static UIView* PFBProbeChildOfClass(UIView* container, Class cls) {
+    for (UIView* sub in container.subviews) {
+        if (cls && [sub isKindOfClass:cls]) {
+            return sub;
+        }
+    }
+    return nil;
+}
+
+static void PFBProbeNoteParts(UIView* bar) {
+    UIView* container = bar.subviews.firstObject;
+    UIView* pill = PFBProbeChildOfClass(container, gProbePillClass);
+    UIView* tab = PFBProbeRestingItems(bar).firstObject;
+    UIView* platter = container.subviews.firstObject;
+    UIView* parts[PFBProbePartCount] = {bar,
+                                        platter,
+                                        pill,
+                                        pill.subviews.firstObject,
+                                        tab.superview,
+                                        tab,
+                                        PFBProbeChildOfClass(container, gProbePortalClass),
+                                        PFBProbeChildOfClass(container, gProbeCarriedClass),
+                                        PFBProbeChildOfClass(container, gProbeBadgesClass),
+                                        gProbeAccessory};
+    for (NSInteger i = 0; i < PFBProbePartCount; i++) {
+        gProbeParts[i] = parts[i];
+        gProbePartRefs[i] = parts[i];
+    }
+    gProbePlatterLayer = platter.layer;
+    gProbePlatterLayerRef = platter.layer;
+    gProbeWatching = YES;
+}
+
+static NSInteger PFBProbePartIndex(id object) {
+    for (NSInteger i = 0; i < PFBProbePartCount; i++) {
+        if (gProbeParts[i] && gProbeParts[i] == object) {
+            return gProbePartRefs[i] == object ? i : -1;
+        }
+    }
+    return -1;
+}
+
+static BOOL PFBProbeIsPlatterLayer(CALayer* layer) {
+    return gProbePlatterLayer && gProbePlatterLayer == layer && gProbePlatterLayerRef == layer;
+}
+
+static NSString* PFBProbeRectText(CGRect rect) {
+    return [NSString stringWithFormat:@"%.0f,%.0f %.0fx%.0f", rect.origin.x, rect.origin.y, rect.size.width,
+                                      rect.size.height];
+}
+
+static void PFBProbeNoteWrite(NSInteger index, NSString* what, const void* sender, NSString* value) {
+    if (index >= 0 && index < PFBProbePartCount) {
+        PFBProbeCount([NSString stringWithFormat:@"%@ %@", kPFBProbePartNames[index], what], sender, value);
+    }
+}
+
+// Each part with its class and place in the bar.
+static NSString* PFBProbePartsText(void) {
+    UIView* bar = gProbeBar;
+    if (!bar) {
+        return @"no bar";
+    }
+    NSMutableArray<NSString*>* parts = [NSMutableArray array];
+    for (NSInteger i = 0; i < PFBProbePartCount; i++) {
+        UIView* part = gProbePartRefs[i];
+        BOOL inBar = part && (part == bar || [part isDescendantOfView:bar] || part == gProbeAccessory);
+        [parts addObject:[NSString stringWithFormat:@"%@ %@", kPFBProbePartNames[i],
+                                                    inBar ? PFBProbeViewText(part, bar) : @"none"]];
+    }
+    return [parts componentsJoinedByString:@" | "];
+}
+
+// Every geometry write counted on one part.
+static NSString* PFBProbeWritesText(NSInteger index) {
+    NSMutableArray<NSString*>* writes = [NSMutableArray array];
+    NSMutableArray<NSString*>* kinds = [@[ @"frame", @"bounds", @"center", @"transform" ] mutableCopy];
+    if (index == PFBProbePlatterPart) {
+        [kinds addObjectsFromArray:@[ @"layer bounds", @"layer position" ]];
+    }
+    for (NSString* kind in kinds) {
+        NSString* name = [NSString stringWithFormat:@"%@ %@", kPFBProbePartNames[index], kind];
+        if (gProbeTallies[name].total) {
+            [writes addObject:[NSString stringWithFormat:@"%@ %@", kind, PFBProbeTallyText(name)]];
+        }
+    }
+    return writes.count ? [writes componentsJoinedByString:@" · "] : @"none";
 }
 
 static id PFBProbeAppNavigation(void) {
@@ -530,6 +693,7 @@ static NSString* PFBProbeRangeText(PFBProbeRange range) {
 @property(nonatomic) double narrowest;
 @property(nonatomic, copy) NSString* peakApplied;
 @property(nonatomic, copy) NSString* peakProgress;
+@property(nonatomic) BOOL collapsedNoted;
 @end
 
 @implementation PFBProbeScrollWindow
@@ -544,6 +708,7 @@ static NSString* PFBProbeRangeText(PFBProbeRange range) {
 static PFBProbeSampler* gProbeSampler;
 static NSUInteger gProbeScrollWindows;
 static NSUInteger gProbeShrunkWindows;
+static NSUInteger gProbeCollapsedNotes;
 
 static NSString* PFBProbeScrollText(PFBProbeScrollWindow* w) {
     NSUInteger barLayouts = gProbeTallies[@"bar layout"].total - w.barLayoutsBefore;
@@ -662,7 +827,9 @@ static id PFBProbeEngine(void) {
     if (top.window) {
         PFBProbeWiden(&w->topY, [top convertRect:top.bounds toView:nil].origin.y);
     }
-    PFBProbeWiden(&w->applied, PFBProbeDouble(bar, "appliedCollapse"));
+    PFBProbeNoteParts(bar);
+    double applied = PFBProbeDouble(bar, "appliedCollapse");
+    PFBProbeWiden(&w->applied, applied);
     id engine = PFBProbeEngine();
     PFBProbeWiden(&w->progress, PFBProbeDouble(engine, "collapseProgress"));
     PFBProbeWiden(&w->extent, PFBProbeDouble(engine, "bottomChromeExtent"));
@@ -674,6 +841,18 @@ static id PFBProbeEngine(void) {
         w.narrowest = width;
         w.peakApplied = PFBProbeHex(bar, "appliedCollapse", 24);
         w.peakProgress = engine ? PFBProbeHex(engine, "collapseProgress", 24) : @"no engine";
+    }
+    // The bar's parts once fully collapsed, once per scroll, with how its glass got there.
+    if (!w.collapsedNoted && !isnan(applied) && applied >= 0.99 && gProbeCollapsedNotes < 4) {
+        w.collapsedNoted = YES;
+        gProbeCollapsedNotes++;
+        UIView* host = gProbeAccessory;
+        PFBCompatMeasure(kPFBProbeTopic,
+                         [NSString stringWithFormat:@"collapsed on %@: %@ · accessory %@ · glass writes: %@", w.screen,
+                                                    PFBProbeCollapsedText(bar),
+                                                    host.window ? PFBProbeViewText(host, bar) : @"none",
+                                                    PFBProbeWritesText(PFBProbePlatterPart)],
+                         60);
     }
 }
 
@@ -726,7 +905,7 @@ static void PFBProbePersist(NSString* moment) {
         for (NSString* name in [gProbeScreens.allKeys sortedArrayUsingSelector:@selector(compare:)]) {
             [screens addObject:[NSString stringWithFormat:@"%@: %@", name, gProbeScreens[name]]];
         }
-        NSArray<NSString*>* lines = @[
+        NSMutableArray<NSString*>* lines = [@[
             [NSString stringWithFormat:@"%@: %@", moment, PFBProbeSettingsText()],
             [NSString stringWithFormat:@"%@: tabs %@, panels %@, current %lld · changes %@ · visiblePanelIDs %@ · "
                                        @"recalculate %@ · recalculate with %@",
@@ -738,7 +917,12 @@ static void PFBProbePersist(NSString* moment) {
                                        screens.count ? [screens componentsJoinedByString:@" | "] : @"none",
                                        (unsigned long)gProbeScrollWindows, (unsigned long)gProbeShrunkWindows],
             [NSString stringWithFormat:@"%@: saved keys %@", moment, PFBProbeSavedKeysText()],
-        ];
+            [NSString stringWithFormat:@"%@: bar parts %@", moment, PFBProbePartsText()],
+        ] mutableCopy];
+        for (NSInteger i = 0; i < PFBProbePartCount; i++) {
+            [lines addObject:[NSString stringWithFormat:@"%@: writes to the %@: %@", moment, kPFBProbePartNames[i],
+                                                        PFBProbeWritesText(i)]];
+        }
         for (NSString* line in lines) {
             PFBCompatMeasure(kPFBProbeTopic, line, 60);
         }
@@ -752,6 +936,7 @@ static void PFBProbeStart(void) {
     gProbePortalClass = NSClassFromString(@"_TtC11XNavigation16TabBarPortalView");
     gProbeCarriedClass = NSClassFromString(@"_TtC11XNavigation16TabBarCarriedRow");
     gProbePillClass = NSClassFromString(@"_TtC11XNavigation10TabBarPill");
+    gProbeBadgesClass = NSClassFromString(@"_TtC11XNavigation18TabBarBadgeOverlay");
     for (NSNumber* moment in @[ @25, @60 ]) {
         dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(moment.doubleValue * NSEC_PER_SEC)),
                        dispatch_get_main_queue(), ^{
@@ -821,6 +1006,7 @@ static void PFBProbeStart(void) {
     if (bar == gProbeBar) {
         @try {
             PFBProbeNoteTabs(bar);
+            PFBProbeNoteParts(bar);
         } @catch (__unused id exception) {
         }
     }
@@ -842,9 +1028,72 @@ static void PFBProbeStart(void) {
 - (void)layoutSubviews {
     %orig;
     UIView* host = (UIView*)self;
-    if (host.frame.size.width > 0 && PFBProbeOnScreen(host)) {
+    if (host.frame.size.width > 0 && PFBProbeOnScreen(host) && host != gProbeAccessory) {
         gProbeAccessory = host;
+        gProbeParts[PFBProbeAccessoryPart] = host;
+        gProbePartRefs[PFBProbeAccessoryPart] = host;
     }
+}
+
+%end
+
+// The writes that place the bar's parts, each charged to the code that sent it.
+%hook UIView
+
+- (void)setFrame:(CGRect)frame {
+    NSInteger index = gProbeWatching ? PFBProbePartIndex(self) : -1;
+    if (index >= 0) {
+        PFBProbeNoteWrite(index, @"frame", __builtin_return_address(0), PFBProbeRectText(frame));
+    }
+    %orig;
+}
+
+- (void)setBounds:(CGRect)bounds {
+    NSInteger index = gProbeWatching ? PFBProbePartIndex(self) : -1;
+    if (index >= 0) {
+        PFBProbeNoteWrite(index, @"bounds", __builtin_return_address(0), PFBProbeRectText(bounds));
+    }
+    %orig;
+}
+
+- (void)setCenter:(CGPoint)center {
+    NSInteger index = gProbeWatching ? PFBProbePartIndex(self) : -1;
+    if (index >= 0) {
+        PFBProbeNoteWrite(index, @"center", __builtin_return_address(0),
+                          [NSString stringWithFormat:@"%.0f,%.0f", center.x, center.y]);
+    }
+    %orig;
+}
+
+- (void)setTransform:(CGAffineTransform)transform {
+    NSInteger index = gProbeWatching ? PFBProbePartIndex(self) : -1;
+    if (index >= 0) {
+        PFBProbeNoteWrite(index, @"transform", __builtin_return_address(0),
+                          [NSString stringWithFormat:@"a%.2f d%.2f tx%.0f ty%.0f", transform.a, transform.d,
+                                                     transform.tx, transform.ty]);
+    }
+    %orig;
+}
+
+%end
+
+// The platter's own layer, where Core Animation writes when the view is skipped.
+%hook CALayer
+
+- (void)setBounds:(CGRect)bounds {
+    if (PFBProbeIsPlatterLayer(self)) {
+        PFBProbeNoteWrite(PFBProbePlatterPart, @"layer bounds", __builtin_return_address(0),
+                          [NSString stringWithFormat:@"%.0fx%.0f", bounds.size.width, bounds.size.height]);
+    }
+    %orig;
+}
+
+- (void)setPosition:(CGPoint)position {
+    if (PFBProbeIsPlatterLayer(self)) {
+        PFBProbeNoteWrite(PFBProbePlatterPart, @"layer position", __builtin_return_address(0),
+                          [NSString stringWithFormat:@"%.0f,%.0f", position.x, position.y]);
+    }
+    %orig;
 }
 
 %end
