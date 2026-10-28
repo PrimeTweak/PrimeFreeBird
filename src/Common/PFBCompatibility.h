@@ -242,6 +242,7 @@ typedef NS_ENUM(NSInteger, PFBCompatPath) {
     PFBCompatPath_leaving_app,
     PFBCompatPath_glass_tab_bar,
     PFBCompatPath_glass_tweet_button,
+    PFBCompatPath_glass_tabs,
     PFBCompatPathCount,
 };
 

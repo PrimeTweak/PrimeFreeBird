@@ -222,6 +222,7 @@ static const PFBCompatPathMeta kPaths[] = {
     {PFBCompatPath_leaving_app, PFBCompat_padlock, "leaving the app"},
     {PFBCompatPath_glass_tab_bar, PFBCompat_tab_bar_theming, "glass tab bar"},
     {PFBCompatPath_glass_tweet_button, PFBCompat_restore_tweet_button, "glass Tweet button"},
+    {PFBCompatPath_glass_tabs, PFBCompat_custom_tab_bar, "glass tab bar"},
 };
 static const size_t kPathCount = sizeof(kPaths) / sizeof(kPaths[0]);
 
@@ -1103,6 +1104,10 @@ static const PFBCompatReq kReqs[] = {
     {PFBCompat_direct_save, "TFSTwitterEntityMediaVideoVariant", "-contentType"},
     {PFBCompat_custom_fonts, "TFNActiveTextItem", "-initWithTextModel:activeRanges:"},
     {PFBCompat_custom_tab_bar, "T1PanelIdentity", "+iconImageNameForPanelID:"},
+    {PFBCompat_custom_tab_bar, "T1PanelIdentity", "+localizedNameForPanelID:"},
+    {PFBCompat_custom_tab_bar, "T1PanelIdentity", "+stringForPanelID:"},
+    {PFBCompat_custom_tab_bar, "_TtC14T1TwitterSwift20XTabbedAppNavigation", "-visiblePanelIDs"},
+    {PFBCompat_custom_tab_bar, "_TtC14T1TwitterSwift20XTabbedAppNavigation", "-recalculateVisiblePanels"},
     {PFBCompat_enable_liquid_glass, "T1PanelIdentity", "+iconImageNameForPanelID:"},
     {PFBCompat_web_session, "T1WebViewController", "-initWithRootURL:account:shouldAuthenticate:shouldPresentAsNativePage:sourceStatus:scribeComponent:scribeParameters:"},
     {PFBCompat_advanced_search, "UIImage", "+tfn_vectorImageNamed:fitsSize:fillColor:"},
@@ -1447,6 +1452,8 @@ static const PFBCompatName kNames[] = {
     {PFBCompatOptionCount, "Features/Appearance/CustomTabBar/PFBCustomTabBarCell.m", "titleLabel"},
     {PFBCompatOptionCount, "Features/Appearance/CustomTabBar/PFBCustomTabBarUtility.m", "imageName"},
     {PFBCompatOptionCount, "Features/Appearance/CustomTabBar/PFBCustomTabBarUtility.m", "title"},
+    {PFBCompat_custom_tab_bar, "Features/Appearance/CustomTabBar/PFBCustomTabBarUtility.m", "appNavigation"},
+    {PFBCompat_custom_tab_bar, "Features/Appearance/CustomTabBar/PFBCustomTabBarUtility.m", "recalculateVisiblePanels"},
     {PFBCompatOptionCount, "Features/Appearance/CustomTabBar/PFBCustomTabBarViewController.m", "recalculateVisiblePanels"},
     {PFBCompatOptionCount, "Features/Appearance/CustomTabBar/PFBCustomTabBarViewController.m", "titleLabel"},
     {PFBCompatOptionCount, "Features/Appearance/CustomTabBar/CustomTabBarNativeColors.m", "itemColor"},
@@ -2071,6 +2078,8 @@ static const PFBCompatDeclared kDeclared[] = {
     {"Support/TAEHeaders.h", "TFNUIDefaultFontGroup", "sharedFontGroup"},
     {"Support/TFSHeaders.h", "NSNumber", "tfs_twitterAbbreviated"},
     {"Support/T1Headers.h", "T1PanelIdentity", "iconImageNameForPanelID:"},
+    {"Support/T1Headers.h", "T1PanelIdentity", "localizedNameForPanelID:"},
+    {"Support/T1Headers.h", "T1PanelIdentity", "stringForPanelID:"},
     {"Support/T1Headers.h", "T1WebViewController", "initWithRootURL:account:shouldAuthenticate:shouldPresentAsNativePage:sourceStatus:scribeComponent:scribeParameters:"},
     {"Support/TFNHeaders.h", "TFNActiveTextItem", "initWithTextModel:activeRanges:"},
     {"Support/TFNHeaders.h", "TFNHUD", "initWithText:"},
