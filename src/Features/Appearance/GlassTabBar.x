@@ -29,6 +29,7 @@ static const CGFloat kPFBGlassLabelHeight = 12.0;
 static const void* kPFBGlassLabelKey = &kPFBGlassLabelKey;
 static const void* kPFBGlassLiftKey = &kPFBGlassLiftKey;
 static const void* kPFBGlassTintKey = &kPFBGlassTintKey;
+static const void* kPFBGlassOwnTintKey = &kPFBGlassOwnTintKey;
 
 static BOOL PFBGlassIsLensRow(UIView* view) {
     return (gPFBGlassPortalClass && [view isKindOfClass:gPFBGlassPortalClass]) ||
@@ -130,6 +131,8 @@ static void PFBGlassLift(UIView* view, BOOL lifted) {
 }
 
 // The lens rows take the accent with Selected tab on; the resting row keeps Twitter's gray.
+// Twitter's own tint is kept and put back with the option off: the glyph would otherwise
+// inherit the window's tint, which carries the accent.
 static void PFBGlassTintGlyph(UIImageView* glyph, BOOL lens) {
     BOOL wanted = lens && [PFBSettings boolForKey:@"tab_bar_theming"];
     if (lens) {
@@ -142,13 +145,19 @@ static void PFBGlassTintGlyph(UIImageView* glyph, BOOL lens) {
     UIColor* applied = objc_getAssociatedObject(glyph, kPFBGlassTintKey);
     if (wanted) {
         UIColor* accent = PFBBrandAccentColor();
-        if (![applied isEqual:accent] || ![glyph.tintColor isEqual:accent]) {
+        UIColor* current = glyph.tintColor;
+        if (![applied isEqual:accent] || ![current isEqual:accent]) {
+            // A tint other than the one written here is Twitter's latest.
+            if (!applied || ![current isEqual:applied]) {
+                objc_setAssociatedObject(glyph, kPFBGlassOwnTintKey, current, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+            }
             glyph.tintColor = accent;
             objc_setAssociatedObject(glyph, kPFBGlassTintKey, accent, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
         }
     } else if (applied) {
-        glyph.tintColor = nil;
+        glyph.tintColor = objc_getAssociatedObject(glyph, kPFBGlassOwnTintKey);
         objc_setAssociatedObject(glyph, kPFBGlassTintKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        objc_setAssociatedObject(glyph, kPFBGlassOwnTintKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     }
 }
 
@@ -234,6 +243,101 @@ static void PFBGlassLiftBadges(UIView* bar) {
       }
     });
 }
+
+static void PFBGlassForEachWindow(void (^block)(UIWindow* window)) {
+    for (UIScene* scene in UIApplication.sharedApplication.connectedScenes) {
+        if (![scene isKindOfClass:[UIWindowScene class]]) {
+            continue;
+        }
+        for (UIWindow* window in ((UIWindowScene*)scene).windows) {
+            block(window);
+        }
+    }
+}
+
+// Every glass tab styled again now: a setting changed while the bar is on screen
+// otherwise waits for Twitter's next layout of the tabs.
+void PFBRestyleGlassTabBars(void) {
+    PFBGlassFindClasses();
+    if (!gPFBGlassBarClass) {
+        return;
+    }
+    PFBGlassForEachWindow(^(UIWindow* window) {
+      PFBWalkAllSubviews(window, 12, ^(UIView* view) {
+        if (![view isKindOfClass:gPFBGlassBarClass]) {
+            return;
+        }
+        PFBGlassLiftBadges(view);
+        PFBWalkAllSubviews(view, 5, ^(UIView* inner) {
+          if ([inner isKindOfClass:gPFBGlassItemClass]) {
+              PFBGlassStyleTab(inner);
+          }
+        });
+      });
+    });
+}
+
+// Twitter keeps its glass tab bar over the settings, which never show the bar under
+// the old design. Its whole chrome, compose button included, is hidden meanwhile.
+static const void* kPFBGlassChromeHiddenKey = &kPFBGlassChromeHiddenKey;
+static BOOL gPFBGlassChromeHidden;
+
+void PFBGlassTabBarHideForSettings(BOOL hidden) {
+    static Class chromeClass;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+      chromeClass = NSClassFromString(@"_TtC11XNavigation25TabBarChromeContainerView");
+    });
+    if (!chromeClass || (!hidden && !gPFBGlassChromeHidden)) {
+        return;
+    }
+    gPFBGlassChromeHidden = hidden;
+    PFBGlassForEachWindow(^(UIWindow* window) {
+      PFBWalkAllSubviews(window, 12, ^(UIView* view) {
+        // The outermost chrome view holds the bar and the compose button; the
+        // chrome views inside it are left alone.
+        if (![view isKindOfClass:chromeClass] || [view.superview isKindOfClass:chromeClass]) {
+            return;
+        }
+        BOOL ours = objc_getAssociatedObject(view, kPFBGlassChromeHiddenKey) != nil;
+        if (hidden && !view.hidden) {
+            view.hidden = YES;
+            objc_setAssociatedObject(view, kPFBGlassChromeHiddenKey, @YES, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+            PFBCompatReach(PFBCompatPath_settings_tab_bar);
+            PFBCOMPAT_ACTION(PFBCompat_custom_tab_bar, @"glass tab bar hidden in the settings");
+        } else if (!hidden && ours) {
+            view.hidden = NO;
+            objc_setAssociatedObject(view, kPFBGlassChromeHiddenKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        }
+      });
+    });
+}
+
+static BOOL PFBGlassStackHoldsSettings(UINavigationController* stack) {
+    Class settings = objc_getClass("T1GenericSettingsViewController");
+    for (UIViewController* screen in stack.viewControllers) {
+        if (settings && [screen isKindOfClass:settings]) {
+            return YES;
+        }
+    }
+    return NO;
+}
+
+// The settings can be left without their own exit running: a tab switch from a notification
+// or a link, or a pop to the stack's root. A screen of Twitter's glass navigation appearing on
+// a stack without settings shows the chrome again.
+%hook UIViewController
+
+- (void)viewDidAppear:(BOOL)animated {
+    %orig;
+    UIViewController* screen = (UIViewController*)self;
+    if (gPFBGlassChromeHidden && PFBOnNativeGlassStack(screen) &&
+        !PFBGlassStackHoldsSettings(screen.navigationController)) {
+        PFBGlassTabBarHideForSettings(NO);
+    }
+}
+
+%end
 
 %hook _TtC11XNavigation10TabBarView
 

@@ -1369,6 +1369,7 @@ static BOOL PFBViewTreeHasTabBar(UIView* root) {
 static void PFBReapplyChromeAccent(void) {
     void (^run)(void) = ^{
         PFBRetintRegisteredLogos();
+        PFBRestyleGlassTabBars();
         for (id scene in UIApplication.sharedApplication.connectedScenes) {
             if (![scene isKindOfClass:objc_getClass("UIWindowScene")]) {
                 continue;
@@ -1499,6 +1500,7 @@ void PFBSyncAccentTheme(void) {
     }
     PFBRestyleComposeFAB();
     PFBReapplyTabBarAccent();
+    PFBRestyleGlassTabBars();
     for (id scene in UIApplication.sharedApplication.connectedScenes) {
         if (![scene isKindOfClass:objc_getClass("UIWindowScene")]) {
             continue;
