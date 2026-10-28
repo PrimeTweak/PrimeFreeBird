@@ -5,6 +5,7 @@
 
 static const void* kPFBQuickMutedBtnKey = &kPFBQuickMutedBtnKey;
 static const void* kPFBQuickMutedGrayKey = &kPFBQuickMutedGrayKey;
+static const void* kPFBQuickMutedItemKey = &kPFBQuickMutedItemKey;
 
 // The avatar is the square view furthest to the left of the bar. Using it as the
 // reference makes the added button match Twitter's own vertical rhythm and
@@ -225,12 +226,69 @@ static void pfbPlaceHomeFiltersItem(UIViewController* home) {
             }
         }
         objc_setAssociatedObject(button, kPFBQuickMutedGrayKey, gray, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        // The item keeps the button, so Twitter setting its own right items puts it back.
+        objc_setAssociatedObject(item, kPFBQuickMutedItemKey, button, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
         if (![item.rightBarButtonItems containsObject:button]) {
             item.rightBarButtonItems = [(item.rightBarButtonItems ?: @[]) arrayByAddingObject:button];
         }
     } @catch (id exception) {
     }
 }
+
+// Twitter sets Home's right items as a whole once the screen is up, which drops the Filters
+// button: it is kept among the items Twitter sets.
+static NSArray* pfbHomeItemsKeepingFilters(UINavigationItem* item, NSArray* items) {
+    UIBarButtonItem* button = objc_getAssociatedObject(item, kPFBQuickMutedItemKey);
+    if (!button || [items containsObject:button]) {
+        return items;
+    }
+    PFBCOMPAT_ACTION(PFBCompat_muted_words, @"Home bar button put back");
+    return [(items ?: @[]) arrayByAddingObject:button];
+}
+
+// What Home's top bar holds 8 s after Home appears, once per launch: Twitter sets its own
+// right items again once the screen is up.
+static void pfbNoteHomeBarSoon(UIViewController* home) {
+    static BOOL noted;
+    if (noted) {
+        return;
+    }
+    noted = YES;
+    __weak UIViewController* weakHome = home;
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(8.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+      UIViewController* screen = weakHome;
+      UINavigationItem* item = screen.navigationItem;
+      if (!item) {
+          return;
+      }
+      UIBarButtonItem* button = objc_getAssociatedObject(item, kPFBQuickMutedItemKey);
+      NSUInteger groups = 0;
+      if (@available(iOS 16.0, *)) {
+          groups = item.trailingItemGroups.count;
+      }
+      PFBCompatMeasure(@"home filters",
+                       [NSString stringWithFormat:@"Home's item %@, button %@, %@ in the bar, right items %lu, "
+                                                  @"trailing groups %lu, top screen %@",
+                                                  button ? @"marked" : @"not marked",
+                                                  [item.rightBarButtonItems containsObject:button] ? @"in its items" : @"missing",
+                                                  button.customView.window ? @"drawn" : @"not drawn",
+                                                  (unsigned long)item.rightBarButtonItems.count, (unsigned long)groups,
+                                                  NSStringFromClass([screen.navigationController.topViewController class])],
+                       10);
+    });
+}
+
+%hook UINavigationItem
+
+- (void)setRightBarButtonItems:(NSArray*)items {
+    %orig(pfbHomeItemsKeepingFilters(self, items));
+}
+
+- (void)setRightBarButtonItems:(NSArray*)items animated:(BOOL)animated {
+    %orig(pfbHomeItemsKeepingFilters(self, items), animated);
+}
+
+%end
 
 %hook _TtC32TwitterHomeFeatureImplementation35HomeTimelineContainerViewController
 
@@ -247,6 +305,9 @@ static void pfbPlaceHomeFiltersItem(UIViewController* home) {
 - (void)viewDidAppear:(BOOL)animated {
     %orig;
     pfbPlaceHomeFiltersItem((UIViewController*)self);
+    if (PFBOnNativeGlassStack((UIViewController*)self)) {
+        pfbNoteHomeBarSoon((UIViewController*)self);
+    }
 }
 
 %end
