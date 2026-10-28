@@ -240,6 +240,8 @@ typedef NS_ENUM(NSInteger, PFBCompatPath) {
     PFBCompatPath_interface_text,
     PFBCompatPath_results_filters_button,
     PFBCompatPath_leaving_app,
+    PFBCompatPath_glass_tab_bar,
+    PFBCompatPath_glass_tweet_button,
     PFBCompatPathCount,
 };
 
