@@ -1,8 +1,12 @@
-// Twitter's own Liquid Glass tab bar. Each tab is drawn in three rows: the resting row,
-// the row seen through the glass lens over the selected tab, and the row the lens
-// carries while it is dragged. Selected tab colors the last two; Tab labels names tabs.
+// Twitter's own Liquid Glass tab bar, drawn in three rows: resting, the row seen through the
+// lens over the selected tab, and the row the lens carries while dragged. Selected tab colors
+// the lens rows; Tab labels names the tabs on a taller bar; Always visible keeps it from collapsing.
 
 #import "Support/HookHelpers.h"
+
+@interface _TtCC11XNavigation14CollapseEngine14ScrollObserver : NSObject
+- (void)handlePan:(UIPanGestureRecognizer*)recognizer;
+@end
 
 static Class gPFBGlassBarClass;
 static Class gPFBGlassItemClass;
@@ -21,15 +25,31 @@ static void PFBGlassFindClasses(void) {
     });
 }
 
-// Points the glyph rises when the name is shown, and the name's box under it.
-static const CGFloat kPFBGlassGlyphLift = 8.0;
-static const CGFloat kPFBGlassLabelTopFromBottom = 21.0;
-static const CGFloat kPFBGlassLabelHeight = 12.0;
+// Twitter's bar is 62 pt; Tab labels makes it 72 pt, where the glyph grows from 24 to 26 pt
+// and rises 9 pt over an 11 pt name. A bar under 70 pt fits a 10 pt name under a glyph risen 8 pt.
+static const CGFloat kPFBGlassExtraHeight = 10.0;
+
+typedef struct {
+    CGFloat lift;
+    CGFloat labelTopFromBottom;
+    CGFloat labelHeight;
+    CGFloat fontSize;
+    CGFloat glyphScale;
+} PFBGlassMetrics;
+
+static PFBGlassMetrics PFBGlassMetricsForHeight(CGFloat height) {
+    if (height >= 70.0) {
+        return (PFBGlassMetrics){9.0, 28.0, 14.0, 11.0, 26.0 / 24.0};
+    }
+    return (PFBGlassMetrics){8.0, 21.0, 12.0, 10.0, 1.0};
+}
 
 static const void* kPFBGlassLabelKey = &kPFBGlassLabelKey;
 static const void* kPFBGlassLiftKey = &kPFBGlassLiftKey;
 static const void* kPFBGlassTintKey = &kPFBGlassTintKey;
 static const void* kPFBGlassOwnTintKey = &kPFBGlassOwnTintKey;
+static const void* kPFBGlassGlyphSizeKey = &kPFBGlassGlyphSizeKey;
+static const void* kPFBGlassOwnGlyphSizeKey = &kPFBGlassOwnGlyphSizeKey;
 
 static BOOL PFBGlassIsLensRow(UIView* view) {
     return (gPFBGlassPortalClass && [view isKindOfClass:gPFBGlassPortalClass]) ||
@@ -112,22 +132,48 @@ static UIImageView* PFBGlassGlyph(UIView* item, UIView** holder) {
 }
 
 // Raises a view's content by shifting its bounds: whatever lays out its subviews, frames
-// and transforms included, the content moves with it.
-static void PFBGlassLift(UIView* view, BOOL lifted) {
+// and transforms included, the content moves with it. A lift of 0 puts it back.
+static void PFBGlassLift(UIView* view, CGFloat lift) {
     if (!view) {
         return;
     }
     BOOL wasLifted = objc_getAssociatedObject(view, kPFBGlassLiftKey) != nil;
-    if (!lifted && !wasLifted) {
+    if (lift <= 0.0 && !wasLifted) {
         return;
     }
     CGRect bounds = view.bounds;
-    CGFloat wanted = lifted ? kPFBGlassGlyphLift : 0.0;
-    if (bounds.origin.y != wanted) {
-        bounds.origin.y = wanted;
+    if (bounds.origin.y != lift) {
+        bounds.origin.y = lift;
         view.bounds = bounds;
     }
-    objc_setAssociatedObject(view, kPFBGlassLiftKey, lifted ? @YES : nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    objc_setAssociatedObject(view, kPFBGlassLiftKey, lift > 0.0 ? @YES : nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+}
+
+// Grows the glyph inside its own box, whose image Twitter scales to fit. Each layout of the
+// tab writes Twitter's size again; that size is kept, so the glyph never grows twice.
+static void PFBGlassSizeGlyph(UIImageView* glyph, CGFloat scale) {
+    NSValue* applied = objc_getAssociatedObject(glyph, kPFBGlassGlyphSizeKey);
+    if (scale == 1.0 && !applied) {
+        return;
+    }
+    CGSize current = glyph.bounds.size;
+    NSValue* own = objc_getAssociatedObject(glyph, kPFBGlassOwnGlyphSizeKey);
+    // A size other than the one written here is Twitter's latest.
+    CGSize base = applied && own && CGSizeEqualToSize(current, applied.CGSizeValue) ? own.CGSizeValue : current;
+    CGSize wanted = CGSizeMake(base.width * scale, base.height * scale);
+    if (CGSizeEqualToSize(current, wanted) && (scale != 1.0) == (applied != nil)) {
+        return;
+    }
+    if (!CGSizeEqualToSize(current, wanted)) {
+        CGRect bounds = glyph.bounds;
+        bounds.size = wanted;
+        glyph.bounds = bounds;
+    }
+    BOOL grown = scale != 1.0;
+    objc_setAssociatedObject(glyph, kPFBGlassGlyphSizeKey, grown ? [NSValue valueWithCGSize:wanted] : nil,
+                             OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    objc_setAssociatedObject(glyph, kPFBGlassOwnGlyphSizeKey, grown ? [NSValue valueWithCGSize:base] : nil,
+                             OBJC_ASSOCIATION_RETAIN_NONATOMIC);
 }
 
 // The lens rows take the accent with Selected tab on; the resting row keeps Twitter's gray.
@@ -161,13 +207,13 @@ static void PFBGlassTintGlyph(UIImageView* glyph, BOOL lens) {
     }
 }
 
-static UIFont* PFBGlassLabelFont(void) {
+static UIFont* PFBGlassLabelFont(CGFloat size) {
     SEL twitterFont = NSSelectorFromString(@"xdsDeprecated_customFontOfSize:weight:scalesWithDynamicType:");
     UIFont* font = nil;
     if ([UIFont respondsToSelector:twitterFont]) {
-        font = ((UIFont * (*)(id, SEL, CGFloat, NSInteger, BOOL))objc_msgSend)([UIFont class], twitterFont, 10.0, 1, NO);
+        font = ((UIFont * (*)(id, SEL, CGFloat, NSInteger, BOOL))objc_msgSend)([UIFont class], twitterFont, size, 1, NO);
     }
-    return [font isKindOfClass:[UIFont class]] ? font : [UIFont systemFontOfSize:10.0 weight:UIFontWeightMedium];
+    return [font isKindOfClass:[UIFont class]] ? font : [UIFont systemFontOfSize:size weight:UIFontWeightMedium];
 }
 
 // The name under the glyph, in the glyph's own color so it follows Twitter's gray, the
@@ -180,12 +226,15 @@ static void PFBGlassNameTab(UIView* item, UIView* holder, UIImageView* glyph, NS
             [label removeFromSuperview];
             objc_setAssociatedObject(item, kPFBGlassLabelKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
         }
-        PFBGlassLift(holder, NO);
+        PFBGlassLift(holder, 0.0);
+        PFBGlassSizeGlyph(glyph, 1.0);
         if (name.length) {
             PFBCOMPAT_OBSERVE(PFBCompat_restore_tab_labels, @"glass tab laid out");
         }
         return;
     }
+    CGRect bounds = item.bounds;
+    PFBGlassMetrics metrics = PFBGlassMetricsForHeight(CGRectGetHeight(bounds));
     if (!label) {
         label = [[UILabel alloc] init];
         label.backgroundColor = [UIColor clearColor];
@@ -197,7 +246,9 @@ static void PFBGlassNameTab(UIView* item, UIView* holder, UIImageView* glyph, NS
         objc_setAssociatedObject(item, kPFBGlassLabelKey, label, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
         [item addSubview:label];
     }
-    label.font = PFBGlassLabelFont();
+    if (label.font.pointSize != metrics.fontSize) {
+        label.font = PFBGlassLabelFont(metrics.fontSize);
+    }
     if (![label.text isEqualToString:name]) {
         label.text = name;
     }
@@ -205,13 +256,13 @@ static void PFBGlassNameTab(UIView* item, UIView* holder, UIImageView* glyph, NS
     if (![label.textColor isEqual:color]) {
         label.textColor = color;
     }
-    CGRect bounds = item.bounds;
-    CGRect frame = CGRectMake(0.0, CGRectGetMaxY(bounds) - kPFBGlassLabelTopFromBottom, CGRectGetWidth(bounds),
-                              kPFBGlassLabelHeight);
+    CGRect frame = CGRectMake(0.0, CGRectGetMaxY(bounds) - metrics.labelTopFromBottom, CGRectGetWidth(bounds),
+                              metrics.labelHeight);
     if (!CGRectEqualToRect(label.frame, frame)) {
         label.frame = frame;
     }
-    PFBGlassLift(holder, YES);
+    PFBGlassSizeGlyph(glyph, metrics.glyphScale);
+    PFBGlassLift(holder, metrics.lift);
     PFBCOMPAT_ACTION(PFBCompat_restore_tab_labels, @"name drawn under the glass icon");
 }
 
@@ -236,12 +287,39 @@ static void PFBGlassStyleTab(UIView* item) {
 // The badges sit over the glyphs, so they rise with them.
 static void PFBGlassLiftBadges(UIView* bar) {
     PFBGlassFindClasses();
-    BOOL labels = [PFBSettings boolForKey:@"restore_tab_labels"];
+    CGFloat lift = [PFBSettings boolForKey:@"restore_tab_labels"]
+                       ? PFBGlassMetricsForHeight(CGRectGetHeight(bar.bounds)).lift
+                       : 0.0;
     PFBWalkAllSubviews(bar, 4, ^(UIView* view) {
       if (gPFBGlassBadgesClass && [view isKindOfClass:gPFBGlassBadgesClass]) {
-          PFBGlassLift(view, labels);
+          PFBGlassLift(view, lift);
       }
     });
+}
+
+// Customize tabs will prove itself on the bar Twitter draws: its tabs must be the chosen ones,
+// in their order. Nothing drives the glass bar yet, so this only measures the two lists; a match
+// is not counted as working, since the tabs would match on their own. Each new set is logged once.
+static void PFBGlassCheckChosenTabs(UIView* bar) {
+    static NSArray<NSString*>* checked;
+    static CFTimeInterval lastLook;
+    CFTimeInterval now = CACurrentMediaTime();
+    if (now - lastLook < 1.0) {
+        return;
+    }
+    lastLook = now;
+    NSArray<NSString*>* shown = PFBGlassTabNames(bar);
+    if (!shown.count || [shown isEqualToArray:checked]) {
+        return;
+    }
+    checked = shown;
+    PFBCompatReach(PFBCompatPath_glass_tabs);
+    NSArray<NSString*>* chosen = [PFBCustomTabBarUtility chosenTabNames];
+    PFBCompatMeasure(@"customize tabs",
+                     [NSString stringWithFormat:@"glass bar [%@] · chosen [%@] · %@", [shown componentsJoinedByString:@", "],
+                                                [chosen componentsJoinedByString:@", "],
+                                                [shown isEqualToArray:chosen] ? @"match" : @"differ"],
+                     6);
 }
 
 static void PFBGlassForEachWindow(void (^block)(UIWindow* window)) {
@@ -256,7 +334,7 @@ static void PFBGlassForEachWindow(void (^block)(UIWindow* window)) {
 }
 
 // Every glass tab styled again now: a setting changed while the bar is on screen
-// otherwise waits for Twitter's next layout of the tabs.
+// otherwise waits for Twitter's next layout of the tabs. The bar takes its new height too.
 void PFBRestyleGlassTabBars(void) {
     PFBGlassFindClasses();
     if (!gPFBGlassBarClass) {
@@ -267,6 +345,8 @@ void PFBRestyleGlassTabBars(void) {
         if (![view isKindOfClass:gPFBGlassBarClass]) {
             return;
         }
+        [view invalidateIntrinsicContentSize];
+        [view.superview setNeedsLayout];
         PFBGlassLiftBadges(view);
         PFBWalkAllSubviews(view, 5, ^(UIView* inner) {
           if ([inner isKindOfClass:gPFBGlassItemClass]) {
@@ -323,6 +403,167 @@ static BOOL PFBGlassStackHoldsSettings(UINavigationController* stack) {
     return NO;
 }
 
+// MARK: - Always visible
+
+// Confirms the collapse-mode bytes sit where the patch writes, by their fingerprint in Twitter's
+// four static configurations. A later build that moves them fails this, so the patch stays off
+// rather than writing into the wrong field.
+static BOOL PFBGlassConfigLayoutVerified(void) {
+    static BOOL verified;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+      Class cls = NSClassFromString(@"XNAVConfiguration");
+      Ivar ivar = cls ? class_getInstanceVariable(cls, "configuration") : NULL;
+      if (!ivar) {
+          return;
+      }
+      ptrdiff_t offset = ivar_getOffset(ivar);
+      if (offset <= 0 || (size_t)offset + 16 > class_getInstanceSize(cls)) {
+          return;
+      }
+      // Navigation bar mode at byte 0, tab bar mode at byte 1 (0 in every preset), style word at 8.
+      const char* names[] = {"standardConfiguration", "pinnedConfiguration", "hiddenConfiguration",
+                             "pinnedTransparentConfiguration"};
+      const uint8_t navBar[] = {1, 3, 2, 3};
+      const uintptr_t style[] = {0, 0, 0, 1};
+      for (NSUInteger i = 0; i < 4; i++) {
+          SEL selector = NSSelectorFromString([NSString stringWithUTF8String:names[i]]);
+          if (![cls respondsToSelector:selector]) {
+              return;
+          }
+          id configuration = ((id (*)(id, SEL))objc_msgSend)(cls, selector);
+          if (![configuration isKindOfClass:cls]) {
+              return;
+          }
+          const uint8_t* bytes = (const uint8_t*)(__bridge void*)configuration + offset;
+          uintptr_t word = 0;
+          memcpy(&word, bytes + 8, sizeof(word));
+          if (bytes[0] != navBar[i] || bytes[1] != 0 || word != style[i]) {
+              return;
+          }
+      }
+      verified = YES;
+    });
+    return verified;
+}
+
+// The stack's applied configuration starts with the collapse mode Twitter's engine reads on
+// each scroll: the top bar's byte (0 to 3), then the tab bar's (0 pinned, 1 collapses, high bit
+// for a manual mode). The bar style at 8 reads 2 while none is applied; 40 bytes in all.
+static ptrdiff_t PFBGlassAppliedConfigurationOffset(void) {
+    static ptrdiff_t offset = -1;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+      Class stack = NSClassFromString(@"XNAVNavigationController");
+      Ivar applied = stack ? class_getInstanceVariable(stack, "appliedConfiguration") : NULL;
+      Ivar next = stack ? class_getInstanceVariable(stack, "chromeFrozenScreen") : NULL;
+      if (applied && next && ivar_getOffset(next) - ivar_getOffset(applied) == 40) {
+          offset = ivar_getOffset(applied);
+      }
+    });
+    return offset;
+}
+
+// The tab bar's collapse in the stack's engine, from 0 shown to 1 collapsed; -1 when unread.
+static double PFBGlassTabBarCollapse(UINavigationController* stack) {
+    static Class engineClass;
+    static ptrdiff_t engineOffset = -1;
+    static ptrdiff_t progressOffset = -1;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+      engineClass = NSClassFromString(@"_TtC11XNavigation14CollapseEngine");
+      Ivar engine = class_getInstanceVariable(NSClassFromString(@"XNAVNavigationController"),
+                                              "$__lazy_storage_$_collapseEngine");
+      Ivar progress = engineClass ? class_getInstanceVariable(engineClass, "collapseProgress") : NULL;
+      if (engine && progress) {
+          engineOffset = ivar_getOffset(engine);
+          progressOffset = ivar_getOffset(progress);
+      }
+    });
+    if (engineOffset < 0) {
+        return -1.0;
+    }
+    void* engine = NULL;
+    memcpy(&engine, (const uint8_t*)(__bridge void*)stack + engineOffset, sizeof(engine));
+    // The engine is made when first needed: until then nothing has collapsed.
+    if (!engine) {
+        return 0.0;
+    }
+    if (object_getClass((__bridge id)engine) != engineClass) {
+        return -1.0;
+    }
+    // The progress holds the top bar's value, then the tab bar's.
+    double progress[2] = {0.0, 0.0};
+    memcpy(progress, (const uint8_t*)engine + progressOffset, sizeof(progress));
+    return isfinite(progress[1]) ? progress[1] : -1.0;
+}
+
+// How many times the patch has flipped the tab-bar byte, for the probe: a high count while
+// Home sits still signals Twitter re-applying its configuration against the patch.
+static NSUInteger gPFBGlassPinCount;
+
+NSUInteger PFBGlassAlwaysVisiblePinCount(void) {
+    return gPFBGlassPinCount;
+}
+
+// Pins the tab bar where Twitter's configuration lets it collapse (Home), the top bar's
+// mode untouched. A bar caught collapsed is pinned once back, as the engine stops moving it.
+static void PFBGlassPinTabBar(UINavigationController* stack) {
+    static Class stackClass;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+      stackClass = NSClassFromString(@"XNAVNavigationController");
+    });
+    ptrdiff_t offset = PFBGlassAppliedConfigurationOffset();
+    if (offset < 0 || !stackClass || ![stack isKindOfClass:stackClass] || !PFBGlassConfigLayoutVerified()) {
+        return;
+    }
+    uint8_t* configuration = (uint8_t*)(__bridge void*)stack + offset;
+    uintptr_t style = 0;
+    memcpy(&style, configuration + 8, sizeof(style));
+    if (style == 2 || configuration[0] > 3 || configuration[1] != 1) {
+        return;
+    }
+    if (![PFBSettings boolForKey:@"no_tab_bar_hiding"]) {
+        PFBCOMPAT_OBSERVE(PFBCompat_no_tab_bar_hiding, @"glass tab bar set to collapse");
+        return;
+    }
+    double collapse = PFBGlassTabBarCollapse(stack);
+    if (collapse < 0.0 || collapse > 0.001) {
+        return;
+    }
+    configuration[1] = 0;
+    gPFBGlassPinCount++;
+    PFBCOMPAT_ACTION(PFBCompat_no_tab_bar_hiding, @"glass tab bar pinned");
+}
+
+// A change to Always visible reaches the bars on screen at once: each glass stack applies its
+// configuration again, so turning the option off lets Home's bar collapse without a navigation,
+// and turning it on pins it at the next layout.
+void PFBGlassRefreshAlwaysVisible(void) {
+    Class stackClass = NSClassFromString(@"XNAVNavigationController");
+    SEL update = NSSelectorFromString(@"xnav_setNeedsNavigationConfigurationUpdateAnimated:");
+    if (!stackClass) {
+        return;
+    }
+    PFBGlassForEachWindow(^(UIWindow* window) {
+      NSMutableArray<UIViewController*>* queue = [NSMutableArray array];
+      if (window.rootViewController) {
+          [queue addObject:window.rootViewController];
+      }
+      for (NSUInteger i = 0; i < queue.count && i < 200; i++) {
+          UIViewController* controller = queue[i];
+          if ([controller isKindOfClass:stackClass] && [controller respondsToSelector:update]) {
+              ((void (*)(id, SEL, BOOL))objc_msgSend)(controller, update, NO);
+          }
+          [queue addObjectsFromArray:controller.childViewControllers];
+          if (controller.presentedViewController) {
+              [queue addObject:controller.presentedViewController];
+          }
+      }
+    });
+}
+
 // The settings can be left without their own exit running: a tab switch from a notification
 // or a link, or a pop to the stack's root. A screen of Twitter's glass navigation appearing on
 // a stack without settings shows the chrome again.
@@ -339,12 +580,52 @@ static BOOL PFBGlassStackHoldsSettings(UINavigationController* stack) {
 
 %end
 
+// The stack applies a screen's configuration while it lays out, when the screen asked for
+// it or its width changed; it is pinned right after.
+%hook XNAVNavigationController
+
+- (void)viewWillLayoutSubviews {
+    %orig;
+    @try {
+        PFBGlassPinTabBar((UINavigationController*)self);
+    } @catch (__unused id exception) {
+    }
+}
+
+%end
+
+// A configuration applied without a layout of its stack is pinned before the finger moves.
+%hook _TtCC11XNavigation14CollapseEngine14ScrollObserver
+
+- (void)handlePan:(UIPanGestureRecognizer*)recognizer {
+    if (recognizer.state == UIGestureRecognizerStateBegan) {
+        @try {
+            PFBGlassPinTabBar(PFBOwningController(recognizer.view).navigationController);
+        } @catch (__unused id exception) {
+        }
+    }
+    %orig;
+}
+
+%end
+
 %hook _TtC11XNavigation10TabBarView
+
+// Auto Layout gives the bar this height, and the bar lays its parts out in its bounds.
+- (CGSize)intrinsicContentSize {
+    CGSize size = %orig;
+    if (size.height > 0.0 && [PFBSettings boolForKey:@"restore_tab_labels"]) {
+        size.height += kPFBGlassExtraHeight;
+    }
+    return size;
+}
 
 - (void)layoutSubviews {
     %orig;
     @try {
-        PFBGlassLiftBadges((UIView*)self);
+        UIView* bar = (UIView*)self;
+        PFBGlassLiftBadges(bar);
+        PFBGlassCheckChosenTabs(bar);
     } @catch (__unused id exception) {
     }
 }
