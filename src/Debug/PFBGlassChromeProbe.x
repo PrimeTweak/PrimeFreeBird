@@ -412,8 +412,14 @@ static NSInteger PFBProbeSelectedIndex(UIView* bar) {
     return value >= -1 && value < 64 ? value : NSNotFound;
 }
 
+// Twitter's host screen, found at run time: the tweak is not linked against Twitter.
+static T1HostViewController* PFBProbeHost(void) {
+    Class hostClass = NSClassFromString(@"T1HostViewController");
+    return [hostClass respondsToSelector:@selector(sharedHostViewController)] ? [hostClass sharedHostViewController] : nil;
+}
+
 static id PFBProbeAppNavigation(void) {
-    T1HostViewController* host = [T1HostViewController sharedHostViewController];
+    T1HostViewController* host = PFBProbeHost();
     return [host respondsToSelector:@selector(appNavigation)] ? [host appNavigation] : nil;
 }
 
@@ -425,10 +431,11 @@ static NSString* PFBProbePanelsText(void) {
         return [NSString stringWithFormat:@"none (%@)", PFBProbeName([navigation class])];
     }
     NSMutableArray<NSString*>* names = [NSMutableArray array];
-    BOOL named = [T1PanelIdentity respondsToSelector:@selector(localizedNameForPanelID:)];
+    Class identity = NSClassFromString(@"T1PanelIdentity");
+    BOOL named = [identity respondsToSelector:@selector(localizedNameForPanelID:)];
     for (id panel in panels) {
         long long panelID = [panel respondsToSelector:@selector(longLongValue)] ? [panel longLongValue] : -1;
-        NSString* name = named ? [T1PanelIdentity localizedNameForPanelID:panelID] : nil;
+        NSString* name = named ? [identity localizedNameForPanelID:panelID] : nil;
         [names addObject:[NSString stringWithFormat:@"%lld %@", panelID, name.length ? name : @"?"]];
     }
     return [NSString stringWithFormat:@"[%@]", [names componentsJoinedByString:@", "]];
@@ -842,7 +849,7 @@ static NSString* PFBProbeCustomNavigationText(void) {
     }
     NSMutableArray<NSString*>* parts = [NSMutableArray array];
     @try {
-        id account = [[T1HostViewController sharedHostViewController] currentAccount];
+        id account = [PFBProbeHost() currentAccount];
         Class configClass = NSClassFromString(@"T1TabCustomizationConfig");
         T1TabCustomizationConfig* config =
             account && configClass ? [(T1TabCustomizationConfig*)[configClass alloc] initWithAccount:account] : nil;
@@ -886,7 +893,7 @@ static NSString* PFBProbeCustomNavigationText(void) {
         [parts addObject:[NSString stringWithFormat:@"stopped: %@", exception]];
     }
     NSString* text = [parts componentsJoinedByString:@" · "];
-    if ([[T1HostViewController sharedHostViewController] currentAccount]) {
+    if ([PFBProbeHost() currentAccount]) {
         gProbeCustomNavigation = text;
     }
     return text;
