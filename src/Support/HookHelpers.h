@@ -169,6 +169,9 @@ void PFBBarPairWithNeighbor(UIBarButtonItem* ours, NSArray<UIBarButtonItem*>* it
 UIViewController* PFBOwningController(UIView* view);
 // The same, with a navigation controller replaced by its top controller.
 UIViewController* PFBOwningTopController(UIView* view);
+// Whether the controller sits in Twitter's own Liquid Glass navigation, whose top bar
+// draws the buttons of the controller's navigation item.
+BOOL PFBOnNativeGlassStack(UIViewController* controller);
 
 // Present the interactive "Log in to Web Session" screen. The completion fires with
 // YES once cookies were harvested and stored, NO if the user canceled.

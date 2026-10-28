@@ -4,6 +4,7 @@
 #import "Features/Timelines/PFBMutedWordsViewController.h"
 
 static const void* kPFBQuickMutedBtnKey = &kPFBQuickMutedBtnKey;
+static const void* kPFBQuickMutedGrayKey = &kPFBQuickMutedGrayKey;
 
 // The avatar is the square view furthest to the left of the bar. Using it as the
 // reference makes the added button match Twitter's own vertical rhythm and
@@ -80,13 +81,9 @@ static UIImage* PFBFilterBarsGlyph(void) {
     return drawn;
 }
 
-%hook TFNNavigationBar
-
-%new
-- (void)pfbShowQuickMutedWords:(id)sender {
-    UIView* bar = (UIView*)self;
-    UIViewController* owner = PFBOwningTopController(bar);
-    if (!owner) {
+// The muted words editor as a popover from `anchor`, its arrow on `rect`.
+static void pfbPresentQuickMutedWords(UIViewController* owner, UIView* anchor, CGRect rect) {
+    if (!owner || !anchor) {
         return;
     }
     while (owner.presentedViewController) {
@@ -99,11 +96,19 @@ static UIImage* PFBFilterBarsGlyph(void) {
     UIPopoverPresentationController* popover = editor.popoverPresentationController;
     popover.delegate = (id<UIPopoverPresentationControllerDelegate>)editor;
     popover.permittedArrowDirections = UIPopoverArrowDirectionUp;
-    UIView* anchor = [sender isKindOfClass:[UIView class]] ? (UIView*)sender : bar;
     popover.sourceView = anchor;
-    popover.sourceRect = anchor.bounds;
+    popover.sourceRect = rect;
 
     [owner presentViewController:editor animated:YES completion:nil];
+}
+
+%hook TFNNavigationBar
+
+%new
+- (void)pfbShowQuickMutedWords:(id)sender {
+    UIView* bar = (UIView*)self;
+    UIView* anchor = [sender isKindOfClass:[UIView class]] ? (UIView*)sender : bar;
+    pfbPresentQuickMutedWords(PFBOwningTopController(bar), anchor, anchor.bounds);
 }
 
 // A plain subview pinned to the trailing edge, re-positioned on every layout pass.
@@ -184,6 +189,64 @@ static UIImage* PFBFilterBarsGlyph(void) {
         PFBCompatReach(PFBCompatPath_home_bar_button);
     } @catch (id exception) {
     }
+}
+
+%end
+
+@interface _TtC32TwitterHomeFeatureImplementation35HomeTimelineContainerViewController : UIViewController
+- (void)pfbShowQuickMutedWordsFrom:(PFBBarGlyphButton*)sender;
+@end
+
+// On Twitter's native glass stack the top bar draws the screen's navigation item, so
+// there the button is a bar item of Home, placed again once the screen is up since
+// Twitter may set its own items after it appears.
+static void pfbPlaceHomeFiltersItem(UIViewController* home) {
+    if (!PFBOnNativeGlassStack(home)) {
+        return;
+    }
+    @try {
+        UINavigationItem* item = home.navigationItem;
+        if (!item) {
+            return;
+        }
+        PFBCompatReach(PFBCompatPath_home_bar_button);
+        UIColor* gray = PFBBarIconGray(home.traitCollection);
+        UIBarButtonItem* button = objc_getAssociatedObject(home, kPFBQuickMutedBtnKey);
+        if (!button) {
+            button = PFBBarGlyphItem(PFBFlatGlyph(PFBFilterBarsGlyph(), gray),
+                                     [[PFBBundle sharedBundle] localizedStringForKey:@"FILTERS_TITLE"], home,
+                                     @selector(pfbShowQuickMutedWordsFrom:));
+            objc_setAssociatedObject(home, kPFBQuickMutedBtnKey, button, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        } else if (![objc_getAssociatedObject(button, kPFBQuickMutedGrayKey) isEqual:gray]) {
+            // The glyph carries its color, so a new gray (light or dark) redraws it.
+            PFBBarGlyphButton* view = (PFBBarGlyphButton*)button.customView;
+            if ([view isKindOfClass:[PFBBarGlyphButton class]]) {
+                view.glyph = PFBFlatGlyph(PFBFilterBarsGlyph(), gray);
+            }
+        }
+        objc_setAssociatedObject(button, kPFBQuickMutedGrayKey, gray, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        if (![item.rightBarButtonItems containsObject:button]) {
+            item.rightBarButtonItems = [(item.rightBarButtonItems ?: @[]) arrayByAddingObject:button];
+        }
+    } @catch (id exception) {
+    }
+}
+
+%hook _TtC32TwitterHomeFeatureImplementation35HomeTimelineContainerViewController
+
+%new
+- (void)pfbShowQuickMutedWordsFrom:(PFBBarGlyphButton*)sender {
+    pfbPresentQuickMutedWords((UIViewController*)self, sender, sender.glyphFrame);
+}
+
+- (void)viewWillAppear:(BOOL)animated {
+    %orig;
+    pfbPlaceHomeFiltersItem((UIViewController*)self);
+}
+
+- (void)viewDidAppear:(BOOL)animated {
+    %orig;
+    pfbPlaceHomeFiltersItem((UIViewController*)self);
 }
 
 %end

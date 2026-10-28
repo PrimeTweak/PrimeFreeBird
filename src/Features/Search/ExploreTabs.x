@@ -97,6 +97,17 @@ static BOOL pfbIsExploreBar(UIView* bar) {
     return (bar == root) || [bar isDescendantOfView:root];
 }
 
+// On Twitter's native glass stack Explore never hands its tab bar over as an accessory:
+// the bar sits in Explore's own view, so the screen above it in the responder chain names it.
+static BOOL pfbOwnedByExplore(UIView* bar) {
+    static Class explore;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+        explore = NSClassFromString(@"_TtC14T1TwitterSwift28GuideContainerViewController");
+    });
+    return explore && [PFBOwningController(bar) isKindOfClass:explore];
+}
+
 // MARK: - view helpers
 
 static UICollectionView* pfbFindCollection(UIView* v, int depth) {
@@ -350,7 +361,10 @@ static BOOL pfbApplyTabFilter(UIView* bar, UICollectionView* cv) {
 - (void)layoutSubviews {
     %orig;
 
-    if (!pfbIsExploreBar((UIView*)self)) { return; }
+    if (!pfbIsExploreBar((UIView*)self)) {
+        if (!pfbOwnedByExplore((UIView*)self)) { return; }
+        pfbNoteExploreAccessoryView((UIView*)self);
+    }
     if (!pfbGranularActive()) {
         PFBCOMPAT_OBSERVE(PFBCompat_choose_explore_tabs, @"Explore tabs found");
         return;

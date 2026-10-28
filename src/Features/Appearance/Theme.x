@@ -183,8 +183,7 @@ BOOL PFBAccentIsActive(void) {
     return ![defs boolForKey:@"pfb_color_reset_done"];
 }
 
-// Read by NavBarIcons.x, whose layer-animation hook keeps the glass vibrancy
-// filter off the tab bar only while a themed bar was asked for.
+// Whether Selected tab paints the tab bar and the top tab underline; the sheet reads it too.
 BOOL PFBThemedTabBarWanted(void) {
     return [PFBSettings boolForKey:@"tab_bar_theming"] && PFBAccentIsActive();
 }

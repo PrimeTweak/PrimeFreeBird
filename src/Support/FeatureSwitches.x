@@ -1112,14 +1112,11 @@ static __thread BOOL DashPanelIDQuery = NO;
 
 %end
 
-%hook T1TabbedAppNavigationViewController
-
-- (NSArray*)visiblePanelIDsForAppNavigation:(id)appNavigation {
-    NSArray* panelIDs = %orig;
-    if (!DashPanelIDQuery) {
+// The tab bar's panels as the drawer reads them, with the panels it must not offer.
+static NSArray* PFBDashPanelIDs(NSArray* panelIDs) {
+    if (![panelIDs isKindOfClass:[NSArray class]]) {
         return panelIDs;
     }
-
     NSMutableArray* spoofed = [panelIDs mutableCopy];
     void (^claim)(NSNumber*) = ^(NSNumber* panelID) {
         if (![spoofed containsObject:panelID]) {
@@ -1145,6 +1142,27 @@ static __thread BOOL DashPanelIDQuery = NO;
     }
 
     return spoofed;
+}
+
+%hook T1TabbedAppNavigationViewController
+
+- (NSArray*)visiblePanelIDsForAppNavigation:(id)appNavigation {
+    NSArray* panelIDs = %orig;
+    return DashPanelIDQuery ? PFBDashPanelIDs(panelIDs) : panelIDs;
+}
+
+%end
+
+@interface _TtC14T1TwitterSwift20XTabbedAppNavigation : NSObject
+- (NSArray*)visiblePanelIDs;
+@end
+
+// Twitter's native glass navigation answers the drawer itself.
+%hook _TtC14T1TwitterSwift20XTabbedAppNavigation
+
+- (NSArray*)visiblePanelIDs {
+    NSArray* panelIDs = %orig;
+    return DashPanelIDQuery ? PFBDashPanelIDs(panelIDs) : panelIDs;
 }
 
 %end

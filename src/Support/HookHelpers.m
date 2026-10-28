@@ -425,6 +425,15 @@ UIViewController* PFBOwningTopController(UIView* view) {
     return controller;
 }
 
+BOOL PFBOnNativeGlassStack(UIViewController* controller) {
+    static Class stack;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+      stack = NSClassFromString(@"XNAVNavigationController");
+    });
+    return stack && [controller.navigationController isKindOfClass:stack];
+}
+
 // A Twitter glyph drawn in the box of the system symbol it replaces; the symbol stays
 // as the fallback when the app does not ship that glyph.
 UIImage* PFBTwitterGlyphFor(NSString* name, UIImage* systemImage) {

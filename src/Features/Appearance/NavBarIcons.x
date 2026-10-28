@@ -1074,24 +1074,6 @@ static BOOL pfbViewSitsInInboxPill(UIView* view) {
     return NO;
 }
 
-// The app also animates the vibrancy filter onto the tab bar's icons. Handled only
-// while a themed bar is switched on; otherwise the bar keeps its glass.
-static BOOL PFBViewSitsInXTabBar(UIView* view) {
-    if (!PFBThemedTabBarWanted()) {
-        return NO;
-    }
-    Class xBar = NSClassFromString(@"_TtC11XNavigation10TabBarView");
-    if (!xBar) {
-        return NO;
-    }
-    for (UIView* v = view; v; v = v.superview) {
-        if ([v isKindOfClass:xBar]) {
-            return YES;
-        }
-    }
-    return NO;
-}
-
 %hook CALayer
 
 - (void)setOpacity:(float)opacity {
@@ -1108,11 +1090,9 @@ static BOOL PFBViewSitsInXTabBar(UIView* view) {
     BOOL ownerIsView = [owner isKindOfClass:[UIView class]];
 
     // On iOS 27 the glass vibrancy filter is animated back onto the logo after the
-    // tint is set; refusing it and dropping the filter keeps the chosen color. The
-    // same holds for the tab bar's icons while a themed tab bar is wanted.
-    if (ownerIsView && [key hasPrefix:@"filters."] &&
-        ((owner == (UIView*)PFBTopBarLogoViewCurrent() && PFBTintedLogoWanted()) ||
-         PFBViewSitsInXTabBar(owner))) {
+    // tint is set; refusing it and dropping the filter keeps the chosen color.
+    if (ownerIsView && [key hasPrefix:@"filters."] && owner == (UIView*)PFBTopBarLogoViewCurrent() &&
+        PFBTintedLogoWanted()) {
         self.filters = nil;
         return;
     }

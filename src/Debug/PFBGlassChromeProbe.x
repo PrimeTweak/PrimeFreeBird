@@ -1,182 +1,86 @@
-// Measures Twitter's own Liquid Glass chrome. The tab bar: what changes in it, who changes
-// it, where the touches land, how busy the main thread is. The rest: which hook points the
-// options rely on still run, what Twitter's new navigation calls instead, and what the
-// main screens show in their bars, compose button, Explore tabs and side menu.
+// Measures what Twitter's own Liquid Glass offers the options that lack a hook point
+// there: the tab bar's icons, titles and room (Selected tab, Tab labels), its shrinking
+// on scroll (Always visible), what builds its tabs (Customize tabs), the compose button
+// (Classic Tweet button, Hide Tweet button) and the Spaces bar.
 //
 // A summary goes to MEASUREMENTS. When Twitter leaves the screen, this report and the
 // whole Compatibility report go to the pasteboard, unless something was copied while
-// Twitter was in front. The hooks are installed after every other file's, so they run
-// first: an animation another hook refuses is seen not landing, and each write is
-// charged to the code that sent it.
+// Twitter was in front. The hooks are installed after every other file's, so each call
+// is charged to the code that sent it.
 
 #import <mach-o/loader.h>
+#import <os/lock.h>
 #import <pthread.h>
 #import "Support/HookHelpers.h"
 #import "Common/PFBCompatibility.h"
 
-extern BOOL PFBAccentIsActive(void);
-
-// The methods hooked below that no header declares.
-@interface T1TabBarViewController (PFBGlassChromeProbe)
-- (void)setTabBarCollapseRatio:(double)ratio;
-- (void)_t1_layoutTabBar;
-- (void)_t1_updateTabBarHidden;
+// The methods called below that no header declares.
+@interface T1PanelIdentity (PFBGlassChromeProbe)
++ (NSString*)localizedNameForPanelID:(long long)panelID;
 @end
 
-@interface T1TabbedAppNavigationViewController (PFBGlassChromeProbe)
-- (void)setVisibleTabEntries:(NSArray*)entries;
-- (NSArray*)_t1_tabEntriesLimitedToBottomCapacity:(NSArray*)entries;
-- (NSArray*)visiblePanelIDsForAppNavigation:(id)appNavigation;
+@interface T1HostViewController (PFBGlassChromeProbe)
+- (id)appNavigation;
 @end
 
-@interface _TtC11XNavigation10TabBarView : UIView
-- (void)handleTracking:(UIGestureRecognizer*)recognizer;
-@end
-
-@interface T1DashContentController : NSObject
-- (void)updateVisiblePanelIDs;
-@end
-
-@interface T1TabNavigationController : UINavigationController
-- (void)_t1_main_updateNavigationItemForViewController:(id)controller
-                                                isRoot:(BOOL)isRoot
-                           providingLeftBarButtonItems:(__unsafe_unretained id)left
-                                 rightBarButtonItems:(__unsafe_unretained id)right;
-@end
-
-@interface TFNExpandingButtonItemView : UIView
-- (void)_tfn_updateIcon;
-@end
-
-@interface _TtC14T1TwitterSwift28GuideContainerViewController : UIViewController
-- (UIView*)tfn_navigationBarAccessoryView;
+@interface TFNTwitterAccount (PFBGlassChromeProbe)
+- (BOOL)isPremiumTierUser;
+- (NSArray*)subscriptionClaims;
+- (id)featureSwitches;
 @end
 
 @interface _TtC14T1TwitterSwift20XTabbedAppNavigation : NSObject
 - (NSArray*)visiblePanelIDs;
-- (void)recalculateVisiblePanels;
-- (void)recalculateVisiblePanelsWithUpdatedPanelIDs:(id)panelIDs;
 - (void)setCurrentPanel:(long long)panel animated:(BOOL)animated completion:(id)completion;
 @end
 
-// MARK: - Counters
+@interface XNAVConfiguration : NSObject
++ (instancetype)standardConfiguration;
++ (instancetype)pinnedConfiguration;
++ (instancetype)hiddenConfiguration;
++ (instancetype)pinnedTransparentConfiguration;
++ (instancetype)configurationWithCollapseMode:(long long)collapse popGestureMode:(long long)pop;
++ (instancetype)configurationWithCollapseMode:(long long)collapse
+                               popGestureMode:(long long)pop
+                         solidBackgroundColor:(UIColor*)color;
+@end
 
-typedef NS_ENUM(NSInteger, PFBProbeEvent) {
-    PFBProbeBarLayout,
-    PFBProbeItemLayout,
-    PFBProbeControllerLayout,
-    PFBProbeControllerTraits,
-    PFBProbePillTraits,
-    PFBProbeLensLayout,
-    PFBProbeAnimation,
-    PFBProbeFilterAnimation,
-    PFBProbeAnimationMissed,
-    PFBProbeFiltersGone,
-    PFBProbeFiltersSet,
-    PFBProbeFiltersEmptied,
-    PFBProbeTint,
-    PFBProbeImage,
-    PFBProbeAlpha,
-    PFBProbeAlphaFlip,
-    PFBProbeHidden,
-    PFBProbeHiddenFlip,
-    PFBProbeBackground,
-    PFBProbeWindowTint,
-    PFBProbeWindowLayout,
-    PFBProbeColorReload,
-    PFBProbeTracking,
-    PFBProbeEventAsked,
-    PFBProbeEventRefused,
-    PFBProbeOldTabIcon,
-    PFBProbeOldTabLayout,
-    PFBProbeOldTabSelected,
-    PFBProbeOldCollapse,
-    PFBProbeOldBarLayout,
-    PFBProbeOldBarHidden,
-    PFBProbeOldHostLayout,
-    PFBProbeOldCustomBarLayout,
-    PFBProbeOldTabEntries,
-    PFBProbeOldTabCapacity,
-    PFBProbeOldPanelsAsked,
-    PFBProbeDashUpdate,
-    PFBProbeOldNavigationItems,
-    PFBProbeOldNavigationBar,
-    PFBProbeOldComposeIcon,
-    PFBProbeOldComposeButton,
-    PFBProbeExploreAccessory,
-    PFBProbeExploreTabs,
-    PFBProbeFleetLine,
-    PFBProbeTweetFooter,
-    PFBProbeNewPanelsAsked,
-    PFBProbeNewPanelsAskedByDash,
-    PFBProbeNewRecalculate,
-    PFBProbeNewSetPanel,
-    PFBProbeDashShown,
-    PFBProbeEventCount
-};
+@interface XNAVNavigationController : UINavigationController
+- (instancetype)initWithRootViewController:(UIViewController*)root
+                      popGestureCapability:(long long)capability
+                      defaultConfiguration:(XNAVConfiguration*)configuration;
+- (instancetype)initWithPopGestureCapability:(long long)capability
+                        defaultConfiguration:(XNAVConfiguration*)configuration;
+@end
 
-typedef struct {
-    NSUInteger total;
-    NSUInteger ours;  // sent straight from PrimeFreeBird's code
-    NSUInteger second;
-    NSUInteger peak;  // the most in one second
-    NSInteger secondIndex;
-    CFTimeInterval spent;  // inside the hooked call, ours included
-} PFBProbeCount;
+@interface T1TabCustomizationConfig : NSObject
+- (instancetype)initWithAccount:(id)account;
+- (BOOL)isTabCustomizationEnabled;
+@end
 
-static PFBProbeCount gProbeCounts[PFBProbeEventCount];
+@interface TFSTwitterSubscriptionClaim : NSObject
+- (NSString*)restId;
+@end
 
-// Seconds kept one by one, from the start of the probe.
-#define PFB_PROBE_SECONDS 600
-#define PFB_PROBE_SERIES 3
-static const PFBProbeEvent kPFBProbeSeriesEvents[PFB_PROBE_SERIES] = {PFBProbeAnimationMissed, PFBProbeBarLayout,
-                                                                       PFBProbeAlphaFlip};
-static uint16_t gProbeSeries[PFB_PROBE_SERIES][PFB_PROBE_SECONDS];
-static float gProbeBusy[PFB_PROBE_SECONDS];
+@interface T1FleetLineHeaderController : NSObject
+- (BOOL)_t1_shouldShowFleetLine;
+@end
 
+@interface T1FleetLineView : UIView
+- (instancetype)initWithAccount:(id)account delegate:(id)delegate;
+@end
+
+@interface _TtCC11XNavigation14CollapseEngine14ScrollObserver : NSObject
+- (void)handlePan:(UIGestureRecognizer*)recognizer;
+@end
+
+static NSString* const kPFBProbeTopic = @"glass probe";
 static CFTimeInterval gProbeStart;
 static NSString* gProbeLaunchClock;
 
-// Main thread only, so the counters need no lock.
-static void PFBProbeNote(PFBProbeEvent event, BOOL ours, CFTimeInterval spent) {
-    if (gProbeStart <= 0 || !pthread_main_np()) {
-        return;
-    }
-    NSInteger second = (NSInteger)(CACurrentMediaTime() - gProbeStart);
-    PFBProbeCount* count = &gProbeCounts[event];
-    if (count->secondIndex != second) {
-        count->secondIndex = second;
-        count->second = 0;
-    }
-    count->total++;
-    count->second++;
-    count->peak = MAX(count->peak, count->second);
-    count->ours += ours ? 1 : 0;
-    count->spent += spent;
-    if (second < 0 || second >= PFB_PROBE_SECONDS) {
-        return;
-    }
-    for (NSUInteger slot = 0; slot < PFB_PROBE_SERIES; slot++) {
-        if (kPFBProbeSeriesEvents[slot] == event && gProbeSeries[slot][second] < UINT16_MAX) {
-            gProbeSeries[slot][second]++;
-        }
-    }
-}
-
-// A name counted in a table that keeps at most 24 names; the rest go under "others".
-static void PFBProbeTally(NSMutableDictionary<NSString*, NSNumber*>* tally, NSString* name) {
-    NSNumber* count = tally[name];
-    if (!count && tally.count >= 24) {
-        name = @"others";
-        count = tally[name];
-    }
-    tally[name] = @(count.unsignedIntegerValue + 1);
-}
-
 // MARK: - Who sent it
 
-// PrimeFreeBird's code is the __TEXT segment of the image this file is in. A write whose
-// return address falls inside it was sent by PrimeFreeBird, not by Twitter or UIKit.
+// PrimeFreeBird's code is the __TEXT segment of the image this file is in.
 static uintptr_t gProbeOursStart;
 static uintptr_t gProbeOursEnd;
 
@@ -206,6 +110,23 @@ static BOOL PFBProbeFromUs(const void* returnAddress) {
     return address >= gProbeOursStart && address < gProbeOursEnd;
 }
 
+// "XServiceLibraries+0x22b6030": the image a call came from and the place in it.
+static NSString* PFBProbeCaller(const void* address) {
+    if (!address) {
+        return @"?";
+    }
+    if (PFBProbeFromUs(address)) {
+        return @"PrimeFreeBird";
+    }
+    Dl_info info;
+    if (!dladdr(address, &info) || !info.dli_fname || !info.dli_fbase) {
+        return @"?";
+    }
+    const char* slash = strrchr(info.dli_fname, '/');
+    return [NSString stringWithFormat:@"%s+0x%lx", slash ? slash + 1 : info.dli_fname,
+                                      (unsigned long)((uintptr_t)address - (uintptr_t)info.dli_fbase)];
+}
+
 // "_TtC11XNavigation10TabBarView" reads "XNavigation.TabBarView".
 static NSString* PFBProbeName(Class cls) {
     if (!cls) {
@@ -230,23 +151,219 @@ static NSString* PFBProbeName(Class cls) {
     return parts.count == 2 && *cursor == '\0' ? [parts componentsJoinedByString:@"."] : name;
 }
 
-// MARK: - The bar
+// MARK: - Tallies
 
-// The glass bar last laid out, held so the hot paths below compare pointers only.
-static UIView* gProbeBar;
-static CALayer* gProbeBarLayer;
-static NSHashTable* gProbeBarsSeen;
-static NSHashTable* gProbeItemsSeen;
-static NSHashTable* gProbeLensesSeen;
-static NSUInteger gProbeBarsMade;
-static NSUInteger gProbeItemsMade;
-static NSUInteger gProbeLensesMade;
+// A count, the part sent by PrimeFreeBird, who sent it and the values seen. Main thread only.
+@interface PFBProbeTally : NSObject
+@property(nonatomic) NSUInteger total;
+@property(nonatomic) NSUInteger ours;
+@property(nonatomic, strong) NSMutableDictionary<NSString*, NSNumber*>* callers;
+@property(nonatomic, strong) NSMutableOrderedSet<NSString*>* values;
+- (void)noteFrom:(const void*)address value:(NSString*)value;
+- (NSString*)text;
+@end
 
-static BOOL PFBProbeViewInBar(UIView* view) {
-    __unsafe_unretained UIView* bar = gProbeBar;
+@implementation PFBProbeTally
+
+- (instancetype)init {
+    self = [super init];
+    if (self) {
+        _callers = [NSMutableDictionary dictionary];
+        _values = [NSMutableOrderedSet orderedSet];
+    }
+    return self;
+}
+
+// The first 300 calls are charged to their sender: each costs a lookup of the image.
+- (void)noteFrom:(const void*)address value:(NSString*)value {
+    self.total++;
+    BOOL ours = PFBProbeFromUs(address);
+    self.ours += ours ? 1 : 0;
+    if (self.total <= 300) {
+        NSString* caller = ours ? @"PrimeFreeBird" : PFBProbeCaller(address);
+        if (self.callers[caller] || self.callers.count < 8) {
+            self.callers[caller] = @(self.callers[caller].unsignedIntegerValue + 1);
+        }
+    }
+    if (value.length && self.values.count < 16) {
+        [self.values addObject:value];
+    }
+}
+
+- (NSString*)text {
+    if (!self.total) {
+        return @"0";
+    }
+    NSArray<NSString*>* names = [self.callers keysSortedByValueUsingComparator:^NSComparisonResult(NSNumber* a, NSNumber* b) {
+      return [b compare:a];
+    }];
+    NSMutableArray<NSString*>* senders = [NSMutableArray array];
+    for (NSString* name in names) {
+        [senders addObject:[NSString stringWithFormat:@"%@ %@", name, self.callers[name]]];
+    }
+    NSMutableString* text = [NSMutableString stringWithFormat:@"%lu (by PrimeFreeBird %lu), from [%@]",
+                                                               (unsigned long)self.total, (unsigned long)self.ours,
+                                                               [senders componentsJoinedByString:@", "]];
+    if (self.values.count) {
+        [text appendFormat:@", values [%@]", [self.values.array componentsJoinedByString:@" | "]];
+    }
+    return text;
+}
+
+@end
+
+static NSMutableDictionary<NSString*, PFBProbeTally*>* gProbeTallies;
+
+static PFBProbeTally* PFBProbeTallyNamed(NSString* name) {
+    if (!gProbeTallies) {
+        gProbeTallies = [NSMutableDictionary dictionary];
+    }
+    PFBProbeTally* tally = gProbeTallies[name];
+    if (!tally) {
+        tally = [PFBProbeTally new];
+        gProbeTallies[name] = tally;
+    }
+    return tally;
+}
+
+static void PFBProbeCount(NSString* name, const void* address, NSString* value) {
+    if (gProbeStart <= 0 || !pthread_main_np()) {
+        return;
+    }
+    [PFBProbeTallyNamed(name) noteFrom:address value:value];
+}
+
+static NSString* PFBProbeTallyText(NSString* name) {
+    PFBProbeTally* tally = gProbeTallies[name];
+    return tally ? [tally text] : @"0";
+}
+
+// MARK: - Icons by name
+
+// The name an icon of Twitter's icon set was loaded with, carried to the copies made of it.
+static const void* kPFBProbeIconKey = &kPFBProbeIconKey;
+static os_unfair_lock gProbeIconLock = OS_UNFAIR_LOCK_INIT;
+static NSMutableDictionary<NSString*, NSString*>* gProbeIconNames;  // name -> first sender
+
+static BOOL PFBProbeIsIconBundle(NSBundle* bundle) {
+    static __weak NSBundle* known;
+    if (!bundle) {
+        return NO;
+    }
+    if (bundle == known) {
+        return YES;
+    }
+    if ([bundle.bundlePath hasSuffix:@"XIconsAssets.bundle"]) {
+        known = bundle;
+        return YES;
+    }
+    return NO;
+}
+
+static void PFBProbeTagIcon(UIImage* image, NSString* name, NSBundle* bundle, const void* address) {
+    if (!image || !name.length || gProbeStart <= 0 || !PFBProbeIsIconBundle(bundle)) {
+        return;
+    }
+    objc_setAssociatedObject(image, kPFBProbeIconKey, name, OBJC_ASSOCIATION_COPY_NONATOMIC);
+    os_unfair_lock_lock(&gProbeIconLock);
+    BOOL known = gProbeIconNames[name] != nil || gProbeIconNames.count >= 120;
+    os_unfair_lock_unlock(&gProbeIconLock);
+    if (known) {
+        return;
+    }
+    NSString* caller = PFBProbeCaller(address);
+    os_unfair_lock_lock(&gProbeIconLock);
+    if (!gProbeIconNames) {
+        gProbeIconNames = [NSMutableDictionary dictionary];
+    }
+    if (!gProbeIconNames[name]) {
+        gProbeIconNames[name] = caller;
+    }
+    os_unfair_lock_unlock(&gProbeIconLock);
+}
+
+static void PFBProbeCarryIcon(UIImage* source, UIImage* copy) {
+    if (!source || !copy || copy == source || gProbeStart <= 0) {
+        return;
+    }
+    NSString* name = objc_getAssociatedObject(source, kPFBProbeIconKey);
+    if (name) {
+        objc_setAssociatedObject(copy, kPFBProbeIconKey, name, OBJC_ASSOCIATION_COPY_NONATOMIC);
+    }
+}
+
+// An image by the icon name it was loaded with, its vector or symbol name, or its size.
+static NSString* PFBProbeImageText(UIImage* image) {
+    if (!image) {
+        return @"no image";
+    }
+    NSString* icon = objc_getAssociatedObject(image, kPFBProbeIconKey);
+    NSString* mode = image.renderingMode == UIImageRenderingModeAlwaysTemplate
+                         ? @" template"
+                         : (image.renderingMode == UIImageRenderingModeAlwaysOriginal ? @" original" : @"");
+    if (icon) {
+        return [NSString stringWithFormat:@"icon %@%@", icon, mode];
+    }
+    id vector = objc_getAssociatedObject(image, (const void*)NSSelectorFromString(@"tfn_vectorImageNamed:fitsSize:fillColor:"));
+    if ([vector isKindOfClass:[NSString class]]) {
+        return [NSString stringWithFormat:@"vector %@%@", vector, mode];
+    }
+    if (image.isSymbolImage) {
+        return [@"symbol" stringByAppendingString:mode];
+    }
+    return [NSString stringWithFormat:@"image %.0fx%.0f%@", image.size.width, image.size.height, mode];
+}
+
+static NSString* PFBProbeColorText(UIColor* color) {
+    if (!color) {
+        return @"none";
+    }
+    CGFloat r = 0, g = 0, b = 0, a = 0;
+    if (![color getRed:&r green:&g blue:&b alpha:&a]) {
+        return PFBProbeName([color class]);
+    }
+    return [NSString stringWithFormat:@"rgba(%.0f,%.0f,%.0f,%.2f)", r * 255.0, g * 255.0, b * 255.0, a];
+}
+
+// A layer's filters by name, and its compositing filter.
+static NSString* PFBProbeFiltersText(CALayer* layer) {
+    NSMutableArray<NSString*>* names = [NSMutableArray array];
+    @try {
+        for (id filter in layer.filters) {
+            id name = [filter respondsToSelector:@selector(name)] ? [filter valueForKey:@"name"] : nil;
+            id type = [filter respondsToSelector:@selector(type)] ? [filter valueForKey:@"type"] : nil;
+            [names addObject:[NSString stringWithFormat:@"%@%@", name ?: @"?",
+                                                        type && ![type isEqual:name] ? [NSString stringWithFormat:@"(%@)", type] : @""]];
+        }
+        id compositing = layer.compositingFilter;
+        if (compositing) {
+            id name = [compositing isKindOfClass:[NSString class]] ? compositing : [compositing valueForKey:@"name"];
+            [names addObject:[NSString stringWithFormat:@"compositing %@", name ?: @"?"]];
+        }
+    } @catch (__unused id exception) {
+        [names addObject:@"unreadable"];
+    }
+    return names.count ? [names componentsJoinedByString:@" "] : @"";
+}
+
+// MARK: - The bar and the compose button
+
+static __weak UIView* gProbeBar;
+static __weak UIView* gProbeAccessory;
+static Class gProbeItemClass;
+
+static BOOL PFBProbeOnScreen(UIView* view) {
+    UIWindow* window = view.window;
+    return window && CGRectIntersectsRect([view convertRect:view.bounds toView:nil], window.bounds);
+}
+
+static BOOL PFBProbeViewIn(UIView* view, UIView* root) {
+    if (!root) {
+        return NO;
+    }
     __unsafe_unretained UIView* node = view;
-    for (NSInteger depth = 0; bar && node && depth < 48; depth++) {
-        if (node == bar) {
+    for (NSInteger depth = 0; node && depth < 40; depth++) {
+        if (node == root) {
             return YES;
         }
         node = node.superview;
@@ -254,10 +371,13 @@ static BOOL PFBProbeViewInBar(UIView* view) {
     return NO;
 }
 
-static BOOL PFBProbeLayerInBar(CALayer* layer) {
-    __unsafe_unretained CALayer* target = gProbeBarLayer;
+static BOOL PFBProbeLayerIn(CALayer* layer, UIView* root) {
+    CALayer* target = root.layer;
+    if (!target) {
+        return NO;
+    }
     __unsafe_unretained CALayer* node = layer;
-    for (NSInteger depth = 0; target && node && depth < 64; depth++) {
+    for (NSInteger depth = 0; node && depth < 60; depth++) {
         if (node == target) {
             return YES;
         }
@@ -266,910 +386,762 @@ static BOOL PFBProbeLayerInBar(CALayer* layer) {
     return NO;
 }
 
-// Inside the old bar, the one Twitter draws without its glass.
-static BOOL PFBProbeViewInOldBar(UIView* view) {
-    for (UIView* node = view; node; node = node.superview) {
-        NSString* name = NSStringFromClass([node class]);
-        if ([name isEqualToString:@"T1TabBarHostView"] || [name isEqualToString:@"TFNCustomTabBar"]) {
-            return YES;
-        }
-    }
-    return NO;
-}
-
-// Counts an object the first time it is seen.
-static void PFBProbeSeen(NSHashTable* __strong* table, NSUInteger* made, id object) {
-    if (!*table) {
-        *table = [NSHashTable weakObjectsHashTable];
-    }
-    if (![*table containsObject:object]) {
-        [*table addObject:object];
-        (*made)++;
-    }
-}
-
-static void PFBProbeNoteBar(UIView* bar) {
-    if (gProbeBar != bar) {
-        gProbeBar = bar;
-        gProbeBarLayer = bar.layer;
-    }
-    PFBProbeSeen(&gProbeBarsSeen, &gProbeBarsMade, bar);
-}
-
-// MARK: - Animations and filters in the bar
-
-static NSMutableDictionary<NSString*, NSNumber*>* gProbeAnimationKinds;
-static NSMutableDictionary<NSString*, NSNumber*>* gProbeMissedKinds;
-static NSMutableDictionary<NSString*, NSNumber*>* gProbeMissedOwners;
-
-// "filters.gaussianBlur.inputRadius" counts as "filters.gaussianBlur", "position.x" as "position".
-static NSString* PFBProbeAnimationKind(NSString* key) {
-    if (!key.length) {
-        return @"(no key)";
-    }
-    NSArray<NSString*>* parts = [key componentsSeparatedByString:@"."];
-    if (parts.count >= 2 && [parts[0] isEqualToString:@"filters"]) {
-        return [NSString stringWithFormat:@"filters.%@", parts[1]];
-    }
-    return parts[0];
-}
-
+// What a layer belongs to: its view's class, or the layer's own.
 static NSString* PFBProbeLayerOwner(CALayer* layer) {
     id delegate = layer.delegate;
     return PFBProbeName([delegate isKindOfClass:[UIView class]] ? [delegate class] : [layer class]);
 }
 
-static void PFBProbeNoteAnimation(CALayer* layer, NSString* key, BOOL landed, BOOL filtersGone) {
-    if (!gProbeAnimationKinds) {
-        gProbeAnimationKinds = [NSMutableDictionary dictionary];
-        gProbeMissedKinds = [NSMutableDictionary dictionary];
-        gProbeMissedOwners = [NSMutableDictionary dictionary];
-    }
-    NSString* kind = PFBProbeAnimationKind(key);
-    PFBProbeNote(PFBProbeAnimation, NO, 0);
-    if ([kind hasPrefix:@"filters"]) {
-        PFBProbeNote(PFBProbeFilterAnimation, NO, 0);
-    }
-    PFBProbeTally(gProbeAnimationKinds, kind);
-    if (landed) {
-        return;
-    }
-    PFBProbeNote(PFBProbeAnimationMissed, NO, 0);
-    if (filtersGone) {
-        PFBProbeNote(PFBProbeFiltersGone, NO, 0);
-    }
-    PFBProbeTally(gProbeMissedKinds, kind);
-    PFBProbeTally(gProbeMissedOwners, PFBProbeLayerOwner(layer));
-}
-
-// MARK: - Touches on the bar
-
-@interface PFBProbeTap : NSObject
-@property(nonatomic) CFTimeInterval began;
-@property(nonatomic) CFTimeInterval ended;
-@property(nonatomic) CGFloat x;
-@property(nonatomic, copy) NSString* view;
-@property(nonatomic, copy) NSString* place;
-@property(nonatomic, copy) NSString* phase;
-@property(nonatomic, copy) NSString* screenBefore;
-@property(nonatomic, copy) NSString* screenAfter;
-@property(nonatomic) NSUInteger trackingBefore;
-@property(nonatomic) NSUInteger trackingAfter;
-@end
-
-@implementation PFBProbeTap
-@end
-
-static NSMutableDictionary<NSValue*, PFBProbeTap*>* gProbeOpenTaps;
-static NSMutableArray<PFBProbeTap*>* gProbeTaps;
-static NSUInteger gProbeTapCount;
-static NSUInteger gProbeTapsOnBar;
-static NSUInteger gProbeTapsOnOldBar;
-static NSUInteger gProbeTapsEnded;
-static NSUInteger gProbeTapsCancelled;
-static NSUInteger gProbeTapsWithScreen;
-static NSUInteger gProbeTrackingStates[6];
-static NSString* gProbeTrackingRecognizer;
-
-// The screen in front: the last full-height controller that appeared.
-static NSString* gProbeScreen;
-static CFTimeInterval gProbeScreenTime;
-
-static void PFBProbeNoteScreen(UIViewController* controller) {
-    static Class barController;
-    static dispatch_once_t once;
-    dispatch_once(&once, ^{
-      barController = NSClassFromString(@"_TtC11XNavigation16TabBarController");
-    });
-    if ([controller isKindOfClass:[UINavigationController class]] ||
-        [controller isKindOfClass:[UITabBarController class]] ||
-        (barController && [controller isKindOfClass:barController])) {
-        return;
-    }
-    UIView* view = controller.viewIfLoaded;
-    UIWindow* window = view.window;
-    if (!window || CGRectGetHeight(view.bounds) < CGRectGetHeight(window.bounds) * 0.5) {
-        return;
-    }
-    gProbeScreen = PFBProbeName([controller class]);
-    gProbeScreenTime = CACurrentMediaTime();
-}
-
-// Touches that start in the bottom fifth of the screen, where the bar sits.
-static void PFBProbeTouches(UIWindow* window, UIEvent* event) {
-    if (!gProbeOpenTaps) {
-        gProbeOpenTaps = [NSMutableDictionary dictionary];
-        gProbeTaps = [NSMutableArray array];
-    }
-    for (UITouch* touch in [event touchesForWindow:window]) {
-        NSValue* key = [NSValue valueWithNonretainedObject:touch];
-        if (touch.phase == UITouchPhaseBegan) {
-            CGPoint point = [touch locationInView:window];
-            CGRect bounds = window.bounds;
-            if (CGRectGetHeight(bounds) <= 0 || point.y < CGRectGetHeight(bounds) * 0.8) {
-                continue;
-            }
-            if (gProbeOpenTaps.count > 16) {
-                [gProbeOpenTaps removeAllObjects];
-            }
-            PFBProbeTap* tap = [PFBProbeTap new];
-            tap.began = CACurrentMediaTime();
-            tap.x = point.x / MAX(CGRectGetWidth(bounds), 1.0);
-            tap.view = PFBProbeName([touch.view class]);
-            if (PFBProbeViewInBar(touch.view)) {
-                tap.place = @"glass bar";
-                gProbeTapsOnBar++;
-            } else if (PFBProbeViewInOldBar(touch.view)) {
-                tap.place = @"old bar";
-                gProbeTapsOnOldBar++;
-            } else {
-                tap.place = @"elsewhere";
-            }
-            tap.phase = @"still down";
-            tap.screenBefore = gProbeScreen ?: @"?";
-            tap.trackingBefore = gProbeCounts[PFBProbeTracking].total;
-            gProbeOpenTaps[key] = tap;
-            [gProbeTaps addObject:tap];
-            if (gProbeTaps.count > 12) {
-                [gProbeTaps removeObjectAtIndex:0];
-            }
-            gProbeTapCount++;
-        } else if (touch.phase == UITouchPhaseEnded || touch.phase == UITouchPhaseCancelled) {
-            PFBProbeTap* tap = gProbeOpenTaps[key];
-            if (!tap) {
-                continue;
-            }
-            [gProbeOpenTaps removeObjectForKey:key];
-            tap.ended = CACurrentMediaTime();
-            BOOL ended = touch.phase == UITouchPhaseEnded;
-            tap.phase = ended ? @"ended" : @"cancelled";
-            if (ended) {
-                gProbeTapsEnded++;
-            } else {
-                gProbeTapsCancelled++;
-            }
-            // A tab change shows its screen within a second and a half.
-            dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1.5 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
-              tap.trackingAfter = gProbeCounts[PFBProbeTracking].total;
-              if (gProbeScreenTime > tap.began && gProbeScreen) {
-                  tap.screenAfter = gProbeScreen;
-                  gProbeTapsWithScreen++;
-              }
-            });
-        }
-    }
-}
-
-// MARK: - Twitter's new navigation
-
-// What the new navigation last answered or was told: the panels it shows, the update it
-// was given, the panels it was sent to.
-static NSArray* gProbePanels;
-static NSString* gProbeUpdatedPanels;
-static NSMutableArray<NSNumber*>* gProbePanelsSet;
-// Set while the side menu works out which panels the tab bar already shows.
-static BOOL gProbeDashQuery;
-
-static NSString* PFBProbePanelsText(NSArray* panels) {
-    if (![panels isKindOfClass:[NSArray class]]) {
-        return panels ? [panels description] : @"none";
-    }
-    return [NSString stringWithFormat:@"[%@]", [[panels valueForKey:@"description"] componentsJoinedByString:@" "]];
-}
-
-// MARK: - The main screens
-
-// Each main screen is taken once per launch, a moment after it appeared.
-static NSMutableDictionary<NSString*, NSString*>* gProbeScreenTexts;
-static NSMutableSet<NSString*>* gProbeScreensTaken;
-
-// A glyph by the name it was loaded with, its system symbol, or its size.
-static NSString* PFBProbeImageText(UIImage* image) {
-    if (!image) {
-        return @"no image";
-    }
-    id vector = objc_getAssociatedObject(image, (const void*)NSSelectorFromString(@"tfn_vectorImageNamed:fitsSize:fillColor:"));
-    if ([vector isKindOfClass:[NSString class]]) {
-        return [@"vector " stringByAppendingString:vector];
-    }
-    if (image.isSymbolImage) {
-        NSString* description = image.description;
-        NSRange start = [description rangeOfString:@"symbol("];
-        NSRange end = start.location == NSNotFound
-                          ? start
-                          : [description rangeOfString:@")"
-                                                options:0
-                                                  range:NSMakeRange(NSMaxRange(start), description.length - NSMaxRange(start))];
-        return end.location == NSNotFound
-                   ? @"symbol"
-                   : [description substringWithRange:NSMakeRange(start.location, NSMaxRange(end) - start.location)];
-    }
-    return [NSString stringWithFormat:@"image %.0fx%.0f", image.size.width, image.size.height];
-}
-
-static NSString* PFBProbeItemText(UIBarButtonItem* item) {
-    NSMutableArray<NSString*>* parts = [NSMutableArray arrayWithObject:PFBProbeName([item class])];
-    if (item.tag) {
-        [parts addObject:[NSString stringWithFormat:@"tag %ld", (long)item.tag]];
-    }
-    if (item.title.length) {
-        [parts addObject:[NSString stringWithFormat:@"\"%@\"", item.title]];
-    }
-    if (item.image) {
-        [parts addObject:PFBProbeImageText(item.image)];
-    }
-    if (item.customView) {
-        [parts addObject:[@"view " stringByAppendingString:PFBProbeName([item.customView class])]];
-    }
-    if (item.action) {
-        [parts addObject:NSStringFromSelector(item.action)];
-    }
-    return [parts componentsJoinedByString:@" "];
-}
-
-static NSString* PFBProbeItemsText(NSArray<UIBarButtonItem*>* items) {
-    if (!items.count) {
-        return @"none";
-    }
-    NSMutableArray<NSString*>* texts = [NSMutableArray array];
-    for (UIBarButtonItem* item in items) {
-        [texts addObject:PFBProbeItemText(item)];
-    }
-    return [texts componentsJoinedByString:@" | "];
-}
-
-// Views whose class name holds one of the parts, outside each other, at most cap.
-static NSArray<UIView*>* PFBProbeViewsNamed(UIView* root, NSArray<NSString*>* parts, NSUInteger cap) {
-    NSMutableArray<UIView*>* found = [NSMutableArray array];
-    PFBWalkAllSubviews(root, 40, ^(UIView* view) {
-      if (found.count >= cap) {
-          return;
-      }
-      for (UIView* earlier in found) {
-          if ([view isDescendantOfView:earlier]) {
-              return;
-          }
-      }
-      NSString* name = NSStringFromClass([view class]);
-      for (NSString* part in parts) {
-          if ([name containsString:part]) {
-              [found addObject:view];
-              return;
-          }
+static UIImageView* PFBProbeGlyphView(UIView* view) {
+    __block UIImageView* found = nil;
+    PFBWalkAllSubviews(view, 6, ^(UIView* sub) {
+      if (!found && [sub isKindOfClass:[UIImageView class]]) {
+          found = (UIImageView*)sub;
       }
     });
     return found;
 }
 
-static NSString* PFBProbeFrameText(UIView* view) {
-    CGRect frame = [view convertRect:view.bounds toView:nil];
-    return [NSString stringWithFormat:@"at %.0f,%.0f %.0fx%.0f%@%@", frame.origin.x, frame.origin.y, frame.size.width,
-                                      frame.size.height, view.hidden ? @", hidden" : @"",
-                                      view.alpha <= 0.01 ? @", clear" : @""];
+// The bar's selected tab, read from its stored index.
+static NSInteger PFBProbeSelectedIndex(UIView* bar) {
+    Ivar ivar = class_getInstanceVariable([bar class], "selectedIndex");
+    if (!ivar) {
+        return NSNotFound;
+    }
+    NSInteger value = *(NSInteger*)((uint8_t*)(__bridge void*)bar + ivar_getOffset(ivar));
+    return value >= -1 && value < 64 ? value : NSNotFound;
 }
 
-// The controls a bar draws, in order: class, place, label and glyph.
-static NSString* PFBProbeDrawnButtons(UIView* bar) {
-    NSMutableArray<NSString*>* found = [NSMutableArray array];
-    PFBWalkAllSubviews(bar, 16, ^(UIView* view) {
-      if (found.count >= 12 || view == bar || !view.window || view.hidden || view.alpha <= 0.01 ||
-          (![view isKindOfClass:[UIControl class]] && ![NSStringFromClass([view class]) containsString:@"Button"])) {
-          return;
-      }
-      __block UIImage* glyph = nil;
-      PFBWalkAllSubviews(view, 5, ^(UIView* sub) {
-        if (!glyph && [sub isKindOfClass:[UIImageView class]]) {
-            glyph = ((UIImageView*)sub).image;
+static id PFBProbeAppNavigation(void) {
+    T1HostViewController* host = [T1HostViewController sharedHostViewController];
+    return [host respondsToSelector:@selector(appNavigation)] ? [host appNavigation] : nil;
+}
+
+// The panels Twitter's new navigation shows, with their names.
+static NSString* PFBProbePanelsText(void) {
+    id navigation = PFBProbeAppNavigation();
+    NSArray* panels = [navigation respondsToSelector:@selector(visiblePanelIDs)] ? [navigation visiblePanelIDs] : nil;
+    if (![panels isKindOfClass:[NSArray class]]) {
+        return [NSString stringWithFormat:@"none (%@)", PFBProbeName([navigation class])];
+    }
+    NSMutableArray<NSString*>* names = [NSMutableArray array];
+    BOOL named = [T1PanelIdentity respondsToSelector:@selector(localizedNameForPanelID:)];
+    for (id panel in panels) {
+        long long panelID = [panel respondsToSelector:@selector(longLongValue)] ? [panel longLongValue] : -1;
+        NSString* name = named ? [T1PanelIdentity localizedNameForPanelID:panelID] : nil;
+        [names addObject:[NSString stringWithFormat:@"%lld %@", panelID, name.length ? name : @"?"]];
+    }
+    return [NSString stringWithFormat:@"[%@]", [names componentsJoinedByString:@", "]];
+}
+
+static NSString* PFBProbeItemText(UIView* item, UIView* bar, BOOL full) {
+    UIImageView* glyph = PFBProbeGlyphView(item);
+    CGRect frame = [item convertRect:item.bounds toView:bar];
+    NSMutableString* text = [NSMutableString stringWithFormat:@"x %.0f w %.0f", frame.origin.x, frame.size.width];
+    if (full) {
+        NSString* label = item.accessibilityLabel;
+        [text appendFormat:@" \"%@\"", label.length ? label : @""];
+        if (glyph) {
+            CGRect inItem = [glyph convertRect:glyph.bounds toView:item];
+            CGRect holder = glyph.superview ? [glyph.superview convertRect:glyph.superview.bounds toView:item] : CGRectZero;
+            [text appendFormat:@", glyph %.0fx%.0f at %.1f,%.1f in a %.0fx%.0f holder", inItem.size.width,
+                               inItem.size.height, inItem.origin.x, inItem.origin.y, holder.size.width,
+                               holder.size.height];
         }
-      });
-      CGRect frame = [view convertRect:view.bounds toView:nil];
-      NSString* label = view.accessibilityLabel ?: view.accessibilityIdentifier;
-      [found addObject:[NSString stringWithFormat:@"%@ at x %.0f w %.0f%@ %@", PFBProbeName([view class]),
-                                                  frame.origin.x, frame.size.width,
-                                                  label.length ? [NSString stringWithFormat:@" \"%@\"", label] : @"",
-                                                  PFBProbeImageText(glyph)]];
-    });
-    return found.count ? [found componentsJoinedByString:@" | "] : @"none";
-}
-
-// The screen's navigation, the items it asks its bar for, and what the bar draws.
-static NSString* PFBProbeTopBarText(UIViewController* controller) {
-    UINavigationController* navigation = controller.navigationController;
-    UINavigationBar* bar = navigation.navigationBar;
-    UINavigationItem* item = controller.navigationItem;
-    NSMutableString* text = [NSMutableString
-        stringWithFormat:@"navigation %@, bar %@%@ · items left: %@ · items right: %@ · title view %@",
-                         PFBProbeName([navigation class]), PFBProbeName([bar class]),
-                         bar.hidden || navigation.navigationBarHidden ? @" (hidden)" : @"",
-                         PFBProbeItemsText(item.leftBarButtonItems), PFBProbeItemsText(item.rightBarButtonItems),
-                         PFBProbeName([item.titleView class])];
-    if (@available(iOS 16.0, *)) {
-        NSMutableArray<UIBarButtonItem*>* trailing = [NSMutableArray array];
-        for (UIBarButtonItemGroup* group in item.trailingItemGroups) {
-            [trailing addObjectsFromArray:group.barButtonItems];
-        }
-        [text appendFormat:@" · trailing groups: %@", PFBProbeItemsText(trailing)];
     }
-    [text appendFormat:@" · the bar draws: %@", bar ? PFBProbeDrawnButtons(bar) : @"no bar"];
-    return text;
-}
-
-static NSString* PFBProbeComposeText(UIWindow* window) {
-    NSArray<UIView*>* buttons =
-        PFBProbeViewsNamed(window, @[ @"FloatingActionButton", @"TabBarAccessoryButtonView", @"ExpandingButton" ], 4);
-    NSMutableArray<NSString*>* texts = [NSMutableArray array];
-    for (UIView* button in buttons) {
-        NSMutableArray<NSString*>* glyphs = [NSMutableArray array];
-        PFBWalkAllSubviews(button, 10, ^(UIView* sub) {
-          if (glyphs.count < 4 && [sub isKindOfClass:[UIImageView class]] && ((UIImageView*)sub).image) {
-              [glyphs addObject:PFBProbeImageText(((UIImageView*)sub).image)];
-          }
-        });
-        [texts addObject:[NSString stringWithFormat:@"%@ %@, glyphs [%@]", PFBProbeName([button class]),
-                                                    PFBProbeFrameText(button), [glyphs componentsJoinedByString:@", "]]];
+    if (glyph) {
+        NSString* filters = PFBProbeFiltersText(glyph.layer);
+        [text appendFormat:@", %@, tint %@%@%@", PFBProbeImageText(glyph.image), PFBProbeColorText(glyph.tintColor),
+                           glyph.alpha < 0.99 ? [NSString stringWithFormat:@", alpha %.2f", glyph.alpha] : @"",
+                           filters.length ? [NSString stringWithFormat:@", filters %@", filters] : @""];
+    } else {
+        [text appendString:@", no glyph"];
     }
-    return texts.count ? [texts componentsJoinedByString:@" | "] : @"none found";
-}
-
-// Views by class name, with their labels: Explore's tabs, the Spaces line, a Tweet's footer.
-static NSString* PFBProbeNamedViewsText(UIWindow* window, NSArray<NSString*>* parts) {
-    NSMutableArray<NSString*>* texts = [NSMutableArray array];
-    for (UIView* view in PFBProbeViewsNamed(window, parts, 4)) {
-        NSMutableArray<NSString*>* labels = [NSMutableArray array];
-        PFBWalkAllSubviews(view, 12, ^(UIView* sub) {
-          NSString* label = [sub isKindOfClass:[UILabel class]] ? ((UILabel*)sub).text : nil;
-          if (labels.count < 10 && label.length && !sub.hidden) {
-              [labels addObject:label];
-          }
-        });
-        [texts addObject:[NSString stringWithFormat:@"%@ %@, labels [%@]", PFBProbeName([view class]),
-                                                    PFBProbeFrameText(view), [labels componentsJoinedByString:@", "]]];
-    }
-    return texts.count ? [texts componentsJoinedByString:@" | "] : @"none found";
-}
-
-// What the side menu offers, as accessibility reads it: its rows are SwiftUI.
-static void PFBProbeCollectLabels(id element, NSInteger depth, NSMutableArray<NSString*>* labels) {
-    if (!element || depth > 14 || labels.count >= 40) {
-        return;
-    }
-    if ([element isAccessibilityElement]) {
-        NSString* label = [element accessibilityLabel];
-        if (label.length && ![labels containsObject:label]) {
-            [labels addObject:label];
-        }
-        return;
-    }
-    NSArray* children = [element accessibilityElements];
-    if (!children.count && [element isKindOfClass:[UIView class]]) {
-        children = ((UIView*)element).subviews;
-    }
-    for (id child in children) {
-        PFBProbeCollectLabels(child, depth + 1, labels);
-    }
-}
-
-static NSString* const kPFBProbeTopic = @"glass probe";
-
-static NSDictionary<NSString*, NSString*>* PFBProbeScreenNames(void) {
-    return @{
-        @"HomeTimelineContainerViewController" : @"Home",
-        @"GuideContainerViewController" : @"Explore",
-        @"T1NotificationsViewController" : @"Notifications",
-        @"XChatViewController" : @"Chat",
-        @"T1ConversationContainerViewController" : @"Tweet",
-        @"DashHostingController" : @"side menu",
-    };
-}
-
-static NSString* PFBProbeSnapshot(NSString* screen, UIViewController* controller) {
-    UIWindow* window = controller.viewIfLoaded.window;
-    if ([screen isEqualToString:@"side menu"]) {
-        NSMutableArray<NSString*>* labels = [NSMutableArray array];
-        PFBProbeCollectLabels(controller.view, 0, labels);
-        return [NSString stringWithFormat:@"entries [%@]", [labels componentsJoinedByString:@", "]];
-    }
-    NSMutableString* text = [PFBProbeTopBarText(controller) mutableCopy];
-    if ([screen isEqualToString:@"Home"]) {
-        [text appendFormat:@" · compose button: %@ · Spaces line: %@", PFBProbeComposeText(window),
-                           PFBProbeNamedViewsText(window, @[ @"FleetLine" ])];
-    } else if ([screen isEqualToString:@"Explore"]) {
-        [text appendFormat:@" · tabs: %@", PFBProbeNamedViewsText(window, @[ @"Segmented" ])];
-    } else if ([screen isEqualToString:@"Tweet"]) {
-        [text appendFormat:@" · footer: %@", PFBProbeNamedViewsText(window, @[ @"ConversationFooter" ])];
+    if (item.alpha < 0.99 || item.hidden) {
+        [text appendFormat:@", item %@", item.hidden ? @"hidden" : [NSString stringWithFormat:@"alpha %.2f", item.alpha]];
     }
     return text;
 }
 
-static void PFBProbeScheduleSnapshot(UIViewController* controller) {
-    NSString* name = NSStringFromClass([controller class]);
-    __block NSString* screen = nil;
-    [PFBProbeScreenNames() enumerateKeysAndObjectsUsingBlock:^(NSString* part, NSString* label, BOOL* stop) {
-      if ([name containsString:part]) {
-          screen = label;
-          *stop = YES;
-      }
-    }];
-    if (!gProbeScreensTaken) {
-        gProbeScreensTaken = [NSMutableSet set];
-        gProbeScreenTexts = [NSMutableDictionary dictionary];
-    }
-    if (!screen || [gProbeScreensTaken containsObject:screen]) {
-        return;
-    }
-    [gProbeScreensTaken addObject:screen];
-    __weak UIViewController* weakController = controller;
-    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1.5 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
-      UIViewController* shown = weakController;
-      if (!shown.viewIfLoaded.window) {
-          [gProbeScreensTaken removeObject:screen];
-          return;
-      }
-      @try {
-          NSString* text = PFBProbeSnapshot(screen, shown);
-          gProbeScreenTexts[screen] = text;
-          PFBCompatMeasure(kPFBProbeTopic, [NSString stringWithFormat:@"launch %@, %@: %@", gProbeLaunchClock, screen, text],
-                           60);
-      } @catch (id exception) {
-          gProbeScreenTexts[screen] = [NSString stringWithFormat:@"stopped: %@", exception];
-      }
-    });
-}
-
-// MARK: - Main thread
-
-// Time between waking up and going back to sleep, with Core Animation's commit, which
-// runs just before the sleep, included.
-static CFTimeInterval gProbeAwakeSince;
-static CFTimeInterval gProbeBusyTotal;
-static CFTimeInterval gProbeLongestPass;
-
-static void PFBProbeBusy(CFTimeInterval from, CFTimeInterval to) {
-    while (from < to) {
-        NSInteger second = (NSInteger)(from - gProbeStart);
-        CFTimeInterval chunkEnd = MIN(to, gProbeStart + (CFTimeInterval)(second + 1));
-        if (chunkEnd <= from) {
+// From a glyph up to the bar: each view and the filters on its layer.
+static NSString* PFBProbeChainText(UIView* glyph, UIView* bar) {
+    NSMutableArray<NSString*>* steps = [NSMutableArray array];
+    for (UIView* node = glyph; node && steps.count < 12; node = node.superview) {
+        NSString* filters = PFBProbeFiltersText(node.layer);
+        [steps addObject:[NSString stringWithFormat:@"%@%@%@", PFBProbeName([node class]),
+                                                    filters.length ? [NSString stringWithFormat:@" [%@]", filters] : @"",
+                                                    node.alpha < 0.99 ? [NSString stringWithFormat:@" alpha %.2f", node.alpha] : @""]];
+        if (node == bar) {
             break;
         }
-        if (second >= 0 && second < PFB_PROBE_SECONDS) {
-            gProbeBusy[second] += (float)(chunkEnd - from);
+    }
+    return [steps componentsJoinedByString:@" < "];
+}
+
+// The bar's tabs row by row: where each sits, its label, glyph, tint and filters.
+static NSString* PFBProbeBarText(void) {
+    UIView* bar = gProbeBar;
+    if (!bar) {
+        return NSClassFromString(@"_TtC11XNavigation10TabBarView") ? @"never laid out" : @"not in this Twitter";
+    }
+    CGRect frame = [bar convertRect:bar.bounds toView:nil];
+    NSMutableString* text = [NSMutableString
+        stringWithFormat:@"%@ at %.0f,%.0f %.0fx%.0f, selected index %@ · panels %@", PFBProbeName([bar class]),
+                         frame.origin.x, frame.origin.y, frame.size.width, frame.size.height,
+                         PFBProbeSelectedIndex(bar) == NSNotFound ? @"?" : @(PFBProbeSelectedIndex(bar)),
+                         PFBProbePanelsText()];
+    NSMutableArray<UIView*>* rows = [NSMutableArray array];
+    NSMapTable<UIView*, NSMutableArray<UIView*>*>* items = [NSMapTable strongToStrongObjectsMapTable];
+    PFBWalkAllSubviews(bar, 30, ^(UIView* view) {
+      if (!gProbeItemClass || ![view isKindOfClass:gProbeItemClass] || !view.superview) {
+          return;
+      }
+      NSMutableArray<UIView*>* row = [items objectForKey:view.superview];
+      if (!row) {
+          row = [NSMutableArray array];
+          [items setObject:row forKey:view.superview];
+          [rows addObject:view.superview];
+      }
+      [row addObject:view];
+    });
+    for (NSUInteger index = 0; index < rows.count; index++) {
+        UIView* rowView = rows[index];
+        NSMutableArray<UIView*>* row = [items objectForKey:rowView];
+        [row sortUsingComparator:^NSComparisonResult(UIView* a, UIView* b) {
+          return a.frame.origin.x < b.frame.origin.x ? NSOrderedAscending
+                                                     : (a.frame.origin.x > b.frame.origin.x ? NSOrderedDescending : NSOrderedSame);
+        }];
+        NSString* rowFilters = PFBProbeFiltersText(rowView.layer);
+        [text appendFormat:@"\n  row %lu, %@%@%@ (%lu tabs):", (unsigned long)index + 1, PFBProbeName([rowView class]),
+                           rowFilters.length ? [NSString stringWithFormat:@" [%@]", rowFilters] : @"",
+                           rowView.alpha < 0.99 || rowView.hidden
+                               ? [NSString stringWithFormat:@" %@", rowView.hidden ? @"hidden" : [NSString stringWithFormat:@"alpha %.2f", rowView.alpha]]
+                               : @"",
+                           (unsigned long)row.count];
+        for (UIView* item in row) {
+            [text appendFormat:@"\n    %@", PFBProbeItemText(item, bar, index == 0)];
         }
-        gProbeBusyTotal += chunkEnd - from;
-        from = chunkEnd;
+        NSInteger selected = PFBProbeSelectedIndex(bar);
+        UIView* sample = selected != NSNotFound && selected >= 0 && (NSUInteger)selected < row.count ? row[(NSUInteger)selected] : row.firstObject;
+        UIImageView* glyph = PFBProbeGlyphView(sample);
+        if (glyph) {
+            [text appendFormat:@"\n    from the %@ glyph to the bar: %@", sample == row.firstObject && selected != 0 ? @"first" : @"selected",
+                               PFBProbeChainText(glyph, bar)];
+        }
     }
-}
-
-static void PFBProbeWake(__unused CFRunLoopObserverRef observer, __unused CFRunLoopActivity activity,
-                         __unused void* info) {
-    gProbeAwakeSince = CACurrentMediaTime();
-}
-
-static void PFBProbeSleep(__unused CFRunLoopObserverRef observer, __unused CFRunLoopActivity activity,
-                          __unused void* info) {
-    if (gProbeAwakeSince <= 0) {
-        return;
-    }
-    CFTimeInterval now = CACurrentMediaTime();
-    PFBProbeBusy(gProbeAwakeSince, now);
-    gProbeLongestPass = MAX(gProbeLongestPass, now - gProbeAwakeSince);
-    gProbeAwakeSince = 0;
-}
-
-// A pass still running is counted up to now.
-static void PFBProbeBusyCatchUp(void) {
-    if (gProbeAwakeSince > 0) {
-        CFTimeInterval now = CACurrentMediaTime();
-        PFBProbeBusy(gProbeAwakeSince, now);
-        gProbeAwakeSince = now;
-    }
-}
-
-// MARK: - The report
-
-static NSString* PFBProbeCountText(PFBProbeEvent event, BOOL withOurs) {
-    PFBProbeCount count = gProbeCounts[event];
-    NSMutableString* text = [NSMutableString stringWithFormat:@"%lu", (unsigned long)count.total];
-    if (withOurs && count.total) {
-        [text appendFormat:@" (%lu by PrimeFreeBird)", (unsigned long)count.ours];
-    }
-    if (count.peak > 1) {
-        [text appendFormat:@", peak %lu/s", (unsigned long)count.peak];
-    }
-    if (count.spent >= 0.001) {
-        [text appendFormat:@", %.0f ms", count.spent * 1000.0];
-    }
+    Class pillClass = NSClassFromString(@"_TtC11XNavigation10TabBarPill");
+    PFBWalkAllSubviews(bar, 20, ^(UIView* view) {
+      if (pillClass && [view isKindOfClass:pillClass]) {
+          CGRect pill = [view convertRect:view.bounds toView:bar];
+          NSMutableArray<NSString*>* parts = [NSMutableArray array];
+          for (UIView* sub in view.subviews) {
+              NSString* filters = PFBProbeFiltersText(sub.layer);
+              [parts addObject:[NSString stringWithFormat:@"%@%@", PFBProbeName([sub class]),
+                                                          filters.length ? [NSString stringWithFormat:@" [%@]", filters] : @""]];
+          }
+          [text appendFormat:@"\n  pill at %.0f,%.0f %.0fx%.0f: %@", pill.origin.x, pill.origin.y, pill.size.width,
+                             pill.size.height, parts.count ? [parts componentsJoinedByString:@", "] : @"no parts"];
+      }
+    });
     return text;
 }
 
-static NSString* PFBProbeTallyText(NSDictionary<NSString*, NSNumber*>* tally) {
-    if (!tally.count) {
+// The compose button: where it is, its glyph and the glass behind it.
+static NSString* PFBProbeComposeText(void) {
+    UIView* host = gProbeAccessory;
+    if (!host) {
+        return @"not laid out yet";
+    }
+    CGRect frame = [host convertRect:host.bounds toView:nil];
+    NSMutableString* text = [NSMutableString stringWithFormat:@"%@ at %.0f,%.0f %.0fx%.0f%@%@", PFBProbeName([host class]),
+                                                              frame.origin.x, frame.origin.y, frame.size.width,
+                                                              frame.size.height, host.hidden ? @", hidden" : @"",
+                                                              host.alpha < 0.99 ? [NSString stringWithFormat:@", alpha %.2f", host.alpha] : @""];
+    NSMutableArray<NSString*>* parts = [NSMutableArray array];
+    PFBWalkAllSubviews(host, 14, ^(UIView* view) {
+      if (parts.count >= 10) {
+          return;
+      }
+      if ([view isKindOfClass:[UIImageView class]] && ((UIImageView*)view).image) {
+          UIImageView* glyph = (UIImageView*)view;
+          [parts addObject:[NSString stringWithFormat:@"glyph %.0fx%.0f %@ tint %@", glyph.bounds.size.width,
+                                                      glyph.bounds.size.height, PFBProbeImageText(glyph.image),
+                                                      PFBProbeColorText(glyph.tintColor)]];
+      } else if ([view isKindOfClass:[UIVisualEffectView class]]) {
+          UIVisualEffect* effect = ((UIVisualEffectView*)view).effect;
+          UIColor* tint = nil;
+          @try {
+              tint = [effect respondsToSelector:@selector(tintColor)] ? [effect valueForKey:@"tintColor"] : nil;
+          } @catch (__unused id exception) {
+          }
+          [parts addObject:[NSString stringWithFormat:@"effect %@ tint %@", PFBProbeName([effect class]),
+                                                      PFBProbeColorText(tint)]];
+      } else if ([view isKindOfClass:[UIControl class]]) {
+          [parts addObject:[NSString stringWithFormat:@"control %@", PFBProbeName([view class])]];
+      }
+    });
+    [text appendFormat:@": %@", parts.count ? [parts componentsJoinedByString:@" · "] : @"no parts"];
+    return text;
+}
+
+// MARK: - Snapshots
+
+static NSMutableArray<NSString*>* gProbeSnapshots;
+static NSUInteger gProbeSnapshotsTaken;
+
+static void PFBProbeTakeSnapshot(NSString* moment) {
+    if (!gProbeSnapshots) {
+        gProbeSnapshots = [NSMutableArray array];
+    }
+    @try {
+        NSString* text = [NSString stringWithFormat:@"%@ (%.0f s): %@", moment, CACurrentMediaTime() - gProbeStart,
+                                                    PFBProbeBarText()];
+        [gProbeSnapshots addObject:text];
+        if (gProbeSnapshots.count > 7) {
+            [gProbeSnapshots removeObjectAtIndex:1];
+        }
+    } @catch (id exception) {
+        [gProbeSnapshots addObject:[NSString stringWithFormat:@"%@: stopped (%@)", moment, exception]];
+    }
+}
+
+static void PFBProbeSnapshotSoon(NSString* moment, double delay) {
+    if (gProbeSnapshotsTaken >= 12) {
+        return;
+    }
+    gProbeSnapshotsTaken++;
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(delay * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+      PFBProbeTakeSnapshot(moment);
+    });
+}
+
+// MARK: - Shrinking on scroll
+
+// The bytes of an XNAVConfiguration's stored configuration, compared with Twitter's
+// four named ones.
+static NSData* PFBProbeConfigBytes(id configuration) {
+    Class cls = NSClassFromString(@"XNAVConfiguration");
+    if (!configuration || !cls || ![configuration isKindOfClass:cls]) {
+        return nil;
+    }
+    Ivar ivar = class_getInstanceVariable(cls, "configuration");
+    ptrdiff_t offset = ivar ? ivar_getOffset(ivar) : 0;
+    size_t size = class_getInstanceSize(cls);
+    if (offset <= 0 || (size_t)offset >= size) {
+        return nil;
+    }
+    return [NSData dataWithBytes:(const uint8_t*)(__bridge void*)configuration + offset length:size - (size_t)offset];
+}
+
+static BOOL gProbeBuildingReferences;
+
+static NSString* PFBProbeConfigText(id configuration) {
+    static NSDictionary<NSString*, NSData*>* references;
+    Class cls = NSClassFromString(@"XNAVConfiguration");
+    if (!references && cls) {
+        gProbeBuildingReferences = YES;
+        NSMutableDictionary<NSString*, NSData*>* found = [NSMutableDictionary dictionary];
+        @try {
+            found[@"standard"] = PFBProbeConfigBytes([cls standardConfiguration]);
+            found[@"pinned"] = PFBProbeConfigBytes([cls pinnedConfiguration]);
+            found[@"hidden"] = PFBProbeConfigBytes([cls hiddenConfiguration]);
+            found[@"pinned transparent"] = PFBProbeConfigBytes([cls pinnedTransparentConfiguration]);
+        } @catch (__unused id exception) {
+        }
+        gProbeBuildingReferences = NO;
+        references = [found copy];
+    }
+    if (!configuration) {
         return @"none";
     }
-    NSArray<NSString*>* names = [tally keysSortedByValueUsingComparator:^NSComparisonResult(NSNumber* a, NSNumber* b) {
-      return [b compare:a];
-    }];
-    NSMutableArray<NSString*>* parts = [NSMutableArray array];
-    for (NSString* name in names) {
-        [parts addObject:[NSString stringWithFormat:@"%@ %@", name, tally[name]]];
-        if (parts.count == 10) {
-            break;
+    NSData* bytes = PFBProbeConfigBytes(configuration);
+    if (!bytes) {
+        return PFBProbeName([configuration class]);
+    }
+    for (NSString* name in references) {
+        if ([references[name] isEqualToData:bytes]) {
+            return name;
         }
+    }
+    NSMutableString* hex = [NSMutableString stringWithString:@"other "];
+    const uint8_t* raw = bytes.bytes;
+    for (NSUInteger i = 0; i < MIN(bytes.length, (NSUInteger)24); i++) {
+        [hex appendFormat:@"%02x", raw[i]];
+    }
+    return hex;
+}
+
+// Whether a screen declares its bars to Twitter's navigation, in Swift or in Objective-C.
+typedef const void* (*PFBProbeConformsFn)(const void* type, const void* protocol);
+typedef const void* (*PFBProbeMetadataFn)(const void* cls);
+
+static NSString* PFBProbeDeclarationText(UIViewController* controller) {
+    static PFBProbeConformsFn conforms;
+    static PFBProbeMetadataFn metadata;
+    static const void* provides;
+    static const void* delegates;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+      conforms = (PFBProbeConformsFn)dlsym(RTLD_DEFAULT, "swift_conformsToProtocol");
+      metadata = (PFBProbeMetadataFn)dlsym(RTLD_DEFAULT, "swift_getObjCClassMetadata");
+      provides = dlsym(RTLD_DEFAULT, "$s11XNavigation32NavigationConfigurationProvidingMp");
+      delegates = dlsym(RTLD_DEFAULT, "$s11XNavigation33NavigationConfigurationDelegatingMp");
+    });
+    NSMutableArray<NSString*>* parts = [NSMutableArray array];
+    const void* type = metadata ? metadata((__bridge const void*)[controller class]) : NULL;
+    if (type && conforms && provides) {
+        [parts addObject:conforms(type, provides) ? @"Swift provides" : @"Swift no"];
+    } else {
+        [parts addObject:@"Swift unreadable"];
+    }
+    if (type && conforms && delegates && conforms(type, delegates)) {
+        [parts addObject:@"Swift delegates"];
+    }
+    Protocol* objc = objc_getProtocol("XNAVConfigurationProviding");
+    SEL getter = NSSelectorFromString(@"xnav_navigationConfiguration");
+    if ((objc && [controller conformsToProtocol:objc]) || [controller respondsToSelector:getter]) {
+        id configuration = [controller respondsToSelector:getter] ? ((id (*)(id, SEL))objc_msgSend)(controller, getter) : nil;
+        [parts addObject:[NSString stringWithFormat:@"ObjC %@", PFBProbeConfigText(configuration)]];
     }
     return [parts componentsJoinedByString:@", "];
 }
 
-// The first minute, one value a second, without the zeros at the end.
-static NSString* PFBProbeSeriesText(NSUInteger slot) {
-    NSInteger last = -1;
-    for (NSInteger second = 0; second < 60; second++) {
-        if (gProbeSeries[slot][second]) {
-            last = second;
-        }
+static NSMutableArray<NSString*>* gProbeStacks;
+static NSMutableDictionary<NSString*, NSString*>* gProbeScreens;
+static __weak UIViewController* gProbeScreen;
+
+static void PFBProbeNoteStack(UIViewController* root, long long capability, id configuration) {
+    if (!gProbeStacks) {
+        gProbeStacks = [NSMutableArray array];
     }
-    if (last < 0) {
-        return @"none";
+    if (gProbeStacks.count >= 14) {
+        return;
     }
-    NSMutableArray<NSString*>* values = [NSMutableArray array];
-    for (NSInteger second = 0; second <= last; second++) {
-        [values addObject:[NSString stringWithFormat:@"%u", (unsigned)gProbeSeries[slot][second]]];
-    }
-    return [values componentsJoinedByString:@" "];
+    [gProbeStacks addObject:[NSString stringWithFormat:@"%@: %@, pop %lld", root ? PFBProbeName([root class]) : @"no root",
+                                                       PFBProbeConfigText(configuration), capability]];
 }
 
-static NSString* PFBProbeBusyText(BOOL withSeries) {
-    PFBProbeBusyCatchUp();
-    CFTimeInterval elapsed = CACurrentMediaTime() - gProbeStart;
-    NSInteger seconds = MIN((NSInteger)elapsed, (NSInteger)PFB_PROBE_SECONDS);
-    float worst = 0;
-    NSInteger worstAt = 0;
-    NSInteger over = 0;
-    for (NSInteger second = 0; second < seconds; second++) {
-        if (gProbeBusy[second] > worst) {
-            worst = gProbeBusy[second];
-            worstAt = second;
+// One window per scroll: what the bar and the top bar did while the finger moved, and
+// for 1.5 s after.
+@interface PFBProbeScrollWindow : NSObject
+@property(nonatomic, copy) NSString* screen;
+@property(nonatomic) CFTimeInterval began;
+@property(nonatomic) CFTimeInterval lastPan;
+@property(nonatomic) NSUInteger pans;
+@property(nonatomic) NSUInteger samples;
+@property(nonatomic) CGFloat barMinWidth, barMaxWidth, barMinHeight, barMaxHeight, barMinY, barMaxY, barMinAlpha;
+@property(nonatomic) CGFloat barMinScale;
+@property(nonatomic) CGFloat topMinY, topMaxY, topMinHeight, topMaxHeight, topMinAlpha;
+@end
+
+@implementation PFBProbeScrollWindow
+@end
+
+@interface PFBProbeSampler : NSObject
+@property(nonatomic, strong) CADisplayLink* link;
+@property(nonatomic, strong) PFBProbeScrollWindow* window;
+- (void)tick:(CADisplayLink*)link;
+@end
+
+static NSMutableArray<NSString*>* gProbeScrollTexts;
+static PFBProbeSampler* gProbeSampler;
+static NSUInteger gProbeScrollWindows;
+static NSUInteger gProbeCollapsedWindows;
+
+static NSString* PFBProbeScrollText(PFBProbeScrollWindow* window) {
+    return [NSString stringWithFormat:@"%@, %lu pans, %lu samples · tab bar width %.0f to %.0f, height %.0f to %.0f, "
+                                      @"top %.0f to %.0f, scale down to %.2f, alpha down to %.2f · top bar y %.0f to "
+                                      @"%.0f, height %.0f to %.0f, alpha down to %.2f",
+                                      window.screen, (unsigned long)window.pans, (unsigned long)window.samples,
+                                      window.barMinWidth, window.barMaxWidth, window.barMinHeight, window.barMaxHeight,
+                                      window.barMinY, window.barMaxY, window.barMinScale, window.barMinAlpha,
+                                      window.topMinY, window.topMaxY, window.topMinHeight, window.topMaxHeight,
+                                      window.topMinAlpha];
+}
+
+@implementation PFBProbeSampler
+
+- (void)tick:(CADisplayLink*)link {
+    PFBProbeScrollWindow* window = self.window;
+    CFTimeInterval now = CACurrentMediaTime();
+    if (!window || now - window.lastPan > 1.5) {
+        [link invalidate];
+        self.link = nil;
+        if (window && window.samples) {
+            gProbeScrollWindows++;
+            gProbeCollapsedWindows += window.barMinWidth < window.barMaxWidth - 20.0 || window.barMinScale < 0.95 ? 1 : 0;
+            if (!gProbeScrollTexts) {
+                gProbeScrollTexts = [NSMutableArray array];
+            }
+            [gProbeScrollTexts addObject:PFBProbeScrollText(window)];
+            if (gProbeScrollTexts.count > 6) {
+                [gProbeScrollTexts removeObjectAtIndex:0];
+            }
         }
-        over += gProbeBusy[second] > 0.8f ? 1 : 0;
+        self.window = nil;
+        return;
     }
-    NSMutableString* text = [NSMutableString
-        stringWithFormat:@"busy %.0f%% on average, worst second %.0f%% at %ld s, %ld s over 80%%, longest pass %.0f ms",
-                         elapsed > 0 ? gProbeBusyTotal / elapsed * 100.0 : 0.0, worst * 100.0, (long)worstAt,
-                         (long)over, gProbeLongestPass * 1000.0];
-    if (withSeries) {
-        NSMutableArray<NSString*>* values = [NSMutableArray array];
-        for (NSInteger second = 0; second < MIN(seconds, (NSInteger)60); second++) {
-            [values addObject:[NSString stringWithFormat:@"%.0f", MIN(gProbeBusy[second], 1.0f) * 100.0]];
+    UIView* bar = gProbeBar;
+    if (!bar.window) {
+        return;
+    }
+    CGRect frame = [bar convertRect:bar.bounds toView:nil];
+    CGFloat scale = (CGFloat)sqrt(bar.transform.a * bar.transform.a + bar.transform.c * bar.transform.c);
+    BOOL first = window.samples == 0;
+    window.samples++;
+    window.barMinWidth = first ? frame.size.width : MIN(window.barMinWidth, frame.size.width);
+    window.barMaxWidth = first ? frame.size.width : MAX(window.barMaxWidth, frame.size.width);
+    window.barMinHeight = first ? frame.size.height : MIN(window.barMinHeight, frame.size.height);
+    window.barMaxHeight = first ? frame.size.height : MAX(window.barMaxHeight, frame.size.height);
+    window.barMinY = first ? frame.origin.y : MIN(window.barMinY, frame.origin.y);
+    window.barMaxY = first ? frame.origin.y : MAX(window.barMaxY, frame.origin.y);
+    window.barMinScale = first ? scale : MIN(window.barMinScale, scale);
+    window.barMinAlpha = first ? bar.alpha : MIN(window.barMinAlpha, bar.alpha);
+    UINavigationBar* top = gProbeScreen.navigationController.navigationBar;
+    if (top.window) {
+        CGRect topFrame = [top convertRect:top.bounds toView:nil];
+        BOOL topFirst = window.topMaxHeight <= 0;
+        window.topMinY = topFirst ? topFrame.origin.y : MIN(window.topMinY, topFrame.origin.y);
+        window.topMaxY = topFirst ? topFrame.origin.y : MAX(window.topMaxY, topFrame.origin.y);
+        window.topMinHeight = topFirst ? topFrame.size.height : MIN(window.topMinHeight, topFrame.size.height);
+        window.topMaxHeight = MAX(window.topMaxHeight, topFrame.size.height);
+        window.topMinAlpha = topFirst ? top.alpha : MIN(window.topMinAlpha, top.alpha);
+    }
+}
+
+@end
+
+static void PFBProbeNotePan(void) {
+    if (!gProbeSampler) {
+        gProbeSampler = [PFBProbeSampler new];
+    }
+    CFTimeInterval now = CACurrentMediaTime();
+    if (!gProbeSampler.window) {
+        PFBProbeScrollWindow* window = [PFBProbeScrollWindow new];
+        window.began = now;
+        window.screen = gProbeScreen ? PFBProbeName([gProbeScreen class]) : @"?";
+        gProbeSampler.window = window;
+    }
+    gProbeSampler.window.lastPan = now;
+    gProbeSampler.window.pans++;
+    if (!gProbeSampler.link) {
+        gProbeSampler.link = [CADisplayLink displayLinkWithTarget:gProbeSampler selector:@selector(tick:)];
+        [gProbeSampler.link addToRunLoop:[NSRunLoop mainRunLoop] forMode:NSRunLoopCommonModes];
+    }
+}
+
+// MARK: - Customize tabs
+
+// Twitter's Custom navigation: whether its gate opens for this account, and what it reads.
+// Read once an account is signed in, then kept: the reading builds one of Twitter's objects.
+static NSString* gProbeCustomNavigation;
+
+static NSString* PFBProbeCustomNavigationText(void) {
+    if (gProbeCustomNavigation) {
+        return gProbeCustomNavigation;
+    }
+    NSMutableArray<NSString*>* parts = [NSMutableArray array];
+    @try {
+        id account = [[T1HostViewController sharedHostViewController] currentAccount];
+        Class configClass = NSClassFromString(@"T1TabCustomizationConfig");
+        T1TabCustomizationConfig* config =
+            account && configClass ? [(T1TabCustomizationConfig*)[configClass alloc] initWithAccount:account] : nil;
+        [parts addObject:[NSString stringWithFormat:@"Custom navigation open %@",
+                                                    [config respondsToSelector:@selector(isTabCustomizationEnabled)]
+                                                        ? ([config isTabCustomizationEnabled] ? @"yes" : @"no")
+                                                        : @"?"]];
+        NSString* const* key = (NSString* const*)dlsym(RTLD_DEFAULT, "T1SubscriptionsTabCustomizationEnabledKey");
+        id switches = [account respondsToSelector:@selector(featureSwitches)] ? [account featureSwitches] : nil;
+        NSString* name = key ? *key : nil;
+        NSString* value = name && [switches respondsToSelector:@selector(boolForKey:)]
+                              ? ([switches boolForKey:name] ? @"yes" : @"no")
+                              : @"?";
+        [parts addObject:[NSString stringWithFormat:@"switch %@ %@", name ?: @"not found", value]];
+        [parts addObject:[NSString stringWithFormat:@"Premium tier %@",
+                                                    [account respondsToSelector:@selector(isPremiumTierUser)]
+                                                        ? ([account isPremiumTierUser] ? @"yes" : @"no")
+                                                        : @"?"]];
+        NSArray* claims = [account respondsToSelector:@selector(subscriptionClaims)] ? [account subscriptionClaims] : nil;
+        NSMutableArray<NSString*>* claimTexts = [NSMutableArray array];
+        for (id claim in [claims isKindOfClass:[NSArray class]] ? claims : @[]) {
+            if (claimTexts.count >= 4) {
+                break;
+            }
+            NSString* rest = [claim respondsToSelector:@selector(restId)] ? [claim restId] : nil;
+            id resources = nil;
+            @try {
+                resources = [claim valueForKey:@"resources"];
+            } @catch (__unused id exception) {
+            }
+            NSString* resourcesText = [resources respondsToSelector:@selector(count)]
+                                          ? [[[resources description] componentsSeparatedByCharactersInSet:NSCharacterSet.newlineCharacterSet]
+                                                componentsJoinedByString:@""]
+                                          : @"?";
+            [claimTexts addObject:[NSString stringWithFormat:@"%@ %@", rest ?: @"?",
+                                                             resourcesText.length > 160 ? [resourcesText substringToIndex:160] : resourcesText]];
         }
-        [text appendFormat:@"\n  busy %% each second: %@", values.count ? [values componentsJoinedByString:@" "] : @"none"];
+        [parts addObject:[NSString stringWithFormat:@"claims %lu [%@]", (unsigned long)claims.count,
+                                                    [claimTexts componentsJoinedByString:@" | "]]];
+    } @catch (id exception) {
+        [parts addObject:[NSString stringWithFormat:@"stopped: %@", exception]];
+    }
+    NSString* text = [parts componentsJoinedByString:@" · "];
+    if ([[T1HostViewController sharedHostViewController] currentAccount]) {
+        gProbeCustomNavigation = text;
     }
     return text;
 }
 
-static void PFBProbeWalkLayers(CALayer* layer, NSInteger depth, NSUInteger* layers, NSUInteger* filtered,
-                               NSUInteger* running) {
-    if (!layer || depth > 30) {
-        return;
-    }
-    (*layers)++;
-    *filtered += layer.filters.count ? 1 : 0;
-    *running += layer.animationKeys.count;
-    for (CALayer* sublayer in layer.sublayers) {
-        PFBProbeWalkLayers(sublayer, depth + 1, layers, filtered, running);
-    }
-}
-
-// A view of the old bar: where it is, whether it can be seen and touched, and whether
-// it sits over the glass bar.
-static NSString* PFBProbeOldBarText(NSString* name, UIView* view, CGRect glass) {
-    if (!view) {
-        return [NSString stringWithFormat:@"%@ none", name];
-    }
-    CGRect frame = [view convertRect:view.bounds toView:nil];
-    return [NSString stringWithFormat:@"%@ at %.0f,%.0f %.0fx%.0f, alpha %.2f%@%@%@", name, frame.origin.x,
-                                      frame.origin.y, frame.size.width, frame.size.height, view.alpha,
-                                      view.hidden ? @", hidden" : @"",
-                                      view.userInteractionEnabled ? @"" : @", no touches",
-                                      CGRectIntersectsRect(frame, glass) ? @", over the glass bar" : @""];
-}
-
-// Drawn on screen: neither it nor anything between it and the bar is hidden or clear.
-// The bar keeps three rows of tabs, and only one of them shows.
-static BOOL PFBProbeShownInBar(UIView* view) {
-    for (UIView* node = view; node && node != gProbeBar; node = node.superview) {
-        if (node.hidden || node.alpha <= 0.01) {
-            return NO;
+// Saved values whose key names a tab set or the navigation.
+static NSString* PFBProbeSavedKeysText(void) {
+    NSDictionary* all = [[NSUserDefaults standardUserDefaults] dictionaryRepresentation];
+    NSMutableArray<NSString*>* found = [NSMutableArray array];
+    NSArray<NSString*>* parts = @[ @"tabidentifier", @"tab_identifier", @"navigation", @"customiz", @"census", @"panel" ];
+    for (NSString* key in [all.allKeys sortedArrayUsingSelector:@selector(compare:)]) {
+        if (found.count >= 25 || ![key isKindOfClass:[NSString class]] || [key hasPrefix:@"pfb_"]) {
+            continue;
         }
-    }
-    return YES;
-}
-
-// The bar as it is now: its parts, its layers, the old bar, and what a tap at the
-// center of each tab on screen would reach.
-static NSString* PFBProbeBarText(void) {
-    UIView* bar = gProbeBar;
-    if (!bar) {
-        return NSClassFromString(@"_TtC11XNavigation10TabBarView") ? @"Glass bar: never laid out"
-                                                                   : @"Glass bar: not in this Twitter";
-    }
-    UIWindow* window = bar.window;
-    CGRect frame = [bar convertRect:bar.bounds toView:nil];
-    Class itemClass = NSClassFromString(@"_TtC11XNavigation14TabBarItemView");
-    Class pillClass = NSClassFromString(@"_TtC11XNavigation10TabBarPill");
-    Class lensClass = NSClassFromString(@"_TtC13XDesignSystem10LiquidLens");
-    NSMutableArray<UIView*>* items = [NSMutableArray array];
-    __block NSUInteger allItems = 0;
-    __block NSUInteger pills = 0;
-    __block NSUInteger lenses = 0;
-    PFBWalkAllSubviews(bar, 30, ^(UIView* view) {
-      if (itemClass && [view isKindOfClass:itemClass]) {
-          allItems++;
-          if (PFBProbeShownInBar(view)) {
-              [items addObject:view];
-          }
-      } else if (pillClass && [view isKindOfClass:pillClass]) {
-          pills++;
-      } else if (lensClass && [view isKindOfClass:lensClass]) {
-          lenses++;
-      }
-    });
-    NSUInteger layers = 0;
-    NSUInteger filtered = 0;
-    NSUInteger running = 0;
-    PFBProbeWalkLayers(bar.layer, 0, &layers, &filtered, &running);
-    NSMutableString* text = [NSMutableString
-        stringWithFormat:@"Glass bar: %@ at %.0f,%.0f %.0fx%.0f in %@, alpha %.2f%@ · tabs shown %lu of %lu (made %lu) · "
-                         @"pills %lu · lenses %lu (made %lu) · bars made %lu",
-                         PFBProbeName([bar class]), frame.origin.x, frame.origin.y, frame.size.width,
-                         frame.size.height, PFBProbeName([window class]), bar.alpha, bar.hidden ? @", hidden" : @"",
-                         (unsigned long)items.count, (unsigned long)allItems, (unsigned long)gProbeItemsMade,
-                         (unsigned long)pills, (unsigned long)lenses, (unsigned long)gProbeLensesMade,
-                         (unsigned long)gProbeBarsMade];
-    [text appendFormat:@"\n  layers %lu, with filters now %lu, animations running now %lu", (unsigned long)layers,
-                       (unsigned long)filtered, (unsigned long)running];
-
-    // What a tap at the center of each tab reaches, from left to right. A window of a higher
-    // level that answers the point takes the tap first.
-    [items sortUsingComparator:^NSComparisonResult(UIView* a, UIView* b) {
-      CGFloat ax = [a convertPoint:CGPointZero toView:nil].x;
-      CGFloat bx = [b convertPoint:CGPointZero toView:nil].x;
-      return ax < bx ? NSOrderedAscending : (ax > bx ? NSOrderedDescending : NSOrderedSame);
-    }];
-    NSMutableArray<NSString*>* hits = [NSMutableArray array];
-    for (UIView* item in items) {
-        if (!window) {
-            break;
-        }
-        CGPoint center = [item convertPoint:CGPointMake(CGRectGetMidX(item.bounds), CGRectGetMidY(item.bounds))
-                                     toView:nil];
-        NSString* cover = nil;
-        for (UIWindow* other in window.windowScene.windows) {
-            if (other == window || other.hidden || other.windowLevel <= window.windowLevel) {
-                continue;
-            }
-            UIView* hit = [other hitTest:[other convertPoint:center fromWindow:window] withEvent:nil];
-            if (hit) {
-                cover = [NSString stringWithFormat:@"%@ in %@", PFBProbeName([hit class]), PFBProbeName([other class])];
+        NSString* lower = key.lowercaseString;
+        for (NSString* part in parts) {
+            if ([lower containsString:part]) {
+                NSString* value = [[[all[key] description] componentsSeparatedByCharactersInSet:NSCharacterSet.newlineCharacterSet]
+                    componentsJoinedByString:@""];
+                [found addObject:[NSString stringWithFormat:@"%@ = %@ %@", key, PFBProbeName([all[key] class]),
+                                                            value.length > 80 ? [value substringToIndex:80] : value]];
                 break;
             }
         }
-        UIView* hit = cover ? nil : [window hitTest:center withEvent:nil];
-        NSString* place = PFBProbeViewInBar(hit) ? @"" : (PFBProbeViewInOldBar(hit) ? @" (old bar)" : @" (outside)");
-        [hits addObject:cover ?: [NSString stringWithFormat:@"%@%@", PFBProbeName([hit class]), place]];
     }
-    [text appendFormat:@"\n  a tap at each tab reaches: %@", hits.count ? [hits componentsJoinedByString:@" | "] : @"no tab"];
-
-    __block UIView* host = nil;
-    __block UIView* custom = nil;
-    if (window) {
-        PFBWalkAllSubviews(window, 40, ^(UIView* view) {
-          NSString* name = NSStringFromClass([view class]);
-          if (!host && [name isEqualToString:@"T1TabBarHostView"]) {
-              host = view;
-          } else if (!custom && [name isEqualToString:@"TFNCustomTabBar"]) {
-              custom = view;
-          }
-        });
-    }
-    [text appendFormat:@"\n  old bar: %@ · %@", PFBProbeOldBarText(@"T1TabBarHostView", host, frame),
-                       PFBProbeOldBarText(@"TFNCustomTabBar", custom, frame)];
-    return text;
+    return found.count ? [found componentsJoinedByString:@" | "] : @"none";
 }
+
+// The tab entries' two answers, counted through their own implementations.
+static NSString* const kPFBProbeEntryClasses[] = {
+    @"T1HomeTimelineAppNavigationTabEntry",
+    @"_TtC14T1TwitterSwift25GrokAppNavigationTabEntry",
+    @"_TtC14T1TwitterSwift25JobsAppNavigationTabEntry",
+    @"_TtC14T1TwitterSwift25MoreAppNavigationTabEntry",
+    @"_TtC14T1TwitterSwift25NewsAppNavigationTabEntry",
+    @"_TtC14T1TwitterSwift26BoostAppNavigationTabEntry",
+    @"_TtC14T1TwitterSwift26CallsAppNavigationTabEntry",
+    @"_TtC14T1TwitterSwift26GuideAppNavigationTabEntry",
+    @"_TtC14T1TwitterSwift26ListsAppNavigationTabEntry",
+    @"_TtC14T1TwitterSwift26VoiceAppNavigationTabEntry",
+    @"_TtC14T1TwitterSwift26XChatAppNavigationTabEntry",
+    @"_TtC14T1TwitterSwift28ConnectAppNavigationTabEntry",
+    @"_TtC14T1TwitterSwift28ProfileAppNavigationTabEntry",
+    @"_TtC14T1TwitterSwift29PaymentsAppNavigationTabEntry",
+    @"_TtC14T1TwitterSwift30BirdwatchAppNavigationTabEntry",
+    @"_TtC14T1TwitterSwift30BookmarksAppNavigationTabEntry",
+    @"_TtC14T1TwitterSwift31PremiumHubAppNavigationTabEntry",
+    @"_TtC14T1TwitterSwift33OfflineCacheAppNavigationTabEntry",
+    @"_TtC14T1TwitterSwift34NotificationsAppNavigationTabEntry",
+    @"_TtC14T1TwitterSwift34T1CommunitiesAppNavigationTabEntry",
+    @"_TtC14T1TwitterSwift36ActivityHistoryAppNavigationTabEntry",
+};
+#define PFB_PROBE_ENTRY_COUNT (sizeof(kPFBProbeEntryClasses) / sizeof(kPFBProbeEntryClasses[0]))
+
+typedef BOOL (*PFBProbeBoolGetter)(id, SEL);
+static Class gProbeEntryClasses[PFB_PROBE_ENTRY_COUNT];
+static PFBProbeBoolGetter gProbeExcludedOriginals[PFB_PROBE_ENTRY_COUNT];
+static PFBProbeBoolGetter gProbeSideBarOriginals[PFB_PROBE_ENTRY_COUNT];
+
+static NSUInteger PFBProbeEntryIndex(id object) {
+    for (Class cls = object_getClass(object); cls; cls = class_getSuperclass(cls)) {
+        for (NSUInteger i = 0; i < PFB_PROBE_ENTRY_COUNT; i++) {
+            if (gProbeEntryClasses[i] == cls) {
+                return i;
+            }
+        }
+    }
+    return NSNotFound;
+}
+
+static void PFBProbeNoteEntry(id entry, NSString* question, BOOL answer, const void* address) {
+    NSString* name = PFBProbeName(object_getClass(entry));
+    if ([name hasSuffix:@"AppNavigationTabEntry"]) {
+        name = [name substringToIndex:name.length - 21];
+    }
+    PFBProbeCount(question, address, [NSString stringWithFormat:@"%@ %@", name, answer ? @"yes" : @"no"]);
+}
+
+static BOOL PFBProbeEntryExcluded(id self, SEL _cmd) {
+    NSUInteger index = PFBProbeEntryIndex(self);
+    BOOL answer = index != NSNotFound && gProbeExcludedOriginals[index] ? gProbeExcludedOriginals[index](self, _cmd) : NO;
+    PFBProbeNoteEntry(self, @"entry excluded from the tab bar", answer, __builtin_return_address(0));
+    return answer;
+}
+
+static BOOL PFBProbeEntrySideBarOnly(id self, SEL _cmd) {
+    NSUInteger index = PFBProbeEntryIndex(self);
+    BOOL answer = index != NSNotFound && gProbeSideBarOriginals[index] ? gProbeSideBarOriginals[index](self, _cmd) : NO;
+    PFBProbeNoteEntry(self, @"entry side menu only", answer, __builtin_return_address(0));
+    return answer;
+}
+
+// Only methods each class implements itself are replaced, so a subclass never calls its
+// parent's original twice.
+static PFBProbeBoolGetter PFBProbeReplaceOwn(Class cls, SEL selector, IMP replacement) {
+    unsigned int count = 0;
+    Method* methods = class_copyMethodList(cls, &count);
+    PFBProbeBoolGetter original = NULL;
+    for (unsigned int i = 0; i < count; i++) {
+        if (method_getName(methods[i]) == selector) {
+            original = (PFBProbeBoolGetter)method_setImplementation(methods[i], replacement);
+            break;
+        }
+    }
+    free(methods);
+    return original;
+}
+
+static void PFBProbeWatchEntries(void) {
+    SEL excluded = NSSelectorFromString(@"isExcludedFromTabBar");
+    SEL sideBar = NSSelectorFromString(@"isTabViewSideBarOnly");
+    for (NSUInteger i = 0; i < PFB_PROBE_ENTRY_COUNT; i++) {
+        Class cls = NSClassFromString(kPFBProbeEntryClasses[i]);
+        if (!cls) {
+            continue;
+        }
+        gProbeEntryClasses[i] = cls;
+        gProbeExcludedOriginals[i] = PFBProbeReplaceOwn(cls, excluded, (IMP)PFBProbeEntryExcluded);
+        gProbeSideBarOriginals[i] = PFBProbeReplaceOwn(cls, sideBar, (IMP)PFBProbeEntrySideBarOnly);
+    }
+}
+
+// MARK: - The Spaces bar
+
+static NSString* PFBProbeSpacesText(UIViewController* home) {
+    NSMutableArray<NSString*>* found = [NSMutableArray array];
+    PFBWalkAllSubviews(home.viewIfLoaded, 40, ^(UIView* view) {
+      if (found.count >= 6) {
+          return;
+      }
+      NSString* name = NSStringFromClass([view class]);
+      BOOL fleet = [name containsString:@"FleetLine"] && ![name containsString:@"ItemView"] &&
+                   ![name containsString:@"PresenceView"];
+      BOOL space = [name containsString:@"SpaceBar"] || [name containsString:@"SpacesBar"] ||
+                   [name containsString:@"AudioSpace"] || [name containsString:@"SpacesDock"];
+      if (fleet || space) {
+          CGRect frame = [view convertRect:view.bounds toView:nil];
+          [found addObject:[NSString stringWithFormat:@"%@ at %.0f,%.0f %.0fx%.0f%@ in %@", PFBProbeName([view class]),
+                                                      frame.origin.x, frame.origin.y, frame.size.width,
+                                                      frame.size.height, view.hidden ? @" hidden" : @"",
+                                                      PFBProbeName([view.superview class])]];
+      }
+    });
+    return found.count ? [found componentsJoinedByString:@" | "] : @"none";
+}
+
+static NSString* gProbeHomeSpaces;
+
+// MARK: - The report
 
 static NSString* PFBProbeSettingsText(void) {
     NSString* (^on)(NSString*) = ^NSString*(NSString* key) {
       return [PFBSettings boolForKey:key] ? @"on" : @"off";
     };
-    return [NSString
-        stringWithFormat:@"Liquid Glass %@, Twitter's glass asked %@ · Selected tab %@, glass filter drop %@ · Tab labels "
-                         @"%@ · Always visible %@ · custom glass bar %@ · accent %@ · Customize tabs %@ · Classic Tweet "
-                         @"button %@ · Hide Tweet button %@ · Hide a notification %@ · Hide sidebar shortcut %@ · Choose "
-                         @"tabs %@ · Hide Spaces bar %@ · Tweet source %@",
-                         on(@"enable_liquid_glass"), PFBNativeGlassAsked() ? @"yes" : @"no", on(@"tab_bar_theming"),
-                         PFBThemedTabBarWanted() ? @"armed" : @"off", on(@"restore_tab_labels"),
-                         on(@"no_tab_bar_hiding"), on(@"custom_glass_tab_bar"),
-                         PFBAccentIsActive() ? @"active" : @"none",
-                         [PFBCustomTabBarUtility visiblePageIDsInOrder] ? @"customized" : @"default",
-                         on(@"restore_tweet_button"), on(@"hide_tweet_button"), on(@"hide_notifications"),
-                         on(@"hide_grok_sidebar"), on(@"choose_explore_tabs"), on(@"hide_spaces"),
-                         on(@"show_tweet_source")];
+    return [NSString stringWithFormat:@"Liquid Glass %@, Twitter's glass asked %@ · Selected tab %@ · Tab labels %@ · "
+                                      @"Always visible %@ · Customize tabs %@ · Classic Tweet button %@ · Hide Tweet "
+                                      @"button %@ · Hide Spaces bar %@",
+                                      on(@"enable_liquid_glass"), PFBNativeGlassAsked() ? @"yes" : @"no",
+                                      on(@"tab_bar_theming"), on(@"restore_tab_labels"), on(@"no_tab_bar_hiding"),
+                                      [PFBCustomTabBarUtility visiblePageIDsInOrder] ? @"customized" : @"default",
+                                      on(@"restore_tweet_button"), on(@"hide_tweet_button"), on(@"hide_spaces")];
 }
 
-// The tabs asked for in Customize tabs, by page and panel, beside the panels Twitter shows.
-static NSString* PFBProbeTabsText(void) {
-    NSArray<NSString*>* pages = [PFBCustomTabBarUtility visiblePageIDsInOrder] ?: [PFBCustomTabBarUtility defaultVisiblePageIDs];
-    NSMutableArray<NSString*>* panels = [NSMutableArray array];
-    for (NSString* page in pages) {
-        id panel = [PFBCustomTabBarUtility metadataForPage:page][PFBTabPanelIDKey];
-        [panels addObject:panel ? [panel description] : @"?"];
+static NSString* PFBProbeIconNamesText(void) {
+    os_unfair_lock_lock(&gProbeIconLock);
+    NSDictionary<NSString*, NSString*>* names = [gProbeIconNames copy];
+    os_unfair_lock_unlock(&gProbeIconLock);
+    if (!names.count) {
+        return @"none";
     }
-    return [NSString stringWithFormat:@"asked %@ [%@] = panels [%@] · Twitter shows panels %@",
-                                      [PFBCustomTabBarUtility visiblePageIDsInOrder] ? @"pages" : @"default pages",
-                                      [pages componentsJoinedByString:@" "], [panels componentsJoinedByString:@" "],
-                                      PFBProbePanelsText(gProbePanels)];
-}
-
-// Where the options hook, beside what Twitter's new navigation calls instead.
-static NSString* PFBProbeHookPointsText(void) {
-    NSMutableString* text = [NSMutableString
-        stringWithFormat:@"Hook points of the old navigation: tab entries %@ · tab capacity %@ · panels asked %@ · side "
-                         @"menu update %@ · bar items %@ · TFN bar layout %@ · compose glyph %@ · compose button %@ · "
-                         @"Explore accessory %@ · Explore tabs layout %@ · Spaces line %@ · Tweet footer %@",
-                         PFBProbeCountText(PFBProbeOldTabEntries, NO), PFBProbeCountText(PFBProbeOldTabCapacity, NO),
-                         PFBProbeCountText(PFBProbeOldPanelsAsked, NO), PFBProbeCountText(PFBProbeDashUpdate, NO),
-                         PFBProbeCountText(PFBProbeOldNavigationItems, NO),
-                         PFBProbeCountText(PFBProbeOldNavigationBar, NO), PFBProbeCountText(PFBProbeOldComposeIcon, NO),
-                         PFBProbeCountText(PFBProbeOldComposeButton, NO),
-                         PFBProbeCountText(PFBProbeExploreAccessory, NO), PFBProbeCountText(PFBProbeExploreTabs, NO),
-                         PFBProbeCountText(PFBProbeFleetLine, NO), PFBProbeCountText(PFBProbeTweetFooter, NO)];
-    [text appendFormat:@"\n  old tab bar: tab icon %@ · tab layout %@ · tab selected %@ · collapse ratio %@ · bar layout "
-                       @"%@ · bar hidden %@ · host layout %@ · app bar layout %@",
-                       PFBProbeCountText(PFBProbeOldTabIcon, NO), PFBProbeCountText(PFBProbeOldTabLayout, NO),
-                       PFBProbeCountText(PFBProbeOldTabSelected, NO), PFBProbeCountText(PFBProbeOldCollapse, NO),
-                       PFBProbeCountText(PFBProbeOldBarLayout, NO), PFBProbeCountText(PFBProbeOldBarHidden, NO),
-                       PFBProbeCountText(PFBProbeOldHostLayout, NO), PFBProbeCountText(PFBProbeOldCustomBarLayout, NO)];
-    NSMutableArray<NSString*>* set = [NSMutableArray array];
-    for (NSNumber* panel in gProbePanelsSet) {
-        [set addObject:panel.description];
+    NSMutableArray<NSString*>* parts = [NSMutableArray array];
+    for (NSString* name in [names.allKeys sortedArrayUsingSelector:@selector(compare:)]) {
+        [parts addObject:[NSString stringWithFormat:@"%@ (%@)", name, names[name]]];
     }
-    [text appendFormat:@"\nTwitter's new navigation: visible panels asked %@ (by the side menu %@), last %@ · "
-                       @"recalculated %@, last update %@ · panel set %@, last [%@] · side menu shown %@",
-                       PFBProbeCountText(PFBProbeNewPanelsAsked, NO), PFBProbeCountText(PFBProbeNewPanelsAskedByDash, NO),
-                       PFBProbePanelsText(gProbePanels), PFBProbeCountText(PFBProbeNewRecalculate, NO),
-                       gProbeUpdatedPanels ?: @"none", PFBProbeCountText(PFBProbeNewSetPanel, NO),
-                       [set componentsJoinedByString:@" "], PFBProbeCountText(PFBProbeDashShown, NO)];
-    [text appendFormat:@"\nCustomize tabs: %@", PFBProbeTabsText()];
-    return text;
-}
-
-static NSString* PFBProbeScreensText(void) {
-    NSMutableString* text = [NSMutableString stringWithString:@"Screens, a moment after they appeared:"];
-    for (NSString* screen in @[ @"Home", @"Explore", @"Notifications", @"Chat", @"Tweet", @"side menu" ]) {
-        [text appendFormat:@"\n  %@: %@", screen, gProbeScreenTexts[screen] ?: @"not shown yet"];
-    }
-    return text;
-}
-
-static NSString* PFBProbeTapsText(void) {
-    NSMutableString* text = [NSMutableString
-        stringWithFormat:@"Taps from the bottom: %lu · on the glass bar %lu · on the old bar %lu · ended %lu · "
-                         @"cancelled %lu · a screen appeared after %lu",
-                         (unsigned long)gProbeTapCount, (unsigned long)gProbeTapsOnBar,
-                         (unsigned long)gProbeTapsOnOldBar, (unsigned long)gProbeTapsEnded,
-                         (unsigned long)gProbeTapsCancelled, (unsigned long)gProbeTapsWithScreen];
-    [text appendFormat:@"\n  bar tracking %@ (%@): began %lu, changed %lu, ended %lu, cancelled %lu, failed %lu · "
-                       @"events asked %@, refused %@",
-                       PFBProbeCountText(PFBProbeTracking, NO), gProbeTrackingRecognizer ?: @"no recognizer",
-                       (unsigned long)gProbeTrackingStates[1], (unsigned long)gProbeTrackingStates[2],
-                       (unsigned long)gProbeTrackingStates[3], (unsigned long)gProbeTrackingStates[4],
-                       (unsigned long)gProbeTrackingStates[5], PFBProbeCountText(PFBProbeEventAsked, NO),
-                       PFBProbeCountText(PFBProbeEventRefused, NO)];
-    for (PFBProbeTap* tap in gProbeTaps) {
-        NSString* held = tap.ended > 0 ? [NSString stringWithFormat:@" after %.2f s", tap.ended - tap.began] : @"";
-        [text appendFormat:@"\n  %.1f s · x %.2f · %@ (%@) · %@%@ · tracking calls %lu · screen %@ -> %@",
-                           tap.began - gProbeStart, tap.x, tap.view, tap.place, tap.phase, held,
-                           (unsigned long)(tap.trackingAfter >= tap.trackingBefore
-                                               ? tap.trackingAfter - tap.trackingBefore
-                                               : 0),
-                           tap.screenBefore, tap.screenAfter ?: @"no new screen"];
-    }
-    return text;
+    return [NSString stringWithFormat:@"%lu: %@", (unsigned long)names.count, [parts componentsJoinedByString:@", "]];
 }
 
 static NSString* PFBProbeText(void) {
     NSDictionary* info = NSBundle.mainBundle.infoDictionary;
     NSMutableString* text = [NSMutableString
-        stringWithFormat:@"GLASS PROBE · PrimeFreeBird %@ · Twitter %@ · iOS %@ · launched %@, %.0f s ago\n%@\n",
-                         PFBCompatBuildID(), info[@"CFBundleShortVersionString"],
-                         UIDevice.currentDevice.systemVersion, gProbeLaunchClock,
-                         CACurrentMediaTime() - gProbeStart, PFBProbeSettingsText()];
-    [text appendFormat:@"Main thread: %@\n", PFBProbeBusyText(YES)];
-    [text appendFormat:@"%@\n", PFBProbeBarText()];
-    [text appendFormat:@"Animations in the bar: %@ · on filters %@ · did not land %@ · filters gone after %@\n",
-                       PFBProbeCountText(PFBProbeAnimation, NO), PFBProbeCountText(PFBProbeFilterAnimation, NO),
-                       PFBProbeCountText(PFBProbeAnimationMissed, NO), PFBProbeCountText(PFBProbeFiltersGone, NO)];
-    [text appendFormat:@"  kinds: %@\n  not landed: %@\n  not landed on: %@\n  not landed each second: %@\n",
-                       PFBProbeTallyText(gProbeAnimationKinds), PFBProbeTallyText(gProbeMissedKinds),
-                       PFBProbeTallyText(gProbeMissedOwners), PFBProbeSeriesText(0)];
-    [text appendFormat:@"Filters set in the bar: %@, emptied %@\n", PFBProbeCountText(PFBProbeFiltersSet, YES),
-                       PFBProbeCountText(PFBProbeFiltersEmptied, NO)];
-    [text appendFormat:@"Writes in the bar: tint %@ · images %@ · alpha %@, visibility flips %@ · hidden %@, flips %@ · "
-                       @"backgrounds %@\n",
-                       PFBProbeCountText(PFBProbeTint, YES), PFBProbeCountText(PFBProbeImage, YES),
-                       PFBProbeCountText(PFBProbeAlpha, YES), PFBProbeCountText(PFBProbeAlphaFlip, NO),
-                       PFBProbeCountText(PFBProbeHidden, YES), PFBProbeCountText(PFBProbeHiddenFlip, NO),
-                       PFBProbeCountText(PFBProbeBackground, YES)];
-    [text appendFormat:@"  visibility flips each second: %@\n", PFBProbeSeriesText(2)];
-    [text appendFormat:@"Windows: tint set %@ · forced layouts %@ · Twitter color reloads %@\n",
-                       PFBProbeCountText(PFBProbeWindowTint, YES), PFBProbeCountText(PFBProbeWindowLayout, YES),
-                       PFBProbeCountText(PFBProbeColorReload, NO)];
-    [text appendFormat:@"Layout: bar %@ · tabs %@ · bar controller %@ · lens %@ · trait changes: pill %@, bar "
-                       @"controller %@\n  bar layouts each second: %@\n",
-                       PFBProbeCountText(PFBProbeBarLayout, NO), PFBProbeCountText(PFBProbeItemLayout, NO),
-                       PFBProbeCountText(PFBProbeControllerLayout, NO), PFBProbeCountText(PFBProbeLensLayout, NO),
-                       PFBProbeCountText(PFBProbePillTraits, NO), PFBProbeCountText(PFBProbeControllerTraits, NO),
-                       PFBProbeSeriesText(1)];
-    [text appendFormat:@"%@\nScreen in front: %@\n", PFBProbeTapsText(), gProbeScreen ?: @"?"];
-    [text appendFormat:@"%@\n%@\n", PFBProbeHookPointsText(), PFBProbeScreensText()];
+        stringWithFormat:@"GLASS PROBE 2 · PrimeFreeBird %@ · Twitter %@ · iOS %@ · launched %@, %.0f s ago\n%@\n",
+                         PFBCompatBuildID(), info[@"CFBundleShortVersionString"], UIDevice.currentDevice.systemVersion,
+                         gProbeLaunchClock, CACurrentMediaTime() - gProbeStart, PFBProbeSettingsText()];
+
+    [text appendString:@"\nTAB BAR (Selected tab, Tab labels)\n"];
+    PFBProbeTakeSnapshot(@"now");
+    for (NSString* snapshot in gProbeSnapshots) {
+        [text appendFormat:@"%@\n", snapshot];
+    }
+    [text appendFormat:@"Writes on the bar's glyphs: images %@\n  tints %@\n  filters set %@\n  compositing filters %@\n",
+                       PFBProbeTallyText(@"bar image"), PFBProbeTallyText(@"bar tint"), PFBProbeTallyText(@"bar filters"),
+                       PFBProbeTallyText(@"bar compositing")];
+    [text appendFormat:@"Bar layouts %@ · tab layouts %@\n", PFBProbeTallyText(@"bar layout"),
+                       PFBProbeTallyText(@"tab layout")];
+    [text appendFormat:@"Icons loaded by name: %@\n", PFBProbeIconNamesText()];
+
+    [text appendString:@"\nSHRINKING ON SCROLL (Always visible)\n"];
+    [text appendFormat:@"Stacks built: %@\n", gProbeStacks.count ? [gProbeStacks componentsJoinedByString:@" | "] : @"none"];
+    [text appendFormat:@"Configurations asked: standard %@\n  pinned %@\n  hidden %@\n  pinned transparent %@\n  by mode %@\n",
+                       PFBProbeTallyText(@"config standard"), PFBProbeTallyText(@"config pinned"),
+                       PFBProbeTallyText(@"config hidden"), PFBProbeTallyText(@"config pinned transparent"),
+                       PFBProbeTallyText(@"config by mode")];
+    NSMutableArray<NSString*>* screens = [NSMutableArray array];
+    for (NSString* screen in [gProbeScreens.allKeys sortedArrayUsingSelector:@selector(compare:)]) {
+        [screens addObject:[NSString stringWithFormat:@"%@: %@", screen, gProbeScreens[screen]]];
+    }
+    [text appendFormat:@"Screens: %@\n", screens.count ? [screens componentsJoinedByString:@" | "] : @"none"];
+    [text appendFormat:@"Scroll observer pans %@ · scroll windows %lu, the bar shrank in %lu\n",
+                       PFBProbeTallyText(@"scroll pan"), (unsigned long)gProbeScrollWindows,
+                       (unsigned long)gProbeCollapsedWindows];
+    for (NSString* window in gProbeScrollTexts) {
+        [text appendFormat:@"  %@\n", window];
+    }
+
+    [text appendString:@"\nCUSTOMIZE TABS\n"];
+    [text appendFormat:@"%@\nTwitter shows panels %@\n", PFBProbeCustomNavigationText(), PFBProbePanelsText()];
+    [text appendFormat:@"Entries asked: excluded from the tab bar %@\n  side menu only %@\n",
+                       PFBProbeTallyText(@"entry excluded from the tab bar"), PFBProbeTallyText(@"entry side menu only")];
+    [text appendFormat:@"Saved keys: %@\n", PFBProbeSavedKeysText()];
+
+    [text appendString:@"\nCOMPOSE BUTTON (Classic Tweet button, Hide Tweet button)\n"];
+    [text appendFormat:@"%@\nWrites: images %@\n  alpha %@\n  hidden %@\n  host layouts %@\n", PFBProbeComposeText(),
+                       PFBProbeTallyText(@"compose image"), PFBProbeTallyText(@"compose alpha"),
+                       PFBProbeTallyText(@"compose hidden"), PFBProbeTallyText(@"compose layout")];
+
+    [text appendString:@"\nSPACES BAR (Hide Spaces bar)\n"];
+    [text appendFormat:@"Spaces line asked %@ · Spaces bars made %@ · on Home: %@\n",
+                       PFBProbeTallyText(@"spaces asked"), PFBProbeTallyText(@"spaces made"), gProbeHomeSpaces ?: @"Home not shown"];
     return text;
 }
 
-// A few lines for MEASUREMENTS, kept until a new build.
 static void PFBProbePersist(NSString* moment) {
     if (gProbeStart <= 0) {
         return;
     }
     NSString* stamp = [NSString stringWithFormat:@"launch %@, %@", gProbeLaunchClock, moment];
-    static BOOL settingsKept;
-    if (!settingsKept) {
-        settingsKept = YES;
-        PFBCompatMeasure(kPFBProbeTopic, [NSString stringWithFormat:@"%@: %@", stamp, PFBProbeSettingsText()], 60);
-    }
-    NSString* bar = [[PFBProbeBarText() componentsSeparatedByString:@"\n  "] componentsJoinedByString:@" · "];
     NSArray<NSString*>* lines = @[
-        [NSString stringWithFormat:@"%@: %@", stamp, bar],
-        [NSString stringWithFormat:@"%@: main thread %@", stamp, PFBProbeBusyText(NO)],
-        [NSString stringWithFormat:@"%@: bar animations %@, did not land %@, filters gone after %@; filters set %@ · "
-                                   @"not landed: %@",
-                                   stamp, PFBProbeCountText(PFBProbeAnimation, NO),
-                                   PFBProbeCountText(PFBProbeAnimationMissed, NO),
-                                   PFBProbeCountText(PFBProbeFiltersGone, NO), PFBProbeCountText(PFBProbeFiltersSet, YES),
-                                   PFBProbeTallyText(gProbeMissedKinds)],
-        [NSString stringWithFormat:@"%@: bar writes tint %@, images %@, alpha %@ (flips %@), hidden %@; window tint %@, "
-                                   @"forced layouts %@; color reloads %@; bar layouts %@",
-                                   stamp, PFBProbeCountText(PFBProbeTint, YES), PFBProbeCountText(PFBProbeImage, YES),
-                                   PFBProbeCountText(PFBProbeAlpha, YES), PFBProbeCountText(PFBProbeAlphaFlip, NO),
-                                   PFBProbeCountText(PFBProbeHidden, YES), PFBProbeCountText(PFBProbeWindowTint, YES),
-                                   PFBProbeCountText(PFBProbeWindowLayout, YES),
-                                   PFBProbeCountText(PFBProbeColorReload, NO), PFBProbeCountText(PFBProbeBarLayout, NO)],
-        [NSString stringWithFormat:@"%@: taps %lu, on the glass bar %lu, on the old bar %lu, cancelled %lu, a screen after "
-                                   @"%lu; tracking ended %lu, cancelled %lu; events refused %lu",
-                                   stamp, (unsigned long)gProbeTapCount, (unsigned long)gProbeTapsOnBar,
-                                   (unsigned long)gProbeTapsOnOldBar, (unsigned long)gProbeTapsCancelled,
-                                   (unsigned long)gProbeTapsWithScreen, (unsigned long)gProbeTrackingStates[3],
-                                   (unsigned long)gProbeTrackingStates[4],
-                                   (unsigned long)gProbeCounts[PFBProbeEventRefused].total],
-        [NSString stringWithFormat:@"%@: %@", stamp,
-                                   [[PFBProbeHookPointsText() componentsSeparatedByString:@"\n"]
-                                       componentsJoinedByString:@" · "]],
+        [NSString stringWithFormat:@"%@: %@", stamp, PFBProbeSettingsText()],
+        [NSString stringWithFormat:@"%@: bar %@", stamp,
+                                   [[PFBProbeBarText() componentsSeparatedByString:@"\n"] componentsJoinedByString:@" ·"]],
+        [NSString stringWithFormat:@"%@: glyph writes: images %@ · tints %@ · filters %@", stamp,
+                                   PFBProbeTallyText(@"bar image"), PFBProbeTallyText(@"bar tint"),
+                                   PFBProbeTallyText(@"bar filters")],
+        [NSString stringWithFormat:@"%@: stacks %@ · pans %@ · scroll windows %lu, shrank in %lu · last %@", stamp,
+                                   gProbeStacks.count ? [gProbeStacks componentsJoinedByString:@" | "] : @"none",
+                                   PFBProbeTallyText(@"scroll pan"), (unsigned long)gProbeScrollWindows,
+                                   (unsigned long)gProbeCollapsedWindows, gProbeScrollTexts.lastObject ?: @"none"],
+        [NSString stringWithFormat:@"%@: %@ · entries excluded %@ · side menu only %@", stamp,
+                                   PFBProbeCustomNavigationText(), PFBProbeTallyText(@"entry excluded from the tab bar"),
+                                   PFBProbeTallyText(@"entry side menu only")],
+        [NSString stringWithFormat:@"%@: compose %@ · images %@ · alpha %@ · hidden %@ · Spaces asked %@, made %@, on Home %@",
+                                   stamp, PFBProbeComposeText(), PFBProbeTallyText(@"compose image"),
+                                   PFBProbeTallyText(@"compose alpha"), PFBProbeTallyText(@"compose hidden"),
+                                   PFBProbeTallyText(@"spaces asked"), PFBProbeTallyText(@"spaces made"),
+                                   gProbeHomeSpaces ?: @"not shown"],
     ];
     for (NSString* line in lines) {
         PFBCompatMeasure(kPFBProbeTopic, line, 60);
@@ -1197,24 +1169,11 @@ static void PFBProbeLeave(void) {
 }
 
 static void PFBProbeStart(void) {
-    gProbeStart = CACurrentMediaTime();
     NSDateFormatter* clock = [[NSDateFormatter alloc] init];
     clock.dateFormat = @"HH:mm:ss";
     gProbeLaunchClock = [clock stringFromDate:[NSDate date]];
-    PFBProbeFindOurCode();
+    gProbeItemClass = NSClassFromString(@"_TtC11XNavigation14TabBarItemView");
     gProbeBoardCount = UIPasteboard.generalPasteboard.changeCount;
-
-    // First after the wake, last before the sleep: after Core Animation's commit.
-    CFRunLoopRef loop = CFRunLoopGetMain();
-    CFRunLoopObserverRef wakeObserver =
-        CFRunLoopObserverCreate(NULL, kCFRunLoopAfterWaiting, true, LONG_MIN, PFBProbeWake, NULL);
-    CFRunLoopObserverRef sleepObserver =
-        CFRunLoopObserverCreate(NULL, kCFRunLoopBeforeWaiting, true, LONG_MAX, PFBProbeSleep, NULL);
-    CFRunLoopAddObserver(loop, wakeObserver, kCFRunLoopCommonModes);
-    CFRunLoopAddObserver(loop, sleepObserver, kCFRunLoopCommonModes);
-    CFRelease(wakeObserver);
-    CFRelease(sleepObserver);
-    gProbeAwakeSince = gProbeStart;
 
     NSNotificationCenter* center = NSNotificationCenter.defaultCenter;
     [center addObserverForName:UIApplicationDidBecomeActiveNotification
@@ -1229,20 +1188,13 @@ static void PFBProbeStart(void) {
                     usingBlock:^(__unused NSNotification* note) {
                       PFBProbeLeave();
                     }];
-    [center addObserverForName:@"TFNDynamicColorsDidReloadNotification"
-                        object:nil
-                         queue:NSOperationQueue.mainQueue
-                    usingBlock:^(__unused NSNotification* note) {
-                      PFBProbeNote(PFBProbeColorReload, NO, 0);
-                    }];
-    for (NSNumber* moment in @[ @20, @60 ]) {
+    for (NSNumber* moment in @[ @25, @60 ]) {
         dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(moment.doubleValue * NSEC_PER_SEC)),
                        dispatch_get_main_queue(), ^{
                          @try {
                              PFBProbePersist([NSString stringWithFormat:@"at %@ s", moment]);
                          } @catch (id exception) {
-                             PFBCompatMeasure(kPFBProbeTopic, [NSString stringWithFormat:@"stopped: %@", exception],
-                                              60);
+                             PFBCompatMeasure(kPFBProbeTopic, [NSString stringWithFormat:@"stopped: %@", exception], 60);
                          }
                        });
     }
@@ -1250,35 +1202,184 @@ static void PFBProbeStart(void) {
 
 // MARK: - Hooks
 
+// What Twitter loads and builds while it launches: installed at once.
+%group PFBGlassProbeEarly
+
+%hook _TtC14T1TwitterSwift20XTabbedAppNavigation
+
+- (void)setCurrentPanel:(long long)panel animated:(BOOL)animated completion:(id)completion {
+    %orig;
+    if (pthread_main_np()) {
+        PFBProbeSnapshotSoon([NSString stringWithFormat:@"after panel %lld", panel], 0.8);
+    }
+}
+
+%end
+
+// MARK: Icons by name
+
+%hook UIImage
+
++ (UIImage*)imageNamed:(NSString*)name inBundle:(NSBundle*)bundle compatibleWithTraitCollection:(UITraitCollection*)traits {
+    UIImage* image = %orig;
+    PFBProbeTagIcon(image, name, bundle, __builtin_return_address(0));
+    return image;
+}
+
++ (UIImage*)imageNamed:(NSString*)name inBundle:(NSBundle*)bundle withConfiguration:(UIImageConfiguration*)configuration {
+    UIImage* image = %orig;
+    PFBProbeTagIcon(image, name, bundle, __builtin_return_address(0));
+    return image;
+}
+
+- (UIImage*)imageWithRenderingMode:(UIImageRenderingMode)mode {
+    UIImage* image = %orig;
+    PFBProbeCarryIcon(self, image);
+    return image;
+}
+
+- (UIImage*)imageWithTintColor:(UIColor*)color {
+    UIImage* image = %orig;
+    PFBProbeCarryIcon(self, image);
+    return image;
+}
+
+- (UIImage*)imageWithTintColor:(UIColor*)color renderingMode:(UIImageRenderingMode)mode {
+    UIImage* image = %orig;
+    PFBProbeCarryIcon(self, image);
+    return image;
+}
+
+- (UIImage*)imageWithConfiguration:(UIImageConfiguration*)configuration {
+    UIImage* image = %orig;
+    PFBProbeCarryIcon(self, image);
+    return image;
+}
+
+%end
+
+// MARK: Shrinking on scroll
+
+%hook XNAVNavigationController
+
+- (id)initWithRootViewController:(UIViewController*)root
+            popGestureCapability:(long long)capability
+            defaultConfiguration:(id)configuration {
+    id controller = %orig;
+    if (pthread_main_np()) {
+        PFBProbeNoteStack(root, capability, configuration);
+    }
+    return controller;
+}
+
+- (id)initWithPopGestureCapability:(long long)capability defaultConfiguration:(id)configuration {
+    id controller = %orig;
+    if (pthread_main_np()) {
+        PFBProbeNoteStack(nil, capability, configuration);
+    }
+    return controller;
+}
+
+%end
+
+%hook XNAVConfiguration
+
++ (id)standardConfiguration {
+    if (!gProbeBuildingReferences) {
+        PFBProbeCount(@"config standard", __builtin_return_address(0), nil);
+    }
+    return %orig;
+}
+
++ (id)pinnedConfiguration {
+    if (!gProbeBuildingReferences) {
+        PFBProbeCount(@"config pinned", __builtin_return_address(0), nil);
+    }
+    return %orig;
+}
+
++ (id)hiddenConfiguration {
+    if (!gProbeBuildingReferences) {
+        PFBProbeCount(@"config hidden", __builtin_return_address(0), nil);
+    }
+    return %orig;
+}
+
++ (id)pinnedTransparentConfiguration {
+    if (!gProbeBuildingReferences) {
+        PFBProbeCount(@"config pinned transparent", __builtin_return_address(0), nil);
+    }
+    return %orig;
+}
+
++ (id)configurationWithCollapseMode:(long long)collapse popGestureMode:(long long)pop {
+    PFBProbeCount(@"config by mode", __builtin_return_address(0),
+                  [NSString stringWithFormat:@"collapse %lld pop %lld", collapse, pop]);
+    return %orig;
+}
+
++ (id)configurationWithCollapseMode:(long long)collapse popGestureMode:(long long)pop solidBackgroundColor:(UIColor*)color {
+    PFBProbeCount(@"config by mode", __builtin_return_address(0),
+                  [NSString stringWithFormat:@"collapse %lld pop %lld with color", collapse, pop]);
+    return %orig;
+}
+
+%end
+
+%hook _TtCC11XNavigation14CollapseEngine14ScrollObserver
+
+- (void)handlePan:(UIGestureRecognizer*)recognizer {
+    %orig;
+    if (pthread_main_np() && gProbeStart > 0) {
+        PFBProbeCount(@"scroll pan", NULL, nil);
+        PFBProbeNotePan();
+    }
+}
+
+%end
+
+// MARK: The Spaces bar
+
+%hook T1FleetLineHeaderController
+
+- (BOOL)_t1_shouldShowFleetLine {
+    BOOL show = %orig;
+    PFBProbeCount(@"spaces asked", __builtin_return_address(0), show ? @"show" : @"hide");
+    return show;
+}
+
+%end
+
+%hook T1FleetLineView
+
+- (id)initWithAccount:(id)account delegate:(id)delegate {
+    id view = %orig;
+    PFBProbeCount(@"spaces made", __builtin_return_address(0), nil);
+    return view;
+}
+
+%end
+
+%end
+
+// Methods other files hook as well: installed last, so each call is charged to its sender.
 %group PFBGlassProbe
 
-// MARK: Twitter's glass bar
+// MARK: Twitter's glass bar and its compose button
 
 %hook _TtC11XNavigation10TabBarView
 
 - (void)layoutSubviews {
-    CFTimeInterval start = CACurrentMediaTime();
     %orig;
-    PFBProbeNoteBar((UIView*)self);
-    PFBProbeNote(PFBProbeBarLayout, NO, CACurrentMediaTime() - start);
-}
-
-- (void)handleTracking:(UIGestureRecognizer*)recognizer {
-    if (!gProbeTrackingRecognizer) {
-        gProbeTrackingRecognizer = PFBProbeName([recognizer class]);
+    UIView* bar = (UIView*)self;
+    if (gProbeBar != bar && PFBProbeOnScreen(bar)) {
+        BOOL first = gProbeBar == nil;
+        gProbeBar = bar;
+        if (first) {
+            PFBProbeSnapshotSoon(@"after launch", 2.0);
+        }
     }
-    gProbeTrackingStates[MIN(MAX((NSInteger)recognizer.state, 0), 5)]++;
-    PFBProbeNote(PFBProbeTracking, NO, 0);
-    %orig;
-}
-
-- (BOOL)gestureRecognizer:(UIGestureRecognizer*)recognizer shouldReceiveEvent:(UIEvent*)event {
-    BOOL receive = %orig;
-    PFBProbeNote(PFBProbeEventAsked, NO, 0);
-    if (!receive) {
-        PFBProbeNote(PFBProbeEventRefused, NO, 0);
-    }
-    return receive;
+    PFBProbeCount(@"bar layout", NULL, nil);
 }
 
 %end
@@ -1286,76 +1387,45 @@ static void PFBProbeStart(void) {
 %hook _TtC11XNavigation14TabBarItemView
 
 - (void)layoutSubviews {
-    CFTimeInterval start = CACurrentMediaTime();
     %orig;
-    PFBProbeSeen(&gProbeItemsSeen, &gProbeItemsMade, self);
-    PFBProbeNote(PFBProbeItemLayout, NO, CACurrentMediaTime() - start);
+    PFBProbeCount(@"tab layout", NULL, nil);
 }
 
 %end
 
-%hook _TtC11XNavigation10TabBarPill
-
-- (void)traitCollectionDidChange:(UITraitCollection*)previous {
-    %orig;
-    PFBProbeNote(PFBProbePillTraits, NO, 0);
-}
-
-%end
-
-%hook _TtC13XDesignSystem10LiquidLens
+%hook _TtC11XNavigation23TabBarAccessoryHostView
 
 - (void)layoutSubviews {
-    CFTimeInterval start = CACurrentMediaTime();
     %orig;
-    PFBProbeSeen(&gProbeLensesSeen, &gProbeLensesMade, self);
-    PFBProbeNote(PFBProbeLensLayout, NO, CACurrentMediaTime() - start);
+    UIView* host = (UIView*)self;
+    if (host.frame.size.width > 0 && PFBProbeOnScreen(host)) {
+        gProbeAccessory = host;
+    }
+    PFBProbeCount(@"compose layout", NULL, nil);
 }
 
 %end
 
-%hook _TtC11XNavigation16TabBarController
-
-- (void)viewDidLayoutSubviews {
-    CFTimeInterval start = CACurrentMediaTime();
-    %orig;
-    PFBProbeNote(PFBProbeControllerLayout, NO, CACurrentMediaTime() - start);
-}
-
-- (void)traitCollectionDidChange:(UITraitCollection*)previous {
-    %orig;
-    PFBProbeNote(PFBProbeControllerTraits, NO, 0);
-}
-
-%end
-
-// MARK: Writes in the bar
+// MARK: Writes on the glyphs
 
 %hook CALayer
 
-// Landed when the layer holds a new animation under the key afterwards.
-- (void)addAnimation:(CAAnimation*)animation forKey:(NSString*)key {
-    if (!gProbeBarLayer || !pthread_main_np() || !PFBProbeLayerInBar(self)) {
-        %orig;
-        return;
-    }
-    CAAnimation* before = key ? [self animationForKey:key] : nil;
-    NSUInteger keysBefore = key ? 0 : self.animationKeys.count;
-    NSUInteger filtersBefore = self.filters.count;
+- (void)setFilters:(NSArray*)filters {
     %orig;
-    CAAnimation* after = key ? [self animationForKey:key] : nil;
-    BOOL landed = key ? (after != nil && after != before) : self.animationKeys.count > keysBefore;
-    PFBProbeNoteAnimation(self, key, landed, filtersBefore > 0 && self.filters.count == 0);
+    UIView* bar = gProbeBar;
+    if (bar && gProbeStart > 0 && pthread_main_np() && PFBProbeLayerIn(self, bar)) {
+        PFBProbeCount(@"bar filters", __builtin_return_address(0),
+                      [NSString stringWithFormat:@"%@ [%@]", PFBProbeLayerOwner(self), PFBProbeFiltersText(self)]);
+    }
 }
 
-- (void)setFilters:(NSArray*)filters {
-    if (gProbeBarLayer && pthread_main_np() && PFBProbeLayerInBar(self)) {
-        PFBProbeNote(PFBProbeFiltersSet, PFBProbeFromUs(__builtin_return_address(0)), 0);
-        if (!filters.count) {
-            PFBProbeNote(PFBProbeFiltersEmptied, NO, 0);
-        }
-    }
+- (void)setCompositingFilter:(id)filter {
     %orig;
+    UIView* bar = gProbeBar;
+    if (bar && gProbeStart > 0 && pthread_main_np() && PFBProbeLayerIn(self, bar)) {
+        PFBProbeCount(@"bar compositing", __builtin_return_address(0),
+                      [NSString stringWithFormat:@"%@ %@", PFBProbeLayerOwner(self), filter ? [filter description] : @"none"]);
+    }
 }
 
 %end
@@ -1363,53 +1433,27 @@ static void PFBProbeStart(void) {
 %hook UIView
 
 - (void)setTintColor:(UIColor*)color {
-    if (pthread_main_np()) {
-        if ([self isKindOfClass:[UIWindow class]]) {
-            PFBProbeNote(PFBProbeWindowTint, PFBProbeFromUs(__builtin_return_address(0)), 0);
-        } else if (gProbeBar && PFBProbeViewInBar(self)) {
-            PFBProbeNote(PFBProbeTint, PFBProbeFromUs(__builtin_return_address(0)), 0);
-        }
-    }
     %orig;
+    UIView* bar = gProbeBar;
+    if (bar && pthread_main_np() && [self isKindOfClass:[UIImageView class]] && PFBProbeViewIn(self, bar)) {
+        PFBProbeCount(@"bar tint", __builtin_return_address(0), PFBProbeColorText(color));
+    }
 }
 
 - (void)setAlpha:(CGFloat)alpha {
-    if (gProbeBar && pthread_main_np() && PFBProbeViewInBar(self)) {
-        PFBProbeNote(PFBProbeAlpha, PFBProbeFromUs(__builtin_return_address(0)), 0);
-        if ((self.alpha <= 0.01) != (alpha <= 0.01)) {
-            PFBProbeNote(PFBProbeAlphaFlip, NO, 0);
-        }
-    }
     %orig;
+    UIView* accessory = gProbeAccessory;
+    if (accessory && pthread_main_np() && PFBProbeViewIn(self, accessory)) {
+        PFBProbeCount(@"compose alpha", __builtin_return_address(0), [NSString stringWithFormat:@"%.2f", alpha]);
+    }
 }
 
 - (void)setHidden:(BOOL)hidden {
-    if (gProbeBar && pthread_main_np() && PFBProbeViewInBar(self)) {
-        PFBProbeNote(PFBProbeHidden, PFBProbeFromUs(__builtin_return_address(0)), 0);
-        if (self.hidden != hidden) {
-            PFBProbeNote(PFBProbeHiddenFlip, NO, 0);
-        }
-    }
     %orig;
-}
-
-- (void)setBackgroundColor:(UIColor*)color {
-    if (gProbeBar && pthread_main_np() && PFBProbeViewInBar(self)) {
-        PFBProbeNote(PFBProbeBackground, PFBProbeFromUs(__builtin_return_address(0)), 0);
+    UIView* accessory = gProbeAccessory;
+    if (accessory && pthread_main_np() && PFBProbeViewIn(self, accessory)) {
+        PFBProbeCount(@"compose hidden", __builtin_return_address(0), hidden ? @"yes" : @"no");
     }
-    %orig;
-}
-
-// A whole window laid out on demand, as the accent repaint does.
-- (void)layoutIfNeeded {
-    if (!pthread_main_np() || ![self isKindOfClass:[UIWindow class]]) {
-        %orig;
-        return;
-    }
-    BOOL ours = PFBProbeFromUs(__builtin_return_address(0));
-    CFTimeInterval start = CACurrentMediaTime();
-    %orig;
-    PFBProbeNote(PFBProbeWindowLayout, ours, CACurrentMediaTime() - start);
 }
 
 %end
@@ -1417,279 +1461,69 @@ static void PFBProbeStart(void) {
 %hook UIImageView
 
 - (void)setImage:(UIImage*)image {
-    if (gProbeBar && pthread_main_np() && image != self.image && PFBProbeViewInBar(self)) {
-        PFBProbeNote(PFBProbeImage, PFBProbeFromUs(__builtin_return_address(0)), 0);
-    }
     %orig;
-}
-
-%end
-
-// MARK: Touches and screens
-
-%hook UIWindow
-
-- (void)sendEvent:(UIEvent*)event {
-    %orig;
-    if (event.type != UIEventTypeTouches || gProbeStart <= 0) {
+    if (!pthread_main_np() || gProbeStart <= 0) {
         return;
     }
-    @try {
-        PFBProbeTouches((UIWindow*)self, event);
-    } @catch (__unused id exception) {
-        // A touch the probe cannot read is left out.
+    UIView* bar = gProbeBar;
+    UIView* accessory = gProbeAccessory;
+    if (bar && PFBProbeViewIn(self, bar)) {
+        PFBProbeCount(@"bar image", __builtin_return_address(0), PFBProbeImageText(image));
+    } else if (accessory && PFBProbeViewIn(self, accessory)) {
+        PFBProbeCount(@"compose image", __builtin_return_address(0), PFBProbeImageText(image));
     }
 }
 
 %end
 
+// The screens in front, and how each declares its bars to Twitter's navigation.
 %hook UIViewController
 
 - (void)viewDidAppear:(BOOL)animated {
     %orig;
-    PFBProbeNoteScreen((UIViewController*)self);
-    PFBProbeScheduleSnapshot((UIViewController*)self);
-}
-
-%end
-
-%hook _TtC11TwitterDash21DashHostingController
-
-- (void)viewDidAppear:(BOOL)animated {
-    %orig;
-    PFBProbeNote(PFBProbeDashShown, NO, 0);
-    PFBProbeScheduleSnapshot((UIViewController*)self);
-}
-
-%end
-
-// MARK: Twitter's new navigation
-
-%hook _TtC14T1TwitterSwift20XTabbedAppNavigation
-
-- (NSArray*)visiblePanelIDs {
-    NSArray* panels = %orig;
-    PFBProbeNote(PFBProbeNewPanelsAsked, NO, 0);
-    if (gProbeDashQuery) {
-        PFBProbeNote(PFBProbeNewPanelsAskedByDash, NO, 0);
+    UIViewController* controller = (UIViewController*)self;
+    if (gProbeStart <= 0 || !PFBOnNativeGlassStack(controller)) {
+        return;
     }
-    if (pthread_main_np() && ![panels isEqual:gProbePanels]) {
-        gProbePanels = [panels copy];
+    UIView* view = controller.viewIfLoaded;
+    if (!view.window || CGRectGetHeight(view.bounds) < CGRectGetHeight(view.window.bounds) * 0.5) {
+        return;
     }
-    return panels;
-}
-
-- (void)recalculateVisiblePanels {
-    PFBProbeNote(PFBProbeNewRecalculate, NO, 0);
-    %orig;
-}
-
-- (void)recalculateVisiblePanelsWithUpdatedPanelIDs:(id)panelIDs {
-    PFBProbeNote(PFBProbeNewRecalculate, NO, 0);
-    if (pthread_main_np()) {
-        gProbeUpdatedPanels = [panelIDs isKindOfClass:[NSArray class]] ? PFBProbePanelsText(panelIDs)
-                                                                       : PFBProbeName([panelIDs class]);
+    gProbeScreen = controller;
+    NSString* name = PFBProbeName([controller class]);
+    if (!gProbeScreens) {
+        gProbeScreens = [NSMutableDictionary dictionary];
     }
-    %orig;
-}
-
-- (void)setCurrentPanel:(long long)panel animated:(BOOL)animated completion:(id)completion {
-    PFBProbeNote(PFBProbeNewSetPanel, NO, 0);
-    if (pthread_main_np()) {
-        if (!gProbePanelsSet) {
-            gProbePanelsSet = [NSMutableArray array];
-        }
-        [gProbePanelsSet addObject:@(panel)];
-        if (gProbePanelsSet.count > 12) {
-            [gProbePanelsSet removeObjectAtIndex:0];
+    if (!gProbeScreens[name] && gProbeScreens.count < 16) {
+        @try {
+            gProbeScreens[name] = PFBProbeDeclarationText(controller);
+        } @catch (id exception) {
+            gProbeScreens[name] = [NSString stringWithFormat:@"unreadable (%@)", exception];
         }
     }
-    %orig;
-}
-
-%end
-
-// MARK: The old navigation, where the options hook
-
-%hook T1DashContentController
-
-- (void)updateVisiblePanelIDs {
-    PFBProbeNote(PFBProbeDashUpdate, NO, 0);
-    BOOL outer = gProbeDashQuery;
-    gProbeDashQuery = YES;
-    %orig;
-    gProbeDashQuery = outer;
-}
-
-%end
-
-%hook T1TabNavigationController
-
-// The last two are objects in Twitter's binary; passed on untouched.
-- (void)_t1_main_updateNavigationItemForViewController:(id)controller
-                                                isRoot:(BOOL)isRoot
-                           providingLeftBarButtonItems:(__unsafe_unretained id)left
-                                 rightBarButtonItems:(__unsafe_unretained id)right {
-    PFBProbeNote(PFBProbeOldNavigationItems, NO, 0);
-    %orig;
-}
-
-%end
-
-%hook TFNNavigationBar
-
-- (void)layoutSubviews {
-    PFBProbeNote(PFBProbeOldNavigationBar, NO, 0);
-    %orig;
-}
-
-%end
-
-%hook TFNExpandingButtonItemView
-
-- (void)_tfn_updateIcon {
-    PFBProbeNote(PFBProbeOldComposeIcon, NO, 0);
-    %orig;
-}
-
-%end
-
-%hook TFNFloatingActionButton
-
-- (void)layoutSubviews {
-    PFBProbeNote(PFBProbeOldComposeButton, NO, 0);
-    %orig;
-}
-
-%end
-
-%hook _TtC14T1TwitterSwift28GuideContainerViewController
-
-- (UIView*)tfn_navigationBarAccessoryView {
-    PFBProbeNote(PFBProbeExploreAccessory, NO, 0);
-    return %orig;
-}
-
-%end
-
-%hook _TtC10TFNUISwift25LegacySegmentedTabBarView
-
-- (void)layoutSubviews {
-    PFBProbeNote(PFBProbeExploreTabs, NO, 0);
-    %orig;
-}
-
-%end
-
-%hook T1FleetLineView
-
-- (void)layoutSubviews {
-    PFBProbeNote(PFBProbeFleetLine, NO, 0);
-    %orig;
-}
-
-%end
-
-%hook T1ConversationFooterTextView
-
-- (void)updateFooterTextView {
-    PFBProbeNote(PFBProbeTweetFooter, NO, 0);
-    %orig;
-}
-
-%end
-
-// MARK: The old bar, which PrimeFreeBird's tab bar options hook
-
-%hook T1TabView
-
-- (void)_t1_updateImageViewAnimated:(BOOL)animated {
-    CFTimeInterval start = CACurrentMediaTime();
-    %orig;
-    PFBProbeNote(PFBProbeOldTabIcon, NO, CACurrentMediaTime() - start);
-}
-
-- (void)_t1_layoutForTabBar {
-    CFTimeInterval start = CACurrentMediaTime();
-    %orig;
-    PFBProbeNote(PFBProbeOldTabLayout, NO, CACurrentMediaTime() - start);
-}
-
-- (void)setSelected:(BOOL)selected {
-    CFTimeInterval start = CACurrentMediaTime();
-    %orig;
-    PFBProbeNote(PFBProbeOldTabSelected, NO, CACurrentMediaTime() - start);
-}
-
-%end
-
-%hook T1TabBarViewController
-
-- (void)setTabBarCollapseRatio:(double)ratio {
-    CFTimeInterval start = CACurrentMediaTime();
-    %orig;
-    PFBProbeNote(PFBProbeOldCollapse, NO, CACurrentMediaTime() - start);
-}
-
-- (void)_t1_layoutTabBar {
-    CFTimeInterval start = CACurrentMediaTime();
-    %orig;
-    PFBProbeNote(PFBProbeOldBarLayout, NO, CACurrentMediaTime() - start);
-}
-
-- (void)_t1_updateTabBarHidden {
-    CFTimeInterval start = CACurrentMediaTime();
-    %orig;
-    PFBProbeNote(PFBProbeOldBarHidden, NO, CACurrentMediaTime() - start);
-}
-
-%end
-
-%hook T1TabBarHostView
-
-- (void)layoutSubviews {
-    CFTimeInterval start = CACurrentMediaTime();
-    %orig;
-    PFBProbeNote(PFBProbeOldHostLayout, NO, CACurrentMediaTime() - start);
-}
-
-%end
-
-%hook TFNCustomTabBar
-
-- (void)layoutSubviews {
-    CFTimeInterval start = CACurrentMediaTime();
-    %orig;
-    PFBProbeNote(PFBProbeOldCustomBarLayout, NO, CACurrentMediaTime() - start);
-}
-
-%end
-
-%hook T1TabbedAppNavigationViewController
-
-- (void)setVisibleTabEntries:(NSArray*)entries {
-    CFTimeInterval start = CACurrentMediaTime();
-    %orig;
-    PFBProbeNote(PFBProbeOldTabEntries, NO, CACurrentMediaTime() - start);
-}
-
-- (NSArray*)_t1_tabEntriesLimitedToBottomCapacity:(NSArray*)entries {
-    PFBProbeNote(PFBProbeOldTabCapacity, NO, 0);
-    return %orig;
-}
-
-- (NSArray*)visiblePanelIDsForAppNavigation:(id)appNavigation {
-    PFBProbeNote(PFBProbeOldPanelsAsked, NO, 0);
-    return %orig;
+    if (!gProbeHomeSpaces && [name containsString:@"HomeTimelineContainer"]) {
+        __weak UIViewController* weakHome = controller;
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1.5 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+          UIViewController* home = weakHome;
+          if (home.viewIfLoaded.window) {
+              gProbeHomeSpaces = PFBProbeSpacesText(home);
+          }
+        });
+    }
 }
 
 %end
 
 %end
 
-// Every other file installs its hooks from its constructor. The main queue first runs
-// once they all have, so these are installed last.
+// The early hooks go in at once, to see the launch. Every other file installs its hooks
+// from its constructor and the main queue first runs once they all have, so the others
+// are installed last.
 %ctor {
+    gProbeStart = CACurrentMediaTime();
+    PFBProbeFindOurCode();
+    PFBProbeWatchEntries();
+    %init(PFBGlassProbeEarly);
     dispatch_async(dispatch_get_main_queue(), ^{
       PFBProbeStart();
       %init(PFBGlassProbe);

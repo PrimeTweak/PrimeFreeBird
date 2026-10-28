@@ -1149,19 +1149,14 @@ reconfigureItemIdentifiers:(id)identifiers
 
 // MARK: - the eye
 
-// Placed by the T1TabNavigationController hook below, when the screen's bar items
-// are built, as a PFBBarGlyphItem paired with the gear beside it.
+// A PFBBarGlyphItem paired with the gear beside it, placed on the Notifications screen's
+// own bar items: by Twitter's navigation when it builds them, and on Twitter's native
+// glass stack, whose top bar draws the screen's navigation item, when the screen appears.
 
 static const NSInteger kPFBNotifBarItemTag = 90314;
 static const CGFloat kPFBNotifEyeSide = 24.0;
 
-%hook T1TabNavigationController
-
-- (void)_t1_main_updateNavigationItemForViewController:(UIViewController*)viewController
-                                                isRoot:(BOOL)isRoot
-                           providingLeftBarButtonItems:(BOOL)left
-                                 rightBarButtonItems:(BOOL)right {
-    %orig;
+static void PFBNotifPlaceEye(UIViewController* viewController) {
     if (!viewController) {
         return;
     }
@@ -1207,6 +1202,36 @@ static const CGFloat kPFBNotifEyeSide = 24.0;
         PFBCOMPAT_ACTION(PFBCompat_hide_notifications, @"eye placed");
     } @catch (id exception) {
         PFBDebugLog(@"[notifs] eye placement abandoned - no consequence");
+    }
+}
+
+%hook T1TabNavigationController
+
+// The last two arguments are objects in Twitter's binary, passed on untouched.
+- (void)_t1_main_updateNavigationItemForViewController:(UIViewController*)viewController
+                                                isRoot:(BOOL)isRoot
+                           providingLeftBarButtonItems:(__unsafe_unretained id)left
+                                 rightBarButtonItems:(__unsafe_unretained id)right {
+    %orig;
+    PFBNotifPlaceEye(viewController);
+}
+
+%end
+
+// Twitter may set its own items after the screen appears, so both moments place it.
+%hook T1NotificationsViewController
+
+- (void)viewWillAppear:(BOOL)animated {
+    %orig;
+    if (PFBOnNativeGlassStack((UIViewController*)self)) {
+        PFBNotifPlaceEye((UIViewController*)self);
+    }
+}
+
+- (void)viewDidAppear:(BOOL)animated {
+    %orig;
+    if (PFBOnNativeGlassStack((UIViewController*)self)) {
+        PFBNotifPlaceEye((UIViewController*)self);
     }
 }
 
