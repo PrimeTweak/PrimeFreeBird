@@ -51,12 +51,9 @@ extern NSString* const PFBTabPanelIDKey; // T1 panel ID (NSNumber)
 // entry is recorded with Twitter's name and glyph for it, Twitter's first one as Home.
 + (void)recordPanelIDs:(NSArray*)panelIDs;
 
-// Twitter's panels in the chosen order, or in the default set until the bar is
-// customized; Twitter's own list when that set does not fully resolve.
-+ (NSArray*)panelIDsInOrderFromPanelIDs:(NSArray*)panelIDs;
-
-// Asks Twitter's glass navigation to list its panels again, so the bar can follow a save.
-+ (void)refreshGlassBar;
+// The names of the chosen tabs in order, or of the default set until the bar is
+// customized, as Twitter names each panel.
++ (NSArray<NSString*>*)chosenTabNames;
 
 @end
 

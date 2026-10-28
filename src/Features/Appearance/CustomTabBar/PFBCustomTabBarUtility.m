@@ -1,6 +1,5 @@
 // Registry and helpers of the custom tab bar: panel ids, images, order.
 
-#import <objc/message.h>
 #import "Features/Appearance/CustomTabBar/PFBCustomTabBarUtility.h"
 #import "Support/T1Headers.h"
 
@@ -209,37 +208,23 @@ static NSDictionary* PFBEntryForPanel(NSArray<NSDictionary*>* registry, long lon
     }
 }
 
-+ (NSArray*)panelIDsInOrderFromPanelIDs:(NSArray*)panelIDs {
-    if (![panelIDs isKindOfClass:[NSArray class]] || panelIDs.count == 0) {
-        return panelIDs;
-    }
-    NSArray<NSString*>* saved = [self visiblePageIDsInOrder];
-    NSMutableArray* shown = [NSMutableArray array];
-    for (NSString* page in saved ?: [self defaultVisiblePageIDs]) {
-        id panel = [self metadataForPage:page][PFBTabPanelIDKey];
-        BOOL offered = [panel isKindOfClass:[NSNumber class]] && [panelIDs containsObject:panel];
-        if (offered && ![shown containsObject:panel]) {
-            [shown addObject:panel];
-        } else if (!offered && !saved) {
-            // Until the bar is customized, a default tab Twitter does not offer keeps
-            // Twitter's own tabs rather than a partial set.
-            return panelIDs;
++ (NSArray<NSString*>*)chosenTabNames {
+    Class identity = NSClassFromString(@"T1PanelIdentity");
+    NSMutableArray<NSString*>* names = [NSMutableArray array];
+    for (NSString* page in [self visiblePageIDsInOrder] ?: [self defaultVisiblePageIDs]) {
+        NSDictionary* entry = [self metadataForPage:page];
+        id panel = entry[PFBTabPanelIDKey];
+        NSString* name = [panel isKindOfClass:[NSNumber class]] && [identity respondsToSelector:@selector(localizedNameForPanelID:)]
+                             ? [identity localizedNameForPanelID:[panel longLongValue]]
+                             : nil;
+        if (!name.length) {
+            name = entry[PFBTabTitleKey];
+        }
+        if ([name isKindOfClass:[NSString class]] && name.length) {
+            [names addObject:name];
         }
     }
-    return shown.count ? shown : panelIDs;
-}
-
-+ (void)refreshGlassBar {
-    Class hostClass = NSClassFromString(@"T1HostViewController");
-    Class glassClass = NSClassFromString(@"_TtC14T1TwitterSwift20XTabbedAppNavigation");
-    SEL appNavigation = NSSelectorFromString(@"appNavigation");
-    SEL recalculate = NSSelectorFromString(@"recalculateVisiblePanels");
-    id host = [hostClass respondsToSelector:@selector(sharedHostViewController)] ? [hostClass sharedHostViewController] : nil;
-    id navigation = [host respondsToSelector:appNavigation] ? ((id (*)(id, SEL))objc_msgSend)(host, appNavigation) : nil;
-    if (!glassClass || ![navigation isKindOfClass:glassClass] || ![navigation respondsToSelector:recalculate]) {
-        return;
-    }
-    ((void (*)(id, SEL))objc_msgSend)(navigation, recalculate);
+    return names;
 }
 
 @end
