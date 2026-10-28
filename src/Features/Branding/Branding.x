@@ -716,6 +716,184 @@ static void pfbApplyComposeFABVisibility(UIView* fab) {
 
 %end
 
+// MARK: - Twitter's glass compose button
+
+// Under Twitter's own Liquid Glass the compose button is an accessory above the tab bar:
+// a glass circle tinted dark around a white glyph. Twitter writes only its alpha.
+static const void* kPFBGlassComposeMaterialKey = &kPFBGlassComposeMaterialKey;
+static const void* kPFBGlassComposeGlyphKey = &kPFBGlassComposeGlyphKey;
+static const void* kPFBGlassComposeTintKey = &kPFBGlassComposeTintKey;
+static const void* kPFBGlassComposeOriginalKey = &kPFBGlassComposeOriginalKey;
+static const void* kPFBGlassComposeHiddenKey = &kPFBGlassComposeHiddenKey;
+
+// The white feather of Twitter's vector set, sized for the button's 24-point glyph.
+static UIImage* PFBGlassFeather(void) {
+    static UIImage* feather;
+    if (!feather) {
+        feather = [UIImage tfn_vectorImageNamed:@"feather" fitsSize:CGSizeMake(24.0, 24.0) fillColor:[UIColor whiteColor]];
+    }
+    return feather;
+}
+
+// The button's glass: the first material in it that takes a tint.
+static UIVisualEffectView* PFBGlassComposeMaterial(UIView* host) {
+    __block UIVisualEffectView* found = nil;
+    PFBWalkAllSubviews(host, 8, ^(UIView* view) {
+      if (!found && [view isKindOfClass:[UIVisualEffectView class]] &&
+          [((UIVisualEffectView*)view).effect respondsToSelector:@selector(setTintColor:)]) {
+          found = (UIVisualEffectView*)view;
+      }
+    });
+    return found;
+}
+
+static UIImageView* PFBGlassComposeGlyph(UIView* material) {
+    __block UIImageView* found = nil;
+    PFBWalkAllSubviews(material, 8, ^(UIView* view) {
+      if (!found && [view isKindOfClass:[UIImageView class]] && ((UIImageView*)view).image) {
+          found = (UIImageView*)view;
+      }
+    });
+    return found;
+}
+
+static UIColor* PFBGlassMaterialTint(UIVisualEffectView* material) {
+    UIVisualEffect* effect = material.effect;
+    id tint = [effect respondsToSelector:@selector(tintColor)] ? [(id)effect tintColor] : nil;
+    return [tint isKindOfClass:[UIColor class]] ? tint : nil;
+}
+
+// The material reads its tint when installed, so a tinted copy is installed, without
+// animation: a re-install animates the glass otherwise.
+static void PFBGlassTintMaterial(UIVisualEffectView* material, UIColor* tint) {
+    UIVisualEffect* effect = [material.effect copy];
+    if (![effect respondsToSelector:@selector(setTintColor:)]) {
+        return;
+    }
+    [(id)effect setTintColor:tint];
+    [UIView performWithoutAnimation:^{
+      [CATransaction begin];
+      [CATransaction setDisableActions:YES];
+      material.effect = effect;
+      [CATransaction commit];
+    }];
+}
+
+// Each accessory Twitter shows there is noted once, by its VoiceOver label.
+static void PFBGlassNoteAccessory(UIView* host) {
+    static NSMutableSet<NSString*>* seen;
+    __block NSString* label = nil;
+    PFBWalkAllSubviews(host, 4, ^(UIView* view) {
+      if (!label && [view isKindOfClass:[UIControl class]]) {
+          label = view.accessibilityLabel.length ? view.accessibilityLabel : @"no label";
+      }
+    });
+    if (!label || [seen containsObject:label] || seen.count >= 6) {
+        return;
+    }
+    if (!seen) {
+        seen = [NSMutableSet set];
+    }
+    [seen addObject:label];
+    CGRect frame = [host convertRect:host.bounds toView:nil];
+    PFBCompatMeasure(@"glass Tweet button",
+                     [NSString stringWithFormat:@"accessory \"%@\" at %.0f,%.0f %.0fx%.0f", label, frame.origin.x,
+                                                frame.origin.y, frame.size.width, frame.size.height],
+                     10);
+}
+
+static void PFBGlassComposeVisibility(UIView* host) {
+    BOOL hide = [PFBSettings boolForKey:@"hide_tweet_button"];
+    BOOL hiddenByUs = objc_getAssociatedObject(host, kPFBGlassComposeHiddenKey) != nil;
+    if (hide) {
+        PFBCOMPAT_ACTION(PFBCompat_hide_tweet_button, @"glass Tweet button hidden");
+        if (!host.hidden) {
+            host.hidden = YES;
+        }
+        if (!hiddenByUs) {
+            objc_setAssociatedObject(host, kPFBGlassComposeHiddenKey, @YES, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        }
+        return;
+    }
+    PFBCOMPAT_OBSERVE(PFBCompat_hide_tweet_button, @"glass Tweet button found");
+    if (hiddenByUs) {
+        host.hidden = NO;
+        objc_setAssociatedObject(host, kPFBGlassComposeHiddenKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    }
+}
+
+// Blue glass and the white feather with the option on; Twitter's own tint and glyph back
+// with it off.
+static void PFBGlassComposeLook(UIView* host) {
+    UIVisualEffectView* material = PFBGlassComposeMaterial(host);
+    UIImageView* glyph = material ? PFBGlassComposeGlyph(material) : nil;
+    if (!material || !glyph) {
+        return;
+    }
+    objc_setAssociatedObject(material, kPFBGlassComposeMaterialKey, @YES, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    objc_setAssociatedObject(glyph, kPFBGlassComposeGlyphKey, @YES, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    id savedTint = objc_getAssociatedObject(material, kPFBGlassComposeTintKey);
+    UIImage* original = objc_getAssociatedObject(glyph, kPFBGlassComposeOriginalKey);
+    if (![PFBSettings boolForKey:@"restore_tweet_button"]) {
+        PFBCOMPAT_OBSERVE(PFBCompat_restore_tweet_button, @"glass Tweet button found");
+        if (savedTint) {
+            PFBGlassTintMaterial(material, savedTint == [NSNull null] ? nil : savedTint);
+            objc_setAssociatedObject(material, kPFBGlassComposeTintKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        }
+        if (original) {
+            glyph.image = original;
+            objc_setAssociatedObject(glyph, kPFBGlassComposeOriginalKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        }
+        return;
+    }
+    UIColor* blue = PFBFABBlueColor();
+    UIColor* tint = PFBGlassMaterialTint(material);
+    if (!savedTint) {
+        objc_setAssociatedObject(material, kPFBGlassComposeTintKey, tint ?: [NSNull null], OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    }
+    if (![tint isEqual:blue]) {
+        PFBGlassTintMaterial(material, blue);
+    }
+    UIImage* feather = PFBGlassFeather();
+    if (feather && glyph.image != feather) {
+        if (!original) {
+            objc_setAssociatedObject(glyph, kPFBGlassComposeOriginalKey, glyph.image, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        }
+        glyph.image = feather;
+    }
+    PFBCOMPAT_ACTION(PFBCompat_restore_tweet_button, @"glass Tweet button restyled");
+}
+
+static void PFBGlassStyleCompose(UIView* host) {
+    PFBCompatReach(PFBCompatPath_glass_tweet_button);
+    PFBGlassNoteAccessory(host);
+    PFBGlassComposeVisibility(host);
+    PFBGlassComposeLook(host);
+}
+
+%hook _TtC11XNavigation23TabBarAccessoryHostView
+
+- (void)layoutSubviews {
+    %orig;
+    @try {
+        PFBGlassStyleCompose((UIView*)self);
+    } @catch (__unused id exception) {
+    }
+}
+
+- (void)didMoveToWindow {
+    %orig;
+    if (!((UIView*)self).window) {
+        return;
+    }
+    @try {
+        PFBGlassStyleCompose((UIView*)self);
+    } @catch (__unused id exception) {
+    }
+}
+
+%end
+
 // Twitter swaps the glyph image on an existing image view during tab transitions,
 // which the subview hook above does not cover. Only the FAB's glyphs and the
 // navigation bar's confirm glyph are touched.
@@ -754,6 +932,14 @@ static void pfbApplyComposeFABVisibility(UIView* fab) {
     // nothing left to lose.
     if (image && objc_getAssociatedObject(self, &kPFBFABGlyphKey)) {
         image = PFBWhiteBakedGlyph(image);
+    } else if (image && objc_getAssociatedObject(self, kPFBGlassComposeGlyphKey) &&
+               [PFBSettings boolForKey:@"restore_tweet_button"]) {
+        // Twitter's own glyph is kept for when the option goes off, and the feather drawn.
+        UIImage* feather = PFBGlassFeather();
+        if (feather && image != feather) {
+            objc_setAssociatedObject(self, kPFBGlassComposeOriginalKey, image, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+            image = feather;
+        }
     } else if (image && objc_getAssociatedObject(self, &PFBConfirmGlyphTag) && PFBThemeScreenCount &&
                PFBAccentIsActive()) {
         image = PFBWhiteBakedGlyph(image);
@@ -772,6 +958,15 @@ static void pfbApplyComposeFABVisibility(UIView* fab) {
 // incoming effect here means the reset itself installs a colored material, with no
 // extra assignment and no rebuild.
 - (void)setEffect:(UIVisualEffect*)effect {
+    // A material Twitter installs again on its glass compose button comes in blue: a
+    // tinted copy, since Twitter may share the material it passes.
+    if (effect && objc_getAssociatedObject(self, kPFBGlassComposeMaterialKey) &&
+        [PFBSettings boolForKey:@"restore_tweet_button"] && [effect respondsToSelector:@selector(setTintColor:)]) {
+        UIVisualEffect* tinted = [effect copy];
+        [(id)tinted setTintColor:PFBFABBlueColor()];
+        %orig(tinted);
+        return;
+    }
     if (effect && objc_getAssociatedObject(self, &kPFBFABGlassKey) &&
         [PFBSettings boolForKey:@"restore_tweet_button"] &&
         [PFBSettings boolForKey:@"enable_liquid_glass"] &&
