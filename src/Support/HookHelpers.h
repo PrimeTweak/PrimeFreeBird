@@ -237,6 +237,10 @@ void PFBGlassTabBarHideForSettings(BOOL hidden);
 void PFBGlassRefreshAlwaysVisible(void);
 NSUInteger PFBGlassAlwaysVisiblePinCount(void);
 
+// Posted on the main thread just before the stethoscope builds its report, so a probe can write
+// a fresh measurement into it (PFBDebugger.m).
+FOUNDATION_EXPORT NSString* const PFBDebuggerWillCaptureNotification;
+
 // Bar items of PrimeFreeBird's own screens carry this tag and keep UIKit's glass;
 // the app-wide flattening in NavBarIcons.x leaves them alone.
 static const NSInteger PFBNativeGlassTag = 0x504647;
