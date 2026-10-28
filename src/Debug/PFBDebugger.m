@@ -11,6 +11,8 @@
 #import "Debug/PFBDebugOverlayWindow.h"
 #import "Debug/PFBDebugTrigger.h"
 
+NSString* const PFBDebuggerWillCaptureNotification = @"PFBDebuggerWillCapture";
+
 // MARK: - gate
 
 BOOL PFBDebugIsRecording(void) {
@@ -530,6 +532,8 @@ void PFBDebuggerCaptureAndPresent(void) {
     PFBCaptureView(root, 0, capture);
     gPFBLastCapture = capture;
 
+    // Let observers (the glass probe) write a fresh measurement before the report is read.
+    [[NSNotificationCenter defaultCenter] postNotificationName:PFBDebuggerWillCaptureNotification object:nil];
     PFBDebuggerPresent();
 }
 

@@ -2,9 +2,9 @@
 // collapses with Always visible on, how the taller bar for Tab labels lays out, and how
 // Twitter gates and saves its own tab list, which Customize tabs needs.
 //
-// Each scroll and a summary at 25 s and 60 s go to MEASUREMENTS, which the stethoscope
-// copies with the Compatibility report. The hooks are installed after every other file's,
-// so each call is charged to the code that sent it.
+// Each scroll goes to MEASUREMENTS, and a full summary once Home is up and signed in, and
+// again whenever the stethoscope captures: both see a populated bar and account, where a timer
+// would not. The hooks are installed after every other file's, so each call is charged to its sender.
 
 #import <mach-o/loader.h>
 #import <pthread.h>
@@ -540,11 +540,90 @@ static NSString* PFBProbeFirstTabText(void) {
                                       content ? [NSString stringWithFormat:@"%.0f", content.adjustedContentInset.bottom] : @"none"];
 }
 
+// The bar docked above the tab bar (the reply or quick-post bar), found by place: the short,
+// wide view whose bottom sits just over the tab bar. Its gap to the tab bar top is what reads
+// too tight on a reply screen; the class names what to measure next.
+static NSString* PFBProbeReplyBarText(void) {
+    UIView* bar = gProbeBar;
+    UIWindow* window = bar.window;
+    if (!bar || !window) {
+        return @"no bar";
+    }
+    CGRect barWin = [bar convertRect:bar.bounds toView:nil];
+    CGFloat barTop = CGRectGetMinY(barWin);
+    __block UIView* found = nil;
+    __block CGRect foundWin = CGRectZero;
+    PFBWalkAllSubviews(window, 10, ^(UIView* view) {
+      if (view == bar || view == gProbeAccessory || [bar isDescendantOfView:view] || [view isDescendantOfView:bar] ||
+          (gProbeAccessory && [view isDescendantOfView:gProbeAccessory])) {
+          return;
+      }
+      CGRect frame = [view convertRect:view.bounds toView:nil];
+      // Short and wide, horizontally over the bar, its bottom just above the bar top.
+      if (CGRectGetHeight(frame) < 20.0 || CGRectGetHeight(frame) > 100.0 ||
+          CGRectGetWidth(frame) < CGRectGetWidth(barWin) * 0.6 ||
+          CGRectGetMaxX(frame) < CGRectGetMinX(barWin) + 20.0 || CGRectGetMinX(frame) > CGRectGetMaxX(barWin) - 20.0) {
+          return;
+      }
+      CGFloat bottom = CGRectGetMaxY(frame);
+      if (bottom > barTop + 2.0 || bottom < barTop - 160.0) {
+          return;
+      }
+      if (!found || bottom > CGRectGetMaxY(foundWin)) {
+          found = view;
+          foundWin = frame;
+      }
+    });
+    if (!found) {
+        return @"none above the bar";
+    }
+    return [NSString stringWithFormat:@"%@ %@ · gap to bar top %.0f", PFBProbeName([found class]),
+                                      PFBProbeRectText(foundWin), barTop - CGRectGetMaxY(foundWin)];
+}
+
 static id PFBProbeAppNavigation(void) {
     Class hostClass = NSClassFromString(@"T1HostViewController");
     T1HostViewController* host =
         [hostClass respondsToSelector:@selector(sharedHostViewController)] ? [hostClass sharedHostViewController] : nil;
     return [host respondsToSelector:@selector(appNavigation)] ? [host appNavigation] : nil;
+}
+
+// The signed-in account Twitter's host holds, or nil before sign-in.
+static id PFBProbeCurrentAccount(void) {
+    Class hostClass = NSClassFromString(@"T1HostViewController");
+    T1HostViewController* host =
+        [hostClass respondsToSelector:@selector(sharedHostViewController)] ? [hostClass sharedHostViewController] : nil;
+    return [host respondsToSelector:@selector(currentAccount)] ? [host currentAccount] : nil;
+}
+
+// An on-screen home timeline anywhere in a controller tree.
+static BOOL PFBProbeControllerTreeHasHome(UIViewController* controller, NSInteger depth) {
+    if (!controller || depth > 8) {
+        return NO;
+    }
+    if ([NSStringFromClass([controller class]) containsString:@"HomeTimeline"]) {
+        UIView* view = controller.viewIfLoaded;
+        if (view.window && CGRectIntersectsRect([view convertRect:view.bounds toView:nil], view.window.bounds)) {
+            return YES;
+        }
+    }
+    for (UIViewController* child in controller.childViewControllers) {
+        if (PFBProbeControllerTreeHasHome(child, depth + 1)) {
+            return YES;
+        }
+    }
+    return PFBProbeControllerTreeHasHome(controller.presentedViewController, depth + 1);
+}
+
+// A home timeline is up, the screen the summary waits for: the frontmost tracked screen, or any
+// on-screen home timeline when a parent appeared after it and took the tracked screen's place.
+static BOOL PFBProbeOnHome(void) {
+    UIViewController* screen = gProbeScreen;
+    if (screen && [NSStringFromClass([screen class]) containsString:@"HomeTimeline"]) {
+        return YES;
+    }
+    UIWindow* window = gProbeBar.window;
+    return window && PFBProbeControllerTreeHasHome(window.rootViewController, 0);
 }
 
 // MARK: - Customize tabs
@@ -646,10 +725,7 @@ static NSString* PFBProbeSavedValueText(id value) {
 }
 
 static NSString* PFBProbeCustomizeTabsText(void) {
-    Class hostClass = NSClassFromString(@"T1HostViewController");
-    T1HostViewController* host =
-        [hostClass respondsToSelector:@selector(sharedHostViewController)] ? [hostClass sharedHostViewController] : nil;
-    id account = [host respondsToSelector:@selector(currentAccount)] ? [host currentAccount] : nil;
+    id account = PFBProbeCurrentAccount();
     if (!account) {
         return @"no account";
     }
@@ -1127,6 +1203,7 @@ static void PFBProbePersist(NSString* moment) {
                                        PFBProbeCustomizeTabsText(), PFBProbePanelNamesText(panels)],
             [NSString stringWithFormat:@"%@: bar parts %@ · first tab %@", moment, PFBProbePartsText(),
                                        PFBProbeFirstTabText()],
+            [NSString stringWithFormat:@"%@: reply bar %@", moment, PFBProbeReplyBarText()],
         ] mutableCopy];
         for (NSInteger i = 0; i < PFBProbePartCount; i++) {
             [lines addObject:[NSString stringWithFormat:@"%@: writes to the %@: %@", moment, kPFBProbePartNames[i],
@@ -1140,18 +1217,25 @@ static void PFBProbePersist(NSString* moment) {
     }
 }
 
+// The summary once, as soon as Home is up with the bar on screen and an account signed in, so
+// it sees a populated state. The stethoscope captures again later; this is the unattended one.
+static BOOL gProbeHomeCaptured;
+
+static void PFBProbeMaybeCaptureOnHome(void) {
+    if (gProbeHomeCaptured || !gProbeBar || !PFBProbeOnScreen(gProbeBar) || !PFBProbeOnHome() ||
+        !PFBProbeCurrentAccount()) {
+        return;
+    }
+    gProbeHomeCaptured = YES;
+    PFBProbePersist(@"on Home");
+}
+
 static void PFBProbeStart(void) {
     gProbeItemClass = NSClassFromString(@"_TtC11XNavigation14TabBarItemView");
     gProbePortalClass = NSClassFromString(@"_TtC11XNavigation16TabBarPortalView");
     gProbeCarriedClass = NSClassFromString(@"_TtC11XNavigation16TabBarCarriedRow");
     gProbePillClass = NSClassFromString(@"_TtC11XNavigation10TabBarPill");
     gProbeBadgesClass = NSClassFromString(@"_TtC11XNavigation18TabBarBadgeOverlay");
-    for (NSNumber* moment in @[ @25, @60 ]) {
-        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(moment.doubleValue * NSEC_PER_SEC)),
-                       dispatch_get_main_queue(), ^{
-                         PFBProbePersist([NSString stringWithFormat:@"at %@ s", moment]);
-                       });
-    }
 }
 
 // MARK: - Hooks
@@ -1216,6 +1300,7 @@ static void PFBProbeStart(void) {
         @try {
             PFBProbeNoteTabs(bar);
             PFBProbeNoteParts(bar);
+            PFBProbeMaybeCaptureOnHome();
         } @catch (__unused id exception) {
         }
     }
@@ -1418,6 +1503,13 @@ static void PFBProbeStart(void) {
 %ctor {
     gProbeStart = CACurrentMediaTime();
     PFBProbeFindOurCode();
+    // A fresh summary each time the stethoscope captures, so the report holds the current state.
+    [[NSNotificationCenter defaultCenter] addObserverForName:PFBDebuggerWillCaptureNotification
+                                                      object:nil
+                                                       queue:nil
+                                                  usingBlock:^(__unused NSNotification* note) {
+                                                    PFBProbePersist(@"at capture");
+                                                  }];
     %init(PFBGlassProbeEarly);
     dispatch_async(dispatch_get_main_queue(), ^{
       PFBProbeStart();
