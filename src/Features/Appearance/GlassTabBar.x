@@ -25,7 +25,7 @@ static void PFBGlassFindClasses(void) {
     });
 }
 
-// Twitter's bar is 62 pt; Tab labels makes it 72 pt, where the glyph grows from 24 to 26 pt
+// Twitter's bar is 62 pt; Tab labels makes it 72 pt, where the glyph grows from 24 to 28 pt
 // and rises 9 pt over an 11 pt name. A bar under 70 pt fits a 10 pt name under a glyph risen 8 pt.
 static const CGFloat kPFBGlassExtraHeight = 10.0;
 
@@ -39,7 +39,7 @@ typedef struct {
 
 static PFBGlassMetrics PFBGlassMetricsForHeight(CGFloat height) {
     if (height >= 70.0) {
-        return (PFBGlassMetrics){9.0, 28.0, 14.0, 11.0, 26.0 / 24.0};
+        return (PFBGlassMetrics){9.0, 28.0, 14.0, 11.0, 28.0 / 24.0};
     }
     return (PFBGlassMetrics){8.0, 21.0, 12.0, 10.0, 1.0};
 }
