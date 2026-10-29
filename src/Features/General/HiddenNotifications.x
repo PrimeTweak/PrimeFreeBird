@@ -224,7 +224,31 @@ static NSString* PFBNotifEntryIdFromDescription(id model) {
 // an accessor, so the cache does not try to message a selector that is not one.
 static NSString* const kPFBIdentityFromDescription = @"<description>";
 
+// A Tweet shown in the notifications list is named by its own ID: its view model has no
+// entry ID. Only Twitter's Tweet view model is read, whose `status` field holds the Tweet.
+static NSString* PFBNotifTweetIdentity(id model) {
+    static Class statusItem;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+      statusItem = objc_getClass("URTTimelineStatusItemViewModel");
+    });
+    if (!statusItem || ![model isKindOfClass:statusItem]) {
+        return nil;
+    }
+    Ivar statusIvar = class_getInstanceVariable([model class], "status");
+    id status = statusIvar ? object_getIvar(model, statusIvar) : nil;
+    if (![status respondsToSelector:@selector(statusID)]) {
+        return nil;
+    }
+    NSInteger statusID = ((TFNTwitterStatus*)status).statusID;
+    return statusID > 0 ? [NSString stringWithFormat:@"tw:%ld", (long)statusID] : nil;
+}
+
 static NSString* PFBNotifIdentity(id model) {
+    NSString* tweet = PFBNotifTweetIdentity(model);
+    if (tweet) {
+        return tweet;
+    }
     static NSMutableDictionary<NSString*, NSString*>* cache;
     if (!cache) { cache = [NSMutableDictionary dictionary]; }
     NSString* className = NSStringFromClass([model class]);
@@ -275,6 +299,31 @@ static NSString* PFBNotifIdentity(id model) {
         return PFBNotifString(PFBNotifAsk(model, found));
     }
     return nil;
+}
+
+// Whether a list belongs to the notifications tab, read up its controllers.
+static BOOL PFBNotifOnNotificationsScreen(id dataViewController) {
+    UIViewController* node = [dataViewController isKindOfClass:[UIViewController class]]
+                                 ? (UIViewController*)dataViewController
+                                 : nil;
+    for (NSInteger hop = 0; node && hop < 6; hop++) {
+        if ([NSStringFromClass([node class]) containsString:@"NotificationsViewController"]) {
+            return YES;
+        }
+        node = node.parentViewController;
+    }
+    return NO;
+}
+
+// A row the hide applies to: a notification, or a Tweet in the notifications tab.
+static BOOL PFBNotifRowHides(id dataViewController, id model) {
+    if (!model) {
+        return NO;
+    }
+    if ([NSStringFromClass([model class]) containsString:@"Notification"]) {
+        return YES;
+    }
+    return PFBNotifTweetIdentity(model) && PFBNotifOnNotificationsScreen(dataViewController);
 }
 
 static BOOL PFBNotifIsHidden(id model) {
@@ -587,10 +636,13 @@ static void PFBNotifDropRow(id dataViewController, NSIndexPath* indexPath) {
         return original;
     }
     NSString* modelClass = NSStringFromClass([model class]);
-    if (![modelClass containsString:@"Notification"]) {
+    if (!PFBNotifRowHides(self, model)) {
         return original;
     }
     PFBCompatReach(PFBCompatPath_notification_swipe);
+    if (![modelClass containsString:@"Notification"]) {
+        PFBCompatReach(PFBCompatPath_notification_tweet_rows);
+    }
     if (![PFBSettings boolForKey:@"hide_notifications"]) {
         PFBCOMPAT_OBSERVE(PFBCompat_hide_notifications, @"notification swipe seen");
         return original;
@@ -968,6 +1020,7 @@ static void PFBNotifSweep(id dataViewController) {
         }
 
         NSMutableArray<NSIndexPath*>* doomed = [NSMutableArray array];
+        BOOL notificationsScreen = PFBNotifOnNotificationsScreen(dataViewController);
         BOOL sawNotification = NO;
         NSInteger examined = 0;
         NSInteger sections = table.numberOfSections;
@@ -977,13 +1030,13 @@ static void PFBNotifSweep(id dataViewController) {
                 NSIndexPath* path = [NSIndexPath indexPathForRow:r inSection:s];
                 id item = ((id (*)(id, SEL, id))objc_msgSend)(dataViewController, itemSel, path);
                 id model = item ? PFBUnwrapDataViewItem(item) : nil;
+                BOOL notification = model && [NSStringFromClass([model class]) containsString:@"Notification"];
                 if (model) {
                     examined++;
-                    if ([NSStringFromClass([model class]) containsString:@"Notification"]) {
-                        sawNotification = YES;
-                    }
+                    sawNotification = sawNotification || notification;
                 }
-                if (model && PFBNotifIsHidden(model)) {
+                if (model && (notification || (notificationsScreen && PFBNotifTweetIdentity(model))) &&
+                    PFBNotifIsHidden(model)) {
                     [doomed addObject:path];
                 }
             }
@@ -1486,7 +1539,7 @@ NSString* PFBNotifRowFacts(UITableView* table, NSIndexPath* indexPath) {
     NSString* entry = match.numberOfRanges > 1 ? [text substringWithRange:[match rangeAtIndex:1]] : @"unread";
     NSString* modelClass = PFBReadableClassName(model);
     BOOL identity = PFBNotifIdentity(model).length > 0;
-    BOOL swipe = identity && [NSStringFromClass([model class]) containsString:@"Notification"];
+    BOOL swipe = identity && PFBNotifRowHides(table.dataSource, model);
     return [NSString stringWithFormat:@"model %@, entry %@, identity %@, swipe Hide %@", modelClass, entry,
                                       identity ? @"read" : @"none", swipe ? @"offered" : @"not offered"];
 }
