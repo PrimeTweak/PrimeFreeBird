@@ -128,17 +128,17 @@ static NSString* PFBIconReport(UIView* icon, BOOL* invisible) {
     if (ink) {
         sscanf(ink.UTF8String, "rgb(%lf,%lf,%lf)", &r, &g, &b);
     }
+    // A bar slid away by a scroll, or a screen beside the one in front, is not looked at.
     CGRect frame = [icon convertRect:icon.bounds toView:nil];
+    if (!CGRectIntersectsRect(frame, icon.window.bounds)) {
+        *invisible = NO;
+        return nil;
+    }
     NSString* cover = PFBIconCover(icon);
     if (hiddenBy) {
         [reasons addObject:[@"hidden by " stringByAppendingString:hiddenBy]];
     }
-    if (alpha < 0.05) {
-        [reasons addObject:@"alpha"];
-    }
-    if (model < 0.05) {
-        [reasons addObject:@"layer opacity"];
-    }
+    // What shows is the opacity on screen: alpha and layer opacity can be mid-animation.
     if (shown < 0.05) {
         [reasons addObject:@"opacity on screen"];
     }
@@ -153,9 +153,6 @@ static NSString* PFBIconReport(UIView* icon, BOOL* invisible) {
     }
     if ([cover containsString:@"(paints)"]) {
         [reasons addObject:@"covered"];
-    }
-    if (!CGRectIntersectsRect(frame, icon.window.bounds)) {
-        [reasons addObject:@"off screen"];
     }
     *invisible = reasons.count > 0;
     return [NSString stringWithFormat:@"%@ · frame %.0f,%.0f %.0fx%.0f · alpha %.2f · opacity %.2f, on screen %.2f · "
@@ -186,6 +183,9 @@ static void PFBIconCheck(NSString* moment) {
     for (UIView* icon in icons) {
         BOOL invisible = NO;
         NSString* report = PFBIconReport(icon, &invisible);
+        if (!report) {
+            continue;
+        }
         NSString* name = icon.accessibilityLabel.length ? icon.accessibilityLabel : PFBReadableClassName(icon);
         NSString* key = [NSString stringWithFormat:@"%@ on %@", name, gPFBIconScreen ?: @"?"];
         // A visible icon is noted once per screen; every way of not showing is noted.

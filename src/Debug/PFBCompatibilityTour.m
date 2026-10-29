@@ -58,8 +58,9 @@ static UILabel* gPFBTourStepLabel;
 static NSFileHandle* gPFBTourJournal;
 // Twitter's palette in use before the dark mode step switched it.
 static id gPFBTourPaletteBefore;
-// Set while the step that opens Twitter's new settings menu is up.
+// Set while the step that opens Twitter's new settings menu is up, and when it asked for it.
 static BOOL gPFBTourNewSettings;
+static CFTimeInterval gPFBTourNewSettingsAt;
 
 // MARK: - Journal
 
@@ -2173,12 +2174,14 @@ static NSArray<NSDictionary*>* tourAllSteps(void) {
              tourPopToRoot();
            }))];
     // Twitter's new settings menu, kept closed otherwise, opened once and held until the probe
-    // has read how it builds its rows.
+    // has read how it builds its rows, or for 5 s; shown, the step is reached either way.
     [steps addObject:tourStepWaiting(kPFBTourProofWait, tourStep(@"new Twitter settings", @"Twitter's new settings", root, ^{
              gPFBTourNewSettings = YES;
+             gPFBTourNewSettingsAt = CACurrentMediaTime();
              tourShowTwitterSettings();
            }, ^BOOL(UIViewController* before, UIViewController* after) {
-             return [NSStringFromClass([after class]) hasPrefix:@"_TtC9XSettings"] && PFBSettingsMenuProbeRead();
+             return [NSStringFromClass([after class]) hasPrefix:@"_TtC9XSettings"] &&
+                    (PFBSettingsMenuProbeRead() || CACurrentMediaTime() - gPFBTourNewSettingsAt > 5.0);
            }, nil, ^{
              gPFBTourNewSettings = NO;
              tourPopToRoot();

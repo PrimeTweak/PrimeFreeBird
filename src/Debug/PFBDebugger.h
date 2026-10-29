@@ -52,3 +52,6 @@ extern BOOL PFBSettingsMenuProbeRead(void);
 
 // The same for Twitter's tab editor (PFBTabEditorProbe.x).
 extern BOOL PFBTabEditorProbeRead(void);
+
+// The opacity a view shows with: zero when it or a parent is hidden (PFBScreenProbe.x).
+extern CGFloat PFBShownOpacity(UIView* view);
