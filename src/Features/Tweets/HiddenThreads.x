@@ -1,4 +1,5 @@
-// Hide conversations: a Tweet menu entry that hides a conversation from every list.
+// Hide conversations: a Tweet menu entry that hides a conversation from every list. In the
+// notifications tab the entry hides the notification instead.
 
 #import "Support/HookHelpers.h"
 
@@ -342,10 +343,10 @@ static void PFBShowHiddenToast(NSString* threadID) {
 // The Tweet's menu is caught as it is set on its caret button (-[UIButton setMenu:]),
 // and the entry is appended to it.
 
-// From the caret button up to the Tweet it belongs to. The chain is walked at
-// the moment it is needed — when the menu is built, and again when the entry is
-// tapped — so nothing is cached and nothing can go stale.
-static id PFBStatusForButton(UIView* button) {
+// From the caret button up to the Tweet it belongs to, a conversation's when asked. The
+// chain is walked at the moment it is needed — when the menu is built, and again when the
+// entry is tapped — so nothing is cached and nothing can go stale.
+static id PFBStatusUpFrom(UIView* button, BOOL conversationOnly) {
     UIView* node = button;
     NSInteger depth = 0;
     while (node && depth < 14) {
@@ -356,13 +357,17 @@ static id PFBStatusForButton(UIView* button) {
             model = nil;
         }
         id status = PFBStatusFromModel(model);
-        if (status && PFBModelIsConversation(status)) {
+        if (status && (!conversationOnly || PFBModelIsConversation(status))) {
             return status;
         }
         node = node.superview;
         depth++;
     }
     return nil;
+}
+
+static id PFBStatusForButton(UIView* button) {
+    return PFBStatusUpFrom(button, YES);
 }
 
 static NSString* PFBThreadIDForButton(UIView* button) {
@@ -393,6 +398,36 @@ static BOOL PFBMenuBelongsToTweet(UIMenu* menu) {
     return PFBMenuHasEntry(menu, [[PFBBundle sharedBundle] localizedTwitterStringForKey:@"NOT_INTERESTED_IN_THIS_LABEL"]);
 }
 
+// In the notifications tab, a Tweet's menu offers to hide the notification instead of the
+// conversation. Its icon is Twitter's crossed eye, as on the hidden notifications screen.
+static UIMenu* PFBMenuWithNotificationHide(UIMenu* menu, UIView* button) {
+    PFBCompatReach(PFBCompatPath_notification_tweet_menu);
+    if (![PFBSettings boolForKey:@"hide_notifications"]) {
+        PFBCOMPAT_OBSERVE(PFBCompat_hide_notifications, @"Tweet menu in the notifications tab found");
+        return menu;
+    }
+    NSString* title = [[PFBBundle sharedBundle] localizedStringForKey:@"NOTIFS_HIDE_MENU_ACTION"];
+    if (PFBMenuHasEntry(menu, title)) {
+        return menu;
+    }
+    UIColor* color = [[UIColor labelColor] resolvedColorWithTraitCollection:button.traitCollection] ?: [UIColor labelColor];
+    UIImage* glyph = [UIImage respondsToSelector:@selector(tfn_vectorImageNamed:fitsSize:fillColor:)]
+                         ? [UIImage tfn_vectorImageNamed:@"eye_off"
+                                                fitsSize:CGSizeMake(kPFBHideGlyphSide, kPFBHideGlyphSide)
+                                               fillColor:color]
+                         : nil;
+    __weak UIView* weakButton = button;
+    UIAction* hide = [UIAction actionWithTitle:title
+                                         image:glyph
+                                    identifier:nil
+                                       handler:^(__unused UIAction* action) {
+                                         UIView* source = weakButton;
+                                         PFBNotifHideTweet(PFBStatusUpFrom(source, NO), source, nil);
+                                       }];
+    PFBCOMPAT_ACTION(PFBCompat_hide_notifications, @"hide entry in a Tweet menu of the notifications tab");
+    return [menu menuByReplacingChildren:[menu.children arrayByAddingObject:hide]];
+}
+
 %hook UIButton
 
 - (void)setMenu:(UIMenu*)menu {
@@ -402,12 +437,17 @@ static BOOL PFBMenuBelongsToTweet(UIMenu* menu) {
         PFBCompatReach(PFBCompatPath_threads_popup_menu);
         PFBCOMPAT_OBSERVE(PFBCompat_hide_threads, @"Tweet menu found");
     }
+    UIView* button = (UIView*)self;
+    if ([menu isKindOfClass:[UIMenu class]] && PFBNotifViewOnNotificationsScreen(button) &&
+        (PFBMenuBelongsToTweet(menu) || PFBStatusUpFrom(button, NO))) {
+        %orig(PFBMenuWithNotificationHide(menu, button));
+        return;
+    }
     if (![menu isKindOfClass:[UIMenu class]] ||
         ![PFBSettings boolForKey:@"hide_threads"]) {
         %orig;
         return;
     }
-    UIView* button = (UIView*)self;
     // Either the menu names itself — an entry the app puts there — or the button
     // sits under a Tweet. The second covers a menu still being assembled, whose
     // entries are not readable yet.
@@ -450,9 +490,10 @@ static BOOL PFBMenuBelongsToTweet(UIMenu* menu) {
 // MARK: - The entry in the Tweet's menu sheet
 
 // A Tweet's menu is built as a sheet of action items and shown as the "About this post"
-// tray, where an entry Twitter does not know lands under "More". The Tweet is held
-// while its menu is built, for the one sheet made then.
+// tray, where an entry Twitter does not know lands under "More". The Tweet, and the
+// notifications screen it is built from if any, are held for the one sheet made then.
 static id gPFBSheetStatus;
+static __weak UIViewController* gPFBSheetScreen;
 
 // As in the pop-up menu, the entry is on every Tweet's menu and acts on a Tweet in a
 // conversation. Its icon is Twitter's own crossed speech bubble.
@@ -475,6 +516,20 @@ static TFNActionItem* PFBHideActionItem(id status) {
                      }];
 }
 
+// The sheet's entry in the notifications tab: hide the notification.
+static TFNActionItem* PFBHideNotificationItem(id status, UIViewController* screen) {
+    Class itemClass = %c(TFNActionItem);
+    if (![itemClass respondsToSelector:@selector(actionItemWithTitle:imageName:action:)]) {
+        return nil;
+    }
+    __weak UIViewController* weakScreen = screen;
+    return [itemClass actionItemWithTitle:[[PFBBundle sharedBundle] localizedStringForKey:@"NOTIFS_HIDE_MENU_ACTION"]
+                                imageName:@"eye_off"
+                                   action:^{
+                                     PFBNotifHideTweet(status, nil, weakScreen);
+                                   }];
+}
+
 %hook UIViewController
 
 - (id)t1_actionsViewControllerForStatus:(id)status
@@ -483,9 +538,12 @@ static TFNActionItem* PFBHideActionItem(id status) {
                                 options:(unsigned long long)options
                               doneBlock:(id)doneBlock {
     id heldStatus = gPFBSheetStatus;
+    UIViewController* heldScreen = gPFBSheetScreen;
     gPFBSheetStatus = status;
+    gPFBSheetScreen = PFBNotifControllerOnNotificationsScreen((UIViewController*)self) ? (UIViewController*)self : nil;
     id sheet = %orig;
     gPFBSheetStatus = heldStatus;
+    gPFBSheetScreen = heldScreen;
     return sheet;
 }
 
@@ -495,9 +553,24 @@ static TFNActionItem* PFBHideActionItem(id status) {
 
 - (id)initWithActionItems:(NSArray*)items {
     id status = PFBStatusFromModel(gPFBSheetStatus);
+    UIViewController* screen = gPFBSheetScreen;
     gPFBSheetStatus = nil;
+    gPFBSheetScreen = nil;
     if (!status || ![items isKindOfClass:[NSArray class]]) {
         return %orig;
+    }
+    if (screen) {
+        PFBCompatReach(PFBCompatPath_notification_tweet_menu);
+        if (![PFBSettings boolForKey:@"hide_notifications"]) {
+            PFBCOMPAT_OBSERVE(PFBCompat_hide_notifications, @"Tweet menu in the notifications tab found");
+            return %orig;
+        }
+        TFNActionItem* hide = PFBHideNotificationItem(status, screen);
+        if (!hide) {
+            return %orig;
+        }
+        PFBCOMPAT_ACTION(PFBCompat_hide_notifications, @"hide entry in a Tweet menu of the notifications tab");
+        return %orig([items arrayByAddingObject:hide]);
     }
     PFBCompatReach(PFBCompatPath_threads_post_menu);
     PFBCOMPAT_OBSERVE(PFBCompat_hide_threads, @"Tweet menu found");
