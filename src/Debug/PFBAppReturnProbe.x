@@ -184,29 +184,8 @@ static void PFBComposeCheck(UIView* host) {
 
 %end
 
-// The rows the side menu shows, by their VoiceOver labels, top to bottom.
-static NSString* PFBAccessibilityText(id element, NSInteger depth) {
-    NSString* label = [element accessibilityLabel];
-    if (label.length || depth > 3) {
-        return label;
-    }
-    for (id inner in [element accessibilityElements] ?: @[]) {
-        NSString* found = PFBAccessibilityText(inner, depth + 1);
-        if (found.length) {
-            return found;
-        }
-    }
-    if ([element isKindOfClass:[UIView class]]) {
-        for (UIView* sub in ((UIView*)element).subviews) {
-            NSString* found = PFBAccessibilityText(sub, depth + 1);
-            if (found.length) {
-                return found;
-            }
-        }
-    }
-    return nil;
-}
-
+// The rows' labels are unreadable without VoiceOver: the row count tells a trimmed
+// menu from the standard one, and the Money row is the one with "Claim bonus".
 static NSString* PFBDashRows(void) {
     UIWindow* window = PFBFrontWindow(PFBFrontScene());
     __block UIView* menu = nil;
@@ -224,17 +203,18 @@ static NSString* PFBDashRows(void) {
     if (!list) {
         return menu ? @"no list found in the menu" : @"no menu found";
     }
-    NSArray<UICollectionViewCell*>* cells =
-        [list.visibleCells sortedArrayUsingComparator:^NSComparisonResult(UICollectionViewCell* a, UICollectionViewCell* b) {
-          return a.frame.origin.y < b.frame.origin.y ? NSOrderedAscending : NSOrderedDescending;
-        }];
-    NSMutableArray<NSString*>* rows = [NSMutableArray array];
-    for (UICollectionViewCell* cell in cells) {
-        if (!cell.hidden) {
-            [rows addObject:PFBAccessibilityText(cell, 0) ?: @"?"];
-        }
+    NSInteger rows = 0;
+    for (NSInteger section = 0; section < list.numberOfSections; section++) {
+        rows += [list numberOfItemsInSection:section];
     }
-    return [NSString stringWithFormat:@"[%@]", [rows componentsJoinedByString:@", "]];
+    __block BOOL bonus = NO;
+    PFBWalkAllSubviews(list, 20, ^(UIView* view) {
+      if (!view.hidden && [view isKindOfClass:[UILabel class]] &&
+          [((UILabel*)view).text isEqualToString:@"Claim bonus"]) {
+          bonus = YES;
+      }
+    });
+    return [NSString stringWithFormat:@"%ld, Claim bonus %@", (long)rows, bonus ? @"shown" : @"absent"];
 }
 
 %hook T1DashContentController

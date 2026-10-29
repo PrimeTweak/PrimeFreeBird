@@ -1,6 +1,6 @@
 // Screen by screen, once it has settled and at each capture: the bar Twitter keeps above Home
-// for Spaces and live games, the blur iOS draws under the top bars, and the notifications list
-// as the hide code reads it.
+// for Spaces and live games, the blur iOS draws under the top bars, the notifications list as
+// the hide code reads it, and the Suggested part of the Chat inbox. Menus: any Imagine entry.
 
 #import "Support/HookHelpers.h"
 #import "Common/PFBCompatibility.h"
@@ -12,6 +12,10 @@ static NSString* const kPFBTopBlurTopic = @"top bar blur";
 static const NSUInteger kPFBTopBlurLines = 25;
 static NSString* const kPFBNotifRowTopic = @"notification rows";
 static const NSUInteger kPFBNotifRowLines = 20;
+static NSString* const kPFBSuggestedTopic = @"suggested chats";
+static const NSUInteger kPFBSuggestedLines = 8;
+static NSString* const kPFBImagineTopic = @"imagine entries";
+static const NSUInteger kPFBImagineLines = 12;
 // The top bars and the lists' top edges sit above this line.
 static const CGFloat kPFBTopArea = 200.0;
 
@@ -250,6 +254,63 @@ static void PFBNotifRowsLook(UIViewController* screen) {
     });
 }
 
+// MARK: - Suggested chats
+
+// Chat's own wording in the app's language, with the brand "X" left out so a renamed one matches.
+static NSString* PFBChatText(NSString* key) {
+    static NSBundle* bundle;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+      NSString* path = [NSBundle.mainBundle pathForResource:@"ChatCore_ChatStrings" ofType:@"bundle"];
+      bundle = path ? [NSBundle bundleWithPath:path] : nil;
+    });
+    NSString* text = [bundle localizedStringForKey:key value:nil table:nil];
+    if (!text.length || [text isEqualToString:key]) {
+        return nil;
+    }
+    NSRegularExpression* brand = [NSRegularExpression regularExpressionWithPattern:@"\\bX\\b" options:0 error:nil];
+    text = [brand stringByReplacingMatchesInString:text options:0 range:NSMakeRange(0, text.length) withTemplate:@""];
+    return [text stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceCharacterSet];
+}
+
+// The inbox's Suggested header and Find friends row, as the texts on screen show them. A screen
+// named for chats is noted either way; any other only when one of them is on it.
+static void PFBSuggestedChatsLook(UIViewController* controller) {
+    UIView* root = controller.viewIfLoaded;
+    NSString* header = PFBChatText(@"CHAT_COLD_INBOX_SUGGESTED_TITLE");
+    NSString* friends = PFBChatText(@"CHAT_COLD_INBOX_FIND_FRIENDS_TITLE");
+    if (!root.window || (!header && !friends)) {
+        return;
+    }
+    __block NSUInteger texts = 0;
+    __block BOOL headerShown = NO, friendsShown = NO;
+    PFBWalkAllSubviews(root, 40, ^(UIView* view) {
+      if (PFBShownOpacity(view) < 0.05) {
+          return;
+      }
+      NSString* text = [view isKindOfClass:[UILabel class]] ? ((UILabel*)view).text : nil;
+      for (NSString* candidate in @[ text ?: @"", view.accessibilityLabel ?: @"" ]) {
+          if (!candidate.length) {
+              continue;
+          }
+          texts++;
+          headerShown = headerShown || (header && [candidate isEqualToString:header]);
+          friendsShown = friendsShown || (friends && [candidate hasPrefix:friends]);
+      }
+    });
+    NSString* screen = PFBReadableClassName(controller);
+    BOOL chatScreen = [screen rangeOfString:@"Inbox|Chat|DM|Message" options:NSRegularExpressionSearch].location != NSNotFound;
+    if (!chatScreen && !headerShown && !friendsShown) {
+        return;
+    }
+    PFBCompatMeasure(kPFBSuggestedTopic,
+                     [NSString stringWithFormat:@"%@: Suggested header %@, Find friends row %@, %lu texts read (option %@)",
+                                                screen, headerShown ? @"shown" : @"absent",
+                                                friendsShown ? @"shown" : @"absent", (unsigned long)texts,
+                                                [PFBSettings boolForKey:@"hide_suggested_chats"] ? @"on" : @"off"],
+                     kPFBSuggestedLines);
+}
+
 // MARK: - When to look
 
 static void PFBScreenLook(UIViewController* controller, NSString* moment) {
@@ -260,6 +321,7 @@ static void PFBScreenLook(UIViewController* controller, NSString* moment) {
         if (notifications && [controller isKindOfClass:notifications]) {
             PFBNotifRowsLook(controller);
         }
+        PFBSuggestedChatsLook(controller);
     } @catch (__unused id exception) {
     }
 }
@@ -286,6 +348,92 @@ static __weak UIViewController* gPFBScreenInFront;
 
 %end
 
+// MARK: - Imagine entries
+
+static NSUInteger gPFBMenusRead;
+static NSUInteger gPFBImagineMenus;
+
+// Every entry title of a menu, submenus included.
+static void PFBMenuTitles(NSArray* children, NSMutableArray<NSString*>* titles, NSInteger depth) {
+    for (id child in children) {
+        if ([child isKindOfClass:[UIMenuElement class]] && ((UIMenuElement*)child).title.length) {
+            [titles addObject:((UIMenuElement*)child).title];
+        } else if (![child isKindOfClass:[UIMenuElement class]] && [child respondsToSelector:@selector(title)]) {
+            id title = [child valueForKey:@"title"];
+            if ([title isKindOfClass:[NSString class]] && ((NSString*)title).length) {
+                [titles addObject:title];
+            }
+        }
+        if (depth < 3 && [child isKindOfClass:[UIMenu class]]) {
+            PFBMenuTitles(((UIMenu*)child).children, titles, depth + 1);
+        }
+    }
+}
+
+// Notes each entry naming Imagine, with the screen in front and the menu's first entries.
+static void PFBImagineLook(NSArray* children, NSString* kind) {
+    if (![children isKindOfClass:[NSArray class]] || !children.count) {
+        return;
+    }
+    gPFBMenusRead++;
+    NSMutableArray<NSString*>* titles = [NSMutableArray array];
+    PFBMenuTitles(children, titles, 0);
+    BOOL found = NO;
+    for (NSString* title in titles) {
+        if ([title rangeOfString:@"imagine" options:NSCaseInsensitiveSearch].location == NSNotFound) {
+            continue;
+        }
+        found = YES;
+        UIViewController* screen = gPFBScreenInFront;
+        NSArray* beside = [titles subarrayWithRange:NSMakeRange(0, MIN(titles.count, (NSUInteger)4))];
+        PFBCompatMeasure(kPFBImagineTopic,
+                         [NSString stringWithFormat:@"\"%@\" in a %@ on %@, beside [%@] (Hide Grok creation %@)", title, kind,
+                                                    screen ? PFBReadableClassName(screen) : @"?",
+                                                    [beside componentsJoinedByString:@", "],
+                                                    [PFBSettings boolForKey:@"hide_grok_create"] ? @"on" : @"off"],
+                         kPFBImagineLines);
+    }
+    if (found) {
+        gPFBImagineMenus++;
+    }
+}
+
+%hook UIMenu
+
++ (UIMenu*)menuWithTitle:(NSString*)title children:(NSArray*)children {
+    @try {
+        PFBImagineLook(children, @"menu");
+    } @catch (__unused id exception) {
+    }
+    return %orig;
+}
+
++ (UIMenu*)menuWithTitle:(NSString*)title
+                   image:(UIImage*)image
+              identifier:(UIMenuIdentifier)identifier
+                 options:(UIMenuOptions)options
+                children:(NSArray*)children {
+    @try {
+        PFBImagineLook(children, @"menu");
+    } @catch (__unused id exception) {
+    }
+    return %orig;
+}
+
+%end
+
+%hook TFNMenuSheetViewController
+
+- (id)initWithActionItems:(NSArray*)items {
+    @try {
+        PFBImagineLook(items, @"sheet");
+    } @catch (__unused id exception) {
+    }
+    return %orig;
+}
+
+%end
+
 %ctor {
     %init;
     [[NSNotificationCenter defaultCenter] addObserverForName:PFBDebuggerWillCaptureNotification
@@ -296,5 +444,10 @@ static __weak UIViewController* gPFBScreenInFront;
                                                     if (controller) {
                                                         PFBScreenLook(controller, @"at capture");
                                                     }
+                                                    PFBCompatMeasure(kPFBImagineTopic,
+                                                                     [NSString stringWithFormat:@"at capture: %lu menus read since launch, %lu with Imagine",
+                                                                                                (unsigned long)gPFBMenusRead,
+                                                                                                (unsigned long)gPFBImagineMenus],
+                                                                     kPFBImagineLines);
                                                   }];
 }
