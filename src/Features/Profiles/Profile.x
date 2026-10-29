@@ -89,36 +89,45 @@ static NSString* pfbProfileAddress(NSString* username) {
     NSString* location = [viewModel respondsToSelector:@selector(location)] ? viewModel.location : nil;
     NSString* url = [viewModel respondsToSelector:@selector(url)] ? viewModel.url : nil;
 
-    UIAction* (^copyAction)(NSString*, NSString*, NSString*) =
-        ^(NSString* titleKey, NSString* iconName, NSString* value) {
-            UIImage* icon = [UIImage respondsToSelector:@selector(tfn_vectorImageNamed:fitsSize:fillColor:)]
-                                ? [UIImage tfn_vectorImageNamed:iconName fitsSize:CGSizeMake(16.0, 16.0) fillColor:UIColor.labelColor]
-                                : nil;
-            UIAction* action =
-                [UIAction actionWithTitle:[[PFBBundle sharedBundle] localizedStringForKey:titleKey]
-                                    image:icon
-                               identifier:nil
-                                  handler:^(__kindof UIAction* act) {
-                                      if (value.length) {
-                                          UIPasteboard.generalPasteboard.string = value;
-                                      }
-                                  }];
+    PFBBundle* bundle = [PFBBundle sharedBundle];
+    UIImage* (^icon)(NSString*) = ^UIImage*(NSString* name) {
+        return [UIImage respondsToSelector:@selector(tfn_vectorImageNamed:fitsSize:fillColor:)]
+                   ? [UIImage tfn_vectorImageNamed:name fitsSize:CGSizeMake(16.0, 16.0) fillColor:UIColor.labelColor]
+                   : nil;
+    };
+    // A row only for a value the profile has.
+    void (^add)(NSMutableArray<UIMenuElement*>*, NSString*, NSString*, NSString*) =
+        ^(NSMutableArray<UIMenuElement*>* rows, NSString* titleKey, NSString* iconName, NSString* value) {
             if (!value.length) {
-                action.attributes = UIMenuElementAttributesDisabled;
+                return;
             }
-            return action;
+            [rows addObject:[UIAction actionWithTitle:[bundle localizedStringForKey:titleKey]
+                                                image:icon(iconName)
+                                           identifier:nil
+                                              handler:^(__unused __kindof UIAction* action) {
+                                                  UIPasteboard.generalPasteboard.string = value;
+                                              }]];
         };
 
-    return @[
-        copyAction(@"COPY_PROFILE_INFO_MENU_OPTION_3", @"account", fullName),
-        copyAction(@"COPY_PROFILE_INFO_MENU_OPTION_2", @"at", username),
-        copyAction(@"COPY_PROFILE_INFO_MENU_OPTION_1", @"news_stroke", bio),
-        copyAction(@"COPY_PROFILE_INFO_MENU_OPTION_5", @"location_stroke", location),
-        copyAction(@"COPY_PROFILE_INFO_MENU_OPTION_4", @"link", url),
-        copyAction(@"COPY_PROFILE_INFO_MENU_OPTION_6", @"link", username.length ? pfbProfileAddress(username) : nil),
-        copyAction(@"COPY_PROFILE_INFO_MENU_OPTION_7", @"bar_chart", pfbProfileUserID(viewModel)),
-        copyAction(@"COPY_PROFILE_INFO_MENU_OPTION_8", @"calendar", pfbProfileJoinDate(viewModel)),
-    ];
+    // The three most copied in front; the rest in a More submenu, left out when it has none.
+    NSMutableArray<UIMenuElement*>* rows = [NSMutableArray array];
+    add(rows, @"COPY_PROFILE_INFO_MENU_OPTION_3", @"account", fullName);
+    add(rows, @"COPY_PROFILE_INFO_MENU_OPTION_2", @"at", username);
+    add(rows, @"COPY_PROFILE_INFO_MENU_OPTION_6", @"link", username.length ? pfbProfileAddress(username) : nil);
+    NSMutableArray<UIMenuElement*>* more = [NSMutableArray array];
+    add(more, @"COPY_PROFILE_INFO_MENU_OPTION_1", @"news_stroke", bio);
+    add(more, @"COPY_PROFILE_INFO_MENU_OPTION_5", @"location_stroke", location);
+    add(more, @"COPY_PROFILE_INFO_MENU_OPTION_4", @"globe_stroke", url);
+    add(more, @"COPY_PROFILE_INFO_MENU_OPTION_7", @"hash_stroke", pfbProfileUserID(viewModel));
+    add(more, @"COPY_PROFILE_INFO_MENU_OPTION_8", @"calendar", pfbProfileJoinDate(viewModel));
+    if (more.count) {
+        [rows addObject:[UIMenu menuWithTitle:[bundle localizedStringForKey:@"COPY_PROFILE_INFO_MENU_MORE"]
+                                        image:icon(@"more_circle")
+                                   identifier:nil
+                                      options:0
+                                     children:more]];
+    }
+    return rows;
 }
 
 @end
@@ -253,7 +262,9 @@ static void pfbMatchNeighborStyle(UIButton* ours, UIView* neighbor) {
             };
         UIDeferredMenuElement* deferred =
             [UIDeferredMenuElement elementWithUncachedProvider:actionsProvider];
-        copyButton.menu = [UIMenu menuWithTitle:@"" children:@[deferred]];
+        copyButton.menu =
+            [UIMenu menuWithTitle:[[PFBBundle sharedBundle] localizedStringForKey:@"COPY_PROFILE_INFO_MENU_TITLE"]
+                         children:@[deferred]];
 
         UIImage* glyph = [UIImage respondsToSelector:@selector(tfn_vectorImageNamed:fitsSize:fillColor:)]
                              ? [UIImage tfn_vectorImageNamed:@"copy_stroke" fitsSize:CGSizeMake(20, 20) fillColor:nil]
