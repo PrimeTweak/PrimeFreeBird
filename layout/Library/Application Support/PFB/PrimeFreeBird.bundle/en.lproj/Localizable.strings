@@ -523,6 +523,7 @@
 
 /* Hidden notifications */
 "NOTIFS_HIDE_ACTION" = "Hide";
+"NOTIFS_HIDE_MENU_ACTION" = "Hide notification";
 "NOTIFS_HIDDEN_TOAST" = "Notification hidden";
 "HIDDEN_NOTIFS_TITLE" = "Hidden notifications";
 "HIDDEN_NOTIFS_COUNT" = "%ld hidden";
