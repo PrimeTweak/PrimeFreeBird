@@ -171,6 +171,8 @@
 "FORCE_TWEET_FULL_FRAME_DETAIL" = "Show photos in full instead of cropped previews.";
 "DISABLE_MEDIA_CAROUSEL_TITLE" = "Classic media grid";
 "DISABLE_MEDIA_CAROUSEL_DETAIL" = "Show several photos in a Tweet as a grid instead of a carousel.";
+"HIDE_MADE_ON_X_TITLE" = "Hide “Made on X”";
+"HIDE_MADE_ON_X_DETAIL" = "Remove the label X adds to photos and videos edited in its editor.";
 "RESTORE_VIDEO_TIMESTAMP_TITLE" = "Video time";
 "RESTORE_VIDEO_TIMESTAMP_DETAIL" = "Show elapsed and total time on full-screen videos, instead of the countdown.";
 "DISABLE_IMMERSIVE_SCROLL_TITLE" = "Disable video auto-scroll";
@@ -295,6 +297,9 @@
 "CUSTOM_TAB_BAR_DISCARD_MESSAGE" = "The tabs you picked are not saved.";
 "CUSTOM_TAB_BAR_DISCARD_ACTION" = "Discard";
 "CUSTOM_TAB_BAR_SETTINGS_NAVIGATION_TITLE" = "Tabs";
+"TAB_EDITOR_TIP_CHANGE" = "Tap a tab to change it";
+"TAB_EDITOR_TIP_ARRANGE" = "Touch and hold a tab to rearrange";
+"TAB_EDITOR_TIP_ADD" = "Tap + to add a tab";
 
 /* ===== Fonts picker ===== */
 "CUSTOM_FONTS_MENU_TITLE" = "\nChoose a font";
@@ -310,11 +315,11 @@
 "DOWNLOAD_ALL_VIDEOS_OPTION_TITLE" = "Download all videos";
 
 /* ===== Profile actions ===== */
-"COPY_PROFILE_INFO_MENU_OPTION_1" = "Copy bio";
-"COPY_PROFILE_INFO_MENU_OPTION_2" = "Copy username";
-"COPY_PROFILE_INFO_MENU_OPTION_3" = "Copy name";
-"COPY_PROFILE_INFO_MENU_OPTION_4" = "Copy website";
-"COPY_PROFILE_INFO_MENU_OPTION_5" = "Copy location";
+"COPY_PROFILE_INFO_MENU_OPTION_1" = "Bio";
+"COPY_PROFILE_INFO_MENU_OPTION_2" = "Username";
+"COPY_PROFILE_INFO_MENU_OPTION_3" = "Name";
+"COPY_PROFILE_INFO_MENU_OPTION_4" = "Website";
+"COPY_PROFILE_INFO_MENU_OPTION_5" = "Location";
 
 /* ===== Padlock / authentication ===== */
 "PADLOCK_LOCKED_LABEL" = "Locked";
@@ -393,9 +398,11 @@
 "DISABLE_VIDEO_DOCKING_DETAIL" = "Stop full-screen videos from shrinking into a floating player.";
 "UPLOAD_FULL_HD_VIDEOS_TITLE" = "Full HD video uploads";
 "UPLOAD_FULL_HD_VIDEOS_DETAIL" = "Upload your videos in 1080p instead of the compressed default.";
-"COPY_PROFILE_INFO_MENU_OPTION_6" = "Copy profile URL";
-"COPY_PROFILE_INFO_MENU_OPTION_7" = "Copy user ID";
-"COPY_PROFILE_INFO_MENU_OPTION_8" = "Copy join date";
+"COPY_PROFILE_INFO_MENU_OPTION_6" = "Profile link";
+"COPY_PROFILE_INFO_MENU_OPTION_7" = "User ID";
+"COPY_PROFILE_INFO_MENU_OPTION_8" = "Join date";
+"COPY_PROFILE_INFO_MENU_TITLE" = "Copy";
+"COPY_PROFILE_INFO_MENU_MORE" = "More";
 "REMOVE_FOLLOWERS_TITLE" = "Remove followers";
 "REMOVE_FOLLOWERS_DETAIL" = "Add “Remove this follower” to the menu of a profile that follows you.";
 "REMOVE_FOLLOWERS_DETAIL_HELD" = "Needs a web session — sign in under Tools › Web session.";
