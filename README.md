@@ -70,7 +70,7 @@
 - **Bios in full** — long bios open expanded, with no *Show more* to tap.
 - **Open profiles where you want** — land on Replies, Highlights, Articles, Media, Videos or Retweets instead of Tweets.
 - **Hide the Videos tab** — alongside the existing switches for Articles and Highlights.
-- **Profile URL** — added to the copy-profile-details button.
+- **Copy profile details** — name, username and profile link up front; bio, location, website, user ID and join date under *More*.
 
 ## Reply in Web View
 
