@@ -519,6 +519,7 @@
 
 /* Hidden notifications */
 "NOTIFS_HIDE_ACTION" = "Masquer";
+"NOTIFS_HIDE_MENU_ACTION" = "Masquer la notification";
 "NOTIFS_HIDDEN_TOAST" = "Notification masquée";
 "HIDDEN_NOTIFS_TITLE" = "Notifications masquées";
 "HIDDEN_NOTIFS_COUNT" = "Masquées : %ld";
