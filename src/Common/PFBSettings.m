@@ -282,6 +282,8 @@ static NSDictionary<NSString*, NSDictionary*>* PFBSettingsPages(void) {
                     @{@"key": @"force_tweet_full_frame",
                       @"default": @YES},
                     @{@"key": @"disable_media_carousel",
+                      @"default": @NO},
+                    @{@"key": @"hide_made_on_x",
                       @"default": @NO}
                 ]
             },

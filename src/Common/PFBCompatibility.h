@@ -62,6 +62,7 @@ typedef NS_ENUM(NSInteger, PFBCompatOption) {
     PFBCompat_enable_image_preloading,
     PFBCompat_force_tweet_full_frame,
     PFBCompat_disable_media_carousel,
+    PFBCompat_hide_made_on_x,
     PFBCompat_upload_full_hd_videos,
     PFBCompat_follow_confirm,
     PFBCompat_expand_bio,
@@ -250,6 +251,7 @@ typedef NS_ENUM(NSInteger, PFBCompatPath) {
     PFBCompatPath_navigation_bar_text,
     PFBCompatPath_glass_pill,
     PFBCompatPath_bottom_fade,
+    PFBCompatPath_tab_editor_page,
     PFBCompatPathCount,
 };
 
