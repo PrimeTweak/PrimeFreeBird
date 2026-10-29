@@ -238,7 +238,7 @@ typedef NS_ENUM(NSInteger, PFBCompatPath) {
     PFBCompatPath_home_bar_button,
     PFBCompatPath_eye_button,
     PFBCompatPath_notification_swipe,
-    PFBCompatPath_notification_tweet_rows,
+    PFBCompatPath_notification_tweet_menu,
     PFBCompatPath_controls_hold,
     PFBCompatPath_played_voice_note,
     PFBCompatPath_interface_text,
