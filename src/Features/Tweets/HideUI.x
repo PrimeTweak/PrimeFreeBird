@@ -339,3 +339,24 @@ grokEditImageButtonConfiguration:(id)configuration {
 }
 
 %end
+
+// MARK: - Made on X
+
+// The label X adds under photos and videos edited in its own editor. Only a label Twitter
+// would show is counted.
+%hook T1StatusEditedOnXLabelAdapter
+
+- (BOOL)shouldBeVisibleForViewModel:(id)viewModel {
+    BOOL visible = %orig;
+    if (!visible) {
+        return NO;
+    }
+    if ([PFBSettings boolForKey:@"hide_made_on_x"]) {
+        PFBCOMPAT_ACTION(PFBCompat_hide_made_on_x, @"Made on X label hidden");
+        return NO;
+    }
+    PFBCOMPAT_OBSERVE(PFBCompat_hide_made_on_x, @"Made on X label shown");
+    return YES;
+}
+
+%end
