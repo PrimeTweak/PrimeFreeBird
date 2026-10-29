@@ -1,5 +1,6 @@
 // Watches the icons PrimeFreeBird adds or repaints in the top bars. One that is on screen but
-// cannot be seen goes to MEASUREMENTS with why: hidden, faded, layer opacity, animations, ink, cover.
+// cannot be seen goes to MEASUREMENTS with why: hidden, faded, layer opacity, animations, ink,
+// cover, and for its own glyph buttons, their last paints.
 
 #import "Support/HookHelpers.h"
 #import "Common/PFBBundle.h"
@@ -13,6 +14,75 @@ static NSString* const kPFBIconReferenceTopic = @"icon reference";
 static const NSUInteger kPFBIconReferenceLines = 10;
 // The top bars sit above this line; the lists below it are not walked.
 static const CGFloat kPFBIconProbeTop = 200.0;
+
+// Each glyph button's last paints: what set or repainted its glyph, in which appearance, in
+// which color. An icon found invisible carries them in its line.
+@interface PFBBarGlyphButton (PFBPaintProbe)
+- (void)pfbPaint;
+@end
+
+static const void* kPFBPaintRingKey = &kPFBPaintRingKey;
+static const void* kPFBPaintStyleKey = &kPFBPaintStyleKey;
+static const NSUInteger kPFBPaintRingLength = 10;
+static CFTimeInterval gPFBPaintStart;
+
+static NSString* PFBStyleName(UITraitCollection* traits) {
+    return traits.userInterfaceStyle == UIUserInterfaceStyleDark ? @"dark" : @"light";
+}
+
+static UIColor* PFBPaintedColor(PFBBarGlyphButton* button) {
+    Ivar ivar = class_getInstanceVariable([PFBBarGlyphButton class], "_paintedColor");
+    id color = ivar ? object_getIvar(button, ivar) : nil;
+    return [color isKindOfClass:[UIColor class]] ? color : nil;
+}
+
+static void PFBPaintNote(PFBBarGlyphButton* button, NSString* event) {
+    NSMutableArray<NSString*>* ring = objc_getAssociatedObject(button, kPFBPaintRingKey);
+    if (!ring) {
+        ring = [NSMutableArray array];
+        objc_setAssociatedObject(button, kPFBPaintRingKey, ring, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    }
+    [ring addObject:[NSString stringWithFormat:@"%.1f s %@ (button %@, painted %@, ink %@)",
+                                               CACurrentMediaTime() - gPFBPaintStart, event,
+                                               PFBStyleName(button.traitCollection), PFBColorText(PFBPaintedColor(button)),
+                                               PFBImageInk(button.glyph) ?: @"none"]];
+    if (ring.count > kPFBPaintRingLength) {
+        [ring removeObjectAtIndex:0];
+    }
+}
+
+%hook PFBBarGlyphButton
+
+- (void)setGlyph:(UIImage*)glyph {
+    %orig;
+    PFBPaintNote(self, [NSString stringWithFormat:@"glyph given in ink %@", PFBImageInk(glyph) ?: @"none"]);
+}
+
+- (void)pfbPaint {
+    UIColor* before = PFBPaintedColor(self);
+    %orig;
+    UIColor* after = PFBPaintedColor(self);
+    if (after && ![after isEqual:before]) {
+        PFBPaintNote(self, @"repainted");
+    }
+}
+
+- (void)traitCollectionDidChange:(UITraitCollection*)previous {
+    %orig;
+    PFBPaintNote(self, [@"told of a change from " stringByAppendingString:PFBStyleName(previous)]);
+}
+
+// A change of appearance seen at layout without the notice above shows up here.
+- (void)layoutSubviews {
+    %orig;
+    NSString* style = PFBStyleName(((UIView*)self).traitCollection);
+    if (![style isEqualToString:objc_getAssociatedObject(self, kPFBPaintStyleKey)]) {
+        objc_setAssociatedObject(self, kPFBPaintStyleKey, style, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        PFBPaintNote(self, [@"laid out as " stringByAppendingString:style]);
+    }
+}
+
+%end
 
 static NSString* gPFBIconScreen;
 static NSString* gPFBIconPreviousScreen;
@@ -155,14 +225,22 @@ static NSString* PFBIconReport(UIView* icon, BOOL* invisible) {
         [reasons addObject:@"covered"];
     }
     *invisible = reasons.count > 0;
+    NSString* paints = @"";
+    if (*invisible && [icon isKindOfClass:[PFBBarGlyphButton class]]) {
+        NSArray<NSString*>* ring = objc_getAssociatedObject(icon, kPFBPaintRingKey);
+        paints = [NSString stringWithFormat:@" · painted %@ while the button is %@ · paints [%@]",
+                                            PFBColorText(PFBPaintedColor((PFBBarGlyphButton*)icon)),
+                                            PFBStyleName(icon.traitCollection),
+                                            [ring componentsJoinedByString:@" > "]];
+    }
     return [NSString stringWithFormat:@"%@ · frame %.0f,%.0f %.0fx%.0f · alpha %.2f · opacity %.2f, on screen %.2f · "
-                                      @"animations [%@] · ink %@ in %@ · tint %@ · over it %@",
+                                      @"animations [%@] · ink %@ in %@ · tint %@ · over it %@%@",
                                       reasons.count ? [@"INVISIBLE: " stringByAppendingString:[reasons componentsJoinedByString:@", "]]
                                                     : @"visible",
                                       frame.origin.x, frame.origin.y, frame.size.width, frame.size.height, alpha, model,
                                       shown, [animations componentsJoinedByString:@", "], ink ?: @"none",
                                       style == UIUserInterfaceStyleDark ? @"dark" : @"light",
-                                      PFBColorText(glyph.tintColor), cover];
+                                      PFBColorText(glyph.tintColor), cover, paints];
 }
 
 static void PFBIconCheck(NSString* moment) {
@@ -240,6 +318,7 @@ static void PFBIconScheduleChecks(void) {
 
 %ctor {
     %init;
+    gPFBPaintStart = CACurrentMediaTime();
     [[NSNotificationCenter defaultCenter] addObserverForName:UIApplicationDidBecomeActiveNotification
                                                       object:nil
                                                        queue:NSOperationQueue.mainQueue

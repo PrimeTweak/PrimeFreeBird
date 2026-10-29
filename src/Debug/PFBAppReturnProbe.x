@@ -1,6 +1,6 @@
 // What changes when Twitter comes back to the front: how it was launched, whether iOS gave it a
-// new scene, window or first screen, the side menu's panels as Twitter takes and holds them, and
-// the Tweet button. Each line names its moment and is kept across launches.
+// new scene, window or first screen, the side menu's panels, the Tweet button and whether its
+// feather is in place. Each line names its moment and is kept across launches.
 
 #import "Support/HookHelpers.h"
 #import "Common/PFBCompatibility.h"
@@ -112,27 +112,114 @@ static void PFBReturnInFront(void) {
 
 // MARK: - Side menu
 
-// The panels the side menu holds as the tab bar's: a row is left out for each of them.
+// The panels the side menu holds as the tab bar's: a row is left out for each of them. The
+// field is read the way key-value coding reads it, and its type is named when that fails.
 static NSString* PFBDashPanels(id controller) {
     Ivar ivar = class_getInstanceVariable(object_getClass(controller), "visiblePanelIDs");
     const char* type = ivar ? ivar_getTypeEncoding(ivar) : NULL;
-    if (!type || type[0] != '@') {
-        return @"unread";
+    NSString* field = [NSString stringWithFormat:@"field %@, type \"%s\"", ivar ? @"found" : @"not found", type ?: ""];
+    id panels = nil;
+    @try {
+        panels = [controller valueForKey:@"visiblePanelIDs"];
+    } @catch (__unused id exception) {
+        return [@"unread, " stringByAppendingString:field];
     }
-    id panels = object_getIvar(controller, ivar);
-    NSArray* list = [panels isKindOfClass:[NSArray class]]        ? panels
-                    : [panels isKindOfClass:[NSSet class]]        ? [(NSSet*)panels allObjects]
-                    : [panels isKindOfClass:[NSOrderedSet class]] ? [panels array]
-                                                                  : nil;
+    NSMutableArray* list = nil;
+    if ([panels isKindOfClass:[NSArray class]]) {
+        list = [panels mutableCopy];
+    } else if ([panels isKindOfClass:[NSSet class]]) {
+        list = [[(NSSet*)panels allObjects] mutableCopy];
+    } else if ([panels isKindOfClass:[NSOrderedSet class]]) {
+        list = [[(NSOrderedSet*)panels array] mutableCopy];
+    } else if ([panels isKindOfClass:[NSIndexSet class]]) {
+        list = [NSMutableArray array];
+        [(NSIndexSet*)panels enumerateIndexesUsingBlock:^(NSUInteger index, __unused BOOL* stop) {
+          [list addObject:@(index)];
+        }];
+    }
     if (!list) {
-        return panels ? PFBReadableClassName(panels) : @"none";
+        return [NSString stringWithFormat:@"%@ (%@)", panels ? PFBReadableClassName(panels) : @"none", field];
     }
-    NSArray* sorted = [list sortedArrayUsingComparator:^NSComparisonResult(id a, id b) {
-      return [a isKindOfClass:[NSNumber class]] && [b isKindOfClass:[NSNumber class]] ? [(NSNumber*)a compare:(NSNumber*)b]
-                                                                                       : NSOrderedSame;
+    [list sortUsingComparator:^NSComparisonResult(id a, id b) {
+      return [a isKindOfClass:[NSNumber class]] && [b isKindOfClass:[NSNumber class]]
+                 ? [(NSNumber*)a compare:(NSNumber*)b]
+                 : NSOrderedSame;
     }];
-    return [NSString stringWithFormat:@"[%@]", [sorted componentsJoinedByString:@", "]];
+    return [NSString stringWithFormat:@"[%@]", [list componentsJoinedByString:@", "]];
 }
+
+// MARK: - Feather on the compose button
+
+static const void* kPFBComposeCheckedAtKey = &kPFBComposeCheckedAtKey;
+
+// The compose button's glass and images, with where each image sits and what it shows.
+static NSString* PFBComposeStructure(UIView* host) {
+    NSMutableArray<NSString*>* parts = [NSMutableArray array];
+    PFBWalkAllSubviews(host, 10, ^(UIView* view) {
+      CGRect frame = [view convertRect:view.bounds toView:host];
+      NSString* place = [NSString stringWithFormat:@"%.0f,%.0f %.0fx%.0f", frame.origin.x, frame.origin.y,
+                                                   frame.size.width, frame.size.height];
+      if ([view isKindOfClass:[UIVisualEffectView class]]) {
+          [parts addObject:[NSString stringWithFormat:@"glass %@ %@", PFBReadableClassName(view), place]];
+      } else if ([view isKindOfClass:[UIImageView class]] && ((UIImageView*)view).image) {
+          BOOL inGlass = NO;
+          for (UIView* node = view.superview; node && node != host; node = node.superview) {
+              inGlass = inGlass || [node isKindOfClass:[UIVisualEffectView class]];
+          }
+          UIImage* image = ((UIImageView*)view).image;
+          [parts addObject:[NSString stringWithFormat:@"image %@ %.0fx%.0f, %@, ink %@, %@, %@", place,
+                                                      image.size.width, image.size.height,
+                                                      PFBGlassIsFeather(image) ? @"the feather" : @"not the feather",
+                                                      PFBImageInk(image) ?: @"none",
+                                                      inGlass ? @"in the glass" : @"outside the glass",
+                                                      view.hidden || PFBShownOpacity(view) < 0.05 ? @"not shown" : @"shown"]];
+      }
+    });
+    return [parts componentsJoinedByString:@" | "];
+}
+
+// Checked once a second at most, after the button's own layout and PrimeFreeBird's restyle.
+static void PFBComposeCheck(UIView* host) {
+    CFTimeInterval now = CACurrentMediaTime();
+    NSNumber* last = objc_getAssociatedObject(host, kPFBComposeCheckedAtKey);
+    if (last && now - last.doubleValue < 1.0) {
+        return;
+    }
+    objc_setAssociatedObject(host, kPFBComposeCheckedAtKey, @(now), OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    __weak UIView* weakHost = host;
+    dispatch_async(dispatch_get_main_queue(), ^{
+      UIView* button = weakHost;
+      if (!button) {
+          return;
+      }
+      @try {
+          NSString* miss = PFBGlassComposeMiss(button);
+          static BOOL referenceNoted;
+          if (miss) {
+              PFBCompatMeasure(@"compose feather",
+                               [NSString stringWithFormat:@"%@: MISSING, %@ · %@", gPFBMoment, miss,
+                                                          PFBComposeStructure(button)],
+                               12);
+          } else if (!referenceNoted && button.window && [PFBSettings boolForKey:@"restore_tweet_button"] &&
+                     [PFBGlassAccessoryFacts(button) hasPrefix:@"compose yes"]) {
+              referenceNoted = YES;
+              PFBCompatMeasure(@"compose feather",
+                               [NSString stringWithFormat:@"%@: in place · %@", gPFBMoment, PFBComposeStructure(button)],
+                               12);
+          }
+      } @catch (__unused id exception) {
+      }
+    });
+}
+
+%hook _TtC11XNavigation23TabBarAccessoryHostView
+
+- (void)layoutSubviews {
+    %orig;
+    PFBComposeCheck((UIView*)self);
+}
+
+%end
 
 %hook T1DashContentController
 
