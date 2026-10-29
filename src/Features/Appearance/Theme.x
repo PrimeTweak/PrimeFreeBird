@@ -2420,9 +2420,11 @@ static void PFBWhitenConfirmGlyphsIn(UIView* view, UINavigationBar* bar) {
 }
 
 // Exposed so the theme screen can run a pass right after a pick (Twitter
-// re-bakes its glyph on the following runloop turn).
+// re-bakes its glyph on the following runloop turn). Only the bar of a settings screen is
+// whitened: a bar left under the settings sheet, as Home's, keeps its icons.
 void PFBWhitenNavigationBarConfirm(UINavigationBar* bar) {
-    if (bar && PFBThemeScreenCount && PFBAccentIsActive()) {
+    if (bar && PFBThemeScreenCount && PFBAccentIsActive() &&
+        objc_getAssociatedObject(PFBOwningTopController(bar), &kPFBThemeScreenCountedKey)) {
         PFBWhitenConfirmGlyphsIn(bar, bar);
     }
 }
