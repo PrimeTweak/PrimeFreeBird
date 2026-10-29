@@ -6,7 +6,7 @@
 #import <objc/message.h>
 
 static const void* kPFBAdvSearchBtnKey = &kPFBAdvSearchBtnKey;
-static const void* kPFBAdvSearchGrayKey = &kPFBAdvSearchGrayKey;
+static const void* kPFBAdvSearchColorKey = &kPFBAdvSearchColorKey;
 static const void* kPFBAdvStyleWatchKey = &kPFBAdvStyleWatchKey;
 static const void* kPFBAdvTakenOverKey = &kPFBAdvTakenOverKey;
 static const void* kPFBAdvFlagBackupKey = &kPFBAdvFlagBackupKey;
@@ -73,17 +73,17 @@ static UIImage* PFBSlidersGlyph(CGFloat canvas, UIColor* color) {
     return [drawn imageWithRenderingMode:UIImageRenderingModeAlwaysOriginal];
 }
 
-// The Filters button in the bar's gray, flat like the settings gear: iOS 26 gives bar
+// The Filters button in the bar's color, flat like the settings gear: iOS 26 gives bar
 // buttons a shared glass capsule, and the property opting out is reached through the
 // runtime, since the build SDK predates it.
-static UIBarButtonItem* PFBFiltersButton(id target, SEL action, UIColor* gray) {
-    UIBarButtonItem* btn = [[UIBarButtonItem alloc] initWithImage:PFBSlidersGlyph(kPFBFiltersSide, gray)
+static UIBarButtonItem* PFBFiltersButton(id target, SEL action, UIColor* color) {
+    UIBarButtonItem* btn = [[UIBarButtonItem alloc] initWithImage:PFBSlidersGlyph(kPFBFiltersSide, color)
                                                             style:UIBarButtonItemStylePlain
                                                            target:target
                                                            action:action];
     // The color lives in the image; the tint matches it so a highlighted state derived
-    // from the tint stays the same gray.
-    btn.tintColor = gray;
+    // from the tint stays the same color.
+    btn.tintColor = color;
     btn.accessibilityLabel = [[PFBBundle sharedBundle] localizedStringForKey:@"ADVANCED_SEARCH_TITLE"];
     if ([btn respondsToSelector:@selector(setHidesSharedBackground:)]) {
         ((void (*)(id, SEL, BOOL))objc_msgSend)(btn, @selector(setHidesSharedBackground:), YES);
@@ -212,7 +212,7 @@ static UIImage* pfbAdvItemImage(UIBarButtonItem* item) {
 
 static BOOL pfbAdvIsFiltersItem(UIBarButtonItem* item) {
     if (objc_getAssociatedObject(item, kPFBAdvReplacedKey) ||
-        objc_getAssociatedObject(item, kPFBAdvSearchGrayKey)) {
+        objc_getAssociatedObject(item, kPFBAdvSearchColorKey)) {
         return NO;
     }
     NSSet* glyphs = [NSSet setWithObjects:@"settings_slider", @"filter_bars", nil];
@@ -231,8 +231,8 @@ static BOOL pfbAdvIsFiltersItem(UIBarButtonItem* item) {
     return pfbAdvMaskAgreement(image) >= 0.85;
 }
 
-// The color the bar's other items are drawn in: the label color on the results screen,
-// gray on Explore. The neighbor decides, and the Explore gray is the fallback.
+// The color the bar's other items are drawn in. The neighbor decides, and the color of
+// the icons added to the top bars is the fallback.
 static UIColor* pfbAdvNeighborTint(UINavigationItem* item, UIViewController* owner) {
     NSMutableArray<UIBarButtonItem*>* candidates = [NSMutableArray array];
     [candidates addObjectsFromArray:item.rightBarButtonItems ?: @[]];
@@ -259,14 +259,14 @@ static UIColor* pfbAdvNeighborTint(UINavigationItem* item, UIViewController* own
             return tint;
         }
     }
-    return PFBBarIconGray(owner.traitCollection);
+    return PFBBarIconColor(owner.traitCollection);
 }
 
 static UIBarButtonItem* pfbAdvReplacementFor(UIViewController* owner) {
-    UIColor* gray = pfbAdvNeighborTint(owner.navigationItem, owner);
+    UIColor* color = pfbAdvNeighborTint(owner.navigationItem, owner);
     PFBAdvSearchLauncher* launcher = [PFBAdvSearchLauncher new];
     launcher.owner = owner;
-    UIBarButtonItem* btn = PFBFiltersButton(launcher, @selector(launch:), gray);
+    UIBarButtonItem* btn = PFBFiltersButton(launcher, @selector(launch:), color);
     // The item holds its launcher; the launcher only holds the owner weakly.
     objc_setAssociatedObject(btn, kPFBAdvLauncherKey, launcher, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     objc_setAssociatedObject(btn, kPFBAdvReplacedKey, @YES, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
@@ -291,7 +291,7 @@ static BOOL pfbAdvGroupHasCancel(NSArray<UIBarButtonItem*>* items) {
 
 static BOOL pfbAdvIsOurs(UIBarButtonItem* entry) {
     return objc_getAssociatedObject(entry, kPFBAdvReplacedKey) != nil ||
-           objc_getAssociatedObject(entry, kPFBAdvSearchGrayKey) != nil;
+           objc_getAssociatedObject(entry, kPFBAdvSearchColorKey) != nil;
 }
 
 // Works on the item that received the buttons rather than the top controller's:
@@ -599,18 +599,18 @@ static void pfbAdvCollapseNativeInSearchBar(UIView* bar) {
 
 %end
 
-// Draws the Explore Filters glyph in the gray of the owner's appearance.
+// Draws the Explore Filters glyph in the color of the owner's appearance.
 static void pfbAdvPaintExploreButton(UIViewController* owner, UIBarButtonItem* button) {
-    UIColor* gray = PFBBarIconGray(owner.traitCollection);
-    UIColor* painted = objc_getAssociatedObject(button, kPFBAdvSearchGrayKey);
-    if (painted && [painted isEqual:gray]) {
+    UIColor* color = PFBBarIconColor(owner.traitCollection);
+    UIColor* painted = objc_getAssociatedObject(button, kPFBAdvSearchColorKey);
+    if (painted && [painted isEqual:color]) {
         return;
     }
     PFBBarGlyphButton* view = (PFBBarGlyphButton*)button.customView;
     if ([view isKindOfClass:[PFBBarGlyphButton class]]) {
-        view.glyph = PFBSlidersGlyph(kPFBExploreGlyphSide, gray);
+        view.glyph = PFBSlidersGlyph(kPFBExploreGlyphSide, color);
     }
-    objc_setAssociatedObject(button, kPFBAdvSearchGrayKey, gray, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    objc_setAssociatedObject(button, kPFBAdvSearchColorKey, color, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
 }
 
 // A light/dark switch while Explore is on screen repaints the glyph at once. The
@@ -666,17 +666,17 @@ static void pfbAdvWatchExploreStyle(UIViewController* owner) {
         UIViewController* owner = (UIViewController*)self;
         UIBarButtonItem* btn = existingBtn;
         if (btn) {
-            // A theme change resolves to another gray; the glyph carries its color, so it
+            // A theme change resolves to another color; the glyph carries its color, so it
             // is redrawn rather than re-tinted.
             pfbAdvPaintExploreButton(owner, btn);
         } else {
-            UIColor* gray = PFBBarIconGray(owner.traitCollection);
+            UIColor* color = PFBBarIconColor(owner.traitCollection);
             // Paired with the gear beside it below, as the Notifications eye is.
             btn = PFBBarGlyphItem(
-                PFBSlidersGlyph(kPFBExploreGlyphSide, gray),
+                PFBSlidersGlyph(kPFBExploreGlyphSide, color),
                 [[PFBBundle sharedBundle] localizedStringForKey:@"ADVANCED_SEARCH_TITLE"],
                 self, @selector(pfbShowAdvancedSearch));
-            objc_setAssociatedObject(btn, kPFBAdvSearchGrayKey, gray,
+            objc_setAssociatedObject(btn, kPFBAdvSearchColorKey, color,
                                      OBJC_ASSOCIATION_RETAIN_NONATOMIC);
             objc_setAssociatedObject(self, kPFBAdvSearchBtnKey, btn,
                                      OBJC_ASSOCIATION_RETAIN_NONATOMIC);

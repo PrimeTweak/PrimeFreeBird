@@ -7,9 +7,11 @@
 // a no-op when debugging is off.
 extern void PFBMark(UIView* view, NSString* origin);
 
-// Records a decision just made, like @"timeline: dropped 3 items" or
-// @"inbox pill: pinned opaque". Kept in a small ring buffer and printed in the
-// report. No-op when debugging is off.
+// A color as rgba(255 scale, alpha), or white(level, alpha), for reports.
+extern NSString* PFBColorText(UIColor* color);
+
+// Records a decision just made, like @"timeline: dropped 3 items". Kept in a small
+// ring buffer and printed in the report. No-op when debugging is off.
 extern void PFBDebugLog(NSString* format, ...) NS_FORMAT_FUNCTION(1, 2);
 
 // Places the floating button when debug_tools is on, and again whenever Twitter comes
@@ -36,3 +38,7 @@ extern void PFBDebuggerSetTriggerHidden(BOOL hidden);
 // True only when debugging is on. Call sites in hot paths test this before
 // building any log string, so the debugger costs one boolean when off.
 extern BOOL PFBDebugIsRecording(void);
+
+// True once Twitter's new settings menu has been read in this launch, so the tour
+// keeps it open until then (PFBSettingsMenuProbe.x).
+extern BOOL PFBSettingsMenuProbeRead(void);

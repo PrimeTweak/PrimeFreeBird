@@ -76,6 +76,8 @@
 "RESTORE_TAB_LABELS_DETAIL" = "Show labels under the icons.";
 "NO_TAB_BAR_HIDING_TITLE" = "Always visible";
 "NO_TAB_BAR_HIDING_DETAIL" = "Don’t fade the bar when you scroll.";
+"HIDE_BOTTOM_FADE_TITLE" = "Hide bottom fade";
+"HIDE_BOTTOM_FADE_DETAIL" = "The white fade Twitter draws under the tab bar.";
 
 /* ===== BRANDING ===== */
 "MODERN_SETTINGS_BRANDING_TITLE" = "Branding";

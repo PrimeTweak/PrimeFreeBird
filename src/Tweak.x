@@ -5,6 +5,7 @@
 void PFBCompatStart(void);
 void PFBCompatTourResumeAtLaunch(void);
 void PFBAppLifecycleStart(void);
+void PFBGlassTabBarStart(void);
 void PFBThemeStart(void);
 void PFBWebReplyStart(void);
 void PFBSendSoundStart(void);
@@ -13,6 +14,7 @@ void PFBSendSoundStart(void);
     PFBCompatStart();
     PFBCompatTourResumeAtLaunch();
     PFBAppLifecycleStart();
+    PFBGlassTabBarStart();
     PFBThemeStart();
     PFBWebReplyStart();
     PFBSendSoundStart();

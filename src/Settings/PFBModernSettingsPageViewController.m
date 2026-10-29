@@ -701,10 +701,14 @@ static NSURL* PFBAccountAvatarURL(TFNTwitterAccount* account) {
         if ([key isEqualToString:@"no_tab_bar_hiding"]) {
             PFBGlassRefreshAlwaysVisible();
         }
+        if ([key isEqualToString:@"hide_bottom_fade"]) {
+            PFBGlassRefreshBottomFades();
+        }
 
-        // Neither applies at once: Record activity is read at launch, and the Tweet
-        // button keeps its glyph until it loads its icon again.
-        if ([key isEqualToString:@"restore_tweet_button"] || [key isEqualToString:@"debug_tools"]) {
+        // None applies in full at once: Record activity is read at launch, the Tweet button
+        // keeps its glyph until it loads its icon again, and the glass bar sizes its pill at launch.
+        if ([key isEqualToString:@"restore_tweet_button"] || [key isEqualToString:@"debug_tools"] ||
+            ([key isEqualToString:@"restore_tab_labels"] && PFBNativeGlassAsked())) {
             [self showRestartRequiredAlert];
         }
         // Only on the way on: turning one of these off gives the app back its

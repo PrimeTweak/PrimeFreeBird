@@ -117,5 +117,5 @@
 @interface TFNBarButtonItemButton : UIButton
 // Added in src/Features/Appearance/NavBarIcons.x; declared so the compiler knows the
 // selector when it is sent to self.
-- (void)pfbGraySettingsGlyphIfNeeded;
+- (void)pfbPaintSettingsGlyphIfNeeded;
 @end

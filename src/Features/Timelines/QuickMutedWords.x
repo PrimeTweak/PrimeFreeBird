@@ -4,7 +4,7 @@
 #import "Features/Timelines/PFBMutedWordsViewController.h"
 
 static const void* kPFBQuickMutedBtnKey = &kPFBQuickMutedBtnKey;
-static const void* kPFBQuickMutedGrayKey = &kPFBQuickMutedGrayKey;
+static const void* kPFBQuickMutedColorKey = &kPFBQuickMutedColorKey;
 static const void* kPFBQuickMutedItemKey = &kPFBQuickMutedItemKey;
 
 // The avatar is the square view furthest to the left of the bar. Using it as the
@@ -147,7 +147,7 @@ static void pfbPresentQuickMutedWords(UIViewController* owner, UIView* anchor, C
             // through the same path so the color survives the window tint. Drawing
             // the shape here cannot come back empty, so no symbol fallback.
             UIImage* icon = PFBFlatGlyph(PFBFilterBarsGlyph(),
-                                         PFBBarIconGray(bar.traitCollection));
+                                         PFBBarIconColor(bar.traitCollection));
             button = [UIButton buttonWithType:UIButtonTypeSystem];
             [button setImage:icon forState:UIControlStateNormal];
 
@@ -166,11 +166,11 @@ static void pfbPresentQuickMutedWords(UIViewController* owner, UIView* anchor, C
 
         // Re-asserted every pass, not just at creation: on a cold launch the
         // theme's window tint claims the icon until the first tab swipe. The icon
-        // is baked in its gray, so a new gray (light or dark) repaints it.
-        UIColor* gray = PFBBarIconGray(bar.traitCollection);
-        if (![button.tintColor isEqual:gray]) {
-            button.tintColor = gray;
-            [button setImage:PFBFlatGlyph(PFBFilterBarsGlyph(), gray) forState:UIControlStateNormal];
+        // is baked in its color, so a new color (light or dark) repaints it.
+        UIColor* color = PFBBarIconColor(bar.traitCollection);
+        if (![button.tintColor isEqual:color]) {
+            button.tintColor = color;
+            [button setImage:PFBFlatGlyph(PFBFilterBarsGlyph(), color) forState:UIControlStateNormal];
         }
 
         // Aligned on the avatar rather than on the bar's box: the bar is taller
@@ -211,21 +211,21 @@ static void pfbPlaceHomeFiltersItem(UIViewController* home) {
             return;
         }
         PFBCompatReach(PFBCompatPath_home_bar_button);
-        UIColor* gray = PFBBarIconGray(home.traitCollection);
+        UIColor* color = PFBBarIconColor(home.traitCollection);
         UIBarButtonItem* button = objc_getAssociatedObject(home, kPFBQuickMutedBtnKey);
         if (!button) {
-            button = PFBBarGlyphItem(PFBFlatGlyph(PFBFilterBarsGlyph(), gray),
+            button = PFBBarGlyphItem(PFBFlatGlyph(PFBFilterBarsGlyph(), color),
                                      [[PFBBundle sharedBundle] localizedStringForKey:@"FILTERS_TITLE"], home,
                                      @selector(pfbShowQuickMutedWordsFrom:));
             objc_setAssociatedObject(home, kPFBQuickMutedBtnKey, button, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-        } else if (![objc_getAssociatedObject(button, kPFBQuickMutedGrayKey) isEqual:gray]) {
-            // The glyph carries its color, so a new gray (light or dark) redraws it.
+        } else if (![objc_getAssociatedObject(button, kPFBQuickMutedColorKey) isEqual:color]) {
+            // The glyph carries its color, so a new color (light or dark) redraws it.
             PFBBarGlyphButton* view = (PFBBarGlyphButton*)button.customView;
             if ([view isKindOfClass:[PFBBarGlyphButton class]]) {
-                view.glyph = PFBFlatGlyph(PFBFilterBarsGlyph(), gray);
+                view.glyph = PFBFlatGlyph(PFBFilterBarsGlyph(), color);
             }
         }
-        objc_setAssociatedObject(button, kPFBQuickMutedGrayKey, gray, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        objc_setAssociatedObject(button, kPFBQuickMutedColorKey, color, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
         // The item keeps the button, so Twitter setting its own right items puts it back.
         objc_setAssociatedObject(item, kPFBQuickMutedItemKey, button, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
         if (![item.rightBarButtonItems containsObject:button]) {

@@ -84,6 +84,16 @@ static NSNumber* FeatureSwitchOverrideValueForKey(NSString* key) {
         return [PFBSettings boolForKey:@"enable_liquid_glass"] ? @YES : nil;
     }
 
+    // Twitter's new settings menu has no PrimeFreeBird row, so the classic one is kept; the
+    // tour lets Twitter's own answer through once, to measure the new menu.
+    if ([key isEqualToString:@"ios_settings_redesign_enabled"]) {
+        if (PFBCompatTourWantsNewSettings()) {
+            return nil;
+        }
+        PFBCOMPAT_ACTION(PFBCompat_settings_entry, @"classic settings menu kept");
+        return @NO;
+    }
+
     // Grok Bot, a separate app, is promoted from the side menu, the home timeline, the
     // presets, the tab icon and banners under posts and replies, each behind its own switch.
     if (pfbIsGrokBotSwitch(key)) {
@@ -306,6 +316,14 @@ static NSNumber* FeatureSwitchOverrideValueForKey(NSString* key) {
         [key isEqualToString:@"grok_explain_text_selection_ask_grok_enabled"]) {
         if ([PFBSettings boolForKey:@"hide_grok_analyze"]) {
             PFBCOMPAT_ACTION(PFBCompat_hide_grok_analyze, @"Ask Grok off in chats and selected text");
+            // Each switch proven on its own: the sheet shows only an option's first proof.
+            static BOOL chatNoted, selectionNoted;
+            BOOL chat = [key hasPrefix:@"xchat"];
+            BOOL* noted = chat ? &chatNoted : &selectionNoted;
+            if (!*noted) {
+                *noted = YES;
+                PFBCompatMeasure(@"grok", chat ? @"Ask Grok off in chats" : @"Ask Grok off in selected text", 2);
+            }
             return @NO;
         }
         PFBCOMPAT_OBSERVE(PFBCompat_hide_grok_analyze, @"read by Twitter");

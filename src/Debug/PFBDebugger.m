@@ -330,7 +330,7 @@ static NSString* PFBViewCover(UIView* view) {
     return nil;
 }
 
-static NSString* PFBColorText(UIColor* color) {
+NSString* PFBColorText(UIColor* color) {
     if (!color) {
         return @"nil";
     }
@@ -552,19 +552,50 @@ static UIView* PFBFirstSubviewOfClass(UIView* root, Class cls) {
     return nil;
 }
 
-// Centered on Twitter's compose button and 16 pt above it, whether the button
-// shows or not; without one on screen, at the fixed spot the button occupies.
-static CGPoint PFBTriggerCenter(UIWindowScene* scene) {
-    CGSize size = scene.coordinateSpace.bounds.size;
-    Class composeClass = NSClassFromString(@"TFNFloatingActionButton");
-    for (UIWindow* window in scene.windows) {
-        UIView* compose = composeClass ? PFBFirstSubviewOfClass(window, composeClass) : nil;
-        if (compose && !CGRectIsEmpty(compose.bounds)) {
-            CGRect frame = [compose convertRect:compose.bounds toView:nil];
-            return CGPointMake(CGRectGetMidX(frame), CGRectGetMinY(frame) - 16.0 - 25.0);
+// The side of the button: the compose button's.
+static const CGFloat kPFBTriggerSide = 48.0;
+
+// Twitter's compose button in window coordinates, shown or not: the glass one under Liquid
+// Glass, the floating one otherwise. CGRectNull when neither is laid out.
+static CGRect PFBComposeFrame(UIWindowScene* scene) {
+    Class composeClasses[] = {NSClassFromString(@"_TtC11XNavigation23TabBarAccessoryHostView"),
+                              NSClassFromString(@"TFNFloatingActionButton")};
+    for (size_t i = 0; i < sizeof(composeClasses) / sizeof(composeClasses[0]); i++) {
+        Class composeClass = composeClasses[i];
+        for (UIWindow* window in scene.windows) {
+            UIView* compose = composeClass ? PFBFirstSubviewOfClass(window, composeClass) : nil;
+            if (compose && !CGRectIsEmpty(compose.bounds)) {
+                return [compose convertRect:compose.bounds toView:nil];
+            }
         }
     }
-    return CGPointMake(size.width - 37.0, size.height - 189.0);
+    return CGRectNull;
+}
+
+// On the compose button's axis, 12 pt above it: the gap Twitter leaves between that button
+// and its tab bar. The axis is taken at the right end, where the button sits when the reply
+// bar of a Tweet fills the same holder. Without one, where it sits with the glass bar and Tab labels.
+static CGPoint PFBTriggerCenter(UIWindowScene* scene, CGRect compose) {
+    if (!CGRectIsNull(compose)) {
+        CGFloat side = MIN(CGRectGetWidth(compose), CGRectGetHeight(compose));
+        return CGPointMake(CGRectGetMaxX(compose) - side / 2.0, CGRectGetMinY(compose) - 12.0 - kPFBTriggerSide / 2.0);
+    }
+    CGSize size = scene.coordinateSpace.bounds.size;
+    return CGPointMake(size.width - 20.0 - kPFBTriggerSide / 2.0, size.height - 188.0);
+}
+
+// The stethoscope at the size of the feather in Twitter's compose button: 21 pt on its larger side.
+static UIImage* PFBTriggerGlyph(void) {
+    UIImageSymbolConfiguration* reference =
+        [UIImageSymbolConfiguration configurationWithPointSize:20.0 weight:UIImageSymbolWeightSemibold];
+    UIImage* glyph = [UIImage systemImageNamed:@"stethoscope" withConfiguration:reference];
+    CGFloat side = MAX(glyph.size.width, glyph.size.height);
+    if (side < 1.0) {
+        return glyph;
+    }
+    UIImageSymbolConfiguration* sized =
+        [UIImageSymbolConfiguration configurationWithPointSize:20.0 * 21.0 / side weight:UIImageSymbolWeightSemibold];
+    return [UIImage systemImageNamed:@"stethoscope" withConfiguration:sized];
 }
 
 // Placed on the scene in front, and placed again when that is no longer the scene it
@@ -596,21 +627,28 @@ static void PFBInstallTrigger(NSString* moment) {
     // Shown, never made key: making it key would put the report's own window
     // in front of the screen it is meant to describe.
     gPFBOverlay.hidden = gPFBTriggerHidden;
-    gPFBTriggerPlacement = replaced ? [NSString stringWithFormat:@"placed again %@, on a new screen", moment]
-                                    : [NSString stringWithFormat:@"placed %@", moment];
+    CGRect compose = PFBComposeFrame(scene);
+    CGPoint center = PFBTriggerCenter(scene, compose);
+    NSString* spot = CGRectIsNull(compose)
+                         ? @"no compose button laid out"
+                         : [NSString stringWithFormat:@"compose %.0f,%.0f %.0fx%.0f", compose.origin.x,
+                                                      compose.origin.y, compose.size.width, compose.size.height];
+    gPFBTriggerPlacement = [NSString stringWithFormat:@"placed %@%@ · %.0f pt at %.0f,%.0f (%@)",
+                                                      replaced ? @"again " : @"", moment, kPFBTriggerSide, center.x,
+                                                      center.y, spot];
+    if (replaced) {
+        gPFBTriggerPlacement = [gPFBTriggerPlacement stringByAppendingString:@", on a new screen"];
+    }
 
     UIButton* button = [UIButton buttonWithType:UIButtonTypeSystem];
-    button.frame = CGRectMake(0, 0, 50, 50);
-    button.center = PFBTriggerCenter(scene);
+    button.frame = CGRectMake(0, 0, kPFBTriggerSide, kPFBTriggerSide);
+    button.center = center;
     button.backgroundColor = [UIColor colorWithWhite:0.09 alpha:0.82];
-    button.layer.cornerRadius = 25.0;
+    button.layer.cornerRadius = kPFBTriggerSide / 2.0;
     button.layer.borderWidth = 1.0;
     button.layer.borderColor = [UIColor colorWithWhite:1.0 alpha:0.22].CGColor;
     button.tintColor = UIColor.whiteColor;
-    UIImageSymbolConfiguration* glyph =
-        [UIImageSymbolConfiguration configurationWithPointSize:19.0 weight:UIImageSymbolWeightSemibold];
-    [button setImage:[UIImage systemImageNamed:@"stethoscope" withConfiguration:glyph]
-            forState:UIControlStateNormal];
+    [button setImage:PFBTriggerGlyph() forState:UIControlStateNormal];
     [button addTarget:[PFBDebugTrigger shared]
                action:@selector(tapped)
      forControlEvents:UIControlEventTouchUpInside];

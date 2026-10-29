@@ -55,6 +55,8 @@ static UILabel* gPFBTourStepLabel;
 static NSFileHandle* gPFBTourJournal;
 // Twitter's palette in use before the dark mode step switched it.
 static id gPFBTourPaletteBefore;
+// Set while the step that opens Twitter's new settings menu is up.
+static BOOL gPFBTourNewSettings;
 
 // MARK: - Journal
 
@@ -939,10 +941,16 @@ static void tourBuildProfileMenu(UIViewController* profile) {
 }
 
 // Twitter's settings opened the way the side menu's "Settings and privacy" row does,
-// in the current tab.
+// in the current tab. Under Liquid Glass the side menu's content is a stored property.
 static void tourShowTwitterSettings(void) {
     UIViewController* tabs = tourFindController(tourRootController(), @"T1TabbedAppNavigationViewController");
-    id presenter = tourGetter(tourGetter(tabs, @"dashContentController"), @"presenter");
+    id content = tourGetter(tabs, @"dashContentController");
+    if (!tabs) {
+        tabs = tourFindController(tourRootController(), @"_TtC14T1TwitterSwift34XTabbedAppNavigationViewController");
+        Ivar ivar = tabs ? class_getInstanceVariable([tabs class], "dashContentController") : NULL;
+        content = ivar ? object_getIvar(tabs, ivar) : nil;
+    }
+    id presenter = tourGetter(content, @"presenter");
     if (!tourSend(presenter, @"showSettings")) {
         PFBCompatTourLog(@"[tour] Twitter settings: no side menu action (%@)",
                          presenter ? NSStringFromClass([presenter class]) : @"no presenter");
@@ -1713,8 +1721,17 @@ static NSArray<NSDictionary*>* tourAllSteps(void) {
                }, changed, nil, nil)];
     }
     if (pages.count > 1) {
-        [steps addObject:tourStep([@"tab " stringByAppendingString:pages[0]], tourTabTitle(pages[0]), root, ^{
+        NSString* homeStep = [@"tab " stringByAppendingString:pages[0]];
+        [steps addObject:tourStep(homeStep, tourTabTitle(pages[0]), root, ^{
                  tourSelectTab(0);
+                 // A Tweet left open on Home's own stack is closed once the tab is in front.
+                 NSUInteger generation = gPFBTourGeneration;
+                 dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.4 * NSEC_PER_SEC)),
+                                dispatch_get_main_queue(), ^{
+                                  if (generation == gPFBTourGeneration && [gPFBTourStepLive isEqualToString:homeStep]) {
+                                      tourPopToRoot();
+                                  }
+                                });
                }, ^BOOL(UIViewController* before, UIViewController* after) {
                  return tourHomeTabs() != nil;
                }, nil, nil)];
@@ -2130,6 +2147,17 @@ static NSArray<NSDictionary*>* tourAllSteps(void) {
            }, nil, ^{
              tourPopToRoot();
            }))];
+    // Twitter's new settings menu, kept closed otherwise, opened once and held until the probe
+    // has read how it builds its rows.
+    [steps addObject:tourStepWaiting(kPFBTourProofWait, tourStep(@"new Twitter settings", @"Twitter's new settings", root, ^{
+             gPFBTourNewSettings = YES;
+             tourShowTwitterSettings();
+           }, ^BOOL(UIViewController* before, UIViewController* after) {
+             return [NSStringFromClass([after class]) hasPrefix:@"_TtC9XSettings"] && PFBSettingsMenuProbeRead();
+           }, nil, ^{
+             gPFBTourNewSettings = NO;
+             tourPopToRoot();
+           }))];
     [steps addObject:tourStep(@"PFB settings", @"PrimeFreeBird settings", root, ^{
              tourShowSettings();
            }, ^BOOL(UIViewController* before, UIViewController* after) {
@@ -2163,6 +2191,7 @@ static void tourHideOverlay(void) {
 // stopped early, if it did.
 static void tourConclude(NSMutableArray<NSString*>* results, BOOL full, NSString* stop) {
     tourRestoreOptions(@"at the end of the tour");
+    gPFBTourNewSettings = NO;
     PFBCompatTourRecord(full, stop, results);
     tourJournalWrite([@"end: " stringByAppendingString:stop ?: @"completed"]);
     tourJournalClose();
@@ -2455,6 +2484,10 @@ void PFBCompatRunTourLeft(void) {
 
 BOOL PFBCompatTourIsRunning(void) {
     return gPFBTourRunning;
+}
+
+BOOL PFBCompatTourWantsNewSettings(void) {
+    return gPFBTourRunning && gPFBTourNewSettings;
 }
 
 // MARK: - Planning a tour

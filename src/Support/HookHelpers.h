@@ -133,8 +133,8 @@ UIImage* PFBFlatGlyph(UIImage* source, UIColor* color);
 // (NavBarIcons.x).
 UIImage* PFBPaintedGlyph(UIImage* source, UIColor* color);
 
-// The gray of the icons added to the top bars, resolved to a fixed color for the traits.
-UIColor* PFBBarIconGray(UITraitCollection* traits);
+// The color of the icons added to the top bars, resolved to a fixed color for the traits.
+UIColor* PFBBarIconColor(UITraitCollection* traits);
 
 // A one-page PDF of the bundle drawn centered in `size`, at `fill` of the largest size
 // that fits (1 fills it), in the PDF's own colors; nil when it cannot be read.
@@ -236,6 +236,11 @@ void PFBGlassTabBarHideForSettings(BOOL hidden);
 // (GlassTabBar.x), and how many times the bar has been pinned, for the probe.
 void PFBGlassRefreshAlwaysVisible(void);
 NSUInteger PFBGlassAlwaysVisiblePinCount(void);
+
+// Sizes the glass bar's pill for Tab labels before Twitter builds the bar, and applies a
+// Hide bottom fade change to the lists on screen (GlassTabBar.x).
+void PFBGlassTabBarStart(void);
+void PFBGlassRefreshBottomFades(void);
 
 // Posted on the main thread just before the stethoscope builds its report, so a probe can write
 // a fresh measurement into it (PFBDebugger.m).

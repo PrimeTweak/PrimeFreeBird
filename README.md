@@ -18,7 +18,7 @@
 
 - **Liquid Glass, enabled** — the stock app opts out of iOS 26's redesign; this switches it back on, or keeps the flat look.
 - **No blurred edge** — the redesign makes iOS draw a strip under every bar; a switch puts the stock look back.
-- **Bar icons that match** — the settings gear, the search filters and the muted-words icon share one gray and keep it.
+- **Bar icons that match** — the settings gear, the search filters and the muted-words icon take the color of Twitter's own bar icons and keep it.
 
 ## Color theme
 

@@ -1,6 +1,7 @@
 // Twitter's own Liquid Glass tab bar, drawn in three rows (resting, seen through the lens, carried
 // by the lens). Selected tab colors the lens rows; Tab labels names the tabs on a taller bar with a
-// matching bottom reserve; Always visible keeps it up.
+// matching bottom reserve and pill; Always visible keeps it up; Hide bottom fade clears the fade
+// under it.
 
 #import "Support/HookHelpers.h"
 
@@ -25,8 +26,8 @@ static void PFBGlassFindClasses(void) {
     });
 }
 
-// Twitter's bar is 62 pt; Tab labels makes it 72 pt, where the glyph grows from 24 to 28 pt
-// and rises 9 pt over an 11 pt name. A bar under 70 pt fits a 10 pt name under a glyph risen 8 pt.
+// Twitter's bar is 62 pt; Tab labels makes it 72 pt, where the glyph keeps Twitter's 24 pt and
+// rises 9 pt over an 11 pt name. A bar under 70 pt fits a 10 pt name under a glyph risen 8 pt.
 static const CGFloat kPFBGlassExtraHeight = 10.0;
 
 typedef struct {
@@ -34,22 +35,20 @@ typedef struct {
     CGFloat labelTopFromBottom;
     CGFloat labelHeight;
     CGFloat fontSize;
-    CGFloat glyphScale;
 } PFBGlassMetrics;
 
 static PFBGlassMetrics PFBGlassMetricsForHeight(CGFloat height) {
     if (height >= 70.0) {
-        return (PFBGlassMetrics){9.0, 28.0, 14.0, 11.0, 28.0 / 24.0};
+        return (PFBGlassMetrics){9.0, 28.0, 14.0, 11.0};
     }
-    return (PFBGlassMetrics){8.0, 21.0, 12.0, 10.0, 1.0};
+    return (PFBGlassMetrics){8.0, 21.0, 12.0, 10.0};
 }
 
 static const void* kPFBGlassLabelKey = &kPFBGlassLabelKey;
 static const void* kPFBGlassLiftKey = &kPFBGlassLiftKey;
 static const void* kPFBGlassTintKey = &kPFBGlassTintKey;
 static const void* kPFBGlassOwnTintKey = &kPFBGlassOwnTintKey;
-static const void* kPFBGlassGlyphSizeKey = &kPFBGlassGlyphSizeKey;
-static const void* kPFBGlassOwnGlyphSizeKey = &kPFBGlassOwnGlyphSizeKey;
+static const void* kPFBGlassCollapseKey = &kPFBGlassCollapseKey;
 
 static BOOL PFBGlassIsLensRow(UIView* view) {
     return (gPFBGlassPortalClass && [view isKindOfClass:gPFBGlassPortalClass]) ||
@@ -149,31 +148,11 @@ static void PFBGlassLift(UIView* view, CGFloat lift) {
     objc_setAssociatedObject(view, kPFBGlassLiftKey, lift > 0.0 ? @YES : nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
 }
 
-// Grows the glyph inside its own box, whose image Twitter scales to fit. Each layout of the
-// tab writes Twitter's size again; that size is kept, so the glyph never grows twice.
-static void PFBGlassSizeGlyph(UIImageView* glyph, CGFloat scale) {
-    NSValue* applied = objc_getAssociatedObject(glyph, kPFBGlassGlyphSizeKey);
-    if (scale == 1.0 && !applied) {
-        return;
-    }
-    CGSize current = glyph.bounds.size;
-    NSValue* own = objc_getAssociatedObject(glyph, kPFBGlassOwnGlyphSizeKey);
-    // A size other than the one written here is Twitter's latest.
-    CGSize base = applied && own && CGSizeEqualToSize(current, applied.CGSizeValue) ? own.CGSizeValue : current;
-    CGSize wanted = CGSizeMake(base.width * scale, base.height * scale);
-    if (CGSizeEqualToSize(current, wanted) && (scale != 1.0) == (applied != nil)) {
-        return;
-    }
-    if (!CGSizeEqualToSize(current, wanted)) {
-        CGRect bounds = glyph.bounds;
-        bounds.size = wanted;
-        glyph.bounds = bounds;
-    }
-    BOOL grown = scale != 1.0;
-    objc_setAssociatedObject(glyph, kPFBGlassGlyphSizeKey, grown ? [NSValue valueWithCGSize:wanted] : nil,
-                             OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-    objc_setAssociatedObject(glyph, kPFBGlassOwnGlyphSizeKey, grown ? [NSValue valueWithCGSize:base] : nil,
-                             OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+// How far the bar has collapsed into its round button, from 0 shown in full to 1 collapsed,
+// as last read from its platter.
+static CGFloat PFBGlassCollapseOf(UIView* bar) {
+    NSNumber* collapse = bar ? objc_getAssociatedObject(bar, kPFBGlassCollapseKey) : nil;
+    return collapse ? collapse.doubleValue : 0.0;
 }
 
 // The lens rows take the accent with Selected tab on; the resting row keeps Twitter's gray.
@@ -217,8 +196,9 @@ static UIFont* PFBGlassLabelFont(CGFloat size) {
 }
 
 // The name under the glyph, in the glyph's own color so it follows Twitter's gray, the
-// selected black and the accent alike.
-static void PFBGlassNameTab(UIView* item, UIView* holder, UIImageView* glyph, NSString* name) {
+// selected black and the accent alike. As the bar collapses, the name fades and the glyph
+// comes back to its own place, so the round button shows Twitter's own tab.
+static void PFBGlassNameTab(UIView* item, UIView* holder, UIImageView* glyph, NSString* name, CGFloat collapse) {
     UILabel* label = objc_getAssociatedObject(item, kPFBGlassLabelKey);
     BOOL wanted = name.length > 0 && [PFBSettings boolForKey:@"restore_tab_labels"];
     if (!wanted) {
@@ -227,7 +207,6 @@ static void PFBGlassNameTab(UIView* item, UIView* holder, UIImageView* glyph, NS
             objc_setAssociatedObject(item, kPFBGlassLabelKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
         }
         PFBGlassLift(holder, 0.0);
-        PFBGlassSizeGlyph(glyph, 1.0);
         if (name.length) {
             PFBCOMPAT_OBSERVE(PFBCompat_restore_tab_labels, @"glass tab laid out");
         }
@@ -261,8 +240,11 @@ static void PFBGlassNameTab(UIView* item, UIView* holder, UIImageView* glyph, NS
     if (!CGRectEqualToRect(label.frame, frame)) {
         label.frame = frame;
     }
-    PFBGlassSizeGlyph(glyph, metrics.glyphScale);
-    PFBGlassLift(holder, metrics.lift);
+    CGFloat alpha = 1.0 - collapse;
+    if (fabs(label.alpha - alpha) > 0.001) {
+        label.alpha = alpha;
+    }
+    PFBGlassLift(holder, metrics.lift * alpha);
     PFBCOMPAT_ACTION(PFBCompat_restore_tab_labels, @"name drawn under the glass icon");
 }
 
@@ -281,14 +263,14 @@ static void PFBGlassStyleTab(UIView* item) {
     NSArray<NSString*>* names = PFBGlassTabNames(bar);
     NSUInteger index = [row indexOfObject:item];
     NSString* name = row.count == names.count && index < names.count ? names[index] : nil;
-    PFBGlassNameTab(item, holder, glyph, name);
+    PFBGlassNameTab(item, holder, glyph, name, PFBGlassCollapseOf(bar));
 }
 
-// The badges sit over the glyphs, so they rise with them.
+// The badges sit over the glyphs, so they rise with them and come down as the bar collapses.
 static void PFBGlassLiftBadges(UIView* bar) {
     PFBGlassFindClasses();
     CGFloat lift = [PFBSettings boolForKey:@"restore_tab_labels"]
-                       ? PFBGlassMetricsForHeight(CGRectGetHeight(bar.bounds)).lift
+                       ? PFBGlassMetricsForHeight(CGRectGetHeight(bar.bounds)).lift * (1.0 - PFBGlassCollapseOf(bar))
                        : 0.0;
     PFBWalkAllSubviews(bar, 4, ^(UIView* view) {
       if (gPFBGlassBadgesClass && [view isKindOfClass:gPFBGlassBadgesClass]) {
@@ -478,6 +460,304 @@ void PFBGlassTabBarHideForSettings(BOOL hidden) {
         } else if (!hidden && ours) {
             view.hidden = NO;
             objc_setAssociatedObject(view, kPFBGlassChromeHiddenKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        }
+      });
+    });
+}
+
+// MARK: - Collapse
+
+// Twitter's own height for the collapsed bar, its round button; 0 when the metric is missing.
+static CGFloat PFBGlassCollapsedHeight(void) {
+    static CGFloat height;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+      double (*getter)(void) = (double (*)(void))dlsym(
+          RTLD_DEFAULT, "$s11XNavigation13TabBarMetricsO15collapsedHeight12CoreGraphics7CGFloatVvgZ");
+      height = getter ? getter() : 0.0;
+      if (height <= 0.0) {
+          PFBCompatMeasure(@"tab labels", @"Twitter's collapsed bar height not found", 4);
+      }
+    });
+    return height;
+}
+
+// Twitter collapses the bar by shrinking its platter frame by frame, from the bar's height to
+// the round button's. Each step sets how far the names have faded and the glyphs come down.
+static void PFBGlassFollowCollapse(UIView* platter, CGFloat height) {
+    UIView* bar = platter.superview.superview;
+    if (!gPFBGlassBarClass || ![bar isKindOfClass:gPFBGlassBarClass] ||
+        ![PFBSettings boolForKey:@"restore_tab_labels"]) {
+        return;
+    }
+    CGFloat full = CGRectGetHeight(bar.bounds);
+    CGFloat collapsed = PFBGlassCollapsedHeight();
+    if (collapsed <= 0.0 || full <= collapsed) {
+        return;
+    }
+    CGFloat collapse = MIN(1.0, MAX(0.0, (full - height) / (full - collapsed)));
+    CGFloat previous = PFBGlassCollapseOf(bar);
+    if (collapse == previous || (fabs(collapse - previous) < 0.02 && collapse > 0.0 && collapse < 1.0)) {
+        return;
+    }
+    objc_setAssociatedObject(bar, kPFBGlassCollapseKey, collapse > 0.0 ? @(collapse) : nil,
+                             OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    PFBGlassLiftBadges(bar);
+    PFBWalkAllSubviews(bar, 5, ^(UIView* inner) {
+      if ([inner isKindOfClass:gPFBGlassItemClass]) {
+          PFBGlassStyleTab(inner);
+      }
+    });
+    if (collapse == 1.0) {
+        PFBCOMPAT_ACTION(PFBCompat_restore_tab_labels, @"names faded in the collapsed bar");
+    }
+}
+
+// MARK: - Pill
+
+// Twitter builds the bar's pill once, from its metrics: 54 pt high, the 62 pt bar less 4 pt above
+// and below. With Tab labels on at launch, the pill keeps those margins in the 72 pt bar.
+static void PFBGlassSizePillForLabels(void) {
+    double* (*heightAt)(void) = (double* (*)(void))dlsym(
+        RTLD_DEFAULT, "$s11XNavigation13TabBarMetricsO10pillHeight12CoreGraphics7CGFloatVvau");
+    CGSize* (*sizeAt)(void) =
+        (CGSize* (*)(void))dlsym(RTLD_DEFAULT, "$s11XNavigation13TabBarMetricsO8pillSizeSo6CGSizeVvau");
+    double (*inset)(void) = (double (*)(void))dlsym(
+        RTLD_DEFAULT, "$s11XNavigation13TabBarMetricsO13pillRestInset12CoreGraphics7CGFloatVvgZ");
+    double (*barHeight)(void) = (double (*)(void))dlsym(
+        RTLD_DEFAULT, "$s11XNavigation13TabBarMetricsO14expandedHeight12CoreGraphics7CGFloatVvgZ");
+    double* height = heightAt ? heightAt() : NULL;
+    CGSize* size = sizeAt ? sizeAt() : NULL;
+    if (!height || !size || !inset || !barHeight) {
+        PFBCompatMeasure(@"tab labels", @"Twitter's pill metrics not found", 4);
+        return;
+    }
+    double own = barHeight() - 2.0 * inset();
+    if (*height != own || size->height != own) {
+        PFBCompatMeasure(@"tab labels",
+                         [NSString stringWithFormat:@"pill left as Twitter set it: %.0f pt, %.0fx%.0f, bar %.0f pt",
+                                                    *height, size->width, size->height, barHeight()],
+                         4);
+        return;
+    }
+    PFBCompatReach(PFBCompatPath_glass_pill);
+    if (![PFBSettings boolForKey:@"restore_tab_labels"]) {
+        return;
+    }
+    *height = own + kPFBGlassExtraHeight;
+    size->height = own + kPFBGlassExtraHeight;
+    PFBCompatMeasure(@"tab labels", [NSString stringWithFormat:@"pill %.0f pt high, Twitter's %.0f", *height, own], 4);
+}
+
+void PFBGlassTabBarStart(void) {
+    if (PFBNativeGlassAsked()) {
+        PFBGlassSizePillForLabels();
+    }
+}
+
+// MARK: - Bottom fade
+
+// Twitter's edge treatment fades a list into white under the tab bar with a blur band, a color
+// band (scrim) or a mask that fades the list itself. Hide bottom fade hides the bands in the lower
+// half of the screen and makes the mask opaque there; the top stays Twitter's.
+static const void* kPFBGlassFadeHiddenKey = &kPFBGlassFadeHiddenKey;
+static const void* kPFBGlassFadeMaskKey = &kPFBGlassFadeMaskKey;
+static const void* kPFBGlassFadeColorsKey = &kPFBGlassFadeColorsKey;
+
+static Class gPFBGlassBlurClass;
+static Class gPFBGlassScrimClass;
+static Class gPFBGlassFadeMaskClass;
+static Ivar gPFBGlassFadeMaskIvar;
+static Ivar gPFBGlassMaskLayerIvar;
+// Set while the mask is written here, so the hooks below tell it from Twitter's own writes.
+static BOOL gPFBGlassWritingMask;
+
+static void PFBGlassFindFadeParts(void) {
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+      gPFBGlassBlurClass = NSClassFromString(@"XDSBlur");
+      gPFBGlassScrimClass = NSClassFromString(@"_TtC13XDesignSystem18ScrollEdgeFadeView");
+      gPFBGlassFadeMaskClass = NSClassFromString(@"_TtC13XDesignSystem18ScrollEdgeFadeMask");
+      Class treatment = NSClassFromString(@"_TtC13XDesignSystem19ScrollEdgeTreatment");
+      gPFBGlassFadeMaskIvar = treatment ? class_getInstanceVariable(treatment, "fadeMask") : NULL;
+      gPFBGlassMaskLayerIvar =
+          gPFBGlassFadeMaskClass ? class_getInstanceVariable(gPFBGlassFadeMaskClass, "gradientLayer") : NULL;
+    });
+}
+
+// The gradient the treatment masks its list with, installed or not.
+static CAGradientLayer* PFBGlassFadeMaskLayer(UIView* treatment) {
+    if (!gPFBGlassFadeMaskIvar || !gPFBGlassMaskLayerIvar) {
+        return nil;
+    }
+    id mask = object_getIvar(treatment, gPFBGlassFadeMaskIvar);
+    if (![mask isKindOfClass:gPFBGlassFadeMaskClass]) {
+        return nil;
+    }
+    id layer = object_getIvar(mask, gPFBGlassMaskLayerIvar);
+    return [layer isKindOfClass:[CAGradientLayer class]] ? layer : nil;
+}
+
+// True when the mask is set on the list under the treatment or on one beside it.
+static BOOL PFBGlassMaskInstalled(UIView* treatment, CALayer* mask) {
+    UIView* parent = treatment.superview;
+    if (parent.layer.mask == mask) {
+        return YES;
+    }
+    for (UIView* sibling in parent.subviews) {
+        if (sibling.layer.mask == mask) {
+            return YES;
+        }
+    }
+    return NO;
+}
+
+// A stop's place down the layer, from 0 at its top to 1 at its bottom.
+static CGFloat PFBGlassStopDepth(CAGradientLayer* layer, NSUInteger index, NSUInteger count) {
+    NSArray<NSNumber*>* locations = layer.locations;
+    CGFloat location = locations.count == count ? locations[index].doubleValue
+                                                : (count > 1 ? (CGFloat)index / (CGFloat)(count - 1) : 0.0);
+    return layer.startPoint.y + location * (layer.endPoint.y - layer.startPoint.y);
+}
+
+// The mask's colors with the stops of its lower half made opaque; nil when none fades there.
+static NSArray* PFBGlassOpenedMaskColors(CAGradientLayer* layer, NSArray* colors) {
+    NSMutableArray* opened = nil;
+    for (NSUInteger i = 0; i < colors.count; i++) {
+        id object = colors[i];
+        if ([object isKindOfClass:[UIColor class]] || CFGetTypeID((__bridge CFTypeRef)object) != CGColorGetTypeID()) {
+            continue;
+        }
+        CGColorRef color = (__bridge CGColorRef)object;
+        if (CGColorGetAlpha(color) >= 1.0 || PFBGlassStopDepth(layer, i, colors.count) <= 0.5) {
+            continue;
+        }
+        CGColorRef opaque = CGColorCreateCopyWithAlpha(color, 1.0);
+        if (!opaque) {
+            continue;
+        }
+        if (!opened) {
+            opened = [colors mutableCopy];
+        }
+        opened[i] = (__bridge_transfer id)opaque;
+    }
+    return opened;
+}
+
+// Writes the mask the option asks for: Twitter's colors, with their lower half opaque while on.
+// YES when the lower half fades in Twitter's colors.
+static BOOL PFBGlassWriteMask(CAGradientLayer* mask) {
+    NSArray* theirs = objc_getAssociatedObject(mask, kPFBGlassFadeColorsKey);
+    NSArray* opened = PFBGlassOpenedMaskColors(mask, theirs);
+    BOOL fades = opened != nil;
+    if (![PFBSettings boolForKey:@"hide_bottom_fade"]) {
+        opened = nil;
+    }
+    NSArray* wanted = opened ?: theirs;
+    if (wanted && ![mask.colors isEqual:wanted]) {
+        gPFBGlassWritingMask = YES;
+        [CATransaction begin];
+        [CATransaction setDisableActions:YES];
+        mask.colors = wanted;
+        [CATransaction commit];
+        gPFBGlassWritingMask = NO;
+    }
+    if (opened) {
+        PFBCOMPAT_ACTION(PFBCompat_hide_bottom_fade, @"fade mask under the tab bar opened");
+    }
+    return fades;
+}
+
+// The blur and color bands in the lower half of the screen, hidden with the option on and given
+// back with it off. Each one found is described in parts.
+static NSUInteger PFBGlassHideBottomBands(UIView* treatment, BOOL hide, NSMutableArray<NSString*>* parts) {
+    __block NSUInteger found = 0;
+    CGFloat middle = CGRectGetHeight(treatment.window.bounds) / 2.0;
+    PFBWalkAllSubviews(treatment, 2, ^(UIView* band) {
+      BOOL blur = gPFBGlassBlurClass && [band isKindOfClass:gPFBGlassBlurClass];
+      BOOL scrim = gPFBGlassScrimClass && [band isKindOfClass:gPFBGlassScrimClass];
+      CGRect frame = [band convertRect:band.bounds toView:nil];
+      if (band == treatment || (!blur && !scrim) || CGRectGetMidY(frame) <= middle) {
+          return;
+      }
+      found++;
+      BOOL ours = objc_getAssociatedObject(band, kPFBGlassFadeHiddenKey) != nil;
+      if (hide && !band.hidden) {
+          band.hidden = YES;
+          objc_setAssociatedObject(band, kPFBGlassFadeHiddenKey, @YES, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+      } else if (!hide && ours) {
+          band.hidden = NO;
+          objc_setAssociatedObject(band, kPFBGlassFadeHiddenKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+      }
+      [parts addObject:[NSString stringWithFormat:@"%@ %.0f,%.0f %.0fx%.0f alpha %.2f", blur ? @"blur" : @"scrim",
+                                                  frame.origin.x, frame.origin.y, frame.size.width,
+                                                  frame.size.height, band.alpha]];
+    });
+    return found;
+}
+
+// The mask's stops as depth:alpha, from Twitter's own colors.
+static NSString* PFBGlassMaskStopsText(CAGradientLayer* mask) {
+    NSArray* theirs = objc_getAssociatedObject(mask, kPFBGlassFadeColorsKey);
+    NSMutableArray<NSString*>* stops = [NSMutableArray array];
+    for (NSUInteger i = 0; i < theirs.count && i < 12; i++) {
+        id object = theirs[i];
+        BOOL color = ![object isKindOfClass:[UIColor class]] &&
+                     CFGetTypeID((__bridge CFTypeRef)object) == CGColorGetTypeID();
+        [stops addObject:[NSString stringWithFormat:@"%.2f:%.2f", PFBGlassStopDepth(mask, i, theirs.count),
+                                                    color ? CGColorGetAlpha((__bridge CGColorRef)object) : -1.0]];
+    }
+    return stops.count ? [stops componentsJoinedByString:@" "] : @"none";
+}
+
+static void PFBGlassApplyBottomFade(UIView* treatment) {
+    PFBGlassFindFadeParts();
+    if (!treatment.window) {
+        return;
+    }
+    BOOL hide = [PFBSettings boolForKey:@"hide_bottom_fade"];
+    NSMutableArray<NSString*>* parts = [NSMutableArray array];
+    NSUInteger bands = PFBGlassHideBottomBands(treatment, hide, parts);
+    CAGradientLayer* mask = PFBGlassFadeMaskLayer(treatment);
+    BOOL masked = mask && PFBGlassMaskInstalled(treatment, mask);
+    BOOL maskFades = NO;
+    if (masked) {
+        if (!objc_getAssociatedObject(mask, kPFBGlassFadeMaskKey)) {
+            objc_setAssociatedObject(mask, kPFBGlassFadeMaskKey, @YES, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+            objc_setAssociatedObject(mask, kPFBGlassFadeColorsKey, mask.colors, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        }
+        maskFades = PFBGlassWriteMask(mask);
+    }
+    if (bands || maskFades) {
+        PFBCompatReach(PFBCompatPath_bottom_fade);
+        if (hide && bands) {
+            PFBCOMPAT_ACTION(PFBCompat_hide_bottom_fade, @"fade under the tab bar hidden");
+        } else if (!hide) {
+            PFBCOMPAT_OBSERVE(PFBCompat_hide_bottom_fade, @"fade under the tab bar found");
+        }
+    }
+    // The edge's parts, until the topic is full.
+    static BOOL measured;
+    if (!measured) {
+        NSString* maskText = !mask ? @"none" : (masked ? PFBGlassMaskStopsText(mask) : @"not set on a list");
+        measured = !PFBCompatMeasure(@"bottom fade",
+                                     [NSString stringWithFormat:@"over %@: bands in the lower half [%@] · mask %@",
+                                                                NSStringFromClass([treatment.superview class]),
+                                                                [parts componentsJoinedByString:@", "], maskText],
+                                     8);
+    }
+}
+
+// A change to Hide bottom fade reaches the lists on screen at once.
+void PFBGlassRefreshBottomFades(void) {
+    Class treatmentClass = NSClassFromString(@"_TtC13XDesignSystem19ScrollEdgeTreatment");
+    if (!treatmentClass) {
+        return;
+    }
+    PFBGlassForEachWindow(^(UIWindow* window) {
+      PFBWalkAllSubviews(window, 60, ^(UIView* view) {
+        if ([view isKindOfClass:treatmentClass]) {
+            PFBGlassApplyBottomFade(view);
         }
       });
     });
@@ -733,6 +1013,57 @@ void PFBGlassRefreshAlwaysVisible(void) {
     @try {
         PFBGlassStyleTab((UIView*)self);
     } @catch (__unused id exception) {
+    }
+}
+
+%end
+
+// The bar's platter, shrunk by Twitter frame by frame as the bar collapses.
+%hook XDSGlass
+
+- (void)setBounds:(CGRect)bounds {
+    %orig;
+    @try {
+        PFBGlassFindClasses();
+        PFBGlassFollowCollapse((UIView*)self, CGRectGetHeight(bounds));
+    } @catch (__unused id exception) {
+    }
+}
+
+%end
+
+%hook _TtC13XDesignSystem19ScrollEdgeTreatment
+
+- (void)layoutSubviews {
+    %orig;
+    @try {
+        PFBGlassApplyBottomFade((UIView*)self);
+    } @catch (__unused id exception) {
+    }
+}
+
+%end
+
+// Twitter rewrites its fade mask as the list scrolls: its colors are kept as Twitter's own, and
+// the lower half opened again with the option on.
+%hook CAGradientLayer
+
+- (void)setColors:(NSArray*)colors {
+    if (gPFBGlassWritingMask || ![NSThread isMainThread] || !objc_getAssociatedObject(self, kPFBGlassFadeMaskKey)) {
+        %orig;
+        return;
+    }
+    objc_setAssociatedObject(self, kPFBGlassFadeColorsKey, colors, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    NSArray* opened = [PFBSettings boolForKey:@"hide_bottom_fade"]
+                          ? PFBGlassOpenedMaskColors((CAGradientLayer*)self, colors)
+                          : nil;
+    %orig(opened ?: colors);
+}
+
+- (void)setLocations:(NSArray*)locations {
+    %orig;
+    if (!gPFBGlassWritingMask && [NSThread isMainThread] && objc_getAssociatedObject(self, kPFBGlassFadeMaskKey)) {
+        PFBGlassWriteMask((CAGradientLayer*)self);
     }
 }
 

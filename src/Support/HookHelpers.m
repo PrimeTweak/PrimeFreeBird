@@ -217,14 +217,14 @@ UIImage* PFBFlatGlyph(UIImage* source, UIColor* color) {
     return [painted imageWithRenderingMode:UIImageRenderingModeAlwaysOriginal];
 }
 
-// The label color at 60 %, the dimming Twitter gives its settings gear. Resolved to a
-// fixed color: the vector renderer turns a dynamic one black, and the theme would claim it.
-UIColor* PFBBarIconGray(UITraitCollection* traits) {
-    UIColor* gray = [[UIColor labelColor] colorWithAlphaComponent:0.6];
+// The label color, as Twitter tints its own bar buttons. Resolved to a fixed color: the
+// vector renderer turns a dynamic one black, and the theme would claim it.
+UIColor* PFBBarIconColor(UITraitCollection* traits) {
+    UIColor* color = [UIColor labelColor];
     if (traits) {
-        return [gray resolvedColorWithTraitCollection:traits] ?: gray;
+        return [color resolvedColorWithTraitCollection:traits] ?: color;
     }
-    return gray;
+    return color;
 }
 
 // imageNamed: cannot see loose PDFs in a bundle, so the page is opened by path and drawn.

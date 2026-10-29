@@ -116,7 +116,8 @@ static NSDictionary<NSString*, NSDictionary*>* PFBSettingsPages(void) {
                     },
                     @{@"key": @"restore_tab_labels",
                       @"default": @NO},
-                    @{@"key": @"no_tab_bar_hiding", @"default": @YES}
+                    @{@"key": @"no_tab_bar_hiding", @"default": @YES},
+                    @{@"key": @"hide_bottom_fade", @"default": @NO}
                 ]
             },
             @"timelines": @{

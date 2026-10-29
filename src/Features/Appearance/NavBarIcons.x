@@ -5,13 +5,12 @@
 #import "Debug/PFBDebugger.h"
 #import <QuartzCore/QuartzCore.h>
 
-static const void* kPFBGrayedImageKey = &kPFBGrayedImageKey;
+static const void* kPFBPaintedImageKey = &kPFBPaintedImageKey;
 // Holds the color forced on a taken-over view, so any image set later goes
 // through the same repaint.
-static const void* kPFBGrayTargetKey = &kPFBGrayTargetKey;
-// The untouched glyph. Repainting is not idempotent — a color at 60% opacity
-// laid over a color already at 60% lands at 36% — so every repaint starts
-// from this original.
+static const void* kPFBPaintColorKey = &kPFBPaintColorKey;
+// The untouched glyph. A translucent color laid over a glyph already painted
+// would compound, so every repaint starts from this original.
 static const void* kPFBOriginalImageKey = &kPFBOriginalImageKey;
 // Marks a repainted image. Two paths repaint on Notifications, and without the mark
 // each treats the other's result as unpainted; the mark travels with the image.
@@ -36,6 +35,14 @@ UIImage* PFBPaintedGlyph(UIImage* source, UIColor* color) {
     return painted;
 }
 
+// The color painted over one of Twitter's bar glyphs beside Twitter's own tint for it, once per pair.
+static void pfbNoteRepaintColors(NSString* what, UIColor* color, UIColor* theirs, UITraitCollection* traits) {
+    PFBCompatMeasure(@"bar colors",
+                     [NSString stringWithFormat:@"%@ painted %@, Twitter's tint %@", what, PFBColorText(color),
+                                                PFBColorText([theirs resolvedColorWithTraitCollection:traits])],
+                     6);
+}
+
 // Replaces the image of every image view under a view. The result
 // is remembered so the work happens once, and happens again only if Twitter
 // puts its own image back or the color changes.
@@ -44,11 +51,11 @@ static void pfbRepaintGlyphs(UIView* view, UIColor* color) {
         if ([subview isKindOfClass:[UIImageView class]]) {
             UIImageView* imageView = (UIImageView*)subview;
             UIImage* current = imageView.image;
-            UIImage* ours = objc_getAssociatedObject(imageView, kPFBGrayedImageKey);
+            UIImage* ours = objc_getAssociatedObject(imageView, kPFBPaintedImageKey);
             // Repaint when the image changed or when the color did. At launch the
             // trait collection is unsettled, so labelColor resolves differently and
             // the first paint comes out pale.
-            UIColor* usedColor = objc_getAssociatedObject(imageView, kPFBGrayTargetKey);
+            UIColor* usedColor = objc_getAssociatedObject(imageView, kPFBPaintColorKey);
             BOOL colorChanged = usedColor && ![usedColor isEqual:color];
             BOOL alreadyOurs =
                 objc_getAssociatedObject(current, kPFBPaintedFlagKey) != nil;
@@ -70,11 +77,12 @@ static void pfbRepaintGlyphs(UIView* view, UIColor* color) {
                                              OBJC_ASSOCIATION_RETAIN_NONATOMIC);
                 }
                 UIImage* painted = PFBPaintedGlyph(source, color);
-                objc_setAssociatedObject(imageView, kPFBGrayTargetKey, color,
+                objc_setAssociatedObject(imageView, kPFBPaintColorKey, color,
                                          OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-                objc_setAssociatedObject(imageView, kPFBGrayedImageKey, painted,
+                objc_setAssociatedObject(imageView, kPFBPaintedImageKey, painted,
                                          OBJC_ASSOCIATION_RETAIN_NONATOMIC);
                 imageView.image = painted;
+                pfbNoteRepaintColors(@"gear", color, imageView.tintColor, imageView.traitCollection);
                 PFBCOMPAT_ACTION(PFBCompat_bar_repairs, @"settings gear repainted");
             }
         }
@@ -232,8 +240,8 @@ static void pfbRepaintNotificationsGear(UIView* bar, UIColor* color) {
         if (button.title.length > 0 || !button.image) {
             continue;
         }
-        UIImage* ours = objc_getAssociatedObject(button, kPFBGrayedImageKey);
-        UIColor* usedColor = objc_getAssociatedObject(button, kPFBGrayTargetKey);
+        UIImage* ours = objc_getAssociatedObject(button, kPFBPaintedImageKey);
+        UIColor* usedColor = objc_getAssociatedObject(button, kPFBPaintColorKey);
         BOOL colorChanged = usedColor && ![usedColor isEqual:color];
         BOOL alreadyOurs =
             objc_getAssociatedObject(button.image, kPFBPaintedFlagKey) != nil;
@@ -255,11 +263,12 @@ static void pfbRepaintNotificationsGear(UIView* bar, UIColor* color) {
                                          OBJC_ASSOCIATION_RETAIN_NONATOMIC);
             }
             UIImage* painted = PFBPaintedGlyph(source, color);
-            objc_setAssociatedObject(button, kPFBGrayTargetKey, color,
+            objc_setAssociatedObject(button, kPFBPaintColorKey, color,
                                      OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-            objc_setAssociatedObject(button, kPFBGrayedImageKey, painted,
+            objc_setAssociatedObject(button, kPFBPaintedImageKey, painted,
                                      OBJC_ASSOCIATION_RETAIN_NONATOMIC);
             button.image = painted;
+            pfbNoteRepaintColors(@"Notifications gear", color, button.tintColor ?: bar.tintColor, bar.traitCollection);
             PFBCOMPAT_ACTION(PFBCompat_bar_repairs, @"Notifications gear repainted");
         }
     }
@@ -512,7 +521,7 @@ static void pfbFlattenItemsNow(NSArray<UIBarButtonItem*>* items) {
             pfbQueueBarGlassPass(bar);
         }
 
-        UIColor* gray = PFBBarIconGray(bar.traitCollection);
+        UIColor* color = PFBBarIconColor(bar.traitCollection);
 
         // Explore is recognized by the button, Notifications by the screen.
         // Anything else is left exactly as Twitter draws it — the header is
@@ -529,11 +538,11 @@ static void pfbFlattenItemsNow(NSArray<UIBarButtonItem*>* items) {
         pfbPinHeaderOpacity(bar);
 
         if (settingsButton) {
-            pfbRepaintGlyphs(settingsButton, gray);
+            pfbRepaintGlyphs(settingsButton, color);
             pfbForceOpaque(settingsButton);
             return;
         }
-        pfbRepaintNotificationsGear(bar, gray);
+        pfbRepaintNotificationsGear(bar, color);
     } @catch (id exception) {
         static BOOL reported;
         if (!reported && PFBDebugIsRecording()) {
@@ -662,7 +671,7 @@ static BOOL pfbIsChatBarGlyph(UIView* view) {
 // set: a view taken over is repainted in its color, a chat-bar or back-arrow glyph
 // is baked in the label color, and any other image passes through.
 - (void)setImage:(UIImage*)image {
-    UIColor* target = objc_getAssociatedObject(self, kPFBGrayTargetKey);
+    UIColor* target = objc_getAssociatedObject(self, kPFBPaintColorKey);
     if (!target || !image) {
         // Not "== AlwaysTemplate": a bar glyph usually arrives in automatic mode,
         // which a bar button draws as a template all the same, so anything not
@@ -691,7 +700,7 @@ static BOOL pfbIsChatBarGlyph(UIView* view) {
         %orig;
         return;
     }
-    UIImage* ours = objc_getAssociatedObject(self, kPFBGrayedImageKey);
+    UIImage* ours = objc_getAssociatedObject(self, kPFBPaintedImageKey);
     if (image == ours ||
         objc_getAssociatedObject(image, kPFBPaintedFlagKey) != nil) {
         %orig;
@@ -704,7 +713,7 @@ static BOOL pfbIsChatBarGlyph(UIView* view) {
     objc_setAssociatedObject(self, kPFBOriginalImageKey, image,
                              OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     UIImage* painted = PFBPaintedGlyph(image, target);
-    objc_setAssociatedObject(self, kPFBGrayedImageKey, painted,
+    objc_setAssociatedObject(self, kPFBPaintedImageKey, painted,
                              OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     %orig(painted);
 }
@@ -714,19 +723,19 @@ static BOOL pfbIsChatBarGlyph(UIView* view) {
 %hook UIBarButtonItem
 
 - (void)setImage:(UIImage*)image {
-    UIColor* target = objc_getAssociatedObject(self, kPFBGrayTargetKey);
+    UIColor* target = objc_getAssociatedObject(self, kPFBPaintColorKey);
     if (!target || !image) {
         %orig;
         return;
     }
-    UIImage* ours = objc_getAssociatedObject(self, kPFBGrayedImageKey);
+    UIImage* ours = objc_getAssociatedObject(self, kPFBPaintedImageKey);
     if (image == ours ||
         objc_getAssociatedObject(image, kPFBPaintedFlagKey) != nil) {
         %orig;
         return;
     }
     UIImage* painted = PFBPaintedGlyph(image, target);
-    objc_setAssociatedObject(self, kPFBGrayedImageKey, painted,
+    objc_setAssociatedObject(self, kPFBPaintedImageKey, painted,
                              OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     %orig(painted);
 }
@@ -997,7 +1006,7 @@ void PFBBarPairWithNeighbor(UIBarButtonItem* ours, NSArray<UIBarButtonItem*>* it
 // before its image view exists on Notifications, so nothing is marked and the
 // interception never arms.
 %new
-- (void)pfbGraySettingsGlyphIfNeeded {
+- (void)pfbPaintSettingsGlyphIfNeeded {
     @try {
         UIView* button = (UIView*)self;
         if (!button.window) {
@@ -1012,7 +1021,7 @@ void PFBBarPairWithNeighbor(UIBarButtonItem* ours, NSArray<UIBarButtonItem*>* it
         if (!wanted) {
             return;
         }
-        pfbRepaintGlyphs(button, PFBBarIconGray(button.traitCollection));
+        pfbRepaintGlyphs(button, PFBBarIconColor(button.traitCollection));
         pfbForceOpaque(button);
     } @catch (id exception) {
         static BOOL reported;
@@ -1025,12 +1034,12 @@ void PFBBarPairWithNeighbor(UIBarButtonItem* ours, NSArray<UIBarButtonItem*>* it
 
 - (void)didMoveToWindow {
     %orig;
-    [self pfbGraySettingsGlyphIfNeeded];
+    [self pfbPaintSettingsGlyphIfNeeded];
 }
 
 - (void)layoutSubviews {
     %orig;
-    [self pfbGraySettingsGlyphIfNeeded];
+    [self pfbPaintSettingsGlyphIfNeeded];
     // An icon paired with this button follows its glyph.
     PFBWeakView* partner = objc_getAssociatedObject(self, kPFBBarPartnerKey);
     [partner.view setNeedsLayout];
@@ -1055,25 +1064,6 @@ void PFBBarPairWithNeighbor(UIBarButtonItem* ours, NSArray<UIBarButtonItem*>* it
 
 %end
 
-// True of the inbox filter pill or anything inside it. Tighter than the bar
-// test below: the avatar in the same bar fades legitimately, and only this
-// control must be held. The class is resolved once and compared by pointer.
-static BOOL pfbViewSitsInInboxPill(UIView* view) {
-    static Class pillClass;
-    static dispatch_once_t once;
-    dispatch_once(&once, ^{
-        pillClass = NSClassFromString(@"_TtC10TFNUISwift34NavigationBarMenuBarButtonItemView");
-    });
-    UIView* node = pillClass ? view : nil;
-    for (NSInteger depth = 0; node && depth < 6; depth++) {
-        if (object_getClass(node) == pillClass) {
-            return YES;
-        }
-        node = node.superview;
-    }
-    return NO;
-}
-
 %hook CALayer
 
 - (void)setOpacity:(float)opacity {
@@ -1094,13 +1084,6 @@ static BOOL pfbViewSitsInInboxPill(UIView* view) {
     if (ownerIsView && [key hasPrefix:@"filters."] && owner == (UIView*)PFBTopBarLogoViewCurrent() &&
         PFBTintedLogoWanted()) {
         self.filters = nil;
-        return;
-    }
-
-    // Under Liquid Glass every animation on this one control is refused, not just
-    // opacity: the fade never announces itself as an opacity change. Its neighbors
-    // in the same bar are untouched.
-    if (ownerIsView && pfbViewSitsInInboxPill(owner) && [PFBSettings boolForKey:@"enable_liquid_glass"]) {
         return;
     }
 

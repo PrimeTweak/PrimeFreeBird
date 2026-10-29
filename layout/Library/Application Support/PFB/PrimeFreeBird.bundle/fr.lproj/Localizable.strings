@@ -72,6 +72,8 @@
 "RESTORE_TAB_LABELS_DETAIL" = "Affiche les étiquettes sous les icônes.";
 "NO_TAB_BAR_HIDING_TITLE" = "Toujours visible";
 "NO_TAB_BAR_HIDING_DETAIL" = "Ne s’estompe pas pendant le défilement.";
+"HIDE_BOTTOM_FADE_TITLE" = "Masquer le fondu du bas";
+"HIDE_BOTTOM_FADE_DETAIL" = "Le fondu blanc que Twitter dessine sous la barre d’onglets.";
 
 /* ===== BRANDING ===== */
 "MODERN_SETTINGS_BRANDING_TITLE" = "Image de marque";

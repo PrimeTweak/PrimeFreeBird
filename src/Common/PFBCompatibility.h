@@ -9,6 +9,7 @@ typedef NS_ENUM(NSInteger, PFBCompatOption) {
     PFBCompat_force_following_tab,
     PFBCompat_no_focus_lost,
     PFBCompat_no_tab_bar_hiding,
+    PFBCompat_hide_bottom_fade,
     PFBCompat_show_scroll_indicator,
     PFBCompat_disable_rtl,
     PFBCompat_hide_premium_offer,
@@ -247,6 +248,8 @@ typedef NS_ENUM(NSInteger, PFBCompatPath) {
     PFBCompatPath_glass_bottom_reserve,
     PFBCompatPath_native_tab_editor,
     PFBCompatPath_navigation_bar_text,
+    PFBCompatPath_glass_pill,
+    PFBCompatPath_bottom_fade,
     PFBCompatPathCount,
 };
 
@@ -260,6 +263,8 @@ FOUNDATION_EXPORT void PFBCompatRunTour(void);
 FOUNDATION_EXPORT void PFBCompatRunTourLeft(void);
 // While a tour drives the app, hooks keep it inside Twitter.
 FOUNDATION_EXPORT BOOL PFBCompatTourIsRunning(void);
+// While the tour opens Twitter's new settings menu, Twitter's own switch for it is let through.
+FOUNDATION_EXPORT BOOL PFBCompatTourWantsNewSettings(void);
 // The screens a full tour shows, or those still owing proofs.
 FOUNDATION_EXPORT NSUInteger PFBCompatTourScreens(BOOL full);
 // When this build started counting, or with earlierBuilds, when the earlier builds of the

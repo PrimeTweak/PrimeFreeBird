@@ -59,6 +59,7 @@ static const PFBCompatMeta kMeta[] = {
     {PFBCompat_custom_tab_bar, "custom_tab_bar", "CUSTOM_TAB_BAR_OPTION_TITLE", "MODERN_SETTINGS_APPEARANCE_TITLE", YES},
     {PFBCompat_restore_tab_labels, "restore_tab_labels", "RESTORE_TAB_LABELS_TITLE", "MODERN_SETTINGS_APPEARANCE_TITLE"},
     {PFBCompat_no_tab_bar_hiding, "no_tab_bar_hiding", "NO_TAB_BAR_HIDING_TITLE", "MODERN_SETTINGS_APPEARANCE_TITLE"},
+    {PFBCompat_hide_bottom_fade, "hide_bottom_fade", "HIDE_BOTTOM_FADE_TITLE", "MODERN_SETTINGS_APPEARANCE_TITLE"},
     {PFBCompat_hide_promoted, "hide_promoted", "HIDE_PROMOTED_TITLE", "MODERN_SETTINGS_TIMELINES_TITLE"},
     {PFBCompat_hide_who_to_follow, "hide_who_to_follow", "HIDE_WHO_TO_FOLLOW_TITLE", "MODERN_SETTINGS_TIMELINES_TITLE"},
     {PFBCompat_hide_topics_to_follow, "hide_topics_to_follow", "HIDE_TOPICS_TO_FOLLOW_TITLE", "MODERN_SETTINGS_TIMELINES_TITLE"},
@@ -227,6 +228,8 @@ static const PFBCompatPathMeta kPaths[] = {
     {PFBCompatPath_glass_bottom_reserve, PFBCompat_restore_tab_labels, "bottom reserve"},
     {PFBCompatPath_native_tab_editor, PFBCompat_custom_tab_bar, "Twitter's tab editor"},
     {PFBCompatPath_navigation_bar_text, PFBCompat_custom_fonts, "navigation bar"},
+    {PFBCompatPath_glass_pill, PFBCompat_restore_tab_labels, "pill height"},
+    {PFBCompatPath_bottom_fade, PFBCompat_hide_bottom_fade, "fade under the tab bar"},
 };
 static const size_t kPathCount = sizeof(kPaths) / sizeof(kPaths[0]);
 
@@ -400,6 +403,10 @@ static const PFBCompatReq kReqs[] = {
     {PFBCompat_restore_tab_labels, "TFNCustomTabBar", "-layoutSubviews"},
     {PFBCompat_restore_tab_labels, "_TtC11XNavigation10TabBarView", "-layoutSubviews"},
     {PFBCompat_restore_tab_labels, "_TtC11XNavigation14TabBarItemView", "-layoutSubviews"},
+    {PFBCompat_restore_tab_labels, "XDSGlass", "-setBounds:"},
+    {PFBCompat_hide_bottom_fade, "_TtC13XDesignSystem19ScrollEdgeTreatment", "-layoutSubviews"},
+    {PFBCompat_hide_bottom_fade, "CAGradientLayer", "-setColors:"},
+    {PFBCompat_hide_bottom_fade, "CAGradientLayer", "-setLocations:"},
     {PFBCompat_custom_fonts, "UIFont", "+tfn_fontWithName:size:"},
     {PFBCompat_custom_fonts, "XFontCatalog", "+tabularDigitsFontOfSize:weight:"},
     {PFBCompat_custom_fonts, "UIFontPickerViewController", "-viewWillAppear:"},
@@ -463,8 +470,6 @@ static const PFBCompatReq kReqs[] = {
     {PFBCompat_enable_liquid_glass, "UINavigationItem", "-setRightBarButtonItems:"},
     {PFBCompat_enable_liquid_glass, "UINavigationItem", "-setRightBarButtonItems:animated:"},
     {PFBCompat_enable_liquid_glass, "UINavigationItem", "-setTrailingItemGroups:"},
-    {PFBCompat_enable_liquid_glass, "_TtC10TFNUISwift34NavigationBarMenuBarButtonItemView", "-didMoveToWindow"},
-    {PFBCompat_enable_liquid_glass, "_TtC10TFNUISwift34NavigationBarMenuBarButtonItemView", "-layoutSubviews"},
     {PFBCompat_enable_liquid_glass, "_TtC16XFeatureSwitches18FeatureSwitchStore", "-boolForKey:"},
     // Navigation-bar repairs in NavBarIcons.x act whatever the Liquid Glass setting says.
     {PFBCompat_bar_repairs, "CALayer", "-addAnimation:forKey:"},
@@ -1085,6 +1090,8 @@ static const PFBCompatReq kReqs[] = {
     {PFBCompat_settings_entry, "TFNItemsDataViewController", "-updatedSections:forStyle:"},
     {PFBCompat_settings_entry, "TFNSettingsNavigationItem", "-initWithTitle:detail:iconName:controllerFactory:"},
     {PFBCompat_settings_entry, "TFNTitleView", "+titleViewWithTitle:subtitle:"},
+    {PFBCompat_settings_entry, "TFSFeatureSwitches", "-boolForKey:"},
+    {PFBCompat_settings_entry, "TFSInstrumentedFeatureSwitches", "-boolForKey:"},
     {PFBCompat_accent_color, "T1GenericSettingsViewController", "-viewWillAppear:"},
     {PFBCompat_accent_color, "T1GenericSettingsViewController", "-viewDidDisappear:"},
     {PFBCompat_no_auto_unmute, "T1InlineVideoView", "-didMoveToWindow"},
@@ -1148,6 +1155,8 @@ static const PFBCompatReq kReqs[] = {
     {PFBCompat_restore_tab_labels, "XNAVNavigationController", "$$__lazy_storage_$_collapseEngine"},
     {PFBCompat_restore_tab_labels, "_TtC11XNavigation14CollapseEngine", "$bottomChromeExtent"},
     {PFBCompat_restore_tab_labels, "_TtC11XNavigation14CollapseEngine", "$hiddenBarTravel"},
+    {PFBCompat_hide_bottom_fade, "_TtC13XDesignSystem19ScrollEdgeTreatment", "$fadeMask"},
+    {PFBCompat_hide_bottom_fade, "_TtC13XDesignSystem18ScrollEdgeFadeMask", "$gradientLayer"},
     {PFBCompat_custom_tab_bar, "T1TabCustomizationConfig", "$migrationHelper"},
     {PFBCompat_custom_tab_bar, "_TtC14T1TwitterSwift33SubscriptionsInfraMigrationHelper", "$$__lazy_storage_$_legacyConfig"},
     {PFBCompat_custom_tab_bar, "_TtC20TwitterSubscriptions31LegacySubscriptionFeatureConfig", "$isFeatureEnabled"},
@@ -1291,6 +1300,7 @@ typedef struct {
 // The Twitter feature switches each option answers in FeatureSwitches.x. A switch
 // Twitter no longer carries is one the option can no longer act through.
 static const PFBCompatFlag kFlags[] = {
+    {PFBCompat_settings_entry, "ios_settings_redesign_enabled", NO},
     {PFBCompat_hide_grok_bot, "grok_ios_grok_bot_sidebar_enabled", NO},
     {PFBCompat_hide_grok_bot, "grok_ios_grok_bot_upsells_enabled", NO},
     {PFBCompat_hide_grok_bot, "grok_ios_grok_bot_home_header_enabled", NO},
@@ -1575,6 +1585,7 @@ static const PFBCompatName kNames[] = {
     {PFBCompatOptionCount, "Debug/PFBCompatibilityTour.m", "bio"},
     {PFBCompatOptionCount, "Debug/PFBCompatibilityTour.m", "userID"},
     {PFBCompatOptionCount, "Debug/PFBCompatibilityTour.m", "T1TabbedAppNavigationViewController"},
+    {PFBCompatOptionCount, "Debug/PFBCompatibilityTour.m", "_TtC14T1TwitterSwift34XTabbedAppNavigationViewController"},
     {PFBCompatOptionCount, "Debug/PFBCompatibilityTour.m", "appNavigation"},
     {PFBCompatOptionCount, "Debug/PFBCompatibilityTour.m", "visiblePanelIDs"},
     {PFBCompatOptionCount, "Debug/PFBCompatibilityTour.m", "currentPanelID"},
@@ -1658,9 +1669,6 @@ static const PFBCompatName kNames[] = {
     {PFBCompatOptionCount, "Features/Media/MediaDownloads.x", "status"},
     {PFBCompatOptionCount, "Features/Appearance/NavBarIcons.x", "setHidesSharedBackground:"},
     {PFBCompatOptionCount, "Features/Appearance/NavBarIcons.x", "setTintColor:"},
-    {PFBCompatOptionCount, "Features/Messages/PillSwap.x", "hidesSharedBackground"},
-    {PFBCompatOptionCount, "Features/Messages/PillSwap.x", "menu"},
-    {PFBCompatOptionCount, "Features/Messages/PillSwap.x", "setHidesSharedBackground:"},
     {PFBCompatOptionCount, "Features/Profiles/Profile.x", "_t1_outerTabIndexForEntry:"},
     {PFBCompatOptionCount, "Features/Profiles/Profile.x", "_t1_selectMainEntry:"},
     {PFBCompatOptionCount, "Features/Profiles/Profile.x", "contentMainEntries"},
@@ -1854,6 +1862,12 @@ static const PFBCompatName kNames[] = {
     {PFBCompat_no_tab_bar_hiding, "Features/Appearance/GlassTabBar.x", "_TtC11XNavigation14CollapseEngine"},
     {PFBCompat_no_tab_bar_hiding, "Features/Appearance/GlassTabBar.x", "collapseProgress"},
     {PFBCompat_restore_tab_labels, "Features/Appearance/GlassTabBar.x", "bottomChromeExtent"},
+    {PFBCompat_hide_bottom_fade, "Features/Appearance/GlassTabBar.x", "XDSBlur"},
+    {PFBCompat_hide_bottom_fade, "Features/Appearance/GlassTabBar.x", "_TtC13XDesignSystem19ScrollEdgeTreatment"},
+    {PFBCompat_hide_bottom_fade, "Features/Appearance/GlassTabBar.x", "_TtC13XDesignSystem18ScrollEdgeFadeView"},
+    {PFBCompat_hide_bottom_fade, "Features/Appearance/GlassTabBar.x", "_TtC13XDesignSystem18ScrollEdgeFadeMask"},
+    {PFBCompat_hide_bottom_fade, "Features/Appearance/GlassTabBar.x", "fadeMask"},
+    {PFBCompat_hide_bottom_fade, "Features/Appearance/GlassTabBar.x", "gradientLayer"},
     {PFBCompat_restore_tab_labels, "Features/Appearance/GlassTabBar.x", "hiddenBarTravel"},
     {PFBCompat_restore_twitter_names, "Features/Branding/Branding.x", "setAttributedString:"},
     {PFBCompat_restore_twitter_names, "Features/Branding/Branding.x", "T1ProfileUserInfoView"},
@@ -2018,7 +2032,6 @@ static const PFBCompatName kClassSubstrings[] = {
     {PFBCompat_muted_words, "Features/Timelines/QuickMutedWords.x", "TimelineContainer|Timelines|Home"},
     {PFBCompat_choose_explore_tabs, "Features/Search/ExploreTabs.x", "SegmentedHighlightBarView"},
     {PFBCompat_restore_tweet_button, "Features/Branding/Branding.x", "FloatingActionButton"},
-    {PFBCompat_enable_liquid_glass, "Features/Messages/PillSwap.x", "Inbox"},
     {PFBCompat_bar_repairs, "Features/Appearance/NavBarIcons.x", "XChatDM"},
     {PFBCompat_bar_repairs, "Features/Appearance/NavBarIcons.x", "ActivityHistory|Notification"},
     {PFBCompat_bar_repairs, "Features/Appearance/NavBarIcons.x", "SelfSizingStackView"},
@@ -2240,6 +2253,7 @@ static const PFBCompatContract kContract[] = {
     {PFBCompat_force_following_tab, "tab home", NULL},
     {PFBCompat_no_focus_lost, "launch", NULL},
     {PFBCompat_no_tab_bar_hiding, "scroll", "tab bar hiding"},
+    {PFBCompat_hide_bottom_fade, "tab home", NULL},
     {PFBCompat_show_scroll_indicator, "tab home", NULL},
     {PFBCompat_disable_rtl, "launch", NULL},
     {PFBCompat_hide_premium_offer, "own profile", NULL},
@@ -2350,7 +2364,7 @@ static const PFBCompatContract kContract[] = {
     {PFBCompat_keep_reading_position, "tab home", NULL},
     {PFBCompat_classic_tweet_detail, "launch", NULL},
     {PFBCompat_web_login, "", "the web login only shows while signed out or when adding an account"},
-    {PFBCompat_settings_entry, "PFB settings", NULL},
+    {PFBCompat_settings_entry, "Twitter settings", NULL},
     {PFBCompat_bar_repairs, "tab guide", NULL},
     {PFBCompat_no_auto_unmute, "tab home", "inline video"},
     {PFBCompat_filter_languages, "tab home", NULL},
@@ -2388,6 +2402,7 @@ static const PFBCompatPathStation kPathStations[] = {
     {PFBCompatPath_eye_button, "tab ntab"},
     {PFBCompatPath_controls_hold, "video full screen"},
     {PFBCompatPath_interface_text, "tab home"},
+    {PFBCompatPath_bottom_fade, "tab home"},
 };
 static const size_t kPathStationCount = sizeof(kPathStations) / sizeof(kPathStations[0]);
 
@@ -2427,6 +2442,7 @@ static NSString* stationLabel(NSString* station) {
           @"web link": @"a web link",
           @"t.co check": @"the t.co link tracking block",
           @"Twitter settings": @"Twitter's settings",
+          @"new Twitter settings": @"Twitter's new settings",
           @"PFB settings": @"the PrimeFreeBird settings",
       };
     });

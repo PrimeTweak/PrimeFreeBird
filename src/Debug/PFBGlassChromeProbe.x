@@ -1,6 +1,6 @@
 // Measures Twitter's own Liquid Glass bar: its collapse with Always visible, the taller bar and
-// the chrome above it, and the tabs kept from Twitter's editor. Scrolls go to MEASUREMENTS; a
-// summary follows once Home is up and signed in, and again at each stethoscope capture.
+// the chrome above it, the badges, and the tabs kept from Twitter's editor. Scrolls go to
+// MEASUREMENTS; a summary follows once Home is up and signed in, and at each stethoscope capture.
 
 #import <mach-o/loader.h>
 #import <pthread.h>
@@ -30,6 +30,7 @@
 @interface UIViewController (PFBGlassChromeProbe)
 - (BOOL)tfn_prefersTabBarPinned;
 - (BOOL)tfn_preferManualNavBarCollapse;
+- (BOOL)isDashOpen;
 @end
 
 @interface _TtCC11XNavigation14CollapseEngine14ScrollObserver : NSObject
@@ -590,9 +591,210 @@ static BOOL PFBProbeOnHome(void) {
     return window && PFBProbeControllerTreeHasHome(window.rootViewController, 0);
 }
 
+// MARK: - Twitter's saved tabs
+
+// The return addresses above a hook's own frame, three at most, each as image+offset.
+static NSString* PFBProbeChainFrom(const void* const* frame) {
+    NSMutableArray<NSString*>* names = [NSMutableArray array];
+    for (NSUInteger i = 0; frame && i < 3; i++) {
+        const void* address = frame[1];
+        const void* const* next = (const void* const*)frame[0];
+        if (!address) {
+            break;
+        }
+        [names addObject:PFBProbeCaller(address)];
+        // Frames sit higher as the chain goes up; anything else ends it.
+        if (next <= frame || ((uintptr_t)next & 0xf)) {
+            break;
+        }
+        frame = next;
+    }
+    return names.count ? [names componentsJoinedByString:@" < "] : @"?";
+}
+
+// Each read and write of the saved tabs in Twitter's account store, from any thread, and who made
+// it: a return to the default tabs follows one of them. Kept on the main thread.
+static NSMutableArray<NSString*>* gProbeTabKeyEvents;
+static NSMutableArray<NSNumber*>* gProbeTabKeyTimes;
+static NSMutableArray<NSNumber*>* gProbeActivations;
+
+static void PFBProbeNoteTabKey(NSString* what, NSString* chain) {
+    if (gProbeStart <= 0) {
+        return;
+    }
+    CFTimeInterval at = CACurrentMediaTime();
+    NSString* event = [NSString stringWithFormat:@"%.1f s %@ by %@%@", at - gProbeStart, what, chain,
+                                                 pthread_main_np() ? @"" : @", off the main thread"];
+    void (^keep)(void) = ^{
+      if (!gProbeTabKeyEvents) {
+          gProbeTabKeyEvents = [NSMutableArray array];
+          gProbeTabKeyTimes = [NSMutableArray array];
+      }
+      if (gProbeTabKeyEvents.count >= 32) {
+          [gProbeTabKeyEvents removeObjectAtIndex:0];
+          [gProbeTabKeyTimes removeObjectAtIndex:0];
+      }
+      [gProbeTabKeyEvents addObject:event];
+      [gProbeTabKeyTimes addObject:@(at)];
+    };
+    if (pthread_main_np()) {
+        keep();
+    } else {
+        dispatch_async(dispatch_get_main_queue(), keep);
+    }
+}
+
+// The saved tabs' events of the last seconds, kept beside a change of the bar's tabs.
+static NSString* PFBProbeRecentTabKeyText(CFTimeInterval seconds) {
+    NSMutableArray<NSString*>* recent = [NSMutableArray array];
+    CFTimeInterval now = CACurrentMediaTime();
+    for (NSUInteger i = 0; i < gProbeTabKeyTimes.count; i++) {
+        if (now - gProbeTabKeyTimes[i].doubleValue <= seconds) {
+            [recent addObject:gProbeTabKeyEvents[i]];
+        }
+    }
+    return recent.count ? [recent componentsJoinedByString:@" | "] : @"none";
+}
+
+static NSString* PFBProbeSavedTabsValue(id value) {
+    if (!value) {
+        return @"nothing";
+    }
+    return [value isKindOfClass:[NSData class]] ? [NSString stringWithFormat:@"%lu bytes", (unsigned long)[(NSData*)value length]]
+                                                : PFBProbeName([value class]);
+}
+
+// Where the app stands when its tabs change: active or not and since when, the side menu, the screen.
+static NSString* PFBProbeMomentText(void) {
+    UIApplicationState state = UIApplication.sharedApplication.applicationState;
+    NSString* stateText = state == UIApplicationStateActive ? @"active"
+                          : state == UIApplicationStateInactive ? @"inactive"
+                                                                : @"in the background";
+    NSNumber* activated = gProbeActivations.lastObject;
+    NSString* since = activated ? [NSString stringWithFormat:@"%.1f s after becoming active",
+                                                             CACurrentMediaTime() - activated.doubleValue]
+                                : @"never active yet";
+    UIViewController* root = gProbeBar.window.rootViewController;
+    Class tabbedClass = NSClassFromString(@"_TtC14T1TwitterSwift34XTabbedAppNavigationViewController");
+    NSMutableArray<UIViewController*>* queue = root ? [NSMutableArray arrayWithObject:root] : [NSMutableArray array];
+    NSString* dash = @"unknown";
+    for (NSUInteger i = 0; i < queue.count && i < 128; i++) {
+        UIViewController* controller = queue[i];
+        if (tabbedClass && [controller isKindOfClass:tabbedClass] &&
+            [controller respondsToSelector:@selector(isDashOpen)]) {
+            dash = [controller isDashOpen] ? @"open" : @"closed";
+            break;
+        }
+        [queue addObjectsFromArray:controller.childViewControllers];
+    }
+    UIViewController* screen = gProbeScreen;
+    return [NSString stringWithFormat:@"app %@, %@, side menu %@, screen %@", stateText, since, dash,
+                                      screen ? PFBProbeName([screen class]) : @"none"];
+}
+
+// MARK: - Badges
+
+// A badge against its tab's glyph, top-right corner to the badge's center: on screen, and in
+// Twitter's own layout, which leaves out the lift Tab labels gives glyphs and badges alike.
+static NSMutableSet<NSString*>* gProbeBadgeModes;
+
+static void PFBProbeNoteBadge(UIView* badge) {
+    UIView* bar = gProbeBar;
+    UIView* overlay = badge.superview;
+    if (!bar.window || !badge.window || CGRectIsEmpty(badge.bounds) || ![badge isDescendantOfView:bar] ||
+        PFBProbeInLens(badge, bar) || !overlay.superview) {
+        return;
+    }
+    NSString* mode = [PFBSettings boolForKey:@"restore_tab_labels"] ? @"labels on" : @"labels off";
+    if ([gProbeBadgeModes containsObject:mode]) {
+        return;
+    }
+    CGRect dot = [badge convertRect:badge.bounds toView:nil];
+    for (UIView* item in PFBProbeRestingItems(bar)) {
+        CGRect place = [item convertRect:item.bounds toView:nil];
+        if (CGRectGetMidX(dot) < CGRectGetMinX(place) || CGRectGetMidX(dot) > CGRectGetMaxX(place)) {
+            continue;
+        }
+        UIView* holder = nil;
+        UIView* glyph = nil;
+        for (UIView* sub in item.subviews) {
+            for (UIView* inner in sub.subviews) {
+                if (!glyph && [inner isKindOfClass:[UIImageView class]]) {
+                    glyph = inner;
+                    holder = sub;
+                }
+            }
+        }
+        if (!glyph) {
+            return;
+        }
+        CGRect drawn = [glyph convertRect:glyph.bounds toView:nil];
+        CGPoint itemOrigin = [item.superview convertPoint:item.frame.origin toView:bar];
+        CGPoint overlayOrigin = [overlay.superview convertPoint:overlay.frame.origin toView:bar];
+        CGPoint ownCorner = CGPointMake(itemOrigin.x + holder.frame.origin.x + CGRectGetMaxX(glyph.frame),
+                                        itemOrigin.y + holder.frame.origin.y + CGRectGetMinY(glyph.frame));
+        CGPoint ownDot = CGPointMake(overlayOrigin.x + CGRectGetMidX(badge.frame), overlayOrigin.y + CGRectGetMidY(badge.frame));
+        if (!gProbeBadgeModes) {
+            gProbeBadgeModes = [NSMutableSet set];
+        }
+        [gProbeBadgeModes addObject:mode];
+        PFBCompatMeasure(kPFBProbeTopic,
+                         [NSString stringWithFormat:@"badge on %@ (%@): %.0fx%.0f, center %+.1f,%+.1f from the glyph's "
+                                                    @"top-right corner on screen, %+.1f,%+.1f in Twitter's own layout, glyph %.0fx%.0f",
+                                                    item.accessibilityLabel.length ? item.accessibilityLabel : @"?", mode,
+                                                    dot.size.width, dot.size.height, CGRectGetMidX(dot) - CGRectGetMaxX(drawn),
+                                                    CGRectGetMidY(dot) - CGRectGetMinY(drawn), ownDot.x - ownCorner.x,
+                                                    ownDot.y - ownCorner.y, drawn.size.width, drawn.size.height],
+                         60);
+        return;
+    }
+}
+
+// The tab under the collapsed bar's round button, per row: its glyph against the button's center,
+// and how much of its name still shows.
+static NSString* PFBProbeButtonTabText(UIView* bar) {
+    UIView* platter = gProbePartRefs[PFBProbePlatterPart];
+    if (!platter.window) {
+        return @"no platter";
+    }
+    CGRect round = [platter convertRect:platter.bounds toView:nil];
+    CGPoint middle = CGPointMake(CGRectGetMidX(round), CGRectGetMidY(round));
+    NSMutableArray<NSString*>* rows = [NSMutableArray array];
+    PFBWalkAllSubviews(bar, 4, ^(UIView* view) {
+      if (!gProbeItemClass || ![view isKindOfClass:gProbeItemClass] ||
+          !CGRectContainsPoint([view convertRect:view.bounds toView:nil], middle)) {
+          return;
+      }
+      UIView* glyph = nil;
+      UILabel* name = nil;
+      for (UIView* sub in view.subviews) {
+          if ([sub isKindOfClass:[UILabel class]]) {
+              name = (UILabel*)sub;
+          }
+          for (UIView* inner in sub.subviews) {
+              if (!glyph && [inner isKindOfClass:[UIImageView class]]) {
+                  glyph = inner;
+              }
+          }
+      }
+      if (!glyph) {
+          return;
+      }
+      CGRect drawn = [glyph convertRect:glyph.bounds toView:nil];
+      [rows addObject:[NSString stringWithFormat:@"%@ glyph %.0fx%.0f at %+.1f,%+.1f from the center, name %@",
+                                                 PFBProbeInLens(view, bar) ? @"lens" : @"resting", drawn.size.width,
+                                                 drawn.size.height, CGRectGetMidX(drawn) - middle.x,
+                                                 CGRectGetMidY(drawn) - middle.y,
+                                                 name ? [NSString stringWithFormat:@"alpha %.2f", name.alpha] : @"none"]];
+    });
+    return [NSString stringWithFormat:@"button %@ · %@", PFBProbeRectText(round),
+                                      rows.count ? [rows componentsJoinedByString:@" | "] : @"no tab under it"];
+}
+
 // MARK: - Customize tabs
 
-// Each change of the bar's tabs, with what Twitter's navigation was asked before it.
+// Each change of the bar's tabs, with what Twitter's navigation was asked before it and where
+// the app stood.
 static NSMutableArray<NSString*>* gProbeTabEvents;
 static NSString* gProbeLastTabs;
 
@@ -612,10 +814,12 @@ static void PFBProbeNoteTabs(UIView* bar) {
     PFBProbeTally* recalculated = gProbeTallies[@"recalculate"];
     PFBProbeTally* updated = gProbeTallies[@"recalculate with"];
     [gProbeTabEvents addObject:[NSString stringWithFormat:@"%.1f s %@ after visiblePanelIDs %lu (last from %@), "
-                                                           @"recalculate %lu, recalculate with %lu",
+                                                           @"recalculate %lu, recalculate with %lu, %@, saved tabs in "
+                                                           @"the 3 s before: %@",
                                                            CACurrentMediaTime() - gProbeStart, tabs,
                                                            (unsigned long)asked.total, asked.lastCaller ?: @"none",
-                                                           (unsigned long)recalculated.total, (unsigned long)updated.total]];
+                                                           (unsigned long)recalculated.total, (unsigned long)updated.total,
+                                                           PFBProbeMomentText(), PFBProbeRecentTabKeyText(3.0)]];
 }
 
 // Saved values whose key names the tabs or the navigation.
@@ -1073,10 +1277,10 @@ static id PFBProbeEngine(void) {
         gProbeCollapsedNotes++;
         UIView* host = gProbeAccessory;
         PFBCompatMeasure(kPFBProbeTopic,
-                         [NSString stringWithFormat:@"collapsed on %@: %@ · accessory %@ · glass writes: %@", w.screen,
+                         [NSString stringWithFormat:@"collapsed on %@: %@ · accessory %@ · %@ · glass writes: %@", w.screen,
                                                     PFBProbeCollapsedText(bar),
                                                     host.window ? PFBProbeViewText(host, bar) : @"none",
-                                                    PFBProbeWritesText(PFBProbePlatterPart)],
+                                                    PFBProbeButtonTabText(bar), PFBProbeWritesText(PFBProbePlatterPart)],
                          60);
     }
 }
@@ -1149,6 +1353,9 @@ static void PFBProbePersist(NSString* moment) {
             [NSString stringWithFormat:@"%@: bar parts %@ · first tab %@", moment, PFBProbePartsText(),
                                        PFBProbeFirstTabText()],
             [NSString stringWithFormat:@"%@: accessory %@", moment, PFBProbeAccessoryText()],
+            [NSString stringWithFormat:@"%@: Twitter's saved tabs %@", moment,
+                                       gProbeTabKeyEvents.count ? [gProbeTabKeyEvents componentsJoinedByString:@" | "]
+                                                                : @"untouched"],
         ] mutableCopy];
         for (NSInteger i = 0; i < PFBProbePartCount; i++) {
             [lines addObject:[NSString stringWithFormat:@"%@: writes to the %@: %@", moment, kPFBProbePartNames[i],
@@ -1354,6 +1561,65 @@ static void PFBProbeStart(void) {
 
 %end
 
+// Twitter's saved tabs as Twitter reads and writes them: PrimeFreeBird's kept copy included.
+%hook TFSAccountUserDefaults
+
+- (id)objectForKey:(id)key {
+    id value = %orig;
+    if ([PFBNativeTabSelectionStore isNativeTabSettingsKey:key]) {
+        PFBProbeNoteTabKey([@"read " stringByAppendingString:PFBProbeSavedTabsValue(value)],
+                           PFBProbeChainFrom((const void* const*)__builtin_frame_address(0)));
+    }
+    return value;
+}
+
+- (BOOL)hasValueForKey:(id)key {
+    BOOL has = %orig;
+    if ([PFBNativeTabSelectionStore isNativeTabSettingsKey:key]) {
+        PFBProbeNoteTabKey(has ? @"asked, has one" : @"asked, has none",
+                           PFBProbeChainFrom((const void* const*)__builtin_frame_address(0)));
+    }
+    return has;
+}
+
+- (void)setObject:(id)value forKey:(id)key {
+    if ([PFBNativeTabSelectionStore isNativeTabSettingsKey:key]) {
+        PFBProbeNoteTabKey([@"write " stringByAppendingString:PFBProbeSavedTabsValue(value)],
+                           PFBProbeChainFrom((const void* const*)__builtin_frame_address(0)));
+    }
+    %orig;
+}
+
+- (id)swapObject:(id)value forKey:(id)key {
+    id previous = %orig;
+    if ([PFBNativeTabSelectionStore isNativeTabSettingsKey:key]) {
+        PFBProbeNoteTabKey([NSString stringWithFormat:@"swap %@ in for %@", PFBProbeSavedTabsValue(value),
+                                                      PFBProbeSavedTabsValue(previous)],
+                           PFBProbeChainFrom((const void* const*)__builtin_frame_address(0)));
+    }
+    return previous;
+}
+
+// Empties the whole store, saved tabs included.
+- (void)purge {
+    PFBProbeNoteTabKey(@"purge", PFBProbeChainFrom((const void* const*)__builtin_frame_address(0)));
+    %orig;
+}
+
+%end
+
+%hook _TtC11XNavigation15TabBarBadgeView
+
+- (void)layoutSubviews {
+    %orig;
+    @try {
+        PFBProbeNoteBadge((UIView*)self);
+    } @catch (__unused id exception) {
+    }
+}
+
+%end
+
 // The switches named subscriptions_, as Twitter receives them: PrimeFreeBird's answers included.
 %hook TFSFeatureSwitches
 
@@ -1422,6 +1688,16 @@ static void PFBProbeStart(void) {
                                                        queue:nil
                                                   usingBlock:^(__unused NSNotification* note) {
                                                     PFBProbePersist(@"at capture");
+                                                  }];
+    [[NSNotificationCenter defaultCenter] addObserverForName:UIApplicationDidBecomeActiveNotification
+                                                      object:nil
+                                                       queue:NSOperationQueue.mainQueue
+                                                  usingBlock:^(__unused NSNotification* note) {
+                                                    if (!gProbeActivations) {
+                                                        gProbeActivations = [NSMutableArray array];
+                                                    }
+                                                    [gProbeActivations addObject:@(CACurrentMediaTime())];
+                                                    PFBProbeNoteTabKey(@"app became active", @"iOS");
                                                   }];
     %init(PFBGlassProbeEarly);
     dispatch_async(dispatch_get_main_queue(), ^{

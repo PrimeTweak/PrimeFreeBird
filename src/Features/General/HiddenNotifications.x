@@ -1186,11 +1186,11 @@ static void PFBNotifPlaceEye(UIViewController* viewController) {
         if (!glyph) {
             glyph = [UIImage systemImageNamed:@"eye.slash"];
         }
-        // In the gray of the bar's icons, which the Notifications bar pass repaints
+        // In the color of the bar's icons, which the Notifications bar pass repaints
         // when it changes (NavBarIcons.x). The same kind of item as the Explore
         // filters button, so both sit the same way beside the gear.
         UIBarButtonItem* ours = PFBBarGlyphItem(
-            PFBFlatGlyph(glyph, PFBBarIconGray(viewController.traitCollection)),
+            PFBFlatGlyph(glyph, PFBBarIconColor(viewController.traitCollection)),
             [[PFBBundle sharedBundle] localizedStringForKey:@"HIDDEN_NOTIFS_TITLE"],
             [PFBNotifQuickPresenter shared], @selector(present:));
         ours.tag = kPFBNotifBarItemTag;
