@@ -15,7 +15,6 @@ static BOOL gPFBWasInFront;
 static __weak UIScene* gPFBLastScene;
 static __weak UIWindow* gPFBLastWindow;
 static __weak UIViewController* gPFBLastRoot;
-static NSHashTable* gPFBDashControllers;
 
 static void PFBReturnNote(NSString* fact) {
     PFBCompatMeasure(kPFBReturnTopic, [NSString stringWithFormat:@"%@: %@", gPFBMoment, fact], kPFBReturnLines);
@@ -112,42 +111,6 @@ static void PFBReturnInFront(void) {
 
 // MARK: - Side menu
 
-// The panels the side menu holds as the tab bar's: a row is left out for each of them. The
-// field is read the way key-value coding reads it, and its type is named when that fails.
-static NSString* PFBDashPanels(id controller) {
-    Ivar ivar = class_getInstanceVariable(object_getClass(controller), "visiblePanelIDs");
-    const char* type = ivar ? ivar_getTypeEncoding(ivar) : NULL;
-    NSString* field = [NSString stringWithFormat:@"field %@, type \"%s\"", ivar ? @"found" : @"not found", type ?: ""];
-    id panels = nil;
-    @try {
-        panels = [controller valueForKey:@"visiblePanelIDs"];
-    } @catch (__unused id exception) {
-        return [@"unread, " stringByAppendingString:field];
-    }
-    NSMutableArray* list = nil;
-    if ([panels isKindOfClass:[NSArray class]]) {
-        list = [panels mutableCopy];
-    } else if ([panels isKindOfClass:[NSSet class]]) {
-        list = [[(NSSet*)panels allObjects] mutableCopy];
-    } else if ([panels isKindOfClass:[NSOrderedSet class]]) {
-        list = [[(NSOrderedSet*)panels array] mutableCopy];
-    } else if ([panels isKindOfClass:[NSIndexSet class]]) {
-        list = [NSMutableArray array];
-        [(NSIndexSet*)panels enumerateIndexesUsingBlock:^(NSUInteger index, __unused BOOL* stop) {
-          [list addObject:@(index)];
-        }];
-    }
-    if (!list) {
-        return [NSString stringWithFormat:@"%@ (%@)", panels ? PFBReadableClassName(panels) : @"none", field];
-    }
-    [list sortUsingComparator:^NSComparisonResult(id a, id b) {
-      return [a isKindOfClass:[NSNumber class]] && [b isKindOfClass:[NSNumber class]]
-                 ? [(NSNumber*)a compare:(NSNumber*)b]
-                 : NSOrderedSame;
-    }];
-    return [NSString stringWithFormat:@"[%@]", [list componentsJoinedByString:@", "]];
-}
-
 // MARK: - Feather on the compose button
 
 static const void* kPFBComposeCheckedAtKey = &kPFBComposeCheckedAtKey;
@@ -221,18 +184,69 @@ static void PFBComposeCheck(UIView* host) {
 
 %end
 
+// The rows the side menu shows, by their VoiceOver labels, top to bottom.
+static NSString* PFBAccessibilityText(id element, NSInteger depth) {
+    NSString* label = [element accessibilityLabel];
+    if (label.length || depth > 3) {
+        return label;
+    }
+    for (id inner in [element accessibilityElements] ?: @[]) {
+        NSString* found = PFBAccessibilityText(inner, depth + 1);
+        if (found.length) {
+            return found;
+        }
+    }
+    if ([element isKindOfClass:[UIView class]]) {
+        for (UIView* sub in ((UIView*)element).subviews) {
+            NSString* found = PFBAccessibilityText(sub, depth + 1);
+            if (found.length) {
+                return found;
+            }
+        }
+    }
+    return nil;
+}
+
+static NSString* PFBDashRows(void) {
+    UIWindow* window = PFBFrontWindow(PFBFrontScene());
+    __block UIView* menu = nil;
+    PFBWalkAllSubviews(window, 30, ^(UIView* view) {
+      if (!menu && [NSStringFromClass([view class]) containsString:@"DashNavigationView"]) {
+          menu = view;
+      }
+    });
+    __block UICollectionView* list = nil;
+    PFBWalkAllSubviews(menu, 10, ^(UIView* view) {
+      if (!list && [view isKindOfClass:[UICollectionView class]]) {
+          list = (UICollectionView*)view;
+      }
+    });
+    if (!list) {
+        return menu ? @"no list found in the menu" : @"no menu found";
+    }
+    NSArray<UICollectionViewCell*>* cells =
+        [list.visibleCells sortedArrayUsingComparator:^NSComparisonResult(UICollectionViewCell* a, UICollectionViewCell* b) {
+          return a.frame.origin.y < b.frame.origin.y ? NSOrderedAscending : NSOrderedDescending;
+        }];
+    NSMutableArray<NSString*>* rows = [NSMutableArray array];
+    for (UICollectionViewCell* cell in cells) {
+        if (!cell.hidden) {
+            [rows addObject:PFBAccessibilityText(cell, 0) ?: @"?"];
+        }
+    }
+    return [NSString stringWithFormat:@"[%@]", [rows componentsJoinedByString:@", "]];
+}
+
 %hook T1DashContentController
 
 - (void)updateVisiblePanelIDs {
     %orig;
-    [gPFBDashControllers addObject:self];
-    PFBReturnNote([@"side menu took the tab bar's panels " stringByAppendingString:PFBDashPanels(self)]);
+    PFBReturnNote([@"side menu built: " stringByAppendingString:PFBDashPanelFacts()]);
 }
 
 - (void)prepareForReuse {
     %orig;
-    [gPFBDashControllers addObject:self];
-    PFBReturnNote([@"side menu reset, panels now " stringByAppendingString:PFBDashPanels(self)]);
+    PFBReturnNote(@"side menu reset");
 }
 
 %end
@@ -244,23 +258,17 @@ static void PFBComposeCheck(UIView* host) {
     if (!open) {
         return;
     }
-    NSMutableArray<NSString*>* held = [NSMutableArray array];
-    for (id controller in gPFBDashControllers) {
-        Ivar presenter = class_getInstanceVariable(object_getClass(controller), "presenter");
-        if (presenter && object_getIvar(controller, presenter) == self) {
-            [held addObject:PFBDashPanels(controller)];
-        }
+    @try {
+        PFBReturnNote([NSString stringWithFormat:@"side menu opened, rows %@ · last answer: %@", PFBDashRows(),
+                                                 PFBDashPanelFacts()]);
+    } @catch (__unused id exception) {
     }
-    PFBReturnNote([NSString stringWithFormat:@"side menu opened, holding %@",
-                                             held.count ? [held componentsJoinedByString:@" / "]
-                                                        : @"the panels of a menu not seen updating"]);
 }
 
 %end
 
 %ctor {
     %init;
-    gPFBDashControllers = [NSHashTable weakObjectsHashTable];
     NSNotificationCenter* center = [NSNotificationCenter defaultCenter];
     NSOperationQueue* main = NSOperationQueue.mainQueue;
     [center addObserverForName:UIApplicationDidFinishLaunchingNotification
