@@ -135,6 +135,12 @@ UIImage* PFBPaintedGlyph(UIImage* source, UIColor* color);
 // Whether an image is one PFBPaintedGlyph made (NavBarIcons.x).
 BOOL PFBIsPaintedBarGlyph(UIImage* image);
 
+// For the probes: how the hide code reads one notifications row and whether an image is
+// its cross (HiddenNotifications.x); how one glass tab bar accessory is seen (Branding.x).
+NSString* PFBNotifRowFacts(UITableView* table, NSIndexPath* indexPath);
+BOOL PFBNotifIsCrossImage(UIImage* image);
+NSString* PFBGlassAccessoryFacts(UIView* host);
+
 // The color of the icons added to the top bars, resolved to a fixed color for the traits.
 UIColor* PFBBarIconColor(UITraitCollection* traits);
 
