@@ -1018,6 +1018,36 @@ void PFBGlassRefreshAlwaysVisible(void) {
 
 %end
 
+// Twitter's tab editor previews the bar: with Tab labels, as tall as the real one and with its names.
+%hook _TtC11XNavigation19TabBarEditorBarView
+
+- (CGSize)intrinsicContentSize {
+    CGSize size = %orig;
+    if (size.height > 0.0 && [PFBSettings boolForKey:@"restore_tab_labels"]) {
+        size.height += kPFBGlassExtraHeight;
+    }
+    return size;
+}
+
+%end
+
+%hook _TtC11XNavigation20TabBarEditorItemView
+
+- (void)layoutSubviews {
+    %orig;
+    @try {
+        UIView* item = (UIView*)self;
+        UIView* holder = nil;
+        UIImageView* glyph = PFBGlassGlyph(item, &holder);
+        if (glyph && holder) {
+            PFBGlassNameTab(item, holder, glyph, PFBGlassTabName(item), 0.0);
+        }
+    } @catch (__unused id exception) {
+    }
+}
+
+%end
+
 // The bar's platter, shrunk by Twitter frame by frame as the bar collapses.
 %hook XDSGlass
 

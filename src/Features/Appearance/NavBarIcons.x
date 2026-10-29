@@ -22,7 +22,7 @@ static const void* kPFBNoFadeKey = &kPFBNoFadeKey;
 
 @interface PFBBarGlyphButton ()
 - (void)pfbPairWith:(UIView*)neighbor screen:(NSString*)screen;
-- (void)pfbPaintIn:(UIColor*)color;
+- (void)pfbPaint;
 - (void)pfbNote:(NSString*)text;
 @end
 
@@ -238,7 +238,7 @@ static void pfbRepaintNotificationsGear(UIView* bar, UIColor* color) {
     UINavigationItem* item = ((id (*)(id, SEL))objc_msgSend)(bar, @selector(topItem));
     for (UIBarButtonItem* button in item.rightBarButtonItems) {
         if ([button.customView isKindOfClass:[PFBBarGlyphButton class]]) {
-            [(PFBBarGlyphButton*)button.customView pfbPaintIn:color];
+            [(PFBBarGlyphButton*)button.customView pfbPaint];
             continue;
         }
         if (button.title.length > 0 || !button.image) {
@@ -861,16 +861,24 @@ static CGRect pfbGlyphRectIn(UIView* button) {
     _paintedColor = nil;
     _glyphView.image = glyph;
     self.largeContentImage = glyph;
+    [self pfbPaint];
     [self setNeedsLayout];
 }
 
-// The glyph last given, painted in `color`, once per color.
-- (void)pfbPaintIn:(UIColor*)color {
+// The glyph last given, painted in the bar icon color of the button's own appearance, once per
+// color: a bar can turn light or dark by itself, and the glyph follows it.
+- (void)pfbPaint {
+    UIColor* color = PFBBarIconColor(self.traitCollection);
     if (!color || !_source || [color isEqual:_paintedColor]) {
         return;
     }
     _paintedColor = color;
     _glyphView.image = PFBPaintedGlyph(_source, color);
+}
+
+- (void)traitCollectionDidChange:(UITraitCollection*)previous {
+    [super traitCollectionDidChange:previous];
+    [self pfbPaint];
 }
 
 - (CGRect)glyphFrame {
@@ -898,9 +906,11 @@ static CGRect pfbGlyphRectIn(UIView* button) {
     [self setNeedsLayout];
 }
 
-// The neighbor's glyph can only be located once both buttons are on screen.
+// The neighbor's glyph can only be located once both buttons are on screen, and the window
+// settles the button's appearance.
 - (void)didMoveToWindow {
     [super didMoveToWindow];
+    [self pfbPaint];
     [self setNeedsLayout];
 }
 
