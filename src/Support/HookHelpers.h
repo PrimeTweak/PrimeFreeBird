@@ -140,6 +140,10 @@ BOOL PFBIsPaintedBarGlyph(UIImage* image);
 NSString* PFBNotifRowFacts(UITableView* table, NSIndexPath* indexPath);
 BOOL PFBNotifIsCrossImage(UIImage* image);
 NSString* PFBGlassAccessoryFacts(UIView* host);
+// Why the feather is missing from a compose button that should carry it, or nil; and whether
+// an image is that feather (Branding.x).
+NSString* PFBGlassComposeMiss(UIView* host);
+BOOL PFBGlassIsFeather(UIImage* image);
 
 // The color of the icons added to the top bars, resolved to a fixed color for the traits.
 UIColor* PFBBarIconColor(UITraitCollection* traits);
