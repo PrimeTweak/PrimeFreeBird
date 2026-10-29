@@ -927,6 +927,14 @@ static void PFBGlassStyleCompose(UIView* host) {
     PFBGlassComposeLook(host, compose);
 }
 
+// How PrimeFreeBird sees one accessory of the glass tab bar, for the app return probe.
+NSString* PFBGlassAccessoryFacts(UIView* host) {
+    return [NSString stringWithFormat:@"compose %@, hidden by PFB %@, PFB look %@",
+                                      PFBGlassIsComposeHost(host) ? @"yes" : @"no",
+                                      objc_getAssociatedObject(host, kPFBGlassComposeHiddenKey) ? @"yes" : @"no",
+                                      objc_getAssociatedObject(host, kPFBGlassComposeTouchedKey) ? @"on" : @"off"];
+}
+
 %hook _TtC11XNavigation23TabBarAccessoryHostView
 
 - (void)layoutSubviews {
