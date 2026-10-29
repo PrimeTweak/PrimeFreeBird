@@ -846,7 +846,7 @@ static void PFBNotifSyncEmptyState(id dataViewController) {
         }
         // The raw row count is the wrong measure: a header, a footer or a
         // zero-height cell leaves one row on a visibly empty screen. Emptiness is
-        // decided by how many rows carry a notification model.
+        // decided by how many rows carry a notification or a Tweet.
         NSInteger rows = 0;
         NSInteger notifRows = 0;
         SEL itemSel = NSSelectorFromString(@"itemAtIndexPath:");
@@ -862,8 +862,9 @@ static void PFBNotifSyncEmptyState(id dataViewController) {
                 id item = ((id (*)(id, SEL, id))objc_msgSend)(dataViewController,
                                                              itemSel, path);
                 id model = item ? PFBUnwrapDataViewItem(item) : nil;
-                if (model && [NSStringFromClass([model class])
-                                 containsString:@"Notification"]) {
+                if (model && ([NSStringFromClass([model class])
+                                  containsString:@"Notification"] ||
+                              PFBNotifTweetIdentity(model))) {
                     notifRows++;
                 }
             }
