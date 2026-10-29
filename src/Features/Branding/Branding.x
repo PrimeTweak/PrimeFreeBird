@@ -929,10 +929,49 @@ static void PFBGlassStyleCompose(UIView* host) {
 
 // How PrimeFreeBird sees one accessory of the glass tab bar, for the app return probe.
 NSString* PFBGlassAccessoryFacts(UIView* host) {
-    return [NSString stringWithFormat:@"compose %@, hidden by PFB %@, PFB look %@",
+    UIVisualEffectView* material = PFBGlassComposeMaterial(host);
+    UIImageView* glyph = material ? PFBGlassComposeGlyph(material) : nil;
+    return [NSString stringWithFormat:@"compose %@, hidden by PFB %@, PFB look %@, glass %@, glyph %@",
                                       PFBGlassIsComposeHost(host) ? @"yes" : @"no",
                                       objc_getAssociatedObject(host, kPFBGlassComposeHiddenKey) ? @"yes" : @"no",
-                                      objc_getAssociatedObject(host, kPFBGlassComposeTouchedKey) ? @"on" : @"off"];
+                                      objc_getAssociatedObject(host, kPFBGlassComposeTouchedKey) ? @"on" : @"off",
+                                      material ? @"found" : @"none",
+                                      !glyph                               ? @"none"
+                                      : glyph.image == PFBGlassFeather()   ? @"the feather"
+                                                                           : @"not the feather"];
+}
+
+// Why the feather is not on a compose button that should carry it, or nil when it is, or
+// when the button is not one PrimeFreeBird styles.
+NSString* PFBGlassComposeMiss(UIView* host) {
+    if (!host.window || host.hidden || ![PFBSettings boolForKey:@"restore_tweet_button"] ||
+        !PFBGlassIsComposeHost(host)) {
+        return nil;
+    }
+    UIVisualEffectView* material = PFBGlassComposeMaterial(host);
+    if (!material) {
+        return @"no glass found";
+    }
+    UIImageView* glyph = PFBGlassComposeGlyph(material);
+    if (!glyph) {
+        return @"no glyph found in the glass";
+    }
+    __block BOOL featherShown = NO;
+    __block NSUInteger shownGlyphs = 0;
+    PFBWalkAllSubviews(host, 10, ^(UIView* view) {
+      if ([view isKindOfClass:[UIImageView class]] && ((UIImageView*)view).image && !view.hidden && view.alpha > 0.05) {
+          shownGlyphs++;
+          featherShown = featherShown || ((UIImageView*)view).image == PFBGlassFeather();
+      }
+    });
+    if (glyph.image != PFBGlassFeather()) {
+        return @"the glyph found is not the feather";
+    }
+    return featherShown && shownGlyphs == 1 ? nil : @"the feather is set, beside another glyph shown";
+}
+
+BOOL PFBGlassIsFeather(UIImage* image) {
+    return image && image == PFBGlassFeather();
 }
 
 %hook _TtC11XNavigation23TabBarAccessoryHostView
