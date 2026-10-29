@@ -2371,6 +2371,10 @@ static BOOL PFBGlyphIsBackArrow(UIView* glyph) {
 
 static void PFBWhitenConfirmGlyphsIn(UIView* view, UINavigationBar* bar) {
     for (UIView* sub in view.subviews) {
+        // PrimeFreeBird's own bar icons are never a confirm button.
+        if ([sub isKindOfClass:[PFBBarGlyphButton class]]) {
+            continue;
+        }
         if ([sub isKindOfClass:[UIImageView class]]) {
             UIImageView* glyph = (UIImageView*)sub;
             CGRect inBar = [glyph convertRect:glyph.bounds toView:bar];
@@ -2420,11 +2424,9 @@ static void PFBWhitenConfirmGlyphsIn(UIView* view, UINavigationBar* bar) {
 }
 
 // Exposed so the theme screen can run a pass right after a pick (Twitter
-// re-bakes its glyph on the following runloop turn). Only the bar of a settings screen is
-// whitened: a bar left under the settings sheet, as Home's, keeps its icons.
+// re-bakes its glyph on the following runloop turn).
 void PFBWhitenNavigationBarConfirm(UINavigationBar* bar) {
-    if (bar && PFBThemeScreenCount && PFBAccentIsActive() &&
-        objc_getAssociatedObject(PFBOwningTopController(bar), &kPFBThemeScreenCountedKey)) {
+    if (bar && PFBThemeScreenCount && PFBAccentIsActive()) {
         PFBWhitenConfirmGlyphsIn(bar, bar);
     }
 }

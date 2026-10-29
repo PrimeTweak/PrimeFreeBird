@@ -819,7 +819,7 @@ static BOOL PFBGlassConfigLayoutVerified(void) {
 
 // The stack's applied configuration starts with the collapse mode Twitter's engine reads on
 // each scroll: the top bar's byte (0 to 3), then the tab bar's (0 pinned, 1 collapses, high bit
-// for a manual mode). The bar style at 8 reads 2 while none is applied; 40 bytes in all.
+// for a manual mode). The bar style at 8 reads 2 while none is applied.
 static ptrdiff_t PFBGlassAppliedConfigurationOffset(void) {
     static ptrdiff_t offset = -1;
     static dispatch_once_t once;
@@ -827,9 +827,18 @@ static ptrdiff_t PFBGlassAppliedConfigurationOffset(void) {
       Class stack = NSClassFromString(@"XNAVNavigationController");
       Ivar applied = stack ? class_getInstanceVariable(stack, "appliedConfiguration") : NULL;
       Ivar next = stack ? class_getInstanceVariable(stack, "chromeFrozenScreen") : NULL;
-      if (applied && next && ivar_getOffset(next) - ivar_getOffset(applied) == 40) {
+      ptrdiff_t size = applied && next ? ivar_getOffset(next) - ivar_getOffset(applied) : 0;
+      // 40 bytes through 12.38.1; 12.39 adds a bar style after the configuration, which
+      // leaves the bytes the patch writes in place.
+      if (size == 40 || size == 48) {
           offset = ivar_getOffset(applied);
       }
+      PFBCompatMeasure(@"always visible",
+                       offset < 0 ? [NSString stringWithFormat:@"patch off: applied configuration is %td bytes", size]
+                       : PFBGlassConfigLayoutVerified()
+                           ? [NSString stringWithFormat:@"patch ready: applied configuration is %td bytes", size]
+                           : @"patch off: the configuration bytes moved",
+                       2);
     });
     return offset;
 }
