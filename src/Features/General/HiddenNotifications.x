@@ -315,17 +315,6 @@ static BOOL PFBNotifOnNotificationsScreen(id dataViewController) {
     return NO;
 }
 
-// A row the hide applies to: a notification, or a Tweet in the notifications tab.
-static BOOL PFBNotifRowHides(id dataViewController, id model) {
-    if (!model) {
-        return NO;
-    }
-    if ([NSStringFromClass([model class]) containsString:@"Notification"]) {
-        return YES;
-    }
-    return PFBNotifTweetIdentity(model) && PFBNotifOnNotificationsScreen(dataViewController);
-}
-
 static BOOL PFBNotifIsHidden(id model) {
     if (!model) {
         return NO;
@@ -636,13 +625,10 @@ static void PFBNotifDropRow(id dataViewController, NSIndexPath* indexPath) {
         return original;
     }
     NSString* modelClass = NSStringFromClass([model class]);
-    if (!PFBNotifRowHides(self, model)) {
+    if (![modelClass containsString:@"Notification"]) {
         return original;
     }
     PFBCompatReach(PFBCompatPath_notification_swipe);
-    if (![modelClass containsString:@"Notification"]) {
-        PFBCompatReach(PFBCompatPath_notification_tweet_rows);
-    }
     if (![PFBSettings boolForKey:@"hide_notifications"]) {
         PFBCOMPAT_OBSERVE(PFBCompat_hide_notifications, @"notification swipe seen");
         return original;
@@ -1520,8 +1506,8 @@ static void PFBNotifMaskHiddenCell(UITableViewCell* cell) {
 
 // MARK: - Read by the notifications probe
 
-// What the hide code reads on one row: its model, the kind of entry it is, whether a
-// notification identity is read, and so whether the swipe offers Hide.
+// What the hide code reads on one row: its model, the kind of entry it is, whether its
+// identity is read, and where Hide is offered for it.
 NSString* PFBNotifRowFacts(UITableView* table, NSIndexPath* indexPath) {
     id model = PFBModelAtIndexPath(table.dataSource, indexPath) ?: PFBModelFromCell(table, indexPath);
     if (!model) {
@@ -1539,11 +1525,75 @@ NSString* PFBNotifRowFacts(UITableView* table, NSIndexPath* indexPath) {
     NSString* entry = match.numberOfRanges > 1 ? [text substringWithRange:[match rangeAtIndex:1]] : @"unread";
     NSString* modelClass = PFBReadableClassName(model);
     BOOL identity = PFBNotifIdentity(model).length > 0;
-    BOOL swipe = identity && PFBNotifRowHides(table.dataSource, model);
-    return [NSString stringWithFormat:@"model %@, entry %@, identity %@, swipe Hide %@", modelClass, entry,
-                                      identity ? @"read" : @"none", swipe ? @"offered" : @"not offered"];
+    NSString* hide = !identity ? @"nowhere"
+                     : [NSStringFromClass([model class]) containsString:@"Notification"] ? @"by the x and the swipe"
+                     : PFBNotifTweetIdentity(model) && PFBNotifOnNotificationsScreen(table.dataSource)
+                         ? @"in the Tweet menu"
+                         : @"nowhere";
+    return [NSString stringWithFormat:@"model %@, entry %@, identity %@, Hide %@", modelClass, entry,
+                                      identity ? @"read" : @"none", hide];
 }
 
 BOOL PFBNotifIsCrossImage(UIImage* image) {
     return image && objc_getAssociatedObject(image, kPFBNotifXmarkImageKey) != nil;
+}
+
+// MARK: - The Tweet menu in the notifications tab (HiddenThreads.x)
+
+BOOL PFBNotifControllerOnNotificationsScreen(UIViewController* controller) {
+    return PFBNotifOnNotificationsScreen(controller);
+}
+
+BOOL PFBNotifViewOnNotificationsScreen(UIView* view) {
+    UIResponder* responder = view;
+    while (responder && ![responder isKindOfClass:[UIViewController class]]) {
+        responder = responder.nextResponder;
+    }
+    return responder && PFBNotifOnNotificationsScreen(responder);
+}
+
+// Hides a Tweet's row in the notifications list: the row holding `source` when there is one,
+// else the row of `status` among those `screen` shows. Filed as hidden, the row dropped and
+// the toast shown; NO when no row is found.
+BOOL PFBNotifHideTweet(id status, UIView* source, UIViewController* screen) {
+    UIView* cell = source;
+    while (cell && ![cell isKindOfClass:[UITableViewCell class]]) {
+        cell = cell.superview;
+    }
+    UITableView* table = cell ? PFBNotifTableForCell(cell) : nil;
+    NSIndexPath* path = table ? [table indexPathForCell:(UITableViewCell*)cell] : nil;
+    if (!path && [status respondsToSelector:@selector(statusID)] && screen.viewIfLoaded) {
+        NSString* identity = [NSString stringWithFormat:@"tw:%ld", (long)((TFNTwitterStatus*)status).statusID];
+        __block UITableView* found = nil;
+        __block NSIndexPath* foundPath = nil;
+        PFBWalkAllSubviews(screen.view, 20, ^(UIView* view) {
+          if (foundPath || ![view isKindOfClass:[UITableView class]]) {
+              return;
+          }
+          UITableView* list = (UITableView*)view;
+          for (NSIndexPath* candidate in list.indexPathsForVisibleRows) {
+              id model = PFBModelAtIndexPath(list.dataSource, candidate) ?: PFBModelFromCell(list, candidate);
+              if ([PFBNotifTweetIdentity(model) isEqualToString:identity]) {
+                  found = list;
+                  foundPath = candidate;
+                  return;
+              }
+          }
+        });
+        table = found;
+        path = foundPath;
+    }
+    if (!path || !PFBNotifOnNotificationsScreen(table.dataSource)) {
+        return NO;
+    }
+    id model = PFBModelAtIndexPath(table.dataSource, path) ?: PFBModelFromCell(table, path);
+    if (!PFBNotifTweetIdentity(model)) {
+        return NO;
+    }
+    NSString* hiddenKey = PFBHideNotifWithText(model, PFBNotifTextFromCell(table, path));
+    PFBNotifDropRow(table.dataSource, path);
+    if (hiddenKey) {
+        PFBShowNotifToast(hiddenKey);
+    }
+    return YES;
 }
