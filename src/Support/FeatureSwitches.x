@@ -330,10 +330,23 @@ static NSNumber* FeatureSwitchOverrideValueForKey(NSString* key) {
         return nil;
     }
 
-    // The "Suggested" list in an empty Chat inbox, behind Twitter's own switch, which
-    // Chat reads from its own store (hooked below).
-    if ([key isEqualToString:@"xchat_cold_inbox_suggestions_enabled"]) {
-        if ([PFBSettings boolForKey:@"hide_suggested_chats"]) {
+    // The "Suggested" list in an empty Chat inbox and its "Find friends" row, behind
+    // Twitter's own switches, which Chat reads from its own store (hooked below).
+    if ([key isEqualToString:@"xchat_cold_inbox_suggestions_enabled"] ||
+        [key isEqualToString:@"xchat_cold_inbox_find_friends_enabled"]) {
+        BOOL off = [PFBSettings boolForKey:@"hide_suggested_chats"];
+        // Each switch proven on its own: the sheet shows only an option's first proof.
+        static BOOL listNoted, friendsNoted;
+        BOOL friends = [key containsString:@"find_friends"];
+        BOOL* noted = friends ? &friendsNoted : &listNoted;
+        if (!*noted) {
+            *noted = YES;
+            PFBCompatMeasure(@"suggested chats",
+                             [NSString stringWithFormat:@"%@ read by Twitter, %@", friends ? @"Find friends" : @"Suggested list",
+                                                        off ? @"turned off" : @"left on"],
+                             4);
+        }
+        if (off) {
             PFBCOMPAT_ACTION(PFBCompat_hide_suggested_chats, @"suggested chats off");
             return @NO;
         }
@@ -763,7 +776,8 @@ static BOOL pfbChatStoreKey(NSString* key) {
     static dispatch_once_t once;
     dispatch_once(&once, ^{
       keys = [NSSet setWithArray:@[
-          @"xchat_cold_inbox_suggestions_enabled", @"xchat_voice_messages_transcription_enabled",
+          @"xchat_cold_inbox_suggestions_enabled", @"xchat_cold_inbox_find_friends_enabled",
+          @"xchat_voice_messages_transcription_enabled",
           @"xchat_liquid_glass_convo_header_enabled", @"xchat_ask_grok_enabled"
       ]];
     });
