@@ -1464,3 +1464,33 @@ static void PFBNotifMaskHiddenCell(UITableViewCell* cell) {
 }
 
 %end
+
+// MARK: - Read by the notifications probe
+
+// What the hide code reads on one row: its model, the kind of entry it is, whether a
+// notification identity is read, and so whether the swipe offers Hide.
+NSString* PFBNotifRowFacts(UITableView* table, NSIndexPath* indexPath) {
+    id model = PFBModelAtIndexPath(table.dataSource, indexPath) ?: PFBModelFromCell(table, indexPath);
+    if (!model) {
+        return @"no model";
+    }
+    static NSRegularExpression* kindPattern;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+      kindPattern = [NSRegularExpression regularExpressionWithPattern:@"entryId[:= ]+([A-Za-z]+)"
+                                                               options:0
+                                                                 error:NULL];
+    });
+    NSString* text = [model description] ?: @"";
+    NSTextCheckingResult* match = [kindPattern firstMatchInString:text options:0 range:NSMakeRange(0, text.length)];
+    NSString* entry = match.numberOfRanges > 1 ? [text substringWithRange:[match rangeAtIndex:1]] : @"unread";
+    NSString* modelClass = PFBReadableClassName(model);
+    BOOL identity = PFBNotifIdentity(model).length > 0;
+    BOOL swipe = identity && [NSStringFromClass([model class]) containsString:@"Notification"];
+    return [NSString stringWithFormat:@"model %@, entry %@, identity %@, swipe Hide %@", modelClass, entry,
+                                      identity ? @"read" : @"none", swipe ? @"offered" : @"not offered"];
+}
+
+BOOL PFBNotifIsCrossImage(UIImage* image) {
+    return image && objc_getAssociatedObject(image, kPFBNotifXmarkImageKey) != nil;
+}
