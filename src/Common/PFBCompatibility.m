@@ -1161,6 +1161,8 @@ static const PFBCompatReq kReqs[] = {
     // Ivars read by name, as "$name"; a "|" lists the other names the code accepts.
     {PFBCompat_no_tab_bar_hiding, "XNAVNavigationController", "$appliedConfiguration"},
     {PFBCompat_no_tab_bar_hiding, "XNAVNavigationController", "$chromeFrozenScreen"},
+    // A size the code relies on, as "=name>next:sizes": the bytes from one ivar to the next.
+    {PFBCompat_no_tab_bar_hiding, "XNAVNavigationController", "=appliedConfiguration>chromeFrozenScreen:40,48"},
     {PFBCompat_no_tab_bar_hiding, "XNAVNavigationController", "$$__lazy_storage_$_collapseEngine"},
     {PFBCompat_no_tab_bar_hiding, "_TtC11XNavigation14CollapseEngine", "$collapseProgress"},
     {PFBCompat_restore_tab_labels, "XNAVNavigationController", "$$__lazy_storage_$_collapseEngine"},
@@ -1355,6 +1357,7 @@ static const PFBCompatFlag kFlags[] = {
     {PFBCompat_hide_grok_analyze, "post_about_hide_grok_pills_enabled", NO},
     {PFBCompat_hide_grok_analyze, "post_about_grok_features_enabled", NO},
     {PFBCompat_hide_suggested_chats, "xchat_cold_inbox_suggestions_enabled", NO},
+    {PFBCompat_hide_suggested_chats, "xchat_cold_inbox_find_friends_enabled", NO},
     {PFBCompat_hide_grok_analyze, "grok_ios_author_view_analyze_button_via_backend_enabled", NO},
     {PFBCompat_hide_grok_analyze, "grok_ios_profile_summary_enabled", NO},
     {PFBCompat_hide_grok_analyze, "grok_ask_grok_button_under_post_focal_enabled", NO},
@@ -1793,7 +1796,6 @@ static const PFBCompatName kNames[] = {
     {PFBCompat_advanced_search, "Features/Search/AdvancedSearch.x", "window"},
     {PFBCompat_choose_explore_tabs, "Features/Search/ExploreTabs.x", "window"},
     {PFBCompatOptionCount, "Features/Appearance/NavBarIcons.x", "boolValue"},
-    {PFBCompatOptionCount, "Features/Appearance/NavBarIcons.x", "hidesSharedBackground"},
     {PFBCompat_bar_repairs, "Features/Appearance/NavBarIcons.x", "NavigationBarSettingsButton"},
     {PFBCompat_color_twitter_icon_in_top_bar, "Features/Appearance/Theme.x", "colorPalette"},
     {PFBCompat_color_twitter_icon_in_top_bar, "Features/Appearance/Theme.x", "currentColorPalette"},
@@ -3794,6 +3796,18 @@ static BOOL methodPresent(const char* className, const char* selector) {
     if (!cls) {
         return NO;
     }
+    if (selector[0] == '=') {
+        // "=first>next:sizes": the bytes from one ivar to the next, one of the sizes listed.
+        NSArray<NSString*>* parts = [[NSString stringWithUTF8String:selector + 1] componentsSeparatedByString:@":"];
+        NSArray<NSString*>* names = [parts.firstObject componentsSeparatedByString:@">"];
+        Ivar first = names.count == 2 ? class_getInstanceVariable(cls, names[0].UTF8String) : NULL;
+        Ivar next = names.count == 2 ? class_getInstanceVariable(cls, names[1].UTF8String) : NULL;
+        if (parts.count != 2 || !first || !next) {
+            return NO;
+        }
+        NSString* size = [NSString stringWithFormat:@"%td", ivar_getOffset(next) - ivar_getOffset(first)];
+        return [[parts[1] componentsSeparatedByString:@","] containsObject:size];
+    }
     if (selector[0] == '$') {
         for (NSString* name in [[NSString stringWithUTF8String:selector + 1] componentsSeparatedByString:@"|"]) {
             if (name.length && class_getInstanceVariable(cls, name.UTF8String)) {
@@ -3809,8 +3823,15 @@ static BOOL methodPresent(const char* className, const char* selector) {
     return class_getInstanceMethod(cls, sel) != NULL || [cls instancesRespondToSelector:sel];
 }
 
-// A requirement as the report names it: "Class selector", or "Class ivar name".
+// A requirement as the report names it: "Class selector", "Class ivar name", or
+// "Class ivar name of 40 or 48 bytes".
 static NSString* reqName(const PFBCompatReq* req) {
+    if (req->selector[0] == '=') {
+        NSArray<NSString*>* parts = [[NSString stringWithUTF8String:req->selector + 1] componentsSeparatedByString:@":"];
+        NSString* sizes = [parts.lastObject stringByReplacingOccurrencesOfString:@"," withString:@" or "];
+        return [NSString stringWithFormat:@"%s ivar %@ of %@ bytes", req->className,
+                                          [parts.firstObject componentsSeparatedByString:@">"].firstObject, sizes];
+    }
     NSString* entry = [[NSString stringWithUTF8String:req->selector + 1] componentsSeparatedByString:@"|"].firstObject;
     return req->selector[0] == '$' ? [NSString stringWithFormat:@"%s ivar %@", req->className, entry]
                                    : [NSString stringWithFormat:@"%s %@", req->className, entry];
