@@ -2443,6 +2443,7 @@ static NSString* stationLabel(NSString* station) {
           @"t.co check": @"the t.co link tracking block",
           @"Twitter settings": @"Twitter's settings",
           @"new Twitter settings": @"Twitter's new settings",
+          @"tab editor": @"Twitter's tab editor",
           @"PFB settings": @"the PrimeFreeBird settings",
       };
     });

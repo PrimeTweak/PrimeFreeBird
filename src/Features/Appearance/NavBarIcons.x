@@ -26,6 +26,10 @@ static const void* kPFBNoFadeKey = &kPFBNoFadeKey;
 - (void)pfbNote:(NSString*)text;
 @end
 
+BOOL PFBIsPaintedBarGlyph(UIImage* image) {
+    return image && objc_getAssociatedObject(image, kPFBPaintedFlagKey) != nil;
+}
+
 UIImage* PFBPaintedGlyph(UIImage* source, UIColor* color) {
     UIImage* painted = PFBFlatGlyph(source, color);
     if (painted != source) {

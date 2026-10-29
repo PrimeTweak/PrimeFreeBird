@@ -253,7 +253,7 @@ static NSString* PFBHealthBlock(void) {
 
 // The average color of an image's non-transparent pixels: an AlwaysOriginal image
 // carries its own pixels, so the view's tint says nothing about what is drawn.
-static NSString* PFBImageInk(UIImage* image) {
+NSString* PFBImageInk(UIImage* image) {
     if (!image) {
         return nil;
     }
@@ -328,6 +328,26 @@ static NSString* PFBViewCover(UIView* view) {
         return [NSString stringWithFormat:@"effective alpha %.2f", alpha];
     }
     return nil;
+}
+
+// "_TtC11XNavigation10TabBarView" reads "XNavigation.TabBarView"; other names stay as they are.
+NSString* PFBReadableClassName(id object) {
+    NSString* name = object ? NSStringFromClass([object class]) : @"none";
+    if (![name hasPrefix:@"_TtC"] || [name hasPrefix:@"_TtCC"]) {
+        return name;
+    }
+    const char* cursor = name.UTF8String + 4;
+    NSMutableArray<NSString*>* parts = [NSMutableArray array];
+    while (*cursor >= '0' && *cursor <= '9') {
+        char* end = NULL;
+        long length = strtol(cursor, &end, 10);
+        if (length <= 0 || (long)strlen(end) < length) {
+            return name;
+        }
+        [parts addObject:[[NSString alloc] initWithBytes:end length:(NSUInteger)length encoding:NSUTF8StringEncoding] ?: @"?"];
+        cursor = end + length;
+    }
+    return parts.count == 2 && *cursor == '\0' ? [parts componentsJoinedByString:@"."] : name;
 }
 
 NSString* PFBColorText(UIColor* color) {

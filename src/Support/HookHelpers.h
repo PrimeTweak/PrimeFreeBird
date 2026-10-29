@@ -132,6 +132,8 @@ UIImage* PFBFlatGlyph(UIImage* source, UIColor* color);
 // The same repaint, marked so the top bar repairs know the image is already theirs
 // (NavBarIcons.x).
 UIImage* PFBPaintedGlyph(UIImage* source, UIColor* color);
+// Whether an image is one PFBPaintedGlyph made (NavBarIcons.x).
+BOOL PFBIsPaintedBarGlyph(UIImage* image);
 
 // The color of the icons added to the top bars, resolved to a fixed color for the traits.
 UIColor* PFBBarIconColor(UITraitCollection* traits);
