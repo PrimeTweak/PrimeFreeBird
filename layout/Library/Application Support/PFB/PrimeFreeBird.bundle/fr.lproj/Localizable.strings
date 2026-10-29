@@ -167,6 +167,8 @@
 "FORCE_TWEET_FULL_FRAME_DETAIL" = "Affiche les photos en entier plutôt qu’en aperçus rognés.";
 "DISABLE_MEDIA_CAROUSEL_TITLE" = "Médias en grille";
 "DISABLE_MEDIA_CAROUSEL_DETAIL" = "Affiche les photos d’un Tweet en grille plutôt qu’en carrousel.";
+"HIDE_MADE_ON_X_TITLE" = "Masquer « Made on X »";
+"HIDE_MADE_ON_X_DETAIL" = "Retire l’étiquette que X ajoute aux photos et vidéos retouchées dans son éditeur.";
 "RESTORE_VIDEO_TIMESTAMP_TITLE" = "Temps écoulé des vidéos";
 "RESTORE_VIDEO_TIMESTAMP_DETAIL" = "Affiche le temps écoulé et la durée en plein écran, au lieu du compte à rebours.";
 "DISABLE_IMMERSIVE_SCROLL_TITLE" = "Désactiver l’enchaînement des vidéos";
@@ -291,6 +293,9 @@
 "CUSTOM_TAB_BAR_DISCARD_MESSAGE" = "Les onglets choisis ne sont pas enregistrés.";
 "CUSTOM_TAB_BAR_DISCARD_ACTION" = "Abandonner";
 "CUSTOM_TAB_BAR_SETTINGS_NAVIGATION_TITLE" = "Onglets";
+"TAB_EDITOR_TIP_CHANGE" = "Touchez un onglet pour le changer";
+"TAB_EDITOR_TIP_ARRANGE" = "Maintenez un onglet pour le déplacer";
+"TAB_EDITOR_TIP_ADD" = "Touchez + pour ajouter un onglet";
 
 /* ===== Fonts picker ===== */
 "CUSTOM_FONTS_MENU_TITLE" = "\nChoisir une police";
@@ -306,11 +311,11 @@
 "DOWNLOAD_ALL_VIDEOS_OPTION_TITLE" = "Télécharger toutes les vidéos";
 
 /* ===== Profile actions ===== */
-"COPY_PROFILE_INFO_MENU_OPTION_1" = "Copier la bio";
-"COPY_PROFILE_INFO_MENU_OPTION_2" = "Copier le nom d’utilisateur";
-"COPY_PROFILE_INFO_MENU_OPTION_3" = "Copier le nom complet";
-"COPY_PROFILE_INFO_MENU_OPTION_4" = "Copier le site Web";
-"COPY_PROFILE_INFO_MENU_OPTION_5" = "Copier la localisation";
+"COPY_PROFILE_INFO_MENU_OPTION_1" = "Bio";
+"COPY_PROFILE_INFO_MENU_OPTION_2" = "Nom d’utilisateur";
+"COPY_PROFILE_INFO_MENU_OPTION_3" = "Nom";
+"COPY_PROFILE_INFO_MENU_OPTION_4" = "Site Web";
+"COPY_PROFILE_INFO_MENU_OPTION_5" = "Localisation";
 
 /* ===== Padlock / authentication ===== */
 "PADLOCK_LOCKED_LABEL" = "Verrouillé";
@@ -389,9 +394,11 @@
 "DISABLE_VIDEO_DOCKING_DETAIL" = "Empêche les vidéos plein écran de se réduire en lecteur flottant.";
 "UPLOAD_FULL_HD_VIDEOS_TITLE" = "Envois vidéo Full HD";
 "UPLOAD_FULL_HD_VIDEOS_DETAIL" = "Envoie vos vidéos en 1080p au lieu de la qualité compressée.";
-"COPY_PROFILE_INFO_MENU_OPTION_6" = "Copier l’URL du profil";
-"COPY_PROFILE_INFO_MENU_OPTION_7" = "Copier l’identifiant";
-"COPY_PROFILE_INFO_MENU_OPTION_8" = "Copier la date d’inscription";
+"COPY_PROFILE_INFO_MENU_OPTION_6" = "Lien du profil";
+"COPY_PROFILE_INFO_MENU_OPTION_7" = "Identifiant";
+"COPY_PROFILE_INFO_MENU_OPTION_8" = "Date d’inscription";
+"COPY_PROFILE_INFO_MENU_TITLE" = "Copier";
+"COPY_PROFILE_INFO_MENU_MORE" = "Plus";
 "REMOVE_FOLLOWERS_TITLE" = "Supprimer des abonnés";
 "REMOVE_FOLLOWERS_DETAIL" = "Ajoute « Supprimer cet abonné » au menu d’un profil qui vous suit.";
 "REMOVE_FOLLOWERS_DETAIL_HELD" = "Nécessite une session web — connectez-vous dans Outils › Session web.";
