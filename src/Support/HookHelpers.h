@@ -86,6 +86,9 @@ void PFBInstallPasteboardObserver(void);
 // Whether the account genuinely has a panel's tab, ignoring the forced tab
 // gates (FeatureSwitches.x)
 BOOL PFBPanelIsGenuinelyAvailable(long long panelID);
+// The last panels Twitter gave the side menu and those PrimeFreeBird gave back, with why
+// (FeatureSwitches.x).
+NSString* PFBDashPanelFacts(void);
 
 // Web session cookie harvesting (WebCreateTweet.x)
 void PFBPrewarmWebCookiesIfNeeded(void);
@@ -139,6 +142,11 @@ BOOL PFBIsPaintedBarGlyph(UIImage* image);
 // its cross (HiddenNotifications.x); how one glass tab bar accessory is seen (Branding.x).
 NSString* PFBNotifRowFacts(UITableView* table, NSIndexPath* indexPath);
 BOOL PFBNotifIsCrossImage(UIImage* image);
+// For the Tweet menu in the notifications tab (HiddenThreads.x): whether a screen or a view
+// belongs to that tab, and the hide of a Tweet's row there (HiddenNotifications.x).
+BOOL PFBNotifControllerOnNotificationsScreen(UIViewController* controller);
+BOOL PFBNotifViewOnNotificationsScreen(UIView* view);
+BOOL PFBNotifHideTweet(id status, UIView* source, UIViewController* screen);
 NSString* PFBGlassAccessoryFacts(UIView* host);
 // Why the feather is missing from a compose button that should carry it, or nil; and whether
 // an image is that feather (Branding.x).

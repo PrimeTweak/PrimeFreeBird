@@ -1158,6 +1158,16 @@ static __thread BOOL DashPanelIDQuery = NO;
 
 %end
 
+// The last answer given to the drawer and when, read by the app return probe.
+static NSString* gPFBDashFacts;
+static CFTimeInterval gPFBDashFactsAt;
+
+NSString* PFBDashPanelFacts(void) {
+    return gPFBDashFacts ? [NSString stringWithFormat:@"%@, %.1f s before", gPFBDashFacts,
+                                                      CACurrentMediaTime() - gPFBDashFactsAt]
+                         : @"never asked";
+}
+
 // The tab bar's panels as the drawer reads them, with the panels it must not offer.
 static NSArray* PFBDashPanelIDs(NSArray* panelIDs) {
     if (![panelIDs isKindOfClass:[NSArray class]]) {
@@ -1170,9 +1180,11 @@ static NSArray* PFBDashPanelIDs(NSArray* panelIDs) {
         }
     };
 
+    NSMutableArray<NSNumber*>* unavailable = [NSMutableArray array];
     for (NSNumber* panelID in @[@13, @15, @16, @17]) {
         if (!PFBPanelIsGenuinelyAvailable(panelID.longLongValue)) {
             claim(panelID);
+            [unavailable addObject:panelID];
         }
     }
 
@@ -1183,10 +1195,18 @@ static NSArray* PFBDashPanelIDs(NSArray* panelIDs) {
         PFBCOMPAT_OBSERVE(PFBCompat_hide_grok_sidebar, @"Grok panel found");
     }
 
-    if (!AccountIsGenuinelyPremium()) {
+    BOOL premium = AccountIsGenuinelyPremium();
+    if (!premium) {
         claim(@15);
     }
 
+    gPFBDashFacts = [NSString
+        stringWithFormat:@"Twitter gave [%@], PrimeFreeBird gave [%@] (not genuinely available [%@], Grok hidden %@, "
+                         @"Premium %@)",
+                         [panelIDs componentsJoinedByString:@", "], [spoofed componentsJoinedByString:@", "],
+                         [unavailable componentsJoinedByString:@", "],
+                         [PFBSettings boolForKey:@"hide_grok_sidebar"] ? @"yes" : @"no", premium ? @"yes" : @"no"];
+    gPFBDashFactsAt = CACurrentMediaTime();
     return spoofed;
 }
 
