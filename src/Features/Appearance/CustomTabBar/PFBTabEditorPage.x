@@ -91,10 +91,13 @@ static id PFBEditorPart(UIViewController* editor, const char* name, Class kind) 
     return [part isKindOfClass:kind] ? part : nil;
 }
 
-// The picker Twitter anchors to the bar follows the bar, once per frame Twitter gives it.
+// The picker Twitter anchors to the bar follows the bar, once per frame Twitter gives it. Its
+// height, sized by Twitter for a bar at the bottom, is kept to the room left below: its list
+// scrolls within.
 static void PFBEditorMovePicker(UIViewController* editor, CGFloat delta) {
     UIView* picker = PFBEditorPart(editor, "picker", [UIView class]);
-    if (!picker.superview || delta == 0.0) {
+    UIView* page = editor.viewIfLoaded;
+    if (!picker.superview || !page || delta == 0.0) {
         return;
     }
     NSValue* placed = objc_getAssociatedObject(picker, kPFBEditorPickerFrameKey);
@@ -102,6 +105,11 @@ static void PFBEditorMovePicker(UIViewController* editor, CGFloat delta) {
         return;
     }
     CGRect frame = CGRectOffset(picker.frame, 0.0, delta);
+    CGRect bottom = [page convertRect:CGRectMake(0.0, CGRectGetMaxY(page.bounds) - page.safeAreaInsets.bottom - 12.0, 1.0, 1.0)
+                               toView:picker.superview];
+    if (CGRectGetMaxY(frame) > CGRectGetMinY(bottom)) {
+        frame.size.height = MAX(120.0, CGRectGetMinY(bottom) - CGRectGetMinY(frame));
+    }
     picker.frame = frame;
     objc_setAssociatedObject(picker, kPFBEditorPickerFrameKey, [NSValue valueWithCGRect:frame],
                              OBJC_ASSOCIATION_RETAIN_NONATOMIC);
@@ -147,6 +155,17 @@ static void PFBEditorLayoutPage(UIViewController* editor) {
     if (!CGRectEqualToRect(bar.frame, barFrame)) {
         bar.frame = barFrame;
     }
+    // While the page slides in or out, the bar sits on its card at once rather than travelling
+    // there inside the slide's animation.
+    if (editor.transitionCoordinator) {
+        for (NSString* key in bar.layer.animationKeys) {
+            CAAnimation* animation = [bar.layer animationForKey:key];
+            NSString* path = [animation isKindOfClass:[CAPropertyAnimation class]] ? ((CAPropertyAnimation*)animation).keyPath : nil;
+            if ([path hasPrefix:@"position"] || [path hasPrefix:@"bounds"]) {
+                [bar.layer removeAnimationForKey:key];
+            }
+        }
+    }
     PFBEditorMovePicker(editor, CGRectGetMinY(barFrame) - twitterBarY);
 
     hint.hidden = YES;
@@ -166,12 +185,46 @@ static void PFBEditorLayoutPage(UIViewController* editor) {
     PFBCOMPAT_ACTION(PFBCompat_custom_tab_bar, @"tab editor page laid out");
 }
 
+// Twitter flies a copy of its bar between the tab bar at the bottom and the editor's bar as the
+// page comes and goes. With the bar on a card at the top that flight crosses the screen: the copy
+// is kept hidden and the editor's own bar shows on its card with the page.
+static void PFBEditorGroundFlight(UIViewController* editor) {
+    UIView* flight = PFBEditorPart(editor, "tabBarFlight", [UIView class]);
+    UIView* bar = PFBEditorPart(editor, "barView", [UIView class]);
+    if (!flight) {
+        return;
+    }
+    flight.hidden = YES;
+    bar.hidden = NO;
+    bar.alpha = 1.0;
+    PFBCOMPAT_ACTION(PFBCompat_custom_tab_bar, @"tab editor bar shown on its card");
+}
+
 %hook _TtC11XNavigation26TabBarEditorViewController
+
+- (void)viewWillAppear:(BOOL)animated {
+    %orig;
+    @try {
+        PFBEditorGroundFlight((UIViewController*)self);
+    } @catch (__unused id exception) {
+    }
+}
+
+- (void)viewWillDisappear:(BOOL)animated {
+    %orig;
+    @try {
+        PFBEditorGroundFlight((UIViewController*)self);
+    } @catch (__unused id exception) {
+    }
+}
 
 - (void)viewDidLayoutSubviews {
     %orig;
     @try {
-        PFBEditorLayoutPage((UIViewController*)self);
+        [UIView performWithoutAnimation:^{
+          PFBEditorLayoutPage((UIViewController*)self);
+        }];
+        PFBEditorGroundFlight((UIViewController*)self);
     } @catch (__unused id exception) {
     }
 }
