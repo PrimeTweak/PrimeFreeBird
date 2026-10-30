@@ -1,7 +1,7 @@
-// What changes when Twitter comes back to the front: how it was launched, whether iOS gave it a
-// new scene, window or first screen, the Tweet button and whether its feather is in place, and,
-// when the side menu was open, every rebuild of its list. Each line names its moment and is kept
-// across launches.
+// What changes when Twitter comes back to the front, from the background or from an inactive
+// spell (the app switcher): how it was launched, whether iOS gave it a new scene, window or first
+// screen, the Tweet button and its feather, and the side menu: every read of its list, the ways
+// it opens and how it shows. Each line names its moment and is kept across launches.
 
 #import "Support/HookHelpers.h"
 #import "Common/PFBCompatibility.h"
@@ -12,6 +12,7 @@ static const NSUInteger kPFBReturnLines = 30;
 
 static NSString* gPFBMoment = @"at launch";
 static BOOL gPFBWasAway;
+static BOOL gPFBWasInactive;
 static BOOL gPFBWasInFront;
 static __weak UIScene* gPFBLastScene;
 static __weak UIWindow* gPFBLastWindow;
@@ -19,6 +20,7 @@ static __weak UIViewController* gPFBLastRoot;
 static CFTimeInterval gPFBReturnAt;
 static BOOL gPFBDashOpen;
 static BOOL gPFBDashOpenWhenAway;
+static __weak UIViewController* gPFBSplit;
 
 static void PFBReturnNote(NSString* fact) {
     PFBCompatMeasure(kPFBReturnTopic, [NSString stringWithFormat:@"%@: %@", gPFBMoment, fact], kPFBReturnLines);
@@ -84,6 +86,7 @@ static void PFBReturnTweetButton(NSString* when) {
 }
 
 static void PFBSideMenuState(NSString* when);
+static BOOL PFBDashIsOpen(void);
 
 // MARK: - Coming to the front
 
@@ -95,16 +98,19 @@ static void PFBReturnInFront(void) {
         gPFBMoment = [NSString stringWithFormat:@"after a return (scene %@, window %@, first screen %@)",
                                                 PFBSameOrNew(scene, gPFBLastScene), PFBSameOrNew(window, gPFBLastWindow),
                                                 PFBSameOrNew(root, gPFBLastRoot)];
+    } else if (gPFBWasInactive && gPFBWasInFront) {
+        gPFBMoment = @"after an inactive spell (app switcher or a system panel)";
     } else if (!gPFBWasInFront) {
         gPFBMoment = [gPFBMoment stringByAppendingString:@", first time in front"];
     }
     gPFBWasAway = NO;
+    gPFBWasInactive = NO;
     gPFBWasInFront = YES;
     gPFBLastScene = scene;
     gPFBLastWindow = window;
     gPFBLastRoot = root;
     PFBReturnNote([NSString stringWithFormat:@"in front, first screen %@", root ? PFBReadableClassName(root) : @"none"]);
-    if (gPFBDashOpenWhenAway) {
+    if (gPFBDashOpenWhenAway || PFBDashIsOpen()) {
         PFBSideMenuState(@"0.5 s later");
         for (NSNumber* delay in @[ @2.0, @5.0 ]) {
             dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)((delay.doubleValue - 0.5) * NSEC_PER_SEC)),
@@ -203,7 +209,7 @@ static void PFBComposeCheck(UIView* host) {
 // MARK: - Side menu
 
 static NSString* const kPFBSideMenuTopic = @"side menu";
-static const NSUInteger kPFBSideMenuLines = 40;
+static const NSUInteger kPFBSideMenuLines = 60;
 
 static void PFBSideMenuNote(NSString* fact) {
     PFBCompatMeasure(kPFBSideMenuTopic,
@@ -212,11 +218,35 @@ static void PFBSideMenuNote(NSString* fact) {
                      kPFBSideMenuLines);
 }
 
-// Rebuilds are noted while the menu is open, and while the app is away or back for 6 s when
-// it left with the menu open.
-static BOOL PFBSideMenuWatched(void) {
-    return gPFBDashOpen ||
-           (gPFBDashOpenWhenAway && (gPFBWasAway || CACurrentMediaTime() - gPFBReturnAt < 6.0));
+static UIViewController* PFBFindSplit(UIViewController* controller, NSInteger depth) {
+    Class split = NSClassFromString(@"T1AppSplitViewController");
+    if (!controller || !split || depth > 5) {
+        return nil;
+    }
+    if ([controller isKindOfClass:split]) {
+        return controller;
+    }
+    for (UIViewController* child in controller.childViewControllers) {
+        UIViewController* found = PFBFindSplit(child, depth + 1);
+        if (found) {
+            return found;
+        }
+    }
+    return nil;
+}
+
+// Open as the split screen that hosts the menu says, or as the last settle notice said.
+static BOOL PFBDashIsOpen(void) {
+    if (!gPFBSplit) {
+        gPFBSplit = PFBFindSplit(PFBFrontWindow(PFBFrontScene()).rootViewController, 0);
+    }
+    UIViewController* split = gPFBSplit;
+    SEL open = NSSelectorFromString(@"isDashOpen");
+    return split && [split respondsToSelector:open] ? ((BOOL (*)(id, SEL))objc_msgSend)(split, open) : gPFBDashOpen;
+}
+
+static NSString* PFBDashOpenText(void) {
+    return PFBDashIsOpen() ? @"menu open" : @"menu closed";
 }
 
 // "T1Twitter+0x12a748": the first caller outside PrimeFreeBird, past the hooks stacked on the
@@ -248,6 +278,14 @@ static NSString* PFBPanelsText(NSArray* panels) {
     return [panels isKindOfClass:[NSArray class]] ? [panels componentsJoinedByString:@", "] : @"none";
 }
 
+// A read of the tab panels, each caller and answer noted once per moment and menu state.
+static void PFBPanelsRead(NSString* reader, const void* frameAddress, NSArray* panels) {
+    PFBSideMenuNote([NSString stringWithFormat:@"%@ read by %@, [%@], %@, %@", reader, PFBSideMenuCaller(frameAddress),
+                                               PFBPanelsText(panels),
+                                               PFBDashAnswerApplies() ? @"PrimeFreeBird's answer" : @"Twitter's own",
+                                               PFBDashOpenText()]);
+}
+
 // The menu as it shows: where it sits, its rows (8 trimmed, 13 standard on this account) and
 // the texts shown on screen in it.
 static void PFBSideMenuState(NSString* when) {
@@ -265,7 +303,8 @@ static void PFBSideMenuState(NSString* when) {
       }
     });
     if (!list) {
-        PFBSideMenuNote([NSString stringWithFormat:@"%@, %@", when, menu ? @"no list in the menu" : @"no menu in the window"]);
+        PFBSideMenuNote([NSString stringWithFormat:@"%@, %@, %@", when, PFBDashOpenText(),
+                                                   menu ? @"no list in the menu" : @"no menu in the window"]);
         return;
     }
     NSInteger rows = 0;
@@ -281,8 +320,8 @@ static void PFBSideMenuState(NSString* when) {
       }
     });
     CGRect frame = [menu convertRect:menu.bounds toView:nil];
-    PFBSideMenuNote([NSString stringWithFormat:@"%@, menu at x %.0f shown %.2f, %ld rows, texts on screen [%@]", when,
-                                               frame.origin.x, PFBShownOpacity(menu), (long)rows,
+    PFBSideMenuNote([NSString stringWithFormat:@"%@, %@, menu at x %.0f shown %.2f, %ld rows, texts on screen [%@]", when,
+                                               PFBDashOpenText(), frame.origin.x, PFBShownOpacity(menu), (long)rows,
                                                [texts componentsJoinedByString:@", "]]);
 }
 
@@ -303,6 +342,19 @@ static void PFBSideMenuState(NSString* when) {
 - (void)accountUserDidUpdateWithNotification:(id)notification;
 @end
 
+@interface T1AppSplitViewController : UIViewController
+- (void)presentDashFromViewController:(UIViewController*)controller animated:(BOOL)animated completion:(id)completion;
+- (void)private_presentDashFromViewController:(UIViewController*)controller
+                               withPanGesture:(id)gesture
+                                     animated:(BOOL)animated
+                                   completion:(id)completion;
+- (void)private_notifyDashDidSettleOpen:(BOOL)open;
+- (void)private_loadDashHostView;
+- (void)private_endDashPan:(id)gesture finished:(BOOL)finished completion:(id)completion;
+- (void)dismissDashAnimated:(BOOL)animated completion:(id)completion;
+- (void)private_dashShowContentViewControllerAnimated:(BOOL)animated completion:(id)completion;
+@end
+
 @interface _TtC11TwitterDash21DashHostingController : UIViewController
 @end
 
@@ -310,26 +362,19 @@ static void PFBSideMenuState(NSString* when) {
 
 - (NSArray*)visiblePanelIDs {
     NSArray* panels = %orig;
-    if (PFBSideMenuWatched()) {
-        PFBSideMenuNote([NSString stringWithFormat:@"tab panels read by %@, [%@], %@",
-                                                   PFBSideMenuCaller(__builtin_frame_address(0)), PFBPanelsText(panels),
-                                                   PFBDashAnswerApplies() ? @"PrimeFreeBird's answer" : @"Twitter's own"]);
-    }
+    PFBPanelsRead(@"tab panels", __builtin_frame_address(0), panels);
     return panels;
 }
 
 - (void)recalculateVisiblePanels {
-    if (PFBSideMenuWatched()) {
-        PFBSideMenuNote([@"glass navigation recalculated by " stringByAppendingString:PFBSideMenuCaller(__builtin_frame_address(0))]);
-    }
+    PFBSideMenuNote([NSString stringWithFormat:@"glass navigation recalculated by %@, %@",
+                                               PFBSideMenuCaller(__builtin_frame_address(0)), PFBDashOpenText()]);
     %orig;
 }
 
 - (void)recalculateVisiblePanelsWithUpdatedPanelIDs:(NSArray*)panelIDs {
-    if (PFBSideMenuWatched()) {
-        PFBSideMenuNote([NSString stringWithFormat:@"glass navigation recalculated with [%@] by %@", PFBPanelsText(panelIDs),
-                                                   PFBSideMenuCaller(__builtin_frame_address(0))]);
-    }
+    PFBSideMenuNote([NSString stringWithFormat:@"glass navigation recalculated with [%@] by %@, %@", PFBPanelsText(panelIDs),
+                                               PFBSideMenuCaller(__builtin_frame_address(0)), PFBDashOpenText()]);
     %orig;
 }
 
@@ -339,26 +384,20 @@ static void PFBSideMenuState(NSString* when) {
 
 - (NSArray*)visiblePanelIDsForAppNavigation:(id)appNavigation {
     NSArray* panels = %orig;
-    if (PFBSideMenuWatched()) {
-        PFBSideMenuNote([NSString stringWithFormat:@"classic tab panels read by %@, [%@], %@",
-                                                   PFBSideMenuCaller(__builtin_frame_address(0)), PFBPanelsText(panels),
-                                                   PFBDashAnswerApplies() ? @"PrimeFreeBird's answer" : @"Twitter's own"]);
-    }
+    PFBPanelsRead(@"classic tab panels", __builtin_frame_address(0), panels);
     return panels;
 }
 
 - (void)recalculateVisiblePanels {
-    if (PFBSideMenuWatched()) {
-        PFBSideMenuNote([@"classic navigation recalculated by " stringByAppendingString:PFBSideMenuCaller(__builtin_frame_address(0))]);
-    }
+    PFBSideMenuNote([NSString stringWithFormat:@"classic navigation recalculated by %@, %@",
+                                               PFBSideMenuCaller(__builtin_frame_address(0)), PFBDashOpenText()]);
     %orig;
 }
 
 - (void)recalculateVisiblePanelsWithUpdatedPanelIDs:(NSArray*)panelIDs {
-    if (PFBSideMenuWatched()) {
-        PFBSideMenuNote([NSString stringWithFormat:@"classic navigation recalculated with [%@] by %@", PFBPanelsText(panelIDs),
-                                                   PFBSideMenuCaller(__builtin_frame_address(0))]);
-    }
+    PFBSideMenuNote([NSString stringWithFormat:@"classic navigation recalculated with [%@] by %@, %@",
+                                               PFBPanelsText(panelIDs), PFBSideMenuCaller(__builtin_frame_address(0)),
+                                               PFBDashOpenText()]);
     %orig;
 }
 
@@ -366,28 +405,86 @@ static void PFBSideMenuState(NSString* when) {
 
 %hook T1DashContentController
 
-- (id)initWithAccount:(id)account interactionsTimelineBridge:(id)bridge {
+- (id)init {
     id controller = %orig;
     PFBSideMenuNote([@"menu content made by " stringByAppendingString:PFBSideMenuCaller(__builtin_frame_address(0))]);
     return controller;
 }
 
+- (id)initWithAccount:(id)account interactionsTimelineBridge:(id)bridge {
+    id controller = %orig;
+    PFBSideMenuNote([@"menu content made with an account by " stringByAppendingString:PFBSideMenuCaller(__builtin_frame_address(0))]);
+    return controller;
+}
+
 - (void)updateVisiblePanelIDs {
     %orig;
-    PFBSideMenuNote([NSString stringWithFormat:@"menu built by %@: %@", PFBSideMenuCaller(__builtin_frame_address(0)),
-                                               PFBDashPanelFacts()]);
+    PFBSideMenuNote([NSString stringWithFormat:@"menu built by %@, %@: %@", PFBSideMenuCaller(__builtin_frame_address(0)),
+                                               PFBDashOpenText(), PFBDashPanelFacts()]);
 }
 
 - (void)prepareForReuse {
     %orig;
-    PFBSideMenuNote([@"menu reset by " stringByAppendingString:PFBSideMenuCaller(__builtin_frame_address(0))]);
+    PFBSideMenuNote([NSString stringWithFormat:@"menu reset by %@, %@", PFBSideMenuCaller(__builtin_frame_address(0)),
+                                               PFBDashOpenText()]);
 }
 
 - (void)accountUserDidUpdateWithNotification:(id)notification {
     %orig;
-    if (PFBSideMenuWatched()) {
-        PFBSideMenuNote(@"account update received");
+    PFBSideMenuNote([@"account update received, " stringByAppendingString:PFBDashOpenText()]);
+}
+
+%end
+
+%hook T1AppSplitViewController
+
+- (void)presentDashFromViewController:(UIViewController*)controller animated:(BOOL)animated completion:(id)completion {
+    gPFBSplit = (UIViewController*)self;
+    PFBSideMenuNote([@"opening asked by " stringByAppendingString:PFBSideMenuCaller(__builtin_frame_address(0))]);
+    %orig;
+}
+
+- (void)private_presentDashFromViewController:(UIViewController*)controller
+                               withPanGesture:(id)gesture
+                                     animated:(BOOL)animated
+                                   completion:(id)completion {
+    gPFBSplit = (UIViewController*)self;
+    PFBSideMenuNote([NSString stringWithFormat:@"opening %@ by %@", gesture ? @"by a swipe" : @"without a swipe",
+                                               PFBSideMenuCaller(__builtin_frame_address(0))]);
+    %orig;
+}
+
+- (void)private_endDashPan:(id)gesture finished:(BOOL)finished completion:(id)completion {
+    gPFBSplit = (UIViewController*)self;
+    %orig;
+    PFBSideMenuNote([NSString stringWithFormat:@"swipe ended, %@, %@", finished ? @"finished" : @"not finished",
+                                               PFBDashOpenText()]);
+}
+
+- (void)private_notifyDashDidSettleOpen:(BOOL)open {
+    gPFBSplit = (UIViewController*)self;
+    %orig;
+    @try {
+        PFBSideMenuState([NSString stringWithFormat:@"settled %@ · last answer: %@", open ? @"open" : @"closed",
+                                                    PFBDashPanelFacts()]);
+    } @catch (__unused id exception) {
     }
+}
+
+- (void)private_loadDashHostView {
+    gPFBSplit = (UIViewController*)self;
+    %orig;
+    PFBSideMenuNote(@"menu host loaded");
+}
+
+- (void)dismissDashAnimated:(BOOL)animated completion:(id)completion {
+    %orig;
+    PFBSideMenuNote([@"closing asked by " stringByAppendingString:PFBSideMenuCaller(__builtin_frame_address(0))]);
+}
+
+- (void)private_dashShowContentViewControllerAnimated:(BOOL)animated completion:(id)completion {
+    %orig;
+    PFBSideMenuNote([@"content shown again by " stringByAppendingString:PFBSideMenuCaller(__builtin_frame_address(0))]);
 }
 
 %end
@@ -396,9 +493,12 @@ static void PFBSideMenuState(NSString* when) {
 
 - (void)viewWillAppear:(BOOL)animated {
     %orig;
-    if (PFBSideMenuWatched()) {
-        PFBSideMenuNote(@"menu screen about to appear");
-    }
+    PFBSideMenuNote([@"menu screen about to appear, " stringByAppendingString:PFBDashOpenText()]);
+}
+
+- (void)viewDidAppear:(BOOL)animated {
+    %orig;
+    PFBSideMenuNote([@"menu screen appeared, " stringByAppendingString:PFBDashOpenText()]);
 }
 
 %end
@@ -408,14 +508,7 @@ static void PFBSideMenuState(NSString* when) {
 - (void)dashDidSettleOpen:(BOOL)open {
     %orig;
     gPFBDashOpen = open;
-    @try {
-        if (open) {
-            PFBSideMenuState([@"opened · last answer: " stringByAppendingString:PFBDashPanelFacts()]);
-        } else {
-            PFBSideMenuNote(@"closed");
-        }
-    } @catch (__unused id exception) {
-    }
+    PFBSideMenuNote([NSString stringWithFormat:@"presenter told the menu settled %@", open ? @"open" : @"closed"]);
 }
 
 %end
@@ -435,15 +528,24 @@ static void PFBSideMenuState(NSString* when) {
                                                               background ? @"background" : @"foreground",
                                                               prewarmed ? @", prewarmed by iOS" : @""];
                     }];
+    [center addObserverForName:UIApplicationWillResignActiveNotification
+                        object:nil
+                         queue:main
+                    usingBlock:^(__unused NSNotification* note) {
+                      gPFBWasInactive = YES;
+                      gPFBDashOpenWhenAway = PFBDashIsOpen();
+                      if (gPFBDashOpenWhenAway) {
+                          @try {
+                              PFBSideMenuState(@"going inactive");
+                          } @catch (__unused id exception) {
+                          }
+                      }
+                    }];
     [center addObserverForName:UIApplicationDidEnterBackgroundNotification
                         object:nil
                          queue:main
                     usingBlock:^(__unused NSNotification* note) {
                       gPFBWasAway = YES;
-                      gPFBDashOpenWhenAway = gPFBDashOpen;
-                      if (gPFBDashOpen) {
-                          PFBSideMenuState(@"leaving");
-                      }
                     }];
     [center addObserverForName:UIApplicationDidBecomeActiveNotification
                         object:nil
@@ -451,7 +553,7 @@ static void PFBSideMenuState(NSString* when) {
                     usingBlock:^(__unused NSNotification* note) {
                       CFTimeInterval returnAt = CACurrentMediaTime();
                       gPFBReturnAt = returnAt;
-                      // The watch on the side menu ends 6 s after the return that follows it.
+                      // "Open when the app left" holds for the 6 s that follow the return.
                       dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(6.0 * NSEC_PER_SEC)),
                                      dispatch_get_main_queue(), ^{
                                        if (gPFBReturnAt == returnAt) {

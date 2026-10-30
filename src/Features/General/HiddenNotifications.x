@@ -576,6 +576,7 @@ static id PFBModelAtIndexPath(id dataViewController, NSIndexPath* indexPath) {
 static void PFBNotifSyncEmptyState(id dataViewController);
 static const char* kPFBNotifVerdictKey = "pfbNotifSweepVerdict";
 static const char* kPFBNotifEverFilledKey = "pfbNotifEverFilled";
+static BOOL gPFBNotifSweeping;
 
 static void PFBNotifDropRow(id dataViewController, NSIndexPath* indexPath) {
     if (!dataViewController || !indexPath) {
@@ -823,6 +824,48 @@ static void PFBNotifLayoutEmptyPanel(UIView* panel, UITableView* table) {
                              width, CGRectGetMaxY(body.frame));
 }
 
+// MARK: Empty panel measurement
+
+static const char* kPFBNotifPanelStateKey = "pfbNotifPanelState";
+static const char* kPFBNotifPanelSinceKey = "pfbNotifPanelSince";
+static const char* kPFBNotifLastSweepKey = "pfbNotifLastSweep";
+
+// Each change of the empty panel's state on a notifications list, with the list as it stood:
+// for the panel that never comes after a launch and the one that flickers after a refresh.
+static void PFBNotifPanelNote(id controller, UITableView* table, NSString* state, NSInteger rows,
+                              NSInteger notifRows, NSUInteger hidden) {
+    NSString* last = objc_getAssociatedObject(controller, kPFBNotifPanelStateKey);
+    if ([last isEqualToString:state]) {
+        return;
+    }
+    objc_setAssociatedObject(controller, kPFBNotifPanelStateKey, state, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    NSNumber* since = objc_getAssociatedObject(controller, kPFBNotifPanelSinceKey);
+    if (!since) {
+        since = @(CACurrentMediaTime());
+        objc_setAssociatedObject(controller, kPFBNotifPanelSinceKey, since, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    }
+    NSUInteger panels = 0;
+    for (UIView* sub in table.subviews) {
+        panels += [sub viewWithTag:kPFBNotifEmptyTitleTag] != nil;
+    }
+    UIView* panel = [table viewWithTag:kPFBNotifEmptyTag];
+    NSString* panelText = panel ? [NSString stringWithFormat:@"y %.0f on screen, alpha %.2f",
+                                                             [panel convertRect:panel.bounds toView:nil].origin.y, panel.alpha]
+                                : @"none";
+    PFBCompatMeasure(@"notification panel",
+                     [NSString stringWithFormat:@"%.1f s: %@ · rows %ld, notifications or Tweets %ld, hidden %lu, %@, "
+                                                @"last sweep %@ · list offset %.0f, top inset %.0f, refreshing %@ · "
+                                                @"panels in the list %lu, tagged panel %@",
+                                                CACurrentMediaTime() - since.doubleValue, state, (long)rows,
+                                                (long)notifRows, (unsigned long)hidden,
+                                                gPFBNotifSweeping ? @"during a sweep" : @"outside a sweep",
+                                                objc_getAssociatedObject(controller, kPFBNotifLastSweepKey) ?: @"none",
+                                                table.contentOffset.y, table.adjustedContentInset.top,
+                                                table.refreshControl.isRefreshing ? @"yes" : @"no",
+                                                (unsigned long)panels, panelText],
+                     60);
+}
+
 static void PFBNotifSyncEmptyState(id dataViewController) {
     if (!dataViewController) {
         return;
@@ -881,13 +924,24 @@ static void PFBNotifSyncEmptyState(id dataViewController) {
             objc_setAssociatedObject(dataViewController, kPFBNotifEverFilledKey, @YES,
                                      OBJC_ASSOCIATION_RETAIN_NONATOMIC);
         }
+        NSString* lastState = objc_getAssociatedObject(dataViewController, kPFBNotifPanelStateKey);
+        if (!existing && ([lastState isEqualToString:@"panel shown"] || [lastState isEqualToString:@"panel kept"])) {
+            PFBNotifPanelNote(dataViewController, table, @"panel gone, not removed by PrimeFreeBird", rows, notifRows,
+                              hidden);
+        }
         if (![everFilled isEqual:@YES]) {
+            PFBNotifPanelNote(dataViewController, table, @"waiting: the list never had a row", rows, notifRows, hidden);
             if (existing) {
                 [existing removeFromSuperview];
             }
             return;
         }
         if (notifRows > 0 || hidden == 0) {
+            PFBNotifPanelNote(dataViewController, table,
+                              [NSString stringWithFormat:@"%@: %@", existing ? @"panel fading" : @"no panel",
+                                                         notifRows > 0 ? @"a notification or Tweet row is shown"
+                                                                       : @"nothing hidden"],
+                              rows, notifRows, hidden);
             if (existing) {
                 // The panel fades out the way it came in. Its tag goes first, so no
                 // later pass finds it mid-fade.
@@ -906,6 +960,7 @@ static void PFBNotifSyncEmptyState(id dataViewController) {
             // A width change (rotation, split view) moves the panel; the frames
             // are recomputed rather than left stale.
             PFBNotifLayoutEmptyPanel(existing, table);
+            PFBNotifPanelNote(dataViewController, table, @"panel kept", rows, notifRows, hidden);
             return;
         }
 
@@ -946,12 +1001,11 @@ static void PFBNotifSyncEmptyState(id dataViewController) {
                            panel.alpha = 1.0;
                          }
                          completion:nil];
+        PFBNotifPanelNote(dataViewController, table, @"panel shown", rows, notifRows, hidden);
     } @catch (id exception) {
         PFBDebugLog(@"[empty] exception: %@", exception);
     }
 }
-
-static BOOL gPFBNotifSweeping;
 
 // Takes the empty-list panel off a notifications list at once, without the fade.
 static void PFBNotifRemoveEmptyPanel(id dataViewController) {
@@ -1034,6 +1088,9 @@ static void PFBNotifSweep(id dataViewController) {
                 dataViewController, deleteSel, path, UITableViewRowAnimationNone);
         }
         PFBNotifRecordVerdict(dataViewController, sawNotification, examined);
+        objc_setAssociatedObject(dataViewController, kPFBNotifLastSweepKey,
+                                 [NSString stringWithFormat:@"removed %lu of %ld", (unsigned long)doomed.count, (long)examined],
+                                 OBJC_ASSOCIATION_RETAIN_NONATOMIC);
         PFBNotifSyncEmptyState(dataViewController);
         if (doomed.count) {
             PFBCOMPAT_ACTION(PFBCompat_hide_notifications, @"hidden notification removed");
