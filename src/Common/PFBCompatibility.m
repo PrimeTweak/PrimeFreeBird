@@ -2462,6 +2462,7 @@ static NSString* stationLabel(NSString* station) {
           @"Tweet menu": @"a Tweet's menu",
           @"video full screen": @"a full-screen video",
           @"video long press": @"a video's long-press menu",
+          @"photo long press": @"a photo's long-press menu",
           @"photo full screen": @"a full-screen photo",
           @"other profile": @"another account's profile",
           @"composer": @"the composer",

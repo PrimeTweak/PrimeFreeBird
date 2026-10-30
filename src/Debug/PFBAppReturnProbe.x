@@ -1,6 +1,7 @@
 // What changes when Twitter comes back to the front: how it was launched, whether iOS gave it a
-// new scene, window or first screen, the side menu's panels, the Tweet button and whether its
-// feather is in place. Each line names its moment and is kept across launches.
+// new scene, window or first screen, the Tweet button and whether its feather is in place, and,
+// when the side menu was open, every rebuild of its list. Each line names its moment and is kept
+// across launches.
 
 #import "Support/HookHelpers.h"
 #import "Common/PFBCompatibility.h"
@@ -15,6 +16,9 @@ static BOOL gPFBWasInFront;
 static __weak UIScene* gPFBLastScene;
 static __weak UIWindow* gPFBLastWindow;
 static __weak UIViewController* gPFBLastRoot;
+static CFTimeInterval gPFBReturnAt;
+static BOOL gPFBDashOpen;
+static BOOL gPFBDashOpenWhenAway;
 
 static void PFBReturnNote(NSString* fact) {
     PFBCompatMeasure(kPFBReturnTopic, [NSString stringWithFormat:@"%@: %@", gPFBMoment, fact], kPFBReturnLines);
@@ -79,6 +83,8 @@ static void PFBReturnTweetButton(NSString* when) {
                                              [accessories componentsJoinedByString:@"; "], (unsigned long)classics]);
 }
 
+static void PFBSideMenuState(NSString* when);
+
 // MARK: - Coming to the front
 
 static void PFBReturnInFront(void) {
@@ -98,6 +104,18 @@ static void PFBReturnInFront(void) {
     gPFBLastWindow = window;
     gPFBLastRoot = root;
     PFBReturnNote([NSString stringWithFormat:@"in front, first screen %@", root ? PFBReadableClassName(root) : @"none"]);
+    if (gPFBDashOpenWhenAway) {
+        PFBSideMenuState(@"0.5 s later");
+        for (NSNumber* delay in @[ @2.0, @5.0 ]) {
+            dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)((delay.doubleValue - 0.5) * NSEC_PER_SEC)),
+                           dispatch_get_main_queue(), ^{
+                             @try {
+                                 PFBSideMenuState([NSString stringWithFormat:@"%.0f s later", delay.doubleValue]);
+                             } @catch (__unused id exception) {
+                             }
+                           });
+        }
+    }
     for (NSNumber* delay in @[ @1.5, @5.0 ]) {
         dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(delay.doubleValue * NSEC_PER_SEC)),
                        dispatch_get_main_queue(), ^{
@@ -108,8 +126,6 @@ static void PFBReturnInFront(void) {
                        });
     }
 }
-
-// MARK: - Side menu
 
 // MARK: - Feather on the compose button
 
@@ -184,9 +200,57 @@ static void PFBComposeCheck(UIView* host) {
 
 %end
 
-// The rows' labels are unreadable without VoiceOver: the row count tells a trimmed
-// menu from the standard one, and the Money row is the one with "Claim bonus".
-static NSString* PFBDashRows(void) {
+// MARK: - Side menu
+
+static NSString* const kPFBSideMenuTopic = @"side menu";
+static const NSUInteger kPFBSideMenuLines = 40;
+
+static void PFBSideMenuNote(NSString* fact) {
+    PFBCompatMeasure(kPFBSideMenuTopic,
+                     [NSString stringWithFormat:@"%@%@: %@", gPFBMoment,
+                                                gPFBDashOpenWhenAway ? @", side menu open when the app left" : @"", fact],
+                     kPFBSideMenuLines);
+}
+
+// Rebuilds are noted while the menu is open, and while the app is away or back for 6 s when
+// it left with the menu open.
+static BOOL PFBSideMenuWatched(void) {
+    return gPFBDashOpen ||
+           (gPFBDashOpenWhenAway && (gPFBWasAway || CACurrentMediaTime() - gPFBReturnAt < 6.0));
+}
+
+// "T1Twitter+0x12a748": the first caller outside PrimeFreeBird, past the hooks stacked on the
+// method, read from the frame records arm64 keeps.
+static NSString* PFBSideMenuCaller(const void* frameAddress) {
+    static const void* ours;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+      Dl_info info;
+      ours = dladdr((const void*)&PFBSideMenuCaller, &info) ? info.dli_fbase : NULL;
+    });
+    const void* const* frame = (const void* const*)frameAddress;
+    for (NSInteger hop = 0; frame && hop < 6; hop++) {
+        Dl_info info;
+        if (!frame[1] || !dladdr(frame[1], &info) || !info.dli_fbase) {
+            return @"?";
+        }
+        if (info.dli_fbase != ours) {
+            const char* slash = info.dli_fname ? strrchr(info.dli_fname, '/') : NULL;
+            return [NSString stringWithFormat:@"%s+0x%lx", slash ? slash + 1 : (info.dli_fname ?: "?"),
+                                              (unsigned long)((uintptr_t)frame[1] - (uintptr_t)info.dli_fbase)];
+        }
+        frame = (const void* const*)frame[0];
+    }
+    return @"PrimeFreeBird";
+}
+
+static NSString* PFBPanelsText(NSArray* panels) {
+    return [panels isKindOfClass:[NSArray class]] ? [panels componentsJoinedByString:@", "] : @"none";
+}
+
+// The menu as it shows: where it sits, its rows (8 trimmed, 13 standard on this account) and
+// the texts shown on screen in it.
+static void PFBSideMenuState(NSString* when) {
     UIWindow* window = PFBFrontWindow(PFBFrontScene());
     __block UIView* menu = nil;
     PFBWalkAllSubviews(window, 30, ^(UIView* view) {
@@ -201,32 +265,140 @@ static NSString* PFBDashRows(void) {
       }
     });
     if (!list) {
-        return menu ? @"no list found in the menu" : @"no menu found";
+        PFBSideMenuNote([NSString stringWithFormat:@"%@, %@", when, menu ? @"no list in the menu" : @"no menu in the window"]);
+        return;
     }
     NSInteger rows = 0;
     for (NSInteger section = 0; section < list.numberOfSections; section++) {
         rows += [list numberOfItemsInSection:section];
     }
-    __block BOOL bonus = NO;
+    NSMutableArray<NSString*>* texts = [NSMutableArray array];
     PFBWalkAllSubviews(list, 20, ^(UIView* view) {
-      if (!view.hidden && [view isKindOfClass:[UILabel class]] &&
-          [((UILabel*)view).text isEqualToString:@"Claim bonus"]) {
-          bonus = YES;
+      NSString* text = [view isKindOfClass:[UILabel class]] ? ((UILabel*)view).text : nil;
+      if (text.length && texts.count < 16 && PFBShownOpacity(view) > 0.05 &&
+          CGRectIntersectsRect([view convertRect:view.bounds toView:nil], window.bounds)) {
+          [texts addObject:text];
       }
     });
-    return [NSString stringWithFormat:@"%ld, Claim bonus %@", (long)rows, bonus ? @"shown" : @"absent"];
+    CGRect frame = [menu convertRect:menu.bounds toView:nil];
+    PFBSideMenuNote([NSString stringWithFormat:@"%@, menu at x %.0f shown %.2f, %ld rows, texts on screen [%@]", when,
+                                               frame.origin.x, PFBShownOpacity(menu), (long)rows,
+                                               [texts componentsJoinedByString:@", "]]);
 }
+
+@interface _TtC14T1TwitterSwift20XTabbedAppNavigation : NSObject
+- (NSArray*)visiblePanelIDs;
+- (void)recalculateVisiblePanels;
+- (void)recalculateVisiblePanelsWithUpdatedPanelIDs:(NSArray*)panelIDs;
+@end
+
+@interface T1TabbedAppNavigationViewController (PFBSideMenuProbe)
+- (NSArray*)visiblePanelIDsForAppNavigation:(id)appNavigation;
+- (void)recalculateVisiblePanels;
+- (void)recalculateVisiblePanelsWithUpdatedPanelIDs:(NSArray*)panelIDs;
+@end
+
+@interface T1DashContentController : NSObject
+- (id)initWithAccount:(id)account interactionsTimelineBridge:(id)bridge;
+- (void)accountUserDidUpdateWithNotification:(id)notification;
+@end
+
+@interface _TtC11TwitterDash21DashHostingController : UIViewController
+@end
+
+%hook _TtC14T1TwitterSwift20XTabbedAppNavigation
+
+- (NSArray*)visiblePanelIDs {
+    NSArray* panels = %orig;
+    if (PFBSideMenuWatched()) {
+        PFBSideMenuNote([NSString stringWithFormat:@"tab panels read by %@, [%@], %@",
+                                                   PFBSideMenuCaller(__builtin_frame_address(0)), PFBPanelsText(panels),
+                                                   PFBDashAnswerApplies() ? @"PrimeFreeBird's answer" : @"Twitter's own"]);
+    }
+    return panels;
+}
+
+- (void)recalculateVisiblePanels {
+    if (PFBSideMenuWatched()) {
+        PFBSideMenuNote([@"glass navigation recalculated by " stringByAppendingString:PFBSideMenuCaller(__builtin_frame_address(0))]);
+    }
+    %orig;
+}
+
+- (void)recalculateVisiblePanelsWithUpdatedPanelIDs:(NSArray*)panelIDs {
+    if (PFBSideMenuWatched()) {
+        PFBSideMenuNote([NSString stringWithFormat:@"glass navigation recalculated with [%@] by %@", PFBPanelsText(panelIDs),
+                                                   PFBSideMenuCaller(__builtin_frame_address(0))]);
+    }
+    %orig;
+}
+
+%end
+
+%hook T1TabbedAppNavigationViewController
+
+- (NSArray*)visiblePanelIDsForAppNavigation:(id)appNavigation {
+    NSArray* panels = %orig;
+    if (PFBSideMenuWatched()) {
+        PFBSideMenuNote([NSString stringWithFormat:@"classic tab panels read by %@, [%@], %@",
+                                                   PFBSideMenuCaller(__builtin_frame_address(0)), PFBPanelsText(panels),
+                                                   PFBDashAnswerApplies() ? @"PrimeFreeBird's answer" : @"Twitter's own"]);
+    }
+    return panels;
+}
+
+- (void)recalculateVisiblePanels {
+    if (PFBSideMenuWatched()) {
+        PFBSideMenuNote([@"classic navigation recalculated by " stringByAppendingString:PFBSideMenuCaller(__builtin_frame_address(0))]);
+    }
+    %orig;
+}
+
+- (void)recalculateVisiblePanelsWithUpdatedPanelIDs:(NSArray*)panelIDs {
+    if (PFBSideMenuWatched()) {
+        PFBSideMenuNote([NSString stringWithFormat:@"classic navigation recalculated with [%@] by %@", PFBPanelsText(panelIDs),
+                                                   PFBSideMenuCaller(__builtin_frame_address(0))]);
+    }
+    %orig;
+}
+
+%end
 
 %hook T1DashContentController
 
+- (id)initWithAccount:(id)account interactionsTimelineBridge:(id)bridge {
+    id controller = %orig;
+    PFBSideMenuNote([@"menu content made by " stringByAppendingString:PFBSideMenuCaller(__builtin_frame_address(0))]);
+    return controller;
+}
+
 - (void)updateVisiblePanelIDs {
     %orig;
-    PFBReturnNote([@"side menu built: " stringByAppendingString:PFBDashPanelFacts()]);
+    PFBSideMenuNote([NSString stringWithFormat:@"menu built by %@: %@", PFBSideMenuCaller(__builtin_frame_address(0)),
+                                               PFBDashPanelFacts()]);
 }
 
 - (void)prepareForReuse {
     %orig;
-    PFBReturnNote(@"side menu reset");
+    PFBSideMenuNote([@"menu reset by " stringByAppendingString:PFBSideMenuCaller(__builtin_frame_address(0))]);
+}
+
+- (void)accountUserDidUpdateWithNotification:(id)notification {
+    %orig;
+    if (PFBSideMenuWatched()) {
+        PFBSideMenuNote(@"account update received");
+    }
+}
+
+%end
+
+%hook _TtC11TwitterDash21DashHostingController
+
+- (void)viewWillAppear:(BOOL)animated {
+    %orig;
+    if (PFBSideMenuWatched()) {
+        PFBSideMenuNote(@"menu screen about to appear");
+    }
 }
 
 %end
@@ -235,12 +407,13 @@ static NSString* PFBDashRows(void) {
 
 - (void)dashDidSettleOpen:(BOOL)open {
     %orig;
-    if (!open) {
-        return;
-    }
+    gPFBDashOpen = open;
     @try {
-        PFBReturnNote([NSString stringWithFormat:@"side menu opened, rows %@ · last answer: %@", PFBDashRows(),
-                                                 PFBDashPanelFacts()]);
+        if (open) {
+            PFBSideMenuState([@"opened · last answer: " stringByAppendingString:PFBDashPanelFacts()]);
+        } else {
+            PFBSideMenuNote(@"closed");
+        }
     } @catch (__unused id exception) {
     }
 }
@@ -267,11 +440,24 @@ static NSString* PFBDashRows(void) {
                          queue:main
                     usingBlock:^(__unused NSNotification* note) {
                       gPFBWasAway = YES;
+                      gPFBDashOpenWhenAway = gPFBDashOpen;
+                      if (gPFBDashOpen) {
+                          PFBSideMenuState(@"leaving");
+                      }
                     }];
     [center addObserverForName:UIApplicationDidBecomeActiveNotification
                         object:nil
                          queue:main
                     usingBlock:^(__unused NSNotification* note) {
+                      CFTimeInterval returnAt = CACurrentMediaTime();
+                      gPFBReturnAt = returnAt;
+                      // The watch on the side menu ends 6 s after the return that follows it.
+                      dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(6.0 * NSEC_PER_SEC)),
+                                     dispatch_get_main_queue(), ^{
+                                       if (gPFBReturnAt == returnAt) {
+                                           gPFBDashOpenWhenAway = NO;
+                                       }
+                                     });
                       dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.5 * NSEC_PER_SEC)),
                                      dispatch_get_main_queue(), ^{
                                        @try {
@@ -298,6 +484,7 @@ static NSString* PFBDashRows(void) {
                     usingBlock:^(__unused NSNotification* note) {
                       @try {
                           PFBReturnTweetButton(@"at capture");
+                          PFBSideMenuState(@"at capture");
                       } @catch (__unused id exception) {
                       }
                     }];

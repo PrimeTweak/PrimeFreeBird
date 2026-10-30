@@ -1172,6 +1172,10 @@ static __thread BOOL DashPanelIDQuery = NO;
 
 %end
 
+BOOL PFBDashAnswerApplies(void) {
+    return DashPanelIDQuery;
+}
+
 // The last answer given to the drawer and when, read by the app return probe.
 static NSString* gPFBDashFacts;
 static CFTimeInterval gPFBDashFactsAt;

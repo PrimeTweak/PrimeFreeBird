@@ -858,19 +858,19 @@ static BOOL tourCheckDoubleTapLike(void) {
 }
 
 // A long press on a Tweet's media is the timeline table's context menu: UIKit asks the
-// list's delegate for it at the point pressed. Asked here at the video's center, its
+// list's delegate for it at the point pressed. Asked here at the media's center, its
 // entries are built without the menu showing, through the same hooks; YES when it has entries.
-static BOOL tourTableMenuDoor(UIView* video, NSString* pass) {
-    UITableView* list = (UITableView*)tourAncestor(video, @"UITableView");
-    UITableViewCell* cell = (UITableViewCell*)tourAncestor(video, @"UITableViewCell");
+static BOOL tourTableMenuDoor(UIView* media, NSString* step) {
+    UITableView* list = (UITableView*)tourAncestor(media, @"UITableView");
+    UITableViewCell* cell = (UITableViewCell*)tourAncestor(media, @"UITableViewCell");
     NSIndexPath* row = cell ? [list indexPathForCell:cell] : nil;
     id<UITableViewDelegate> delegate = list.delegate;
     SEL build = @selector(tableView:contextMenuConfigurationForRowAtIndexPath:point:);
     if (!row || ![delegate respondsToSelector:build]) {
-        PFBCompatTourLog(@"[tour] video long press: %@", !row ? @"no row under the video" : @"the list builds no context menu");
+        PFBCompatTourLog(@"[tour] %@: %@", step, !row ? @"no row under the media" : @"the list builds no context menu");
         return NO;
     }
-    CGPoint point = [video convertPoint:CGPointMake(CGRectGetMidX(video.bounds), CGRectGetMidY(video.bounds))
+    CGPoint point = [media convertPoint:CGPointMake(CGRectGetMidX(media.bounds), CGRectGetMidY(media.bounds))
                                  toView:list];
     UIContextMenuConfiguration* configuration =
         [delegate tableView:list contextMenuConfigurationForRowAtIndexPath:row point:point];
@@ -1950,7 +1950,7 @@ static NSArray<NSDictionary*>* tourAllSteps(void) {
     [steps addObject:tourStep(@"video long press", @"Video menu", home, ^{
              menuBuilt = NO;
              UIView* pressed = tourHomeVideo(@"video long press");
-             menuBuilt = tourTableMenuDoor(pressed, @"first");
+             menuBuilt = tourTableMenuDoor(pressed, @"video long press");
              // Twitter's share sheet names the Tweet a moment after an ask; the asks that
              // follow find it, as the menu of a real long press does, on the video the row
              // shows then, a preview having become its player.
@@ -1966,13 +1966,24 @@ static NSArray<NSDictionary*>* tourAllSteps(void) {
                                         UIView* shown = tourFindClass(weakRow, @"T1InlineVideoView")
                                                             ?: tourFindClass(weakRow, @"T1InlineVideoFacadeView")
                                                             ?: weakPressed;
-                                        menuBuilt = tourTableMenuDoor(shown, ask == 1 ? @"again" : @"a third time") || menuBuilt;
+                                        menuBuilt = tourTableMenuDoor(shown, @"video long press") || menuBuilt;
                                       });
                                   }
                                 });
              }
            }, ^BOOL(UIViewController* before, UIViewController* after) {
              return menuBuilt;
+           }, nil, ^{
+             tourDismissPresented();
+             tourScrollHomeToTop();
+           })];
+    // The photo's long-press menu, read by the Imagine measurement.
+    __block BOOL photoMenuBuilt = NO;
+    [steps addObject:tourStep(@"photo long press", @"Photo menu", home, ^{
+             photoMenuBuilt = tourTableMenuDoor(tourHomeViewOfClass(@"_TtC21TweetMediaAttachments14MultiMediaView"),
+                                                @"photo long press");
+           }, ^BOOL(__unused UIViewController* before, __unused UIViewController* after) {
+             return photoMenuBuilt;
            }, nil, ^{
              tourDismissPresented();
              tourScrollHomeToTop();
