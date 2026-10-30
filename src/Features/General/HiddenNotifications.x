@@ -862,19 +862,32 @@ static void PFBNotifLayoutEmptyPanel(UIView* panel, UITableView* table) {
 @end
 
 // Each scroll of the list lays it out: the panel follows a pull there, in the same pass that
-// places the background view.
+// places the background view. A rise of more than a step at once, as at the end of a refresh,
+// glides in 0.2 s, as the list's own content does.
 %hook UITableView
 
 - (void)layoutSubviews {
     %orig;
     PFBNotifPanelRef* ref = objc_getAssociatedObject(self, kPFBNotifPanelKey);
     UIView* panel = ref.panel;
-    if (panel.superview) {
-        CGRect frame = panel.frame;
-        frame.origin.y = PFBNotifPanelTop((UITableView*)self);
-        if (!CGRectEqualToRect(frame, panel.frame)) {
-            panel.frame = frame;
-        }
+    if (!panel.superview) {
+        return;
+    }
+    CGRect frame = panel.frame;
+    frame.origin.y = PFBNotifPanelTop((UITableView*)self);
+    if (CGRectEqualToRect(frame, panel.frame)) {
+        return;
+    }
+    if (CGRectGetMinY(panel.frame) - CGRectGetMinY(frame) > 12.0) {
+        [UIView animateWithDuration:0.2
+                              delay:0.0
+                            options:UIViewAnimationOptionCurveEaseInOut | UIViewAnimationOptionBeginFromCurrentState
+                         animations:^{
+                           panel.frame = frame;
+                         }
+                         completion:nil];
+    } else {
+        panel.frame = frame;
     }
 }
 
