@@ -1162,12 +1162,43 @@ BOOL PFBPanelIsGenuinelyAvailable(long long panelID) {
 
 static __thread BOOL DashPanelIDQuery = NO;
 
+static void PFBDashRebuild(id controller) {
+    SEL update = NSSelectorFromString(@"updateVisiblePanelIDs");
+    if ([controller respondsToSelector:update]) {
+        ((void (*)(id, SEL))objc_msgSend)(controller, update);
+    }
+}
+
 %hook T1DashContentController
 
 - (void)updateVisiblePanelIDs {
     DashPanelIDQuery = YES;
     %orig;
     DashPanelIDQuery = NO;
+}
+
+// Each close resets the content to Twitter's full list, and some ways of opening show it
+// without a rebuild: rebuilt at once, it keeps the trimmed list.
+- (void)prepareForReuse {
+    %orig;
+    PFBDashRebuild(self);
+}
+
+%end
+
+@interface T1AppSplitViewController : UIViewController
+- (void)private_loadDashHostView;
+@end
+
+// Until a first rebuild the content holds Twitter's full list: it is built as its host loads.
+%hook T1AppSplitViewController
+
+- (void)private_loadDashHostView {
+    %orig;
+    SEL content = NSSelectorFromString(@"dashContentController");
+    if ([(id)self respondsToSelector:content]) {
+        PFBDashRebuild(((id (*)(id, SEL))objc_msgSend)(self, content));
+    }
 }
 
 %end

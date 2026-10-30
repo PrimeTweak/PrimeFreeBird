@@ -176,11 +176,13 @@
 "DOWNLOAD_ALL_VIDEOS_OPTION_TITLE" = "Tüm videoları indir";
 
 /* ===== Profile actions ===== */
-"COPY_PROFILE_INFO_MENU_OPTION_1" = "Biyografiyi kopyala";
-"COPY_PROFILE_INFO_MENU_OPTION_2" = "Kullanıcı adını kopyala";
-"COPY_PROFILE_INFO_MENU_OPTION_3" = "İsmi kopyala";
-"COPY_PROFILE_INFO_MENU_OPTION_4" = "İnternet sitesini kopyala";
-"COPY_PROFILE_INFO_MENU_OPTION_5" = "Konumu kopyala";
+"COPY_PROFILE_INFO_MENU_OPTION_1" = "Biyografi";
+"COPY_PROFILE_INFO_MENU_OPTION_2" = "Kullanıcı adı";
+"COPY_PROFILE_INFO_MENU_OPTION_3" = "İsim";
+"COPY_PROFILE_INFO_MENU_OPTION_4" = "İnternet sitesi";
+"COPY_PROFILE_INFO_MENU_OPTION_5" = "Konum";
+"COPY_PROFILE_INFO_MENU_TITLE" = "Kopyala";
+"COPY_PROFILE_INFO_MENU_MORE" = "Daha fazla";
 "REMOVE_FOLLOWERS_TITLE" = "Takipçileri kaldır";
 "REMOVE_FOLLOWERS_DETAIL" = "Seni takip eden bir profilin menüsüne “Bu takipçiyi kaldır” seçeneğini ekle.";
 "REMOVE_FOLLOWER_TITLE" = "Bu takipçiyi kaldır";

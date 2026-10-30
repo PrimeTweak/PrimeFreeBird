@@ -176,11 +176,13 @@
 "DOWNLOAD_ALL_VIDEOS_OPTION_TITLE" = "Завантажити всі відео";
 
 /* ===== Profile actions ===== */
-"COPY_PROFILE_INFO_MENU_OPTION_1" = "Копіювати біо";
-"COPY_PROFILE_INFO_MENU_OPTION_2" = "Копіювати ім’я користувача";
-"COPY_PROFILE_INFO_MENU_OPTION_3" = "Копіювати повне ім’я";
-"COPY_PROFILE_INFO_MENU_OPTION_4" = "Копіювати веб-сторінку";
-"COPY_PROFILE_INFO_MENU_OPTION_5" = "Копіювати місцезнаходження";
+"COPY_PROFILE_INFO_MENU_OPTION_1" = "Біо";
+"COPY_PROFILE_INFO_MENU_OPTION_2" = "Ім’я користувача";
+"COPY_PROFILE_INFO_MENU_OPTION_3" = "Повне ім’я";
+"COPY_PROFILE_INFO_MENU_OPTION_4" = "Веб-сторінка";
+"COPY_PROFILE_INFO_MENU_OPTION_5" = "Місцезнаходження";
+"COPY_PROFILE_INFO_MENU_TITLE" = "Копіювати";
+"COPY_PROFILE_INFO_MENU_MORE" = "Більше";
 "REMOVE_FOLLOWERS_TITLE" = "Вилучення читачів";
 "REMOVE_FOLLOWERS_DETAIL" = "Додає «Вилучити цього читача» в меню профілю, який вас читає.";
 "REMOVE_FOLLOWER_TITLE" = "Вилучити цього читача";

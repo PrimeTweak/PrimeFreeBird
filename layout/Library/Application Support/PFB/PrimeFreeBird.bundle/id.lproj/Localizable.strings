@@ -176,11 +176,13 @@
 "DOWNLOAD_ALL_VIDEOS_OPTION_TITLE" = "Unduh semua video";
 
 /* ===== Profile actions ===== */
-"COPY_PROFILE_INFO_MENU_OPTION_1" = "Salin bio";
-"COPY_PROFILE_INFO_MENU_OPTION_2" = "Salin nama pengguna";
-"COPY_PROFILE_INFO_MENU_OPTION_3" = "Salin nama";
-"COPY_PROFILE_INFO_MENU_OPTION_4" = "Salin situs web";
-"COPY_PROFILE_INFO_MENU_OPTION_5" = "Salin lokasi";
+"COPY_PROFILE_INFO_MENU_OPTION_1" = "Bio";
+"COPY_PROFILE_INFO_MENU_OPTION_2" = "Nama pengguna";
+"COPY_PROFILE_INFO_MENU_OPTION_3" = "Nama";
+"COPY_PROFILE_INFO_MENU_OPTION_4" = "Situs web";
+"COPY_PROFILE_INFO_MENU_OPTION_5" = "Lokasi";
+"COPY_PROFILE_INFO_MENU_TITLE" = "Salin";
+"COPY_PROFILE_INFO_MENU_MORE" = "Lainnya";
 "REMOVE_FOLLOWERS_TITLE" = "Hapus pengikut";
 "REMOVE_FOLLOWERS_DETAIL" = "Tambahkan “Hapus pengikut ini” ke menu profil yang mengikuti Anda.";
 "REMOVE_FOLLOWER_TITLE" = "Hapus pengikut ini";

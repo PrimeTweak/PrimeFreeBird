@@ -176,11 +176,13 @@
 "DOWNLOAD_ALL_VIDEOS_OPTION_TITLE" = "Alle Videos herunterladen";
 
 /* ===== Profile actions ===== */
-"COPY_PROFILE_INFO_MENU_OPTION_1" = "Bio kopieren";
-"COPY_PROFILE_INFO_MENU_OPTION_2" = "Benutzernamen kopieren";
-"COPY_PROFILE_INFO_MENU_OPTION_3" = "Namen kopieren";
-"COPY_PROFILE_INFO_MENU_OPTION_4" = "Webseite kopieren";
-"COPY_PROFILE_INFO_MENU_OPTION_5" = "Ort kopieren";
+"COPY_PROFILE_INFO_MENU_OPTION_1" = "Bio";
+"COPY_PROFILE_INFO_MENU_OPTION_2" = "Benutzername";
+"COPY_PROFILE_INFO_MENU_OPTION_3" = "Name";
+"COPY_PROFILE_INFO_MENU_OPTION_4" = "Webseite";
+"COPY_PROFILE_INFO_MENU_OPTION_5" = "Ort";
+"COPY_PROFILE_INFO_MENU_TITLE" = "Kopieren";
+"COPY_PROFILE_INFO_MENU_MORE" = "Mehr";
 "REMOVE_FOLLOWERS_TITLE" = "Follower entfernen";
 "REMOVE_FOLLOWERS_DETAIL" = "Fügt dem Menü eines Profils, das dir folgt, „Diesen Follower entfernen“ hinzu.";
 "REMOVE_FOLLOWER_TITLE" = "Diesen Follower entfernen";

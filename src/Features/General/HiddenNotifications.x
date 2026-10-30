@@ -1072,12 +1072,14 @@ static void PFBNotifSweep(id dataViewController) {
                 id item = ((id (*)(id, SEL, id))objc_msgSend)(dataViewController, itemSel, path);
                 id model = item ? PFBUnwrapDataViewItem(item) : nil;
                 BOOL notification = model && [NSStringFromClass([model class]) containsString:@"Notification"];
+                // The All tab can hold only Tweet rows; on the notifications screen they
+                // identify the list as well as a notification row does.
+                BOOL tweetHere = model && notificationsScreen && PFBNotifTweetIdentity(model);
                 if (model) {
                     examined++;
-                    sawNotification = sawNotification || notification;
+                    sawNotification = sawNotification || notification || tweetHere;
                 }
-                if (model && (notification || (notificationsScreen && PFBNotifTweetIdentity(model))) &&
-                    PFBNotifIsHidden(model)) {
+                if ((notification || tweetHere) && PFBNotifIsHidden(model)) {
                     [doomed addObject:path];
                 }
             }
@@ -1088,6 +1090,11 @@ static void PFBNotifSweep(id dataViewController) {
                 dataViewController, deleteSel, path, UITableViewRowAnimationNone);
         }
         PFBNotifRecordVerdict(dataViewController, sawNotification, examined);
+        // Rows this sweep removed were delivered: the list is loaded, only emptied.
+        if (doomed.count) {
+            objc_setAssociatedObject(dataViewController, kPFBNotifEverFilledKey, @YES,
+                                     OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        }
         objc_setAssociatedObject(dataViewController, kPFBNotifLastSweepKey,
                                  [NSString stringWithFormat:@"removed %lu of %ld", (unsigned long)doomed.count, (long)examined],
                                  OBJC_ASSOCIATION_RETAIN_NONATOMIC);

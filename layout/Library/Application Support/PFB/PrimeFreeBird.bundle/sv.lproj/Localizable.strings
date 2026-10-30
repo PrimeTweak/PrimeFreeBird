@@ -176,11 +176,13 @@
 "DOWNLOAD_ALL_VIDEOS_OPTION_TITLE" = "Ladda ner alla videor";
 
 /* ===== Profile actions ===== */
-"COPY_PROFILE_INFO_MENU_OPTION_1" = "Kopiera biografi";
-"COPY_PROFILE_INFO_MENU_OPTION_2" = "Kopiera användarnamn";
-"COPY_PROFILE_INFO_MENU_OPTION_3" = "Kopiera namn";
-"COPY_PROFILE_INFO_MENU_OPTION_4" = "Kopiera webbsida";
-"COPY_PROFILE_INFO_MENU_OPTION_5" = "Kopiera plats";
+"COPY_PROFILE_INFO_MENU_OPTION_1" = "Biografi";
+"COPY_PROFILE_INFO_MENU_OPTION_2" = "Användarnamn";
+"COPY_PROFILE_INFO_MENU_OPTION_3" = "Namn";
+"COPY_PROFILE_INFO_MENU_OPTION_4" = "Webbsida";
+"COPY_PROFILE_INFO_MENU_OPTION_5" = "Plats";
+"COPY_PROFILE_INFO_MENU_TITLE" = "Kopiera";
+"COPY_PROFILE_INFO_MENU_MORE" = "Mer";
 "REMOVE_FOLLOWERS_TITLE" = "Ta bort följare";
 "REMOVE_FOLLOWERS_DETAIL" = "Lägg till ”Ta bort denna följare” i menyn för en profil som följer dig.";
 "REMOVE_FOLLOWER_TITLE" = "Ta bort denna följare";

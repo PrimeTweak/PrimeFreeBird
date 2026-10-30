@@ -176,11 +176,13 @@
 "DOWNLOAD_ALL_VIDEOS_OPTION_TITLE" = "すべての動画をダウンロード";
 
 /* ===== Profile actions ===== */
-"COPY_PROFILE_INFO_MENU_OPTION_1" = "自己紹介をコピー";
-"COPY_PROFILE_INFO_MENU_OPTION_2" = "ユーザー名をコピー";
-"COPY_PROFILE_INFO_MENU_OPTION_3" = "名前をコピー";
-"COPY_PROFILE_INFO_MENU_OPTION_4" = "ウェブサイトをコピー";
-"COPY_PROFILE_INFO_MENU_OPTION_5" = "位置情報をコピー";
+"COPY_PROFILE_INFO_MENU_OPTION_1" = "自己紹介";
+"COPY_PROFILE_INFO_MENU_OPTION_2" = "ユーザー名";
+"COPY_PROFILE_INFO_MENU_OPTION_3" = "名前";
+"COPY_PROFILE_INFO_MENU_OPTION_4" = "ウェブサイト";
+"COPY_PROFILE_INFO_MENU_OPTION_5" = "位置情報";
+"COPY_PROFILE_INFO_MENU_TITLE" = "コピー";
+"COPY_PROFILE_INFO_MENU_MORE" = "その他";
 "REMOVE_FOLLOWERS_TITLE" = "フォロワーを削除";
 "REMOVE_FOLLOWERS_DETAIL" = "あなたをフォローしているプロフィールのメニューに「このフォロワーを削除」を追加します。";
 "REMOVE_FOLLOWER_TITLE" = "このフォロワーを削除";

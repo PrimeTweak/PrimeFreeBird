@@ -176,11 +176,13 @@
 "DOWNLOAD_ALL_VIDEOS_OPTION_TITLE" = "Preuzmi sve videozapise";
 
 /* ===== Profile actions ===== */
-"COPY_PROFILE_INFO_MENU_OPTION_1" = "Kopiraj biografiju";
-"COPY_PROFILE_INFO_MENU_OPTION_2" = "Kopiraj korisničko ime";
-"COPY_PROFILE_INFO_MENU_OPTION_3" = "Kopiraj ime";
-"COPY_PROFILE_INFO_MENU_OPTION_4" = "Kopiraj web-mjesto";
-"COPY_PROFILE_INFO_MENU_OPTION_5" = "Kopiraj lokaciju";
+"COPY_PROFILE_INFO_MENU_OPTION_1" = "Biografija";
+"COPY_PROFILE_INFO_MENU_OPTION_2" = "Korisničko ime";
+"COPY_PROFILE_INFO_MENU_OPTION_3" = "Ime";
+"COPY_PROFILE_INFO_MENU_OPTION_4" = "Web-mjesto";
+"COPY_PROFILE_INFO_MENU_OPTION_5" = "Lokacija";
+"COPY_PROFILE_INFO_MENU_TITLE" = "Kopiraj";
+"COPY_PROFILE_INFO_MENU_MORE" = "Više";
 "REMOVE_FOLLOWERS_TITLE" = "Ukloni pratitelje";
 "REMOVE_FOLLOWERS_DETAIL" = "Dodaj „Ukloni ovog pratitelja” u izbornik profila koji te prati.";
 "REMOVE_FOLLOWER_TITLE" = "Ukloni ovog pratitelja";

@@ -176,11 +176,13 @@
 "DOWNLOAD_ALL_VIDEOS_OPTION_TITLE" = "Pobierz wszystkie filmy";
 
 /* ===== Profile actions ===== */
-"COPY_PROFILE_INFO_MENU_OPTION_1" = "Kopiuj bio";
-"COPY_PROFILE_INFO_MENU_OPTION_2" = "Kopiuj nazwę użytkownika";
-"COPY_PROFILE_INFO_MENU_OPTION_3" = "Kopiuj nazwę";
-"COPY_PROFILE_INFO_MENU_OPTION_4" = "Kopiuj stronę internetową";
-"COPY_PROFILE_INFO_MENU_OPTION_5" = "Kopiuj lokalizację";
+"COPY_PROFILE_INFO_MENU_OPTION_1" = "Bio";
+"COPY_PROFILE_INFO_MENU_OPTION_2" = "Nazwa użytkownika";
+"COPY_PROFILE_INFO_MENU_OPTION_3" = "Nazwa";
+"COPY_PROFILE_INFO_MENU_OPTION_4" = "Strona internetowa";
+"COPY_PROFILE_INFO_MENU_OPTION_5" = "Lokalizacja";
+"COPY_PROFILE_INFO_MENU_TITLE" = "Kopiuj";
+"COPY_PROFILE_INFO_MENU_MORE" = "Więcej";
 "REMOVE_FOLLOWERS_TITLE" = "Usuwaj obserwujących";
 "REMOVE_FOLLOWERS_DETAIL" = "Dodaj „Usuń tego obserwującego” do menu profilu, który Cię obserwuje.";
 "REMOVE_FOLLOWER_TITLE" = "Usuń tego obserwującego";

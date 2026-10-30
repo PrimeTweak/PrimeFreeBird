@@ -176,11 +176,13 @@
 "DOWNLOAD_ALL_VIDEOS_OPTION_TITLE" = "Скачать все видео";
 
 /* ===== Profile actions ===== */
-"COPY_PROFILE_INFO_MENU_OPTION_1" = "Скопировать био";
-"COPY_PROFILE_INFO_MENU_OPTION_2" = "Скопировать имя пользователя";
-"COPY_PROFILE_INFO_MENU_OPTION_3" = "Скопировать полное имя";
-"COPY_PROFILE_INFO_MENU_OPTION_4" = "Скопировать веб-сайт";
-"COPY_PROFILE_INFO_MENU_OPTION_5" = "Скопировать местоположение";
+"COPY_PROFILE_INFO_MENU_OPTION_1" = "Био";
+"COPY_PROFILE_INFO_MENU_OPTION_2" = "Имя пользователя";
+"COPY_PROFILE_INFO_MENU_OPTION_3" = "Полное имя";
+"COPY_PROFILE_INFO_MENU_OPTION_4" = "Веб-сайт";
+"COPY_PROFILE_INFO_MENU_OPTION_5" = "Местоположение";
+"COPY_PROFILE_INFO_MENU_TITLE" = "Скопировать";
+"COPY_PROFILE_INFO_MENU_MORE" = "Ещё";
 "REMOVE_FOLLOWERS_TITLE" = "Удаление читателей";
 "REMOVE_FOLLOWERS_DETAIL" = "Добавляет «Удалить из читателей» в меню профиля, который вас читает.";
 "REMOVE_FOLLOWER_TITLE" = "Удалить из читателей";

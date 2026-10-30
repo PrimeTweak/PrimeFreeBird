@@ -176,11 +176,13 @@
 "DOWNLOAD_ALL_VIDEOS_OPTION_TITLE" = "تحميل كل الفيديوهات";
 
 /* ===== Profile actions ===== */
-"COPY_PROFILE_INFO_MENU_OPTION_1" = "نسخ النبذة";
-"COPY_PROFILE_INFO_MENU_OPTION_2" = "نسخ اسم المستخدم";
-"COPY_PROFILE_INFO_MENU_OPTION_3" = "نسخ الاسم";
-"COPY_PROFILE_INFO_MENU_OPTION_4" = "نسخ الموقع الإلكتروني";
-"COPY_PROFILE_INFO_MENU_OPTION_5" = "نسخ الموقع";
+"COPY_PROFILE_INFO_MENU_OPTION_1" = "النبذة";
+"COPY_PROFILE_INFO_MENU_OPTION_2" = "اسم المستخدم";
+"COPY_PROFILE_INFO_MENU_OPTION_3" = "الاسم";
+"COPY_PROFILE_INFO_MENU_OPTION_4" = "الموقع الإلكتروني";
+"COPY_PROFILE_INFO_MENU_OPTION_5" = "الموقع";
+"COPY_PROFILE_INFO_MENU_TITLE" = "نسخ";
+"COPY_PROFILE_INFO_MENU_MORE" = "المزيد";
 "REMOVE_FOLLOWERS_TITLE" = "إزالة المتابعين";
 "REMOVE_FOLLOWERS_DETAIL" = "إضافة «إزالة هذا المتابع» إلى قائمة الملف الشخصي الذي يتابعك.";
 "REMOVE_FOLLOWER_TITLE" = "إزالة هذا المتابع";
