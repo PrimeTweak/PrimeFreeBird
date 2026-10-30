@@ -798,9 +798,31 @@ static const CGFloat kPFBNotifEmptyGap = 8.0;
 static const CGFloat kPFBNotifEmptyTitleSize = 30.0;
 static const CGFloat kPFBNotifEmptyBodySize = 15.0;
 
-// Places the panel with frames in the table's content coordinate space, so it
-// travels with the list; pinned to frameLayoutGuide it would stay welded to the
-// viewport. Auto Layout is avoided: a table view owns its own content size.
+static const char* kPFBNotifRestInsetKey = "pfbNotifRestInset";
+
+// The list's top inset at rest: a refresh adds its spinner's room, which the panel ignores.
+static CGFloat PFBNotifRestInset(UITableView* table) {
+    if (!table.refreshControl.isRefreshing) {
+        objc_setAssociatedObject(table, kPFBNotifRestInsetKey, @(table.adjustedContentInset.top),
+                                 OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    }
+    NSNumber* rest = objc_getAssociatedObject(table, kPFBNotifRestInsetKey);
+    return rest ? (CGFloat)rest.doubleValue : table.adjustedContentInset.top;
+}
+
+// The panel sits behind the list, in its background view, as iOS's own empty screens do:
+// a jump of the list (a refresh) leaves it where it is.
+static UIView* PFBNotifPanelHost(UITableView* table) {
+    if (!table.backgroundView) {
+        UIView* host = [[UIView alloc] init];
+        host.backgroundColor = UIColor.clearColor;
+        host.userInteractionEnabled = NO;
+        table.backgroundView = host;
+    }
+    return table.backgroundView;
+}
+
+// Frames rather than Auto Layout, below the bars at rest, in the background view's space.
 static void PFBNotifLayoutEmptyPanel(UIView* panel, UITableView* table) {
     UILabel* title = (UILabel*)[panel viewWithTag:kPFBNotifEmptyTitleTag];
     UILabel* body = (UILabel*)[panel viewWithTag:kPFBNotifEmptyBodyTag];
@@ -820,8 +842,27 @@ static void PFBNotifLayoutEmptyPanel(UIView* panel, UITableView* table) {
     body.frame = CGRectMake(0.0, CGRectGetMaxY(title.frame) + kPFBNotifEmptyGap,
                             width, ceil(bodySize.height));
     panel.frame = CGRectMake(kPFBNotifEmptySideInset,
-                             kPFBNotifEmptyTopInset,
+                             PFBNotifRestInset(table) + kPFBNotifEmptyTopInset,
                              width, CGRectGetMaxY(body.frame));
+}
+
+// The panel of a notifications list, and how many panels its list holds (one fading out and
+// a new one, at most), for the screen probe.
+UIView* PFBNotifEmptyPanel(UITableView* table, NSUInteger* panels) {
+    __block NSUInteger count = 0;
+    PFBWalkAllSubviews(table, 4, ^(UIView* view) {
+      count += view.tag == kPFBNotifEmptyTitleTag;
+    });
+    if (panels) {
+        *panels = count;
+    }
+    return [table viewWithTag:kPFBNotifEmptyTag];
+}
+
+static NSUInteger gPFBNotifSweeps;
+
+NSUInteger PFBNotifSweepCount(void) {
+    return gPFBNotifSweeps;
 }
 
 // MARK: Empty panel measurement
@@ -845,10 +886,7 @@ static void PFBNotifPanelNote(id controller, UITableView* table, NSString* state
         objc_setAssociatedObject(controller, kPFBNotifPanelSinceKey, since, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     }
     NSUInteger panels = 0;
-    for (UIView* sub in table.subviews) {
-        panels += [sub viewWithTag:kPFBNotifEmptyTitleTag] != nil;
-    }
-    UIView* panel = [table viewWithTag:kPFBNotifEmptyTag];
+    UIView* panel = PFBNotifEmptyPanel(table, &panels);
     NSString* panelText = panel ? [NSString stringWithFormat:@"y %.0f on screen, alpha %.2f",
                                                              [panel convertRect:panel.bounds toView:nil].origin.y, panel.alpha]
                                 : @"none";
@@ -992,7 +1030,7 @@ static void PFBNotifSyncEmptyState(id dataViewController) {
         // Faded in rather than popped, and timed to land as the last row finishes
         // sliding out, so the two read as one motion instead of a flash.
         panel.alpha = 0.0;
-        [table addSubview:panel];
+        [PFBNotifPanelHost(table) addSubview:panel];
         PFBNotifLayoutEmptyPanel(panel, table);
         [UIView animateWithDuration:0.3
                               delay:0.15
@@ -1062,6 +1100,7 @@ static void PFBNotifSweep(id dataViewController) {
 
         NSMutableArray<NSIndexPath*>* doomed = [NSMutableArray array];
         BOOL notificationsScreen = PFBNotifOnNotificationsScreen(dataViewController);
+        gPFBNotifSweeps += notificationsScreen;
         BOOL sawNotification = NO;
         NSInteger examined = 0;
         NSInteger sections = table.numberOfSections;

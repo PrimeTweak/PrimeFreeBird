@@ -249,29 +249,62 @@ static NSString* PFBDashOpenText(void) {
     return PFBDashIsOpen() ? @"menu open" : @"menu closed";
 }
 
-// "T1Twitter+0x12a748": the first caller outside PrimeFreeBird, past the hooks stacked on the
-// method, read from the frame records arm64 keeps.
-static NSString* PFBSideMenuCaller(const void* frameAddress) {
+// The first return address outside PrimeFreeBird, past the hooks stacked on the method, read
+// from the frame records arm64 keeps; NULL when the walk ends inside PrimeFreeBird.
+static const void* PFBFirstOutsideCaller(const void* frameAddress, BOOL* unreadable) {
     static const void* ours;
     static dispatch_once_t once;
     dispatch_once(&once, ^{
       Dl_info info;
-      ours = dladdr((const void*)&PFBSideMenuCaller, &info) ? info.dli_fbase : NULL;
+      ours = dladdr((const void*)&PFBFirstOutsideCaller, &info) ? info.dli_fbase : NULL;
     });
     const void* const* frame = (const void* const*)frameAddress;
     for (NSInteger hop = 0; frame && hop < 6; hop++) {
         Dl_info info;
         if (!frame[1] || !dladdr(frame[1], &info) || !info.dli_fbase) {
-            return @"?";
+            *unreadable = YES;
+            return NULL;
         }
         if (info.dli_fbase != ours) {
-            const char* slash = info.dli_fname ? strrchr(info.dli_fname, '/') : NULL;
-            return [NSString stringWithFormat:@"%s+0x%lx", slash ? slash + 1 : (info.dli_fname ?: "?"),
-                                              (unsigned long)((uintptr_t)frame[1] - (uintptr_t)info.dli_fbase)];
+            return frame[1];
         }
         frame = (const void* const*)frame[0];
     }
-    return @"PrimeFreeBird";
+    return NULL;
+}
+
+// "T1Twitter+0x12a748": that caller as an image and an offset in it.
+static NSString* PFBSideMenuCaller(const void* frameAddress) {
+    BOOL unreadable = NO;
+    const void* address = PFBFirstOutsideCaller(frameAddress, &unreadable);
+    Dl_info info;
+    if (!address || !dladdr(address, &info)) {
+        return unreadable ? @"?" : @"PrimeFreeBird";
+    }
+    const char* slash = info.dli_fname ? strrchr(info.dli_fname, '/') : NULL;
+    return [NSString stringWithFormat:@"%s+0x%lx", slash ? slash + 1 : (info.dli_fname ?: "?"),
+                                      (unsigned long)((uintptr_t)address - (uintptr_t)info.dli_fbase)];
+}
+
+// For a read made while the menu is open: the symbol iOS names at the caller and where
+// Twitter's Swift menu builder is, the two ways an earlier fix tried to recognise it.
+static void PFBSideMenuReaderSymbol(const void* frameAddress) {
+    BOOL unreadable = NO;
+    const void* address = PFBFirstOutsideCaller(frameAddress, &unreadable);
+    Dl_info info;
+    if (!address || !dladdr(address, &info)) {
+        return;
+    }
+    const void* builder = dlsym(RTLD_DEFAULT, "$s14T1TwitterSwift21DashContentControllerC21updateVisiblePanelIDsyyF");
+    NSString* builderText = !builder ? @"not found"
+                                     : [NSString stringWithFormat:@"at +0x%lx in the caller's image",
+                                                                  (unsigned long)((uintptr_t)builder - (uintptr_t)info.dli_fbase)];
+    PFBCompatMeasure(@"side menu answer",
+                     [NSString stringWithFormat:@"read while the menu is open: symbol at the caller %s (+0x%lx), "
+                                                @"Swift builder by name %@",
+                                                info.dli_sname ?: "none",
+                                                (unsigned long)((uintptr_t)address - (uintptr_t)info.dli_saddr), builderText],
+                     4);
 }
 
 static NSString* PFBPanelsText(NSArray* panels) {
@@ -279,11 +312,15 @@ static NSString* PFBPanelsText(NSArray* panels) {
 }
 
 // A read of the tab panels, each caller and answer noted once per moment and menu state.
-static void PFBPanelsRead(NSString* reader, const void* frameAddress, NSArray* panels) {
+static void PFBPanelsRead(NSString* reader, BOOL glass, const void* frameAddress, NSArray* panels) {
+    BOOL open = PFBDashIsOpen();
     PFBSideMenuNote([NSString stringWithFormat:@"%@ read by %@, [%@], %@, %@", reader, PFBSideMenuCaller(frameAddress),
                                                PFBPanelsText(panels),
-                                               PFBDashAnswerApplies(frameAddress) ? @"PrimeFreeBird's answer" : @"Twitter's own",
-                                               PFBDashOpenText()]);
+                                               PFBDashAnswerApplies(glass) ? @"PrimeFreeBird's answer" : @"Twitter's own",
+                                               open ? @"menu open" : @"menu closed"]);
+    if (open) {
+        PFBSideMenuReaderSymbol(frameAddress);
+    }
 }
 
 // The menu as it shows: where it sits, its rows (8 trimmed, 13 standard on this account) and
@@ -362,7 +399,7 @@ static void PFBSideMenuState(NSString* when) {
 
 - (NSArray*)visiblePanelIDs {
     NSArray* panels = %orig;
-    PFBPanelsRead(@"tab panels", __builtin_frame_address(0), panels);
+    PFBPanelsRead(@"tab panels", YES, __builtin_frame_address(0), panels);
     return panels;
 }
 
@@ -384,7 +421,7 @@ static void PFBSideMenuState(NSString* when) {
 
 - (NSArray*)visiblePanelIDsForAppNavigation:(id)appNavigation {
     NSArray* panels = %orig;
-    PFBPanelsRead(@"classic tab panels", __builtin_frame_address(0), panels);
+    PFBPanelsRead(@"classic tab panels", NO, __builtin_frame_address(0), panels);
     return panels;
 }
 

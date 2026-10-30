@@ -1162,34 +1162,10 @@ BOOL PFBPanelIsGenuinelyAvailable(long long panelID) {
 
 static __thread BOOL DashPanelIDQuery = NO;
 
-// Twitter also runs the menu's Swift builder directly, past the Objective-C door above (on
-// a return from the app switcher): a read made from it is recognised by its exported name.
-static BOOL PFBDashSwiftBuilderReads(const void* frameAddress) {
-    static const void* builder;
-    static const void* ours;
-    static dispatch_once_t once;
-    dispatch_once(&once, ^{
-      builder = dlsym(RTLD_DEFAULT, "$s14T1TwitterSwift21DashContentControllerC21updateVisiblePanelIDsyyF");
-      Dl_info info;
-      ours = dladdr((const void*)&PFBDashSwiftBuilderReads, &info) ? info.dli_fbase : NULL;
-      if (!builder) {
-          PFBCompatMeasure(@"side menu", @"Twitter's Swift menu builder not found", 2);
-      }
-    });
-    // The first caller outside PrimeFreeBird, past the hooks stacked on the read.
-    const void* const* frame = (const void* const*)frameAddress;
-    for (NSInteger hop = 0; builder && frame && hop < 6; hop++) {
-        Dl_info info;
-        if (!frame[1] || !dladdr(frame[1], &info)) {
-            return NO;
-        }
-        if (info.dli_fbase != ours) {
-            return info.dli_saddr == builder;
-        }
-        frame = (const void* const*)frame[0];
-    }
-    return NO;
-}
+// Twitter also rebuilds the open menu from its Swift side, past the Objective-C door above
+// (on a return from the app switcher): the glass navigation's list is answered as well
+// while the menu is open, as its presenter reports it.
+static BOOL gPFBDashMenuOpen;
 
 static void PFBDashRebuild(id controller) {
     SEL update = NSSelectorFromString(@"updateVisiblePanelIDs");
@@ -1232,9 +1208,22 @@ static void PFBDashRebuild(id controller) {
 
 %end
 
-BOOL PFBDashAnswerApplies(const void* frameAddress) {
-    return DashPanelIDQuery || PFBDashSwiftBuilderReads(frameAddress);
+BOOL PFBDashAnswerApplies(BOOL glassNavigation) {
+    return DashPanelIDQuery || (glassNavigation && gPFBDashMenuOpen);
 }
+
+@interface T1DashContentPresenter : NSObject
+- (void)dashDidSettleOpen:(BOOL)open;
+@end
+
+%hook T1DashContentPresenter
+
+- (void)dashDidSettleOpen:(BOOL)open {
+    gPFBDashMenuOpen = open;
+    %orig;
+}
+
+%end
 
 // The last answer given to the drawer and when, read by the app return probe.
 static NSString* gPFBDashFacts;
@@ -1292,7 +1281,7 @@ static NSArray* PFBDashPanelIDs(NSArray* panelIDs) {
 
 - (NSArray*)visiblePanelIDsForAppNavigation:(id)appNavigation {
     NSArray* panelIDs = %orig;
-    return PFBDashAnswerApplies(__builtin_frame_address(0)) ? PFBDashPanelIDs(panelIDs) : panelIDs;
+    return PFBDashAnswerApplies(NO) ? PFBDashPanelIDs(panelIDs) : panelIDs;
 }
 
 %end
@@ -1308,7 +1297,7 @@ static NSArray* PFBDashPanelIDs(NSArray* panelIDs) {
 
 - (NSArray*)visiblePanelIDs {
     NSArray* panelIDs = %orig;
-    if (PFBDashAnswerApplies(__builtin_frame_address(0))) {
+    if (PFBDashAnswerApplies(YES)) {
         return PFBDashPanelIDs(panelIDs);
     }
     [PFBCustomTabBarUtility recordPanelIDs:panelIDs];

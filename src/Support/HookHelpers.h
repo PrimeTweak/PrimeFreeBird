@@ -89,9 +89,13 @@ BOOL PFBPanelIsGenuinelyAvailable(long long panelID);
 // The last panels Twitter gave the side menu and those PrimeFreeBird gave back, with why
 // (FeatureSwitches.x).
 NSString* PFBDashPanelFacts(void);
-// Whether a panel list read now, from the hook whose frame is given, gets PrimeFreeBird's
-// answer for the side menu.
-BOOL PFBDashAnswerApplies(const void* frameAddress);
+// Whether a panel list read now gets PrimeFreeBird's answer for the side menu, from the glass
+// navigation or from the classic one.
+BOOL PFBDashAnswerApplies(BOOL glassNavigation);
+// The empty panel of a notifications list and how many panels the list holds, and how many
+// sweeps of a list have run (HiddenNotifications.x), for the screen probe.
+UIView* PFBNotifEmptyPanel(UITableView* table, NSUInteger* panels);
+NSUInteger PFBNotifSweepCount(void);
 
 // Web session cookie harvesting (WebCreateTweet.x)
 void PFBPrewarmWebCookiesIfNeeded(void);

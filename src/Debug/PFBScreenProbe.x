@@ -1,6 +1,7 @@
 // Screen by screen, once it has settled and at each capture: the bar Twitter keeps above Home
 // for Spaces and live games, the blur iOS draws under the top bars, the notifications list as
 // the hide code reads it, and the Suggested part of the Chat inbox. Menus: any Imagine entry.
+// On Notifications, each frame of a pull or a refresh: the list, its rows and the empty panel.
 
 #import "Support/HookHelpers.h"
 #import "Common/PFBCompatibility.h"
@@ -311,6 +312,120 @@ static void PFBSuggestedChatsLook(UIViewController* controller) {
                      kPFBSuggestedLines);
 }
 
+// MARK: - Notifications refresh, frame by frame
+
+static NSString* const kPFBRefreshTopic = @"notification refresh";
+static const NSUInteger kPFBRefreshLines = 80;
+
+// While the list is pulled or refreshing, and 3 s after, each change of what shows: the list's
+// offset and inset, the visible rows, the sweeps, and the panel's place, opacity and count.
+// A jump of the panel or the list within one frame is noted as such.
+@interface PFBRefreshSampler : NSObject
+@property (nonatomic, weak) UIViewController* screen;
+@property (nonatomic, weak) UITableView* list;
+@property (nonatomic, strong) CADisplayLink* link;
+@property (nonatomic) CFTimeInterval activeSince;
+@property (nonatomic) CFTimeInterval lastActive;
+@property (nonatomic, copy) NSString* lastState;
+@property (nonatomic) CGFloat lastPanelY;
+@property (nonatomic) CGFloat lastOffset;
+@end
+
+static PFBRefreshSampler* gPFBRefreshSampler;
+
+@implementation PFBRefreshSampler
+
+// The notifications list: the one holding the panel, or the widest list on screen.
+- (UITableView*)findList {
+    UITableView* list = self.list;
+    if (list.window) {
+        return list;
+    }
+    __block UITableView* found = nil;
+    PFBWalkAllSubviews(self.screen.viewIfLoaded, 20, ^(UIView* view) {
+      if (![view isKindOfClass:[UITableView class]] || !view.window) {
+          return;
+      }
+      if (PFBNotifEmptyPanel((UITableView*)view, NULL) ||
+          (!found && CGRectGetWidth(view.bounds) >= CGRectGetWidth(view.window.bounds) - 1.0 &&
+           CGRectIntersectsRect([view convertRect:view.bounds toView:nil], view.window.bounds))) {
+          found = (UITableView*)view;
+      }
+    });
+    self.list = found;
+    return found;
+}
+
+- (void)tick:(CADisplayLink*)link {
+    UIViewController* screen = self.screen;
+    if (!screen.viewIfLoaded.window) {
+        [link invalidate];
+        gPFBRefreshSampler = nil;
+        return;
+    }
+    UITableView* list = [self findList];
+    if (!list) {
+        return;
+    }
+    CFTimeInterval now = CACurrentMediaTime();
+    CGFloat inset = list.adjustedContentInset.top;
+    BOOL refreshing = list.refreshControl.isRefreshing;
+    BOOL pulled = list.contentOffset.y < -inset - 2.0;
+    if (refreshing || pulled) {
+        if (self.activeSince == 0) {
+            self.activeSince = now;
+            self.lastState = nil;
+        }
+        self.lastActive = now;
+    } else if (self.activeSince == 0 || now - self.lastActive > 3.0) {
+        self.activeSince = 0;
+        return;
+    }
+    NSUInteger panels = 0;
+    UIView* panel = PFBNotifEmptyPanel(list, &panels);
+    CGFloat panelY = panel.window ? [panel convertRect:panel.bounds toView:nil].origin.y : -1.0;
+    NSUInteger rows = 0;
+    for (UITableViewCell* cell in list.visibleCells) {
+        rows += CGRectGetHeight(cell.bounds) > 1.0 && PFBShownOpacity(cell) > 0.05;
+    }
+    NSString* panelText = !panel ? @"none"
+                          : !panel.window ? @"off the window"
+                                          : [NSString stringWithFormat:@"y %.0f shown %.1f", panelY, PFBShownOpacity(panel)];
+    NSString* state = [NSString stringWithFormat:@"refreshing %@, panel %@, panels %lu, visible rows %lu, sweeps %lu",
+                                                 refreshing ? @"yes" : @"no", panelText, (unsigned long)panels,
+                                                 (unsigned long)rows, (unsigned long)PFBNotifSweepCount()];
+    CGFloat panelJump = panel.window && self.lastPanelY >= 0 ? panelY - self.lastPanelY : 0.0;
+    CGFloat listJump = list.contentOffset.y - self.lastOffset;
+    BOOL jump = self.lastState && (fabs(panelJump) > 8.0 || fabs(listJump) > 20.0);
+    if (jump || ![state isEqualToString:self.lastState]) {
+        PFBCompatMeasure(kPFBRefreshTopic,
+                         [NSString stringWithFormat:@"+%.2f s: list offset %.0f, inset %.0f, %@%@", now - self.activeSince,
+                                                    list.contentOffset.y, inset, state,
+                                                    jump ? [NSString stringWithFormat:@" · jump in one frame: panel %+.0f pt, list %+.0f pt",
+                                                                                      panelJump, listJump]
+                                                         : @""],
+                         kPFBRefreshLines);
+        self.lastState = state;
+    }
+    self.lastPanelY = panelY;
+    self.lastOffset = list.contentOffset.y;
+}
+
+@end
+
+static void PFBRefreshWatch(UIViewController* screen) {
+    if (gPFBRefreshSampler.screen == screen) {
+        return;
+    }
+    [gPFBRefreshSampler.link invalidate];
+    PFBRefreshSampler* sampler = [[PFBRefreshSampler alloc] init];
+    sampler.screen = screen;
+    sampler.lastPanelY = -1.0;
+    sampler.link = [CADisplayLink displayLinkWithTarget:sampler selector:@selector(tick:)];
+    [sampler.link addToRunLoop:NSRunLoop.mainRunLoop forMode:NSRunLoopCommonModes];
+    gPFBRefreshSampler = sampler;
+}
+
 // MARK: - When to look
 
 static void PFBScreenLook(UIViewController* controller, NSString* moment) {
@@ -320,6 +435,7 @@ static void PFBScreenLook(UIViewController* controller, NSString* moment) {
         Class notifications = NSClassFromString(@"T1NotificationsViewController");
         if (notifications && [controller isKindOfClass:notifications]) {
             PFBNotifRowsLook(controller);
+            PFBRefreshWatch(controller);
         }
         PFBSuggestedChatsLook(controller);
     } @catch (__unused id exception) {
