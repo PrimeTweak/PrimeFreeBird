@@ -2,6 +2,7 @@
 // for Spaces and live games, the blur iOS draws under the top bars, the notifications list as
 // the hide code reads it, and the Suggested part of the Chat inbox. Menus: any Imagine entry.
 // On Notifications, each frame of a pull or a refresh: the list, its rows and the empty panel.
+// As Twitter's tab editor comes and goes, each frame of its bar, its flying copy and the tab bar.
 
 #import "Support/HookHelpers.h"
 #import "Common/PFBCompatibility.h"
@@ -425,6 +426,94 @@ static void PFBRefreshWatch(UIViewController* screen) {
     [sampler.link addToRunLoop:NSRunLoop.mainRunLoop forMode:NSRunLoopCommonModes];
     gPFBRefreshSampler = sampler;
 }
+
+// MARK: - Tab editor flight, frame by frame
+
+static NSString* const kPFBFlightTopic = @"tab editor flight";
+static const NSUInteger kPFBFlightLines = 60;
+
+static UIView* PFBEditorIvarView(UIViewController* editor, const char* name) {
+    Ivar ivar = class_getInstanceVariable(object_getClass(editor), name);
+    id value = ivar ? object_getIvar(editor, ivar) : nil;
+    return [value isKindOfClass:[UIView class]] ? value : nil;
+}
+
+static NSString* PFBFlightViewText(UIView* view) {
+    if (!view) {
+        return @"none";
+    }
+    if (!view.window) {
+        return @"off the window";
+    }
+    CGRect frame = [view convertRect:view.bounds toView:nil];
+    return [NSString stringWithFormat:@"%.0f,%.0f%@ shown %.1f", 4.0 * round(frame.origin.x / 4.0),
+                                      4.0 * round(frame.origin.y / 4.0), view.hidden ? @" hidden" : @"",
+                                      PFBShownOpacity(view)];
+}
+
+// For 1.2 s from a page change: the editor's bar, the copy Twitter flies, and the tab bars shown.
+@interface PFBFlightSampler : NSObject
+@property (nonatomic, weak) UIViewController* editor;
+@property (nonatomic, copy) NSString* change;
+@property (nonatomic) CFTimeInterval start;
+@property (nonatomic, copy) NSString* lastState;
+@end
+
+@implementation PFBFlightSampler
+
+- (void)tick:(CADisplayLink*)link {
+    UIViewController* editor = self.editor;
+    CFTimeInterval elapsed = CACurrentMediaTime() - self.start;
+    if (!editor || elapsed > 1.2) {
+        [link invalidate];
+        return;
+    }
+    UIWindow* window = editor.viewIfLoaded.window ?: PFBProbeKeyWindow();
+    Class tabBarClass = NSClassFromString(@"_TtC11XNavigation10TabBarView");
+    NSMutableArray<NSString*>* tabBars = [NSMutableArray array];
+    PFBWalkAllSubviews(window, 40, ^(UIView* view) {
+      if (tabBarClass && [view isKindOfClass:tabBarClass] && PFBShownOpacity(view) > 0.05) {
+          [tabBars addObject:PFBFlightViewText(view)];
+      }
+    });
+    NSString* state = [NSString stringWithFormat:@"editor bar %@ · flying copy %@ · tab bars shown [%@]",
+                                                 PFBFlightViewText(PFBEditorIvarView(editor, "barView")),
+                                                 PFBFlightViewText(PFBEditorIvarView(editor, "tabBarFlight")),
+                                                 [tabBars componentsJoinedByString:@"; "]];
+    if (![state isEqualToString:self.lastState]) {
+        PFBCompatMeasure(kPFBFlightTopic, [NSString stringWithFormat:@"%@ +%.2f s: %@", self.change, elapsed, state],
+                         kPFBFlightLines);
+        self.lastState = state;
+    }
+}
+
+@end
+
+static void PFBFlightWatch(UIViewController* editor, NSString* change) {
+    PFBFlightSampler* sampler = [[PFBFlightSampler alloc] init];
+    sampler.editor = editor;
+    sampler.change = change;
+    sampler.start = CACurrentMediaTime();
+    CADisplayLink* link = [CADisplayLink displayLinkWithTarget:sampler selector:@selector(tick:)];
+    [link addToRunLoop:NSRunLoop.mainRunLoop forMode:NSRunLoopCommonModes];
+}
+
+@interface _TtC11XNavigation26TabBarEditorViewController : UIViewController
+@end
+
+%hook _TtC11XNavigation26TabBarEditorViewController
+
+- (void)viewWillAppear:(BOOL)animated {
+    %orig;
+    PFBFlightWatch((UIViewController*)self, @"opening");
+}
+
+- (void)viewWillDisappear:(BOOL)animated {
+    %orig;
+    PFBFlightWatch((UIViewController*)self, @"closing");
+}
+
+%end
 
 // MARK: - When to look
 
