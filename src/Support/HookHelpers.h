@@ -89,8 +89,9 @@ BOOL PFBPanelIsGenuinelyAvailable(long long panelID);
 // The last panels Twitter gave the side menu and those PrimeFreeBird gave back, with why
 // (FeatureSwitches.x).
 NSString* PFBDashPanelFacts(void);
-// Whether a panel list read now gets PrimeFreeBird's answer for the side menu.
-BOOL PFBDashAnswerApplies(void);
+// Whether a panel list read now, from the hook whose frame is given, gets PrimeFreeBird's
+// answer for the side menu.
+BOOL PFBDashAnswerApplies(const void* frameAddress);
 
 // Web session cookie harvesting (WebCreateTweet.x)
 void PFBPrewarmWebCookiesIfNeeded(void);

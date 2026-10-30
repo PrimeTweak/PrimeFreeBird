@@ -282,7 +282,7 @@ static NSString* PFBPanelsText(NSArray* panels) {
 static void PFBPanelsRead(NSString* reader, const void* frameAddress, NSArray* panels) {
     PFBSideMenuNote([NSString stringWithFormat:@"%@ read by %@, [%@], %@, %@", reader, PFBSideMenuCaller(frameAddress),
                                                PFBPanelsText(panels),
-                                               PFBDashAnswerApplies() ? @"PrimeFreeBird's answer" : @"Twitter's own",
+                                               PFBDashAnswerApplies(frameAddress) ? @"PrimeFreeBird's answer" : @"Twitter's own",
                                                PFBDashOpenText()]);
 }
 

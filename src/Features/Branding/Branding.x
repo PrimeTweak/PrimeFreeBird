@@ -927,6 +927,47 @@ static void PFBGlassStyleCompose(UIView* host) {
     PFBGlassComposeLook(host, compose);
 }
 
+// The accessory hosts seen, styled again when their light or dark look changes and when the
+// app becomes active: the app switcher repaints the app both ways for its previews, and the
+// glyph Twitter draws back then brings no layout pass of the host.
+static NSHashTable<UIView*>* PFBGlassHosts(void) {
+    static NSHashTable<UIView*>* hosts;
+    if (!hosts) {
+        hosts = [NSHashTable weakObjectsHashTable];
+    }
+    return hosts;
+}
+
+static void PFBGlassRestyleLater(UIView* host) {
+    __weak UIView* weakHost = host;
+    dispatch_async(dispatch_get_main_queue(), ^{
+      UIView* alive = weakHost;
+      if (alive.window) {
+          @try {
+              PFBGlassStyleCompose(alive);
+          } @catch (__unused id exception) {
+          }
+      }
+    });
+}
+
+static void PFBGlassWatchHost(UIView* host) {
+    if ([PFBGlassHosts() containsObject:host]) {
+        return;
+    }
+    [PFBGlassHosts() addObject:host];
+    Class style = NSClassFromString(@"UITraitUserInterfaceStyle");
+    SEL registration = NSSelectorFromString(@"registerForTraitChanges:withHandler:");
+    if (style && [host respondsToSelector:registration]) {
+        void (^handler)(id, id) = ^(id environment, __unused id previous) {
+          if ([environment isKindOfClass:[UIView class]]) {
+              PFBGlassRestyleLater((UIView*)environment);
+          }
+        };
+        ((id (*)(id, SEL, NSArray*, id))objc_msgSend)(host, registration, @[ style ], handler);
+    }
+}
+
 // How PrimeFreeBird sees one accessory of the glass tab bar, for the app return probe.
 NSString* PFBGlassAccessoryFacts(UIView* host) {
     UIVisualEffectView* material = PFBGlassComposeMaterial(host);
@@ -980,6 +1021,7 @@ BOOL PFBGlassIsFeather(UIImage* image) {
     %orig;
     @try {
         PFBGlassStyleCompose((UIView*)self);
+        PFBGlassWatchHost((UIView*)self);
     } @catch (__unused id exception) {
     }
 }
@@ -991,6 +1033,7 @@ BOOL PFBGlassIsFeather(UIImage* image) {
     }
     @try {
         PFBGlassStyleCompose((UIView*)self);
+        PFBGlassWatchHost((UIView*)self);
     } @catch (__unused id exception) {
     }
 }
@@ -1135,3 +1178,15 @@ BOOL PFBGlassIsFeather(UIImage* image) {
 }
 
 %end
+
+%ctor {
+    %init;
+    [[NSNotificationCenter defaultCenter] addObserverForName:UIApplicationDidBecomeActiveNotification
+                                                      object:nil
+                                                       queue:NSOperationQueue.mainQueue
+                                                  usingBlock:^(__unused NSNotification* note) {
+                                                    for (UIView* host in PFBGlassHosts().allObjects) {
+                                                        PFBGlassRestyleLater(host);
+                                                    }
+                                                  }];
+}

@@ -1162,6 +1162,35 @@ BOOL PFBPanelIsGenuinelyAvailable(long long panelID) {
 
 static __thread BOOL DashPanelIDQuery = NO;
 
+// Twitter also runs the menu's Swift builder directly, past the Objective-C door above (on
+// a return from the app switcher): a read made from it is recognised by its exported name.
+static BOOL PFBDashSwiftBuilderReads(const void* frameAddress) {
+    static const void* builder;
+    static const void* ours;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+      builder = dlsym(RTLD_DEFAULT, "$s14T1TwitterSwift21DashContentControllerC21updateVisiblePanelIDsyyF");
+      Dl_info info;
+      ours = dladdr((const void*)&PFBDashSwiftBuilderReads, &info) ? info.dli_fbase : NULL;
+      if (!builder) {
+          PFBCompatMeasure(@"side menu", @"Twitter's Swift menu builder not found", 2);
+      }
+    });
+    // The first caller outside PrimeFreeBird, past the hooks stacked on the read.
+    const void* const* frame = (const void* const*)frameAddress;
+    for (NSInteger hop = 0; builder && frame && hop < 6; hop++) {
+        Dl_info info;
+        if (!frame[1] || !dladdr(frame[1], &info)) {
+            return NO;
+        }
+        if (info.dli_fbase != ours) {
+            return info.dli_saddr == builder;
+        }
+        frame = (const void* const*)frame[0];
+    }
+    return NO;
+}
+
 static void PFBDashRebuild(id controller) {
     SEL update = NSSelectorFromString(@"updateVisiblePanelIDs");
     if ([controller respondsToSelector:update]) {
@@ -1203,8 +1232,8 @@ static void PFBDashRebuild(id controller) {
 
 %end
 
-BOOL PFBDashAnswerApplies(void) {
-    return DashPanelIDQuery;
+BOOL PFBDashAnswerApplies(const void* frameAddress) {
+    return DashPanelIDQuery || PFBDashSwiftBuilderReads(frameAddress);
 }
 
 // The last answer given to the drawer and when, read by the app return probe.
@@ -1263,7 +1292,7 @@ static NSArray* PFBDashPanelIDs(NSArray* panelIDs) {
 
 - (NSArray*)visiblePanelIDsForAppNavigation:(id)appNavigation {
     NSArray* panelIDs = %orig;
-    return DashPanelIDQuery ? PFBDashPanelIDs(panelIDs) : panelIDs;
+    return PFBDashAnswerApplies(__builtin_frame_address(0)) ? PFBDashPanelIDs(panelIDs) : panelIDs;
 }
 
 %end
@@ -1279,7 +1308,7 @@ static NSArray* PFBDashPanelIDs(NSArray* panelIDs) {
 
 - (NSArray*)visiblePanelIDs {
     NSArray* panelIDs = %orig;
-    if (DashPanelIDQuery) {
+    if (PFBDashAnswerApplies(__builtin_frame_address(0))) {
         return PFBDashPanelIDs(panelIDs);
     }
     [PFBCustomTabBarUtility recordPanelIDs:panelIDs];
