@@ -799,19 +799,28 @@ static const CGFloat kPFBNotifEmptyTitleSize = 30.0;
 static const CGFloat kPFBNotifEmptyBodySize = 15.0;
 
 static const char* kPFBNotifRestInsetKey = "pfbNotifRestInset";
+static const char* kPFBNotifPanelKey = "pfbNotifPanel";
 
-// The list's top inset at rest: a refresh adds its spinner's room, which the panel ignores.
+// The list's top inset at rest: the smallest seen since the panel came, as a refresh only
+// adds its spinner's room.
 static CGFloat PFBNotifRestInset(UITableView* table) {
-    if (!table.refreshControl.isRefreshing) {
-        objc_setAssociatedObject(table, kPFBNotifRestInsetKey, @(table.adjustedContentInset.top),
-                                 OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-    }
+    CGFloat inset = table.adjustedContentInset.top;
     NSNumber* rest = objc_getAssociatedObject(table, kPFBNotifRestInsetKey);
-    return rest ? (CGFloat)rest.doubleValue : table.adjustedContentInset.top;
+    if (!rest || inset < rest.doubleValue) {
+        objc_setAssociatedObject(table, kPFBNotifRestInsetKey, @(inset), OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        return inset;
+    }
+    return (CGFloat)rest.doubleValue;
 }
 
-// The panel sits behind the list, in its background view, as iOS's own empty screens do:
-// a jump of the list (a refresh) leaves it where it is.
+// The panel's top: below the bars, lowered by a pull past the list's rest as the list's own
+// content is. A move the other way, as the jump Twitter makes after a refresh, leaves it at rest.
+static CGFloat PFBNotifPanelTop(UITableView* table) {
+    CGFloat rest = PFBNotifRestInset(table);
+    return rest + kPFBNotifEmptyTopInset + MAX(0.0, -table.contentOffset.y - rest);
+}
+
+// The panel sits behind the list, in its background view, so the list's jumps do not carry it.
 static UIView* PFBNotifPanelHost(UITableView* table) {
     if (!table.backgroundView) {
         UIView* host = [[UIView alloc] init];
@@ -841,10 +850,35 @@ static void PFBNotifLayoutEmptyPanel(UIView* panel, UITableView* table) {
     title.frame = CGRectMake(0.0, 0.0, width, ceil(titleSize.height));
     body.frame = CGRectMake(0.0, CGRectGetMaxY(title.frame) + kPFBNotifEmptyGap,
                             width, ceil(bodySize.height));
-    panel.frame = CGRectMake(kPFBNotifEmptySideInset,
-                             PFBNotifRestInset(table) + kPFBNotifEmptyTopInset,
-                             width, CGRectGetMaxY(body.frame));
+    panel.frame = CGRectMake(kPFBNotifEmptySideInset, PFBNotifPanelTop(table), width, CGRectGetMaxY(body.frame));
 }
+
+// The panel weakly, for the list's layout passes.
+@interface PFBNotifPanelRef : NSObject
+@property (nonatomic, weak) UIView* panel;
+@end
+
+@implementation PFBNotifPanelRef
+@end
+
+// Each scroll of the list lays it out: the panel follows a pull there, in the same pass that
+// places the background view.
+%hook UITableView
+
+- (void)layoutSubviews {
+    %orig;
+    PFBNotifPanelRef* ref = objc_getAssociatedObject(self, kPFBNotifPanelKey);
+    UIView* panel = ref.panel;
+    if (panel.superview) {
+        CGRect frame = panel.frame;
+        frame.origin.y = PFBNotifPanelTop((UITableView*)self);
+        if (!CGRectEqualToRect(frame, panel.frame)) {
+            panel.frame = frame;
+        }
+    }
+}
+
+%end
 
 // The panel of a notifications list, and how many panels its list holds (one fading out and
 // a new one, at most), for the screen probe.
@@ -1031,6 +1065,10 @@ static void PFBNotifSyncEmptyState(id dataViewController) {
         // sliding out, so the two read as one motion instead of a flash.
         panel.alpha = 0.0;
         [PFBNotifPanelHost(table) addSubview:panel];
+        objc_setAssociatedObject(table, kPFBNotifRestInsetKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        PFBNotifPanelRef* ref = [[PFBNotifPanelRef alloc] init];
+        ref.panel = panel;
+        objc_setAssociatedObject(table, kPFBNotifPanelKey, ref, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
         PFBNotifLayoutEmptyPanel(panel, table);
         [UIView animateWithDuration:0.3
                               delay:0.15

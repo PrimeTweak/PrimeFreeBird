@@ -670,6 +670,7 @@ static const PFBCompatReq kReqs[] = {
     {PFBCompat_hide_threads, "TFNMenuSheetViewController", "-initWithActionItems:"},
     {PFBCompat_hide_threads, "TFNActionItem", "+actionItemWithTitle:imageName:action:"},
     {PFBCompat_hide_notifications, "UIButton", "-setMenu:"},
+    {PFBCompat_hide_notifications, "UITableView", "-layoutSubviews"},
     {PFBCompat_hide_notifications, "UIViewController", "-t1_actionsViewControllerForStatus:account:source:options:doneBlock:"},
     {PFBCompat_hide_notifications, "TFNMenuSheetViewController", "-initWithActionItems:"},
     {PFBCompat_hide_notifications, "TFNActionItem", "+actionItemWithTitle:imageName:action:"},
