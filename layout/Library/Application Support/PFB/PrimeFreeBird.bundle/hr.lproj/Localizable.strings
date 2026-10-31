@@ -1,0 +1,223 @@
+/*
+  Language: hr
+  PrimeFreeBird
+*/
+
+/* ===== GENERAL — page ===== */
+"MODERN_SETTINGS_LAYOUT_TITLE" = "Općenito";
+"MODERN_SETTINGS_LAYOUT_SUBTITLE" = "Zaključaj aplikaciju, prilagodi ponašanje Twittera i upravljaj poveznicama.";
+
+/* ===== General › Privacy ===== */
+"PADLOCK_TITLE" = "Zaključaj Twitter";
+"PADLOCK_DETAIL" = "Za otvaranje Twittera potreban je Face ID ili šifra.";
+
+/* ===== General › App behavior ===== */
+"NO_TAB_BAR_HIDING_TITLE" = "Uvijek vidljiva";
+"NO_TAB_BAR_HIDING_DETAIL" = "Ne skrivaj traku pri pomicanju.";
+"SHOW_SCROLL_INDICATOR_TITLE" = "Traka za pomicanje";
+"DISABLE_RTL_TITLE" = "Tekst slijeva nadesno";
+"DISABLE_RTL_DETAIL" = "Prikaži tekst slijeva nadesno, čak i u jezicima koji se pišu zdesna nalijevo.";
+"HIDE_PREMIUM_OFFER_TITLE" = "Sakrij Twitter Blue ponude";
+"HIDE_PREMIUM_OFFER_DETAIL" = "Ukloni gumbe 'Izvršite provjeru autentičnosti' i 'Nadogradi'.";
+
+/* ===== General › Links ===== */
+"SHARING_DOMAIN_TITLE" = "Domena za dijeljenje";
+"ALWAYS_OPEN_SAFARI_TITLE" = "Vanjski preglednik";
+"ALWAYS_OPEN_SAFARI_DETAIL" = "Otvaraj poveznice u Safariju ili zadanom pregledniku.";
+"NEW_INAPP_WEBVIEW_TITLE" = "Novi preglednik u aplikaciji";
+"NEW_INAPP_WEBVIEW_DETAIL" = "Koristi Twitterov novi preglednik u aplikaciji za otvaranje poveznica.";
+
+/* ===== APPEARANCE — page ===== */
+"MODERN_SETTINGS_APPEARANCE_TITLE" = "Izgled";
+"MODERN_SETTINGS_APPEARANCE_SUBTITLE" = "Stil, fontovi, boje i navigacijska traka.";
+
+/* ===== Appearance › Interface ===== */
+"CUSTOM_TAB_BAR_OPTION_TITLE" = "Prilagodi kartice";
+"RESTORE_TAB_LABELS_TITLE" = "Oznake kartica";
+"RESTORE_TAB_LABELS_DETAIL" = "Prikaži oznake ispod ikona.";
+"CUSTOM_FONTS_TITLE" = "Prilagođeni fontovi";
+"CUSTOM_FONTS_DETAIL" = "Koristi prilagođeni font u cijelom Twitteru.";
+"REGULAR_FONTS_PICKER_OPTION_TITLE" = "Obični font";
+"BOLD_FONTS_PICKER_OPTION_TITLE" = "Podebljani font";
+"FONT_SYSTEM_DEFAULT_SUBTITLE" = "Zadano";
+
+/* ===== Appearance › Colors ===== */
+"THEME_OPTION_TITLE" = "Boja teme";
+"TAB_BAR_THEMING_TITLE" = "Odabrana kartica";
+"TAB_BAR_THEMING_DETAIL" = "Primjenjuje boju naglaska na odabranu karticu i podcrtavanje gornjih kartica.";
+"COLOR_TWITTER_ICON_IN_TOP_BAR_TITLE" = "Twitter ikona";
+"COLOR_TWITTER_ICON_IN_TOP_BAR_DETAIL" = "Primjenjuje boju naglaska na Twitter ikonu u gornjoj traci.";
+
+/* ===== BRANDING ===== */
+"MODERN_SETTINGS_BRANDING_TITLE" = "Brendiranje";
+"MODERN_SETTINGS_BRANDING_SUBTITLE" = "Vrati pticu, gumb Tweet i Twitterove izraze.";
+"APP_ICON_TITLE" = "Ikona aplikacije";
+"RESTORE_TWITTER_NAMES_TITLE" = "Vrati Twitter terminologiju";
+"RESTORE_TWITTER_NAMES_DETAIL" = "Vraća pticu i zamjenjuje 'X' s 'Twitter', 'objava' s 'tweet' i tako dalje.";
+"REFRESH_PILL_LABEL_TITLE" = "Tekst trake novih tweetova";
+"REFRESH_PILL_LABEL_DETAIL" = "Prikazuje riječ pokraj avatara na traci novih tweetova.";
+
+/* ===== TIMELINES ===== */
+"MODERN_SETTINGS_TIMELINES_TITLE" = "Vremenske crte";
+"MODERN_SETTINGS_TIMELINES_SUBTITLE" = "Ukloni oglase i prijedloge te filtriraj svoju vremensku crtu.";
+"HIDE_PROMOTED_TITLE" = "Sakrij oglase";
+"HIDE_PROMOTED_DETAIL" = "Ukloni sponzorirane tweetove, trendove i videooglase.";
+"HIDE_WHO_TO_FOLLOW_TITLE" = "Sakrij 'Koga pratiti'";
+"HIDE_WHO_TO_FOLLOW_DETAIL" = "Ukloni prijedloge za praćenje.";
+"HIDE_TIMELINE_PROMPTS_TITLE" = "Sakrij upite na vremenskoj crti";
+"HIDE_TIMELINE_PROMPTS_DETAIL" = "Ukloni natpise poput 'Dodaj kontakte'.";
+"HIDE_SPACES_TITLE" = "Sakrij traku Prostora";
+"HIDE_CUSTOM_TIMELINES_TITLE" = "Sakrij prilagođene vremenske crte";
+"HIDE_CUSTOM_TIMELINES_DETAIL" = "Ukloni prikvačene popise i zajednice s kartica Naslovnice, kao i gumb Dodaj.";
+
+/* ===== TWEETS ===== */
+"MODERN_SETTINGS_TWEETS_TITLE" = "Tweetovi";
+"MODERN_SETTINGS_TWEETS_SUBTITLE" = "Pisanje, gumbi, odgovori i osjetljiv sadržaj.";
+"UNDO_TWEET_TITLE" = "Poništi tweet";
+"TWEET_CONFIRM_TITLE" = "Potvrda tweeta";
+"LIKE_CONFIRM_TITLE" = "Potvrda lajka";
+"HIDE_VIEW_COUNT_TITLE" = "Sakrij broj pregleda";
+"HIDE_BOOKMARK_BUTTON_TITLE" = "Sakrij gumb za knjižne oznake";
+"HIDE_DOWNVOTE_BUTTON_TITLE" = "Sakrij gumb za negativni glas";
+"DISABLE_SENSITIVE_TWEET_WARNINGS_TITLE" = "Sakrij upozorenja";
+"BYPASS_AGE_VERIFICATION_TITLE" = "Zaobiđi provjeru dobi";
+"BYPASS_AGE_VERIFICATION_DETAIL" = "Preskače provjeru dobi za osjetljiv sadržaj.";
+"REPLY_SORTING_TITLE" = "Sortiranje odgovora";
+"RESTORE_REPLY_CONTEXT_TITLE" = "Redak „Odgovor na“";
+"RESTORE_REPLY_CONTEXT_DETAIL" = "Prikazuje se iznad teksta otvorenog odgovora.";
+"SHOW_QUOTE_COUNTS_TITLE" = "Broj citata i retweetova";
+"SHOW_QUOTE_COUNTS_DETAIL" = "Prikaži oba broja na vrhu zaslona citata tweeta.";
+"SHOW_TWEET_SOURCE_TITLE" = "Izvor tweeta";
+"SHOW_TWEET_SOURCE_DETAIL" = "Prikaži aplikaciju iz koje je tweet poslan pokraj vremena otvorenog tweeta.";
+"SHOW_ACCOUNT_LOCATION_TITLE" = "Država računa";
+"SHOW_ACCOUNT_LOCATION_DETAIL" = "Prikaži državu računa pokraj vremena otvorenog tweeta.";
+"QUOTE_COUNTS_TITLE_FORMAT" = "Citati: %@ · Retweetovi: %@";
+
+/* ===== MEDIA ===== */
+"MODERN_SETTINGS_MEDIA_TITLE" = "Mediji";
+"MODERN_SETTINGS_MEDIA_SUBTITLE" = "Preuzimanja, reprodukcija, kvaliteta i prikaz.";
+"DOWNLOAD_VIDEOS_TITLE" = "Videozapisi i GIF-ovi";
+"DOWNLOAD_VIDEOS_DETAIL" = "Spremi ih iz izbornika dugog pritiska na medij.";
+"DIRECT_SAVE_TITLE" = "Spremi u Fotografije";
+"DIRECT_SAVE_DETAIL" = "Videozapisi se spremaju izravno u aplikaciju Fotografije.";
+"TWEET_TO_IMAGE_TITLE" = "Spremi tweet kao sliku";
+"TWEET_TO_IMAGE_DETAIL" = "Dugo pritisni 'Dijeli' za spremanje kao sliku.";
+"DISABLE_VIDEO_CAPTIONS_TITLE" = "Sakrij titlove videozapisa";
+"AUTO_HIGHEST_LOAD_TITLE" = "Fotografije u punoj razlučivosti";
+"AUTO_HIGHEST_LOAD_DETAIL" = "Uvijek učitavaj fotografije u najvećoj razlučivosti.";
+"FORCE_TWEET_FULL_FRAME_TITLE" = "Neobrezane slike";
+"RESTORE_VIDEO_TIMESTAMP_TITLE" = "Vrijeme videozapisa";
+"RESTORE_VIDEO_TIMESTAMP_DETAIL" = "Na videozapisima preko cijelog zaslona prikazuje proteklo i ukupno vrijeme umjesto odbrojavanja.";
+"DISABLE_IMMERSIVE_SCROLL_TITLE" = "Isključi automatsko pomicanje videozapisa";
+
+/* ===== PROFILES ===== */
+"MODERN_SETTINGS_PROFILES_TITLE" = "Profili";
+"MODERN_SETTINGS_PROFILES_SUBTITLE" = "Gumbi Prati, značke i kartice profila.";
+"FOLLOW_CONFIRM_TITLE" = "Potvrda praćenja";
+"COPY_PROFILE_INFO_TITLE" = "Kopiraj podatke profila";
+"COPY_PROFILE_INFO_DETAIL" = "Dodaj gumb za kopiranje na profile.";
+"DISABLE_ARTICLES_TITLE" = "Sakrij Članke";
+"DISABLE_ARTICLES_DETAIL" = "Ukloni karticu 'Članci' iz profila.";
+"DISABLE_HIGHLIGHTS_TITLE" = "Sakrij Istaknuto";
+"DISABLE_HIGHLIGHTS_DETAIL" = "Ukloni karticu 'Istaknuto' iz profila.";
+"HIDE_BLUE_VERIFIED_TITLE" = "Sakrij Blue oznake provjere";
+"HIDE_BLUE_VERIFIED_DETAIL" = "Uklanja Twitter Blue oznake provjere, a oznake brendova i vladinih računa ostaju.";
+"HIDE_FOLLOW_BUTTON_TITLE" = "Sakrij gumb 'Prati'";
+"HIDE_FOLLOW_BUTTON_DETAIL" = "Sakriva gumb 'Prati' pokraj imena autora u tweetovima, ali ne i onaj na profilima.";
+/* Legacy key name: this row HIDES the Subscribe button. Do not rename the
+   key — it is persisted in user defaults. */
+"RESTORE_FOLLOW_BUTTON_TITLE" = "Sakrij gumb 'Pretplatite se'";
+"RESTORE_FOLLOW_BUTTON_DETAIL" = "Sakriva gumb 'Pretplatite se' u tweetovima i profilima.";
+"SQUARE_AVATARS_TITLE" = "Kvadratne profilne slike";
+"SQUARE_AVATARS_DETAIL" = "Prikaži profilne slike kao zaobljene kvadrate, kao u klasičnom Twitteru.";
+
+/* ===== SEARCH ===== */
+"MODERN_SETTINGS_SEARCH_TITLE" = "Pretraživanje";
+"MODERN_SETTINGS_SEARCH_SUBTITLE" = "Povijest pretrage, napredno pretraživanje i Istraživanje.";
+"NO_HISTORY_TITLE" = "Isključi povijest pretrage";
+"NO_HISTORY_DETAIL" = "Ne spremaj i ne prikazuj nedavne pretrage.";
+"HIDE_TREND_VIDEOS_TITLE" = "Sakrij popularne videozapise";
+"HIDE_TREND_VIDEOS_DETAIL" = "Ukloni redak s popularnim videozapisima iz pretrage.";
+
+/* ===== GROK ===== */
+"HIDE_SUGGESTED_CHATS_TITLE" = "Sakrij predložene razgovore";
+"HIDE_SUGGESTED_CHATS_DETAIL" = "Uklanja popis „Predloženi” iz pristigle pošte razgovora.";
+"HIDE_GROK_ANALYZE_TITLE" = "Sakrij Grok gumb za analizu";
+"HIDE_GROK_SIDEBAR_TITLE" = "Sakrij Grok u bočnoj traci";
+"HIDE_GROK_CREATE_TITLE" = "Sakrij alate za stvaranje";
+"HIDE_GROK_CREATE_DETAIL" = "Uklanja opcije za stvaranje ili uređivanje slika i videozapisa pomoću Groka.";
+/* Legacy key name: this row TURNS ON auto-translation (the switch is inverted).
+   Do not rename the key — it is persisted in user defaults. */
+"DISABLE_AUTO_TRANSLATE_TITLE" = "Automatsko prevođenje";
+"DISABLE_AUTO_TRANSLATE_DETAIL" = "Automatski prevodi tweetove, biografije, bilješke zajednice i obavijesti.";
+
+/* ===== LAB ===== */
+"REPLY_IN_WEBVIEW_TITLE" = "Odgovori na webu";
+"REPLY_IN_WEBVIEW_DETAIL" = "Odgovaraj putem web-stranice kad aplikacija odbije poslati odgovore.";
+
+/* ===== Theme color picker ===== */
+"THEME_SETTINGS_NAVIGATION_DETAIL" = "Odaberi boju naglaska. Vidiš je samo ti.";
+"THEME_SETTINGS_NAVIGATION_TITLE" = "Boja teme";
+
+/* ===== Navigation bar editor ===== */
+"CUSTOM_TAB_BAR_GRID_DETAIL" = "Dodirni karticu da je dodaš ili ukloniš. Zadrži ikonu na traci ispod, a zatim je povuci da promijeniš redoslijed.";
+"CUSTOM_TAB_BAR_RESET_MESSAGE" = "Uređivač se vraća na zadane kartice Twittera. Dodirni Spremi da ih zadržiš.";
+"CUSTOM_TAB_BAR_SETTINGS_NAVIGATION_TITLE" = "Kartice";
+
+/* ===== Fonts picker ===== */
+"CUSTOM_FONTS_MENU_TITLE" = "\nOdaberi font";
+"CUSTOM_FONTS_NAVIGATION_BUTTON_TITLE" = "Prilagođeni fontovi";
+
+/* ===== Media & download flows ===== */
+"DOWNLOAD_AS_GIF_OPTION_TITLE" = "Preuzmi kao GIF";
+"DOWNLOAD_AS_MP4_OPTION_TITLE" = "Preuzmi kao MP4";
+"DOWNLOAD_MENU_TITLE" = "Odaberi kvalitetu videa";
+"DOWNLOAD_VIDEO_NUMBER_TITLE" = "Videozapis %lu";
+"DOWNLOAD_ALL_VIDEOS_OPTION_TITLE" = "Preuzmi sve videozapise";
+
+/* ===== Profile actions ===== */
+"COPY_PROFILE_INFO_MENU_OPTION_1" = "Biografija";
+"COPY_PROFILE_INFO_MENU_OPTION_2" = "Korisničko ime";
+"COPY_PROFILE_INFO_MENU_OPTION_3" = "Ime";
+"COPY_PROFILE_INFO_MENU_OPTION_4" = "Web-mjesto";
+"COPY_PROFILE_INFO_MENU_OPTION_5" = "Lokacija";
+"COPY_PROFILE_INFO_MENU_TITLE" = "Kopiraj";
+"COPY_PROFILE_INFO_MENU_MORE" = "Više";
+"REMOVE_FOLLOWERS_TITLE" = "Ukloni pratitelje";
+"REMOVE_FOLLOWERS_DETAIL" = "Dodaj „Ukloni ovog pratitelja” u izbornik profila koji te prati.";
+"REMOVE_FOLLOWER_TITLE" = "Ukloni ovog pratitelja";
+"REMOVE_FOLLOWER_CONFIRM_TITLE" = "Ukloni ovog pratitelja";
+"REMOVE_FOLLOWER_CONFIRM_MESSAGE" = "%@ te više neće pratiti i neće dobiti obavijest o tome. Kasnije te može ponovno početi pratiti.";
+"REMOVE_FOLLOWER_ACTION" = "Ukloni";
+"REMOVE_FOLLOWER_DONE" = "Pratitelj je uklonjen";
+"REMOVE_FOLLOWER_FAILED" = "Pratitelja nije moguće ukloniti. Pokušaj ponovno.";
+
+/* ===== Padlock / authentication ===== */
+"PADLOCK_LOCKED_LABEL" = "Zaključano";
+"PADLOCK_REASON" = "Otključaj Twitter";
+
+/* ===== Alerts, confirmations & shared labels ===== */
+"RESTART_REQUIRED_ALERT_TITLE" = "Ponovno pokreni Twitter";
+"LIGHT_MODE_RESTART_MESSAGE" = "Boja pozadine vraćena je na Sustav. Ponovno pokretanje uklanja preostale tamne boje.";
+"CLOSE_APP_ACTION" = "Zatvori aplikaciju";
+
+/* ===== Miscellaneous ===== */
+"FETCHING_PROGRESS_TITLE" = "Samo trenutak…";
+"PFB_SETTINGS_DETAIL" = "Sakrij oglase, vrati pticu i prilagodi Twitter po svom ukusu.";
+"REFRESH_PILL_TEXT" = "Objavljeno";
+"UNKNOWN_ERROR" = "Došlo je do nepoznate pogreške.";
+"PHOTOS_SAVE_FAILED_MESSAGE" = "Fotografije nisu prihvatile datoteku. U Postavkama provjeri smije li Twitter dodavati fotografije.";
+
+/* ===== TWEETS: groups and options ===== */
+"HIDE_TWEET_BUTTON_DETAIL" = "Ukloni plutajući gumb za pisanje tweeta.";
+"SEND_SOUND_TITLE" = "Zvuk slanja";
+"SEND_SOUND_NONE" = "Nijedan";
+"SEND_SOUND_IMPORT_ACTION" = "Uvezi…";
+"SEND_SOUND_REMOVE_ACTION" = "Ukloni";
+"SEND_SOUND_FAILED_TITLE" = "Zvuk nije uvezen";
+"SEND_SOUND_TOO_LONG" = "Odaberi zvuk od najviše 7 sekundi.";
+"SEND_SOUND_UNREADABLE" = "Ova datoteka nije zvuk koji se može reproducirati.";
+
+/* Hidden notifications */
+"FLEX_TWITTER_TITLE" = "FLEX istraživač";
+"FLEX_TWITTER_DETAIL" = "Pregledaj zaslone i podatke aplikacije. Za razvojne programere.";

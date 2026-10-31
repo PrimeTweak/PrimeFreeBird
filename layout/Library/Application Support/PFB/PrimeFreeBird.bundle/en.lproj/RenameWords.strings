@@ -1,0 +1,14 @@
+/* Word replacements for Restore Twitter terminology, on localized and server-composed text. Lowercase
+   keys match whole words case-insensitively and copy the match's capitals; keys with a capital match
+   exactly. List each word once; no value may match a key. Per language, no fallback. */
+
+"repost" = "Retweet";
+"reposts" = "Retweets";
+"reposted" = "Retweeted";
+"reposting" = "Retweeting";
+"post" = "Tweet";
+"posts" = "Tweets";
+"posted" = "Tweeted";
+"posting" = "Tweeting";
+"premium" = "blue";
+"X" = "Twitter";
