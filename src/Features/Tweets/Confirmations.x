@@ -100,15 +100,45 @@ static void ShowConfirmation(PFBCompatOption option, NSString* detail, NSString*
 
 // MARK: - Like confirm
 
+// A BOOL getter's value, read only when the object answers it with a BOOL; NO when it
+// cannot be read.
+static BOOL PFBReadBool(id object, NSString* getter, BOOL* value) {
+    SEL selector = NSSelectorFromString(getter);
+    if (![object respondsToSelector:selector] ||
+        strcmp([object methodSignatureForSelector:selector].methodReturnType, @encode(BOOL)) != 0) {
+        return NO;
+    }
+    *value = ((BOOL (*)(id, SEL))objc_msgSend)(object, selector);
+    return YES;
+}
+
 // Whether the Tweet already shows as liked, read only when its view model answers with
 // a BOOL.
 static BOOL PFBShowsAsLiked(id viewModel) {
-    SEL liked = NSSelectorFromString(@"displayAsFavorited");
-    if (![viewModel respondsToSelector:liked] ||
-        strcmp([viewModel methodSignatureForSelector:liked].methodReturnType, @encode(BOOL)) != 0) {
-        return NO;
+    BOOL liked = NO;
+    return PFBReadBool(viewModel, @"displayAsFavorited", &liked) && liked;
+}
+
+// The double tap is confirmed without a liked test. Its Tweet, read from the card the gesture
+// sits on or else the full-screen player's current card, goes to the report when it is
+// already liked or cannot be read.
+static void PFBNoteDoubleTapLikedState(UIView* plugin) {
+    Class cardClass = NSClassFromString(@"_TtC14T1TwitterSwift17ImmersiveCardView");
+    id status = nil;
+    for (UIResponder* node = plugin.nextResponder; node && !status; node = node.nextResponder) {
+        SEL getter = NSSelectorFromString(cardClass && [node isKindOfClass:cardClass] ? @"status"
+                                                                                       : @"currentCardStatus");
+        if ([node respondsToSelector:getter] &&
+            [node methodSignatureForSelector:getter].methodReturnType[0] == '@') {
+            status = ((id (*)(id, SEL))objc_msgSend)(node, getter);
+        }
     }
-    return ((BOOL (*)(id, SEL))objc_msgSend)(viewModel, liked);
+    BOOL liked = NO;
+    if (!PFBReadBool(status, @"seenAsFavorited", &liked)) {
+        PFBCompatMeasure(@"like confirmation", @"liked state not readable on a double tap", 2);
+    } else if (liked) {
+        PFBCompatMeasure(@"like confirmation", @"double tap asked to like a Tweet already liked", 2);
+    }
 }
 
 // Every inline action button's tap goes through this method, so only the like button
@@ -141,6 +171,7 @@ static BOOL PFBShowsAsLiked(id viewModel) {
     if (![PFBSettings boolForKey:@"like_confirm"]) {
         return %orig;
     }
+    PFBNoteDoubleTapLikedState((UIView*)self);
 
     ShowConfirmation(PFBCompat_like_confirm, @"double tap like", @"CONFIRM_LIKE_TITLE", @"CONFIRM_LIKE_ACTION", ^{
         %orig;

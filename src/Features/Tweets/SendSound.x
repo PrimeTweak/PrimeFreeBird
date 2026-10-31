@@ -108,7 +108,7 @@ static NSString* PFBSendSoundStore(NSURL* source) {
         return @"SEND_SOUND_TOO_LONG";
     }
     NSFileManager* files = [NSFileManager defaultManager];
-    NSURL* partial = [[NSURL fileURLWithPath:NSTemporaryDirectory()]
+    NSURL* partial = [[PFBManager temporaryFolder]
         URLByAppendingPathComponent:[NSUUID.UUID.UUIDString stringByAppendingPathExtension:@"caf"]];
     BOOL stored = PFBSendSoundDecode(input, partial) &&
                   [files createDirectoryAtURL:PFBSendSoundFolder()

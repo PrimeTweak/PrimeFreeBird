@@ -433,7 +433,7 @@ static UIMenu* PFBMenuWithNotificationHide(UIMenu* menu, UIView* button) {
 - (void)setMenu:(UIMenu*)menu {
     // A Tweet's menu reaching here is the path, whatever the toggle and the Tweet.
     if ([menu isKindOfClass:[UIMenu class]] && PFBCompatNeedsObservation(PFBCompat_hide_threads) &&
-        (PFBMenuBelongsToTweet(menu) || PFBThreadIDForButton((UIView*)self).length)) {
+        (PFBMenuBelongsToTweet(menu) || PFBStatusUpFrom((UIView*)self, NO))) {
         PFBCompatReach(PFBCompatPath_threads_popup_menu);
         PFBCOMPAT_OBSERVE(PFBCompat_hide_threads, @"Tweet menu found");
     }
@@ -451,7 +451,7 @@ static UIMenu* PFBMenuWithNotificationHide(UIMenu* menu, UIView* button) {
     // Either the menu names itself — an entry the app puts there — or the button
     // sits under a Tweet. The second covers a menu still being assembled, whose
     // entries are not readable yet.
-    if (!PFBMenuBelongsToTweet(menu) && !PFBThreadIDForButton(button).length) {
+    if (!PFBMenuBelongsToTweet(menu) && !PFBStatusUpFrom(button, NO)) {
         %orig;
         return;
     }
@@ -464,6 +464,11 @@ static UIMenu* PFBMenuWithNotificationHide(UIMenu* menu, UIView* button) {
         return;
     }
     PFBCompatReach(PFBCompatPath_threads_popup_menu);
+    // The entry goes only on the menu of a Tweet in a conversation, the one it can hide.
+    if (!PFBThreadIDForButton(button).length) {
+        %orig;
+        return;
+    }
     UIColor* color = [UIColor labelColor];
     color = [color resolvedColorWithTraitCollection:button.traitCollection] ?: color;
     UIAction* hide = [UIAction
@@ -495,8 +500,8 @@ static UIMenu* PFBMenuWithNotificationHide(UIMenu* menu, UIView* button) {
 static id gPFBSheetStatus;
 static __weak UIViewController* gPFBSheetScreen;
 
-// As in the pop-up menu, the entry is on every Tweet's menu and acts on a Tweet in a
-// conversation. Its icon is Twitter's own crossed speech bubble.
+// As in the pop-up menu, the entry goes only on the menu of a Tweet in a conversation. Its
+// icon is Twitter's own crossed speech bubble.
 static TFNActionItem* PFBHideActionItem(id status) {
     Class itemClass = %c(TFNActionItem);
     if (![itemClass respondsToSelector:@selector(actionItemWithTitle:imageName:action:)]) {
@@ -506,7 +511,7 @@ static TFNActionItem* PFBHideActionItem(id status) {
         actionItemWithTitle:[[PFBBundle sharedBundle] localizedStringForKey:@"THREADS_HIDE_ACTION"]
                   imageName:@"chat_bubble_strikethrough_stroke"
                      action:^{
-                       NSString* threadID = PFBModelIsConversation(status) ? PFBThreadIDForModel(status) : nil;
+                       NSString* threadID = PFBThreadIDForModel(status);
                        if (!threadID.length) {
                            return;
                        }
@@ -574,7 +579,7 @@ static TFNActionItem* PFBHideNotificationItem(id status, UIViewController* scree
     }
     PFBCompatReach(PFBCompatPath_threads_post_menu);
     PFBCOMPAT_OBSERVE(PFBCompat_hide_threads, @"Tweet menu found");
-    if (![PFBSettings boolForKey:@"hide_threads"]) {
+    if (![PFBSettings boolForKey:@"hide_threads"] || !PFBModelIsConversation(status)) {
         return %orig;
     }
     TFNActionItem* hide = PFBHideActionItem(status);

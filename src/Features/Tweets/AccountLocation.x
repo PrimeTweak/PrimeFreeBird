@@ -5,6 +5,8 @@
 
 static NSString* const kPFBAboutAccountURL =
     @"https://x.com/i/api/graphql/XRqGa7EeokUU5kppkh13EA/AboutAccountQuery?variables=";
+static NSString* const kPFBTweetResultURL =
+    @"https://x.com/i/api/graphql/U8lc5aomF5krJzZ9vJ9wxg/TweetResultByRestId";
 static NSString* const kPFBFooterLabelNote = @"PFBFooterLabelArrived";
 static const NSInteger kPFBFooterLabelTries = 3;
 
@@ -24,6 +26,8 @@ static BOOL gPFBLabelShown;
 @property (nonatomic) NSString* (*label)(NSData* data, NSString* key);
 @property (nonatomic) BOOL refusalTold;
 @property (nonatomic) PFBCompatOption option;
+// Recorded on the option when x.com answers without a label, where that is never normal.
+@property (nonatomic, copy) NSString* emptyNote;
 @end
 
 @implementation PFBFooterLabels
@@ -76,15 +80,50 @@ static NSString* PFBFooterTweetID(T1ConversationFooterTextView* footer) {
     return value > 0 ? [NSString stringWithFormat:@"%lld", value] : nil;
 }
 
-// The About this account question for a handle.
-static NSMutableURLRequest* PFBCountryRequest(NSString* handle) {
-    NSData* variables =
-        [NSJSONSerialization dataWithJSONObject:@{@"screenName": handle} options:0 error:nil];
+// Text a URL query can carry as is.
+static NSString* PFBQueryValue(id object) {
+    NSData* json = [NSJSONSerialization dataWithJSONObject:object options:0 error:nil];
     NSCharacterSet* plain =
         [NSCharacterSet characterSetWithCharactersInString:
                             @"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~"];
-    NSString* query = [[[NSString alloc] initWithData:variables encoding:NSUTF8StringEncoding]
+    return [[[NSString alloc] initWithData:json encoding:NSUTF8StringEncoding]
         stringByAddingPercentEncodingWithAllowedCharacters:plain];
+}
+
+// What Twitter's own model of the footer's Tweet holds as its composer source, once:
+// Tweet source could then be read without asking x.com.
+static void PFBNoteComposerSource(T1ConversationFooterTextView* footer) {
+    static BOOL noted;
+    id model = [footer respondsToSelector:@selector(viewModel)] ? footer.viewModel : nil;
+    if (noted || !model) {
+        return;
+    }
+    noted = YES;
+    SEL getter = NSSelectorFromString(@"composerSource");
+    NSString* kind = NSStringFromClass([model class]);
+    if (![model respondsToSelector:getter]) {
+        PFBCompatMeasure(@"tweet source", [kind stringByAppendingString:@" has no composer source"], 2);
+        return;
+    }
+    char type = [model methodSignatureForSelector:getter].methodReturnType[0];
+    NSString* value;
+    if (type == '@') {
+        id held = ((id (*)(id, SEL))objc_msgSend)(model, getter);
+        value = [NSString stringWithFormat:@"%@ %@", held ? NSStringFromClass([held class]) : @"nil", held ?: @""];
+    } else if (type == 'q' || type == 'Q' || type == 'l' || type == 'L' || type == 'i' || type == 'I') {
+        value = [NSString stringWithFormat:@"number %lld", ((long long (*)(id, SEL))objc_msgSend)(model, getter)];
+    } else {
+        value = [NSString stringWithFormat:@"type %c", type];
+    }
+    if (value.length > 80) {
+        value = [[value substringToIndex:80] stringByAppendingString:@"\u2026"];
+    }
+    PFBCompatMeasure(@"tweet source", [NSString stringWithFormat:@"%@ composer source: %@", kind, value], 2);
+}
+
+// The About this account question for a handle.
+static NSMutableURLRequest* PFBCountryRequest(NSString* handle) {
+    NSString* query = PFBQueryValue(@{@"screenName": handle});
     NSMutableURLRequest* request =
         PFBWebSessionGETRequest([NSURL URLWithString:[kPFBAboutAccountURL stringByAppendingString:query]]);
     // The country comes back in the language Twitter shows.
@@ -109,11 +148,52 @@ static NSString* PFBCountryFromAnswer(NSData* data, NSString* handle) {
     return doubtful ? [place stringByAppendingString:@"?"] : place;
 }
 
-// The conversation of one Tweet, which carries the app it was sent from.
+// One Tweet as x.com's web client asks for it, with the features its query expects.
 static NSMutableURLRequest* PFBSourceRequest(NSString* tweetID) {
-    NSString* address = [NSString
-        stringWithFormat:@"https://x.com/i/api/2/timeline/conversation/%@.json?tweet_mode=extended&count=1",
-                         tweetID];
+    static NSString* features;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+      NSArray<NSString*>* on = @[
+          @"creator_subscriptions_tweet_preview_api_enabled", @"communities_web_enable_tweet_community_results_fetch",
+          @"c9s_tweet_anatomy_moderator_badge_enabled", @"responsive_web_grok_analyze_post_followups_enabled",
+          @"rweb_cashtags_composer_attachment_enabled", @"responsive_web_jetfuel_frame",
+          @"rweb_sports_post_context_enabled", @"x_elections_post_context_enabled",
+          @"responsive_web_grok_share_attachment_enabled", @"responsive_web_grok_annotations_enabled",
+          @"articles_preview_enabled", @"responsive_web_edit_tweet_api_enabled",
+          @"graphql_is_translatable_rweb_tweet_is_translatable_enabled", @"view_counts_everywhere_api_enabled",
+          @"longform_notetweets_consumption_enabled", @"responsive_web_twitter_article_tweet_consumption_enabled",
+          @"content_disclosure_indicator_enabled", @"content_disclosure_ai_generated_indicator_enabled",
+          @"responsive_web_grok_show_grok_translated_post", @"responsive_web_grok_analysis_button_from_backend",
+          @"rweb_cashtags_enabled", @"freedom_of_speech_not_reach_fetch_enabled", @"standardized_nudges_misinfo",
+          @"tweet_with_visibility_results_prefer_gql_limited_actions_policy_enabled",
+          @"longform_notetweets_rich_text_read_enabled", @"profile_label_improvements_pcf_label_in_post_enabled",
+          @"responsive_web_profile_redirect_enabled", @"responsive_web_nested_quote_preview_enabled",
+          @"responsive_web_grok_image_annotation_enabled", @"responsive_web_grok_imagine_annotation_enabled",
+          @"responsive_web_grok_community_note_auto_translation_is_enabled",
+          @"responsive_web_graphql_timeline_navigation_enabled"
+      ];
+      NSArray<NSString*>* off = @[
+          @"premium_content_api_read_enabled", @"responsive_web_grok_analyze_button_fetch_trends_enabled",
+          @"post_ctas_fetch_enabled", @"longform_notetweets_inline_media_enabled", @"rweb_tipjar_consumption_enabled",
+          @"verified_phone_label_enabled"
+      ];
+      NSMutableDictionary* all = [NSMutableDictionary dictionary];
+      for (NSString* name in on) {
+          all[name] = @YES;
+      }
+      for (NSString* name in off) {
+          all[name] = @NO;
+      }
+      features = PFBQueryValue(all);
+    });
+    NSDictionary* variables = @{
+        @"tweetId": tweetID,
+        @"withCommunity": @NO,
+        @"includePromotedContent": @NO,
+        @"withVoice": @NO
+    };
+    NSString* address = [NSString stringWithFormat:@"%@?variables=%@&features=%@", kPFBTweetResultURL,
+                                                   PFBQueryValue(variables), features];
     return PFBWebSessionGETRequest([NSURL URLWithString:address]);
 }
 
@@ -132,47 +212,58 @@ static NSString* PFBSourceFromMarkup(id markup) {
     return name.length ? name : nil;
 }
 
-// The app a Tweet was sent from, in either form x.com answers the conversation with.
+// The app a Tweet was sent from. A Tweet with visibility limits comes wrapped in a result
+// of its own.
 static NSString* PFBSourceFromAnswer(NSData* data, NSString* tweetID) {
-    id json = data ? [NSJSONSerialization JSONObjectWithData:data options:0 error:nil] : nil;
-    if (![json isKindOfClass:[NSDictionary class]]) {
+    id result = data ? [NSJSONSerialization JSONObjectWithData:data options:0 error:nil] : nil;
+    for (NSString* key in @[@"data", @"tweetResult", @"result"]) {
+        result = [result isKindOfClass:[NSDictionary class]] ? result[key] : nil;
+    }
+    id inner = [result isKindOfClass:[NSDictionary class]] ? result[@"tweet"] : nil;
+    NSDictionary* tweet = [inner isKindOfClass:[NSDictionary class]] ? inner : result;
+    if (![tweet isKindOfClass:[NSDictionary class]]) {
         return nil;
     }
-    id tweets = json[@"globalObjects"];
-    tweets = [tweets isKindOfClass:[NSDictionary class]] ? tweets[@"tweets"] : nil;
-    id tweet = [tweets isKindOfClass:[NSDictionary class]] ? tweets[tweetID] : nil;
-    if ([tweet isKindOfClass:[NSDictionary class]]) {
-        return PFBSourceFromMarkup(tweet[@"source"]);
+    id restID = tweet[@"rest_id"];
+    if (restID && ![restID isEqual:tweetID]) {
+        return nil;
     }
-    id conversation = json[@"data"];
-    conversation = [conversation isKindOfClass:[NSDictionary class]]
-                       ? conversation[@"threaded_conversation_with_injections_v2"]
-                       : nil;
-    id instructions = [conversation isKindOfClass:[NSDictionary class]] ? conversation[@"instructions"] : nil;
-    for (id instruction in [instructions isKindOfClass:[NSArray class]] ? instructions : @[]) {
-        id entries = [instruction isKindOfClass:[NSDictionary class]] ? instruction[@"entries"] : nil;
-        for (id entry in [entries isKindOfClass:[NSArray class]] ? entries : @[]) {
-            id result = entry;
-            for (NSString* key in @[@"content", @"itemContent", @"tweet_results", @"result"]) {
-                result = [result isKindOfClass:[NSDictionary class]] ? result[key] : nil;
-            }
-            id inner = [result isKindOfClass:[NSDictionary class]] ? result[@"tweet"] : nil;
-            id found = [inner isKindOfClass:[NSDictionary class]] ? inner : result;
-            if ([found isKindOfClass:[NSDictionary class]] && [found[@"rest_id"] isEqual:tweetID]) {
-                return PFBSourceFromMarkup(found[@"source"]);
-            }
-        }
+    id legacy = tweet[@"legacy"];
+    NSString* source = PFBSourceFromMarkup(tweet[@"source"]);
+    if (!source && [legacy isKindOfClass:[NSDictionary class]]) {
+        source = PFBSourceFromMarkup(legacy[@"source"]);
     }
-    return nil;
+    return source;
+}
+
+// The first message of an answer x.com sent back as an error.
+static NSString* PFBAnswerError(NSData* data) {
+    id json = data ? [NSJSONSerialization JSONObjectWithData:data options:0 error:nil] : nil;
+    id errors = [json isKindOfClass:[NSDictionary class]] ? json[@"errors"] : nil;
+    id first = [errors isKindOfClass:[NSArray class]] ? [(NSArray*)errors firstObject] : nil;
+    id found = [first isKindOfClass:[NSDictionary class]] ? first[@"message"] : nil;
+    NSString* message = [found isKindOfClass:[NSString class]] ? found : nil;
+    if (!message.length) {
+        return nil;
+    }
+    return message.length > 120 ? [[message substringToIndex:120] stringByAppendingString:@"\u2026"] : message;
 }
 
 static void PFBAskForLabel(PFBFooterLabels* labels, NSString* key);
 
 // Main thread. A failed answer is asked again twice, then settled as no label; a request
-// x.com still refuses then is recorded on the option with its HTTP status.
-static void PFBSettleLabel(PFBFooterLabels* labels, NSString* key, NSString* label, NSInteger status) {
+// x.com still refuses then is recorded on the option with its HTTP status, and so is an
+// answer that carries an error or, where that is never normal, no label.
+static void PFBSettleLabel(PFBFooterLabels* labels, NSString* key, NSString* label, NSInteger status,
+                           NSString* answerError) {
     [labels.asked removeObject:key];
-    if (status != 200) {
+    if (status == 200 && !label.length) {
+        NSString* why = answerError ? [@"x.com answered with an error: " stringByAppendingString:answerError]
+                                    : labels.emptyNote;
+        if (why) {
+            PFBCompatNoteRefusal(labels.option, why);
+        }
+    } else if (status != 200) {
         NSInteger failures = labels.failures[key].integerValue + 1;
         labels.failures[key] = @(failures);
         if (failures < kPFBFooterLabelTries) {
@@ -215,6 +306,7 @@ static void PFBAskForLabel(PFBFooterLabels* labels, NSString* key) {
                                      ? ((NSHTTPURLResponse*)response).statusCode
                                      : 0;
               NSString* label = status == 200 ? parse(data, key) : nil;
+              NSString* answerError = status == 200 && !label ? PFBAnswerError(data) : nil;
               dispatch_async(dispatch_get_main_queue(), ^{
                 if (status != 200 && !labels.refusalTold) {
                     labels.refusalTold = YES;
@@ -222,7 +314,7 @@ static void PFBAskForLabel(PFBFooterLabels* labels, NSString* key) {
                                 error ? [@" " stringByAppendingString:error.localizedDescription] : @"",
                                 key);
                 }
-                PFBSettleLabel(labels, key, label, status);
+                PFBSettleLabel(labels, key, label, status, answerError);
               });
           }] resume];
 }
@@ -345,6 +437,9 @@ static void PFBRefreshFooterOnArrival(T1ConversationFooterTextView* footer, NSSt
         %orig;
         return;
     }
+    if (tweetID) {
+        PFBNoteComposerSource(self);
+    }
     PFBRefreshFooterOnArrival(self, handle, tweetID);
     NSString* source = tweetID ? PFBLabelFor(gPFBSources, tweetID) : nil;
     NSString* country = handle ? PFBLabelFor(gPFBCountries, handle) : nil;
@@ -383,8 +478,9 @@ static PFBFooterLabels* PFBMakeFooterLabels(NSString* name, PFBCompatOption opti
 }
 
 %ctor {
-    gPFBSources = PFBMakeFooterLabels(@"conversation", PFBCompat_show_tweet_source, PFBSourceRequest,
+    gPFBSources = PFBMakeFooterLabels(@"tweet result", PFBCompat_show_tweet_source, PFBSourceRequest,
                                       PFBSourceFromAnswer);
+    gPFBSources.emptyNote = @"x.com answered without a source";
     gPFBCountries = PFBMakeFooterLabels(@"about-account", PFBCompat_show_account_location, PFBCountryRequest,
                                         PFBCountryFromAnswer);
     %init;
