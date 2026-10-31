@@ -2165,7 +2165,9 @@ static NSArray<NSDictionary*>* tourAllSteps(void) {
     [steps addObject:tourStepWaiting(kPFBTourProofWait, tourStep(@"Twitter settings", @"Twitter settings", root, ^{
              tourShowTwitterSettings();
            }, ^BOOL(UIViewController* before, UIViewController* after) {
-             return [after isKindOfClass:NSClassFromString(@"T1GenericSettingsViewController")];
+             // Twitter's classic settings, or its new ones with New Twitter settings on.
+             return [after isKindOfClass:NSClassFromString(@"T1GenericSettingsViewController")] ||
+                    [after isKindOfClass:NSClassFromString(@"_TtC9XSettings26SettingsListViewController")];
            }, nil, ^{
              tourPopToRoot();
            }))];
