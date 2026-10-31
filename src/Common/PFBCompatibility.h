@@ -125,6 +125,7 @@ typedef NS_ENUM(NSInteger, PFBCompatOption) {
     PFBCompat_no_auto_unmute,
     PFBCompat_filter_languages,
     PFBCompat_hide_quote_tweets,
+    PFBCompat_new_twitter_settings,
     PFBCompatOptionCount,
 };
 
@@ -150,6 +151,9 @@ FOUNDATION_EXPORT PFBCompatReadState PFBCompatReadStatus(void);
 FOUNDATION_EXPORT void PFBCompatCount(PFBCompatOption option);
 FOUNDATION_EXPORT BOOL PFBCompatWantsDetail(PFBCompatOption option);
 FOUNDATION_EXPORT void PFBCompatSetDetail(PFBCompatOption option, NSString* detail);
+// Notes that a server refused what an option asked. The report shows the build's latest
+// refusal while the option has not acted.
+FOUNDATION_EXPORT void PFBCompatNoteRefusal(PFBCompatOption option, NSString* text);
 
 FOUNDATION_EXPORT void PFBCompatReset(void);
 // Writes the counts out now, for a path that ends the process itself.

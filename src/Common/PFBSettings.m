@@ -30,6 +30,7 @@ static NSDictionary<NSString*, NSDictionary*>* PFBSettingsPages(void) {
                     @{@"key": @"show_scroll_indicator", @"default": @NO},
                     @{@"key": @"disable_rtl", @"default": @NO},
                     @{@"key": @"hide_notifications", @"default": @YES},
+                    @{@"key": @"new_twitter_settings", @"default": @NO},
                     @{@"type": @"header", @"titleKey": @"GENERAL_GROUP_LINKS"},
                     @{
                         @"type": @"compactButton",

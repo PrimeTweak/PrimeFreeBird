@@ -36,6 +36,7 @@ static const PFBCompatMeta kMeta[] = {
     {PFBCompat_show_scroll_indicator, "show_scroll_indicator", "SHOW_SCROLL_INDICATOR_TITLE", "MODERN_SETTINGS_LAYOUT_TITLE"},
     {PFBCompat_disable_rtl, "disable_rtl", "DISABLE_RTL_TITLE", "MODERN_SETTINGS_LAYOUT_TITLE"},
     {PFBCompat_hide_notifications, "hide_notifications", "HIDE_NOTIFICATIONS_TITLE", "MODERN_SETTINGS_LAYOUT_TITLE"},
+    {PFBCompat_new_twitter_settings, "new_twitter_settings", "NEW_TWITTER_SETTINGS_TITLE", "MODERN_SETTINGS_LAYOUT_TITLE"},
     {PFBCompat_premium_unlock, "premium_unlock", "PREMIUM_UNLOCK_TITLE", "MODERN_SETTINGS_LAYOUT_TITLE", YES},
     {PFBCompat_hide_upsells, "hide_upsells", "HIDE_UPSELLS_TITLE", "MODERN_SETTINGS_LAYOUT_TITLE", YES},
     {PFBCompat_settings_entry, "settings_entry", "SETTINGS_ENTRY_TITLE", "MODERN_SETTINGS_LAYOUT_TITLE", YES},
@@ -1110,6 +1111,12 @@ static const PFBCompatReq kReqs[] = {
     {PFBCompat_settings_entry, "TFNTitleView", "+titleViewWithTitle:subtitle:"},
     {PFBCompat_settings_entry, "TFSFeatureSwitches", "-boolForKey:"},
     {PFBCompat_settings_entry, "TFSInstrumentedFeatureSwitches", "-boolForKey:"},
+    {PFBCompat_new_twitter_settings, "TFSFeatureSwitches", "-boolForKey:"},
+    {PFBCompat_new_twitter_settings, "TFSInstrumentedFeatureSwitches", "-boolForKey:"},
+    {PFBCompat_new_twitter_settings, "_TtC9XSettings26SettingsListViewController", "-viewWillAppear:"},
+    {PFBCompat_new_twitter_settings, "_TtC9XSettings26SettingsListViewController", "-viewWillDisappear:"},
+    {PFBCompat_new_twitter_settings, "_TtC9XSettings26SettingsListViewController", "-viewDidDisappear:"},
+    {PFBCompat_new_twitter_settings, "_TtC9XSettings26SettingsListViewController", "-viewDidLayoutSubviews"},
     {PFBCompat_accent_color, "T1GenericSettingsViewController", "-viewWillAppear:"},
     {PFBCompat_accent_color, "T1GenericSettingsViewController", "-viewDidDisappear:"},
     {PFBCompat_no_auto_unmute, "T1InlineVideoView", "-didMoveToWindow"},
@@ -1328,6 +1335,7 @@ typedef struct {
 // Twitter no longer carries is one the option can no longer act through.
 static const PFBCompatFlag kFlags[] = {
     {PFBCompat_settings_entry, "ios_settings_redesign_enabled", NO},
+    {PFBCompat_new_twitter_settings, "ios_settings_redesign_enabled", NO},
     {PFBCompat_hide_grok_bot, "grok_ios_grok_bot_sidebar_enabled", NO},
     {PFBCompat_hide_grok_bot, "grok_ios_grok_bot_upsells_enabled", NO},
     {PFBCompat_hide_grok_bot, "grok_ios_grok_bot_home_header_enabled", NO},
@@ -2236,6 +2244,7 @@ static const PFBCompatOption kFlagOnly[] = {
     PFBCompat_grok_translation,
     PFBCompat_classic_tweet_detail,
     PFBCompat_hide_suggested_chats,
+    PFBCompat_new_twitter_settings,
 };
 static const size_t kFlagOnlyCount = sizeof(kFlagOnly) / sizeof(kFlagOnly[0]);
 
@@ -2409,6 +2418,7 @@ static const PFBCompatContract kContract[] = {
     {PFBCompat_classic_tweet_detail, "launch", NULL},
     {PFBCompat_web_login, "", "the web login only shows while signed out or when adding an account"},
     {PFBCompat_settings_entry, "Twitter settings", NULL},
+    {PFBCompat_new_twitter_settings, "Twitter settings", NULL},
     {PFBCompat_bar_repairs, "tab guide", NULL},
     {PFBCompat_no_auto_unmute, "tab home", "inline video"},
     {PFBCompat_filter_languages, "tab home", NULL},
@@ -2732,6 +2742,7 @@ static void prepare(void) {
           gStore[@"details"] = @{};
           gStore[@"observed"] = @{};
           gStore[@"paths"] = @{};
+          [gStore removeObjectForKey:@"refusals"];
           [gStore removeObjectForKey:@"flags"];
           writeStore();
       }
@@ -2763,6 +2774,27 @@ void PFBCompatSetDetail(PFBCompatOption option, NSString* detail) {
         }
     }
     atomic_store_explicit(&gHasDetail[option], true, memory_order_relaxed);
+}
+
+// The latest refusal is kept: it says why the option has not acted yet on this build.
+void PFBCompatNoteRefusal(PFBCompatOption option, NSString* text) {
+    if (option <= PFBCompatOptionNone || option >= PFBCompatOptionCount || text.length == 0) {
+        return;
+    }
+    prepare();
+    const char* key = gKeys[option];
+    if (!key) {
+        return;
+    }
+    NSString* name = [NSString stringWithUTF8String:key];
+    @synchronized(gLock) {
+        NSMutableDictionary* refusals = [storeDictionary(@"refusals") mutableCopy];
+        if (![refusals[name] isEqual:text]) {
+            refusals[name] = text;
+            gStore[@"refusals"] = refusals;
+            atomic_store_explicit(&gDirty, true, memory_order_relaxed);
+        }
+    }
 }
 
 BOOL PFBCompatNeedsObservation(PFBCompatOption option) {
@@ -4193,6 +4225,7 @@ NSArray<PFBCompatResult*>* PFBCompatResults(void) {
     NSDictionary* details;
     NSDictionary* observed;
     NSDictionary* paths;
+    NSDictionary* refusals;
     NSDictionary* earlier;
     NSMutableDictionary<NSString*, NSNumber*>* earlierCodes = [NSMutableDictionary dictionary];
     NSDictionary* stations;
@@ -4205,6 +4238,7 @@ NSArray<PFBCompatResult*>* PFBCompatResults(void) {
         details = storeDictionary(@"details");
         observed = storeDictionary(@"observed");
         paths = storeDictionary(@"paths");
+        refusals = storeDictionary(@"refusals");
         earlier = storeDictionary(@"earlier");
         for (size_t i = 0; i < kMetaCount; i++) {
             NSString* key = [NSString stringWithUTF8String:kMeta[i].key];
@@ -4264,6 +4298,12 @@ NSArray<PFBCompatResult*>* PFBCompatResults(void) {
             result.evidence = earlierText;
         } else {
             result.evidence = @"not seen yet";
+        }
+        id refusal = refusals[key];
+        if (done == 0 && [refusal isKindOfClass:[NSString class]]) {
+            result.evidence = [result.evidence isEqualToString:@"not seen yet"]
+                                  ? refusal
+                                  : [NSString stringWithFormat:@"%@ \u00b7 %@", result.evidence, refusal];
         }
         NSDictionary* earlierPaths = [earlier[@"paths"] isKindOfClass:[NSDictionary class]] ? earlier[@"paths"] : @{};
         NSString* pathNote = pathsNote(meta->option, key, paths, earlierPaths, code);
@@ -4448,6 +4488,7 @@ void PFBCompatReset(void) {
         gStore[@"details"] = @{};
         gStore[@"observed"] = @{};
         gStore[@"paths"] = @{};
+        [gStore removeObjectForKey:@"refusals"];
         gStore[@"earlier"] = @{};
         [gStore removeObjectForKey:@"earlierSince"];
         [gStore removeObjectForKey:@"earlierFingerprints"];
