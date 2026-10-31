@@ -29,6 +29,27 @@ static NSString* const kPFBMutedSpanKey = @"pfb_muted_span";
 static NSString* const kPFBMutedSkipFollowingKey = @"pfb_muted_skip_following";
 static NSString* const kPFBMutedIncludeRepostsKey = @"pfb_muted_include_reposts";
 
+// When the filters last changed; back to 0 once the screen closes on that change.
+static CFAbsoluteTime gPFBFiltersChangedAt = 0;
+
+static void PFBNoteFiltersChange(void) {
+    gPFBFiltersChangedAt = CFAbsoluteTimeGetCurrent();
+}
+
+// The filters act when Twitter hands a list its sections. Three seconds after the screen
+// closes on a change, the report notes whether a list on screen was handed sections since.
+static void PFBFollowFiltersChange(void) {
+    CFAbsoluteTime changedAt = gPFBFiltersChangedAt;
+    gPFBFiltersChangedAt = 0;
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(3 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+        PFBCompatMeasure(@"filters",
+                         pfbLastTimelineDelivery() > changedAt
+                             ? @"Twitter delivered Tweets within 3 s of a Filters change"
+                             : @"no new Tweets within 3 s of a Filters change: words already on screen stay",
+                         2);
+    });
+}
+
 // MARK: - controller
 
 @interface PFBMutedWordsViewController () <UITextFieldDelegate,
@@ -72,6 +93,13 @@ static NSString* const kPFBMutedIncludeRepostsKey = @"pfb_muted_include_reposts"
 - (void)viewDidDisappear:(BOOL)animated {
     [super viewDidDisappear:animated];
     PFBThemeScreenLeave(self);
+    // Closed: dismissed, popped, or gone with its navigation; the language list popping back
+    // to the screen leaves it open.
+    BOOL closed = self.isBeingDismissed || self.navigationController.isBeingDismissed ||
+                  (self.isMovingFromParentViewController && !self.othersOnly);
+    if (closed && gPFBFiltersChangedAt > 0) {
+        PFBFollowFiltersChange();
+    }
 }
 
 - (instancetype)init {
@@ -164,6 +192,10 @@ static NSMutableArray<NSString*>* PFBKeptLanguageList(void) {
                                               : @"FILTERS_TITLE"];
     self.terms = [([[NSUserDefaults standardUserDefaults] arrayForKey:kPFBMutedWordsKey]
                        ?: @[]) mutableCopy];
+    // A change counts from the screen it is made in, not from an earlier one left open.
+    if (!self.othersOnly) {
+        gPFBFiltersChangedAt = 0;
+    }
     [self pruneExpiredTerms];
     self.tableView.keyboardDismissMode = UIScrollViewKeyboardDismissModeInteractive;
     if (self.compact) {
@@ -433,6 +465,7 @@ static NSMutableArray<NSString*>* PFBKeptLanguageList(void) {
     [defaults setObject:map forKey:kPFBMutedExpiryKey];
     [defaults setObject:spans forKey:kPFBMutedSpanKey];
     pfbRefreshMutedWords();
+    PFBNoteFiltersChange();
 }
 
 // Drops filters whose deadline has passed, and forgets their entry.
@@ -525,6 +558,7 @@ static NSMutableArray<NSString*>* PFBKeptLanguageList(void) {
     NSUserDefaults* d = [NSUserDefaults standardUserDefaults];
     [d setObject:self.terms forKey:kPFBMutedWordsKey];
     pfbRefreshMutedWords();
+    PFBNoteFiltersChange();
 }
 
 // MARK: actions
@@ -570,6 +604,7 @@ static NSMutableArray<NSString*>* PFBKeptLanguageList(void) {
     }
     [[NSUserDefaults standardUserDefaults] setBool:sender.isOn forKey:keys[index]];
     pfbRefreshMutedWords();
+    PFBNoteFiltersChange();
 }
 
 - (BOOL)textFieldShouldReturn:(UITextField*)textField {
@@ -997,6 +1032,7 @@ static NSMutableArray<NSString*>* PFBKeptLanguageList(void) {
         [kept addObject:code];
     }
     [[NSUserDefaults standardUserDefaults] setObject:kept forKey:kPFBLanguagesKey];
+    PFBNoteFiltersChange();
     [tableView reloadData];
 }
 
@@ -1011,6 +1047,7 @@ static NSMutableArray<NSString*>* PFBKeptLanguageList(void) {
         if (indexPath.row < (NSInteger)threads.count) {
             PFBUnhideThread(threads[(NSUInteger)indexPath.row][@"id"]);
             pfbRefreshMutedWords();
+            PFBNoteFiltersChange();
         }
         [self updatePreferredSize];
         [tableView reloadData];

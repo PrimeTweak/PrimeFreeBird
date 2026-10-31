@@ -40,6 +40,72 @@ static BOOL ScribeItemIsPromoted(id item) {
            scribeItem[@"promoted_id"] != nil;
 }
 
+// The object a getter returns, read only when the object's method for it returns one.
+static id GetterObject(id object, NSString* name) {
+    SEL selector = NSSelectorFromString(name);
+    if (![object respondsToSelector:selector]) {
+        return nil;
+    }
+    const char* types = method_getTypeEncoding(class_getInstanceMethod(object_getClass(object), selector));
+    return types && types[0] == '@' ? ((id (*)(id, SEL))objc_msgSend)(object, selector) : nil;
+}
+
+// A text value as one line of about 60 characters: rich text is read through text, then
+// string, and anything else through its description. nil when there is no text.
+static NSString* ShortText(id value) {
+    id text = value;
+    for (NSString* getter in @[ @"text", @"string" ]) {
+        if (text && ![text isKindOfClass:[NSString class]]) {
+            text = GetterObject(text, getter) ?: text;
+        }
+    }
+    NSString* line = [text isKindOfClass:[NSString class]] ? text : [text description];
+    line = [[line componentsSeparatedByCharactersInSet:NSCharacterSet.newlineCharacterSet]
+        componentsJoinedByString:@" "];
+    if (line.length > 60) {
+        line = [[line substringToIndex:[line rangeOfComposedCharacterSequenceAtIndex:60].location]
+            stringByAppendingString:@"…"];
+    }
+    return line.length ? line : nil;
+}
+
+// What the first message cards of a launch say, one line per scribe component: the header
+// (else the body or the banner), the main button's title and the link it opens.
+static void NoteMessageCard(id card) {
+    static NSMutableSet<NSString*>* components;
+    if (components.count >= 3) {
+        return;
+    }
+    NSString* component = ShortText(GetterObject(card, @"scribeComponent")) ?: @"-";
+    if ([components containsObject:component]) {
+        return;
+    }
+    components = components ?: [NSMutableSet set];
+    [components addObject:component];
+    NSString* text = nil;
+    for (NSString* getter in @[ @"headerRichText", @"bodyRichText", @"bannerText" ]) {
+        text = text ?: ShortText(GetterObject(card, getter));
+    }
+    id button = GetterObject(card, @"primaryButtonAction");
+    NSArray<NSString*>* parts = @[
+        component, text ?: @"-", ShortText(GetterObject(button, @"text")) ?: @"-",
+        ShortText(GetterObject(GetterObject(button, @"action"), @"url")) ?: @"-"
+    ];
+    PFBCompatMeasure(@"message cards", [parts componentsJoinedByString:@" · "], 3);
+}
+
+// Where the first carousels of a launch appear, one line per list location.
+static void NoteCarouselLocation(NSString* location) {
+    static NSMutableSet<NSString*>* locations;
+    NSString* place = location.length ? location : @"no location";
+    if (locations.count >= 3 || [locations containsObject:place]) {
+        return;
+    }
+    locations = locations ?: [NSMutableSet set];
+    [locations addObject:place];
+    PFBCompatMeasure(@"carousels", [@"carousel in a list at " stringByAppendingString:place], 3);
+}
+
 static BOOL ShouldHideItem(id item, NSString* location) {
     item = PFBUnwrapDataViewItem(item);
     NSString* className = NSStringFromClass([item classForCoder]);
@@ -71,13 +137,18 @@ static BOOL ShouldHideItem(id item, NSString* location) {
         }
     }
 
-    if ([PFBSettings boolForKey:@"hide_premium_offer"]) {
-        if ([className isEqualToString:@"URTTimelineMessageItemViewModel"]) {
-            PFBCOMPAT_ACTION(PFBCompat_hide_premium_offer, @"premium message hidden");
+    if ([className isEqualToString:@"URTTimelineMessageItemViewModel"]) {
+        NoteMessageCard(item);
+        if ([PFBSettings boolForKey:@"hide_timeline_prompts"]) {
+            PFBCOMPAT_ACTION(PFBCompat_hide_timeline_prompts, @"message card hidden");
             return YES;
         }
+        PFBCOMPAT_OBSERVE(PFBCompat_hide_timeline_prompts, @"message card found");
     }
 
+    if ([className isEqualToString:@"T1TwitterSwift.URTTimelineCarouselViewModel"]) {
+        NoteCarouselLocation(location);
+    }
     if (PFBCompatNeedsObservation(PFBCompat_hide_trend_videos) &&
         ![PFBSettings boolForKey:@"hide_trend_videos"] && [location isEqualToString:@"OTHER"] &&
         [className isEqualToString:@"T1TwitterSwift.URTTimelineCarouselViewModel"]) {
@@ -98,8 +169,9 @@ static BOOL ShouldHideItem(id item, NSString* location) {
 static NSArray* FilteredSections(TFNItemsDataViewController* dataViewController,
                                  NSArray* sections) {
     if (!([PFBSettings boolForKey:@"hide_promoted"] ||
-          [PFBSettings boolForKey:@"hide_premium_offer"] ||
-          [PFBSettings boolForKey:@"hide_trend_videos"])) {
+          [PFBSettings boolForKey:@"hide_timeline_prompts"] ||
+          [PFBSettings boolForKey:@"hide_trend_videos"] ||
+          PFBCompatNeedsObservation(PFBCompat_hide_timeline_prompts))) {
         return sections;
     }
 

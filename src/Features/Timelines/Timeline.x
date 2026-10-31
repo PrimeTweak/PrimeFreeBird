@@ -398,6 +398,22 @@ static NSString* CarouselScribeComponent(id viewModel) {
     return [value isKindOfClass:[NSString class]] ? value : nil;
 }
 
+// The first carousels of a launch removed from a profile without Twitter's Who to follow
+// mark, one report line per component.
+static void PFBNoteProfileCarousel(id viewModel) {
+    static NSMutableSet<NSString*>* components;
+    if (components.count >= 3) {
+        return;
+    }
+    NSString* component = CarouselScribeComponent(viewModel) ?: @"no component";
+    if ([component isEqualToString:@"suggest_who_to_follow"] || [components containsObject:component]) {
+        return;
+    }
+    components = components ?: [NSMutableSet set];
+    [components addObject:component];
+    PFBCompatMeasure(@"profile carousels", [@"carousel removed in a profile: " stringByAppendingString:component], 3);
+}
+
 // Tweets a topic brought in carry Twitter's own label for it, "From <topic>" in
 // the app's language, as their context banner.
 static BOOL ItemIsTopicPost(id viewModel) {
@@ -1008,6 +1024,7 @@ static BOOL ShouldHideTimelineItem(id item, const PFBTimelinePass* pass) {
 
     if (pass->hideWhoToFollow && pass->inProfile &&
         [className isEqualToString:@"T1TwitterSwift.URTTimelineCarouselViewModel"]) {
+        PFBNoteProfileCarousel(viewModel);
         PFBCOMPAT_ACTION(PFBCompat_hide_who_to_follow, @"profile suggestions hidden");
         return YES;
     }
@@ -1744,8 +1761,18 @@ static BOOL PFBTimelineFiltersNeedObservation(void) {
            PFBCompatNeedsObservation(PFBCompat_filter_languages);
 }
 
+// When a list on screen was last handed sections, read by the Filters screen.
+static CFAbsoluteTime gPFBLastTimelineDelivery = 0;
+
+CFAbsoluteTime pfbLastTimelineDelivery(void) {
+    return gPFBLastTimelineDelivery;
+}
+
 static NSArray* FilteredTimelineSections(TFNItemsDataViewController* dataViewController,
                                          NSArray* sections) {
+    if (dataViewController.viewIfLoaded.window) {
+        gPFBLastTimelineDelivery = CFAbsoluteTimeGetCurrent();
+    }
     PFBTimelinePass pass = {0};
     pass.hideWhoToFollow = [PFBSettings boolForKey:@"hide_who_to_follow"];
     pass.hidePrompts = [PFBSettings boolForKey:@"hide_timeline_prompts"];
