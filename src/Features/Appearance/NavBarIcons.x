@@ -574,14 +574,30 @@ static void pfbTintGlyphChain(UIView* view, UIColor* color) {
     }
 }
 
+// The bar classes the glyph tests below compare a view's class with, resolved once.
+static Class gPFBButtonBarButtonClass;
+static Class gPFBBackMaskClass;
+static Class gPFBModernBarButtonClass;
+static Class gPFBTFNBarButtonClass;
+
+static void pfbFindBarClasses(void) {
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+      gPFBButtonBarButtonClass = NSClassFromString(@"_UIButtonBarButton");
+      gPFBBackMaskClass = NSClassFromString(@"_UIBackButtonMaskView");
+      gPFBModernBarButtonClass = NSClassFromString(@"_UIModernBarButton");
+      gPFBTFNBarButtonClass = NSClassFromString(@"TFNBarButtonItemButton");
+    });
+}
+
 // True of a back button's own subtree only: _UIBackButtonMaskView is created for
-// back buttons and nothing else. Class names are read, never touched, and no view
+// back buttons and nothing else. Classes are compared, never touched, and no view
 // in the subtree is painted.
 static BOOL pfbSubtreeHasBackMask(UIView* view, NSInteger depth) {
     if (!view || depth > 4) {
         return NO;
     }
-    if ([NSStringFromClass([view class]) isEqualToString:@"_UIBackButtonMaskView"]) {
+    if ([view class] == gPFBBackMaskClass) {
         return YES;
     }
     for (UIView* sub in view.subviews) {
@@ -593,11 +609,12 @@ static BOOL pfbSubtreeHasBackMask(UIView* view, NSInteger depth) {
 }
 
 static BOOL pfbIsBackArrowGlyph(UIView* view) {
+    pfbFindBarClasses();
     UIView* container = nil;
     UIView* node = view.superview;
     NSInteger depth = 0;
     while (node && depth < 5) {
-        if ([NSStringFromClass([node class]) isEqualToString:@"_UIButtonBarButton"]) {
+        if ([node class] == gPFBButtonBarButtonClass) {
             container = node;
             break;
         }
@@ -611,18 +628,17 @@ static BOOL pfbIsBackArrowGlyph(UIView* view) {
 }
 
 static BOOL pfbIsChatBarGlyph(UIView* view) {
+    pfbFindBarClasses();
     UIView* ancestor = view.superview;
     NSInteger depth = 0;
     BOOL inHolder = NO;
     while (ancestor && depth < 4) {
-        NSString* name = NSStringFromClass([ancestor class]);
+        Class cls = [ancestor class];
         // A back button carries two image views, one under the modern button and
         // one under the mask; the mask's is the one UIKit draws, so both count.
-        if ([name isEqualToString:@"_UIModernBarButton"] ||
-            [name isEqualToString:@"_UIBackButtonMaskView"] ||
-            [name isEqualToString:@"_UIButtonBarButton"] ||
-            [name isEqualToString:@"TFNBarButtonItemButton"] ||
-            [name containsString:@"SelfSizingStackView"]) {
+        if (cls == gPFBModernBarButtonClass || cls == gPFBBackMaskClass ||
+            cls == gPFBButtonBarButtonClass || cls == gPFBTFNBarButtonClass ||
+            [NSStringFromClass(cls) containsString:@"SelfSizingStackView"]) {
             inHolder = YES;
             break;
         }
@@ -644,8 +660,8 @@ static BOOL pfbIsChatBarGlyph(UIView* view) {
     UIImage* chatImage = self.image;
     if (chatImage &&
         chatImage.renderingMode != UIImageRenderingModeAlwaysOriginal &&
-        (pfbIsChatBarGlyph((UIView*)self) ||
-         pfbIsBackArrowGlyph((UIView*)self))) {
+        (pfbIsBackArrowGlyph((UIView*)self) ||
+         pfbIsChatBarGlyph((UIView*)self))) {
         UIColor* color = pfbBarGlyphColor((UIView*)self);
         UIImage* baked = PFBPaintedGlyph(chatImage, color);
         if (baked) {
@@ -667,7 +683,7 @@ static BOOL pfbIsChatBarGlyph(UIView* view) {
         // already original is claimed.
         if (image.renderingMode != UIImageRenderingModeAlwaysOriginal) {
             BOOL backArrow = pfbIsBackArrowGlyph((UIView*)self);
-            if (pfbIsChatBarGlyph((UIView*)self) || backArrow) {
+            if (backArrow || pfbIsChatBarGlyph((UIView*)self)) {
                 // Baked at the setter: whoever writes last, the pixels that
                 // land carry the color. A mode change alone leaves an alpha mask,
                 // which a bar button re-tints per its own contrast rule.
@@ -696,8 +712,15 @@ static BOOL pfbIsChatBarGlyph(UIView* view) {
         return;
     }
     // Twitter's own image is the source; repainting a repainted image would compound and go pale.
-    if (objc_getAssociatedObject(self, kPFBOriginalImageKey)) {
-        image = objc_getAssociatedObject(self, kPFBOriginalImageKey);
+    UIImage* original = objc_getAssociatedObject(self, kPFBOriginalImageKey);
+    if (original) {
+        // The repaint keeps showing the first original, even when Twitter sets another glyph.
+        static BOOL changeNoted;
+        if (!changeNoted && image != original && ![image isEqual:original]) {
+            changeNoted = YES;
+            PFBCompatMeasure(@"bar icons", @"Twitter changed an icon the tweak had taken over", 2);
+        }
+        image = original;
     }
     objc_setAssociatedObject(self, kPFBOriginalImageKey, image,
                              OBJC_ASSOCIATION_RETAIN_NONATOMIC);
