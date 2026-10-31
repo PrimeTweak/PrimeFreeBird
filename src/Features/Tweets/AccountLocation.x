@@ -182,9 +182,9 @@ static void PFBSettleLabel(PFBFooterLabels* labels, NSString* key, NSString* lab
                            });
             return;
         }
-        if (status > 0 && PFBCompatWantsDetail(labels.option)) {
-            PFBCompatSetDetail(labels.option,
-                               [NSString stringWithFormat:@"x.com refused the request (HTTP %ld)", (long)status]);
+        if (status > 0) {
+            PFBCompatNoteRefusal(labels.option,
+                                 [NSString stringWithFormat:@"x.com refused the request (HTTP %ld)", (long)status]);
         }
     }
     [labels.failures removeObjectForKey:key];
