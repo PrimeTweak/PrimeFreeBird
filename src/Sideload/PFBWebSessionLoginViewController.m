@@ -1,4 +1,5 @@
 #import "Support/HookHelpers.h"
+#import "Sideload/PFBWebLoginViewController.h"
 #import "Sideload/PFBWebSessionLoginViewController.h"
 
 // Persist harvested cookies to the shared jar (survives relaunch) + the in-memory globals.
@@ -13,6 +14,12 @@ static void persistWebSessionCookies(NSArray<NSHTTPCookie*>* cookies) {
     }
     PFBStoreWebCookies(cookies);
 }
+
+@interface PFBWebSessionLoginViewController ()
+@property (nonatomic, strong) UILabel* statusLabel;
+@property (nonatomic, strong) UIButton* retryButton;
+@end
+
 @implementation PFBWebSessionLoginViewController
 
 - (void)viewDidLoad {
@@ -32,7 +39,7 @@ static void persistWebSessionCookies(NSArray<NSHTTPCookie*>* cookies) {
     self.loginWebView.autoresizingMask =
         UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
     self.loginWebView.navigationDelegate = self;
-    self.loginWebView.customUserAgent = PFBMobileSafariUserAgent;
+    self.loginWebView.customUserAgent = PFBDesktopSafariUserAgent;
     [self.view addSubview:self.loginWebView];
 
     self.spinner = [[UIActivityIndicatorView alloc]
@@ -42,11 +49,47 @@ static void persistWebSessionCookies(NSArray<NSHTTPCookie*>* cookies) {
         UIViewAutoresizingFlexibleTopMargin | UIViewAutoresizingFlexibleBottomMargin |
         UIViewAutoresizingFlexibleLeftMargin | UIViewAutoresizingFlexibleRightMargin;
     self.spinner.hidesWhenStopped = YES;
-    [self.spinner startAnimating];
     [self.view addSubview:self.spinner];
 
+    // Error text and Retry, as on the account login.
+    self.statusLabel = [[UILabel alloc] init];
+    self.statusLabel.numberOfLines = 0;
+    self.statusLabel.textAlignment = NSTextAlignmentCenter;
+    self.statusLabel.textColor = [UIColor secondaryLabelColor];
+    self.statusLabel.hidden = YES;
+    self.statusLabel.translatesAutoresizingMaskIntoConstraints = NO;
+    [self.view addSubview:self.statusLabel];
+
+    self.retryButton = [UIButton buttonWithType:UIButtonTypeSystem];
+    [self.retryButton setTitle:[[PFBBundle sharedBundle] localizedStringForKey:@"WEB_LOGIN_RETRY_ACTION"]
+                      forState:UIControlStateNormal];
+    self.retryButton.hidden = YES;
+    self.retryButton.translatesAutoresizingMaskIntoConstraints = NO;
+    [self.retryButton addTarget:self
+                         action:@selector(loadLoginPage)
+               forControlEvents:UIControlEventTouchUpInside];
+    [self.view addSubview:self.retryButton];
+
+    [NSLayoutConstraint activateConstraints:@[
+        [self.statusLabel.centerYAnchor constraintEqualToAnchor:self.loginWebView.centerYAnchor],
+        [self.statusLabel.leadingAnchor constraintEqualToAnchor:self.loginWebView.leadingAnchor
+                                                        constant:24],
+        [self.statusLabel.trailingAnchor constraintEqualToAnchor:self.loginWebView.trailingAnchor
+                                                         constant:-24],
+        [self.retryButton.centerXAnchor constraintEqualToAnchor:self.loginWebView.centerXAnchor],
+        [self.retryButton.topAnchor constraintEqualToAnchor:self.statusLabel.bottomAnchor
+                                                    constant:16],
+    ]];
+
+    [self loadLoginPage];
+}
+
+- (void)loadLoginPage {
+    [self.spinner startAnimating];
+    self.statusLabel.hidden = YES;
+    self.retryButton.hidden = YES;
     [self.loginWebView
-        loadRequest:[NSURLRequest requestWithURL:[NSURL URLWithString:@"https://x.com/login"]]];
+        loadRequest:[NSURLRequest requestWithURL:[NSURL URLWithString:PFBWebLoginFlowURL]]];
 }
 
 - (void)cancelTapped {
@@ -103,8 +146,18 @@ static void persistWebSessionCookies(NSArray<NSHTTPCookie*>* cookies) {
 
 - (void)webView:(__unused WKWebView*)webView
     didFailProvisionalNavigation:(__unused WKNavigation*)navigation
-                       withError:(__unused NSError*)error {
+                       withError:(NSError*)error {
+    // A redirect supersedes the previous load and cancels it; that is not a real
+    // failure, so leave the spinner running.
+    if (error.code == NSURLErrorCancelled) {
+        return;
+    }
     [self.spinner stopAnimating];
+    self.statusLabel.text =
+        [NSString stringWithFormat:[[PFBBundle sharedBundle] localizedStringForKey:@"WEB_LOGIN_LOAD_FAILED"],
+                                   error.localizedDescription];
+    self.statusLabel.hidden = NO;
+    self.retryButton.hidden = NO;
 }
 
 @end

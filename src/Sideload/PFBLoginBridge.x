@@ -276,14 +276,13 @@ static void pfbBridgeShowRestartPrompt(void) {
 }
 
 // Registers the account with the app's account service and switches the UI to it,
-// dismissing the login screen first.
-static void pfbBridgeMount(NSString* screen, long long uid, NSString* token, NSString* secret,
-                           UIViewController* presenter) {
+// dismissing the login screen first. Returns why no account was mounted, or nil.
+static NSString* pfbBridgeMount(NSString* screen, long long uid, NSString* token, NSString* secret,
+                                UIViewController* presenter) {
     Class accountCls = objc_getClass("TFNTwitterAccount");
     SEL initSel = NSSelectorFromString(@"initWithUsername:userID:");
     if (!accountCls || ![accountCls instancesRespondToSelector:initSel]) {
-        PFBDebugLog(@"[bridge] account class/init absent");
-        return;
+        return @"TFNTwitterAccount -initWithUsername:userID: not found";
     }
     // The ID goes in as the integer or the object the initializer takes.
     Method init = class_getInstanceMethod(accountCls, initSel);
@@ -300,8 +299,7 @@ static void pfbBridgeMount(NSString* screen, long long uid, NSString* token, NSS
         ((void (*)(id, SEL, id, id, id))objc_msgSend)(account, updSel, token, secret, screen);
     }
     if (!account) {
-        PFBDebugLog(@"[bridge] account nil after init");
-        return;
+        return @"no account made from the session";
     }
 
     Class twitterCls = objc_getClass("TFNTwitter");
@@ -343,6 +341,7 @@ static void pfbBridgeMount(NSString* screen, long long uid, NSString* token, NSS
     } else {
         switchBlock();
     }
+    return nil;
 }
 
 @implementation PFBLoginBridge
@@ -351,17 +350,20 @@ static void pfbBridgeMount(NSString* screen, long long uid, NSString* token, NSS
                       csrf:(NSString*)csrf
                     userID:(long long)userID
                 screenName:(NSString*)screenName
-                 presenter:(UIViewController*)presenter {
-    if (!authToken.length || !csrf.length || userID == 0) {
-        PFBDebugLog(@"[bridge] session/userID missing - abort");
-        return;
+                 presenter:(UIViewController*)presenter
+                   failure:(void (^)(NSString* reason))failure {
+    NSString* stop = @"session or user ID missing";
+    if (authToken.length && csrf.length && userID != 0) {
+        // The shell account is mounted directly over the shared web session: reads
+        // authenticate by cookie (the NSURLSession hook), writes reroute through
+        // WebCreateTweet.x, and the session already lives in the shared cookie jar.
+        NSString* screen =
+            screenName.length ? screenName : [NSString stringWithFormat:@"id%lld", userID];
+        stop = pfbBridgeMount(screen, userID, authToken, csrf, presenter);
     }
-    // The shell account is mounted directly over the shared web session: reads
-    // authenticate by cookie (the NSURLSession hook), writes reroute through
-    // WebCreateTweet.x, and the session already lives in the shared cookie jar.
-    NSString* screen =
-        screenName.length ? screenName : [NSString stringWithFormat:@"id%lld", userID];
-    pfbBridgeMount(screen, userID, authToken, csrf, presenter);
+    if (stop && failure) {
+        failure(stop);
+    }
 }
 
 @end

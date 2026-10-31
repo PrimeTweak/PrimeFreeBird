@@ -6,8 +6,15 @@
 #import "Support/TwitterChirpFont.h"
 #import "Support/HookHelpers.h"
 
+// The flow entry directly, not twitter.com/login: that route bounces through the x.com
+// landing before reaching the same flow, and each hop is wait time.
+NSString* const PFBWebLoginFlowURL = @"https://x.com/i/flow/login";
+NSString* const PFBDesktopSafariUserAgent =
+    @"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 "
+    @"(KHTML, like Gecko) Version/17.0 Safari/605.1.15";
+
 // The cookies that prove a real session: the auth token and the CSRF token the API
-// calls need; the first auth_token after login starts the bridge.
+// calls need; with the twid naming the account, they start the bridge.
 static NSString* const kPFBAuthCookie = @"auth_token";
 static NSString* const kPFBCsrfCookie = @"ct0";
 
@@ -25,6 +32,7 @@ static UIImage* pfbLoginBirdImage(CGSize size) {
 @property (nonatomic, strong) UILabel* statusLabel;
 @property (nonatomic, strong) UIButton* retryButton;
 @property (nonatomic, strong) UILabel* connectingLabel;
+@property (nonatomic, weak) UIView* switchingOverlay;
 @property (nonatomic, assign) BOOL sawAuth;
 @property (nonatomic, assign) BOOL asRoot;
 @property (nonatomic, assign) BOOL didStartInitialLoad;
@@ -60,9 +68,7 @@ static UIImage* pfbLoginBirdImage(CGSize size) {
     self.webView = [[WKWebView alloc] initWithFrame:self.view.bounds
                                       configuration:cfg];
     self.webView.navigationDelegate = self;
-    self.webView.customUserAgent =
-        @"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 "
-        @"(KHTML, like Gecko) Version/17.0 Safari/605.1.15";
+    self.webView.customUserAgent = PFBDesktopSafariUserAgent;
     // Not opaque, over a matching background color, so the web area never flashes
     // white before x.com paints.
     self.webView.opaque = NO;
@@ -244,7 +250,10 @@ static UIImage* pfbLoginBirdImage(CGSize size) {
                                                     csrf:csrf
                                                   userID:userID
                                               screenName:screen
-                                               presenter:self];
+                                               presenter:self
+                                                 failure:^(NSString* reason) {
+                                                   [self bridgeStoppedWithReason:reason];
+                                                 }];
                          return;
                      }
                      dispatch_after(
@@ -274,7 +283,7 @@ static UIImage* pfbLoginBirdImage(CGSize size) {
 
 // Full-screen cover shown the moment the session is captured, so the web -> native
 // handoff reads as a deliberate step, not a frozen page. It rides along until the
-// account switch dismisses this screen.
+// account switch dismisses this screen, or comes down if the bridge stops.
 - (void)showSwitchingOverlay {
     UIView* overlay = [[UIView alloc] initWithFrame:self.view.bounds];
     overlay.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
@@ -308,12 +317,29 @@ static UIImage* pfbLoginBirdImage(CGSize size) {
     [overlay addSubview:stack];
 
     [self.view addSubview:overlay];
+    self.switchingOverlay = overlay;
     [NSLayoutConstraint activateConstraints:@[
         [bird.widthAnchor constraintEqualToConstant:48],
         [bird.heightAnchor constraintEqualToConstant:48],
         [stack.centerXAnchor constraintEqualToAnchor:overlay.centerXAnchor],
         [stack.centerYAnchor constraintEqualToAnchor:overlay.centerYAnchor]
     ]];
+}
+
+// The bridge mounted no account: the cover comes down and the error shows with Retry over
+// the hidden page; the next whole session starts the bridge again.
+- (void)bridgeStoppedWithReason:(NSString*)reason {
+    PFBCompatMeasure(@"web login", [@"sign-in stopped: " stringByAppendingString:reason], 3);
+    [self.switchingOverlay removeFromSuperview];
+    self.sawAuth = NO;
+    // Counted as revealed, so a pending reveal leaves the page hidden behind the error.
+    self.didRevealWeb = YES;
+    self.webView.alpha = 0.0;
+    [self.spinner stopAnimating];
+    self.connectingLabel.hidden = YES;
+    self.statusLabel.text = [[PFBBundle sharedBundle] localizedStringForKey:@"UNKNOWN_ERROR"];
+    self.statusLabel.hidden = NO;
+    self.retryButton.hidden = NO;
 }
 
 - (void)reload {
@@ -323,9 +349,7 @@ static UIImage* pfbLoginBirdImage(CGSize size) {
     self.retryButton.hidden = YES;
     self.webView.alpha = 0.0;
     self.didRevealWeb = NO;
-    // The flow entry directly, not twitter.com/login: that route bounces through
-    // the x.com landing before reaching the same flow, and each hop is wait time.
-    NSURL* url = [NSURL URLWithString:@"https://x.com/i/flow/login"];
+    NSURL* url = [NSURL URLWithString:PFBWebLoginFlowURL];
     [self.webView loadRequest:[NSURLRequest requestWithURL:url]];
     // Safety net: if the flow never settles on x.com, show whatever loaded rather
     // than spin forever.
@@ -351,7 +375,8 @@ static UIImage* pfbLoginBirdImage(CGSize size) {
     decisionHandler(WKNavigationResponsePolicyAllow);
 }
 
-// After every page settles, the cookie jar is read; the first auth_token starts the bridge.
+// After every page settles, the cookie jar is read; the first whole session (auth_token,
+// ct0 and the twid naming the account) starts the bridge.
 - (void)webView:(WKWebView*)webView didFinishNavigation:(WKNavigation*)navigation {
     // Reveal only once the login flow itself is up, not the brief x.com landing
     // ("Log in / Sign up") the redirect passes through first.
@@ -360,7 +385,6 @@ static UIImage* pfbLoginBirdImage(CGSize size) {
     }
     WKHTTPCookieStore* store = webView.configuration.websiteDataStore.httpCookieStore;
     [store getAllCookies:^(NSArray<NSHTTPCookie*>* cookies) {
-      BOOL auth = NO;
       NSString* authVal = nil;
       NSString* csrfVal = nil;
       long long uid = 0;
@@ -370,7 +394,6 @@ static UIImage* pfbLoginBirdImage(CGSize size) {
               continue;
           }
           if ([cookie.name isEqualToString:kPFBAuthCookie]) {
-              auth = YES;
               authVal = cookie.value;
           } else if ([cookie.name isEqualToString:kPFBCsrfCookie]) {
               csrfVal = cookie.value;
@@ -380,7 +403,7 @@ static UIImage* pfbLoginBirdImage(CGSize size) {
               uid = [[[dec componentsSeparatedByString:@"="] lastObject] longLongValue];
           }
       }
-      if (auth && !self.sawAuth) {
+      if (authVal.length && csrfVal.length && uid > 0 && !self.sawAuth) {
           self.sawAuth = YES;
           [self showSwitchingOverlay];
           // Seed the shared cookie jar with this session so the read injection and

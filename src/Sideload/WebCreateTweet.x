@@ -307,6 +307,16 @@ static void onHelperWebViewLoaded(WKWebView* webView);
     WebHelperReady = NO;
     WebHelperInFlight = NO;
 }
+// A page failing after it started loading leaves the helper in flight without its
+// script; the report gets the error's domain and code.
+- (void)webView:(__unused WKWebView*)webView
+    didFailNavigation:(__unused WKNavigation*)navigation
+            withError:(NSError*)error {
+    PFBCompatMeasure(@"web helper",
+                     [NSString stringWithFormat:@"x.com page failed after loading: %@ %ld", error.domain,
+                                                (long)error.code],
+                     2);
+}
 @end
 
 static PFBWebHelperDelegate* WebHelperDelegateInstance = nil;
@@ -1243,6 +1253,13 @@ NSMutableURLRequest* PFBWebSessionGETRequest(NSURL* url) {
     request.HTTPMethod = @"GET";
     request.timeoutInterval = 10.0;
     applyWebAuth(request, authToken, ct0, nil);
+    // The path's transaction id when one is ready, as the web client sends; the next one is
+    // minted now for the request that follows.
+    NSString* xtid = cachedXTID(xtidKey(@"GET", url.path));
+    if (xtid.length) {
+        [request setValue:xtid forHTTPHeaderField:@"x-client-transaction-id"];
+    }
+    refreshXTIDFor(@"GET", url.path);
     return request;
 }
 
