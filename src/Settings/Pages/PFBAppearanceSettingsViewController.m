@@ -125,6 +125,10 @@
                 handler:^{
                     BOOL wasEnabled = [PFBSettings boolForKey:@"enable_liquid_glass"];
                     BOOL nowEnabled = (i == 1);
+                    if (nowEnabled && wasEnabled && !PFBNativeGlassAsked()) {
+                        PFBCompatMeasure(@"visual style",
+                                         @"Liquid Glass chosen again during its safe mode: no restart asked", 2);
+                    }
                     [[NSUserDefaults standardUserDefaults] setBool:nowEnabled
                                                             forKey:@"enable_liquid_glass"];
                     if (nowEnabled) {
