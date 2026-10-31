@@ -59,6 +59,9 @@ void PFBApplyHideCustomTimelinesSetting(void);
 
 // Runs the timeline filter again on the timelines already on screen (Timeline.x).
 void pfbReapplyTimelineFilter(void);
+// When the timeline filter last ran on sections handed to a list on screen; 0 before the
+// first (Timeline.x).
+CFAbsoluteTime pfbLastTimelineDelivery(void);
 
 // The hidden-conversation registry, and taking one entry out of it (HiddenThreads.x).
 NSArray<NSDictionary*>* PFBHiddenThreads(void);
@@ -100,8 +103,8 @@ FOUNDATION_EXPORT NSString* const PFBNativeGlassEarlyExitsKey;
 FOUNDATION_EXPORT BOOL PFBNativeGlassAsked(void);
 // YES when a usable web session (auth_token + ct0) is available (WebCreateTweet.x).
 BOOL PFBHasUsableWebCredentials(void);
-// A GET signed with the web session; nil without one or for a URL that is not
-// https on x.com (WebCreateTweet.x).
+// A GET signed with the web session, with its path's transaction id when one is ready; nil
+// without a session or for a URL that is not https on x.com (WebCreateTweet.x).
 NSMutableURLRequest* PFBWebSessionGETRequest(NSURL* url);
 // The current account's ID when the web session is that account's, else nil. Main thread.
 NSString* PFBWebSessionAccountID(void);

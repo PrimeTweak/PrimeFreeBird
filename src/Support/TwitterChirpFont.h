@@ -37,21 +37,23 @@ static inline UIFont* PFBTabularDigitsFont(UIFont* font) {
     return [UIFont fontWithDescriptor:descriptor size:font.pointSize];
 }
 
-// A Chirp face from Twitter's font group, or a system font when the group gives none.
+// A Chirp face from Twitter's font group, or a system font when the group or the method
+// is missing.
 static inline UIFont* TwitterChirpFont(TwitterFontStyle style) {
+    Class groupClass = objc_getClass("TFNUIDefaultFontGroup");
     TFNUIDefaultFontGroup* group =
-        [objc_getClass("TFNUIDefaultFontGroup") sharedFontGroup];
+        [groupClass respondsToSelector:@selector(sharedFontGroup)] ? [groupClass sharedFontGroup] : nil;
 
     switch (style) {
         case TwitterFontStyleBold:
-            return [group heavyFontOfSize:17]
+            return ([group respondsToSelector:@selector(heavyFontOfSize:)] ? [group heavyFontOfSize:17] : nil)
                        ?: [UIFont systemFontOfSize:17 weight:UIFontWeightBold];
         case TwitterFontStyleSemibold:
-            return [group boldFontOfSize:14]
+            return ([group respondsToSelector:@selector(boldFontOfSize:)] ? [group boldFontOfSize:14] : nil)
                        ?: [UIFont systemFontOfSize:14 weight:UIFontWeightSemibold];
         case TwitterFontStyleRegular:
         default:
-            return [group fontOfSize:12]
+            return ([group respondsToSelector:@selector(fontOfSize:)] ? [group fontOfSize:12] : nil)
                        ?: [UIFont systemFontOfSize:12 weight:UIFontWeightRegular];
     }
 }

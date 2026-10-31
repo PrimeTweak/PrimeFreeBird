@@ -18,6 +18,14 @@ static __thread BOOL ReportGenuineTabGates = NO;
 // unlock — for switch-gated surfaces that have no premium-aware seam of their
 // own.
 static BOOL AccountIsGenuinelyPremium(void) {
+    if (![NSThread isMainThread]) {
+        static dispatch_once_t offMain;
+        dispatch_once(&offMain, ^{
+          dispatch_async(dispatch_get_main_queue(), ^{
+              PFBCompatMeasure(@"premium check", @"account read off the main thread", 2);
+          });
+        });
+    }
     Class hostClass = objc_getClass("T1HostViewController");
     if (![(id)hostClass respondsToSelector:@selector(sharedHostViewController)]) {
         return NO;
@@ -62,11 +70,124 @@ static BOOL pfbIsGrokBotSwitch(NSString* key) {
     return [keys containsObject:key];
 }
 
+// Every key FeatureSwitchOverrideValueForKey answers, by name or by family, so the many
+// switches it leaves alone return before its comparisons. A key it answers is listed here too.
+static BOOL pfbSwitchIsAnswered(NSString* key) {
+    static NSSet<NSString*>* keys;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+      keys = [NSSet setWithArray:@[
+          @"app_customization_custom_primary_color_enabled",
+          @"ios_liquid_glass_redesign_enabled", @"xchat_liquid_glass_convo_header_enabled",
+          @"ios_settings_redesign_enabled",
+          @"hometimeline_pinned_tabs_topics_enabled",
+          @"hometimeline_pinned_tabs_generic_timelines_enabled",
+          @"hometimeline_pinned_tabs_limit",
+          @"hometimeline_pinned_tabs_management_pinnedsection_inline_limit",
+          @"hometimeline_pinned_tabs_management_topics_inline_limit",
+          @"edit_tweet_ga_composition_enabled", @"edit_tweet_pdp_dialog_enabled",
+          @"app_launch_animated_launch_screen_enabled",
+          @"grok_translations_bio_inline_translation_is_enabled",
+          @"grok_translations_bio_translation_is_enabled",
+          @"grok_translations_post_inline_translation_is_enabled",
+          @"grok_translations_post_translation_is_enabled",
+          @"grok_translations_community_note_translation_is_enabled",
+          @"grok_translations_poll_translation_is_enabled",
+          @"grok_translations_post_auto_translation_is_enabled",
+          @"grok_translations_bio_auto_translation_is_enabled",
+          @"grok_translations_community_note_auto_translation_is_enabled",
+          @"grok_translations_notification_auto_translation_is_enabled",
+          @"grok_translations_immersive_auto_translate_is_enabled",
+          @"grok_ask_grok_button_under_post_focal_enabled",
+          @"grok_ask_grok_button_under_post_preview_enabled",
+          @"grok_edit_with_grok_button_under_post_focal_enabled",
+          @"grok_edit_with_grok_button_under_post_preview_enabled",
+          @"ios_composer_grok_button_enabled", @"grok_composer_imagine_is_enabled",
+          @"grok_composer_attachment_imagine_menu_is_enabled",
+          @"grok_timeline_preview_imagine_menu_is_enabled",
+          @"grok_timeline_video_imagine_menu_is_enabled",
+          @"grok_timeline_slideshow_imagine_menu_is_enabled",
+          @"grok_ios_edit_photo_post_button_enabled", @"grok_ios_imagine_2_cta_enabled",
+          @"grok_ios_author_view_analyze_button_via_backend_enabled",
+          @"grok_ios_profile_summary_enabled",
+          @"post_about_hide_grok_pills_enabled", @"post_about_grok_features_enabled",
+          @"xchat_ask_grok_enabled", @"grok_explain_text_selection_ask_grok_enabled",
+          @"xchat_cold_inbox_suggestions_enabled", @"xchat_cold_inbox_find_friends_enabled",
+          @"home_timeline_non_sticky_tab_on_new_session_enabled",
+          @"home_timeline_foreground_refresh_min_background_seconds",
+          @"articles_timeline_profile_tab_enabled", @"highlights_tweets_tab_ui_enabled",
+          @"grok_settings_age_restriction_enabled",
+          @"ad_formats_click_id_enabled", @"ad_formats_dcm_enabled",
+          @"wcl_unified_cards_likely_open_link_prefetch_enabled",
+          @"reply_sorting_enabled",
+          @"ios_tweet_detail_overflow_in_navigation_enabled",
+          @"ios_tweet_detail_conversation_context_removal_enabled",
+          @"ios_ui_multi_media_carousel_enabled",
+          @"ios_ui_multi_media_carousel_avatar_avoidance_enabled",
+          @"ios_ui_quote_tweet_multi_media_carousel_enabled",
+          @"ios_tav_default_closed_captions_enabled",
+          @"ios_audio_transcription_subtitles_vod_enabled",
+          @"xchat_voice_messages_transcription_enabled",
+          @"ios_tav_video_prefetch_range", @"ios_tav_video_prefetch_batch_size",
+          @"ios_tav_video_prefetch_videos_kept_in_cache",
+          @"ios_tab_bar_default_show_profile", @"ios_tab_bar_default_show_communities",
+          @"voice_rooms_consumption_enabled", @"communities_enable_explore_tab",
+          @"subscriptions_inapp_grok", @"ai_trends_ios_enable_news_tab", @"c9s_tab_visibility",
+          @"subscriptions_premium_hub_enabled", @"recruiting_global_jobs_hub_enabled",
+          @"ios_in_app_article_webview_enabled",
+          @"immersive_video_auto_advance_duration_threshold",
+          @"ssp_ads_spotlight", @"ssp_ads_spotlight_client_only_integration",
+          @"ssp_ads_spotlight_client_only_integration_preload", @"ssp_ads_home_enabled",
+          @"ssp_ads_home_client_only_integration", @"ssp_ads_profile",
+          @"ssp_ads_profile_client_only_integration_enabled", @"ssp_ads_immersive",
+          @"ssp_ads_immersive_client_only_integration", @"ssp_ads_tweet_details",
+          @"ssp_ads_tweet_details_client_only_integration",
+          @"wtf_device_follow_nudge_turn_off_reactive_blending_enabled",
+          @"subscriptions_gating_bypass",
+          @"ios_profile_analytics_upsell_enabled",
+          @"ios_profile_analytics_upsell_possible_enabled",
+          @"ios_profile_upgrade_upsell_enabled", @"ios_profile_upgrade_upsell_swapper_enabled",
+          @"ios_profile_visitor_upsell_enabled", @"subscriptions_upsells_get_verified_profile",
+          @"subscriptions_upsells_reply_boost_enabled",
+          @"subscriptions_upsells_reply_boost_popup_enabled",
+          @"subscriptions_upsells_post_analytics_enabled",
+          @"subscriptions_upsells_creator_support_post_conversation_enabled",
+          @"longform_notetweets_composer_upsell_enabled",
+          @"longform_notetweets_composer_auto_upsell_enabled",
+          @"subscriptions_cta_on_replies_enabled", @"super_follow_upsell_sticky_button_enabled",
+          @"subscriptions_new_paywall_enabled", @"subscriptions_offers_promotional_enabled",
+          @"subscriptions_gifting_premium_enabled",
+          @"subscriptions_gifting_premium_intro_copy_enabled",
+          @"ios_notifications_blue_verified_introductory_offer_visible",
+          @"ios_notifications_blue_verified_introductory_offer_prefix_visible",
+          @"dash_items_download_grok_enabled",
+          @"ios_tweet_promote_button_enabled", @"ios_tweet_promote_button_timeline_enabled",
+          @"ios_tweet_promote_button_in_tweet_composer_enabled",
+          @"ios_tweet_promote_button_in_overflow_menu_enabled",
+          @"ios_tweet_promote_button_in_focal_top_toolbar_enabled",
+          @"ios_tweet_promote_button_in_focal_bottom_toolbar_enabled",
+          @"ios_tweet_promote_button_in_focal_top_analytics_enabled",
+          @"ios_tweet_promote_button_in_post_analytics_enabled",
+          @"ios_tweet_promote_button_boost_again_in_top_toolbar_enabled",
+          @"ios_tweet_promote_button_sent_tweet_toast_enabled",
+          @"ios_tweet_promote_button_third_party_boost_enabled",
+          @"thirdparty_boost_author_view_button_enabled",
+          @"creator_studio_nav_enabled", @"creator_monetization_dashboard_enabled"
+      ]];
+    });
+    return [keys containsObject:key] || pfbIsGrokBotSwitch(key) ||
+           [key hasPrefix:@"ios_age_assurance"] ||
+           ([key hasPrefix:@"ios_button_layout_fix"] && [key hasSuffix:@"_enabled"]);
+}
+
 static NSNumber* FeatureSwitchOverrideValueForKey(NSString* key) {
     if (![key isKindOfClass:[NSString class]]) {
         return nil;
     }
     PFBCompatNoteSettingRead(key);
+    if (!pfbSwitchIsAnswered(key)) {
+        return nil;
+    }
     // Unlock Twitter's native premium color themes, so the accent the user picks
     // is applied everywhere (links, buttons, highlights) by Twitter itself.
     if ([key isEqualToString:@"app_customization_custom_primary_color_enabled"]) {
@@ -108,34 +229,17 @@ static NSNumber* FeatureSwitchOverrideValueForKey(NSString* key) {
         return nil;
     }
 
-    // Screenshot share sheet: the prompt goes on cooldown after max_dismisses
-    // dismissals. The max is forced to infinity so the cooldown never triggers and
-    // the duration to 0 so any active one clears.
-    if (![PFBSettings boolForKey:@"no_screenshot_detection"]) {
-        if ([key isEqualToString:@"ios_consideration_share_cooldown_max_dismisses"]) {
-            return @(1000000);
-        }
-        if ([key isEqualToString:@"ios_consideration_share_cooldown_days"]) {
-            return @0;
-        }
-        if ([key isEqualToString:@"ios_consideration_share_cooldown_window_hours"]) {
-            return @0;
-        }
-    }
-
     // Two switches meet here. Hiding always wins, since with the strip gone the tab
     // options are moot. Otherwise unlimited_timeline_tabs unlocks every tab type and
     // lifts the pin limit, or returns nil for Twitter's own server values.
-    BOOL hideCustomTimelines = [PFBSettings boolForKey:@"hide_custom_timelines"];
-    BOOL unlimitedTabs = [PFBSettings boolForKey:@"unlimited_timeline_tabs"];
     if ([key isEqualToString:@"hometimeline_pinned_tabs_topics_enabled"] ||
         [key isEqualToString:@"hometimeline_pinned_tabs_generic_timelines_enabled"]) {
-        if (hideCustomTimelines) {
+        if ([PFBSettings boolForKey:@"hide_custom_timelines"]) {
             PFBCOMPAT_ACTION(PFBCompat_hide_custom_timelines, @"pinned tab gate off");
             PFBCOMPAT_OBSERVE(PFBCompat_unlimited_timeline_tabs, @"read by Twitter, Hide custom timelines answers first");
             return @NO;
         }
-        if (unlimitedTabs) {
+        if ([PFBSettings boolForKey:@"unlimited_timeline_tabs"]) {
             PFBCOMPAT_ACTION(PFBCompat_unlimited_timeline_tabs, @"every tab type allowed");
             return @YES;
         }
@@ -148,12 +252,12 @@ static NSNumber* FeatureSwitchOverrideValueForKey(NSString* key) {
                              @"inline_limit"] ||
         [key isEqualToString:
                  @"hometimeline_pinned_tabs_management_topics_inline_limit"]) {
-        if (hideCustomTimelines) {
+        if ([PFBSettings boolForKey:@"hide_custom_timelines"]) {
             PFBCOMPAT_ACTION(PFBCompat_hide_custom_timelines, @"pin limit 0");
             PFBCOMPAT_OBSERVE(PFBCompat_unlimited_timeline_tabs, @"read by Twitter, Hide custom timelines answers first");
             return @0;
         }
-        if (unlimitedTabs) {
+        if ([PFBSettings boolForKey:@"unlimited_timeline_tabs"]) {
             PFBCOMPAT_ACTION(PFBCompat_unlimited_timeline_tabs, @"pin limit lifted");
             return @100;
         }
@@ -1147,6 +1251,10 @@ static void PFBDashRebuild(id controller) {
 %hook T1DashContentController
 
 - (void)updateVisiblePanelIDs {
+    // A nested update would clear the flag for the rest of the outer one.
+    if (DashPanelIDQuery) {
+        PFBCompatMeasure(@"side menu panels", @"panel list updated inside its own update", 2);
+    }
     DashPanelIDQuery = YES;
     %orig;
     DashPanelIDQuery = NO;
@@ -1323,13 +1431,23 @@ static BOOL pfbHidesGrokCreate(void) {
 
 %end
 
+static const char* kPFBGrokPillHiddenKey = "pfbGrokPillHidden";
+
 %hook _TtC14T1TwitterSwift36ImmersiveShimmerPillButtonPluginView
 
+// Shown again only when the tweak hid it, so a pill Twitter hides itself stays hidden.
 - (void)layoutSubviews {
     %orig;
     PFBCompatReach(PFBCompatPath_grok_create_own_pill);
+    UIView* pill = (UIView*)self;
     if (pfbHidesGrokCreate()) {
-        ((UIView*)self).hidden = YES;
+        if (!pill.hidden) {
+            objc_setAssociatedObject(pill, kPFBGrokPillHiddenKey, @YES, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+            pill.hidden = YES;
+        }
+    } else if (objc_getAssociatedObject(pill, kPFBGrokPillHiddenKey)) {
+        objc_setAssociatedObject(pill, kPFBGrokPillHiddenKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        pill.hidden = NO;
     }
 }
 

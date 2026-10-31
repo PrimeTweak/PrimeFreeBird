@@ -125,9 +125,15 @@ UIColor* PFBCurrentAccentColor(void) {
         return [UIColor systemBlueColor];
     }
 
-    id settings = [TAEColorSettingsCls sharedSettings];
-    id current = [settings currentColorPalette];
-    id palette = [current colorPalette];
+    // Each step is asked only where it is answered, so a renamed one falls back to blue.
+    id settings = [TAEColorSettingsCls respondsToSelector:@selector(sharedSettings)]
+                      ? [TAEColorSettingsCls sharedSettings]
+                      : nil;
+    id current = [settings respondsToSelector:@selector(currentColorPalette)] ? [settings currentColorPalette] : nil;
+    id palette = [current respondsToSelector:@selector(colorPalette)] ? [current colorPalette] : nil;
+    if (![palette respondsToSelector:@selector(primaryColorForOption:)]) {
+        return [UIColor systemBlueColor];
+    }
     NSUserDefaults* defs = [NSUserDefaults standardUserDefaults];
 
     // The stored PrimeFreeBird pick wins over Twitter's own color option.

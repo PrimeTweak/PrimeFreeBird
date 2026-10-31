@@ -1,69 +1,35 @@
 // Media download and save helpers, cache sweep, menu font, branding test and settings screen.
 
 #import "Support/PFBManager.h"
+#import "Support/TwitterChirpFont.h"
 #import "Settings/PFBModernSettingsViewController.h"
 
 @implementation PFBManager
 + (void)cleanCache {
-    NSArray<NSURL*>* DocumentFiles = [[NSFileManager defaultManager]
-          contentsOfDirectoryAtURL:
-              [NSURL
-                  fileURLWithPath:NSSearchPathForDirectoriesInDomains(
-                                      NSDocumentDirectory, NSUserDomainMask, true)
-                                      .firstObject]
-        includingPropertiesForKeys:@[]
-                           options:NSDirectoryEnumerationSkipsHiddenFiles
-                             error:nil];
-
-    for (NSURL* file in DocumentFiles) {
-        if ([file.pathExtension.lowercaseString isEqualToString:@"mp4"]) {
-            [[NSFileManager defaultManager] removeItemAtURL:file error:nil];
+    dispatch_async(dispatch_get_global_queue(QOS_CLASS_UTILITY, 0), ^{
+        NSFileManager* files = [NSFileManager defaultManager];
+        for (NSURL* item in [files contentsOfDirectoryAtURL:[PFBManager temporaryFolder]
+                                 includingPropertiesForKeys:nil
+                                                    options:0
+                                                      error:nil]) {
+            [files removeItemAtURL:item error:nil];
         }
-    }
-
-    NSArray<NSURL*>* TempFiles = [[NSFileManager defaultManager]
-          contentsOfDirectoryAtURL:[NSURL fileURLWithPath:NSTemporaryDirectory()]
-        includingPropertiesForKeys:@[]
-                           options:NSDirectoryEnumerationSkipsHiddenFiles
-                             error:nil];
-
-    for (NSURL* file in TempFiles) {
-        if ([file.pathExtension.lowercaseString isEqualToString:@"mp4"]) {
-            [[NSFileManager defaultManager] removeItemAtURL:file error:nil];
-        }
-        if ([file.pathExtension.lowercaseString isEqualToString:@"mov"]) {
-            [[NSFileManager defaultManager] removeItemAtURL:file error:nil];
-        }
-        if ([file.pathExtension.lowercaseString isEqualToString:@"tmp"]) {
-            [[NSFileManager defaultManager] removeItemAtURL:file error:nil];
-        }
-        if ([file hasDirectoryPath]) {
-            if ([PFBManager isEmpty:file]) {
-                [[NSFileManager defaultManager] removeItemAtURL:file error:nil];
-            }
-        }
-    }
+    });
 }
-+ (BOOL)isEmpty:(NSURL*)url {
-    NSArray* FolderFiles = [[NSFileManager defaultManager]
-          contentsOfDirectoryAtURL:url
-        includingPropertiesForKeys:@[]
-                           options:NSDirectoryEnumerationSkipsHiddenFiles
-                             error:nil];
-    if (FolderFiles.count == 0) {
-        return true;
-    } else {
-        return false;
-    }
++ (NSURL*)temporaryFolder {
+    NSURL* folder = [[NSURL fileURLWithPath:NSTemporaryDirectory()] URLByAppendingPathComponent:@"PFB" isDirectory:YES];
+    [[NSFileManager defaultManager] createDirectoryAtURL:folder
+                             withIntermediateDirectories:YES
+                                              attributes:nil
+                                                   error:nil];
+    return folder;
 }
 + (id)sharedFontGroup {
-    return [objc_getClass("TFNUIDefaultFontGroup") sharedFontGroup];
+    Class groupClass = objc_getClass("TFNUIDefaultFontGroup");
+    return [groupClass respondsToSelector:@selector(sharedFontGroup)] ? [groupClass sharedFontGroup] : nil;
 }
 + (UIFont*)menuTitleFont {
-    UIFont* font = [[self sharedFontGroup] headline2BoldFont];
-    if (!font)
-        font = [UIFont boldSystemFontOfSize:17.0];
-    return font;
+    return PFBFontGroupFont(@selector(headline2BoldFont), [UIFont boldSystemFontOfSize:17.0]);
 }
 + (NSString*)getVideoQuality:(NSString*)url {
     NSMutableArray* q = [NSMutableArray new];

@@ -3,7 +3,11 @@
 #import "Support/TWHeaders.h"
 
 @interface PFBManager : NSObject
+// Empties the tweak's folder in tmp/, off the main thread.
 + (void)cleanCache;
+// The tweak's folder in tmp/, created when asked for. Every file the tweak writes on its way
+// to a share sheet, to Photos or to its final place goes there.
++ (NSURL*)temporaryFolder;
 + (NSString*)getVideoQuality:(NSString*)url;
 + (id)sharedFontGroup;
 + (UIFont*)menuTitleFont;
