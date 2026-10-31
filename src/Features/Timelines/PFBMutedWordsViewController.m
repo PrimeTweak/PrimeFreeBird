@@ -402,8 +402,7 @@ static NSMutableArray<NSString*>* PFBKeptLanguageList(void) {
 
 // MARK: expiry
 
-// Expiry lives in a companion dictionary keyed by the term, so an existing
-// list of plain strings keeps working untouched.
+// Expiry lives in a companion dictionary keyed by the term, beside the plain list of terms.
 - (NSMutableDictionary*)expiryMap {
     return [([[NSUserDefaults standardUserDefaults] dictionaryForKey:kPFBMutedExpiryKey]
                  ?: @{}) mutableCopy];
@@ -504,7 +503,7 @@ static NSMutableArray<NSString*>* PFBKeptLanguageList(void) {
                         [weakSelf setExpiry:deadline span:span forTerm:term];
                         [weakSelf.tableView reloadData];
                     }];
-        // A term timed before spans were kept is matched by its time left.
+        // A timed term with no saved span is matched by its time left.
         BOOL selected;
         if (span <= 0) {
             selected = current <= 0;
@@ -603,7 +602,7 @@ static NSMutableArray<NSString*>* PFBKeptLanguageList(void) {
     return 4;
 }
 
-// Custom headers, Chirp heavy — the advanced-search recipe, instead of the
+// Custom headers in Chirp Bold, as on the Advanced search screen, instead of the
 // small gray system captions.
 - (UIView*)tableView:(UITableView*)tableView viewForHeaderInSection:(NSInteger)section {
     if (self.compact) {

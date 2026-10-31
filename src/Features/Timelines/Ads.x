@@ -1,4 +1,4 @@
-// Hides ads, the premium offer, trending videos and Videos for you in timelines and the
+// Hides ads, timeline message cards, trending videos and Videos for you in timelines and the
 // video feed.
 
 #import "Support/HookHelpers.h"
@@ -59,7 +59,7 @@ static BOOL ShouldHideItem(id item, NSString* location) {
         }
 
         if ([className isEqualToString:@"TwitterURT.URTTimelineTrendViewModel"] &&
-            (ScribeItemIsPromoted(item) || ItemHasPromotedContent(item))) {
+            ScribeItemIsPromoted(item)) {
             PFBCOMPAT_ACTION(PFBCompat_hide_promoted, @"promoted trend");
             return YES;
         }

@@ -18,9 +18,6 @@
 
 NSNotificationName const PFBCompatDidChangeNotification = @"PFBCompatDidChangeNotification";
 
-// Theme.x: whether an accent color is set.
-extern BOOL PFBAccentIsActive(void);
-
 typedef struct {
     PFBCompatOption option;
     const char* key;
@@ -526,7 +523,6 @@ static const PFBCompatReq kReqs[] = {
     {PFBCompat_accent_color, "TAELightColorPalette", "-primaryColorOptionPurpleColor"},
     {PFBCompat_accent_color, "TAELightColorPalette", "-primaryColorOptionRedColor"},
     {PFBCompat_accent_color, "TAELightColorPalette", "-primaryColorOptionYellowColor"},
-    {PFBCompat_accent_color, "TFNMutableTwitterStatusDisplayAttributedTextModelFontOptions", "-linkTextColor"},
     {PFBCompat_accent_color, "TFNTwitterStatusDisplayAttributedTextModelFontOptions", "-linkTextColor"},
     {PFBCompat_accent_color, "TFNUIDefaultColorPalette", "-primaryColor"},
     {PFBCompat_accent_color, "TFSFeatureSwitches", "-boolForKey:"},
@@ -1328,7 +1324,7 @@ typedef struct {
     BOOL prefix;
 } PFBCompatFlag;
 
-// The Twitter feature switches each option answers in FeatureSwitches.x. A switch
+// The Twitter feature switches each option answers or reads in FeatureSwitches.x. A switch
 // Twitter no longer carries is one the option can no longer act through.
 static const PFBCompatFlag kFlags[] = {
     {PFBCompat_settings_entry, "ios_settings_redesign_enabled", NO},
@@ -1665,10 +1661,6 @@ static const PFBCompatName kNames[] = {
     {PFBCompatOptionCount, "Debug/PFBCompatibilityTour.m", "verifyTalonURL:completion:"},
     {PFBCompatOptionCount, "Debug/PFBCompatibilityTour.m", "T1TwitterClickIDHandler"},
     {PFBCompatOptionCount, "Debug/PFBCompatibilityTour.m", "URLByAppendingTwitterClickIDIfNecessary:status:account:scribePage:scribeComponent:"},
-    {PFBCompatOptionCount, "Debug/PFBCompatibilityReportViewController.m", "tableView"},
-    {PFBCompatOptionCount, "Debug/PFBCompatibilityReportViewController.m", "title"},
-    {PFBCompatOptionCount, "Debug/PFBTourChoicePopover.m", "title"},
-    {PFBCompatOptionCount, "Debug/PFBDebugger.m", "windows"},
     {PFBCompatOptionCount, "Features/General/PFBHiddenNotificationsViewController.m", "tableView"},
     {PFBCompatOptionCount, "Features/General/PFBHiddenNotificationsViewController.m", "title"},
     {PFBCompatOptionCount, "Features/General/PFBHiddenNotificationsViewController.m", "titleLabel"},
@@ -1708,10 +1700,6 @@ static const PFBCompatName kNames[] = {
     {PFBCompatOptionCount, "Features/Media/MediaDownloads.x", "status"},
     {PFBCompatOptionCount, "Features/Appearance/NavBarIcons.x", "setHidesSharedBackground:"},
     {PFBCompatOptionCount, "Features/Appearance/NavBarIcons.x", "setTintColor:"},
-    {PFBCompatOptionCount, "Features/Profiles/Profile.x", "_t1_outerTabIndexForEntry:"},
-    {PFBCompatOptionCount, "Features/Profiles/Profile.x", "_t1_selectMainEntry:"},
-    {PFBCompatOptionCount, "Features/Profiles/Profile.x", "contentMainEntries"},
-    {PFBCompatOptionCount, "Features/Profiles/Profile.x", "currentDisplayContentProvider"},
     {PFBCompatOptionCount, "Features/Profiles/Profile.x", "viewModel"},
     {PFBCompatOptionCount, "Features/Timelines/QuickMutedWords.x", "window"},
     {PFBCompatOptionCount, "Settings/Settings.x", "icon"},
@@ -1742,7 +1730,6 @@ static const PFBCompatName kNames[] = {
     {PFBCompatOptionCount, "Sideload/PFBReplyWebViewController.m", "title"},
     {PFBCompatOptionCount, "Sideload/PFBReplyWebViewController.m", "webView"},
     {PFBCompatOptionCount, "Sideload/PFBReplyWebViewController.m", "window"},
-    {PFBCompatOptionCount, "Sideload/PFBIconRelay.m", "window"},
     {PFBCompatOptionCount, "Sideload/PFBLoginBridge.x", "accountService"},
     {PFBCompatOptionCount, "Sideload/PFBLoginBridge.x", "addAccount:"},
     {PFBCompatOptionCount, "Sideload/PFBLoginBridge.x", "initWithUsername:userID:"},
@@ -1894,6 +1881,8 @@ static const PFBCompatName kNames[] = {
     {PFBCompat_restore_tab_labels, "Features/Appearance/Theme.x", "window"},
     {PFBCompat_restore_tweet_button, "Features/Branding/Branding.x", "setTintColor:"},
     {PFBCompat_restore_tweet_button, "Features/Branding/Branding.x", "tintColor"},
+    {PFBCompat_restore_tweet_button, "Features/Branding/Branding.x", "_TtC11XNavigation25TabBarAccessoryButtonView"},
+    {PFBCompat_hide_tweet_button, "Features/Branding/Branding.x", "_TtC11XNavigation25TabBarAccessoryButtonView"},
     {PFBCompat_restore_tab_labels, "Features/Appearance/GlassTabBar.x", "xdsDeprecated_customFontOfSize:weight:scalesWithDynamicType:"},
     {PFBCompat_no_tab_bar_hiding, "Features/Appearance/GlassTabBar.x", "XNAVNavigationController"},
     {PFBCompat_no_tab_bar_hiding, "Features/Appearance/GlassTabBar.x", "appliedConfiguration"},
@@ -2017,6 +2006,10 @@ static const PFBCompatName kNames[] = {
     {PFBCompat_profile_initial_tab, "Features/Profiles/Profile.x", "photoEntry"},
     {PFBCompat_profile_initial_tab, "Features/Profiles/Profile.x", "videoEntry"},
     {PFBCompat_profile_initial_tab, "Features/Profiles/Profile.x", "repostsEntry"},
+    {PFBCompat_profile_initial_tab, "Features/Profiles/Profile.x", "_t1_outerTabIndexForEntry:"},
+    {PFBCompat_profile_initial_tab, "Features/Profiles/Profile.x", "_t1_selectMainEntry:"},
+    {PFBCompat_profile_initial_tab, "Features/Profiles/Profile.x", "contentMainEntries"},
+    {PFBCompat_profile_initial_tab, "Features/Profiles/Profile.x", "currentDisplayContentProvider"},
     {PFBCompat_restore_tweet_button, "Features/Branding/Branding.x", "feather"},
     {PFBCompat_restore_tweet_button, "Features/Branding/Branding.x", "plus|compose|alt_compose|alt_compose_plus|compose_square"},
     {PFBCompat_hide_notifications, "Features/General/HiddenNotifications.x", "eye_off"},
@@ -2025,6 +2018,10 @@ static const PFBCompatName kNames[] = {
     {PFBCompat_hide_notifications, "Features/General/HiddenNotifications.x", "URTTimelineStatusItemViewModel"},
     {PFBCompat_padlock, "Features/General/AppLifecycle.x", "lock_stroke"},
     {PFBCompat_copy_profile_info, "Features/Profiles/Profile.x", "copy_stroke"},
+    {PFBCompat_copy_profile_info, "Features/Profiles/Profile.x", "account"},
+    {PFBCompat_copy_profile_info, "Features/Profiles/Profile.x", "at"},
+    {PFBCompat_copy_profile_info, "Features/Profiles/Profile.x", "link"},
+    {PFBCompat_copy_profile_info, "Features/Profiles/Profile.x", "calendar"},
     {PFBCompat_copy_profile_info, "Features/Profiles/Profile.x", "news_stroke"},
     {PFBCompat_copy_profile_info, "Features/Profiles/Profile.x", "location_stroke"},
     {PFBCompat_copy_profile_info, "Features/Profiles/Profile.x", "globe_stroke"},
@@ -2238,6 +2235,7 @@ static const PFBCompatOption kFlagOnly[] = {
     PFBCompat_edit_tweet,
     PFBCompat_grok_translation,
     PFBCompat_classic_tweet_detail,
+    PFBCompat_hide_suggested_chats,
 };
 static const size_t kFlagOnlyCount = sizeof(kFlagOnly) / sizeof(kFlagOnly[0]);
 
@@ -2453,6 +2451,13 @@ static const PFBCompatPathStation kPathStations[] = {
 };
 static const size_t kPathStationCount = sizeof(kPathStations) / sizeof(kPathStations[0]);
 
+// The feather and reply bar paths go through Twitter's classic views, so a station owes
+// them only while Twitter's own Liquid Glass is not in use.
+static BOOL pathStationOwed(const PFBCompatPathStation* entry) {
+    return !PFBNativeGlassAsked() ||
+           (entry->path != PFBCompatPath_feather && entry->path != PFBCompatPath_reply_bar);
+}
+
 // How the report names a tour step's screen.
 static NSString* stationLabel(NSString* station) {
     static NSDictionary<NSString*, NSString*>* labels;
@@ -2477,7 +2482,6 @@ static NSString* stationLabel(NSString* station) {
           @"Tweet menu": @"a Tweet's menu",
           @"video full screen": @"a full-screen video",
           @"video long press": @"a video's long-press menu",
-          @"photo long press": @"a photo's long-press menu",
           @"photo full screen": @"a full-screen photo",
           @"other profile": @"another account's profile",
           @"composer": @"the composer",
@@ -2490,7 +2494,6 @@ static NSString* stationLabel(NSString* station) {
           @"web link": @"a web link",
           @"t.co check": @"the t.co link tracking block",
           @"Twitter settings": @"Twitter's settings",
-          @"new Twitter settings": @"Twitter's new settings",
           @"tab editor": @"Twitter's tab editor",
           @"PFB settings": @"the PrimeFreeBird settings",
       };
@@ -2636,7 +2639,7 @@ static void foldIntoEarlier(void) {
     for (NSString* key in keys) {
         id last = lastPrints[key];
         if (![last isKindOfClass:[NSString class]]) {
-            // A build from before the fingerprints: its evidence joins, of unknown code.
+            // No fingerprint for the folded build: its evidence joins, of unknown code.
             [earlierPrints removeObjectForKey:key];
         } else if (![last isEqual:earlierPrints[key]]) {
             for (NSString* kind in kinds) {
@@ -2925,8 +2928,8 @@ NSSet<NSString*>* PFBCompatStationPending(NSString* station) {
     }
     for (size_t i = 0; i < kPathStationCount; i++) {
         const PFBCompatPathMeta* meta = pathMetaFor(kPathStations[i].path);
-        if (meta && [station isEqualToString:[NSString stringWithUTF8String:kPathStations[i].station]] &&
-            !pathProven(meta)) {
+        if (meta && pathStationOwed(&kPathStations[i]) &&
+            [station isEqualToString:[NSString stringWithUTF8String:kPathStations[i].station]] && !pathProven(meta)) {
             [pending addObject:[@"path:" stringByAppendingString:[NSString stringWithUTF8String:meta->name]]];
         }
     }
@@ -2993,9 +2996,9 @@ void PFBCompatStationRecordCrash(NSString* station) {
     }
 }
 
-BOOL PFBCompatMeasure(NSString* topic, NSString* line, NSUInteger cap) {
+void PFBCompatMeasure(NSString* topic, NSString* line, NSUInteger cap) {
     if (!topic.length || !line.length) {
-        return YES;
+        return;
     }
     prepare();
     @synchronized(gLock) {
@@ -3008,7 +3011,6 @@ BOOL PFBCompatMeasure(NSString* topic, NSString* line, NSUInteger cap) {
             gStore[@"measures"] = updated;
             writeStore();
         }
-        return lines.count < cap;
     }
 }
 
@@ -3398,7 +3400,7 @@ typedef struct {
     size_t lostLength;
     char* words[4];
     size_t wordCount;
-} PFBLeadProbe;
+} PFBLeadQuery;
 
 static BOOL leadStopWord(NSString* word) {
     static NSSet<NSString*>* stops;
@@ -3476,28 +3478,28 @@ static BOOL leadIsKey(const char* s, size_t length) {
     return underscore;
 }
 
-// Scores one section's strings against the probes of its pool. A probe's own
-// name found intact is noted rather than scored.
-static void leadScan(const char* strings, size_t size, PFBLeadPool pool, const PFBLeadProbe* probes, size_t count,
+// Scores one section's strings against the lost names of its pool. A lost name found
+// intact is noted rather than scored.
+static void leadScan(const char* strings, size_t size, PFBLeadPool pool, const PFBLeadQuery* queries, size_t count,
                      NSArray<NSMutableDictionary<NSString*, NSNumber*>*>* found, BOOL* present) {
     const char* end = strings + size;
     for (const char* s = strings; s < end;) {
         size_t length = strnlen(s, (size_t)(end - s));
         if (length >= 4 && length <= 90 && s + length < end && (pool != PFBLeadPoolKeys || leadIsKey(s, length))) {
             for (size_t i = 0; i < count; i++) {
-                const PFBLeadProbe* probe = &probes[i];
-                if (probe->pool != pool) {
+                const PFBLeadQuery* query = &queries[i];
+                if (query->pool != pool) {
                     continue;
                 }
-                if (length == probe->lostLength && memcmp(s, probe->lost, length) == 0) {
+                if (length == query->lostLength && memcmp(s, query->lost, length) == 0) {
                     present[i] = YES;
                     continue;
                 }
                 NSUInteger score = 0;
-                for (size_t w = 0; w < probe->wordCount; w++) {
-                    score += strcasestr(s, probe->words[w]) != NULL;
+                for (size_t w = 0; w < query->wordCount; w++) {
+                    score += strcasestr(s, query->words[w]) != NULL;
                 }
-                if (score == 0 || (score < MIN((size_t)2, probe->wordCount) && found[i].count >= 200)) {
+                if (score == 0 || (score < MIN((size_t)2, query->wordCount) && found[i].count >= 200)) {
                     continue;
                 }
                 NSString* candidate = [[NSString alloc] initWithBytes:s length:length encoding:NSUTF8StringEncoding];
@@ -3539,13 +3541,13 @@ static NSString* leadDisplayName(NSString* name) {
 
 // The best leads: most shared words, then shipped settings, the closest ending and
 // the shortest name. A setting key needs two shared words to count.
-static NSArray<NSString*>* leadRank(NSDictionary<NSString*, NSNumber*>* found, NSString* lost, const PFBLeadProbe* probe,
+static NSArray<NSString*>* leadRank(NSDictionary<NSString*, NSNumber*>* found, NSString* lost, const PFBLeadQuery* query,
                                     NSSet<NSString*>* settings) {
     NSUInteger best = 0;
     for (NSNumber* score in found.allValues) {
         best = MAX(best, score.unsignedIntegerValue);
     }
-    if (best == 0 || (probe->pool == PFBLeadPoolKeys && best < MIN((NSUInteger)2, (NSUInteger)probe->wordCount))) {
+    if (best == 0 || (query->pool == PFBLeadPoolKeys && best < MIN((NSUInteger)2, (NSUInteger)query->wordCount))) {
         return @[];
     }
     NSSet<NSString*>* top = [found keysOfEntriesPassingTest:^BOOL(NSString* key, NSNumber* score, BOOL* stop) {
@@ -3635,7 +3637,7 @@ static NSDictionary<NSString*, NSArray<NSString*>*>* findLeads(NSArray<NSString*
     if (count == 0) {
         return @{};
     }
-    PFBLeadProbe* probes = calloc(count, sizeof(PFBLeadProbe));
+    PFBLeadQuery* queries = calloc(count, sizeof(PFBLeadQuery));
     BOOL* present = calloc(count, sizeof(BOOL));
     NSMutableArray<NSArray<NSString*>*>* wordLists = [NSMutableArray array];
     NSMutableArray<NSMutableDictionary<NSString*, NSNumber*>*>* found = [NSMutableArray array];
@@ -3647,14 +3649,14 @@ static NSDictionary<NSString*, NSArray<NSString*>*>* findLeads(NSArray<NSString*
         [wordLists addObject:words];
         [found addObject:[NSMutableDictionary dictionary]];
         // The member of a "Class member" path is a method or ivar name, whatever its underscores.
-        probes[i].pool = [members containsIndex:i] ? PFBLeadPoolSelectors : leadPool(names[i]);
-        probes[i].lost = strdup(names[i].UTF8String);
-        probes[i].lostLength = strlen(probes[i].lost);
-        probes[i].wordCount = words.count;
+        queries[i].pool = [members containsIndex:i] ? PFBLeadPoolSelectors : leadPool(names[i]);
+        queries[i].lost = strdup(names[i].UTF8String);
+        queries[i].lostLength = strlen(queries[i].lost);
+        queries[i].wordCount = words.count;
         for (size_t w = 0; w < words.count; w++) {
-            probes[i].words[w] = strdup(words[w].UTF8String);
+            queries[i].words[w] = strdup(words[w].UTF8String);
         }
-        wantsSettings |= probes[i].pool == PFBLeadPoolKeys;
+        wantsSettings |= queries[i].pool == PFBLeadPoolKeys;
     }
     static const char* const kSections[] = {"__cstring", "__objc_methname", "__objc_classname"};
     static const PFBLeadPool kSectionPools[] = {PFBLeadPoolKeys, PFBLeadPoolSelectors, PFBLeadPoolClasses};
@@ -3666,7 +3668,7 @@ static NSDictionary<NSString*, NSArray<NSString*>*>* findLeads(NSArray<NSString*
                 BOOL encrypted = NO;
                 const char* strings = textSection(data, kSections[s], &size, &encrypted);
                 if (strings) {
-                    leadScan(strings, size, kSectionPools[s], probes, count, found, present);
+                    leadScan(strings, size, kSectionPools[s], queries, count, found, present);
                 }
             }
         }
@@ -3685,7 +3687,7 @@ static NSDictionary<NSString*, NSArray<NSString*>*>* findLeads(NSArray<NSString*
             }
             [list addObjectsFromArray:sameClassLeads([owner substringToIndex:space.location], wordLists[i])];
         }
-        for (NSString* lead in leadRank(found[i], names[i], &probes[i], settings)) {
+        for (NSString* lead in leadRank(found[i], names[i], &queries[i], settings)) {
             if (list.count < 4 && ![list containsObject:lead]) {
                 [list addObject:lead];
                 if ([settings containsObject:lead]) {
@@ -3693,12 +3695,12 @@ static NSDictionary<NSString*, NSArray<NSString*>*>* findLeads(NSArray<NSString*
                 }
             }
         }
-        free(probes[i].lost);
-        for (size_t w = 0; w < probes[i].wordCount; w++) {
-            free(probes[i].words[w]);
+        free(queries[i].lost);
+        for (size_t w = 0; w < queries[i].wordCount; w++) {
+            free(queries[i].words[w]);
         }
     }
-    free(probes);
+    free(queries);
     free(present);
     *settingsOut = shipped;
     NSMutableDictionary<NSString*, NSArray<NSString*>*>* result = [NSMutableDictionary dictionary];
@@ -3989,15 +3991,18 @@ static void appendInternals(NSMutableArray<PFBCompatResult*>* results, NSSet<NSS
             [gone[file] addObject:hookPath(record.className, record.methodName)];
         }
     }
-    for (size_t i = 0; i < kNameCount; i++) {
-        if (kNames[i].option != PFBCompatOptionCount) {
+    for (size_t i = 0; i < kNameCount + kClassSubstringCount; i++) {
+        BOOL substring = i >= kNameCount;
+        const PFBCompatName* row = substring ? &kClassSubstrings[i - kNameCount] : &kNames[i];
+        if (row->option != PFBCompatOptionCount) {
             continue;
         }
-        NSString* file = [[NSString stringWithUTF8String:kNames[i].file] lastPathComponent];
+        NSString* file = [[NSString stringWithUTF8String:row->file] lastPathComponent];
         names[file] = @(names[file].integerValue + 1);
-        NSString* name = [NSString stringWithUTF8String:kNames[i].name];
+        NSString* name = [NSString stringWithUTF8String:row->name];
         if (!nameGone[file] && [goneNames containsObject:name]) {
-            nameGone[file] = [name stringByAppendingString:@" not found, read by name"];
+            nameGone[file] = [name stringByAppendingString:substring ? @" not found, matched by part of a class name"
+                                                                     : @" not found, read by name"];
             nameLost[file] = name;
         }
     }
@@ -4127,8 +4132,8 @@ static PFBCompatVerdict tourVerdict(const PFBCompatMeta* meta, NSString* key, BO
         const PFBCompatPathMeta* path = pathMetaFor(kPathStations[i].path);
         NSString* station = [NSString stringWithUTF8String:kPathStations[i].station];
         NSDictionary* record = stations[station];
-        if (!path || path->option != meta->option || ![record isKindOfClass:[NSDictionary class]] ||
-            ![record[@"reached"] boolValue]) {
+        if (!path || !pathStationOwed(&kPathStations[i]) || path->option != meta->option ||
+            ![record isKindOfClass:[NSDictionary class]] || ![record[@"reached"] boolValue]) {
             continue;
         }
         NSString* name = [NSString stringWithUTF8String:path->name];

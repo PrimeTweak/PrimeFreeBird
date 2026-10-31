@@ -86,7 +86,7 @@
         button.backgroundColor = faint;
         [button setTitleColor:ink forState:UIControlStateNormal];
     }
-    // The session card's colors for its destructive button.
+    // A destructive second action reads in red; disabled, in gray.
     [self.secondButton setTitleColor:self.secondDestructive ? alert : ink forState:UIControlStateNormal];
     [self.secondButton setTitleColor:soft forState:UIControlStateDisabled];
 }

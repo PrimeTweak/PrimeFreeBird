@@ -83,9 +83,7 @@ static const CGFloat kRadioCheckSize = 12.0;
     self.swatchTint = color;
     // Restore the colored look in case this control was neutral before.
     self.nameLabel.textColor = [UIColor whiteColor];
-    // A small white check on a filled circle. checkmark.circle.fill carries its own
-    // artwork margins, which render the checked circle smaller than the empty ring;
-    // filling radioView itself keeps it at the ring's 22 pt.
+    // A white check on the filled ring keeps the checked state at the ring's 22 pt.
     UIImage* check = [PFBTwitterGlyphFor(@"checkmark", [UIImage systemImageNamed:@"checkmark"])
         imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate];
     self.radioCheck.image = check;

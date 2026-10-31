@@ -150,8 +150,6 @@ static void SyncHomeAddTabButton(id container, BOOL hidden) {
 // its height and blurred background. Collapse the view to zero as well.
 static const void* kPFBFleetHiddenKey = &kPFBFleetHiddenKey;
 
-// Plain C rather than a %new method: a %new selector isn't known to the
-// compiler when called through an id handle.
 static void pfbApplyFleetVisibility(UIView* view) {
     // Restores a bar hidden here once the option is switched off, without a relaunch. Only
     // a view hidden here is restored, so Twitter's own hiding is never overridden.
@@ -205,8 +203,8 @@ static void pfbApplyFleetVisibility(UIView* view) {
 
 // MARK: - Scroll edge effect
 
-// Opting back into the iOS 26 design makes iOS draw a scroll edge effect under
-// every bar. This option switches that effect off, except on modal screens.
+// With the iOS 26 design, iOS draws a scroll edge effect under the top bars. This option
+// hides that top effect, except on modal screens.
 
 static void PFBReadingLayoutTick(UIScrollView* scrollView);
 

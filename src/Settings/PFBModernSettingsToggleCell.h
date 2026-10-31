@@ -7,8 +7,8 @@
 @property (nonatomic, strong) NSLayoutConstraint* titleLeading;
 - (void)configureWithTitle:(NSString*)title subtitle:(NSString*)subtitle;
 - (void)addTarget:(id)target action:(SEL)action forControlEvents:(UIControlEvents)events;
-// A row another option has taken over: the switch stops responding and the
-// text recedes, so the reason reads as state rather than failure.
+// A row another option has taken over: the switch stops responding and the title
+// dims; the line under it says why.
 - (void)setRowEnabled:(BOOL)enabled;
 // A second control on the same row, carrying a value in words rather than a
 // state to guess. Hidden unless a row asks for one, so every other row keeps

@@ -2,7 +2,7 @@
 
 // Bridges a captured web session (auth_token + ct0) into a native account: a
 // shell account is mounted over the shared session, and the app's API traffic
-// authenticates by cookie. Receipts under [bridge].
+// authenticates by cookie.
 @interface PFBLoginBridge : NSObject
 + (void)startWithAuthToken:(NSString*)authToken
                       csrf:(NSString*)csrf

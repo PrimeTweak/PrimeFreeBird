@@ -21,14 +21,9 @@ static const void* kPFBPaintedFlagKey = &kPFBPaintedFlagKey;
 static const void* kPFBNoFadeKey = &kPFBNoFadeKey;
 
 @interface PFBBarGlyphButton ()
-- (void)pfbPairWith:(UIView*)neighbor screen:(NSString*)screen;
+- (void)pfbPairWith:(UIView*)neighbor;
 - (void)pfbPaint;
-- (void)pfbNote:(NSString*)text;
 @end
-
-BOOL PFBIsPaintedBarGlyph(UIImage* image) {
-    return image && objc_getAssociatedObject(image, kPFBPaintedFlagKey) != nil;
-}
 
 UIImage* PFBPaintedGlyph(UIImage* source, UIColor* color) {
     UIImage* painted = PFBFlatGlyph(source, color);
@@ -37,14 +32,6 @@ UIImage* PFBPaintedGlyph(UIImage* source, UIColor* color) {
                                  OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     }
     return painted;
-}
-
-// The color painted over one of Twitter's bar glyphs beside Twitter's own tint for it, once per pair.
-static void pfbNoteRepaintColors(NSString* what, UIColor* color, UIColor* theirs, UITraitCollection* traits) {
-    PFBCompatMeasure(@"bar colors",
-                     [NSString stringWithFormat:@"%@ painted %@, Twitter's tint %@", what, PFBColorText(color),
-                                                PFBColorText([theirs resolvedColorWithTraitCollection:traits])],
-                     6);
 }
 
 // Replaces the image of every image view under a view. The result
@@ -86,7 +73,6 @@ static void pfbRepaintGlyphs(UIView* view, UIColor* color) {
                 objc_setAssociatedObject(imageView, kPFBPaintedImageKey, painted,
                                          OBJC_ASSOCIATION_RETAIN_NONATOMIC);
                 imageView.image = painted;
-                pfbNoteRepaintColors(@"gear", color, imageView.tintColor, imageView.traitCollection);
                 PFBCOMPAT_ACTION(PFBCompat_bar_repairs, @"settings gear repainted");
             }
         }
@@ -272,7 +258,6 @@ static void pfbRepaintNotificationsGear(UIView* bar, UIColor* color) {
             objc_setAssociatedObject(button, kPFBPaintedImageKey, painted,
                                      OBJC_ASSOCIATION_RETAIN_NONATOMIC);
             button.image = painted;
-            pfbNoteRepaintColors(@"Notifications gear", color, button.tintColor ?: bar.tintColor, bar.traitCollection);
             PFBCOMPAT_ACTION(PFBCompat_bar_repairs, @"Notifications gear repainted");
         }
     }
@@ -831,11 +816,6 @@ static CGRect pfbGlyphRectIn(UIView* button) {
     UIImage* _source;
     UIColor* _paintedColor;
     __weak UIView* _neighbor;
-    NSString* _screen;
-    NSString* _lastNote;
-    // The spacing last noted, in whole points; -1 before the first note.
-    NSInteger _notedGap;
-    NSInteger _notedSlot;
 }
 
 - (instancetype)initWithFrame:(CGRect)frame {
@@ -846,8 +826,6 @@ static CGRect pfbGlyphRectIn(UIView* button) {
         [self addSubview:_glyphView];
         self.isAccessibilityElement = YES;
         self.accessibilityTraits = UIAccessibilityTraitButton;
-        _notedGap = -1;
-        _notedSlot = -1;
     }
     return self;
 }
@@ -900,9 +878,8 @@ static CGRect pfbGlyphRectIn(UIView* button) {
     _glyphView.alpha = (self.highlighted || !enabled) ? 0.35 : 1.0;
 }
 
-- (void)pfbPairWith:(UIView*)neighbor screen:(NSString*)screen {
+- (void)pfbPairWith:(UIView*)neighbor {
     _neighbor = neighbor;
-    _screen = [screen copy];
     [self setNeedsLayout];
 }
 
@@ -939,31 +916,6 @@ static CGRect pfbGlyphRectIn(UIView* button) {
     CGFloat x = round((room + shift) * scale) / scale;
     CGFloat y = round((box.height - size.height) / 2.0 * scale) / scale;
     _glyphView.frame = CGRectMake(x, y, size.width, size.height);
-    if (!CGRectIsNull(glyph)) {
-        CGFloat ours = [self convertPoint:CGPointMake(CGRectGetMidX(_glyphView.frame), 0.0) toView:nil].x;
-        CGFloat theirs = [neighbor convertPoint:CGPointMake(CGRectGetMidX(glyph), 0.0) toView:nil].x;
-        NSInteger gap = (NSInteger)lround(fabs(theirs - ours));
-        NSInteger slot = (NSInteger)lround(CGRectGetWidth(neighbor.bounds));
-        // Formatted only when a value changes: the bar lays out far more often than that.
-        if (gap != _notedGap || slot != _notedSlot) {
-            _notedGap = gap;
-            _notedSlot = slot;
-            [self pfbNote:[NSString stringWithFormat:@"icon and gear centers %ld pt apart, gear slot %ld pt",
-                                                     (long)gap, (long)slot]];
-        }
-    } else if (shown) {
-        [self pfbNote:@"the gear's glyph was not found"];
-    }
-}
-
-// One line per change, under MEASUREMENTS in the compatibility report, until the topic is full.
-- (void)pfbNote:(NSString*)text {
-    static BOOL full;
-    if (full || [text isEqualToString:_lastNote]) {
-        return;
-    }
-    _lastNote = [text copy];
-    full = !PFBCompatMeasure(@"bar icons", [NSString stringWithFormat:@"%@: %@", _screen ?: @"?", text], 12);
 }
 
 @end
@@ -985,7 +937,7 @@ UIBarButtonItem* PFBBarGlyphItem(UIImage* glyph, NSString* label, id target, SEL
     return item;
 }
 
-void PFBBarPairWithNeighbor(UIBarButtonItem* ours, NSArray<UIBarButtonItem*>* items, NSString* screen) {
+void PFBBarPairWithNeighbor(UIBarButtonItem* ours, NSArray<UIBarButtonItem*>* items) {
     PFBBarGlyphButton* button = (PFBBarGlyphButton*)ours.customView;
     if (![button isKindOfClass:[PFBBarGlyphButton class]]) {
         return;
@@ -1001,14 +953,13 @@ void PFBBarPairWithNeighbor(UIBarButtonItem* ours, NSArray<UIBarButtonItem*>* it
     }
     UIView* view = neighbor.customView;
     if (![view isKindOfClass:[UIButton class]]) {
-        [button pfbPairWith:nil screen:screen];
-        [button pfbNote:@"no button beside the icon"];
+        [button pfbPairWith:nil];
         return;
     }
     PFBWeakView* partner = [PFBWeakView new];
     partner.view = button;
     objc_setAssociatedObject(view, kPFBBarPartnerKey, partner, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-    [button pfbPairWith:view screen:screen];
+    [button pfbPairWith:view];
 }
 
 // The same treatment as Explore, reached from the other side: Notifications
@@ -1130,12 +1081,10 @@ typedef struct {
     NSInteger writes;
     NSTimeInterval window;
     NSTimeInterval hold;
-    const char* site;
 } PFBHeightDamper;
 
-static PFBHeightDamper gPFBFrameDamper = { NULL, -1, -1, -1, 0, 0, 0, 0, "frame" };
-static PFBHeightDamper gPFBSimulatedDamper = { NULL, -1, -1, -1, 0, 0, 0, 0,
-                                               "simulated" };
+static PFBHeightDamper gPFBFrameDamper = { NULL, -1, -1, -1, 0, 0, 0, 0 };
+static PFBHeightDamper gPFBSimulatedDamper = { NULL, -1, -1, -1, 0, 0, 0, 0 };
 
 // A storm is a height that only undoes the previous one, or a sheer rate of writes:
 // a storm runs at about 1500 writes a second, while a 120 Hz scroll, which moves
@@ -1175,12 +1124,9 @@ static double pfbDampedHeight(PFBHeightDamper* state, void* owner,
         return height;
     }
     // Held long enough for the run loop to settle, then the app drives again.
-    const char* pattern = state->flips >= PFB_DAMP_FLIPS ? "alternating" : "rate";
     state->held = height;
     state->hold = now + 0.5;
     state->flips = state->writes = 0;
-    PFBDebugLog(@"[navbar] %s storm damped at %.0f pt (%s)", state->site, height,
-                pattern);
     PFBCOMPAT_ACTION(PFBCompat_bar_repairs, @"bar height storm damped");
     return height;
 }

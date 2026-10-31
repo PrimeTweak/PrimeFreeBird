@@ -86,16 +86,6 @@ void PFBInstallPasteboardObserver(void);
 // Whether the account genuinely has a panel's tab, ignoring the forced tab
 // gates (FeatureSwitches.x)
 BOOL PFBPanelIsGenuinelyAvailable(long long panelID);
-// The last panels Twitter gave the side menu and those PrimeFreeBird gave back, with why
-// (FeatureSwitches.x).
-NSString* PFBDashPanelFacts(void);
-// Whether a panel list read now gets PrimeFreeBird's answer for the side menu, from the glass
-// navigation or from the classic one.
-BOOL PFBDashAnswerApplies(BOOL glassNavigation);
-// The empty panel of a notifications list and how many panels the list holds, and how many
-// sweeps of a list have run (HiddenNotifications.x), for the screen probe.
-UIView* PFBNotifEmptyPanel(UITableView* table, NSUInteger* panels);
-NSUInteger PFBNotifSweepCount(void);
 
 // Web session cookie harvesting (WebCreateTweet.x)
 void PFBPrewarmWebCookiesIfNeeded(void);
@@ -104,11 +94,10 @@ void PFBMaybeHandleHarvestWebView(__unsafe_unretained id webViewController);
 // The mobile Safari user agent presented by the web views and web requests (HookHelpers.m).
 FOUNDATION_EXPORT NSString* const PFBMobileSafariUserAgent;
 
-// Twitter's own Liquid Glass: whether its second gate value is given at this launch,
-// and how many launches before it in a row ended early with it given (AppLifecycle.x).
+// Twitter's own Liquid Glass: whether its second gate value is given at this launch, and the
+// key counting launches that ended early with it given (AppLifecycle.x).
 FOUNDATION_EXPORT NSString* const PFBNativeGlassEarlyExitsKey;
 FOUNDATION_EXPORT BOOL PFBNativeGlassAsked(void);
-FOUNDATION_EXPORT NSInteger PFBNativeGlassEarlyExits(void);
 // YES when a usable web session (auth_token + ct0) is available (WebCreateTweet.x).
 BOOL PFBHasUsableWebCredentials(void);
 // A GET signed with the web session; nil without one or for a URL that is not
@@ -142,23 +131,12 @@ UIImage* PFBFlatGlyph(UIImage* source, UIColor* color);
 // The same repaint, marked so the top bar repairs know the image is already theirs
 // (NavBarIcons.x).
 UIImage* PFBPaintedGlyph(UIImage* source, UIColor* color);
-// Whether an image is one PFBPaintedGlyph made (NavBarIcons.x).
-BOOL PFBIsPaintedBarGlyph(UIImage* image);
 
-// For the probes: how the hide code reads one notifications row and whether an image is
-// its cross (HiddenNotifications.x); how one glass tab bar accessory is seen (Branding.x).
-NSString* PFBNotifRowFacts(UITableView* table, NSIndexPath* indexPath);
-BOOL PFBNotifIsCrossImage(UIImage* image);
 // For the Tweet menu in the notifications tab (HiddenThreads.x): whether a screen or a view
 // belongs to that tab, and the hide of a Tweet's row there (HiddenNotifications.x).
 BOOL PFBNotifControllerOnNotificationsScreen(UIViewController* controller);
 BOOL PFBNotifViewOnNotificationsScreen(UIView* view);
 BOOL PFBNotifHideTweet(id status, UIView* source, UIViewController* screen);
-NSString* PFBGlassAccessoryFacts(UIView* host);
-// Why the feather is missing from a compose button that should carry it, or nil; and whether
-// an image is that feather (Branding.x).
-NSString* PFBGlassComposeMiss(UIView* host);
-BOOL PFBGlassIsFeather(UIImage* image);
 
 // The color of the icons added to the top bars, resolved to a fixed color for the traits.
 UIColor* PFBBarIconColor(UITraitCollection* traits);
@@ -188,9 +166,9 @@ void PFBShowToast(UIWindow* window, NSString* text, void (^undo)(void));
 // PFBBarGlyphButton as the sender (NavBarIcons.x).
 UIBarButtonItem* PFBBarGlyphItem(UIImage* glyph, NSString* label, id target, SEL action);
 
-// Pairs `ours` with the glyph button just outside it among `items`; the compatibility
-// report notes, under `screen`, how far apart their glyphs land (NavBarIcons.x).
-void PFBBarPairWithNeighbor(UIBarButtonItem* ours, NSArray<UIBarButtonItem*>* items, NSString* screen);
+// Pairs `ours` with the glyph button just outside it among `items`, so its glyph moves toward
+// that button's (NavBarIcons.x).
+void PFBBarPairWithNeighbor(UIBarButtonItem* ours, NSArray<UIBarButtonItem*>* items);
 
 // The first view controller up a view's responder chain, or nil.
 UIViewController* PFBOwningController(UIView* view);
@@ -259,19 +237,13 @@ void PFBThemeScreenLeave(UIViewController* screen);
 void PFBRestyleGlassTabBars(void);
 void PFBGlassTabBarHideForSettings(BOOL hidden);
 
-// Reapplies each glass stack's configuration so an Always visible change takes effect now
-// (GlassTabBar.x), and how many times the bar has been pinned, for the probe.
+// Reapplies each glass stack's configuration so an Always visible change takes effect now (GlassTabBar.x).
 void PFBGlassRefreshAlwaysVisible(void);
-NSUInteger PFBGlassAlwaysVisiblePinCount(void);
 
 // Sizes the glass bar's pill for Tab labels before Twitter builds the bar, and applies a
 // Hide bottom fade change to the lists on screen (GlassTabBar.x).
 void PFBGlassTabBarStart(void);
 void PFBGlassRefreshBottomFades(void);
-
-// Posted on the main thread just before the stethoscope builds its report, so a probe can write
-// a fresh measurement into it (PFBDebugger.m).
-FOUNDATION_EXPORT NSString* const PFBDebuggerWillCaptureNotification;
 
 // Bar items of PrimeFreeBird's own screens carry this tag and keep UIKit's glass;
 // the app-wide flattening in NavBarIcons.x leaves them alone.

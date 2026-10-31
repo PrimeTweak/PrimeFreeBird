@@ -37,8 +37,7 @@ static inline UIFont* PFBTabularDigitsFont(UIFont* font) {
     return [UIFont fontWithDescriptor:descriptor size:font.pointSize];
 }
 
-// A Chirp face from Twitter's own font group (TFNUIDefaultFontGroup) rather than
-// fragile variable-font instance names; falls back to system fonts.
+// A Chirp face from Twitter's font group, or a system font when the group gives none.
 static inline UIFont* TwitterChirpFont(TwitterFontStyle style) {
     TFNUIDefaultFontGroup* group =
         [objc_getClass("TFNUIDefaultFontGroup") sharedFontGroup];

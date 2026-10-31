@@ -498,8 +498,8 @@ static void refreshXTID(void) {
 
 // MARK: - Native bootstrap webview (per-account web session)
 
-// Only the native authenticated webview can perform the OAuth->cookie exchange, so
-// accounts with no web cookies yet get one loaded offscreen and harvested.
+// Accounts signed in natively with no web cookies get one loaded offscreen and harvested
+// (not possible on a sideloaded build).
 static void bootstrapAccount(id account, NSString* userID) {
     if (!account || userID.length == 0 || WebBootstrapInFlight) {
         return;
@@ -791,7 +791,9 @@ NSString* PFBWebCt0ForAuthToken(NSString* authToken, BOOL mint) {
             @synchronized(accountCacheLock()) {
                 [WebCt0Minting removeObject:authToken];
             }
-            PFBDebugLog(@"[bridge] csrf token fetched for a session: %@", fresh.length ? @"yes" : @"no");
+            if (!fresh.length) {
+                PFBDebugLog(@"[bridge] csrf token not fetched for a session");
+            }
         });
     }
     return known.length ? known : nil;
@@ -969,7 +971,7 @@ static BOOL isPeriscopeAuthURL(NSURL* url) {
            [url.path containsString:@"authenticate_periscope"];
 }
 
-// Mute lists and Grok's translation are refused on the native path as well.
+// Mute lists and Grok requests are refused on the native path as well.
 static BOOL isMuteURL(NSURL* url) {
     return [url.path containsString:@"/1.1/mutes/"] && [url.scheme isEqualToString:@"https"] &&
            PFBIsXDomain(url.host);
@@ -984,13 +986,12 @@ static BOOL isGrokURL(NSURL* url) {
 // the session's cookies and a transaction id for its own path, native identity
 // headers stripped. A fresh csrf token costs one request to x.com.
 static NSMutableURLRequest* webPathRequest(NSURLRequest* request, NSString* host, NSString* path,
-                                           NSString* what, BOOL freshCsrf) {
+                                           BOOL freshCsrf) {
     harvestSharedCookies();
     NSString *authToken = nil, *ct0 = nil, *sharedUserID = nil;
     if (!resolveCredsForRequest(request, &authToken, &ct0, &sharedUserID, freshCsrf)) {
         return nil;
     }
-    BOOL own = sharedUserID == nil;
     NSString* method = (request.HTTPMethod ?: @"GET").uppercaseString;
     NSString* key = xtidKey(method, path);
     void (^mint)(void) = ^{
@@ -1021,9 +1022,6 @@ static NSMutableURLRequest* webPathRequest(NSURLRequest* request, NSString* host
     if (xtid.length) {
         [outgoing setValue:xtid forHTTPHeaderField:@"x-client-transaction-id"];
     }
-    PFBDebugLog(@"[webtweet] rewrote %@ -> web with %@ session (auth=%lu ct0=%lu xtid=%lu)", what,
-                own ? @"its own account's" : @"the shared", (unsigned long)authToken.length,
-                (unsigned long)ct0.length, (unsigned long)xtid.length);
     return outgoing;
 }
 
@@ -1035,7 +1033,7 @@ static NSMutableURLRequest* webRequestFromNativeSend(NSURLRequest* request) {
         return nil;
     }
     if (isPeriscopeAuthURL(request.URL)) {
-        NSMutableURLRequest* outgoing = webPathRequest(request, @"x.com", PeriscopeWebPath, @"periscope token", YES);
+        NSMutableURLRequest* outgoing = webPathRequest(request, @"x.com", PeriscopeWebPath, YES);
         if (outgoing) {
             PFBCOMPAT_ACTION(PFBCompat_web_session, @"Spaces sign-in rerouted to the web session");
         } else {
@@ -1047,7 +1045,7 @@ static NSMutableURLRequest* webRequestFromNativeSend(NSURLRequest* request) {
         NSString* path = request.URL.path;
         NSString* webPath =
             [@"/i/api" stringByAppendingString:[path substringFromIndex:[path rangeOfString:@"/1.1/mutes/"].location]];
-        NSMutableURLRequest* outgoing = webPathRequest(request, @"x.com", webPath, @"mute list", NO);
+        NSMutableURLRequest* outgoing = webPathRequest(request, @"x.com", webPath, NO);
         if (outgoing) {
             PFBCompatReach(PFBCompatPath_web_mutes);
             PFBCOMPAT_ACTION(PFBCompat_web_session, @"mute list rerouted to the web session");
@@ -1058,7 +1056,7 @@ static NSMutableURLRequest* webRequestFromNativeSend(NSURLRequest* request) {
     }
     if (isGrokURL(request.URL)) {
         NSString* host = [request.URL.host isEqualToString:@"api.twitter.com"] ? @"api.x.com" : request.URL.host;
-        NSMutableURLRequest* outgoing = webPathRequest(request, host, request.URL.path, @"Grok request", NO);
+        NSMutableURLRequest* outgoing = webPathRequest(request, host, request.URL.path, NO);
         if (outgoing) {
             PFBCompatReach(PFBCompatPath_web_grok);
             PFBCOMPAT_ACTION(PFBCompat_web_session, @"Grok request rerouted to the web session");
@@ -1122,9 +1120,7 @@ static NSMutableURLRequest* webRequestFromNativeSend(NSURLRequest* request) {
             PFBCOMPAT_OBSERVE(PFBCompat_web_session, @"Tweet seen, no web session");
             return nil;
         }
-        BOOL own = sharedUserID == nil;
         postingUserID = sharedUserID;
-        PFBDebugLog(@"[webtweet] reroute via %@ session", own ? @"its own account's" : @"the shared");
     }
 
     NSMutableURLRequest* outgoing = [request mutableCopy];
@@ -1137,9 +1133,6 @@ static NSMutableURLRequest* webRequestFromNativeSend(NSURLRequest* request) {
     // 401 or 403 drops; empty for an account sending with its own session.
     objc_setAssociatedObject(outgoing, WebPostingUIDKey, postingUserID.length ? postingUserID : @"",
                              OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-    PFBDebugLog(@"[webtweet] rewrote CreateTweet -> web (auth=%lu ct0=%lu xtid=%lu)",
-                (unsigned long)authToken.length, (unsigned long)ct0.length,
-                (unsigned long)xtid.length);
     PFBCompatReach(PFBCompatPath_web_tweets);
     return outgoing;
 }
@@ -1274,7 +1267,7 @@ NSMutableURLRequest* PFBWebSessionPOSTRequest(NSString* path, NSData* body) {
     request.HTTPBody = body;
     request.timeoutInterval = 15.0;
     [request setValue:@"application/json" forHTTPHeaderField:@"Content-Type"];
-    return webPathRequest(request, @"x.com", path, @"web operation", NO);
+    return webPathRequest(request, @"x.com", path, NO);
 }
 
 static UIViewController* webSessionTopController(void) {
@@ -1427,7 +1420,9 @@ void PFBSeedReplyWebViewCookies(WKWebView* webView, void (^done)(void)) {
                 [self setValue:outgoing forKey:@"currentRequest"];
             } @catch (__unused NSException* exception) {
             }
-            PFBDebugLog(@"[webtweet] Grok task %@", self.currentRequest == outgoing ? @"rebuilt" : @"left as it was");
+            if (self.currentRequest != outgoing) {
+                PFBDebugLog(@"[webtweet] Grok task left as it was");
+            }
         }
     }
     %orig;
@@ -1505,7 +1500,6 @@ static NSURLRequest* webPageRequest(NSURLRequest* request) {
             [page setValue:nil forHTTPHeaderField:@"Authorization"];
             PFBCompatReach(PFBCompatPath_web_pages);
             PFBCOMPAT_ACTION(PFBCompat_web_session, @"Twitter web page rerouted to the web session");
-            PFBDebugLog(@"[webtweet] web page loaded directly: %@%@", target.host, target.path);
             return page;
         }
     }

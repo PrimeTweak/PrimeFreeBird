@@ -109,7 +109,7 @@ static NSString* pfbProfileAddress(NSString* username) {
                                               }]];
         };
 
-    // The three most copied in front; the rest in a More submenu, left out when it has none.
+    // Name, username and profile link in front; the rest in a More submenu, left out when empty.
     NSMutableArray<UIMenuElement*>* rows = [NSMutableArray array];
     add(rows, @"COPY_PROFILE_INFO_MENU_OPTION_3", @"account", fullName);
     add(rows, @"COPY_PROFILE_INFO_MENU_OPTION_2", @"at", username);

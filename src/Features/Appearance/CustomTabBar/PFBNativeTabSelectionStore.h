@@ -6,9 +6,6 @@
 
 NS_ASSUME_NONNULL_BEGIN
 
-// The standard-defaults key the selections live under.
-extern NSString* const PFBNativeTabSelectionsKey;
-
 @interface PFBNativeTabSelectionStore : NSObject
 
 + (instancetype)sharedStore;

@@ -12,7 +12,7 @@
 - (UIFont*)subtext2Font;
 - (UIFont*)subtext2BoldFont;
 - (UIFont*)subtext3BoldFont;
-// Three of the five root builders every named font getter dispatches through.
+// Faces of the font group by size: regular, bold and heavy.
 - (UIFont*)fontOfSize:(CGFloat)size;
 - (UIFont*)boldFontOfSize:(CGFloat)size;
 - (UIFont*)heavyFontOfSize:(CGFloat)size;

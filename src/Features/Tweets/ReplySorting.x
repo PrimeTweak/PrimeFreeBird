@@ -219,11 +219,11 @@ static void PFBRebindReplySortingInit(const struct mach_header* header, intptr_t
     }
     NSUInteger rebound = PFBRebindPointers((const struct mach_header_64*)header, slide, (void*)gReplySortingInit,
                                            (void*)PFBReplySortingInitHook);
-    dispatch_async(dispatch_get_main_queue(), ^{
-        PFBCompatMeasure(@"reply order",
-                         rebound ? @"opening order hooked in T1Twitter" : @"opening order: no call found in T1Twitter",
-                         2);
-    });
+    if (rebound == 0) {
+        dispatch_async(dispatch_get_main_queue(), ^{
+            PFBCompatMeasure(@"reply order", @"opening order: no call found in T1Twitter", 2);
+        });
+    }
 }
 
 %ctor {

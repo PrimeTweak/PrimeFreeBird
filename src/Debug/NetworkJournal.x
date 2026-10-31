@@ -47,8 +47,7 @@ static void pfbRespLogAccount(NSString* method, NSString* path, NSURLResponse* r
 // Per-task accumulated body, so a delegate-based reply can be read on completion.
 static char kPFBRespBodyKey;
 
-// Forwards every delegate callback to the real delegate, intercepting only the
-// two response callbacks to log them. Transparent for everything else.
+// Forwards every delegate callback to the real delegate and reads the two response callbacks on the way.
 @interface PFBURLDelegateProxy : NSObject
 @property (nonatomic, strong) id pfbReal;
 @end

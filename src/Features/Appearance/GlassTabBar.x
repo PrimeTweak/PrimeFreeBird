@@ -1,7 +1,5 @@
-// Twitter's own Liquid Glass tab bar, drawn in three rows (resting, seen through the lens, carried
-// by the lens). Selected tab colors the lens rows; Tab labels names the tabs on a taller bar with a
-// matching bottom reserve and pill; Always visible keeps it up; Hide bottom fade clears the fade
-// under it.
+// Twitter's own Liquid Glass tab bar: Selected tab tints the lens rows, Tab labels names the tabs on a taller
+// bar, Always visible keeps it up, and Hide bottom fade clears the fade under it.
 
 #import "Support/HookHelpers.h"
 
@@ -279,25 +277,6 @@ static void PFBGlassLiftBadges(UIView* bar) {
     });
 }
 
-// The tabs of the bar Twitter draws, which Twitter's own editor sets, logged once per new set.
-static void PFBGlassCheckChosenTabs(UIView* bar) {
-    static NSArray<NSString*>* checked;
-    static CFTimeInterval lastLook;
-    CFTimeInterval now = CACurrentMediaTime();
-    if (now - lastLook < 1.0) {
-        return;
-    }
-    lastLook = now;
-    NSArray<NSString*>* shown = PFBGlassTabNames(bar);
-    if (!shown.count || [shown isEqualToArray:checked]) {
-        return;
-    }
-    checked = shown;
-    PFBCompatReach(PFBCompatPath_glass_tabs);
-    PFBCompatMeasure(@"customize tabs",
-                     [NSString stringWithFormat:@"glass bar [%@]", [shown componentsJoinedByString:@", "]], 6);
-}
-
 static void PFBGlassForEachWindow(void (^block)(UIWindow* window)) {
     for (UIScene* scene in UIApplication.sharedApplication.connectedScenes) {
         if (![scene isKindOfClass:[UIWindowScene class]]) {
@@ -429,8 +408,7 @@ void PFBRestyleGlassTabBars(void) {
     });
 }
 
-// Twitter keeps its glass tab bar over the settings, which never show the bar under
-// the old design. Its whole chrome, compose button included, is hidden meanwhile.
+// Twitter keeps its glass tab bar over the settings; its whole chrome, compose button included, is hidden there.
 static const void* kPFBGlassChromeHiddenKey = &kPFBGlassChromeHiddenKey;
 static BOOL gPFBGlassChromeHidden;
 
@@ -546,7 +524,6 @@ static void PFBGlassSizePillForLabels(void) {
     }
     *height = own + kPFBGlassExtraHeight;
     size->height = own + kPFBGlassExtraHeight;
-    PFBCompatMeasure(@"tab labels", [NSString stringWithFormat:@"pill %.0f pt high, Twitter's %.0f", *height, own], 4);
 }
 
 void PFBGlassTabBarStart(void) {
@@ -669,8 +646,8 @@ static BOOL PFBGlassWriteMask(CAGradientLayer* mask) {
 }
 
 // The blur and color bands in the lower half of the screen, hidden with the option on and given
-// back with it off. Each one found is described in parts.
-static NSUInteger PFBGlassHideBottomBands(UIView* treatment, BOOL hide, NSMutableArray<NSString*>* parts) {
+// back with it off.
+static NSUInteger PFBGlassHideBottomBands(UIView* treatment, BOOL hide) {
     __block NSUInteger found = 0;
     CGFloat middle = CGRectGetHeight(treatment.window.bounds) / 2.0;
     PFBWalkAllSubviews(treatment, 2, ^(UIView* band) {
@@ -689,25 +666,8 @@ static NSUInteger PFBGlassHideBottomBands(UIView* treatment, BOOL hide, NSMutabl
           band.hidden = NO;
           objc_setAssociatedObject(band, kPFBGlassFadeHiddenKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
       }
-      [parts addObject:[NSString stringWithFormat:@"%@ %.0f,%.0f %.0fx%.0f alpha %.2f", blur ? @"blur" : @"scrim",
-                                                  frame.origin.x, frame.origin.y, frame.size.width,
-                                                  frame.size.height, band.alpha]];
     });
     return found;
-}
-
-// The mask's stops as depth:alpha, from Twitter's own colors.
-static NSString* PFBGlassMaskStopsText(CAGradientLayer* mask) {
-    NSArray* theirs = objc_getAssociatedObject(mask, kPFBGlassFadeColorsKey);
-    NSMutableArray<NSString*>* stops = [NSMutableArray array];
-    for (NSUInteger i = 0; i < theirs.count && i < 12; i++) {
-        id object = theirs[i];
-        BOOL color = ![object isKindOfClass:[UIColor class]] &&
-                     CFGetTypeID((__bridge CFTypeRef)object) == CGColorGetTypeID();
-        [stops addObject:[NSString stringWithFormat:@"%.2f:%.2f", PFBGlassStopDepth(mask, i, theirs.count),
-                                                    color ? CGColorGetAlpha((__bridge CGColorRef)object) : -1.0]];
-    }
-    return stops.count ? [stops componentsJoinedByString:@" "] : @"none";
 }
 
 static void PFBGlassApplyBottomFade(UIView* treatment) {
@@ -716,8 +676,7 @@ static void PFBGlassApplyBottomFade(UIView* treatment) {
         return;
     }
     BOOL hide = [PFBSettings boolForKey:@"hide_bottom_fade"];
-    NSMutableArray<NSString*>* parts = [NSMutableArray array];
-    NSUInteger bands = PFBGlassHideBottomBands(treatment, hide, parts);
+    NSUInteger bands = PFBGlassHideBottomBands(treatment, hide);
     CAGradientLayer* mask = PFBGlassFadeMaskLayer(treatment);
     BOOL masked = mask && PFBGlassMaskInstalled(treatment, mask);
     BOOL maskFades = NO;
@@ -735,16 +694,6 @@ static void PFBGlassApplyBottomFade(UIView* treatment) {
         } else if (!hide) {
             PFBCOMPAT_OBSERVE(PFBCompat_hide_bottom_fade, @"fade under the tab bar found");
         }
-    }
-    // The edge's parts, until the topic is full.
-    static BOOL measured;
-    if (!measured) {
-        NSString* maskText = !mask ? @"none" : (masked ? PFBGlassMaskStopsText(mask) : @"not set on a list");
-        measured = !PFBCompatMeasure(@"bottom fade",
-                                     [NSString stringWithFormat:@"over %@: bands in the lower half [%@] · mask %@",
-                                                                NSStringFromClass([treatment.superview class]),
-                                                                [parts componentsJoinedByString:@", "], maskText],
-                                     8);
     }
 }
 
@@ -828,17 +777,16 @@ static ptrdiff_t PFBGlassAppliedConfigurationOffset(void) {
       Ivar applied = stack ? class_getInstanceVariable(stack, "appliedConfiguration") : NULL;
       Ivar next = stack ? class_getInstanceVariable(stack, "chromeFrozenScreen") : NULL;
       ptrdiff_t size = applied && next ? ivar_getOffset(next) - ivar_getOffset(applied) : 0;
-      // 40 bytes through 12.38.1; 12.39 adds a bar style after the configuration, which
-      // leaves the bytes the patch writes in place.
+      // 40 bytes, or 48 with a bar style after the configuration; the patched bytes stay in place.
       if (size == 40 || size == 48) {
           offset = ivar_getOffset(applied);
       }
-      PFBCompatMeasure(@"always visible",
-                       offset < 0 ? [NSString stringWithFormat:@"patch off: applied configuration is %td bytes", size]
-                       : PFBGlassConfigLayoutVerified()
-                           ? [NSString stringWithFormat:@"patch ready: applied configuration is %td bytes", size]
-                           : @"patch off: the configuration bytes moved",
-                       2);
+      if (offset < 0 || !PFBGlassConfigLayoutVerified()) {
+          PFBCompatMeasure(@"always visible",
+                           offset < 0 ? [NSString stringWithFormat:@"patch off: applied configuration is %td bytes", size]
+                                      : @"patch off: the configuration bytes moved",
+                           2);
+      }
     });
     return offset;
 }
@@ -877,14 +825,6 @@ static double PFBGlassTabBarCollapse(UINavigationController* stack) {
     return isfinite(progress[1]) ? progress[1] : -1.0;
 }
 
-// How many times the patch has flipped the tab-bar byte, for the probe: a high count while
-// Home sits still signals Twitter re-applying its configuration against the patch.
-static NSUInteger gPFBGlassPinCount;
-
-NSUInteger PFBGlassAlwaysVisiblePinCount(void) {
-    return gPFBGlassPinCount;
-}
-
 // Pins the tab bar where Twitter's configuration lets it collapse (Home), the top bar's
 // mode untouched. A bar caught collapsed is pinned once back, as the engine stops moving it.
 static void PFBGlassPinTabBar(UINavigationController* stack) {
@@ -912,7 +852,6 @@ static void PFBGlassPinTabBar(UINavigationController* stack) {
         return;
     }
     configuration[1] = 0;
-    gPFBGlassPinCount++;
     PFBCOMPAT_ACTION(PFBCompat_no_tab_bar_hiding, @"glass tab bar pinned");
 }
 
@@ -1008,7 +947,7 @@ void PFBGlassRefreshAlwaysVisible(void) {
     @try {
         UIView* bar = (UIView*)self;
         PFBGlassLiftBadges(bar);
-        PFBGlassCheckChosenTabs(bar);
+        PFBCompatReach(PFBCompatPath_glass_tabs);
     } @catch (__unused id exception) {
     }
 }

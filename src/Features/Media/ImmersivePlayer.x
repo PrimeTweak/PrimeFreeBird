@@ -48,9 +48,8 @@ static const void* kPFBWantedAlphaKey = &kPFBWantedAlphaKey;
 static NSInteger gPFBSyntheticBudget = 0;
 static const NSInteger kPFBSyntheticPerPause = 3;
 
-// Read once per video rather than on every setAlpha: the app re-asserts alpha
-// hundreds of times while a video plays, and the setting cannot change while
-// one is on screen - the settings page is not.
+// Read once per video rather than on every setAlpha: the app sets alpha hundreds of
+// times while a video plays, and the settings cannot be opened over a video.
 static BOOL gPFBCleanPlayerOn = NO;
 
 static void pfbRefreshCleanPlayerFlag(void) {

@@ -23,6 +23,7 @@ static BOOL gPFBLabelShown;
 @property (nonatomic) NSMutableURLRequest* (*request)(NSString* key);
 @property (nonatomic) NSString* (*label)(NSData* data, NSString* key);
 @property (nonatomic) BOOL refusalTold;
+@property (nonatomic) PFBCompatOption option;
 @end
 
 @implementation PFBFooterLabels
@@ -167,10 +168,11 @@ static NSString* PFBSourceFromAnswer(NSData* data, NSString* tweetID) {
 
 static void PFBAskForLabel(PFBFooterLabels* labels, NSString* key);
 
-// Main thread. A failed answer is asked again twice, then settled as no label.
-static void PFBSettleLabel(PFBFooterLabels* labels, NSString* key, NSString* label, BOOL failed) {
+// Main thread. A failed answer is asked again twice, then settled as no label; a request
+// x.com still refuses then is recorded on the option with its HTTP status.
+static void PFBSettleLabel(PFBFooterLabels* labels, NSString* key, NSString* label, NSInteger status) {
     [labels.asked removeObject:key];
-    if (failed) {
+    if (status != 200) {
         NSInteger failures = labels.failures[key].integerValue + 1;
         labels.failures[key] = @(failures);
         if (failures < kPFBFooterLabelTries) {
@@ -179,6 +181,10 @@ static void PFBSettleLabel(PFBFooterLabels* labels, NSString* key, NSString* lab
                              PFBAskForLabel(labels, key);
                            });
             return;
+        }
+        if (status > 0 && PFBCompatWantsDetail(labels.option)) {
+            PFBCompatSetDetail(labels.option,
+                               [NSString stringWithFormat:@"x.com refused the request (HTTP %ld)", (long)status]);
         }
     }
     [labels.failures removeObjectForKey:key];
@@ -216,7 +222,7 @@ static void PFBAskForLabel(PFBFooterLabels* labels, NSString* key) {
                                 error ? [@" " stringByAppendingString:error.localizedDescription] : @"",
                                 key);
                 }
-                PFBSettleLabel(labels, key, label, status != 200);
+                PFBSettleLabel(labels, key, label, status);
               });
           }] resume];
 }
@@ -361,10 +367,12 @@ static void PFBRefreshFooterOnArrival(T1ConversationFooterTextView* footer, NSSt
 
 %end
 
-static PFBFooterLabels* PFBMakeFooterLabels(NSString* name, NSMutableURLRequest* (*request)(NSString*),
+static PFBFooterLabels* PFBMakeFooterLabels(NSString* name, PFBCompatOption option,
+                                            NSMutableURLRequest* (*request)(NSString*),
                                             NSString* (*label)(NSData*, NSString*)) {
     PFBFooterLabels* labels = [PFBFooterLabels new];
     labels.name = name;
+    labels.option = option;
     labels.answers = [NSCache new];
     labels.answers.countLimit = 500;
     labels.asked = [NSMutableSet set];
@@ -375,7 +383,9 @@ static PFBFooterLabels* PFBMakeFooterLabels(NSString* name, NSMutableURLRequest*
 }
 
 %ctor {
-    gPFBSources = PFBMakeFooterLabels(@"conversation", PFBSourceRequest, PFBSourceFromAnswer);
-    gPFBCountries = PFBMakeFooterLabels(@"about-account", PFBCountryRequest, PFBCountryFromAnswer);
+    gPFBSources = PFBMakeFooterLabels(@"conversation", PFBCompat_show_tweet_source, PFBSourceRequest,
+                                      PFBSourceFromAnswer);
+    gPFBCountries = PFBMakeFooterLabels(@"about-account", PFBCompat_show_account_location, PFBCountryRequest,
+                                        PFBCountryFromAnswer);
     %init;
 }

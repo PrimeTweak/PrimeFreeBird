@@ -2,8 +2,6 @@
 
 #import "Support/HookHelpers.h"
 #import "Features/Search/PFBAdvancedSearchViewController.h"
-#import <objc/runtime.h>
-#import <objc/message.h>
 
 static const void* kPFBAdvSearchBtnKey = &kPFBAdvSearchBtnKey;
 static const void* kPFBAdvSearchColorKey = &kPFBAdvSearchColorKey;
@@ -434,10 +432,8 @@ static BOOL pfbAdvIsOnSearchScreen(UIViewController* vc) {
     return NO;
 }
 
-// The navigation item that just received the buttons is passed straight in, so a search
-// bar setting them on its own item is covered too. That item must sit on a search screen:
-// under Twitter's own Liquid Glass the top found is a container, and Chat's own button
-// passes for the Filters glyph.
+// On the next turn, the top screen and the screen owning `item` are rescanned; only one on a
+// search screen is edited, since other screens carry look-alike glyphs.
 static void pfbAdvRescanItemSoon(UINavigationItem* item) {
     dispatch_async(dispatch_get_main_queue(), ^{
       UIViewController* top = pfbAdvTopViewController();
@@ -688,7 +684,7 @@ static void pfbAdvWatchExploreStyle(UIViewController* owner) {
             item.rightBarButtonItems = [existing arrayByAddingObject:btn];
         }
         if ([item.rightBarButtonItems containsObject:btn]) {
-            PFBBarPairWithNeighbor(btn, item.rightBarButtonItems, @"Explore");
+            PFBBarPairWithNeighbor(btn, item.rightBarButtonItems);
             PFBCOMPAT_ACTION(PFBCompat_advanced_search, @"Advanced search button in Explore");
         }
     } @catch (id e) {

@@ -266,8 +266,6 @@ FOUNDATION_EXPORT void PFBCompatRunTour(void);
 FOUNDATION_EXPORT void PFBCompatRunTourLeft(void);
 // While a tour drives the app, hooks keep it inside Twitter.
 FOUNDATION_EXPORT BOOL PFBCompatTourIsRunning(void);
-// While the tour opens Twitter's new settings menu, Twitter's own switch for it is let through.
-FOUNDATION_EXPORT BOOL PFBCompatTourWantsNewSettings(void);
 // The screens a full tour shows, or those still owing proofs.
 FOUNDATION_EXPORT NSUInteger PFBCompatTourScreens(BOOL full);
 // When this build started counting, or with earlierBuilds, when the earlier builds of the
@@ -293,8 +291,8 @@ FOUNDATION_EXPORT void PFBCompatTourRecord(BOOL full, NSString* stop, NSArray<NS
 FOUNDATION_EXPORT void PFBCompatTourLog(NSString* format, ...) NS_FORMAT_FUNCTION(1, 2);
 FOUNDATION_EXPORT NSString* PFBCompatTourJournalText(void);
 // A measurement line for the report, kept across launches until a new build, at most cap
-// distinct lines per topic. Returns NO once the topic is full.
-FOUNDATION_EXPORT BOOL PFBCompatMeasure(NSString* topic, NSString* line, NSUInteger cap);
+// distinct lines per topic.
+FOUNDATION_EXPORT void PFBCompatMeasure(NSString* topic, NSString* line, NSUInteger cap);
 // This PrimeFreeBird build's identifier, so a stopped tour is charged to the build it ran on.
 FOUNDATION_EXPORT NSString* PFBCompatBuildID(void);
 // A new Twitter binary is installed and no full tour has run on it yet.

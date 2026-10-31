@@ -85,4 +85,4 @@ fi
 say "Rebranding $(basename "$IPA")."
 TWITTER_BRANDING="$TWITTER_BRANDING" RESOURCE_PACK="$RESOURCE_PACK" \
   python3 "$SCRIPT_DIR/branding/ipa_branding.py" "$IPA"
-say "$(basename "$IPA") has been successfully rebranded. Enjoy!"
+say "$(basename "$IPA") rebranded."

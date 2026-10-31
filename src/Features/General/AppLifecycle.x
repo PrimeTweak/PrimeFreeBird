@@ -1,4 +1,4 @@
-// Launch-time hooks: the padlock, the classic launch animation and the Liquid Glass opt-in.
+// App lifecycle hooks: the padlock, the classic launch animation and the Liquid Glass opt-in.
 
 #import <LocalAuthentication/LocalAuthentication.h>
 #import "Support/HookHelpers.h"
@@ -137,9 +137,7 @@ static void askToUnlock(void) {
         return;
     }
     LAContext* context = [[LAContext alloc] init];
-    NSError* unavailable = nil;
-    if (![context canEvaluatePolicy:LAPolicyDeviceOwnerAuthentication error:&unavailable]) {
-        PFBDebugLog(@"[padlock] nothing to ask, the app opens: %@", unavailable.localizedDescription);
+    if (![context canEvaluatePolicy:LAPolicyDeviceOwnerAuthentication error:NULL]) {
         PFBCOMPAT_OBSERVE(PFBCompat_padlock, @"no passcode to ask for");
         setAuthenticated(YES);
         removePadlockOverlay();
@@ -421,10 +419,6 @@ static void PFBNativeGlassSettle(void) {
 
 BOOL PFBNativeGlassAsked(void) {
     return gPFBNativeGlassAsked;
-}
-
-NSInteger PFBNativeGlassEarlyExits(void) {
-    return gPFBNativeGlassExitsAtLaunch;
 }
 
 %hook TFNTwitterAccount

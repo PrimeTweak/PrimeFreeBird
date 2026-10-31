@@ -110,7 +110,6 @@ static NSURL* PFBLargestMP4(TFSTwitterEntityMedia* media) {
                               : @"HLS only, no MP4 (dry run)";
         PFBCOMPAT_OBSERVE(PFBCompat_download_highest_quality, @"%@", found);
         PFBCOMPAT_OBSERVE(PFBCompat_direct_save, @"download path read (dry run)");
-        PFBCompatTourLog(@"[dlvideo] dry run: %@", found);
         return;
     }
     PFBCompatTourLog(@"[dlvideo] dry run: no video among %lu media", (unsigned long)mediaEntities.count);

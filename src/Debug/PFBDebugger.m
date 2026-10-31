@@ -4,14 +4,11 @@
 #import "Support/Generated/PFBHookManifest.h"
 #import "Common/PFBCompatibility.h"
 #import "Common/PFBSettings.h"
-#import "Support/HookHelpers.h"
 #import <CoreGraphics/CoreGraphics.h>
 #import <objc/runtime.h>
 #import <sys/utsname.h>
 #import "Debug/PFBDebugOverlayWindow.h"
 #import "Debug/PFBDebugTrigger.h"
-
-NSString* const PFBDebuggerWillCaptureNotification = @"PFBDebuggerWillCapture";
 
 // MARK: - gate
 
@@ -79,8 +76,8 @@ void PFBDebugLog(NSString* format, ...) {
 
 // MARK: - environment
 
-// How the floating button got on screen this launch.
-static NSString* gPFBTriggerPlacement = @"not placed yet";
+// Why the floating button is not on screen yet this launch; nil once it is placed.
+static NSString* gPFBTriggerNotPlaced;
 
 static NSString* PFBEnvironmentBlock(void) {
     NSDictionary* info = [NSBundle mainBundle].infoDictionary;
@@ -100,14 +97,16 @@ static NSString* PFBEnvironmentBlock(void) {
     NSString* style = traits.userInterfaceStyle == UIUserInterfaceStyleDark
         ? @"Dark" : @"Light";
     BOOL liquidGlass = [PFBSettings boolForKey:@"enable_liquid_glass"];
+    NSString* stethoscope =
+        gPFBTriggerNotPlaced ? [NSString stringWithFormat:@"Stethoscope: %@\n", gPFBTriggerNotPlaced] : @"";
 
     return [NSString stringWithFormat:
         @"PFB DIAG\n"
         @"Twitter %@ (%@) · iOS %@ · %@\n"
         @"Interface: %@ · Liquid Glass %@\n"
-        @"Stethoscope: %@\n",
+        @"%@",
         app, build, device.systemVersion, model,
-        style, liquidGlass ? @"ON" : @"OFF", gPFBTriggerPlacement];
+        style, liquidGlass ? @"ON" : @"OFF", stethoscope];
 }
 
 // MARK: - hook health
@@ -253,7 +252,7 @@ static NSString* PFBHealthBlock(void) {
 
 // The average color of an image's non-transparent pixels: an AlwaysOriginal image
 // carries its own pixels, so the view's tint says nothing about what is drawn.
-NSString* PFBImageInk(UIImage* image) {
+static NSString* PFBImageInk(UIImage* image) {
     if (!image) {
         return nil;
     }
@@ -330,27 +329,8 @@ static NSString* PFBViewCover(UIView* view) {
     return nil;
 }
 
-// "_TtC11XNavigation10TabBarView" reads "XNavigation.TabBarView"; other names stay as they are.
-NSString* PFBReadableClassName(id object) {
-    NSString* name = object ? NSStringFromClass([object class]) : @"none";
-    if (![name hasPrefix:@"_TtC"] || [name hasPrefix:@"_TtCC"]) {
-        return name;
-    }
-    const char* cursor = name.UTF8String + 4;
-    NSMutableArray<NSString*>* parts = [NSMutableArray array];
-    while (*cursor >= '0' && *cursor <= '9') {
-        char* end = NULL;
-        long length = strtol(cursor, &end, 10);
-        if (length <= 0 || (long)strlen(end) < length) {
-            return name;
-        }
-        [parts addObject:[[NSString alloc] initWithBytes:end length:(NSUInteger)length encoding:NSUTF8StringEncoding] ?: @"?"];
-        cursor = end + length;
-    }
-    return parts.count == 2 && *cursor == '\0' ? [parts componentsJoinedByString:@"."] : name;
-}
-
-NSString* PFBColorText(UIColor* color) {
+// A color as rgba(255 scale, alpha), or white(level, alpha).
+static NSString* PFBColorText(UIColor* color) {
     if (!color) {
         return @"nil";
     }
@@ -551,9 +531,6 @@ void PFBDebuggerCaptureAndPresent(void) {
     UIView* root = top.viewIfLoaded ?: window;
     PFBCaptureView(root, 0, capture);
     gPFBLastCapture = capture;
-
-    // Let observers (the glass probe) write a fresh measurement before the report is read.
-    [[NSNotificationCenter defaultCenter] postNotificationName:PFBDebuggerWillCaptureNotification object:nil];
     PFBDebuggerPresent();
 }
 
@@ -620,7 +597,7 @@ static UIImage* PFBTriggerGlyph(void) {
 
 // Placed on the scene in front, and placed again when that is no longer the scene it
 // sits on, as when iOS replaces Twitter's scene while it is in the background.
-static void PFBInstallTrigger(NSString* moment) {
+static void PFBInstallTrigger(void) {
     UIWindowScene* scene = nil;
     for (UIScene* candidate in UIApplication.sharedApplication.connectedScenes) {
         if ([candidate isKindOfClass:[UIWindowScene class]] &&
@@ -647,18 +624,8 @@ static void PFBInstallTrigger(NSString* moment) {
     // Shown, never made key: making it key would put the report's own window
     // in front of the screen it is meant to describe.
     gPFBOverlay.hidden = gPFBTriggerHidden;
-    CGRect compose = PFBComposeFrame(scene);
-    CGPoint center = PFBTriggerCenter(scene, compose);
-    NSString* spot = CGRectIsNull(compose)
-                         ? @"no compose button laid out"
-                         : [NSString stringWithFormat:@"compose %.0f,%.0f %.0fx%.0f", compose.origin.x,
-                                                      compose.origin.y, compose.size.width, compose.size.height];
-    gPFBTriggerPlacement = [NSString stringWithFormat:@"placed %@%@ · %.0f pt at %.0f,%.0f (%@)",
-                                                      replaced ? @"again " : @"", moment, kPFBTriggerSide, center.x,
-                                                      center.y, spot];
-    if (replaced) {
-        gPFBTriggerPlacement = [gPFBTriggerPlacement stringByAppendingString:@", on a new screen"];
-    }
+    CGPoint center = PFBTriggerCenter(scene, PFBComposeFrame(scene));
+    gPFBTriggerNotPlaced = nil;
 
     UIButton* button = [UIButton buttonWithType:UIButtonTypeSystem];
     button.frame = CGRectMake(0, 0, kPFBTriggerSide, kPFBTriggerSide);
@@ -685,17 +652,16 @@ void PFBDebuggerInstall(void) {
     // The scene is not connected at launch, so the button is placed once the
     // first screen is up, and retried if it was not ready.
     BOOL background = UIApplication.sharedApplication.applicationState == UIApplicationStateBackground;
-    NSString* launch = background ? @"a launch in the background" : @"a launch in the foreground";
-    CFTimeInterval launchedAt = CACurrentMediaTime();
-    gPFBTriggerPlacement = [@"not placed yet, after " stringByAppendingString:launch];
+    gPFBTriggerNotPlaced = background ? @"not placed, after a launch in the background"
+                                      : @"not placed, after a launch in the foreground";
     static BOOL triesDone;
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(3.0 * NSEC_PER_SEC)),
                    dispatch_get_main_queue(), ^{
-                     PFBInstallTrigger([@"3 s after " stringByAppendingString:launch]);
+                     PFBInstallTrigger();
                    });
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(10.0 * NSEC_PER_SEC)),
                    dispatch_get_main_queue(), ^{
-                     PFBInstallTrigger([@"10 s after " stringByAppendingString:launch]);
+                     PFBInstallTrigger();
                      triesDone = YES;
                    });
     // A launch in the background ends both tries with no screen up: Twitter coming to the
@@ -710,9 +676,7 @@ void PFBDebuggerInstall(void) {
                   }
                   dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1.0 * NSEC_PER_SEC)),
                                  dispatch_get_main_queue(), ^{
-                                   PFBInstallTrigger([NSString
-                                       stringWithFormat:@"when Twitter came to the front, %.0f s after %@",
-                                                        CACurrentMediaTime() - launchedAt, launch]);
+                                   PFBInstallTrigger();
                                  });
                 }];
 }

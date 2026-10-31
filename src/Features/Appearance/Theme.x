@@ -412,9 +412,7 @@ static void PFBReapplyTabBarAccent(void) {
     }
 }
 
-// Twitter's home header is not always a UINavigationBar, so the class name is
-// matched too. Inside such a container only image views already in template mode
-// are converted; an arbitrary one would flatten avatars into silhouettes.
+// Twitter's home header is not always a UINavigationBar, so the class name is matched too.
 static BOOL PFBIsTopBarContainer(UIView* view) {
     if ([view isKindOfClass:[UINavigationBar class]]) {
         return YES;
@@ -498,9 +496,7 @@ static void PFBApplyTabBarAccent(UITabBar* bar) {
         PFBCOMPAT_OBSERVE(PFBCompat_tab_bar_theming, @"tab bar found");
     }
 
-    // In Liquid Glass the native tab bar takes its selected color from tintColor,
-    // so this line paints the tab. Never nil when the toggle is off: nil makes the
-    // bar inherit the window tint, while labelColor is explicit and overrides it.
+    // The bar's tint colors its selected item; never nil, which would inherit the window tint.
     bar.tintColor = accent ?: [UIColor labelColor];
 }
 
@@ -2038,7 +2034,7 @@ static void PFBLayoutTabLabel(T1TabView* tab) {
             [label removeFromSuperview];
             objc_setAssociatedObject(tab, kPFBTabLabelKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
         }
-        if (drawn) {
+        if (drawn && tab.window) {
             PFBCOMPAT_OBSERVE(PFBCompat_restore_tab_labels, @"tab laid out");
         }
         return;
@@ -2064,7 +2060,9 @@ static void PFBLayoutTabLabel(T1TabView* tab) {
     CGFloat top = round((CGRectGetMaxY(bounds) - 17.0) * scale) / scale;
     label.frame = CGRectMake(1.0, top, MAX(CGRectGetWidth(bounds) - 2.0, 0.0), 14.0);
     tab.imageView.center = CGPointMake(0.0, 2.0 - 14.0 / 2.0);
-    PFBCOMPAT_ACTION(PFBCompat_restore_tab_labels, @"label drawn under the icon");
+    if (tab.window) {
+        PFBCOMPAT_ACTION(PFBCompat_restore_tab_labels, @"label drawn under the icon");
+    }
 }
 
 %hook T1TabView
@@ -2092,18 +2090,20 @@ static void PFBLayoutTabLabel(T1TabView* tab) {
     PFBReapplyTabBarFrom((UIView*)self);
 
     // The icon is also baked in the tab color. Nothing is baked while the native
-    // bar is up: its items are built from these icons.
+    // bar is up: its items are built from these icons. Only a tab on screen counts
+    // in the compatibility sheet.
     BOOL nativeBarUp = PFBHostHasNativeBar((UIView*)self);
-    if (!nativeBarUp) {
+    BOOL shown = self.window != nil;
+    if (!nativeBarUp && shown) {
         PFBCompatReach(PFBCompatPath_tab_bar);
     }
     if (!nativeBarUp && [PFBSettings boolForKey:@"tab_bar_theming"]) {
-        if (PFBBakeTabIcon(self.imageView, tabItemColor(self.selected))) {
+        if (PFBBakeTabIcon(self.imageView, tabItemColor(self.selected)) && shown) {
             PFBCOMPAT_ACTION(PFBCompat_tab_bar_theming, @"tab icon colored");
         }
     } else {
         PFBRestoreTabIcon(self.imageView);
-        if (!nativeBarUp) {
+        if (!nativeBarUp && shown) {
             PFBCOMPAT_OBSERVE(PFBCompat_tab_bar_theming, @"tab icon found");
         }
     }

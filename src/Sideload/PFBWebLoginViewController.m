@@ -53,8 +53,8 @@ static UIImage* pfbLoginBirdImage(CGSize size) {
 
     [self setupHeader];
 
-    // A desktop user agent and a standing data store: the mobile login page leans on flows
-    // the forced iOS 26 design disturbs, the desktop one does not.
+    // A desktop user agent, so x.com serves its desktop login flow, and the default data store,
+    // so the session outlives the screen.
     WKWebViewConfiguration* cfg = [[WKWebViewConfiguration alloc] init];
     cfg.websiteDataStore = [WKWebsiteDataStore defaultDataStore];
     self.webView = [[WKWebView alloc] initWithFrame:self.view.bounds
@@ -222,8 +222,8 @@ static UIImage* pfbLoginBirdImage(CGSize size) {
     [self dismissViewControllerAnimated:YES completion:nil];
 }
 
-// The handle is read from the account switcher of the logged-in page (no REST identity
-// endpoint answers), retried a few times while it renders.
+// The handle is read from the logged-in page (profile link, else account switcher), retried
+// while the page renders.
 - (void)resolveScreenNameThenBridgeWithAuthToken:(NSString*)authToken
                                             csrf:(NSString*)csrf
                                           userID:(long long)userID
@@ -239,8 +239,6 @@ static UIImage* pfbLoginBirdImage(CGSize size) {
     [self.webView evaluateJavaScript:js
                    completionHandler:^(id result, NSError* error) {
                      NSString* screen = [result isKindOfClass:[NSString class]] ? result : nil;
-                     PFBDebugLog(@"[weblogin] handle read attempt=%d -> %@", attempt,
-                                 screen.length ? screen : @"(none)");
                      if (screen.length || attempt >= 8) {
                          [PFBLoginBridge startWithAuthToken:authToken
                                                     csrf:csrf
@@ -329,7 +327,6 @@ static UIImage* pfbLoginBirdImage(CGSize size) {
     // the x.com landing before reaching the same flow, and each hop is wait time.
     NSURL* url = [NSURL URLWithString:@"https://x.com/i/flow/login"];
     [self.webView loadRequest:[NSURLRequest requestWithURL:url]];
-    PFBDebugLog(@"[weblogin] loading %@", url.absoluteString);
     // Safety net: if the flow never settles on x.com, show whatever loaded rather
     // than spin forever.
     __weak typeof(self) weakSelf = self;
@@ -339,12 +336,12 @@ static UIImage* pfbLoginBirdImage(CGSize size) {
                    });
 }
 
-// The server can answer a page with an HTTP error and no navigation failure, so
-// the status code is read here to tell an empty 404 page from a real login form.
+// An HTTP error answered to a page leaves no navigation failure, so it is journaled here.
 - (void)webView:(WKWebView*)webView
     decidePolicyForNavigationResponse:(WKNavigationResponse*)response
                     decisionHandler:(void (^)(WKNavigationResponsePolicy))decisionHandler {
-    if ([response.response isKindOfClass:[NSHTTPURLResponse class]]) {
+    if ([response.response isKindOfClass:[NSHTTPURLResponse class]] &&
+        ((NSHTTPURLResponse*)response.response).statusCode >= 400) {
         // Site and path only: a query can carry account identifiers.
         NSURL* url = response.response.URL;
         PFBDebugLog(@"[weblogin] http %ld for %@%@",
@@ -385,7 +382,6 @@ static UIImage* pfbLoginBirdImage(CGSize size) {
       }
       if (auth && !self.sawAuth) {
           self.sawAuth = YES;
-          PFBDebugLog(@"[weblogin] AUTH TOKEN OBTAINED - web login reaches a session");
           [self showSwitchingOverlay];
           // Seed the shared cookie jar with this session so the read injection and
           // WebCreateTweet.x (writes) both draw on the one session, and it survives

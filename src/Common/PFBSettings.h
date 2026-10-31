@@ -3,8 +3,8 @@
 #import <Foundation/Foundation.h>
 
 // The settings registry: each page's rows (headers, toggles, buttons) with their
-// defaults, and the page titles. A key set from a picker, a menu, a pill or the
-// Explore bar has no row of its own.
+// defaults, and the page titles. Keys set from a picker, a pill, the Explore bar or
+// the profile tab menu have no row of their own.
 @interface PFBSettings : NSObject
 
 + (NSArray<NSDictionary*>*)settingsForPage:(NSString*)pageKey;

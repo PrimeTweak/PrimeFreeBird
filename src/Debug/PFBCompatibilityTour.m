@@ -58,9 +58,6 @@ static UILabel* gPFBTourStepLabel;
 static NSFileHandle* gPFBTourJournal;
 // Twitter's palette in use before the dark mode step switched it.
 static id gPFBTourPaletteBefore;
-// Set while the step that opens Twitter's new settings menu is up, and when it asked for it.
-static BOOL gPFBTourNewSettings;
-static CFTimeInterval gPFBTourNewSettingsAt;
 
 // MARK: - Journal
 
@@ -724,8 +721,7 @@ static NSArray<NSString*>* tourControlActions(UIControl* control) {
     return found.array;
 }
 
-// Whether a control under the root sends the action; what the controls send goes to
-// the log, so a rewired button shows how.
+// Whether a control under the root sends the action; every action seen is added to seen.
 static BOOL tourWired(UIView* root, NSString* action, NSMutableArray<NSString*>* seen) {
     __block BOOL wired = NO;
     tourFindView(root, ^BOOL(UIView* view) {
@@ -1977,17 +1973,6 @@ static NSArray<NSDictionary*>* tourAllSteps(void) {
              tourDismissPresented();
              tourScrollHomeToTop();
            })];
-    // The photo's long-press menu, read by the Imagine measurement.
-    __block BOOL photoMenuBuilt = NO;
-    [steps addObject:tourStep(@"photo long press", @"Photo menu", home, ^{
-             photoMenuBuilt = tourTableMenuDoor(tourHomeViewOfClass(@"_TtC21TweetMediaAttachments14MultiMediaView"),
-                                                @"photo long press");
-           }, ^BOOL(__unused UIViewController* before, __unused UIViewController* after) {
-             return photoMenuBuilt;
-           }, nil, ^{
-             tourDismissPresented();
-             tourScrollHomeToTop();
-           })];
     __block __weak UIView* photos = nil;
     [steps addObject:tourStep(@"photo full screen", @"Photo full screen", home, ^{
              photos = tourHomeViewOfClass(@"_TtC21TweetMediaAttachments14MultiMediaView");
@@ -2184,29 +2169,15 @@ static NSArray<NSDictionary*>* tourAllSteps(void) {
            }, nil, ^{
              tourPopToRoot();
            }))];
-    // Twitter's new settings menu, kept closed otherwise, opened once and held until the probe
-    // has read how it builds its rows, or for 5 s; shown, the step is reached either way.
-    [steps addObject:tourStepWaiting(kPFBTourProofWait, tourStep(@"new Twitter settings", @"Twitter's new settings", root, ^{
-             gPFBTourNewSettings = YES;
-             gPFBTourNewSettingsAt = CACurrentMediaTime();
-             tourShowTwitterSettings();
-           }, ^BOOL(UIViewController* before, UIViewController* after) {
-             return [NSStringFromClass([after class]) hasPrefix:@"_TtC9XSettings"] &&
-                    (PFBSettingsMenuProbeRead() || CACurrentMediaTime() - gPFBTourNewSettingsAt > 5.0);
-           }, nil, ^{
-             gPFBTourNewSettings = NO;
-             tourPopToRoot();
-           }))];
-    // Twitter's tab editor, opened once and held until the probe has read how its page is laid out.
-    [steps addObject:tourStepWaiting(kPFBTourProofWait, tourStep(@"tab editor", @"Twitter's tab editor", root, ^{
+    // Twitter's tab editor, opened the way Customize tabs opens it.
+    [steps addObject:tourStep(@"tab editor", @"Twitter's tab editor", root, ^{
              tourShowTabEditor();
            }, ^BOOL(UIViewController* before, UIViewController* after) {
              return tourFindController(tourRootController().presentedViewController,
-                                       @"T1TabCustomizationViewController") != nil &&
-                    PFBTabEditorProbeRead();
+                                       @"T1TabCustomizationViewController") != nil;
            }, nil, ^{
              tourDismissPresented();
-           }))];
+           })];
     [steps addObject:tourStep(@"PFB settings", @"PrimeFreeBird settings", root, ^{
              tourShowSettings();
            }, ^BOOL(UIViewController* before, UIViewController* after) {
@@ -2240,7 +2211,6 @@ static void tourHideOverlay(void) {
 // stopped early, if it did.
 static void tourConclude(NSMutableArray<NSString*>* results, BOOL full, NSString* stop) {
     tourRestoreOptions(@"at the end of the tour");
-    gPFBTourNewSettings = NO;
     PFBCompatTourRecord(full, stop, results);
     tourJournalWrite([@"end: " stringByAppendingString:stop ?: @"completed"]);
     tourJournalClose();
@@ -2533,10 +2503,6 @@ void PFBCompatRunTourLeft(void) {
 
 BOOL PFBCompatTourIsRunning(void) {
     return gPFBTourRunning;
-}
-
-BOOL PFBCompatTourWantsNewSettings(void) {
-    return gPFBTourRunning && gPFBTourNewSettings;
 }
 
 // MARK: - Planning a tour

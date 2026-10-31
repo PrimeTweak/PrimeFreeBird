@@ -4,7 +4,8 @@
 #import <objc/message.h>
 #import <objc/runtime.h>
 
-NSString* const PFBNativeTabSelectionsKey = @"pfb_native_tab_selections";
+// The standard-defaults key the selections live under.
+static NSString* const PFBNativeTabSelectionsKey = @"pfb_native_tab_selections";
 
 @implementation PFBNativeTabSelectionStore
 

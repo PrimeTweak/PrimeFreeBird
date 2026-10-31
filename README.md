@@ -47,11 +47,10 @@
 - **Reading marker** — marks where you were when new Tweets arrive above, on Following.
 - **Hide topics** — topic Tweets and the "Topics to follow" carousel both go.
 - **Remember Home tab** — Home stays on the tab you last picked instead of going back to For You after 12 hours.
-- **Preload media** — images and videos are ready the moment you scroll to them.
-- **Clean screenshots** — an on/off switch for Twitter's screenshot detection.
 
 ## Media
 
+- **Preload media** — images and videos are ready the moment you scroll to them.
 - **Tap to play or pause** — tap a video to start or stop it; the controls come up while paused and clear away during playback.
 - **Video time** — full-screen videos show the elapsed and total time instead of the countdown, on the bar and beside the progress line.
 - **Drag the progress line** — hold the line under a full-screen video and slide to move through it.
@@ -72,7 +71,7 @@
 - **Hide the Videos tab** — alongside the existing switches for Articles and Highlights.
 - **Copy profile details** — name, username and profile link up front; bio, location, website, user ID and join date under *More*.
 
-## Reply in Web View
+## Reply on the web
 
 - **One-time web login** — sign in once in Settings → Tools; the session is saved on-device and cleared in one tap.
 - **Native icon bar** — the composer's toolbar is a real iOS bar that follows the keyboard.
@@ -80,6 +79,7 @@
 ## Elsewhere
 
 - **Grouped settings** — every page is split into labeled groups instead of one long list.
+- **Clean screenshots** — an on/off switch for Twitter's screenshot detection.
 - **Clean links** — tracking parameters stripped from links you open, copy *or* share, profiles included.
 - **French localization** — the settings and the new screens are in French, except the swatch names and the Compatibility tools.
 

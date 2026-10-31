@@ -785,29 +785,6 @@ static void PFBGlassTintMaterial(UIVisualEffectView* material, UIColor* tint) {
     gPFBGlassTinting = NO;
 }
 
-// Each accessory Twitter shows there is noted once, by its VoiceOver label.
-static void PFBGlassNoteAccessory(UIView* host) {
-    static NSMutableSet<NSString*>* seen;
-    __block NSString* label = nil;
-    PFBWalkAllSubviews(host, 4, ^(UIView* view) {
-      if (!label && [view isKindOfClass:[UIControl class]]) {
-          label = view.accessibilityLabel.length ? view.accessibilityLabel : @"no label";
-      }
-    });
-    if (!label || [seen containsObject:label] || seen.count >= 6) {
-        return;
-    }
-    if (!seen) {
-        seen = [NSMutableSet set];
-    }
-    [seen addObject:label];
-    CGRect frame = [host convertRect:host.bounds toView:nil];
-    PFBCompatMeasure(@"glass Tweet button",
-                     [NSString stringWithFormat:@"accessory \"%@\" at %.0f,%.0f %.0fx%.0f", label, frame.origin.x,
-                                                frame.origin.y, frame.size.width, frame.size.height],
-                     10);
-}
-
 // The compose button is a round accessory button of 48 points. The reply bar is another
 // accessory, a wide one, which keeps Twitter's own look and always shows.
 static BOOL PFBGlassIsComposeHost(UIView* host) {
@@ -918,7 +895,6 @@ static void PFBGlassComposeLook(UIView* host, BOOL compose) {
 }
 
 static void PFBGlassStyleCompose(UIView* host) {
-    PFBGlassNoteAccessory(host);
     BOOL compose = PFBGlassIsComposeHost(host);
     if (compose) {
         PFBCompatReach(PFBCompatPath_glass_tweet_button);
@@ -968,53 +944,6 @@ static void PFBGlassWatchHost(UIView* host) {
     }
 }
 
-// How PrimeFreeBird sees one accessory of the glass tab bar, for the app return probe.
-NSString* PFBGlassAccessoryFacts(UIView* host) {
-    UIVisualEffectView* material = PFBGlassComposeMaterial(host);
-    UIImageView* glyph = material ? PFBGlassComposeGlyph(material) : nil;
-    return [NSString stringWithFormat:@"compose %@, hidden by PFB %@, PFB look %@, glass %@, glyph %@",
-                                      PFBGlassIsComposeHost(host) ? @"yes" : @"no",
-                                      objc_getAssociatedObject(host, kPFBGlassComposeHiddenKey) ? @"yes" : @"no",
-                                      objc_getAssociatedObject(host, kPFBGlassComposeTouchedKey) ? @"on" : @"off",
-                                      material ? @"found" : @"none",
-                                      !glyph                               ? @"none"
-                                      : glyph.image == PFBGlassFeather()   ? @"the feather"
-                                                                           : @"not the feather"];
-}
-
-// Why the feather is not on a compose button that should carry it, or nil when it is, or
-// when the button is not one PrimeFreeBird styles.
-NSString* PFBGlassComposeMiss(UIView* host) {
-    if (!host.window || host.hidden || ![PFBSettings boolForKey:@"restore_tweet_button"] ||
-        !PFBGlassIsComposeHost(host)) {
-        return nil;
-    }
-    UIVisualEffectView* material = PFBGlassComposeMaterial(host);
-    if (!material) {
-        return @"no glass found";
-    }
-    UIImageView* glyph = PFBGlassComposeGlyph(material);
-    if (!glyph) {
-        return @"no glyph found in the glass";
-    }
-    __block BOOL featherShown = NO;
-    __block NSUInteger shownGlyphs = 0;
-    PFBWalkAllSubviews(host, 10, ^(UIView* view) {
-      if ([view isKindOfClass:[UIImageView class]] && ((UIImageView*)view).image && !view.hidden && view.alpha > 0.05) {
-          shownGlyphs++;
-          featherShown = featherShown || ((UIImageView*)view).image == PFBGlassFeather();
-      }
-    });
-    if (glyph.image != PFBGlassFeather()) {
-        return @"the glyph found is not the feather";
-    }
-    return featherShown && shownGlyphs == 1 ? nil : @"the feather is set, beside another glyph shown";
-}
-
-BOOL PFBGlassIsFeather(UIImage* image) {
-    return image && image == PFBGlassFeather();
-}
-
 %hook _TtC11XNavigation23TabBarAccessoryHostView
 
 - (void)layoutSubviews {
@@ -1040,9 +969,8 @@ BOOL PFBGlassIsFeather(UIImage* image) {
 
 %end
 
-// Twitter swaps the glyph image on an existing image view during tab transitions,
-// which the subview hook above does not cover. Only the FAB's glyphs and the
-// navigation bar's confirm glyph are touched.
+// Twitter swaps glyph images on existing image views, which the subview hooks above do not see.
+// Only the classic button's glyphs, the glass compose glyph and the navigation bar's confirm glyph are touched.
 %hook UIImageView
 
 // The glyph often sits inside the glass material's contentView, where the FAB's

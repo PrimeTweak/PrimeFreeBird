@@ -340,7 +340,7 @@ static const NSTimeInterval kPFBVMDFreshness = 3.0;
 
 // The added entry is told apart by identifier: the app's own entry can carry the
 // very same title.
-static NSString* const kPFBVMDActionIdentifier = @"com.primefreebird.download-video";
+static NSString* const kPFBVMDActionIdentifier = @"com.primetweak.primefreebird.download-video";
 
 static id                    gPFBVMDStatus;        // tweet under the long press
 static NSTimeInterval        gPFBVMDStatusTime;

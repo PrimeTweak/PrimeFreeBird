@@ -1,4 +1,4 @@
-// The accent color picker, cloned from the app's ColorThemePickerItem.
+// The accent color picker, laid out like Twitter's own color picker.
 
 #import "Features/Appearance/ThemeColor/PFBColorThemeViewController.h"
 #import <UIKit/UIKit.h>

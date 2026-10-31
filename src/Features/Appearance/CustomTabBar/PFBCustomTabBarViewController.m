@@ -11,7 +11,6 @@
 #import "Support/Helpers.h"
 #import "Support/HookHelpers.h"
 #import "Support/T1Headers.h"
-#import "Debug/PFBDebugger.h"
 
 // The floating compose button, hidden while the editor is on screen.
 @interface TFNFloatingActionButton : UIView
@@ -358,7 +357,6 @@ static UIViewController* findViewControllerOfClass(UIViewController* vc,
         return 0;
     }
     NSInteger capacity = [(T1TabbedAppNavigationViewController*)tabNav _t1_bottomTabItemCapacity];
-    PFBDebugLog(@"[tabbar] editor capacity %ld", (long)capacity);
     return capacity >= 2 ? capacity : 0;
 }
 
@@ -372,7 +370,7 @@ static UIViewController* findViewControllerOfClass(UIViewController* vc,
     [self updateSaveButtonState];
 }
 
-// Restore puts Twitter's default tabs in the editor only; Save keeps them, as it keeps any pick.
+// Restore puts the default tabs (Home, Explore, Notifications, Chat) in the editor only; Save keeps them.
 - (void)restoreTapped {
     PFBBundle* bundle = [PFBBundle sharedBundle];
     UIAlertController* alert = [UIAlertController

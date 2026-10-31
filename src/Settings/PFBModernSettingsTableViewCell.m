@@ -2,7 +2,6 @@
 #import "Features/Appearance/ThemeColor/PFBPalette.h"
 #import "Settings/PFBSettingsCellStyle.h"
 #import "Settings/PFBModernSettingsTableViewCell.h"
-#import "Settings/PFBModernSettingsCompactButtonCell.h"
 
 @interface PFBModernSettingsTableViewCell ()
 @property (nonatomic, strong) NSLayoutConstraint* titleLeadingWithIcon;

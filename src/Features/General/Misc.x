@@ -24,7 +24,7 @@ static BOOL ShouldKeepBrowserURLInApp(NSURL* url) {
         return %orig;
     }
 
-    // initialURL is Safari's private getter: asked first, a missing one leaves the link in the app.
+    // rootURL first, then Safari's private initialURL when it exists; with neither, the link stays in the app.
     NSURL* url = [self rootURL] ?: ([self respondsToSelector:@selector(initialURL)] ? [self initialURL] : nil);
     if (url == nil || ShouldKeepBrowserURLInApp(url)) {
         return %orig;
@@ -339,7 +339,7 @@ static BOOL PFBKeepLeftToRight(BOOL rightToLeft) {
 // guarded against re-triggering. strip_url_tracking removes s, t, ref_src and ref_url;
 // the share builders apply sharing_domain on their own, copies only with Clean links on.
 
-static NSString* PFBProcessSharedURL(NSString* urlString, NSString* from) {
+static NSString* PFBProcessSharedURL(NSString* urlString) {
     if (urlString.length == 0) {
         return urlString;
     }
@@ -347,12 +347,6 @@ static NSString* PFBProcessSharedURL(NSString* urlString, NSString* from) {
     NSURLComponents* c = [NSURLComponents componentsWithString:urlString];
     if (!c || !PFBIsXDomain(c.host)) {
         return urlString;
-    }
-    // The names of the parameters Twitter puts on its links, values left out.
-    if (c.queryItems.count > 0) {
-        NSArray<NSString*>* names = [[c.queryItems valueForKey:@"name"] sortedArrayUsingSelector:@selector(compare:)];
-        PFBCompatMeasure(@"link parameters",
-                         [NSString stringWithFormat:@"%@: %@", from, [names componentsJoinedByString:@", "]], 12);
     }
 
     // Option off: a tracked link is only noted for the Compatibility sheet.
@@ -397,19 +391,17 @@ static NSString* PFBProcessSharedURL(NSString* urlString, NSString* from) {
 
 %hook TFNTwitterStatus
 
-// Twitter passes the share number as 64 bits; the value it passes is noted once.
+// The share number is a 64-bit value.
 - (NSString*)twitterURLForShareWithSParam:(unsigned long long)sParam {
-    PFBCompatMeasure(@"share number", [NSString stringWithFormat:@"Tweet share: %llu", sParam], 8);
     NSString* url = %orig;
-    return PFBProcessSharedURL(url, @"Tweet share");
+    return PFBProcessSharedURL(url);
 }
 
 + (NSString*)twitterURLForShareWithSParam:(unsigned long long)sParam
                                  username:(NSString*)username
                                  statusID:(long long)statusID {
-    PFBCompatMeasure(@"share number", [NSString stringWithFormat:@"Tweet share by ID: %llu", sParam], 8);
     NSString* url = %orig;
-    return PFBProcessSharedURL(url, @"Tweet share by ID");
+    return PFBProcessSharedURL(url);
 }
 
 %end
@@ -419,12 +411,12 @@ static NSString* PFBProcessSharedURL(NSString* urlString, NSString* from) {
 
 - (NSString*)twitterURLForShare {
     NSString* url = %orig;
-    return PFBProcessSharedURL(url, @"profile share");
+    return PFBProcessSharedURL(url);
 }
 
 - (NSString*)twitterURLForCopy {
     NSString* url = %orig;
-    return PFBProcessSharedURL(url, @"profile copy");
+    return PFBProcessSharedURL(url);
 }
 
 %end
@@ -452,7 +444,7 @@ void PFBInstallPasteboardObserver(void) {
             if ([current isEqualToString:PFBLastCleanedURL]) {
                 return;
             }
-            NSString* cleaned = PFBProcessSharedURL(current, @"copied link");
+            NSString* cleaned = PFBProcessSharedURL(current);
             if (![cleaned isEqualToString:current]) {
                 PFBLastCleanedURL = [cleaned copy];
                 pb.string = cleaned;
@@ -610,7 +602,6 @@ static BOOL PFBScreenshotSuppressed(void) {
 %end
 
 // (2) Watermark suppression, gated.
-@class TFSAccountFeatureSwitches;
 
 // Whether Twitter's custom screenshot gates are refused: YES while screenshot detection
 // is disabled, counted as the option acting; otherwise Twitter's own answer stands.

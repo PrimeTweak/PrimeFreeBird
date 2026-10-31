@@ -1,4 +1,4 @@
-// A muted-words button in the Home timeline's top bar.
+// The Filters button in the Home timeline's top bar.
 
 #import "Support/HookHelpers.h"
 #import "Features/Timelines/PFBMutedWordsViewController.h"
@@ -143,9 +143,8 @@ static void pfbPresentQuickMutedWords(UIViewController* owner, UIView* anchor, C
             return;
         }
         if (!button) {
-            // Twitter's filter_bars shape drawn at the gear's weight, repainted
-            // through the same path so the color survives the window tint. Drawing
-            // the shape here cannot come back empty, so no symbol fallback.
+            // Twitter's filter_bars shape at the gear's weight, painted in the bar's icon color so the
+            // window tint cannot recolor it.
             UIImage* icon = PFBFlatGlyph(PFBFilterBarsGlyph(),
                                          PFBBarIconColor(bar.traitCollection));
             button = [UIButton buttonWithType:UIButtonTypeSystem];
@@ -246,38 +245,6 @@ static NSArray* pfbHomeItemsKeepingFilters(UINavigationItem* item, NSArray* item
     return [(items ?: @[]) arrayByAddingObject:button];
 }
 
-// What Home's top bar holds 8 s after Home appears, once per launch: Twitter sets its own
-// right items again once the screen is up.
-static void pfbNoteHomeBarSoon(UIViewController* home) {
-    static BOOL noted;
-    if (noted) {
-        return;
-    }
-    noted = YES;
-    __weak UIViewController* weakHome = home;
-    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(8.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
-      UIViewController* screen = weakHome;
-      UINavigationItem* item = screen.navigationItem;
-      if (!item) {
-          return;
-      }
-      UIBarButtonItem* button = objc_getAssociatedObject(item, kPFBQuickMutedItemKey);
-      NSUInteger groups = 0;
-      if (@available(iOS 16.0, *)) {
-          groups = item.trailingItemGroups.count;
-      }
-      PFBCompatMeasure(@"home filters",
-                       [NSString stringWithFormat:@"Home's item %@, button %@, %@ in the bar, right items %lu, "
-                                                  @"trailing groups %lu, top screen %@",
-                                                  button ? @"marked" : @"not marked",
-                                                  [item.rightBarButtonItems containsObject:button] ? @"in its items" : @"missing",
-                                                  button.customView.window ? @"drawn" : @"not drawn",
-                                                  (unsigned long)item.rightBarButtonItems.count, (unsigned long)groups,
-                                                  NSStringFromClass([screen.navigationController.topViewController class])],
-                       10);
-    });
-}
-
 %hook UINavigationItem
 
 - (void)setRightBarButtonItems:(NSArray*)items {
@@ -305,9 +272,6 @@ static void pfbNoteHomeBarSoon(UIViewController* home) {
 - (void)viewDidAppear:(BOOL)animated {
     %orig;
     pfbPlaceHomeFiltersItem((UIViewController*)self);
-    if (PFBOnNativeGlassStack((UIViewController*)self)) {
-        pfbNoteHomeBarSoon((UIViewController*)self);
-    }
 }
 
 %end

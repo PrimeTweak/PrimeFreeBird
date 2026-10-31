@@ -1,10 +1,8 @@
-// Feature-switch overrides read by the app, the web login mounted in place of the
-// native login screens, the skipped notification-permission onboarding step, and the
-// account feature gates.
+// Feature-switch answers and account gates, the web login in place of the native login
+// screens, and the side menu's panel list.
 
 #import "Support/HookHelpers.h"
 #import "Sideload/PFBWebLoginViewController.h"
-#import "Debug/PFBDebugger.h"
 
 // While set, -isSubscribedTo: (below) reports the account's genuine
 // subscription state instead of the forced premium tiers, so paths that need
@@ -84,12 +82,8 @@ static NSNumber* FeatureSwitchOverrideValueForKey(NSString* key) {
         return [PFBSettings boolForKey:@"enable_liquid_glass"] ? @YES : nil;
     }
 
-    // Twitter's new settings menu has no PrimeFreeBird row, so the classic one is kept; the
-    // tour lets Twitter's own answer through once, to measure the new menu.
+    // Twitter's new settings menu has no PrimeFreeBird row, so the classic one is kept.
     if ([key isEqualToString:@"ios_settings_redesign_enabled"]) {
-        if (PFBCompatTourWantsNewSettings()) {
-            return nil;
-        }
         PFBCOMPAT_ACTION(PFBCompat_settings_entry, @"classic settings menu kept");
         return @NO;
     }
@@ -316,14 +310,6 @@ static NSNumber* FeatureSwitchOverrideValueForKey(NSString* key) {
         [key isEqualToString:@"grok_explain_text_selection_ask_grok_enabled"]) {
         if ([PFBSettings boolForKey:@"hide_grok_analyze"]) {
             PFBCOMPAT_ACTION(PFBCompat_hide_grok_analyze, @"Ask Grok off in chats and selected text");
-            // Each switch proven on its own: the sheet shows only an option's first proof.
-            static BOOL chatNoted, selectionNoted;
-            BOOL chat = [key hasPrefix:@"xchat"];
-            BOOL* noted = chat ? &chatNoted : &selectionNoted;
-            if (!*noted) {
-                *noted = YES;
-                PFBCompatMeasure(@"grok", chat ? @"Ask Grok off in chats" : @"Ask Grok off in selected text", 2);
-            }
             return @NO;
         }
         PFBCOMPAT_OBSERVE(PFBCompat_hide_grok_analyze, @"read by Twitter");
@@ -335,17 +321,6 @@ static NSNumber* FeatureSwitchOverrideValueForKey(NSString* key) {
     if ([key isEqualToString:@"xchat_cold_inbox_suggestions_enabled"] ||
         [key isEqualToString:@"xchat_cold_inbox_find_friends_enabled"]) {
         BOOL off = [PFBSettings boolForKey:@"hide_suggested_chats"];
-        // Each switch proven on its own: the sheet shows only an option's first proof.
-        static BOOL listNoted, friendsNoted;
-        BOOL friends = [key containsString:@"find_friends"];
-        BOOL* noted = friends ? &friendsNoted : &listNoted;
-        if (!*noted) {
-            *noted = YES;
-            PFBCompatMeasure(@"suggested chats",
-                             [NSString stringWithFormat:@"%@ read by Twitter, %@", friends ? @"Find friends" : @"Suggested list",
-                                                        off ? @"turned off" : @"left on"],
-                             4);
-        }
         if (off) {
             PFBCOMPAT_ACTION(PFBCompat_hide_suggested_chats, @"suggested chats off");
             return @NO;
@@ -523,10 +498,6 @@ static NSNumber* FeatureSwitchOverrideValueForKey(NSString* key) {
         }
     }
 
-    // The Connect tab stays on its native gate (fresh accounts only): its drawer
-    // row doesn't consult the tab bar, so forcing it would grow a row that can't
-    // be hidden.
-
     // In-app article webview
     if ([key isEqualToString:@"ios_in_app_article_webview_enabled"]) {
         if ([PFBSettings boolForKey:@"new_inapp_webview"]) {
@@ -649,10 +620,6 @@ static NSNumber* FeatureSwitchOverrideValueForKey(NSString* key) {
         PFBCOMPAT_ACTION(PFBCompat_hide_upsells, @"Boost button off");
         return @NO;
     }
-
-    // The Premium settings row is handled in the subscriptions hook below. Creator
-    // purchases and the subscriber-only profile tab gate on real creator
-    // eligibility, which the forced tier does not affect.
 
     // Creator Studio / Monetization entries gate purely on these switches with no
     // premium check, so follow the genuine status: a real subscriber keeps them
@@ -851,7 +818,6 @@ static BOOL pfbChatStoreKey(NSString* key) {
 %hook T1AccountsViewController
 
 - (void)private_startLoginFlowWithSender:(id)sender {
-    PFBDebugLog(@"[login-entry] startLoginFlow -> web login presented");
     [PFBWebLoginViewController presentFrom:(UIViewController*)self];
     PFBCOMPAT_ACTION(PFBCompat_web_login, @"web login shown to add an account");
 }
@@ -865,7 +831,6 @@ static BOOL pfbChatStoreKey(NSString* key) {
         %orig;
         return;
     }
-    PFBDebugLog(@"[login-entry] makeOnboardingViewController -> web login as root");
     completion([PFBWebLoginViewController rootNavigationController]);
     PFBCOMPAT_ACTION(PFBCompat_web_login, @"web login shown signed out");
 }
@@ -1162,9 +1127,8 @@ BOOL PFBPanelIsGenuinelyAvailable(long long panelID) {
 
 static __thread BOOL DashPanelIDQuery = NO;
 
-// Twitter also rebuilds the open menu from its Swift side, past the Objective-C door above
-// (on a return from the app switcher): the glass navigation's list is answered as well
-// while the menu is open, as its presenter reports it.
+// While the presenter reports the menu open, the glass navigation's list is answered too:
+// Twitter also rebuilds the open menu from its Swift side.
 static BOOL gPFBDashMenuOpen;
 
 static void PFBDashRebuild(id controller) {
@@ -1208,7 +1172,9 @@ static void PFBDashRebuild(id controller) {
 
 %end
 
-BOOL PFBDashAnswerApplies(BOOL glassNavigation) {
+// Whether a panel list read now gets PrimeFreeBird's answer for the side menu, from the glass
+// navigation or from the classic one.
+static BOOL PFBDashAnswerApplies(BOOL glassNavigation) {
     return DashPanelIDQuery || (glassNavigation && gPFBDashMenuOpen);
 }
 
@@ -1225,16 +1191,6 @@ BOOL PFBDashAnswerApplies(BOOL glassNavigation) {
 
 %end
 
-// The last answer given to the drawer and when, read by the app return probe.
-static NSString* gPFBDashFacts;
-static CFTimeInterval gPFBDashFactsAt;
-
-NSString* PFBDashPanelFacts(void) {
-    return gPFBDashFacts ? [NSString stringWithFormat:@"%@, %.1f s before", gPFBDashFacts,
-                                                      CACurrentMediaTime() - gPFBDashFactsAt]
-                         : @"never asked";
-}
-
 // The tab bar's panels as the drawer reads them, with the panels it must not offer.
 static NSArray* PFBDashPanelIDs(NSArray* panelIDs) {
     if (![panelIDs isKindOfClass:[NSArray class]]) {
@@ -1247,11 +1203,9 @@ static NSArray* PFBDashPanelIDs(NSArray* panelIDs) {
         }
     };
 
-    NSMutableArray<NSNumber*>* unavailable = [NSMutableArray array];
     for (NSNumber* panelID in @[@13, @15, @16, @17]) {
         if (!PFBPanelIsGenuinelyAvailable(panelID.longLongValue)) {
             claim(panelID);
-            [unavailable addObject:panelID];
         }
     }
 
@@ -1262,18 +1216,9 @@ static NSArray* PFBDashPanelIDs(NSArray* panelIDs) {
         PFBCOMPAT_OBSERVE(PFBCompat_hide_grok_sidebar, @"Grok panel found");
     }
 
-    BOOL premium = AccountIsGenuinelyPremium();
-    if (!premium) {
+    if (!AccountIsGenuinelyPremium()) {
         claim(@15);
     }
-
-    gPFBDashFacts = [NSString
-        stringWithFormat:@"Twitter gave [%@], PrimeFreeBird gave [%@] (not genuinely available [%@], Grok hidden %@, "
-                         @"Premium %@)",
-                         [panelIDs componentsJoinedByString:@", "], [spoofed componentsJoinedByString:@", "],
-                         [unavailable componentsJoinedByString:@", "],
-                         [PFBSettings boolForKey:@"hide_grok_sidebar"] ? @"yes" : @"no", premium ? @"yes" : @"no"];
-    gPFBDashFactsAt = CACurrentMediaTime();
     return spoofed;
 }
 

@@ -133,8 +133,8 @@ static void PFBRestoreNativeTabSelection(id controller) {
 
 %hook T1TabCustomizationConfig
 
-// Called by the code above only: Twitter's Swift reads its gate directly. When Twitter's own
-// answer turns open once the cached flag is set, the native editor works on this build.
+// When Twitter's answer is closed, the cached flag is set and the gate asked again;
+// an open answer then counts as Twitter's tab editor gate opened.
 - (BOOL)isTabCustomizationEnabled {
     BOOL open = %orig;
     if (open || !PFBEnableCachedTabCustomization(self)) {
@@ -158,10 +158,6 @@ static void PFBRestoreNativeTabSelection(id controller) {
         NSData* data = [value isKindOfClass:[NSData class]] ? value : nil;
         [[PFBNativeTabSelectionStore sharedStore] saveData:data forAccountID:PFBTabAccountID(self) settingsKey:key];
         PFBCOMPAT_ACTION(PFBCompat_custom_tab_bar, @"selection from Twitter's tab editor kept");
-        PFBCompatMeasure(@"tab editor",
-                         data ? [NSString stringWithFormat:@"selection kept, %lu bytes", (unsigned long)data.length]
-                              : @"default layout saved",
-                         8);
     }
 }
 
@@ -211,7 +207,6 @@ static void PFBRestoreNativeTabSelection(id controller) {
 - (void)viewDidLoad {
     %orig;
     PFBPrepareNativeTabSave(self);
-    PFBCompatMeasure(@"tab editor", @"Twitter's tab editor shown", 8);
 }
 
 - (void)didPressSaveButton {

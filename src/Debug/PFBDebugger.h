@@ -7,16 +7,6 @@
 // a no-op when debugging is off.
 extern void PFBMark(UIView* view, NSString* origin);
 
-// A color as rgba(255 scale, alpha), or white(level, alpha), for reports.
-extern NSString* PFBColorText(UIColor* color);
-
-// The average color of an image's visible pixels as rgb(255 scale), or "transparent"; nil
-// without an image.
-extern NSString* PFBImageInk(UIImage* image);
-
-// A class name as Swift writes it ("XNavigation.TabBarView"), for reports.
-extern NSString* PFBReadableClassName(id object);
-
 // Records a decision just made, like @"timeline: dropped 3 items". Kept in a small
 // ring buffer and printed in the report. No-op when debugging is off.
 extern void PFBDebugLog(NSString* format, ...) NS_FORMAT_FUNCTION(1, 2);
@@ -45,13 +35,3 @@ extern void PFBDebuggerSetTriggerHidden(BOOL hidden);
 // True only when debugging is on. Call sites in hot paths test this before
 // building any log string, so the debugger costs one boolean when off.
 extern BOOL PFBDebugIsRecording(void);
-
-// True once Twitter's new settings menu has been read in this launch, so the tour
-// keeps it open until then (PFBSettingsMenuProbe.x).
-extern BOOL PFBSettingsMenuProbeRead(void);
-
-// The same for Twitter's tab editor (PFBTabEditorProbe.x).
-extern BOOL PFBTabEditorProbeRead(void);
-
-// The opacity a view shows with: zero when it or a parent is hidden (PFBScreenProbe.x).
-extern CGFloat PFBShownOpacity(UIView* view);

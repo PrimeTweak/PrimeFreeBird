@@ -77,8 +77,8 @@ static void pfbBridgeReadSharedSession(NSString** authToken, NSString** csrf) {
     }
 }
 
-// Once per launch and per answer, while the journal records: which session a request
-// signed for another account than the shared session's goes out with.
+// Once per launch, while the journal records: a request signed for another account went
+// out before its csrf token was known.
 static void pfbBridgeLogAccount(NSString* line) {
     static NSMutableSet<NSString*>* said;
     static dispatch_once_t once;
@@ -170,9 +170,10 @@ static NSURLRequest* pfbBridgeInject(NSURLRequest* req) {
         // fetched. Until then the request may be refused, but never sent as another account.
         authToken = own;
         csrf = PFBWebCt0ForAuthToken(own, YES);
-        pfbBridgeLogAccount(csrf.length
-            ? @"[bridge] a request signed for another account went with its own web session"
-            : @"[bridge] a request signed for another account went with its own web session, csrf pending");
+        if (!csrf.length) {
+            pfbBridgeLogAccount(
+                @"[bridge] a request signed for another account went with its own web session, csrf pending");
+        }
     }
     NSMutableURLRequest* m = [req mutableCopy];
     if (pfbBridgeIsMediaUpload(req)) {
@@ -318,8 +319,6 @@ static void pfbBridgeMount(NSString* screen, long long uid, NSString* token, NSS
     if (twitterCls && [twitterCls respondsToSelector:saveSel]) {
         ((void (*)(id, SEL))objc_msgSend)(twitterCls, saveSel);
     }
-    PFBDebugLog(@"[bridge] account registered: screen=%@ id=%lld (service=%d)", screen ?: @"nil",
-                uid, service != nil);
 
     void (^switchBlock)(void) = ^{
         Class hostCls = objc_getClass("T1HostViewController");
@@ -330,7 +329,6 @@ static void pfbBridgeMount(NSString* screen, long long uid, NSString* token, NSS
         if (host && [host respondsToSelector:viewSel]) {
             ((void (*)(id, SEL, id, BOOL))objc_msgSend)(host, viewSel, account, YES);
         }
-        PFBDebugLog(@"[bridge] switched to account (host=%d)", host != nil);
         // Once the native account is live, prompt the restart that settles the
         // themed chrome; a short delay lets the switch animation land first.
         dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.8 * NSEC_PER_SEC)),
@@ -354,8 +352,6 @@ static void pfbBridgeMount(NSString* screen, long long uid, NSString* token, NSS
                     userID:(long long)userID
                 screenName:(NSString*)screenName
                  presenter:(UIViewController*)presenter {
-    PFBDebugLog(@"[bridge] start: auth=%lu ct0=%lu id=%lld screen=%@", (unsigned long)authToken.length,
-                (unsigned long)csrf.length, userID, screenName ?: @"nil");
     if (!authToken.length || !csrf.length || userID == 0) {
         PFBDebugLog(@"[bridge] session/userID missing - abort");
         return;

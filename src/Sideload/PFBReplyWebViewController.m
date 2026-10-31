@@ -35,9 +35,7 @@ static NSString* const ReplyReadScript =
     @"(function(){var "
     @"v=sessionStorage.getItem('__pfbNewReply')||'';sessionStorage.removeItem('__pfbNewReply');"
     @"return v;})();";
-// Injected on the reply page: hides only the promo banners and the web back arrow.
-// The compose toolbar and layout are left untouched, since x.com keeps its toolbar
-// above the keyboard by itself.
+// Injected on the reply page: hides the promo banners and the web back arrow.
 static NSString* const ReplyStyleScript =
     @"(function(){var css='"
     @"[data-testid=\"app-promo-banner\"],div[role=\"dialog\"] a[href*=\"apple.com\"],"
@@ -73,9 +71,9 @@ static NSString* const ReplyTapDismissScript =
     @"var t=document.querySelector('[data-testid=\"toolBar\"]');"
     @"if(b&&!b.contains(e.target)&&!(t&&t.contains(e.target))){"
     @"var a=document.activeElement;if(a&&a.blur){a.blur();}}},true);})();";
-// The web view is full height and never resized: WebKit applies its own keyboard
-// inset; native code forwards keyboard events and trims the scroll range under the
-// composer (pfbGeo). The reply box stays in flow with the tweet.
+// The web view keeps its full height; native code forwards keyboard changes (__pfbKb) and
+// trims the scroll range under the composer (pfbGeo). The box stays in flow while typing,
+// pinned to the bottom otherwise.
 static NSString* const ReplyBarPinScript =
     @"(function(){if(window.__pfbKbInit)return;window.__pfbKbInit=1;window.__pfbColl=[];"
     @"function findBox(){"

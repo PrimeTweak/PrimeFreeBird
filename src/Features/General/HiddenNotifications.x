@@ -224,8 +224,8 @@ static NSString* PFBNotifEntryIdFromDescription(id model) {
 // an accessor, so the cache does not try to message a selector that is not one.
 static NSString* const kPFBIdentityFromDescription = @"<description>";
 
-// A Tweet shown in the notifications list is named by its own ID: its view model has no
-// entry ID. Only Twitter's Tweet view model is read, whose `status` field holds the Tweet.
+// A Tweet shown in the notifications list is named by its own ID, read from the status
+// field of Twitter's Tweet view model.
 static NSString* PFBNotifTweetIdentity(id model) {
     static Class statusItem;
     static dispatch_once_t once;
@@ -506,9 +506,6 @@ static void PFBShowNotifToast(NSString* notifID) {
 
 // MARK: - The swipe, on the list's own delegate
 
-// The action is placed before whatever Twitter already returns, so nothing native
-// is dropped and an empty return carries the added action alone.
-
 // The fallback when the controller yields no model: the cell's own model
 // accessors, unwrapped from their data-view item when wrapped.
 static id PFBModelFromCell(UITableView* table, NSIndexPath* indexPath) {
@@ -678,6 +675,8 @@ static void PFBNotifDropRow(id dataViewController, NSIndexPath* indexPath) {
         hide.image = glyph;
     }
 
+    // The action is placed before whatever Twitter already returns, so nothing native
+    // is dropped and an empty return carries the added action alone.
     NSMutableArray<UIContextualAction*>* actions = [NSMutableArray arrayWithObject:hide];
     if (original.actions.count) {
         [actions addObjectsFromArray:original.actions];
@@ -692,9 +691,8 @@ static void PFBNotifDropRow(id dataViewController, NSIndexPath* indexPath) {
 
 // MARK: - Keeping them out of the list
 
-// Which screens the sweep may touch, decided by observation rather than by class
-// name. One notification model keeps a controller, several without drops it, and
-// the home timeline is then never walked again.
+// Which lists the sweep walks: one that shows a notification is kept; one outside the
+// notifications screens that shows five items and none is dropped for good.
 static BOOL PFBNotifSweepAllowed(id dataViewController) {
     id verdict = objc_getAssociatedObject(dataViewController, kPFBNotifVerdictKey);
     return verdict ? [verdict boolValue] : YES;   // undecided: walk it
@@ -714,15 +712,8 @@ static void PFBNotifRecordVerdict(id dataViewController, BOOL sawNotification,
     // A screen belonging to the notifications tab is never condemned: it could be
     // dropped for showing placeholder rows before its notifications arrive. Staying
     // undecided costs one extra walk; being wrong costs the feature.
-    UIViewController* node = [dataViewController isKindOfClass:[UIViewController class]]
-                                 ? (UIViewController*)dataViewController
-                                 : nil;
-    for (NSInteger hop = 0; node && hop < 6; hop++) {
-        if ([NSStringFromClass([node class])
-                containsString:@"NotificationsViewController"]) {
-            return;      // undecided on purpose — keep observing
-        }
-        node = node.parentViewController;
+    if (PFBNotifOnNotificationsScreen(dataViewController)) {
+        return;
     }
     // Only decide against a screen once enough items have been seen: an empty
     // or still-loading list must not be condemned on a single empty pass.
@@ -768,9 +759,8 @@ static UIColor* PFBNotifDetailColor(void) {
     return [UIColor secondaryLabelColor];
 }
 
-// Twitter composes in Chirp, and sets these large empty-state headlines in Heavy.
-// The font group is reached the way the settings screens reach it; the system font
-// is the fallback.
+// Twitter's empty-state face: Heavy for the title from Twitter's font group, as the
+// settings screens use it; Chirp Bold or Regular otherwise.
 static UIFont* PFBNotifEmptyFont(CGFloat size, BOOL heavy) {
     id group = [PFBManager sharedFontGroup];
     TFNUIDefaultFontGroup* fonts = (TFNUIDefaultFontGroup*)group;
@@ -893,64 +883,6 @@ static void PFBNotifLayoutEmptyPanel(UIView* panel, UITableView* table) {
 
 %end
 
-// The panel of a notifications list, and how many panels its list holds (one fading out and
-// a new one, at most), for the screen probe.
-UIView* PFBNotifEmptyPanel(UITableView* table, NSUInteger* panels) {
-    __block NSUInteger count = 0;
-    PFBWalkAllSubviews(table, 4, ^(UIView* view) {
-      count += view.tag == kPFBNotifEmptyTitleTag;
-    });
-    if (panels) {
-        *panels = count;
-    }
-    return [table viewWithTag:kPFBNotifEmptyTag];
-}
-
-static NSUInteger gPFBNotifSweeps;
-
-NSUInteger PFBNotifSweepCount(void) {
-    return gPFBNotifSweeps;
-}
-
-// MARK: Empty panel measurement
-
-static const char* kPFBNotifPanelStateKey = "pfbNotifPanelState";
-static const char* kPFBNotifPanelSinceKey = "pfbNotifPanelSince";
-static const char* kPFBNotifLastSweepKey = "pfbNotifLastSweep";
-
-// Each change of the empty panel's state on a notifications list, with the list as it stood:
-// for the panel that never comes after a launch and the one that flickers after a refresh.
-static void PFBNotifPanelNote(id controller, UITableView* table, NSString* state, NSInteger rows,
-                              NSInteger notifRows, NSUInteger hidden) {
-    NSString* last = objc_getAssociatedObject(controller, kPFBNotifPanelStateKey);
-    if ([last isEqualToString:state]) {
-        return;
-    }
-    objc_setAssociatedObject(controller, kPFBNotifPanelStateKey, state, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-    NSNumber* since = objc_getAssociatedObject(controller, kPFBNotifPanelSinceKey);
-    if (!since) {
-        since = @(CACurrentMediaTime());
-        objc_setAssociatedObject(controller, kPFBNotifPanelSinceKey, since, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-    }
-    NSUInteger panels = 0;
-    UIView* panel = PFBNotifEmptyPanel(table, &panels);
-    NSString* panelText = panel ? [NSString stringWithFormat:@"y %.0f on screen, alpha %.2f",
-                                                             [panel convertRect:panel.bounds toView:nil].origin.y, panel.alpha]
-                                : @"none";
-    PFBCompatMeasure(@"notification panel",
-                     [NSString stringWithFormat:@"%.1f s: %@ · rows %ld, notifications or Tweets %ld, hidden %lu, %@, "
-                                                @"last sweep %@ · list offset %.0f, top inset %.0f, refreshing %@ · "
-                                                @"panels in the list %lu, tagged panel %@",
-                                                CACurrentMediaTime() - since.doubleValue, state, (long)rows,
-                                                (long)notifRows, (unsigned long)hidden,
-                                                gPFBNotifSweeping ? @"during a sweep" : @"outside a sweep",
-                                                objc_getAssociatedObject(controller, kPFBNotifLastSweepKey) ?: @"none",
-                                                table.contentOffset.y, table.adjustedContentInset.top,
-                                                table.refreshControl.isRefreshing ? @"yes" : @"no",
-                                                (unsigned long)panels, panelText],
-                     60);
-}
-
 static void PFBNotifSyncEmptyState(id dataViewController) {
     if (!dataViewController) {
         return;
@@ -1009,24 +941,13 @@ static void PFBNotifSyncEmptyState(id dataViewController) {
             objc_setAssociatedObject(dataViewController, kPFBNotifEverFilledKey, @YES,
                                      OBJC_ASSOCIATION_RETAIN_NONATOMIC);
         }
-        NSString* lastState = objc_getAssociatedObject(dataViewController, kPFBNotifPanelStateKey);
-        if (!existing && ([lastState isEqualToString:@"panel shown"] || [lastState isEqualToString:@"panel kept"])) {
-            PFBNotifPanelNote(dataViewController, table, @"panel gone, not removed by PrimeFreeBird", rows, notifRows,
-                              hidden);
-        }
         if (![everFilled isEqual:@YES]) {
-            PFBNotifPanelNote(dataViewController, table, @"waiting: the list never had a row", rows, notifRows, hidden);
             if (existing) {
                 [existing removeFromSuperview];
             }
             return;
         }
         if (notifRows > 0 || hidden == 0) {
-            PFBNotifPanelNote(dataViewController, table,
-                              [NSString stringWithFormat:@"%@: %@", existing ? @"panel fading" : @"no panel",
-                                                         notifRows > 0 ? @"a notification or Tweet row is shown"
-                                                                       : @"nothing hidden"],
-                              rows, notifRows, hidden);
             if (existing) {
                 // The panel fades out the way it came in. Its tag goes first, so no
                 // later pass finds it mid-fade.
@@ -1045,7 +966,6 @@ static void PFBNotifSyncEmptyState(id dataViewController) {
             // A width change (rotation, split view) moves the panel; the frames
             // are recomputed rather than left stale.
             PFBNotifLayoutEmptyPanel(existing, table);
-            PFBNotifPanelNote(dataViewController, table, @"panel kept", rows, notifRows, hidden);
             return;
         }
 
@@ -1090,7 +1010,6 @@ static void PFBNotifSyncEmptyState(id dataViewController) {
                            panel.alpha = 1.0;
                          }
                          completion:nil];
-        PFBNotifPanelNote(dataViewController, table, @"panel shown", rows, notifRows, hidden);
     } @catch (id exception) {
         PFBDebugLog(@"[empty] exception: %@", exception);
     }
@@ -1151,7 +1070,6 @@ static void PFBNotifSweep(id dataViewController) {
 
         NSMutableArray<NSIndexPath*>* doomed = [NSMutableArray array];
         BOOL notificationsScreen = PFBNotifOnNotificationsScreen(dataViewController);
-        gPFBNotifSweeps += notificationsScreen;
         BOOL sawNotification = NO;
         NSInteger examined = 0;
         NSInteger sections = table.numberOfSections;
@@ -1185,9 +1103,6 @@ static void PFBNotifSweep(id dataViewController) {
             objc_setAssociatedObject(dataViewController, kPFBNotifEverFilledKey, @YES,
                                      OBJC_ASSOCIATION_RETAIN_NONATOMIC);
         }
-        objc_setAssociatedObject(dataViewController, kPFBNotifLastSweepKey,
-                                 [NSString stringWithFormat:@"removed %lu of %ld", (unsigned long)doomed.count, (long)examined],
-                                 OBJC_ASSOCIATION_RETAIN_NONATOMIC);
         PFBNotifSyncEmptyState(dataViewController);
         if (doomed.count) {
             PFBCOMPAT_ACTION(PFBCompat_hide_notifications, @"hidden notification removed");
@@ -1367,7 +1282,7 @@ static void PFBNotifPlaceEye(UIViewController* viewController) {
         UINavigationItem* item = viewController.navigationItem;
         for (UIBarButtonItem* existing in item.rightBarButtonItems) {
             if (existing.tag == kPFBNotifBarItemTag) {
-                PFBBarPairWithNeighbor(existing, item.rightBarButtonItems, @"Notifications");
+                PFBBarPairWithNeighbor(existing, item.rightBarButtonItems);
                 return;
             }
         }
@@ -1392,7 +1307,7 @@ static void PFBNotifPlaceEye(UIViewController* viewController) {
             [NSMutableArray arrayWithArray:item.rightBarButtonItems ?: @[]];
         [items addObject:ours];
         item.rightBarButtonItems = items;
-        PFBBarPairWithNeighbor(ours, item.rightBarButtonItems, @"Notifications");
+        PFBBarPairWithNeighbor(ours, item.rightBarButtonItems);
         PFBCOMPAT_ACTION(PFBCompat_hide_notifications, @"eye placed");
     } @catch (id exception) {
         PFBDebugLog(@"[notifs] eye placement abandoned - no consequence");
@@ -1658,40 +1573,6 @@ static void PFBNotifMaskHiddenCell(UITableViewCell* cell) {
 }
 
 %end
-
-// MARK: - Read by the notifications probe
-
-// What the hide code reads on one row: its model, the kind of entry it is, whether its
-// identity is read, and where Hide is offered for it.
-NSString* PFBNotifRowFacts(UITableView* table, NSIndexPath* indexPath) {
-    id model = PFBModelAtIndexPath(table.dataSource, indexPath) ?: PFBModelFromCell(table, indexPath);
-    if (!model) {
-        return @"no model";
-    }
-    static NSRegularExpression* kindPattern;
-    static dispatch_once_t once;
-    dispatch_once(&once, ^{
-      kindPattern = [NSRegularExpression regularExpressionWithPattern:@"entryId[:= ]+([A-Za-z]+)"
-                                                               options:0
-                                                                 error:NULL];
-    });
-    NSString* text = [model description] ?: @"";
-    NSTextCheckingResult* match = [kindPattern firstMatchInString:text options:0 range:NSMakeRange(0, text.length)];
-    NSString* entry = match.numberOfRanges > 1 ? [text substringWithRange:[match rangeAtIndex:1]] : @"unread";
-    NSString* modelClass = PFBReadableClassName(model);
-    BOOL identity = PFBNotifIdentity(model).length > 0;
-    NSString* hide = !identity ? @"nowhere"
-                     : [NSStringFromClass([model class]) containsString:@"Notification"] ? @"by the x and the swipe"
-                     : PFBNotifTweetIdentity(model) && PFBNotifOnNotificationsScreen(table.dataSource)
-                         ? @"in the Tweet menu"
-                         : @"nowhere";
-    return [NSString stringWithFormat:@"model %@, entry %@, identity %@, Hide %@", modelClass, entry,
-                                      identity ? @"read" : @"none", hide];
-}
-
-BOOL PFBNotifIsCrossImage(UIImage* image) {
-    return image && objc_getAssociatedObject(image, kPFBNotifXmarkImageKey) != nil;
-}
 
 // MARK: - The Tweet menu in the notifications tab (HiddenThreads.x)
 
