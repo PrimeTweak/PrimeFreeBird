@@ -257,6 +257,57 @@ static BOOL pfbHoldsSound(void) {
            [PFBSettings boolForKey:@"tap_to_pause"] && pfbOpensMuted();
 }
 
+// The full-screen player in a window, found from every window's controllers and kept
+// while it stays in one; nil when there is none.
+static UIViewController* pfbFullScreenPlayerInWindow(void) {
+    static __weak UIViewController* player;
+    if (player.viewIfLoaded.window) {
+        return player;
+    }
+    Class playerClass = objc_getClass("T1ImmersiveFullScreenViewController");
+    if (!playerClass) {
+        return nil;
+    }
+    for (UIScene* scene in UIApplication.sharedApplication.connectedScenes) {
+        if (![scene isKindOfClass:[UIWindowScene class]]) {
+            continue;
+        }
+        for (UIWindow* window in ((UIWindowScene*)scene).windows) {
+            NSMutableArray<UIViewController*>* queue = [NSMutableArray array];
+            if (window.rootViewController) {
+                [queue addObject:window.rootViewController];
+            }
+            for (NSUInteger i = 0; i < queue.count && i < 256; i++) {
+                UIViewController* controller = queue[i];
+                if ([controller isKindOfClass:playerClass] && controller.viewIfLoaded.window) {
+                    player = controller;
+                    return controller;
+                }
+                [queue addObjectsFromArray:controller.childViewControllers];
+                if (controller.presentedViewController) {
+                    [queue addObject:controller.presentedViewController];
+                }
+            }
+        }
+    }
+    return nil;
+}
+
+// Any card entering a window arms the guards, and only the full-screen player leaving
+// disarms them: an unmute refused with no such player in a window goes to the report once.
+static void pfbNoteRefusedUnmute(void) {
+    static BOOL noted = NO;
+    if (noted) {
+        return;
+    }
+    dispatch_async(dispatch_get_main_queue(), ^{
+      if (!noted && !pfbFullScreenPlayerInWindow()) {
+          noted = YES;
+          PFBCompatMeasure(@"video sound", @"unmute refused while no full-screen player was open", 2);
+      }
+    });
+}
+
 static void pfbClearAutoUnmute(UIView* view) {
     Ivar flagIvar =
         class_getInstanceVariable(object_getClass(view), "isAutoUnmuteEnabled");
@@ -327,6 +378,7 @@ static BOOL pfbInlineVideoHasSound(UIView* view) {
 - (void)setIsMuted:(BOOL)muted {
     if (!muted && pfbHoldsSound()) {
         PFBCompatReach(PFBCompatPath_starts_muted);
+        pfbNoteRefusedUnmute();
         return;
     }
     %orig;
@@ -335,6 +387,7 @@ static BOOL pfbInlineVideoHasSound(UIView* view) {
 - (void)setVolume:(float)volume {
     if (volume > 0 && pfbHoldsSound()) {
         PFBCompatReach(PFBCompatPath_starts_muted);
+        pfbNoteRefusedUnmute();
         %orig(0);
         return;
     }

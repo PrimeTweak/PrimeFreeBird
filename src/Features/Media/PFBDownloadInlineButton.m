@@ -152,7 +152,7 @@ static NSURL* PFBLargestMP4(TFSTwitterEntityMedia* media) {
             showHUD(downloadingText);
             // FFmpeg's own log lines stay out of the system log.
             [FFmpegKitConfig setLogRedirectionStrategy:LogRedirectionStrategyNeverPrintLogs];
-            NSURL* outFile = [[NSURL fileURLWithPath:NSTemporaryDirectory()]
+            NSURL* outFile = [[PFBManager temporaryFolder]
                 URLByAppendingPathComponent:[NSString
                                                 stringWithFormat:@"%@.%@",
                                                                  NSUUID.UUID

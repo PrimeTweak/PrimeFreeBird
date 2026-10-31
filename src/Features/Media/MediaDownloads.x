@@ -40,14 +40,82 @@ static NSArray* DMVideoEntities(UIView* attachmentView) {
 
 static NSURL* gPFBLastVoiceURL = nil;
 
+// When a tap last reached a voice note, and any message, in a conversation.
+static CFAbsoluteTime gPFBVoiceTapAt = 0;
+static CFAbsoluteTime gPFBMessageTapAt = 0;
+
+// How long ago a tap came, in steps; nil past 30 s.
+static NSString* PFBSinceTap(CFAbsoluteTime now, CFAbsoluteTime tapAt) {
+    CFAbsoluteTime since = now - tapAt;
+    return since < 1 ? @"under 1 s" : since < 5 ? @"1 to 5 s" : since < 30 ? @"5 to 30 s" : nil;
+}
+
+// For the report: a decrypted file's place under decrypted-media-v2, each name given by its
+// length, the thread opening it and how long after a tap it came.
+static void PFBNoteDecryptedFile(NSURL* url) {
+    NSString* inside = [url.path componentsSeparatedByString:@"/decrypted-media-v2/"].lastObject;
+    NSMutableArray<NSString*>* parts = [NSMutableArray array];
+    for (NSString* part in inside.pathComponents) {
+        NSString* stem = [NSString stringWithFormat:@"#%lu", (unsigned long)part.stringByDeletingPathExtension.length];
+        [parts addObject:part.pathExtension.length ? [stem stringByAppendingFormat:@".%@", part.pathExtension] : stem];
+    }
+    CFAbsoluteTime now = CFAbsoluteTimeGetCurrent();
+    NSString* voice = PFBSinceTap(now, gPFBVoiceTapAt);
+    NSString* message = PFBSinceTap(now, gPFBMessageTapAt);
+    NSString* when = voice     ? [voice stringByAppendingString:@" after a voice note tap"]
+                     : message ? [message stringByAppendingString:@" after a message tap"]
+                               : @"no tap in the 30 s before";
+    NSString* line = [NSString stringWithFormat:@"%@ · %@ · %@", [parts componentsJoinedByString:@"/"],
+                                                NSThread.isMainThread ? @"main thread" : @"other thread", when];
+    dispatch_async(dispatch_get_main_queue(), ^{
+        PFBCompatMeasure(@"voice notes", line, 8);
+    });
+}
+
 %hook AVURLAsset
 
 - (id)initWithURL:(NSURL*)url options:(NSDictionary*)options {
     if ([url.path containsString:@"/decrypted-media-v2/"]) {
         PFBCompatReach(PFBCompatPath_played_voice_note);
         gPFBLastVoiceURL = url;
+        PFBNoteDecryptedFile(url);
     }
     return %orig;
+}
+
+%end
+
+// Whether an attachment slot shows a voice note view.
+static BOOL PFBShowsVoiceNote(UIView* view, NSInteger depth) {
+    Class voiceClass = objc_getClass("_TtC6ChatUI26MessageAttachmentAudioView");
+    if (!voiceClass || depth > 3) {
+        return NO;
+    }
+    for (UIView* sub in view.subviews) {
+        if ([sub isKindOfClass:voiceClass] ? !sub.hidden && sub.alpha > 0.01 : PFBShowsVoiceNote(sub, depth + 1)) {
+            return YES;
+        }
+    }
+    return NO;
+}
+
+// Taps on an attachment and on a message, timed for the decrypted file lines.
+%hook _TtC16ChatConversation26MessageAttachmentStackView
+
+- (void)handleTap:(UITapGestureRecognizer*)recognizer {
+    if ([recognizer isKindOfClass:[UIGestureRecognizer class]] && PFBShowsVoiceNote(recognizer.view, 0)) {
+        gPFBVoiceTapAt = CFAbsoluteTimeGetCurrent();
+    }
+    %orig;
+}
+
+%end
+
+%hook _TtC16ChatConversation18MessageContentView
+
+- (void)handleCellTap {
+    gPFBMessageTapAt = CFAbsoluteTimeGetCurrent();
+    %orig;
 }
 
 %end
@@ -59,7 +127,7 @@ static void PFBSaveVoiceMessage(NSURL* sourceURL) {
         return;
     }
     NSString* extension = sourceURL.pathExtension.length ? sourceURL.pathExtension : @"m4a";
-    NSURL* destination = [[NSURL fileURLWithPath:NSTemporaryDirectory()]
+    NSURL* destination = [[PFBManager temporaryFolder]
         URLByAppendingPathComponent:[NSString stringWithFormat:@"%@.%@",
                                                               NSUUID.UUID.UUIDString,
                                                               extension]];
@@ -177,6 +245,31 @@ static const void* kPFBVoiceInteractionKey = &kPFBVoiceInteractionKey;
 
 // MARK: - Upload custom voice
 
+// The video is copied into the tweak's folder first and only then swapped in for the
+// recording, so a failed copy leaves the recording as it was.
+static void PFBReplaceVoiceRecording(NSURL* videoURL, NSString* recordingPath) {
+    if (!videoURL.isFileURL || recordingPath.length == 0) {
+        return;
+    }
+    NSFileManager* fileManager = [NSFileManager defaultManager];
+    NSURL* recordingURL = [NSURL fileURLWithPath:recordingPath];
+    NSURL* staged = [[PFBManager temporaryFolder] URLByAppendingPathComponent:NSUUID.UUID.UUIDString];
+    if (![fileManager copyItemAtURL:videoURL toURL:staged error:nil]) {
+        return;
+    }
+    BOOL swapped = [fileManager fileExistsAtPath:recordingPath]
+                       ? [fileManager replaceItemAtURL:recordingURL
+                                         withItemAtURL:staged
+                                        backupItemName:nil
+                                               options:0
+                                      resultingItemURL:nil
+                                                 error:nil]
+                       : [fileManager moveItemAtURL:staged toURL:recordingURL error:nil];
+    if (!swapped) {
+        [fileManager removeItemAtURL:staged error:nil];
+    }
+}
+
 // Overwrites the recording at the attachment's existing file path, so the
 // composer picks up the replacement without any model changes.
 %hook T1MediaAttachmentsViewCell
@@ -238,22 +331,8 @@ static const void* kPFBVoiceInteractionKey = &kPFBVoiceInteractionKey;
 %new
 - (void)imagePickerController:(UIImagePickerController*)picker
     didFinishPickingMediaWithInfo:(NSDictionary<UIImagePickerControllerInfoKey, id>*)info {
-    NSURL* videoURL = info[UIImagePickerControllerMediaURL];
     TTMAssetVoiceRecording* attachment = self.attachment;
-    NSString* recorderPath = attachment.filePath;
-    NSURL* recorder_url = recorderPath ? [NSURL fileURLWithPath:recorderPath] : nil;
-
-    if (recorder_url != nil) {
-        NSFileManager* fileManager = [NSFileManager defaultManager];
-
-        NSError* error = nil;
-        if ([fileManager fileExistsAtPath:[recorder_url path]]) {
-            [fileManager removeItemAtURL:recorder_url error:&error];
-        }
-
-        [fileManager copyItemAtURL:videoURL toURL:recorder_url error:&error];
-    }
-
+    PFBReplaceVoiceRecording(info[UIImagePickerControllerMediaURL], attachment.filePath);
     [picker dismissViewControllerAnimated:true completion:nil];
 }
 %new
@@ -264,8 +343,21 @@ static const void* kPFBVoiceInteractionKey = &kPFBVoiceInteractionKey;
 
 // MARK: - Save tweet as an image
 
+// Set when the tweak took the start of the share long press in progress.
+static BOOL gPFBShareStartTaken;
+
 %hook TTAStatusInlineShareButton
 - (void)didLongPressActionButton:(UILongPressGestureRecognizer*)gestureRecognizer {
+    UIGestureRecognizerState state = gestureRecognizer.state;
+    if (state == UIGestureRecognizerStateBegan) {
+        gPFBShareStartTaken = NO;
+    } else if (gPFBShareStartTaken &&
+               (state == UIGestureRecognizerStateChanged || state == UIGestureRecognizerStateEnded)) {
+        static dispatch_once_t noted;
+        dispatch_once(&noted, ^{
+            PFBCompatMeasure(@"save as image", @"Twitter's share long press got its end without its start", 2);
+        });
+    }
     if ([PFBSettings boolForKey:@"tweet_to_image"]) {
         if (gestureRecognizer.state == UIGestureRecognizerStateBegan) {
             UIView* statusView = self.superview;
@@ -294,7 +386,7 @@ static const void* kPFBVoiceInteractionKey = &kPFBVoiceInteractionKey;
 
             UIImage* tweetImage = imageFromView(tweetView);
             NSData* pngData = UIImagePNGRepresentation(tweetImage);
-            NSURL* pngURL = [[NSURL fileURLWithPath:NSTemporaryDirectory()]
+            NSURL* pngURL = [[PFBManager temporaryFolder]
                 URLByAppendingPathComponent:[NSString
                                                 stringWithFormat:@"%@.png", [[NSUUID UUID] UUIDString]]];
             [pngData writeToURL:pngURL atomically:YES];
@@ -310,6 +402,7 @@ static const void* kPFBVoiceInteractionKey = &kPFBVoiceInteractionKey;
                                             completion:^{
                                               PFBCOMPAT_ACTION(PFBCompat_tweet_to_image, @"Tweet image offered");
                                             }];
+            gPFBShareStartTaken = YES;
             return;
         }
     }
@@ -462,6 +555,29 @@ static NSArray* PFBVMDWithoutNativeDownload(NSArray* children) {
     return kept ?: children;
 }
 
+// A media menu shows one of Twitter's own media entries (Post Video, Copy Video Link, React
+// with Video, Add to Offline) or one of its download entries.
+static BOOL PFBVMDIsMediaMenu(NSArray* children) {
+    PFBBundle* bundle = [PFBBundle sharedBundle];
+    NSMutableSet<NSString*>* titles = [NSMutableSet set];
+    for (NSString* key in @[@"TWEET_VIDEO_ACTIVITY_VIEW_LABEL", @"COPY_VIDEO_LINK_ACTIVITY_VIEW_LABEL",
+                            @"REACT_WITH_VIDEO", @"OFFLINE_ADD_TO_OFFLINE_BUTTON_TITLE"]) {
+        [titles addObject:[bundle localizedTwitterStringForKey:key]];
+    }
+    NSString* ours = PFBVMDMenuTitle();
+    NSString* generic = [bundle localizedTwitterStringForKey:@"DOWNLOAD_ACTIVITY_VIEW_LABEL"];
+    for (id element in children) {
+        if (![element respondsToSelector:@selector(title)]) {
+            continue;
+        }
+        NSString* title = [element title];
+        if (title.length > 0 && ([titles containsObject:title] || PFBVMDTitleIsDownload(title, ours, generic))) {
+            return YES;
+        }
+    }
+    return NO;
+}
+
 // The children to install: the added entry before the last item ("Share via..."), in
 // place of the app's own; unchanged without a fresh video Tweet or with the option off.
 static NSArray* PFBVMDMenuChildren(NSArray* children) {
@@ -488,6 +604,14 @@ static NSArray* PFBVMDMenuChildren(NSArray* children) {
         return children;
     }
     PFBCOMPAT_ACTION(PFBCompat_download_videos, @"download entry in a video menu");
+    if (!PFBVMDIsMediaMenu(children)) {
+        id first = children.firstObject;
+        NSString* name = [first respondsToSelector:@selector(title)] ? [first title] : nil;
+        PFBCompatMeasure(@"download video",
+                         [NSString stringWithFormat:@"Download Video added to an unrelated menu: %@",
+                                                    name.length > 0 ? name : NSStringFromClass([first class])],
+                         2);
+    }
 
     UIAction* action = [UIAction actionWithTitle:PFBVMDMenuTitle()
                                            image:PFBDownloadGlyph()
