@@ -264,9 +264,7 @@ static NSString* PFBNotifIdentity(id model) {
         cache[className] = kPFBIdentityFromDescription;
         return fromDescription;
     }
-    // Durable names first, the ones inside scribeItem and then the usual entry
-    // ids. The impression id is the last resort: it is minted per display, so a key
-    // written from it never matches on a later pass.
+    // Durable names only: the ones inside scribeItem, then the usual entry ids.
     id scribeItem = PFBNotifAsk(model, NSSelectorFromString(@"scribeItem"));
     if (scribeItem && ![scribeItem isKindOfClass:[NSString class]]) {
         NSArray<NSString*>* inner = @[@"entryId", @"entryID", @"id", @"itemId",
@@ -282,8 +280,7 @@ static NSString* PFBNotifIdentity(id model) {
     }
     NSArray<NSString*>* candidates = @[
         @"entryId", @"entryID", @"identifier", @"notificationId", @"notificationID",
-        @"id", @"sortIndex", @"key", @"itemIdentifier",
-        @"scribeItemImpressionID", @"scribeItemImpressionId"
+        @"id", @"sortIndex", @"key", @"itemIdentifier"
     ];
     for (NSString* name in candidates) {
         NSString* value = PFBNotifString(PFBNotifAsk(model, NSSelectorFromString(name)));
@@ -791,6 +788,24 @@ static const CGFloat kPFBNotifEmptyBodySize = 15.0;
 static const char* kPFBNotifRestInsetKey = "pfbNotifRestInset";
 static const char* kPFBNotifPanelKey = "pfbNotifPanel";
 
+// Notes, once a launch, a list inset grown past the rest with no pull or refresh under way:
+// Twitter's pull control adds its room above the list only while pulled or loading.
+static void PFBNotifNoteInsetGrowth(UITableView* table) {
+    static BOOL noted;
+    if (noted || table.isDragging || table.contentOffset.y < -table.adjustedContentInset.top) {
+        return;
+    }
+    id control = PFBNotifAsk(PFBOwningController(table), NSSelectorFromString(@"pullToLoadTopControl"));
+    for (NSString* name in @[ @"loading", @"isCurrentlyInUse" ]) {
+        SEL getter = NSSelectorFromString(name);
+        if ([control respondsToSelector:getter] && ((BOOL (*)(id, SEL))objc_msgSend)(control, getter)) {
+            return;
+        }
+    }
+    noted = YES;
+    PFBCompatMeasure(@"hidden notifications", @"list inset grew while the panel was open", 2);
+}
+
 // The list's top inset at rest: the smallest seen since the panel came, as a refresh only
 // adds its spinner's room.
 static CGFloat PFBNotifRestInset(UITableView* table) {
@@ -799,6 +814,9 @@ static CGFloat PFBNotifRestInset(UITableView* table) {
     if (!rest || inset < rest.doubleValue) {
         objc_setAssociatedObject(table, kPFBNotifRestInsetKey, @(inset), OBJC_ASSOCIATION_RETAIN_NONATOMIC);
         return inset;
+    }
+    if (inset > rest.doubleValue + 1.0) {
+        PFBNotifNoteInsetGrowth(table);
     }
     return (CGFloat)rest.doubleValue;
 }

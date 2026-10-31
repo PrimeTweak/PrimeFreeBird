@@ -77,6 +77,14 @@ static BOOL ShouldKeepBrowserURLInApp(NSURL* url) {
                                }
                              }];
     [self dismissViewControllerAnimated:NO completion:nil];
+    // The dismiss comes while the browser is still being presented, which UIKit can refuse:
+    // half a second later, a browser still presented is noted.
+    __weak SFSafariViewController* browser = self;
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.5 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+        if (browser.presentingViewController) {
+            PFBCompatMeasure(@"external browser", @"in-app browser still open behind Safari", 2);
+        }
+    });
 }
 
 %end

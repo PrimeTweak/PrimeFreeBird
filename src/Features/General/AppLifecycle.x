@@ -217,6 +217,8 @@ static void PFBNativeGlassSettle(void);
             });
         }
     } else {
+        // Off, the app counts as unlocked: turned on later, it asks after the next departure.
+        setAuthenticated(YES);
         removePadlockOverlay();
     }
 }
@@ -225,17 +227,25 @@ static void PFBNativeGlassSettle(void);
     %orig;
     PFBCompatReach(PFBCompatPath_leaving_app);
 
+    // Covers the app and its app-switcher snapshot. Control Center, a call or a system
+    // alert leave it active again without a prompt; only a real departure locks it.
     if ([PFBSettings boolForKey:@"padlock"]) {
-        // Cover the UI (and the app-switcher snapshot) and mark unauthenticated so
-        // the next activation prompts again; the overlay persists into background.
         showPadlockOverlay();
-        setAuthenticated(NO);
         PFBCOMPAT_ACTION(PFBCompat_padlock, @"screen covered on leaving");
     }
 
     if ([PFBSettings boolForKey:@"flex_twitter"] && %c(FLEXManager)) {
         [[%c(FLEXManager) sharedManager] showExplorer];
         PFBCOMPAT_ACTION(PFBCompat_flex_twitter, @"explorer shown on leaving");
+    }
+}
+
+// Leaving for the background is what makes the next activation ask again.
+- (void)applicationDidEnterBackground:(__unsafe_unretained id)arg1 {
+    %orig;
+    if ([PFBSettings boolForKey:@"padlock"]) {
+        setAuthenticated(NO);
+        PFBCOMPAT_ACTION(PFBCompat_padlock, @"locked in the background");
     }
 }
 
@@ -288,7 +298,11 @@ static void applySplashBrandColors(UIView* view) {
     });
 }
 
-// Replaces Twitter's launch "xLogo" with the bundled white bird.
+// Set once the splash starts its reveal.
+static BOOL gPFBSplashRevealing = NO;
+
+// Replaces Twitter's launch "xLogo" with the bundled white bird. Any other screen asking
+// for it later gets the same white bird, which the report names.
 %hook UIImage
 
 + (UIImage*)imageNamed:(NSString*)name {
@@ -296,6 +310,20 @@ static void applySplashBrandColors(UIView* view) {
         UIImage* bird = PFBBundlePDFImage(@"LaunchTwitterBird.pdf", CGSizeMake(180, 180), 1.0);
         if (bird) {
             PFBCOMPAT_ACTION(PFBCompat_launch_screen, @"bird shown");
+            static NSUInteger told;
+            if (gPFBSplashRevealing && told < 4) {
+                told++;
+                NSArray<NSString*>* stack = [NSThread callStackSymbols];
+                NSString* caller = stack.count > 1 ? stack[1] : @"?";
+                NSRange start = [caller rangeOfString:@"0x"];
+                if (start.location != NSNotFound) {
+                    caller = [caller substringFromIndex:start.location];
+                }
+                PFBCompatMeasure(@"launch screen",
+                                 [@"bird image asked after the launch screen by "
+                                     stringByAppendingString:caller.length > 90 ? [caller substringToIndex:90] : caller],
+                                 2);
+            }
             return bird;
         }
     }
@@ -307,8 +335,6 @@ static void applySplashBrandColors(UIView* view) {
 // The splash is torn down before the timeline has drawn, and a window with no
 // background color is black. Painting the window fills that gap, and fading the
 // splash out rather than cutting hides the seam.
-
-static BOOL gPFBSplashRevealing = NO;
 
 static void paintWindowForSplash(UIView* view) {
     UIColor* twitterBlue = [UIColor colorWithRed:0x1D / 255.0
