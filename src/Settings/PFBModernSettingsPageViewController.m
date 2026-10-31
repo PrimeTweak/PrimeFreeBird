@@ -750,9 +750,7 @@ static NSURL* PFBAccountAvatarURL(TFNTwitterAccount* account) {
     if (!data) {
         return;
     }
-    NSString* path = [NSTemporaryDirectory()
-        stringByAppendingPathComponent:@"PrimeFreeBird-settings.json"];
-    NSURL* url = [NSURL fileURLWithPath:path];
+    NSURL* url = [[PFBManager temporaryFolder] URLByAppendingPathComponent:@"PrimeFreeBird-settings.json"];
     if (![data writeToURL:url atomically:YES]) {
         return;
     }

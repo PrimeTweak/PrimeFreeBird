@@ -536,7 +536,9 @@ static NSString* const kPFBAddedFontsPath = @"/var/mobile/Library/Fonts/AddedFon
                                                                                  fontName
                                                                          }]];
                                  }
-                                 [self.delegate fontPickerViewControllerDidPickFont:self];
+                                 if ([self.delegate respondsToSelector:@selector(fontPickerViewControllerDidPickFont:)]) {
+                                     [self.delegate fontPickerViewControllerDidPickFont:self];
+                                 }
                              }];
             [actions addObject:fontAction];
         } @catch (NSException* exception) {
