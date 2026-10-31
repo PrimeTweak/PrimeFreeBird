@@ -3,19 +3,22 @@
 #import "Support/HookHelpers.h"
 #import "Support/TwitterChirpFont.h"
 #import "Common/PFBCompatibility.h"
+#import "Settings/PFBSettingsCellStyle.h"
 
 // MARK: - PrimeFreeBird settings entry
 
 static const void* SettingsEntryKey = &SettingsEntryKey;
 static const void* SettingsRootKey = &SettingsRootKey;
 
+// Twitter's classic settings pages, or the list of its new settings.
 static BOOL isSettingsClass(UIViewController* viewController) {
-    return [viewController isKindOfClass:objc_getClass("T1GenericSettingsViewController")];
+    return [viewController isKindOfClass:objc_getClass("T1GenericSettingsViewController")] ||
+           [viewController isKindOfClass:objc_getClass("_TtC9XSettings26SettingsListViewController")];
 }
 
 // The generic controller backs the root and every sub-page alike, so the root is
 // the first settings-class controller in the navigation stack.
-static BOOL settingsVCIsRoot(TFNItemsDataViewController* settingsVC) {
+static BOOL settingsVCIsRoot(UIViewController* settingsVC) {
     for (UIViewController* viewController in settingsVC.navigationController.viewControllers) {
         if (viewController == settingsVC) {
             return YES;
@@ -200,6 +203,258 @@ static BOOL settingsVCLeavesSettings(UIViewController* settingsVC) {
 - (void)viewDidDisappear:(BOOL)animated {
     %orig;
     PFBThemeScreenLeave(self);
+}
+%end
+
+// MARK: - Twitter's new settings
+
+@interface _TtC9XSettings26SettingsListViewController : UIViewController
+@end
+
+// The PrimeFreeBird row on top of Twitter's new settings list. It copies the height, font,
+// icon frame and chevron of the list's own rows once one is on screen, starting from their
+// usual layout. Frames are kept left to right and mirrored when drawn.
+@interface PFBNewSettingsRow : UIControl
+@property (nonatomic, strong) UIImageView* icon;
+@property (nonatomic, strong) UILabel* title;
+@property (nonatomic, strong) UIImageView* chevron;
+@property (nonatomic, weak) UIViewController* list;
+@property (nonatomic) CGFloat rowHeight;
+@property (nonatomic) CGRect iconFrame;
+@property (nonatomic) CGRect titleFrame;
+// Its x is counted from the row's trailing edge.
+@property (nonatomic) CGRect chevronFrame;
+@property (nonatomic) BOOL matched;
+@property (nonatomic) BOOL chevronCopied;
+@end
+
+// Shown inside the row: neither the view nor a container up to the row is hidden.
+static BOOL PFBShownInRow(UIView* view, UIView* row) {
+    for (UIView* current = view; current && current != row; current = current.superview) {
+        if (current.hidden || current.alpha < 0.01) {
+            return NO;
+        }
+    }
+    return YES;
+}
+
+// Turns a frame between left-to-right terms and a right-to-left row; the flip is the same
+// both ways.
+static CGRect PFBMirrored(CGRect frame, CGFloat width, BOOL rtl) {
+    if (rtl) {
+        frame.origin.x = width - CGRectGetMaxX(frame);
+    }
+    return frame;
+}
+
+@implementation PFBNewSettingsRow
+
+- (instancetype)initWithFrame:(CGRect)frame {
+    self = [super initWithFrame:frame];
+    if (self) {
+        _rowHeight = 56;
+        _iconFrame = CGRectMake(24, 12, 24, 24);
+        _titleFrame = CGRectMake(64, 14, 0, 20);
+        _chevronFrame = CGRectMake(48, 18, 16, 16);
+        _icon = [[UIImageView alloc] init];
+        _icon.contentMode = UIViewContentModeScaleAspectFit;
+        _icon.image = [PFBBundlePDFImage(@"bird_stroke.pdf", CGSizeMake(24, 24), 20.0 / 24.0)
+            imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate];
+        _title = [[UILabel alloc] init];
+        _title.text = @PFB_PRODUCT_NAME;
+        _title.font = [TwitterChirpFont(TwitterFontStyleRegular) fontWithSize:16];
+        _chevron = [[UIImageView alloc] init];
+        _chevron.contentMode = UIViewContentModeCenter;
+        for (UIView* part in @[ _icon, _title, _chevron ]) {
+            part.userInteractionEnabled = NO;
+            [self addSubview:part];
+        }
+        self.isAccessibilityElement = YES;
+        self.accessibilityLabel = @PFB_PRODUCT_NAME;
+        self.accessibilityTraits = UIAccessibilityTraitButton;
+        [self addTarget:self action:@selector(pfbOpen) forControlEvents:UIControlEventTouchUpInside];
+        [self pfbApplyColors];
+    }
+    return self;
+}
+
+- (void)layoutSubviews {
+    [super layoutSubviews];
+    CGFloat width = self.bounds.size.width;
+    BOOL rtl = self.effectiveUserInterfaceLayoutDirection == UIUserInterfaceLayoutDirectionRightToLeft;
+    CGRect chevron = self.chevronFrame;
+    chevron.origin.x = width - chevron.origin.x;
+    CGRect title = self.titleFrame;
+    title.size.width = MAX(0, CGRectGetMinX(chevron) - 8 - CGRectGetMinX(title));
+    self.chevron.frame = PFBMirrored(chevron, width, rtl);
+    self.icon.frame = PFBMirrored(self.iconFrame, width, rtl);
+    self.title.frame = PFBMirrored(title, width, rtl);
+}
+
+// UIKit's own selection gray, or the dark style's shade above its filter.
+- (void)setHighlighted:(BOOL)highlighted {
+    [super setHighlighted:highlighted];
+    self.backgroundColor = highlighted ? ([PFBDarkModeStyle elevatedBackgroundColor] ?: [UIColor systemGray4Color])
+                                       : nil;
+}
+
+// A copied chevron may carry the old appearance's color: it is copied again.
+- (void)traitCollectionDidChange:(UITraitCollection*)previousTraitCollection {
+    [super traitCollectionDidChange:previousTraitCollection];
+    self.matched = NO;
+    [self pfbApplyColors];
+}
+
+- (void)pfbApplyColors {
+    UIColor* ink = PFBSettingsTextColor();
+    self.icon.tintColor = ink;
+    self.title.textColor = ink;
+    if (!self.chevronCopied && [UIImage respondsToSelector:@selector(tfn_vectorImageNamed:fitsSize:fillColor:)]) {
+        self.chevron.image = [[UIImage tfn_vectorImageNamed:@"chevron_right"
+                                                   fitsSize:self.chevronFrame.size
+                                                  fillColor:[UIColor tertiaryLabelColor]]
+            imageFlippedForRightToLeftLayoutDirection];
+    }
+}
+
+// Twitter's rows put the icon at the leading edge, the title at x 64 and the chevron in
+// the trailing quarter.
+- (void)pfbMatchRowsOf:(UITableView*)table {
+    Class rowClass = objc_getClass("_TtC13XDesignSystem7ListRow");
+    if (self.matched || !rowClass) {
+        return;
+    }
+    for (UITableViewCell* cell in table.visibleCells) {
+        if (![cell isKindOfClass:rowClass]) {
+            continue;
+        }
+        CGFloat width = cell.bounds.size.width;
+        BOOL rtl = cell.effectiveUserInterfaceLayoutDirection == UIUserInterfaceLayoutDirectionRightToLeft;
+        __block UIImageView* icon = nil;
+        __block UILabel* title = nil;
+        __block UIImageView* chevron = nil;
+        PFBWalkAllSubviews(cell, 5, ^(UIView* view) {
+          if (view == cell || !PFBShownInRow(view, cell)) {
+              return;
+          }
+          CGRect frame = PFBMirrored([view convertRect:view.bounds toView:cell], width, rtl);
+          if ([view isKindOfClass:[UILabel class]]) {
+              if (!title && ((UILabel*)view).text.length && CGRectGetMinX(frame) > 56 && CGRectGetMinX(frame) < 72) {
+                  title = (UILabel*)view;
+              }
+          } else if ([view isKindOfClass:[UIImageView class]] && ((UIImageView*)view).image) {
+              if (!icon && CGRectGetMinX(frame) < 40 && frame.size.width <= 40) {
+                  icon = (UIImageView*)view;
+              } else if (!chevron && CGRectGetMinX(frame) > width * 0.75) {
+                  chevron = (UIImageView*)view;
+              }
+          }
+        });
+        if (!title.font) {
+            continue;
+        }
+        self.title.font = title.font;
+        self.titleFrame = PFBMirrored([title convertRect:title.bounds toView:cell], width, rtl);
+        if (icon) {
+            self.iconFrame = PFBMirrored([icon convertRect:icon.bounds toView:cell], width, rtl);
+        }
+        if (chevron) {
+            CGRect frame = PFBMirrored([chevron convertRect:chevron.bounds toView:cell], width, rtl);
+            frame.origin.x = width - frame.origin.x;
+            self.chevronFrame = frame;
+            self.chevron.contentMode = chevron.contentMode;
+            self.chevron.tintColor = chevron.tintColor;
+            self.chevron.image = chevron.image;
+            self.chevronCopied = YES;
+        }
+        self.rowHeight = cell.bounds.size.height >= 44 ? cell.bounds.size.height : self.rowHeight;
+        self.matched = YES;
+        [self setNeedsLayout];
+        return;
+    }
+}
+
+- (void)pfbOpen {
+    UINavigationController* stack = self.list.navigationController;
+    if (!stack) {
+        return;
+    }
+    Class hostClass = objc_getClass("T1HostViewController");
+    T1HostViewController* host =
+        [hostClass respondsToSelector:@selector(sharedHostViewController)] ? [hostClass sharedHostViewController] : nil;
+    id current = [host respondsToSelector:@selector(currentAccount)] ? [host currentAccount] : nil;
+    TFNTwitterAccount* account = [current isKindOfClass:objc_getClass("TFNTwitterAccount")] ? current : nil;
+    [stack pushViewController:[PFBManager PFBSettingsWithAccount:account] animated:YES];
+}
+
+@end
+
+static const void* kPFBNewSettingsRowKey = &kPFBNewSettingsRowKey;
+
+// The row is the list's table header, which Twitter leaves empty. A header Twitter sets
+// itself is kept, and the report says why no row shows.
+static void PFBPlaceNewSettingsRow(UIViewController* list) {
+    PFBNewSettingsRow* row = objc_getAssociatedObject(list, kPFBNewSettingsRowKey);
+    __block UITableView* table = (UITableView*)row.superview;
+    if (![table isKindOfClass:[UITableView class]] || table.tableHeaderView != row) {
+        table = nil;
+        PFBWalkAllSubviews(list.view, 4, ^(UIView* view) {
+          if (!table && [view isKindOfClass:[UITableView class]]) {
+              table = (UITableView*)view;
+          }
+        });
+        if (!table) {
+            if (list.view.window) {
+                PFBCompatMeasure(@"new settings", @"Twitter's settings list not found", 2);
+            }
+            return;
+        }
+        if (table.tableHeaderView) {
+            PFBCompatMeasure(@"new settings", @"the list already has a header: no PrimeFreeBird row", 2);
+            return;
+        }
+        if (!row) {
+            row = [[PFBNewSettingsRow alloc] initWithFrame:CGRectMake(0, 0, table.bounds.size.width, 56)];
+            row.list = list;
+            objc_setAssociatedObject(list, kPFBNewSettingsRowKey, row, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        }
+        table.tableHeaderView = row;
+        PFBCOMPAT_ACTION(PFBCompat_settings_entry, @"row in Twitter's new settings");
+    }
+    [row pfbMatchRowsOf:table];
+    // The table reads its header's height only when the header is set.
+    if (fabs(row.frame.size.height - row.rowHeight) > 0.5) {
+        row.frame = CGRectMake(0, 0, table.bounds.size.width, row.rowHeight);
+        table.tableHeaderView = row;
+    }
+}
+
+// The tab bar and the theme count as in the classic settings.
+%hook _TtC9XSettings26SettingsListViewController
+- (void)viewWillAppear:(BOOL)animated {
+    %orig;
+    PFBThemeScreenEnter(self);
+    setSettingsTabBarHidden(self, YES);
+}
+
+- (void)viewWillDisappear:(BOOL)animated {
+    %orig;
+    if (settingsVCLeavesSettings(self)) {
+        setSettingsTabBarHidden(self, NO);
+    }
+}
+
+- (void)viewDidDisappear:(BOOL)animated {
+    %orig;
+    PFBThemeScreenLeave(self);
+}
+
+// Only the first list of the stack: Twitter may build its sub-pages with the same class.
+- (void)viewDidLayoutSubviews {
+    %orig;
+    if (settingsVCIsRoot(self)) {
+        PFBPlaceNewSettingsRow(self);
+    }
 }
 %end
 
