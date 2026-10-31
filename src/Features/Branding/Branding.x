@@ -856,10 +856,24 @@ static void PFBGlassComposeRestore(UIView* host) {
     });
 }
 
+// Notes the compose button switching look within one launch, which the settings answer
+// with a restart request.
+static void PFBGlassComposeNoteLook(BOOL classic) {
+    static NSInteger last = -1;
+    if (last != -1 && last != classic) {
+        PFBCompatMeasure(@"classic tweet button", @"look changed without a restart", 2);
+    }
+    last = classic;
+}
+
 // Blue glass and the white feather on the compose button with the option on; Twitter's
 // own tint and glyph back with it off, or once the accessory is no compose button.
 static void PFBGlassComposeLook(UIView* host, BOOL compose) {
-    if (!compose || ![PFBSettings boolForKey:@"restore_tweet_button"]) {
+    BOOL classic = [PFBSettings boolForKey:@"restore_tweet_button"];
+    if (compose) {
+        PFBGlassComposeNoteLook(classic);
+    }
+    if (!compose || !classic) {
         if (compose) {
             PFBCOMPAT_OBSERVE(PFBCompat_restore_tweet_button, @"glass Tweet button found");
         }
