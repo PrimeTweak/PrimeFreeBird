@@ -82,8 +82,14 @@ static NSNumber* FeatureSwitchOverrideValueForKey(NSString* key) {
         return [PFBSettings boolForKey:@"enable_liquid_glass"] ? @YES : nil;
     }
 
-    // Twitter's new settings menu has no PrimeFreeBird row, so the classic one is kept.
+    // New Twitter settings picks Twitter's new settings menu, where Settings.x adds a
+    // PrimeFreeBird row on top; otherwise the classic menu is kept.
     if ([key isEqualToString:@"ios_settings_redesign_enabled"]) {
+        if ([PFBSettings boolForKey:@"new_twitter_settings"]) {
+            PFBCOMPAT_ACTION(PFBCompat_new_twitter_settings, @"new settings asked");
+            return @YES;
+        }
+        PFBCOMPAT_OBSERVE(PFBCompat_new_twitter_settings, @"read by Twitter");
         PFBCOMPAT_ACTION(PFBCompat_settings_entry, @"classic settings menu kept");
         return @NO;
     }
