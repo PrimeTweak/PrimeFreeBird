@@ -151,8 +151,8 @@ FOUNDATION_EXPORT PFBCompatReadState PFBCompatReadStatus(void);
 FOUNDATION_EXPORT void PFBCompatCount(PFBCompatOption option);
 FOUNDATION_EXPORT BOOL PFBCompatWantsDetail(PFBCompatOption option);
 FOUNDATION_EXPORT void PFBCompatSetDetail(PFBCompatOption option, NSString* detail);
-// Notes that a server refused what an option asked. The report shows the build's latest
-// refusal while the option has not acted.
+// Notes why a server gave an option nothing to show: a refusal, an error or an empty answer.
+// The report shows the build's latest note while the option has not acted.
 FOUNDATION_EXPORT void PFBCompatNoteRefusal(PFBCompatOption option, NSString* text);
 
 FOUNDATION_EXPORT void PFBCompatReset(void);
