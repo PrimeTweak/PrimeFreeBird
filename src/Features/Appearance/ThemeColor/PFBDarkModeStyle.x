@@ -4,6 +4,7 @@
 #import "Features/Appearance/ThemeColor/PFBDarkModeStyle.h"
 #import "Common/PFBSettings.h"
 #import <objc/runtime.h>
+#import <os/lock.h>
 #import "Support/TAEHeaders.h"
 
 @interface TFNSolidColorView : UIView
@@ -13,10 +14,45 @@
 @interface TFNSearchBar : UISearchBar
 @end
 
+// The stored style, read again only once the defaults have changed: every layer background
+// asks for it. A read that a change overtakes is not kept.
+static os_unfair_lock gPFBStyleLock = OS_UNFAIR_LOCK_INIT;
+static NSUInteger gPFBDefaultsChanges;
+static BOOL gPFBStyleKnown;
+static PFBDarkModeStyleKind gPFBStyle;
+
 @implementation PFBDarkModeStyle
 
 + (PFBDarkModeStyleKind)selectedStyle {
-    return (PFBDarkModeStyleKind)[PFBSettings integerForKey:@"dark_mode_style"];
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+      [[NSNotificationCenter defaultCenter]
+          addObserverForName:NSUserDefaultsDidChangeNotification
+                      object:nil
+                       queue:nil
+                  usingBlock:^(__unused NSNotification* note) {
+          os_unfair_lock_lock(&gPFBStyleLock);
+          gPFBDefaultsChanges++;
+          gPFBStyleKnown = NO;
+          os_unfair_lock_unlock(&gPFBStyleLock);
+      }];
+    });
+    os_unfair_lock_lock(&gPFBStyleLock);
+    BOOL known = gPFBStyleKnown;
+    PFBDarkModeStyleKind style = gPFBStyle;
+    NSUInteger changes = gPFBDefaultsChanges;
+    os_unfair_lock_unlock(&gPFBStyleLock);
+    if (known) {
+        return style;
+    }
+    style = (PFBDarkModeStyleKind)[PFBSettings integerForKey:@"dark_mode_style"];
+    os_unfair_lock_lock(&gPFBStyleLock);
+    if (changes == gPFBDefaultsChanges) {
+        gPFBStyle = style;
+        gPFBStyleKnown = YES;
+    }
+    os_unfair_lock_unlock(&gPFBStyleLock);
+    return style;
 }
 
 + (BOOL)isDarkModeActive {
