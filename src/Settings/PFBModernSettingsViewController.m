@@ -5,7 +5,6 @@
 #import "Common/PFBBundle.h"
 #import "Settings/PFBModernSettingsCells.h"
 #import "Settings/PFBModernSettingsPageViewController.h"
-#import "Settings/Native/PFBNativeSettingsPageViewController.h"
 #import "Settings/Native/PFBNativeSettingsRowCell.h"
 #import "Settings/Pages/PFBAppearanceSettingsViewController.h"
 #import "Settings/Pages/PFBProfilesSettingsViewController.h"
@@ -261,6 +260,7 @@
                                                                         forIndexPath:indexPath];
         [row configureWithTitle:sectionData[@"title"]
                        iconName:sectionData[@"icon"]
+                          value:nil
                       accessory:PFBNativeSettingsRowAccessoryChevron];
         return row;
     }
@@ -289,10 +289,9 @@
 
 #pragma mark - Navigation to Sub-pages
 
-// In the new look, the page's groups open one by one in sheets.
 - (void)showPage:(PFBModernSettingsPageViewController*)page {
-    UIViewController* shown = self.native ? [[PFBNativeSettingsPageViewController alloc] initWithPage:page] : page;
-    [self.navigationController pushViewController:shown animated:YES];
+    page.nativeLook = self.native;
+    [self.navigationController pushViewController:page animated:YES];
 }
 
 - (void)showGeneralSettings {

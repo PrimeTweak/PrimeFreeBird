@@ -2,9 +2,7 @@
 // a close button, the group's rows, then Done.
 
 #import "Settings/Native/PFBNativeSettingsSheetController.h"
-#import <objc/runtime.h>
 #import "Common/PFBBundle.h"
-#import "Settings/Native/PFBNativeSettingsPageViewController.h"
 #import "Settings/PFBModernSettingsPageViewController.h"
 #import "Settings/PFBSettingsCellStyle.h"
 #import "Support/PFBManager.h"
@@ -25,33 +23,6 @@ static BOOL PFBSheetUsesGlass(void) {
     return NO;
 }
 
-static const void* kPFBSheetKeptKey = &kPFBSheetKeptKey;
-
-// A screen a row opens closes the sheet and goes onto the settings stack. It keeps the sheet's
-// page alive, since some report back to it.
-@interface PFBNativeSettingsSheetStack : UINavigationController
-@property (nonatomic, weak) UINavigationController* settingsStack;
-@end
-
-@implementation PFBNativeSettingsSheetStack
-
-- (void)pushViewController:(UIViewController*)controller animated:(BOOL)animated {
-    UINavigationController* stack = self.settingsStack;
-    if (self.viewControllers.count == 0 || !stack) {
-        [super pushViewController:controller animated:animated];
-        return;
-    }
-    objc_setAssociatedObject(controller, kPFBSheetKeptKey, self.viewControllers.firstObject,
-                             OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-    UIViewController* shown = [PFBNativeSettingsPageViewController controllerShowing:controller];
-    [self dismissViewControllerAnimated:YES
-                             completion:^{
-                                 [stack pushViewController:shown animated:YES];
-                             }];
-}
-
-@end
-
 static void* kPFBSheetRowsContext = &kPFBSheetRowsContext;
 
 // The room under the rows: the gap above Done, Done itself, and the margin below it.
@@ -62,6 +33,7 @@ static const CGFloat kPFBSheetBottomMargin = 16;
 @interface PFBNativeSettingsSheetController ()
 @property (nonatomic, strong) PFBModernSettingsPageViewController* page;
 @property (nonatomic, copy) NSString* groupTitle;
+@property (nonatomic, copy) void (^closed)(void);
 @property (nonatomic, strong) UILabel* titleLabel;
 @property (nonatomic, strong) UIButton* closeButton;
 @property (nonatomic, strong) UIView* divider;
@@ -74,21 +46,20 @@ static const CGFloat kPFBSheetBottomMargin = 16;
 
 + (void)presentPage:(PFBModernSettingsPageViewController*)page
              titled:(NSString*)title
-               from:(UIViewController*)presenter {
+               from:(UIViewController*)presenter
+             closed:(void (^)(void))closed {
     PFBNativeSettingsSheetController* sheet = [[self alloc] init];
     sheet.page = page;
     sheet.groupTitle = title;
-    PFBNativeSettingsSheetStack* stack = [[PFBNativeSettingsSheetStack alloc] initWithRootViewController:sheet];
-    stack.settingsStack = presenter.navigationController;
-    stack.navigationBarHidden = YES;
-    stack.modalPresentationStyle = UIModalPresentationPageSheet;
+    sheet.closed = closed;
+    sheet.modalPresentationStyle = UIModalPresentationPageSheet;
     // Sized once at the window's width before it opens, so the sheet comes up at its rows' height.
     [sheet loadViewIfNeeded];
     sheet.view.frame = presenter.view.window ? presenter.view.window.bounds : UIScreen.mainScreen.bounds;
     [sheet.view layoutIfNeeded];
     [page.tableView layoutIfNeeded];
     sheet.fittedHeight = [sheet contentHeight];
-    UISheetPresentationController* presentation = stack.sheetPresentationController;
+    UISheetPresentationController* presentation = sheet.sheetPresentationController;
     if (@available(iOS 16.0, *)) {
         __weak PFBNativeSettingsSheetController* weakSheet = sheet;
         presentation.detents = @[ [UISheetPresentationControllerDetent
@@ -102,7 +73,7 @@ static const CGFloat kPFBSheetBottomMargin = 16;
         presentation.detents = @[ [UISheetPresentationControllerDetent mediumDetent],
                                   [UISheetPresentationControllerDetent largeDetent] ];
     }
-    [presenter presentViewController:stack animated:YES completion:nil];
+    [presenter presentViewController:sheet animated:YES completion:nil];
 }
 
 - (void)viewDidLoad {
@@ -198,6 +169,16 @@ static const CGFloat kPFBSheetBottomMargin = 16;
     [self dismissViewControllerAnimated:YES completion:nil];
 }
 
+// Done, the X and a swipe down all end here.
+- (void)viewDidDisappear:(BOOL)animated {
+    [super viewDidDisappear:animated];
+    void (^closed)(void) = self.closed;
+    if (self.isBeingDismissed && closed) {
+        self.closed = nil;
+        closed();
+    }
+}
+
 // The header, the rows and Done.
 - (CGFloat)contentHeight {
     return CGRectGetMinY(self.page.view.frame) + self.page.tableView.contentSize.height + kPFBSheetDoneGap +
@@ -215,9 +196,9 @@ static const CGFloat kPFBSheetBottomMargin = 16;
     }
     self.fittedHeight = height;
     if (@available(iOS 16.0, *)) {
-        UISheetPresentationController* sheet = self.navigationController.sheetPresentationController;
+        UISheetPresentationController* sheet = self.sheetPresentationController;
         // While the sheet comes up, the height joins its opening rather than following it.
-        if (self.navigationController.isBeingPresented) {
+        if (self.isBeingPresented) {
             [sheet invalidateDetents];
             return;
         }

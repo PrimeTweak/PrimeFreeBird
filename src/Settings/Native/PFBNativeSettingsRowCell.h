@@ -1,4 +1,5 @@
-// A row of Twitter's new settings: icon, title, and a chevron or a three-dot glyph.
+// A row of Twitter's new settings: icon, title, the current choice when it has one, and a chevron
+// or a three-dot glyph.
 
 #import <UIKit/UIKit.h>
 
@@ -21,7 +22,9 @@ typedef NS_ENUM(NSInteger, PFBNativeSettingsRowAccessory) {
 @end
 
 @interface PFBNativeSettingsRowCell : UITableViewCell
+// value is the row's current choice, shown before its glyph; nil for none.
 - (void)configureWithTitle:(NSString*)title
                   iconName:(NSString*)iconName
+                     value:(NSString*)value
                  accessory:(PFBNativeSettingsRowAccessory)accessory;
 @end

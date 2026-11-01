@@ -1,4 +1,5 @@
-// A row of Twitter's new settings: icon, title, and a chevron or a three-dot glyph.
+// A row of Twitter's new settings: icon, title, the current choice when it has one, and a chevron
+// or a three-dot glyph.
 
 #import "Settings/Native/PFBNativeSettingsRowCell.h"
 #import "Settings/PFBSettingsCellStyle.h"
@@ -32,6 +33,7 @@ static CGRect PFBRowMirrored(CGRect frame, CGFloat width, BOOL rtl) {
 @interface PFBNativeSettingsRowCell ()
 @property (nonatomic, strong) UIImageView* icon;
 @property (nonatomic, strong) UILabel* title;
+@property (nonatomic, strong) UILabel* value;
 @property (nonatomic, strong) UIImageView* trailing;
 @property (nonatomic, copy) NSString* iconName;
 @property (nonatomic) PFBNativeSettingsRowAccessory accessory;
@@ -45,9 +47,10 @@ static CGRect PFBRowMirrored(CGRect frame, CGFloat width, BOOL rtl) {
         _icon = [[UIImageView alloc] init];
         _icon.contentMode = UIViewContentModeScaleAspectFit;
         _title = [[UILabel alloc] init];
+        _value = [[UILabel alloc] init];
         _trailing = [[UIImageView alloc] init];
         _trailing.contentMode = UIViewContentModeCenter;
-        for (UIView* part in @[ _icon, _title, _trailing ]) {
+        for (UIView* part in @[ _icon, _title, _value, _trailing ]) {
             [self.contentView addSubview:part];
         }
         self.accessibilityTraits = UIAccessibilityTraitButton;
@@ -58,9 +61,12 @@ static CGRect PFBRowMirrored(CGRect frame, CGFloat width, BOOL rtl) {
 
 - (void)configureWithTitle:(NSString*)title
                   iconName:(NSString*)iconName
+                     value:(NSString*)value
                  accessory:(PFBNativeSettingsRowAccessory)accessory {
     self.title.text = title;
+    self.value.text = value;
     self.accessibilityLabel = title;
+    self.accessibilityValue = value;
     self.iconName = iconName;
     self.accessory = accessory;
     [self applyTheme];
@@ -75,6 +81,8 @@ static CGRect PFBRowMirrored(CGRect frame, CGFloat width, BOOL rtl) {
     pfbApplySelectedBackground(self);
     self.title.font = style.titleFont ?: [TwitterChirpFont(TwitterFontStyleRegular) fontWithSize:16];
     self.title.textColor = ink;
+    self.value.font = self.title.font;
+    self.value.textColor = PFBSettingsSubtitleColor();
     if (![UIImage respondsToSelector:@selector(tfn_vectorImageNamed:fitsSize:fillColor:)]) {
         return;
     }
@@ -110,11 +118,23 @@ static CGRect PFBRowMirrored(CGRect frame, CGFloat width, BOOL rtl) {
     }
     CGRect title = style.titleFrame;
     CGFloat titleHeight = MAX(title.size.height, ceil(self.title.font.lineHeight));
-    title = CGRectMake(title.origin.x, CGRectGetMidY(title) + shift - titleHeight / 2,
-                       MAX(0, CGRectGetMinX(trailing) - 8 - title.origin.x), titleHeight);
+    CGFloat titleY = CGRectGetMidY(title) + shift - titleHeight / 2;
+    // The value takes what the title leaves, and half the room when both are long.
+    CGFloat end = CGRectGetMinX(trailing) - 8;
+    CGRect value = CGRectZero;
+    if (self.value.text.length) {
+        CGFloat room = MAX(0, end - title.origin.x);
+        CGFloat needed = ceil([self.title sizeThatFits:CGSizeMake(CGFLOAT_MAX, titleHeight)].width);
+        CGFloat fitted = MIN(ceil([self.value sizeThatFits:CGSizeMake(CGFLOAT_MAX, titleHeight)].width),
+                             MAX(room - needed - 8, room / 2));
+        value = CGRectMake(end - fitted, titleY, fitted, titleHeight);
+        end = CGRectGetMinX(value) - 8;
+    }
+    title = CGRectMake(title.origin.x, titleY, MAX(0, end - title.origin.x), titleHeight);
     self.trailing.frame = PFBRowMirrored(trailing, width, rtl);
     self.icon.frame = PFBRowMirrored(CGRectOffset(style.iconFrame, 0, shift), width, rtl);
     self.title.frame = PFBRowMirrored(title, width, rtl);
+    self.value.frame = PFBRowMirrored(value, width, rtl);
 }
 
 @end

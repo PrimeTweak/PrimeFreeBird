@@ -17,7 +17,8 @@ static NSDictionary<NSString*, NSDictionary*>* PFBSettingsPages(void) {
     static NSDictionary<NSString*, NSDictionary*>* pages;
     static dispatch_once_t onceToken;
     dispatch_once(&onceToken, ^{
-        // A header's icon is Twitter's, for its group's row in the new look.
+        // Icons are Twitter's, for the rows of the new look: a header's for its group, and one on
+        // each row marked opensPage, which that look lists on the page rather than in the sheet.
         pages = @{
             @"general": @{
                 @"titleKey": @"MODERN_SETTINGS_LAYOUT_TITLE",
@@ -52,7 +53,7 @@ static NSDictionary<NSString*, NSDictionary*>* PFBSettingsPages(void) {
                 @"settings": @[
                     @{@"type": @"header",
                       @"titleKey": @"APPEARANCE_GROUP_INTERFACE",
-                      @"icon": @"layers_stroke"},
+                      @"icon": @"eye"},
                     @{
                         @"titleKey": @"INTERFACE_STYLE_TITLE",
                         @"subtitleKey": @"INTERFACE_STYLE_SUBTITLE",
@@ -69,6 +70,8 @@ static NSDictionary<NSString*, NSDictionary*>* PFBSettingsPages(void) {
                         @"key": @"regular_font_button",
                         @"titleKey": @"REGULAR_FONTS_PICKER_OPTION_TITLE",
                         @"action": @"showRegularFontPicker:",
+                        @"opensPage": @YES,
+                        @"icon": @"text_size",
                         @"prefKeyForSubtitle": @"pfb_font_1",
                         @"subtitleDefaultKey": @"FONT_SYSTEM_DEFAULT_SUBTITLE"
                     },
@@ -78,6 +81,8 @@ static NSDictionary<NSString*, NSDictionary*>* PFBSettingsPages(void) {
                         @"key": @"bold_font_button",
                         @"titleKey": @"BOLD_FONTS_PICKER_OPTION_TITLE",
                         @"action": @"showBoldFontPicker:",
+                        @"opensPage": @YES,
+                        @"icon": @"text_bold",
                         @"prefKeyForSubtitle": @"pfb_font_2",
                         @"subtitleDefaultKey": @"FONT_SYSTEM_DEFAULT_SUBTITLE"
                     },
@@ -91,11 +96,13 @@ static NSDictionary<NSString*, NSDictionary*>* PFBSettingsPages(void) {
                     },
                     @{@"type": @"header",
                       @"titleKey": @"APPEARANCE_GROUP_COLORS",
-                      @"icon": @"colorpicker"},
+                      @"icon": @"transparency_off"},
                     @{
                         @"titleKey": @"THEME_OPTION_TITLE",
                         @"subtitleKey": @"THEME_OPTION_SUBTITLE",
                         @"action": @"showThemeViewController:",
+                        @"opensPage": @YES,
+                        @"icon": @"paintbrush_stroke",
                         @"type": @"button"
                     },
                     @{
@@ -117,6 +124,8 @@ static NSDictionary<NSString*, NSDictionary*>* PFBSettingsPages(void) {
                         @"titleKey": @"CUSTOM_TAB_BAR_OPTION_TITLE",
                         @"subtitleKey": @"CUSTOM_TAB_BAR_OPTION_SUBTITLE",
                         @"action": @"showCustomTabBarVC:",
+                        @"opensPage": @YES,
+                        @"icon": @"draggable",
                         @"type": @"button"
                     },
                     @{@"key": @"restore_tab_labels",
@@ -140,12 +149,14 @@ static NSDictionary<NSString*, NSDictionary*>* PFBSettingsPages(void) {
                       @"default": @YES},
                     @{@"key": @"hide_videos_for_you",
                       @"default": @NO},
-                    @{@"type": @"header", @"titleKey": @"TIMELINES_GROUP_CONTENT", @"icon": @"filter_bars"},
+                    @{@"type": @"header", @"titleKey": @"TIMELINES_GROUP_CONTENT", @"icon": @"eye_off"},
                     @{
                         @"type": @"button",
                         @"titleKey": @"FILTERS_TITLE",
                         @"subtitleKey": @"FILTERS_DETAIL",
-                        @"action": @"showMutedWords:"
+                        @"action": @"showMutedWords:",
+                        @"opensPage": @YES,
+                        @"icon": @"filter_bars"
                     },
                     @{@"key": @"hide_topics",
                       @"default": @NO},
@@ -165,7 +176,7 @@ static NSDictionary<NSString*, NSDictionary*>* PFBSettingsPages(void) {
                     @{@"key": @"no_focus_lost", @"default": @NO},
                     @{@"key": @"reading_line",
                       @"default": @NO},
-                    @{@"type": @"header", @"titleKey": @"TIMELINES_GROUP_HEADER", @"icon": @"lists_stroke"},
+                    @{@"type": @"header", @"titleKey": @"TIMELINES_GROUP_HEADER", @"icon": @"timeline_stroke"},
                     @{@"key": @"hide_spaces",
                       @"default": @YES},
                     @{@"key": @"hide_new_tweets_pill",
@@ -310,7 +321,7 @@ static NSDictionary<NSString*, NSDictionary*>* PFBSettingsPages(void) {
                         @"default": @YES,
                         @"blockedUnless": @"web_session"
                     },
-                    @{@"type": @"header", @"titleKey": @"PROFILES_GROUP_TABS", @"icon": @"posts_stroke"},
+                    @{@"type": @"header", @"titleKey": @"PROFILES_GROUP_TABS", @"icon": @"deck_stroke"},
                     @{
                         @"titleKey": @"PROFILE_INITIAL_TAB_TITLE",
                         @"menu": @"profileTabMenu",
@@ -428,11 +439,13 @@ static NSDictionary<NSString*, NSDictionary*>* PFBSettingsPages(void) {
                 @"titleKey": @"MODERN_SETTINGS_BRANDING_TITLE",
                 @"subtitleKey": @"MODERN_SETTINGS_BRANDING_SUBTITLE",
                 @"settings": @[
-                    @{@"type": @"header", @"titleKey": @"BRANDING_GROUP_CLASSIC", @"icon": @"feather"},
+                    @{@"type": @"header", @"titleKey": @"BRANDING_GROUP_CLASSIC", @"icon": @"compose"},
                     @{
                         @"titleKey": @"APP_ICON_TITLE",
                         @"subtitleKey": @"APP_ICON_SUBTITLE",
                         @"action": @"showAppIconViewController:",
+                        @"opensPage": @YES,
+                        @"icon": @"device_phone",
                         @"type": @"button"
                     },
                     @{
@@ -468,7 +481,9 @@ static NSDictionary<NSString*, NSDictionary*>* PFBSettingsPages(void) {
                         @"titleKey": @"COMPATIBILITY_REPORT_TITLE",
                         @"prefKeyForSubtitle": @"pfb_compat_status",
                         @"subtitleDefaultKey": @"COMPATIBILITY_REPORT_DETAIL",
-                        @"action": @"showCompatibilityReport:"
+                        @"action": @"showCompatibilityReport:",
+                        @"opensPage": @YES,
+                        @"icon": @"bar_chart"
                     }
                 ]
             },
@@ -511,7 +526,9 @@ static NSDictionary<NSString*, NSDictionary*>* PFBSettingsPages(void) {
                         @"type": @"button",
                         @"titleKey": @"COMPATIBILITY_TITLE",
                         @"subtitleKey": @"COMPATIBILITY_DETAIL",
-                        @"action": @"showCompatibility:"
+                        @"action": @"showCompatibility:",
+                        @"opensPage": @YES,
+                        @"icon": @"checkmark_circle"
                     },
                     @{@"key": @"flex_twitter", @"default": @NO}
                 ]

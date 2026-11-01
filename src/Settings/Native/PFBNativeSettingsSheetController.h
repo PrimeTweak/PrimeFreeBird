@@ -6,9 +6,10 @@
 
 @interface PFBNativeSettingsSheetController : UIViewController
 
-// The page shows a single group; screens its rows open go onto the presenter's stack.
+// The page shows a single group; closed runs once the sheet has gone, however it was closed.
 + (void)presentPage:(PFBModernSettingsPageViewController*)page
              titled:(NSString*)title
-               from:(UIViewController*)presenter;
+               from:(UIViewController*)presenter
+             closed:(void (^)(void))closed;
 
 @end

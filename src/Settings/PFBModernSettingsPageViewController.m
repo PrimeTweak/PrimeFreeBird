@@ -12,11 +12,13 @@
 #import "Support/HookHelpers.h"
 #import "Common/PFBCompatibility.h"
 #import "Debug/PFBDebugger.h"
+#import "Settings/Native/PFBNativeSettingsPageRows.h"
 
 @interface PFBModernSettingsPageViewController ()
 @property (nonatomic, copy) NSString* registryPageKey;
 @property (nonatomic, readwrite) BOOL inSheet;
 @property (nonatomic) NSInteger sheetGroup;
+@property (nonatomic, strong) PFBNativeSettingsPageRows* nativeRows;
 // Redraws the rows whose `disabledWhen` names this key.
 - (void)reloadRowsHeldBy:(NSString*)key;
 @end
@@ -58,6 +60,19 @@ static NSURL* PFBAccountAvatarURL(TFNTwitterAccount* account) {
 - (void)viewWillAppear:(BOOL)animated {
     [super viewWillAppear:animated];
     PFBThemeScreenEnter(self);
+    // Back from a screen one of its rows opened, the new look shows the values as they now stand.
+    if (self.nativeLook) {
+        [self.tableView reloadData];
+    }
+}
+
+// The new look sets its ground again on a change of appearance, as its rows do.
+- (void)traitCollectionDidChange:(UITraitCollection*)previousTraitCollection {
+    [super traitCollectionDidChange:previousTraitCollection];
+    if (self.nativeLook) {
+        self.view.backgroundColor = [PFBPalette currentBackgroundColor];
+        self.tableView.backgroundColor = self.view.backgroundColor;
+    }
 }
 
 - (void)viewDidDisappear:(BOOL)animated {
@@ -150,7 +165,8 @@ static NSURL* PFBAccountAvatarURL(TFNTwitterAccount* account) {
     return [PFBSettings subtitleKeyForPage:[self pageKey]];
 }
 
-// In a sheet, the rows under the group's header up to the next one.
+// In a sheet, the rows under the group's header up to the next one, but for those the new look
+// lists on the page.
 - (void)buildSettingsList {
     NSArray<NSDictionary*>* entries = [PFBSettings settingsForPage:[self pageKey]];
     if (!self.inSheet) {
@@ -162,7 +178,7 @@ static NSURL* PFBAccountAvatarURL(TFNTwitterAccount* account) {
     for (NSDictionary* entry in entries) {
         if ([entry[@"type"] isEqualToString:@"header"]) {
             group++;
-        } else if (group == self.sheetGroup) {
+        } else if (group == self.sheetGroup && ![entry[@"opensPage"] boolValue]) {
             [rows addObject:entry];
         }
     }
@@ -171,13 +187,13 @@ static NSURL* PFBAccountAvatarURL(TFNTwitterAccount* account) {
 
 #pragma mark - Setup
 
-// A sheet brings its own title.
+// A sheet brings its own title; the new look titles its pages alone, without the account line.
 - (void)setupNav {
     if (self.inSheet) {
         return;
     }
     NSString* title = [[PFBBundle sharedBundle] localizedStringForKey:[self pageTitleKey]];
-    if (self.account) {
+    if (self.account && !self.nativeLook) {
         self.navigationItem.titleView =
             [objc_getClass("TFNTitleView") titleViewWithTitle:title
                                                      subtitle:self.account.displayUsername];
@@ -186,8 +202,22 @@ static NSURL* PFBAccountAvatarURL(TFNTwitterAccount* account) {
     }
 }
 
-// In a sheet, the rows sit on the sheet's own ground and scroll only past its height.
+// In a sheet, the rows sit on the sheet's own ground and scroll only past its height. The new
+// look's rows come from their own source, which the classic rows' handling never meets.
 - (void)setupTable {
+    if (self.nativeLook) {
+        self.view.backgroundColor = [PFBPalette currentBackgroundColor];
+        self.tableView = [[UITableView alloc] initWithFrame:self.view.bounds style:UITableViewStylePlain];
+        self.tableView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+        self.tableView.backgroundColor = self.view.backgroundColor;
+        self.tableView.separatorStyle = UITableViewCellSeparatorStyleNone;
+        self.tableView.sectionHeaderTopPadding = 0;
+        self.tableView.tableFooterView = [[UIView alloc] init];
+        self.nativeRows = [[PFBNativeSettingsPageRows alloc] initWithPage:self];
+        [self.nativeRows showInTable:self.tableView];
+        [self.view addSubview:self.tableView];
+        return;
+    }
     UIColor* ground = self.inSheet ? [UIColor clearColor] : [PFBPalette currentBackgroundColor];
     self.view.backgroundColor = ground;
     self.tableView = [[UITableView alloc] initWithFrame:self.view.bounds
@@ -1186,10 +1216,10 @@ static NSURL* PFBAccountAvatarURL(TFNTwitterAccount* account) {
 // MARK: - Diagnostics
 
 - (void)showCompatibility:(NSDictionary*)sender {
-    [self.navigationController
-        pushViewController:[[PFBModernSettingsPageViewController alloc] initWithAccount:self.account
-                                                                             pageKey:@"compatibility"]
-                  animated:YES];
+    PFBModernSettingsPageViewController* page =
+        [[PFBModernSettingsPageViewController alloc] initWithAccount:self.account pageKey:@"compatibility"];
+    page.nativeLook = self.nativeLook;
+    [self.navigationController pushViewController:page animated:YES];
 }
 
 - (void)showCompatibilityReport:(NSDictionary*)sender {

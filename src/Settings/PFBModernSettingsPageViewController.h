@@ -26,6 +26,10 @@
 // YES when the page shows one group in a sheet.
 @property (nonatomic, readonly) BOOL inSheet;
 
+// Set before the page shows: it then lists its groups, each opening in a sheet, and the rows
+// that open a screen, as Twitter's new settings do.
+@property (nonatomic) BOOL nativeLook;
+
 // Identifies the page's entry in the PFBSettings registry
 - (NSString*)pageKey;
 
