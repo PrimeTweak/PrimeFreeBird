@@ -323,7 +323,7 @@ static NSNumber* FeatureSwitchOverrideValueForKey(NSString* key) {
             return @NO;
         }
         PFBCOMPAT_OBSERVE(PFBCompat_hide_grok_analyze, @"read by Twitter");
-        return @YES;
+        return nil;
     }
 
     if ([key isEqualToString:
@@ -335,7 +335,7 @@ static NSNumber* FeatureSwitchOverrideValueForKey(NSString* key) {
             return @NO;
         }
         PFBCOMPAT_OBSERVE(PFBCompat_hide_grok_create, @"read by Twitter");
-        return @YES;
+        return nil;
     }
 
     // Grok creation surfaces: the composer's Grok and Imagine entries, Imagine menus on
@@ -389,7 +389,7 @@ static NSNumber* FeatureSwitchOverrideValueForKey(NSString* key) {
             return @NO;
         }
         PFBCOMPAT_OBSERVE(PFBCompat_hide_grok_analyze, @"read by Twitter");
-        return @YES;
+        return nil;
     }
 
     // The "About this post" menu's Grok pills ("Ask Grok", "Is this true?",
@@ -469,7 +469,7 @@ static NSNumber* FeatureSwitchOverrideValueForKey(NSString* key) {
             return @NO;
         }
         PFBCOMPAT_OBSERVE(PFBCompat_disable_articles, @"read by Twitter");
-        return @YES;
+        return nil;
     }
 
     if ([key isEqualToString:@"highlights_tweets_tab_ui_enabled"]) {
@@ -478,7 +478,7 @@ static NSNumber* FeatureSwitchOverrideValueForKey(NSString* key) {
             return @NO;
         }
         PFBCOMPAT_OBSERVE(PFBCompat_disable_highlights, @"read by Twitter");
-        return @YES;
+        return nil;
     }
 
     // Age verification bypass
@@ -520,7 +520,7 @@ static NSNumber* FeatureSwitchOverrideValueForKey(NSString* key) {
             return @NO;
         }
         PFBCOMPAT_OBSERVE(PFBCompat_restore_reply_context, @"read by Twitter");
-        return @YES;
+        return nil;
     }
 
     // The carousel is Twitter's newer layout for several photos in one Tweet;

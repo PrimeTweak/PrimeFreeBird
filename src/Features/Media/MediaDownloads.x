@@ -35,14 +35,20 @@ static NSArray* DMVideoEntities(UIView* attachmentView) {
 
 // MARK: - Voice messages
 
-// A voice note is decrypted to disk before playing, so its URL passes through the
-// asset opened to play it. The last one seen is taken as the one under the finger.
+// A voice note is decrypted to disk before playing, so its URL passes through the asset
+// opened to play it. The file opened right after a tap on a note becomes that note's own;
+// the last file opened, kept on the main thread, is the fallback.
 
 static NSURL* gPFBLastVoiceURL = nil;
 
 // When a tap last reached a voice note, and any message, in a conversation.
 static CFAbsoluteTime gPFBVoiceTapAt = 0;
 static CFAbsoluteTime gPFBMessageTapAt = 0;
+
+// The voice note view last tapped, and whether the next file opened is still its to claim.
+static __weak UIView* gPFBTappedVoiceView;
+static BOOL gPFBVoiceClaimOpen = NO;
+static const void* kPFBVoiceFileKey = &kPFBVoiceFileKey;
 
 // How long ago a tap came, in steps; nil past 30 s.
 static NSString* PFBSinceTap(CFAbsoluteTime now, CFAbsoluteTime tapAt) {
@@ -72,39 +78,65 @@ static void PFBNoteDecryptedFile(NSURL* url) {
     });
 }
 
+// The file opened becomes the last one, and the tapped note's own when it opens within
+// 5 s of the tap.
+static void PFBKeepVoiceFile(NSURL* url) {
+    gPFBLastVoiceURL = url;
+    UIView* view = gPFBTappedVoiceView;
+    if (gPFBVoiceClaimOpen && view && CFAbsoluteTimeGetCurrent() - gPFBVoiceTapAt <= 5.0) {
+        objc_setAssociatedObject(view, kPFBVoiceFileKey, url, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    }
+    gPFBVoiceClaimOpen = NO;
+}
+
 %hook AVURLAsset
 
 - (id)initWithURL:(NSURL*)url options:(NSDictionary*)options {
     if ([url.path containsString:@"/decrypted-media-v2/"]) {
         PFBCompatReach(PFBCompatPath_played_voice_note);
-        gPFBLastVoiceURL = url;
         PFBNoteDecryptedFile(url);
+        dispatch_async(dispatch_get_main_queue(), ^{
+            PFBKeepVoiceFile(url);
+        });
     }
     return %orig;
 }
 
 %end
 
-// Whether an attachment slot shows a voice note view.
-static BOOL PFBShowsVoiceNote(UIView* view, NSInteger depth) {
-    Class voiceClass = objc_getClass("_TtC6ChatUI26MessageAttachmentAudioView");
-    if (!voiceClass || depth > 3) {
-        return NO;
-    }
-    for (UIView* sub in view.subviews) {
-        if ([sub isKindOfClass:voiceClass] ? !sub.hidden && sub.alpha > 0.01 : PFBShowsVoiceNote(sub, depth + 1)) {
-            return YES;
-        }
-    }
-    return NO;
+// A note's own file, while it is still on disk.
+static NSURL* PFBVoiceOwnFile(UIView* view) {
+    NSURL* url = objc_getAssociatedObject(view, kPFBVoiceFileKey);
+    return [NSFileManager.defaultManager fileExistsAtPath:url.path] ? url : nil;
 }
 
-// Taps on an attachment and on a message, timed for the decrypted file lines.
+// The voice note view shown in an attachment slot, or nil.
+static UIView* PFBShownVoiceView(UIView* view, NSInteger depth) {
+    Class voiceClass = objc_getClass("_TtC6ChatUI26MessageAttachmentAudioView");
+    if (!voiceClass || depth > 3) {
+        return nil;
+    }
+    for (UIView* sub in view.subviews) {
+        UIView* found = [sub isKindOfClass:voiceClass] ? (!sub.hidden && sub.alpha > 0.01 ? sub : nil)
+                                                       : PFBShownVoiceView(sub, depth + 1);
+        if (found) {
+            return found;
+        }
+    }
+    return nil;
+}
+
+// A tap on a voice note without a file of its own lets it claim the next file opened; every
+// tap on a voice note or a message is timed for the decrypted file lines.
 %hook _TtC16ChatConversation26MessageAttachmentStackView
 
 - (void)handleTap:(UITapGestureRecognizer*)recognizer {
-    if ([recognizer isKindOfClass:[UIGestureRecognizer class]] && PFBShowsVoiceNote(recognizer.view, 0)) {
+    UIView* voice =
+        [recognizer isKindOfClass:[UIGestureRecognizer class]] ? PFBShownVoiceView(recognizer.view, 0) : nil;
+    if (voice) {
         gPFBVoiceTapAt = CFAbsoluteTimeGetCurrent();
+        gPFBTappedVoiceView = voice;
+        gPFBVoiceClaimOpen = PFBVoiceOwnFile(voice) == nil;
     }
     %orig;
 }
@@ -148,6 +180,18 @@ static const void* kPFBVoiceInteractionKey = &kPFBVoiceInteractionKey;
 
 %hook _TtC6ChatUI26MessageAttachmentAudioView
 
+// A view that leaves its window can come back showing another message: it forgets its file.
+- (void)didMoveToWindow {
+    %orig;
+    UIView* view = (UIView*)self;
+    if (!view.window) {
+        objc_setAssociatedObject(view, kPFBVoiceFileKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        if (gPFBTappedVoiceView == view) {
+            gPFBTappedVoiceView = nil;
+        }
+    }
+}
+
 - (void)layoutSubviews {
     %orig;
     UIView* view = (UIView*)self;
@@ -170,8 +214,16 @@ static const void* kPFBVoiceInteractionKey = &kPFBVoiceInteractionKey;
 - (UIContextMenuConfiguration*)contextMenuInteraction:(UIContextMenuInteraction*)interaction
                        configurationForMenuAtLocation:(CGPoint)location {
     // The interaction stays on views laid out while the option was on; off, it opens nothing.
-    NSURL* voiceURL = gPFBLastVoiceURL;
-    if (!voiceURL || ![PFBSettings boolForKey:@"download_voice_messages"]) {
+    if (![PFBSettings boolForKey:@"download_voice_messages"]) {
+        return nil;
+    }
+    // The note's own file; else the last one opened, for the note last tapped or while no
+    // tap on a voice note was seen this launch.
+    UIView* view = (UIView*)self;
+    NSURL* own = PFBVoiceOwnFile(view);
+    NSURL* voiceURL = own ?: (gPFBVoiceTapAt == 0 || view == gPFBTappedVoiceView ? gPFBLastVoiceURL : nil);
+    if (!voiceURL) {
+        PFBCompatMeasure(@"voice notes", @"long press on a voice note without a file of its own: no menu", 2);
         return nil;
     }
     return [UIContextMenuConfiguration
@@ -186,6 +238,9 @@ static const void* kPFBVoiceInteractionKey = &kPFBVoiceInteractionKey;
                                      image:PFBDownloadGlyph()
                                 identifier:nil
                                    handler:^(__kindof UIAction* _Nonnull action) {
+                                     PFBCOMPAT_ACTION(PFBCompat_download_voice_messages,
+                                                      own ? @"voice note saved from its own file"
+                                                          : @"voice note saved from the last one played");
                                      PFBSaveVoiceMessage(voiceURL);
                                    }];
                        return [UIMenu menuWithTitle:@"" children:@[ saveAction ]];
