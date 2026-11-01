@@ -5,7 +5,7 @@
 
 /* Toggles read <KEY>_TITLE (or their titleKey) and optional <KEY>_DETAIL; buttons name titleKey/subtitleKey;
    headers are <PAGE>_GROUP_<NAME>; pages MODERN_SETTINGS_<PAGE>_TITLE (General uses _LAYOUT_,
-   Tools _LAB_, Compatibility COMPATIBILITY_TITLE). A missing key shows as the raw key. */
+   Tools _LAB_). A missing key shows as the raw key. */
 
 /* ===== GENERAL — page ===== */
 "MODERN_SETTINGS_LAYOUT_TITLE" = "General";
@@ -570,7 +570,6 @@
 "FLEX_TWITTER_DETAIL" = "Inspect the app’s screens and data. For developers.";
 "COMPATIBILITY_TITLE" = "Compatibility";
 "COMPATIBILITY_DETAIL" = "Check every option still works after a Twitter update.";
-"COMPATIBILITY_GROUP_CHECKS" = "Monitoring";
 "COMPATIBILITY_RECORD_TITLE" = "Record activity";
 "DEBUG_TOOLS_DETAIL" = "Show the diagnostic button and keep a detailed log. Checks run without it.";
 "COMPATIBILITY_REPORT_TITLE" = "Report";

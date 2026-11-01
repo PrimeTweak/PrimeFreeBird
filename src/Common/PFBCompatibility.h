@@ -143,8 +143,6 @@ typedef NS_ENUM(NSInteger, PFBCompatReadState) {
 
 // Posted on the main queue whenever the verdicts may have changed.
 FOUNDATION_EXPORT NSNotificationName const PFBCompatDidChangeNotification;
-// The preference behind the Report row's status.
-FOUNDATION_EXPORT NSString* const PFBCompatStatusKey;
 // Where the read of Twitter's binaries stands on this install.
 FOUNDATION_EXPORT PFBCompatReadState PFBCompatReadStatus(void);
 

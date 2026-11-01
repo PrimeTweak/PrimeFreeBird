@@ -467,26 +467,6 @@ static NSDictionary<NSString*, NSDictionary*>* PFBSettingsPages(void) {
                     }
                 ]
             },
-            @"compatibility": @{
-                @"titleKey": @"COMPATIBILITY_TITLE",
-                @"subtitleKey": @"COMPATIBILITY_DETAIL",
-                @"settings": @[
-                    @{@"type": @"header", @"titleKey": @"COMPATIBILITY_GROUP_CHECKS", @"icon": @"activity"},
-                    @{@"key": @"debug_tools",
-                      @"default": @NO,
-                      @"titleKey": @"COMPATIBILITY_RECORD_TITLE"},
-                    @{
-                        @"key": @"compatibility_report",
-                        @"type": @"button",
-                        @"titleKey": @"COMPATIBILITY_REPORT_TITLE",
-                        @"prefKeyForSubtitle": @"pfb_compat_status",
-                        @"subtitleDefaultKey": @"COMPATIBILITY_REPORT_DETAIL",
-                        @"action": @"showCompatibilityReport:",
-                        @"opensPage": @YES,
-                        @"icon": @"bar_chart"
-                    }
-                ]
-            },
             @"lab": @{
                 @"titleKey": @"MODERN_SETTINGS_LAB_TITLE",
                 @"subtitleKey": @"MODERN_SETTINGS_LAB_SUBTITLE",
@@ -523,13 +503,17 @@ static NSDictionary<NSString*, NSDictionary*>* PFBSettingsPages(void) {
                     @{@"type": @"header", @"titleKey": @"LAB_GROUP_TOOLS", @"icon": @"debugging"},
                     @{
                         @"key": @"compatibility",
-                        @"type": @"button",
+                        @"type": @"compactButton",
                         @"titleKey": @"COMPATIBILITY_TITLE",
-                        @"subtitleKey": @"COMPATIBILITY_DETAIL",
-                        @"action": @"showCompatibility:",
+                        @"prefKeyForSubtitle": @"pfb_compat_status",
+                        @"subtitleDefaultKey": @"COMPATIBILITY_REPORT_DETAIL",
+                        @"action": @"showCompatibilityReport:",
                         @"opensPage": @YES,
                         @"icon": @"checkmark_circle"
                     },
+                    @{@"key": @"debug_tools",
+                      @"default": @NO,
+                      @"titleKey": @"COMPATIBILITY_RECORD_TITLE"},
                     @{@"key": @"flex_twitter", @"default": @NO}
                 ]
             },

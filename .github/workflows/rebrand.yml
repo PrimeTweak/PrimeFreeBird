@@ -4,12 +4,12 @@ on:
   workflow_dispatch:
     inputs:
       ipa_url:
-        description: "Direct URL of an X IPA"
+        description: "X IPA link"
         default: ""
         required: true
         type: string
       twitter_branding:
-        description: "Set app name to Twitter"
+        description: "Name the app Twitter"
         default: true
         required: false
         type: boolean

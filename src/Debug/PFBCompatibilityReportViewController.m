@@ -412,7 +412,7 @@ static void PFBReportFitSheet(UIViewController* page) {
     [self.tableView reloadData];
 }
 
-// The page underneath shows the status on its Report row; it redraws on return. Covered by
+// The page underneath shows the status on its Compatibility row; it redraws on return. Covered by
 // one of its own lists, the report has not left.
 - (void)viewWillDisappear:(BOOL)animated {
     [super viewWillDisappear:animated];

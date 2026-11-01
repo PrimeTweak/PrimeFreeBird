@@ -2075,8 +2075,6 @@ static const PFBCompatName kNames[] = {
     {PFBCompat_new_twitter_settings, "Common/PFBSettings.m", "grok_stroke"},
     {PFBCompat_new_twitter_settings, "Common/PFBSettings.m", "compose"},
     {PFBCompat_new_twitter_settings, "Common/PFBSettings.m", "device_phone"},
-    {PFBCompat_new_twitter_settings, "Common/PFBSettings.m", "activity"},
-    {PFBCompat_new_twitter_settings, "Common/PFBSettings.m", "bar_chart"},
     {PFBCompat_new_twitter_settings, "Common/PFBSettings.m", "globe_stroke"},
     {PFBCompat_new_twitter_settings, "Common/PFBSettings.m", "file_stroke"},
     {PFBCompat_new_twitter_settings, "Common/PFBSettings.m", "debugging"},
@@ -2572,7 +2570,8 @@ static const PFBCompatPathMeta* pathMetaFor(PFBCompatPath path) {
 // MARK: - Counting
 
 static NSString* const kStoreKey = @"pfb_compat_evidence";
-NSString* const PFBCompatStatusKey = @"pfb_compat_status";
+// The status the Compatibility row of Tools shows (PFBSettings.m).
+static NSString* const kStatusKey = @"pfb_compat_status";
 
 // Actions since the last save, and whether this install has a detail yet.
 static _Atomic(uint64_t) gHits[PFBCompatOptionCount];
@@ -4440,7 +4439,7 @@ static NSString* PFBCompatStatusText(void) {
 }
 
 void PFBCompatRefreshStatus(void) {
-    [[NSUserDefaults standardUserDefaults] setObject:PFBCompatStatusText() forKey:PFBCompatStatusKey];
+    [[NSUserDefaults standardUserDefaults] setObject:PFBCompatStatusText() forKey:kStatusKey];
     [[NSNotificationCenter defaultCenter] postNotificationName:PFBCompatDidChangeNotification
                                                         object:nil];
 }
@@ -4659,7 +4658,7 @@ static dispatch_source_t gSaveTimer;
 void PFBCompatStart(void) {
     prepare();
     if (PFBCompatReadStatus() == PFBCompatReadPending) {
-        [[NSUserDefaults standardUserDefaults] setObject:PFBCompatStatusText() forKey:PFBCompatStatusKey];
+        [[NSUserDefaults standardUserDefaults] setObject:PFBCompatStatusText() forKey:kStatusKey];
     }
     NSNotificationCenter* center = [NSNotificationCenter defaultCenter];
     for (NSNotificationName name in @[ UIApplicationDidEnterBackgroundNotification,

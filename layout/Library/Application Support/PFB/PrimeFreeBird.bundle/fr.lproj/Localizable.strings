@@ -566,7 +566,6 @@
 "FLEX_TWITTER_DETAIL" = "Permet d’inspecter les écrans et les données de l’app. Pour les développeurs.";
 "COMPATIBILITY_TITLE" = "Compatibilité";
 "COMPATIBILITY_DETAIL" = "Vérifie que chaque option fonctionne encore après une mise à jour de Twitter.";
-"COMPATIBILITY_GROUP_CHECKS" = "Suivi";
 "COMPATIBILITY_RECORD_TITLE" = "Enregistrer l’activité";
 "DEBUG_TOOLS_DETAIL" = "Affiche le bouton de diagnostic et tient un journal détaillé. Les vérifications tournent sans lui.";
 "COMPATIBILITY_REPORT_TITLE" = "Rapport";

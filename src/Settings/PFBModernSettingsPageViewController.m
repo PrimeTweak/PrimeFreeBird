@@ -111,36 +111,6 @@ static NSURL* PFBAccountAvatarURL(TFNTwitterAccount* account) {
     });
 }
 
-// While Twitter's binaries are read, the Report row's status leads with a spinner.
-- (void)pfbShowCompatSpinner:(BOOL)show inCell:(PFBModernSettingsTableViewCell*)cell subtitle:(NSString*)subtitle {
-    static const NSInteger kSpinnerTag = 90314;
-    [[cell.contentView viewWithTag:kSpinnerTag] removeFromSuperview];
-    if (!show || !cell.subtitleLabel || subtitle.length == 0) {
-        return;
-    }
-    UIFont* font = cell.subtitleLabel.font ?: [UIFont systemFontOfSize:13.0];
-    UIActivityIndicatorView* spinner =
-        [[UIActivityIndicatorView alloc] initWithActivityIndicatorStyle:UIActivityIndicatorViewStyleMedium];
-    spinner.tag = kSpinnerTag;
-    spinner.transform = CGAffineTransformMakeScale(0.7, 0.7);
-    spinner.translatesAutoresizingMaskIntoConstraints = NO;
-    [cell.contentView addSubview:spinner];
-    [NSLayoutConstraint activateConstraints:@[
-        [spinner.centerXAnchor constraintEqualToAnchor:cell.subtitleLabel.leadingAnchor constant:7.0],
-        [spinner.centerYAnchor constraintEqualToAnchor:cell.subtitleLabel.topAnchor constant:font.lineHeight / 2.0],
-    ]];
-    [spinner startAnimating];
-    NSMutableParagraphStyle* indent = [[NSMutableParagraphStyle alloc] init];
-    indent.firstLineHeadIndent = 20.0;
-    cell.subtitleLabel.attributedText = [[NSAttributedString alloc]
-        initWithString:subtitle
-            attributes:@{
-                NSParagraphStyleAttributeName : indent,
-                NSFontAttributeName : font,
-                NSForegroundColorAttributeName : cell.subtitleLabel.textColor ?: [UIColor secondaryLabelColor],
-            }];
-}
-
 - (void)viewDidLoad {
     [super viewDidLoad];
     [[NSNotificationCenter defaultCenter] addObserver:self
@@ -408,10 +378,6 @@ static NSURL* PFBAccountAvatarURL(TFNTwitterAccount* account) {
             subtitle = [[PFBBundle sharedBundle] localizedStringForKey:subtitleKey];
         }
         [cell configureWithTitle:title subtitle:subtitle iconName:nil];
-        [self pfbShowCompatSpinner:[prefKey isEqualToString:PFBCompatStatusKey] &&
-                                   PFBCompatReadStatus() == PFBCompatReadPending
-                            inCell:cell
-                          subtitle:subtitle];
         // No action means nowhere to go: the row states something and the
         // chevron would say otherwise.
         BOOL leadsSomewhere = toggleData[@"action"] != nil;
@@ -1214,13 +1180,6 @@ static NSURL* PFBAccountAvatarURL(TFNTwitterAccount* account) {
 
 
 // MARK: - Diagnostics
-
-- (void)showCompatibility:(NSDictionary*)sender {
-    PFBModernSettingsPageViewController* page =
-        [[PFBModernSettingsPageViewController alloc] initWithAccount:self.account pageKey:@"compatibility"];
-    page.nativeLook = self.nativeLook;
-    [self.navigationController pushViewController:page animated:YES];
-}
 
 - (void)showCompatibilityReport:(NSDictionary*)sender {
     [self.navigationController
