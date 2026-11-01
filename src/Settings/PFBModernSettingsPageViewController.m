@@ -13,12 +13,15 @@
 #import "Common/PFBCompatibility.h"
 #import "Debug/PFBDebugger.h"
 #import "Settings/Native/PFBNativeSettingsPageRows.h"
+#import "Settings/PFBSettingsRowsProbe.h"
 
 @interface PFBModernSettingsPageViewController ()
 @property (nonatomic, copy) NSString* registryPageKey;
 @property (nonatomic, readwrite) BOOL inSheet;
 @property (nonatomic) NSInteger sheetGroup;
 @property (nonatomic, strong) PFBNativeSettingsPageRows* nativeRows;
+// The height each row last showed at, keyed by its registry entry.
+@property (nonatomic, strong) NSMapTable<NSDictionary*, NSNumber*>* rowHeights;
 // Redraws the rows whose `disabledWhen` names this key.
 - (void)reloadRowsHeldBy:(NSString*)key;
 @end
@@ -62,6 +65,7 @@ static NSURL* PFBAccountAvatarURL(TFNTwitterAccount* account) {
     PFBThemeScreenEnter(self);
     // Back from a screen one of its rows opened, the new look shows the values as they now stand.
     if (self.nativeLook) {
+        PFBSettingsWatchRows(self.tableView, @"page shown again");
         [self.tableView reloadData];
     }
 }
@@ -107,6 +111,7 @@ static NSURL* PFBAccountAvatarURL(TFNTwitterAccount* account) {
 // The Compatibility row shows a status that the checks update after launch.
 - (void)pfbCompatDidChange:(NSNotification*)note {
     dispatch_async(dispatch_get_main_queue(), ^{
+        PFBSettingsWatchRows(self.tableView, @"Compatibility status");
         [self.tableView reloadData];
     });
 }
@@ -202,11 +207,17 @@ static NSURL* PFBAccountAvatarURL(TFNTwitterAccount* account) {
         self.tableView.alwaysBounceVertical = NO;
         self.tableView.contentInsetAdjustmentBehavior = UIScrollViewContentInsetAdjustmentNever;
         self.tableView.sectionHeaderTopPadding = 0;
+        // A sheet's group has no header or footer: estimated at zero, they never push the rows.
+        self.tableView.estimatedSectionHeaderHeight = 0;
+        self.tableView.estimatedSectionFooterHeight = 0;
     }
     self.tableView.rowHeight = UITableViewAutomaticDimension;
     self.tableView.showsVerticalScrollIndicator = NO;
     self.tableView.showsHorizontalScrollIndicator = NO;
     self.tableView.estimatedRowHeight = 80;
+    self.rowHeights = [NSMapTable mapTableWithKeyOptions:NSPointerFunctionsStrongMemory |
+                                                         NSPointerFunctionsObjectPointerPersonality
+                                            valueOptions:NSPointerFunctionsStrongMemory];
     [self.tableView registerClass:[PFBModernSettingsToggleCell class]
            forCellReuseIdentifier:@"ToggleCell"];
     [self.tableView registerClass:[PFBModernSettingsTableViewCell class]
@@ -551,6 +562,33 @@ static NSURL* PFBAccountAvatarURL(TFNTwitterAccount* account) {
     if (self.inSheet) {
         cell.backgroundColor = [UIColor clearColor];
     }
+    if ((NSUInteger)indexPath.row < self.visibleToggles.count) {
+        [self.rowHeights setObject:@(CGRectGetHeight(cell.bounds)) forKey:self.visibleToggles[(NSUInteger)indexPath.row]];
+    }
+}
+
+// A row already shown is estimated at its real height, so a reload or an update lays the rows
+// out where they already are; one never shown gets the table's estimate.
+- (CGFloat)tableView:(UITableView*)tableView estimatedHeightForRowAtIndexPath:(NSIndexPath*)indexPath {
+    NSNumber* shown = (NSUInteger)indexPath.row < self.visibleToggles.count
+                          ? [self.rowHeights objectForKey:self.visibleToggles[(NSUInteger)indexPath.row]]
+                          : nil;
+    return shown ? (CGFloat)shown.doubleValue : tableView.estimatedRowHeight;
+}
+
+- (void)refreshRowsInPlace {
+    PFBSettingsWatchRows(self.tableView, @"menu choice");
+    NSArray<NSIndexPath*>* visible = self.tableView.indexPathsForVisibleRows;
+    if (!visible.count) {
+        return;
+    }
+    // The update sizes the rows again, for a value that changes its row's height.
+    [UIView performWithoutAnimation:^{
+        [self.tableView performBatchUpdates:^{
+            [self.tableView reconfigureRowsAtIndexPaths:visible];
+        }
+                                 completion:nil];
+    }];
 }
 
 #pragma mark - Switch Handling
@@ -681,6 +719,7 @@ static NSURL* PFBAccountAvatarURL(TFNTwitterAccount* account) {
 - (void)switchChanged:(UISwitch*)sender {
     NSString* key = objc_getAssociatedObject(sender, @"prefKey");
     if (key) {
+        PFBSettingsWatchRows(self.tableView, [@"switch " stringByAppendingString:key]);
         BOOL inverted = [objc_getAssociatedObject(sender, @"inverted") boolValue];
         [[NSUserDefaults standardUserDefaults]
             setBool:(inverted ? !sender.isOn : sender.isOn)

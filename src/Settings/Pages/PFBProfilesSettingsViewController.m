@@ -89,7 +89,7 @@ static NSInteger PFBProfileTabCurrent(void) {
                                                  [[NSUserDefaults standardUserDefaults]
                                                      setInteger:i
                                                          forKey:@"profile_initial_tab"];
-                                                 [weakSelf.tableView reloadData];
+                                                 [weakSelf refreshRowsInPlace];
                                              }];
         action.state = i == current ? UIMenuElementStateOn : UIMenuElementStateOff;
         [actions addObject:action];

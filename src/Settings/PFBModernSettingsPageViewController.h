@@ -52,4 +52,7 @@
 - (NSString*)localizedDetailForKey:(NSString*)key;
 // Opens the menu an entry names under "menu" from anywhere on its row.
 - (void)attachMenuIfNeeded:(UITableViewCell*)cell entry:(NSDictionary*)entry;
+// Shows a value a menu just changed: the visible rows are refreshed in place and take their
+// new heights, without a reload or an animation, so the list keeps still.
+- (void)refreshRowsInPlace;
 @end

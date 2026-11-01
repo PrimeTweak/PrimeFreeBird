@@ -98,7 +98,7 @@ static NSArray<NSArray*>* PFBReplySortingChoices(void) {
                                                  [[NSUserDefaults standardUserDefaults]
                                                      setInteger:seconds.integerValue
                                                          forKey:@"undo_tweet_timeout"];
-                                                 [weakSelf.tableView reloadData];
+                                                 [weakSelf refreshRowsInPlace];
                                              }];
         action.state = seconds.integerValue == current ? UIMenuElementStateOn : UIMenuElementStateOff;
         [actions addObject:action];
@@ -130,7 +130,7 @@ static NSArray<NSArray*>* PFBReplySortingChoices(void) {
                                              handler:^(__unused UIAction* chosen) {
                                                  [[NSUserDefaults standardUserDefaults] setInteger:value
                                                                                             forKey:@"reply_sorting"];
-                                                 [weakSelf.tableView reloadData];
+                                                 [weakSelf refreshRowsInPlace];
                                              }];
         action.state = value == current ? UIMenuElementStateOn : UIMenuElementStateOff;
         [actions addObject:action];

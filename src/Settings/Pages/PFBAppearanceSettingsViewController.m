@@ -171,7 +171,7 @@ static NSInteger PFBInterfaceStyleCurrent(void) {
     [[NSUserDefaults standardUserDefaults] setInteger:shade forKey:@"dark_mode_style"];
     [[NSUserDefaults standardUserDefaults] synchronize];
     if (self.inSheet) {
-        [self.tableView reloadData];
+        [self refreshRowsInPlace];
     }
     [self showRestartRequiredAlert];
 }
@@ -188,7 +188,7 @@ static NSInteger PFBInterfaceStyleCurrent(void) {
     }
     [[NSUserDefaults standardUserDefaults] synchronize];
     if (self.inSheet) {
-        [self.tableView reloadData];
+        [self refreshRowsInPlace];
     }
     if (wasEnabled != nowEnabled) {
         [self showRestartRequiredAlert];

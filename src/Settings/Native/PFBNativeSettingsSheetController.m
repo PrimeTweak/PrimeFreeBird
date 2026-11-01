@@ -5,6 +5,7 @@
 #import "Common/PFBBundle.h"
 #import "Settings/PFBModernSettingsPageViewController.h"
 #import "Settings/PFBSettingsCellStyle.h"
+#import "Settings/PFBSettingsRowsProbe.h"
 #import "Support/PFBManager.h"
 
 // iOS draws the design it launched with: glass sheets under Liquid Glass, opaque ones under the
@@ -161,6 +162,7 @@ static const CGFloat kPFBSheetBottomMargin = 16;
     [super traitCollectionDidChange:previousTraitCollection];
     [self applyTheme];
     dispatch_async(dispatch_get_main_queue(), ^{
+        PFBSettingsWatchRows(self.page.tableView, @"appearance change");
         [self.page.tableView reloadData];
     });
 }
@@ -194,6 +196,7 @@ static const CGFloat kPFBSheetBottomMargin = 16;
     if (fabs(height - self.fittedHeight) < 1) {
         return;
     }
+    PFBSettingsNoteSheetHeight(self.fittedHeight, height, self.isBeingPresented);
     self.fittedHeight = height;
     if (@available(iOS 16.0, *)) {
         UISheetPresentationController* sheet = self.sheetPresentationController;

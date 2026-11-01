@@ -51,7 +51,7 @@ static NSInteger PFBRetweetsCurrent(void) {
                                                  [[NSUserDefaults standardUserDefaults]
                                                      setInteger:choice
                                                          forKey:@"hide_blocked_retweets"];
-                                                 [weakSelf.tableView reloadData];
+                                                 [weakSelf refreshRowsInPlace];
                                              }];
         action.state = choice == current ? UIMenuElementStateOn : UIMenuElementStateOff;
         [actions addObject:action];
