@@ -90,37 +90,6 @@ static NSString* PFBQueryValue(id object) {
         stringByAddingPercentEncodingWithAllowedCharacters:plain];
 }
 
-// What Twitter's own model of the footer's Tweet holds as its composer source, once:
-// Tweet source could then be read without asking x.com.
-static void PFBNoteComposerSource(T1ConversationFooterTextView* footer) {
-    static BOOL noted;
-    id model = [footer respondsToSelector:@selector(viewModel)] ? footer.viewModel : nil;
-    if (noted || !model) {
-        return;
-    }
-    noted = YES;
-    SEL getter = NSSelectorFromString(@"composerSource");
-    NSString* kind = NSStringFromClass([model class]);
-    if (![model respondsToSelector:getter]) {
-        PFBCompatMeasure(@"tweet source", [kind stringByAppendingString:@" has no composer source"], 2);
-        return;
-    }
-    char type = [model methodSignatureForSelector:getter].methodReturnType[0];
-    NSString* value;
-    if (type == '@') {
-        id held = ((id (*)(id, SEL))objc_msgSend)(model, getter);
-        value = [NSString stringWithFormat:@"%@ %@", held ? NSStringFromClass([held class]) : @"nil", held ?: @""];
-    } else if (type == 'q' || type == 'Q' || type == 'l' || type == 'L' || type == 'i' || type == 'I') {
-        value = [NSString stringWithFormat:@"number %lld", ((long long (*)(id, SEL))objc_msgSend)(model, getter)];
-    } else {
-        value = [NSString stringWithFormat:@"type %c", type];
-    }
-    if (value.length > 80) {
-        value = [[value substringToIndex:80] stringByAppendingString:@"\u2026"];
-    }
-    PFBCompatMeasure(@"tweet source", [NSString stringWithFormat:@"%@ composer source: %@", kind, value], 2);
-}
-
 // The About this account question for a handle.
 static NSMutableURLRequest* PFBCountryRequest(NSString* handle) {
     NSString* query = PFBQueryValue(@{@"screenName": handle});
@@ -436,9 +405,6 @@ static void PFBRefreshFooterOnArrival(T1ConversationFooterTextView* footer, NSSt
     if (!item || (!tweetID && !handle)) {
         %orig;
         return;
-    }
-    if (tweetID) {
-        PFBNoteComposerSource(self);
     }
     PFBRefreshFooterOnArrival(self, handle, tweetID);
     NSString* source = tweetID ? PFBLabelFor(gPFBSources, tweetID) : nil;

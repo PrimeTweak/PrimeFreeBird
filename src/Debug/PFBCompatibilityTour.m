@@ -2209,6 +2209,26 @@ static void tourHideOverlay(void) {
     gPFBTourStepLabel = nil;
 }
 
+// Whether Twitter has an account signed in: every screen the tour opens comes from it.
+static BOOL tourSignedIn(void) {
+    return tourGetter(UIApplication.sharedApplication.delegate, @"_t1_currentAccount") != nil;
+}
+
+// Says why the tour does not run, or why it stopped, over the screen in front.
+static void tourShowSignedOut(void) {
+    UIViewController* top = tourTopController();
+    if (!top) {
+        return;
+    }
+    UIAlertController* alert =
+        [UIAlertController alertControllerWithTitle:@"Signed out"
+                                            message:@"The tour needs Twitter signed in to open its screens. Sign in, "
+                                                    @"then start it again."
+                                     preferredStyle:UIAlertControllerStyleAlert];
+    [alert addAction:[UIAlertAction actionWithTitle:@"OK" style:UIAlertActionStyleDefault handler:nil]];
+    [top presentViewController:alert animated:YES completion:nil];
+}
+
 // Records the outcome for the report: each step's result in order, and why the tour
 // stopped early, if it did.
 static void tourConclude(NSMutableArray<NSString*>* results, BOOL full, NSString* stop) {
@@ -2423,6 +2443,13 @@ static void tourRun(NSArray<NSDictionary*>* steps, NSUInteger index, NSMutableAr
     NSUInteger generation = gPFBTourGeneration;
     NSDictionary* step = steps[index];
     NSString* name = step[@"name"];
+    // Signed out, every screen left would fail: the tour stops and the steps left stay unjudged.
+    if (!tourSignedIn()) {
+        PFBCompatTourLog(@"[tour] signed out before %@", name);
+        tourConclude(results, full, [@"signed out before " stringByAppendingString:name]);
+        tourShowSignedOut();
+        return;
+    }
     gPFBTourStepLive = name;
     gPFBTourStepEmpty = nil;
     tourShowStep(step[@"label"], index, steps.count);
@@ -2455,6 +2482,10 @@ static void tourRun(NSArray<NSDictionary*>* steps, NSUInteger index, NSMutableAr
 
 static void tourStart(BOOL full) {
     if (gPFBTourRunning) {
+        return;
+    }
+    if (!tourSignedIn()) {
+        tourShowSignedOut();
         return;
     }
     NSArray<NSDictionary*>* steps = tourSteps(full);
@@ -2520,10 +2551,10 @@ void PFBCompatScheduleTourAtLaunch(void) {
     [[NSUserDefaults standardUserDefaults] setBool:YES forKey:kPFBTourPendingKey];
 }
 
-// On a new Twitter binary, once per launch until a full tour has run on it.
+// On a new Twitter binary, once per launch while signed in, until a full tour has run on it.
 static void tourAskAtLaunch(void) {
     UIViewController* top = tourTopController();
-    if (gPFBTourRunning || !top) {
+    if (gPFBTourRunning || !top || !tourSignedIn()) {
         return;
     }
     NSString* version = NSBundle.mainBundle.infoDictionary[@"CFBundleShortVersionString"] ?: @"";

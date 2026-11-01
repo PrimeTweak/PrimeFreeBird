@@ -10,19 +10,29 @@
 - (NSURL*)initialURL;
 @end
 
-static inline void changeTwitterColor(NSInteger colorID) {
-    NSUserDefaults* defaults = [NSUserDefaults standardUserDefaults];
-    TAEColorSettings* colorSettings =
-        [objc_getClass("TAEColorSettings") sharedSettings];
-
-    [defaults setObject:@(colorID)
-                 forKey:@"T1ColorSettingsPrimaryColorOptionKey"];
-    [colorSettings setPrimaryColorOption:colorID];
+// Twitter's color settings, or nil when the class or its accessor is gone.
+static inline TAEColorSettings* PFBColorSettings(void) {
+    Class settingsClass = objc_getClass("TAEColorSettings");
+    return [settingsClass respondsToSelector:@selector(sharedSettings)] ? [settingsClass sharedSettings] : nil;
 }
+
+// Stores the accent option, and hands it to Twitter's color settings when they take it.
+static inline void changeTwitterColor(NSInteger colorID) {
+    [[NSUserDefaults standardUserDefaults] setObject:@(colorID)
+                                              forKey:@"T1ColorSettingsPrimaryColorOptionKey"];
+    TAEColorSettings* colorSettings = PFBColorSettings();
+    if ([colorSettings respondsToSelector:@selector(setPrimaryColorOption:)]) {
+        [colorSettings setPrimaryColorOption:colorID];
+    }
+}
+
+// A snapshot of the view: opaque under a dark palette, transparent otherwise or when the
+// palette cannot be read.
 static inline UIImage* imageFromView(UIView* view) {
-    TAEColorSettings* colorSettings =
-        [objc_getClass("TAEColorSettings") sharedSettings];
-    bool opaque = [colorSettings.currentColorPalette isDark] ? true : false;
+    TAEColorSettings* colorSettings = PFBColorSettings();
+    TAETwitterColorPaletteSettingInfo* palette =
+        [colorSettings respondsToSelector:@selector(currentColorPalette)] ? colorSettings.currentColorPalette : nil;
+    BOOL opaque = [palette respondsToSelector:@selector(isDark)] && palette.isDark;
     UIGraphicsBeginImageContextWithOptions(view.frame.size, opaque, 0.0);
     [view drawViewHierarchyInRect:view.bounds afterScreenUpdates:false];
     UIImage* img = UIGraphicsGetImageFromCurrentImageContext();
