@@ -538,6 +538,8 @@
 "HIDDEN_NOTIFS_UNTITLED" = "Hidden notification";
 "HIDE_NOTIFICATIONS_TITLE" = "Hide a notification";
 "HIDE_NOTIFICATIONS_DETAIL" = "Tap its × or swipe it. The eye at the top of Notifications lists the hidden ones.";
+"NEW_TWITTER_SETTINGS_TITLE" = "New Twitter settings";
+"NEW_TWITTER_SETTINGS_DETAIL" = "Use Twitter’s redesigned settings. PrimeFreeBird stays at the top.";
 "EXPLORE_TABS_CAPTION" = "Explore bar";
 "EXPLORE_TABS_HINT" = "Tap a tab to remove or restore it.";
 "EXPLORE_TABS_HIDDEN_COUNT" = "%lu hidden";

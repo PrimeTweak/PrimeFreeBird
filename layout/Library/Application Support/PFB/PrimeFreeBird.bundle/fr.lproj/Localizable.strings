@@ -534,6 +534,8 @@
 "HIDDEN_NOTIFS_UNTITLED" = "Notification masquée";
 "HIDE_NOTIFICATIONS_TITLE" = "Masquer une notification";
 "HIDE_NOTIFICATIONS_DETAIL" = "Touchez son × ou balayez-la. L’œil en haut de Notifications liste les notifications masquées.";
+"NEW_TWITTER_SETTINGS_TITLE" = "Nouveaux réglages Twitter";
+"NEW_TWITTER_SETTINGS_DETAIL" = "Utilise les réglages redessinés de Twitter. PrimeFreeBird reste en haut.";
 "EXPLORE_TABS_CAPTION" = "Barre d’Explorer";
 "EXPLORE_TABS_HINT" = "Touchez un onglet pour le retirer ou le remettre.";
 "EXPLORE_TABS_HIDDEN_COUNT" = "Masqués : %lu";
