@@ -13,7 +13,7 @@
 
 /* ===== General › App behavior ===== */
 "NO_TAB_BAR_HIDING_TITLE" = "Zawsze widoczny";
-"NO_TAB_BAR_HIDING_DETAIL" = "Nie wygaszaj paska podczas przewijania.";
+"NO_TAB_BAR_HIDING_DETAIL" = "Nie zmniejszaj ani nie wygaszaj paska podczas przewijania.";
 "SHOW_SCROLL_INDICATOR_TITLE" = "Pasek przewijania";
 "DISABLE_RTL_TITLE" = "Tekst od lewej do prawej";
 "DISABLE_RTL_DETAIL" = "Wyświetlaj tekst od lewej do prawej, nawet w językach pisanych od prawej do lewej.";
@@ -46,7 +46,7 @@
 "TAB_BAR_THEMING_TITLE" = "Wybrana karta";
 "TAB_BAR_THEMING_DETAIL" = "Nadaje kolor akcentu wybranej karcie i podkreśleniu górnych kart.";
 "COLOR_TWITTER_ICON_IN_TOP_BAR_TITLE" = "Ikona Twittera";
-"COLOR_TWITTER_ICON_IN_TOP_BAR_DETAIL" = "Nadaje kolor akcentu ikonie Twittera na górnym pasku.";
+"COLOR_TWITTER_ICON_IN_TOP_BAR_DETAIL" = "Nadaje logo na górnym pasku kolor akcentu.";
 
 /* ===== BRANDING ===== */
 "MODERN_SETTINGS_BRANDING_TITLE" = "Branding";
@@ -65,8 +65,9 @@
 "HIDE_WHO_TO_FOLLOW_TITLE" = "Ukryj \"Warci obserwowania\"";
 "HIDE_WHO_TO_FOLLOW_DETAIL" = "Usuń sugestie obserwowania.";
 "HIDE_TIMELINE_PROMPTS_TITLE" = "Ukryj monity na osi czasu";
-"HIDE_TIMELINE_PROMPTS_DETAIL" = "Usuń banery takie jak \"Dodaj kontakty\".";
+"HIDE_TIMELINE_PROMPTS_DETAIL" = "Usuń banery i karty, takie jak „Dodaj kontakty” lub oferty Premium.";
 "HIDE_SPACES_TITLE" = "Ukryj pasek Pokoi";
+"HIDE_SPACES_DETAIL" = "Usuwa pasek Pokoi u góry Strony głównej.";
 "HIDE_CUSTOM_TIMELINES_TITLE" = "Ukryj własne osie czasu";
 "HIDE_CUSTOM_TIMELINES_DETAIL" = "Usuwa przypięte Listy i Grupy dyskusyjne z kart Strony głównej oraz przycisk Dodaj.";
 
@@ -75,16 +76,21 @@
 "MODERN_SETTINGS_TWEETS_SUBTITLE" = "Pisanie, przyciski, odpowiedzi i nieodpowiednie treści.";
 "UNDO_TWEET_TITLE" = "Cofnij Tweet";
 "TWEET_CONFIRM_TITLE" = "Potwierdzaj Tweety";
+"TWEET_CONFIRM_DETAIL" = "Prosi o potwierdzenie przed wysłaniem Tweeta lub odpowiedzi.";
 "LIKE_CONFIRM_TITLE" = "Potwierdzaj polubienia";
+"LIKE_CONFIRM_DETAIL" = "Prosi o potwierdzenie przed polubieniem Tweeta.";
 "HIDE_VIEW_COUNT_TITLE" = "Ukryj liczbę wyświetleń";
+"HIDE_VIEW_COUNT_DETAIL" = "Usuwa liczbę wyświetleń pod Tweetami i w otwartym Tweecie.";
 "HIDE_BOOKMARK_BUTTON_TITLE" = "Ukryj przycisk zakładek";
+"HIDE_BOOKMARK_BUTTON_DETAIL" = "Usuwa przycisk zakładek pod Tweetami.";
 "HIDE_DOWNVOTE_BUTTON_TITLE" = "Ukryj przycisk głosu negatywnego";
+"HIDE_DOWNVOTE_BUTTON_DETAIL" = "Usuwa przycisk głosu negatywnego pod Tweetami.";
 "DISABLE_SENSITIVE_TWEET_WARNINGS_TITLE" = "Ukryj ostrzeżenia";
 "BYPASS_AGE_VERIFICATION_TITLE" = "Pomijaj weryfikację wieku";
 "BYPASS_AGE_VERIFICATION_DETAIL" = "Pomija weryfikację wieku dla nieodpowiednich treści.";
 "REPLY_SORTING_TITLE" = "Sortuj odpowiedzi";
 "RESTORE_REPLY_CONTEXT_TITLE" = "Wiersz „W odpowiedzi do”";
-"RESTORE_REPLY_CONTEXT_DETAIL" = "Pojawia się nad tekstem otwartej odpowiedzi.";
+"RESTORE_REPLY_CONTEXT_DETAIL" = "Pokazuje wiersz „W odpowiedzi do” nad otwartą odpowiedzią.";
 "SHOW_QUOTE_COUNTS_TITLE" = "Liczba cytatów i Retweetów";
 "SHOW_QUOTE_COUNTS_DETAIL" = "Pokazuje obie liczby u góry ekranu cytatów Tweeta.";
 "SHOW_TWEET_SOURCE_TITLE" = "Źródło Tweeta";
@@ -97,14 +103,14 @@
 "MODERN_SETTINGS_MEDIA_TITLE" = "Multimedia";
 "MODERN_SETTINGS_MEDIA_SUBTITLE" = "Pobieranie, odtwarzanie, jakość i układ.";
 "DOWNLOAD_VIDEOS_TITLE" = "Filmy i GIF-y";
-"DOWNLOAD_VIDEOS_DETAIL" = "Zapisuje je z menu po przytrzymaniu multimediów.";
+"DOWNLOAD_VIDEOS_DETAIL" = "Zapisuje film lub GIF z menu po jego przytrzymaniu.";
 "DIRECT_SAVE_TITLE" = "Zapisuj w Zdjęciach";
 "DIRECT_SAVE_DETAIL" = "Zapisywane filmy trafią prosto do aplikacji Zdjęcia.";
 "TWEET_TO_IMAGE_TITLE" = "Zapisz Tweeta jako obraz";
-"TWEET_TO_IMAGE_DETAIL" = "Przytrzymaj udostępnianie, aby eksportować Tweety jako obrazy.";
+"TWEET_TO_IMAGE_DETAIL" = "Eksportuje Tweeta jako obraz po przytrzymaniu przycisku Udostępnij.";
 "DISABLE_VIDEO_CAPTIONS_TITLE" = "Ukryj napisy wideo";
 "AUTO_HIGHEST_LOAD_TITLE" = "Zdjęcia w pełnej rozdzielczości";
-"AUTO_HIGHEST_LOAD_DETAIL" = "Zawsze ładuj zdjęcia w najwyższej rozdzielczości.";
+"AUTO_HIGHEST_LOAD_DETAIL" = "Ładuj zdjęcia w najwyższej rozdzielczości.";
 "FORCE_TWEET_FULL_FRAME_TITLE" = "Obrazy bez przycinania";
 "RESTORE_VIDEO_TIMESTAMP_TITLE" = "Czas odtwarzania wideo";
 "RESTORE_VIDEO_TIMESTAMP_DETAIL" = "Pokazuje czas, który upłynął, i całkowitą długość filmu w pełnoekranowym odtwarzaczu zamiast odliczania.";
@@ -114,6 +120,7 @@
 "MODERN_SETTINGS_PROFILES_TITLE" = "Profile";
 "MODERN_SETTINGS_PROFILES_SUBTITLE" = "Przyciski Obserwuj, odznaki i karty profilu.";
 "FOLLOW_CONFIRM_TITLE" = "Potwierdzaj obserwowanie";
+"FOLLOW_CONFIRM_DETAIL" = "Prosi o potwierdzenie przed zaobserwowaniem konta.";
 "COPY_PROFILE_INFO_TITLE" = "Kopiuj dane profilu";
 "COPY_PROFILE_INFO_DETAIL" = "Dodaj przycisk kopiowania do profili.";
 "DISABLE_ARTICLES_TITLE" = "Ukryj Artykuły";
@@ -137,23 +144,23 @@
 "NO_HISTORY_TITLE" = "Wyłącz historię wyszukiwania";
 "NO_HISTORY_DETAIL" = "Nie zapisuj ani nie pokazuj ostatnich wyszukiwań.";
 "HIDE_TREND_VIDEOS_TITLE" = "Ukryj popularne filmy";
-"HIDE_TREND_VIDEOS_DETAIL" = "Usuń wiersz popularnych filmów z wyszukiwania.";
+"HIDE_TREND_VIDEOS_DETAIL" = "Usuń wiersz popularnych filmów z karty Przeglądaj.";
 
 /* ===== GROK ===== */
 "HIDE_SUGGESTED_CHATS_TITLE" = "Ukryj sugerowane czaty";
 "HIDE_SUGGESTED_CHATS_DETAIL" = "Usuwa listę „Sugerowane” ze skrzynki odbiorczej czatu.";
-"HIDE_GROK_ANALYZE_TITLE" = "Ukryj przyciski analizy Grok";
+"HIDE_GROK_ANALYZE_TITLE" = "Ukryj przyciski analizy i pytań";
 "HIDE_GROK_SIDEBAR_TITLE" = "Ukryj Grok na pasku bocznym";
 "HIDE_GROK_CREATE_TITLE" = "Ukryj narzędzia tworzenia";
 "HIDE_GROK_CREATE_DETAIL" = "Usuwa opcje tworzenia i edycji obrazów oraz filmów za pomocą Grok.";
 /* Legacy key name: this row TURNS ON auto-translation (the switch is inverted).
    Do not rename the key — it is persisted in user defaults. */
 "DISABLE_AUTO_TRANSLATE_TITLE" = "Automatyczne tłumaczenie";
-"DISABLE_AUTO_TRANSLATE_DETAIL" = "Automatycznie tłumacz Tweety, opisy profili, Uwagi Społeczności i powiadomienia.";
+"DISABLE_AUTO_TRANSLATE_DETAIL" = "Pozwól Twitterowi automatycznie tłumaczyć Tweety, opisy profili, Uwagi Społeczności i powiadomienia.";
 
 /* ===== LAB ===== */
 "REPLY_IN_WEBVIEW_TITLE" = "Odpowiadaj w wersji webowej";
-"REPLY_IN_WEBVIEW_DETAIL" = "Wysyła odpowiedzi przez stronę internetową, gdy aplikacja odmawia ich wysłania.";
+"REPLY_IN_WEBVIEW_DETAIL" = "Wysyła wszystkie odpowiedzi przez stronę internetową na wypadek, gdyby aplikacja odmawiała ich wysyłania.";
 
 /* ===== Theme color picker ===== */
 "THEME_SETTINGS_NAVIGATION_DETAIL" = "Wybierz kolor akcentu. Widzisz go tylko Ty.";

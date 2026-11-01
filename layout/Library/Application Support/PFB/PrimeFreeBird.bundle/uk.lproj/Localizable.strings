@@ -13,7 +13,7 @@
 
 /* ===== General › App behavior ===== */
 "NO_TAB_BAR_HIDING_TITLE" = "Завжди видима";
-"NO_TAB_BAR_HIDING_DETAIL" = "Не приховувати панель під час прокручування.";
+"NO_TAB_BAR_HIDING_DETAIL" = "Не зменшувати й не приховувати панель під час прокручування.";
 "SHOW_SCROLL_INDICATOR_TITLE" = "Смуга прокручування";
 "DISABLE_RTL_TITLE" = "Текст зліва направо";
 "DISABLE_RTL_DETAIL" = "Показує текст зліва направо, навіть у мовах із письмом справа наліво.";
@@ -46,7 +46,7 @@
 "TAB_BAR_THEMING_TITLE" = "Вибрана вкладка";
 "TAB_BAR_THEMING_DETAIL" = "Застосовує акцентний колір до вибраної вкладки та підкреслення верхніх вкладок.";
 "COLOR_TWITTER_ICON_IN_TOP_BAR_TITLE" = "Значок Twitter";
-"COLOR_TWITTER_ICON_IN_TOP_BAR_DETAIL" = "Застосовує акцентний колір до значка Twitter на верхній панелі.";
+"COLOR_TWITTER_ICON_IN_TOP_BAR_DETAIL" = "Застосовує акцентний колір до логотипа на верхній панелі.";
 
 /* ===== BRANDING ===== */
 "MODERN_SETTINGS_BRANDING_TITLE" = "Брендинг";
@@ -65,8 +65,9 @@
 "HIDE_WHO_TO_FOLLOW_TITLE" = "Приховати «Кого читати»";
 "HIDE_WHO_TO_FOLLOW_DETAIL" = "Прибрати рекомендації профілів.";
 "HIDE_TIMELINE_PROMPTS_TITLE" = "Приховати підказки в стрічці";
-"HIDE_TIMELINE_PROMPTS_DETAIL" = "Прибрати банери на кшталт «Додати контакти».";
+"HIDE_TIMELINE_PROMPTS_DETAIL" = "Прибрати банери й картки на кшталт «Додати контакти» чи пропозицій Premium.";
 "HIDE_SPACES_TITLE" = "Приховати панель аудіокімнат";
+"HIDE_SPACES_DETAIL" = "Прибирає панель аудіокімнат угорі «Головної».";
 "HIDE_CUSTOM_TIMELINES_TITLE" = "Приховати власні стрічки";
 "HIDE_CUSTOM_TIMELINES_DETAIL" = "Прибирає з вкладок «Головної» закріплені списки та спільноти, а також кнопку «Додати».";
 
@@ -75,16 +76,21 @@
 "MODERN_SETTINGS_TWEETS_SUBTITLE" = "Написання, кнопки, відповіді та делікатний вміст.";
 "UNDO_TWEET_TITLE" = "Скасувати твіт";
 "TWEET_CONFIRM_TITLE" = "Підтвердження твіту";
+"TWEET_CONFIRM_DETAIL" = "Запитує підтвердження перед надсиланням твіту чи відповіді.";
 "LIKE_CONFIRM_TITLE" = "Підтвердження вподобань";
+"LIKE_CONFIRM_DETAIL" = "Запитує підтвердження, перш ніж вподобати твіт.";
 "HIDE_VIEW_COUNT_TITLE" = "Приховати кількість переглядів";
+"HIDE_VIEW_COUNT_DETAIL" = "Прибирає кількість переглядів під твітами й у відкритому твіті.";
 "HIDE_BOOKMARK_BUTTON_TITLE" = "Приховати кнопку закладок";
+"HIDE_BOOKMARK_BUTTON_DETAIL" = "Прибирає кнопку закладок під твітами.";
 "HIDE_DOWNVOTE_BUTTON_TITLE" = "Приховати кнопку дизлайка";
+"HIDE_DOWNVOTE_BUTTON_DETAIL" = "Прибирає кнопку дизлайка під твітами.";
 "DISABLE_SENSITIVE_TWEET_WARNINGS_TITLE" = "Приховати попередження";
 "BYPASS_AGE_VERIFICATION_TITLE" = "Обійти перевірку віку";
 "BYPASS_AGE_VERIFICATION_DETAIL" = "Пропускає перевірку віку для делікатного вмісту.";
 "REPLY_SORTING_TITLE" = "Сортувати відповіді";
 "RESTORE_REPLY_CONTEXT_TITLE" = "Рядок «У відповідь»";
-"RESTORE_REPLY_CONTEXT_DETAIL" = "Показується над текстом відкритої відповіді.";
+"RESTORE_REPLY_CONTEXT_DETAIL" = "Показує рядок «У відповідь» над відкритою відповіддю.";
 "SHOW_QUOTE_COUNTS_TITLE" = "Кількість цитат і ретвітів";
 "SHOW_QUOTE_COUNTS_DETAIL" = "Показує обидва числа вгорі екрана цитат твіту.";
 "SHOW_TWEET_SOURCE_TITLE" = "Джерело твіту";
@@ -97,14 +103,14 @@
 "MODERN_SETTINGS_MEDIA_TITLE" = "Медіа";
 "MODERN_SETTINGS_MEDIA_SUBTITLE" = "Завантаження, відтворення, якість і відображення.";
 "DOWNLOAD_VIDEOS_TITLE" = "Відео та GIF";
-"DOWNLOAD_VIDEOS_DETAIL" = "Зберігає їх з меню довгого натискання на медіа.";
+"DOWNLOAD_VIDEOS_DETAIL" = "Зберігає відео чи GIF з його меню довгого натискання.";
 "DIRECT_SAVE_TITLE" = "Зберегти в Фото";
 "DIRECT_SAVE_DETAIL" = "Зберігає відео одразу в додаток «Фото».";
 "TWEET_TO_IMAGE_TITLE" = "Зберегти твіт як зображення";
-"TWEET_TO_IMAGE_DETAIL" = "Натисніть та утримуйте «Поділитися», щоб експортувати у вигляді картинки.";
+"TWEET_TO_IMAGE_DETAIL" = "Експортує твіт як зображення довгим натисканням на «Поділитися».";
 "DISABLE_VIDEO_CAPTIONS_TITLE" = "Приховати субтитри відео";
 "AUTO_HIGHEST_LOAD_TITLE" = "Фото в повній роздільності";
-"AUTO_HIGHEST_LOAD_DETAIL" = "Завжди показувати фото в найвищій роздільній здатності.";
+"AUTO_HIGHEST_LOAD_DETAIL" = "Показувати фото в найвищій роздільній здатності.";
 "FORCE_TWEET_FULL_FRAME_TITLE" = "Зображення без обрізання";
 "RESTORE_VIDEO_TIMESTAMP_TITLE" = "Час у відео";
 "RESTORE_VIDEO_TIMESTAMP_DETAIL" = "Показує час, що минув, і загальну тривалість у повноекранному режимі відео замість зворотного відліку.";
@@ -114,6 +120,7 @@
 "MODERN_SETTINGS_PROFILES_TITLE" = "Профілі";
 "MODERN_SETTINGS_PROFILES_SUBTITLE" = "Кнопки «Читати», значки та вкладки профілю.";
 "FOLLOW_CONFIRM_TITLE" = "Підтвердження читань";
+"FOLLOW_CONFIRM_DETAIL" = "Запитує підтвердження, перш ніж почати читати профіль.";
 "COPY_PROFILE_INFO_TITLE" = "Копіювати інформацію профілю";
 "COPY_PROFILE_INFO_DETAIL" = "Додає до профілів кнопку копіювання.";
 "DISABLE_ARTICLES_TITLE" = "Приховати «Статті»";
@@ -137,23 +144,23 @@
 "NO_HISTORY_TITLE" = "Вимкнути історію пошуку";
 "NO_HISTORY_DETAIL" = "Не зберігати й не показувати нещодавні пошукові запити.";
 "HIDE_TREND_VIDEOS_TITLE" = "Приховати трендові відео";
-"HIDE_TREND_VIDEOS_DETAIL" = "Прибрати рядок трендових відео з пошуку.";
+"HIDE_TREND_VIDEOS_DETAIL" = "Прибрати рядок трендових відео з розділу «Перегляньте».";
 
 /* ===== GROK ===== */
 "HIDE_SUGGESTED_CHATS_TITLE" = "Приховати рекомендовані чати";
 "HIDE_SUGGESTED_CHATS_DETAIL" = "Прибирає список «Рекомендовані» зі скриньки вхідних чатів.";
-"HIDE_GROK_ANALYZE_TITLE" = "Приховати кнопки аналізу Grok";
+"HIDE_GROK_ANALYZE_TITLE" = "Приховати кнопки аналізу й запитань";
 "HIDE_GROK_SIDEBAR_TITLE" = "Приховати Grok у бічній панелі";
 "HIDE_GROK_CREATE_TITLE" = "Приховати інструменти створення";
 "HIDE_GROK_CREATE_DETAIL" = "Прибирає можливість створювати та редагувати зображення й відео за допомогою Grok.";
 /* Legacy key name: this row TURNS ON auto-translation (the switch is inverted).
    Do not rename the key — it is persisted in user defaults. */
 "DISABLE_AUTO_TRANSLATE_TITLE" = "Автопереклад";
-"DISABLE_AUTO_TRANSLATE_DETAIL" = "Автоматично перекладати твіти, біографії, примітки та сповіщення.";
+"DISABLE_AUTO_TRANSLATE_DETAIL" = "Дозволити Twitter автоматично перекладати твіти, біографії, примітки та сповіщення.";
 
 /* ===== LAB ===== */
 "REPLY_IN_WEBVIEW_TITLE" = "Відповідати через веб";
-"REPLY_IN_WEBVIEW_DETAIL" = "Надсилає відповіді через вебсторінку, коли додаток відмовляється їх надсилати.";
+"REPLY_IN_WEBVIEW_DETAIL" = "Надсилає всі відповіді через вебсторінку — для випадків, коли додаток відмовляється їх надсилати.";
 
 /* ===== Theme color picker ===== */
 "THEME_SETTINGS_NAVIGATION_DETAIL" = "Виберіть акцентний колір. Його бачите лише ви.";

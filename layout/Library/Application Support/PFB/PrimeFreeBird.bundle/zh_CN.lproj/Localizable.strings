@@ -13,7 +13,7 @@
 
 /* ===== General › App behavior ===== */
 "NO_TAB_BAR_HIDING_TITLE" = "始终显示";
-"NO_TAB_BAR_HIDING_DETAIL" = "滚动时不淡出。";
+"NO_TAB_BAR_HIDING_DETAIL" = "滚动时不缩小也不淡出。";
 "SHOW_SCROLL_INDICATOR_TITLE" = "滚动条";
 "DISABLE_RTL_TITLE" = "文字从左到右";
 "DISABLE_RTL_DETAIL" = "即使是从右到左书写的语言，文字也从左到右显示。";
@@ -46,7 +46,7 @@
 "TAB_BAR_THEMING_TITLE" = "选中的标签";
 "TAB_BAR_THEMING_DETAIL" = "将强调色应用于选中的标签和顶部标签的下划线。";
 "COLOR_TWITTER_ICON_IN_TOP_BAR_TITLE" = "Twitter 图标";
-"COLOR_TWITTER_ICON_IN_TOP_BAR_DETAIL" = "将强调色应用于顶栏的 Twitter 图标。";
+"COLOR_TWITTER_ICON_IN_TOP_BAR_DETAIL" = "将强调色应用于顶栏的标志。";
 
 /* ===== BRANDING ===== */
 "MODERN_SETTINGS_BRANDING_TITLE" = "品牌";
@@ -65,8 +65,9 @@
 "HIDE_WHO_TO_FOLLOW_TITLE" = "隐藏“推荐关注”";
 "HIDE_WHO_TO_FOLLOW_DETAIL" = "移除关注推荐。";
 "HIDE_TIMELINE_PROMPTS_TITLE" = "隐藏时间线提示";
-"HIDE_TIMELINE_PROMPTS_DETAIL" = "移除“添加通讯录”等横幅。";
+"HIDE_TIMELINE_PROMPTS_DETAIL" = "移除“添加通讯录”、Premium 优惠等横幅和卡片。";
 "HIDE_SPACES_TITLE" = "隐藏空间栏";
+"HIDE_SPACES_DETAIL" = "移除主页顶部的空间栏。";
 "HIDE_CUSTOM_TIMELINES_TITLE" = "隐藏自定义时间线";
 "HIDE_CUSTOM_TIMELINES_DETAIL" = "从主页标签中移除置顶的列表和社群，以及添加按钮。";
 
@@ -75,16 +76,21 @@
 "MODERN_SETTINGS_TWEETS_SUBTITLE" = "撰写、按钮、回复和敏感内容。";
 "UNDO_TWEET_TITLE" = "撤销推文";
 "TWEET_CONFIRM_TITLE" = "确认发推";
+"TWEET_CONFIRM_DETAIL" = "发送推文或回复前先询问。";
 "LIKE_CONFIRM_TITLE" = "确认喜欢";
+"LIKE_CONFIRM_DETAIL" = "喜欢推文前先询问。";
 "HIDE_VIEW_COUNT_TITLE" = "隐藏查看次数";
+"HIDE_VIEW_COUNT_DETAIL" = "移除推文下方和已打开推文中的查看次数。";
 "HIDE_BOOKMARK_BUTTON_TITLE" = "隐藏书签按钮";
+"HIDE_BOOKMARK_BUTTON_DETAIL" = "移除推文下方的书签按钮。";
 "HIDE_DOWNVOTE_BUTTON_TITLE" = "隐藏点踩按钮";
+"HIDE_DOWNVOTE_BUTTON_DETAIL" = "移除推文下方的点踩按钮。";
 "DISABLE_SENSITIVE_TWEET_WARNINGS_TITLE" = "隐藏警告";
 "BYPASS_AGE_VERIFICATION_TITLE" = "绕过年龄验证";
 "BYPASS_AGE_VERIFICATION_DETAIL" = "跳过敏感内容的年龄验证流程。";
 "REPLY_SORTING_TITLE" = "对回复排序";
 "RESTORE_REPLY_CONTEXT_TITLE" = "“回复”提示行";
-"RESTORE_REPLY_CONTEXT_DETAIL" = "显示在打开的回复正文上方。";
+"RESTORE_REPLY_CONTEXT_DETAIL" = "在打开的回复上方显示“回复”提示行。";
 "SHOW_QUOTE_COUNTS_TITLE" = "引用和转推数";
 "SHOW_QUOTE_COUNTS_DETAIL" = "在推文的引用页面顶部显示这两个数字。";
 "SHOW_TWEET_SOURCE_TITLE" = "推文来源";
@@ -97,14 +103,14 @@
 "MODERN_SETTINGS_MEDIA_TITLE" = "媒体";
 "MODERN_SETTINGS_MEDIA_SUBTITLE" = "下载、播放、画质和布局。";
 "DOWNLOAD_VIDEOS_TITLE" = "视频和 GIF";
-"DOWNLOAD_VIDEOS_DETAIL" = "从媒体的长按菜单保存。";
+"DOWNLOAD_VIDEOS_DETAIL" = "从视频或 GIF 的长按菜单保存。";
 "DIRECT_SAVE_TITLE" = "保存至“照片”";
 "DIRECT_SAVE_DETAIL" = "视频会直接保存到你的“照片”应用中。";
 "TWEET_TO_IMAGE_TITLE" = "将推文保存为图片";
-"TWEET_TO_IMAGE_DETAIL" = "长按“分享”按钮可导出为图片。";
+"TWEET_TO_IMAGE_DETAIL" = "长按“分享”按钮，将推文导出为图片。";
 "DISABLE_VIDEO_CAPTIONS_TITLE" = "隐藏视频字幕";
 "AUTO_HIGHEST_LOAD_TITLE" = "全分辨率图片";
-"AUTO_HIGHEST_LOAD_DETAIL" = "始终以最高分辨率加载图片。";
+"AUTO_HIGHEST_LOAD_DETAIL" = "以最高分辨率加载图片。";
 "FORCE_TWEET_FULL_FRAME_TITLE" = "完整显示图片";
 "RESTORE_VIDEO_TIMESTAMP_TITLE" = "视频播放时间";
 "RESTORE_VIDEO_TIMESTAMP_DETAIL" = "在全屏视频上显示已播放时间和总时长，而不是倒计时。";
@@ -114,6 +120,7 @@
 "MODERN_SETTINGS_PROFILES_TITLE" = "个人资料";
 "MODERN_SETTINGS_PROFILES_SUBTITLE" = "关注按钮、徽章和个人资料标签。";
 "FOLLOW_CONFIRM_TITLE" = "确认关注";
+"FOLLOW_CONFIRM_DETAIL" = "关注账号前先询问。";
 "COPY_PROFILE_INFO_TITLE" = "复制个人资料信息";
 "COPY_PROFILE_INFO_DETAIL" = "在个人资料中添加复制按钮。";
 "DISABLE_ARTICLES_TITLE" = "隐藏“文章”";
@@ -137,23 +144,23 @@
 "NO_HISTORY_TITLE" = "关闭搜索历史";
 "NO_HISTORY_DETAIL" = "不保存也不显示最近的搜索记录。";
 "HIDE_TREND_VIDEOS_TITLE" = "隐藏热门视频";
-"HIDE_TREND_VIDEOS_DETAIL" = "从搜索中移除热门视频行。";
+"HIDE_TREND_VIDEOS_DETAIL" = "从探索中移除热门视频行。";
 
 /* ===== GROK ===== */
 "HIDE_SUGGESTED_CHATS_TITLE" = "隐藏推荐的聊天";
 "HIDE_SUGGESTED_CHATS_DETAIL" = "从聊天收件箱中移除“推荐”列表。";
-"HIDE_GROK_ANALYZE_TITLE" = "隐藏 Grok 分析按钮";
+"HIDE_GROK_ANALYZE_TITLE" = "隐藏分析和提问按钮";
 "HIDE_GROK_SIDEBAR_TITLE" = "隐藏侧边栏中的 Grok";
 "HIDE_GROK_CREATE_TITLE" = "隐藏创建工具";
 "HIDE_GROK_CREATE_DETAIL" = "移除使用 Grok 创建或编辑图片和视频的选项。";
 /* Legacy key name: this row TURNS ON auto-translation (the switch is inverted).
    Do not rename the key — it is persisted in user defaults. */
 "DISABLE_AUTO_TRANSLATE_TITLE" = "自动翻译";
-"DISABLE_AUTO_TRANSLATE_DETAIL" = "自动翻译推文、简介、社群附注和通知。";
+"DISABLE_AUTO_TRANSLATE_DETAIL" = "允许 Twitter 自动翻译推文、简介、社群附注和通知。";
 
 /* ===== LAB ===== */
 "REPLY_IN_WEBVIEW_TITLE" = "在网页上回复";
-"REPLY_IN_WEBVIEW_DETAIL" = "当应用拒绝发送回复时，通过网页回复。";
+"REPLY_IN_WEBVIEW_DETAIL" = "所有回复都通过网页发送，适用于应用拒绝发送回复的情况。";
 
 /* ===== Theme color picker ===== */
 "THEME_SETTINGS_NAVIGATION_DETAIL" = "选择强调色。只有你能看到。";

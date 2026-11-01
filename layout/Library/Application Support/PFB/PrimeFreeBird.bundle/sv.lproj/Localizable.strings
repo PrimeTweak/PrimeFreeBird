@@ -13,7 +13,7 @@
 
 /* ===== General › App behavior ===== */
 "NO_TAB_BAR_HIDING_TITLE" = "Alltid synligt";
-"NO_TAB_BAR_HIDING_DETAIL" = "Tona inte bort fältet när du scrollar.";
+"NO_TAB_BAR_HIDING_DETAIL" = "Låt inte fältet krympa eller tonas bort när du scrollar.";
 "SHOW_SCROLL_INDICATOR_TITLE" = "Rullningslist";
 "DISABLE_RTL_TITLE" = "Text från vänster till höger";
 "DISABLE_RTL_DETAIL" = "Visa text från vänster till höger, även på språk som skrivs från höger till vänster.";
@@ -46,7 +46,7 @@
 "TAB_BAR_THEMING_TITLE" = "Vald flik";
 "TAB_BAR_THEMING_DETAIL" = "Tillämpa accentfärgen på den valda fliken och understrykningen av de övre flikarna.";
 "COLOR_TWITTER_ICON_IN_TOP_BAR_TITLE" = "Twitter-ikon";
-"COLOR_TWITTER_ICON_IN_TOP_BAR_DETAIL" = "Tillämpa accentfärgen på Twitter-ikonen i det övre fältet.";
+"COLOR_TWITTER_ICON_IN_TOP_BAR_DETAIL" = "Tillämpa accentfärgen på logotypen i det övre fältet.";
 
 /* ===== BRANDING ===== */
 "MODERN_SETTINGS_BRANDING_TITLE" = "Profilering";
@@ -65,8 +65,9 @@
 "HIDE_WHO_TO_FOLLOW_TITLE" = "Dölj ”Hitta användare”";
 "HIDE_WHO_TO_FOLLOW_DETAIL" = "Ta bort förslag om vem du kan följa.";
 "HIDE_TIMELINE_PROMPTS_TITLE" = "Dölj uppmaningar i tidslinjen";
-"HIDE_TIMELINE_PROMPTS_DETAIL" = "Ta bort banderoller som ”Lägg till kontakter”.";
+"HIDE_TIMELINE_PROMPTS_DETAIL" = "Ta bort banderoller och kort som ”Lägg till kontakter” eller Premium-erbjudanden.";
 "HIDE_SPACES_TITLE" = "Dölj Områden-fältet";
+"HIDE_SPACES_DETAIL" = "Ta bort Områden-fältet högst upp på Hem.";
 "HIDE_CUSTOM_TIMELINES_TITLE" = "Dölj anpassade tidslinjer";
 "HIDE_CUSTOM_TIMELINES_DETAIL" = "Ta bort fastnålade listor och grupper från flikarna på Hem, samt Lägg till-knappen.";
 
@@ -75,16 +76,21 @@
 "MODERN_SETTINGS_TWEETS_SUBTITLE" = "Skriva, knappar, svar och känsligt innehåll.";
 "UNDO_TWEET_TITLE" = "Ångra Tweet";
 "TWEET_CONFIRM_TITLE" = "Bekräfta Tweets";
+"TWEET_CONFIRM_DETAIL" = "Fråga innan du skickar en Tweet eller ett svar.";
 "LIKE_CONFIRM_TITLE" = "Bekräfta gilla-markeringar";
+"LIKE_CONFIRM_DETAIL" = "Fråga innan du gillar en Tweet.";
 "HIDE_VIEW_COUNT_TITLE" = "Dölj antal visningar";
+"HIDE_VIEW_COUNT_DETAIL" = "Ta bort antalet visningar under Tweets och i en öppnad Tweet.";
 "HIDE_BOOKMARK_BUTTON_TITLE" = "Dölj bokmärkesknapp";
+"HIDE_BOOKMARK_BUTTON_DETAIL" = "Ta bort bokmärkesknappen under Tweets.";
 "HIDE_DOWNVOTE_BUTTON_TITLE" = "Dölj nedröstningsknapp";
+"HIDE_DOWNVOTE_BUTTON_DETAIL" = "Ta bort nedröstningsknappen under Tweets.";
 "DISABLE_SENSITIVE_TWEET_WARNINGS_TITLE" = "Dölj varningar";
 "BYPASS_AGE_VERIFICATION_TITLE" = "Kringgå åldersverifiering";
 "BYPASS_AGE_VERIFICATION_DETAIL" = "Hoppar över åldersverifieringen för känsligt innehåll.";
 "REPLY_SORTING_TITLE" = "Sortera svar";
 "RESTORE_REPLY_CONTEXT_TITLE" = "Raden ”Svarar till”";
-"RESTORE_REPLY_CONTEXT_DETAIL" = "Visas ovanför texten i ett svar du öppnar.";
+"RESTORE_REPLY_CONTEXT_DETAIL" = "Visa raden ”Svarar till” ovanför ett svar du öppnar.";
 "SHOW_QUOTE_COUNTS_TITLE" = "Antal citat och Retweets";
 "SHOW_QUOTE_COUNTS_DETAIL" = "Visa båda siffrorna överst på en Tweets citatskärm.";
 "SHOW_TWEET_SOURCE_TITLE" = "Tweetens källa";
@@ -97,14 +103,14 @@
 "MODERN_SETTINGS_MEDIA_TITLE" = "Medier";
 "MODERN_SETTINGS_MEDIA_SUBTITLE" = "Nedladdningar, uppspelning, kvalitet och layout.";
 "DOWNLOAD_VIDEOS_TITLE" = "Videor och GIF:ar";
-"DOWNLOAD_VIDEOS_DETAIL" = "Spara dem från menyn när du trycker länge på medier.";
+"DOWNLOAD_VIDEOS_DETAIL" = "Spara en video eller GIF från menyn när du trycker länge på den.";
 "DIRECT_SAVE_TITLE" = "Spara till Bilder";
 "DIRECT_SAVE_DETAIL" = "Videor du sparar hamnar direkt i Bilder-appen.";
 "TWEET_TO_IMAGE_TITLE" = "Spara Tweet som bild";
-"TWEET_TO_IMAGE_DETAIL" = "Tryck länge på dela för att exportera Tweets som bilder.";
+"TWEET_TO_IMAGE_DETAIL" = "Exportera en Tweet som bild genom att trycka länge på Dela.";
 "DISABLE_VIDEO_CAPTIONS_TITLE" = "Dölj videoundertexter";
 "AUTO_HIGHEST_LOAD_TITLE" = "Foton i full upplösning";
-"AUTO_HIGHEST_LOAD_DETAIL" = "Läs alltid in foton i högsta upplösning.";
+"AUTO_HIGHEST_LOAD_DETAIL" = "Läs in foton i högsta upplösning.";
 "FORCE_TWEET_FULL_FRAME_TITLE" = "Obeskurna bilder";
 "RESTORE_VIDEO_TIMESTAMP_TITLE" = "Videotid";
 "RESTORE_VIDEO_TIMESTAMP_DETAIL" = "Visar förfluten och total tid på videor i helskärm i stället för nedräkningen.";
@@ -114,6 +120,7 @@
 "MODERN_SETTINGS_PROFILES_TITLE" = "Profiler";
 "MODERN_SETTINGS_PROFILES_SUBTITLE" = "Följ-knappar, märken och profilflikar.";
 "FOLLOW_CONFIRM_TITLE" = "Bekräfta följningar";
+"FOLLOW_CONFIRM_DETAIL" = "Fråga innan du följer ett konto.";
 "COPY_PROFILE_INFO_TITLE" = "Kopiera profilinfo";
 "COPY_PROFILE_INFO_DETAIL" = "Lägg till en kopieringsknapp i profiler.";
 "DISABLE_ARTICLES_TITLE" = "Dölj Artiklar";
@@ -137,23 +144,23 @@
 "NO_HISTORY_TITLE" = "Stäng av sökhistorik";
 "NO_HISTORY_DETAIL" = "Varken sparar eller visar senaste sökningar.";
 "HIDE_TREND_VIDEOS_TITLE" = "Dölj trendande videor";
-"HIDE_TREND_VIDEOS_DETAIL" = "Ta bort raden med trendande videor från sökningen.";
+"HIDE_TREND_VIDEOS_DETAIL" = "Ta bort raden med trendande videor från Utforska.";
 
 /* ===== GROK ===== */
 "HIDE_SUGGESTED_CHATS_TITLE" = "Dölj föreslagna chattar";
 "HIDE_SUGGESTED_CHATS_DETAIL" = "Tar bort listan ”Föreslagna” från din chattinkorg.";
-"HIDE_GROK_ANALYZE_TITLE" = "Dölj Grok-analysknappar";
+"HIDE_GROK_ANALYZE_TITLE" = "Dölj analys- och frågeknappar";
 "HIDE_GROK_SIDEBAR_TITLE" = "Dölj Grok i sidofältet";
 "HIDE_GROK_CREATE_TITLE" = "Dölj skapandeverktyg";
 "HIDE_GROK_CREATE_DETAIL" = "Tar bort alternativen för att skapa eller redigera bilder och videor med Grok.";
 /* Legacy key name: this row TURNS ON auto-translation (the switch is inverted).
    Do not rename the key — it is persisted in user defaults. */
 "DISABLE_AUTO_TRANSLATE_TITLE" = "Automatisk översättning";
-"DISABLE_AUTO_TRANSLATE_DETAIL" = "Översätt Tweets, biografier, gruppanmärkningar och notiser automatiskt.";
+"DISABLE_AUTO_TRANSLATE_DETAIL" = "Låt Twitter översätta Tweets, biografier, gruppanmärkningar och notiser automatiskt.";
 
 /* ===== LAB ===== */
 "REPLY_IN_WEBVIEW_TITLE" = "Svara via webben";
-"REPLY_IN_WEBVIEW_DETAIL" = "Svara via en webbsida när appen vägrar skicka svar.";
+"REPLY_IN_WEBVIEW_DETAIL" = "Skicka alla svar via en webbsida, för de gånger appen vägrar skicka svar.";
 
 /* ===== Theme color picker ===== */
 "THEME_SETTINGS_NAVIGATION_DETAIL" = "Välj en accentfärg. Bara du kan se den.";

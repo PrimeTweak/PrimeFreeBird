@@ -13,7 +13,7 @@
 
 /* ===== General › App behavior ===== */
 "NO_TAB_BAR_HIDING_TITLE" = "ظاهر دائمًا";
-"NO_TAB_BAR_HIDING_DETAIL" = "عدم إخفاء الشريط عند التمرير.";
+"NO_TAB_BAR_HIDING_DETAIL" = "عدم تصغير الشريط أو تلاشيه عند التمرير.";
 "SHOW_SCROLL_INDICATOR_TITLE" = "شريط التمرير";
 "DISABLE_RTL_TITLE" = "نص من اليسار إلى اليمين";
 "DISABLE_RTL_DETAIL" = "عرض النص من اليسار إلى اليمين، حتى في اللغات التي تُكتب من اليمين إلى اليسار.";
@@ -46,7 +46,7 @@
 "TAB_BAR_THEMING_TITLE" = "التبويب المحدد";
 "TAB_BAR_THEMING_DETAIL" = "تطبيق لون التمييز على التبويب المحدد وعلى الخط أسفل التبويبات العلوية.";
 "COLOR_TWITTER_ICON_IN_TOP_BAR_TITLE" = "أيقونة تويتر";
-"COLOR_TWITTER_ICON_IN_TOP_BAR_DETAIL" = "تطبيق لون التمييز على أيقونة تويتر في الشريط العلوي.";
+"COLOR_TWITTER_ICON_IN_TOP_BAR_DETAIL" = "تطبيق لون التمييز على الشعار في الشريط العلوي.";
 
 /* ===== BRANDING ===== */
 "MODERN_SETTINGS_BRANDING_TITLE" = "الهوية";
@@ -65,8 +65,9 @@
 "HIDE_WHO_TO_FOLLOW_TITLE" = "إخفاء 'اقتراحات المتابعة'";
 "HIDE_WHO_TO_FOLLOW_DETAIL" = "إخفاء اقتراحات المتابعة.";
 "HIDE_TIMELINE_PROMPTS_TITLE" = "إخفاء مطالبات الخط الزمني";
-"HIDE_TIMELINE_PROMPTS_DETAIL" = "إزالة اللافتات مثل 'إضافة جهات الاتصال'.";
+"HIDE_TIMELINE_PROMPTS_DETAIL" = "إزالة اللافتات والبطاقات مثل «إضافة جهات الاتصال» أو عروض Premium.";
 "HIDE_SPACES_TITLE" = "إخفاء شريط المساحات";
+"HIDE_SPACES_DETAIL" = "إزالة شريط المساحات من أعلى الرئيسية.";
 "HIDE_CUSTOM_TIMELINES_TITLE" = "إخفاء الخطوط الزمنية المخصصة";
 "HIDE_CUSTOM_TIMELINES_DETAIL" = "إزالة القوائم والمجتمعات المثبّتة من تبويبات الرئيسية، وزر الإضافة.";
 
@@ -75,16 +76,21 @@
 "MODERN_SETTINGS_TWEETS_SUBTITLE" = "الكتابة والأزرار والردود والمحتوى الحساس.";
 "UNDO_TWEET_TITLE" = "تراجع عن التغريدة";
 "TWEET_CONFIRM_TITLE" = "تأكيد التغريد";
+"TWEET_CONFIRM_DETAIL" = "طلب تأكيد قبل إرسال تغريدة أو رد.";
 "LIKE_CONFIRM_TITLE" = "تأكيد الإعجابات";
+"LIKE_CONFIRM_DETAIL" = "طلب تأكيد قبل الإعجاب بتغريدة.";
 "HIDE_VIEW_COUNT_TITLE" = "إخفاء عدد المشاهدات";
+"HIDE_VIEW_COUNT_DETAIL" = "إزالة عدد المشاهدات أسفل التغريدات وفي التغريدة المفتوحة.";
 "HIDE_BOOKMARK_BUTTON_TITLE" = "إخفاء زر العلامات المرجعية";
+"HIDE_BOOKMARK_BUTTON_DETAIL" = "إزالة زر العلامات المرجعية أسفل التغريدات.";
 "HIDE_DOWNVOTE_BUTTON_TITLE" = "إخفاء زر التصويت السلبي";
+"HIDE_DOWNVOTE_BUTTON_DETAIL" = "إزالة زر التصويت السلبي أسفل التغريدات.";
 "DISABLE_SENSITIVE_TWEET_WARNINGS_TITLE" = "إخفاء التحذيرات";
 "BYPASS_AGE_VERIFICATION_TITLE" = "تجاوز التحقق من العمر";
 "BYPASS_AGE_VERIFICATION_DETAIL" = "تخطي عملية التحقق من العمر للمحتوى الحساس.";
 "REPLY_SORTING_TITLE" = "فرز الردود";
 "RESTORE_REPLY_CONTEXT_TITLE" = "سطر 'ردًا على'";
-"RESTORE_REPLY_CONTEXT_DETAIL" = "يظهر فوق نص الرد الذي تفتحه.";
+"RESTORE_REPLY_CONTEXT_DETAIL" = "عرض سطر «ردًا على» فوق الرد الذي تفتحه.";
 "SHOW_QUOTE_COUNTS_TITLE" = "عدد الاقتباسات وإعادات التغريد";
 "SHOW_QUOTE_COUNTS_DETAIL" = "عرض العددين أعلى شاشة اقتباسات التغريدة.";
 "SHOW_TWEET_SOURCE_TITLE" = "مصدر التغريدة";
@@ -97,14 +103,14 @@
 "MODERN_SETTINGS_MEDIA_TITLE" = "الوسائط";
 "MODERN_SETTINGS_MEDIA_SUBTITLE" = "التنزيلات والتشغيل والجودة وطريقة العرض.";
 "DOWNLOAD_VIDEOS_TITLE" = "الفيديوهات وصور GIF";
-"DOWNLOAD_VIDEOS_DETAIL" = "احفظها من قائمة الضغط المطوّل على الوسائط.";
+"DOWNLOAD_VIDEOS_DETAIL" = "احفظ الفيديو أو صورة GIF من قائمة الضغط المطوّل.";
 "DIRECT_SAVE_TITLE" = "حفظ في الصور";
 "DIRECT_SAVE_DETAIL" = "يتم حفظ الفيديوهات مباشرة في تطبيق الصور.";
 "TWEET_TO_IMAGE_TITLE" = "حفظ التغريدة كصورة";
-"TWEET_TO_IMAGE_DETAIL" = "اضغط مطوّلًا على زر المشاركة لتصدير التغريدة كصورة.";
+"TWEET_TO_IMAGE_DETAIL" = "تصدير التغريدة كصورة بالضغط المطوّل على زر المشاركة.";
 "DISABLE_VIDEO_CAPTIONS_TITLE" = "إخفاء ترجمات الفيديو";
 "AUTO_HIGHEST_LOAD_TITLE" = "صور بالدقة الكاملة";
-"AUTO_HIGHEST_LOAD_DETAIL" = "عرض الصور دائمًا بأعلى دقة.";
+"AUTO_HIGHEST_LOAD_DETAIL" = "عرض الصور بأعلى دقة.";
 "FORCE_TWEET_FULL_FRAME_TITLE" = "صور غير مقصوصة";
 "RESTORE_VIDEO_TIMESTAMP_TITLE" = "وقت الفيديو";
 "RESTORE_VIDEO_TIMESTAMP_DETAIL" = "عرض الوقت المنقضي والمدة الإجمالية في الفيديوهات بملء الشاشة بدلًا من العد التنازلي.";
@@ -114,6 +120,7 @@
 "MODERN_SETTINGS_PROFILES_TITLE" = "الملفات الشخصية";
 "MODERN_SETTINGS_PROFILES_SUBTITLE" = "أزرار المتابعة والشارات وتبويبات الملف الشخصي.";
 "FOLLOW_CONFIRM_TITLE" = "تأكيد المتابعة";
+"FOLLOW_CONFIRM_DETAIL" = "طلب تأكيد قبل متابعة حساب.";
 "COPY_PROFILE_INFO_TITLE" = "نسخ معلومات الملف الشخصي";
 "COPY_PROFILE_INFO_DETAIL" = "إضافة زر نسخ إلى الملفات الشخصية.";
 "DISABLE_ARTICLES_TITLE" = "إخفاء المقالات";
@@ -137,23 +144,23 @@
 "NO_HISTORY_TITLE" = "تعطيل سجل البحث";
 "NO_HISTORY_DETAIL" = "عدم حفظ عمليات البحث الأخيرة أو عرضها.";
 "HIDE_TREND_VIDEOS_TITLE" = "إخفاء الفيديوهات الرائجة";
-"HIDE_TREND_VIDEOS_DETAIL" = "إزالة صف الفيديوهات الرائجة من البحث.";
+"HIDE_TREND_VIDEOS_DETAIL" = "إزالة صف الفيديوهات الرائجة من تبويب استكشاف.";
 
 /* ===== GROK ===== */
 "HIDE_SUGGESTED_CHATS_TITLE" = "إخفاء الدردشات المقترحة";
 "HIDE_SUGGESTED_CHATS_DETAIL" = "يزيل قائمة «مقترح» من صندوق وارد الدردشة.";
-"HIDE_GROK_ANALYZE_TITLE" = "إخفاء أزرار تحليل Grok";
+"HIDE_GROK_ANALYZE_TITLE" = "إخفاء أزرار التحليل والسؤال";
 "HIDE_GROK_SIDEBAR_TITLE" = "إخفاء Grok من الشريط الجانبي";
 "HIDE_GROK_CREATE_TITLE" = "إخفاء أدوات الإنشاء";
 "HIDE_GROK_CREATE_DETAIL" = "يزيل خيارات إنشاء أو تعديل الصور والفيديوهات باستخدام Grok.";
 /* Legacy key name: this row TURNS ON auto-translation (the switch is inverted).
    Do not rename the key — it is persisted in user defaults. */
 "DISABLE_AUTO_TRANSLATE_TITLE" = "الترجمة التلقائية";
-"DISABLE_AUTO_TRANSLATE_DETAIL" = "ترجمة التغريدات والنبذات التعريفية وملاحظات المجتمع والتنبيهات تلقائيًا.";
+"DISABLE_AUTO_TRANSLATE_DETAIL" = "السماح لتويتر بترجمة التغريدات والنبذات التعريفية وملاحظات المجتمع والتنبيهات تلقائيًا.";
 
 /* ===== LAB ===== */
 "REPLY_IN_WEBVIEW_TITLE" = "الرد عبر الويب";
-"REPLY_IN_WEBVIEW_DETAIL" = "الرد عبر صفحة ويب عندما يرفض التطبيق إرسال الردود.";
+"REPLY_IN_WEBVIEW_DETAIL" = "إرسال كل الردود عبر صفحة ويب، للحالات التي يرفض فيها التطبيق إرسالها.";
 
 /* ===== Theme color picker ===== */
 "THEME_SETTINGS_NAVIGATION_DETAIL" = "اختر لون تمييز. أنت فقط من يراه.";

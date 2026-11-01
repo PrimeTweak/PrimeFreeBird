@@ -13,7 +13,7 @@
 
 /* ===== General › App behavior ===== */
 "NO_TAB_BAR_HIDING_TITLE" = "永遠顯示";
-"NO_TAB_BAR_HIDING_DETAIL" = "捲動時不淡出。";
+"NO_TAB_BAR_HIDING_DETAIL" = "捲動時不縮小也不淡出。";
 "SHOW_SCROLL_INDICATOR_TITLE" = "捲動條";
 "DISABLE_RTL_TITLE" = "文字由左至右";
 "DISABLE_RTL_DETAIL" = "即使是由右至左書寫的語言，文字也由左至右顯示。";
@@ -46,7 +46,7 @@
 "TAB_BAR_THEMING_TITLE" = "已選取的分頁";
 "TAB_BAR_THEMING_DETAIL" = "將強調色套用至選取的分頁和上方分頁的底線。";
 "COLOR_TWITTER_ICON_IN_TOP_BAR_TITLE" = "Twitter 圖示";
-"COLOR_TWITTER_ICON_IN_TOP_BAR_DETAIL" = "將主題強調色套用至頂部導覽列的 Twitter 小鳥圖示。";
+"COLOR_TWITTER_ICON_IN_TOP_BAR_DETAIL" = "將主題強調色套用至頂部導覽列的標誌。";
 
 /* ===== BRANDING ===== */
 "MODERN_SETTINGS_BRANDING_TITLE" = "品牌外觀";
@@ -65,8 +65,9 @@
 "HIDE_WHO_TO_FOLLOW_TITLE" = "隱藏「建議跟隨」";
 "HIDE_WHO_TO_FOLLOW_DETAIL" = "移除跟隨建議。";
 "HIDE_TIMELINE_PROMPTS_TITLE" = "隱藏時間軸提示";
-"HIDE_TIMELINE_PROMPTS_DETAIL" = "移除「新增聯絡人」等橫幅。";
+"HIDE_TIMELINE_PROMPTS_DETAIL" = "移除「新增聯絡人」、Premium 優惠等橫幅和卡片。";
 "HIDE_SPACES_TITLE" = "隱藏音訊空間列";
+"HIDE_SPACES_DETAIL" = "移除首頁頂端的音訊空間列。";
 "HIDE_CUSTOM_TIMELINES_TITLE" = "隱藏自訂時間軸";
 "HIDE_CUSTOM_TIMELINES_DETAIL" = "從首頁分頁移除已釘選的列表和社群，以及新增按鈕。";
 
@@ -75,16 +76,21 @@
 "MODERN_SETTINGS_TWEETS_SUBTITLE" = "撰寫、按鈕、回覆和敏感內容。";
 "UNDO_TWEET_TITLE" = "撤銷推文";
 "TWEET_CONFIRM_TITLE" = "確認推文";
+"TWEET_CONFIRM_DETAIL" = "送出推文或回覆前先詢問。";
 "LIKE_CONFIRM_TITLE" = "確認喜歡";
+"LIKE_CONFIRM_DETAIL" = "喜歡推文前先詢問。";
 "HIDE_VIEW_COUNT_TITLE" = "隱藏查看次數";
+"HIDE_VIEW_COUNT_DETAIL" = "移除推文下方和已開啟推文中的查看次數。";
 "HIDE_BOOKMARK_BUTTON_TITLE" = "隱藏書籤按鈕";
+"HIDE_BOOKMARK_BUTTON_DETAIL" = "移除推文下方的書籤按鈕。";
 "HIDE_DOWNVOTE_BUTTON_TITLE" = "隱藏倒讚按鈕";
+"HIDE_DOWNVOTE_BUTTON_DETAIL" = "移除推文下方的倒讚按鈕。";
 "DISABLE_SENSITIVE_TWEET_WARNINGS_TITLE" = "隱藏警告";
 "BYPASS_AGE_VERIFICATION_TITLE" = "繞過年齡驗證";
 "BYPASS_AGE_VERIFICATION_DETAIL" = "略過敏感內容的年齡驗證流程。";
 "REPLY_SORTING_TITLE" = "排序回覆";
 "RESTORE_REPLY_CONTEXT_TITLE" = "「回覆給」提示行";
-"RESTORE_REPLY_CONTEXT_DETAIL" = "顯示在開啟的回覆內文上方。";
+"RESTORE_REPLY_CONTEXT_DETAIL" = "在開啟的回覆上方顯示「回覆給」提示行。";
 "SHOW_QUOTE_COUNTS_TITLE" = "引用和轉推次數";
 "SHOW_QUOTE_COUNTS_DETAIL" = "在推文的引用畫面頂端顯示兩個數字。";
 "SHOW_TWEET_SOURCE_TITLE" = "推文來源";
@@ -97,14 +103,14 @@
 "MODERN_SETTINGS_MEDIA_TITLE" = "媒體";
 "MODERN_SETTINGS_MEDIA_SUBTITLE" = "下載、播放、畫質與版面配置。";
 "DOWNLOAD_VIDEOS_TITLE" = "影片和 GIF";
-"DOWNLOAD_VIDEOS_DETAIL" = "從媒體的長按選單儲存。";
+"DOWNLOAD_VIDEOS_DETAIL" = "從影片或 GIF 的長按選單儲存。";
 "DIRECT_SAVE_TITLE" = "儲存至照片";
 "DIRECT_SAVE_DETAIL" = "將儲存的影片直接存入「照片」App。";
 "TWEET_TO_IMAGE_TITLE" = "將推文存為圖片";
-"TWEET_TO_IMAGE_DETAIL" = "長按分享按鈕以圖片格式儲存推文。";
+"TWEET_TO_IMAGE_DETAIL" = "長按分享按鈕，將推文匯出為圖片。";
 "DISABLE_VIDEO_CAPTIONS_TITLE" = "隱藏影片字幕";
 "AUTO_HIGHEST_LOAD_TITLE" = "完整解析度照片";
-"AUTO_HIGHEST_LOAD_DETAIL" = "一律以最高解析度載入照片。";
+"AUTO_HIGHEST_LOAD_DETAIL" = "以最高解析度載入照片。";
 "FORCE_TWEET_FULL_FRAME_TITLE" = "顯示完整圖片";
 "RESTORE_VIDEO_TIMESTAMP_TITLE" = "顯示影片時間";
 "RESTORE_VIDEO_TIMESTAMP_DETAIL" = "在全螢幕影片上顯示已播放時間和總時長，而非倒數計時。";
@@ -114,6 +120,7 @@
 "MODERN_SETTINGS_PROFILES_TITLE" = "個人資料";
 "MODERN_SETTINGS_PROFILES_SUBTITLE" = "跟隨按鈕、徽章和個人資料分頁。";
 "FOLLOW_CONFIRM_TITLE" = "確認跟隨";
+"FOLLOW_CONFIRM_DETAIL" = "跟隨帳號前先詢問。";
 "COPY_PROFILE_INFO_TITLE" = "複製個人資料資訊";
 "COPY_PROFILE_INFO_DETAIL" = "在個人資料中加入複製按鈕。";
 "DISABLE_ARTICLES_TITLE" = "隱藏「文章」";
@@ -137,23 +144,23 @@
 "NO_HISTORY_TITLE" = "關閉搜尋紀錄";
 "NO_HISTORY_DETAIL" = "不儲存也不顯示最近的搜尋紀錄。";
 "HIDE_TREND_VIDEOS_TITLE" = "隱藏熱門影片";
-"HIDE_TREND_VIDEOS_DETAIL" = "從搜尋中移除熱門影片列。";
+"HIDE_TREND_VIDEOS_DETAIL" = "從探索中移除熱門影片列。";
 
 /* ===== GROK ===== */
 "HIDE_SUGGESTED_CHATS_TITLE" = "隱藏推薦的聊天";
 "HIDE_SUGGESTED_CHATS_DETAIL" = "從聊天收件匣移除「推薦」清單。";
-"HIDE_GROK_ANALYZE_TITLE" = "隱藏 Grok 分析按鈕";
+"HIDE_GROK_ANALYZE_TITLE" = "隱藏分析和提問按鈕";
 "HIDE_GROK_SIDEBAR_TITLE" = "隱藏側邊欄中的 Grok";
 "HIDE_GROK_CREATE_TITLE" = "隱藏建立工具";
 "HIDE_GROK_CREATE_DETAIL" = "移除使用 Grok 建立或編輯圖片和影片的選項。";
 /* Legacy key name: this row TURNS ON auto-translation (the switch is inverted).
    Do not rename the key — it is persisted in user defaults. */
 "DISABLE_AUTO_TRANSLATE_TITLE" = "自動翻譯";
-"DISABLE_AUTO_TRANSLATE_DETAIL" = "自動翻譯推文、簡介、社群備註和通知。";
+"DISABLE_AUTO_TRANSLATE_DETAIL" = "允許 Twitter 自動翻譯推文、簡介、社群備註和通知。";
 
 /* ===== LAB ===== */
 "REPLY_IN_WEBVIEW_TITLE" = "在網頁上回覆";
-"REPLY_IN_WEBVIEW_DETAIL" = "當應用程式拒絕送出回覆時，改透過網頁回覆。";
+"REPLY_IN_WEBVIEW_DETAIL" = "所有回覆都透過網頁送出，適用於應用程式拒絕送出回覆的情況。";
 
 /* ===== Theme color picker ===== */
 "THEME_SETTINGS_NAVIGATION_DETAIL" = "選擇強調色。只有你看得到。";

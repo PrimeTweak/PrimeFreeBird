@@ -13,7 +13,7 @@
 
 /* ===== General › App behavior ===== */
 "NO_TAB_BAR_HIDING_TITLE" = "Immer sichtbar";
-"NO_TAB_BAR_HIDING_DETAIL" = "Leiste beim Scrollen nicht ausblenden.";
+"NO_TAB_BAR_HIDING_DETAIL" = "Leiste beim Scrollen weder verkleinern noch ausblenden.";
 "SHOW_SCROLL_INDICATOR_TITLE" = "Scrollleiste";
 "DISABLE_RTL_TITLE" = "Text von links nach rechts";
 "DISABLE_RTL_DETAIL" = "Zeigt Text von links nach rechts an, selbst in Sprachen, die von rechts nach links gelesen werden.";
@@ -46,7 +46,7 @@
 "TAB_BAR_THEMING_TITLE" = "Ausgewählter Tab";
 "TAB_BAR_THEMING_DETAIL" = "Wendet die Akzentfarbe auf den ausgewählten Tab und die Unterstreichung der oberen Tabs an.";
 "COLOR_TWITTER_ICON_IN_TOP_BAR_TITLE" = "Twitter-Symbol";
-"COLOR_TWITTER_ICON_IN_TOP_BAR_DETAIL" = "Wendet die Akzentfarbe auf das Twitter-Symbol in der oberen Leiste an.";
+"COLOR_TWITTER_ICON_IN_TOP_BAR_DETAIL" = "Wendet die Akzentfarbe auf das Logo in der oberen Leiste an.";
 
 /* ===== BRANDING ===== */
 "MODERN_SETTINGS_BRANDING_TITLE" = "Branding";
@@ -65,8 +65,9 @@
 "HIDE_WHO_TO_FOLLOW_TITLE" = "„Wem folgen?“ ausblenden";
 "HIDE_WHO_TO_FOLLOW_DETAIL" = "Folge-Empfehlungen entfernen.";
 "HIDE_TIMELINE_PROMPTS_TITLE" = "Timeline-Hinweise ausblenden";
-"HIDE_TIMELINE_PROMPTS_DETAIL" = "Banner wie „Kontakte hinzufügen“ entfernen.";
+"HIDE_TIMELINE_PROMPTS_DETAIL" = "Banner und Karten wie „Kontakte hinzufügen“ oder Premium-Angebote entfernen.";
 "HIDE_SPACES_TITLE" = "Spaces-Leiste ausblenden";
+"HIDE_SPACES_DETAIL" = "Entfernt die Spaces-Leiste oben auf der Startseite.";
 "HIDE_CUSTOM_TIMELINES_TITLE" = "Benutzerdefinierte Timelines ausblenden";
 "HIDE_CUSTOM_TIMELINES_DETAIL" = "Entfernt angeheftete Listen und Communities sowie den Hinzufügen-Button aus den Tabs der Startseite.";
 
@@ -75,16 +76,21 @@
 "MODERN_SETTINGS_TWEETS_SUBTITLE" = "Verfassen, Buttons, Antworten und sensible Inhalte.";
 "UNDO_TWEET_TITLE" = "Tweet rückgängig machen";
 "TWEET_CONFIRM_TITLE" = "Tweets bestätigen";
+"TWEET_CONFIRM_DETAIL" = "Fragt nach, bevor du einen Tweet oder eine Antwort sendest.";
 "LIKE_CONFIRM_TITLE" = "Likes bestätigen";
+"LIKE_CONFIRM_DETAIL" = "Fragt nach, bevor du einen Tweet likest.";
 "HIDE_VIEW_COUNT_TITLE" = "Aufrufzahl ausblenden";
+"HIDE_VIEW_COUNT_DETAIL" = "Entfernt die Aufrufzahl unter Tweets und in einem geöffneten Tweet.";
 "HIDE_BOOKMARK_BUTTON_TITLE" = "Lesezeichen-Button ausblenden";
+"HIDE_BOOKMARK_BUTTON_DETAIL" = "Entfernt den Lesezeichen-Button unter Tweets.";
 "HIDE_DOWNVOTE_BUTTON_TITLE" = "Downvote-Button ausblenden";
+"HIDE_DOWNVOTE_BUTTON_DETAIL" = "Entfernt den Downvote-Button unter Tweets.";
 "DISABLE_SENSITIVE_TWEET_WARNINGS_TITLE" = "Warnungen ausblenden";
 "BYPASS_AGE_VERIFICATION_TITLE" = "Altersverifizierung umgehen";
 "BYPASS_AGE_VERIFICATION_DETAIL" = "Überspringt die Altersverifizierung für sensible Inhalte.";
 "REPLY_SORTING_TITLE" = "Antwortsortierung";
 "RESTORE_REPLY_CONTEXT_TITLE" = "Zeile „Antwort an“";
-"RESTORE_REPLY_CONTEXT_DETAIL" = "Erscheint über dem Text einer geöffneten Antwort.";
+"RESTORE_REPLY_CONTEXT_DETAIL" = "Zeigt die Zeile „Antwort an“ über einer geöffneten Antwort.";
 "SHOW_QUOTE_COUNTS_TITLE" = "Anzahl der Zitate und Retweets";
 "SHOW_QUOTE_COUNTS_DETAIL" = "Zeigt beide Zahlen oben im Zitate-Bildschirm eines Tweets.";
 "SHOW_TWEET_SOURCE_TITLE" = "Tweet-Quelle";
@@ -97,14 +103,14 @@
 "MODERN_SETTINGS_MEDIA_TITLE" = "Medien";
 "MODERN_SETTINGS_MEDIA_SUBTITLE" = "Downloads, Wiedergabe, Qualität und Layout.";
 "DOWNLOAD_VIDEOS_TITLE" = "Videos und GIFs";
-"DOWNLOAD_VIDEOS_DETAIL" = "Speichert sie über das Menü bei langem Drücken auf Medien.";
+"DOWNLOAD_VIDEOS_DETAIL" = "Speichert ein Video oder GIF über das Menü, das sich bei langem Drücken darauf öffnet.";
 "DIRECT_SAVE_TITLE" = "In „Fotos“ speichern";
 "DIRECT_SAVE_DETAIL" = "Gespeicherte Videos werden direkt in deiner Fotos-App abgelegt.";
 "TWEET_TO_IMAGE_TITLE" = "Tweet als Bild speichern";
-"TWEET_TO_IMAGE_DETAIL" = "Halte den Teilen-Button gedrückt, um Tweets als Bilder zu exportieren.";
+"TWEET_TO_IMAGE_DETAIL" = "Exportiert einen Tweet als Bild, wenn du den Teilen-Button gedrückt hältst.";
 "DISABLE_VIDEO_CAPTIONS_TITLE" = "Videountertitel ausblenden";
 "AUTO_HIGHEST_LOAD_TITLE" = "Fotos in voller Auflösung";
-"AUTO_HIGHEST_LOAD_DETAIL" = "Fotos stets in höchster Auflösung laden.";
+"AUTO_HIGHEST_LOAD_DETAIL" = "Fotos in höchster Auflösung laden.";
 "FORCE_TWEET_FULL_FRAME_TITLE" = "Bilder ohne Zuschnitt";
 "RESTORE_VIDEO_TIMESTAMP_TITLE" = "Video-Zeitanzeige";
 "RESTORE_VIDEO_TIMESTAMP_DETAIL" = "Zeigt bei Vollbild-Videos die verstrichene Zeit und die Gesamtdauer statt des Countdowns an.";
@@ -114,6 +120,7 @@
 "MODERN_SETTINGS_PROFILES_TITLE" = "Profile";
 "MODERN_SETTINGS_PROFILES_SUBTITLE" = "Folgen-Buttons, Abzeichen und Profil-Tabs.";
 "FOLLOW_CONFIRM_TITLE" = "Folgen bestätigen";
+"FOLLOW_CONFIRM_DETAIL" = "Fragt nach, bevor du einem Account folgst.";
 "COPY_PROFILE_INFO_TITLE" = "Profildetails kopieren";
 "COPY_PROFILE_INFO_DETAIL" = "Fügt Profilen einen Kopieren-Button hinzu.";
 "DISABLE_ARTICLES_TITLE" = "Artikel ausblenden";
@@ -137,23 +144,23 @@
 "NO_HISTORY_TITLE" = "Suchverlauf deaktivieren";
 "NO_HISTORY_DETAIL" = "Letzte Suchanfragen weder speichern noch anzeigen.";
 "HIDE_TREND_VIDEOS_TITLE" = "Trendende Videos ausblenden";
-"HIDE_TREND_VIDEOS_DETAIL" = "Entfernt die Zeile mit trendenden Videos aus der Suche.";
+"HIDE_TREND_VIDEOS_DETAIL" = "Entfernt die Zeile mit trendenden Videos aus „Entdecken“.";
 
 /* ===== GROK ===== */
 "HIDE_SUGGESTED_CHATS_TITLE" = "Vorgeschlagene Chats ausblenden";
 "HIDE_SUGGESTED_CHATS_DETAIL" = "Entfernt die Liste „Vorgeschlagen“ aus deinem Chat-Posteingang.";
-"HIDE_GROK_ANALYZE_TITLE" = "Analyse-Button ausblenden";
+"HIDE_GROK_ANALYZE_TITLE" = "Analyse- und Frage-Buttons ausblenden";
 "HIDE_GROK_SIDEBAR_TITLE" = "Grok in der Seitenleiste ausblenden";
 "HIDE_GROK_CREATE_TITLE" = "Erstellungswerkzeuge ausblenden";
 "HIDE_GROK_CREATE_DETAIL" = "Entfernt die Optionen, Bilder und Videos mit Grok zu erstellen oder zu bearbeiten.";
 /* Legacy key name: this row TURNS ON auto-translation (the switch is inverted).
    Do not rename the key — it is persisted in user defaults. */
 "DISABLE_AUTO_TRANSLATE_TITLE" = "Automatische Übersetzung";
-"DISABLE_AUTO_TRANSLATE_DETAIL" = "Tweets, Bios, Kollektive Anmerkungen und Mitteilungen automatisch übersetzen.";
+"DISABLE_AUTO_TRANSLATE_DETAIL" = "Tweets, Bios, Kollektive Anmerkungen und Mitteilungen automatisch von Twitter übersetzen lassen.";
 
 /* ===== LAB ===== */
 "REPLY_IN_WEBVIEW_TITLE" = "Im Web antworten";
-"REPLY_IN_WEBVIEW_DETAIL" = "Antwortet über eine Webseite, wenn die App das Senden von Antworten verweigert.";
+"REPLY_IN_WEBVIEW_DETAIL" = "Sendet jede Antwort über eine Webseite – für den Fall, dass die App Antworten verweigert.";
 
 /* ===== Theme color picker ===== */
 "THEME_SETTINGS_NAVIGATION_DETAIL" = "Wähle eine Akzentfarbe. Nur du siehst sie.";

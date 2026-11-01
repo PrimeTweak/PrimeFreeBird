@@ -13,7 +13,7 @@
 
 /* ===== General › App behavior ===== */
 "NO_TAB_BAR_HIDING_TITLE" = "常に表示";
-"NO_TAB_BAR_HIDING_DETAIL" = "スクロールしてもバーが消えないようにします。";
+"NO_TAB_BAR_HIDING_DETAIL" = "スクロールしてもバーが縮んだり薄くなったりしないようにします。";
 "SHOW_SCROLL_INDICATOR_TITLE" = "スクロールバー";
 "DISABLE_RTL_TITLE" = "テキストを左から右に表示";
 "DISABLE_RTL_DETAIL" = "右から左に読む言語の場合でも、テキストを左から右に表示します。";
@@ -46,7 +46,7 @@
 "TAB_BAR_THEMING_TITLE" = "選択中のタブ";
 "TAB_BAR_THEMING_DETAIL" = "選択中のタブと上部タブの下線にアクセントカラーを適用します。";
 "COLOR_TWITTER_ICON_IN_TOP_BAR_TITLE" = "Twitterアイコン";
-"COLOR_TWITTER_ICON_IN_TOP_BAR_DETAIL" = "上部バーのTwitterアイコンにアクセントカラーを適用できます。";
+"COLOR_TWITTER_ICON_IN_TOP_BAR_DETAIL" = "上部バーのロゴにアクセントカラーを適用できます。";
 
 /* ===== BRANDING ===== */
 "MODERN_SETTINGS_BRANDING_TITLE" = "ブランド";
@@ -65,8 +65,9 @@
 "HIDE_WHO_TO_FOLLOW_TITLE" = "「おすすめユーザー」を非表示";
 "HIDE_WHO_TO_FOLLOW_DETAIL" = "フォロー候補を非表示にします。";
 "HIDE_TIMELINE_PROMPTS_TITLE" = "タイムラインのプロンプトを非表示";
-"HIDE_TIMELINE_PROMPTS_DETAIL" = "「連絡先を追加」などのバナーを非表示にします。";
+"HIDE_TIMELINE_PROMPTS_DETAIL" = "「連絡先を追加」やPremiumのオファーなどのバナーとカードを非表示にします。";
 "HIDE_SPACES_TITLE" = "スペースバーを非表示";
+"HIDE_SPACES_DETAIL" = "ホーム上部のスペースバーを非表示にします。";
 "HIDE_CUSTOM_TIMELINES_TITLE" = "カスタムタイムラインを非表示";
 "HIDE_CUSTOM_TIMELINES_DETAIL" = "ホームのタブから固定したリストとコミュニティ、「追加」ボタンを削除します。";
 
@@ -75,16 +76,21 @@
 "MODERN_SETTINGS_TWEETS_SUBTITLE" = "作成、ボタン、返信、センシティブな内容。";
 "UNDO_TWEET_TITLE" = "ツイートの取り消し";
 "TWEET_CONFIRM_TITLE" = "ツイートの確認";
+"TWEET_CONFIRM_DETAIL" = "ツイートや返信を送信する前に確認します。";
 "LIKE_CONFIRM_TITLE" = "いいねの確認";
+"LIKE_CONFIRM_DETAIL" = "ツイートにいいねする前に確認します。";
 "HIDE_VIEW_COUNT_TITLE" = "表示回数を非表示";
+"HIDE_VIEW_COUNT_DETAIL" = "ツイートの下と開いたツイート内の表示回数を非表示にします。";
 "HIDE_BOOKMARK_BUTTON_TITLE" = "ブックマークボタンを非表示";
+"HIDE_BOOKMARK_BUTTON_DETAIL" = "ツイートの下のブックマークボタンを非表示にします。";
 "HIDE_DOWNVOTE_BUTTON_TITLE" = "ダウンボートボタンを非表示";
+"HIDE_DOWNVOTE_BUTTON_DETAIL" = "ツイートの下のダウンボートボタンを非表示にします。";
 "DISABLE_SENSITIVE_TWEET_WARNINGS_TITLE" = "警告を非表示";
 "BYPASS_AGE_VERIFICATION_TITLE" = "年齢確認をスキップ";
 "BYPASS_AGE_VERIFICATION_DETAIL" = "センシティブな内容の年齢確認をスキップします。";
 "REPLY_SORTING_TITLE" = "返信を並べ替え";
 "RESTORE_REPLY_CONTEXT_TITLE" = "「返信先」の行";
-"RESTORE_REPLY_CONTEXT_DETAIL" = "開いた返信の本文の上に表示されます。";
+"RESTORE_REPLY_CONTEXT_DETAIL" = "開いた返信の上に「返信先」の行を表示します。";
 "SHOW_QUOTE_COUNTS_TITLE" = "引用とリツイートの数";
 "SHOW_QUOTE_COUNTS_DETAIL" = "ツイートの引用画面の上部に両方の数を表示します。";
 "SHOW_TWEET_SOURCE_TITLE" = "投稿元アプリ";
@@ -97,14 +103,14 @@
 "MODERN_SETTINGS_MEDIA_TITLE" = "メディア";
 "MODERN_SETTINGS_MEDIA_SUBTITLE" = "ダウンロード、再生、画質、レイアウト。";
 "DOWNLOAD_VIDEOS_TITLE" = "動画とGIF";
-"DOWNLOAD_VIDEOS_DETAIL" = "メディアの長押しメニューから保存します。";
+"DOWNLOAD_VIDEOS_DETAIL" = "動画やGIFを長押しメニューから保存します。";
 "DIRECT_SAVE_TITLE" = "写真に保存";
 "DIRECT_SAVE_DETAIL" = "保存した動画を「写真」アプリに直接保存します。";
 "TWEET_TO_IMAGE_TITLE" = "ツイートを画像として保存";
-"TWEET_TO_IMAGE_DETAIL" = "「共有」を長押しすると、ツイートを画像としてエクスポートできます。";
+"TWEET_TO_IMAGE_DETAIL" = "ツイートを「共有」の長押しで画像としてエクスポートできます。";
 "DISABLE_VIDEO_CAPTIONS_TITLE" = "字幕を非表示";
 "AUTO_HIGHEST_LOAD_TITLE" = "フル解像度の写真";
-"AUTO_HIGHEST_LOAD_DETAIL" = "写真を常に可能な限り最高の解像度で読み込みます。";
+"AUTO_HIGHEST_LOAD_DETAIL" = "写真を可能な限り最高の解像度で読み込みます。";
 "FORCE_TWEET_FULL_FRAME_TITLE" = "画像をトリミングしない";
 "RESTORE_VIDEO_TIMESTAMP_TITLE" = "動画の再生時間";
 "RESTORE_VIDEO_TIMESTAMP_DETAIL" = "全画面表示の動画で、カウントダウンではなく経過時間と合計時間を表示します。";
@@ -114,6 +120,7 @@
 "MODERN_SETTINGS_PROFILES_TITLE" = "プロフィール";
 "MODERN_SETTINGS_PROFILES_SUBTITLE" = "フォローボタン、バッジ、プロフィールのタブ。";
 "FOLLOW_CONFIRM_TITLE" = "フォローの確認";
+"FOLLOW_CONFIRM_DETAIL" = "アカウントをフォローする前に確認します。";
 "COPY_PROFILE_INFO_TITLE" = "プロフィールの詳細をコピー";
 "COPY_PROFILE_INFO_DETAIL" = "プロフィールにコピーボタンを追加します。";
 "DISABLE_ARTICLES_TITLE" = "記事を非表示";
@@ -137,23 +144,23 @@
 "NO_HISTORY_TITLE" = "検索履歴を残さない";
 "NO_HISTORY_DETAIL" = "最近の検索を保存せず、表示もしません。";
 "HIDE_TREND_VIDEOS_TITLE" = "トレンド動画を非表示";
-"HIDE_TREND_VIDEOS_DETAIL" = "検索からトレンド動画の行を非表示にします。";
+"HIDE_TREND_VIDEOS_DETAIL" = "「話題を検索」からトレンド動画の行を非表示にします。";
 
 /* ===== GROK ===== */
 "HIDE_SUGGESTED_CHATS_TITLE" = "おすすめのチャットを非表示";
 "HIDE_SUGGESTED_CHATS_DETAIL" = "チャットの受信トレイから「おすすめ」のリストを取り除きます。";
-"HIDE_GROK_ANALYZE_TITLE" = "分析ボタンを非表示";
+"HIDE_GROK_ANALYZE_TITLE" = "分析・質問ボタンを非表示";
 "HIDE_GROK_SIDEBAR_TITLE" = "サイドバーのGrokを非表示";
 "HIDE_GROK_CREATE_TITLE" = "作成ツールを非表示";
 "HIDE_GROK_CREATE_DETAIL" = "Grokで画像や動画を作成・編集するオプションを削除します。";
 /* Legacy key name: this row TURNS ON auto-translation (the switch is inverted).
    Do not rename the key — it is persisted in user defaults. */
 "DISABLE_AUTO_TRANSLATE_TITLE" = "自動翻訳";
-"DISABLE_AUTO_TRANSLATE_DETAIL" = "ツイート、自己紹介、コミュニティノート、通知を自動的に翻訳します。";
+"DISABLE_AUTO_TRANSLATE_DETAIL" = "Twitterがツイート、自己紹介、コミュニティノート、通知を自動的に翻訳できるようにします。";
 
 /* ===== LAB ===== */
 "REPLY_IN_WEBVIEW_TITLE" = "ウェブで返信";
-"REPLY_IN_WEBVIEW_DETAIL" = "アプリが返信の送信を拒否するとき、ウェブページ経由で返信します。";
+"REPLY_IN_WEBVIEW_DETAIL" = "アプリが返信を拒否する場合に備えて、すべての返信をウェブページ経由で送信します。";
 
 /* ===== Theme color picker ===== */
 "THEME_SETTINGS_NAVIGATION_DETAIL" = "アクセントカラーを選択します。あなただけに表示されます。";

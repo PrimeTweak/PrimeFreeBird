@@ -68,8 +68,8 @@
                                                    constant:2],
         [self.detailLabel.bottomAnchor constraintEqualToAnchor:self.contentView.bottomAnchor
                                                       constant:-18],
-        [self.detailLabel.trailingAnchor constraintLessThanOrEqualToAnchor:self.subtitleLabel.leadingAnchor
-                                                                   constant:-16],
+        // The value sits on the title's line, so the description runs under it.
+        [self.detailLabel.trailingAnchor constraintLessThanOrEqualToAnchor:self.subtitleLabel.trailingAnchor],
     ];
     [NSLayoutConstraint activateConstraints:self.singleLine];
     // The value and its chevron sit on the title's line, as a switch does; without a
@@ -133,7 +133,7 @@
     self.detailLabel.hidden = !described;
     [NSLayoutConstraint deactivateConstraints:described ? self.singleLine : self.withDetail];
     [NSLayoutConstraint activateConstraints:described ? self.withDetail : self.singleLine];
-    // Described, the value keeps its width and the description wraps instead.
+    // Described, the value keeps its width and a long title wraps instead.
     [self.subtitleLabel setContentCompressionResistancePriority:described ? UILayoutPriorityDefaultHigh + 1
                                                                           : UILayoutPriorityDefaultLow
                                                         forAxis:UILayoutConstraintAxisHorizontal];

@@ -1,4 +1,4 @@
-// Hide a notification with its x or a swipe, keep it out of the list, and list the hidden ones.
+// Hide a notification with its x, keep it out of the list, and list the hidden ones.
 
 #import "Support/HookHelpers.h"
 #import "Debug/PFBDebugger.h"
@@ -501,7 +501,7 @@ static void PFBShowNotifToast(NSString* notifID) {
     });
 }
 
-// MARK: - The swipe, on the list's own delegate
+// MARK: - A row's notification
 
 // The fallback when the controller yields no model: the cell's own model
 // accessors, unwrapped from their data-view item when wrapped.
@@ -606,85 +606,6 @@ static void PFBNotifDropRow(id dataViewController, NSIndexPath* indexPath) {
         PFBDebugLog(@"[notifs] direct removal refused - the row goes on reload");
     }
 }
-
-%hook T1URTViewController
-
-- (UISwipeActionsConfiguration*)tableView:(UITableView*)tableView
-    trailingSwipeActionsConfigurationForRowAtIndexPath:(NSIndexPath*)indexPath {
-    UISwipeActionsConfiguration* original = %orig;
-    id model = PFBModelAtIndexPath(self, indexPath) ?: PFBModelFromCell(tableView, indexPath);
-    // Only rows that carry a notification and can be named: one that cannot be
-    // identified could never be unhidden. A notification with no readable identity
-    // is journaled once.
-    if (!model) {
-        return original;
-    }
-    NSString* modelClass = NSStringFromClass([model class]);
-    if (![modelClass containsString:@"Notification"]) {
-        return original;
-    }
-    PFBCompatReach(PFBCompatPath_notification_swipe);
-    if (![PFBSettings boolForKey:@"hide_notifications"]) {
-        PFBCOMPAT_OBSERVE(PFBCompat_hide_notifications, @"notification swipe seen");
-        return original;
-    }
-    if (!PFBNotifIdentity(model)) {
-        static BOOL saidNoIdentity;
-        if (!saidNoIdentity) {
-            saidNoIdentity = YES;
-            PFBDebugLog(@"[notifs] swipe: %@ has no readable identity - action refused",
-                        modelClass);
-        }
-        return original;
-    }
-
-    NSString* title = [[PFBBundle sharedBundle] localizedStringForKey:@"NOTIFS_HIDE_ACTION"];
-    UIContextualAction* hide = [UIContextualAction
-        contextualActionWithStyle:UIContextualActionStyleDestructive
-                            title:title
-                          handler:^(__unused UIContextualAction* action,
-                                    __unused UIView* sourceView,
-                                    void (^completion)(BOOL)) {
-            // Rows can shift while the swipe is open: the row is found again by its notification.
-            NSString* identity = PFBNotifIdentity(model);
-            NSMutableArray<NSIndexPath*>* candidates = [NSMutableArray arrayWithObject:indexPath];
-            [candidates addObjectsFromArray:tableView.indexPathsForVisibleRows ?: @[]];
-            NSIndexPath* row = nil;
-            for (NSIndexPath* candidate in candidates) {
-                id current = PFBModelAtIndexPath(self, candidate) ?: PFBModelFromCell(tableView, candidate);
-                if (current && (current == model || [PFBNotifIdentity(current) isEqualToString:identity])) {
-                    row = candidate;
-                    break;
-                }
-            }
-            NSString* hiddenKey = PFBHideNotifWithText(model, row ? PFBNotifTextFromCell(tableView, row) : nil);
-            completion(YES);
-            if (row) {
-                PFBNotifDropRow(self, row);
-            }
-            if (hiddenKey) {
-                PFBShowNotifToast(hiddenKey);
-            }
-        }];
-    hide.backgroundColor = [UIColor systemGrayColor];
-    UIImage* glyph = PFBTwitterGlyphFor(@"eye_off", [UIImage systemImageNamed:@"eye.slash.fill"]);
-    if (glyph) {
-        hide.image = glyph;
-    }
-
-    // The action is placed before whatever Twitter already returns, so nothing native
-    // is dropped and an empty return carries the added action alone.
-    NSMutableArray<UIContextualAction*>* actions = [NSMutableArray arrayWithObject:hide];
-    if (original.actions.count) {
-        [actions addObjectsFromArray:original.actions];
-    }
-    UISwipeActionsConfiguration* configuration =
-        [UISwipeActionsConfiguration configurationWithActions:actions];
-    configuration.performsFirstActionWithFullSwipe = NO;  // a full swipe never hides by accident
-    return configuration;
-}
-
-%end
 
 // MARK: - Keeping them out of the list
 

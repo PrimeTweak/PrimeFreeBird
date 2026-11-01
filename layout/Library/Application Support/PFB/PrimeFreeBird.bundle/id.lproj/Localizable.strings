@@ -13,7 +13,7 @@
 
 /* ===== General › App behavior ===== */
 "NO_TAB_BAR_HIDING_TITLE" = "Selalu terlihat";
-"NO_TAB_BAR_HIDING_DETAIL" = "Jangan sembunyikan bilah saat menggulir.";
+"NO_TAB_BAR_HIDING_DETAIL" = "Jangan perkecil atau pudarkan bilah saat menggulir.";
 "SHOW_SCROLL_INDICATOR_TITLE" = "Bilah gulir";
 "DISABLE_RTL_TITLE" = "Teks kiri-ke-kanan";
 "DISABLE_RTL_DETAIL" = "Tampilkan teks dari kiri ke kanan, bahkan untuk bahasa yang ditulis dari kanan ke kiri.";
@@ -46,7 +46,7 @@
 "TAB_BAR_THEMING_TITLE" = "Tab yang dipilih";
 "TAB_BAR_THEMING_DETAIL" = "Terapkan warna aksen ke tab yang dipilih dan garis bawah tab atas.";
 "COLOR_TWITTER_ICON_IN_TOP_BAR_TITLE" = "Ikon Twitter";
-"COLOR_TWITTER_ICON_IN_TOP_BAR_DETAIL" = "Terapkan warna aksen ke ikon Twitter di bilah atas.";
+"COLOR_TWITTER_ICON_IN_TOP_BAR_DETAIL" = "Terapkan warna aksen ke logo di bilah atas.";
 
 /* ===== BRANDING ===== */
 "MODERN_SETTINGS_BRANDING_TITLE" = "Branding";
@@ -65,8 +65,9 @@
 "HIDE_WHO_TO_FOLLOW_TITLE" = "Sembunyikan 'Untuk diikuti'";
 "HIDE_WHO_TO_FOLLOW_DETAIL" = "Sembunyikan saran akun untuk diikuti.";
 "HIDE_TIMELINE_PROMPTS_TITLE" = "Sembunyikan ajakan di linimasa";
-"HIDE_TIMELINE_PROMPTS_DETAIL" = "Sembunyikan spanduk seperti 'Tambahkan kontak'.";
+"HIDE_TIMELINE_PROMPTS_DETAIL" = "Sembunyikan spanduk dan kartu seperti “Tambahkan kontak” atau penawaran Premium.";
 "HIDE_SPACES_TITLE" = "Sembunyikan bilah Spaces";
+"HIDE_SPACES_DETAIL" = "Hapus bilah Spaces di bagian atas Beranda.";
 "HIDE_CUSTOM_TIMELINES_TITLE" = "Sembunyikan linimasa khusus";
 "HIDE_CUSTOM_TIMELINES_DETAIL" = "Hapus Daftar dan Komunitas yang disematkan dari tab Beranda, serta tombol Tambah.";
 
@@ -75,16 +76,21 @@
 "MODERN_SETTINGS_TWEETS_SUBTITLE" = "Menulis, tombol, balasan, dan konten sensitif.";
 "UNDO_TWEET_TITLE" = "Batalkan Tweet";
 "TWEET_CONFIRM_TITLE" = "Konfirmasi Tweet";
+"TWEET_CONFIRM_DETAIL" = "Minta konfirmasi sebelum mengirim Tweet atau balasan.";
 "LIKE_CONFIRM_TITLE" = "Konfirmasi suka";
+"LIKE_CONFIRM_DETAIL" = "Minta konfirmasi sebelum menyukai Tweet.";
 "HIDE_VIEW_COUNT_TITLE" = "Sembunyikan jumlah penayangan";
+"HIDE_VIEW_COUNT_DETAIL" = "Hapus jumlah penayangan di bawah Tweet dan di Tweet yang dibuka.";
 "HIDE_BOOKMARK_BUTTON_TITLE" = "Sembunyikan tombol markah";
+"HIDE_BOOKMARK_BUTTON_DETAIL" = "Hapus tombol markah di bawah Tweet.";
 "HIDE_DOWNVOTE_BUTTON_TITLE" = "Sembunyikan tombol downvote";
+"HIDE_DOWNVOTE_BUTTON_DETAIL" = "Hapus tombol downvote di bawah Tweet.";
 "DISABLE_SENSITIVE_TWEET_WARNINGS_TITLE" = "Sembunyikan peringatan";
 "BYPASS_AGE_VERIFICATION_TITLE" = "Lewati verifikasi usia";
 "BYPASS_AGE_VERIFICATION_DETAIL" = "Lewati proses verifikasi usia untuk konten sensitif.";
 "REPLY_SORTING_TITLE" = "Mengurutkan balasan";
 "RESTORE_REPLY_CONTEXT_TITLE" = "Baris 'Membalas'";
-"RESTORE_REPLY_CONTEXT_DETAIL" = "Ditampilkan di atas teks balasan yang Anda buka.";
+"RESTORE_REPLY_CONTEXT_DETAIL" = "Tampilkan baris “Membalas” di atas balasan yang Anda buka.";
 "SHOW_QUOTE_COUNTS_TITLE" = "Jumlah kutipan dan Retweet";
 "SHOW_QUOTE_COUNTS_DETAIL" = "Tampilkan kedua angka di bagian atas layar Kutipan sebuah Tweet.";
 "SHOW_TWEET_SOURCE_TITLE" = "Sumber Tweet";
@@ -97,14 +103,14 @@
 "MODERN_SETTINGS_MEDIA_TITLE" = "Media";
 "MODERN_SETTINGS_MEDIA_SUBTITLE" = "Unduhan, pemutaran, kualitas, dan tata letak.";
 "DOWNLOAD_VIDEOS_TITLE" = "Video dan GIF";
-"DOWNLOAD_VIDEOS_DETAIL" = "Simpan dari menu tekan lama pada media.";
+"DOWNLOAD_VIDEOS_DETAIL" = "Simpan video atau GIF dari menu yang muncul saat ditekan lama.";
 "DIRECT_SAVE_TITLE" = "Simpan ke Foto";
 "DIRECT_SAVE_DETAIL" = "Video disimpan langsung ke aplikasi Foto.";
 "TWEET_TO_IMAGE_TITLE" = "Simpan Tweet sebagai gambar";
-"TWEET_TO_IMAGE_DETAIL" = "Tekan lama tombol bagikan untuk ekspor ke gambar.";
+"TWEET_TO_IMAGE_DETAIL" = "Ekspor Tweet sebagai gambar dengan menekan lama tombol Bagikan.";
 "DISABLE_VIDEO_CAPTIONS_TITLE" = "Sembunyikan subtitle video";
 "AUTO_HIGHEST_LOAD_TITLE" = "Foto resolusi penuh";
-"AUTO_HIGHEST_LOAD_DETAIL" = "Selalu muat foto dalam resolusi tertinggi.";
+"AUTO_HIGHEST_LOAD_DETAIL" = "Muat foto dalam resolusi tertinggi.";
 "FORCE_TWEET_FULL_FRAME_TITLE" = "Gambar tidak dipangkas";
 "RESTORE_VIDEO_TIMESTAMP_TITLE" = "Waktu video";
 "RESTORE_VIDEO_TIMESTAMP_DETAIL" = "Menampilkan waktu yang telah berlalu dan durasi total pada video layar penuh, bukan hitung mundur.";
@@ -114,6 +120,7 @@
 "MODERN_SETTINGS_PROFILES_TITLE" = "Profil";
 "MODERN_SETTINGS_PROFILES_SUBTITLE" = "Tombol Ikuti, lencana, dan tab profil.";
 "FOLLOW_CONFIRM_TITLE" = "Konfirmasi mengikuti";
+"FOLLOW_CONFIRM_DETAIL" = "Minta konfirmasi sebelum mengikuti akun.";
 "COPY_PROFILE_INFO_TITLE" = "Salin info profil";
 "COPY_PROFILE_INFO_DETAIL" = "Tambahkan tombol salin ke profil.";
 "DISABLE_ARTICLES_TITLE" = "Sembunyikan Artikel";
@@ -137,23 +144,23 @@
 "NO_HISTORY_TITLE" = "Nonaktifkan riwayat pencarian";
 "NO_HISTORY_DETAIL" = "Jangan simpan atau tampilkan pencarian terbaru.";
 "HIDE_TREND_VIDEOS_TITLE" = "Sembunyikan video trending";
-"HIDE_TREND_VIDEOS_DETAIL" = "Hapus baris video trending dari pencarian.";
+"HIDE_TREND_VIDEOS_DETAIL" = "Hapus baris video trending dari Jelajahi.";
 
 /* ===== GROK ===== */
 "HIDE_SUGGESTED_CHATS_TITLE" = "Sembunyikan chat yang disarankan";
 "HIDE_SUGGESTED_CHATS_DETAIL" = "Hapus daftar “Disarankan” dari kotak masuk Chat.";
-"HIDE_GROK_ANALYZE_TITLE" = "Sembunyikan tombol analisis Grok";
+"HIDE_GROK_ANALYZE_TITLE" = "Sembunyikan tombol analisis dan tanya";
 "HIDE_GROK_SIDEBAR_TITLE" = "Sembunyikan Grok di bilah samping";
 "HIDE_GROK_CREATE_TITLE" = "Sembunyikan alat pembuatan";
 "HIDE_GROK_CREATE_DETAIL" = "Menghapus opsi untuk membuat atau mengedit gambar dan video dengan Grok.";
 /* Legacy key name: this row TURNS ON auto-translation (the switch is inverted).
    Do not rename the key — it is persisted in user defaults. */
 "DISABLE_AUTO_TRANSLATE_TITLE" = "Terjemahan otomatis";
-"DISABLE_AUTO_TRANSLATE_DETAIL" = "Terjemahkan Tweet, bio, Catatan Komunitas, dan notifikasi secara otomatis.";
+"DISABLE_AUTO_TRANSLATE_DETAIL" = "Izinkan Twitter menerjemahkan Tweet, bio, Catatan Komunitas, dan notifikasi secara otomatis.";
 
 /* ===== LAB ===== */
 "REPLY_IN_WEBVIEW_TITLE" = "Balas di web";
-"REPLY_IN_WEBVIEW_DETAIL" = "Balas melalui halaman web saat aplikasi menolak mengirim balasan.";
+"REPLY_IN_WEBVIEW_DETAIL" = "Kirim semua balasan melalui halaman web, berguna saat aplikasi menolak mengirim balasan.";
 
 /* ===== Theme color picker ===== */
 "THEME_SETTINGS_NAVIGATION_DETAIL" = "Pilih warna aksen. Hanya Anda yang dapat melihatnya.";
