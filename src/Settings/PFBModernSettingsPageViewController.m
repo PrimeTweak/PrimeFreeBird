@@ -15,6 +15,8 @@
 
 @interface PFBModernSettingsPageViewController ()
 @property (nonatomic, copy) NSString* registryPageKey;
+@property (nonatomic, readwrite) BOOL inSheet;
+@property (nonatomic) NSInteger sheetGroup;
 // Redraws the rows whose `disabledWhen` names this key.
 - (void)reloadRowsHeldBy:(NSString*)key;
 @end
@@ -70,9 +72,17 @@ static NSURL* PFBAccountAvatarURL(TFNTwitterAccount* account) {
 }
 
 - (instancetype)initWithAccount:(TFNTwitterAccount*)account pageKey:(NSString*)pageKey {
+    return [self initWithAccount:account pageKey:pageKey group:NSNotFound];
+}
+
+- (instancetype)initWithAccount:(TFNTwitterAccount*)account
+                        pageKey:(NSString*)pageKey
+                          group:(NSInteger)group {
     if ((self = [super init])) {
         self.account = account;
         self.registryPageKey = pageKey;
+        self.inSheet = group != NSNotFound;
+        self.sheetGroup = group;
         [self buildSettingsList];
         [self updateVisibleToggles];
     }
@@ -140,13 +150,32 @@ static NSURL* PFBAccountAvatarURL(TFNTwitterAccount* account) {
     return [PFBSettings subtitleKeyForPage:[self pageKey]];
 }
 
+// In a sheet, the rows under the group's header up to the next one.
 - (void)buildSettingsList {
-    self.toggles = [PFBSettings settingsForPage:[self pageKey]];
+    NSArray<NSDictionary*>* entries = [PFBSettings settingsForPage:[self pageKey]];
+    if (!self.inSheet) {
+        self.toggles = entries;
+        return;
+    }
+    NSMutableArray<NSDictionary*>* rows = [NSMutableArray array];
+    NSInteger group = -1;
+    for (NSDictionary* entry in entries) {
+        if ([entry[@"type"] isEqualToString:@"header"]) {
+            group++;
+        } else if (group == self.sheetGroup) {
+            [rows addObject:entry];
+        }
+    }
+    self.toggles = rows;
 }
 
 #pragma mark - Setup
 
+// A sheet brings its own title.
 - (void)setupNav {
+    if (self.inSheet) {
+        return;
+    }
     NSString* title = [[PFBBundle sharedBundle] localizedStringForKey:[self pageTitleKey]];
     if (self.account) {
         self.navigationItem.titleView =
@@ -157,16 +186,23 @@ static NSURL* PFBAccountAvatarURL(TFNTwitterAccount* account) {
     }
 }
 
+// In a sheet, the rows sit on the sheet's own ground and scroll only past its height.
 - (void)setupTable {
-    self.view.backgroundColor = [PFBPalette currentBackgroundColor];
+    UIColor* ground = self.inSheet ? [UIColor clearColor] : [PFBPalette currentBackgroundColor];
+    self.view.backgroundColor = ground;
     self.tableView = [[UITableView alloc] initWithFrame:self.view.bounds
-                                                  style:UITableViewStyleGrouped];
+                                                  style:self.inSheet ? UITableViewStylePlain : UITableViewStyleGrouped];
     self.tableView.autoresizingMask =
         UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
     self.tableView.dataSource = self;
     self.tableView.delegate = self;
-    self.tableView.backgroundColor = [PFBPalette currentBackgroundColor];
+    self.tableView.backgroundColor = ground;
     self.tableView.separatorStyle = UITableViewCellSeparatorStyleNone;
+    if (self.inSheet) {
+        self.tableView.alwaysBounceVertical = NO;
+        self.tableView.contentInsetAdjustmentBehavior = UIScrollViewContentInsetAdjustmentNever;
+        self.tableView.sectionHeaderTopPadding = 0;
+    }
     self.tableView.rowHeight = UITableViewAutomaticDimension;
     self.tableView.showsVerticalScrollIndicator = NO;
     self.tableView.showsHorizontalScrollIndicator = NO;
@@ -482,7 +518,11 @@ static NSURL* PFBAccountAvatarURL(TFNTwitterAccount* account) {
     }
 }
 
+// A sheet's group has no page description above its rows.
 - (UIView*)tableView:(UITableView*)tableView viewForHeaderInSection:(NSInteger)section {
+    if (self.inSheet) {
+        return nil;
+    }
     UIView* header = [[UIView alloc] initWithFrame:CGRectMake(0, 0, tableView.frame.size.width, 0)];
     UILabel* label = [[UILabel alloc] init];
     label.translatesAutoresizingMaskIntoConstraints = NO;
@@ -505,7 +545,16 @@ static NSURL* PFBAccountAvatarURL(TFNTwitterAccount* account) {
 }
 
 - (CGFloat)tableView:(UITableView*)tableView heightForHeaderInSection:(NSInteger)section {
-    return UITableViewAutomaticDimension;
+    return self.inSheet ? CGFLOAT_MIN : UITableViewAutomaticDimension;
+}
+
+// In a sheet the sheet's ground shows through the rows, which paint the page's otherwise.
+- (void)tableView:(UITableView*)tableView
+      willDisplayCell:(UITableViewCell*)cell
+    forRowAtIndexPath:(NSIndexPath*)indexPath {
+    if (self.inSheet) {
+        cell.backgroundColor = [UIColor clearColor];
+    }
 }
 
 #pragma mark - Switch Handling
@@ -672,6 +721,9 @@ static NSURL* PFBAccountAvatarURL(TFNTwitterAccount* account) {
 #pragma clang diagnostic ignored "-Warc-performSelector-leaks"
                     [cell performSelector:applyThemeSel];
 #pragma clang diagnostic pop
+                }
+                if (self.inSheet) {
+                    cell.backgroundColor = [UIColor clearColor];
                 }
             }
         }

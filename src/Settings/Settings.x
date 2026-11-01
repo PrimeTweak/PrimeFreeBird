@@ -4,6 +4,7 @@
 #import "Support/TwitterChirpFont.h"
 #import "Common/PFBCompatibility.h"
 #import "Settings/PFBSettingsCellStyle.h"
+#import "Settings/Native/PFBNativeSettingsRowCell.h"
 
 // MARK: - PrimeFreeBird settings entry
 
@@ -72,7 +73,7 @@ static TFNSettingsNavigationItem* makePrimeFreeBirdSettingsItem(
                    detail:[[PFBBundle sharedBundle] localizedStringForKey:@"PFB_SETTINGS_DETAIL"]
                  iconName:nil
         controllerFactory:^UIViewController* {
-            return [PFBManager PFBSettingsWithAccount:account];
+            return [PFBManager PFBSettingsWithAccount:account native:NO];
         }];
 
     // The icon has no setter: key-value coding writes its _icon ivar, looked up first so a
@@ -252,10 +253,11 @@ static CGRect PFBMirrored(CGRect frame, CGFloat width, BOOL rtl) {
 - (instancetype)initWithFrame:(CGRect)frame {
     self = [super initWithFrame:frame];
     if (self) {
-        _rowHeight = 56;
-        _iconFrame = CGRectMake(24, 12, 24, 24);
-        _titleFrame = CGRectMake(64, 14, 0, 20);
-        _chevronFrame = CGRectMake(48, 18, 16, 16);
+        PFBNativeSettingsRowStyle* style = [PFBNativeSettingsRowStyle shared];
+        _rowHeight = style.rowHeight;
+        _iconFrame = style.iconFrame;
+        _titleFrame = style.titleFrame;
+        _chevronFrame = style.chevronFrame;
         _icon = [[UIImageView alloc] init];
         _icon.contentMode = UIViewContentModeScaleAspectFit;
         _icon.image = [PFBBundlePDFImage(@"bird_stroke.pdf", CGSizeMake(24, 24), 20.0 / 24.0)
@@ -370,8 +372,19 @@ static CGRect PFBMirrored(CGRect frame, CGFloat width, BOOL rtl) {
         self.rowHeight = cell.bounds.size.height >= 44 ? cell.bounds.size.height : self.rowHeight;
         self.matched = YES;
         [self setNeedsLayout];
+        [self pfbShareStyle];
         return;
     }
+}
+
+// PrimeFreeBird's pages in the new look draw their rows with the same values.
+- (void)pfbShareStyle {
+    PFBNativeSettingsRowStyle* style = [PFBNativeSettingsRowStyle shared];
+    style.titleFont = self.title.font;
+    style.rowHeight = self.rowHeight;
+    style.iconFrame = self.iconFrame;
+    style.titleFrame = self.titleFrame;
+    style.chevronFrame = self.chevronFrame;
 }
 
 - (void)pfbOpen {
@@ -384,7 +397,7 @@ static CGRect PFBMirrored(CGRect frame, CGFloat width, BOOL rtl) {
         [hostClass respondsToSelector:@selector(sharedHostViewController)] ? [hostClass sharedHostViewController] : nil;
     id current = [host respondsToSelector:@selector(currentAccount)] ? [host currentAccount] : nil;
     TFNTwitterAccount* account = [current isKindOfClass:objc_getClass("TFNTwitterAccount")] ? current : nil;
-    [stack pushViewController:[PFBManager PFBSettingsWithAccount:account] animated:YES];
+    [stack pushViewController:[PFBManager PFBSettingsWithAccount:account native:YES] animated:YES];
 }
 
 @end

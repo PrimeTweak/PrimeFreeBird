@@ -11,7 +11,8 @@
 + (NSString*)getVideoQuality:(NSString*)url;
 + (id)sharedFontGroup;
 + (UIFont*)menuTitleFont;
-+ (UIViewController*)PFBSettingsWithAccount:(TFNTwitterAccount*)twAccount;
+// The PrimeFreeBird settings; native gives them the look of Twitter's new settings.
++ (UIViewController*)PFBSettingsWithAccount:(TFNTwitterAccount*)twAccount native:(BOOL)native;
 + (void)showSaveVC:(NSURL*)url;
 + (void)showSaveVCForItems:(NSArray<NSURL*>*)urls;
 // Adds a video, or a GIF as an image, to Photos. The completion runs on the main thread

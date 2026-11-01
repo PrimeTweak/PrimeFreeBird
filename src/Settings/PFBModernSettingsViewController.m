@@ -5,6 +5,8 @@
 #import "Common/PFBBundle.h"
 #import "Settings/PFBModernSettingsCells.h"
 #import "Settings/PFBModernSettingsPageViewController.h"
+#import "Settings/Native/PFBNativeSettingsPageViewController.h"
+#import "Settings/Native/PFBNativeSettingsRowCell.h"
 #import "Settings/Pages/PFBAppearanceSettingsViewController.h"
 #import "Settings/Pages/PFBProfilesSettingsViewController.h"
 #import "Settings/Pages/PFBTimelinesSettingsViewController.h"
@@ -16,6 +18,7 @@
 @property (nonatomic, strong) TFNTwitterAccount* account;
 @property (nonatomic, strong) UITableView* tableView;
 @property (nonatomic, strong) NSArray* sections;
+@property (nonatomic) BOOL native;
 @end
 
 @implementation PFBModernSettingsViewController
@@ -33,7 +36,11 @@
 
 #pragma mark - Section Headers
 
+// Twitter's new settings list has no description above its rows.
 - (UIView*)tableView:(UITableView*)tableView viewForHeaderInSection:(NSInteger)section {
+    if (self.native) {
+        return nil;
+    }
     UIView* headerView = [[UIView alloc] init];
     headerView.backgroundColor = [PFBPalette currentBackgroundColor];
 
@@ -64,15 +71,16 @@
 }
 
 - (CGFloat)tableView:(UITableView*)tableView heightForHeaderInSection:(NSInteger)section {
-    return UITableViewAutomaticDimension;
+    return self.native ? CGFLOAT_MIN : UITableViewAutomaticDimension;
 }
 
 #pragma mark - Lifecycle & Setup
 
-- (instancetype)initWithAccount:(TFNTwitterAccount*)account {
+- (instancetype)initWithAccount:(TFNTwitterAccount*)account native:(BOOL)native {
     self = [super init];
     if (self) {
         _account = account;
+        _native = native;
         [self setupSections];
     }
     return self;
@@ -172,10 +180,11 @@
     [self.tableView reloadData];
 }
 
+// Twitter's new settings title their pages alone, without the account line.
 - (void)setupNavigationBar {
     self.view.backgroundColor = [PFBPalette currentBackgroundColor];
     Class titleViewClass = objc_getClass("TFNTitleView");
-    if (self.account && [titleViewClass respondsToSelector:@selector(titleViewWithTitle:subtitle:)]) {
+    if (!self.native && self.account && [titleViewClass respondsToSelector:@selector(titleViewWithTitle:subtitle:)]) {
         self.navigationItem.titleView = [titleViewClass titleViewWithTitle:@PFB_PRODUCT_NAME
                                                                   subtitle:self.account.displayUsername];
     } else {
@@ -184,20 +193,27 @@
 }
 
 - (void)setupTableView {
-    self.tableView = [[UITableView alloc] initWithFrame:self.view.bounds style:UITableViewStyleGrouped];
+    self.tableView = [[UITableView alloc] initWithFrame:self.view.bounds
+                                                  style:self.native ? UITableViewStylePlain : UITableViewStyleGrouped];
     self.tableView.autoresizingMask =
         UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
     self.tableView.dataSource = self;
     self.tableView.delegate = self;
     self.tableView.backgroundColor = [PFBPalette currentBackgroundColor];
     self.tableView.separatorStyle = UITableViewCellSeparatorStyleNone;
-    self.tableView.estimatedRowHeight = 80;
-    self.tableView.rowHeight = UITableViewAutomaticDimension;
-    self.tableView.sectionHeaderHeight = UITableViewAutomaticDimension;
+    if (self.native) {
+        self.tableView.rowHeight = [PFBNativeSettingsRowStyle shared].rowHeight;
+        self.tableView.sectionHeaderTopPadding = 0;
+        [self.tableView registerClass:[PFBNativeSettingsRowCell class] forCellReuseIdentifier:@"NativeRow"];
+    } else {
+        self.tableView.estimatedRowHeight = 80;
+        self.tableView.rowHeight = UITableViewAutomaticDimension;
+        self.tableView.sectionHeaderHeight = UITableViewAutomaticDimension;
+        [self.tableView registerClass:[PFBModernSettingsTableViewCell class]
+               forCellReuseIdentifier:@"SettingsCell"];
+    }
     self.tableView.showsVerticalScrollIndicator = NO;
     self.tableView.showsHorizontalScrollIndicator = NO;
-    [self.tableView registerClass:[PFBModernSettingsTableViewCell class]
-           forCellReuseIdentifier:@"SettingsCell"];
 
     // Footer: the product name and version, then the credit to the original work, with
     // 16 pt of room below.
@@ -239,9 +255,17 @@
 
 - (UITableViewCell*)tableView:(UITableView*)tableView
         cellForRowAtIndexPath:(NSIndexPath*)indexPath {
+    NSDictionary* sectionData = self.sections[indexPath.row];
+    if (self.native) {
+        PFBNativeSettingsRowCell* row = [tableView dequeueReusableCellWithIdentifier:@"NativeRow"
+                                                                        forIndexPath:indexPath];
+        [row configureWithTitle:sectionData[@"title"]
+                       iconName:sectionData[@"icon"]
+                      accessory:PFBNativeSettingsRowAccessoryChevron];
+        return row;
+    }
     PFBModernSettingsTableViewCell* cell = [tableView dequeueReusableCellWithIdentifier:@"SettingsCell"
                                                                         forIndexPath:indexPath];
-    NSDictionary* sectionData = self.sections[indexPath.row];
     [cell configureWithTitle:sectionData[@"title"]
                     subtitle:sectionData[@"subtitle"]
                     iconName:sectionData[@"icon"]];
@@ -265,69 +289,75 @@
 
 #pragma mark - Navigation to Sub-pages
 
+// In the new look, the page's groups open one by one in sheets.
+- (void)showPage:(PFBModernSettingsPageViewController*)page {
+    UIViewController* shown = self.native ? [[PFBNativeSettingsPageViewController alloc] initWithPage:page] : page;
+    [self.navigationController pushViewController:shown animated:YES];
+}
+
 - (void)showGeneralSettings {
     PFBModernSettingsPageViewController* vc =
         [[PFBModernSettingsPageViewController alloc] initWithAccount:self.account
                                                           pageKey:@"general"];
-    [self.navigationController pushViewController:vc animated:YES];
+    [self showPage:vc];
 }
 
 - (void)showLabSettings {
     PFBModernSettingsPageViewController* vc =
         [[PFBModernSettingsPageViewController alloc] initWithAccount:self.account
                                                           pageKey:@"lab"];
-    [self.navigationController pushViewController:vc animated:YES];
+    [self showPage:vc];
 }
 
 - (void)showAppearanceSettings {
     PFBAppearanceSettingsViewController* vc =
         [[PFBAppearanceSettingsViewController alloc] initWithAccount:self.account];
-    [self.navigationController pushViewController:vc animated:YES];
+    [self showPage:vc];
 }
 
 - (void)showTimelinesSettings {
     PFBTimelinesSettingsViewController* vc =
         [[PFBTimelinesSettingsViewController alloc] initWithAccount:self.account];
-    [self.navigationController pushViewController:vc animated:YES];
+    [self showPage:vc];
 }
 
 - (void)showMessagesSettings {
     PFBModernSettingsPageViewController* vc =
         [[PFBModernSettingsPageViewController alloc] initWithAccount:self.account
                                                           pageKey:@"messages"];
-    [self.navigationController pushViewController:vc animated:YES];
+    [self showPage:vc];
 }
 
 - (void)showMediaSettings {
     PFBModernSettingsPageViewController* vc =
         [[PFBModernSettingsPageViewController alloc] initWithAccount:self.account
                                                           pageKey:@"media_downloads"];
-    [self.navigationController pushViewController:vc animated:YES];
+    [self showPage:vc];
 }
 
 - (void)showProfilesSettings {
     PFBProfilesSettingsViewController* vc =
         [[PFBProfilesSettingsViewController alloc] initWithAccount:self.account];
-    [self.navigationController pushViewController:vc animated:YES];
+    [self showPage:vc];
 }
 
 - (void)showTweetsSettings {
     PFBTweetsSettingsViewController* vc =
         [[PFBTweetsSettingsViewController alloc] initWithAccount:self.account];
-    [self.navigationController pushViewController:vc animated:YES];
+    [self showPage:vc];
 }
 
 - (void)showBrandingSettings {
     PFBModernSettingsPageViewController* vc =
         [[PFBModernSettingsPageViewController alloc] initWithAccount:self.account
                                                           pageKey:@"branding"];
-    [self.navigationController pushViewController:vc animated:YES];
+    [self showPage:vc];
 }
 
 - (void)showSearchSettings {
     PFBModernSettingsPageViewController* vc =
         [[PFBModernSettingsPageViewController alloc] initWithAccount:self.account
                                                           pageKey:@"search"];
-    [self.navigationController pushViewController:vc animated:YES];
+    [self showPage:vc];
 }
 @end

@@ -18,6 +18,14 @@
 // custom behavior subclass this and override -pageKey instead.
 - (instancetype)initWithAccount:(TFNTwitterAccount*)account pageKey:(NSString*)pageKey;
 
+// One group of the page alone, counted from its first header, for a sheet of the new look.
+- (instancetype)initWithAccount:(TFNTwitterAccount*)account
+                        pageKey:(NSString*)pageKey
+                          group:(NSInteger)group;
+
+// YES when the page shows one group in a sheet.
+@property (nonatomic, readonly) BOOL inSheet;
+
 // Identifies the page's entry in the PFBSettings registry
 - (NSString*)pageKey;
 

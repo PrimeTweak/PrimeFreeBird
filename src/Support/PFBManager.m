@@ -109,8 +109,8 @@
     return branded;
 }
 
-+ (UIViewController*)PFBSettingsWithAccount:(TFNTwitterAccount*)twAccount {
-    return [[PFBModernSettingsViewController alloc] initWithAccount:twAccount];
++ (UIViewController*)PFBSettingsWithAccount:(TFNTwitterAccount*)twAccount native:(BOOL)native {
+    return [[PFBModernSettingsViewController alloc] initWithAccount:twAccount native:native];
 }
 
 // YES when the string holds nothing but decimal digits (an empty string too).

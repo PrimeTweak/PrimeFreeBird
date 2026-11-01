@@ -8,6 +8,21 @@
 #import "Support/HookHelpers.h"
 #import "Features/Appearance/ThemeColor/PFBColorThemeViewController.h"
 #import "Features/Appearance/CustomTabBar/PFBCustomTabBarViewController.h"
+#import "Settings/PFBModernSettingsCells.h"
+
+// The dark shades, in the order dark_mode_style stores them.
+static NSArray<NSString*>* PFBDarkModeStyleKeys(void) {
+    return @[ @"DARK_MODE_STYLE_SYSTEM", @"DARK_MODE_STYLE_DIM", @"DARK_MODE_STYLE_GRAY", @"DARK_MODE_STYLE_PURE_BLACK" ];
+}
+
+// Standard, then Liquid Glass, as enable_liquid_glass is off or on.
+static NSArray<NSString*>* PFBInterfaceStyleKeys(void) {
+    return @[ @"INTERFACE_STYLE_STANDARD", @"INTERFACE_STYLE_LIQUID_GLASS" ];
+}
+
+static NSInteger PFBInterfaceStyleCurrent(void) {
+    return [PFBSettings boolForKey:@"enable_liquid_glass"] ? 1 : 0;
+}
 
 @interface PFBAppearanceSettingsViewController () <UIFontPickerViewControllerDelegate>
 @end
@@ -21,6 +36,35 @@
 
 - (NSString*)pageKey {
     return @"appearance";
+}
+
+// In a sheet, Visual style and Background color show their choice and open a menu, as Retweets
+// does; the classic look keeps their alerts.
+- (UITableViewCell*)tableView:(UITableView*)tableView cellForRowAtIndexPath:(NSIndexPath*)indexPath {
+    NSDictionary* entry = self.visibleToggles[indexPath.row];
+    NSDictionary<NSString*, NSString*>* menus = @{
+        @"showInterfaceStylePicker:": @"interfaceStyleMenu",
+        @"showDarkModeStylePicker:": @"darkModeStyleMenu",
+    };
+    NSString* menu = self.inSheet && entry[@"action"] ? menus[entry[@"action"]] : nil;
+    if (!menu) {
+        return [super tableView:tableView cellForRowAtIndexPath:indexPath];
+    }
+    BOOL glass = [menu isEqualToString:@"interfaceStyleMenu"];
+    NSArray<NSString*>* choices = glass ? PFBInterfaceStyleKeys() : PFBDarkModeStyleKeys();
+    NSInteger current = glass ? PFBInterfaceStyleCurrent() : [PFBSettings integerForKey:@"dark_mode_style"];
+    PFBBundle* bundle = [PFBBundle sharedBundle];
+    PFBModernSettingsCompactButtonCell* cell = [tableView dequeueReusableCellWithIdentifier:@"CompactButtonCell"
+                                                                               forIndexPath:indexPath];
+    [cell configureWithTitle:[bundle localizedStringForKey:entry[@"titleKey"]]
+                    subtitle:[bundle localizedStringForKey:choices[current >= 0 && current < (NSInteger)choices.count
+                                                                       ? (NSUInteger)current
+                                                                       : 0]]
+                      detail:[bundle localizedStringForKey:entry[@"subtitleKey"]]];
+    NSMutableDictionary* withMenu = [entry mutableCopy];
+    withMenu[@"menu"] = menu;
+    [self attachMenuIfNeeded:cell entry:withMenu];
+    return cell;
 }
 
 #pragma mark - Sub-page Navigation
@@ -70,12 +114,7 @@
                          message:[bundle localizedStringForKey:@"DARK_MODE_STYLE_DETAIL"]
                   preferredStyle:UIAlertControllerStyleAlert];
 
-    NSArray<NSString*>* titleKeys = @[
-        @"DARK_MODE_STYLE_SYSTEM",
-        @"DARK_MODE_STYLE_DIM",
-        @"DARK_MODE_STYLE_GRAY",
-        @"DARK_MODE_STYLE_PURE_BLACK"
-    ];
+    NSArray<NSString*>* titleKeys = PFBDarkModeStyleKeys();
     NSInteger current = [PFBSettings integerForKey:@"dark_mode_style"];
 
     PFBAppearanceSettingsViewController* page = self;
@@ -84,14 +123,7 @@
                selected:(i == current)
                toPicker:sheet
                 handler:^{
-                    // Picking the shade already in use changes nothing to restart for.
-                    if (i == current) {
-                        return;
-                    }
-                    [[NSUserDefaults standardUserDefaults] setInteger:i
-                                                               forKey:@"dark_mode_style"];
-                    [[NSUserDefaults standardUserDefaults] synchronize];
-                    [page showRestartRequiredAlert];
+                    [page chooseDarkModeStyle:i];
                 }];
     }
 
@@ -110,12 +142,8 @@
                          message:[bundle localizedStringForKey:@"INTERFACE_STYLE_DETAIL"]
                   preferredStyle:UIAlertControllerStyleAlert];
 
-    NSArray<NSString*>* titleKeys = @[
-        @"INTERFACE_STYLE_STANDARD",
-        @"INTERFACE_STYLE_LIQUID_GLASS"
-    ];
-    // Index 0 = Standard (glass off), index 1 = Liquid Glass (glass on).
-    NSInteger current = [PFBSettings boolForKey:@"enable_liquid_glass"] ? 1 : 0;
+    NSArray<NSString*>* titleKeys = PFBInterfaceStyleKeys();
+    NSInteger current = PFBInterfaceStyleCurrent();
 
     PFBAppearanceSettingsViewController* page = self;
     for (NSInteger i = 0; i < (NSInteger)titleKeys.count; i++) {
@@ -123,21 +151,7 @@
                selected:(i == current)
                toPicker:sheet
                 handler:^{
-                    BOOL wasEnabled = [PFBSettings boolForKey:@"enable_liquid_glass"];
-                    BOOL nowEnabled = (i == 1);
-                    if (nowEnabled && wasEnabled && !PFBNativeGlassAsked()) {
-                        PFBCompatMeasure(@"visual style",
-                                         @"Liquid Glass chosen again during its safe mode: no restart asked", 2);
-                    }
-                    [[NSUserDefaults standardUserDefaults] setBool:nowEnabled
-                                                            forKey:@"enable_liquid_glass"];
-                    if (nowEnabled) {
-                        [[NSUserDefaults standardUserDefaults] removeObjectForKey:PFBNativeGlassEarlyExitsKey];
-                    }
-                    [[NSUserDefaults standardUserDefaults] synchronize];
-                    if (wasEnabled != nowEnabled) {
-                        [page showRestartRequiredAlert];
-                    }
+                    [page chooseInterfaceStyle:i];
                 }];
     }
 
@@ -147,6 +161,78 @@
                                  handler:nil]];
 
     [self presentViewController:sheet animated:YES completion:nil];
+}
+
+// Picking the shade already in use changes nothing to restart for.
+- (void)chooseDarkModeStyle:(NSInteger)shade {
+    if (shade == [PFBSettings integerForKey:@"dark_mode_style"]) {
+        return;
+    }
+    [[NSUserDefaults standardUserDefaults] setInteger:shade forKey:@"dark_mode_style"];
+    [[NSUserDefaults standardUserDefaults] synchronize];
+    if (self.inSheet) {
+        [self.tableView reloadData];
+    }
+    [self showRestartRequiredAlert];
+}
+
+- (void)chooseInterfaceStyle:(NSInteger)style {
+    BOOL wasEnabled = [PFBSettings boolForKey:@"enable_liquid_glass"];
+    BOOL nowEnabled = (style == 1);
+    if (nowEnabled && wasEnabled && !PFBNativeGlassAsked()) {
+        PFBCompatMeasure(@"visual style", @"Liquid Glass chosen again during its safe mode: no restart asked", 2);
+    }
+    [[NSUserDefaults standardUserDefaults] setBool:nowEnabled forKey:@"enable_liquid_glass"];
+    if (nowEnabled) {
+        [[NSUserDefaults standardUserDefaults] removeObjectForKey:PFBNativeGlassEarlyExitsKey];
+    }
+    [[NSUserDefaults standardUserDefaults] synchronize];
+    if (self.inSheet) {
+        [self.tableView reloadData];
+    }
+    if (wasEnabled != nowEnabled) {
+        [self showRestartRequiredAlert];
+    }
+}
+
+// The pickers' choices in a menu that marks the current one.
+- (UIMenu*)menuTitled:(NSString*)titleKey
+              choices:(NSArray<NSString*>*)choiceKeys
+              current:(NSInteger)current
+               choose:(void (^)(NSInteger choice))choose {
+    PFBBundle* bundle = [PFBBundle sharedBundle];
+    NSMutableArray<UIAction*>* actions = [NSMutableArray array];
+    for (NSInteger choice = 0; choice < (NSInteger)choiceKeys.count; choice++) {
+        UIAction* action = [UIAction actionWithTitle:[bundle localizedStringForKey:choiceKeys[(NSUInteger)choice]]
+                                               image:nil
+                                          identifier:nil
+                                             handler:^(__unused UIAction* chosen) {
+                                                 choose(choice);
+                                             }];
+        action.state = choice == current ? UIMenuElementStateOn : UIMenuElementStateOff;
+        [actions addObject:action];
+    }
+    return [UIMenu menuWithTitle:[bundle localizedStringForKey:titleKey] children:actions];
+}
+
+- (UIMenu*)interfaceStyleMenu {
+    __weak typeof(self) weakSelf = self;
+    return [self menuTitled:@"INTERFACE_STYLE_TITLE"
+                    choices:PFBInterfaceStyleKeys()
+                    current:PFBInterfaceStyleCurrent()
+                     choose:^(NSInteger choice) {
+                         [weakSelf chooseInterfaceStyle:choice];
+                     }];
+}
+
+- (UIMenu*)darkModeStyleMenu {
+    __weak typeof(self) weakSelf = self;
+    return [self menuTitled:@"DARK_MODE_STYLE_TITLE"
+                    choices:PFBDarkModeStyleKeys()
+                    current:[PFBSettings integerForKey:@"dark_mode_style"]
+                     choose:^(NSInteger choice) {
+                         [weakSelf chooseDarkModeStyle:choice];
+                     }];
 }
 
 #pragma mark - Tab Bar Refresh

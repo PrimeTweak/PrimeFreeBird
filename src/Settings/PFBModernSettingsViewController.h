@@ -7,7 +7,8 @@ NS_ASSUME_NONNULL_BEGIN
 
 @interface PFBModernSettingsViewController : UIViewController
 
-- (instancetype)initWithAccount:(TFNTwitterAccount*)account;
+// native gives the pages the look of Twitter's new settings; the classic look otherwise.
+- (instancetype)initWithAccount:(TFNTwitterAccount*)account native:(BOOL)native;
 
 @end
 
