@@ -1,6 +1,7 @@
 #import "Sideload/PFBLoginBridge.h"
 #import "Debug/PFBDebugger.h"
 #import "Support/HookHelpers.h"
+#import "Support/PFBTwitterPopups.h"
 #import <objc/runtime.h>
 #import <objc/message.h>
 
@@ -260,19 +261,15 @@ static void pfbBridgeShowRestartPrompt(void) {
         alertControllerWithTitle:[bundle localizedStringForKey:@"RESTART_REQUIRED_ALERT_TITLE"]
                          message:[bundle localizedStringForKey:@"LOGIN_RESTART_MESSAGE"]
                   preferredStyle:UIAlertControllerStyleAlert];
-    [alert addAction:[UIAlertAction actionWithTitle:[bundle localizedStringForKey:@"RESTART_LATER_ACTION"]
-                                              style:UIAlertActionStyleCancel
-                                            handler:nil]];
-    UIAlertAction* close = [UIAlertAction actionWithTitle:[bundle localizedStringForKey:@"CLOSE_APP_ACTION"]
-                                                    style:UIAlertActionStyleDefault
-                                                  handler:^(__unused UIAlertAction* action) {
-                                                      PFBCompatSaveNow();
-                                                      [[NSUserDefaults standardUserDefaults] synchronize];
-                                                      exit(0);
-                                                  }];
-    [alert addAction:close];
+    PFBAlertAddAction(alert, [bundle localizedStringForKey:@"RESTART_LATER_ACTION"], UIAlertActionStyleCancel, YES, nil);
+    UIAlertAction* close =
+        PFBAlertAddAction(alert, [bundle localizedStringForKey:@"CLOSE_APP_ACTION"], UIAlertActionStyleDefault, YES, ^{
+            PFBCompatSaveNow();
+            [[NSUserDefaults standardUserDefaults] synchronize];
+            exit(0);
+        });
     alert.preferredAction = close;
-    [top presentViewController:alert animated:YES completion:nil];
+    PFBAlertPresent(alert, top, YES, nil);
 }
 
 // Registers the account with the app's account service and switches the UI to it,

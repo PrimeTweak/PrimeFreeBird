@@ -1,4 +1,5 @@
 #import "Support/HookHelpers.h"
+#import "Support/PFBTwitterPopups.h"
 #import <QuartzCore/QuartzCore.h>
 #import "Sideload/PFBReplyWebViewState.h"
 #import "Sideload/PFBReplyWebViewController.h"
@@ -201,34 +202,37 @@ static void PFBBuildIconBar(NSArray<NSDictionary*>* icons, WKWebView* replyWebVi
     UIView* fr = PFBFindFirstResponder(replyWebView);
     [fr reloadInputViews];  // nil-safe; the bar is picked up on focus if the keyboard isn't up yet
 }
-static void showPostSentAlert(NSString* statusID) {
+// Twitter's toast with View, which opens the reply; where the app has no toaster, an alert.
+static void showReplySent(NSString* statusID) {
     dispatch_async(dispatch_get_main_queue(), ^{
+        PFBBundle* bundle = [PFBBundle sharedBundle];
+        if (PFBPushTwitterToast([bundle localizedTwitterStringForKey:@"REPLY_SENT_TOAST_MESSAGE"], nil,
+                                PFBToastKindPlain, [bundle localizedTwitterStringForKey:@"VIEW_ACTION_LABEL"],
+                                ^{
+                                    PFBOpenStatusNatively(statusID);
+                                },
+                                NO)) {
+            return;
+        }
         UIViewController* top = topMostController();
         if (!top) {
             return;
         }
         // Twitter files this text as a plural; formatting it for one Tweet picks the singular.
         NSString* sent = PFBTwitterTerminology([NSString
-            localizedStringWithFormat:[[PFBBundle sharedBundle]
-                                          localizedTwitterStringForKey:
-                                              @"COMPOSITION_COMPLETE_SENDING_TWEET_TOAST_NOTIFICATION_MESSAGE"],
+            localizedStringWithFormat:[bundle localizedTwitterStringForKey:
+                                                  @"COMPOSITION_COMPLETE_SENDING_TWEET_TOAST_NOTIFICATION_MESSAGE"],
                                       1LL]);
         UIAlertController* alert = [UIAlertController alertControllerWithTitle:sent
                                                                        message:nil
                                                                 preferredStyle:UIAlertControllerStyleAlert];
-        [alert addAction:[UIAlertAction actionWithTitle:[[PFBBundle sharedBundle]
-                                                            localizedTwitterStringForKey:
-                                                                @"DM_MESSAGE_ACTION_OPEN_GENERIC_TITLE"]
-                                                  style:UIAlertActionStyleDefault
-                                                handler:^(UIAlertAction* action) {
-                                                    PFBOpenStatusNatively(statusID);
-                                                }]];
-        [alert
-            addAction:[UIAlertAction actionWithTitle:[[PFBBundle sharedBundle]
-                                                         localizedTwitterStringForKey:@"DISMISS_LABEL"]
-                                               style:UIAlertActionStyleCancel
-                                             handler:nil]];
-        [top presentViewController:alert animated:YES completion:nil];
+        PFBAlertAddAction(alert, [bundle localizedTwitterStringForKey:@"DM_MESSAGE_ACTION_OPEN_GENERIC_TITLE"],
+                          UIAlertActionStyleDefault, YES, ^{
+                              PFBOpenStatusNatively(statusID);
+                          });
+        PFBAlertAddAction(alert, [bundle localizedTwitterStringForKey:@"DISMISS_LABEL"], UIAlertActionStyleCancel, YES,
+                          nil);
+        PFBAlertPresent(alert, top, YES, nil);
     });
 }
 @implementation PFBReplyWebViewController
@@ -482,7 +486,7 @@ static void showPostSentAlert(NSString* statusID) {
                       [weakSelf dismissViewControllerAnimated:YES
                                                    completion:^{
                                                        if (newReplyID.length > 0) {
-                                                           showPostSentAlert(newReplyID);
+                                                           showReplySent(newReplyID);
                                                        }
                                                    }];
                   }];
