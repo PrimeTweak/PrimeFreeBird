@@ -12,6 +12,7 @@
 #import "Support/HookHelpers.h"
 #import "Settings/PFBModernSettingsPageViewController.h"
 #import "Debug/PFBTourOverlayWindow.h"
+#import "Support/PFBTwitterPopups.h"
 
 // Long enough for a screen and its first page of content to arrive.
 static const NSTimeInterval kPFBTourPause = 2.5;
@@ -42,6 +43,8 @@ static const CGFloat kPFBTourPullDistance = 160.0;
 static const NSTimeInterval kPFBTourLaunchDelay = 4.0;
 
 static NSString* const kPFBTourPendingKey = @"pfb_compat_tour_pending";
+// What the tour's toast says.
+static NSString* const kPFBTourToastTitle = @"Check every option";
 
 typedef BOOL (^PFBTourCheck)(UIViewController* before, UIViewController* after);
 
@@ -55,6 +58,9 @@ static NSString* gPFBTourStepLive;
 static NSString* gPFBTourStepEmpty;
 static UIWindow* gPFBTourOverlay;
 static UILabel* gPFBTourStepLabel;
+// Cancel, as the toast or the box offers it; and whether Twitter's toast says where the tour stands.
+static void (^gPFBTourCancel)(void);
+static BOOL gPFBTourToasts;
 static NSFileHandle* gPFBTourJournal;
 // Twitter's palette in use before the dark mode step switched it.
 static id gPFBTourPaletteBefore;
@@ -2203,7 +2209,11 @@ static NSArray<NSDictionary*>* tourSteps(BOOL full) {
 
 // MARK: - Running the tour
 
+// A toast pushed before the toaster refused one still has its time to run: all of them go.
 static void tourHideOverlay(void) {
+    PFBClearTwitterToasts();
+    gPFBTourToasts = NO;
+    gPFBTourCancel = nil;
     gPFBTourOverlay.hidden = YES;
     gPFBTourOverlay = nil;
     gPFBTourStepLabel = nil;
@@ -2225,8 +2235,8 @@ static void tourShowSignedOut(void) {
                                             message:@"The tour needs Twitter signed in to open its screens. Sign in, "
                                                     @"then start it again."
                                      preferredStyle:UIAlertControllerStyleAlert];
-    [alert addAction:[UIAlertAction actionWithTitle:@"OK" style:UIAlertActionStyleDefault handler:nil]];
-    [top presentViewController:alert animated:YES completion:nil];
+    PFBAlertAddAction(alert, @"OK", UIAlertActionStyleDefault, YES, nil);
+    PFBAlertPresent(alert, top, YES, nil);
 }
 
 // Records the outcome for the report: each step's result in order, and why the tour
@@ -2259,9 +2269,9 @@ static void tourCancel(NSArray<NSDictionary*>* steps, NSMutableArray<NSString*>*
     tourConclude(results, full, [@"canceled at " stringByAppendingString:current[@"name"]]);
 }
 
-// A box over the app while the tour runs, in its own window: it says what is
-// happening and has a Cancel button; touches outside the box reach the app.
-static void tourShowOverlay(NSArray<NSDictionary*>* steps, NSMutableArray<NSString*>* results, BOOL full) {
+// Where the app has no toaster, a box over the app in its own window says what is happening and
+// has a Cancel button; touches outside the box reach the app.
+static void tourShowBox(void) {
     UIWindowScene* scene = tourWindow().windowScene;
     if (!scene || gPFBTourOverlay) {
         return;
@@ -2279,7 +2289,7 @@ static void tourShowOverlay(NSArray<NSDictionary*>* steps, NSMutableArray<NSStri
         [[UIActivityIndicatorView alloc] initWithActivityIndicatorStyle:UIActivityIndicatorViewStyleMedium];
     [spinner startAnimating];
     UILabel* title = [UILabel new];
-    title.text = @"Check every option";
+    title.text = kPFBTourToastTitle;
     title.font = [TwitterChirpFont(TwitterFontStyleBold) fontWithSize:17.0];
     title.textColor = UIColor.labelColor;
     UILabel* step = [UILabel new];
@@ -2292,9 +2302,12 @@ static void tourShowOverlay(NSArray<NSDictionary*>* steps, NSMutableArray<NSStri
     style.attributedTitle = [[NSAttributedString alloc]
         initWithString:@"Cancel"
             attributes:@{NSFontAttributeName : [TwitterChirpFont(TwitterFontStyleBold) fontWithSize:15.0]}];
+    void (^cancelTour)(void) = gPFBTourCancel;
     UIButton* cancel = [UIButton buttonWithConfiguration:style
                                            primaryAction:[UIAction actionWithHandler:^(__unused UIAction* action) {
-                                             tourCancel(steps, results, full);
+                                             if (cancelTour) {
+                                                 cancelTour();
+                                             }
                                            }]];
     UIStackView* stack = [[UIStackView alloc] initWithArrangedSubviews:@[ spinner, title, step, cancel ]];
     stack.axis = UILayoutConstraintAxisVertical;
@@ -2320,9 +2333,31 @@ static void tourShowOverlay(NSArray<NSDictionary*>* steps, NSMutableArray<NSStri
     gPFBTourStepLabel = step;
 }
 
+// While the tour runs, Twitter's toast says what is happening and holds Cancel; it stays until the
+// next step's toast replaces it. The box stands in from the first toast the app cannot show.
+static void tourShowOverlay(NSArray<NSDictionary*>* steps, NSMutableArray<NSString*>* results, BOOL full) {
+    gPFBTourCancel = ^{
+      tourCancel(steps, results, full);
+    };
+    gPFBTourToasts =
+        PFBPushTwitterToast(kPFBTourToastTitle, nil, PFBToastKindPlain, @"Cancel", gPFBTourCancel, YES);
+    if (!gPFBTourToasts) {
+        tourShowBox();
+    }
+}
+
 static void tourShowStep(NSString* label, NSUInteger index, NSUInteger total) {
-    gPFBTourStepLabel.text = [NSString stringWithFormat:@"%@ \u00b7 %lu of %lu", label, (unsigned long)(index + 1),
-                                                        (unsigned long)total];
+    NSString* line = [NSString stringWithFormat:@"%@ \u00b7 %lu of %lu", label, (unsigned long)(index + 1),
+                                                (unsigned long)total];
+    if (gPFBTourToasts) {
+        gPFBTourToasts =
+            PFBPushTwitterToast(kPFBTourToastTitle, line, PFBToastKindPlain, @"Cancel", gPFBTourCancel, YES);
+        if (gPFBTourToasts) {
+            return;
+        }
+        tourShowBox();
+    }
+    gPFBTourStepLabel.text = line;
 }
 
 // The start's own proofs are judged last, so the late ones still count; then Home
@@ -2566,15 +2601,12 @@ static void tourAskAtLaunch(void) {
                                                             @"any time.",
                                                             (unsigned long)screens, tourDuration(screens)]
                   preferredStyle:UIAlertControllerStyleAlert];
-    [alert addAction:[UIAlertAction actionWithTitle:@"Later" style:UIAlertActionStyleCancel handler:nil]];
-    UIAlertAction* now = [UIAlertAction actionWithTitle:@"Check now"
-                                                  style:UIAlertActionStyleDefault
-                                                handler:^(__unused UIAlertAction* action) {
-                                                  PFBCompatRunTour();
-                                                }];
-    [alert addAction:now];
+    PFBAlertAddAction(alert, @"Later", UIAlertActionStyleCancel, YES, nil);
+    UIAlertAction* now = PFBAlertAddAction(alert, @"Check now", UIAlertActionStyleDefault, YES, ^{
+      PFBCompatRunTour();
+    });
     alert.preferredAction = now;
-    [top presentViewController:alert animated:YES completion:nil];
+    PFBAlertPresent(alert, top, YES, nil);
 }
 
 // A journal without its end line means Twitter closed during the tour. On the same

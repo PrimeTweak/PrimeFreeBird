@@ -10,6 +10,8 @@
 #import "Features/Appearance/ThemeColor/PFBPalette.h"
 #import "Debug/PFBTourChoicePopover.h"
 #import "Settings/Native/PFBShowcase.h"
+#import "Settings/Native/PFBNativeSettingsSheetController.h"
+#import "Support/PFBTwitterPopups.h"
 
 // An orange dark enough to read on a light page; the system orange on a dark one.
 static UIColor* PFBCompatWarningTextColor(void) {
@@ -293,9 +295,12 @@ static void PFBReportFitSheet(UIViewController* page) {
     });
 }
 
+// Over the report's Tray head, which hides the bar, the list shows it again: also when a swipe
+// back to the report is called off.
 - (void)viewWillAppear:(BOOL)animated {
     [super viewWillAppear:animated];
     PFBDebuggerSetTriggerHidden(YES);
+    [self.navigationController setNavigationBarHidden:NO animated:animated];
     [self rebuild];
     [self.tableView reloadData];
 }
@@ -650,6 +655,8 @@ static NSString* PFBReportReadLine(void) {
     BOOL _copied;
     // Whether the foot stands where it belongs for the content and width it was placed for.
     BOOL _footerPlaced;
+    // In the new look's sheet, the head of Twitter's Tray in place of the bar.
+    PFBNativeSheetHead* _trayHead;
 }
 
 + (UINavigationController*)sheetFor:(UIWindow*)window {
@@ -680,9 +687,13 @@ static NSString* PFBReportReadLine(void) {
         // Sized once at the window's width before it opens, from a bar and the page's table,
         // so the sheet comes up at about the page's height.
         [report loadViewIfNeeded];
+        // Under the Tray head the sheet opens with no bar.
+        navigation.navigationBarHidden = report->_trayHead != nil;
         report.view.frame = window.bounds;
+        [report placeTrayHead];
         [report.tableView layoutIfNeeded];
-        CGFloat bar = [navigation.navigationBar sizeThatFits:window.bounds.size].height;
+        CGFloat bar = report->_trayHead ? report.tableView.contentInset.top
+                                        : [navigation.navigationBar sizeThatFits:window.bounds.size].height;
         objc_setAssociatedObject(navigation, kPFBReportFittedKey,
                                  @(MIN(ceil(bar + report.tableView.contentSize.height), window.bounds.size.height)),
                                  OBJC_ASSOCIATION_RETAIN_NONATOMIC);
@@ -708,6 +719,14 @@ static NSString* PFBReportReadLine(void) {
     }
     self.view.backgroundColor = [PFBPalette currentBackgroundColor];
     PFBReportSetUpTable(self.tableView);
+    if (self.inSheet && self.nativeLook) {
+        _trayHead = [[PFBNativeSheetHead alloc]
+            initWithTitle:[[PFBBundle sharedBundle] localizedStringForKey:@"COMPATIBILITY_TITLE"]
+                     step:NO];
+        [_trayHead.button addTarget:self action:@selector(close) forControlEvents:UIControlEventTouchUpInside];
+        _trayHead.backgroundColor = self.view.backgroundColor;
+        [self.tableView addSubview:_trayHead];
+    }
     if (!self.nativeLook) {
         UIBarButtonItem* copy = [[UIBarButtonItem alloc] initWithTitle:@"Copy"
                                                                  style:UIBarButtonItemStylePlain
@@ -737,10 +756,13 @@ static NSString* PFBReportReadLine(void) {
     [super viewWillAppear:animated];
     // The stethoscope leads here: it steps aside while the report is on screen.
     PFBDebuggerSetTriggerHidden(YES);
-    // Opened as a sheet, the report gets a check button that closes it.
-    if (self.navigationController.presentingViewController &&
-        self.navigationController.viewControllers.firstObject == self &&
-        !self.navigationItem.leftBarButtonItem) {
+    // Opened as a sheet, the report gets a check button that closes it, or in the new look the
+    // Tray head, which takes the bar's place.
+    BOOL sheetRoot = self.navigationController.presentingViewController &&
+                     self.navigationController.viewControllers.firstObject == self;
+    if (sheetRoot && _trayHead) {
+        [self.navigationController setNavigationBarHidden:YES animated:animated];
+    } else if (sheetRoot && !self.navigationItem.leftBarButtonItem) {
         UIImageSymbolConfiguration* size =
             [UIImageSymbolConfiguration configurationWithPointSize:17.0 weight:UIImageSymbolWeightSemibold];
         UIBarButtonItem* done =
@@ -785,6 +807,7 @@ static NSString* PFBReportReadLine(void) {
     [super traitCollectionDidChange:previousTraitCollection];
     if ([self.traitCollection hasDifferentColorAppearanceComparedToTraitCollection:previousTraitCollection]) {
         self.tableView.backgroundColor = [PFBPalette currentBackgroundColor];
+        _trayHead.backgroundColor = self.tableView.backgroundColor;
         [self rebuild];
         [self.tableView reloadData];
     }
@@ -792,8 +815,42 @@ static NSString* PFBReportReadLine(void) {
 
 - (void)viewDidLayoutSubviews {
     [super viewDidLayoutSubviews];
+    [self placeTrayHead];
     [self layoutShowcase];
     PFBReportFitSheet(self);
+}
+
+- (void)scrollViewDidScroll:(UIScrollView*)scrollView {
+    [self placeTrayHead];
+}
+
+// The head takes the room above the rows and stays at the top while they scroll under it; pulled
+// down, it goes with them.
+- (void)placeTrayHead {
+    if (!_trayHead) {
+        return;
+    }
+    UITableView* table = self.tableView;
+    CGFloat width = CGRectGetWidth(table.bounds);
+    if (width <= 0) {
+        return;
+    }
+    CGFloat height = [_trayHead systemLayoutSizeFittingSize:CGSizeMake(width, 0)
+                              withHorizontalFittingPriority:UILayoutPriorityRequired
+                                    verticalFittingPriority:UILayoutPriorityFittingSizeLevel]
+                         .height;
+    if (fabs(table.contentInset.top - height) > 0.5) {
+        BOOL atTop = table.contentOffset.y <= 0.5 - table.adjustedContentInset.top;
+        UIEdgeInsets insets = table.contentInset;
+        insets.top = height;
+        table.contentInset = insets;
+        if (atTop) {
+            table.contentOffset = CGPointMake(table.contentOffset.x, -table.adjustedContentInset.top);
+        }
+    }
+    CGFloat top = MAX(-height, table.contentOffset.y + table.safeAreaInsets.top);
+    _trayHead.frame = CGRectMake(0, top, width, height);
+    [table bringSubviewToFront:_trayHead];
 }
 
 - (void)rebuild {
@@ -873,8 +930,7 @@ static NSString* PFBReportReadLine(void) {
     _sections = @[ rows ];
 
     _showcaseHeader = [[PFBReportShowcaseHeader alloc] initWithResults:results];
-    _showcaseHeader.check.menu = [self tourMenu];
-    _showcaseHeader.check.showsMenuAsPrimaryAction = YES;
+    [_showcaseHeader.check addTarget:self action:@selector(showTourTray:) forControlEvents:UIControlEventTouchUpInside];
     if (!_showcaseFooter) {
         _showcaseFooter = [[UIView alloc] init];
         _historyLabel = [[UILabel alloc] init];
@@ -1124,18 +1180,16 @@ static NSString* PFBReportReadLine(void) {
                          message:@"Clears everything counted and closes Twitter. Reopen it and every option is "
                                  @"checked on its own, then this report opens. Your settings are kept."
                   preferredStyle:UIAlertControllerStyleAlert];
-    [alert addAction:[UIAlertAction actionWithTitle:@"Cancel" style:UIAlertActionStyleCancel handler:nil]];
-    [alert addAction:[UIAlertAction actionWithTitle:@"Clear all"
-                                              style:UIAlertActionStyleDestructive
-                                            handler:^(__unused UIAlertAction* action) {
-                                                // No app can relaunch itself: quitting cleanly makes the next
-                                                // launch replay everything a new install does.
-                                                PFBCompatReset();
-                                                PFBCompatScheduleTourAtLaunch();
-                                                [[NSUserDefaults standardUserDefaults] synchronize];
-                                                exit(0);
-                                            }]];
-    [self presentViewController:alert animated:YES completion:nil];
+    PFBAlertAddAction(alert, @"Cancel", UIAlertActionStyleCancel, self.nativeLook, nil);
+    PFBAlertAddAction(alert, @"Clear all", UIAlertActionStyleDestructive, self.nativeLook, ^{
+        // No app can relaunch itself: quitting cleanly makes the next launch replay everything a
+        // new install does.
+        PFBCompatReset();
+        PFBCompatScheduleTourAtLaunch();
+        [[NSUserDefaults standardUserDefaults] synchronize];
+        exit(0);
+    });
+    PFBAlertPresent(alert, self, self.nativeLook, nil);
 }
 
 - (void)close {
@@ -1145,6 +1199,17 @@ static NSString* PFBReportReadLine(void) {
 // The tours are offered from the checklist button, the popover's arrow on the icon:
 // an image item's rendered view carries the rect the arrow needs.
 - (void)showTourChoice:(UIBarButtonItem*)sender {
+    UIView* anchor = nil;
+    @try {
+        id rendered = [sender valueForKey:@"view"];
+        anchor = [rendered isKindOfClass:[UIView class]] ? rendered : nil;
+    } @catch (__unused id exception) {
+        anchor = nil;
+    }
+    [self showTourBubbleFrom:anchor item:sender];
+}
+
+- (void)showTourBubbleFrom:(UIView*)anchor item:(UIBarButtonItem*)item {
     if (PFBCompatTourIsRunning() || self.presentedViewController) {
         return;
     }
@@ -1155,44 +1220,42 @@ static NSString* PFBReportReadLine(void) {
     };
     choice.modalPresentationStyle = UIModalPresentationPopover;
     UIPopoverPresentationController* popover = choice.popoverPresentationController;
-    UIView* anchor = nil;
-    @try {
-        id rendered = [sender valueForKey:@"view"];
-        anchor = [rendered isKindOfClass:[UIView class]] ? rendered : nil;
-    } @catch (__unused id exception) {
-        anchor = nil;
-    }
     if (anchor) {
         popover.sourceView = anchor;
         popover.sourceRect = anchor.bounds;
     } else {
-        popover.barButtonItem = sender;
+        popover.barButtonItem = item;
     }
     popover.permittedArrowDirections = UIPopoverArrowDirectionUp;
     popover.delegate = choice;
     [self presentViewController:choice animated:YES completion:nil];
 }
 
-// The new look offers them in a menu on Check options, the second one grayed out once nothing
-// is left.
-- (UIMenu*)tourMenu {
+// The new look offers them in Twitter's Tray from Check options, the second one grayed out once
+// nothing is left; the bubble stands in where the app has no Tray. A tour starts once the Tray
+// has gone.
+- (void)showTourTray:(UIButton*)sender {
+    if (PFBCompatTourIsRunning() || self.presentedViewController) {
+        return;
+    }
     __weak __typeof(self) weakSelf = self;
-    NSMutableArray<UIMenuElement*>* tours = [NSMutableArray array];
+    NSMutableArray* rows = [NSMutableArray array];
     for (NSNumber* tour in @[ @YES, @NO ]) {
         BOOL full = tour.boolValue;
-        UIAction* action = [UIAction actionWithTitle:PFBTourChoiceTitle(full)
-                                               image:nil
-                                          identifier:nil
-                                             handler:^(__unused UIAction* chosen) {
-                                               [weakSelf startTour:full];
-                                             }];
-        action.subtitle = PFBTourChoiceLine(full);
-        if (!full && PFBCompatTourScreens(NO) == 0) {
-            action.attributes = UIMenuElementAttributesDisabled;
+        id row = PFBTrayRow(PFBTourChoiceTitle(full), PFBTourChoiceLine(full), full ? @"bulleted_list" : @"skip_forward",
+                            !full && PFBCompatTourScreens(NO) == 0, ^{
+                                PFBAfterPresentations(^{
+                                    [weakSelf startTour:full];
+                                });
+                            });
+        if (row) {
+            [rows addObject:row];
         }
-        [tours addObject:action];
     }
-    return [UIMenu menuWithTitle:@"Check options" children:tours];
+    if (rows.count == 2 && PFBPresentTray(self, @"Check options", rows)) {
+        return;
+    }
+    [self showTourBubbleFrom:sender item:nil];
 }
 
 // The tour needs Twitter's screens in front, so the report steps aside first.
