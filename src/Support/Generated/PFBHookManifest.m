@@ -587,7 +587,7 @@ const PFBOptionFingerprint PFBOptionFingerprints[] = {
     {"color_twitter_icon_in_top_bar", "7918d9b9"},
     {"copy_profile_info", "0c08fd89"},
     {"custom_fonts", "3832ae6d"},
-    {"custom_tab_bar", "234501ba"},
+    {"custom_tab_bar", "7f6d58ca"},
     {"dark_mode_style", "3e7e5412"},
     {"direct_save", "050f51f9"},
     {"disable_articles", "a1063a69"},
