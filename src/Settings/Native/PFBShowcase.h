@@ -11,6 +11,10 @@ BOOL PFBShowcaseUsesGlass(void);
 // The page's line under its title, centered.
 UILabel* PFBShowcaseIntroLabel(void);
 
+// Titles a page as Twitter's new settings title theirs: in Twitter's heavy face at the size the
+// app gives it, in place of the bar's own title.
+void PFBShowcaseSetTitle(UIViewController* controller, NSString* title);
+
 // The soft card the glass stands on.
 UIView* PFBShowcaseCard(void);
 
