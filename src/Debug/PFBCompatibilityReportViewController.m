@@ -267,7 +267,11 @@ static void PFBReportFitSheet(UIViewController* page) {
         _verdict = verdict;
         _note = [note copy];
         _native = native;
-        self.title = title;
+        if (native) {
+            PFBShowcaseSetTitle(self, title);
+        } else {
+            self.title = title;
+        }
     }
     return self;
 }
@@ -697,8 +701,11 @@ static NSString* PFBReportReadLine(void) {
                                                  name:PFBCompatDidChangeNotification
                                                object:nil];
     // The new look titles the report as the row that opens it, and holds its actions in the page.
-    self.title = [[PFBBundle sharedBundle]
-        localizedStringForKey:self.nativeLook ? @"COMPATIBILITY_TITLE" : @"COMPATIBILITY_REPORT_TITLE"];
+    if (self.nativeLook) {
+        PFBShowcaseSetTitle(self, [[PFBBundle sharedBundle] localizedStringForKey:@"COMPATIBILITY_TITLE"]);
+    } else {
+        self.title = [[PFBBundle sharedBundle] localizedStringForKey:@"COMPATIBILITY_REPORT_TITLE"];
+    }
     self.view.backgroundColor = [PFBPalette currentBackgroundColor];
     PFBReportSetUpTable(self.tableView);
     if (!self.nativeLook) {
@@ -866,7 +873,8 @@ static NSString* PFBReportReadLine(void) {
     _sections = @[ rows ];
 
     _showcaseHeader = [[PFBReportShowcaseHeader alloc] initWithResults:results];
-    [_showcaseHeader.check addTarget:self action:@selector(checkOptions:) forControlEvents:UIControlEventTouchUpInside];
+    _showcaseHeader.check.menu = [self tourMenu];
+    _showcaseHeader.check.showsMenuAsPrimaryAction = YES;
     if (!_showcaseFooter) {
         _showcaseFooter = [[UIView alloc] init];
         _historyLabel = [[UILabel alloc] init];
@@ -1137,22 +1145,6 @@ static NSString* PFBReportReadLine(void) {
 // The tours are offered from the checklist button, the popover's arrow on the icon:
 // an image item's rendered view carries the rect the arrow needs.
 - (void)showTourChoice:(UIBarButtonItem*)sender {
-    UIView* anchor = nil;
-    @try {
-        id rendered = [sender valueForKey:@"view"];
-        anchor = [rendered isKindOfClass:[UIView class]] ? rendered : nil;
-    } @catch (__unused id exception) {
-        anchor = nil;
-    }
-    [self presentTourChoiceFrom:anchor item:sender];
-}
-
-// The new look offers them from Check options on the card.
-- (void)checkOptions:(UIButton*)sender {
-    [self presentTourChoiceFrom:sender item:nil];
-}
-
-- (void)presentTourChoiceFrom:(UIView*)anchor item:(UIBarButtonItem*)item {
     if (PFBCompatTourIsRunning() || self.presentedViewController) {
         return;
     }
@@ -1163,16 +1155,44 @@ static NSString* PFBReportReadLine(void) {
     };
     choice.modalPresentationStyle = UIModalPresentationPopover;
     UIPopoverPresentationController* popover = choice.popoverPresentationController;
+    UIView* anchor = nil;
+    @try {
+        id rendered = [sender valueForKey:@"view"];
+        anchor = [rendered isKindOfClass:[UIView class]] ? rendered : nil;
+    } @catch (__unused id exception) {
+        anchor = nil;
+    }
     if (anchor) {
         popover.sourceView = anchor;
         popover.sourceRect = anchor.bounds;
     } else {
-        popover.barButtonItem = item;
+        popover.barButtonItem = sender;
     }
-    popover.permittedArrowDirections =
-        item ? UIPopoverArrowDirectionUp : UIPopoverArrowDirectionUp | UIPopoverArrowDirectionDown;
+    popover.permittedArrowDirections = UIPopoverArrowDirectionUp;
     popover.delegate = choice;
     [self presentViewController:choice animated:YES completion:nil];
+}
+
+// The new look offers them in a menu on Check options, the second one grayed out once nothing
+// is left.
+- (UIMenu*)tourMenu {
+    __weak __typeof(self) weakSelf = self;
+    NSMutableArray<UIMenuElement*>* tours = [NSMutableArray array];
+    for (NSNumber* tour in @[ @YES, @NO ]) {
+        BOOL full = tour.boolValue;
+        UIAction* action = [UIAction actionWithTitle:PFBTourChoiceTitle(full)
+                                               image:nil
+                                          identifier:nil
+                                             handler:^(__unused UIAction* chosen) {
+                                               [weakSelf startTour:full];
+                                             }];
+        action.subtitle = PFBTourChoiceLine(full);
+        if (!full && PFBCompatTourScreens(NO) == 0) {
+            action.attributes = UIMenuElementAttributesDisabled;
+        }
+        [tours addObject:action];
+    }
+    return [UIMenu menuWithTitle:@"Check options" children:tours];
 }
 
 // The tour needs Twitter's screens in front, so the report steps aside first.

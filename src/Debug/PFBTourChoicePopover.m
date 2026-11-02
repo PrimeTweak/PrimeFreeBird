@@ -13,12 +13,11 @@ static const CGFloat kPFBTourChoiceInset = 20.0;
 static const CGFloat kPFBTourChoicePad = 11.0;
 static const CGFloat kPFBTourChoiceLineGap = 2.0;
 
-static NSString* PFBTourChoiceTitle(BOOL full) {
+NSString* PFBTourChoiceTitle(BOOL full) {
     return full ? @"All screens" : @"Remaining screens";
 }
 
-// What a tour covers: every screen, or those still to check.
-static NSString* PFBTourChoiceLine(BOOL full) {
+NSString* PFBTourChoiceLine(BOOL full) {
     NSUInteger screens = PFBCompatTourScreens(full);
     if (full) {
         return [NSString stringWithFormat:@"%lu screen%@", (unsigned long)screens, screens == 1 ? @"" : @"s"];
