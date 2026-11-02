@@ -93,6 +93,8 @@
 + (instancetype)defaultToaster;
 - (void)pushToast:(id)toast withPriority:(NSUInteger)priority;
 - (void)dequeueToastsPassingTest:(BOOL (^)(id toast, NSUInteger priority))test;
+// The toast on screen, nil when none shows.
+- (id)activeToast;
 @end
 
 @interface TFNHUD : NSObject

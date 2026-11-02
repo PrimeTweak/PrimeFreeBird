@@ -28,6 +28,9 @@ typedef NS_ENUM(NSInteger, PFBToastKind) {
 BOOL PFBPushTwitterToast(NSString* text, NSString* detail, PFBToastKind kind, NSString* actionTitle,
                          void (^action)(void), BOOL persistent);
 
+// Whether the last persistent toast pushed is the one Twitter shows.
+BOOL PFBPersistentToastShowing(void);
+
 // Takes the tweak's toasts off the screen and out of Twitter's queue.
 void PFBClearTwitterToasts(void);
 

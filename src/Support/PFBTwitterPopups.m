@@ -12,6 +12,8 @@ static const void* kPFBToastActionKey = &kPFBToastActionKey;
 // start at 3, each above the one before it.
 static const NSUInteger kPFBToastPersistent = 2;
 static NSUInteger gPFBToastRank = kPFBToastPersistent;
+// The last persistent toast pushed; Twitter holds it while it waits or shows.
+static __weak id gPFBPersistentToast;
 
 BOOL PFBTrayAvailable(void) {
     Class sheetClass = objc_getClass("TFNMenuSheetViewController");
@@ -124,9 +126,16 @@ BOOL PFBPushTwitterToast(NSString* text, NSString* detail, PFBToastKind kind, NS
     objc_setAssociatedObject(toast, kPFBToastActionKey, button, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     if (persistent) {
         PFBClearTwitterToasts();
+        gPFBPersistentToast = toast;
     }
     [toaster pushToast:toast withPriority:persistent ? kPFBToastPersistent : ++gPFBToastRank];
     return YES;
+}
+
+BOOL PFBPersistentToastShowing(void) {
+    TFNToaster* toaster = PFBToaster();
+    id persistent = gPFBPersistentToast;
+    return persistent && [toaster respondsToSelector:@selector(activeToast)] && [toaster activeToast] == persistent;
 }
 
 void PFBClearTwitterToasts(void) {
