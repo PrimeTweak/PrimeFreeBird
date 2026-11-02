@@ -6,6 +6,7 @@
 #import "Settings/PFBModernSettingsCells.h"
 #import "Settings/PFBModernSettingsPageViewController.h"
 #import "Settings/Native/PFBNativeSettingsRowCell.h"
+#import "Settings/Native/PFBShowcase.h"
 #import "Settings/Pages/PFBAppearanceSettingsViewController.h"
 #import "Settings/Pages/PFBProfilesSettingsViewController.h"
 #import "Settings/Pages/PFBTimelinesSettingsViewController.h"
@@ -186,6 +187,8 @@
     if (!self.native && self.account && [titleViewClass respondsToSelector:@selector(titleViewWithTitle:subtitle:)]) {
         self.navigationItem.titleView = [titleViewClass titleViewWithTitle:@PFB_PRODUCT_NAME
                                                                   subtitle:self.account.displayUsername];
+    } else if (self.native) {
+        PFBShowcaseSetTitle(self, @PFB_PRODUCT_NAME);
     } else {
         self.title = @PFB_PRODUCT_NAME;
     }

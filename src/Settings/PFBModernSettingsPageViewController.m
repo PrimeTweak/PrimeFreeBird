@@ -13,6 +13,7 @@
 #import "Common/PFBCompatibility.h"
 #import "Debug/PFBDebugger.h"
 #import "Settings/Native/PFBNativeSettingsPageRows.h"
+#import "Settings/Native/PFBShowcase.h"
 
 @interface PFBModernSettingsPageViewController ()
 @property (nonatomic, copy) NSString* registryPageKey;
@@ -165,7 +166,9 @@ static NSURL* PFBAccountAvatarURL(TFNTwitterAccount* account) {
         return;
     }
     NSString* title = [[PFBBundle sharedBundle] localizedStringForKey:[self pageTitleKey]];
-    if (self.account && !self.nativeLook) {
+    if (self.nativeLook) {
+        PFBShowcaseSetTitle(self, title);
+    } else if (self.account) {
         self.navigationItem.titleView =
             [objc_getClass("TFNTitleView") titleViewWithTitle:title
                                                      subtitle:self.account.displayUsername];
@@ -806,16 +809,17 @@ static NSURL* PFBAccountAvatarURL(TFNTwitterAccount* account) {
     }
 }
 
-// The screen titles itself; the classic look adds the account under the title.
+// The screen titles itself; the classic look adds the account under the title, and the new look
+// titles it as its pages.
 - (void)showAppIconViewController:(NSDictionary*)sender {
     UIViewController* appIconVC = [[PFBAppIconViewController alloc] init];
-    if (self.account && !self.nativeLook) {
-        [appIconVC.navigationItem
-            setTitleView:[objc_getClass("TFNTitleView")
-                             titleViewWithTitle:[[PFBBundle sharedBundle]
-                                                    localizedTwitterStringForKey:
-                                                        @"SUBSCRIPTION_APP_ICON_SETTINGS_TITLE"]
-                                       subtitle:self.account.displayUsername]];
+    NSString* title = [[PFBBundle sharedBundle] localizedTwitterStringForKey:@"SUBSCRIPTION_APP_ICON_SETTINGS_TITLE"];
+    if (self.nativeLook) {
+        PFBShowcaseSetTitle(appIconVC, title);
+    } else if (self.account) {
+        [appIconVC.navigationItem setTitleView:[objc_getClass("TFNTitleView")
+                                                   titleViewWithTitle:title
+                                                             subtitle:self.account.displayUsername]];
     }
     [self.navigationController pushViewController:appIconVC animated:YES];
 }
