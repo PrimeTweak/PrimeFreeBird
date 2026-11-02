@@ -10,8 +10,6 @@ typedef NS_ENUM(NSInteger, PFBNativeSettingsRowAccessory) {
     PFBNativeSettingsRowAccessoryMore,
     // The row acts where it is.
     PFBNativeSettingsRowAccessoryNone,
-    // The row opens a menu in place, after its value.
-    PFBNativeSettingsRowAccessoryMenu,
 };
 
 // The look of Twitter's rows, copied from one of them once on screen (Settings.x), their usual
@@ -38,8 +36,4 @@ typedef NS_ENUM(NSInteger, PFBNativeSettingsRowAccessory) {
                   iconName:(NSString*)iconName
                      value:(NSString*)value
                  accessory:(PFBNativeSettingsRowAccessory)accessory;
-// The title and icon in red, for a row that erases something.
-@property (nonatomic) BOOL destructive;
-// The icon's fill, as a picked color shows it; nil for the text color.
-@property (nonatomic, strong) UIColor* iconColor;
 @end

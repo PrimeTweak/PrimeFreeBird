@@ -11,7 +11,9 @@
 #import "Settings/PFBTintedSwitch.h"
 #import "Settings/Native/PFBNativeSettingsRowCell.h"
 #import "Settings/Native/PFBNativeSettingsSheetController.h"
+#import "Settings/Native/PFBShowcase.h"
 #import "Settings/PFBSettingsCellStyle.h"
+#import "Features/Timelines/PFBMutedShowcaseCells.h"
 
 // A language row's own height, so the switch is spaced like one more entry.
 static const CGFloat kPFBTranslateBarHeight = 51.0;
@@ -20,7 +22,7 @@ static const CGFloat kPFBTranslateBarHeight = 51.0;
 // margin above it.
 static const CGFloat kPFBCompactRowMargin = 14.0;
 static const NSInteger kPFBTickTag = 7701;
-// The new look's button over a term's row, which opens its duration menu.
+// The new look's button over a term's row, which opens its menu.
 static const NSInteger kPFBRowMenuTag = 7702;
 
 // Plain strings: an "@" prefix marks an account, a space a phrase, anything else a
@@ -159,15 +161,21 @@ static void PFBMutedOptionToggled(UISwitch* sender) {
 
 @end
 
-// The new look's glyph for a term's kind: "@handle" an account, "two words" a phrase, else a word.
-static NSString* PFBMutedKindGlyph(NSString* term) {
+// The new look's symbol for a term's kind: "@handle" an account, "two words" a phrase, else a word.
+static NSString* PFBMutedKindSymbol(NSString* term) {
     if ([term hasPrefix:@"@"]) {
         return @"at";
     }
     if ([term rangeOfString:@" "].location != NSNotFound) {
-        return @"quote_stroke";
+        return @"quote.opening";
     }
-    return @"text_size";
+    return @"textformat";
+}
+
+// The durations a term can be filtered for, the last being forever.
+static NSArray<NSArray*>* PFBMutedDurations(void) {
+    return @[ @[ @"MUTED_WORDS_DURATION_24H", @(86400.0) ], @[ @"MUTED_WORDS_DURATION_7D", @(604800.0) ],
+              @[ @"MUTED_WORDS_DURATION_30D", @(2592000.0) ], @[ @"MUTED_WORDS_DURATION_FOREVER", @(0.0) ] ];
 }
 
 // MARK: - controller
@@ -189,6 +197,9 @@ static NSString* PFBMutedKindGlyph(NSString* term) {
 @property (nonatomic, strong) UIVisualEffectView* headerMaterial;
 @property (nonatomic, strong) UIVisualEffectView* barMaterial;
 @property (nonatomic, assign) CGFloat pinnedHeaderHeight;
+// The new look: the duration the next term added gets, forever when 0, and the kind its head shows.
+@property (nonatomic, assign) NSTimeInterval pendingSpan;
+@property (nonatomic, copy) NSString* shownKindSymbol;
 @end
 
 // The confirm glyph is baked opaque white by the theme hooks, but only while the
@@ -349,11 +360,12 @@ static NSMutableArray<NSString*>* PFBKeptLanguageList(void) {
     [self.tableView registerClass:[PFBMutedAddCell class] forCellReuseIdentifier:@"add"];
     [self.tableView registerClass:[PFBModernSettingsToggleCell class] forCellReuseIdentifier:@"opt"];
     [self.tableView registerClass:[PFBMutedTermCell class] forCellReuseIdentifier:@"term"];
-    // The new look's rows: a term with its menu and remove button, a language with its check,
-    // and the plain rows.
-    [self.tableView registerClass:[PFBNativeSettingsRowCell class] forCellReuseIdentifier:@"NativeTerm"];
+    // The new look's other languages with their check, then its heads and rows.
     [self.tableView registerClass:[PFBNativeSettingsRowCell class] forCellReuseIdentifier:@"NativeCheck"];
-    [self.tableView registerClass:[PFBNativeSettingsRowCell class] forCellReuseIdentifier:@"NativeRow"];
+    [self.tableView registerClass:[PFBMutedWordsHeroCell class] forCellReuseIdentifier:@"WordsHero"];
+    [self.tableView registerClass:[PFBMutedLanguagesHeroCell class] forCellReuseIdentifier:@"LanguagesHero"];
+    [self.tableView registerClass:[PFBMutedThreadsHeroCell class] forCellReuseIdentifier:@"ThreadsHero"];
+    [self.tableView registerClass:[PFBShowcaseRowCell class] forCellReuseIdentifier:@"ShowcaseRow"];
     self.languageCodes = PFBLanguageCatalog();
     if (!self.othersOnly) {
         [self installModeControl];
@@ -378,7 +390,7 @@ static NSMutableArray<NSString*>* PFBKeptLanguageList(void) {
         forControlEvents:UIControlEventValueChanged];
     // The segment keeps its system appearance: it names a place in the screen,
     // not a setting, so it stays out of the accent's vocabulary.
-    CGFloat inset = self.nativeLook ? 16.0 : kPFBMutedSideMargin;
+    CGFloat inset = self.nativeLook ? 20.0 : kPFBMutedSideMargin;
     CGFloat controlHeight = 32.0;
     CGFloat top = kPFBMutedSideMargin;
     // The popover's material fills this header, so it carries the same margin
@@ -544,11 +556,6 @@ static NSMutableArray<NSString*>* PFBKeptLanguageList(void) {
     return self.compact ? kPFBCompactRowMargin : kPFBMutedSideMargin;
 }
 
-// Where the notes under the lists start: in the new look, where its rows' icons stand.
-- (CGFloat)textMargin {
-    return self.nativeLook ? [PFBNativeSettingsRowStyle shared].iconFrame.origin.x : kPFBMutedSideMargin;
-}
-
 // A bar shows its material only while content passes underneath, the way the
 // system's own bars do; at rest it is the card's glass that shows.
 - (void)updateBarMaterials {
@@ -569,6 +576,10 @@ static NSMutableArray<NSString*>* PFBKeptLanguageList(void) {
 }
 
 - (void)modeChanged:(UISegmentedControl*)control {
+    // The new look's field leaves with the Words head, so its keyboard goes first.
+    if ([self showcase]) {
+        [self.view endEditing:YES];
+    }
     self.mode = control.selectedSegmentIndex;
     [self.tableView reloadData];
     [self updatePinnedInsets];
@@ -715,6 +726,7 @@ static NSMutableArray<NSString*>* PFBKeptLanguageList(void) {
     for (NSString* existing in self.terms) {
         if ([existing caseInsensitiveCompare:raw] == NSOrderedSame) {
             field.text = @"";
+            [self refreshWordsHero];
             return;
         }
     }
@@ -726,6 +738,27 @@ static NSMutableArray<NSString*>* PFBKeptLanguageList(void) {
     [self.terms insertObject:raw atIndex:0];
     field.text = @"";
     [self persist];
+    // On the Words list, the new look slides the term in under the head, which keeps the field
+    // and the keyboard.
+    if ([self showcase]) {
+        if (self.pendingSpan > 0) {
+            [self setExpiry:[[NSDate date] timeIntervalSince1970] + self.pendingSpan span:self.pendingSpan forTerm:raw];
+        }
+        self.pendingSpan = 0;
+        if (self.mode == 0) {
+            NSIndexPath* first = [NSIndexPath indexPathForRow:1 inSection:0];
+            [self.tableView performBatchUpdates:^{
+              if (self.terms.count == 1) {
+                  [self.tableView reloadRowsAtIndexPaths:@[ first ] withRowAnimation:UITableViewRowAnimationFade];
+              } else {
+                  [self.tableView insertRowsAtIndexPaths:@[ first ] withRowAnimation:UITableViewRowAnimationTop];
+              }
+            }
+                                     completion:nil];
+            [self refreshWordsHero];
+            return;
+        }
+    }
     [self updatePreferredSize];
     [self.tableView reloadData];
 }
@@ -735,7 +768,10 @@ static NSMutableArray<NSString*>* PFBKeptLanguageList(void) {
 - (void)translateChanged:(UISwitch*)sender {
     [[NSUserDefaults standardUserDefaults] setBool:!sender.isOn
                                             forKey:@"disable_auto_translate"];
-    [self.tableView reloadData];
+    // In the new look the switch alone shows the flag, and a reload would cut its slide.
+    if (![self showcase]) {
+        [self.tableView reloadData];
+    }
 }
 
 - (void)toggleChanged:(UISwitch*)sender {
@@ -768,6 +804,10 @@ static NSMutableArray<NSString*>* PFBKeptLanguageList(void) {
 
 // Section 0 is "Filters": the add row first, then the list (or one empty row).
 - (NSInteger)tableView:(UITableView*)tableView numberOfRowsInSection:(NSInteger)section {
+    // The new look opens each list on its head; Languages then holds two rows.
+    if ([self showcase] && self.mode != 0) {
+        return 1 + (self.mode == 1 ? 2 : (NSInteger)PFBHiddenThreads().count);
+    }
     if (self.mode == 2) {
         // One row stands in for the empty list, as the word list does.
         return (NSInteger)MAX(PFBHiddenThreads().count, (NSUInteger)1);
@@ -822,6 +862,10 @@ static NSMutableArray<NSString*>* PFBKeptLanguageList(void) {
 // or how many Tweets the words filtered today.
 - (NSString*)tableView:(UITableView*)tableView
     titleForFooterInSection:(NSInteger)section {
+    // In the new look the heads say what the lists do; Languages adds the language-less Tweets.
+    if ([self showcase]) {
+        return self.mode == 1 ? [[PFBBundle sharedBundle] localizedStringForKey:@"LANGUAGES_NOTE_UNDETECTED"] : nil;
+    }
     if (self.mode == 2) {
         if (self.compact) {
             return nil;
@@ -872,12 +916,15 @@ static NSMutableArray<NSString*>* PFBKeptLanguageList(void) {
     label.font = PFBScaledFont([TwitterChirpFont(TwitterFontStyleRegular) fontWithSize:13.5]);
     label.textColor = [UIColor secondaryLabelColor];
     label.translatesAutoresizingMaskIntoConstraints = NO;
+    // The new look centers its notes under the rows, as under the heads' cards.
+    CGFloat margin = [self showcase] ? 20.0 : kPFBMutedSideMargin;
+    label.textAlignment = [self showcase] ? NSTextAlignmentCenter : NSTextAlignmentNatural;
     [container addSubview:label];
     [NSLayoutConstraint activateConstraints:@[
         [label.leadingAnchor constraintEqualToAnchor:container.leadingAnchor
-                                            constant:[self textMargin]],
+                                            constant:margin],
         [label.trailingAnchor constraintEqualToAnchor:container.trailingAnchor
-                                             constant:-[self textMargin]],
+                                             constant:-margin],
         [label.topAnchor constraintEqualToAnchor:container.topAnchor constant:14.0],
         [label.bottomAnchor constraintEqualToAnchor:container.bottomAnchor
                                            constant:-18.0],
@@ -894,72 +941,306 @@ static NSMutableArray<NSString*>* PFBKeptLanguageList(void) {
 
 // MARK: new look
 
-// The new look's own rows; nil where the classic cell serves, restyled: the field and the
-// auto-translate switch.
-- (UITableViewCell*)nativeCellFor:(UITableView*)tableView at:(NSIndexPath*)indexPath {
-    if (self.mode == 2) {
-        return [self nativeThreadCellFor:tableView at:indexPath];
-    }
-    if (self.mode == 1) {
-        if ([self rowIsTranslate:indexPath.row]) {
-            return nil;
-        }
-        return [self rowIsPicker:indexPath.row] ? [self nativePickerCellFor:tableView at:indexPath]
-                                                : [self nativeLanguageCellFor:tableView at:indexPath];
-    }
-    if (indexPath.section == 1) {
-        PFBNativeSettingsRowCell* cell = [tableView dequeueReusableCellWithIdentifier:@"NativeRow"
-                                                                         forIndexPath:indexPath];
-        [cell configureWithTitle:[[PFBBundle sharedBundle] localizedStringForKey:@"MUTED_WORDS_OPTIONS_HEADER"]
-                        iconName:@"settings_slider"
-                           value:nil
-                       accessory:PFBNativeSettingsRowAccessoryMore];
-        cell.selectionStyle = UITableViewCellSelectionStyleDefault;
-        cell.contentView.alpha = 1.0;
-        return cell;
-    }
-    return indexPath.row == 0 ? nil : [self nativeTermCellFor:tableView at:indexPath];
+// The full screen of the new look; its language picker keeps plain rows.
+- (BOOL)showcase {
+    return self.nativeLook && !self.compact && !self.othersOnly;
 }
 
-// A term: its kind's glyph, the term, its duration as a menu over the whole row, and the button
-// that removes it. With no term yet, a dimmed example with nothing to open or remove.
-- (UITableViewCell*)nativeTermCellFor:(UITableView*)tableView at:(NSIndexPath*)indexPath {
-    PFBNativeSettingsRowCell* cell = [tableView dequeueReusableCellWithIdentifier:@"NativeTerm"
-                                                                     forIndexPath:indexPath];
+// Each list opens on its head; Words then lists its terms and Options, Languages the other
+// languages and Auto-translate, Conversations what is hidden.
+- (UITableViewCell*)showcaseCellFor:(UITableView*)tableView at:(NSIndexPath*)indexPath {
+    if (indexPath.section == 0 && indexPath.row == 0) {
+        if (self.mode == 0) {
+            return [self wordsHeroFor:tableView at:indexPath];
+        }
+        return self.mode == 1 ? [self languagesHeroFor:tableView at:indexPath] : [self threadsHeroFor:tableView at:indexPath];
+    }
+    PFBShowcaseRowCell* cell = [tableView dequeueReusableCellWithIdentifier:@"ShowcaseRow" forIndexPath:indexPath];
     cell.selectionStyle = UITableViewCellSelectionStyleNone;
-    UIButton* menu = [cell.contentView viewWithTag:kPFBRowMenuTag];
-    if (!menu) {
-        menu = [UIButton buttonWithType:UIButtonTypeCustom];
-        menu.tag = kPFBRowMenuTag;
-        menu.showsMenuAsPrimaryAction = YES;
-        menu.frame = cell.contentView.bounds;
-        menu.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
-        [cell.contentView addSubview:menu];
+    [[cell.contentView viewWithTag:kPFBRowMenuTag] removeFromSuperview];
+    if (self.mode == 0 && indexPath.section == 1) {
+        [cell configureWithSymbol:@"slider.horizontal.3"
+                            title:[[PFBBundle sharedBundle] localizedStringForKey:@"MUTED_WORDS_OPTIONS_HEADER"]
+                         subtitle:nil
+                            value:nil
+                        accessory:PFBShowcaseAccessoryMore];
+        cell.selectionStyle = UITableViewCellSelectionStyleDefault;
+        return cell;
     }
-    UIButton* remove = [cell.accessoryView isKindOfClass:[UIButton class]] ? (UIButton*)cell.accessoryView : nil;
-    if (!remove) {
-        remove = [PFBHitButton buttonWithType:UIButtonTypeSystem];
-        [remove setImage:PFBTwitterGlyphFor(@"close_circle_fill", [UIImage systemImageNamed:@"xmark.circle.fill"])
-                forState:UIControlStateNormal];
-        remove.tintColor = [[UIColor labelColor] colorWithAlphaComponent:0.25];
-        remove.frame = CGRectMake(0, 0, 26.0, 26.0);
-        [remove addTarget:self action:@selector(removeTapped:) forControlEvents:UIControlEventTouchUpInside];
-        cell.accessoryView = remove;
+    if (self.mode == 0) {
+        return [self termCell:cell at:(NSUInteger)indexPath.row - 1];
     }
-    BOOL example = self.terms.count == 0;
-    NSUInteger termIndex = (NSUInteger)indexPath.row - 1;
-    NSString* term = example ? [[PFBBundle sharedBundle] localizedStringForKey:@"MUTED_WORDS_EXAMPLE_TERM"]
-                             : self.terms[termIndex];
-    [cell configureWithTitle:term
-                    iconName:PFBMutedKindGlyph(term)
-                       value:example ? nil : [self durationLabelForTerm:term]
-                   accessory:example ? PFBNativeSettingsRowAccessoryNone : PFBNativeSettingsRowAccessoryMenu];
-    cell.contentView.alpha = example ? 0.38 : 1.0;
-    menu.hidden = example;
-    menu.menu = example ? nil : [self durationMenuForTerm:term];
-    remove.hidden = example;
-    remove.tag = (NSInteger)termIndex;
+    if (self.mode == 1) {
+        return indexPath.row == 1 ? [self otherLanguagesCell:cell] : [self translateCell:cell];
+    }
+    return [self threadCell:cell at:(NSUInteger)indexPath.row - 1];
+}
+
+- (UITableViewCell*)wordsHeroFor:(UITableView*)tableView at:(NSIndexPath*)indexPath {
+    PFBBundle* bundle = [PFBBundle sharedBundle];
+    PFBMutedWordsHeroCell* hero = [tableView dequeueReusableCellWithIdentifier:@"WordsHero" forIndexPath:indexPath];
+    hero.intro.text = [bundle localizedStringForKey:@"MUTED_WORDS_SUBTITLE"];
+    hero.field.placeholder = [bundle localizedStringForKey:@"MUTED_WORDS_ADD_PLACEHOLDER"];
+    hero.field.delegate = self;
+    [hero.field removeTarget:self action:NULL forControlEvents:UIControlEventEditingChanged];
+    [hero.field addTarget:self action:@selector(heroFieldChanged:) forControlEvents:UIControlEventEditingChanged];
+    hero.addButton.accessibilityLabel = [bundle localizedStringForKey:@"MUTED_WORDS_ADD_BUTTON"];
+    [hero.addButton removeTarget:self action:NULL forControlEvents:UIControlEventTouchUpInside];
+    [hero.addButton addTarget:self action:@selector(heroAddTapped:) forControlEvents:UIControlEventTouchUpInside];
+    [self configureWordsHero:hero];
+    return hero;
+}
+
+// The day's count, and under the field, while a term is typed, its kind and the duration it gets.
+- (void)configureWordsHero:(PFBMutedWordsHeroCell*)hero {
+    PFBBundle* bundle = [PFBBundle sharedBundle];
+    [hero setCount:pfbMutedHiddenCountToday() caption:[bundle localizedStringForKey:@"MUTED_WORDS_COUNT_TODAY"]];
+    NSString* typed =
+        [hero.field.text stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+    NSString* symbol = typed.length ? PFBMutedKindSymbol(typed) : nil;
+    [hero setKindSymbol:symbol name:typed.length ? [[self kindLabelForTerm:typed] localizedCapitalizedString] : nil];
+    self.shownKindSymbol = symbol;
+    hero.durationButton.label = [self durationNameForSpan:self.pendingSpan];
+    hero.durationButton.menu = [self pendingDurationMenu];
+}
+
+// The head is set again in place, so the field keeps its text and the keyboard; its height follows.
+- (void)refreshWordsHero {
+    UITableViewCell* head = [self.tableView cellForRowAtIndexPath:[NSIndexPath indexPathForRow:0 inSection:0]];
+    if (![head isKindOfClass:[PFBMutedWordsHeroCell class]]) {
+        return;
+    }
+    [self configureWordsHero:(PFBMutedWordsHeroCell*)head];
+    [self.tableView performBatchUpdates:nil completion:nil];
+}
+
+// Only a change of kind redraws the head, not every letter.
+- (void)heroFieldChanged:(UITextField*)field {
+    NSString* typed = [field.text stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+    NSString* symbol = typed.length ? PFBMutedKindSymbol(typed) : nil;
+    if (symbol != self.shownKindSymbol && ![symbol isEqualToString:self.shownKindSymbol]) {
+        [self refreshWordsHero];
+    }
+}
+
+- (void)heroAddTapped:(UIButton*)sender {
+    UITableViewCell* head = [self.tableView cellForRowAtIndexPath:[NSIndexPath indexPathForRow:0 inSection:0]];
+    if ([head isKindOfClass:[PFBMutedWordsHeroCell class]]) {
+        [self addTermFromField:((PFBMutedWordsHeroCell*)head).field];
+    }
+}
+
+- (NSString*)durationNameForSpan:(NSTimeInterval)span {
+    PFBBundle* bundle = [PFBBundle sharedBundle];
+    for (NSArray* option in PFBMutedDurations()) {
+        if (fabs([option[1] doubleValue] - span) < 1.0) {
+            return [bundle localizedStringForKey:option[0]];
+        }
+    }
+    return [bundle localizedStringForKey:@"MUTED_WORDS_DURATION_FOREVER"];
+}
+
+// The duration the next term gets, chosen before it is added.
+- (UIMenu*)pendingDurationMenu {
+    NSMutableArray<UIAction*>* actions = [NSMutableArray array];
+    __weak typeof(self) weakSelf = self;
+    for (NSArray* option in PFBMutedDurations()) {
+        double span = [option[1] doubleValue];
+        UIAction* action = [UIAction actionWithTitle:[[PFBBundle sharedBundle] localizedStringForKey:option[0]]
+                                               image:nil
+                                          identifier:nil
+                                             handler:^(__unused UIAction* chosen) {
+                                               weakSelf.pendingSpan = span;
+                                               [weakSelf refreshWordsHero];
+                                             }];
+        action.state = fabs(span - self.pendingSpan) < 1.0 ? UIMenuElementStateOn : UIMenuElementStateOff;
+        [actions addObject:action];
+    }
+    return [UIMenu menuWithChildren:actions];
+}
+
+// A term: its kind's symbol, the term, then its kind and the time left. The row opens its menu:
+// the durations, then Remove. With none yet, a line says the list is empty.
+- (UITableViewCell*)termCell:(PFBShowcaseRowCell*)cell at:(NSUInteger)index {
+    PFBBundle* bundle = [PFBBundle sharedBundle];
+    if (index >= self.terms.count) {
+        [cell configureWithSymbol:nil
+                            title:@""
+                         subtitle:[bundle localizedStringForKey:@"MUTED_WORDS_EMPTY"]
+                            value:nil
+                        accessory:PFBShowcaseAccessoryNone];
+        return cell;
+    }
+    NSString* term = self.terms[index];
+    NSString* kind = [[self kindLabelForTerm:term] localizedCapitalizedString];
+    [cell configureWithSymbol:PFBMutedKindSymbol(term)
+                        title:term
+                     subtitle:[NSString stringWithFormat:@"%@ · %@", kind, [self durationLabelForTerm:term]]
+                        value:nil
+                    accessory:PFBShowcaseAccessoryMenu];
+    UIButton* menu = [UIButton buttonWithType:UIButtonTypeCustom];
+    menu.tag = kPFBRowMenuTag;
+    menu.showsMenuAsPrimaryAction = YES;
+    menu.frame = cell.contentView.bounds;
+    menu.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+    menu.menu = [self termMenuForTerm:term];
+    menu.isAccessibilityElement = NO;
+    [cell.contentView addSubview:menu];
     return cell;
+}
+
+- (UIMenu*)termMenuForTerm:(NSString*)term {
+    __weak typeof(self) weakSelf = self;
+    UIAction* remove = [UIAction actionWithTitle:[[PFBBundle sharedBundle] localizedStringForKey:@"MUTED_WORDS_REMOVE_ACTION"]
+                                           image:[UIImage systemImageNamed:@"trash"]
+                                      identifier:nil
+                                         handler:^(__unused UIAction* chosen) {
+                                           [weakSelf removeTerm:term];
+                                         }];
+    remove.attributes = UIMenuElementAttributesDestructive;
+    UIMenu* removal = [UIMenu menuWithTitle:@"" image:nil identifier:nil options:UIMenuOptionsDisplayInline children:@[ remove ]];
+    return [UIMenu menuWithChildren:[[self durationMenuForTerm:term].children arrayByAddingObject:removal]];
+}
+
+- (void)removeTerm:(NSString*)term {
+    NSUInteger index = [self.terms indexOfObject:term];
+    if (index == NSNotFound) {
+        return;
+    }
+    [self.terms removeObjectAtIndex:index];
+    [self persist];
+    [self.tableView reloadData];
+}
+
+- (UITableViewCell*)languagesHeroFor:(UITableView*)tableView at:(NSIndexPath*)indexPath {
+    PFBMutedLanguagesHeroCell* hero = [tableView dequeueReusableCellWithIdentifier:@"LanguagesHero"
+                                                                      forIndexPath:indexPath];
+    [self configureLanguagesHero:hero];
+    return hero;
+}
+
+// What the filter does now, then a chip per language of the list, filled while it is kept.
+- (void)configureLanguagesHero:(PFBMutedLanguagesHeroCell*)hero {
+    NSArray<NSString*>* codes = [self visibleLanguages];
+    NSArray* kept = PFBKeptLanguageList();
+    NSMutableArray<NSString*>* names = [NSMutableArray array];
+    NSMutableIndexSet* on = [NSMutableIndexSet indexSet];
+    for (NSUInteger i = 0; i < codes.count; i++) {
+        [names addObject:PFBLanguageName(codes[i])];
+        if ([kept containsObject:codes[i]]) {
+            [on addIndex:i];
+        }
+    }
+    hero.intro.text =
+        [[PFBBundle sharedBundle] localizedStringForKey:kept.count ? @"LANGUAGES_INTRO_ON" : @"LANGUAGES_FOOTER_OFF"];
+    [hero setLanguages:names kept:on target:self action:@selector(languageChipTapped:)];
+}
+
+- (void)languageChipTapped:(UIButton*)chip {
+    NSArray<NSString*>* codes = [self visibleLanguages];
+    if (chip.tag < 0 || (NSUInteger)chip.tag >= codes.count) {
+        return;
+    }
+    [self toggleLanguage:codes[(NSUInteger)chip.tag]];
+    UITableViewCell* head = [self.tableView cellForRowAtIndexPath:[NSIndexPath indexPathForRow:0 inSection:0]];
+    if ([head isKindOfClass:[PFBMutedLanguagesHeroCell class]]) {
+        [self configureLanguagesHero:(PFBMutedLanguagesHeroCell*)head];
+        [self.tableView performBatchUpdates:nil completion:nil];
+    }
+}
+
+// The languages the list leaves out, named once picked, behind a chevron.
+- (UITableViewCell*)otherLanguagesCell:(PFBShowcaseRowCell*)cell {
+    PFBBundle* bundle = [PFBBundle sharedBundle];
+    NSArray* tail = [self.languageCodes
+        subarrayWithRange:NSMakeRange(kPFBLanguagesFull, self.languageCodes.count - kPFBLanguagesFull)];
+    NSMutableArray* picked = [NSMutableArray array];
+    for (NSString* code in tail) {
+        if ([PFBKeptLanguageList() containsObject:code]) {
+            [picked addObject:PFBLanguageName(code)];
+        }
+    }
+    [cell configureWithSymbol:@"globe"
+                        title:[bundle localizedStringForKey:@"LANGUAGES_OTHERS_TITLE"]
+                     subtitle:nil
+                        value:picked.count ? [NSListFormatter localizedStringByJoiningStrings:picked]
+                                           : [bundle localizedStringForKey:@"LANGUAGES_OTHERS_NONE"]
+                    accessory:PFBShowcaseAccessoryChevron];
+    cell.selectionStyle = UITableViewCellSelectionStyleDefault;
+    return cell;
+}
+
+// The stored flag is the negative one: on means Twitter may translate.
+- (UITableViewCell*)translateCell:(PFBShowcaseRowCell*)cell {
+    PFBBundle* bundle = [PFBBundle sharedBundle];
+    NSString* title = [bundle localizedStringForKey:@"LANGUAGES_TRANSLATE_TITLE"];
+    NSString* detail = [bundle localizedStringForKey:@"LANGUAGES_TRANSLATE_DETAIL"];
+    [cell configureWithSymbol:@"translate" title:title subtitle:detail value:nil accessory:PFBShowcaseAccessoryNone];
+    UISwitch* toggle = [PFBTintedSwitch new];
+    toggle.on = ![[NSUserDefaults standardUserDefaults] boolForKey:@"disable_auto_translate"];
+    toggle.accessibilityLabel = title;
+    toggle.accessibilityHint = detail;
+    [toggle addTarget:self action:@selector(translateChanged:) forControlEvents:UIControlEventValueChanged];
+    cell.trailingView = toggle;
+    return cell;
+}
+
+- (UITableViewCell*)threadsHeroFor:(UITableView*)tableView at:(NSIndexPath*)indexPath {
+    PFBBundle* bundle = [PFBBundle sharedBundle];
+    PFBMutedThreadsHeroCell* hero = [tableView dequeueReusableCellWithIdentifier:@"ThreadsHero" forIndexPath:indexPath];
+    hero.intro.text = [bundle localizedStringForKey:@"THREADS_INTRO"];
+    NSUInteger count = PFBHiddenThreads().count;
+    if (count == 0) {
+        [hero setTitle:[bundle localizedStringForKey:@"THREADS_EMPTY"]
+                  hint:[bundle localizedStringForKey:@"THREADS_EMPTY_HINT"]];
+    } else {
+        [hero setTitle:count == 1 ? [bundle localizedStringForKey:@"THREADS_COUNT_ONE"]
+                                  : [NSString stringWithFormat:[bundle localizedStringForKey:@"THREADS_COUNT_FORMAT"],
+                                                               (long)count]
+                  hint:nil];
+    }
+    return hero;
+}
+
+// A hidden conversation: its text, its author under it, and Show, which brings it back.
+- (UITableViewCell*)threadCell:(PFBShowcaseRowCell*)cell at:(NSUInteger)index {
+    PFBBundle* bundle = [PFBBundle sharedBundle];
+    NSArray<NSDictionary*>* threads = PFBHiddenThreads();
+    // The list can shrink after the row count was taken.
+    if (index >= threads.count) {
+        [cell configureWithSymbol:nil title:@"" subtitle:nil value:nil accessory:PFBShowcaseAccessoryNone];
+        return cell;
+    }
+    NSDictionary* entry = threads[index];
+    NSString* preview = entry[@"preview"];
+    NSString* who = entry[@"who"];
+    NSString* title = preview.length ? preview : [bundle localizedStringForKey:@"THREADS_NO_PREVIEW"];
+    cell.titleLines = 2;
+    [cell configureWithSymbol:@"bubble.left"
+                        title:title
+                     subtitle:who.length ? who : nil
+                        value:nil
+                    accessory:PFBShowcaseAccessoryNone];
+    PFBShowcaseButton* show = [PFBShowcaseButton buttonWithStyle:PFBShowcaseButtonStyleGlass];
+    show.label = [bundle localizedStringForKey:@"THREADS_SHOW_ACTION"];
+    show.accessibilityValue = title;
+    show.labelFont = PFBScaledFont([TwitterChirpFont(TwitterFontStyleSemibold) fontWithSize:14]);
+    show.tag = (NSInteger)index;
+    [show addTarget:self action:@selector(showThreadTapped:) forControlEvents:UIControlEventTouchUpInside];
+    show.frame = CGRectMake(0, 0, [show sizeThatFits:CGSizeMake(CGFLOAT_MAX, 32.0)].width, 32.0);
+    cell.trailingView = show;
+    return cell;
+}
+
+- (void)showThreadTapped:(UIButton*)sender {
+    NSArray<NSDictionary*>* threads = PFBHiddenThreads();
+    if (sender.tag < 0 || (NSUInteger)sender.tag >= threads.count) {
+        return;
+    }
+    PFBUnhideThread(threads[(NSUInteger)sender.tag][@"id"]);
+    pfbRefreshMutedWords();
+    PFBNoteFiltersChange();
+    [self.tableView reloadData];
 }
 
 // A language: its name, with a check while its Tweets are kept.
@@ -983,65 +1264,14 @@ static NSMutableArray<NSString*>* PFBKeptLanguageList(void) {
     return cell;
 }
 
-// The languages the list leaves out, named once picked, behind a chevron.
-- (UITableViewCell*)nativePickerCellFor:(UITableView*)tableView at:(NSIndexPath*)indexPath {
-    PFBBundle* bundle = [PFBBundle sharedBundle];
-    PFBNativeSettingsRowCell* cell = [tableView dequeueReusableCellWithIdentifier:@"NativeRow"
-                                                                     forIndexPath:indexPath];
-    NSArray* tail = [self.languageCodes
-        subarrayWithRange:NSMakeRange(kPFBLanguagesFull, self.languageCodes.count - kPFBLanguagesFull)];
-    NSMutableArray* picked = [NSMutableArray array];
-    for (NSString* code in tail) {
-        if ([PFBKeptLanguageList() containsObject:code]) {
-            [picked addObject:PFBLanguageName(code)];
-        }
-    }
-    [cell configureWithTitle:[bundle localizedStringForKey:@"LANGUAGES_OTHERS_TITLE"]
-                    iconName:nil
-                       value:picked.count ? [NSListFormatter localizedStringByJoiningStrings:picked]
-                                          : [bundle localizedStringForKey:@"LANGUAGES_OTHERS_NONE"]
-                   accessory:PFBNativeSettingsRowAccessoryChevron];
-    cell.selectionStyle = UITableViewCellSelectionStyleDefault;
-    cell.contentView.alpha = 1.0;
-    return cell;
-}
-
-// A hidden conversation: its text, and its author under it when known.
-- (UITableViewCell*)nativeThreadCellFor:(UITableView*)tableView at:(NSIndexPath*)indexPath {
-    PFBBundle* bundle = [PFBBundle sharedBundle];
-    PFBNativeSettingsRowCell* cell = [tableView dequeueReusableCellWithIdentifier:@"NativeRow"
-                                                                     forIndexPath:indexPath];
-    cell.selectionStyle = UITableViewCellSelectionStyleNone;
-    NSArray<NSDictionary*>* threads = PFBHiddenThreads();
-    // The list can shrink after the row count was taken.
-    if ((NSUInteger)indexPath.row >= threads.count) {
-        [cell configureWithTitle:[bundle localizedStringForKey:@"THREADS_EMPTY"]
-                        iconName:nil
-                           value:nil
-                       accessory:PFBNativeSettingsRowAccessoryNone];
-        cell.contentView.alpha = 0.38;
-        return cell;
-    }
-    NSDictionary* entry = threads[(NSUInteger)indexPath.row];
-    NSString* preview = entry[@"preview"];
-    NSString* who = entry[@"who"];
-    [cell configureWithTitle:preview.length ? preview : [bundle localizedStringForKey:@"THREADS_NO_PREVIEW"]
-                      detail:who.length ? who : nil
-                    iconName:nil
-                       value:nil
-                   accessory:PFBNativeSettingsRowAccessoryNone];
-    cell.contentView.alpha = 1.0;
-    return cell;
-}
-
 - (UITableViewCell*)tableView:(UITableView*)tableView
         cellForRowAtIndexPath:(NSIndexPath*)indexPath {
     PFBBundle* bundle = [PFBBundle sharedBundle];
-    if (self.nativeLook) {
-        UITableViewCell* cell = [self nativeCellFor:tableView at:indexPath];
-        if (cell) {
-            return cell;
-        }
+    if ([self showcase]) {
+        return [self showcaseCellFor:tableView at:indexPath];
+    }
+    if (self.nativeLook && self.othersOnly) {
+        return [self nativeLanguageCellFor:tableView at:indexPath];
     }
 
     if (self.mode == 2) {
@@ -1079,9 +1309,6 @@ static NSMutableArray<NSString*>* PFBKeptLanguageList(void) {
                 [tableView dequeueReusableCellWithIdentifier:@"opt"
                                                 forIndexPath:indexPath];
             cell.backgroundColor = [UIColor clearColor];
-            if (self.nativeLook) {
-                [cell setSideMargin:[self textMargin]];
-            }
             [cell configureWithTitle:[bundle localizedStringForKey:@"LANGUAGES_TRANSLATE_TITLE"]
                             subtitle:[bundle localizedStringForKey:@"LANGUAGES_TRANSLATE_DETAIL"]];
             cell.toggleSwitch.tag = NSIntegerMax;
@@ -1177,9 +1404,6 @@ static NSMutableArray<NSString*>* PFBKeptLanguageList(void) {
             [bundle localizedStringForKey:@"MUTED_WORDS_ADD_PLACEHOLDER"];
         cell.hintLabel.text = [bundle localizedStringForKey:@"MUTED_WORDS_SUBTITLE"];
         cell.field.delegate = self;
-        if (self.nativeLook) {
-            [cell applyNativeLook];
-        }
         [cell.addButton setTitle:[bundle localizedStringForKey:@"MUTED_WORDS_ADD_BUTTON"]
                         forState:UIControlStateNormal];
         [cell.addButton removeTarget:nil
@@ -1271,6 +1495,10 @@ static NSMutableArray<NSString*>* PFBKeptLanguageList(void) {
 
 - (BOOL)tableView:(UITableView*)tableView
     canEditRowAtIndexPath:(NSIndexPath*)indexPath {
+    // In the new look the heads stand at the top; the conversations follow theirs.
+    if ([self showcase] && self.mode == 2) {
+        return indexPath.row > 0;
+    }
     if (self.mode == 2) {
         return PFBHiddenThreads().count > 0;
     }
@@ -1280,13 +1508,15 @@ static NSMutableArray<NSString*>* PFBKeptLanguageList(void) {
     return indexPath.section == 0 && indexPath.row > 0 && self.terms.count > 0;
 }
 
-// Selecting a language keeps it; clearing the last one empties the set, which
-// turns the filter off rather than hiding everything.
 - (void)tableView:(UITableView*)tableView
     didSelectRowAtIndexPath:(NSIndexPath*)indexPath {
     [tableView deselectRowAtIndexPath:indexPath animated:YES];
-    if (self.nativeLook && self.mode == 0 && indexPath.section == 1) {
-        [self showOptions];
+    if ([self showcase]) {
+        if (self.mode == 0 && indexPath.section == 1) {
+            [self showOptions];
+        } else if (self.mode == 1 && indexPath.row == 1) {
+            [self showOtherLanguages];
+        }
         return;
     }
     if (self.mode != 1) {
@@ -1296,14 +1526,24 @@ static NSMutableArray<NSString*>* PFBKeptLanguageList(void) {
         return;
     }
     if ([self rowIsPicker:indexPath.row]) {
-        PFBMutedWordsViewController* others = [[PFBMutedWordsViewController alloc] init];
-        others.othersOnly = YES;
-        others.mode = 1;
-        others.nativeLook = self.nativeLook;
-        [self.navigationController pushViewController:others animated:YES];
+        [self showOtherLanguages];
         return;
     }
-    NSString* code = [self visibleLanguages][(NSUInteger)indexPath.row];
+    [self toggleLanguage:[self visibleLanguages][(NSUInteger)indexPath.row]];
+    [tableView reloadData];
+}
+
+- (void)showOtherLanguages {
+    PFBMutedWordsViewController* others = [[PFBMutedWordsViewController alloc] init];
+    others.othersOnly = YES;
+    others.mode = 1;
+    others.nativeLook = self.nativeLook;
+    [self.navigationController pushViewController:others animated:YES];
+}
+
+// Keeping a language adds it; clearing the last one empties the set, which turns the filter off
+// rather than hiding everything.
+- (void)toggleLanguage:(NSString*)code {
     NSMutableArray* kept = PFBKeptLanguageList();
     if ([kept containsObject:code]) {
         [kept removeObject:code];
@@ -1312,7 +1552,6 @@ static NSMutableArray<NSString*>* PFBKeptLanguageList(void) {
     }
     [[NSUserDefaults standardUserDefaults] setObject:kept forKey:kPFBLanguagesKey];
     PFBNoteFiltersChange();
-    [tableView reloadData];
 }
 
 - (void)tableView:(UITableView*)tableView
@@ -1323,8 +1562,9 @@ static NSMutableArray<NSString*>* PFBKeptLanguageList(void) {
     }
     if (self.mode == 2) {
         NSArray<NSDictionary*>* threads = PFBHiddenThreads();
-        if (indexPath.row < (NSInteger)threads.count) {
-            PFBUnhideThread(threads[(NSUInteger)indexPath.row][@"id"]);
+        NSInteger index = [self showcase] ? indexPath.row - 1 : indexPath.row;
+        if (index >= 0 && index < (NSInteger)threads.count) {
+            PFBUnhideThread(threads[(NSUInteger)index][@"id"]);
             pfbRefreshMutedWords();
             PFBNoteFiltersChange();
         }

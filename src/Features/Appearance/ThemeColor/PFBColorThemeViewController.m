@@ -11,7 +11,9 @@ extern void PFBWhitenNavigationBarConfirm(UINavigationBar* bar);
 #import "Support/TWHeaders.h"
 #import "Support/HookHelpers.h"
 #import "Features/Appearance/ThemeColor/PFBPalette.h"
-#import "Settings/Native/PFBNativeSettingsRowCell.h"
+#import "Features/Appearance/ThemeColor/PFBAccentPreviewView.h"
+#import "Common/PFBSettings.h"
+#import "Settings/Native/PFBShowcase.h"
 #import "Settings/PFBSettingsCellStyle.h"
 extern void PFBBeginRawPaletteRead(void);
 extern void PFBEndRawPaletteRead(void);
@@ -85,13 +87,18 @@ static NSInteger NearestAccentOption(UIColor* color) {
     return best;
 }
 
-@interface PFBColorThemeViewController () <UIColorPickerViewControllerDelegate, UITableViewDataSource,
-                                           UITableViewDelegate>
+@interface PFBColorThemeViewController () <UIColorPickerViewControllerDelegate>
 @property (nonatomic, strong) NSMutableArray<PFBColorSwatchControl*>* swatches;
 @property (nonatomic, strong) PFBColorSwatchControl* customSwatch;
 @property (nonatomic, strong) UIButton* resetButton;
-// The new look's list: the options in its header, then Custom and Reset to default.
-@property (nonatomic, strong) UITableView* nativeTable;
+// The new look's page: its line, the sample on its card, the colors with the chosen one's name,
+// and Reset to default at the bottom.
+@property (nonatomic, strong) UIScrollView* nativeScroll;
+@property (nonatomic, strong) UILabel* introLabel;
+@property (nonatomic, strong) UIView* previewCard;
+@property (nonatomic, strong) PFBAccentPreviewView* preview;
+@property (nonatomic, strong) UILabel* colorName;
+@property (nonatomic, strong) PFBShowcaseButton* resetCapsule;
 @end
 
 @implementation PFBColorThemeViewController
@@ -245,140 +252,120 @@ static NSInteger NearestAccentOption(UIColor* color) {
 
 // MARK: - New look
 
-// The six colors as round options under the screen's line, then Custom and Reset to default as
-// rows of Twitter's settings.
+// The page scrolls under the bar; Reset to default stays at its bottom.
 - (void)buildNativeLook {
     PFBBundle* bundle = [PFBBundle sharedBundle];
-    UITableView* table = [[UITableView alloc] initWithFrame:self.view.bounds style:UITableViewStylePlain];
-    table.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
-    table.backgroundColor = [PFBPalette currentBackgroundColor];
-    table.separatorStyle = UITableViewCellSeparatorStyleNone;
-    table.rowHeight = UITableViewAutomaticDimension;
-    table.estimatedRowHeight = 72;
-    table.sectionHeaderTopPadding = 0;
-    table.dataSource = self;
-    table.delegate = self;
-    [table registerClass:[PFBNativeSettingsRowCell class] forCellReuseIdentifier:@"NativeRow"];
-    [self.view addSubview:table];
-    self.nativeTable = table;
+    UIScrollView* scroll = [[UIScrollView alloc] initWithFrame:self.view.bounds];
+    scroll.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+    scroll.alwaysBounceVertical = YES;
+    [self.view addSubview:scroll];
+    self.nativeScroll = scroll;
 
-    UIView* header = [[UIView alloc] init];
-    UILabel* detail = [UILabel new];
-    detail.translatesAutoresizingMaskIntoConstraints = NO;
-    detail.text = [bundle localizedStringForKey:@"THEME_SETTINGS_NAVIGATION_DETAIL"];
-    detail.font = PFBSettingsDetailFont();
-    detail.textColor = PFBSettingsSubtitleColor();
-    detail.numberOfLines = 0;
-    [header addSubview:detail];
-    UIStackView* grid = [[UIStackView alloc] init];
-    grid.translatesAutoresizingMaskIntoConstraints = NO;
-    grid.axis = UILayoutConstraintAxisVertical;
-    grid.spacing = 14;
-    [header addSubview:grid];
+    self.introLabel = PFBShowcaseIntroLabel();
+    self.introLabel.text = [bundle localizedStringForKey:@"THEME_SETTINGS_NAVIGATION_DETAIL"];
+    self.previewCard = PFBShowcaseCard();
+    self.preview = [[PFBAccentPreviewView alloc] init];
+    [self.previewCard addSubview:self.preview];
+    [scroll addSubview:self.introLabel];
+    [scroll addSubview:self.previewCard];
 
     self.swatches = [NSMutableArray new];
     PFBBeginRawPaletteRead();
-    UIStackView* line = nil;
     for (NSUInteger option = 1; option <= kAccentOptionCount; option++) {
-        if ((option - 1) % 3 == 0) {
-            line = [[UIStackView alloc] init];
-            line.axis = UILayoutConstraintAxisHorizontal;
-            line.distribution = UIStackViewDistributionFillEqually;
-            [grid addArrangedSubview:line];
-        }
         PFBColorSwatchControl* swatch = [[PFBColorSwatchControl alloc] initRound];
         swatch.colorID = option;
         swatch.isAccessibilityElement = YES;
-        NSString* name = [bundle localizedTwitterStringForKey:kAccentNameKeys[option - 1]];
-        swatch.accessibilityLabel = name;
+        swatch.accessibilityLabel = [bundle localizedTwitterStringForKey:kAccentNameKeys[option - 1]];
         [swatch setSwatchColor:NativeAccentColor(option)];
-        [swatch setSwatchName:name];
         [swatch addTarget:self action:@selector(swatchTapped:) forControlEvents:UIControlEventTouchUpInside];
-        [line addArrangedSubview:swatch];
+        [scroll addSubview:swatch];
         [self.swatches addObject:swatch];
     }
     PFBEndRawPaletteRead();
+    PFBColorSwatchControl* custom = [[PFBColorSwatchControl alloc] initRainbow];
+    custom.colorID = -1;
+    custom.isAccessibilityElement = YES;
+    custom.accessibilityLabel = [bundle localizedStringForKey:@"THEME_CUSTOM_NAME"];
+    [custom addTarget:self action:@selector(openColorPicker) forControlEvents:UIControlEventTouchUpInside];
+    [scroll addSubview:custom];
+    self.customSwatch = custom;
 
-    CGFloat margin = [PFBNativeSettingsRowStyle shared].iconFrame.origin.x;
-    [NSLayoutConstraint activateConstraints:@[
-        [detail.topAnchor constraintEqualToAnchor:header.topAnchor constant:8],
-        [detail.leadingAnchor constraintEqualToAnchor:header.leadingAnchor constant:margin],
-        [detail.trailingAnchor constraintEqualToAnchor:header.trailingAnchor constant:-margin],
-        [grid.topAnchor constraintEqualToAnchor:detail.bottomAnchor constant:20],
-        [grid.leadingAnchor constraintEqualToAnchor:header.leadingAnchor constant:margin],
-        [grid.trailingAnchor constraintEqualToAnchor:header.trailingAnchor constant:-margin],
-        [grid.bottomAnchor constraintEqualToAnchor:header.bottomAnchor constant:-16],
-    ]];
-    table.tableHeaderView = header;
+    self.colorName = [[UILabel alloc] init];
+    self.colorName.textAlignment = NSTextAlignmentCenter;
+    self.colorName.font = PFBScaledFont([TwitterChirpFont(TwitterFontStyleRegular) fontWithSize:15]);
+    [scroll addSubview:self.colorName];
+
+    self.resetCapsule = [PFBShowcaseButton buttonWithStyle:PFBShowcaseButtonStyleOutline];
+    self.resetCapsule.label = [bundle localizedStringForKey:@"THEME_RESET_TITLE"];
+    [self.resetCapsule addTarget:self
+                          action:@selector(confirmResetToDefaultColor)
+                forControlEvents:UIControlEventTouchUpInside];
+    [self.view addSubview:self.resetCapsule];
+    [self applyNativeColors];
 }
 
-// The header takes the height its constraints give at the table's width, again when that changes.
+- (void)applyNativeColors {
+    self.view.backgroundColor = [PFBPalette currentBackgroundColor];
+    // The capsule floats over the page as it scrolls, so it stands on the page's ground.
+    self.resetCapsule.groundColor = self.view.backgroundColor;
+    self.introLabel.textColor = PFBSettingsSubtitleColor();
+    self.colorName.textColor = PFBSettingsSubtitleColor();
+}
+
+// The line, the card, then the seven colors on one row with the chosen one's name under them.
 - (void)viewDidLayoutSubviews {
     [super viewDidLayoutSubviews];
-    UIView* header = self.nativeTable.tableHeaderView;
-    if (!header) {
+    UIScrollView* scroll = self.nativeScroll;
+    if (!scroll) {
         return;
     }
-    CGFloat width = self.nativeTable.bounds.size.width;
-    CGFloat height = [header systemLayoutSizeFittingSize:CGSizeMake(width, 0)
-                           withHorizontalFittingPriority:UILayoutPriorityRequired
-                                 verticalFittingPriority:UILayoutPriorityFittingSizeLevel]
-                         .height;
-    if (fabs(header.frame.size.width - width) < 0.5 && fabs(header.frame.size.height - height) < 0.5) {
-        return;
+    CGFloat width = CGRectGetWidth(scroll.bounds);
+    CGFloat side = 20.0;
+    CGFloat inner = MAX(0, width - 2 * side);
+    CGFloat introHeight = ceil([self.introLabel sizeThatFits:CGSizeMake(inner, CGFLOAT_MAX)].height);
+    self.introLabel.frame = CGRectMake(side, 12.0, inner, introHeight);
+    CGFloat previewHeight = [self.preview sizeThatFits:CGSizeMake(inner, CGFLOAT_MAX)].height;
+    self.previewCard.frame = CGRectMake(side, CGRectGetMaxY(self.introLabel.frame) + 20.0, inner, previewHeight);
+    self.preview.frame = self.previewCard.bounds;
+
+    NSArray<PFBColorSwatchControl*>* row = [self.swatches arrayByAddingObject:self.customSwatch];
+    CGFloat cell = inner / (CGFloat)row.count;
+    CGFloat ring = MIN(54.0, floor(cell - 2.0));
+    CGFloat rowY = CGRectGetMaxY(self.previewCard.frame) + 24.0;
+    BOOL rtl = self.view.effectiveUserInterfaceLayoutDirection == UIUserInterfaceLayoutDirectionRightToLeft;
+    for (NSUInteger i = 0; i < row.count; i++) {
+        NSUInteger slot = rtl ? row.count - 1 - i : i;
+        row[i].frame = CGRectMake(side + cell * (CGFloat)slot + (cell - ring) / 2.0, rowY, ring, ring);
     }
-    header.frame = CGRectMake(0, 0, width, height);
-    self.nativeTable.tableHeaderView = header;
-}
+    self.colorName.frame = CGRectMake(side, rowY + ring + 8.0, inner, ceil(self.colorName.font.lineHeight));
+    scroll.contentSize = CGSizeMake(width, CGRectGetMaxY(self.colorName.frame) + 24.0);
 
-- (NSInteger)tableView:(UITableView*)tableView numberOfRowsInSection:(NSInteger)section {
-    return 2;
-}
-
-// Custom draws its icon in the picked color while that color is the accent; Reset to default
-// reads in red.
-- (UITableViewCell*)tableView:(UITableView*)tableView cellForRowAtIndexPath:(NSIndexPath*)indexPath {
-    PFBBundle* bundle = [PFBBundle sharedBundle];
-    PFBNativeSettingsRowCell* cell = [tableView dequeueReusableCellWithIdentifier:@"NativeRow"
-                                                                     forIndexPath:indexPath];
-    if (indexPath.row == 0) {
-        [cell configureWithTitle:[bundle localizedStringForKey:@"THEME_CUSTOM_NAME"]
-                          detail:[bundle localizedStringForKey:@"THEME_CUSTOM_HINT"]
-                        iconName:@"colorpicker"
-                           value:nil
-                       accessory:PFBNativeSettingsRowAccessoryChevron];
-        BOOL customActive = [[NSUserDefaults standardUserDefaults] boolForKey:@"pfb_custom_is_active"];
-        cell.iconColor = customActive ? PFBCustomAccentColor() : nil;
-        return cell;
-    }
-    [cell configureWithTitle:[bundle localizedStringForKey:@"THEME_RESET_TITLE"]
-                      detail:[bundle localizedStringForKey:@"THEME_RESET_HINT"]
-                    iconName:@"reload"
-                       value:nil
-                   accessory:PFBNativeSettingsRowAccessoryNone];
-    cell.destructive = YES;
-    return cell;
-}
-
-- (void)tableView:(UITableView*)tableView didSelectRowAtIndexPath:(NSIndexPath*)indexPath {
-    [tableView deselectRowAtIndexPath:indexPath animated:YES];
-    if (indexPath.row == 0) {
-        [self openColorPicker];
-    } else {
-        [self confirmResetToDefaultColor];
+    // Above Twitter's tab bar when it shows; the page scrolls clear of the capsule.
+    CGFloat capsuleHeight = [self.resetCapsule sizeThatFits:CGSizeMake(inner, CGFLOAT_MAX)].height;
+    CGFloat capsuleY = PFBShowcaseBottomLimit(self.view) - 16.0 - capsuleHeight;
+    self.resetCapsule.frame = CGRectMake(side, capsuleY, inner, capsuleHeight);
+    UIEdgeInsets insets = scroll.contentInset;
+    insets.bottom = MAX(0, CGRectGetMaxY(self.view.bounds) - self.view.safeAreaInsets.bottom - capsuleY + 12.0);
+    if (fabs(insets.bottom - scroll.contentInset.bottom) > 0.5) {
+        scroll.contentInset = insets;
     }
 }
 
-// The border is a CGColor and the new look's ground a fixed palette color: neither follows a
-// light or dark switch by itself.
+// Twitter's tab bar settles once the page is in: the capsule is placed again then.
+- (void)viewDidAppear:(BOOL)animated {
+    [super viewDidAppear:animated];
+    [self.view setNeedsLayout];
+}
+
+// The ground and the gray lines are palette colors, read again when light and dark switch.
 - (void)traitCollectionDidChange:(UITraitCollection*)previousTraitCollection {
     [super traitCollectionDidChange:previousTraitCollection];
     self.resetButton.layer.borderColor =
         [[UIColor systemGray4Color] resolvedColorWithTraitCollection:self.traitCollection].CGColor;
-    if (self.nativeTable &&
+    if (self.nativeScroll &&
         [self.traitCollection hasDifferentColorAppearanceComparedToTraitCollection:previousTraitCollection]) {
-        self.view.backgroundColor = [PFBPalette currentBackgroundColor];
-        self.nativeTable.backgroundColor = self.view.backgroundColor;
+        [self applyNativeColors];
+        [self refreshSelection];
     }
 }
 
@@ -473,13 +460,36 @@ static NSInteger NearestAccentOption(UIColor* color) {
         [self.customSwatch setSwatchNeutral];
     }
     [self.customSwatch setSwatchSelected:customActive];
-    [self.nativeTable reloadData];
+    if (self.nativeScroll) {
+        [self refreshNativeSample:customActive selected:selected];
+    }
     // Twitter re-bakes the confirm glyph on the run loop after the accent notifications, so
     // the white bake runs now and once more next turn.
     PFBWhitenNavigationBarConfirm(self.navigationController.navigationBar);
     dispatch_async(dispatch_get_main_queue(), ^{
         PFBWhitenNavigationBarConfirm(self.navigationController.navigationBar);
     });
+}
+
+// The chosen color's name under the row, and the sample in that color.
+- (void)refreshNativeSample:(BOOL)customActive selected:(NSInteger)selected {
+    PFBBundle* bundle = [PFBBundle sharedBundle];
+    if (customActive) {
+        self.colorName.text = [bundle localizedStringForKey:@"THEME_CUSTOM_NAME"];
+    } else if (selected >= 1 && selected <= (NSInteger)kAccentOptionCount) {
+        self.colorName.text = [bundle localizedTwitterStringForKey:kAccentNameKeys[selected - 1]];
+    } else {
+        self.colorName.text = [bundle localizedStringForKey:@"THEME_DEFAULT_NAME"];
+    }
+    // VoiceOver hears every color as a button and the chosen one as selected.
+    for (PFBColorSwatchControl* swatch in self.swatches) {
+        BOOL chosen = !customActive && swatch.colorID == selected;
+        swatch.accessibilityTraits = UIAccessibilityTraitButton | (chosen ? UIAccessibilityTraitSelected : 0);
+    }
+    self.customSwatch.accessibilityTraits = UIAccessibilityTraitButton | (customActive ? UIAccessibilityTraitSelected : 0);
+    UIColor* accent = (customActive ? PFBCustomAccentColor() : nil) ?: PFBBrandAccentColor();
+    [self.preview applyAccent:accent tintsSelectedTab:[PFBSettings boolForKey:@"tab_bar_theming"]];
+    [self.view setNeedsLayout];
 }
 
 - (void)swatchTapped:(PFBColorSwatchControl*)swatch {

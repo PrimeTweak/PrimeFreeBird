@@ -294,6 +294,8 @@
 "THEME_RESET_CONFIRM_MESSAGE" = "The accent color goes back to Twitter’s default, and Selected tab, Switches and Twitter icon stop using it. Your other settings stay.";
 "THEME_RESET_ACTION" = "Reset";
 "THEME_CUSTOM_NAME" = "Custom";
+"THEME_PREVIEW_TWEET" = "Your color shows in links like twitter.com, mentions like @Twitter, and hashtags like #Twitter.";
+"THEME_DEFAULT_NAME" = "Default";
 
 /* ===== Tabs editor ===== */
 "CUSTOM_TAB_BAR_GRID_DETAIL" = "Tap a tab to add or remove it. Touch and hold an icon in the bar below, then drag it to reorder.";
@@ -497,6 +499,16 @@
 "DAYS_LEFT_FORMAT" = "%ld days left";
 "DAYS_LEFT_ONE" = "1 day left";
 "MUTED_WORDS_EXAMPLE_TERM" = "spoiler";
+"MUTED_WORDS_COUNT_TODAY" = "Tweets filtered today";
+"MUTED_WORDS_EMPTY" = "Nothing filtered yet. Add a word, phrase, or @account above.";
+"MUTED_WORDS_REMOVE_ACTION" = "Remove";
+"LANGUAGES_INTRO_ON" = "Only Tweets in the checked languages reach your timeline.";
+"LANGUAGES_NOTE_UNDETECTED" = "Tweets with no detected language always pass.";
+"THREADS_INTRO" = "Conversations you hid from a Tweet.";
+"THREADS_COUNT_ONE" = "1 hidden conversation";
+"THREADS_COUNT_FORMAT" = "%ld hidden conversations";
+"THREADS_EMPTY_HINT" = "Hide one from a Tweet’s menu.";
+"THREADS_SHOW_ACTION" = "Show";
 
 
 "SHOW_POLL_RESULTS_TITLE" = "Poll results";

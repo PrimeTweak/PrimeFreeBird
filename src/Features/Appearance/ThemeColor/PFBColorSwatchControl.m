@@ -1,4 +1,4 @@
-// A pill-style accent color option.
+// A pill-style accent color option, or the new look's round one.
 
 #import "Features/Appearance/ThemeColor/PFBColorSwatchControl.h"
 #import "Support/TwitterChirpFont.h"
@@ -7,10 +7,10 @@
 static const CGFloat kPillHeight = 40.0;
 static const CGFloat kRadioDiameter = 22.0;
 static const CGFloat kRadioCheckSize = 12.0;
-// The round option: its color, the ring drawn around it once chosen, and the check inside.
-static const CGFloat kRoundDiameter = 44.0;
-static const CGFloat kRoundRingDiameter = 54.0;
-static const CGFloat kRoundCheckSize = 18.0;
+// The round option's ring is 2 points wide and stands 3 points off its color.
+static const CGFloat kRoundRingInset = 5.0;
+// The rainbow's band around the custom color.
+static const CGFloat kRainbowBand = 5.0;
 
 @interface PFBColorSwatchControl ()
 @property (nonatomic, strong) UIView* pillView;
@@ -19,6 +19,8 @@ static const CGFloat kRoundCheckSize = 18.0;
 @property (nonatomic, strong) UIImageView* radioCheck;
 @property (nonatomic, strong) UIColor* swatchTint;
 @property (nonatomic, assign) BOOL round;
+@property (nonatomic, strong) CAGradientLayer* rainbow;
+@property (nonatomic, strong) UIView* wellView;
 @end
 
 @implementation PFBColorSwatchControl
@@ -29,52 +31,78 @@ static const CGFloat kRoundCheckSize = 18.0;
     if (self) {
         _round = YES;
         self.radioView = [[UIView alloc] init];
-        self.radioView.userInteractionEnabled = NO;
-        self.radioView.layer.cornerRadius = kRoundRingDiameter / 2.0;
         self.radioView.layer.borderWidth = 2.0;
         self.radioView.hidden = YES;
         self.pillView = [[UIView alloc] init];
-        self.pillView.userInteractionEnabled = NO;
-        self.pillView.layer.cornerRadius = kRoundDiameter / 2.0;
+        self.pillView.clipsToBounds = YES;
         self.radioCheck = [[UIImageView alloc] init];
         self.radioCheck.contentMode = UIViewContentModeScaleAspectFit;
         self.radioCheck.image = [PFBTwitterGlyphFor(@"checkmark", [UIImage systemImageNamed:@"checkmark"])
             imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate];
         self.radioCheck.tintColor = [UIColor whiteColor];
         self.radioCheck.hidden = YES;
-        self.nameLabel = [[UILabel alloc] init];
-        self.nameLabel.userInteractionEnabled = NO;
-        self.nameLabel.textAlignment = NSTextAlignmentCenter;
-        self.nameLabel.font = PFBScaledFont([TwitterChirpFont(TwitterFontStyleRegular) fontWithSize:13]);
-        self.nameLabel.textColor = [UIColor secondaryLabelColor];
-        for (UIView* part in @[ self.radioView, self.pillView, self.nameLabel ]) {
-            part.translatesAutoresizingMaskIntoConstraints = NO;
+        for (UIView* part in @[ self.radioView, self.pillView, self.radioCheck ]) {
+            part.userInteractionEnabled = NO;
             [self addSubview:part];
         }
-        self.radioCheck.translatesAutoresizingMaskIntoConstraints = NO;
-        [self.pillView addSubview:self.radioCheck];
-        [NSLayoutConstraint activateConstraints:@[
-            [self.radioView.topAnchor constraintEqualToAnchor:self.topAnchor],
-            [self.radioView.centerXAnchor constraintEqualToAnchor:self.centerXAnchor],
-            [self.radioView.widthAnchor constraintEqualToConstant:kRoundRingDiameter],
-            [self.radioView.heightAnchor constraintEqualToConstant:kRoundRingDiameter],
-            [self.pillView.centerXAnchor constraintEqualToAnchor:self.radioView.centerXAnchor],
-            [self.pillView.centerYAnchor constraintEqualToAnchor:self.radioView.centerYAnchor],
-            [self.pillView.widthAnchor constraintEqualToConstant:kRoundDiameter],
-            [self.pillView.heightAnchor constraintEqualToConstant:kRoundDiameter],
-            [self.radioCheck.centerXAnchor constraintEqualToAnchor:self.pillView.centerXAnchor],
-            [self.radioCheck.centerYAnchor constraintEqualToAnchor:self.pillView.centerYAnchor],
-            [self.radioCheck.widthAnchor constraintEqualToConstant:kRoundCheckSize],
-            [self.radioCheck.heightAnchor constraintEqualToConstant:kRoundCheckSize],
-            [self.nameLabel.topAnchor constraintEqualToAnchor:self.radioView.bottomAnchor constant:4],
-            [self.nameLabel.centerXAnchor constraintEqualToAnchor:self.centerXAnchor],
-            [self.nameLabel.leadingAnchor constraintGreaterThanOrEqualToAnchor:self.leadingAnchor],
-            [self.nameLabel.trailingAnchor constraintLessThanOrEqualToAnchor:self.trailingAnchor],
-            [self.nameLabel.bottomAnchor constraintEqualToAnchor:self.bottomAnchor],
-        ]];
-        self.radioView.layer.borderColor = [UIColor labelColor].CGColor;
+        self.radioView.layer.borderColor =
+            [[UIColor labelColor] resolvedColorWithTraitCollection:self.traitCollection].CGColor;
     }
     return self;
+}
+
+// A band of hues around a well that holds the custom color, empty until one is picked.
+- (instancetype)initRainbow {
+    self = [self initRound];
+    if (self) {
+        NSMutableArray* hues = [NSMutableArray array];
+        for (NSNumber* hex in @[ @0xFF3B30, @0xFF9500, @0xFFCC00, @0x34C759, @0x00C7BE, @0x007AFF, @0xAF52DE,
+                                 @0xFF2D55, @0xFF3B30 ]) {
+            unsigned int rgb = hex.unsignedIntValue;
+            [hues addObject:(id)[UIColor colorWithRed:((rgb >> 16) & 0xFF) / 255.0
+                                                green:((rgb >> 8) & 0xFF) / 255.0
+                                                 blue:(rgb & 0xFF) / 255.0
+                                                alpha:1.0]
+                                 .CGColor];
+        }
+        self.rainbow = [CAGradientLayer layer];
+        self.rainbow.type = kCAGradientLayerConic;
+        self.rainbow.startPoint = CGPointMake(0.5, 0.5);
+        self.rainbow.endPoint = CGPointMake(0.5, 0.0);
+        self.rainbow.colors = hues;
+        [self.pillView.layer addSublayer:self.rainbow];
+        self.wellView = [[UIView alloc] init];
+        self.wellView.userInteractionEnabled = NO;
+        [self.pillView addSubview:self.wellView];
+        [self setSwatchNeutral];
+    }
+    return self;
+}
+
+// The whole control is the ring; the color stands inside it, the check on the color.
+- (void)layoutSubviews {
+    [super layoutSubviews];
+    if (!self.round) {
+        return;
+    }
+    CGRect bounds = self.bounds;
+    CGFloat ring = MIN(CGRectGetWidth(bounds), CGRectGetHeight(bounds));
+    CGRect ringFrame = CGRectMake(CGRectGetMidX(bounds) - ring / 2.0, CGRectGetMidY(bounds) - ring / 2.0, ring, ring);
+    self.radioView.frame = ringFrame;
+    self.radioView.layer.cornerRadius = ring / 2.0;
+    CGRect color = CGRectInset(ringFrame, kRoundRingInset, kRoundRingInset);
+    self.pillView.frame = color;
+    self.pillView.layer.cornerRadius = CGRectGetWidth(color) / 2.0;
+    CGRect well = CGRectInset(self.pillView.bounds, kRainbowBand, kRainbowBand);
+    self.wellView.frame = well;
+    self.wellView.layer.cornerRadius = CGRectGetWidth(well) / 2.0;
+    [CATransaction begin];
+    [CATransaction setDisableActions:YES];
+    self.rainbow.frame = self.pillView.bounds;
+    [CATransaction commit];
+    CGFloat check = round(CGRectGetWidth(color) * 0.42);
+    self.radioCheck.frame =
+        CGRectMake(CGRectGetMidX(color) - check / 2.0, CGRectGetMidY(color) - check / 2.0, check, check);
 }
 
 - (instancetype)initWithFrame:(CGRect)frame {
@@ -138,11 +166,12 @@ static const CGFloat kRoundCheckSize = 18.0;
 }
 
 - (void)setSwatchColor:(UIColor*)color {
-    self.pillView.backgroundColor = color;
-    self.swatchTint = color;
     if (self.round) {
+        (self.wellView ?: self.pillView).backgroundColor = color;
         return;
     }
+    self.pillView.backgroundColor = color;
+    self.swatchTint = color;
     // Restore the colored look in case this control was neutral before.
     self.nameLabel.textColor = [UIColor whiteColor];
     // A white check on the filled ring keeps the checked state at the ring's 22 pt.
@@ -158,6 +187,10 @@ static const CGFloat kRoundCheckSize = 18.0;
 // The colorless state: a quiet gray fill with readable secondary text. Used by
 // the Custom swatch until a custom color is active.
 - (void)setSwatchNeutral {
+    if (self.round) {
+        self.wellView.backgroundColor = [UIColor systemBackgroundColor];
+        return;
+    }
     self.pillView.backgroundColor = [UIColor tertiarySystemFillColor];
     self.nameLabel.textColor = [UIColor secondaryLabelColor];
 }
@@ -170,7 +203,6 @@ static const CGFloat kRoundCheckSize = 18.0;
     self.radioCheck.hidden = !selected;
     if (self.round) {
         self.radioView.hidden = !selected;
-        self.nameLabel.textColor = selected ? [UIColor labelColor] : [UIColor secondaryLabelColor];
         return;
     }
     if (selected) {

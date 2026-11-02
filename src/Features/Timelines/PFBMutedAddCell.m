@@ -2,18 +2,9 @@
 #import "Support/HookHelpers.h"
 #import "Features/Timelines/PFBMutedWordsStyle.h"
 #import "Features/Timelines/PFBMutedAddCell.h"
-#import "Settings/Native/PFBNativeSettingsRowCell.h"
-#import "Settings/PFBSettingsCellStyle.h"
 
 @interface PFBMutedAddCell ()
 @property (nonatomic, strong) UIView* box;
-@property (nonatomic, assign) BOOL native;
-@property (nonatomic, strong) NSLayoutConstraint* boxLeading;
-@property (nonatomic, strong) NSLayoutConstraint* boxHeight;
-@property (nonatomic, strong) NSLayoutConstraint* addTrailing;
-@property (nonatomic, strong) NSLayoutConstraint* addHeight;
-@property (nonatomic, strong) NSLayoutConstraint* hintLeading;
-@property (nonatomic, strong) NSLayoutConstraint* hintTrailing;
 @end
 
 @implementation PFBMutedAddCell
@@ -68,26 +59,19 @@
         _field.translatesAutoresizingMaskIntoConstraints = NO;
         [box addSubview:_field];
 
-        _boxLeading = [box.leadingAnchor constraintEqualToAnchor:self.contentView.leadingAnchor
-                                                        constant:kPFBMutedSideMargin];
-        _boxHeight = [box.heightAnchor constraintEqualToConstant:42.0];
-        _hintLeading = [_hintLabel.leadingAnchor constraintEqualToAnchor:self.contentView.leadingAnchor
-                                                                constant:kPFBMutedSideMargin + 2.0];
-        _hintTrailing = [_hintLabel.trailingAnchor constraintEqualToAnchor:self.contentView.trailingAnchor
-                                                                  constant:-kPFBMutedSideMargin];
-        _addTrailing = [_addButton.trailingAnchor constraintEqualToAnchor:self.contentView.trailingAnchor
-                                                                 constant:-kPFBMutedSideMargin];
-        _addHeight = [_addButton.heightAnchor constraintEqualToConstant:42.0];
         [NSLayoutConstraint activateConstraints:@[
-            _boxLeading,
+            [box.leadingAnchor constraintEqualToAnchor:self.contentView.leadingAnchor
+                                              constant:kPFBMutedSideMargin],
             // 16 pt matches the visible top of a language name in the other list.
             [box.topAnchor constraintEqualToAnchor:self.contentView.topAnchor
                                           constant:16.0],
-            _boxHeight,
+            [box.heightAnchor constraintEqualToConstant:42.0],
             [_hintLabel.topAnchor constraintEqualToAnchor:box.bottomAnchor
                                                  constant:8.0],
-            _hintLeading,
-            _hintTrailing,
+            [_hintLabel.leadingAnchor constraintEqualToAnchor:self.contentView.leadingAnchor
+                                                     constant:kPFBMutedSideMargin + 2.0],
+            [_hintLabel.trailingAnchor constraintEqualToAnchor:self.contentView.trailingAnchor
+                                                      constant:-kPFBMutedSideMargin],
             [_hintLabel.bottomAnchor constraintEqualToAnchor:self.contentView.bottomAnchor
                                                     constant:-10.0],
             [_field.leadingAnchor constraintEqualToAnchor:box.leadingAnchor
@@ -97,55 +81,26 @@
             [_field.centerYAnchor constraintEqualToAnchor:box.centerYAnchor],
             [_addButton.leadingAnchor constraintEqualToAnchor:box.trailingAnchor
                                                      constant:10.0],
-            _addTrailing,
+            [_addButton.trailingAnchor constraintEqualToAnchor:self.contentView.trailingAnchor
+                                                      constant:-kPFBMutedSideMargin],
             [_addButton.centerYAnchor constraintEqualToAnchor:box.centerYAnchor],
-            _addHeight,
+            [_addButton.heightAnchor constraintEqualToConstant:42.0],
             [_addButton.widthAnchor constraintGreaterThanOrEqualToConstant:64.0],
         ]];
     }
     return self;
 }
 
-// The controls stand 16 points in, the text where the rows' icons stand.
-- (void)applyNativeLook {
-    self.native = YES;
-    CGFloat text = [PFBNativeSettingsRowStyle shared].iconFrame.origin.x;
-    self.boxLeading.constant = 16.0;
-    self.addTrailing.constant = -16.0;
-    self.hintLeading.constant = text;
-    self.hintTrailing.constant = -text;
-    self.boxHeight.constant = 40.0;
-    self.addHeight.constant = 40.0;
-    self.box.layer.borderWidth = 0.0;
-    self.box.layer.cornerRadius = 20.0;
-    self.addButton.layer.cornerRadius = 20.0;
-    [self applyNativeColors];
-}
-
-- (void)applyNativeColors {
-    self.box.backgroundColor = PFBSettingsFaintColor();
-    self.addButton.backgroundColor = PFBSettingsTextColor();
-    [self.addButton setTitleColor:[PFBPalette currentBackgroundColor] forState:UIControlStateNormal];
-}
-
-// In the new look Add keeps the text color; the classic one takes the accent.
 - (void)tintColorDidChange {
     [super tintColorDidChange];
-    if (self.native) {
-        return;
-    }
     self.addButton.backgroundColor =
         PFBCurrentAccentColor() ?: (self.tintColor ?: [UIColor systemBlueColor]);
 }
 
 // A layer border keeps the CGColor it was given: the gray is resolved again for the new
-// appearance, as the new look's colors are.
+// appearance.
 - (void)traitCollectionDidChange:(UITraitCollection*)previousTraitCollection {
     [super traitCollectionDidChange:previousTraitCollection];
-    if (self.native) {
-        [self applyNativeColors];
-        return;
-    }
     self.box.layer.borderColor = [[UIColor systemGray3Color] resolvedColorWithTraitCollection:self.traitCollection].CGColor;
 }
 

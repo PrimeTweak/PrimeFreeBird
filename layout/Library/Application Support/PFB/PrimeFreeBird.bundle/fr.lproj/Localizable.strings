@@ -290,6 +290,8 @@
 "THEME_RESET_CONFIRM_MESSAGE" = "La couleur d’accent revient à celle de Twitter, et Onglet sélectionné, Interrupteurs et Icône Twitter ne l’utilisent plus. Vos autres réglages restent.";
 "THEME_RESET_ACTION" = "Rétablir";
 "THEME_CUSTOM_NAME" = "Personnalisée";
+"THEME_PREVIEW_TWEET" = "Votre couleur s’affiche dans les liens comme twitter.com, les mentions comme @Twitter et les hashtags comme #Twitter.";
+"THEME_DEFAULT_NAME" = "Par défaut";
 
 /* ===== Tabs editor ===== */
 "CUSTOM_TAB_BAR_GRID_DETAIL" = "Touchez un onglet pour l’ajouter ou le retirer. Maintenez une icône de la barre ci-dessous, puis glissez-la pour réordonner.";
@@ -493,6 +495,16 @@
 "DAYS_LEFT_FORMAT" = "encore %ld jours";
 "DAYS_LEFT_ONE" = "encore 1 jour";
 "MUTED_WORDS_EXAMPLE_TERM" = "spoiler";
+"MUTED_WORDS_COUNT_TODAY" = "Tweets filtrés aujourd’hui";
+"MUTED_WORDS_EMPTY" = "Rien n’est filtré pour l’instant. Ajoutez un mot, une expression ou un @compte ci-dessus.";
+"MUTED_WORDS_REMOVE_ACTION" = "Retirer";
+"LANGUAGES_INTRO_ON" = "Seuls les Tweets dans les langues cochées atteignent votre fil.";
+"LANGUAGES_NOTE_UNDETECTED" = "Les Tweets sans langue détectée passent toujours.";
+"THREADS_INTRO" = "Conversations masquées depuis un Tweet.";
+"THREADS_COUNT_ONE" = "1 conversation masquée";
+"THREADS_COUNT_FORMAT" = "%ld conversations masquées";
+"THREADS_EMPTY_HINT" = "Masquez-en une depuis le menu d’un Tweet.";
+"THREADS_SHOW_ACTION" = "Afficher";
 
 
 "SHOW_POLL_RESULTS_TITLE" = "Résultats des sondages";

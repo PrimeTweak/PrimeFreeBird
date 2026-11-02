@@ -76,12 +76,6 @@ static CGRect PFBRowTrailingFrame(CGFloat width, CGFloat shift, PFBNativeSetting
     return self;
 }
 
-- (void)prepareForReuse {
-    [super prepareForReuse];
-    _destructive = NO;
-    _iconColor = nil;
-}
-
 - (void)configureWithTitle:(NSString*)title
                   iconName:(NSString*)iconName
                      value:(NSString*)value
@@ -106,20 +100,10 @@ static CGRect PFBRowTrailingFrame(CGFloat width, CGFloat shift, PFBNativeSetting
     [self setNeedsLayout];
 }
 
-- (void)setDestructive:(BOOL)destructive {
-    _destructive = destructive;
-    [self applyTheme];
-}
-
-- (void)setIconColor:(UIColor*)iconColor {
-    _iconColor = iconColor;
-    [self applyTheme];
-}
-
 // Vector images bake in their fill color, so they are drawn again on every appearance change.
 - (void)applyTheme {
     PFBNativeSettingsRowStyle* style = [PFBNativeSettingsRowStyle shared];
-    UIColor* ink = self.destructive ? PFBSettingsAlertColor() : PFBSettingsTextColor();
+    UIColor* ink = PFBSettingsTextColor();
     self.backgroundColor = [PFBPalette currentBackgroundColor];
     pfbApplySelectedBackground(self);
     self.title.font = style.titleFont ?: [TwitterChirpFont(TwitterFontStyleRegular) fontWithSize:16];
@@ -133,18 +117,10 @@ static CGRect PFBRowTrailingFrame(CGFloat width, CGFloat shift, PFBNativeSetting
     }
     self.icon.image = self.iconName ? [UIImage tfn_vectorImageNamed:self.iconName
                                                            fitsSize:style.iconFrame.size
-                                                          fillColor:self.iconColor ?: ink]
+                                                          fillColor:ink]
                                     : nil;
     if (self.accessory == PFBNativeSettingsRowAccessoryNone) {
         self.trailing.image = nil;
-        return;
-    }
-    // A menu shows the up-down chevron of UIKit's pop-up buttons, as the sheets' menu rows do.
-    if (self.accessory == PFBNativeSettingsRowAccessoryMenu) {
-        UIImageSymbolConfiguration* config =
-            [UIImageSymbolConfiguration configurationWithPointSize:12 weight:UIImageSymbolWeightSemibold];
-        self.trailing.tintColor = [UIColor tertiaryLabelColor];
-        self.trailing.image = [UIImage systemImageNamed:@"chevron.up.chevron.down" withConfiguration:config];
         return;
     }
     BOOL more = self.accessory == PFBNativeSettingsRowAccessoryMore;

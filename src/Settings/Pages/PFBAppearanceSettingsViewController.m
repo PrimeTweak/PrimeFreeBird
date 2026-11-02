@@ -85,7 +85,7 @@ static NSInteger PFBInterfaceStyleCurrent(void) {
 }
 
 // Twitter's own tab editor under its Liquid Glass navigation, which brings its own title and
-// account line; PrimeFreeBird's editor otherwise.
+// account line; PrimeFreeBird's editor otherwise. The new look shows either title alone.
 - (void)showCustomTabBarVC:(NSDictionary*)sender {
     PFBBundle* bundle = [PFBBundle sharedBundle];
     UIViewController* customTabBarVC = [PFBCustomTabBarUtility editorForAccount:self.account];
@@ -100,7 +100,13 @@ static NSInteger PFBInterfaceStyleCurrent(void) {
         [self presentViewController:alert animated:YES completion:nil];
         return;
     }
-    if (self.account && [customTabBarVC isKindOfClass:[PFBCustomTabBarViewController class]]) {
+    if (![customTabBarVC isKindOfClass:[PFBCustomTabBarViewController class]]) {
+        if (self.nativeLook) {
+            [PFBCustomTabBarUtility showTitleAloneInEditor:customTabBarVC];
+        }
+    } else if (self.nativeLook) {
+        customTabBarVC.title = [bundle localizedStringForKey:@"CUSTOM_TAB_BAR_SETTINGS_NAVIGATION_TITLE"];
+    } else if (self.account) {
         [customTabBarVC.navigationItem
             setTitleView:[objc_getClass("TFNTitleView")
                              titleViewWithTitle:[bundle localizedStringForKey:@"CUSTOM_TAB_BAR_SETTINGS_NAVIGATION_TITLE"]

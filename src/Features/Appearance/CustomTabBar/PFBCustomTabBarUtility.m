@@ -78,6 +78,16 @@ static BOOL PFBRegistryEntryIsValid(id entry) {
                                                                                     scribeContext:context];
 }
 
+static const void* kPFBTitleAloneKey = &kPFBTitleAloneKey;
+
++ (void)showTitleAloneInEditor:(UIViewController*)editor {
+    objc_setAssociatedObject(editor, kPFBTitleAloneKey, @YES, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+}
+
++ (BOOL)editorShowsTitleAlone:(UIViewController*)editor {
+    return [objc_getAssociatedObject(editor, kPFBTitleAloneKey) boolValue];
+}
+
 #pragma mark - Live capture
 
 // Ordered union of every tab ever recorded, persisted across launches, so a tab

@@ -9,6 +9,7 @@
 #import "Common/PFBSettings.h"
 #import "Features/Appearance/ThemeColor/PFBPalette.h"
 #import "Debug/PFBTourChoicePopover.h"
+#import "Settings/Native/PFBShowcase.h"
 
 // An orange dark enough to read on a light page; the system orange on a dark one.
 static UIColor* PFBCompatWarningTextColor(void) {
@@ -25,6 +26,7 @@ typedef NS_ENUM(NSInteger, PFBReportRowKind) {
     PFBReportRowOption,
     PFBReportRowClearAll,
     PFBReportRowHistory,
+    PFBReportRowCopy,
 };
 
 // One row of the report or of one of its lists.
@@ -33,11 +35,11 @@ typedef NS_ENUM(NSInteger, PFBReportRowKind) {
 @property (nonatomic, copy) NSString* title;
 @property (nonatomic, copy) NSString* value;
 @property (nonatomic, copy) NSString* detail;
-// Whether a tap does something: a list with options in it, or Clear all.
+// Whether a tap does something: a list with options in it, Clear all, or the copy.
 @property (nonatomic) BOOL enabled;
 // The verdict a list row opens.
 @property (nonatomic) PFBCompatVerdict verdict;
-// The new look's glyph before the title.
+// The new look's symbol before the title.
 @property (nonatomic, copy) NSString* iconName;
 @end
 
@@ -148,10 +150,10 @@ static void PFBReportSetUpTable(UITableView* table) {
     [table registerClass:[PFBModernSettingsTableViewCell class] forCellReuseIdentifier:@"ButtonCell"];
     [table registerClass:[PFBNativeSettingsRowCell class] forCellReuseIdentifier:@"NativeRow"];
     [table registerClass:[PFBReportGroupCell class] forCellReuseIdentifier:@"GroupCell"];
+    [table registerClass:[PFBShowcaseRowCell class] forCellReuseIdentifier:@"ShowcaseRow"];
 }
 
-// A row of the new look: a list opens on a chevron, Clear all and Broken read in red, and an
-// option carries its reason under its name.
+// A row of a list in the new look: a group's name, or an option with its reason under its name.
 static UITableViewCell* PFBReportNativeCell(UITableView* table, NSIndexPath* indexPath, PFBReportRow* row) {
     if (row.kind == PFBReportRowHeader) {
         PFBReportGroupCell* cell = [table dequeueReusableCellWithIdentifier:@"GroupCell" forIndexPath:indexPath];
@@ -159,15 +161,12 @@ static UITableViewCell* PFBReportNativeCell(UITableView* table, NSIndexPath* ind
         return cell;
     }
     PFBNativeSettingsRowCell* cell = [table dequeueReusableCellWithIdentifier:@"NativeRow" forIndexPath:indexPath];
-    BOOL list = row.kind == PFBReportRowList;
     [cell configureWithTitle:row.title
-                      detail:list ? nil : row.detail
-                    iconName:row.iconName
+                      detail:row.detail
+                    iconName:nil
                        value:row.value
-                   accessory:list && row.enabled ? PFBNativeSettingsRowAccessoryChevron
-                                                 : PFBNativeSettingsRowAccessoryNone];
-    cell.destructive = row.kind == PFBReportRowClearAll || (list && row.verdict == PFBCompatVerdictBroken);
-    cell.selectionStyle = row.enabled ? UITableViewCellSelectionStyleDefault : UITableViewCellSelectionStyleNone;
+                   accessory:PFBNativeSettingsRowAccessoryNone];
+    cell.selectionStyle = UITableViewCellSelectionStyleNone;
     return cell;
 }
 
@@ -404,19 +403,254 @@ static PFBReportRow* PFBReportListRow(NSString* title, NSUInteger count, PFBComp
     return row;
 }
 
-// The new look's copy button: its glyph, and a check for a moment once the report is copied.
-static UIImage* PFBReportCopyGlyph(BOOL copied) {
-    return copied ? PFBTwitterGlyphFor(@"checkmark", [UIImage systemImageNamed:@"checkmark"])
-                  : PFBTwitterGlyphFor(@"copy_stroke", [UIImage systemImageNamed:@"doc.on.doc"]);
+// The verdict the report opens on, its mark and the mark's tone. Never "Compatible" before
+// Twitter's binaries are read; problems show as soon as known. A nil mark is a spinner.
+static NSString* PFBReportVerdict(NSArray<PFBCompatResult*>* results, UIColor** tone, NSString** symbol) {
+    NSInteger broken = 0;
+    for (PFBCompatResult* r in results) {
+        broken += r.verdict == PFBCompatVerdictBroken ? 1 : 0;
+    }
+    PFBCompatReadState state = PFBCompatReadStatus();
+    NSString* version = NSBundle.mainBundle.infoDictionary[@"CFBundleShortVersionString"] ?: @"";
+    *tone = [UIColor systemGreenColor];
+    *symbol = @"checkmark";
+    if (broken > 0) {
+        *tone = [UIColor systemRedColor];
+        *symbol = @"xmark";
+        return [NSString stringWithFormat:@"%ld problem%@ with Twitter %@", (long)broken, broken == 1 ? @"" : @"s",
+                                          version];
+    }
+    if (state == PFBCompatReadPending) {
+        *tone = PFBSettingsSubtitleColor();
+        *symbol = nil;
+        return [NSString stringWithFormat:@"Checking Twitter %@", version];
+    }
+    if (PFBCompatCheckIsDue()) {
+        *tone = [UIColor systemOrangeColor];
+        *symbol = @"exclamationmark";
+        return [NSString stringWithFormat:@"Twitter %@ not checked yet", version];
+    }
+    if (state == PFBCompatReadFailed) {
+        *tone = [UIColor systemOrangeColor];
+        *symbol = @"exclamationmark";
+        return [NSString stringWithFormat:@"Twitter %@ not fully checked", version];
+    }
+    return [NSString stringWithFormat:@"Compatible with Twitter %@", version];
 }
 
+// The line under the verdict while Twitter's settings are read, or when they could not be.
+static NSString* PFBReportReadLine(void) {
+    PFBCompatReadState state = PFBCompatReadStatus();
+    if (state == PFBCompatReadPending) {
+        return @"Checking Twitter’s settings…";
+    }
+    return state == PFBCompatReadFailed ? @"Twitter’s settings could not be read" : nil;
+}
+
+// The new look's head of the report: its line, then a card with the verdict on a glass disc,
+// the share of options seen working on a glass meter, and the button that checks the rest.
+@interface PFBReportShowcaseHeader : UIView
+@property (nonatomic, strong) UILabel* intro;
+@property (nonatomic, strong) UIView* card;
+@property (nonatomic, strong) PFBShowcaseSurface* disc;
+@property (nonatomic, strong) UIView* mark;
+@property (nonatomic, strong) UILabel* verdict;
+@property (nonatomic, strong) UILabel* subline;
+@property (nonatomic, strong) UILabel* readLine;
+@property (nonatomic, strong) PFBShowcaseSurface* meter;
+@property (nonatomic, strong) NSArray<UIView*>* segments;
+@property (nonatomic, strong) NSArray<NSNumber*>* shares;
+@property (nonatomic, strong) UILabel* caption;
+@property (nonatomic, strong) PFBShowcaseButton* check;
+@end
+
+@implementation PFBReportShowcaseHeader
+
+- (instancetype)initWithResults:(NSArray<PFBCompatResult*>*)results {
+    self = [super initWithFrame:CGRectZero];
+    if (self) {
+        NSUInteger working = 0;
+        NSUInteger notTested = 0;
+        NSUInteger broken = 0;
+        NSUInteger options = 0;
+        for (PFBCompatResult* result in results) {
+            options += result.internal ? 0 : 1;
+            if (result.verdict == PFBCompatVerdictBroken) {
+                broken++;
+            } else if (result.verdict == PFBCompatVerdictNotTested) {
+                notTested++;
+            } else if (!result.internal) {
+                working++;
+            }
+        }
+        _intro = PFBShowcaseIntroLabel();
+        _intro.text = @"Check every option still works after a Twitter update.";
+        _card = PFBShowcaseCard();
+        _disc = [[PFBShowcaseSurface alloc] initWithCornerRadius:-1];
+        UIColor* tone = nil;
+        NSString* symbol = nil;
+        _verdict = [[UILabel alloc] init];
+        _verdict.text = PFBReportVerdict(results, &tone, &symbol);
+        _verdict.numberOfLines = 0;
+        _verdict.textAlignment = NSTextAlignmentCenter;
+        _verdict.font = PFBScaledFont([TwitterChirpFont(TwitterFontStyleSemibold) fontWithSize:17]);
+        _verdict.textColor = PFBSettingsTextColor();
+        if (symbol) {
+            UIImageSymbolConfiguration* size = [UIImageSymbolConfiguration configurationWithPointSize:26
+                                                                                              weight:UIImageSymbolWeightBold];
+            UIImageView* image = [[UIImageView alloc] initWithImage:[UIImage systemImageNamed:symbol withConfiguration:size]];
+            image.contentMode = UIViewContentModeCenter;
+            image.tintColor = tone;
+            _mark = image;
+        } else {
+            UIActivityIndicatorView* spinner =
+                [[UIActivityIndicatorView alloc] initWithActivityIndicatorStyle:UIActivityIndicatorViewStyleMedium];
+            [spinner startAnimating];
+            _mark = spinner;
+        }
+        [_disc.contentView addSubview:_mark];
+        _subline = [[UILabel alloc] init];
+        _subline.text = [NSString stringWithFormat:@"iOS %@ · %lu options", UIDevice.currentDevice.systemVersion,
+                                                   (unsigned long)options];
+        _subline.textAlignment = NSTextAlignmentCenter;
+        _subline.font = PFBSettingsDetailFont();
+        _subline.textColor = PFBSettingsSubtitleColor();
+        NSString* read = PFBReportReadLine();
+        if (read) {
+            _readLine = [[UILabel alloc] init];
+            _readLine.text = read;
+            _readLine.numberOfLines = 0;
+            _readLine.textAlignment = NSTextAlignmentCenter;
+            _readLine.font = PFBSettingsDetailFont();
+            _readLine.textColor = PFBCompatReadStatus() == PFBCompatReadFailed ? PFBCompatWarningTextColor()
+                                                                               : PFBSettingsSubtitleColor();
+        }
+        // The meter holds what was seen working, what is not tested yet, and what broke.
+        _meter = [[PFBShowcaseSurface alloc] initWithCornerRadius:-1];
+        NSMutableArray<UIView*>* segments = [NSMutableArray array];
+        for (UIColor* color in @[ [UIColor systemGreenColor], [UIColor systemGray3Color], [UIColor systemRedColor] ]) {
+            UIView* segment = [[UIView alloc] init];
+            segment.backgroundColor = color;
+            [_meter.contentView addSubview:segment];
+            [segments addObject:segment];
+        }
+        _segments = segments;
+        _shares = @[ @(working), @(notTested), @(broken) ];
+        NSMutableString* caption =
+            [NSMutableString stringWithFormat:@"%lu of %lu seen working", (unsigned long)working, (unsigned long)options];
+        if (broken > 0) {
+            [caption appendFormat:@" · %lu broken", (unsigned long)broken];
+        }
+        if (notTested > 0) {
+            [caption appendFormat:@" · %lu to check", (unsigned long)notTested];
+        }
+        _caption = [[UILabel alloc] init];
+        _caption.text = caption;
+        _caption.numberOfLines = 0;
+        _caption.textAlignment = NSTextAlignmentCenter;
+        _caption.font = PFBSettingsDetailFont();
+        _caption.textColor = PFBSettingsSubtitleColor();
+        _check = [PFBShowcaseButton buttonWithStyle:PFBShowcaseButtonStyleGlass];
+        _check.symbolName = @"checklist";
+        _check.label = @"Check options";
+        for (UIView* part in @[ _disc, _verdict, _subline, _meter, _caption, _check ]) {
+            [_card addSubview:part];
+        }
+        if (_readLine) {
+            [_card addSubview:_readLine];
+        }
+        [self addSubview:_intro];
+        [self addSubview:_card];
+    }
+    return self;
+}
+
+// Lays the parts out at the width given and returns the height they take.
+- (CGFloat)layoutForWidth:(CGFloat)width {
+    CGFloat side = 20.0;
+    CGFloat inner = MAX(0, width - 2 * side);
+    CGFloat introHeight = ceil([self.intro sizeThatFits:CGSizeMake(inner, CGFLOAT_MAX)].height);
+    self.intro.frame = CGRectMake(side, 12.0, inner, introHeight);
+    CGFloat room = MAX(0, inner - 2 * side);
+    CGFloat y = 24.0;
+    self.disc.frame = CGRectMake(inner / 2.0 - 32.0, y, 64.0, 64.0);
+    self.mark.frame = self.disc.bounds;
+    y = CGRectGetMaxY(self.disc.frame) + 14.0;
+    CGFloat verdictHeight = ceil([self.verdict sizeThatFits:CGSizeMake(room, CGFLOAT_MAX)].height);
+    self.verdict.frame = CGRectMake(side, y, room, verdictHeight);
+    y += verdictHeight + 4.0;
+    CGFloat sublineHeight = ceil(self.subline.font.lineHeight);
+    self.subline.frame = CGRectMake(side, y, room, sublineHeight);
+    y += sublineHeight;
+    if (self.readLine) {
+        CGFloat readHeight = ceil([self.readLine sizeThatFits:CGSizeMake(room, CGFLOAT_MAX)].height);
+        self.readLine.frame = CGRectMake(side, y + 8.0, room, readHeight);
+        y += 8.0 + readHeight;
+    }
+    y += 18.0;
+    self.meter.frame = CGRectMake(side, y, room, 12.0);
+    [self layoutMeter];
+    y += 12.0 + 8.0;
+    CGFloat captionHeight = ceil([self.caption sizeThatFits:CGSizeMake(room, CGFLOAT_MAX)].height);
+    self.caption.frame = CGRectMake(side, y, room, captionHeight);
+    y += captionHeight + 16.0;
+    CGFloat checkHeight = [self.check sizeThatFits:CGSizeMake(room, CGFLOAT_MAX)].height + 4.0;
+    self.check.frame = CGRectMake(side, y, room, checkHeight);
+    y += checkHeight + 20.0;
+    self.card.frame = CGRectMake(side, CGRectGetMaxY(self.intro.frame) + 20.0, inner, y);
+    return CGRectGetMaxY(self.card.frame) + 8.0;
+}
+
+// The shares side by side in the meter, 2 points apart and 2 points in from its edge.
+- (void)layoutMeter {
+    CGRect track = CGRectInset(self.meter.bounds, 2.0, 2.0);
+    double total = 0;
+    NSUInteger shown = 0;
+    for (NSNumber* share in self.shares) {
+        total += share.doubleValue;
+        shown += share.doubleValue > 0 ? 1 : 0;
+    }
+    CGFloat room = MAX(0, CGRectGetWidth(track) - 2.0 * (CGFloat)MAX((NSInteger)shown - 1, 0));
+    BOOL rtl = self.effectiveUserInterfaceLayoutDirection == UIUserInterfaceLayoutDirectionRightToLeft;
+    CGFloat x = CGRectGetMinX(track);
+    for (NSUInteger i = 0; i < self.segments.count; i++) {
+        double share = self.shares[i].doubleValue;
+        CGFloat length = total > 0 ? floor(room * (CGFloat)(share / total)) : 0;
+        CGRect frame = CGRectMake(x, CGRectGetMinY(track), length, CGRectGetHeight(track));
+        if (rtl) {
+            frame.origin.x = CGRectGetWidth(self.meter.bounds) - CGRectGetMaxX(frame);
+        }
+        self.segments[i].frame = frame;
+        self.segments[i].layer.cornerRadius = CGRectGetHeight(track) / 2.0;
+        self.segments[i].hidden = length <= 0;
+        x += length + (length > 0 ? 2.0 : 0);
+    }
+}
+
+@end
+
+@interface PFBCompatibilityReportViewController ()
+// Opened as the stethoscope's sheet, which takes no more height than the report's content.
+@property (nonatomic) BOOL inSheet;
+@end
+
 @implementation PFBCompatibilityReportViewController {
-    // The rows by section: one section, or in the new look the lists, then Clear all.
+    // The rows by section: one section in both looks.
     NSArray<NSArray<PFBReportRow*>*>* _sections;
+    // The new look's head, and its foot: the history, then Clear all.
+    PFBReportShowcaseHeader* _showcaseHeader;
+    UIView* _showcaseFooter;
+    UILabel* _historyLabel;
+    PFBShowcaseButton* _clearAllButton;
+    // While the copy row shows Copied.
+    BOOL _copied;
+    // Whether the foot stands where it belongs for the content and width it was placed for.
+    BOOL _footerPlaced;
 }
 
 + (UINavigationController*)sheetFor:(UIWindow*)window {
     PFBCompatibilityReportViewController* report = [[self alloc] initWithStyle:UITableViewStyleGrouped];
+    report.inSheet = YES;
     // Away from the settings, the report takes the look New Twitter settings gives them.
     report.nativeLook = [PFBSettings boolForKey:@"new_twitter_settings"];
     UINavigationController* navigation = [[UINavigationController alloc] initWithRootViewController:report];
@@ -462,30 +696,25 @@ static UIImage* PFBReportCopyGlyph(BOOL copied) {
                                              selector:@selector(compatDidChange:)
                                                  name:PFBCompatDidChangeNotification
                                                object:nil];
-    // The new look titles the report as the row that opens it, and draws its copy button as a glyph.
+    // The new look titles the report as the row that opens it, and holds its actions in the page.
     self.title = [[PFBBundle sharedBundle]
         localizedStringForKey:self.nativeLook ? @"COMPATIBILITY_TITLE" : @"COMPATIBILITY_REPORT_TITLE"];
     self.view.backgroundColor = [PFBPalette currentBackgroundColor];
     PFBReportSetUpTable(self.tableView);
-    UIBarButtonItem* copy = self.nativeLook ? [[UIBarButtonItem alloc] initWithImage:PFBReportCopyGlyph(NO)
-                                                                               style:UIBarButtonItemStylePlain
-                                                                              target:self
-                                                                              action:@selector(copyReport)]
-                                            : [[UIBarButtonItem alloc] initWithTitle:@"Copy"
-                                                                               style:UIBarButtonItemStylePlain
-                                                                              target:self
-                                                                              action:@selector(copyReport)];
-    if (self.nativeLook) {
-        copy.accessibilityLabel = @"Copy";
+    if (!self.nativeLook) {
+        UIBarButtonItem* copy = [[UIBarButtonItem alloc] initWithTitle:@"Copy"
+                                                                 style:UIBarButtonItemStylePlain
+                                                                target:self
+                                                                action:@selector(copyReport)];
+        copy.tag = PFBNativeGlassTag;
+        UIBarButtonItem* tours = [[UIBarButtonItem alloc] initWithImage:[UIImage systemImageNamed:@"checklist"]
+                                                                  style:UIBarButtonItemStylePlain
+                                                                 target:self
+                                                                 action:@selector(showTourChoice:)];
+        tours.accessibilityLabel = @"Check options";
+        tours.tag = PFBNativeGlassTag;
+        self.navigationItem.rightBarButtonItems = @[ copy, tours ];
     }
-    copy.tag = PFBNativeGlassTag;
-    UIBarButtonItem* tours = [[UIBarButtonItem alloc] initWithImage:[UIImage systemImageNamed:@"checklist"]
-                                                              style:UIBarButtonItemStylePlain
-                                                             target:self
-                                                             action:@selector(showTourChoice:)];
-    tours.accessibilityLabel = @"Check options";
-    tours.tag = PFBNativeGlassTag;
-    self.navigationItem.rightBarButtonItems = @[ copy, tours ];
     [self rebuild];
 }
 
@@ -520,6 +749,13 @@ static UIImage* PFBReportCopyGlyph(BOOL copied) {
     [self.tableView reloadData];
 }
 
+// Twitter's tab bar settles once the page is in: the new look's foot is placed again then.
+- (void)viewDidAppear:(BOOL)animated {
+    [super viewDidAppear:animated];
+    _footerPlaced = NO;
+    [self.view setNeedsLayout];
+}
+
 // The page underneath shows the status on its Compatibility row; it redraws on return. Covered by
 // one of its own lists, the report has not left.
 - (void)viewWillDisappear:(BOOL)animated {
@@ -549,6 +785,7 @@ static UIImage* PFBReportCopyGlyph(BOOL copied) {
 
 - (void)viewDidLayoutSubviews {
     [super viewDidLayoutSubviews];
+    [self layoutShowcase];
     PFBReportFitSheet(self);
 }
 
@@ -556,9 +793,9 @@ static UIImage* PFBReportCopyGlyph(BOOL copied) {
     NSArray<PFBCompatResult*>* results = PFBCompatResults();
     if (self.nativeLook) {
         [self rebuildNative:results];
-    } else {
-        [self rebuildClassic:results];
+        return;
     }
+    [self rebuildClassic:results];
     self.tableView.tableHeaderView = [self summaryHeaderFor:results];
 }
 
@@ -601,8 +838,8 @@ static UIImage* PFBReportCopyGlyph(BOOL copied) {
     _sections = @[ rows ];
 }
 
-// The new look: one row per verdict, the broken options first when there are any, then Clear
-// all, and the history under them.
+// The new look: the head's card, one row per verdict with the broken options first when there
+// are any, the copy, then the history and Clear all at the foot.
 - (void)rebuildNative:(NSArray<PFBCompatResult*>*)results {
     NSUInteger broken = 0;
     NSUInteger notTested = 0;
@@ -616,90 +853,100 @@ static UIImage* PFBReportCopyGlyph(BOOL copied) {
             working++;
         }
     }
-    NSMutableArray<PFBReportRow*>* lists = [NSMutableArray array];
+    NSMutableArray<PFBReportRow*>* rows = [NSMutableArray array];
     if (broken > 0) {
-        [lists addObject:PFBReportListRow(@"Broken", broken, PFBCompatVerdictBroken, @"error_circle")];
+        [rows addObject:PFBReportListRow(@"Broken", broken, PFBCompatVerdictBroken, @"xmark")];
     }
-    [lists addObject:PFBReportListRow(@"Not tested", notTested, PFBCompatVerdictNotTested, @"circle")];
-    [lists addObject:PFBReportListRow(@"Working", working, PFBCompatVerdictOK, @"checkmark_circle")];
-    PFBReportRow* clearAll = PFBReportRowMake(PFBReportRowClearAll, @"Clear all", nil,
-                                              @"Clear the counts and close Twitter. Settings are kept.");
-    clearAll.iconName = @"trashcan_stroke";
-    clearAll.enabled = YES;
-    _sections = @[ lists, @[ clearAll ] ];
-    self.tableView.tableFooterView = [self historyFooter];
+    [rows addObject:PFBReportListRow(@"Not tested", notTested, PFBCompatVerdictNotTested, @"circle.dashed")];
+    [rows addObject:PFBReportListRow(@"Working", working, PFBCompatVerdictOK, @"checkmark")];
+    PFBReportRow* copy = PFBReportRowMake(PFBReportRowCopy, _copied ? @"Copied" : @"Copy report", nil, nil);
+    copy.iconName = _copied ? @"checkmark" : @"doc.on.doc";
+    copy.enabled = YES;
+    [rows addObject:copy];
+    _sections = @[ rows ];
+
+    _showcaseHeader = [[PFBReportShowcaseHeader alloc] initWithResults:results];
+    [_showcaseHeader.check addTarget:self action:@selector(checkOptions:) forControlEvents:UIControlEventTouchUpInside];
+    if (!_showcaseFooter) {
+        _showcaseFooter = [[UIView alloc] init];
+        _historyLabel = [[UILabel alloc] init];
+        _historyLabel.numberOfLines = 0;
+        _historyLabel.textAlignment = NSTextAlignmentCenter;
+        _clearAllButton = [PFBShowcaseButton buttonWithStyle:PFBShowcaseButtonStyleDestructive];
+        _clearAllButton.label = @"Clear all";
+        [_clearAllButton addTarget:self action:@selector(confirmClearAll) forControlEvents:UIControlEventTouchUpInside];
+        [_showcaseFooter addSubview:_historyLabel];
+        [_showcaseFooter addSubview:_clearAllButton];
+    }
+    _historyLabel.text = PFBReportHistoryText();
+    _historyLabel.font = PFBSettingsDetailFont();
+    _historyLabel.textColor = PFBSettingsSubtitleColor();
+    self.tableView.tableHeaderView = nil;
+    _footerPlaced = NO;
+    [self.view setNeedsLayout];
 }
 
-// The history in small print under the rows, as the settings page closes on its credits.
-- (UIView*)historyFooter {
-    NSString* history = PFBReportHistoryText();
-    if (!history) {
-        return nil;
+// The head at the table's width; at the foot, the history, then Clear all held to the bottom of the
+// page above Twitter's tab bar, or right under the history in the sheet. The table lays itself out
+// on every scroll, so both are placed again only for a new width or new content.
+- (void)layoutShowcase {
+    if (!_showcaseHeader) {
+        return;
     }
-    UILabel* label = [[UILabel alloc] init];
-    label.text = history;
-    label.numberOfLines = 0;
-    label.textAlignment = NSTextAlignmentCenter;
-    label.font = PFBSettingsDetailFont();
-    label.textColor = PFBSettingsSubtitleColor();
-    CGFloat margin = [PFBNativeSettingsRowStyle shared].iconFrame.origin.x;
-    CGFloat width = self.tableView.bounds.size.width;
-    CGFloat room = MAX(width - 2 * margin, 1);
-    CGFloat height = ceil([label sizeThatFits:CGSizeMake(room, CGFLOAT_MAX)].height);
-    UIView* footer = [[UIView alloc] initWithFrame:CGRectMake(0, 0, width, height + 22 + 16)];
-    label.frame = CGRectMake(margin, 22, room, height);
-    label.autoresizingMask = UIViewAutoresizingFlexibleWidth;
-    [footer addSubview:label];
-    return footer;
+    UITableView* table = self.tableView;
+    CGFloat width = CGRectGetWidth(table.bounds);
+    if (width <= 0) {
+        return;
+    }
+    BOOL newWidth = fabs(CGRectGetWidth(_showcaseHeader.frame) - width) > 0.5;
+    if (table.tableHeaderView != _showcaseHeader || newWidth) {
+        CGFloat headerHeight = [_showcaseHeader layoutForWidth:width];
+        _showcaseHeader.frame = CGRectMake(0, 0, width, headerHeight);
+        table.tableHeaderView = _showcaseHeader;
+    }
+    if (_footerPlaced && !newWidth) {
+        return;
+    }
+    _footerPlaced = YES;
+    CGFloat inner = MAX(0, width - 40.0);
+    CGFloat historyHeight =
+        _historyLabel.text.length ? ceil([_historyLabel sizeThatFits:CGSizeMake(inner, CGFLOAT_MAX)].height) : 0;
+    _historyLabel.frame = CGRectMake(20.0, 20.0, inner, historyHeight);
+    CGFloat capsuleHeight = [_clearAllButton sizeThatFits:CGSizeMake(inner, CGFLOAT_MAX)].height;
+    CGFloat height = 20.0 + historyHeight + 28.0 + capsuleHeight + 16.0;
+    if (!self.inSheet) {
+        NSInteger sections = table.numberOfSections;
+        CGFloat footerTop = sections > 0 ? CGRectGetMaxY([table rectForSection:sections - 1])
+                                         : CGRectGetMaxY(_showcaseHeader.frame);
+        CGFloat limit = PFBShowcaseBottomLimit(table) - table.bounds.origin.y - table.adjustedContentInset.top;
+        height = MAX(height, limit - footerTop);
+    }
+    _clearAllButton.frame = CGRectMake(20.0, height - 16.0 - capsuleHeight, inner, capsuleHeight);
+    _showcaseFooter.frame = CGRectMake(0, 0, width, height);
+    table.tableFooterView = _showcaseFooter;
 }
 
 - (UIView*)summaryHeaderFor:(NSArray<PFBCompatResult*>*)results {
-    NSInteger broken = 0;
     NSUInteger optionCount = 0;
     for (PFBCompatResult* r in results) {
-        broken += r.verdict == PFBCompatVerdictBroken ? 1 : 0;
         optionCount += r.internal ? 0 : 1;
     }
     PFBCompatReadState state = PFBCompatReadStatus();
-    NSString* version = NSBundle.mainBundle.infoDictionary[@"CFBundleShortVersionString"] ?: @"";
-    // Never "Compatible" before Twitter's binaries are read; problems show as soon as known.
-    UIColor* tone = [UIColor systemGreenColor];
-    NSString* symbol = @"checkmark";
-    NSString* title = [NSString stringWithFormat:@"Compatible with Twitter %@", version];
-    if (broken > 0) {
-        tone = [UIColor systemRedColor];
-        symbol = @"xmark";
-        title = [NSString stringWithFormat:@"%ld problem%@ with Twitter %@", (long)broken,
-                                           broken == 1 ? @"" : @"s", version];
-    } else if (state == PFBCompatReadPending) {
-        tone = PFBSettingsSubtitleColor();
-        symbol = nil;
-        title = [NSString stringWithFormat:@"Checking Twitter %@", version];
-    } else if (PFBCompatCheckIsDue()) {
-        tone = [UIColor systemOrangeColor];
-        symbol = @"exclamationmark";
-        title = [NSString stringWithFormat:@"Twitter %@ not checked yet", version];
-    } else if (state == PFBCompatReadFailed) {
-        tone = [UIColor systemOrangeColor];
-        symbol = @"exclamationmark";
-        title = [NSString stringWithFormat:@"Twitter %@ not fully checked", version];
-    }
+    UIColor* tone = nil;
+    NSString* symbol = nil;
+    NSString* title = PFBReportVerdict(results, &tone, &symbol);
     BOOL statusLine = state != PFBCompatReadDone;
-    // The new look sets the verdict beside a smaller mark, on the rows' left edge.
-    BOOL native = self.nativeLook;
-    CGFloat discSize = native ? 40.0 : 52.0;
-    CGFloat height = native ? (statusLine ? 100.0 : 72.0) : (statusLine ? 172.0 : 140.0);
-    UIView* header = [[UIView alloc] initWithFrame:CGRectMake(0, 0, self.view.bounds.size.width, height)];
+    UIView* header = [[UIView alloc]
+        initWithFrame:CGRectMake(0, 0, self.view.bounds.size.width, statusLine ? 172.0 : 140.0)];
 
     UIView* disc = [[UIView alloc] init];
     disc.backgroundColor = [tone colorWithAlphaComponent:0.15];
-    disc.layer.cornerRadius = discSize / 2;
+    disc.layer.cornerRadius = 26.0;
     disc.translatesAutoresizingMaskIntoConstraints = NO;
     UIView* mark;
     if (symbol) {
         UIImageSymbolConfiguration* markSize =
-            [UIImageSymbolConfiguration configurationWithPointSize:native ? 20.0 : 26.0
-                                                            weight:UIImageSymbolWeightBold];
+            [UIImageSymbolConfiguration configurationWithPointSize:26.0 weight:UIImageSymbolWeightBold];
         UIImageView* image = [[UIImageView alloc] initWithImage:[UIImage systemImageNamed:symbol
                                                                          withConfiguration:markSize]];
         image.tintColor = tone;
@@ -717,7 +964,7 @@ static UIImage* PFBReportCopyGlyph(BOOL copied) {
     headline.text = title;
     headline.font = PFBScaledFont([TwitterChirpFont(TwitterFontStyleBold) fontWithSize:17]);
     headline.textColor = [UIColor labelColor];
-    headline.textAlignment = native ? NSTextAlignmentNatural : NSTextAlignmentCenter;
+    headline.textAlignment = NSTextAlignmentCenter;
     headline.translatesAutoresizingMaskIntoConstraints = NO;
 
     UILabel* subline = [[UILabel alloc] init];
@@ -725,27 +972,13 @@ static UIImage* PFBReportCopyGlyph(BOOL copied) {
                                               (unsigned long)optionCount];
     subline.font = PFBSettingsDetailFont();
     subline.textColor = PFBSettingsSubtitleColor();
-    subline.textAlignment = headline.textAlignment;
+    subline.textAlignment = NSTextAlignmentCenter;
     subline.translatesAutoresizingMaskIntoConstraints = NO;
 
     [header addSubview:disc];
     [header addSubview:headline];
     [header addSubview:subline];
-    CGFloat margin = [PFBNativeSettingsRowStyle shared].iconFrame.origin.x;
-    NSMutableArray<NSLayoutConstraint*>* constraints = [NSMutableArray arrayWithArray:native ? @[
-        [disc.topAnchor constraintEqualToAnchor:header.topAnchor constant:8.0],
-        [disc.leadingAnchor constraintEqualToAnchor:header.leadingAnchor constant:margin],
-        [disc.widthAnchor constraintEqualToConstant:discSize],
-        [disc.heightAnchor constraintEqualToConstant:discSize],
-        [mark.centerXAnchor constraintEqualToAnchor:disc.centerXAnchor],
-        [mark.centerYAnchor constraintEqualToAnchor:disc.centerYAnchor],
-        [headline.topAnchor constraintEqualToAnchor:disc.topAnchor],
-        [headline.leadingAnchor constraintEqualToAnchor:disc.trailingAnchor constant:14.0],
-        [headline.trailingAnchor constraintEqualToAnchor:header.trailingAnchor constant:-margin],
-        [subline.topAnchor constraintEqualToAnchor:headline.bottomAnchor constant:2.0],
-        [subline.leadingAnchor constraintEqualToAnchor:headline.leadingAnchor],
-        [subline.trailingAnchor constraintEqualToAnchor:headline.trailingAnchor],
-    ] : @[
+    NSMutableArray<NSLayoutConstraint*>* constraints = [NSMutableArray arrayWithArray:@[
         [disc.topAnchor constraintEqualToAnchor:header.topAnchor constant:16.0],
         [disc.centerXAnchor constraintEqualToAnchor:header.centerXAnchor],
         [disc.widthAnchor constraintEqualToConstant:52.0],
@@ -769,7 +1002,7 @@ static UIImage* PFBReportCopyGlyph(BOOL copied) {
             small.transform = CGAffineTransformMakeScale(0.7, 0.7);
             [small startAnimating];
             icon = small;
-            status.text = @"Checking Twitter’s settings…";
+            status.text = PFBReportReadLine();
             status.textColor = PFBSettingsSubtitleColor();
         } else {
             UIImageView* warning =
@@ -777,7 +1010,7 @@ static UIImage* PFBReportCopyGlyph(BOOL copied) {
             warning.tintColor = [UIColor systemOrangeColor];
             warning.contentMode = UIViewContentModeScaleAspectFit;
             icon = warning;
-            status.text = @"Twitter’s settings could not be read";
+            status.text = PFBReportReadLine();
             status.textColor = PFBCompatWarningTextColor();
         }
         UIStackView* line = [[UIStackView alloc] initWithArrangedSubviews:@[ icon, status ]];
@@ -789,10 +1022,8 @@ static UIImage* PFBReportCopyGlyph(BOOL copied) {
         [constraints addObjectsFromArray:@[
             [icon.widthAnchor constraintEqualToConstant:16.0],
             [icon.heightAnchor constraintEqualToConstant:16.0],
-            native ? [line.topAnchor constraintEqualToAnchor:disc.bottomAnchor constant:12.0]
-                   : [line.topAnchor constraintEqualToAnchor:subline.bottomAnchor constant:12.0],
-            native ? [line.leadingAnchor constraintEqualToAnchor:headline.leadingAnchor]
-                   : [line.centerXAnchor constraintEqualToAnchor:header.centerXAnchor],
+            [line.topAnchor constraintEqualToAnchor:subline.bottomAnchor constant:12.0],
+            [line.centerXAnchor constraintEqualToAnchor:header.centerXAnchor],
         ]];
     }
     [NSLayoutConstraint activateConstraints:constraints];
@@ -811,13 +1042,35 @@ static UIImage* PFBReportCopyGlyph(BOOL copied) {
     return (NSInteger)_sections[(NSUInteger)section].count;
 }
 
+// The new look's rows carry a symbol in a gray circle: the verdict's in its color, the copy's in the
+// text color.
 - (UITableViewCell*)tableView:(UITableView*)tableView cellForRowAtIndexPath:(NSIndexPath*)indexPath {
-    return PFBReportCell(tableView, indexPath, [self rowAt:indexPath], self.nativeLook);
+    PFBReportRow* row = [self rowAt:indexPath];
+    if (!self.nativeLook) {
+        return PFBReportCell(tableView, indexPath, row, NO);
+    }
+    PFBShowcaseRowCell* cell = [tableView dequeueReusableCellWithIdentifier:@"ShowcaseRow" forIndexPath:indexPath];
+    BOOL list = row.kind == PFBReportRowList;
+    [cell configureWithSymbol:row.iconName
+                        title:row.title
+                     subtitle:nil
+                        value:row.value
+                    accessory:list && row.enabled ? PFBShowcaseAccessoryChevron : PFBShowcaseAccessoryNone];
+    if (list) {
+        cell.symbolColor = row.verdict == PFBCompatVerdictBroken ? [UIColor systemRedColor]
+                           : row.verdict == PFBCompatVerdictOK   ? [UIColor systemGreenColor]
+                                                                 : PFBSettingsSubtitleColor();
+    }
+    cell.selectionStyle = row.enabled ? UITableViewCellSelectionStyleDefault : UITableViewCellSelectionStyleNone;
+    // Copy report acts on a tap, so VoiceOver hears a button.
+    if (row.kind == PFBReportRowCopy) {
+        cell.accessibilityTraits = UIAccessibilityTraitButton;
+    }
+    return cell;
 }
 
-// The new look sets Clear all apart from the lists with a gap.
 - (CGFloat)tableView:(UITableView*)tableView heightForHeaderInSection:(NSInteger)section {
-    return section > 0 ? 16.0 : CGFLOAT_MIN;
+    return CGFLOAT_MIN;
 }
 
 - (CGFloat)tableView:(UITableView*)tableView heightForFooterInSection:(NSInteger)section {
@@ -852,6 +1105,8 @@ static UIImage* PFBReportCopyGlyph(BOOL copied) {
         [self.navigationController pushViewController:list animated:YES];
     } else if (row.kind == PFBReportRowClearAll) {
         [self confirmClearAll];
+    } else if (row.kind == PFBReportRowCopy) {
+        [self copyReport];
     }
 }
 
@@ -882,6 +1137,22 @@ static UIImage* PFBReportCopyGlyph(BOOL copied) {
 // The tours are offered from the checklist button, the popover's arrow on the icon:
 // an image item's rendered view carries the rect the arrow needs.
 - (void)showTourChoice:(UIBarButtonItem*)sender {
+    UIView* anchor = nil;
+    @try {
+        id rendered = [sender valueForKey:@"view"];
+        anchor = [rendered isKindOfClass:[UIView class]] ? rendered : nil;
+    } @catch (__unused id exception) {
+        anchor = nil;
+    }
+    [self presentTourChoiceFrom:anchor item:sender];
+}
+
+// The new look offers them from Check options on the card.
+- (void)checkOptions:(UIButton*)sender {
+    [self presentTourChoiceFrom:sender item:nil];
+}
+
+- (void)presentTourChoiceFrom:(UIView*)anchor item:(UIBarButtonItem*)item {
     if (PFBCompatTourIsRunning() || self.presentedViewController) {
         return;
     }
@@ -892,20 +1163,14 @@ static UIImage* PFBReportCopyGlyph(BOOL copied) {
     };
     choice.modalPresentationStyle = UIModalPresentationPopover;
     UIPopoverPresentationController* popover = choice.popoverPresentationController;
-    UIView* anchor = nil;
-    @try {
-        id rendered = [sender valueForKey:@"view"];
-        anchor = [rendered isKindOfClass:[UIView class]] ? rendered : nil;
-    } @catch (__unused id exception) {
-        anchor = nil;
-    }
     if (anchor) {
         popover.sourceView = anchor;
         popover.sourceRect = anchor.bounds;
     } else {
-        popover.barButtonItem = sender;
+        popover.barButtonItem = item;
     }
-    popover.permittedArrowDirections = UIPopoverArrowDirectionUp;
+    popover.permittedArrowDirections =
+        item ? UIPopoverArrowDirectionUp : UIPopoverArrowDirectionUp | UIPopoverArrowDirectionDown;
     popover.delegate = choice;
     [self presentViewController:choice animated:YES completion:nil];
 }
@@ -930,23 +1195,36 @@ static UIImage* PFBReportCopyGlyph(BOOL copied) {
     }
 }
 
+// Copied shows a moment on the button, or in the new look on the copy row.
 - (void)copyReport {
     [UIPasteboard generalPasteboard].string = PFBCompatReportText();
-    UIBarButtonItem* item = self.navigationItem.rightBarButtonItem;
-    BOOL native = self.nativeLook;
-    if (native) {
-        item.image = PFBReportCopyGlyph(YES);
-    } else {
-        item.title = @"Copied";
+    if (self.nativeLook) {
+        [self showCopied:YES];
+        __weak __typeof(self) weakSelf = self;
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1.2 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+          [weakSelf showCopied:NO];
+        });
+        return;
     }
-    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1.2 * NSEC_PER_SEC)),
-                   dispatch_get_main_queue(), ^{
-                     if (native) {
-                         item.image = PFBReportCopyGlyph(NO);
-                     } else {
-                         item.title = @"Copy";
-                     }
-                   });
+    UIBarButtonItem* item = self.navigationItem.rightBarButtonItem;
+    item.title = @"Copied";
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1.2 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+      item.title = @"Copy";
+    });
+}
+
+- (void)showCopied:(BOOL)copied {
+    _copied = copied;
+    NSArray<PFBReportRow*>* rows = _sections.firstObject;
+    for (NSUInteger i = 0; i < rows.count; i++) {
+        PFBReportRow* row = rows[i];
+        if (row.kind != PFBReportRowCopy) {
+            continue;
+        }
+        row.title = copied ? @"Copied" : @"Copy report";
+        row.iconName = copied ? @"checkmark" : @"doc.on.doc";
+        [self.tableView reconfigureRowsAtIndexPaths:@[ [NSIndexPath indexPathForRow:(NSInteger)i inSection:0] ]];
+    }
 }
 
 @end

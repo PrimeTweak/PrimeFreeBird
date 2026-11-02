@@ -5,22 +5,7 @@
 #import "Common/PFBBundle.h"
 #import "Settings/PFBSettingsCellStyle.h"
 #import "Support/PFBManager.h"
-
-// iOS draws the design it launched with: glass sheets under Liquid Glass, opaque ones under the
-// Standard look. Visual style is read as it stood at launch, since a change waits for a restart.
-static BOOL gPFBSheetGlassAtLaunch;
-
-__attribute__((constructor)) static void PFBSheetReadLaunchDesign(void) {
-    id glass = [[NSUserDefaults standardUserDefaults] objectForKey:@"enable_liquid_glass"];
-    gPFBSheetGlassAtLaunch = glass ? [glass boolValue] : YES;
-}
-
-static BOOL PFBSheetUsesGlass(void) {
-    if (@available(iOS 26.0, *)) {
-        return gPFBSheetGlassAtLaunch;
-    }
-    return NO;
-}
+#import "Settings/Native/PFBShowcase.h"
 
 static void* kPFBSheetRowsContext = &kPFBSheetRowsContext;
 
@@ -140,7 +125,7 @@ static const CGFloat kPFBSheetBottomMargin = 16;
     UIColor* ink = PFBSettingsTextColor();
     UIColor* ground = [PFBPalette currentBackgroundColor];
     UIFont* bold = PFBFontGroupFont(@selector(headline2BoldFont), [UIFont systemFontOfSize:17 weight:UIFontWeightBold]);
-    self.view.backgroundColor = PFBSheetUsesGlass() ? [UIColor clearColor] : ground;
+    self.view.backgroundColor = PFBShowcaseUsesGlass() ? [UIColor clearColor] : ground;
     self.titleLabel.font = PFBScaledFont([bold fontWithSize:20]);
     self.titleLabel.textColor = ink;
     self.divider.backgroundColor = PFBSettingsDividerColor();

@@ -5,7 +5,7 @@
 NS_ASSUME_NONNULL_BEGIN
 
 @interface PFBColorThemeViewController : UIViewController
-// Set before it shows: round options and rows, as Twitter's new settings draw theirs.
+// Set before it shows: the new look's page, the colors as round options under a sample in the accent.
 @property (nonatomic) BOOL nativeLook;
 @end
 

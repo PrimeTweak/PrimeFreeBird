@@ -204,9 +204,21 @@ static void PFBRestoreNativeTabSelection(id controller) {
 
 %hook T1TabCustomizationViewController
 
+// Twitter titles its editor with a view holding the title and the account under it; opened from
+// the new look, the title it set before stands alone.
 - (void)viewDidLoad {
     %orig;
     PFBPrepareNativeTabSave(self);
+    UIViewController* editor = (UIViewController*)self;
+    if (![PFBCustomTabBarUtility editorShowsTitleAlone:editor]) {
+        return;
+    }
+    if (editor.navigationItem.titleView) {
+        editor.navigationItem.titleView = nil;
+        PFBCOMPAT_ACTION(PFBCompat_custom_tab_bar, @"tab editor title shown alone");
+    } else {
+        PFBCOMPAT_OBSERVE(PFBCompat_custom_tab_bar, @"tab editor had no title view to take down");
+    }
 }
 
 - (void)didPressSaveButton {

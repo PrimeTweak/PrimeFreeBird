@@ -26,6 +26,11 @@ extern NSString* const PFBTabPanelIDKey; // T1 panel ID (NSNumber)
 // Glass navigation, PrimeFreeBird's otherwise; nil when Twitter's cannot be built.
 + (nullable UIViewController*)editorForAccount:(nullable id)account;
 
+// Marks Twitter's editor to show its title without the account under it, as the new look's pages
+// do; the editor's hook reads the mark once its view loads.
++ (void)showTitleAloneInEditor:(UIViewController*)editor;
++ (BOOL)editorShowsTitleAlone:(UIViewController*)editor;
+
 // Records the tabs the app builds so the editor can display real titles and
 // icons without hardcoding them. Called from the tab bar hook with the live tab
 // views.

@@ -3,10 +3,6 @@
 #import "Settings/PFBModernSettingsToggleCell.h"
 #import "Settings/PFBTintedSwitch.h"
 
-@interface PFBModernSettingsToggleCell ()
-@property (nonatomic, strong) NSLayoutConstraint* switchTrailing;
-@end
-
 @implementation PFBModernSettingsToggleCell
  
 - (instancetype)initWithStyle:(UITableViewCellStyle)style
@@ -61,10 +57,9 @@
         self.titleTrailingToPill =
             [self.titleLabel.trailingAnchor constraintEqualToAnchor:self.pillButton.leadingAnchor
                                                            constant:-12];
-        self.switchTrailing = [self.toggleSwitch.trailingAnchor constraintEqualToAnchor:self.contentView.trailingAnchor
-                                                                                constant:-10];
         [NSLayoutConstraint activateConstraints:@[
-            self.switchTrailing,
+            [self.toggleSwitch.trailingAnchor constraintEqualToAnchor:self.contentView.trailingAnchor
+                                                             constant:-10],
             [self.pillButton.trailingAnchor constraintEqualToAnchor:self.toggleSwitch.leadingAnchor
                                                            constant:-12],
             [self.pillButton.centerYAnchor constraintEqualToAnchor:self.toggleSwitch.centerYAnchor],
@@ -91,11 +86,6 @@
 - (void)configureWithTitle:(NSString*)title subtitle:(NSString*)subtitle {
     self.titleLabel.text = title;
     self.subtitleLabel.text = subtitle;
-}
-
-- (void)setSideMargin:(CGFloat)margin {
-    self.titleLeading.constant = margin;
-    self.switchTrailing.constant = -margin;
 }
  
 // Held, the title and the switch dim; the line under them, which says why, stays readable.
