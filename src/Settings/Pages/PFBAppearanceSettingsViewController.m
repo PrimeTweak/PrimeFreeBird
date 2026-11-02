@@ -10,6 +10,7 @@
 #import "Features/Appearance/CustomTabBar/PFBCustomTabBarViewController.h"
 #import "Settings/PFBModernSettingsCells.h"
 #import "Settings/Native/PFBShowcase.h"
+#import "Support/PFBTwitterPopups.h"
 
 // The dark shades, in the order dark_mode_style stores them.
 static NSArray<NSString*>* PFBDarkModeStyleKeys(void) {
@@ -39,8 +40,8 @@ static NSInteger PFBInterfaceStyleCurrent(void) {
     return @"appearance";
 }
 
-// In a sheet, Visual style and Background color show their choice and open a menu, as Retweets
-// does; the classic look keeps their alerts.
+// In a sheet, Visual style and Background color show their choice and open their choices as
+// Retweets does, under the text their alerts carry; the classic look keeps the alerts.
 - (UITableViewCell*)tableView:(UITableView*)tableView cellForRowAtIndexPath:(NSIndexPath*)indexPath {
     NSDictionary* entry = self.visibleToggles[indexPath.row];
     NSDictionary<NSString*, NSString*>* menus = @{
@@ -64,6 +65,7 @@ static NSInteger PFBInterfaceStyleCurrent(void) {
                       detail:[bundle localizedStringForKey:entry[@"subtitleKey"]]];
     NSMutableDictionary* withMenu = [entry mutableCopy];
     withMenu[@"menu"] = menu;
+    withMenu[@"noteKey"] = glass ? @"INTERFACE_STYLE_DETAIL" : @"DARK_MODE_STYLE_DETAIL";
     [self attachMenuIfNeeded:cell entry:withMenu];
     return cell;
 }
@@ -95,10 +97,9 @@ static NSInteger PFBInterfaceStyleCurrent(void) {
             [UIAlertController alertControllerWithTitle:[bundle localizedStringForKey:@"CUSTOM_TAB_BAR_SETTINGS_NAVIGATION_TITLE"]
                                                 message:[bundle localizedStringForKey:@"UNKNOWN_ERROR"]
                                          preferredStyle:UIAlertControllerStyleAlert];
-        [alert addAction:[UIAlertAction actionWithTitle:[bundle localizedStringForKey:@"OK_ACTION"]
-                                                  style:UIAlertActionStyleCancel
-                                                handler:nil]];
-        [self presentViewController:alert animated:YES completion:nil];
+        PFBAlertAddAction(alert, [bundle localizedStringForKey:@"OK_ACTION"], UIAlertActionStyleCancel, self.newLook,
+                          nil);
+        PFBAlertPresent(alert, self, self.newLook, nil);
         return;
     }
     if (![customTabBarVC isKindOfClass:[PFBCustomTabBarViewController class]]) {
@@ -107,6 +108,7 @@ static NSInteger PFBInterfaceStyleCurrent(void) {
         }
     } else if (self.nativeLook) {
         PFBShowcaseSetTitle(customTabBarVC, [bundle localizedStringForKey:@"CUSTOM_TAB_BAR_SETTINGS_NAVIGATION_TITLE"]);
+        ((PFBCustomTabBarViewController*)customTabBarVC).nativeLook = YES;
     } else if (self.account) {
         [customTabBarVC.navigationItem
             setTitleView:[objc_getClass("TFNTitleView")
@@ -343,23 +345,18 @@ static NSInteger PFBInterfaceStyleCurrent(void) {
         alertControllerWithTitle:title
                          message:[bundle localizedStringForKey:@"DEFAULT_FONT_CONFIRM_MESSAGE"]
                   preferredStyle:UIAlertControllerStyleAlert];
-    [alert addAction:[UIAlertAction
-                         actionWithTitle:[bundle localizedTwitterStringForKey:@"CANCEL_ACTION_LABEL"]
-                                   style:UIAlertActionStyleCancel
-                                 handler:nil]];
+    PFBAlertAddAction(alert, [bundle localizedTwitterStringForKey:@"CANCEL_ACTION_LABEL"], UIAlertActionStyleCancel,
+                      self.newLook, nil);
     __weak __typeof__(self) weakSelf = self;
-    [alert addAction:[UIAlertAction actionWithTitle:title
-                                              style:UIAlertActionStyleDestructive
-                                            handler:^(__unused UIAlertAction* action) {
-                                                NSUserDefaults* defaults =
-                                                    [NSUserDefaults standardUserDefaults];
-                                                [defaults removeObjectForKey:@"pfb_font_1"];
-                                                [defaults removeObjectForKey:@"pfb_font_2"];
-                                                [defaults removeObjectForKey:@"UIFontPickerRecentFamilies"];
-                                                [weakSelf updateVisibleToggles];
-                                                [weakSelf.tableView reloadData];
-                                            }]];
-    [self presentViewController:alert animated:YES completion:nil];
+    PFBAlertAddAction(alert, title, UIAlertActionStyleDestructive, self.newLook, ^{
+        NSUserDefaults* defaults = [NSUserDefaults standardUserDefaults];
+        [defaults removeObjectForKey:@"pfb_font_1"];
+        [defaults removeObjectForKey:@"pfb_font_2"];
+        [defaults removeObjectForKey:@"UIFontPickerRecentFamilies"];
+        [weakSelf updateVisibleToggles];
+        [weakSelf.tableView reloadData];
+    });
+    PFBAlertPresent(alert, self, self.newLook, nil);
 }
 
 - (void)fontPickerViewControllerDidPickFont:(UIFontPickerViewController*)viewController {

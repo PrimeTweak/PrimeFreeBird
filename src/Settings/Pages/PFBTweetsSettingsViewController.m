@@ -6,6 +6,7 @@
 #import "Common/PFBSettings.h"
 #import "Support/HookHelpers.h"
 #import "Settings/PFBModernSettingsCells.h"
+#import "Support/PFBTwitterPopups.h"
 
 // Off, then Twitter's three orders under its own names, in the order its menu lists them.
 static NSArray<NSArray*>* PFBReplySortingChoices(void) {
@@ -162,17 +163,15 @@ static NSArray<NSArray*>* PFBReplySortingChoices(void) {
         [UIAlertController alertControllerWithTitle:[bundle localizedStringForKey:@"SEND_SOUND_REMOVE_CONFIRM_TITLE"]
                                             message:[bundle localizedStringForKey:@"SEND_SOUND_REMOVE_CONFIRM_MESSAGE"]
                                      preferredStyle:UIAlertControllerStyleAlert];
-    [confirm addAction:[UIAlertAction actionWithTitle:[bundle localizedStringForKey:@"CANCEL_ACTION"]
-                                                style:UIAlertActionStyleCancel
-                                              handler:nil]];
+    PFBAlertAddAction(confirm, [bundle localizedStringForKey:@"CANCEL_ACTION"], UIAlertActionStyleCancel, self.newLook,
+                      nil);
     __weak typeof(self) weakSelf = self;
-    [confirm addAction:[UIAlertAction actionWithTitle:[bundle localizedStringForKey:@"SEND_SOUND_REMOVE_ACTION"]
-                                                style:UIAlertActionStyleDestructive
-                                              handler:^(__unused UIAlertAction* action) {
-                                                  PFBSendSoundRemove();
-                                                  [weakSelf reloadSendSoundRows];
-                                              }]];
-    [self presentViewController:confirm animated:YES completion:nil];
+    PFBAlertAddAction(confirm, [bundle localizedStringForKey:@"SEND_SOUND_REMOVE_ACTION"], UIAlertActionStyleDestructive,
+                      self.newLook, ^{
+                          PFBSendSoundRemove();
+                          [weakSelf reloadSendSoundRows];
+                      });
+    PFBAlertPresent(confirm, self, self.newLook, nil);
 }
 
 // The sound picker's file becomes the send sound; any other picker is the settings import.
@@ -217,10 +216,8 @@ static NSArray<NSArray*>* PFBReplySortingChoices(void) {
         [UIAlertController alertControllerWithTitle:[bundle localizedStringForKey:@"SEND_SOUND_FAILED_TITLE"]
                                             message:[bundle localizedStringForKey:messageKey]
                                      preferredStyle:UIAlertControllerStyleAlert];
-    [alert addAction:[UIAlertAction actionWithTitle:[bundle localizedStringForKey:@"OK_ACTION"]
-                                              style:UIAlertActionStyleDefault
-                                            handler:nil]];
-    [self presentViewController:alert animated:YES completion:nil];
+    PFBAlertAddAction(alert, [bundle localizedStringForKey:@"OK_ACTION"], UIAlertActionStyleDefault, self.newLook, nil);
+    PFBAlertPresent(alert, self, self.newLook, nil);
 }
 
 @end
