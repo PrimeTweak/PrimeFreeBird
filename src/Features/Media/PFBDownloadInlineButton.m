@@ -6,25 +6,32 @@
 #import "Common/PFBBundle.h"
 #import "Common/PFBSettings.h"
 #import "Common/PFBCompatibility.h"
+#import "Support/PFBTwitterPopups.h"
 #import "FFmpegKitConfig.h"
 
 #pragma mark - Helpers
 
-// An alert under Twitter's error title, with the bundled message for the key.
+// Twitter's error toast in its own words: the file could not be downloaded, or Photos refused it.
+// Where the app has no toaster, an alert under Twitter's error title with the bundled message.
 static void PFBShowDownloadFailure(NSString* messageKey) {
     PFBBundle* bundle = [PFBBundle sharedBundle];
+    BOOL photos = [messageKey isEqualToString:@"PHOTOS_SAVE_FAILED_MESSAGE"];
+    NSString* toast = [bundle localizedTwitterStringForKey:photos ? @"PHOTO_LIBRARY_EXPORT_ERROR_TOAST_MESSAGE"
+                                                                  : @"DOWNLOAD_ERROR_TOAST_MESSAGE"];
+    if (PFBPushTwitterToast(toast, nil, PFBToastKindError, nil, nil, NO)) {
+        return;
+    }
     UIAlertController* alert =
         [UIAlertController alertControllerWithTitle:[bundle localizedTwitterStringForKey:@"ERROR_ALERT_TITLE"]
                                             message:[bundle localizedStringForKey:messageKey]
                                      preferredStyle:UIAlertControllerStyleAlert];
-    [alert addAction:[UIAlertAction actionWithTitle:[bundle localizedTwitterStringForKey:@"OK_ACTION_LABEL"]
-                                              style:UIAlertActionStyleDefault
-                                            handler:nil]];
-    [topMostController() presentViewController:alert animated:YES completion:nil];
+    PFBAlertAddAction(alert, [bundle localizedTwitterStringForKey:@"OK_ACTION_LABEL"], UIAlertActionStyleDefault, YES, nil);
+    PFBAlertPresent(alert, topMostController(), YES, nil);
 }
 
-// Hands the files to Photos. Once Photos has answered for all of them: the success haptic
-// and the proof, or the error haptic and an alert when it refused any.
+// Hands the files to Photos. Once Photos has answered for all of them: the success haptic,
+// Twitter's toast for videos and the proof, or the error haptic and the failure when it
+// refused any.
 static void PFBSaveDownloads(NSArray<NSURL*>* files, BOOL gif) {
     dispatch_group_t group = dispatch_group_create();
     __block BOOL allSaved = YES;
@@ -42,6 +49,10 @@ static void PFBSaveDownloads(NSArray<NSURL*>* files, BOOL gif) {
         if (allSaved) {
             PFBCOMPAT_ACTION(PFBCompat_direct_save, @"saved to Photos");
             [feedback notificationOccurred:UINotificationFeedbackTypeSuccess];
+            if (!gif) {
+                PFBPushTwitterToast([[PFBBundle sharedBundle] localizedTwitterStringForKey:@"DOWNLOAD_TOAST_MESSAGE"],
+                                    nil, PFBToastKindSuccess, nil, nil, NO);
+            }
             return;
         }
         [feedback notificationOccurred:UINotificationFeedbackTypeError];
@@ -359,21 +370,25 @@ static NSURL* PFBLargestMP4(TFSTwitterEntityMedia* media) {
             }
         }
 
+        // Twitter's Tray once what opened it has closed, so a video's qualities can follow the
+        // list of videos; Twitter's older sheet where the app has no Tray.
         void (^presentSheet)(NSString*, NSArray*) = ^(NSString* titleKey, NSArray* items) {
             // A video with no playable file would open a title and nothing to choose.
             if (items.count == 0) {
                 PFBShowDownloadFailure(@"UNKNOWN_ERROR");
                 return;
             }
-            NSMutableArray* actions = [NSMutableArray arrayWithObject:sheetTitle(titleKey)];
-            [actions addObjectsFromArray:items];
-
-            TFNMenuSheetViewController* sheet =
-                [[objc_getClass("TFNMenuSheetViewController") alloc]
-                    initWithActionItems:actions.copy];
-            [sheet tfnPresentedCustomPresentFromViewController:topMostController()
-                                                      animated:YES
-                                                    completion:nil];
+            PFBAfterPresentations(^{
+                if (PFBPresentTray(topMostController(), [[PFBBundle sharedBundle] localizedStringForKey:titleKey],
+                                   items)) {
+                    return;
+                }
+                NSMutableArray* actions = [NSMutableArray arrayWithObject:sheetTitle(titleKey)];
+                [actions addObjectsFromArray:items];
+                TFNMenuSheetViewController* sheet =
+                    [[objc_getClass("TFNMenuSheetViewController") alloc] initWithActionItems:actions.copy];
+                [sheet tfnPresentedCustomPresentFromViewController:topMostController() animated:YES completion:nil];
+            });
         };
 
         if (videoEntities.count > 1) {
