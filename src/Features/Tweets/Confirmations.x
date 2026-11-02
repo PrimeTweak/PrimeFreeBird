@@ -1,6 +1,7 @@
 // Confirmation alerts before posting, following and liking, and the Undo Tweet delay.
 
 #import "Support/HookHelpers.h"
+#import "Support/PFBTwitterPopups.h"
 
 // Asks before an action, with a title that names it and a button that does it. The
 // option's proof is counted once the alert is on screen.
@@ -10,21 +11,14 @@ static void ShowConfirmation(PFBCompatOption option, NSString* detail, NSString*
     UIAlertController* alert = [UIAlertController alertControllerWithTitle:[bundle localizedStringForKey:titleKey]
                                                                    message:nil
                                                             preferredStyle:UIAlertControllerStyleAlert];
-    [alert addAction:[UIAlertAction actionWithTitle:[bundle localizedTwitterStringForKey:@"CANCEL_ACTION_LABEL"]
-                                              style:UIAlertActionStyleCancel
-                                            handler:nil]];
-    UIAlertAction* confirm = [UIAlertAction actionWithTitle:[bundle localizedStringForKey:actionKey]
-                                                      style:UIAlertActionStyleDefault
-                                                    handler:^(__unused UIAlertAction* action) {
-                                                        confirmed();
-                                                    }];
-    [alert addAction:confirm];
+    PFBAlertAddAction(alert, [bundle localizedTwitterStringForKey:@"CANCEL_ACTION_LABEL"], UIAlertActionStyleCancel, YES,
+                      nil);
+    UIAlertAction* confirm =
+        PFBAlertAddAction(alert, [bundle localizedStringForKey:actionKey], UIAlertActionStyleDefault, YES, confirmed);
     alert.preferredAction = confirm;
-    [topMostController() presentViewController:alert
-                                       animated:YES
-                                     completion:^{
-                                       PFBCOMPAT_ACTION(option, @"%@", detail);
-                                     }];
+    PFBAlertPresent(alert, topMostController(), YES, ^{
+        PFBCOMPAT_ACTION(option, @"%@", detail);
+    });
 }
 
 // MARK: - Tweet confirm
