@@ -4,6 +4,7 @@
 
 #import "Support/HookHelpers.h"
 #import "Features/Appearance/CustomTabBar/PFBNativeTabSelectionStore.h"
+#import "Settings/Native/PFBShowcase.h"
 
 // The messages sent below, declared for the compiler.
 @protocol PFBNativeTabMessages <NSObject>
@@ -205,7 +206,7 @@ static void PFBRestoreNativeTabSelection(id controller) {
 %hook T1TabCustomizationViewController
 
 // Twitter titles its editor with a view holding the title and the account under it; opened from
-// the new look, the title it set before stands alone.
+// the new look, the title it set before stands alone, drawn as the new look draws its titles.
 - (void)viewDidLoad {
     %orig;
     PFBPrepareNativeTabSave(self);
@@ -213,11 +214,12 @@ static void PFBRestoreNativeTabSelection(id controller) {
     if (![PFBCustomTabBarUtility editorShowsTitleAlone:editor]) {
         return;
     }
-    if (editor.navigationItem.titleView) {
-        editor.navigationItem.titleView = nil;
+    NSString* title = editor.navigationItem.title ?: editor.title;
+    if (editor.navigationItem.titleView && title.length) {
+        PFBShowcaseSetTitle(editor, title);
         PFBCOMPAT_ACTION(PFBCompat_custom_tab_bar, @"tab editor title shown alone");
     } else {
-        PFBCOMPAT_OBSERVE(PFBCompat_custom_tab_bar, @"tab editor had no title view to take down");
+        PFBCOMPAT_OBSERVE(PFBCompat_custom_tab_bar, @"tab editor had no title to show alone");
     }
 }
 
