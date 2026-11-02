@@ -973,17 +973,22 @@ static NSString* PFBReportReadLine(void) {
     }
     _footerPlaced = YES;
     CGFloat inner = MAX(0, width - 40.0);
+    // The foot starts where the rows' section ends, which the grouped table keeps below the last row;
+    // the history goes 14 pt under that row, as the notes under the Filters lists do.
+    NSInteger sections = table.numberOfSections;
+    NSInteger rows = sections > 0 ? [table numberOfRowsInSection:sections - 1] : 0;
+    CGFloat footerTop = sections > 0 ? CGRectGetMaxY([table rectForSection:sections - 1])
+                                     : CGRectGetMaxY(_showcaseHeader.frame);
+    NSIndexPath* last = rows > 0 ? [NSIndexPath indexPathForRow:rows - 1 inSection:sections - 1] : nil;
+    CGFloat historyY = (last ? CGRectGetMaxY([table rectForRowAtIndexPath:last]) : footerTop) + 14.0 - footerTop;
     // The history starts where the rows' gray circles do.
     CGFloat noteWidth = MAX(0, width - 2 * kPFBShowcaseRowLeading);
     CGFloat historyHeight =
         _historyLabel.text.length ? ceil([_historyLabel sizeThatFits:CGSizeMake(noteWidth, CGFLOAT_MAX)].height) : 0;
-    _historyLabel.frame = CGRectMake(kPFBShowcaseRowLeading, 20.0, noteWidth, historyHeight);
+    _historyLabel.frame = CGRectMake(kPFBShowcaseRowLeading, historyY, noteWidth, historyHeight);
     CGFloat capsuleHeight = [_clearAllButton sizeThatFits:CGSizeMake(inner, CGFLOAT_MAX)].height;
-    CGFloat height = 20.0 + historyHeight + 28.0 + capsuleHeight + 16.0;
+    CGFloat height = historyY + historyHeight + 28.0 + capsuleHeight + 16.0;
     if (!self.inSheet) {
-        NSInteger sections = table.numberOfSections;
-        CGFloat footerTop = sections > 0 ? CGRectGetMaxY([table rectForSection:sections - 1])
-                                         : CGRectGetMaxY(_showcaseHeader.frame);
         CGFloat limit = PFBShowcaseBottomLimit(table) - table.bounds.origin.y - table.adjustedContentInset.top;
         height = MAX(height, limit - footerTop);
     }

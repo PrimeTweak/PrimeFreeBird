@@ -38,6 +38,8 @@ static const CGFloat kColorBarHeight = 56.0;
 static const CGFloat kColorBarPadding = 6.0;
 static const CGFloat kColorLensInset = 4.0;
 static const CGFloat kChosenScale = 1.15;
+// The space between the sample's card and the colors' card.
+static const CGFloat kCardGap = 16.0;
 
 // The names inside the pills, in Twitter's words from its own color settings.
 static NSString* const kAccentNameKeys[kAccentOptionCount] = {
@@ -99,12 +101,13 @@ static NSInteger NearestAccentOption(UIColor* color) {
 @property (nonatomic, strong) NSMutableArray<PFBColorSwatchControl*>* swatches;
 @property (nonatomic, strong) PFBColorSwatchControl* customSwatch;
 @property (nonatomic, strong) UIButton* resetButton;
-// The new look's page: its line, then one card holding the sample, the colors in a glass bar with a
-// lens on the chosen one, and that color's name, then Reset to default at the bottom.
+// The new look's page: its line, the sample on its card, then a card holding the colors in a glass
+// bar with a lens on the chosen one and that color's name, then Reset to default at the bottom.
 @property (nonatomic, strong) UIScrollView* nativeScroll;
 @property (nonatomic, strong) UILabel* introLabel;
 @property (nonatomic, strong) UIView* previewCard;
 @property (nonatomic, strong) PFBAccentPreviewView* preview;
+@property (nonatomic, strong) UIView* paletteCard;
 @property (nonatomic, strong) PFBShowcaseSurface* colorBar;
 @property (nonatomic, strong) UIView* lens;
 @property (nonatomic, weak) PFBColorSwatchControl* chosenSwatch;
@@ -277,8 +280,10 @@ static NSInteger NearestAccentOption(UIColor* color) {
     self.previewCard = PFBShowcaseCard();
     self.preview = [[PFBAccentPreviewView alloc] init];
     [self.previewCard addSubview:self.preview];
+    self.paletteCard = PFBShowcaseCard();
     [scroll addSubview:self.introLabel];
     [scroll addSubview:self.previewCard];
+    [scroll addSubview:self.paletteCard];
 
     // The colors sit in a glass bar shaped like Twitter's tab bar, the chosen one on a lens like its
     // selected tab's, in the same fill as the sample's.
@@ -288,7 +293,7 @@ static NSInteger NearestAccentOption(UIColor* color) {
     self.lens.hidden = YES;
     self.lens.backgroundColor = [UIColor tertiarySystemFillColor];
     [self.colorBar.contentView addSubview:self.lens];
-    [self.previewCard addSubview:self.colorBar];
+    [self.paletteCard addSubview:self.colorBar];
 
     self.swatches = [NSMutableArray new];
     PFBBeginRawPaletteRead();
@@ -314,7 +319,7 @@ static NSInteger NearestAccentOption(UIColor* color) {
     self.colorName = [[UILabel alloc] init];
     self.colorName.textAlignment = NSTextAlignmentCenter;
     self.colorName.font = PFBScaledFont([TwitterChirpFont(TwitterFontStyleSemibold) fontWithSize:15]);
-    [self.previewCard addSubview:self.colorName];
+    [self.paletteCard addSubview:self.colorName];
 
     self.resetCapsule = [PFBShowcaseButton buttonWithStyle:PFBShowcaseButtonStyleOutline];
     self.resetCapsule.label = [bundle localizedStringForKey:@"THEME_RESET_TITLE"];
@@ -333,8 +338,8 @@ static NSInteger NearestAccentOption(UIColor* color) {
     self.colorName.textColor = PFBSettingsTextColor();
 }
 
-// The line, then the card: the sample, the color bar lined up with the sample's screen under it,
-// and the chosen color's name under the bar.
+// The line, the sample's card, then the colors' card: the bar as wide as the sample's screen and as
+// far from its card's edges, and the chosen color's name under it.
 - (void)viewDidLayoutSubviews {
     [super viewDidLayoutSubviews];
     UIScrollView* scroll = self.nativeScroll;
@@ -348,15 +353,16 @@ static NSInteger NearestAccentOption(UIColor* color) {
     self.introLabel.frame = CGRectMake(side, 12.0, inner, introHeight);
     CGFloat previewHeight = [self.preview sizeThatFits:CGSizeMake(inner, CGFLOAT_MAX)].height;
     self.preview.frame = CGRectMake(0, 0, inner, previewHeight);
+    self.previewCard.frame = CGRectMake(side, CGRectGetMaxY(self.introLabel.frame) + 20.0, inner, previewHeight);
     CGFloat barWidth = MAX(0, inner - 2 * kPFBAccentPreviewInset);
-    self.colorBar.frame = CGRectMake(kPFBAccentPreviewInset, previewHeight + 2.0, barWidth, kColorBarHeight);
+    self.colorBar.frame = CGRectMake(kPFBAccentPreviewInset, kPFBAccentPreviewInset, barWidth, kColorBarHeight);
     [self layoutColorBar];
     CGFloat nameTop = CGRectGetMaxY(self.colorBar.frame) + 10.0;
     CGFloat nameHeight = ceil(self.colorName.font.lineHeight);
     self.colorName.frame = CGRectMake(kPFBAccentPreviewInset, nameTop, barWidth, nameHeight);
-    self.previewCard.frame =
-        CGRectMake(side, CGRectGetMaxY(self.introLabel.frame) + 20.0, inner, nameTop + nameHeight + 14.0);
-    scroll.contentSize = CGSizeMake(width, CGRectGetMaxY(self.previewCard.frame) + 24.0);
+    self.paletteCard.frame =
+        CGRectMake(side, CGRectGetMaxY(self.previewCard.frame) + kCardGap, inner, nameTop + nameHeight + 14.0);
+    scroll.contentSize = CGSizeMake(width, CGRectGetMaxY(self.paletteCard.frame) + 24.0);
 
     // Above Twitter's tab bar when it shows; the page scrolls clear of the capsule.
     CGFloat capsuleHeight = [self.resetCapsule sizeThatFits:CGSizeMake(inner, CGFLOAT_MAX)].height;

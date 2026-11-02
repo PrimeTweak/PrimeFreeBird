@@ -712,10 +712,12 @@ void PFBGlassRefreshBottomFades(void) {
     });
 }
 
+// Twitter's classic settings pages, or the list of its new settings, anywhere in the stack.
 static BOOL PFBGlassStackHoldsSettings(UINavigationController* stack) {
-    Class settings = objc_getClass("T1GenericSettingsViewController");
+    Class classic = objc_getClass("T1GenericSettingsViewController");
+    Class list = objc_getClass("_TtC9XSettings26SettingsListViewController");
     for (UIViewController* screen in stack.viewControllers) {
-        if (settings && [screen isKindOfClass:settings]) {
+        if ((classic && [screen isKindOfClass:classic]) || (list && [screen isKindOfClass:list])) {
             return YES;
         }
     }

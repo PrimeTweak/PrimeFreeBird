@@ -202,9 +202,10 @@ static CGRect PFBPreviewMirrored(CGRect frame, CGFloat width, BOOL rtl) {
     _following.textColor = gray;
     _underline.backgroundColor = chosen;
     _divider.backgroundColor = line;
-    _avatar.backgroundColor = ink;
+    // The Tweet's avatar: the bird in white on the accent, as on the compose button.
+    _avatar.backgroundColor = accent;
     _bird.image = PFBPreviewBird(24.0);
-    _bird.tintColor = ground;
+    _bird.tintColor = [UIColor whiteColor];
     NSMutableAttributedString* byline = [[NSMutableAttributedString alloc]
         initWithString:@"Twitter"
             attributes:@{
