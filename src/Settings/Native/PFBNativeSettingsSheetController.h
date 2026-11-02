@@ -16,6 +16,13 @@
 @property (nonatomic, strong, readonly) UIButton* button;
 @end
 
+// A choice of a step: its title, and a ring that fills when it is the chosen one.
+@interface PFBSheetChoiceRow : UIControl
+- (instancetype)initWithTitle:(NSString*)title;
+@property (nonatomic, strong, readonly) UILabel* title;
+@property (nonatomic) BOOL chosen;
+@end
+
 @interface PFBNativeSettingsSheetController : UIViewController
 
 // The rows show a single group; closed runs once the sheet has gone, however it was closed.

@@ -1,5 +1,5 @@
-// The parts of the new look's showcase pages: a centered line, a soft card that holds Liquid
-// Glass, rows with a symbol in a gray circle, and capsule buttons.
+// The parts of the new look's showcase pages: a line under the title, a soft card that holds
+// Liquid Glass, rows with a symbol in a gray circle, and capsule buttons.
 
 #import <UIKit/UIKit.h>
 
@@ -8,7 +8,7 @@ NS_ASSUME_NONNULL_BEGIN
 // Whether the new look draws Liquid Glass: iOS 26 or later, with Visual style as it stood at launch.
 BOOL PFBShowcaseUsesGlass(void);
 
-// The page's line under its title, centered.
+// The page's line under its title, aligned as Twitter aligns its settings descriptions.
 UILabel* PFBShowcaseIntroLabel(void);
 
 // Titles a page as Twitter's new settings title theirs: Chirp Bold at 18 pt in the label color,

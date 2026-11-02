@@ -169,12 +169,6 @@ static void PFBSheetRefit(UIViewController* sheet) {
 
 #pragma mark - Choice row
 
-// A choice of a step: its title, and a ring that fills when it is the chosen one.
-@interface PFBSheetChoiceRow : UIControl
-@property (nonatomic, strong, readonly) UILabel* title;
-@property (nonatomic) BOOL chosen;
-@end
-
 @implementation PFBSheetChoiceRow {
     UIView* _ring;
 }

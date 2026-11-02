@@ -22,7 +22,7 @@ BOOL PFBShowcaseUsesGlass(void) {
 UILabel* PFBShowcaseIntroLabel(void) {
     UILabel* label = [[UILabel alloc] init];
     label.numberOfLines = 0;
-    label.textAlignment = NSTextAlignmentCenter;
+    label.textAlignment = NSTextAlignmentNatural;
     label.font = PFBScaledFont([TwitterChirpFont(TwitterFontStyleRegular) fontWithSize:16]);
     label.textColor = PFBSettingsSubtitleColor();
     return label;
