@@ -6,6 +6,9 @@
 
 NS_ASSUME_NONNULL_BEGIN
 
+// The margin around the sample's screen.
+static const CGFloat kPFBAccentPreviewInset = 10.0;
+
 @interface PFBAccentPreviewView : UIView
 // The selected tab and its underline take the accent only when Selected tab is on, and the bird on
 // top only when Twitter icon is on, as in the app.

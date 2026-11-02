@@ -8,9 +8,8 @@
 #import "Support/HookHelpers.h"
 #import "Support/PFBManager.h"
 
-// The screen's margin on the card, its top bar and timeline tabs, the Tweet's avatar, padding and
-// action row, and the tab bar that the compose button's size matches.
-static const CGFloat kPFBPreviewInset = 10.0;
+// The screen's top bar and timeline tabs, the Tweet's avatar, padding and action row, and the tab
+// bar that the compose button's size matches.
 static const CGFloat kPFBPreviewTopBar = 44.0;
 static const CGFloat kPFBPreviewTabs = 40.0;
 static const CGFloat kPFBPreviewAvatar = 40.0;
@@ -270,19 +269,19 @@ static CGRect PFBPreviewMirrored(CGRect frame, CGFloat width, BOOL rtl) {
 
 - (CGFloat)screenHeightForWidth:(CGFloat)width {
     return kPFBPreviewTopBar + [self tabsHeight] + [self tweetHeightForScreenWidth:width] + kPFBPreviewBarHeight +
-           kPFBPreviewInset;
+           kPFBAccentPreviewInset;
 }
 
 - (CGSize)sizeThatFits:(CGSize)size {
-    CGFloat screenWidth = MAX(0, size.width - 2 * kPFBPreviewInset);
-    return CGSizeMake(size.width, 2 * kPFBPreviewInset + [self screenHeightForWidth:screenWidth]);
+    CGFloat screenWidth = MAX(0, size.width - 2 * kPFBAccentPreviewInset);
+    return CGSizeMake(size.width, 2 * kPFBAccentPreviewInset + [self screenHeightForWidth:screenWidth]);
 }
 
 - (void)layoutSubviews {
     [super layoutSubviews];
     BOOL rtl = self.effectiveUserInterfaceLayoutDirection == UIUserInterfaceLayoutDirectionRightToLeft;
-    CGFloat width = MAX(0, CGRectGetWidth(self.bounds) - 2 * kPFBPreviewInset);
-    _screen.frame = CGRectMake(kPFBPreviewInset, kPFBPreviewInset, width, [self screenHeightForWidth:width]);
+    CGFloat width = MAX(0, CGRectGetWidth(self.bounds) - 2 * kPFBAccentPreviewInset);
+    _screen.frame = CGRectMake(kPFBAccentPreviewInset, kPFBAccentPreviewInset, width, [self screenHeightForWidth:width]);
 
     // The top bar: the reader's avatar, and the bird in the middle.
     _reader.frame = PFBPreviewMirrored(
@@ -326,11 +325,11 @@ static CGRect PFBPreviewMirrored(CGRect frame, CGFloat width, BOOL rtl) {
     }
 
     // The bar beside the compose button, as at the bottom of the app; Home is the selected tab.
-    CGFloat barY = CGRectGetHeight(_screen.bounds) - kPFBPreviewInset - kPFBPreviewBarHeight;
-    CGFloat barWidth = MAX(0, width - 2 * kPFBPreviewInset - kPFBPreviewBarHeight - 10.0);
-    _bar.frame = PFBPreviewMirrored(CGRectMake(kPFBPreviewInset, barY, barWidth, kPFBPreviewBarHeight), width, rtl);
+    CGFloat barY = CGRectGetHeight(_screen.bounds) - kPFBAccentPreviewInset - kPFBPreviewBarHeight;
+    CGFloat barWidth = MAX(0, width - 2 * kPFBAccentPreviewInset - kPFBPreviewBarHeight - 10.0);
+    _bar.frame = PFBPreviewMirrored(CGRectMake(kPFBAccentPreviewInset, barY, barWidth, kPFBPreviewBarHeight), width, rtl);
     _compose.frame = PFBPreviewMirrored(
-        CGRectMake(width - kPFBPreviewInset - kPFBPreviewBarHeight, barY, kPFBPreviewBarHeight, kPFBPreviewBarHeight),
+        CGRectMake(width - kPFBAccentPreviewInset - kPFBPreviewBarHeight, barY, kPFBPreviewBarHeight, kPFBPreviewBarHeight),
         width, rtl);
     _composeGlyph.frame = _compose.bounds;
     CGFloat tabSlot = MAX(0, (barWidth - 8.0) / (CGFloat)_tabs.count);

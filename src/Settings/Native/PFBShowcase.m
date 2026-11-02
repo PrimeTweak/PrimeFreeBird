@@ -3,6 +3,7 @@
 #import "Settings/Native/PFBShowcase.h"
 #import "Settings/PFBSettingsCellStyle.h"
 #import "Support/PFBManager.h"
+#import "Support/HookHelpers.h"
 
 // iOS draws the design it launched with, so Visual style counts as it stood at launch.
 static BOOL gPFBShowcaseGlassAtLaunch;
@@ -361,7 +362,6 @@ static const CGFloat kPFBShowcaseButtonPadding = 16.0;
 
 #pragma mark - Row
 
-static const CGFloat kPFBShowcaseRowLeading = 24.0;
 static const CGFloat kPFBShowcaseRowTrailing = 20.0;
 static const CGFloat kPFBShowcaseCircle = 32.0;
 static const CGFloat kPFBShowcaseRowGap = 12.0;
@@ -406,6 +406,7 @@ static const CGFloat kPFBShowcaseRowPadding = 13.0;
 - (void)prepareForReuse {
     [super prepareForReuse];
     _symbolColor = nil;
+    _twitterGlyphName = nil;
     self.trailingView = nil;
     self.titleLines = 1;
 }
@@ -429,6 +430,11 @@ static const CGFloat kPFBShowcaseRowPadding = 13.0;
 
 - (void)setSymbolColor:(UIColor*)symbolColor {
     _symbolColor = symbolColor;
+    [self applyTheme];
+}
+
+- (void)setTwitterGlyphName:(NSString*)twitterGlyphName {
+    _twitterGlyphName = [twitterGlyphName copy];
     [self applyTheme];
 }
 
@@ -472,7 +478,11 @@ static const CGFloat kPFBShowcaseRowPadding = 13.0;
     _circle.hidden = _symbolName == nil;
     UIImageSymbolConfiguration* config = [UIImageSymbolConfiguration configurationWithPointSize:15
                                                                                         weight:UIImageSymbolWeightMedium];
-    _symbol.image = _symbolName ? [UIImage systemImageNamed:_symbolName withConfiguration:config] : nil;
+    UIImage* symbol = _symbolName ? [UIImage systemImageNamed:_symbolName withConfiguration:config] : nil;
+    // A Twitter glyph takes the box of the system circle at the same size.
+    UIImage* box = _twitterGlyphName ? [UIImage systemImageNamed:@"circle" withConfiguration:config] : nil;
+    UIImage* twitterGlyph = box ? PFBTwitterGlyphFor(_twitterGlyphName, box) : nil;
+    _symbol.image = twitterGlyph && twitterGlyph != box ? twitterGlyph : symbol;
     _symbol.tintColor = self.symbolColor ?: ink;
     _glyph.image = nil;
     if (_accessory == PFBShowcaseAccessoryMenu) {

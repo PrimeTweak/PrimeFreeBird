@@ -7,10 +7,10 @@
 static const CGFloat kPillHeight = 40.0;
 static const CGFloat kRadioDiameter = 22.0;
 static const CGFloat kRadioCheckSize = 12.0;
-// The round option's ring is 2 points wide and stands 3 points off its color.
-static const CGFloat kRoundRingInset = 5.0;
 // The rainbow's band around the custom color.
 static const CGFloat kRainbowBand = 5.0;
+// A round option's color, whatever the control's size.
+static const CGFloat kRoundDiameter = 28.0;
 
 @interface PFBColorSwatchControl ()
 @property (nonatomic, strong) UIView* pillView;
@@ -25,28 +25,15 @@ static const CGFloat kRainbowBand = 5.0;
 
 @implementation PFBColorSwatchControl
 
-// The ring is the radio here: hidden until chosen, then in the text color around the color.
+// The color alone: the bar holding the options marks the chosen one.
 - (instancetype)initRound {
     self = [super initWithFrame:CGRectZero];
     if (self) {
         _round = YES;
-        self.radioView = [[UIView alloc] init];
-        self.radioView.layer.borderWidth = 2.0;
-        self.radioView.hidden = YES;
         self.pillView = [[UIView alloc] init];
         self.pillView.clipsToBounds = YES;
-        self.radioCheck = [[UIImageView alloc] init];
-        self.radioCheck.contentMode = UIViewContentModeScaleAspectFit;
-        self.radioCheck.image = [PFBTwitterGlyphFor(@"checkmark", [UIImage systemImageNamed:@"checkmark"])
-            imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate];
-        self.radioCheck.tintColor = [UIColor whiteColor];
-        self.radioCheck.hidden = YES;
-        for (UIView* part in @[ self.radioView, self.pillView, self.radioCheck ]) {
-            part.userInteractionEnabled = NO;
-            [self addSubview:part];
-        }
-        self.radioView.layer.borderColor =
-            [[UIColor labelColor] resolvedColorWithTraitCollection:self.traitCollection].CGColor;
+        self.pillView.userInteractionEnabled = NO;
+        [self addSubview:self.pillView];
     }
     return self;
 }
@@ -79,20 +66,16 @@ static const CGFloat kRainbowBand = 5.0;
     return self;
 }
 
-// The whole control is the ring; the color stands inside it, the check on the color.
+// The color centered in the control, with the rainbow's well inside it.
 - (void)layoutSubviews {
     [super layoutSubviews];
     if (!self.round) {
         return;
     }
     CGRect bounds = self.bounds;
-    CGFloat ring = MIN(CGRectGetWidth(bounds), CGRectGetHeight(bounds));
-    CGRect ringFrame = CGRectMake(CGRectGetMidX(bounds) - ring / 2.0, CGRectGetMidY(bounds) - ring / 2.0, ring, ring);
-    self.radioView.frame = ringFrame;
-    self.radioView.layer.cornerRadius = ring / 2.0;
-    CGRect color = CGRectInset(ringFrame, kRoundRingInset, kRoundRingInset);
-    self.pillView.frame = color;
-    self.pillView.layer.cornerRadius = CGRectGetWidth(color) / 2.0;
+    self.pillView.frame = CGRectMake(CGRectGetMidX(bounds) - kRoundDiameter / 2.0,
+                                     CGRectGetMidY(bounds) - kRoundDiameter / 2.0, kRoundDiameter, kRoundDiameter);
+    self.pillView.layer.cornerRadius = kRoundDiameter / 2.0;
     CGRect well = CGRectInset(self.pillView.bounds, kRainbowBand, kRainbowBand);
     self.wellView.frame = well;
     self.wellView.layer.cornerRadius = CGRectGetWidth(well) / 2.0;
@@ -100,9 +83,6 @@ static const CGFloat kRainbowBand = 5.0;
     [CATransaction setDisableActions:YES];
     self.rainbow.frame = self.pillView.bounds;
     [CATransaction commit];
-    CGFloat check = round(CGRectGetWidth(color) * 0.42);
-    self.radioCheck.frame =
-        CGRectMake(CGRectGetMidX(color) - check / 2.0, CGRectGetMidY(color) - check / 2.0, check, check);
 }
 
 - (instancetype)initWithFrame:(CGRect)frame {
@@ -199,12 +179,12 @@ static const CGFloat kRainbowBand = 5.0;
     self.nameLabel.text = name;
 }
 
+// A round option shows nothing itself: the bar holding it marks the chosen one.
 - (void)setSwatchSelected:(BOOL)selected {
-    self.radioCheck.hidden = !selected;
     if (self.round) {
-        self.radioView.hidden = !selected;
         return;
     }
+    self.radioCheck.hidden = !selected;
     if (selected) {
         self.radioView.backgroundColor = self.swatchTint ?: [UIColor secondaryLabelColor];
         self.radioView.layer.borderColor = [UIColor clearColor].CGColor;
@@ -218,8 +198,6 @@ static const CGFloat kRainbowBand = 5.0;
 - (void)traitCollectionDidChange:(UITraitCollection*)previousTraitCollection {
     [super traitCollectionDidChange:previousTraitCollection];
     if (self.round) {
-        self.radioView.layer.borderColor =
-            [[UIColor labelColor] resolvedColorWithTraitCollection:self.traitCollection].CGColor;
         return;
     }
     if (self.radioCheck.hidden) {

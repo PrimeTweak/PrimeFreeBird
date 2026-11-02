@@ -63,6 +63,9 @@ typedef NS_ENUM(NSInteger, PFBShowcaseAccessory) {
     PFBShowcaseAccessoryMore,
 };
 
+// Where a row's gray circle starts; the notes under the rows start there too.
+static const CGFloat kPFBShowcaseRowLeading = 24.0;
+
 // A row: a symbol in a gray circle, a title with an optional line under it, then a value, a
 // glyph, or a control of its own.
 @interface PFBShowcaseRowCell : UITableViewCell
@@ -73,6 +76,8 @@ typedef NS_ENUM(NSInteger, PFBShowcaseAccessory) {
                   accessory:(PFBShowcaseAccessory)accessory;
 // The symbol's color; nil for the text color.
 @property (nonatomic, strong, nullable) UIColor* symbolColor;
+// A Twitter glyph drawn in the circle in place of the symbol, which stays as the fallback.
+@property (nonatomic, copy, nullable) NSString* twitterGlyphName;
 // A switch or a button standing after the text. VoiceOver reads the row as that control alone,
 // so its label and hint carry the row's words.
 @property (nonatomic, strong, nullable) UIView* trailingView;

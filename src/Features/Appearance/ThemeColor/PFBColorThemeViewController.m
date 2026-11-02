@@ -32,6 +32,13 @@ static NSInteger CurrentSelectedColorOption(void) {
 
 enum { kAccentOptionCount = 6 };
 
+// The new look's color bar: the height of the sample's tab bar, its padding, how far its lens
+// stands inside it, and how much larger the chosen color shows.
+static const CGFloat kColorBarHeight = 56.0;
+static const CGFloat kColorBarPadding = 6.0;
+static const CGFloat kColorLensInset = 4.0;
+static const CGFloat kChosenScale = 1.15;
+
 // The names inside the pills, in Twitter's words from its own color settings.
 static NSString* const kAccentNameKeys[kAccentOptionCount] = {
     @"SETTINGS_DISPLAY_COLOR_BLUE",   @"SETTINGS_DISPLAY_COLOR_YELLOW", @"SETTINGS_DISPLAY_COLOR_RED",
@@ -92,12 +99,15 @@ static NSInteger NearestAccentOption(UIColor* color) {
 @property (nonatomic, strong) NSMutableArray<PFBColorSwatchControl*>* swatches;
 @property (nonatomic, strong) PFBColorSwatchControl* customSwatch;
 @property (nonatomic, strong) UIButton* resetButton;
-// The new look's page: its line, the sample on its card, the colors with the chosen one's name,
-// and Reset to default at the bottom.
+// The new look's page: its line, then one card holding the sample, the colors in a glass bar with a
+// lens on the chosen one, and that color's name, then Reset to default at the bottom.
 @property (nonatomic, strong) UIScrollView* nativeScroll;
 @property (nonatomic, strong) UILabel* introLabel;
 @property (nonatomic, strong) UIView* previewCard;
 @property (nonatomic, strong) PFBAccentPreviewView* preview;
+@property (nonatomic, strong) PFBShowcaseSurface* colorBar;
+@property (nonatomic, strong) UIView* lens;
+@property (nonatomic, weak) PFBColorSwatchControl* chosenSwatch;
 @property (nonatomic, strong) UILabel* colorName;
 @property (nonatomic, strong) PFBShowcaseButton* resetCapsule;
 @end
@@ -270,6 +280,16 @@ static NSInteger NearestAccentOption(UIColor* color) {
     [scroll addSubview:self.introLabel];
     [scroll addSubview:self.previewCard];
 
+    // The colors sit in a glass bar shaped like Twitter's tab bar, the chosen one on a lens like its
+    // selected tab's, in the same fill as the sample's.
+    self.colorBar = [[PFBShowcaseSurface alloc] initWithCornerRadius:-1];
+    self.lens = [[UIView alloc] init];
+    self.lens.userInteractionEnabled = NO;
+    self.lens.hidden = YES;
+    self.lens.backgroundColor = [UIColor tertiarySystemFillColor];
+    [self.colorBar.contentView addSubview:self.lens];
+    [self.previewCard addSubview:self.colorBar];
+
     self.swatches = [NSMutableArray new];
     PFBBeginRawPaletteRead();
     for (NSUInteger option = 1; option <= kAccentOptionCount; option++) {
@@ -279,7 +299,7 @@ static NSInteger NearestAccentOption(UIColor* color) {
         swatch.accessibilityLabel = [bundle localizedTwitterStringForKey:kAccentNameKeys[option - 1]];
         [swatch setSwatchColor:NativeAccentColor(option)];
         [swatch addTarget:self action:@selector(swatchTapped:) forControlEvents:UIControlEventTouchUpInside];
-        [scroll addSubview:swatch];
+        [self.colorBar.contentView addSubview:swatch];
         [self.swatches addObject:swatch];
     }
     PFBEndRawPaletteRead();
@@ -288,13 +308,13 @@ static NSInteger NearestAccentOption(UIColor* color) {
     custom.isAccessibilityElement = YES;
     custom.accessibilityLabel = [bundle localizedStringForKey:@"THEME_CUSTOM_NAME"];
     [custom addTarget:self action:@selector(openColorPicker) forControlEvents:UIControlEventTouchUpInside];
-    [scroll addSubview:custom];
+    [self.colorBar.contentView addSubview:custom];
     self.customSwatch = custom;
 
     self.colorName = [[UILabel alloc] init];
     self.colorName.textAlignment = NSTextAlignmentCenter;
-    self.colorName.font = PFBScaledFont([TwitterChirpFont(TwitterFontStyleRegular) fontWithSize:15]);
-    [scroll addSubview:self.colorName];
+    self.colorName.font = PFBScaledFont([TwitterChirpFont(TwitterFontStyleSemibold) fontWithSize:15]);
+    [self.previewCard addSubview:self.colorName];
 
     self.resetCapsule = [PFBShowcaseButton buttonWithStyle:PFBShowcaseButtonStyleOutline];
     self.resetCapsule.label = [bundle localizedStringForKey:@"THEME_RESET_TITLE"];
@@ -310,10 +330,11 @@ static NSInteger NearestAccentOption(UIColor* color) {
     // The capsule floats over the page as it scrolls, so it stands on the page's ground.
     self.resetCapsule.groundColor = self.view.backgroundColor;
     self.introLabel.textColor = PFBSettingsSubtitleColor();
-    self.colorName.textColor = PFBSettingsSubtitleColor();
+    self.colorName.textColor = PFBSettingsTextColor();
 }
 
-// The line, the card, then the seven colors on one row with the chosen one's name under them.
+// The line, then the card: the sample, the color bar lined up with the sample's screen under it,
+// and the chosen color's name under the bar.
 - (void)viewDidLayoutSubviews {
     [super viewDidLayoutSubviews];
     UIScrollView* scroll = self.nativeScroll;
@@ -326,20 +347,16 @@ static NSInteger NearestAccentOption(UIColor* color) {
     CGFloat introHeight = ceil([self.introLabel sizeThatFits:CGSizeMake(inner, CGFLOAT_MAX)].height);
     self.introLabel.frame = CGRectMake(side, 12.0, inner, introHeight);
     CGFloat previewHeight = [self.preview sizeThatFits:CGSizeMake(inner, CGFLOAT_MAX)].height;
-    self.previewCard.frame = CGRectMake(side, CGRectGetMaxY(self.introLabel.frame) + 20.0, inner, previewHeight);
-    self.preview.frame = self.previewCard.bounds;
-
-    NSArray<PFBColorSwatchControl*>* row = [self.swatches arrayByAddingObject:self.customSwatch];
-    CGFloat cell = inner / (CGFloat)row.count;
-    CGFloat ring = MIN(54.0, floor(cell - 2.0));
-    CGFloat rowY = CGRectGetMaxY(self.previewCard.frame) + 24.0;
-    BOOL rtl = self.view.effectiveUserInterfaceLayoutDirection == UIUserInterfaceLayoutDirectionRightToLeft;
-    for (NSUInteger i = 0; i < row.count; i++) {
-        NSUInteger slot = rtl ? row.count - 1 - i : i;
-        row[i].frame = CGRectMake(side + cell * (CGFloat)slot + (cell - ring) / 2.0, rowY, ring, ring);
-    }
-    self.colorName.frame = CGRectMake(side, rowY + ring + 8.0, inner, ceil(self.colorName.font.lineHeight));
-    scroll.contentSize = CGSizeMake(width, CGRectGetMaxY(self.colorName.frame) + 24.0);
+    self.preview.frame = CGRectMake(0, 0, inner, previewHeight);
+    CGFloat barWidth = MAX(0, inner - 2 * kPFBAccentPreviewInset);
+    self.colorBar.frame = CGRectMake(kPFBAccentPreviewInset, previewHeight + 2.0, barWidth, kColorBarHeight);
+    [self layoutColorBar];
+    CGFloat nameTop = CGRectGetMaxY(self.colorBar.frame) + 10.0;
+    CGFloat nameHeight = ceil(self.colorName.font.lineHeight);
+    self.colorName.frame = CGRectMake(kPFBAccentPreviewInset, nameTop, barWidth, nameHeight);
+    self.previewCard.frame =
+        CGRectMake(side, CGRectGetMaxY(self.introLabel.frame) + 20.0, inner, nameTop + nameHeight + 14.0);
+    scroll.contentSize = CGSizeMake(width, CGRectGetMaxY(self.previewCard.frame) + 24.0);
 
     // Above Twitter's tab bar when it shows; the page scrolls clear of the capsule.
     CGFloat capsuleHeight = [self.resetCapsule sizeThatFits:CGSizeMake(inner, CGFLOAT_MAX)].height;
@@ -350,6 +367,40 @@ static NSInteger NearestAccentOption(UIColor* color) {
     if (fabs(insets.bottom - scroll.contentInset.bottom) > 0.5) {
         scroll.contentInset = insets;
     }
+}
+
+// Each color in its slot of the bar, mirrored right to left, then the lens on the chosen one.
+- (void)layoutColorBar {
+    NSArray<PFBColorSwatchControl*>* row = [self.swatches arrayByAddingObject:self.customSwatch];
+    CGFloat height = CGRectGetHeight(self.colorBar.bounds);
+    CGFloat slot = MAX(0, CGRectGetWidth(self.colorBar.bounds) - 2 * kColorBarPadding) / (CGFloat)row.count;
+    CGFloat size = MIN(44.0, MIN(slot, height));
+    BOOL rtl = self.view.effectiveUserInterfaceLayoutDirection == UIUserInterfaceLayoutDirectionRightToLeft;
+    for (NSUInteger i = 0; i < row.count; i++) {
+        CGFloat index = (CGFloat)(rtl ? row.count - 1 - i : i);
+        row[i].bounds = CGRectMake(0, 0, size, size);
+        row[i].center = CGPointMake(kColorBarPadding + slot * (index + 0.5), height / 2.0);
+    }
+    [self placeLensOn:self.chosenSwatch];
+}
+
+// The lens behind the chosen color, and that color a little larger, as Twitter marks its selected
+// tab; no lens while no color is chosen.
+- (void)placeLensOn:(PFBColorSwatchControl*)chosen {
+    for (PFBColorSwatchControl* swatch in [self.swatches arrayByAddingObject:self.customSwatch]) {
+        swatch.transform = swatch == chosen ? CGAffineTransformMakeScale(kChosenScale, kChosenScale)
+                                            : CGAffineTransformIdentity;
+    }
+    self.lens.hidden = chosen == nil;
+    if (!chosen) {
+        return;
+    }
+    NSUInteger count = self.swatches.count + 1;
+    CGFloat slot = MAX(0, CGRectGetWidth(self.colorBar.bounds) - 2 * kColorBarPadding) / (CGFloat)count;
+    CGFloat lensHeight = MAX(0, CGRectGetHeight(self.colorBar.bounds) - 2 * kColorLensInset);
+    self.lens.bounds = CGRectMake(0, 0, MAX(lensHeight, slot - 4.0), lensHeight);
+    self.lens.center = chosen.center;
+    self.lens.layer.cornerRadius = lensHeight / 2.0;
 }
 
 // Twitter's tab bar settles once the page is in: the capsule is placed again then.
@@ -470,7 +521,7 @@ static NSInteger NearestAccentOption(UIColor* color) {
     });
 }
 
-// The chosen color's name under the row, and the sample in that color.
+// The chosen color's name under the bar, the lens on that color, and the sample in that color.
 - (void)refreshNativeSample:(BOOL)customActive selected:(NSInteger)selected {
     PFBBundle* bundle = [PFBBundle sharedBundle];
     if (customActive) {
@@ -486,6 +537,29 @@ static NSInteger NearestAccentOption(UIColor* color) {
         swatch.accessibilityTraits = UIAccessibilityTraitButton | (chosen ? UIAccessibilityTraitSelected : 0);
     }
     self.customSwatch.accessibilityTraits = UIAccessibilityTraitButton | (customActive ? UIAccessibilityTraitSelected : 0);
+    PFBColorSwatchControl* chosen = customActive ? self.customSwatch : nil;
+    for (PFBColorSwatchControl* swatch in self.swatches) {
+        if (!customActive && swatch.colorID == selected) {
+            chosen = swatch;
+        }
+    }
+    // The lens slides from one color to another; it is placed without motion on the page's first
+    // pass and when a color is chosen after none.
+    BOOL slides = self.view.window && !self.lens.hidden && chosen && chosen != self.chosenSwatch;
+    self.chosenSwatch = chosen;
+    if (slides) {
+        [UIView animateWithDuration:0.35
+                              delay:0
+             usingSpringWithDamping:0.8
+              initialSpringVelocity:0
+                            options:UIViewAnimationOptionBeginFromCurrentState
+                         animations:^{
+                           [self placeLensOn:chosen];
+                         }
+                         completion:nil];
+    } else {
+        [self placeLensOn:chosen];
+    }
     UIColor* accent = (customActive ? PFBCustomAccentColor() : nil) ?: PFBBrandAccentColor();
     [self.preview applyAccent:accent
              tintsSelectedTab:[PFBSettings boolForKey:@"tab_bar_theming"]

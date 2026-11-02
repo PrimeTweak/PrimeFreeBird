@@ -1481,6 +1481,23 @@ static void tourShowSettings(void) {
     [tourTopController() presentViewController:stack animated:NO completion:nil];
 }
 
+static NSString* tourTwitterSwitch(NSString* getterName);
+
+// One of Twitter's alerts, raised the way the tweak raises its own, with two buttons so Twitter draws
+// it in its style. With Twitter's alert bridge off, the step says why no alert of Twitter's shows.
+static void tourShowAlert(void) {
+    if ([tourTwitterSwitch(@"isXDSAlertBridgeMultiButtonEnabled") isEqualToString:@"off"]) {
+        gPFBTourStepEmpty = @"Twitter shows alerts the iOS way";
+    }
+    PFBBundle* bundle = [PFBBundle sharedBundle];
+    UIAlertController* alert = [UIAlertController alertControllerWithTitle:@"Checking alerts"
+                                                                   message:@"This alert closes by itself."
+                                                            preferredStyle:UIAlertControllerStyleAlert];
+    PFBAlertAddAction(alert, [bundle localizedStringForKey:@"CANCEL_ACTION"], UIAlertActionStyleCancel, YES, nil);
+    PFBAlertAddAction(alert, [bundle localizedStringForKey:@"OK_ACTION"], UIAlertActionStyleDefault, YES, nil);
+    PFBAlertPresent(alert, tourTopController(), YES, nil);
+}
+
 // Runs one part of a step. An exception there goes to the journal and leaves the step
 // unreached, instead of closing Twitter.
 static BOOL tourAttempt(NSString* step, NSString* part, dispatch_block_t body) {
@@ -2191,6 +2208,14 @@ static NSArray<NSDictionary*>* tourAllSteps(void) {
            }, ^BOOL(UIViewController* before, UIViewController* after) {
              return tourFindController(tourRootController().presentedViewController,
                                        @"PFBModernSettingsPageViewController") != nil;
+           }, nil, ^{
+             tourDismissPresented();
+           })];
+    // One of Twitter's alerts, whose text the tweak sets from the leading edge.
+    [steps addObject:tourStep(@"alert", @"Twitter alert", root, ^{
+             tourShowAlert();
+           }, ^BOOL(UIViewController* before, UIViewController* after) {
+             return tourFindClass(tourWindow(), @"_TtC13XDesignSystem16AlertContentView") != nil;
            }, nil, ^{
              tourDismissPresented();
            })];

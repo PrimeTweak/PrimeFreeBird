@@ -126,6 +126,7 @@ typedef NS_ENUM(NSInteger, PFBCompatOption) {
     PFBCompat_filter_languages,
     PFBCompat_hide_quote_tweets,
     PFBCompat_new_twitter_settings,
+    PFBCompat_left_aligned_alerts,
     PFBCompatOptionCount,
 };
 

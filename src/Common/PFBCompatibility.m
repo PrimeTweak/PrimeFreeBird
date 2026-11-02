@@ -54,6 +54,7 @@ static const PFBCompatMeta kMeta[] = {
     {PFBCompat_color_pfb_switches, "color_pfb_switches", "COLOR_PFB_SWITCHES_TITLE", "MODERN_SETTINGS_APPEARANCE_TITLE"},
     {PFBCompat_color_twitter_icon_in_top_bar, "color_twitter_icon_in_top_bar", "COLOR_TWITTER_ICON_IN_TOP_BAR_TITLE", "MODERN_SETTINGS_APPEARANCE_TITLE"},
     {PFBCompat_bar_repairs, "bar_repairs", "BAR_REPAIRS_TITLE", "MODERN_SETTINGS_APPEARANCE_TITLE", YES},
+    {PFBCompat_left_aligned_alerts, "left_aligned_alerts", "LEFT_ALIGNED_ALERTS_TITLE", "MODERN_SETTINGS_APPEARANCE_TITLE", YES},
     {PFBCompat_custom_tab_bar, "custom_tab_bar", "CUSTOM_TAB_BAR_OPTION_TITLE", "MODERN_SETTINGS_APPEARANCE_TITLE", YES},
     {PFBCompat_restore_tab_labels, "restore_tab_labels", "RESTORE_TAB_LABELS_TITLE", "MODERN_SETTINGS_APPEARANCE_TITLE"},
     {PFBCompat_no_tab_bar_hiding, "no_tab_bar_hiding", "NO_TAB_BAR_HIDING_TITLE", "MODERN_SETTINGS_APPEARANCE_TITLE"},
@@ -1180,6 +1181,11 @@ static const PFBCompatReq kReqs[] = {
     {PFBCompat_custom_tab_bar, "T1TabCustomizationViewController", "$viewModel"},
     {PFBCompat_custom_tab_bar, "_TtC14T1TwitterSwift25TabCustomizationViewModel", "$navigationSettings"},
     {PFBCompat_custom_tab_bar, "_TtC14T1TwitterSwift25MainAppNavigationSettings", "$$__lazy_storage_$_tabCustomizationConfig"},
+    {PFBCompat_left_aligned_alerts, "_TtC13XDesignSystem16AlertContentView", "-layoutSubviews"},
+    {PFBCompat_left_aligned_alerts, "_TtC13XDesignSystem16AlertContentView", "$titleLabel"},
+    {PFBCompat_left_aligned_alerts, "_TtC13XDesignSystem16AlertContentView", "$messageLabel"},
+    {PFBCompat_left_aligned_alerts, "_TtC13XDesignSystem16AlertContentView", "=titleLabel>messageLabel:8"},
+    {PFBCompat_left_aligned_alerts, "_TtC13XDesignSystem16AlertContentView", "=messageLabel>actions:8"},
     {PFBCompat_advanced_search, "_TtC15TwitterSearchV29SearchBar", "$showsFilterButton"},
     {PFBCompat_advanced_search, "_TtC15TwitterSearchV29SearchBar", "$filterButton"},
     {PFBCompat_restore_video_timestamp, "_TtC14T1TwitterSwift17VideoControlsView", "$progressLabelMode"},
@@ -2114,6 +2120,8 @@ static const PFBCompatName kNames[] = {
     {PFBCompat_direct_save, "Features/Media/PFBDownloadInlineButton.m", "PHOTO_LIBRARY_EXPORT_ERROR_TOAST_MESSAGE"},
     {PFBCompatOptionCount, "Debug/PFBCompatibilityReportViewController.m", "bulleted_list"},
     {PFBCompatOptionCount, "Debug/PFBCompatibilityReportViewController.m", "skip_forward"},
+    {PFBCompatOptionCount, "Debug/PFBCompatibilityReportViewController.m", "checkmark_circle"},
+    {PFBCompatOptionCount, "Debug/PFBCompatibilityReportViewController.m", "clock_dashed"},
     {PFBCompat_new_twitter_settings, "Features/Appearance/ThemeColor/PFBColorSwatchControl.m", "checkmark"},
     {PFBCompat_new_twitter_settings, "Features/Timelines/PFBMutedWordsViewController.m", "checkmark"},
     {PFBCompat_muted_words, "Features/Timelines/Timeline.x", "fullText|tweetText|text|displayText|bodyText"},
@@ -2133,6 +2141,7 @@ static const PFBCompatName kNames[] = {
     {PFBCompatOptionCount, "Debug/PFBCompatibilityTour.m", "_TtC20ChatConversationList24ConversationListItemCell"},
     {PFBCompatOptionCount, "Debug/PFBCompatibilityTour.m", "_TtC20ChatConversationList31ConversationListItemContentView"},
     {PFBCompatOptionCount, "Debug/PFBCompatibilityTour.m", "accessoryButton"},
+    {PFBCompatOptionCount, "Debug/PFBCompatibilityTour.m", "_TtC13XDesignSystem16AlertContentView"},
     {PFBCompat_download_videos, "Features/Media/MediaDownloads.x", "DOWNLOAD_ACTIVITY_VIEW_LABEL"},
 };
 enum { kNameCount = sizeof(kNames) / sizeof(kNames[0]) };
@@ -2497,6 +2506,7 @@ static const PFBCompatContract kContract[] = {
     {PFBCompat_settings_entry, "Twitter settings", NULL},
     {PFBCompat_new_twitter_settings, "Twitter settings", NULL},
     {PFBCompat_bar_repairs, "tab guide", NULL},
+    {PFBCompat_left_aligned_alerts, "alert", NULL},
     {PFBCompat_no_auto_unmute, "tab home", "inline video"},
     {PFBCompat_filter_languages, "tab home", NULL},
 };
@@ -2583,6 +2593,7 @@ static NSString* stationLabel(NSString* station) {
           @"Twitter settings": @"Twitter's settings",
           @"tab editor": @"Twitter's tab editor",
           @"PFB settings": @"the PrimeFreeBird settings",
+          @"alert": @"one of Twitter's alerts",
       };
     });
     return labels[station] ?: station;

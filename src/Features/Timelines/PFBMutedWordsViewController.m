@@ -813,9 +813,9 @@ static NSMutableArray<NSString*>* PFBKeptLanguageList(void) {
     label.font = PFBScaledFont([TwitterChirpFont(TwitterFontStyleRegular) fontWithSize:13.5]);
     label.textColor = [UIColor secondaryLabelColor];
     label.translatesAutoresizingMaskIntoConstraints = NO;
-    // The new look centers its notes under the rows, as under the heads' cards.
-    CGFloat margin = [self showcase] ? 20.0 : kPFBMutedSideMargin;
-    label.textAlignment = [self showcase] ? NSTextAlignmentCenter : NSTextAlignmentNatural;
+    // In the new look the note starts where the rows' gray circles do.
+    CGFloat margin = [self showcase] ? kPFBShowcaseRowLeading : kPFBMutedSideMargin;
+    label.textAlignment = NSTextAlignmentNatural;
     [container addSubview:label];
     [NSLayoutConstraint activateConstraints:@[
         [label.leadingAnchor constraintEqualToAnchor:container.leadingAnchor

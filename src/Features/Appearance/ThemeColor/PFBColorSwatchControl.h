@@ -8,8 +8,8 @@ NS_ASSUME_NONNULL_BEGIN
 
 @property (nonatomic, assign) NSInteger colorID;
 
-// The new look's options instead: a round color, ringed and checked once chosen, the whole
-// control being the ring. The rainbow one holds the custom color in its middle.
+// The new look's options instead: a round color at a fixed size, which the bar holding the options
+// marks once chosen. The rainbow one holds the custom color in its middle.
 - (instancetype)initRound;
 - (instancetype)initRainbow;
 

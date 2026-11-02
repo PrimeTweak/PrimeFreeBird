@@ -935,7 +935,7 @@ static NSString* PFBReportReadLine(void) {
         _showcaseFooter = [[UIView alloc] init];
         _historyLabel = [[UILabel alloc] init];
         _historyLabel.numberOfLines = 0;
-        _historyLabel.textAlignment = NSTextAlignmentCenter;
+        _historyLabel.textAlignment = NSTextAlignmentNatural;
         _clearAllButton = [PFBShowcaseButton buttonWithStyle:PFBShowcaseButtonStyleDestructive];
         _clearAllButton.label = @"Clear all";
         [_clearAllButton addTarget:self action:@selector(confirmClearAll) forControlEvents:UIControlEventTouchUpInside];
@@ -973,9 +973,11 @@ static NSString* PFBReportReadLine(void) {
     }
     _footerPlaced = YES;
     CGFloat inner = MAX(0, width - 40.0);
+    // The history starts where the rows' gray circles do.
+    CGFloat noteWidth = MAX(0, width - 2 * kPFBShowcaseRowLeading);
     CGFloat historyHeight =
-        _historyLabel.text.length ? ceil([_historyLabel sizeThatFits:CGSizeMake(inner, CGFLOAT_MAX)].height) : 0;
-    _historyLabel.frame = CGRectMake(20.0, 20.0, inner, historyHeight);
+        _historyLabel.text.length ? ceil([_historyLabel sizeThatFits:CGSizeMake(noteWidth, CGFLOAT_MAX)].height) : 0;
+    _historyLabel.frame = CGRectMake(kPFBShowcaseRowLeading, 20.0, noteWidth, historyHeight);
     CGFloat capsuleHeight = [_clearAllButton sizeThatFits:CGSizeMake(inner, CGFLOAT_MAX)].height;
     CGFloat height = 20.0 + historyHeight + 28.0 + capsuleHeight + 16.0;
     if (!self.inSheet) {
@@ -1107,7 +1109,7 @@ static NSString* PFBReportReadLine(void) {
 }
 
 // The new look's rows carry a symbol in a gray circle: the verdict's in its color, the copy's in the
-// text color.
+// text color. Working and Not tested take Twitter's glyphs, Working in Twitter's green.
 - (UITableViewCell*)tableView:(UITableView*)tableView cellForRowAtIndexPath:(NSIndexPath*)indexPath {
     PFBReportRow* row = [self rowAt:indexPath];
     if (!self.nativeLook) {
@@ -1122,8 +1124,12 @@ static NSString* PFBReportReadLine(void) {
                     accessory:list && row.enabled ? PFBShowcaseAccessoryChevron : PFBShowcaseAccessoryNone];
     if (list) {
         cell.symbolColor = row.verdict == PFBCompatVerdictBroken ? [UIColor systemRedColor]
-                           : row.verdict == PFBCompatVerdictOK   ? [UIColor systemGreenColor]
-                                                                 : PFBSettingsSubtitleColor();
+                           : row.verdict == PFBCompatVerdictOK
+                               ? [UIColor colorWithRed:0.0 green:186.0 / 255.0 blue:124.0 / 255.0 alpha:1.0]
+                               : PFBSettingsSubtitleColor();
+        cell.twitterGlyphName = row.verdict == PFBCompatVerdictOK          ? @"checkmark_circle"
+                                : row.verdict == PFBCompatVerdictNotTested ? @"clock_dashed"
+                                                                           : nil;
     }
     cell.selectionStyle = row.enabled ? UITableViewCellSelectionStyleDefault : UITableViewCellSelectionStyleNone;
     // Copy report acts on a tap, so VoiceOver hears a button.

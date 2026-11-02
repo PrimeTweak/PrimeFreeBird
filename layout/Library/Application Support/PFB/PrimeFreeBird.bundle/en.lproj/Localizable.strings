@@ -471,8 +471,6 @@
 "THREADS_HIDE_ACTION" = "Hide this conversation";
 "LANGUAGES_FOOTER_OFF" = "No language checked — every language reaches your timeline.";
 "LANGUAGES_FOOTER_ON" = "Only the checked languages reach your timeline.\nTweets with no detected language always pass.\nUncheck every language to turn the filter off.";
-"LANGUAGES_TRANSLATE_TITLE" = "Auto-translate";
-"LANGUAGES_TRANSLATE_DETAIL" = "Let Twitter translate Tweets, bios, notes, and notifications automatically.";
 "LANGUAGES_OTHERS_TITLE" = "Other languages";
 "LANGUAGES_OTHERS_NONE" = "None";
 "MUTED_WORDS_ADD_PLACEHOLDER" = "Add a word, phrase, or @account";
@@ -630,6 +628,8 @@
 "TW_SETTINGS_DISPLAY_COLOR_PURPLE" = "Purple";
 "TW_SETTINGS_DISPLAY_COLOR_ORANGE" = "Orange";
 "TW_SETTINGS_DISPLAY_COLOR_GREEN" = "Green";
+"TW_HOME_TIMELINE_TITLE" = "For you";
+"TW_HOME_TIMELINE_LATEST_TITLE" = "Following";
 "MEDIA_GROUP_LAYOUT" = "Layout";
 "BRANDING_GROUP_CLASSIC" = "Classic Twitter";
 "VOICE_NOTE_FROM_VIDEO_TITLE" = "Voice note from a video";
@@ -658,5 +658,6 @@
 "WEB_LOGIN_TITLE" = "Web login";
 "SETTINGS_ENTRY_TITLE" = "PrimeFreeBird in Settings";
 "BAR_REPAIRS_TITLE" = "Top bar repairs";
+"LEFT_ALIGNED_ALERTS_TITLE" = "Left-aligned alerts";
 "NO_AUTO_UNMUTE_TITLE" = "No sound on tap";
 "FILTER_LANGUAGES_TITLE" = "Language filter";
