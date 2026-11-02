@@ -1,6 +1,7 @@
 // Shared helpers for the hook files.
 
 #import "Support/HookHelpers.h"
+#import "Support/PFBTwitterPopups.h"
 #import "Support/TwitterChirpFont.h"
 
 void PFBEnumerateSubviewsRecursively(UIView* view,
@@ -281,10 +282,14 @@ static void PFBDismissToast(UIView* toast) {
         }];
 }
 
-// Built end to end, since the app's own strip draws its label white. Under Liquid Glass
-// the capsule is real glass, which shapes its own edge; otherwise the frosted material
+// The capsule is built end to end, since the app's own strip draws its label white. Under
+// Liquid Glass it is real glass, which shapes its own edge; otherwise the frosted material
 // is clipped to the rounded shape with a hairline border.
 void PFBShowToast(UIWindow* window, NSString* text, void (^undo)(void)) {
+    NSString* undoTitle = undo ? [[PFBBundle sharedBundle] localizedStringForKey:@"THREADS_UNDO"] : nil;
+    if (PFBPushTwitterToast(text, nil, PFBToastKindPlain, undoTitle, undo, NO)) {
+        return;
+    }
     if (!window) {
         for (UIScene* scene in UIApplication.sharedApplication.connectedScenes) {
             if (![scene isKindOfClass:[UIWindowScene class]]) {
@@ -360,8 +365,7 @@ void PFBShowToast(UIWindow* window, NSString* text, void (^undo)(void)) {
     ] mutableCopy];
     if (undo) {
         UIButton* button = [UIButton buttonWithType:UIButtonTypeSystem];
-        [button setTitle:[[PFBBundle sharedBundle] localizedStringForKey:@"THREADS_UNDO"]
-                forState:UIControlStateNormal];
+        [button setTitle:undoTitle forState:UIControlStateNormal];
         [button setTitleColor:PFBCurrentAccentColor() forState:UIControlStateNormal];
         button.titleLabel.font =
             PFBScaledFont([TwitterChirpFont(TwitterFontStyleSemibold) fontWithSize:15]);

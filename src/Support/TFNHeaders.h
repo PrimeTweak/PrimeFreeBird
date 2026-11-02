@@ -34,6 +34,11 @@
 + (instancetype)actionItemWithTitle:(NSString*)arg1
                           imageName:(NSString*)arg2
                              action:(void (^)(void))arg3;
++ (instancetype)actionItemWithTitle:(NSString*)arg1
+                           subtitle:(NSString*)arg2
+                          imageName:(NSString*)arg3
+                             action:(void (^)(void))arg4;
+- (void)setDisabled:(BOOL)disabled;
 @end
 
 @interface TFNAttributedTextModel : NSObject
@@ -50,9 +55,44 @@
 
 @interface TFNMenuSheetViewController : TFNItemsDataViewController
 - (instancetype)initWithActionItems:(NSArray*)actionItems;
+- (instancetype)initWithTitle:(NSString*)title actionItems:(NSArray*)actionItems;
+- (void)setShouldPresentAsMenu:(BOOL)asMenu;
 - (void)tfnPresentedCustomPresentFromViewController:(id)arg1
                                            animated:(BOOL)arg2
                                          completion:(void (^)(void))arg3;
+@end
+
+// Twitter's own presentation: its Tray for a menu sheet, its alert for a bridged alert.
+@interface UIViewController (TFNPresented)
+- (void)tfn_presentFromViewController:(UIViewController*)presenter
+                             animated:(BOOL)animated
+                           completion:(void (^)(void))completion;
+@end
+
+// A button added this way is recorded, so Twitter can draw the alert in its own style.
+@interface UIAlertController (TFNAdditions)
+- (UIAlertAction*)tfn_addActionWithTitle:(NSString*)title
+                                   style:(UIAlertActionStyle)style
+                                 handler:(void (^)(void))handler;
+@end
+
+@interface TFNToastAction : NSObject
+- (instancetype)initWithTitle:(NSString*)title scribeAction:(id)scribeAction handler:(void (^)(void))handler;
+@end
+
+@interface TFNInformationToast : NSObject
++ (instancetype)successToastWithMessageText:(NSString*)text detailText:(NSString*)detail;
++ (instancetype)errorToastWithMessageText:(NSString*)text detailText:(NSString*)detail;
+- (instancetype)initWithMessageText:(NSString*)text
+                         detailText:(NSString*)detail
+                           iconName:(NSString*)iconName
+                    displayDuration:(double)duration;
+@end
+
+@interface TFNToaster : NSObject
++ (instancetype)defaultToaster;
+- (void)pushToast:(id)toast withPriority:(NSUInteger)priority;
+- (void)dequeueToastsPassingTest:(BOOL (^)(id toast, NSUInteger priority))test;
 @end
 
 @interface TFNHUD : NSObject

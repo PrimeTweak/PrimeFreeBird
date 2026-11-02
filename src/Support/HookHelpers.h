@@ -148,9 +148,9 @@ UIColor* PFBBarIconColor(UITraitCollection* traits);
 // that fits (1 fills it), in the PDF's own colors; nil when it cannot be read.
 UIImage* PFBBundlePDFImage(NSString* file, CGSize size, CGFloat fill);
 
-// A capsule at the top of the window (nil: the key window) with the text, and an Undo
-// that runs `undo` when one is given. It replaces the capsule shown before it and leaves
-// after a few seconds.
+// Twitter's toast with the text, and an Undo that runs `undo` when one is given. Where the app
+// has no toaster, a capsule at the top of the window (nil: the key window) instead. Either
+// replaces the one shown before it and leaves after a few seconds.
 void PFBShowToast(UIWindow* window, NSString* text, void (^undo)(void));
 
 // A button whose touch area reaches 44 × 44 points around its center, Apple's minimum,
