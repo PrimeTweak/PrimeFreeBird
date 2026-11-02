@@ -58,7 +58,7 @@ static NSString* gPFBTourStepLive;
 static NSString* gPFBTourStepEmpty;
 static UIWindow* gPFBTourOverlay;
 static UILabel* gPFBTourStepLabel;
-// Cancel, as the toast or the box offers it; and whether Twitter's toast says where the tour stands.
+// Cancel, as the toast or the box offers it; and whether Twitter's toast stands for the tour.
 static void (^gPFBTourCancel)(void);
 static BOOL gPFBTourToasts;
 static NSFileHandle* gPFBTourJournal;
@@ -2333,8 +2333,8 @@ static void tourShowBox(void) {
     gPFBTourStepLabel = step;
 }
 
-// While the tour runs, Twitter's toast says what is happening and holds Cancel; it stays until the
-// next step's toast replaces it. The box stands in from the first toast the app cannot show.
+// While the tour runs, Twitter's toast says what is happening and holds Cancel, from the start to the
+// end. The box stands in from the first toast the app cannot show.
 static void tourShowOverlay(NSArray<NSDictionary*>* steps, NSMutableArray<NSString*>* results, BOOL full) {
     gPFBTourCancel = ^{
       tourCancel(steps, results, full);
@@ -2346,18 +2346,28 @@ static void tourShowOverlay(NSArray<NSDictionary*>* steps, NSMutableArray<NSStri
     }
 }
 
+// Twitter cannot change the words of a toast on screen, so the toast is left as it is and pushed
+// again only once another toast took its place; the box shows each step.
 static void tourShowStep(NSString* label, NSUInteger index, NSUInteger total) {
-    NSString* line = [NSString stringWithFormat:@"%@ \u00b7 %lu of %lu", label, (unsigned long)(index + 1),
-                                                (unsigned long)total];
-    if (gPFBTourToasts) {
+    if (gPFBTourToasts && !PFBPersistentToastShowing()) {
         gPFBTourToasts =
-            PFBPushTwitterToast(kPFBTourToastTitle, line, PFBToastKindPlain, @"Cancel", gPFBTourCancel, YES);
-        if (gPFBTourToasts) {
-            return;
+            PFBPushTwitterToast(kPFBTourToastTitle, nil, PFBToastKindPlain, @"Cancel", gPFBTourCancel, YES);
+        if (!gPFBTourToasts) {
+            tourShowBox();
         }
-        tourShowBox();
     }
-    gPFBTourStepLabel.text = line;
+    gPFBTourStepLabel.text = [NSString stringWithFormat:@"%@ \u00b7 %lu of %lu", label, (unsigned long)(index + 1),
+                                                        (unsigned long)total];
+}
+
+// How the app reads a switch behind Twitter's toasts and alerts: on, off, or not found.
+static NSString* tourTwitterSwitch(NSString* getterName) {
+    Class switches = objc_getClass("TFSAccountFeatureSwitches");
+    SEL getter = NSSelectorFromString(getterName);
+    if (![(id)switches respondsToSelector:getter]) {
+        return @"not found";
+    }
+    return ((BOOL (*)(id, SEL))objc_msgSend)((id)switches, getter) ? @"on" : @"off";
 }
 
 // The start's own proofs are judged last, so the late ones still count; then Home
@@ -2535,6 +2545,11 @@ static void tourStart(BOOL full) {
     [[NSFileManager defaultManager] removeItemAtPath:tourJournalPath() error:nil];
     tourJournalWrite([NSString stringWithFormat:@"start: %@ \u00b7 %lu steps \u00b7 build %@", full ? @"full" : @"what is left",
                                                 (unsigned long)steps.count, PFBCompatBuildID()]);
+    tourJournalWrite([NSString
+        stringWithFormat:@"Twitter switches: toasts update %@ \u00b7 alert bridge, one button %@ \u00b7 several buttons %@",
+                         tourTwitterSwitch(@"isToastsUpdateEnabled"),
+                         tourTwitterSwitch(@"isXDSAlertBridgeSingleButtonEnabled"),
+                         tourTwitterSwitch(@"isXDSAlertBridgeMultiButtonEnabled")]);
     for (NSDictionary* step in tourAllSteps()) {
         if (PFBCompatStationCrashed(step[@"name"])) {
             PFBCompatTourLog(@"[tour] %@ skipped: it closed Twitter on a previous tour of this build", step[@"name"]);
