@@ -16,6 +16,7 @@ extern void PFBWhitenNavigationBarConfirm(UINavigationBar* bar);
 #import "Settings/Native/PFBShowcase.h"
 #import "Settings/PFBSettingsCellStyle.h"
 #import "Debug/PFBDebugger.h"
+#import "Support/PFBTwitterPopups.h"
 extern void PFBBeginRawPaletteRead(void);
 extern void PFBEndRawPaletteRead(void);
 extern BOOL PFBAccentIsActive(void);
@@ -442,16 +443,14 @@ static NSInteger NearestAccentOption(UIColor* color) {
         [UIAlertController alertControllerWithTitle:[bundle localizedStringForKey:@"THEME_RESET_CONFIRM_TITLE"]
                                             message:[bundle localizedStringForKey:@"THEME_RESET_CONFIRM_MESSAGE"]
                                      preferredStyle:UIAlertControllerStyleAlert];
-    [confirm addAction:[UIAlertAction actionWithTitle:[bundle localizedStringForKey:@"CANCEL_ACTION"]
-                                                style:UIAlertActionStyleCancel
-                                              handler:nil]];
+    PFBAlertAddAction(confirm, [bundle localizedStringForKey:@"CANCEL_ACTION"], UIAlertActionStyleCancel, self.nativeLook,
+                      nil);
     __weak typeof(self) weakSelf = self;
-    [confirm addAction:[UIAlertAction actionWithTitle:[bundle localizedStringForKey:@"THEME_RESET_ACTION"]
-                                                style:UIAlertActionStyleDestructive
-                                              handler:^(__unused UIAlertAction* action) {
-                                                  [weakSelf resetToDefaultColor];
-                                              }]];
-    [self presentViewController:confirm animated:YES completion:nil];
+    PFBAlertAddAction(confirm, [bundle localizedStringForKey:@"THEME_RESET_ACTION"], UIAlertActionStyleDestructive,
+                      self.nativeLook, ^{
+                          [weakSelf resetToDefaultColor];
+                      });
+    PFBAlertPresent(confirm, self, self.nativeLook, nil);
 }
 
 - (void)resetToDefaultColor {
