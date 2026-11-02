@@ -130,7 +130,6 @@ static void PFBEditorLayoutPage(UIViewController* editor) {
     UIEdgeInsets safe = page.safeAreaInsets;
     CGFloat width = CGRectGetWidth(bounds);
 
-    message.textAlignment = NSTextAlignmentCenter;
     CGFloat messageHeight = ceil([message sizeThatFits:CGSizeMake(width - 40.0, CGFLOAT_MAX)].height);
     message.frame = CGRectMake(20.0, safe.top + 12.0, width - 40.0, messageHeight);
 
