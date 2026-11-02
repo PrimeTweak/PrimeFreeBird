@@ -15,8 +15,72 @@ extern void PFBWhitenNavigationBarConfirm(UINavigationBar* bar);
 #import "Common/PFBSettings.h"
 #import "Settings/Native/PFBShowcase.h"
 #import "Settings/PFBSettingsCellStyle.h"
+#import "Debug/PFBDebugger.h"
 extern void PFBBeginRawPaletteRead(void);
 extern void PFBEndRawPaletteRead(void);
+extern BOOL PFBAccentIsActive(void);
+
+// A color as #RRGGBB in the given appearance, or "none".
+static NSString* PFBResetProbeHex(id color, UITraitCollection* traits) {
+    CGFloat r = 0, g = 0, b = 0, a = 0;
+    if (![color isKindOfClass:[UIColor class]] ||
+        ![[color resolvedColorWithTraitCollection:traits] getRed:&r green:&g blue:&b alpha:&a]) {
+        return @"none";
+    }
+    return [NSString stringWithFormat:@"#%02X%02X%02X", (int)lround(MIN(MAX(r, 0.0), 1.0) * 255.0),
+                                      (int)lround(MIN(MAX(g, 0.0), 1.0) * 255.0),
+                                      (int)lround(MIN(MAX(b, 0.0), 1.0) * 255.0)];
+}
+
+// Writes to the debug journal, under [theme-reset], what Reset to default leaves: the stored keys,
+// Twitter's option and colors, raw and as the app gets them, the accent the tweak derives, and
+// every stored key naming a color.
+static void PFBResetProbe(NSString* stage, UITraitCollection* traits) {
+    if (!PFBDebugIsRecording()) {
+        return;
+    }
+    NSUserDefaults* defaults = NSUserDefaults.standardUserDefaults;
+    Class settingsClass = objc_getClass("TAEColorSettings");
+    id settings = [settingsClass respondsToSelector:@selector(sharedSettings)] ? [settingsClass sharedSettings] : nil;
+    SEL optionGetter = NSSelectorFromString(@"primaryColorOption");
+    NSInteger option = [settings respondsToSelector:optionGetter]
+                           ? ((NSInteger (*)(id, SEL))objc_msgSend)(settings, optionGetter)
+                           : -1;
+    id current = [settings respondsToSelector:@selector(currentColorPalette)] ? [settings currentColorPalette] : nil;
+    id palette = [current respondsToSelector:@selector(colorPalette)] ? [current colorPalette] : nil;
+    BOOL hasPrimary = [palette respondsToSelector:@selector(primaryColor)];
+    BOOL hasOptions = [palette respondsToSelector:@selector(primaryColorForOption:)];
+    NSMutableString* options = [NSMutableString string];
+    PFBBeginRawPaletteRead();
+    UIColor* raw = hasPrimary ? ((UIColor * (*)(id, SEL)) objc_msgSend)(palette, @selector(primaryColor)) : nil;
+    for (NSUInteger i = 0; i <= 7; i++) {
+        UIColor* color = hasOptions ? [palette primaryColorForOption:i] : nil;
+        [options appendFormat:@" %lu=%@", (unsigned long)i, PFBResetProbeHex(color, traits)];
+    }
+    PFBEndRawPaletteRead();
+    UIColor* used = hasPrimary ? ((UIColor * (*)(id, SEL)) objc_msgSend)(palette, @selector(primaryColor)) : nil;
+    PFBDebugLog(@"[theme-reset] %@: custom=%d hex=%@ pick=%@ twitterKey=%@ resetDone=%d option=%ld active=%d raw=%@ "
+                @"used=%@ brand=%@ current=%@ options:%@",
+                stage, [defaults boolForKey:@"pfb_custom_is_active"],
+                [defaults objectForKey:@"pfb_custom_accent_hex"] ?: @"none",
+                [defaults objectForKey:@"pfb_color_theme_selectedColor"] ?: @"none",
+                [defaults objectForKey:@"T1ColorSettingsPrimaryColorOptionKey"] ?: @"none",
+                [defaults boolForKey:@"pfb_color_reset_done"], (long)option, PFBAccentIsActive(),
+                PFBResetProbeHex(raw, traits), PFBResetProbeHex(used, traits),
+                PFBResetProbeHex(PFBBrandAccentColor(), traits), PFBResetProbeHex(PFBCurrentAccentColor(), traits),
+                options);
+    NSMutableArray<NSString*>* keys = [NSMutableArray array];
+    [[defaults dictionaryRepresentation] enumerateKeysAndObjectsUsingBlock:^(NSString* key, id value, __unused BOOL* stop) {
+      NSString* lower = key.lowercaseString;
+      BOOL named = [lower containsString:@"color"] || [lower containsString:@"accent"];
+      BOOL plain = [value isKindOfClass:[NSNumber class]] || [value isKindOfClass:[NSString class]];
+      if (named && plain && keys.count < 40) {
+          [keys addObject:[NSString stringWithFormat:@"%@=%@", key, value]];
+      }
+    }];
+    [keys sortUsingSelector:@selector(compare:)];
+    PFBDebugLog(@"[theme-reset] %@ keys: %@", stage, [keys componentsJoinedByString:@" "]);
+}
 
 // Mirrors PFBCurrentAccentColor's precedence: the stored pick, then Twitter's own option.
 static NSInteger CurrentSelectedColorOption(void) {
@@ -391,6 +455,8 @@ static NSInteger NearestAccentOption(UIColor* color) {
 }
 
 - (void)resetToDefaultColor {
+    UITraitCollection* traits = self.traitCollection;
+    PFBResetProbe(@"before", traits);
     NSUserDefaults* defaults = NSUserDefaults.standardUserDefaults;
     // Clears every override so nothing declares an accent: the custom hex, the
     // picked option and Twitter's own stored option. With all three gone the window
@@ -419,6 +485,13 @@ static NSInteger NearestAccentOption(UIColor* color) {
 
     PFBSyncAccentTheme();
     [self refreshSelection];
+    PFBResetProbe(@"after", traits);
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+      PFBResetProbe(@"after 1 s", traits);
+    });
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(3.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+      PFBResetProbe(@"after 3 s", traits);
+    });
 }
 
 // MARK: - Visibility
@@ -488,7 +561,9 @@ static NSInteger NearestAccentOption(UIColor* color) {
     }
     self.customSwatch.accessibilityTraits = UIAccessibilityTraitButton | (customActive ? UIAccessibilityTraitSelected : 0);
     UIColor* accent = (customActive ? PFBCustomAccentColor() : nil) ?: PFBBrandAccentColor();
-    [self.preview applyAccent:accent tintsSelectedTab:[PFBSettings boolForKey:@"tab_bar_theming"]];
+    [self.preview applyAccent:accent
+             tintsSelectedTab:[PFBSettings boolForKey:@"tab_bar_theming"]
+                    tintsLogo:[PFBSettings boolForKey:@"color_twitter_icon_in_top_bar"]];
     [self.view setNeedsLayout];
 }
 
