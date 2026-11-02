@@ -8,15 +8,12 @@
 #import "Features/Timelines/PFBMutedAddCell.h"
 #import "Features/Timelines/PFBMutedTermCell.h"
 #import "Settings/PFBModernSettingsToggleCell.h"
-#import "Settings/PFBTintedSwitch.h"
 #import "Settings/Native/PFBNativeSettingsRowCell.h"
 #import "Settings/Native/PFBNativeSettingsSheetController.h"
 #import "Settings/Native/PFBShowcase.h"
 #import "Settings/PFBSettingsCellStyle.h"
 #import "Features/Timelines/PFBMutedShowcaseCells.h"
 
-// A language row's own height, so the switch is spaced like one more entry.
-static const CGFloat kPFBTranslateBarHeight = 51.0;
 // The popover's rounded corners cut into its bottom row, so its list sits a
 // little further in than the full screen's; the segment keeps the card's own
 // margin above it.
@@ -190,13 +187,10 @@ static NSArray<NSArray*>* PFBMutedDurations(void) {
 @property (nonatomic, strong) NSArray<NSString*>* languageCodes;
 // The pushed screen that holds every language the two shortlists leave out.
 @property (nonatomic, assign) BOOL othersOnly;
-// In the popover the segment and the switch are held against the table's
-// frame, so only the rows between them move.
+// In the popover the segment is held against the table's frame, so only the
+// rows under it move.
 @property (nonatomic, strong) UIView* pinnedHeader;
-@property (nonatomic, strong) UIView* pinnedBar;
 @property (nonatomic, strong) UIVisualEffectView* headerMaterial;
-@property (nonatomic, strong) UIVisualEffectView* barMaterial;
-@property (nonatomic, assign) CGFloat pinnedHeaderHeight;
 // The new look: the duration the next term added gets, forever when 0, and the kind its head shows.
 @property (nonatomic, assign) NSTimeInterval pendingSpan;
 @property (nonatomic, copy) NSString* shownKindSymbol;
@@ -309,17 +303,16 @@ static NSMutableArray<NSString*>* PFBKeptLanguageList(void) {
         measured = 100.0;
     }
     // The language list is short and fixed: the popover asks for its whole
-    // height, so nothing scrolls and the switch below stays in view.
+    // height, so nothing scrolls.
     CGFloat cap = (self.mode == 0) ? 330.0 : 420.0;
     self.preferredContentSize = CGSizeMake(320.0, MIN(measured, cap));
 }
 
 - (void)viewDidLayoutSubviews {
     [super viewDidLayoutSubviews];
-    // Reloading adds cells above the pinned views, so their order is restored
+    // Reloading adds cells above the pinned header, so its order is restored
     // on every layout pass.
     [self.tableView bringSubviewToFront:self.pinnedHeader];
-    [self.tableView bringSubviewToFront:self.pinnedBar];
     [self updateBarMaterials];
     [self updatePreferredSize];
 }
@@ -327,9 +320,12 @@ static NSMutableArray<NSString*>* PFBKeptLanguageList(void) {
 - (void)viewDidLoad {
     [super viewDidLoad];
     PFBBundle* bundle = [PFBBundle sharedBundle];
-    self.title = [bundle
-        localizedStringForKey:self.othersOnly ? @"LANGUAGES_OTHERS_TITLE"
-                                              : @"FILTERS_TITLE"];
+    NSString* title = [bundle localizedStringForKey:self.othersOnly ? @"LANGUAGES_OTHERS_TITLE" : @"FILTERS_TITLE"];
+    if (self.nativeLook && !self.compact) {
+        PFBShowcaseSetTitle(self, title);
+    } else {
+        self.title = title;
+    }
     self.terms = [([[NSUserDefaults standardUserDefaults] arrayForKey:kPFBMutedWordsKey]
                        ?: @[]) mutableCopy];
     // A change counts from the screen it is made in, not from an earlier one left open.
@@ -428,9 +424,10 @@ static NSMutableArray<NSString*>* PFBKeptLanguageList(void) {
         ]];
         self.headerMaterial = PFBMaterialBehind(header);
         self.pinnedHeader = header;
-        self.pinnedHeaderHeight = height;
-        [self installTranslateBar];
-        [self updatePinnedInsets];
+        // The rows start below the segment.
+        UIEdgeInsets insets = UIEdgeInsetsMake(height, 0, 0, 0);
+        self.tableView.contentInset = insets;
+        self.tableView.verticalScrollIndicatorInsets = insets;
         return;
     }
     // The header's size is read when it is assigned, so its frame is set
@@ -445,79 +442,6 @@ static NSMutableArray<NSString*>* PFBKeptLanguageList(void) {
     self.tableView.tableHeaderView = header;
 }
 
-// The switch is held against the bottom of the table's frame, below the rows
-// it belongs to.
-- (void)installTranslateBar {
-    // Built to a language row's proportions rather than reusing the settings
-    // cell, whose 18 pt margins would set it apart from the list above it.
-    UIView* bar = [[UIView alloc] init];
-    bar.backgroundColor = [UIColor clearColor];
-    bar.translatesAutoresizingMaskIntoConstraints = NO;
-
-    UILabel* label = [[UILabel alloc] init];
-    label.text =
-        [[PFBBundle sharedBundle] localizedStringForKey:@"LANGUAGES_TRANSLATE_TITLE"];
-    label.font = PFBScaledFont([TwitterChirpFont(TwitterFontStyleRegular) fontWithSize:16.5]);
-    label.textColor = [UIColor labelColor];
-    label.translatesAutoresizingMaskIntoConstraints = NO;
-
-    UISwitch* toggle = [PFBTintedSwitch new];
-    toggle.on =
-        ![[NSUserDefaults standardUserDefaults] boolForKey:@"disable_auto_translate"];
-    [toggle addTarget:self
-                  action:@selector(translateChanged:)
-        forControlEvents:UIControlEventValueChanged];
-    toggle.translatesAutoresizingMaskIntoConstraints = NO;
-
-    // Edge to edge rather than inset like the row separators: it marks where
-    // the scrolling list ends and the pinned switch begins.
-    UIView* hairline = [[UIView alloc] init];
-    hairline.backgroundColor = [UIColor separatorColor];
-    hairline.translatesAutoresizingMaskIntoConstraints = NO;
-
-    for (UIView* v in @[ label, toggle, hairline ]) {
-        [bar addSubview:v];
-    }
-    [self.tableView addSubview:bar];
-    UILayoutGuide* tableFrame = self.tableView.frameLayoutGuide;
-    [NSLayoutConstraint activateConstraints:@[
-        [label.leadingAnchor constraintEqualToAnchor:bar.leadingAnchor
-                                            constant:[self rowMargin]],
-        [label.centerYAnchor constraintEqualToAnchor:bar.centerYAnchor],
-        [toggle.trailingAnchor constraintEqualToAnchor:bar.trailingAnchor
-                                              constant:-[self rowMargin]],
-        [toggle.centerYAnchor constraintEqualToAnchor:bar.centerYAnchor],
-        [hairline.leadingAnchor constraintEqualToAnchor:bar.leadingAnchor],
-        [hairline.trailingAnchor constraintEqualToAnchor:bar.trailingAnchor],
-        [hairline.topAnchor constraintEqualToAnchor:bar.topAnchor],
-        [hairline.heightAnchor constraintEqualToConstant:0.5],
-        [bar.leadingAnchor constraintEqualToAnchor:tableFrame.leadingAnchor],
-        [bar.trailingAnchor constraintEqualToAnchor:tableFrame.trailingAnchor],
-        [bar.heightAnchor constraintEqualToConstant:kPFBTranslateBarHeight],
-        [bar.bottomAnchor constraintEqualToAnchor:tableFrame.bottomAnchor],
-    ]];
-    self.barMaterial = PFBMaterialBehind(bar);
-    self.pinnedBar = bar;
-}
-
-// The rows start below the segment and end where the switch's bar begins, at the
-// bubble's bottom edge; the bar shows only with the languages.
-- (void)updatePinnedInsets {
-    if (!self.compact) {
-        return;
-    }
-    BOOL languages = self.mode == 1;
-    self.pinnedBar.hidden = !languages;
-    CGFloat bottom = languages ? kPFBTranslateBarHeight : 0.0;
-    UIEdgeInsets insets =
-        UIEdgeInsetsMake(self.pinnedHeaderHeight, 0, bottom, 0);
-    self.tableView.contentInset = insets;
-    self.tableView.verticalScrollIndicatorInsets = insets;
-    [self.tableView bringSubviewToFront:self.pinnedHeader];
-    [self.tableView bringSubviewToFront:self.pinnedBar];
-    [self updateBarMaterials];
-}
-
 // The codes this screen lists: the picker takes the tail, the popover the
 // first four, the full screen the first six.
 - (NSArray<NSString*>*)visibleLanguages {
@@ -530,15 +454,9 @@ static NSMutableArray<NSString*>* PFBKeptLanguageList(void) {
     return [all subarrayWithRange:NSMakeRange(0, MIN(head, all.count))];
 }
 
-// After the languages come the picker row (full screen only) and the
-// auto-translate row; the picker screen has neither.
+// After the languages comes the picker row, on the full screen only.
 - (NSInteger)languageExtraRows {
-    if (self.othersOnly) {
-        return 0;
-    }
-    // The popover holds its switch outside the table, so the list carries no
-    // extra row there.
-    return self.compact ? 0 : 2;
+    return self.othersOnly || self.compact ? 0 : 1;
 }
 
 - (BOOL)rowIsPicker:(NSInteger)row {
@@ -546,29 +464,20 @@ static NSMutableArray<NSString*>* PFBKeptLanguageList(void) {
            row == (NSInteger)[self visibleLanguages].count;
 }
 
-- (BOOL)rowIsTranslate:(NSInteger)row {
-    return !self.othersOnly && !self.compact &&
-           row == (NSInteger)[self visibleLanguages].count + 1;
-}
-
 // Rows of the popover clear the corner curve; the full screen keeps its own.
 - (CGFloat)rowMargin {
     return self.compact ? kPFBCompactRowMargin : kPFBMutedSideMargin;
 }
 
-// A bar shows its material only while content passes underneath, the way the
-// system's own bars do; at rest it is the card's glass that shows.
+// The segment's bar shows its material only while rows pass underneath, the way
+// the system's own bars do; at rest it is the card's glass that shows.
 - (void)updateBarMaterials {
     if (!self.compact) {
         return;
     }
     UIScrollView* list = self.tableView;
     CGFloat under = list.contentOffset.y + list.adjustedContentInset.top;
-    CGFloat below = list.contentSize.height -
-                    (list.contentOffset.y + CGRectGetHeight(list.bounds) -
-                     list.adjustedContentInset.bottom);
     self.headerMaterial.alpha = MIN(MAX(under / 8.0, 0.0), 1.0);
-    self.barMaterial.alpha = MIN(MAX(below / 8.0, 0.0), 1.0);
 }
 
 - (void)scrollViewDidScroll:(UIScrollView*)scrollView {
@@ -582,7 +491,6 @@ static NSMutableArray<NSString*>* PFBKeptLanguageList(void) {
     }
     self.mode = control.selectedSegmentIndex;
     [self.tableView reloadData];
-    [self updatePinnedInsets];
     [self updatePreferredSize];
 }
 
@@ -763,17 +671,6 @@ static NSMutableArray<NSString*>* PFBKeptLanguageList(void) {
     [self.tableView reloadData];
 }
 
-// The stored flag is the negative one, so the switch reads and writes it
-// inverted: on means Twitter may translate.
-- (void)translateChanged:(UISwitch*)sender {
-    [[NSUserDefaults standardUserDefaults] setBool:!sender.isOn
-                                            forKey:@"disable_auto_translate"];
-    // In the new look the switch alone shows the flag, and a reload would cut its slide.
-    if (![self showcase]) {
-        [self.tableView reloadData];
-    }
-}
-
 - (void)toggleChanged:(UISwitch*)sender {
     PFBMutedOptionToggled(sender);
 }
@@ -804,9 +701,9 @@ static NSMutableArray<NSString*>* PFBKeptLanguageList(void) {
 
 // Section 0 is "Filters": the add row first, then the list (or one empty row).
 - (NSInteger)tableView:(UITableView*)tableView numberOfRowsInSection:(NSInteger)section {
-    // The new look opens each list on its head; Languages then holds two rows.
+    // The new look opens each list on its head; Languages then holds one row.
     if ([self showcase] && self.mode != 0) {
-        return 1 + (self.mode == 1 ? 2 : (NSInteger)PFBHiddenThreads().count);
+        return 1 + (self.mode == 1 ? 1 : (NSInteger)PFBHiddenThreads().count);
     }
     if (self.mode == 2) {
         // One row stands in for the empty list, as the word list does.
@@ -947,7 +844,7 @@ static NSMutableArray<NSString*>* PFBKeptLanguageList(void) {
 }
 
 // Each list opens on its head; Words then lists its terms and Options, Languages the other
-// languages and Auto-translate, Conversations what is hidden.
+// languages, Conversations what is hidden.
 - (UITableViewCell*)showcaseCellFor:(UITableView*)tableView at:(NSIndexPath*)indexPath {
     if (indexPath.section == 0 && indexPath.row == 0) {
         if (self.mode == 0) {
@@ -971,7 +868,7 @@ static NSMutableArray<NSString*>* PFBKeptLanguageList(void) {
         return [self termCell:cell at:(NSUInteger)indexPath.row - 1];
     }
     if (self.mode == 1) {
-        return indexPath.row == 1 ? [self otherLanguagesCell:cell] : [self translateCell:cell];
+        return [self otherLanguagesCell:cell];
     }
     return [self threadCell:cell at:(NSUInteger)indexPath.row - 1];
 }
@@ -1170,21 +1067,6 @@ static NSMutableArray<NSString*>* PFBKeptLanguageList(void) {
     return cell;
 }
 
-// The stored flag is the negative one: on means Twitter may translate.
-- (UITableViewCell*)translateCell:(PFBShowcaseRowCell*)cell {
-    PFBBundle* bundle = [PFBBundle sharedBundle];
-    NSString* title = [bundle localizedStringForKey:@"LANGUAGES_TRANSLATE_TITLE"];
-    NSString* detail = [bundle localizedStringForKey:@"LANGUAGES_TRANSLATE_DETAIL"];
-    [cell configureWithSymbol:@"translate" title:title subtitle:detail value:nil accessory:PFBShowcaseAccessoryNone];
-    UISwitch* toggle = [PFBTintedSwitch new];
-    toggle.on = ![[NSUserDefaults standardUserDefaults] boolForKey:@"disable_auto_translate"];
-    toggle.accessibilityLabel = title;
-    toggle.accessibilityHint = detail;
-    [toggle addTarget:self action:@selector(translateChanged:) forControlEvents:UIControlEventValueChanged];
-    cell.trailingView = toggle;
-    return cell;
-}
-
 - (UITableViewCell*)threadsHeroFor:(UITableView*)tableView at:(NSIndexPath*)indexPath {
     PFBBundle* bundle = [PFBBundle sharedBundle];
     PFBMutedThreadsHeroCell* hero = [tableView dequeueReusableCellWithIdentifier:@"ThreadsHero" forIndexPath:indexPath];
@@ -1304,25 +1186,6 @@ static NSMutableArray<NSString*>* PFBKeptLanguageList(void) {
     if (self.mode == 1) {
         UIColor* accent = PFBCurrentAccentColor() ?: self.view.tintColor;
 
-        if ([self rowIsTranslate:indexPath.row]) {
-            PFBModernSettingsToggleCell* cell =
-                [tableView dequeueReusableCellWithIdentifier:@"opt"
-                                                forIndexPath:indexPath];
-            cell.backgroundColor = [UIColor clearColor];
-            [cell configureWithTitle:[bundle localizedStringForKey:@"LANGUAGES_TRANSLATE_TITLE"]
-                            subtitle:[bundle localizedStringForKey:@"LANGUAGES_TRANSLATE_DETAIL"]];
-            cell.toggleSwitch.tag = NSIntegerMax;
-            cell.toggleSwitch.on =
-                ![[NSUserDefaults standardUserDefaults] boolForKey:@"disable_auto_translate"];
-            [cell.toggleSwitch removeTarget:nil
-                                     action:NULL
-                           forControlEvents:UIControlEventValueChanged];
-            [cell.toggleSwitch addTarget:self
-                                  action:@selector(translateChanged:)
-                        forControlEvents:UIControlEventValueChanged];
-            return cell;
-        }
-
         UITableViewCell* cell =
             [tableView dequeueReusableCellWithIdentifier:@"lang"];
         if (!cell) {
@@ -1372,8 +1235,8 @@ static NSMutableArray<NSString*>* PFBKeptLanguageList(void) {
         cell.detailTextLabel.text = nil;
         cell.textLabel.textColor = [UIColor labelColor];
         // Placed by constraint rather than as an accessory: the system gives an
-        // accessory its own inset, which leaves this column adrift from the switch
-        // pinned below the list.
+        // accessory its own inset, which would set this column apart from the
+        // screen's row margin.
         UIImageView* tick = [cell.contentView viewWithTag:kPFBTickTag];
         if (!tick) {
             tick = [[UIImageView alloc] init];
@@ -1520,9 +1383,6 @@ static NSMutableArray<NSString*>* PFBKeptLanguageList(void) {
         return;
     }
     if (self.mode != 1) {
-        return;
-    }
-    if ([self rowIsTranslate:indexPath.row]) {
         return;
     }
     if ([self rowIsPicker:indexPath.row]) {
