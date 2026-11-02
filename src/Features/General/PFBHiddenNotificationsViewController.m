@@ -3,6 +3,7 @@
 #import "Support/TwitterChirpFont.h"
 #import "Support/HookHelpers.h"
 #import "Features/General/PFBHiddenNotifCell.h"
+#import "Support/PFBTwitterPopups.h"
 
 // MARK: - The screen
 
@@ -261,22 +262,18 @@ static const CGFloat kPFBNotifBarHeight = 57.0;
         [UIAlertController alertControllerWithTitle:[bundle localizedStringForKey:@"HIDDEN_NOTIFS_CLEAR_ALL_TITLE"]
                                             message:message
                                      preferredStyle:UIAlertControllerStyleAlert];
-    [confirm addAction:[UIAlertAction actionWithTitle:[bundle localizedStringForKey:@"CANCEL_ACTION"]
-                                                style:UIAlertActionStyleCancel
-                                              handler:nil]];
+    PFBAlertAddAction(confirm, [bundle localizedStringForKey:@"CANCEL_ACTION"], UIAlertActionStyleCancel, YES, nil);
     __weak typeof(self) weakSelf = self;
     UIAlertAction* unhide =
-        [UIAlertAction actionWithTitle:[bundle localizedStringForKey:@"HIDDEN_NOTIFS_CLEAR_ALL"]
-                                 style:UIAlertActionStyleDefault
-                               handler:^(__unused UIAlertAction* action) {
-                                   PFBUnhideAllNotifs();
-                                   // Nothing is left to manage: the bubble closes while the
-                                   // list refreshes behind it.
-                                   [weakSelf dismissViewControllerAnimated:YES completion:nil];
-                               }];
-    [confirm addAction:unhide];
+        PFBAlertAddAction(confirm, [bundle localizedStringForKey:@"HIDDEN_NOTIFS_CLEAR_ALL"], UIAlertActionStyleDefault,
+                          YES, ^{
+                              PFBUnhideAllNotifs();
+                              // Nothing is left to manage: the bubble closes while the list
+                              // refreshes behind it.
+                              [weakSelf dismissViewControllerAnimated:YES completion:nil];
+                          });
     confirm.preferredAction = unhide;
-    [self presentViewController:confirm animated:YES completion:nil];
+    PFBAlertPresent(confirm, self, YES, nil);
 }
 
 @end
