@@ -1,6 +1,7 @@
 // Profile options: copy, premium offer, counts, opening tab, Videos tab, bio, followers.
 
 #import "Support/HookHelpers.h"
+#import "Support/PFBTwitterPopups.h"
 #import "Debug/PFBDebugger.h"
 
 // MARK: - Copy profile info
@@ -9,6 +10,8 @@ static char kCopyProviderKey;
 
 @interface PFBProfileCopyButtonProvider : NSObject
 @property (nonatomic, weak) T1ProfileHeaderViewController* headerViewController;
+- (NSArray<UIMenuElement*>*)copyActions;
+- (void)presentCopyTray;
 @end
 
 // A getter reached by name, whatever it returns: an object, or a whole number
@@ -76,50 +79,77 @@ static NSString* pfbProfileAddress(NSString* username) {
     return [NSString stringWithFormat:@"https://%@/%@", host, username];
 }
 
+// Twitter's Tray rows that copy each value.
+static NSArray* pfbCopyTrayRows(NSArray<NSArray<NSString*>*>* entries) {
+    PFBBundle* bundle = [PFBBundle sharedBundle];
+    NSMutableArray* rows = [NSMutableArray array];
+    for (NSArray<NSString*>* entry in entries) {
+        NSString* value = entry[2];
+        id row = PFBTrayRow([bundle localizedStringForKey:entry[0]], nil, entry[1], NO, ^{
+            UIPasteboard.generalPasteboard.string = value;
+        });
+        if (row) {
+            [rows addObject:row];
+        }
+    }
+    return rows;
+}
+
 @implementation PFBProfileCopyButtonProvider
 
-- (NSArray<UIMenuElement*>*)copyActions {
+// What can be copied, each as its title key, its glyph and its value: name, username and profile
+// link in front, the rest under More. A value the profile lacks gets no row.
+- (NSArray<NSArray<NSString*>*>*)copyEntriesUnderMore:(BOOL)more {
     // Each value is read only where its owner still answers for it.
     T1ProfileHeaderViewController* header = self.headerViewController;
     T1ProfileUserViewModel* viewModel =
         [header respondsToSelector:@selector(viewModel)] ? header.viewModel : nil;
-    NSString* fullName = [viewModel respondsToSelector:@selector(fullName)] ? viewModel.fullName : nil;
-    NSString* username = [viewModel respondsToSelector:@selector(username)] ? viewModel.username : nil;
-    NSString* bio = [viewModel respondsToSelector:@selector(bio)] ? viewModel.bio : nil;
-    NSString* location = [viewModel respondsToSelector:@selector(location)] ? viewModel.location : nil;
-    NSString* url = [viewModel respondsToSelector:@selector(url)] ? viewModel.url : nil;
+    NSMutableArray<NSArray<NSString*>*>* entries = [NSMutableArray array];
+    void (^add)(NSString*, NSString*, NSString*) = ^(NSString* titleKey, NSString* iconName, NSString* value) {
+        if (value.length) {
+            [entries addObject:@[ titleKey, iconName, value ]];
+        }
+    };
+    if (!more) {
+        NSString* username = [viewModel respondsToSelector:@selector(username)] ? viewModel.username : nil;
+        add(@"COPY_PROFILE_INFO_MENU_OPTION_3", @"account",
+            [viewModel respondsToSelector:@selector(fullName)] ? viewModel.fullName : nil);
+        add(@"COPY_PROFILE_INFO_MENU_OPTION_2", @"at", username);
+        add(@"COPY_PROFILE_INFO_MENU_OPTION_6", @"link", username.length ? pfbProfileAddress(username) : nil);
+        return entries;
+    }
+    add(@"COPY_PROFILE_INFO_MENU_OPTION_1", @"news_stroke", [viewModel respondsToSelector:@selector(bio)] ? viewModel.bio : nil);
+    add(@"COPY_PROFILE_INFO_MENU_OPTION_5", @"location_stroke",
+        [viewModel respondsToSelector:@selector(location)] ? viewModel.location : nil);
+    add(@"COPY_PROFILE_INFO_MENU_OPTION_4", @"globe_stroke", [viewModel respondsToSelector:@selector(url)] ? viewModel.url : nil);
+    add(@"COPY_PROFILE_INFO_MENU_OPTION_7", @"hash_stroke", pfbProfileUserID(viewModel));
+    add(@"COPY_PROFILE_INFO_MENU_OPTION_8", @"calendar", pfbProfileJoinDate(viewModel));
+    return entries;
+}
 
+// The system menu, where the app has no Tray: the front values, then More as a submenu.
+- (NSArray<UIMenuElement*>*)copyActions {
     PFBBundle* bundle = [PFBBundle sharedBundle];
     UIImage* (^icon)(NSString*) = ^UIImage*(NSString* name) {
         return [UIImage respondsToSelector:@selector(tfn_vectorImageNamed:fitsSize:fillColor:)]
                    ? [UIImage tfn_vectorImageNamed:name fitsSize:CGSizeMake(16.0, 16.0) fillColor:UIColor.labelColor]
                    : nil;
     };
-    // A row only for a value the profile has.
-    void (^add)(NSMutableArray<UIMenuElement*>*, NSString*, NSString*, NSString*) =
-        ^(NSMutableArray<UIMenuElement*>* rows, NSString* titleKey, NSString* iconName, NSString* value) {
-            if (!value.length) {
-                return;
-            }
-            [rows addObject:[UIAction actionWithTitle:[bundle localizedStringForKey:titleKey]
-                                                image:icon(iconName)
+    NSArray<UIMenuElement*>* (^actions)(NSArray<NSArray<NSString*>*>*) = ^(NSArray<NSArray<NSString*>*>* entries) {
+        NSMutableArray<UIMenuElement*>* rows = [NSMutableArray array];
+        for (NSArray<NSString*>* entry in entries) {
+            NSString* value = entry[2];
+            [rows addObject:[UIAction actionWithTitle:[bundle localizedStringForKey:entry[0]]
+                                                image:icon(entry[1])
                                            identifier:nil
                                               handler:^(__unused __kindof UIAction* action) {
                                                   UIPasteboard.generalPasteboard.string = value;
                                               }]];
-        };
-
-    // Name, username and profile link in front; the rest in a More submenu, left out when empty.
-    NSMutableArray<UIMenuElement*>* rows = [NSMutableArray array];
-    add(rows, @"COPY_PROFILE_INFO_MENU_OPTION_3", @"account", fullName);
-    add(rows, @"COPY_PROFILE_INFO_MENU_OPTION_2", @"at", username);
-    add(rows, @"COPY_PROFILE_INFO_MENU_OPTION_6", @"link", username.length ? pfbProfileAddress(username) : nil);
-    NSMutableArray<UIMenuElement*>* more = [NSMutableArray array];
-    add(more, @"COPY_PROFILE_INFO_MENU_OPTION_1", @"news_stroke", bio);
-    add(more, @"COPY_PROFILE_INFO_MENU_OPTION_5", @"location_stroke", location);
-    add(more, @"COPY_PROFILE_INFO_MENU_OPTION_4", @"globe_stroke", url);
-    add(more, @"COPY_PROFILE_INFO_MENU_OPTION_7", @"hash_stroke", pfbProfileUserID(viewModel));
-    add(more, @"COPY_PROFILE_INFO_MENU_OPTION_8", @"calendar", pfbProfileJoinDate(viewModel));
+        }
+        return rows;
+    };
+    NSMutableArray<UIMenuElement*>* rows = [actions([self copyEntriesUnderMore:NO]) mutableCopy];
+    NSArray<UIMenuElement*>* more = actions([self copyEntriesUnderMore:YES]);
     if (more.count) {
         [rows addObject:[UIMenu menuWithTitle:[bundle localizedStringForKey:@"COPY_PROFILE_INFO_MENU_MORE"]
                                         image:icon(@"more_circle")
@@ -128,6 +158,27 @@ static NSString* pfbProfileAddress(NSString* username) {
                                      children:more]];
     }
     return rows;
+}
+
+// Twitter's Tray with the front values and More, which opens a second Tray with the rest: the
+// app's Tray shows no submenu.
+- (void)presentCopyTray {
+    UIViewController* from = self.headerViewController;
+    PFBBundle* bundle = [PFBBundle sharedBundle];
+    NSMutableArray* rows = [pfbCopyTrayRows([self copyEntriesUnderMore:NO]) mutableCopy];
+    NSArray* more = pfbCopyTrayRows([self copyEntriesUnderMore:YES]);
+    NSString* moreTitle = [bundle localizedStringForKey:@"COPY_PROFILE_INFO_MENU_MORE"];
+    __weak UIViewController* weakFrom = from;
+    id moreRow = more.count ? PFBTrayRow(moreTitle, nil, @"more_circle", NO, ^{
+        PFBAfterPresentations(^{
+            PFBPresentTray(weakFrom, moreTitle, more);
+        });
+    })
+                            : nil;
+    if (moreRow) {
+        [rows addObject:moreRow];
+    }
+    PFBPresentTray(from, [bundle localizedStringForKey:@"COPY_PROFILE_INFO_MENU_TITLE"], rows);
 }
 
 @end
@@ -246,7 +297,6 @@ static void pfbMatchNeighborStyle(UIButton* ours, UIView* neighbor) {
         copyButton = [UIButton buttonWithType:UIButtonTypeSystem];
         copyButton.accessibilityLabel =
             [[PFBBundle sharedBundle] localizedStringForKey:@"COPY_PROFILE_INFO_TITLE"];
-        copyButton.showsMenuAsPrimaryAction = YES;
 
         PFBProfileCopyButtonProvider* provider = [PFBProfileCopyButtonProvider new];
         // The provider reads the profile through the header's view controller,
@@ -255,16 +305,25 @@ static void pfbMatchNeighborStyle(UIButton* ours, UIView* neighbor) {
         objc_setAssociatedObject(copyButton, &kCopyProviderKey, provider,
                                  OBJC_ASSOCIATION_RETAIN_NONATOMIC);
 
+        // Twitter's Tray when the app has it, the system menu otherwise.
         __weak PFBProfileCopyButtonProvider* weakProvider = provider;
-        void (^actionsProvider)(void (^)(NSArray<UIMenuElement*>*)) =
-            ^(void (^completion)(NSArray<UIMenuElement*>*)) {
-                completion([weakProvider copyActions] ?: @[]);
-            };
-        UIDeferredMenuElement* deferred =
-            [UIDeferredMenuElement elementWithUncachedProvider:actionsProvider];
-        copyButton.menu =
-            [UIMenu menuWithTitle:[[PFBBundle sharedBundle] localizedStringForKey:@"COPY_PROFILE_INFO_MENU_TITLE"]
-                         children:@[deferred]];
+        if (PFBTrayAvailable()) {
+            [copyButton addAction:[UIAction actionWithHandler:^(__unused UIAction* action) {
+                            [weakProvider presentCopyTray];
+                        }]
+                 forControlEvents:UIControlEventTouchUpInside];
+        } else {
+            copyButton.showsMenuAsPrimaryAction = YES;
+            void (^actionsProvider)(void (^)(NSArray<UIMenuElement*>*)) =
+                ^(void (^completion)(NSArray<UIMenuElement*>*)) {
+                    completion([weakProvider copyActions] ?: @[]);
+                };
+            UIDeferredMenuElement* deferred =
+                [UIDeferredMenuElement elementWithUncachedProvider:actionsProvider];
+            copyButton.menu =
+                [UIMenu menuWithTitle:[[PFBBundle sharedBundle] localizedStringForKey:@"COPY_PROFILE_INFO_MENU_TITLE"]
+                             children:@[deferred]];
+        }
 
         UIImage* glyph = [UIImage respondsToSelector:@selector(tfn_vectorImageNamed:fitsSize:fillColor:)]
                              ? [UIImage tfn_vectorImageNamed:@"copy_stroke" fitsSize:CGSizeMake(20, 20) fillColor:nil]
@@ -635,24 +694,19 @@ static void pfbConfirmRemoveFollower(UIViewController* from, NSString* userID, N
         [UIAlertController alertControllerWithTitle:[bundle localizedStringForKey:@"REMOVE_FOLLOWER_CONFIRM_TITLE"]
                                             message:message
                                      preferredStyle:UIAlertControllerStyleAlert];
-    [alert addAction:[UIAlertAction actionWithTitle:[bundle localizedStringForKey:@"CANCEL_ACTION"]
-                                              style:UIAlertActionStyleCancel
-                                            handler:nil]];
-    [alert addAction:[UIAlertAction actionWithTitle:[bundle localizedStringForKey:@"REMOVE_FOLLOWER_ACTION"]
-                                              style:UIAlertActionStyleDestructive
-                                            handler:^(UIAlertAction* action) {
-                                                pfbSendRemoveFollower(userID, @"target_user_id", NO, ^(BOOL removed) {
-                                                  if (removed) {
-                                                      PFBCOMPAT_ACTION(PFBCompat_remove_followers, @"follower removed");
-                                                  }
-                                                  PFBShowToast(window,
-                                                               [bundle localizedStringForKey:removed
-                                                                           ? @"REMOVE_FOLLOWER_DONE"
-                                                                           : @"REMOVE_FOLLOWER_FAILED"],
-                                                               nil);
-                                                });
-                                            }]];
-    [top presentViewController:alert animated:YES completion:nil];
+    PFBAlertAddAction(alert, [bundle localizedStringForKey:@"CANCEL_ACTION"], UIAlertActionStyleCancel, YES, nil);
+    PFBAlertAddAction(alert, [bundle localizedStringForKey:@"REMOVE_FOLLOWER_ACTION"], UIAlertActionStyleDestructive, YES, ^{
+        pfbSendRemoveFollower(userID, @"target_user_id", NO, ^(BOOL removed) {
+          if (removed) {
+              PFBCOMPAT_ACTION(PFBCompat_remove_followers, @"follower removed");
+          }
+          NSString* result = [bundle localizedStringForKey:removed ? @"REMOVE_FOLLOWER_DONE" : @"REMOVE_FOLLOWER_FAILED"];
+          if (!PFBPushTwitterToast(result, nil, removed ? PFBToastKindSuccess : PFBToastKindError, nil, nil, NO)) {
+              PFBShowToast(window, result, nil);
+          }
+        });
+    });
+    PFBAlertPresent(alert, top, YES, nil);
 }
 
 %hook T1ProfileHeaderViewController
