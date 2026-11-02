@@ -31,6 +31,10 @@
 // that open a screen, as Twitter's new settings do.
 @property (nonatomic) BOOL nativeLook;
 
+// Whether the page belongs to the new look, as a page or as one group in its sheet: its pop-ups
+// are then Twitter's own.
+@property (nonatomic, readonly) BOOL newLook;
+
 // Identifies the page's entry in the PFBSettings registry
 - (NSString*)pageKey;
 
@@ -51,7 +55,8 @@
 
 // The row description filed as <KEY>_DETAIL, or an empty string when there is none.
 - (NSString*)localizedDetailForKey:(NSString*)key;
-// Opens the menu an entry names under "menu" from anywhere on its row.
+// Opens the menu an entry names under "menu" from anywhere on its row; in a sheet of the new
+// look, the menu's choices open as a step of the sheet instead.
 - (void)attachMenuIfNeeded:(UITableViewCell*)cell entry:(NSDictionary*)entry;
 // Shows a value a menu just changed: the visible rows are refreshed in place and take their
 // new heights, without a reload or an animation, so the list keeps still.

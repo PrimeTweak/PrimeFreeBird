@@ -5,6 +5,8 @@
 #import "Common/PFBCompatibility.h"
 #import "Settings/PFBSettingsCellStyle.h"
 #import "Settings/Native/PFBNativeSettingsRowCell.h"
+#import "Settings/PFBModernSettingsPageViewController.h"
+#import "Support/PFBTwitterPopups.h"
 
 // MARK: - PrimeFreeBird settings entry
 
@@ -512,20 +514,7 @@ static NSString* const kPFBAddedFontsPath = @"/var/mobile/Library/Fonts/AddedFon
     if (![plistDictionary isKindOfClass:[NSDictionary class]]) {
         return;
     }
-    NSAttributedString* AttString = [[NSAttributedString alloc]
-        initWithString:[[PFBBundle sharedBundle] localizedStringForKey:@"CUSTOM_FONTS_MENU_TITLE"]
-            attributes:@{
-                NSFontAttributeName: [PFBManager menuTitleFont],
-                NSForegroundColorAttributeName: UIColor.labelColor
-            }];
-    TFNActiveTextItem* title =
-        [[%c(TFNActiveTextItem) alloc] initWithTextModel:[[%c(TFNAttributedTextModel) alloc]
-                                                                 initWithAttributedString:AttString]
-                                                activeRanges:nil];
-
     NSMutableArray* actions = [[NSMutableArray alloc] init];
-    [actions addObject:title];
-
     [plistDictionary enumerateKeysAndObjectsUsingBlock:^(id _Nonnull key, id _Nonnull obj,
                                                          BOOL* _Nonnull stop) {
         @try {
@@ -558,6 +547,26 @@ static NSString* const kPFBAddedFontsPath = @"/var/mobile/Library/Fonts/AddedFon
         }
     }];
 
+    // The new look, whose page picks the fonts, shows them in Twitter's Tray; the classic look in
+    // Twitter's older sheet, under a title row whose text starts with a line break for its spacing.
+    NSString* titleText = [[PFBBundle sharedBundle] localizedStringForKey:@"CUSTOM_FONTS_MENU_TITLE"];
+    NSString* trayTitle = [titleText stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceAndNewlineCharacterSet];
+    id page = self.delegate;
+    if ([page isKindOfClass:[PFBModernSettingsPageViewController class]] &&
+        ((PFBModernSettingsPageViewController*)page).newLook && PFBPresentTray(self, trayTitle, actions)) {
+        return;
+    }
+    NSAttributedString* AttString = [[NSAttributedString alloc]
+        initWithString:titleText
+            attributes:@{
+                NSFontAttributeName: [PFBManager menuTitleFont],
+                NSForegroundColorAttributeName: UIColor.labelColor
+            }];
+    TFNActiveTextItem* title =
+        [[%c(TFNActiveTextItem) alloc] initWithTextModel:[[%c(TFNAttributedTextModel) alloc]
+                                                                 initWithAttributedString:AttString]
+                                                activeRanges:nil];
+    [actions insertObject:title atIndex:0];
     TFNMenuSheetViewController* alert = [[%c(TFNMenuSheetViewController) alloc]
         initWithActionItems:[NSArray arrayWithArray:actions]];
     [alert tfnPresentedCustomPresentFromViewController:self animated:YES completion:nil];

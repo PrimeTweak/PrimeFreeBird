@@ -14,6 +14,7 @@
 #import "Debug/PFBDebugger.h"
 #import "Settings/Native/PFBNativeSettingsPageRows.h"
 #import "Settings/Native/PFBShowcase.h"
+#import "Support/PFBTwitterPopups.h"
 
 @interface PFBModernSettingsPageViewController ()
 @property (nonatomic, copy) NSString* registryPageKey;
@@ -59,6 +60,10 @@ static NSURL* PFBAccountAvatarURL(TFNTwitterAccount* account) {
 }
 
 @implementation PFBModernSettingsPageViewController
+
+- (BOOL)newLook {
+    return self.nativeLook || self.inSheet;
+}
 
 - (void)viewWillAppear:(BOOL)animated {
     [super viewWillAppear:animated];
@@ -486,7 +491,7 @@ static NSURL* PFBAccountAvatarURL(TFNTwitterAccount* account) {
     if (!button) {
         button = [UIButton buttonWithType:UIButtonTypeCustom];
         button.tag = kMenuButtonTag;
-        button.showsMenuAsPrimaryAction = YES;
+        button.showsMenuAsPrimaryAction = !self.inSheet;
         button.translatesAutoresizingMaskIntoConstraints = NO;
         [cell.contentView addSubview:button];
         [NSLayoutConstraint activateConstraints:@[
@@ -496,9 +501,45 @@ static NSURL* PFBAccountAvatarURL(TFNTwitterAccount* account) {
             [button.bottomAnchor constraintEqualToAnchor:cell.contentView.bottomAnchor],
         ]];
     }
+    // The step reads the menu when it opens, so it shows the value as it stands; an action with
+    // the same identifier replaces the one a reused cell had.
+    if (self.inSheet) {
+        NSString* noteKey = entry[@"noteKey"];
+        __weak typeof(self) weakSelf = self;
+        __weak UITableViewCell* weakCell = cell;
+        UIAction* open = [UIAction actionWithTitle:@""
+                                             image:nil
+                                        identifier:@"pfb.step"
+                                           handler:^(__unused UIAction* tapped) {
+                                               NSString* note = noteKey
+                                                   ? [[PFBBundle sharedBundle] localizedStringForKey:noteKey]
+                                                   : [weakSelf noteOfMenuCell:weakCell];
+                                               [weakSelf showChoicesOfMenu:selector note:note];
+                                           }];
+        [button addAction:open forControlEvents:UIControlEventTouchUpInside];
+        return;
+    }
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Warc-performSelector-leaks"
     button.menu = [self performSelector:selector];
+#pragma clang diagnostic pop
+}
+
+// The description under a menu row's title, which the step repeats above the choices.
+- (NSString*)noteOfMenuCell:(UITableViewCell*)cell {
+    return [cell isKindOfClass:[PFBModernSettingsCompactButtonCell class]]
+               ? ((PFBModernSettingsCompactButtonCell*)cell).detailLabel.text
+               : nil;
+}
+
+- (void)showChoicesOfMenu:(SEL)selector note:(NSString*)note {
+    PFBNativeSettingsSheetController* sheet = (PFBNativeSettingsSheetController*)self.parentViewController;
+    if (![sheet isKindOfClass:[PFBNativeSettingsSheetController class]] || ![self respondsToSelector:selector]) {
+        return;
+    }
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Warc-performSelector-leaks"
+    [sheet showChoices:[self performSelector:selector] note:note];
 #pragma clang diagnostic pop
 }
 
@@ -883,10 +924,9 @@ static NSURL* PFBAccountAvatarURL(TFNTwitterAccount* account) {
             alertControllerWithTitle:[bundle localizedStringForKey:@"IMPORT_SETTINGS_FAILED_TITLE"]
                              message:[bundle localizedStringForKey:@"IMPORT_SETTINGS_FAILED_MESSAGE"]
                       preferredStyle:UIAlertControllerStyleAlert];
-        [failed addAction:[UIAlertAction actionWithTitle:[bundle localizedStringForKey:@"OK_ACTION"]
-                                                   style:UIAlertActionStyleDefault
-                                                 handler:nil]];
-        [self presentViewController:failed animated:YES completion:nil];
+        PFBAlertAddAction(failed, [bundle localizedStringForKey:@"OK_ACTION"], UIAlertActionStyleDefault, self.newLook,
+                          nil);
+        PFBAlertPresent(failed, self, self.newLook, nil);
         return;
     }
     __weak typeof(self) weakSelf = self;
@@ -894,15 +934,13 @@ static NSURL* PFBAccountAvatarURL(TFNTwitterAccount* account) {
         alertControllerWithTitle:[bundle localizedStringForKey:@"IMPORT_SETTINGS_CONFIRM_TITLE"]
                          message:[bundle localizedStringForKey:@"IMPORT_SETTINGS_CONFIRM_MESSAGE"]
                   preferredStyle:UIAlertControllerStyleAlert];
-    [confirm addAction:[UIAlertAction actionWithTitle:[bundle localizedStringForKey:@"CANCEL_ACTION"]
-                                                style:UIAlertActionStyleCancel
-                                              handler:nil]];
-    [confirm addAction:[UIAlertAction actionWithTitle:[bundle localizedStringForKey:@"IMPORT_SETTINGS_CONFIRM_ACTION"]
-                                                style:UIAlertActionStyleDestructive
-                                              handler:^(__unused UIAlertAction* action) {
-                                                  [weakSelf applyImportedSettings:settings];
-                                              }]];
-    [self presentViewController:confirm animated:YES completion:nil];
+    PFBAlertAddAction(confirm, [bundle localizedStringForKey:@"CANCEL_ACTION"], UIAlertActionStyleCancel, self.newLook,
+                      nil);
+    PFBAlertAddAction(confirm, [bundle localizedStringForKey:@"IMPORT_SETTINGS_CONFIRM_ACTION"],
+                      UIAlertActionStyleDestructive, self.newLook, ^{
+                          [weakSelf applyImportedSettings:settings];
+                      });
+    PFBAlertPresent(confirm, self, self.newLook, nil);
 }
 
 - (void)applyImportedSettings:(NSDictionary*)settings {
@@ -931,15 +969,13 @@ static NSURL* PFBAccountAvatarURL(TFNTwitterAccount* account) {
         alertControllerWithTitle:[bundle localizedStringForKey:@"RESET_SETTINGS_CONFIRM_TITLE"]
                          message:[bundle localizedStringForKey:@"RESET_SETTINGS_CONFIRM_MESSAGE"]
                   preferredStyle:UIAlertControllerStyleAlert];
-    [confirm addAction:[UIAlertAction actionWithTitle:[bundle localizedStringForKey:@"CANCEL_ACTION"]
-                                                style:UIAlertActionStyleCancel
-                                              handler:nil]];
-    [confirm addAction:[UIAlertAction actionWithTitle:[bundle localizedStringForKey:@"RESET_SETTINGS_CONFIRM_ACTION"]
-                                                style:UIAlertActionStyleDestructive
-                                              handler:^(__unused UIAlertAction* action) {
-                                                  [weakSelf applyResetSettings];
-                                              }]];
-    [self presentViewController:confirm animated:YES completion:nil];
+    PFBAlertAddAction(confirm, [bundle localizedStringForKey:@"CANCEL_ACTION"], UIAlertActionStyleCancel, self.newLook,
+                      nil);
+    PFBAlertAddAction(confirm, [bundle localizedStringForKey:@"RESET_SETTINGS_CONFIRM_ACTION"],
+                      UIAlertActionStyleDestructive, self.newLook, ^{
+                          [weakSelf applyResetSettings];
+                      });
+    PFBAlertPresent(confirm, self, self.newLook, nil);
 }
 
 // As on a new install: no stored option, filter, color, tab, send sound, hidden notification
@@ -979,24 +1015,17 @@ static NSURL* PFBAccountAvatarURL(TFNTwitterAccount* account) {
                          message:[[PFBBundle sharedBundle]
                                      localizedStringForKey:@"WEB_SESSION_CLEAR_CONFIRM"]
                   preferredStyle:UIAlertControllerStyleAlert];
-    [confirm addAction:[UIAlertAction
-                           actionWithTitle:[[PFBBundle sharedBundle]
-                                               localizedStringForKey:@"CANCEL_ACTION"]
-                                     style:UIAlertActionStyleCancel
-                                   handler:nil]];
-    [confirm addAction:[UIAlertAction
-                           actionWithTitle:[[PFBBundle sharedBundle]
-                                               localizedStringForKey:@"WEB_SESSION_CLEAR_ACTION"]
-                                     style:UIAlertActionStyleDestructive
-                                   handler:^(__unused UIAlertAction* action) {
-                                       PFBClearWebSession();
-                                       // The card and the rows gated on the
-                                       // session have no other way to learn it
-                                       // is gone. Sign-in already does this.
-                                       [weakSelf updateVisibleToggles];
-                                       [weakSelf.tableView reloadData];
-                                   }]];
-    [self presentViewController:confirm animated:YES completion:nil];
+    PFBAlertAddAction(confirm, [[PFBBundle sharedBundle] localizedStringForKey:@"CANCEL_ACTION"],
+                      UIAlertActionStyleCancel, self.newLook, nil);
+    PFBAlertAddAction(confirm, [[PFBBundle sharedBundle] localizedStringForKey:@"WEB_SESSION_CLEAR_ACTION"],
+                      UIAlertActionStyleDestructive, self.newLook, ^{
+                          PFBClearWebSession();
+                          // The card and the rows gated on the session have no other way to learn
+                          // it is gone. Sign-in already does this.
+                          [weakSelf updateVisibleToggles];
+                          [weakSelf.tableView reloadData];
+                      });
+    PFBAlertPresent(confirm, self, self.newLook, nil);
 }
 
 // Reduces user input like "https://fxtwitter.com/" to a bare host, so the
@@ -1018,12 +1047,41 @@ static NSURL* PFBAccountAvatarURL(TFNTwitterAccount* account) {
     return domain;
 }
 
-// Lives in the base class so the General page, which holds the link settings,
-// can present it.
+// Stores what was typed for the sharing domain, or forgets it when empty, then shows it on its row.
+- (void)saveSharingDomainInput:(NSString*)input row:(NSIndexPath*)indexPath {
+    NSUserDefaults* defaults = [NSUserDefaults standardUserDefaults];
+    NSString* domain = [self sharingDomainFromInput:input];
+    if (domain.length > 0) {
+        [defaults setObject:domain forKey:@"sharing_domain"];
+    } else {
+        [defaults removeObjectForKey:@"sharing_domain"];
+    }
+    [defaults synchronize];
+    if (indexPath) {
+        [self.tableView reloadRowsAtIndexPaths:@[ indexPath ] withRowAnimation:UITableViewRowAnimationNone];
+    }
+}
+
+// Lives in the base class so the General page, which holds the link settings, can present it.
+// The new look asks in a sheet laid out as its group sheets, the classic look in an alert.
 - (void)showSharingDomainPrompt:(NSDictionary*)data {
     NSUserDefaults* defaults = [NSUserDefaults standardUserDefaults];
     id storedHost = [defaults objectForKey:@"sharing_domain"];
     NSString* currentHost = [storedHost isKindOfClass:[NSString class]] ? storedHost : nil;
+    NSIndexPath* row = data[@"indexPath"];
+    if (self.newLook) {
+        PFBBundle* bundle = [PFBBundle sharedBundle];
+        __weak typeof(self) weakSelf = self;
+        [PFBNativeSettingsSheetController presentFieldTitled:[bundle localizedStringForKey:@"SHARING_DOMAIN_TITLE"]
+                                                        note:[bundle localizedStringForKey:@"SHARING_DOMAIN_PROMPT_MESSAGE"]
+                                                       value:currentHost
+                                                 placeholder:@"x.com"
+                                                        from:self
+                                                        save:^(NSString* text) {
+                                                            [weakSelf saveSharingDomainInput:text row:row];
+                                                        }];
+        return;
+    }
 
     UIAlertController* alert =
         [UIAlertController alertControllerWithTitle:[[PFBBundle sharedBundle]
@@ -1056,22 +1114,9 @@ static NSURL* PFBAccountAvatarURL(TFNTwitterAccount* account) {
                                           localizedTwitterStringForKey:@"SAVE_ACTION_LABEL"]
                                 style:UIAlertActionStyleDefault
                               handler:^(UIAlertAction* action) {
-                                  NSString* domain =
-                                      [self sharingDomainFromInput:answered.textFields.firstObject.text];
+                                  NSString* input = answered.textFields.firstObject.text;
                                   answered = nil;
-
-                                  if (domain.length > 0) {
-                                      [defaults setObject:domain forKey:@"sharing_domain"];
-                                  } else {
-                                      [defaults removeObjectForKey:@"sharing_domain"];
-                                  }
-                                  [defaults synchronize];
-
-                                  NSIndexPath* indexPath = data[@"indexPath"];
-                                  if (indexPath) {
-                                      [self.tableView reloadRowsAtIndexPaths:@[indexPath]
-                                                            withRowAnimation:UITableViewRowAnimationNone];
-                                  }
+                                  [self saveSharingDomainInput:input row:row];
                               }]];
 
     [self presentViewController:alert animated:YES completion:nil];
@@ -1086,11 +1131,9 @@ static NSURL* PFBAccountAvatarURL(TFNTwitterAccount* account) {
         alertControllerWithTitle:[bundle localizedStringForKey:@"RESTART_REQUIRED_ALERT_TITLE"]
                          message:[bundle localizedStringForKey:@"RESTART_INFO_ALERT_MESSAGE"]
                   preferredStyle:UIAlertControllerStyleAlert];
-    [alert addAction:[UIAlertAction
-                         actionWithTitle:[bundle localizedTwitterStringForKey:@"OK_ACTION_LABEL"]
-                                   style:UIAlertActionStyleDefault
-                                 handler:nil]];
-    [self presentViewController:alert animated:YES completion:nil];
+    PFBAlertAddAction(alert, [bundle localizedTwitterStringForKey:@"OK_ACTION_LABEL"], UIAlertActionStyleDefault,
+                      self.newLook, nil);
+    PFBAlertPresent(alert, self, self.newLook, nil);
 }
 
 - (void)showRestartRequiredAlert {
@@ -1113,31 +1156,29 @@ static NSURL* PFBAccountAvatarURL(TFNTwitterAccount* account) {
     UIAlertController* alert = [UIAlertController alertControllerWithTitle:title
                                                                     message:message
                                                              preferredStyle:UIAlertControllerStyleAlert];
-    [alert addAction:[UIAlertAction actionWithTitle:[bundle localizedStringForKey:@"RESTART_LATER_ACTION"]
-                                              style:UIAlertActionStyleCancel
-                                            handler:^(__unused UIAlertAction* action) {
-                                                if (answered) {
-                                                    answered(^{
-                                                    });
-                                                }
-                                            }]];
-    UIAlertAction* close = [UIAlertAction actionWithTitle:[bundle localizedStringForKey:@"CLOSE_APP_ACTION"]
-                                                    style:UIAlertActionStyleDefault
-                                                  handler:^(__unused UIAlertAction* action) {
-                                                      void (^quit)(void) = ^{
-                                                          PFBCompatSaveNow();
-                                                          [[NSUserDefaults standardUserDefaults] synchronize];
-                                                          exit(0);
-                                                      };
-                                                      if (answered) {
-                                                          answered(quit);
-                                                      } else {
-                                                          quit();
-                                                      }
-                                                  }];
-    [alert addAction:close];
+    PFBAlertAddAction(alert, [bundle localizedStringForKey:@"RESTART_LATER_ACTION"], UIAlertActionStyleCancel,
+                      self.newLook, ^{
+                          if (answered) {
+                              answered(^{
+                              });
+                          }
+                      });
+    UIAlertAction* close =
+        PFBAlertAddAction(alert, [bundle localizedStringForKey:@"CLOSE_APP_ACTION"], UIAlertActionStyleDefault,
+                          self.newLook, ^{
+                              void (^quit)(void) = ^{
+                                  PFBCompatSaveNow();
+                                  [[NSUserDefaults standardUserDefaults] synchronize];
+                                  exit(0);
+                              };
+                              if (answered) {
+                                  answered(quit);
+                              } else {
+                                  quit();
+                              }
+                          });
     alert.preferredAction = close;
-    [self presentViewController:alert animated:YES completion:nil];
+    PFBAlertPresent(alert, self, self.newLook, nil);
 }
 
 // UIAlertAction carries a private checked flag that draws the system checkmark
