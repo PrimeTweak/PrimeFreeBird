@@ -11,6 +11,7 @@
 #import "Support/Helpers.h"
 #import "Support/HookHelpers.h"
 #import "Support/T1Headers.h"
+#import "Support/PFBTwitterPopups.h"
 
 // The floating compose button, hidden while the editor is on screen.
 @interface TFNFloatingActionButton : UIView
@@ -287,16 +288,14 @@ static NSString* const kGridFooterID = @"gridFooter";
         [UIAlertController alertControllerWithTitle:[bundle localizedStringForKey:@"CUSTOM_TAB_BAR_DISCARD_TITLE"]
                                             message:[bundle localizedStringForKey:@"CUSTOM_TAB_BAR_DISCARD_MESSAGE"]
                                      preferredStyle:UIAlertControllerStyleAlert];
-    [alert addAction:[UIAlertAction actionWithTitle:[bundle localizedTwitterStringForKey:@"CANCEL_ACTION_LABEL"]
-                                              style:UIAlertActionStyleCancel
-                                            handler:nil]];
+    PFBAlertAddAction(alert, [bundle localizedTwitterStringForKey:@"CANCEL_ACTION_LABEL"], UIAlertActionStyleCancel,
+                      self.nativeLook, nil);
     __weak typeof(self) weakSelf = self;
-    [alert addAction:[UIAlertAction actionWithTitle:[bundle localizedStringForKey:@"CUSTOM_TAB_BAR_DISCARD_ACTION"]
-                                              style:UIAlertActionStyleDestructive
-                                            handler:^(__unused UIAlertAction* action) {
-                                                [weakSelf.navigationController popViewControllerAnimated:YES];
-                                            }]];
-    [self presentViewController:alert animated:YES completion:nil];
+    PFBAlertAddAction(alert, [bundle localizedStringForKey:@"CUSTOM_TAB_BAR_DISCARD_ACTION"],
+                      UIAlertActionStyleDestructive, self.nativeLook, ^{
+                          [weakSelf.navigationController popViewControllerAnimated:YES];
+                      });
+    PFBAlertPresent(alert, self, self.nativeLook, nil);
 }
 
 #pragma mark - Save / Reset
@@ -377,22 +376,18 @@ static UIViewController* findViewControllerOfClass(UIViewController* vc,
         alertControllerWithTitle:[bundle localizedTwitterStringForKey:@"SUBSCRIPTION_TAB_CUSTOMIZATION_RESTORE_BUTTON_TITLE"]
                          message:[bundle localizedStringForKey:@"CUSTOM_TAB_BAR_RESET_MESSAGE"]
                   preferredStyle:UIAlertControllerStyleAlert];
-    [alert addAction:[UIAlertAction actionWithTitle:[bundle localizedTwitterStringForKey:@"CANCEL_ACTION_LABEL"]
-                                              style:UIAlertActionStyleCancel
-                                            handler:nil]];
+    PFBAlertAddAction(alert, [bundle localizedTwitterStringForKey:@"CANCEL_ACTION_LABEL"], UIAlertActionStyleCancel,
+                      self.nativeLook, nil);
     __weak typeof(self) weakSelf = self;
-    UIAlertAction* restore =
-        [UIAlertAction actionWithTitle:[bundle localizedStringForKey:@"CUSTOM_TAB_BAR_RESTORE_ACTION"]
-                                 style:UIAlertActionStyleDefault
-                               handler:^(__unused UIAlertAction* action) {
-                                   [weakSelf selectPages:[PFBCustomTabBarUtility defaultVisiblePageIDs]];
-                                   [weakSelf recomputeChanges];
-                                   [weakSelf.gridView reloadData];
-                                   [weakSelf.previewView reloadData];
-                               }];
-    [alert addAction:restore];
+    UIAlertAction* restore = PFBAlertAddAction(alert, [bundle localizedStringForKey:@"CUSTOM_TAB_BAR_RESTORE_ACTION"],
+                                               UIAlertActionStyleDefault, self.nativeLook, ^{
+                                                   [weakSelf selectPages:[PFBCustomTabBarUtility defaultVisiblePageIDs]];
+                                                   [weakSelf recomputeChanges];
+                                                   [weakSelf.gridView reloadData];
+                                                   [weakSelf.previewView reloadData];
+                                               });
     alert.preferredAction = restore;
-    [self presentViewController:alert animated:YES completion:nil];
+    PFBAlertPresent(alert, self, self.nativeLook, nil);
 }
 
 // The refusal takes the instructions' place in the alert color for a moment, and the
