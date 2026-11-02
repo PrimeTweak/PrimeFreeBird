@@ -9,4 +9,7 @@
 // without a second implementation.
 - (instancetype)initCompact;
 
+// Set before the full screen shows: the new look of Twitter's settings, with the options in a sheet.
+@property (nonatomic) BOOL nativeLook;
+
 @end

@@ -4,6 +4,17 @@
 #import "Features/Appearance/ThemeColor/PFBPalette.h"
 #import "Support/TwitterChirpFont.h"
 
+// The ground a row paints: none in a list that lets its own ground show through, as a sheet's
+// does, the page's color otherwise. The list is looked for above the row, whatever lies between.
+static inline UIColor* PFBSettingsRowGround(UITableViewCell* cell) {
+    UIView* list = cell.superview;
+    while (list && ![list isKindOfClass:[UITableView class]]) {
+        list = list.superview;
+    }
+    UIColor* ground = list.backgroundColor;
+    return ground && CGColorGetAlpha(ground.CGColor) == 0 ? [UIColor clearColor] : [PFBPalette currentBackgroundColor];
+}
+
 // UIKit paints its own selection in a system gray bright enough to sit above
 // the dark-style filter's ceiling, so the row stays gray while the rest of the
 // screen is recolored. The shade is handed to the cell directly instead.

@@ -13,7 +13,6 @@
 #import "Common/PFBCompatibility.h"
 #import "Debug/PFBDebugger.h"
 #import "Settings/Native/PFBNativeSettingsPageRows.h"
-#import "Settings/PFBSettingsRowsProbe.h"
 
 @interface PFBModernSettingsPageViewController ()
 @property (nonatomic, copy) NSString* registryPageKey;
@@ -65,7 +64,6 @@ static NSURL* PFBAccountAvatarURL(TFNTwitterAccount* account) {
     PFBThemeScreenEnter(self);
     // Back from a screen one of its rows opened, the new look shows the values as they now stand.
     if (self.nativeLook) {
-        PFBSettingsWatchRows(self.tableView, @"page shown again");
         [self.tableView reloadData];
     }
 }
@@ -111,7 +109,6 @@ static NSURL* PFBAccountAvatarURL(TFNTwitterAccount* account) {
 // The Compatibility row shows a status that the checks update after launch.
 - (void)pfbCompatDidChange:(NSNotification*)note {
     dispatch_async(dispatch_get_main_queue(), ^{
-        PFBSettingsWatchRows(self.tableView, @"Compatibility status");
         [self.tableView reloadData];
     });
 }
@@ -562,6 +559,8 @@ static NSURL* PFBAccountAvatarURL(TFNTwitterAccount* account) {
     if (self.inSheet) {
         cell.backgroundColor = [UIColor clearColor];
     }
+    // A row emptied as it went away comes back whole when it is used again.
+    cell.contentView.hidden = NO;
     if ((NSUInteger)indexPath.row < self.visibleToggles.count) {
         [self.rowHeights setObject:@(CGRectGetHeight(cell.bounds)) forKey:self.visibleToggles[(NSUInteger)indexPath.row]];
     }
@@ -577,7 +576,6 @@ static NSURL* PFBAccountAvatarURL(TFNTwitterAccount* account) {
 }
 
 - (void)refreshRowsInPlace {
-    PFBSettingsWatchRows(self.tableView, @"menu choice");
     NSArray<NSIndexPath*>* visible = self.tableView.indexPathsForVisibleRows;
     if (!visible.count) {
         return;
@@ -719,7 +717,6 @@ static NSURL* PFBAccountAvatarURL(TFNTwitterAccount* account) {
 - (void)switchChanged:(UISwitch*)sender {
     NSString* key = objc_getAssociatedObject(sender, @"prefKey");
     if (key) {
-        PFBSettingsWatchRows(self.tableView, [@"switch " stringByAppendingString:key]);
         BOOL inverted = [objc_getAssociatedObject(sender, @"inverted") boolValue];
         [[NSUserDefaults standardUserDefaults]
             setBool:(inverted ? !sender.isOn : sender.isOn)
@@ -809,9 +806,10 @@ static NSURL* PFBAccountAvatarURL(TFNTwitterAccount* account) {
     }
 }
 
+// The screen titles itself; the classic look adds the account under the title.
 - (void)showAppIconViewController:(NSDictionary*)sender {
     UIViewController* appIconVC = [[PFBAppIconViewController alloc] init];
-    if (self.account) {
+    if (self.account && !self.nativeLook) {
         [appIconVC.navigationItem
             setTitleView:[objc_getClass("TFNTitleView")
                              titleViewWithTitle:[[PFBBundle sharedBundle]
@@ -827,6 +825,7 @@ static NSURL* PFBAccountAvatarURL(TFNTwitterAccount* account) {
 // Pushes the muted-words editor; the list itself lives in NSUserDefaults.
 - (void)showMutedWords:(NSDictionary*)sender {
     PFBMutedWordsViewController* editor = [[PFBMutedWordsViewController alloc] init];
+    editor.nativeLook = self.nativeLook;
     [self.navigationController pushViewController:editor animated:YES];
 }
 
@@ -1211,6 +1210,13 @@ static NSURL* PFBAccountAvatarURL(TFNTwitterAccount* account) {
         [self.tableView insertRowsAtIndexPaths:indexPaths
                               withRowAnimation:UITableViewRowAnimationAutomatic];
     } else {
+        // A sheet's rows are clear over its ground: a row slid under the one above would show
+        // through it, so the rows going away lose their content at once.
+        if (self.inSheet) {
+            for (NSIndexPath* path in indexPaths) {
+                [self.tableView cellForRowAtIndexPath:path].contentView.hidden = YES;
+            }
+        }
         [self.tableView deleteRowsAtIndexPaths:indexPaths
                               withRowAnimation:UITableViewRowAnimationAutomatic];
     }
@@ -1221,10 +1227,10 @@ static NSURL* PFBAccountAvatarURL(TFNTwitterAccount* account) {
 // MARK: - Diagnostics
 
 - (void)showCompatibilityReport:(NSDictionary*)sender {
-    [self.navigationController
-        pushViewController:[[PFBCompatibilityReportViewController alloc]
-                               initWithStyle:UITableViewStyleGrouped]
-                  animated:YES];
+    PFBCompatibilityReportViewController* report =
+        [[PFBCompatibilityReportViewController alloc] initWithStyle:UITableViewStyleGrouped];
+    report.nativeLook = self.nativeLook;
+    [self.navigationController pushViewController:report animated:YES];
 }
 
 @end

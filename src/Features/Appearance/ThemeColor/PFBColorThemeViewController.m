@@ -11,6 +11,8 @@ extern void PFBWhitenNavigationBarConfirm(UINavigationBar* bar);
 #import "Support/TWHeaders.h"
 #import "Support/HookHelpers.h"
 #import "Features/Appearance/ThemeColor/PFBPalette.h"
+#import "Settings/Native/PFBNativeSettingsRowCell.h"
+#import "Settings/PFBSettingsCellStyle.h"
 extern void PFBBeginRawPaletteRead(void);
 extern void PFBEndRawPaletteRead(void);
 
@@ -83,10 +85,13 @@ static NSInteger NearestAccentOption(UIColor* color) {
     return best;
 }
 
-@interface PFBColorThemeViewController () <UIColorPickerViewControllerDelegate>
+@interface PFBColorThemeViewController () <UIColorPickerViewControllerDelegate, UITableViewDataSource,
+                                           UITableViewDelegate>
 @property (nonatomic, strong) NSMutableArray<PFBColorSwatchControl*>* swatches;
 @property (nonatomic, strong) PFBColorSwatchControl* customSwatch;
 @property (nonatomic, strong) UIButton* resetButton;
+// The new look's list: the options in its header, then Custom and Reset to default.
+@property (nonatomic, strong) UITableView* nativeTable;
 @end
 
 @implementation PFBColorThemeViewController
@@ -98,6 +103,11 @@ static NSInteger NearestAccentOption(UIColor* color) {
 
     self.navigationController.navigationBar.prefersLargeTitles = NO;
     self.view.backgroundColor = [PFBPalette currentBackgroundColor];
+    if (self.nativeLook) {
+        [self buildNativeLook];
+        [self refreshSelection];
+        return;
+    }
 
     UILabel* detail = [UILabel new];
     detail.translatesAutoresizingMaskIntoConstraints = NO;
@@ -233,11 +243,143 @@ static NSInteger NearestAccentOption(UIColor* color) {
     [self refreshSelection];
 }
 
-// The border is a CGColor, which does not follow a light or dark switch by itself.
+// MARK: - New look
+
+// The six colors as round options under the screen's line, then Custom and Reset to default as
+// rows of Twitter's settings.
+- (void)buildNativeLook {
+    PFBBundle* bundle = [PFBBundle sharedBundle];
+    UITableView* table = [[UITableView alloc] initWithFrame:self.view.bounds style:UITableViewStylePlain];
+    table.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+    table.backgroundColor = [PFBPalette currentBackgroundColor];
+    table.separatorStyle = UITableViewCellSeparatorStyleNone;
+    table.rowHeight = UITableViewAutomaticDimension;
+    table.estimatedRowHeight = 72;
+    table.sectionHeaderTopPadding = 0;
+    table.dataSource = self;
+    table.delegate = self;
+    [table registerClass:[PFBNativeSettingsRowCell class] forCellReuseIdentifier:@"NativeRow"];
+    [self.view addSubview:table];
+    self.nativeTable = table;
+
+    UIView* header = [[UIView alloc] init];
+    UILabel* detail = [UILabel new];
+    detail.translatesAutoresizingMaskIntoConstraints = NO;
+    detail.text = [bundle localizedStringForKey:@"THEME_SETTINGS_NAVIGATION_DETAIL"];
+    detail.font = PFBSettingsDetailFont();
+    detail.textColor = PFBSettingsSubtitleColor();
+    detail.numberOfLines = 0;
+    [header addSubview:detail];
+    UIStackView* grid = [[UIStackView alloc] init];
+    grid.translatesAutoresizingMaskIntoConstraints = NO;
+    grid.axis = UILayoutConstraintAxisVertical;
+    grid.spacing = 14;
+    [header addSubview:grid];
+
+    self.swatches = [NSMutableArray new];
+    PFBBeginRawPaletteRead();
+    UIStackView* line = nil;
+    for (NSUInteger option = 1; option <= kAccentOptionCount; option++) {
+        if ((option - 1) % 3 == 0) {
+            line = [[UIStackView alloc] init];
+            line.axis = UILayoutConstraintAxisHorizontal;
+            line.distribution = UIStackViewDistributionFillEqually;
+            [grid addArrangedSubview:line];
+        }
+        PFBColorSwatchControl* swatch = [[PFBColorSwatchControl alloc] initRound];
+        swatch.colorID = option;
+        swatch.isAccessibilityElement = YES;
+        NSString* name = [bundle localizedTwitterStringForKey:kAccentNameKeys[option - 1]];
+        swatch.accessibilityLabel = name;
+        [swatch setSwatchColor:NativeAccentColor(option)];
+        [swatch setSwatchName:name];
+        [swatch addTarget:self action:@selector(swatchTapped:) forControlEvents:UIControlEventTouchUpInside];
+        [line addArrangedSubview:swatch];
+        [self.swatches addObject:swatch];
+    }
+    PFBEndRawPaletteRead();
+
+    CGFloat margin = [PFBNativeSettingsRowStyle shared].iconFrame.origin.x;
+    [NSLayoutConstraint activateConstraints:@[
+        [detail.topAnchor constraintEqualToAnchor:header.topAnchor constant:8],
+        [detail.leadingAnchor constraintEqualToAnchor:header.leadingAnchor constant:margin],
+        [detail.trailingAnchor constraintEqualToAnchor:header.trailingAnchor constant:-margin],
+        [grid.topAnchor constraintEqualToAnchor:detail.bottomAnchor constant:20],
+        [grid.leadingAnchor constraintEqualToAnchor:header.leadingAnchor constant:margin],
+        [grid.trailingAnchor constraintEqualToAnchor:header.trailingAnchor constant:-margin],
+        [grid.bottomAnchor constraintEqualToAnchor:header.bottomAnchor constant:-16],
+    ]];
+    table.tableHeaderView = header;
+}
+
+// The header takes the height its constraints give at the table's width, again when that changes.
+- (void)viewDidLayoutSubviews {
+    [super viewDidLayoutSubviews];
+    UIView* header = self.nativeTable.tableHeaderView;
+    if (!header) {
+        return;
+    }
+    CGFloat width = self.nativeTable.bounds.size.width;
+    CGFloat height = [header systemLayoutSizeFittingSize:CGSizeMake(width, 0)
+                           withHorizontalFittingPriority:UILayoutPriorityRequired
+                                 verticalFittingPriority:UILayoutPriorityFittingSizeLevel]
+                         .height;
+    if (fabs(header.frame.size.width - width) < 0.5 && fabs(header.frame.size.height - height) < 0.5) {
+        return;
+    }
+    header.frame = CGRectMake(0, 0, width, height);
+    self.nativeTable.tableHeaderView = header;
+}
+
+- (NSInteger)tableView:(UITableView*)tableView numberOfRowsInSection:(NSInteger)section {
+    return 2;
+}
+
+// Custom draws its icon in the picked color while that color is the accent; Reset to default
+// reads in red.
+- (UITableViewCell*)tableView:(UITableView*)tableView cellForRowAtIndexPath:(NSIndexPath*)indexPath {
+    PFBBundle* bundle = [PFBBundle sharedBundle];
+    PFBNativeSettingsRowCell* cell = [tableView dequeueReusableCellWithIdentifier:@"NativeRow"
+                                                                     forIndexPath:indexPath];
+    if (indexPath.row == 0) {
+        [cell configureWithTitle:[bundle localizedStringForKey:@"THEME_CUSTOM_NAME"]
+                          detail:[bundle localizedStringForKey:@"THEME_CUSTOM_HINT"]
+                        iconName:@"colorpicker"
+                           value:nil
+                       accessory:PFBNativeSettingsRowAccessoryChevron];
+        BOOL customActive = [[NSUserDefaults standardUserDefaults] boolForKey:@"pfb_custom_is_active"];
+        cell.iconColor = customActive ? PFBCustomAccentColor() : nil;
+        return cell;
+    }
+    [cell configureWithTitle:[bundle localizedStringForKey:@"THEME_RESET_TITLE"]
+                      detail:[bundle localizedStringForKey:@"THEME_RESET_HINT"]
+                    iconName:@"reload"
+                       value:nil
+                   accessory:PFBNativeSettingsRowAccessoryNone];
+    cell.destructive = YES;
+    return cell;
+}
+
+- (void)tableView:(UITableView*)tableView didSelectRowAtIndexPath:(NSIndexPath*)indexPath {
+    [tableView deselectRowAtIndexPath:indexPath animated:YES];
+    if (indexPath.row == 0) {
+        [self openColorPicker];
+    } else {
+        [self confirmResetToDefaultColor];
+    }
+}
+
+// The border is a CGColor and the new look's ground a fixed palette color: neither follows a
+// light or dark switch by itself.
 - (void)traitCollectionDidChange:(UITraitCollection*)previousTraitCollection {
     [super traitCollectionDidChange:previousTraitCollection];
     self.resetButton.layer.borderColor =
         [[UIColor systemGray4Color] resolvedColorWithTraitCollection:self.traitCollection].CGColor;
+    if (self.nativeTable &&
+        [self.traitCollection hasDifferentColorAppearanceComparedToTraitCollection:previousTraitCollection]) {
+        self.view.backgroundColor = [PFBPalette currentBackgroundColor];
+        self.nativeTable.backgroundColor = self.view.backgroundColor;
+    }
 }
 
 // MARK: - Reset
@@ -331,6 +473,7 @@ static NSInteger NearestAccentOption(UIColor* color) {
         [self.customSwatch setSwatchNeutral];
     }
     [self.customSwatch setSwatchSelected:customActive];
+    [self.nativeTable reloadData];
     // Twitter re-bakes the confirm glyph on the run loop after the accent notifications, so
     // the white bake runs now and once more next turn.
     PFBWhitenNavigationBarConfirm(self.navigationController.navigationBar);

@@ -1,11 +1,12 @@
 // A settings page: builds its rows from PFBSettings and handles their actions.
 
 #import <UIKit/UIKit.h>
+#import "Settings/Native/PFBNativeSettingsSheetController.h"
 
 @class TFNTwitterAccount;
 
 @interface PFBModernSettingsPageViewController
-    : UIViewController <UITableViewDataSource, UITableViewDelegate, UIDocumentPickerDelegate>
+    : UIViewController <UITableViewDataSource, UITableViewDelegate, UIDocumentPickerDelegate, PFBNativeSheetRows>
 
 @property (nonatomic, strong) TFNTwitterAccount* account;
 @property (nonatomic, strong) UITableView* tableView;

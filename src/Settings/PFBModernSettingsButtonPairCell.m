@@ -75,7 +75,7 @@
 }
 
 - (void)applyTheme {
-    self.backgroundColor = [PFBPalette currentBackgroundColor];
+    self.backgroundColor = PFBSettingsRowGround(self);
     UIFont* font = PFBSettingsTitleFont();
     UIColor* ink = PFBSettingsTextColor();
     UIColor* soft = PFBSettingsSubtitleColor();

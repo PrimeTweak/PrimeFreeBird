@@ -3,9 +3,7 @@
 
 #import "Settings/Native/PFBNativeSettingsSheetController.h"
 #import "Common/PFBBundle.h"
-#import "Settings/PFBModernSettingsPageViewController.h"
 #import "Settings/PFBSettingsCellStyle.h"
-#import "Settings/PFBSettingsRowsProbe.h"
 #import "Support/PFBManager.h"
 
 // iOS draws the design it launched with: glass sheets under Liquid Glass, opaque ones under the
@@ -32,7 +30,7 @@ static const CGFloat kPFBSheetDoneHeight = 48;
 static const CGFloat kPFBSheetBottomMargin = 16;
 
 @interface PFBNativeSettingsSheetController ()
-@property (nonatomic, strong) PFBModernSettingsPageViewController* page;
+@property (nonatomic, strong) UIViewController<PFBNativeSheetRows>* page;
 @property (nonatomic, copy) NSString* groupTitle;
 @property (nonatomic, copy) void (^closed)(void);
 @property (nonatomic, strong) UILabel* titleLabel;
@@ -45,12 +43,12 @@ static const CGFloat kPFBSheetBottomMargin = 16;
 
 @implementation PFBNativeSettingsSheetController
 
-+ (void)presentPage:(PFBModernSettingsPageViewController*)page
++ (void)presentRows:(UIViewController<PFBNativeSheetRows>*)rows
              titled:(NSString*)title
                from:(UIViewController*)presenter
              closed:(void (^)(void))closed {
     PFBNativeSettingsSheetController* sheet = [[self alloc] init];
-    sheet.page = page;
+    sheet.page = rows;
     sheet.groupTitle = title;
     sheet.closed = closed;
     sheet.modalPresentationStyle = UIModalPresentationPageSheet;
@@ -58,7 +56,7 @@ static const CGFloat kPFBSheetBottomMargin = 16;
     [sheet loadViewIfNeeded];
     sheet.view.frame = presenter.view.window ? presenter.view.window.bounds : UIScreen.mainScreen.bounds;
     [sheet.view layoutIfNeeded];
-    [page.tableView layoutIfNeeded];
+    [rows.tableView layoutIfNeeded];
     sheet.fittedHeight = [sheet contentHeight];
     UISheetPresentationController* presentation = sheet.sheetPresentationController;
     if (@available(iOS 16.0, *)) {
@@ -157,14 +155,10 @@ static const CGFloat kPFBSheetBottomMargin = 16;
     self.closeButton.tintColor = ink;
 }
 
-// The rows paint their own ground again on a change of appearance; the next pass clears it.
+// The rows keep their sheet's clear ground on their own; the title and Done follow here.
 - (void)traitCollectionDidChange:(UITraitCollection*)previousTraitCollection {
     [super traitCollectionDidChange:previousTraitCollection];
     [self applyTheme];
-    dispatch_async(dispatch_get_main_queue(), ^{
-        PFBSettingsWatchRows(self.page.tableView, @"appearance change");
-        [self.page.tableView reloadData];
-    });
 }
 
 - (void)close {
@@ -196,7 +190,6 @@ static const CGFloat kPFBSheetBottomMargin = 16;
     if (fabs(height - self.fittedHeight) < 1) {
         return;
     }
-    PFBSettingsNoteSheetHeight(self.fittedHeight, height, self.isBeingPresented);
     self.fittedHeight = height;
     if (@available(iOS 16.0, *)) {
         UISheetPresentationController* sheet = self.sheetPresentationController;

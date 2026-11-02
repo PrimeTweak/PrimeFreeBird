@@ -8,6 +8,10 @@ NS_ASSUME_NONNULL_BEGIN
 
 @property (nonatomic, assign) NSInteger colorID;
 
+// The new look's option instead: a round color with its name under it, and a check inside it
+// once chosen.
+- (instancetype)initRound;
+
 - (void)setSwatchColor:(UIColor*)color;
 - (void)setSwatchName:(NSString*)name;
 - (void)setSwatchNeutral;

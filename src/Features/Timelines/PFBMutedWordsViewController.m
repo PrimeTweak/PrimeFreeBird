@@ -9,6 +9,9 @@
 #import "Features/Timelines/PFBMutedTermCell.h"
 #import "Settings/PFBModernSettingsToggleCell.h"
 #import "Settings/PFBTintedSwitch.h"
+#import "Settings/Native/PFBNativeSettingsRowCell.h"
+#import "Settings/Native/PFBNativeSettingsSheetController.h"
+#import "Settings/PFBSettingsCellStyle.h"
 
 // A language row's own height, so the switch is spaced like one more entry.
 static const CGFloat kPFBTranslateBarHeight = 51.0;
@@ -17,6 +20,8 @@ static const CGFloat kPFBTranslateBarHeight = 51.0;
 // margin above it.
 static const CGFloat kPFBCompactRowMargin = 14.0;
 static const NSInteger kPFBTickTag = 7701;
+// The new look's button over a term's row, which opens its duration menu.
+static const NSInteger kPFBRowMenuTag = 7702;
 
 // Plain strings: an "@" prefix marks an account, a space a phrase, anything else a
 // word. Timeline.x reads the same keys and reloads through pfbRefreshMutedWords().
@@ -48,6 +53,121 @@ static void PFBFollowFiltersChange(void) {
                              : @"no new Tweets within 3 s of a Filters change: words already on screen stay",
                          2);
     });
+}
+
+// MARK: - options
+
+enum { kPFBMutedOptionCount = 4 };
+
+// One option's row: what it says, and its switch as stored, or as its default until set.
+static void PFBMutedConfigureOption(PFBModernSettingsToggleCell* cell, NSUInteger index) {
+    struct {
+        __unsafe_unretained NSString* titleKey;
+        __unsafe_unretained NSString* detailKey;
+        __unsafe_unretained NSString* prefKey;
+        BOOL defaultOn;
+    } options[kPFBMutedOptionCount] = {
+        { @"MUTED_WORDS_WHOLE_TITLE", @"MUTED_WORDS_WHOLE_DETAIL",
+          kPFBMutedWholeWordsKey, YES },
+        { @"MUTED_WORDS_CONVERSATIONS_TITLE", @"MUTED_WORDS_CONVERSATIONS_DETAIL",
+          kPFBMutedInConversationsKey, YES },
+        { @"MUTED_WORDS_FOLLOWING_TITLE", @"MUTED_WORDS_FOLLOWING_DETAIL",
+          kPFBMutedSkipFollowingKey, YES },
+        { @"MUTED_WORDS_REPOSTS_TITLE", @"MUTED_WORDS_REPOSTS_DETAIL",
+          kPFBMutedIncludeRepostsKey, NO },
+    };
+    if (index >= kPFBMutedOptionCount) {
+        index = 0;
+    }
+    PFBBundle* bundle = [PFBBundle sharedBundle];
+    [cell configureWithTitle:[bundle localizedStringForKey:options[index].titleKey]
+                    subtitle:[bundle localizedStringForKey:options[index].detailKey]];
+    cell.toggleSwitch.tag = (NSInteger)index;
+    NSUserDefaults* d = [NSUserDefaults standardUserDefaults];
+    cell.toggleSwitch.on = ([d objectForKey:options[index].prefKey] == nil)
+                               ? options[index].defaultOn
+                               : [d boolForKey:options[index].prefKey];
+}
+
+// An option's switch moved: its key is written and the filters run again.
+static void PFBMutedOptionToggled(UISwitch* sender) {
+    NSArray* keys = @[ kPFBMutedWholeWordsKey, kPFBMutedInConversationsKey,
+                       kPFBMutedSkipFollowingKey, kPFBMutedIncludeRepostsKey ];
+    NSUInteger index = (NSUInteger)sender.tag;
+    if (index >= keys.count) {
+        return;
+    }
+    [[NSUserDefaults standardUserDefaults] setBool:sender.isOn forKey:keys[index]];
+    pfbRefreshMutedWords();
+    PFBNoteFiltersChange();
+}
+
+// The options in a sheet of the new look, the same switches the classic screen lists.
+@interface PFBMutedOptionsViewController : UIViewController <PFBNativeSheetRows, UITableViewDataSource,
+                                                            UITableViewDelegate>
+@property (nonatomic, strong) UITableView* tableView;
+@end
+
+@implementation PFBMutedOptionsViewController
+
+// A sheet's rows sit on its ground and scroll only past its height, as a settings group's do.
+- (void)viewDidLoad {
+    [super viewDidLoad];
+    self.view.backgroundColor = [UIColor clearColor];
+    UITableView* table = [[UITableView alloc] initWithFrame:self.view.bounds style:UITableViewStylePlain];
+    table.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+    table.backgroundColor = [UIColor clearColor];
+    table.separatorStyle = UITableViewCellSeparatorStyleNone;
+    table.rowHeight = UITableViewAutomaticDimension;
+    table.estimatedRowHeight = 80;
+    table.alwaysBounceVertical = NO;
+    table.showsVerticalScrollIndicator = NO;
+    table.contentInsetAdjustmentBehavior = UIScrollViewContentInsetAdjustmentNever;
+    table.sectionHeaderTopPadding = 0;
+    table.estimatedSectionHeaderHeight = 0;
+    table.estimatedSectionFooterHeight = 0;
+    table.dataSource = self;
+    table.delegate = self;
+    [table registerClass:[PFBModernSettingsToggleCell class] forCellReuseIdentifier:@"opt"];
+    [self.view addSubview:table];
+    self.tableView = table;
+}
+
+- (NSInteger)tableView:(UITableView*)tableView numberOfRowsInSection:(NSInteger)section {
+    return kPFBMutedOptionCount;
+}
+
+- (UITableViewCell*)tableView:(UITableView*)tableView cellForRowAtIndexPath:(NSIndexPath*)indexPath {
+    PFBModernSettingsToggleCell* cell = [tableView dequeueReusableCellWithIdentifier:@"opt"
+                                                                       forIndexPath:indexPath];
+    cell.backgroundColor = [UIColor clearColor];
+    PFBMutedConfigureOption(cell, (NSUInteger)indexPath.row);
+    [cell.toggleSwitch removeTarget:nil action:NULL forControlEvents:UIControlEventValueChanged];
+    [cell.toggleSwitch addTarget:self
+                          action:@selector(optionChanged:)
+                forControlEvents:UIControlEventValueChanged];
+    return cell;
+}
+
+- (CGFloat)tableView:(UITableView*)tableView heightForHeaderInSection:(NSInteger)section {
+    return CGFLOAT_MIN;
+}
+
+- (void)optionChanged:(UISwitch*)sender {
+    PFBMutedOptionToggled(sender);
+}
+
+@end
+
+// The new look's glyph for a term's kind: "@handle" an account, "two words" a phrase, else a word.
+static NSString* PFBMutedKindGlyph(NSString* term) {
+    if ([term hasPrefix:@"@"]) {
+        return @"at";
+    }
+    if ([term rangeOfString:@" "].location != NSNotFound) {
+        return @"quote_stroke";
+    }
+    return @"text_size";
 }
 
 // MARK: - controller
@@ -87,6 +207,15 @@ static void PFBFollowFiltersChange(void) {
     // Back from the language picker: the Other languages row lists what was picked there.
     if (!self.compact && !self.othersOnly && self.mode == 1) {
         [self.tableView reloadData];
+    }
+}
+
+// The new look's ground is a fixed palette color, read again when light and dark switch.
+- (void)traitCollectionDidChange:(UITraitCollection*)previousTraitCollection {
+    [super traitCollectionDidChange:previousTraitCollection];
+    if (self.nativeLook && !self.compact &&
+        [self.traitCollection hasDifferentColorAppearanceComparedToTraitCollection:previousTraitCollection]) {
+        self.tableView.backgroundColor = [PFBPalette currentBackgroundColor];
     }
 }
 
@@ -206,6 +335,10 @@ static NSMutableArray<NSString*>* PFBKeptLanguageList(void) {
         // Plain tables reserve room above their first section on iOS 15 and
         // later; the pinned segment already provides that gap.
         self.tableView.sectionHeaderTopPadding = 0.0;
+    } else if (self.nativeLook) {
+        // The new look stands on the settings pages' ground.
+        self.tableView.backgroundColor = [PFBPalette currentBackgroundColor];
+        self.tableView.separatorStyle = UITableViewCellSeparatorStyleNone;
     } else {
         // Full screen follows the advanced-search recipe.
         self.tableView.backgroundColor = [UIColor systemBackgroundColor];
@@ -216,6 +349,11 @@ static NSMutableArray<NSString*>* PFBKeptLanguageList(void) {
     [self.tableView registerClass:[PFBMutedAddCell class] forCellReuseIdentifier:@"add"];
     [self.tableView registerClass:[PFBModernSettingsToggleCell class] forCellReuseIdentifier:@"opt"];
     [self.tableView registerClass:[PFBMutedTermCell class] forCellReuseIdentifier:@"term"];
+    // The new look's rows: a term with its menu and remove button, a language with its check,
+    // and the plain rows.
+    [self.tableView registerClass:[PFBNativeSettingsRowCell class] forCellReuseIdentifier:@"NativeTerm"];
+    [self.tableView registerClass:[PFBNativeSettingsRowCell class] forCellReuseIdentifier:@"NativeCheck"];
+    [self.tableView registerClass:[PFBNativeSettingsRowCell class] forCellReuseIdentifier:@"NativeRow"];
     self.languageCodes = PFBLanguageCatalog();
     if (!self.othersOnly) {
         [self installModeControl];
@@ -240,7 +378,7 @@ static NSMutableArray<NSString*>* PFBKeptLanguageList(void) {
         forControlEvents:UIControlEventValueChanged];
     // The segment keeps its system appearance: it names a place in the screen,
     // not a setting, so it stays out of the accent's vocabulary.
-    CGFloat inset = kPFBMutedSideMargin;
+    CGFloat inset = self.nativeLook ? 16.0 : kPFBMutedSideMargin;
     CGFloat controlHeight = 32.0;
     CGFloat top = kPFBMutedSideMargin;
     // The popover's material fills this header, so it carries the same margin
@@ -404,6 +542,11 @@ static NSMutableArray<NSString*>* PFBKeptLanguageList(void) {
 // Rows of the popover clear the corner curve; the full screen keeps its own.
 - (CGFloat)rowMargin {
     return self.compact ? kPFBCompactRowMargin : kPFBMutedSideMargin;
+}
+
+// Where the notes under the lists start: in the new look, where its rows' icons stand.
+- (CGFloat)textMargin {
+    return self.nativeLook ? [PFBNativeSettingsRowStyle shared].iconFrame.origin.x : kPFBMutedSideMargin;
 }
 
 // A bar shows its material only while content passes underneath, the way the
@@ -596,15 +739,16 @@ static NSMutableArray<NSString*>* PFBKeptLanguageList(void) {
 }
 
 - (void)toggleChanged:(UISwitch*)sender {
-    NSArray* keys = @[ kPFBMutedWholeWordsKey, kPFBMutedInConversationsKey,
-                       kPFBMutedSkipFollowingKey, kPFBMutedIncludeRepostsKey ];
-    NSUInteger index = (NSUInteger)sender.tag;
-    if (index >= keys.count) {
-        return;
-    }
-    [[NSUserDefaults standardUserDefaults] setBool:sender.isOn forKey:keys[index]];
-    pfbRefreshMutedWords();
-    PFBNoteFiltersChange();
+    PFBMutedOptionToggled(sender);
+}
+
+// The new look lists the options in a sheet, as Twitter's new settings hold theirs.
+- (void)showOptions {
+    [PFBNativeSettingsSheetController
+        presentRows:[[PFBMutedOptionsViewController alloc] init]
+             titled:[[PFBBundle sharedBundle] localizedStringForKey:@"MUTED_WORDS_OPTIONS_HEADER"]
+               from:self
+             closed:nil];
 }
 
 - (BOOL)textFieldShouldReturn:(UITextField*)textField {
@@ -634,13 +778,14 @@ static NSMutableArray<NSString*>* PFBKeptLanguageList(void) {
     if (section == 0) {
         return 1 + (NSInteger)MAX(self.terms.count, (NSUInteger)1);
     }
-    return 4;
+    // The new look opens the options from a single row.
+    return self.nativeLook ? 1 : kPFBMutedOptionCount;
 }
 
 // Custom headers in Chirp Bold, as on the Advanced search screen, instead of the
 // small gray system captions.
 - (UIView*)tableView:(UITableView*)tableView viewForHeaderInSection:(NSInteger)section {
-    if (self.compact) {
+    if (self.compact || self.nativeLook) {
         return nil;
     }
     if (self.mode != 0 || section == 0) {
@@ -667,7 +812,7 @@ static NSMutableArray<NSString*>* PFBKeptLanguageList(void) {
 }
 
 - (CGFloat)tableView:(UITableView*)tableView heightForHeaderInSection:(NSInteger)section {
-    if (self.compact || self.mode != 0 || section == 0) {
+    if (self.compact || self.nativeLook || self.mode != 0 || section == 0) {
         return 0.01;
     }
     return 46.0;
@@ -730,9 +875,9 @@ static NSMutableArray<NSString*>* PFBKeptLanguageList(void) {
     [container addSubview:label];
     [NSLayoutConstraint activateConstraints:@[
         [label.leadingAnchor constraintEqualToAnchor:container.leadingAnchor
-                                            constant:kPFBMutedSideMargin],
+                                            constant:[self textMargin]],
         [label.trailingAnchor constraintEqualToAnchor:container.trailingAnchor
-                                             constant:-kPFBMutedSideMargin],
+                                             constant:-[self textMargin]],
         [label.topAnchor constraintEqualToAnchor:container.topAnchor constant:14.0],
         [label.bottomAnchor constraintEqualToAnchor:container.bottomAnchor
                                            constant:-18.0],
@@ -747,9 +892,157 @@ static NSMutableArray<NSString*>* PFBKeptLanguageList(void) {
                : 0.01;
 }
 
+// MARK: new look
+
+// The new look's own rows; nil where the classic cell serves, restyled: the field and the
+// auto-translate switch.
+- (UITableViewCell*)nativeCellFor:(UITableView*)tableView at:(NSIndexPath*)indexPath {
+    if (self.mode == 2) {
+        return [self nativeThreadCellFor:tableView at:indexPath];
+    }
+    if (self.mode == 1) {
+        if ([self rowIsTranslate:indexPath.row]) {
+            return nil;
+        }
+        return [self rowIsPicker:indexPath.row] ? [self nativePickerCellFor:tableView at:indexPath]
+                                                : [self nativeLanguageCellFor:tableView at:indexPath];
+    }
+    if (indexPath.section == 1) {
+        PFBNativeSettingsRowCell* cell = [tableView dequeueReusableCellWithIdentifier:@"NativeRow"
+                                                                         forIndexPath:indexPath];
+        [cell configureWithTitle:[[PFBBundle sharedBundle] localizedStringForKey:@"MUTED_WORDS_OPTIONS_HEADER"]
+                        iconName:@"settings_slider"
+                           value:nil
+                       accessory:PFBNativeSettingsRowAccessoryMore];
+        cell.selectionStyle = UITableViewCellSelectionStyleDefault;
+        cell.contentView.alpha = 1.0;
+        return cell;
+    }
+    return indexPath.row == 0 ? nil : [self nativeTermCellFor:tableView at:indexPath];
+}
+
+// A term: its kind's glyph, the term, its duration as a menu over the whole row, and the button
+// that removes it. With no term yet, a dimmed example with nothing to open or remove.
+- (UITableViewCell*)nativeTermCellFor:(UITableView*)tableView at:(NSIndexPath*)indexPath {
+    PFBNativeSettingsRowCell* cell = [tableView dequeueReusableCellWithIdentifier:@"NativeTerm"
+                                                                     forIndexPath:indexPath];
+    cell.selectionStyle = UITableViewCellSelectionStyleNone;
+    UIButton* menu = [cell.contentView viewWithTag:kPFBRowMenuTag];
+    if (!menu) {
+        menu = [UIButton buttonWithType:UIButtonTypeCustom];
+        menu.tag = kPFBRowMenuTag;
+        menu.showsMenuAsPrimaryAction = YES;
+        menu.frame = cell.contentView.bounds;
+        menu.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+        [cell.contentView addSubview:menu];
+    }
+    UIButton* remove = [cell.accessoryView isKindOfClass:[UIButton class]] ? (UIButton*)cell.accessoryView : nil;
+    if (!remove) {
+        remove = [PFBHitButton buttonWithType:UIButtonTypeSystem];
+        [remove setImage:PFBTwitterGlyphFor(@"close_circle_fill", [UIImage systemImageNamed:@"xmark.circle.fill"])
+                forState:UIControlStateNormal];
+        remove.tintColor = [[UIColor labelColor] colorWithAlphaComponent:0.25];
+        remove.frame = CGRectMake(0, 0, 26.0, 26.0);
+        [remove addTarget:self action:@selector(removeTapped:) forControlEvents:UIControlEventTouchUpInside];
+        cell.accessoryView = remove;
+    }
+    BOOL example = self.terms.count == 0;
+    NSUInteger termIndex = (NSUInteger)indexPath.row - 1;
+    NSString* term = example ? [[PFBBundle sharedBundle] localizedStringForKey:@"MUTED_WORDS_EXAMPLE_TERM"]
+                             : self.terms[termIndex];
+    [cell configureWithTitle:term
+                    iconName:PFBMutedKindGlyph(term)
+                       value:example ? nil : [self durationLabelForTerm:term]
+                   accessory:example ? PFBNativeSettingsRowAccessoryNone : PFBNativeSettingsRowAccessoryMenu];
+    cell.contentView.alpha = example ? 0.38 : 1.0;
+    menu.hidden = example;
+    menu.menu = example ? nil : [self durationMenuForTerm:term];
+    remove.hidden = example;
+    remove.tag = (NSInteger)termIndex;
+    return cell;
+}
+
+// A language: its name, with a check while its Tweets are kept.
+- (UITableViewCell*)nativeLanguageCellFor:(UITableView*)tableView at:(NSIndexPath*)indexPath {
+    PFBNativeSettingsRowCell* cell = [tableView dequeueReusableCellWithIdentifier:@"NativeCheck"
+                                                                     forIndexPath:indexPath];
+    UIImageView* tick = [cell.accessoryView isKindOfClass:[UIImageView class]] ? (UIImageView*)cell.accessoryView : nil;
+    if (!tick) {
+        tick = [[UIImageView alloc] initWithImage:PFBTwitterGlyphFor(@"checkmark", [UIImage systemImageNamed:@"checkmark"])];
+        tick.tintColor = [UIColor labelColor];
+        cell.accessoryView = tick;
+    }
+    NSString* code = [self visibleLanguages][(NSUInteger)indexPath.row];
+    tick.hidden = ![PFBKeptLanguageList() containsObject:code];
+    [cell configureWithTitle:PFBLanguageName(code)
+                    iconName:nil
+                       value:nil
+                   accessory:PFBNativeSettingsRowAccessoryNone];
+    cell.selectionStyle = UITableViewCellSelectionStyleDefault;
+    cell.contentView.alpha = 1.0;
+    return cell;
+}
+
+// The languages the list leaves out, named once picked, behind a chevron.
+- (UITableViewCell*)nativePickerCellFor:(UITableView*)tableView at:(NSIndexPath*)indexPath {
+    PFBBundle* bundle = [PFBBundle sharedBundle];
+    PFBNativeSettingsRowCell* cell = [tableView dequeueReusableCellWithIdentifier:@"NativeRow"
+                                                                     forIndexPath:indexPath];
+    NSArray* tail = [self.languageCodes
+        subarrayWithRange:NSMakeRange(kPFBLanguagesFull, self.languageCodes.count - kPFBLanguagesFull)];
+    NSMutableArray* picked = [NSMutableArray array];
+    for (NSString* code in tail) {
+        if ([PFBKeptLanguageList() containsObject:code]) {
+            [picked addObject:PFBLanguageName(code)];
+        }
+    }
+    [cell configureWithTitle:[bundle localizedStringForKey:@"LANGUAGES_OTHERS_TITLE"]
+                    iconName:nil
+                       value:picked.count ? [NSListFormatter localizedStringByJoiningStrings:picked]
+                                          : [bundle localizedStringForKey:@"LANGUAGES_OTHERS_NONE"]
+                   accessory:PFBNativeSettingsRowAccessoryChevron];
+    cell.selectionStyle = UITableViewCellSelectionStyleDefault;
+    cell.contentView.alpha = 1.0;
+    return cell;
+}
+
+// A hidden conversation: its text, and its author under it when known.
+- (UITableViewCell*)nativeThreadCellFor:(UITableView*)tableView at:(NSIndexPath*)indexPath {
+    PFBBundle* bundle = [PFBBundle sharedBundle];
+    PFBNativeSettingsRowCell* cell = [tableView dequeueReusableCellWithIdentifier:@"NativeRow"
+                                                                     forIndexPath:indexPath];
+    cell.selectionStyle = UITableViewCellSelectionStyleNone;
+    NSArray<NSDictionary*>* threads = PFBHiddenThreads();
+    // The list can shrink after the row count was taken.
+    if ((NSUInteger)indexPath.row >= threads.count) {
+        [cell configureWithTitle:[bundle localizedStringForKey:@"THREADS_EMPTY"]
+                        iconName:nil
+                           value:nil
+                       accessory:PFBNativeSettingsRowAccessoryNone];
+        cell.contentView.alpha = 0.38;
+        return cell;
+    }
+    NSDictionary* entry = threads[(NSUInteger)indexPath.row];
+    NSString* preview = entry[@"preview"];
+    NSString* who = entry[@"who"];
+    [cell configureWithTitle:preview.length ? preview : [bundle localizedStringForKey:@"THREADS_NO_PREVIEW"]
+                      detail:who.length ? who : nil
+                    iconName:nil
+                       value:nil
+                   accessory:PFBNativeSettingsRowAccessoryNone];
+    cell.contentView.alpha = 1.0;
+    return cell;
+}
+
 - (UITableViewCell*)tableView:(UITableView*)tableView
         cellForRowAtIndexPath:(NSIndexPath*)indexPath {
     PFBBundle* bundle = [PFBBundle sharedBundle];
+    if (self.nativeLook) {
+        UITableViewCell* cell = [self nativeCellFor:tableView at:indexPath];
+        if (cell) {
+            return cell;
+        }
+    }
 
     if (self.mode == 2) {
         PFBMutedTermCell* cell =
@@ -786,6 +1079,9 @@ static NSMutableArray<NSString*>* PFBKeptLanguageList(void) {
                 [tableView dequeueReusableCellWithIdentifier:@"opt"
                                                 forIndexPath:indexPath];
             cell.backgroundColor = [UIColor clearColor];
+            if (self.nativeLook) {
+                [cell setSideMargin:[self textMargin]];
+            }
             [cell configureWithTitle:[bundle localizedStringForKey:@"LANGUAGES_TRANSLATE_TITLE"]
                             subtitle:[bundle localizedStringForKey:@"LANGUAGES_TRANSLATE_DETAIL"]];
             cell.toggleSwitch.tag = NSIntegerMax;
@@ -881,6 +1177,9 @@ static NSMutableArray<NSString*>* PFBKeptLanguageList(void) {
             [bundle localizedStringForKey:@"MUTED_WORDS_ADD_PLACEHOLDER"];
         cell.hintLabel.text = [bundle localizedStringForKey:@"MUTED_WORDS_SUBTITLE"];
         cell.field.delegate = self;
+        if (self.nativeLook) {
+            [cell applyNativeLook];
+        }
         [cell.addButton setTitle:[bundle localizedStringForKey:@"MUTED_WORDS_ADD_BUTTON"]
                         forState:UIControlStateNormal];
         [cell.addButton removeTarget:nil
@@ -941,32 +1240,7 @@ static NSMutableArray<NSString*>* PFBKeptLanguageList(void) {
     PFBModernSettingsToggleCell* cell = [tableView dequeueReusableCellWithIdentifier:@"opt"
                                                                        forIndexPath:indexPath];
     cell.backgroundColor = [UIColor clearColor];
-    struct {
-        __unsafe_unretained NSString* titleKey;
-        __unsafe_unretained NSString* detailKey;
-        __unsafe_unretained NSString* prefKey;
-        BOOL defaultOn;
-    } options[] = {
-        { @"MUTED_WORDS_WHOLE_TITLE", @"MUTED_WORDS_WHOLE_DETAIL",
-          kPFBMutedWholeWordsKey, YES },
-        { @"MUTED_WORDS_CONVERSATIONS_TITLE", @"MUTED_WORDS_CONVERSATIONS_DETAIL",
-          kPFBMutedInConversationsKey, YES },
-        { @"MUTED_WORDS_FOLLOWING_TITLE", @"MUTED_WORDS_FOLLOWING_DETAIL",
-          kPFBMutedSkipFollowingKey, YES },
-        { @"MUTED_WORDS_REPOSTS_TITLE", @"MUTED_WORDS_REPOSTS_DETAIL",
-          kPFBMutedIncludeRepostsKey, NO },
-    };
-    NSUInteger index = (NSUInteger)indexPath.row;
-    if (index >= sizeof(options) / sizeof(options[0])) {
-        index = 0;
-    }
-    [cell configureWithTitle:[bundle localizedStringForKey:options[index].titleKey]
-                    subtitle:[bundle localizedStringForKey:options[index].detailKey]];
-    cell.toggleSwitch.tag = (NSInteger)index;
-    NSUserDefaults* d = [NSUserDefaults standardUserDefaults];
-    cell.toggleSwitch.on = ([d objectForKey:options[index].prefKey] == nil)
-                               ? options[index].defaultOn
-                               : [d boolForKey:options[index].prefKey];
+    PFBMutedConfigureOption(cell, (NSUInteger)indexPath.row);
     [cell.toggleSwitch removeTarget:nil action:NULL forControlEvents:UIControlEventValueChanged];
     [cell.toggleSwitch addTarget:self
                           action:@selector(toggleChanged:)
@@ -1011,6 +1285,10 @@ static NSMutableArray<NSString*>* PFBKeptLanguageList(void) {
 - (void)tableView:(UITableView*)tableView
     didSelectRowAtIndexPath:(NSIndexPath*)indexPath {
     [tableView deselectRowAtIndexPath:indexPath animated:YES];
+    if (self.nativeLook && self.mode == 0 && indexPath.section == 1) {
+        [self showOptions];
+        return;
+    }
     if (self.mode != 1) {
         return;
     }
@@ -1021,6 +1299,7 @@ static NSMutableArray<NSString*>* PFBKeptLanguageList(void) {
         PFBMutedWordsViewController* others = [[PFBMutedWordsViewController alloc] init];
         others.othersOnly = YES;
         others.mode = 1;
+        others.nativeLook = self.nativeLook;
         [self.navigationController pushViewController:others animated:YES];
         return;
     }

@@ -168,7 +168,7 @@
  
 - (void)traitCollectionDidChange:(UITraitCollection*)previousTraitCollection {
     [super traitCollectionDidChange:previousTraitCollection];
-    self.backgroundColor = [PFBPalette currentBackgroundColor];
+    self.backgroundColor = PFBSettingsRowGround(self);
     pfbApplySelectedBackground(self);
     [self updateChevronColor];
     [self updateSubtitleColor];

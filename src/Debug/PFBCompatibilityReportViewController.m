@@ -5,6 +5,8 @@
 #import "Support/HookHelpers.h"
 #import "Settings/PFBModernSettingsPageViewController.h"
 #import "Settings/PFBModernSettingsCells.h"
+#import "Settings/Native/PFBNativeSettingsRowCell.h"
+#import "Common/PFBSettings.h"
 #import "Features/Appearance/ThemeColor/PFBPalette.h"
 #import "Debug/PFBTourChoicePopover.h"
 
@@ -35,9 +37,51 @@ typedef NS_ENUM(NSInteger, PFBReportRowKind) {
 @property (nonatomic) BOOL enabled;
 // The verdict a list row opens.
 @property (nonatomic) PFBCompatVerdict verdict;
+// The new look's glyph before the title.
+@property (nonatomic, copy) NSString* iconName;
 @end
 
 @implementation PFBReportRow
+@end
+
+// A group's name in a list of the new look, over the rows it holds.
+@interface PFBReportGroupCell : UITableViewCell
+@property (nonatomic, strong) UILabel* label;
+@end
+
+@implementation PFBReportGroupCell
+
+- (instancetype)initWithStyle:(UITableViewCellStyle)style reuseIdentifier:(NSString*)reuseIdentifier {
+    self = [super initWithStyle:style reuseIdentifier:reuseIdentifier];
+    if (self) {
+        self.selectionStyle = UITableViewCellSelectionStyleNone;
+        _label = [[UILabel alloc] init];
+        _label.translatesAutoresizingMaskIntoConstraints = NO;
+        _label.numberOfLines = 0;
+        [self.contentView addSubview:_label];
+        CGFloat margin = [PFBNativeSettingsRowStyle shared].iconFrame.origin.x;
+        [NSLayoutConstraint activateConstraints:@[
+            [_label.leadingAnchor constraintEqualToAnchor:self.contentView.leadingAnchor constant:margin],
+            [_label.trailingAnchor constraintEqualToAnchor:self.contentView.trailingAnchor constant:-margin],
+            [_label.topAnchor constraintEqualToAnchor:self.contentView.topAnchor constant:20],
+            [_label.bottomAnchor constraintEqualToAnchor:self.contentView.bottomAnchor constant:-4],
+        ]];
+        [self applyTheme];
+    }
+    return self;
+}
+
+- (void)applyTheme {
+    self.backgroundColor = [PFBPalette currentBackgroundColor];
+    self.label.font = PFBSettingsTitleFont();
+    self.label.textColor = PFBSettingsSubtitleColor();
+}
+
+- (void)traitCollectionDidChange:(UITraitCollection*)previousTraitCollection {
+    [super traitCollectionDidChange:previousTraitCollection];
+    [self applyTheme];
+}
+
 @end
 
 static PFBReportRow* PFBReportRowMake(PFBReportRowKind kind, NSString* title, NSString* value, NSString* detail) {
@@ -102,10 +146,36 @@ static void PFBReportSetUpTable(UITableView* table) {
     [table registerClass:[PFBModernSettingsHeaderCell class] forCellReuseIdentifier:@"HeaderCell"];
     [table registerClass:[PFBModernSettingsCompactButtonCell class] forCellReuseIdentifier:@"CompactButtonCell"];
     [table registerClass:[PFBModernSettingsTableViewCell class] forCellReuseIdentifier:@"ButtonCell"];
+    [table registerClass:[PFBNativeSettingsRowCell class] forCellReuseIdentifier:@"NativeRow"];
+    [table registerClass:[PFBReportGroupCell class] forCellReuseIdentifier:@"GroupCell"];
+}
+
+// A row of the new look: a list opens on a chevron, Clear all and Broken read in red, and an
+// option carries its reason under its name.
+static UITableViewCell* PFBReportNativeCell(UITableView* table, NSIndexPath* indexPath, PFBReportRow* row) {
+    if (row.kind == PFBReportRowHeader) {
+        PFBReportGroupCell* cell = [table dequeueReusableCellWithIdentifier:@"GroupCell" forIndexPath:indexPath];
+        cell.label.text = row.title;
+        return cell;
+    }
+    PFBNativeSettingsRowCell* cell = [table dequeueReusableCellWithIdentifier:@"NativeRow" forIndexPath:indexPath];
+    BOOL list = row.kind == PFBReportRowList;
+    [cell configureWithTitle:row.title
+                      detail:list ? nil : row.detail
+                    iconName:row.iconName
+                       value:row.value
+                   accessory:list && row.enabled ? PFBNativeSettingsRowAccessoryChevron
+                                                 : PFBNativeSettingsRowAccessoryNone];
+    cell.destructive = row.kind == PFBReportRowClearAll || (list && row.verdict == PFBCompatVerdictBroken);
+    cell.selectionStyle = row.enabled ? UITableViewCellSelectionStyleDefault : UITableViewCellSelectionStyleNone;
+    return cell;
 }
 
 // The settings cell that draws a row; every state is set again, as cells are recycled.
-static UITableViewCell* PFBReportCell(UITableView* table, NSIndexPath* indexPath, PFBReportRow* row) {
+static UITableViewCell* PFBReportCell(UITableView* table, NSIndexPath* indexPath, PFBReportRow* row, BOOL native) {
+    if (native) {
+        return PFBReportNativeCell(table, indexPath, row);
+    }
     if (row.kind == PFBReportRowHeader) {
         PFBModernSettingsHeaderCell* cell = [table dequeueReusableCellWithIdentifier:@"HeaderCell"
                                                                          forIndexPath:indexPath];
@@ -173,22 +243,31 @@ static void PFBReportFitSheet(UIViewController* page) {
 }
 
 // One verdict's options on a page of their own: those not tested, or those working under
-// their settings pages. The internal checks stay in the copied report.
+// their settings pages. The internal checks stay in the copied report, but for a broken one,
+// which the new look's Broken row counts.
 @interface PFBCompatibilityListViewController : UITableViewController
-- (instancetype)initWithVerdict:(PFBCompatVerdict)verdict title:(NSString*)title note:(NSString*)note;
+- (instancetype)initWithVerdict:(PFBCompatVerdict)verdict
+                          title:(NSString*)title
+                           note:(NSString*)note
+                         native:(BOOL)native;
 @end
 
 @implementation PFBCompatibilityListViewController {
     PFBCompatVerdict _verdict;
     NSString* _note;
+    BOOL _native;
     NSArray<PFBReportRow*>* _rows;
 }
 
-- (instancetype)initWithVerdict:(PFBCompatVerdict)verdict title:(NSString*)title note:(NSString*)note {
+- (instancetype)initWithVerdict:(PFBCompatVerdict)verdict
+                          title:(NSString*)title
+                           note:(NSString*)note
+                         native:(BOOL)native {
     self = [super initWithStyle:UITableViewStyleGrouped];
     if (self) {
         _verdict = verdict;
         _note = [note copy];
+        _native = native;
         self.title = title;
     }
     return self;
@@ -256,7 +335,7 @@ static void PFBReportFitSheet(UIViewController* page) {
     NSMutableArray<PFBReportRow*>* rows = [NSMutableArray array];
     NSString* section = nil;
     for (PFBCompatResult* result in PFBCompatResults()) {
-        if (result.verdict != _verdict || result.internal) {
+        if (result.verdict != _verdict || (result.internal && _verdict != PFBCompatVerdictBroken)) {
             continue;
         }
         // Working options sit under their settings page, as in the copied report.
@@ -274,7 +353,7 @@ static void PFBReportFitSheet(UIViewController* page) {
 }
 
 - (UITableViewCell*)tableView:(UITableView*)tableView cellForRowAtIndexPath:(NSIndexPath*)indexPath {
-    return PFBReportCell(tableView, indexPath, _rows[(NSUInteger)indexPath.row]);
+    return PFBReportCell(tableView, indexPath, _rows[(NSUInteger)indexPath.row], _native);
 }
 
 - (BOOL)tableView:(UITableView*)tableView shouldHighlightRowAtIndexPath:(NSIndexPath*)indexPath {
@@ -291,9 +370,11 @@ static void PFBReportFitSheet(UIViewController* page) {
     label.font = PFBSettingsDetailFont();
     label.textColor = PFBSettingsSubtitleColor();
     [header addSubview:label];
+    // The new look's rows start their text where its icons stand.
+    CGFloat margin = _native ? [PFBNativeSettingsRowStyle shared].iconFrame.origin.x : 10;
     [NSLayoutConstraint activateConstraints:@[
-        [label.leadingAnchor constraintEqualToAnchor:header.leadingAnchor constant:10],
-        [label.trailingAnchor constraintEqualToAnchor:header.trailingAnchor constant:-10],
+        [label.leadingAnchor constraintEqualToAnchor:header.leadingAnchor constant:margin],
+        [label.trailingAnchor constraintEqualToAnchor:header.trailingAnchor constant:-margin],
         [label.topAnchor constraintEqualToAnchor:header.topAnchor constant:8],
         [label.bottomAnchor constraintEqualToAnchor:header.bottomAnchor constant:-8],
     ]];
@@ -314,12 +395,30 @@ static void PFBReportFitSheet(UIViewController* page) {
 
 @end
 
+// A row that opens one verdict's list, with how many options it holds.
+static PFBReportRow* PFBReportListRow(NSString* title, NSUInteger count, PFBCompatVerdict verdict, NSString* iconName) {
+    PFBReportRow* row = PFBReportRowMake(PFBReportRowList, title, @(count).stringValue, nil);
+    row.verdict = verdict;
+    row.enabled = count > 0;
+    row.iconName = iconName;
+    return row;
+}
+
+// The new look's copy button: its glyph, and a check for a moment once the report is copied.
+static UIImage* PFBReportCopyGlyph(BOOL copied) {
+    return copied ? PFBTwitterGlyphFor(@"checkmark", [UIImage systemImageNamed:@"checkmark"])
+                  : PFBTwitterGlyphFor(@"copy_stroke", [UIImage systemImageNamed:@"doc.on.doc"]);
+}
+
 @implementation PFBCompatibilityReportViewController {
-    NSArray<PFBReportRow*>* _rows;
+    // The rows by section: one section, or in the new look the lists, then Clear all.
+    NSArray<NSArray<PFBReportRow*>*>* _sections;
 }
 
 + (UINavigationController*)sheetFor:(UIWindow*)window {
     PFBCompatibilityReportViewController* report = [[self alloc] initWithStyle:UITableViewStyleGrouped];
+    // Away from the settings, the report takes the look New Twitter settings gives them.
+    report.nativeLook = [PFBSettings boolForKey:@"new_twitter_settings"];
     UINavigationController* navigation = [[UINavigationController alloc] initWithRootViewController:report];
     navigation.modalPresentationStyle = UIModalPresentationPageSheet;
     if (@available(iOS 16.0, *)) {
@@ -363,13 +462,22 @@ static void PFBReportFitSheet(UIViewController* page) {
                                              selector:@selector(compatDidChange:)
                                                  name:PFBCompatDidChangeNotification
                                                object:nil];
-    self.title = [[PFBBundle sharedBundle] localizedStringForKey:@"COMPATIBILITY_REPORT_TITLE"];
+    // The new look titles the report as the row that opens it, and draws its copy button as a glyph.
+    self.title = [[PFBBundle sharedBundle]
+        localizedStringForKey:self.nativeLook ? @"COMPATIBILITY_TITLE" : @"COMPATIBILITY_REPORT_TITLE"];
     self.view.backgroundColor = [PFBPalette currentBackgroundColor];
     PFBReportSetUpTable(self.tableView);
-    UIBarButtonItem* copy = [[UIBarButtonItem alloc] initWithTitle:@"Copy"
-                                                             style:UIBarButtonItemStylePlain
-                                                            target:self
-                                                            action:@selector(copyReport)];
+    UIBarButtonItem* copy = self.nativeLook ? [[UIBarButtonItem alloc] initWithImage:PFBReportCopyGlyph(NO)
+                                                                               style:UIBarButtonItemStylePlain
+                                                                              target:self
+                                                                              action:@selector(copyReport)]
+                                            : [[UIBarButtonItem alloc] initWithTitle:@"Copy"
+                                                                               style:UIBarButtonItemStylePlain
+                                                                              target:self
+                                                                              action:@selector(copyReport)];
+    if (self.nativeLook) {
+        copy.accessibilityLabel = @"Copy";
+    }
     copy.tag = PFBNativeGlassTag;
     UIBarButtonItem* tours = [[UIBarButtonItem alloc] initWithImage:[UIImage systemImageNamed:@"checklist"]
                                                               style:UIBarButtonItemStylePlain
@@ -444,9 +552,18 @@ static void PFBReportFitSheet(UIViewController* page) {
     PFBReportFitSheet(self);
 }
 
-// The problems first, then the options by verdict, then the counts.
 - (void)rebuild {
     NSArray<PFBCompatResult*>* results = PFBCompatResults();
+    if (self.nativeLook) {
+        [self rebuildNative:results];
+    } else {
+        [self rebuildClassic:results];
+    }
+    self.tableView.tableHeaderView = [self summaryHeaderFor:results];
+}
+
+// The problems first, then the options by verdict, then the counts.
+- (void)rebuildClassic:(NSArray<PFBCompatResult*>*)results {
     NSMutableArray<PFBReportRow*>* broken = [NSMutableArray array];
     NSUInteger notTested = 0;
     NSUInteger working = 0;
@@ -465,15 +582,11 @@ static void PFBReportFitSheet(UIViewController* page) {
         [rows addObjectsFromArray:broken];
     }
     [rows addObject:PFBReportRowMake(PFBReportRowHeader, @"Options", nil, nil)];
-    PFBReportRow* untestedRow = PFBReportRowMake(PFBReportRowList, @"Not tested", @(notTested).stringValue,
-                                                 @"Not seen yet during the check.");
-    untestedRow.verdict = PFBCompatVerdictNotTested;
-    untestedRow.enabled = notTested > 0;
+    PFBReportRow* untestedRow = PFBReportListRow(@"Not tested", notTested, PFBCompatVerdictNotTested, nil);
+    untestedRow.detail = @"Not seen yet during the check.";
     [rows addObject:untestedRow];
-    PFBReportRow* workingRow = PFBReportRowMake(PFBReportRowList, @"Working", @(working).stringValue,
-                                                @"Seen working on this build.");
-    workingRow.verdict = PFBCompatVerdictOK;
-    workingRow.enabled = working > 0;
+    PFBReportRow* workingRow = PFBReportListRow(@"Working", working, PFBCompatVerdictOK, nil);
+    workingRow.detail = @"Seen working on this build.";
     [rows addObject:workingRow];
 
     [rows addObject:PFBReportRowMake(PFBReportRowHeader, @"Data", nil, nil)];
@@ -485,8 +598,59 @@ static void PFBReportFitSheet(UIViewController* page) {
     if (history) {
         [rows addObject:PFBReportRowMake(PFBReportRowHistory, @"History", nil, history)];
     }
-    _rows = rows;
-    self.tableView.tableHeaderView = [self summaryHeaderFor:results];
+    _sections = @[ rows ];
+}
+
+// The new look: one row per verdict, the broken options first when there are any, then Clear
+// all, and the history under them.
+- (void)rebuildNative:(NSArray<PFBCompatResult*>*)results {
+    NSUInteger broken = 0;
+    NSUInteger notTested = 0;
+    NSUInteger working = 0;
+    for (PFBCompatResult* result in results) {
+        if (result.verdict == PFBCompatVerdictBroken) {
+            broken++;
+        } else if (result.verdict == PFBCompatVerdictNotTested) {
+            notTested++;
+        } else if (!result.internal) {
+            working++;
+        }
+    }
+    NSMutableArray<PFBReportRow*>* lists = [NSMutableArray array];
+    if (broken > 0) {
+        [lists addObject:PFBReportListRow(@"Broken", broken, PFBCompatVerdictBroken, @"error_circle")];
+    }
+    [lists addObject:PFBReportListRow(@"Not tested", notTested, PFBCompatVerdictNotTested, @"circle")];
+    [lists addObject:PFBReportListRow(@"Working", working, PFBCompatVerdictOK, @"checkmark_circle")];
+    PFBReportRow* clearAll = PFBReportRowMake(PFBReportRowClearAll, @"Clear all", nil,
+                                              @"Clear the counts and close Twitter. Settings are kept.");
+    clearAll.iconName = @"trashcan_stroke";
+    clearAll.enabled = YES;
+    _sections = @[ lists, @[ clearAll ] ];
+    self.tableView.tableFooterView = [self historyFooter];
+}
+
+// The history in small print under the rows, as the settings page closes on its credits.
+- (UIView*)historyFooter {
+    NSString* history = PFBReportHistoryText();
+    if (!history) {
+        return nil;
+    }
+    UILabel* label = [[UILabel alloc] init];
+    label.text = history;
+    label.numberOfLines = 0;
+    label.textAlignment = NSTextAlignmentCenter;
+    label.font = PFBSettingsDetailFont();
+    label.textColor = PFBSettingsSubtitleColor();
+    CGFloat margin = [PFBNativeSettingsRowStyle shared].iconFrame.origin.x;
+    CGFloat width = self.tableView.bounds.size.width;
+    CGFloat room = MAX(width - 2 * margin, 1);
+    CGFloat height = ceil([label sizeThatFits:CGSizeMake(room, CGFLOAT_MAX)].height);
+    UIView* footer = [[UIView alloc] initWithFrame:CGRectMake(0, 0, width, height + 22 + 16)];
+    label.frame = CGRectMake(margin, 22, room, height);
+    label.autoresizingMask = UIViewAutoresizingFlexibleWidth;
+    [footer addSubview:label];
+    return footer;
 }
 
 - (UIView*)summaryHeaderFor:(NSArray<PFBCompatResult*>*)results {
@@ -521,17 +685,21 @@ static void PFBReportFitSheet(UIViewController* page) {
         title = [NSString stringWithFormat:@"Twitter %@ not fully checked", version];
     }
     BOOL statusLine = state != PFBCompatReadDone;
-    UIView* header = [[UIView alloc]
-        initWithFrame:CGRectMake(0, 0, self.view.bounds.size.width, statusLine ? 172.0 : 140.0)];
+    // The new look sets the verdict beside a smaller mark, on the rows' left edge.
+    BOOL native = self.nativeLook;
+    CGFloat discSize = native ? 40.0 : 52.0;
+    CGFloat height = native ? (statusLine ? 100.0 : 72.0) : (statusLine ? 172.0 : 140.0);
+    UIView* header = [[UIView alloc] initWithFrame:CGRectMake(0, 0, self.view.bounds.size.width, height)];
 
     UIView* disc = [[UIView alloc] init];
     disc.backgroundColor = [tone colorWithAlphaComponent:0.15];
-    disc.layer.cornerRadius = 26.0;
+    disc.layer.cornerRadius = discSize / 2;
     disc.translatesAutoresizingMaskIntoConstraints = NO;
     UIView* mark;
     if (symbol) {
         UIImageSymbolConfiguration* markSize =
-            [UIImageSymbolConfiguration configurationWithPointSize:26.0 weight:UIImageSymbolWeightBold];
+            [UIImageSymbolConfiguration configurationWithPointSize:native ? 20.0 : 26.0
+                                                            weight:UIImageSymbolWeightBold];
         UIImageView* image = [[UIImageView alloc] initWithImage:[UIImage systemImageNamed:symbol
                                                                          withConfiguration:markSize]];
         image.tintColor = tone;
@@ -549,7 +717,7 @@ static void PFBReportFitSheet(UIViewController* page) {
     headline.text = title;
     headline.font = PFBScaledFont([TwitterChirpFont(TwitterFontStyleBold) fontWithSize:17]);
     headline.textColor = [UIColor labelColor];
-    headline.textAlignment = NSTextAlignmentCenter;
+    headline.textAlignment = native ? NSTextAlignmentNatural : NSTextAlignmentCenter;
     headline.translatesAutoresizingMaskIntoConstraints = NO;
 
     UILabel* subline = [[UILabel alloc] init];
@@ -557,13 +725,27 @@ static void PFBReportFitSheet(UIViewController* page) {
                                               (unsigned long)optionCount];
     subline.font = PFBSettingsDetailFont();
     subline.textColor = PFBSettingsSubtitleColor();
-    subline.textAlignment = NSTextAlignmentCenter;
+    subline.textAlignment = headline.textAlignment;
     subline.translatesAutoresizingMaskIntoConstraints = NO;
 
     [header addSubview:disc];
     [header addSubview:headline];
     [header addSubview:subline];
-    NSMutableArray<NSLayoutConstraint*>* constraints = [NSMutableArray arrayWithArray:@[
+    CGFloat margin = [PFBNativeSettingsRowStyle shared].iconFrame.origin.x;
+    NSMutableArray<NSLayoutConstraint*>* constraints = [NSMutableArray arrayWithArray:native ? @[
+        [disc.topAnchor constraintEqualToAnchor:header.topAnchor constant:8.0],
+        [disc.leadingAnchor constraintEqualToAnchor:header.leadingAnchor constant:margin],
+        [disc.widthAnchor constraintEqualToConstant:discSize],
+        [disc.heightAnchor constraintEqualToConstant:discSize],
+        [mark.centerXAnchor constraintEqualToAnchor:disc.centerXAnchor],
+        [mark.centerYAnchor constraintEqualToAnchor:disc.centerYAnchor],
+        [headline.topAnchor constraintEqualToAnchor:disc.topAnchor],
+        [headline.leadingAnchor constraintEqualToAnchor:disc.trailingAnchor constant:14.0],
+        [headline.trailingAnchor constraintEqualToAnchor:header.trailingAnchor constant:-margin],
+        [subline.topAnchor constraintEqualToAnchor:headline.bottomAnchor constant:2.0],
+        [subline.leadingAnchor constraintEqualToAnchor:headline.leadingAnchor],
+        [subline.trailingAnchor constraintEqualToAnchor:headline.trailingAnchor],
+    ] : @[
         [disc.topAnchor constraintEqualToAnchor:header.topAnchor constant:16.0],
         [disc.centerXAnchor constraintEqualToAnchor:header.centerXAnchor],
         [disc.widthAnchor constraintEqualToConstant:52.0],
@@ -607,28 +789,35 @@ static void PFBReportFitSheet(UIViewController* page) {
         [constraints addObjectsFromArray:@[
             [icon.widthAnchor constraintEqualToConstant:16.0],
             [icon.heightAnchor constraintEqualToConstant:16.0],
-            [line.topAnchor constraintEqualToAnchor:subline.bottomAnchor constant:12.0],
-            [line.centerXAnchor constraintEqualToAnchor:header.centerXAnchor],
+            native ? [line.topAnchor constraintEqualToAnchor:disc.bottomAnchor constant:12.0]
+                   : [line.topAnchor constraintEqualToAnchor:subline.bottomAnchor constant:12.0],
+            native ? [line.leadingAnchor constraintEqualToAnchor:headline.leadingAnchor]
+                   : [line.centerXAnchor constraintEqualToAnchor:header.centerXAnchor],
         ]];
     }
     [NSLayoutConstraint activateConstraints:constraints];
     return header;
 }
 
+- (PFBReportRow*)rowAt:(NSIndexPath*)indexPath {
+    return _sections[(NSUInteger)indexPath.section][(NSUInteger)indexPath.row];
+}
+
 - (NSInteger)numberOfSectionsInTableView:(UITableView*)tableView {
-    return 1;
+    return (NSInteger)_sections.count;
 }
 
 - (NSInteger)tableView:(UITableView*)tableView numberOfRowsInSection:(NSInteger)section {
-    return (NSInteger)_rows.count;
+    return (NSInteger)_sections[(NSUInteger)section].count;
 }
 
 - (UITableViewCell*)tableView:(UITableView*)tableView cellForRowAtIndexPath:(NSIndexPath*)indexPath {
-    return PFBReportCell(tableView, indexPath, _rows[(NSUInteger)indexPath.row]);
+    return PFBReportCell(tableView, indexPath, [self rowAt:indexPath], self.nativeLook);
 }
 
+// The new look sets Clear all apart from the lists with a gap.
 - (CGFloat)tableView:(UITableView*)tableView heightForHeaderInSection:(NSInteger)section {
-    return CGFLOAT_MIN;
+    return section > 0 ? 16.0 : CGFLOAT_MIN;
 }
 
 - (CGFloat)tableView:(UITableView*)tableView heightForFooterInSection:(NSInteger)section {
@@ -636,24 +825,30 @@ static void PFBReportFitSheet(UIViewController* page) {
 }
 
 - (BOOL)tableView:(UITableView*)tableView shouldHighlightRowAtIndexPath:(NSIndexPath*)indexPath {
-    return _rows[(NSUInteger)indexPath.row].enabled;
+    return [self rowAt:indexPath].enabled;
 }
 
 - (void)tableView:(UITableView*)tableView didSelectRowAtIndexPath:(NSIndexPath*)indexPath {
     [tableView deselectRowAtIndexPath:indexPath animated:YES];
-    PFBReportRow* row = _rows[(NSUInteger)indexPath.row];
+    PFBReportRow* row = [self rowAt:indexPath];
     if (!row.enabled) {
         return;
     }
     if (row.kind == PFBReportRowList) {
         NSString* version = NSBundle.mainBundle.infoDictionary[@"CFBundleShortVersionString"] ?: @"";
-        NSString* note = row.verdict == PFBCompatVerdictOK
-                             ? [NSString stringWithFormat:@"Options seen working on Twitter %@.", version]
-                             : [NSString stringWithFormat:@"Options not seen yet on Twitter %@, or not since their code "
-                                                          @"changed. The next tour or normal use proves them.",
-                                                          version];
+        NSString* note = [NSString stringWithFormat:@"Options not seen yet on Twitter %@, or not since their code "
+                                                    @"changed. The next tour or normal use proves them.",
+                                                    version];
+        if (row.verdict == PFBCompatVerdictOK) {
+            note = [NSString stringWithFormat:@"Options seen working on Twitter %@.", version];
+        } else if (row.verdict == PFBCompatVerdictBroken) {
+            note = [NSString stringWithFormat:@"Options that stopped working on Twitter %@.", version];
+        }
         PFBCompatibilityListViewController* list =
-            [[PFBCompatibilityListViewController alloc] initWithVerdict:row.verdict title:row.title note:note];
+            [[PFBCompatibilityListViewController alloc] initWithVerdict:row.verdict
+                                                                  title:row.title
+                                                                   note:note
+                                                                 native:self.nativeLook];
         [self.navigationController pushViewController:list animated:YES];
     } else if (row.kind == PFBReportRowClearAll) {
         [self confirmClearAll];
@@ -737,10 +932,20 @@ static void PFBReportFitSheet(UIViewController* page) {
 
 - (void)copyReport {
     [UIPasteboard generalPasteboard].string = PFBCompatReportText();
-    self.navigationItem.rightBarButtonItem.title = @"Copied";
+    UIBarButtonItem* item = self.navigationItem.rightBarButtonItem;
+    BOOL native = self.nativeLook;
+    if (native) {
+        item.image = PFBReportCopyGlyph(YES);
+    } else {
+        item.title = @"Copied";
+    }
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1.2 * NSEC_PER_SEC)),
                    dispatch_get_main_queue(), ^{
-                     self.navigationItem.rightBarButtonItem.title = @"Copy";
+                     if (native) {
+                         item.image = PFBReportCopyGlyph(NO);
+                     } else {
+                         item.title = @"Copy";
+                     }
                    });
 }
 

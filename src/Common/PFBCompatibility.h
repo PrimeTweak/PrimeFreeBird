@@ -136,6 +136,8 @@ typedef NS_ENUM(NSInteger, PFBCompatReadState) {
 };
 
 @interface PFBCompatibilityReportViewController : UITableViewController
+// Set before it shows: the report then takes the new look of Twitter's settings.
+@property (nonatomic) BOOL nativeLook;
 // The report in a navigation of its own, for the stethoscope's sheet: as tall as the page
 // in front of it, up to the screen's.
 + (UINavigationController*)sheetFor:(UIWindow*)window;

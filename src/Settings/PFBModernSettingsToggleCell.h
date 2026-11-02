@@ -6,6 +6,9 @@
 @property (nonatomic, strong) UISwitch* toggleSwitch;
 @property (nonatomic, strong) NSLayoutConstraint* titleLeading;
 - (void)configureWithTitle:(NSString*)title subtitle:(NSString*)subtitle;
+// The room on both sides, 10 points unless set: a page of the new look lines its rows up
+// where Twitter's icons stand.
+- (void)setSideMargin:(CGFloat)margin;
 - (void)addTarget:(id)target action:(SEL)action forControlEvents:(UIControlEvents)events;
 // A row another option has taken over: the switch stops responding and the title
 // dims; the line under it says why.

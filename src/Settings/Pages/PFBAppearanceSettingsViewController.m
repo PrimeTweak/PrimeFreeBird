@@ -69,15 +69,17 @@ static NSInteger PFBInterfaceStyleCurrent(void) {
 
 #pragma mark - Sub-page Navigation
 
+// The new look titles its screens alone, as it titles its pages.
 - (void)showThemeViewController:(NSDictionary*)sender {
-    UIViewController* themeVC = [[PFBColorThemeViewController alloc] init];
-    if (self.account) {
+    PFBColorThemeViewController* themeVC = [[PFBColorThemeViewController alloc] init];
+    themeVC.nativeLook = self.nativeLook;
+    NSString* title = [[PFBBundle sharedBundle] localizedStringForKey:@"THEME_SETTINGS_NAVIGATION_TITLE"];
+    if (self.nativeLook) {
+        themeVC.title = title;
+    } else if (self.account) {
         [themeVC.navigationItem
-            setTitleView:
-                [objc_getClass("TFNTitleView")
-                    titleViewWithTitle:[[PFBBundle sharedBundle]
-                                           localizedStringForKey:@"THEME_SETTINGS_NAVIGATION_TITLE"]
-                              subtitle:self.account.displayUsername]];
+            setTitleView:[objc_getClass("TFNTitleView") titleViewWithTitle:title
+                                                                   subtitle:self.account.displayUsername]];
     }
     [self.navigationController pushViewController:themeVC animated:YES];
 }
@@ -294,7 +296,7 @@ static NSInteger PFBInterfaceStyleCurrent(void) {
         [[UIFontPickerViewController alloc] initWithConfiguration:configuration];
     fontPicker.delegate = (id<UIFontPickerViewControllerDelegate>)self;
     objc_setAssociatedObject(fontPicker, @"fontType", @"regular", OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-    if (self.account) {
+    if (self.account && !self.nativeLook) {
         [fontPicker.navigationItem
             setTitleView:
                 [objc_getClass("TFNTitleView")
@@ -317,7 +319,7 @@ static NSInteger PFBInterfaceStyleCurrent(void) {
         [[UIFontPickerViewController alloc] initWithConfiguration:configuration];
     fontPicker.delegate = (id<UIFontPickerViewControllerDelegate>)self;
     objc_setAssociatedObject(fontPicker, @"fontType", @"bold", OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-    if (self.account) {
+    if (self.account && !self.nativeLook) {
         [fontPicker.navigationItem
             setTitleView:
                 [objc_getClass("TFNTitleView")

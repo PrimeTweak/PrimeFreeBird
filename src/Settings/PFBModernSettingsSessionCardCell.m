@@ -243,7 +243,7 @@ static NSCache* PFBAvatarCache(void) {
     UIColor* alert = PFBSettingsAlertColor();
     UIColor* accent = [PFBPalette colorFor:@selector(primaryColor) fallback:[UIColor systemBlueColor]];
 
-    self.backgroundColor = [PFBPalette currentBackgroundColor];
+    self.backgroundColor = PFBSettingsRowGround(self);
     self.box.backgroundColor = faint;
     self.avatarLabel.backgroundColor = self.signedIn ? accent : [PFBPalette currentBackgroundColor];
     self.placeholderImage.tintColor = soft;

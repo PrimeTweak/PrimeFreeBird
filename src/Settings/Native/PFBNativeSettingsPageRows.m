@@ -7,7 +7,6 @@
 #import "Settings/Native/PFBNativeSettingsRowCell.h"
 #import "Settings/Native/PFBNativeSettingsSheetController.h"
 #import "Settings/PFBModernSettingsPageViewController.h"
-#import "Settings/PFBSettingsRowsProbe.h"
 
 static BOOL PFBRowIsGroup(NSDictionary* entry) {
     return [entry[@"type"] isEqualToString:@"header"];
@@ -138,7 +137,7 @@ static BOOL PFBRowIsGroup(NSDictionary* entry) {
                                                                                pageKey:[page pageKey]
                                                                                  group:group];
     __weak typeof(self) weakSelf = self;
-    [PFBNativeSettingsSheetController presentPage:rows
+    [PFBNativeSettingsSheetController presentRows:rows
                                            titled:[self titleOf:header]
                                              from:page
                                            closed:^{
@@ -165,7 +164,6 @@ static BOOL PFBRowIsGroup(NSDictionary* entry) {
 // their values as they now stand.
 - (void)showChanges {
     UITableView* table = self.page.tableView;
-    PFBSettingsWatchRows(table, @"sheet closed");
     // A reload still waiting is done first, so the rows before the change are those on screen.
     [table layoutIfNeeded];
     NSArray<NSDictionary*>* before = self.rows;
