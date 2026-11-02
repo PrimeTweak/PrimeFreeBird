@@ -6,6 +6,7 @@
 #import "Support/HookHelpers.h"
 #import "Common/PFBBundle.h"
 #import "Debug/PFBDebugger.h"
+#import "Support/PFBTwitterPopups.h"
 
 #import "Features/Appearance/ThemeColor/PFBDarkModeStyle.h"
 
@@ -1537,19 +1538,15 @@ static void PFBShowRestartReminder(void) {
         alertControllerWithTitle:[bundle localizedStringForKey:@"RESTART_REQUIRED_ALERT_TITLE"]
                          message:[bundle localizedStringForKey:@"LIGHT_MODE_RESTART_MESSAGE"]
                   preferredStyle:UIAlertControllerStyleAlert];
-    [alert addAction:[UIAlertAction actionWithTitle:[bundle localizedStringForKey:@"RESTART_LATER_ACTION"]
-                                              style:UIAlertActionStyleCancel
-                                            handler:nil]];
-    UIAlertAction* close = [UIAlertAction actionWithTitle:[bundle localizedStringForKey:@"CLOSE_APP_ACTION"]
-                                                    style:UIAlertActionStyleDefault
-                                                  handler:^(__unused UIAlertAction* action) {
-                                                      PFBCompatSaveNow();
-                                                      [[NSUserDefaults standardUserDefaults] synchronize];
-                                                      exit(0);
-                                                  }];
-    [alert addAction:close];
+    PFBAlertAddAction(alert, [bundle localizedStringForKey:@"RESTART_LATER_ACTION"], UIAlertActionStyleCancel, YES, nil);
+    UIAlertAction* close =
+        PFBAlertAddAction(alert, [bundle localizedStringForKey:@"CLOSE_APP_ACTION"], UIAlertActionStyleDefault, YES, ^{
+            PFBCompatSaveNow();
+            [[NSUserDefaults standardUserDefaults] synchronize];
+            exit(0);
+        });
     alert.preferredAction = close;
-    [top presentViewController:alert animated:YES completion:nil];
+    PFBAlertPresent(alert, top, YES, nil);
 }
 
 // Every apply path (launch re-apply, trait changes, both settings pickers)
