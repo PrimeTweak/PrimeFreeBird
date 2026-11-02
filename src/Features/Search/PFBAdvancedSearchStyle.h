@@ -1,81 +1,64 @@
-// The web form's look, shared by the advanced search cells.
+// The new look's parts as the advanced search cells use them: a title over a capsule field, and
+// the example under it.
 #import <UIKit/UIKit.h>
-#import "Support/TwitterChirpFont.h"
+#import "Settings/PFBSettingsCellStyle.h"
+#import "Settings/Native/PFBShowcase.h"
+#import "Settings/Native/PFBNativeSettingsRowCell.h"
 
-// x.com focus blue (#1D9BF0) — the web form's focus ring.
-static inline UIColor* PFBAdvBlue(void) {
-    return [UIColor colorWithRed:0x1D / 255.0
-                           green:0x9B / 255.0
-                            blue:0xF0 / 255.0
-                           alpha:1.0];
+static const CGFloat kPFBAdvFieldHeight = 50.0;
+// The text's side margin, and the capsule's, as the new look's sheets place theirs.
+static const CGFloat kPFBAdvTextSide = 24.0;
+static const CGFloat kPFBAdvFieldSide = 20.0;
+
+// The font of a row's title in Twitter's new settings.
+static inline UIFont* PFBAdvTitleFont(void) {
+    return [PFBNativeSettingsRowStyle shared].titleFont
+               ?: PFBScaledFont([TwitterChirpFont(TwitterFontStyleRegular) fontWithSize:16]);
 }
-// Sets the gray border of a form box again. A layer border keeps the CGColor it was
-// given, so its owner calls this when the appearance changes.
-static inline void PFBAdvRefreshBoxBorder(UIView* box) {
-    box.layer.borderColor = [[UIColor systemGray3Color] resolvedColorWithTraitCollection:box.traitCollection].CGColor;
+
+// The title and the example in the palette's fonts and colors, set again on every appearance change.
+static inline void PFBAdvThemeLabels(UILabel* title, UILabel* example) {
+    title.font = PFBAdvTitleFont();
+    title.textColor = PFBSettingsTextColor();
+    example.font = PFBSettingsDetailFont();
+    example.textColor = PFBSettingsSubtitleColor();
 }
-// Builds the web form's bordered box with a floating label, hosting an
-// arbitrary content view, plus the gray example line underneath.
-static inline UILabel* PFBAdvInstallBox(UITableViewCell* cell,
-                                 UIView* content,
-                                 UILabel** outExample) {
+
+// Lays the cell out as the title, the capsule holding content, then the example.
+static inline void PFBAdvInstallField(UITableViewCell* cell, UIView* content, UILabel** outTitle,
+                                      UILabel** outExample) {
     cell.selectionStyle = UITableViewCellSelectionStyleNone;
     cell.backgroundColor = [UIColor clearColor];
-
-    UIView* box = [[UIView alloc] init];
-    box.layer.borderWidth = 1.0;
-    box.layer.borderColor = [UIColor systemGray3Color].CGColor;
-    box.layer.cornerRadius = 6.0;
-    box.translatesAutoresizingMaskIntoConstraints = NO;
-    [cell.contentView addSubview:box];
-
-    UILabel* floatLabel = [[UILabel alloc] init];
-    floatLabel.font = PFBScaledFont([TwitterChirpFont(TwitterFontStyleRegular) fontWithSize:13]);
-    floatLabel.textColor = [UIColor secondaryLabelColor];
-    floatLabel.translatesAutoresizingMaskIntoConstraints = NO;
-    [box addSubview:floatLabel];
-
-    content.translatesAutoresizingMaskIntoConstraints = NO;
-    [box addSubview:content];
-
+    UILabel* title = [[UILabel alloc] init];
+    title.numberOfLines = 0;
+    PFBShowcaseSurface* surface = [[PFBShowcaseSurface alloc] initWithCornerRadius:-1];
     UILabel* example = [[UILabel alloc] init];
-    example.font = PFBScaledFont([TwitterChirpFont(TwitterFontStyleRegular) fontWithSize:13.5]);
-    example.textColor = [UIColor secondaryLabelColor];
     example.numberOfLines = 0;
-    example.translatesAutoresizingMaskIntoConstraints = NO;
-    [cell.contentView addSubview:example];
-
-    UILayoutGuide* margins = cell.contentView.layoutMarginsGuide;
+    UIView* box = cell.contentView;
+    for (UIView* part in @[ title, surface, example ]) {
+        part.translatesAutoresizingMaskIntoConstraints = NO;
+        [box addSubview:part];
+    }
+    content.translatesAutoresizingMaskIntoConstraints = NO;
+    [surface.contentView addSubview:content];
     [NSLayoutConstraint activateConstraints:@[
-        [box.topAnchor constraintEqualToAnchor:cell.contentView.topAnchor
-                                      constant:7.0],
-        [box.leadingAnchor constraintEqualToAnchor:margins.leadingAnchor],
-        [box.trailingAnchor constraintEqualToAnchor:margins.trailingAnchor],
-
-        [floatLabel.topAnchor constraintEqualToAnchor:box.topAnchor constant:7.0],
-        [floatLabel.leadingAnchor constraintEqualToAnchor:box.leadingAnchor
-                                                 constant:12.0],
-        [floatLabel.trailingAnchor constraintEqualToAnchor:box.trailingAnchor
-                                                  constant:-12.0],
-
-        [content.topAnchor constraintEqualToAnchor:floatLabel.bottomAnchor
-                                          constant:1.0],
-        [content.leadingAnchor constraintEqualToAnchor:box.leadingAnchor
-                                              constant:12.0],
-        [content.trailingAnchor constraintEqualToAnchor:box.trailingAnchor
-                                               constant:-12.0],
-        [content.bottomAnchor constraintEqualToAnchor:box.bottomAnchor
-                                             constant:-9.0],
-        [content.heightAnchor constraintGreaterThanOrEqualToConstant:22.0],
-
-        [example.topAnchor constraintEqualToAnchor:box.bottomAnchor constant:6.0],
-        [example.leadingAnchor constraintEqualToAnchor:margins.leadingAnchor
-                                               constant:2.0],
-        [example.trailingAnchor constraintEqualToAnchor:margins.trailingAnchor],
-        [example.bottomAnchor
-            constraintEqualToAnchor:cell.contentView.bottomAnchor
-                           constant:-7.0],
+        [title.topAnchor constraintEqualToAnchor:box.topAnchor constant:10.0],
+        [title.leadingAnchor constraintEqualToAnchor:box.leadingAnchor constant:kPFBAdvTextSide],
+        [title.trailingAnchor constraintEqualToAnchor:box.trailingAnchor constant:-kPFBAdvTextSide],
+        [surface.topAnchor constraintEqualToAnchor:title.bottomAnchor constant:8.0],
+        [surface.leadingAnchor constraintEqualToAnchor:box.leadingAnchor constant:kPFBAdvFieldSide],
+        [surface.trailingAnchor constraintEqualToAnchor:box.trailingAnchor constant:-kPFBAdvFieldSide],
+        [surface.heightAnchor constraintEqualToConstant:kPFBAdvFieldHeight],
+        [content.leadingAnchor constraintEqualToAnchor:surface.contentView.leadingAnchor constant:18.0],
+        [content.trailingAnchor constraintEqualToAnchor:surface.contentView.trailingAnchor constant:-12.0],
+        [content.topAnchor constraintEqualToAnchor:surface.contentView.topAnchor],
+        [content.bottomAnchor constraintEqualToAnchor:surface.contentView.bottomAnchor],
+        [example.topAnchor constraintEqualToAnchor:surface.bottomAnchor constant:6.0],
+        [example.leadingAnchor constraintEqualToAnchor:box.leadingAnchor constant:kPFBAdvTextSide],
+        [example.trailingAnchor constraintEqualToAnchor:box.trailingAnchor constant:-kPFBAdvTextSide],
+        [example.bottomAnchor constraintEqualToAnchor:box.bottomAnchor constant:-10.0],
     ]];
-    if (outExample) { *outExample = example; }
-    return floatLabel;
+    PFBAdvThemeLabels(title, example);
+    *outTitle = title;
+    *outExample = example;
 }

@@ -2,8 +2,10 @@
 
 @class PFBAdvField;
 
+// A date of the form: its title, the capsule with iOS's date control and a clear button, then
+// the example.
 @interface PFBAdvDateCell : UITableViewCell
-@property (nonatomic, strong) UILabel* floatLabel;
+@property (nonatomic, strong) UILabel* nameLabel;
 @property (nonatomic, strong) UILabel* exampleLabel;
 @property (nonatomic, strong) UIDatePicker* picker;
 @property (nonatomic, strong) UIButton* clearButton;

@@ -4,7 +4,7 @@ typedef NS_ENUM(NSInteger, PFBAdvFieldKind) {
     PFBAdvFieldText = 0,     // free words / phrases / account lists
     PFBAdvFieldNumber,       // minimum engagement counts
     PFBAdvFieldDate,         // calendar picker, optional
-    PFBAdvFieldMenu,         // language pull-down
+    PFBAdvFieldMenu,         // language, chosen on its own step
     PFBAdvFieldToggle,       // filters switches
 };
 

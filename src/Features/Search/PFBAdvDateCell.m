@@ -25,9 +25,7 @@
                           action:@selector(pfbClearDate)
                 forControlEvents:UIControlEventTouchUpInside];
 
-        // Compact row: the native calendar capsule anchored to the RIGHT
-        // (the iOS Settings pattern), the clear × just left of it, nothing
-        // stretched — the box stays as tight as every other field.
+        // The native calendar control at the trailing end, the clear button just before it.
         UIView* row = [[UIView alloc] init];
         _picker.translatesAutoresizingMaskIntoConstraints = NO;
         _clearButton.translatesAutoresizingMaskIntoConstraints = NO;
@@ -44,7 +42,6 @@
                 constraintGreaterThanOrEqualToAnchor:row.topAnchor],
             [_picker.bottomAnchor
                 constraintLessThanOrEqualToAnchor:row.bottomAnchor],
-            [row.heightAnchor constraintEqualToConstant:36.0],
             [_clearButton.centerYAnchor
                 constraintEqualToAnchor:_picker.centerYAnchor],
             [_clearButton.trailingAnchor
@@ -53,8 +50,10 @@
             [_clearButton.widthAnchor constraintEqualToConstant:26.0],
         ]];
 
+        UILabel* name = nil;
         UILabel* example = nil;
-        _floatLabel = PFBAdvInstallBox(self, row, &example);
+        PFBAdvInstallField(self, row, &name, &example);
+        _nameLabel = name;
         _exampleLabel = example;
     }
     return self;
@@ -74,7 +73,8 @@
 - (void)configureWith:(PFBAdvField*)model {
     self.model = model;
     PFBBundle* bundle = [PFBBundle sharedBundle];
-    self.floatLabel.text = [bundle localizedStringForKey:model.labelKey];
+    self.nameLabel.text = [bundle localizedStringForKey:model.labelKey];
+    self.picker.accessibilityLabel = self.nameLabel.text;
     self.exampleLabel.text =
         model.exampleKey ? [bundle localizedStringForKey:model.exampleKey] : @"";
     NSString* stored =
@@ -105,10 +105,9 @@
     self.clearButton.hidden = YES;
 }
 
-// The box is the floating label's container.
 - (void)traitCollectionDidChange:(UITraitCollection*)previousTraitCollection {
     [super traitCollectionDidChange:previousTraitCollection];
-    PFBAdvRefreshBoxBorder(self.floatLabel.superview);
+    PFBAdvThemeLabels(self.nameLabel, self.exampleLabel);
 }
 
 @end

@@ -1,4 +1,4 @@
-// The Advanced Search form, styled after the web's: bordered fields, toggles, dates.
+// The Advanced Search form in the new look: capsule fields, switches, dates and a language step.
 
 #import "Features/Search/PFBAdvancedSearchViewController.h"
 #import "Common/PFBBundle.h"
@@ -10,6 +10,48 @@
 #import "Features/Search/PFBAdvMenuCell.h"
 #import "Features/Search/PFBAdvToggleCell.h"
 #import "Features/Search/PFBAdvDateCell.h"
+#import "Features/Search/PFBAdvLanguageViewController.h"
+#import "Features/Search/PFBAdvancedSearchStyle.h"
+#import "Support/PFBTwitterPopups.h"
+
+// MARK: - section title
+
+// A section's title in the palette's text color, set again when the appearance changes.
+@interface PFBAdvSectionHead : UIView
+@property (nonatomic, strong) UILabel* label;
+@end
+
+@implementation PFBAdvSectionHead
+
+- (instancetype)initWithTitle:(NSString*)title {
+    self = [super initWithFrame:CGRectZero];
+    if (self) {
+        _label = [[UILabel alloc] init];
+        _label.text = title;
+        _label.accessibilityTraits = UIAccessibilityTraitHeader;
+        _label.translatesAutoresizingMaskIntoConstraints = NO;
+        [self addSubview:_label];
+        [NSLayoutConstraint activateConstraints:@[
+            [_label.leadingAnchor constraintEqualToAnchor:self.leadingAnchor constant:kPFBAdvTextSide],
+            [_label.trailingAnchor constraintEqualToAnchor:self.trailingAnchor constant:-kPFBAdvTextSide],
+            [_label.bottomAnchor constraintEqualToAnchor:self.bottomAnchor constant:-4.0],
+        ]];
+        [self applyTheme];
+    }
+    return self;
+}
+
+- (void)applyTheme {
+    self.label.font = PFBScaledFont([TwitterChirpFont(TwitterFontStyleBold) fontWithSize:20]);
+    self.label.textColor = PFBSettingsTextColor();
+}
+
+- (void)traitCollectionDidChange:(UITraitCollection*)previousTraitCollection {
+    [super traitCollectionDidChange:previousTraitCollection];
+    [self applyTheme];
+}
+
+@end
 
 // MARK: - controller
 
@@ -17,7 +59,6 @@
 @property (nonatomic, strong) NSArray<NSString*>* sectionKeys;
 @property (nonatomic, strong) NSArray<NSArray<PFBAdvField*>*>* sections;
 @property (nonatomic, strong) NSArray<NSString*>* languageCodes;
-@property (nonatomic, weak) UIButton* clearButton;
 @end
 
 // A bar button tints a title with the glass material but leaves an original image as
@@ -64,11 +105,12 @@ static UIImage* pfbBakedTitleImage(NSString* title, UIFont* font) {
     PFBThemeScreenLeave(self);
 }
 
-// A layer border keeps the CGColor it was given: the Clear pill's gray is set again.
+// The page takes Twitter's background and the close glyph its text color, which change with
+// the appearance.
 - (void)traitCollectionDidChange:(UITraitCollection*)previousTraitCollection {
     [super traitCollectionDidChange:previousTraitCollection];
-    self.clearButton.layer.borderColor =
-        [[UIColor systemGray4Color] resolvedColorWithTraitCollection:self.traitCollection].CGColor;
+    self.tableView.backgroundColor = [PFBPalette currentBackgroundColor];
+    self.navigationItem.leftBarButtonItem.tintColor = PFBSettingsTextColor();
 }
 
 - (instancetype)init {
@@ -166,50 +208,45 @@ static UIImage* pfbBakedTitleImage(NSString* title, UIFont* font) {
         self.navigationItem.rightBarButtonItem = search;
     }
 
+    // Twitter's close glyph, as its sheets have; marked for the bar-glass pass, it keeps the
+    // capsule iOS gives it.
     if (self.presentingViewController) {
-        self.navigationItem.leftBarButtonItem = [[UIBarButtonItem alloc]
-            initWithBarButtonSystemItem:UIBarButtonSystemItemCancel
-                                 target:self
-                                 action:@selector(pfbCancel)];
-        // Marked for the bar-glass pass: this one keeps the capsule iOS gives it.
-        objc_setAssociatedObject(self.navigationItem.leftBarButtonItem,
-                                 @selector(pfbKeepsBarGlass), @YES,
-                                 OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        UIBarButtonItem* close = [[UIBarButtonItem alloc]
+            initWithImage:PFBTwitterGlyphFor(@"close_nomargin", [UIImage systemImageNamed:@"xmark"])
+                    style:UIBarButtonItemStylePlain
+                   target:self
+                   action:@selector(pfbCancel)];
+        close.tintColor = PFBSettingsTextColor();
+        close.accessibilityLabel = [bundle localizedTwitterStringForKey:@"CLOSE_ACTION_LABEL"];
+        objc_setAssociatedObject(close, @selector(pfbKeepsBarGlass), @YES, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        self.navigationItem.leftBarButtonItem = close;
     }
+    // The language step's back button shows its chevron alone.
+    self.navigationItem.backButtonDisplayMode = UINavigationItemBackButtonDisplayModeMinimal;
     NSDictionary* chirpTitle = @{
         NSFontAttributeName : PFBScaledFont([TwitterChirpFont(TwitterFontStyleBold) fontWithSize:17])
     };
     self.navigationController.navigationBar.titleTextAttributes = chirpTitle;
 
-    // Outline pill with pale gray border and text, the "Reset to default" style.
-    UIView* footer = [[UIView alloc] initWithFrame:CGRectMake(0, 0, 0, 78.0)];
-    UIButton* clear = [UIButton buttonWithType:UIButtonTypeSystem];
-    [clear setTitle:[bundle localizedStringForKey:@"ADVSEARCH_CLEAR"]
-           forState:UIControlStateNormal];
-    [clear setTitleColor:[UIColor secondaryLabelColor]
-                forState:UIControlStateNormal];
-    clear.titleLabel.font =
-        PFBScaledFont([TwitterChirpFont(TwitterFontStyleRegular) fontWithSize:15.5]);
-    clear.layer.borderWidth = 1.0;
-    clear.layer.borderColor = [UIColor systemGray4Color].CGColor;
-    clear.layer.cornerRadius = 22.0;
-    self.clearButton = clear;
+    // The outlined capsule of the new look's Reset to default.
+    PFBShowcaseButton* clear = [PFBShowcaseButton buttonWithStyle:PFBShowcaseButtonStyleOutline];
+    clear.label = [bundle localizedStringForKey:@"ADVSEARCH_CLEAR"];
     [clear addTarget:self
                   action:@selector(pfbClearAll)
         forControlEvents:UIControlEventTouchUpInside];
+    CGFloat clearHeight = [clear sizeThatFits:CGSizeMake(CGFLOAT_MAX, CGFLOAT_MAX)].height;
+    UIView* footer = [[UIView alloc] initWithFrame:CGRectMake(0, 0, 0, 20.0 + clearHeight + 24.0)];
     clear.translatesAutoresizingMaskIntoConstraints = NO;
     [footer addSubview:clear];
     [NSLayoutConstraint activateConstraints:@[
-        [clear.topAnchor constraintEqualToAnchor:footer.topAnchor constant:16.0],
-        [clear.leadingAnchor constraintEqualToAnchor:footer.leadingAnchor
-                                            constant:16.0],
-        [clear.trailingAnchor constraintEqualToAnchor:footer.trailingAnchor
-                                             constant:-16.0],
-        [clear.heightAnchor constraintEqualToConstant:44.0],
+        [clear.topAnchor constraintEqualToAnchor:footer.topAnchor constant:20.0],
+        [clear.leadingAnchor constraintEqualToAnchor:footer.leadingAnchor constant:kPFBAdvFieldSide],
+        [clear.trailingAnchor constraintEqualToAnchor:footer.trailingAnchor constant:-kPFBAdvFieldSide],
+        [clear.heightAnchor constraintEqualToConstant:clearHeight],
     ]];
     self.tableView.tableFooterView = footer;
 
-    self.tableView.backgroundColor = [UIColor systemBackgroundColor];
+    self.tableView.backgroundColor = [PFBPalette currentBackgroundColor];
     self.tableView.separatorStyle = UITableViewCellSeparatorStyleNone;
     [self.tableView registerClass:[PFBAdvBoxCell class]
            forCellReuseIdentifier:@"box"];
@@ -245,40 +282,31 @@ static NSString* PFBAdvLangName(NSString* code) {
     return PFBAdvLangName(code);
 }
 
-- (UIMenu*)pfbLanguageMenu {
-    NSString* current =
-        [[NSUserDefaults standardUserDefaults] stringForKey:@"pfb_advs_lang"]
-            ?: @"";
-    __weak typeof(self) weakSelf = self;
-    NSMutableArray* actions = [NSMutableArray array];
-    UIAction* any = [UIAction
-        actionWithTitle:[[PFBBundle sharedBundle]
-                            localizedStringForKey:@"ADVSEARCH_ANY_LANGUAGE"]
-                  image:nil
-             identifier:nil
-                handler:^(UIAction* a) {
-                    [[NSUserDefaults standardUserDefaults]
-                        removeObjectForKey:@"pfb_advs_lang"];
-                    [weakSelf.tableView reloadData];
-                }];
-    any.state = (current.length == 0) ? UIMenuElementStateOn
-                                      : UIMenuElementStateOff;
-    [actions addObject:any];
+// The language step: Any language first, then the languages in the form's order.
+- (void)pfbOpenLanguages {
+    NSMutableArray<NSString*>* titles =
+        [NSMutableArray arrayWithObject:[[PFBBundle sharedBundle] localizedStringForKey:@"ADVSEARCH_ANY_LANGUAGE"]];
+    NSMutableArray<NSString*>* codes = [NSMutableArray arrayWithObject:@""];
     for (NSString* code in self.languageCodes) {
-        UIAction* a = [UIAction
-            actionWithTitle:PFBAdvLangName(code)
-                      image:nil
-                 identifier:nil
-                    handler:^(UIAction* act) {
-                        [[NSUserDefaults standardUserDefaults]
-                            setObject:code forKey:@"pfb_advs_lang"];
-                        [weakSelf.tableView reloadData];
-                    }];
-        a.state = [current isEqualToString:code] ? UIMenuElementStateOn
-                                                 : UIMenuElementStateOff;
-        [actions addObject:a];
+        [titles addObject:PFBAdvLangName(code)];
+        [codes addObject:code];
     }
-    return [UIMenu menuWithChildren:actions];
+    NSString* current = [[NSUserDefaults standardUserDefaults] stringForKey:@"pfb_advs_lang"] ?: @"";
+    __weak typeof(self) weakSelf = self;
+    PFBAdvLanguageViewController* step =
+        [[PFBAdvLanguageViewController alloc] initWithTitles:titles
+                                                       codes:codes
+                                                      chosen:current
+                                                        pick:^(NSString* code) {
+                                                            NSUserDefaults* defaults = NSUserDefaults.standardUserDefaults;
+                                                            if (code.length) {
+                                                                [defaults setObject:code forKey:@"pfb_advs_lang"];
+                                                            } else {
+                                                                [defaults removeObjectForKey:@"pfb_advs_lang"];
+                                                            }
+                                                            [weakSelf.tableView reloadData];
+                                                        }];
+    [self.navigationController pushViewController:step animated:YES];
 }
 
 // Filters default ON (the web form's default): absent key means included.
@@ -300,23 +328,8 @@ static BOOL PFBAdvFilterOn(NSString* key) {
 
 - (UIView*)tableView:(UITableView*)tableView
     viewForHeaderInSection:(NSInteger)section {
-    UIView* container = [[UIView alloc] init];
-    UILabel* label = [[UILabel alloc] init];
-    label.text = [[PFBBundle sharedBundle]
-        localizedStringForKey:self.sectionKeys[(NSUInteger)section]];
-    label.font = PFBScaledFont([TwitterChirpFont(TwitterFontStyleBold) fontWithSize:20]);
-    label.textColor = [UIColor labelColor];
-    label.translatesAutoresizingMaskIntoConstraints = NO;
-    [container addSubview:label];
-    [NSLayoutConstraint activateConstraints:@[
-        [label.leadingAnchor
-            constraintEqualToAnchor:container.layoutMarginsGuide.leadingAnchor],
-        [label.trailingAnchor
-            constraintEqualToAnchor:container.layoutMarginsGuide.trailingAnchor],
-        [label.bottomAnchor constraintEqualToAnchor:container.bottomAnchor
-                                           constant:-6.0],
-    ]];
-    return container;
+    return [[PFBAdvSectionHead alloc]
+        initWithTitle:[[PFBBundle sharedBundle] localizedStringForKey:self.sectionKeys[(NSUInteger)section]]];
 }
 
 - (CGFloat)tableView:(UITableView*)tableView
@@ -333,9 +346,12 @@ static BOOL PFBAdvFilterOn(NSString* key) {
             PFBAdvMenuCell* cell =
                 [tableView dequeueReusableCellWithIdentifier:@"menu"
                                                 forIndexPath:indexPath];
+            __weak typeof(self) weakSelf = self;
             [cell configureWith:model
-                           menu:[self pfbLanguageMenu]
-                   currentTitle:[self pfbCurrentLanguageTitle]];
+                   currentTitle:[self pfbCurrentLanguageTitle]
+                           open:^{
+                               [weakSelf pfbOpenLanguages];
+                           }];
             return cell;
         }
         case PFBAdvFieldToggle: {
@@ -376,16 +392,13 @@ static BOOL PFBAdvFilterOn(NSString* key) {
         [UIAlertController alertControllerWithTitle:[bundle localizedStringForKey:@"ADVSEARCH_CLEAR"]
                                             message:[bundle localizedStringForKey:@"ADVSEARCH_CLEAR_CONFIRM_MESSAGE"]
                                      preferredStyle:UIAlertControllerStyleAlert];
-    [confirm addAction:[UIAlertAction actionWithTitle:[bundle localizedStringForKey:@"CANCEL_ACTION"]
-                                                style:UIAlertActionStyleCancel
-                                              handler:nil]];
+    PFBAlertAddAction(confirm, [bundle localizedStringForKey:@"CANCEL_ACTION"], UIAlertActionStyleCancel, YES, nil);
     __weak typeof(self) weakSelf = self;
-    [confirm addAction:[UIAlertAction actionWithTitle:[bundle localizedStringForKey:@"ADVSEARCH_CLEAR_ACTION"]
-                                                style:UIAlertActionStyleDestructive
-                                              handler:^(__unused UIAlertAction* action) {
-                                                  [weakSelf pfbEmptyForm];
-                                              }]];
-    [self presentViewController:confirm animated:YES completion:nil];
+    PFBAlertAddAction(confirm, [bundle localizedStringForKey:@"ADVSEARCH_CLEAR_ACTION"], UIAlertActionStyleDestructive,
+                      YES, ^{
+                          [weakSelf pfbEmptyForm];
+                      });
+    PFBAlertPresent(confirm, self, YES, nil);
 }
 
 - (void)pfbEmptyForm {
@@ -529,10 +542,8 @@ static NSString* PFBAdvValue(NSString* key) {
             alertControllerWithTitle:[bundle localizedStringForKey:@"ADVSEARCH_EMPTY_TITLE"]
                              message:[bundle localizedStringForKey:errorKey]
                       preferredStyle:UIAlertControllerStyleAlert];
-        [alert addAction:[UIAlertAction actionWithTitle:[bundle localizedStringForKey:@"OK_ACTION"]
-                                                  style:UIAlertActionStyleDefault
-                                                handler:nil]];
-        [self presentViewController:alert animated:YES completion:nil];
+        PFBAlertAddAction(alert, [bundle localizedStringForKey:@"OK_ACTION"], UIAlertActionStyleDefault, YES, nil);
+        PFBAlertPresent(alert, self, YES, nil);
         return;
     }
 
