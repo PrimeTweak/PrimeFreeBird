@@ -28,25 +28,12 @@ UILabel* PFBShowcaseIntroLabel(void) {
     return label;
 }
 
-// A page title, its color read again when light and dark switch.
-@interface PFBShowcaseTitleLabel : UILabel
-@end
-
-@implementation PFBShowcaseTitleLabel
-
-- (void)traitCollectionDidChange:(UITraitCollection*)previousTraitCollection {
-    [super traitCollectionDidChange:previousTraitCollection];
-    self.textColor = PFBSettingsTextColor();
-}
-
-@end
-
 void PFBShowcaseSetTitle(UIViewController* controller, NSString* title) {
     controller.title = title;
-    PFBShowcaseTitleLabel* label = [[PFBShowcaseTitleLabel alloc] init];
+    UILabel* label = [[UILabel alloc] init];
     label.text = title;
-    label.font = TwitterChirpFont(TwitterFontStyleBold);
-    label.textColor = PFBSettingsTextColor();
+    label.font = [TwitterChirpFont(TwitterFontStyleSemibold) fontWithSize:18];
+    label.textColor = UIColor.labelColor;
     label.textAlignment = NSTextAlignmentCenter;
     label.adjustsFontSizeToFitWidth = YES;
     label.minimumScaleFactor = 0.8;
