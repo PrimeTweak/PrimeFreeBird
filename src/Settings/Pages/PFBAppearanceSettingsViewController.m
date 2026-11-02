@@ -9,6 +9,7 @@
 #import "Features/Appearance/ThemeColor/PFBColorThemeViewController.h"
 #import "Features/Appearance/CustomTabBar/PFBCustomTabBarViewController.h"
 #import "Settings/PFBModernSettingsCells.h"
+#import "Settings/Native/PFBShowcase.h"
 
 // The dark shades, in the order dark_mode_style stores them.
 static NSArray<NSString*>* PFBDarkModeStyleKeys(void) {
@@ -75,7 +76,7 @@ static NSInteger PFBInterfaceStyleCurrent(void) {
     themeVC.nativeLook = self.nativeLook;
     NSString* title = [[PFBBundle sharedBundle] localizedStringForKey:@"THEME_SETTINGS_NAVIGATION_TITLE"];
     if (self.nativeLook) {
-        themeVC.title = title;
+        PFBShowcaseSetTitle(themeVC, title);
     } else if (self.account) {
         [themeVC.navigationItem
             setTitleView:[objc_getClass("TFNTitleView") titleViewWithTitle:title
@@ -105,7 +106,7 @@ static NSInteger PFBInterfaceStyleCurrent(void) {
             [PFBCustomTabBarUtility showTitleAloneInEditor:customTabBarVC];
         }
     } else if (self.nativeLook) {
-        customTabBarVC.title = [bundle localizedStringForKey:@"CUSTOM_TAB_BAR_SETTINGS_NAVIGATION_TITLE"];
+        PFBShowcaseSetTitle(customTabBarVC, [bundle localizedStringForKey:@"CUSTOM_TAB_BAR_SETTINGS_NAVIGATION_TITLE"]);
     } else if (self.account) {
         [customTabBarVC.navigationItem
             setTitleView:[objc_getClass("TFNTitleView")
@@ -302,17 +303,8 @@ static NSInteger PFBInterfaceStyleCurrent(void) {
         [[UIFontPickerViewController alloc] initWithConfiguration:configuration];
     fontPicker.delegate = (id<UIFontPickerViewControllerDelegate>)self;
     objc_setAssociatedObject(fontPicker, @"fontType", @"regular", OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-    if (self.account && !self.nativeLook) {
-        [fontPicker.navigationItem
-            setTitleView:
-                [objc_getClass("TFNTitleView")
-                    titleViewWithTitle:[[PFBBundle sharedBundle]
-                                           localizedStringForKey:@"REGULAR_FONTS_PICKER_OPTION_TITLE"]
-                              subtitle:self.account.displayUsername]];
-    } else {
-        fontPicker.title =
-            [[PFBBundle sharedBundle] localizedStringForKey:@"REGULAR_FONTS_PICKER_OPTION_TITLE"];
-    }
+    [self titleFontPicker:fontPicker
+                    title:[[PFBBundle sharedBundle] localizedStringForKey:@"REGULAR_FONTS_PICKER_OPTION_TITLE"]];
     [self.navigationController pushViewController:fontPicker animated:YES];
 }
 
@@ -325,18 +317,21 @@ static NSInteger PFBInterfaceStyleCurrent(void) {
         [[UIFontPickerViewController alloc] initWithConfiguration:configuration];
     fontPicker.delegate = (id<UIFontPickerViewControllerDelegate>)self;
     objc_setAssociatedObject(fontPicker, @"fontType", @"bold", OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-    if (self.account && !self.nativeLook) {
-        [fontPicker.navigationItem
-            setTitleView:
-                [objc_getClass("TFNTitleView")
-                    titleViewWithTitle:[[PFBBundle sharedBundle]
-                                           localizedStringForKey:@"BOLD_FONTS_PICKER_OPTION_TITLE"]
-                              subtitle:self.account.displayUsername]];
-    } else {
-        fontPicker.title =
-            [[PFBBundle sharedBundle] localizedStringForKey:@"BOLD_FONTS_PICKER_OPTION_TITLE"];
-    }
+    [self titleFontPicker:fontPicker
+                    title:[[PFBBundle sharedBundle] localizedStringForKey:@"BOLD_FONTS_PICKER_OPTION_TITLE"]];
     [self.navigationController pushViewController:fontPicker animated:YES];
+}
+
+// The new look titles the picker as its pages; the classic look adds the account under the title.
+- (void)titleFontPicker:(UIViewController*)fontPicker title:(NSString*)title {
+    if (self.nativeLook) {
+        PFBShowcaseSetTitle(fontPicker, title);
+    } else if (self.account) {
+        [fontPicker.navigationItem setTitleView:[objc_getClass("TFNTitleView") titleViewWithTitle:title
+                                                                                          subtitle:self.account.displayUsername]];
+    } else {
+        fontPicker.title = title;
+    }
 }
 
 // Clears the regular and bold choices so Twitter's own font returns, and the font
