@@ -61,6 +61,10 @@ static UILabel* gPFBTourStepLabel;
 // Cancel, as the toast or the box offers it; and whether Twitter's toast stands for the tour.
 static void (^gPFBTourCancel)(void);
 static BOOL gPFBTourToasts;
+// The step line the toast opens with, the one it shows, and the one it should show.
+static NSString* gPFBTourToastOpening;
+static NSString* gPFBTourToastLine;
+static NSString* gPFBTourToastWanted;
 static NSFileHandle* gPFBTourJournal;
 // Twitter's palette in use before the dark mode step switched it.
 static id gPFBTourPaletteBefore;
@@ -2242,6 +2246,9 @@ static void tourHideOverlay(void) {
     gPFBTourOverlay.hidden = YES;
     gPFBTourOverlay = nil;
     gPFBTourStepLabel = nil;
+    gPFBTourToastOpening = nil;
+    gPFBTourToastLine = nil;
+    gPFBTourToastWanted = nil;
 }
 
 // Whether Twitter has an account signed in: every screen the tour opens comes from it.
@@ -2358,31 +2365,83 @@ static void tourShowBox(void) {
     gPFBTourStepLabel = step;
 }
 
+static NSString* tourStepLine(NSString* label, NSUInteger index, NSUInteger total) {
+    return [NSString stringWithFormat:@"%@ \u00b7 %lu of %lu", label, (unsigned long)(index + 1), (unsigned long)total];
+}
+
+// Twitter's toast keeps the width of the line it opens with, so it opens with the widest step, then
+// shows the first one.
+static NSString* tourOpeningLine(NSArray<NSDictionary*>* steps) {
+    NSDictionary* font = @{NSFontAttributeName : [TwitterChirpFont(TwitterFontStyleRegular) fontWithSize:14.0]};
+    NSString* widest = nil;
+    CGFloat widestWidth = 0;
+    for (NSUInteger i = 0; i < steps.count; i++) {
+        NSString* line = tourStepLine(steps[i][@"label"], i, steps.count);
+        CGFloat width = [line sizeWithAttributes:font].width;
+        if (width > widestWidth) {
+            widest = line;
+            widestWidth = width;
+        }
+    }
+    return widest;
+}
+
+static void tourPushToast(void) {
+    gPFBTourToasts = PFBPushTwitterToast(kPFBTourToastTitle, gPFBTourToastOpening, PFBToastKindPlain, @"Cancel",
+                                         gPFBTourCancel, YES);
+    gPFBTourToastLine = gPFBTourToastOpening;
+    if (!gPFBTourToasts) {
+        tourShowBox();
+    }
+}
+
+// Writes the wanted step into the toast, found by the line it shows or the one it opened with; a
+// toast pushed again waits behind the one on screen, so this tries until the step changes.
+static void tourApplyToastLine(NSString* wanted) {
+    if (!gPFBTourToasts || ![wanted isEqualToString:gPFBTourToastWanted] ||
+        [wanted isEqualToString:gPFBTourToastLine]) {
+        return;
+    }
+    NSMutableArray<NSString*>* shown = [NSMutableArray array];
+    if (gPFBTourToastLine) {
+        [shown addObject:gPFBTourToastLine];
+    }
+    if (gPFBTourToastOpening) {
+        [shown addObject:gPFBTourToastOpening];
+    }
+    if (PFBRewriteToastLine(shown, wanted)) {
+        gPFBTourToastLine = wanted;
+        return;
+    }
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.1 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+      tourApplyToastLine(wanted);
+    });
+}
+
 // While the tour runs, Twitter's toast says what is happening and holds Cancel, from the start to the
 // end. The box stands in from the first toast the app cannot show.
 static void tourShowOverlay(NSArray<NSDictionary*>* steps, NSMutableArray<NSString*>* results, BOOL full) {
     gPFBTourCancel = ^{
       tourCancel(steps, results, full);
     };
-    gPFBTourToasts =
-        PFBPushTwitterToast(kPFBTourToastTitle, nil, PFBToastKindPlain, @"Cancel", gPFBTourCancel, YES);
-    if (!gPFBTourToasts) {
-        tourShowBox();
+    gPFBTourToastOpening = tourOpeningLine(steps);
+    tourPushToast();
+    if (steps.count) {
+        gPFBTourToastWanted = tourStepLine(steps.firstObject[@"label"], 0, steps.count);
+        tourApplyToastLine(gPFBTourToastWanted);
     }
 }
 
-// Twitter cannot change the words of a toast on screen, so the toast is left as it is and pushed
-// again only once another toast took its place; the box shows each step.
+// The toast's step line is written in place; the toast is pushed again only once another toast
+// took its place. The box shows each step too.
 static void tourShowStep(NSString* label, NSUInteger index, NSUInteger total) {
     if (gPFBTourToasts && !PFBPersistentToastShowing()) {
-        gPFBTourToasts =
-            PFBPushTwitterToast(kPFBTourToastTitle, nil, PFBToastKindPlain, @"Cancel", gPFBTourCancel, YES);
-        if (!gPFBTourToasts) {
-            tourShowBox();
-        }
+        tourPushToast();
     }
-    gPFBTourStepLabel.text = [NSString stringWithFormat:@"%@ \u00b7 %lu of %lu", label, (unsigned long)(index + 1),
-                                                        (unsigned long)total];
+    NSString* line = tourStepLine(label, index, total);
+    gPFBTourToastWanted = line;
+    tourApplyToastLine(line);
+    gPFBTourStepLabel.text = line;
 }
 
 // How the app reads a switch behind Twitter's toasts and alerts: on, off, or not found.

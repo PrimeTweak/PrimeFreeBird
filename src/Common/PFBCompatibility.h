@@ -127,6 +127,7 @@ typedef NS_ENUM(NSInteger, PFBCompatOption) {
     PFBCompat_hide_quote_tweets,
     PFBCompat_new_twitter_settings,
     PFBCompat_left_aligned_alerts,
+    PFBCompat_glass_toasts,
     PFBCompatOptionCount,
 };
 
@@ -257,6 +258,8 @@ typedef NS_ENUM(NSInteger, PFBCompatPath) {
     PFBCompatPath_glass_pill,
     PFBCompatPath_bottom_fade,
     PFBCompatPath_tab_editor_page,
+    PFBCompatPath_glass_toast_row,
+    PFBCompatPath_glass_toast_width,
     PFBCompatPathCount,
 };
 

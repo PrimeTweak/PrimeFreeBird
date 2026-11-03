@@ -34,6 +34,10 @@ BOOL PFBPersistentToastShowing(void);
 // Takes the tweak's toasts off the screen and out of Twitter's queue.
 void PFBClearTwitterToasts(void);
 
+// Rewrites a line of the toast on screen, found by one of the texts it may show; NO while no toast
+// shows any of them.
+BOOL PFBRewriteToastLine(NSArray<NSString*>* shown, NSString* line);
+
 // Adds a button the way Twitter adds its own when twitter is YES, so the app can draw the alert
 // in its style; the system's way otherwise.
 UIAlertAction* PFBAlertAddAction(UIAlertController* alert, NSString* title, UIAlertActionStyle style, BOOL twitter,

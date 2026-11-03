@@ -87,6 +87,16 @@
                          detailText:(NSString*)detail
                            iconName:(NSString*)iconName
                     displayDuration:(double)duration;
+- (NSString*)iconName;
+@end
+
+// Shows the toaster's toasts in its own window, in a container it sizes and places.
+@interface TFNToastViewController : UIViewController
+- (id)currentToast;
+- (UIView*)toastContainerView;
+- (double)_tfn_toastWidth;
+- (CGRect)_tfn_toastContainerFrame;
+- (CGRect)_tfn_toastHorizontalPlacementBounds;
 @end
 
 @interface TFNToaster : NSObject
@@ -95,6 +105,16 @@
 - (void)dequeueToastsPassingTest:(BOOL (^)(id toast, NSUInteger priority))test;
 // The toast on screen, nil when none shows.
 - (id)activeToast;
+- (TFNToastViewController*)toastViewController;
+@end
+
+@interface T1ToastContainerView : UIView
+- (TFNToastViewController*)toastViewController;
+@end
+
+// The toast's chrome, under its content: a blur and a shadow.
+@interface XDSToastContainerView : UIView
+- (void)setBlurHidden:(BOOL)hidden;
 @end
 
 @interface TFNHUD : NSObject

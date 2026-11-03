@@ -3,6 +3,7 @@
 #import "Support/PFBTwitterPopups.h"
 #import <objc/runtime.h>
 #import "Support/Helpers.h"
+#import "Support/HookHelpers.h"
 #import "Support/TFNHeaders.h"
 
 static const void* kPFBToastActionKey = &kPFBToastActionKey;
@@ -147,6 +148,24 @@ void PFBClearTwitterToasts(void) {
     [toaster dequeueToastsPassingTest:^BOOL(id toast, __unused NSUInteger priority) {
         return [toast isKindOfClass:ours];
     }];
+}
+
+BOOL PFBRewriteToastLine(NSArray<NSString*>* shown, NSString* line) {
+    TFNToaster* toaster = PFBToaster();
+    TFNToastViewController* shower =
+        [toaster respondsToSelector:@selector(toastViewController)] ? [toaster toastViewController] : nil;
+    UIView* container = [shower respondsToSelector:@selector(toastContainerView)] ? [shower toastContainerView] : nil;
+    if (!container || !shown.count) {
+        return NO;
+    }
+    __block UILabel* label = nil;
+    PFBWalkAllSubviews(container, 12, ^(UIView* view) {
+      if (!label && [view isKindOfClass:[UILabel class]] && [shown containsObject:((UILabel*)view).text ?: @""]) {
+          label = (UILabel*)view;
+      }
+    });
+    label.text = line;
+    return label != nil;
 }
 
 UIAlertAction* PFBAlertAddAction(UIAlertController* alert, NSString* title, UIAlertActionStyle style, BOOL twitter,

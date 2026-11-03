@@ -60,6 +60,8 @@ static NSDictionary<NSString*, NSDictionary*>* PFBSettingsPages(void) {
                         @"action": @"showInterfaceStylePicker:",
                         @"type": @"button"
                     },
+                    @{@"key": @"glass_toasts",
+                      @"default": @YES},
                     @{@"key": @"hide_scroll_edge_blur",
                       @"default": @YES},
                     @{@"key": @"custom_fonts",
