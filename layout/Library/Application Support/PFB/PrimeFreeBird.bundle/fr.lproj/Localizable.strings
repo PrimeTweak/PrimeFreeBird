@@ -45,8 +45,8 @@
 "INTERFACE_STYLE_SUBTITLE" = "Choisissez entre Standard et Liquid Glass.";
 "GLASS_TOASTS_TITLE" = "Toasts en verre";
 "GLASS_TOASTS_DETAIL" = "Affiche les toasts de Twitter en barre de verre, en haut.";
-"HIDE_SCROLL_EDGE_BLUR_TITLE" = "Masquer le flou des barres";
-"HIDE_SCROLL_EDGE_BLUR_DETAIL" = "Retire la bande floue qu’iOS dessine sous les barres du haut pendant le défilement.";
+"HIDE_SCROLL_EDGE_BLUR_TITLE" = "Barre du haut adoucie";
+"HIDE_SCROLL_EDGE_BLUR_DETAIL" = "Fait passer le contenu en fondu sous la barre du haut, au lieu d’une bande avec une ligne.";
 "CUSTOM_FONTS_TITLE" = "Polices personnalisées";
 "CUSTOM_FONTS_DETAIL" = "Utilise une police personnalisée dans tout Twitter.";
 "REGULAR_FONTS_PICKER_OPTION_TITLE" = "Police normale";
