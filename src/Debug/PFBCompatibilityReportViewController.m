@@ -215,8 +215,27 @@ static CGFloat PFBReportPageHeight(UIViewController* page) {
 static const void* kPFBReportFittedKey = &kPFBReportFittedKey;
 static const void* kPFBReportMostKey = &kPFBReportMostKey;
 
+// The sheet's height in the report while it moves: when a page asks for it, right after, and
+// once the page has settled, for the first moves of a launch.
+static NSUInteger gPFBReportFitMeasured;
+static void PFBReportMeasureFit(UIViewController* page, NSString* moment) {
+    UINavigationController* navigation = page.navigationController;
+    if (gPFBReportFitMeasured >= 12 || !navigation.presentingViewController) {
+        return;
+    }
+    gPFBReportFitMeasured++;
+    PFBCompatMeasure(@"sheet fit",
+                     [NSString stringWithFormat:@"%@ %@: sheet %.0f, page needs %.0f, moving %@",
+                                                NSStringFromClass([page class]), moment,
+                                                CGRectGetHeight(navigation.view.frame), PFBReportPageHeight(page),
+                                                page.transitionCoordinator ? @"yes" : @"no"],
+                     12);
+}
+
 // The stethoscope's sheet takes the height of the page in front again when it changed, up
 // to the most it can take. Pushed in the settings, the report has no sheet of its own.
+// The sheet re-reads its height at its next layout, which waits for the end of a push or a
+// pop: during one, that layout is run at once, inside the animation, so the sheet moves with it.
 static void PFBReportFitSheet(UIViewController* page) {
     UINavigationController* navigation = page.navigationController;
     if (navigation.topViewController != page || !navigation.presentingViewController ||
@@ -237,28 +256,26 @@ static void PFBReportFitSheet(UIViewController* page) {
             [sheet invalidateDetents];
             return;
         }
+        BOOL moving = page.transitionCoordinator != nil;
         [sheet animateChanges:^{
           [sheet invalidateDetents];
+          if (moving) {
+              [sheet.containerView layoutIfNeeded];
+          }
         }];
     }
 }
 
-// A page coming in by a push or a pop takes its height while it slides in, not once it has
-// settled, so the sheet never shows it cut at the height of the page it replaces.
+// A page coming in by a push or a pop takes its height as it starts to slide in, not once it
+// has settled, so the sheet never shows it cut at the height of the page it replaces.
 static void PFBReportFitSheetAlongside(UIViewController* page) {
-    id<UIViewControllerTransitionCoordinator> coordinator = page.transitionCoordinator;
-    if (!coordinator || page.navigationController.isBeingPresented) {
+    if (!page.transitionCoordinator || page.navigationController.isBeingPresented) {
         return;
     }
     [page.view layoutIfNeeded];
-    __weak UIViewController* weakPage = page;
-    [coordinator animateAlongsideTransition:^(__unused id<UIViewControllerTransitionCoordinatorContext> context) {
-      UIViewController* fitted = weakPage;
-      if (fitted) {
-          PFBReportFitSheet(fitted);
-      }
-    }
-                                 completion:nil];
+    PFBReportMeasureFit(page, @"comes in");
+    PFBReportFitSheet(page);
+    PFBReportMeasureFit(page, @"asked");
 }
 
 // One verdict's options on a page of their own: those not tested, or those working under
@@ -322,6 +339,11 @@ static void PFBReportFitSheetAlongside(UIViewController* page) {
     [self rebuild];
     [self.tableView reloadData];
     PFBReportFitSheetAlongside(self);
+}
+
+- (void)viewDidAppear:(BOOL)animated {
+    [super viewDidAppear:animated];
+    PFBReportMeasureFit(self, @"settled");
 }
 
 // Left together with the report, by closing the sheet or going back past it, the list
@@ -801,6 +823,7 @@ static NSString* PFBReportReadLine(void) {
 // Twitter's tab bar settles once the page is in: the new look's foot is placed again then.
 - (void)viewDidAppear:(BOOL)animated {
     [super viewDidAppear:animated];
+    PFBReportMeasureFit(self, @"settled");
     _footerPlaced = NO;
     [self.view setNeedsLayout];
 }
