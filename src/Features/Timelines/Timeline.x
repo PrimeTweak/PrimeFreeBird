@@ -203,9 +203,9 @@ static void pfbApplyFleetVisibility(UIView* view) {
 
 // MARK: - Scroll edge effect
 
-// With the iOS 26 design, iOS draws a scroll edge effect under the top bars. This option
-// hides that top effect, except on modal screens and on the tweak's pages, which keep the soft
-// frost of Twitter's settings.
+// With the iOS 26 design, iOS draws a scroll edge effect under the top bars: a solid band with a
+// line on the settings screens. This option hides that top effect, except on modal screens; on the
+// tweak's pages it shows the effect in its soft style instead, as Twitter's settings then fade.
 
 static void PFBReadingLayoutTick(UIScrollView* scrollView);
 
@@ -302,26 +302,57 @@ static void pfbMeasureSettingsEdge(UIScrollView* scrollView, id effect) {
                      12);
 }
 
-// The tweak's pages keep the effect, in the soft style of Twitter's settings; set once per list
-// and window, so a style that is a new object at each read never sets it again on every layout.
+static id pfbTopEdgeEffect(UIScrollView* scrollView) {
+    SEL edge = NSSelectorFromString(@"topEdgeEffect");
+    if (![scrollView respondsToSelector:edge]) {
+        return nil;
+    }
+    id effect = ((id (*)(id, SEL))objc_msgSend)(scrollView, edge);
+    BOOL styled = [effect respondsToSelector:@selector(setStyle:)] && [effect respondsToSelector:@selector(style)];
+    return styled ? effect : nil;
+}
+
+// With the option on, a tweak page's effect takes the soft style, its own style kept to give back
+// when the option goes off; set once per list and window, as a style may be a new object at
+// each read.
 static void pfbSoftenEdgeEffect(UIScrollView* scrollView, BOOL moved) {
     if (!moved && objc_getAssociatedObject(scrollView, kPFBEdgeSoftenedKey)) {
         return;
     }
-    objc_setAssociatedObject(scrollView, kPFBEdgeSoftenedKey, @YES, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-    SEL edge = NSSelectorFromString(@"topEdgeEffect");
+    id effect = pfbTopEdgeEffect(scrollView);
     SEL softStyle = NSSelectorFromString(@"softStyle");
     Class styleClass = NSClassFromString(@"UIScrollEdgeEffectStyle");
-    if (![scrollView respondsToSelector:edge] || ![styleClass respondsToSelector:softStyle]) {
+    if (!effect || ![styleClass respondsToSelector:softStyle]) {
         return;
     }
-    id effect = ((id (*)(id, SEL))objc_msgSend)(scrollView, edge);
-    if (![effect respondsToSelector:@selector(setStyle:)] || ![effect respondsToSelector:@selector(style)]) {
-        return;
-    }
+    id own = objc_getAssociatedObject(scrollView, kPFBEdgeSoftenedKey) ?: [effect performSelector:@selector(style)];
+    objc_setAssociatedObject(scrollView, kPFBEdgeSoftenedKey, own ?: [NSNull null], OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     id soft = ((id (*)(id, SEL))objc_msgSend)(styleClass, softStyle);
     if (soft && ![[effect performSelector:@selector(style)] isEqual:soft]) {
         [effect performSelector:@selector(setStyle:) withObject:soft];
+    }
+}
+
+// With the option off, a tweak page's effect gets back the style iOS gave it.
+static void pfbUnsoftenEdgeEffect(UIScrollView* scrollView) {
+    id own = objc_getAssociatedObject(scrollView, kPFBEdgeSoftenedKey);
+    if (!own) {
+        return;
+    }
+    objc_setAssociatedObject(scrollView, kPFBEdgeSoftenedKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    id effect = pfbTopEdgeEffect(scrollView);
+    if (effect && own != [NSNull null]) {
+        [effect performSelector:@selector(setStyle:) withObject:own];
+    }
+}
+
+// A tweak page keeps its effect shown, soft while the option is on.
+static void pfbApplyTweakPageEdge(UIScrollView* scrollView, BOOL moved) {
+    pfbApplyEdgeEffect(scrollView, NO);
+    if (pfbEdgeHideEnabled()) {
+        pfbSoftenEdgeEffect(scrollView, moved);
+    } else {
+        pfbUnsoftenEdgeEffect(scrollView);
     }
 }
 
@@ -341,8 +372,7 @@ static BOOL pfbScrollViewIsModal(UIScrollView* scrollView) {
 
     @try {
         if (self.window && pfbScrollViewIsTweakPage(self)) {
-            pfbApplyEdgeEffect(self, NO);
-            pfbSoftenEdgeEffect(self, YES);
+            pfbApplyTweakPageEdge(self, YES);
         } else if (self.window && !pfbScrollViewIsModal(self)) {
             pfbApplyEdgeEffect(self, pfbEdgeHideEnabled());
         }
@@ -365,14 +395,14 @@ static BOOL pfbScrollViewIsModal(UIScrollView* scrollView) {
             return;
         }
         BOOL marked = objc_getAssociatedObject(self, kPFBEdgeMarkKey) != nil;
+        BOOL softened = objc_getAssociatedObject(self, kPFBEdgeSoftenedKey) != nil;
         BOOL hide = pfbEdgeHideEnabled();
         PFBReadingLayoutTick(self);
-        if (!marked && (!hide || pfbScrollViewIsModal(self))) {
+        if (!marked && !softened && (!hide || pfbScrollViewIsModal(self))) {
             return;
         }
         if (pfbScrollViewIsTweakPage(self)) {
-            pfbApplyEdgeEffect(self, NO);
-            pfbSoftenEdgeEffect(self, NO);
+            pfbApplyTweakPageEdge(self, NO);
             return;
         }
         pfbApplyEdgeEffect(self, hide);
