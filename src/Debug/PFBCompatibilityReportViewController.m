@@ -243,6 +243,24 @@ static void PFBReportFitSheet(UIViewController* page) {
     }
 }
 
+// A page coming in by a push or a pop takes its height while it slides in, not once it has
+// settled, so the sheet never shows it cut at the height of the page it replaces.
+static void PFBReportFitSheetAlongside(UIViewController* page) {
+    id<UIViewControllerTransitionCoordinator> coordinator = page.transitionCoordinator;
+    if (!coordinator || page.navigationController.isBeingPresented) {
+        return;
+    }
+    [page.view layoutIfNeeded];
+    __weak UIViewController* weakPage = page;
+    [coordinator animateAlongsideTransition:^(__unused id<UIViewControllerTransitionCoordinatorContext> context) {
+      UIViewController* fitted = weakPage;
+      if (fitted) {
+          PFBReportFitSheet(fitted);
+      }
+    }
+                                 completion:nil];
+}
+
 // One verdict's options on a page of their own: those not tested, or those working under
 // their settings pages. The internal checks stay in the copied report, but for a broken one,
 // which the new look's Broken row counts.
@@ -303,6 +321,7 @@ static void PFBReportFitSheet(UIViewController* page) {
     [self.navigationController setNavigationBarHidden:NO animated:animated];
     [self rebuild];
     [self.tableView reloadData];
+    PFBReportFitSheetAlongside(self);
 }
 
 // Left together with the report, by closing the sheet or going back past it, the list
@@ -776,6 +795,7 @@ static NSString* PFBReportReadLine(void) {
     }
     [self rebuild];
     [self.tableView reloadData];
+    PFBReportFitSheetAlongside(self);
 }
 
 // Twitter's tab bar settles once the page is in: the new look's foot is placed again then.
