@@ -7,8 +7,7 @@
 #import "Common/PFBBundle.h"
 #import "Support/TwitterChirpFont.h"
 #import "Features/Appearance/ThemeColor/PFBPalette.h"
-
-extern UIColor* PFBCurrentAccentColor(void);
+#import "Support/Helpers.h"
 
 // UIApplication's alternateIconName getter goes stale on sideloaded installs
 // (setting the icon works, but the getter keeps reporting an old name across
@@ -49,114 +48,9 @@ static NSString* AppIconDetailText(void) {
         localizedTwitterStringForKey:@"SUBSCRIPTION_APP_ICON_SETTINGS_DETAIL"];
 }
 
-@interface PFBAppIconViewController () <UICollectionViewDelegate,
-                                     UICollectionViewDataSource,
-                                     UICollectionViewDelegateFlowLayout>
-@property (nonatomic, strong) UICollectionView* appIconCollectionView;
-@property (nonatomic, copy) NSArray<PFBAppIconItem*>* icons;
-@end
-
-@implementation PFBAppIconViewController
-
-#pragma mark - Lifecycle
-
-- (void)viewDidLoad {
-    [super viewDidLoad];
-
-    self.navigationItem.title = [[PFBBundle sharedBundle]
-        localizedTwitterStringForKey:@"SUBSCRIPTION_APP_ICON_SETTINGS_TITLE"];
-
-    UICollectionViewFlowLayout* flow = [UICollectionViewFlowLayout new];
-    flow.sectionInset = UIEdgeInsetsMake(16, 16, 16, 16);
-    flow.minimumLineSpacing = 10;
-    flow.minimumInteritemSpacing = 10;
-
-    self.appIconCollectionView =
-        [[UICollectionView alloc] initWithFrame:CGRectZero
-                           collectionViewLayout:flow];
-    [self.appIconCollectionView registerClass:[PFBAppIconCell class]
-                   forCellWithReuseIdentifier:[PFBAppIconCell reuseIdentifier]];
-    [self.appIconCollectionView registerClass:[UICollectionReusableView class]
-                   forSupplementaryViewOfKind:UICollectionElementKindSectionHeader
-                          withReuseIdentifier:@"HeaderView"];
-    self.appIconCollectionView.delegate = self;
-    self.appIconCollectionView.dataSource = self;
-    self.appIconCollectionView.translatesAutoresizingMaskIntoConstraints = NO;
-    self.appIconCollectionView.backgroundColor = [PFBPalette currentBackgroundColor];
-
-    self.view.backgroundColor = [PFBPalette currentBackgroundColor];
-
-    [self.view addSubview:self.appIconCollectionView];
-
-    [NSLayoutConstraint activateConstraints:@[
-        [self.appIconCollectionView.topAnchor
-            constraintEqualToAnchor:self.view.topAnchor],
-        [self.appIconCollectionView.leadingAnchor
-            constraintEqualToAnchor:self.view.leadingAnchor],
-        [self.appIconCollectionView.trailingAnchor
-            constraintEqualToAnchor:self.view.trailingAnchor],
-        [self.appIconCollectionView.bottomAnchor
-            constraintEqualToAnchor:self.view.bottomAnchor],
-    ]];
-
-    [self loadAppIcons];
-}
-
-- (void)viewWillAppear:(BOOL)animated {
-    [super viewWillAppear:animated];
-
-    self.view.backgroundColor = [PFBPalette currentBackgroundColor];
-    self.appIconCollectionView.backgroundColor = [PFBPalette currentBackgroundColor];
-    [self.appIconCollectionView reloadData];
-}
-
-#pragma mark - Icon data
-
-// Icons come from Info.plist so the picker matches whatever the build ships;
-// the primary icon is listed first so it can be restored. Like the native
-// picker, icons whose preview art is missing are dropped.
-- (void)loadAppIcons {
-    NSDictionary* iconsDict =
-        [[NSBundle mainBundle] objectForInfoDictionaryKey:@"CFBundleIcons"];
-
-    NSMutableArray<PFBAppIconItem*>* items = [NSMutableArray new];
-
-    NSDictionary* primary = iconsDict[@"CFBundlePrimaryIcon"];
-    if ([primary isKindOfClass:[NSDictionary class]]) {
-        PFBAppIconItem* item = [[PFBAppIconItem alloc]
-            initWithBundleIconName:primary[@"CFBundleIconName"]
-                     iconFileNames:primary[@"CFBundleIconFiles"]
-                     isPrimaryIcon:YES];
-        if ([self thumbnailForItem:item]) {
-            [items addObject:item];
-        }
-    }
-
-    NSDictionary* alternates = iconsDict[@"CFBundleAlternateIcons"];
-    if ([alternates isKindOfClass:[NSDictionary class]]) {
-        NSArray<NSString*>* sortedKeys = [alternates.allKeys
-            sortedArrayUsingSelector:@selector(caseInsensitiveCompare:)];
-        for (NSString* key in sortedKeys) {
-            NSDictionary* alt = alternates[key];
-            NSString* name = alt[@"CFBundleIconName"] ?: key;
-            PFBAppIconItem* item = [[PFBAppIconItem alloc]
-                initWithBundleIconName:name
-                         iconFileNames:alt[@"CFBundleIconFiles"]
-                         isPrimaryIcon:NO];
-            if ([self thumbnailForItem:item]) {
-                [items addObject:item];
-            }
-        }
-    }
-
-    self.icons = items;
-    [self.appIconCollectionView reloadData];
-}
-
 // Thumbnails are "<name>-settings" in the asset catalog ("Icon-<Name>-settings"
 // for the primary icon), falling back to the icon art itself.
-- (UIImage*)thumbnailForItem:(PFBAppIconItem*)item {
-    UITraitCollection* tc = self.traitCollection;
+static UIImage* AppIconThumbnail(PFBAppIconItem* item, UITraitCollection* tc) {
     NSBundle* bundle = [NSBundle mainBundle];
 
     NSString* settingsName;
@@ -190,6 +84,183 @@ static NSString* AppIconDetailText(void) {
     return img;
 }
 
+@interface PFBAppIconViewController () <UICollectionViewDelegate,
+                                     UICollectionViewDataSource,
+                                     UICollectionViewDelegateFlowLayout>
+@property (nonatomic, strong) UICollectionView* appIconCollectionView;
+@property (nonatomic, copy) NSArray<PFBAppIconItem*>* icons;
+@property (nonatomic, copy) NSArray<UIImage*>* thumbnails;
+@property (nonatomic) UIUserInterfaceStyle thumbnailStyle;
+@property (nonatomic, strong) UIView* loadingView;
+@property (nonatomic, strong) UIActivityIndicatorView* loadingIndicator;
+@end
+
+// The icon's widest, 109 pt on Twitter's Premium page.
+static const CGFloat kAppIconMaxWidth = 110.0;
+static const CGFloat kAppIconSideInset = 18.0;
+
+// The check of the icon in use: the green of Twitter's Premium page, measured in dark mode, and
+// Twitter's success green in light mode.
+static UIColor* AppIconSelectedColor(void) {
+    return [UIColor colorWithDynamicProvider:^UIColor*(UITraitCollection* traits) {
+      return traits.userInterfaceStyle == UIUserInterfaceStyleDark
+                 ? [UIColor colorWithRed:83.0 / 255.0 green:183.0 / 255.0 blue:128.0 / 255.0 alpha:1.0]
+                 : [UIColor colorWithRed:0.0 green:186.0 / 255.0 blue:124.0 / 255.0 alpha:1.0];
+    }];
+}
+
+@implementation PFBAppIconViewController
+
+#pragma mark - Lifecycle
+
+- (void)viewDidLoad {
+    [super viewDidLoad];
+
+    self.navigationItem.title = [[PFBBundle sharedBundle]
+        localizedTwitterStringForKey:@"SUBSCRIPTION_APP_ICON_SETTINGS_TITLE"];
+
+    // The grid of Twitter's Premium icon page, as measured: 18 pt from the sides, 38 pt
+    // between columns, 13 pt between rows.
+    UICollectionViewFlowLayout* flow = [UICollectionViewFlowLayout new];
+    flow.sectionInset = UIEdgeInsetsMake(16, kAppIconSideInset, 16, kAppIconSideInset);
+    flow.minimumLineSpacing = 13;
+    flow.minimumInteritemSpacing = 38;
+
+    self.appIconCollectionView =
+        [[UICollectionView alloc] initWithFrame:CGRectZero
+                           collectionViewLayout:flow];
+    [self.appIconCollectionView registerClass:[PFBAppIconCell class]
+                   forCellWithReuseIdentifier:[PFBAppIconCell reuseIdentifier]];
+    [self.appIconCollectionView registerClass:[UICollectionReusableView class]
+                   forSupplementaryViewOfKind:UICollectionElementKindSectionHeader
+                          withReuseIdentifier:@"HeaderView"];
+    self.appIconCollectionView.delegate = self;
+    self.appIconCollectionView.dataSource = self;
+    self.appIconCollectionView.translatesAutoresizingMaskIntoConstraints = NO;
+    self.appIconCollectionView.backgroundColor = [PFBPalette currentBackgroundColor];
+
+    self.view.backgroundColor = [PFBPalette currentBackgroundColor];
+
+    [self.view addSubview:self.appIconCollectionView];
+
+    [NSLayoutConstraint activateConstraints:@[
+        [self.appIconCollectionView.topAnchor
+            constraintEqualToAnchor:self.view.topAnchor],
+        [self.appIconCollectionView.leadingAnchor
+            constraintEqualToAnchor:self.view.leadingAnchor],
+        [self.appIconCollectionView.trailingAnchor
+            constraintEqualToAnchor:self.view.trailingAnchor],
+        [self.appIconCollectionView.bottomAnchor
+            constraintEqualToAnchor:self.view.bottomAnchor],
+    ]];
+
+    self.loadingView = [UIView new];
+    self.loadingView.translatesAutoresizingMaskIntoConstraints = NO;
+    self.loadingView.backgroundColor = [PFBPalette currentBackgroundColor];
+    [self.view addSubview:self.loadingView];
+
+    self.loadingIndicator = [[UIActivityIndicatorView alloc]
+        initWithActivityIndicatorStyle:UIActivityIndicatorViewStyleMedium];
+    self.loadingIndicator.translatesAutoresizingMaskIntoConstraints = NO;
+    [self.loadingView addSubview:self.loadingIndicator];
+
+    [NSLayoutConstraint activateConstraints:@[
+        [self.loadingView.topAnchor constraintEqualToAnchor:self.view.topAnchor],
+        [self.loadingView.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor],
+        [self.loadingView.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor],
+        [self.loadingView.bottomAnchor constraintEqualToAnchor:self.view.bottomAnchor],
+        [self.loadingIndicator.centerXAnchor constraintEqualToAnchor:self.loadingView.centerXAnchor],
+        [self.loadingIndicator.centerYAnchor constraintEqualToAnchor:self.loadingView.centerYAnchor],
+    ]];
+    [self.loadingIndicator startAnimating];
+
+    [self loadAppIcons];
+}
+
+- (void)viewWillAppear:(BOOL)animated {
+    [super viewWillAppear:animated];
+    [self applyAppearance];
+}
+
+// The palette background and the cells' borders and art follow light and dark.
+- (void)traitCollectionDidChange:(UITraitCollection*)previousTraitCollection {
+    [super traitCollectionDidChange:previousTraitCollection];
+    if (previousTraitCollection.userInterfaceStyle != self.traitCollection.userInterfaceStyle) {
+        [self applyAppearance];
+    }
+}
+
+- (void)applyAppearance {
+    self.view.backgroundColor = [PFBPalette currentBackgroundColor];
+    self.appIconCollectionView.backgroundColor = [PFBPalette currentBackgroundColor];
+    self.loadingView.backgroundColor = [PFBPalette currentBackgroundColor];
+    [self.appIconCollectionView reloadData];
+}
+
+#pragma mark - Icon data
+
+// Icons come from Info.plist, the primary first so it can be restored; those whose preview
+// art is missing are dropped, as in the native picker. The art loads off the main thread,
+// under a spinner, so a large icon pack does not hold the app.
+- (void)loadAppIcons {
+    UITraitCollection* traits = self.traitCollection;
+    __weak typeof(self) weakSelf = self;
+    dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
+        NSDictionary* iconsDict =
+            [[NSBundle mainBundle] objectForInfoDictionaryKey:@"CFBundleIcons"];
+
+        NSMutableArray<PFBAppIconItem*>* items = [NSMutableArray new];
+        NSMutableArray<UIImage*>* thumbnails = [NSMutableArray new];
+        void (^keep)(PFBAppIconItem*) = ^(PFBAppIconItem* item) {
+            UIImage* thumbnail = AppIconThumbnail(item, traits);
+            if (thumbnail) {
+                [items addObject:item];
+                [thumbnails addObject:thumbnail];
+            }
+        };
+
+        NSDictionary* primary = iconsDict[@"CFBundlePrimaryIcon"];
+        if ([primary isKindOfClass:[NSDictionary class]]) {
+            keep([[PFBAppIconItem alloc] initWithBundleIconName:primary[@"CFBundleIconName"]
+                                                  iconFileNames:primary[@"CFBundleIconFiles"]
+                                                  isPrimaryIcon:YES]);
+        }
+
+        NSDictionary* alternates = iconsDict[@"CFBundleAlternateIcons"];
+        if ([alternates isKindOfClass:[NSDictionary class]]) {
+            NSArray<NSString*>* sortedKeys = [alternates.allKeys
+                sortedArrayUsingSelector:@selector(caseInsensitiveCompare:)];
+            for (NSString* key in sortedKeys) {
+                NSDictionary* alt = alternates[key];
+                keep([[PFBAppIconItem alloc] initWithBundleIconName:alt[@"CFBundleIconName"] ?: key
+                                                      iconFileNames:alt[@"CFBundleIconFiles"]
+                                                      isPrimaryIcon:NO]);
+            }
+        }
+
+        dispatch_async(dispatch_get_main_queue(), ^{
+            PFBAppIconViewController* controller = weakSelf;
+            if (!controller) {
+                return;
+            }
+            controller.icons = items;
+            controller.thumbnails = thumbnails;
+            controller.thumbnailStyle = traits.userInterfaceStyle;
+            [controller.loadingIndicator stopAnimating];
+            controller.loadingView.hidden = YES;
+            [controller.appIconCollectionView reloadData];
+        });
+    });
+}
+
+// The art read while loading, or read again for an appearance changed since.
+- (UIImage*)thumbnailAtIndex:(NSInteger)index {
+    if (self.traitCollection.userInterfaceStyle == self.thumbnailStyle) {
+        return self.thumbnails[(NSUInteger)index];
+    }
+    return AppIconThumbnail(self.icons[(NSUInteger)index], self.traitCollection);
+}
+
 - (BOOL)isItemActive:(PFBAppIconItem*)item {
     NSString* saved = [[NSUserDefaults standardUserDefaults]
         stringForKey:kLastSelectedIconKey];
@@ -220,9 +291,9 @@ static NSString* AppIconDetailText(void) {
                                       forIndexPath:ip];
     PFBAppIconItem* item = self.icons[ip.row];
 
-    [cell configureWithImage:[self thumbnailForItem:item]
+    [cell configureWithImage:[self thumbnailAtIndex:ip.row]
                       active:[self isItemActive:item]
-                 accentColor:PFBCurrentAccentColor()];
+                 accentColor:AppIconSelectedColor()];
 
     return cell;
 }
@@ -240,14 +311,20 @@ static NSString* AppIconDetailText(void) {
 
     NSString* toSet = item.isPrimaryIcon ? nil : item.bundleIconName;
 
-    [[NSUserDefaults standardUserDefaults]
-        setObject:(toSet ?: kPrimaryIconSentinel)
-           forKey:kLastSelectedIconKey];
-    [cv reloadData];
-
-    // A block is always passed: nil name + nil handler crashes UIKit.
+    // The choice is kept once iOS has applied it, so an icon it refuses is never checked.
+    __weak UICollectionView* weakList = cv;
     [[UIApplication sharedApplication] setAlternateIconName:toSet
-                                          completionHandler:^(NSError* _Nullable error){}];
+                                          completionHandler:^(NSError* _Nullable error) {
+                                              if (error) {
+                                                  return;
+                                              }
+                                              dispatch_async(dispatch_get_main_queue(), ^{
+                                                  [[NSUserDefaults standardUserDefaults]
+                                                      setObject:(toSet ?: kPrimaryIconSentinel)
+                                                         forKey:kLastSelectedIconKey];
+                                                  [weakList reloadData];
+                                              });
+                                          }];
 }
 
 #pragma mark - Section header
@@ -306,8 +383,30 @@ static NSString* AppIconDetailText(void) {
                         flow.sectionInset.right -
                         flow.minimumInteritemSpacing * 2;
     CGFloat scale = UIScreen.mainScreen.scale ?: 1;
-    CGFloat width = MIN(floor(available / 3.0 * scale) / scale, 96.0);
-    return CGSizeMake(width, width + 38.0);
+    CGFloat width = MIN(floor(available / 3.0 * scale) / scale, kAppIconMaxWidth);
+    return CGSizeMake(width, width + kAppIconIndicatorGap + kAppIconIndicatorSize);
+}
+
+#pragma mark - Reset
+
++ (void)restorePrimaryIconThen:(void (^)(void))done {
+    UIApplication* application = [UIApplication sharedApplication];
+    NSUserDefaults* defaults = [NSUserDefaults standardUserDefaults];
+    NSString* current = [defaults stringForKey:kLastSelectedIconKey] ?: application.alternateIconName;
+    if (!application.supportsAlternateIcons || !current.length || [current isEqualToString:kPrimaryIconSentinel]) {
+        [defaults removeObjectForKey:kLastSelectedIconKey];
+        done();
+        return;
+    }
+    [application setAlternateIconName:nil
+                    completionHandler:^(NSError* _Nullable error) {
+                        dispatch_async(dispatch_get_main_queue(), ^{
+                            if (!error) {
+                                [[NSUserDefaults standardUserDefaults] removeObjectForKey:kLastSelectedIconKey];
+                            }
+                            done();
+                        });
+                    }];
 }
 
 @end

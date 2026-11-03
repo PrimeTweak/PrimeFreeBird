@@ -4,6 +4,10 @@
 
 NS_ASSUME_NONNULL_BEGIN
 
+// The selection mark under each icon, and the room above it, as on Twitter's Premium page.
+static const CGFloat kAppIconIndicatorSize = 24.0;
+static const CGFloat kAppIconIndicatorGap = 17.0;
+
 @interface PFBAppIconCell : UICollectionViewCell
 
 - (void)configureWithImage:(nullable UIImage*)image

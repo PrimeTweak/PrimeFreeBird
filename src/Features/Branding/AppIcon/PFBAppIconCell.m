@@ -2,15 +2,10 @@
 
 #import "Features/Branding/AppIcon/PFBAppIconCell.h"
 #import <QuartzCore/QuartzCore.h>
+#import "Support/TFNHeaders.h"
 
 // The native cell rounds the icon to width / 4.491 (~22.27%).
 static const CGFloat kAppIconCornerDivisor = 4.491;
-
-@interface UIImage (TFNAdditions)
-+ (id)tfn_vectorImageNamed:(id)arg1
-                  fitsSize:(struct CGSize)arg2
-                 fillColor:(id)arg3;
-@end
 
 @interface UIColor (NativeTokens)
 + (id)tfnuiColors;
@@ -65,9 +60,10 @@ static UIImage* AppIconIndicator(BOOL active, UIColor* accentColor) {
     } else {
         vectorName = @"circle";
     }
-    UIImage* image = [UIImage tfn_vectorImageNamed:vectorName
-                                          fitsSize:CGSizeMake(24, 24)
-                                         fillColor:fill];
+    UIImage* image = nil;
+    if ([UIImage respondsToSelector:@selector(tfn_vectorImageNamed:fitsSize:fillColor:)]) {
+        image = [UIImage tfn_vectorImageNamed:vectorName fitsSize:CGSizeMake(24, 24) fillColor:fill];
+    }
     if (!image) {
         UIImage* symbol = [UIImage
             systemImageNamed:(active ? @"checkmark.circle.fill" : @"circle")];
@@ -118,9 +114,9 @@ static UIImage* AppIconIndicator(BOOL active, UIColor* accentColor) {
                 constraintEqualToAnchor:self.contentView.centerXAnchor],
             [self.checkView.topAnchor
                 constraintEqualToAnchor:self.iconView.bottomAnchor
-                               constant:14],
-            [self.checkView.widthAnchor constraintEqualToConstant:24],
-            [self.checkView.heightAnchor constraintEqualToConstant:24]
+                               constant:kAppIconIndicatorGap],
+            [self.checkView.widthAnchor constraintEqualToConstant:kAppIconIndicatorSize],
+            [self.checkView.heightAnchor constraintEqualToConstant:kAppIconIndicatorSize]
         ]];
     }
     return self;
