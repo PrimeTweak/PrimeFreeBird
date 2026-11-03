@@ -629,7 +629,7 @@ const PFBOptionFingerprint PFBOptionFingerprints[] = {
     {"follow_confirm", "3b013d80"},
     {"force_following_tab", "a1063a69"},
     {"force_tweet_full_frame", "9fa50f81"},
-    {"glass_toasts", "9e7dce8d"},
+    {"glass_toasts", "cb16c1cb"},
     {"grok_translation", "a1063a69"},
     {"hide_blocked_retweets", "9fa50f81"},
     {"hide_blue_verified", "456527fb"},

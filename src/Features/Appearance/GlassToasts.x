@@ -19,6 +19,10 @@
 static const CGFloat kPFBGlassToastMargin = 16.0;
 static const CGFloat kPFBGlassToastSideInset = 16.0;
 static const CGFloat kPFBGlassToastTopInset = 8.0;
+// Every capsule's height: two lines of words with the room above and below.
+static const CGFloat kPFBGlassToastHeight = 52.0;
+// Twitter's room on each side of a label in its words view, as measured.
+static const CGFloat kPFBGlassToastLabelInset = 4.0;
 // Twitter's room around the content, as measured.
 static const CGFloat kPFBGlassToastTwitterInset = 12.0;
 
@@ -27,6 +31,7 @@ static const void* kPFBGlassToastTwitterLookKey = &kPFBGlassToastTwitterLookKey;
 static const void* kPFBGlassToastArrangedKey = &kPFBGlassToastArrangedKey;
 static const void* kPFBGlassToastSideKey = &kPFBGlassToastSideKey;
 static NSUInteger gPFBGlassToastsMeasured;
+static CGFloat gPFBGlassToastTwitterWidth;
 
 static BOOL PFBGlassToastsOn(void) {
     return [PFBSettings boolForKey:@"glass_toasts"];
@@ -55,6 +60,39 @@ static UIView* PFBGlassToastContentIn(UIView* container) {
     return content;
 }
 
+// The width the content takes on one row: each label's words on a single line, the icon, then
+// the button. Labels are measured by their text, as Twitter may have wrapped them already.
+static CGFloat PFBGlassToastContentWidth(UIStackView* column) {
+    UIView* words = column.arrangedSubviews[0];
+    UIView* holder = column.arrangedSubviews[1];
+    __block CGFloat text = 0;
+    PFBWalkAllSubviews(words, 8, ^(UIView* view) {
+      if ([view isKindOfClass:[UILabel class]] && !view.hidden && ((UILabel*)view).text.length) {
+          UILabel* label = (UILabel*)view;
+          NSDictionary* font = @{NSFontAttributeName : label.font ?: [UIFont systemFontOfSize:16]};
+          text = MAX(text, ceil([label.text sizeWithAttributes:font].width));
+      }
+    });
+    CGFloat width = text + 2 * kPFBGlassToastLabelInset;
+    if ([words isKindOfClass:[UIStackView class]]) {
+        UIStackView* row = (UIStackView*)words;
+        UIView* icon = row.arrangedSubviews.firstObject;
+        if (row.arrangedSubviews.count == 2 && !icon.hidden) {
+            width += [icon systemLayoutSizeFittingSize:UILayoutFittingCompressedSize].width + row.spacing;
+        }
+    }
+    if (!holder.hidden) {
+        __block CGFloat button = 0;
+        PFBWalkAllSubviews(holder, 4, ^(UIView* view) {
+          if (button == 0 && [view isKindOfClass:[UIButton class]]) {
+              button = view.intrinsicContentSize.width;
+          }
+        });
+        width += MAX(button, CGRectGetWidth(holder.bounds)) + column.spacing;
+    }
+    return width;
+}
+
 // The capsule's width: its content on one row with the room around it, within the margins.
 static CGFloat PFBGlassToastWidth(UIView* container, CGRect placement, CGFloat twitterWidth) {
     CGFloat room = CGRectGetWidth(placement) - 2 * kPFBGlassToastMargin;
@@ -68,8 +106,26 @@ static CGFloat PFBGlassToastWidth(UIView* container, CGRect placement, CGFloat t
     }
     NSNumber* side = objc_getAssociatedObject(content, kPFBGlassToastSideKey);
     CGFloat inset = side ? side.doubleValue : kPFBGlassToastTwitterInset;
-    CGFloat width = [column systemLayoutSizeFittingSize:UILayoutFittingCompressedSize].width + 2 * inset;
-    return MIN(ceil(width), room);
+    return MIN(ceil(PFBGlassToastContentWidth(column) + 2 * inset), room);
+}
+
+// The capsule's height: the same for every toast, taller only for a larger text size or a picture
+// that would not fit; 0 for a toast laid out otherwise, which keeps Twitter's height.
+static CGFloat PFBGlassToastHeight(UIView* container) {
+    UIStackView* column = PFBGlassToastColumn(PFBGlassToastContentIn(container));
+    if (!column) {
+        return 0;
+    }
+    UIView* words = column.arrangedSubviews.firstObject;
+    __block CGFloat lines = 0;
+    PFBWalkAllSubviews(words, 8, ^(UIView* view) {
+      if ([view isKindOfClass:[UILabel class]] && !view.hidden && ((UILabel*)view).text.length) {
+          lines += ((UILabel*)view).font.lineHeight;
+      }
+    });
+    UIView* icon = [words isKindOfClass:[UIStackView class]] ? ((UIStackView*)words).arrangedSubviews.firstObject : nil;
+    CGFloat picture = icon && !icon.hidden ? [icon systemLayoutSizeFittingSize:UILayoutFittingCompressedSize].height : 0;
+    return MAX(kPFBGlassToastHeight, ceil(MAX(lines, picture)) + 2 * kPFBGlassToastTopInset);
 }
 
 static void PFBGlassToastSetPriority(UIView* view, UILayoutPriority priority) {
@@ -128,8 +184,13 @@ static void PFBGlassToastArrange(UIView* content) {
         column.spacing = 16.0;
     }
     PFBGlassToastInsets(content, column);
+    // One line each, so every capsule has the same height.
     PFBWalkAllSubviews(column.arrangedSubviews[0], 8, ^(UIView* view) {
       if ([view isKindOfClass:[UILabel class]]) {
+          UILabel* label = (UILabel*)view;
+          if (label.numberOfLines != 1) {
+              label.numberOfLines = 1;
+          }
           PFBGlassToastSetPriority(view, UILayoutPriorityDefaultLow);
       }
     });
@@ -274,7 +335,7 @@ static void PFBGlassToastDescribe(NSMutableString* text, UIView* view, NSInteger
 
 // The drawn capsule in the report, for the first toasts of a launch: the views above it up to the
 // window, then each of its layers, recorded at once.
-static void PFBGlassToastMeasure(UIView* container, CGFloat twitterWidth) {
+static void PFBGlassToastMeasure(UIView* container) {
     if (gPFBGlassToastsMeasured >= 3 || !container.window) {
         return;
     }
@@ -284,7 +345,7 @@ static void PFBGlassToastMeasure(UIView* container, CGFloat twitterWidth) {
         stringWithFormat:@"Liquid Glass %@ · capsule %.0fx%.0f at %.0f,%.0f · Twitter's width %.0f · side room %@",
                          PFBShowcaseUsesGlass() ? @"on" : @"off", CGRectGetWidth(container.frame),
                          CGRectGetHeight(container.frame), CGRectGetMinX(container.frame),
-                         CGRectGetMinY(container.frame), twitterWidth,
+                         CGRectGetMinY(container.frame), gPFBGlassToastTwitterWidth,
                          objc_getAssociatedObject(content, kPFBGlassToastSideKey) ?: @"not set"];
     [text appendString:@"\nabove:"];
     for (UIView* view = container.superview; view; view = view.superview) {
@@ -355,20 +416,21 @@ static void PFBGlassToastDress(UIView* container, BOOL styled) {
     id toast = [shower respondsToSelector:@selector(currentToast)] ? [shower currentToast] : nil;
     PFBGlassToastColor(container, toast);
     if (styled) {
-        // Twitter may size the toast before its new content is in: the width is set again from it.
-        CGFloat twitterWidth = CGRectGetWidth(container.frame);
-        if ([shower respondsToSelector:@selector(_tfn_toastHorizontalPlacementBounds)]) {
+        // A toast already placed may get new content: its size is set again from it.
+        CGRect frame = container.frame;
+        if (CGRectGetHeight(frame) > 0 && [shower respondsToSelector:@selector(_tfn_toastHorizontalPlacementBounds)]) {
             CGRect placement = [shower _tfn_toastHorizontalPlacementBounds];
-            CGFloat width = PFBGlassToastWidth(container, placement, twitterWidth);
-            if (fabs(width - twitterWidth) > 0.5) {
-                CGRect frame = container.frame;
+            CGFloat width = PFBGlassToastWidth(container, placement, CGRectGetWidth(frame));
+            CGFloat height = PFBGlassToastHeight(container);
+            height = height > 0 ? height : CGRectGetHeight(frame);
+            if (fabs(width - CGRectGetWidth(frame)) > 0.5 || fabs(height - CGRectGetHeight(frame)) > 0.5) {
                 frame.origin.x = CGRectGetMidX(placement) - width / 2.0;
-                frame.size.width = width;
+                frame.size = CGSizeMake(width, height);
                 container.frame = frame;
             }
         }
         dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.6 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
-          PFBGlassToastMeasure(container, twitterWidth);
+          PFBGlassToastMeasure(container);
         });
     }
     PFBCOMPAT_ACTION(PFBCompat_glass_toasts, @"toast drawn as the glass capsule");
@@ -378,6 +440,7 @@ static void PFBGlassToastDress(UIView* container, BOOL styled) {
 
 - (double)_tfn_toastWidth {
     double width = %orig;
+    gPFBGlassToastTwitterWidth = width;
     if (!PFBGlassToastsOn() || ![self respondsToSelector:@selector(_tfn_toastHorizontalPlacementBounds)]) {
         return width;
     }
@@ -397,6 +460,10 @@ static void PFBGlassToastDress(UIView* container, BOOL styled) {
     CGFloat width = PFBGlassToastWidth([self toastContainerView], placement, CGRectGetWidth(frame));
     frame.origin.x = CGRectGetMidX(placement) - width / 2.0;
     frame.size.width = width;
+    CGFloat height = PFBGlassToastHeight([self toastContainerView]);
+    if (height > 0) {
+        frame.size.height = height;
+    }
     return frame;
 }
 
