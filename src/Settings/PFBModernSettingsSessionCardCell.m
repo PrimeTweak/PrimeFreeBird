@@ -186,6 +186,29 @@ static NSCache* PFBAvatarCache(void) {
     return cache;
 }
 
++ (void)fetchAvatarFromURL:(NSURL*)url completion:(void (^)(UIImage* image))completion {
+    UIImage* cached = url ? [PFBAvatarCache() objectForKey:url] : nil;
+    if (!url || cached) {
+        completion(cached);
+        return;
+    }
+    NSURLSessionDataTask* task = [[NSURLSession sharedSession]
+          dataTaskWithURL:url
+        completionHandler:^(NSData* data, __unused NSURLResponse* response,
+                            __unused NSError* error) {
+          UIImage* image = data.length ? [UIImage imageWithData:data] : nil;
+          dispatch_async(dispatch_get_main_queue(), ^{
+            if (image) {
+                [PFBAvatarCache() setObject:image forKey:url];
+            } else {
+                PFBDebugLog(@"[session] avatar download failed");
+            }
+            completion(image);
+          });
+        }];
+    [task resume];
+}
+
 // No address, or a failed download, leaves the initial in place.
 - (void)loadAvatarFromURL:(NSURL*)url {
     self.avatarURL = url;
@@ -196,30 +219,19 @@ static NSCache* PFBAvatarCache(void) {
         return;
     }
     __weak PFBModernSettingsSessionCardCell* weakSelf = self;
-    NSURLSessionDataTask* task = [[NSURLSession sharedSession]
-          dataTaskWithURL:url
-        completionHandler:^(NSData* data, __unused NSURLResponse* response,
-                            __unused NSError* error) {
-          UIImage* image = data.length ? [UIImage imageWithData:data] : nil;
-          dispatch_async(dispatch_get_main_queue(), ^{
-            if (!image) {
-                PFBDebugLog(@"[session] avatar download failed");
-                return;
-            }
-            [PFBAvatarCache() setObject:image forKey:url];
-            PFBModernSettingsSessionCardCell* cell = weakSelf;
-            // A reused cell may belong to another account by now.
-            if (![cell.avatarURL isEqual:url]) {
-                return;
-            }
-            cell.avatarImage.image = image;
-            [UIView animateWithDuration:0.2
-                             animations:^{
-                               cell.avatarImage.alpha = 1.0;
-                             }];
-          });
-        }];
-    [task resume];
+    [PFBModernSettingsSessionCardCell fetchAvatarFromURL:url
+                                              completion:^(UIImage* image) {
+                                                PFBModernSettingsSessionCardCell* cell = weakSelf;
+                                                // A reused cell may belong to another account by now.
+                                                if (!image || ![cell.avatarURL isEqual:url]) {
+                                                    return;
+                                                }
+                                                cell.avatarImage.image = image;
+                                                [UIView animateWithDuration:0.2
+                                                                 animations:^{
+                                                                   cell.avatarImage.alpha = 1.0;
+                                                                 }];
+                                              }];
 }
 
 - (void)addPrimaryTarget:(id)target action:(SEL)action {

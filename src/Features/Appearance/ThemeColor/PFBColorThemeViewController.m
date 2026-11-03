@@ -16,6 +16,8 @@ extern void PFBWhitenNavigationBarConfirm(UINavigationBar* bar);
 #import "Settings/Native/PFBShowcase.h"
 #import "Settings/PFBSettingsCellStyle.h"
 #import "Support/PFBTwitterPopups.h"
+#import "Settings/PFBModernSettingsPageViewController.h"
+#import "Settings/PFBModernSettingsSessionCardCell.h"
 extern void PFBBeginRawPaletteRead(void);
 extern void PFBEndRawPaletteRead(void);
 
@@ -280,6 +282,11 @@ static NSInteger NearestAccentOption(UIColor* color) {
     self.previewCard = PFBShowcaseCard();
     self.preview = [[PFBAccentPreviewView alloc] init];
     [self.previewCard addSubview:self.preview];
+    __weak PFBAccentPreviewView* preview = self.preview;
+    [PFBModernSettingsSessionCardCell fetchAvatarFromURL:self.account ? PFBAccountAvatarURL(self.account) : nil
+                                              completion:^(UIImage* photo) {
+                                                [preview showReaderPhoto:photo];
+                                              }];
     self.paletteCard = PFBShowcaseCard();
     [scroll addSubview:self.introLabel];
     [scroll addSubview:self.previewCard];

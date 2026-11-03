@@ -45,6 +45,7 @@ static CGRect PFBPreviewMirrored(CGRect frame, CGFloat width, BOOL rtl) {
 @implementation PFBAccentPreviewView {
     UIView* _screen;
     UIView* _reader;
+    UIImageView* _readerPhoto;
     UIImageView* _logo;
     UILabel* _forYou;
     UILabel* _following;
@@ -81,6 +82,12 @@ static CGRect PFBPreviewMirrored(CGRect frame, CGFloat width, BOOL rtl) {
 
         _reader = [[UIView alloc] init];
         _reader.layer.cornerRadius = 13.0;
+        _reader.clipsToBounds = YES;
+        _readerPhoto = [[UIImageView alloc] init];
+        _readerPhoto.contentMode = UIViewContentModeScaleAspectFill;
+        _readerPhoto.alpha = 0;
+        _readerPhoto.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+        [_reader addSubview:_readerPhoto];
         _logo = [[UIImageView alloc] init];
         _logo.contentMode = UIViewContentModeCenter;
         PFBBundle* bundle = [PFBBundle sharedBundle];
@@ -287,6 +294,7 @@ static CGRect PFBPreviewMirrored(CGRect frame, CGFloat width, BOOL rtl) {
     // The top bar: the reader's avatar, and the bird in the middle.
     _reader.frame = PFBPreviewMirrored(
         CGRectMake(kPFBPreviewPadding, (kPFBPreviewTopBar - 26.0) / 2.0, 26.0, 26.0), width, rtl);
+    _readerPhoto.frame = _reader.bounds;
     _logo.frame = CGRectMake((width - 32.0) / 2.0, (kPFBPreviewTopBar - 32.0) / 2.0, 32.0, 32.0);
 
     // The timeline tabs, For you chosen, its underline on the divider.
@@ -346,6 +354,17 @@ static CGRect PFBPreviewMirrored(CGRect frame, CGFloat width, BOOL rtl) {
     CGFloat dotX = rtl ? CGRectGetMidX(home) - kPFBPreviewGlyph / 2.0 - kPFBPreviewDot / 2.0 + 1.0
                        : CGRectGetMidX(home) + kPFBPreviewGlyph / 2.0 - kPFBPreviewDot / 2.0 - 1.0;
     _dot.frame = CGRectMake(dotX, CGRectGetMidY(home) - kPFBPreviewGlyph / 2.0 - 2.0, kPFBPreviewDot, kPFBPreviewDot);
+}
+
+- (void)showReaderPhoto:(UIImage*)photo {
+    if (!photo) {
+        return;
+    }
+    _readerPhoto.image = photo;
+    [UIView animateWithDuration:0.2
+                     animations:^{
+                       self->_readerPhoto.alpha = 1.0;
+                     }];
 }
 
 @end

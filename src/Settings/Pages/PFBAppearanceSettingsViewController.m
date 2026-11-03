@@ -76,6 +76,7 @@ static NSInteger PFBInterfaceStyleCurrent(void) {
 - (void)showThemeViewController:(NSDictionary*)sender {
     PFBColorThemeViewController* themeVC = [[PFBColorThemeViewController alloc] init];
     themeVC.nativeLook = self.nativeLook;
+    themeVC.account = self.account;
     NSString* title = [[PFBBundle sharedBundle] localizedStringForKey:@"THEME_SETTINGS_NAVIGATION_TITLE"];
     if (self.nativeLook) {
         PFBShowcaseSetTitle(themeVC, title);

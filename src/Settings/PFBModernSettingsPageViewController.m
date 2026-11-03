@@ -42,7 +42,7 @@ static id PFBAskObject(id target, NSString* name) {
 
 // The account's profile photo, from the app's own user model. The 200 px variant
 // keeps the 40 pt circle sharp.
-static NSURL* PFBAccountAvatarURL(TFNTwitterAccount* account) {
+NSURL* PFBAccountAvatarURL(TFNTwitterAccount* account) {
     id entity = PFBAskObject(PFBAskObject(account, @"user"), @"profileImageMediaEntity");
     id address = PFBAskObject(entity, @"imageURLString") ?: PFBAskObject(entity, @"mediaURL");
     NSString* string = [address isKindOfClass:[NSURL class]] ? [address absoluteString]

@@ -5,6 +5,9 @@
 
 @class TFNTwitterAccount;
 
+// The account's profile photo address, from the app's own user model; nil when it has none.
+FOUNDATION_EXPORT NSURL* PFBAccountAvatarURL(TFNTwitterAccount* account);
+
 @interface PFBModernSettingsPageViewController
     : UIViewController <UITableViewDataSource, UITableViewDelegate, UIDocumentPickerDelegate, PFBNativeSheetRows>
 
