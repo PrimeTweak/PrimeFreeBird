@@ -580,19 +580,26 @@ static void PFBSheetRefit(UIViewController* sheet) {
     self.stepActions = actions;
     self.stepRows = rows;
     step.translatesAutoresizingMaskIntoConstraints = NO;
-    [UIView transitionWithView:self.view
-                      duration:0.25
-                       options:UIViewAnimationOptionTransitionCrossDissolve
-                    animations:^{
-                        [self.view addSubview:step];
-                        [NSLayoutConstraint activateConstraints:@[
-                            [step.topAnchor constraintEqualToAnchor:self.view.topAnchor],
-                            [step.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor],
-                            [step.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor],
-                        ]];
-                        [self showGroup:NO];
-                    }
-                    completion:nil];
+    step.alpha = 0;
+    [self.view addSubview:step];
+    [NSLayoutConstraint activateConstraints:@[
+        [step.topAnchor constraintEqualToAnchor:self.view.topAnchor],
+        [step.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor],
+        [step.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor],
+    ]];
+    [self.view layoutIfNeeded];
+    // Only the content fades: Done stays drawn and follows the sheet's bottom as it resizes.
+    [UIView animateWithDuration:0.25
+        animations:^{
+          step.alpha = 1;
+          [self fadeGroup:0];
+        }
+        completion:^(__unused BOOL finished) {
+          if (self.stepView == step) {
+              [self showGroup:NO];
+              [self fadeGroup:1];
+          }
+        }];
     [self.view setNeedsLayout];
     UIAccessibilityPostNotification(UIAccessibilityScreenChangedNotification, head.titleLabel);
 }
@@ -603,19 +610,26 @@ static void PFBSheetRefit(UIViewController* sheet) {
     self.page.view.hidden = !shown;
 }
 
+- (void)fadeGroup:(CGFloat)alpha {
+    self.head.alpha = alpha;
+    self.page.view.alpha = alpha;
+}
+
 - (void)leaveStep {
     UIView* step = self.stepView;
     self.stepView = nil;
     self.stepActions = nil;
     self.stepRows = nil;
-    [UIView transitionWithView:self.view
-                      duration:0.25
-                       options:UIViewAnimationOptionTransitionCrossDissolve
-                    animations:^{
-                        [step removeFromSuperview];
-                        [self showGroup:YES];
-                    }
-                    completion:nil];
+    [self fadeGroup:0];
+    [self showGroup:YES];
+    [UIView animateWithDuration:0.25
+        animations:^{
+          step.alpha = 0;
+          [self fadeGroup:1];
+        }
+        completion:^(__unused BOOL finished) {
+          [step removeFromSuperview];
+        }];
     [self.view setNeedsLayout];
     UIAccessibilityPostNotification(UIAccessibilityScreenChangedNotification, self.head.titleLabel);
 }

@@ -204,11 +204,14 @@ static void pfbApplyFleetVisibility(UIView* view) {
 // MARK: - Scroll edge effect
 
 // With the iOS 26 design, iOS draws a scroll edge effect under the top bars. This option
-// hides that top effect, except on modal screens.
+// hides that top effect, except on modal screens and on the tweak's pages, which keep the soft
+// frost of Twitter's settings.
 
 static void PFBReadingLayoutTick(UIScrollView* scrollView);
 
 static const void* kPFBEdgeMarkKey = &kPFBEdgeMarkKey;
+static const void* kPFBEdgeTweakPageKey = &kPFBEdgeTweakPageKey;
+static const void* kPFBEdgeSoftenedKey = &kPFBEdgeSoftenedKey;
 
 // The option is cached: reading NSUserDefaults on every layout pass of every
 // scroll view in the app would be far too costly, and a refresh twice a second
@@ -251,6 +254,77 @@ static void pfbApplyEdgeEffect(UIScrollView* scrollView, BOOL hide) {
                              OBJC_ASSOCIATION_RETAIN_NONATOMIC);
 }
 
+// Whether a list belongs to one of the tweak's pages, decided once per list.
+static BOOL pfbScrollViewIsTweakPage(UIScrollView* scrollView) {
+    NSNumber* known = objc_getAssociatedObject(scrollView, kPFBEdgeTweakPageKey);
+    if (known) {
+        return known.boolValue;
+    }
+    UIViewController* owner = PFBOwningController(scrollView);
+    if (!owner) {
+        return NO;
+    }
+    BOOL tweak = [NSStringFromClass([owner class]) hasPrefix:@"PFB"];
+    objc_setAssociatedObject(scrollView, kPFBEdgeTweakPageKey, @(tweak), OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    return tweak;
+}
+
+// A top effect's style by name, as iOS gives each style its own object.
+static NSString* pfbEdgeStyleName(id style) {
+    Class styleClass = NSClassFromString(@"UIScrollEdgeEffectStyle");
+    for (NSString* name in @[ @"soft", @"hard", @"automatic" ]) {
+        SEL selector = NSSelectorFromString([name stringByAppendingString:@"Style"]);
+        if (style && [styleClass respondsToSelector:selector] &&
+            [style isEqual:((id (*)(id, SEL))objc_msgSend)(styleClass, selector)]) {
+            return name;
+        }
+    }
+    return style ? [@"other " stringByAppendingString:NSStringFromClass([style class])] : @"none";
+}
+
+// A settings list's top effect in the report: whose list, its style, whether it shows.
+static void pfbMeasureSettingsEdge(UIScrollView* scrollView, id effect) {
+    NSString* name = nil;
+    for (UIViewController* vc = PFBOwningController(scrollView); vc && !name; vc = vc.parentViewController) {
+        if ([NSStringFromClass([vc class]) containsString:@"Settings"]) {
+            name = NSStringFromClass([vc class]);
+        }
+    }
+    if (!name) {
+        return;
+    }
+    id style = [effect respondsToSelector:@selector(style)] ? [effect performSelector:@selector(style)] : nil;
+    BOOL hidden = [effect respondsToSelector:@selector(isHidden)] &&
+                  ((BOOL (*)(id, SEL))objc_msgSend)(effect, @selector(isHidden));
+    PFBCompatMeasure(@"settings top edge",
+                     [NSString stringWithFormat:@"%@ · %@ · style %@ · %@", name, NSStringFromClass([scrollView class]),
+                                                pfbEdgeStyleName(style), hidden ? @"hidden" : @"shown"],
+                     12);
+}
+
+// The tweak's pages keep the effect, in the soft style of Twitter's settings; set once per list
+// and window, so a style that is a new object at each read never sets it again on every layout.
+static void pfbSoftenEdgeEffect(UIScrollView* scrollView, BOOL moved) {
+    if (!moved && objc_getAssociatedObject(scrollView, kPFBEdgeSoftenedKey)) {
+        return;
+    }
+    objc_setAssociatedObject(scrollView, kPFBEdgeSoftenedKey, @YES, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    SEL edge = NSSelectorFromString(@"topEdgeEffect");
+    SEL softStyle = NSSelectorFromString(@"softStyle");
+    Class styleClass = NSClassFromString(@"UIScrollEdgeEffectStyle");
+    if (![scrollView respondsToSelector:edge] || ![styleClass respondsToSelector:softStyle]) {
+        return;
+    }
+    id effect = ((id (*)(id, SEL))objc_msgSend)(scrollView, edge);
+    if (![effect respondsToSelector:@selector(setStyle:)] || ![effect respondsToSelector:@selector(style)]) {
+        return;
+    }
+    id soft = ((id (*)(id, SEL))objc_msgSend)(styleClass, softStyle);
+    if (soft && ![[effect performSelector:@selector(style)] isEqual:soft]) {
+        [effect performSelector:@selector(setStyle:) withObject:soft];
+    }
+}
+
 %hook UIScrollView
 
 // Modal screens are left alone: hiding the effect on Twitter's own settings sheet breaks
@@ -266,8 +340,15 @@ static BOOL pfbScrollViewIsModal(UIScrollView* scrollView) {
     %orig;
 
     @try {
-        if (self.window && !pfbScrollViewIsModal(self)) {
+        if (self.window && pfbScrollViewIsTweakPage(self)) {
+            pfbApplyEdgeEffect(self, NO);
+            pfbSoftenEdgeEffect(self, YES);
+        } else if (self.window && !pfbScrollViewIsModal(self)) {
             pfbApplyEdgeEffect(self, pfbEdgeHideEnabled());
+        }
+        SEL edge = NSSelectorFromString(@"topEdgeEffect");
+        if (self.window && [self respondsToSelector:edge]) {
+            pfbMeasureSettingsEdge(self, ((id (*)(id, SEL))objc_msgSend)(self, edge));
         }
     } @catch (id exception) {
     }
@@ -287,6 +368,11 @@ static BOOL pfbScrollViewIsModal(UIScrollView* scrollView) {
         BOOL hide = pfbEdgeHideEnabled();
         PFBReadingLayoutTick(self);
         if (!marked && (!hide || pfbScrollViewIsModal(self))) {
+            return;
+        }
+        if (pfbScrollViewIsTweakPage(self)) {
+            pfbApplyEdgeEffect(self, NO);
+            pfbSoftenEdgeEffect(self, NO);
             return;
         }
         pfbApplyEdgeEffect(self, hide);
