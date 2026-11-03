@@ -14,6 +14,8 @@
 /* ===== General › App behavior ===== */
 "NO_TAB_BAR_HIDING_TITLE" = "Her zaman görünür";
 "NO_TAB_BAR_HIDING_DETAIL" = "Kaydırırken çubuğu küçültme ya da gizleme.";
+"GLASS_TOASTS_TITLE" = "Cam bildirimler";
+"GLASS_TOASTS_DETAIL" = "Twitter bildirimlerini üstte cam bir çubuk olarak göster.";
 "SHOW_SCROLL_INDICATOR_TITLE" = "Kaydırma çubuğu";
 "DISABLE_RTL_TITLE" = "Soldan sağa metin";
 "DISABLE_RTL_DETAIL" = "Metni, sağdan sola yazılan dillerde bile soldan sağa göster.";

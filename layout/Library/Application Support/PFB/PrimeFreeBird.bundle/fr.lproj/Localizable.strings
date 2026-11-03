@@ -43,6 +43,8 @@
 "APPEARANCE_GROUP_INTERFACE" = "Interface";
 "INTERFACE_STYLE_TITLE" = "Style visuel";
 "INTERFACE_STYLE_SUBTITLE" = "Choisissez entre Standard et Liquid Glass.";
+"GLASS_TOASTS_TITLE" = "Toasts en verre";
+"GLASS_TOASTS_DETAIL" = "Affiche les toasts de Twitter en barre de verre, en haut.";
 "HIDE_SCROLL_EDGE_BLUR_TITLE" = "Masquer le flou des barres";
 "HIDE_SCROLL_EDGE_BLUR_DETAIL" = "Retire la bande floue qu’iOS dessine sous les barres du haut pendant le défilement.";
 "CUSTOM_FONTS_TITLE" = "Polices personnalisées";

@@ -47,6 +47,8 @@
 "APPEARANCE_GROUP_INTERFACE" = "Interface";
 "INTERFACE_STYLE_TITLE" = "Visual style";
 "INTERFACE_STYLE_SUBTITLE" = "Choose between the Standard look and the Liquid Glass design.";
+"GLASS_TOASTS_TITLE" = "Glass toasts";
+"GLASS_TOASTS_DETAIL" = "Show Twitter’s toasts as a glass bar at the top.";
 "HIDE_SCROLL_EDGE_BLUR_TITLE" = "Hide top bar blur";
 "HIDE_SCROLL_EDGE_BLUR_DETAIL" = "Remove the blurred band iOS draws under the top bars as you scroll.";
 "CUSTOM_FONTS_TITLE" = "Custom fonts";

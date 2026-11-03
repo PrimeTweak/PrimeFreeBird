@@ -14,6 +14,8 @@
 /* ===== General › App behavior ===== */
 "NO_TAB_BAR_HIDING_TITLE" = "Selalu terlihat";
 "NO_TAB_BAR_HIDING_DETAIL" = "Jangan perkecil atau pudarkan bilah saat menggulir.";
+"GLASS_TOASTS_TITLE" = "Toast kaca";
+"GLASS_TOASTS_DETAIL" = "Tampilkan toast Twitter sebagai bilah kaca di atas.";
 "SHOW_SCROLL_INDICATOR_TITLE" = "Bilah gulir";
 "DISABLE_RTL_TITLE" = "Teks kiri-ke-kanan";
 "DISABLE_RTL_DETAIL" = "Tampilkan teks dari kiri ke kanan, bahkan untuk bahasa yang ditulis dari kanan ke kiri.";

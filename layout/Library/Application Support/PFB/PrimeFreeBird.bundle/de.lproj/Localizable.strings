@@ -14,6 +14,8 @@
 /* ===== General › App behavior ===== */
 "NO_TAB_BAR_HIDING_TITLE" = "Immer sichtbar";
 "NO_TAB_BAR_HIDING_DETAIL" = "Leiste beim Scrollen weder verkleinern noch ausblenden.";
+"GLASS_TOASTS_TITLE" = "Glas-Toasts";
+"GLASS_TOASTS_DETAIL" = "Zeigt die Toasts von Twitter als Glasleiste oben an.";
 "SHOW_SCROLL_INDICATOR_TITLE" = "Scrollleiste";
 "DISABLE_RTL_TITLE" = "Text von links nach rechts";
 "DISABLE_RTL_DETAIL" = "Zeigt Text von links nach rechts an, selbst in Sprachen, die von rechts nach links gelesen werden.";

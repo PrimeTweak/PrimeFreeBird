@@ -14,6 +14,8 @@
 /* ===== General › App behavior ===== */
 "NO_TAB_BAR_HIDING_TITLE" = "Alltid synligt";
 "NO_TAB_BAR_HIDING_DETAIL" = "Låt inte fältet krympa eller tonas bort när du scrollar.";
+"GLASS_TOASTS_TITLE" = "Glasnotiser";
+"GLASS_TOASTS_DETAIL" = "Visa Twitters notiser som ett glasfält högst upp.";
 "SHOW_SCROLL_INDICATOR_TITLE" = "Rullningslist";
 "DISABLE_RTL_TITLE" = "Text från vänster till höger";
 "DISABLE_RTL_DETAIL" = "Visa text från vänster till höger, även på språk som skrivs från höger till vänster.";

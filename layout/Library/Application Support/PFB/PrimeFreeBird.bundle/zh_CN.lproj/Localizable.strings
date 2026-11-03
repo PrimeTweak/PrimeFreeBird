@@ -14,6 +14,8 @@
 /* ===== General › App behavior ===== */
 "NO_TAB_BAR_HIDING_TITLE" = "始终显示";
 "NO_TAB_BAR_HIDING_DETAIL" = "滚动时不缩小也不淡出。";
+"GLASS_TOASTS_TITLE" = "玻璃提示";
+"GLASS_TOASTS_DETAIL" = "以顶部的玻璃栏显示 Twitter 的提示。";
 "SHOW_SCROLL_INDICATOR_TITLE" = "滚动条";
 "DISABLE_RTL_TITLE" = "文字从左到右";
 "DISABLE_RTL_DETAIL" = "即使是从右到左书写的语言，文字也从左到右显示。";

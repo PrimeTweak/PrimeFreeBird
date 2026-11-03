@@ -14,6 +14,8 @@
 /* ===== General › App behavior ===== */
 "NO_TAB_BAR_HIDING_TITLE" = "항상 표시";
 "NO_TAB_BAR_HIDING_DETAIL" = "스크롤해도 바가 작아지거나 흐려지지 않습니다.";
+"GLASS_TOASTS_TITLE" = "유리 토스트";
+"GLASS_TOASTS_DETAIL" = "Twitter 토스트를 상단의 유리 막대로 표시합니다.";
 "SHOW_SCROLL_INDICATOR_TITLE" = "스크롤 바";
 "DISABLE_RTL_TITLE" = "텍스트를 왼쪽에서 오른쪽으로 표시";
 "DISABLE_RTL_DETAIL" = "아랍어 등 오른쪽에서 왼쪽으로 쓰는 언어에서도 텍스트를 왼쪽에서 오른쪽으로 표시합니다.";

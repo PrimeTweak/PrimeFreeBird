@@ -14,6 +14,8 @@
 /* ===== General › App behavior ===== */
 "NO_TAB_BAR_HIDING_TITLE" = "Zawsze widoczny";
 "NO_TAB_BAR_HIDING_DETAIL" = "Nie zmniejszaj ani nie wygaszaj paska podczas przewijania.";
+"GLASS_TOASTS_TITLE" = "Szklane powiadomienia";
+"GLASS_TOASTS_DETAIL" = "Pokazuj powiadomienia Twittera jako szklany pasek u góry.";
 "SHOW_SCROLL_INDICATOR_TITLE" = "Pasek przewijania";
 "DISABLE_RTL_TITLE" = "Tekst od lewej do prawej";
 "DISABLE_RTL_DETAIL" = "Wyświetlaj tekst od lewej do prawej, nawet w językach pisanych od prawej do lewej.";

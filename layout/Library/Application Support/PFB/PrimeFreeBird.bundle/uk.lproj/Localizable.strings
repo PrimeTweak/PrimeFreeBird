@@ -14,6 +14,8 @@
 /* ===== General › App behavior ===== */
 "NO_TAB_BAR_HIDING_TITLE" = "Завжди видима";
 "NO_TAB_BAR_HIDING_DETAIL" = "Не зменшувати й не приховувати панель під час прокручування.";
+"GLASS_TOASTS_TITLE" = "Скляні сповіщення";
+"GLASS_TOASTS_DETAIL" = "Показувати сповіщення Twitter скляною панеллю вгорі.";
 "SHOW_SCROLL_INDICATOR_TITLE" = "Смуга прокручування";
 "DISABLE_RTL_TITLE" = "Текст зліва направо";
 "DISABLE_RTL_DETAIL" = "Показує текст зліва направо, навіть у мовах із письмом справа наліво.";

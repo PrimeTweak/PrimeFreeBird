@@ -14,6 +14,8 @@
 /* ===== General › App behavior ===== */
 "NO_TAB_BAR_HIDING_TITLE" = "ظاهر دائمًا";
 "NO_TAB_BAR_HIDING_DETAIL" = "عدم تصغير الشريط أو تلاشيه عند التمرير.";
+"GLASS_TOASTS_TITLE" = "إشعارات زجاجية";
+"GLASS_TOASTS_DETAIL" = "عرض إشعارات تويتر كشريط زجاجي في الأعلى.";
 "SHOW_SCROLL_INDICATOR_TITLE" = "شريط التمرير";
 "DISABLE_RTL_TITLE" = "نص من اليسار إلى اليمين";
 "DISABLE_RTL_DETAIL" = "عرض النص من اليسار إلى اليمين، حتى في اللغات التي تُكتب من اليمين إلى اليسار.";

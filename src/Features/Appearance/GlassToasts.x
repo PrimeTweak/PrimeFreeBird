@@ -1,5 +1,5 @@
-// Glass toasts: Twitter's toasts drawn as the tweak's bar at the top, across the width, the words
-// beside the icon and the button on the right, on glass or on the standard look's light capsule.
+// Glass toasts: Twitter's toasts drawn as the tweak's capsule at the top, as wide as their words,
+// the button on the right, on Liquid Glass or on the standard look's light capsule.
 
 #import "Support/HookHelpers.h"
 #import "Support/TFNHeaders.h"
@@ -15,30 +15,24 @@
 - (void)prepareForToastWithUpdatedStyle:(BOOL)updated;
 @end
 
-// The bar's margin to the screen's sides, and its widest on a large screen.
+// The capsule's margin to the screen's sides, and the room around its content.
 static const CGFloat kPFBGlassToastMargin = 16.0;
-static const CGFloat kPFBGlassToastMaxWidth = 560.0;
+static const CGFloat kPFBGlassToastSideInset = 16.0;
+static const CGFloat kPFBGlassToastTopInset = 8.0;
+// Twitter's room around the content, as measured.
+static const CGFloat kPFBGlassToastTwitterInset = 12.0;
 
 static const void* kPFBGlassToastSurfaceKey = &kPFBGlassToastSurfaceKey;
-static const void* kPFBGlassToastVeilKey = &kPFBGlassToastVeilKey;
 static const void* kPFBGlassToastTwitterLookKey = &kPFBGlassToastTwitterLookKey;
 static const void* kPFBGlassToastArrangedKey = &kPFBGlassToastArrangedKey;
+static const void* kPFBGlassToastSideKey = &kPFBGlassToastSideKey;
+static NSUInteger gPFBGlassToastsMeasured;
 
 static BOOL PFBGlassToastsOn(void) {
     return [PFBSettings boolForKey:@"glass_toasts"];
 }
 
-// The bar's width in the room Twitter places its toasts in: never narrower than Twitter's own,
-// never past the margins.
-static CGFloat PFBGlassToastWidth(CGRect placement, CGFloat twitterWidth) {
-    CGFloat room = CGRectGetWidth(placement) - 2 * kPFBGlassToastMargin;
-    if (room <= 0) {
-        return twitterWidth;
-    }
-    return MIN(MAX(MIN(room, kPFBGlassToastMaxWidth), twitterWidth), room);
-}
-
-// The content's column of two: the icon with the words, then the button.
+// The content's column: the icon with the words, then the button.
 static UIStackView* PFBGlassToastColumn(UIView* content) {
     for (UIView* view in content.subviews) {
         if ([view isKindOfClass:[UIStackView class]]) {
@@ -49,6 +43,35 @@ static UIStackView* PFBGlassToastColumn(UIView* content) {
     return nil;
 }
 
+// The toast's content: the last one shown, as a new toast's content comes after the one it replaces.
+static UIView* PFBGlassToastContentIn(UIView* container) {
+    Class contentClass = NSClassFromString(@"XDSToastContentView");
+    __block UIView* content = nil;
+    PFBWalkAllSubviews(container, 4, ^(UIView* view) {
+      if (contentClass && [view isKindOfClass:contentClass] && !view.hidden) {
+          content = view;
+      }
+    });
+    return content;
+}
+
+// The capsule's width: its content on one row with the room around it, within the margins.
+static CGFloat PFBGlassToastWidth(UIView* container, CGRect placement, CGFloat twitterWidth) {
+    CGFloat room = CGRectGetWidth(placement) - 2 * kPFBGlassToastMargin;
+    if (room <= 0) {
+        return twitterWidth;
+    }
+    UIView* content = PFBGlassToastContentIn(container);
+    UIStackView* column = PFBGlassToastColumn(content);
+    if (!column) {
+        return MIN(twitterWidth, room);
+    }
+    NSNumber* side = objc_getAssociatedObject(content, kPFBGlassToastSideKey);
+    CGFloat inset = side ? side.doubleValue : kPFBGlassToastTwitterInset;
+    CGFloat width = [column systemLayoutSizeFittingSize:UILayoutFittingCompressedSize].width + 2 * inset;
+    return MIN(ceil(width), room);
+}
+
 static void PFBGlassToastSetPriority(UIView* view, UILayoutPriority priority) {
     UILayoutConstraintAxis axis = UILayoutConstraintAxisHorizontal;
     if ([view contentHuggingPriorityForAxis:axis] != priority) {
@@ -57,6 +80,36 @@ static void PFBGlassToastSetPriority(UIView* view, UILayoutPriority priority) {
     if ([view contentCompressionResistancePriorityForAxis:axis] != priority) {
         [view setContentCompressionResistancePriority:priority forAxis:axis];
     }
+}
+
+// Twitter's room around the column becomes the capsule's: wider at the round ends, lower above
+// and below. The side room in use is kept for the width.
+static void PFBGlassToastInsets(UIView* content, UIStackView* column) {
+    NSUInteger sides = 0;
+    for (NSLayoutConstraint* constraint in content.constraints) {
+        if (constraint.firstItem != column && constraint.secondItem != column) {
+            continue;
+        }
+        NSLayoutAttribute attribute =
+            constraint.firstItem == column ? constraint.firstAttribute : constraint.secondAttribute;
+        CGFloat sign = constraint.constant < 0 ? -1.0 : 1.0;
+        CGFloat inset = 0;
+        if (attribute == NSLayoutAttributeLeading || attribute == NSLayoutAttributeTrailing ||
+            attribute == NSLayoutAttributeLeft || attribute == NSLayoutAttributeRight) {
+            inset = kPFBGlassToastSideInset;
+        } else if (attribute == NSLayoutAttributeTop || attribute == NSLayoutAttributeBottom) {
+            inset = kPFBGlassToastTopInset;
+        }
+        if (inset > 0 && fabs(constraint.constant) == kPFBGlassToastTwitterInset) {
+            constraint.constant = sign * inset;
+        }
+        if (inset == kPFBGlassToastSideInset && fabs(constraint.constant) == kPFBGlassToastSideInset) {
+            sides++;
+        }
+    }
+    objc_setAssociatedObject(content, kPFBGlassToastSideKey,
+                             @(sides == 2 ? kPFBGlassToastSideInset : kPFBGlassToastTwitterInset),
+                             OBJC_ASSOCIATION_RETAIN_NONATOMIC);
 }
 
 // The column becomes a row: the words give way to the button, which keeps its whole title.
@@ -71,9 +124,10 @@ static void PFBGlassToastArrange(UIView* content) {
     if (column.alignment != UIStackViewAlignmentCenter) {
         column.alignment = UIStackViewAlignmentCenter;
     }
-    if (column.spacing != 12.0) {
-        column.spacing = 12.0;
+    if (column.spacing != 16.0) {
+        column.spacing = 16.0;
     }
+    PFBGlassToastInsets(content, column);
     PFBWalkAllSubviews(column.arrangedSubviews[0], 8, ^(UIView* view) {
       if ([view isKindOfClass:[UILabel class]]) {
           PFBGlassToastSetPriority(view, UILayoutPriorityDefaultLow);
@@ -131,6 +185,7 @@ static void PFBGlassToastColor(UIView* container, id toast) {
     });
 }
 
+// Twitter's chrome under the content: its dark blur and its shadow, nothing else.
 static NSArray<UIView*>* PFBGlassToastChrome(UIView* container) {
     NSMutableArray<UIView*>* chrome = [NSMutableArray array];
     for (UIView* view in container.subviews) {
@@ -141,8 +196,8 @@ static NSArray<UIView*>* PFBGlassToastChrome(UIView* container) {
     return chrome;
 }
 
-// Twitter's look as it last set it: its color, corners and shadow. A solid color goes with its
-// blur hidden, as on the error toast.
+// Twitter's look as it last set it: its color and corners. A solid color goes with its blur
+// hidden, as on the error toast.
 static void PFBGlassToastNoteTwitterLook(UIView* container, BOOL corners) {
     NSMutableDictionary* look = objc_getAssociatedObject(container, kPFBGlassToastTwitterLookKey);
     if (!look) {
@@ -153,14 +208,12 @@ static void PFBGlassToastNoteTwitterLook(UIView* container, BOOL corners) {
     if (corners) {
         look[@"radius"] = @(container.layer.cornerRadius);
         look[@"curve"] = container.layer.cornerCurve ?: kCACornerCurveCircular;
-        look[@"shadow"] = @(PFBGlassToastChrome(container).firstObject.layer.shadowOpacity);
     }
 }
 
 static void PFBGlassToastRestore(UIView* container, UIView* surface) {
     [surface removeFromSuperview];
     objc_setAssociatedObject(container, kPFBGlassToastSurfaceKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-    objc_setAssociatedObject(container, kPFBGlassToastVeilKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     NSDictionary* look = objc_getAssociatedObject(container, kPFBGlassToastTwitterLookKey);
     UIColor* color = [look[@"color"] isKindOfClass:[UIColor class]] ? look[@"color"] : nil;
     CGFloat alpha = 0;
@@ -169,13 +222,92 @@ static void PFBGlassToastRestore(UIView* container, UIView* surface) {
     container.layer.cornerRadius = [look[@"radius"] doubleValue];
     container.layer.cornerCurve = look[@"curve"] ?: kCACornerCurveCircular;
     for (UIView* chrome in PFBGlassToastChrome(container)) {
-        chrome.layer.shadowOpacity = [look[@"shadow"] floatValue];
+        chrome.hidden = NO;
         [(XDSToastContainerView*)chrome setBlurHidden:alpha >= 0.99];
     }
 }
 
-// The container drawn as the bar: the glass behind everything, Twitter's blur, shadow and error
-// red put away, the corners round. With the option off, Twitter's look comes back.
+static NSString* PFBGlassToastColorText(UIColor* color) {
+    CGFloat r = 0, g = 0, b = 0, a = 0;
+    if (![color getRed:&r green:&g blue:&b alpha:&a]) {
+        return color ? @"pattern" : @"none";
+    }
+    return [NSString stringWithFormat:@"#%02X%02X%02X/%.2f", (int)lround(r * 255), (int)lround(g * 255),
+                                      (int)lround(b * 255), a];
+}
+
+static void PFBGlassToastDescribe(NSMutableString* text, UIView* view, NSInteger depth) {
+    [text appendFormat:@"\n%@%@ %.0f,%.0f %.0fx%.0f", [@"" stringByPaddingToLength:depth * 2 withString:@" " startingAtIndex:0],
+                       NSStringFromClass([view class]), CGRectGetMinX(view.frame), CGRectGetMinY(view.frame),
+                       CGRectGetWidth(view.frame), CGRectGetHeight(view.frame)];
+    if (view.hidden) {
+        [text appendString:@" hidden"];
+    }
+    if (view.alpha < 1) {
+        [text appendFormat:@" alpha %.2f", view.alpha];
+    }
+    if (view.layer.opacity < 1) {
+        [text appendFormat:@" opacity %.2f", view.layer.opacity];
+    }
+    if (view.layer.cornerRadius > 0) {
+        [text appendFormat:@" radius %.0f", view.layer.cornerRadius];
+    }
+    if (view.clipsToBounds || view.layer.masksToBounds) {
+        [text appendString:@" clips"];
+    }
+    if (view.layer.mask || view.maskView) {
+        [text appendString:@" mask"];
+    }
+    if (view.layer.filters.count || view.layer.compositingFilter) {
+        [text appendString:@" filters"];
+    }
+    if (view.backgroundColor) {
+        [text appendFormat:@" bg %@", PFBGlassToastColorText(view.backgroundColor)];
+    }
+    if ([view isKindOfClass:[UIVisualEffectView class]]) {
+        [text appendFormat:@" effect %@", NSStringFromClass([((UIVisualEffectView*)view).effect class])];
+    }
+    if ([view isKindOfClass:[UILabel class]]) {
+        [text appendFormat:@" \"%@\"", ((UILabel*)view).text ?: @""];
+    }
+}
+
+// The drawn capsule in the report, for the first toasts of a launch: the views above it up to the
+// window, then each of its layers, recorded at once.
+static void PFBGlassToastMeasure(UIView* container, CGFloat twitterWidth) {
+    if (gPFBGlassToastsMeasured >= 3 || !container.window) {
+        return;
+    }
+    gPFBGlassToastsMeasured++;
+    UIView* content = PFBGlassToastContentIn(container);
+    NSMutableString* text = [NSMutableString
+        stringWithFormat:@"Liquid Glass %@ · capsule %.0fx%.0f at %.0f,%.0f · Twitter's width %.0f · side room %@",
+                         PFBShowcaseUsesGlass() ? @"on" : @"off", CGRectGetWidth(container.frame),
+                         CGRectGetHeight(container.frame), CGRectGetMinX(container.frame),
+                         CGRectGetMinY(container.frame), twitterWidth,
+                         objc_getAssociatedObject(content, kPFBGlassToastSideKey) ?: @"not set"];
+    [text appendString:@"\nabove:"];
+    for (UIView* view = container.superview; view; view = view.superview) {
+        PFBGlassToastDescribe(text, view, 1);
+    }
+    [text appendString:@"\ncapsule:"];
+    NSMutableArray<NSArray*>* stack = [NSMutableArray arrayWithObject:@[ container, @1 ]];
+    while (stack.count) {
+        UIView* view = stack.lastObject[0];
+        NSInteger depth = [stack.lastObject[1] integerValue];
+        [stack removeLastObject];
+        PFBGlassToastDescribe(text, view, depth);
+        if (depth < 9 && ![view isKindOfClass:[UILabel class]] && ![view isKindOfClass:[UIButton class]]) {
+            for (UIView* child in view.subviews.reverseObjectEnumerator) {
+                [stack addObject:@[ child, @(depth + 1) ]];
+            }
+        }
+    }
+    PFBCompatMeasure([NSString stringWithFormat:@"glass toast %lu", (unsigned long)gPFBGlassToastsMeasured], text, 2);
+}
+
+// The container drawn as the capsule: the glass behind everything, Twitter's chrome put away,
+// the corners round. With the option off, Twitter's look comes back.
 static void PFBGlassToastDress(UIView* container, BOOL styled) {
     UIView* surface = objc_getAssociatedObject(container, kPFBGlassToastSurfaceKey);
     if (!PFBGlassToastsOn()) {
@@ -193,26 +325,14 @@ static void PFBGlassToastDress(UIView* container, BOOL styled) {
         PFBGlassToastNoteTwitterLook(container, YES);
         PFBShowcaseSurface* glass = [[PFBShowcaseSurface alloc] initWithCornerRadius:-1];
         glass.userInteractionEnabled = NO;
-        // Under glass, a veil keeps the words readable over a busy picture.
-        if (PFBShowcaseUsesGlass()) {
-            UIView* veil = [[UIView alloc] initWithFrame:glass.contentView.bounds];
-            veil.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
-            veil.backgroundColor = [[UIColor systemBackgroundColor] colorWithAlphaComponent:0.55];
-            veil.userInteractionEnabled = NO;
-            veil.layer.cornerCurve = kCACornerCurveContinuous;
-            [glass.contentView addSubview:veil];
-            objc_setAssociatedObject(container, kPFBGlassToastVeilKey, veil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-        }
         surface = glass;
         objc_setAssociatedObject(container, kPFBGlassToastSurfaceKey, surface, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-        styled = YES;
     } else if (styled) {
         PFBGlassToastNoteTwitterLook(container, NO);
     }
-    if (styled) {
-        for (UIView* chrome in PFBGlassToastChrome(container)) {
-            chrome.layer.shadowOpacity = 0;
-            [(XDSToastContainerView*)chrome setBlurHidden:YES];
+    for (UIView* chrome in PFBGlassToastChrome(container)) {
+        if (!chrome.hidden) {
+            chrome.hidden = YES;
         }
     }
     if (container.subviews.firstObject != surface) {
@@ -229,16 +349,29 @@ static void PFBGlassToastDress(UIView* container, BOOL styled) {
         container.layer.cornerRadius = radius;
         container.layer.cornerCurve = kCACornerCurveContinuous;
     }
-    UIView* veil = objc_getAssociatedObject(container, kPFBGlassToastVeilKey);
-    if (veil.layer.cornerRadius != radius) {
-        veil.layer.cornerRadius = radius;
-    }
     TFNToastViewController* shower = [container respondsToSelector:@selector(toastViewController)]
                                          ? [(T1ToastContainerView*)container toastViewController]
                                          : nil;
     id toast = [shower respondsToSelector:@selector(currentToast)] ? [shower currentToast] : nil;
     PFBGlassToastColor(container, toast);
-    PFBCOMPAT_ACTION(PFBCompat_glass_toasts, @"toast drawn as the glass bar");
+    if (styled) {
+        // Twitter may size the toast before its new content is in: the width is set again from it.
+        CGFloat twitterWidth = CGRectGetWidth(container.frame);
+        if ([shower respondsToSelector:@selector(_tfn_toastHorizontalPlacementBounds)]) {
+            CGRect placement = [shower _tfn_toastHorizontalPlacementBounds];
+            CGFloat width = PFBGlassToastWidth(container, placement, twitterWidth);
+            if (fabs(width - twitterWidth) > 0.5) {
+                CGRect frame = container.frame;
+                frame.origin.x = CGRectGetMidX(placement) - width / 2.0;
+                frame.size.width = width;
+                container.frame = frame;
+            }
+        }
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.6 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+          PFBGlassToastMeasure(container, twitterWidth);
+        });
+    }
+    PFBCOMPAT_ACTION(PFBCompat_glass_toasts, @"toast drawn as the glass capsule");
 }
 
 %hook TFNToastViewController
@@ -248,7 +381,7 @@ static void PFBGlassToastDress(UIView* container, BOOL styled) {
     if (!PFBGlassToastsOn() || ![self respondsToSelector:@selector(_tfn_toastHorizontalPlacementBounds)]) {
         return width;
     }
-    return PFBGlassToastWidth([self _tfn_toastHorizontalPlacementBounds], width);
+    return PFBGlassToastWidth([self toastContainerView], [self _tfn_toastHorizontalPlacementBounds], width);
 }
 
 - (CGRect)_tfn_toastContainerFrame {
@@ -261,7 +394,7 @@ static void PFBGlassToastDress(UIView* container, BOOL styled) {
         return frame;
     }
     CGRect placement = [self _tfn_toastHorizontalPlacementBounds];
-    CGFloat width = PFBGlassToastWidth(placement, CGRectGetWidth(frame));
+    CGFloat width = PFBGlassToastWidth([self toastContainerView], placement, CGRectGetWidth(frame));
     frame.origin.x = CGRectGetMidX(placement) - width / 2.0;
     frame.size.width = width;
     return frame;
@@ -294,7 +427,7 @@ static void PFBGlassToastDress(UIView* container, BOOL styled) {
 
 %hook T1ToastContainerView
 
-// Twitter sets each toast's blur and color here, then lays it out: the bar is drawn after both.
+// Twitter sets each toast's blur and color here, then lays it out: the capsule is drawn after both.
 - (void)prepareForToastWithUpdatedStyle:(BOOL)updated {
     %orig;
     PFBGlassToastDress(self, YES);

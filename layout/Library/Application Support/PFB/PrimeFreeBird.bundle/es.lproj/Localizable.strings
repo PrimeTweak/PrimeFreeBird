@@ -14,6 +14,8 @@
 /* ===== General › App behavior ===== */
 "NO_TAB_BAR_HIDING_TITLE" = "Siempre visible";
 "NO_TAB_BAR_HIDING_DETAIL" = "Evita que la barra se encoja o se desvanezca al hacer scroll.";
+"GLASS_TOASTS_TITLE" = "Avisos de cristal";
+"GLASS_TOASTS_DETAIL" = "Muestra los avisos de Twitter como una barra de cristal arriba.";
 "SHOW_SCROLL_INDICATOR_TITLE" = "Barra de desplazamiento";
 "DISABLE_RTL_TITLE" = "Texto de izquierda a derecha";
 "DISABLE_RTL_DETAIL" = "Muestra el texto de izquierda a derecha, incluso en idiomas que se escriben de derecha a izquierda.";

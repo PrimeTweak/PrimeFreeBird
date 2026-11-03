@@ -14,6 +14,8 @@
 /* ===== General › App behavior ===== */
 "NO_TAB_BAR_HIDING_TITLE" = "Всегда видна";
 "NO_TAB_BAR_HIDING_DETAIL" = "Не уменьшать и не скрывать панель при прокрутке.";
+"GLASS_TOASTS_TITLE" = "Стеклянные уведомления";
+"GLASS_TOASTS_DETAIL" = "Показывать уведомления Twitter стеклянной панелью сверху.";
 "SHOW_SCROLL_INDICATOR_TITLE" = "Полоса прокрутки";
 "DISABLE_RTL_TITLE" = "Текст слева направо";
 "DISABLE_RTL_DETAIL" = "Показывает текст слева направо, даже в языках с письмом справа налево.";

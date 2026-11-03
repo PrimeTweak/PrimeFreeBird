@@ -14,6 +14,8 @@
 /* ===== General › App behavior ===== */
 "NO_TAB_BAR_HIDING_TITLE" = "Uvijek vidljiva";
 "NO_TAB_BAR_HIDING_DETAIL" = "Ne smanjuj i ne skrivaj traku pri pomicanju.";
+"GLASS_TOASTS_TITLE" = "Staklene obavijesti";
+"GLASS_TOASTS_DETAIL" = "Prikaži Twitterove obavijesti kao staklenu traku na vrhu.";
 "SHOW_SCROLL_INDICATOR_TITLE" = "Traka za pomicanje";
 "DISABLE_RTL_TITLE" = "Tekst slijeva nadesno";
 "DISABLE_RTL_DETAIL" = "Prikaži tekst slijeva nadesno, čak i u jezicima koji se pišu zdesna nalijevo.";

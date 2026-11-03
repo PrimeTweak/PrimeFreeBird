@@ -14,6 +14,8 @@
 /* ===== General › App behavior ===== */
 "NO_TAB_BAR_HIDING_TITLE" = "常に表示";
 "NO_TAB_BAR_HIDING_DETAIL" = "スクロールしてもバーが縮んだり薄くなったりしないようにします。";
+"GLASS_TOASTS_TITLE" = "ガラスのトースト";
+"GLASS_TOASTS_DETAIL" = "Twitterのトーストを上部のガラスバーで表示します。";
 "SHOW_SCROLL_INDICATOR_TITLE" = "スクロールバー";
 "DISABLE_RTL_TITLE" = "テキストを左から右に表示";
 "DISABLE_RTL_DETAIL" = "右から左に読む言語の場合でも、テキストを左から右に表示します。";

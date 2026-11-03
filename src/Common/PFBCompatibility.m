@@ -232,7 +232,7 @@ static const PFBCompatPathMeta kPaths[] = {
     {PFBCompatPath_glass_pill, PFBCompat_restore_tab_labels, "pill height"},
     {PFBCompatPath_bottom_fade, PFBCompat_hide_bottom_fade, "fade under the tab bar"},
     {PFBCompatPath_tab_editor_page, PFBCompat_custom_tab_bar, "tab editor page"},
-    {PFBCompatPath_glass_toast_row, PFBCompat_glass_toasts, "toast with a button"},
+    {PFBCompatPath_glass_toast_row, PFBCompat_glass_toasts, "toast row"},
     {PFBCompatPath_glass_toast_width, PFBCompat_glass_toasts, "toast width"},
 };
 static const size_t kPathCount = sizeof(kPaths) / sizeof(kPaths[0]);
@@ -403,6 +403,7 @@ static const PFBCompatReq kReqs[] = {
     {PFBCompat_glass_toasts, "TFNToastViewController", "-_tfn_toastContainerFrame"},
     {PFBCompat_glass_toasts, "TFNToastViewController", "-_tfn_toastHorizontalPlacementBounds"},
     {PFBCompat_glass_toasts, "TFNToastViewController", "-currentToast"},
+    {PFBCompat_glass_toasts, "TFNToastViewController", "-toastContainerView"},
     {PFBCompat_glass_toasts, "XDSToastContentView", "-initWithFrame:configuration:"},
     {PFBCompat_glass_toasts, "XDSToastContentView", "-updateConstraints"},
     {PFBCompat_glass_toasts, "T1ToastContainerView", "-prepareForToastWithUpdatedStyle:"},
