@@ -114,9 +114,9 @@ static UIImage* AppIconIndicator(BOOL active, UIColor* accentColor) {
                 constraintEqualToAnchor:self.contentView.centerXAnchor],
             [self.checkView.topAnchor
                 constraintEqualToAnchor:self.iconView.bottomAnchor
-                               constant:14],
-            [self.checkView.widthAnchor constraintEqualToConstant:24],
-            [self.checkView.heightAnchor constraintEqualToConstant:24]
+                               constant:kAppIconIndicatorGap],
+            [self.checkView.widthAnchor constraintEqualToConstant:kAppIconIndicatorSize],
+            [self.checkView.heightAnchor constraintEqualToConstant:kAppIconIndicatorSize]
         ]];
     }
     return self;

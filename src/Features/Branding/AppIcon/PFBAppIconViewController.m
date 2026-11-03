@@ -95,6 +95,20 @@ static UIImage* AppIconThumbnail(PFBAppIconItem* item, UITraitCollection* tc) {
 @property (nonatomic, strong) UIActivityIndicatorView* loadingIndicator;
 @end
 
+// The icon's widest, 109 pt on Twitter's Premium page.
+static const CGFloat kAppIconMaxWidth = 110.0;
+static const CGFloat kAppIconSideInset = 18.0;
+
+// The check of the icon in use: the green of Twitter's Premium page, measured in dark mode, and
+// Twitter's success green in light mode.
+static UIColor* AppIconSelectedColor(void) {
+    return [UIColor colorWithDynamicProvider:^UIColor*(UITraitCollection* traits) {
+      return traits.userInterfaceStyle == UIUserInterfaceStyleDark
+                 ? [UIColor colorWithRed:83.0 / 255.0 green:183.0 / 255.0 blue:128.0 / 255.0 alpha:1.0]
+                 : [UIColor colorWithRed:0.0 green:186.0 / 255.0 blue:124.0 / 255.0 alpha:1.0];
+    }];
+}
+
 @implementation PFBAppIconViewController
 
 #pragma mark - Lifecycle
@@ -105,10 +119,12 @@ static UIImage* AppIconThumbnail(PFBAppIconItem* item, UITraitCollection* tc) {
     self.navigationItem.title = [[PFBBundle sharedBundle]
         localizedTwitterStringForKey:@"SUBSCRIPTION_APP_ICON_SETTINGS_TITLE"];
 
+    // The grid of Twitter's Premium icon page, as measured: 18 pt from the sides, 38 pt
+    // between columns, 13 pt between rows.
     UICollectionViewFlowLayout* flow = [UICollectionViewFlowLayout new];
-    flow.sectionInset = UIEdgeInsetsMake(16, 16, 16, 16);
-    flow.minimumLineSpacing = 10;
-    flow.minimumInteritemSpacing = 10;
+    flow.sectionInset = UIEdgeInsetsMake(16, kAppIconSideInset, 16, kAppIconSideInset);
+    flow.minimumLineSpacing = 13;
+    flow.minimumInteritemSpacing = 38;
 
     self.appIconCollectionView =
         [[UICollectionView alloc] initWithFrame:CGRectZero
@@ -277,7 +293,7 @@ static UIImage* AppIconThumbnail(PFBAppIconItem* item, UITraitCollection* tc) {
 
     [cell configureWithImage:[self thumbnailAtIndex:ip.row]
                       active:[self isItemActive:item]
-                 accentColor:PFBCurrentAccentColor()];
+                 accentColor:AppIconSelectedColor()];
 
     return cell;
 }
@@ -367,8 +383,8 @@ static UIImage* AppIconThumbnail(PFBAppIconItem* item, UITraitCollection* tc) {
                         flow.sectionInset.right -
                         flow.minimumInteritemSpacing * 2;
     CGFloat scale = UIScreen.mainScreen.scale ?: 1;
-    CGFloat width = MIN(floor(available / 3.0 * scale) / scale, 96.0);
-    return CGSizeMake(width, width + 38.0);
+    CGFloat width = MIN(floor(available / 3.0 * scale) / scale, kAppIconMaxWidth);
+    return CGSizeMake(width, width + kAppIconIndicatorGap + kAppIconIndicatorSize);
 }
 
 #pragma mark - Reset
