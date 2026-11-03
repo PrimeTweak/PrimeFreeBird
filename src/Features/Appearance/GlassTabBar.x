@@ -735,9 +735,15 @@ static NSString* PFBGlassConfigBytes(const uint8_t* bytes) {
     return text;
 }
 
+// Whether Twitter's configuration is the larger one of 12.40 on, where the word at 8 no longer
+// holds the bar style.
+static BOOL gPFBGlassConfigLarge;
+
 // Confirms the collapse-mode bytes sit where the patch writes, by their fingerprint in Twitter's
-// four static configurations. A later build that moves them fails this, so the patch stays off
-// rather than writing into the wrong field; the bytes read go to the report.
+// four static configurations: the top bar's mode at byte 0, the tab bar's at byte 1 (0 in every
+// one), and in the smaller configuration the style word at 8. A later build that moves them fails
+// this, so the patch stays off rather than writing into the wrong field; a larger configuration
+// has the bytes of all four read into the report.
 static BOOL PFBGlassConfigLayoutVerified(void) {
     static BOOL verified;
     static dispatch_once_t once;
@@ -751,11 +757,12 @@ static BOOL PFBGlassConfigLayoutVerified(void) {
       if (offset <= 0 || (size_t)offset + 16 > class_getInstanceSize(cls)) {
           return;
       }
-      // Navigation bar mode at byte 0, tab bar mode at byte 1 (0 in every preset), style word at 8.
+      gPFBGlassConfigLarge = class_getInstanceSize(cls) - (size_t)offset > 24;
       const char* names[] = {"standardConfiguration", "pinnedConfiguration", "hiddenConfiguration",
                              "pinnedTransparentConfiguration"};
       const uint8_t navBar[] = {1, 3, 2, 3};
       const uintptr_t style[] = {0, 0, 0, 1};
+      BOOL matches = YES;
       for (NSUInteger i = 0; i < 4; i++) {
           SEL selector = NSSelectorFromString([NSString stringWithUTF8String:names[i]]);
           if (![cls respondsToSelector:selector]) {
@@ -768,14 +775,16 @@ static BOOL PFBGlassConfigLayoutVerified(void) {
           const uint8_t* bytes = (const uint8_t*)(__bridge void*)configuration + offset;
           uintptr_t word = 0;
           memcpy(&word, bytes + 8, sizeof(word));
-          if (bytes[0] != navBar[i] || bytes[1] != 0 || word != style[i]) {
+          BOOL match = bytes[0] == navBar[i] && bytes[1] == 0 && (gPFBGlassConfigLarge || word == style[i]);
+          if (!match || gPFBGlassConfigLarge) {
               PFBCompatMeasure(@"always visible",
-                               [NSString stringWithFormat:@"%s does not match: %@", names[i], PFBGlassConfigBytes(bytes)],
-                               6);
-              return;
+                               [NSString stringWithFormat:@"%s %@: %@", names[i], match ? @"matches" : @"does not match",
+                                                          PFBGlassConfigBytes(bytes)],
+                               8);
           }
+          matches = matches && match;
       }
-      verified = YES;
+      verified = matches;
     });
     return verified;
 }
@@ -860,7 +869,7 @@ static void PFBGlassPinTabBar(UINavigationController* stack) {
     uint8_t* configuration = (uint8_t*)(__bridge void*)stack + offset;
     uintptr_t style = 0;
     memcpy(&style, configuration + 8, sizeof(style));
-    if (style == 2 || configuration[0] > 3 || configuration[1] != 1) {
+    if ((!gPFBGlassConfigLarge && style == 2) || configuration[0] > 3 || configuration[1] != 1) {
         return;
     }
     if (![PFBSettings boolForKey:@"no_tab_bar_hiding"]) {
