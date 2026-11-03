@@ -1174,7 +1174,7 @@ static const PFBCompatReq kReqs[] = {
     {PFBCompat_no_tab_bar_hiding, "XNAVNavigationController", "$appliedConfiguration"},
     {PFBCompat_no_tab_bar_hiding, "XNAVNavigationController", "$chromeFrozenScreen"},
     // A size the code relies on, as "=name>next:sizes": the bytes from one ivar to the next.
-    {PFBCompat_no_tab_bar_hiding, "XNAVNavigationController", "=appliedConfiguration>chromeFrozenScreen:40,48"},
+    {PFBCompat_no_tab_bar_hiding, "XNAVNavigationController", "=appliedConfiguration>chromeFrozenScreen:40,48,400"},
     {PFBCompat_no_tab_bar_hiding, "XNAVNavigationController", "$$__lazy_storage_$_collapseEngine"},
     {PFBCompat_no_tab_bar_hiding, "_TtC11XNavigation14CollapseEngine", "$collapseProgress"},
     {PFBCompat_restore_tab_labels, "XNAVNavigationController", "$$__lazy_storage_$_collapseEngine"},
