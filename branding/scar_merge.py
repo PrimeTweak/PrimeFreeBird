@@ -72,6 +72,62 @@ def load_catalog(catalog):
     return manifest, facets, by_ident
 
 
+# The name of the self-contained template made when the catalog has none of its own.
+SYNTH_TEMPLATE = "PrimeFreeBird-Icon-Template"
+
+
+def synth_template(scar, catalog, icon_names, facets, primary):
+    """Clones a stock alternate whose renditions point into a shared atlas, then turns the
+    clone into one 1024 px image per idiom under a multisize stub, the shape a self-contained
+    alternate had before the app moved its icons to atlases. Returns its name, or None."""
+    base = next((n for n in sorted(icon_names)
+                 if n != primary and "%s-settings" % n in facets), None)
+    if not base:
+        return None
+    run_scar(scar, "clone-asset", catalog, "--from", base, "--to", SYNTH_TEMPLATE)
+    run_scar(scar, "clone-asset", catalog, "--from", "%s-settings" % base,
+             "--to", "%s-settings" % SYNTH_TEMPLATE)
+    manifest, facets, by_ident = load_catalog(catalog)
+    ident = facets[SYNTH_TEMPLATE]
+    stubs = [r for r in by_ident.get(ident, [])
+             if r["content"]["type"] == "multisize" and "subtype" not in r["key"]]
+    if not stubs:
+        return None
+    os.makedirs(os.path.join(catalog, "renditions"), exist_ok=True)
+    made = []
+    for stub in stubs:
+        idiom = stub["key"].get("idiom", 0)
+        stub["content"]["sizes"] = [{"width": 1024, "height": 1024, "index": 1}]
+        image = "renditions/%s-%d.png" % (SYNTH_TEMPLATE, idiom)
+        Image.new("RGBA", (1024, 1024), (0, 0, 0, 255)).save(os.path.join(catalog, image))
+        key = dict(stub["key"])
+        key.update({"dimension2": 1, "part": 220, "scale": 1})
+        made.append(stub)
+        made.append({
+            "key": key, "name": "%s.png" % SYNTH_TEMPLATE, "layout": 12, "flags": 0,
+            "pixel_format": "ARGB", "color_space_id": 1, "width": 1024, "height": 1024,
+            "scale": 100, "modified": 0, "slices": [[0, 0, 1024, 1024]],
+            "metrics": {"edge_insets": [0, 0, 0, 0], "image_size": [1024, 1024]},
+            "composition": {"blend_mode": 0, "opacity": 1.0}, "bitmap_info": 1,
+            "content": {"type": "image", "file": image, "compression": "lzfse"},
+        })
+    manifest["renditions"] = [r for r in manifest["renditions"]
+                              if r["key"].get("identifier") != ident] + made
+    with open(os.path.join(catalog, "manifest.json"), "w") as handle:
+        json.dump(manifest, handle, indent=2)
+    return SYNTH_TEMPLATE
+
+
+def drop_assets(catalog, names):
+    manifest, facets, _ = load_catalog(catalog)
+    gone = {facets[n] for n in names if n in facets}
+    manifest["facets"] = [f for f in manifest["facets"] if f["name"] not in names]
+    manifest["renditions"] = [r for r in manifest["renditions"]
+                              if r["key"].get("identifier") not in gone]
+    with open(os.path.join(catalog, "manifest.json"), "w") as handle:
+        json.dump(manifest, handle, indent=2)
+
+
 def settings_base(name):
     low = name.lower()
     if low in SETTINGS_SPECIAL:
@@ -145,12 +201,21 @@ def main():
             print("replace: %s (%d renditions)" % (name, count))
 
     # 2. New alternate icons: unmatched masters cloned from a stock alternate built
-    #    from its own images.
+    #    from its own images, or from a template made in that shape when every stock
+    #    alternate points into a shared atlas.
     def self_contained(n):
         return all(r["content"]["type"] != "link" for r in by_ident.get(facets[n], []))
 
     template = next((n for n in sorted(icon_names)
                      if n != primary and self_contained(n) and "%s-settings" % n in facets), None)
+    pending = [(f, path) for f, path in sorted(overlays.items())
+               if path not in used and os.path.splitext(f)[0] not in facets
+               and "@" not in f and not re.search(r"\d+x\d+", os.path.splitext(f)[0])]
+    made_template = None
+    if pending and not template:
+        made_template = template = synth_template(args.scar, catalog, icon_names, facets, primary)
+        if made_template:
+            print("template: %s, made for %d new icons" % (made_template, len(pending)))
     new_icons = []
     for f, path in sorted(overlays.items()):
         stem = os.path.splitext(f)[0]
@@ -188,6 +253,9 @@ def main():
             print("new icon: %s" % stem)
         with open(os.path.join(catalog, "manifest.json"), "w") as handle:
             json.dump(manifest, handle, indent=2)
+
+    if made_template:
+        drop_assets(catalog, {made_template, "%s-settings" % made_template})
 
     # Stock alternates the pack does not replace stay as Twitter ships them, so its own
     # icons (the Premium ones included) remain in the picker beside the pack's.
