@@ -145,7 +145,7 @@ def main():
             print("replace: %s (%d renditions)" % (name, count))
 
     # 2. New alternate icons: unmatched masters cloned from a stock alternate built
-    #    from its own images, before step 3 drops that template.
+    #    from its own images.
     def self_contained(n):
         return all(r["content"]["type"] != "link" for r in by_ident.get(facets[n], []))
 
@@ -189,19 +189,11 @@ def main():
         with open(os.path.join(catalog, "manifest.json"), "w") as handle:
             json.dump(manifest, handle, indent=2)
 
-    # 3. Drop stock alternates that got no replacement art, plus their
-    #    -settings thumbnails, so the base app's icons don't linger in the
-    #    picker alongside the pack's.
-    drop = {n for n in icon_names if n != primary and n not in themed}
-    drop |= {n for n in facets if settings_base(n) in drop and n not in themed}
-    if drop:
-        gone = {facets[n] for n in drop}
-        manifest["facets"] = [f for f in manifest["facets"] if f["name"] not in drop]
-        manifest["renditions"] = [r for r in manifest["renditions"]
-                                  if r["key"].get("identifier") not in gone]
-        with open(os.path.join(catalog, "manifest.json"), "w") as handle:
-            json.dump(manifest, handle, indent=2)
-        print("dropped: %s" % ", ".join(sorted(drop)))
+    # Stock alternates the pack does not replace stay as Twitter ships them, so its own
+    # icons (the Premium ones included) remain in the picker beside the pack's.
+    kept = sorted(n for n in icon_names if n != primary and n not in themed)
+    if kept:
+        print("kept: %s" % ", ".join(kept))
 
     run_scar(args.scar, "compile", catalog, "--out", args.out_car)
 
