@@ -215,27 +215,8 @@ static CGFloat PFBReportPageHeight(UIViewController* page) {
 static const void* kPFBReportFittedKey = &kPFBReportFittedKey;
 static const void* kPFBReportMostKey = &kPFBReportMostKey;
 
-// The sheet's height in the report while it moves: when a page asks for it, right after, and
-// once the page has settled, for the first moves of a launch.
-static NSUInteger gPFBReportFitMeasured;
-static void PFBReportMeasureFit(UIViewController* page, NSString* moment) {
-    UINavigationController* navigation = page.navigationController;
-    if (gPFBReportFitMeasured >= 12 || !navigation.presentingViewController) {
-        return;
-    }
-    gPFBReportFitMeasured++;
-    PFBCompatMeasure(@"sheet fit",
-                     [NSString stringWithFormat:@"%@ %@: sheet %.0f, page needs %.0f, moving %@",
-                                                NSStringFromClass([page class]), moment,
-                                                CGRectGetHeight(navigation.view.frame), PFBReportPageHeight(page),
-                                                page.transitionCoordinator ? @"yes" : @"no"],
-                     12);
-}
-
 // The stethoscope's sheet takes the height of the page in front again when it changed, up
 // to the most it can take. Pushed in the settings, the report has no sheet of its own.
-// The sheet re-reads its height at its next layout, which waits for the end of a push or a
-// pop: during one, that layout is run at once, inside the animation, so the sheet moves with it.
 static void PFBReportFitSheet(UIViewController* page) {
     UINavigationController* navigation = page.navigationController;
     if (navigation.topViewController != page || !navigation.presentingViewController ||
@@ -256,26 +237,30 @@ static void PFBReportFitSheet(UIViewController* page) {
             [sheet invalidateDetents];
             return;
         }
-        BOOL moving = page.transitionCoordinator != nil;
         [sheet animateChanges:^{
           [sheet invalidateDetents];
-          if (moving) {
-              [sheet.containerView layoutIfNeeded];
-          }
         }];
     }
 }
 
-// A page coming in by a push or a pop takes its height as it starts to slide in, not once it
-// has settled, so the sheet never shows it cut at the height of the page it replaces.
-static void PFBReportFitSheetAlongside(UIViewController* page) {
-    if (!page.transitionCoordinator || page.navigationController.isBeingPresented) {
-        return;
-    }
-    [page.view layoutIfNeeded];
-    PFBReportMeasureFit(page, @"comes in");
-    PFBReportFitSheet(page);
-    PFBReportMeasureFit(page, @"asked");
+// Whether the report shows in the stethoscope's sheet, where its pages swap in place.
+static BOOL PFBReportInSheet(UINavigationController* navigation) {
+    return navigation.presentingViewController != nil &&
+           [navigation.viewControllers.firstObject isKindOfClass:[PFBCompatibilityReportViewController class]];
+}
+
+// In the sheet, a page replaces the one in front by a fade while the sheet takes its height, as
+// the settings sheets swap their steps: iOS holds a sheet's layout until a slide ends, so a
+// slide would show the page cut, then the sheet jump.
+static void PFBReportSwapPage(UINavigationController* navigation, void (^change)(void)) {
+    [UIView transitionWithView:navigation.view
+                      duration:0.25
+                       options:UIViewAnimationOptionTransitionCrossDissolve | UIViewAnimationOptionAllowAnimatedContent
+                    animations:^{
+                      change();
+                      [navigation.view layoutIfNeeded];
+                    }
+                    completion:nil];
 }
 
 // One verdict's options on a page of their own: those not tested, or those working under
@@ -338,12 +323,32 @@ static void PFBReportFitSheetAlongside(UIViewController* page) {
     [self.navigationController setNavigationBarHidden:NO animated:animated];
     [self rebuild];
     [self.tableView reloadData];
-    PFBReportFitSheetAlongside(self);
+    // In the sheet, the way back fades as the way in did, and the edge swipe, which would slide,
+    // is off.
+    UINavigationController* navigation = self.navigationController;
+    if (PFBReportInSheet(navigation)) {
+        navigation.interactivePopGestureRecognizer.enabled = NO;
+        if (!self.navigationItem.leftBarButtonItem) {
+            UIImageSymbolConfiguration* size =
+                [UIImageSymbolConfiguration configurationWithPointSize:17.0 weight:UIImageSymbolWeightSemibold];
+            UIBarButtonItem* back =
+                [[UIBarButtonItem alloc] initWithImage:[UIImage systemImageNamed:@"chevron.backward" withConfiguration:size]
+                                                 style:UIBarButtonItemStylePlain
+                                                target:self
+                                                action:@selector(goBack)];
+            back.tintColor = [UIColor labelColor];
+            back.tag = PFBNativeGlassTag;
+            self.navigationItem.hidesBackButton = YES;
+            self.navigationItem.leftBarButtonItem = back;
+        }
+    }
 }
 
-- (void)viewDidAppear:(BOOL)animated {
-    [super viewDidAppear:animated];
-    PFBReportMeasureFit(self, @"settled");
+- (void)goBack {
+    UINavigationController* navigation = self.navigationController;
+    PFBReportSwapPage(navigation, ^{
+      [navigation popViewControllerAnimated:NO];
+    });
 }
 
 // Left together with the report, by closing the sheet or going back past it, the list
@@ -817,13 +822,11 @@ static NSString* PFBReportReadLine(void) {
     }
     [self rebuild];
     [self.tableView reloadData];
-    PFBReportFitSheetAlongside(self);
 }
 
 // Twitter's tab bar settles once the page is in: the new look's foot is placed again then.
 - (void)viewDidAppear:(BOOL)animated {
     [super viewDidAppear:animated];
-    PFBReportMeasureFit(self, @"settled");
     _footerPlaced = NO;
     [self.view setNeedsLayout];
 }
@@ -1220,7 +1223,14 @@ static NSString* PFBReportReadLine(void) {
                                                                   title:row.title
                                                                    note:note
                                                                  native:self.nativeLook];
-        [self.navigationController pushViewController:list animated:YES];
+        UINavigationController* navigation = self.navigationController;
+        if (PFBReportInSheet(navigation)) {
+            PFBReportSwapPage(navigation, ^{
+              [navigation pushViewController:list animated:NO];
+            });
+        } else {
+            [navigation pushViewController:list animated:YES];
+        }
     } else if (row.kind == PFBReportRowClearAll) {
         [self confirmClearAll];
     } else if (row.kind == PFBReportRowCopy) {
