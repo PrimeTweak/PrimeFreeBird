@@ -330,6 +330,7 @@
 
 /* ===== Padlock / authentication ===== */
 "PADLOCK_LOCKED_LABEL" = "Verrouillé";
+"PADLOCK_UNLOCK_BUTTON" = "Déverrouiller";
 "PADLOCK_REASON" = "Déverrouiller Twitter";
 
 /* ===== Alerts, confirmations & shared labels ===== */
@@ -447,6 +448,8 @@
 "FORCE_FOLLOWING_TAB_DETAIL" = "Garde le dernier onglet choisi au lieu de revenir à Pour vous après 12 heures.";
 "NO_FOCUS_LOST_TITLE" = "Garder votre position";
 "NO_FOCUS_LOST_DETAIL" = "Ne recharge plus le fil quand vous revenez d’une autre app.";
+"NO_JUMP_BACK_HOME_TITLE" = "Mémoriser le dernier écran";
+"NO_JUMP_BACK_HOME_DETAIL" = "Revient à l’écran quitté, pas à l’accueil, après 5 minutes d’absence.";
 "READING_LINE_TITLE" = "Repère de lecture";
 "READING_LINE_DETAIL" = "Marque où vous en étiez sur Abonnements quand de nouveaux Tweets arrivent.";
 "TIMELINES_GROUP_HEADER" = "En-tête";

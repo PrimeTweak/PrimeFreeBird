@@ -203,6 +203,7 @@
 
 /* ===== Padlock / authentication ===== */
 "PADLOCK_LOCKED_LABEL" = "已锁定";
+"PADLOCK_UNLOCK_BUTTON" = "解锁";
 "PADLOCK_REASON" = "解锁 Twitter";
 
 /* ===== Alerts, confirmations & shared labels ===== */

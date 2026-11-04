@@ -10,6 +10,8 @@
 @property (readonly, nonatomic) TFNTwitterAccountModel* model;
 // The second value Twitter's own Liquid Glass gate asks for.
 - (BOOL)isDummyTest1FeatureEnabled;
+// Asked on each return to the app: whether to send the open screen back to Home.
+- (BOOL)shouldJumpBackToHomeWithActiveTimeStamp:(double)active inactiveTimeStamp:(double)inactive;
 @end
 
 @interface TFNTableView : UITableView

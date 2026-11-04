@@ -8,6 +8,7 @@ typedef NS_ENUM(NSInteger, PFBCompatOption) {
     PFBCompat_no_screenshot_detection,
     PFBCompat_force_following_tab,
     PFBCompat_no_focus_lost,
+    PFBCompat_no_jump_back_home,
     PFBCompat_no_tab_bar_hiding,
     PFBCompat_hide_bottom_fade,
     PFBCompat_show_scroll_indicator,

@@ -71,16 +71,38 @@ static UIWindow* padlockWindowForScene(UIWindowScene* scene) {
     label.font = PFBScaledFont([TwitterChirpFont(TwitterFontStyleSemibold) fontWithSize:22]);
     label.textAlignment = NSTextAlignmentCenter;
 
+    // Twitter's primary button: the text color filled, the background's color on it.
+    UIButton* unlock = [UIButton buttonWithType:UIButtonTypeCustom];
+    unlock.translatesAutoresizingMaskIntoConstraints = NO;
+    [unlock setTitle:[[PFBBundle sharedBundle] localizedStringForKey:@"PADLOCK_UNLOCK_BUTTON"]
+            forState:UIControlStateNormal];
+    unlock.titleLabel.font = PFBScaledFont([TwitterChirpFont(TwitterFontStyleBold) fontWithSize:15]);
+    unlock.titleLabel.adjustsFontForContentSizeCategory = YES;
+    unlock.backgroundColor = UIColor.labelColor;
+    [unlock setTitleColor:UIColor.systemBackgroundColor forState:UIControlStateNormal];
+    [unlock setTitleColor:[UIColor.systemBackgroundColor colorWithAlphaComponent:0.6]
+                 forState:UIControlStateHighlighted];
+    unlock.contentEdgeInsets = UIEdgeInsetsMake(0, 24, 0, 24);
+    unlock.layer.cornerRadius = 20;
+    [unlock addAction:[UIAction actionWithHandler:^(__unused UIAction* action) {
+                askToUnlock();
+            }]
+        forControlEvents:UIControlEventTouchUpInside];
+
     [overlay addSubview:icon];
     [overlay addSubview:label];
+    [overlay addSubview:unlock];
 
     [NSLayoutConstraint activateConstraints:@[
         [icon.centerXAnchor constraintEqualToAnchor:overlay.centerXAnchor],
         [icon.centerYAnchor constraintEqualToAnchor:overlay.centerYAnchor
-                                           constant:-20],
+                                           constant:-40],
         [label.centerXAnchor constraintEqualToAnchor:overlay.centerXAnchor],
         [label.topAnchor constraintEqualToAnchor:icon.bottomAnchor
-                                        constant:8]
+                                        constant:8],
+        [unlock.centerXAnchor constraintEqualToAnchor:overlay.centerXAnchor],
+        [unlock.topAnchor constraintEqualToAnchor:label.bottomAnchor constant:20],
+        [unlock.heightAnchor constraintEqualToConstant:40]
     ]];
 
     [root addSubview:overlay];
@@ -247,6 +269,28 @@ static void PFBNativeGlassSettle(void);
         setAuthenticated(NO);
         PFBCOMPAT_ACTION(PFBCompat_padlock, @"locked in the background");
     }
+}
+
+%end
+
+// MARK: - Remember last screen
+
+// Twitter's check, on a return to the app, for sending the open screen back to Home
+// (after five minutes away by default). The option keeps the screen that was open.
+%hook TFNTwitterAccount
+
+- (BOOL)shouldJumpBackToHomeWithActiveTimeStamp:(double)active inactiveTimeStamp:(double)inactive {
+    BOOL jump = %orig;
+    if (![PFBSettings boolForKey:@"no_jump_back_home"]) {
+        PFBCOMPAT_OBSERVE(PFBCompat_no_jump_back_home, @"read by Twitter");
+        return jump;
+    }
+    if (jump) {
+        PFBCOMPAT_ACTION(PFBCompat_no_jump_back_home, @"return to Home held");
+    } else {
+        PFBCOMPAT_OBSERVE(PFBCompat_no_jump_back_home, @"return checked");
+    }
+    return NO;
 }
 
 %end

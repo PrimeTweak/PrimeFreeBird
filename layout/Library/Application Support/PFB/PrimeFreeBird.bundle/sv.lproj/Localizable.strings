@@ -203,6 +203,7 @@
 
 /* ===== Padlock / authentication ===== */
 "PADLOCK_LOCKED_LABEL" = "Låst";
+"PADLOCK_UNLOCK_BUTTON" = "Lås upp";
 "PADLOCK_REASON" = "Lås upp Twitter";
 
 /* ===== Alerts, confirmations & shared labels ===== */

@@ -203,6 +203,7 @@
 
 /* ===== Padlock / authentication ===== */
 "PADLOCK_LOCKED_LABEL" = "ロック中";
+"PADLOCK_UNLOCK_BUTTON" = "ロックを解除";
 "PADLOCK_REASON" = "Twitterのロックを解除";
 
 /* ===== Alerts, confirmations & shared labels ===== */

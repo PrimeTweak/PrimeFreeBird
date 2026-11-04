@@ -203,6 +203,7 @@
 
 /* ===== Padlock / authentication ===== */
 "PADLOCK_LOCKED_LABEL" = "Terkunci";
+"PADLOCK_UNLOCK_BUTTON" = "Buka kunci";
 "PADLOCK_REASON" = "Buka kunci Twitter";
 
 /* ===== Alerts, confirmations & shared labels ===== */

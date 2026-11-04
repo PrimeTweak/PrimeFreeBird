@@ -334,6 +334,7 @@
 
 /* ===== Padlock / authentication ===== */
 "PADLOCK_LOCKED_LABEL" = "Locked";
+"PADLOCK_UNLOCK_BUTTON" = "Unlock";
 "PADLOCK_REASON" = "Unlock Twitter";
 
 /* ===== Alerts, confirmations & shared labels ===== */
@@ -451,6 +452,8 @@
 "FORCE_FOLLOWING_TAB_DETAIL" = "Keep Home on your last tab instead of going back to For you after 12 hours.";
 "NO_FOCUS_LOST_TITLE" = "Keep your place";
 "NO_FOCUS_LOST_DETAIL" = "Don’t refresh the timeline when you come back from another app.";
+"NO_JUMP_BACK_HOME_TITLE" = "Remember last screen";
+"NO_JUMP_BACK_HOME_DETAIL" = "Come back to the screen you left, not Home, after 5 minutes away.";
 "READING_LINE_TITLE" = "Reading marker";
 "READING_LINE_DETAIL" = "Mark where you stopped on Following when new Tweets arrive above.";
 "TIMELINES_GROUP_HEADER" = "Header";

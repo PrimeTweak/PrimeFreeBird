@@ -176,6 +176,7 @@ static NSDictionary<NSString*, NSDictionary*>* PFBSettingsPages(void) {
                     @{@"type": @"header", @"titleKey": @"TIMELINES_GROUP_REFRESH", @"icon": @"reload"},
                     @{@"key": @"force_following_tab", @"default": @YES},
                     @{@"key": @"no_focus_lost", @"default": @NO},
+                    @{@"key": @"no_jump_back_home", @"default": @YES},
                     @{@"key": @"reading_line",
                       @"default": @NO},
                     @{@"type": @"header", @"titleKey": @"TIMELINES_GROUP_HEADER", @"icon": @"timeline_stroke"},

@@ -203,6 +203,7 @@
 
 /* ===== Padlock / authentication ===== */
 "PADLOCK_LOCKED_LABEL" = "مقفل";
+"PADLOCK_UNLOCK_BUTTON" = "فتح القفل";
 "PADLOCK_REASON" = "فتح قفل تويتر";
 
 /* ===== Alerts, confirmations & shared labels ===== */

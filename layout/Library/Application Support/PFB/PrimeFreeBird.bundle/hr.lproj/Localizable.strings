@@ -203,6 +203,7 @@
 
 /* ===== Padlock / authentication ===== */
 "PADLOCK_LOCKED_LABEL" = "Zaključano";
+"PADLOCK_UNLOCK_BUTTON" = "Otključaj";
 "PADLOCK_REASON" = "Otključaj Twitter";
 
 /* ===== Alerts, confirmations & shared labels ===== */

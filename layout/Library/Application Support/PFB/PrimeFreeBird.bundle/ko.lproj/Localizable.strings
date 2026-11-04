@@ -203,6 +203,7 @@
 
 /* ===== Padlock / authentication ===== */
 "PADLOCK_LOCKED_LABEL" = "잠김";
+"PADLOCK_UNLOCK_BUTTON" = "잠금 해제";
 "PADLOCK_REASON" = "트위터 잠금 해제";
 
 /* ===== Alerts, confirmations & shared labels ===== */

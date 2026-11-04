@@ -203,6 +203,7 @@
 
 /* ===== Padlock / authentication ===== */
 "PADLOCK_LOCKED_LABEL" = "Gesperrt";
+"PADLOCK_UNLOCK_BUTTON" = "Entsperren";
 "PADLOCK_REASON" = "Twitter entsperren";
 
 /* ===== Alerts, confirmations & shared labels ===== */

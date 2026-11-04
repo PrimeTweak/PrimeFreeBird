@@ -203,6 +203,7 @@
 
 /* ===== Padlock / authentication ===== */
 "PADLOCK_LOCKED_LABEL" = "Заблокировано";
+"PADLOCK_UNLOCK_BUTTON" = "Разблокировать";
 "PADLOCK_REASON" = "Разблокировать Twitter";
 
 /* ===== Alerts, confirmations & shared labels ===== */

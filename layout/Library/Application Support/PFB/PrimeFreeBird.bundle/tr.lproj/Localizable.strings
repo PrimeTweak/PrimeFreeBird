@@ -203,6 +203,7 @@
 
 /* ===== Padlock / authentication ===== */
 "PADLOCK_LOCKED_LABEL" = "Kilitli";
+"PADLOCK_UNLOCK_BUTTON" = "Kilidi aç";
 "PADLOCK_REASON" = "Twitter’ın kilidini aç";
 
 /* ===== Alerts, confirmations & shared labels ===== */

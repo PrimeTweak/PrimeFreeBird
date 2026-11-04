@@ -208,6 +208,7 @@
 
 /* ===== Padlock / authentication ===== */
 "PADLOCK_LOCKED_LABEL" = "Bloqueado";
+"PADLOCK_UNLOCK_BUTTON" = "Desbloquear";
 "PADLOCK_REASON" = "Desbloquear Twitter";
 
 /* ===== Alerts, confirmations & shared labels ===== */
