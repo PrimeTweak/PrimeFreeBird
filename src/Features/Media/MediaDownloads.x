@@ -41,42 +41,13 @@ static NSArray* DMVideoEntities(UIView* attachmentView) {
 
 static NSURL* gPFBLastVoiceURL = nil;
 
-// When a tap last reached a voice note, and any message, in a conversation.
+// When a tap last reached a voice note in a conversation.
 static CFAbsoluteTime gPFBVoiceTapAt = 0;
-static CFAbsoluteTime gPFBMessageTapAt = 0;
 
 // The voice note view last tapped, and whether the next file opened is still its to claim.
 static __weak UIView* gPFBTappedVoiceView;
 static BOOL gPFBVoiceClaimOpen = NO;
 static const void* kPFBVoiceFileKey = &kPFBVoiceFileKey;
-
-// How long ago a tap came, in steps; nil past 30 s.
-static NSString* PFBSinceTap(CFAbsoluteTime now, CFAbsoluteTime tapAt) {
-    CFAbsoluteTime since = now - tapAt;
-    return since < 1 ? @"under 1 s" : since < 5 ? @"1 to 5 s" : since < 30 ? @"5 to 30 s" : nil;
-}
-
-// For the report: a decrypted file's place under decrypted-media-v2, each name given by its
-// length, the thread opening it and how long after a tap it came.
-static void PFBNoteDecryptedFile(NSURL* url) {
-    NSString* inside = [url.path componentsSeparatedByString:@"/decrypted-media-v2/"].lastObject;
-    NSMutableArray<NSString*>* parts = [NSMutableArray array];
-    for (NSString* part in inside.pathComponents) {
-        NSString* stem = [NSString stringWithFormat:@"#%lu", (unsigned long)part.stringByDeletingPathExtension.length];
-        [parts addObject:part.pathExtension.length ? [stem stringByAppendingFormat:@".%@", part.pathExtension] : stem];
-    }
-    CFAbsoluteTime now = CFAbsoluteTimeGetCurrent();
-    NSString* voice = PFBSinceTap(now, gPFBVoiceTapAt);
-    NSString* message = PFBSinceTap(now, gPFBMessageTapAt);
-    NSString* when = voice     ? [voice stringByAppendingString:@" after a voice note tap"]
-                     : message ? [message stringByAppendingString:@" after a message tap"]
-                               : @"no tap in the 30 s before";
-    NSString* line = [NSString stringWithFormat:@"%@ · %@ · %@", [parts componentsJoinedByString:@"/"],
-                                                NSThread.isMainThread ? @"main thread" : @"other thread", when];
-    dispatch_async(dispatch_get_main_queue(), ^{
-        PFBCompatMeasure(@"voice notes", line, 8);
-    });
-}
 
 // The file opened becomes the last one, and the tapped note's own when it opens within
 // 5 s of the tap.
@@ -94,7 +65,6 @@ static void PFBKeepVoiceFile(NSURL* url) {
 - (id)initWithURL:(NSURL*)url options:(NSDictionary*)options {
     if ([url.path containsString:@"/decrypted-media-v2/"]) {
         PFBCompatReach(PFBCompatPath_played_voice_note);
-        PFBNoteDecryptedFile(url);
         dispatch_async(dispatch_get_main_queue(), ^{
             PFBKeepVoiceFile(url);
         });
@@ -126,8 +96,7 @@ static UIView* PFBShownVoiceView(UIView* view, NSInteger depth) {
     return nil;
 }
 
-// A tap on a voice note without a file of its own lets it claim the next file opened; every
-// tap on a voice note or a message is timed for the decrypted file lines.
+// A tap on a voice note without a file of its own lets it claim the next file opened.
 %hook _TtC16ChatConversation26MessageAttachmentStackView
 
 - (void)handleTap:(UITapGestureRecognizer*)recognizer {
@@ -138,15 +107,6 @@ static UIView* PFBShownVoiceView(UIView* view, NSInteger depth) {
         gPFBTappedVoiceView = voice;
         gPFBVoiceClaimOpen = PFBVoiceOwnFile(voice) == nil;
     }
-    %orig;
-}
-
-%end
-
-%hook _TtC16ChatConversation18MessageContentView
-
-- (void)handleCellTap {
-    gPFBMessageTapAt = CFAbsoluteTimeGetCurrent();
     %orig;
 }
 

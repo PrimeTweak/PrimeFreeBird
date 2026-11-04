@@ -78,8 +78,8 @@ SYNTH_TEMPLATE = "PrimeFreeBird-Icon-Template"
 
 def synth_template(scar, catalog, icon_names, facets, primary):
     """Clones a stock alternate whose renditions point into a shared atlas, then turns the
-    clone into one 1024 px image per idiom under a multisize stub, the shape a self-contained
-    alternate had before the app moved its icons to atlases. Returns its name, or None."""
+    clone into a self-contained alternate: one 1024 px image per idiom under a multisize
+    stub. Returns its name, or None."""
     base = next((n for n in sorted(icon_names)
                  if n != primary and "%s-settings" % n in facets), None)
     if not base:

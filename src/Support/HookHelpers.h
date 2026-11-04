@@ -59,9 +59,6 @@ void PFBApplyHideCustomTimelinesSetting(void);
 
 // Runs the timeline filter again on the timelines already on screen (Timeline.x).
 void pfbReapplyTimelineFilter(void);
-// When the timeline filter last ran on sections handed to a list on screen; 0 before the
-// first (Timeline.x).
-CFAbsoluteTime pfbLastTimelineDelivery(void);
 
 // The hidden-conversation registry, and taking one entry out of it (HiddenThreads.x).
 NSArray<NSDictionary*>* PFBHiddenThreads(void);

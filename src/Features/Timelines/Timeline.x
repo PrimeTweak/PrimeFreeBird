@@ -269,39 +269,6 @@ static BOOL pfbScrollViewIsTweakPage(UIScrollView* scrollView) {
     return tweak;
 }
 
-// A top effect's style by name, as iOS gives each style its own object.
-static NSString* pfbEdgeStyleName(id style) {
-    Class styleClass = NSClassFromString(@"UIScrollEdgeEffectStyle");
-    for (NSString* name in @[ @"soft", @"hard", @"automatic" ]) {
-        SEL selector = NSSelectorFromString([name stringByAppendingString:@"Style"]);
-        if (style && [styleClass respondsToSelector:selector] &&
-            [style isEqual:((id (*)(id, SEL))objc_msgSend)(styleClass, selector)]) {
-            return name;
-        }
-    }
-    return style ? [@"other " stringByAppendingString:NSStringFromClass([style class])] : @"none";
-}
-
-// A settings list's top effect in the report: whose list, its style, whether it shows.
-static void pfbMeasureSettingsEdge(UIScrollView* scrollView, id effect) {
-    NSString* name = nil;
-    for (UIViewController* vc = PFBOwningController(scrollView); vc && !name; vc = vc.parentViewController) {
-        if ([NSStringFromClass([vc class]) containsString:@"Settings"]) {
-            name = NSStringFromClass([vc class]);
-        }
-    }
-    if (!name) {
-        return;
-    }
-    id style = [effect respondsToSelector:@selector(style)] ? [effect performSelector:@selector(style)] : nil;
-    BOOL hidden = [effect respondsToSelector:@selector(isHidden)] &&
-                  ((BOOL (*)(id, SEL))objc_msgSend)(effect, @selector(isHidden));
-    PFBCompatMeasure(@"settings top edge",
-                     [NSString stringWithFormat:@"%@ · %@ · style %@ · %@", name, NSStringFromClass([scrollView class]),
-                                                pfbEdgeStyleName(style), hidden ? @"hidden" : @"shown"],
-                     12);
-}
-
 static id pfbTopEdgeEffect(UIScrollView* scrollView) {
     SEL edge = NSSelectorFromString(@"topEdgeEffect");
     if (![scrollView respondsToSelector:edge]) {
@@ -375,10 +342,6 @@ static BOOL pfbScrollViewIsModal(UIScrollView* scrollView) {
             pfbApplyTweakPageEdge(self, YES);
         } else if (self.window && !pfbScrollViewIsModal(self)) {
             pfbApplyEdgeEffect(self, pfbEdgeHideEnabled());
-        }
-        SEL edge = NSSelectorFromString(@"topEdgeEffect");
-        if (self.window && [self respondsToSelector:edge]) {
-            pfbMeasureSettingsEdge(self, ((id (*)(id, SEL))objc_msgSend)(self, edge));
         }
     } @catch (id exception) {
     }
@@ -512,22 +475,6 @@ static NSString* CarouselScribeComponent(id viewModel) {
     SEL selector = NSSelectorFromString(@"component");
     id value = [info respondsToSelector:selector] ? ((id (*)(id, SEL))objc_msgSend)(info, selector) : nil;
     return [value isKindOfClass:[NSString class]] ? value : nil;
-}
-
-// The first carousels of a launch removed from a profile without Twitter's Who to follow
-// mark, one report line per component.
-static void PFBNoteProfileCarousel(id viewModel) {
-    static NSMutableSet<NSString*>* components;
-    if (components.count >= 3) {
-        return;
-    }
-    NSString* component = CarouselScribeComponent(viewModel) ?: @"no component";
-    if ([component isEqualToString:@"suggest_who_to_follow"] || [components containsObject:component]) {
-        return;
-    }
-    components = components ?: [NSMutableSet set];
-    [components addObject:component];
-    PFBCompatMeasure(@"profile carousels", [@"carousel removed in a profile: " stringByAppendingString:component], 3);
 }
 
 // Tweets a topic brought in carry Twitter's own label for it, "From <topic>" in
@@ -1140,7 +1087,6 @@ static BOOL ShouldHideTimelineItem(id item, const PFBTimelinePass* pass) {
 
     if (pass->hideWhoToFollow && pass->inProfile &&
         [className isEqualToString:@"T1TwitterSwift.URTTimelineCarouselViewModel"]) {
-        PFBNoteProfileCarousel(viewModel);
         PFBCOMPAT_ACTION(PFBCompat_hide_who_to_follow, @"profile suggestions hidden");
         return YES;
     }
@@ -1877,18 +1823,8 @@ static BOOL PFBTimelineFiltersNeedObservation(void) {
            PFBCompatNeedsObservation(PFBCompat_filter_languages);
 }
 
-// When a list on screen was last handed sections, read by the Filters screen.
-static CFAbsoluteTime gPFBLastTimelineDelivery = 0;
-
-CFAbsoluteTime pfbLastTimelineDelivery(void) {
-    return gPFBLastTimelineDelivery;
-}
-
 static NSArray* FilteredTimelineSections(TFNItemsDataViewController* dataViewController,
                                          NSArray* sections) {
-    if (dataViewController.viewIfLoaded.window) {
-        gPFBLastTimelineDelivery = CFAbsoluteTimeGetCurrent();
-    }
     PFBTimelinePass pass = {0};
     pass.hideWhoToFollow = [PFBSettings boolForKey:@"hide_who_to_follow"];
     pass.hidePrompts = [PFBSettings boolForKey:@"hide_timeline_prompts"];

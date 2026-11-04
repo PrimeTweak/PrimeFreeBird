@@ -310,20 +310,6 @@ static BOOL gPFBSplashRevealing = NO;
         UIImage* bird = PFBBundlePDFImage(@"LaunchTwitterBird.pdf", CGSizeMake(180, 180), 1.0);
         if (bird) {
             PFBCOMPAT_ACTION(PFBCompat_launch_screen, @"bird shown");
-            static NSUInteger told;
-            if (gPFBSplashRevealing && told < 4) {
-                told++;
-                NSArray<NSString*>* stack = [NSThread callStackSymbols];
-                NSString* caller = stack.count > 1 ? stack[1] : @"?";
-                NSRange start = [caller rangeOfString:@"0x"];
-                if (start.location != NSNotFound) {
-                    caller = [caller substringFromIndex:start.location];
-                }
-                PFBCompatMeasure(@"launch screen",
-                                 [@"bird image asked after the launch screen by "
-                                     stringByAppendingString:caller.length > 90 ? [caller substringToIndex:90] : caller],
-                                 2);
-            }
             return bird;
         }
     }

@@ -30,8 +30,6 @@ static const void* kPFBGlassToastSurfaceKey = &kPFBGlassToastSurfaceKey;
 static const void* kPFBGlassToastTwitterLookKey = &kPFBGlassToastTwitterLookKey;
 static const void* kPFBGlassToastArrangedKey = &kPFBGlassToastArrangedKey;
 static const void* kPFBGlassToastSideKey = &kPFBGlassToastSideKey;
-static NSUInteger gPFBGlassToastsMeasured;
-static CGFloat gPFBGlassToastTwitterWidth;
 
 static BOOL PFBGlassToastsOn(void) {
     return [PFBSettings boolForKey:@"glass_toasts"];
@@ -288,85 +286,6 @@ static void PFBGlassToastRestore(UIView* container, UIView* surface) {
     }
 }
 
-static NSString* PFBGlassToastColorText(UIColor* color) {
-    CGFloat r = 0, g = 0, b = 0, a = 0;
-    if (![color getRed:&r green:&g blue:&b alpha:&a]) {
-        return color ? @"pattern" : @"none";
-    }
-    return [NSString stringWithFormat:@"#%02X%02X%02X/%.2f", (int)lround(r * 255), (int)lround(g * 255),
-                                      (int)lround(b * 255), a];
-}
-
-static void PFBGlassToastDescribe(NSMutableString* text, UIView* view, NSInteger depth) {
-    [text appendFormat:@"\n%@%@ %.0f,%.0f %.0fx%.0f", [@"" stringByPaddingToLength:depth * 2 withString:@" " startingAtIndex:0],
-                       NSStringFromClass([view class]), CGRectGetMinX(view.frame), CGRectGetMinY(view.frame),
-                       CGRectGetWidth(view.frame), CGRectGetHeight(view.frame)];
-    if (view.hidden) {
-        [text appendString:@" hidden"];
-    }
-    if (view.alpha < 1) {
-        [text appendFormat:@" alpha %.2f", view.alpha];
-    }
-    if (view.layer.opacity < 1) {
-        [text appendFormat:@" opacity %.2f", view.layer.opacity];
-    }
-    if (view.layer.cornerRadius > 0) {
-        [text appendFormat:@" radius %.0f", view.layer.cornerRadius];
-    }
-    if (view.clipsToBounds || view.layer.masksToBounds) {
-        [text appendString:@" clips"];
-    }
-    if (view.layer.mask || view.maskView) {
-        [text appendString:@" mask"];
-    }
-    if (view.layer.filters.count || view.layer.compositingFilter) {
-        [text appendString:@" filters"];
-    }
-    if (view.backgroundColor) {
-        [text appendFormat:@" bg %@", PFBGlassToastColorText(view.backgroundColor)];
-    }
-    if ([view isKindOfClass:[UIVisualEffectView class]]) {
-        [text appendFormat:@" effect %@", NSStringFromClass([((UIVisualEffectView*)view).effect class])];
-    }
-    if ([view isKindOfClass:[UILabel class]]) {
-        [text appendFormat:@" \"%@\"", ((UILabel*)view).text ?: @""];
-    }
-}
-
-// The drawn capsule in the report, for the first toasts of a launch: the views above it up to the
-// window, then each of its layers, recorded at once.
-static void PFBGlassToastMeasure(UIView* container) {
-    if (gPFBGlassToastsMeasured >= 3 || !container.window) {
-        return;
-    }
-    gPFBGlassToastsMeasured++;
-    UIView* content = PFBGlassToastContentIn(container);
-    NSMutableString* text = [NSMutableString
-        stringWithFormat:@"Liquid Glass %@ · capsule %.0fx%.0f at %.0f,%.0f · Twitter's width %.0f · side room %@",
-                         PFBShowcaseUsesGlass() ? @"on" : @"off", CGRectGetWidth(container.frame),
-                         CGRectGetHeight(container.frame), CGRectGetMinX(container.frame),
-                         CGRectGetMinY(container.frame), gPFBGlassToastTwitterWidth,
-                         objc_getAssociatedObject(content, kPFBGlassToastSideKey) ?: @"not set"];
-    [text appendString:@"\nabove:"];
-    for (UIView* view = container.superview; view; view = view.superview) {
-        PFBGlassToastDescribe(text, view, 1);
-    }
-    [text appendString:@"\ncapsule:"];
-    NSMutableArray<NSArray*>* stack = [NSMutableArray arrayWithObject:@[ container, @1 ]];
-    while (stack.count) {
-        UIView* view = stack.lastObject[0];
-        NSInteger depth = [stack.lastObject[1] integerValue];
-        [stack removeLastObject];
-        PFBGlassToastDescribe(text, view, depth);
-        if (depth < 9 && ![view isKindOfClass:[UILabel class]] && ![view isKindOfClass:[UIButton class]]) {
-            for (UIView* child in view.subviews.reverseObjectEnumerator) {
-                [stack addObject:@[ child, @(depth + 1) ]];
-            }
-        }
-    }
-    PFBCompatMeasure([NSString stringWithFormat:@"glass toast %lu", (unsigned long)gPFBGlassToastsMeasured], text, 2);
-}
-
 // The container drawn as the capsule: the glass behind everything, Twitter's chrome put away,
 // the corners round. With the option off, Twitter's look comes back.
 static void PFBGlassToastDress(UIView* container, BOOL styled) {
@@ -429,9 +348,6 @@ static void PFBGlassToastDress(UIView* container, BOOL styled) {
                 container.frame = frame;
             }
         }
-        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.6 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
-          PFBGlassToastMeasure(container);
-        });
     }
     PFBCOMPAT_ACTION(PFBCompat_glass_toasts, @"toast drawn as the glass capsule");
 }
@@ -440,7 +356,6 @@ static void PFBGlassToastDress(UIView* container, BOOL styled) {
 
 - (double)_tfn_toastWidth {
     double width = %orig;
-    gPFBGlassToastTwitterWidth = width;
     if (!PFBGlassToastsOn() || ![self respondsToSelector:@selector(_tfn_toastHorizontalPlacementBounds)]) {
         return width;
     }

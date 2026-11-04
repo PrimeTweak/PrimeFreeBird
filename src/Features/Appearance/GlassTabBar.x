@@ -735,15 +735,12 @@ static NSString* PFBGlassConfigBytes(const uint8_t* bytes) {
     return text;
 }
 
-// Whether Twitter's configuration is the larger one of 12.40 on, where the word at 8 no longer
-// holds the bar style.
+// Whether Twitter's configuration is the larger layout, where the word at 8 is not the bar style.
 static BOOL gPFBGlassConfigLarge;
 
 // Confirms the collapse-mode bytes sit where the patch writes, by their fingerprint in Twitter's
-// four static configurations: the top bar's mode at byte 0, the tab bar's at byte 1 (0 in every
-// one), and in the smaller configuration the style word at 8. A later build that moves them fails
-// this, so the patch stays off rather than writing into the wrong field; a larger configuration
-// has the bytes of all four read into the report.
+// four static configurations: top bar mode at byte 0, tab bar mode at 1, and in the smaller
+// layout the style word at 8. A mismatch keeps the patch off.
 static BOOL PFBGlassConfigLayoutVerified(void) {
     static BOOL verified;
     static dispatch_once_t once;
@@ -776,10 +773,9 @@ static BOOL PFBGlassConfigLayoutVerified(void) {
           uintptr_t word = 0;
           memcpy(&word, bytes + 8, sizeof(word));
           BOOL match = bytes[0] == navBar[i] && bytes[1] == 0 && (gPFBGlassConfigLarge || word == style[i]);
-          if (!match || gPFBGlassConfigLarge) {
+          if (!match) {
               PFBCompatMeasure(@"always visible",
-                               [NSString stringWithFormat:@"%s %@: %@", names[i], match ? @"matches" : @"does not match",
-                                                          PFBGlassConfigBytes(bytes)],
+                               [NSString stringWithFormat:@"%s does not match: %@", names[i], PFBGlassConfigBytes(bytes)],
                                8);
           }
           matches = matches && match;
@@ -804,11 +800,6 @@ static ptrdiff_t PFBGlassAppliedConfigurationOffset(void) {
       // Twitter's own configurations still puts the patched bytes in place.
       if (size == 40 || size == 48 || (size > 48 && PFBGlassConfigLayoutVerified())) {
           offset = ivar_getOffset(applied);
-      }
-      if (offset >= 0 && size > 48) {
-          PFBCompatMeasure(@"always visible",
-                           [NSString stringWithFormat:@"patch on: applied configuration is %td bytes, fingerprint matches", size],
-                           6);
       }
       if (offset < 0 || !PFBGlassConfigLayoutVerified()) {
           PFBCompatMeasure(@"always visible",

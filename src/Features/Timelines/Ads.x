@@ -40,18 +40,6 @@ static BOOL ScribeItemIsPromoted(id item) {
            scribeItem[@"promoted_id"] != nil;
 }
 
-// Where the first carousels of a launch appear, one line per list location.
-static void NoteCarouselLocation(NSString* location) {
-    static NSMutableSet<NSString*>* locations;
-    NSString* place = location.length ? location : @"no location";
-    if (locations.count >= 3 || [locations containsObject:place]) {
-        return;
-    }
-    locations = locations ?: [NSMutableSet set];
-    [locations addObject:place];
-    PFBCompatMeasure(@"carousels", [@"carousel in a list at " stringByAppendingString:place], 3);
-}
-
 static BOOL ShouldHideItem(id item, NSString* location) {
     item = PFBUnwrapDataViewItem(item);
     NSString* className = NSStringFromClass([item classForCoder]);
@@ -91,9 +79,6 @@ static BOOL ShouldHideItem(id item, NSString* location) {
         PFBCOMPAT_OBSERVE(PFBCompat_hide_timeline_prompts, @"message card found");
     }
 
-    if ([className isEqualToString:@"T1TwitterSwift.URTTimelineCarouselViewModel"]) {
-        NoteCarouselLocation(location);
-    }
     if (PFBCompatNeedsObservation(PFBCompat_hide_trend_videos) &&
         ![PFBSettings boolForKey:@"hide_trend_videos"] && [location isEqualToString:@"OTHER"] &&
         [className isEqualToString:@"T1TwitterSwift.URTTimelineCarouselViewModel"]) {
