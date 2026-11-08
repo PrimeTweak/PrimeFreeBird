@@ -1,0 +1,1134 @@
+// Branding: Twitter terminology, the new Tweets pill and the classic compose button.
+
+#import "Support/HookHelpers.h"
+
+// Defined in Theme.x.
+extern UIImage* PFBWhiteBakedGlyph(UIImage* image);
+extern char PFBConfirmGlyphTag;
+extern NSInteger PFBThemeScreenCount;
+extern BOOL PFBAccentIsActive(void);
+
+// MARK: - Restore Twitter terminology
+
+// Word replacements come from the bundle's RenameWords.strings, per language, with no
+// fallback to English rules.
+
+static NSDictionary<NSString*, NSString*>* RenameTable(NSString* name) {
+    NSBundle* bundle = [PFBBundle sharedBundle].mainBundle;
+    NSString* appLanguage =
+        [[NSBundle mainBundle] preferredLocalizations].firstObject ?: @"en";
+    NSString* localization =
+        [NSBundle preferredLocalizationsFromArray:bundle.localizations
+                                   forPreferences:@[appLanguage]]
+            .firstObject;
+
+    // preferredLocalizationsFromArray: falls back to en when nothing matches, so
+    // reject a mismatch: unsupported languages skip renaming, not get English
+    // rules.
+    NSString* appCode =
+        [appLanguage componentsSeparatedByString:@"-"].firstObject;
+    NSString* lprojCode =
+        [[localization stringByReplacingOccurrencesOfString:@"_" withString:@"-"]
+            componentsSeparatedByString:@"-"]
+            .firstObject;
+    if (![appCode isEqualToString:lprojCode]) {
+        return @{};
+    }
+
+    NSString* path = [bundle pathForResource:name
+                                      ofType:@"strings"
+                                 inDirectory:nil
+                             forLocalization:localization];
+    NSString* contents =
+        path ? [NSString stringWithContentsOfFile:path
+                                         encoding:NSUTF8StringEncoding
+                                            error:nil]
+             : nil;
+    NSDictionary* table = [contents propertyListFromStringsFileFormat];
+    return [table isKindOfClass:[NSDictionary class]] ? table : @{};
+}
+
+static NSDictionary<NSString*, NSString*>* TwitterWordMap(void) {
+    static NSDictionary* map = nil;
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        map = RenameTable(@"RenameWords");
+    });
+    return map;
+}
+
+// Builds a case-insensitive \b(word|word…)\b from the map keys, longest first
+// so inflections win over their stems. Exact case for uppercase-bearing keys is
+// enforced per match in RenameEdits, so lowercase "x" never becomes "Twitter".
+static NSRegularExpression* RenameRegex(void) {
+    NSMutableArray<NSString*>* words = [NSMutableArray array];
+    for (NSString* word in TwitterWordMap()) {
+        [words addObject:[NSRegularExpression escapedPatternForString:word]];
+    }
+    if (words.count == 0) {
+        return nil;
+    }
+
+    [words sortUsingComparator:^NSComparisonResult(NSString* a, NSString* b) {
+        if (a.length > b.length)
+            return NSOrderedAscending;
+        if (a.length < b.length)
+            return NSOrderedDescending;
+        return [a compare:b];
+    }];
+    NSString* pattern = [NSString
+        stringWithFormat:@"\\b(%@)\\b", [words componentsJoinedByString:@"|"]];
+    return [NSRegularExpression
+        regularExpressionWithPattern:pattern
+                             options:NSRegularExpressionCaseInsensitive
+                               error:nil];
+}
+
+// Applies the capitalization style of `token` (all-caps or leading-capital) to
+// `base`.
+static NSString* MatchCapitalisation(NSString* token, NSString* base) {
+    if (token.length == 0 || base.length == 0) {
+        return base;
+    }
+
+    NSString* lower = token.lowercaseString;
+    if (token.length > 1 && [token isEqualToString:token.uppercaseString] &&
+        ![token isEqualToString:lower]) {
+        return base.uppercaseString;
+    }
+
+    unichar first = [token characterAtIndex:0];
+    if ([[NSCharacterSet uppercaseLetterCharacterSet] characterIsMember:first]) {
+        return [base stringByReplacingCharactersInRange:NSMakeRange(0, 1)
+                                             withString:[base substringToIndex:1]
+                                                            .uppercaseString];
+    }
+    return base;
+}
+
+// Returns the edits (@"range" -> NSValue, @"repl" -> NSString) in ascending,
+// non-overlapping order — apply them back-to-front. Nil when nothing changes.
+static NSArray<NSDictionary*>* RenameEdits(NSString* input) {
+    if (input.length == 0) {
+        return nil;
+    }
+
+    static NSRegularExpression* regex = nil;
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        regex = RenameRegex();
+    });
+    if (!regex) {
+        return nil;
+    }
+
+    NSDictionary* wordMap = TwitterWordMap();
+    NSRange full = NSMakeRange(0, input.length);
+    NSMutableArray<NSDictionary*>* edits = [NSMutableArray array];
+
+    for (NSTextCheckingResult* match in [regex matchesInString:input
+                                                       options:0
+                                                         range:full]) {
+        // The first half of a compound ("post-season") is not the word itself.
+        NSUInteger after = NSMaxRange(match.range);
+        if (after < input.length && [input characterAtIndex:after] == '-') {
+            continue;
+        }
+        NSString* token = [input substringWithRange:match.range];
+        // Exact key wins; otherwise fall back to the lowercase key and copy the
+        // token's capitalization. A lowercase hit on an uppercase-only key is left
+        // alone.
+        NSString* repl = wordMap[token];
+        if (!repl) {
+            NSString* base = wordMap[token.lowercaseString];
+            repl = base ? MatchCapitalisation(token, base) : nil;
+        }
+        if (repl) {
+            [edits addObject:@{
+                @"range": [NSValue valueWithRange:match.range],
+                @"repl": repl
+            }];
+        }
+    }
+
+    return edits.count > 0 ? edits : nil;
+}
+
+static NSString* RestoreTwitterTerminology(NSString* input) {
+    // Memoized: labels re-set the same handful of strings over and over.
+    static NSCache<NSString*, NSString*>* cache = nil;
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        cache = [NSCache new];
+    });
+
+    NSString* cached = [cache objectForKey:input];
+    if (cached) {
+        return cached;
+    }
+
+    NSArray<NSDictionary*>* edits = RenameEdits(input);
+    NSString* output = input;
+    if (edits) {
+        NSMutableString* result = [input mutableCopy];
+        for (NSDictionary* edit in edits.reverseObjectEnumerator) {
+            [result replaceCharactersInRange:[edit[@"range"] rangeValue]
+                                  withString:edit[@"repl"]];
+        }
+        output = [result copy];
+        PFBCOMPAT_ACTION(PFBCompat_restore_twitter_names, @"string renamed");
+    }
+
+    [cache setObject:output forKey:input];
+    return output;
+}
+
+static NSAttributedString* RestoreTwitterAttributed(NSAttributedString* input) {
+    NSArray<NSDictionary*>* edits = RenameEdits(input.string);
+    if (!edits) {
+        return input;
+    }
+
+    NSMutableAttributedString* result = [input mutableCopy];
+    for (NSDictionary* edit in edits.reverseObjectEnumerator) {
+        NSRange range = [edit[@"range"] rangeValue];
+        NSDictionary* attrs = [result attributesAtIndex:range.location
+                                         effectiveRange:NULL];
+        NSAttributedString* piece =
+            [[NSAttributedString alloc] initWithString:edit[@"repl"]
+                                            attributes:attrs];
+        [result replaceCharactersInRange:range withAttributedString:piece];
+    }
+    return result;
+}
+
+// Text filled in after the lookup the NSBundle hook sees, such as a plural format,
+// in Twitter's terminology when the option is on.
+NSString* PFBTwitterTerminology(NSString* text) {
+    return text.length && [PFBSettings boolForKey:@"restore_twitter_names"] ? RestoreTwitterTerminology(text) : text;
+}
+
+// MARK: - Rename localized strings
+
+// Every UI string routes through this Foundation method, so the rename applies
+// broadly. PFBBundle's own bundles are skipped so their strings are not reprocessed.
+%hook NSBundle
+- (NSString*)localizedStringForKey:(NSString*)key
+                             value:(NSString*)value
+                             table:(NSString*)tableName {
+    NSString* result = %orig;
+    if (![PFBSettings boolForKey:@"restore_twitter_names"]) {
+        if (PFBCompatNeedsObservation(PFBCompat_restore_twitter_names) &&
+            self != [PFBBundle sharedBundle].mainBundle && self != [PFBBundle sharedBundle].englishBundle) {
+            PFBCOMPAT_OBSERVE(PFBCompat_restore_twitter_names, @"read by Twitter");
+        }
+        return result;
+    }
+    PFBBundle* own = [PFBBundle sharedBundle];
+    if (self == own.mainBundle || self == own.englishBundle) {
+        return result;
+    }
+
+    // A plural format carries its forms with it, which a renamed copy loses, and two keys
+    // can share one format, which the memo below would mix up: it is left as it is.
+    if ([result containsString:@"%#@"]) {
+        return result;
+    }
+    return result.length > 0 ? RestoreTwitterTerminology(result) : result;
+}
+%end
+
+// MARK: - Rename server-composed text
+
+// The view holds people's own words: a Tweet body, a bio, a draft or a link card.
+static BOOL PFBTextViewHoldsOwnWords(UIView* view) {
+    static NSArray<Class>* containers;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+        NSMutableArray<Class>* found = [NSMutableArray array];
+        for (NSString* name in @[
+                 @"T1ProfileUserInfoView", @"T1UserView", @"T1UserRecommendationView",
+                 @"T1TweetDraftsDraftCompositionView", @"T1WebCardView"
+             ]) {
+            Class container = NSClassFromString(name);
+            if (container) {
+                [found addObject:container];
+            }
+        }
+        containers = found.copy;
+    });
+    if ([view isKindOfClass:%c(TTAStatusBodyAttributedTextView)]) {
+        return YES;
+    }
+    UIView* node = view.superview;
+    for (NSInteger up = 0; node && up < 6; up++, node = node.superview) {
+        for (Class container in containers) {
+            if ([node isKindOfClass:container]) {
+                return YES;
+            }
+        }
+    }
+    return NO;
+}
+
+// TFNAttributedTextView renders text carrying no localization key, out of the NSBundle
+// hook's reach. The new string is set on the model received, which keeps its line limit
+// and its trailing "more" text.
+%hook TFNAttributedTextView
+- (void)setTextModel:(TFNAttributedTextModel*)model {
+    NSAttributedString* source = [model respondsToSelector:@selector(attributedString)] ? model.attributedString : nil;
+    if (source.length == 0) {
+        %orig(model);
+        return;
+    }
+    if (![PFBSettings boolForKey:@"restore_twitter_names"]) {
+        PFBCOMPAT_OBSERVE(PFBCompat_restore_twitter_names, @"server text shown");
+        %orig(model);
+        return;
+    }
+    if ([model respondsToSelector:@selector(setAttributedString:)] && !PFBTextViewHoldsOwnWords(self)) {
+        NSAttributedString* renamed = RestoreTwitterAttributed(source);
+        if (renamed != source) {
+            [model setAttributedString:renamed];
+            PFBCOMPAT_ACTION(PFBCompat_restore_twitter_names, @"text renamed");
+        }
+    }
+    %orig(model);
+}
+%end
+
+// MARK: - Label the "new posts" refresh pill
+
+// The facepile pill variant hardcodes blank text. The label is shipped in the app's
+// terminology and routed through the rename pipeline, so it converts per-language.
+static NSString* PillLabelText(void) {
+    NSString* label =
+        [[PFBBundle sharedBundle] localizedStringForKey:@"REFRESH_PILL_TEXT"];
+    if ([PFBSettings boolForKey:@"restore_twitter_names"]) {
+        label = RestoreTwitterTerminology(label);
+    }
+    return label;
+}
+
+%hook TUIUpdateIndicator
+
+// Hide new Tweets pill: the indicator is refused the pill before it builds one.
+- (BOOL)_canShowPillForContentNotification:(id)notification {
+    BOOL canShow = %orig;
+    if (!canShow) {
+        return NO;
+    }
+    if ([PFBSettings boolForKey:@"hide_new_tweets_pill"]) {
+        PFBCOMPAT_ACTION(PFBCompat_hide_new_tweets_pill, @"new Tweets pill held back");
+        return NO;
+    }
+    PFBCOMPAT_OBSERVE(PFBCompat_hide_new_tweets_pill, @"new Tweets pill offered");
+    return YES;
+}
+
+- (void)_recreatePillControlForContentNotification:(id)notification
+                                      hideOnScroll:(BOOL)hideOnScroll {
+    %orig;
+    TFNPillControl* pill = [self respondsToSelector:@selector(pillControl)] ? self.pillControl : nil;
+
+    // A pill built by another path is hidden before it can be seen.
+    if ([PFBSettings boolForKey:@"hide_new_tweets_pill"]) {
+        if (pill) {
+            pill.hidden = YES;
+            PFBCOMPAT_ACTION(PFBCompat_hide_new_tweets_pill, @"new Tweets pill hidden");
+        }
+        return;
+    }
+
+    if (![PFBSettings boolForKey:@"refresh_pill_label"]) {
+        PFBCOMPAT_OBSERVE(PFBCompat_refresh_pill_label, @"refresh pill shown");
+        return;
+    }
+
+    if (![pill respondsToSelector:@selector(text)] || ![pill respondsToSelector:@selector(setText:)]) {
+        return;
+    }
+    NSString* current = [pill.text
+        stringByTrimmingCharactersInSet:[NSCharacterSet
+                                            whitespaceAndNewlineCharacterSet]];
+    if (current.length > 0) {
+        return;
+    }
+
+    NSString* label = PillLabelText();
+    if (label) {
+        pill.text = label;
+        PFBCOMPAT_ACTION(PFBCompat_refresh_pill_label, @"pill labeled");
+    }
+}
+
+%end
+
+// MARK: - Classic compose button
+
+// Two pieces restore the bird-era Tweet button: the compose glyph is swapped for the
+// feather in white where the button loads it, and the FAB is painted Twitter blue, or
+// the picked accent.
+
+static UIColor* PFBTwitterBlue(void) {
+    return [UIColor colorWithRed:0x1D / 255.0
+                           green:0xA1 / 255.0
+                            blue:0xF2 / 255.0
+                           alpha:1.0];
+}
+
+// "plus" is the pre-Liquid-Glass compose glyph; the redesign draws the button with one
+// of the compose vectors instead, so both kinds count.
+static BOOL isComposeGlyphName(id name) {
+    static NSSet<NSString*>* composeGlyphs = nil;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+        composeGlyphs = [NSSet setWithArray:@[
+            @"plus", @"compose", @"alt_compose", @"alt_compose_plus", @"compose_square"
+        ]];
+    });
+    return [name isKindOfClass:[NSString class]] && [composeGlyphs containsObject:name];
+}
+
+// The button's item view loads its glyph by name on the main thread, inside
+// _tfn_updateIcon; a compose glyph loaded there is noted, and swapped for the feather
+// with the option on. Other screens keep their compose and plus glyphs.
+static BOOL gPFBButtonIconLoading;
+static BOOL gPFBButtonComposeGlyph;
+
+static BOOL pfbSwapsForFeather(id name) {
+    if (!gPFBButtonIconLoading || ![NSThread isMainThread] || !isComposeGlyphName(name)) {
+        return NO;
+    }
+    gPFBButtonComposeGlyph = YES;
+    return [PFBSettings boolForKey:@"restore_tweet_button"];
+}
+
+// Every vector the app loads by name keeps that name on the image, keyed by the
+// tfn_vectorImageNamed:fitsSize:fillColor: selector so any file can read it back
+// without a shared declaration. It is how a bar button is told apart by what it shows.
+static id PFBNamedVector(id image, id name) {
+    if (image && [name isKindOfClass:[NSString class]]) {
+        objc_setAssociatedObject(image, @selector(tfn_vectorImageNamed:fitsSize:fillColor:),
+                                 name, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    }
+    return image;
+}
+
+%hook UIImage
+
++ (id)tfn_vectorImageNamed:(id)name fitsSize:(CGSize)size fillColor:(id)color {
+    return PFBNamedVector(%orig(name, size, color), name);
+}
+
++ (id)tfn_vectorImageNamed:(id)name
+    highContrastVariantNamed:(id)variant
+                    fitsSize:(CGSize)size
+                   fillColor:(id)color {
+    return PFBNamedVector(%orig(name, variant, size, color), name);
+}
+
++ (id)tfn_vectorImageNamed:(id)name height:(double)height fillColor:(id)color {
+    if (pfbSwapsForFeather(name)) {
+        return %orig(@"feather", height, [UIColor whiteColor]);
+    }
+    return PFBNamedVector(%orig(name, height, color), name);
+}
+
+%end
+
+@interface TFNExpandingButtonItemView : UIView
+- (void)_tfn_updateIcon;
+@end
+
+%hook TFNExpandingButtonItemView
+
+- (void)_tfn_updateIcon {
+    gPFBButtonIconLoading = YES;
+    gPFBButtonComposeGlyph = NO;
+    %orig;
+    gPFBButtonIconLoading = NO;
+    if (!gPFBButtonComposeGlyph) {
+        return;
+    }
+    PFBCompatReach(PFBCompatPath_feather);
+    if ([PFBSettings boolForKey:@"restore_tweet_button"]) {
+        PFBCOMPAT_ACTION(PFBCompat_restore_tweet_button, @"feather placed");
+    } else {
+        PFBCOMPAT_OBSERVE(PFBCompat_restore_tweet_button, @"Tweet button glyph read");
+    }
+}
+
+%end
+
+// The compose FAB is a plain UIView subclass, so it is styled directly: blue
+// disc, white glyphs, and any internal chrome (gray disc, blur) neutralized.
+@interface TFNFloatingActionButton : UIView
+@end
+
+// Tag set on the FAB's glyph image views so the UIImageView hook below can
+// recognize them in O(1) and bake swapped-in images white.
+static char kPFBFABGlyphKey;
+// Set while an effect is being installed here, so the setEffect: hook lets it
+// through. Without it that hook swallows and re-tints in a loop, and the material
+// is never tinted.
+static BOOL PFBEffectInstallAllowed;
+// The tint last installed here. UIVisualEffectView.effect vends copies whose tintColor
+// does not round-trip, so mismatches are detected against this shadow instead.
+static char kPFBFABGlassShadowTintKey;
+// The opaque color cap inside the material's contentView. Snapshots render glass
+// materials blank-white while plain layers snapshot correctly, so the cap is what
+// keeps the snapshot colored.
+static char kPFBFABGlassCapKey;
+// Tag for the FAB's glass material so the layout guard below can re-assert its
+// color the instant anything clears it.
+static char kPFBFABGlassKey;
+
+// One place to color the FAB's glass, in three layers since the system can
+// re-render the material during transitions: the effect's own tint, the effect
+// view's backgroundColor, and the contentView color.
+static void PFBColorFABGlass(UIVisualEffectView* effect, UIColor* blue) {
+    // The material is kept tinted at all times, since an untinted one renders
+    // opaque light over the colored background. Re-assigned only on a mismatch and
+    // without implicit animation: a re-assignment rebuilds and flashes the glyph.
+    UIVisualEffect* fx = effect.effect;
+    UIColor* lastInstalled = objc_getAssociatedObject(effect, &kPFBFABGlassShadowTintKey);
+    if (fx && [fx respondsToSelector:@selector(setTintColor:)] &&
+        ![lastInstalled isEqual:blue]) {
+        [(id)fx setTintColor:blue];
+        PFBEffectInstallAllowed = YES;
+        [UIView performWithoutAnimation:^{
+            [CATransaction begin];
+            [CATransaction setDisableActions:YES];
+            effect.effect = fx;
+            [CATransaction commit];
+        }];
+        PFBEffectInstallAllowed = NO;
+        objc_setAssociatedObject(effect, &kPFBFABGlassShadowTintKey, blue,
+                                 OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    }
+    if (![effect.backgroundColor isEqual:blue]) {
+        effect.backgroundColor = blue;
+    }
+    if (![effect.contentView.backgroundColor isEqual:blue]) {
+        effect.contentView.backgroundColor = blue;
+    }
+    UIView* cap = objc_getAssociatedObject(effect, &kPFBFABGlassCapKey);
+    if (!cap) {
+        cap = [[UIView alloc] initWithFrame:effect.contentView.bounds];
+        cap.autoresizingMask =
+            UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+        cap.userInteractionEnabled = NO;
+        [effect.contentView insertSubview:cap atIndex:0];
+        objc_setAssociatedObject(effect, &kPFBFABGlassCapKey, cap,
+                                 OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    }
+    cap.layer.cornerRadius = effect.layer.cornerRadius;
+    cap.layer.cornerCurve = effect.layer.cornerCurve;
+    cap.clipsToBounds = YES;
+    if (![cap.backgroundColor isEqual:blue]) {
+        cap.backgroundColor = blue;
+    }
+}
+
+// The compose FAB is a brand button: its base color is Twitter blue, never iOS
+// systemBlue. The accent is used only when one was actually picked, since without
+// that the palette can resolve option 0 to systemBlue through the fallback.
+static UIColor* PFBFABBlueColor(void) {
+    NSUserDefaults* d = NSUserDefaults.standardUserDefaults;
+    BOOL picked = [d objectForKey:@"pfb_custom_accent_hex"] ||
+                  [d objectForKey:@"pfb_color_theme_selectedColor"] ||
+                  [d integerForKey:@"T1ColorSettingsPrimaryColorOptionKey"] >= 1;
+    if (picked) {
+        return PFBCurrentAccentColor() ?: PFBTwitterBlue();
+    }
+    return PFBTwitterBlue();
+}
+
+static void styleComposeFAB(UIView* fab) {
+    if (![PFBSettings boolForKey:@"restore_tweet_button"]) {
+        PFBCOMPAT_OBSERVE(PFBCompat_restore_tweet_button, @"Tweet button found");
+        return;
+    }
+    PFBCOMPAT_ACTION(PFBCompat_restore_tweet_button, @"Tweet button restyled");
+    UIColor* blue = PFBFABBlueColor();
+    if (![fab.backgroundColor isEqual:blue]) {
+        fab.backgroundColor = blue;
+    }
+    CGFloat radius = MIN(fab.bounds.size.width, fab.bounds.size.height) / 2.0;
+    if (fab.layer.cornerRadius != radius) {
+        fab.layer.cornerRadius = radius;
+    }
+    fab.clipsToBounds = YES;
+    // The button itself takes a white tint so any template glyph is white from its very
+    // first render; tinting only the image view leaves one black frame on a tab change.
+    if (![fab.tintColor isEqual:[UIColor whiteColor]]) {
+        fab.tintColor = [UIColor whiteColor];
+    }
+    PFBEnumerateSubviewsRecursively(fab, ^(UIView* sub) {
+        if (sub == fab) {
+            return;
+        }
+        if ([sub isKindOfClass:[UIImageView class]]) {
+            UIImageView* imageView = (UIImageView*)sub;
+            BOOL alreadyTagged =
+                objc_getAssociatedObject(imageView, &kPFBFABGlyphKey) != nil;
+            objc_setAssociatedObject(imageView, &kPFBFABGlyphKey, @YES,
+                                     OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+            if (!alreadyTagged && imageView.image) {
+                // First encounter: bake what is already there; every later
+                // assignment goes through the setter hook and arrives baked.
+                imageView.image = PFBWhiteBakedGlyph(imageView.image);
+            }
+            if (![imageView.tintColor isEqual:[UIColor whiteColor]]) {
+                imageView.tintColor = [UIColor whiteColor];
+            }
+        } else if ([sub isKindOfClass:[UIVisualEffectView class]]) {
+            UIVisualEffectView* effect = (UIVisualEffectView*)sub;
+            if ([PFBSettings boolForKey:@"enable_liquid_glass"]) {
+                objc_setAssociatedObject(effect, &kPFBFABGlassKey, @YES,
+                                         OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+                PFBColorFABGlass(effect, blue);
+            } else if (!effect.hidden) {
+                effect.hidden = YES;
+            }
+        } else if (![sub isKindOfClass:[UILabel class]] &&
+                   sub.subviews.count == 0 &&
+                   sub.backgroundColor) {
+            CGFloat r = sub.layer.cornerRadius;
+            BOOL isDisc = r > 1.0 &&
+                          fabs(sub.bounds.size.width - sub.bounds.size.height) < 2.0 &&
+                          fabs(r - sub.bounds.size.width / 2.0) < 2.0;
+            if (isDisc && ![sub.backgroundColor isEqual:blue]) {
+                sub.backgroundColor = blue;
+            }
+        }
+    });
+}
+
+// Weak handle to the live compose FAB so a color pick can restyle it
+// immediately, without waiting for the next layout pass.
+static __weak UIView* PFBComposeFABView;
+
+// Called from PFBSyncAccentTheme (Theme.x) right after the accent changes.
+void PFBRestyleComposeFAB(void) {
+    void (^run)(void) = ^{
+        // The cached handle is only a fast path: with the settings screen pushed,
+        // the timeline's views are detached and the FAB is often rebuilt, so a stale
+        // reference is normal. The live hierarchy is swept afterward.
+        UIView* known = PFBComposeFABView;
+        if (known) {
+            styleComposeFAB(known);
+            [known setNeedsLayout];
+        }
+        Class FABClass = NSClassFromString(@"TFNFloatingActionButton");
+        if (!FABClass) {
+            return;
+        }
+        for (id scene in UIApplication.sharedApplication.connectedScenes) {
+            if (![scene isKindOfClass:NSClassFromString(@"UIWindowScene")]) {
+                continue;
+            }
+            for (UIWindow* window in [scene windows]) {
+                PFBEnumerateSubviewsRecursively(window, ^(UIView* sub) {
+                    if ([sub isKindOfClass:FABClass]) {
+                        PFBComposeFABView = sub;
+                        styleComposeFAB(sub);
+                        [sub setNeedsLayout];
+                    }
+                });
+            }
+        }
+    };
+    if ([NSThread isMainThread]) {
+        run();
+    } else {
+        dispatch_async(dispatch_get_main_queue(), run);
+    }
+}
+
+// Hiding the compose button is independent of restyling it: styleComposeFAB only
+// paints. Whether the button was hidden here is recorded, so turning the option
+// off restores it without forcing an untouched button visible.
+static const void* kPFBFABHiddenByUsKey = &kPFBFABHiddenByUsKey;
+
+static void pfbApplyComposeFABVisibility(UIView* fab) {
+    if (!fab) {
+        return;
+    }
+    BOOL wantHidden = [PFBSettings boolForKey:@"hide_tweet_button"];
+    BOOL hiddenByUs = objc_getAssociatedObject(fab, kPFBFABHiddenByUsKey) != nil;
+    if (!wantHidden) {
+        PFBCOMPAT_OBSERVE(PFBCompat_hide_tweet_button, @"Tweet button found");
+    }
+    if (wantHidden) {
+        PFBCOMPAT_ACTION(PFBCompat_hide_tweet_button, @"Tweet button hidden");
+        fab.hidden = YES;
+        fab.alpha = 0.0;
+        fab.userInteractionEnabled = NO;
+        if (!hiddenByUs) {
+            objc_setAssociatedObject(fab, kPFBFABHiddenByUsKey, @YES,
+                                     OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        }
+    } else if (hiddenByUs) {
+        fab.hidden = NO;
+        fab.alpha = 1.0;
+        fab.userInteractionEnabled = YES;
+        objc_setAssociatedObject(fab, kPFBFABHiddenByUsKey, nil,
+                                 OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    }
+}
+
+%hook TFNFloatingActionButton
+
+// willMoveToWindow: fires before the button is ever drawn, so the white glyph tint and
+// the disc color are in place for its very first frame.
+- (void)willMoveToWindow:(UIWindow*)newWindow {
+    %orig;
+    if (newWindow) {
+        PFBComposeFABView = (UIView*)self;
+        styleComposeFAB((UIView*)self);
+        pfbApplyComposeFABVisibility((UIView*)self);
+    }
+}
+
+- (void)didMoveToWindow {
+    %orig;
+    PFBComposeFABView = (UIView*)self;
+    styleComposeFAB((UIView*)self);
+    pfbApplyComposeFABVisibility((UIView*)self);
+}
+
+// The glass material and the glyph arrive as subviews after the button is
+// attached, which willMoveToWindow: is too early to see. Styling them as they land
+// colors them within the same transaction, before their first frame.
+- (void)didAddSubview:(UIView*)subview {
+    %orig;
+    styleComposeFAB((UIView*)self);
+}
+
+- (void)layoutSubviews {
+    %orig;
+    PFBComposeFABView = (UIView*)self;
+    styleComposeFAB((UIView*)self);
+    pfbApplyComposeFABVisibility((UIView*)self);
+}
+
+%end
+
+// MARK: - Twitter's glass compose button
+
+// Under Twitter's own Liquid Glass the compose button is an accessory above the tab bar:
+// a glass circle tinted dark around a white glyph. Twitter writes only its alpha.
+static const void* kPFBGlassComposeMaterialKey = &kPFBGlassComposeMaterialKey;
+static const void* kPFBGlassComposeGlyphKey = &kPFBGlassComposeGlyphKey;
+static const void* kPFBGlassComposeTintKey = &kPFBGlassComposeTintKey;
+static const void* kPFBGlassComposeOriginalKey = &kPFBGlassComposeOriginalKey;
+static const void* kPFBGlassComposeHiddenKey = &kPFBGlassComposeHiddenKey;
+static const void* kPFBGlassComposeTouchedKey = &kPFBGlassComposeTouchedKey;
+
+// The white feather of Twitter's vector set, sized for the button's 24-point glyph.
+static UIImage* PFBGlassFeather(void) {
+    static UIImage* feather;
+    if (!feather) {
+        feather = [UIImage tfn_vectorImageNamed:@"feather" fitsSize:CGSizeMake(24.0, 24.0) fillColor:[UIColor whiteColor]];
+    }
+    return feather;
+}
+
+// The button's glass: the first material in it that takes a tint.
+static UIVisualEffectView* PFBGlassComposeMaterial(UIView* host) {
+    __block UIVisualEffectView* found = nil;
+    PFBWalkAllSubviews(host, 8, ^(UIView* view) {
+      if (!found && [view isKindOfClass:[UIVisualEffectView class]] &&
+          [((UIVisualEffectView*)view).effect respondsToSelector:@selector(setTintColor:)]) {
+          found = (UIVisualEffectView*)view;
+      }
+    });
+    return found;
+}
+
+static UIImageView* PFBGlassComposeGlyph(UIView* material) {
+    __block UIImageView* found = nil;
+    PFBWalkAllSubviews(material, 8, ^(UIView* view) {
+      if (!found && [view isKindOfClass:[UIImageView class]] && ((UIImageView*)view).image) {
+          found = (UIImageView*)view;
+      }
+    });
+    return found;
+}
+
+static UIColor* PFBGlassMaterialTint(UIVisualEffectView* material) {
+    UIVisualEffect* effect = material.effect;
+    id tint = [effect respondsToSelector:@selector(tintColor)] ? [(id)effect tintColor] : nil;
+    return [tint isKindOfClass:[UIColor class]] ? tint : nil;
+}
+
+// The material reads its tint when installed, so a tinted copy is installed, without
+// animation: a re-install animates the glass otherwise. The flag tells these installs from
+// Twitter's own.
+static BOOL gPFBGlassTinting;
+
+static void PFBGlassTintMaterial(UIVisualEffectView* material, UIColor* tint) {
+    UIVisualEffect* effect = [material.effect copy];
+    if (![effect respondsToSelector:@selector(setTintColor:)]) {
+        return;
+    }
+    [(id)effect setTintColor:tint];
+    gPFBGlassTinting = YES;
+    [UIView performWithoutAnimation:^{
+      [CATransaction begin];
+      [CATransaction setDisableActions:YES];
+      material.effect = effect;
+      [CATransaction commit];
+    }];
+    gPFBGlassTinting = NO;
+}
+
+// The compose button is a round accessory button of 48 points. The reply bar is another
+// accessory, a wide one, which keeps Twitter's own look and always shows.
+static BOOL PFBGlassIsComposeHost(UIView* host) {
+    static Class buttonClass;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+      buttonClass = NSClassFromString(@"_TtC11XNavigation25TabBarAccessoryButtonView");
+    });
+    CGSize size = host.bounds.size;
+    if (!buttonClass || size.width < 1.0 || size.width > 72.0 || fabs(size.width - size.height) > 8.0) {
+        return NO;
+    }
+    __block BOOL found = NO;
+    PFBWalkAllSubviews(host, 3, ^(UIView* view) {
+      found = found || [view isKindOfClass:buttonClass];
+    });
+    return found;
+}
+
+static void PFBGlassComposeVisibility(UIView* host, BOOL compose) {
+    BOOL hide = compose && [PFBSettings boolForKey:@"hide_tweet_button"];
+    BOOL hiddenByUs = objc_getAssociatedObject(host, kPFBGlassComposeHiddenKey) != nil;
+    if (hide) {
+        PFBCOMPAT_ACTION(PFBCompat_hide_tweet_button, @"glass Tweet button hidden");
+        if (!host.hidden) {
+            host.hidden = YES;
+        }
+        if (!hiddenByUs) {
+            objc_setAssociatedObject(host, kPFBGlassComposeHiddenKey, @YES, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        }
+        return;
+    }
+    if (compose) {
+        PFBCOMPAT_OBSERVE(PFBCompat_hide_tweet_button, @"glass Tweet button found");
+    }
+    if (hiddenByUs) {
+        host.hidden = NO;
+        objc_setAssociatedObject(host, kPFBGlassComposeHiddenKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    }
+}
+
+// Every material and glyph this accessory carries from the compose button gets Twitter's
+// latest tint and image back. The tags go first, so what Twitter writes next stays its own.
+static void PFBGlassComposeRestore(UIView* host) {
+    if (!objc_getAssociatedObject(host, kPFBGlassComposeTouchedKey)) {
+        return;
+    }
+    objc_setAssociatedObject(host, kPFBGlassComposeTouchedKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    PFBWalkAllSubviews(host, 8, ^(UIView* view) {
+      if ([view isKindOfClass:[UIVisualEffectView class]] &&
+          objc_getAssociatedObject(view, kPFBGlassComposeMaterialKey)) {
+          UIVisualEffectView* material = (UIVisualEffectView*)view;
+          id savedTint = objc_getAssociatedObject(material, kPFBGlassComposeTintKey);
+          objc_setAssociatedObject(material, kPFBGlassComposeMaterialKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+          objc_setAssociatedObject(material, kPFBGlassComposeTintKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+          if (savedTint) {
+              PFBGlassTintMaterial(material, savedTint == [NSNull null] ? nil : savedTint);
+          }
+      } else if ([view isKindOfClass:[UIImageView class]] &&
+                 objc_getAssociatedObject(view, kPFBGlassComposeGlyphKey)) {
+          UIImageView* glyph = (UIImageView*)view;
+          UIImage* original = objc_getAssociatedObject(glyph, kPFBGlassComposeOriginalKey);
+          objc_setAssociatedObject(glyph, kPFBGlassComposeGlyphKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+          objc_setAssociatedObject(glyph, kPFBGlassComposeOriginalKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+          if (original) {
+              glyph.image = original;
+          }
+      }
+    });
+}
+
+// Notes the compose button switching look within one launch, which the settings answer
+// with a restart request.
+static void PFBGlassComposeNoteLook(BOOL classic) {
+    static NSInteger last = -1;
+    if (last != -1 && last != classic) {
+        PFBCompatMeasure(@"classic tweet button", @"look changed without a restart", 2);
+    }
+    last = classic;
+}
+
+// Blue glass and the white feather on the compose button with the option on; Twitter's
+// own tint and glyph back with it off, or once the accessory is no compose button.
+static void PFBGlassComposeLook(UIView* host, BOOL compose) {
+    BOOL classic = [PFBSettings boolForKey:@"restore_tweet_button"];
+    if (compose) {
+        PFBGlassComposeNoteLook(classic);
+    }
+    if (!compose || !classic) {
+        if (compose) {
+            PFBCOMPAT_OBSERVE(PFBCompat_restore_tweet_button, @"glass Tweet button found");
+        }
+        PFBGlassComposeRestore(host);
+        return;
+    }
+    UIVisualEffectView* material = PFBGlassComposeMaterial(host);
+    UIImageView* glyph = material ? PFBGlassComposeGlyph(material) : nil;
+    if (!material || !glyph) {
+        return;
+    }
+    id savedTint = objc_getAssociatedObject(material, kPFBGlassComposeTintKey);
+    UIImage* original = objc_getAssociatedObject(glyph, kPFBGlassComposeOriginalKey);
+    objc_setAssociatedObject(host, kPFBGlassComposeTouchedKey, @YES, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    objc_setAssociatedObject(material, kPFBGlassComposeMaterialKey, @YES, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    objc_setAssociatedObject(glyph, kPFBGlassComposeGlyphKey, @YES, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    UIColor* blue = PFBFABBlueColor();
+    UIColor* tint = PFBGlassMaterialTint(material);
+    if (!savedTint) {
+        objc_setAssociatedObject(material, kPFBGlassComposeTintKey, tint ?: [NSNull null], OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    }
+    if (![tint isEqual:blue]) {
+        PFBGlassTintMaterial(material, blue);
+    }
+    UIImage* feather = PFBGlassFeather();
+    if (feather && glyph.image != feather) {
+        if (!original) {
+            objc_setAssociatedObject(glyph, kPFBGlassComposeOriginalKey, glyph.image, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        }
+        glyph.image = feather;
+    }
+    PFBCOMPAT_ACTION(PFBCompat_restore_tweet_button, @"glass Tweet button restyled");
+}
+
+static void PFBGlassStyleCompose(UIView* host) {
+    BOOL compose = PFBGlassIsComposeHost(host);
+    if (compose) {
+        PFBCompatReach(PFBCompatPath_glass_tweet_button);
+    }
+    PFBGlassComposeVisibility(host, compose);
+    PFBGlassComposeLook(host, compose);
+}
+
+// The accessory hosts seen, styled again when their light or dark look changes and when the
+// app becomes active: the app switcher repaints the app both ways for its previews, and the
+// glyph Twitter draws back then brings no layout pass of the host.
+static NSHashTable<UIView*>* PFBGlassHosts(void) {
+    static NSHashTable<UIView*>* hosts;
+    if (!hosts) {
+        hosts = [NSHashTable weakObjectsHashTable];
+    }
+    return hosts;
+}
+
+static void PFBGlassRestyleLater(UIView* host) {
+    __weak UIView* weakHost = host;
+    dispatch_async(dispatch_get_main_queue(), ^{
+      UIView* alive = weakHost;
+      if (alive.window) {
+          @try {
+              PFBGlassStyleCompose(alive);
+          } @catch (__unused id exception) {
+          }
+      }
+    });
+}
+
+static void PFBGlassWatchHost(UIView* host) {
+    if ([PFBGlassHosts() containsObject:host]) {
+        return;
+    }
+    [PFBGlassHosts() addObject:host];
+    Class style = NSClassFromString(@"UITraitUserInterfaceStyle");
+    SEL registration = NSSelectorFromString(@"registerForTraitChanges:withHandler:");
+    if (style && [host respondsToSelector:registration]) {
+        void (^handler)(id, id) = ^(id environment, __unused id previous) {
+          if ([environment isKindOfClass:[UIView class]]) {
+              PFBGlassRestyleLater((UIView*)environment);
+          }
+        };
+        ((id (*)(id, SEL, NSArray*, id))objc_msgSend)(host, registration, @[ style ], handler);
+    }
+}
+
+%hook _TtC11XNavigation23TabBarAccessoryHostView
+
+- (void)layoutSubviews {
+    %orig;
+    @try {
+        PFBGlassStyleCompose((UIView*)self);
+        PFBGlassWatchHost((UIView*)self);
+    } @catch (__unused id exception) {
+    }
+}
+
+- (void)didMoveToWindow {
+    %orig;
+    if (!((UIView*)self).window) {
+        return;
+    }
+    @try {
+        PFBGlassStyleCompose((UIView*)self);
+        PFBGlassWatchHost((UIView*)self);
+    } @catch (__unused id exception) {
+    }
+}
+
+%end
+
+// Twitter swaps glyph images on existing image views, which the subview hooks above do not see.
+// Only the classic button's glyphs, the glass compose glyph and the navigation bar's confirm glyph are touched.
+%hook UIImageView
+
+// The glyph often sits inside the glass material's contentView, where the FAB's
+// own didAddSubview: never fires. Tagged and baked white at attach, in the same
+// transaction; the ancestor walk is six levels at most.
+- (void)willMoveToWindow:(UIWindow*)newWindow {
+    %orig;
+    if (!newWindow || objc_getAssociatedObject(self, &kPFBFABGlyphKey) ||
+        ![PFBSettings boolForKey:@"restore_tweet_button"]) {
+        return;
+    }
+    UIView* ancestor = self.superview;
+    NSInteger depth = 0;
+    while (ancestor && depth < 6) {
+        if ([NSStringFromClass([ancestor class])
+                containsString:@"FloatingActionButton"]) {
+            objc_setAssociatedObject(self, &kPFBFABGlyphKey, @YES,
+                                     OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+            if (self.image) {
+                self.image = PFBWhiteBakedGlyph(self.image);
+            }
+            self.tintColor = [UIColor whiteColor];
+            return;
+        }
+        ancestor = ancestor.superview;
+        depth++;
+    }
+}
+
+- (void)setImage:(UIImage*)image {
+    // Baked at the setter, so the pixels that land are white whoever writes last.
+    // A template glyph is only white while its tint survives; a baked one has
+    // nothing left to lose.
+    if (image && objc_getAssociatedObject(self, &kPFBFABGlyphKey)) {
+        image = PFBWhiteBakedGlyph(image);
+    } else if (image && objc_getAssociatedObject(self, kPFBGlassComposeGlyphKey) &&
+               [PFBSettings boolForKey:@"restore_tweet_button"]) {
+        // Twitter's own glyph is kept for when the option goes off, and the feather drawn.
+        UIImage* feather = PFBGlassFeather();
+        if (feather && image != feather) {
+            objc_setAssociatedObject(self, kPFBGlassComposeOriginalKey, image, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+            image = feather;
+        }
+    } else if (image && objc_getAssociatedObject(self, &PFBConfirmGlyphTag) && PFBThemeScreenCount &&
+               PFBAccentIsActive()) {
+        image = PFBWhiteBakedGlyph(image);
+    }
+    %orig(image);
+}
+
+%end
+
+// The same principle applied to the disc: during a tab transition the glass
+// material can arrive as a fresh UIVisualEffectView, colored only at the next
+// styling pass. It is colored as it enters a window, in the same transaction.
+%hook UIVisualEffectView
+
+// The system re-installs the material's effect on each tab transition. Tinting the
+// incoming effect here means the reset itself installs a colored material, with no
+// extra assignment and no rebuild.
+- (void)setEffect:(UIVisualEffect*)effect {
+    // A material Twitter installs again on its glass compose button comes in blue: a
+    // tinted copy, since Twitter may share the material it passes. Twitter's own tint is
+    // kept for when the blue goes.
+    if (effect && objc_getAssociatedObject(self, kPFBGlassComposeMaterialKey) &&
+        [PFBSettings boolForKey:@"restore_tweet_button"] && [effect respondsToSelector:@selector(setTintColor:)]) {
+        if (!gPFBGlassTinting) {
+            id incoming = [effect respondsToSelector:@selector(tintColor)] ? [(id)effect tintColor] : nil;
+            objc_setAssociatedObject(self, kPFBGlassComposeTintKey, incoming ?: [NSNull null],
+                                     OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        }
+        UIVisualEffect* tinted = [effect copy];
+        [(id)tinted setTintColor:PFBFABBlueColor()];
+        %orig(tinted);
+        return;
+    }
+    if (effect && objc_getAssociatedObject(self, &kPFBFABGlassKey) &&
+        [PFBSettings boolForKey:@"restore_tweet_button"] &&
+        [PFBSettings boolForKey:@"enable_liquid_glass"] &&
+        [effect respondsToSelector:@selector(setTintColor:)]) {
+        UIColor* blue = PFBFABBlueColor();
+        // Installs made here pass through, tinted.
+        if (PFBEffectInstallAllowed) {
+            [(id)effect setTintColor:blue];
+            %orig;
+            return;
+        }
+        // The per-transition re-install triggers the animated rebuild, so an
+        // effect of the same class as the current one is swallowed. No in-place
+        // mutation here: self.effect returns a copy, so mutating it is a no-op.
+        UIVisualEffect* current = self.effect;
+        if (current && [current class] == [effect class]) {
+            return;
+        }
+        [(id)effect setTintColor:blue];
+        %orig;
+        return;
+    }
+    %orig;
+}
+
+- (void)willMoveToWindow:(UIWindow*)newWindow {
+    %orig;
+    if (!newWindow || ![PFBSettings boolForKey:@"restore_tweet_button"] ||
+        ![PFBSettings boolForKey:@"enable_liquid_glass"]) {
+        return;
+    }
+    UIView* ancestor = self.superview;
+    NSInteger depth = 0;
+    while (ancestor && depth < 6) {
+        if ([NSStringFromClass([ancestor class])
+                containsString:@"FloatingActionButton"]) {
+            objc_setAssociatedObject(self, &kPFBFABGlassKey, @YES,
+                                     OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+            UIColor* blue = PFBFABBlueColor();
+            PFBColorFABGlass(self, blue);
+            return;
+        }
+        ancestor = ancestor.superview;
+        depth++;
+    }
+}
+
+// If anything clears the tagged material's color mid-transition, this
+// re-asserts it within the same layout pass.
+- (void)layoutSubviews {
+    %orig;
+    if (!objc_getAssociatedObject(self, &kPFBFABGlassKey)) {
+        return;
+    }
+    UIColor* blue = PFBFABBlueColor();
+    PFBColorFABGlass(self, blue);
+}
+
+%end
+
+%ctor {
+    %init;
+    [[NSNotificationCenter defaultCenter] addObserverForName:UIApplicationDidBecomeActiveNotification
+                                                      object:nil
+                                                       queue:NSOperationQueue.mainQueue
+                                                  usingBlock:^(__unused NSNotification* note) {
+                                                    for (UIView* host in PFBGlassHosts().allObjects) {
+                                                        PFBGlassRestyleLater(host);
+                                                    }
+                                                  }];
+}

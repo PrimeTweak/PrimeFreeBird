@@ -1,0 +1,2529 @@
+// Theming: the accent color, the tab bars, the top bar logo and the bar chrome.
+
+#import <objc/runtime.h>
+#import <objc/message.h>
+#import <QuartzCore/QuartzCore.h>
+#import "Support/HookHelpers.h"
+#import "Common/PFBBundle.h"
+#import "Debug/PFBDebugger.h"
+#import "Support/PFBTwitterPopups.h"
+
+#import "Features/Appearance/ThemeColor/PFBDarkModeStyle.h"
+
+// Defined in Branding.x.
+extern void PFBRestyleComposeFAB(void);
+
+// MARK: - Custom accent color
+
+static NSNumber* selectedThemeColor(void) {
+    return [NSUserDefaults.standardUserDefaults objectForKey:@"pfb_color_theme_selectedColor"];
+}
+
+UIColor* PFBCustomAccentColor(void) {
+    NSString* hex = [NSUserDefaults.standardUserDefaults objectForKey:@"pfb_custom_accent_hex"];
+    if (![hex isKindOfClass:[NSString class]] || hex.length < 6) {
+        return nil;
+    }
+    unsigned int rgb = 0;
+    NSScanner* scanner = [NSScanner scannerWithString:hex];
+    [scanner setScanLocation:[hex hasPrefix:@"#"] ? 1 : 0];
+    if (![scanner scanHexInt:&rgb]) {
+        return nil;
+    }
+    return [UIColor colorWithRed:((rgb & 0xFF0000) >> 16) / 255.0
+                           green:((rgb & 0x00FF00) >> 8) / 255.0
+                            blue:(rgb & 0x0000FF) / 255.0
+                           alpha:1.0];
+}
+
+// Depth counter, not a flag: raw reads nest. With a plain boolean an inner End
+// closes a read opened further out, and the swatches still to be built then
+// resolve to the custom accent.
+static NSInteger PFBRawPaletteDepth = 0;
+static inline BOOL PFBRawPaletteReading(void) { return PFBRawPaletteDepth > 0; }
+void PFBBeginRawPaletteRead(void) { PFBRawPaletteDepth++; }
+void PFBEndRawPaletteRead(void)   { if (PFBRawPaletteDepth > 0) { PFBRawPaletteDepth--; } }
+
+static BOOL customAccentActive(void) {
+    return [NSUserDefaults.standardUserDefaults boolForKey:@"pfb_custom_is_active"]
+           && PFBCustomAccentColor() != nil;
+}
+
+// Central accent resolver. Every accent-producing palette accessor routes through
+// this: the custom color when active, except during a raw swatch read, and
+// otherwise whatever Twitter returns natively.
+static UIColor* PFBAccent(UIColor* orig) {
+    if (!PFBRawPaletteReading() &&
+        [NSUserDefaults.standardUserDefaults boolForKey:@"pfb_custom_is_active"]) {
+        UIColor* c = PFBCustomAccentColor();
+        if (c) {
+            PFBCOMPAT_ACTION(PFBCompat_accent_color, @"custom color returned");
+            return c;
+        }
+    }
+    return orig;
+}
+
+// Logo colors follow the accent ONLY when the user opted in via the
+// "Twitter icon" toggle; otherwise the native logo color passes through.
+static UIColor* PFBLogoAccent(UIColor* orig) {
+    if (![PFBSettings boolForKey:@"color_twitter_icon_in_top_bar"]) {
+        return orig;
+    }
+    return PFBAccent(orig);
+}
+
+// Depth counter for the settings stack. The Done platter is one button shared by
+// the whole stack, and on pop the target's viewWillAppear fires before the
+// source's viewDidDisappear, so a flag would be clobbered mid-stack. >0 = visible.
+NSInteger PFBThemeScreenCount;
+
+// Each screen counts once: a canceled swipe back calls viewWillAppear: again with no
+// viewDidDisappear: in between.
+static char kPFBThemeScreenCountedKey;
+
+void PFBThemeScreenEnter(UIViewController* screen) {
+    if (objc_getAssociatedObject(screen, &kPFBThemeScreenCountedKey)) {
+        return;
+    }
+    objc_setAssociatedObject(screen, &kPFBThemeScreenCountedKey, @YES, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    PFBThemeScreenCount++;
+}
+
+void PFBThemeScreenLeave(UIViewController* screen) {
+    if (!objc_getAssociatedObject(screen, &kPFBThemeScreenCountedKey)) {
+        return;
+    }
+    objc_setAssociatedObject(screen, &kPFBThemeScreenCountedKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    if (PFBThemeScreenCount > 0) {
+        PFBThemeScreenCount--;
+    }
+}
+
+// Liquid Glass controls take their accent from the window tint rather than the
+// palette, so the accent goes on the windows. Under the standard interface the
+// palette carries it alone and a window tint would only leak.
+static BOOL PFBWindowTintWanted(void) {
+    if (![PFBSettings boolForKey:@"enable_liquid_glass"]) {
+        return NO;
+    }
+    // UIKit's own controls inherit the window tint, so it is spent only on a
+    // color that was actually picked. The theming toggles are not a color:
+    // they paint the tab bar and the logo and leave the system alone.
+    NSUserDefaults* defs = NSUserDefaults.standardUserDefaults;
+    return customAccentActive() || [defs objectForKey:@"pfb_color_theme_selectedColor"] != nil ||
+           [defs integerForKey:@"T1ColorSettingsPrimaryColorOptionKey"] >= 1;
+}
+
+// Every window gets the accent, or loses it when none is wanted.
+static void PFBApplyGlobalTint(void) {
+    UIColor* tint = PFBWindowTintWanted() ? PFBCurrentAccentColor() : nil;
+    void (^apply)(void) = ^{
+        for (id scene in UIApplication.sharedApplication.connectedScenes) {
+            if ([scene isKindOfClass:objc_getClass("UIWindowScene")]) {
+                for (UIWindow* w in [scene windows]) { w.tintColor = tint; }
+            }
+        }
+    };
+    if ([NSThread isMainThread]) { apply(); }
+    else { dispatch_async(dispatch_get_main_queue(), apply); }
+}
+
+// Weak handle to the live top-bar logo, so a color pick re-tints it at once
+// instead of after a restart, when the title view is rebuilt.
+static __weak UIImageView* PFBTopBarLogoView;
+
+// Read by the layer-animation hook in NavBarIcons.x, which has to know which
+// image view is the logo to keep the glass vibrancy filter off it.
+UIImageView* PFBTopBarLogoViewCurrent(void) {
+    return PFBTopBarLogoView;
+}
+
+// In Liquid Glass the title plugin returns a CONTAINER, not the image view
+// itself. Find the image view wherever it sits in the returned hierarchy.
+static UIImageView* PFBFindLogoImageView(UIView* root) {
+    if ([root isKindOfClass:[UIImageView class]] && ((UIImageView*)root).image) {
+        return (UIImageView*)root;
+    }
+    for (UIView* sub in root.subviews) {
+        UIImageView* found = PFBFindLogoImageView(sub);
+        if (found) {
+            return found;
+        }
+    }
+    return nil;
+}
+
+// Every vetted logo, weakly held. Re-tinting the registry needs no container matching,
+// unlike the name-based sweep, which misses Twitter's Swift home header.
+static NSHashTable<UIImageView*>* PFBLogoRegistry;
+
+static void PFBRegisterLogoView(UIImageView* logo) {
+    if (!logo) {
+        return;
+    }
+    if (!PFBLogoRegistry) {
+        PFBLogoRegistry = [NSHashTable weakObjectsHashTable];
+    }
+    [PFBLogoRegistry addObject:logo];
+}
+
+// PFBCurrentAccentColor() falls back to systemBlue and so cannot report whether an
+// accent is set. This is the real test.
+BOOL PFBAccentIsActive(void) {
+    if (customAccentActive()) {
+        return YES;
+    }
+    NSUserDefaults* defs = NSUserDefaults.standardUserDefaults;
+    if ([defs objectForKey:@"pfb_color_theme_selectedColor"] ||
+        [defs integerForKey:@"T1ColorSettingsPrimaryColorOptionKey"] >= 1) {
+        return YES;
+    }
+    // Fresh install (option 0, nothing picked yet) defaults to Twitter blue as the
+    // active accent — UNLESS the user reset (which reverts to native/black).
+    return ![defs boolForKey:@"pfb_color_reset_done"];
+}
+
+// Whether Selected tab paints the tab bar and the top tab underline; the sheet reads it too.
+BOOL PFBThemedTabBarWanted(void) {
+    return [PFBSettings boolForKey:@"tab_bar_theming"] && PFBAccentIsActive();
+}
+
+BOOL PFBTintedLogoWanted(void) {
+    return [PFBSettings boolForKey:@"color_twitter_icon_in_top_bar"] && PFBAccentIsActive();
+}
+
+// Twitter's own logo color, read raw so the accent hooks do not repaint it.
+static UIColor* PFBRawLogoColor(void) {
+    PFBBeginRawPaletteRead();
+    id palette = [[[objc_getClass("TAEColorSettings") sharedSettings]
+        currentColorPalette] colorPalette];
+    UIColor* raw = nil;
+    if ([palette respondsToSelector:@selector(navigationBarLogoColor)]) {
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Warc-performSelector-leaks"
+        raw = [palette performSelector:@selector(navigationBarLogoColor)];
+#pragma clang diagnostic pop
+    }
+    PFBEndRawPaletteRead();
+    return raw;
+}
+
+static const void* kPFBLogoOriginalKey = &kPFBLogoOriginalKey;
+static const void* kPFBLogoBakedKey = &kPFBLogoBakedKey;
+// Marks a rendered bird, so an original that already is one is not looked up again.
+static const void* kPFBBirdImageKey = &kPFBBirdImageKey;
+
+// The filled bird at the size the bar asks for, a shade smaller than that box: the X it
+// replaces reads narrower than a bird at the same nominal size. Cached per size: the
+// render costs a PDF parse and the bar asks on every layout pass.
+static UIImage* PFBBirdLogoImage(CGSize size) {
+    static NSMutableDictionary<NSString*, UIImage*>* cache = nil;
+    if (!cache) {
+        cache = [NSMutableDictionary dictionary];
+    }
+    NSString* key = [NSString stringWithFormat:@"%.0fx%.0f", size.width, size.height];
+    UIImage* cached = cache[key];
+    if (cached) {
+        return cached;
+    }
+    UIImage* rendered = [PFBBundlePDFImage(@"LaunchTwitterBird.pdf", size, 0.86)
+        imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate];
+    if (rendered) {
+        objc_setAssociatedObject(rendered, kPFBBirdImageKey, @YES,
+                                 OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        cache[key] = rendered;
+    }
+    return rendered;
+}
+
+static BOOL PFBSubtreeHostsText(UIView* view, NSInteger depth) {
+    if (!view || depth > 6) {
+        return NO;
+    }
+    if ([view isKindOfClass:[UILabel class]] || [view isKindOfClass:[UITextField class]] ||
+        [view isKindOfClass:[UITextView class]]) {
+        return YES;
+    }
+    for (UIView* sub in view.subviews) {
+        if (PFBSubtreeHostsText(sub, depth + 1)) {
+            return YES;
+        }
+    }
+    return NO;
+}
+
+// The logo is the one title made of an image and nothing else. A title that
+// also hosts text is a search field, a conversation header with its name, or
+// a plain title: the image found there is a magnifier or an avatar, never the X.
+static BOOL PFBSitsInTextTitle(UIView* view) {
+    UIView* node = view.superview;
+    for (NSInteger up = 0; node && up < 8; up++) {
+        NSString* name = NSStringFromClass([node class]);
+        if ([name containsString:@"Search"]) {
+            return YES;
+        }
+        if ([name containsString:@"NavigationBarTitleControl"]) {
+            return PFBSubtreeHostsText(node, 0);
+        }
+        node = node.superview;
+    }
+    return NO;
+}
+
+// Set once a logo was given the bird or the accent: from then on the bars are walked
+// so that turning both options off can hand the native logo back.
+static BOOL PFBLogoEverPainted;
+
+static void PFBApplyLogoTint(UIImageView* logoView) {
+    UIImage* current = logoView.image;
+    if (!current || PFBSitsInTextTitle(logoView)) {
+        return;
+    }
+    PFBRegisterLogoView(logoView);
+    UIImage* original = objc_getAssociatedObject(logoView, kPFBLogoOriginalKey);
+    UIImage* baked = objc_getAssociatedObject(logoView, kPFBLogoBakedKey);
+    if (!original || (current != original && current != baked)) {
+        // A new image from the app: remember it as the one to paint from.
+        original = current;
+        objc_setAssociatedObject(logoView, kPFBLogoOriginalKey, original,
+                                 OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        baked = nil;
+        objc_setAssociatedObject(logoView, kPFBLogoBakedKey, nil,
+                                 OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    }
+    // The bird replaces the X when Twitter's branding is switched back on.
+    // Substituting the image, not the tint: the glyph itself is what changed.
+    if ([PFBSettings boolForKey:@"restore_twitter_names"] &&
+        !objc_getAssociatedObject(original, kPFBBirdImageKey)) {
+        UIImage* bird = PFBBirdLogoImage(original.size);
+        if (bird && original != bird) {
+            original = bird;
+            objc_setAssociatedObject(logoView, kPFBLogoOriginalKey, bird,
+                                     OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+            baked = nil;
+            objc_setAssociatedObject(logoView, kPFBLogoBakedKey, nil,
+                                     OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+            PFBLogoEverPainted = YES;
+            PFBCOMPAT_ACTION(PFBCompat_restore_twitter_names, @"bird logo");
+        }
+    }
+    UIColor* target = nil;
+    if (PFBTintedLogoWanted()) {
+        target = PFBBrandAccentColor();
+        PFBLogoEverPainted = YES;
+        PFBCOMPAT_ACTION(PFBCompat_color_twitter_icon_in_top_bar, @"logo tinted");
+    } else {
+        PFBCOMPAT_OBSERVE(PFBCompat_color_twitter_icon_in_top_bar, @"logo found");
+    }
+    if (!target) {
+        // Option off: hand the untouched image back and restore the native color.
+        if (current != original) {
+            logoView.image = original;
+        }
+        UIColor* raw = PFBRawLogoColor() ?: [UIColor labelColor];
+        if (original.renderingMode == UIImageRenderingModeAlwaysTemplate &&
+            ![logoView.tintColor isEqual:raw]) {
+            logoView.tintColor = raw;
+        }
+        return;
+    }
+    // The glass vibrancy filter would wash the accent out of the painted logo.
+    if (logoView.layer.filters.count) {
+        logoView.layer.filters = nil;
+    }
+    if (!baked) {
+        baked = PFBPaintedGlyph(original, target);
+        objc_setAssociatedObject(logoView, kPFBLogoBakedKey, baked,
+                                 OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    }
+    if (current != baked) {
+        logoView.image = baked;
+    }
+}
+
+static void PFBRetintRegisteredLogos(void) {
+    // The baked copy is tied to one color; a new accent starts over.
+    for (UIImageView* logo in PFBLogoRegistry) {
+        objc_setAssociatedObject(logo, kPFBLogoBakedKey, nil,
+                                 OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    }
+    for (UIImageView* logo in PFBLogoRegistry) {
+        PFBApplyLogoTint(logo);
+    }
+}
+
+// Tab icons cache their tinted image, so they need an explicit nudge: walks the
+// live controller tree and asks every tab view to re-theme its icon.
+static void PFBReapplyTabBarAccent(void) {
+    Class tabBarVCClass = objc_getClass("T1TabBarViewController");
+    if (!tabBarVCClass) {
+        return;
+    }
+    void (^apply)(void) = ^{
+        for (id scene in UIApplication.sharedApplication.connectedScenes) {
+            if (![scene isKindOfClass:objc_getClass("UIWindowScene")]) {
+                continue;
+            }
+            for (UIWindow* window in [scene windows]) {
+                NSMutableArray* stack = [NSMutableArray array];
+                NSHashTable* seen = [NSHashTable hashTableWithOptions:NSPointerFunctionsStrongMemory |
+                                                                      NSPointerFunctionsObjectPointerPersonality];
+                if (window.rootViewController) {
+                    [stack addObject:window.rootViewController];
+                }
+                while (stack.count) {
+                    UIViewController* vc = stack.firstObject;
+                    [stack removeObjectAtIndex:0];
+                    // A presented controller answers for every descendant of its presenter, and a
+                    // navigation stack is also its children: each controller is walked once.
+                    if ([seen containsObject:vc]) {
+                        continue;
+                    }
+                    [seen addObject:vc];
+                    if ([vc isKindOfClass:tabBarVCClass] &&
+                        [vc respondsToSelector:@selector(tabViews)]) {
+                        for (id tab in [vc valueForKey:@"tabViews"]) {
+                            if ([tab respondsToSelector:@selector(pfbApplyCurrentThemeToIcon)]) {
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Warc-performSelector-leaks"
+                                [tab performSelector:@selector(pfbApplyCurrentThemeToIcon)];
+#pragma clang diagnostic pop
+                            }
+                        }
+                    }
+                    if (vc.presentedViewController) {
+                        [stack addObject:vc.presentedViewController];
+                    }
+                    if ([vc isKindOfClass:[UINavigationController class]]) {
+                        [stack addObjectsFromArray:((UINavigationController*)vc).viewControllers];
+                    }
+                    if ([vc isKindOfClass:[UITabBarController class]]) {
+                        [stack addObjectsFromArray:((UITabBarController*)vc).viewControllers];
+                    }
+                    [stack addObjectsFromArray:vc.childViewControllers];
+                }
+            }
+        }
+    };
+    if ([NSThread isMainThread]) {
+        apply();
+    } else {
+        dispatch_async(dispatch_get_main_queue(), apply);
+    }
+}
+
+// Twitter's home header is not always a UINavigationBar, so the class name is matched too.
+static BOOL PFBIsTopBarContainer(UIView* view) {
+    if ([view isKindOfClass:[UINavigationBar class]]) {
+        return YES;
+    }
+    return [NSStringFromClass([view class]) containsString:@"NavigationBar"];
+}
+
+// Twitter puts its logo in Home's top bar only. Elsewhere a small title image is another
+// glyph, such as the search bar's magnifier on Explore and search.
+static BOOL PFBBarIsHome(UIView* bar) {
+    return [NSStringFromClass([PFBOwningTopController(bar) class]) containsString:@"HomeTimelineContainer"];
+}
+
+// Every image view under a title control, painted. The title control is the
+// only place the bar puts a title image, so the reach is exactly the logo.
+static void PFBBakeTitleControlLogos(UIView* root) {
+    if ([NSStringFromClass([root class]) containsString:@"NavigationBarTitleControl"]) {
+        PFBEnumerateSubviewsRecursively(root, ^(UIView* view) {
+          if ([view isKindOfClass:[UIImageView class]]) {
+              PFBApplyLogoTint((UIImageView*)view);
+          }
+        });
+        return;
+    }
+    for (UIView* sub in root.subviews) {
+        PFBBakeTitleControlLogos(sub);
+    }
+}
+
+static void PFBRetintTemplateLogos(UIView* root) {
+    // The bar's button items are never logos: iOS 26 hosts them in a platter
+    // container, older systems in a button bar. Both are skipped whole, or a
+    // 24-point template share icon takes the logo's tint and glyph.
+    NSString* name = NSStringFromClass([root class]);
+    if ([name containsString:@"Platter"] || [name containsString:@"ButtonBar"] ||
+        [name containsString:@"BarButton"]) {
+        return;
+    }
+    if ([root isKindOfClass:[UIImageView class]]) {
+        UIImageView* imageView = (UIImageView*)root;
+        if (imageView.image &&
+            imageView.image.renderingMode == UIImageRenderingModeAlwaysTemplate &&
+            imageView.bounds.size.width > 0 && imageView.bounds.size.width < 60) {
+            PFBApplyLogoTint(imageView);
+        }
+        return;
+    }
+    for (UIView* sub in root.subviews) {
+        PFBRetintTemplateLogos(sub);
+    }
+}
+
+// The live navigation bars are swept at refresh time rather than relying on the
+// logo captured at install: this holds whichever title plugin built it, and
+// whether the bar is native or custom.
+static void PFBSweepTopBarLogos(UIView* root) {
+    if (PFBIsTopBarContainer(root)) {
+        if (PFBBarIsHome(root)) {
+            PFBRetintTemplateLogos(root);
+        }
+        return;
+    }
+    for (UIView* sub in root.subviews) {
+        PFBSweepTopBarLogos(sub);
+    }
+}
+
+// Raised on every accent change; the view-controller hook below keeps
+// re-applying until the timeline chrome is actually back on screen.
+static BOOL PFBAccentPending = NO;
+
+static void PFBApplyTabBarAccent(UITabBar* bar) {
+    BOOL active = [PFBSettings boolForKey:@"tab_bar_theming"] && PFBAccentIsActive();
+    PFBCompatReach(PFBCompatPath_tab_bar);
+    // Brand accent, not PFBCurrentAccentColor: with nothing picked the latter falls
+    // back to iOS systemBlue, which does not belong on a Twitter surface.
+    UIColor* accent = active ? PFBBrandAccentColor() : nil;
+    if (active) {
+        PFBCOMPAT_ACTION(PFBCompat_tab_bar_theming, @"tab bar tinted");
+    } else {
+        PFBCOMPAT_OBSERVE(PFBCompat_tab_bar_theming, @"tab bar found");
+    }
+
+    // The bar's tint colors its selected item; never nil, which would inherit the window tint.
+    bar.tintColor = accent ?: [UIColor labelColor];
+}
+
+// The resting color for the native bar's icons. Kept apart from tabItemColor,
+// which also drives the app's own bar: that one keeps its secondary gray for
+// the classic style, while the glass bar draws its unselected icons in the label color.
+static UIColor* PFBGlassTabRestingColor(void) {
+    return [UIColor labelColor];
+}
+
+static UIColor* tabItemColor(BOOL selected) {
+    return selected ? PFBBrandAccentColor() : [UIColor secondaryLabelColor];
+}
+
+static const void* kPFBTabOriginalKey = &kPFBTabOriginalKey;
+static const void* kPFBTabBakedKey = &kPFBTabBakedKey;
+static const void* kPFBTabColorKey = &kPFBTabColorKey;
+
+// A real UITabBar outside any UITabBarController still gets the iOS 26 treatment, so
+// the app's bar can be covered by one. It must be the real control; a decorative
+// copy loses the slide gesture.
+static const void* kPFBTabBarKey = &kPFBTabBarKey;
+static const void* kPFBTabHiddenKey = &kPFBTabHiddenKey;
+static const void* kPFBTabBridgeKey = &kPFBTabBridgeKey;
+static const void* kPFBTabPushedKey = &kPFBTabPushedKey;
+static const void* kPFBTabOursKey = &kPFBTabOursKey;
+// The tabs' pages, in order, the glass bar's items were last built from.
+static const void* kPFBTabPagesKey = &kPFBTabPagesKey;
+
+// True for the bar this file builds. A plain function, not a %new method: the
+// compiler needs a visible declaration to type-check a message send, and Logos
+// only adds %new methods at runtime.
+static BOOL PFBIsOurGlassBar(id bar) {
+    return objc_getAssociatedObject(bar, kPFBTabOursKey) != nil;
+}
+
+// Both variants of a tab glyph, by name: the filled icon is the bare name, the
+// outline is the same name with _stroke. Loaded through the app's vector loader
+// at the 24 pt the bar draws, filled black, so the bar's tint pair colors them.
+static UIImage* PFBTabVectorNamed(NSString* name) {
+    if (!name.length ||
+        ![UIImage respondsToSelector:@selector(tfn_vectorImageNamed:fitsSize:fillColor:)]) {
+        return nil;
+    }
+    return [UIImage tfn_vectorImageNamed:name
+                                fitsSize:CGSizeMake(24.0, 24.0)
+                               fillColor:[UIColor blackColor]];
+}
+
+// The ink of a glyph: its alpha summed over a small bitmap. Two variants that
+// draw the same pixels score the same, which is how a "filled" name that only
+// repeats the outline is told apart from a real second glyph.
+static double PFBGlyphInk(UIImage* glyph) {
+    if (!glyph) {
+        return 0;
+    }
+    const size_t side = 24;
+    uint8_t* pixels = calloc(side * side, 1);
+    CGColorSpaceRef gray = CGColorSpaceCreateDeviceGray();
+    CGContextRef context = CGBitmapContextCreate(pixels, side, side, 8, side, gray,
+                                                 kCGImageAlphaOnly);
+    CGColorSpaceRelease(gray);
+    double ink = 0;
+    if (context) {
+        CGContextDrawImage(context, CGRectMake(0, 0, side, side), glyph.CGImage);
+        for (size_t i = 0; i < side * side; i++) {
+            ink += pixels[i];
+        }
+        CGContextRelease(context);
+    }
+    free(pixels);
+    return ink;
+}
+
+// An integer a getter returns, read only when its signature says it returns one.
+static BOOL PFBTabInteger(id object, NSString* name, long long* value) {
+    SEL selector = NSSelectorFromString(name);
+    if (![object respondsToSelector:selector]) {
+        return NO;
+    }
+    char type = [object methodSignatureForSelector:selector].methodReturnType[0];
+    if (type != 'q' && type != 'Q' && type != 'l' && type != 'L') {
+        return NO;
+    }
+    *value = ((long long (*)(id, SEL))objc_msgSend)(object, selector);
+    return YES;
+}
+
+// A flag a getter returns, read only when its signature says it returns one.
+static BOOL PFBTabFlag(id object, NSString* name) {
+    SEL selector = NSSelectorFromString(name);
+    if (![object respondsToSelector:selector] ||
+        [object methodSignatureForSelector:selector].methodReturnType[0] != 'B') {
+        return NO;
+    }
+    return ((BOOL (*)(id, SEL))objc_msgSend)(object, selector);
+}
+
+// An object a getter returns, read only when its signature says it returns one.
+static id PFBTabObject(id object, NSString* name) {
+    SEL selector = NSSelectorFromString(name);
+    if (![object respondsToSelector:selector] ||
+        [object methodSignatureForSelector:selector].methodReturnType[0] != '@') {
+        return nil;
+    }
+    return ((id (*)(id, SEL))objc_msgSend)(object, selector);
+}
+
+// The badge a Twitter tab shows: its unread count, capped as its own badge view caps
+// it ("20+"), an empty string for the unread dot, nil for none.
+static NSString* PFBTabBadgeText(UIView* tab) {
+    long long count = 0;
+    if (PFBTabInteger(tab, @"badgeCount", &count) && count > 0) {
+        NSNumber* limit = PFBTabObject(PFBTabObject(tab, @"badgeView"), @"overflowLimit");
+        if ([limit isKindOfClass:[NSNumber class]] && limit.longLongValue > 0 &&
+            count > limit.longLongValue) {
+            return [NSString stringWithFormat:@"%lld+", limit.longLongValue];
+        }
+        return [NSString stringWithFormat:@"%lld", count];
+    }
+    return PFBTabFlag(tab, @"hasUnreadContent") ? @"" : nil;
+}
+
+// One tab's badge as Twitter draws it: the count with its colors and font, or, with an
+// empty text, the unread dot's image.
+@interface PFBTabBadge : NSObject
+@property (nonatomic, copy) NSString* text;
+@property (nonatomic, strong) UIColor* fill;
+@property (nonatomic, strong) UIColor* ink;
+@property (nonatomic, strong) UIFont* font;
+@property (nonatomic, strong) UIImage* dot;
+@end
+
+@implementation PFBTabBadge
+@end
+
+static const void* kPFBItemBadgeKey = &kPFBItemBadgeKey;
+static const void* kPFBBadgeLayerKey = &kPFBBadgeLayerKey;
+static const void* kPFBBadgeLabelsKey = &kPFBBadgeLabelsKey;
+static const void* kPFBBadgeDotsKey = &kPFBBadgeDotsKey;
+
+static PFBTabBadge* PFBTabBadgeFor(UIView* tab) {
+    NSString* text = PFBTabBadgeText(tab);
+    if (!text) {
+        return nil;
+    }
+    PFBTabBadge* badge = [PFBTabBadge new];
+    badge.text = text;
+    if (text.length) {
+        id view = PFBTabObject(tab, @"badgeView");
+        UIColor* fill = PFBTabObject(view, @"badgeColor");
+        UIColor* ink = PFBTabObject(view, @"textColor");
+        UIFont* font = PFBTabObject(view, @"font");
+        badge.fill = [fill isKindOfClass:[UIColor class]] ? fill : nil;
+        badge.ink = [ink isKindOfClass:[UIColor class]] ? ink : nil;
+        badge.font = [font isKindOfClass:[UIFont class]] ? font : nil;
+    } else {
+        UIImageView* indicator = PFBTabObject(tab, @"unreadIndicatorImageView");
+        badge.dot = [indicator isKindOfClass:[UIImageView class]] ? indicator.image : nil;
+    }
+    return badge;
+}
+
+// The native bar's icon frames in item order, in the bar's coordinates (mirrored in RTL).
+// Icons sit in _UITabButton (glass) or UITabBarButton (classic); the glass bar lays each
+// tab out twice, selected and normal, and the normal copies are read.
+static NSArray<NSValue*>* PFBNativeIconFrames(UITabBar* bar) {
+    NSMutableDictionary<NSNumber*, NSValue*>* byCenter = [NSMutableDictionary dictionary];
+    PFBWalkAllSubviews(bar, 12, ^(UIView* sub) {
+      NSString* button = NSStringFromClass([sub.superview class]);
+      NSString* container = NSStringFromClass([sub.superview.superview class]);
+      BOOL inButton = [button containsString:@"TabButton"] || [button containsString:@"TabBarButton"];
+      if ([sub isKindOfClass:[UIImageView class]] && inButton && ![container containsString:@"Selected"]) {
+          CGRect frame = [sub convertRect:sub.bounds toView:bar];
+          byCenter[@(lround(CGRectGetMidX(frame)))] = [NSValue valueWithCGRect:frame];
+      }
+    });
+    NSArray<NSNumber*>* centers = [byCenter.allKeys sortedArrayUsingSelector:@selector(compare:)];
+    if (bar.effectiveUserInterfaceLayoutDirection == UIUserInterfaceLayoutDirectionRightToLeft) {
+        centers = centers.reverseObjectEnumerator.allObjects;
+    }
+    NSMutableArray<NSValue*>* frames = [NSMutableArray array];
+    for (NSNumber* center in centers) {
+        [frames addObject:byCenter[center]];
+    }
+    return frames;
+}
+
+static BOOL PFBBarHasBadge(UITabBar* bar) {
+    for (UITabBarItem* item in bar.items) {
+        if (objc_getAssociatedObject(item, kPFBItemBadgeKey)) {
+            return YES;
+        }
+    }
+    return NO;
+}
+
+// The view at an item's index in one of the layer's badge lists, made on first use.
+static UIView* PFBBadgeView(UIView* layer, const void* key, Class cls, NSUInteger index) {
+    NSMutableArray<UIView*>* views = objc_getAssociatedObject(layer, key);
+    if (!views) {
+        views = [NSMutableArray array];
+        objc_setAssociatedObject(layer, key, views, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    }
+    while (views.count <= index) {
+        UIView* view = [[cls alloc] init];
+        view.hidden = YES;
+        view.layer.masksToBounds = YES;
+        [layer addSubview:view];
+        [views addObject:view];
+    }
+    return views[index];
+}
+
+// The glass bar draws an item's badge in its own red, 18 pt high, whatever color it is
+// given, so Twitter's badges are drawn over the bar, where Twitter places them.
+static void PFBPlaceTabBadges(UITabBar* bar, UIView* layer) {
+    NSArray<UITabBarItem*>* items = bar.items;
+    BOOL any = PFBBarHasBadge(bar);
+    NSArray<NSValue*>* icons = any ? PFBNativeIconFrames(bar) : nil;
+    BOOL placeable = icons.count == items.count;
+    static BOOL saidMissing;
+    if (any && !placeable && !saidMissing) {
+        saidMissing = YES;
+        PFBDebugLog(@"[tabbar] badges not drawn: %lu icon(s) found for %lu tab(s)",
+                    (unsigned long)icons.count, (unsigned long)items.count);
+    }
+    for (NSUInteger i = 0; i < items.count; i++) {
+        PFBTabBadge* badge = objc_getAssociatedObject(items[i], kPFBItemBadgeKey);
+        UILabel* label = (UILabel*)PFBBadgeView(layer, kPFBBadgeLabelsKey, [UILabel class], i);
+        UIImageView* dot = (UIImageView*)PFBBadgeView(layer, kPFBBadgeDotsKey, [UIImageView class], i);
+        BOOL counted = placeable && badge.text.length > 0;
+        BOOL unread = placeable && badge && badge.text.length == 0 && badge.dot;
+        label.hidden = !counted;
+        dot.hidden = !unread;
+        if (!counted && !unread) {
+            continue;
+        }
+        CGRect icon = icons[i].CGRectValue;
+        if (counted) {
+            UIFont* font = badge.font ?: [UIFont boldSystemFontOfSize:11.0];
+            CGSize textSize = [badge.text sizeWithAttributes:@{NSFontAttributeName : font}];
+            CGFloat height = MAX(16.0, ceil(textSize.height));
+            CGFloat width = MAX(height, ceil(textSize.width) + 10.0);
+            label.font = font;
+            label.text = badge.text;
+            label.textAlignment = NSTextAlignmentCenter;
+            label.textColor = badge.ink ?: [UIColor whiteColor];
+            label.backgroundColor = badge.fill ?: bar.tintColor;
+            label.layer.cornerRadius = height / 2.0;
+            // Twitter's placement: the center 12 pt right of the icon's center and half
+            // the badge's height above it.
+            label.frame = CGRectMake(CGRectGetMidX(icon) + 12.0 - width / 2.0,
+                                     CGRectGetMidY(icon) - height, width, height);
+        } else {
+            UIImage* image = [badge.dot imageWithRenderingMode:UIImageRenderingModeAlwaysOriginal];
+            CGSize size = image.size;
+            dot.image = image;
+            // Twitter's placement: the center 8 pt right of the icon's center, on its top edge.
+            dot.frame = CGRectMake(CGRectGetMidX(icon) + 8.0 - size.width / 2.0,
+                                   CGRectGetMinY(icon) - size.height / 2.0, size.width, size.height);
+        }
+        PFBCompatReach(PFBCompatPath_tab_badges);
+    }
+    // Views left past the last item, once the bar has lost a tab.
+    for (NSArray<UIView*>* views in @[objc_getAssociatedObject(layer, kPFBBadgeLabelsKey) ?: @[],
+                                      objc_getAssociatedObject(layer, kPFBBadgeDotsKey) ?: @[]]) {
+        for (NSUInteger i = items.count; i < views.count; i++) {
+            views[i].hidden = YES;
+        }
+    }
+}
+
+// The layer the badges sit in: one view spanning the bar, closed to touches. As the
+// bar's last subview it is drawn above the bar's buttons and laid out after them, so
+// its own layout places the badges.
+@interface PFBTabBadgeLayer : UIView
+@end
+
+@implementation PFBTabBadgeLayer
+
+- (void)layoutSubviews {
+    [super layoutSubviews];
+    if ([self.superview isKindOfClass:[UITabBar class]]) {
+        PFBPlaceTabBadges((UITabBar*)self.superview, self);
+    }
+}
+
+@end
+
+// Has the bar's badges placed again; the layer is made for the first badge.
+static void PFBRefreshTabBadges(UITabBar* bar) {
+    UIView* layer = objc_getAssociatedObject(bar, kPFBBadgeLayerKey);
+    if (!layer) {
+        if (!PFBBarHasBadge(bar)) {
+            return;
+        }
+        layer = [[PFBTabBadgeLayer alloc] initWithFrame:bar.bounds];
+        layer.userInteractionEnabled = NO;
+        layer.accessibilityElementsHidden = YES;
+        layer.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+        objc_setAssociatedObject(bar, kPFBBadgeLayerKey, layer, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    }
+    if (layer.superview != bar) {
+        [bar addSubview:layer];
+    } else if (bar.subviews.lastObject != layer) {
+        [bar bringSubviewToFront:layer];
+    }
+    layer.frame = bar.bounds;
+    [layer setNeedsLayout];
+}
+
+// Twitter's badges stay on its own bar, faded out behind the native one: each item
+// keeps the badge of the tab it stands for, and the badge layer draws it.
+static void PFBRelayTabBadges(UITabBar* native, NSArray<UIView*>* tabs) {
+    BOOL changed = NO;
+    for (UITabBarItem* item in native.items) {
+        if (item.tag < 0 || (NSUInteger)item.tag >= tabs.count) {
+            continue;
+        }
+        PFBTabBadge* badge = PFBTabBadgeFor(tabs[(NSUInteger)item.tag]);
+        PFBTabBadge* kept = objc_getAssociatedObject(item, kPFBItemBadgeKey);
+        if (badge.text == kept.text || [badge.text isEqualToString:kept.text]) {
+            continue;
+        }
+        objc_setAssociatedObject(item, kPFBItemBadgeKey, badge, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        changed = YES;
+    }
+    if (changed) {
+        PFBRefreshTabBadges(native);
+    }
+}
+
+// Marks an unknown cell as outside and pushes it, so no cell enters the stack twice and
+// the stack never holds more entries than there are cells.
+static inline void PFBFloodPush(uint8_t* cell, size_t* stack, size_t* top, size_t k) {
+    if (cell[k] == 0) {
+        cell[k] = 2;
+        stack[(*top)++] = k;
+    }
+}
+
+// A selected glyph built from its outline, for tabs with no true filled variant.
+// The outline is rendered as a mask, the outside flooded from the edges, and the
+// enclosed area is what remains. Drawn at twice the size, returned at 24 pt.
+static UIImage* PFBFilledGlyph(UIImage* outline) {
+    if (!outline.CGImage) {
+        return nil;
+    }
+    const size_t side = 48;
+    const size_t count = side * side;
+    uint8_t* alpha = calloc(count, 1);
+    CGColorSpaceRef gray = CGColorSpaceCreateDeviceGray();
+    CGContextRef maskContext =
+        CGBitmapContextCreate(alpha, side, side, 8, side, gray, kCGImageAlphaOnly);
+    CGColorSpaceRelease(gray);
+    if (!maskContext) {
+        free(alpha);
+        return nil;
+    }
+    CGContextDrawImage(maskContext, CGRectMake(0, 0, side, side), outline.CGImage);
+    CGContextRelease(maskContext);
+
+    // 0 = unknown, 1 = ink, 2 = outside.
+    uint8_t* cell = calloc(count, 1);
+    for (size_t k = 0; k < count; k++) {
+        cell[k] = alpha[k] > 127 ? 1 : 0;
+    }
+    size_t* stack = malloc(count * sizeof(size_t));
+    size_t top = 0;
+    for (size_t x = 0; x < side; x++) {
+        PFBFloodPush(cell, stack, &top, x);
+        PFBFloodPush(cell, stack, &top, (side - 1) * side + x);
+    }
+    for (size_t y = 1; y + 1 < side; y++) {
+        PFBFloodPush(cell, stack, &top, y * side);
+        PFBFloodPush(cell, stack, &top, y * side + side - 1);
+    }
+    while (top > 0) {
+        size_t k = stack[--top];
+        size_t x = k % side;
+        size_t y = k / side;
+        if (x > 0) {
+            PFBFloodPush(cell, stack, &top, k - 1);
+        }
+        if (x + 1 < side) {
+            PFBFloodPush(cell, stack, &top, k + 1);
+        }
+        if (y > 0) {
+            PFBFloodPush(cell, stack, &top, k - side);
+        }
+        if (y + 1 < side) {
+            PFBFloodPush(cell, stack, &top, k + side);
+        }
+    }
+    free(stack);
+
+    // The outline stays and a disc sits at the center of the enclosed area, at 62 %
+    // of its radius. Center and radius come from the enclosed pixels, so the shape
+    // follows whatever glyph the bundle provides.
+    double sumX = 0;
+    double sumY = 0;
+    size_t enclosed = 0;
+    for (size_t k = 0; k < count; k++) {
+        if (cell[k] == 0) {
+            sumX += (double)(k % side);
+            sumY += (double)(k / side);
+            enclosed++;
+        }
+    }
+    double centerX = enclosed ? sumX / (double)enclosed : (double)side / 2.0;
+    double centerY = enclosed ? sumY / (double)enclosed : (double)side / 2.0;
+    double radius = enclosed ? sqrt((double)enclosed / M_PI) * 0.62 : 0;
+    uint8_t* rgba = calloc(count * 4, 1);
+    for (size_t k = 0; k < count; k++) {
+        double dx = (double)(k % side) - centerX;
+        double dy = (double)(k / side) - centerY;
+        BOOL inDisc = radius > 0 && (dx * dx + dy * dy) <= radius * radius;
+        if (cell[k] == 1 || inDisc) {
+            rgba[k * 4 + 3] = 255;
+        }
+    }
+    free(cell);
+    free(alpha);
+    CGColorSpaceRef rgb = CGColorSpaceCreateDeviceRGB();
+    CGContextRef imageContext = CGBitmapContextCreate(
+        rgba, side, side, 8, side * 4, rgb, kCGImageAlphaPremultipliedLast);
+    CGColorSpaceRelease(rgb);
+    if (!imageContext) {
+        free(rgba);
+        return nil;
+    }
+    CGImageRef cgImage = CGBitmapContextCreateImage(imageContext);
+    CGContextRelease(imageContext);
+    free(rgba);
+    if (!cgImage) {
+        return nil;
+    }
+    UIImage* filled = [[UIImage imageWithCGImage:cgImage scale:2.0 orientation:UIImageOrientationUp]
+        imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate];
+    CGImageRelease(cgImage);
+    return filled;
+}
+
+// A tab glyph at full opacity. Resting icons are drawn at 60 % black baked into
+// the image, and a template renders tint through alpha, so 0.6 stays gray however
+// it is tinted. Compositing the glyph over itself six times drives 0.6 to 0.996.
+static UIImage* PFBOpaqueTabGlyph(UIImage* source) {
+    if (!source || source.size.width < 1.0 || source.size.height < 1.0) {
+        return source;
+    }
+    UIGraphicsImageRendererFormat* format = [UIGraphicsImageRendererFormat preferredFormat];
+    format.opaque = NO;
+    format.scale = source.scale;
+    UIGraphicsImageRenderer* renderer =
+        [[UIGraphicsImageRenderer alloc] initWithSize:source.size format:format];
+    UIImage* solid = [renderer imageWithActions:^(UIGraphicsImageRendererContext* context) {
+      CGRect box = CGRectMake(0, 0, source.size.width, source.size.height);
+      for (NSInteger pass = 0; pass < 6; pass++) {
+          [source drawInRect:box blendMode:kCGBlendModeNormal alpha:1.0];
+      }
+    }];
+    return [solid imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate];
+}
+
+static UIView* PFBCustomTabBar(UIView* host) {
+    __block UIView* found = nil;
+    PFBWalkAllSubviews(host, 12, ^(UIView* sub) {
+      if (!found && [NSStringFromClass([sub class]) containsString:@"CustomTabBar"]) {
+          found = sub;
+      }
+    });
+    return found;
+}
+
+// Twitter's tab views, left to right.
+static NSArray<UIView*>* PFBTabViews(UIView* bar) {
+    NSMutableArray<UIView*>* tabs = [NSMutableArray array];
+    PFBWalkAllSubviews(bar, 12, ^(UIView* sub) {
+      if ([NSStringFromClass([sub class]) isEqualToString:@"T1TabView"]) {
+          [tabs addObject:sub];
+      }
+    });
+    [tabs sortUsingComparator:^NSComparisonResult(UIView* a, UIView* b) {
+      CGFloat ax = [a convertPoint:CGPointZero toView:bar].x;
+      CGFloat bx = [b convertPoint:CGPointZero toView:bar].x;
+      return ax < bx ? NSOrderedAscending : (ax > bx ? NSOrderedDescending : NSOrderedSame);
+    }];
+    return tabs;
+}
+
+static NSUInteger PFBSelectedTabIndex(NSArray<UIView*>* tabs) {
+    for (NSUInteger i = 0; i < tabs.count; i++) {
+        id tab = tabs[i];
+        if ([tab respondsToSelector:@selector(isSelected)] && [tab isSelected]) {
+            return i;
+        }
+    }
+    return NSNotFound;
+}
+
+// First responder up the chain that answers `sel`, starting at the view.
+static id PFBResponderAnswering(UIView* view, SEL sel) {
+    UIResponder* candidate = view;
+    while (candidate) {
+        if ([candidate respondsToSelector:sel]) {
+            return candidate;
+        }
+        candidate = candidate.nextResponder;
+    }
+    return nil;
+}
+
+// Selection routing: the app's own selector first, then the bar's.
+static void PFBRouteTabSelection(UIView* hostBar, NSArray<UIView*>* tabs, NSUInteger index) {
+    if (index >= tabs.count) {
+        return;
+    }
+    id target = PFBResponderAnswering(hostBar, @selector(selectTabAtIndex:));
+    if (target) {
+        ((void (*)(id, SEL, NSInteger))objc_msgSend)(target, @selector(selectTabAtIndex:),
+                                                     (NSInteger)index);
+        return;
+    }
+    PFBDebugLog(@"[tabbar] no selectTabAtIndex: above %@", NSStringFromClass([hostBar class]));
+    target = PFBResponderAnswering(hostBar, @selector(setSelectedIndex:));
+    if (target) {
+        ((void (*)(id, SEL, NSInteger))objc_msgSend)(target, @selector(setSelectedIndex:),
+                                                     (NSInteger)index);
+    }
+}
+
+@interface PFBTabBarBridge : NSObject <UITabBarDelegate>
+@property (nonatomic, weak) UIView* host;
+@end
+
+@implementation PFBTabBarBridge
+
+- (void)tabBar:(UITabBar*)tabBar didSelectItem:(UITabBarItem*)item {
+    UIView* host = self.host;
+    if (!host) {
+        return;
+    }
+    UIView* bar = PFBCustomTabBar(host);
+    if (!bar) {
+        PFBDebugLog(@"[tabbar] tap ignored: no CustomTabBar under the host");
+        return;
+    }
+    NSArray<UIView*>* tabs = PFBTabViews(bar);
+    NSUInteger index = (NSUInteger)item.tag;
+    if (index >= tabs.count) {
+        PFBDebugLog(@"[tabbar] tap %lu out of range: the app shows %lu tab(s)",
+                    (unsigned long)index, (unsigned long)tabs.count);
+        return;
+    }
+    PFBRouteTabSelection(bar, tabs, index);
+}
+
+@end
+
+static void PFBApplyTabBarGlassBody(UIView* host);
+
+// The rebuilt glass bar is drawn only with custom_glass_tab_bar on, which no settings
+// row shows: Twitter's own Liquid Glass bar is the one asked for.
+static BOOL PFBCustomGlassBarWanted(void) {
+    return [PFBSettings boolForKey:@"enable_liquid_glass"] && [PFBSettings boolForKey:@"custom_glass_tab_bar"];
+}
+
+static void PFBApplyTabBarGlass(UIView* host) {
+    // Never re-entered. This runs from layout passes, from the collapse ratio
+    // on every scroll frame, and from the tab views' own updates; routing a
+    // selection from inside it can bring it straight back in.
+    static BOOL applying = NO;
+    if (applying) {
+        return;
+    }
+    applying = YES;
+    PFBApplyTabBarGlassBody(host);
+    applying = NO;
+}
+
+static void PFBApplyTabBarGlassBody(UIView* host) {
+    UITabBar* native = objc_getAssociatedObject(host, kPFBTabBarKey);
+
+    if (!PFBCustomGlassBarWanted()) {
+        // Observed once the app's bar and its tabs are found, as the glass style needs both.
+        if (PFBCompatNeedsObservation(PFBCompat_enable_liquid_glass)) {
+            UIView* appBar = PFBCustomTabBar(host);
+            if (appBar.superview && PFBTabViews(appBar).count > 0) {
+                PFBCOMPAT_OBSERVE(PFBCompat_enable_liquid_glass, @"tab bar found");
+            }
+        }
+        if (native) {
+            [native removeFromSuperview];
+            objc_setAssociatedObject(host, kPFBTabBarKey, nil,
+                                     OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+            objc_setAssociatedObject(host, kPFBTabBridgeKey, nil,
+                                     OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        }
+        for (UIView* faded in objc_getAssociatedObject(host, kPFBTabHiddenKey)) {
+            faded.alpha = 1.0;
+        }
+        objc_setAssociatedObject(host, kPFBTabHiddenKey, nil,
+                                 OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        return;
+    }
+
+    UIView* bar = PFBCustomTabBar(host);
+    UIView* parent = bar.superview;
+    NSArray<UIView*>* tabs = bar ? PFBTabViews(bar) : nil;
+    if (!parent || tabs.count == 0) {
+        return;  // Laid out later; the next pass will find it.
+    }
+
+    if (!native) {
+        PFBTabBarBridge* bridge = [[PFBTabBarBridge alloc] init];
+        bridge.host = host;
+        native = [[UITabBar alloc] initWithFrame:parent.bounds];
+        native.delegate = bridge;
+        native.autoresizingMask =
+            UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+        objc_setAssociatedObject(native, kPFBTabOursKey, @YES,
+                                 OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        objc_setAssociatedObject(host, kPFBTabBarKey, native,
+                                 OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        objc_setAssociatedObject(host, kPFBTabBridgeKey, bridge,
+                                 OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        PFBCOMPAT_ACTION(PFBCompat_enable_liquid_glass, @"native tab bar built");
+    }
+
+    // Items carry the app's own icons and titles, so the bar reads as Twitter's
+    // while UIKit draws the platter, the capsule and the slide gesture. A reorder
+    // keeps the count, so the pages are compared too.
+    NSMutableArray<NSString*>* pages = [NSMutableArray arrayWithCapacity:tabs.count];
+    for (id tab in tabs) {
+        NSString* page = [tab respondsToSelector:@selector(scribePage)] ? [tab scribePage] : nil;
+        [pages addObject:page ?: @""];
+    }
+    if (native.items.count != tabs.count ||
+        ![objc_getAssociatedObject(native, kPFBTabPagesKey) isEqualToArray:pages]) {
+        objc_setAssociatedObject(native, kPFBTabPagesKey, [pages copy], OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        NSMutableArray<UITabBarItem*>* items = [NSMutableArray array];
+        for (NSUInteger i = 0; i < tabs.count; i++) {
+            id tab = tabs[i];
+            UIImage* image = nil;
+            if ([tab respondsToSelector:@selector(imageView)]) {
+                UIImageView* icon = (UIImageView*)[tab imageView];
+                // The untouched image, never the baked one: a baked copy carries
+                // the color held at install time and never changes. A clean
+                // template lets UIKit color selected and unselected itself.
+                image = objc_getAssociatedObject(icon, kPFBTabOriginalKey) ?: icon.image;
+            }
+            // Template images, colored by the bar's own tint pair below. Baked
+            // pixels or per-item appearances would paint every icon in the accent.
+            NSString* name = [tab respondsToSelector:@selector(imageName)]
+                                 ? [PFBCustomTabBarUtility imageNameForTabView:tab]
+                                 : nil;
+            NSString* base = [name hasSuffix:@"_stroke"]
+                                 ? [name substringToIndex:name.length - 7]
+                                 : name;
+            UIImage* outline = PFBTabVectorNamed([base stringByAppendingString:@"_stroke"]);
+            UIImage* filled = PFBTabVectorNamed(base);
+            // The tab's own image is the fallback when the bundle has no glyph
+            // under that name; it is whichever variant the tab shows right now.
+            UIImage* resting = outline ?: image;
+            double restingInk = PFBGlyphInk(resting);
+            double filledInk = PFBGlyphInk(filled);
+            // A true fill carries well over twice its outline's ink. A variant
+            // under 1.6x is another stroke, not a fill, and gets a disc inside its
+            // outline instead so the selected state still reads heavier.
+            if (!filled || filledInk < restingInk * 1.6) {
+                filled = PFBFilledGlyph(resting);
+            }
+            UITabBarItem* item = [[UITabBarItem alloc] initWithTitle:nil
+                                                               image:PFBOpaqueTabGlyph(resting)
+                                                                 tag:(NSInteger)i];
+            item.selectedImage = filled ? PFBOpaqueTabGlyph(filled) : nil;
+            [items addObject:item];
+        }
+        native.items = items;
+        PFBRefreshTabBadges(native);
+    }
+    // Only the bar's tint pair, which the iOS 26 floating bar honors while ignoring
+    // UITabBarAppearance: the accent when Selected tab is on and an accent is active,
+    // otherwise the label color.
+    BOOL themed =
+        [PFBSettings boolForKey:@"tab_bar_theming"] && PFBAccentIsActive();
+    UIColor* accent = themed ? tabItemColor(YES) : [UIColor labelColor];
+    UIColor* resting = PFBGlassTabRestingColor();
+    BOOL labels = [PFBSettings boolForKey:@"restore_tab_labels"];
+    PFBCompatReach(PFBCompatPath_native_tab_bar);
+    if (themed) {
+        PFBCOMPAT_ACTION(PFBCompat_tab_bar_theming, @"native tab bar tinted");
+    }
+    if (![native.tintColor isEqual:accent]) {
+        native.tintColor = accent;
+    }
+    if (![native.unselectedItemTintColor isEqual:resting]) {
+        native.unselectedItemTintColor = resting;
+    }
+
+    // Titles follow the setting: the native bar carries them, so the option also
+    // works under Liquid Glass.
+    BOOL titled = NO;
+    for (UITabBarItem* item in native.items) {
+        NSInteger tag = item.tag;
+        NSString* wanted = nil;
+        if (labels && tag >= 0 && (NSUInteger)tag < tabs.count) {
+            id tab = tabs[(NSUInteger)tag];
+            if ([tab respondsToSelector:@selector(title)]) {
+                wanted = [tab title];
+            }
+        }
+        if (wanted != item.title && ![wanted isEqualToString:item.title]) {
+            item.title = wanted;
+        }
+        titled = titled || item.title.length > 0;
+    }
+    if (labels && titled) {
+        PFBCOMPAT_ACTION(PFBCompat_restore_tab_labels, @"labels under the tab icons");
+    }
+    PFBRelayTabBadges(native, tabs);
+
+    // On top of the host bar, re-seated every pass: the bar has to receive the
+    // touches for the long-press-and-slide to exist at all.
+    NSUInteger nativeIndex = [parent.subviews indexOfObject:native];
+    NSUInteger barIndex = [parent.subviews indexOfObject:bar];
+    BOOL seated = native.superview == parent && nativeIndex != NSNotFound &&
+                  barIndex != NSNotFound && nativeIndex > barIndex;
+    if (!seated) {
+        [native removeFromSuperview];
+        [parent insertSubview:native aboveSubview:bar];
+    }
+    if (!CGRectEqualToRect(native.frame, parent.bounds)) {
+        native.frame = parent.bounds;
+    }
+    // Twitter hides its own bar, never the view this one shares with it.
+    if (native.hidden != bar.hidden) {
+        native.hidden = bar.hidden;
+        if (bar.hidden) {
+            PFBCompatReach(PFBCompatPath_native_bar_hidden);
+        }
+    }
+
+    // Selection, both ways. The slide gesture sets selectedItem without calling
+    // the delegate, so the tap route alone never sees it. The chosen tab is
+    // whatever differs from the index last pushed here.
+    NSUInteger appIndex = PFBSelectedTabIndex(tabs);
+    NSUInteger shownIndex = native.selectedItem
+                                ? [native.items indexOfObject:native.selectedItem]
+                                : NSNotFound;
+    NSNumber* pushed = objc_getAssociatedObject(host, kPFBTabPushedKey);
+    BOOL readerMoved = shownIndex != NSNotFound && shownIndex != appIndex &&
+                       (pushed == nil || shownIndex != pushed.unsignedIntegerValue);
+
+    if (readerMoved) {
+        PFBRouteTabSelection(bar, tabs, shownIndex);
+        objc_setAssociatedObject(host, kPFBTabPushedKey, @(shownIndex),
+                                 OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    } else if (appIndex != NSNotFound && appIndex < native.items.count &&
+               native.selectedItem != native.items[appIndex]) {
+        native.selectedItem = native.items[appIndex];
+        objc_setAssociatedObject(host, kPFBTabPushedKey, @(appIndex),
+                                 OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    }
+
+    // Faded to alpha 0, never hidden. `hidden` takes a view out of layout and out
+    // of hit-testing, and the app's own selectTabAtIndex: then does nothing. At
+    // alpha 0 the app keeps a live, laid-out bar and simply stops drawing it.
+    NSHashTable<UIView*>* hidden = objc_getAssociatedObject(host, kPFBTabHiddenKey);
+    if (!hidden) {
+        hidden = [NSHashTable weakObjectsHashTable];
+        objc_setAssociatedObject(host, kPFBTabHiddenKey, hidden, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    }
+    void (^hide)(UIView*) = ^(UIView* view) {
+      if (view) {
+          [hidden addObject:view];
+      }
+      if (view.alpha != 0.0) {
+          view.alpha = 0.0;
+      }
+    };
+    // Its children, never the bar itself. The app owns alpha on TFNCustomTabBar,
+    // which setTabBarCollapseRatio: animates on scroll, so anything set there is
+    // overwritten within a frame. The tab host views carry the icons.
+    for (UIView* child in bar.subviews) {
+        hide(child);
+    }
+    // Every sibling that draws something, not only the opaque ones: the app's
+    // own capsule and its faded icons carry a translucent fill that would show
+    // through the glass.
+    for (UIView* sub in parent.subviews) {
+        if (sub == native || sub == bar) {
+            continue;
+        }
+        hide(sub);
+    }
+    PFBWalkAllSubviews(host, 12, ^(UIView* sub) {
+      // The native bar, its own tree, the app bar and its tree, and any view the
+      // native bar sits inside. Sparing the parent outright leaves the container
+      // holding the white panel visible beneath.
+      if (sub == native || [sub isDescendantOfView:native] || sub == bar ||
+          [sub isDescendantOfView:bar] || [native isDescendantOfView:sub]) {
+          return;
+      }
+      UIColor* color = sub.backgroundColor;
+      CGFloat fill = 0;
+      if (color && ([color getWhite:NULL alpha:&fill] ||
+                     [color getRed:NULL green:NULL blue:NULL alpha:&fill]) &&
+          fill > 0.05) {
+          hide(sub);
+      }
+    });
+}
+
+// True when a native bar is installed for the host above this view.
+static BOOL PFBHostHasNativeBar(UIView* view) {
+    UIView* host = view;
+    while (host && ![NSStringFromClass([host class]) isEqualToString:@"T1TabBarHostView"]) {
+        host = host.superview;
+    }
+    return host && objc_getAssociatedObject(host, kPFBTabBarKey) != nil;
+}
+
+// The app puts its own bar back on a tab change or a timeline scroll, and
+// neither goes through a host layout pass. Every hook that fires on those two
+// paths reapplies through here.
+static void PFBReapplyTabBarFrom(UIView* view) {
+    UIView* host = view;
+    while (host && ![NSStringFromClass([host class]) isEqualToString:@"T1TabBarHostView"]) {
+        host = host.superview;
+    }
+    if (host) {
+        PFBApplyTabBarGlass(host);
+    }
+}
+
+static void PFBSweepNativeTabBars(UIView* root) {
+    if ([root isKindOfClass:[UITabBar class]]) {
+        PFBApplyTabBarAccent((UITabBar*)root);
+        [root setNeedsLayout];
+        return;
+    }
+    for (UIView* sub in root.subviews) {
+        PFBSweepNativeTabBars(sub);
+    }
+}
+
+// Twitter hides the tab bar on its settings screens, so finding one — native
+// UITabBar, or the T1 custom bar whose class names all contain "TabBar" — is
+// the signal that the timeline chrome is actually back on screen.
+static BOOL PFBViewTreeHasTabBar(UIView* root) {
+    if ([root isKindOfClass:[UITabBar class]] ||
+        [NSStringFromClass([root class]) containsString:@"TabBar"]) {
+        return YES;
+    }
+    for (UIView* sub in root.subviews) {
+        if (PFBViewTreeHasTabBar(sub)) {
+            return YES;
+        }
+    }
+    return NO;
+}
+
+// Reapplies the custom accent to whatever chrome is on screen.
+static void PFBReapplyChromeAccent(void) {
+    void (^run)(void) = ^{
+        PFBRetintRegisteredLogos();
+        PFBRestyleGlassTabBars();
+        for (id scene in UIApplication.sharedApplication.connectedScenes) {
+            if (![scene isKindOfClass:objc_getClass("UIWindowScene")]) {
+                continue;
+            }
+            for (UIWindow* w in [scene windows]) {
+                PFBSweepTopBarLogos(w);
+                // Ungated: the applier is bidirectional and decides
+                // accent-or-native itself, so the native colors also come back
+                // when the switch is turned off.
+                PFBSweepNativeTabBars(w);
+                [w setNeedsLayout];
+                [w layoutIfNeeded];
+            }
+        }
+    };
+    if ([NSThread isMainThread]) { run(); }
+    else { dispatch_async(dispatch_get_main_queue(), run); }
+}
+
+// Twitter's OWN repaint path: TFNDynamicColorManager's reloadDynamicColors
+// walks every registered dynamic-color setter and repaints, which is what
+// the navigation bar and tab bar actually use.
+static void PFBReloadTwitterDynamicColors(void) {
+    Class managerClass = objc_getClass("TFNDynamicColorManager");
+    SEL shared = NSSelectorFromString(@"sharedColorManager");
+    SEL reload = NSSelectorFromString(@"reloadDynamicColors");
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Warc-performSelector-leaks"
+    id manager = [managerClass respondsToSelector:shared] ? [managerClass performSelector:shared] : nil;
+    if ([manager respondsToSelector:reload]) {
+        [manager performSelector:reload];
+    }
+#pragma clang diagnostic pop
+
+    // Broadcast the notifications Twitter's views observe: the tab icons' vector images
+    // register dynamic-color info on this bus, so posting it directly makes them
+    // re-resolve through the palette hooks even when the accessor finds nothing.
+    NSNotificationCenter* nc = NSNotificationCenter.defaultCenter;
+    [nc postNotificationName:@"TFNDynamicColorsWillReloadNotification" object:nil];
+    [nc postNotificationName:@"TFNDynamicColorsDidReloadNotification" object:nil];
+    [nc postNotificationName:@"TAEColorSettingsDidChangeUserDefaultsNotification"
+                      object:nil];
+}
+
+// MARK: - Accent settle timer
+
+// No mount callback is guaranteed to fire when the timeline chrome returns, and
+// the hosting view differs between styles. After an accent change the idempotent
+// appliers re-run on a short cadence until a bar is seen, capped at six seconds.
+static dispatch_source_t PFBAccentSettleTimer;
+
+static BOOL PFBAccentSettlePass(void) {
+    PFBRetintRegisteredLogos();
+    BOOL chromeSeen = NO;
+    for (id scene in UIApplication.sharedApplication.connectedScenes) {
+        if (![scene isKindOfClass:objc_getClass("UIWindowScene")]) {
+            continue;
+        }
+        for (UIWindow* w in [scene windows]) {
+            PFBSweepTopBarLogos(w);
+            PFBSweepNativeTabBars(w);
+            if (!chromeSeen && PFBViewTreeHasTabBar(w)) {
+                chromeSeen = YES;
+            }
+        }
+    }
+    PFBReapplyTabBarAccent();
+    PFBRestyleComposeFAB();
+    return chromeSeen;
+}
+
+static void PFBStartAccentSettle(void) {
+    if (PFBAccentSettleTimer) {
+        dispatch_source_cancel(PFBAccentSettleTimer);
+        PFBAccentSettleTimer = nil;
+    }
+    __block NSInteger ticks = 0;
+    __block NSInteger graceLeft = -1;
+    dispatch_source_t timer =
+        dispatch_source_create(DISPATCH_SOURCE_TYPE_TIMER, 0, 0, dispatch_get_main_queue());
+    dispatch_source_set_timer(timer, dispatch_time(DISPATCH_TIME_NOW, 0),
+                              (uint64_t)(0.3 * NSEC_PER_SEC),
+                              (uint64_t)(0.05 * NSEC_PER_SEC));
+    dispatch_source_set_event_handler(timer, ^{
+        ticks++;
+        BOOL seen = PFBAccentSettlePass();
+        if (seen && graceLeft < 0) {
+            graceLeft = 2;
+        }
+        if (graceLeft > 0) {
+            graceLeft--;
+        }
+        if (graceLeft == 0 || ticks >= 20) {
+            PFBAccentPending = NO;
+            if (PFBAccentSettleTimer == timer) {
+                dispatch_source_cancel(timer);
+                PFBAccentSettleTimer = nil;
+            }
+        }
+    });
+    PFBAccentSettleTimer = timer;
+    dispatch_resume(timer);
+}
+
+void PFBSyncAccentTheme(void) {
+    PFBAccentPending = YES;
+    id settings = [objc_getClass("TAEColorSettings") sharedSettings];
+    if ([settings respondsToSelector:@selector(applyCurrentColorPalette)]) {
+        [settings performSelector:@selector(applyCurrentColorPalette)];
+    }
+
+    // Rebuilds Twitter's cached primary-color-derived colors (FAB, follow buttons, pill,
+    // badges, selection) through the hooked palette accessors, so the results take the accent.
+    Class T1ColorSettingsCls = objc_getClass("T1ColorSettings");
+    if ([T1ColorSettingsCls respondsToSelector:@selector(_t1_applyPrimaryColorOption)]) {
+        [T1ColorSettingsCls performSelector:@selector(_t1_applyPrimaryColorOption)];
+    }
+
+    // Liquid Glass controls read the window tint, not the palette.
+    PFBApplyGlobalTint();
+
+    // No window check: while the settings screen is pushed the timeline's views
+    // are detached (window == nil), which is precisely when a color gets
+    // picked. The weak ref stays valid, so re-tint it regardless.
+    UIImageView* logo = PFBTopBarLogoView;
+    if (logo) {
+        PFBApplyLogoTint(logo);
+    }
+    PFBRestyleComposeFAB();
+    PFBReapplyTabBarAccent();
+    PFBRestyleGlassTabBars();
+    for (id scene in UIApplication.sharedApplication.connectedScenes) {
+        if (![scene isKindOfClass:objc_getClass("UIWindowScene")]) {
+            continue;
+        }
+        for (UIWindow* w in [scene windows]) {
+            PFBSweepTopBarLogos(w);
+            PFBSweepNativeTabBars(w);
+            // Force a layout pass so the navigation-bar and tab-bar hooks run
+            // now, instead of waiting for the next natural relayout.
+            [w setNeedsLayout];
+            [w layoutIfNeeded];
+        }
+    }
+
+    PFBReloadTwitterDynamicColors();
+    PFBStartAccentSettle();
+}
+
+static CFAbsoluteTime PFBThemeLoadTime;
+
+// Shown when the user leaves a dark palette while Dim/Gray/Blackout was active:
+// live views keep their old backgrounds, so suggest a quick restart to clear them.
+static void PFBShowRestartReminder(void) {
+    if (CFAbsoluteTimeGetCurrent() - PFBThemeLoadTime < 5.0) {
+        return; // ignore palette churn during app launch
+    }
+    UIWindow* keyWindow = nil;
+    for (UIWindow* window in UIApplication.sharedApplication.windows) {
+        if (window.isKeyWindow) { keyWindow = window; break; }
+    }
+    UIViewController* top = keyWindow.rootViewController;
+    if (!top) { return; }
+    while (top.presentedViewController) {
+        top = top.presentedViewController;
+    }
+    PFBBundle* bundle = [PFBBundle sharedBundle];
+    UIAlertController* alert = [UIAlertController
+        alertControllerWithTitle:[bundle localizedStringForKey:@"RESTART_REQUIRED_ALERT_TITLE"]
+                         message:[bundle localizedStringForKey:@"LIGHT_MODE_RESTART_MESSAGE"]
+                  preferredStyle:UIAlertControllerStyleAlert];
+    PFBAlertAddAction(alert, [bundle localizedStringForKey:@"RESTART_LATER_ACTION"], UIAlertActionStyleCancel, YES, nil);
+    UIAlertAction* close =
+        PFBAlertAddAction(alert, [bundle localizedStringForKey:@"CLOSE_APP_ACTION"], UIAlertActionStyleDefault, YES, ^{
+            PFBCompatSaveNow();
+            [[NSUserDefaults standardUserDefaults] synchronize];
+            exit(0);
+        });
+    alert.preferredAction = close;
+    PFBAlertPresent(alert, top, YES, nil);
+}
+
+// Every apply path (launch re-apply, trait changes, both settings pickers)
+// funnels through this setter, so coercing here keeps the custom color pinned.
+%hook TAEColorSettings
+
+- (void)setPrimaryColorOption:(NSInteger)colorOption {
+    NSNumber* selectedColor = selectedThemeColor();
+    %orig(selectedColor ? selectedColor.integerValue : colorOption);
+}
+
+- (void)setCurrentColorPalette:(TAETwitterColorPaletteSettingInfo*)palette {
+    %orig(palette);
+    // Twitter just swapped Day/Night. Once settled, if not dark, back to System
+    // and remind the user to restart so leftover dark backgrounds clear out.
+    dispatch_async(dispatch_get_main_queue(), ^{
+        if (![PFBDarkModeStyle isDarkModeActive]) {
+            // On a switch to a light palette the pinned style is read first, then
+            // dropped back to System, then the restart reminder is shown. Order
+            // matters: after the overwrite the condition would only ever see System.
+            NSInteger previous = [[NSUserDefaults standardUserDefaults]
+                integerForKey:@"dark_mode_style"];
+            [[NSUserDefaults standardUserDefaults]
+                setInteger:PFBDarkModeStyleSystem
+                    forKey:@"dark_mode_style"];
+            if (previous != PFBDarkModeStyleSystem) {
+                PFBShowRestartReminder();
+            }
+        }
+    });
+}
+
+- (NSInteger)primaryColorOption {
+    NSNumber* selectedColor = selectedThemeColor();
+    return selectedColor ? selectedColor.integerValue : %orig;
+}
+
+%end
+
+%hook TAEDarkColorPalette
+
+- (UIColor*)primaryColor {
+    UIColor* o = %orig;
+    return PFBAccent(o);
+}
+- (UIColor*)primaryColorForOption:(NSUInteger)colorOption {
+    UIColor* o = %orig;
+    return PFBAccent(o);
+}
+- (UIColor*)primaryColorOptionBlueColor {
+    UIColor* o = %orig;
+    return PFBAccent(o);
+}
+- (UIColor*)primaryColorOptionGreenColor {
+    UIColor* o = %orig;
+    return PFBAccent(o);
+}
+- (UIColor*)primaryColorOptionYellowColor {
+    UIColor* o = %orig;
+    return PFBAccent(o);
+}
+- (UIColor*)primaryColorOptionOrangeColor {
+    UIColor* o = %orig;
+    return PFBAccent(o);
+}
+- (UIColor*)primaryColorOptionPurpleColor {
+    UIColor* o = %orig;
+    return PFBAccent(o);
+}
+- (UIColor*)primaryColorOptionRedColor {
+    UIColor* o = %orig;
+    return PFBAccent(o);
+}
+- (UIColor*)brandLogoColor {
+    UIColor* o = %orig;
+    return PFBLogoAccent(o);
+}
+- (UIColor*)navigationBarLogoColor {
+    UIColor* o = %orig;
+    return PFBLogoAccent(o);
+}
+%end
+
+%hook TAELightColorPalette
+
+- (UIColor*)primaryColor {
+    UIColor* o = %orig;
+    return PFBAccent(o);
+}
+- (UIColor*)primaryColorForOption:(NSUInteger)colorOption {
+    UIColor* o = %orig;
+    return PFBAccent(o);
+}
+- (UIColor*)primaryColorOptionBlueColor {
+    UIColor* o = %orig;
+    return PFBAccent(o);
+}
+- (UIColor*)primaryColorOptionGreenColor {
+    UIColor* o = %orig;
+    return PFBAccent(o);
+}
+- (UIColor*)primaryColorOptionYellowColor {
+    UIColor* o = %orig;
+    return PFBAccent(o);
+}
+- (UIColor*)primaryColorOptionOrangeColor {
+    UIColor* o = %orig;
+    return PFBAccent(o);
+}
+- (UIColor*)primaryColorOptionPurpleColor {
+    UIColor* o = %orig;
+    return PFBAccent(o);
+}
+- (UIColor*)primaryColorOptionRedColor {
+    UIColor* o = %orig;
+    return PFBAccent(o);
+}
+- (UIColor*)brandLogoColor {
+    UIColor* o = %orig;
+    return PFBLogoAccent(o);
+}
+- (UIColor*)navigationBarLogoColor {
+    UIColor* o = %orig;
+    return PFBLogoAccent(o);
+}
+%end
+
+%hook TFNUIDefaultColorPalette
+
+- (UIColor*)primaryColor {
+    UIColor* o = %orig;
+    return PFBAccent(o);
+}
+- (UIColor*)navigationBarLogoColor {
+    UIColor* o = %orig;
+    return PFBLogoAccent(o);
+}
+%end
+
+// A window made key after the last pass gets the accent by the same rule. Without
+// one it keeps its own tint, so nothing inherits the accent that should not.
+%hook UIWindow
+- (void)makeKeyAndVisible {
+    %orig;
+    PFBCompatReach(PFBCompatPath_window_tint);
+    if (PFBWindowTintWanted()) {
+        self.tintColor = PFBCurrentAccentColor();
+    }
+}
+%end
+
+%hook TFNTwitterStatusDisplayAttributedTextModelFontOptions
+- (UIColor*)linkTextColor {
+    if (customAccentActive()) {
+        UIColor* c = PFBCustomAccentColor();
+        if (c) { return c; }
+    }
+    return %orig;
+}
+%end
+
+void PFBApplySelectedThemeColor(void) {
+    NSNumber* selectedColor = selectedThemeColor();
+    id colorSettings = [objc_getClass("TAEColorSettings") sharedSettings];
+    if (![colorSettings respondsToSelector:@selector(setPrimaryColorOption:)]) {
+        return;
+    }
+    if (selectedColor) {
+        [colorSettings setPrimaryColorOption:selectedColor.integerValue];
+        // A custom color is proven where the palette returns it.
+        if (!customAccentActive()) {
+            PFBCOMPAT_ACTION(PFBCompat_accent_color, @"accent color applied");
+        }
+    } else {
+        PFBCOMPAT_OBSERVE(PFBCompat_accent_color, @"color settings found");
+    }
+}
+
+static void PFBRefreshSubviewBackgrounds(UIView* view) {
+    UIColor* current = view.backgroundColor;
+    if (current) {
+        view.backgroundColor = nil;
+        view.backgroundColor = current;
+    }
+    for (UIView* sub in view.subviews) {
+        PFBRefreshSubviewBackgrounds(sub);
+    }
+}
+
+static void PFBForceBackgroundRefresh(void) {
+    dispatch_async(dispatch_get_main_queue(), ^{
+        for (UIWindow* window in UIApplication.sharedApplication.windows) {
+            PFBRefreshSubviewBackgrounds(window);
+        }
+    });
+}
+
+void PFBThemeStart(void) {
+    PFBThemeLoadTime = CFAbsoluteTimeGetCurrent();
+    [[NSNotificationCenter defaultCenter]
+        addObserverForName:@"TAEColorSettingsDidChangeUserDefaultsNotification"
+                    object:nil
+                     queue:[NSOperationQueue mainQueue]
+                usingBlock:^(NSNotification* note) {
+                    // Leaving a dark palette is handled in setCurrentColorPalette:
+                    // alone. This notification fires first, so resetting here would
+                    // race it; only backgrounds are refreshed.
+                    PFBForceBackgroundRefresh();
+                }];
+
+    // Whenever Twitter repaints its own dynamic colors, from any screen, the custom
+    // accent is repainted in the same pass.
+    [[NSNotificationCenter defaultCenter]
+        addObserverForName:@"TFNDynamicColorsDidReloadNotification"
+                    object:nil
+                     queue:[NSOperationQueue mainQueue]
+                usingBlock:^(NSNotification* note) {
+                    PFBReapplyChromeAccent();
+                }];
+
+    // Surfaces that resolve their color once at launch and cache it miss the custom accent
+    // without a reload pass. With an accent active, one is broadcast shortly after boot.
+    if (PFBAccentIsActive()) {
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.8 * NSEC_PER_SEC)),
+                       dispatch_get_main_queue(), ^{
+                           // The window tint is the Confirm button's color. The
+                           // reload re-resolves Twitter's palette but sets no tint,
+                           // so it is set here, once the window exists.
+                           PFBApplyGlobalTint();
+                           PFBReloadTwitterDynamicColors();
+                       });
+    }
+}
+
+// MARK: - Accent on the top tab underline
+
+// The bar under the selected top tab (For you, Following) takes its color from its
+// style, from the style handed to the tab bar, or from the bar view itself.
+static UIColor* PFBTopTabUnderlineColor(UIColor* color) {
+    if (!color || CGColorGetAlpha(color.CGColor) <= 0.0) {
+        return color;
+    }
+    PFBCompatReach(PFBCompatPath_top_tab_underline);
+    UIColor* accent = PFBThemedTabBarWanted() ? PFBBrandAccentColor() : nil;
+    if (!accent) {
+        PFBCOMPAT_OBSERVE(PFBCompat_tab_bar_theming, @"top tab underline found");
+        return color;
+    }
+    PFBCOMPAT_ACTION(PFBCompat_tab_bar_theming, @"top tab underline tinted");
+    return accent;
+}
+
+%hook _TtC10TFNUISwift26LegacySegmentedTabBarStyle
+- (void)setHighlightBarColor:(UIColor*)color {
+    %orig(PFBTopTabUnderlineColor(color));
+}
+%end
+
+%hook _TtC10TFNUISwift25LegacySegmentedTabBarView
+- (void)setStyle:(id)style {
+    SEL setter = @selector(setHighlightBarColor:);
+    if (style && PFBThemedTabBarWanted() && [style respondsToSelector:setter]) {
+        UIColor* accent = PFBBrandAccentColor();
+        if (accent) {
+            ((void (*)(id, SEL, UIColor*))objc_msgSend)(style, setter, accent);
+        }
+    }
+    %orig;
+}
+%end
+
+%hook _TtC10TFNUISwift31LegacySegmentedHighlightBarView
+- (void)setBackgroundColor:(UIColor*)color {
+    %orig(PFBTopTabUnderlineColor(color));
+}
+%end
+
+// MARK: - Custom tab bar order and visibility
+
+static NSString* scribePageForEntry(id<T1AppNavigationTabEntry> entry) {
+    T1TabView* tabView = [entry respondsToSelector:@selector(tabView)] ? [entry tabView] : nil;
+    return [tabView respondsToSelector:@selector(scribePage)] ? tabView.scribePage : nil;
+}
+
+// Operates on the tab ENTRIES, not the button views: the app derives both the
+// buttons and their content view controllers from this one array.
+static NSArray* orderedTabEntries(NSArray* entries) {
+    // Record the underlying tab views so the editor can show real titles and icons.
+    NSMutableArray* tabViews = [NSMutableArray new];
+    for (id<T1AppNavigationTabEntry> entry in entries) {
+        T1TabView* tabView = [entry respondsToSelector:@selector(tabView)] ? [entry tabView] : nil;
+        if (tabView) {
+            [tabViews addObject:tabView];
+        }
+    }
+    [PFBCustomTabBarUtility recordTabViews:tabViews];
+
+    NSArray<NSString*>* visibleOrder = [PFBCustomTabBarUtility visiblePageIDsInOrder];
+
+    NSMutableDictionary<NSString*, id>* entriesByPage = [NSMutableDictionary new];
+    for (id<T1AppNavigationTabEntry> entry in entries) {
+        NSString* page = scribePageForEntry(entry);
+        if (page && !entriesByPage[page]) {
+            entriesByPage[page] = entry;
+        }
+    }
+
+    NSMutableArray* shown = [NSMutableArray new];
+    if (!visibleOrder) {
+        // Not customized yet: show the default set (Home, Search, Notifications, Chats)
+        // in that order, hiding everything else the app builds.
+        for (NSString* pageID in [PFBCustomTabBarUtility defaultVisiblePageIDs]) {
+            id entry = entriesByPage[pageID];
+            if (entry) {
+                [shown addObject:entry];
+            }
+        }
+    } else {
+        // Only the chosen tabs show; anything the editor hasn't been told to show
+        // (including tabs unlocked after the user last saved) stays hidden.
+        NSMutableSet* placed = [NSMutableSet new];
+        for (NSString* pageID in visibleOrder) {
+            id entry = entriesByPage[pageID];
+            if (entry && ![placed containsObject:pageID]) {
+                [shown addObject:entry];
+                [placed addObject:pageID];
+            }
+        }
+    }
+
+    // None of the chosen tabs exists in this Twitter: its own tabs are kept rather than an empty bar.
+    if (shown.count == 0) {
+        if (entries.count > 0) {
+            PFBDebugLog(@"[tabbar] none of the %lu tabs matched: Twitter's tabs kept", (unsigned long)entries.count);
+        }
+        return entries;
+    }
+    PFBCOMPAT_ACTION(PFBCompat_custom_tab_bar, visibleOrder ? @"saved tabs shown" : @"default tabs shown");
+    return shown;
+}
+
+// The single ordered spine that feeds both the tab buttons and their content, so
+// filtering/reordering here keeps taps mapped to the right panel.
+%hook T1TabbedAppNavigationViewController
+
+- (void)setVisibleTabEntries:(NSArray*)entries {
+    %orig(orderedTabEntries(entries));
+}
+
+// Twitter keeps only the first tabs the bar can hold (five on a phone); the chosen
+// tabs are picked before that cut, so it never drops one of them.
+- (NSArray*)_t1_tabEntriesLimitedToBottomCapacity:(NSArray*)entries {
+    PFBCompatReach(PFBCompatPath_tab_capacity);
+    return %orig(orderedTabEntries(entries));
+}
+
+%end
+
+// MARK: - Keep tab bar visible
+
+%hook T1TabBarViewController
+
+// The scroll-driven hide only reaches the tab bar as a collapse ratio, so
+// clamping it spares the deliberate hides (fullscreen media, immersive player).
+- (void)setTabBarCollapseRatio:(double)ratio {
+    // Fires while the timeline scrolls, the other path that brings Twitter's own
+    // bar back without a host layout.
+    PFBReapplyTabBarFrom(((UIViewController*)self).viewIfLoaded);
+    if (ratio > 0.0 && ![PFBSettings boolForKey:@"no_tab_bar_hiding"]) {
+        PFBCOMPAT_OBSERVE(PFBCompat_no_tab_bar_hiding, @"tab bar hiding seen");
+    }
+    if ([PFBSettings boolForKey:@"no_tab_bar_hiding"]) {
+        if (ratio > 0.0) {
+            PFBCOMPAT_ACTION(PFBCompat_no_tab_bar_hiding, @"bar kept on screen");
+        }
+        %orig(0.0);
+    } else {
+        %orig(ratio);
+    }
+}
+
+// Both apply the bar's hidden state, which the native bar then follows.
+- (void)_t1_layoutTabBar {
+    %orig;
+    PFBReapplyTabBarFrom(((UIViewController*)self).viewIfLoaded);
+}
+
+- (void)_t1_updateTabBarHidden {
+    %orig;
+    PFBReapplyTabBarFrom(((UIViewController*)self).viewIfLoaded);
+}
+
+%end
+
+// MARK: - Tab bar icon and label theming
+
+static BOOL updatingTabIconColor = NO;
+
+// Same trick as the logo: the color lives in the pixels, so no tint and no
+// vibrancy filter downstream can undo it. The untouched image is kept so the
+// icon can be handed back when the option goes off. Returns whether it is colored.
+static BOOL PFBBakeTabIcon(UIImageView* icon, UIColor* color) {
+    UIImage* current = icon.image;
+    if (!current || !color) {
+        return NO;
+    }
+    UIImage* original = objc_getAssociatedObject(icon, kPFBTabOriginalKey);
+    UIImage* baked = objc_getAssociatedObject(icon, kPFBTabBakedKey);
+    UIColor* bakedColor = objc_getAssociatedObject(icon, kPFBTabColorKey);
+    if (!original || (current != original && current != baked)) {
+        original = current;
+        objc_setAssociatedObject(icon, kPFBTabOriginalKey, original,
+                                 OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        baked = nil;
+    }
+    if (!baked || ![bakedColor isEqual:color]) {
+        baked = PFBPaintedGlyph(original, color);
+        objc_setAssociatedObject(icon, kPFBTabBakedKey, baked,
+                                 OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        objc_setAssociatedObject(icon, kPFBTabColorKey, color,
+                                 OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    }
+    if (icon.image != baked) {
+        icon.image = baked;
+    }
+    return YES;
+}
+
+static void PFBRestoreTabIcon(UIImageView* icon) {
+    UIImage* original = objc_getAssociatedObject(icon, kPFBTabOriginalKey);
+    if (original && icon.image != original) {
+        icon.image = original;
+    }
+}
+
+// MARK: - Tab labels
+
+// Twitter's tab views keep their title without drawing it, so a label is drawn here in
+// Twitter's tab font and colors, under the icon.
+static const void* kPFBTabLabelKey = &kPFBTabLabelKey;
+
+static UIFont* PFBTabLabelFont(void) {
+    SEL twitterFont = NSSelectorFromString(@"xdsDeprecated_customFontOfSize:weight:scalesWithDynamicType:");
+    UIFont* font = nil;
+    if ([UIFont respondsToSelector:twitterFont]) {
+        font = ((UIFont * (*)(id, SEL, CGFloat, NSInteger, BOOL))objc_msgSend)([UIFont class], twitterFont, 12.0, 1, NO);
+    }
+    return [font isKindOfClass:[UIFont class]] ? font : [UIFont systemFontOfSize:12.0 weight:UIFontWeightMedium];
+}
+
+// The accent of Selected tab when it is on, otherwise Twitter's primary color for the
+// selected tab and its text color for the others.
+static UIColor* PFBTabLabelColor(T1TabView* tab) {
+    if ([PFBSettings boolForKey:@"tab_bar_theming"]) {
+        return tabItemColor(tab.selected);
+    }
+    SEL palette = NSSelectorFromString(@"twitterColors");
+    id colors = [UIColor respondsToSelector:palette] ? ((id (*)(id, SEL))objc_msgSend)([UIColor class], palette) : nil;
+    SEL pick = NSSelectorFromString(tab.selected ? @"primaryColor" : @"textColor");
+    id color = [colors respondsToSelector:pick] ? ((id (*)(id, SEL))objc_msgSend)(colors, pick) : nil;
+    if ([color isKindOfClass:[UIColor class]]) {
+        return color;
+    }
+    return tab.selected ? [UIColor systemBlueColor] : [UIColor labelColor];
+}
+
+static void PFBColorTabLabel(T1TabView* tab) {
+    UILabel* label = objc_getAssociatedObject(tab, kPFBTabLabelKey);
+    if (label) {
+        label.textColor = PFBTabLabelColor(tab);
+    }
+}
+
+// 14 pt tall, its top 17 pt above the tab's bottom edge, and the icon raised by half
+// the label's height less 2 pt. Under a rebuilt glass bar the bar shows the titles.
+static void PFBLayoutTabLabel(T1TabView* tab) {
+    UILabel* label = objc_getAssociatedObject(tab, kPFBTabLabelKey);
+    NSString* title = tab.title;
+    BOOL drawn = title.length > 0 && !PFBHostHasNativeBar(tab);
+    if (!drawn || ![PFBSettings boolForKey:@"restore_tab_labels"]) {
+        if (label) {
+            [label removeFromSuperview];
+            objc_setAssociatedObject(tab, kPFBTabLabelKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        }
+        if (drawn && tab.window) {
+            PFBCOMPAT_OBSERVE(PFBCompat_restore_tab_labels, @"tab laid out");
+        }
+        return;
+    }
+    if (!label) {
+        label = [[UILabel alloc] init];
+        label.backgroundColor = [UIColor clearColor];
+        label.isAccessibilityElement = NO;
+        label.textAlignment = NSTextAlignmentCenter;
+        label.font = PFBTabLabelFont();
+        objc_setAssociatedObject(tab, kPFBTabLabelKey, label, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        [tab addSubview:label];
+    }
+    if (![label.text isEqualToString:title]) {
+        label.text = title;
+    }
+    label.textColor = PFBTabLabelColor(tab);
+    CGRect bounds = tab.bounds;
+    CGFloat scale = tab.window.screen.scale;
+    if (scale <= 0.0) {
+        scale = [UIScreen mainScreen].scale;
+    }
+    CGFloat top = round((CGRectGetMaxY(bounds) - 17.0) * scale) / scale;
+    label.frame = CGRectMake(1.0, top, MAX(CGRectGetWidth(bounds) - 2.0, 0.0), 14.0);
+    tab.imageView.center = CGPointMake(0.0, 2.0 - 14.0 / 2.0);
+    if (tab.window) {
+        PFBCOMPAT_ACTION(PFBCompat_restore_tab_labels, @"label drawn under the icon");
+    }
+}
+
+%hook T1TabView
+
+- (void)_t1_updateImageViewAnimated:(BOOL)animated {
+    // setIconColor: re-enters this method, so swallow the inner call and let
+    // %orig below render once with the new color
+    if (updatingTabIconColor) {
+        return;
+    }
+
+    updatingTabIconColor = YES;
+    if ([PFBSettings boolForKey:@"tab_bar_theming"]) {
+        self.iconColor = tabItemColor(self.selected);
+    } else if (self.iconColor) {
+        self.iconColor = nil;
+    }
+    updatingTabIconColor = NO;
+
+    %orig(animated);
+
+    // After %orig, not before: this call swaps the tab's glyph between its filled
+    // and outline variants, and the native bar reads that glyph. Ahead of %orig the
+    // reapply would capture the old image.
+    PFBReapplyTabBarFrom((UIView*)self);
+
+    // The icon is also baked in the tab color. Nothing is baked while the native
+    // bar is up: its items are built from these icons. Only a tab on screen counts
+    // in the compatibility sheet.
+    BOOL nativeBarUp = PFBHostHasNativeBar((UIView*)self);
+    BOOL shown = self.window != nil;
+    if (!nativeBarUp && shown) {
+        PFBCompatReach(PFBCompatPath_tab_bar);
+    }
+    if (!nativeBarUp && [PFBSettings boolForKey:@"tab_bar_theming"]) {
+        if (PFBBakeTabIcon(self.imageView, tabItemColor(self.selected)) && shown) {
+            PFBCOMPAT_ACTION(PFBCompat_tab_bar_theming, @"tab icon colored");
+        }
+    } else {
+        PFBRestoreTabIcon(self.imageView);
+        if (!nativeBarUp && shown) {
+            PFBCOMPAT_OBSERVE(PFBCompat_tab_bar_theming, @"tab icon found");
+        }
+    }
+}
+
+// Twitter centers the icon first; the label and the raised icon follow.
+- (void)_t1_layoutForTabBar {
+    %orig;
+    PFBLayoutTabLabel(self);
+}
+
+- (void)setSelected:(BOOL)selected {
+    %orig;
+    PFBColorTabLabel(self);
+}
+
+// The count badge rises with the icon when a label is drawn.
+- (void)_t1_layoutBadgeViewMaximized {
+    %orig;
+    if (objc_getAssociatedObject(self, kPFBTabLabelKey)) {
+        UIView* badge = self.badgeView;
+        badge.center = CGPointMake(badge.center.x, badge.center.y - 5.0);
+    }
+}
+
+// A badge change reaches the native bar at once, without waiting for its next layout.
+- (void)setBadgeCount:(unsigned long long)count animated:(BOOL)animated {
+    %orig;
+    PFBReapplyTabBarFrom((UIView*)self);
+}
+
+- (void)setHasUnreadContent:(BOOL)unread animated:(BOOL)animated {
+    %orig;
+    PFBReapplyTabBarFrom((UIView*)self);
+}
+
+%new
+- (void)pfbApplyCurrentThemeToIcon {
+    if ([self respondsToSelector:@selector(_t1_updateImageViewAnimated:)]) {
+        [self _t1_updateImageViewAnimated:NO];
+    }
+    PFBColorTabLabel(self);
+}
+
+%end
+
+// MARK: - Top bar logo theming
+
+%hook _TtC11TwitterHome39HomeDefaultNavigationBarTitleViewPlugin
+
+- (UIView*)titleView {
+    UIView* titleView = %orig;
+    UIImageView* logo = PFBFindLogoImageView(titleView);
+    // iOS 27 does not put the handed-over view on screen: it builds its own image
+    // view inside _UINavigationBarTitleControl. The sweep below runs after the bar
+    // has built that chain.
+    dispatch_async(dispatch_get_main_queue(), ^{
+      UIView* bar = titleView;
+      while (bar && ![NSStringFromClass([bar class]) containsString:@"NavigationBar"]) {
+          bar = bar.superview;
+      }
+      if (bar) {
+          PFBBakeTitleControlLogos(bar);
+      }
+    });
+    if (logo) {
+        PFBTopBarLogoView = logo;
+        PFBRegisterLogoView(logo);
+        PFBApplyLogoTint(logo);
+    }
+    return titleView;
+}
+
+%end
+
+// Inside the search title view the app lays its own search bar out with a
+// negative x on the results screen, which pushes the capsule under the back
+// button. The overshoot goes to x and comes off the width.
+%hook TFNSearchBar
+
+- (void)setFrame:(CGRect)frame {
+    UIView* view = (UIView*)self;
+    static Class titleViewClass;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+      titleViewClass = NSClassFromString(@"TFNNavigationBarSearchView");
+    });
+    BOOL inTitleView = titleViewClass && [view.superview class] == titleViewClass;
+    if (inTitleView) {
+        PFBCompatReach(PFBCompatPath_search_bar_frame);
+    }
+    if (inTitleView && [PFBSettings boolForKey:@"enable_liquid_glass"] && frame.origin.x < 4.0) {
+        CGFloat overshoot = 4.0 - frame.origin.x;
+        frame.origin.x = 4.0;
+        CGFloat wanted = frame.size.width - overshoot;
+        frame.size.width = MAX(80.0, wanted);
+    }
+    %orig(frame);
+}
+
+%end
+
+%hook TFNNavigationBarSearchView
+
+// The correction lives in setFrame:, never in layoutSubviews: writing a frame
+// from inside a layout pass re-enters the parent's layout and loops. Here the
+// incoming value is adjusted before it lands.
+- (void)setFrame:(CGRect)frame {
+    UIView* view = (UIView*)self;
+    if (![PFBSettings boolForKey:@"enable_liquid_glass"] || !view.superview) {
+        %orig(frame);
+        return;
+    }
+    UIView* bar = view.superview;
+    while (bar && ![bar isKindOfClass:[UINavigationBar class]]) {
+        bar = bar.superview;
+    }
+    if (!bar) {
+        %orig(frame);
+        return;
+    }
+    // The view can start at the bar's leading margin, over the avatar that sits
+    // there. A frame landing in that zone is moved out by the overlap, and the
+    // width gives the same amount back.
+    CGRect inBar = [view.superview convertRect:frame toView:bar];
+    const CGFloat avatarTrailing = 64.0;
+    const CGFloat gap = 16.0;
+    if (inBar.origin.x < avatarTrailing && inBar.size.width > 100.0) {
+        CGFloat shift = (avatarTrailing + gap) - inBar.origin.x;
+        CGRect fixed = frame;
+        fixed.origin.x += shift;
+        fixed.size.width = MAX(80.0, fixed.size.width - shift);
+        %orig(fixed);
+        return;
+    }
+    %orig(frame);
+}
+
+%end
+
+%hook T1TabBarHostView
+
+- (void)layoutSubviews {
+    %orig;
+    PFBApplyTabBarGlass((UIView*)self);
+}
+
+%end
+
+// The app lays its own bar out without the host taking part, and puts back what
+// was hidden while doing it. Reapplying from here closes that gap.
+%hook TFNCustomTabBar
+
+- (void)layoutSubviews {
+    %orig;
+    PFBReapplyTabBarFrom((UIView*)self);
+}
+
+%end
+
+// The glass bar's badges are placed again after its buttons each time it lays out.
+%hook UITabBar
+
+- (void)layoutSubviews {
+    %orig;
+    if (PFBIsOurGlassBar(self)) {
+        PFBRefreshTabBadges(self);
+    }
+}
+
+%end
+
+// The canonical white bake: draw the original, then sourceIn-fill white, so every
+// opaque pixel becomes white with alpha preserved and the rendering mode plain. An
+// imageWithTintColor result can stay template and re-tint with the view's tint.
+UIImage* PFBWhiteBakedGlyph(UIImage* image) {
+    UIGraphicsImageRendererFormat* format =
+        [UIGraphicsImageRendererFormat preferredFormat];
+    format.opaque = NO;
+    UIGraphicsImageRenderer* renderer =
+        [[UIGraphicsImageRenderer alloc] initWithSize:image.size format:format];
+    UIImage* baked =
+        [renderer imageWithActions:^(UIGraphicsImageRendererContext* ctx) {
+            CGRect rect = CGRectMake(0, 0, image.size.width, image.size.height);
+            [image drawInRect:rect];
+            CGContextSetBlendMode(ctx.CGContext, kCGBlendModeSourceIn);
+            [[UIColor whiteColor] setFill];
+            CGContextFillRect(ctx.CGContext, rect);
+        }];
+    // A bar button treats an automatic-mode image as a template and re-tints it
+    // per its contrast rule. AlwaysOriginal forbids that: a plain rendered bitmap
+    // accepts the mode change, an imageWithTintColor result does not.
+    return [baked imageWithRenderingMode:UIImageRenderingModeAlwaysOriginal];
+}
+
+// Shared with the setImage: hook in Branding.x: once the confirm glyph is identified,
+// every image Twitter assigns to it is baked white before it renders.
+char PFBConfirmGlyphTag;
+
+static char kPFBWhiteBakedKey;
+
+static char kPFBConfirmGlassCapKey;
+
+// Forces the confirm platter's glass to iOS system blue while the window tint
+// keeps the accent: the glass material is tinted and an opaque disc laid over
+// it. Scoped to the confirm button's own subtree.
+static void PFBTintConfirmGlassBlue(UIView* container) {
+    UIColor* blue = [UIColor systemBlueColor];
+    for (UIView* sub in container.subviews) {
+        if ([sub isKindOfClass:[UIVisualEffectView class]]) {
+            UIVisualEffectView* fx = (UIVisualEffectView*)sub;
+            UIVisualEffect* effect = fx.effect;
+            if (effect && [effect respondsToSelector:@selector(setTintColor:)]) {
+                [(id)effect setTintColor:blue];
+            }
+            if (![fx.backgroundColor isEqual:blue]) {
+                fx.backgroundColor = blue;
+            }
+            if (![fx.contentView.backgroundColor isEqual:blue]) {
+                fx.contentView.backgroundColor = blue;
+            }
+            UIView* cap = objc_getAssociatedObject(fx, &kPFBConfirmGlassCapKey);
+            if (!cap) {
+                cap = [[UIView alloc] initWithFrame:fx.contentView.bounds];
+                cap.autoresizingMask =
+                    UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+                cap.userInteractionEnabled = NO;
+                [fx.contentView insertSubview:cap atIndex:0];
+                objc_setAssociatedObject(fx, &kPFBConfirmGlassCapKey, cap,
+                                         OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+            }
+            cap.backgroundColor = blue;
+        }
+        PFBTintConfirmGlassBlue(sub);
+    }
+}
+
+// A back button hosts a mask view beside its glyph. Any glyph whose button
+// carries one is the back arrow, whatever its position during a transition.
+static BOOL PFBSubtreeHasBackMask(UIView* view, NSInteger depth) {
+    if (!view || depth > 4) {
+        return NO;
+    }
+    if ([NSStringFromClass([view class]) containsString:@"BackButtonMask"]) {
+        return YES;
+    }
+    for (UIView* sub in view.subviews) {
+        if (PFBSubtreeHasBackMask(sub, depth + 1)) {
+            return YES;
+        }
+    }
+    return NO;
+}
+
+static BOOL PFBGlyphIsBackArrow(UIView* glyph) {
+    UIView* node = glyph.superview;
+    for (NSInteger up = 0; node && up < 5; up++) {
+        if ([NSStringFromClass([node class]) isEqualToString:@"_UIButtonBarButton"]) {
+            return PFBSubtreeHasBackMask(node, 0);
+        }
+        node = node.superview;
+    }
+    return NO;
+}
+
+static void PFBWhitenConfirmGlyphsIn(UIView* view, UINavigationBar* bar) {
+    for (UIView* sub in view.subviews) {
+        // PrimeFreeBird's own bar icons are never a confirm button.
+        if ([sub isKindOfClass:[PFBBarGlyphButton class]]) {
+            continue;
+        }
+        if ([sub isKindOfClass:[UIImageView class]]) {
+            UIImageView* glyph = (UIImageView*)sub;
+            CGRect inBar = [glyph convertRect:glyph.bounds toView:bar];
+            // The back arrow slides through the right zone during a transition
+            // and must never be whitened or have its glass tinted.
+            if (PFBGlyphIsBackArrow(glyph)) {
+                continue;
+            }
+            if (CGRectGetMidX(inBar) > bar.bounds.size.width * 0.6 &&
+                glyph.bounds.size.width > 0 && glyph.bounds.size.width < 44 &&
+                glyph.image &&
+                objc_getAssociatedObject(glyph, &kPFBWhiteBakedKey) != (id)glyph.image) {
+                objc_setAssociatedObject(glyph, &PFBConfirmGlyphTag, @YES,
+                                         OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+                UIImage* white = PFBWhiteBakedGlyph(glyph.image);
+                glyph.image = white;
+                objc_setAssociatedObject(glyph, &kPFBWhiteBakedKey, white,
+                                         OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+                // Fallback for the one frame a freshly re-created button can show
+                // before its first baked image lands: with the whole BarButton
+                // chain tinted white, even a template-treated frame is white.
+                glyph.tintColor = [UIColor whiteColor];
+                UIView* ancestor = glyph.superview;
+                for (NSInteger hop = 0; ancestor && hop < 2; hop++) {
+                    if ([NSStringFromClass([ancestor class])
+                            containsString:@"BarButton"]) {
+                        ancestor.tintColor = [UIColor whiteColor];
+                    }
+                    ancestor = ancestor.superview;
+                }
+                // Recolor this confirm button's glass to iOS blue (native), apart
+                // from the accent window tint the tab needs.
+                UIView* platter = nil;
+                UIView* node = glyph.superview;
+                for (NSInteger phop = 0; node && phop < 5; phop++) {
+                    if ([NSStringFromClass([node class]) containsString:@"BarButton"]) {
+                        platter = node;
+                        break;
+                    }
+                    node = node.superview;
+                }
+                PFBTintConfirmGlassBlue(platter ?: glyph.superview);
+            }
+        }
+        PFBWhitenConfirmGlyphsIn(sub, bar);
+    }
+}
+
+// Exposed so the theme screen can run a pass right after a pick (Twitter
+// re-bakes its glyph on the following runloop turn).
+void PFBWhitenNavigationBarConfirm(UINavigationBar* bar) {
+    if (bar && PFBThemeScreenCount && PFBAccentIsActive()) {
+        PFBWhitenConfirmGlyphsIn(bar, bar);
+    }
+}
+
+// The app lays an opaque backdrop under its own bars, a plain view at index 0
+// running above the bar into the status area. Under the glass design it hides
+// the translucency; cleared there, and given back when the setting is off.
+static const void* kPFBBarBackdropColorKey = &kPFBBarBackdropColorKey;
+
+static void PFBSettleBarBackdrop(UINavigationBar* bar) {
+    UIView* backdrop = bar.subviews.firstObject;
+    if (!backdrop || [backdrop class] != [UIView class] ||
+        backdrop.frame.origin.y >= 0.0 ||
+        fabs(backdrop.frame.size.width - bar.bounds.size.width) > 1.0) {
+        return;
+    }
+    PFBCompatReach(PFBCompatPath_bar_backdrop);
+    BOOL glass = [PFBSettings boolForKey:@"enable_liquid_glass"];
+    UIColor* kept = objc_getAssociatedObject(backdrop, kPFBBarBackdropColorKey);
+    if (glass) {
+        CGFloat alpha = 0.0;
+        [backdrop.backgroundColor getRed:NULL green:NULL blue:NULL alpha:&alpha];
+        if (alpha > 0.05) {
+            objc_setAssociatedObject(backdrop, kPFBBarBackdropColorKey,
+                                     backdrop.backgroundColor,
+                                     OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+            backdrop.backgroundColor = [UIColor clearColor];
+        }
+    } else if (kept) {
+        backdrop.backgroundColor = kept;
+        objc_setAssociatedObject(backdrop, kPFBBarBackdropColorKey, nil,
+                                 OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    }
+}
+
+%hook UINavigationBar
+
+- (void)didMoveToWindow {
+    %orig;
+    [self setNeedsLayout];
+}
+
+- (void)layoutSubviews {
+    %orig;
+    PFBSettleBarBackdrop(self);
+    PFBWhitenNavigationBarConfirm(self);
+    if (!PFBBarIsHome(self)) {
+        return;
+    }
+    UIView* titleView = self.topItem.titleView;
+    if (titleView) {
+        UIImageView* logo = PFBFindLogoImageView(titleView);
+        // Logo-sized only, tested here because bounds are real at layout time.
+        if (logo && logo.bounds.size.width > 0 && logo.bounds.size.width < 60) {
+            PFBTopBarLogoView = logo;
+            PFBRegisterLogoView(logo);
+            PFBApplyLogoTint(logo);
+        }
+    }
+    // The walk over the whole bar is skipped while both options are off and no logo
+    // was ever painted: it would have nothing to paint or to give back.
+    if (PFBLogoEverPainted || [PFBSettings boolForKey:@"color_twitter_icon_in_top_bar"] ||
+        [PFBSettings boolForKey:@"restore_twitter_names"]) {
+        PFBRetintTemplateLogos(self);
+    }
+}
+
+%end
+
+// Safety net for containers not known by name: for a few seconds after an accent
+// change, every controller that appears re-applies it to the chrome on screen.
+// Outside that window this costs one boolean test.
+%hook UIViewController
+
+- (void)viewDidAppear:(BOOL)animated {
+    %orig;
+    if (!PFBAccentPending) {
+        return;
+    }
+    BOOL reachedChrome = NO;
+    for (id scene in UIApplication.sharedApplication.connectedScenes) {
+        if (![scene isKindOfClass:objc_getClass("UIWindowScene")]) {
+            continue;
+        }
+        for (UIWindow* w in [scene windows]) {
+            PFBSweepTopBarLogos(w);
+            PFBSweepNativeTabBars(w);
+            if (!reachedChrome && PFBViewTreeHasTabBar(w)) {
+                reachedChrome = YES;
+            }
+            [w setNeedsLayout];
+        }
+    }
+    PFBReapplyTabBarAccent();
+    // Only a tab bar's presence proves the timeline is back; until then the
+    // flag stays up and every appearance retries.
+    if (reachedChrome) {
+        PFBAccentPending = NO;
+    }
+}
+
+%end
+

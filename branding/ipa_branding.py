@@ -1,0 +1,297 @@
+#!/usr/bin/env python3
+"""Applies the icon pack (RESOURCE_PACK) and the Twitter name (TWITTER_BRANDING=1) to a built IPA."""
+
+import hashlib
+import os
+import plistlib
+import shutil
+import subprocess
+import sys
+import tarfile
+import tempfile
+import time
+import urllib.request
+from pathlib import Path
+
+BRANDING_DIR = Path(__file__).resolve().parent
+
+# Pinned scar release used for Assets.car work (https://github.com/theacrat/scar),
+# with each archive's SHA-256.
+SCAR_VERSION = "v0.1.0"
+SCAR_URL = "https://github.com/theacrat/scar/releases/download/{v}/scar-{v}-{triple}.tar.gz"
+SCAR_SHA256 = {
+    "aarch64-apple-darwin": "fde9b4937c057ff5672195367e48d95d3ea87df00302191693e866e0b1f7e1a4",
+    "x86_64-unknown-linux-musl": "5bc77c8fb5fba892cb54f577f4f9b3ae3e6d721a7ef4764f96f9052169f3d418",
+    "aarch64-unknown-linux-musl": "a4d6c21b2591d7054c62c376e2cb5a53a477be0839bc326402305b51fa66a9e0",
+}
+
+def err(message):
+    print(f"Error: {message}", file=sys.stderr)
+
+
+class BrandingError(Exception):
+    """Raised for a failed branding step; maps to a fatal non-zero exit."""
+
+
+def _have(cmd):
+    return shutil.which(cmd) is not None
+
+
+def _run(args, **kwargs):
+    """Run a command, returning True on success (exit 0)."""
+    return subprocess.run(args, **kwargs).returncode == 0
+
+
+def _find(root, predicate):
+    """True if any file under root satisfies predicate(Path)."""
+    root = Path(root)
+    if not root.exists():
+        return False
+    for path in root.rglob("*"):
+        if path.is_file() and predicate(path):
+            return True
+    return False
+
+
+def _is_apple_double(path):
+    return path.name.startswith("._")
+
+
+# --- display name -----------------------------------------------------------
+
+def _patch_info_plist(appdir, mutate):
+    """Loads the app's Info.plist, applies mutate, and writes it back as binary,
+    the format IPAs ship; plistlib needs no macOS-only tool.
+    """
+    plist = appdir / "Info.plist"
+    if not plist.is_file():
+        raise BrandingError("Branding: could not locate app Info.plist")
+    with open(plist, "rb") as f:
+        data = plistlib.load(f)
+    mutate(data)
+    with open(plist, "wb") as f:
+        plistlib.dump(data, f, fmt=plistlib.FMT_BINARY)
+
+
+def _set_display_name_in_app(appdir):
+    """Force the on-device app name back to "Twitter"."""
+    _patch_info_plist(appdir, lambda data: data.update(CFBundleDisplayName="Twitter"))
+
+# --- bundle version ----------------------------------------------------------
+
+def _bump_bundle_version(appdir):
+    """Gives CFBundleVersion a fresh value on every run: iOS keeps a launch-screen
+    snapshot per build and would otherwise flash the old one over new assets.
+    """
+    _patch_info_plist(appdir, lambda data: data.update(CFBundleVersion=str(int(time.time()))))
+
+
+# --- resource pack ----------------------------------------------------------
+
+def _apply_resource_pack_to_app(appdir, workdir, zip_path):
+    """Overlays a pack zip onto the app: icons/ (or loose images) go into Assets.car,
+    other root files over the app's own.
+    """
+    zip_path = Path(zip_path)
+    if not zip_path.is_file():
+        raise BrandingError(f"Branding: image pack not found: {zip_path}")
+    if not _have("unzip"):
+        raise BrandingError("Branding: 'unzip' is required for --resource-pack")
+
+    zip_path = zip_path.resolve()
+    plist = appdir / "Info.plist"
+    car = appdir / "Assets.car"
+
+    pack = workdir / "pack"
+    if not _run(["unzip", "-q", "-o", str(zip_path), "-d", str(pack)]):
+        raise BrandingError(f"Branding: failed to unpack image pack {zip_path}")
+
+    icons_dir = pack / "icons"
+    if not icons_dir.is_dir():
+        icons_dir = pack  # a flat zip keeps its icons at the root
+
+    have_icons = _find(
+        icons_dir,
+        lambda p: p.suffix.lower() in (".png", ".jpg", ".jpeg") and not _is_apple_double(p),
+    )
+    # Non-image files at the pack root overwrite the same-named file in the app
+    # root; root images are the icons of a flat zip.
+    root_files = [
+        p for p in pack.iterdir()
+        if p.is_file()
+        and p.suffix.lower() not in (".png", ".jpg", ".jpeg", ".svg")
+        and not _is_apple_double(p)
+    ]
+    have_root = bool(root_files)
+
+    if not (have_icons or have_root):
+        raise BrandingError("Branding: image pack has no icons/ images or root files")
+
+    # --- icons/: merge into Assets.car ---
+    if have_icons:
+        if not car.is_file():
+            raise BrandingError("Branding: app has no Assets.car to merge into")
+        scar = _ensure_scar(workdir)
+        python = _python_with_pillow()
+
+        new_car = workdir / "new.car"
+        if not _run([
+            str(python), str(BRANDING_DIR / "scar_merge.py"),
+            str(car), str(icons_dir), str(new_car),
+            "--workdir", str(workdir), "--scar", str(scar),
+        ]):
+            raise BrandingError("Branding: failed to rebuild Assets.car")
+        shutil.copyfile(new_car, car)
+
+        # The merged catalog directory holds the final decoded art.
+        catalog = workdir / "catalog"
+
+        if not _run([
+            sys.executable, str(BRANDING_DIR / "update_bundle_icons.py"),
+            str(plist), str(catalog),
+        ]):
+            raise BrandingError("Branding: failed to update CFBundleIcons")
+
+        # Sync the loose fallback icons in the app root (used by SpringBoard) to
+        # the rebuilt catalog, else the home-screen icon stays stale.
+        if not _run([
+            sys.executable, str(BRANDING_DIR / "overwrite_loose_icons.py"),
+            str(appdir), str(catalog),
+        ]):
+            raise BrandingError("Branding: failed to sync the home-screen icons")
+
+    # --- root files (e.g. LaunchScreen.nib): overwrite the same file in app root ---
+    if have_root:
+        for rf in root_files:
+            dest = appdir / rf.name
+            if dest.exists():
+                if dest.is_dir():
+                    shutil.rmtree(dest)
+                else:
+                    dest.unlink()
+                shutil.copyfile(rf, dest)
+            else:
+                err(f"Branding: '{rf.name}' is not present in the app root; skipped.")
+
+
+def _python_with_pillow():
+    """Interpreter for the Pillow-dependent steps: a cached venv, bootstrapped
+    with Pillow on first use (plain `pip install` is refused on
+    externally-managed Pythons, e.g. Homebrew and Debian)."""
+    devnull = {"stdout": subprocess.DEVNULL, "stderr": subprocess.DEVNULL}
+    cache = Path(os.environ.get("XDG_CACHE_HOME") or Path.home() / ".cache") / "primefreebird"
+    venv = cache / "venv"
+    venv_python = venv / "bin" / "python3"
+    if venv_python.is_file() and _run([str(venv_python), "-c", "import PIL"], **devnull):
+        return venv_python
+
+    print("Branding: setting up a Python venv with Pillow (one-time)...")
+    cache.mkdir(parents=True, exist_ok=True)
+    if not _run([sys.executable, "-m", "venv", "--clear", str(venv)]):
+        raise BrandingError(
+            "Branding: could not create a venv for Pillow; install the venv "
+            "module (e.g. python3-venv) or install Pillow for %s yourself" % sys.executable
+        )
+    if not _run([str(venv_python), "-m", "pip", "install", "--quiet", "Pillow"]):
+        raise BrandingError(
+            "Branding: could not install Pillow into %s; install Pillow for "
+            "%s yourself" % (venv, sys.executable)
+        )
+    return venv_python
+
+
+def _scar_triple():
+    machine = os.uname().machine.lower()
+    if sys.platform == "darwin" and machine == "arm64":
+        return "aarch64-apple-darwin"
+    if sys.platform.startswith("linux") and machine in ("x86_64", "amd64"):
+        return "x86_64-unknown-linux-musl"
+    if sys.platform.startswith("linux") and machine in ("aarch64", "arm64"):
+        return "aarch64-unknown-linux-musl"
+    return None
+
+
+def _ensure_scar(workdir):
+    """Download the pinned scar release build for this platform."""
+    triple = _scar_triple()
+    if not triple:
+        raise BrandingError("Branding: no pinned scar release build for this platform")
+    url = SCAR_URL.format(v=SCAR_VERSION, triple=triple)
+    tgz = workdir / "scar.tar.gz"
+    try:
+        urllib.request.urlretrieve(url, tgz)
+        if hashlib.sha256(tgz.read_bytes()).hexdigest() != SCAR_SHA256[triple]:
+            raise BrandingError(f"Branding: scar from {url} does not match its pinned SHA-256")
+        with tarfile.open(tgz) as tf:
+            tf.extract("scar", workdir)
+    except (OSError, tarfile.TarError) as exc:
+        raise BrandingError(f"Branding: failed to download scar from {url}: {exc}")
+    scar = workdir / "scar"
+    scar.chmod(0o755)
+    return scar
+
+
+# --- entry point ------------------------------------------------------------
+
+def apply_ipa_branding(ipa):
+    """Unpack the IPA once, apply every enabled step, repackage once."""
+    resource_pack = os.environ.get("RESOURCE_PACK", "")
+    twitter_branding = os.environ.get("TWITTER_BRANDING", "0") == "1"
+    if not resource_pack and not twitter_branding:
+        return
+
+    ipa = Path(ipa)
+    if not ipa.is_file():
+        raise BrandingError(f"Branding: IPA not found: {ipa}")
+    if not _have("unzip"):
+        raise BrandingError("Branding: 'unzip' is required")
+    if not _have("zip"):
+        raise BrandingError("Branding: 'zip' is required")
+
+    workdir = Path(tempfile.mkdtemp())
+    try:
+        ipa_root = workdir / "ipa"
+        if not _run(["unzip", "-q", str(ipa), "-d", str(ipa_root)]):
+            raise BrandingError(f"Branding: failed to unpack {ipa}")
+
+        payload = ipa_root / "Payload"
+        apps = sorted(payload.glob("*.app")) if payload.is_dir() else []
+        appdir = next((a for a in apps if a.is_dir()), None)
+        if appdir is None:
+            raise BrandingError(f"Branding: could not locate .app inside {ipa}")
+
+        if resource_pack:
+            _apply_resource_pack_to_app(appdir, workdir, resource_pack)
+        if twitter_branding:
+            _set_display_name_in_app(appdir)
+        _bump_bundle_version(appdir)
+
+        # Repackage once. The zip binary (not zipfile) keeps the files' permissions
+        # as they were unpacked.
+        ipa = ipa.resolve()
+        tmp_ipa = ipa.with_name(ipa.name + ".branding.tmp")
+        if tmp_ipa.exists():
+            tmp_ipa.unlink()
+        if not _run(["zip", "-qr", str(tmp_ipa), "Payload"], cwd=str(ipa_root)):
+            if tmp_ipa.exists():
+                tmp_ipa.unlink()
+            raise BrandingError(f"Branding: failed to repackage {ipa}")
+        os.replace(tmp_ipa, ipa)
+    finally:
+        shutil.rmtree(workdir, ignore_errors=True)
+
+
+def main(argv):
+    if len(argv) != 2:
+        err("usage: ipa_branding.py <ipa_path>")
+        return 2
+    try:
+        apply_ipa_branding(argv[1])
+    except BrandingError as exc:
+        err(str(exc))
+        return 1
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv))

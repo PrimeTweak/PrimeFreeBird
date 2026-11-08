@@ -1,0 +1,12 @@
+#import "Debug/PFBTourOverlayWindow.h"
+
+@implementation PFBTourOverlayWindow
+- (UIView*)hitTest:(CGPoint)point withEvent:(UIEvent*)event {
+    UIView* hit = [super hitTest:point withEvent:event];
+    return hit == self ? nil : hit;
+}
+
+- (BOOL)canBecomeKeyWindow {
+    return NO;
+}
+@end

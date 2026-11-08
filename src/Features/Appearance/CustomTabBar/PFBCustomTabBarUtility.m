@@ -1,0 +1,268 @@
+// Registry and helpers of the custom tab bar: panel ids, images, order.
+
+#import "Features/Appearance/CustomTabBar/PFBCustomTabBarUtility.h"
+#import <objc/message.h>
+#import "Support/HookHelpers.h"
+#import "Features/Appearance/CustomTabBar/PFBCustomTabBarViewController.h"
+#import "Support/T1Headers.h"
+
+// Twitter's own tab editor and what building it takes.
+@protocol PFBNativeTabEditorMessages <NSObject>
+@optional
+- (id)appNavigation;
+- (instancetype)initWithAccount:(id)account scribeContext:(id)context;
++ (id)scribeContextWithPage:(NSString*)page;
+@end
+
+// The Home tab is the app's landing surface, so it is always kept visible and
+// pinned first.
+NSString* const PFBCustomTabBarHomePageID = @"home";
+
+NSString* const PFBTabPageKey = @"page";
+NSString* const PFBTabTitleKey = @"title";
+NSString* const PFBTabImageKey = @"image";
+NSString* const PFBTabPanelIDKey = @"panelID";
+
+static NSString* const kVisibleKey = @"pfb_tabs_visible";
+static NSString* const kRegistryKey = @"pfb_tab_registry";
+
+// A saved entry is kept only when its fields have the types the editor reads.
+static BOOL PFBRegistryEntryIsValid(id entry) {
+    if (![entry isKindOfClass:[NSDictionary class]] ||
+        ![entry[PFBTabPageKey] isKindOfClass:[NSString class]]) {
+        return NO;
+    }
+    id title = entry[PFBTabTitleKey];
+    id image = entry[PFBTabImageKey];
+    id panelID = entry[PFBTabPanelIDKey];
+    return (!title || [title isKindOfClass:[NSString class]]) &&
+           (!image || [image isKindOfClass:[NSString class]]) &&
+           (!panelID || [panelID isKindOfClass:[NSNumber class]]);
+}
+
+@implementation PFBCustomTabBarUtility
+
+#pragma mark - Editor routing
+
++ (BOOL)usesNativeEditor {
+    id host = [NSClassFromString(@"T1HostViewController") sharedHostViewController];
+    if ([host respondsToSelector:@selector(appNavigation)]) {
+        id navigation = ((id (*)(id, SEL))objc_msgSend)(host, @selector(appNavigation));
+        if (navigation) {
+            Class nativeNavigation = NSClassFromString(@"_TtC14T1TwitterSwift20XTabbedAppNavigation");
+            return nativeNavigation && [navigation isKindOfClass:nativeNavigation];
+        }
+    }
+    return PFBNativeGlassAsked();
+}
+
++ (UIViewController*)editorForAccount:(id)account {
+    if (![self usesNativeEditor]) {
+        return [[PFBCustomTabBarViewController alloc] init];
+    }
+    Class editorClass = NSClassFromString(@"T1TabCustomizationViewController");
+    Class contextClass = NSClassFromString(@"TFSTwitterScribeContext");
+    if (![editorClass isSubclassOfClass:[UIViewController class]] ||
+        ![editorClass instancesRespondToSelector:@selector(initWithAccount:scribeContext:)] ||
+        ![contextClass respondsToSelector:@selector(scribeContextWithPage:)]) {
+        return nil;
+    }
+    if (!account) {
+        account = [[NSClassFromString(@"T1HostViewController") sharedHostViewController] currentAccount];
+    }
+    id context = ((id (*)(id, SEL, id))objc_msgSend)(contextClass, @selector(scribeContextWithPage:), @"settings");
+    if (!account || !context) {
+        return nil;
+    }
+    return (UIViewController*)[(id<PFBNativeTabEditorMessages>)[editorClass alloc] initWithAccount:account
+                                                                                    scribeContext:context];
+}
+
+static const void* kPFBTitleAloneKey = &kPFBTitleAloneKey;
+
++ (void)showTitleAloneInEditor:(UIViewController*)editor {
+    objc_setAssociatedObject(editor, kPFBTitleAloneKey, @YES, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+}
+
++ (BOOL)editorShowsTitleAlone:(UIViewController*)editor {
+    return [objc_getAssociatedObject(editor, kPFBTitleAloneKey) boolValue];
+}
+
+#pragma mark - Live capture
+
+// Ordered union of every tab ever recorded, persisted across launches, so a tab
+// missing from the current tab bar stays available in the editor.
++ (NSMutableArray<NSDictionary*>*)registry {
+    static NSMutableArray<NSDictionary*>* registry;
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        registry = [NSMutableArray array];
+        NSArray* saved =
+            [[NSUserDefaults standardUserDefaults] arrayForKey:kRegistryKey];
+        for (id entry in saved) {
+            if (PFBRegistryEntryIsValid(entry)) {
+                [registry addObject:entry];
+            }
+        }
+    });
+    return registry;
+}
+
++ (void)recordTabViews:(NSArray*)tabViews {
+    NSMutableArray<NSDictionary*>* registry = [self registry];
+    BOOL changed = NO;
+
+    for (T1TabView* tabView in tabViews) {
+        // Each getter is asked first, so a tab Twitter describes another way is skipped.
+        if (![tabView respondsToSelector:@selector(scribePage)] || ![tabView respondsToSelector:@selector(panelID)]) {
+            continue;
+        }
+        NSString* page = tabView.scribePage;
+        if (page.length == 0) {
+            continue;
+        }
+
+        NSString* title = [tabView respondsToSelector:@selector(title)] && tabView.title.length ? tabView.title : page;
+        NSString* image = [self imageNameForTabView:tabView] ?: @"";
+        NSDictionary* entry = @{
+            PFBTabPageKey: page,
+            PFBTabTitleKey: title,
+            PFBTabImageKey: image,
+            PFBTabPanelIDKey: @(tabView.panelID)
+        };
+
+        NSInteger existing = NSNotFound;
+        for (NSInteger i = 0; i < (NSInteger)registry.count; i++) {
+            if ([registry[i][PFBTabPageKey] isEqualToString:page]) {
+                existing = i;
+                break;
+            }
+        }
+
+        if (existing == NSNotFound) {
+            [registry addObject:entry];
+            changed = YES;
+        } else if (![registry[existing] isEqualToDictionary:entry]) {
+            registry[existing] = entry;
+            changed = YES;
+        }
+    }
+
+    if (changed) {
+        [[NSUserDefaults standardUserDefaults] setObject:[registry copy]
+                                                  forKey:kRegistryKey];
+    }
+}
+
++ (NSString*)imageNameForTabView:(T1TabView*)tabView {
+    NSString* image = [tabView respondsToSelector:@selector(imageName)] ? tabView.imageName : nil;
+    if (image.length) {
+        return image;
+    }
+    // Avatar-drawn tabs (Profile) have no imageName; use the glyph the
+    // native customization screen resolves for the panel.
+    Class identity = NSClassFromString(@"T1PanelIdentity");
+    if (![identity respondsToSelector:@selector(iconImageNameForPanelID:)] ||
+        ![tabView respondsToSelector:@selector(panelID)]) {
+        return nil;
+    }
+    return [identity iconImageNameForPanelID:tabView.panelID];
+}
+
++ (NSArray<NSDictionary*>*)availableTabs {
+    return [[self registry] copy];
+}
+
++ (NSDictionary*)metadataForPage:(NSString*)pageID {
+    for (NSDictionary* entry in [self registry]) {
+        if ([entry[PFBTabPageKey] isEqualToString:pageID]) {
+            return entry;
+        }
+    }
+    return nil;
+}
+
+#pragma mark - Selection
+
++ (NSArray<NSString*>*)visiblePageIDsInOrder {
+    NSArray<NSString*>* visible =
+        [[NSUserDefaults standardUserDefaults] stringArrayForKey:kVisibleKey];
+    if (!visible) {
+        return nil;
+    }
+
+    NSMutableArray<NSString*>* pageIDs = [visible mutableCopy];
+    // Home is always visible and always first.
+    [pageIDs removeObject:PFBCustomTabBarHomePageID];
+    [pageIDs insertObject:PFBCustomTabBarHomePageID atIndex:0];
+    return pageIDs;
+}
+
++ (void)setVisiblePageIDs:(NSArray<NSString*>*)visible {
+    [[NSUserDefaults standardUserDefaults] setObject:visible forKey:kVisibleKey];
+    [[NSUserDefaults standardUserDefaults] synchronize];
+}
+
++ (NSArray<NSString*>*)defaultVisiblePageIDs {
+    return @[@"home", @"guide", @"ntab", @"messages"];
+}
+
+#pragma mark - Twitter's glass bar
+
+static NSDictionary* PFBEntryForPanel(NSArray<NSDictionary*>* registry, long long panelID) {
+    for (NSDictionary* entry in registry) {
+        id value = entry[PFBTabPanelIDKey];
+        if ([value isKindOfClass:[NSNumber class]] && [value longLongValue] == panelID) {
+            return entry;
+        }
+    }
+    return nil;
+}
+
++ (void)recordPanelIDs:(NSArray*)panelIDs {
+    if (![panelIDs isKindOfClass:[NSArray class]]) {
+        return;
+    }
+    Class identity = NSClassFromString(@"T1PanelIdentity");
+    NSMutableArray<NSDictionary*>* registry = [self registry];
+    BOOL changed = NO;
+    for (NSUInteger index = 0; index < panelIDs.count; index++) {
+        id panel = panelIDs[index];
+        if (![panel isKindOfClass:[NSNumber class]] || PFBEntryForPanel(registry, [panel longLongValue])) {
+            continue;
+        }
+        long long panelID = [panel longLongValue];
+        // Twitter lists Home first; the editor keeps Home under its own page.
+        NSString* page = nil;
+        if (index == 0 && ![self metadataForPage:PFBCustomTabBarHomePageID]) {
+            page = PFBCustomTabBarHomePageID;
+        } else if ([identity respondsToSelector:@selector(stringForPanelID:)]) {
+            page = [identity stringForPanelID:panelID];
+        }
+        if (!page.length) {
+            page = [NSString stringWithFormat:@"panel %lld", panelID];
+        }
+        // A page another panel already holds would merge the two in the editor.
+        if ([self metadataForPage:page]) {
+            continue;
+        }
+        NSString* title = [identity respondsToSelector:@selector(localizedNameForPanelID:)]
+                              ? [identity localizedNameForPanelID:panelID]
+                              : nil;
+        NSString* image = [identity respondsToSelector:@selector(iconImageNameForPanelID:)]
+                              ? [identity iconImageNameForPanelID:panelID]
+                              : nil;
+        [registry addObject:@{
+            PFBTabPageKey: page,
+            PFBTabTitleKey: title.length ? title : page,
+            PFBTabImageKey: image ?: @"",
+            PFBTabPanelIDKey: @(panelID)
+        }];
+        changed = YES;
+    }
+    if (changed) {
+        [[NSUserDefaults standardUserDefaults] setObject:[registry copy] forKey:kRegistryKey];
+    }
+}
+
+@end

@@ -1,0 +1,2192 @@
+// Timeline options: content filters, muted words, languages, reading marker, bars, polls.
+
+#import <QuartzCore/QuartzCore.h>
+
+#import "Support/HookHelpers.h"
+
+// MARK: - Hide custom timelines
+
+static __weak NSObject* PinnedTimelinesRepository;
+static NSArray* LastPinnedTimelineModels;
+static BOOL PinnedTimelinesWriteBypass = NO;
+
+// Applies the toggle without relaunching. The unchanged pinned list is rewritten
+// purely to republish, since updatePinnedTimelines: persists server-side; the
+// delegate hook below swaps in the empty list on the way through.
+void PFBApplyHideCustomTimelinesSetting(void) {
+    NSObject* repository = PinnedTimelinesRepository;
+    if (!repository) {
+        return;
+    }
+
+    if ([PFBSettings boolForKey:@"hide_custom_timelines"]) {
+        NSArray* models = LastPinnedTimelineModels;
+        SEL update = @selector(updatePinnedTimelines:);
+        if (models.count > 0 && [repository respondsToSelector:update]) {
+            PinnedTimelinesWriteBypass = YES;
+            ((void (*)(id, SEL, id))objc_msgSend)(repository, update, models);
+            PinnedTimelinesWriteBypass = NO;
+        }
+    } else if ([repository respondsToSelector:@selector(fetchPinnedTimelinesWithThrottleEnabled:)]) {
+        ((void (*)(id, SEL, BOOL))objc_msgSend)(
+            repository, @selector(fetchPinnedTimelinesWithThrottleEnabled:), NO);
+    }
+}
+
+// The trailing accessory is only reconfigured while the strip is showing, so a
+// button built before hiding mid-session survives; sync its visibility here. The
+// button is a Swift ivar with no accessor or type encoding, read from the ivar list.
+static void SyncHomeAddTabButton(id container, BOOL hidden) {
+    UIView* button = nil;
+    unsigned int ivarCount = 0;
+    Ivar* ivars = class_copyIvarList([container class], &ivarCount);
+    for (unsigned int i = 0; i < ivarCount; i++) {
+        const char* name = ivar_getName(ivars[i]);
+        if (name && strstr(name, "addTabButton")) {
+            button = object_getIvar(container, ivars[i]);
+            break;
+        }
+    }
+    free(ivars);
+
+    if ([button isKindOfClass:[UIView class]]) {
+        button.hidden = hidden;
+    }
+}
+
+// The repository publishes the pinned list through this single delegate call, so
+// handing it an empty array hides the tabs without touching persisted state.
+%hook _TtC32TwitterHomeFeatureImplementation35HomeTimelineContainerViewController
+
+- (void)pinnedTimelinesRepository:(id)repository
+    didChangeWithPinnedTimelineModels:(NSArray*)models {
+    // Another repository, another account: the list kept belongs to the one before.
+    if (repository != PinnedTimelinesRepository) {
+        LastPinnedTimelineModels = nil;
+    }
+    PinnedTimelinesRepository = repository;
+    BOOL hide = [PFBSettings boolForKey:@"hide_custom_timelines"];
+    if (models.count > 0) {
+        LastPinnedTimelineModels = [models copy];
+    } else if (!hide) {
+        // Empty while nothing is hidden: the user removed every pin.
+        LastPinnedTimelineModels = nil;
+    }
+    if (hide && models.count > 0) {
+        PFBCOMPAT_ACTION(PFBCompat_hide_custom_timelines, @"pinned tabs hidden");
+    }
+
+    %orig(repository, hide ? @[] : models);
+    SyncHomeAddTabButton(self, hide);
+}
+
+- (id)tfn_navigationBarAccessoryView {
+    id accessoryView = %orig;
+    SyncHomeAddTabButton(self, [PFBSettings boolForKey:@"hide_custom_timelines"]);
+    return accessoryView;
+}
+
+- (void)viewDidAppear:(BOOL)animated {
+    %orig;
+    SyncHomeAddTabButton(self, [PFBSettings boolForKey:@"hide_custom_timelines"]);
+}
+
+%end
+
+// While hiding, the overridden pinned-tabs feature switches make the app compute
+// an empty pinned list; freeze writes so it can't overwrite the real tabs.
+%hook _TtC32TwitterHomeFeatureImplementation31CachedPinnedTimelinesRepository
+
+- (void)updatePinnedTimelines:(id)timelines {
+    if (!PinnedTimelinesWriteBypass && [PFBSettings boolForKey:@"hide_custom_timelines"]) {
+        return;
+    }
+
+    %orig;
+}
+
+%end
+
+// MARK: - Force tweet images to full frame
+
+%hook T1StandardStatusAttachmentViewAdapter
+
+// attachmentType 2 = photos, displayType 1 = full frame
+- (NSUInteger)displayType {
+    if (self.attachmentType == 2) {
+        if ([PFBSettings boolForKey:@"force_tweet_full_frame"]) {
+            PFBCOMPAT_ACTION(PFBCompat_force_tweet_full_frame, @"image shown uncropped");
+            return 1;
+        }
+        PFBCOMPAT_OBSERVE(PFBCompat_force_tweet_full_frame, @"read by Twitter");
+        return %orig;
+    }
+
+    return %orig;
+}
+
+%end
+
+// MARK: - Hide the Spaces bar
+
+// Twitter draws the Spaces bar with its Fleet line classes; both home timeline
+// implementations share this visibility gate, re-evaluated on every content or
+// settings update.
+%hook T1FleetLineHeaderController
+
+- (BOOL)_t1_shouldShowFleetLine {
+    if ([PFBSettings boolForKey:@"hide_spaces"]) {
+        PFBCOMPAT_ACTION(PFBCompat_hide_spaces, @"Spaces bar hidden");
+        return NO;
+    }
+    PFBCOMPAT_OBSERVE(PFBCompat_hide_spaces, @"Spaces bar asked");
+
+    return %orig;
+}
+
+%end
+
+// The header hook removes the content, but the T1FleetLineView itself keeps
+// its height and blurred background. Collapse the view to zero as well.
+static const void* kPFBFleetHiddenKey = &kPFBFleetHiddenKey;
+
+static void pfbApplyFleetVisibility(UIView* view) {
+    // Restores a bar hidden here once the option is switched off, without a relaunch. Only
+    // a view hidden here is restored, so Twitter's own hiding is never overridden.
+    BOOL hide = [PFBSettings boolForKey:@"hide_spaces"];
+    BOOL markedHidden = objc_getAssociatedObject(view, kPFBFleetHiddenKey) != nil;
+    if (hide) {
+        if (!view.hidden) {
+            view.hidden = YES;
+        }
+        if (!markedHidden) {
+            objc_setAssociatedObject(view, kPFBFleetHiddenKey, @YES,
+                                     OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        }
+    } else if (markedHidden) {
+        view.hidden = NO;
+        objc_setAssociatedObject(view, kPFBFleetHiddenKey, nil,
+                                 OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    }
+}
+
+%hook T1FleetLineView
+
+- (void)didMoveToWindow {
+    %orig;
+    pfbApplyFleetVisibility((UIView*)self);
+}
+
+// Also on every layout pass: coming back from the settings screen doesn't
+// always move the view to a new window, and the bar would stay gone until the
+// app was relaunched.
+- (void)layoutSubviews {
+    %orig;
+    pfbApplyFleetVisibility((UIView*)self);
+}
+
+- (CGSize)intrinsicContentSize {
+    if ([PFBSettings boolForKey:@"hide_spaces"]) {
+        return CGSizeZero;
+    }
+    return %orig;
+}
+
+- (CGSize)sizeThatFits:(CGSize)size {
+    if ([PFBSettings boolForKey:@"hide_spaces"]) {
+        return CGSizeZero;
+    }
+    return %orig;
+}
+
+%end
+
+// MARK: - Scroll edge effect
+
+// iOS 26 draws a scroll edge effect under the top bars, and Twitter's navigation its own opaque
+// band with a line. The option clears Twitter's band and hides iOS's effect; the tweak's pages,
+// the lists under Twitter's band and modal screens keep iOS's effect in its soft style instead.
+
+static void PFBReadingLayoutTick(UIScrollView* scrollView);
+
+static const void* kPFBEdgeMarkKey = &kPFBEdgeMarkKey;
+static const void* kPFBEdgeTweakPageKey = &kPFBEdgeTweakPageKey;
+static const void* kPFBEdgeSoftenedKey = &kPFBEdgeSoftenedKey;
+static const void* kPFBEdgeUnderBandKey = &kPFBEdgeUnderBandKey;
+static const void* kPFBBandColorKey = &kPFBBandColorKey;
+
+// The option is cached: reading NSUserDefaults on every layout pass of every
+// scroll view in the app would be far too costly, and a refresh twice a second
+// is plenty for a settings toggle.
+static BOOL gPFBEdgeHide = NO;
+static CFAbsoluteTime gPFBEdgeChecked = 0;
+
+static BOOL pfbEdgeHideEnabled(void) {
+    CFAbsoluteTime now = CFAbsoluteTimeGetCurrent();
+    if (now - gPFBEdgeChecked > 0.5) {
+        gPFBEdgeChecked = now;
+        gPFBEdgeHide = [PFBSettings boolForKey:@"hide_scroll_edge_blur"];
+    }
+    return gPFBEdgeHide;
+}
+
+// Hides or shows the top edge effect of one scroll view; a view it hid keeps a
+// mark until it shows the effect again.
+static void pfbApplyEdgeEffect(UIScrollView* scrollView, BOOL hide) {
+    if (![scrollView respondsToSelector:@selector(topEdgeEffect)]) {
+        return;   // nothing to do before iOS 26
+    }
+    id effect = ((id (*)(id, SEL))objc_msgSend)(scrollView, @selector(topEdgeEffect));
+    if (![effect respondsToSelector:@selector(setHidden:)] ||
+        ![effect respondsToSelector:@selector(isHidden)]) {
+        return;
+    }
+    BOOL alreadyHidden = ((BOOL (*)(id, SEL))objc_msgSend)(effect, @selector(isHidden));
+    if (!hide) {
+        PFBCOMPAT_OBSERVE(PFBCompat_hide_scroll_edge_blur, @"edge blur found");
+    }
+    if (alreadyHidden == hide) {
+        return;   // nothing to do: the common case, and the cheapest
+    }
+    ((void (*)(id, SEL, BOOL))objc_msgSend)(effect, @selector(setHidden:), hide);
+    if (hide) {
+        PFBCOMPAT_ACTION(PFBCompat_hide_scroll_edge_blur, @"edge blur hidden");
+    }
+    objc_setAssociatedObject(scrollView, kPFBEdgeMarkKey, hide ? @YES : nil,
+                             OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+}
+
+// Whether a list belongs to one of the tweak's pages, decided once per list.
+static BOOL pfbScrollViewIsTweakPage(UIScrollView* scrollView) {
+    NSNumber* known = objc_getAssociatedObject(scrollView, kPFBEdgeTweakPageKey);
+    if (known) {
+        return known.boolValue;
+    }
+    UIViewController* owner = PFBOwningController(scrollView);
+    if (!owner) {
+        return NO;
+    }
+    BOOL tweak = [NSStringFromClass([owner class]) hasPrefix:@"PFB"];
+    objc_setAssociatedObject(scrollView, kPFBEdgeTweakPageKey, @(tweak), OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    return tweak;
+}
+
+static id pfbTopEdgeEffect(UIScrollView* scrollView) {
+    SEL edge = NSSelectorFromString(@"topEdgeEffect");
+    if (![scrollView respondsToSelector:edge]) {
+        return nil;
+    }
+    id effect = ((id (*)(id, SEL))objc_msgSend)(scrollView, edge);
+    BOOL styled = [effect respondsToSelector:@selector(setStyle:)] && [effect respondsToSelector:@selector(style)];
+    return styled ? effect : nil;
+}
+
+// With the option on, a tweak page's effect takes the soft style, its own style kept to give back
+// when the option goes off; set once per list and window, as a style may be a new object at
+// each read.
+static void pfbSoftenEdgeEffect(UIScrollView* scrollView, BOOL moved) {
+    if (!moved && objc_getAssociatedObject(scrollView, kPFBEdgeSoftenedKey)) {
+        return;
+    }
+    id effect = pfbTopEdgeEffect(scrollView);
+    SEL softStyle = NSSelectorFromString(@"softStyle");
+    Class styleClass = NSClassFromString(@"UIScrollEdgeEffectStyle");
+    if (!effect || ![styleClass respondsToSelector:softStyle]) {
+        return;
+    }
+    id own = objc_getAssociatedObject(scrollView, kPFBEdgeSoftenedKey) ?: [effect performSelector:@selector(style)];
+    objc_setAssociatedObject(scrollView, kPFBEdgeSoftenedKey, own ?: [NSNull null], OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    id soft = ((id (*)(id, SEL))objc_msgSend)(styleClass, softStyle);
+    if (soft && ![[effect performSelector:@selector(style)] isEqual:soft]) {
+        [effect performSelector:@selector(setStyle:) withObject:soft];
+    }
+}
+
+// With the option off, a tweak page's effect gets back the style iOS gave it.
+static void pfbUnsoftenEdgeEffect(UIScrollView* scrollView) {
+    id own = objc_getAssociatedObject(scrollView, kPFBEdgeSoftenedKey);
+    if (!own) {
+        return;
+    }
+    objc_setAssociatedObject(scrollView, kPFBEdgeSoftenedKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    id effect = pfbTopEdgeEffect(scrollView);
+    if (effect && own != [NSNull null]) {
+        [effect performSelector:@selector(setStyle:) withObject:own];
+    }
+}
+
+// A tweak page keeps its effect shown, soft while the option is on.
+static void pfbApplyTweakPageEdge(UIScrollView* scrollView, BOOL moved) {
+    pfbApplyEdgeEffect(scrollView, NO);
+    if (pfbEdgeHideEnabled()) {
+        pfbSoftenEdgeEffect(scrollView, moved);
+    } else {
+        pfbUnsoftenEdgeEffect(scrollView);
+    }
+}
+
+// The lists that take the soft effect: the tweak's pages, and those under Twitter's band.
+static BOOL pfbScrollViewTakesSoftEdge(UIScrollView* scrollView) {
+    return objc_getAssociatedObject(scrollView, kPFBEdgeUnderBandKey) != nil || pfbScrollViewIsTweakPage(scrollView);
+}
+
+// Modal screens take the soft effect rather than none: hiding it on Twitter's own settings sheet
+// breaks its content inset and slides the list up under the title.
+static BOOL pfbScrollViewIsModal(UIScrollView* scrollView) {
+    UIViewController* owner = PFBOwningController(scrollView);
+    return owner != nil && owner.presentingViewController != nil;
+}
+
+%hook UIScrollView
+
+- (void)didMoveToWindow {
+    %orig;
+
+    @try {
+        if (self.window && (pfbScrollViewTakesSoftEdge(self) || pfbScrollViewIsModal(self))) {
+            pfbApplyTweakPageEdge(self, YES);
+        } else if (self.window) {
+            pfbApplyEdgeEffect(self, pfbEdgeHideEnabled());
+        }
+    } @catch (id exception) {
+    }
+}
+
+// Checked on every layout of every scroll view, since iOS re-enables the effect whenever a bar
+// reconfigures. A view the option has not touched returns early while the option is off.
+- (void)layoutSubviews {
+    %orig;
+
+    @try {
+        if (!self.window) {
+            return;
+        }
+        BOOL marked = objc_getAssociatedObject(self, kPFBEdgeMarkKey) != nil;
+        BOOL softened = objc_getAssociatedObject(self, kPFBEdgeSoftenedKey) != nil;
+        BOOL hide = pfbEdgeHideEnabled();
+        PFBReadingLayoutTick(self);
+        if (!marked && !softened && !hide) {
+            return;
+        }
+        if (pfbScrollViewTakesSoftEdge(self) || pfbScrollViewIsModal(self)) {
+            pfbApplyTweakPageEdge(self, NO);
+            return;
+        }
+        pfbApplyEdgeEffect(self, hide);
+    } @catch (id exception) {
+    }
+}
+
+%end
+
+// Twitter's navigation paints an opaque band behind its top bar, with a line once the list scrolls
+// under it. With the option on, the band is cleared and its line hidden, and the lists beside it
+// take the soft effect.
+static BOOL gPFBBandWriting = NO;
+
+static BOOL pfbBandIsPainted(UIColor* color) {
+    return color && CGColorGetAlpha(color.CGColor) > 0.01;
+}
+
+// Marks the lists beside the band, a few levels down at most, and gives them the soft effect.
+static void pfbMarkListsUnderBand(UIView* view, NSInteger depth, CGFloat width) {
+    if ([view isKindOfClass:[UIScrollView class]] && CGRectGetWidth(view.bounds) >= width * 0.8) {
+        if (!objc_getAssociatedObject(view, kPFBEdgeUnderBandKey)) {
+            objc_setAssociatedObject(view, kPFBEdgeUnderBandKey, @YES, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+            pfbApplyTweakPageEdge((UIScrollView*)view, YES);
+        }
+        return;
+    }
+    if (depth >= 3) {
+        return;
+    }
+    for (UIView* subview in view.subviews) {
+        pfbMarkListsUnderBand(subview, depth + 1, width);
+    }
+}
+
+static void pfbApplyTwitterBand(UIView* band) {
+    UIColor* own = objc_getAssociatedObject(band, kPFBBandColorKey);
+    if (!pfbBandIsPainted(own)) {
+        return;
+    }
+    BOOL soft = pfbEdgeHideEnabled();
+    UIColor* shown = soft ? UIColor.clearColor : own;
+    if (![band.backgroundColor isEqual:shown]) {
+        gPFBBandWriting = YES;
+        band.backgroundColor = shown;
+        gPFBBandWriting = NO;
+        if (soft) {
+            PFBCOMPAT_ACTION(PFBCompat_hide_scroll_edge_blur, @"Twitter's top band cleared");
+        }
+    }
+    Ivar lineIvar = class_getInstanceVariable(object_getClass(band), "separatorView");
+    id line = lineIvar ? object_getIvar(band, lineIvar) : nil;
+    if ([line isKindOfClass:[UIView class]] && ((UIView*)line).hidden != soft) {
+        ((UIView*)line).hidden = soft;
+    }
+    if (!soft) {
+        PFBCOMPAT_OBSERVE(PFBCompat_hide_scroll_edge_blur, @"Twitter's top band found");
+        return;
+    }
+    UIView* host = band.superview;
+    for (UIView* sibling in host.subviews) {
+        if (sibling != band) {
+            pfbMarkListsUnderBand(sibling, 0, CGRectGetWidth(host.bounds));
+        }
+    }
+}
+
+%hook _TtC11XNavigation20ChromeBackgroundView
+
+// Twitter's own color is kept, to give back when the option goes off.
+- (void)setBackgroundColor:(UIColor*)color {
+    if (gPFBBandWriting) {
+        %orig;
+        return;
+    }
+    objc_setAssociatedObject(self, kPFBBandColorKey, color, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    %orig(pfbBandIsPainted(color) && pfbEdgeHideEnabled() ? UIColor.clearColor : color);
+}
+
+- (void)didMoveToWindow {
+    %orig;
+    @try {
+        if (((UIView*)self).window) {
+            pfbApplyTwitterBand((UIView*)self);
+        }
+    } @catch (__unused id exception) {
+    }
+}
+
+- (void)layoutSubviews {
+    %orig;
+    @try {
+        pfbApplyTwitterBand((UIView*)self);
+    } @catch (__unused id exception) {
+    }
+}
+
+%end
+
+%hook TFNTableView
+
+// Twitter's own table does not route its layout through UIScrollView, so the
+// wash would only be repositioned on a data change and would drift as
+// self-sizing rows settle.
+- (void)layoutSubviews {
+    %orig;
+    @try {
+        PFBReadingLayoutTick(self);
+    } @catch (id exception) {
+    }
+}
+
+%end
+
+
+// MARK: - Timeline item filters
+
+// Resolves the class by name so mangled Swift names work; NSStringFromClass
+// would only ever produce the demangled dotted form.
+static BOOL IsInHierarchyOfClass(UIViewController* viewController, NSString* className) {
+    Class targetClass = NSClassFromString(className);
+    if (!targetClass) {
+        return NO;
+    }
+
+    UIViewController* currentVC = viewController;
+
+    while (currentVC) {
+        if ([currentVC isKindOfClass:targetClass]) {
+            return YES;
+        }
+
+        if (currentVC.parentViewController) {
+            currentVC = currentVC.parentViewController;
+        } else if (currentVC.navigationController) {
+            currentVC = currentVC.navigationController;
+        } else if (currentVC.presentingViewController) {
+            currentVC = currentVC.presentingViewController;
+        } else {
+            break;
+        }
+    }
+
+    return NO;
+}
+
+// The edit history is shown by a generic timeline controller, so the one its
+// factory builds is tagged to tell it apart.
+static const void* kPFBEditHistoryKey = &kPFBEditHistoryKey;
+
+static BOOL IsInEditHistory(UIViewController* viewController) {
+    for (UIViewController* current = viewController; current; current = current.parentViewController) {
+        if (objc_getAssociatedObject(current, kPFBEditHistoryKey)) {
+            return YES;
+        }
+    }
+    return NO;
+}
+
+%hook T1EditHistoryViewControllerFactory
+
++ (id)viewControllerWithAccount:(id)account
+                        tweetID:(unsigned long long)tweetID
+                  scribeContext:(id)scribeContext {
+    id viewController = %orig;
+    if (viewController) {
+        objc_setAssociatedObject(viewController, kPFBEditHistoryKey, @YES, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        PFBCompatReach(PFBCompatPath_verified_edit_history);
+    }
+    return viewController;
+}
+
+%end
+
+static NSString* ItemEntryID(id viewModel) {
+    if (![viewModel respondsToSelector:@selector(entryID)]) {
+        return nil;
+    }
+
+    NSString* entryID = [viewModel performSelector:@selector(entryID)];
+    return [entryID isKindOfClass:[NSString class]] ? entryID : nil;
+}
+
+static NSString* ItemScribeComponent(id viewModel) {
+    if (![viewModel respondsToSelector:@selector(scribeComponent)]) {
+        return nil;
+    }
+
+    NSString* component = [viewModel performSelector:@selector(scribeComponent)];
+    return [component isKindOfClass:[NSString class]] ? component : nil;
+}
+
+// A carousel module's own scribe component, from its client event info.
+static NSString* CarouselScribeComponent(id viewModel) {
+    Ivar ivar = class_getInstanceVariable([viewModel class], "clientEventInfo");
+    id info = ivar ? object_getIvar(viewModel, ivar) : nil;
+    SEL selector = NSSelectorFromString(@"component");
+    id value = [info respondsToSelector:selector] ? ((id (*)(id, SEL))objc_msgSend)(info, selector) : nil;
+    return [value isKindOfClass:[NSString class]] ? value : nil;
+}
+
+// Tweets a topic brought in carry Twitter's own label for it, "From <topic>" in
+// the app's language, as their context banner.
+static BOOL ItemIsTopicPost(id viewModel) {
+    static NSString* prefix;
+    static NSString* suffix;
+    static SEL selector;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+      selector = NSSelectorFromString(@"socialContextBannerText");
+      NSString* path = [NSBundle.mainBundle pathForResource:@"TwitterTweetAnatomy_TwitterTweetAnatomyStrings"
+                                                     ofType:@"bundle"];
+      NSString* format = [[NSBundle bundleWithPath:path] localizedStringForKey:@"FROM_TAG_TOPIC_SOCIAL_CONTEXT_LABEL_FORMAT"
+                                                                         value:nil
+                                                                         table:nil];
+      NSRange slot = [format rangeOfString:@"%1$@"];
+      if (format && slot.location != NSNotFound) {
+          prefix = [format substringToIndex:slot.location];
+          suffix = [format substringFromIndex:NSMaxRange(slot)];
+      }
+    });
+    if (prefix.length + suffix.length == 0 || ![viewModel respondsToSelector:selector]) {
+        return NO;
+    }
+    id banner = ((id (*)(id, SEL))objc_msgSend)(viewModel, selector);
+    NSString* text = [banner isKindOfClass:[NSAttributedString class]] ? [(NSAttributedString*)banner string]
+                     : [banner isKindOfClass:[NSString class]]         ? banner
+                                                                       : nil;
+    // hasPrefix: and hasSuffix: answer NO for an empty string, so an empty side always matches.
+    return text.length > prefix.length + suffix.length && (prefix.length == 0 || [text hasPrefix:prefix]) &&
+           (suffix.length == 0 || [text hasSuffix:suffix]);
+}
+
+// A BOOL getter's answer, read only when its signature says it returns one.
+static BOOL ItemRespondsAndInvokesBOOL(id viewModel, SEL selector) {
+    if (![viewModel respondsToSelector:selector] ||
+        strcmp([viewModel methodSignatureForSelector:selector].methodReturnType, @encode(BOOL)) != 0) {
+        return NO;
+    }
+    return ((BOOL (*)(id, SEL))objc_msgSend)(viewModel, selector);
+}
+
+static BOOL ItemIsBookmarked(id viewModel) {
+    return ItemRespondsAndInvokesBOOL(viewModel, @selector(displayAsBookmarked));
+}
+
+// Set when a reply is only on the feed because a followed account replied to
+// someone else's tweet.
+static BOOL ItemIsReplyWithSocialContext(id viewModel) {
+    return ItemRespondsAndInvokesBOOL(viewModel, @selector(isReplyAndShouldShowSocialContext));
+}
+
+static BOOL ItemIsConversationThreadReply(id viewModel) {
+    return [ItemEntryID(viewModel) containsString:@"conversationthread"];
+}
+
+// The tweet's author and who it's directly replying to, for recognizing an
+// exchange between the thread's own author and a verified user. Real user IDs
+// are never 0, so that doubles as "unknown/unsupported".
+static long long ItemRepresentedFromUserID(id viewModel) {
+    SEL selector = @selector(representedFromUserID);
+    if (![viewModel respondsToSelector:selector]) {
+        return 0;
+    }
+    return ((long long (*)(id, SEL))objc_msgSend)(viewModel, selector);
+}
+
+static long long ItemInReplyToUserID(id viewModel) {
+    SEL selector = @selector(inReplyToUserID);
+    if (![viewModel respondsToSelector:selector]) {
+        return 0;
+    }
+    return ((long long (*)(id, SEL))objc_msgSend)(viewModel, selector);
+}
+
+// Twitter's *ByCurrentAccountState fields are a tri-state
+// (0 unknown, 1 yes, 2 no).
+static const NSInteger kFollowedByCurrentAccountStateFollowing = 1;
+
+static BOOL PFBAuthorIsFollowed(id viewModel);
+
+static BOOL PFBShouldHideVerifiedItem(id viewModel, BOOL inConversation,
+                                     long long conversationRootUserID,
+                                     NSSet<NSNumber*>* authorRepliedToUserIDs) {
+    SEL verifiedSelector = @selector(isFromUserVerified);
+    if (![viewModel respondsToSelector:verifiedSelector]) {
+        return NO;
+    }
+
+    // The real flag: Hide blue verified answers NO for it everywhere else.
+    PFBBeginRawVerifiedRead();
+    BOOL verified = ((BOOL (*)(id, SEL))objc_msgSend)(viewModel, verifiedSelector);
+    PFBEndRawVerifiedRead();
+    if (!verified) {
+        return NO;
+    }
+
+    // A bookmarked Tweet stays.
+    if (ItemIsBookmarked(viewModel)) {
+        return NO;
+    }
+
+    if (inConversation) {
+        if (!ItemIsConversationThreadReply(viewModel)) {
+            return NO;
+        }
+
+        if (conversationRootUserID != 0) {
+            long long repliedUserID = ItemRepresentedFromUserID(viewModel);
+
+            BOOL isAuthorsOwnReply = repliedUserID == conversationRootUserID;
+            BOOL authorRepliedToThisUser =
+                [authorRepliedToUserIDs containsObject:@(repliedUserID)];
+            if (isAuthorsOwnReply || authorRepliedToThisUser) {
+                return NO;
+            }
+        }
+    }
+
+    if (!inConversation && ItemIsReplyWithSocialContext(viewModel)) {
+        return NO;
+    }
+
+    if (PFBAuthorIsFollowed(viewModel)) {
+        return NO;
+    }
+
+    return YES;
+}
+
+// MARK: - Muted words
+
+// The rule list is cached rather than read per item; the editor calls
+// pfbRefreshMutedWords() and the signature below invalidates the memo. Text and
+// handle are read through several known selectors, so a rename means no match.
+
+static NSArray<NSString*>* gPFBMutedWords = nil;      // lowercased, no "@"
+static NSArray<NSString*>* gPFBMutedHandles = nil;    // lowercased, no "@"
+static BOOL gPFBMutedWholeWords = YES;
+static BOOL gPFBMutedInConversations = YES;
+static BOOL gPFBMutedSkipFollowing = YES;
+static BOOL gPFBMutedIncludeReposts = NO;
+static NSInteger gPFBMutedHiddenToday = 0;
+static NSInteger gPFBMutedFlushCounter = 0;
+static NSString* gPFBMutedCountDay = nil;
+static CFAbsoluteTime gPFBMutedDayEnd = 0;
+static NSMutableSet<NSString*>* gPFBMutedCountedIDs = nil;
+static NSTimeInterval gPFBMutedNextExpiry = 0;   // 1970-based; 0 while no term expires
+static NSUInteger gPFBMutedSignature = 0;
+static BOOL gPFBMutedLoaded = NO;
+
+void pfbRefreshMutedWords(void) {
+    NSUserDefaults* d = [NSUserDefaults standardUserDefaults];
+    NSArray* raw = [d arrayForKey:@"pfb_muted_words"] ?: @[];
+    // term -> expiry timestamp; a missing entry means "forever".
+    NSDictionary* expiry = [d dictionaryForKey:@"pfb_muted_expiry"] ?: @{};
+    NSTimeInterval now = [[NSDate date] timeIntervalSince1970];
+    NSMutableArray* words = [NSMutableArray array];
+    NSMutableArray* handles = [NSMutableArray array];
+    NSUInteger signature = 1;
+    NSTimeInterval nextExpiry = 0;
+    for (id entry in raw) {
+        if (![entry isKindOfClass:[NSString class]]) { continue; }
+        NSString* original = (NSString*)entry;
+        id deadline = expiry[original];
+        double when = [deadline respondsToSelector:@selector(doubleValue)] ? [deadline doubleValue] : 0;
+        if (when > 0 && when <= now) {
+            continue;   // expired: ignored until the editor prunes it
+        }
+        if (when > 0 && (nextExpiry == 0 || when < nextExpiry)) {
+            nextExpiry = when;
+        }
+        NSString* term = [[original
+            stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceCharacterSet]]
+            lowercaseString];
+        if (term.length == 0) { continue; }
+        signature = signature * 31 + term.hash;
+        if ([term hasPrefix:@"@"]) {
+            NSString* handle = [term substringFromIndex:1];
+            if (handle.length) { [handles addObject:handle]; }
+        } else {
+            [words addObject:term];
+        }
+    }
+    gPFBMutedWords = words;
+    gPFBMutedHandles = handles;
+    gPFBMutedWholeWords =
+        ([d objectForKey:@"pfb_muted_whole_words"] == nil) ? YES
+                                                           : [d boolForKey:@"pfb_muted_whole_words"];
+    gPFBMutedInConversations =
+        ([d objectForKey:@"pfb_muted_in_conversations"] == nil)
+            ? YES
+            : [d boolForKey:@"pfb_muted_in_conversations"];
+    gPFBMutedSkipFollowing =
+        ([d objectForKey:@"pfb_muted_skip_following"] == nil)
+            ? YES
+            : [d boolForKey:@"pfb_muted_skip_following"];
+    gPFBMutedIncludeReposts = [d boolForKey:@"pfb_muted_include_reposts"];
+    gPFBMutedNextExpiry = nextExpiry;
+
+    // Hidden conversations share this memo, signed by their ids: a count alone stays
+    // the same when one is unhidden and another hidden, and the timeline would keep
+    // its previous verdict.
+    for (id thread in PFBHiddenThreads()) {
+        id threadID = [thread isKindOfClass:[NSDictionary class]] ? ((NSDictionary*)thread)[@"id"] : nil;
+        signature = signature * 31 + [threadID hash];
+    }
+    gPFBMutedSignature = signature * 31 + (gPFBMutedWholeWords ? 2 : 1) +
+                         (gPFBMutedSkipFollowing ? 4 : 0) +
+                         (gPFBMutedIncludeReposts ? 8 : 0) +
+                         (gPFBMutedInConversations ? 16 : 0);
+    gPFBMutedLoaded = YES;
+}
+
+// The rules load once, and again as soon as a timed term reaches its deadline.
+static void PFBEnsureMutedLoaded(void) {
+    if (!gPFBMutedLoaded ||
+        (gPFBMutedNextExpiry > 0 &&
+         CFAbsoluteTimeGetCurrent() + kCFAbsoluteTimeIntervalSince1970 >= gPFBMutedNextExpiry)) {
+        pfbRefreshMutedWords();
+    }
+}
+
+// The object a getter returns, read only when its signature says it returns one.
+static id PFBTimelineObject(id object, NSString* name) {
+    SEL selector = NSSelectorFromString(name);
+    if (![object respondsToSelector:selector]) {
+        return nil;
+    }
+    NSMethodSignature* signature = [object methodSignatureForSelector:selector];
+    if (signature.numberOfArguments != 2 || signature.methodReturnType[0] != '@') {
+        return nil;
+    }
+    return ((id (*)(id, SEL))objc_msgSend)(object, selector);
+}
+
+// First non-empty string among a list of selectors, on the object itself and
+// then on its status/tweet child.
+static NSString* PFBStringFromSelectors(id object, BOOL descend) {
+    if (!object) { return nil; }
+    for (NSString* name in @[ @"fullText", @"tweetText", @"text", @"displayText", @"bodyText" ]) {
+        id value = PFBTimelineObject(object, name);
+        if ([value isKindOfClass:[NSString class]] && ((NSString*)value).length) {
+            return (NSString*)value;
+        }
+        if ([value isKindOfClass:[NSAttributedString class]] &&
+            ((NSAttributedString*)value).string.length) {
+            return ((NSAttributedString*)value).string;
+        }
+    }
+    if (!descend) { return nil; }
+    for (NSString* name in @[ @"status", @"tweet" ]) {
+        NSString* text = PFBStringFromSelectors(PFBTimelineObject(object, name), NO);
+        if (text.length) { return text; }
+    }
+    return nil;
+}
+
+// The author's handle: fromUserName on a Tweet's view model, else the names other
+// models use, on the object and then on its status, tweet, author or user.
+static NSString* PFBHandleFromSelectors(id object, BOOL descend) {
+    if (!object) { return nil; }
+    for (NSString* name in @[ @"fromUserName", @"screenName", @"authorScreenName", @"username", @"handle" ]) {
+        id value = PFBTimelineObject(object, name);
+        if ([value isKindOfClass:[NSString class]] && ((NSString*)value).length) {
+            return (NSString*)value;
+        }
+    }
+    if (!descend) { return nil; }
+    for (NSString* name in @[ @"status", @"tweet", @"author", @"user" ]) {
+        NSString* handle = PFBHandleFromSelectors(PFBTimelineObject(object, name), NO);
+        if (handle.length) { return handle; }
+    }
+    return nil;
+}
+
+// Scripts written without spaces between words (Thai, Lao, Khmer, kana, Han): a
+// neighbor in one of them says nothing about a word's end, so it counts as a boundary.
+static BOOL PFBIsUnspacedScript(unichar c) {
+    return (c >= 0x0E00 && c <= 0x0EFF) || (c >= 0x1780 && c <= 0x17FF) ||
+           (c >= 0x3040 && c <= 0x30FF) || (c >= 0x31F0 && c <= 0x31FF) ||
+           (c >= 0x3400 && c <= 0x4DBF) || (c >= 0x4E00 && c <= 0x9FFF) ||
+           (c >= 0xF900 && c <= 0xFAFF) || (c >= 0xFF66 && c <= 0xFF9F);
+}
+
+// Whole-word matching without a regex: find the needle, then require that
+// neither neighboring character is alphanumeric.
+static BOOL PFBHaystackContainsTerm(NSString* haystack, NSString* term, BOOL wholeWords) {
+    NSRange search = NSMakeRange(0, haystack.length);
+    while (search.length > 0) {
+        NSRange found = [haystack rangeOfString:term options:0 range:search];
+        if (found.location == NSNotFound) { return NO; }
+        if (!wholeWords) { return YES; }
+        NSCharacterSet* alnum = [NSCharacterSet alphanumericCharacterSet];
+        BOOL leftOK = YES;
+        BOOL rightOK = YES;
+        if (found.location > 0) {
+            unichar left = [haystack characterAtIndex:found.location - 1];
+            leftOK = ![alnum characterIsMember:left] || PFBIsUnspacedScript(left);
+        }
+        NSUInteger after = found.location + found.length;
+        if (after < haystack.length) {
+            unichar right = [haystack characterAtIndex:after];
+            rightOK = ![alnum characterIsMember:right] || PFBIsUnspacedScript(right);
+        }
+        if (leftOK && rightOK) { return YES; }
+        NSUInteger next = found.location + 1;
+        if (next >= haystack.length) { return NO; }
+        search = NSMakeRange(next, haystack.length - next);
+    }
+    return NO;
+}
+
+// "Tweets filtered today" follows the local day: past the next local midnight the count
+// starts over. The count is kept in memory and saved sparingly, so the hot path rarely
+// touches NSUserDefaults.
+static void PFBMutedRollDay(void) {
+    CFAbsoluteTime now = CFAbsoluteTimeGetCurrent();
+    if (gPFBMutedCountDay && now < gPFBMutedDayEnd) {
+        return;
+    }
+    NSCalendar* calendar = [NSCalendar currentCalendar];
+    NSDate* start = [calendar startOfDayForDate:[NSDate date]];
+    NSDate* end = [calendar dateByAddingUnit:NSCalendarUnitDay value:1 toDate:start options:0];
+    gPFBMutedDayEnd = end ? end.timeIntervalSinceReferenceDate : now + 3600.0;
+    NSString* today = [NSString stringWithFormat:@"%.0f", start.timeIntervalSince1970];
+    if ([today isEqualToString:gPFBMutedCountDay]) {
+        return;
+    }
+    // The saved count holds only for its own day: kept after a relaunch that day.
+    NSUserDefaults* d = [NSUserDefaults standardUserDefaults];
+    BOOL sameDay = !gPFBMutedCountDay && [[d stringForKey:@"pfb_muted_count_day"] isEqualToString:today];
+    gPFBMutedHiddenToday = sameDay ? [d integerForKey:@"pfb_muted_hidden_count"] : 0;
+    if (!sameDay) {
+        [d setObject:today forKey:@"pfb_muted_count_day"];
+        [d setInteger:0 forKey:@"pfb_muted_hidden_count"];
+    }
+    gPFBMutedCountedIDs = [NSMutableSet set];
+    gPFBMutedCountDay = today;
+}
+
+// Read by the muted-words editor for its "Tweets filtered today" footer.
+NSInteger pfbMutedHiddenCountToday(void) {
+    PFBEnsureMutedLoaded();
+    PFBMutedRollDay();
+    return gPFBMutedHiddenToday;
+}
+
+// Each Tweet counts once a day, however often the timeline is filtered again.
+static void PFBNoteMutedHidden(NSString* entryID) {
+    PFBCOMPAT_ACTION(PFBCompat_muted_words, @"muted post hidden");
+    PFBMutedRollDay();
+    if (!entryID || [gPFBMutedCountedIDs containsObject:entryID]) {
+        return;
+    }
+    [gPFBMutedCountedIDs addObject:entryID];
+    gPFBMutedHiddenToday++;
+    // Persist every so often rather than on every hidden post.
+    if (++gPFBMutedFlushCounter >= 25) {
+        gPFBMutedFlushCounter = 0;
+        NSUserDefaults* d = [NSUserDefaults standardUserDefaults];
+        [d setInteger:gPFBMutedHiddenToday forKey:@"pfb_muted_hidden_count"];
+        if (gPFBMutedCountDay) {
+            [d setObject:gPFBMutedCountDay forKey:@"pfb_muted_count_day"];
+        }
+    }
+}
+
+// The view model's follow state for the Tweet's author, read only when it answers with
+// an integer. Unknown counts as not followed: the filter still applies.
+static NSInteger PFBAuthorFollowState(id viewModel) {
+    SEL selector = NSSelectorFromString(@"representedFromUserFollowedByCurrentAccountState");
+    if (![viewModel respondsToSelector:selector]) {
+        return 0;
+    }
+    char type = [viewModel methodSignatureForSelector:selector].methodReturnType[0];
+    if (type != 'q' && type != 'l') {
+        return 0;
+    }
+    return ((NSInteger (*)(id, SEL))objc_msgSend)(viewModel, selector);
+}
+
+static BOOL PFBAuthorIsFollowed(id viewModel) {
+    return PFBAuthorFollowState(viewModel) == kFollowedByCurrentAccountStateFollowing;
+}
+
+static BOOL PFBHandleIsMuted(id handle) {
+    if (![handle isKindOfClass:[NSString class]] || ![(NSString*)handle length]) { return NO; }
+    NSString* lower = [(NSString*)handle lowercaseString];
+    if ([lower hasPrefix:@"@"]) { lower = [lower substringFromIndex:1]; }
+    return [gPFBMutedHandles containsObject:lower];
+}
+
+static BOOL PFBObjectMatchesMutedRule(id object) {
+    if (!object) { return NO; }
+    if (gPFBMutedHandles.count && PFBHandleIsMuted(PFBHandleFromSelectors(object, YES))) {
+        return YES;
+    }
+    if (gPFBMutedWords.count) {
+        NSString* text = PFBStringFromSelectors(object, YES);
+        if (text.length) {
+            NSString* lower = [text lowercaseString];
+            for (NSString* term in gPFBMutedWords) {
+                if (PFBHaystackContainsTerm(lower, term, gPFBMutedWholeWords)) {
+                    return YES;
+                }
+            }
+        }
+    }
+    return NO;
+}
+
+static BOOL PFBItemIsMuted(id viewModel) {
+    if (gPFBMutedSkipFollowing && PFBAuthorIsFollowed(viewModel)) {
+        return NO;
+    }
+    // A retweet's view model carries the original's author and text, so a retweet is
+    // filtered only with Include retweets on.
+    BOOL retweet = ItemRespondsAndInvokesBOOL(viewModel, NSSelectorFromString(@"isRetweet"));
+    if (retweet && !gPFBMutedIncludeReposts) {
+        return NO;
+    }
+    if (PFBObjectMatchesMutedRule(viewModel)) {
+        return YES;
+    }
+    // A retweet also answers for the original: its author and its own Tweet.
+    if (retweet) {
+        if (gPFBMutedHandles.count && PFBHandleIsMuted(PFBTimelineObject(viewModel, @"representedFromUserName"))) {
+            return YES;
+        }
+        if (PFBObjectMatchesMutedRule(PFBTimelineObject(viewModel, @"representedStatus"))) {
+            return YES;
+        }
+    }
+    return NO;
+}
+
+// Whether a retweet's original author blocks this account (state 1). *checked is
+// set once the whole chain answered, so a missing link is told from "not blocking".
+static BOOL PFBRetweetAuthorBlocksAccount(id viewModel, BOOL* checked) {
+    *checked = NO;
+    if (!ItemRespondsAndInvokesBOOL(viewModel, NSSelectorFromString(@"isRetweet"))) {
+        return NO;
+    }
+    id author = PFBTimelineObject(viewModel, @"representedFromUser");
+    id relationship = PFBTimelineObject(author, @"relationship");
+    SEL state = NSSelectorFromString(@"blockingCurrentAccountState");
+    char type = [relationship respondsToSelector:state]
+                    ? [relationship methodSignatureForSelector:state].methodReturnType[0]
+                    : 0;
+    if (type != 'q' && type != 'l') {
+        return NO;
+    }
+    *checked = YES;
+    return ((NSInteger (*)(id, SEL))objc_msgSend)(relationship, state) == 1;
+}
+
+// The signed-in account's user ID; 0 when it cannot be read.
+static long long PFBCurrentAccountUserID(void) {
+    Class hostClass = objc_getClass("T1HostViewController");
+    if (![(id)hostClass respondsToSelector:@selector(sharedHostViewController)]) {
+        return 0;
+    }
+    id host = ((id (*)(id, SEL))objc_msgSend)((id)hostClass, @selector(sharedHostViewController));
+    id account = [host respondsToSelector:@selector(currentAccount)]
+                     ? ((id (*)(id, SEL))objc_msgSend)(host, @selector(currentAccount))
+                     : nil;
+    SEL userID = NSSelectorFromString(@"userID");
+    if (![account respondsToSelector:userID] ||
+        [account methodSignatureForSelector:userID].methodReturnType[0] != 'q') {
+        return 0;
+    }
+    return ((long long (*)(id, SEL))objc_msgSend)(account, userID);
+}
+
+// Who posted the item, the retweeter for a Retweet; 0 when it cannot be read.
+static long long ItemFromUserID(id viewModel) {
+    SEL selector = NSSelectorFromString(@"fromUserID");
+    if (![viewModel respondsToSelector:selector] ||
+        [viewModel methodSignatureForSelector:selector].methodReturnType[0] != 'q') {
+        return 0;
+    }
+    return ((long long (*)(id, SEL))objc_msgSend)(viewModel, selector);
+}
+
+// A Retweet or a quote Tweet, per the getter, posted by someone else than the signed-in
+// account (0 when unknown): the account's own stay.
+static BOOL PFBItemIsOthers(id viewModel, NSString* getter, long long account) {
+    if (!ItemRespondsAndInvokesBOOL(viewModel, NSSelectorFromString(getter))) {
+        return NO;
+    }
+    return account == 0 || ItemFromUserID(viewModel) != account;
+}
+
+// What a filtering pass knows of its list and of the options, read once per pass.
+typedef struct {
+    BOOL hideWhoToFollow;
+    BOOL hidePrompts;
+    BOOL hideTopics;
+    BOOL hideTopicsToFollow;
+    BOOL hideVerified;
+    BOOL hideBlockedRetweets;
+    BOOL hideAllRetweets;
+    BOOL hideQuoteTweets;
+    BOOL hideThreads;
+    BOOL applyMuted;
+    BOOL inHome;
+    BOOL inConversation;
+    BOOL inProfile;
+    long long accountUserID;
+    long long conversationRootUserID;
+    __unsafe_unretained NSSet<NSNumber*>* authorRepliedToUserIDs;
+} PFBTimelinePass;
+
+static BOOL ShouldHideTimelineItem(id item, const PFBTimelinePass* pass) {
+    id viewModel = PFBUnwrapDataViewItem(item);
+    NSString* className = NSStringFromClass([viewModel classForCoder]);
+
+    // Hidden conversations are their own filter, tested before the muted rules:
+    // PFBItemIsMuted is only reached when a muted word or handle exists.
+    if (pfbThreadIsHidden(viewModel)) {
+        PFBCOMPAT_ACTION(PFBCompat_hide_threads, @"conversation hidden");
+        return YES;
+    }
+
+    // Proven once a Tweet's text and author are read, with or without a muted word.
+    if (PFBCompatNeedsObservation(PFBCompat_muted_words) && PFBStringFromSelectors(viewModel, YES).length &&
+        PFBHandleFromSelectors(viewModel, YES).length) {
+        PFBCOMPAT_OBSERVE(PFBCompat_muted_words, @"Tweet text and author read");
+    }
+    if (pass->applyMuted && PFBItemIsMuted(viewModel)) {
+        PFBNoteMutedHidden(ItemEntryID(viewModel));
+        return YES;
+    }
+
+    if (pass->hideVerified && PFBShouldHideVerifiedItem(viewModel, pass->inConversation, pass->conversationRootUserID,
+                                                       pass->authorRepliedToUserIDs)) {
+        PFBCOMPAT_ACTION(PFBCompat_hide_verified_tweets, @"verified Tweet hidden");
+        return YES;
+    }
+
+    if (pass->hideBlockedRetweets || PFBCompatNeedsObservation(PFBCompat_hide_blocked_retweets)) {
+        BOOL checked = NO;
+        BOOL blocking = PFBRetweetAuthorBlocksAccount(viewModel, &checked);
+        if (checked) {
+            PFBCOMPAT_OBSERVE(PFBCompat_hide_blocked_retweets, @"retweet checked");
+        }
+        if (blocking && pass->hideBlockedRetweets) {
+            PFBCOMPAT_ACTION(PFBCompat_hide_blocked_retweets, @"blocked retweet hidden");
+            return YES;
+        }
+    }
+
+    // Retweets set to None: Retweets by other accounts leave the Home timelines.
+    if (pass->inHome && (pass->hideAllRetweets || !PFBCompatPathReached(PFBCompatPath_home_retweets)) &&
+        PFBItemIsOthers(viewModel, @"isRetweet", pass->accountUserID)) {
+        PFBCompatReach(PFBCompatPath_home_retweets);
+        if (pass->hideAllRetweets) {
+            PFBCOMPAT_ACTION(PFBCompat_hide_blocked_retweets, @"Retweet hidden");
+            return YES;
+        }
+    }
+
+    // Quote Tweets of others leave the Home timelines; a reply shown for its context stays.
+    if (pass->inHome && (pass->hideQuoteTweets || PFBCompatNeedsObservation(PFBCompat_hide_quote_tweets)) &&
+        !ItemIsReplyWithSocialContext(viewModel) &&
+        PFBItemIsOthers(viewModel, @"isQuoteStatus", pass->accountUserID)) {
+        if (pass->hideQuoteTweets) {
+            PFBCOMPAT_ACTION(PFBCompat_hide_quote_tweets, @"quote Tweet hidden");
+            return YES;
+        }
+        PFBCOMPAT_OBSERVE(PFBCompat_hide_quote_tweets, @"quote Tweet found");
+    }
+
+    if (!pass->hidePrompts && [className isEqualToString:@"TwitterURT.URTTimelinePromptViewModel"]) {
+        PFBCOMPAT_OBSERVE(PFBCompat_hide_timeline_prompts, @"prompt found");
+    }
+    if (!pass->hideTopics && ItemIsTopicPost(viewModel)) {
+        PFBCOMPAT_OBSERVE(PFBCompat_hide_topics, @"topic label found");
+    }
+    if (!pass->hideTopicsToFollow && [ItemScribeComponent(viewModel) isEqualToString:@"suggest_topics_module"]) {
+        PFBCOMPAT_OBSERVE(PFBCompat_hide_topics_to_follow, @"topic suggestions found");
+    }
+    if (!pass->hideVerified && PFBCompatNeedsObservation(PFBCompat_hide_verified_tweets) &&
+        PFBShouldHideVerifiedItem(viewModel, pass->inConversation, pass->conversationRootUserID,
+                                  pass->authorRepliedToUserIDs)) {
+        PFBCOMPAT_OBSERVE(PFBCompat_hide_verified_tweets, @"verified Tweet found");
+    }
+    if (pass->hidePrompts && [className isEqualToString:@"TwitterURT.URTTimelinePromptViewModel"]) {
+        PFBCOMPAT_ACTION(PFBCompat_hide_timeline_prompts, @"prompt hidden");
+        return YES;
+    }
+
+    if (pass->hideTopics && ItemIsTopicPost(viewModel)) {
+        PFBCOMPAT_ACTION(PFBCompat_hide_topics, @"topic Tweet hidden");
+        return YES;
+    }
+
+    // Topic suggestions arrive as a module marked like Who to follow's.
+    if (pass->hideTopicsToFollow && [ItemScribeComponent(viewModel) isEqualToString:@"suggest_topics_module"]) {
+        PFBCOMPAT_ACTION(PFBCompat_hide_topics_to_follow, @"topic suggestions hidden");
+        return YES;
+    }
+
+    if (pass->hideWhoToFollow && [ItemScribeComponent(viewModel) isEqualToString:@"suggest_who_to_follow"]) {
+        PFBCOMPAT_ACTION(PFBCompat_hide_who_to_follow, @"who-to-follow module hidden");
+        return YES;
+    }
+
+    if (pass->hideWhoToFollow && pass->inProfile &&
+        [className isEqualToString:@"T1TwitterSwift.URTTimelineCarouselViewModel"]) {
+        PFBCOMPAT_ACTION(PFBCompat_hide_who_to_follow, @"profile suggestions hidden");
+        return YES;
+    }
+
+    // Outside a profile, a carousel is one item holding its own accounts: it goes only
+    // when Twitter marks the module itself as Who to follow.
+    if (pass->hideWhoToFollow && [className isEqualToString:@"T1TwitterSwift.URTTimelineCarouselViewModel"] &&
+        [CarouselScribeComponent(viewModel) isEqualToString:@"suggest_who_to_follow"]) {
+        PFBCOMPAT_ACTION(PFBCompat_hide_who_to_follow, @"who-to-follow carousel hidden");
+        return YES;
+    }
+
+    NSString* entryID = ItemEntryID(viewModel);
+
+    if (!entryID) {
+        return NO;
+    }
+
+    if (pass->inConversation && [entryID hasPrefix:@"tweetdetailrelatedtweets"]) {
+        PFBCOMPAT_ACTION(PFBCompat_remove_related_tweets, @"related Tweets removed");
+        return YES;
+    }
+
+    if (pass->hideWhoToFollow && [entryID containsString:@"who-to-follow"]) {
+        PFBCOMPAT_ACTION(PFBCompat_hide_who_to_follow, @"who-to-follow entry hidden");
+        return YES;
+    }
+
+    return NO;
+}
+
+// Verdicts are kept per entry: evaluating every item again on each pass slows the app
+// down a lot when hide verified scans every reply. A verdict also depends on whether the
+// author is followed and the Tweet bookmarked, so both are part of its key.
+static BOOL MemoizedShouldHideTimelineItem(id item, const PFBTimelinePass* pass) {
+    static NSCache<NSString*, NSNumber*>* cache;
+    static NSUInteger cachedFlags = NSUIntegerMax;
+    static NSUInteger cachedMutedSignature = NSUIntegerMax;
+    static long long cachedAccountUserID = 0;
+    static long long cachedRootUserID = 0;
+    static NSSet<NSNumber*>* cachedAuthorRepliedToUserIDs;
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        cache = [NSCache new];
+        cache.countLimit = 4000;
+    });
+
+    NSUInteger flags = (pass->hideWhoToFollow << 0) | (pass->hidePrompts << 1) | (pass->hideTopics << 2) |
+                       (pass->hideTopicsToFollow << 3) | (pass->hideVerified << 4) |
+                       (pass->inConversation << 5) | (pass->inProfile << 6) |
+                       (pass->hideBlockedRetweets << 7) | (pass->hideAllRetweets << 8) |
+                       (pass->hideQuoteTweets << 9) | (pass->inHome << 10) |
+                       (pass->hideThreads << 11) | (pass->applyMuted << 12);
+    NSSet<NSNumber*>* replied = pass->authorRepliedToUserIDs;
+    BOOL repliedSetChanged = replied != cachedAuthorRepliedToUserIDs &&
+                             ![replied isEqualToSet:cachedAuthorRepliedToUserIDs];
+    if (flags != cachedFlags || pass->conversationRootUserID != cachedRootUserID ||
+        pass->accountUserID != cachedAccountUserID || repliedSetChanged ||
+        gPFBMutedSignature != cachedMutedSignature) {
+        [cache removeAllObjects];
+        cachedMutedSignature = gPFBMutedSignature;
+        cachedFlags = flags;
+        cachedRootUserID = pass->conversationRootUserID;
+        cachedAccountUserID = pass->accountUserID;
+        cachedAuthorRepliedToUserIDs = replied;
+    }
+
+    id viewModel = PFBUnwrapDataViewItem(item);
+    NSString* entryID = ItemEntryID(viewModel);
+    if (!entryID) {
+        return ShouldHideTimelineItem(item, pass);
+    }
+    NSString* key = [NSString stringWithFormat:@"%@|%ld|%d", entryID, (long)PFBAuthorFollowState(viewModel),
+                                               ItemIsBookmarked(viewModel)];
+    NSNumber* cached = [cache objectForKey:key];
+    if (cached) {
+        return cached.boolValue;
+    }
+
+    BOOL hide = ShouldHideTimelineItem(item, pass);
+    [cache setObject:@(hide) forKey:key];
+    return hide;
+}
+
+static long long ConversationRootUserID(NSArray* sections) {
+    for (id section in sections) {
+        if (![section isKindOfClass:[NSArray class]]) {
+            continue;
+        }
+        for (id item in (NSArray*)section) {
+            id viewModel = PFBUnwrapDataViewItem(item);
+            if (ItemIsConversationThreadReply(viewModel)) {
+                continue;
+            }
+            long long userID = ItemRepresentedFromUserID(viewModel);
+            if (userID != 0) {
+                return userID;
+            }
+        }
+    }
+    return 0;
+}
+
+static NSSet<NSNumber*>* ConversationAuthorRepliedToUserIDs(NSArray* sections,
+                                                            long long rootUserID) {
+    NSMutableSet<NSNumber*>* repliedToUserIDs = [NSMutableSet set];
+    if (rootUserID == 0) {
+        return repliedToUserIDs;
+    }
+    for (id section in sections) {
+        if (![section isKindOfClass:[NSArray class]]) {
+            continue;
+        }
+        for (id item in (NSArray*)section) {
+            id viewModel = PFBUnwrapDataViewItem(item);
+            if (!ItemIsConversationThreadReply(viewModel)) {
+                continue;
+            }
+            if (ItemRepresentedFromUserID(viewModel) != rootUserID) {
+                continue;
+            }
+            long long repliedToUserID = ItemInReplyToUserID(viewModel);
+            if (repliedToUserID != 0) {
+                [repliedToUserIDs addObject:@(repliedToUserID)];
+            }
+        }
+    }
+    return repliedToUserIDs;
+}
+
+// MARK: - Reading marker
+
+// An accent wash over the first Tweet under an arriving batch. The anchor is the
+// list's head, recaptured only when incoming data carries a different one; every
+// other delivery keeps the boundary. Only the Following tab is eligible.
+
+static const void* kPFBReadingAnchorIDKey = &kPFBReadingAnchorIDKey;
+static const void* kPFBReadingAnchorPathKey = &kPFBReadingAnchorPathKey;
+static const void* kPFBReadingMarkerViewKey = &kPFBReadingMarkerViewKey;
+static const void* kPFBListViewKey = &kPFBListViewKey;
+static const void* kPFBReadingTopAtCaptureKey = &kPFBReadingTopAtCaptureKey;
+static const void* kPFBReadingRetiredKey = &kPFBReadingRetiredKey;
+static const void* kPFBReadingMissCountKey = &kPFBReadingMissCountKey;
+
+// The wash covers the Tweet's header and fades out before the media: solid for
+// the first 34 points, gone by 110. Light enough to read through, strong enough
+// to spot at a glance.
+static const CGFloat kPFBReadingMarkerAlpha = 0.18;
+static const CGFloat kPFBReadingFadeSolid = 34.0;
+static const CGFloat kPFBReadingFadeReach = 110.0;
+static NSHashTable* gPFBReadingControllers = nil;
+
+// A list scroll view is one that can name its visible index paths.
+static BOOL PFBViewIsList(UIView* view) {
+    return [view isKindOfClass:[UIScrollView class]] &&
+           ([view respondsToSelector:@selector(indexPathsForVisibleRows)] ||
+            [view respondsToSelector:@selector(indexPathsForVisibleItems)]);
+}
+
+static UIScrollView* PFBFindListInView(UIView* view) {
+    if (PFBViewIsList(view)) {
+        return (UIScrollView*)view;
+    }
+    for (UIView* subview in view.subviews) {
+        UIScrollView* found = PFBFindListInView(subview);
+        if (found) {
+            return found;
+        }
+    }
+    return nil;
+}
+
+// The controller's list, found in its mounted view tree. Asking for -tableView or
+// -collectionView invokes a lazy getter that builds a view never meant to exist,
+// and on a collection view that raises.
+static UIScrollView* PFBListScrollView(TFNItemsDataViewController* dataViewController) {
+    if (![dataViewController isViewLoaded]) {
+        return nil;
+    }
+    UIScrollView* cached =
+        objc_getAssociatedObject(dataViewController, kPFBListViewKey);
+    if (cached.window && [cached isDescendantOfView:dataViewController.view]) {
+        return cached;
+    }
+    UIScrollView* found = PFBFindListInView(dataViewController.view);
+    // Retained, not assigned: an assigned pointer is a raw address, and the check
+    // above would message freed memory once the app releases the list. Holding it
+    // costs one stale scroll view until the next lookup.
+    objc_setAssociatedObject(dataViewController, kPFBListViewKey, found,
+                             OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    return found;
+}
+
+static NSArray<NSIndexPath*>* PFBListVisibleIndexPaths(UIScrollView* scrollView) {
+    if ([scrollView respondsToSelector:@selector(indexPathsForVisibleRows)]) {
+        return ((NSArray* (*)(id, SEL))objc_msgSend)(
+            scrollView, @selector(indexPathsForVisibleRows));
+    }
+    if ([scrollView respondsToSelector:@selector(indexPathsForVisibleItems)]) {
+        return ((NSArray* (*)(id, SEL))objc_msgSend)(
+            scrollView, @selector(indexPathsForVisibleItems));
+    }
+    return @[];
+}
+
+static BOOL PFBListCellFrame(UIScrollView* scrollView, NSIndexPath* path,
+                             CGRect* outFrame) {
+    if ([scrollView respondsToSelector:@selector(cellForRowAtIndexPath:)]) {
+        UIView* cell = ((UIView* (*)(id, SEL, id))objc_msgSend)(
+            scrollView, @selector(cellForRowAtIndexPath:), path);
+        if (cell) {
+            *outFrame = cell.frame;
+            return YES;
+        }
+        if ([scrollView respondsToSelector:@selector(rectForRowAtIndexPath:)]) {
+            // The path comes from the data, which can run ahead of the table's own rows.
+            if ([scrollView isKindOfClass:[UITableView class]]) {
+                UITableView* table = (UITableView*)scrollView;
+                if (path.section >= table.numberOfSections ||
+                    path.row >= [table numberOfRowsInSection:path.section]) {
+                    return NO;
+                }
+            }
+            *outFrame = ((CGRect (*)(id, SEL, id))objc_msgSend)(
+                scrollView, @selector(rectForRowAtIndexPath:), path);
+            return YES;
+        }
+    }
+    if ([scrollView respondsToSelector:@selector(cellForItemAtIndexPath:)]) {
+        UIView* cell = ((UIView* (*)(id, SEL, id))objc_msgSend)(
+            scrollView, @selector(cellForItemAtIndexPath:), path);
+        if (cell) {
+            *outFrame = cell.frame;
+            return YES;
+        }
+    }
+    if ([scrollView respondsToSelector:@selector(layoutAttributesForItemAtIndexPath:)]) {
+        // The same check as for a table: the data can run ahead of the collection's items.
+        if ([scrollView isKindOfClass:[UICollectionView class]]) {
+            UICollectionView* collection = (UICollectionView*)scrollView;
+            if (path.section >= collection.numberOfSections ||
+                path.item >= [collection numberOfItemsInSection:path.section]) {
+                return NO;
+            }
+        }
+        id attributes = ((id (*)(id, SEL, id))objc_msgSend)(
+            scrollView, @selector(layoutAttributesForItemAtIndexPath:), path);
+        if (attributes && [attributes respondsToSelector:@selector(frame)]) {
+            *outFrame = ((CGRect (*)(id, SEL))objc_msgSend)(attributes,
+                                                            @selector(frame));
+            return YES;
+        }
+    }
+    return NO;
+}
+
+static BOOL PFBReadingIsHomeTimeline(TFNItemsDataViewController* dataViewController) {
+    return IsInHierarchyOfClass(
+        dataViewController,
+        @"_TtC32TwitterHomeFeatureImplementation35HomeTimelineContainerViewController");
+}
+
+// The topmost visible row's entry ID; nil when the table, its section or the item
+// cannot be resolved.
+static NSString* PFBReadingTopVisibleEntryID(TFNItemsDataViewController* dataViewController) {
+    UIScrollView* list = PFBListScrollView(dataViewController);
+    NSIndexPath* top = PFBListVisibleIndexPaths(list).firstObject;
+    if (!top) {
+        return nil;
+    }
+    NSArray* sections = dataViewController.sections;
+    if (top.section >= (NSInteger)sections.count) {
+        return nil;
+    }
+    id section = sections[top.section];
+    if (![section isKindOfClass:[NSArray class]] ||
+        top.row >= (NSInteger)((NSArray*)section).count) {
+        return nil;
+    }
+    return ItemEntryID(((NSArray*)section)[top.row]);
+}
+
+// The list's first datable item — the reference for "has anything new
+// arrived above the anchor since it was captured".
+static NSString* PFBReadingFirstEntryID(NSArray* sections) {
+    for (id section in sections) {
+        if (![section isKindOfClass:[NSArray class]]) {
+            continue;
+        }
+        for (id item in (NSArray*)section) {
+            NSString* entryID = ItemEntryID(item);
+            if (entryID.length) {
+                return entryID;
+            }
+        }
+    }
+    return nil;
+}
+
+static NSIndexPath* PFBReadingIndexPathForEntryID(
+    TFNItemsDataViewController* dataViewController, NSString* target) {
+    if (!target.length) {
+        return nil;
+    }
+    NSArray* sections = dataViewController.sections;
+    for (NSUInteger sectionIndex = 0; sectionIndex < sections.count; sectionIndex++) {
+        id section = sections[sectionIndex];
+        if (![section isKindOfClass:[NSArray class]]) {
+            continue;
+        }
+        NSArray* items = section;
+        for (NSUInteger row = 0; row < items.count; row++) {
+            if ([target isEqualToString:ItemEntryID(items[row])]) {
+                return [NSIndexPath indexPathForRow:row inSection:sectionIndex];
+            }
+        }
+    }
+    return nil;
+}
+
+// Anchors outlive the process. Which tab one belongs to is never recorded: each
+// list looks for the first stored anchor it still contains, so a list holding none
+// of them simply starts fresh.
+static NSString* const kPFBReadingStoreKey = @"pfb_reading_anchors";
+static const NSUInteger kPFBReadingStoreLimit = 12;
+
+static void PFBReadingStoreRemember(NSString* previousAnchor, NSString* anchor,
+                                    NSString* head) {
+    if (!anchor.length || !head.length) {
+        return;
+    }
+    NSUserDefaults* defaults = [NSUserDefaults standardUserDefaults];
+    NSMutableArray* entries =
+        [NSMutableArray arrayWithObject:@{@"anchor": anchor, @"head": head}];
+    for (id entry in [defaults arrayForKey:kPFBReadingStoreKey]) {
+        if (entries.count >= kPFBReadingStoreLimit) {
+            break;
+        }
+        if (![entry isKindOfClass:[NSDictionary class]]) {
+            continue;
+        }
+        NSString* storedAnchor = ((NSDictionary*)entry)[@"anchor"];
+        // The tab's own previous entry is replaced, not stacked.
+        if (![storedAnchor isKindOfClass:[NSString class]] ||
+            [storedAnchor isEqualToString:anchor] ||
+            (previousAnchor.length &&
+             [storedAnchor isEqualToString:previousAnchor])) {
+            continue;
+        }
+        [entries addObject:entry];
+    }
+    [defaults setObject:entries forKey:kPFBReadingStoreKey];
+}
+
+static BOOL PFBReadingStoreRestore(TFNItemsDataViewController* dataViewController) {
+    for (id entry in
+         [[NSUserDefaults standardUserDefaults] arrayForKey:kPFBReadingStoreKey]) {
+        if (![entry isKindOfClass:[NSDictionary class]]) {
+            continue;
+        }
+        NSString* anchor = ((NSDictionary*)entry)[@"anchor"];
+        NSString* head = ((NSDictionary*)entry)[@"head"];
+        if (![anchor isKindOfClass:[NSString class]] ||
+            ![head isKindOfClass:[NSString class]] ||
+            !PFBReadingIndexPathForEntryID(dataViewController, anchor)) {
+            continue;
+        }
+        objc_setAssociatedObject(dataViewController, kPFBReadingAnchorIDKey,
+                                 anchor, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        objc_setAssociatedObject(dataViewController, kPFBReadingTopAtCaptureKey,
+                                 head, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        return YES;
+    }
+    return NO;
+}
+
+// scribeSection is not declared in the Twitter headers. This shim is only a
+// cast target: never instantiated, never messaged as a class, so no class
+// symbol is referenced.
+@interface PFBReadingScribeShim : NSObject
+- (NSString*)scribeSection;
+@end
+
+// Identifies the Following tab by the timeline's own scribe section: For you
+// reports "home", Following reports "latest". An allowlist on purpose, so a
+// section that cannot be read denies the marker rather than granting it.
+static BOOL PFBReadingIsFollowingTab(TFNItemsDataViewController* dataViewController) {
+    if (![dataViewController respondsToSelector:@selector(scribeSection)]) {
+        return NO;
+    }
+    PFBReadingScribeShim* shim = (PFBReadingScribeShim*)dataViewController;
+    NSString* section = [shim scribeSection];
+    if (![section isKindOfClass:[NSString class]]) {
+        return NO;
+    }
+    return [section isEqualToString:@"latest"];
+}
+
+static BOOL PFBReadingMarkerAllowed(TFNItemsDataViewController* dataViewController) {
+    if (![PFBSettings boolForKey:@"reading_line"]) {
+        if (PFBCompatNeedsObservation(PFBCompat_reading_line) &&
+            PFBReadingIsHomeTimeline(dataViewController) &&
+            PFBReadingIsFollowingTab(dataViewController)) {
+            PFBCOMPAT_OBSERVE(PFBCompat_reading_line, @"Following timeline found");
+        }
+        return NO;
+    }
+    return PFBReadingIsHomeTimeline(dataViewController) &&
+           ![objc_getAssociatedObject(dataViewController, kPFBReadingRetiredKey)
+               boolValue] &&
+           PFBReadingIsFollowingTab(dataViewController);
+}
+
+static NSUInteger PFBReadingItemCount(NSArray* sections) {
+    NSUInteger count = 0;
+    for (id section in sections) {
+        if ([section isKindOfClass:[NSArray class]]) {
+            count += ((NSArray*)section).count;
+        }
+    }
+    return count;
+}
+
+// The boundary is taken from the list as it stands, and only when incoming data
+// has a different head. Deliveries that change nothing above only write the held
+// boundary out.
+static void PFBReadingCaptureAnchor(TFNItemsDataViewController* dataViewController,
+                                    NSArray* incomingSections) {
+    if (!PFBReadingMarkerAllowed(dataViewController)) {
+        return;
+    }
+    // A list with nothing on screen has nothing to record.
+    if (!PFBReadingTopVisibleEntryID(dataViewController).length) {
+        return;
+    }
+    // A controller with no anchor is new or just relaunched, and claiming the head
+    // would bury the one on disk. The stored anchors are tried first; the head becomes
+    // the boundary when none is stored, or none matches once the list holds 10 items.
+    if (!objc_getAssociatedObject(dataViewController, kPFBReadingAnchorIDKey)) {
+        if (PFBReadingStoreRestore(dataViewController)) {
+            return;
+        }
+        NSArray* stored =
+            [[NSUserDefaults standardUserDefaults] arrayForKey:kPFBReadingStoreKey];
+        if ([stored isKindOfClass:[NSArray class]] && stored.count &&
+            PFBReadingItemCount(dataViewController.sections) < 10) {
+            return;
+        }
+    } else {
+        NSString* incomingHead = PFBReadingFirstEntryID(incomingSections);
+        NSString* currentHead =
+            PFBReadingFirstEntryID(dataViewController.sections);
+        if (!incomingHead.length || !currentHead.length ||
+            [incomingHead isEqualToString:currentHead]) {
+            // Nothing arrives above: the boundary stays, and is written out
+            // as it is.
+            NSString* held =
+                objc_getAssociatedObject(dataViewController, kPFBReadingAnchorIDKey);
+            PFBReadingStoreRemember(
+                held, held,
+                objc_getAssociatedObject(dataViewController,
+                                         kPFBReadingTopAtCaptureKey));
+            return;
+        }
+    }
+    NSString* listHead = PFBReadingFirstEntryID(dataViewController.sections);
+    if (!listHead.length) {
+        return;
+    }
+    // The list's first Tweet is the boundary: the batch lands above it, and the
+    // wash falls on the first Tweet under that batch.
+    NSString* previousAnchor =
+        objc_getAssociatedObject(dataViewController, kPFBReadingAnchorIDKey);
+    objc_setAssociatedObject(dataViewController, kPFBReadingAnchorIDKey, listHead,
+                             OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    objc_setAssociatedObject(dataViewController, kPFBReadingTopAtCaptureKey,
+                             listHead, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    PFBReadingStoreRemember(previousAnchor, listHead, listHead);
+}
+
+// One row's true geometry. The rendered cell is authoritative on screen, since
+// data sections and table rows do not always map one-to-one. Off screen the
+// computed rect only decides visibility. Returns whether the marker is shown.
+static BOOL PFBReadingPlaceMarker(UIScrollView* table, UIView* marker,
+                                  NSIndexPath* path) {
+    CGRect rowRect;
+    if (!PFBListCellFrame(table, path, &rowRect)) {
+        marker.hidden = YES;
+        return NO;
+    }
+    UIColor* accent = PFBCurrentAccentColor() ?: [UIColor systemBlueColor];
+    CGFloat reach = MIN(CGRectGetHeight(rowRect), kPFBReadingFadeReach);
+    marker.frame = CGRectMake(CGRectGetMinX(rowRect), CGRectGetMinY(rowRect),
+                              CGRectGetWidth(rowRect), reach);
+    CAGradientLayer* fade =
+        (CAGradientLayer*)marker.layer.sublayers.firstObject;
+    if (![fade isKindOfClass:[CAGradientLayer class]]) {
+        fade = [CAGradientLayer layer];
+        [marker.layer addSublayer:fade];
+    }
+    UIColor* tint = [accent colorWithAlphaComponent:kPFBReadingMarkerAlpha];
+    // The layer would animate every reposition; the marker must simply be
+    // where its Tweet is.
+    [CATransaction begin];
+    [CATransaction setDisableActions:YES];
+    fade.frame = marker.bounds;
+    fade.colors = @[
+        (id)tint.CGColor, (id)tint.CGColor, (id)UIColor.clearColor.CGColor
+    ];
+    fade.locations = @[
+        @0, @(reach > 0.0 ? MIN(kPFBReadingFadeSolid / reach, 1.0) : 0.0), @1
+    ];
+    [CATransaction commit];
+    if (marker.superview != table) {
+        [table addSubview:marker];
+    }
+    marker.hidden = NO;
+    [table bringSubviewToFront:marker];
+    return YES;
+}
+
+// Places or hides the marker for the current data. The row rect is content-space,
+// so the wash scrolls with the feed. It sits above the cell at low alpha, since an
+// opaque cell would hide it entirely.
+static void PFBReadingPositionMarker(TFNItemsDataViewController* dataViewController) {
+    UIScrollView* table = PFBListScrollView(dataViewController);
+    if (!table) {
+        return;
+    }
+    UIView* marker = objc_getAssociatedObject(table, kPFBReadingMarkerViewKey);
+    BOOL allowed = PFBReadingMarkerAllowed(dataViewController);
+    // A launch starts with no anchor in memory; the stored ones are tried
+    // against this list on every pass until one matches.
+    if (allowed &&
+        !objc_getAssociatedObject(dataViewController, kPFBReadingAnchorIDKey)) {
+        // Tried on every pass once the list holds items: a fixed number of attempts
+        // would run out before the first page arrives.
+        if (PFBReadingItemCount(dataViewController.sections) > 0) {
+            PFBReadingStoreRestore(dataViewController);
+        }
+    }
+    NSString* anchor =
+        objc_getAssociatedObject(dataViewController, kPFBReadingAnchorIDKey);
+    NSIndexPath* path = allowed
+                            ? PFBReadingIndexPathForEntryID(dataViewController, anchor)
+                            : nil;
+    objc_setAssociatedObject(table, kPFBReadingAnchorPathKey, path,
+                             OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    if (!path) {
+        // A replaced list has a new first item as well as a missing anchor; an
+        // anchor that fell out of a list whose head is unchanged is a loading
+        // phase. Two consecutive absent passes retire the marker for the session.
+        NSString* headNow = PFBReadingFirstEntryID(dataViewController.sections);
+        NSString* headThen =
+            objc_getAssociatedObject(dataViewController, kPFBReadingTopAtCaptureKey);
+        BOOL replaced = headNow.length && headThen.length &&
+                        ![headNow isEqualToString:headThen];
+        if (allowed && anchor.length && replaced &&
+            PFBReadingItemCount(dataViewController.sections) >= 10) {
+            NSInteger misses =
+                [objc_getAssociatedObject(dataViewController,
+                                          kPFBReadingMissCountKey) integerValue] +
+                1;
+            if (misses >= 2) {
+                objc_setAssociatedObject(dataViewController,
+                                         kPFBReadingRetiredKey, @YES,
+                                         OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+                objc_setAssociatedObject(dataViewController,
+                                         kPFBReadingAnchorIDKey, nil,
+                                         OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+                objc_setAssociatedObject(dataViewController,
+                                         kPFBReadingMissCountKey, nil,
+                                         OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+            } else {
+                objc_setAssociatedObject(dataViewController,
+                                         kPFBReadingMissCountKey, @(misses),
+                                         OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+            }
+        }
+        marker.hidden = YES;
+        return;
+    }
+    objc_setAssociatedObject(dataViewController, kPFBReadingMissCountKey, nil,
+                             OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    // An anchor that is still the first row has nothing above it to mark.
+    NSString* topNow = PFBReadingFirstEntryID(dataViewController.sections);
+    if (!topNow.length || [anchor isEqualToString:topNow]) {
+        // The layout tick draws from the cached path: an anchor with nothing
+        // to mark leaves none behind.
+        objc_setAssociatedObject(table, kPFBReadingAnchorPathKey, nil,
+                                 OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        marker.hidden = YES;
+        return;
+    }
+    if (!marker) {
+        marker = [[UIView alloc] init];
+        marker.userInteractionEnabled = NO;
+        objc_setAssociatedObject(table, kPFBReadingMarkerViewKey, marker,
+                                 OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    }
+    if (PFBReadingPlaceMarker(table, marker, path)) {
+        PFBCOMPAT_ACTION(PFBCompat_reading_line, @"marker placed");
+    }
+}
+
+// Row heights settle after the reload, so the scan waits one runloop turn.
+static void PFBReadingRescanSoon(TFNItemsDataViewController* dataViewController) {
+    if (!PFBReadingIsHomeTimeline(dataViewController)) {
+        return;
+    }
+    __weak TFNItemsDataViewController* weakController = dataViewController;
+    dispatch_async(dispatch_get_main_queue(), ^{
+        TFNItemsDataViewController* controller = weakController;
+        if (controller) {
+            PFBReadingPositionMarker(controller);
+        }
+    });
+}
+
+// Self-sizing rows shift their rects as cells realize, so the tick keeps the wash
+// on its row from the cached index path. A row with no measurable rect at first
+// placement is retried here.
+static void PFBReadingLayoutTick(UIScrollView* scrollView) {
+    UIView* marker = objc_getAssociatedObject(scrollView, kPFBReadingMarkerViewKey);
+    if (!marker) {
+        return;
+    }
+    NSIndexPath* path =
+        objc_getAssociatedObject(scrollView, kPFBReadingAnchorPathKey);
+    if (!path) {
+        marker.hidden = YES;
+        return;
+    }
+    PFBReadingPlaceMarker(scrollView, marker, path);
+}
+
+// The app backgrounding is the one leave moment no view callback covers.
+static void PFBReadingTrack(TFNItemsDataViewController* dataViewController) {
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+        gPFBReadingControllers = [NSHashTable weakObjectsHashTable];
+        [[NSNotificationCenter defaultCenter]
+            addObserverForName:UIApplicationDidEnterBackgroundNotification
+                        object:nil
+                         queue:[NSOperationQueue mainQueue]
+                    usingBlock:^(NSNotification* note) {
+                        for (TFNItemsDataViewController* controller in
+                             gPFBReadingControllers.allObjects) {
+                            PFBReadingCaptureAnchor(controller, nil);
+                        }
+                    }];
+    });
+    [gPFBReadingControllers addObject:dataViewController];
+}
+
+// MARK: - Language filter
+
+// A Tweet carries the language of its original text, and the kept set lists the
+// selected ones; empty means off. A Tweet whose language cannot be detected always
+// passes, so image-only posts are never lost.
+
+static NSString* const kPFBLanguagesKey = @"pfb_filter_languages";
+
+static id PFBStatusForItem(id item) {
+    for (NSString* name in @[ @"status", @"tweet" ]) {
+        id value = PFBTimelineObject(item, name);
+        if (value) {
+            return value;
+        }
+    }
+    return item;
+}
+
+// The Tweet's language code: its view model's own, else its status's or tweet's.
+static NSString* PFBItemLanguage(id item) {
+    id code = PFBTimelineObject(item, @"language");
+    if (![code isKindOfClass:[NSString class]]) {
+        code = PFBTimelineObject(PFBStatusForItem(item), @"language");
+    }
+    return [code isKindOfClass:[NSString class]] ? code : nil;
+}
+
+static BOOL PFBItemLanguageAllowed(id item, NSSet<NSString*>* kept) {
+    if (!kept.count) {
+        return YES;
+    }
+    NSString* language = PFBItemLanguage(PFBUnwrapDataViewItem(item)).lowercaseString;
+    // Codes that name no language always pass: undetermined, no linguistic content, and
+    // Twitter's tags for Tweets of media, hashtags, cashtags, mentions or very short text.
+    static NSSet<NSString*>* languageless;
+    static NSDictionary<NSString*, NSString*>* legacy;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+        languageless = [NSSet setWithArray:@[ @"und", @"zxx", @"qme", @"qht", @"qct", @"qam", @"qst" ]];
+        // Twitter files Indonesian and Hebrew under the codes "in" and "iw".
+        legacy = @{@"in": @"id", @"iw": @"he"};
+    });
+    if (!language.length || [languageless containsObject:language]) {
+        return YES;
+    }
+    // A regional code ("pt-BR") matches the language it belongs to.
+    NSString* base = [language componentsSeparatedByString:@"-"].firstObject;
+    BOOL allowed = [kept containsObject:legacy[base] ?: base];
+    if (!allowed) {
+        PFBCOMPAT_ACTION(PFBCompat_filter_languages, @"Tweet left out by language");
+    }
+    return allowed;
+}
+
+static NSSet<NSString*>* PFBKeptLanguages(void) {
+    NSArray* stored =
+        [[NSUserDefaults standardUserDefaults] arrayForKey:kPFBLanguagesKey];
+    if (![stored isKindOfClass:[NSArray class]] || !stored.count) {
+        return nil;
+    }
+    NSMutableSet* set = [NSMutableSet setWithCapacity:stored.count];
+    for (id code in stored) {
+        if ([code isKindOfClass:[NSString class]]) {
+            [set addObject:((NSString*)code).lowercaseString];
+        }
+    }
+    return set;
+}
+
+// Off filters keep classifying the timeline until each has found its items once
+// this launch, so the report can show they still would.
+static BOOL PFBTimelineFiltersNeedObservation(void) {
+    return PFBCompatNeedsObservation(PFBCompat_hide_timeline_prompts) ||
+           PFBCompatNeedsObservation(PFBCompat_hide_topics) ||
+           PFBCompatNeedsObservation(PFBCompat_hide_topics_to_follow) ||
+           PFBCompatNeedsObservation(PFBCompat_hide_verified_tweets) ||
+           PFBCompatNeedsObservation(PFBCompat_hide_blocked_retweets) ||
+           PFBCompatNeedsObservation(PFBCompat_hide_quote_tweets) ||
+           PFBCompatNeedsObservation(PFBCompat_filter_languages);
+}
+
+static NSArray* FilteredTimelineSections(TFNItemsDataViewController* dataViewController,
+                                         NSArray* sections) {
+    PFBTimelinePass pass = {0};
+    pass.hideWhoToFollow = [PFBSettings boolForKey:@"hide_who_to_follow"];
+    pass.hidePrompts = [PFBSettings boolForKey:@"hide_timeline_prompts"];
+    pass.hideTopics = [PFBSettings boolForKey:@"hide_topics"];
+    pass.hideTopicsToFollow = [PFBSettings boolForKey:@"hide_topics_to_follow"];
+    pass.hideThreads = [PFBSettings boolForKey:@"hide_threads"];
+    pass.inConversation = IsInHierarchyOfClass(dataViewController, @"T1ConversationContainerViewController");
+    pass.inProfile = IsInHierarchyOfClass(dataViewController, @"T1ProfileViewController");
+    // A search is opened on purpose, like a profile: verified Tweets, muted words and
+    // @accounts, and other languages all stay in its results.
+    BOOL inSearch = IsInHierarchyOfClass(dataViewController, @"TTSSearchContainerViewController");
+
+    // An edit history lists one Tweet's own versions: it keeps them all.
+    pass.hideVerified = [PFBSettings boolForKey:@"hide_verified_tweets"] && !pass.inProfile && !inSearch &&
+                        !IsInEditHistory(dataViewController);
+    pass.hideBlockedRetweets = [PFBSettings integerForKey:@"hide_blocked_retweets"] != PFBRetweetsAll;
+    // Retweets set to None and Hide quote Tweets act on the Home timelines only.
+    pass.inHome = PFBReadingIsHomeTimeline(dataViewController);
+    pass.hideAllRetweets = pass.inHome && [PFBSettings integerForKey:@"hide_blocked_retweets"] == PFBRetweetsNone;
+    pass.hideQuoteTweets = pass.inHome && [PFBSettings boolForKey:@"hide_quote_tweets"];
+    PFBEnsureMutedLoaded();
+    pass.applyMuted = (gPFBMutedWords.count || gPFBMutedHandles.count) && !pass.inProfile && !inSearch &&
+                      (!pass.inConversation || gPFBMutedInConversations);
+    // The language filter belongs to the timelines, not to a conversation, a profile
+    // or a search opened on purpose.
+    NSSet<NSString*>* keptLanguages =
+        (pass.inConversation || pass.inProfile || inSearch) ? nil : PFBKeptLanguages();
+
+    // Hidden conversations open this pass like any other option; otherwise, with
+    // no option on, the loop below would be skipped and every hidden thread kept.
+    BOOL hasHiddenThreads = PFBHiddenThreads().count > 0;
+
+    if (!pass.hideWhoToFollow && !pass.hidePrompts && !pass.hideTopics && !pass.hideTopicsToFollow &&
+        !pass.hideVerified && !pass.hideBlockedRetweets && !pass.hideQuoteTweets && !pass.applyMuted &&
+        !pass.inConversation && !keptLanguages.count && !hasHiddenThreads && !inSearch &&
+        !(pass.inHome && !PFBCompatPathReached(PFBCompatPath_home_retweets)) &&
+        !PFBTimelineFiltersNeedObservation()) {
+        return sections;
+    }
+
+    // Read once per pass: the memo starts over when another account is signed in.
+    pass.accountUserID = PFBCurrentAccountUserID();
+    pass.conversationRootUserID =
+        (pass.hideVerified && pass.inConversation) ? ConversationRootUserID(sections) : 0;
+    NSSet<NSNumber*>* authorRepliedToUserIDs =
+        (pass.hideVerified && pass.inConversation)
+            ? ConversationAuthorRepliedToUserIDs(sections, pass.conversationRootUserID)
+            : nil;
+    pass.authorRepliedToUserIDs = authorRepliedToUserIDs;
+
+    // Modules can share a section with unrelated items, so filtering is per item;
+    // a purely filtered section (like the Discover More one) empties and is dropped.
+    BOOL modified = NO;
+    NSMutableArray* filteredSections = [NSMutableArray arrayWithCapacity:sections.count];
+
+    for (id section in sections) {
+        if (![section isKindOfClass:[NSArray class]]) {
+            [filteredSections addObject:section];
+            continue;
+        }
+
+        NSArray* items = section;
+        NSMutableIndexSet* removed = [NSMutableIndexSet indexSet];
+
+        for (NSUInteger i = 0; i < items.count; i++) {
+            if (!keptLanguages.count && !pass.inConversation && !pass.inProfile && !inSearch &&
+                PFBCompatNeedsObservation(PFBCompat_filter_languages) && PFBItemLanguage(items[i]).length) {
+                PFBCOMPAT_OBSERVE(PFBCompat_filter_languages, @"language read");
+            }
+            if (MemoizedShouldHideTimelineItem(items[i], &pass) ||
+                !PFBItemLanguageAllowed(items[i], keptLanguages)) {
+                [removed addIndex:i];
+            } else if (inSearch && PFBShouldHideVerifiedItem(PFBUnwrapDataViewItem(items[i]), NO, 0, nil)) {
+                PFBCompatReach(PFBCompatPath_verified_search);
+            }
+        }
+
+        if (removed.count == 0) {
+            [filteredSections addObject:section];
+            continue;
+        }
+
+        PFBMarkEmptiedModuleChrome(items, removed);
+
+        modified = YES;
+        NSMutableArray* keptItems = [items mutableCopy];
+        [keptItems removeObjectsAtIndexes:removed];
+        if (keptItems.count > 0) {
+            [filteredSections addObject:keptItems];
+        }
+    }
+
+    return modified ? [filteredSections copy] : sections;
+}
+
+// Every data view controller currently on screen, asked to set again what it
+// already has.
+static void PFBReapplyInHierarchy(UIViewController* controller) {
+    if (!controller) {
+        return;
+    }
+    if ([controller isKindOfClass:%c(TFNItemsDataViewController)] &&
+        [controller respondsToSelector:@selector(sections)] &&
+        [controller respondsToSelector:@selector(setSections:restoreScrollPosition:)]) {
+        id sections = ((id (*)(id, SEL))objc_msgSend)(controller, @selector(sections));
+        if ([sections isKindOfClass:[NSArray class]]) {
+            ((void (*)(id, SEL, id, BOOL))objc_msgSend)(
+                controller, @selector(setSections:restoreScrollPosition:), sections, YES);
+        }
+    }
+    for (UIViewController* child in controller.childViewControllers) {
+        PFBReapplyInHierarchy(child);
+    }
+    PFBReapplyInHierarchy(controller.presentedViewController);
+}
+
+// Re-applies the filter to what is already on screen. It runs when sections are
+// handed to the controller, not when the table draws, so the sections are set
+// again with what the controller already holds.
+void pfbReapplyTimelineFilter(void) {
+    for (UIScene* scene in UIApplication.sharedApplication.connectedScenes) {
+        if (![scene isKindOfClass:[UIWindowScene class]]) {
+            continue;
+        }
+        for (UIWindow* window in ((UIWindowScene*)scene).windows) {
+            PFBReapplyInHierarchy(window.rootViewController);
+        }
+    }
+}
+
+%hook TFNItemsDataViewController
+
+- (void)setSections:(NSArray*)sections restoreScrollPosition:(BOOL)restoreScrollPosition {
+    BOOL keepPlace = restoreScrollPosition;
+    NSArray* filtered = FilteredTimelineSections(self, sections);
+    if (PFBReadingIsHomeTimeline(self)) {
+        // Every home controller is tracked, the algorithmic tab included: tracking is pure
+        // registration, and each reading action gates itself on MarkerAllowed.
+        // The registry is read when the app backgrounds, to capture each anchor.
+        PFBReadingTrack(self);
+        if (PFBReadingMarkerAllowed(self)) {
+            PFBReadingCaptureAnchor(self, filtered);
+        }
+        // Twitter's own restore flag, forced on the home timeline so a reload
+        // keeps the reading position instead of jumping to the top.
+        if (restoreScrollPosition) {
+            PFBCOMPAT_OBSERVE(PFBCompat_keep_reading_position, @"place already kept");
+        } else {
+            PFBCOMPAT_ACTION(PFBCompat_keep_reading_position, @"place kept");
+        }
+        keepPlace = YES;
+    }
+    %orig(filtered, keepPlace);
+    PFBReadingRescanSoon(self);
+}
+
+- (void)updateSections:(NSArray*)sections
+    reconfigureItemIdentifiers:(NSArray*)identifiers
+              withRowAnimation:(long long)animation
+                    completion:(id)completion {
+    NSArray* filtered = FilteredTimelineSections(self, sections);
+    if (PFBReadingMarkerAllowed(self)) {
+        PFBReadingCaptureAnchor(self, filtered);
+    }
+    %orig(filtered, identifiers, animation, completion);
+    PFBReadingRescanSoon(self);
+}
+
+- (void)viewWillAppear:(BOOL)animated {
+    %orig;
+    PFBReadingRescanSoon(self);
+}
+
+- (void)viewWillDisappear:(BOOL)animated {
+    PFBReadingCaptureAnchor(self, nil);
+    %orig;
+}
+
+%end
+
+// MARK: - Poll results before voting
+
+// The counts travel with the card data before a vote, so the percentage is
+// appended to each option's label. The choice count is not derived from the card
+// name, since image polls carry none; the per-choice bindings are probed instead.
+
+static const NSUInteger kPFBPollMaxChoices = 4;
+
+// "choice2_label" -> 2, anything else -> 0.
+static NSUInteger pfbPollChoiceIndexForKey(NSString* key) {
+    if (![key hasPrefix:@"choice"] || ![key hasSuffix:@"_label"]) {
+        return 0;
+    }
+    NSRange digits = NSMakeRange(6, key.length - 6 - 6);
+    NSInteger index = [key substringWithRange:digits].integerValue;
+    return index > 0 ? (NSUInteger)index : 0;
+}
+
+static BOOL pfbPollAlreadyShowsResults(TFCCardData* cardData) {
+    if ([cardData boolForKey:@"counts_are_final"]) {
+        return YES;
+    }
+    return [cardData stringForKey:@"selected_choice"].length > 0;
+}
+
+static NSString* pfbPollPercentageString(double fraction) {
+    static NSNumberFormatter* formatter;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+        formatter = [[NSNumberFormatter alloc] init];
+        formatter.numberStyle = NSNumberFormatterPercentStyle;
+        formatter.maximumFractionDigits = 0;
+    });
+    return [formatter stringFromNumber:@(fraction)];
+}
+
+static NSString* pfbPollTitleWithPercentage(TFCCardData* cardData,
+                                            NSString* key,
+                                            NSString* title) {
+    NSUInteger choice = pfbPollChoiceIndexForKey(key);
+    if (choice > 0 && choice <= kPFBPollMaxChoices && title.length > 0 &&
+        ![PFBSettings boolForKey:@"show_poll_results"]) {
+        PFBCOMPAT_OBSERVE(PFBCompat_show_poll_results, @"poll found");
+    }
+    if (choice == 0 || choice > kPFBPollMaxChoices || title.length == 0 ||
+        ![PFBSettings boolForKey:@"show_poll_results"]) {
+        return title;
+    }
+    if (pfbPollAlreadyShowsResults(cardData)) {
+        return title;
+    }
+
+    // numberForKey: tells a missing binding apart from a zero tally, and
+    // neither it nor numberFromStringForKey: is hooked below, so probing the
+    // siblings cannot recurse back in here.
+    long long total = 0;
+    long long votes = 0;
+    for (NSUInteger i = 1; i <= kPFBPollMaxChoices; i++) {
+        NSString* countKey =
+            [NSString stringWithFormat:@"choice%lu_count", (unsigned long)i];
+        NSNumber* count = [cardData numberForKey:countKey]
+                              ?: [cardData numberFromStringForKey:countKey];
+        if (!count) {
+            continue;
+        }
+        total += count.longLongValue;
+        if (i == choice) {
+            votes = count.longLongValue;
+        }
+    }
+    if (total <= 0) {
+        return title;
+    }
+    PFBCOMPAT_ACTION(PFBCompat_show_poll_results, @"results shown");
+    NSString* format = [[PFBBundle sharedBundle] localizedStringForKey:@"POLL_RESULT_FORMAT"];
+    return [NSString stringWithFormat:format, title, pfbPollPercentageString((double)votes / (double)total)];
+}
+
+%hook TFCCardData
+
+- (NSString*)stringForKey:(NSString*)key {
+    NSString* title = %orig;
+    return pfbPollTitleWithPercentage(self, key, title);
+}
+
+- (NSString*)stringForKey:(NSString*)key defaultValue:(NSString*)value {
+    NSString* title = %orig;
+    return pfbPollTitleWithPercentage(self, key, title);
+}
+
+%end

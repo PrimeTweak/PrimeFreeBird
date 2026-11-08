@@ -1,0 +1,1281 @@
+// A settings page: builds its rows from PFBSettings and handles their actions.
+
+#import "Settings/PFBModernSettingsPageViewController.h"
+#import "Common/PFBBundle.h"
+#import "Common/PFBSettings.h"
+#import "Settings/PFBModernSettingsCells.h"
+#import "Features/Timelines/PFBMutedWordsViewController.h"
+#import "Features/Branding/AppIcon/PFBAppIconViewController.h"
+#import "Common/PFBSettingsBackup.h"
+#import "Features/Appearance/CustomTabBar/PFBNativeTabSelectionStore.h"
+#import "Features/Appearance/ThemeColor/PFBPalette.h"
+#import "Support/HookHelpers.h"
+#import "Common/PFBCompatibility.h"
+#import "Debug/PFBDebugger.h"
+#import "Settings/Native/PFBNativeSettingsPageRows.h"
+#import "Settings/Native/PFBShowcase.h"
+#import "Support/PFBTwitterPopups.h"
+
+@interface PFBModernSettingsPageViewController ()
+@property (nonatomic, copy) NSString* registryPageKey;
+@property (nonatomic, readwrite) BOOL inSheet;
+@property (nonatomic) NSInteger sheetGroup;
+@property (nonatomic, strong) PFBNativeSettingsPageRows* nativeRows;
+// The height each row last showed at, keyed by its registry entry.
+@property (nonatomic, strong) NSMapTable<NSDictionary*, NSNumber*>* rowHeights;
+// Redraws the rows whose `disabledWhen` names this key.
+- (void)reloadRowsHeldBy:(NSString*)key;
+@end
+
+// Reads an object property only when the method really returns an object.
+static id PFBAskObject(id target, NSString* name) {
+    SEL selector = NSSelectorFromString(name);
+    if (!target || ![target respondsToSelector:selector]) {
+        return nil;
+    }
+    const char* type = [target methodSignatureForSelector:selector].methodReturnType;
+    if (!type || strcmp(type, "@") != 0) {
+        return nil;
+    }
+    return ((id (*)(id, SEL))objc_msgSend)(target, selector);
+}
+
+// The account's profile photo, from the app's own user model. The 200 px variant
+// keeps the 40 pt circle sharp.
+NSURL* PFBAccountAvatarURL(TFNTwitterAccount* account) {
+    id entity = PFBAskObject(PFBAskObject(account, @"user"), @"profileImageMediaEntity");
+    id address = PFBAskObject(entity, @"imageURLString") ?: PFBAskObject(entity, @"mediaURL");
+    NSString* string = [address isKindOfClass:[NSURL class]] ? [address absoluteString]
+                     : ([address isKindOfClass:[NSString class]] ? address : nil);
+    if (!string.length) {
+        static BOOL said;
+        if (!said) {
+            said = YES;
+            PFBDebugLog(@"[session] avatar: the account carries no photo address");
+        }
+        return nil;
+    }
+    string = [string stringByReplacingOccurrencesOfString:@"_normal." withString:@"_200x200."];
+    return [NSURL URLWithString:string];
+}
+
+@implementation PFBModernSettingsPageViewController
+
+- (BOOL)newLook {
+    return self.nativeLook || self.inSheet;
+}
+
+- (void)viewWillAppear:(BOOL)animated {
+    [super viewWillAppear:animated];
+    PFBThemeScreenEnter(self);
+    // Back from a screen one of its rows opened, the new look shows the values as they now stand.
+    if (self.nativeLook) {
+        [self.tableView reloadData];
+    }
+}
+
+// The new look sets its ground again on a change of appearance, as its rows do.
+- (void)traitCollectionDidChange:(UITraitCollection*)previousTraitCollection {
+    [super traitCollectionDidChange:previousTraitCollection];
+    if (self.nativeLook) {
+        self.view.backgroundColor = [PFBPalette currentBackgroundColor];
+        self.tableView.backgroundColor = self.view.backgroundColor;
+    }
+}
+
+- (void)viewDidDisappear:(BOOL)animated {
+    [super viewDidDisappear:animated];
+    PFBThemeScreenLeave(self);
+}
+
+#pragma mark - Lifecycle
+
+- (instancetype)initWithAccount:(TFNTwitterAccount*)account {
+    return [self initWithAccount:account pageKey:nil];
+}
+
+- (instancetype)initWithAccount:(TFNTwitterAccount*)account pageKey:(NSString*)pageKey {
+    return [self initWithAccount:account pageKey:pageKey group:NSNotFound];
+}
+
+- (instancetype)initWithAccount:(TFNTwitterAccount*)account
+                        pageKey:(NSString*)pageKey
+                          group:(NSInteger)group {
+    if ((self = [super init])) {
+        self.account = account;
+        self.registryPageKey = pageKey;
+        self.inSheet = group != NSNotFound;
+        self.sheetGroup = group;
+        [self buildSettingsList];
+        [self updateVisibleToggles];
+    }
+    return self;
+}
+
+// The Compatibility row shows a status that the checks update after launch.
+- (void)pfbCompatDidChange:(NSNotification*)note {
+    dispatch_async(dispatch_get_main_queue(), ^{
+        [self.tableView reloadData];
+    });
+}
+
+- (void)viewDidLoad {
+    [super viewDidLoad];
+    [[NSNotificationCenter defaultCenter] addObserver:self
+                                             selector:@selector(pfbCompatDidChange:)
+                                                 name:PFBCompatDidChangeNotification
+                                               object:nil];
+    [self setupNav];
+    [self setupTable];
+}
+
+#pragma mark - Page Registry
+
+- (NSString*)pageKey {
+    return self.registryPageKey;
+}
+
+- (NSString*)pageTitleKey {
+    return [PFBSettings titleKeyForPage:[self pageKey]];
+}
+
+- (NSString*)pageSubtitleKey {
+    return [PFBSettings subtitleKeyForPage:[self pageKey]];
+}
+
+// In a sheet, the rows under the group's header up to the next one, but for those the new look
+// lists on the page.
+- (void)buildSettingsList {
+    NSArray<NSDictionary*>* entries = [PFBSettings settingsForPage:[self pageKey]];
+    if (!self.inSheet) {
+        self.toggles = entries;
+        return;
+    }
+    NSMutableArray<NSDictionary*>* rows = [NSMutableArray array];
+    NSInteger group = -1;
+    for (NSDictionary* entry in entries) {
+        if ([entry[@"type"] isEqualToString:@"header"]) {
+            group++;
+        } else if (group == self.sheetGroup && ![entry[@"opensPage"] boolValue]) {
+            [rows addObject:entry];
+        }
+    }
+    self.toggles = rows;
+}
+
+#pragma mark - Setup
+
+// A sheet brings its own title; the new look titles its pages alone, without the account line.
+- (void)setupNav {
+    if (self.inSheet) {
+        return;
+    }
+    NSString* title = [[PFBBundle sharedBundle] localizedStringForKey:[self pageTitleKey]];
+    if (self.nativeLook) {
+        PFBShowcaseSetTitle(self, title);
+    } else if (self.account) {
+        self.navigationItem.titleView =
+            [objc_getClass("TFNTitleView") titleViewWithTitle:title
+                                                     subtitle:self.account.displayUsername];
+    } else {
+        self.title = title;
+    }
+}
+
+// In a sheet, the rows sit on the sheet's own ground and scroll only past its height. The new
+// look's rows come from their own source, which the classic rows' handling never meets.
+- (void)setupTable {
+    if (self.nativeLook) {
+        self.view.backgroundColor = [PFBPalette currentBackgroundColor];
+        self.tableView = [[UITableView alloc] initWithFrame:self.view.bounds style:UITableViewStylePlain];
+        self.tableView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+        self.tableView.backgroundColor = self.view.backgroundColor;
+        self.tableView.separatorStyle = UITableViewCellSeparatorStyleNone;
+        self.tableView.sectionHeaderTopPadding = 0;
+        self.tableView.tableFooterView = [[UIView alloc] init];
+        self.nativeRows = [[PFBNativeSettingsPageRows alloc] initWithPage:self];
+        [self.nativeRows showInTable:self.tableView];
+        [self.view addSubview:self.tableView];
+        return;
+    }
+    UIColor* ground = self.inSheet ? [UIColor clearColor] : [PFBPalette currentBackgroundColor];
+    self.view.backgroundColor = ground;
+    self.tableView = [[UITableView alloc] initWithFrame:self.view.bounds
+                                                  style:self.inSheet ? UITableViewStylePlain : UITableViewStyleGrouped];
+    self.tableView.autoresizingMask =
+        UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+    self.tableView.dataSource = self;
+    self.tableView.delegate = self;
+    self.tableView.backgroundColor = ground;
+    self.tableView.separatorStyle = UITableViewCellSeparatorStyleNone;
+    if (self.inSheet) {
+        self.tableView.alwaysBounceVertical = NO;
+        self.tableView.contentInsetAdjustmentBehavior = UIScrollViewContentInsetAdjustmentNever;
+        self.tableView.sectionHeaderTopPadding = 0;
+        // A sheet's group has no header or footer: estimated at zero, they never push the rows.
+        self.tableView.estimatedSectionHeaderHeight = 0;
+        self.tableView.estimatedSectionFooterHeight = 0;
+    }
+    self.tableView.rowHeight = UITableViewAutomaticDimension;
+    self.tableView.showsVerticalScrollIndicator = NO;
+    self.tableView.showsHorizontalScrollIndicator = NO;
+    self.tableView.estimatedRowHeight = 80;
+    self.rowHeights = [NSMapTable mapTableWithKeyOptions:NSPointerFunctionsStrongMemory |
+                                                         NSPointerFunctionsObjectPointerPersonality
+                                            valueOptions:NSPointerFunctionsStrongMemory];
+    [self.tableView registerClass:[PFBModernSettingsToggleCell class]
+           forCellReuseIdentifier:@"ToggleCell"];
+    [self.tableView registerClass:[PFBModernSettingsTableViewCell class]
+           forCellReuseIdentifier:@"ButtonCell"];
+    [self.tableView registerClass:[PFBModernSettingsCompactButtonCell class]
+           forCellReuseIdentifier:@"CompactButtonCell"];
+    [self.tableView registerClass:[PFBModernSettingsTabBarCell class]
+           forCellReuseIdentifier:@"TabBarCell"];
+    [self.tableView registerClass:[PFBModernSettingsSessionCardCell class]
+           forCellReuseIdentifier:@"SessionCardCell"];
+    [self.tableView registerClass:[PFBModernSettingsButtonPairCell class]
+           forCellReuseIdentifier:@"ButtonPairCell"];
+    [self.tableView registerClass:[PFBModernSettingsHeaderCell class]
+           forCellReuseIdentifier:@"HeaderCell"];
+    [self.view addSubview:self.tableView];
+}
+
+#pragma mark - Visible Toggles
+
+- (void)updateVisibleToggles {
+    NSMutableArray* visible = [NSMutableArray array];
+    for (NSDictionary* toggleData in self.toggles) {
+        // Two relations, opposite directions: a row appears while its parent is
+        // on, and disappears while its blocker is on.
+        NSString* parentKey = toggleData[@"parentKey"];
+        NSString* hiddenWhen = toggleData[@"hiddenWhen"];
+        BOOL show = YES;
+        if (parentKey) {
+            // The parent's own state, its declared default included.
+            show = [PFBSettings boolForKey:parentKey];
+        }
+        if (show && hiddenWhen && [PFBSettings boolForKey:hiddenWhen]) {
+            show = NO;
+        }
+        if (show) {
+            [visible addObject:toggleData];
+        }
+    }
+    self.visibleToggles = [visible copy];
+}
+
+#pragma mark - UITableViewDataSource
+
+- (NSInteger)tableView:(UITableView*)tableView numberOfRowsInSection:(NSInteger)section {
+    return self.visibleToggles.count;
+}
+
+// Title key defaults to KEY_TITLE; an explicit titleKey takes precedence.
+- (NSString*)localizedTitleForEntry:(NSDictionary*)entry {
+    NSString* titleKey = entry[@"titleKey"];
+    if (!titleKey) {
+        titleKey = [NSString stringWithFormat:@"%@_TITLE", [entry[@"key"] uppercaseString]];
+    }
+    return [[PFBBundle sharedBundle] localizedStringForKey:titleKey];
+}
+
+// The bundle returns the key itself when no string exists, which counts as no detail.
+- (NSString*)localizedDetailForKey:(NSString*)key {
+    NSString* detailKey = [NSString stringWithFormat:@"%@_DETAIL", [key uppercaseString]];
+    NSString* detail = [[PFBBundle sharedBundle] localizedStringForKey:detailKey];
+    return [detail isEqualToString:detailKey] ? @"" : detail;
+}
+
+// Localized at render time; the registry can't call localizedStringForKey
+// without re-entering the settings lookup.
+- (NSString*)defaultSubtitleForEntry:(NSDictionary*)entry {
+    NSString* subtitleDefaultKey = entry[@"subtitleDefaultKey"];
+    if (subtitleDefaultKey) {
+        return [[PFBBundle sharedBundle] localizedStringForKey:subtitleDefaultKey];
+    }
+    return entry[@"subtitleDefault"];
+}
+
+- (UITableViewCell*)tableView:(UITableView*)tableView
+        cellForRowAtIndexPath:(NSIndexPath*)indexPath {
+    NSDictionary* toggleData = self.visibleToggles[indexPath.row];
+    NSString* type = toggleData[@"type"];
+    if ([type isEqualToString:@"header"]) {
+        PFBModernSettingsHeaderCell* cell =
+            [tableView dequeueReusableCellWithIdentifier:@"HeaderCell"
+                                            forIndexPath:indexPath];
+        [cell configureWithTitle:[[PFBBundle sharedBundle]
+                                     localizedStringForKey:toggleData[@"titleKey"]]];
+        return cell;
+    }
+    if ([type isEqualToString:@"sessionCard"]) {
+        PFBModernSettingsSessionCardCell* cell =
+            [tableView dequeueReusableCellWithIdentifier:@"SessionCardCell"
+                                            forIndexPath:indexPath];
+        PFBBundle* bundle = [PFBBundle sharedBundle];
+        // The session check is not tied to an account: whenever a usable web
+        // session exists, the card names this page's account.
+        BOOL signedIn = PFBHasUsableWebCredentials();
+        NSString* handle = self.account.displayUsername;
+        [cell configureWithHandle:(signedIn && handle.length)
+                                      ? handle
+                                      : [bundle localizedStringForKey:@"WEB_SESSION_NONE_TITLE"]
+                         signedIn:signedIn
+                           detail:[bundle localizedStringForKey:
+                                              signedIn ? @"WEB_SESSION_LIVE_DETAIL"
+                                                       : @"WEB_SESSION_NONE_DETAIL"]
+                     primaryTitle:[bundle localizedStringForKey:signedIn ? @"WEB_SESSION_SIGN_IN_AGAIN_ACTION"
+                                                                         : @"WEB_SESSION_SIGN_IN_ACTION"]
+                 destructiveTitle:[bundle localizedStringForKey:@"WEB_SESSION_CLEAR_ACTION"]];
+        // Signed out, the card downloads no photo.
+        [cell loadAvatarFromURL:signedIn ? PFBAccountAvatarURL(self.account) : nil];
+        [cell addPrimaryTarget:self action:@selector(sessionSignInTapped:)];
+        [cell addDestructiveTarget:self action:@selector(sessionClearTapped:)];
+        return cell;
+    }
+    if ([type isEqualToString:@"buttonPair"]) {
+        PFBModernSettingsButtonPairCell* cell =
+            [tableView dequeueReusableCellWithIdentifier:@"ButtonPairCell"
+                                            forIndexPath:indexPath];
+        PFBBundle* bundle = [PFBBundle sharedBundle];
+        [cell configureWithFirst:[bundle localizedStringForKey:toggleData[@"firstKey"]]
+                          second:[bundle localizedStringForKey:toggleData[@"secondKey"]]];
+        // Set on every pass: cells are recycled.
+        [cell setSecondDestructive:[toggleData[@"secondDestructive"] boolValue]];
+        [cell addFirstTarget:self action:NSSelectorFromString(toggleData[@"firstAction"])];
+        [cell addSecondTarget:self action:NSSelectorFromString(toggleData[@"secondAction"])];
+        return cell;
+    }
+    if ([type isEqualToString:@"tabBar"]) {
+        PFBModernSettingsTabBarCell* cell =
+            [tableView dequeueReusableCellWithIdentifier:@"TabBarCell"
+                                            forIndexPath:indexPath];
+        NSArray* tabs = [self tabsForEntry:toggleData];
+        [cell configureWithTabs:tabs
+                        caption:[[PFBBundle sharedBundle]
+                                    localizedStringForKey:toggleData[@"captionKey"]]
+                           hint:[[PFBBundle sharedBundle]
+                                    localizedStringForKey:toggleData[@"hintKey"]]];
+        [cell setCountText:[self hiddenCountTextForTabs:tabs]];
+        [cell addTabTarget:self action:@selector(tabTapped:)];
+        return cell;
+    }
+    if ([type isEqualToString:@"compactButton"]) {
+        PFBModernSettingsCompactButtonCell* cell =
+            [tableView dequeueReusableCellWithIdentifier:@"CompactButtonCell"
+                                            forIndexPath:indexPath];
+        NSString* title = [self localizedTitleForEntry:toggleData];
+        NSString* subtitle = @"";
+        NSString* prefKey = toggleData[@"prefKeyForSubtitle"];
+        if (prefKey) {
+            NSString* defaultSubtitle = [self defaultSubtitleForEntry:toggleData];
+            // A restored backup can hold another type under this key.
+            id stored = [[NSUserDefaults standardUserDefaults] objectForKey:prefKey];
+            subtitle = [stored isKindOfClass:[NSString class]] ? stored : defaultSubtitle;
+        }
+        NSString* key = toggleData[@"key"];
+        [cell configureWithTitle:title subtitle:subtitle detail:key ? [self localizedDetailForKey:key] : nil];
+        // A row that asks for its value in place leads to no screen.
+        [cell setShowsChevron:![toggleData[@"opensPrompt"] boolValue]];
+        [self attachMenuIfNeeded:cell entry:toggleData];
+        return cell;
+    } else if ([type isEqualToString:@"button"]) {
+        PFBModernSettingsTableViewCell* cell = [tableView dequeueReusableCellWithIdentifier:@"ButtonCell"
+                                                                            forIndexPath:indexPath];
+        NSString* title = [self localizedTitleForEntry:toggleData];
+        NSString* subtitle = @"";
+        NSString* prefKey = toggleData[@"prefKeyForSubtitle"];
+        if (prefKey) {
+            NSString* defaultSubtitle = [self defaultSubtitleForEntry:toggleData];
+            subtitle = [[NSUserDefaults standardUserDefaults] objectForKey:prefKey] ?: defaultSubtitle;
+        }
+        NSString* subtitleKey = toggleData[@"subtitleKey"];
+        if (subtitleKey) {
+            subtitle = [[PFBBundle sharedBundle] localizedStringForKey:subtitleKey];
+        }
+        [cell configureWithTitle:title subtitle:subtitle iconName:nil];
+        // No action means nowhere to go: the row states something and the
+        // chevron would say otherwise.
+        BOOL leadsSomewhere = toggleData[@"action"] != nil;
+        // A destructive row acts in place rather than opening a page, so it reads
+        // in red with no chevron. Set on every pass: cells are recycled.
+        BOOL destructive = [toggleData[@"destructive"] boolValue];
+        cell.titleLabel.textColor = destructive ? [UIColor systemRedColor] : [UIColor labelColor];
+        [cell setShowsChevron:leadsSomewhere && !destructive];
+        cell.selectionStyle = leadsSomewhere ? UITableViewCellSelectionStyleDefault
+                                             : UITableViewCellSelectionStyleNone;
+        [self attachMenuIfNeeded:cell entry:toggleData];
+        return cell;
+    } else {
+        PFBModernSettingsToggleCell* cell = [tableView dequeueReusableCellWithIdentifier:@"ToggleCell"
+                                                                         forIndexPath:indexPath];
+        NSString* key = toggleData[@"key"];
+        NSString* title = [self localizedTitleForEntry:toggleData];
+        BOOL isEnabled = [PFBSettings boolForKey:key];
+        // A row is held while another option is on, or while it waits; one that waits
+        // still turns off, so it never stays on out of reach.
+        BOOL waiting = [self rowIsWaiting:toggleData];
+        NSString* blocker = toggleData[@"disabledWhen"];
+        BOOL overridden = blocker && [PFBSettings boolForKey:blocker];
+        // While the row is held, its detail says why instead, when it has that text.
+        NSString* heldKey = [NSString stringWithFormat:@"%@_DETAIL_HELD", key.uppercaseString];
+        NSString* held = [[PFBBundle sharedBundle] localizedStringForKey:heldKey];
+        NSString* subtitle = (waiting || overridden) && ![held isEqualToString:heldKey]
+                                 ? held
+                                 : [self localizedDetailForKey:key];
+        [cell configureWithTitle:title subtitle:subtitle];
+        BOOL rowEnabled = !overridden && !(waiting && !isEnabled);
+        [cell setRowEnabled:rowEnabled];
+        // An option stored as a negative reads and writes flipped, so every
+        // screen can name it the way it behaves.
+        BOOL inverted = [toggleData[@"inverted"] boolValue];
+        cell.toggleSwitch.on = inverted ? !isEnabled : isEnabled;
+        objc_setAssociatedObject(cell.toggleSwitch, @"prefKey", key,
+                                 OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        objc_setAssociatedObject(cell.toggleSwitch, @"inverted", @(inverted),
+                                 OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        [cell addTarget:self
+                      action:@selector(switchChanged:)
+            forControlEvents:UIControlEventValueChanged];
+        // A pill carries a second setting on the same row. It belongs to the
+        // row's own switch, so it is only on screen while that switch is on.
+        NSString* pillKey = toggleData[@"pillKey"];
+        if (pillKey) {
+            [cell setPillTitle:[self pillTitleForKey:pillKey]];
+            objc_setAssociatedObject(cell.pillButton, @"pillKey", pillKey,
+                                     OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+            [cell addPillTarget:self action:@selector(pillTapped:)];
+            [cell setPillVisible:(cell.toggleSwitch.on && rowEnabled) animated:NO];
+        } else {
+            // A reused cell drops the pill key of the row it showed before.
+            objc_setAssociatedObject(cell.pillButton, @"pillKey", nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+            [cell setPillVisible:NO animated:NO];
+        }
+        return cell;
+    }
+}
+
+#pragma mark - UITableViewDelegate
+
+// A row with nothing to open should not light up under the finger either. The
+// table is asked rather than the cell, so this also covers keyboard focus and
+// VoiceOver, which read highlightability rather than the chevron.
+- (BOOL)tableView:(UITableView*)tableView
+    shouldHighlightRowAtIndexPath:(NSIndexPath*)indexPath {
+    if (indexPath.row >= (NSInteger)self.visibleToggles.count) {
+        return YES;
+    }
+    NSDictionary* data = self.visibleToggles[indexPath.row];
+    NSString* type = data[@"type"];
+    if (([type isEqualToString:@"button"] ||
+         [type isEqualToString:@"compactButton"]) &&
+        data[@"action"] == nil) {
+        return NO;
+    }
+    return YES;
+}
+
+- (void)attachMenuIfNeeded:(UITableViewCell*)cell entry:(NSDictionary*)entry {
+    static const NSInteger kMenuButtonTag = 0x4D454E55;
+    UIButton* button = [cell.contentView viewWithTag:kMenuButtonTag];
+    NSString* provider = entry[@"menu"];
+    SEL selector = provider ? NSSelectorFromString(provider) : NULL;
+    BOOL opensMenu = selector && [self respondsToSelector:selector];
+    if ([cell isKindOfClass:[PFBModernSettingsCompactButtonCell class]]) {
+        [(PFBModernSettingsCompactButtonCell*)cell setOpensMenu:opensMenu];
+    }
+    if (!opensMenu) {
+        [button removeFromSuperview];
+        return;
+    }
+    if (!button) {
+        button = [UIButton buttonWithType:UIButtonTypeCustom];
+        button.tag = kMenuButtonTag;
+        button.showsMenuAsPrimaryAction = !self.inSheet;
+        button.translatesAutoresizingMaskIntoConstraints = NO;
+        [cell.contentView addSubview:button];
+        [NSLayoutConstraint activateConstraints:@[
+            [button.leadingAnchor constraintEqualToAnchor:cell.contentView.leadingAnchor],
+            [button.trailingAnchor constraintEqualToAnchor:cell.contentView.trailingAnchor],
+            [button.topAnchor constraintEqualToAnchor:cell.contentView.topAnchor],
+            [button.bottomAnchor constraintEqualToAnchor:cell.contentView.bottomAnchor],
+        ]];
+    }
+    // The step reads the menu when it opens, so it shows the value as it stands; an action with
+    // the same identifier replaces the one a reused cell had.
+    if (self.inSheet) {
+        NSString* noteKey = entry[@"noteKey"];
+        __weak typeof(self) weakSelf = self;
+        __weak UITableViewCell* weakCell = cell;
+        UIAction* open = [UIAction actionWithTitle:@""
+                                             image:nil
+                                        identifier:@"pfb.step"
+                                           handler:^(__unused UIAction* tapped) {
+                                               NSString* note = noteKey
+                                                   ? [[PFBBundle sharedBundle] localizedStringForKey:noteKey]
+                                                   : [weakSelf noteOfMenuCell:weakCell];
+                                               [weakSelf showChoicesOfMenu:selector note:note];
+                                           }];
+        [button addAction:open forControlEvents:UIControlEventTouchUpInside];
+        return;
+    }
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Warc-performSelector-leaks"
+    button.menu = [self performSelector:selector];
+#pragma clang diagnostic pop
+}
+
+// The description under a menu row's title, which the step repeats above the choices.
+- (NSString*)noteOfMenuCell:(UITableViewCell*)cell {
+    return [cell isKindOfClass:[PFBModernSettingsCompactButtonCell class]]
+               ? ((PFBModernSettingsCompactButtonCell*)cell).detailLabel.text
+               : nil;
+}
+
+- (void)showChoicesOfMenu:(SEL)selector note:(NSString*)note {
+    PFBNativeSettingsSheetController* sheet = (PFBNativeSettingsSheetController*)self.parentViewController;
+    if (![sheet isKindOfClass:[PFBNativeSettingsSheetController class]] || ![self respondsToSelector:selector]) {
+        return;
+    }
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Warc-performSelector-leaks"
+    [sheet showChoices:[self performSelector:selector] note:note];
+#pragma clang diagnostic pop
+}
+
+- (void)tableView:(UITableView*)tableView didSelectRowAtIndexPath:(NSIndexPath*)indexPath {
+    [tableView deselectRowAtIndexPath:indexPath animated:YES];
+    NSDictionary* data = self.visibleToggles[indexPath.row];
+    if ([data[@"type"] isEqualToString:@"button"] ||
+        [data[@"type"] isEqualToString:@"compactButton"]) {
+        NSString* actionName = data[@"action"];
+        if (actionName) {
+            SEL action = NSSelectorFromString(actionName);
+            if ([self respondsToSelector:action]) {
+                // Pass the row's indexPath so value-editing actions can reload
+                // their own row afterward (e.g. the sharing domain prompt).
+                NSMutableDictionary* payload = [data mutableCopy];
+                payload[@"indexPath"] = indexPath;
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Warc-performSelector-leaks"
+                [self performSelector:action
+                           withObject:payload];
+#pragma clang diagnostic pop
+            }
+        }
+    }
+}
+
+// A sheet's group has no page description above its rows.
+- (UIView*)tableView:(UITableView*)tableView viewForHeaderInSection:(NSInteger)section {
+    if (self.inSheet) {
+        return nil;
+    }
+    UIView* header = [[UIView alloc] initWithFrame:CGRectMake(0, 0, tableView.frame.size.width, 0)];
+    UILabel* label = [[UILabel alloc] init];
+    label.translatesAutoresizingMaskIntoConstraints = NO;
+    label.text = [[PFBBundle sharedBundle] localizedStringForKey:[self pageSubtitleKey]];
+    label.numberOfLines = 0;
+    label.font = PFBSettingsDetailFont();
+    label.textColor = PFBSettingsSubtitleColor();
+    [header addSubview:label];
+    [NSLayoutConstraint activateConstraints:@[
+        [label.leadingAnchor constraintEqualToAnchor:header.leadingAnchor
+                                            constant:10],
+        [label.trailingAnchor constraintEqualToAnchor:header.trailingAnchor
+                                             constant:-10],
+        [label.topAnchor constraintEqualToAnchor:header.topAnchor
+                                        constant:8],
+        [label.bottomAnchor constraintEqualToAnchor:header.bottomAnchor
+                                           constant:-8]
+    ]];
+    return header;
+}
+
+- (CGFloat)tableView:(UITableView*)tableView heightForHeaderInSection:(NSInteger)section {
+    return self.inSheet ? CGFLOAT_MIN : UITableViewAutomaticDimension;
+}
+
+// In a sheet the sheet's ground shows through the rows, which paint the page's otherwise.
+- (void)tableView:(UITableView*)tableView
+      willDisplayCell:(UITableViewCell*)cell
+    forRowAtIndexPath:(NSIndexPath*)indexPath {
+    if (self.inSheet) {
+        cell.backgroundColor = [UIColor clearColor];
+    }
+    // A row emptied as it went away comes back whole when it is used again.
+    cell.contentView.hidden = NO;
+    if ((NSUInteger)indexPath.row < self.visibleToggles.count) {
+        [self.rowHeights setObject:@(CGRectGetHeight(cell.bounds)) forKey:self.visibleToggles[(NSUInteger)indexPath.row]];
+    }
+}
+
+// A row already shown is estimated at its real height, so a reload or an update lays the rows
+// out where they already are; one never shown gets the table's estimate.
+- (CGFloat)tableView:(UITableView*)tableView estimatedHeightForRowAtIndexPath:(NSIndexPath*)indexPath {
+    NSNumber* shown = (NSUInteger)indexPath.row < self.visibleToggles.count
+                          ? [self.rowHeights objectForKey:self.visibleToggles[(NSUInteger)indexPath.row]]
+                          : nil;
+    return shown ? (CGFloat)shown.doubleValue : tableView.estimatedRowHeight;
+}
+
+- (void)refreshRowsInPlace {
+    NSArray<NSIndexPath*>* visible = self.tableView.indexPathsForVisibleRows;
+    if (!visible.count) {
+        return;
+    }
+    // The update sizes the rows again, for a value that changes its row's height.
+    [UIView performWithoutAnimation:^{
+        [self.tableView performBatchUpdates:^{
+            [self.tableView reconfigureRowsAtIndexPaths:visible];
+        }
+                                 completion:nil];
+    }];
+}
+
+#pragma mark - Switch Handling
+
+// A row waiting on something the app knows at run time rather than on a stored option;
+// the conditions are named, so the registry stays declarative.
+- (BOOL)rowIsWaiting:(NSDictionary*)entry {
+    NSString* requires = entry[@"blockedUnless"];
+    return [requires isEqualToString:@"web_session"] && !PFBHasUsableWebCredentials();
+}
+
+// A row another option holds must redraw the moment that option moves,
+// otherwise it stays enabled until the page is left.
+- (void)reloadRowsHeldBy:(NSString*)key {
+    NSMutableArray<NSIndexPath*>* paths = [NSMutableArray array];
+    [self.visibleToggles enumerateObjectsUsingBlock:^(NSDictionary* entry,
+                                                      NSUInteger row, BOOL* stop) {
+        if ([entry[@"disabledWhen"] isEqualToString:key]) {
+            [paths addObject:[NSIndexPath indexPathForRow:(NSInteger)row inSection:0]];
+        }
+    }];
+    if (paths.count) {
+        [self.tableView reloadRowsAtIndexPaths:paths
+                              withRowAnimation:UITableViewRowAnimationFade];
+    }
+}
+
+// The tabs of the Explore bar, in the order the app shows them. Each carries
+// the preference key that hides it.
+- (NSArray<NSDictionary*>*)tabsForEntry:(NSDictionary*)entry {
+    NSMutableArray* out = [NSMutableArray array];
+    for (NSString* key in entry[@"tabKeys"]) {
+        NSString* nameKey =
+            [NSString stringWithFormat:@"%@_TAB_NAME", key.uppercaseString];
+        [out addObject:@{
+            @"key" : key,
+            @"name" : [[PFBBundle sharedBundle] localizedStringForKey:nameKey]
+        }];
+    }
+    return out;
+}
+
+- (NSString*)hiddenCountTextForTabs:(NSArray<NSDictionary*>*)tabs {
+    NSUInteger hidden = 0;
+    for (NSDictionary* tab in tabs) {
+        if ([PFBSettings boolForKey:tab[@"key"]]) {
+            hidden++;
+        }
+    }
+    if (hidden == 0) {
+        return [[PFBBundle sharedBundle] localizedStringForKey:@"EXPLORE_TABS_NONE_HIDDEN"];
+    }
+    return [NSString
+        stringWithFormat:[[PFBBundle sharedBundle]
+                             localizedStringForKey:@"EXPLORE_TABS_HIDDEN_COUNT"],
+                         (unsigned long)hidden];
+}
+
+// The card acts on the session and then redraws: the rows that depend on it
+// have no other way to learn that it changed.
+- (void)sessionSignInTapped:(UIButton*)sender {
+    PFBPresentWebSessionLogin(^(__unused BOOL success) {
+      [self updateVisibleToggles];
+      [self.tableView reloadData];
+    });
+}
+
+- (void)tabTapped:(UIButton*)sender {
+    NSString* key = objc_getAssociatedObject(sender, @"tabKey");
+    if (!key) {
+        return;
+    }
+    UIView* walk = sender;
+    while (walk && ![walk isKindOfClass:[PFBModernSettingsTabBarCell class]]) {
+        walk = walk.superview;
+    }
+    PFBModernSettingsTabBarCell* host = (PFBModernSettingsTabBarCell*)walk;
+    NSIndexPath* hostPath = host ? [self.tableView indexPathForCell:host] : nil;
+    NSArray* allTabs = hostPath ? [self tabsForEntry:self.visibleToggles[hostPath.row]] : nil;
+
+    // Striking the last tab left would leave a bar with nothing in it, and a
+    // pager with nothing to show. Hiding all of Explore is a switch of its own,
+    // so the refusal points at it instead of silently doing it.
+    if (!([PFBSettings boolForKey:key])) {
+        NSUInteger kept = 0;
+        for (NSDictionary* tab in allTabs) {
+            if (![PFBSettings boolForKey:tab[@"key"]]) {
+                kept++;
+            }
+        }
+        if (kept <= 1) {
+            [host refuseTab:sender
+                withMessage:[[PFBBundle sharedBundle]
+                                localizedStringForKey:@"EXPLORE_TABS_KEEP_ONE"]];
+            return;
+        }
+    }
+
+    [[NSUserDefaults standardUserDefaults] setBool:![PFBSettings boolForKey:key]
+                                            forKey:key];
+    // Repainting the live cell keeps the strike-through immediate; reloading the
+    // row would flash the whole bar for one tap.
+    [host refreshTabs];
+    if (allTabs) {
+        [host setCountText:[self hiddenCountTextForTabs:allTabs]];
+    }
+}
+
+// The pill reads out its own state, so neither position has to be guessed.
+- (NSString*)pillTitleForKey:(NSString*)key {
+    NSString* suffix = [PFBSettings boolForKey:key] ? @"_PILL_ON" : @"_PILL_OFF";
+    return [[PFBBundle sharedBundle]
+        localizedStringForKey:[NSString stringWithFormat:@"%@%@",
+                                                         key.uppercaseString,
+                                                         suffix]];
+}
+
+- (void)pillTapped:(UIButton*)sender {
+    NSString* key = objc_getAssociatedObject(sender, @"pillKey");
+    if (!key) {
+        return;
+    }
+    BOOL next = ![PFBSettings boolForKey:key];
+    [[NSUserDefaults standardUserDefaults] setBool:next forKey:key];
+    [sender setTitle:[self pillTitleForKey:key] forState:UIControlStateNormal];
+}
+
+- (void)switchChanged:(UISwitch*)sender {
+    NSString* key = objc_getAssociatedObject(sender, @"prefKey");
+    if (key) {
+        BOOL inverted = [objc_getAssociatedObject(sender, @"inverted") boolValue];
+        [[NSUserDefaults standardUserDefaults]
+            setBool:(inverted ? !sender.isOn : sender.isOn)
+             forKey:key];
+        [self updateAndAnimateChangesForKey:key];
+
+        [self reloadRowsHeldBy:key];
+
+        // A row carrying a pill keeps its cell: reloading it would cut the fade
+        // short, so the pill is moved on the live cell instead.
+        UIView* walk = sender;
+        while (walk && ![walk isKindOfClass:[PFBModernSettingsToggleCell class]]) {
+            walk = walk.superview;
+        }
+        PFBModernSettingsToggleCell* liveCell = (PFBModernSettingsToggleCell*)walk;
+        if (liveCell &&
+            objc_getAssociatedObject(liveCell.pillButton, @"pillKey")) {
+            [liveCell setPillVisible:sender.isOn animated:YES];
+        }
+        // A waiting row just turned off cannot be turned back on yet.
+        NSIndexPath* livePath = liveCell ? [self.tableView indexPathForCell:liveCell] : nil;
+        if (!sender.isOn && livePath && (NSUInteger)livePath.row < self.visibleToggles.count &&
+            [self rowIsWaiting:self.visibleToggles[(NSUInteger)livePath.row]]) {
+            [liveCell setRowEnabled:NO];
+        }
+
+        // The switch-tint toggle changes how every OTHER visible switch is
+        // drawn, so re-run applyTheme on the live cells right away.
+        if ([key isEqualToString:@"color_pfb_switches"]) {
+            SEL applyThemeSel = @selector(applyTheme);
+            for (UITableViewCell* cell in self.tableView.visibleCells) {
+                if ([cell respondsToSelector:applyThemeSel]) {
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Warc-performSelector-leaks"
+                    [cell performSelector:applyThemeSel];
+#pragma clang diagnostic pop
+                }
+                if (self.inSheet) {
+                    cell.backgroundColor = [UIColor clearColor];
+                }
+            }
+        }
+
+        // Reset raises a flag that keeps the accent inactive, so it reverts to
+        // native. Switching a toggle back on states the same intent as picking a
+        // color, so the flag is cleared here or nothing would be painted.
+        if (sender.isOn &&
+            ([key isEqualToString:@"tab_bar_theming"] ||
+             [key isEqualToString:@"color_pfb_switches"] ||
+             [key isEqualToString:@"color_twitter_icon_in_top_bar"])) {
+            [[NSUserDefaults standardUserDefaults]
+                removeObjectForKey:@"pfb_color_reset_done"];
+        }
+
+        // These toggles change which surfaces follow the accent, so push the
+        // accent through again instead of waiting for those views to rebuild.
+        if ([key isEqualToString:@"color_twitter_icon_in_top_bar"] ||
+            [key isEqualToString:@"tab_bar_theming"]) {
+            PFBSyncAccentTheme();
+        }
+        // Twitter's glass tabs show the names at once rather than at their next layout.
+        if ([key isEqualToString:@"restore_tab_labels"]) {
+            PFBRestyleGlassTabBars();
+        }
+        // Keeping or releasing the glass bar takes effect without leaving the settings.
+        if ([key isEqualToString:@"no_tab_bar_hiding"]) {
+            PFBGlassRefreshAlwaysVisible();
+        }
+        if ([key isEqualToString:@"hide_bottom_fade"]) {
+            PFBGlassRefreshBottomFades();
+        }
+
+        // None applies in full at once: Record activity is read at launch, the Tweet button
+        // keeps its glyph until it loads its icon again, and the glass bar sizes its pill at launch.
+        if ([key isEqualToString:@"restore_tweet_button"] || [key isEqualToString:@"debug_tools"] ||
+            ([key isEqualToString:@"restore_tab_labels"] && PFBNativeGlassAsked())) {
+            [self showRestartRequiredAlert];
+        }
+        // Only on the way on: turning one of these off gives the app back its
+        // own behavior, which needs no warning, and a modal on every flip makes
+        // the section unusable to settle.
+        if (sender.isOn && ([key isEqualToString:@"hide_explore_all"] ||
+                            [key isEqualToString:@"choose_explore_tabs"] ||
+                            [key isEqualToString:@"hide_tweet_button"])) {
+            [self showRestartInfoAlert];
+        }
+    }
+}
+
+// The screen titles itself; the classic look adds the account under the title, and the new look
+// titles it as its pages.
+- (void)showAppIconViewController:(NSDictionary*)sender {
+    UIViewController* appIconVC = [[PFBAppIconViewController alloc] init];
+    NSString* title = [[PFBBundle sharedBundle] localizedTwitterStringForKey:@"SUBSCRIPTION_APP_ICON_SETTINGS_TITLE"];
+    if (self.nativeLook) {
+        PFBShowcaseSetTitle(appIconVC, title);
+    } else if (self.account) {
+        [appIconVC.navigationItem setTitleView:[objc_getClass("TFNTitleView")
+                                                   titleViewWithTitle:title
+                                                             subtitle:self.account.displayUsername]];
+    }
+    [self.navigationController pushViewController:appIconVC animated:YES];
+}
+
+// MARK: - Muted words
+
+// Pushes the muted-words editor; the list itself lives in NSUserDefaults.
+- (void)showMutedWords:(NSDictionary*)sender {
+    PFBMutedWordsViewController* editor = [[PFBMutedWordsViewController alloc] init];
+    editor.nativeLook = self.nativeLook;
+    [self.navigationController pushViewController:editor animated:YES];
+}
+
+// MARK: - Settings backup
+
+- (void)showExportSettings:(NSDictionary*)sender {
+    NSData* data = [PFBSettingsBackup exportData];
+    if (!data) {
+        return;
+    }
+    NSURL* url = [[PFBManager temporaryFolder] URLByAppendingPathComponent:@"PrimeFreeBird-settings.json"];
+    if (![data writeToURL:url atomically:YES]) {
+        return;
+    }
+    UIActivityViewController* share =
+        [[UIActivityViewController alloc] initWithActivityItems:@[ url ]
+                                          applicationActivities:nil];
+    share.popoverPresentationController.sourceView = self.view;
+    share.popoverPresentationController.sourceRect =
+        CGRectMake(CGRectGetMidX(self.view.bounds),
+                   CGRectGetMidY(self.view.bounds), 1, 1);
+    [self presentViewController:share animated:YES completion:nil];
+}
+
+- (void)showImportSettings:(NSDictionary*)sender {
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+    UIDocumentPickerViewController* picker = [[UIDocumentPickerViewController alloc]
+        initWithDocumentTypes:@[ @"public.json", @"public.plain-text" ]
+                       inMode:UIDocumentPickerModeImport];
+#pragma clang diagnostic pop
+    picker.delegate = self;
+    [self presentViewController:picker animated:YES completion:nil];
+}
+
+- (void)documentPicker:(UIDocumentPickerViewController*)controller
+    didPickDocumentsAtURLs:(NSArray<NSURL*>*)urls {
+    NSURL* url = urls.firstObject;
+    if (!url) {
+        return;
+    }
+    BOOL scoped = [url startAccessingSecurityScopedResource];
+    NSData* data = [NSData dataWithContentsOfURL:url];
+    if (scoped) {
+        [url stopAccessingSecurityScopedResource];
+    }
+    NSDictionary* settings = [PFBSettingsBackup settingsInData:data];
+    PFBBundle* bundle = [PFBBundle sharedBundle];
+    if (!settings) {
+        UIAlertController* failed = [UIAlertController
+            alertControllerWithTitle:[bundle localizedStringForKey:@"IMPORT_SETTINGS_FAILED_TITLE"]
+                             message:[bundle localizedStringForKey:@"IMPORT_SETTINGS_FAILED_MESSAGE"]
+                      preferredStyle:UIAlertControllerStyleAlert];
+        PFBAlertAddAction(failed, [bundle localizedStringForKey:@"OK_ACTION"], UIAlertActionStyleDefault, self.newLook,
+                          nil);
+        PFBAlertPresent(failed, self, self.newLook, nil);
+        return;
+    }
+    __weak typeof(self) weakSelf = self;
+    UIAlertController* confirm = [UIAlertController
+        alertControllerWithTitle:[bundle localizedStringForKey:@"IMPORT_SETTINGS_CONFIRM_TITLE"]
+                         message:[bundle localizedStringForKey:@"IMPORT_SETTINGS_CONFIRM_MESSAGE"]
+                  preferredStyle:UIAlertControllerStyleAlert];
+    PFBAlertAddAction(confirm, [bundle localizedStringForKey:@"CANCEL_ACTION"], UIAlertActionStyleCancel, self.newLook,
+                      nil);
+    PFBAlertAddAction(confirm, [bundle localizedStringForKey:@"IMPORT_SETTINGS_CONFIRM_ACTION"],
+                      UIAlertActionStyleDestructive, self.newLook, ^{
+                          [weakSelf applyImportedSettings:settings];
+                      });
+    PFBAlertPresent(confirm, self, self.newLook, nil);
+}
+
+- (void)applyImportedSettings:(NSDictionary*)settings {
+    [PFBSettingsBackup applySettings:settings];
+    [self showRestoredSettings];
+    PFBBundle* bundle = [PFBBundle sharedBundle];
+    [self presentRestartAlertWithTitle:[bundle localizedStringForKey:@"IMPORT_SETTINGS_DONE_TITLE"]
+                               message:[bundle localizedStringForKey:@"IMPORT_SETTINGS_DONE_MESSAGE"]];
+}
+
+// The notifications Theme.x posts after a live color change, so the restored accent
+// repaints without waiting for the restart, then the rows with their new values.
+- (void)showRestoredSettings {
+    NSNotificationCenter* center = [NSNotificationCenter defaultCenter];
+    [center postNotificationName:@"TFNDynamicColorsWillReloadNotification" object:nil];
+    [center postNotificationName:@"TFNDynamicColorsDidReloadNotification" object:nil];
+    [center postNotificationName:@"TAEColorSettingsDidChangeUserDefaultsNotification" object:nil];
+    [self updateVisibleToggles];
+    [self.tableView reloadData];
+}
+
+- (void)resetSettings:(NSDictionary*)sender {
+    PFBBundle* bundle = [PFBBundle sharedBundle];
+    __weak typeof(self) weakSelf = self;
+    UIAlertController* confirm = [UIAlertController
+        alertControllerWithTitle:[bundle localizedStringForKey:@"RESET_SETTINGS_CONFIRM_TITLE"]
+                         message:[bundle localizedStringForKey:@"RESET_SETTINGS_CONFIRM_MESSAGE"]
+                  preferredStyle:UIAlertControllerStyleAlert];
+    PFBAlertAddAction(confirm, [bundle localizedStringForKey:@"CANCEL_ACTION"], UIAlertActionStyleCancel, self.newLook,
+                      nil);
+    PFBAlertAddAction(confirm, [bundle localizedStringForKey:@"RESET_SETTINGS_CONFIRM_ACTION"],
+                      UIAlertActionStyleDestructive, self.newLook, ^{
+                          [weakSelf applyResetSettings];
+                      });
+    PFBAlertPresent(confirm, self, self.newLook, nil);
+}
+
+// As on a new install: no stored option, filter, color, tab, send sound, hidden notification
+// or hidden conversation, and Twitter's own accent option and the app icon back to Twitter's.
+- (void)applyResetSettings {
+    [PFBSettingsBackup applySettings:@{}];
+    PFBSendSoundRemove();
+    [[PFBNativeTabSelectionStore sharedStore] removeAllSelections];
+    NSUserDefaults* defaults = [NSUserDefaults standardUserDefaults];
+    for (NSString* key in @[ @"pfb_hidden_notifs", @"pfb_hidden_threads", @"T1ColorSettingsPrimaryColorOptionKey" ]) {
+        [defaults removeObjectForKey:key];
+    }
+    // Visual style is also read straight from the defaults, which a launch seeds with its default.
+    [defaults setBool:[PFBSettings boolForKey:@"enable_liquid_glass"] forKey:@"enable_liquid_glass"];
+    TAEColorSettings* colorSettings = [objc_getClass("TAEColorSettings") sharedSettings];
+    if ([colorSettings respondsToSelector:@selector(setPrimaryColorOption:)]) {
+        [colorSettings setPrimaryColorOption:0];
+    }
+    [self showRestoredSettings];
+    // iOS shows its own alert when the icon changes, so the icon goes back once this one is answered.
+    PFBBundle* bundle = [PFBBundle sharedBundle];
+    [self presentRestartAlertWithTitle:[bundle localizedStringForKey:@"RESET_SETTINGS_DONE_TITLE"]
+                               message:[bundle localizedStringForKey:@"RESET_SETTINGS_DONE_MESSAGE"]
+                              answered:^(void (^done)(void)) {
+                                  [PFBAppIconViewController restorePrimaryIconThen:done];
+                              }];
+}
+
+// MARK: - Web session
+
+// Deletes the stored web session, behind a destructive confirmation.
+- (void)sessionClearTapped:(UIButton*)sender {
+    __weak typeof(self) weakSelf = self;
+    UIAlertController* confirm = [UIAlertController
+        alertControllerWithTitle:[[PFBBundle sharedBundle]
+                                     localizedStringForKey:@"WEB_SESSION_CLEAR_TITLE"]
+                         message:[[PFBBundle sharedBundle]
+                                     localizedStringForKey:@"WEB_SESSION_CLEAR_CONFIRM"]
+                  preferredStyle:UIAlertControllerStyleAlert];
+    PFBAlertAddAction(confirm, [[PFBBundle sharedBundle] localizedStringForKey:@"CANCEL_ACTION"],
+                      UIAlertActionStyleCancel, self.newLook, nil);
+    PFBAlertAddAction(confirm, [[PFBBundle sharedBundle] localizedStringForKey:@"WEB_SESSION_CLEAR_ACTION"],
+                      UIAlertActionStyleDestructive, self.newLook, ^{
+                          PFBClearWebSession();
+                          // The card and the rows gated on the session have no other way to learn
+                          // it is gone. Sign-in already does this.
+                          [weakSelf updateVisibleToggles];
+                          [weakSelf.tableView reloadData];
+                      });
+    PFBAlertPresent(confirm, self, self.newLook, nil);
+}
+
+// Reduces user input like "https://fxtwitter.com/" to a bare host, so the
+// value can be assigned straight to NSURLComponents.host when rewriting.
+- (NSString*)sharingDomainFromInput:(NSString*)input {
+    NSString* domain =
+        [input stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+
+    NSRange schemeRange = [domain rangeOfString:@"://"];
+    if (schemeRange.location != NSNotFound) {
+        domain = [domain substringFromIndex:NSMaxRange(schemeRange)];
+    }
+
+    NSRange pathRange = [domain rangeOfString:@"/"];
+    if (pathRange.location != NSNotFound) {
+        domain = [domain substringToIndex:pathRange.location];
+    }
+
+    return domain;
+}
+
+// Stores what was typed for the sharing domain, or forgets it when empty, then shows it on its row.
+- (void)saveSharingDomainInput:(NSString*)input row:(NSIndexPath*)indexPath {
+    NSUserDefaults* defaults = [NSUserDefaults standardUserDefaults];
+    NSString* domain = [self sharingDomainFromInput:input];
+    if (domain.length > 0) {
+        [defaults setObject:domain forKey:@"sharing_domain"];
+    } else {
+        [defaults removeObjectForKey:@"sharing_domain"];
+    }
+    [defaults synchronize];
+    if (indexPath) {
+        [self.tableView reloadRowsAtIndexPaths:@[ indexPath ] withRowAnimation:UITableViewRowAnimationNone];
+    }
+}
+
+// Lives in the base class so the General page, which holds the link settings, can present it.
+// The new look asks in a sheet laid out as its group sheets, the classic look in an alert.
+- (void)showSharingDomainPrompt:(NSDictionary*)data {
+    NSUserDefaults* defaults = [NSUserDefaults standardUserDefaults];
+    id storedHost = [defaults objectForKey:@"sharing_domain"];
+    NSString* currentHost = [storedHost isKindOfClass:[NSString class]] ? storedHost : nil;
+    NSIndexPath* row = data[@"indexPath"];
+    if (self.newLook) {
+        PFBBundle* bundle = [PFBBundle sharedBundle];
+        __weak typeof(self) weakSelf = self;
+        [PFBNativeSettingsSheetController presentFieldTitled:[bundle localizedStringForKey:@"SHARING_DOMAIN_TITLE"]
+                                                        note:[bundle localizedStringForKey:@"SHARING_DOMAIN_PROMPT_MESSAGE"]
+                                                       value:currentHost
+                                                 placeholder:@"x.com"
+                                                        from:self
+                                                        save:^(NSString* text) {
+                                                            [weakSelf saveSharingDomainInput:text row:row];
+                                                        }];
+        return;
+    }
+
+    UIAlertController* alert =
+        [UIAlertController alertControllerWithTitle:[[PFBBundle sharedBundle]
+                                                        localizedStringForKey:@"SHARING_DOMAIN_TITLE"]
+                                            message:[[PFBBundle sharedBundle]
+                                                        localizedStringForKey:@"SHARING_DOMAIN_PROMPT_MESSAGE"]
+                                     preferredStyle:UIAlertControllerStyleAlert];
+
+    [alert addTextFieldWithConfigurationHandler:^(UITextField* textField) {
+        textField.text = currentHost;
+        textField.placeholder = @"x.com";
+        textField.keyboardType = UIKeyboardTypeURL;
+        textField.autocapitalizationType = UITextAutocapitalizationTypeNone;
+        textField.autocorrectionType = UITextAutocorrectionTypeNo;
+    }];
+
+    // The alert holds its actions: each handler lets go of it once the alert is answered.
+    __block UIAlertController* answered = alert;
+    [alert addAction:[UIAlertAction
+                         actionWithTitle:[[PFBBundle sharedBundle]
+                                             localizedTwitterStringForKey:@"CANCEL_ACTION_LABEL"]
+                                   style:UIAlertActionStyleCancel
+                                 handler:^(__unused UIAlertAction* action) {
+                                     answered = nil;
+                                 }]];
+
+    [alert
+        addAction:[UIAlertAction
+                      actionWithTitle:[[PFBBundle sharedBundle]
+                                          localizedTwitterStringForKey:@"SAVE_ACTION_LABEL"]
+                                style:UIAlertActionStyleDefault
+                              handler:^(UIAlertAction* action) {
+                                  NSString* input = answered.textFields.firstObject.text;
+                                  answered = nil;
+                                  [self saveSharingDomainInput:input row:row];
+                              }]];
+
+    [self presentViewController:alert animated:YES completion:nil];
+}
+
+// Informational only: tells the user a restart is needed for the change to
+// fully apply. One OK button, dismisses the alert and nothing else — the app
+// never closes itself here.
+- (void)showRestartInfoAlert {
+    PFBBundle* bundle = [PFBBundle sharedBundle];
+    UIAlertController* alert = [UIAlertController
+        alertControllerWithTitle:[bundle localizedStringForKey:@"RESTART_REQUIRED_ALERT_TITLE"]
+                         message:[bundle localizedStringForKey:@"RESTART_INFO_ALERT_MESSAGE"]
+                  preferredStyle:UIAlertControllerStyleAlert];
+    PFBAlertAddAction(alert, [bundle localizedTwitterStringForKey:@"OK_ACTION_LABEL"], UIAlertActionStyleDefault,
+                      self.newLook, nil);
+    PFBAlertPresent(alert, self, self.newLook, nil);
+}
+
+- (void)showRestartRequiredAlert {
+    PFBBundle* bundle = [PFBBundle sharedBundle];
+    [self presentRestartAlertWithTitle:[bundle localizedStringForKey:@"RESTART_REQUIRED_ALERT_TITLE"]
+                               message:[bundle localizedStringForKey:@"RESTART_REQUIRED_ALERT_MESSAGE"]];
+}
+
+- (void)presentRestartAlertWithTitle:(NSString*)title message:(NSString*)message {
+    [self presentRestartAlertWithTitle:title message:message answered:nil];
+}
+
+// Later keeps Twitter open; Close app saves the settings and quits, since iOS gives an
+// app no way to relaunch itself: it is reopened from its icon. answered runs first on
+// either button, and Close app waits for it to call back.
+- (void)presentRestartAlertWithTitle:(NSString*)title
+                             message:(NSString*)message
+                            answered:(void (^)(void (^done)(void)))answered {
+    PFBBundle* bundle = [PFBBundle sharedBundle];
+    UIAlertController* alert = [UIAlertController alertControllerWithTitle:title
+                                                                    message:message
+                                                             preferredStyle:UIAlertControllerStyleAlert];
+    PFBAlertAddAction(alert, [bundle localizedStringForKey:@"RESTART_LATER_ACTION"], UIAlertActionStyleCancel,
+                      self.newLook, ^{
+                          if (answered) {
+                              answered(^{
+                              });
+                          }
+                      });
+    UIAlertAction* close =
+        PFBAlertAddAction(alert, [bundle localizedStringForKey:@"CLOSE_APP_ACTION"], UIAlertActionStyleDefault,
+                          self.newLook, ^{
+                              void (^quit)(void) = ^{
+                                  PFBCompatSaveNow();
+                                  [[NSUserDefaults standardUserDefaults] synchronize];
+                                  exit(0);
+                              };
+                              if (answered) {
+                                  answered(quit);
+                              } else {
+                                  quit();
+                              }
+                          });
+    alert.preferredAction = close;
+    PFBAlertPresent(alert, self, self.newLook, nil);
+}
+
+// UIAlertAction carries a private checked flag that draws the system checkmark
+// against the trailing edge and leaves the title centered. It is looked up by name;
+// without it the current option becomes the preferred action and comes out bold.
+- (void)addOption:(NSString*)title
+         selected:(BOOL)selected
+         toPicker:(UIAlertController*)picker
+          handler:(void (^)(void))handler {
+    if (!picker || !title) {
+        return;
+    }
+    UIAlertAction* action = [UIAlertAction actionWithTitle:title
+                                                     style:UIAlertActionStyleDefault
+                                                   handler:^(UIAlertAction* a) {
+                                                       if (handler) {
+                                                           handler();
+                                                       }
+                                                   }];
+    [picker addAction:action];
+    if (!selected) {
+        return;
+    }
+    static BOOL checkable = NO;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+        checkable = [UIAlertAction
+            instancesRespondToSelector:NSSelectorFromString(@"setChecked:")];
+    });
+    if (checkable) {
+        [action setValue:@YES forKey:@"checked"];
+    } else {
+        picker.preferredAction = action;
+    }
+}
+
+- (void)updateAndAnimateChangesForKey:(NSString*)key {
+    NSArray* oldVisibleToggles = self.visibleToggles;
+    [self updateVisibleToggles];
+    NSArray* newVisibleToggles = self.visibleToggles;
+    [self.tableView beginUpdates];
+    __block NSInteger toggleIndex = -1;
+    [oldVisibleToggles enumerateObjectsUsingBlock:^(NSDictionary* _Nonnull obj, NSUInteger idx,
+                                                    BOOL* _Nonnull stop) {
+        if ([obj[@"key"] isEqualToString:key]) {
+            toggleIndex = idx;
+            *stop = YES;
+        }
+    }];
+    if (toggleIndex == -1) {
+        [self.tableView endUpdates];
+        [self.tableView reloadData];
+        return;
+    }
+    BOOL isAdding = newVisibleToggles.count > oldVisibleToggles.count;
+    // Children are not necessarily contiguous below their parent, so each child's
+    // row is looked up where it actually is: in the new list when appearing, in the
+    // old one when going away.
+    NSArray* reference = isAdding ? newVisibleToggles : oldVisibleToggles;
+    NSMutableArray* indexPaths = [NSMutableArray array];
+    [reference enumerateObjectsUsingBlock:^(NSDictionary* entry, NSUInteger row,
+                                            BOOL* stop) {
+      if ([entry[@"parentKey"] isEqualToString:key] ||
+          [entry[@"hiddenWhen"] isEqualToString:key]) {
+          [indexPaths addObject:[NSIndexPath indexPathForRow:(NSInteger)row
+                                                   inSection:0]];
+      }
+    }];
+    if (indexPaths.count == 0) {
+        [self.tableView endUpdates];
+        return;
+    }
+    if (isAdding) {
+        [self.tableView insertRowsAtIndexPaths:indexPaths
+                              withRowAnimation:UITableViewRowAnimationAutomatic];
+    } else {
+        // A sheet's rows are clear over its ground: a row slid under the one above would show
+        // through it, so the rows going away lose their content at once.
+        if (self.inSheet) {
+            for (NSIndexPath* path in indexPaths) {
+                [self.tableView cellForRowAtIndexPath:path].contentView.hidden = YES;
+            }
+        }
+        [self.tableView deleteRowsAtIndexPaths:indexPaths
+                              withRowAnimation:UITableViewRowAnimationAutomatic];
+    }
+    [self.tableView endUpdates];
+}
+
+
+// MARK: - Diagnostics
+
+- (void)showCompatibilityReport:(NSDictionary*)sender {
+    PFBCompatibilityReportViewController* report =
+        [[PFBCompatibilityReportViewController alloc] initWithStyle:UITableViewStyleGrouped];
+    report.nativeLook = self.nativeLook;
+    [self.navigationController pushViewController:report animated:YES];
+}
+
+@end

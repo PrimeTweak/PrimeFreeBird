@@ -1,0 +1,98 @@
+name: Rebrand X
+
+on:
+  workflow_dispatch:
+    inputs:
+      ipa_url:
+        description: "X IPA link"
+        default: ""
+        required: true
+        type: string
+      twitter_branding:
+        description: "Name the app Twitter"
+        default: true
+        required: false
+        type: boolean
+      icon_pack:
+        description: "Apply icon pack"
+        default: true
+        required: false
+        type: boolean
+      resource_pack_url:
+        description: "Other icon pack link (.zip)"
+        default: ""
+        required: false
+        type: string
+      commit_id:
+        description: "(Optional) Commit ID to run at"
+        default: ""
+        required: false
+        type: string
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  rebrand:
+    name: Rebrand IPA
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Main
+        uses: actions/checkout@v6
+        with:
+          path: main
+          ref: ${{ github.event.inputs.commit_id || github.ref }}
+
+      # Both links are masked in the log. The runner decodes %25, %0D and %0A in a mask,
+      # so they are encoded first.
+      - name: Hide sensitive inputs
+        run: |
+          for input in ipa_url resource_pack_url; do
+            value=$(jq -r --arg input "$input" \
+              '.inputs[$input] // "" | gsub("%"; "%25") | gsub("\r"; "%0D") | gsub("\n"; "%0A")' "$GITHUB_EVENT_PATH")
+            if [ -n "$value" ]; then echo "::add-mask::$value"; fi
+          done
+
+      - name: Download IPA
+        id: ipa
+        run: |
+          IPA_EXT=ipa
+          case "${IPA_URL%%\?*}" in *.tipa) IPA_EXT=tipa ;; esac
+          echo "ext=${IPA_EXT}" >> "$GITHUB_OUTPUT"
+          wget -q "$IPA_URL" -O "main/packages/X-rebranded.${IPA_EXT}"
+        env:
+          IPA_URL: ${{ inputs.ipa_url }}
+
+      # The repository's branding/resource-pack.zip, unless another link is given.
+      - name: Prepare Image Pack
+        if: inputs.icon_pack
+        run: |
+          if [ -z "$IMAGE_URL" ]; then
+            cp main/branding/resource-pack.zip main/resource-pack.zip
+            exit 0
+          fi
+          if ! wget "$IMAGE_URL" --quiet --tries=4 --waitretry=10 --timeout=20 --retry-connrefused -O main/resource-pack.zip; then
+            rm -f main/resource-pack.zip
+            echo "::error::Icon pack not downloaded from $IMAGE_URL. Clear Other icon pack link to use the repository's pack, or untick Apply icon pack."
+            exit 1
+          fi
+        env:
+          IMAGE_URL: ${{ inputs.resource_pack_url }}
+
+      - name: Rebrand IPA
+        run: |
+          cd ${{ github.workspace }}/main
+          IMAGE_FLAG=""
+          if [ -f resource-pack.zip ]; then IMAGE_FLAG="--resource-pack resource-pack.zip"; fi
+          ./rebrand.sh${{ inputs.twitter_branding && ' --twitter-branding' || '' }} $IMAGE_FLAG \
+            "packages/X-rebranded.${{ steps.ipa.outputs.ext }}"
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: X-rebranded
+          path: ${{ github.workspace }}/main/packages/X-rebranded.${{ steps.ipa.outputs.ext }}
+          archive: false
+          if-no-files-found: error

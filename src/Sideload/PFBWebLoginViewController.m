@@ -1,0 +1,460 @@
+#import "Sideload/PFBWebLoginViewController.h"
+#import <WebKit/WebKit.h>
+#import "Debug/PFBDebugger.h"
+#import "Sideload/PFBLoginBridge.h"
+#import "Common/PFBBundle.h"
+#import "Support/TwitterChirpFont.h"
+#import "Support/HookHelpers.h"
+
+// The flow entry directly, not twitter.com/login: that route bounces through the x.com
+// landing before reaching the same flow, and each hop is wait time.
+NSString* const PFBWebLoginFlowURL = @"https://x.com/i/flow/login";
+NSString* const PFBDesktopSafariUserAgent =
+    @"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 "
+    @"(KHTML, like Gecko) Version/17.0 Safari/605.1.15";
+
+// The cookies that prove a real session: the auth token and the CSRF token the API
+// calls need; with the twid naming the account, they start the bridge.
+static NSString* const kPFBAuthCookie = @"auth_token";
+static NSString* const kPFBCsrfCookie = @"ct0";
+
+// The bird of the bundled PDF, the same as the top bar's, so the login header carries
+// the app's branding. Template mode lets the header tint it.
+static UIImage* pfbLoginBirdImage(CGSize size) {
+    return [PFBBundlePDFImage(@"LaunchTwitterBird.pdf", size, 1.0)
+        imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate];
+}
+
+@interface PFBWebLoginViewController () <WKNavigationDelegate>
+@property (nonatomic, strong) WKWebView* webView;
+@property (nonatomic, strong) UIView* headerView;
+@property (nonatomic, strong) UIActivityIndicatorView* spinner;
+@property (nonatomic, strong) UILabel* statusLabel;
+@property (nonatomic, strong) UIButton* retryButton;
+@property (nonatomic, strong) UILabel* connectingLabel;
+@property (nonatomic, weak) UIView* switchingOverlay;
+@property (nonatomic, assign) BOOL sawAuth;
+@property (nonatomic, assign) BOOL asRoot;
+@property (nonatomic, assign) BOOL didStartInitialLoad;
+@property (nonatomic, assign) BOOL didRevealWeb;
+@end
+
+@implementation PFBWebLoginViewController
+
++ (void)presentFrom:(UIViewController*)presenter {
+    PFBWebLoginViewController* login = [PFBWebLoginViewController new];
+    UINavigationController* nav =
+        [[UINavigationController alloc] initWithRootViewController:login];
+    nav.modalPresentationStyle = UIModalPresentationFullScreen;
+    [presenter presentViewController:nav animated:YES completion:nil];
+}
+
++ (UINavigationController*)rootNavigationController {
+    PFBWebLoginViewController* login = [PFBWebLoginViewController new];
+    login.asRoot = YES;
+    return [[UINavigationController alloc] initWithRootViewController:login];
+}
+
+- (void)viewDidLoad {
+    [super viewDidLoad];
+    self.view.backgroundColor = [UIColor systemBackgroundColor];
+
+    [self setupHeader];
+
+    // A desktop user agent, so x.com serves its desktop login flow, and the default data store,
+    // so the session outlives the screen.
+    WKWebViewConfiguration* cfg = [[WKWebViewConfiguration alloc] init];
+    cfg.websiteDataStore = [WKWebsiteDataStore defaultDataStore];
+    self.webView = [[WKWebView alloc] initWithFrame:self.view.bounds
+                                      configuration:cfg];
+    self.webView.navigationDelegate = self;
+    self.webView.customUserAgent = PFBDesktopSafariUserAgent;
+    // Not opaque, over a matching background color, so the web area never flashes
+    // white before x.com paints.
+    self.webView.opaque = NO;
+    self.webView.backgroundColor = [UIColor systemBackgroundColor];
+    self.webView.scrollView.backgroundColor = [UIColor systemBackgroundColor];
+    self.webView.translatesAutoresizingMaskIntoConstraints = NO;
+    // Kept hidden until the page finishes, so the redirect chain and the X splash
+    // never flash; the header and spinner cover the wait, then it fades in.
+    self.webView.alpha = 0.0;
+    [self.view addSubview:self.webView];
+
+    // Loading spinner and error text, in front of the web area.
+    self.spinner = [[UIActivityIndicatorView alloc]
+        initWithActivityIndicatorStyle:UIActivityIndicatorViewStyleMedium];
+    self.spinner.color = [UIColor secondaryLabelColor];
+    self.spinner.hidesWhenStopped = YES;
+    self.spinner.translatesAutoresizingMaskIntoConstraints = NO;
+    [self.view addSubview:self.spinner];
+
+    self.statusLabel = [[UILabel alloc] init];
+    self.statusLabel.numberOfLines = 0;
+    self.statusLabel.textAlignment = NSTextAlignmentCenter;
+    self.statusLabel.textColor = [UIColor secondaryLabelColor];
+    self.statusLabel.hidden = YES;
+    self.statusLabel.translatesAutoresizingMaskIntoConstraints = NO;
+    [self.view addSubview:self.statusLabel];
+
+    self.retryButton = [UIButton buttonWithType:UIButtonTypeSystem];
+    [self.retryButton setTitle:[[PFBBundle sharedBundle] localizedStringForKey:@"WEB_LOGIN_RETRY_ACTION"]
+                      forState:UIControlStateNormal];
+    self.retryButton.hidden = YES;
+    self.retryButton.translatesAutoresizingMaskIntoConstraints = NO;
+    [self.retryButton addTarget:self
+                         action:@selector(reload)
+               forControlEvents:UIControlEventTouchUpInside];
+    [self.view addSubview:self.retryButton];
+
+    self.connectingLabel = [[UILabel alloc] init];
+    self.connectingLabel.text = [[PFBBundle sharedBundle] localizedStringForKey:@"WEB_LOGIN_CONNECTING"];
+    self.connectingLabel.font = PFBScaledFont([TwitterChirpFont(TwitterFontStyleRegular) fontWithSize:14]);
+    self.connectingLabel.textColor = [UIColor secondaryLabelColor];
+    self.connectingLabel.hidden = YES;
+    self.connectingLabel.translatesAutoresizingMaskIntoConstraints = NO;
+    [self.view addSubview:self.connectingLabel];
+
+    [NSLayoutConstraint activateConstraints:@[
+        [self.webView.topAnchor constraintEqualToAnchor:self.headerView.bottomAnchor],
+        [self.webView.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor],
+        [self.webView.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor],
+        [self.webView.bottomAnchor constraintEqualToAnchor:self.view.bottomAnchor],
+        [self.spinner.centerXAnchor constraintEqualToAnchor:self.webView.centerXAnchor],
+        [self.spinner.centerYAnchor constraintEqualToAnchor:self.webView.centerYAnchor],
+        [self.statusLabel.centerYAnchor constraintEqualToAnchor:self.webView.centerYAnchor],
+        [self.statusLabel.leadingAnchor constraintEqualToAnchor:self.webView.leadingAnchor
+                                                        constant:24],
+        [self.statusLabel.trailingAnchor constraintEqualToAnchor:self.webView.trailingAnchor
+                                                         constant:-24],
+        [self.retryButton.centerXAnchor constraintEqualToAnchor:self.webView.centerXAnchor],
+        [self.retryButton.topAnchor constraintEqualToAnchor:self.statusLabel.bottomAnchor
+                                                    constant:16],
+        [self.connectingLabel.centerXAnchor constraintEqualToAnchor:self.spinner.centerXAnchor],
+        [self.connectingLabel.topAnchor constraintEqualToAnchor:self.spinner.bottomAnchor
+                                                        constant:12],
+    ]];
+}
+
+// Native brand header that stands in for the navigation bar: instant to draw, so
+// the screen has content the moment it animates in.
+- (void)setupHeader {
+    UIView* header = [[UIView alloc] init];
+    header.translatesAutoresizingMaskIntoConstraints = NO;
+    header.backgroundColor = [UIColor systemBackgroundColor];
+    [self.view addSubview:header];
+    self.headerView = header;
+
+    UIImageView* bird =
+        [[UIImageView alloc] initWithImage:pfbLoginBirdImage(CGSizeMake(40, 40))];
+    bird.tintColor = [UIColor colorWithRed:0.114 green:0.631 blue:0.949 alpha:1.0];
+    bird.contentMode = UIViewContentModeScaleAspectFit;
+    bird.translatesAutoresizingMaskIntoConstraints = NO;
+
+    UILabel* name = [[UILabel alloc] init];
+    name.text = @PFB_PRODUCT_NAME;
+    name.font = PFBScaledFont([TwitterChirpFont(TwitterFontStyleBold) fontWithSize:21]);
+    name.textColor = [UIColor labelColor];
+
+    UILabel* tagline = [[UILabel alloc] init];
+    tagline.text = [[PFBBundle sharedBundle] localizedStringForKey:@"WEB_LOGIN_TAGLINE"];
+    tagline.font = PFBScaledFont([TwitterChirpFont(TwitterFontStyleRegular) fontWithSize:12]);
+    tagline.textColor = [UIColor secondaryLabelColor];
+
+    UIStackView* stack =
+        [[UIStackView alloc] initWithArrangedSubviews:@[ bird, name, tagline ]];
+    stack.axis = UILayoutConstraintAxisVertical;
+    stack.alignment = UIStackViewAlignmentCenter;
+    stack.spacing = 6;
+    [stack setCustomSpacing:9 afterView:bird];
+    stack.translatesAutoresizingMaskIntoConstraints = NO;
+    [header addSubview:stack];
+
+    UIView* hair = [[UIView alloc] init];
+    hair.backgroundColor = [UIColor separatorColor];
+    hair.translatesAutoresizingMaskIntoConstraints = NO;
+    [header addSubview:hair];
+
+    NSMutableArray<NSLayoutConstraint*>* c = [NSMutableArray arrayWithArray:@[
+        [header.topAnchor constraintEqualToAnchor:self.view.safeAreaLayoutGuide.topAnchor],
+        [header.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor],
+        [header.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor],
+        [bird.widthAnchor constraintEqualToConstant:40],
+        [bird.heightAnchor constraintEqualToConstant:40],
+        [stack.centerXAnchor constraintEqualToAnchor:header.centerXAnchor],
+        [stack.topAnchor constraintEqualToAnchor:header.topAnchor constant:14],
+        [stack.bottomAnchor constraintEqualToAnchor:header.bottomAnchor constant:-16],
+        [hair.leadingAnchor constraintEqualToAnchor:header.leadingAnchor],
+        [hair.trailingAnchor constraintEqualToAnchor:header.trailingAnchor],
+        [hair.bottomAnchor constraintEqualToAnchor:header.bottomAnchor],
+        [hair.heightAnchor constraintEqualToConstant:0.5]
+    ]];
+
+    if (!self.asRoot) {
+        UIButton* close = [PFBHitButton buttonWithType:UIButtonTypeSystem];
+        [close setImage:PFBTwitterGlyphFor(@"close", [UIImage systemImageNamed:@"xmark"]) forState:UIControlStateNormal];
+        close.tintColor = [UIColor secondaryLabelColor];
+        close.translatesAutoresizingMaskIntoConstraints = NO;
+        [close addTarget:self
+                    action:@selector(dismissSelf)
+          forControlEvents:UIControlEventTouchUpInside];
+        [header addSubview:close];
+        [c addObjectsFromArray:@[
+            [close.leadingAnchor constraintEqualToAnchor:header.leadingAnchor constant:12],
+            [close.topAnchor constraintEqualToAnchor:header.topAnchor constant:8],
+            [close.widthAnchor constraintEqualToConstant:36],
+            [close.heightAnchor constraintEqualToConstant:36]
+        ]];
+    }
+    [NSLayoutConstraint activateConstraints:c];
+}
+
+- (void)viewWillAppear:(BOOL)animated {
+    [super viewWillAppear:animated];
+    // The brand header replaces the navigation bar, so the screen is one clean
+    // surface instead of two stacked strips.
+    [self.navigationController setNavigationBarHidden:YES animated:NO];
+}
+
+- (void)viewDidAppear:(BOOL)animated {
+    [super viewDidAppear:animated];
+    // x.com is heavy, so the first load starts once the presentation has settled.
+    if (!self.didStartInitialLoad) {
+        self.didStartInitialLoad = YES;
+        [self reload];
+    }
+}
+
+- (void)dismissSelf {
+    [self dismissViewControllerAnimated:YES completion:nil];
+}
+
+// The handle is read from the logged-in page (profile link, else account switcher), retried
+// while the page renders.
+- (void)resolveScreenNameThenBridgeWithAuthToken:(NSString*)authToken
+                                            csrf:(NSString*)csrf
+                                          userID:(long long)userID
+                                         attempt:(int)attempt {
+    NSString* js =
+        @"(function(){"
+        @"var p=document.querySelector('[data-testid=\"AppTabBar_Profile_Link\"]');"
+        @"if(p){var m=(p.getAttribute('href')||'').match(/^\\/([A-Za-z0-9_]{1,15})$/);"
+        @"if(m)return m[1];}"
+        @"var b=document.querySelector('[data-testid=\"SideNav_AccountSwitcher_Button\"]');"
+        @"if(b){var mm=(b.innerText||'').match(/@([A-Za-z0-9_]{1,15})/);if(mm)return mm[1];}"
+        @"return '';})();";
+    [self.webView evaluateJavaScript:js
+                   completionHandler:^(id result, NSError* error) {
+                     NSString* screen = [result isKindOfClass:[NSString class]] ? result : nil;
+                     if (screen.length || attempt >= 8) {
+                         [PFBLoginBridge startWithAuthToken:authToken
+                                                    csrf:csrf
+                                                  userID:userID
+                                              screenName:screen
+                                               presenter:self
+                                                 failure:^(NSString* reason) {
+                                                   [self bridgeStoppedWithReason:reason];
+                                                 }];
+                         return;
+                     }
+                     dispatch_after(
+                         dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.5 * NSEC_PER_SEC)),
+                         dispatch_get_main_queue(), ^{
+                           [self resolveScreenNameThenBridgeWithAuthToken:authToken
+                                                                     csrf:csrf
+                                                                   userID:userID
+                                                                  attempt:attempt + 1];
+                         });
+                   }];
+}
+
+- (void)revealWebIfNeeded {
+    if (self.didRevealWeb) {
+        return;
+    }
+    self.didRevealWeb = YES;
+    [self.spinner stopAnimating];
+    self.connectingLabel.hidden = YES;
+    self.statusLabel.hidden = YES;
+    [UIView animateWithDuration:0.22
+                     animations:^{
+                       self.webView.alpha = 1.0;
+                     }];
+}
+
+// Full-screen cover shown the moment the session is captured, so the web -> native
+// handoff reads as a deliberate step, not a frozen page. It rides along until the
+// account switch dismisses this screen, or comes down if the bridge stops.
+- (void)showSwitchingOverlay {
+    UIView* overlay = [[UIView alloc] initWithFrame:self.view.bounds];
+    overlay.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+    overlay.backgroundColor = [UIColor systemBackgroundColor];
+
+    UIImageView* bird =
+        [[UIImageView alloc] initWithImage:pfbLoginBirdImage(CGSizeMake(48, 48))];
+    bird.tintColor = [UIColor colorWithRed:0.114 green:0.631 blue:0.949 alpha:1.0];
+    bird.contentMode = UIViewContentModeScaleAspectFit;
+    bird.translatesAutoresizingMaskIntoConstraints = NO;
+
+    UILabel* label = [[UILabel alloc] init];
+    label.text = [[PFBBundle sharedBundle] localizedStringForKey:@"WEB_LOGIN_SIGNING_IN"];
+    label.font = PFBScaledFont([TwitterChirpFont(TwitterFontStyleSemibold) fontWithSize:17]);
+    label.textColor = [UIColor labelColor];
+    label.translatesAutoresizingMaskIntoConstraints = NO;
+
+    UIActivityIndicatorView* spin = [[UIActivityIndicatorView alloc]
+        initWithActivityIndicatorStyle:UIActivityIndicatorViewStyleMedium];
+    spin.color = [UIColor secondaryLabelColor];
+    spin.translatesAutoresizingMaskIntoConstraints = NO;
+    [spin startAnimating];
+
+    UIStackView* stack =
+        [[UIStackView alloc] initWithArrangedSubviews:@[ bird, label, spin ]];
+    stack.axis = UILayoutConstraintAxisVertical;
+    stack.alignment = UIStackViewAlignmentCenter;
+    stack.spacing = 16;
+    [stack setCustomSpacing:20 afterView:label];
+    stack.translatesAutoresizingMaskIntoConstraints = NO;
+    [overlay addSubview:stack];
+
+    [self.view addSubview:overlay];
+    self.switchingOverlay = overlay;
+    [NSLayoutConstraint activateConstraints:@[
+        [bird.widthAnchor constraintEqualToConstant:48],
+        [bird.heightAnchor constraintEqualToConstant:48],
+        [stack.centerXAnchor constraintEqualToAnchor:overlay.centerXAnchor],
+        [stack.centerYAnchor constraintEqualToAnchor:overlay.centerYAnchor]
+    ]];
+}
+
+// The bridge mounted no account: the cover comes down and the error shows with Retry over
+// the hidden page; the next whole session starts the bridge again.
+- (void)bridgeStoppedWithReason:(NSString*)reason {
+    PFBCompatMeasure(@"web login", [@"sign-in stopped: " stringByAppendingString:reason], 3);
+    [self.switchingOverlay removeFromSuperview];
+    self.sawAuth = NO;
+    // Counted as revealed, so a pending reveal leaves the page hidden behind the error.
+    self.didRevealWeb = YES;
+    self.webView.alpha = 0.0;
+    [self.spinner stopAnimating];
+    self.connectingLabel.hidden = YES;
+    self.statusLabel.text = [[PFBBundle sharedBundle] localizedStringForKey:@"UNKNOWN_ERROR"];
+    self.statusLabel.hidden = NO;
+    self.retryButton.hidden = NO;
+}
+
+- (void)reload {
+    [self.spinner startAnimating];
+    self.connectingLabel.hidden = NO;
+    self.statusLabel.hidden = YES;
+    self.retryButton.hidden = YES;
+    self.webView.alpha = 0.0;
+    self.didRevealWeb = NO;
+    NSURL* url = [NSURL URLWithString:PFBWebLoginFlowURL];
+    [self.webView loadRequest:[NSURLRequest requestWithURL:url]];
+    // Safety net: if the flow never settles on x.com, show whatever loaded rather
+    // than spin forever.
+    __weak typeof(self) weakSelf = self;
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(10.0 * NSEC_PER_SEC)),
+                   dispatch_get_main_queue(), ^{
+                     [weakSelf revealWebIfNeeded];
+                   });
+}
+
+// An HTTP error answered to a page leaves no navigation failure, so it is journaled here.
+- (void)webView:(WKWebView*)webView
+    decidePolicyForNavigationResponse:(WKNavigationResponse*)response
+                    decisionHandler:(void (^)(WKNavigationResponsePolicy))decisionHandler {
+    if ([response.response isKindOfClass:[NSHTTPURLResponse class]] &&
+        ((NSHTTPURLResponse*)response.response).statusCode >= 400) {
+        // Site and path only: a query can carry account identifiers.
+        NSURL* url = response.response.URL;
+        PFBDebugLog(@"[weblogin] http %ld for %@%@",
+                    (long)((NSHTTPURLResponse*)response.response).statusCode,
+                    url.host ?: @"", url.path ?: @"");
+    }
+    decisionHandler(WKNavigationResponsePolicyAllow);
+}
+
+// After every page settles, the cookie jar is read; the first whole session (auth_token,
+// ct0 and the twid naming the account) starts the bridge.
+- (void)webView:(WKWebView*)webView didFinishNavigation:(WKNavigation*)navigation {
+    // Reveal only once the login flow itself is up, not the brief x.com landing
+    // ("Log in / Sign up") the redirect passes through first.
+    if ([webView.URL.absoluteString containsString:@"i/flow"]) {
+        [self revealWebIfNeeded];
+    }
+    WKHTTPCookieStore* store = webView.configuration.websiteDataStore.httpCookieStore;
+    [store getAllCookies:^(NSArray<NSHTTPCookie*>* cookies) {
+      NSString* authVal = nil;
+      NSString* csrfVal = nil;
+      long long uid = 0;
+      for (NSHTTPCookie* cookie in cookies) {
+          // Only X's own cookies count: another site in the flow can use the same names.
+          if (!PFBIsXDomain(cookie.domain ?: @"")) {
+              continue;
+          }
+          if ([cookie.name isEqualToString:kPFBAuthCookie]) {
+              authVal = cookie.value;
+          } else if ([cookie.name isEqualToString:kPFBCsrfCookie]) {
+              csrfVal = cookie.value;
+          } else if ([cookie.name isEqualToString:@"twid"]) {
+              // twid is u=<userID>, url-encoded as u%3D<userID>.
+              NSString* dec = [cookie.value stringByRemovingPercentEncoding] ?: cookie.value;
+              uid = [[[dec componentsSeparatedByString:@"="] lastObject] longLongValue];
+          }
+      }
+      if (authVal.length && csrfVal.length && uid > 0 && !self.sawAuth) {
+          self.sawAuth = YES;
+          [self showSwitchingOverlay];
+          // Seed the shared cookie jar with this session so the read injection and
+          // WebCreateTweet.x (writes) both draw on the one session, and it survives
+          // relaunch. PFBClearWebSession wipes this same jar.
+          NSHTTPCookieStorage* jar = [NSHTTPCookieStorage sharedHTTPCookieStorage];
+          for (NSHTTPCookie* c in cookies) {
+              NSString* domain = c.domain ?: @"";
+              if (PFBIsXDomain(domain)) {
+                  [jar setCookie:c];
+              }
+          }
+          // Reads the handle from the page itself, then bridges the session into a native account.
+          [self resolveScreenNameThenBridgeWithAuthToken:authVal csrf:csrfVal userID:uid attempt:0];
+      }
+    }];
+}
+
+
+- (void)webView:(WKWebView*)webView
+    didFailProvisionalNavigation:(WKNavigation*)navigation
+                       withError:(NSError*)error {
+    // A redirect supersedes the previous load and cancels it; that is not a real
+    // failure, so leave the spinner running.
+    if (error.code == NSURLErrorCancelled) {
+        return;
+    }
+    [self.spinner stopAnimating];
+    self.connectingLabel.hidden = YES;
+    self.statusLabel.hidden = NO;
+    self.retryButton.hidden = NO;
+    self.statusLabel.text =
+        [NSString stringWithFormat:[[PFBBundle sharedBundle] localizedStringForKey:@"WEB_LOGIN_LOAD_FAILED"],
+                                   error.localizedDescription];
+    PFBDebugLog(@"[weblogin] provisional navigation failed (%ld): %@",
+                (long)error.code, error.localizedDescription);
+}
+
+- (void)webView:(WKWebView*)webView
+    didFailNavigation:(WKNavigation*)navigation
+            withError:(NSError*)error {
+    PFBDebugLog(@"[weblogin] navigation failed after start (%ld): %@",
+                (long)error.code, error.localizedDescription);
+}
+
+- (void)webViewWebContentProcessDidTerminate:(WKWebView*)webView {
+    PFBDebugLog(@"[weblogin] web content process terminated");
+    // A page whose process died stays blank: the flow loads again until a session is caught.
+    if (!self.sawAuth) {
+        [self reload];
+    }
+}
+
+@end

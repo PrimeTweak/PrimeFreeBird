@@ -1,0 +1,308 @@
+// Compatibility sheet: options, paths and their proofs, the tour, and the report.
+#import <UIKit/UIKit.h>
+#import "Common/PFBCompatResult.h"
+
+typedef NS_ENUM(NSInteger, PFBCompatOption) {
+    PFBCompatOptionNone = -1,
+    PFBCompat_padlock,
+    PFBCompat_no_screenshot_detection,
+    PFBCompat_force_following_tab,
+    PFBCompat_no_focus_lost,
+    PFBCompat_no_jump_back_home,
+    PFBCompat_no_tab_bar_hiding,
+    PFBCompat_hide_bottom_fade,
+    PFBCompat_show_scroll_indicator,
+    PFBCompat_disable_rtl,
+    PFBCompat_hide_premium_offer,
+    PFBCompat_sharing_domain,
+    PFBCompat_strip_url_tracking,
+    PFBCompat_always_open_safari,
+    PFBCompat_new_inapp_webview,
+    PFBCompat_restore_tab_labels,
+    PFBCompat_custom_fonts,
+    PFBCompat_tab_bar_theming,
+    PFBCompat_color_pfb_switches,
+    PFBCompat_color_twitter_icon_in_top_bar,
+    PFBCompat_hide_promoted,
+    PFBCompat_hide_who_to_follow,
+    PFBCompat_hide_topics_to_follow,
+    PFBCompat_hide_timeline_prompts,
+    PFBCompat_hide_videos_for_you,
+    PFBCompat_hide_topics,
+    PFBCompat_hide_verified_tweets,
+    PFBCompat_hide_blocked_retweets,
+    PFBCompat_reading_line,
+    PFBCompat_hide_spaces,
+    PFBCompat_hide_new_tweets_pill,
+    PFBCompat_hide_scroll_edge_blur,
+    PFBCompat_hide_custom_timelines,
+    PFBCompat_unlimited_timeline_tabs,
+    PFBCompat_undo_tweet_timeout,
+    PFBCompat_tweet_confirm,
+    PFBCompat_hide_tweet_button,
+    PFBCompat_hide_threads,
+    PFBCompat_like_confirm,
+    PFBCompat_hide_view_count,
+    PFBCompat_hide_bookmark_button,
+    PFBCompat_hide_downvote_button,
+    PFBCompat_show_poll_results,
+    PFBCompat_disable_sensitive_tweet_warnings,
+    PFBCompat_bypass_age_verification,
+    PFBCompat_reply_sorting,
+    PFBCompat_restore_reply_context,
+    PFBCompat_download_videos,
+    PFBCompat_download_highest_quality,
+    PFBCompat_direct_save,
+    PFBCompat_tweet_to_image,
+    PFBCompat_tap_to_pause,
+    PFBCompat_restore_video_timestamp,
+    PFBCompat_disable_video_captions,
+    PFBCompat_disable_immersive_scroll,
+    PFBCompat_disable_video_docking,
+    PFBCompat_keep_background_audio,
+    PFBCompat_auto_highest_load,
+    PFBCompat_enable_image_preloading,
+    PFBCompat_force_tweet_full_frame,
+    PFBCompat_disable_media_carousel,
+    PFBCompat_hide_made_on_x,
+    PFBCompat_upload_full_hd_videos,
+    PFBCompat_follow_confirm,
+    PFBCompat_expand_bio,
+    PFBCompat_copy_profile_info,
+    PFBCompat_remove_followers,
+    PFBCompat_disable_articles,
+    PFBCompat_disable_highlights,
+    PFBCompat_disable_videos_tab,
+    PFBCompat_hide_blue_verified,
+    PFBCompat_hide_follow_button,
+    PFBCompat_hide_message_button,
+    PFBCompat_restore_follow_button,
+    PFBCompat_square_avatars,
+    PFBCompat_no_history,
+    PFBCompat_advanced_search,
+    PFBCompat_hide_trend_videos,
+    PFBCompat_hide_explore_all,
+    PFBCompat_choose_explore_tabs,
+    PFBCompat_hide_typing_indicator,
+    PFBCompat_hide_suggested_chats,
+    PFBCompat_voice_transcription,
+    PFBCompat_download_voice_messages,
+    PFBCompat_voice_note_from_video,
+    PFBCompat_hide_grok_analyze,
+    PFBCompat_hide_grok_sidebar,
+    PFBCompat_hide_grok_bot,
+    PFBCompat_hide_grok_create,
+    PFBCompat_disable_auto_translate,
+    PFBCompat_restore_twitter_names,
+    PFBCompat_refresh_pill_label,
+    PFBCompat_restore_tweet_button,
+    PFBCompat_restore_refresh_sounds,
+    PFBCompat_reply_in_webview,
+    PFBCompat_flex_twitter,
+    PFBCompat_hide_notifications,
+    PFBCompat_enable_liquid_glass,
+    PFBCompat_dark_mode_style,
+    PFBCompat_accent_color,
+    PFBCompat_muted_words,
+    PFBCompat_profile_initial_tab,
+    PFBCompat_web_session,
+    PFBCompat_unrounded_counts,
+    PFBCompat_show_quote_counts,
+    PFBCompat_send_sound,
+    PFBCompat_show_tweet_source,
+    PFBCompat_show_account_location,
+    PFBCompat_custom_tab_bar,
+    PFBCompat_premium_unlock,
+    PFBCompat_hide_upsells,
+    PFBCompat_edit_tweet,
+    PFBCompat_grok_translation,
+    PFBCompat_launch_screen,
+    PFBCompat_expand_tco_links,
+    PFBCompat_remove_related_tweets,
+    PFBCompat_keep_reading_position,
+    PFBCompat_classic_tweet_detail,
+    PFBCompat_web_login,
+    PFBCompat_settings_entry,
+    PFBCompat_bar_repairs,
+    PFBCompat_no_auto_unmute,
+    PFBCompat_filter_languages,
+    PFBCompat_hide_quote_tweets,
+    PFBCompat_new_twitter_settings,
+    PFBCompat_left_aligned_alerts,
+    PFBCompat_glass_toasts,
+    PFBCompatOptionCount,
+};
+
+typedef NS_ENUM(NSInteger, PFBCompatReadState) {
+    PFBCompatReadPending,
+    PFBCompatReadDone,
+    PFBCompatReadFailed,
+};
+
+@interface PFBCompatibilityReportViewController : UITableViewController
+// Set before it shows: the report then takes the new look of Twitter's settings.
+@property (nonatomic) BOOL nativeLook;
+// The report in a navigation of its own, for the stethoscope's sheet: as tall as the page
+// in front of it, up to the screen's.
++ (UINavigationController*)sheetFor:(UIWindow*)window;
+@end
+
+// Posted on the main queue whenever the verdicts may have changed.
+FOUNDATION_EXPORT NSNotificationName const PFBCompatDidChangeNotification;
+// Where the read of Twitter's binaries stands on this install.
+FOUNDATION_EXPORT PFBCompatReadState PFBCompatReadStatus(void);
+
+FOUNDATION_EXPORT void PFBCompatCount(PFBCompatOption option);
+FOUNDATION_EXPORT BOOL PFBCompatWantsDetail(PFBCompatOption option);
+FOUNDATION_EXPORT void PFBCompatSetDetail(PFBCompatOption option, NSString* detail);
+// Notes why a server gave an option nothing to show: a refusal, an error or an empty answer.
+// The report shows the build's latest note while the option has not acted.
+FOUNDATION_EXPORT void PFBCompatNoteRefusal(PFBCompatOption option, NSString* text);
+
+FOUNDATION_EXPORT void PFBCompatReset(void);
+// Writes the counts out now, for a path that ends the process itself.
+FOUNDATION_EXPORT void PFBCompatSaveNow(void);
+FOUNDATION_EXPORT void PFBCompatRefreshStatus(void);
+FOUNDATION_EXPORT NSArray<PFBCompatResult*>* PFBCompatResults(void);
+FOUNDATION_EXPORT NSString* PFBCompatReportText(void);
+
+// Notes a setting Twitter reads while the debugger records: it marks the leads
+// Twitter actually reads.
+FOUNDATION_EXPORT void PFBCompatNoteSettingRead(NSString* key);
+
+// Counts one action for an option. The detail is only formatted for the first
+// action of an install, so the call stays cheap on paths that run constantly.
+#define PFBCOMPAT_ACTION(option, ...)                                              \
+    do {                                                                           \
+        PFBCompatCount(option);                                                    \
+        if (PFBCompatWantsDetail(option))                                          \
+            PFBCompatSetDetail((option), [NSString stringWithFormat:__VA_ARGS__]); \
+    } while (0)
+
+FOUNDATION_EXPORT BOOL PFBCompatNeedsObservation(PFBCompatOption option);
+FOUNDATION_EXPORT void PFBCompatObserve(PFBCompatOption option, NSString* detail);
+
+// Notes, once per launch, that an option which is off would have acted here:
+// proof that what it relies on still works, without turning it on.
+#define PFBCOMPAT_OBSERVE(option, ...)                                             \
+    do {                                                                           \
+        if (PFBCompatNeedsObservation(option))                                     \
+            PFBCompatObserve((option), [NSString stringWithFormat:__VA_ARGS__]);   \
+    } while (0)
+
+// Paths of options that act in more than one place. Each is noted when reached,
+// whether the option is on or off, and the report names the ones not seen.
+typedef NS_ENUM(NSInteger, PFBCompatPath) {
+    PFBCompatPath_grok_bot_upsells,
+    PFBCompatPath_tab_bar,
+    PFBCompatPath_native_tab_bar,
+    PFBCompatPath_top_tab_underline,
+    PFBCompatPath_pull_sound,
+    PFBCompatPath_refresh_end_sound,
+    PFBCompatPath_copy_button,
+    PFBCompatPath_copy_id_and_date,
+    PFBCompatPath_follower_counts,
+    PFBCompatPath_post_count,
+    PFBCompatPath_verified_search,
+    PFBCompatPath_verified_edit_history,
+    PFBCompatPath_promoted_video_feed,
+    PFBCompatPath_download_all,
+    PFBCompatPath_web_mutes,
+    PFBCompatPath_web_grok,
+    PFBCompatPath_web_pages,
+    PFBCompatPath_web_tweets,
+    PFBCompatPath_web_media,
+    PFBCompatPath_tab_badges,
+    PFBCompatPath_starts_muted,
+    PFBCompatPath_replies_by_date,
+    PFBCompatPath_native_filter_button,
+    PFBCompatPath_views_footer,
+    PFBCompatPath_tco_requests,
+    PFBCompatPath_tab_capacity,
+    PFBCompatPath_grok_imagine_button,
+    PFBCompatPath_grok_create_own_button,
+    PFBCompatPath_grok_create_own_pill,
+    PFBCompatPath_threads_popup_menu,
+    PFBCompatPath_threads_post_menu,
+    PFBCompatPath_grok_post_menu,
+    PFBCompatPath_settings_tab_bar,
+    PFBCompatPath_native_bar_hidden,
+    PFBCompatPath_rtl_checks,
+    PFBCompatPath_click_ids,
+    PFBCompatPath_ad_redirect,
+    PFBCompatPath_video_feed_response,
+    PFBCompatPath_video_feed_ads,
+    PFBCompatPath_counter_digits,
+    PFBCompatPath_return_report,
+    PFBCompatPath_opened_links,
+    PFBCompatPath_home_retweets,
+    PFBCompatPath_reply_order_set,
+    PFBCompatPath_reply_order_request,
+    PFBCompatPath_feather,
+    PFBCompatPath_search_bar_frame,
+    PFBCompatPath_bar_backdrop,
+    PFBCompatPath_window_tint,
+    PFBCompatPath_reply_bar,
+    PFBCompatPath_home_bar_button,
+    PFBCompatPath_eye_button,
+    PFBCompatPath_notification_tweet_menu,
+    PFBCompatPath_controls_hold,
+    PFBCompatPath_played_voice_note,
+    PFBCompatPath_interface_text,
+    PFBCompatPath_results_filters_button,
+    PFBCompatPath_leaving_app,
+    PFBCompatPath_glass_tab_bar,
+    PFBCompatPath_glass_tweet_button,
+    PFBCompatPath_glass_tabs,
+    PFBCompatPath_glass_bottom_reserve,
+    PFBCompatPath_native_tab_editor,
+    PFBCompatPath_navigation_bar_text,
+    PFBCompatPath_glass_pill,
+    PFBCompatPath_bottom_fade,
+    PFBCompatPath_tab_editor_page,
+    PFBCompatPath_glass_toast_row,
+    PFBCompatPath_glass_toast_width,
+    PFBCompatPathCount,
+};
+
+FOUNDATION_EXPORT void PFBCompatReach(PFBCompatPath path);
+FOUNDATION_EXPORT BOOL PFBCompatPathReached(PFBCompatPath path);
+
+// Shows Twitter's own screens one after another so the report proves the paths they
+// carry, whatever the toggles say, then opens the report.
+FOUNDATION_EXPORT void PFBCompatRunTour(void);
+// The same tour, limited to the screens whose options are not proven yet.
+FOUNDATION_EXPORT void PFBCompatRunTourLeft(void);
+// While a tour drives the app, hooks keep it inside Twitter.
+FOUNDATION_EXPORT BOOL PFBCompatTourIsRunning(void);
+// The screens a full tour shows, or those still owing proofs.
+FOUNDATION_EXPORT NSUInteger PFBCompatTourScreens(BOOL full);
+// When this build started counting, or with earlierBuilds, when the earlier builds of the
+// same Twitter did; nil when unknown or when there were none.
+FOUNDATION_EXPORT NSDate* PFBCompatCountingSince(BOOL earlierBuilds);
+// Asks for a tour at the next launch, as a new install would need one.
+FOUNDATION_EXPORT void PFBCompatScheduleTourAtLaunch(void);
+
+// A tour step's pending proofs: option keys, and "path:" plus a path name.
+FOUNDATION_EXPORT NSSet<NSString*>* PFBCompatStationPending(NSString* station);
+FOUNDATION_EXPORT BOOL PFBCompatStationLeft(NSString* station);
+// Whether a step showed its screen, and what it still missed then.
+FOUNDATION_EXPORT void PFBCompatStationRecord(NSString* station, BOOL reached, NSSet<NSString*>* missed);
+// A step whose screen had nothing to open, and why ("none in the inbox").
+FOUNDATION_EXPORT void PFBCompatStationRecordEmpty(NSString* station, NSString* why);
+// A step during which Twitter closed: left out of the tours until a new build.
+FOUNDATION_EXPORT void PFBCompatStationRecordCrash(NSString* station);
+FOUNDATION_EXPORT BOOL PFBCompatStationCrashed(NSString* station);
+// stop is nil for a tour that ran to its end, or says why it stopped.
+FOUNDATION_EXPORT void PFBCompatTourRecord(BOOL full, NSString* stop, NSArray<NSString*>* results);
+// A line of the tour's journal, kept in a file that outlives a crash, and the whole
+// journal of the last tour for the report.
+FOUNDATION_EXPORT void PFBCompatTourLog(NSString* format, ...) NS_FORMAT_FUNCTION(1, 2);
+FOUNDATION_EXPORT NSString* PFBCompatTourJournalText(void);
+// A measurement line for the report, kept across launches until a new build, at most cap
+// distinct lines per topic.
+FOUNDATION_EXPORT void PFBCompatMeasure(NSString* topic, NSString* line, NSUInteger cap);
+// This PrimeFreeBird build's identifier, so a stopped tour is charged to the build it ran on.
+FOUNDATION_EXPORT NSString* PFBCompatBuildID(void);
+// A new Twitter binary is installed and no full tour has run on it yet.
+FOUNDATION_EXPORT BOOL PFBCompatCheckIsDue(void);

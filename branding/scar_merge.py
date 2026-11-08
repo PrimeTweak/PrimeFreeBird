@@ -1,0 +1,275 @@
+#!/usr/bin/env python3
+"""Rebuilds Assets.car with scar from the pack's images; unmatched ones become alternate icons."""
+
+import argparse
+import json
+import os
+import re
+import subprocess
+import sys
+
+from PIL import Image
+
+# Settings-picker thumbnails (<Icon>-settings) reuse their base icon's image.
+SETTINGS_SPECIAL = {"icon-production-settings": "ProductionAppIcon"}
+
+
+def run_scar(scar, *args):
+    res = subprocess.run([scar, *args], capture_output=True, text=True)
+    if res.returncode != 0:
+        sys.stderr.write("scar %s failed:\n%s\n%s\n" % (args[0], res.stdout, res.stderr))
+        raise SystemExit(1)
+    return res
+
+
+_resize_cache = {}
+
+
+def pad_resize(master, w, h):
+    """Aspect-preserving resize of `master` to exactly w x h, centered on a
+    transparent canvas (a square master is never stretched into a non-square
+    slot). Cached per (master, w, h)."""
+    key = (master, w, h)
+    if key not in _resize_cache:
+        try:
+            im = Image.open(master).convert("RGBA")
+        except OSError as exc:
+            sys.stderr.write("unreadable image %s: %s (Apple-optimized CgBI PNGs "
+                             "must be converted to standard PNG)\n" % (master, exc))
+            raise SystemExit(1)
+        scale = min(w / im.width, h / im.height)
+        nw, nh = max(1, round(im.width * scale)), max(1, round(im.height * scale))
+        canvas = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+        canvas.paste(im.resize((nw, nh), Image.LANCZOS), ((w - nw) // 2, (h - nh) // 2))
+        _resize_cache[key] = canvas
+    return _resize_cache[key]
+
+
+def install(catalog, rend, master):
+    """Write `master` (pad-resized) as the edited pixels of one rendition.
+    Returns False for renditions with no editable pixels (multisize stubs,
+    data, undecodable codecs)."""
+    c = rend["content"]
+    if c["type"] == "image":
+        target, w, h = c["file"], rend["width"], rend["height"]
+    elif c["type"] == "raw-payload" and c.get("preview") and c.get("edit_hash"):
+        target, w, h = c["preview"], rend["width"], rend["height"]
+    elif c["type"] == "link" and c.get("preview") and c.get("edit_hash"):
+        target, (w, h) = c["preview"], c["rect"][2:4]
+    else:
+        return False
+    pad_resize(master, w, h).save(os.path.join(catalog, target))
+    return True
+
+
+def load_catalog(catalog):
+    with open(os.path.join(catalog, "manifest.json")) as handle:
+        manifest = json.load(handle)
+    facets = {f["name"]: f["attributes"].get("identifier") for f in manifest["facets"]}
+    by_ident = {}
+    for r in manifest["renditions"]:
+        by_ident.setdefault(r["key"].get("identifier"), []).append(r)
+    return manifest, facets, by_ident
+
+
+# The name of the self-contained template made when the catalog has none of its own.
+SYNTH_TEMPLATE = "PrimeFreeBird-Icon-Template"
+
+
+def synth_template(scar, catalog, icon_names, facets, primary):
+    """Clones a stock alternate whose renditions point into a shared atlas, then turns the
+    clone into a self-contained alternate: one 1024 px image per idiom under a multisize
+    stub. Returns its name, or None."""
+    base = next((n for n in sorted(icon_names)
+                 if n != primary and "%s-settings" % n in facets), None)
+    if not base:
+        return None
+    run_scar(scar, "clone-asset", catalog, "--from", base, "--to", SYNTH_TEMPLATE)
+    run_scar(scar, "clone-asset", catalog, "--from", "%s-settings" % base,
+             "--to", "%s-settings" % SYNTH_TEMPLATE)
+    manifest, facets, by_ident = load_catalog(catalog)
+    ident = facets[SYNTH_TEMPLATE]
+    stubs = [r for r in by_ident.get(ident, [])
+             if r["content"]["type"] == "multisize" and "subtype" not in r["key"]]
+    if not stubs:
+        return None
+    os.makedirs(os.path.join(catalog, "renditions"), exist_ok=True)
+    made = []
+    for stub in stubs:
+        idiom = stub["key"].get("idiom", 0)
+        stub["content"]["sizes"] = [{"width": 1024, "height": 1024, "index": 1}]
+        image = "renditions/%s-%d.png" % (SYNTH_TEMPLATE, idiom)
+        Image.new("RGBA", (1024, 1024), (0, 0, 0, 255)).save(os.path.join(catalog, image))
+        key = dict(stub["key"])
+        key.update({"dimension2": 1, "part": 220, "scale": 1})
+        made.append(stub)
+        made.append({
+            "key": key, "name": "%s.png" % SYNTH_TEMPLATE, "layout": 12, "flags": 0,
+            "pixel_format": "ARGB", "color_space_id": 1, "width": 1024, "height": 1024,
+            "scale": 100, "modified": 0, "slices": [[0, 0, 1024, 1024]],
+            "metrics": {"edge_insets": [0, 0, 0, 0], "image_size": [1024, 1024]},
+            "composition": {"blend_mode": 0, "opacity": 1.0}, "bitmap_info": 1,
+            "content": {"type": "image", "file": image, "compression": "lzfse"},
+        })
+    manifest["renditions"] = [r for r in manifest["renditions"]
+                              if r["key"].get("identifier") != ident] + made
+    with open(os.path.join(catalog, "manifest.json"), "w") as handle:
+        json.dump(manifest, handle, indent=2)
+    return SYNTH_TEMPLATE
+
+
+def drop_assets(catalog, names):
+    manifest, facets, _ = load_catalog(catalog)
+    gone = {facets[n] for n in names if n in facets}
+    manifest["facets"] = [f for f in manifest["facets"] if f["name"] not in names]
+    manifest["renditions"] = [r for r in manifest["renditions"]
+                              if r["key"].get("identifier") not in gone]
+    with open(os.path.join(catalog, "manifest.json"), "w") as handle:
+        json.dump(manifest, handle, indent=2)
+
+
+def settings_base(name):
+    low = name.lower()
+    if low in SETTINGS_SPECIAL:
+        return SETTINGS_SPECIAL[low]
+    if low.endswith("-settings"):
+        return name[: -len("-settings")]
+    return None
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("car")
+    ap.add_argument("overlay_dir")
+    ap.add_argument("out_car")
+    ap.add_argument("--workdir", required=True)
+    ap.add_argument("--scar", required=True)
+    args = ap.parse_args()
+
+    catalog = os.path.join(args.workdir, "catalog")
+    run_scar(args.scar, "decompile", args.car, "--out", catalog)
+    manifest, facets, by_ident = load_catalog(catalog)
+
+    # Overlay files by exact name (single-rendition overrides) and by stem
+    # ("master" images resized into every rendition of the matching asset).
+    overlays, masters = {}, {}
+    for root, dirs, files in os.walk(args.overlay_dir):
+        dirs[:] = [d for d in dirs if d != "__MACOSX"]
+        for f in files:
+            if f.startswith("._") or not f.lower().endswith((".png", ".jpg", ".jpeg")):
+                continue
+            overlays.setdefault(f, os.path.join(root, f))
+            masters.setdefault(os.path.splitext(f)[0].lower(), os.path.join(root, f))
+    used = set()
+
+    # App-icon assets are the facets that own multisize (MSIS) stubs.
+    icon_names = {n for n, i in facets.items()
+                  if any(r["content"]["type"] == "multisize" for r in by_ident.get(i, []))}
+    primary = None
+    for n in sorted(icon_names):
+        if primary is None or "production" in n.lower():
+            primary = n
+
+    def master_for(name):
+        m = masters.get(name.lower())
+        if m:
+            return m
+        base = settings_base(name)
+        if base:
+            m = masters.get(base.lower())
+            if m:
+                return m
+            if base in icon_names and "appicon" in masters:
+                return masters["appicon"]
+        if name in icon_names and "appicon" in masters:
+            return masters["appicon"]
+        return None
+
+    # 1. Replace pixels of existing assets. Exact rendition-name overlays beat
+    #    the asset master.
+    themed = set()
+    for name, ident in facets.items():
+        m = master_for(name)
+        count = 0
+        for r in by_ident.get(ident, []):
+            src = overlays.get(r["name"]) or m
+            if src and install(catalog, r, src):
+                used.add(src)
+                count += 1
+        if count:
+            themed.add(name)
+            print("replace: %s (%d renditions)" % (name, count))
+
+    # 2. New alternate icons: unmatched masters cloned from a stock alternate built
+    #    from its own images, or from a template made in that shape when every stock
+    #    alternate points into a shared atlas.
+    def self_contained(n):
+        return all(r["content"]["type"] != "link" for r in by_ident.get(facets[n], []))
+
+    template = next((n for n in sorted(icon_names)
+                     if n != primary and self_contained(n) and "%s-settings" % n in facets), None)
+    pending = [(f, path) for f, path in sorted(overlays.items())
+               if path not in used and os.path.splitext(f)[0] not in facets
+               and "@" not in f and not re.search(r"\d+x\d+", os.path.splitext(f)[0])]
+    made_template = None
+    if pending and not template:
+        made_template = template = synth_template(args.scar, catalog, icon_names, facets, primary)
+        if made_template:
+            print("template: %s, made for %d new icons" % (made_template, len(pending)))
+    new_icons = []
+    for f, path in sorted(overlays.items()):
+        stem = os.path.splitext(f)[0]
+        if path in used or stem in facets:
+            continue
+        if "@" in stem or re.search(r"\d+x\d+", stem):  # a rendition file, not a master
+            continue
+        if not template:
+            sys.stderr.write("no-template: %s (no self-contained alternate icon to clone)\n" % f)
+            continue
+        run_scar(args.scar, "clone-asset", catalog, "--from", template, "--to", stem)
+        run_scar(args.scar, "clone-asset", catalog, "--from", "%s-settings" % template,
+                 "--to", "%s-settings" % stem)
+        new_icons.append((stem, path))
+        used.add(path)
+
+    if new_icons:
+        # clone-asset rewrote the manifest: reload it, then size each clone to its
+        # master's own resolution, since upscaled 1024 px art weighs megabytes
+        # and iOS scales icons from whatever sizes the catalog offers.
+        manifest, facets, by_ident = load_catalog(catalog)
+        for stem, path in new_icons:
+            native = min(Image.open(path).size)
+            for r in by_ident.get(facets[stem], []):
+                c = r["content"]
+                if c["type"] == "image" and r["width"] > native:
+                    r["width"] = r["height"] = native
+                elif c["type"] == "multisize":
+                    for e in c["sizes"]:
+                        e["width"] = min(e["width"], native)
+                        e["height"] = min(e["height"], native)
+            for name in (stem, "%s-settings" % stem):
+                for r in by_ident.get(facets[name], []):
+                    install(catalog, r, path)
+            print("new icon: %s" % stem)
+        with open(os.path.join(catalog, "manifest.json"), "w") as handle:
+            json.dump(manifest, handle, indent=2)
+
+    if made_template:
+        drop_assets(catalog, {made_template, "%s-settings" % made_template})
+
+    # Stock alternates the pack does not replace stay as Twitter ships them, so its own
+    # icons (the Premium ones included) remain in the picker beside the pack's.
+    kept = sorted(n for n in icon_names if n != primary and n not in themed)
+    if kept:
+        print("kept: %s" % ", ".join(kept))
+
+    run_scar(args.scar, "compile", catalog, "--out", args.out_car)
+
+    for p in sorted(set(overlays.values()) - used):
+        sys.stderr.write("overlay-unmatched: %s (no rendition or asset with that name)\n"
+                         % os.path.basename(p))
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
