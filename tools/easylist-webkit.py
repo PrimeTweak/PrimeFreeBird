@@ -1,13 +1,17 @@
 #!/usr/bin/env python3
-"""Turns EasyList into the WebKit content-blocker lists of Block web ads.
+"""Turns EasyList, EasyPrivacy and Fanboy's Annoyance list into the WebKit content-blocker
+lists of Block web ads.
 
 Usage: easylist-webkit.py EASYLIST OUTPUT_DIR
-EASYLIST is an EasyList checkout (its easylist.template is followed) or an easylist.txt.
-OUTPUT_DIR receives web-ads.json (version and list names) and web-ads-N.json.
+EASYLIST is an EasyList checkout (its easylist, easyprivacy and fanboy-annoyance templates
+are followed) or a single filter list. OUTPUT_DIR receives web-ads.json (version and list
+names) and web-ads-N.json.
 
 Rules WebKit cannot express (regular expressions, scriptlets, extended selectors, options
-it has no trigger for) are left out. Each list carries every exception, since an exception
-only reaches the rules of its own list, and ends by leaving X's own pages alone.
+it has no trigger for) are left out. An exception only reaches the rules of its own list, so
+each list carries the exceptions that can apply to it, and ends by leaving X's own pages alone.
+Generic hiding has lists of its own, the only ones $generichide exceptions cancel, and :has()
+selectors too, so a WebKit that refuses them leaves the other lists whole.
 """
 import hashlib
 import json
@@ -15,7 +19,8 @@ import os
 import re
 import sys
 
-RULES_PER_LIST = 9000
+TEMPLATES = ("easylist.template", "easyprivacy.template", "fanboy-annoyance.template")
+RULES_PER_LIST = 15000
 SELECTORS_PER_RULE = 250
 X_DOMAINS = ["*x.com", "*twitter.com", "*twimg.com", "*t.co"]
 
@@ -25,26 +30,29 @@ TYPES = {
     "ping": "raw", "other": "raw", "popup": "popup",
 }
 ALL_TYPES = sorted(set(TYPES.values()))
+PAGE_OPTIONS = {"generichide": "generichide", "ghide": "generichide", "elemhide": "elemhide", "ehide": "elemhide"}
 IGNORED_OPTIONS = {"important"}
 UNSUPPORTED_PSEUDO = re.compile(
     r":(-abp-|-ext-|has-text|xpath|upward|remove|style|matches-|contains|min-text-length|"
-    r"watch-attr|others|nth-ancestor|if\(|if-not|spath|shadow|has\()")
+    r"watch-attr|others|nth-ancestor|if\(|if-not|spath|shadow)")
 DOMAIN = re.compile(r"^[a-z0-9.-]+$")
 SPECIALS = set(".+?$()[]{}\\|")
+IGNORE = {"type": "ignore-previous-rules"}
 
 
 def read_lines(source):
-    if os.path.isdir(source):
-        lines = []
-        with open(os.path.join(source, "easylist.template"), encoding="utf-8") as template:
+    if not os.path.isdir(source):
+        with open(source, encoding="utf-8") as whole:
+            return whole.read().splitlines()
+    lines = []
+    for name in TEMPLATES:
+        with open(os.path.join(source, name), encoding="utf-8") as template:
             for line in template:
                 include = re.match(r"%include easylist:(.+)%", line.strip())
                 if include:
                     with open(os.path.join(source, include.group(1)), encoding="utf-8") as part:
                         lines.extend(part.read().splitlines())
-        return lines
-    with open(source, encoding="utf-8") as whole:
-        return whole.read().splitlines()
+    return list(dict.fromkeys(lines))
 
 
 def domains_of(text, separator):
@@ -92,14 +100,15 @@ def url_filter(pattern, case_sensitive):
 
 
 def network_rule(line):
+    """Returns the rules of a line and their kind: block, exception, generichide or elemhide."""
     exception = line.startswith("@@")
     if exception:
         line = line[2:]
     pattern, options = line, []
     dollar = line.rfind("$")
-    if dollar > 0 and re.match(r"^[a-z0-9~_=|.,*:-]+$", line[dollar + 1:], re.I):
+    if dollar >= 0 and re.match(r"^[a-z0-9~_=|.,*:-]+$", line[dollar + 1:], re.I):
         pattern, options = line[:dollar], line[dollar + 1:].split(",")
-    trigger, types, negated, case_sensitive, whole_site = {}, set(), set(), False, False
+    trigger, types, negated, case_sensitive, whole_site, page = {}, set(), set(), False, False, None
     for option in options:
         name = option.strip().lower()
         if name in IGNORED_OPTIONS:
@@ -120,16 +129,20 @@ def network_rule(line):
             types.add(TYPES[name])
         elif name.startswith("~") and name[1:] in TYPES:
             negated.add(TYPES[name[1:]])
-        elif exception and name == "document":
-            whole_site = True
+        elif name in ("document", "doc"):
+            whole_site = exception
+            types.add("document")
+        elif exception and name in PAGE_OPTIONS:
+            page = PAGE_OPTIONS[name]
         else:
             return None
     if whole_site:
         site = re.match(r"^\|\|([a-z0-9.-]+)\^?$", pattern.lower())
         if not site or len(options) != 1:
             return None
-        return [{"trigger": {"url-filter": ".*", "if-domain": ["*" + site.group(1)]},
-                 "action": {"type": "ignore-previous-rules"}}], True
+        return [{"trigger": {"url-filter": ".*", "if-domain": ["*" + site.group(1)]}, "action": IGNORE}], "exception"
+    if page and (types or negated):
+        return None
     if negated:
         types = (types or set(ALL_TYPES)) - negated
         if not types:
@@ -140,10 +153,14 @@ def network_rule(line):
     trigger = dict({"url-filter": regex}, **trigger)
     if case_sensitive:
         trigger["url-filter-is-case-sensitive"] = True
+    # Hiding is cancelled on the page itself, the load of its document.
+    if page:
+        trigger["resource-type"] = ["document"]
+        return [{"trigger": trigger, "action": IGNORE}], page
     if exception:
         if types:
             trigger["resource-type"] = sorted(types)
-        return [{"trigger": trigger, "action": {"type": "ignore-previous-rules"}}], True
+        return [{"trigger": trigger, "action": IGNORE}], "exception"
     # A page the user opens is never blocked by a pattern that only names a path: WebKit's
     # document type also covers the top frame, so documents are blocked in frames only.
     types = types or set(ALL_TYPES)
@@ -156,13 +173,27 @@ def network_rule(line):
         if types != set(ALL_TYPES):
             trigger["resource-type"] = sorted(types)
         rules.insert(0, {"trigger": trigger, "action": {"type": "block"}})
-    return rules, False
+    return rules, "block"
+
+
+def nested_has(selector):
+    """CSS refuses a :has() inside another one."""
+    depth, opened = 0, []
+    for index, ch in enumerate(selector):
+        if selector.startswith(":has(", index):
+            if opened:
+                return True
+            opened.append(depth)
+        elif ch == ")" and opened and opened[-1] == depth - 1:
+            opened.pop()
+        depth += (ch == "(") - (ch == ")")
+    return False
 
 
 def selector_ok(selector):
     return (selector and all(32 <= ord(ch) <= 126 for ch in selector)
             and "{" not in selector and not selector.startswith("+js")
-            and not UNSUPPORTED_PSEUDO.search(selector))
+            and not UNSUPPORTED_PSEUDO.search(selector) and not nested_has(selector))
 
 
 def hide_rules(selectors, condition):
@@ -176,6 +207,15 @@ def hide_rules(selectors, condition):
     return rules
 
 
+def unique(rules):
+    return list({json.dumps(rule, sort_keys=True): rule for rule in rules}.values())
+
+
+def reaches_pages(rule):
+    types = rule["trigger"].get("resource-type")
+    return types is None or "document" in types
+
+
 def check(rule):
     """The url-filter keeps to what WebKit compiles: no alternation, braces or inner anchors."""
     text = rule["trigger"]["url-filter"]
@@ -186,7 +226,8 @@ def check(rule):
 
 
 def main(source, output):
-    blocks, exceptions, generic, generic_allowed, specific = [], [], [], set(), {}
+    made_rules = {"block": [], "exception": [], "generichide": [], "elemhide": []}
+    generic, generic_allowed, site_allowed, specific = [], set(), {}, {}
     skipped = 0
     for raw in read_lines(source):
         line = raw.strip()
@@ -194,8 +235,11 @@ def main(source, output):
             continue
         if "#@#" in line:
             domains, selector = line.split("#@#", 1)
+            found = domains_of(domains, ",")
             if not domains:
                 generic_allowed.add(selector)
+            elif found and found[0] == "if-domain":
+                site_allowed.setdefault(selector, set()).update(found[1])
             continue
         if re.search(r"#[?$%@]+#|#\+js", line):
             skipped += 1
@@ -218,34 +262,57 @@ def main(source, output):
         if made is None:
             skipped += 1
             continue
-        (exceptions if made[1] else blocks).extend(made[0])
-    generic = [selector for selector in dict.fromkeys(generic) if selector not in generic_allowed]
-    hides = hide_rules(generic, None)
-    for (kind, domains), selectors in sorted(specific.items()):
-        hides.extend(hide_rules(list(dict.fromkeys(selectors)), (kind, list(domains))))
-    for rule in blocks + exceptions:
+        made_rules[made[1]].extend(made[0])
+    blocks, exceptions, generichide, elemhide = (unique(made_rules[kind]) for kind in
+                                                  ("block", "exception", "generichide", "elemhide"))
+    for rule in blocks + exceptions + generichide + elemhide:
         check(rule)
-    closing = {"trigger": {"url-filter": ".*", "if-domain": X_DOMAINS},
-               "action": {"type": "ignore-previous-rules"}}
-    body = blocks + hides
-    per_list = RULES_PER_LIST
-    chunks = [body[start:start + per_list] for start in range(0, len(body), per_list)]
+
+    # A generic selector some sites allow is kept apart, with those sites left out.
+    generic = [selector for selector in dict.fromkeys(generic) if selector not in generic_allowed]
+    groups = [([s for s in generic if s not in site_allowed], None, True)]
+    by_sites = {}
+    for selector in generic:
+        if selector in site_allowed:
+            by_sites.setdefault(tuple(sorted(site_allowed[selector])), []).append(selector)
+    groups += [(selectors, ("unless-domain", list(sites)), True) for sites, selectors in sorted(by_sites.items())]
+    groups += [(selectors, (kind, list(domains)), False) for (kind, domains), selectors in sorted(specific.items())]
+    hides = {(is_generic, has): [] for is_generic in (True, False) for has in (False, True)}
+    for selectors, condition, is_generic in groups:
+        selectors = list(dict.fromkeys(selectors))
+        for has in (False, True):
+            chosen = [selector for selector in selectors if (":has(" in selector) == has]
+            hides[(is_generic, has)].extend(hide_rules(chosen, condition))
+
+    page_exceptions = [rule for rule in exceptions if reaches_pages(rule)]
+    generic_tail = generichide + elemhide + page_exceptions
+    layouts = [
+        (hides[(True, False)], generic_tail),
+        (hides[(True, True)], generic_tail),
+        (hides[(False, True)], elemhide + page_exceptions),
+        (blocks + hides[(False, False)], elemhide + exceptions),
+    ]
+    closing = {"trigger": {"url-filter": ".*", "if-domain": X_DOMAINS}, "action": IGNORE}
     os.makedirs(output, exist_ok=True)
     for name in os.listdir(output):
         if re.match(r"^web-ads(-\d+)?\.json$", name):
             os.remove(os.path.join(output, name))
     names, digest = [], hashlib.sha256()
-    for index, chunk in enumerate(chunks, 1):
-        text = json.dumps(chunk + exceptions + [closing], separators=(",", ":"))
-        digest.update(text.encode())
-        name = "web-ads-%d.json" % index
-        with open(os.path.join(output, name), "w", encoding="utf-8") as out:
-            out.write(text)
-        names.append(name)
+    for body, tail in layouts:
+        for start in range(0, len(body), RULES_PER_LIST):
+            text = json.dumps(body[start:start + RULES_PER_LIST] + tail + [closing], separators=(",", ":"))
+            digest.update(text.encode())
+            name = "web-ads-%d.json" % (len(names) + 1)
+            with open(os.path.join(output, name), "w", encoding="utf-8") as out:
+                out.write(text)
+            names.append(name)
     with open(os.path.join(output, "web-ads.json"), "w", encoding="utf-8") as out:
         json.dump({"version": digest.hexdigest()[:12], "lists": names}, out)
-    print("block %d, exceptions %d, hiding rules %d (generic selectors %d), lists %d, skipped %d"
-          % (len(blocks), len(exceptions), len(hides), len(generic), len(names), skipped))
+    print("block %d, exceptions %d, generichide %d, elemhide %d, generic selectors %d, "
+          "hiding rules %d (:has %d), lists %d, skipped %d"
+          % (len(blocks), len(exceptions), len(generichide), len(elemhide), len(generic),
+             sum(len(rules) for rules in hides.values()), len(hides[(True, True)]) + len(hides[(False, True)]),
+             len(names), skipped))
 
 
 if __name__ == "__main__":

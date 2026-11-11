@@ -87,7 +87,7 @@
 - **Hide notifications** — the × on a notification, or the Tweet's menu, hides it; the eye at the top lists what is hidden.
 - **Clean screenshots** — an on/off switch for Twitter's screenshot detection.
 - **Clean links** — tracking parameters stripped from links you open, copy *or* share, profiles included.
-- **Block web ads** — pages opened in Twitter's in-app browser load without their ads.
+- **Block web ads** — pages opened in Twitter's in-app browser load without their ads, trackers, cookie banners, and pop-ups.
 - **French localization** — the settings and the new screens are in French, except the swatch names and the Compatibility tools.
 
 # Build

@@ -39,7 +39,7 @@
 "NEW_INAPP_WEBVIEW_TITLE" = "New in-app browser";
 "NEW_INAPP_WEBVIEW_DETAIL" = "Use Twitter’s newer in-app browser for opening links.";
 "BLOCK_WEB_ADS_TITLE" = "Block web ads";
-"BLOCK_WEB_ADS_DETAIL" = "Block ads on pages opened in Twitter’s in-app browser.";
+"BLOCK_WEB_ADS_DETAIL" = "Block ads, trackers, and annoyances on pages opened in Twitter’s in-app browser.";
 "BLOCK_WEB_ADS_DETAIL_HELD" = "Not needed while links open in your browser.";
 
 /* ===== APPEARANCE — page ===== */

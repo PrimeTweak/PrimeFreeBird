@@ -1,5 +1,5 @@
-// Block web ads: EasyList's rules, shipped as WebKit content-blocker lists made by
-// tools/easylist-webkit.py, are compiled once by iOS and put on the web views Twitter opens.
+// Block web ads: EasyList, EasyPrivacy and Fanboy's Annoyance list, made into WebKit content
+// blockers by tools/easylist-webkit.py, are compiled once by iOS and put on Twitter's web views.
 // The lists leave X's own pages alone, the tweak's web views included.
 
 #import <WebKit/WebKit.h>

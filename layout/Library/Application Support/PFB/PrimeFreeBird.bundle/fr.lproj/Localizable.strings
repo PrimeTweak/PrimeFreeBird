@@ -35,7 +35,7 @@
 "NEW_INAPP_WEBVIEW_TITLE" = "Nouveau navigateur intégré";
 "NEW_INAPP_WEBVIEW_DETAIL" = "Ouvre les liens dans le nouveau navigateur intégré de Twitter.";
 "BLOCK_WEB_ADS_TITLE" = "Bloquer les pubs web";
-"BLOCK_WEB_ADS_DETAIL" = "Bloque les pubs des pages ouvertes dans le navigateur intégré de Twitter.";
+"BLOCK_WEB_ADS_DETAIL" = "Bloque les pubs, les traceurs et les nuisances des pages ouvertes dans le navigateur intégré de Twitter.";
 "BLOCK_WEB_ADS_DETAIL_HELD" = "Inutile tant que les liens s’ouvrent dans votre navigateur.";
 
 /* ===== APPEARANCE — page ===== */
