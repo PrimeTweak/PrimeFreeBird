@@ -18,6 +18,7 @@ typedef NS_ENUM(NSInteger, PFBCompatOption) {
     PFBCompat_strip_url_tracking,
     PFBCompat_always_open_safari,
     PFBCompat_new_inapp_webview,
+    PFBCompat_block_web_ads,
     PFBCompat_restore_tab_labels,
     PFBCompat_custom_fonts,
     PFBCompat_tab_bar_theming,

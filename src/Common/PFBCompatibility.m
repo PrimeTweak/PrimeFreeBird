@@ -44,6 +44,7 @@ static const PFBCompatMeta kMeta[] = {
     {PFBCompat_strip_url_tracking, "strip_url_tracking", "STRIP_URL_TRACKING_TITLE", "MODERN_SETTINGS_LAYOUT_TITLE"},
     {PFBCompat_always_open_safari, "always_open_safari", "ALWAYS_OPEN_SAFARI_TITLE", "MODERN_SETTINGS_LAYOUT_TITLE"},
     {PFBCompat_new_inapp_webview, "new_inapp_webview", "NEW_INAPP_WEBVIEW_TITLE", "MODERN_SETTINGS_LAYOUT_TITLE"},
+    {PFBCompat_block_web_ads, "block_web_ads", "BLOCK_WEB_ADS_TITLE", "MODERN_SETTINGS_LAYOUT_TITLE"},
     {PFBCompat_expand_tco_links, "expand_tco_links", "EXPAND_TCO_LINKS_TITLE", "MODERN_SETTINGS_LAYOUT_TITLE", YES},
     {PFBCompat_enable_liquid_glass, "enable_liquid_glass", "INTERFACE_STYLE_TITLE", "MODERN_SETTINGS_APPEARANCE_TITLE"},
     {PFBCompat_glass_toasts, "glass_toasts", "GLASS_TOASTS_TITLE", "MODERN_SETTINGS_APPEARANCE_TITLE", NO},
@@ -354,6 +355,9 @@ static const PFBCompatReq kReqs[] = {
     {PFBCompat_new_inapp_webview, "TFSInstrumentedFeatureSwitches", "-rawValueForKey:"},
     {PFBCompat_new_inapp_webview, "TFSInstrumentedFeatureSwitches", "-unsafePeekBoolForKey:"},
     {PFBCompat_new_inapp_webview, "TFSInstrumentedFeatureSwitches", "-unsafePeekIntegerForKey:"},
+    {PFBCompat_block_web_ads, "WKWebView", "-initWithFrame:configuration:"},
+    {PFBCompat_block_web_ads, "WKWebView", "-loadRequest:"},
+    {PFBCompat_block_web_ads, "WKContentRuleListStore", "+defaultStore"},
     {PFBCompat_custom_tab_bar, "T1DashContentController", "-updateVisiblePanelIDs"},
     {PFBCompat_custom_tab_bar, "T1DashContentController", "-prepareForReuse"},
     {PFBCompat_custom_tab_bar, "T1AppSplitViewController", "-private_loadDashHostView"},
@@ -2431,6 +2435,7 @@ static const PFBCompatContract kContract[] = {
     {PFBCompat_sharing_domain, "video long press", "shared link"},
     {PFBCompat_strip_url_tracking, "video long press", "tracked link"},
     {PFBCompat_always_open_safari, "web link", NULL},
+    {PFBCompat_block_web_ads, "", "the tour opens links in Safari's view, not in Twitter's in-app browser"},
     {PFBCompat_new_inapp_webview, "launch", NULL},
     {PFBCompat_custom_tab_bar, "launch", NULL},
     {PFBCompat_restore_tab_labels, "launch", NULL},
@@ -3921,6 +3926,8 @@ static BOOL optionEnabled(const PFBCompatMeta* meta) {
             return [PFBSettings boolForKey:key] && ![PFBSettings boolForKey:@"hide_new_tweets_pill"];
         case PFBCompat_choose_explore_tabs:
             return [PFBSettings boolForKey:key] && ![PFBSettings boolForKey:@"hide_explore_all"];
+        case PFBCompat_block_web_ads:
+            return [PFBSettings boolForKey:key] && ![PFBSettings boolForKey:@"always_open_safari"];
         case PFBCompat_tab_bar_theming:
             return PFBThemedTabBarWanted();
         case PFBCompat_color_twitter_icon_in_top_bar:

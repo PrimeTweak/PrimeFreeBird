@@ -44,7 +44,8 @@ static NSDictionary<NSString*, NSDictionary*>* PFBSettingsPages(void) {
                     },
                     @{@"key": @"strip_url_tracking", @"default": @YES},
                     @{@"key": @"always_open_safari", @"default": @NO},
-                    @{@"key": @"new_inapp_webview", @"default": @YES}
+                    @{@"key": @"new_inapp_webview", @"default": @YES},
+                    @{@"key": @"block_web_ads", @"default": @YES, @"disabledWhen": @"always_open_safari"}
                 ]
             },
             @"appearance": @{
