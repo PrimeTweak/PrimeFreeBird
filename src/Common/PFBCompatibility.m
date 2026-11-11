@@ -1643,6 +1643,8 @@ static const PFBCompatName kNames[] = {
     {PFBCompatOptionCount, "Debug/PFBCompatibilityTour.m", "visiblePanelIDs"},
     {PFBCompatOptionCount, "Debug/PFBCompatibilityTour.m", "currentPanelID"},
     {PFBCompatOptionCount, "Debug/PFBCompatibilityTour.m", "setCurrentPanel:animated:completion:"},
+    {PFBCompatOptionCount, "Debug/PFBCompatibilityTour.m", "stringForPanelID:"},
+    {PFBCompatOptionCount, "Debug/PFBCompatibilityTour.m", "sharedHostViewController"},
     {PFBCompatOptionCount, "Debug/PFBCompatibilityTour.m", "showProfileForUsername:orUserID:fromPanel:source:sourceNavigationMetadata:completion:"},
     {PFBCompatOptionCount, "Debug/PFBCompatibilityTour.m", "dashContentController"},
     {PFBCompatOptionCount, "Debug/PFBCompatibilityTour.m", "presenter"},
@@ -2400,6 +2402,9 @@ static const PFBCompatClassText kClassTexts[] = {
     {PFBCompat_hide_blocked_retweets, "TwitterHomeFeatureImplementation.HomeTimelineContainerViewController"},
     {PFBCompat_hide_quote_tweets, "TwitterHomeFeatureImplementation.HomeTimelineContainerViewController"},
     {PFBCompat_reading_line, "TwitterHomeFeatureImplementation.HomeTimelineContainerViewController"},
+    {PFBCompat_hide_scroll_edge_blur, "TwitterHomeFeatureImplementation.HomeTimelineContainerViewController"},
+    {PFBCompat_hide_scroll_edge_blur, "T1TwitterSwift.GuideContainerViewController"},
+    {PFBCompat_hide_scroll_edge_blur, "T1NotificationsViewController"},
 };
 static const size_t kClassTextCount = sizeof(kClassTexts) / sizeof(kClassTexts[0]);
 

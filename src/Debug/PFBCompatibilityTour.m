@@ -202,6 +202,7 @@ static id tourTabSwitcher(void) {
 
 static NSInteger tourIntegerGetter(id object, NSString* name);
 static UIView* tourFindClass(UIView* root, NSString* className);
+static UIView* tourFindView(UIView* root, BOOL (^match)(UIView* view));
 static id tourGetter(id object, NSString* name);
 
 // Twitter's app navigation object, answered by its tabbed controller in either design.
@@ -219,6 +220,97 @@ static id tourAppNavigation(void) {
         [queue addObjectsFromArray:queue[i].childViewControllers];
     }
     return nil;
+}
+
+// Twitter's name for a panel, after its number.
+static NSString* tourPanelName(long long panel) {
+    Class identity = NSClassFromString(@"T1PanelIdentity");
+    SEL selector = NSSelectorFromString(@"stringForPanelID:");
+    id name = [identity respondsToSelector:selector]
+                  ? ((id (*)(id, SEL, long long))objc_msgSend)(identity, selector, panel)
+                  : nil;
+    return [name isKindOfClass:[NSString class]] && [name length] ? [NSString stringWithFormat:@"%lld %@", panel, name]
+                                                                  : [NSString stringWithFormat:@"%lld", panel];
+}
+
+// The items of one row of Twitter's glass tab bar, left to right.
+static NSArray<UIView*>* tourBarItems(void) {
+    Class itemClass = NSClassFromString(@"_TtC11XNavigation14TabBarItemView");
+    UIView* first = tourFindClass(tourWindow(), @"_TtC11XNavigation14TabBarItemView");
+    NSMutableArray<UIView*>* items = [NSMutableArray array];
+    for (UIView* view in first.superview.subviews) {
+        if ([view isKindOfClass:itemClass] && !view.hidden) {
+            [items addObject:view];
+        }
+    }
+    return [items sortedArrayUsingComparator:^NSComparisonResult(UIView* a, UIView* b) {
+      return a.frame.origin.x < b.frame.origin.x ? NSOrderedAscending : NSOrderedDescending;
+    }];
+}
+
+// The places of the bar items marked selected.
+static NSString* tourBarSelection(NSArray<UIView*>* items) {
+    NSMutableArray<NSString*>* selected = [NSMutableArray array];
+    for (NSUInteger i = 0; i < items.count; i++) {
+        if (items[i].accessibilityTraits & UIAccessibilityTraitSelected) {
+            [selected addObject:[NSString stringWithFormat:@"%lu", (unsigned long)i]];
+        }
+    }
+    return selected.count ? [selected componentsJoinedByString:@", "] : @"none";
+}
+
+// Acts as a tap on the bar item at that place: its control's action, else its accessibility action.
+static NSString* tourTapBarItem(NSArray<UIView*>* items, NSUInteger place) {
+    if (place >= items.count) {
+        return [NSString stringWithFormat:@"no bar item %lu of %lu", (unsigned long)place, (unsigned long)items.count];
+    }
+    UIView* item = items[place];
+    UIControl* control = (UIControl*)tourFindView(item, ^BOOL(UIView* view) {
+      return [view isKindOfClass:[UIControl class]];
+    });
+    NSMutableArray<NSString*>* gestures = [NSMutableArray array];
+    for (UIGestureRecognizer* recognizer in item.gestureRecognizers) {
+        [gestures addObject:NSStringFromClass([recognizer class])];
+    }
+    NSString* how = nil;
+    if (control) {
+        UIControlEvents event = (control.allControlEvents & UIControlEventPrimaryActionTriggered)
+                                    ? UIControlEventPrimaryActionTriggered
+                                    : UIControlEventTouchUpInside;
+        [control sendActionsForControlEvents:event];
+        how = [NSString stringWithFormat:@"%@ action sent", NSStringFromClass([control class])];
+    } else {
+        how = [item accessibilityActivate] ? @"accessibility action taken" : @"accessibility action refused";
+    }
+    return [NSString stringWithFormat:@"bar item %lu tapped (%@, gestures: %@): %@", (unsigned long)place,
+                                      NSStringFromClass([item class]),
+                                      gestures.count ? [gestures componentsJoinedByString:@", "] : @"none", how];
+}
+
+// Each panel switch logs how its panel was chosen and where Twitter is 0.6 s later; one that did
+// not land is tried again as a tap on its bar item.
+static void tourCheckPanelSwitch(id navigation, NSString* page, long long value, NSUInteger place, NSString* before) {
+    NSUInteger generation = gPFBTourGeneration;
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.6 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+      if (generation != gPFBTourGeneration) {
+          return;
+      }
+      long long now = tourIntegerGetter(navigation, @"currentPanelID");
+      NSString* screen = tourScreenName(tourScreen());
+      NSArray<UIView*>* items = tourBarItems();
+      PFBCompatTourLog(@"[tour] switch to %@: 0.6 s later panel %@, %@ in front (was %@), bar items %lu, selected %@", page,
+                       tourPanelName(now), screen, before, (unsigned long)items.count, tourBarSelection(items));
+      if (now == value && ![screen isEqualToString:before]) {
+          return;
+      }
+      PFBCompatTourLog(@"[tour] switch to %@: %@", page, tourTapBarItem(items, place));
+      dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.6 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+        if (generation == gPFBTourGeneration) {
+            PFBCompatTourLog(@"[tour] switch to %@: after the tap panel %@, %@ in front", page,
+                             tourPanelName(tourIntegerGetter(navigation, @"currentPanelID")), tourScreenName(tourScreen()));
+        }
+      });
+    });
 }
 
 // Without a tab bar controller to ask, as under Twitter's own Liquid Glass, the app
@@ -252,10 +344,25 @@ static void tourSelectPanel(NSInteger index) {
         return;
     }
     long long value = [panel longLongValue];
-    if (tourIntegerGetter(navigation, @"currentPanelID") == value) {
+    long long current = tourIntegerGetter(navigation, @"currentPanelID");
+    NSString* page = index >= 0 && index < (NSInteger)pages.count ? pages[(NSUInteger)index] : @"?";
+    NSMutableArray<NSString*>* listed = [NSMutableArray array];
+    for (id entry in panels) {
+        [listed addObject:[entry respondsToSelector:@selector(longLongValue)] ? tourPanelName([entry longLongValue])
+                                                                             : NSStringFromClass([entry class])];
+    }
+    id hostController = tourGetter(NSClassFromString(@"T1HostViewController"), @"sharedHostViewController");
+    id host = tourGetter(hostController, @"appNavigation");
+    PFBCompatTourLog(@"[tour] switch to %@ (place %ld): panel %@ from %@, listed %@, current %@%@, navigation %@", page,
+                     (long)index, tourPanelName(value), panel == recorded ? @"the tab registry" : @"its place in the list",
+                     [listed componentsJoinedByString:@", "], tourPanelName(current), current == value ? @", already current" : @"",
+                     !host ? @"the host has none" : host == navigation ? @"the host's" : NSStringFromClass([host class]));
+    if (current == value) {
         return;
     }
+    NSString* before = tourScreenName(tourScreen());
     ((void (*)(id, SEL, long long, BOOL, id))objc_msgSend)(navigation, set, value, NO, nil);
+    tourCheckPanelSwitch(navigation, page, value, [panels indexOfObject:panel], before);
 }
 
 // Selecting the tab already in front would make Twitter scroll it back to the top.
@@ -1324,8 +1431,8 @@ static void tourWhenChatShown(NSInteger tab, NSUInteger tries, NSUInteger genera
     if (tries == 0) {
         UIViewController* presented = tourRootController().presentedViewController;
         gPFBTourStepEmpty = @"Chat tab not reached";
-        PFBCompatTourLog(@"[tour] conversation: Chat tab not reached, %@ in front on panel %ld%@",
-                         tourScreenName(tourScreen()), (long)tourIntegerGetter(tourAppNavigation(), @"currentPanelID"),
+        PFBCompatTourLog(@"[tour] conversation: Chat tab not reached, %@ in front on panel %@%@",
+                         tourScreenName(tourScreen()), tourPanelName(tourIntegerGetter(tourAppNavigation(), @"currentPanelID")),
                          presented ? [@", presented " stringByAppendingString:NSStringFromClass([presented class])] : @"");
         return;
     }
