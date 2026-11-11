@@ -7,8 +7,8 @@ EASYLIST is an EasyList checkout (its easylist, easyprivacy and fanboy-annoyance
 followed) or a single filter list. OUTPUT_DIR receives web-ads.json, web-ads-N.json and web-ads-page.json.
 
 Each list carries the exceptions that can apply to it and ends by leaving X's own pages alone;
-generic hiding and :has() selectors have lists of their own. The page engine takes what WebKit
-cannot express; redirections to stand-in resources are left out.
+generic hiding, :has() selectors and the ping type have lists of their own. The page engine takes
+what WebKit cannot express; regular expressions and redirections to stand-in resources are left out.
 """
 import hashlib
 import json
@@ -31,7 +31,7 @@ ENTITY_ENDINGS = (
 TYPES = {
     "script": "script", "image": "image", "stylesheet": "style-sheet", "font": "font",
     "media": "media", "subdocument": "document", "xmlhttprequest": "raw", "websocket": "raw",
-    "ping": "raw", "other": "raw", "popup": "popup",
+    "ping": "ping", "other": "raw", "popup": "popup",
 }
 ALL_TYPES = sorted(set(TYPES.values()))
 PAGE_OPTIONS = {"generichide": "generichide", "ghide": "generichide", "elemhide": "elemhide", "ehide": "elemhide"}
@@ -116,114 +116,6 @@ def engine_domains(text):
             return None
         target.append(item)
     return included, excluded
-
-
-def regex_parts(pattern):
-    """Splits a regular expression into WebKit's subset: no alternation, braces or shorthand
-    classes. Returns the url-filters it stands for, or None."""
-    shorthand = {"d": "0-9", "w": "a-zA-Z0-9_"}
-    position = [0]
-
-    def atom_class():
-        start = position[0]
-        position[0] += 1
-        body = "["
-        if pattern[position[0]:position[0] + 1] == "^":
-            body += "^"
-            position[0] += 1
-        while position[0] < len(pattern) and pattern[position[0]] != "]":
-            ch = pattern[position[0]]
-            if ch == "\\":
-                following = pattern[position[0] + 1:position[0] + 2]
-                body += shorthand.get(following, "\\" + following if following in "]\\^-" else following)
-                position[0] += 2
-                continue
-            body += ch
-            position[0] += 1
-        if position[0] >= len(pattern) or position[0] == start + 1:
-            raise ValueError("class")
-        position[0] += 1
-        return [body + "]"]
-
-    def sequence():
-        variants = [""]
-        while position[0] < len(pattern) and pattern[position[0]] not in "|)":
-            ch = pattern[position[0]]
-            if ch == "(":
-                position[0] += 1
-                if pattern.startswith("?:", position[0]):
-                    position[0] += 2
-                elif pattern.startswith("?", position[0]):
-                    raise ValueError("lookaround")
-                inner = alternation()
-                if pattern[position[0]:position[0] + 1] != ")":
-                    raise ValueError("group")
-                position[0] += 1
-                repeated = pattern[position[0]:position[0] + 1] in ("*", "+", "?", "{")
-                atoms = ["(%s)" % part if repeated and len(part) > 1 else part for part in inner]
-            elif ch == "[":
-                atoms = atom_class()
-            elif ch == "\\":
-                following = pattern[position[0] + 1:position[0] + 2]
-                if following in shorthand:
-                    atoms = ["[%s]" % shorthand[following]]
-                elif following and not following.isalnum():
-                    atoms = ["\\" + following if following in ".+?*()[]$^\\/{}|" else following]
-                else:
-                    raise ValueError("escape")
-                position[0] += 2
-            elif ch in "^$":
-                atoms = [ch]
-                position[0] += 1
-            elif ch in "{}*+?":
-                raise ValueError("quantifier")
-            else:
-                atoms = ["\\" + ch if ch in "/" else ch]
-                position[0] += 1
-            atoms = [quantified(atom) for atom in atoms]
-            variants = [variant + atom for variant in variants for atom in atoms]
-            if len(variants) > 64:
-                raise ValueError("too many")
-        return variants
-
-    def quantified(atom):
-        rest = pattern[position[0]:]
-        braces = re.match(r"\{(\d+)(,(\d*))?\}\??", rest)
-        if braces:
-            position[0] += len(braces.group(0))
-            low = int(braces.group(1))
-            high = low if not braces.group(2) else (int(braces.group(3)) if braces.group(3) else None)
-            if low > 120 or (high is not None and (high < low or high > 120)):
-                raise ValueError("repeat")
-            text = atom * low
-            return text + (atom + "*" if high is None else (atom + "?") * (high - low))
-        simple = re.match(r"[*+?]\??", rest)
-        if simple:
-            position[0] += len(simple.group(0))
-            return atom + simple.group(0)[0]
-        return atom
-
-    def alternation():
-        variants = sequence()
-        while pattern[position[0]:position[0] + 1] == "|":
-            position[0] += 1
-            variants += sequence()
-        return variants
-
-    try:
-        variants = alternation()
-        if position[0] != len(pattern):
-            return None
-    except (ValueError, IndexError):
-        return None
-    filters = []
-    for variant in variants:
-        inner = variant[1:] if variant.startswith("^") else variant
-        inner = inner[:-1] if inner.endswith("$") and not inner.endswith("\\$") else inner
-        if re.search(r"(?<!\\)[$^](?![^\[]*\])", inner) or not variant:
-            return None
-        filters.append(variant)
-    return filters
 
 
 def url_filter(pattern, case_sensitive):
@@ -313,17 +205,11 @@ def network_rule(line):
         types = (types or set(ALL_TYPES)) - negated
         if not types:
             return None
-    if pattern.startswith("/") and pattern.endswith("/") and len(pattern) > 2:
-        regexes = regex_parts(pattern[1:-1])
-    else:
-        regexes = [url_filter(pattern, case_sensitive)]
-    if not regexes or None in regexes:
+    regex = url_filter(pattern, case_sensitive)
+    if regex is None:
         return None
-    rules = []
-    for regex in regexes:
-        made = made_rules(dict({"url-filter": regex}, **trigger), types, case_sensitive, page, exception,
-                          pattern.startswith("||"))
-        rules.extend(made)
+    rules = made_rules(dict({"url-filter": regex}, **trigger), types, case_sensitive, page, exception,
+                       pattern.startswith("||"))
     return rules, page or ("exception" if exception else "block")
 
 
@@ -505,6 +391,22 @@ def hide_rules(selectors, condition):
     return rules
 
 
+def split_ping(rules):
+    """Rules naming WebKit's ping type keep it in a list of their own, so a WebKit that refuses
+    the type loses that list only."""
+    others, pings = [], []
+    for rule in rules:
+        types = rule["trigger"].get("resource-type")
+        if not types or "ping" not in types:
+            others.append(rule)
+            continue
+        pings.append({"trigger": dict(rule["trigger"], **{"resource-type": ["ping"]}), "action": rule["action"]})
+        rest = [kind for kind in types if kind != "ping"]
+        if rest:
+            others.append({"trigger": dict(rule["trigger"], **{"resource-type": rest}), "action": rule["action"]})
+    return others, pings
+
+
 def unique(rules):
     return list({json.dumps(rule, sort_keys=True): rule for rule in rules}.values())
 
@@ -637,6 +539,8 @@ def main(source, output):
                                                   ("block", "exception", "generichide", "elemhide"))
     for rule in blocks + exceptions + generichide + elemhide:
         check(rule)
+    blocks, ping_blocks = split_ping(blocks)
+    exceptions, ping_exceptions = split_ping(exceptions)
 
     # A generic selector some sites allow is kept apart, with those sites left out.
     generic = [selector for selector in dict.fromkeys(generic) if selector not in generic_allowed]
@@ -661,6 +565,7 @@ def main(source, output):
         (hides[(True, True)], generic_tail),
         (hides[(False, True)], elemhide + page_exceptions),
         (blocks + hides[(False, False)], elemhide + exceptions),
+        (ping_blocks, ping_exceptions + [rule for rule in exceptions if "resource-type" not in rule["trigger"]]),
     ]
     closing = {"trigger": {"url-filter": ".*", "if-domain": X_DOMAINS}, "action": IGNORE}
     os.makedirs(output, exist_ok=True)
@@ -684,9 +589,9 @@ def main(source, output):
     kinds = {}
     for rule in page["rules"]:
         kinds[rule[0]] = kinds.get(rule[0], 0) + 1
-    print("block %d, exceptions %d, generichide %d, elemhide %d, generic selectors %d, "
+    print("block %d (ping %d), exceptions %d, generichide %d, elemhide %d, generic selectors %d, "
           "hiding rules %d (:has %d), lists %d, page rules %s, skipped %d"
-          % (len(blocks), len(exceptions), len(generichide), len(elemhide), len(generic),
+          % (len(blocks), len(ping_blocks), len(exceptions), len(generichide), len(elemhide), len(generic),
              sum(len(rules) for rules in hides.values()), len(hides[(True, True)]) + len(hides[(False, True)]),
              len(names), kinds, skipped))
 

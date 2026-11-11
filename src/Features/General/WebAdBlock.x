@@ -84,6 +84,7 @@ static void pfbWebAdsLoad(void) {
     WKContentRuleListStore* store = [WKContentRuleListStore defaultStore];
     NSMutableArray<WKContentRuleList*>* ready = [NSMutableArray array];
     NSMutableSet<NSString*>* current = [NSMutableSet set];
+    NSMutableSet<NSString*>* pending = [NSMutableSet set];
     dispatch_group_t group = dispatch_group_create();
     for (NSString* name in names) {
         if (![name isKindOfClass:[NSString class]]) {
@@ -91,17 +92,24 @@ static void pfbWebAdsLoad(void) {
         }
         NSString* identifier = [NSString stringWithFormat:@"PFBWebAds.%@.%@", version, name];
         [current addObject:identifier];
+        [pending addObject:name];
         dispatch_group_enter(group);
         void (^keep)(WKContentRuleList*) = ^(WKContentRuleList* list) {
             @synchronized(ready) {
                 [ready addObject:list];
             }
         };
+        void (^leave)(void) = ^{
+            @synchronized(pending) {
+                [pending removeObject:name];
+            }
+            dispatch_group_leave(group);
+        };
         [store lookUpContentRuleListForIdentifier:identifier
                                 completionHandler:^(WKContentRuleList* found, __unused NSError* missing) {
                                     if (found) {
                                         keep(found);
-                                        dispatch_group_leave(group);
+                                        leave();
                                         return;
                                     }
                                     NSURL* url = [[PFBBundle sharedBundle] pathForFile:name];
@@ -111,7 +119,7 @@ static void pfbWebAdsLoad(void) {
                                                           : nil;
                                     if (!rules) {
                                         pfbWebAdsNote([name stringByAppendingString:@" missing"]);
-                                        dispatch_group_leave(group);
+                                        leave();
                                         return;
                                     }
                                     [store compileContentRuleListForIdentifier:identifier
@@ -123,10 +131,20 @@ static void pfbWebAdsLoad(void) {
                                                                      pfbWebAdsNote([NSString stringWithFormat:@"%@ not compiled: %@",
                                                                                                               name, error.localizedDescription]);
                                                                  }
-                                                                 dispatch_group_leave(group);
+                                                                 leave();
                                                              }];
                                 }];
     }
+    // A list iOS has still not compiled a minute later holds back all of them, so it is reported.
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(60 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+      NSArray<NSString*>* late;
+      @synchronized(pending) {
+          late = [pending.allObjects sortedArrayUsingSelector:@selector(compare:)];
+      }
+      if (late.count) {
+          pfbWebAdsNote([@"not compiled after 60 s: " stringByAppendingString:[late componentsJoinedByString:@", "]]);
+      }
+    });
     dispatch_group_notify(group, dispatch_get_main_queue(), ^{
       @synchronized(ready) {
           gPFBWebAdLists = [ready copy];
@@ -184,8 +202,11 @@ static NSInteger pfbWebAdsNumber(NSDictionary* body, NSString* key) {
     return [body[key] isKindOfClass:[NSNumber class]] ? [body[key] integerValue] : 0;
 }
 
-static NSString* pfbWebAdsPageLine(NSString* host, NSDictionary* body, WKWebView* webView) {
+static NSString* pfbWebAdsPageLine(NSString* host, NSDictionary* body, WKWebView* webView, BOOL listed) {
     NSMutableArray<NSString*>* parts = [NSMutableArray array];
+    if (!listed) {
+        [parts addObject:@"block lists not on this page"];
+    }
     [parts addObject:[NSString stringWithFormat:@"%ld page rules", (long)pfbWebAdsNumber(body, @"rules")]];
     NSCountedSet* scripts = [NSCountedSet set];
     for (id name in [body[@"scripts"] isKindOfClass:[NSArray class]] ? body[@"scripts"] : @[]) {
@@ -230,7 +251,7 @@ static NSString* pfbWebAdsPageLine(NSString* host, NSDictionary* body, WKWebView
 @implementation PFBWebAdReports
 
 // A page's report, and a frame's only when it has errors; both come from the page's own world.
-- (void)userContentController:(__unused WKUserContentController*)controller didReceiveScriptMessage:(WKScriptMessage*)message {
+- (void)userContentController:(WKUserContentController*)controller didReceiveScriptMessage:(WKScriptMessage*)message {
     NSDictionary* body = [message.body isKindOfClass:[NSDictionary class]] ? message.body : nil;
     NSString* host = [body[@"host"] isKindOfClass:[NSString class]] ? body[@"host"] : nil;
     if (!host.length) {
@@ -246,8 +267,14 @@ static NSString* pfbWebAdsPageLine(NSString* host, NSDictionary* body, WKWebView
     if (![body[@"t"] isEqual:@"page"]) {
         return;
     }
-    PFBCOMPAT_ACTION(PFBCompat_block_web_ads, @"page engine on a web page");
-    PFBCompatMeasure(@"web pages", pfbWebAdsPageLine(host, body, message.webView), 30);
+    // The option only counts as working on a page that has the lists.
+    BOOL listed = ([objc_getAssociatedObject(controller, kPFBWebAdControllerKey) unsignedIntegerValue] & kPFBWebAdHasLists) != 0;
+    if (listed) {
+        PFBCOMPAT_ACTION(PFBCompat_block_web_ads, @"page engine on a web page");
+    } else {
+        PFBCOMPAT_OBSERVE(PFBCompat_block_web_ads, @"page engine ran, block lists not on the page");
+    }
+    PFBCompatMeasure(@"web pages", pfbWebAdsPageLine(host, body, message.webView, listed), 30);
 }
 
 @end

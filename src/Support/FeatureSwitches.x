@@ -83,7 +83,6 @@ static BOOL pfbSwitchIsAnswered(NSString* key) {
           @"hometimeline_pinned_tabs_generic_timelines_enabled",
           @"hometimeline_pinned_tabs_limit",
           @"hometimeline_pinned_tabs_management_pinnedsection_inline_limit",
-          @"hometimeline_pinned_tabs_management_topics_inline_limit",
           @"edit_tweet_ga_composition_enabled", @"edit_tweet_pdp_dialog_enabled",
           @"app_launch_animated_launch_screen_enabled",
           @"grok_translations_bio_inline_translation_is_enabled",
@@ -114,7 +113,6 @@ static BOOL pfbSwitchIsAnswered(NSString* key) {
           @"home_timeline_foreground_refresh_min_background_seconds",
           @"articles_timeline_profile_tab_enabled", @"highlights_tweets_tab_ui_enabled",
           @"grok_settings_age_restriction_enabled",
-          @"ad_formats_click_id_enabled", @"ad_formats_dcm_enabled",
           @"wcl_unified_cards_likely_open_link_prefetch_enabled",
           @"reply_sorting_enabled",
           @"ios_tweet_detail_overflow_in_navigation_enabled",
@@ -246,9 +244,7 @@ static NSNumber* FeatureSwitchOverrideValueForKey(NSString* key) {
 
     if ([key isEqualToString:@"hometimeline_pinned_tabs_limit"] ||
         [key isEqualToString:@"hometimeline_pinned_tabs_management_pinnedsection_"
-                             @"inline_limit"] ||
-        [key isEqualToString:
-                 @"hometimeline_pinned_tabs_management_topics_inline_limit"]) {
+                             @"inline_limit"]) {
         if ([PFBSettings boolForKey:@"hide_custom_timelines"]) {
             PFBCOMPAT_ACTION(PFBCompat_hide_custom_timelines, @"pin limit 0");
             PFBCOMPAT_OBSERVE(PFBCompat_unlimited_timeline_tabs, @"read by Twitter, Hide custom timelines answers first");
@@ -485,10 +481,8 @@ static NSNumber* FeatureSwitchOverrideValueForKey(NSString* key) {
         return nil;
     }
 
-    // Full links: no click ID or DoubleClick redirect on promoted links, no card link
-    // fetched before a tap.
-    if ([key isEqualToString:@"ad_formats_click_id_enabled"] || [key isEqualToString:@"ad_formats_dcm_enabled"] ||
-        [key isEqualToString:@"wcl_unified_cards_likely_open_link_prefetch_enabled"]) {
+    // Full links: no card link fetched before a tap.
+    if ([key isEqualToString:@"wcl_unified_cards_likely_open_link_prefetch_enabled"]) {
         PFBCOMPAT_ACTION(PFBCompat_expand_tco_links, @"link tracking switch off");
         return @NO;
     }
@@ -1073,13 +1067,6 @@ static BOOL pfbSkipsSensitiveWarnings(void) {
 - (BOOL)isVideoDynamicAdEnabled {
     if (pfbHidesPromoted()) {
         return NO;
-    }
-    return %orig;
-}
-
-- (BOOL)isDoubleMaxZoomFor4KImagesEnabled {
-    if (pfbForcesHighestQuality()) {
-        return YES;
     }
     return %orig;
 }
