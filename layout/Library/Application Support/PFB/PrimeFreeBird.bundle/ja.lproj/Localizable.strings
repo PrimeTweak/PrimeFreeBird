@@ -231,3 +231,12 @@
 /* Hidden notifications */
 "FLEX_TWITTER_TITLE" = "FLEXエクスプローラ";
 "FLEX_TWITTER_DETAIL" = "アプリの画面とデータを調べます。開発者向け。";
+"APPEARANCE_GROUP_SIDEBAR" = "サイドバー";
+"CUSTOM_SIDEBAR_OPTION_TITLE" = "サイドバーをカスタマイズ";
+"CUSTOM_SIDEBAR_OPTION_SUBTITLE" = "サイドバーに表示する項目を選択します。";
+"SIDEBAR_EDITOR_NAVIGATION_TITLE" = "サイドバー";
+"SIDEBAR_EDITOR_DETAIL" = "項目をタップするとサイドバーから非表示になります。もう一度タップすると元に戻ります。";
+"SIDEBAR_EDITOR_TAB_BAR_HEADER" = "タブバーにある項目";
+"SIDEBAR_RESET_TITLE" = "デフォルトに戻す";
+"SIDEBAR_ITEM_SHOWN" = "表示";
+"SIDEBAR_ITEM_HIDDEN" = "非表示";

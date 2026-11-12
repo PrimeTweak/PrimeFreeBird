@@ -231,3 +231,12 @@
 /* Hidden notifications */
 "FLEX_TWITTER_TITLE" = "مستكشف FLEX";
 "FLEX_TWITTER_DETAIL" = "فحص شاشات التطبيق وبياناته. للمطورين.";
+"APPEARANCE_GROUP_SIDEBAR" = "الشريط الجانبي";
+"CUSTOM_SIDEBAR_OPTION_TITLE" = "تخصيص الشريط الجانبي";
+"CUSTOM_SIDEBAR_OPTION_SUBTITLE" = "اختر العناصر التي تظهر في الشريط الجانبي.";
+"SIDEBAR_EDITOR_NAVIGATION_TITLE" = "الشريط الجانبي";
+"SIDEBAR_EDITOR_DETAIL" = "انقر على عنصر لإخفائه من الشريط الجانبي، وانقر عليه مرة أخرى لإعادته.";
+"SIDEBAR_EDITOR_TAB_BAR_HEADER" = "في شريط التبويبات";
+"SIDEBAR_RESET_TITLE" = "إعادة التعيين إلى الافتراضي";
+"SIDEBAR_ITEM_SHOWN" = "ظاهر";
+"SIDEBAR_ITEM_HIDDEN" = "مخفي";

@@ -231,3 +231,12 @@
 /* Hidden notifications */
 "FLEX_TWITTER_TITLE" = "FLEX istraživač";
 "FLEX_TWITTER_DETAIL" = "Pregledaj zaslone i podatke aplikacije. Za razvojne programere.";
+"APPEARANCE_GROUP_SIDEBAR" = "Bočna traka";
+"CUSTOM_SIDEBAR_OPTION_TITLE" = "Prilagodi bočnu traku";
+"CUSTOM_SIDEBAR_OPTION_SUBTITLE" = "Odaberi koje se stavke prikazuju u bočnoj traci.";
+"SIDEBAR_EDITOR_NAVIGATION_TITLE" = "Bočna traka";
+"SIDEBAR_EDITOR_DETAIL" = "Dodirni stavku da je sakriješ iz bočne trake. Dodirni je ponovno da je vratiš.";
+"SIDEBAR_EDITOR_TAB_BAR_HEADER" = "Na tvojoj traci kartica";
+"SIDEBAR_RESET_TITLE" = "Vrati na zadano";
+"SIDEBAR_ITEM_SHOWN" = "Prikazano";
+"SIDEBAR_ITEM_HIDDEN" = "Skriveno";

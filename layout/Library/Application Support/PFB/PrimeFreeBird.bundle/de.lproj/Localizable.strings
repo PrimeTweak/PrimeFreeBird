@@ -231,3 +231,12 @@
 /* Hidden notifications */
 "FLEX_TWITTER_TITLE" = "FLEX-Explorer";
 "FLEX_TWITTER_DETAIL" = "Untersucht die Bildschirme und Daten der App. Für Entwickler.";
+"APPEARANCE_GROUP_SIDEBAR" = "Seitenleiste";
+"CUSTOM_SIDEBAR_OPTION_TITLE" = "Seitenleiste anpassen";
+"CUSTOM_SIDEBAR_OPTION_SUBTITLE" = "Wähle, welche Elemente in der Seitenleiste erscheinen.";
+"SIDEBAR_EDITOR_NAVIGATION_TITLE" = "Seitenleiste";
+"SIDEBAR_EDITOR_DETAIL" = "Tippe auf ein Element, um es aus der Seitenleiste auszublenden. Tippe erneut, um es zurückzuholen.";
+"SIDEBAR_EDITOR_TAB_BAR_HEADER" = "In deiner Tableiste";
+"SIDEBAR_RESET_TITLE" = "Auf Standard zurücksetzen";
+"SIDEBAR_ITEM_SHOWN" = "Angezeigt";
+"SIDEBAR_ITEM_HIDDEN" = "Ausgeblendet";

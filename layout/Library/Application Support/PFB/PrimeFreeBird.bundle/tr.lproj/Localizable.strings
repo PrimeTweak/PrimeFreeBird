@@ -231,3 +231,12 @@
 /* Hidden notifications */
 "FLEX_TWITTER_TITLE" = "FLEX gezgini";
 "FLEX_TWITTER_DETAIL" = "Uygulamanın ekranlarını ve verilerini incele. Geliştiriciler için.";
+"APPEARANCE_GROUP_SIDEBAR" = "Kenar çubuğu";
+"CUSTOM_SIDEBAR_OPTION_TITLE" = "Kenar çubuğunu özelleştir";
+"CUSTOM_SIDEBAR_OPTION_SUBTITLE" = "Kenar çubuğunda hangi öğelerin görüneceğini seç.";
+"SIDEBAR_EDITOR_NAVIGATION_TITLE" = "Kenar çubuğu";
+"SIDEBAR_EDITOR_DETAIL" = "Bir öğeyi kenar çubuğundan gizlemek için ona dokun. Geri getirmek için yeniden dokun.";
+"SIDEBAR_EDITOR_TAB_BAR_HEADER" = "Sekme çubuğunda";
+"SIDEBAR_RESET_TITLE" = "Varsayılana sıfırla";
+"SIDEBAR_ITEM_SHOWN" = "Gösteriliyor";
+"SIDEBAR_ITEM_HIDDEN" = "Gizli";

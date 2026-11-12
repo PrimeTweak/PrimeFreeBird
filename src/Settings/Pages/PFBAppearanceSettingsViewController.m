@@ -1,4 +1,5 @@
-// The Appearance page: interface style, fonts, accent color, dark mode style and the tab bar editor.
+// The Appearance page: interface style, fonts, accent color, dark mode style, the tab bar editor
+// and the Sidebar page.
 
 #import "Settings/Pages/PFBAppearanceSettingsViewController.h"
 #import <objc/message.h>
@@ -8,6 +9,7 @@
 #import "Support/HookHelpers.h"
 #import "Features/Appearance/ThemeColor/PFBColorThemeViewController.h"
 #import "Features/Appearance/CustomTabBar/PFBCustomTabBarViewController.h"
+#import "Features/Appearance/Sidebar/PFBSidebarViewController.h"
 #import "Settings/PFBModernSettingsCells.h"
 #import "Settings/Native/PFBShowcase.h"
 #import "Support/PFBTwitterPopups.h"
@@ -117,6 +119,21 @@ static NSInteger PFBInterfaceStyleCurrent(void) {
                                        subtitle:self.account.displayUsername]];
     }
     [self.navigationController pushViewController:customTabBarVC animated:YES];
+}
+
+// The Sidebar page, titled as the Theme color page is in either look.
+- (void)showSidebarEditor:(NSDictionary*)sender {
+    PFBSidebarViewController* sidebarVC = [[PFBSidebarViewController alloc] init];
+    NSString* title = [[PFBBundle sharedBundle] localizedStringForKey:@"SIDEBAR_EDITOR_NAVIGATION_TITLE"];
+    if (self.nativeLook) {
+        PFBShowcaseSetTitle(sidebarVC, title);
+    } else if (self.account) {
+        [sidebarVC.navigationItem
+            setTitleView:[objc_getClass("TFNTitleView") titleViewWithTitle:title subtitle:self.account.displayUsername]];
+    } else {
+        sidebarVC.title = title;
+    }
+    [self.navigationController pushViewController:sidebarVC animated:YES];
 }
 
 - (void)showDarkModeStylePicker:(NSDictionary*)sender {

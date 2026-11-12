@@ -231,3 +231,12 @@
 /* Hidden notifications */
 "FLEX_TWITTER_TITLE" = "Penjelajah FLEX";
 "FLEX_TWITTER_DETAIL" = "Periksa layar dan data aplikasi. Untuk pengembang.";
+"APPEARANCE_GROUP_SIDEBAR" = "Bilah samping";
+"CUSTOM_SIDEBAR_OPTION_TITLE" = "Sesuaikan bilah samping";
+"CUSTOM_SIDEBAR_OPTION_SUBTITLE" = "Pilih item yang muncul di bilah samping.";
+"SIDEBAR_EDITOR_NAVIGATION_TITLE" = "Bilah samping";
+"SIDEBAR_EDITOR_DETAIL" = "Ketuk item untuk menyembunyikannya dari bilah samping. Ketuk lagi untuk mengembalikannya.";
+"SIDEBAR_EDITOR_TAB_BAR_HEADER" = "Di bilah tab Anda";
+"SIDEBAR_RESET_TITLE" = "Kembalikan ke default";
+"SIDEBAR_ITEM_SHOWN" = "Ditampilkan";
+"SIDEBAR_ITEM_HIDDEN" = "Disembunyikan";

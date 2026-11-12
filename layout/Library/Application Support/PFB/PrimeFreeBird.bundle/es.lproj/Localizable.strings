@@ -236,3 +236,12 @@
 /* Hidden notifications */
 "FLEX_TWITTER_TITLE" = "Explorador FLEX";
 "FLEX_TWITTER_DETAIL" = "Inspecciona las pantallas y los datos de la app. Para desarrolladores.";
+"APPEARANCE_GROUP_SIDEBAR" = "Barra lateral";
+"CUSTOM_SIDEBAR_OPTION_TITLE" = "Personalizar barra lateral";
+"CUSTOM_SIDEBAR_OPTION_SUBTITLE" = "Elige qué elementos aparecen en la barra lateral.";
+"SIDEBAR_EDITOR_NAVIGATION_TITLE" = "Barra lateral";
+"SIDEBAR_EDITOR_DETAIL" = "Toca un elemento para ocultarlo de la barra lateral. Tócalo de nuevo para que vuelva.";
+"SIDEBAR_EDITOR_TAB_BAR_HEADER" = "En tu barra de pestañas";
+"SIDEBAR_RESET_TITLE" = "Restablecer valores predeterminados";
+"SIDEBAR_ITEM_SHOWN" = "Visible";
+"SIDEBAR_ITEM_HIDDEN" = "Oculto";

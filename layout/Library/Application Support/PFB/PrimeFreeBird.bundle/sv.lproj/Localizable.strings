@@ -231,3 +231,12 @@
 /* Hidden notifications */
 "FLEX_TWITTER_TITLE" = "FLEX-utforskare";
 "FLEX_TWITTER_DETAIL" = "Granska appens skärmar och data. För utvecklare.";
+"APPEARANCE_GROUP_SIDEBAR" = "Sidofält";
+"CUSTOM_SIDEBAR_OPTION_TITLE" = "Anpassa sidofältet";
+"CUSTOM_SIDEBAR_OPTION_SUBTITLE" = "Välj vilka objekt som visas i sidofältet.";
+"SIDEBAR_EDITOR_NAVIGATION_TITLE" = "Sidofält";
+"SIDEBAR_EDITOR_DETAIL" = "Tryck på ett objekt för att dölja det i sidofältet. Tryck igen för att få tillbaka det.";
+"SIDEBAR_EDITOR_TAB_BAR_HEADER" = "I ditt flikfält";
+"SIDEBAR_RESET_TITLE" = "Återställ till standard";
+"SIDEBAR_ITEM_SHOWN" = "Visas";
+"SIDEBAR_ITEM_HIDDEN" = "Dold";

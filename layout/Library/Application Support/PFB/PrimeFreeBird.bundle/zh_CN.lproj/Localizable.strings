@@ -231,3 +231,12 @@
 /* Hidden notifications */
 "FLEX_TWITTER_TITLE" = "FLEX 探索器";
 "FLEX_TWITTER_DETAIL" = "检查应用的界面和数据。供开发者使用。";
+"APPEARANCE_GROUP_SIDEBAR" = "侧边栏";
+"CUSTOM_SIDEBAR_OPTION_TITLE" = "自定义侧边栏";
+"CUSTOM_SIDEBAR_OPTION_SUBTITLE" = "选择要在侧边栏中显示的项目。";
+"SIDEBAR_EDITOR_NAVIGATION_TITLE" = "侧边栏";
+"SIDEBAR_EDITOR_DETAIL" = "轻点项目即可从侧边栏隐藏，再次轻点即可恢复。";
+"SIDEBAR_EDITOR_TAB_BAR_HEADER" = "在你的标签栏中";
+"SIDEBAR_RESET_TITLE" = "恢复默认设置";
+"SIDEBAR_ITEM_SHOWN" = "已显示";
+"SIDEBAR_ITEM_HIDDEN" = "已隐藏";

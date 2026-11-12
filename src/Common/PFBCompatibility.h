@@ -131,6 +131,7 @@ typedef NS_ENUM(NSInteger, PFBCompatOption) {
     PFBCompat_new_twitter_settings,
     PFBCompat_left_aligned_alerts,
     PFBCompat_glass_toasts,
+    PFBCompat_customize_sidebar,
     PFBCompatOptionCount,
 };
 

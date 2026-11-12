@@ -77,6 +77,15 @@
 "APPEARANCE_GROUP_TAB_BAR" = "Tab bar";
 "CUSTOM_TAB_BAR_OPTION_TITLE" = "Customize tabs";
 "CUSTOM_TAB_BAR_OPTION_SUBTITLE" = "Choose which tabs appear and in what order.";
+"APPEARANCE_GROUP_SIDEBAR" = "Sidebar";
+"CUSTOM_SIDEBAR_OPTION_TITLE" = "Customize sidebar";
+"CUSTOM_SIDEBAR_OPTION_SUBTITLE" = "Choose which items appear in the sidebar.";
+"SIDEBAR_EDITOR_NAVIGATION_TITLE" = "Sidebar";
+"SIDEBAR_EDITOR_DETAIL" = "Tap an item to hide it from the sidebar. Tap it again to bring it back.";
+"SIDEBAR_EDITOR_TAB_BAR_HEADER" = "In your tab bar";
+"SIDEBAR_RESET_TITLE" = "Reset to default";
+"SIDEBAR_ITEM_SHOWN" = "Shown";
+"SIDEBAR_ITEM_HIDDEN" = "Hidden";
 "RESTORE_TAB_LABELS_TITLE" = "Tab labels";
 "RESTORE_TAB_LABELS_DETAIL" = "Show labels under the icons.";
 "NO_TAB_BAR_HIDING_TITLE" = "Always visible";

@@ -3,6 +3,7 @@
 
 #import "Support/HookHelpers.h"
 #import "Sideload/PFBWebLoginViewController.h"
+#import "Features/Appearance/Sidebar/PFBSidebarItems.h"
 
 // While set, -isSubscribedTo: (below) reports the account's genuine
 // subscription state instead of the forced premium tiers, so paths that need
@@ -1260,6 +1261,30 @@ static void PFBDashRebuild(id controller) {
     }
 }
 
+void PFBDashRefresh(void) {
+    Class splitClass = NSClassFromString(@"T1AppSplitViewController");
+    SEL content = NSSelectorFromString(@"dashContentController");
+    for (UIScene* scene in UIApplication.sharedApplication.connectedScenes) {
+        if (![scene isKindOfClass:[UIWindowScene class]]) {
+            continue;
+        }
+        for (UIWindow* window in ((UIWindowScene*)scene).windows) {
+            NSMutableArray<UIViewController*>* queue = [NSMutableArray array];
+            if (window.rootViewController) {
+                [queue addObject:window.rootViewController];
+            }
+            for (NSUInteger index = 0; index < queue.count && index < 200; index++) {
+                UIViewController* controller = queue[index];
+                if (splitClass && [controller isKindOfClass:splitClass] && [controller respondsToSelector:content]) {
+                    PFBDashRebuild(((id (*)(id, SEL))objc_msgSend)(controller, content));
+                    return;
+                }
+                [queue addObjectsFromArray:controller.childViewControllers];
+            }
+        }
+    }
+}
+
 %hook T1DashContentController
 
 - (void)updateVisiblePanelIDs {
@@ -1310,18 +1335,26 @@ static BOOL PFBDashAnswerApplies(BOOL glassNavigation) {
 
 %hook T1DashContentPresenter
 
+// The open sidebar is read once it settles, for the Sidebar page and its check.
 - (void)dashDidSettleOpen:(BOOL)open {
     gPFBDashMenuOpen = open;
     %orig;
+    if (open) {
+        dispatch_async(dispatch_get_main_queue(), ^{
+          [PFBSidebarItems readOpenSidebar];
+        });
+    }
 }
 
 %end
 
-// The tab bar's panels as the drawer reads them, with the panels it must not offer.
+// The tab bar's panels as the drawer reads them, with the panels it must not offer and the
+// ones hidden from the Sidebar page.
 static NSArray* PFBDashPanelIDs(NSArray* panelIDs) {
     if (![panelIDs isKindOfClass:[NSArray class]]) {
         return panelIDs;
     }
+    [PFBSidebarItems recordTabPanelIDs:panelIDs];
     NSMutableArray* spoofed = [panelIDs mutableCopy];
     void (^claim)(NSNumber*) = ^(NSNumber* panelID) {
         if (![spoofed containsObject:panelID]) {
@@ -1344,6 +1377,16 @@ static NSArray* PFBDashPanelIDs(NSArray* panelIDs) {
 
     if (!AccountIsGenuinelyPremium()) {
         claim(@15);
+    }
+
+    NSArray<NSNumber*>* hidden = [PFBSidebarItems hiddenPanelIDs];
+    if (hidden.count) {
+        PFBCOMPAT_ACTION(PFBCompat_customize_sidebar, @"sidebar items hidden");
+        for (NSNumber* panelID in hidden) {
+            claim(panelID);
+        }
+    } else {
+        PFBCOMPAT_OBSERVE(PFBCompat_customize_sidebar, @"sidebar list read");
     }
     return spoofed;
 }

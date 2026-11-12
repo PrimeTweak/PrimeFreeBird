@@ -231,3 +231,12 @@
 /* Hidden notifications */
 "FLEX_TWITTER_TITLE" = "Обозреватель FLEX";
 "FLEX_TWITTER_DETAIL" = "Позволяет изучать экраны и данные приложения. Для разработчиков.";
+"APPEARANCE_GROUP_SIDEBAR" = "Боковая панель";
+"CUSTOM_SIDEBAR_OPTION_TITLE" = "Настроить боковую панель";
+"CUSTOM_SIDEBAR_OPTION_SUBTITLE" = "Выберите, какие пункты показывать в боковой панели.";
+"SIDEBAR_EDITOR_NAVIGATION_TITLE" = "Боковая панель";
+"SIDEBAR_EDITOR_DETAIL" = "Нажмите на пункт, чтобы скрыть его из боковой панели. Нажмите снова, чтобы вернуть его.";
+"SIDEBAR_EDITOR_TAB_BAR_HEADER" = "На панели вкладок";
+"SIDEBAR_RESET_TITLE" = "Сбросить по умолчанию";
+"SIDEBAR_ITEM_SHOWN" = "Показано";
+"SIDEBAR_ITEM_HIDDEN" = "Скрыто";

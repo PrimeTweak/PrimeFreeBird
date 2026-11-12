@@ -231,3 +231,12 @@
 /* Hidden notifications */
 "FLEX_TWITTER_TITLE" = "FLEX 탐색기";
 "FLEX_TWITTER_DETAIL" = "앱의 화면과 데이터를 살펴봅니다. 개발자용.";
+"APPEARANCE_GROUP_SIDEBAR" = "사이드바";
+"CUSTOM_SIDEBAR_OPTION_TITLE" = "사이드바 사용자화";
+"CUSTOM_SIDEBAR_OPTION_SUBTITLE" = "사이드바에 표시할 항목을 선택하세요.";
+"SIDEBAR_EDITOR_NAVIGATION_TITLE" = "사이드바";
+"SIDEBAR_EDITOR_DETAIL" = "항목을 탭하면 사이드바에서 숨겨집니다. 다시 탭하면 돌아옵니다.";
+"SIDEBAR_EDITOR_TAB_BAR_HEADER" = "탭 바에 있는 항목";
+"SIDEBAR_RESET_TITLE" = "기본값으로 재설정";
+"SIDEBAR_ITEM_SHOWN" = "표시됨";
+"SIDEBAR_ITEM_HIDDEN" = "숨겨짐";
