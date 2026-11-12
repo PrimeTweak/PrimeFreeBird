@@ -57,6 +57,12 @@ static BOOL PFBSidebarIsNamedWhenBuilt(NSInteger panelID) {
            panelID == 22 || panelID == 23 || panelID == 24 || panelID == 25;
 }
 
+// Twitter leaves a tab bar item out of the sidebar, and the unlock-only panels stay out unless
+// the account has them.
+static BOOL PFBSidebarHiddenByDefault(NSInteger panelID) {
+    return [[PFBSidebarItems tabPanelIDs] containsObject:@(panelID)] || PFBDashKeepsOut(panelID);
+}
+
 // The signed-in account's feature switches, the ones the sidebar's conditions read.
 static id PFBSidebarAccountSwitches(void) {
     Class hostClass = NSClassFromString(@"T1HostViewController");
@@ -132,7 +138,7 @@ NSArray<NSNumber*>* PFBDashSnapshot(id content) {
     if (key && [[self keysFor:kShownKey] containsObject:key]) {
         return NO;
     }
-    return PFBDashKeepsOut(panelID);
+    return PFBSidebarHiddenByDefault(panelID);
 }
 
 // A choice that matches the default is not kept, so the default still follows the account.
@@ -149,7 +155,7 @@ NSArray<NSNumber*>* PFBDashSnapshot(id content) {
         NSMutableArray<NSString*>* shownKeys = [[self keysFor:kShownKey] mutableCopy];
         [hiddenKeys removeObject:key];
         [shownKeys removeObject:key];
-        BOOL hiddenByDefault = PFBDashKeepsOut(panelID);
+        BOOL hiddenByDefault = PFBSidebarHiddenByDefault(panelID);
         if (hidden && !hiddenByDefault) {
             [hiddenKeys addObject:key];
         } else if (!hidden && hiddenByDefault) {
@@ -162,9 +168,22 @@ NSArray<NSNumber*>* PFBDashSnapshot(id content) {
 }
 
 + (NSArray<NSNumber*>*)hiddenPanelIDs {
+    NSArray<NSNumber*>* tabs = [self tabPanelIDs];
     NSMutableArray<NSNumber*>* panels = [NSMutableArray array];
     for (NSNumber* panel in [self catalog]) {
-        if (panel.integerValue != PFBSidebarGrokPanel && [self isHidden:panel.integerValue]) {
+        if (panel.integerValue != PFBSidebarGrokPanel && ![tabs containsObject:panel] &&
+            [self isHidden:panel.integerValue]) {
+            [panels addObject:panel];
+        }
+    }
+    return panels;
+}
+
++ (NSArray<NSNumber*>*)tabPanelsInSidebar {
+    NSArray<NSNumber*>* catalog = [self catalog];
+    NSMutableArray<NSNumber*>* panels = [NSMutableArray array];
+    for (NSNumber* panel in [self tabPanelIDs]) {
+        if ([catalog containsObject:panel] && ![self isHidden:panel.integerValue]) {
             [panels addObject:panel];
         }
     }
@@ -236,21 +255,27 @@ NSArray<NSNumber*>* PFBDashSnapshot(id content) {
         [[NSUserDefaults standardUserDefaults] setObject:keys forKey:kBuiltKey];
         for (NSNumber* panel in hidden) {
             if ([built containsObject:panel]) {
-                [self noteStillShown:panel];
+                [self noteFailureOf:panel state:@"still in the sidebar"];
             }
         }
     }
     for (NSNumber* panel in snapshot ? hidden : @[]) {
         if (![snapshot containsObject:panel]) {
-            [self noteStillShown:panel];
+            [self noteFailureOf:panel state:@"still in the sidebar"];
+        }
+    }
+    // A rebuild that named nothing tells nothing about the items it names.
+    for (NSNumber* panel in [self tabPanelsInSidebar]) {
+        if ((snapshot && [snapshot containsObject:panel]) ||
+            (built.count && PFBSidebarIsNamedWhenBuilt(panel.integerValue) && ![built containsObject:panel])) {
+            [self noteFailureOf:panel state:@"not added to the sidebar"];
         }
     }
 }
 
-+ (void)noteStillShown:(NSNumber*)panel {
-    PFBCompatNoteFailure(PFBCompat_customize_sidebar,
-                         [NSString stringWithFormat:@"%@ still in the sidebar",
-                                                    [self nameForPanel:panel.integerValue] ?: panel.stringValue]);
++ (void)noteFailureOf:(NSNumber*)panel state:(NSString*)state {
+    NSString* name = [self nameForPanel:panel.integerValue] ?: panel.stringValue;
+    PFBCompatNoteFailure(PFBCompat_customize_sidebar, [NSString stringWithFormat:@"%@ %@", name, state]);
 }
 
 + (NSArray<NSNumber*>*)lastBuiltPanels {
@@ -288,16 +313,19 @@ NSArray<NSNumber*>* PFBDashSnapshot(id content) {
     NSMutableArray<NSNumber*>* panels = [NSMutableArray array];
     for (NSNumber* panel in [self catalog]) {
         NSInteger panelID = panel.integerValue;
-        if ([tabs containsObject:panel] || ![self nameForPanel:panelID]) {
+        if (![self nameForPanel:panelID]) {
             continue;
         }
+        // A tab bar item is offered as is: Twitter leaves it out only for being a tab.
         BOOL kept = YES;
-        if (PFBSidebarIsNamedWhenBuilt(panelID)) {
-            kept = !built || [built containsObject:panel];
-        } else if (panelID == 20) {
-            kept = [self newsOffered];
-        } else if (panelID == 21) {
-            kept = [self businessOffered];
+        if (![tabs containsObject:panel]) {
+            if (PFBSidebarIsNamedWhenBuilt(panelID)) {
+                kept = !built || [built containsObject:panel];
+            } else if (panelID == 20) {
+                kept = [self newsOffered];
+            } else if (panelID == 21) {
+                kept = [self businessOffered];
+            }
         }
         if (kept || [self isHidden:panelID]) {
             [panels addObject:panel];

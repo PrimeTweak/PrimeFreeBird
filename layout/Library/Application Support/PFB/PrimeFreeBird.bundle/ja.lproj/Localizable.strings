@@ -235,7 +235,9 @@
 "CUSTOM_SIDEBAR_OPTION_TITLE" = "サイドバーをカスタマイズ";
 "CUSTOM_SIDEBAR_OPTION_SUBTITLE" = "サイドバーに表示する項目を選択します。";
 "SIDEBAR_EDITOR_NAVIGATION_TITLE" = "サイドバー";
-"SIDEBAR_EDITOR_DETAIL" = "項目をタップするとサイドバーから非表示になります。もう一度タップすると元に戻ります。";
-"SIDEBAR_EDITOR_TAB_BAR_HEADER" = "タブバーにある項目";
+"SIDEBAR_EDITOR_DETAIL" = "項目をタップすると、サイドバーに追加したり外したりできます。";
+"SIDEBAR_SECTION_SHOWN" = "表示中";
+"SIDEBAR_SECTION_HIDDEN" = "非表示";
+"SIDEBAR_ITEM_TAB_BAR" = "タブバー";
 "SIDEBAR_ITEM_SHOWN" = "表示";
 "SIDEBAR_ITEM_HIDDEN" = "非表示";

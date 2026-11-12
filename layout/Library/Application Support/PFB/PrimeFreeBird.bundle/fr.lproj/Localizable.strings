@@ -77,8 +77,10 @@
 "CUSTOM_SIDEBAR_OPTION_TITLE" = "Personnaliser la barre latérale";
 "CUSTOM_SIDEBAR_OPTION_SUBTITLE" = "Choisissez les éléments affichés dans la barre latérale.";
 "SIDEBAR_EDITOR_NAVIGATION_TITLE" = "Barre latérale";
-"SIDEBAR_EDITOR_DETAIL" = "Touchez un élément pour le masquer de la barre latérale. Touchez-le de nouveau pour le rétablir.";
-"SIDEBAR_EDITOR_TAB_BAR_HEADER" = "Dans votre barre d’onglets";
+"SIDEBAR_EDITOR_DETAIL" = "Touchez un élément pour l’ajouter à la barre latérale ou l’en retirer.";
+"SIDEBAR_SECTION_SHOWN" = "Affichés";
+"SIDEBAR_SECTION_HIDDEN" = "Masqués";
+"SIDEBAR_ITEM_TAB_BAR" = "Barre d’onglets";
 "SIDEBAR_ITEM_SHOWN" = "Affiché";
 "SIDEBAR_ITEM_HIDDEN" = "Masqué";
 "RESTORE_TAB_LABELS_TITLE" = "Étiquettes des onglets";

@@ -1,7 +1,9 @@
-// Probe for the Sidebar page: Twitter's panel table, and after each update of the sidebar what
-// its rebuild kept, the drawer's own list and the page's tiles. Removed once read.
+// Probe for the Sidebar page: Twitter's panel table, after each update of the sidebar what its
+// rebuild kept, the drawer's own list and the page's tiles, and who asks for each item's name.
+// Removed once read.
 
 #import <QuartzCore/QuartzCore.h>
+#import <dlfcn.h>
 #import <objc/message.h>
 #import "Common/PFBCompatibility.h"
 #import "Features/Appearance/Sidebar/PFBSidebarItems.h"
@@ -10,6 +12,8 @@
 static CFTimeInterval gProbeStart;
 static NSUInteger gProbeUpdates;
 static NSUInteger gProbeAnswers;
+static NSUInteger gProbeNamings;
+static NSInteger gProbeUpdateDepth;
 static BOOL gProbeMenuOpen;
 
 static NSString* pfbProbeNow(void) {
@@ -40,7 +44,9 @@ static NSString* pfbProbePanels(NSArray* panels) {
 
 - (void)updateVisiblePanelIDs {
     NSArray<NSNumber*>* before = PFBDashSnapshot(self);
+    gProbeUpdateDepth++;
     %orig;
+    gProbeUpdateDepth--;
     if (gProbeUpdates >= 16) {
         return;
     }
@@ -54,12 +60,49 @@ static NSString* pfbProbePanels(NSArray* panels) {
                                           before && after ? ([before isEqualToArray:after] ? @"same" : @"changed") : @"unreadable",
                                           pfbProbePanels([PFBSidebarItems lastBuiltPanels]), pfbProbePanels(after),
                                           pfbProbePanels([PFBSidebarItems tabPanelIDs])]);
-      pfbProbe([NSString stringWithFormat:@"%@ update %lu: hidden %@; page %@; News %@, Business %@", pfbProbeNow(),
-                                          (unsigned long)update, pfbProbePanels([PFBSidebarItems hiddenPanelIDs]),
+      pfbProbe([NSString stringWithFormat:@"%@ update %lu: hidden %@; tab items added %@; page %@; News %@, Business %@",
+                                          pfbProbeNow(), (unsigned long)update,
+                                          pfbProbePanels([PFBSidebarItems hiddenPanelIDs]),
+                                          pfbProbePanels([PFBSidebarItems tabPanelsInSidebar]),
                                           pfbProbePanels([PFBSidebarItems panelsForPage]),
                                           [PFBSidebarItems newsOffered] ? @"offered" : @"not offered",
                                           [PFBSidebarItems businessOffered] ? @"offered" : @"not offered"]);
     });
+}
+
+%end
+
+// The first caller outside this tweak: its image and its address there, which names the
+// sidebar's item builder in Twitter's binary.
+static NSString* pfbProbeCaller(void) {
+    Dl_info own;
+    dladdr((const void*)&pfbProbeCaller, &own);
+    NSArray<NSNumber*>* stack = [NSThread callStackReturnAddresses];
+    for (NSNumber* address in [stack subarrayWithRange:NSMakeRange(0, MIN((NSUInteger)8, stack.count))]) {
+        Dl_info info;
+        if (dladdr((const void*)address.unsignedLongValue, &info) && info.dli_fbase != own.dli_fbase) {
+            return [NSString stringWithFormat:@"%@+0x%lx", [@(info.dli_fname) lastPathComponent],
+                                              address.unsignedLongValue - (unsigned long)info.dli_fbase];
+        }
+    }
+    return @"?";
+}
+
+// Each name Twitter asks for an item the sidebar names as it builds, inside an update or not.
+%hook T1PanelIdentity
+
++ (NSString*)localizedNameForPanelID:(long long)panelID {
+    NSString* name = %orig;
+    BOOL named = panelID == 2 || panelID == 5 || panelID == 9 || panelID == 11 || panelID == 14 || panelID == 18 ||
+                 panelID == 22 || panelID == 23 || panelID == 24 || panelID == 25;
+    NSString* caller = named && gProbeNamings < 40 ? pfbProbeCaller() : nil;
+    if ([caller hasPrefix:@"T1Twitter+"]) {
+        gProbeNamings++;
+        pfbProbe([NSString stringWithFormat:@"%@ %lld %@ named by %@, %@ an update, menu %@", pfbProbeNow(), panelID,
+                                            name ?: @"-", caller, gProbeUpdateDepth ? @"inside" : @"outside",
+                                            gProbeMenuOpen ? @"open" : @"closed"]);
+    }
+    return name;
 }
 
 %end

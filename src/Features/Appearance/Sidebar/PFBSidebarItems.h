@@ -19,12 +19,14 @@ static const NSInteger PFBSidebarGrokPanel = 14;
 + (nullable NSString*)nameForPanel:(NSInteger)panelID;
 + (nullable NSString*)glyphForPanel:(NSInteger)panelID;
 
-// Hidden as chosen on the page, or by default: Grok by its own option, and the panels the
-// unlock would show without their feature.
+// Out of the sidebar as chosen on the page, or by default: Grok by its own option, a tab bar
+// item, and the panels the unlock would show without their feature.
 + (BOOL)isHidden:(NSInteger)panelID;
 + (void)setPanel:(NSInteger)panelID hidden:(BOOL)hidden;
-// The panels hidden from the sidebar, Grok's shortcut aside.
+// The panels kept out of the sidebar, Grok's shortcut and the tab bar's items aside.
 + (NSArray<NSNumber*>*)hiddenPanelIDs;
+// The tab bar's items also shown in the sidebar.
++ (NSArray<NSNumber*>*)tabPanelsInSidebar;
 // Every item back to its default.
 + (void)resetToDefault;
 
@@ -33,7 +35,7 @@ static const NSInteger PFBSidebarGrokPanel = 14;
 + (NSArray<NSNumber*>*)tabPanelIDs;
 
 // Around each update of the sidebar: the panels Twitter names while it rebuilds are the ones it
-// keeps, and the drawer's list must then hold every hidden panel.
+// keeps, and the drawer's list must hold every hidden panel and none of the tab items added.
 + (void)beginBuildOfContent:(id)content;
 + (void)noteBuiltPanel:(NSInteger)panelID;
 + (void)endBuildOfContent:(id)content;
@@ -43,7 +45,8 @@ static const NSInteger PFBSidebarGrokPanel = 14;
 + (BOOL)newsOffered;
 + (BOOL)businessOffered;
 
-// The page's tiles, in the sidebar's order: what Twitter keeps there and what is hidden from it.
+// The page's tiles, in the sidebar's order: what Twitter keeps there, what is hidden from it,
+// and the tab bar's items Twitter has a sidebar item for.
 + (NSArray<NSNumber*>*)panelsForPage;
 
 @end

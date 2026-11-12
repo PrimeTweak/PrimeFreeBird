@@ -235,7 +235,9 @@
 "CUSTOM_SIDEBAR_OPTION_TITLE" = "사이드바 사용자화";
 "CUSTOM_SIDEBAR_OPTION_SUBTITLE" = "사이드바에 표시할 항목을 선택하세요.";
 "SIDEBAR_EDITOR_NAVIGATION_TITLE" = "사이드바";
-"SIDEBAR_EDITOR_DETAIL" = "항목을 탭하면 사이드바에서 숨겨집니다. 다시 탭하면 돌아옵니다.";
-"SIDEBAR_EDITOR_TAB_BAR_HEADER" = "탭 바에 있는 항목";
+"SIDEBAR_EDITOR_DETAIL" = "항목을 탭하여 사이드바에 추가하거나 제거하세요.";
+"SIDEBAR_SECTION_SHOWN" = "표시됨";
+"SIDEBAR_SECTION_HIDDEN" = "숨겨짐";
+"SIDEBAR_ITEM_TAB_BAR" = "탭 바";
 "SIDEBAR_ITEM_SHOWN" = "표시됨";
 "SIDEBAR_ITEM_HIDDEN" = "숨겨짐";

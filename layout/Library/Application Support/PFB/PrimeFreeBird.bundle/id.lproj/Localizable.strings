@@ -235,7 +235,9 @@
 "CUSTOM_SIDEBAR_OPTION_TITLE" = "Sesuaikan bilah samping";
 "CUSTOM_SIDEBAR_OPTION_SUBTITLE" = "Pilih item yang muncul di bilah samping.";
 "SIDEBAR_EDITOR_NAVIGATION_TITLE" = "Bilah samping";
-"SIDEBAR_EDITOR_DETAIL" = "Ketuk item untuk menyembunyikannya dari bilah samping. Ketuk lagi untuk mengembalikannya.";
-"SIDEBAR_EDITOR_TAB_BAR_HEADER" = "Di bilah tab Anda";
+"SIDEBAR_EDITOR_DETAIL" = "Ketuk item untuk menambahkannya ke bilah samping atau menghapusnya.";
+"SIDEBAR_SECTION_SHOWN" = "Ditampilkan";
+"SIDEBAR_SECTION_HIDDEN" = "Disembunyikan";
+"SIDEBAR_ITEM_TAB_BAR" = "Bilah tab";
 "SIDEBAR_ITEM_SHOWN" = "Ditampilkan";
 "SIDEBAR_ITEM_HIDDEN" = "Disembunyikan";

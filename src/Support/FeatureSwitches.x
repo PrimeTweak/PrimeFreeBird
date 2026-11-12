@@ -1376,7 +1376,7 @@ static BOOL PFBDashAnswerApplies(BOOL glassNavigation) {
 %end
 
 // The tab bar's panels as the drawer reads them, with Grok's shortcut and the items hidden
-// from the Sidebar page, the unlock-only panels by default.
+// from the Sidebar page, the unlock-only panels by default, and without the tab items added.
 static NSArray* PFBDashPanelIDs(NSArray* panelIDs) {
     if (![panelIDs isKindOfClass:[NSArray class]]) {
         return panelIDs;
@@ -1397,12 +1397,18 @@ static NSArray* PFBDashPanelIDs(NSArray* panelIDs) {
     }
 
     NSArray<NSNumber*>* hidden = [PFBSidebarItems hiddenPanelIDs];
+    NSArray<NSNumber*>* added = [PFBSidebarItems tabPanelsInSidebar];
     if (hidden.count) {
         PFBCOMPAT_ACTION(PFBCompat_customize_sidebar, @"sidebar items hidden");
         for (NSNumber* panelID in hidden) {
             claim(panelID);
         }
-    } else {
+    }
+    if (added.count) {
+        PFBCOMPAT_ACTION(PFBCompat_customize_sidebar, @"tab bar items added to the sidebar");
+        [spoofed removeObjectsInArray:added];
+    }
+    if (!hidden.count && !added.count) {
         PFBCOMPAT_OBSERVE(PFBCompat_customize_sidebar, @"sidebar list read");
     }
     return spoofed;

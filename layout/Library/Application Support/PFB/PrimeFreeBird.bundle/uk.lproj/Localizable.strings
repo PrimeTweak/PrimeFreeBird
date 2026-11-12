@@ -235,7 +235,9 @@
 "CUSTOM_SIDEBAR_OPTION_TITLE" = "Налаштувати бічну панель";
 "CUSTOM_SIDEBAR_OPTION_SUBTITLE" = "Виберіть, які пункти показувати в бічній панелі.";
 "SIDEBAR_EDITOR_NAVIGATION_TITLE" = "Бічна панель";
-"SIDEBAR_EDITOR_DETAIL" = "Торкніться пункту, щоб приховати його з бічної панелі. Торкніться знову, щоб повернути його.";
-"SIDEBAR_EDITOR_TAB_BAR_HEADER" = "На панелі вкладок";
+"SIDEBAR_EDITOR_DETAIL" = "Торкніться пункту, щоб додати його на бічну панель або прибрати з неї.";
+"SIDEBAR_SECTION_SHOWN" = "Показано";
+"SIDEBAR_SECTION_HIDDEN" = "Приховано";
+"SIDEBAR_ITEM_TAB_BAR" = "Панель вкладок";
 "SIDEBAR_ITEM_SHOWN" = "Показано";
 "SIDEBAR_ITEM_HIDDEN" = "Приховано";

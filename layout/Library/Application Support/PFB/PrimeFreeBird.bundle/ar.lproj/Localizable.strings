@@ -235,7 +235,9 @@
 "CUSTOM_SIDEBAR_OPTION_TITLE" = "تخصيص الشريط الجانبي";
 "CUSTOM_SIDEBAR_OPTION_SUBTITLE" = "اختر العناصر التي تظهر في الشريط الجانبي.";
 "SIDEBAR_EDITOR_NAVIGATION_TITLE" = "الشريط الجانبي";
-"SIDEBAR_EDITOR_DETAIL" = "انقر على عنصر لإخفائه من الشريط الجانبي، وانقر عليه مرة أخرى لإعادته.";
-"SIDEBAR_EDITOR_TAB_BAR_HEADER" = "في شريط التبويبات";
+"SIDEBAR_EDITOR_DETAIL" = "انقر على عنصر لإضافته إلى الشريط الجانبي أو إزالته منه.";
+"SIDEBAR_SECTION_SHOWN" = "ظاهرة";
+"SIDEBAR_SECTION_HIDDEN" = "مخفية";
+"SIDEBAR_ITEM_TAB_BAR" = "شريط التبويبات";
 "SIDEBAR_ITEM_SHOWN" = "ظاهر";
 "SIDEBAR_ITEM_HIDDEN" = "مخفي";
