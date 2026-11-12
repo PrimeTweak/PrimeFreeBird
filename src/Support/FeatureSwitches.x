@@ -78,6 +78,7 @@ static BOOL pfbSwitchIsAnswered(NSString* key) {
       keys = [NSSet setWithArray:@[
           @"app_customization_custom_primary_color_enabled",
           @"ios_liquid_glass_redesign_enabled", @"xchat_liquid_glass_convo_header_enabled",
+          @"ios_liquid_glass_xnc2_disabled",
           @"ios_settings_redesign_enabled",
           @"hometimeline_pinned_tabs_topics_enabled",
           @"hometimeline_pinned_tabs_generic_timelines_enabled",
@@ -196,6 +197,17 @@ static NSNumber* FeatureSwitchOverrideValueForKey(NSString* key) {
     if ([key isEqualToString:@"ios_liquid_glass_redesign_enabled"] ||
         [key isEqualToString:@"xchat_liquid_glass_convo_header_enabled"]) {
         return [PFBSettings boolForKey:@"enable_liquid_glass"] ? @YES : nil;
+    }
+
+    // Twitter's newer liquid navigation, turned on from its server, collapses the tab bar its
+    // own way. Always visible keeps the navigation this build ships with, the one it pins.
+    if ([key isEqualToString:@"ios_liquid_glass_xnc2_disabled"]) {
+        if ([PFBSettings boolForKey:@"no_tab_bar_hiding"]) {
+            PFBCOMPAT_ACTION(PFBCompat_no_tab_bar_hiding, @"Twitter's liquid navigation kept off");
+            return @YES;
+        }
+        PFBCOMPAT_OBSERVE(PFBCompat_no_tab_bar_hiding, @"liquid navigation switch read");
+        return nil;
     }
 
     // New Twitter settings picks Twitter's new settings menu, where Settings.x adds a
