@@ -10,15 +10,10 @@
 // the real status can read through the unlock.
 static __thread BOOL ReportGenuineSubscription = NO;
 
-// While set, the custom-navigation tab gates (below) report their real values: callers tell
-// genuinely-held panels from ones unlocked for the tab pool, and the side drawer, which sets it
-// as it rebuilds, shows what Twitter shows.
+// While set, the custom-navigation tab gates (below) report their real values,
+// so callers can tell genuinely-held panels from ones only unlocked for the tab
+// pool.
 static __thread BOOL ReportGenuineTabGates = NO;
-
-// Set while the side drawer rebuilds (updateVisiblePanelIDs), and while a rebuild only measures
-// what Twitter shows there with nothing hidden.
-static __thread BOOL DashPanelIDQuery = NO;
-static __thread BOOL DashMeasuring = NO;
 
 // Whether the account is really a premium subscriber, ignoring the forced
 // unlock — for switch-gated surfaces that have no premium-aware seam of their
@@ -136,7 +131,7 @@ static BOOL pfbSwitchIsAnswered(NSString* key) {
           @"voice_rooms_consumption_enabled", @"communities_enable_explore_tab",
           @"subscriptions_inapp_grok", @"ai_trends_ios_enable_news_tab", @"c9s_tab_visibility",
           @"subscriptions_premium_hub_enabled", @"recruiting_global_jobs_hub_enabled",
-          @"ios_dash_connect_max_followings_count",
+          @"ios_dash_connect_max_followings_count", @"premium_business_ios_nav_promo_enabled",
           @"ios_in_app_article_webview_enabled",
           @"immersive_video_auto_advance_duration_threshold",
           @"ssp_ads_spotlight", @"ssp_ads_spotlight_client_only_integration",
@@ -175,7 +170,7 @@ static BOOL pfbSwitchIsAnswered(NSString* key) {
           @"ios_tweet_promote_button_sent_tweet_toast_enabled",
           @"ios_tweet_promote_button_third_party_boost_enabled",
           @"thirdparty_boost_author_view_button_enabled",
-          @"creator_monetization_dashboard_enabled"
+          @"creator_studio_nav_enabled", @"creator_monetization_dashboard_enabled"
       ]];
     });
     return [keys containsObject:key] || pfbIsGrokBotSwitch(key) ||
@@ -579,32 +574,54 @@ static NSNumber* FeatureSwitchOverrideValueForKey(NSString* key) {
         return nil;
     }
 
-    // Per-panel tab gates, forced on so every panel exists for the editor to offer, News also
-    // for the Explore remap's five tabs. The tab bar hook keeps them out of the bar; the side
-    // drawer reads them as they are.
+    // Per-panel tab gates, forced on so every panel exists for the editor to offer.
+    // The tab bar hook keeps them out of the bar and the dash spoof below keeps them
+    // out of the side drawer.
+    if ([key isEqualToString:@"ios_tab_bar_default_show_profile"] ||
+        [key isEqualToString:@"ios_tab_bar_default_show_communities"]) {
+        return @YES;
+    }
+
+    // Spaces, Communities-in-Explore and Grok are enabled outright for every
+    // account (Custom Navigation needs their panels to exist).
+    if ([key isEqualToString:@"voice_rooms_consumption_enabled"] ||
+        [key isEqualToString:@"communities_enable_explore_tab"] ||
+        [key isEqualToString:@"subscriptions_inapp_grok"]) {
+        return @YES;
+    }
+
+    // The Explore News tab's server gate is forced on unconditionally: Custom
+    // Navigation needs the panel to exist, and the Explore remap requires a stable
+    // five-tab population.
+    if ([key isEqualToString:@"ai_trends_ios_enable_news_tab"]) {
+        return @YES;
+    }
+
+    // 0 hides the Communities tab, 1 is contextual-only; anything else shows it.
+    if ([key isEqualToString:@"c9s_tab_visibility"]) {
+        return @2;
+    }
+
     if (!ReportGenuineTabGates) {
-        if ([key isEqualToString:@"ios_tab_bar_default_show_profile"] ||
-            [key isEqualToString:@"ios_tab_bar_default_show_communities"] ||
-            [key isEqualToString:@"voice_rooms_consumption_enabled"] ||
-            [key isEqualToString:@"communities_enable_explore_tab"] ||
-            [key isEqualToString:@"subscriptions_inapp_grok"] ||
-            [key isEqualToString:@"ai_trends_ios_enable_news_tab"] ||
-            [key isEqualToString:@"subscriptions_premium_hub_enabled"] ||
+        if ([key isEqualToString:@"subscriptions_premium_hub_enabled"] ||
             [key isEqualToString:@"recruiting_global_jobs_hub_enabled"]) {
             return @YES;
         }
-        // 0 hides the Communities tab, 1 is contextual-only; anything else shows it.
-        if ([key isEqualToString:@"c9s_tab_visibility"]) {
-            return @2;
-        }
     }
 
-    // Follow hidden from the Sidebar page: its builder reads no tab list, only this ceiling on the
+    // Follow as set on the Sidebar page: its builder reads no tab list, only this ceiling on the
     // accounts followed, read for the drawer alone; under 1, no Follow item.
-    if (!DashMeasuring && [key isEqualToString:@"ios_dash_connect_max_followings_count"] &&
-        [PFBSidebarItems isHidden:22]) {
-        PFBCOMPAT_ACTION(PFBCompat_customize_sidebar, @"Follow hidden");
-        return @0;
+    if ([key isEqualToString:@"ios_dash_connect_max_followings_count"]) {
+        BOOL shown = ![PFBSidebarItems isHidden:22];
+        PFBCOMPAT_ACTION(PFBCompat_customize_sidebar, shown ? @"Follow shown" : @"Follow hidden");
+        return shown ? @1000000000 : @0;
+    }
+
+    // Business shown on the Sidebar page: its drawer item and Twitter's other reader of this
+    // switch, isBusinessPromoNavEnabled, both see it on.
+    if ([key isEqualToString:@"premium_business_ios_nav_promo_enabled"] && ![PFBSidebarItems isHidden:21]) {
+        PFBCOMPAT_ACTION(PFBCompat_customize_sidebar, @"Business shown");
+        return @YES;
     }
 
     // In-app article webview
@@ -731,10 +748,15 @@ static NSNumber* FeatureSwitchOverrideValueForKey(NSString* key) {
     }
 
     // The Monetization entries gate purely on this switch with no premium check: kept for a
-    // real subscriber, hidden behind the spoof, and as it is while the drawer rebuilds.
-    if (!ReportGenuineTabGates && [key isEqualToString:@"creator_monetization_dashboard_enabled"] &&
-        !AccountIsGenuinelyPremium()) {
+    // real subscriber, hidden behind the spoof.
+    if ([key isEqualToString:@"creator_monetization_dashboard_enabled"] && !AccountIsGenuinelyPremium()) {
         return @NO;
+    }
+
+    // Creator Studio shown on the Sidebar page; Twitter reads this switch for the drawer alone.
+    if ([key isEqualToString:@"creator_studio_nav_enabled"] && ![PFBSidebarItems isHidden:12]) {
+        PFBCOMPAT_ACTION(PFBCompat_customize_sidebar, @"Creator Studio shown");
+        return @YES;
     }
 
     return nil;
@@ -1244,17 +1266,11 @@ BOOL PFBPanelIsGenuinelyAvailable(long long panelID) {
 // taken in updateVisiblePanelIDs. Extra panels are injected only there, scoped by a
 // flag, so other readers see the real tab state.
 
+static __thread BOOL DashPanelIDQuery = NO;
+
 // While the presenter reports the menu open, the glass navigation's list is answered too:
 // Twitter also rebuilds the open menu from its Swift side.
 static BOOL gPFBDashMenuOpen;
-
-// What the measuring rebuild saw: the drawer, the tab bar's list and the answer given for it,
-// and the panels Twitter named as it built.
-static __weak id gPFBDashMeasuredContent;
-static NSArray<NSNumber*>* gPFBDashMeasuredTabs;
-static NSArray* gPFBDashMeasureAnswer;
-static NSMutableArray<NSNumber*>* gPFBDashMeasuredNamed;
-static BOOL gPFBDashMeasurePending;
 
 static void PFBDashRebuild(id controller) {
     SEL update = NSSelectorFromString(@"updateVisiblePanelIDs");
@@ -1287,66 +1303,20 @@ void PFBDashRefresh(void) {
     }
 }
 
-PFBDashMeasurement PFBDashMeasure(void (^measured)(NSArray<NSNumber*>* tabs, NSArray<NSNumber*>* named)) {
-    gPFBDashMeasuredContent = nil;
-    gPFBDashMeasuredTabs = nil;
-    gPFBDashMeasureAnswer = nil;
-    gPFBDashMeasuredNamed = [NSMutableArray array];
-    DashMeasuring = YES;
-    PFBDashRefresh();
-    DashMeasuring = NO;
-    id content = gPFBDashMeasuredContent;
-    if (!content) {
-        return PFBDashMeasurementNoSidebar;
-    }
-    // The drawer keeps the list it rebuilt with; unreadable, a named panel proves the rebuild.
-    NSArray<NSNumber*>* kept = PFBDashSnapshot(content);
-    BOOL rebuilt = gPFBDashMeasuredTabs &&
-                   (kept ? [kept isEqualToArray:gPFBDashMeasureAnswer] : gPFBDashMeasuredNamed.count > 0);
-    if (rebuilt) {
-        BOOL savedGates = ReportGenuineTabGates;
-        ReportGenuineTabGates = YES;
-        measured(gPFBDashMeasuredTabs, [gPFBDashMeasuredNamed copy]);
-        ReportGenuineTabGates = savedGates;
-    }
-    PFBDashRefresh();
-    return rebuilt ? PFBDashMeasurementDone : PFBDashMeasurementNotRebuilt;
-}
-
-// Measured with the drawer closed, so neither rebuild shows; else once it closes.
-static void PFBDashMeasureWhenClosed(void) {
-    gPFBDashMeasurePending = gPFBDashMenuOpen || ![PFBSidebarItems measureNative];
-}
-
-// Once a launch, a while after it, Twitter's sidebar is measured for the Sidebar page and the sheet.
-%ctor {
-    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(15 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
-      PFBDashMeasureWhenClosed();
-    });
-}
-
 %hook T1DashContentController
 
 - (void)updateVisiblePanelIDs {
     // A nested update would clear the flag for the rest of the outer one.
     BOOL outer = !DashPanelIDQuery;
-    // A measuring rebuild is not the tweak's: the sidebar's record leaves it out.
-    BOOL recorded = outer && !DashMeasuring;
     if (!outer) {
         PFBCompatMeasure(@"side menu panels", @"panel list updated inside its own update", 2);
-    } else if (recorded) {
+    } else {
         [PFBSidebarItems beginBuildOfContent:self];
     }
-    if (DashMeasuring) {
-        gPFBDashMeasuredContent = self;
-    }
-    BOOL savedGates = ReportGenuineTabGates;
-    ReportGenuineTabGates = YES;
     DashPanelIDQuery = YES;
     %orig;
     DashPanelIDQuery = NO;
-    ReportGenuineTabGates = savedGates;
-    if (recorded) {
+    if (outer) {
         [PFBSidebarItems endBuildOfContent:self];
     }
 }
@@ -1392,25 +1362,16 @@ static BOOL PFBDashAnswerApplies(BOOL glassNavigation) {
 - (void)dashDidSettleOpen:(BOOL)open {
     gPFBDashMenuOpen = open;
     %orig;
-    if (!open && gPFBDashMeasurePending) {
-        dispatch_async(dispatch_get_main_queue(), ^{
-          PFBDashMeasureWhenClosed();
-        });
-    }
 }
 
 %end
 
-// The sidebar's rebuild names each of some items once it keeps it: a measuring rebuild tells
-// the Sidebar page what to offer, and an item hidden from it must not be named.
+// The sidebar's rebuild names each of some items once it keeps it: the Sidebar page offers
+// those, and an item hidden from it must not be named.
 %hook T1PanelIdentity
 
 + (NSString*)localizedNameForPanelID:(long long)panelID {
-    if (DashPanelIDQuery && DashMeasuring) {
-        if (![gPFBDashMeasuredNamed containsObject:@(panelID)]) {
-            [gPFBDashMeasuredNamed addObject:@(panelID)];
-        }
-    } else if (DashPanelIDQuery) {
+    if (DashPanelIDQuery) {
         [PFBSidebarItems noteBuiltPanel:(NSInteger)panelID];
     }
     return %orig;
@@ -1418,26 +1379,13 @@ static BOOL PFBDashAnswerApplies(BOOL glassNavigation) {
 
 %end
 
-// A measuring rebuild gets the tab bar's list with its first panel repeated: the drawer sees a
-// new list, so it rebuilds, with no panel more or less.
-static NSArray* PFBDashMeasureAnswer(NSArray* panelIDs) {
-    if (!panelIDs.count || [panelIDs isEqualToArray:gPFBDashMeasureAnswer ?: @[]]) {
-        return panelIDs;
-    }
-    gPFBDashMeasuredTabs = [panelIDs copy];
-    gPFBDashMeasureAnswer = [panelIDs arrayByAddingObject:panelIDs.firstObject];
-    return gPFBDashMeasureAnswer;
-}
-
-// The tab bar's panels as the drawer reads them, with Grok's shortcut, the items hidden from
-// the Sidebar page, and the ones only the unlock's gates would add.
+// The tab bar's panels as the drawer reads them, with Grok's shortcut and the items hidden
+// from the Sidebar page.
 static NSArray* PFBDashPanelIDs(NSArray* panelIDs) {
     if (![panelIDs isKindOfClass:[NSArray class]]) {
         return panelIDs;
     }
-    if (DashMeasuring) {
-        return PFBDashMeasureAnswer(panelIDs);
-    }
+    [PFBSidebarItems recordTabPanelIDs:panelIDs];
     NSMutableArray* spoofed = [panelIDs mutableCopy];
     void (^claim)(NSNumber*) = ^(NSNumber* panelID) {
         if (![spoofed containsObject:panelID]) {
@@ -1460,9 +1408,6 @@ static NSArray* PFBDashPanelIDs(NSArray* panelIDs) {
         }
     } else {
         PFBCOMPAT_OBSERVE(PFBCompat_customize_sidebar, @"sidebar list read");
-    }
-    for (NSNumber* panelID in [PFBSidebarItems unlockedPanelIDs]) {
-        claim(panelID);
     }
     return spoofed;
 }

@@ -213,13 +213,16 @@ static const CGFloat kTileRadius = 22.0;
     [self applyColors];
 }
 
-// The tiles are built as the page opens, from Twitter's sidebar measured then, in its order; a tap
-// moves one to the other group, where it keeps that order.
+// The tiles are built as the page opens, in the sidebar's order; a tap moves one to the other
+// group, where it keeps that order.
 - (void)buildTiles {
     for (PFBSidebarTile* tile in self.tiles) {
         [tile removeFromSuperview];
     }
-    [PFBSidebarItems measureNative];
+    // The tab bar's panels are known once the sidebar has asked for them.
+    if (![PFBSidebarItems tabPanelIDs].count) {
+        PFBDashRefresh();
+    }
     NSMutableArray<PFBSidebarTile*>* tiles = [NSMutableArray array];
     for (NSNumber* panel in [PFBSidebarItems panelsForPage]) {
         PFBSidebarTile* tile = [[PFBSidebarTile alloc] initWithPanel:panel.integerValue];
