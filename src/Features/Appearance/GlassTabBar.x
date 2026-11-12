@@ -491,6 +491,27 @@ static void PFBGlassFollowCollapse(UIView* platter, CGFloat height) {
     }
 }
 
+// Always visible keeps the bar full: its glass laid out as the round button, about as wide as
+// tall and far narrower than the bar, means the bar collapsed anyway and fails the option.
+static void PFBGlassCheckAlwaysVisible(UIView* glass) {
+    static BOOL noted;
+    CGSize size = glass.bounds.size;
+    if (noted || size.height <= 0.0 || size.width <= 0.0 || size.width > size.height * 1.5 || !glass.window ||
+        !gPFBGlassBarClass) {
+        return;
+    }
+    UIView* bar = glass.superview;
+    for (NSUInteger hops = 0; bar && hops < 3 && ![bar isKindOfClass:gPFBGlassBarClass]; hops++) {
+        bar = bar.superview;
+    }
+    if (![bar isKindOfClass:gPFBGlassBarClass] || CGRectGetWidth(bar.bounds) < size.width * 2.0 ||
+        ![PFBSettings boolForKey:@"no_tab_bar_hiding"]) {
+        return;
+    }
+    noted = YES;
+    PFBCompatNoteFailure(PFBCompat_no_tab_bar_hiding, @"tab bar collapsed while on");
+}
+
 // MARK: - Pill
 
 // Twitter builds the bar's pill once, from its metrics: 54 pt high, the 62 pt bar less 4 pt above
@@ -1024,6 +1045,35 @@ void PFBGlassRefreshAlwaysVisible(void) {
     @try {
         PFBGlassFindClasses();
         PFBGlassFollowCollapse((UIView*)self, CGRectGetHeight(bounds));
+    } @catch (__unused id exception) {
+    }
+}
+
+- (void)layoutSubviews {
+    %orig;
+    @try {
+        PFBGlassFindClasses();
+        PFBGlassCheckAlwaysVisible((UIView*)self);
+    } @catch (__unused id exception) {
+    }
+}
+
+%end
+
+// Twitter's liquid navigation, which Always visible keeps off: a screen shown in it while the
+// option is on is measured, for the report to name.
+%hook XNAVLiquidNavigationController
+
+- (void)viewDidAppear:(BOOL)animated {
+    %orig;
+    @try {
+        UIViewController* top = ((UINavigationController*)self).topViewController;
+        if ([PFBSettings boolForKey:@"no_tab_bar_hiding"]) {
+            PFBCompatMeasure(@"always visible",
+                             [NSString stringWithFormat:@"liquid navigation in use while on, showing %@",
+                                                        NSStringFromClass([top class]) ?: @"nothing"],
+                             4);
+        }
     } @catch (__unused id exception) {
     }
 }
