@@ -59,7 +59,7 @@
 "REGULAR_FONTS_PICKER_OPTION_TITLE" = "一般字體";
 "BOLD_FONTS_PICKER_OPTION_TITLE" = "粗體字體";
 "FONT_SYSTEM_DEFAULT_SUBTITLE" = "預設";
-"DEFAULT_FONT_OPTION_TITLE" = "重設字體";
+"DEFAULT_FONT_OPTION_TITLE" = "復原字體";
 "DEFAULT_FONT_CONFIRM_MESSAGE" = "一般與粗體會回到 Twitter 的字體，並清除最近使用的字體。";
 
 /* ===== Appearance › Colors ===== */
@@ -84,7 +84,6 @@
 "SIDEBAR_EDITOR_DETAIL" = "點一下項目即可加入側邊欄或從中移除。";
 "SIDEBAR_SECTION_SHOWN" = "已顯示";
 "SIDEBAR_SECTION_HIDDEN" = "已隱藏";
-"SIDEBAR_ITEM_TAB_BAR" = "分頁列";
 "SIDEBAR_ITEM_SHOWN" = "已顯示";
 "SIDEBAR_ITEM_HIDDEN" = "已隱藏";
 "RESTORE_TAB_LABELS_TITLE" = "分頁標籤";
@@ -304,9 +303,9 @@
 "THEME_SETTINGS_NAVIGATION_TITLE" = "主題顏色";
 "THEME_CUSTOM_HINT" = "為連結、按鈕和醒目標示選擇任何顏色。";
 "THEME_RESET_HINT" = "移除所有地方的強調色，包括已選取的分頁、開關和 Twitter 圖示。";
-"THEME_RESET_CONFIRM_TITLE" = "重設主題顏色";
+"THEME_RESET_CONFIRM_TITLE" = "復原主題顏色";
 "THEME_RESET_CONFIRM_MESSAGE" = "強調色會恢復為 Twitter 的預設值，「已選取的分頁」、「開關」和「Twitter 圖示」不再使用它。你的其他設定會保留。";
-"THEME_RESET_ACTION" = "重設";
+"THEME_RESET_ACTION" = "復原";
 "THEME_CUSTOM_NAME" = "自訂";
 "THEME_PREVIEW_TWEET" = "你的顏色會出現在 twitter.com 這類連結、@Twitter 這類提及和 #Twitter 這類主題標籤中。";
 "THEME_DEFAULT_NAME" = "預設";

@@ -59,7 +59,7 @@
 "REGULAR_FONTS_PICKER_OPTION_TITLE" = "標準フォント";
 "BOLD_FONTS_PICKER_OPTION_TITLE" = "太字フォント";
 "FONT_SYSTEM_DEFAULT_SUBTITLE" = "デフォルト";
-"DEFAULT_FONT_OPTION_TITLE" = "フォントをリセット";
+"DEFAULT_FONT_OPTION_TITLE" = "フォントを元に戻す";
 "DEFAULT_FONT_CONFIRM_MESSAGE" = "標準と太字がTwitterのフォントに戻り、最近使ったフォントは消去されます。";
 
 /* ===== Appearance › Colors ===== */
@@ -84,7 +84,6 @@
 "SIDEBAR_EDITOR_DETAIL" = "項目をタップすると、サイドバーに追加したり外したりできます。";
 "SIDEBAR_SECTION_SHOWN" = "表示中";
 "SIDEBAR_SECTION_HIDDEN" = "非表示";
-"SIDEBAR_ITEM_TAB_BAR" = "タブバー";
 "SIDEBAR_ITEM_SHOWN" = "表示";
 "SIDEBAR_ITEM_HIDDEN" = "非表示";
 "RESTORE_TAB_LABELS_TITLE" = "タブのラベル";
@@ -304,9 +303,9 @@
 "THEME_SETTINGS_NAVIGATION_TITLE" = "テーマカラー";
 "THEME_CUSTOM_HINT" = "リンク、ボタン、ハイライトに好きな色を選びます。";
 "THEME_RESET_HINT" = "選択中のタブ、スイッチ、Twitterアイコンを含め、すべての場所からアクセントカラーを取り除きます。";
-"THEME_RESET_CONFIRM_TITLE" = "テーマカラーをリセット";
+"THEME_RESET_CONFIRM_TITLE" = "テーマカラーを元に戻す";
 "THEME_RESET_CONFIRM_MESSAGE" = "アクセントカラーがTwitterのデフォルトに戻り、「選択中のタブ」「スイッチ」「Twitterアイコン」はそれを使わなくなります。その他の設定は残ります。";
-"THEME_RESET_ACTION" = "リセット";
+"THEME_RESET_ACTION" = "元に戻す";
 "THEME_CUSTOM_NAME" = "カスタム";
 "THEME_PREVIEW_TWEET" = "あなたの色は、twitter.comのようなリンク、@Twitterのようなメンション、#Twitterのようなハッシュタグに表示されます。";
 "THEME_DEFAULT_NAME" = "デフォルト";

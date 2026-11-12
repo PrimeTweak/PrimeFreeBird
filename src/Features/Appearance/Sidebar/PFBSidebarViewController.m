@@ -20,11 +20,11 @@ static const CGFloat kTileRadius = 22.0;
 // MARK: - Tile
 
 // One item: Twitter's glyph and name on glass with a filled check while it is in the sidebar; a
-// dashed outline and a plus once hidden. A tab bar item says so above its name.
+// dashed outline and a plus once hidden.
 @interface PFBSidebarTile : UIControl
 @property (nonatomic, readonly) NSInteger panelID;
 @property (nonatomic) BOOL shown;
-- (instancetype)initWithPanel:(NSInteger)panelID inTabBar:(BOOL)inTabBar;
+- (instancetype)initWithPanel:(NSInteger)panelID;
 - (void)applyTheme;
 @end
 
@@ -34,12 +34,11 @@ static const CGFloat kTileRadius = 22.0;
     UIImageView* _glyph;
     UIView* _mark;
     UIImageView* _sign;
-    UILabel* _caption;
     UILabel* _name;
     NSString* _glyphName;
 }
 
-- (instancetype)initWithPanel:(NSInteger)panelID inTabBar:(BOOL)inTabBar {
+- (instancetype)initWithPanel:(NSInteger)panelID {
     self = [super initWithFrame:CGRectZero];
     if (self) {
         _panelID = panelID;
@@ -58,22 +57,18 @@ static const CGFloat kTileRadius = 22.0;
         _sign = [[UIImageView alloc] init];
         _sign.contentMode = UIViewContentModeCenter;
         [_mark addSubview:_sign];
-        _caption = [[UILabel alloc] init];
-        _caption.font = PFBScaledFont([TwitterChirpFont(TwitterFontStyleRegular) fontWithSize:12]);
-        _caption.text = inTabBar ? [[PFBBundle sharedBundle] localizedStringForKey:@"SIDEBAR_ITEM_TAB_BAR"] : nil;
-        _caption.hidden = !inTabBar;
         _name = [[UILabel alloc] init];
         _name.font = PFBScaledFont([TwitterChirpFont(TwitterFontStyleBold) fontWithSize:16]);
         _name.adjustsFontSizeToFitWidth = YES;
         _name.minimumScaleFactor = 0.75;
         _name.text = [PFBSidebarItems nameForPanel:panelID];
         _glyphName = [PFBSidebarItems glyphForPanel:panelID];
-        for (UIView* part in @[ _glyph, _mark, _caption, _name ]) {
+        for (UIView* part in @[ _glyph, _mark, _name ]) {
             part.userInteractionEnabled = NO;
             [self addSubview:part];
         }
         self.isAccessibilityElement = YES;
-        self.accessibilityLabel = inTabBar ? [NSString stringWithFormat:@"%@, %@", _name.text, _caption.text] : _name.text;
+        self.accessibilityLabel = _name.text;
         self.accessibilityTraits = UIAccessibilityTraitButton;
         _shown = YES;
         [self applyTheme];
@@ -88,7 +83,6 @@ static const CGFloat kTileRadius = 22.0;
     }
     _glyph.image = [glyph imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate]
                        ?: [UIImage systemImageNamed:@"circle.grid.2x2"];
-    _caption.textColor = PFBSettingsSubtitleColor();
     [self applyState];
 }
 
@@ -134,19 +128,15 @@ static const CGFloat kTileRadius = 22.0;
     CGRect mark = CGRectMake(width - kTileInset - kMarkSize, kTileInset, kMarkSize, kMarkSize);
     CGFloat line = ceil(_name.font.lineHeight);
     CGRect name = CGRectMake(kTileInset, height - kTileInset - line, textWidth, line);
-    CGFloat captionLine = ceil(_caption.font.lineHeight);
-    CGRect caption = CGRectMake(kTileInset, CGRectGetMinY(name) - captionLine, textWidth, captionLine);
     if (rtl) {
         glyph.origin.x = width - CGRectGetMaxX(glyph);
         mark.origin.x = width - CGRectGetMaxX(mark);
     }
     _name.textAlignment = rtl ? NSTextAlignmentRight : NSTextAlignmentLeft;
-    _caption.textAlignment = _name.textAlignment;
     _glyph.frame = glyph;
     _mark.frame = mark;
     _sign.frame = _mark.bounds;
     _name.frame = name;
-    _caption.frame = caption;
 }
 
 // A press shrinks the tile a little, as the page's capsules do.
@@ -223,21 +213,16 @@ static const CGFloat kTileRadius = 22.0;
     [self applyColors];
 }
 
-// The tiles are built as the page opens, in the sidebar's order; a tap moves one to the other
-// group, where it keeps that order.
+// The tiles are built as the page opens, from Twitter's sidebar measured then, in its order; a tap
+// moves one to the other group, where it keeps that order.
 - (void)buildTiles {
     for (PFBSidebarTile* tile in self.tiles) {
         [tile removeFromSuperview];
     }
-    // The tab bar's panels are known once the sidebar has asked for them.
-    if (![PFBSidebarItems tabPanelIDs].count) {
-        PFBDashRefresh();
-    }
-    NSArray<NSNumber*>* tabs = [PFBSidebarItems tabPanelIDs];
+    [PFBSidebarItems measureNative];
     NSMutableArray<PFBSidebarTile*>* tiles = [NSMutableArray array];
     for (NSNumber* panel in [PFBSidebarItems panelsForPage]) {
-        PFBSidebarTile* tile = [[PFBSidebarTile alloc] initWithPanel:panel.integerValue
-                                                            inTabBar:[tabs containsObject:panel]];
+        PFBSidebarTile* tile = [[PFBSidebarTile alloc] initWithPanel:panel.integerValue];
         [tile addTarget:self action:@selector(tileTapped:) forControlEvents:UIControlEventTouchUpInside];
         [self.scroll addSubview:tile];
         [tiles addObject:tile];

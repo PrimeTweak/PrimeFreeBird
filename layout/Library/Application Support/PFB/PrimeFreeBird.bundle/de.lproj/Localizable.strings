@@ -59,7 +59,7 @@
 "REGULAR_FONTS_PICKER_OPTION_TITLE" = "Normale Schriftart";
 "BOLD_FONTS_PICKER_OPTION_TITLE" = "Fette Schriftart";
 "FONT_SYSTEM_DEFAULT_SUBTITLE" = "Standard";
-"DEFAULT_FONT_OPTION_TITLE" = "Schriften zurücksetzen";
+"DEFAULT_FONT_OPTION_TITLE" = "Schriften wiederherstellen";
 "DEFAULT_FONT_CONFIRM_MESSAGE" = "Normal und Fett nutzen wieder die Schrift von Twitter, und die zuletzt genutzten Schriften werden gelöscht.";
 
 /* ===== Appearance › Colors ===== */
@@ -84,7 +84,6 @@
 "SIDEBAR_EDITOR_DETAIL" = "Tippe auf ein Element, um es der Seitenleiste hinzuzufügen oder daraus zu entfernen.";
 "SIDEBAR_SECTION_SHOWN" = "Angezeigt";
 "SIDEBAR_SECTION_HIDDEN" = "Ausgeblendet";
-"SIDEBAR_ITEM_TAB_BAR" = "Tableiste";
 "SIDEBAR_ITEM_SHOWN" = "Angezeigt";
 "SIDEBAR_ITEM_HIDDEN" = "Ausgeblendet";
 "RESTORE_TAB_LABELS_TITLE" = "Tab-Beschriftungen";
@@ -304,9 +303,9 @@
 "THEME_SETTINGS_NAVIGATION_TITLE" = "Designfarbe";
 "THEME_CUSTOM_HINT" = "Wähle eine beliebige Farbe für Links, Buttons und Hervorhebungen.";
 "THEME_RESET_HINT" = "Entfernt die Akzentfarbe überall, auch vom ausgewählten Tab, den Schaltern und dem Twitter-Symbol.";
-"THEME_RESET_CONFIRM_TITLE" = "Designfarbe zurücksetzen";
+"THEME_RESET_CONFIRM_TITLE" = "Designfarbe wiederherstellen";
 "THEME_RESET_CONFIRM_MESSAGE" = "Die Akzentfarbe kehrt zum Standard von Twitter zurück, und Ausgewählter Tab, Schalter und Twitter-Symbol nutzen sie nicht mehr. Deine übrigen Einstellungen bleiben.";
-"THEME_RESET_ACTION" = "Zurücksetzen";
+"THEME_RESET_ACTION" = "Wiederherstellen";
 "THEME_CUSTOM_NAME" = "Eigene";
 "THEME_PREVIEW_TWEET" = "Deine Farbe erscheint in Links wie twitter.com, Erwähnungen wie @Twitter und Hashtags wie #Twitter.";
 "THEME_DEFAULT_NAME" = "Standard";

@@ -1,5 +1,5 @@
-// The sidebar's items as Twitter's panels: their names and glyphs, the ones hidden from the
-// Sidebar page, and the ones Twitter built when it last rebuilt the sidebar.
+// The sidebar's items as Twitter's panels: their names and glyphs, the ones Twitter shows there,
+// and the ones hidden from the Sidebar page.
 
 #import <UIKit/UIKit.h>
 
@@ -19,47 +19,44 @@ static const NSInteger PFBSidebarGrokPanel = 14;
 + (nullable NSString*)nameForPanel:(NSInteger)panelID;
 + (nullable NSString*)glyphForPanel:(NSInteger)panelID;
 
-// Out of the sidebar as chosen on the page, or by default: Grok by its own option, a tab bar
-// item, and the panels the unlock would show without their feature.
+// Hidden from the sidebar on the page; Grok by its own option.
 + (BOOL)isHidden:(NSInteger)panelID;
 + (void)setPanel:(NSInteger)panelID hidden:(BOOL)hidden;
-// The panels kept out of the sidebar, Grok's shortcut and the tab bar's items aside.
+// The panels kept out of the sidebar, Grok's shortcut aside.
 + (NSArray<NSNumber*>*)hiddenPanelIDs;
-// The tab bar's items also shown in the sidebar.
-+ (NSArray<NSNumber*>*)tabPanelsInSidebar;
-// Every item back to its default.
+// Every item back in the sidebar.
 + (void)resetToDefault;
 
-// Twitter's own tab bar panels, in their order, as the sidebar last asked for them.
-+ (void)recordTabPanelIDs:(NSArray*)panelIDs;
-+ (NSArray<NSNumber*>*)tabPanelIDs;
+// Twitter's sidebar measured as Twitter shows it with nothing hidden; NO when there is no sidebar
+// to rebuild yet.
++ (BOOL)measureNative;
+// The panels of the last measure, in the sidebar's order: the page's tiles.
++ (NSArray<NSNumber*>*)panelsForPage;
+// The panels only the unlock's gates would add to the sidebar, kept out with the hidden ones;
+// none before a measure.
++ (NSArray<NSNumber*>*)unlockedPanelIDs;
 
 // Around each update of the sidebar: the panels Twitter names while it rebuilds are the ones it
-// keeps, and the drawer's list must hold every hidden panel and none of the tab items added.
+// keeps, and the drawer's list must hold every hidden panel and every unlocked one.
 + (void)beginBuildOfContent:(id)content;
 + (void)noteBuiltPanel:(NSInteger)panelID;
 + (void)endBuildOfContent:(id)content;
-// The panels the last rebuild kept, of those Twitter names as it builds; nil before one.
-+ (nullable NSArray<NSNumber*>*)lastBuiltPanels;
-// Twitter's own conditions for News and Business in the sidebar.
-+ (BOOL)newsOffered;
-+ (BOOL)businessOffered;
-
-// The page's tiles, in the sidebar's order: what Twitter keeps there, what is hidden from it,
-// and the tab bar's items Twitter has a sidebar item for.
-+ (NSArray<NSNumber*>*)panelsForPage;
 
 @end
 
+typedef NS_ENUM(NSInteger, PFBDashMeasurement) {
+    PFBDashMeasurementNoSidebar,
+    PFBDashMeasurementNotRebuilt,
+    PFBDashMeasurementDone,
+};
+
 // The open session's sidebar rebuilt with the items as they stand (FeatureSwitches.x).
 FOUNDATION_EXPORT void PFBDashRefresh(void);
-// Whether a panel the unlock would show is one this account does not have (FeatureSwitches.x).
-FOUNDATION_EXPORT BOOL PFBDashKeepsOut(long long panelID);
+// The sidebar rebuilt once with nothing hidden, then as it stands; in between, while Twitter's
+// gates still answer, the tab bar's panels and the ones Twitter named (FeatureSwitches.x).
+FOUNDATION_EXPORT PFBDashMeasurement PFBDashMeasure(void (^measured)(NSArray<NSNumber*>* tabs,
+                                                                     NSArray<NSNumber*>* named));
 // The drawer's own list of the tab bar's panels, read from its Swift array; nil when unreadable.
 FOUNDATION_EXPORT NSArray<NSNumber*>* _Nullable PFBDashSnapshot(id content);
-// Between these, reads and rebuilds of the sidebar are Twitter's alone: no switch answer, and
-// the drawer's list as the tab bar gives it (FeatureSwitches.x).
-FOUNDATION_EXPORT void PFBBeginTwitterOnlyReads(void);
-FOUNDATION_EXPORT void PFBEndTwitterOnlyReads(void);
 
 NS_ASSUME_NONNULL_END

@@ -59,7 +59,7 @@
 "REGULAR_FONTS_PICKER_OPTION_TITLE" = "Regular font";
 "BOLD_FONTS_PICKER_OPTION_TITLE" = "Bold font";
 "FONT_SYSTEM_DEFAULT_SUBTITLE" = "Default";
-"DEFAULT_FONT_OPTION_TITLE" = "Reset fonts";
+"DEFAULT_FONT_OPTION_TITLE" = "Restore fonts";
 "DEFAULT_FONT_CONFIRM_MESSAGE" = "Regular and bold go back to Twitter’s font, and the recent fonts are cleared.";
 
 /* ===== Appearance › Colors ===== */
@@ -84,7 +84,6 @@
 "SIDEBAR_EDITOR_DETAIL" = "Tap an item to add it to the sidebar or take it out.";
 "SIDEBAR_SECTION_SHOWN" = "In sidebar";
 "SIDEBAR_SECTION_HIDDEN" = "Hidden";
-"SIDEBAR_ITEM_TAB_BAR" = "Tab bar";
 "SIDEBAR_ITEM_SHOWN" = "Shown";
 "SIDEBAR_ITEM_HIDDEN" = "Hidden";
 "RESTORE_TAB_LABELS_TITLE" = "Tab labels";
@@ -304,9 +303,9 @@
 "THEME_SETTINGS_NAVIGATION_TITLE" = "Theme color";
 "THEME_CUSTOM_HINT" = "Pick any color for links, buttons, and highlights.";
 "THEME_RESET_HINT" = "Removes the accent color everywhere, including the selected tab, the switches and the Twitter icon.";
-"THEME_RESET_CONFIRM_TITLE" = "Reset theme color";
+"THEME_RESET_CONFIRM_TITLE" = "Restore theme color";
 "THEME_RESET_CONFIRM_MESSAGE" = "The accent color goes back to Twitter’s default, and Selected tab, Switches and Twitter icon stop using it. Your other settings stay.";
-"THEME_RESET_ACTION" = "Reset";
+"THEME_RESET_ACTION" = "Restore";
 "THEME_CUSTOM_NAME" = "Custom";
 "THEME_PREVIEW_TWEET" = "Your color shows in links like twitter.com, mentions like @Twitter, and hashtags like #Twitter.";
 "THEME_DEFAULT_NAME" = "Default";

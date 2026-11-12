@@ -59,7 +59,7 @@
 "REGULAR_FONTS_PICKER_OPTION_TITLE" = "الخط العادي";
 "BOLD_FONTS_PICKER_OPTION_TITLE" = "الخط العريض";
 "FONT_SYSTEM_DEFAULT_SUBTITLE" = "افتراضي";
-"DEFAULT_FONT_OPTION_TITLE" = "إعادة تعيين الخطوط";
+"DEFAULT_FONT_OPTION_TITLE" = "استعادة الخطوط";
 "DEFAULT_FONT_CONFIRM_MESSAGE" = "يعود الخط العادي والعريض إلى خط تويتر، وتُمسح الخطوط الأخيرة.";
 
 /* ===== Appearance › Colors ===== */
@@ -84,7 +84,6 @@
 "SIDEBAR_EDITOR_DETAIL" = "انقر على عنصر لإضافته إلى الشريط الجانبي أو إزالته منه.";
 "SIDEBAR_SECTION_SHOWN" = "ظاهرة";
 "SIDEBAR_SECTION_HIDDEN" = "مخفية";
-"SIDEBAR_ITEM_TAB_BAR" = "شريط التبويبات";
 "SIDEBAR_ITEM_SHOWN" = "ظاهر";
 "SIDEBAR_ITEM_HIDDEN" = "مخفي";
 "RESTORE_TAB_LABELS_TITLE" = "تسميات التبويبات";
@@ -304,9 +303,9 @@
 "THEME_SETTINGS_NAVIGATION_TITLE" = "لون السمة";
 "THEME_CUSTOM_HINT" = "اختر أي لون للروابط والأزرار والتمييز.";
 "THEME_RESET_HINT" = "يزيل لون التمييز من كل مكان، بما في ذلك التبويب المحدد والمفاتيح وأيقونة تويتر.";
-"THEME_RESET_CONFIRM_TITLE" = "إعادة تعيين لون السمة";
+"THEME_RESET_CONFIRM_TITLE" = "استعادة لون السمة";
 "THEME_RESET_CONFIRM_MESSAGE" = "يعود لون التمييز إلى لون تويتر الافتراضي، ويتوقف التبويب المحدد والمفاتيح وأيقونة تويتر عن استخدامه. تبقى إعداداتك الأخرى.";
-"THEME_RESET_ACTION" = "إعادة تعيين";
+"THEME_RESET_ACTION" = "استعادة";
 "THEME_CUSTOM_NAME" = "مخصص";
 "THEME_PREVIEW_TWEET" = "يظهر لونك في الروابط مثل twitter.com، والإشارات مثل @Twitter، والوسوم مثل #Twitter.";
 "THEME_DEFAULT_NAME" = "افتراضي";

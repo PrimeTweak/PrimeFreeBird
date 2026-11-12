@@ -59,7 +59,7 @@
 "REGULAR_FONTS_PICKER_OPTION_TITLE" = "Normal yazı tipi";
 "BOLD_FONTS_PICKER_OPTION_TITLE" = "Kalın yazı tipi";
 "FONT_SYSTEM_DEFAULT_SUBTITLE" = "Varsayılan";
-"DEFAULT_FONT_OPTION_TITLE" = "Yazı tiplerini sıfırla";
+"DEFAULT_FONT_OPTION_TITLE" = "Yazı tiplerini geri yükle";
 "DEFAULT_FONT_CONFIRM_MESSAGE" = "Normal ve kalın yazı Twitter’ın yazı tipine döner ve son kullanılan yazı tipleri temizlenir.";
 
 /* ===== Appearance › Colors ===== */
@@ -84,7 +84,6 @@
 "SIDEBAR_EDITOR_DETAIL" = "Kenar çubuğuna eklemek ya da çıkarmak için bir öğeye dokun.";
 "SIDEBAR_SECTION_SHOWN" = "Gösterilen";
 "SIDEBAR_SECTION_HIDDEN" = "Gizli";
-"SIDEBAR_ITEM_TAB_BAR" = "Sekme çubuğu";
 "SIDEBAR_ITEM_SHOWN" = "Gösteriliyor";
 "SIDEBAR_ITEM_HIDDEN" = "Gizli";
 "RESTORE_TAB_LABELS_TITLE" = "Sekme etiketleri";
@@ -304,9 +303,9 @@
 "THEME_SETTINGS_NAVIGATION_TITLE" = "Tema rengi";
 "THEME_CUSTOM_HINT" = "Bağlantılar, düğmeler ve vurgular için istediğin rengi seç.";
 "THEME_RESET_HINT" = "Vurgu rengini seçili sekme, anahtarlar ve Twitter simgesi dahil her yerden kaldırır.";
-"THEME_RESET_CONFIRM_TITLE" = "Tema rengini sıfırla";
+"THEME_RESET_CONFIRM_TITLE" = "Tema rengini geri yükle";
 "THEME_RESET_CONFIRM_MESSAGE" = "Vurgu rengi Twitter’ın varsayılanına döner; Seçili sekme, Anahtarlar ve Twitter simgesi onu kullanmayı bırakır. Diğer ayarların kalır.";
-"THEME_RESET_ACTION" = "Sıfırla";
+"THEME_RESET_ACTION" = "Geri yükle";
 "THEME_CUSTOM_NAME" = "Özel";
 "THEME_PREVIEW_TWEET" = "Rengin twitter.com gibi bağlantılarda, @Twitter gibi bahsetmelerde ve #Twitter gibi etiketlerde görünür.";
 "THEME_DEFAULT_NAME" = "Varsayılan";

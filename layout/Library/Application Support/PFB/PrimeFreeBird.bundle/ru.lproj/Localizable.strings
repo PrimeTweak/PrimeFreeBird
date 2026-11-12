@@ -59,7 +59,7 @@
 "REGULAR_FONTS_PICKER_OPTION_TITLE" = "Обычный шрифт";
 "BOLD_FONTS_PICKER_OPTION_TITLE" = "Жирный шрифт";
 "FONT_SYSTEM_DEFAULT_SUBTITLE" = "По умолчанию";
-"DEFAULT_FONT_OPTION_TITLE" = "Сбросить шрифты";
+"DEFAULT_FONT_OPTION_TITLE" = "Восстановить шрифты";
 "DEFAULT_FONT_CONFIRM_MESSAGE" = "Обычный и жирный возвращаются к шрифту Twitter, недавние шрифты очищаются.";
 
 /* ===== Appearance › Colors ===== */
@@ -84,7 +84,6 @@
 "SIDEBAR_EDITOR_DETAIL" = "Нажмите на пункт, чтобы добавить его в боковую панель или убрать из неё.";
 "SIDEBAR_SECTION_SHOWN" = "Показаны";
 "SIDEBAR_SECTION_HIDDEN" = "Скрыты";
-"SIDEBAR_ITEM_TAB_BAR" = "Панель вкладок";
 "SIDEBAR_ITEM_SHOWN" = "Показано";
 "SIDEBAR_ITEM_HIDDEN" = "Скрыто";
 "RESTORE_TAB_LABELS_TITLE" = "Подписи вкладок";
@@ -304,9 +303,9 @@
 "THEME_SETTINGS_NAVIGATION_TITLE" = "Цвет темы";
 "THEME_CUSTOM_HINT" = "Выберите любой цвет для ссылок, кнопок и выделений.";
 "THEME_RESET_HINT" = "Убирает цвет акцента везде, включая выбранную вкладку, переключатели и значок Twitter.";
-"THEME_RESET_CONFIRM_TITLE" = "Сбросить цвет темы";
+"THEME_RESET_CONFIRM_TITLE" = "Восстановить цвет темы";
 "THEME_RESET_CONFIRM_MESSAGE" = "Цвет акцента вернётся к стандартному цвету Twitter, а «Выбранная вкладка», «Переключатели» и «Значок Twitter» перестанут его использовать. Остальные настройки сохранятся.";
-"THEME_RESET_ACTION" = "Сбросить";
+"THEME_RESET_ACTION" = "Восстановить";
 "THEME_CUSTOM_NAME" = "Свой";
 "THEME_PREVIEW_TWEET" = "Ваш цвет виден в ссылках вроде twitter.com, упоминаниях вроде @Twitter и хештегах вроде #Twitter.";
 "THEME_DEFAULT_NAME" = "По умолчанию";

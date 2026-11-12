@@ -55,7 +55,7 @@
 "REGULAR_FONTS_PICKER_OPTION_TITLE" = "Police normale";
 "BOLD_FONTS_PICKER_OPTION_TITLE" = "Police en gras";
 "FONT_SYSTEM_DEFAULT_SUBTITLE" = "Par défaut";
-"DEFAULT_FONT_OPTION_TITLE" = "Rétablir les polices";
+"DEFAULT_FONT_OPTION_TITLE" = "Restaurer les polices";
 "DEFAULT_FONT_CONFIRM_MESSAGE" = "Les polices normale et grasse reviennent à celle de Twitter, et les polices récentes sont effacées.";
 
 /* ===== Appearance › Colors ===== */
@@ -80,7 +80,6 @@
 "SIDEBAR_EDITOR_DETAIL" = "Touchez un élément pour l’ajouter à la barre latérale ou l’en retirer.";
 "SIDEBAR_SECTION_SHOWN" = "Affichés";
 "SIDEBAR_SECTION_HIDDEN" = "Masqués";
-"SIDEBAR_ITEM_TAB_BAR" = "Barre d’onglets";
 "SIDEBAR_ITEM_SHOWN" = "Affiché";
 "SIDEBAR_ITEM_HIDDEN" = "Masqué";
 "RESTORE_TAB_LABELS_TITLE" = "Étiquettes des onglets";
@@ -300,9 +299,9 @@
 "THEME_SETTINGS_NAVIGATION_TITLE" = "Couleur du thème";
 "THEME_CUSTOM_HINT" = "Choisissez n’importe quelle couleur pour les liens, les boutons et les mises en évidence.";
 "THEME_RESET_HINT" = "Retire la couleur d’accent partout, y compris de l’onglet sélectionné, des interrupteurs et de l’icône Twitter.";
-"THEME_RESET_CONFIRM_TITLE" = "Rétablir la couleur du thème";
+"THEME_RESET_CONFIRM_TITLE" = "Restaurer la couleur du thème";
 "THEME_RESET_CONFIRM_MESSAGE" = "La couleur d’accent revient à celle de Twitter, et Onglet sélectionné, Interrupteurs et Icône Twitter ne l’utilisent plus. Vos autres réglages restent.";
-"THEME_RESET_ACTION" = "Rétablir";
+"THEME_RESET_ACTION" = "Restaurer";
 "THEME_CUSTOM_NAME" = "Personnalisée";
 "THEME_PREVIEW_TWEET" = "Votre couleur s’affiche dans les liens comme twitter.com, les mentions comme @Twitter et les hashtags comme #Twitter.";
 "THEME_DEFAULT_NAME" = "Par défaut";

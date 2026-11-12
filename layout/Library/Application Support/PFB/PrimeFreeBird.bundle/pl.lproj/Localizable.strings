@@ -59,7 +59,7 @@
 "REGULAR_FONTS_PICKER_OPTION_TITLE" = "Zwykła czcionka";
 "BOLD_FONTS_PICKER_OPTION_TITLE" = "Pogrubiona czcionka";
 "FONT_SYSTEM_DEFAULT_SUBTITLE" = "Domyślna";
-"DEFAULT_FONT_OPTION_TITLE" = "Resetuj czcionki";
+"DEFAULT_FONT_OPTION_TITLE" = "Przywróć czcionki";
 "DEFAULT_FONT_CONFIRM_MESSAGE" = "Zwykła i pogrubiona wracają do czcionki Twittera, a ostatnio używane czcionki zostają wyczyszczone.";
 
 /* ===== Appearance › Colors ===== */
@@ -84,7 +84,6 @@
 "SIDEBAR_EDITOR_DETAIL" = "Stuknij element, aby dodać go do paska bocznego lub go usunąć.";
 "SIDEBAR_SECTION_SHOWN" = "Widoczne";
 "SIDEBAR_SECTION_HIDDEN" = "Ukryte";
-"SIDEBAR_ITEM_TAB_BAR" = "Pasek kart";
 "SIDEBAR_ITEM_SHOWN" = "Widoczny";
 "SIDEBAR_ITEM_HIDDEN" = "Ukryty";
 "RESTORE_TAB_LABELS_TITLE" = "Etykiety kart";
@@ -304,9 +303,9 @@
 "THEME_SETTINGS_NAVIGATION_TITLE" = "Kolor motywu";
 "THEME_CUSTOM_HINT" = "Wybierz dowolny kolor dla linków, przycisków i wyróżnień.";
 "THEME_RESET_HINT" = "Usuwa kolor akcentu wszędzie, także z wybranej karty, przełączników i ikony Twittera.";
-"THEME_RESET_CONFIRM_TITLE" = "Resetuj kolor motywu";
+"THEME_RESET_CONFIRM_TITLE" = "Przywróć kolor motywu";
 "THEME_RESET_CONFIRM_MESSAGE" = "Kolor akcentu wraca do domyślnego koloru Twittera, a Wybrana karta, Przełączniki i Ikona Twittera przestają go używać. Pozostałe ustawienia zostają.";
-"THEME_RESET_ACTION" = "Resetuj";
+"THEME_RESET_ACTION" = "Przywróć";
 "THEME_CUSTOM_NAME" = "Własny";
 "THEME_PREVIEW_TWEET" = "Twój kolor widać w linkach jak twitter.com, wzmiankach jak @Twitter i hasztagach jak #Twitter.";
 "THEME_DEFAULT_NAME" = "Domyślny";

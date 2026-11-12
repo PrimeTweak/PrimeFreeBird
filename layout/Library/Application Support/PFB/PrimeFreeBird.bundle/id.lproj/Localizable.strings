@@ -59,7 +59,7 @@
 "REGULAR_FONTS_PICKER_OPTION_TITLE" = "Font reguler";
 "BOLD_FONTS_PICKER_OPTION_TITLE" = "Font tebal";
 "FONT_SYSTEM_DEFAULT_SUBTITLE" = "Default";
-"DEFAULT_FONT_OPTION_TITLE" = "Atur ulang font";
+"DEFAULT_FONT_OPTION_TITLE" = "Pulihkan font";
 "DEFAULT_FONT_CONFIRM_MESSAGE" = "Reguler dan tebal kembali ke font Twitter, dan font terbaru dihapus.";
 
 /* ===== Appearance › Colors ===== */
@@ -84,7 +84,6 @@
 "SIDEBAR_EDITOR_DETAIL" = "Ketuk item untuk menambahkannya ke bilah samping atau menghapusnya.";
 "SIDEBAR_SECTION_SHOWN" = "Ditampilkan";
 "SIDEBAR_SECTION_HIDDEN" = "Disembunyikan";
-"SIDEBAR_ITEM_TAB_BAR" = "Bilah tab";
 "SIDEBAR_ITEM_SHOWN" = "Ditampilkan";
 "SIDEBAR_ITEM_HIDDEN" = "Disembunyikan";
 "RESTORE_TAB_LABELS_TITLE" = "Label tab";
@@ -304,9 +303,9 @@
 "THEME_SETTINGS_NAVIGATION_TITLE" = "Warna tema";
 "THEME_CUSTOM_HINT" = "Pilih warna apa pun untuk tautan, tombol, dan sorotan.";
 "THEME_RESET_HINT" = "Menghapus warna aksen di mana pun, termasuk tab terpilih, sakelar, dan ikon Twitter.";
-"THEME_RESET_CONFIRM_TITLE" = "Atur ulang warna tema";
+"THEME_RESET_CONFIRM_TITLE" = "Pulihkan warna tema";
 "THEME_RESET_CONFIRM_MESSAGE" = "Warna aksen kembali ke bawaan Twitter, dan Tab terpilih, Sakelar, serta Ikon Twitter berhenti memakainya. Pengaturan Anda yang lain tetap.";
-"THEME_RESET_ACTION" = "Atur ulang";
+"THEME_RESET_ACTION" = "Pulihkan";
 "THEME_CUSTOM_NAME" = "Kustom";
 "THEME_PREVIEW_TWEET" = "Warna Anda muncul di tautan seperti twitter.com, sebutan seperti @Twitter, dan tagar seperti #Twitter.";
 "THEME_DEFAULT_NAME" = "Bawaan";

@@ -59,7 +59,7 @@
 "REGULAR_FONTS_PICKER_OPTION_TITLE" = "Fuente normal";
 "BOLD_FONTS_PICKER_OPTION_TITLE" = "Fuente en negrita";
 "FONT_SYSTEM_DEFAULT_SUBTITLE" = "Predeterminada";
-"DEFAULT_FONT_OPTION_TITLE" = "Restablecer fuentes";
+"DEFAULT_FONT_OPTION_TITLE" = "Restaurar fuentes";
 "DEFAULT_FONT_CONFIRM_MESSAGE" = "Normal y negrita vuelven a la fuente de Twitter, y se borran las fuentes recientes.";
 
 /* ===== Appearance › Colors ===== */
@@ -84,7 +84,6 @@
 "SIDEBAR_EDITOR_DETAIL" = "Toca un elemento para añadirlo a la barra lateral o quitarlo.";
 "SIDEBAR_SECTION_SHOWN" = "Visibles";
 "SIDEBAR_SECTION_HIDDEN" = "Ocultos";
-"SIDEBAR_ITEM_TAB_BAR" = "Barra de pestañas";
 "SIDEBAR_ITEM_SHOWN" = "Visible";
 "SIDEBAR_ITEM_HIDDEN" = "Oculto";
 "RESTORE_TAB_LABELS_TITLE" = "Etiquetas de las pestañas";
@@ -304,9 +303,9 @@
 "THEME_SETTINGS_NAVIGATION_TITLE" = "Color del tema";
 "THEME_CUSTOM_HINT" = "Elige cualquier color para enlaces, botones y resaltados.";
 "THEME_RESET_HINT" = "Quita el color de acento en todas partes, incluida la pestaña seleccionada, los interruptores y el icono de Twitter.";
-"THEME_RESET_CONFIRM_TITLE" = "Restablecer color del tema";
+"THEME_RESET_CONFIRM_TITLE" = "Restaurar color del tema";
 "THEME_RESET_CONFIRM_MESSAGE" = "El color de acento vuelve al predeterminado de Twitter, y Pestaña seleccionada, Interruptores e Icono de Twitter dejan de usarlo. Tus demás ajustes se mantienen.";
-"THEME_RESET_ACTION" = "Restablecer";
+"THEME_RESET_ACTION" = "Restaurar";
 "THEME_CUSTOM_NAME" = "Personalizado";
 "THEME_PREVIEW_TWEET" = "Tu color aparece en enlaces como twitter.com, menciones como @Twitter y hashtags como #Twitter.";
 "THEME_DEFAULT_NAME" = "Predeterminado";

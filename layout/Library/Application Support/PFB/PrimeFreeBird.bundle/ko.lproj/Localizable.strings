@@ -59,7 +59,7 @@
 "REGULAR_FONTS_PICKER_OPTION_TITLE" = "기본 글꼴";
 "BOLD_FONTS_PICKER_OPTION_TITLE" = "굵은 글꼴";
 "FONT_SYSTEM_DEFAULT_SUBTITLE" = "기본값";
-"DEFAULT_FONT_OPTION_TITLE" = "글꼴 재설정";
+"DEFAULT_FONT_OPTION_TITLE" = "글꼴 복원";
 "DEFAULT_FONT_CONFIRM_MESSAGE" = "일반체와 굵은체가 트위터 글꼴로 돌아가고 최근 글꼴은 지워집니다.";
 
 /* ===== Appearance › Colors ===== */
@@ -84,7 +84,6 @@
 "SIDEBAR_EDITOR_DETAIL" = "항목을 탭하여 사이드바에 추가하거나 제거하세요.";
 "SIDEBAR_SECTION_SHOWN" = "표시됨";
 "SIDEBAR_SECTION_HIDDEN" = "숨겨짐";
-"SIDEBAR_ITEM_TAB_BAR" = "탭 바";
 "SIDEBAR_ITEM_SHOWN" = "표시됨";
 "SIDEBAR_ITEM_HIDDEN" = "숨겨짐";
 "RESTORE_TAB_LABELS_TITLE" = "탭 라벨";
@@ -304,9 +303,9 @@
 "THEME_SETTINGS_NAVIGATION_TITLE" = "테마 색상";
 "THEME_CUSTOM_HINT" = "링크, 버튼, 강조에 원하는 색상을 선택합니다.";
 "THEME_RESET_HINT" = "선택한 탭, 스위치, 트위터 아이콘을 포함해 모든 곳에서 강조 색상을 제거합니다.";
-"THEME_RESET_CONFIRM_TITLE" = "테마 색상 재설정";
+"THEME_RESET_CONFIRM_TITLE" = "테마 색상 복원";
 "THEME_RESET_CONFIRM_MESSAGE" = "강조 색상이 트위터 기본값으로 돌아가고, 선택한 탭·스위치·트위터 아이콘은 더 이상 이 색을 쓰지 않습니다. 다른 설정은 유지됩니다.";
-"THEME_RESET_ACTION" = "재설정";
+"THEME_RESET_ACTION" = "복원";
 "THEME_CUSTOM_NAME" = "사용자 지정";
 "THEME_PREVIEW_TWEET" = "내 색상은 twitter.com 같은 링크, @Twitter 같은 멘션, #Twitter 같은 해시태그에 표시됩니다.";
 "THEME_DEFAULT_NAME" = "기본값";
