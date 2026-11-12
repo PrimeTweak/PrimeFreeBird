@@ -228,7 +228,7 @@ static UIImage* pfbBakedTitleImage(NSString* title, UIFont* font) {
     };
     self.navigationController.navigationBar.titleTextAttributes = chirpTitle;
 
-    // The outlined capsule of the new look's Reset to default.
+    // The outlined capsule of the new look's Restore to default.
     PFBShowcaseButton* clear = [PFBShowcaseButton buttonWithStyle:PFBShowcaseButtonStyleOutline];
     clear.label = [bundle localizedStringForKey:@"ADVSEARCH_CLEAR"];
     [clear addTarget:self

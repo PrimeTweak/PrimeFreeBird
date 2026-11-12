@@ -1,5 +1,6 @@
 // The Compatibility report screen and its option lists, drawn like the settings pages.
 #import "Common/PFBCompatibility.h"
+#import "Common/PFBBundle.h"
 #import "Debug/PFBDebugger.h"
 #import "Support/TwitterChirpFont.h"
 #import "Support/HookHelpers.h"
@@ -12,6 +13,16 @@
 #import "Settings/Native/PFBShowcase.h"
 #import "Settings/Native/PFBNativeSettingsSheetController.h"
 #import "Support/PFBTwitterPopups.h"
+
+// The page's own words, in the app's language.
+static NSString* PFBReportText(NSString* key) {
+    return [[PFBBundle sharedBundle] localizedStringForKey:key];
+}
+
+// A count with its noun, by the language's plural rules.
+static NSString* PFBReportCount(NSString* key, NSUInteger count) {
+    return [NSString localizedStringWithFormat:PFBReportText(key), (unsigned long)count];
+}
 
 // An orange dark enough to read on a light page; the system orange on a dark one.
 static UIColor* PFBCompatWarningTextColor(void) {
@@ -102,8 +113,9 @@ static PFBReportRow* PFBReportRowMake(PFBReportRowKind kind, NSString* title, NS
 // as the copied report does.
 static PFBReportRow* PFBReportOptionRow(PFBCompatResult* result) {
     BOOL working = result.verdict == PFBCompatVerdictOK;
-    NSString* state = result.enabled ? (result.alwaysOn ? @"Always on" : @"On") : @"Off";
-    NSString* value = result.internal ? nil : (working ? state : (result.enabled ? nil : @"Off"));
+    NSString* off = PFBReportText(@"COMPAT_STATE_OFF");
+    NSString* state = result.enabled ? PFBReportText(result.alwaysOn ? @"COMPAT_STATE_ALWAYS_ON" : @"COMPAT_STATE_ON") : off;
+    NSString* value = result.internal ? nil : (working ? state : (result.enabled ? nil : off));
     NSString* detail = (!working || result.internal) ? result.detail : nil;
     if (result.verdict == PFBCompatVerdictNotTested && result.evidence.length) {
         detail = detail.length ? [NSString stringWithFormat:@"%@ \u00b7 %@", detail, result.evidence] : result.evidence;
@@ -111,17 +123,18 @@ static PFBReportRow* PFBReportOptionRow(PFBCompatResult* result) {
     return PFBReportRowMake(PFBReportRowOption, result.title, value, detail);
 }
 
-// "today", or the day as "Oct 23", with its year when it is not this one.
+// "today", or the day as "Oct 23", with its year when it is not this one, in the app's language.
 static NSString* PFBReportDay(NSDate* date) {
     NSCalendar* calendar = [NSCalendar currentCalendar];
     if ([calendar isDateInToday:date]) {
-        return @"today";
+        return PFBReportText(@"COMPAT_DAY_TODAY");
     }
     BOOL thisYear = [calendar component:NSCalendarUnitYear fromDate:date] ==
                     [calendar component:NSCalendarUnitYear fromDate:[NSDate date]];
+    NSLocale* locale = [NSLocale localeWithLocaleIdentifier:NSBundle.mainBundle.preferredLocalizations.firstObject ?: @"en"];
     NSDateFormatter* formatter = [NSDateFormatter new];
-    formatter.locale = [NSLocale localeWithLocaleIdentifier:@"en_US"];
-    formatter.dateFormat = thisYear ? @"MMM d" : @"MMM d, yyyy";
+    formatter.locale = locale;
+    formatter.dateFormat = [NSDateFormatter dateFormatFromTemplate:thisYear ? @"MMMd" : @"MMMdyyyy" options:0 locale:locale];
     return [formatter stringFromDate:date];
 }
 
@@ -135,9 +148,9 @@ static NSString* PFBReportHistoryText(void) {
     NSString* buildDay = PFBReportDay(build);
     NSString* earlierDay = earlier ? PFBReportDay(earlier) : nil;
     if (!earlierDay || [earlierDay isEqualToString:buildDay]) {
-        return [NSString stringWithFormat:@"Counting since %@.", buildDay];
+        return [NSString stringWithFormat:PFBReportText(@"COMPAT_HISTORY_SINCE"), buildDay];
     }
-    return [NSString stringWithFormat:@"Counting since %@ · this build since %@.", earlierDay, buildDay];
+    return [NSString stringWithFormat:PFBReportText(@"COMPAT_HISTORY_SINCE_BUILD"), earlierDay, buildDay];
 }
 
 // The settings pages' table: their cells, no separators, the palette's background.
@@ -472,34 +485,34 @@ static NSString* PFBReportVerdict(NSArray<PFBCompatResult*>* results, UIColor** 
     if (broken > 0) {
         *tone = [UIColor systemRedColor];
         *symbol = @"xmark";
-        return [NSString stringWithFormat:@"%ld problem%@ with Twitter %@", (long)broken, broken == 1 ? @"" : @"s",
-                                          version];
+        return [NSString stringWithFormat:PFBReportText(@"COMPAT_VERDICT_PROBLEMS"),
+                                          PFBReportCount(@"COMPAT_PROBLEM_COUNT", (NSUInteger)broken), version];
     }
     if (state == PFBCompatReadPending) {
         *tone = PFBSettingsSubtitleColor();
         *symbol = nil;
-        return [NSString stringWithFormat:@"Checking Twitter %@", version];
+        return [NSString stringWithFormat:PFBReportText(@"COMPAT_VERDICT_CHECKING"), version];
     }
     if (PFBCompatCheckIsDue()) {
         *tone = [UIColor systemOrangeColor];
         *symbol = @"exclamationmark";
-        return [NSString stringWithFormat:@"Twitter %@ not checked yet", version];
+        return [NSString stringWithFormat:PFBReportText(@"COMPAT_VERDICT_DUE"), version];
     }
     if (state == PFBCompatReadFailed) {
         *tone = [UIColor systemOrangeColor];
         *symbol = @"exclamationmark";
-        return [NSString stringWithFormat:@"Twitter %@ not fully checked", version];
+        return [NSString stringWithFormat:PFBReportText(@"COMPAT_VERDICT_PARTIAL"), version];
     }
-    return [NSString stringWithFormat:@"Compatible with Twitter %@", version];
+    return [NSString stringWithFormat:PFBReportText(@"COMPAT_VERDICT_OK"), version];
 }
 
 // The line under the verdict while Twitter's settings are read, or when they could not be.
 static NSString* PFBReportReadLine(void) {
     PFBCompatReadState state = PFBCompatReadStatus();
     if (state == PFBCompatReadPending) {
-        return @"Checking Twitter’s settings…";
+        return PFBReportText(@"COMPAT_READ_PENDING");
     }
-    return state == PFBCompatReadFailed ? @"Twitter’s settings could not be read" : nil;
+    return state == PFBCompatReadFailed ? PFBReportText(@"COMPAT_READ_FAILED") : nil;
 }
 
 // The new look's head of the report: its line, then a card with the verdict on a glass disc,
@@ -539,7 +552,7 @@ static NSString* PFBReportReadLine(void) {
             }
         }
         _intro = PFBShowcaseIntroLabel();
-        _intro.text = @"Check every option still works after a Twitter update.";
+        _intro.text = PFBReportText(@"COMPATIBILITY_DETAIL");
         _card = PFBShowcaseCard();
         _disc = [[PFBShowcaseSurface alloc] initWithCornerRadius:-1];
         UIColor* tone = nil;
@@ -565,8 +578,8 @@ static NSString* PFBReportReadLine(void) {
         }
         [_disc.contentView addSubview:_mark];
         _subline = [[UILabel alloc] init];
-        _subline.text = [NSString stringWithFormat:@"iOS %@ · %lu options", UIDevice.currentDevice.systemVersion,
-                                                   (unsigned long)options];
+        _subline.text = [NSString stringWithFormat:@"iOS %@ · %@", UIDevice.currentDevice.systemVersion,
+                                                   PFBReportCount(@"COMPAT_OPTION_COUNT", options)];
         _subline.textAlignment = NSTextAlignmentCenter;
         _subline.font = PFBSettingsDetailFont();
         _subline.textColor = PFBSettingsSubtitleColor();
@@ -591,13 +604,15 @@ static NSString* PFBReportReadLine(void) {
         }
         _segments = segments;
         _shares = @[ @(working), @(notTested), @(broken) ];
-        NSMutableString* caption =
-            [NSMutableString stringWithFormat:@"%lu of %lu seen working", (unsigned long)working, (unsigned long)options];
+        NSMutableString* caption = [NSMutableString
+            stringWithFormat:PFBReportText(@"COMPAT_METER_WORKING"), (unsigned long)working, (unsigned long)options];
         if (broken > 0) {
-            [caption appendFormat:@" · %lu broken", (unsigned long)broken];
+            [caption appendFormat:@" · %@", [NSString stringWithFormat:PFBReportText(@"COMPAT_METER_BROKEN"),
+                                                                       (unsigned long)broken]];
         }
         if (notTested > 0) {
-            [caption appendFormat:@" · %lu to check", (unsigned long)notTested];
+            [caption appendFormat:@" · %@", [NSString stringWithFormat:PFBReportText(@"COMPAT_METER_TO_CHECK"),
+                                                                       (unsigned long)notTested]];
         }
         _caption = [[UILabel alloc] init];
         _caption.text = caption;
@@ -607,7 +622,7 @@ static NSString* PFBReportReadLine(void) {
         _caption.textColor = PFBSettingsSubtitleColor();
         _check = [PFBShowcaseButton buttonWithStyle:PFBShowcaseButtonStyleGlass];
         _check.symbolName = @"checklist";
-        _check.label = @"Check options";
+        _check.label = PFBReportText(@"COMPAT_CHECK_OPTIONS");
         for (UIView* part in @[ _disc, _verdict, _subline, _meter, _caption, _check ]) {
             [_card addSubview:part];
         }
@@ -774,7 +789,7 @@ static NSString* PFBReportReadLine(void) {
         [self.tableView addSubview:_trayHead];
     }
     if (!self.nativeLook) {
-        UIBarButtonItem* copy = [[UIBarButtonItem alloc] initWithTitle:@"Copy"
+        UIBarButtonItem* copy = [[UIBarButtonItem alloc] initWithTitle:PFBReportText(@"COMPAT_COPY")
                                                                  style:UIBarButtonItemStylePlain
                                                                 target:self
                                                                 action:@selector(copyReport)];
@@ -783,7 +798,7 @@ static NSString* PFBReportReadLine(void) {
                                                                   style:UIBarButtonItemStylePlain
                                                                  target:self
                                                                  action:@selector(showTourChoice:)];
-        tours.accessibilityLabel = @"Check options";
+        tours.accessibilityLabel = PFBReportText(@"COMPAT_CHECK_OPTIONS");
         tours.tag = PFBNativeGlassTag;
         self.navigationItem.rightBarButtonItems = @[ copy, tours ];
     }
@@ -925,25 +940,26 @@ static NSString* PFBReportReadLine(void) {
     }
     NSMutableArray<PFBReportRow*>* rows = [NSMutableArray array];
     if (broken.count > 0) {
-        [rows addObject:PFBReportRowMake(PFBReportRowHeader, @"Broken", nil, nil)];
+        [rows addObject:PFBReportRowMake(PFBReportRowHeader, PFBReportText(@"COMPAT_BROKEN"), nil, nil)];
         [rows addObjectsFromArray:broken];
     }
-    [rows addObject:PFBReportRowMake(PFBReportRowHeader, @"Options", nil, nil)];
-    PFBReportRow* untestedRow = PFBReportListRow(@"Not tested", notTested, PFBCompatVerdictNotTested, nil);
-    untestedRow.detail = @"Not seen yet during the check.";
+    [rows addObject:PFBReportRowMake(PFBReportRowHeader, PFBReportText(@"COMPAT_GROUP_OPTIONS"), nil, nil)];
+    PFBReportRow* untestedRow =
+        PFBReportListRow(PFBReportText(@"COMPAT_NOT_TESTED"), notTested, PFBCompatVerdictNotTested, nil);
+    untestedRow.detail = PFBReportText(@"COMPAT_NOT_TESTED_DETAIL");
     [rows addObject:untestedRow];
-    PFBReportRow* workingRow = PFBReportListRow(@"Working", working, PFBCompatVerdictOK, nil);
-    workingRow.detail = @"Seen working on this build.";
+    PFBReportRow* workingRow = PFBReportListRow(PFBReportText(@"COMPAT_WORKING"), working, PFBCompatVerdictOK, nil);
+    workingRow.detail = PFBReportText(@"COMPAT_WORKING_DETAIL");
     [rows addObject:workingRow];
 
-    [rows addObject:PFBReportRowMake(PFBReportRowHeader, @"Data", nil, nil)];
-    PFBReportRow* clearAll = PFBReportRowMake(PFBReportRowClearAll, @"Clear all", nil,
-                                              @"Clear the counts and close Twitter. Settings are kept.");
+    [rows addObject:PFBReportRowMake(PFBReportRowHeader, PFBReportText(@"COMPAT_GROUP_DATA"), nil, nil)];
+    PFBReportRow* clearAll = PFBReportRowMake(PFBReportRowClearAll, PFBReportText(@"COMPAT_CLEAR_ALL"), nil,
+                                              PFBReportText(@"COMPAT_CLEAR_ALL_DETAIL"));
     clearAll.enabled = YES;
     [rows addObject:clearAll];
     NSString* history = PFBReportHistoryText();
     if (history) {
-        [rows addObject:PFBReportRowMake(PFBReportRowHistory, @"History", nil, history)];
+        [rows addObject:PFBReportRowMake(PFBReportRowHistory, PFBReportText(@"COMPAT_HISTORY"), nil, history)];
     }
     _sections = @[ rows ];
 }
@@ -965,11 +981,13 @@ static NSString* PFBReportReadLine(void) {
     }
     NSMutableArray<PFBReportRow*>* rows = [NSMutableArray array];
     if (broken > 0) {
-        [rows addObject:PFBReportListRow(@"Broken", broken, PFBCompatVerdictBroken, @"xmark")];
+        [rows addObject:PFBReportListRow(PFBReportText(@"COMPAT_BROKEN"), broken, PFBCompatVerdictBroken, @"xmark")];
     }
-    [rows addObject:PFBReportListRow(@"Not tested", notTested, PFBCompatVerdictNotTested, @"circle.dashed")];
-    [rows addObject:PFBReportListRow(@"Working", working, PFBCompatVerdictOK, @"checkmark")];
-    PFBReportRow* copy = PFBReportRowMake(PFBReportRowCopy, _copied ? @"Copied" : @"Copy report", nil, nil);
+    [rows addObject:PFBReportListRow(PFBReportText(@"COMPAT_NOT_TESTED"), notTested, PFBCompatVerdictNotTested,
+                                     @"circle.dashed")];
+    [rows addObject:PFBReportListRow(PFBReportText(@"COMPAT_WORKING"), working, PFBCompatVerdictOK, @"checkmark")];
+    PFBReportRow* copy =
+        PFBReportRowMake(PFBReportRowCopy, PFBReportText(_copied ? @"COMPAT_COPIED" : @"COMPAT_COPY_REPORT"), nil, nil);
     copy.iconName = _copied ? @"checkmark" : @"doc.on.doc";
     copy.enabled = YES;
     [rows addObject:copy];
@@ -983,7 +1001,7 @@ static NSString* PFBReportReadLine(void) {
         _historyLabel.numberOfLines = 0;
         _historyLabel.textAlignment = NSTextAlignmentNatural;
         _clearAllButton = [PFBShowcaseButton buttonWithStyle:PFBShowcaseButtonStyleDestructive];
-        _clearAllButton.label = @"Clear all";
+        _clearAllButton.label = PFBReportText(@"COMPAT_CLEAR_ALL");
         [_clearAllButton addTarget:self action:@selector(confirmClearAll) forControlEvents:UIControlEventTouchUpInside];
         [_showcaseFooter addSubview:_historyLabel];
         [_showcaseFooter addSubview:_clearAllButton];
@@ -1085,8 +1103,8 @@ static NSString* PFBReportReadLine(void) {
     headline.translatesAutoresizingMaskIntoConstraints = NO;
 
     UILabel* subline = [[UILabel alloc] init];
-    subline.text = [NSString stringWithFormat:@"iOS %@ · %lu options", UIDevice.currentDevice.systemVersion,
-                                              (unsigned long)optionCount];
+    subline.text = [NSString stringWithFormat:@"iOS %@ · %@", UIDevice.currentDevice.systemVersion,
+                                              PFBReportCount(@"COMPAT_OPTION_COUNT", optionCount)];
     subline.font = PFBSettingsDetailFont();
     subline.textColor = PFBSettingsSubtitleColor();
     subline.textAlignment = NSTextAlignmentCenter;
@@ -1210,14 +1228,10 @@ static NSString* PFBReportReadLine(void) {
     }
     if (row.kind == PFBReportRowList) {
         NSString* version = NSBundle.mainBundle.infoDictionary[@"CFBundleShortVersionString"] ?: @"";
-        NSString* note = [NSString stringWithFormat:@"Options not seen yet on Twitter %@, or not since their code "
-                                                    @"changed. The next tour or normal use proves them.",
-                                                    version];
-        if (row.verdict == PFBCompatVerdictOK) {
-            note = [NSString stringWithFormat:@"Options seen working on Twitter %@.", version];
-        } else if (row.verdict == PFBCompatVerdictBroken) {
-            note = [NSString stringWithFormat:@"Options that stopped working on Twitter %@.", version];
-        }
+        NSString* noteKey = row.verdict == PFBCompatVerdictOK       ? @"COMPAT_LIST_WORKING_NOTE"
+                            : row.verdict == PFBCompatVerdictBroken ? @"COMPAT_LIST_BROKEN_NOTE"
+                                                                    : @"COMPAT_LIST_NOT_TESTED_NOTE";
+        NSString* note = [NSString stringWithFormat:PFBReportText(noteKey), version];
         PFBCompatibilityListViewController* list =
             [[PFBCompatibilityListViewController alloc] initWithVerdict:row.verdict
                                                                   title:row.title
@@ -1240,12 +1254,11 @@ static NSString* PFBReportReadLine(void) {
 
 - (void)confirmClearAll {
     UIAlertController* alert = [UIAlertController
-        alertControllerWithTitle:@"Clear all"
-                         message:@"Clears everything counted and closes Twitter. Reopen it and every option is "
-                                 @"checked on its own, then this report opens. Your settings are kept."
+        alertControllerWithTitle:PFBReportText(@"COMPAT_CLEAR_ALL")
+                         message:PFBReportText(@"COMPAT_CLEAR_ALL_MESSAGE")
                   preferredStyle:UIAlertControllerStyleAlert];
-    PFBAlertAddAction(alert, @"Cancel", UIAlertActionStyleCancel, self.nativeLook, nil);
-    PFBAlertAddAction(alert, @"Clear all", UIAlertActionStyleDestructive, self.nativeLook, ^{
+    PFBAlertAddAction(alert, PFBReportText(@"CANCEL_ACTION"), UIAlertActionStyleCancel, self.nativeLook, nil);
+    PFBAlertAddAction(alert, PFBReportText(@"COMPAT_CLEAR_ALL"), UIAlertActionStyleDestructive, self.nativeLook, ^{
         // No app can relaunch itself: quitting cleanly makes the next launch replay everything a
         // new install does.
         PFBCompatReset();
@@ -1316,7 +1329,7 @@ static NSString* PFBReportReadLine(void) {
             [rows addObject:row];
         }
     }
-    if (rows.count == 2 && PFBPresentTray(self, @"Check options", rows)) {
+    if (rows.count == 2 && PFBPresentTray(self, PFBReportText(@"COMPAT_CHECK_OPTIONS"), rows)) {
         return;
     }
     [self showTourBubbleFrom:sender item:nil];
@@ -1354,9 +1367,9 @@ static NSString* PFBReportReadLine(void) {
         return;
     }
     UIBarButtonItem* item = self.navigationItem.rightBarButtonItem;
-    item.title = @"Copied";
+    item.title = PFBReportText(@"COMPAT_COPIED");
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1.2 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
-      item.title = @"Copy";
+      item.title = PFBReportText(@"COMPAT_COPY");
     });
 }
 
@@ -1368,7 +1381,7 @@ static NSString* PFBReportReadLine(void) {
         if (row.kind != PFBReportRowCopy) {
             continue;
         }
-        row.title = copied ? @"Copied" : @"Copy report";
+        row.title = PFBReportText(copied ? @"COMPAT_COPIED" : @"COMPAT_COPY_REPORT");
         row.iconName = copied ? @"checkmark" : @"doc.on.doc";
         [self.tableView reconfigureRowsAtIndexPaths:@[ [NSIndexPath indexPathForRow:(NSInteger)i inSection:0] ]];
     }

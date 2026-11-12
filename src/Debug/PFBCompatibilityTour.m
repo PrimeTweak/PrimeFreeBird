@@ -43,8 +43,10 @@ static const CGFloat kPFBTourPullDistance = 160.0;
 static const NSTimeInterval kPFBTourLaunchDelay = 4.0;
 
 static NSString* const kPFBTourPendingKey = @"pfb_compat_tour_pending";
-// What the tour's toast says.
-static NSString* const kPFBTourToastTitle = @"Check every option";
+// The tour's own words, in the app's language.
+static NSString* tourText(NSString* key) {
+    return [[PFBBundle sharedBundle] localizedStringForKey:key];
+}
 
 typedef BOOL (^PFBTourCheck)(UIViewController* before, UIViewController* after);
 
@@ -876,11 +878,12 @@ static UIGestureRecognizer* tourGesture(UIView* root, NSString* action) {
 static NSString* tourDuration(NSUInteger steps) {
     NSUInteger seconds = (NSUInteger)((double)steps * kPFBTourSecondsPerStep / 5.0 + 0.5) * 5;
     if (seconds < 60) {
-        return [NSString stringWithFormat:@"about %lu s", (unsigned long)MAX(seconds, (NSUInteger)5)];
+        return [NSString stringWithFormat:tourText(@"TOUR_DURATION_SECONDS"), (unsigned long)MAX(seconds, (NSUInteger)5)];
     }
     NSUInteger rest = seconds % 60;
-    return rest ? [NSString stringWithFormat:@"about %lu min %lu", (unsigned long)(seconds / 60), (unsigned long)rest]
-                : [NSString stringWithFormat:@"about %lu min", (unsigned long)(seconds / 60)];
+    return rest ? [NSString stringWithFormat:tourText(@"TOUR_DURATION_MINUTES_SECONDS"), (unsigned long)(seconds / 60),
+                                             (unsigned long)rest]
+                : [NSString stringWithFormat:tourText(@"TOUR_DURATION_MINUTES"), (unsigned long)(seconds / 60)];
 }
 
 // MARK: - Step checks
@@ -1630,8 +1633,8 @@ static void tourShowAlert(void) {
         gPFBTourStepEmpty = @"Twitter shows alerts the iOS way";
     }
     PFBBundle* bundle = [PFBBundle sharedBundle];
-    UIAlertController* alert = [UIAlertController alertControllerWithTitle:@"Checking alerts"
-                                                                   message:@"This alert closes by itself."
+    UIAlertController* alert = [UIAlertController alertControllerWithTitle:tourText(@"TOUR_ALERT_TITLE")
+                                                                   message:tourText(@"TOUR_ALERT_MESSAGE")
                                                             preferredStyle:UIAlertControllerStyleAlert];
     PFBAlertAddAction(alert, [bundle localizedStringForKey:@"CANCEL_ACTION"], UIAlertActionStyleCancel, YES, nil);
     PFBAlertAddAction(alert, [bundle localizedStringForKey:@"OK_ACTION"], UIAlertActionStyleDefault, YES, nil);
@@ -1921,14 +1924,14 @@ static NSArray<NSDictionary*>* tourAllSteps(void) {
                  return tourHomeTabs() != nil;
                }, nil, nil)];
     }
-    [steps addObject:tourStep(@"pull", @"Pull to refresh", home, ^{
+    [steps addObject:tourStep(@"pull", tourText(@"TOUR_STEP_PULL"), home, ^{
              tourPull();
            }, ^BOOL(UIViewController* before, UIViewController* after) {
              return PFBCompatPathReached(PFBCompatPath_pull_sound);
            }, nil, nil)];
     __block NSInteger tweetLooks = 0;
     __block BOOL replyBarRead = NO;
-    [steps addObject:tourStep(@"first Tweet", @"First Tweet", home, ^{
+    [steps addObject:tourStep(@"first Tweet", tourText(@"TOUR_STEP_FIRST_TWEET"), home, ^{
              tweetLooks = 0;
              replyBarRead = NO;
              tourOpenFirstTweet();
@@ -1946,26 +1949,26 @@ static NSArray<NSDictionary*>* tourAllSteps(void) {
              }
              return opened;
            }, nil, nil)];
-    [steps addObject:tourStep(@"Tweet interactions", @"Tweet interactions", home, ^{
+    [steps addObject:tourStep(@"Tweet interactions", tourText(@"TOUR_STEP_TWEET_INTERACTIONS"), home, ^{
              tourShowTweetInteractions();
            }, ^BOOL(UIViewController* before, UIViewController* after) {
              return tourFindController(after, @"T1PostInteractionsViewController") != nil;
            }, nil, ^{
              tourPopToRoot();
            })];
-    [steps addObject:tourStep(@"edit history", @"Edit history", home, ^{
+    [steps addObject:tourStep(@"edit history", tourText(@"TOUR_STEP_EDIT_HISTORY"), home, ^{
              tourAttempt(@"edit history", @"building it", ^{
                tourBuildEditHistory();
              });
            }, ^BOOL(UIViewController* before, UIViewController* after) {
              return PFBCompatPathReached(PFBCompatPath_verified_edit_history);
            }, nil, nil)];
-    [steps addObject:tourStep(@"own profile", @"Your profile", root, ^{
+    [steps addObject:tourStep(@"own profile", tourText(@"TOUR_STEP_OWN_PROFILE"), root, ^{
              tourOpenOwnProfile();
            }, ^BOOL(UIViewController* before, UIViewController* after) {
              return [tourScreenName(after) containsString:@"Profile"];
            }, nil, nil)];
-    [steps addObject:tourStep(@"search", @"Search", root, ^{
+    [steps addObject:tourStep(@"search", tourText(@"TOUR_STEP_SEARCH"), root, ^{
              tourOpenLink(@"twitter://search?query=twitter");
            }, ^BOOL(UIViewController* before, UIViewController* after) {
              return [tourScreenName(after) containsString:@"Search"];
@@ -1973,7 +1976,7 @@ static NSArray<NSDictionary*>* tourAllSteps(void) {
     __block BOOL barTapped = NO;
     // Runs on the screen the search step leaves open: a search link opened later in the tour,
     // after the composer, goes nowhere.
-    [steps addObject:tourStep(@"search field", @"Search field", ^{
+    [steps addObject:tourStep(@"search field", tourText(@"TOUR_STEP_SEARCH_FIELD"), ^{
            }, ^{
              barTapped = NO;
            }, ^BOOL(UIViewController* before, UIViewController* after) {
@@ -1994,7 +1997,7 @@ static NSArray<NSDictionary*>* tourAllSteps(void) {
     // Advanced search switched off for one search, whatever the setting says: Twitter's own
     // filter button must be back in the search bar. Before the composer, after which a
     // search link goes nowhere.
-    [steps addObject:tourStep(@"search off", @"Search, Advanced search off", ^{
+    [steps addObject:tourStep(@"search off", tourText(@"TOUR_STEP_SEARCH_OFF"), ^{
              root();
              tourSwitchOption(@"advanced_search", NO);
            }, ^{
@@ -2007,7 +2010,7 @@ static NSArray<NSDictionary*>* tourAllSteps(void) {
              tourPopToRoot();
              tourSelectTab(0);
            })];
-    [steps addObject:tourStep(@"refresh end", @"Refresh end", home, ^{
+    [steps addObject:tourStep(@"refresh end", tourText(@"TOUR_STEP_REFRESH_END"), home, ^{
              // Posts that arrive while the list is away from its top come with the pill.
              UITableView* list = tourFrontList();
              tourDrag(list, list.bounds.size.height * 1.5, ^{
@@ -2024,7 +2027,7 @@ static NSArray<NSDictionary*>* tourAllSteps(void) {
            })];
     __block __weak id homeTabs = nil;
     __block NSInteger homeTabShown = NSNotFound;
-    [steps addObject:tourStep(@"following timeline", @"Following", home, ^{
+    [steps addObject:tourStep(@"following timeline", tourText(@"TOUR_STEP_FOLLOWING_TIMELINE"), home, ^{
              homeTabs = tourHomeTabs();
              homeTabShown = tourIntegerGetter(homeTabs, @"selectedIndex");
              NSInteger count = tourIntegerGetter(homeTabs, @"numberOfTabs");
@@ -2050,7 +2053,7 @@ static NSArray<NSDictionary*>* tourAllSteps(void) {
              }
            })];
     __block CGFloat scrollStart = 0.0;
-    [steps addObject:tourStep(@"scroll", @"Scroll", home, ^{
+    [steps addObject:tourStep(@"scroll", tourText(@"TOUR_STEP_SCROLL"), home, ^{
              UITableView* list = tourFrontList();
              scrollStart = list.contentOffset.y;
              tourDrag(list, list.bounds.size.height * 1.5, nil);
@@ -2062,7 +2065,7 @@ static NSArray<NSDictionary*>* tourAllSteps(void) {
              tourScrollHomeToTop();
            })];
     __block BOOL buttonsRead = NO;
-    [steps addObject:tourStep(@"Tweet buttons", @"Tweet buttons", home, ^{
+    [steps addObject:tourStep(@"Tweet buttons", tourText(@"TOUR_STEP_TWEET_BUTTONS"), home, ^{
              buttonsRead = tourCheckTweetButtons();
            }, ^BOOL(UIViewController* before, UIViewController* after) {
              return buttonsRead;
@@ -2070,7 +2073,7 @@ static NSArray<NSDictionary*>* tourAllSteps(void) {
              tourScrollHomeToTop();
            })];
     __block __weak UIControl* caret = nil;
-    [steps addObject:tourStep(@"Tweet menu", @"Tweet menu", home, ^{
+    [steps addObject:tourStep(@"Tweet menu", tourText(@"TOUR_STEP_TWEET_MENU"), home, ^{
              caret = tourOpenTweetMenu();
            }, presented, nil, ^{
              tourDismissPresented();
@@ -2080,7 +2083,7 @@ static NSArray<NSDictionary*>* tourAllSteps(void) {
     __block __weak UIView* video = nil;
     __block BOOL doubleTapRead = NO;
     __block NSInteger playerLooks = 0;
-    [steps addObject:tourStep(@"video full screen", @"Video full screen", home, ^{
+    [steps addObject:tourStep(@"video full screen", tourText(@"TOUR_STEP_VIDEO_FULL_SCREEN"), home, ^{
              doubleTapRead = NO;
              playerLooks = 0;
              video = tourOpenVideo();
@@ -2106,7 +2109,7 @@ static NSArray<NSDictionary*>* tourAllSteps(void) {
              tourScrollHomeToTop();
            })];
     __block BOOL menuBuilt = NO;
-    [steps addObject:tourStep(@"video long press", @"Video menu", home, ^{
+    [steps addObject:tourStep(@"video long press", tourText(@"TOUR_STEP_VIDEO_LONG_PRESS"), home, ^{
              menuBuilt = NO;
              UIView* pressed = tourHomeVideo(@"video long press");
              menuBuilt = tourTableMenuDoor(pressed, @"video long press");
@@ -2137,7 +2140,7 @@ static NSArray<NSDictionary*>* tourAllSteps(void) {
              tourScrollHomeToTop();
            })];
     __block __weak UIView* photos = nil;
-    [steps addObject:tourStep(@"photo full screen", @"Photo full screen", home, ^{
+    [steps addObject:tourStep(@"photo full screen", tourText(@"TOUR_STEP_PHOTO_FULL_SCREEN"), home, ^{
              photos = tourHomeViewOfClass(@"_TtC21TweetMediaAttachments14MultiMediaView");
              tourTapMedia(photos, @"photo full screen");
            }, ^BOOL(UIViewController* before, UIViewController* after) {
@@ -2155,7 +2158,7 @@ static NSArray<NSDictionary*>* tourAllSteps(void) {
     __block NSInteger profileLooks = 0;
     __block NSString* profileHandle = nil;
     __block long long profileUserID = 0;
-    [steps addObject:tourStep(@"other profile", @"Another profile", home, ^{
+    [steps addObject:tourStep(@"other profile", tourText(@"TOUR_STEP_OTHER_PROFILE"), home, ^{
              followRead = NO;
              profileMenuBuilt = NO;
              profileLooks = 0;
@@ -2189,7 +2192,7 @@ static NSArray<NSDictionary*>* tourAllSteps(void) {
              tourPopToRoot();
            })];
     __block BOOL sendRead = NO;
-    [steps addObject:tourStep(@"composer", @"Composer", root, ^{
+    [steps addObject:tourStep(@"composer", tourText(@"TOUR_STEP_COMPOSER"), root, ^{
              sendRead = NO;
              tourOpenLink(@"twitter://post");
            }, ^BOOL(UIViewController* before, UIViewController* after) {
@@ -2208,7 +2211,7 @@ static NSArray<NSDictionary*>* tourAllSteps(void) {
     NSUInteger messages = [pages indexOfObject:@"messages"];
     if (messages != NSNotFound) {
         __block NSString* inbox = nil;
-        [steps addObject:tourStep(@"conversation", @"Conversation", root, ^{
+        [steps addObject:tourStep(@"conversation", tourText(@"TOUR_STEP_CONVERSATION"), root, ^{
                  inbox = nil;
                  tourSelectTab((NSInteger)messages);
                  NSUInteger generation = gPFBTourGeneration;
@@ -2249,7 +2252,7 @@ static NSArray<NSDictionary*>* tourAllSteps(void) {
     __block NSInteger replyLooks = 0;
     __block BOOL repliesRead = NO;
     NSMutableArray<NSNumber*>* replyOrder = [NSMutableArray array];
-    [steps addObject:tourStepWaiting(8.0, tourStep(@"replies", @"Replies by date", ^{
+    [steps addObject:tourStepWaiting(8.0, tourStep(@"replies", tourText(@"TOUR_STEP_REPLIES"), ^{
                                                      tourHomeFront();
                                                      tourSwitchOption(@"reply_sorting", YES);
                                                    }, ^{
@@ -2291,7 +2294,7 @@ static NSArray<NSDictionary*>* tourAllSteps(void) {
                                                      }
                                                      tourPopToRoot();
                                                    }))];
-    [steps addObject:tourStep(@"side menu", @"Side menu", home, ^{
+    [steps addObject:tourStep(@"side menu", tourText(@"TOUR_STEP_SIDE_MENU"), home, ^{
              tourOpenSideMenu();
            }, ^BOOL(UIViewController* before, UIViewController* after) {
              return tourBoolGetter(tourSideMenuOwner(), @"isDashOpen");
@@ -2299,7 +2302,7 @@ static NSArray<NSDictionary*>* tourAllSteps(void) {
              tourCloseSideMenu();
            })];
     __block UIUserInterfaceStyle styleBefore = UIUserInterfaceStyleUnspecified;
-    [steps addObject:tourStep(@"dark mode", @"Dark mode", ^{
+    [steps addObject:tourStep(@"dark mode", tourText(@"TOUR_STEP_DARK_MODE"), ^{
              home();
              styleBefore = tourWindow().overrideUserInterfaceStyle;
            }, ^{
@@ -2314,14 +2317,14 @@ static NSArray<NSDictionary*>* tourAllSteps(void) {
              tourWindow().overrideUserInterfaceStyle = styleBefore;
              tourRestorePalette();
            })];
-    [steps addObject:tourStep(@"web link", @"Web link", home, ^{
+    [steps addObject:tourStep(@"web link", tourText(@"TOUR_STEP_WEB_LINK"), home, ^{
              tourOpenWebLink();
            }, ^BOOL(UIViewController* before, UIViewController* after) {
              return tourFindController(tourRootController().presentedViewController, @"SFSafariViewController") != nil;
            }, nil, ^{
              tourDismissPresented();
            })];
-    [steps addObject:tourStep(@"t.co check", @"t.co block", root, ^{
+    [steps addObject:tourStep(@"t.co check", tourText(@"TOUR_STEP_T_CO_CHECK"), root, ^{
              tourAttempt(@"t.co check", @"asking", ^{
                tourAskTcoRequests();
              });
@@ -2329,7 +2332,7 @@ static NSArray<NSDictionary*>* tourAllSteps(void) {
              return PFBCompatPathReached(PFBCompatPath_tco_requests) || PFBCompatPathReached(PFBCompatPath_click_ids);
            }, nil, nil)];
     // Given the proof wait even when nothing is owed, so a slow opening still shows.
-    [steps addObject:tourStepWaiting(kPFBTourProofWait, tourStep(@"Twitter settings", @"Twitter settings", root, ^{
+    [steps addObject:tourStepWaiting(kPFBTourProofWait, tourStep(@"Twitter settings", tourText(@"TOUR_STEP_TWITTER_SETTINGS"), root, ^{
              tourShowTwitterSettings();
            }, ^BOOL(UIViewController* before, UIViewController* after) {
              // Twitter's classic settings, or its new ones with New Twitter settings on.
@@ -2339,7 +2342,7 @@ static NSArray<NSDictionary*>* tourAllSteps(void) {
              tourPopToRoot();
            }))];
     // Twitter's tab editor, opened the way Customize tabs opens it.
-    [steps addObject:tourStep(@"tab editor", @"Twitter's tab editor", root, ^{
+    [steps addObject:tourStep(@"tab editor", tourText(@"TOUR_STEP_TAB_EDITOR"), root, ^{
              tourShowTabEditor();
            }, ^BOOL(UIViewController* before, UIViewController* after) {
              return tourFindController(tourRootController().presentedViewController,
@@ -2347,7 +2350,7 @@ static NSArray<NSDictionary*>* tourAllSteps(void) {
            }, nil, ^{
              tourDismissPresented();
            })];
-    [steps addObject:tourStep(@"PFB settings", @"PrimeFreeBird settings", root, ^{
+    [steps addObject:tourStep(@"PFB settings", tourText(@"TOUR_STEP_PFB_SETTINGS"), root, ^{
              tourShowSettings();
            }, ^BOOL(UIViewController* before, UIViewController* after) {
              return tourFindController(tourRootController().presentedViewController,
@@ -2356,7 +2359,7 @@ static NSArray<NSDictionary*>* tourAllSteps(void) {
              tourDismissPresented();
            })];
     // One of Twitter's alerts, whose text the tweak sets from the leading edge.
-    [steps addObject:tourStep(@"alert", @"Twitter alert", root, ^{
+    [steps addObject:tourStep(@"alert", tourText(@"TOUR_STEP_ALERT"), root, ^{
              tourShowAlert();
            }, ^BOOL(UIViewController* before, UIViewController* after) {
              return tourFindClass(tourWindow(), @"_TtC13XDesignSystem16AlertContentView") != nil;
@@ -2403,11 +2406,10 @@ static void tourShowSignedOut(void) {
         return;
     }
     UIAlertController* alert =
-        [UIAlertController alertControllerWithTitle:@"Signed out"
-                                            message:@"The tour needs Twitter signed in to open its screens. Sign in, "
-                                                    @"then start it again."
+        [UIAlertController alertControllerWithTitle:tourText(@"TOUR_SIGNED_OUT_TITLE")
+                                            message:tourText(@"TOUR_SIGNED_OUT_MESSAGE")
                                      preferredStyle:UIAlertControllerStyleAlert];
-    PFBAlertAddAction(alert, @"OK", UIAlertActionStyleDefault, YES, nil);
+    PFBAlertAddAction(alert, tourText(@"OK_ACTION"), UIAlertActionStyleDefault, YES, nil);
     PFBAlertPresent(alert, top, YES, nil);
 }
 
@@ -2461,7 +2463,7 @@ static void tourShowBox(void) {
         [[UIActivityIndicatorView alloc] initWithActivityIndicatorStyle:UIActivityIndicatorViewStyleMedium];
     [spinner startAnimating];
     UILabel* title = [UILabel new];
-    title.text = kPFBTourToastTitle;
+    title.text = tourText(@"TOUR_TITLE");
     title.font = [TwitterChirpFont(TwitterFontStyleBold) fontWithSize:17.0];
     title.textColor = UIColor.labelColor;
     UILabel* step = [UILabel new];
@@ -2472,7 +2474,7 @@ static void tourShowBox(void) {
     style.cornerStyle = UIButtonConfigurationCornerStyleCapsule;
     style.baseForegroundColor = UIColor.labelColor;
     style.attributedTitle = [[NSAttributedString alloc]
-        initWithString:@"Cancel"
+        initWithString:tourText(@"CANCEL_ACTION")
             attributes:@{NSFontAttributeName : [TwitterChirpFont(TwitterFontStyleBold) fontWithSize:15.0]}];
     void (^cancelTour)(void) = gPFBTourCancel;
     UIButton* cancel = [UIButton buttonWithConfiguration:style
@@ -2506,7 +2508,7 @@ static void tourShowBox(void) {
 }
 
 static NSString* tourStepLine(NSString* label, NSUInteger index, NSUInteger total) {
-    return [NSString stringWithFormat:@"%@ \u00b7 %lu of %lu", label, (unsigned long)(index + 1), (unsigned long)total];
+    return [NSString stringWithFormat:tourText(@"TOUR_STEP_LINE"), label, (unsigned long)(index + 1), (unsigned long)total];
 }
 
 // Twitter's toast keeps the width of the line it opens with, so it opens with the widest step, then
@@ -2527,7 +2529,8 @@ static NSString* tourOpeningLine(NSArray<NSDictionary*>* steps) {
 }
 
 static void tourPushToast(void) {
-    gPFBTourToasts = PFBPushTwitterToast(kPFBTourToastTitle, gPFBTourToastOpening, PFBToastKindPlain, @"Cancel",
+    gPFBTourToasts = PFBPushTwitterToast(tourText(@"TOUR_TITLE"), gPFBTourToastOpening, PFBToastKindPlain,
+                                         tourText(@"CANCEL_ACTION"),
                                          gPFBTourCancel, YES);
     gPFBTourToastLine = gPFBTourToastOpening;
     if (!gPFBTourToasts) {
@@ -2834,14 +2837,14 @@ static void tourAskAtLaunch(void) {
     NSString* version = NSBundle.mainBundle.infoDictionary[@"CFBundleShortVersionString"] ?: @"";
     NSUInteger screens = tourSteps(YES).count;
     UIAlertController* alert = [UIAlertController
-        alertControllerWithTitle:[NSString stringWithFormat:@"Check Twitter %@", version]
-                         message:[NSString stringWithFormat:@"Check every option on this version. The tour opens "
-                                                            @"%lu screens on its own, %@. Cancel stops it at "
-                                                            @"any time.",
-                                                            (unsigned long)screens, tourDuration(screens)]
+        alertControllerWithTitle:[NSString stringWithFormat:tourText(@"TOUR_ASK_TITLE"), version]
+                         message:[NSString stringWithFormat:tourText(@"TOUR_ASK_MESSAGE"),
+                                                            [NSString localizedStringWithFormat:tourText(@"TOUR_SCREEN_COUNT"),
+                                                                                                (unsigned long)screens],
+                                                            tourDuration(screens)]
                   preferredStyle:UIAlertControllerStyleAlert];
-    PFBAlertAddAction(alert, @"Later", UIAlertActionStyleCancel, YES, nil);
-    UIAlertAction* now = PFBAlertAddAction(alert, @"Check now", UIAlertActionStyleDefault, YES, ^{
+    PFBAlertAddAction(alert, tourText(@"TOUR_LATER"), UIAlertActionStyleCancel, YES, nil);
+    UIAlertAction* now = PFBAlertAddAction(alert, tourText(@"TOUR_CHECK_NOW"), UIAlertActionStyleDefault, YES, ^{
       PFBCompatRunTour();
     });
     alert.preferredAction = now;

@@ -15,6 +15,10 @@ static __thread BOOL ReportGenuineSubscription = NO;
 // pool.
 static __thread BOOL ReportGenuineTabGates = NO;
 
+// While set, no switch answer below applies and the drawer reads the tab bar as it is, so a
+// rebuild of the sidebar is the one Twitter makes on its own.
+static __thread BOOL ReportTwitterOnly = NO;
+
 // Whether the account is really a premium subscriber, ignoring the forced
 // unlock — for switch-gated surfaces that have no premium-aware seam of their
 // own.
@@ -182,7 +186,7 @@ static NSNumber* FeatureSwitchOverrideValueForKey(NSString* key) {
         return nil;
     }
     PFBCompatNoteSettingRead(key);
-    if (!pfbSwitchIsAnswered(key)) {
+    if (ReportTwitterOnly || !pfbSwitchIsAnswered(key)) {
         return nil;
     }
     // Unlock Twitter's native premium color themes, so the accent the user picks
@@ -1256,6 +1260,31 @@ BOOL PFBDashKeepsOut(long long panelID) {
     }
 }
 
+// Reads and rebuilds made between these are Twitter's alone: the real subscription and gates,
+// no switch answer, and the drawer's list as the tab bar gives it.
+static __thread BOOL TwitterOnlySavedSubscription;
+static __thread BOOL TwitterOnlySavedTabGates;
+
+void PFBBeginTwitterOnlyReads(void) {
+    if (ReportTwitterOnly) {
+        return;
+    }
+    TwitterOnlySavedSubscription = ReportGenuineSubscription;
+    TwitterOnlySavedTabGates = ReportGenuineTabGates;
+    ReportGenuineSubscription = YES;
+    ReportGenuineTabGates = YES;
+    ReportTwitterOnly = YES;
+}
+
+void PFBEndTwitterOnlyReads(void) {
+    if (!ReportTwitterOnly) {
+        return;
+    }
+    ReportGenuineSubscription = TwitterOnlySavedSubscription;
+    ReportGenuineTabGates = TwitterOnlySavedTabGates;
+    ReportTwitterOnly = NO;
+}
+
 // MARK: - Custom navigation - side drawer rows
 
 // The drawer builds a row for each panel absent from the tab bar, from a snapshot
@@ -1304,15 +1333,17 @@ void PFBDashRefresh(void) {
 - (void)updateVisiblePanelIDs {
     // A nested update would clear the flag for the rest of the outer one.
     BOOL outer = !DashPanelIDQuery;
+    // Twitter's rebuild on its own is not the tweak's: the sidebar's record leaves it out.
+    BOOL recorded = outer && !ReportTwitterOnly;
     if (!outer) {
         PFBCompatMeasure(@"side menu panels", @"panel list updated inside its own update", 2);
-    } else {
+    } else if (recorded) {
         [PFBSidebarItems beginBuildOfContent:self];
     }
     DashPanelIDQuery = YES;
     %orig;
     DashPanelIDQuery = NO;
-    if (outer) {
+    if (recorded) {
         [PFBSidebarItems endBuildOfContent:self];
     }
 }
@@ -1367,7 +1398,7 @@ static BOOL PFBDashAnswerApplies(BOOL glassNavigation) {
 %hook T1PanelIdentity
 
 + (NSString*)localizedNameForPanelID:(long long)panelID {
-    if (DashPanelIDQuery) {
+    if (DashPanelIDQuery && !ReportTwitterOnly) {
         [PFBSidebarItems noteBuiltPanel:(NSInteger)panelID];
     }
     return %orig;
@@ -1376,9 +1407,10 @@ static BOOL PFBDashAnswerApplies(BOOL glassNavigation) {
 %end
 
 // The tab bar's panels as the drawer reads them, with Grok's shortcut and the items hidden
-// from the Sidebar page, the unlock-only panels by default, and without the tab items added.
+// from the Sidebar page, the unlock-only panels by default, and without the tab items added;
+// untouched while Twitter rebuilds on its own.
 static NSArray* PFBDashPanelIDs(NSArray* panelIDs) {
-    if (![panelIDs isKindOfClass:[NSArray class]]) {
+    if (![panelIDs isKindOfClass:[NSArray class]] || ReportTwitterOnly) {
         return panelIDs;
     }
     [PFBSidebarItems recordTabPanelIDs:panelIDs];

@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>COMPAT_PROBLEM_COUNT</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lu</string>
+			<key>one</key>
+			<string>%lu проблема</string>
+			<key>few</key>
+			<string>%lu проблемы</string>
+			<key>many</key>
+			<string>%lu проблем</string>
+			<key>other</key>
+			<string>%lu проблемы</string>
+		</dict>
+	</dict>
+	<key>COMPAT_OPTION_COUNT</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lu</string>
+			<key>one</key>
+			<string>%lu параметр</string>
+			<key>few</key>
+			<string>%lu параметра</string>
+			<key>many</key>
+			<string>%lu параметров</string>
+			<key>other</key>
+			<string>%lu параметра</string>
+		</dict>
+	</dict>
+	<key>TOUR_SCREEN_COUNT</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lu</string>
+			<key>one</key>
+			<string>%lu экран</string>
+			<key>few</key>
+			<string>%lu экрана</string>
+			<key>many</key>
+			<string>%lu экранов</string>
+			<key>other</key>
+			<string>%lu экрана</string>
+		</dict>
+	</dict>
+	<key>TOUR_SCREENS_LEFT</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lu</string>
+			<key>one</key>
+			<string>остался %lu</string>
+			<key>few</key>
+			<string>осталось %lu</string>
+			<key>many</key>
+			<string>осталось %lu</string>
+			<key>other</key>
+			<string>осталось %lu</string>
+		</dict>
+	</dict>
+</dict>
+</plist>

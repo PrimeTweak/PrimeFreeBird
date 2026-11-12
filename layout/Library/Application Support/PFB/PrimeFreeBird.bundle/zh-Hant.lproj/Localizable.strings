@@ -3,61 +3,108 @@
   PrimeFreeBird
 */
 
+/* Toggles read <KEY>_TITLE (or their titleKey) and optional <KEY>_DETAIL; buttons name titleKey/subtitleKey;
+   headers are <PAGE>_GROUP_<NAME>; pages MODERN_SETTINGS_<PAGE>_TITLE (General uses _LAYOUT_,
+   Tools _LAB_). A missing key shows as the raw key. */
+
 /* ===== GENERAL — page ===== */
 "MODERN_SETTINGS_LAYOUT_TITLE" = "一般";
 "MODERN_SETTINGS_LAYOUT_SUBTITLE" = "隱私、應用程式行為與連結。";
 
 /* ===== General › Privacy ===== */
+"GENERAL_GROUP_PRIVACY" = "隱私";
 "PADLOCK_TITLE" = "鎖定 Twitter";
 "PADLOCK_DETAIL" = "開啟時需使用 Face ID 或密碼。";
+"NO_SCREENSHOT_DETECTION_TITLE" = "乾淨的截圖";
+"NO_SCREENSHOT_DETECTION_DETAIL" = "阻止 Twitter 在截圖上加入浮水印或分享提示。";
 
-/* ===== General › App behavior ===== */
-"NO_TAB_BAR_HIDING_TITLE" = "永遠顯示";
-"NO_TAB_BAR_HIDING_DETAIL" = "捲動時不縮小也不淡出。";
-"GLASS_TOASTS_TITLE" = "玻璃提示";
-"GLASS_TOASTS_DETAIL" = "以頂部的玻璃列顯示 Twitter 的提示。";
+/* ===== General › App ===== */
+"GENERAL_GROUP_APP" = "App";
 "SHOW_SCROLL_INDICATOR_TITLE" = "捲動條";
+"SHOW_SCROLL_INDICATOR_DETAIL" = "捲動時在右側顯示位置指示器。";
 "DISABLE_RTL_TITLE" = "文字由左至右";
 "DISABLE_RTL_DETAIL" = "即使是由右至左書寫的語言，文字也由左至右顯示。";
 "HIDE_PREMIUM_OFFER_TITLE" = "隱藏 Premium 提示";
 "HIDE_PREMIUM_OFFER_DETAIL" = "隱藏「獲得認證」和「升級」按鈕。";
 
 /* ===== General › Links ===== */
+"GENERAL_GROUP_LINKS" = "連結";
 "SHARING_DOMAIN_TITLE" = "分享網域";
+"SHARING_DOMAIN_DETAIL" = "你分享的連結所使用的網址。";
+"SHARING_DOMAIN_PROMPT_MESSAGE" = "你分享的連結會使用這個網址。留空即使用 x.com。";
+"STRIP_URL_TRACKING_TITLE" = "乾淨的連結";
+"STRIP_URL_TRACKING_DETAIL" = "移除你開啟的連結，以及你分享或複製的 Twitter 連結中的追蹤資訊。";
 "ALWAYS_OPEN_SAFARI_TITLE" = "外部瀏覽器";
 "ALWAYS_OPEN_SAFARI_DETAIL" = "在 Safari 或預設瀏覽器中開啟連結。";
 "NEW_INAPP_WEBVIEW_TITLE" = "新版內建瀏覽器";
 "NEW_INAPP_WEBVIEW_DETAIL" = "使用 Twitter 新版內建瀏覽器開啟連結。";
+"BLOCK_WEB_ADS_TITLE" = "封鎖網頁廣告";
+"BLOCK_WEB_ADS_DETAIL" = "封鎖在 Twitter 內建瀏覽器中開啟的網頁上的廣告、追蹤器和干擾元素。";
+"BLOCK_WEB_ADS_DETAIL_HELD" = "連結在你的瀏覽器中開啟時不需要。";
 
 /* ===== APPEARANCE — page ===== */
 "MODERN_SETTINGS_APPEARANCE_TITLE" = "外觀";
 "MODERN_SETTINGS_APPEARANCE_SUBTITLE" = "樣式、字體、顏色與導覽列。";
 
-/* ===== Appearance › Interface ===== */
-"CUSTOM_TAB_BAR_OPTION_TITLE" = "自訂分頁";
-"RESTORE_TAB_LABELS_TITLE" = "分頁標籤";
-"RESTORE_TAB_LABELS_DETAIL" = "在圖示下方顯示標籤。";
+/* ===== Appearance › Style ===== */
+"APPEARANCE_GROUP_STYLE" = "樣式";
+"INTERFACE_STYLE_TITLE" = "視覺樣式";
+"INTERFACE_STYLE_SUBTITLE" = "在標準外觀和 Liquid Glass 設計之間選擇。";
+"GLASS_TOASTS_TITLE" = "玻璃提示";
+"GLASS_TOASTS_DETAIL" = "以頂部的玻璃列顯示 Twitter 的提示。";
+"HIDE_SCROLL_EDGE_BLUR_TITLE" = "柔和的頂部列";
+"HIDE_SCROLL_EDGE_BLUR_DETAIL" = "讓頂部列下方的內容漸漸淡出，而不是有線條的實色色帶。";
 "CUSTOM_FONTS_TITLE" = "自訂字體";
 "CUSTOM_FONTS_DETAIL" = "在整個 Twitter 中使用自訂字體。";
 "REGULAR_FONTS_PICKER_OPTION_TITLE" = "一般字體";
 "BOLD_FONTS_PICKER_OPTION_TITLE" = "粗體字體";
 "FONT_SYSTEM_DEFAULT_SUBTITLE" = "預設";
+"DEFAULT_FONT_OPTION_TITLE" = "重設字體";
+"DEFAULT_FONT_CONFIRM_MESSAGE" = "一般與粗體會回到 Twitter 的字體，並清除最近使用的字體。";
 
 /* ===== Appearance › Colors ===== */
+"APPEARANCE_GROUP_COLORS" = "顏色";
 "THEME_OPTION_TITLE" = "主題顏色";
+"THEME_OPTION_SUBTITLE" = "選擇整個 App 使用的強調色。";
+"DARK_MODE_STYLE_TITLE" = "背景顏色";
+"DARK_MODE_STYLE_SUBTITLE" = "選擇深色模式的背景色調。";
 "TAB_BAR_THEMING_TITLE" = "已選取的分頁";
 "TAB_BAR_THEMING_DETAIL" = "將強調色套用至選取的分頁和上方分頁的底線。";
+"COLOR_PFB_SWITCHES_TITLE" = "開關";
+"COLOR_PFB_SWITCHES_DETAIL" = "將強調色套用到這些設定中的開關。";
 "COLOR_TWITTER_ICON_IN_TOP_BAR_TITLE" = "Twitter 圖示";
 "COLOR_TWITTER_ICON_IN_TOP_BAR_DETAIL" = "將主題強調色套用至頂部導覽列的標誌。";
+"APPEARANCE_GROUP_TAB_BAR" = "標籤列";
+"CUSTOM_TAB_BAR_OPTION_TITLE" = "自訂分頁";
+"CUSTOM_TAB_BAR_OPTION_SUBTITLE" = "選擇要顯示的分頁及其順序。";
+"APPEARANCE_GROUP_SIDEBAR" = "側邊欄";
+"CUSTOM_SIDEBAR_OPTION_TITLE" = "自訂側邊欄";
+"CUSTOM_SIDEBAR_OPTION_SUBTITLE" = "選擇要在側邊欄顯示的項目。";
+"SIDEBAR_EDITOR_NAVIGATION_TITLE" = "側邊欄";
+"SIDEBAR_EDITOR_DETAIL" = "點一下項目即可加入側邊欄或從中移除。";
+"SIDEBAR_SECTION_SHOWN" = "已顯示";
+"SIDEBAR_SECTION_HIDDEN" = "已隱藏";
+"SIDEBAR_ITEM_TAB_BAR" = "分頁列";
+"SIDEBAR_ITEM_SHOWN" = "已顯示";
+"SIDEBAR_ITEM_HIDDEN" = "已隱藏";
+"RESTORE_TAB_LABELS_TITLE" = "分頁標籤";
+"RESTORE_TAB_LABELS_DETAIL" = "在圖示下方顯示標籤。";
+"NO_TAB_BAR_HIDING_TITLE" = "永遠顯示";
+"NO_TAB_BAR_HIDING_DETAIL" = "捲動時不縮小也不淡出。";
+"HIDE_BOTTOM_FADE_TITLE" = "隱藏底部漸層";
+"HIDE_BOTTOM_FADE_DETAIL" = "移除 Twitter 在標籤列下方繪製的漸層。";
 
 /* ===== BRANDING ===== */
 "MODERN_SETTINGS_BRANDING_TITLE" = "品牌外觀";
 "MODERN_SETTINGS_BRANDING_SUBTITLE" = "應用程式圖示、Twitter 用語、推文按鈕與音效。";
 "APP_ICON_TITLE" = "應用程式圖示";
+"APP_ICON_SUBTITLE" = "為主畫面選擇經典 Twitter 圖示。";
 "RESTORE_TWITTER_NAMES_TITLE" = "Twitter 用語";
 "RESTORE_TWITTER_NAMES_DETAIL" = "找回小鳥，並將「X」換成「Twitter」、「貼文」換成「推文」等。";
 "REFRESH_PILL_LABEL_TITLE" = "新推文提示文字";
 "REFRESH_PILL_LABEL_DETAIL" = "在新推文提示的大頭貼旁顯示文字。";
+"RESTORE_TWEET_BUTTON_TITLE" = "經典推文按鈕";
+"RESTORE_TWEET_BUTTON_DETAIL" = "在彩色圓圈上顯示羽毛。";
 
 /* ===== TIMELINES ===== */
 "MODERN_SETTINGS_TIMELINES_TITLE" = "時間軸";
@@ -66,31 +113,50 @@
 "HIDE_PROMOTED_DETAIL" = "移除推廣推文、趨勢和影片廣告。";
 "HIDE_WHO_TO_FOLLOW_TITLE" = "隱藏「建議跟隨」";
 "HIDE_WHO_TO_FOLLOW_DETAIL" = "移除跟隨建議。";
+"HIDE_TOPICS_TITLE" = "隱藏主題推文";
+"HIDE_TOPICS_DETAIL" = "移除因符合某個主題而被推入時間軸的推文。";
+"HIDE_TOPICS_TO_FOLLOW_TITLE" = "隱藏推薦主題";
+"HIDE_TOPICS_TO_FOLLOW_DETAIL" = "移除推薦要跟隨主題的卡片。";
 "HIDE_TIMELINE_PROMPTS_TITLE" = "隱藏提示";
 "HIDE_TIMELINE_PROMPTS_DETAIL" = "移除「新增聯絡人」、Premium 優惠等橫幅和卡片。";
+"HIDE_VIDEOS_FOR_YOU_TITLE" = "隱藏「為你推薦的影片」";
+"HIDE_VIDEOS_FOR_YOU_DETAIL" = "從時間軸移除「為你推薦的影片」列。";
 "HIDE_SPACES_TITLE" = "隱藏音訊空間列";
 "HIDE_SPACES_DETAIL" = "移除首頁頂端的音訊空間列。";
 "HIDE_CUSTOM_TIMELINES_TITLE" = "隱藏自訂時間軸";
 "HIDE_CUSTOM_TIMELINES_DETAIL" = "從首頁分頁移除已釘選的列表和社群，以及新增按鈕。";
+"RESTORE_REFRESH_SOUNDS_TITLE" = "重新整理音效";
+"RESTORE_REFRESH_SOUNDS_DETAIL" = "下拉重新整理時播放經典音效。";
+
+"HIDE_VERIFIED_TWEETS_TITLE" = "隱藏已驗證推文";
+"HIDE_VERIFIED_TWEETS_DETAIL" = "移除你未跟隨的已驗證帳號的推文。個人資料和搜尋仍會顯示。";
+"HIDE_BLOCKED_RETWEETS_TITLE" = "轉推";
+"HIDE_BLOCKED_RETWEETS_DETAIL" = "選擇要看到哪些轉推；「無」只適用於首頁。你的轉推一律保留。";
+"RETWEETS_SHOW_ALL" = "全部";
+"RETWEETS_HIDE_BLOCKED" = "不包括封鎖你的帳號";
+"RETWEETS_HIDE_ALL" = "無";
+"HIDE_QUOTE_TWEETS_TITLE" = "隱藏引用推文";
+"HIDE_QUOTE_TWEETS_DETAIL" = "從首頁移除引用推文。你的會保留。";
 
 /* ===== TWEETS ===== */
 "MODERN_SETTINGS_TWEETS_TITLE" = "推文";
 "MODERN_SETTINGS_TWEETS_SUBTITLE" = "撰寫、按鈕、回覆和敏感內容。";
 "UNDO_TWEET_TITLE" = "撤銷推文";
+"UNDO_TWEET_TIMEOUT_DETAIL" = "傳送推文後可以取消的時間。";
 "TWEET_CONFIRM_TITLE" = "確認推文";
 "TWEET_CONFIRM_DETAIL" = "送出推文或回覆前先詢問。";
 "LIKE_CONFIRM_TITLE" = "確認喜歡";
 "LIKE_CONFIRM_DETAIL" = "喜歡推文前先詢問。";
+"HIDE_THREADS_TITLE" = "隱藏對話";
+"HIDE_THREADS_DETAIL" = "在推文選單加入「隱藏這段對話」，並在各處移除已隱藏的對話。";
 "HIDE_VIEW_COUNT_TITLE" = "隱藏查看次數";
 "HIDE_VIEW_COUNT_DETAIL" = "移除推文下方和已開啟推文中的查看次數。";
 "HIDE_BOOKMARK_BUTTON_TITLE" = "隱藏書籤按鈕";
 "HIDE_BOOKMARK_BUTTON_DETAIL" = "移除推文下方的書籤按鈕。";
 "HIDE_DOWNVOTE_BUTTON_TITLE" = "隱藏倒讚按鈕";
 "HIDE_DOWNVOTE_BUTTON_DETAIL" = "移除推文下方的倒讚按鈕。";
-"DISABLE_SENSITIVE_TWEET_WARNINGS_TITLE" = "隱藏警告";
-"BYPASS_AGE_VERIFICATION_TITLE" = "繞過年齡驗證";
-"BYPASS_AGE_VERIFICATION_DETAIL" = "略過敏感內容的年齡驗證流程。";
 "REPLY_SORTING_TITLE" = "排序回覆";
+"REPLY_SORTING_DETAIL" = "回覆開啟時的排列順序。Twitter 的排序按鈕仍會保留。";
 "RESTORE_REPLY_CONTEXT_TITLE" = "「回覆給」提示行";
 "RESTORE_REPLY_CONTEXT_DETAIL" = "在開啟的回覆上方重新顯示這一行。";
 "SHOW_QUOTE_COUNTS_TITLE" = "引用和轉推";
@@ -100,23 +166,38 @@
 "SHOW_ACCOUNT_LOCATION_TITLE" = "帳戶所在地";
 "SHOW_ACCOUNT_LOCATION_DETAIL" = "在開啟的推文時間旁顯示帳戶所在的國家。";
 "QUOTE_COUNTS_TITLE_FORMAT" = "引用：%@ · 轉推：%@";
+"DISABLE_SENSITIVE_TWEET_WARNINGS_TITLE" = "隱藏警告";
+"DISABLE_SENSITIVE_TWEET_WARNINGS_DETAIL" = "直接顯示敏感的相片和影片，不顯示警告畫面。";
+"BYPASS_AGE_VERIFICATION_TITLE" = "繞過年齡驗證";
+"BYPASS_AGE_VERIFICATION_DETAIL" = "略過敏感內容的年齡驗證流程。";
 
 /* ===== MEDIA ===== */
 "MODERN_SETTINGS_MEDIA_TITLE" = "媒體";
 "MODERN_SETTINGS_MEDIA_SUBTITLE" = "下載、播放、畫質與版面配置。";
 "DOWNLOAD_VIDEOS_TITLE" = "影片和 GIF";
 "DOWNLOAD_VIDEOS_DETAIL" = "從影片或 GIF 的長按選單儲存。";
+"DOWNLOAD_HIGHEST_QUALITY_TITLE" = "最佳畫質";
+"DOWNLOAD_HIGHEST_QUALITY_DETAIL" = "略過畫質選單，儲存最佳畫質的影片。";
 "DIRECT_SAVE_TITLE" = "儲存至照片";
 "DIRECT_SAVE_DETAIL" = "將儲存的影片直接存入「照片」App。";
 "TWEET_TO_IMAGE_TITLE" = "將推文存為圖片";
 "TWEET_TO_IMAGE_DETAIL" = "長按分享按鈕，將推文匯出為圖片。";
 "DISABLE_VIDEO_CAPTIONS_TITLE" = "隱藏字幕";
+"DISABLE_VIDEO_CAPTIONS_DETAIL" = "移除影片上的自動字幕。";
 "AUTO_HIGHEST_LOAD_TITLE" = "完整解析度照片";
 "AUTO_HIGHEST_LOAD_DETAIL" = "以最高解析度載入照片。";
+"ENABLE_IMAGE_PRELOADING_TITLE" = "預先載入媒體";
+"ENABLE_IMAGE_PRELOADING_DETAIL" = "事先載入相片和影片，讓捲動更流暢。";
 "FORCE_TWEET_FULL_FRAME_TITLE" = "顯示完整照片";
+"FORCE_TWEET_FULL_FRAME_DETAIL" = "完整顯示相片，而不是裁切過的預覽。";
+"DISABLE_MEDIA_CAROUSEL_TITLE" = "經典媒體網格";
+"DISABLE_MEDIA_CAROUSEL_DETAIL" = "以網格而非輪播顯示推文中的多張相片。";
+"HIDE_MADE_ON_X_TITLE" = "隱藏「Made on X」";
+"HIDE_MADE_ON_X_DETAIL" = "移除 X 為在其編輯器中編輯的相片和影片加上的標籤。";
 "RESTORE_VIDEO_TIMESTAMP_TITLE" = "已播放時間";
 "RESTORE_VIDEO_TIMESTAMP_DETAIL" = "在全螢幕影片上顯示已播放時間和總時長，而非倒數計時。";
 "DISABLE_IMMERSIVE_SCROLL_TITLE" = "停用自動捲動";
+"DISABLE_IMMERSIVE_SCROLL_DETAIL" = "停留在目前的全螢幕影片：不自動前進，也不能滑到下一部。";
 
 /* ===== PROFILES ===== */
 "MODERN_SETTINGS_PROFILES_TITLE" = "個人資料";
@@ -133,6 +214,8 @@
 "HIDE_BLUE_VERIFIED_DETAIL" = "移除 Premium 驗證徽章，保留品牌和政府帳號的徽章。";
 "HIDE_FOLLOW_BUTTON_TITLE" = "隱藏跟隨按鈕";
 "HIDE_FOLLOW_BUTTON_DETAIL" = "隱藏推文作者旁的跟隨按鈕。個人資料頁保留自己的按鈕。";
+"HIDE_MESSAGE_BUTTON_TITLE" = "隱藏訊息按鈕";
+"HIDE_MESSAGE_BUTTON_DETAIL" = "移除推文作者旁的訊息按鈕。";
 /* Legacy key name: this row HIDES the Subscribe button. Do not rename the
    key — it is persisted in user defaults. */
 "RESTORE_FOLLOW_BUTTON_TITLE" = "隱藏訂閱按鈕";
@@ -141,6 +224,8 @@
 "SQUARE_AVATARS_DETAIL" = "像經典 Twitter 一樣，以圓角方形顯示頭像。";
 
 /* ===== SEARCH ===== */
+"SEARCH_GROUP_SEARCHING" = "搜尋";
+"SEARCH_GROUP_EXPLORE" = "探索";
 "MODERN_SETTINGS_SEARCH_TITLE" = "搜尋";
 "MODERN_SETTINGS_SEARCH_SUBTITLE" = "搜尋紀錄、進階搜尋與探索。";
 "NO_HISTORY_TITLE" = "關閉搜尋紀錄";
@@ -148,11 +233,27 @@
 "HIDE_TREND_VIDEOS_TITLE" = "隱藏熱門影片";
 "HIDE_TREND_VIDEOS_DETAIL" = "從探索中移除熱門影片列。";
 
-/* ===== GROK ===== */
+/* ===== MESSAGES ===== */
+"MODERN_SETTINGS_MESSAGES_TITLE" = "訊息";
+"MODERN_SETTINGS_MESSAGES_SUBTITLE" = "輸入中、語音訊息和 Grok。";
+"MESSAGES_GROUP_CHAT" = "聊天";
+"MESSAGES_GROUP_GROK" = "Grok";
 "HIDE_SUGGESTED_CHATS_TITLE" = "隱藏推薦的聊天";
 "HIDE_SUGGESTED_CHATS_DETAIL" = "從聊天收件匣移除「推薦」清單。";
+"HIDE_TYPING_INDICATOR_TITLE" = "隱藏輸入中指示";
+"HIDE_TYPING_INDICATOR_DETAIL" = "不再讓對方知道你正在輸入。";
+"VOICE_TRANSCRIPTION_TITLE" = "語音轉文字";
+"VOICE_TRANSCRIPTION_DETAIL" = "在語音訊息的波形下方顯示文字。";
+"DOWNLOAD_VOICE_MESSAGES_TITLE" = "下載語音訊息";
+"DOWNLOAD_VOICE_MESSAGES_DETAIL" = "播放後長按即可儲存語音訊息的音訊。";
+
+/* ===== GROK ===== */
 "HIDE_GROK_ANALYZE_TITLE" = "隱藏分析和提問按鈕";
+"HIDE_GROK_ANALYZE_DETAIL" = "移除 Grok 的分析和提問按鈕。";
 "HIDE_GROK_SIDEBAR_TITLE" = "隱藏側邊欄中的 Grok";
+"HIDE_GROK_SIDEBAR_DETAIL" = "從側邊欄移除 Grok 捷徑。";
+"HIDE_GROK_BOT_TITLE" = "隱藏 Grok Bot";
+"HIDE_GROK_BOT_DETAIL" = "移除「Try Grok Bot」列和其他 Grok Bot 推廣。";
 "HIDE_GROK_CREATE_TITLE" = "隱藏建立工具";
 "HIDE_GROK_CREATE_DETAIL" = "移除使用 Grok 建立或編輯圖片和影片的選項。";
 /* Legacy key name: this row TURNS ON auto-translation (the switch is inverted).
@@ -161,17 +262,67 @@
 "DISABLE_AUTO_TRANSLATE_DETAIL" = "允許 Twitter 自動翻譯推文、簡介、社群備註和通知。";
 
 /* ===== LAB ===== */
+"MODERN_SETTINGS_LAB_TITLE" = "工具";
+"MODERN_SETTINGS_LAB_SUBTITLE" = "網頁工作階段、備份和相容性。";
 "REPLY_IN_WEBVIEW_TITLE" = "在網頁上回覆";
 "REPLY_IN_WEBVIEW_DETAIL" = "所有回覆都透過網頁送出，適用於應用程式拒絕送出回覆的情況。";
+"IMPORT_SETTINGS_DONE_TITLE" = "已匯入設定";
+"IMPORT_SETTINGS_DONE_MESSAGE" = "重新啟動 Twitter 以全部套用。";
+"IMPORT_SETTINGS_FAILED_TITLE" = "匯入失敗";
+"IMPORT_SETTINGS_FAILED_MESSAGE" = "此檔案不是 PrimeFreeBird 設定的備份。";
+"IMPORT_SETTINGS_CONFIRM_TITLE" = "匯入設定";
+"IMPORT_SETTINGS_CONFIRM_MESSAGE" = "檔案中的選項、篩選器和顏色會取代你的設定；檔案中沒有的選項會恢復預設值。";
+"IMPORT_SETTINGS_CONFIRM_ACTION" = "匯入";
+"RESET_SETTINGS_CONFIRM_TITLE" = "重設設定";
+"RESET_SETTINGS_CONFIRM_MESSAGE" = "選項、篩選器、顏色、分頁、傳送音效、App 圖示，以及隱藏的通知和對話都會恢復為安裝時的狀態。網頁工作階段會保留。";
+"RESET_SETTINGS_CONFIRM_ACTION" = "重設";
+"RESET_SETTINGS_DONE_TITLE" = "已重設設定";
+"RESET_SETTINGS_DONE_MESSAGE" = "重新啟動 Twitter 以完成。";
+/* Reply-in-web-view: the reply screen title + the web-session login/clear
+   buttons (Lab) and their alerts. */
+"REPLY_WEBVIEW_TITLE" = "回覆";
+"WEB_SESSION_CLEAR_TITLE" = "登出網頁工作階段";
+"WEB_SESSION_CLEAR_CONFIRM" = "在你重新登入之前，推文、Spaces、Grok 和靜音名單都不會再使用它。如果 Twitter 是用它登入的，Twitter 會停止載入。";
+"WEB_SESSION_CLEAR_ACTION" = "登出";
+"OK_ACTION" = "好";
+"CANCEL_ACTION" = "取消";
+
+/* ===== Interface style picker ===== */
+"INTERFACE_STYLE_DETAIL" = "Liquid Glass 是隨 iOS 26 推出的半透明設計；標準則保留熟悉的平面外觀。";
+"INTERFACE_STYLE_STANDARD" = "標準";
+"INTERFACE_STYLE_LIQUID_GLASS" = "Liquid Glass";
+
+/* ===== Background color picker ===== */
+"DARK_MODE_STYLE_DETAIL" = "選擇 Twitter 深色背景使用的色調。";
+"DARK_MODE_STYLE_DIM" = "暗色";
+"DARK_MODE_STYLE_GRAY" = "灰色";
+"DARK_MODE_STYLE_PURE_BLACK" = "純黑";
+"DARK_MODE_STYLE_SYSTEM" = "系統";
 
 /* ===== Theme color picker ===== */
 "THEME_SETTINGS_NAVIGATION_DETAIL" = "選擇強調色。只有你看得到。";
 "THEME_SETTINGS_NAVIGATION_TITLE" = "主題顏色";
+"THEME_CUSTOM_HINT" = "為連結、按鈕和醒目標示選擇任何顏色。";
+"THEME_RESET_HINT" = "移除所有地方的強調色，包括已選取的分頁、開關和 Twitter 圖示。";
+"THEME_RESET_CONFIRM_TITLE" = "重設主題顏色";
+"THEME_RESET_CONFIRM_MESSAGE" = "強調色會恢復為 Twitter 的預設值，「已選取的分頁」、「開關」和「Twitter 圖示」不再使用它。你的其他設定會保留。";
+"THEME_RESET_ACTION" = "重設";
+"THEME_CUSTOM_NAME" = "自訂";
+"THEME_PREVIEW_TWEET" = "你的顏色會出現在 twitter.com 這類連結、@Twitter 這類提及和 #Twitter 這類主題標籤中。";
+"THEME_DEFAULT_NAME" = "預設";
 
-/* ===== Navigation bar editor ===== */
+/* ===== Tabs editor ===== */
 "CUSTOM_TAB_BAR_GRID_DETAIL" = "點一下分頁即可新增或移除。按住下方列中的圖示，然後拖移以重新排序。";
 "CUSTOM_TAB_BAR_RESET_MESSAGE" = "編輯器會回到 Twitter 的預設分頁。點一下「儲存」即可保留。";
+"CUSTOM_TAB_BAR_RESTORE_ACTION" = "復原";
+"CUSTOM_TAB_BAR_FULL_FORMAT" = "標籤列最多可放 %ld 個分頁。請先移除一個。";
+"CUSTOM_TAB_BAR_DISCARD_TITLE" = "捨棄變更";
+"CUSTOM_TAB_BAR_DISCARD_MESSAGE" = "你選擇的分頁不會儲存。";
+"CUSTOM_TAB_BAR_DISCARD_ACTION" = "捨棄";
 "CUSTOM_TAB_BAR_SETTINGS_NAVIGATION_TITLE" = "分頁";
+"TAB_EDITOR_TIP_CHANGE" = "點一下分頁即可更改";
+"TAB_EDITOR_TIP_ARRANGE" = "按住分頁即可重新排列";
+"TAB_EDITOR_TIP_ADD" = "點一下 + 即可新增分頁";
 
 /* ===== Fonts picker ===== */
 "CUSTOM_FONTS_MENU_TITLE" = "\n選擇字體";
@@ -181,6 +332,8 @@
 "DOWNLOAD_AS_GIF_OPTION_TITLE" = "下載為 GIF";
 "DOWNLOAD_AS_MP4_OPTION_TITLE" = "下載為 MP4";
 "DOWNLOAD_MENU_TITLE" = "選擇影片畫質";
+"DOWNLOAD_PICK_VIDEO_TITLE" = "選擇影片";
+"DOWNLOAD_PICK_FORMAT_TITLE" = "選擇格式";
 "DOWNLOAD_VIDEO_NUMBER_TITLE" = "影片 %lu";
 "DOWNLOAD_ALL_VIDEOS_OPTION_TITLE" = "下載所有影片";
 
@@ -190,16 +343,6 @@
 "COPY_PROFILE_INFO_MENU_OPTION_3" = "名稱";
 "COPY_PROFILE_INFO_MENU_OPTION_4" = "網站";
 "COPY_PROFILE_INFO_MENU_OPTION_5" = "地點";
-"COPY_PROFILE_INFO_MENU_TITLE" = "複製";
-"COPY_PROFILE_INFO_MENU_MORE" = "更多";
-"REMOVE_FOLLOWERS_TITLE" = "移除跟隨者";
-"REMOVE_FOLLOWERS_DETAIL" = "在跟隨你的個人資料選單中加入「移除此跟隨者」。";
-"REMOVE_FOLLOWER_TITLE" = "移除此跟隨者";
-"REMOVE_FOLLOWER_CONFIRM_TITLE" = "移除此跟隨者";
-"REMOVE_FOLLOWER_CONFIRM_MESSAGE" = "%@ 將從你的跟隨者中移除，而且不會收到通知。他們將來仍可再次跟隨你。";
-"REMOVE_FOLLOWER_ACTION" = "移除";
-"REMOVE_FOLLOWER_DONE" = "已移除跟隨者";
-"REMOVE_FOLLOWER_FAILED" = "無法移除此跟隨者，請再試一次。";
 
 /* ===== Padlock / authentication ===== */
 "PADLOCK_LOCKED_LABEL" = "已鎖定";
@@ -207,7 +350,10 @@
 "PADLOCK_REASON" = "解鎖 Twitter";
 
 /* ===== Alerts, confirmations & shared labels ===== */
+"RESTART_REQUIRED_ALERT_MESSAGE" = "Twitter 將關閉以套用變更。";
 "RESTART_REQUIRED_ALERT_TITLE" = "重新啟動 Twitter";
+"RESTART_LATER_ACTION" = "稍後";
+"LOGIN_RESTART_MESSAGE" = "Twitter 將關閉以完成載入介面。";
 "LIGHT_MODE_RESTART_MESSAGE" = "背景顏色已重設為「系統」。重新啟動可清除殘留的深色。";
 "CLOSE_APP_ACTION" = "關閉應用程式";
 
@@ -218,26 +364,399 @@
 "UNKNOWN_ERROR" = "發生未知的錯誤。";
 "PHOTOS_SAVE_FAILED_MESSAGE" = "「照片」未接受此檔案。請在「設定」中確認 Twitter 可以加入照片。";
 
+/* ===== Advanced search ===== */
+"ADVANCED_SEARCH_TITLE" = "進階搜尋";
+"ADVANCED_SEARCH_DETAIL" = "在探索和搜尋結果中加入按鈕，可依字詞、帳號或日期篩選。";
+"ADVSEARCH_SECTION_WORDS" = "字詞";
+"ADVSEARCH_SECTION_ACCOUNTS" = "帳號";
+"ADVSEARCH_SECTION_ENGAGEMENT" = "互動";
+"ADVSEARCH_SECTION_DATES" = "日期";
+"ADVSEARCH_ALL_WORDS" = "包含所有這些字詞";
+"ADVSEARCH_EXACT_PHRASE" = "包含這個完整詞組";
+"ADVSEARCH_ANY_WORDS" = "包含任一這些字詞";
+"ADVSEARCH_NONE_WORDS" = "不包含這些字詞";
+"ADVSEARCH_HASHTAGS" = "這些主題標籤";
+"ADVSEARCH_FROM_ACCOUNTS" = "來自這些帳號";
+"ADVSEARCH_TO_ACCOUNTS" = "回覆給這些帳號";
+"ADVSEARCH_MENTIONING" = "提及這些帳號";
+"ADVSEARCH_MIN_REPLIES" = "最少回覆數";
+"ADVSEARCH_MIN_LIKES" = "最少喜歡數";
+"ADVSEARCH_MIN_REPOSTS" = "最少轉推數";
+"ADVSEARCH_SINCE_DATE" = "開始日期";
+"ADVSEARCH_UNTIL_DATE" = "結束日期";
+"ADVSEARCH_SEARCH" = "搜尋";
+"ADVSEARCH_CLEAR" = "清除所有欄位";
+"ADVSEARCH_CLEAR_CONFIRM_MESSAGE" = "此表單的所有欄位和篩選器都會清空。";
+"ADVSEARCH_CLEAR_ACTION" = "清除";
+"ADVSEARCH_EMPTY" = "請至少填寫一個欄位。";
+"ADVSEARCH_EMPTY_TITLE" = "沒有可搜尋的內容";
+"RESTART_INFO_ALERT_MESSAGE" = "重新啟動後變更才會完全生效。";
+
+/* ===== Advanced search: web form labels ===== */
+"ADVSEARCH_SECTION_FILTERS" = "篩選器";
+"ADVSEARCH_LANGUAGE" = "語言";
+"ADVSEARCH_ANY_LANGUAGE" = "任何語言";
+"ADVSEARCH_REPLIES" = "回覆";
+"ADVSEARCH_REPLIES_SUB" = "包含回覆和原始推文。";
+"ADVSEARCH_LINKS" = "連結";
+"ADVSEARCH_LINKS_SUB" = "包含有連結的推文。";
+"ADVSEARCH_EX_ALL" = "範例：發生 什麼事 · 同時包含「發生」和「什麼事」";
+"ADVSEARCH_EX_EXACT" = "範例：歡樂時光 · 包含完整詞組「歡樂時光」";
+"ADVSEARCH_EX_ANY" = "範例：貓 狗 · 包含「貓」或「狗」（或兩者）";
+"ADVSEARCH_EX_NONE" = "範例：貓 狗 · 不包含「貓」也不包含「狗」";
+"ADVSEARCH_EX_TAGS" = "範例：#ThrowbackThursday · 包含主題標籤 #ThrowbackThursday";
+"ADVSEARCH_EX_FROM" = "範例：@NASA · 由 @NASA 傳送";
+"ADVSEARCH_EX_TO" = "範例：@NASA · 回覆給 @NASA";
+"ADVSEARCH_EX_MENTION" = "範例：@SFBART @Caltrain · 提及 @SFBART 或 @Caltrain";
+"ADVSEARCH_EX_MINREPLIES" = "範例：280 · 至少有 280 則回覆的推文";
+"ADVSEARCH_EX_MINLIKES" = "範例：280 · 至少有 280 個喜歡的推文";
+"ADVSEARCH_EX_MINREPOSTS" = "範例：280 · 至少有 280 次轉推的推文";
+"ADVSEARCH_EX_SINCE" = "只限在此日期之後發布的推文";
+"ADVSEARCH_EX_UNTIL" = "只限在此日期之前發布的推文";
+
+/* ===== MEDIA: groups and options ===== */
+"MEDIA_GROUP_DOWNLOADS" = "下載";
+"MEDIA_GROUP_PLAYBACK" = "播放";
+"MEDIA_GROUP_QUALITY" = "畫質";
+"DISABLE_VIDEO_DOCKING_TITLE" = "停用迷你播放器";
+"DISABLE_VIDEO_DOCKING_DETAIL" = "避免全螢幕影片縮小成浮動播放器。";
+"KEEP_BACKGROUND_AUDIO_TITLE" = "保留背景音訊";
+"KEEP_BACKGROUND_AUDIO_DETAIL" = "避免時間軸中的靜音影片打斷你的音樂或 Podcast。";
+"UPLOAD_FULL_HD_VIDEOS_TITLE" = "上傳 Full HD 影片";
+"UPLOAD_FULL_HD_VIDEOS_DETAIL" = "以 1080p 上傳影片，而不是預設的壓縮畫質。";
+"COPY_PROFILE_INFO_MENU_OPTION_6" = "個人資料連結";
+"COPY_PROFILE_INFO_MENU_OPTION_7" = "使用者 ID";
+"COPY_PROFILE_INFO_MENU_OPTION_8" = "加入日期";
+"COPY_PROFILE_INFO_MENU_TITLE" = "複製";
+"COPY_PROFILE_INFO_MENU_MORE" = "更多";
+"REMOVE_FOLLOWERS_TITLE" = "移除跟隨者";
+"REMOVE_FOLLOWERS_DETAIL" = "在跟隨你的個人資料選單中加入「移除此跟隨者」。";
+"REMOVE_FOLLOWERS_DETAIL_HELD" = "需要網頁工作階段——請到工具 › 網頁工作階段登入。";
+"REMOVE_FOLLOWER_TITLE" = "移除此跟隨者";
+"REMOVE_FOLLOWER_CONFIRM_TITLE" = "移除此跟隨者";
+"REMOVE_FOLLOWER_CONFIRM_MESSAGE" = "%@ 將從你的跟隨者中移除，而且不會收到通知。他們將來仍可再次跟隨你。";
+"REMOVE_FOLLOWER_ACTION" = "移除";
+"REMOVE_FOLLOWER_DONE" = "已移除跟隨者";
+"REMOVE_FOLLOWER_FAILED" = "無法移除此跟隨者，請再試一次。";
+"UNROUNDED_COUNTS_TITLE" = "不四捨五入的數字";
+
 /* ===== TWEETS: groups and options ===== */
+"TWEETS_GROUP_COMPOSING" = "撰寫";
+"TWEETS_GROUP_INTERACTIONS" = "互動";
+"TWEETS_GROUP_DETAILS" = "詳細資料";
+"TWEETS_GROUP_SENSITIVE" = "敏感內容";
+"HIDE_TWEET_BUTTON_TITLE" = "隱藏推文按鈕";
 "HIDE_TWEET_BUTTON_DETAIL" = "移除浮動的撰寫推文按鈕。";
 "SEND_SOUND_TITLE" = "傳送音效";
+"SEND_SOUND_DETAIL" = "傳送推文時播放的音效。";
 "SEND_SOUND_NONE" = "無";
 "SEND_SOUND_IMPORT_ACTION" = "匯入…";
 "SEND_SOUND_REMOVE_ACTION" = "移除";
+"SEND_SOUND_REMOVE_CONFIRM_TITLE" = "移除傳送音效";
+"SEND_SOUND_REMOVE_CONFIRM_MESSAGE" = "匯入的音效會被刪除。推文傳送時不會有音效。";
 "SEND_SOUND_FAILED_TITLE" = "未匯入音效";
 "SEND_SOUND_TOO_LONG" = "請選擇 7 秒以內的音效。";
 "SEND_SOUND_UNREADABLE" = "這個檔案不是可播放的音效。";
 
+/* ===== TIMELINES: groups and options ===== */
+"TIMELINES_GROUP_SUGGESTIONS" = "推廣";
+"TIMELINES_GROUP_CONTENT" = "內容";
+"TIMELINES_GROUP_POSITION" = "位置";
+"FORCE_FOLLOWING_TAB_TITLE" = "記住首頁分頁";
+"FORCE_FOLLOWING_TAB_DETAIL" = "讓首頁停留在你最後看的分頁，而不是 12 小時後回到「為你推薦」。";
+"NO_FOCUS_LOST_TITLE" = "保留閱讀位置";
+"NO_FOCUS_LOST_DETAIL" = "從其他 App 返回時不重新整理時間軸。";
+"NO_JUMP_BACK_HOME_TITLE" = "記住最後畫面";
+"NO_JUMP_BACK_HOME_DETAIL" = "離開 5 分鐘後回來，仍回到你離開的畫面，而不是首頁。";
+"READING_LINE_TITLE" = "閱讀標記";
+"READING_LINE_DETAIL" = "有新推文出現在上方時，標記你在「正在跟隨」中讀到哪裡。";
+"TIMELINES_GROUP_HOME" = "首頁";
+"UNLIMITED_TIMELINE_TABS_TITLE" = "無限制時間軸分頁";
+"UNLIMITED_TIMELINE_TABS_DETAIL" = "取消首頁釘選分頁的數量上限，並允許各種分頁。";
+"UNLIMITED_TIMELINE_TABS_DETAIL_HELD" = "自訂時間軸隱藏時不需要。";
+
+/* ===== MUTED WORDS ===== */
+"MUTED_WORDS_SUBTITLE" = "符合此清單中任何項目的推文都會從時間軸中篩除。";
+"FILTERS_TITLE" = "篩選器";
+"FILTERS_DETAIL" = "依字詞、帳號或語言篩選推文，並管理隱藏的對話。";
+"FILTERS_SEGMENT_WORDS" = "字詞";
+"FILTERS_SEGMENT_LANGUAGES" = "語言";
+"FILTERS_SEGMENT_THREADS" = "對話";
+"THREADS_FOOTER" = "你從推文中隱藏的對話。滑動一列即可恢復。";
+"THREADS_EMPTY" = "沒有隱藏的對話";
+"THREADS_NO_PREVIEW" = "（沒有文字）";
+"THREADS_HIDDEN_TOAST" = "已隱藏對話";
+"THREADS_UNDO" = "復原";
+"THREADS_HIDE_ACTION" = "隱藏這段對話";
+"LANGUAGES_FOOTER_OFF" = "未勾選任何語言——所有語言都會出現在你的時間軸。";
+"LANGUAGES_FOOTER_ON" = "只有勾選的語言會出現在你的時間軸。\n未偵測到語言的推文一律顯示。\n取消勾選所有語言即可關閉篩選器。";
+"LANGUAGES_OTHERS_TITLE" = "其他語言";
+"LANGUAGES_OTHERS_NONE" = "無";
+"MUTED_WORDS_ADD_PLACEHOLDER" = "新增字詞、詞組或 @帳號";
+"MUTED_WORDS_ADD_BUTTON" = "新增";
+"MUTED_WORDS_OPTIONS_HEADER" = "選項";
+"MUTED_WORDS_KIND_WORD" = "字詞";
+"MUTED_WORDS_KIND_PHRASE" = "詞組";
+"MUTED_WORDS_KIND_ACCOUNT" = "帳號";
+"MUTED_WORDS_WHOLE_TITLE" = "只比對完整字詞";
+"MUTED_WORDS_WHOLE_DETAIL" = "將「cat」視為一個字詞比對，而不比對「concatenate」中的部分。";
+"MUTED_WORDS_CONVERSATIONS_TITLE" = "在對話中篩選";
+"MUTED_WORDS_CONVERSATIONS_DETAIL" = "除了時間軸，也將清單套用到回覆。";
+
+/* ===== MUTED WORDS: expiry, scope, counter ===== */
+"MUTED_WORDS_FOLLOWING_TITLE" = "略過你跟隨的帳號";
+"MUTED_WORDS_FOLLOWING_DETAIL" = "你跟隨的人的推文永遠不會被篩除。";
+"MUTED_WORDS_REPOSTS_TITLE" = "包含轉推";
+"MUTED_WORDS_REPOSTS_DETAIL" = "也篩除已靜音字詞或帳號的轉推。";
+"MUTED_WORDS_COUNT_FORMAT" = "今天篩除的推文：%ld";
+"MUTED_WORDS_DURATION_FOREVER" = "永久";
+"MUTED_WORDS_DURATION_24H" = "24 小時";
+"MUTED_WORDS_DURATION_7D" = "7 天";
+"MUTED_WORDS_DURATION_30D" = "30 天";
+"DAYS_LEFT_FORMAT" = "還剩 %ld 天";
+"DAYS_LEFT_ONE" = "還剩 1 天";
+"MUTED_WORDS_EXAMPLE_TERM" = "劇透";
+"MUTED_WORDS_COUNT_TODAY" = "今天篩除的推文";
+"MUTED_WORDS_EMPTY" = "目前還沒有篩除任何內容。請在上方新增字詞、詞組或 @帳號。";
+"MUTED_WORDS_REMOVE_ACTION" = "移除";
+"LANGUAGES_INTRO_ON" = "只有使用勾選語言的推文會出現在你的時間軸。";
+"LANGUAGES_NOTE_UNDETECTED" = "未偵測到語言的推文一律顯示。";
+"THREADS_INTRO" = "你從推文中隱藏的對話。";
+"THREADS_COUNT_ONE" = "1 段隱藏的對話";
+"THREADS_COUNT_FORMAT" = "%ld 段隱藏的對話";
+"THREADS_EMPTY_HINT" = "從推文選單中隱藏一段對話。";
+"THREADS_SHOW_ACTION" = "顯示";
+
+
+"SHOW_POLL_RESULTS_TITLE" = "投票結果";
+"SHOW_POLL_RESULTS_DETAIL" = "在你投票前顯示每個選項的得票比例。";
+"POLL_RESULT_FORMAT" = "%1$@ (%2$@)";
+"TAP_TO_PAUSE_TITLE" = "簡潔影片播放器";
+"TAP_TO_PAUSE_DETAIL" = "點一下即可播放或暫停，並顯示最精簡的控制列。";
+"VIDEO_STARTS_MUTED_PILL_ON" = "靜音";
+"VIDEO_STARTS_MUTED_PILL_OFF" = "已開啟聲音";
+
+"PROFILES_GROUP_BEHAVIOR" = "行為";
+"PROFILES_GROUP_TABS" = "分頁";
+"PROFILES_GROUP_INTERFACE" = "介面";
+
+"PROFILE_INITIAL_TAB_TITLE" = "個人資料開啟於";
+"PROFILE_TAB_DEFAULT" = "預設";
+"PROFILE_TAB_REPLIES" = "回覆";
+"PROFILE_TAB_HIGHLIGHTS" = "精選";
+"PROFILE_TAB_ARTICLES" = "文章";
+"PROFILE_TAB_MEDIA" = "媒體";
+"PROFILE_TAB_VIDEOS" = "影片";
+
+"DISABLE_VIDEOS_TAB_TITLE" = "隱藏影片";
+"DISABLE_VIDEOS_TAB_DETAIL" = "從個人資料移除影片分頁。";
+
+"EXPAND_BIO_TITLE" = "展開自我介紹";
+"EXPAND_BIO_DETAIL" = "一次顯示個人資料的完整自我介紹，不必點「顯示更多」。";
+
+
+"PROFILE_TAB_REPOSTS" = "轉推";
+
 /* Hidden notifications */
+"NOTIFS_HIDE_MENU_ACTION" = "隱藏通知";
+"NOTIFS_HIDDEN_TOAST" = "已隱藏通知";
+"HIDDEN_NOTIFS_TITLE" = "隱藏的通知";
+"HIDDEN_NOTIFS_COUNT" = "已隱藏 %ld 則";
+"HIDDEN_NOTIFS_CLEAR_ALL" = "全部取消隱藏";
+"HIDDEN_NOTIFS_CLEAR_ALL_TITLE" = "取消隱藏所有通知";
+"HIDDEN_NOTIFS_CLEAR_ALL_MESSAGE" = "%ld 則隱藏的通知會回到「通知」中。";
+"HIDDEN_NOTIFS_CLEAR_ONE_MESSAGE" = "隱藏的通知會回到「通知」中。";
+"HIDDEN_NOTIFS_EMPTY_TITLE" = "這裡沒有任何內容";
+"HIDDEN_NOTIFS_EMPTY_BODY" = "這裡的所有通知都已隱藏。點一下上方的眼睛即可查看或恢復其中一則。";
+"HIDDEN_NOTIFS_EXAMPLE" = "點一下通知上的 × 即可隱藏";
+"HIDDEN_NOTIFS_UNHIDE" = "取消隱藏";
+"HIDDEN_NOTIFS_UNTITLED" = "隱藏的通知";
+"HIDE_NOTIFICATIONS_TITLE" = "隱藏通知";
+"HIDE_NOTIFICATIONS_DETAIL" = "用 × 或推文選單隱藏通知。頂部的眼睛會列出它們。";
+"NEW_TWITTER_SETTINGS_TITLE" = "新版 Twitter 設定";
+"NEW_TWITTER_SETTINGS_DETAIL" = "使用 Twitter 重新設計的設定，並讓 PrimeFreeBird 採用相同外觀。";
+"EXPLORE_TABS_CAPTION" = "探索列";
+"EXPLORE_TABS_HINT" = "點一下分頁即可移除或恢復。";
+"EXPLORE_TABS_HIDDEN_COUNT" = "已隱藏 %lu 個";
+"EXPLORE_TABS_NONE_HIDDEN" = "沒有隱藏";
+"HIDE_TAB_FORYOU_TAB_NAME" = "探索";
+"HIDE_TAB_TRENDING_TAB_NAME" = "趨勢";
+"HIDE_TAB_NEWS_TAB_NAME" = "新聞";
+"HIDE_TAB_SPORTS_TAB_NAME" = "運動";
+"HIDE_TAB_ENTERTAINMENT_TAB_NAME" = "娛樂";
+"HIDE_EXPLORE_ALL_TITLE" = "隱藏所有分頁";
+"HIDE_EXPLORE_ALL_DETAIL" = "只保留搜尋列。";
+"CHOOSE_EXPLORE_TABS_TITLE" = "選擇分頁";
+"CHOOSE_EXPLORE_TABS_DETAIL" = "選擇要留在列上的分頁。";
+"CHOOSE_EXPLORE_TABS_DETAIL_HELD" = "所有分頁隱藏時不需要。";
+"EXPLORE_TABS_KEEP_ONE" = "保留一個分頁，或使用「隱藏所有分頁」。";
+"LAB_GROUP_SESSION" = "網頁工作階段";
+"LAB_GROUP_TOOLS" = "疑難排解";
+"LAB_GROUP_BACKUP" = "備份";
+"WEB_SESSION_NONE_TITLE" = "沒有網頁工作階段";
+"WEB_SESSION_LIVE_DETAIL" = "已在此裝置上登入。";
+"WEB_SESSION_NONE_DETAIL" = "在網頁上登入，即可在此 App 中傳送推文、加入 Spaces，並使用靜音名單、Grok 和 Twitter 的網頁。";
+"WEB_SESSION_SIGN_IN_ACTION" = "登入";
+"WEB_SESSION_SIGN_IN_AGAIN_ACTION" = "重新登入";
+"REPLY_IN_WEBVIEW_DETAIL_HELD" = "需要網頁工作階段——請在上方登入。";
+"SHOW_TWEET_SOURCE_DETAIL_HELD" = "需要網頁工作階段——請到工具 › 網頁工作階段登入。";
+"SHOW_ACCOUNT_LOCATION_DETAIL_HELD" = "需要網頁工作階段——請到工具 › 網頁工作階段登入。";
 "FLEX_TWITTER_TITLE" = "FLEX 探索器";
 "FLEX_TWITTER_DETAIL" = "檢查應用程式的畫面和資料。供開發者使用。";
-"APPEARANCE_GROUP_SIDEBAR" = "側邊欄";
-"CUSTOM_SIDEBAR_OPTION_TITLE" = "自訂側邊欄";
-"CUSTOM_SIDEBAR_OPTION_SUBTITLE" = "選擇要在側邊欄顯示的項目。";
-"SIDEBAR_EDITOR_NAVIGATION_TITLE" = "側邊欄";
-"SIDEBAR_EDITOR_DETAIL" = "點一下項目即可加入側邊欄或從中移除。";
-"SIDEBAR_SECTION_SHOWN" = "已顯示";
-"SIDEBAR_SECTION_HIDDEN" = "已隱藏";
-"SIDEBAR_ITEM_TAB_BAR" = "分頁列";
-"SIDEBAR_ITEM_SHOWN" = "已顯示";
-"SIDEBAR_ITEM_HIDDEN" = "已隱藏";
+"COMPATIBILITY_TITLE" = "相容性";
+"COMPATIBILITY_DETAIL" = "檢查每個選項在 Twitter 更新後是否仍能運作。";
+"COMPATIBILITY_RECORD_TITLE" = "記錄活動";
+"DEBUG_TOOLS_DETAIL" = "顯示診斷按鈕並保留詳細記錄。即使不開啟，檢查仍會執行。";
+"COMPATIBILITY_REPORT_TITLE" = "報告";
+"COMPATIBILITY_REPORT_DETAIL" = "尚未檢查";
+
+/* ===== Compatibility report and its tour ===== */
+"COMPAT_VERDICT_PROBLEMS" = "%@（Twitter %@）";
+"COMPAT_VERDICT_CHECKING" = "正在檢查 Twitter %@";
+"COMPAT_VERDICT_DUE" = "尚未檢查 Twitter %@";
+"COMPAT_VERDICT_PARTIAL" = "Twitter %@ 尚未完整檢查";
+"COMPAT_VERDICT_OK" = "與 Twitter %@ 相容";
+"COMPAT_READ_PENDING" = "正在讀取 Twitter 的設定⋯";
+"COMPAT_READ_FAILED" = "無法讀取 Twitter 的設定";
+"COMPAT_METER_WORKING" = "運作中：%lu／%lu";
+"COMPAT_METER_BROKEN" = "故障：%lu";
+"COMPAT_METER_TO_CHECK" = "待檢查：%lu";
+"COMPAT_CHECK_OPTIONS" = "檢查選項";
+"COMPAT_COPY" = "拷貝";
+"COMPAT_COPIED" = "已拷貝";
+"COMPAT_COPY_REPORT" = "拷貝報告";
+"COMPAT_BROKEN" = "故障";
+"COMPAT_NOT_TESTED" = "未測試";
+"COMPAT_WORKING" = "運作中";
+"COMPAT_GROUP_OPTIONS" = "選項";
+"COMPAT_GROUP_DATA" = "資料";
+"COMPAT_NOT_TESTED_DETAIL" = "檢查期間尚未看到。";
+"COMPAT_WORKING_DETAIL" = "已在此版本中看到正常運作。";
+"COMPAT_CLEAR_ALL" = "全部清除";
+"COMPAT_CLEAR_ALL_DETAIL" = "清除計數並關閉 Twitter。設定會保留。";
+"COMPAT_CLEAR_ALL_MESSAGE" = "清除所有計數並關閉 Twitter。重新開啟後，每個選項會自行檢查，接著開啟這份報告。你的設定會保留。";
+"COMPAT_HISTORY" = "記錄";
+"COMPAT_HISTORY_SINCE" = "計數起始：%@。";
+"COMPAT_HISTORY_SINCE_BUILD" = "計數起始：%@ · 此版本起始：%@。";
+"COMPAT_DAY_TODAY" = "今天";
+"COMPAT_LIST_NOT_TESTED_NOTE" = "在 Twitter %@ 上尚未看到、或程式碼變更後尚未看到的選項。下一次導覽或一般使用會加以確認。";
+"COMPAT_LIST_WORKING_NOTE" = "在 Twitter %@ 上看到正常運作的選項。";
+"COMPAT_LIST_BROKEN_NOTE" = "在 Twitter %@ 上停止運作的選項。";
+"COMPAT_STATE_ON" = "開啟";
+"COMPAT_STATE_OFF" = "關閉";
+"COMPAT_STATE_ALWAYS_ON" = "永遠開啟";
+"TOUR_TITLE" = "檢查每個選項";
+"TOUR_ALL_SCREENS" = "所有畫面";
+"TOUR_REMAINING_SCREENS" = "剩餘畫面";
+"TOUR_NOTHING_LEFT" = "沒有剩餘";
+"TOUR_STEP_LINE" = "%@ · %lu／%lu";
+"TOUR_DURATION_SECONDS" = "約 %lu 秒";
+"TOUR_DURATION_MINUTES_SECONDS" = "約 %lu 分 %lu 秒";
+"TOUR_DURATION_MINUTES" = "約 %lu 分鐘";
+"TOUR_ALERT_TITLE" = "正在檢查提示";
+"TOUR_ALERT_MESSAGE" = "此提示會自動關閉。";
+"TOUR_SIGNED_OUT_TITLE" = "已登出";
+"TOUR_SIGNED_OUT_MESSAGE" = "導覽需要已登入的 Twitter 才能開啟畫面。請登入後再重新開始。";
+"TOUR_ASK_TITLE" = "檢查 Twitter %@";
+"TOUR_ASK_MESSAGE" = "檢查此版本的每個選項。導覽會自行開啟 %@（%@）。「取消」可隨時停止。";
+"TOUR_LATER" = "稍後";
+"TOUR_CHECK_NOW" = "立即檢查";
+"TOUR_STEP_PULL" = "下拉重新整理";
+"TOUR_STEP_FIRST_TWEET" = "第一則推文";
+"TOUR_STEP_TWEET_INTERACTIONS" = "推文互動";
+"TOUR_STEP_EDIT_HISTORY" = "編輯記錄";
+"TOUR_STEP_OWN_PROFILE" = "你的個人資料";
+"TOUR_STEP_SEARCH" = "搜尋";
+"TOUR_STEP_SEARCH_FIELD" = "搜尋欄位";
+"TOUR_STEP_SEARCH_OFF" = "搜尋，進階搜尋關閉";
+"TOUR_STEP_REFRESH_END" = "重新整理結束";
+"TOUR_STEP_FOLLOWING_TIMELINE" = "正在跟隨";
+"TOUR_STEP_SCROLL" = "捲動";
+"TOUR_STEP_TWEET_BUTTONS" = "推文按鈕";
+"TOUR_STEP_TWEET_MENU" = "推文選單";
+"TOUR_STEP_VIDEO_FULL_SCREEN" = "全螢幕影片";
+"TOUR_STEP_VIDEO_LONG_PRESS" = "影片選單";
+"TOUR_STEP_PHOTO_FULL_SCREEN" = "全螢幕相片";
+"TOUR_STEP_OTHER_PROFILE" = "其他個人資料";
+"TOUR_STEP_COMPOSER" = "撰寫";
+"TOUR_STEP_CONVERSATION" = "對話";
+"TOUR_STEP_REPLIES" = "依日期排列的回覆";
+"TOUR_STEP_SIDE_MENU" = "側邊欄";
+"TOUR_STEP_DARK_MODE" = "深色模式";
+"TOUR_STEP_WEB_LINK" = "網頁連結";
+"TOUR_STEP_T_CO_CHECK" = "t.co 封鎖";
+"TOUR_STEP_TWITTER_SETTINGS" = "Twitter 設定";
+"TOUR_STEP_TAB_EDITOR" = "Twitter 的分頁編輯器";
+"TOUR_STEP_PFB_SETTINGS" = "PrimeFreeBird 設定";
+"TOUR_STEP_ALERT" = "Twitter 提示";
+"SETTINGS_BACKUP_TITLE" = "設定檔";
+"SETTINGS_BACKUP_DETAIL" = "匯出或匯入所有選項、篩選器和顏色。";
+"EXPORT_SETTINGS_ACTION" = "匯出⋯";
+"IMPORT_SETTINGS_ACTION" = "匯入⋯";
+"RESET_SETTINGS_TITLE" = "重設設定";
+"WEB_SESSION_LOGIN_TITLE" = "在網頁上登入";
+"WEB_LOGIN_CONNECTING" = "正在連線到 Twitter⋯";
+"WEB_LOGIN_TAGLINE" = "資訊流，沒有雜訊。";
+"WEB_LOGIN_SIGNING_IN" = "正在為你登入⋯";
+"WEB_LOGIN_RETRY_ACTION" = "重試";
+"WEB_LOGIN_LOAD_FAILED" = "無法載入登入頁面。\n\n%@";
+/* Copies of Twitter's own strings, read only when Twitter's string tables lack the key. */
+"TW_CANCEL_ACTION_LABEL" = "取消";
+"TW_COMPOSITION_COMPLETE_SENDING_TWEET_TOAST_NOTIFICATION_MESSAGE" = "你的推文已傳送。";
+"TW_DISMISS_LABEL" = "關閉";
+"TW_DM_MESSAGE_ACTION_OPEN_GENERIC_TITLE" = "開啟";
+"TW_DOWNLOAD_ACTIVITY_VIEW_LABEL" = "下載";
+"TW_DOWNLOAD_LIVE_ACTIVITY_DOWNLOADING" = "下載中";
+"TW_DOWNLOAD_VIDEO_ACTIVITY_VIEW_LABEL" = "下載影片";
+"TW_ERROR_ALERT_TITLE" = "錯誤";
+"TW_GENERIC_OFF_LABEL" = "關閉";
+"TW_NOT_INTERESTED_IN_THIS_LABEL" = "對這個不感興趣";
+"TW_OK_ACTION_LABEL" = "確定";
+"TW_SAVE_ACTION_LABEL" = "儲存";
+"TW_SUBSCRIPTION_APP_ICON_SETTINGS_DETAIL" = "為你裝置的首頁畫面選擇自訂的應用程式圖示。可隨時變更。";
+"TW_SUBSCRIPTION_APP_ICON_SETTINGS_TITLE" = "應用程式圖示";
+"TW_SUBSCRIPTION_TAB_CUSTOMIZATION_RESTORE_BUTTON_TITLE" = "還原為預設";
+"TW_SUBSCRIPTION_UNDO_SEND_DURATION_LABEL" = "%ld 秒";
+"TW_TIMELINE_SORT_REPLIES_BY_LIKED" = "最多人喜歡的回覆";
+"TW_TIMELINE_SORT_REPLIES_BY_RECENT" = "最近的回覆";
+"TW_TIMELINE_SORT_REPLIES_BY_RELEVANT" = "最相關的回覆";
+"TW_TIMELINE_SORT_REPLIES_TITLE" = "排序回覆";
+"TW_SETTINGS_DISPLAY_COLOR_BLUE" = "藍色";
+"TW_SETTINGS_DISPLAY_COLOR_YELLOW" = "黃色";
+"TW_SETTINGS_DISPLAY_COLOR_RED" = "紅色";
+"TW_SETTINGS_DISPLAY_COLOR_PURPLE" = "紫色";
+"TW_SETTINGS_DISPLAY_COLOR_ORANGE" = "橙色";
+"TW_SETTINGS_DISPLAY_COLOR_GREEN" = "綠色";
+"TW_HOME_TIMELINE_TITLE" = "為你推薦";
+"TW_HOME_TIMELINE_LATEST_TITLE" = "正在跟隨";
+"MEDIA_GROUP_LAYOUT" = "版面配置";
+"BRANDING_GROUP_CLASSIC" = "經典 Twitter";
+"VOICE_NOTE_FROM_VIDEO_TITLE" = "用影片製作語音訊息";
+"VOICE_NOTE_FROM_VIDEO_DETAIL" = "在錄好的語音訊息加入按鈕，用你資料庫中影片的聲音取代它的聲音。";
+"VOICE_NOTE_FROM_VIDEO_BUTTON" = "以影片取代";
+"CONFIRM_TWEET_TITLE" = "傳送這則推文";
+"CONFIRM_TWEET_ACTION" = "發推";
+"CONFIRM_LIKE_TITLE" = "喜歡這則推文";
+"CONFIRM_LIKE_ACTION" = "喜歡";
+"CONFIRM_FOLLOW_TITLE" = "跟隨此帳號";
+"CONFIRM_FOLLOW_ACTION" = "跟隨";
+"HIDE_NEW_TWEETS_PILL_TITLE" = "隱藏新推文按鈕";
+"HIDE_NEW_TWEETS_PILL_DETAIL" = "移除時間軸頂端通知新推文的按鈕。";
+"REFRESH_PILL_LABEL_DETAIL_HELD" = "新推文按鈕隱藏時不需要。";
+
+/* ===== COMPATIBILITY: behaviors with no toggle ===== */
+"PREMIUM_UNLOCK_TITLE" = "已解鎖 Premium";
+"HIDE_UPSELLS_TITLE" = "隱藏推銷";
+"EDIT_TWEET_TITLE" = "編輯推文";
+"GROK_TRANSLATION_TITLE" = "翻譯按鈕";
+"LAUNCH_SCREEN_TITLE" = "經典啟動畫面";
+"EXPAND_TCO_LINKS_TITLE" = "完整連結";
+"REMOVE_RELATED_TWEETS_TITLE" = "隱藏相關推文";
+"KEEP_READING_POSITION_TITLE" = "重新載入時保留閱讀位置";
+"CLASSIC_TWEET_DETAIL_TITLE" = "經典推文頁面";
+"WEB_LOGIN_TITLE" = "網頁登入";
+"SETTINGS_ENTRY_TITLE" = "設定中的 PrimeFreeBird";
+"BAR_REPAIRS_TITLE" = "頂部列修正";
+"LEFT_ALIGNED_ALERTS_TITLE" = "靠左對齊的提示";
+"NO_AUTO_UNMUTE_TITLE" = "點一下不出聲";
+"FILTER_LANGUAGES_TITLE" = "語言篩選器";

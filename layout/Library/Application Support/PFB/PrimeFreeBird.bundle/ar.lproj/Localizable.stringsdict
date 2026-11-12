@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>COMPAT_PROBLEM_COUNT</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lu</string>
+			<key>zero</key>
+			<string>لا مشكلات</string>
+			<key>one</key>
+			<string>مشكلة واحدة</string>
+			<key>two</key>
+			<string>مشكلتان</string>
+			<key>few</key>
+			<string>%lu مشكلات</string>
+			<key>many</key>
+			<string>%lu مشكلة</string>
+			<key>other</key>
+			<string>%lu مشكلة</string>
+		</dict>
+	</dict>
+	<key>COMPAT_OPTION_COUNT</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lu</string>
+			<key>zero</key>
+			<string>لا خيارات</string>
+			<key>one</key>
+			<string>خيار واحد</string>
+			<key>two</key>
+			<string>خياران</string>
+			<key>few</key>
+			<string>%lu خيارات</string>
+			<key>many</key>
+			<string>%lu خيارًا</string>
+			<key>other</key>
+			<string>%lu خيار</string>
+		</dict>
+	</dict>
+	<key>TOUR_SCREEN_COUNT</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lu</string>
+			<key>zero</key>
+			<string>لا شاشات</string>
+			<key>one</key>
+			<string>شاشة واحدة</string>
+			<key>two</key>
+			<string>شاشتان</string>
+			<key>few</key>
+			<string>%lu شاشات</string>
+			<key>many</key>
+			<string>%lu شاشة</string>
+			<key>other</key>
+			<string>%lu شاشة</string>
+		</dict>
+	</dict>
+	<key>TOUR_SCREENS_LEFT</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lu</string>
+			<key>zero</key>
+			<string>لم يتبقَّ شيء</string>
+			<key>one</key>
+			<string>تبقّت واحدة</string>
+			<key>two</key>
+			<string>تبقّت اثنتان</string>
+			<key>few</key>
+			<string>تبقّت %lu</string>
+			<key>many</key>
+			<string>تبقّت %lu</string>
+			<key>other</key>
+			<string>تبقّت %lu</string>
+		</dict>
+	</dict>
+</dict>
+</plist>

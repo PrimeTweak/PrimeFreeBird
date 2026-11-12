@@ -57,5 +57,9 @@ FOUNDATION_EXPORT void PFBDashRefresh(void);
 FOUNDATION_EXPORT BOOL PFBDashKeepsOut(long long panelID);
 // The drawer's own list of the tab bar's panels, read from its Swift array; nil when unreadable.
 FOUNDATION_EXPORT NSArray<NSNumber*>* _Nullable PFBDashSnapshot(id content);
+// Between these, reads and rebuilds of the sidebar are Twitter's alone: no switch answer, and
+// the drawer's list as the tab bar gives it (FeatureSwitches.x).
+FOUNDATION_EXPORT void PFBBeginTwitterOnlyReads(void);
+FOUNDATION_EXPORT void PFBEndTwitterOnlyReads(void);
 
 NS_ASSUME_NONNULL_END

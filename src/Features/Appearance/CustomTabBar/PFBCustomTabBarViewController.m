@@ -507,7 +507,7 @@ static UIViewController* findViewControllerOfClass(UIViewController* vc,
             @"SUBSCRIPTION_TAB_CUSTOMIZATION_RESTORE_BUTTON_TITLE"];
     UIButton* restore = [UIButton buttonWithType:UIButtonTypeSystem];
     [restore setTitle:title forState:UIControlStateNormal];
-    // Same quiet outlined pill as the theme picker's "Reset to default" button.
+    // Same quiet outlined pill as the theme picker's "Restore to default" button.
     restore.titleLabel.font = PFBScaledFont([TwitterChirpFont(TwitterFontStyleRegular) fontWithSize:15]);
     [restore setTitleColor:[UIColor secondaryLabelColor] forState:UIControlStateNormal];
     restore.backgroundColor = [UIColor clearColor];

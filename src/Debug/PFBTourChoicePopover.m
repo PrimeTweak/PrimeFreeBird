@@ -1,3 +1,4 @@
+#import "Common/PFBBundle.h"
 #import "Common/PFBCompatibility.h"
 #import "Support/TwitterChirpFont.h"
 #import "Settings/PFBSettingsCellStyle.h"
@@ -14,15 +15,18 @@ static const CGFloat kPFBTourChoicePad = 11.0;
 static const CGFloat kPFBTourChoiceLineGap = 2.0;
 
 NSString* PFBTourChoiceTitle(BOOL full) {
-    return full ? @"All screens" : @"Remaining screens";
+    return [[PFBBundle sharedBundle] localizedStringForKey:full ? @"TOUR_ALL_SCREENS" : @"TOUR_REMAINING_SCREENS"];
 }
 
+// The screens a tour opens, or those left, counted by the language's plural rules.
 NSString* PFBTourChoiceLine(BOOL full) {
+    PFBBundle* bundle = [PFBBundle sharedBundle];
     NSUInteger screens = PFBCompatTourScreens(full);
-    if (full) {
-        return [NSString stringWithFormat:@"%lu screen%@", (unsigned long)screens, screens == 1 ? @"" : @"s"];
+    if (!full && !screens) {
+        return [bundle localizedStringForKey:@"TOUR_NOTHING_LEFT"];
     }
-    return screens ? [NSString stringWithFormat:@"%lu left", (unsigned long)screens] : @"Nothing left";
+    NSString* format = [bundle localizedStringForKey:full ? @"TOUR_SCREEN_COUNT" : @"TOUR_SCREENS_LEFT"];
+    return [NSString localizedStringWithFormat:format, (unsigned long)screens];
 }
 
 static UILabel* PFBTourChoiceLabel(NSString* text, UIFont* font, UIColor* color) {
@@ -72,7 +76,7 @@ static UILabel* PFBTourChoiceLabel(NSString* text, UIFont* font, UIColor* color)
     self.view.backgroundColor = [UIColor clearColor];
 
     UILabel* title = [[UILabel alloc] init];
-    title.text = @"Check options";
+    title.text = [[PFBBundle sharedBundle] localizedStringForKey:@"COMPAT_CHECK_OPTIONS"];
     title.font = PFBScaledFont([TwitterChirpFont(TwitterFontStyleBold) fontWithSize:20]);
     title.textColor = [UIColor labelColor];
     title.accessibilityTraits = UIAccessibilityTraitHeader;

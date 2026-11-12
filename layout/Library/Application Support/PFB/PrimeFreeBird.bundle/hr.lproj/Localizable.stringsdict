@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>COMPAT_PROBLEM_COUNT</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lu</string>
+			<key>one</key>
+			<string>%lu problem</string>
+			<key>few</key>
+			<string>%lu problema</string>
+			<key>other</key>
+			<string>%lu problema</string>
+		</dict>
+	</dict>
+	<key>COMPAT_OPTION_COUNT</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lu</string>
+			<key>one</key>
+			<string>%lu opcija</string>
+			<key>few</key>
+			<string>%lu opcije</string>
+			<key>other</key>
+			<string>%lu opcija</string>
+		</dict>
+	</dict>
+	<key>TOUR_SCREEN_COUNT</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lu</string>
+			<key>one</key>
+			<string>%lu zaslon</string>
+			<key>few</key>
+			<string>%lu zaslona</string>
+			<key>other</key>
+			<string>%lu zaslona</string>
+		</dict>
+	</dict>
+	<key>TOUR_SCREENS_LEFT</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lu</string>
+			<key>one</key>
+			<string>preostao %lu</string>
+			<key>few</key>
+			<string>preostala %lu</string>
+			<key>other</key>
+			<string>preostalo %lu</string>
+		</dict>
+	</dict>
+</dict>
+</plist>

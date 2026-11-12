@@ -104,7 +104,7 @@ static NSInteger NearestAccentOption(UIColor* color) {
 @property (nonatomic, strong) PFBColorSwatchControl* customSwatch;
 @property (nonatomic, strong) UIButton* resetButton;
 // The new look's page: its line, the sample on its card, then a card holding the colors in a glass
-// bar with a lens on the chosen one and that color's name, then Reset to default at the bottom.
+// bar with a lens on the chosen one and that color's name, then Restore to default at the bottom.
 @property (nonatomic, strong) UIScrollView* nativeScroll;
 @property (nonatomic, strong) UILabel* introLabel;
 @property (nonatomic, strong) UIView* previewCard;
@@ -201,7 +201,8 @@ static NSInteger NearestAccentOption(UIColor* color) {
     [self.view addSubview:customHint];
     UIButton* resetButton = [UIButton buttonWithType:UIButtonTypeSystem];
     resetButton.translatesAutoresizingMaskIntoConstraints = NO;
-    [resetButton setTitle:[[PFBBundle sharedBundle] localizedStringForKey:@"THEME_RESET_TITLE"]
+    [resetButton setTitle:[[PFBBundle sharedBundle]
+                              localizedTwitterStringForKey:@"SUBSCRIPTION_TAB_CUSTOMIZATION_RESTORE_BUTTON_TITLE"]
                  forState:UIControlStateNormal];
     // An outlined pill in neutral colors, so it never competes with the accent
     // swatches it resets.
@@ -268,7 +269,7 @@ static NSInteger NearestAccentOption(UIColor* color) {
 
 // MARK: - New look
 
-// The page scrolls under the bar; Reset to default stays at its bottom.
+// The page scrolls under the bar; Restore to default stays at its bottom.
 - (void)buildNativeLook {
     PFBBundle* bundle = [PFBBundle sharedBundle];
     UIScrollView* scroll = [[UIScrollView alloc] initWithFrame:self.view.bounds];
@@ -329,7 +330,7 @@ static NSInteger NearestAccentOption(UIColor* color) {
     [self.paletteCard addSubview:self.colorName];
 
     self.resetCapsule = [PFBShowcaseButton buttonWithStyle:PFBShowcaseButtonStyleOutline];
-    self.resetCapsule.label = [bundle localizedStringForKey:@"THEME_RESET_TITLE"];
+    self.resetCapsule.label = [bundle localizedTwitterStringForKey:@"SUBSCRIPTION_TAB_CUSTOMIZATION_RESTORE_BUTTON_TITLE"];
     [self.resetCapsule addTarget:self
                           action:@selector(confirmResetToDefaultColor)
                 forControlEvents:UIControlEventTouchUpInside];

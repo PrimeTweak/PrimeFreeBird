@@ -3,61 +3,108 @@
   PrimeFreeBird
 */
 
+/* Toggles read <KEY>_TITLE (or their titleKey) and optional <KEY>_DETAIL; buttons name titleKey/subtitleKey;
+   headers are <PAGE>_GROUP_<NAME>; pages MODERN_SETTINGS_<PAGE>_TITLE (General uses _LAYOUT_,
+   Tools _LAB_). A missing key shows as the raw key. */
+
 /* ===== GENERAL — page ===== */
 "MODERN_SETTINGS_LAYOUT_TITLE" = "Общие";
 "MODERN_SETTINGS_LAYOUT_SUBTITLE" = "Конфиденциальность, поведение приложения и ссылки.";
 
 /* ===== General › Privacy ===== */
+"GENERAL_GROUP_PRIVACY" = "Конфиденциальность";
 "PADLOCK_TITLE" = "Заблокировать Twitter";
 "PADLOCK_DETAIL" = "Запрашивает Face ID или код-пароль для открытия Twitter.";
+"NO_SCREENSHOT_DETECTION_TITLE" = "Чистые скриншоты";
+"NO_SCREENSHOT_DETECTION_DETAIL" = "Не даёт Twitter добавлять к скриншотам водяные знаки и предложения поделиться.";
 
-/* ===== General › App behavior ===== */
-"NO_TAB_BAR_HIDING_TITLE" = "Всегда видна";
-"NO_TAB_BAR_HIDING_DETAIL" = "Не уменьшать и не скрывать панель при прокрутке.";
-"GLASS_TOASTS_TITLE" = "Стеклянные уведомления";
-"GLASS_TOASTS_DETAIL" = "Показывать уведомления Twitter стеклянной панелью сверху.";
+/* ===== General › App ===== */
+"GENERAL_GROUP_APP" = "Приложение";
 "SHOW_SCROLL_INDICATOR_TITLE" = "Полоса прокрутки";
+"SHOW_SCROLL_INDICATOR_DETAIL" = "Показывает индикатор положения справа при прокрутке.";
 "DISABLE_RTL_TITLE" = "Текст слева направо";
 "DISABLE_RTL_DETAIL" = "Показывает текст слева направо, даже в языках с письмом справа налево.";
 "HIDE_PREMIUM_OFFER_TITLE" = "Скрыть предложения Premium";
 "HIDE_PREMIUM_OFFER_DETAIL" = "Убрать кнопки «Подтвердить подлинность» и «Приобрести».";
 
 /* ===== General › Links ===== */
+"GENERAL_GROUP_LINKS" = "Ссылки";
 "SHARING_DOMAIN_TITLE" = "Домен для ссылок";
+"SHARING_DOMAIN_DETAIL" = "Адрес в ссылках, которыми вы делитесь.";
+"SHARING_DOMAIN_PROMPT_MESSAGE" = "Ссылки, которыми вы делитесь, используют этот адрес. Оставьте пустым для x.com.";
+"STRIP_URL_TRACKING_TITLE" = "Чистые ссылки";
+"STRIP_URL_TRACKING_DETAIL" = "Убирает отслеживание из открываемых ссылок и из ссылок Twitter, которыми вы делитесь или которые копируете.";
 "ALWAYS_OPEN_SAFARI_TITLE" = "Внешний браузер";
 "ALWAYS_OPEN_SAFARI_DETAIL" = "Открывать ссылки в Safari или браузере по умолчанию.";
 "NEW_INAPP_WEBVIEW_TITLE" = "Новый встроенный браузер";
 "NEW_INAPP_WEBVIEW_DETAIL" = "Используйте новый встроенный браузер Twitter для открытия ссылок.";
+"BLOCK_WEB_ADS_TITLE" = "Блокировать веб-рекламу";
+"BLOCK_WEB_ADS_DETAIL" = "Блокирует рекламу, трекеры и раздражающие элементы на страницах во встроенном браузере Twitter.";
+"BLOCK_WEB_ADS_DETAIL_HELD" = "Не нужно, пока ссылки открываются в вашем браузере.";
 
 /* ===== APPEARANCE — page ===== */
 "MODERN_SETTINGS_APPEARANCE_TITLE" = "Внешний вид";
 "MODERN_SETTINGS_APPEARANCE_SUBTITLE" = "Стиль, шрифты, цвета и панель навигации.";
 
-/* ===== Appearance › Interface ===== */
-"CUSTOM_TAB_BAR_OPTION_TITLE" = "Настроить вкладки";
-"RESTORE_TAB_LABELS_TITLE" = "Подписи вкладок";
-"RESTORE_TAB_LABELS_DETAIL" = "Показывает подписи под значками.";
+/* ===== Appearance › Style ===== */
+"APPEARANCE_GROUP_STYLE" = "Стиль";
+"INTERFACE_STYLE_TITLE" = "Визуальный стиль";
+"INTERFACE_STYLE_SUBTITLE" = "Выберите стандартный вид или дизайн Liquid Glass.";
+"GLASS_TOASTS_TITLE" = "Стеклянные уведомления";
+"GLASS_TOASTS_DETAIL" = "Показывать уведомления Twitter стеклянной панелью сверху.";
+"HIDE_SCROLL_EDGE_BLUR_TITLE" = "Мягкая верхняя панель";
+"HIDE_SCROLL_EDGE_BLUR_DETAIL" = "Плавно скрывает содержимое под верхней панелью вместо сплошной полосы с линией.";
 "CUSTOM_FONTS_TITLE" = "Пользовательские шрифты";
 "CUSTOM_FONTS_DETAIL" = "Использует свой шрифт во всём Twitter.";
 "REGULAR_FONTS_PICKER_OPTION_TITLE" = "Обычный шрифт";
 "BOLD_FONTS_PICKER_OPTION_TITLE" = "Жирный шрифт";
 "FONT_SYSTEM_DEFAULT_SUBTITLE" = "По умолчанию";
+"DEFAULT_FONT_OPTION_TITLE" = "Сбросить шрифты";
+"DEFAULT_FONT_CONFIRM_MESSAGE" = "Обычный и жирный возвращаются к шрифту Twitter, недавние шрифты очищаются.";
 
 /* ===== Appearance › Colors ===== */
+"APPEARANCE_GROUP_COLORS" = "Цвета";
 "THEME_OPTION_TITLE" = "Цвет темы";
+"THEME_OPTION_SUBTITLE" = "Выберите цвет акцента для всего приложения.";
+"DARK_MODE_STYLE_TITLE" = "Цвет фона";
+"DARK_MODE_STYLE_SUBTITLE" = "Выберите оттенок фона в тёмном режиме.";
 "TAB_BAR_THEMING_TITLE" = "Выбранная вкладка";
 "TAB_BAR_THEMING_DETAIL" = "Применяет акцентный цвет к выбранной вкладке и подчёркиванию верхних вкладок.";
+"COLOR_PFB_SWITCHES_TITLE" = "Переключатели";
+"COLOR_PFB_SWITCHES_DETAIL" = "Применяет цвет акцента к переключателям в этих настройках.";
 "COLOR_TWITTER_ICON_IN_TOP_BAR_TITLE" = "Значок Twitter";
 "COLOR_TWITTER_ICON_IN_TOP_BAR_DETAIL" = "Применяет акцентный цвет к логотипу на верхней панели.";
+"APPEARANCE_GROUP_TAB_BAR" = "Панель вкладок";
+"CUSTOM_TAB_BAR_OPTION_TITLE" = "Настроить вкладки";
+"CUSTOM_TAB_BAR_OPTION_SUBTITLE" = "Выберите, какие вкладки показывать и в каком порядке.";
+"APPEARANCE_GROUP_SIDEBAR" = "Боковая панель";
+"CUSTOM_SIDEBAR_OPTION_TITLE" = "Настроить боковую панель";
+"CUSTOM_SIDEBAR_OPTION_SUBTITLE" = "Выберите, какие пункты показывать в боковой панели.";
+"SIDEBAR_EDITOR_NAVIGATION_TITLE" = "Боковая панель";
+"SIDEBAR_EDITOR_DETAIL" = "Нажмите на пункт, чтобы добавить его в боковую панель или убрать из неё.";
+"SIDEBAR_SECTION_SHOWN" = "Показаны";
+"SIDEBAR_SECTION_HIDDEN" = "Скрыты";
+"SIDEBAR_ITEM_TAB_BAR" = "Панель вкладок";
+"SIDEBAR_ITEM_SHOWN" = "Показано";
+"SIDEBAR_ITEM_HIDDEN" = "Скрыто";
+"RESTORE_TAB_LABELS_TITLE" = "Подписи вкладок";
+"RESTORE_TAB_LABELS_DETAIL" = "Показывает подписи под значками.";
+"NO_TAB_BAR_HIDING_TITLE" = "Всегда видна";
+"NO_TAB_BAR_HIDING_DETAIL" = "Не уменьшать и не скрывать панель при прокрутке.";
+"HIDE_BOTTOM_FADE_TITLE" = "Скрыть нижнее затемнение";
+"HIDE_BOTTOM_FADE_DETAIL" = "Убирает затемнение, которое Twitter рисует под панелью вкладок.";
 
 /* ===== BRANDING ===== */
 "MODERN_SETTINGS_BRANDING_TITLE" = "Брендинг";
 "MODERN_SETTINGS_BRANDING_SUBTITLE" = "Значок приложения, терминология Twitter, кнопка «Твитнуть» и звуки.";
 "APP_ICON_TITLE" = "Значок приложения";
+"APP_ICON_SUBTITLE" = "Выберите классический значок Twitter для экрана «Домой».";
 "RESTORE_TWITTER_NAMES_TITLE" = "Терминология Twitter";
 "RESTORE_TWITTER_NAMES_DETAIL" = "Возвращает птичку и заменяет «X» на «Twitter», «пост» на «твит» и так далее.";
 "REFRESH_PILL_LABEL_TITLE" = "Текст плашки новых твитов";
 "REFRESH_PILL_LABEL_DETAIL" = "Показывает слово рядом с аватарами на плашке новых твитов.";
+"RESTORE_TWEET_BUTTON_TITLE" = "Классическая кнопка твита";
+"RESTORE_TWEET_BUTTON_DETAIL" = "Показывает перо на цветном круге.";
 
 /* ===== TIMELINES ===== */
 "MODERN_SETTINGS_TIMELINES_TITLE" = "Ленты";
@@ -66,31 +113,50 @@
 "HIDE_PROMOTED_DETAIL" = "Убирает рекламные твиты, актуальные темы и видеорекламу.";
 "HIDE_WHO_TO_FOLLOW_TITLE" = "Скрыть «Кого читать»";
 "HIDE_WHO_TO_FOLLOW_DETAIL" = "Убрать рекомендации подписок.";
+"HIDE_TOPICS_TITLE" = "Скрыть твиты по темам";
+"HIDE_TOPICS_DETAIL" = "Убирает твиты, попадающие в ленту, потому что они подходят под тему.";
+"HIDE_TOPICS_TO_FOLLOW_TITLE" = "Скрыть рекомендуемые темы";
+"HIDE_TOPICS_TO_FOLLOW_DETAIL" = "Убирает карточки с предложениями тем для подписки.";
 "HIDE_TIMELINE_PROMPTS_TITLE" = "Скрыть подсказки";
 "HIDE_TIMELINE_PROMPTS_DETAIL" = "Убрать баннеры и карточки вроде «Добавить контакты» или предложений Premium.";
+"HIDE_VIDEOS_FOR_YOU_TITLE" = "Скрыть «Видео для вас»";
+"HIDE_VIDEOS_FOR_YOU_DETAIL" = "Убирает ряд «Видео для вас» из ваших лент.";
 "HIDE_SPACES_TITLE" = "Скрыть панель аудиокомнат";
 "HIDE_SPACES_DETAIL" = "Убирает панель аудиокомнат вверху «Главной».";
 "HIDE_CUSTOM_TIMELINES_TITLE" = "Скрыть свои ленты";
 "HIDE_CUSTOM_TIMELINES_DETAIL" = "Убирает из вкладок «Главной» закреплённые списки и сообщества, а также кнопку «Добавить».";
+"RESTORE_REFRESH_SOUNDS_TITLE" = "Звуки обновления";
+"RESTORE_REFRESH_SOUNDS_DETAIL" = "Воспроизводит классические звуки, когда вы тянете для обновления.";
+
+"HIDE_VERIFIED_TWEETS_TITLE" = "Скрыть твиты верифицированных";
+"HIDE_VERIFIED_TWEETS_DETAIL" = "Убирает твиты верифицированных аккаунтов, которые вы не читаете. Профили и поиск их сохраняют.";
+"HIDE_BLOCKED_RETWEETS_TITLE" = "Ретвиты";
+"HIDE_BLOCKED_RETWEETS_DETAIL" = "Выберите, какие ретвиты видеть; «Никакие» действует только на Главной. Ваши остаются всегда.";
+"RETWEETS_SHOW_ALL" = "Все";
+"RETWEETS_HIDE_BLOCKED" = "Не от аккаунтов, которые вас заблокировали";
+"RETWEETS_HIDE_ALL" = "Никакие";
+"HIDE_QUOTE_TWEETS_TITLE" = "Скрыть твиты с цитатой";
+"HIDE_QUOTE_TWEETS_DETAIL" = "Убирает твиты с цитатой с Главной. Ваши остаются.";
 
 /* ===== TWEETS ===== */
 "MODERN_SETTINGS_TWEETS_TITLE" = "Твиты";
 "MODERN_SETTINGS_TWEETS_SUBTITLE" = "Написание, кнопки, ответы и деликатный контент.";
 "UNDO_TWEET_TITLE" = "Отменить твит";
+"UNDO_TWEET_TIMEOUT_DETAIL" = "Время на отмену твита после отправки.";
 "TWEET_CONFIRM_TITLE" = "Подтверждение твита";
 "TWEET_CONFIRM_DETAIL" = "Запрашивает подтверждение перед отправкой твита или ответа.";
 "LIKE_CONFIRM_TITLE" = "Подтверждение лайка";
 "LIKE_CONFIRM_DETAIL" = "Запрашивает подтверждение, прежде чем поставить лайк твиту.";
+"HIDE_THREADS_TITLE" = "Скрыть переписки";
+"HIDE_THREADS_DETAIL" = "Добавляет «Скрыть эту переписку» в меню твита и убирает скрытые отовсюду.";
 "HIDE_VIEW_COUNT_TITLE" = "Скрыть число просмотров";
 "HIDE_VIEW_COUNT_DETAIL" = "Убирает число просмотров под твитами и в открытом твите.";
 "HIDE_BOOKMARK_BUTTON_TITLE" = "Скрыть кнопку закладок";
 "HIDE_BOOKMARK_BUTTON_DETAIL" = "Убирает кнопку закладок под твитами.";
 "HIDE_DOWNVOTE_BUTTON_TITLE" = "Скрыть кнопку дизлайка";
 "HIDE_DOWNVOTE_BUTTON_DETAIL" = "Убирает кнопку дизлайка под твитами.";
-"DISABLE_SENSITIVE_TWEET_WARNINGS_TITLE" = "Скрыть предупреждения";
-"BYPASS_AGE_VERIFICATION_TITLE" = "Обойти проверку возраста";
-"BYPASS_AGE_VERIFICATION_DETAIL" = "Пропускает проверку возраста для деликатного контента.";
 "REPLY_SORTING_TITLE" = "Упорядочить ответы";
+"REPLY_SORTING_DETAIL" = "Порядок, в котором открываются ответы. Кнопка сортировки Twitter остаётся.";
 "RESTORE_REPLY_CONTEXT_TITLE" = "Строка «В ответ»";
 "RESTORE_REPLY_CONTEXT_DETAIL" = "Возвращает её над открытым ответом.";
 "SHOW_QUOTE_COUNTS_TITLE" = "Цитаты и ретвиты";
@@ -100,23 +166,38 @@
 "SHOW_ACCOUNT_LOCATION_TITLE" = "Страна аккаунта";
 "SHOW_ACCOUNT_LOCATION_DETAIL" = "Показывает страну аккаунта рядом со временем открытого твита.";
 "QUOTE_COUNTS_TITLE_FORMAT" = "Цитаты: %@ · Ретвиты: %@";
+"DISABLE_SENSITIVE_TWEET_WARNINGS_TITLE" = "Скрыть предупреждения";
+"DISABLE_SENSITIVE_TWEET_WARNINGS_DETAIL" = "Показывает деликатные фото и видео без экрана предупреждения.";
+"BYPASS_AGE_VERIFICATION_TITLE" = "Обойти проверку возраста";
+"BYPASS_AGE_VERIFICATION_DETAIL" = "Пропускает проверку возраста для деликатного контента.";
 
 /* ===== MEDIA ===== */
 "MODERN_SETTINGS_MEDIA_TITLE" = "Медиа";
 "MODERN_SETTINGS_MEDIA_SUBTITLE" = "Скачивание, воспроизведение, качество и отображение.";
 "DOWNLOAD_VIDEOS_TITLE" = "Видео и GIF";
 "DOWNLOAD_VIDEOS_DETAIL" = "Сохраняет видео или GIF из его меню долгого нажатия.";
+"DOWNLOAD_HIGHEST_QUALITY_TITLE" = "Лучшее качество";
+"DOWNLOAD_HIGHEST_QUALITY_DETAIL" = "Пропускает меню качества и сохраняет лучшее видео.";
 "DIRECT_SAVE_TITLE" = "Сохранять в Фото";
 "DIRECT_SAVE_DETAIL" = "Сохранённые видео будут в приложении Фото.";
 "TWEET_TO_IMAGE_TITLE" = "Сохранять твит как изображение";
 "TWEET_TO_IMAGE_DETAIL" = "Экспортирует твит как изображение по долгому нажатию на «Поделиться».";
 "DISABLE_VIDEO_CAPTIONS_TITLE" = "Скрыть субтитры";
+"DISABLE_VIDEO_CAPTIONS_DETAIL" = "Убирает автоматические субтитры с видео.";
 "AUTO_HIGHEST_LOAD_TITLE" = "Фото в полном разрешении";
 "AUTO_HIGHEST_LOAD_DETAIL" = "Показывать фото в максимальном разрешении.";
+"ENABLE_IMAGE_PRELOADING_TITLE" = "Предзагрузка медиа";
+"ENABLE_IMAGE_PRELOADING_DETAIL" = "Заранее загружает фото и видео для более плавной прокрутки.";
 "FORCE_TWEET_FULL_FRAME_TITLE" = "Фото без обрезки";
+"FORCE_TWEET_FULL_FRAME_DETAIL" = "Показывает фото целиком вместо обрезанных превью.";
+"DISABLE_MEDIA_CAROUSEL_TITLE" = "Классическая сетка медиа";
+"DISABLE_MEDIA_CAROUSEL_DETAIL" = "Показывает несколько фото в твите сеткой вместо карусели.";
+"HIDE_MADE_ON_X_TITLE" = "Скрыть «Made on X»";
+"HIDE_MADE_ON_X_DETAIL" = "Убирает метку, которую X добавляет к фото и видео, отредактированным в его редакторе.";
 "RESTORE_VIDEO_TIMESTAMP_TITLE" = "Прошедшее время";
 "RESTORE_VIDEO_TIMESTAMP_DETAIL" = "Показывает прошедшее и общее время в полноэкранных видео вместо обратного отсчёта.";
 "DISABLE_IMMERSIVE_SCROLL_TITLE" = "Отключить автопрокрутку";
+"DISABLE_IMMERSIVE_SCROLL_DETAIL" = "Остаётесь на текущем полноэкранном видео: без автоперехода и без пролистывания к следующему.";
 
 /* ===== PROFILES ===== */
 "MODERN_SETTINGS_PROFILES_TITLE" = "Профили";
@@ -133,6 +214,8 @@
 "HIDE_BLUE_VERIFIED_DETAIL" = "Убрать галочки подтверждения Premium, оставив значки брендов и государственных аккаунтов.";
 "HIDE_FOLLOW_BUTTON_TITLE" = "Скрыть кнопку «Читать»";
 "HIDE_FOLLOW_BUTTON_DETAIL" = "Скрывает кнопку «Читать» рядом с автором твита. В профилях она остаётся.";
+"HIDE_MESSAGE_BUTTON_TITLE" = "Скрыть кнопку «Сообщение»";
+"HIDE_MESSAGE_BUTTON_DETAIL" = "Убирает кнопку «Сообщение» рядом с автором твита.";
 /* Legacy key name: this row HIDES the Subscribe button. Do not rename the
    key — it is persisted in user defaults. */
 "RESTORE_FOLLOW_BUTTON_TITLE" = "Скрыть кнопку «Подписаться»";
@@ -141,6 +224,8 @@
 "SQUARE_AVATARS_DETAIL" = "Показывает аватары скруглёнными квадратами, как в классическом Twitter.";
 
 /* ===== SEARCH ===== */
+"SEARCH_GROUP_SEARCHING" = "Поиск";
+"SEARCH_GROUP_EXPLORE" = "Обзор";
 "MODERN_SETTINGS_SEARCH_TITLE" = "Поиск";
 "MODERN_SETTINGS_SEARCH_SUBTITLE" = "История поиска, расширенный поиск и «Обзор».";
 "NO_HISTORY_TITLE" = "Отключить историю поиска";
@@ -148,11 +233,27 @@
 "HIDE_TREND_VIDEOS_TITLE" = "Скрыть популярные видео";
 "HIDE_TREND_VIDEOS_DETAIL" = "Убрать строку популярных видео из раздела «Обзор».";
 
-/* ===== GROK ===== */
+/* ===== MESSAGES ===== */
+"MODERN_SETTINGS_MESSAGES_TITLE" = "Сообщения";
+"MODERN_SETTINGS_MESSAGES_SUBTITLE" = "Набор текста, голосовые и Grok.";
+"MESSAGES_GROUP_CHAT" = "Чат";
+"MESSAGES_GROUP_GROK" = "Grok";
 "HIDE_SUGGESTED_CHATS_TITLE" = "Скрыть рекомендуемые чаты";
 "HIDE_SUGGESTED_CHATS_DETAIL" = "Убирает список «Рекомендуемые» из папки входящих чатов.";
+"HIDE_TYPING_INDICATOR_TITLE" = "Скрыть индикатор набора";
+"HIDE_TYPING_INDICATOR_DETAIL" = "Перестаёт сообщать собеседнику, что вы пишете.";
+"VOICE_TRANSCRIPTION_TITLE" = "Расшифровки голосовых";
+"VOICE_TRANSCRIPTION_DETAIL" = "Показывает текст голосового сообщения под его волной.";
+"DOWNLOAD_VOICE_MESSAGES_TITLE" = "Скачивание голосовых";
+"DOWNLOAD_VOICE_MESSAGES_DETAIL" = "Сохраняет звук голосового сообщения долгим нажатием после воспроизведения.";
+
+/* ===== GROK ===== */
 "HIDE_GROK_ANALYZE_TITLE" = "Скрыть кнопки анализа и вопросов";
+"HIDE_GROK_ANALYZE_DETAIL" = "Убирает кнопки анализа и вопросов Grok.";
 "HIDE_GROK_SIDEBAR_TITLE" = "Скрыть Grok в боковой панели";
+"HIDE_GROK_SIDEBAR_DETAIL" = "Убирает ярлык Grok с боковой панели.";
+"HIDE_GROK_BOT_TITLE" = "Скрыть Grok Bot";
+"HIDE_GROK_BOT_DETAIL" = "Убирает строку «Try Grok Bot» и другие промо Grok Bot.";
 "HIDE_GROK_CREATE_TITLE" = "Скрыть инструменты создания";
 "HIDE_GROK_CREATE_DETAIL" = "Убирает возможность создавать и редактировать изображения и видео с помощью Grok.";
 /* Legacy key name: this row TURNS ON auto-translation (the switch is inverted).
@@ -161,17 +262,67 @@
 "DISABLE_AUTO_TRANSLATE_DETAIL" = "Разрешить Twitter автоматически переводить твиты, описания профилей, примечания сообщества и уведомления.";
 
 /* ===== LAB ===== */
+"MODERN_SETTINGS_LAB_TITLE" = "Инструменты";
+"MODERN_SETTINGS_LAB_SUBTITLE" = "Веб-сеанс, резервная копия и совместимость.";
 "REPLY_IN_WEBVIEW_TITLE" = "Отвечать через веб";
 "REPLY_IN_WEBVIEW_DETAIL" = "Отправляет все ответы через веб-страницу — для случаев, когда приложение отказывается их отправлять.";
+"IMPORT_SETTINGS_DONE_TITLE" = "Настройки импортированы";
+"IMPORT_SETTINGS_DONE_MESSAGE" = "Перезапустите Twitter, чтобы применить их все.";
+"IMPORT_SETTINGS_FAILED_TITLE" = "Ошибка импорта";
+"IMPORT_SETTINGS_FAILED_MESSAGE" = "Этот файл не является резервной копией настроек PrimeFreeBird.";
+"IMPORT_SETTINGS_CONFIRM_TITLE" = "Импорт настроек";
+"IMPORT_SETTINGS_CONFIRM_MESSAGE" = "Параметры, фильтры и цвета из файла заменят ваши; параметры, которых в нём нет, вернутся к значениям по умолчанию.";
+"IMPORT_SETTINGS_CONFIRM_ACTION" = "Импортировать";
+"RESET_SETTINGS_CONFIRM_TITLE" = "Сброс настроек";
+"RESET_SETTINGS_CONFIRM_MESSAGE" = "Параметры, фильтры, цвета, вкладки, звук отправки, значок приложения, скрытые уведомления и переписки вернутся к состоянию после установки. Веб-сеанс сохранится.";
+"RESET_SETTINGS_CONFIRM_ACTION" = "Сбросить";
+"RESET_SETTINGS_DONE_TITLE" = "Настройки сброшены";
+"RESET_SETTINGS_DONE_MESSAGE" = "Перезапустите Twitter, чтобы завершить.";
+/* Reply-in-web-view: the reply screen title + the web-session login/clear
+   buttons (Lab) and their alerts. */
+"REPLY_WEBVIEW_TITLE" = "Ответить";
+"WEB_SESSION_CLEAR_TITLE" = "Выйти из веб-сеанса";
+"WEB_SESSION_CLEAR_CONFIRM" = "Твиты, Spaces, Grok и списки игнорирования перестанут его использовать, пока вы снова не войдёте. Если Twitter вошёл через него, Twitter перестанет загружаться.";
+"WEB_SESSION_CLEAR_ACTION" = "Выйти";
+"OK_ACTION" = "OK";
+"CANCEL_ACTION" = "Отмена";
+
+/* ===== Interface style picker ===== */
+"INTERFACE_STYLE_DETAIL" = "Liquid Glass — полупрозрачный дизайн, появившийся в iOS 26; стандартный сохраняет привычный плоский вид.";
+"INTERFACE_STYLE_STANDARD" = "Стандартный";
+"INTERFACE_STYLE_LIQUID_GLASS" = "Liquid Glass";
+
+/* ===== Background color picker ===== */
+"DARK_MODE_STYLE_DETAIL" = "Выберите оттенок, который Twitter использует для тёмных фонов.";
+"DARK_MODE_STYLE_DIM" = "Приглушённый";
+"DARK_MODE_STYLE_GRAY" = "Серый";
+"DARK_MODE_STYLE_PURE_BLACK" = "Чёрный";
+"DARK_MODE_STYLE_SYSTEM" = "Системный";
 
 /* ===== Theme color picker ===== */
 "THEME_SETTINGS_NAVIGATION_DETAIL" = "Выберите акцентный цвет. Его видите только вы.";
 "THEME_SETTINGS_NAVIGATION_TITLE" = "Цвет темы";
+"THEME_CUSTOM_HINT" = "Выберите любой цвет для ссылок, кнопок и выделений.";
+"THEME_RESET_HINT" = "Убирает цвет акцента везде, включая выбранную вкладку, переключатели и значок Twitter.";
+"THEME_RESET_CONFIRM_TITLE" = "Сбросить цвет темы";
+"THEME_RESET_CONFIRM_MESSAGE" = "Цвет акцента вернётся к стандартному цвету Twitter, а «Выбранная вкладка», «Переключатели» и «Значок Twitter» перестанут его использовать. Остальные настройки сохранятся.";
+"THEME_RESET_ACTION" = "Сбросить";
+"THEME_CUSTOM_NAME" = "Свой";
+"THEME_PREVIEW_TWEET" = "Ваш цвет виден в ссылках вроде twitter.com, упоминаниях вроде @Twitter и хештегах вроде #Twitter.";
+"THEME_DEFAULT_NAME" = "По умолчанию";
 
-/* ===== Navigation bar editor ===== */
+/* ===== Tabs editor ===== */
 "CUSTOM_TAB_BAR_GRID_DETAIL" = "Нажмите на вкладку, чтобы добавить или убрать её. Удерживайте значок на панели ниже, затем перетащите его, чтобы изменить порядок.";
 "CUSTOM_TAB_BAR_RESET_MESSAGE" = "Редактор вернётся к вкладкам Twitter по умолчанию. Нажмите «Сохранить», чтобы оставить их.";
+"CUSTOM_TAB_BAR_RESTORE_ACTION" = "Восстановить";
+"CUSTOM_TAB_BAR_FULL_FORMAT" = "Вкладок на панели не больше: %ld. Сначала уберите одну.";
+"CUSTOM_TAB_BAR_DISCARD_TITLE" = "Отменить изменения";
+"CUSTOM_TAB_BAR_DISCARD_MESSAGE" = "Выбранные вкладки не сохранятся.";
+"CUSTOM_TAB_BAR_DISCARD_ACTION" = "Отменить";
 "CUSTOM_TAB_BAR_SETTINGS_NAVIGATION_TITLE" = "Вкладки";
+"TAB_EDITOR_TIP_CHANGE" = "Коснитесь вкладки, чтобы изменить её";
+"TAB_EDITOR_TIP_ARRANGE" = "Коснитесь и удерживайте вкладку, чтобы переставить её";
+"TAB_EDITOR_TIP_ADD" = "Коснитесь +, чтобы добавить вкладку";
 
 /* ===== Fonts picker ===== */
 "CUSTOM_FONTS_MENU_TITLE" = "\nВыберите шрифт";
@@ -181,6 +332,8 @@
 "DOWNLOAD_AS_GIF_OPTION_TITLE" = "Скачать как GIF";
 "DOWNLOAD_AS_MP4_OPTION_TITLE" = "Скачать как MP4";
 "DOWNLOAD_MENU_TITLE" = "Выберите качество видео";
+"DOWNLOAD_PICK_VIDEO_TITLE" = "Выберите видео";
+"DOWNLOAD_PICK_FORMAT_TITLE" = "Выберите формат";
 "DOWNLOAD_VIDEO_NUMBER_TITLE" = "Видео %lu";
 "DOWNLOAD_ALL_VIDEOS_OPTION_TITLE" = "Скачать все видео";
 
@@ -190,16 +343,6 @@
 "COPY_PROFILE_INFO_MENU_OPTION_3" = "Полное имя";
 "COPY_PROFILE_INFO_MENU_OPTION_4" = "Веб-сайт";
 "COPY_PROFILE_INFO_MENU_OPTION_5" = "Местоположение";
-"COPY_PROFILE_INFO_MENU_TITLE" = "Скопировать";
-"COPY_PROFILE_INFO_MENU_MORE" = "Ещё";
-"REMOVE_FOLLOWERS_TITLE" = "Удаление читателей";
-"REMOVE_FOLLOWERS_DETAIL" = "Добавляет «Удалить из читателей» в меню профиля, который вас читает.";
-"REMOVE_FOLLOWER_TITLE" = "Удалить из читателей";
-"REMOVE_FOLLOWER_CONFIRM_TITLE" = "Удалить из читателей";
-"REMOVE_FOLLOWER_CONFIRM_MESSAGE" = "%@ будет удален(а) из числа ваших читателей и не получит уведомления об этом. Позже этот пользователь сможет снова начать вас читать.";
-"REMOVE_FOLLOWER_ACTION" = "Удалить";
-"REMOVE_FOLLOWER_DONE" = "Удалено из читателей";
-"REMOVE_FOLLOWER_FAILED" = "Не удалось удалить из читателей. Повторите попытку.";
 
 /* ===== Padlock / authentication ===== */
 "PADLOCK_LOCKED_LABEL" = "Заблокировано";
@@ -207,7 +350,10 @@
 "PADLOCK_REASON" = "Разблокировать Twitter";
 
 /* ===== Alerts, confirmations & shared labels ===== */
+"RESTART_REQUIRED_ALERT_MESSAGE" = "Twitter закроется, чтобы изменение вступило в силу.";
 "RESTART_REQUIRED_ALERT_TITLE" = "Перезапустить Twitter";
+"RESTART_LATER_ACTION" = "Позже";
+"LOGIN_RESTART_MESSAGE" = "Twitter закроется, чтобы завершить загрузку интерфейса.";
 "LIGHT_MODE_RESTART_MESSAGE" = "Цвет фона сброшен на «Системный». Перезапуск уберёт оставшиеся тёмные цвета.";
 "CLOSE_APP_ACTION" = "Закрыть приложение";
 
@@ -218,26 +364,399 @@
 "UNKNOWN_ERROR" = "Произошла неизвестная ошибка.";
 "PHOTOS_SAVE_FAILED_MESSAGE" = "Приложение «Фото» не приняло файл. В Настройках проверьте, что Twitter может добавлять фото.";
 
+/* ===== Advanced search ===== */
+"ADVANCED_SEARCH_TITLE" = "Расширенный поиск";
+"ADVANCED_SEARCH_DETAIL" = "Добавляет в «Обзор» и результаты поиска кнопку фильтра по слову, аккаунту или дате.";
+"ADVSEARCH_SECTION_WORDS" = "Слова";
+"ADVSEARCH_SECTION_ACCOUNTS" = "Аккаунты";
+"ADVSEARCH_SECTION_ENGAGEMENT" = "Активность";
+"ADVSEARCH_SECTION_DATES" = "Даты";
+"ADVSEARCH_ALL_WORDS" = "Все эти слова";
+"ADVSEARCH_EXACT_PHRASE" = "Точная фраза";
+"ADVSEARCH_ANY_WORDS" = "Любое из этих слов";
+"ADVSEARCH_NONE_WORDS" = "Ни одного из этих слов";
+"ADVSEARCH_HASHTAGS" = "Эти хештеги";
+"ADVSEARCH_FROM_ACCOUNTS" = "От этих аккаунтов";
+"ADVSEARCH_TO_ACCOUNTS" = "Этим аккаунтам";
+"ADVSEARCH_MENTIONING" = "С упоминанием этих аккаунтов";
+"ADVSEARCH_MIN_REPLIES" = "Минимум ответов";
+"ADVSEARCH_MIN_LIKES" = "Минимум отметок «Нравится»";
+"ADVSEARCH_MIN_REPOSTS" = "Минимум ретвитов";
+"ADVSEARCH_SINCE_DATE" = "С даты";
+"ADVSEARCH_UNTIL_DATE" = "По дату";
+"ADVSEARCH_SEARCH" = "Искать";
+"ADVSEARCH_CLEAR" = "Очистить все поля";
+"ADVSEARCH_CLEAR_CONFIRM_MESSAGE" = "Все поля и фильтры этой формы будут очищены.";
+"ADVSEARCH_CLEAR_ACTION" = "Очистить";
+"ADVSEARCH_EMPTY" = "Заполните хотя бы одно поле.";
+"ADVSEARCH_EMPTY_TITLE" = "Нечего искать";
+"RESTART_INFO_ALERT_MESSAGE" = "Изменение полностью вступит в силу после перезапуска.";
+
+/* ===== Advanced search: web form labels ===== */
+"ADVSEARCH_SECTION_FILTERS" = "Фильтры";
+"ADVSEARCH_LANGUAGE" = "Язык";
+"ADVSEARCH_ANY_LANGUAGE" = "Любой язык";
+"ADVSEARCH_REPLIES" = "Ответы";
+"ADVSEARCH_REPLIES_SUB" = "Включать ответы и исходные твиты.";
+"ADVSEARCH_LINKS" = "Ссылки";
+"ADVSEARCH_LINKS_SUB" = "Включать твиты со ссылками.";
+"ADVSEARCH_EX_ALL" = "Пример: что происходит · содержит и «что», и «происходит»";
+"ADVSEARCH_EX_EXACT" = "Пример: счастливый час · содержит точную фразу «счастливый час»";
+"ADVSEARCH_EX_ANY" = "Пример: кошки собаки · содержит «кошки» или «собаки» (или оба)";
+"ADVSEARCH_EX_NONE" = "Пример: кошки собаки · не содержит ни «кошки», ни «собаки»";
+"ADVSEARCH_EX_TAGS" = "Пример: #ThrowbackThursday · содержит хештег #ThrowbackThursday";
+"ADVSEARCH_EX_FROM" = "Пример: @NASA · отправлено @NASA";
+"ADVSEARCH_EX_TO" = "Пример: @NASA · отправлено в ответ @NASA";
+"ADVSEARCH_EX_MENTION" = "Пример: @SFBART @Caltrain · упоминает @SFBART или @Caltrain";
+"ADVSEARCH_EX_MINREPLIES" = "Пример: 280 · твиты, где ответов не меньше 280";
+"ADVSEARCH_EX_MINLIKES" = "Пример: 280 · твиты, где отметок «Нравится» не меньше 280";
+"ADVSEARCH_EX_MINREPOSTS" = "Пример: 280 · твиты, где ретвитов не меньше 280";
+"ADVSEARCH_EX_SINCE" = "Только твиты, опубликованные после этой даты";
+"ADVSEARCH_EX_UNTIL" = "Только твиты, опубликованные до этой даты";
+
+/* ===== MEDIA: groups and options ===== */
+"MEDIA_GROUP_DOWNLOADS" = "Загрузки";
+"MEDIA_GROUP_PLAYBACK" = "Воспроизведение";
+"MEDIA_GROUP_QUALITY" = "Качество";
+"DISABLE_VIDEO_DOCKING_TITLE" = "Отключить мини-плеер";
+"DISABLE_VIDEO_DOCKING_DETAIL" = "Не даёт полноэкранному видео сворачиваться в плавающий плеер.";
+"KEEP_BACKGROUND_AUDIO_TITLE" = "Не прерывать фоновый звук";
+"KEEP_BACKGROUND_AUDIO_DETAIL" = "Не даёт беззвучным видео в ленте прерывать вашу музыку или подкасты.";
+"UPLOAD_FULL_HD_VIDEOS_TITLE" = "Загрузка видео в Full HD";
+"UPLOAD_FULL_HD_VIDEOS_DETAIL" = "Загружает ваши видео в 1080p вместо сжатого качества по умолчанию.";
+"COPY_PROFILE_INFO_MENU_OPTION_6" = "Ссылка на профиль";
+"COPY_PROFILE_INFO_MENU_OPTION_7" = "ID пользователя";
+"COPY_PROFILE_INFO_MENU_OPTION_8" = "Дата регистрации";
+"COPY_PROFILE_INFO_MENU_TITLE" = "Скопировать";
+"COPY_PROFILE_INFO_MENU_MORE" = "Ещё";
+"REMOVE_FOLLOWERS_TITLE" = "Удаление читателей";
+"REMOVE_FOLLOWERS_DETAIL" = "Добавляет «Удалить из читателей» в меню профиля, который вас читает.";
+"REMOVE_FOLLOWERS_DETAIL_HELD" = "Нужен веб-сеанс — войдите в «Инструменты › Веб-сеанс».";
+"REMOVE_FOLLOWER_TITLE" = "Удалить из читателей";
+"REMOVE_FOLLOWER_CONFIRM_TITLE" = "Удалить из читателей";
+"REMOVE_FOLLOWER_CONFIRM_MESSAGE" = "%@ будет удален(а) из числа ваших читателей и не получит уведомления об этом. Позже этот пользователь сможет снова начать вас читать.";
+"REMOVE_FOLLOWER_ACTION" = "Удалить";
+"REMOVE_FOLLOWER_DONE" = "Удалено из читателей";
+"REMOVE_FOLLOWER_FAILED" = "Не удалось удалить из читателей. Повторите попытку.";
+"UNROUNDED_COUNTS_TITLE" = "Неокруглённые числа";
+
 /* ===== TWEETS: groups and options ===== */
+"TWEETS_GROUP_COMPOSING" = "Написание";
+"TWEETS_GROUP_INTERACTIONS" = "Взаимодействия";
+"TWEETS_GROUP_DETAILS" = "Подробности";
+"TWEETS_GROUP_SENSITIVE" = "Деликатный контент";
+"HIDE_TWEET_BUTTON_TITLE" = "Скрыть кнопку твита";
 "HIDE_TWEET_BUTTON_DETAIL" = "Убирает плавающую кнопку создания твита.";
 "SEND_SOUND_TITLE" = "Звук отправки";
+"SEND_SOUND_DETAIL" = "Звук при отправке твита.";
 "SEND_SOUND_NONE" = "Нет";
 "SEND_SOUND_IMPORT_ACTION" = "Импортировать…";
 "SEND_SOUND_REMOVE_ACTION" = "Удалить";
+"SEND_SOUND_REMOVE_CONFIRM_TITLE" = "Удалить звук отправки";
+"SEND_SOUND_REMOVE_CONFIRM_MESSAGE" = "Импортированный звук будет удалён. Твиты отправляются без звука.";
 "SEND_SOUND_FAILED_TITLE" = "Звук не импортирован";
 "SEND_SOUND_TOO_LONG" = "Выберите звук длительностью не более 7 секунд.";
 "SEND_SOUND_UNREADABLE" = "Этот файл не является воспроизводимым звуком.";
 
+/* ===== TIMELINES: groups and options ===== */
+"TIMELINES_GROUP_SUGGESTIONS" = "Продвижение";
+"TIMELINES_GROUP_CONTENT" = "Контент";
+"TIMELINES_GROUP_POSITION" = "Позиция";
+"FORCE_FOLLOWING_TAB_TITLE" = "Запоминать вкладку Главной";
+"FORCE_FOLLOWING_TAB_DETAIL" = "Оставляет Главную на последней вкладке, а не возвращает к «Для вас» через 12 часов.";
+"NO_FOCUS_LOST_TITLE" = "Сохранять место";
+"NO_FOCUS_LOST_DETAIL" = "Не обновляет ленту, когда вы возвращаетесь из другого приложения.";
+"NO_JUMP_BACK_HOME_TITLE" = "Запоминать последний экран";
+"NO_JUMP_BACK_HOME_DETAIL" = "Возвращает на экран, где вы были, а не на Главную, после 5 минут отсутствия.";
+"READING_LINE_TITLE" = "Метка чтения";
+"READING_LINE_DETAIL" = "Отмечает, где вы остановились в «Читаемых», когда сверху появляются новые твиты.";
+"TIMELINES_GROUP_HOME" = "Главная";
+"UNLIMITED_TIMELINE_TABS_TITLE" = "Неограниченные вкладки лент";
+"UNLIMITED_TIMELINE_TABS_DETAIL" = "Снимает ограничение на закреплённые вкладки Главной и разрешает вкладки любого типа.";
+"UNLIMITED_TIMELINE_TABS_DETAIL_HELD" = "Не нужно, пока собственные ленты скрыты.";
+
+/* ===== MUTED WORDS ===== */
+"MUTED_WORDS_SUBTITLE" = "Твиты, совпадающие с чем-либо из этого списка, отфильтровываются из ленты.";
+"FILTERS_TITLE" = "Фильтры";
+"FILTERS_DETAIL" = "Фильтрует твиты по слову, аккаунту или языку и управляет скрытыми переписками.";
+"FILTERS_SEGMENT_WORDS" = "Слова";
+"FILTERS_SEGMENT_LANGUAGES" = "Языки";
+"FILTERS_SEGMENT_THREADS" = "Переписки";
+"THREADS_FOOTER" = "Переписки, скрытые из твита. Смахните строку, чтобы вернуть её.";
+"THREADS_EMPTY" = "Нет скрытых переписок";
+"THREADS_NO_PREVIEW" = "(нет текста)";
+"THREADS_HIDDEN_TOAST" = "Переписка скрыта";
+"THREADS_UNDO" = "Отменить";
+"THREADS_HIDE_ACTION" = "Скрыть эту переписку";
+"LANGUAGES_FOOTER_OFF" = "Языки не отмечены — в ленту попадают все языки.";
+"LANGUAGES_FOOTER_ON" = "В ленту попадают только отмеченные языки.\nТвиты без определённого языка проходят всегда.\nСнимите все отметки, чтобы выключить фильтр.";
+"LANGUAGES_OTHERS_TITLE" = "Другие языки";
+"LANGUAGES_OTHERS_NONE" = "Нет";
+"MUTED_WORDS_ADD_PLACEHOLDER" = "Добавьте слово, фразу или @аккаунт";
+"MUTED_WORDS_ADD_BUTTON" = "Добавить";
+"MUTED_WORDS_OPTIONS_HEADER" = "Параметры";
+"MUTED_WORDS_KIND_WORD" = "слово";
+"MUTED_WORDS_KIND_PHRASE" = "фраза";
+"MUTED_WORDS_KIND_ACCOUNT" = "аккаунт";
+"MUTED_WORDS_WHOLE_TITLE" = "Только целые слова";
+"MUTED_WORDS_WHOLE_DETAIL" = "Находит «кот» как слово, но не внутри «котлета».";
+"MUTED_WORDS_CONVERSATIONS_TITLE" = "Фильтровать в переписках";
+"MUTED_WORDS_CONVERSATIONS_DETAIL" = "Применяет список к ответам, а не только к ленте.";
+
+/* ===== MUTED WORDS: expiry, scope, counter ===== */
+"MUTED_WORDS_FOLLOWING_TITLE" = "Пропускать читаемые аккаунты";
+"MUTED_WORDS_FOLLOWING_DETAIL" = "Твиты людей, которых вы читаете, никогда не фильтруются.";
+"MUTED_WORDS_REPOSTS_TITLE" = "Включать ретвиты";
+"MUTED_WORDS_REPOSTS_DETAIL" = "Фильтрует и ретвиты игнорируемого слова или аккаунта.";
+"MUTED_WORDS_COUNT_FORMAT" = "Отфильтровано твитов сегодня: %ld";
+"MUTED_WORDS_DURATION_FOREVER" = "Навсегда";
+"MUTED_WORDS_DURATION_24H" = "24 часа";
+"MUTED_WORDS_DURATION_7D" = "7 дней";
+"MUTED_WORDS_DURATION_30D" = "30 дней";
+"DAYS_LEFT_FORMAT" = "Осталось дней: %ld";
+"DAYS_LEFT_ONE" = "Остался 1 день";
+"MUTED_WORDS_EXAMPLE_TERM" = "спойлер";
+"MUTED_WORDS_COUNT_TODAY" = "Отфильтровано твитов сегодня";
+"MUTED_WORDS_EMPTY" = "Пока ничего не отфильтровано. Добавьте выше слово, фразу или @аккаунт.";
+"MUTED_WORDS_REMOVE_ACTION" = "Удалить";
+"LANGUAGES_INTRO_ON" = "В ленту попадают только твиты на отмеченных языках.";
+"LANGUAGES_NOTE_UNDETECTED" = "Твиты без определённого языка проходят всегда.";
+"THREADS_INTRO" = "Переписки, скрытые из твита.";
+"THREADS_COUNT_ONE" = "1 скрытая переписка";
+"THREADS_COUNT_FORMAT" = "Скрытых переписок: %ld";
+"THREADS_EMPTY_HINT" = "Скройте переписку через меню твита.";
+"THREADS_SHOW_ACTION" = "Показать";
+
+
+"SHOW_POLL_RESULTS_TITLE" = "Результаты опросов";
+"SHOW_POLL_RESULTS_DETAIL" = "Показывает долю голосов каждого варианта до того, как вы проголосуете.";
+"POLL_RESULT_FORMAT" = "%1$@ (%2$@)";
+"TAP_TO_PAUSE_TITLE" = "Чистый видеоплеер";
+"TAP_TO_PAUSE_DETAIL" = "Воспроизведение и пауза касанием, минимальная панель.";
+"VIDEO_STARTS_MUTED_PILL_ON" = "Без звука";
+"VIDEO_STARTS_MUTED_PILL_OFF" = "Со звуком";
+
+"PROFILES_GROUP_BEHAVIOR" = "Поведение";
+"PROFILES_GROUP_TABS" = "Вкладки";
+"PROFILES_GROUP_INTERFACE" = "Интерфейс";
+
+"PROFILE_INITIAL_TAB_TITLE" = "Открывать профили на";
+"PROFILE_TAB_DEFAULT" = "По умолчанию";
+"PROFILE_TAB_REPLIES" = "Ответы";
+"PROFILE_TAB_HIGHLIGHTS" = "Главное";
+"PROFILE_TAB_ARTICLES" = "Статьи";
+"PROFILE_TAB_MEDIA" = "Медиа";
+"PROFILE_TAB_VIDEOS" = "Видео";
+
+"DISABLE_VIDEOS_TAB_TITLE" = "Скрыть «Видео»";
+"DISABLE_VIDEOS_TAB_DETAIL" = "Убирает вкладку «Видео» из профилей.";
+
+"EXPAND_BIO_TITLE" = "Раскрывать описание";
+"EXPAND_BIO_DETAIL" = "Показывает всё описание профиля сразу, без нажатия «Показать ещё».";
+
+
+"PROFILE_TAB_REPOSTS" = "Ретвиты";
+
 /* Hidden notifications */
+"NOTIFS_HIDE_MENU_ACTION" = "Скрыть уведомление";
+"NOTIFS_HIDDEN_TOAST" = "Уведомление скрыто";
+"HIDDEN_NOTIFS_TITLE" = "Скрытые уведомления";
+"HIDDEN_NOTIFS_COUNT" = "Скрыто: %ld";
+"HIDDEN_NOTIFS_CLEAR_ALL" = "Показать все";
+"HIDDEN_NOTIFS_CLEAR_ALL_TITLE" = "Показать все уведомления";
+"HIDDEN_NOTIFS_CLEAR_ALL_MESSAGE" = "Скрытые уведомления (%ld) вернутся в «Уведомления».";
+"HIDDEN_NOTIFS_CLEAR_ONE_MESSAGE" = "Скрытое уведомление вернётся в «Уведомления».";
+"HIDDEN_NOTIFS_EMPTY_TITLE" = "Здесь ничего нет";
+"HIDDEN_NOTIFS_EMPTY_BODY" = "Все уведомления здесь скрыты. Коснитесь глаза сверху, чтобы увидеть их или вернуть одно из них.";
+"HIDDEN_NOTIFS_EXAMPLE" = "Коснитесь × у уведомления, чтобы скрыть его";
+"HIDDEN_NOTIFS_UNHIDE" = "Показать";
+"HIDDEN_NOTIFS_UNTITLED" = "Скрытое уведомление";
+"HIDE_NOTIFICATIONS_TITLE" = "Скрывать уведомления";
+"HIDE_NOTIFICATIONS_DETAIL" = "Скройте уведомление его × или через меню твита. Глаз сверху показывает их список.";
+"NEW_TWITTER_SETTINGS_TITLE" = "Новые настройки Twitter";
+"NEW_TWITTER_SETTINGS_DETAIL" = "Использует обновлённые настройки Twitter и придаёт PrimeFreeBird тот же вид.";
+"EXPLORE_TABS_CAPTION" = "Панель «Обзора»";
+"EXPLORE_TABS_HINT" = "Коснитесь вкладки, чтобы убрать или вернуть её.";
+"EXPLORE_TABS_HIDDEN_COUNT" = "Скрыто: %lu";
+"EXPLORE_TABS_NONE_HIDDEN" = "Ничего не скрыто";
+"HIDE_TAB_FORYOU_TAB_NAME" = "Обзор";
+"HIDE_TAB_TRENDING_TAB_NAME" = "Актуальное";
+"HIDE_TAB_NEWS_TAB_NAME" = "Новости";
+"HIDE_TAB_SPORTS_TAB_NAME" = "Спорт";
+"HIDE_TAB_ENTERTAINMENT_TAB_NAME" = "Развлечения";
+"HIDE_EXPLORE_ALL_TITLE" = "Скрыть все вкладки";
+"HIDE_EXPLORE_ALL_DETAIL" = "Оставляет только строку поиска.";
+"CHOOSE_EXPLORE_TABS_TITLE" = "Выбрать вкладки";
+"CHOOSE_EXPLORE_TABS_DETAIL" = "Выберите, какие вкладки остаются на панели.";
+"CHOOSE_EXPLORE_TABS_DETAIL_HELD" = "Не нужно, пока все вкладки скрыты.";
+"EXPLORE_TABS_KEEP_ONE" = "Оставьте одну вкладку или используйте «Скрыть все вкладки».";
+"LAB_GROUP_SESSION" = "Веб-сеанс";
+"LAB_GROUP_TOOLS" = "Устранение неполадок";
+"LAB_GROUP_BACKUP" = "Резервная копия";
+"WEB_SESSION_NONE_TITLE" = "Нет веб-сеанса";
+"WEB_SESSION_LIVE_DETAIL" = "Вход выполнен на этом устройстве.";
+"WEB_SESSION_NONE_DETAIL" = "Войдите через веб, чтобы отправлять твиты, присоединяться к Spaces и использовать списки игнорирования, Grok и веб-страницы Twitter в этом приложении.";
+"WEB_SESSION_SIGN_IN_ACTION" = "Войти";
+"WEB_SESSION_SIGN_IN_AGAIN_ACTION" = "Войти снова";
+"REPLY_IN_WEBVIEW_DETAIL_HELD" = "Нужен веб-сеанс — войдите выше.";
+"SHOW_TWEET_SOURCE_DETAIL_HELD" = "Нужен веб-сеанс — войдите в «Инструменты › Веб-сеанс».";
+"SHOW_ACCOUNT_LOCATION_DETAIL_HELD" = "Нужен веб-сеанс — войдите в «Инструменты › Веб-сеанс».";
 "FLEX_TWITTER_TITLE" = "Обозреватель FLEX";
 "FLEX_TWITTER_DETAIL" = "Позволяет изучать экраны и данные приложения. Для разработчиков.";
-"APPEARANCE_GROUP_SIDEBAR" = "Боковая панель";
-"CUSTOM_SIDEBAR_OPTION_TITLE" = "Настроить боковую панель";
-"CUSTOM_SIDEBAR_OPTION_SUBTITLE" = "Выберите, какие пункты показывать в боковой панели.";
-"SIDEBAR_EDITOR_NAVIGATION_TITLE" = "Боковая панель";
-"SIDEBAR_EDITOR_DETAIL" = "Нажмите на пункт, чтобы добавить его в боковую панель или убрать из неё.";
-"SIDEBAR_SECTION_SHOWN" = "Показаны";
-"SIDEBAR_SECTION_HIDDEN" = "Скрыты";
-"SIDEBAR_ITEM_TAB_BAR" = "Панель вкладок";
-"SIDEBAR_ITEM_SHOWN" = "Показано";
-"SIDEBAR_ITEM_HIDDEN" = "Скрыто";
+"COMPATIBILITY_TITLE" = "Совместимость";
+"COMPATIBILITY_DETAIL" = "Проверяет, что каждый параметр работает после обновления Twitter.";
+"COMPATIBILITY_RECORD_TITLE" = "Записывать активность";
+"DEBUG_TOOLS_DETAIL" = "Показывает кнопку диагностики и ведёт подробный журнал. Проверки работают и без неё.";
+"COMPATIBILITY_REPORT_TITLE" = "Отчёт";
+"COMPATIBILITY_REPORT_DETAIL" = "Ещё не проверено";
+
+/* ===== Compatibility report and its tour ===== */
+"COMPAT_VERDICT_PROBLEMS" = "%@ с Twitter %@";
+"COMPAT_VERDICT_CHECKING" = "Проверка Twitter %@";
+"COMPAT_VERDICT_DUE" = "Twitter %@ ещё не проверен";
+"COMPAT_VERDICT_PARTIAL" = "Twitter %@ проверен не полностью";
+"COMPAT_VERDICT_OK" = "Совместим с Twitter %@";
+"COMPAT_READ_PENDING" = "Чтение настроек Twitter…";
+"COMPAT_READ_FAILED" = "Не удалось прочитать настройки Twitter";
+"COMPAT_METER_WORKING" = "Работают: %lu из %lu";
+"COMPAT_METER_BROKEN" = "Сломано: %lu";
+"COMPAT_METER_TO_CHECK" = "К проверке: %lu";
+"COMPAT_CHECK_OPTIONS" = "Проверить параметры";
+"COMPAT_COPY" = "Копировать";
+"COMPAT_COPIED" = "Скопировано";
+"COMPAT_COPY_REPORT" = "Копировать отчёт";
+"COMPAT_BROKEN" = "Сломаны";
+"COMPAT_NOT_TESTED" = "Не проверены";
+"COMPAT_WORKING" = "Работают";
+"COMPAT_GROUP_OPTIONS" = "Параметры";
+"COMPAT_GROUP_DATA" = "Данные";
+"COMPAT_NOT_TESTED_DETAIL" = "Ещё не замечены во время проверки.";
+"COMPAT_WORKING_DETAIL" = "Замечены в работе в этой сборке.";
+"COMPAT_CLEAR_ALL" = "Очистить всё";
+"COMPAT_CLEAR_ALL_DETAIL" = "Очищает подсчёты и закрывает Twitter. Настройки сохраняются.";
+"COMPAT_CLEAR_ALL_MESSAGE" = "Очищает всё подсчитанное и закрывает Twitter. Откройте его снова: каждый параметр проверится сам, затем откроется этот отчёт. Ваши настройки сохранятся.";
+"COMPAT_HISTORY" = "История";
+"COMPAT_HISTORY_SINCE" = "Подсчёт с: %@.";
+"COMPAT_HISTORY_SINCE_BUILD" = "Подсчёт с: %@ · эта сборка с: %@.";
+"COMPAT_DAY_TODAY" = "сегодня";
+"COMPAT_LIST_NOT_TESTED_NOTE" = "Параметры, ещё не замеченные в Twitter %@ или не замеченные с изменения их кода. Следующий обход или обычное использование подтвердит их.";
+"COMPAT_LIST_WORKING_NOTE" = "Параметры, замеченные в работе в Twitter %@.";
+"COMPAT_LIST_BROKEN_NOTE" = "Параметры, переставшие работать в Twitter %@.";
+"COMPAT_STATE_ON" = "Вкл.";
+"COMPAT_STATE_OFF" = "Выкл.";
+"COMPAT_STATE_ALWAYS_ON" = "Всегда вкл.";
+"TOUR_TITLE" = "Проверить все параметры";
+"TOUR_ALL_SCREENS" = "Все экраны";
+"TOUR_REMAINING_SCREENS" = "Оставшиеся экраны";
+"TOUR_NOTHING_LEFT" = "Ничего не осталось";
+"TOUR_STEP_LINE" = "%@ · %lu из %lu";
+"TOUR_DURATION_SECONDS" = "около %lu с";
+"TOUR_DURATION_MINUTES_SECONDS" = "около %lu мин %lu";
+"TOUR_DURATION_MINUTES" = "около %lu мин";
+"TOUR_ALERT_TITLE" = "Проверка оповещений";
+"TOUR_ALERT_MESSAGE" = "Это оповещение закроется само.";
+"TOUR_SIGNED_OUT_TITLE" = "Выход выполнен";
+"TOUR_SIGNED_OUT_MESSAGE" = "Обходу нужен Twitter с выполненным входом, чтобы открывать экраны. Войдите и запустите его снова.";
+"TOUR_ASK_TITLE" = "Проверить Twitter %@";
+"TOUR_ASK_MESSAGE" = "Проверьте каждый параметр в этой версии. Обход сам откроет %@, %@. «Отмена» останавливает его в любой момент.";
+"TOUR_LATER" = "Позже";
+"TOUR_CHECK_NOW" = "Проверить сейчас";
+"TOUR_STEP_PULL" = "Потянуть для обновления";
+"TOUR_STEP_FIRST_TWEET" = "Первый твит";
+"TOUR_STEP_TWEET_INTERACTIONS" = "Взаимодействия с твитом";
+"TOUR_STEP_EDIT_HISTORY" = "История изменений";
+"TOUR_STEP_OWN_PROFILE" = "Ваш профиль";
+"TOUR_STEP_SEARCH" = "Поиск";
+"TOUR_STEP_SEARCH_FIELD" = "Поле поиска";
+"TOUR_STEP_SEARCH_OFF" = "Поиск, расширенный поиск выкл.";
+"TOUR_STEP_REFRESH_END" = "Конец обновления";
+"TOUR_STEP_FOLLOWING_TIMELINE" = "Читаемые";
+"TOUR_STEP_SCROLL" = "Прокрутка";
+"TOUR_STEP_TWEET_BUTTONS" = "Кнопки твита";
+"TOUR_STEP_TWEET_MENU" = "Меню твита";
+"TOUR_STEP_VIDEO_FULL_SCREEN" = "Видео на весь экран";
+"TOUR_STEP_VIDEO_LONG_PRESS" = "Меню видео";
+"TOUR_STEP_PHOTO_FULL_SCREEN" = "Фото на весь экран";
+"TOUR_STEP_OTHER_PROFILE" = "Другой профиль";
+"TOUR_STEP_COMPOSER" = "Написание";
+"TOUR_STEP_CONVERSATION" = "Переписка";
+"TOUR_STEP_REPLIES" = "Ответы по дате";
+"TOUR_STEP_SIDE_MENU" = "Боковая панель";
+"TOUR_STEP_DARK_MODE" = "Тёмный режим";
+"TOUR_STEP_WEB_LINK" = "Веб-ссылка";
+"TOUR_STEP_T_CO_CHECK" = "Блокировка t.co";
+"TOUR_STEP_TWITTER_SETTINGS" = "Настройки Twitter";
+"TOUR_STEP_TAB_EDITOR" = "Редактор вкладок Twitter";
+"TOUR_STEP_PFB_SETTINGS" = "Настройки PrimeFreeBird";
+"TOUR_STEP_ALERT" = "Оповещение Twitter";
+"SETTINGS_BACKUP_TITLE" = "Файл настроек";
+"SETTINGS_BACKUP_DETAIL" = "Экспорт и импорт всех параметров, фильтров и цветов.";
+"EXPORT_SETTINGS_ACTION" = "Экспорт…";
+"IMPORT_SETTINGS_ACTION" = "Импорт…";
+"RESET_SETTINGS_TITLE" = "Сбросить настройки";
+"WEB_SESSION_LOGIN_TITLE" = "Войти через веб";
+"WEB_LOGIN_CONNECTING" = "Подключение к Twitter…";
+"WEB_LOGIN_TAGLINE" = "Лента без шума.";
+"WEB_LOGIN_SIGNING_IN" = "Выполняется вход…";
+"WEB_LOGIN_RETRY_ACTION" = "Повторить";
+"WEB_LOGIN_LOAD_FAILED" = "Не удалось загрузить страницу входа.\n\n%@";
+/* Copies of Twitter's own strings, read only when Twitter's string tables lack the key. */
+"TW_CANCEL_ACTION_LABEL" = "Отмена";
+"TW_COMPOSITION_COMPLETE_SENDING_TWEET_TOAST_NOTIFICATION_MESSAGE" = "Ваш твит отправлен.";
+"TW_DISMISS_LABEL" = "Закрыть";
+"TW_DM_MESSAGE_ACTION_OPEN_GENERIC_TITLE" = "Открыть";
+"TW_DOWNLOAD_ACTIVITY_VIEW_LABEL" = "Скачать";
+"TW_DOWNLOAD_LIVE_ACTIVITY_DOWNLOADING" = "Скачивание";
+"TW_DOWNLOAD_VIDEO_ACTIVITY_VIEW_LABEL" = "Скачать видео";
+"TW_ERROR_ALERT_TITLE" = "Ошибка";
+"TW_GENERIC_OFF_LABEL" = "Выкл";
+"TW_NOT_INTERESTED_IN_THIS_LABEL" = "Мне это неинтересно";
+"TW_OK_ACTION_LABEL" = "OK";
+"TW_SAVE_ACTION_LABEL" = "Сохранить";
+"TW_SUBSCRIPTION_APP_ICON_SETTINGS_DETAIL" = "Выберите значок приложения для главного экрана своего устройства. Меняйте его когда угодно.";
+"TW_SUBSCRIPTION_APP_ICON_SETTINGS_TITLE" = "Значок приложения";
+"TW_SUBSCRIPTION_TAB_CUSTOMIZATION_RESTORE_BUTTON_TITLE" = "Восстановить настройки по умолчанию";
+"TW_SUBSCRIPTION_UNDO_SEND_DURATION_LABEL" = "%ld сек.";
+"TW_TIMELINE_SORT_REPLIES_BY_LIKED" = "Наиболее понравившиеся ответы";
+"TW_TIMELINE_SORT_REPLIES_BY_RECENT" = "Наиболее свежие ответы";
+"TW_TIMELINE_SORT_REPLIES_BY_RELEVANT" = "Наиболее актуальные ответы";
+"TW_TIMELINE_SORT_REPLIES_TITLE" = "Упорядочить ответы";
+"TW_SETTINGS_DISPLAY_COLOR_BLUE" = "Синий";
+"TW_SETTINGS_DISPLAY_COLOR_YELLOW" = "Желтый";
+"TW_SETTINGS_DISPLAY_COLOR_RED" = "Красный";
+"TW_SETTINGS_DISPLAY_COLOR_PURPLE" = "Фиолетовый";
+"TW_SETTINGS_DISPLAY_COLOR_ORANGE" = "Оранжевый";
+"TW_SETTINGS_DISPLAY_COLOR_GREEN" = "Зеленый";
+"TW_HOME_TIMELINE_TITLE" = "Для вас";
+"TW_HOME_TIMELINE_LATEST_TITLE" = "Вы читаете";
+"MEDIA_GROUP_LAYOUT" = "Макет";
+"BRANDING_GROUP_CLASSIC" = "Классический Twitter";
+"VOICE_NOTE_FROM_VIDEO_TITLE" = "Голосовое из видео";
+"VOICE_NOTE_FROM_VIDEO_DETAIL" = "Добавляет к записанному голосовому сообщению кнопку, которая заменяет его звук звуком видео из вашей медиатеки.";
+"VOICE_NOTE_FROM_VIDEO_BUTTON" = "Заменить видео";
+"CONFIRM_TWEET_TITLE" = "Отправить этот твит";
+"CONFIRM_TWEET_ACTION" = "Твитнуть";
+"CONFIRM_LIKE_TITLE" = "Отметить твит «Нравится»";
+"CONFIRM_LIKE_ACTION" = "Нравится";
+"CONFIRM_FOLLOW_TITLE" = "Читать этот аккаунт";
+"CONFIRM_FOLLOW_ACTION" = "Читать";
+"HIDE_NEW_TWEETS_PILL_TITLE" = "Скрыть кнопку новых твитов";
+"HIDE_NEW_TWEETS_PILL_DETAIL" = "Убирает кнопку, сообщающую о новых твитах вверху ленты.";
+"REFRESH_PILL_LABEL_DETAIL_HELD" = "Не нужно, пока кнопка новых твитов скрыта.";
+
+/* ===== COMPATIBILITY: behaviors with no toggle ===== */
+"PREMIUM_UNLOCK_TITLE" = "Premium разблокирован";
+"HIDE_UPSELLS_TITLE" = "Скрыть допродажи";
+"EDIT_TWEET_TITLE" = "Изменить твит";
+"GROK_TRANSLATION_TITLE" = "Кнопка перевода";
+"LAUNCH_SCREEN_TITLE" = "Классический экран запуска";
+"EXPAND_TCO_LINKS_TITLE" = "Полные ссылки";
+"REMOVE_RELATED_TWEETS_TITLE" = "Скрыть похожие твиты";
+"KEEP_READING_POSITION_TITLE" = "Сохранять место при перезагрузке";
+"CLASSIC_TWEET_DETAIL_TITLE" = "Классическая страница твита";
+"WEB_LOGIN_TITLE" = "Веб-вход";
+"SETTINGS_ENTRY_TITLE" = "PrimeFreeBird в Настройках";
+"BAR_REPAIRS_TITLE" = "Исправления верхней панели";
+"LEFT_ALIGNED_ALERTS_TITLE" = "Выравнивание оповещений влево";
+"NO_AUTO_UNMUTE_TITLE" = "Без звука по касанию";
+"FILTER_LANGUAGES_TITLE" = "Языковой фильтр";

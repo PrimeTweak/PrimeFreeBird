@@ -1810,6 +1810,7 @@ static const PFBCompatName kNames[] = {
     {PFBCompatOptionCount, "Features/Appearance/ThemeColor/PFBColorThemeViewController.m", "currentColorPalette"},
     {PFBCompatOptionCount, "Features/Appearance/ThemeColor/PFBColorThemeViewController.m", "setPrimaryColorOption:"},
     {PFBCompatOptionCount, "Features/Appearance/ThemeColor/PFBColorThemeViewController.m", "sharedSettings"},
+    {PFBCompatOptionCount, "Features/Appearance/ThemeColor/PFBColorThemeViewController.m", "SUBSCRIPTION_TAB_CUSTOMIZATION_RESTORE_BUTTON_TITLE"},
     {PFBCompatOptionCount, "Features/Appearance/ThemeColor/PFBDarkModeStyle.x", "currentColorPalette"},
     {PFBCompatOptionCount, "Features/Appearance/ThemeColor/PFBDarkModeStyle.x", "isDark"},
     {PFBCompatOptionCount, "Features/Appearance/ThemeColor/PFBDarkModeStyle.x", "sharedSettings"},
