@@ -1,7 +1,8 @@
 #import <Foundation/Foundation.h>
 
 // OK: proven on this Twitter version. Not tested: no proof yet, whether or not the tour
-// showed its screen. Broken: a path is lost, something it relies on is not in Twitter.
+// showed its screen. Broken: a path is lost, something it relies on is not in Twitter, or it
+// failed at what it is for.
 typedef NS_ENUM(NSInteger, PFBCompatVerdict) {
     PFBCompatVerdictOK,
     PFBCompatVerdictNotTested,

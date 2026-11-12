@@ -1426,6 +1426,7 @@ static const PFBCompatFlag kFlags[] = {
     {PFBCompat_hide_who_to_follow, "wtf_device_follow_nudge_turn_off_reactive_blending_enabled", NO},
     {PFBCompat_enable_liquid_glass, "ios_liquid_glass_redesign_enabled", NO},
     {PFBCompat_enable_liquid_glass, "xchat_liquid_glass_convo_header_enabled", NO},
+    {PFBCompat_no_tab_bar_hiding, "ios_liquid_glass_xnc2_disabled", NO},
     {PFBCompat_accent_color, "app_customization_custom_primary_color_enabled", NO},
     {PFBCompat_custom_tab_bar, "ios_tab_bar_default_show_profile", NO},
     {PFBCompat_custom_tab_bar, "ios_tab_bar_default_show_communities", NO},
@@ -2874,6 +2875,7 @@ static void prepare(void) {
           gStore[@"observed"] = @{};
           gStore[@"paths"] = @{};
           [gStore removeObjectForKey:@"refusals"];
+          [gStore removeObjectForKey:@"failures"];
           [gStore removeObjectForKey:@"flags"];
           writeStore();
       }
@@ -2924,6 +2926,26 @@ void PFBCompatNoteRefusal(PFBCompatOption option, NSString* text) {
             refusals[name] = text;
             gStore[@"refusals"] = refusals;
             atomic_store_explicit(&gDirty, true, memory_order_relaxed);
+        }
+    }
+}
+
+void PFBCompatNoteFailure(PFBCompatOption option, NSString* text) {
+    if (option <= PFBCompatOptionNone || option >= PFBCompatOptionCount || text.length == 0) {
+        return;
+    }
+    prepare();
+    const char* key = gKeys[option];
+    if (!key) {
+        return;
+    }
+    NSString* name = [NSString stringWithUTF8String:key];
+    @synchronized(gLock) {
+        NSMutableDictionary* failures = [storeDictionary(@"failures") mutableCopy];
+        if (!failures[name]) {
+            failures[name] = text;
+            gStore[@"failures"] = failures;
+            writeStore();
         }
     }
 }
@@ -4359,6 +4381,7 @@ NSArray<PFBCompatResult*>* PFBCompatResults(void) {
     NSDictionary* observed;
     NSDictionary* paths;
     NSDictionary* refusals;
+    NSDictionary* failures;
     NSDictionary* earlier;
     NSMutableDictionary<NSString*, NSNumber*>* earlierCodes = [NSMutableDictionary dictionary];
     NSDictionary* stations;
@@ -4372,6 +4395,7 @@ NSArray<PFBCompatResult*>* PFBCompatResults(void) {
         observed = storeDictionary(@"observed");
         paths = storeDictionary(@"paths");
         refusals = storeDictionary(@"refusals");
+        failures = storeDictionary(@"failures");
         earlier = storeDictionary(@"earlier");
         for (size_t i = 0; i < kMetaCount; i++) {
             NSString* key = [NSString stringWithUTF8String:kMeta[i].key];
@@ -4445,7 +4469,8 @@ NSArray<PFBCompatResult*>* PFBCompatResults(void) {
         }
         NSString* goneName = nil;
         NSUInteger nameCount = namesGone(meta->option, missingNames, &goneName);
-        // Broken means the option's path is lost, not that the feature left Twitter.
+        id failure = failures[key];
+        // Broken means the option's path is lost or it failed in use, not that the feature left Twitter.
         NSString* lostPath = nil;
         if (missing) {
             result.verdict = PFBCompatVerdictBroken;
@@ -4466,6 +4491,9 @@ NSArray<PFBCompatResult*>* PFBCompatResults(void) {
             result.verdict = PFBCompatVerdictBroken;
             result.detail = [NSString stringWithFormat:@"Path lost: class %@ not found", classGone ?: @"?"];
             lostPath = classGone;
+        } else if ([failure isKindOfClass:[NSString class]]) {
+            result.verdict = PFBCompatVerdictBroken;
+            result.detail = [@"Failed: " stringByAppendingString:failure];
         } else {
             NSString* judged = nil;
             BOOL proven = done > 0 || [seen isKindOfClass:[NSString class]] ||
@@ -4622,6 +4650,7 @@ void PFBCompatReset(void) {
         gStore[@"observed"] = @{};
         gStore[@"paths"] = @{};
         [gStore removeObjectForKey:@"refusals"];
+        [gStore removeObjectForKey:@"failures"];
         gStore[@"earlier"] = @{};
         [gStore removeObjectForKey:@"earlierSince"];
         [gStore removeObjectForKey:@"earlierFingerprints"];

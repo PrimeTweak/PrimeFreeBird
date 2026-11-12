@@ -159,6 +159,9 @@ FOUNDATION_EXPORT void PFBCompatSetDetail(PFBCompatOption option, NSString* deta
 // Notes why a server gave an option nothing to show: a refusal, an error or an empty answer.
 // The report shows the build's latest note while the option has not acted.
 FOUNDATION_EXPORT void PFBCompatNoteRefusal(PFBCompatOption option, NSString* text);
+// Notes that an option failed at what it is for on this build: the report marks it broken
+// with the reason, the first one kept.
+FOUNDATION_EXPORT void PFBCompatNoteFailure(PFBCompatOption option, NSString* text);
 
 FOUNDATION_EXPORT void PFBCompatReset(void);
 // Writes the counts out now, for a path that ends the process itself.
