@@ -83,7 +83,6 @@
 "SIDEBAR_EDITOR_NAVIGATION_TITLE" = "Sidebar";
 "SIDEBAR_EDITOR_DETAIL" = "Tap an item to hide it from the sidebar. Tap it again to bring it back.";
 "SIDEBAR_EDITOR_TAB_BAR_HEADER" = "In your tab bar";
-"SIDEBAR_RESET_TITLE" = "Reset to default";
 "SIDEBAR_ITEM_SHOWN" = "Shown";
 "SIDEBAR_ITEM_HIDDEN" = "Hidden";
 "RESTORE_TAB_LABELS_TITLE" = "Tab labels";

@@ -1,29 +1,24 @@
 // The sidebar's items as Twitter's panels: names and glyphs from Twitter's panel table, the
-// hidden ones stored by Twitter's panel name, and readings of the open sidebar.
+// choices stored by Twitter's panel name, and what each rebuild of the sidebar kept.
 
 #import "Features/Appearance/Sidebar/PFBSidebarItems.h"
+#import <malloc/malloc.h>
 #import <objc/message.h>
+#import <objc/runtime.h>
+#import "Common/PFBBundle.h"
 #import "Common/PFBCompatibility.h"
 #import "Common/PFBSettings.h"
-#import "Support/HookHelpers.h"
 
 NSNotificationName const PFBSidebarItemsDidChangeNotification = @"PFBSidebarItemsDidChangeNotification";
 
 static NSString* const kHiddenKey = @"pfb_sidebar_hidden";
-static NSString* const kSeenKey = @"pfb_sidebar_seen";
-
-// Panels Twitter offers only to some accounts; PrimeFreeBird keeps them out unless they are.
-static BOOL PFBSidebarIsGated(NSInteger panelID) {
-    return panelID == 13 || panelID == 15 || panelID == 16 || panelID == 17;
-}
-
-// The main tabs and the Connect tab reach the sidebar only once taken out of the tab bar.
-static BOOL PFBSidebarIsTabFirst(NSInteger panelID) {
-    return panelID == 1 || panelID == 2 || panelID == 4 || panelID == 5 || panelID == 22;
-}
+static NSString* const kShownKey = @"pfb_sidebar_shown";
+static NSString* const kBuiltKey = @"pfb_sidebar_built";
 
 static NSArray<NSNumber*>* gPFBSidebarTabs;
-static NSDictionary* gPFBSidebarReading;
+static NSMutableArray<NSNumber*>* gPFBSidebarBuilding;
+static NSArray<NSNumber*>* gPFBSidebarBefore;
+static NSArray<NSNumber*>* gPFBSidebarBuilt;
 
 // Twitter's panel table answers by class method; each read is checked so a renamed one gives nil.
 static id PFBPanelIdentityAnswer(NSString* selectorName, NSInteger panelID) {
@@ -45,15 +40,76 @@ static NSInteger PFBPanelForKey(NSString* key) {
     return (NSInteger)((long long (*)(id, SEL, id))objc_msgSend)(identity, selector, key);
 }
 
+static NSArray<NSNumber*>* PFBPanelsForKeys(NSArray* keys) {
+    NSMutableArray<NSNumber*>* panels = [NSMutableArray array];
+    for (NSString* key in keys) {
+        NSInteger panelID = PFBPanelForKey(key);
+        if (panelID > 0) {
+            [panels addObject:@(panelID)];
+        }
+    }
+    return panels;
+}
+
+// The items whose builders ask Twitter's panel table for their name once they are kept.
+static BOOL PFBSidebarIsNamedWhenBuilt(NSInteger panelID) {
+    return panelID == 2 || panelID == 5 || panelID == 9 || panelID == 11 || panelID == 14 || panelID == 18 ||
+           panelID == 22 || panelID == 23 || panelID == 24 || panelID == 25;
+}
+
+// The signed-in account's feature switches, the ones the sidebar's conditions read.
+static id PFBSidebarAccountSwitches(void) {
+    Class hostClass = NSClassFromString(@"T1HostViewController");
+    SEL shared = NSSelectorFromString(@"sharedHostViewController");
+    SEL current = NSSelectorFromString(@"currentAccount");
+    SEL switches = NSSelectorFromString(@"featureSwitches");
+    if (![hostClass respondsToSelector:shared]) {
+        return nil;
+    }
+    id host = ((id (*)(id, SEL))objc_msgSend)(hostClass, shared);
+    id account = [host respondsToSelector:current] ? ((id (*)(id, SEL))objc_msgSend)(host, current) : nil;
+    return [account respondsToSelector:switches] ? ((id (*)(id, SEL))objc_msgSend)(account, switches) : nil;
+}
+
+NSArray<NSNumber*>* PFBDashSnapshot(id content) {
+    Ivar ivar = content ? class_getInstanceVariable(object_getClass(content), "visiblePanelIDs") : NULL;
+    if (!ivar) {
+        return nil;
+    }
+    void* storage = NULL;
+    memcpy(&storage, (const uint8_t*)(__bridge void*)content + ivar_getOffset(ivar), sizeof(storage));
+    if (!storage || !malloc_zone_from_ptr(storage)) {
+        return nil;
+    }
+    size_t size = malloc_size(storage);
+    int64_t count = 0;
+    memcpy(&count, (const uint8_t*)storage + 16, sizeof(count));
+    if (count < 0 || count > 64 || (size_t)(32 + count * 8) > size) {
+        return nil;
+    }
+    NSMutableArray<NSNumber*>* panels = [NSMutableArray array];
+    for (int64_t index = 0; index < count; index++) {
+        int64_t value = 0;
+        memcpy(&value, (const uint8_t*)storage + 32 + index * 8, sizeof(value));
+        [panels addObject:@(value)];
+    }
+    return panels;
+}
+
 @implementation PFBSidebarItems
 
 + (NSArray<NSNumber*>*)catalog {
-    return @[
-        @8, @15, @24, @6, @23, @25, @9, @20, @7, @16, @12, @19, @17, @13, @21, @18, @14, @11, @22, @1, @5, @2, @4
-    ];
+    return @[ @8, @15, @14, @17, @24, @23, @25, @9, @20, @18, @16, @7, @13, @4, @5, @2, @22, @11, @21 ];
 }
 
+// The sidebar titles Premium with Twitter's subscription title, not the panel table's name.
 + (NSString*)nameForPanel:(NSInteger)panelID {
+    if (panelID == 15) {
+        NSString* title = [[PFBBundle sharedBundle] localizedTwitterStringForKey:@"SUBSCRIPTION_TITLE"];
+        if (title.length && ![title isEqualToString:@"SUBSCRIPTION_TITLE"]) {
+            return title;
+        }
+    }
     return PFBPanelIdentityAnswer(@"localizedNameForPanelID:", panelID);
 }
 
@@ -61,9 +117,8 @@ static NSInteger PFBPanelForKey(NSString* key) {
     return PFBPanelIdentityAnswer(@"iconImageNameForPanelID:", panelID);
 }
 
-+ (NSArray<NSString*>*)hiddenKeys {
-    NSArray* keys = [[NSUserDefaults standardUserDefaults] arrayForKey:kHiddenKey];
-    return keys ?: @[];
++ (NSArray<NSString*>*)keysFor:(NSString*)defaultsKey {
+    return [[NSUserDefaults standardUserDefaults] arrayForKey:defaultsKey] ?: @[];
 }
 
 + (BOOL)isHidden:(NSInteger)panelID {
@@ -71,33 +126,46 @@ static NSInteger PFBPanelForKey(NSString* key) {
         return [PFBSettings boolForKey:@"hide_grok_sidebar"];
     }
     NSString* key = PFBPanelIdentityAnswer(@"stringForPanelID:", panelID);
-    return key && [[self hiddenKeys] containsObject:key];
+    if (key && [[self keysFor:kHiddenKey] containsObject:key]) {
+        return YES;
+    }
+    if (key && [[self keysFor:kShownKey] containsObject:key]) {
+        return NO;
+    }
+    return PFBDashKeepsOut(panelID);
 }
 
+// A choice that matches the default is not kept, so the default still follows the account.
 + (void)setPanel:(NSInteger)panelID hidden:(BOOL)hidden {
+    NSUserDefaults* defaults = [NSUserDefaults standardUserDefaults];
     if (panelID == PFBSidebarGrokPanel) {
-        [[NSUserDefaults standardUserDefaults] setBool:hidden forKey:@"hide_grok_sidebar"];
+        [defaults setBool:hidden forKey:@"hide_grok_sidebar"];
     } else {
         NSString* key = PFBPanelIdentityAnswer(@"stringForPanelID:", panelID);
         if (!key) {
             return;
         }
-        NSMutableArray<NSString*>* keys = [[self hiddenKeys] mutableCopy];
-        [keys removeObject:key];
-        if (hidden) {
-            [keys addObject:key];
+        NSMutableArray<NSString*>* hiddenKeys = [[self keysFor:kHiddenKey] mutableCopy];
+        NSMutableArray<NSString*>* shownKeys = [[self keysFor:kShownKey] mutableCopy];
+        [hiddenKeys removeObject:key];
+        [shownKeys removeObject:key];
+        BOOL hiddenByDefault = PFBDashKeepsOut(panelID);
+        if (hidden && !hiddenByDefault) {
+            [hiddenKeys addObject:key];
+        } else if (!hidden && hiddenByDefault) {
+            [shownKeys addObject:key];
         }
-        [[NSUserDefaults standardUserDefaults] setObject:keys forKey:kHiddenKey];
+        [defaults setObject:hiddenKeys forKey:kHiddenKey];
+        [defaults setObject:shownKeys forKey:kShownKey];
     }
     [self changed];
 }
 
 + (NSArray<NSNumber*>*)hiddenPanelIDs {
     NSMutableArray<NSNumber*>* panels = [NSMutableArray array];
-    for (NSString* key in [self hiddenKeys]) {
-        NSInteger panelID = PFBPanelForKey(key);
-        if (panelID > 0 && panelID != PFBSidebarGrokPanel) {
-            [panels addObject:@(panelID)];
+    for (NSNumber* panel in [self catalog]) {
+        if (panel.integerValue != PFBSidebarGrokPanel && [self isHidden:panel.integerValue]) {
+            [panels addObject:panel];
         }
     }
     return panels;
@@ -106,6 +174,7 @@ static NSInteger PFBPanelForKey(NSString* key) {
 + (void)resetToDefault {
     NSUserDefaults* defaults = [NSUserDefaults standardUserDefaults];
     [defaults removeObjectForKey:kHiddenKey];
+    [defaults removeObjectForKey:kShownKey];
     [defaults removeObjectForKey:@"hide_grok_sidebar"];
     [self changed];
 }
@@ -118,7 +187,7 @@ static NSInteger PFBPanelForKey(NSString* key) {
 + (void)recordTabPanelIDs:(NSArray*)panelIDs {
     NSMutableArray<NSNumber*>* tabs = [NSMutableArray array];
     for (id panel in [panelIDs isKindOfClass:[NSArray class]] ? panelIDs : @[]) {
-        if ([panel isKindOfClass:[NSNumber class]]) {
+        if ([panel isKindOfClass:[NSNumber class]] && ![tabs containsObject:panel]) {
             [tabs addObject:panel];
         }
     }
@@ -133,180 +202,108 @@ static NSInteger PFBPanelForKey(NSString* key) {
     }
 }
 
-+ (NSArray<NSNumber*>*)seenPanelIDs {
-    NSArray* keys = [[NSUserDefaults standardUserDefaults] arrayForKey:kSeenKey];
-    if (!keys.count) {
-        return nil;
+// MARK: - Rebuilds
+
++ (void)beginBuildOfContent:(id)content {
+    gPFBSidebarBefore = PFBDashSnapshot(content);
+    gPFBSidebarBuilding = [NSMutableArray array];
+}
+
++ (void)noteBuiltPanel:(NSInteger)panelID {
+    if (PFBSidebarIsNamedWhenBuilt(panelID) && ![gPFBSidebarBuilding containsObject:@(panelID)]) {
+        [gPFBSidebarBuilding addObject:@(panelID)];
     }
-    NSMutableArray<NSNumber*>* panels = [NSMutableArray array];
-    for (NSString* key in keys) {
-        NSInteger panelID = PFBPanelForKey(key);
-        if (panelID > 0) {
-            [panels addObject:@(panelID)];
+}
+
+// Twitter rebuilds only when the list it keeps changes, so a rebuild either named an item or
+// left a new list behind.
++ (void)endBuildOfContent:(id)content {
+    NSArray<NSNumber*>* built = gPFBSidebarBuilding;
+    NSArray<NSNumber*>* before = gPFBSidebarBefore;
+    gPFBSidebarBuilding = nil;
+    gPFBSidebarBefore = nil;
+    NSArray<NSNumber*>* snapshot = PFBDashSnapshot(content);
+    NSArray<NSNumber*>* hidden = [self hiddenPanelIDs];
+    if (built.count || (before && snapshot && ![before isEqualToArray:snapshot])) {
+        gPFBSidebarBuilt = [built copy];
+        NSMutableArray<NSString*>* keys = [NSMutableArray array];
+        for (NSNumber* panel in built) {
+            NSString* key = PFBPanelIdentityAnswer(@"stringForPanelID:", panel.integerValue);
+            if (key) {
+                [keys addObject:key];
+            }
+        }
+        [[NSUserDefaults standardUserDefaults] setObject:keys forKey:kBuiltKey];
+        for (NSNumber* panel in hidden) {
+            if ([built containsObject:panel]) {
+                [self noteStillShown:panel];
+            }
         }
     }
-    return panels;
+    for (NSNumber* panel in snapshot ? hidden : @[]) {
+        if (![snapshot containsObject:panel]) {
+            [self noteStillShown:panel];
+        }
+    }
+}
+
++ (void)noteStillShown:(NSNumber*)panel {
+    PFBCompatNoteFailure(PFBCompat_customize_sidebar,
+                         [NSString stringWithFormat:@"%@ still in the sidebar",
+                                                    [self nameForPanel:panel.integerValue] ?: panel.stringValue]);
+}
+
++ (NSArray<NSNumber*>*)lastBuiltPanels {
+    if (gPFBSidebarBuilt) {
+        return gPFBSidebarBuilt;
+    }
+    NSArray* keys = [[NSUserDefaults standardUserDefaults] arrayForKey:kBuiltKey];
+    return keys ? PFBPanelsForKeys(keys) : nil;
+}
+
++ (BOOL)newsOffered {
+    Class features = NSClassFromString(@"T1ExploreFeatures");
+    SEL initializer = NSSelectorFromString(@"initWithFeatureSwitches:");
+    SEL news = NSSelectorFromString(@"enableNewsTab");
+    id switches = PFBSidebarAccountSwitches();
+    if (!switches || ![features instancesRespondToSelector:initializer] || ![features instancesRespondToSelector:news]) {
+        return YES;
+    }
+    id explore = ((id (*)(id, SEL, id))objc_msgSend)([features alloc], initializer, switches);
+    return explore ? ((BOOL (*)(id, SEL))objc_msgSend)(explore, news) : YES;
+}
+
++ (BOOL)businessOffered {
+    id switches = PFBSidebarAccountSwitches();
+    SEL reader = NSSelectorFromString(@"boolForKey:");
+    if (![switches respondsToSelector:reader]) {
+        return YES;
+    }
+    return ((BOOL (*)(id, SEL, id))objc_msgSend)(switches, reader, @"premium_business_ios_nav_promo_enabled");
 }
 
 + (NSArray<NSNumber*>*)panelsForPage {
     NSArray<NSNumber*>* tabs = [self tabPanelIDs];
-    NSArray<NSNumber*>* seen = [self seenPanelIDs];
+    NSArray<NSNumber*>* built = [self lastBuiltPanels];
     NSMutableArray<NSNumber*>* panels = [NSMutableArray array];
     for (NSNumber* panel in [self catalog]) {
         NSInteger panelID = panel.integerValue;
         if ([tabs containsObject:panel] || ![self nameForPanel:panelID]) {
             continue;
         }
-        if (PFBSidebarIsGated(panelID) && !PFBPanelIsGenuinelyAvailable(panelID) && ![seen containsObject:panel]) {
-            continue;
+        BOOL kept = YES;
+        if (PFBSidebarIsNamedWhenBuilt(panelID)) {
+            kept = !built || [built containsObject:panel];
+        } else if (panelID == 20) {
+            kept = [self newsOffered];
+        } else if (panelID == 21) {
+            kept = [self businessOffered];
         }
-        BOOL listed = seen ? [seen containsObject:panel] : !PFBSidebarIsTabFirst(panelID);
-        if (listed || [self isHidden:panelID]) {
+        if (kept || [self isHidden:panelID]) {
             [panels addObject:panel];
         }
     }
     return panels;
-}
-
-// MARK: - Reading the open sidebar
-
-// The sidebar's SwiftUI host, under the controller that slides it in.
-static UIViewController* PFBSidebarHost(void) {
-    Class hostClass = NSClassFromString(@"_TtC11TwitterDash21DashHostingController");
-    if (!hostClass) {
-        return nil;
-    }
-    for (UIScene* scene in UIApplication.sharedApplication.connectedScenes) {
-        if (![scene isKindOfClass:[UIWindowScene class]]) {
-            continue;
-        }
-        for (UIWindow* window in ((UIWindowScene*)scene).windows) {
-            NSMutableArray<UIViewController*>* queue = [NSMutableArray array];
-            if (window.rootViewController) {
-                [queue addObject:window.rootViewController];
-            }
-            for (NSUInteger index = 0; index < queue.count && index < 400; index++) {
-                UIViewController* controller = queue[index];
-                if ([controller isKindOfClass:hostClass]) {
-                    return controller;
-                }
-                [queue addObjectsFromArray:controller.childViewControllers];
-                if (controller.presentedViewController) {
-                    [queue addObject:controller.presentedViewController];
-                }
-            }
-        }
-    }
-    return nil;
-}
-
-// The labels the accessibility tree gives, in reading order.
-static void PFBSidebarCollect(id element, NSUInteger depth, NSMutableArray<NSString*>* labels, NSUInteger* visits) {
-    if (!element || depth > 18 || *visits > 800) {
-        return;
-    }
-    (*visits)++;
-    if ([element isKindOfClass:[UIView class]] && (((UIView*)element).hidden || ((UIView*)element).alpha < 0.01)) {
-        return;
-    }
-    NSString* label = [element isAccessibilityElement] ? [element accessibilityLabel] : nil;
-    if ([label isKindOfClass:[NSString class]] && label.length) {
-        [labels addObject:label];
-    }
-    NSArray* children = [element accessibilityElements];
-    if (![children isKindOfClass:[NSArray class]] || !children.count) {
-        children = nil;
-        NSInteger count = [element accessibilityElementCount];
-        if (count != NSNotFound && count > 0 && count < 300) {
-            NSMutableArray* found = [NSMutableArray array];
-            for (NSInteger index = 0; index < count; index++) {
-                id child = [element accessibilityElementAtIndex:index];
-                if (child) {
-                    [found addObject:child];
-                }
-            }
-            children = found;
-        }
-    }
-    if (!children.count && [element isKindOfClass:[UIView class]]) {
-        children = ((UIView*)element).subviews;
-    }
-    for (id child in children) {
-        PFBSidebarCollect(child, depth + 1, labels, visits);
-    }
-}
-
-// The panel a label names: Twitter's name for it, alone or before a badge.
-static NSInteger PFBSidebarPanelForLabel(NSString* label, NSDictionary<NSString*, NSNumber*>* names) {
-    NSString* text = [[label stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceAndNewlineCharacterSet]
-        lowercaseString];
-    NSInteger best = 0;
-    NSUInteger bestLength = 0;
-    for (NSString* name in names) {
-        BOOL whole = [text isEqualToString:name];
-        BOOL leads = [text hasPrefix:name] && text.length > name.length &&
-                     ![NSCharacterSet.letterCharacterSet characterIsMember:[text characterAtIndex:name.length]];
-        if ((whole || leads) && name.length > bestLength) {
-            best = names[name].integerValue;
-            bestLength = name.length;
-        }
-    }
-    return best;
-}
-
-+ (void)readOpenSidebar {
-    UIViewController* host = PFBSidebarHost();
-    NSMutableArray<NSString*>* labels = [NSMutableArray array];
-    NSUInteger visits = 0;
-    if (host.isViewLoaded) {
-        PFBSidebarCollect(host.view, 0, labels, &visits);
-    }
-    NSMutableDictionary<NSString*, NSNumber*>* names = [NSMutableDictionary dictionary];
-    for (NSNumber* panel in [self catalog]) {
-        NSString* name = [self nameForPanel:panel.integerValue];
-        if (name) {
-            names[name.lowercaseString] = panel;
-        }
-    }
-    NSMutableArray<NSNumber*>* shown = [NSMutableArray array];
-    for (NSString* label in labels) {
-        NSInteger panelID = PFBSidebarPanelForLabel(label, names);
-        if (panelID && ![shown containsObject:@(panelID)]) {
-            [shown addObject:@(panelID)];
-        }
-    }
-    @synchronized(self) {
-        gPFBSidebarReading = @{
-            @"host": host ? NSStringFromClass([host class]) : @"none",
-            @"labels": labels,
-            @"visits": @(visits),
-            @"panels": shown
-        };
-    }
-    if (!shown.count) {
-        return;
-    }
-    NSMutableArray<NSString*>* keys = [NSMutableArray array];
-    for (NSNumber* panel in shown) {
-        NSString* key = PFBPanelIdentityAnswer(@"stringForPanelID:", panel.integerValue);
-        if (key) {
-            [keys addObject:key];
-        }
-    }
-    [[NSUserDefaults standardUserDefaults] setObject:keys forKey:kSeenKey];
-    for (NSNumber* panel in [self hiddenPanelIDs]) {
-        if ([shown containsObject:panel]) {
-            PFBCompatNoteFailure(PFBCompat_customize_sidebar,
-                                 [NSString stringWithFormat:@"%@ still in the sidebar",
-                                                            [self nameForPanel:panel.integerValue] ?: panel.stringValue]);
-        }
-    }
-}
-
-+ (NSDictionary*)lastReading {
-    @synchronized(self) {
-        return gPFBSidebarReading ?: @{};
-    }
 }
 
 @end

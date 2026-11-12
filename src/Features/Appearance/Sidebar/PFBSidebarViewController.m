@@ -1,5 +1,5 @@
 // The Sidebar page: its line, the sidebar's items as glass tiles on a card, the tab bar's apart,
-// and Reset to default at the bottom. A tap hides an item or shows it again.
+// and Twitter's Restore to default at the bottom. A tap hides an item or shows it again.
 
 #import "Features/Appearance/Sidebar/PFBSidebarViewController.h"
 #import "Common/PFBBundle.h"
@@ -202,7 +202,7 @@ static const CGFloat kMarkSize = 24.0;
     }
 
     self.resetCapsule = [PFBShowcaseButton buttonWithStyle:PFBShowcaseButtonStyleOutline];
-    self.resetCapsule.label = [bundle localizedStringForKey:@"SIDEBAR_RESET_TITLE"];
+    self.resetCapsule.label = [bundle localizedTwitterStringForKey:@"SUBSCRIPTION_TAB_CUSTOMIZATION_RESTORE_BUTTON_TITLE"];
     [self.resetCapsule addTarget:self action:@selector(resetToDefault) forControlEvents:UIControlEventTouchUpInside];
     [self.view addSubview:self.resetCapsule];
     self.feedback = [[UISelectionFeedbackGenerator alloc] init];
@@ -229,9 +229,8 @@ static const CGFloat kMarkSize = 24.0;
         [tiles addObject:tile];
     }
     NSMutableArray<PFBSidebarTile*>* tabTiles = [NSMutableArray array];
-    NSArray<NSNumber*>* tabs = [PFBSidebarItems tabPanelIDs];
-    for (NSNumber* panel in [PFBSidebarItems catalog]) {
-        if ([tabs containsObject:panel] && [PFBSidebarItems nameForPanel:panel.integerValue]) {
+    for (NSNumber* panel in [PFBSidebarItems tabPanelIDs]) {
+        if ([PFBSidebarItems nameForPanel:panel.integerValue]) {
             PFBSidebarTile* tile = [[PFBSidebarTile alloc] initWithPanel:panel.integerValue fixed:YES];
             [self.tabCard addSubview:tile];
             [tabTiles addObject:tile];

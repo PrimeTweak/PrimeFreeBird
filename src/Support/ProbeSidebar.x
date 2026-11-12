@@ -1,16 +1,14 @@
-// Probe for the Sidebar page: Twitter's panel table, and at each opening of the sidebar what it
-// was read showing, the lists it was answered and the drawer's own snapshot. Removed once read.
+// Probe for the Sidebar page: Twitter's panel table, and after each update of the sidebar what
+// its rebuild kept, the drawer's own list and the page's tiles. Removed once read.
 
 #import <QuartzCore/QuartzCore.h>
-#import <malloc/malloc.h>
 #import <objc/message.h>
-#import <objc/runtime.h>
 #import "Common/PFBCompatibility.h"
 #import "Features/Appearance/Sidebar/PFBSidebarItems.h"
 #import "Features/Appearance/Sidebar/PFBSidebarViewController.h"
 
 static CFTimeInterval gProbeStart;
-static NSUInteger gProbeOpenings;
+static NSUInteger gProbeUpdates;
 static NSUInteger gProbeAnswers;
 static BOOL gProbeMenuOpen;
 
@@ -24,6 +22,9 @@ static void pfbProbe(NSString* line) {
 
 // Panels by number and Twitter's name, as a list reads them.
 static NSString* pfbProbePanels(NSArray* panels) {
+    if (!panels) {
+        return @"unknown";
+    }
     NSMutableArray<NSString*>* items = [NSMutableArray array];
     for (id panel in [panels isKindOfClass:[NSArray class]] ? panels : @[]) {
         NSInteger panelID = [panel respondsToSelector:@selector(integerValue)] ? [panel integerValue] : 0;
@@ -34,133 +35,40 @@ static NSString* pfbProbePanels(NSArray* panels) {
     return items.count ? [items componentsJoinedByString:@", "] : @"none";
 }
 
-// A Swift [Int] held in an instance variable: its count and elements, read from its heap storage.
-static NSString* pfbProbeSwiftInts(id owner, const char* name) {
-    Ivar ivar = owner ? class_getInstanceVariable(object_getClass(owner), name) : NULL;
-    if (!ivar) {
-        return @"no such variable";
-    }
-    void* storage = NULL;
-    memcpy(&storage, (const uint8_t*)(__bridge void*)owner + ivar_getOffset(ivar), sizeof(storage));
-    if (!storage || !malloc_zone_from_ptr(storage)) {
-        return [NSString stringWithFormat:@"storage %p outside the heap (an empty array)", storage];
-    }
-    size_t size = malloc_size(storage);
-    int64_t count = 0;
-    memcpy(&count, (const uint8_t*)storage + 16, sizeof(count));
-    if (count < 0 || count > 64 || (size_t)(32 + count * 8) > size) {
-        return [NSString stringWithFormat:@"count %lld unreadable in %zu bytes", count, size];
-    }
-    NSMutableArray<NSNumber*>* values = [NSMutableArray array];
-    for (int64_t index = 0; index < count; index++) {
-        int64_t value = 0;
-        memcpy(&value, (const uint8_t*)storage + 32 + index * 8, sizeof(value));
-        [values addObject:@(value)];
-    }
-    return pfbProbePanels(values);
-}
+// One line per update, once the update and its check are done.
+%hook T1DashContentController
 
-// The drawer's content controller, through the controller that slides the sidebar in.
-static id pfbProbeDashContent(void) {
-    Class splitClass = NSClassFromString(@"T1AppSplitViewController");
-    SEL content = NSSelectorFromString(@"dashContentController");
-    for (UIScene* scene in UIApplication.sharedApplication.connectedScenes) {
-        if (![scene isKindOfClass:[UIWindowScene class]]) {
-            continue;
-        }
-        for (UIWindow* window in ((UIWindowScene*)scene).windows) {
-            NSMutableArray<UIViewController*>* queue = [NSMutableArray array];
-            if (window.rootViewController) {
-                [queue addObject:window.rootViewController];
-            }
-            for (NSUInteger index = 0; index < queue.count && index < 200; index++) {
-                UIViewController* controller = queue[index];
-                if (splitClass && [controller isKindOfClass:splitClass] && [controller respondsToSelector:content]) {
-                    return ((id (*)(id, SEL))objc_msgSend)(controller, content);
-                }
-                [queue addObjectsFromArray:controller.childViewControllers];
-            }
-        }
-    }
-    return nil;
-}
-
-// The classes under the drawer's host down three levels, counted, for a sidebar whose rows
-// gave no labels.
-static NSString* pfbProbeHostShape(void) {
-    Class hostClass = NSClassFromString(@"_TtC11TwitterDash21DashHostingController");
-    UIViewController* host = nil;
-    for (UIScene* scene in UIApplication.sharedApplication.connectedScenes) {
-        if (![scene isKindOfClass:[UIWindowScene class]]) {
-            continue;
-        }
-        for (UIWindow* window in ((UIWindowScene*)scene).windows) {
-            NSMutableArray<UIViewController*>* queue = [NSMutableArray array];
-            if (window.rootViewController) {
-                [queue addObject:window.rootViewController];
-            }
-            for (NSUInteger index = 0; index < queue.count && index < 400 && !host; index++) {
-                if (hostClass && [queue[index] isKindOfClass:hostClass]) {
-                    host = queue[index];
-                }
-                [queue addObjectsFromArray:queue[index].childViewControllers];
-            }
-        }
-    }
-    if (!host.isViewLoaded) {
-        return @"no host view";
-    }
-    NSCountedSet<NSString*>* classes = [NSCountedSet set];
-    NSArray<UIView*>* level = @[ host.view ];
-    for (NSUInteger depth = 0; depth < 4 && level.count; depth++) {
-        NSMutableArray<UIView*>* next = [NSMutableArray array];
-        for (UIView* view in level) {
-            [classes addObject:[NSString stringWithFormat:@"%lu:%@", (unsigned long)depth, NSStringFromClass([view class])]];
-            [next addObjectsFromArray:view.subviews];
-        }
-        level = next;
-    }
-    NSMutableArray<NSString*>* items = [NSMutableArray array];
-    for (NSString* name in [classes.allObjects sortedArrayUsingSelector:@selector(compare:)]) {
-        [items addObject:[NSString stringWithFormat:@"%@ x%lu", name, (unsigned long)[classes countForObject:name]]];
-    }
-    return [items componentsJoinedByString:@", "];
-}
-
-static void pfbProbeOpening(void) {
-    gProbeOpenings++;
-    if (gProbeOpenings > 12) {
+- (void)updateVisiblePanelIDs {
+    NSArray<NSNumber*>* before = PFBDashSnapshot(self);
+    %orig;
+    if (gProbeUpdates >= 16) {
         return;
     }
-    NSDictionary* reading = [PFBSidebarItems lastReading];
-    NSArray<NSString*>* labels = reading[@"labels"];
-    NSArray* shown = reading[@"panels"];
-    pfbProbe([NSString stringWithFormat:@"%@ opening %lu: host %@, %lu nodes, VoiceOver %@, %lu labels: %@",
-                                        pfbProbeNow(), (unsigned long)gProbeOpenings, reading[@"host"] ?: @"?",
-                                        (unsigned long)[reading[@"visits"] unsignedIntegerValue],
-                                        UIAccessibilityIsVoiceOverRunning() ? @"on" : @"off", (unsigned long)labels.count,
-                                        labels.count ? [[labels subarrayWithRange:NSMakeRange(0, MIN(labels.count, 60))]
-                                                           componentsJoinedByString:@" | "]
-                                                     : pfbProbeHostShape()]);
-    pfbProbe([NSString stringWithFormat:@"%@ opening %lu: rows named %@; tab bar %@; hidden %@; page %@",
-                                        pfbProbeNow(), (unsigned long)gProbeOpenings, pfbProbePanels(shown),
-                                        pfbProbePanels([PFBSidebarItems tabPanelIDs]),
-                                        pfbProbePanels([PFBSidebarItems hiddenPanelIDs]),
-                                        pfbProbePanels([PFBSidebarItems panelsForPage])]);
-    pfbProbe([NSString stringWithFormat:@"%@ opening %lu: drawer snapshot visiblePanelIDs %@", pfbProbeNow(),
-                                        (unsigned long)gProbeOpenings, pfbProbeSwiftInts(pfbProbeDashContent(), "visiblePanelIDs")]);
+    gProbeUpdates++;
+    NSUInteger update = gProbeUpdates;
+    __weak id content = self;
+    dispatch_async(dispatch_get_main_queue(), ^{
+      NSArray<NSNumber*>* after = PFBDashSnapshot(content);
+      pfbProbe([NSString stringWithFormat:@"%@ update %lu: list %@; rebuild kept %@; drawer list %@; tab bar %@",
+                                          pfbProbeNow(), (unsigned long)update,
+                                          before && after ? ([before isEqualToArray:after] ? @"same" : @"changed") : @"unreadable",
+                                          pfbProbePanels([PFBSidebarItems lastBuiltPanels]), pfbProbePanels(after),
+                                          pfbProbePanels([PFBSidebarItems tabPanelIDs])]);
+      pfbProbe([NSString stringWithFormat:@"%@ update %lu: hidden %@; page %@; News %@, Business %@", pfbProbeNow(),
+                                          (unsigned long)update, pfbProbePanels([PFBSidebarItems hiddenPanelIDs]),
+                                          pfbProbePanels([PFBSidebarItems panelsForPage]),
+                                          [PFBSidebarItems newsOffered] ? @"offered" : @"not offered",
+                                          [PFBSidebarItems businessOffered] ? @"offered" : @"not offered"]);
+    });
 }
+
+%end
 
 %hook T1DashContentPresenter
 
 - (void)dashDidSettleOpen:(BOOL)open {
     gProbeMenuOpen = open;
     %orig;
-    if (open) {
-        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.8 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
-          pfbProbeOpening();
-        });
-    }
 }
 
 %end
@@ -196,8 +104,10 @@ static void pfbProbeOpening(void) {
 
 - (void)viewDidAppear:(BOOL)animated {
     %orig;
-    pfbProbe([NSString stringWithFormat:@"%@ Sidebar page shows %@; tab bar %@", pfbProbeNow(),
-                                        pfbProbePanels([PFBSidebarItems panelsForPage]), pfbProbePanels([PFBSidebarItems tabPanelIDs])]);
+    pfbProbe([NSString stringWithFormat:@"%@ Sidebar page shows %@; hidden %@; tab bar %@", pfbProbeNow(),
+                                        pfbProbePanels([PFBSidebarItems panelsForPage]),
+                                        pfbProbePanels([PFBSidebarItems hiddenPanelIDs]),
+                                        pfbProbePanels([PFBSidebarItems tabPanelIDs])]);
 }
 
 %end
@@ -217,5 +127,11 @@ static void pfbProbeOpening(void) {
                                                       [PFBSidebarItems glyphForPanel:panelID] ?: @"-"]];
       }
       pfbProbe([NSString stringWithFormat:@"%@ panel table: %@", pfbProbeNow(), [table componentsJoinedByString:@"; "]]);
+      NSMutableArray<NSString*>* kept = [NSMutableArray array];
+      for (NSNumber* panel in @[ @13, @15, @16, @17 ]) {
+          [kept addObject:[NSString stringWithFormat:@"%@ %@", panel, PFBDashKeepsOut(panel.longLongValue) ? @"out" : @"in"]];
+      }
+      pfbProbe([NSString stringWithFormat:@"%@ unlock-only panels by default: %@", pfbProbeNow(),
+                                          [kept componentsJoinedByString:@", "]]);
     });
 }

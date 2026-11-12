@@ -237,6 +237,5 @@
 "SIDEBAR_EDITOR_NAVIGATION_TITLE" = "Боковая панель";
 "SIDEBAR_EDITOR_DETAIL" = "Нажмите на пункт, чтобы скрыть его из боковой панели. Нажмите снова, чтобы вернуть его.";
 "SIDEBAR_EDITOR_TAB_BAR_HEADER" = "На панели вкладок";
-"SIDEBAR_RESET_TITLE" = "Сбросить по умолчанию";
 "SIDEBAR_ITEM_SHOWN" = "Показано";
 "SIDEBAR_ITEM_HIDDEN" = "Скрыто";

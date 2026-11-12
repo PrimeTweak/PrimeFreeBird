@@ -237,6 +237,5 @@
 "SIDEBAR_EDITOR_NAVIGATION_TITLE" = "侧边栏";
 "SIDEBAR_EDITOR_DETAIL" = "轻点项目即可从侧边栏隐藏，再次轻点即可恢复。";
 "SIDEBAR_EDITOR_TAB_BAR_HEADER" = "在你的标签栏中";
-"SIDEBAR_RESET_TITLE" = "恢复默认设置";
 "SIDEBAR_ITEM_SHOWN" = "已显示";
 "SIDEBAR_ITEM_HIDDEN" = "已隐藏";

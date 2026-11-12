@@ -237,6 +237,5 @@
 "SIDEBAR_EDITOR_NAVIGATION_TITLE" = "側邊欄";
 "SIDEBAR_EDITOR_DETAIL" = "點一下項目即可從側邊欄隱藏，再點一下即可恢復。";
 "SIDEBAR_EDITOR_TAB_BAR_HEADER" = "在你的分頁列中";
-"SIDEBAR_RESET_TITLE" = "重設為預設值";
 "SIDEBAR_ITEM_SHOWN" = "已顯示";
 "SIDEBAR_ITEM_HIDDEN" = "已隱藏";

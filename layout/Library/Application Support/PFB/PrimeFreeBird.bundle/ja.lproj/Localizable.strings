@@ -237,6 +237,5 @@
 "SIDEBAR_EDITOR_NAVIGATION_TITLE" = "サイドバー";
 "SIDEBAR_EDITOR_DETAIL" = "項目をタップするとサイドバーから非表示になります。もう一度タップすると元に戻ります。";
 "SIDEBAR_EDITOR_TAB_BAR_HEADER" = "タブバーにある項目";
-"SIDEBAR_RESET_TITLE" = "デフォルトに戻す";
 "SIDEBAR_ITEM_SHOWN" = "表示";
 "SIDEBAR_ITEM_HIDDEN" = "非表示";

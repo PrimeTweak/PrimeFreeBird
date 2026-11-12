@@ -19,7 +19,7 @@ static NSArray<NSString*>* PFBBackupExtraKeys(void) {
         @"pfb_muted_words", @"pfb_muted_expiry", @"pfb_muted_span", @"pfb_muted_whole_words",
         @"pfb_muted_in_conversations", @"pfb_muted_skip_following",
         @"pfb_muted_include_reposts", @"pfb_filter_languages",
-        @"pfb_tabs_visible", @"pfb_tab_registry", @"pfb_sidebar_hidden",
+        @"pfb_tabs_visible", @"pfb_tab_registry", @"pfb_sidebar_hidden", @"pfb_sidebar_shown",
     ];
 }
 

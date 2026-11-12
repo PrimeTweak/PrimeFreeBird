@@ -1242,6 +1242,20 @@ BOOL PFBPanelIsGenuinelyAvailable(long long panelID) {
     }
 }
 
+// The unlock would put these in the sidebar without their feature: hidden there by default.
+BOOL PFBDashKeepsOut(long long panelID) {
+    switch (panelID) {
+        case 13:
+        case 16:
+        case 17:
+            return !PFBPanelIsGenuinelyAvailable(panelID);
+        case 15:
+            return !PFBPanelIsGenuinelyAvailable(panelID) || !AccountIsGenuinelyPremium();
+        default:
+            return NO;
+    }
+}
+
 // MARK: - Custom navigation - side drawer rows
 
 // The drawer builds a row for each panel absent from the tab bar, from a snapshot
@@ -1289,12 +1303,18 @@ void PFBDashRefresh(void) {
 
 - (void)updateVisiblePanelIDs {
     // A nested update would clear the flag for the rest of the outer one.
-    if (DashPanelIDQuery) {
+    BOOL outer = !DashPanelIDQuery;
+    if (!outer) {
         PFBCompatMeasure(@"side menu panels", @"panel list updated inside its own update", 2);
+    } else {
+        [PFBSidebarItems beginBuildOfContent:self];
     }
     DashPanelIDQuery = YES;
     %orig;
     DashPanelIDQuery = NO;
+    if (outer) {
+        [PFBSidebarItems endBuildOfContent:self];
+    }
 }
 
 // Each close resets the content to Twitter's full list, and some ways of opening show it
@@ -1335,21 +1355,28 @@ static BOOL PFBDashAnswerApplies(BOOL glassNavigation) {
 
 %hook T1DashContentPresenter
 
-// The open sidebar is read once it settles, for the Sidebar page and its check.
 - (void)dashDidSettleOpen:(BOOL)open {
     gPFBDashMenuOpen = open;
     %orig;
-    if (open) {
-        dispatch_async(dispatch_get_main_queue(), ^{
-          [PFBSidebarItems readOpenSidebar];
-        });
-    }
 }
 
 %end
 
-// The tab bar's panels as the drawer reads them, with the panels it must not offer and the
-// ones hidden from the Sidebar page.
+// The sidebar's rebuild names each of some items once it keeps it: the Sidebar page offers
+// those, and an item hidden from it must not be named.
+%hook T1PanelIdentity
+
++ (NSString*)localizedNameForPanelID:(long long)panelID {
+    if (DashPanelIDQuery) {
+        [PFBSidebarItems noteBuiltPanel:(NSInteger)panelID];
+    }
+    return %orig;
+}
+
+%end
+
+// The tab bar's panels as the drawer reads them, with Grok's shortcut and the items hidden
+// from the Sidebar page, the unlock-only panels by default.
 static NSArray* PFBDashPanelIDs(NSArray* panelIDs) {
     if (![panelIDs isKindOfClass:[NSArray class]]) {
         return panelIDs;
@@ -1362,21 +1389,11 @@ static NSArray* PFBDashPanelIDs(NSArray* panelIDs) {
         }
     };
 
-    for (NSNumber* panelID in @[@13, @15, @16, @17]) {
-        if (!PFBPanelIsGenuinelyAvailable(panelID.longLongValue)) {
-            claim(panelID);
-        }
-    }
-
     if ([PFBSettings boolForKey:@"hide_grok_sidebar"]) {
         PFBCOMPAT_ACTION(PFBCompat_hide_grok_sidebar, @"Grok panel hidden");
         claim(@14);
     } else {
         PFBCOMPAT_OBSERVE(PFBCompat_hide_grok_sidebar, @"Grok panel found");
-    }
-
-    if (!AccountIsGenuinelyPremium()) {
-        claim(@15);
     }
 
     NSArray<NSNumber*>* hidden = [PFBSidebarItems hiddenPanelIDs];

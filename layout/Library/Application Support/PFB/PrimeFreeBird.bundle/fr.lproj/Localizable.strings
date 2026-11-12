@@ -79,7 +79,6 @@
 "SIDEBAR_EDITOR_NAVIGATION_TITLE" = "Barre latérale";
 "SIDEBAR_EDITOR_DETAIL" = "Touchez un élément pour le masquer de la barre latérale. Touchez-le de nouveau pour le rétablir.";
 "SIDEBAR_EDITOR_TAB_BAR_HEADER" = "Dans votre barre d’onglets";
-"SIDEBAR_RESET_TITLE" = "Rétablir par défaut";
 "SIDEBAR_ITEM_SHOWN" = "Affiché";
 "SIDEBAR_ITEM_HIDDEN" = "Masqué";
 "RESTORE_TAB_LABELS_TITLE" = "Étiquettes des onglets";

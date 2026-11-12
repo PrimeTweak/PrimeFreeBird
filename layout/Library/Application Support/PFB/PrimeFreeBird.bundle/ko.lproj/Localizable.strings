@@ -237,6 +237,5 @@
 "SIDEBAR_EDITOR_NAVIGATION_TITLE" = "사이드바";
 "SIDEBAR_EDITOR_DETAIL" = "항목을 탭하면 사이드바에서 숨겨집니다. 다시 탭하면 돌아옵니다.";
 "SIDEBAR_EDITOR_TAB_BAR_HEADER" = "탭 바에 있는 항목";
-"SIDEBAR_RESET_TITLE" = "기본값으로 재설정";
 "SIDEBAR_ITEM_SHOWN" = "표시됨";
 "SIDEBAR_ITEM_HIDDEN" = "숨겨짐";

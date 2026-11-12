@@ -237,6 +237,5 @@
 "SIDEBAR_EDITOR_NAVIGATION_TITLE" = "Sidofält";
 "SIDEBAR_EDITOR_DETAIL" = "Tryck på ett objekt för att dölja det i sidofältet. Tryck igen för att få tillbaka det.";
 "SIDEBAR_EDITOR_TAB_BAR_HEADER" = "I ditt flikfält";
-"SIDEBAR_RESET_TITLE" = "Återställ till standard";
 "SIDEBAR_ITEM_SHOWN" = "Visas";
 "SIDEBAR_ITEM_HIDDEN" = "Dold";

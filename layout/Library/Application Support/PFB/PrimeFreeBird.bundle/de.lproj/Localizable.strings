@@ -237,6 +237,5 @@
 "SIDEBAR_EDITOR_NAVIGATION_TITLE" = "Seitenleiste";
 "SIDEBAR_EDITOR_DETAIL" = "Tippe auf ein Element, um es aus der Seitenleiste auszublenden. Tippe erneut, um es zurückzuholen.";
 "SIDEBAR_EDITOR_TAB_BAR_HEADER" = "In deiner Tableiste";
-"SIDEBAR_RESET_TITLE" = "Auf Standard zurücksetzen";
 "SIDEBAR_ITEM_SHOWN" = "Angezeigt";
 "SIDEBAR_ITEM_HIDDEN" = "Ausgeblendet";
