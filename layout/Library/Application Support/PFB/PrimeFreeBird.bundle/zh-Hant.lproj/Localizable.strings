@@ -64,7 +64,7 @@
 
 /* ===== Appearance › Colors ===== */
 "APPEARANCE_GROUP_COLORS" = "顏色";
-"THEME_OPTION_TITLE" = "主題顏色";
+"THEME_OPTION_TITLE" = "強調色";
 "THEME_OPTION_SUBTITLE" = "選擇整個 App 使用的強調色。";
 "DARK_MODE_STYLE_TITLE" = "背景顏色";
 "DARK_MODE_STYLE_SUBTITLE" = "選擇深色模式的背景色調。";
@@ -74,13 +74,13 @@
 "COLOR_PFB_SWITCHES_DETAIL" = "將強調色套用到這些設定中的開關。";
 "COLOR_TWITTER_ICON_IN_TOP_BAR_TITLE" = "Twitter 圖示";
 "COLOR_TWITTER_ICON_IN_TOP_BAR_DETAIL" = "將主題強調色套用至頂部導覽列的標誌。";
-"APPEARANCE_GROUP_TAB_BAR" = "導覽列";
-"CUSTOM_TAB_BAR_OPTION_TITLE" = "自訂導覽";
+"APPEARANCE_GROUP_TAB_BAR" = "導覽";
+"CUSTOM_TAB_BAR_OPTION_TITLE" = "分頁";
 "CUSTOM_TAB_BAR_OPTION_SUBTITLE" = "選擇要顯示的分頁及其順序。";
-"APPEARANCE_GROUP_SIDEBAR" = "帳戶選單";
-"CUSTOM_SIDEBAR_OPTION_TITLE" = "帳戶選單";
+"APPEARANCE_GROUP_SIDEBAR" = "選單";
+"CUSTOM_SIDEBAR_OPTION_TITLE" = "選單";
 "CUSTOM_SIDEBAR_OPTION_SUBTITLE" = "選擇要在選單中顯示的項目。";
-"SIDEBAR_EDITOR_NAVIGATION_TITLE" = "帳戶選單";
+"SIDEBAR_EDITOR_NAVIGATION_TITLE" = "選單";
 "SIDEBAR_EDITOR_DETAIL" = "點一下項目即可加入選單或從中移除。";
 "SIDEBAR_SECTION_SHOWN" = "已顯示";
 "SIDEBAR_SECTION_HIDDEN" = "已隱藏";
@@ -298,12 +298,12 @@
 "DARK_MODE_STYLE_PURE_BLACK" = "純黑";
 "DARK_MODE_STYLE_SYSTEM" = "系統";
 
-/* ===== Theme color picker ===== */
+/* ===== Accent picker ===== */
 "THEME_SETTINGS_NAVIGATION_DETAIL" = "選擇強調色。只有你看得到。";
-"THEME_SETTINGS_NAVIGATION_TITLE" = "主題顏色";
+"THEME_SETTINGS_NAVIGATION_TITLE" = "強調色";
 "THEME_CUSTOM_HINT" = "為連結、按鈕和醒目標示選擇任何顏色。";
 "THEME_RESET_HINT" = "移除所有地方的強調色，包括已選取的分頁、開關和 Twitter 圖示。";
-"THEME_RESET_CONFIRM_TITLE" = "復原主題顏色";
+"THEME_RESET_CONFIRM_TITLE" = "復原強調色";
 "THEME_RESET_CONFIRM_MESSAGE" = "強調色會恢復為 Twitter 的預設值，「已選取的分頁」、「開關」和「Twitter 圖示」不再使用它。你的其他設定會保留。";
 "THEME_RESET_ACTION" = "復原";
 "THEME_CUSTOM_NAME" = "自訂";
@@ -318,7 +318,7 @@
 "CUSTOM_TAB_BAR_DISCARD_TITLE" = "捨棄變更";
 "CUSTOM_TAB_BAR_DISCARD_MESSAGE" = "你選擇的分頁不會儲存。";
 "CUSTOM_TAB_BAR_DISCARD_ACTION" = "捨棄";
-"CUSTOM_TAB_BAR_SETTINGS_NAVIGATION_TITLE" = "自訂導覽";
+"CUSTOM_TAB_BAR_SETTINGS_NAVIGATION_TITLE" = "分頁";
 "TAB_EDITOR_TIP_CHANGE" = "點一下分頁即可更改";
 "TAB_EDITOR_TIP_ARRANGE" = "按住分頁即可重新排列";
 "TAB_EDITOR_TIP_ADD" = "點一下 + 即可新增分頁";

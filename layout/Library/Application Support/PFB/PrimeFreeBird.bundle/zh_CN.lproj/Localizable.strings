@@ -64,7 +64,7 @@
 
 /* ===== Appearance › Colors ===== */
 "APPEARANCE_GROUP_COLORS" = "颜色";
-"THEME_OPTION_TITLE" = "主题颜色";
+"THEME_OPTION_TITLE" = "强调色";
 "THEME_OPTION_SUBTITLE" = "选择整个应用使用的强调色。";
 "DARK_MODE_STYLE_TITLE" = "背景颜色";
 "DARK_MODE_STYLE_SUBTITLE" = "选择深色模式下的背景色调。";
@@ -74,13 +74,13 @@
 "COLOR_PFB_SWITCHES_DETAIL" = "将强调色应用到这些设置中的开关。";
 "COLOR_TWITTER_ICON_IN_TOP_BAR_TITLE" = "Twitter 图标";
 "COLOR_TWITTER_ICON_IN_TOP_BAR_DETAIL" = "将强调色应用于顶栏的标志。";
-"APPEARANCE_GROUP_TAB_BAR" = "导航栏";
-"CUSTOM_TAB_BAR_OPTION_TITLE" = "自定义导航";
+"APPEARANCE_GROUP_TAB_BAR" = "导航";
+"CUSTOM_TAB_BAR_OPTION_TITLE" = "标签页";
 "CUSTOM_TAB_BAR_OPTION_SUBTITLE" = "选择显示哪些标签及其顺序。";
-"APPEARANCE_GROUP_SIDEBAR" = "账号菜单";
-"CUSTOM_SIDEBAR_OPTION_TITLE" = "账号菜单";
+"APPEARANCE_GROUP_SIDEBAR" = "菜单";
+"CUSTOM_SIDEBAR_OPTION_TITLE" = "菜单";
 "CUSTOM_SIDEBAR_OPTION_SUBTITLE" = "选择要在菜单中显示的项目。";
-"SIDEBAR_EDITOR_NAVIGATION_TITLE" = "账号菜单";
+"SIDEBAR_EDITOR_NAVIGATION_TITLE" = "菜单";
 "SIDEBAR_EDITOR_DETAIL" = "轻点项目即可添加到菜单或从中移除。";
 "SIDEBAR_SECTION_SHOWN" = "已显示";
 "SIDEBAR_SECTION_HIDDEN" = "已隐藏";
@@ -298,12 +298,12 @@
 "DARK_MODE_STYLE_PURE_BLACK" = "纯黑";
 "DARK_MODE_STYLE_SYSTEM" = "系统";
 
-/* ===== Theme color picker ===== */
+/* ===== Accent picker ===== */
 "THEME_SETTINGS_NAVIGATION_DETAIL" = "选择强调色。只有你能看到。";
-"THEME_SETTINGS_NAVIGATION_TITLE" = "主题颜色";
+"THEME_SETTINGS_NAVIGATION_TITLE" = "强调色";
 "THEME_CUSTOM_HINT" = "为链接、按钮和高亮选择任意颜色。";
 "THEME_RESET_HINT" = "移除所有位置的强调色，包括所选标签、开关和 Twitter 图标。";
-"THEME_RESET_CONFIRM_TITLE" = "恢复主题颜色";
+"THEME_RESET_CONFIRM_TITLE" = "恢复强调色";
 "THEME_RESET_CONFIRM_MESSAGE" = "强调色将恢复为 Twitter 的默认颜色，“所选标签”“开关”和“Twitter 图标”将不再使用它。你的其他设置会保留。";
 "THEME_RESET_ACTION" = "恢复";
 "THEME_CUSTOM_NAME" = "自定义";
@@ -318,7 +318,7 @@
 "CUSTOM_TAB_BAR_DISCARD_TITLE" = "放弃更改";
 "CUSTOM_TAB_BAR_DISCARD_MESSAGE" = "你选择的标签不会被保存。";
 "CUSTOM_TAB_BAR_DISCARD_ACTION" = "放弃";
-"CUSTOM_TAB_BAR_SETTINGS_NAVIGATION_TITLE" = "自定义导航";
+"CUSTOM_TAB_BAR_SETTINGS_NAVIGATION_TITLE" = "标签页";
 "TAB_EDITOR_TIP_CHANGE" = "轻点标签即可更改";
 "TAB_EDITOR_TIP_ARRANGE" = "按住标签即可重新排列";
 "TAB_EDITOR_TIP_ADD" = "轻点 + 即可添加标签";

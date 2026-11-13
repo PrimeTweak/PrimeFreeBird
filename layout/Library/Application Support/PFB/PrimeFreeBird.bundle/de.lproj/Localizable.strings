@@ -64,7 +64,7 @@
 
 /* ===== Appearance › Colors ===== */
 "APPEARANCE_GROUP_COLORS" = "Farben";
-"THEME_OPTION_TITLE" = "Designfarbe";
+"THEME_OPTION_TITLE" = "Akzentfarbe";
 "THEME_OPTION_SUBTITLE" = "Wähle die Akzentfarbe für die ganze App.";
 "DARK_MODE_STYLE_TITLE" = "Hintergrundfarbe";
 "DARK_MODE_STYLE_SUBTITLE" = "Wähle den Hintergrundton im dunklen Modus.";
@@ -74,13 +74,13 @@
 "COLOR_PFB_SWITCHES_DETAIL" = "Wendet die Akzentfarbe auf die Schalter dieser Einstellungen an.";
 "COLOR_TWITTER_ICON_IN_TOP_BAR_TITLE" = "Twitter-Symbol";
 "COLOR_TWITTER_ICON_IN_TOP_BAR_DETAIL" = "Wendet die Akzentfarbe auf das Logo in der oberen Leiste an.";
-"APPEARANCE_GROUP_TAB_BAR" = "Navigationsleiste";
-"CUSTOM_TAB_BAR_OPTION_TITLE" = "Angepasste Navigation";
+"APPEARANCE_GROUP_TAB_BAR" = "Navigation";
+"CUSTOM_TAB_BAR_OPTION_TITLE" = "Tabs";
 "CUSTOM_TAB_BAR_OPTION_SUBTITLE" = "Wähle, welche Tabs erscheinen und in welcher Reihenfolge.";
-"APPEARANCE_GROUP_SIDEBAR" = "Account-Menü";
-"CUSTOM_SIDEBAR_OPTION_TITLE" = "Account-Menü";
+"APPEARANCE_GROUP_SIDEBAR" = "Menü";
+"CUSTOM_SIDEBAR_OPTION_TITLE" = "Menü";
 "CUSTOM_SIDEBAR_OPTION_SUBTITLE" = "Wähle, welche Elemente im Menü erscheinen.";
-"SIDEBAR_EDITOR_NAVIGATION_TITLE" = "Account-Menü";
+"SIDEBAR_EDITOR_NAVIGATION_TITLE" = "Menü";
 "SIDEBAR_EDITOR_DETAIL" = "Tippe auf ein Element, um es dem Menü hinzuzufügen oder daraus zu entfernen.";
 "SIDEBAR_SECTION_SHOWN" = "Angezeigt";
 "SIDEBAR_SECTION_HIDDEN" = "Ausgeblendet";
@@ -298,12 +298,12 @@
 "DARK_MODE_STYLE_PURE_BLACK" = "Schwarz";
 "DARK_MODE_STYLE_SYSTEM" = "System";
 
-/* ===== Theme color picker ===== */
+/* ===== Accent picker ===== */
 "THEME_SETTINGS_NAVIGATION_DETAIL" = "Wähle eine Akzentfarbe. Nur du siehst sie.";
-"THEME_SETTINGS_NAVIGATION_TITLE" = "Designfarbe";
+"THEME_SETTINGS_NAVIGATION_TITLE" = "Akzentfarbe";
 "THEME_CUSTOM_HINT" = "Wähle eine beliebige Farbe für Links, Buttons und Hervorhebungen.";
 "THEME_RESET_HINT" = "Entfernt die Akzentfarbe überall, auch vom ausgewählten Tab, den Schaltern und dem Twitter-Symbol.";
-"THEME_RESET_CONFIRM_TITLE" = "Designfarbe wiederherstellen";
+"THEME_RESET_CONFIRM_TITLE" = "Akzentfarbe wiederherstellen";
 "THEME_RESET_CONFIRM_MESSAGE" = "Die Akzentfarbe kehrt zum Standard von Twitter zurück, und Ausgewählter Tab, Schalter und Twitter-Symbol nutzen sie nicht mehr. Deine übrigen Einstellungen bleiben.";
 "THEME_RESET_ACTION" = "Wiederherstellen";
 "THEME_CUSTOM_NAME" = "Eigene";
@@ -318,7 +318,7 @@
 "CUSTOM_TAB_BAR_DISCARD_TITLE" = "Änderungen verwerfen";
 "CUSTOM_TAB_BAR_DISCARD_MESSAGE" = "Die gewählten Tabs werden nicht gespeichert.";
 "CUSTOM_TAB_BAR_DISCARD_ACTION" = "Verwerfen";
-"CUSTOM_TAB_BAR_SETTINGS_NAVIGATION_TITLE" = "Angepasste Navigation";
+"CUSTOM_TAB_BAR_SETTINGS_NAVIGATION_TITLE" = "Tabs";
 "TAB_EDITOR_TIP_CHANGE" = "Tippe auf einen Tab, um ihn zu ändern";
 "TAB_EDITOR_TIP_ARRANGE" = "Halte einen Tab gedrückt, um ihn zu verschieben";
 "TAB_EDITOR_TIP_ADD" = "Tippe auf +, um einen Tab hinzuzufügen";

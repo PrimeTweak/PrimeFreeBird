@@ -64,7 +64,7 @@
 
 /* ===== Appearance › Colors ===== */
 "APPEARANCE_GROUP_COLORS" = "Boje";
-"THEME_OPTION_TITLE" = "Boja teme";
+"THEME_OPTION_TITLE" = "Boja naglaska";
 "THEME_OPTION_SUBTITLE" = "Odaberi boju naglaska u cijeloj aplikaciji.";
 "DARK_MODE_STYLE_TITLE" = "Boja pozadine";
 "DARK_MODE_STYLE_SUBTITLE" = "Odaberi nijansu pozadine u tamnom načinu.";
@@ -74,13 +74,13 @@
 "COLOR_PFB_SWITCHES_DETAIL" = "Primijeni boju naglaska na prekidače u ovim postavkama.";
 "COLOR_TWITTER_ICON_IN_TOP_BAR_TITLE" = "Twitter ikona";
 "COLOR_TWITTER_ICON_IN_TOP_BAR_DETAIL" = "Primjenjuje boju naglaska na logotip u gornjoj traci.";
-"APPEARANCE_GROUP_TAB_BAR" = "Navigacijska traka";
-"CUSTOM_TAB_BAR_OPTION_TITLE" = "Prilagođena navigacija";
+"APPEARANCE_GROUP_TAB_BAR" = "Navigacija";
+"CUSTOM_TAB_BAR_OPTION_TITLE" = "Kartice";
 "CUSTOM_TAB_BAR_OPTION_SUBTITLE" = "Odaberi koje se kartice prikazuju i kojim redom.";
-"APPEARANCE_GROUP_SIDEBAR" = "Izbornik računa";
-"CUSTOM_SIDEBAR_OPTION_TITLE" = "Izbornik računa";
+"APPEARANCE_GROUP_SIDEBAR" = "Izbornik";
+"CUSTOM_SIDEBAR_OPTION_TITLE" = "Izbornik";
 "CUSTOM_SIDEBAR_OPTION_SUBTITLE" = "Odaberi koje se stavke prikazuju u izborniku.";
-"SIDEBAR_EDITOR_NAVIGATION_TITLE" = "Izbornik računa";
+"SIDEBAR_EDITOR_NAVIGATION_TITLE" = "Izbornik";
 "SIDEBAR_EDITOR_DETAIL" = "Dodirni stavku da je dodaš u izbornik ili je ukloniš iz njega.";
 "SIDEBAR_SECTION_SHOWN" = "Prikazano";
 "SIDEBAR_SECTION_HIDDEN" = "Skriveno";
@@ -298,12 +298,12 @@
 "DARK_MODE_STYLE_PURE_BLACK" = "Crna";
 "DARK_MODE_STYLE_SYSTEM" = "Sustav";
 
-/* ===== Theme color picker ===== */
+/* ===== Accent picker ===== */
 "THEME_SETTINGS_NAVIGATION_DETAIL" = "Odaberi boju naglaska. Vidiš je samo ti.";
-"THEME_SETTINGS_NAVIGATION_TITLE" = "Boja teme";
+"THEME_SETTINGS_NAVIGATION_TITLE" = "Boja naglaska";
 "THEME_CUSTOM_HINT" = "Odaberi bilo koju boju za poveznice, gumbe i isticanja.";
 "THEME_RESET_HINT" = "Uklanja boju naglaska posvuda, uključujući odabranu karticu, prekidače i ikonu Twittera.";
-"THEME_RESET_CONFIRM_TITLE" = "Vrati boju teme";
+"THEME_RESET_CONFIRM_TITLE" = "Vrati boju naglaska";
 "THEME_RESET_CONFIRM_MESSAGE" = "Boja naglaska vraća se na Twitterovu zadanu, a Odabrana kartica, Prekidači i Ikona Twittera prestaju je koristiti. Ostale postavke ostaju.";
 "THEME_RESET_ACTION" = "Vrati";
 "THEME_CUSTOM_NAME" = "Prilagođena";
@@ -318,7 +318,7 @@
 "CUSTOM_TAB_BAR_DISCARD_TITLE" = "Odbaci promjene";
 "CUSTOM_TAB_BAR_DISCARD_MESSAGE" = "Odabrane kartice neće se spremiti.";
 "CUSTOM_TAB_BAR_DISCARD_ACTION" = "Odbaci";
-"CUSTOM_TAB_BAR_SETTINGS_NAVIGATION_TITLE" = "Prilagođena navigacija";
+"CUSTOM_TAB_BAR_SETTINGS_NAVIGATION_TITLE" = "Kartice";
 "TAB_EDITOR_TIP_CHANGE" = "Dodirni karticu da je promijeniš";
 "TAB_EDITOR_TIP_ARRANGE" = "Dodirni i drži karticu za promjenu redoslijeda";
 "TAB_EDITOR_TIP_ADD" = "Dodirni + za dodavanje kartice";

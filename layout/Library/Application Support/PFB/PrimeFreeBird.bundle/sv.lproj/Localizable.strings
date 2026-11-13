@@ -64,7 +64,7 @@
 
 /* ===== Appearance › Colors ===== */
 "APPEARANCE_GROUP_COLORS" = "Färger";
-"THEME_OPTION_TITLE" = "Temafärg";
+"THEME_OPTION_TITLE" = "Accentfärg";
 "THEME_OPTION_SUBTITLE" = "Välj accentfärgen som används i hela appen.";
 "DARK_MODE_STYLE_TITLE" = "Bakgrundsfärg";
 "DARK_MODE_STYLE_SUBTITLE" = "Välj bakgrundstonen i mörkt läge.";
@@ -74,13 +74,13 @@
 "COLOR_PFB_SWITCHES_DETAIL" = "Använd accentfärgen på reglagen i de här inställningarna.";
 "COLOR_TWITTER_ICON_IN_TOP_BAR_TITLE" = "Twitter-ikon";
 "COLOR_TWITTER_ICON_IN_TOP_BAR_DETAIL" = "Tillämpa accentfärgen på logotypen i det övre fältet.";
-"APPEARANCE_GROUP_TAB_BAR" = "Navigeringsfält";
-"CUSTOM_TAB_BAR_OPTION_TITLE" = "Anpassad navigering";
+"APPEARANCE_GROUP_TAB_BAR" = "Navigering";
+"CUSTOM_TAB_BAR_OPTION_TITLE" = "Flikar";
 "CUSTOM_TAB_BAR_OPTION_SUBTITLE" = "Välj vilka flikar som visas och i vilken ordning.";
-"APPEARANCE_GROUP_SIDEBAR" = "Kontomeny";
-"CUSTOM_SIDEBAR_OPTION_TITLE" = "Kontomeny";
+"APPEARANCE_GROUP_SIDEBAR" = "Meny";
+"CUSTOM_SIDEBAR_OPTION_TITLE" = "Meny";
 "CUSTOM_SIDEBAR_OPTION_SUBTITLE" = "Välj vilka objekt som visas i menyn.";
-"SIDEBAR_EDITOR_NAVIGATION_TITLE" = "Kontomeny";
+"SIDEBAR_EDITOR_NAVIGATION_TITLE" = "Meny";
 "SIDEBAR_EDITOR_DETAIL" = "Tryck på ett objekt för att lägga till det i menyn eller ta bort det.";
 "SIDEBAR_SECTION_SHOWN" = "Visas";
 "SIDEBAR_SECTION_HIDDEN" = "Dolda";
@@ -298,12 +298,12 @@
 "DARK_MODE_STYLE_PURE_BLACK" = "Svart";
 "DARK_MODE_STYLE_SYSTEM" = "System";
 
-/* ===== Theme color picker ===== */
+/* ===== Accent picker ===== */
 "THEME_SETTINGS_NAVIGATION_DETAIL" = "Välj en accentfärg. Bara du kan se den.";
-"THEME_SETTINGS_NAVIGATION_TITLE" = "Temafärg";
+"THEME_SETTINGS_NAVIGATION_TITLE" = "Accentfärg";
 "THEME_CUSTOM_HINT" = "Välj valfri färg för länkar, knappar och markeringar.";
 "THEME_RESET_HINT" = "Tar bort accentfärgen överallt, även från den valda fliken, reglagen och Twitter-symbolen.";
-"THEME_RESET_CONFIRM_TITLE" = "Återställ temafärg";
+"THEME_RESET_CONFIRM_TITLE" = "Återställ accentfärg";
 "THEME_RESET_CONFIRM_MESSAGE" = "Accentfärgen går tillbaka till Twitters standard, och Vald flik, Reglage och Twitter-symbol slutar använda den. Dina övriga inställningar finns kvar.";
 "THEME_RESET_ACTION" = "Återställ";
 "THEME_CUSTOM_NAME" = "Anpassad";
@@ -318,7 +318,7 @@
 "CUSTOM_TAB_BAR_DISCARD_TITLE" = "Släng ändringar";
 "CUSTOM_TAB_BAR_DISCARD_MESSAGE" = "Flikarna du valt sparas inte.";
 "CUSTOM_TAB_BAR_DISCARD_ACTION" = "Släng";
-"CUSTOM_TAB_BAR_SETTINGS_NAVIGATION_TITLE" = "Anpassad navigering";
+"CUSTOM_TAB_BAR_SETTINGS_NAVIGATION_TITLE" = "Flikar";
 "TAB_EDITOR_TIP_CHANGE" = "Tryck på en flik för att ändra den";
 "TAB_EDITOR_TIP_ARRANGE" = "Håll ned en flik för att flytta den";
 "TAB_EDITOR_TIP_ADD" = "Tryck på + för att lägga till en flik";

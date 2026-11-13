@@ -64,7 +64,7 @@
 
 /* ===== Appearance › Colors ===== */
 "APPEARANCE_GROUP_COLORS" = "Colores";
-"THEME_OPTION_TITLE" = "Color del tema";
+"THEME_OPTION_TITLE" = "Color de acento";
 "THEME_OPTION_SUBTITLE" = "Elige el color de acento usado en toda la app.";
 "DARK_MODE_STYLE_TITLE" = "Color de fondo";
 "DARK_MODE_STYLE_SUBTITLE" = "Elige el tono de fondo del modo oscuro.";
@@ -74,13 +74,13 @@
 "COLOR_PFB_SWITCHES_DETAIL" = "Aplica el color de acento a los interruptores de estos ajustes.";
 "COLOR_TWITTER_ICON_IN_TOP_BAR_TITLE" = "Ícono de Twitter";
 "COLOR_TWITTER_ICON_IN_TOP_BAR_DETAIL" = "Aplica el color de acento al logo de la barra superior.";
-"APPEARANCE_GROUP_TAB_BAR" = "Barra de navegación";
-"CUSTOM_TAB_BAR_OPTION_TITLE" = "Personalizar navegación";
+"APPEARANCE_GROUP_TAB_BAR" = "Navegación";
+"CUSTOM_TAB_BAR_OPTION_TITLE" = "Pestañas";
 "CUSTOM_TAB_BAR_OPTION_SUBTITLE" = "Elige qué pestañas aparecen y en qué orden.";
-"APPEARANCE_GROUP_SIDEBAR" = "Menú de la cuenta";
-"CUSTOM_SIDEBAR_OPTION_TITLE" = "Menú de la cuenta";
+"APPEARANCE_GROUP_SIDEBAR" = "Menú";
+"CUSTOM_SIDEBAR_OPTION_TITLE" = "Menú";
 "CUSTOM_SIDEBAR_OPTION_SUBTITLE" = "Elige qué elementos aparecen en el menú.";
-"SIDEBAR_EDITOR_NAVIGATION_TITLE" = "Menú de la cuenta";
+"SIDEBAR_EDITOR_NAVIGATION_TITLE" = "Menú";
 "SIDEBAR_EDITOR_DETAIL" = "Toca un elemento para añadirlo al menú o quitarlo.";
 "SIDEBAR_SECTION_SHOWN" = "Visibles";
 "SIDEBAR_SECTION_HIDDEN" = "Ocultos";
@@ -298,12 +298,12 @@
 "DARK_MODE_STYLE_PURE_BLACK" = "Negro";
 "DARK_MODE_STYLE_SYSTEM" = "Sistema";
 
-/* ===== Theme color picker ===== */
+/* ===== Accent picker ===== */
 "THEME_SETTINGS_NAVIGATION_DETAIL" = "Elige un color de acento. Solo tú puedes verlo.";
-"THEME_SETTINGS_NAVIGATION_TITLE" = "Color del tema";
+"THEME_SETTINGS_NAVIGATION_TITLE" = "Color de acento";
 "THEME_CUSTOM_HINT" = "Elige cualquier color para enlaces, botones y resaltados.";
 "THEME_RESET_HINT" = "Quita el color de acento en todas partes, incluida la pestaña seleccionada, los interruptores y el icono de Twitter.";
-"THEME_RESET_CONFIRM_TITLE" = "Restaurar color del tema";
+"THEME_RESET_CONFIRM_TITLE" = "Restaurar color de acento";
 "THEME_RESET_CONFIRM_MESSAGE" = "El color de acento vuelve al predeterminado de Twitter, y Pestaña seleccionada, Interruptores e Icono de Twitter dejan de usarlo. Tus demás ajustes se mantienen.";
 "THEME_RESET_ACTION" = "Restaurar";
 "THEME_CUSTOM_NAME" = "Personalizado";
@@ -318,7 +318,7 @@
 "CUSTOM_TAB_BAR_DISCARD_TITLE" = "Descartar cambios";
 "CUSTOM_TAB_BAR_DISCARD_MESSAGE" = "Las pestañas elegidas no se guardan.";
 "CUSTOM_TAB_BAR_DISCARD_ACTION" = "Descartar";
-"CUSTOM_TAB_BAR_SETTINGS_NAVIGATION_TITLE" = "Personalizar navegación";
+"CUSTOM_TAB_BAR_SETTINGS_NAVIGATION_TITLE" = "Pestañas";
 "TAB_EDITOR_TIP_CHANGE" = "Toca una pestaña para cambiarla";
 "TAB_EDITOR_TIP_ARRANGE" = "Mantén pulsada una pestaña para moverla";
 "TAB_EDITOR_TIP_ADD" = "Toca + para añadir una pestaña";

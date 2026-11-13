@@ -64,7 +64,7 @@
 
 /* ===== Appearance › Colors ===== */
 "APPEARANCE_GROUP_COLORS" = "Colors";
-"THEME_OPTION_TITLE" = "Theme color";
+"THEME_OPTION_TITLE" = "Accent";
 "THEME_OPTION_SUBTITLE" = "Choose the accent color used throughout the app.";
 "DARK_MODE_STYLE_TITLE" = "Background color";
 "DARK_MODE_STYLE_SUBTITLE" = "Choose the background shade used in dark mode.";
@@ -74,13 +74,13 @@
 "COLOR_PFB_SWITCHES_DETAIL" = "Apply the accent color to the switches in these settings.";
 "COLOR_TWITTER_ICON_IN_TOP_BAR_TITLE" = "Twitter icon";
 "COLOR_TWITTER_ICON_IN_TOP_BAR_DETAIL" = "Apply the accent color to the logo in the top bar.";
-"APPEARANCE_GROUP_TAB_BAR" = "Navigation bar";
-"CUSTOM_TAB_BAR_OPTION_TITLE" = "Custom navigation";
+"APPEARANCE_GROUP_TAB_BAR" = "Navigation";
+"CUSTOM_TAB_BAR_OPTION_TITLE" = "Tabs";
 "CUSTOM_TAB_BAR_OPTION_SUBTITLE" = "Choose which tabs appear and in what order.";
-"APPEARANCE_GROUP_SIDEBAR" = "Account menu";
-"CUSTOM_SIDEBAR_OPTION_TITLE" = "Account menu";
+"APPEARANCE_GROUP_SIDEBAR" = "Menu";
+"CUSTOM_SIDEBAR_OPTION_TITLE" = "Menu";
 "CUSTOM_SIDEBAR_OPTION_SUBTITLE" = "Choose which items appear in the menu.";
-"SIDEBAR_EDITOR_NAVIGATION_TITLE" = "Account menu";
+"SIDEBAR_EDITOR_NAVIGATION_TITLE" = "Menu";
 "SIDEBAR_EDITOR_DETAIL" = "Tap an item to add it to the menu or take it out.";
 "SIDEBAR_SECTION_SHOWN" = "In menu";
 "SIDEBAR_SECTION_HIDDEN" = "Hidden";
@@ -298,12 +298,12 @@
 "DARK_MODE_STYLE_PURE_BLACK" = "Blackout";
 "DARK_MODE_STYLE_SYSTEM" = "System";
 
-/* ===== Theme color picker ===== */
+/* ===== Accent picker ===== */
 "THEME_SETTINGS_NAVIGATION_DETAIL" = "Choose an accent color. Only you can see it.";
-"THEME_SETTINGS_NAVIGATION_TITLE" = "Theme color";
+"THEME_SETTINGS_NAVIGATION_TITLE" = "Accent";
 "THEME_CUSTOM_HINT" = "Pick any color for links, buttons, and highlights.";
 "THEME_RESET_HINT" = "Removes the accent color everywhere, including the selected tab, the switches and the Twitter icon.";
-"THEME_RESET_CONFIRM_TITLE" = "Restore theme color";
+"THEME_RESET_CONFIRM_TITLE" = "Restore accent color";
 "THEME_RESET_CONFIRM_MESSAGE" = "The accent color goes back to Twitter’s default, and Selected tab, Switches and Twitter icon stop using it. Your other settings stay.";
 "THEME_RESET_ACTION" = "Restore";
 "THEME_CUSTOM_NAME" = "Custom";
@@ -318,7 +318,7 @@
 "CUSTOM_TAB_BAR_DISCARD_TITLE" = "Discard changes";
 "CUSTOM_TAB_BAR_DISCARD_MESSAGE" = "The tabs you picked are not saved.";
 "CUSTOM_TAB_BAR_DISCARD_ACTION" = "Discard";
-"CUSTOM_TAB_BAR_SETTINGS_NAVIGATION_TITLE" = "Custom navigation";
+"CUSTOM_TAB_BAR_SETTINGS_NAVIGATION_TITLE" = "Tabs";
 "TAB_EDITOR_TIP_CHANGE" = "Tap a tab to change it";
 "TAB_EDITOR_TIP_ARRANGE" = "Touch and hold a tab to rearrange";
 "TAB_EDITOR_TIP_ADD" = "Tap + to add a tab";

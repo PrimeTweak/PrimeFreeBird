@@ -64,7 +64,7 @@
 
 /* ===== Appearance › Colors ===== */
 "APPEARANCE_GROUP_COLORS" = "Kolory";
-"THEME_OPTION_TITLE" = "Kolor motywu";
+"THEME_OPTION_TITLE" = "Kolor akcentu";
 "THEME_OPTION_SUBTITLE" = "Wybierz kolor akcentu używany w całej aplikacji.";
 "DARK_MODE_STYLE_TITLE" = "Kolor tła";
 "DARK_MODE_STYLE_SUBTITLE" = "Wybierz odcień tła w trybie ciemnym.";
@@ -74,13 +74,13 @@
 "COLOR_PFB_SWITCHES_DETAIL" = "Nadaje kolor akcentu przełącznikom w tych ustawieniach.";
 "COLOR_TWITTER_ICON_IN_TOP_BAR_TITLE" = "Ikona Twittera";
 "COLOR_TWITTER_ICON_IN_TOP_BAR_DETAIL" = "Nadaje logo na górnym pasku kolor akcentu.";
-"APPEARANCE_GROUP_TAB_BAR" = "Pasek nawigacji";
-"CUSTOM_TAB_BAR_OPTION_TITLE" = "Spersonalizowana nawigacja";
+"APPEARANCE_GROUP_TAB_BAR" = "Nawigacja";
+"CUSTOM_TAB_BAR_OPTION_TITLE" = "Karty";
 "CUSTOM_TAB_BAR_OPTION_SUBTITLE" = "Wybierz, które karty się pojawiają i w jakiej kolejności.";
-"APPEARANCE_GROUP_SIDEBAR" = "Menu konta";
-"CUSTOM_SIDEBAR_OPTION_TITLE" = "Menu konta";
+"APPEARANCE_GROUP_SIDEBAR" = "Menu";
+"CUSTOM_SIDEBAR_OPTION_TITLE" = "Menu";
 "CUSTOM_SIDEBAR_OPTION_SUBTITLE" = "Wybierz, które elementy pojawiają się w menu.";
-"SIDEBAR_EDITOR_NAVIGATION_TITLE" = "Menu konta";
+"SIDEBAR_EDITOR_NAVIGATION_TITLE" = "Menu";
 "SIDEBAR_EDITOR_DETAIL" = "Stuknij element, aby dodać go do menu lub go usunąć.";
 "SIDEBAR_SECTION_SHOWN" = "Widoczne";
 "SIDEBAR_SECTION_HIDDEN" = "Ukryte";
@@ -298,12 +298,12 @@
 "DARK_MODE_STYLE_PURE_BLACK" = "Czarny";
 "DARK_MODE_STYLE_SYSTEM" = "Systemowy";
 
-/* ===== Theme color picker ===== */
+/* ===== Accent picker ===== */
 "THEME_SETTINGS_NAVIGATION_DETAIL" = "Wybierz kolor akcentu. Widzisz go tylko Ty.";
-"THEME_SETTINGS_NAVIGATION_TITLE" = "Kolor motywu";
+"THEME_SETTINGS_NAVIGATION_TITLE" = "Kolor akcentu";
 "THEME_CUSTOM_HINT" = "Wybierz dowolny kolor dla linków, przycisków i wyróżnień.";
 "THEME_RESET_HINT" = "Usuwa kolor akcentu wszędzie, także z wybranej karty, przełączników i ikony Twittera.";
-"THEME_RESET_CONFIRM_TITLE" = "Przywróć kolor motywu";
+"THEME_RESET_CONFIRM_TITLE" = "Przywróć kolor akcentu";
 "THEME_RESET_CONFIRM_MESSAGE" = "Kolor akcentu wraca do domyślnego koloru Twittera, a Wybrana karta, Przełączniki i Ikona Twittera przestają go używać. Pozostałe ustawienia zostają.";
 "THEME_RESET_ACTION" = "Przywróć";
 "THEME_CUSTOM_NAME" = "Własny";
@@ -318,7 +318,7 @@
 "CUSTOM_TAB_BAR_DISCARD_TITLE" = "Odrzuć zmiany";
 "CUSTOM_TAB_BAR_DISCARD_MESSAGE" = "Wybrane karty nie zostaną zapisane.";
 "CUSTOM_TAB_BAR_DISCARD_ACTION" = "Odrzuć";
-"CUSTOM_TAB_BAR_SETTINGS_NAVIGATION_TITLE" = "Spersonalizowana nawigacja";
+"CUSTOM_TAB_BAR_SETTINGS_NAVIGATION_TITLE" = "Karty";
 "TAB_EDITOR_TIP_CHANGE" = "Stuknij kartę, aby ją zmienić";
 "TAB_EDITOR_TIP_ARRANGE" = "Dotknij i przytrzymaj kartę, aby zmienić kolejność";
 "TAB_EDITOR_TIP_ADD" = "Stuknij +, aby dodać kartę";

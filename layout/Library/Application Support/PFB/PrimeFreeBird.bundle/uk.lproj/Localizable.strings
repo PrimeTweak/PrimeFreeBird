@@ -64,7 +64,7 @@
 
 /* ===== Appearance › Colors ===== */
 "APPEARANCE_GROUP_COLORS" = "Кольори";
-"THEME_OPTION_TITLE" = "Колір теми";
+"THEME_OPTION_TITLE" = "Акцентний колір";
 "THEME_OPTION_SUBTITLE" = "Виберіть колір акценту для всього застосунку.";
 "DARK_MODE_STYLE_TITLE" = "Колір тла";
 "DARK_MODE_STYLE_SUBTITLE" = "Виберіть відтінок тла в темному режимі.";
@@ -74,13 +74,13 @@
 "COLOR_PFB_SWITCHES_DETAIL" = "Застосовує колір акценту до перемикачів у цих налаштуваннях.";
 "COLOR_TWITTER_ICON_IN_TOP_BAR_TITLE" = "Значок Twitter";
 "COLOR_TWITTER_ICON_IN_TOP_BAR_DETAIL" = "Застосовує акцентний колір до логотипа на верхній панелі.";
-"APPEARANCE_GROUP_TAB_BAR" = "Панель навігації";
-"CUSTOM_TAB_BAR_OPTION_TITLE" = "Власна навігація";
+"APPEARANCE_GROUP_TAB_BAR" = "Навігація";
+"CUSTOM_TAB_BAR_OPTION_TITLE" = "Вкладки";
 "CUSTOM_TAB_BAR_OPTION_SUBTITLE" = "Виберіть, які вкладки показувати та в якому порядку.";
-"APPEARANCE_GROUP_SIDEBAR" = "Меню профілю";
-"CUSTOM_SIDEBAR_OPTION_TITLE" = "Меню профілю";
+"APPEARANCE_GROUP_SIDEBAR" = "Меню";
+"CUSTOM_SIDEBAR_OPTION_TITLE" = "Меню";
 "CUSTOM_SIDEBAR_OPTION_SUBTITLE" = "Виберіть, які пункти показувати в меню.";
-"SIDEBAR_EDITOR_NAVIGATION_TITLE" = "Меню профілю";
+"SIDEBAR_EDITOR_NAVIGATION_TITLE" = "Меню";
 "SIDEBAR_EDITOR_DETAIL" = "Торкніться пункту, щоб додати його в меню або прибрати з нього.";
 "SIDEBAR_SECTION_SHOWN" = "Показано";
 "SIDEBAR_SECTION_HIDDEN" = "Приховано";
@@ -298,12 +298,12 @@
 "DARK_MODE_STYLE_PURE_BLACK" = "Чорний";
 "DARK_MODE_STYLE_SYSTEM" = "Системний";
 
-/* ===== Theme color picker ===== */
+/* ===== Accent picker ===== */
 "THEME_SETTINGS_NAVIGATION_DETAIL" = "Виберіть акцентний колір. Його бачите лише ви.";
-"THEME_SETTINGS_NAVIGATION_TITLE" = "Колір теми";
+"THEME_SETTINGS_NAVIGATION_TITLE" = "Акцентний колір";
 "THEME_CUSTOM_HINT" = "Виберіть будь-який колір для посилань, кнопок і виділень.";
 "THEME_RESET_HINT" = "Прибирає колір акценту всюди, зокрема з вибраної вкладки, перемикачів та іконки Twitter.";
-"THEME_RESET_CONFIRM_TITLE" = "Відновити колір теми";
+"THEME_RESET_CONFIRM_TITLE" = "Відновити акцентний колір";
 "THEME_RESET_CONFIRM_MESSAGE" = "Колір акценту повернеться до типового кольору Twitter, а «Вибрана вкладка», «Перемикачі» та «Іконка Twitter» перестануть його використовувати. Інші налаштування збережуться.";
 "THEME_RESET_ACTION" = "Відновити";
 "THEME_CUSTOM_NAME" = "Власний";
@@ -318,7 +318,7 @@
 "CUSTOM_TAB_BAR_DISCARD_TITLE" = "Відхилити зміни";
 "CUSTOM_TAB_BAR_DISCARD_MESSAGE" = "Вибрані вкладки не збережуться.";
 "CUSTOM_TAB_BAR_DISCARD_ACTION" = "Відхилити";
-"CUSTOM_TAB_BAR_SETTINGS_NAVIGATION_TITLE" = "Власна навігація";
+"CUSTOM_TAB_BAR_SETTINGS_NAVIGATION_TITLE" = "Вкладки";
 "TAB_EDITOR_TIP_CHANGE" = "Торкніться вкладки, щоб змінити її";
 "TAB_EDITOR_TIP_ARRANGE" = "Торкніться й утримуйте вкладку, щоб переставити її";
 "TAB_EDITOR_TIP_ADD" = "Торкніться +, щоб додати вкладку";

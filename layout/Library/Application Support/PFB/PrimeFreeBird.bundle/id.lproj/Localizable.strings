@@ -64,7 +64,7 @@
 
 /* ===== Appearance › Colors ===== */
 "APPEARANCE_GROUP_COLORS" = "Warna";
-"THEME_OPTION_TITLE" = "Warna tema";
+"THEME_OPTION_TITLE" = "Warna aksen";
 "THEME_OPTION_SUBTITLE" = "Pilih warna aksen yang dipakai di seluruh aplikasi.";
 "DARK_MODE_STYLE_TITLE" = "Warna latar";
 "DARK_MODE_STYLE_SUBTITLE" = "Pilih nuansa latar untuk mode gelap.";
@@ -74,13 +74,13 @@
 "COLOR_PFB_SWITCHES_DETAIL" = "Terapkan warna aksen pada sakelar di pengaturan ini.";
 "COLOR_TWITTER_ICON_IN_TOP_BAR_TITLE" = "Ikon Twitter";
 "COLOR_TWITTER_ICON_IN_TOP_BAR_DETAIL" = "Terapkan warna aksen ke logo di bilah atas.";
-"APPEARANCE_GROUP_TAB_BAR" = "Bilah navigasi";
-"CUSTOM_TAB_BAR_OPTION_TITLE" = "Navigasi kustom";
+"APPEARANCE_GROUP_TAB_BAR" = "Navigasi";
+"CUSTOM_TAB_BAR_OPTION_TITLE" = "Tab";
 "CUSTOM_TAB_BAR_OPTION_SUBTITLE" = "Pilih tab yang muncul dan urutannya.";
-"APPEARANCE_GROUP_SIDEBAR" = "Menu akun";
-"CUSTOM_SIDEBAR_OPTION_TITLE" = "Menu akun";
+"APPEARANCE_GROUP_SIDEBAR" = "Menu";
+"CUSTOM_SIDEBAR_OPTION_TITLE" = "Menu";
 "CUSTOM_SIDEBAR_OPTION_SUBTITLE" = "Pilih item yang muncul di menu.";
-"SIDEBAR_EDITOR_NAVIGATION_TITLE" = "Menu akun";
+"SIDEBAR_EDITOR_NAVIGATION_TITLE" = "Menu";
 "SIDEBAR_EDITOR_DETAIL" = "Ketuk item untuk menambahkannya ke menu atau menghapusnya.";
 "SIDEBAR_SECTION_SHOWN" = "Ditampilkan";
 "SIDEBAR_SECTION_HIDDEN" = "Disembunyikan";
@@ -298,12 +298,12 @@
 "DARK_MODE_STYLE_PURE_BLACK" = "Hitam";
 "DARK_MODE_STYLE_SYSTEM" = "Sistem";
 
-/* ===== Theme color picker ===== */
+/* ===== Accent picker ===== */
 "THEME_SETTINGS_NAVIGATION_DETAIL" = "Pilih warna aksen. Hanya Anda yang dapat melihatnya.";
-"THEME_SETTINGS_NAVIGATION_TITLE" = "Warna tema";
+"THEME_SETTINGS_NAVIGATION_TITLE" = "Warna aksen";
 "THEME_CUSTOM_HINT" = "Pilih warna apa pun untuk tautan, tombol, dan sorotan.";
 "THEME_RESET_HINT" = "Menghapus warna aksen di mana pun, termasuk tab terpilih, sakelar, dan ikon Twitter.";
-"THEME_RESET_CONFIRM_TITLE" = "Pulihkan warna tema";
+"THEME_RESET_CONFIRM_TITLE" = "Pulihkan warna aksen";
 "THEME_RESET_CONFIRM_MESSAGE" = "Warna aksen kembali ke bawaan Twitter, dan Tab terpilih, Sakelar, serta Ikon Twitter berhenti memakainya. Pengaturan Anda yang lain tetap.";
 "THEME_RESET_ACTION" = "Pulihkan";
 "THEME_CUSTOM_NAME" = "Kustom";
@@ -318,7 +318,7 @@
 "CUSTOM_TAB_BAR_DISCARD_TITLE" = "Buang perubahan";
 "CUSTOM_TAB_BAR_DISCARD_MESSAGE" = "Tab yang Anda pilih tidak disimpan.";
 "CUSTOM_TAB_BAR_DISCARD_ACTION" = "Buang";
-"CUSTOM_TAB_BAR_SETTINGS_NAVIGATION_TITLE" = "Navigasi kustom";
+"CUSTOM_TAB_BAR_SETTINGS_NAVIGATION_TITLE" = "Tab";
 "TAB_EDITOR_TIP_CHANGE" = "Ketuk tab untuk mengubahnya";
 "TAB_EDITOR_TIP_ARRANGE" = "Sentuh dan tahan tab untuk menata ulang";
 "TAB_EDITOR_TIP_ADD" = "Ketuk + untuk menambah tab";

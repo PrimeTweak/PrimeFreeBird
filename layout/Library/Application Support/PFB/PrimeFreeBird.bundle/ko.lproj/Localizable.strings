@@ -64,7 +64,7 @@
 
 /* ===== Appearance › Colors ===== */
 "APPEARANCE_GROUP_COLORS" = "색상";
-"THEME_OPTION_TITLE" = "테마 색상";
+"THEME_OPTION_TITLE" = "강조 색상";
 "THEME_OPTION_SUBTITLE" = "앱 전체에 쓰이는 강조 색상을 선택합니다.";
 "DARK_MODE_STYLE_TITLE" = "배경 색상";
 "DARK_MODE_STYLE_SUBTITLE" = "다크 모드의 배경 색조를 선택합니다.";
@@ -74,13 +74,13 @@
 "COLOR_PFB_SWITCHES_DETAIL" = "이 설정의 스위치에 강조 색상을 적용합니다.";
 "COLOR_TWITTER_ICON_IN_TOP_BAR_TITLE" = "트위터 아이콘";
 "COLOR_TWITTER_ICON_IN_TOP_BAR_DETAIL" = "상단 바의 로고에 강조 색상을 적용합니다.";
-"APPEARANCE_GROUP_TAB_BAR" = "탐색 바";
-"CUSTOM_TAB_BAR_OPTION_TITLE" = "맞춤 탐색";
+"APPEARANCE_GROUP_TAB_BAR" = "탐색";
+"CUSTOM_TAB_BAR_OPTION_TITLE" = "탭";
 "CUSTOM_TAB_BAR_OPTION_SUBTITLE" = "표시할 탭과 순서를 선택합니다.";
-"APPEARANCE_GROUP_SIDEBAR" = "계정 메뉴";
-"CUSTOM_SIDEBAR_OPTION_TITLE" = "계정 메뉴";
+"APPEARANCE_GROUP_SIDEBAR" = "메뉴";
+"CUSTOM_SIDEBAR_OPTION_TITLE" = "메뉴";
 "CUSTOM_SIDEBAR_OPTION_SUBTITLE" = "메뉴에 표시할 항목을 선택하세요.";
-"SIDEBAR_EDITOR_NAVIGATION_TITLE" = "계정 메뉴";
+"SIDEBAR_EDITOR_NAVIGATION_TITLE" = "메뉴";
 "SIDEBAR_EDITOR_DETAIL" = "항목을 탭하여 메뉴에 추가하거나 제거하세요.";
 "SIDEBAR_SECTION_SHOWN" = "표시됨";
 "SIDEBAR_SECTION_HIDDEN" = "숨겨짐";
@@ -298,12 +298,12 @@
 "DARK_MODE_STYLE_PURE_BLACK" = "검정";
 "DARK_MODE_STYLE_SYSTEM" = "시스템";
 
-/* ===== Theme color picker ===== */
+/* ===== Accent picker ===== */
 "THEME_SETTINGS_NAVIGATION_DETAIL" = "강조 색상을 선택하세요. 나만 볼 수 있습니다.";
-"THEME_SETTINGS_NAVIGATION_TITLE" = "테마 색상";
+"THEME_SETTINGS_NAVIGATION_TITLE" = "강조 색상";
 "THEME_CUSTOM_HINT" = "링크, 버튼, 강조에 원하는 색상을 선택합니다.";
 "THEME_RESET_HINT" = "선택한 탭, 스위치, 트위터 아이콘을 포함해 모든 곳에서 강조 색상을 제거합니다.";
-"THEME_RESET_CONFIRM_TITLE" = "테마 색상 복원";
+"THEME_RESET_CONFIRM_TITLE" = "강조 색상 복원";
 "THEME_RESET_CONFIRM_MESSAGE" = "강조 색상이 트위터 기본값으로 돌아가고, 선택한 탭·스위치·트위터 아이콘은 더 이상 이 색을 쓰지 않습니다. 다른 설정은 유지됩니다.";
 "THEME_RESET_ACTION" = "복원";
 "THEME_CUSTOM_NAME" = "사용자 지정";
@@ -318,7 +318,7 @@
 "CUSTOM_TAB_BAR_DISCARD_TITLE" = "변경 사항 버리기";
 "CUSTOM_TAB_BAR_DISCARD_MESSAGE" = "선택한 탭이 저장되지 않습니다.";
 "CUSTOM_TAB_BAR_DISCARD_ACTION" = "버리기";
-"CUSTOM_TAB_BAR_SETTINGS_NAVIGATION_TITLE" = "맞춤 탐색";
+"CUSTOM_TAB_BAR_SETTINGS_NAVIGATION_TITLE" = "탭";
 "TAB_EDITOR_TIP_CHANGE" = "탭을 눌러 변경";
 "TAB_EDITOR_TIP_ARRANGE" = "탭을 길게 눌러 순서 변경";
 "TAB_EDITOR_TIP_ADD" = "+를 눌러 탭 추가";

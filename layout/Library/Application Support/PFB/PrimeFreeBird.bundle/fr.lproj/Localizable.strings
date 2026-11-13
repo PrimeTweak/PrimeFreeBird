@@ -60,7 +60,7 @@
 
 /* ===== Appearance › Colors ===== */
 "APPEARANCE_GROUP_COLORS" = "Couleurs";
-"THEME_OPTION_TITLE" = "Couleur du thème";
+"THEME_OPTION_TITLE" = "Couleur d’accent";
 "THEME_OPTION_SUBTITLE" = "Choisissez la couleur d’accent utilisée dans toute l’app.";
 "DARK_MODE_STYLE_TITLE" = "Couleur d’arrière-plan";
 "DARK_MODE_STYLE_SUBTITLE" = "Choisissez la teinte d’arrière-plan utilisée en mode sombre.";
@@ -70,13 +70,13 @@
 "COLOR_PFB_SWITCHES_DETAIL" = "Applique la couleur d’accent aux interrupteurs de ces réglages.";
 "COLOR_TWITTER_ICON_IN_TOP_BAR_TITLE" = "Icône Twitter";
 "COLOR_TWITTER_ICON_IN_TOP_BAR_DETAIL" = "Applique la couleur d’accent au logo de la barre du haut.";
-"APPEARANCE_GROUP_TAB_BAR" = "Barre de navigation";
-"CUSTOM_TAB_BAR_OPTION_TITLE" = "Navigation personnalisée";
+"APPEARANCE_GROUP_TAB_BAR" = "Navigation";
+"CUSTOM_TAB_BAR_OPTION_TITLE" = "Onglets";
 "CUSTOM_TAB_BAR_OPTION_SUBTITLE" = "Choisissez les onglets affichés et leur ordre.";
-"APPEARANCE_GROUP_SIDEBAR" = "Menu du compte";
-"CUSTOM_SIDEBAR_OPTION_TITLE" = "Menu du compte";
+"APPEARANCE_GROUP_SIDEBAR" = "Menu";
+"CUSTOM_SIDEBAR_OPTION_TITLE" = "Menu";
 "CUSTOM_SIDEBAR_OPTION_SUBTITLE" = "Choisissez les éléments affichés dans le menu.";
-"SIDEBAR_EDITOR_NAVIGATION_TITLE" = "Menu du compte";
+"SIDEBAR_EDITOR_NAVIGATION_TITLE" = "Menu";
 "SIDEBAR_EDITOR_DETAIL" = "Touchez un élément pour l’ajouter au menu ou l’en retirer.";
 "SIDEBAR_SECTION_SHOWN" = "Affichés";
 "SIDEBAR_SECTION_HIDDEN" = "Masqués";
@@ -294,12 +294,12 @@
 "DARK_MODE_STYLE_PURE_BLACK" = "Noir total";
 "DARK_MODE_STYLE_SYSTEM" = "Système";
 
-/* ===== Theme color picker ===== */
+/* ===== Accent picker ===== */
 "THEME_SETTINGS_NAVIGATION_DETAIL" = "Choisissez une couleur d’accent. Vous seul pouvez la voir.";
-"THEME_SETTINGS_NAVIGATION_TITLE" = "Couleur du thème";
+"THEME_SETTINGS_NAVIGATION_TITLE" = "Couleur d’accent";
 "THEME_CUSTOM_HINT" = "Choisissez n’importe quelle couleur pour les liens, les boutons et les mises en évidence.";
 "THEME_RESET_HINT" = "Retire la couleur d’accent partout, y compris de l’onglet sélectionné, des interrupteurs et de l’icône Twitter.";
-"THEME_RESET_CONFIRM_TITLE" = "Restaurer la couleur du thème";
+"THEME_RESET_CONFIRM_TITLE" = "Restaurer la couleur d’accent";
 "THEME_RESET_CONFIRM_MESSAGE" = "La couleur d’accent revient à celle de Twitter, et Onglet sélectionné, Interrupteurs et Icône Twitter ne l’utilisent plus. Vos autres réglages restent.";
 "THEME_RESET_ACTION" = "Restaurer";
 "THEME_CUSTOM_NAME" = "Personnalisée";
@@ -314,7 +314,7 @@
 "CUSTOM_TAB_BAR_DISCARD_TITLE" = "Abandonner les modifications";
 "CUSTOM_TAB_BAR_DISCARD_MESSAGE" = "Les onglets choisis ne sont pas enregistrés.";
 "CUSTOM_TAB_BAR_DISCARD_ACTION" = "Abandonner";
-"CUSTOM_TAB_BAR_SETTINGS_NAVIGATION_TITLE" = "Navigation personnalisée";
+"CUSTOM_TAB_BAR_SETTINGS_NAVIGATION_TITLE" = "Onglets";
 "TAB_EDITOR_TIP_CHANGE" = "Touchez un onglet pour le changer";
 "TAB_EDITOR_TIP_ARRANGE" = "Maintenez un onglet pour le déplacer";
 "TAB_EDITOR_TIP_ADD" = "Touchez + pour ajouter un onglet";

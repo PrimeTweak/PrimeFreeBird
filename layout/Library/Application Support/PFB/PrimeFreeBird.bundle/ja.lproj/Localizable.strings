@@ -64,7 +64,7 @@
 
 /* ===== Appearance › Colors ===== */
 "APPEARANCE_GROUP_COLORS" = "カラー";
-"THEME_OPTION_TITLE" = "テーマカラー";
+"THEME_OPTION_TITLE" = "アクセントカラー";
 "THEME_OPTION_SUBTITLE" = "アプリ全体で使うアクセントカラーを選びます。";
 "DARK_MODE_STYLE_TITLE" = "背景色";
 "DARK_MODE_STYLE_SUBTITLE" = "ダークモードの背景の色合いを選びます。";
@@ -74,13 +74,13 @@
 "COLOR_PFB_SWITCHES_DETAIL" = "この設定画面のスイッチにアクセントカラーを使います。";
 "COLOR_TWITTER_ICON_IN_TOP_BAR_TITLE" = "Twitterアイコン";
 "COLOR_TWITTER_ICON_IN_TOP_BAR_DETAIL" = "上部バーのロゴにアクセントカラーを適用できます。";
-"APPEARANCE_GROUP_TAB_BAR" = "ナビゲーションバー";
-"CUSTOM_TAB_BAR_OPTION_TITLE" = "カスタムナビゲーション";
+"APPEARANCE_GROUP_TAB_BAR" = "ナビゲーション";
+"CUSTOM_TAB_BAR_OPTION_TITLE" = "タブ";
 "CUSTOM_TAB_BAR_OPTION_SUBTITLE" = "表示するタブとその順番を選びます。";
-"APPEARANCE_GROUP_SIDEBAR" = "アカウントメニュー";
-"CUSTOM_SIDEBAR_OPTION_TITLE" = "アカウントメニュー";
+"APPEARANCE_GROUP_SIDEBAR" = "メニュー";
+"CUSTOM_SIDEBAR_OPTION_TITLE" = "メニュー";
 "CUSTOM_SIDEBAR_OPTION_SUBTITLE" = "メニューに表示する項目を選択します。";
-"SIDEBAR_EDITOR_NAVIGATION_TITLE" = "アカウントメニュー";
+"SIDEBAR_EDITOR_NAVIGATION_TITLE" = "メニュー";
 "SIDEBAR_EDITOR_DETAIL" = "項目をタップすると、メニューに追加したり外したりできます。";
 "SIDEBAR_SECTION_SHOWN" = "表示中";
 "SIDEBAR_SECTION_HIDDEN" = "非表示";
@@ -298,12 +298,12 @@
 "DARK_MODE_STYLE_PURE_BLACK" = "ブラック";
 "DARK_MODE_STYLE_SYSTEM" = "システム";
 
-/* ===== Theme color picker ===== */
+/* ===== Accent picker ===== */
 "THEME_SETTINGS_NAVIGATION_DETAIL" = "アクセントカラーを選択します。あなただけに表示されます。";
-"THEME_SETTINGS_NAVIGATION_TITLE" = "テーマカラー";
+"THEME_SETTINGS_NAVIGATION_TITLE" = "アクセントカラー";
 "THEME_CUSTOM_HINT" = "リンク、ボタン、ハイライトに好きな色を選びます。";
 "THEME_RESET_HINT" = "選択中のタブ、スイッチ、Twitterアイコンを含め、すべての場所からアクセントカラーを取り除きます。";
-"THEME_RESET_CONFIRM_TITLE" = "テーマカラーを元に戻す";
+"THEME_RESET_CONFIRM_TITLE" = "アクセントカラーを元に戻す";
 "THEME_RESET_CONFIRM_MESSAGE" = "アクセントカラーがTwitterのデフォルトに戻り、「選択中のタブ」「スイッチ」「Twitterアイコン」はそれを使わなくなります。その他の設定は残ります。";
 "THEME_RESET_ACTION" = "元に戻す";
 "THEME_CUSTOM_NAME" = "カスタム";
@@ -318,7 +318,7 @@
 "CUSTOM_TAB_BAR_DISCARD_TITLE" = "変更を破棄";
 "CUSTOM_TAB_BAR_DISCARD_MESSAGE" = "選んだタブは保存されません。";
 "CUSTOM_TAB_BAR_DISCARD_ACTION" = "破棄";
-"CUSTOM_TAB_BAR_SETTINGS_NAVIGATION_TITLE" = "カスタムナビゲーション";
+"CUSTOM_TAB_BAR_SETTINGS_NAVIGATION_TITLE" = "タブ";
 "TAB_EDITOR_TIP_CHANGE" = "タブをタップして変更";
 "TAB_EDITOR_TIP_ARRANGE" = "タブを長押しして並べ替え";
 "TAB_EDITOR_TIP_ADD" = "+をタップしてタブを追加";
