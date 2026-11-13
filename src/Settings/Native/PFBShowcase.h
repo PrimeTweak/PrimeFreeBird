@@ -22,6 +22,10 @@ UIView* PFBShowcaseCard(void);
 // safe area, and above Twitter's floating tab bar while it shows over the page.
 CGFloat PFBShowcaseBottomLimit(UIView* view);
 
+// Where a glass bar pinned to the page's foot goes, in the view's coordinates: where Twitter's
+// floating tab bar stands while the settings hide it, or above that bar while it shows.
+CGRect PFBShowcaseDockFrame(UIView* view);
+
 // A glass surface; a light one with a hairline when glass is off. A negative radius makes a capsule.
 @interface PFBShowcaseSurface : UIView
 - (instancetype)initWithCornerRadius:(CGFloat)radius;

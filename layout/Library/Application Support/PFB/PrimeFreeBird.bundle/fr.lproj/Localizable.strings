@@ -40,7 +40,7 @@
 
 /* ===== APPEARANCE — page ===== */
 "MODERN_SETTINGS_APPEARANCE_TITLE" = "Apparence";
-"MODERN_SETTINGS_APPEARANCE_SUBTITLE" = "Style, polices, couleurs et barre d’onglets.";
+"MODERN_SETTINGS_APPEARANCE_SUBTITLE" = "Style, polices, couleurs et barre de navigation.";
 
 /* ===== Appearance › Style ===== */
 "APPEARANCE_GROUP_STYLE" = "Style";
@@ -70,14 +70,14 @@
 "COLOR_PFB_SWITCHES_DETAIL" = "Applique la couleur d’accent aux interrupteurs de ces réglages.";
 "COLOR_TWITTER_ICON_IN_TOP_BAR_TITLE" = "Icône Twitter";
 "COLOR_TWITTER_ICON_IN_TOP_BAR_DETAIL" = "Applique la couleur d’accent au logo de la barre du haut.";
-"APPEARANCE_GROUP_TAB_BAR" = "Barre d’onglets";
-"CUSTOM_TAB_BAR_OPTION_TITLE" = "Personnaliser les onglets";
+"APPEARANCE_GROUP_TAB_BAR" = "Barre de navigation";
+"CUSTOM_TAB_BAR_OPTION_TITLE" = "Navigation personnalisée";
 "CUSTOM_TAB_BAR_OPTION_SUBTITLE" = "Choisissez les onglets affichés et leur ordre.";
-"APPEARANCE_GROUP_SIDEBAR" = "Barre latérale";
-"CUSTOM_SIDEBAR_OPTION_TITLE" = "Personnaliser la barre latérale";
-"CUSTOM_SIDEBAR_OPTION_SUBTITLE" = "Choisissez les éléments affichés dans la barre latérale.";
-"SIDEBAR_EDITOR_NAVIGATION_TITLE" = "Barre latérale";
-"SIDEBAR_EDITOR_DETAIL" = "Touchez un élément pour l’ajouter à la barre latérale ou l’en retirer.";
+"APPEARANCE_GROUP_SIDEBAR" = "Menu du compte";
+"CUSTOM_SIDEBAR_OPTION_TITLE" = "Personnaliser le menu du compte";
+"CUSTOM_SIDEBAR_OPTION_SUBTITLE" = "Choisissez les éléments affichés dans le menu.";
+"SIDEBAR_EDITOR_NAVIGATION_TITLE" = "Menu du compte";
+"SIDEBAR_EDITOR_DETAIL" = "Touchez un élément pour l’ajouter au menu ou l’en retirer.";
 "SIDEBAR_SECTION_SHOWN" = "Affichés";
 "SIDEBAR_SECTION_HIDDEN" = "Masqués";
 "SIDEBAR_ITEM_SHOWN" = "Affiché";
@@ -87,7 +87,7 @@
 "NO_TAB_BAR_HIDING_TITLE" = "Toujours visible";
 "NO_TAB_BAR_HIDING_DETAIL" = "Ne réduit ni n’estompe la barre au défilement.";
 "HIDE_BOTTOM_FADE_TITLE" = "Masquer le fondu du bas";
-"HIDE_BOTTOM_FADE_DETAIL" = "Retire le fondu que Twitter dessine sous la barre d’onglets.";
+"HIDE_BOTTOM_FADE_DETAIL" = "Retire le fondu que Twitter dessine sous la barre de navigation.";
 
 /* ===== BRANDING ===== */
 "MODERN_SETTINGS_BRANDING_TITLE" = "Image de marque";
@@ -245,8 +245,8 @@
 /* ===== GROK ===== */
 "HIDE_GROK_ANALYZE_TITLE" = "Masquer les boutons d’analyse et de question";
 "HIDE_GROK_ANALYZE_DETAIL" = "Retire les boutons d’analyse et de question de Grok.";
-"HIDE_GROK_SIDEBAR_TITLE" = "Masquer le raccourci de la barre latérale";
-"HIDE_GROK_SIDEBAR_DETAIL" = "Retire le raccourci Grok de la barre latérale.";
+"HIDE_GROK_SIDEBAR_TITLE" = "Masquer le raccourci du menu";
+"HIDE_GROK_SIDEBAR_DETAIL" = "Retire le raccourci Grok du menu du compte.";
 "HIDE_GROK_BOT_TITLE" = "Masquer Grok Bot";
 "HIDE_GROK_BOT_DETAIL" = "Retire la rangée « Try Grok Bot » et les autres promotions de Grok Bot.";
 "HIDE_GROK_CREATE_TITLE" = "Masquer les outils de création";
@@ -314,7 +314,7 @@
 "CUSTOM_TAB_BAR_DISCARD_TITLE" = "Abandonner les modifications";
 "CUSTOM_TAB_BAR_DISCARD_MESSAGE" = "Les onglets choisis ne sont pas enregistrés.";
 "CUSTOM_TAB_BAR_DISCARD_ACTION" = "Abandonner";
-"CUSTOM_TAB_BAR_SETTINGS_NAVIGATION_TITLE" = "Onglets";
+"CUSTOM_TAB_BAR_SETTINGS_NAVIGATION_TITLE" = "Navigation personnalisée";
 "TAB_EDITOR_TIP_CHANGE" = "Touchez un onglet pour le changer";
 "TAB_EDITOR_TIP_ARRANGE" = "Maintenez un onglet pour le déplacer";
 "TAB_EDITOR_TIP_ADD" = "Touchez + pour ajouter un onglet";
@@ -676,7 +676,7 @@
 "TOUR_STEP_COMPOSER" = "Rédaction";
 "TOUR_STEP_CONVERSATION" = "Conversation";
 "TOUR_STEP_REPLIES" = "Réponses par date";
-"TOUR_STEP_SIDE_MENU" = "Barre latérale";
+"TOUR_STEP_SIDE_MENU" = "Menu du compte";
 "TOUR_STEP_DARK_MODE" = "Mode sombre";
 "TOUR_STEP_WEB_LINK" = "Lien web";
 "TOUR_STEP_T_CO_CHECK" = "Blocage t.co";

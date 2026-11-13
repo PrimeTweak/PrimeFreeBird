@@ -74,14 +74,14 @@
 "COLOR_PFB_SWITCHES_DETAIL" = "この設定画面のスイッチにアクセントカラーを使います。";
 "COLOR_TWITTER_ICON_IN_TOP_BAR_TITLE" = "Twitterアイコン";
 "COLOR_TWITTER_ICON_IN_TOP_BAR_DETAIL" = "上部バーのロゴにアクセントカラーを適用できます。";
-"APPEARANCE_GROUP_TAB_BAR" = "タブバー";
-"CUSTOM_TAB_BAR_OPTION_TITLE" = "タブをカスタマイズ";
+"APPEARANCE_GROUP_TAB_BAR" = "ナビゲーションバー";
+"CUSTOM_TAB_BAR_OPTION_TITLE" = "カスタムナビゲーション";
 "CUSTOM_TAB_BAR_OPTION_SUBTITLE" = "表示するタブとその順番を選びます。";
-"APPEARANCE_GROUP_SIDEBAR" = "サイドバー";
-"CUSTOM_SIDEBAR_OPTION_TITLE" = "サイドバーをカスタマイズ";
-"CUSTOM_SIDEBAR_OPTION_SUBTITLE" = "サイドバーに表示する項目を選択します。";
-"SIDEBAR_EDITOR_NAVIGATION_TITLE" = "サイドバー";
-"SIDEBAR_EDITOR_DETAIL" = "項目をタップすると、サイドバーに追加したり外したりできます。";
+"APPEARANCE_GROUP_SIDEBAR" = "アカウントメニュー";
+"CUSTOM_SIDEBAR_OPTION_TITLE" = "アカウントメニューをカスタマイズ";
+"CUSTOM_SIDEBAR_OPTION_SUBTITLE" = "メニューに表示する項目を選択します。";
+"SIDEBAR_EDITOR_NAVIGATION_TITLE" = "アカウントメニュー";
+"SIDEBAR_EDITOR_DETAIL" = "項目をタップすると、メニューに追加したり外したりできます。";
 "SIDEBAR_SECTION_SHOWN" = "表示中";
 "SIDEBAR_SECTION_HIDDEN" = "非表示";
 "SIDEBAR_ITEM_SHOWN" = "表示";
@@ -91,7 +91,7 @@
 "NO_TAB_BAR_HIDING_TITLE" = "常に表示";
 "NO_TAB_BAR_HIDING_DETAIL" = "スクロールしてもバーが縮んだり薄くなったりしないようにします。";
 "HIDE_BOTTOM_FADE_TITLE" = "下部のフェードを非表示";
-"HIDE_BOTTOM_FADE_DETAIL" = "Twitterがタブバーの下に描くフェードを取り除きます。";
+"HIDE_BOTTOM_FADE_DETAIL" = "Twitterがナビゲーションバーの下に描くフェードを取り除きます。";
 
 /* ===== BRANDING ===== */
 "MODERN_SETTINGS_BRANDING_TITLE" = "ブランド";
@@ -249,8 +249,8 @@
 /* ===== GROK ===== */
 "HIDE_GROK_ANALYZE_TITLE" = "分析・質問ボタンを非表示";
 "HIDE_GROK_ANALYZE_DETAIL" = "Grokの分析ボタンと質問ボタンを取り除きます。";
-"HIDE_GROK_SIDEBAR_TITLE" = "サイドバーのGrokを非表示";
-"HIDE_GROK_SIDEBAR_DETAIL" = "サイドバーからGrokのショートカットを取り除きます。";
+"HIDE_GROK_SIDEBAR_TITLE" = "メニューのGrokを非表示";
+"HIDE_GROK_SIDEBAR_DETAIL" = "アカウントメニューからGrokのショートカットを取り除きます。";
 "HIDE_GROK_BOT_TITLE" = "Grok Botを非表示";
 "HIDE_GROK_BOT_DETAIL" = "「Try Grok Bot」の行とその他のGrok Botの宣伝を取り除きます。";
 "HIDE_GROK_CREATE_TITLE" = "作成ツールを非表示";
@@ -318,7 +318,7 @@
 "CUSTOM_TAB_BAR_DISCARD_TITLE" = "変更を破棄";
 "CUSTOM_TAB_BAR_DISCARD_MESSAGE" = "選んだタブは保存されません。";
 "CUSTOM_TAB_BAR_DISCARD_ACTION" = "破棄";
-"CUSTOM_TAB_BAR_SETTINGS_NAVIGATION_TITLE" = "タブ";
+"CUSTOM_TAB_BAR_SETTINGS_NAVIGATION_TITLE" = "カスタムナビゲーション";
 "TAB_EDITOR_TIP_CHANGE" = "タブをタップして変更";
 "TAB_EDITOR_TIP_ARRANGE" = "タブを長押しして並べ替え";
 "TAB_EDITOR_TIP_ADD" = "+をタップしてタブを追加";
@@ -680,7 +680,7 @@
 "TOUR_STEP_COMPOSER" = "作成";
 "TOUR_STEP_CONVERSATION" = "会話";
 "TOUR_STEP_REPLIES" = "日付順の返信";
-"TOUR_STEP_SIDE_MENU" = "サイドバー";
+"TOUR_STEP_SIDE_MENU" = "アカウントメニュー";
 "TOUR_STEP_DARK_MODE" = "ダークモード";
 "TOUR_STEP_WEB_LINK" = "ウェブリンク";
 "TOUR_STEP_T_CO_CHECK" = "t.coブロック";

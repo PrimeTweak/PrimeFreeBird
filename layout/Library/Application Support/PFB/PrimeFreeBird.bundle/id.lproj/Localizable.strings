@@ -74,14 +74,14 @@
 "COLOR_PFB_SWITCHES_DETAIL" = "Terapkan warna aksen pada sakelar di pengaturan ini.";
 "COLOR_TWITTER_ICON_IN_TOP_BAR_TITLE" = "Ikon Twitter";
 "COLOR_TWITTER_ICON_IN_TOP_BAR_DETAIL" = "Terapkan warna aksen ke logo di bilah atas.";
-"APPEARANCE_GROUP_TAB_BAR" = "Bilah tab";
-"CUSTOM_TAB_BAR_OPTION_TITLE" = "Sesuaikan tab";
+"APPEARANCE_GROUP_TAB_BAR" = "Bilah navigasi";
+"CUSTOM_TAB_BAR_OPTION_TITLE" = "Navigasi kustom";
 "CUSTOM_TAB_BAR_OPTION_SUBTITLE" = "Pilih tab yang muncul dan urutannya.";
-"APPEARANCE_GROUP_SIDEBAR" = "Bilah samping";
-"CUSTOM_SIDEBAR_OPTION_TITLE" = "Sesuaikan bilah samping";
-"CUSTOM_SIDEBAR_OPTION_SUBTITLE" = "Pilih item yang muncul di bilah samping.";
-"SIDEBAR_EDITOR_NAVIGATION_TITLE" = "Bilah samping";
-"SIDEBAR_EDITOR_DETAIL" = "Ketuk item untuk menambahkannya ke bilah samping atau menghapusnya.";
+"APPEARANCE_GROUP_SIDEBAR" = "Menu akun";
+"CUSTOM_SIDEBAR_OPTION_TITLE" = "Sesuaikan menu akun";
+"CUSTOM_SIDEBAR_OPTION_SUBTITLE" = "Pilih item yang muncul di menu.";
+"SIDEBAR_EDITOR_NAVIGATION_TITLE" = "Menu akun";
+"SIDEBAR_EDITOR_DETAIL" = "Ketuk item untuk menambahkannya ke menu atau menghapusnya.";
 "SIDEBAR_SECTION_SHOWN" = "Ditampilkan";
 "SIDEBAR_SECTION_HIDDEN" = "Disembunyikan";
 "SIDEBAR_ITEM_SHOWN" = "Ditampilkan";
@@ -91,7 +91,7 @@
 "NO_TAB_BAR_HIDING_TITLE" = "Selalu terlihat";
 "NO_TAB_BAR_HIDING_DETAIL" = "Jangan perkecil atau pudarkan bilah saat menggulir.";
 "HIDE_BOTTOM_FADE_TITLE" = "Sembunyikan gradasi bawah";
-"HIDE_BOTTOM_FADE_DETAIL" = "Hapus gradasi yang digambar Twitter di bawah bilah tab.";
+"HIDE_BOTTOM_FADE_DETAIL" = "Hapus gradasi yang digambar Twitter di bawah bilah navigasi.";
 
 /* ===== BRANDING ===== */
 "MODERN_SETTINGS_BRANDING_TITLE" = "Branding";
@@ -249,8 +249,8 @@
 /* ===== GROK ===== */
 "HIDE_GROK_ANALYZE_TITLE" = "Sembunyikan tombol analisis dan tanya";
 "HIDE_GROK_ANALYZE_DETAIL" = "Hapus tombol analisis dan tanya dari Grok.";
-"HIDE_GROK_SIDEBAR_TITLE" = "Sembunyikan Grok di bilah samping";
-"HIDE_GROK_SIDEBAR_DETAIL" = "Hapus pintasan Grok dari bilah samping.";
+"HIDE_GROK_SIDEBAR_TITLE" = "Sembunyikan Grok di menu";
+"HIDE_GROK_SIDEBAR_DETAIL" = "Hapus pintasan Grok dari menu akun.";
 "HIDE_GROK_BOT_TITLE" = "Sembunyikan Grok Bot";
 "HIDE_GROK_BOT_DETAIL" = "Hapus baris “Try Grok Bot” dan promosi Grok Bot lainnya.";
 "HIDE_GROK_CREATE_TITLE" = "Sembunyikan alat pembuatan";
@@ -318,7 +318,7 @@
 "CUSTOM_TAB_BAR_DISCARD_TITLE" = "Buang perubahan";
 "CUSTOM_TAB_BAR_DISCARD_MESSAGE" = "Tab yang Anda pilih tidak disimpan.";
 "CUSTOM_TAB_BAR_DISCARD_ACTION" = "Buang";
-"CUSTOM_TAB_BAR_SETTINGS_NAVIGATION_TITLE" = "Tab";
+"CUSTOM_TAB_BAR_SETTINGS_NAVIGATION_TITLE" = "Navigasi kustom";
 "TAB_EDITOR_TIP_CHANGE" = "Ketuk tab untuk mengubahnya";
 "TAB_EDITOR_TIP_ARRANGE" = "Sentuh dan tahan tab untuk menata ulang";
 "TAB_EDITOR_TIP_ADD" = "Ketuk + untuk menambah tab";
@@ -680,7 +680,7 @@
 "TOUR_STEP_COMPOSER" = "Menulis";
 "TOUR_STEP_CONVERSATION" = "Percakapan";
 "TOUR_STEP_REPLIES" = "Balasan menurut tanggal";
-"TOUR_STEP_SIDE_MENU" = "Bilah samping";
+"TOUR_STEP_SIDE_MENU" = "Menu akun";
 "TOUR_STEP_DARK_MODE" = "Mode gelap";
 "TOUR_STEP_WEB_LINK" = "Tautan web";
 "TOUR_STEP_T_CO_CHECK" = "Blokir t.co";

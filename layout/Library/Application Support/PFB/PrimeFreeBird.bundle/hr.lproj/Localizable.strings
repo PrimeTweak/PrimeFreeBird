@@ -74,14 +74,14 @@
 "COLOR_PFB_SWITCHES_DETAIL" = "Primijeni boju naglaska na prekidače u ovim postavkama.";
 "COLOR_TWITTER_ICON_IN_TOP_BAR_TITLE" = "Twitter ikona";
 "COLOR_TWITTER_ICON_IN_TOP_BAR_DETAIL" = "Primjenjuje boju naglaska na logotip u gornjoj traci.";
-"APPEARANCE_GROUP_TAB_BAR" = "Traka kartica";
-"CUSTOM_TAB_BAR_OPTION_TITLE" = "Prilagodi kartice";
+"APPEARANCE_GROUP_TAB_BAR" = "Navigacijska traka";
+"CUSTOM_TAB_BAR_OPTION_TITLE" = "Prilagođena navigacija";
 "CUSTOM_TAB_BAR_OPTION_SUBTITLE" = "Odaberi koje se kartice prikazuju i kojim redom.";
-"APPEARANCE_GROUP_SIDEBAR" = "Bočna traka";
-"CUSTOM_SIDEBAR_OPTION_TITLE" = "Prilagodi bočnu traku";
-"CUSTOM_SIDEBAR_OPTION_SUBTITLE" = "Odaberi koje se stavke prikazuju u bočnoj traci.";
-"SIDEBAR_EDITOR_NAVIGATION_TITLE" = "Bočna traka";
-"SIDEBAR_EDITOR_DETAIL" = "Dodirni stavku da je dodaš u bočnu traku ili je ukloniš iz nje.";
+"APPEARANCE_GROUP_SIDEBAR" = "Izbornik računa";
+"CUSTOM_SIDEBAR_OPTION_TITLE" = "Prilagodi izbornik računa";
+"CUSTOM_SIDEBAR_OPTION_SUBTITLE" = "Odaberi koje se stavke prikazuju u izborniku.";
+"SIDEBAR_EDITOR_NAVIGATION_TITLE" = "Izbornik računa";
+"SIDEBAR_EDITOR_DETAIL" = "Dodirni stavku da je dodaš u izbornik ili je ukloniš iz njega.";
 "SIDEBAR_SECTION_SHOWN" = "Prikazano";
 "SIDEBAR_SECTION_HIDDEN" = "Skriveno";
 "SIDEBAR_ITEM_SHOWN" = "Prikazano";
@@ -91,7 +91,7 @@
 "NO_TAB_BAR_HIDING_TITLE" = "Uvijek vidljiva";
 "NO_TAB_BAR_HIDING_DETAIL" = "Ne smanjuj i ne skrivaj traku pri pomicanju.";
 "HIDE_BOTTOM_FADE_TITLE" = "Sakrij donje pretapanje";
-"HIDE_BOTTOM_FADE_DETAIL" = "Ukloni pretapanje koje Twitter crta ispod trake kartica.";
+"HIDE_BOTTOM_FADE_DETAIL" = "Ukloni pretapanje koje Twitter crta ispod navigacijske trake.";
 
 /* ===== BRANDING ===== */
 "MODERN_SETTINGS_BRANDING_TITLE" = "Brendiranje";
@@ -249,8 +249,8 @@
 /* ===== GROK ===== */
 "HIDE_GROK_ANALYZE_TITLE" = "Sakrij gumbe za analizu i pitanja";
 "HIDE_GROK_ANALYZE_DETAIL" = "Ukloni Grokove gumbe za analizu i pitanja.";
-"HIDE_GROK_SIDEBAR_TITLE" = "Sakrij Grok u bočnoj traci";
-"HIDE_GROK_SIDEBAR_DETAIL" = "Ukloni prečac za Grok s bočne trake.";
+"HIDE_GROK_SIDEBAR_TITLE" = "Sakrij Grok u izborniku";
+"HIDE_GROK_SIDEBAR_DETAIL" = "Ukloni prečac za Grok iz izbornika računa.";
 "HIDE_GROK_BOT_TITLE" = "Sakrij Grok Bot";
 "HIDE_GROK_BOT_DETAIL" = "Ukloni red „Try Grok Bot“ i ostale promocije Grok Bota.";
 "HIDE_GROK_CREATE_TITLE" = "Sakrij alate za stvaranje";
@@ -318,7 +318,7 @@
 "CUSTOM_TAB_BAR_DISCARD_TITLE" = "Odbaci promjene";
 "CUSTOM_TAB_BAR_DISCARD_MESSAGE" = "Odabrane kartice neće se spremiti.";
 "CUSTOM_TAB_BAR_DISCARD_ACTION" = "Odbaci";
-"CUSTOM_TAB_BAR_SETTINGS_NAVIGATION_TITLE" = "Kartice";
+"CUSTOM_TAB_BAR_SETTINGS_NAVIGATION_TITLE" = "Prilagođena navigacija";
 "TAB_EDITOR_TIP_CHANGE" = "Dodirni karticu da je promijeniš";
 "TAB_EDITOR_TIP_ARRANGE" = "Dodirni i drži karticu za promjenu redoslijeda";
 "TAB_EDITOR_TIP_ADD" = "Dodirni + za dodavanje kartice";
@@ -680,7 +680,7 @@
 "TOUR_STEP_COMPOSER" = "Pisanje";
 "TOUR_STEP_CONVERSATION" = "Razgovor";
 "TOUR_STEP_REPLIES" = "Odgovori po datumu";
-"TOUR_STEP_SIDE_MENU" = "Bočna traka";
+"TOUR_STEP_SIDE_MENU" = "Izbornik računa";
 "TOUR_STEP_DARK_MODE" = "Tamni način";
 "TOUR_STEP_WEB_LINK" = "Web-poveznica";
 "TOUR_STEP_T_CO_CHECK" = "Blokada t.co";

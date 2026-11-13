@@ -44,7 +44,7 @@
 
 /* ===== APPEARANCE — page ===== */
 "MODERN_SETTINGS_APPEARANCE_TITLE" = "Görünüm";
-"MODERN_SETTINGS_APPEARANCE_SUBTITLE" = "Stil, yazı tipleri, renkler ve gezinme çubuğu.";
+"MODERN_SETTINGS_APPEARANCE_SUBTITLE" = "Stil, yazı tipleri, renkler ve gezinti çubuğu.";
 
 /* ===== Appearance › Style ===== */
 "APPEARANCE_GROUP_STYLE" = "Stil";
@@ -74,14 +74,14 @@
 "COLOR_PFB_SWITCHES_DETAIL" = "Vurgu rengini bu ayarlardaki anahtarlara uygula.";
 "COLOR_TWITTER_ICON_IN_TOP_BAR_TITLE" = "Twitter simgesi";
 "COLOR_TWITTER_ICON_IN_TOP_BAR_DETAIL" = "Üst çubuktaki logoya vurgu rengini uygular.";
-"APPEARANCE_GROUP_TAB_BAR" = "Sekme çubuğu";
-"CUSTOM_TAB_BAR_OPTION_TITLE" = "Sekmeleri özelleştir";
+"APPEARANCE_GROUP_TAB_BAR" = "Gezinti çubuğu";
+"CUSTOM_TAB_BAR_OPTION_TITLE" = "Gezintiyi kişiselleştir";
 "CUSTOM_TAB_BAR_OPTION_SUBTITLE" = "Hangi sekmelerin hangi sırayla görüneceğini seç.";
-"APPEARANCE_GROUP_SIDEBAR" = "Kenar çubuğu";
-"CUSTOM_SIDEBAR_OPTION_TITLE" = "Kenar çubuğunu özelleştir";
-"CUSTOM_SIDEBAR_OPTION_SUBTITLE" = "Kenar çubuğunda hangi öğelerin görüneceğini seç.";
-"SIDEBAR_EDITOR_NAVIGATION_TITLE" = "Kenar çubuğu";
-"SIDEBAR_EDITOR_DETAIL" = "Kenar çubuğuna eklemek ya da çıkarmak için bir öğeye dokun.";
+"APPEARANCE_GROUP_SIDEBAR" = "Hesap menüsü";
+"CUSTOM_SIDEBAR_OPTION_TITLE" = "Hesap menüsünü özelleştir";
+"CUSTOM_SIDEBAR_OPTION_SUBTITLE" = "Menüde hangi öğelerin görüneceğini seç.";
+"SIDEBAR_EDITOR_NAVIGATION_TITLE" = "Hesap menüsü";
+"SIDEBAR_EDITOR_DETAIL" = "Menüye eklemek ya da çıkarmak için bir öğeye dokun.";
 "SIDEBAR_SECTION_SHOWN" = "Gösterilen";
 "SIDEBAR_SECTION_HIDDEN" = "Gizli";
 "SIDEBAR_ITEM_SHOWN" = "Gösteriliyor";
@@ -91,7 +91,7 @@
 "NO_TAB_BAR_HIDING_TITLE" = "Her zaman görünür";
 "NO_TAB_BAR_HIDING_DETAIL" = "Kaydırırken çubuğu küçültme ya da gizleme.";
 "HIDE_BOTTOM_FADE_TITLE" = "Alttaki geçişi gizle";
-"HIDE_BOTTOM_FADE_DETAIL" = "Twitter’ın sekme çubuğunun altına çizdiği geçişi kaldır.";
+"HIDE_BOTTOM_FADE_DETAIL" = "Twitter’ın gezinti çubuğunun altına çizdiği geçişi kaldır.";
 
 /* ===== BRANDING ===== */
 "MODERN_SETTINGS_BRANDING_TITLE" = "Marka";
@@ -249,8 +249,8 @@
 /* ===== GROK ===== */
 "HIDE_GROK_ANALYZE_TITLE" = "Analiz ve soru düğmelerini gizle";
 "HIDE_GROK_ANALYZE_DETAIL" = "Grok’un analiz et ve sor düğmelerini kaldır.";
-"HIDE_GROK_SIDEBAR_TITLE" = "Kenar çubuğunda Grok’u gizle";
-"HIDE_GROK_SIDEBAR_DETAIL" = "Grok kısayolunu kenar çubuğundan kaldır.";
+"HIDE_GROK_SIDEBAR_TITLE" = "Menüde Grok’u gizle";
+"HIDE_GROK_SIDEBAR_DETAIL" = "Grok kısayolunu hesap menüsünden kaldır.";
 "HIDE_GROK_BOT_TITLE" = "Grok Bot’u gizle";
 "HIDE_GROK_BOT_DETAIL" = "“Try Grok Bot” satırını ve diğer Grok Bot tanıtımlarını kaldır.";
 "HIDE_GROK_CREATE_TITLE" = "Oluşturma araçlarını gizle";
@@ -318,7 +318,7 @@
 "CUSTOM_TAB_BAR_DISCARD_TITLE" = "Değişiklikleri at";
 "CUSTOM_TAB_BAR_DISCARD_MESSAGE" = "Seçtiğin sekmeler kaydedilmez.";
 "CUSTOM_TAB_BAR_DISCARD_ACTION" = "At";
-"CUSTOM_TAB_BAR_SETTINGS_NAVIGATION_TITLE" = "Sekmeler";
+"CUSTOM_TAB_BAR_SETTINGS_NAVIGATION_TITLE" = "Gezintiyi kişiselleştir";
 "TAB_EDITOR_TIP_CHANGE" = "Değiştirmek için bir sekmeye dokun";
 "TAB_EDITOR_TIP_ARRANGE" = "Yeniden düzenlemek için bir sekmeyi basılı tut";
 "TAB_EDITOR_TIP_ADD" = "Sekme eklemek için +’ya dokun";
@@ -680,7 +680,7 @@
 "TOUR_STEP_COMPOSER" = "Yazma";
 "TOUR_STEP_CONVERSATION" = "Sohbet";
 "TOUR_STEP_REPLIES" = "Tarihe göre yanıtlar";
-"TOUR_STEP_SIDE_MENU" = "Kenar çubuğu";
+"TOUR_STEP_SIDE_MENU" = "Hesap menüsü";
 "TOUR_STEP_DARK_MODE" = "Karanlık mod";
 "TOUR_STEP_WEB_LINK" = "Web bağlantısı";
 "TOUR_STEP_T_CO_CHECK" = "t.co engeli";

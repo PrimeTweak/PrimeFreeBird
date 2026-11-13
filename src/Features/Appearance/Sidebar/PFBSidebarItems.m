@@ -2,6 +2,8 @@
 // choices stored by Twitter's panel name, and what each rebuild of the sidebar kept.
 
 #import "Features/Appearance/Sidebar/PFBSidebarItems.h"
+#import <dlfcn.h>
+#import <mach-o/loader.h>
 #import <malloc/malloc.h>
 #import <objc/message.h>
 #import <objc/runtime.h>
@@ -16,6 +18,14 @@ static NSString* const kChoicesKey = @"pfb_sidebar_choices";
 
 static NSArray<NSNumber*>* gPFBSidebarTabs;
 static NSMutableArray<NSNumber*>* gPFBSidebarBuilding;
+static BOOL gPFBSidebarAnalyticsAsked;
+
+// Analytics is shown only to an account that is not Premium. In T1Twitter 12.42.1, the build with
+// this UUID, its builder asks once, from the call returning to this offset.
+static const NSInteger kAnalyticsPanel = 19;
+static const uintptr_t kAnalyticsPremiumReturn = 0xa01ecc;
+static const uint8_t kT1Twitter1242UUID[16] = {0xBB, 0x9C, 0xD0, 0x55, 0xAE, 0xFC, 0x31, 0xEC,
+                                               0xB9, 0x34, 0x1C, 0x11, 0x79, 0x31, 0x93, 0x3F};
 
 // Twitter's panel table answers by class method; each read is checked so a renamed one gives nil.
 static id PFBPanelIdentityAnswer(NSString* selectorName, NSInteger panelID) {
@@ -34,10 +44,39 @@ static NSString* PFBSidebarTwitterString(NSString* key) {
     return text.length && ![text isEqualToString:key] ? text : nil;
 }
 
-// Downloads, Boost and Analytics stay as Twitter shows them: whether the tweak can show them
-// is not measured yet.
+// T1Twitter's load address when it is 12.42.1's build, where Analytics' check is known; 0 otherwise.
+static uintptr_t PFBSidebarT1TwitterBase(void) {
+    static uintptr_t base;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+      Class dash = NSClassFromString(@"T1DashContentController");
+      Dl_info info;
+      if (!dash || !dladdr((__bridge const void*)dash, &info) || !info.dli_fbase) {
+          return;
+      }
+      const struct mach_header_64* header = (const struct mach_header_64*)info.dli_fbase;
+      const uint8_t* cursor = (const uint8_t*)(header + 1);
+      for (uint32_t i = 0; header->magic == MH_MAGIC_64 && i < header->ncmds; i++) {
+          const struct load_command* command = (const struct load_command*)cursor;
+          if (command->cmd == LC_UUID) {
+              if (!memcmp(((const struct uuid_command*)command)->uuid, kT1Twitter1242UUID, 16)) {
+                  base = (uintptr_t)header;
+              }
+              return;
+          }
+          cursor += command->cmdsize;
+      }
+    });
+    return base;
+}
+
+// Downloads and Boost stay as Twitter shows them: they depend on downloads and badges the account
+// has. Analytics is offered where its check is known.
 static BOOL PFBSidebarIsOffered(NSInteger panelID) {
-    return panelID != 18 && panelID != 19 && panelID != 23;
+    if (panelID == kAnalyticsPanel) {
+        return PFBSidebarT1TwitterBase() != 0;
+    }
+    return panelID != 18 && panelID != 23;
 }
 
 // In the sidebar on a fresh install: Profile, History, News, Lists and Spaces.
@@ -57,18 +96,41 @@ static BOOL PFBSidebarIsBuiltWhenShown(NSInteger panelID) {
     return panelID == 24 || panelID == 9 || panelID == 11 || panelID == 22;
 }
 
-// The signed-in account's feature switches, as Twitter's sidebar reads them.
-static id PFBSidebarAccountSwitches(void) {
+// The signed-in account, as Twitter's sidebar reads it.
+static id PFBSidebarAccount(void) {
     Class hostClass = NSClassFromString(@"T1HostViewController");
     SEL shared = NSSelectorFromString(@"sharedHostViewController");
     SEL current = NSSelectorFromString(@"currentAccount");
-    SEL switches = NSSelectorFromString(@"featureSwitches");
     if (![hostClass respondsToSelector:shared]) {
         return nil;
     }
     id host = ((id (*)(id, SEL))objc_msgSend)(hostClass, shared);
-    id account = [host respondsToSelector:current] ? ((id (*)(id, SEL))objc_msgSend)(host, current) : nil;
+    return [host respondsToSelector:current] ? ((id (*)(id, SEL))objc_msgSend)(host, current) : nil;
+}
+
+static id PFBSidebarAccountSwitches(void) {
+    id account = PFBSidebarAccount();
+    SEL switches = NSSelectorFromString(@"featureSwitches");
     return [account respondsToSelector:switches] ? ((id (*)(id, SEL))objc_msgSend)(account, switches) : nil;
+}
+
+// Twitter keeps Analytics from organizations and business accounts before it asks for Premium.
+static BOOL PFBSidebarAccountIsBusiness(void) {
+    id account = PFBSidebarAccount();
+    for (NSString* name in @[ @"isVerifiedOrganizationAccount", @"isBusinessOrAffiliateAccount" ]) {
+        SEL selector = NSSelectorFromString(name);
+        if ([account respondsToSelector:selector] && ((BOOL (*)(id, SEL))objc_msgSend)(account, selector)) {
+            return YES;
+        }
+    }
+    return NO;
+}
+
+// The choice made on the page for a panel, nil when none was made.
+static NSNumber* PFBSidebarChoice(NSInteger panelID) {
+    NSString* key = PFBPanelIdentityAnswer(@"stringForPanelID:", panelID);
+    id choice = key ? [[NSUserDefaults standardUserDefaults] dictionaryForKey:kChoicesKey][key] : nil;
+    return [choice isKindOfClass:[NSNumber class]] ? choice : nil;
 }
 
 NSArray<NSNumber*>* PFBDashSnapshot(id content) {
@@ -102,12 +164,14 @@ NSArray<NSNumber*>* PFBDashSnapshot(id content) {
     return @[ @8, @15, @14, @17, @24, @23, @25, @9, @20, @18, @16, @7, @13, @4, @5, @2, @22, @11, @19, @12, @21 ];
 }
 
-// Premium and Creator Studio carry the titles their rows show, not the panel table's; the Creator
-// Studio row turns into Monetization when that switch is on.
+// Premium, Analytics and Creator Studio carry the titles their rows show, not the panel table's;
+// the Creator Studio row turns into Monetization when that switch is on.
 + (NSString*)nameForPanel:(NSInteger)panelID {
     NSString* title = nil;
     if (panelID == 15) {
         title = PFBSidebarTwitterString(@"SUBSCRIPTION_TITLE");
+    } else if (panelID == kAnalyticsPanel) {
+        title = PFBSidebarTwitterString(@"DASH_ANALYTICS_TITLE");
     } else if (panelID == 12) {
         SEL reader = NSSelectorFromString(@"boolForKey:");
         id switches = PFBSidebarAccountSwitches();
@@ -129,10 +193,8 @@ NSArray<NSNumber*>* PFBDashSnapshot(id content) {
     if (!PFBSidebarIsOffered(panelID)) {
         return NO;
     }
-    NSString* key = PFBPanelIdentityAnswer(@"stringForPanelID:", panelID);
-    id choice = key ? [[NSUserDefaults standardUserDefaults] dictionaryForKey:kChoicesKey][key] : nil;
-    BOOL shown = [choice isKindOfClass:[NSNumber class]] ? [choice boolValue] : PFBSidebarShownByDefault(panelID);
-    return !shown;
+    NSNumber* choice = PFBSidebarChoice(panelID);
+    return !(choice ? choice.boolValue : PFBSidebarShownByDefault(panelID));
 }
 
 // A choice that matches the default is not kept.
@@ -171,6 +233,20 @@ NSArray<NSNumber*>* PFBDashSnapshot(id content) {
     [defaults removeObjectForKey:kChoicesKey];
     [defaults removeObjectForKey:@"hide_grok_sidebar"];
     [self changed];
+}
+
++ (BOOL)showsAnalytics {
+    return PFBSidebarIsOffered(kAnalyticsPanel) && ![self isHidden:kAnalyticsPanel];
+}
+
++ (BOOL)isAnalyticsPremiumCheck:(const void*)returnAddress {
+    uintptr_t base = PFBSidebarT1TwitterBase();
+    if (!base || (uintptr_t)returnAddress - base != kAnalyticsPremiumReturn || ![self showsAnalytics]) {
+        return NO;
+    }
+    gPFBSidebarAnalyticsAsked = YES;
+    PFBCOMPAT_ACTION(PFBCompat_customize_sidebar, @"Analytics shown");
+    return YES;
 }
 
 + (void)changed {
@@ -213,6 +289,7 @@ NSArray<NSNumber*>* PFBDashSnapshot(id content) {
 
 + (void)beginBuildOfContent:(id)content {
     gPFBSidebarBuilding = [NSMutableArray array];
+    gPFBSidebarAnalyticsAsked = NO;
 }
 
 + (void)noteBuiltPanel:(NSInteger)panelID {
@@ -222,7 +299,8 @@ NSArray<NSNumber*>* PFBDashSnapshot(id content) {
 }
 
 // A hidden item Twitter named, or one missing from the list the drawer kept, is still in the
-// sidebar; a rebuild that named items and not a shown one Twitter always builds left it out.
+// sidebar; a rebuild that named items and not a shown one Twitter always builds left it out, as
+// one where Analytics, shown, never asked its check of a personal account.
 + (void)endBuildOfContent:(id)content {
     NSArray<NSNumber*>* built = gPFBSidebarBuilding;
     gPFBSidebarBuilding = nil;
@@ -238,6 +316,13 @@ NSArray<NSNumber*>* PFBDashSnapshot(id content) {
             ![tabs containsObject:panel] && ![built containsObject:panel]) {
             [self noteFailureOf:panel state:@"missing from the sidebar"];
         }
+    }
+    if (built.count && [self showsAnalytics] && ![tabs containsObject:@(kAnalyticsPanel)] && !gPFBSidebarAnalyticsAsked &&
+        !PFBSidebarAccountIsBusiness()) {
+        [self noteFailureOf:@(kAnalyticsPanel) state:@"missing from the sidebar"];
+    }
+    if (!PFBSidebarIsOffered(kAnalyticsPanel) && PFBSidebarChoice(kAnalyticsPanel).boolValue) {
+        PFBCompatNoteFailure(PFBCompat_customize_sidebar, @"Analytics not offered: T1Twitter is not 12.42.1's build");
     }
 }
 

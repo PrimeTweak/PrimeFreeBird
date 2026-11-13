@@ -74,14 +74,14 @@
 "COLOR_PFB_SWITCHES_DETAIL" = "Använd accentfärgen på reglagen i de här inställningarna.";
 "COLOR_TWITTER_ICON_IN_TOP_BAR_TITLE" = "Twitter-ikon";
 "COLOR_TWITTER_ICON_IN_TOP_BAR_DETAIL" = "Tillämpa accentfärgen på logotypen i det övre fältet.";
-"APPEARANCE_GROUP_TAB_BAR" = "Flikfält";
-"CUSTOM_TAB_BAR_OPTION_TITLE" = "Anpassa flikar";
+"APPEARANCE_GROUP_TAB_BAR" = "Navigeringsfält";
+"CUSTOM_TAB_BAR_OPTION_TITLE" = "Anpassad navigering";
 "CUSTOM_TAB_BAR_OPTION_SUBTITLE" = "Välj vilka flikar som visas och i vilken ordning.";
-"APPEARANCE_GROUP_SIDEBAR" = "Sidofält";
-"CUSTOM_SIDEBAR_OPTION_TITLE" = "Anpassa sidofältet";
-"CUSTOM_SIDEBAR_OPTION_SUBTITLE" = "Välj vilka objekt som visas i sidofältet.";
-"SIDEBAR_EDITOR_NAVIGATION_TITLE" = "Sidofält";
-"SIDEBAR_EDITOR_DETAIL" = "Tryck på ett objekt för att lägga till det i sidofältet eller ta bort det.";
+"APPEARANCE_GROUP_SIDEBAR" = "Kontomeny";
+"CUSTOM_SIDEBAR_OPTION_TITLE" = "Anpassa kontomenyn";
+"CUSTOM_SIDEBAR_OPTION_SUBTITLE" = "Välj vilka objekt som visas i menyn.";
+"SIDEBAR_EDITOR_NAVIGATION_TITLE" = "Kontomeny";
+"SIDEBAR_EDITOR_DETAIL" = "Tryck på ett objekt för att lägga till det i menyn eller ta bort det.";
 "SIDEBAR_SECTION_SHOWN" = "Visas";
 "SIDEBAR_SECTION_HIDDEN" = "Dolda";
 "SIDEBAR_ITEM_SHOWN" = "Visas";
@@ -91,7 +91,7 @@
 "NO_TAB_BAR_HIDING_TITLE" = "Alltid synligt";
 "NO_TAB_BAR_HIDING_DETAIL" = "Låt inte fältet krympa eller tonas bort när du scrollar.";
 "HIDE_BOTTOM_FADE_TITLE" = "Dölj nedre toning";
-"HIDE_BOTTOM_FADE_DETAIL" = "Ta bort toningen som Twitter ritar under flikfältet.";
+"HIDE_BOTTOM_FADE_DETAIL" = "Ta bort toningen som Twitter ritar under navigeringsfältet.";
 
 /* ===== BRANDING ===== */
 "MODERN_SETTINGS_BRANDING_TITLE" = "Profilering";
@@ -249,8 +249,8 @@
 /* ===== GROK ===== */
 "HIDE_GROK_ANALYZE_TITLE" = "Dölj analys- och frågeknappar";
 "HIDE_GROK_ANALYZE_DETAIL" = "Ta bort Groks knappar för att analysera och fråga.";
-"HIDE_GROK_SIDEBAR_TITLE" = "Dölj Grok i sidofältet";
-"HIDE_GROK_SIDEBAR_DETAIL" = "Ta bort Grok-genvägen från sidofältet.";
+"HIDE_GROK_SIDEBAR_TITLE" = "Dölj Grok i menyn";
+"HIDE_GROK_SIDEBAR_DETAIL" = "Ta bort Grok-genvägen från kontomenyn.";
 "HIDE_GROK_BOT_TITLE" = "Dölj Grok Bot";
 "HIDE_GROK_BOT_DETAIL" = "Ta bort raden ”Try Grok Bot” och övriga kampanjer för Grok Bot.";
 "HIDE_GROK_CREATE_TITLE" = "Dölj skapandeverktyg";
@@ -318,7 +318,7 @@
 "CUSTOM_TAB_BAR_DISCARD_TITLE" = "Släng ändringar";
 "CUSTOM_TAB_BAR_DISCARD_MESSAGE" = "Flikarna du valt sparas inte.";
 "CUSTOM_TAB_BAR_DISCARD_ACTION" = "Släng";
-"CUSTOM_TAB_BAR_SETTINGS_NAVIGATION_TITLE" = "Flikar";
+"CUSTOM_TAB_BAR_SETTINGS_NAVIGATION_TITLE" = "Anpassad navigering";
 "TAB_EDITOR_TIP_CHANGE" = "Tryck på en flik för att ändra den";
 "TAB_EDITOR_TIP_ARRANGE" = "Håll ned en flik för att flytta den";
 "TAB_EDITOR_TIP_ADD" = "Tryck på + för att lägga till en flik";
@@ -680,7 +680,7 @@
 "TOUR_STEP_COMPOSER" = "Skriva";
 "TOUR_STEP_CONVERSATION" = "Konversation";
 "TOUR_STEP_REPLIES" = "Svar efter datum";
-"TOUR_STEP_SIDE_MENU" = "Sidofält";
+"TOUR_STEP_SIDE_MENU" = "Kontomeny";
 "TOUR_STEP_DARK_MODE" = "Mörkt läge";
 "TOUR_STEP_WEB_LINK" = "Webblänk";
 "TOUR_STEP_T_CO_CHECK" = "t.co-blockering";

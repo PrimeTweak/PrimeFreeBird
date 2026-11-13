@@ -27,6 +27,12 @@ static const NSInteger PFBSidebarGrokPanel = 14;
 // Every item back to its default.
 + (void)resetToDefault;
 
+// Analytics On on the page, where the page offers it.
++ (BOOL)showsAnalytics;
+// Whether a Premium check returning to this address is Analytics' own while Analytics is On; that
+// check alone then finds the account not Premium.
++ (BOOL)isAnalyticsPremiumCheck:(const void*)returnAddress;
+
 // Twitter's own tab bar panels, in their order, as the sidebar last asked for them.
 + (void)recordTabPanelIDs:(NSArray*)panelIDs;
 + (NSArray<NSNumber*>*)tabPanelIDs;

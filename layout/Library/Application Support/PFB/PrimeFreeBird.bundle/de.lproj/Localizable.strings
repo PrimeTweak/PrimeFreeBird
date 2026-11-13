@@ -74,14 +74,14 @@
 "COLOR_PFB_SWITCHES_DETAIL" = "Wendet die Akzentfarbe auf die Schalter dieser Einstellungen an.";
 "COLOR_TWITTER_ICON_IN_TOP_BAR_TITLE" = "Twitter-Symbol";
 "COLOR_TWITTER_ICON_IN_TOP_BAR_DETAIL" = "Wendet die Akzentfarbe auf das Logo in der oberen Leiste an.";
-"APPEARANCE_GROUP_TAB_BAR" = "Tableiste";
-"CUSTOM_TAB_BAR_OPTION_TITLE" = "Tabs anpassen";
+"APPEARANCE_GROUP_TAB_BAR" = "Navigationsleiste";
+"CUSTOM_TAB_BAR_OPTION_TITLE" = "Angepasste Navigation";
 "CUSTOM_TAB_BAR_OPTION_SUBTITLE" = "Wähle, welche Tabs erscheinen und in welcher Reihenfolge.";
-"APPEARANCE_GROUP_SIDEBAR" = "Seitenleiste";
-"CUSTOM_SIDEBAR_OPTION_TITLE" = "Seitenleiste anpassen";
-"CUSTOM_SIDEBAR_OPTION_SUBTITLE" = "Wähle, welche Elemente in der Seitenleiste erscheinen.";
-"SIDEBAR_EDITOR_NAVIGATION_TITLE" = "Seitenleiste";
-"SIDEBAR_EDITOR_DETAIL" = "Tippe auf ein Element, um es der Seitenleiste hinzuzufügen oder daraus zu entfernen.";
+"APPEARANCE_GROUP_SIDEBAR" = "Account-Menü";
+"CUSTOM_SIDEBAR_OPTION_TITLE" = "Account-Menü anpassen";
+"CUSTOM_SIDEBAR_OPTION_SUBTITLE" = "Wähle, welche Elemente im Menü erscheinen.";
+"SIDEBAR_EDITOR_NAVIGATION_TITLE" = "Account-Menü";
+"SIDEBAR_EDITOR_DETAIL" = "Tippe auf ein Element, um es dem Menü hinzuzufügen oder daraus zu entfernen.";
 "SIDEBAR_SECTION_SHOWN" = "Angezeigt";
 "SIDEBAR_SECTION_HIDDEN" = "Ausgeblendet";
 "SIDEBAR_ITEM_SHOWN" = "Angezeigt";
@@ -91,7 +91,7 @@
 "NO_TAB_BAR_HIDING_TITLE" = "Immer sichtbar";
 "NO_TAB_BAR_HIDING_DETAIL" = "Leiste beim Scrollen weder verkleinern noch ausblenden.";
 "HIDE_BOTTOM_FADE_TITLE" = "Unteren Verlauf ausblenden";
-"HIDE_BOTTOM_FADE_DETAIL" = "Entfernt den Verlauf, den Twitter unter der Tableiste zeichnet.";
+"HIDE_BOTTOM_FADE_DETAIL" = "Entfernt den Verlauf, den Twitter unter der Navigationsleiste zeichnet.";
 
 /* ===== BRANDING ===== */
 "MODERN_SETTINGS_BRANDING_TITLE" = "Branding";
@@ -249,8 +249,8 @@
 /* ===== GROK ===== */
 "HIDE_GROK_ANALYZE_TITLE" = "Analyse- und Frage-Buttons ausblenden";
 "HIDE_GROK_ANALYZE_DETAIL" = "Entfernt die Analyse- und Frage-Buttons von Grok.";
-"HIDE_GROK_SIDEBAR_TITLE" = "Grok in der Seitenleiste ausblenden";
-"HIDE_GROK_SIDEBAR_DETAIL" = "Entfernt die Grok-Verknüpfung aus der Seitenleiste.";
+"HIDE_GROK_SIDEBAR_TITLE" = "Grok im Menü ausblenden";
+"HIDE_GROK_SIDEBAR_DETAIL" = "Entfernt die Grok-Verknüpfung aus dem Account-Menü.";
 "HIDE_GROK_BOT_TITLE" = "Grok Bot ausblenden";
 "HIDE_GROK_BOT_DETAIL" = "Entfernt die Zeile „Try Grok Bot“ und die übrige Werbung für Grok Bot.";
 "HIDE_GROK_CREATE_TITLE" = "Erstellungswerkzeuge ausblenden";
@@ -318,7 +318,7 @@
 "CUSTOM_TAB_BAR_DISCARD_TITLE" = "Änderungen verwerfen";
 "CUSTOM_TAB_BAR_DISCARD_MESSAGE" = "Die gewählten Tabs werden nicht gespeichert.";
 "CUSTOM_TAB_BAR_DISCARD_ACTION" = "Verwerfen";
-"CUSTOM_TAB_BAR_SETTINGS_NAVIGATION_TITLE" = "Tabs";
+"CUSTOM_TAB_BAR_SETTINGS_NAVIGATION_TITLE" = "Angepasste Navigation";
 "TAB_EDITOR_TIP_CHANGE" = "Tippe auf einen Tab, um ihn zu ändern";
 "TAB_EDITOR_TIP_ARRANGE" = "Halte einen Tab gedrückt, um ihn zu verschieben";
 "TAB_EDITOR_TIP_ADD" = "Tippe auf +, um einen Tab hinzuzufügen";
@@ -680,7 +680,7 @@
 "TOUR_STEP_COMPOSER" = "Verfassen";
 "TOUR_STEP_CONVERSATION" = "Unterhaltung";
 "TOUR_STEP_REPLIES" = "Antworten nach Datum";
-"TOUR_STEP_SIDE_MENU" = "Seitenleiste";
+"TOUR_STEP_SIDE_MENU" = "Account-Menü";
 "TOUR_STEP_DARK_MODE" = "Dunkler Modus";
 "TOUR_STEP_WEB_LINK" = "Weblink";
 "TOUR_STEP_T_CO_CHECK" = "t.co-Sperre";

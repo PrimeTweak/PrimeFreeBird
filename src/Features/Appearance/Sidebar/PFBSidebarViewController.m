@@ -1,5 +1,6 @@
 // The Sidebar page: its line, the items in the sidebar and the hidden ones as two groups of glass
-// tiles, and Twitter's Restore to default at the bottom. A tap moves an item to the other group.
+// tiles, and Twitter's Restore to default on a glass bar in the tab bar's place. A tap moves an item
+// to the other group.
 
 #import "Features/Appearance/Sidebar/PFBSidebarViewController.h"
 #import "Common/PFBBundle.h"
@@ -203,8 +204,9 @@ static const CGFloat kTileRadius = 22.0;
     self.shownGroup = [self groupTitled:@"SIDEBAR_SECTION_SHOWN"];
     self.hiddenGroup = [self groupTitled:@"SIDEBAR_SECTION_HIDDEN"];
 
-    self.resetCapsule = [PFBShowcaseButton buttonWithStyle:PFBShowcaseButtonStyleOutline];
+    self.resetCapsule = [PFBShowcaseButton buttonWithStyle:PFBShowcaseButtonStyleGlass];
     self.resetCapsule.label = [bundle localizedTwitterStringForKey:@"SUBSCRIPTION_TAB_CUSTOMIZATION_RESTORE_BUTTON_TITLE"];
+    self.resetCapsule.labelFont = PFBScaledFont([TwitterChirpFont(TwitterFontStyleSemibold) fontWithSize:17]);
     [self.resetCapsule addTarget:self action:@selector(resetToDefault) forControlEvents:UIControlEventTouchUpInside];
     [self.view addSubview:self.resetCapsule];
     self.feedback = [[UISelectionFeedbackGenerator alloc] init];
@@ -285,7 +287,6 @@ static const CGFloat kTileRadius = 22.0;
 
 - (void)applyColors {
     self.view.backgroundColor = [PFBPalette currentBackgroundColor];
-    self.resetCapsule.groundColor = self.view.backgroundColor;
     self.introLabel.textColor = PFBSettingsSubtitleColor();
     for (PFBSidebarGroup* group in @[ self.shownGroup, self.hiddenGroup ]) {
         group.title.textColor = PFBSettingsTextColor();
@@ -363,13 +364,11 @@ static const CGFloat kTileRadius = 22.0;
     [super viewDidLayoutSubviews];
     [self layoutPage];
 
-    // Above Twitter's tab bar when it shows; the page scrolls clear of the capsule.
-    CGFloat inner = MAX(0, CGRectGetWidth(self.scroll.bounds) - 40.0);
-    CGFloat capsuleHeight = [self.resetCapsule sizeThatFits:CGSizeMake(inner, CGFLOAT_MAX)].height;
-    CGFloat capsuleY = PFBShowcaseBottomLimit(self.view) - 16.0 - capsuleHeight;
-    self.resetCapsule.frame = CGRectMake(20.0, capsuleY, inner, capsuleHeight);
+    // The tiles scroll under the glass bar and stop clear of it.
+    self.resetCapsule.frame = PFBShowcaseDockFrame(self.view);
     UIEdgeInsets insets = self.scroll.contentInset;
-    insets.bottom = MAX(0, CGRectGetMaxY(self.view.bounds) - self.view.safeAreaInsets.bottom - capsuleY + 12.0);
+    insets.bottom = MAX(0, CGRectGetMaxY(self.view.bounds) - self.view.safeAreaInsets.bottom -
+                               CGRectGetMinY(self.resetCapsule.frame) + 16.0);
     if (fabs(insets.bottom - self.scroll.contentInset.bottom) > 0.5) {
         self.scroll.contentInset = insets;
     }

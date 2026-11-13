@@ -107,6 +107,64 @@ CGFloat PFBShowcaseBottomLimit(UIView* view) {
     return limit;
 }
 
+// Twitter's tab bar under a window, hidden or not: the settings hide its container, which keeps
+// the bar where it stood.
+static UIView* PFBShowcaseTabBarUnder(UIWindow* window) {
+    static Class barClass;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+      barClass = NSClassFromString(@"_TtC11XNavigation10TabBarView");
+    });
+    static __weak UIView* found;
+    UIView* bar = found;
+    if (bar.window == window) {
+        return bar;
+    }
+    NSArray<UIView*>* level = barClass ? @[ window ] : @[];
+    while (level.count) {
+        NSMutableArray<UIView*>* next = [NSMutableArray array];
+        for (UIView* view in level) {
+            if ([view isKindOfClass:barClass]) {
+                found = view;
+                return view;
+            }
+            [next addObjectsFromArray:view.subviews];
+        }
+        level = next;
+    }
+    return nil;
+}
+
+// Twitter's bar is 62 pt high (GlassTabBar.x); without it, a bar of that height above the safe
+// area, as wide as the page's cards. A bar collapsed to its round button keeps that width.
+CGRect PFBShowcaseDockFrame(UIView* view) {
+    CGFloat height = 62.0;
+    CGRect dock = CGRectMake(20.0, CGRectGetMaxY(view.bounds) - view.safeAreaInsets.bottom - height,
+                             MAX(0, CGRectGetWidth(view.bounds) - 40.0), height);
+    if (!view.window) {
+        return dock;
+    }
+    UIView* bar = PFBShowcaseTabBarUnder(view.window);
+    CGRect frame = bar ? [bar convertRect:bar.bounds toView:view] : CGRectNull;
+    NSString* from = @"no tab bar";
+    if (bar && PFBShowcaseShows(bar)) {
+        dock.origin.y = MIN(CGRectGetMinY(dock), CGRectGetMinY(frame) - 12.0 - height);
+        from = @"above the showing tab bar";
+    } else if (bar && CGRectGetWidth(frame) > 2 * CGRectGetHeight(frame) && CGRectGetHeight(frame) > 0 &&
+               CGRectContainsRect(view.bounds, frame)) {
+        dock = frame;
+        from = @"on the hidden tab bar";
+    } else if (bar) {
+        from = @"tab bar collapsed or off the page";
+    }
+    PFBCompatMeasure(@"restore bar", [NSString stringWithFormat:@"%@ in a %.0f x %.0f page: %@, tab bar %@", from,
+                                                                CGRectGetWidth(view.bounds), CGRectGetHeight(view.bounds),
+                                                                NSStringFromCGRect(CGRectIntegral(dock)),
+                                                                bar ? NSStringFromCGRect(CGRectIntegral(frame)) : @"none"],
+                     6);
+    return dock;
+}
+
 // A color of Twitter's palette reached by name, or the fallback.
 static UIColor* PFBShowcasePaletteColor(NSString* getter, UIColor* fallback) {
     return [PFBPalette colorFor:NSSelectorFromString(getter) fallback:fallback];

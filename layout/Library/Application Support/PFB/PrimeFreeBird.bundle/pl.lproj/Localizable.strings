@@ -74,14 +74,14 @@
 "COLOR_PFB_SWITCHES_DETAIL" = "Nadaje kolor akcentu przełącznikom w tych ustawieniach.";
 "COLOR_TWITTER_ICON_IN_TOP_BAR_TITLE" = "Ikona Twittera";
 "COLOR_TWITTER_ICON_IN_TOP_BAR_DETAIL" = "Nadaje logo na górnym pasku kolor akcentu.";
-"APPEARANCE_GROUP_TAB_BAR" = "Pasek kart";
-"CUSTOM_TAB_BAR_OPTION_TITLE" = "Dostosuj karty";
+"APPEARANCE_GROUP_TAB_BAR" = "Pasek nawigacji";
+"CUSTOM_TAB_BAR_OPTION_TITLE" = "Spersonalizowana nawigacja";
 "CUSTOM_TAB_BAR_OPTION_SUBTITLE" = "Wybierz, które karty się pojawiają i w jakiej kolejności.";
-"APPEARANCE_GROUP_SIDEBAR" = "Pasek boczny";
-"CUSTOM_SIDEBAR_OPTION_TITLE" = "Dostosuj pasek boczny";
-"CUSTOM_SIDEBAR_OPTION_SUBTITLE" = "Wybierz, które elementy pojawiają się na pasku bocznym.";
-"SIDEBAR_EDITOR_NAVIGATION_TITLE" = "Pasek boczny";
-"SIDEBAR_EDITOR_DETAIL" = "Stuknij element, aby dodać go do paska bocznego lub go usunąć.";
+"APPEARANCE_GROUP_SIDEBAR" = "Menu konta";
+"CUSTOM_SIDEBAR_OPTION_TITLE" = "Dostosuj menu konta";
+"CUSTOM_SIDEBAR_OPTION_SUBTITLE" = "Wybierz, które elementy pojawiają się w menu.";
+"SIDEBAR_EDITOR_NAVIGATION_TITLE" = "Menu konta";
+"SIDEBAR_EDITOR_DETAIL" = "Stuknij element, aby dodać go do menu lub go usunąć.";
 "SIDEBAR_SECTION_SHOWN" = "Widoczne";
 "SIDEBAR_SECTION_HIDDEN" = "Ukryte";
 "SIDEBAR_ITEM_SHOWN" = "Widoczny";
@@ -91,7 +91,7 @@
 "NO_TAB_BAR_HIDING_TITLE" = "Zawsze widoczny";
 "NO_TAB_BAR_HIDING_DETAIL" = "Nie zmniejszaj ani nie wygaszaj paska podczas przewijania.";
 "HIDE_BOTTOM_FADE_TITLE" = "Ukryj dolne przejście";
-"HIDE_BOTTOM_FADE_DETAIL" = "Usuwa przejście, które Twitter rysuje pod paskiem kart.";
+"HIDE_BOTTOM_FADE_DETAIL" = "Usuwa przejście, które Twitter rysuje pod paskiem nawigacji.";
 
 /* ===== BRANDING ===== */
 "MODERN_SETTINGS_BRANDING_TITLE" = "Branding";
@@ -249,8 +249,8 @@
 /* ===== GROK ===== */
 "HIDE_GROK_ANALYZE_TITLE" = "Ukryj przyciski analizy i pytań";
 "HIDE_GROK_ANALYZE_DETAIL" = "Usuwa przyciski analizy i pytań Groka.";
-"HIDE_GROK_SIDEBAR_TITLE" = "Ukryj Grok na pasku bocznym";
-"HIDE_GROK_SIDEBAR_DETAIL" = "Usuwa skrót Groka z paska bocznego.";
+"HIDE_GROK_SIDEBAR_TITLE" = "Ukryj Grok w menu";
+"HIDE_GROK_SIDEBAR_DETAIL" = "Usuwa skrót Groka z menu konta.";
 "HIDE_GROK_BOT_TITLE" = "Ukryj Grok Bot";
 "HIDE_GROK_BOT_DETAIL" = "Usuwa wiersz „Try Grok Bot” i inne promocje Grok Bot.";
 "HIDE_GROK_CREATE_TITLE" = "Ukryj narzędzia tworzenia";
@@ -318,7 +318,7 @@
 "CUSTOM_TAB_BAR_DISCARD_TITLE" = "Odrzuć zmiany";
 "CUSTOM_TAB_BAR_DISCARD_MESSAGE" = "Wybrane karty nie zostaną zapisane.";
 "CUSTOM_TAB_BAR_DISCARD_ACTION" = "Odrzuć";
-"CUSTOM_TAB_BAR_SETTINGS_NAVIGATION_TITLE" = "Karty";
+"CUSTOM_TAB_BAR_SETTINGS_NAVIGATION_TITLE" = "Spersonalizowana nawigacja";
 "TAB_EDITOR_TIP_CHANGE" = "Stuknij kartę, aby ją zmienić";
 "TAB_EDITOR_TIP_ARRANGE" = "Dotknij i przytrzymaj kartę, aby zmienić kolejność";
 "TAB_EDITOR_TIP_ADD" = "Stuknij +, aby dodać kartę";
@@ -680,7 +680,7 @@
 "TOUR_STEP_COMPOSER" = "Pisanie";
 "TOUR_STEP_CONVERSATION" = "Rozmowa";
 "TOUR_STEP_REPLIES" = "Odpowiedzi według daty";
-"TOUR_STEP_SIDE_MENU" = "Pasek boczny";
+"TOUR_STEP_SIDE_MENU" = "Menu konta";
 "TOUR_STEP_DARK_MODE" = "Tryb ciemny";
 "TOUR_STEP_WEB_LINK" = "Link internetowy";
 "TOUR_STEP_T_CO_CHECK" = "Blokada t.co";

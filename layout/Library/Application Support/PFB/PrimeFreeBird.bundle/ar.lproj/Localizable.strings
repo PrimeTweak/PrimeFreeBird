@@ -74,14 +74,14 @@
 "COLOR_PFB_SWITCHES_DETAIL" = "تطبيق لون التمييز على المفاتيح في هذه الإعدادات.";
 "COLOR_TWITTER_ICON_IN_TOP_BAR_TITLE" = "أيقونة تويتر";
 "COLOR_TWITTER_ICON_IN_TOP_BAR_DETAIL" = "تطبيق لون التمييز على الشعار في الشريط العلوي.";
-"APPEARANCE_GROUP_TAB_BAR" = "شريط التبويبات";
-"CUSTOM_TAB_BAR_OPTION_TITLE" = "تخصيص التبويبات";
+"APPEARANCE_GROUP_TAB_BAR" = "شريط التنقل";
+"CUSTOM_TAB_BAR_OPTION_TITLE" = "التصفّح المخصص";
 "CUSTOM_TAB_BAR_OPTION_SUBTITLE" = "اختر التبويبات التي تظهر وترتيبها.";
-"APPEARANCE_GROUP_SIDEBAR" = "الشريط الجانبي";
-"CUSTOM_SIDEBAR_OPTION_TITLE" = "تخصيص الشريط الجانبي";
-"CUSTOM_SIDEBAR_OPTION_SUBTITLE" = "اختر العناصر التي تظهر في الشريط الجانبي.";
-"SIDEBAR_EDITOR_NAVIGATION_TITLE" = "الشريط الجانبي";
-"SIDEBAR_EDITOR_DETAIL" = "انقر على عنصر لإضافته إلى الشريط الجانبي أو إزالته منه.";
+"APPEARANCE_GROUP_SIDEBAR" = "قائمة الحساب";
+"CUSTOM_SIDEBAR_OPTION_TITLE" = "تخصيص قائمة الحساب";
+"CUSTOM_SIDEBAR_OPTION_SUBTITLE" = "اختر العناصر التي تظهر في القائمة.";
+"SIDEBAR_EDITOR_NAVIGATION_TITLE" = "قائمة الحساب";
+"SIDEBAR_EDITOR_DETAIL" = "انقر على عنصر لإضافته إلى القائمة أو إزالته منها.";
 "SIDEBAR_SECTION_SHOWN" = "ظاهرة";
 "SIDEBAR_SECTION_HIDDEN" = "مخفية";
 "SIDEBAR_ITEM_SHOWN" = "ظاهر";
@@ -91,7 +91,7 @@
 "NO_TAB_BAR_HIDING_TITLE" = "ظاهر دائمًا";
 "NO_TAB_BAR_HIDING_DETAIL" = "عدم تصغير الشريط أو تلاشيه عند التمرير.";
 "HIDE_BOTTOM_FADE_TITLE" = "إخفاء التدرج السفلي";
-"HIDE_BOTTOM_FADE_DETAIL" = "إزالة التدرج الذي يرسمه تويتر تحت شريط التبويبات.";
+"HIDE_BOTTOM_FADE_DETAIL" = "إزالة التدرج الذي يرسمه تويتر تحت شريط التنقل.";
 
 /* ===== BRANDING ===== */
 "MODERN_SETTINGS_BRANDING_TITLE" = "الهوية";
@@ -249,8 +249,8 @@
 /* ===== GROK ===== */
 "HIDE_GROK_ANALYZE_TITLE" = "إخفاء أزرار التحليل والسؤال";
 "HIDE_GROK_ANALYZE_DETAIL" = "إزالة زرّي التحليل والسؤال في Grok.";
-"HIDE_GROK_SIDEBAR_TITLE" = "إخفاء Grok من الشريط الجانبي";
-"HIDE_GROK_SIDEBAR_DETAIL" = "إزالة اختصار Grok من الشريط الجانبي.";
+"HIDE_GROK_SIDEBAR_TITLE" = "إخفاء Grok من القائمة";
+"HIDE_GROK_SIDEBAR_DETAIL" = "إزالة اختصار Grok من قائمة الحساب.";
 "HIDE_GROK_BOT_TITLE" = "إخفاء Grok Bot";
 "HIDE_GROK_BOT_DETAIL" = "إزالة صف «Try Grok Bot» وسائر الترويج لـGrok Bot.";
 "HIDE_GROK_CREATE_TITLE" = "إخفاء أدوات الإنشاء";
@@ -318,7 +318,7 @@
 "CUSTOM_TAB_BAR_DISCARD_TITLE" = "تجاهل التغييرات";
 "CUSTOM_TAB_BAR_DISCARD_MESSAGE" = "لن تُحفظ التبويبات التي اخترتها.";
 "CUSTOM_TAB_BAR_DISCARD_ACTION" = "تجاهل";
-"CUSTOM_TAB_BAR_SETTINGS_NAVIGATION_TITLE" = "التبويبات";
+"CUSTOM_TAB_BAR_SETTINGS_NAVIGATION_TITLE" = "التصفّح المخصص";
 "TAB_EDITOR_TIP_CHANGE" = "اضغط على تبويب لتغييره";
 "TAB_EDITOR_TIP_ARRANGE" = "المس تبويبًا مع الاستمرار لإعادة ترتيبه";
 "TAB_EDITOR_TIP_ADD" = "اضغط + لإضافة تبويب";
@@ -680,7 +680,7 @@
 "TOUR_STEP_COMPOSER" = "الكتابة";
 "TOUR_STEP_CONVERSATION" = "المحادثة";
 "TOUR_STEP_REPLIES" = "الردود حسب التاريخ";
-"TOUR_STEP_SIDE_MENU" = "الشريط الجانبي";
+"TOUR_STEP_SIDE_MENU" = "قائمة الحساب";
 "TOUR_STEP_DARK_MODE" = "الوضع الداكن";
 "TOUR_STEP_WEB_LINK" = "رابط ويب";
 "TOUR_STEP_T_CO_CHECK" = "حظر t.co";

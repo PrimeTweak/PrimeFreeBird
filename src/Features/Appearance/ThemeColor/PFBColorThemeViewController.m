@@ -104,7 +104,8 @@ static NSInteger NearestAccentOption(UIColor* color) {
 @property (nonatomic, strong) PFBColorSwatchControl* customSwatch;
 @property (nonatomic, strong) UIButton* resetButton;
 // The new look's page: its line, the sample on its card, then a card holding the colors in a glass
-// bar with a lens on the chosen one and that color's name, then Restore to default at the bottom.
+// bar with a lens on the chosen one and that color's name, and Restore to default on a glass bar in
+// the tab bar's place.
 @property (nonatomic, strong) UIScrollView* nativeScroll;
 @property (nonatomic, strong) UILabel* introLabel;
 @property (nonatomic, strong) UIView* previewCard;
@@ -269,7 +270,7 @@ static NSInteger NearestAccentOption(UIColor* color) {
 
 // MARK: - New look
 
-// The page scrolls under the bar; Restore to default stays at its bottom.
+// The page scrolls under the navigation bar and under Restore to default's glass bar.
 - (void)buildNativeLook {
     PFBBundle* bundle = [PFBBundle sharedBundle];
     UIScrollView* scroll = [[UIScrollView alloc] initWithFrame:self.view.bounds];
@@ -329,8 +330,9 @@ static NSInteger NearestAccentOption(UIColor* color) {
     self.colorName.font = PFBScaledFont([TwitterChirpFont(TwitterFontStyleSemibold) fontWithSize:15]);
     [self.paletteCard addSubview:self.colorName];
 
-    self.resetCapsule = [PFBShowcaseButton buttonWithStyle:PFBShowcaseButtonStyleOutline];
+    self.resetCapsule = [PFBShowcaseButton buttonWithStyle:PFBShowcaseButtonStyleGlass];
     self.resetCapsule.label = [bundle localizedTwitterStringForKey:@"SUBSCRIPTION_TAB_CUSTOMIZATION_RESTORE_BUTTON_TITLE"];
+    self.resetCapsule.labelFont = PFBScaledFont([TwitterChirpFont(TwitterFontStyleSemibold) fontWithSize:17]);
     [self.resetCapsule addTarget:self
                           action:@selector(confirmResetToDefaultColor)
                 forControlEvents:UIControlEventTouchUpInside];
@@ -340,8 +342,6 @@ static NSInteger NearestAccentOption(UIColor* color) {
 
 - (void)applyNativeColors {
     self.view.backgroundColor = [PFBPalette currentBackgroundColor];
-    // The capsule floats over the page as it scrolls, so it stands on the page's ground.
-    self.resetCapsule.groundColor = self.view.backgroundColor;
     self.introLabel.textColor = PFBSettingsSubtitleColor();
     self.colorName.textColor = PFBSettingsTextColor();
 }
@@ -372,12 +372,11 @@ static NSInteger NearestAccentOption(UIColor* color) {
         CGRectMake(side, CGRectGetMaxY(self.previewCard.frame) + kCardGap, inner, nameTop + nameHeight + 14.0);
     scroll.contentSize = CGSizeMake(width, CGRectGetMaxY(self.paletteCard.frame) + 24.0);
 
-    // Above Twitter's tab bar when it shows; the page scrolls clear of the capsule.
-    CGFloat capsuleHeight = [self.resetCapsule sizeThatFits:CGSizeMake(inner, CGFLOAT_MAX)].height;
-    CGFloat capsuleY = PFBShowcaseBottomLimit(self.view) - 16.0 - capsuleHeight;
-    self.resetCapsule.frame = CGRectMake(side, capsuleY, inner, capsuleHeight);
+    // The cards scroll under the glass bar and stop clear of it.
+    self.resetCapsule.frame = PFBShowcaseDockFrame(self.view);
     UIEdgeInsets insets = scroll.contentInset;
-    insets.bottom = MAX(0, CGRectGetMaxY(self.view.bounds) - self.view.safeAreaInsets.bottom - capsuleY + 12.0);
+    insets.bottom = MAX(0, CGRectGetMaxY(self.view.bounds) - self.view.safeAreaInsets.bottom -
+                               CGRectGetMinY(self.resetCapsule.frame) + 16.0);
     if (fabs(insets.bottom - scroll.contentInset.bottom) > 0.5) {
         scroll.contentInset = insets;
     }

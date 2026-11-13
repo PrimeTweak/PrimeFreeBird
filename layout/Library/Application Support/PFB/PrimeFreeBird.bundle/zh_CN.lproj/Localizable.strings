@@ -74,14 +74,14 @@
 "COLOR_PFB_SWITCHES_DETAIL" = "将强调色应用到这些设置中的开关。";
 "COLOR_TWITTER_ICON_IN_TOP_BAR_TITLE" = "Twitter 图标";
 "COLOR_TWITTER_ICON_IN_TOP_BAR_DETAIL" = "将强调色应用于顶栏的标志。";
-"APPEARANCE_GROUP_TAB_BAR" = "标签栏";
-"CUSTOM_TAB_BAR_OPTION_TITLE" = "自定义标签页";
+"APPEARANCE_GROUP_TAB_BAR" = "导航栏";
+"CUSTOM_TAB_BAR_OPTION_TITLE" = "自定义导航";
 "CUSTOM_TAB_BAR_OPTION_SUBTITLE" = "选择显示哪些标签及其顺序。";
-"APPEARANCE_GROUP_SIDEBAR" = "侧边栏";
-"CUSTOM_SIDEBAR_OPTION_TITLE" = "自定义侧边栏";
-"CUSTOM_SIDEBAR_OPTION_SUBTITLE" = "选择要在侧边栏中显示的项目。";
-"SIDEBAR_EDITOR_NAVIGATION_TITLE" = "侧边栏";
-"SIDEBAR_EDITOR_DETAIL" = "轻点项目即可添加到侧边栏或从中移除。";
+"APPEARANCE_GROUP_SIDEBAR" = "账号菜单";
+"CUSTOM_SIDEBAR_OPTION_TITLE" = "自定义账号菜单";
+"CUSTOM_SIDEBAR_OPTION_SUBTITLE" = "选择要在菜单中显示的项目。";
+"SIDEBAR_EDITOR_NAVIGATION_TITLE" = "账号菜单";
+"SIDEBAR_EDITOR_DETAIL" = "轻点项目即可添加到菜单或从中移除。";
 "SIDEBAR_SECTION_SHOWN" = "已显示";
 "SIDEBAR_SECTION_HIDDEN" = "已隐藏";
 "SIDEBAR_ITEM_SHOWN" = "已显示";
@@ -91,7 +91,7 @@
 "NO_TAB_BAR_HIDING_TITLE" = "始终显示";
 "NO_TAB_BAR_HIDING_DETAIL" = "滚动时不缩小也不淡出。";
 "HIDE_BOTTOM_FADE_TITLE" = "隐藏底部渐变";
-"HIDE_BOTTOM_FADE_DETAIL" = "移除 Twitter 在标签栏下方绘制的渐变。";
+"HIDE_BOTTOM_FADE_DETAIL" = "移除 Twitter 在导航栏下方绘制的渐变。";
 
 /* ===== BRANDING ===== */
 "MODERN_SETTINGS_BRANDING_TITLE" = "品牌";
@@ -249,8 +249,8 @@
 /* ===== GROK ===== */
 "HIDE_GROK_ANALYZE_TITLE" = "隐藏分析和提问按钮";
 "HIDE_GROK_ANALYZE_DETAIL" = "移除 Grok 的分析和提问按钮。";
-"HIDE_GROK_SIDEBAR_TITLE" = "隐藏侧边栏中的 Grok";
-"HIDE_GROK_SIDEBAR_DETAIL" = "从侧边栏移除 Grok 快捷方式。";
+"HIDE_GROK_SIDEBAR_TITLE" = "隐藏菜单中的 Grok";
+"HIDE_GROK_SIDEBAR_DETAIL" = "从账号菜单移除 Grok 快捷方式。";
 "HIDE_GROK_BOT_TITLE" = "隐藏 Grok Bot";
 "HIDE_GROK_BOT_DETAIL" = "移除“Try Grok Bot”一行以及其他 Grok Bot 推广。";
 "HIDE_GROK_CREATE_TITLE" = "隐藏创建工具";
@@ -314,11 +314,11 @@
 "CUSTOM_TAB_BAR_GRID_DETAIL" = "轻点标签页即可添加或移除。按住下方栏中的图标，然后拖动以调整顺序。";
 "CUSTOM_TAB_BAR_RESET_MESSAGE" = "编辑器会恢复为 Twitter 的默认标签页。轻点“保存”即可保留。";
 "CUSTOM_TAB_BAR_RESTORE_ACTION" = "恢复";
-"CUSTOM_TAB_BAR_FULL_FORMAT" = "标签栏最多容纳 %ld 个标签。请先移除一个。";
+"CUSTOM_TAB_BAR_FULL_FORMAT" = "导航栏最多容纳 %ld 个标签。请先移除一个。";
 "CUSTOM_TAB_BAR_DISCARD_TITLE" = "放弃更改";
 "CUSTOM_TAB_BAR_DISCARD_MESSAGE" = "你选择的标签不会被保存。";
 "CUSTOM_TAB_BAR_DISCARD_ACTION" = "放弃";
-"CUSTOM_TAB_BAR_SETTINGS_NAVIGATION_TITLE" = "标签页";
+"CUSTOM_TAB_BAR_SETTINGS_NAVIGATION_TITLE" = "自定义导航";
 "TAB_EDITOR_TIP_CHANGE" = "轻点标签即可更改";
 "TAB_EDITOR_TIP_ARRANGE" = "按住标签即可重新排列";
 "TAB_EDITOR_TIP_ADD" = "轻点 + 即可添加标签";
@@ -680,7 +680,7 @@
 "TOUR_STEP_COMPOSER" = "撰写";
 "TOUR_STEP_CONVERSATION" = "对话";
 "TOUR_STEP_REPLIES" = "按日期排列的回复";
-"TOUR_STEP_SIDE_MENU" = "侧边栏";
+"TOUR_STEP_SIDE_MENU" = "账号菜单";
 "TOUR_STEP_DARK_MODE" = "深色模式";
 "TOUR_STEP_WEB_LINK" = "网页链接";
 "TOUR_STEP_T_CO_CHECK" = "t.co 屏蔽";

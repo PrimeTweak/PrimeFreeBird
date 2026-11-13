@@ -170,7 +170,8 @@ static BOOL pfbSwitchIsAnswered(NSString* key) {
           @"ios_tweet_promote_button_sent_tweet_toast_enabled",
           @"ios_tweet_promote_button_third_party_boost_enabled",
           @"thirdparty_boost_author_view_button_enabled",
-          @"creator_studio_nav_enabled", @"creator_monetization_dashboard_enabled"
+          @"creator_studio_nav_enabled", @"creator_monetization_dashboard_enabled",
+          @"dash_items_account_analytics_enabled"
       ]];
     });
     return [keys containsObject:key] || pfbIsGrokBotSwitch(key) ||
@@ -759,6 +760,11 @@ static NSNumber* FeatureSwitchOverrideValueForKey(NSString* key) {
         return @YES;
     }
 
+    // Analytics shown on the Sidebar page; Twitter reads this switch for the drawer alone.
+    if ([key isEqualToString:@"dash_items_account_analytics_enabled"] && [PFBSidebarItems showsAnalytics]) {
+        return @YES;
+    }
+
     return nil;
 }
 
@@ -1063,6 +1069,15 @@ static BOOL pfbSkipsSensitiveWarnings(void) {
     if (!ReportGenuineSubscription && (tier == 0 || tier == 7 || tier == 8)) {
         PFBCOMPAT_ACTION(PFBCompat_premium_unlock, @"premium tier granted");
         return YES;
+    }
+    return %orig;
+}
+
+// Analytics shown on the Sidebar page: Twitter shows it only to an account that is not Premium,
+// so its own check, and no other, finds the account not Premium.
+- (BOOL)isPremiumTierUser {
+    if ([PFBSidebarItems isAnalyticsPremiumCheck:__builtin_return_address(0)]) {
+        return NO;
     }
     return %orig;
 }

@@ -44,7 +44,7 @@
 
 /* ===== APPEARANCE — page ===== */
 "MODERN_SETTINGS_APPEARANCE_TITLE" = "Appearance";
-"MODERN_SETTINGS_APPEARANCE_SUBTITLE" = "Style, fonts, colors, and tab bar.";
+"MODERN_SETTINGS_APPEARANCE_SUBTITLE" = "Style, fonts, colors, and navigation bar.";
 
 /* ===== Appearance › Style ===== */
 "APPEARANCE_GROUP_STYLE" = "Style";
@@ -74,15 +74,15 @@
 "COLOR_PFB_SWITCHES_DETAIL" = "Apply the accent color to the switches in these settings.";
 "COLOR_TWITTER_ICON_IN_TOP_BAR_TITLE" = "Twitter icon";
 "COLOR_TWITTER_ICON_IN_TOP_BAR_DETAIL" = "Apply the accent color to the logo in the top bar.";
-"APPEARANCE_GROUP_TAB_BAR" = "Tab bar";
-"CUSTOM_TAB_BAR_OPTION_TITLE" = "Customize tabs";
+"APPEARANCE_GROUP_TAB_BAR" = "Navigation bar";
+"CUSTOM_TAB_BAR_OPTION_TITLE" = "Custom navigation";
 "CUSTOM_TAB_BAR_OPTION_SUBTITLE" = "Choose which tabs appear and in what order.";
-"APPEARANCE_GROUP_SIDEBAR" = "Sidebar";
-"CUSTOM_SIDEBAR_OPTION_TITLE" = "Customize sidebar";
-"CUSTOM_SIDEBAR_OPTION_SUBTITLE" = "Choose which items appear in the sidebar.";
-"SIDEBAR_EDITOR_NAVIGATION_TITLE" = "Sidebar";
-"SIDEBAR_EDITOR_DETAIL" = "Tap an item to add it to the sidebar or take it out.";
-"SIDEBAR_SECTION_SHOWN" = "In sidebar";
+"APPEARANCE_GROUP_SIDEBAR" = "Account menu";
+"CUSTOM_SIDEBAR_OPTION_TITLE" = "Customize account menu";
+"CUSTOM_SIDEBAR_OPTION_SUBTITLE" = "Choose which items appear in the menu.";
+"SIDEBAR_EDITOR_NAVIGATION_TITLE" = "Account menu";
+"SIDEBAR_EDITOR_DETAIL" = "Tap an item to add it to the menu or take it out.";
+"SIDEBAR_SECTION_SHOWN" = "In menu";
 "SIDEBAR_SECTION_HIDDEN" = "Hidden";
 "SIDEBAR_ITEM_SHOWN" = "Shown";
 "SIDEBAR_ITEM_HIDDEN" = "Hidden";
@@ -91,7 +91,7 @@
 "NO_TAB_BAR_HIDING_TITLE" = "Always visible";
 "NO_TAB_BAR_HIDING_DETAIL" = "Don’t shrink or fade the bar when you scroll.";
 "HIDE_BOTTOM_FADE_TITLE" = "Hide bottom fade";
-"HIDE_BOTTOM_FADE_DETAIL" = "Remove the fade Twitter draws under the tab bar.";
+"HIDE_BOTTOM_FADE_DETAIL" = "Remove the fade Twitter draws under the navigation bar.";
 
 /* ===== BRANDING ===== */
 "MODERN_SETTINGS_BRANDING_TITLE" = "Branding";
@@ -249,8 +249,8 @@
 /* ===== GROK ===== */
 "HIDE_GROK_ANALYZE_TITLE" = "Hide analyze and ask buttons";
 "HIDE_GROK_ANALYZE_DETAIL" = "Remove Grok’s analyze and ask buttons.";
-"HIDE_GROK_SIDEBAR_TITLE" = "Hide sidebar shortcut";
-"HIDE_GROK_SIDEBAR_DETAIL" = "Remove the Grok shortcut from the sidebar.";
+"HIDE_GROK_SIDEBAR_TITLE" = "Hide menu shortcut";
+"HIDE_GROK_SIDEBAR_DETAIL" = "Remove the Grok shortcut from the account menu.";
 "HIDE_GROK_BOT_TITLE" = "Hide Grok Bot";
 "HIDE_GROK_BOT_DETAIL" = "Remove the “Try Grok Bot” row and the other Grok Bot promotions.";
 "HIDE_GROK_CREATE_TITLE" = "Hide creation tools";
@@ -318,7 +318,7 @@
 "CUSTOM_TAB_BAR_DISCARD_TITLE" = "Discard changes";
 "CUSTOM_TAB_BAR_DISCARD_MESSAGE" = "The tabs you picked are not saved.";
 "CUSTOM_TAB_BAR_DISCARD_ACTION" = "Discard";
-"CUSTOM_TAB_BAR_SETTINGS_NAVIGATION_TITLE" = "Tabs";
+"CUSTOM_TAB_BAR_SETTINGS_NAVIGATION_TITLE" = "Custom navigation";
 "TAB_EDITOR_TIP_CHANGE" = "Tap a tab to change it";
 "TAB_EDITOR_TIP_ARRANGE" = "Touch and hold a tab to rearrange";
 "TAB_EDITOR_TIP_ADD" = "Tap + to add a tab";
@@ -680,7 +680,7 @@
 "TOUR_STEP_COMPOSER" = "Composer";
 "TOUR_STEP_CONVERSATION" = "Conversation";
 "TOUR_STEP_REPLIES" = "Replies by date";
-"TOUR_STEP_SIDE_MENU" = "Sidebar";
+"TOUR_STEP_SIDE_MENU" = "Account menu";
 "TOUR_STEP_DARK_MODE" = "Dark mode";
 "TOUR_STEP_WEB_LINK" = "Web link";
 "TOUR_STEP_T_CO_CHECK" = "t.co block";

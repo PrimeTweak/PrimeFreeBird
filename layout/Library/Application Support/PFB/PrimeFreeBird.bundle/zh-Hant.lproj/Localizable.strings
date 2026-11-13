@@ -74,14 +74,14 @@
 "COLOR_PFB_SWITCHES_DETAIL" = "將強調色套用到這些設定中的開關。";
 "COLOR_TWITTER_ICON_IN_TOP_BAR_TITLE" = "Twitter 圖示";
 "COLOR_TWITTER_ICON_IN_TOP_BAR_DETAIL" = "將主題強調色套用至頂部導覽列的標誌。";
-"APPEARANCE_GROUP_TAB_BAR" = "標籤列";
-"CUSTOM_TAB_BAR_OPTION_TITLE" = "自訂分頁";
+"APPEARANCE_GROUP_TAB_BAR" = "導覽列";
+"CUSTOM_TAB_BAR_OPTION_TITLE" = "自訂導覽";
 "CUSTOM_TAB_BAR_OPTION_SUBTITLE" = "選擇要顯示的分頁及其順序。";
-"APPEARANCE_GROUP_SIDEBAR" = "側邊欄";
-"CUSTOM_SIDEBAR_OPTION_TITLE" = "自訂側邊欄";
-"CUSTOM_SIDEBAR_OPTION_SUBTITLE" = "選擇要在側邊欄顯示的項目。";
-"SIDEBAR_EDITOR_NAVIGATION_TITLE" = "側邊欄";
-"SIDEBAR_EDITOR_DETAIL" = "點一下項目即可加入側邊欄或從中移除。";
+"APPEARANCE_GROUP_SIDEBAR" = "帳戶選單";
+"CUSTOM_SIDEBAR_OPTION_TITLE" = "自訂帳戶選單";
+"CUSTOM_SIDEBAR_OPTION_SUBTITLE" = "選擇要在選單中顯示的項目。";
+"SIDEBAR_EDITOR_NAVIGATION_TITLE" = "帳戶選單";
+"SIDEBAR_EDITOR_DETAIL" = "點一下項目即可加入選單或從中移除。";
 "SIDEBAR_SECTION_SHOWN" = "已顯示";
 "SIDEBAR_SECTION_HIDDEN" = "已隱藏";
 "SIDEBAR_ITEM_SHOWN" = "已顯示";
@@ -91,7 +91,7 @@
 "NO_TAB_BAR_HIDING_TITLE" = "永遠顯示";
 "NO_TAB_BAR_HIDING_DETAIL" = "捲動時不縮小也不淡出。";
 "HIDE_BOTTOM_FADE_TITLE" = "隱藏底部漸層";
-"HIDE_BOTTOM_FADE_DETAIL" = "移除 Twitter 在標籤列下方繪製的漸層。";
+"HIDE_BOTTOM_FADE_DETAIL" = "移除 Twitter 在導覽列下方繪製的漸層。";
 
 /* ===== BRANDING ===== */
 "MODERN_SETTINGS_BRANDING_TITLE" = "品牌外觀";
@@ -249,8 +249,8 @@
 /* ===== GROK ===== */
 "HIDE_GROK_ANALYZE_TITLE" = "隱藏分析和提問按鈕";
 "HIDE_GROK_ANALYZE_DETAIL" = "移除 Grok 的分析和提問按鈕。";
-"HIDE_GROK_SIDEBAR_TITLE" = "隱藏側邊欄中的 Grok";
-"HIDE_GROK_SIDEBAR_DETAIL" = "從側邊欄移除 Grok 捷徑。";
+"HIDE_GROK_SIDEBAR_TITLE" = "隱藏選單中的 Grok";
+"HIDE_GROK_SIDEBAR_DETAIL" = "從帳戶選單移除 Grok 捷徑。";
 "HIDE_GROK_BOT_TITLE" = "隱藏 Grok Bot";
 "HIDE_GROK_BOT_DETAIL" = "移除「Try Grok Bot」列和其他 Grok Bot 推廣。";
 "HIDE_GROK_CREATE_TITLE" = "隱藏建立工具";
@@ -314,11 +314,11 @@
 "CUSTOM_TAB_BAR_GRID_DETAIL" = "點一下分頁即可新增或移除。按住下方列中的圖示，然後拖移以重新排序。";
 "CUSTOM_TAB_BAR_RESET_MESSAGE" = "編輯器會回到 Twitter 的預設分頁。點一下「儲存」即可保留。";
 "CUSTOM_TAB_BAR_RESTORE_ACTION" = "復原";
-"CUSTOM_TAB_BAR_FULL_FORMAT" = "標籤列最多可放 %ld 個分頁。請先移除一個。";
+"CUSTOM_TAB_BAR_FULL_FORMAT" = "導覽列最多可放 %ld 個分頁。請先移除一個。";
 "CUSTOM_TAB_BAR_DISCARD_TITLE" = "捨棄變更";
 "CUSTOM_TAB_BAR_DISCARD_MESSAGE" = "你選擇的分頁不會儲存。";
 "CUSTOM_TAB_BAR_DISCARD_ACTION" = "捨棄";
-"CUSTOM_TAB_BAR_SETTINGS_NAVIGATION_TITLE" = "分頁";
+"CUSTOM_TAB_BAR_SETTINGS_NAVIGATION_TITLE" = "自訂導覽";
 "TAB_EDITOR_TIP_CHANGE" = "點一下分頁即可更改";
 "TAB_EDITOR_TIP_ARRANGE" = "按住分頁即可重新排列";
 "TAB_EDITOR_TIP_ADD" = "點一下 + 即可新增分頁";
@@ -680,7 +680,7 @@
 "TOUR_STEP_COMPOSER" = "撰寫";
 "TOUR_STEP_CONVERSATION" = "對話";
 "TOUR_STEP_REPLIES" = "依日期排列的回覆";
-"TOUR_STEP_SIDE_MENU" = "側邊欄";
+"TOUR_STEP_SIDE_MENU" = "帳戶選單";
 "TOUR_STEP_DARK_MODE" = "深色模式";
 "TOUR_STEP_WEB_LINK" = "網頁連結";
 "TOUR_STEP_T_CO_CHECK" = "t.co 封鎖";
