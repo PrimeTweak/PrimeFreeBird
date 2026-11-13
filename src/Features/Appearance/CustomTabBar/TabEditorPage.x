@@ -1,11 +1,14 @@
 // Twitter's tab editor laid out over the whole page: its message at the top, the bar on a card,
-// the hint as three illustrated tips, and Restore to default at the bottom. Twitter keeps the
-// editing itself; only the places of its views change.
+// the hint as three illustrated tips, and Restore to default on a glass bar in the tab bar's place.
+// Twitter keeps the editing itself; only the places of its views change.
 
 #import "Support/HookHelpers.h"
 #import "Common/PFBBundle.h"
+#import "Settings/Native/PFBShowcase.h"
+#import "Support/TwitterChirpFont.h"
 
 static const void* kPFBEditorCardKey = &kPFBEditorCardKey;
+static const void* kPFBEditorRestoreKey = &kPFBEditorRestoreKey;
 static const void* kPFBEditorTipsKey = &kPFBEditorTipsKey;
 static const void* kPFBEditorPickerFrameKey = &kPFBEditorPickerFrameKey;
 
@@ -92,9 +95,8 @@ static id PFBEditorPart(UIViewController* editor, const char* name, Class kind) 
 }
 
 // The picker Twitter anchors to the bar follows the bar, once per frame Twitter gives it. Its
-// height, sized by Twitter for a bar at the bottom, is kept to the room left below: its list
-// scrolls within.
-static void PFBEditorMovePicker(UIViewController* editor, CGFloat delta) {
+// height, sized by Twitter for a bar at the bottom, is kept above floorY: its list scrolls within.
+static void PFBEditorMovePicker(UIViewController* editor, CGFloat delta, CGFloat floorY) {
     UIView* picker = PFBEditorPart(editor, "picker", [UIView class]);
     UIView* page = editor.viewIfLoaded;
     if (!picker.superview || !page || delta == 0.0) {
@@ -105,14 +107,35 @@ static void PFBEditorMovePicker(UIViewController* editor, CGFloat delta) {
         return;
     }
     CGRect frame = CGRectOffset(picker.frame, 0.0, delta);
-    CGRect bottom = [page convertRect:CGRectMake(0.0, CGRectGetMaxY(page.bounds) - page.safeAreaInsets.bottom - 12.0, 1.0, 1.0)
-                               toView:picker.superview];
+    CGRect bottom = [page convertRect:CGRectMake(0.0, floorY, 1.0, 1.0) toView:picker.superview];
     if (CGRectGetMaxY(frame) > CGRectGetMinY(bottom)) {
         frame.size.height = MAX(120.0, CGRectGetMinY(bottom) - CGRectGetMinY(frame));
     }
     picker.frame = frame;
     objc_setAssociatedObject(picker, kPFBEditorPickerFrameKey, [NSValue valueWithCGRect:frame],
                              OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+}
+
+// Restore to default as the settings' glass bar; a tap is passed to Twitter's own button, whose
+// restore Twitter keeps.
+static PFBShowcaseButton* PFBEditorRestoreBar(UIViewController* editor) {
+    PFBShowcaseButton* restore = objc_getAssociatedObject(editor, kPFBEditorRestoreKey);
+    if (restore) {
+        return restore;
+    }
+    restore = [PFBShowcaseButton buttonWithStyle:PFBShowcaseButtonStyleGlass];
+    restore.label = [[PFBBundle sharedBundle] localizedTwitterStringForKey:@"SUBSCRIPTION_TAB_CUSTOMIZATION_RESTORE_BUTTON_TITLE"];
+    restore.labelFont = PFBScaledFont([TwitterChirpFont(TwitterFontStyleSemibold) fontWithSize:17]);
+    __weak UIViewController* weakEditor = editor;
+    [restore addAction:[UIAction actionWithHandler:^(__unused UIAction* action) {
+               UIControl* reset = PFBEditorPart(weakEditor, "resetButton", [UIControl class]);
+               [reset sendActionsForControlEvents:UIControlEventTouchUpInside];
+               PFBCOMPAT_ACTION(PFBCompat_custom_tab_bar, reset ? @"Restore passed to Twitter's button"
+                                                                : @"Restore found no button of Twitter's");
+           }]
+        forControlEvents:UIControlEventTouchUpInside];
+    objc_setAssociatedObject(editor, kPFBEditorRestoreKey, restore, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    return restore;
 }
 
 static void PFBEditorLayoutPage(UIViewController* editor) {
@@ -165,7 +188,10 @@ static void PFBEditorLayoutPage(UIViewController* editor) {
             }
         }
     }
-    PFBEditorMovePicker(editor, CGRectGetMinY(barFrame) - twitterBarY);
+    BOOL glassRestore = [reset isKindOfClass:[UIControl class]];
+    CGRect dock = PFBShowcaseDockFrame(page);
+    CGFloat floorY = glassRestore ? CGRectGetMinY(dock) - 12.0 : CGRectGetMaxY(bounds) - safe.bottom - 12.0;
+    PFBEditorMovePicker(editor, CGRectGetMinY(barFrame) - twitterBarY, floorY);
 
     hint.hidden = YES;
     PFBTabEditorTipsView* tips = objc_getAssociatedObject(editor, kPFBEditorTipsKey);
@@ -179,9 +205,22 @@ static void PFBEditorLayoutPage(UIViewController* editor) {
     tips.font = [message.font fontWithSize:15.0];
     tips.frame = CGRectMake(24.0, CGRectGetMaxY(card) + 20.0, width - 48.0, 132.0);
 
-    CGFloat resetHeight = CGRectGetHeight(reset.frame) > 0.0 ? CGRectGetHeight(reset.frame) : 36.0;
-    reset.frame = CGRectMake(20.0, CGRectGetMaxY(bounds) - safe.bottom - 12.0 - resetHeight, width - 40.0, resetHeight);
-    PFBCOMPAT_ACTION(PFBCompat_custom_tab_bar, @"tab editor page laid out");
+    // Twitter's button stays the one that restores, hidden under the glass bar, which follows its state.
+    if (glassRestore) {
+        PFBShowcaseButton* restore = PFBEditorRestoreBar(editor);
+        if (restore.superview != page) {
+            [page addSubview:restore];
+        }
+        restore.frame = dock;
+        restore.enabled = ((UIControl*)reset).enabled;
+        restore.alpha = restore.enabled ? 1.0 : 0.4;
+        reset.hidden = YES;
+        PFBCOMPAT_ACTION(PFBCompat_custom_tab_bar, @"tab editor page laid out, Restore on the glass bar");
+    } else {
+        CGFloat resetHeight = CGRectGetHeight(reset.frame) > 0.0 ? CGRectGetHeight(reset.frame) : 36.0;
+        reset.frame = CGRectMake(20.0, floorY - resetHeight, width - 40.0, resetHeight);
+        PFBCOMPAT_OBSERVE(PFBCompat_custom_tab_bar, @"tab editor page laid out, Twitter's Restore not a control");
+    }
 }
 
 // Twitter flies a copy of its bar between the tab bar at the bottom and the editor's bar as the

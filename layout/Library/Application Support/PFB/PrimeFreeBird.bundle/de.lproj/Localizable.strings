@@ -78,7 +78,7 @@
 "CUSTOM_TAB_BAR_OPTION_TITLE" = "Angepasste Navigation";
 "CUSTOM_TAB_BAR_OPTION_SUBTITLE" = "Wähle, welche Tabs erscheinen und in welcher Reihenfolge.";
 "APPEARANCE_GROUP_SIDEBAR" = "Account-Menü";
-"CUSTOM_SIDEBAR_OPTION_TITLE" = "Account-Menü anpassen";
+"CUSTOM_SIDEBAR_OPTION_TITLE" = "Account-Menü";
 "CUSTOM_SIDEBAR_OPTION_SUBTITLE" = "Wähle, welche Elemente im Menü erscheinen.";
 "SIDEBAR_EDITOR_NAVIGATION_TITLE" = "Account-Menü";
 "SIDEBAR_EDITOR_DETAIL" = "Tippe auf ein Element, um es dem Menü hinzuzufügen oder daraus zu entfernen.";

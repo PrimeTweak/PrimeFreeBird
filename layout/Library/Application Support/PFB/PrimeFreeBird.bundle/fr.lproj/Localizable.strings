@@ -74,7 +74,7 @@
 "CUSTOM_TAB_BAR_OPTION_TITLE" = "Navigation personnalisée";
 "CUSTOM_TAB_BAR_OPTION_SUBTITLE" = "Choisissez les onglets affichés et leur ordre.";
 "APPEARANCE_GROUP_SIDEBAR" = "Menu du compte";
-"CUSTOM_SIDEBAR_OPTION_TITLE" = "Personnaliser le menu du compte";
+"CUSTOM_SIDEBAR_OPTION_TITLE" = "Menu du compte";
 "CUSTOM_SIDEBAR_OPTION_SUBTITLE" = "Choisissez les éléments affichés dans le menu.";
 "SIDEBAR_EDITOR_NAVIGATION_TITLE" = "Menu du compte";
 "SIDEBAR_EDITOR_DETAIL" = "Touchez un élément pour l’ajouter au menu ou l’en retirer.";

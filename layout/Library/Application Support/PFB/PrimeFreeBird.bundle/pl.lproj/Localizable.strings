@@ -78,7 +78,7 @@
 "CUSTOM_TAB_BAR_OPTION_TITLE" = "Spersonalizowana nawigacja";
 "CUSTOM_TAB_BAR_OPTION_SUBTITLE" = "Wybierz, które karty się pojawiają i w jakiej kolejności.";
 "APPEARANCE_GROUP_SIDEBAR" = "Menu konta";
-"CUSTOM_SIDEBAR_OPTION_TITLE" = "Dostosuj menu konta";
+"CUSTOM_SIDEBAR_OPTION_TITLE" = "Menu konta";
 "CUSTOM_SIDEBAR_OPTION_SUBTITLE" = "Wybierz, które elementy pojawiają się w menu.";
 "SIDEBAR_EDITOR_NAVIGATION_TITLE" = "Menu konta";
 "SIDEBAR_EDITOR_DETAIL" = "Stuknij element, aby dodać go do menu lub go usunąć.";

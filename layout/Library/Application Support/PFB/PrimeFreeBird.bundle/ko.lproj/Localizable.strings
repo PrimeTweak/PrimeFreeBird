@@ -78,7 +78,7 @@
 "CUSTOM_TAB_BAR_OPTION_TITLE" = "맞춤 탐색";
 "CUSTOM_TAB_BAR_OPTION_SUBTITLE" = "표시할 탭과 순서를 선택합니다.";
 "APPEARANCE_GROUP_SIDEBAR" = "계정 메뉴";
-"CUSTOM_SIDEBAR_OPTION_TITLE" = "계정 메뉴 사용자화";
+"CUSTOM_SIDEBAR_OPTION_TITLE" = "계정 메뉴";
 "CUSTOM_SIDEBAR_OPTION_SUBTITLE" = "메뉴에 표시할 항목을 선택하세요.";
 "SIDEBAR_EDITOR_NAVIGATION_TITLE" = "계정 메뉴";
 "SIDEBAR_EDITOR_DETAIL" = "항목을 탭하여 메뉴에 추가하거나 제거하세요.";

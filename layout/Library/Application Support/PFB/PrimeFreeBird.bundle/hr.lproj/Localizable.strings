@@ -78,7 +78,7 @@
 "CUSTOM_TAB_BAR_OPTION_TITLE" = "Prilagođena navigacija";
 "CUSTOM_TAB_BAR_OPTION_SUBTITLE" = "Odaberi koje se kartice prikazuju i kojim redom.";
 "APPEARANCE_GROUP_SIDEBAR" = "Izbornik računa";
-"CUSTOM_SIDEBAR_OPTION_TITLE" = "Prilagodi izbornik računa";
+"CUSTOM_SIDEBAR_OPTION_TITLE" = "Izbornik računa";
 "CUSTOM_SIDEBAR_OPTION_SUBTITLE" = "Odaberi koje se stavke prikazuju u izborniku.";
 "SIDEBAR_EDITOR_NAVIGATION_TITLE" = "Izbornik računa";
 "SIDEBAR_EDITOR_DETAIL" = "Dodirni stavku da je dodaš u izbornik ili je ukloniš iz njega.";

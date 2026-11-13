@@ -78,7 +78,7 @@
 "CUSTOM_TAB_BAR_OPTION_TITLE" = "カスタムナビゲーション";
 "CUSTOM_TAB_BAR_OPTION_SUBTITLE" = "表示するタブとその順番を選びます。";
 "APPEARANCE_GROUP_SIDEBAR" = "アカウントメニュー";
-"CUSTOM_SIDEBAR_OPTION_TITLE" = "アカウントメニューをカスタマイズ";
+"CUSTOM_SIDEBAR_OPTION_TITLE" = "アカウントメニュー";
 "CUSTOM_SIDEBAR_OPTION_SUBTITLE" = "メニューに表示する項目を選択します。";
 "SIDEBAR_EDITOR_NAVIGATION_TITLE" = "アカウントメニュー";
 "SIDEBAR_EDITOR_DETAIL" = "項目をタップすると、メニューに追加したり外したりできます。";

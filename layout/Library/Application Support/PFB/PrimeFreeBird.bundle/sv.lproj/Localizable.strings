@@ -78,7 +78,7 @@
 "CUSTOM_TAB_BAR_OPTION_TITLE" = "Anpassad navigering";
 "CUSTOM_TAB_BAR_OPTION_SUBTITLE" = "Välj vilka flikar som visas och i vilken ordning.";
 "APPEARANCE_GROUP_SIDEBAR" = "Kontomeny";
-"CUSTOM_SIDEBAR_OPTION_TITLE" = "Anpassa kontomenyn";
+"CUSTOM_SIDEBAR_OPTION_TITLE" = "Kontomeny";
 "CUSTOM_SIDEBAR_OPTION_SUBTITLE" = "Välj vilka objekt som visas i menyn.";
 "SIDEBAR_EDITOR_NAVIGATION_TITLE" = "Kontomeny";
 "SIDEBAR_EDITOR_DETAIL" = "Tryck på ett objekt för att lägga till det i menyn eller ta bort det.";

@@ -1573,6 +1573,7 @@ static const PFBCompatName kNames[] = {
     {PFBCompat_custom_tab_bar, "Features/Appearance/CustomTabBar/TabEditorPage.x", "barView"},
     {PFBCompat_custom_tab_bar, "Features/Appearance/CustomTabBar/TabEditorPage.x", "picker"},
     {PFBCompat_custom_tab_bar, "Features/Appearance/CustomTabBar/TabEditorPage.x", "tabBarFlight"},
+    {PFBCompat_custom_tab_bar, "Features/Appearance/CustomTabBar/TabEditorPage.x", "SUBSCRIPTION_TAB_CUSTOMIZATION_RESTORE_BUTTON_TITLE"},
     {PFBCompat_custom_tab_bar, "Features/Appearance/CustomTabBar/PFBCustomTabBarUtility.m", "T1HostViewController"},
     {PFBCompat_custom_tab_bar, "Features/Appearance/CustomTabBar/PFBCustomTabBarUtility.m", "appNavigation"},
     {PFBCompat_custom_tab_bar, "Features/Appearance/CustomTabBar/PFBCustomTabBarUtility.m", "_TtC14T1TwitterSwift20XTabbedAppNavigation"},

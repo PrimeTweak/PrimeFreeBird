@@ -78,7 +78,7 @@
 "CUSTOM_TAB_BAR_OPTION_TITLE" = "Власна навігація";
 "CUSTOM_TAB_BAR_OPTION_SUBTITLE" = "Виберіть, які вкладки показувати та в якому порядку.";
 "APPEARANCE_GROUP_SIDEBAR" = "Меню профілю";
-"CUSTOM_SIDEBAR_OPTION_TITLE" = "Налаштувати меню профілю";
+"CUSTOM_SIDEBAR_OPTION_TITLE" = "Меню профілю";
 "CUSTOM_SIDEBAR_OPTION_SUBTITLE" = "Виберіть, які пункти показувати в меню.";
 "SIDEBAR_EDITOR_NAVIGATION_TITLE" = "Меню профілю";
 "SIDEBAR_EDITOR_DETAIL" = "Торкніться пункту, щоб додати його в меню або прибрати з нього.";

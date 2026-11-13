@@ -78,7 +78,7 @@
 "CUSTOM_TAB_BAR_OPTION_TITLE" = "Personalizar navegación";
 "CUSTOM_TAB_BAR_OPTION_SUBTITLE" = "Elige qué pestañas aparecen y en qué orden.";
 "APPEARANCE_GROUP_SIDEBAR" = "Menú de la cuenta";
-"CUSTOM_SIDEBAR_OPTION_TITLE" = "Personalizar menú de la cuenta";
+"CUSTOM_SIDEBAR_OPTION_TITLE" = "Menú de la cuenta";
 "CUSTOM_SIDEBAR_OPTION_SUBTITLE" = "Elige qué elementos aparecen en el menú.";
 "SIDEBAR_EDITOR_NAVIGATION_TITLE" = "Menú de la cuenta";
 "SIDEBAR_EDITOR_DETAIL" = "Toca un elemento para añadirlo al menú o quitarlo.";

@@ -21,7 +21,7 @@ static const CGFloat kTileRadius = 22.0;
 // MARK: - Tile
 
 // One item: Twitter's glyph and name on glass with a filled check while it is in the sidebar; a
-// dashed outline and a plus once hidden.
+// fine dashed outline over a veil of the page's ground, and a plus, once hidden.
 @interface PFBSidebarTile : UIControl
 @property (nonatomic, readonly) NSInteger panelID;
 @property (nonatomic) BOOL shown;
@@ -47,9 +47,8 @@ static const CGFloat kTileRadius = 22.0;
         _surface.userInteractionEnabled = NO;
         [self addSubview:_surface];
         _outline = [CAShapeLayer layer];
-        _outline.fillColor = UIColor.clearColor.CGColor;
-        _outline.lineWidth = 1.0;
-        _outline.lineDashPattern = @[ @5, @4 ];
+        _outline.lineWidth = 0.75;
+        _outline.lineDashPattern = @[ @4, @4 ];
         [self.layer addSublayer:_outline];
         _glyph = [[UIImageView alloc] init];
         _glyph.contentMode = UIViewContentModeScaleAspectFit;
@@ -92,22 +91,25 @@ static const CGFloat kTileRadius = 22.0;
     [self applyState];
 }
 
-// In the sidebar: glass, ink and the check on the accent. Hidden: the dashed outline, muted ink
-// and a plus in an empty ring.
+// In the sidebar: glass, ink and the check on the accent. Hidden: the dashed outline and the veil,
+// ink at 65 % and a plus in a fine ring.
 - (void)applyState {
-    UIColor* ink = _shown ? PFBSettingsTextColor() : PFBSettingsSubtitleColor();
+    UIColor* ink = _shown ? PFBSettingsTextColor() : [PFBSettingsSubtitleColor() colorWithAlphaComponent:0.65];
     _glyph.tintColor = ink;
     _name.textColor = ink;
     _surface.alpha = _shown ? 1.0 : 0.0;
     _outline.opacity = _shown ? 0.0 : 1.0;
-    _outline.strokeColor = [PFBSettingsSubtitleColor() colorWithAlphaComponent:0.6].CGColor;
+    _outline.strokeColor = [PFBSettingsSubtitleColor() colorWithAlphaComponent:0.3].CGColor;
+    _outline.fillColor =
+        [[[PFBPalette currentBackgroundColor] colorWithAlphaComponent:0.6] resolvedColorWithTraitCollection:self.traitCollection]
+            .CGColor;
     _mark.backgroundColor = _shown ? PFBBrandAccentColor() : [UIColor clearColor];
-    _mark.layer.borderWidth = _shown ? 0.0 : 1.5;
+    _mark.layer.borderWidth = _shown ? 0.0 : 1.0;
     _mark.layer.borderColor = [[UIColor separatorColor] resolvedColorWithTraitCollection:self.traitCollection].CGColor;
     _sign.image = [UIImage systemImageNamed:_shown ? @"checkmark" : @"plus"
                           withConfiguration:[UIImageSymbolConfiguration configurationWithPointSize:11
                                                                                             weight:UIImageSymbolWeightBold]];
-    _sign.tintColor = _shown ? [UIColor whiteColor] : PFBSettingsSubtitleColor();
+    _sign.tintColor = _shown ? [UIColor whiteColor] : ink;
     self.accessibilityValue = [[PFBBundle sharedBundle] localizedStringForKey:_shown ? @"SIDEBAR_ITEM_SHOWN" : @"SIDEBAR_ITEM_HIDDEN"];
 }
 
@@ -122,7 +124,7 @@ static const CGFloat kTileRadius = 22.0;
     CGFloat height = CGRectGetHeight(self.bounds);
     _surface.frame = self.bounds;
     _outline.frame = self.bounds;
-    _outline.path = [UIBezierPath bezierPathWithRoundedRect:CGRectInset(self.bounds, 0.5, 0.5) cornerRadius:kTileRadius].CGPath;
+    _outline.path = [UIBezierPath bezierPathWithRoundedRect:CGRectInset(self.bounds, 0.375, 0.375) cornerRadius:kTileRadius].CGPath;
     BOOL rtl = self.effectiveUserInterfaceLayoutDirection == UIUserInterfaceLayoutDirectionRightToLeft;
     CGFloat textWidth = MAX(0, width - 2 * kTileInset);
     CGRect glyph = CGRectMake(kTileInset, kTileInset, 24, 24);

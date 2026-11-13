@@ -78,7 +78,7 @@
 "CUSTOM_TAB_BAR_OPTION_TITLE" = "Custom navigation";
 "CUSTOM_TAB_BAR_OPTION_SUBTITLE" = "Choose which tabs appear and in what order.";
 "APPEARANCE_GROUP_SIDEBAR" = "Account menu";
-"CUSTOM_SIDEBAR_OPTION_TITLE" = "Customize account menu";
+"CUSTOM_SIDEBAR_OPTION_TITLE" = "Account menu";
 "CUSTOM_SIDEBAR_OPTION_SUBTITLE" = "Choose which items appear in the menu.";
 "SIDEBAR_EDITOR_NAVIGATION_TITLE" = "Account menu";
 "SIDEBAR_EDITOR_DETAIL" = "Tap an item to add it to the menu or take it out.";

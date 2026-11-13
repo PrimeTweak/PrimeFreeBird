@@ -78,7 +78,7 @@
 "CUSTOM_TAB_BAR_OPTION_TITLE" = "التصفّح المخصص";
 "CUSTOM_TAB_BAR_OPTION_SUBTITLE" = "اختر التبويبات التي تظهر وترتيبها.";
 "APPEARANCE_GROUP_SIDEBAR" = "قائمة الحساب";
-"CUSTOM_SIDEBAR_OPTION_TITLE" = "تخصيص قائمة الحساب";
+"CUSTOM_SIDEBAR_OPTION_TITLE" = "قائمة الحساب";
 "CUSTOM_SIDEBAR_OPTION_SUBTITLE" = "اختر العناصر التي تظهر في القائمة.";
 "SIDEBAR_EDITOR_NAVIGATION_TITLE" = "قائمة الحساب";
 "SIDEBAR_EDITOR_DETAIL" = "انقر على عنصر لإضافته إلى القائمة أو إزالته منها.";

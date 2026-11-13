@@ -78,7 +78,7 @@
 "CUSTOM_TAB_BAR_OPTION_TITLE" = "Собственная панель навигации";
 "CUSTOM_TAB_BAR_OPTION_SUBTITLE" = "Выберите, какие вкладки показывать и в каком порядке.";
 "APPEARANCE_GROUP_SIDEBAR" = "Меню учетной записи";
-"CUSTOM_SIDEBAR_OPTION_TITLE" = "Настроить меню учетной записи";
+"CUSTOM_SIDEBAR_OPTION_TITLE" = "Меню учетной записи";
 "CUSTOM_SIDEBAR_OPTION_SUBTITLE" = "Выберите, какие пункты показывать в меню.";
 "SIDEBAR_EDITOR_NAVIGATION_TITLE" = "Меню учетной записи";
 "SIDEBAR_EDITOR_DETAIL" = "Нажмите на пункт, чтобы добавить его в меню или убрать из него.";
