@@ -114,9 +114,9 @@
 - (TFNToastViewController*)toastViewController;
 @end
 
-// The toast's chrome, under its content: a blur and a shadow.
+// The toast's chrome: Twitter's glass, holding the content and tinted with the toast's color.
 @interface XDSToastContainerView : UIView
-- (void)setBlurHidden:(BOOL)hidden;
+- (UIColor*)surfaceColor;
 @end
 
 @interface TFNHUD : NSObject

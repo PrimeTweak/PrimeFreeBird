@@ -240,15 +240,16 @@ NSString* PFBTwitterTerminology(NSString* text) {
 
 // MARK: - Rename server-composed text
 
-// The view holds people's own words: a Tweet body, a bio, a draft or a link card.
+// The view holds people's own words: a Tweet body, a bio, a link card, or anything in the
+// drafts list.
 static BOOL PFBTextViewHoldsOwnWords(UIView* view) {
     static NSArray<Class>* containers;
+    static Class drafts;
     static dispatch_once_t once;
     dispatch_once(&once, ^{
         NSMutableArray<Class>* found = [NSMutableArray array];
         for (NSString* name in @[
-                 @"T1ProfileUserInfoView", @"T1UserView", @"T1UserRecommendationView",
-                 @"T1TweetDraftsDraftCompositionView", @"T1WebCardView"
+                 @"T1ProfileUserInfoView", @"T1UserView", @"T1UserRecommendationView", @"T1WebCardView"
              ]) {
             Class container = NSClassFromString(name);
             if (container) {
@@ -256,6 +257,7 @@ static BOOL PFBTextViewHoldsOwnWords(UIView* view) {
             }
         }
         containers = found.copy;
+        drafts = NSClassFromString(@"TTDTweetDraftListViewController");
     });
     if ([view isKindOfClass:%c(TTAStatusBodyAttributedTextView)]) {
         return YES;
@@ -266,6 +268,11 @@ static BOOL PFBTextViewHoldsOwnWords(UIView* view) {
             if ([node isKindOfClass:container]) {
                 return YES;
             }
+        }
+    }
+    for (UIResponder* responder = view.nextResponder; drafts && responder; responder = responder.nextResponder) {
+        if ([responder isKindOfClass:drafts]) {
+            return YES;
         }
     }
     return NO;

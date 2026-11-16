@@ -347,24 +347,29 @@ static PFBGlassReserve PFBGlassApplyChromeReserve(void) {
     return found;
 }
 
-// A stack's collapse engine copies the reserve when it is made, and Twitter copies it into the
-// hide travel: an engine made before the reserve changed is brought in line. Only Twitter's own
-// values, with or without the extra height, are replaced.
+// A stack's collapse engine keeps the bar's band (extent first, then a byte at 24 that is 0 once
+// set) and copies the extent into the hide travel: an engine made before the reserve changed is
+// brought in line. Only Twitter's own values, with or without the extra height, are replaced.
 static void PFBGlassSyncEngineReserve(UINavigationController* stack, PFBGlassReserve found) {
     static Class engineClass;
     static ptrdiff_t engineOffset = -1;
-    static ptrdiff_t fields[2] = {-1, -1};
+    static ptrdiff_t bandOffset = -1;
+    static ptrdiff_t travelOffset = -1;
     static dispatch_once_t once;
     dispatch_once(&once, ^{
       engineClass = NSClassFromString(@"_TtC11XNavigation14CollapseEngine");
       Ivar engine = class_getInstanceVariable(NSClassFromString(@"XNAVNavigationController"),
                                               "$__lazy_storage_$_collapseEngine");
-      Ivar extent = engineClass ? class_getInstanceVariable(engineClass, "bottomChromeExtent") : NULL;
+      Ivar band = engineClass ? class_getInstanceVariable(engineClass, "bottomChromeBand") : NULL;
+      Ivar next = engineClass ? class_getInstanceVariable(engineClass, "progressMemory") : NULL;
       Ivar travel = engineClass ? class_getInstanceVariable(engineClass, "hiddenBarTravel") : NULL;
-      if (engine && extent && travel) {
+      // Extent, slide and opacity, then the byte, in the 32 bytes measured before the next field.
+      if (engine && band && next && travel && ivar_getOffset(next) - ivar_getOffset(band) == 32) {
           engineOffset = ivar_getOffset(engine);
-          fields[0] = ivar_getOffset(extent);
-          fields[1] = ivar_getOffset(travel);
+          bandOffset = ivar_getOffset(band);
+          travelOffset = ivar_getOffset(travel);
+      } else if (engineClass) {
+          PFBCompatMeasure(@"bottom reserve", @"collapse engine band not found", 2);
       }
     });
     if (!found.reserve || engineOffset < 0 || !stack) {
@@ -375,10 +380,14 @@ static void PFBGlassSyncEngineReserve(UINavigationController* stack, PFBGlassRes
     if (!engine || object_getClass((__bridge id)engine) != engineClass) {
         return;
     }
+    uint8_t* bytes = (uint8_t*)engine;
+    double* values[2] = {bytes[bandOffset + 24] == 0 ? (double*)(bytes + bandOffset) : NULL,
+                         (double*)(bytes + travelOffset)};
     double wanted = *found.reserve;
     for (NSUInteger i = 0; i < 2; i++) {
-        double* value = (double*)((uint8_t*)engine + fields[i]);
-        if (*value != wanted && (*value == found.original || *value == found.original + kPFBGlassExtraHeight)) {
+        double* value = values[i];
+        if (value && *value != wanted &&
+            (*value == found.original || *value == found.original + kPFBGlassExtraHeight)) {
             *value = wanted;
         }
     }
@@ -938,6 +947,34 @@ static NSString* PFBGlassStackState(UINavigationController* stack) {
                                       PFBGlassTabBarCollapse(stack)];
 }
 
+// Twitter's glass stacks showing in a window, each as its top screen and its state; tops gets the
+// top screens alone.
+static NSString* PFBGlassShowingStacks(UIWindow* window, NSString** tops) {
+    Class stackClass = NSClassFromString(@"XNAVNavigationController");
+    NSMutableArray<NSString*>* states = [NSMutableArray array];
+    NSMutableArray<NSString*>* screens = [NSMutableArray array];
+    NSMutableArray<UIViewController*>* queue = [NSMutableArray array];
+    if (window.rootViewController) {
+        [queue addObject:window.rootViewController];
+    }
+    for (NSUInteger i = 0; i < queue.count && i < 200 && states.count < 4; i++) {
+        UIViewController* controller = queue[i];
+        if (stackClass && [controller isKindOfClass:stackClass] && controller.isViewLoaded &&
+            controller.view.window && !controller.view.hidden) {
+            UINavigationController* stack = (UINavigationController*)controller;
+            NSString* top = NSStringFromClass([stack.topViewController class]) ?: @"none";
+            [screens addObject:top];
+            [states addObject:[NSString stringWithFormat:@"%@ on %@", top, PFBGlassStackState(stack)]];
+        }
+        [queue addObjectsFromArray:controller.childViewControllers];
+        if (controller.presentedViewController) {
+            [queue addObject:controller.presentedViewController];
+        }
+    }
+    *tops = screens.count ? [screens componentsJoinedByString:@", "] : @"none";
+    return states.count ? [states componentsJoinedByString:@" | "] : @"none";
+}
+
 // The screen in front of a window: the last one presented, or the top of its stack.
 static UIViewController* PFBGlassFrontScreen(UIWindow* window) {
     UIViewController* screen = window.rootViewController;
@@ -951,8 +988,8 @@ static UIViewController* PFBGlassFrontScreen(UIWindow* window) {
 }
 
 // Always visible keeps the bar full: its glass laid out as the round button, about as wide as
-// tall and far narrower than the bar, fails the option once a launch. Each new place it happens
-// is measured: bar shown or hidden, screen in front, last screen scrolled and its stack.
+// tall and far narrower than the bar, fails the option once a launch. Each new place it happens is
+// measured: bar shown or hidden, screen in front, last screen scrolled, every glass stack showing.
 static void PFBGlassCheckAlwaysVisible(UIView* glass) {
     static BOOL noted;
     static NSMutableSet<NSString*>* places;
@@ -984,7 +1021,9 @@ static void PFBGlassCheckAlwaysVisible(UIView* glass) {
                                                  gPFBGlassChromeHidden ? @" by the settings" : @"",
                                                  NSStringFromClass([PFBGlassFrontScreen(glass.window) class]) ?: @"none",
                                                  NSStringFromClass([scrolled class]) ?: @"none"];
-    NSString* key = [place stringByAppendingString:tour];
+    NSString* tops = nil;
+    NSString* stacks = PFBGlassShowingStacks(glass.window, &tops);
+    NSString* key = [NSString stringWithFormat:@"%@%@, %@", place, tour, tops];
     if (!places) {
         places = [NSMutableSet set];
     }
@@ -1004,8 +1043,8 @@ static void PFBGlassCheckAlwaysVisible(UIView* glass) {
                                                              PFBGlassStackState(scrolled.navigationController)]
                                 : @"";
     NSString* line = [NSString
-        stringWithFormat:@"collapsed at %@ (+%.1f s%@): %@%@; bar %@, glass %.0f x %.0f",
-                         [clock stringFromDate:[NSDate date]], PFBGlassSinceLaunch(), tour, place, scroll,
+        stringWithFormat:@"collapsed at %@ (+%.1f s%@): %@%@; stacks: %@; bar %@, glass %.0f x %.0f",
+                         [clock stringFromDate:[NSDate date]], PFBGlassSinceLaunch(), tour, place, scroll, stacks,
                          NSStringFromCGRect(CGRectIntegral([bar convertRect:bar.bounds toView:nil])), size.width,
                          size.height];
     PFBCompatMeasure(@"always visible", line, 10);

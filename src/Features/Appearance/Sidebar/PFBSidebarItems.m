@@ -20,12 +20,12 @@ static NSArray<NSNumber*>* gPFBSidebarTabs;
 static NSMutableArray<NSNumber*>* gPFBSidebarBuilding;
 static BOOL gPFBSidebarAnalyticsAsked;
 
-// Analytics is shown only to an account that is not Premium. In T1Twitter 12.42.1, the build with
+// Analytics is shown only to an account that is not Premium. In T1Twitter 12.44, the build with
 // this UUID, its builder asks once, from the call returning to this offset.
 static const NSInteger kAnalyticsPanel = 19;
-static const uintptr_t kAnalyticsPremiumReturn = 0xa01ecc;
-static const uint8_t kT1Twitter1242UUID[16] = {0xBB, 0x9C, 0xD0, 0x55, 0xAE, 0xFC, 0x31, 0xEC,
-                                               0xB9, 0x34, 0x1C, 0x11, 0x79, 0x31, 0x93, 0x3F};
+static const uintptr_t kAnalyticsPremiumReturn = 0x9f6860;
+static const uint8_t kT1Twitter1244UUID[16] = {0xFF, 0x04, 0xD4, 0x03, 0x9F, 0x49, 0x3B, 0x14,
+                                               0x87, 0x6C, 0xA8, 0xF7, 0xAD, 0x59, 0x18, 0x9F};
 
 // Twitter's panel table answers by class method; each read is checked so a renamed one gives nil.
 static id PFBPanelIdentityAnswer(NSString* selectorName, NSInteger panelID) {
@@ -44,7 +44,7 @@ static NSString* PFBSidebarTwitterString(NSString* key) {
     return text.length && ![text isEqualToString:key] ? text : nil;
 }
 
-// T1Twitter's load address when it is 12.42.1's build, where Analytics' check is known; 0 otherwise.
+// T1Twitter's load address when it is 12.44's build, where Analytics' check is known; 0 otherwise.
 static uintptr_t PFBSidebarT1TwitterBase(void) {
     static uintptr_t base;
     static dispatch_once_t once;
@@ -59,7 +59,7 @@ static uintptr_t PFBSidebarT1TwitterBase(void) {
       for (uint32_t i = 0; header->magic == MH_MAGIC_64 && i < header->ncmds; i++) {
           const struct load_command* command = (const struct load_command*)cursor;
           if (command->cmd == LC_UUID) {
-              if (!memcmp(((const struct uuid_command*)command)->uuid, kT1Twitter1242UUID, 16)) {
+              if (!memcmp(((const struct uuid_command*)command)->uuid, kT1Twitter1244UUID, 16)) {
                   base = (uintptr_t)header;
               }
               return;
@@ -322,7 +322,7 @@ NSArray<NSNumber*>* PFBDashSnapshot(id content) {
         [self noteFailureOf:@(kAnalyticsPanel) state:@"missing from the sidebar"];
     }
     if (!PFBSidebarIsOffered(kAnalyticsPanel) && PFBSidebarChoice(kAnalyticsPanel).boolValue) {
-        PFBCompatNoteFailure(PFBCompat_customize_sidebar, @"Analytics not offered: T1Twitter is not 12.42.1's build");
+        PFBCompatNoteFailure(PFBCompat_customize_sidebar, @"Analytics not offered: T1Twitter is not 12.44's build");
     }
 }
 

@@ -244,19 +244,45 @@ static void PFBGlassToastColor(UIView* container, id toast) {
     });
 }
 
-// Twitter's chrome under the content: its dark blur and its shadow, nothing else.
-static NSArray<UIView*>* PFBGlassToastChrome(UIView* container) {
-    NSMutableArray<UIView*>* chrome = [NSMutableArray array];
-    for (UIView* view in container.subviews) {
-        if ([view respondsToSelector:@selector(setBlurHidden:)]) {
-            [chrome addObject:view];
-        }
+// Twitter's own glass, which holds the toast's content and takes its color: where it sits and how
+// it is shaped against the capsule, measured on the first toasts of a launch for the report.
+static void PFBGlassToastMeasureChrome(UIView* container, UIView* surface) {
+    static NSUInteger measured;
+    Class chromeClass = NSClassFromString(@"XDSToastContainerView");
+    Class glassClass = NSClassFromString(@"XDSGlass");
+    if (measured >= 3 || !chromeClass || CGRectIsEmpty(container.bounds)) {
+        return;
     }
-    return chrome;
+    for (UIView* chrome in container.subviews) {
+        if (![chrome isKindOfClass:chromeClass]) {
+            continue;
+        }
+        measured++;
+        __block UIView* glass = nil;
+        PFBWalkAllSubviews(chrome, 3, ^(UIView* view) {
+          if (!glass && glassClass && [view isKindOfClass:glassClass]) {
+              glass = view;
+          }
+        });
+        UIColor* tint = [chrome respondsToSelector:@selector(surfaceColor)] ? [(XDSToastContainerView*)chrome surfaceColor] : nil;
+        CGFloat red = 0, green = 0, blue = 0, alpha = 0;
+        [tint getRed:&red green:&green blue:&blue alpha:&alpha];
+        NSUInteger ours = surface ? [container.subviews indexOfObject:surface] : NSNotFound;
+        NSString* place = ours == NSNotFound ? @"none" : (ours < [container.subviews indexOfObject:chrome] ? @"under it" : @"over it");
+        PFBCompatMeasure(@"glass toasts",
+                         [NSString stringWithFormat:@"capsule %.0f x %.0f radius %.1f; Twitter's chrome %@%@ alpha %.2f, "
+                                                    @"its glass %@ radius %.1f, tint rgba(%.0f, %.0f, %.0f, %.2f); ours %@",
+                                                    CGRectGetWidth(container.bounds), CGRectGetHeight(container.bounds),
+                                                    container.layer.cornerRadius, NSStringFromCGRect(CGRectIntegral(chrome.frame)),
+                                                    chrome.hidden ? @" hidden" : @"", chrome.alpha,
+                                                    glass ? NSStringFromCGRect(CGRectIntegral(glass.frame)) : @"none",
+                                                    glass.layer.cornerRadius, red * 255.0, green * 255.0, blue * 255.0, alpha, place],
+                         3);
+        return;
+    }
 }
 
-// Twitter's look as it last set it: its color and corners. A solid color goes with its blur
-// hidden, as on the error toast.
+// Twitter's look as it last set it: its color and corners.
 static void PFBGlassToastNoteTwitterLook(UIView* container, BOOL corners) {
     NSMutableDictionary* look = objc_getAssociatedObject(container, kPFBGlassToastTwitterLookKey);
     if (!look) {
@@ -274,25 +300,18 @@ static void PFBGlassToastRestore(UIView* container, UIView* surface) {
     [surface removeFromSuperview];
     objc_setAssociatedObject(container, kPFBGlassToastSurfaceKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     NSDictionary* look = objc_getAssociatedObject(container, kPFBGlassToastTwitterLookKey);
-    UIColor* color = [look[@"color"] isKindOfClass:[UIColor class]] ? look[@"color"] : nil;
-    CGFloat alpha = 0;
-    [color getRed:NULL green:NULL blue:NULL alpha:&alpha];
-    container.backgroundColor = color;
+    container.backgroundColor = [look[@"color"] isKindOfClass:[UIColor class]] ? look[@"color"] : nil;
     container.layer.cornerRadius = [look[@"radius"] doubleValue];
     container.layer.cornerCurve = look[@"curve"] ?: kCACornerCurveCircular;
-    for (UIView* chrome in PFBGlassToastChrome(container)) {
-        chrome.hidden = NO;
-        [(XDSToastContainerView*)chrome setBlurHidden:alpha >= 0.99];
-    }
 }
 
-// The container drawn as the capsule: the glass behind everything, Twitter's chrome put away,
-// the corners round. With the option off, Twitter's look comes back.
+// The container drawn as the capsule: the glass behind everything, the corners round. With the
+// option off, Twitter's look comes back.
 static void PFBGlassToastDress(UIView* container, BOOL styled) {
     UIView* surface = objc_getAssociatedObject(container, kPFBGlassToastSurfaceKey);
     if (!PFBGlassToastsOn()) {
         if (surface) {
-            // Twitter has just set this toast's color and blur: they are the ones given back.
+            // Twitter has just set this toast's color: it is the one given back.
             if (styled) {
                 PFBGlassToastNoteTwitterLook(container, NO);
             }
@@ -309,11 +328,6 @@ static void PFBGlassToastDress(UIView* container, BOOL styled) {
         objc_setAssociatedObject(container, kPFBGlassToastSurfaceKey, surface, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     } else if (styled) {
         PFBGlassToastNoteTwitterLook(container, NO);
-    }
-    for (UIView* chrome in PFBGlassToastChrome(container)) {
-        if (!chrome.hidden) {
-            chrome.hidden = YES;
-        }
     }
     if (container.subviews.firstObject != surface) {
         [container insertSubview:surface atIndex:0];
@@ -349,6 +363,7 @@ static void PFBGlassToastDress(UIView* container, BOOL styled) {
             }
         }
     }
+    PFBGlassToastMeasureChrome(container, surface);
     PFBCOMPAT_ACTION(PFBCompat_glass_toasts, @"toast drawn as the glass capsule");
 }
 
