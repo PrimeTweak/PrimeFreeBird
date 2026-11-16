@@ -1546,6 +1546,26 @@ static const char* kPFBGrokPillHiddenKey = "pfbGrokPillHidden";
 
 // MARK: - Sensitive media warnings
 
+// Twitter's sensitive box over a whole Tweet: for a possibly sensitive Tweet with media, Twitter
+// answers yes without the account gate above, which only covers a warning the author added. The
+// first Tweets shown in full are noted for the report.
+static BOOL pfbShowsSensitiveTweet(id model, BOOL sensitive) {
+    static NSUInteger noted;
+    PFBCompatReach(PFBCompatPath_sensitive_box);
+    if (!sensitive || !pfbSkipsSensitiveWarnings()) {
+        return NO;
+    }
+    if (noted < 3) {
+        noted++;
+        BOOL flagged = [model respondsToSelector:@selector(hasSensitiveMediaWarningsFlaggedByAuthor)] &&
+                       ((BOOL (*)(id, SEL))objc_msgSend)(model, @selector(hasSensitiveMediaWarningsFlaggedByAuthor));
+        PFBCompatMeasure(@"warnings", [NSString stringWithFormat:@"sensitive box left off a %@ Tweet (author's warning %@)",
+                                                                 NSStringFromClass([model class]), flagged ? @"yes" : @"no"],
+                         3);
+    }
+    return YES;
+}
+
 %hook TFNTwitterStatus
 
 - (BOOL)hasImageInterstitial {
@@ -1567,6 +1587,41 @@ static const char* kPFBGrokPillHiddenKey = "pfbGrokPillHidden";
         return nil;
     }
     return %orig;
+}
+
+- (BOOL)isPossiblySensitiveViewModelForAccount:(id)account {
+    BOOL sensitive = %orig;
+    return pfbShowsSensitiveTweet(self, sensitive) ? NO : sensitive;
+}
+
+%end
+
+%hook URTTimelineStatusItemViewModel
+
+- (BOOL)isPossiblySensitiveViewModelForAccount:(id)account {
+    BOOL sensitive = %orig;
+    return pfbShowsSensitiveTweet(self, sensitive) ? NO : sensitive;
+}
+
+%end
+
+// Twitter's box, still drawn with the option on, is noted once for the report with the views
+// around it.
+%hook T1StatusSensitiveContentView
+
+- (void)layoutSubviews {
+    %orig;
+    static BOOL noted;
+    UIView* box = (UIView*)self;
+    if (noted || !box.window || ![PFBSettings boolForKey:@"disable_sensitive_tweet_warnings"]) {
+        return;
+    }
+    noted = YES;
+    NSMutableArray<NSString*>* chain = [NSMutableArray array];
+    for (UIView* node = box.superview; node && chain.count < 6; node = node.superview) {
+        [chain addObject:NSStringFromClass([node class])];
+    }
+    PFBCompatMeasure(@"warnings", [NSString stringWithFormat:@"sensitive box still drawn, in %@", [chain componentsJoinedByString:@" < "]], 3);
 }
 
 %end
