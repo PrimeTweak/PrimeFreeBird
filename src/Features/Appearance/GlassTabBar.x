@@ -2,6 +2,7 @@
 // bar, Always visible keeps it up, and Hide bottom fade clears the fade under it.
 
 #import "Support/HookHelpers.h"
+#import <sys/sysctl.h>
 
 @interface _TtCC11XNavigation14CollapseEngine14ScrollObserver : NSObject
 - (void)handlePan:(UIPanGestureRecognizer*)recognizer;
@@ -491,27 +492,6 @@ static void PFBGlassFollowCollapse(UIView* platter, CGFloat height) {
     }
 }
 
-// Always visible keeps the bar full: its glass laid out as the round button, about as wide as
-// tall and far narrower than the bar, means the bar collapsed anyway and fails the option.
-static void PFBGlassCheckAlwaysVisible(UIView* glass) {
-    static BOOL noted;
-    CGSize size = glass.bounds.size;
-    if (noted || size.height <= 0.0 || size.width <= 0.0 || size.width > size.height * 1.5 || !glass.window ||
-        !gPFBGlassBarClass) {
-        return;
-    }
-    UIView* bar = glass.superview;
-    for (NSUInteger hops = 0; bar && hops < 3 && ![bar isKindOfClass:gPFBGlassBarClass]; hops++) {
-        bar = bar.superview;
-    }
-    if (![bar isKindOfClass:gPFBGlassBarClass] || CGRectGetWidth(bar.bounds) < size.width * 2.0 ||
-        ![PFBSettings boolForKey:@"no_tab_bar_hiding"]) {
-        return;
-    }
-    noted = YES;
-    PFBCompatNoteFailure(PFBCompat_no_tab_bar_hiding, @"tab bar collapsed while on");
-}
-
 // MARK: - Pill
 
 // Twitter builds the bar's pill once, from its metrics: 54 pt high, the 62 pt bar less 4 pt above
@@ -923,6 +903,114 @@ void PFBGlassRefreshAlwaysVisible(void) {
     });
 }
 
+// The screen whose scroll Twitter's collapse engine last followed, and when.
+static __weak UIViewController* gPFBGlassScrolled;
+static CFAbsoluteTime gPFBGlassScrolledAt;
+
+// Seconds since the process started, or -1 when unread.
+static double PFBGlassSinceLaunch(void) {
+    struct kinfo_proc info;
+    size_t length = sizeof(info);
+    int name[4] = {CTL_KERN, KERN_PROC, KERN_PROC_PID, getpid()};
+    if (sysctl(name, 4, &info, &length, NULL, 0) != 0 || length == 0) {
+        return -1.0;
+    }
+    struct timeval start = info.kp_proc.p_starttime;
+    return [NSDate date].timeIntervalSince1970 - (double)start.tv_sec - (double)start.tv_usec / 1e6;
+}
+
+// A stack as the pin reads it: its class, then for Twitter's glass stack the top bar and tab bar
+// mode bytes, the style word and the engine's tab bar collapse.
+static NSString* PFBGlassStackState(UINavigationController* stack) {
+    Class stackClass = NSClassFromString(@"XNAVNavigationController");
+    ptrdiff_t offset = PFBGlassAppliedConfigurationOffset();
+    if (!stack) {
+        return @"none";
+    }
+    if (offset < 0 || !stackClass || ![stack isKindOfClass:stackClass]) {
+        return NSStringFromClass([stack class]);
+    }
+    const uint8_t* configuration = (const uint8_t*)(__bridge void*)stack + offset;
+    uintptr_t style = 0;
+    memcpy(&style, configuration + 8, sizeof(style));
+    return [NSString stringWithFormat:@"%@ modes %u/%u, style %lu, collapse %.2f", NSStringFromClass([stack class]),
+                                      configuration[0], configuration[1], (unsigned long)style,
+                                      PFBGlassTabBarCollapse(stack)];
+}
+
+// The screen in front of a window: the last one presented, or the top of its stack.
+static UIViewController* PFBGlassFrontScreen(UIWindow* window) {
+    UIViewController* screen = window.rootViewController;
+    while (screen.presentedViewController && !screen.presentedViewController.isBeingDismissed) {
+        screen = screen.presentedViewController;
+    }
+    if ([screen isKindOfClass:[UINavigationController class]]) {
+        screen = ((UINavigationController*)screen).topViewController ?: screen;
+    }
+    return screen;
+}
+
+// Always visible keeps the bar full: its glass laid out as the round button, about as wide as
+// tall and far narrower than the bar, fails the option once a launch. Each new place it happens
+// is measured: bar shown or hidden, screen in front, last screen scrolled and its stack.
+static void PFBGlassCheckAlwaysVisible(UIView* glass) {
+    static BOOL noted;
+    static NSMutableSet<NSString*>* places;
+    CGSize size = glass.bounds.size;
+    if (size.height <= 0.0 || size.width <= 0.0 || size.width > size.height * 1.5 || !glass.window ||
+        !gPFBGlassBarClass) {
+        return;
+    }
+    UIView* bar = glass.superview;
+    for (NSUInteger hops = 0; bar && hops < 3 && ![bar isKindOfClass:gPFBGlassBarClass]; hops++) {
+        bar = bar.superview;
+    }
+    if (![bar isKindOfClass:gPFBGlassBarClass] || CGRectGetWidth(bar.bounds) < size.width * 2.0 ||
+        ![PFBSettings boolForKey:@"no_tab_bar_hiding"]) {
+        return;
+    }
+    if (!noted) {
+        noted = YES;
+        PFBCompatNoteFailure(PFBCompat_no_tab_bar_hiding, @"tab bar collapsed while on");
+    }
+    BOOL shown = YES;
+    for (UIView* level = bar; level && shown; level = level.superview) {
+        shown = !level.hidden && level.alpha > 0.01;
+    }
+    UIViewController* scrolled = gPFBGlassScrolled;
+    NSString* tour = PFBCompatTourIsRunning() ? @", during the tour" : @"";
+    NSString* place = [NSString stringWithFormat:@"bar %@%@, front %@, last scrolled %@",
+                                                 shown ? @"showing" : @"hidden",
+                                                 gPFBGlassChromeHidden ? @" by the settings" : @"",
+                                                 NSStringFromClass([PFBGlassFrontScreen(glass.window) class]) ?: @"none",
+                                                 NSStringFromClass([scrolled class]) ?: @"none"];
+    NSString* key = [place stringByAppendingString:tour];
+    if (!places) {
+        places = [NSMutableSet set];
+    }
+    if (places.count >= 10 || [places containsObject:key]) {
+        return;
+    }
+    [places addObject:key];
+    static NSDateFormatter* clock;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+      clock = [[NSDateFormatter alloc] init];
+      clock.locale = [NSLocale localeWithLocaleIdentifier:@"en_US_POSIX"];
+      clock.dateFormat = @"HH:mm:ss";
+    });
+    NSString* scroll = scrolled ? [NSString stringWithFormat:@" %.1f s before, stack %@",
+                                                             CFAbsoluteTimeGetCurrent() - gPFBGlassScrolledAt,
+                                                             PFBGlassStackState(scrolled.navigationController)]
+                                : @"";
+    NSString* line = [NSString
+        stringWithFormat:@"collapsed at %@ (+%.1f s%@): %@%@; bar %@, glass %.0f x %.0f",
+                         [clock stringFromDate:[NSDate date]], PFBGlassSinceLaunch(), tour, place, scroll,
+                         NSStringFromCGRect(CGRectIntegral([bar convertRect:bar.bounds toView:nil])), size.width,
+                         size.height];
+    PFBCompatMeasure(@"always visible", line, 10);
+}
+
 // The settings can be left without their own exit running: a tab switch from a notification
 // or a link, or a pop to the stack's root. A screen of Twitter's glass navigation appearing on
 // a stack without settings shows the chrome again.
@@ -963,7 +1051,10 @@ void PFBGlassRefreshAlwaysVisible(void) {
 - (void)handlePan:(UIPanGestureRecognizer*)recognizer {
     if (recognizer.state == UIGestureRecognizerStateBegan) {
         @try {
-            PFBGlassPinTabBar(PFBOwningController(recognizer.view).navigationController);
+            UIViewController* screen = PFBOwningController(recognizer.view);
+            gPFBGlassScrolled = screen;
+            gPFBGlassScrolledAt = CFAbsoluteTimeGetCurrent();
+            PFBGlassPinTabBar(screen.navigationController);
         } @catch (__unused id exception) {
         }
     }
