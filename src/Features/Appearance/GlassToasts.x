@@ -1,5 +1,6 @@
-// Glass toasts: Twitter's toasts drawn as the tweak's capsule at the top, as wide as their words,
-// the button on the right, on Liquid Glass or on the standard look's light capsule.
+// Glass toasts: Twitter's toasts at the top, as wide as their words, the button on the right. On
+// Twitter's own glass (12.44) the glass is made clear under a faint veil and the words gray; without
+// it, the tweak's capsule, on Liquid Glass or on the standard look's light capsule.
 
 #import "Support/HookHelpers.h"
 #import "Support/TFNHeaders.h"
@@ -13,6 +14,16 @@
 
 @interface T1ToastContainerView (PFBGlassToasts)
 - (void)prepareForToastWithUpdatedStyle:(BOOL)updated;
+- (void)setSurfaceColor:(UIColor*)color;
+@end
+
+@interface XDSToastContainerView (PFBGlassToasts)
+- (UIView*)contentView;
+@end
+
+// Twitter's Liquid Glass view: its clear tint and its scrim are colors.
+@interface XDSGlass : UIView
+- (void)setClearTint:(UIColor*)tint scrimColor:(UIColor*)scrim;
 @end
 
 // The capsule's margin to the screen's sides, and the room around its content.
@@ -30,6 +41,8 @@ static const void* kPFBGlassToastSurfaceKey = &kPFBGlassToastSurfaceKey;
 static const void* kPFBGlassToastTwitterLookKey = &kPFBGlassToastTwitterLookKey;
 static const void* kPFBGlassToastArrangedKey = &kPFBGlassToastArrangedKey;
 static const void* kPFBGlassToastSideKey = &kPFBGlassToastSideKey;
+static const void* kPFBGlassToastVeilKey = &kPFBGlassToastVeilKey;
+static const void* kPFBGlassToastClearedKey = &kPFBGlassToastClearedKey;
 
 static BOOL PFBGlassToastsOn(void) {
     return [PFBSettings boolForKey:@"glass_toasts"];
@@ -91,7 +104,8 @@ static CGFloat PFBGlassToastContentWidth(UIStackView* column) {
     return width;
 }
 
-// The capsule's width: its content on one row with the room around it, within the margins.
+// The toast's width: its content on one row with the room around it, within the margins. The room
+// is read from the last layout, as Twitter's glass adds its own since 12.44; the tweak's before any.
 static CGFloat PFBGlassToastWidth(UIView* container, CGRect placement, CGFloat twitterWidth) {
     CGFloat room = CGRectGetWidth(placement) - 2 * kPFBGlassToastMargin;
     if (room <= 0) {
@@ -103,8 +117,19 @@ static CGFloat PFBGlassToastWidth(UIView* container, CGRect placement, CGFloat t
         return MIN(twitterWidth, room);
     }
     NSNumber* side = objc_getAssociatedObject(content, kPFBGlassToastSideKey);
-    CGFloat inset = side ? side.doubleValue : kPFBGlassToastTwitterInset;
-    return MIN(ceil(PFBGlassToastContentWidth(column) + 2 * inset), room);
+    CGFloat around = 2 * (side ? side.doubleValue : kPFBGlassToastTwitterInset);
+    CGFloat laid = CGRectGetWidth(column.bounds);
+    if (laid > 0 && CGRectGetWidth(container.bounds) > laid) {
+        around = CGRectGetWidth(container.bounds) - laid;
+    }
+    return MIN(ceil(PFBGlassToastContentWidth(column) + around), room);
+}
+
+// The words no longer fit the row the last layout gave them.
+static BOOL PFBGlassToastCramped(UIView* container) {
+    UIStackView* column = PFBGlassToastColumn(PFBGlassToastContentIn(container));
+    CGFloat laid = CGRectGetWidth(column.bounds);
+    return column && laid > 0 && PFBGlassToastContentWidth(column) > laid + 0.5;
 }
 
 // The capsule's height: the same for every toast, taller only for a larger text size or a picture
@@ -216,10 +241,15 @@ static UIColor* PFBGlassToastIconColor(id toast) {
     return [UIColor labelColor];
 }
 
-// The words in the text colors, the button as a plain one in the accent, the icon in its color;
-// each set only when it differs, as this runs on every layout.
-static void PFBGlassToastColor(UIView* container, id toast) {
+// The words in the text colors, or on Twitter's glass in the gray its tab bar gives unselected tabs
+// (the text color at 60 %); the button as a plain one in the accent, the icon in its color. Each is
+// set only when it differs, as this runs on every layout.
+static void PFBGlassToastColor(UIView* container, id toast, BOOL twitterGlass) {
+    UIColor* gray = [[UIColor labelColor] colorWithAlphaComponent:0.6];
     UIColor* iconColor = PFBGlassToastIconColor(toast);
+    if (twitterGlass && [iconColor isEqual:[UIColor labelColor]]) {
+        iconColor = gray;
+    }
     UIColor* accent = PFBCurrentAccentColor() ?: [UIColor systemBlueColor];
     PFBWalkAllSubviews(container, 12, ^(UIView* view) {
       if ([view isKindOfClass:[UIButton class]]) {
@@ -233,7 +263,9 @@ static void PFBGlassToastColor(UIView* container, id toast) {
       } else if ([view isKindOfClass:[UILabel class]] && ![view.superview isKindOfClass:[UIButton class]]) {
           UILabel* label = (UILabel*)view;
           // Twitter sets the message larger than the line under it.
-          UIColor* color = label.font.pointSize >= 15.5 ? [UIColor labelColor] : [UIColor secondaryLabelColor];
+          UIColor* color = twitterGlass                   ? gray
+                           : label.font.pointSize >= 15.5 ? [UIColor labelColor]
+                                                          : [UIColor secondaryLabelColor];
           if (![label.textColor isEqual:color]) {
               label.textColor = color;
           }
@@ -244,42 +276,104 @@ static void PFBGlassToastColor(UIView* container, id toast) {
     });
 }
 
-// Twitter's own glass, which holds the toast's content and takes its color: where it sits and how
-// it is shaped against the capsule, measured on the first toasts of a launch for the report.
-static void PFBGlassToastMeasureChrome(UIView* container, UIView* surface) {
-    static NSUInteger measured;
+// Twitter's glass around the toast since 12.44: its chrome holds the content in a view inside the
+// glass. nil when Twitter draws the toast otherwise; host gets the view holding the content.
+static UIView* PFBGlassToastTwitterGlass(UIView* container, UIView** host) {
     Class chromeClass = NSClassFromString(@"XDSToastContainerView");
     Class glassClass = NSClassFromString(@"XDSGlass");
-    if (measured >= 3 || !chromeClass || CGRectIsEmpty(container.bounds)) {
-        return;
-    }
     for (UIView* chrome in container.subviews) {
-        if (![chrome isKindOfClass:chromeClass]) {
+        if (!chromeClass || !glassClass || ![chrome isKindOfClass:chromeClass] ||
+            ![chrome respondsToSelector:@selector(contentView)]) {
             continue;
         }
-        measured++;
-        __block UIView* glass = nil;
-        PFBWalkAllSubviews(chrome, 3, ^(UIView* view) {
-          if (!glass && glassClass && [view isKindOfClass:glassClass]) {
-              glass = view;
-          }
-        });
-        UIColor* tint = [chrome respondsToSelector:@selector(surfaceColor)] ? [(XDSToastContainerView*)chrome surfaceColor] : nil;
-        CGFloat red = 0, green = 0, blue = 0, alpha = 0;
-        [tint getRed:&red green:&green blue:&blue alpha:&alpha];
-        NSUInteger ours = surface ? [container.subviews indexOfObject:surface] : NSNotFound;
-        NSString* place = ours == NSNotFound ? @"none" : (ours < [container.subviews indexOfObject:chrome] ? @"under it" : @"over it");
-        PFBCompatMeasure(@"glass toasts",
-                         [NSString stringWithFormat:@"capsule %.0f x %.0f radius %.1f; Twitter's chrome %@%@ alpha %.2f, "
-                                                    @"its glass %@ radius %.1f, tint rgba(%.0f, %.0f, %.0f, %.2f); ours %@",
-                                                    CGRectGetWidth(container.bounds), CGRectGetHeight(container.bounds),
-                                                    container.layer.cornerRadius, NSStringFromCGRect(CGRectIntegral(chrome.frame)),
-                                                    chrome.hidden ? @" hidden" : @"", chrome.alpha,
-                                                    glass ? NSStringFromCGRect(CGRectIntegral(glass.frame)) : @"none",
-                                                    glass.layer.cornerRadius, red * 255.0, green * 255.0, blue * 255.0, alpha, place],
-                         3);
+        UIView* inside = [(XDSToastContainerView*)chrome contentView];
+        UIView* glass = inside.superview;
+        while (glass && glass != chrome && ![glass isKindOfClass:glassClass]) {
+            glass = glass.superview;
+        }
+        if (glass && glass != chrome && [glass respondsToSelector:@selector(setClearTint:scrimColor:)]) {
+            *host = inside;
+            return glass;
+        }
+    }
+    return nil;
+}
+
+// Twitter's glass made clear, its tint and scrim set to none, once per toast style unless forced,
+// with a veil over the glass and under the words: the text color at 1.2 %, fading out by 70 %.
+static void PFBGlassToastClear(UIView* glass, UIView* host, BOOL force) {
+    if (force || !objc_getAssociatedObject(glass, kPFBGlassToastClearedKey)) {
+        [(XDSGlass*)glass setClearTint:[UIColor clearColor] scrimColor:[UIColor clearColor]];
+        objc_setAssociatedObject(glass, kPFBGlassToastClearedKey, @YES, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    }
+    UIView* veil = objc_getAssociatedObject(glass, kPFBGlassToastVeilKey);
+    if (!veil) {
+        veil = [[UIView alloc] init];
+        veil.userInteractionEnabled = NO;
+        veil.clipsToBounds = YES;
+        CAGradientLayer* fade = [CAGradientLayer layer];
+        fade.startPoint = CGPointMake(0.5, 0.0);
+        fade.endPoint = CGPointMake(0.5, 1.0);
+        fade.locations = @[ @0.0, @0.7 ];
+        [veil.layer addSublayer:fade];
+        objc_setAssociatedObject(glass, kPFBGlassToastVeilKey, veil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    }
+    UIView* parent = host.superview;
+    if (!parent) {
         return;
     }
+    if (veil.superview != parent || [parent.subviews indexOfObject:veil] > [parent.subviews indexOfObject:host]) {
+        [parent insertSubview:veil belowSubview:host];
+    }
+    CGRect frame = [glass convertRect:glass.bounds toView:parent];
+    [CATransaction begin];
+    [CATransaction setDisableActions:YES];
+    if (!CGRectEqualToRect(veil.frame, frame)) {
+        veil.frame = frame;
+    }
+    veil.layer.cornerRadius = glass.layer.cornerRadius;
+    veil.layer.cornerCurve = glass.layer.cornerCurve;
+    CAGradientLayer* fade = (CAGradientLayer*)veil.layer.sublayers.firstObject;
+    fade.frame = veil.bounds;
+    UIColor* top = [[[UIColor labelColor] resolvedColorWithTraitCollection:glass.traitCollection] colorWithAlphaComponent:0.012];
+    fade.colors = @[ (id)top.CGColor, (id)[top colorWithAlphaComponent:0.0].CGColor ];
+    [CATransaction commit];
+}
+
+// With the option off, the veil goes; Twitter gives each new toast its own glass.
+static void PFBGlassToastUnclear(UIView* glass) {
+    UIView* veil = objc_getAssociatedObject(glass, kPFBGlassToastVeilKey);
+    [veil removeFromSuperview];
+    objc_setAssociatedObject(glass, kPFBGlassToastVeilKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    objc_setAssociatedObject(glass, kPFBGlassToastClearedKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+}
+
+// Twitter's glass on the first toasts of a launch, for the report: its frame and corners against
+// the toast, its effect and the color it is tinted with, and whether the veil is on.
+static void PFBGlassToastMeasureChrome(UIView* container, UIView* glass) {
+    static NSUInteger measured;
+    if (measured >= 3 || !glass || CGRectIsEmpty(container.bounds)) {
+        return;
+    }
+    measured++;
+    Ivar effectIvar = class_getInstanceVariable([glass class], "visualEffectView");
+    id effectView = effectIvar ? object_getIvar(glass, effectIvar) : nil;
+    UIVisualEffect* effect = [effectView isKindOfClass:[UIVisualEffectView class]] ? [(UIVisualEffectView*)effectView effect] : nil;
+    UIColor* tint = [effect respondsToSelector:@selector(tintColor)] ? ((UIColor * (*)(id, SEL)) objc_msgSend)(effect, @selector(tintColor)) : nil;
+    CGFloat red = 0, green = 0, blue = 0, alpha = 0;
+    [tint getRed:&red green:&green blue:&blue alpha:&alpha];
+    UIView* veil = objc_getAssociatedObject(glass, kPFBGlassToastVeilKey);
+    PFBCompatMeasure(@"glass toasts",
+                     [NSString stringWithFormat:@"toast %.0f x %.0f; Twitter's glass %@ radius %.1f%@, effect %@ tint %@; veil %@",
+                                                CGRectGetWidth(container.bounds), CGRectGetHeight(container.bounds),
+                                                NSStringFromCGRect(CGRectIntegral([glass convertRect:glass.bounds toView:container])),
+                                                glass.layer.cornerRadius, glass.hidden || glass.alpha < 0.01 ? @" hidden" : @"",
+                                                NSStringFromClass([effect class]) ?: @"none",
+                                                tint ? [NSString stringWithFormat:@"rgba(%.0f, %.0f, %.0f, %.2f)", red * 255.0,
+                                                                                  green * 255.0, blue * 255.0, alpha]
+                                                     : @"none",
+                                                veil.superview ? @"on" : @"off"],
+                     3);
 }
 
 // Twitter's look as it last set it: its color and corners.
@@ -305,10 +399,12 @@ static void PFBGlassToastRestore(UIView* container, UIView* surface) {
     container.layer.cornerCurve = look[@"curve"] ?: kCACornerCurveCircular;
 }
 
-// The container drawn as the capsule: the glass behind everything, the corners round. With the
-// option off, Twitter's look comes back.
+// On Twitter's glass, the glass made clear; without it, the container drawn as the capsule, the
+// glass behind everything and the corners round. With the option off, Twitter's look comes back.
 static void PFBGlassToastDress(UIView* container, BOOL styled) {
     UIView* surface = objc_getAssociatedObject(container, kPFBGlassToastSurfaceKey);
+    UIView* host = nil;
+    UIView* twitterGlass = PFBGlassToastTwitterGlass(container, &host);
     if (!PFBGlassToastsOn()) {
         if (surface) {
             // Twitter has just set this toast's color: it is the one given back.
@@ -317,39 +413,50 @@ static void PFBGlassToastDress(UIView* container, BOOL styled) {
             }
             PFBGlassToastRestore(container, surface);
         }
+        if (twitterGlass) {
+            PFBGlassToastUnclear(twitterGlass);
+        }
         PFBCOMPAT_OBSERVE(PFBCompat_glass_toasts, @"Twitter's toast found");
         return;
     }
-    if (!surface) {
-        PFBGlassToastNoteTwitterLook(container, YES);
-        PFBShowcaseSurface* glass = [[PFBShowcaseSurface alloc] initWithCornerRadius:-1];
-        glass.userInteractionEnabled = NO;
-        surface = glass;
-        objc_setAssociatedObject(container, kPFBGlassToastSurfaceKey, surface, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-    } else if (styled) {
-        PFBGlassToastNoteTwitterLook(container, NO);
-    }
-    if (container.subviews.firstObject != surface) {
-        [container insertSubview:surface atIndex:0];
-    }
-    if (!CGRectEqualToRect(surface.frame, container.bounds)) {
-        surface.frame = container.bounds;
-    }
-    if (![container.backgroundColor isEqual:[UIColor clearColor]]) {
-        container.backgroundColor = [UIColor clearColor];
-    }
-    CGFloat radius = CGRectGetHeight(container.bounds) / 2.0;
-    if (container.layer.cornerRadius != radius) {
-        container.layer.cornerRadius = radius;
-        container.layer.cornerCurve = kCACornerCurveContinuous;
+    if (twitterGlass) {
+        // Twitter's glass is the toast's: its shape and corners stay, the tweak's own glass goes.
+        if (surface) {
+            PFBGlassToastRestore(container, surface);
+        }
+        PFBGlassToastClear(twitterGlass, host, styled);
+    } else {
+        if (!surface) {
+            PFBGlassToastNoteTwitterLook(container, YES);
+            PFBShowcaseSurface* glass = [[PFBShowcaseSurface alloc] initWithCornerRadius:-1];
+            glass.userInteractionEnabled = NO;
+            surface = glass;
+            objc_setAssociatedObject(container, kPFBGlassToastSurfaceKey, surface, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        } else if (styled) {
+            PFBGlassToastNoteTwitterLook(container, NO);
+        }
+        if (container.subviews.firstObject != surface) {
+            [container insertSubview:surface atIndex:0];
+        }
+        if (!CGRectEqualToRect(surface.frame, container.bounds)) {
+            surface.frame = container.bounds;
+        }
+        if (![container.backgroundColor isEqual:[UIColor clearColor]]) {
+            container.backgroundColor = [UIColor clearColor];
+        }
+        CGFloat radius = CGRectGetHeight(container.bounds) / 2.0;
+        if (container.layer.cornerRadius != radius) {
+            container.layer.cornerRadius = radius;
+            container.layer.cornerCurve = kCACornerCurveContinuous;
+        }
     }
     TFNToastViewController* shower = [container respondsToSelector:@selector(toastViewController)]
                                          ? [(T1ToastContainerView*)container toastViewController]
                                          : nil;
     id toast = [shower respondsToSelector:@selector(currentToast)] ? [shower currentToast] : nil;
-    PFBGlassToastColor(container, toast);
-    if (styled) {
-        // A toast already placed may get new content: its size is set again from it.
+    PFBGlassToastColor(container, toast, twitterGlass != nil);
+    // A toast already placed may get new content, or words wider than its row: its size is set again.
+    if (styled || PFBGlassToastCramped(container)) {
         CGRect frame = container.frame;
         if (CGRectGetHeight(frame) > 0 && [shower respondsToSelector:@selector(_tfn_toastHorizontalPlacementBounds)]) {
             CGRect placement = [shower _tfn_toastHorizontalPlacementBounds];
@@ -363,8 +470,12 @@ static void PFBGlassToastDress(UIView* container, BOOL styled) {
             }
         }
     }
-    PFBGlassToastMeasureChrome(container, surface);
-    PFBCOMPAT_ACTION(PFBCompat_glass_toasts, @"toast drawn as the glass capsule");
+    if (twitterGlass) {
+        PFBGlassToastMeasureChrome(container, twitterGlass);
+        PFBCOMPAT_ACTION(PFBCompat_glass_toasts, @"toast drawn on Twitter's clear glass");
+    } else {
+        PFBCOMPAT_ACTION(PFBCompat_glass_toasts, @"toast drawn as the glass capsule");
+    }
 }
 
 %hook TFNToastViewController
@@ -424,10 +535,20 @@ static void PFBGlassToastDress(UIView* container, BOOL styled) {
 
 %hook T1ToastContainerView
 
-// Twitter sets each toast's blur and color here, then lays it out: the capsule is drawn after both.
+// Twitter sets each toast's look and color here, then lays it out: the toast is drawn after both.
 - (void)prepareForToastWithUpdatedStyle:(BOOL)updated {
     %orig;
     PFBGlassToastDress(self, YES);
+}
+
+// Twitter tints its glass with the toast's color: the glass is made clear again after it.
+- (void)setSurfaceColor:(UIColor*)color {
+    %orig;
+    UIView* host = nil;
+    UIView* glass = PFBGlassToastsOn() ? PFBGlassToastTwitterGlass(self, &host) : nil;
+    if (glass) {
+        PFBGlassToastClear(glass, host, YES);
+    }
 }
 
 - (void)layoutSubviews {

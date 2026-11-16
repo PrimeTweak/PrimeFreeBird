@@ -821,8 +821,9 @@ static ptrdiff_t PFBGlassAppliedConfigurationOffset(void) {
     return offset;
 }
 
-// The tab bar's collapse in the stack's engine, from 0 shown to 1 collapsed; -1 when unread.
-static double PFBGlassTabBarCollapse(UINavigationController* stack) {
+// The stack engine's collapse progress: the top bar's value, then the tab bar's, from 0 shown to
+// 1 collapsed. NULL with no engine yet, and *readable NO when the layout is not the one measured.
+static double* PFBGlassCollapseProgress(UINavigationController* stack, BOOL* readable) {
     static Class engineClass;
     static ptrdiff_t engineOffset = -1;
     static ptrdiff_t progressOffset = -1;
@@ -837,26 +838,98 @@ static double PFBGlassTabBarCollapse(UINavigationController* stack) {
           progressOffset = ivar_getOffset(progress);
       }
     });
+    *readable = engineOffset >= 0;
     if (engineOffset < 0) {
-        return -1.0;
+        return NULL;
     }
     void* engine = NULL;
     memcpy(&engine, (const uint8_t*)(__bridge void*)stack + engineOffset, sizeof(engine));
-    // The engine is made when first needed: until then nothing has collapsed.
-    if (!engine) {
-        return 0.0;
+    if (engine && object_getClass((__bridge id)engine) != engineClass) {
+        *readable = NO;
+        return NULL;
     }
-    if (object_getClass((__bridge id)engine) != engineClass) {
-        return -1.0;
-    }
-    // The progress holds the top bar's value, then the tab bar's.
-    double progress[2] = {0.0, 0.0};
-    memcpy(progress, (const uint8_t*)engine + progressOffset, sizeof(progress));
-    return isfinite(progress[1]) ? progress[1] : -1.0;
+    return engine ? (double*)((uint8_t*)engine + progressOffset) : NULL;
 }
 
-// Pins the tab bar where Twitter's configuration lets it collapse (Home), the top bar's
-// mode untouched. A bar caught collapsed is pinned once back, as the engine stops moving it.
+// The tab bar's collapse in the stack's engine, from 0 shown to 1 collapsed; -1 when unread.
+// The engine is made when first needed: until then nothing has collapsed.
+static double PFBGlassTabBarCollapse(UINavigationController* stack) {
+    BOOL readable = NO;
+    double* progress = PFBGlassCollapseProgress(stack, &readable);
+    if (!readable) {
+        return -1.0;
+    }
+    return !progress ? 0.0 : (isfinite(progress[1]) ? progress[1] : -1.0);
+}
+
+// A finger is on a list Twitter's collapse engine follows.
+static BOOL gPFBGlassDragging;
+static const void* kPFBGlassBroughtBackKey = &kPFBGlassBroughtBackKey;
+
+// Twitter's tab bar showing in a window, and the size of its glass.
+static UIView* PFBGlassBarIn(UIWindow* window, CGSize* glassSize) {
+    __block UIView* found = nil;
+    __block CGSize size = CGSizeZero;
+    Class glassClass = NSClassFromString(@"XDSGlass");
+    PFBGlassFindClasses();
+    PFBWalkAllSubviews(window, 40, ^(UIView* view) {
+      if (!found && gPFBGlassBarClass && [view isKindOfClass:gPFBGlassBarClass]) {
+          found = view;
+          PFBWalkAllSubviews(view, 3, ^(UIView* inner) {
+            if (CGSizeEqualToSize(size, CGSizeZero) && glassClass && [inner isKindOfClass:glassClass]) {
+                size = inner.bounds.size;
+            }
+          });
+      }
+    });
+    *glassSize = size;
+    return found;
+}
+
+// A bar left collapsed with no finger on the screen, as Twitter hands Home back after its own
+// Search, is set back to shown and the stack applies its configuration again; a second later
+// the report gets whether it came back. At most twice a second per stack.
+static BOOL PFBGlassBringBackTabBar(UINavigationController* stack) {
+    BOOL readable = NO;
+    double* progress = PFBGlassCollapseProgress(stack, &readable);
+    NSNumber* last = objc_getAssociatedObject(stack, kPFBGlassBroughtBackKey);
+    CFAbsoluteTime now = CFAbsoluteTimeGetCurrent();
+    if (!progress || gPFBGlassDragging || (last && now - last.doubleValue < 0.5)) {
+        return NO;
+    }
+    objc_setAssociatedObject(stack, kPFBGlassBroughtBackKey, @(now), OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    double was = progress[1];
+    progress[1] = 0.0;
+    PFBCOMPAT_ACTION(PFBCompat_no_tab_bar_hiding, @"collapsed tab bar brought back");
+    __weak UINavigationController* weakStack = stack;
+    dispatch_async(dispatch_get_main_queue(), ^{
+      SEL update = NSSelectorFromString(@"xnav_setNeedsNavigationConfigurationUpdateAnimated:");
+      if ([weakStack respondsToSelector:update]) {
+          ((void (*)(id, SEL, BOOL))objc_msgSend)(weakStack, update, NO);
+      }
+    });
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, NSEC_PER_SEC), dispatch_get_main_queue(), ^{
+      UINavigationController* checked = weakStack;
+      if (!checked.view.window) {
+          return;
+      }
+      CGSize glass = CGSizeZero;
+      UIView* bar = PFBGlassBarIn(checked.view.window, &glass);
+      BOOL full = glass.width > glass.height * 1.5;
+      PFBCompatMeasure(@"always visible",
+                       [NSString stringWithFormat:@"brought back from collapse %.2f on %@: %@ a second later, "
+                                                  @"collapse %.2f, glass %.0f x %.0f",
+                                                  was, NSStringFromClass([checked.topViewController class]) ?: @"none",
+                                                  !bar ? @"no tab bar" : (full ? @"full" : @"still collapsed"),
+                                                  PFBGlassTabBarCollapse(checked), glass.width, glass.height],
+                       10);
+    });
+    return YES;
+}
+
+// Pins the tab bar where Twitter's configuration lets it collapse (Home), the top bar's mode
+// untouched. A bar caught collapsing under a finger is pinned once back, as the engine stops
+// moving it; one left collapsed is brought back first.
 static void PFBGlassPinTabBar(UINavigationController* stack) {
     static Class stackClass;
     static dispatch_once_t once;
@@ -878,7 +951,7 @@ static void PFBGlassPinTabBar(UINavigationController* stack) {
         return;
     }
     double collapse = PFBGlassTabBarCollapse(stack);
-    if (collapse < 0.0 || collapse > 0.001) {
+    if (collapse < 0.0 || (collapse > 0.001 && !PFBGlassBringBackTabBar(stack))) {
         return;
     }
     configuration[1] = 0;
@@ -987,11 +1060,22 @@ static UIViewController* PFBGlassFrontScreen(UIWindow* window) {
     return screen;
 }
 
-// Always visible keeps the bar full: its glass laid out as the round button, about as wide as
-// tall and far narrower than the bar, fails the option once a launch. Each new place it happens is
-// measured: bar shown or hidden, screen in front, last screen scrolled, every glass stack showing.
+// Whether nothing above the view hides it.
+static BOOL PFBGlassShowing(UIView* view) {
+    for (UIView* level = view; level; level = level.superview) {
+        if (level.hidden || level.alpha <= 0.01) {
+            return NO;
+        }
+    }
+    return view != nil;
+}
+
+// Always visible keeps the bar full: its glass laid out as the round button, about as wide as tall
+// and far narrower than the bar, fails the option when it still shows so a second later. Each new
+// place it happens is measured: bar shown or hidden, screen in front, last screen scrolled, stacks.
 static void PFBGlassCheckAlwaysVisible(UIView* glass) {
     static BOOL noted;
+    static BOOL pending;
     static NSMutableSet<NSString*>* places;
     CGSize size = glass.bounds.size;
     if (size.height <= 0.0 || size.width <= 0.0 || size.width > size.height * 1.5 || !glass.window ||
@@ -1006,14 +1090,26 @@ static void PFBGlassCheckAlwaysVisible(UIView* glass) {
         ![PFBSettings boolForKey:@"no_tab_bar_hiding"]) {
         return;
     }
-    if (!noted) {
-        noted = YES;
-        PFBCompatNoteFailure(PFBCompat_no_tab_bar_hiding, @"tab bar collapsed while on");
+    if (!pending && !noted) {
+        pending = YES;
+        __weak UIView* weakGlass = glass;
+        __weak UIView* weakBar = bar;
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, NSEC_PER_SEC), dispatch_get_main_queue(), ^{
+          pending = NO;
+          CGSize later = weakGlass.bounds.size;
+          BOOL collapsed = weakGlass.window && later.height > 0.0 && later.width <= later.height * 1.5;
+          BOOL showing = collapsed && PFBGlassShowing(weakBar);
+          if (showing && [PFBSettings boolForKey:@"no_tab_bar_hiding"]) {
+              noted = YES;
+              PFBCompatNoteFailure(PFBCompat_no_tab_bar_hiding, @"tab bar still collapsed a second later");
+          }
+          PFBCompatMeasure(@"always visible",
+                           [NSString stringWithFormat:@"a second after a collapse: %@",
+                                                      showing ? @"still collapsed" : (collapsed ? @"collapsed, hidden" : @"full")],
+                           10);
+        });
     }
-    BOOL shown = YES;
-    for (UIView* level = bar; level && shown; level = level.superview) {
-        shown = !level.hidden && level.alpha > 0.01;
-    }
+    BOOL shown = PFBGlassShowing(bar);
     UIViewController* scrolled = gPFBGlassScrolled;
     NSString* tour = PFBCompatTourIsRunning() ? @", during the tour" : @"";
     NSString* place = [NSString stringWithFormat:@"bar %@%@, front %@, last scrolled %@",
@@ -1088,7 +1184,8 @@ static void PFBGlassCheckAlwaysVisible(UIView* glass) {
 %hook _TtCC11XNavigation14CollapseEngine14ScrollObserver
 
 - (void)handlePan:(UIPanGestureRecognizer*)recognizer {
-    if (recognizer.state == UIGestureRecognizerStateBegan) {
+    UIGestureRecognizerState state = recognizer.state;
+    if (state == UIGestureRecognizerStateBegan) {
         @try {
             UIViewController* screen = PFBOwningController(recognizer.view);
             gPFBGlassScrolled = screen;
@@ -1097,6 +1194,7 @@ static void PFBGlassCheckAlwaysVisible(UIView* glass) {
         } @catch (__unused id exception) {
         }
     }
+    gPFBGlassDragging = state == UIGestureRecognizerStateBegan || state == UIGestureRecognizerStateChanged;
     %orig;
 }
 
