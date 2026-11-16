@@ -44,7 +44,7 @@
 
 /* ===== APPEARANCE — page ===== */
 "MODERN_SETTINGS_APPEARANCE_TITLE" = "Appearance";
-"MODERN_SETTINGS_APPEARANCE_SUBTITLE" = "Style, fonts, colors, and navigation bar.";
+"MODERN_SETTINGS_APPEARANCE_SUBTITLE" = "Style, fonts, colors, and bottom bar.";
 
 /* ===== Appearance › Style ===== */
 "APPEARANCE_GROUP_STYLE" = "Style";
@@ -74,8 +74,8 @@
 "COLOR_PFB_SWITCHES_DETAIL" = "Apply the accent color to the switches in these settings.";
 "COLOR_TWITTER_ICON_IN_TOP_BAR_TITLE" = "Twitter icon";
 "COLOR_TWITTER_ICON_IN_TOP_BAR_DETAIL" = "Apply the accent color to the logo in the top bar.";
-"APPEARANCE_GROUP_TAB_BAR" = "Navigation";
-"CUSTOM_TAB_BAR_OPTION_TITLE" = "Tabs";
+"APPEARANCE_GROUP_TAB_BAR" = "Bottom bar";
+"CUSTOM_TAB_BAR_OPTION_TITLE" = "Navigation";
 "CUSTOM_TAB_BAR_OPTION_SUBTITLE" = "Choose which tabs appear and in what order.";
 "APPEARANCE_GROUP_SIDEBAR" = "Menu";
 "CUSTOM_SIDEBAR_OPTION_TITLE" = "Menu";
@@ -89,9 +89,9 @@
 "RESTORE_TAB_LABELS_TITLE" = "Tab labels";
 "RESTORE_TAB_LABELS_DETAIL" = "Show labels under the icons.";
 "NO_TAB_BAR_HIDING_TITLE" = "Always visible";
-"NO_TAB_BAR_HIDING_DETAIL" = "Don’t shrink or fade the bar when you scroll.";
+"NO_TAB_BAR_HIDING_DETAIL" = "Don’t shrink or fade the bottom bar when you scroll.";
 "HIDE_BOTTOM_FADE_TITLE" = "Hide bottom fade";
-"HIDE_BOTTOM_FADE_DETAIL" = "Remove the fade Twitter draws under the navigation bar.";
+"HIDE_BOTTOM_FADE_DETAIL" = "Remove the fade Twitter draws under the bottom bar.";
 
 /* ===== BRANDING ===== */
 "MODERN_SETTINGS_BRANDING_TITLE" = "Branding";
@@ -314,11 +314,11 @@
 "CUSTOM_TAB_BAR_GRID_DETAIL" = "Tap a tab to add or remove it. Touch and hold an icon in the bar below, then drag it to reorder.";
 "CUSTOM_TAB_BAR_RESET_MESSAGE" = "The editor goes back to Twitter’s default tabs. Tap Save to keep them.";
 "CUSTOM_TAB_BAR_RESTORE_ACTION" = "Restore";
-"CUSTOM_TAB_BAR_FULL_FORMAT" = "The bar holds %ld tabs. Remove one first.";
+"CUSTOM_TAB_BAR_FULL_FORMAT" = "The bottom bar holds %ld tabs. Remove one first.";
 "CUSTOM_TAB_BAR_DISCARD_TITLE" = "Discard changes";
 "CUSTOM_TAB_BAR_DISCARD_MESSAGE" = "The tabs you picked are not saved.";
 "CUSTOM_TAB_BAR_DISCARD_ACTION" = "Discard";
-"CUSTOM_TAB_BAR_SETTINGS_NAVIGATION_TITLE" = "Tabs";
+"CUSTOM_TAB_BAR_SETTINGS_NAVIGATION_TITLE" = "Navigation";
 "TAB_EDITOR_TIP_CHANGE" = "Tap a tab to change it";
 "TAB_EDITOR_TIP_ARRANGE" = "Touch and hold a tab to rearrange";
 "TAB_EDITOR_TIP_ADD" = "Tap + to add a tab";

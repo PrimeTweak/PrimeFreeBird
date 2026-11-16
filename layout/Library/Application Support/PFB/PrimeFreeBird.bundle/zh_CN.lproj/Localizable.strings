@@ -44,7 +44,7 @@
 
 /* ===== APPEARANCE — page ===== */
 "MODERN_SETTINGS_APPEARANCE_TITLE" = "外观";
-"MODERN_SETTINGS_APPEARANCE_SUBTITLE" = "样式、字体、颜色和导航栏。";
+"MODERN_SETTINGS_APPEARANCE_SUBTITLE" = "样式、字体、颜色和底部栏。";
 
 /* ===== Appearance › Style ===== */
 "APPEARANCE_GROUP_STYLE" = "样式";
@@ -74,8 +74,8 @@
 "COLOR_PFB_SWITCHES_DETAIL" = "将强调色应用到这些设置中的开关。";
 "COLOR_TWITTER_ICON_IN_TOP_BAR_TITLE" = "Twitter 图标";
 "COLOR_TWITTER_ICON_IN_TOP_BAR_DETAIL" = "将强调色应用于顶栏的标志。";
-"APPEARANCE_GROUP_TAB_BAR" = "导航";
-"CUSTOM_TAB_BAR_OPTION_TITLE" = "标签页";
+"APPEARANCE_GROUP_TAB_BAR" = "底部栏";
+"CUSTOM_TAB_BAR_OPTION_TITLE" = "导航";
 "CUSTOM_TAB_BAR_OPTION_SUBTITLE" = "选择显示哪些标签及其顺序。";
 "APPEARANCE_GROUP_SIDEBAR" = "菜单";
 "CUSTOM_SIDEBAR_OPTION_TITLE" = "菜单";
@@ -89,9 +89,9 @@
 "RESTORE_TAB_LABELS_TITLE" = "标签文字";
 "RESTORE_TAB_LABELS_DETAIL" = "在图标下方显示标签。";
 "NO_TAB_BAR_HIDING_TITLE" = "始终显示";
-"NO_TAB_BAR_HIDING_DETAIL" = "滚动时不缩小也不淡出。";
+"NO_TAB_BAR_HIDING_DETAIL" = "滚动时底部栏不缩小也不淡出。";
 "HIDE_BOTTOM_FADE_TITLE" = "隐藏底部渐变";
-"HIDE_BOTTOM_FADE_DETAIL" = "移除 Twitter 在导航栏下方绘制的渐变。";
+"HIDE_BOTTOM_FADE_DETAIL" = "移除 Twitter 在底部栏下方绘制的渐变。";
 
 /* ===== BRANDING ===== */
 "MODERN_SETTINGS_BRANDING_TITLE" = "品牌";
@@ -314,11 +314,11 @@
 "CUSTOM_TAB_BAR_GRID_DETAIL" = "轻点标签页即可添加或移除。按住下方栏中的图标，然后拖动以调整顺序。";
 "CUSTOM_TAB_BAR_RESET_MESSAGE" = "编辑器会恢复为 Twitter 的默认标签页。轻点“保存”即可保留。";
 "CUSTOM_TAB_BAR_RESTORE_ACTION" = "恢复";
-"CUSTOM_TAB_BAR_FULL_FORMAT" = "导航栏最多容纳 %ld 个标签。请先移除一个。";
+"CUSTOM_TAB_BAR_FULL_FORMAT" = "底部栏最多容纳 %ld 个标签。请先移除一个。";
 "CUSTOM_TAB_BAR_DISCARD_TITLE" = "放弃更改";
 "CUSTOM_TAB_BAR_DISCARD_MESSAGE" = "你选择的标签不会被保存。";
 "CUSTOM_TAB_BAR_DISCARD_ACTION" = "放弃";
-"CUSTOM_TAB_BAR_SETTINGS_NAVIGATION_TITLE" = "标签页";
+"CUSTOM_TAB_BAR_SETTINGS_NAVIGATION_TITLE" = "导航";
 "TAB_EDITOR_TIP_CHANGE" = "轻点标签即可更改";
 "TAB_EDITOR_TIP_ARRANGE" = "按住标签即可重新排列";
 "TAB_EDITOR_TIP_ADD" = "轻点 + 即可添加标签";

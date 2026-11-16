@@ -44,7 +44,7 @@
 
 /* ===== APPEARANCE — page ===== */
 "MODERN_SETTINGS_APPEARANCE_TITLE" = "Wygląd";
-"MODERN_SETTINGS_APPEARANCE_SUBTITLE" = "Styl, czcionki, kolory i pasek nawigacji.";
+"MODERN_SETTINGS_APPEARANCE_SUBTITLE" = "Styl, czcionki, kolory i dolny pasek.";
 
 /* ===== Appearance › Style ===== */
 "APPEARANCE_GROUP_STYLE" = "Styl";
@@ -74,8 +74,8 @@
 "COLOR_PFB_SWITCHES_DETAIL" = "Nadaje kolor akcentu przełącznikom w tych ustawieniach.";
 "COLOR_TWITTER_ICON_IN_TOP_BAR_TITLE" = "Ikona Twittera";
 "COLOR_TWITTER_ICON_IN_TOP_BAR_DETAIL" = "Nadaje logo na górnym pasku kolor akcentu.";
-"APPEARANCE_GROUP_TAB_BAR" = "Nawigacja";
-"CUSTOM_TAB_BAR_OPTION_TITLE" = "Karty";
+"APPEARANCE_GROUP_TAB_BAR" = "Dolny pasek";
+"CUSTOM_TAB_BAR_OPTION_TITLE" = "Nawigacja";
 "CUSTOM_TAB_BAR_OPTION_SUBTITLE" = "Wybierz, które karty się pojawiają i w jakiej kolejności.";
 "APPEARANCE_GROUP_SIDEBAR" = "Menu";
 "CUSTOM_SIDEBAR_OPTION_TITLE" = "Menu";
@@ -89,9 +89,9 @@
 "RESTORE_TAB_LABELS_TITLE" = "Etykiety kart";
 "RESTORE_TAB_LABELS_DETAIL" = "Pokazuje etykiety pod ikonami.";
 "NO_TAB_BAR_HIDING_TITLE" = "Zawsze widoczny";
-"NO_TAB_BAR_HIDING_DETAIL" = "Nie zmniejszaj ani nie wygaszaj paska podczas przewijania.";
+"NO_TAB_BAR_HIDING_DETAIL" = "Nie zmniejszaj ani nie wygaszaj dolnego paska podczas przewijania.";
 "HIDE_BOTTOM_FADE_TITLE" = "Ukryj dolne przejście";
-"HIDE_BOTTOM_FADE_DETAIL" = "Usuwa przejście, które Twitter rysuje pod paskiem nawigacji.";
+"HIDE_BOTTOM_FADE_DETAIL" = "Usuwa przejście, które Twitter rysuje pod dolnym paskiem.";
 
 /* ===== BRANDING ===== */
 "MODERN_SETTINGS_BRANDING_TITLE" = "Branding";
@@ -314,11 +314,11 @@
 "CUSTOM_TAB_BAR_GRID_DETAIL" = "Stuknij kartę, aby ją dodać lub usunąć. Przytrzymaj ikonę na pasku poniżej, a następnie przeciągnij ją, aby zmienić kolejność.";
 "CUSTOM_TAB_BAR_RESET_MESSAGE" = "Edytor wraca do domyślnych kart Twittera. Stuknij Zapisz, aby je zachować.";
 "CUSTOM_TAB_BAR_RESTORE_ACTION" = "Przywróć";
-"CUSTOM_TAB_BAR_FULL_FORMAT" = "Maksymalna liczba kart na pasku: %ld. Najpierw usuń jedną.";
+"CUSTOM_TAB_BAR_FULL_FORMAT" = "Maksymalna liczba kart na dolnym pasku: %ld. Najpierw usuń jedną.";
 "CUSTOM_TAB_BAR_DISCARD_TITLE" = "Odrzuć zmiany";
 "CUSTOM_TAB_BAR_DISCARD_MESSAGE" = "Wybrane karty nie zostaną zapisane.";
 "CUSTOM_TAB_BAR_DISCARD_ACTION" = "Odrzuć";
-"CUSTOM_TAB_BAR_SETTINGS_NAVIGATION_TITLE" = "Karty";
+"CUSTOM_TAB_BAR_SETTINGS_NAVIGATION_TITLE" = "Nawigacja";
 "TAB_EDITOR_TIP_CHANGE" = "Stuknij kartę, aby ją zmienić";
 "TAB_EDITOR_TIP_ARRANGE" = "Dotknij i przytrzymaj kartę, aby zmienić kolejność";
 "TAB_EDITOR_TIP_ADD" = "Stuknij +, aby dodać kartę";

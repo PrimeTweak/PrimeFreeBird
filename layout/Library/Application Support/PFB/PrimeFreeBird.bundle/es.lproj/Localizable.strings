@@ -44,7 +44,7 @@
 
 /* ===== APPEARANCE — page ===== */
 "MODERN_SETTINGS_APPEARANCE_TITLE" = "Apariencia";
-"MODERN_SETTINGS_APPEARANCE_SUBTITLE" = "Estilo, fuentes, colores y barra de navegación.";
+"MODERN_SETTINGS_APPEARANCE_SUBTITLE" = "Estilo, fuentes, colores y barra inferior.";
 
 /* ===== Appearance › Style ===== */
 "APPEARANCE_GROUP_STYLE" = "Estilo";
@@ -74,8 +74,8 @@
 "COLOR_PFB_SWITCHES_DETAIL" = "Aplica el color de acento a los interruptores de estos ajustes.";
 "COLOR_TWITTER_ICON_IN_TOP_BAR_TITLE" = "Ícono de Twitter";
 "COLOR_TWITTER_ICON_IN_TOP_BAR_DETAIL" = "Aplica el color de acento al logo de la barra superior.";
-"APPEARANCE_GROUP_TAB_BAR" = "Navegación";
-"CUSTOM_TAB_BAR_OPTION_TITLE" = "Pestañas";
+"APPEARANCE_GROUP_TAB_BAR" = "Barra inferior";
+"CUSTOM_TAB_BAR_OPTION_TITLE" = "Navegación";
 "CUSTOM_TAB_BAR_OPTION_SUBTITLE" = "Elige qué pestañas aparecen y en qué orden.";
 "APPEARANCE_GROUP_SIDEBAR" = "Menú";
 "CUSTOM_SIDEBAR_OPTION_TITLE" = "Menú";
@@ -89,9 +89,9 @@
 "RESTORE_TAB_LABELS_TITLE" = "Etiquetas de las pestañas";
 "RESTORE_TAB_LABELS_DETAIL" = "Muestra las etiquetas debajo de los íconos.";
 "NO_TAB_BAR_HIDING_TITLE" = "Siempre visible";
-"NO_TAB_BAR_HIDING_DETAIL" = "Evita que la barra se encoja o se desvanezca al hacer scroll.";
+"NO_TAB_BAR_HIDING_DETAIL" = "Evita que la barra inferior se encoja o se desvanezca al hacer scroll.";
 "HIDE_BOTTOM_FADE_TITLE" = "Ocultar degradado inferior";
-"HIDE_BOTTOM_FADE_DETAIL" = "Quita el degradado que Twitter dibuja bajo la barra de navegación.";
+"HIDE_BOTTOM_FADE_DETAIL" = "Quita el degradado que Twitter dibuja bajo la barra inferior.";
 
 /* ===== BRANDING ===== */
 "MODERN_SETTINGS_BRANDING_TITLE" = "Marca";
@@ -314,11 +314,11 @@
 "CUSTOM_TAB_BAR_GRID_DETAIL" = "Toca una pestaña para añadirla o quitarla. Mantén pulsado un ícono de la barra de abajo y arrástralo para reordenar.";
 "CUSTOM_TAB_BAR_RESET_MESSAGE" = "El editor vuelve a las pestañas predeterminadas de Twitter. Toca Guardar para conservarlas.";
 "CUSTOM_TAB_BAR_RESTORE_ACTION" = "Restaurar";
-"CUSTOM_TAB_BAR_FULL_FORMAT" = "La barra admite %ld pestañas. Quita una primero.";
+"CUSTOM_TAB_BAR_FULL_FORMAT" = "La barra inferior admite %ld pestañas. Quita una primero.";
 "CUSTOM_TAB_BAR_DISCARD_TITLE" = "Descartar cambios";
 "CUSTOM_TAB_BAR_DISCARD_MESSAGE" = "Las pestañas elegidas no se guardan.";
 "CUSTOM_TAB_BAR_DISCARD_ACTION" = "Descartar";
-"CUSTOM_TAB_BAR_SETTINGS_NAVIGATION_TITLE" = "Pestañas";
+"CUSTOM_TAB_BAR_SETTINGS_NAVIGATION_TITLE" = "Navegación";
 "TAB_EDITOR_TIP_CHANGE" = "Toca una pestaña para cambiarla";
 "TAB_EDITOR_TIP_ARRANGE" = "Mantén pulsada una pestaña para moverla";
 "TAB_EDITOR_TIP_ADD" = "Toca + para añadir una pestaña";

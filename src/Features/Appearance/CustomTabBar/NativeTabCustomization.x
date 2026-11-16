@@ -206,7 +206,7 @@ static void PFBRestoreNativeTabSelection(id controller) {
 %hook T1TabCustomizationViewController
 
 // Twitter titles its editor with a view holding the title and the account under it; opened from
-// the new look, the title it set before stands alone, drawn as the new look draws its titles.
+// the new look, the page takes its row's title alone, drawn as the new look draws its titles.
 - (void)viewDidLoad {
     %orig;
     PFBPrepareNativeTabSave(self);
@@ -214,10 +214,10 @@ static void PFBRestoreNativeTabSelection(id controller) {
     if (![PFBCustomTabBarUtility editorShowsTitleAlone:editor]) {
         return;
     }
-    NSString* title = editor.navigationItem.title ?: editor.title;
+    NSString* title = [[PFBBundle sharedBundle] localizedStringForKey:@"CUSTOM_TAB_BAR_SETTINGS_NAVIGATION_TITLE"];
     if (editor.navigationItem.titleView && title.length) {
         PFBShowcaseSetTitle(editor, title);
-        PFBCOMPAT_ACTION(PFBCompat_custom_tab_bar, @"tab editor title shown alone");
+        PFBCOMPAT_ACTION(PFBCompat_custom_tab_bar, @"tab editor titled as its row");
     } else {
         PFBCOMPAT_OBSERVE(PFBCompat_custom_tab_bar, @"tab editor had no title to show alone");
     }

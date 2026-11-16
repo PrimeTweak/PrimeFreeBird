@@ -44,7 +44,7 @@
 
 /* ===== APPEARANCE — page ===== */
 "MODERN_SETTINGS_APPEARANCE_TITLE" = "모양";
-"MODERN_SETTINGS_APPEARANCE_SUBTITLE" = "스타일, 글꼴, 색상, 탐색 바.";
+"MODERN_SETTINGS_APPEARANCE_SUBTITLE" = "스타일, 글꼴, 색상, 하단 바.";
 
 /* ===== Appearance › Style ===== */
 "APPEARANCE_GROUP_STYLE" = "스타일";
@@ -74,8 +74,8 @@
 "COLOR_PFB_SWITCHES_DETAIL" = "이 설정의 스위치에 강조 색상을 적용합니다.";
 "COLOR_TWITTER_ICON_IN_TOP_BAR_TITLE" = "트위터 아이콘";
 "COLOR_TWITTER_ICON_IN_TOP_BAR_DETAIL" = "상단 바의 로고에 강조 색상을 적용합니다.";
-"APPEARANCE_GROUP_TAB_BAR" = "탐색";
-"CUSTOM_TAB_BAR_OPTION_TITLE" = "탭";
+"APPEARANCE_GROUP_TAB_BAR" = "하단 바";
+"CUSTOM_TAB_BAR_OPTION_TITLE" = "탐색";
 "CUSTOM_TAB_BAR_OPTION_SUBTITLE" = "표시할 탭과 순서를 선택합니다.";
 "APPEARANCE_GROUP_SIDEBAR" = "메뉴";
 "CUSTOM_SIDEBAR_OPTION_TITLE" = "메뉴";
@@ -89,9 +89,9 @@
 "RESTORE_TAB_LABELS_TITLE" = "탭 라벨";
 "RESTORE_TAB_LABELS_DETAIL" = "아이콘 아래에 라벨을 표시합니다.";
 "NO_TAB_BAR_HIDING_TITLE" = "항상 표시";
-"NO_TAB_BAR_HIDING_DETAIL" = "스크롤해도 바가 작아지거나 흐려지지 않습니다.";
+"NO_TAB_BAR_HIDING_DETAIL" = "스크롤해도 하단 바가 작아지거나 흐려지지 않습니다.";
 "HIDE_BOTTOM_FADE_TITLE" = "하단 페이드 숨기기";
-"HIDE_BOTTOM_FADE_DETAIL" = "트위터가 탐색 바 아래에 그리는 페이드를 제거합니다.";
+"HIDE_BOTTOM_FADE_DETAIL" = "트위터가 하단 바 아래에 그리는 페이드를 제거합니다.";
 
 /* ===== BRANDING ===== */
 "MODERN_SETTINGS_BRANDING_TITLE" = "브랜딩";
@@ -314,11 +314,11 @@
 "CUSTOM_TAB_BAR_GRID_DETAIL" = "탭을 눌러 추가하거나 제거합니다. 아래 바의 아이콘을 길게 누른 다음 드래그하여 순서를 바꿉니다.";
 "CUSTOM_TAB_BAR_RESET_MESSAGE" = "편집기가 트위터의 기본 탭으로 돌아갑니다. 유지하려면 저장을 누르세요.";
 "CUSTOM_TAB_BAR_RESTORE_ACTION" = "복원";
-"CUSTOM_TAB_BAR_FULL_FORMAT" = "바에는 탭을 %ld개까지 둘 수 있습니다. 먼저 하나를 제거하세요.";
+"CUSTOM_TAB_BAR_FULL_FORMAT" = "하단 바에는 탭을 %ld개까지 둘 수 있습니다. 먼저 하나를 제거하세요.";
 "CUSTOM_TAB_BAR_DISCARD_TITLE" = "변경 사항 버리기";
 "CUSTOM_TAB_BAR_DISCARD_MESSAGE" = "선택한 탭이 저장되지 않습니다.";
 "CUSTOM_TAB_BAR_DISCARD_ACTION" = "버리기";
-"CUSTOM_TAB_BAR_SETTINGS_NAVIGATION_TITLE" = "탭";
+"CUSTOM_TAB_BAR_SETTINGS_NAVIGATION_TITLE" = "탐색";
 "TAB_EDITOR_TIP_CHANGE" = "탭을 눌러 변경";
 "TAB_EDITOR_TIP_ARRANGE" = "탭을 길게 눌러 순서 변경";
 "TAB_EDITOR_TIP_ADD" = "+를 눌러 탭 추가";

@@ -44,7 +44,7 @@
 
 /* ===== APPEARANCE — page ===== */
 "MODERN_SETTINGS_APPEARANCE_TITLE" = "المظهر";
-"MODERN_SETTINGS_APPEARANCE_SUBTITLE" = "النمط والخطوط والألوان وشريط التنقل.";
+"MODERN_SETTINGS_APPEARANCE_SUBTITLE" = "النمط والخطوط والألوان والشريط السفلي.";
 
 /* ===== Appearance › Style ===== */
 "APPEARANCE_GROUP_STYLE" = "النمط";
@@ -74,8 +74,8 @@
 "COLOR_PFB_SWITCHES_DETAIL" = "تطبيق لون التمييز على المفاتيح في هذه الإعدادات.";
 "COLOR_TWITTER_ICON_IN_TOP_BAR_TITLE" = "أيقونة تويتر";
 "COLOR_TWITTER_ICON_IN_TOP_BAR_DETAIL" = "تطبيق لون التمييز على الشعار في الشريط العلوي.";
-"APPEARANCE_GROUP_TAB_BAR" = "التصفّح";
-"CUSTOM_TAB_BAR_OPTION_TITLE" = "التبويبات";
+"APPEARANCE_GROUP_TAB_BAR" = "الشريط السفلي";
+"CUSTOM_TAB_BAR_OPTION_TITLE" = "التصفّح";
 "CUSTOM_TAB_BAR_OPTION_SUBTITLE" = "اختر التبويبات التي تظهر وترتيبها.";
 "APPEARANCE_GROUP_SIDEBAR" = "القائمة";
 "CUSTOM_SIDEBAR_OPTION_TITLE" = "القائمة";
@@ -89,9 +89,9 @@
 "RESTORE_TAB_LABELS_TITLE" = "تسميات التبويبات";
 "RESTORE_TAB_LABELS_DETAIL" = "عرض التسميات أسفل الأيقونات.";
 "NO_TAB_BAR_HIDING_TITLE" = "ظاهر دائمًا";
-"NO_TAB_BAR_HIDING_DETAIL" = "عدم تصغير الشريط أو تلاشيه عند التمرير.";
+"NO_TAB_BAR_HIDING_DETAIL" = "عدم تصغير الشريط السفلي أو تلاشيه عند التمرير.";
 "HIDE_BOTTOM_FADE_TITLE" = "إخفاء التدرج السفلي";
-"HIDE_BOTTOM_FADE_DETAIL" = "إزالة التدرج الذي يرسمه تويتر تحت شريط التنقل.";
+"HIDE_BOTTOM_FADE_DETAIL" = "إزالة التدرج الذي يرسمه تويتر تحت الشريط السفلي.";
 
 /* ===== BRANDING ===== */
 "MODERN_SETTINGS_BRANDING_TITLE" = "الهوية";
@@ -314,11 +314,11 @@
 "CUSTOM_TAB_BAR_GRID_DETAIL" = "اضغط على تبويب لإضافته أو إزالته. المس مطولًا أيقونة في الشريط أدناه، ثم اسحبها لإعادة الترتيب.";
 "CUSTOM_TAB_BAR_RESET_MESSAGE" = "يعود المحرّر إلى تبويبات تويتر الافتراضية. اضغط على حفظ للاحتفاظ بها.";
 "CUSTOM_TAB_BAR_RESTORE_ACTION" = "استعادة";
-"CUSTOM_TAB_BAR_FULL_FORMAT" = "الحد الأقصى للتبويبات في الشريط: %ld. أزل واحدًا أولًا.";
+"CUSTOM_TAB_BAR_FULL_FORMAT" = "الحد الأقصى للتبويبات في الشريط السفلي: %ld. أزل واحدًا أولًا.";
 "CUSTOM_TAB_BAR_DISCARD_TITLE" = "تجاهل التغييرات";
 "CUSTOM_TAB_BAR_DISCARD_MESSAGE" = "لن تُحفظ التبويبات التي اخترتها.";
 "CUSTOM_TAB_BAR_DISCARD_ACTION" = "تجاهل";
-"CUSTOM_TAB_BAR_SETTINGS_NAVIGATION_TITLE" = "التبويبات";
+"CUSTOM_TAB_BAR_SETTINGS_NAVIGATION_TITLE" = "التصفّح";
 "TAB_EDITOR_TIP_CHANGE" = "اضغط على تبويب لتغييره";
 "TAB_EDITOR_TIP_ARRANGE" = "المس تبويبًا مع الاستمرار لإعادة ترتيبه";
 "TAB_EDITOR_TIP_ADD" = "اضغط + لإضافة تبويب";

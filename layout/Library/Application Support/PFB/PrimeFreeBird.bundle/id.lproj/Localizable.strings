@@ -44,7 +44,7 @@
 
 /* ===== APPEARANCE — page ===== */
 "MODERN_SETTINGS_APPEARANCE_TITLE" = "Tampilan";
-"MODERN_SETTINGS_APPEARANCE_SUBTITLE" = "Gaya, font, warna, dan bilah navigasi.";
+"MODERN_SETTINGS_APPEARANCE_SUBTITLE" = "Gaya, font, warna, dan bilah bawah.";
 
 /* ===== Appearance › Style ===== */
 "APPEARANCE_GROUP_STYLE" = "Gaya";
@@ -74,8 +74,8 @@
 "COLOR_PFB_SWITCHES_DETAIL" = "Terapkan warna aksen pada sakelar di pengaturan ini.";
 "COLOR_TWITTER_ICON_IN_TOP_BAR_TITLE" = "Ikon Twitter";
 "COLOR_TWITTER_ICON_IN_TOP_BAR_DETAIL" = "Terapkan warna aksen ke logo di bilah atas.";
-"APPEARANCE_GROUP_TAB_BAR" = "Navigasi";
-"CUSTOM_TAB_BAR_OPTION_TITLE" = "Tab";
+"APPEARANCE_GROUP_TAB_BAR" = "Bilah bawah";
+"CUSTOM_TAB_BAR_OPTION_TITLE" = "Navigasi";
 "CUSTOM_TAB_BAR_OPTION_SUBTITLE" = "Pilih tab yang muncul dan urutannya.";
 "APPEARANCE_GROUP_SIDEBAR" = "Menu";
 "CUSTOM_SIDEBAR_OPTION_TITLE" = "Menu";
@@ -89,9 +89,9 @@
 "RESTORE_TAB_LABELS_TITLE" = "Label tab";
 "RESTORE_TAB_LABELS_DETAIL" = "Tampilkan label di bawah ikon.";
 "NO_TAB_BAR_HIDING_TITLE" = "Selalu terlihat";
-"NO_TAB_BAR_HIDING_DETAIL" = "Jangan perkecil atau pudarkan bilah saat menggulir.";
+"NO_TAB_BAR_HIDING_DETAIL" = "Jangan perkecil atau pudarkan bilah bawah saat menggulir.";
 "HIDE_BOTTOM_FADE_TITLE" = "Sembunyikan gradasi bawah";
-"HIDE_BOTTOM_FADE_DETAIL" = "Hapus gradasi yang digambar Twitter di bawah bilah navigasi.";
+"HIDE_BOTTOM_FADE_DETAIL" = "Hapus gradasi yang digambar Twitter di bawah bilah bawah.";
 
 /* ===== BRANDING ===== */
 "MODERN_SETTINGS_BRANDING_TITLE" = "Branding";
@@ -314,11 +314,11 @@
 "CUSTOM_TAB_BAR_GRID_DETAIL" = "Ketuk tab untuk menambahkan atau menghapusnya. Sentuh lama ikon di bilah bawah, lalu seret untuk mengubah urutan.";
 "CUSTOM_TAB_BAR_RESET_MESSAGE" = "Editor kembali ke tab default Twitter. Ketuk Simpan untuk mempertahankannya.";
 "CUSTOM_TAB_BAR_RESTORE_ACTION" = "Pulihkan";
-"CUSTOM_TAB_BAR_FULL_FORMAT" = "Bilah memuat %ld tab. Hapus satu dulu.";
+"CUSTOM_TAB_BAR_FULL_FORMAT" = "Bilah bawah memuat %ld tab. Hapus satu dulu.";
 "CUSTOM_TAB_BAR_DISCARD_TITLE" = "Buang perubahan";
 "CUSTOM_TAB_BAR_DISCARD_MESSAGE" = "Tab yang Anda pilih tidak disimpan.";
 "CUSTOM_TAB_BAR_DISCARD_ACTION" = "Buang";
-"CUSTOM_TAB_BAR_SETTINGS_NAVIGATION_TITLE" = "Tab";
+"CUSTOM_TAB_BAR_SETTINGS_NAVIGATION_TITLE" = "Navigasi";
 "TAB_EDITOR_TIP_CHANGE" = "Ketuk tab untuk mengubahnya";
 "TAB_EDITOR_TIP_ARRANGE" = "Sentuh dan tahan tab untuk menata ulang";
 "TAB_EDITOR_TIP_ADD" = "Ketuk + untuk menambah tab";

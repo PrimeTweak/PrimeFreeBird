@@ -44,7 +44,7 @@
 
 /* ===== APPEARANCE — page ===== */
 "MODERN_SETTINGS_APPEARANCE_TITLE" = "外観";
-"MODERN_SETTINGS_APPEARANCE_SUBTITLE" = "スタイル、フォント、カラー、ナビゲーションバー。";
+"MODERN_SETTINGS_APPEARANCE_SUBTITLE" = "スタイル、フォント、カラー、下部バー。";
 
 /* ===== Appearance › Style ===== */
 "APPEARANCE_GROUP_STYLE" = "スタイル";
@@ -74,8 +74,8 @@
 "COLOR_PFB_SWITCHES_DETAIL" = "この設定画面のスイッチにアクセントカラーを使います。";
 "COLOR_TWITTER_ICON_IN_TOP_BAR_TITLE" = "Twitterアイコン";
 "COLOR_TWITTER_ICON_IN_TOP_BAR_DETAIL" = "上部バーのロゴにアクセントカラーを適用できます。";
-"APPEARANCE_GROUP_TAB_BAR" = "ナビゲーション";
-"CUSTOM_TAB_BAR_OPTION_TITLE" = "タブ";
+"APPEARANCE_GROUP_TAB_BAR" = "下部バー";
+"CUSTOM_TAB_BAR_OPTION_TITLE" = "ナビゲーション";
 "CUSTOM_TAB_BAR_OPTION_SUBTITLE" = "表示するタブとその順番を選びます。";
 "APPEARANCE_GROUP_SIDEBAR" = "メニュー";
 "CUSTOM_SIDEBAR_OPTION_TITLE" = "メニュー";
@@ -89,9 +89,9 @@
 "RESTORE_TAB_LABELS_TITLE" = "タブのラベル";
 "RESTORE_TAB_LABELS_DETAIL" = "アイコンの下にラベルを表示します。";
 "NO_TAB_BAR_HIDING_TITLE" = "常に表示";
-"NO_TAB_BAR_HIDING_DETAIL" = "スクロールしてもバーが縮んだり薄くなったりしないようにします。";
+"NO_TAB_BAR_HIDING_DETAIL" = "スクロールしても下部バーが縮んだり薄くなったりしないようにします。";
 "HIDE_BOTTOM_FADE_TITLE" = "下部のフェードを非表示";
-"HIDE_BOTTOM_FADE_DETAIL" = "Twitterがナビゲーションバーの下に描くフェードを取り除きます。";
+"HIDE_BOTTOM_FADE_DETAIL" = "Twitterが下部バーの下に描くフェードを取り除きます。";
 
 /* ===== BRANDING ===== */
 "MODERN_SETTINGS_BRANDING_TITLE" = "ブランド";
@@ -314,11 +314,11 @@
 "CUSTOM_TAB_BAR_GRID_DETAIL" = "タブをタップして追加または削除します。下のバーのアイコンを長押ししてから、ドラッグして並べ替えます。";
 "CUSTOM_TAB_BAR_RESET_MESSAGE" = "エディターがTwitterのデフォルトのタブに戻ります。保持するには「保存」をタップしてください。";
 "CUSTOM_TAB_BAR_RESTORE_ACTION" = "元に戻す";
-"CUSTOM_TAB_BAR_FULL_FORMAT" = "バーに置けるタブは%ld個までです。先に1つ取り除いてください。";
+"CUSTOM_TAB_BAR_FULL_FORMAT" = "下部バーに置けるタブは%ld個までです。先に1つ取り除いてください。";
 "CUSTOM_TAB_BAR_DISCARD_TITLE" = "変更を破棄";
 "CUSTOM_TAB_BAR_DISCARD_MESSAGE" = "選んだタブは保存されません。";
 "CUSTOM_TAB_BAR_DISCARD_ACTION" = "破棄";
-"CUSTOM_TAB_BAR_SETTINGS_NAVIGATION_TITLE" = "タブ";
+"CUSTOM_TAB_BAR_SETTINGS_NAVIGATION_TITLE" = "ナビゲーション";
 "TAB_EDITOR_TIP_CHANGE" = "タブをタップして変更";
 "TAB_EDITOR_TIP_ARRANGE" = "タブを長押しして並べ替え";
 "TAB_EDITOR_TIP_ADD" = "+をタップしてタブを追加";

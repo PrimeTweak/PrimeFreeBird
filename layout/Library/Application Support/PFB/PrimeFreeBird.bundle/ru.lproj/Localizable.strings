@@ -44,7 +44,7 @@
 
 /* ===== APPEARANCE — page ===== */
 "MODERN_SETTINGS_APPEARANCE_TITLE" = "Внешний вид";
-"MODERN_SETTINGS_APPEARANCE_SUBTITLE" = "Стиль, шрифты, цвета и панель навигации.";
+"MODERN_SETTINGS_APPEARANCE_SUBTITLE" = "Стиль, шрифты, цвета и нижняя панель.";
 
 /* ===== Appearance › Style ===== */
 "APPEARANCE_GROUP_STYLE" = "Стиль";
@@ -74,8 +74,8 @@
 "COLOR_PFB_SWITCHES_DETAIL" = "Применяет цвет акцента к переключателям в этих настройках.";
 "COLOR_TWITTER_ICON_IN_TOP_BAR_TITLE" = "Значок Twitter";
 "COLOR_TWITTER_ICON_IN_TOP_BAR_DETAIL" = "Применяет акцентный цвет к логотипу на верхней панели.";
-"APPEARANCE_GROUP_TAB_BAR" = "Навигация";
-"CUSTOM_TAB_BAR_OPTION_TITLE" = "Вкладки";
+"APPEARANCE_GROUP_TAB_BAR" = "Нижняя панель";
+"CUSTOM_TAB_BAR_OPTION_TITLE" = "Навигация";
 "CUSTOM_TAB_BAR_OPTION_SUBTITLE" = "Выберите, какие вкладки показывать и в каком порядке.";
 "APPEARANCE_GROUP_SIDEBAR" = "Меню";
 "CUSTOM_SIDEBAR_OPTION_TITLE" = "Меню";
@@ -89,9 +89,9 @@
 "RESTORE_TAB_LABELS_TITLE" = "Подписи вкладок";
 "RESTORE_TAB_LABELS_DETAIL" = "Показывает подписи под значками.";
 "NO_TAB_BAR_HIDING_TITLE" = "Всегда видна";
-"NO_TAB_BAR_HIDING_DETAIL" = "Не уменьшать и не скрывать панель при прокрутке.";
+"NO_TAB_BAR_HIDING_DETAIL" = "Не уменьшать и не скрывать нижнюю панель при прокрутке.";
 "HIDE_BOTTOM_FADE_TITLE" = "Скрыть нижнее затемнение";
-"HIDE_BOTTOM_FADE_DETAIL" = "Убирает затемнение, которое Twitter рисует под панелью навигации.";
+"HIDE_BOTTOM_FADE_DETAIL" = "Убирает затемнение, которое Twitter рисует под нижней панелью.";
 
 /* ===== BRANDING ===== */
 "MODERN_SETTINGS_BRANDING_TITLE" = "Брендинг";
@@ -314,11 +314,11 @@
 "CUSTOM_TAB_BAR_GRID_DETAIL" = "Нажмите на вкладку, чтобы добавить или убрать её. Удерживайте значок на панели ниже, затем перетащите его, чтобы изменить порядок.";
 "CUSTOM_TAB_BAR_RESET_MESSAGE" = "Редактор вернётся к вкладкам Twitter по умолчанию. Нажмите «Сохранить», чтобы оставить их.";
 "CUSTOM_TAB_BAR_RESTORE_ACTION" = "Восстановить";
-"CUSTOM_TAB_BAR_FULL_FORMAT" = "Вкладок на панели не больше: %ld. Сначала уберите одну.";
+"CUSTOM_TAB_BAR_FULL_FORMAT" = "Вкладок на нижней панели не больше: %ld. Сначала уберите одну.";
 "CUSTOM_TAB_BAR_DISCARD_TITLE" = "Отменить изменения";
 "CUSTOM_TAB_BAR_DISCARD_MESSAGE" = "Выбранные вкладки не сохранятся.";
 "CUSTOM_TAB_BAR_DISCARD_ACTION" = "Отменить";
-"CUSTOM_TAB_BAR_SETTINGS_NAVIGATION_TITLE" = "Вкладки";
+"CUSTOM_TAB_BAR_SETTINGS_NAVIGATION_TITLE" = "Навигация";
 "TAB_EDITOR_TIP_CHANGE" = "Коснитесь вкладки, чтобы изменить её";
 "TAB_EDITOR_TIP_ARRANGE" = "Коснитесь и удерживайте вкладку, чтобы переставить её";
 "TAB_EDITOR_TIP_ADD" = "Коснитесь +, чтобы добавить вкладку";

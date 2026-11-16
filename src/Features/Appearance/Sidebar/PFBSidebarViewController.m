@@ -12,6 +12,7 @@
 #import "Support/TWHeaders.h"
 
 static const CGFloat kTileHeight = 92.0;
+static const NSUInteger kTileColumns = 3;
 static const CGFloat kTileGap = 10.0;
 static const CGFloat kTileInset = 14.0;
 static const CGFloat kCardPadding = 12.0;
@@ -129,8 +130,13 @@ static const CGFloat kTileRadius = 22.0;
     CGFloat textWidth = MAX(0, width - 2 * kTileInset);
     CGRect glyph = CGRectMake(kTileInset, kTileInset, 24, 24);
     CGRect mark = CGRectMake(width - kTileInset - kMarkSize, kTileInset, kMarkSize, kMarkSize);
+    // A name of several words too wide for one line takes two; a single word shrinks instead.
     CGFloat line = ceil(_name.font.lineHeight);
-    CGRect name = CGRectMake(kTileInset, height - kTileInset - line, textWidth, line);
+    CGFloat fullWidth = ceil([_name.text sizeWithAttributes:@{NSFontAttributeName : _name.font}].width);
+    BOOL wraps = fullWidth > textWidth && [_name.text containsString:@" "];
+    _name.numberOfLines = wraps ? 2 : 1;
+    CGFloat nameHeight = wraps ? 2 * line : line;
+    CGRect name = CGRectMake(kTileInset, height - kTileInset - nameHeight, textWidth, nameHeight);
     if (rtl) {
         glyph.origin.x = width - CGRectGetMaxX(glyph);
         mark.origin.x = width - CGRectGetMaxX(mark);
@@ -303,7 +309,7 @@ static const CGFloat kTileRadius = 22.0;
     }
 }
 
-// One group at the given height: its title and count, then its tiles two to a row on its card,
+// One group at the given height: its title and count, then its tiles three to a row on its card,
 // mirrored right to left. An empty group folds away. Returns the height below it.
 - (CGFloat)layoutGroup:(PFBSidebarGroup*)group tiles:(NSArray<PFBSidebarTile*>*)tiles top:(CGFloat)top {
     CGFloat width = CGRectGetWidth(self.scroll.bounds);
@@ -323,15 +329,15 @@ static const CGFloat kTileRadius = 22.0;
     group.title.frame = title;
     group.count.frame = count;
 
-    CGFloat tileWidth = floor((inner - 2 * kCardPadding - kTileGap) / 2.0);
-    NSUInteger rows = (tiles.count + 1) / 2;
+    CGFloat tileWidth = floor((inner - 2 * kCardPadding - (kTileColumns - 1) * kTileGap) / kTileColumns);
+    NSUInteger rows = (tiles.count + kTileColumns - 1) / kTileColumns;
     CGFloat cardTop = top + headerHeight + 10.0;
     CGFloat cardHeight = rows ? 2 * kCardPadding + rows * kTileHeight + (rows - 1) * kTileGap : 0;
     group.card.frame = CGRectMake(side, cardTop, inner, cardHeight);
     for (NSUInteger index = 0; index < tiles.count; index++) {
-        NSUInteger column = rtl ? 1 - index % 2 : index % 2;
+        NSUInteger column = rtl ? kTileColumns - 1 - index % kTileColumns : index % kTileColumns;
         CGFloat x = side + kCardPadding + column * (tileWidth + kTileGap);
-        CGFloat y = cardTop + kCardPadding + (index / 2) * (kTileHeight + kTileGap);
+        CGFloat y = cardTop + kCardPadding + (index / kTileColumns) * (kTileHeight + kTileGap);
         tiles[index].bounds = CGRectMake(0, 0, tileWidth, kTileHeight);
         tiles[index].center = CGPointMake(x + tileWidth / 2.0, y + kTileHeight / 2.0);
     }

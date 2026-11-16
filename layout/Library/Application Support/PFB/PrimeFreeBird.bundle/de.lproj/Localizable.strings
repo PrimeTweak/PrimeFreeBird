@@ -44,7 +44,7 @@
 
 /* ===== APPEARANCE — page ===== */
 "MODERN_SETTINGS_APPEARANCE_TITLE" = "Aussehen";
-"MODERN_SETTINGS_APPEARANCE_SUBTITLE" = "Stil, Schriftarten, Farben und Navigationsleiste.";
+"MODERN_SETTINGS_APPEARANCE_SUBTITLE" = "Stil, Schriftarten, Farben und untere Leiste.";
 
 /* ===== Appearance › Style ===== */
 "APPEARANCE_GROUP_STYLE" = "Stil";
@@ -74,8 +74,8 @@
 "COLOR_PFB_SWITCHES_DETAIL" = "Wendet die Akzentfarbe auf die Schalter dieser Einstellungen an.";
 "COLOR_TWITTER_ICON_IN_TOP_BAR_TITLE" = "Twitter-Symbol";
 "COLOR_TWITTER_ICON_IN_TOP_BAR_DETAIL" = "Wendet die Akzentfarbe auf das Logo in der oberen Leiste an.";
-"APPEARANCE_GROUP_TAB_BAR" = "Navigation";
-"CUSTOM_TAB_BAR_OPTION_TITLE" = "Tabs";
+"APPEARANCE_GROUP_TAB_BAR" = "Untere Leiste";
+"CUSTOM_TAB_BAR_OPTION_TITLE" = "Navigation";
 "CUSTOM_TAB_BAR_OPTION_SUBTITLE" = "Wähle, welche Tabs erscheinen und in welcher Reihenfolge.";
 "APPEARANCE_GROUP_SIDEBAR" = "Menü";
 "CUSTOM_SIDEBAR_OPTION_TITLE" = "Menü";
@@ -89,9 +89,9 @@
 "RESTORE_TAB_LABELS_TITLE" = "Tab-Beschriftungen";
 "RESTORE_TAB_LABELS_DETAIL" = "Zeigt Beschriftungen unter den Symbolen an.";
 "NO_TAB_BAR_HIDING_TITLE" = "Immer sichtbar";
-"NO_TAB_BAR_HIDING_DETAIL" = "Leiste beim Scrollen weder verkleinern noch ausblenden.";
+"NO_TAB_BAR_HIDING_DETAIL" = "Untere Leiste beim Scrollen weder verkleinern noch ausblenden.";
 "HIDE_BOTTOM_FADE_TITLE" = "Unteren Verlauf ausblenden";
-"HIDE_BOTTOM_FADE_DETAIL" = "Entfernt den Verlauf, den Twitter unter der Navigationsleiste zeichnet.";
+"HIDE_BOTTOM_FADE_DETAIL" = "Entfernt den Verlauf, den Twitter unter der unteren Leiste zeichnet.";
 
 /* ===== BRANDING ===== */
 "MODERN_SETTINGS_BRANDING_TITLE" = "Branding";
@@ -314,11 +314,11 @@
 "CUSTOM_TAB_BAR_GRID_DETAIL" = "Tippe auf einen Tab, um ihn hinzuzufügen oder zu entfernen. Halte ein Symbol in der Leiste unten gedrückt und ziehe es, um die Reihenfolge zu ändern.";
 "CUSTOM_TAB_BAR_RESET_MESSAGE" = "Der Editor kehrt zu Twitters Standard-Tabs zurück. Tippe auf „Speichern“, um sie zu behalten.";
 "CUSTOM_TAB_BAR_RESTORE_ACTION" = "Wiederherstellen";
-"CUSTOM_TAB_BAR_FULL_FORMAT" = "Die Leiste fasst %ld Tabs. Entferne zuerst einen.";
+"CUSTOM_TAB_BAR_FULL_FORMAT" = "Die untere Leiste fasst %ld Tabs. Entferne zuerst einen.";
 "CUSTOM_TAB_BAR_DISCARD_TITLE" = "Änderungen verwerfen";
 "CUSTOM_TAB_BAR_DISCARD_MESSAGE" = "Die gewählten Tabs werden nicht gespeichert.";
 "CUSTOM_TAB_BAR_DISCARD_ACTION" = "Verwerfen";
-"CUSTOM_TAB_BAR_SETTINGS_NAVIGATION_TITLE" = "Tabs";
+"CUSTOM_TAB_BAR_SETTINGS_NAVIGATION_TITLE" = "Navigation";
 "TAB_EDITOR_TIP_CHANGE" = "Tippe auf einen Tab, um ihn zu ändern";
 "TAB_EDITOR_TIP_ARRANGE" = "Halte einen Tab gedrückt, um ihn zu verschieben";
 "TAB_EDITOR_TIP_ADD" = "Tippe auf +, um einen Tab hinzuzufügen";

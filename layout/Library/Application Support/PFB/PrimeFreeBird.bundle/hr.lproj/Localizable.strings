@@ -44,7 +44,7 @@
 
 /* ===== APPEARANCE — page ===== */
 "MODERN_SETTINGS_APPEARANCE_TITLE" = "Izgled";
-"MODERN_SETTINGS_APPEARANCE_SUBTITLE" = "Stil, fontovi, boje i navigacijska traka.";
+"MODERN_SETTINGS_APPEARANCE_SUBTITLE" = "Stil, fontovi, boje i donja traka.";
 
 /* ===== Appearance › Style ===== */
 "APPEARANCE_GROUP_STYLE" = "Stil";
@@ -74,8 +74,8 @@
 "COLOR_PFB_SWITCHES_DETAIL" = "Primijeni boju naglaska na prekidače u ovim postavkama.";
 "COLOR_TWITTER_ICON_IN_TOP_BAR_TITLE" = "Twitter ikona";
 "COLOR_TWITTER_ICON_IN_TOP_BAR_DETAIL" = "Primjenjuje boju naglaska na logotip u gornjoj traci.";
-"APPEARANCE_GROUP_TAB_BAR" = "Navigacija";
-"CUSTOM_TAB_BAR_OPTION_TITLE" = "Kartice";
+"APPEARANCE_GROUP_TAB_BAR" = "Donja traka";
+"CUSTOM_TAB_BAR_OPTION_TITLE" = "Navigacija";
 "CUSTOM_TAB_BAR_OPTION_SUBTITLE" = "Odaberi koje se kartice prikazuju i kojim redom.";
 "APPEARANCE_GROUP_SIDEBAR" = "Izbornik";
 "CUSTOM_SIDEBAR_OPTION_TITLE" = "Izbornik";
@@ -89,9 +89,9 @@
 "RESTORE_TAB_LABELS_TITLE" = "Oznake kartica";
 "RESTORE_TAB_LABELS_DETAIL" = "Prikaži oznake ispod ikona.";
 "NO_TAB_BAR_HIDING_TITLE" = "Uvijek vidljiva";
-"NO_TAB_BAR_HIDING_DETAIL" = "Ne smanjuj i ne skrivaj traku pri pomicanju.";
+"NO_TAB_BAR_HIDING_DETAIL" = "Ne smanjuj i ne skrivaj donju traku pri pomicanju.";
 "HIDE_BOTTOM_FADE_TITLE" = "Sakrij donje pretapanje";
-"HIDE_BOTTOM_FADE_DETAIL" = "Ukloni pretapanje koje Twitter crta ispod navigacijske trake.";
+"HIDE_BOTTOM_FADE_DETAIL" = "Ukloni pretapanje koje Twitter crta ispod donje trake.";
 
 /* ===== BRANDING ===== */
 "MODERN_SETTINGS_BRANDING_TITLE" = "Brendiranje";
@@ -314,11 +314,11 @@
 "CUSTOM_TAB_BAR_GRID_DETAIL" = "Dodirni karticu da je dodaš ili ukloniš. Zadrži ikonu na traci ispod, a zatim je povuci da promijeniš redoslijed.";
 "CUSTOM_TAB_BAR_RESET_MESSAGE" = "Uređivač se vraća na zadane kartice Twittera. Dodirni Spremi da ih zadržiš.";
 "CUSTOM_TAB_BAR_RESTORE_ACTION" = "Vrati";
-"CUSTOM_TAB_BAR_FULL_FORMAT" = "Najveći broj kartica na traci: %ld. Najprije ukloni jednu.";
+"CUSTOM_TAB_BAR_FULL_FORMAT" = "Najveći broj kartica na donjoj traci: %ld. Najprije ukloni jednu.";
 "CUSTOM_TAB_BAR_DISCARD_TITLE" = "Odbaci promjene";
 "CUSTOM_TAB_BAR_DISCARD_MESSAGE" = "Odabrane kartice neće se spremiti.";
 "CUSTOM_TAB_BAR_DISCARD_ACTION" = "Odbaci";
-"CUSTOM_TAB_BAR_SETTINGS_NAVIGATION_TITLE" = "Kartice";
+"CUSTOM_TAB_BAR_SETTINGS_NAVIGATION_TITLE" = "Navigacija";
 "TAB_EDITOR_TIP_CHANGE" = "Dodirni karticu da je promijeniš";
 "TAB_EDITOR_TIP_ARRANGE" = "Dodirni i drži karticu za promjenu redoslijeda";
 "TAB_EDITOR_TIP_ADD" = "Dodirni + za dodavanje kartice";
