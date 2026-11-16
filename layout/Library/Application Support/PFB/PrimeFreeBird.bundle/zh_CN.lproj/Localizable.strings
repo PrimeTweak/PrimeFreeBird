@@ -90,8 +90,8 @@
 "RESTORE_TAB_LABELS_DETAIL" = "在图标下方显示标签。";
 "NO_TAB_BAR_HIDING_TITLE" = "始终显示";
 "NO_TAB_BAR_HIDING_DETAIL" = "滚动时底部栏不缩小也不淡出。";
-"HIDE_BOTTOM_FADE_TITLE" = "隐藏底部渐变";
-"HIDE_BOTTOM_FADE_DETAIL" = "移除 Twitter 在底部栏下方绘制的渐变。";
+"SHOW_BOTTOM_FADE_TITLE" = "显示底部渐变";
+"SHOW_BOTTOM_FADE_DETAIL" = "恢复 Twitter 以前的外观：在更透明的底部栏下方显示渐变。";
 
 /* ===== BRANDING ===== */
 "MODERN_SETTINGS_BRANDING_TITLE" = "品牌";

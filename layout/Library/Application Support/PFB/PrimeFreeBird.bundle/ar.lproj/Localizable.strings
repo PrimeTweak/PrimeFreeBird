@@ -90,8 +90,8 @@
 "RESTORE_TAB_LABELS_DETAIL" = "عرض التسميات أسفل الأيقونات.";
 "NO_TAB_BAR_HIDING_TITLE" = "ظاهر دائمًا";
 "NO_TAB_BAR_HIDING_DETAIL" = "عدم تصغير الشريط السفلي أو تلاشيه عند التمرير.";
-"HIDE_BOTTOM_FADE_TITLE" = "إخفاء التدرج السفلي";
-"HIDE_BOTTOM_FADE_DETAIL" = "إزالة التدرج الذي يرسمه تويتر تحت الشريط السفلي.";
+"SHOW_BOTTOM_FADE_TITLE" = "إظهار التدرج السفلي";
+"SHOW_BOTTOM_FADE_DETAIL" = "يعيد مظهر تويتر السابق: تدرج تحت شريط سفلي أكثر شفافية.";
 
 /* ===== BRANDING ===== */
 "MODERN_SETTINGS_BRANDING_TITLE" = "الهوية";

@@ -90,8 +90,8 @@
 "RESTORE_TAB_LABELS_DETAIL" = "Muestra las etiquetas debajo de los íconos.";
 "NO_TAB_BAR_HIDING_TITLE" = "Siempre visible";
 "NO_TAB_BAR_HIDING_DETAIL" = "Evita que la barra inferior se encoja o se desvanezca al hacer scroll.";
-"HIDE_BOTTOM_FADE_TITLE" = "Ocultar degradado inferior";
-"HIDE_BOTTOM_FADE_DETAIL" = "Quita el degradado que Twitter dibuja bajo la barra inferior.";
+"SHOW_BOTTOM_FADE_TITLE" = "Mostrar degradado inferior";
+"SHOW_BOTTOM_FADE_DETAIL" = "Recupera el aspecto anterior de Twitter: un degradado bajo una barra inferior más clara.";
 
 /* ===== BRANDING ===== */
 "MODERN_SETTINGS_BRANDING_TITLE" = "Marca";

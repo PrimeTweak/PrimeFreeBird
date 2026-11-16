@@ -90,8 +90,8 @@
 "RESTORE_TAB_LABELS_DETAIL" = "Показывает подписи под значками.";
 "NO_TAB_BAR_HIDING_TITLE" = "Всегда видна";
 "NO_TAB_BAR_HIDING_DETAIL" = "Не уменьшать и не скрывать нижнюю панель при прокрутке.";
-"HIDE_BOTTOM_FADE_TITLE" = "Скрыть нижнее затемнение";
-"HIDE_BOTTOM_FADE_DETAIL" = "Убирает затемнение, которое Twitter рисует под нижней панелью.";
+"SHOW_BOTTOM_FADE_TITLE" = "Показать нижнее затемнение";
+"SHOW_BOTTOM_FADE_DETAIL" = "Возвращает прежний вид Twitter: затемнение под более прозрачной нижней панелью.";
 
 /* ===== BRANDING ===== */
 "MODERN_SETTINGS_BRANDING_TITLE" = "Брендинг";

@@ -240,10 +240,10 @@ void PFBGlassTabBarHideForSettings(BOOL hidden);
 // Reapplies each glass stack's configuration so an Always visible change takes effect now (GlassTabBar.x).
 void PFBGlassRefreshAlwaysVisible(void);
 
-// Sizes the glass bar's pill for Tab labels before Twitter builds the bar, and applies a
-// Hide bottom fade change to the lists on screen (GlassTabBar.x).
+// Sizes the glass bar's pill for Tab labels and sets its tint for Show bottom fade before Twitter
+// builds the bar, and applies a Show bottom fade change to the bar on screen (GlassTabBar.x).
 void PFBGlassTabBarStart(void);
-void PFBGlassRefreshBottomFades(void);
+void PFBGlassRefreshBottomFade(void);
 
 // Bar items of PrimeFreeBird's own screens carry this tag and keep UIKit's glass;
 // the app-wide flattening in NavBarIcons.x leaves them alone.

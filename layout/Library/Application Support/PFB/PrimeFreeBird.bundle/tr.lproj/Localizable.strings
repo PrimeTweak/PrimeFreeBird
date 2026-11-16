@@ -90,8 +90,8 @@
 "RESTORE_TAB_LABELS_DETAIL" = "Simgelerin altında etiketleri göster.";
 "NO_TAB_BAR_HIDING_TITLE" = "Her zaman görünür";
 "NO_TAB_BAR_HIDING_DETAIL" = "Kaydırırken alt çubuğu küçültme ya da gizleme.";
-"HIDE_BOTTOM_FADE_TITLE" = "Alttaki geçişi gizle";
-"HIDE_BOTTOM_FADE_DETAIL" = "Twitter’ın alt çubuğun altına çizdiği geçişi kaldır.";
+"SHOW_BOTTOM_FADE_TITLE" = "Alttaki geçişi göster";
+"SHOW_BOTTOM_FADE_DETAIL" = "Twitter’ın eski görünümünü geri getirir: daha şeffaf bir alt çubuğun altında geçiş.";
 
 /* ===== BRANDING ===== */
 "MODERN_SETTINGS_BRANDING_TITLE" = "Marka";

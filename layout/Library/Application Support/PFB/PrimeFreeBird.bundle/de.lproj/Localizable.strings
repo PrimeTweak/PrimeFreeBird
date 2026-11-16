@@ -90,8 +90,8 @@
 "RESTORE_TAB_LABELS_DETAIL" = "Zeigt Beschriftungen unter den Symbolen an.";
 "NO_TAB_BAR_HIDING_TITLE" = "Immer sichtbar";
 "NO_TAB_BAR_HIDING_DETAIL" = "Untere Leiste beim Scrollen weder verkleinern noch ausblenden.";
-"HIDE_BOTTOM_FADE_TITLE" = "Unteren Verlauf ausblenden";
-"HIDE_BOTTOM_FADE_DETAIL" = "Entfernt den Verlauf, den Twitter unter der unteren Leiste zeichnet.";
+"SHOW_BOTTOM_FADE_TITLE" = "Unteren Verlauf zeigen";
+"SHOW_BOTTOM_FADE_DETAIL" = "Bringt Twitters früheren Look zurück: einen Verlauf unter einer klareren unteren Leiste.";
 
 /* ===== BRANDING ===== */
 "MODERN_SETTINGS_BRANDING_TITLE" = "Branding";

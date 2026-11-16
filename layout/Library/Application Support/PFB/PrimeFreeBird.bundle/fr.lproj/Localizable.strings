@@ -86,8 +86,8 @@
 "RESTORE_TAB_LABELS_DETAIL" = "Affiche les étiquettes sous les icônes.";
 "NO_TAB_BAR_HIDING_TITLE" = "Toujours visible";
 "NO_TAB_BAR_HIDING_DETAIL" = "Ne réduit ni n’estompe la barre du bas au défilement.";
-"HIDE_BOTTOM_FADE_TITLE" = "Masquer le fondu du bas";
-"HIDE_BOTTOM_FADE_DETAIL" = "Retire le fondu que Twitter dessine sous la barre du bas.";
+"SHOW_BOTTOM_FADE_TITLE" = "Afficher le fondu du bas";
+"SHOW_BOTTOM_FADE_DETAIL" = "Ramène l’ancien look de Twitter : un fondu sous une barre du bas plus claire.";
 
 /* ===== BRANDING ===== */
 "MODERN_SETTINGS_BRANDING_TITLE" = "Image de marque";

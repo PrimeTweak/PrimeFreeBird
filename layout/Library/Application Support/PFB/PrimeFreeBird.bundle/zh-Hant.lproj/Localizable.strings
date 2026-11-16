@@ -90,8 +90,8 @@
 "RESTORE_TAB_LABELS_DETAIL" = "在圖示下方顯示標籤。";
 "NO_TAB_BAR_HIDING_TITLE" = "永遠顯示";
 "NO_TAB_BAR_HIDING_DETAIL" = "捲動時底部列不縮小也不淡出。";
-"HIDE_BOTTOM_FADE_TITLE" = "隱藏底部漸層";
-"HIDE_BOTTOM_FADE_DETAIL" = "移除 Twitter 在底部列下方繪製的漸層。";
+"SHOW_BOTTOM_FADE_TITLE" = "顯示底部漸層";
+"SHOW_BOTTOM_FADE_DETAIL" = "恢復 Twitter 先前的外觀：在更透明的底部列下方顯示漸層。";
 
 /* ===== BRANDING ===== */
 "MODERN_SETTINGS_BRANDING_TITLE" = "品牌外觀";

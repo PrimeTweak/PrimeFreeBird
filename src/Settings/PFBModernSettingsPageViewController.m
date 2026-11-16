@@ -829,8 +829,8 @@ NSURL* PFBAccountAvatarURL(TFNTwitterAccount* account) {
         if ([key isEqualToString:@"no_tab_bar_hiding"]) {
             PFBGlassRefreshAlwaysVisible();
         }
-        if ([key isEqualToString:@"hide_bottom_fade"]) {
-            PFBGlassRefreshBottomFades();
+        if ([key isEqualToString:@"show_bottom_fade"]) {
+            PFBGlassRefreshBottomFade();
         }
 
         // None applies in full at once: Record activity is read at launch, the Tweet button

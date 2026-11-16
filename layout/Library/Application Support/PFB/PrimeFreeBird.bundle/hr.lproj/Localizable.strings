@@ -90,8 +90,8 @@
 "RESTORE_TAB_LABELS_DETAIL" = "Prikaži oznake ispod ikona.";
 "NO_TAB_BAR_HIDING_TITLE" = "Uvijek vidljiva";
 "NO_TAB_BAR_HIDING_DETAIL" = "Ne smanjuj i ne skrivaj donju traku pri pomicanju.";
-"HIDE_BOTTOM_FADE_TITLE" = "Sakrij donje pretapanje";
-"HIDE_BOTTOM_FADE_DETAIL" = "Ukloni pretapanje koje Twitter crta ispod donje trake.";
+"SHOW_BOTTOM_FADE_TITLE" = "Prikaži donje pretapanje";
+"SHOW_BOTTOM_FADE_DETAIL" = "Vraća raniji izgled Twittera: pretapanje ispod prozirnije donje trake.";
 
 /* ===== BRANDING ===== */
 "MODERN_SETTINGS_BRANDING_TITLE" = "Brendiranje";

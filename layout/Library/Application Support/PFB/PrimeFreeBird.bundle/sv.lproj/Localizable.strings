@@ -90,8 +90,8 @@
 "RESTORE_TAB_LABELS_DETAIL" = "Visa etiketter under ikonerna.";
 "NO_TAB_BAR_HIDING_TITLE" = "Alltid synligt";
 "NO_TAB_BAR_HIDING_DETAIL" = "Låt inte det nedre fältet krympa eller tonas bort när du scrollar.";
-"HIDE_BOTTOM_FADE_TITLE" = "Dölj nedre toning";
-"HIDE_BOTTOM_FADE_DETAIL" = "Ta bort toningen som Twitter ritar under det nedre fältet.";
+"SHOW_BOTTOM_FADE_TITLE" = "Visa nedre toning";
+"SHOW_BOTTOM_FADE_DETAIL" = "Återställer Twitters tidigare utseende: en toning under ett klarare nedre fält.";
 
 /* ===== BRANDING ===== */
 "MODERN_SETTINGS_BRANDING_TITLE" = "Profilering";

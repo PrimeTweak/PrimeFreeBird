@@ -90,8 +90,8 @@
 "RESTORE_TAB_LABELS_DETAIL" = "Tampilkan label di bawah ikon.";
 "NO_TAB_BAR_HIDING_TITLE" = "Selalu terlihat";
 "NO_TAB_BAR_HIDING_DETAIL" = "Jangan perkecil atau pudarkan bilah bawah saat menggulir.";
-"HIDE_BOTTOM_FADE_TITLE" = "Sembunyikan gradasi bawah";
-"HIDE_BOTTOM_FADE_DETAIL" = "Hapus gradasi yang digambar Twitter di bawah bilah bawah.";
+"SHOW_BOTTOM_FADE_TITLE" = "Tampilkan gradasi bawah";
+"SHOW_BOTTOM_FADE_DETAIL" = "Kembalikan tampilan lama Twitter: gradasi di bawah bilah bawah yang lebih bening.";
 
 /* ===== BRANDING ===== */
 "MODERN_SETTINGS_BRANDING_TITLE" = "Branding";

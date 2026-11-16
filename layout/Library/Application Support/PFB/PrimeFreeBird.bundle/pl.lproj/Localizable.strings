@@ -90,8 +90,8 @@
 "RESTORE_TAB_LABELS_DETAIL" = "Pokazuje etykiety pod ikonami.";
 "NO_TAB_BAR_HIDING_TITLE" = "Zawsze widoczny";
 "NO_TAB_BAR_HIDING_DETAIL" = "Nie zmniejszaj ani nie wygaszaj dolnego paska podczas przewijania.";
-"HIDE_BOTTOM_FADE_TITLE" = "Ukryj dolne przejście";
-"HIDE_BOTTOM_FADE_DETAIL" = "Usuwa przejście, które Twitter rysuje pod dolnym paskiem.";
+"SHOW_BOTTOM_FADE_TITLE" = "Pokaż dolne przejście";
+"SHOW_BOTTOM_FADE_DETAIL" = "Przywraca dawny wygląd Twittera: przejście pod bardziej przejrzystym dolnym paskiem.";
 
 /* ===== BRANDING ===== */
 "MODERN_SETTINGS_BRANDING_TITLE" = "Branding";

@@ -90,8 +90,8 @@
 "RESTORE_TAB_LABELS_DETAIL" = "Show labels under the icons.";
 "NO_TAB_BAR_HIDING_TITLE" = "Always visible";
 "NO_TAB_BAR_HIDING_DETAIL" = "Don’t shrink or fade the bottom bar when you scroll.";
-"HIDE_BOTTOM_FADE_TITLE" = "Hide bottom fade";
-"HIDE_BOTTOM_FADE_DETAIL" = "Remove the fade Twitter draws under the bottom bar.";
+"SHOW_BOTTOM_FADE_TITLE" = "Show bottom fade";
+"SHOW_BOTTOM_FADE_DETAIL" = "Bring back Twitter’s earlier look: a fade under a clearer bottom bar.";
 
 /* ===== BRANDING ===== */
 "MODERN_SETTINGS_BRANDING_TITLE" = "Branding";

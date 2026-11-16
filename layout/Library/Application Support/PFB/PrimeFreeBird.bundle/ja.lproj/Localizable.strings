@@ -90,8 +90,8 @@
 "RESTORE_TAB_LABELS_DETAIL" = "アイコンの下にラベルを表示します。";
 "NO_TAB_BAR_HIDING_TITLE" = "常に表示";
 "NO_TAB_BAR_HIDING_DETAIL" = "スクロールしても下部バーが縮んだり薄くなったりしないようにします。";
-"HIDE_BOTTOM_FADE_TITLE" = "下部のフェードを非表示";
-"HIDE_BOTTOM_FADE_DETAIL" = "Twitterが下部バーの下に描くフェードを取り除きます。";
+"SHOW_BOTTOM_FADE_TITLE" = "下部のフェードを表示";
+"SHOW_BOTTOM_FADE_DETAIL" = "以前のTwitterの見た目に戻します：より透明な下部バーの下にフェードを表示します。";
 
 /* ===== BRANDING ===== */
 "MODERN_SETTINGS_BRANDING_TITLE" = "ブランド";
