@@ -650,14 +650,24 @@ static void PFBGlassApplyBarTint(void) {
 // MARK: - Bottom band
 
 // 12.42.1's band under its clear bar: from the bar's top to the screen's bottom, the page blurred
-// over the whole band, as Twitter's own bands blur, under the background color rising as the square
-// of the height. 12.44 builds none; this one sits right under the bar and follows it.
+// from about halfway down, under the background color. 12.44 builds none; this one sits right under
+// the bar and follows it.
 static const void* kPFBGlassBandKey = &kPFBGlassBandKey;
+// The background color over the bar's top, as chosen on renders against 12.42.1's captures; it fills
+// in down to the screen's bottom.
+static const double kPFBGlassBandTopColor = 0.5;
 
 static UIView* PFBGlassMakeBand(void) {
     UIView* band = [[UIView alloc] initWithFrame:CGRectZero];
     band.userInteractionEnabled = NO;
     UIVisualEffectView* blur = [[UIVisualEffectView alloc] initWithEffect:[UIBlurEffect effectWithStyle:UIBlurEffectStyleRegular]];
+    UIView* blurMask = [[UIView alloc] initWithFrame:CGRectZero];
+    CAGradientLayer* blurRamp = [CAGradientLayer layer];
+    blurRamp.colors = @[ (id)UIColor.clearColor.CGColor, (id)UIColor.clearColor.CGColor,
+                         (id)[UIColor colorWithWhite:0 alpha:0.5].CGColor, (id)UIColor.blackColor.CGColor ];
+    blurRamp.locations = @[ @0.0, @0.1, @0.35, @0.6 ];
+    [blurMask.layer addSublayer:blurRamp];
+    blur.maskView = blurMask;
     [band addSubview:blur];
     UIView* color = [[UIView alloc] initWithFrame:CGRectZero];
     [color.layer addSublayer:[CAGradientLayer layer]];
@@ -665,23 +675,27 @@ static UIView* PFBGlassMakeBand(void) {
     return band;
 }
 
-// The band's parts sized to it, and its color ramp in the background color of its appearance. As in
-// 12.42.1's band, the blur's own 30 % white veil stays off: only the color ramp whitens the page.
+// The band's parts sized to it, and its color ramp in the background color of its appearance: the
+// top color over a ramp rising as the square of the height. The blur's own 30 % white veil stays off.
 static void PFBGlassLayOutBand(UIView* band) {
     UIVisualEffectView* blur = band.subviews.firstObject;
     UIView* color = band.subviews.lastObject;
+    CAGradientLayer* blurRamp = (CAGradientLayer*)blur.maskView.layer.sublayers.firstObject;
     CAGradientLayer* colorRamp = (CAGradientLayer*)color.layer.sublayers.firstObject;
     UIColor* background = [[PFBPalette currentBackgroundColor] resolvedColorWithTraitCollection:band.traitCollection];
     NSMutableArray* colors = [NSMutableArray array];
     NSMutableArray* locations = [NSMutableArray array];
     for (NSUInteger i = 0; i <= 8; i++) {
         double t = i / 8.0;
-        [colors addObject:(id)[background colorWithAlphaComponent:t * t].CGColor];
+        double top = kPFBGlassBandTopColor * (1.0 - t);
+        [colors addObject:(id)[background colorWithAlphaComponent:1.0 - (1.0 - t * t) * (1.0 - top)].CGColor];
         [locations addObject:@(t)];
     }
     [CATransaction begin];
     [CATransaction setDisableActions:YES];
     blur.frame = band.bounds;
+    blur.maskView.frame = blur.bounds;
+    blurRamp.frame = blur.bounds;
     color.frame = band.bounds;
     colorRamp.frame = color.bounds;
     colorRamp.colors = colors;
