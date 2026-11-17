@@ -240,6 +240,7 @@ static const PFBCompatPathMeta kPaths[] = {
     {PFBCompatPath_tab_editor_page, PFBCompat_custom_tab_bar, "tab editor page"},
     {PFBCompatPath_glass_toast_row, PFBCompat_glass_toasts, "toast row"},
     {PFBCompatPath_glass_toast_width, PFBCompat_glass_toasts, "toast width"},
+    {PFBCompatPath_glass_toast_button, PFBCompat_glass_toasts, "toast button"},
     {PFBCompatPath_refresh_logo, PFBCompat_restore_twitter_names, "Home refresh logo"},
     {PFBCompatPath_refresh_animation, PFBCompat_restore_twitter_names, "Home refresh animation"},
     {PFBCompatPath_sensitive_box, PFBCompat_disable_sensitive_tweet_warnings, "sensitive box check"},

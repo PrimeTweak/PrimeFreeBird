@@ -12,7 +12,6 @@ static const void* kPFBEditorRestoreKey = &kPFBEditorRestoreKey;
 static const void* kPFBEditorTipsKey = &kPFBEditorTipsKey;
 static const void* kPFBEditorPickerFrameKey = &kPFBEditorPickerFrameKey;
 static const void* kPFBEditorBounceKey = &kPFBEditorBounceKey;
-static const void* kPFBEditorPullingKey = &kPFBEditorPullingKey;
 
 // The three tips, each a symbol in a circle beside its line.
 @interface PFBTabEditorTipsView : UIView
@@ -142,11 +141,6 @@ static PFBShowcaseButton* PFBEditorRestoreBar(UIViewController* editor) {
 
 // MARK: - Page pull
 
-// Temporary measure: the pull's start and end, and each move of Restore, on this page.
-static void PFBEditorMeasure(NSString* line) {
-    PFBCompatMeasure(@"restore pull", line, 40);
-}
-
 // The settings' other pages scroll; this one fits the screen. A vertical drag that starts outside
 // the bar, its picker and Restore pulls the page as a scroll view's rubber band does, Restore staying
 // in place, and lets it spring back.
@@ -167,17 +161,12 @@ static void PFBEditorMeasure(NSString* line) {
     NSArray* parts = @[ PFBEditorPart(editor, "barView", [UIView class]) ?: [NSNull null],
                         PFBEditorPart(editor, "picker", [UIView class]) ?: [NSNull null],
                         objc_getAssociatedObject(editor, kPFBEditorRestoreKey) ?: [NSNull null] ];
-    NSArray<NSString*>* names = @[ @"the bar", @"the picker", @"Restore" ];
-    for (NSUInteger i = 0; i < parts.count; i++) {
-        UIView* part = parts[i];
+    for (UIView* part in parts) {
         if ([part isKindOfClass:[UIView class]] && !part.hidden && part.superview &&
             CGRectContainsPoint([part convertRect:part.bounds toView:pan.view], point)) {
-            PFBEditorMeasure([NSString stringWithFormat:@"pull refused on %@ at y %.0f, dragging %@", names[i], point.y,
-                                                        velocity.y < 0.0 ? @"up" : @"down"]);
             return NO;
         }
     }
-    PFBEditorMeasure([NSString stringWithFormat:@"pull began at y %.0f, dragging %@", point.y, velocity.y < 0.0 ? @"up" : @"down"]);
     return YES;
 }
 
@@ -188,9 +177,7 @@ static void PFBEditorMeasure(NSString* line) {
         [page.layer removeAnimationForKey:@"pfbPagePull"];
         [restore.layer removeAnimationForKey:@"pfbPagePull"];
     }
-    BOOL pulling = pan.state == UIGestureRecognizerStateBegan || pan.state == UIGestureRecognizerStateChanged;
-    objc_setAssociatedObject(page, kPFBEditorPullingKey, pulling ? @YES : nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-    if (pulling) {
+    if (pan.state == UIGestureRecognizerStateBegan || pan.state == UIGestureRecognizerStateChanged) {
         CGFloat height = MAX(1.0, CGRectGetHeight(page.bounds));
         CGFloat drag = [pan translationInView:page].y;
         CGFloat offset = (1.0 - 1.0 / (fabs(drag) * 0.55 / height + 1.0)) * height * (drag < 0.0 ? -1.0 : 1.0);
@@ -201,8 +188,6 @@ static void PFBEditorMeasure(NSString* line) {
         [CATransaction commit];
         return;
     }
-    PFBEditorMeasure([NSString stringWithFormat:@"pull ended at page shift %.1f: Restore center y %.1f, shift %.1f",
-                                                page.layer.sublayerTransform.m42, restore.center.y, restore.layer.transform.m42]);
     for (CALayer* layer in @[ page.layer, restore.layer ?: page.layer ]) {
         NSString* path = layer == page.layer ? @"sublayerTransform" : @"transform";
         CASpringAnimation* spring = [CASpringAnimation animationWithKeyPath:path];
@@ -305,17 +290,8 @@ static void PFBEditorLayoutPage(UIViewController* editor) {
             [page addSubview:restore];
         }
         // Placed by bounds and center: during a pull, its layer holds Restore in place with a transform.
-        CGFloat before = restore.center.y;
         restore.bounds = CGRectMake(0.0, 0.0, CGRectGetWidth(dock), CGRectGetHeight(dock));
         restore.center = CGPointMake(CGRectGetMidX(dock), CGRectGetMidY(dock));
-        if (fabs(restore.center.y - before) > 0.5) {
-            CALayer* shown = restore.layer.presentationLayer ?: restore.layer;
-            PFBEditorMeasure([NSString stringWithFormat:@"Restore center y %.1f -> %.1f; page shift %.1f, Restore shift %.1f, "
-                                                        @"on screen y %.1f; pull %@",
-                                                        before, restore.center.y, page.layer.sublayerTransform.m42,
-                                                        restore.layer.transform.m42, shown.position.y,
-                                                        objc_getAssociatedObject(page, kPFBEditorPullingKey) ? @"on" : @"off"]);
-        }
         restore.enabled = ((UIControl*)reset).enabled;
         restore.alpha = restore.enabled ? 1.0 : 0.4;
         reset.hidden = YES;
