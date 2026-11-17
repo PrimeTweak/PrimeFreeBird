@@ -538,12 +538,19 @@ static void PFBGlassSizePillForLabels(void) {
 
 static void PFBGlassApplyBarTint(void);
 
+static NSString* PFBBarProbeMetrics(void);
+
 // Before the first bar is built: the pill's height for Tab labels and the glass tint for Bottom fade.
 void PFBGlassTabBarStart(void) {
     if (PFBNativeGlassAsked()) {
         PFBGlassSizePillForLabels();
         PFBGlassApplyBarTint();
     }
+    // [barprobe] The metrics as the bar is about to be built.
+    PFBCompatMeasure(@"bar height", [NSString stringWithFormat:@"launch: labels %d, glass %d, %@",
+                                                               [PFBSettings boolForKey:@"restore_tab_labels"],
+                                                               PFBNativeGlassAsked(), PFBBarProbeMetrics()],
+                     6);
 }
 
 // MARK: - Bottom fade
@@ -1109,15 +1116,183 @@ static void PFBGlassCheckAlwaysVisible(UIView* glass) {
 
 %end
 
+// MARK: - [barprobe]
+
+// [barprobe] Twitter's tab bar metrics, read from their storage so no initializer runs.
+static NSString* PFBBarProbeMetrics(void) {
+    static const char* const names[] = {"14expandedHeight", "15collapsedHeight", "14barBottomInset", "13restingExtent",
+                                        "10pillHeight", "13pillRestInset", "16pillSlotOverhang", "16pillLiftedOutset"};
+    NSMutableArray<NSString*>* parts = [NSMutableArray array];
+    for (size_t i = 0; i < sizeof(names) / sizeof(names[0]); i++) {
+        NSString* symbol =
+            [NSString stringWithFormat:@"$s11XNavigation13TabBarMetricsO%s12CoreGraphics7CGFloatVvpZ", names[i]];
+        const double* value = (const double*)dlsym(RTLD_DEFAULT, symbol.UTF8String);
+        [parts addObject:value ? [NSString stringWithFormat:@"%s %.1f", names[i] + 2, *value]
+                               : [NSString stringWithFormat:@"%s missing", names[i] + 2]];
+    }
+    const CGSize* pill = (const CGSize*)dlsym(RTLD_DEFAULT, "$s11XNavigation13TabBarMetricsO8pillSizeSo6CGSizeVvpZ");
+    [parts addObject:pill ? [NSString stringWithFormat:@"pillSize %.1fx%.1f", pill->width, pill->height] : @"pillSize missing"];
+    return [parts componentsJoinedByString:@", "];
+}
+
+// [barprobe] The code a call returns to: its image, the offset there and the nearest exported name.
+static NSString* PFBBarProbeCaller(const void* address) {
+    Dl_info info;
+    if (!address || !dladdr(address, &info) || !info.dli_fname) {
+        return @"unknown";
+    }
+    const char* image = strrchr(info.dli_fname, '/');
+    return [NSString stringWithFormat:@"%s+0x%lx %s", image ? image + 1 : info.dli_fname,
+                                      (unsigned long)((uintptr_t)address - (uintptr_t)info.dli_fbase),
+                                      info.dli_sname ?: "-"];
+}
+
+// [barprobe] A frame or bounds the bar or its placement is given, and by which code.
+static void PFBBarProbeNoteRect(NSString* who, NSString* setter, CGRect rect, const void* caller) {
+    if (CGRectGetHeight(rect) <= 0.0) {
+        return;
+    }
+    PFBCompatMeasure([@"bar sizes " stringByAppendingString:who],
+                     [NSString stringWithFormat:@"%@ %@ by %@", setter, NSStringFromCGRect(rect), PFBBarProbeCaller(caller)],
+                     14);
+}
+
+static NSString* PFBBarProbeItem(id item, UIView* bar, UIView* placement) {
+    if (!item) {
+        return @"-";
+    }
+    if (item == bar || item == placement) {
+        return item == bar ? @"bar" : @"placement";
+    }
+    if ([item isKindOfClass:[UILayoutGuide class]]) {
+        UILayoutGuide* guide = item;
+        return [NSString stringWithFormat:@"guide(%@ in %@)", guide.identifier.length ? guide.identifier : @"-",
+                                          NSStringFromClass([guide.owningView class])];
+    }
+    return NSStringFromClass([item class]);
+}
+
+static NSString* PFBBarProbeAttribute(NSLayoutAttribute attribute) {
+    static NSString* const names[] = {@"none",     @"left",   @"right",  @"top",     @"bottom",       @"leading",
+                                      @"trailing", @"width",  @"height", @"centerX", @"centerY",      @"lastBaseline",
+                                      @"firstBaseline"};
+    return attribute >= 0 && attribute <= 12 ? names[attribute] : [NSString stringWithFormat:@"%ld", (long)attribute];
+}
+
+// [barprobe] A constraint: its kind, items and attributes, relation, multiplier, constant, priority and state.
+static NSString* PFBBarProbeConstraint(NSLayoutConstraint* constraint, UIView* bar, UIView* placement) {
+    NSLayoutRelation relation = constraint.relation;
+    return [NSString stringWithFormat:@"%@ %@.%@ %@ %@.%@ x%.2f %+.1f p%.0f %@%@", NSStringFromClass([constraint class]),
+                                      PFBBarProbeItem(constraint.firstItem, bar, placement),
+                                      PFBBarProbeAttribute(constraint.firstAttribute),
+                                      relation == NSLayoutRelationEqual ? @"==" : (relation < 0 ? @"<=" : @">="),
+                                      PFBBarProbeItem(constraint.secondItem, bar, placement),
+                                      PFBBarProbeAttribute(constraint.secondAttribute), constraint.multiplier,
+                                      constraint.constant, constraint.priority, constraint.active ? @"on" : @"off",
+                                      constraint.identifier.length ? [@" " stringByAppendingString:constraint.identifier] : @""];
+}
+
+// [barprobe] The views from the bar up, then every constraint that sets the bar's and the placement's height.
+static void PFBBarProbeLayout(UIView* bar, NSString* when) {
+    UIView* placement = bar.superview;
+    NSString* topic = [@"bar layout " stringByAppendingString:when];
+    PFBCompatMeasure(topic, [@"metrics: " stringByAppendingString:PFBBarProbeMetrics()], 90);
+    NSInteger depth = 0;
+    for (UIView* view = bar; view && depth < 6; view = view.superview, depth++) {
+        NSString* line = [NSString
+            stringWithFormat:@"view %ld %@ %@ autoresizing %d mask %lu hug %.0f resist %.0f transform %@", (long)depth,
+                             NSStringFromClass([view class]), NSStringFromCGRect(view.frame),
+                             view.translatesAutoresizingMaskIntoConstraints, (unsigned long)view.autoresizingMask,
+                             [view contentHuggingPriorityForAxis:UILayoutConstraintAxisVertical],
+                             [view contentCompressionResistancePriorityForAxis:UILayoutConstraintAxisVertical],
+                             NSStringFromCGAffineTransform(view.transform)];
+        PFBCompatMeasure(topic, line, 90);
+    }
+    for (UIView* sub in bar.subviews) {
+        PFBCompatMeasure(topic, [NSString stringWithFormat:@"bar part %@ %@", NSStringFromClass([sub class]),
+                                                           NSStringFromCGRect(sub.frame)],
+                         90);
+    }
+    for (UIView* view in @[ bar, placement ?: bar ]) {
+        for (NSLayoutConstraint* constraint in [view constraintsAffectingLayoutForAxis:UILayoutConstraintAxisVertical]) {
+            PFBCompatMeasure(topic, [NSString stringWithFormat:@"%@ vertical: %@", view == bar ? @"bar" : @"placement",
+                                                               PFBBarProbeConstraint(constraint, bar, placement)],
+                             90);
+        }
+    }
+}
+
+// [barprobe] The trial, with Tab labels on: a required height equal to Twitter's bar height, set on the bar
+// or its placement, is raised by the extra height.
+static void PFBBarProbeTrial(UIView* bar) {
+    if (![PFBSettings boolForKey:@"restore_tab_labels"]) {
+        return;
+    }
+    const double* twitter =
+        (const double*)dlsym(RTLD_DEFAULT, "$s11XNavigation13TabBarMetricsO14expandedHeight12CoreGraphics7CGFloatVvpZ");
+    UIView* placement = bar.superview;
+    BOOL raised = NO;
+    for (UIView* view in @[ bar, placement ?: bar ]) {
+        for (NSLayoutConstraint* constraint in [view constraintsAffectingLayoutForAxis:UILayoutConstraintAxisVertical]) {
+            if (twitter && [constraint isMemberOfClass:[NSLayoutConstraint class]] && constraint.firstItem == view &&
+                constraint.firstAttribute == NSLayoutAttributeHeight && !constraint.secondItem &&
+                constraint.relation == NSLayoutRelationEqual && constraint.constant == *twitter) {
+                constraint.constant = *twitter + kPFBGlassExtraHeight;
+                raised = YES;
+                PFBCompatMeasure(@"bar trial", [NSString stringWithFormat:@"%@ height raised from %.0f to %.0f",
+                                                                          view == bar ? @"bar" : @"placement", *twitter,
+                                                                          constraint.constant],
+                                 4);
+            }
+        }
+    }
+    if (!raised) {
+        PFBCompatMeasure(@"bar trial", @"no required height equal to Twitter's bar height on the bar or its placement", 4);
+    }
+}
+
+%hook _TtC11XNavigation19TabBarPlacementView
+
+- (void)setFrame:(CGRect)frame {
+    PFBBarProbeNoteRect(@"placement", @"frame", frame, __builtin_return_address(0));
+    %orig;
+}
+
+- (void)setBounds:(CGRect)bounds {
+    PFBBarProbeNoteRect(@"placement", @"bounds", bounds, __builtin_return_address(0));
+    %orig;
+}
+
+%end
+
 %hook _TtC11XNavigation10TabBarView
 
 // Auto Layout gives the bar this height, and the bar lays its parts out in its bounds.
 - (CGSize)intrinsicContentSize {
     CGSize size = %orig;
+    // [barprobe] Whether anything asks the bar for its size, and what Twitter answers.
+    static NSUInteger calls;
+    calls++;
+    if (calls <= 3 || calls == 20 || calls == 200) {
+        PFBCompatMeasure(@"bar intrinsic", [NSString stringWithFormat:@"call %lu: Twitter %@, by %@", (unsigned long)calls,
+                                                                      NSStringFromCGSize(size),
+                                                                      PFBBarProbeCaller(__builtin_return_address(0))],
+                         6);
+    }
     if (size.height > 0.0 && [PFBSettings boolForKey:@"restore_tab_labels"]) {
         size.height += kPFBGlassExtraHeight;
     }
     return size;
+}
+
+- (void)setFrame:(CGRect)frame {
+    PFBBarProbeNoteRect(@"bar", @"frame", frame, __builtin_return_address(0));
+    %orig;
+}
+
+- (void)setBounds:(CGRect)bounds {
+    PFBBarProbeNoteRect(@"bar", @"bounds", bounds, __builtin_return_address(0));
+    %orig;
 }
 
 - (void)layoutSubviews {
@@ -1126,6 +1301,25 @@ static void PFBGlassCheckAlwaysVisible(UIView* glass) {
         UIView* bar = (UIView*)self;
         PFBGlassLiftBadges(bar);
         PFBCompatReach(PFBCompatPath_glass_tabs);
+        // [barprobe] Once per launch, a second after the first bar is on screen, then five seconds later.
+        static BOOL probed;
+        if (!probed && bar.window && CGRectGetHeight(bar.bounds) > 0.0) {
+            probed = YES;
+            __weak UIView* weakBar = bar;
+            dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+              UIView* strongBar = weakBar;
+              if (strongBar) {
+                  PFBBarProbeLayout(strongBar, @"before trial");
+                  PFBBarProbeTrial(strongBar);
+              }
+            });
+            dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(6.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+              UIView* strongBar = weakBar;
+              if (strongBar) {
+                  PFBBarProbeLayout(strongBar, @"after trial");
+              }
+            });
+        }
     } @catch (__unused id exception) {
     }
 }
