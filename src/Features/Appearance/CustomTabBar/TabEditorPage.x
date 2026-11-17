@@ -1,6 +1,6 @@
 // Twitter's tab editor laid out over the whole page: its message at the top, the bar on a card,
 // the hint as three illustrated tips, and Restore to default on a glass bar in the tab bar's place.
-// Twitter keeps the editing itself; the page pulls up and down like the settings' other pages.
+// Twitter keeps the editing itself; the page scrolls like the settings' other pages.
 
 #import "Support/HookHelpers.h"
 #import "Common/PFBBundle.h"
@@ -11,7 +11,7 @@ static const void* kPFBEditorCardKey = &kPFBEditorCardKey;
 static const void* kPFBEditorRestoreKey = &kPFBEditorRestoreKey;
 static const void* kPFBEditorTipsKey = &kPFBEditorTipsKey;
 static const void* kPFBEditorPickerFrameKey = &kPFBEditorPickerFrameKey;
-static const void* kPFBEditorBounceKey = &kPFBEditorBounceKey;
+static const void* kPFBEditorScrollKey = &kPFBEditorScrollKey;
 
 // The three tips, each a symbol in a circle beside its line.
 @interface PFBTabEditorTipsView : UIView
@@ -139,81 +139,69 @@ static PFBShowcaseButton* PFBEditorRestoreBar(UIViewController* editor) {
     return restore;
 }
 
-// MARK: - Page pull
+// MARK: - Page scroll
 
-// The settings' other pages scroll; this one fits the screen. A vertical drag that starts outside
-// the bar, its picker and Restore pulls the page as a scroll view's rubber band does, Restore staying
-// in place, and lets it spring back.
-@interface PFBTabEditorBounce : NSObject <UIGestureRecognizerDelegate>
+// The page in a scroll view, as the settings' other pages: it bounces, and iOS draws its soft top
+// under the navigation bar. A drag that starts on the bar or its picker stays theirs.
+@interface PFBTabEditorScroll : UIScrollView
 @property (nonatomic, weak) UIViewController* editor;
 @end
 
-@implementation PFBTabEditorBounce
+@implementation PFBTabEditorScroll
 
 - (BOOL)gestureRecognizerShouldBegin:(UIGestureRecognizer*)recognizer {
-    UIPanGestureRecognizer* pan = (UIPanGestureRecognizer*)recognizer;
-    CGPoint velocity = [pan velocityInView:pan.view];
-    if (fabs(velocity.y) <= fabs(velocity.x)) {
-        return NO;
-    }
-    UIViewController* editor = self.editor;
-    CGPoint point = [pan locationInView:pan.view];
-    NSArray* parts = @[ PFBEditorPart(editor, "barView", [UIView class]) ?: [NSNull null],
-                        PFBEditorPart(editor, "picker", [UIView class]) ?: [NSNull null],
-                        objc_getAssociatedObject(editor, kPFBEditorRestoreKey) ?: [NSNull null] ];
-    for (UIView* part in parts) {
-        if ([part isKindOfClass:[UIView class]] && !part.hidden && part.superview &&
-            CGRectContainsPoint([part convertRect:part.bounds toView:pan.view], point)) {
-            return NO;
+    if (recognizer == self.panGestureRecognizer) {
+        CGPoint point = [recognizer locationInView:self];
+        for (NSString* name in @[ @"barView", @"picker" ]) {
+            UIView* part = PFBEditorPart(self.editor, name.UTF8String, [UIView class]);
+            if (part && !part.hidden && part.superview &&
+                CGRectContainsPoint([part convertRect:part.bounds toView:self], point)) {
+                return NO;
+            }
         }
     }
-    return YES;
-}
-
-- (void)pull:(UIPanGestureRecognizer*)pan {
-    UIView* page = pan.view;
-    UIView* restore = objc_getAssociatedObject(self.editor, kPFBEditorRestoreKey);
-    if (pan.state == UIGestureRecognizerStateBegan) {
-        [page.layer removeAnimationForKey:@"pfbPagePull"];
-        [restore.layer removeAnimationForKey:@"pfbPagePull"];
-    }
-    if (pan.state == UIGestureRecognizerStateBegan || pan.state == UIGestureRecognizerStateChanged) {
-        CGFloat height = MAX(1.0, CGRectGetHeight(page.bounds));
-        CGFloat drag = [pan translationInView:page].y;
-        CGFloat offset = (1.0 - 1.0 / (fabs(drag) * 0.55 / height + 1.0)) * height * (drag < 0.0 ? -1.0 : 1.0);
-        [CATransaction begin];
-        [CATransaction setDisableActions:YES];
-        page.layer.sublayerTransform = CATransform3DMakeTranslation(0.0, offset, 0.0);
-        restore.layer.transform = CATransform3DMakeTranslation(0.0, -offset, 0.0);
-        [CATransaction commit];
-        return;
-    }
-    for (CALayer* layer in @[ page.layer, restore.layer ?: page.layer ]) {
-        NSString* path = layer == page.layer ? @"sublayerTransform" : @"transform";
-        CASpringAnimation* spring = [CASpringAnimation animationWithKeyPath:path];
-        spring.fromValue = [layer valueForKey:path];
-        spring.toValue = [NSValue valueWithCATransform3D:CATransform3DIdentity];
-        spring.stiffness = 300.0;
-        spring.damping = 32.0;
-        spring.duration = spring.settlingDuration;
-        [layer setValue:spring.toValue forKey:path];
-        [layer addAnimation:spring forKey:@"pfbPagePull"];
-    }
+    return [super gestureRecognizerShouldBegin:recognizer];
 }
 
 @end
 
-// The pull is added once to the editor's page.
-static void PFBEditorAddPull(UIViewController* editor, UIView* page) {
-    if (objc_getAssociatedObject(editor, kPFBEditorBounceKey)) {
-        return;
+// The page's views, Twitter's and the tweak's, moved into the scroll view in their order. Twitter
+// places them by frames from the page's bounds (read in the binary), which hold at the scroll view's
+// rest. Restore to default stays on the page, over it.
+static UIScrollView* PFBEditorScroll(UIViewController* editor, UIView* page) {
+    PFBTabEditorScroll* scroll = objc_getAssociatedObject(editor, kPFBEditorScrollKey);
+    if (!scroll) {
+        scroll = [[PFBTabEditorScroll alloc] initWithFrame:page.bounds];
+        scroll.editor = editor;
+        scroll.alwaysBounceVertical = YES;
+        scroll.showsVerticalScrollIndicator = NO;
+        scroll.showsHorizontalScrollIndicator = NO;
+        scroll.delaysContentTouches = NO;
+        scroll.contentInsetAdjustmentBehavior = UIScrollViewContentInsetAdjustmentNever;
+        objc_setAssociatedObject(editor, kPFBEditorScrollKey, scroll, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     }
-    PFBTabEditorBounce* bounce = [[PFBTabEditorBounce alloc] init];
-    bounce.editor = editor;
-    UIPanGestureRecognizer* pan = [[UIPanGestureRecognizer alloc] initWithTarget:bounce action:@selector(pull:)];
-    pan.delegate = bounce;
-    [page addGestureRecognizer:pan];
-    objc_setAssociatedObject(editor, kPFBEditorBounceKey, bounce, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    if (scroll.superview != page) {
+        [page insertSubview:scroll atIndex:0];
+        [editor setContentScrollView:scroll forEdge:NSDirectionalRectEdgeAll];
+    }
+    if (!CGRectEqualToRect(scroll.frame, page.bounds)) {
+        scroll.frame = page.bounds;
+    }
+    scroll.contentSize = page.bounds.size;
+    UIView* restore = objc_getAssociatedObject(editor, kPFBEditorRestoreKey);
+    for (UIView* view in [page.subviews copy]) {
+        if (view != scroll && view != restore) {
+            [scroll addSubview:view];
+        }
+    }
+    if (!PFBCompatPathReached(PFBCompatPath_tab_editor_soft_top)) {
+        PFBWalkAllSubviews(scroll, 3, ^(UIView* view) {
+          if ([NSStringFromClass([view class]) containsString:@"ScrollEdgeEffect"]) {
+              PFBCompatReach(PFBCompatPath_tab_editor_soft_top);
+          }
+        });
+    }
+    return scroll;
 }
 
 static void PFBEditorLayoutPage(UIViewController* editor) {
@@ -227,6 +215,7 @@ static void PFBEditorLayoutPage(UIViewController* editor) {
         return;
     }
     PFBCompatReach(PFBCompatPath_tab_editor_page);
+    UIScrollView* scroll = PFBEditorScroll(editor, page);
     CGRect bounds = page.bounds;
     UIEdgeInsets safe = page.safeAreaInsets;
     CGFloat width = CGRectGetWidth(bounds);
@@ -245,8 +234,8 @@ static void PFBEditorLayoutPage(UIViewController* editor) {
         cardView.userInteractionEnabled = NO;
         objc_setAssociatedObject(editor, kPFBEditorCardKey, cardView, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     }
-    if (cardView.superview != page) {
-        [page insertSubview:cardView atIndex:0];
+    if (cardView.superview != scroll) {
+        [scroll insertSubview:cardView atIndex:0];
     }
     cardView.frame = card;
 
@@ -277,8 +266,8 @@ static void PFBEditorLayoutPage(UIViewController* editor) {
         tips = [[PFBTabEditorTipsView alloc] initWithFrame:CGRectZero];
         objc_setAssociatedObject(editor, kPFBEditorTipsKey, tips, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     }
-    if (tips.superview != page) {
-        [page insertSubview:tips aboveSubview:cardView];
+    if (tips.superview != scroll) {
+        [scroll insertSubview:tips aboveSubview:cardView];
     }
     tips.font = [message.font fontWithSize:15.0];
     tips.frame = CGRectMake(24.0, CGRectGetMaxY(card) + 20.0, width - 48.0, 132.0);
@@ -289,14 +278,11 @@ static void PFBEditorLayoutPage(UIViewController* editor) {
         if (restore.superview != page) {
             [page addSubview:restore];
         }
-        // Placed by bounds and center: during a pull, its layer holds Restore in place with a transform.
-        restore.bounds = CGRectMake(0.0, 0.0, CGRectGetWidth(dock), CGRectGetHeight(dock));
-        restore.center = CGPointMake(CGRectGetMidX(dock), CGRectGetMidY(dock));
+        restore.frame = dock;
         restore.enabled = ((UIControl*)reset).enabled;
         restore.alpha = restore.enabled ? 1.0 : 0.4;
         reset.hidden = YES;
-        PFBEditorAddPull(editor, page);
-        PFBCOMPAT_ACTION(PFBCompat_custom_tab_bar, @"tab editor page laid out, Restore on the glass bar");
+        PFBCOMPAT_ACTION(PFBCompat_custom_tab_bar, @"tab editor page laid out in a scroll view, Restore on the glass bar");
     } else {
         CGFloat resetHeight = CGRectGetHeight(reset.frame) > 0.0 ? CGRectGetHeight(reset.frame) : 36.0;
         reset.frame = CGRectMake(20.0, floorY - resetHeight, width - 40.0, resetHeight);

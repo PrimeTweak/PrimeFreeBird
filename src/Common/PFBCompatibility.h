@@ -267,6 +267,7 @@ typedef NS_ENUM(NSInteger, PFBCompatPath) {
     PFBCompatPath_bottom_fade,
     PFBCompatPath_bottom_band,
     PFBCompatPath_tab_editor_page,
+    PFBCompatPath_tab_editor_soft_top,
     PFBCompatPath_glass_toast_row,
     PFBCompatPath_glass_toast_width,
     PFBCompatPath_glass_toast_button,

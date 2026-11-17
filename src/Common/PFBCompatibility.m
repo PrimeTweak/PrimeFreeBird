@@ -238,6 +238,7 @@ static const PFBCompatPathMeta kPaths[] = {
     {PFBCompatPath_bottom_fade, PFBCompat_show_bottom_fade, "tab bar tint"},
     {PFBCompatPath_bottom_band, PFBCompat_show_bottom_fade, "bottom band"},
     {PFBCompatPath_tab_editor_page, PFBCompat_custom_tab_bar, "tab editor page"},
+    {PFBCompatPath_tab_editor_soft_top, PFBCompat_custom_tab_bar, "soft top"},
     {PFBCompatPath_glass_toast_row, PFBCompat_glass_toasts, "toast row"},
     {PFBCompatPath_glass_toast_width, PFBCompat_glass_toasts, "toast width"},
     {PFBCompatPath_glass_toast_button, PFBCompat_glass_toasts, "toast button"},
