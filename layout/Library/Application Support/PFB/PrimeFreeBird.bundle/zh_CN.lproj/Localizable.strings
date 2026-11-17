@@ -90,8 +90,8 @@
 "RESTORE_TAB_LABELS_DETAIL" = "在图标下方显示标签。";
 "NO_TAB_BAR_HIDING_TITLE" = "始终显示";
 "NO_TAB_BAR_HIDING_DETAIL" = "滚动时底部栏不缩小也不淡出。";
-"SHOW_BOTTOM_FADE_TITLE" = "显示底部渐变";
-"SHOW_BOTTOM_FADE_DETAIL" = "恢复 Twitter 以前的外观：在更透明的底部栏下方显示渐变。";
+"SHOW_BOTTOM_FADE_TITLE" = "透明底部栏";
+"SHOW_BOTTOM_FADE_DETAIL" = "移除底部栏的色调，并让下方页面渐隐。";
 
 /* ===== BRANDING ===== */
 "MODERN_SETTINGS_BRANDING_TITLE" = "品牌";
@@ -752,6 +752,7 @@
 "EXPAND_TCO_LINKS_TITLE" = "完整链接";
 "REMOVE_RELATED_TWEETS_TITLE" = "隐藏相关推文";
 "KEEP_READING_POSITION_TITLE" = "重新加载时保留阅读位置";
+"REFRESH_FADE_TITLE" = "平滑刷新";
 "CLASSIC_TWEET_DETAIL_TITLE" = "经典推文页面";
 "WEB_LOGIN_TITLE" = "网页登录";
 "SETTINGS_ENTRY_TITLE" = "设置中的 PrimeFreeBird";

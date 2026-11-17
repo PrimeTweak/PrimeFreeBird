@@ -86,8 +86,8 @@
 "RESTORE_TAB_LABELS_DETAIL" = "Affiche les étiquettes sous les icônes.";
 "NO_TAB_BAR_HIDING_TITLE" = "Toujours visible";
 "NO_TAB_BAR_HIDING_DETAIL" = "Ne réduit ni n’estompe la barre du bas au défilement.";
-"SHOW_BOTTOM_FADE_TITLE" = "Afficher le fondu du bas";
-"SHOW_BOTTOM_FADE_DETAIL" = "Ramène l’ancien look de Twitter : un fondu sous une barre du bas plus claire.";
+"SHOW_BOTTOM_FADE_TITLE" = "Barre claire";
+"SHOW_BOTTOM_FADE_DETAIL" = "Retire la teinte de la barre et estompe la page en dessous.";
 
 /* ===== BRANDING ===== */
 "MODERN_SETTINGS_BRANDING_TITLE" = "Image de marque";
@@ -748,6 +748,7 @@
 "EXPAND_TCO_LINKS_TITLE" = "Liens complets";
 "REMOVE_RELATED_TWEETS_TITLE" = "Masquer les Tweets similaires";
 "KEEP_READING_POSITION_TITLE" = "Garder votre place au rechargement";
+"REFRESH_FADE_TITLE" = "Actualisation en douceur";
 "CLASSIC_TWEET_DETAIL_TITLE" = "Page de Tweet classique";
 "WEB_LOGIN_TITLE" = "Connexion web";
 "SETTINGS_ENTRY_TITLE" = "PrimeFreeBird dans les réglages";

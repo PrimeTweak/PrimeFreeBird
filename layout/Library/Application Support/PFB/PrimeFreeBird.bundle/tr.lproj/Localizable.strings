@@ -90,8 +90,8 @@
 "RESTORE_TAB_LABELS_DETAIL" = "Simgelerin altında etiketleri göster.";
 "NO_TAB_BAR_HIDING_TITLE" = "Her zaman görünür";
 "NO_TAB_BAR_HIDING_DETAIL" = "Kaydırırken alt çubuğu küçültme ya da gizleme.";
-"SHOW_BOTTOM_FADE_TITLE" = "Alttaki geçişi göster";
-"SHOW_BOTTOM_FADE_DETAIL" = "Twitter’ın eski görünümünü geri getirir: daha şeffaf bir alt çubuğun altında geçiş.";
+"SHOW_BOTTOM_FADE_TITLE" = "Şeffaf çubuk";
+"SHOW_BOTTOM_FADE_DETAIL" = "Çubuğun rengini kaldır ve altındaki sayfayı soldur.";
 
 /* ===== BRANDING ===== */
 "MODERN_SETTINGS_BRANDING_TITLE" = "Marka";
@@ -752,6 +752,7 @@
 "EXPAND_TCO_LINKS_TITLE" = "Tam bağlantılar";
 "REMOVE_RELATED_TWEETS_TITLE" = "İlgili Tweetleri gizle";
 "KEEP_READING_POSITION_TITLE" = "Yeniden yüklemede yerini koru";
+"REFRESH_FADE_TITLE" = "Yumuşak yenileme";
 "CLASSIC_TWEET_DETAIL_TITLE" = "Klasik Tweet sayfası";
 "WEB_LOGIN_TITLE" = "Web girişi";
 "SETTINGS_ENTRY_TITLE" = "Ayarlar’da PrimeFreeBird";

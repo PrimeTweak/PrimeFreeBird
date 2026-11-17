@@ -90,8 +90,8 @@
 "RESTORE_TAB_LABELS_DETAIL" = "Prikaži oznake ispod ikona.";
 "NO_TAB_BAR_HIDING_TITLE" = "Uvijek vidljiva";
 "NO_TAB_BAR_HIDING_DETAIL" = "Ne smanjuj i ne skrivaj donju traku pri pomicanju.";
-"SHOW_BOTTOM_FADE_TITLE" = "Prikaži donje pretapanje";
-"SHOW_BOTTOM_FADE_DETAIL" = "Vraća raniji izgled Twittera: pretapanje ispod prozirnije donje trake.";
+"SHOW_BOTTOM_FADE_TITLE" = "Prozirna traka";
+"SHOW_BOTTOM_FADE_DETAIL" = "Ukloni nijansu trake i pretopi stranicu ispod nje.";
 
 /* ===== BRANDING ===== */
 "MODERN_SETTINGS_BRANDING_TITLE" = "Brendiranje";
@@ -752,6 +752,7 @@
 "EXPAND_TCO_LINKS_TITLE" = "Pune poveznice";
 "REMOVE_RELATED_TWEETS_TITLE" = "Sakrij povezane tweetove";
 "KEEP_READING_POSITION_TITLE" = "Zadrži mjesto pri ponovnom učitavanju";
+"REFRESH_FADE_TITLE" = "Glatko osvježavanje";
 "CLASSIC_TWEET_DETAIL_TITLE" = "Klasična stranica tweeta";
 "WEB_LOGIN_TITLE" = "Web-prijava";
 "SETTINGS_ENTRY_TITLE" = "PrimeFreeBird u Postavkama";

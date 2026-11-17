@@ -301,18 +301,25 @@ static void PFBGlassToastColor(UIView* container, id toast) {
     });
 }
 
+// How deep the toast's words are looked for: past Twitter's glass and the views that host its content.
+static const NSInteger kPFBGlassToastWordsDepth = 16;
+
 // On Twitter's glass, every word and icon in the gray its tab bar gives unselected tabs, the text
 // color at 60 % (measured in the bar); the button keeps Twitter's shape. Set only when it differs.
-static void PFBGlassToastGrayText(UIView* container) {
+// Returns how many words and buttons the toast holds.
+static NSUInteger PFBGlassToastGrayText(UIView* container) {
     UIColor* gray = [[UIColor labelColor] colorWithAlphaComponent:0.6];
-    PFBWalkAllSubviews(container, 14, ^(UIView* view) {
+    __block NSUInteger words = 0;
+    PFBWalkAllSubviews(container, kPFBGlassToastWordsDepth, ^(UIView* view) {
       if ([view isKindOfClass:[UIButton class]]) {
+          words++;
           UIButton* button = (UIButton*)view;
           if (![[button titleColorForState:UIControlStateNormal] isEqual:gray]) {
               [button setTitleColor:gray forState:UIControlStateNormal];
           }
       } else if ([view isKindOfClass:[UILabel class]]) {
           UILabel* label = (UILabel*)view;
+          words++;
           if (![label.textColor isEqual:gray]) {
               label.textColor = gray;
           }
@@ -321,6 +328,7 @@ static void PFBGlassToastGrayText(UIView* container) {
           view.tintColor = gray;
       }
     });
+    return words;
 }
 
 // Twitter's glass around the toast since 12.44: its chrome holds the content in a view inside the
@@ -404,7 +412,7 @@ static void PFBGlassToastMeasureBarGlass(void) {
     PFBCompatMeasure(@"glass toasts", [@"tab bar glass: " stringByAppendingString:PFBGlassToastDescribeGlass(found)], 10);
 }
 
-// The content's class and its depth under the toast, searched to depth 10; nil when there is none.
+// The content's class and its depth under the toast, searched as deep as the words; nil when there is none.
 static NSString* PFBGlassToastDescribeContent(UIView* view, NSUInteger depth, UIView** content) {
     Class contentClass = NSClassFromString(@"XDSToastContentView");
     if (contentClass && [view isKindOfClass:contentClass]) {
@@ -412,7 +420,7 @@ static NSString* PFBGlassToastDescribeContent(UIView* view, NSUInteger depth, UI
         return [NSString stringWithFormat:@"%@ at depth %lu%@", NSStringFromClass([view class]), (unsigned long)depth,
                                           view.hidden ? @" hidden" : @""];
     }
-    for (UIView* subview in depth < 10 ? view.subviews : @[]) {
+    for (UIView* subview in depth < kPFBGlassToastWordsDepth ? view.subviews : @[]) {
         NSString* found = PFBGlassToastDescribeContent(subview, depth + 1, content);
         if (found) {
             return found;
@@ -429,8 +437,8 @@ static void PFBGlassToastMeasure(UIView* container, UIView* glass, id toast, BOO
     NSString* where = PFBGlassToastDescribeContent(container, 0, &content);
     if (!where) {
         NSMutableOrderedSet<NSString*>* classes = [NSMutableOrderedSet orderedSet];
-        PFBWalkAllSubviews(container, 6, ^(UIView* view) {
-          if (classes.count < 12) {
+        PFBWalkAllSubviews(container, 10, ^(UIView* view) {
+          if (classes.count < 16) {
               [classes addObject:NSStringFromClass([view class])];
           }
         });
@@ -444,7 +452,7 @@ static void PFBGlassToastMeasure(UIView* container, UIView* glass, id toast, BOO
     }
     NSMutableArray<NSString*>* labels = [NSMutableArray array];
     NSMutableArray<NSString*>* buttons = [NSMutableArray array];
-    PFBWalkAllSubviews(content ?: container, content ? 8 : 12, ^(UIView* view) {
+    PFBWalkAllSubviews(content ?: container, kPFBGlassToastWordsDepth, ^(UIView* view) {
       if ([view isKindOfClass:[UIControl class]] && ![view isKindOfClass:[UILabel class]] && buttons.count < 3) {
           UIButton* button = [view isKindOfClass:[UIButton class]] ? (UIButton*)view : nil;
           [buttons addObject:[NSString stringWithFormat:@"%@ \"%@\" %@ background %@ corners %.0f, title %@",
@@ -493,7 +501,7 @@ static void PFBGlassToastMeasure(UIView* container, UIView* glass, id toast, BOO
     }
 }
 
-// Each toast is measured once, a second after it and its glass first have a size, for its words to
+// Each toast is measured once, a second after it is first seen with its size, for its words to
 // settle; up to 8 toasts a launch.
 static void PFBGlassToastScheduleMeasure(UIView* container, UIView* glass, id toast) {
     static NSUInteger scheduled;
@@ -590,13 +598,16 @@ static void PFBGlassToastDress(UIView* container, BOOL styled) {
         if (surface) {
             PFBGlassToastRestore(container, surface);
         }
-        PFBGlassToastScheduleMeasure(container, twitterGlass, toast);
         if (!twitterGlass) {
+            PFBGlassToastScheduleMeasure(container, nil, toast);
             PFBCOMPAT_OBSERVE(PFBCompat_glass_toasts, @"Twitter's toast without its glass");
             return;
         }
         PFBGlassToastTintLikeBar(twitterGlass, styled);
-        PFBGlassToastGrayText(container);
+        // Measured once its words are in it.
+        if (PFBGlassToastGrayText(container) > 0) {
+            PFBGlassToastScheduleMeasure(container, twitterGlass, toast);
+        }
         PFBCOMPAT_ACTION(PFBCompat_glass_toasts, @"Twitter's toast tinted like the tab bar, words in its gray");
         return;
     }

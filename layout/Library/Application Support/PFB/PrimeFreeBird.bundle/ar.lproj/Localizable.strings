@@ -90,8 +90,8 @@
 "RESTORE_TAB_LABELS_DETAIL" = "عرض التسميات أسفل الأيقونات.";
 "NO_TAB_BAR_HIDING_TITLE" = "ظاهر دائمًا";
 "NO_TAB_BAR_HIDING_DETAIL" = "عدم تصغير الشريط السفلي أو تلاشيه عند التمرير.";
-"SHOW_BOTTOM_FADE_TITLE" = "إظهار التدرج السفلي";
-"SHOW_BOTTOM_FADE_DETAIL" = "يعيد مظهر تويتر السابق: تدرج تحت شريط سفلي أكثر شفافية.";
+"SHOW_BOTTOM_FADE_TITLE" = "شريط شفاف";
+"SHOW_BOTTOM_FADE_DETAIL" = "إزالة صبغة الشريط وإخفاء الصفحة تحته تدريجيًا.";
 
 /* ===== BRANDING ===== */
 "MODERN_SETTINGS_BRANDING_TITLE" = "الهوية";
@@ -752,6 +752,7 @@
 "EXPAND_TCO_LINKS_TITLE" = "روابط كاملة";
 "REMOVE_RELATED_TWEETS_TITLE" = "إخفاء التغريدات ذات الصلة";
 "KEEP_READING_POSITION_TITLE" = "الاحتفاظ بمكانك عند إعادة التحميل";
+"REFRESH_FADE_TITLE" = "تحديث سلس";
 "CLASSIC_TWEET_DETAIL_TITLE" = "صفحة التغريدة الكلاسيكية";
 "WEB_LOGIN_TITLE" = "تسجيل الدخول عبر الويب";
 "SETTINGS_ENTRY_TITLE" = "PrimeFreeBird في الإعدادات";

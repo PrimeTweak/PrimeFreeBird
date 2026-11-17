@@ -90,8 +90,8 @@
 "RESTORE_TAB_LABELS_DETAIL" = "Показує підписи під значками.";
 "NO_TAB_BAR_HIDING_TITLE" = "Завжди видима";
 "NO_TAB_BAR_HIDING_DETAIL" = "Не зменшувати й не приховувати нижню панель під час прокручування.";
-"SHOW_BOTTOM_FADE_TITLE" = "Показати нижнє затемнення";
-"SHOW_BOTTOM_FADE_DETAIL" = "Повертає попередній вигляд Twitter: затемнення під прозорішою нижньою панеллю.";
+"SHOW_BOTTOM_FADE_TITLE" = "Прозора панель";
+"SHOW_BOTTOM_FADE_DETAIL" = "Прибрати відтінок панелі й плавно розчинити сторінку під нею.";
 
 /* ===== BRANDING ===== */
 "MODERN_SETTINGS_BRANDING_TITLE" = "Брендинг";
@@ -752,6 +752,7 @@
 "EXPAND_TCO_LINKS_TITLE" = "Повні посилання";
 "REMOVE_RELATED_TWEETS_TITLE" = "Приховати пов’язані твіти";
 "KEEP_READING_POSITION_TITLE" = "Зберігати місце під час перезавантаження";
+"REFRESH_FADE_TITLE" = "Плавне оновлення";
 "CLASSIC_TWEET_DETAIL_TITLE" = "Класична сторінка твіта";
 "WEB_LOGIN_TITLE" = "Вебвхід";
 "SETTINGS_ENTRY_TITLE" = "PrimeFreeBird у Параметрах";

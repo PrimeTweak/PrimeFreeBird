@@ -90,8 +90,8 @@
 "RESTORE_TAB_LABELS_DETAIL" = "아이콘 아래에 라벨을 표시합니다.";
 "NO_TAB_BAR_HIDING_TITLE" = "항상 표시";
 "NO_TAB_BAR_HIDING_DETAIL" = "스크롤해도 하단 바가 작아지거나 흐려지지 않습니다.";
-"SHOW_BOTTOM_FADE_TITLE" = "하단 페이드 표시";
-"SHOW_BOTTOM_FADE_DETAIL" = "이전 트위터 모습으로 되돌립니다: 더 투명한 하단 바 아래에 페이드를 표시합니다.";
+"SHOW_BOTTOM_FADE_TITLE" = "투명한 바";
+"SHOW_BOTTOM_FADE_DETAIL" = "바의 색조를 없애고 아래 페이지를 흐려지게 합니다.";
 
 /* ===== BRANDING ===== */
 "MODERN_SETTINGS_BRANDING_TITLE" = "브랜딩";
@@ -752,6 +752,7 @@
 "EXPAND_TCO_LINKS_TITLE" = "전체 링크";
 "REMOVE_RELATED_TWEETS_TITLE" = "관련 트윗 숨기기";
 "KEEP_READING_POSITION_TITLE" = "새로고침 시 위치 유지";
+"REFRESH_FADE_TITLE" = "부드러운 새로고침";
 "CLASSIC_TWEET_DETAIL_TITLE" = "클래식 트윗 화면";
 "WEB_LOGIN_TITLE" = "웹 로그인";
 "SETTINGS_ENTRY_TITLE" = "설정의 PrimeFreeBird";

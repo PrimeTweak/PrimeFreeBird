@@ -2212,8 +2212,10 @@ static void PFBPaintRefreshFills(id node, NSArray* rgb) {
 }
 
 // The file Twitter is given: the bird's with Twitter wording, otherwise Twitter's X; with Twitter
-// icon, written again with its filling shapes in the accent. nil keeps Twitter's own file.
+// icon, written again once a launch with its filling shapes in the accent, so a new bundled file
+// replaces an older copy. nil keeps Twitter's own file.
 static NSURL* PFBRefreshLogoURL(NSBundle* twitters) {
+    static NSMutableSet<NSString*>* written;
     BOOL bird = [PFBSettings boolForKey:@"restore_twitter_names"];
     BOOL accent = PFBTintedLogoWanted();
     NSURL* source = bird ? [[PFBBundle sharedBundle] pathForFile:@"bird_refresh_logo.json"]
@@ -2230,7 +2232,7 @@ static NSURL* PFBRefreshLogoURL(NSBundle* twitters) {
                                                 (int)lround(green * 255), (int)lround(blue * 255)];
     NSURL* caches = [[NSFileManager defaultManager] URLsForDirectory:NSCachesDirectory inDomains:NSUserDomainMask].firstObject;
     NSURL* painted = [caches URLByAppendingPathComponent:name];
-    if ([painted checkResourceIsReachableAndReturnError:nil]) {
+    if ([written containsObject:name] && [painted checkResourceIsReachableAndReturnError:nil]) {
         return painted;
     }
     NSData* data = [NSData dataWithContentsOfURL:source];
@@ -2244,8 +2246,13 @@ static NSURL* PFBRefreshLogoURL(NSBundle* twitters) {
             PFBPaintRefreshFills(layer, @[ @(red), @(green), @(blue) ]);
         }
     }
-    NSData* written = [NSJSONSerialization dataWithJSONObject:animation options:0 error:nil];
-    return [written writeToURL:painted atomically:YES] ? painted : source;
+    NSData* json = [NSJSONSerialization dataWithJSONObject:animation options:0 error:nil];
+    if (![json writeToURL:painted atomically:YES]) {
+        return source;
+    }
+    written = written ?: [NSMutableSet set];
+    [written addObject:name];
+    return painted;
 }
 
 %hook NSBundle
@@ -2272,37 +2279,58 @@ static NSURL* PFBRefreshLogoURL(NSBundle* twitters) {
 
 %end
 
-// The logo's two views, for the report.
+// The logo's two views, for the report, with their sizes.
 static NSString* PFBRefreshLogoState(id still, id moving) {
     UIView* stillView = [still isKindOfClass:[UIView class]] ? still : nil;
     UIView* movingView = [moving isKindOfClass:[UIView class]] ? moving : nil;
     UIImage* image = [still isKindOfClass:[UIImageView class]] ? ((UIImageView*)still).image : nil;
-    return [NSString stringWithFormat:@"still %@ image %@%@ alpha %.2f, animation %@%@ alpha %.2f",
-                                      NSStringFromClass([still class]) ?: @"none", image ? NSStringFromCGSize(image.size) : @"none",
-                                      stillView.hidden ? @" hidden" : @"", stillView.alpha, NSStringFromClass([moving class]) ?: @"none",
-                                      movingView.hidden ? @" hidden" : @"", movingView.alpha];
+    return [NSString stringWithFormat:@"still %@ %@ image %@%@ alpha %.2f, animation %@ %@%@ alpha %.2f",
+                                      NSStringFromClass([still class]) ?: @"none", NSStringFromCGSize(stillView.bounds.size),
+                                      image ? NSStringFromCGSize(image.size) : @"none", stillView.hidden ? @" hidden" : @"",
+                                      stillView.alpha, NSStringFromClass([moving class]) ?: @"none",
+                                      NSStringFromCGSize(movingView.bounds.size), movingView.hidden ? @" hidden" : @"", movingView.alpha];
 }
 
-// Beside the animation, Twitter keeps a still image as a fallback. Once the tweak's animation was
-// handed over, the animation plays and the still image only takes the bird and the accent. Without
-// it, the still image shows in place of the animation, as the bird or the accent need. Measured once.
+// The logo's animation view: Twitter's ivar, else its Lottie view among the logo's subviews.
+static UIView* PFBRefreshLogoAnimationView(UIView* logo, id stored) {
+    if ([stored isKindOfClass:[UIView class]]) {
+        return stored;
+    }
+    for (UIView* subview in logo.subviews) {
+        if ([NSStringFromClass([subview class]) containsString:@"AnimationView"]) {
+            return subview;
+        }
+    }
+    return nil;
+}
+
+// Twitter keeps a still image beside the animation. Once the tweak's file is served, both stay as
+// Twitter sets them; otherwise the still image, as the bird or the accent need, replaces the animation
+// held in Twitter's ivar. Reported once the animation is a subview, or after 20 layouts on screen.
 static void PFBDressRefreshLogo(UIView* logo) {
     static BOOL measured;
+    static NSUInteger waited;
     Ivar stillIvar = class_getInstanceVariable([logo class], "fallbackView");
     Ivar movingIvar = class_getInstanceVariable([logo class], "animationView");
     id stillObject = stillIvar ? object_getIvar(logo, stillIvar) : nil;
     id movingObject = movingIvar ? object_getIvar(logo, movingIvar) : nil;
     PFBCompatReach(PFBCompatPath_refresh_logo);
-    if (![stillObject isKindOfClass:[UIImageView class]] || ![movingObject isKindOfClass:[UIView class]]) {
-        if (!measured && logo.window) {
+    if (!measured && logo.window && !CGRectIsEmpty(logo.bounds)) {
+        UIView* shown = PFBRefreshLogoAnimationView(logo, movingObject);
+        if (shown || ++waited >= 20) {
             measured = YES;
-            PFBCompatMeasure(@"bird", [NSString stringWithFormat:@"Home refresh logo without its two views: %@", PFBRefreshLogoState(stillObject, movingObject)], 3);
+            PFBCompatMeasure(@"bird", [NSString stringWithFormat:@"Home refresh logo %@, %@, animation %@: %@", NSStringFromCGSize(logo.bounds.size),
+                                                                gPFBRefreshLogoServed ? @"tweak's file" : @"Twitter's file",
+                                                                [movingObject isKindOfClass:[UIView class]] ? @"in Twitter's ivar" : @"not in Twitter's ivar",
+                                                                PFBRefreshLogoState(stillObject, shown)],
+                             3);
         }
+    }
+    if (![stillObject isKindOfClass:[UIImageView class]] || ![movingObject isKindOfClass:[UIView class]]) {
         return;
     }
     UIImageView* still = stillObject;
     UIView* moving = movingObject;
-    NSString* before = PFBRefreshLogoState(still, moving);
     BOOL bird = [PFBSettings boolForKey:@"restore_twitter_names"];
     BOOL wanted = (bird || PFBTintedLogoWanted()) && (still.image || bird);
     NSDictionary* twitters = objc_getAssociatedObject(logo, kPFBRefreshLogoStateKey);
@@ -2312,9 +2340,6 @@ static void PFBDressRefreshLogo(UIView* logo) {
             still.hidden = [twitters[@"hidden"] boolValue];
             still.alpha = [twitters[@"alpha"] doubleValue];
             objc_setAssociatedObject(logo, kPFBRefreshLogoStateKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-        }
-        if (gPFBRefreshLogoServed && wanted && still.image) {
-            PFBApplyLogoTint(still);
         }
     } else {
         if (!twitters) {
@@ -2333,13 +2358,6 @@ static void PFBDressRefreshLogo(UIView* logo) {
             PFBRegisterLogoView(still);
             PFBApplyLogoTint(still);
         }
-    }
-    if (!measured && logo.window && !CGRectIsEmpty(logo.bounds)) {
-        measured = YES;
-        PFBCompatMeasure(@"bird", [NSString stringWithFormat:@"Home refresh logo %@, %@: Twitter's %@; now %@", NSStringFromCGSize(logo.bounds.size),
-                                                            gPFBRefreshLogoServed ? @"tweak's animation" : @"Twitter's animation", before,
-                                                            PFBRefreshLogoState(still, moving)],
-                         3);
     }
 }
 

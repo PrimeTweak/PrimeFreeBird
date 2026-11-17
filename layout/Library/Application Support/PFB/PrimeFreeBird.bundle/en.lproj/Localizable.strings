@@ -90,8 +90,8 @@
 "RESTORE_TAB_LABELS_DETAIL" = "Show labels under the icons.";
 "NO_TAB_BAR_HIDING_TITLE" = "Always visible";
 "NO_TAB_BAR_HIDING_DETAIL" = "Don’t shrink or fade the bottom bar when you scroll.";
-"SHOW_BOTTOM_FADE_TITLE" = "Show bottom fade";
-"SHOW_BOTTOM_FADE_DETAIL" = "Bring back Twitter’s earlier look: a fade under a clearer bottom bar.";
+"SHOW_BOTTOM_FADE_TITLE" = "Clear bar";
+"SHOW_BOTTOM_FADE_DETAIL" = "Remove the bar’s tint and fade the page under it.";
 
 /* ===== BRANDING ===== */
 "MODERN_SETTINGS_BRANDING_TITLE" = "Branding";
@@ -752,6 +752,7 @@
 "EXPAND_TCO_LINKS_TITLE" = "Full links";
 "REMOVE_RELATED_TWEETS_TITLE" = "Hide related Tweets";
 "KEEP_READING_POSITION_TITLE" = "Keep your place on reload";
+"REFRESH_FADE_TITLE" = "Smooth refresh";
 "CLASSIC_TWEET_DETAIL_TITLE" = "Classic Tweet page";
 "WEB_LOGIN_TITLE" = "Web login";
 "SETTINGS_ENTRY_TITLE" = "PrimeFreeBird in Settings";

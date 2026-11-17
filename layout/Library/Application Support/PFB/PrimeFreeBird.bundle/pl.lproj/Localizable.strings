@@ -90,8 +90,8 @@
 "RESTORE_TAB_LABELS_DETAIL" = "Pokazuje etykiety pod ikonami.";
 "NO_TAB_BAR_HIDING_TITLE" = "Zawsze widoczny";
 "NO_TAB_BAR_HIDING_DETAIL" = "Nie zmniejszaj ani nie wygaszaj dolnego paska podczas przewijania.";
-"SHOW_BOTTOM_FADE_TITLE" = "Pokaż dolne przejście";
-"SHOW_BOTTOM_FADE_DETAIL" = "Przywraca dawny wygląd Twittera: przejście pod bardziej przejrzystym dolnym paskiem.";
+"SHOW_BOTTOM_FADE_TITLE" = "Przejrzysty pasek";
+"SHOW_BOTTOM_FADE_DETAIL" = "Usuń odcień paska i wygaś stronę pod nim.";
 
 /* ===== BRANDING ===== */
 "MODERN_SETTINGS_BRANDING_TITLE" = "Branding";
@@ -752,6 +752,7 @@
 "EXPAND_TCO_LINKS_TITLE" = "Pełne linki";
 "REMOVE_RELATED_TWEETS_TITLE" = "Ukryj powiązane Tweety";
 "KEEP_READING_POSITION_TITLE" = "Zachowaj miejsce przy przeładowaniu";
+"REFRESH_FADE_TITLE" = "Płynne odświeżanie";
 "CLASSIC_TWEET_DETAIL_TITLE" = "Klasyczna strona Tweeta";
 "WEB_LOGIN_TITLE" = "Logowanie przez sieć";
 "SETTINGS_ENTRY_TITLE" = "PrimeFreeBird w Ustawieniach";

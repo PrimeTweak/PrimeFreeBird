@@ -90,8 +90,8 @@
 "RESTORE_TAB_LABELS_DETAIL" = "Tampilkan label di bawah ikon.";
 "NO_TAB_BAR_HIDING_TITLE" = "Selalu terlihat";
 "NO_TAB_BAR_HIDING_DETAIL" = "Jangan perkecil atau pudarkan bilah bawah saat menggulir.";
-"SHOW_BOTTOM_FADE_TITLE" = "Tampilkan gradasi bawah";
-"SHOW_BOTTOM_FADE_DETAIL" = "Kembalikan tampilan lama Twitter: gradasi di bawah bilah bawah yang lebih bening.";
+"SHOW_BOTTOM_FADE_TITLE" = "Bilah bening";
+"SHOW_BOTTOM_FADE_DETAIL" = "Hapus warna bilah dan pudarkan halaman di bawahnya.";
 
 /* ===== BRANDING ===== */
 "MODERN_SETTINGS_BRANDING_TITLE" = "Branding";
@@ -752,6 +752,7 @@
 "EXPAND_TCO_LINKS_TITLE" = "Tautan lengkap";
 "REMOVE_RELATED_TWEETS_TITLE" = "Sembunyikan Tweet terkait";
 "KEEP_READING_POSITION_TITLE" = "Tetap di posisi saat memuat ulang";
+"REFRESH_FADE_TITLE" = "Muat ulang halus";
 "CLASSIC_TWEET_DETAIL_TITLE" = "Halaman Tweet klasik";
 "WEB_LOGIN_TITLE" = "Masuk web";
 "SETTINGS_ENTRY_TITLE" = "PrimeFreeBird di Pengaturan";

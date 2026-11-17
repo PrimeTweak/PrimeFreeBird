@@ -90,8 +90,8 @@
 "RESTORE_TAB_LABELS_DETAIL" = "アイコンの下にラベルを表示します。";
 "NO_TAB_BAR_HIDING_TITLE" = "常に表示";
 "NO_TAB_BAR_HIDING_DETAIL" = "スクロールしても下部バーが縮んだり薄くなったりしないようにします。";
-"SHOW_BOTTOM_FADE_TITLE" = "下部のフェードを表示";
-"SHOW_BOTTOM_FADE_DETAIL" = "以前のTwitterの見た目に戻します：より透明な下部バーの下にフェードを表示します。";
+"SHOW_BOTTOM_FADE_TITLE" = "透明なバー";
+"SHOW_BOTTOM_FADE_DETAIL" = "バーの色合いを外し、下のページをフェードさせます。";
 
 /* ===== BRANDING ===== */
 "MODERN_SETTINGS_BRANDING_TITLE" = "ブランド";
@@ -752,6 +752,7 @@
 "EXPAND_TCO_LINKS_TITLE" = "完全なリンク";
 "REMOVE_RELATED_TWEETS_TITLE" = "関連ツイートを非表示";
 "KEEP_READING_POSITION_TITLE" = "再読み込み時に位置を維持";
+"REFRESH_FADE_TITLE" = "なめらかな更新";
 "CLASSIC_TWEET_DETAIL_TITLE" = "クラシックなツイート画面";
 "WEB_LOGIN_TITLE" = "ウェブログイン";
 "SETTINGS_ENTRY_TITLE" = "設定にPrimeFreeBird";

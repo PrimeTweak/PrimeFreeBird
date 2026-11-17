@@ -90,8 +90,8 @@
 "RESTORE_TAB_LABELS_DETAIL" = "Visa etiketter under ikonerna.";
 "NO_TAB_BAR_HIDING_TITLE" = "Alltid synligt";
 "NO_TAB_BAR_HIDING_DETAIL" = "Låt inte det nedre fältet krympa eller tonas bort när du scrollar.";
-"SHOW_BOTTOM_FADE_TITLE" = "Visa nedre toning";
-"SHOW_BOTTOM_FADE_DETAIL" = "Återställer Twitters tidigare utseende: en toning under ett klarare nedre fält.";
+"SHOW_BOTTOM_FADE_TITLE" = "Klart fält";
+"SHOW_BOTTOM_FADE_DETAIL" = "Ta bort fältets ton och tona ut sidan under det.";
 
 /* ===== BRANDING ===== */
 "MODERN_SETTINGS_BRANDING_TITLE" = "Profilering";
@@ -752,6 +752,7 @@
 "EXPAND_TCO_LINKS_TITLE" = "Fullständiga länkar";
 "REMOVE_RELATED_TWEETS_TITLE" = "Dölj relaterade Tweets";
 "KEEP_READING_POSITION_TITLE" = "Behåll din plats vid omladdning";
+"REFRESH_FADE_TITLE" = "Mjuk uppdatering";
 "CLASSIC_TWEET_DETAIL_TITLE" = "Klassisk Tweet-sida";
 "WEB_LOGIN_TITLE" = "Webbinloggning";
 "SETTINGS_ENTRY_TITLE" = "PrimeFreeBird i Inställningar";
