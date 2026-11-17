@@ -270,6 +270,7 @@ typedef NS_ENUM(NSInteger, PFBCompatPath) {
     PFBCompatPath_glass_toast_row,
     PFBCompatPath_glass_toast_width,
     PFBCompatPath_glass_toast_button,
+    PFBCompatPath_glass_toast_layer,
     PFBCompatPath_refresh_logo,
     PFBCompatPath_sensitive_box,
     PFBCompatPath_refresh_animation,
