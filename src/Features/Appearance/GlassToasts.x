@@ -348,20 +348,27 @@ static void PFBGlassToastTintLikeBar(UIView* glass, BOOL force) {
 
 // MARK: - Glass compare (temporary)
 
-// A layer filter for the report: its name, then its radius, amount, scale and bias when it has them.
+// A layer filter for the report: its name, then each of its inputs, numbers as values, others by kind.
 static NSString* PFBGlassToastFilter(id filter) {
     NSMutableString* text = [NSMutableString string];
     @try {
-        id name = [filter valueForKey:@"name"];
+        id name = [filter respondsToSelector:@selector(name)] ? [filter valueForKey:@"name"] : nil;
         [text appendString:[name isKindOfClass:[NSString class]] ? name : NSStringFromClass([filter class])];
-        for (NSString* key in @[ @"inputRadius", @"inputAmount", @"inputScale", @"inputBias" ]) {
+        SEL inputs = NSSelectorFromString(@"inputKeys");
+        NSArray* keys = [filter respondsToSelector:inputs] ? ((NSArray * (*)(id, SEL)) objc_msgSend)(filter, inputs) : nil;
+        for (NSString* key in [keys isKindOfClass:[NSArray class]] ? keys : @[]) {
             id value = [filter valueForKey:key];
             if ([value isKindOfClass:[NSNumber class]]) {
-                [text appendFormat:@" %@ %.2f", [key substringFromIndex:5], [value doubleValue]];
+                [text appendFormat:@" %@=%.3g", key, [value doubleValue]];
+            } else if (value) {
+                NSString* kind = CFGetTypeID((__bridge CFTypeRef)value) == CGColorGetTypeID()
+                                     ? [NSString stringWithFormat:@"color %.2f", CGColorGetAlpha((__bridge CGColorRef)value)]
+                                     : NSStringFromClass([value class]);
+                [text appendFormat:@" %@=%@", key, kind];
             }
         }
     } @catch (__unused id exception) {
-        [text appendString:@"?"];
+        [text appendString:@" ?"];
     }
     return text;
 }
@@ -396,6 +403,12 @@ static NSString* PFBGlassToastLayers(CALayer* root) {
         if (layer.mask) {
             [text appendString:@" mask"];
         }
+        if ([NSStringFromClass([layer class]) isEqualToString:@"CABackdropLayer"]) {
+            @try {
+                [text appendFormat:@" scale %@ group %@", [layer valueForKey:@"scale"], [layer valueForKey:@"groupName"] ?: @"none"];
+            } @catch (__unused id exception) {
+            }
+        }
         [parts addObject:text];
         for (CALayer* sublayer in depth < 8 ? layer.sublayers : @[]) {
             [queue addObject:@[ sublayer, @(depth + 1) ]];
@@ -404,7 +417,8 @@ static NSString* PFBGlassToastLayers(CALayer* root) {
     return [parts componentsJoinedByString:@" | "];
 }
 
-// The first two toasts on Twitter's glass and the tab bar's glass, once each, a second after they show.
+// The first two toasts on Twitter's glass and the tab bar's glass, which sits in another window, once
+// each, a second after a toast shows.
 static void PFBGlassToastCompareGlass(UIView* glass) {
     static NSUInteger toasts;
     static BOOL barDone;
@@ -425,11 +439,15 @@ static void PFBGlassToastCompareGlass(UIView* glass) {
       Class barClass = NSClassFromString(@"_TtC11XNavigation10TabBarView");
       Class glassClass = NSClassFromString(@"XDSGlass");
       __block UIView* bar = nil;
-      PFBWalkAllSubviews(toastGlass.window, 40, ^(UIView* view) {
-        if (!bar && barClass && [view isKindOfClass:barClass]) {
-            bar = view;
-        }
-      });
+      for (UIScene* scene in UIApplication.sharedApplication.connectedScenes) {
+          for (UIWindow* window in [scene isKindOfClass:[UIWindowScene class]] ? ((UIWindowScene*)scene).windows : @[]) {
+              PFBWalkAllSubviews(window, 40, ^(UIView* view) {
+                if (!bar && barClass && [view isKindOfClass:barClass] && view.window) {
+                    bar = view;
+                }
+              });
+          }
+      }
       __block UIView* barGlass = nil;
       PFBWalkAllSubviews(bar, 3, ^(UIView* view) {
         if (!barGlass && glassClass && [view isKindOfClass:glassClass]) {
@@ -438,8 +456,14 @@ static void PFBGlassToastCompareGlass(UIView* glass) {
       });
       if (barGlass && !barDone) {
           barDone = YES;
-          PFBCompatMeasure(@"glass compare", [NSString stringWithFormat:@"bar %.0fx%.0f, bar view %@: %@", CGRectGetWidth(barGlass.bounds),
-                                                                         CGRectGetHeight(barGlass.bounds), PFBGlassToastLayers(bar.layer),
+          NSMutableArray<NSString*>* around = [NSMutableArray array];
+          for (UIView* view in bar.subviews) {
+              [around addObject:[NSString stringWithFormat:@"%@ %.0fx%.0f%@", NSStringFromClass([view class]), CGRectGetWidth(view.bounds),
+                                                           CGRectGetHeight(view.bounds), view.hidden ? @" hidden" : @""]];
+          }
+          PFBCompatMeasure(@"glass compare", [NSString stringWithFormat:@"bar %.0fx%.0f in %@ (%@): %@", CGRectGetWidth(barGlass.bounds),
+                                                                         CGRectGetHeight(barGlass.bounds), NSStringFromClass([bar class]),
+                                                                         [around componentsJoinedByString:@", "],
                                                                          PFBGlassToastLayers(barGlass.layer)],
                            3);
       }
