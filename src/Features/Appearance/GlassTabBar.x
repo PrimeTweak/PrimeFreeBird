@@ -755,7 +755,8 @@ static UIView* PFBGlassMakeBand(void) {
     return band;
 }
 
-// The band's parts sized to it, and its color ramp in the background color of its appearance.
+// The band's parts sized to it, and its color ramp in the background color of its appearance. As in
+// 12.42.1's band, the blur's own 30 % white veil stays off: only the color ramp whitens the page.
 static void PFBGlassLayOutBand(UIView* band) {
     UIVisualEffectView* blur = band.subviews.firstObject;
     UIView* color = band.subviews.lastObject;
@@ -779,6 +780,11 @@ static void PFBGlassLayOutBand(UIView* band) {
     colorRamp.colors = colors;
     colorRamp.locations = locations;
     [CATransaction commit];
+    for (UIView* veil in blur.subviews) {
+        if ([NSStringFromClass([veil class]) isEqualToString:@"_UIVisualEffectSubview"] && veil.alpha > 0.0) {
+            veil.alpha = 0.0;
+        }
+    }
 }
 
 // With Clear bar on, the band is placed under the tab bar's platter, the glass at least 60 % as wide
@@ -840,8 +846,8 @@ static void PFBGlassPlaceBand(UIView* glass) {
         measured++;
         PFBCompatMeasure(@"bottom fade",
                          [NSString stringWithFormat:@"band %@ on screen, in %@ %@ (%lu up from the bar's container %@ %@%@), "
-                                                    @"right under %@; bar glass top %.0f, window %@; blur %@ masked %@, color %@ "
-                                                    @"rising as the square of the height",
+                                                    @"right under %@; bar glass top %.0f, window %@; blur %@ masked %@, inside %@; "
+                                                    @"color %@ rising as the square of the height",
                                                     NSStringFromCGRect(CGRectIntegral([band convertRect:band.bounds toView:nil])),
                                                     NSStringFromClass([host class]),
                                                     NSStringFromCGRect(CGRectIntegral([host convertRect:host.bounds toView:nil])),
@@ -851,6 +857,7 @@ static void PFBGlassPlaceBand(UIView* glass) {
                                                     CGRectGetMinY(onScreen), NSStringFromCGSize(window.bounds.size),
                                                     [((UIVisualEffectView*)band.subviews.firstObject).effect description] ?: @"none",
                                                     ((UIVisualEffectView*)band.subviews.firstObject).maskView ? @"yes" : @"no",
+                                                    PFBGlassDescribeTree(band.subviews.firstObject, 1),
                                                     PFBGlassRGBA([PFBPalette currentBackgroundColor], band)],
                          8);
     }
