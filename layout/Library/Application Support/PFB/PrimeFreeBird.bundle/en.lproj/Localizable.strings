@@ -90,8 +90,8 @@
 "RESTORE_TAB_LABELS_DETAIL" = "Show labels under the icons.";
 "NO_TAB_BAR_HIDING_TITLE" = "Always visible";
 "NO_TAB_BAR_HIDING_DETAIL" = "Don’t shrink or fade the bottom bar when you scroll.";
-"SHOW_BOTTOM_FADE_TITLE" = "Clear bar";
-"SHOW_BOTTOM_FADE_DETAIL" = "Remove the bar’s tint and fade the page under it.";
+"SHOW_BOTTOM_FADE_TITLE" = "Bottom fade";
+"SHOW_BOTTOM_FADE_DETAIL" = "Fade the page under the bar, for a softer look behind the glass.";
 
 /* ===== BRANDING ===== */
 "MODERN_SETTINGS_BRANDING_TITLE" = "Branding";

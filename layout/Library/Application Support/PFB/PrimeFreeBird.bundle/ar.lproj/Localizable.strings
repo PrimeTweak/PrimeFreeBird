@@ -90,8 +90,8 @@
 "RESTORE_TAB_LABELS_DETAIL" = "عرض التسميات أسفل الأيقونات.";
 "NO_TAB_BAR_HIDING_TITLE" = "ظاهر دائمًا";
 "NO_TAB_BAR_HIDING_DETAIL" = "عدم تصغير الشريط السفلي أو تلاشيه عند التمرير.";
-"SHOW_BOTTOM_FADE_TITLE" = "شريط شفاف";
-"SHOW_BOTTOM_FADE_DETAIL" = "إزالة صبغة الشريط وإخفاء الصفحة تحته تدريجيًا.";
+"SHOW_BOTTOM_FADE_TITLE" = "التلاشي السفلي";
+"SHOW_BOTTOM_FADE_DETAIL" = "إخفاء الصفحة تحت الشريط تدريجيًا، لمظهر أنعم خلف الزجاج.";
 
 /* ===== BRANDING ===== */
 "MODERN_SETTINGS_BRANDING_TITLE" = "الهوية";

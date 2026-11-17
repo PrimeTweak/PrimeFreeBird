@@ -90,8 +90,8 @@
 "RESTORE_TAB_LABELS_DETAIL" = "在圖示下方顯示標籤。";
 "NO_TAB_BAR_HIDING_TITLE" = "永遠顯示";
 "NO_TAB_BAR_HIDING_DETAIL" = "捲動時底部列不縮小也不淡出。";
-"SHOW_BOTTOM_FADE_TITLE" = "透明底部列";
-"SHOW_BOTTOM_FADE_DETAIL" = "移除底部列的色調，並讓下方頁面漸隱。";
+"SHOW_BOTTOM_FADE_TITLE" = "底部漸隱";
+"SHOW_BOTTOM_FADE_DETAIL" = "讓底部列下方的頁面漸隱，玻璃後方看起來更柔和。";
 
 /* ===== BRANDING ===== */
 "MODERN_SETTINGS_BRANDING_TITLE" = "品牌外觀";

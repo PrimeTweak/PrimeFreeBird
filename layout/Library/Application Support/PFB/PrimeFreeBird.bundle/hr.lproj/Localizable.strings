@@ -90,8 +90,8 @@
 "RESTORE_TAB_LABELS_DETAIL" = "Prikaži oznake ispod ikona.";
 "NO_TAB_BAR_HIDING_TITLE" = "Uvijek vidljiva";
 "NO_TAB_BAR_HIDING_DETAIL" = "Ne smanjuj i ne skrivaj donju traku pri pomicanju.";
-"SHOW_BOTTOM_FADE_TITLE" = "Prozirna traka";
-"SHOW_BOTTOM_FADE_DETAIL" = "Ukloni nijansu trake i pretopi stranicu ispod nje.";
+"SHOW_BOTTOM_FADE_TITLE" = "Donje pretapanje";
+"SHOW_BOTTOM_FADE_DETAIL" = "Pretopi stranicu ispod trake za mekši izgled iza stakla.";
 
 /* ===== BRANDING ===== */
 "MODERN_SETTINGS_BRANDING_TITLE" = "Brendiranje";

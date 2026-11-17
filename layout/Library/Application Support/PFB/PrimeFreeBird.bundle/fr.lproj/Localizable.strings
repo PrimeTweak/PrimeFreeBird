@@ -86,8 +86,8 @@
 "RESTORE_TAB_LABELS_DETAIL" = "Affiche les étiquettes sous les icônes.";
 "NO_TAB_BAR_HIDING_TITLE" = "Toujours visible";
 "NO_TAB_BAR_HIDING_DETAIL" = "Ne réduit ni n’estompe la barre du bas au défilement.";
-"SHOW_BOTTOM_FADE_TITLE" = "Barre claire";
-"SHOW_BOTTOM_FADE_DETAIL" = "Retire la teinte de la barre et estompe la page en dessous.";
+"SHOW_BOTTOM_FADE_TITLE" = "Fondu du bas";
+"SHOW_BOTTOM_FADE_DETAIL" = "Estompe la page sous la barre, pour un rendu plus doux derrière le verre.";
 
 /* ===== BRANDING ===== */
 "MODERN_SETTINGS_BRANDING_TITLE" = "Image de marque";

@@ -90,8 +90,8 @@
 "RESTORE_TAB_LABELS_DETAIL" = "アイコンの下にラベルを表示します。";
 "NO_TAB_BAR_HIDING_TITLE" = "常に表示";
 "NO_TAB_BAR_HIDING_DETAIL" = "スクロールしても下部バーが縮んだり薄くなったりしないようにします。";
-"SHOW_BOTTOM_FADE_TITLE" = "透明なバー";
-"SHOW_BOTTOM_FADE_DETAIL" = "バーの色合いを外し、下のページをフェードさせます。";
+"SHOW_BOTTOM_FADE_TITLE" = "下部のフェード";
+"SHOW_BOTTOM_FADE_DETAIL" = "バーの下のページをフェードさせ、ガラス越しの見た目をやわらかくします。";
 
 /* ===== BRANDING ===== */
 "MODERN_SETTINGS_BRANDING_TITLE" = "ブランド";

@@ -90,8 +90,8 @@
 "RESTORE_TAB_LABELS_DETAIL" = "Zeigt Beschriftungen unter den Symbolen an.";
 "NO_TAB_BAR_HIDING_TITLE" = "Immer sichtbar";
 "NO_TAB_BAR_HIDING_DETAIL" = "Untere Leiste beim Scrollen weder verkleinern noch ausblenden.";
-"SHOW_BOTTOM_FADE_TITLE" = "Klare Leiste";
-"SHOW_BOTTOM_FADE_DETAIL" = "Tönung der Leiste entfernen und die Seite darunter ausblenden.";
+"SHOW_BOTTOM_FADE_TITLE" = "Ausblendung unten";
+"SHOW_BOTTOM_FADE_DETAIL" = "Seite unter der Leiste ausblenden, für einen weicheren Look hinter dem Glas.";
 
 /* ===== BRANDING ===== */
 "MODERN_SETTINGS_BRANDING_TITLE" = "Branding";

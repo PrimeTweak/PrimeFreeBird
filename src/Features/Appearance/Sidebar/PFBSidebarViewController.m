@@ -204,6 +204,8 @@ static const CGFloat kTileRadius = 22.0;
     self.scroll = [[UIScrollView alloc] initWithFrame:self.view.bounds];
     self.scroll.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
     self.scroll.alwaysBounceVertical = YES;
+    // No scroll indicator, as on the settings pages.
+    self.scroll.showsVerticalScrollIndicator = NO;
     [self.view addSubview:self.scroll];
 
     self.introLabel = PFBShowcaseIntroLabel();

@@ -135,6 +135,32 @@ static UIView* PFBShowcaseTabBarUnder(UIWindow* window) {
     return nil;
 }
 
+// Temporary measure: each new place of a page's Restore, with the bar it came from.
+static void PFBShowcaseMeasureDock(UIView* view, CGRect dock, NSString* source, UIView* bar, CGRect frame) {
+    static const void* kLastKey = &kLastKey;
+    NSString* hiddenBy = @"nothing";
+    for (UIView* level = bar; level; level = level.superview) {
+        if (level.hidden || level.alpha <= 0.01) {
+            hiddenBy = NSStringFromClass([level class]);
+            break;
+        }
+    }
+    NSString* barText = bar ? [NSString stringWithFormat:@"%@ %p in %@%@ at y %.1f h %.1f x %.1f w %.1f, hidden by %@",
+                                                         NSStringFromClass([bar class]), bar, NSStringFromClass([bar.superview class]),
+                                                         [bar isDescendantOfView:view] ? @" inside the page" : @"", CGRectGetMinY(frame),
+                                                         CGRectGetHeight(frame), CGRectGetMinX(frame), CGRectGetWidth(frame), hiddenBy]
+                            : @"none";
+    NSString* line = [NSString stringWithFormat:@"%@: y %.1f h %.1f x %.1f w %.1f from %@; bar %@; page h %.1f, safe bottom %.1f",
+                                                NSStringFromClass([view.nextResponder class]), CGRectGetMinY(dock), CGRectGetHeight(dock),
+                                                CGRectGetMinX(dock), CGRectGetWidth(dock), source, barText, CGRectGetHeight(view.bounds),
+                                                view.safeAreaInsets.bottom];
+    if ([objc_getAssociatedObject(view, kLastKey) isEqualToString:line]) {
+        return;
+    }
+    objc_setAssociatedObject(view, kLastKey, line, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    PFBCompatMeasure(@"restore dock", line, 40);
+}
+
 // Twitter's bar is 62 pt high (GlassTabBar.x); without it, a bar of that height above the safe
 // area, as wide as the page's cards. A bar collapsed to its round button keeps that width.
 CGRect PFBShowcaseDockFrame(UIView* view) {
@@ -142,16 +168,21 @@ CGRect PFBShowcaseDockFrame(UIView* view) {
     CGRect dock = CGRectMake(20.0, CGRectGetMaxY(view.bounds) - view.safeAreaInsets.bottom - height,
                              MAX(0, CGRectGetWidth(view.bounds) - 40.0), height);
     if (!view.window) {
+        PFBShowcaseMeasureDock(view, dock, @"no window", nil, CGRectNull);
         return dock;
     }
     UIView* bar = PFBShowcaseTabBarUnder(view.window);
     CGRect frame = bar ? [bar convertRect:bar.bounds toView:view] : CGRectNull;
+    NSString* source = bar ? @"safe area, bar left aside" : @"safe area, no bar";
     if (bar && PFBShowcaseShows(bar)) {
         dock.origin.y = MIN(CGRectGetMinY(dock), CGRectGetMinY(frame) - 12.0 - height);
+        source = @"above the bar shown";
     } else if (bar && CGRectGetWidth(frame) > 2 * CGRectGetHeight(frame) && CGRectGetHeight(frame) > 0 &&
                CGRectContainsRect(view.bounds, frame)) {
         dock = frame;
+        source = @"the hidden bar's place";
     }
+    PFBShowcaseMeasureDock(view, dock, source, bar, frame);
     return dock;
 }
 

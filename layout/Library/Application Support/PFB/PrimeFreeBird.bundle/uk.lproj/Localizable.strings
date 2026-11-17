@@ -90,8 +90,8 @@
 "RESTORE_TAB_LABELS_DETAIL" = "Показує підписи під значками.";
 "NO_TAB_BAR_HIDING_TITLE" = "Завжди видима";
 "NO_TAB_BAR_HIDING_DETAIL" = "Не зменшувати й не приховувати нижню панель під час прокручування.";
-"SHOW_BOTTOM_FADE_TITLE" = "Прозора панель";
-"SHOW_BOTTOM_FADE_DETAIL" = "Прибрати відтінок панелі й плавно розчинити сторінку під нею.";
+"SHOW_BOTTOM_FADE_TITLE" = "Згасання внизу";
+"SHOW_BOTTOM_FADE_DETAIL" = "Плавно розчинити сторінку під панеллю, щоб за склом усе виглядало м’якше.";
 
 /* ===== BRANDING ===== */
 "MODERN_SETTINGS_BRANDING_TITLE" = "Брендинг";

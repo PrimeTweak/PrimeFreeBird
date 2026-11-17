@@ -270,12 +270,14 @@ static NSInteger NearestAccentOption(UIColor* color) {
 
 // MARK: - New look
 
-// The page scrolls under the navigation bar and under Restore to default's glass bar.
+// The page scrolls under the navigation bar and under Restore to default's glass bar, with no
+// indicator, as on the settings pages.
 - (void)buildNativeLook {
     PFBBundle* bundle = [PFBBundle sharedBundle];
     UIScrollView* scroll = [[UIScrollView alloc] initWithFrame:self.view.bounds];
     scroll.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
     scroll.alwaysBounceVertical = YES;
+    scroll.showsVerticalScrollIndicator = NO;
     [self.view addSubview:scroll];
     self.nativeScroll = scroll;
 

@@ -90,8 +90,8 @@
 "RESTORE_TAB_LABELS_DETAIL" = "Tampilkan label di bawah ikon.";
 "NO_TAB_BAR_HIDING_TITLE" = "Selalu terlihat";
 "NO_TAB_BAR_HIDING_DETAIL" = "Jangan perkecil atau pudarkan bilah bawah saat menggulir.";
-"SHOW_BOTTOM_FADE_TITLE" = "Bilah bening";
-"SHOW_BOTTOM_FADE_DETAIL" = "Hapus warna bilah dan pudarkan halaman di bawahnya.";
+"SHOW_BOTTOM_FADE_TITLE" = "Pudar bawah";
+"SHOW_BOTTOM_FADE_DETAIL" = "Pudarkan halaman di bawah bilah agar tampilan di balik kaca lebih lembut.";
 
 /* ===== BRANDING ===== */
 "MODERN_SETTINGS_BRANDING_TITLE" = "Branding";

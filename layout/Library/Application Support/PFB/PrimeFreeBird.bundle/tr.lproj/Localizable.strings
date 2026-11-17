@@ -90,8 +90,8 @@
 "RESTORE_TAB_LABELS_DETAIL" = "Simgelerin altında etiketleri göster.";
 "NO_TAB_BAR_HIDING_TITLE" = "Her zaman görünür";
 "NO_TAB_BAR_HIDING_DETAIL" = "Kaydırırken alt çubuğu küçültme ya da gizleme.";
-"SHOW_BOTTOM_FADE_TITLE" = "Şeffaf çubuk";
-"SHOW_BOTTOM_FADE_DETAIL" = "Çubuğun rengini kaldır ve altındaki sayfayı soldur.";
+"SHOW_BOTTOM_FADE_TITLE" = "Alt solma";
+"SHOW_BOTTOM_FADE_DETAIL" = "Camın ardında daha yumuşak bir görünüm için çubuğun altındaki sayfayı soldur.";
 
 /* ===== BRANDING ===== */
 "MODERN_SETTINGS_BRANDING_TITLE" = "Marka";

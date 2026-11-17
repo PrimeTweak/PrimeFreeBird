@@ -90,8 +90,8 @@
 "RESTORE_TAB_LABELS_DETAIL" = "Pokazuje etykiety pod ikonami.";
 "NO_TAB_BAR_HIDING_TITLE" = "Zawsze widoczny";
 "NO_TAB_BAR_HIDING_DETAIL" = "Nie zmniejszaj ani nie wygaszaj dolnego paska podczas przewijania.";
-"SHOW_BOTTOM_FADE_TITLE" = "Przejrzysty pasek";
-"SHOW_BOTTOM_FADE_DETAIL" = "Usuń odcień paska i wygaś stronę pod nim.";
+"SHOW_BOTTOM_FADE_TITLE" = "Wygaszanie u dołu";
+"SHOW_BOTTOM_FADE_DETAIL" = "Wygaś stronę pod paskiem, by za szkłem wyglądała łagodniej.";
 
 /* ===== BRANDING ===== */
 "MODERN_SETTINGS_BRANDING_TITLE" = "Branding";

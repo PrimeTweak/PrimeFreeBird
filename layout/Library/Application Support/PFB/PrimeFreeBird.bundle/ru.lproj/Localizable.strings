@@ -90,8 +90,8 @@
 "RESTORE_TAB_LABELS_DETAIL" = "Показывает подписи под значками.";
 "NO_TAB_BAR_HIDING_TITLE" = "Всегда видна";
 "NO_TAB_BAR_HIDING_DETAIL" = "Не уменьшать и не скрывать нижнюю панель при прокрутке.";
-"SHOW_BOTTOM_FADE_TITLE" = "Прозрачная панель";
-"SHOW_BOTTOM_FADE_DETAIL" = "Убрать оттенок панели и плавно растворить страницу под ней.";
+"SHOW_BOTTOM_FADE_TITLE" = "Затухание внизу";
+"SHOW_BOTTOM_FADE_DETAIL" = "Плавно растворить страницу под панелью, чтобы за стеклом всё выглядело мягче.";
 
 /* ===== BRANDING ===== */
 "MODERN_SETTINGS_BRANDING_TITLE" = "Брендинг";

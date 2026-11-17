@@ -20,7 +20,7 @@
 - **Soft top bar** — content fades under the top bar instead of a solid band with a line.
 - **Bar icons that match** — the settings gear, the search filters and the muted-words icon take the color of Twitter's own bar icons and keep it.
 - **Glass toasts** — Twitter's toasts take the bottom bar's look.
-- **Bottom bar** — labels under the icons, a bar that never shrinks, and a clear bar over a fade.
+- **Bottom bar** — labels under the icons, a bar that never shrinks, and a fade under the bar.
 
 ## Color theme
 

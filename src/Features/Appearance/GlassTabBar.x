@@ -1,5 +1,5 @@
 // Twitter's own Liquid Glass tab bar: Selected tab tints the lens rows, Tab labels names the tabs on a taller
-// bar, Always visible keeps it up, and Clear bar gives it 12.42.1's untinted glass over a fade.
+// bar, Always visible keeps it up, and Bottom fade gives it 12.42.1's untinted glass over a fade.
 
 #import "Support/HookHelpers.h"
 #import "Features/Appearance/ThemeColor/PFBPalette.h"
@@ -538,7 +538,7 @@ static void PFBGlassSizePillForLabels(void) {
 
 static void PFBGlassApplyBarTint(void);
 
-// Before the first bar is built: the pill's height for Tab labels and the glass tint for Clear bar.
+// Before the first bar is built: the pill's height for Tab labels and the glass tint for Bottom fade.
 void PFBGlassTabBarStart(void) {
     if (PFBNativeGlassAsked()) {
         PFBGlassSizePillForLabels();
@@ -546,7 +546,7 @@ void PFBGlassTabBarStart(void) {
     }
 }
 
-// MARK: - Clear bar
+// MARK: - Bottom fade
 
 // Twitter's Liquid Glass tuning, reached by its exported addressor: since 12.44 the tab bar's glass
 // takes a 25 % tint in both themes, at 0x48 and 0x50 of it; 12.42.1 had none.
@@ -600,7 +600,7 @@ static UIView* PFBGlassBarGlass(void) {
     return found;
 }
 
-// With Clear bar on, the tab bar's glass gets 12.42.1's untinted glass at its next layout, so a
+// With Bottom fade on, the tab bar's glass gets 12.42.1's untinted glass at its next layout, so a
 // change of the option shows without a relaunch; turned back off, Twitter's 25 % of the background.
 static const void* kPFBGlassBarClearedKey = &kPFBGlassBarClearedKey;
 
@@ -625,7 +625,7 @@ static void PFBGlassTintBarGlass(UIView* glass) {
     }
 }
 
-// Clear bar gives the bar 12.42.1's look, no tint; off, Twitter's 25 % comes back. Only those
+// Bottom fade gives the bar 12.42.1's look, no tint; off, Twitter's 25 % comes back. Only those
 // two values are ever written.
 static void PFBGlassApplyBarTint(void) {
     double* tint = PFBGlassTabBarTint();
@@ -649,12 +649,12 @@ static void PFBGlassApplyBarTint(void) {
 
 // MARK: - Bottom band
 
-// 12.42.1's band under its clear bar: from the bar's top to the screen's bottom, the page blurred
+// 12.42.1's band under its untinted bar: from the bar's top to the screen's bottom, the page blurred
 // from about halfway down, under the background color. 12.44 builds none; this one sits right under
 // the bar and follows it.
 static const void* kPFBGlassBandKey = &kPFBGlassBandKey;
-// The background color over the bar's top, as chosen on renders against 12.42.1's captures; it fills
-// in down to the screen's bottom.
+// The background color added under the glass at the bar's top, as chosen on renders against 12.42.1's
+// captures; beside the glass, the page fades in from nothing, as on 12.42.1.
 static const double kPFBGlassBandTopColor = 0.5;
 
 static UIView* PFBGlassMakeBand(void) {
@@ -672,25 +672,35 @@ static UIView* PFBGlassMakeBand(void) {
     UIView* color = [[UIView alloc] initWithFrame:CGRectZero];
     [color.layer addSublayer:[CAGradientLayer layer]];
     [band addSubview:color];
+    UIView* lift = [[UIView alloc] initWithFrame:CGRectZero];
+    [lift.layer addSublayer:[CAGradientLayer layer]];
+    lift.layer.mask = [CAShapeLayer layer];
+    [band addSubview:lift];
     return band;
 }
 
-// The band's parts sized to it, and its color ramp in the background color of its appearance: the
-// top color over a ramp rising as the square of the height. The blur's own 30 % white veil stays off.
-static void PFBGlassLayOutBand(UIView* band) {
-    UIVisualEffectView* blur = band.subviews.firstObject;
-    UIView* color = band.subviews.lastObject;
+// The band's parts sized to it, in the background color of its appearance: a ramp rising as the square
+// of the height, and under the glass's capsule the top color fading out down the band. The blur's own
+// 30 % white veil stays off.
+static void PFBGlassLayOutBand(UIView* band, CGRect glass) {
+    UIVisualEffectView* blur = band.subviews[0];
+    UIView* color = band.subviews[1];
+    UIView* lift = band.subviews[2];
     CAGradientLayer* blurRamp = (CAGradientLayer*)blur.maskView.layer.sublayers.firstObject;
     CAGradientLayer* colorRamp = (CAGradientLayer*)color.layer.sublayers.firstObject;
+    CAGradientLayer* liftRamp = (CAGradientLayer*)lift.layer.sublayers.firstObject;
+    CAShapeLayer* capsule = (CAShapeLayer*)lift.layer.mask;
     UIColor* background = [[PFBPalette currentBackgroundColor] resolvedColorWithTraitCollection:band.traitCollection];
     NSMutableArray* colors = [NSMutableArray array];
+    NSMutableArray* lifts = [NSMutableArray array];
     NSMutableArray* locations = [NSMutableArray array];
     for (NSUInteger i = 0; i <= 8; i++) {
         double t = i / 8.0;
-        double top = kPFBGlassBandTopColor * (1.0 - t);
-        [colors addObject:(id)[background colorWithAlphaComponent:1.0 - (1.0 - t * t) * (1.0 - top)].CGColor];
+        [colors addObject:(id)[background colorWithAlphaComponent:t * t].CGColor];
+        [lifts addObject:(id)[background colorWithAlphaComponent:kPFBGlassBandTopColor * (1.0 - t)].CGColor];
         [locations addObject:@(t)];
     }
+    CGFloat radius = MIN(CGRectGetWidth(glass), CGRectGetHeight(glass)) / 2.0;
     [CATransaction begin];
     [CATransaction setDisableActions:YES];
     blur.frame = band.bounds;
@@ -700,6 +710,12 @@ static void PFBGlassLayOutBand(UIView* band) {
     colorRamp.frame = color.bounds;
     colorRamp.colors = colors;
     colorRamp.locations = locations;
+    lift.frame = band.bounds;
+    liftRamp.frame = lift.bounds;
+    liftRamp.colors = lifts;
+    liftRamp.locations = locations;
+    capsule.frame = lift.bounds;
+    capsule.path = [UIBezierPath bezierPathWithRoundedRect:glass cornerRadius:radius].CGPath;
     [CATransaction commit];
     for (UIView* veil in blur.subviews) {
         if ([NSStringFromClass([veil class]) isEqualToString:@"_UIVisualEffectSubview"] && veil.alpha > 0.0) {
@@ -708,7 +724,7 @@ static void PFBGlassLayOutBand(UIView* band) {
     }
 }
 
-// With Clear bar on, the band is placed under the tab bar's platter, the glass at least 60 % as wide
+// With Bottom fade on, the band is placed under the tab bar's platter, the glass at least 60 % as wide
 // as the bar, from its top to the window's bottom, in the bar's closest ancestor that reaches that
 // bottom, right under the branch holding the bar. It takes that branch's visibility; off, it hides.
 static void PFBGlassPlaceBand(UIView* glass) {
@@ -750,7 +766,7 @@ static void PFBGlassPlaceBand(UIView* glass) {
     if (!CGRectEqualToRect(band.frame, frame)) {
         band.frame = frame;
     }
-    PFBGlassLayOutBand(band);
+    PFBGlassLayOutBand(band, [band convertRect:glass.bounds fromView:glass]);
     BOOL hidden = NO;
     CGFloat alpha = 1.0;
     for (UIView* node = bar; node && node != host; node = node.superview) {
@@ -762,7 +778,7 @@ static void PFBGlassPlaceBand(UIView* glass) {
     PFBCOMPAT_ACTION(PFBCompat_show_bottom_fade, @"fade drawn under the bottom bar");
 }
 
-// A change to Clear bar reaches the bar on screen, which takes its new look at its next layout.
+// A change to Bottom fade reaches the bar on screen, which takes its new look at its next layout.
 void PFBGlassRefreshBottomFade(void) {
     if (!PFBNativeGlassAsked()) {
         return;

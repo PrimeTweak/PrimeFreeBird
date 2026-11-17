@@ -240,8 +240,8 @@ void PFBGlassTabBarHideForSettings(BOOL hidden);
 // Reapplies each glass stack's configuration so an Always visible change takes effect now (GlassTabBar.x).
 void PFBGlassRefreshAlwaysVisible(void);
 
-// Sizes the glass bar's pill for Tab labels and sets its tint for Clear bar before Twitter
-// builds the bar, and applies a Clear bar change to the bar on screen (GlassTabBar.x).
+// Sizes the glass bar's pill for Tab labels and sets its tint for Bottom fade before Twitter
+// builds the bar, and applies a Bottom fade change to the bar on screen (GlassTabBar.x).
 void PFBGlassTabBarStart(void);
 void PFBGlassRefreshBottomFade(void);
 

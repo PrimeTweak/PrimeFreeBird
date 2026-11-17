@@ -90,8 +90,8 @@
 "RESTORE_TAB_LABELS_DETAIL" = "在图标下方显示标签。";
 "NO_TAB_BAR_HIDING_TITLE" = "始终显示";
 "NO_TAB_BAR_HIDING_DETAIL" = "滚动时底部栏不缩小也不淡出。";
-"SHOW_BOTTOM_FADE_TITLE" = "透明底部栏";
-"SHOW_BOTTOM_FADE_DETAIL" = "移除底部栏的色调，并让下方页面渐隐。";
+"SHOW_BOTTOM_FADE_TITLE" = "底部渐隐";
+"SHOW_BOTTOM_FADE_DETAIL" = "让底部栏下方的页面渐隐，玻璃后方看起来更柔和。";
 
 /* ===== BRANDING ===== */
 "MODERN_SETTINGS_BRANDING_TITLE" = "品牌";

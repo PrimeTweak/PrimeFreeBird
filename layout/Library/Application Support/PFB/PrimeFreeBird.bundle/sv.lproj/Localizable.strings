@@ -90,8 +90,8 @@
 "RESTORE_TAB_LABELS_DETAIL" = "Visa etiketter under ikonerna.";
 "NO_TAB_BAR_HIDING_TITLE" = "Alltid synligt";
 "NO_TAB_BAR_HIDING_DETAIL" = "Låt inte det nedre fältet krympa eller tonas bort när du scrollar.";
-"SHOW_BOTTOM_FADE_TITLE" = "Klart fält";
-"SHOW_BOTTOM_FADE_DETAIL" = "Ta bort fältets ton och tona ut sidan under det.";
+"SHOW_BOTTOM_FADE_TITLE" = "Toning nedtill";
+"SHOW_BOTTOM_FADE_DETAIL" = "Tona ut sidan under fältet för ett mjukare utseende bakom glaset.";
 
 /* ===== BRANDING ===== */
 "MODERN_SETTINGS_BRANDING_TITLE" = "Profilering";
