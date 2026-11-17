@@ -66,8 +66,6 @@ UIView* PFBFindFirstResponder(UIView* v) {
     return nil;
 }
 
-// ---------------------------------------------------------------------------
-
 void PFBOpenStatusNatively(NSString* statusID) {
     if (statusID.length == 0) {
         return;
@@ -110,9 +108,8 @@ static BOOL openAuthenticatedTweetWebView(NSString* statusID) {
     return YES;
 }
 
-// No web session yet: present the interactive login once, then open the reply once
-// cookies have been harvested. There is no fallback to a native reply here
-// (that's the attestation path the user turned reply_in_webview on to avoid).
+// No web session yet: the web login shows once, and the reply opens once its cookies
+// are harvested. No native reply as a fallback: that path is what Reply in web view avoids.
 static void ensureSessionThenOpenReply(NSString* statusID) {
     PFBPresentWebSessionLogin(^(BOOL success) {
         if (success && PFBHasUsableWebCredentials()) {

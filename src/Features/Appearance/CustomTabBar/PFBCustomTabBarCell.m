@@ -112,9 +112,8 @@
         self.titleLabel.font = PFBScaledFont([TwitterChirpFont(TwitterFontStyleRegular) fontWithSize:13]);
     }
 
-    // A soft floating-card shadow on the non-selected cards (and the locked Home
-    // card) — the elevated floating look. The selected card is already defined by
-    // its accent border, so it stays flat.
+    // Unselected cards and the locked Home card float on a soft shadow; a selected
+    // card has its accent border and stays flat.
     if (!self.fixed && on) {
         self.container.layer.shadowOpacity = 0.0;
     } else {

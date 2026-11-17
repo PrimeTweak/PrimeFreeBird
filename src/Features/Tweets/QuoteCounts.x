@@ -3,7 +3,7 @@
 #import "Support/HookHelpers.h"
 #import "Debug/PFBDebugger.h"
 
-// Both counts in full, grouped the way the user's locale writes numbers.
+// Both counts in full, grouped the way the phone's region writes numbers.
 static NSString* PFBQuoteCountsTitle(TFNTwitterStatus* status) {
     NSNumberFormatter* formatter = [[NSNumberFormatter alloc] init];
     formatter.numberStyle = NSNumberFormatterDecimalStyle;

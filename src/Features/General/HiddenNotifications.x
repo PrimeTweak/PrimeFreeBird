@@ -329,9 +329,8 @@ static BOOL PFBNotifIsHidden(id model) {
     return identity.length && hidden[identity] != nil;
 }
 
-// The notification's view model carries no text, so the wording shown in the hidden
-// list is read from the CELL at the moment of hiding — its labels are the only place
-// the notification's words exist.
+// The notification's model carries no text, so the words shown in the hidden list
+// are read from its cell when it is hidden: its labels are the only place they exist.
 static NSString* PFBNotifTextFromCell(UITableView* table, NSIndexPath* indexPath) {
     if (![table isKindOfClass:[UITableView class]] || !indexPath) {
         return nil;
@@ -651,9 +650,8 @@ static const NSInteger kPFBNotifEmptyTag = 90315;
 static const NSInteger kPFBNotifEmptyTitleTag = 90316;
 static const NSInteger kPFBNotifEmptyBodyTag = 90317;
 
-// textDetailsColor is the palette entry Twitter uses for secondary copy. It is
-// not declared in Support/TAEHeaders.h, so this declaration shim serves as a cast
-// target. Never instantiated, never messaged as a class.
+// Declares textDetailsColor, the palette color of Twitter's secondary text, which
+// the headers lack, so it can be asked of Twitter's palette; never created.
 @interface PFBNotifPaletteShim : NSObject
 - (UIColor*)textDetailsColor;
 @end

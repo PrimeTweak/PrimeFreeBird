@@ -12,7 +12,7 @@ typedef NS_ENUM(NSInteger, TwitterFontStyle) {
     TwitterFontStyleBold
 };
 
-// Scales a font with the reader's text size, as Twitter's own screens do.
+// Scales a font with the text size set in iOS, as Twitter's own screens do.
 static inline UIFont* PFBScaledFont(UIFont* font) {
     return font ? [[UIFontMetrics defaultMetrics] scaledFontForFont:font] : nil;
 }

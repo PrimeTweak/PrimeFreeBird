@@ -194,13 +194,6 @@ static UIScrollView* PFBEditorScroll(UIViewController* editor, UIView* page) {
             [scroll addSubview:view];
         }
     }
-    if (!PFBCompatPathReached(PFBCompatPath_tab_editor_soft_top)) {
-        PFBWalkAllSubviews(scroll, 3, ^(UIView* view) {
-          if ([NSStringFromClass([view class]) containsString:@"ScrollEdgeEffect"]) {
-              PFBCompatReach(PFBCompatPath_tab_editor_soft_top);
-          }
-        });
-    }
     return scroll;
 }
 

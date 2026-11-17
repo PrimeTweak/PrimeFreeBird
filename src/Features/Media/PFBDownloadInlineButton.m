@@ -359,8 +359,8 @@ static NSURL* PFBLargestMP4(TFSTwitterEntityMedia* media) {
             });
         };
 
-        // Filter to video/GIF so grouping keys off the real video count, not the
-        // raw media count.
+        // Videos and GIFs only, so the choice of one or all counts the videos, not
+        // every media of the Tweet.
         NSMutableArray<TFSTwitterEntityMedia*>* videoEntities =
             [NSMutableArray new];
         for (TFSTwitterEntityMedia* media in mediaEntities) {

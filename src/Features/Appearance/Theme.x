@@ -64,8 +64,8 @@ static UIColor* PFBAccent(UIColor* orig) {
     return orig;
 }
 
-// Logo colors follow the accent ONLY when the user opted in via the
-// "Twitter icon" toggle; otherwise the native logo color passes through.
+// The logo takes the accent only with the Twitter icon toggle on; otherwise
+// Twitter's own logo color passes through.
 static UIColor* PFBLogoAccent(UIColor* orig) {
     if (![PFBSettings boolForKey:@"color_twitter_icon_in_top_bar"]) {
         return orig;
@@ -139,8 +139,8 @@ UIImageView* PFBTopBarLogoViewCurrent(void) {
     return PFBTopBarLogoView;
 }
 
-// In Liquid Glass the title plugin returns a CONTAINER, not the image view
-// itself. Find the image view wherever it sits in the returned hierarchy.
+// Under Liquid Glass the title plugin returns a container, not the image view
+// itself: the image view is looked for anywhere inside it.
 static UIImageView* PFBFindLogoImageView(UIView* root) {
     if ([root isKindOfClass:[UIImageView class]] && ((UIImageView*)root).image) {
         return (UIImageView*)root;
@@ -179,8 +179,8 @@ BOOL PFBAccentIsActive(void) {
         [defs integerForKey:@"T1ColorSettingsPrimaryColorOptionKey"] >= 1) {
         return YES;
     }
-    // Fresh install (option 0, nothing picked yet) defaults to Twitter blue as the
-    // active accent — UNLESS the user reset (which reverts to native/black).
+    // A fresh install (option 0, nothing picked) starts in Twitter blue; after a
+    // reset, Twitter's own colors come back instead.
     return ![defs boolForKey:@"pfb_color_reset_done"];
 }
 
@@ -1386,7 +1386,7 @@ static void PFBReapplyChromeAccent(void) {
     else { dispatch_async(dispatch_get_main_queue(), run); }
 }
 
-// Twitter's OWN repaint path: TFNDynamicColorManager's reloadDynamicColors
+// Twitter's own repaint path: TFNDynamicColorManager's reloadDynamicColors
 // walks every registered dynamic-color setter and repaints, which is what
 // the navigation bar and tab bar actually use.
 static void PFBReloadTwitterDynamicColors(void) {
@@ -1518,8 +1518,8 @@ void PFBSyncAccentTheme(void) {
 
 static CFAbsoluteTime PFBThemeLoadTime;
 
-// Shown when the user leaves a dark palette while Dim/Gray/Blackout was active:
-// live views keep their old backgrounds, so suggest a quick restart to clear them.
+// Shown on leaving a dark palette while Dim, Gray or Pure black was active: views on
+// screen keep their old backgrounds, so a restart is suggested to clear them.
 static void PFBShowRestartReminder(void) {
     if (CFAbsoluteTimeGetCurrent() - PFBThemeLoadTime < 5.0) {
         return; // ignore palette churn during app launch
@@ -1560,8 +1560,8 @@ static void PFBShowRestartReminder(void) {
 
 - (void)setCurrentColorPalette:(TAETwitterColorPaletteSettingInfo*)palette {
     %orig(palette);
-    // Twitter just swapped Day/Night. Once settled, if not dark, back to System
-    // and remind the user to restart so leftover dark backgrounds clear out.
+    // Twitter just swapped day and night. Once settled and not dark: back to System,
+    // with a restart reminder so leftover dark backgrounds clear out.
     dispatch_async(dispatch_get_main_queue(), ^{
         if (![PFBDarkModeStyle isDarkModeActive]) {
             // On a switch to a light palette the pinned style is read first, then
@@ -1831,7 +1831,7 @@ static NSString* scribePageForEntry(id<T1AppNavigationTabEntry> entry) {
     return [tabView respondsToSelector:@selector(scribePage)] ? tabView.scribePage : nil;
 }
 
-// Operates on the tab ENTRIES, not the button views: the app derives both the
+// Works on the tab entries, not the button views: the app derives both the
 // buttons and their content view controllers from this one array.
 static NSArray* orderedTabEntries(NSArray* entries) {
     // Record the underlying tab views so the editor can show real titles and icons.
@@ -1856,8 +1856,8 @@ static NSArray* orderedTabEntries(NSArray* entries) {
 
     NSMutableArray* shown = [NSMutableArray new];
     if (!visibleOrder) {
-        // Not customized yet: show the default set (Home, Search, Notifications, Chats)
-        // in that order, hiding everything else the app builds.
+        // Not customized yet: the default set (Home, Explore, Notifications, Chat)
+        // in that order, every other tab the app builds hidden.
         for (NSString* pageID in [PFBCustomTabBarUtility defaultVisiblePageIDs]) {
             id entry = entriesByPage[pageID];
             if (entry) {
@@ -1865,8 +1865,8 @@ static NSArray* orderedTabEntries(NSArray* entries) {
             }
         }
     } else {
-        // Only the chosen tabs show; anything the editor hasn't been told to show
-        // (including tabs unlocked after the user last saved) stays hidden.
+        // Only the chosen tabs show; any other, even one unlocked after the last
+        // save, stays hidden.
         NSMutableSet* placed = [NSMutableSet new];
         for (NSString* pageID in visibleOrder) {
             id entry = entriesByPage[pageID];

@@ -787,8 +787,8 @@ NSURL* PFBAccountAvatarURL(TFNTwitterAccount* account) {
             [liveCell setRowEnabled:NO];
         }
 
-        // The switch-tint toggle changes how every OTHER visible switch is
-        // drawn, so re-run applyTheme on the live cells right away.
+        // The switch-tint toggle changes how every other visible switch is
+        // drawn, so the cells on screen apply their theme again at once.
         if ([key isEqualToString:@"color_pfb_switches"]) {
             SEL applyThemeSel = @selector(applyTheme);
             for (UITableViewCell* cell in self.tableView.visibleCells) {
@@ -1028,8 +1028,8 @@ NSURL* PFBAccountAvatarURL(TFNTwitterAccount* account) {
     PFBAlertPresent(confirm, self, self.newLook, nil);
 }
 
-// Reduces user input like "https://fxtwitter.com/" to a bare host, so the
-// value can be assigned straight to NSURLComponents.host when rewriting.
+// Reduces what was typed, like "https://fxtwitter.com/", to a bare host, so the
+// value can go straight into NSURLComponents.host when a link is rewritten.
 - (NSString*)sharingDomainFromInput:(NSString*)input {
     NSString* domain =
         [input stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
@@ -1122,9 +1122,8 @@ NSURL* PFBAccountAvatarURL(TFNTwitterAccount* account) {
     [self presentViewController:alert animated:YES completion:nil];
 }
 
-// Informational only: tells the user a restart is needed for the change to
-// fully apply. One OK button, dismisses the alert and nothing else — the app
-// never closes itself here.
+// Says a restart is needed for the change to fully apply. One OK button that only
+// closes the alert: the app never quits itself here.
 - (void)showRestartInfoAlert {
     PFBBundle* bundle = [PFBBundle sharedBundle];
     UIAlertController* alert = [UIAlertController

@@ -575,7 +575,7 @@ static void tourDismissPresented(void) {
     }
 }
 
-// Home in front, on whichever of its tabs the user left: where most steps start.
+// Home in front, on whichever of its tabs was left open: where most steps start.
 static void tourHomeFront(void) {
     tourDismissPresented();
     tourPopToRoot();
@@ -1658,7 +1658,7 @@ static BOOL tourAttempt(NSString* step, NSString* part, dispatch_block_t body) {
 
 // MARK: - Options switched for one step
 
-// A step can switch an option for its own screen. What the person had stays on disk
+// A step can switch an option for its own screen. The value it had stays on disk
 // until it is put back, so a tour Twitter closed gives it back at the next launch.
 static NSString* const kPFBTourSwitchedKey = @"pfb_compat_tour_switched";
 
@@ -1675,7 +1675,7 @@ static void tourSwitchOption(NSString* key, BOOL value) {
     PFBCompatTourLog(@"[tour] %@ switched %@ for this step", key, value ? @"on" : @"off");
 }
 
-// Every option a step switched goes back to what the person had; one never set stays unset.
+// Every option a step switched goes back to the value it had; one never set stays unset.
 static void tourRestoreOptions(NSString* when) {
     NSUserDefaults* defaults = [NSUserDefaults standardUserDefaults];
     NSDictionary* saved = [defaults dictionaryForKey:kPFBTourSwitchedKey];

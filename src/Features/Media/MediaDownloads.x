@@ -435,9 +435,8 @@ static BOOL gPFBShareStartTaken;
 // two-argument +[UIMenu menuWithTitle:children:]. The tweet comes from the
 // T1ActivityItemProvider built shortly before.
 
-// T1ActivityItemProvider is not declared in src/Support, so a declaration
-// shim is used purely as a cast target. It is never instantiated and never
-// messaged as a class, so no class symbol is referenced and linking is safe.
+// Declares the status getter of T1ActivityItemProvider, which the headers lack, so
+// it can be asked of Twitter's provider; never created.
 @interface PFBVMDProviderShim : NSObject
 - (id)status;
 @end

@@ -577,7 +577,7 @@ static BOOL PFBScreenshotSuppressed(void) {
     return [PFBSettings boolForKey:@"no_screenshot_detection"];
 }
 
-// (1) Notification-based suppression, gated on the setting.
+// With the option on, Twitter's screenshot listeners get a block that does nothing.
 %hook NSNotificationCenter
 
 - (id)addObserverForName:(NSNotificationName)name
@@ -608,8 +608,6 @@ static BOOL PFBScreenshotSuppressed(void) {
 }
 
 %end
-
-// (2) Watermark suppression, gated.
 
 // Whether Twitter's custom screenshot gates are refused: YES while screenshot detection
 // is disabled, counted as the option acting; otherwise Twitter's own answer stands.

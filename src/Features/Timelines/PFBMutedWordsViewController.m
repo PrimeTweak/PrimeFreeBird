@@ -1268,8 +1268,8 @@ static NSMutableArray<NSString*>* PFBKeptLanguageList(void) {
         PFBMutedTermCell* cell = [tableView dequeueReusableCellWithIdentifier:@"term"
                                                                  forIndexPath:indexPath];
         NSString* term = self.terms[termIndex];
-        // Undo whatever the example row or the Threads list changed — cells are
-        // reused across all three modes.
+        // Undoes what the example row or the conversations list changed: cells are
+        // reused across all three lists.
         [cell applyTermRow];
         cell.termLabel.font = PFBScaledFont([TwitterChirpFont(TwitterFontStyleRegular) fontWithSize:16.5]);
         cell.termLabel.text = term;

@@ -47,17 +47,15 @@ extern NSString* const PFBTabPanelIDKey; // T1 panel ID (NSNumber)
 // Metadata for a single tab, or nil if it has never been seen.
 + (nullable NSDictionary*)metadataForPage:(NSString*)pageID;
 
-// The visible tabs in the user's chosen order (Home first). Returns nil when
-// the user has never customized the bar, so callers can fall back to the
-// default.
+// The visible tabs in the order chosen in the editor (Home first); nil while the
+// bar was never customized, so callers fall back to the default.
 + (nullable NSArray<NSString*>*)visiblePageIDsInOrder;
 
 // Persists the editor's selection; every other tab is hidden.
 + (void)setVisiblePageIDs:(NSArray<NSString*>*)visible;
 
-// The tabs shown until the user customizes the bar: Home, Search, Notifications
-// and Chats. Everything else the app offers is available in the editor but
-// hidden.
+// The tabs shown until the bar is customized: Home, Explore, Notifications and
+// Chat. Every other tab the app offers waits, hidden, in the editor.
 + (NSArray<NSString*>*)defaultVisiblePageIDs;
 
 // Twitter's own Liquid Glass bar lists panels, not tab views: each panel without an

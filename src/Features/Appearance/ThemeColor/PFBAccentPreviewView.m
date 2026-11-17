@@ -291,7 +291,7 @@ static CGRect PFBPreviewMirrored(CGRect frame, CGFloat width, BOOL rtl) {
     CGFloat width = MAX(0, CGRectGetWidth(self.bounds) - 2 * kPFBAccentPreviewInset);
     _screen.frame = CGRectMake(kPFBAccentPreviewInset, kPFBAccentPreviewInset, width, [self screenHeightForWidth:width]);
 
-    // The top bar: the reader's avatar, and the bird in the middle.
+    // The top bar: the account's avatar, and the bird in the middle.
     _reader.frame = PFBPreviewMirrored(
         CGRectMake(kPFBPreviewPadding, (kPFBPreviewTopBar - 26.0) / 2.0, 26.0, 26.0), width, rtl);
     _readerPhoto.frame = _reader.bounds;

@@ -70,7 +70,7 @@ static void SyncHomeAddTabButton(id container, BOOL hidden) {
     if (models.count > 0) {
         LastPinnedTimelineModels = [models copy];
     } else if (!hide) {
-        // Empty while nothing is hidden: the user removed every pin.
+        // Empty while nothing is hidden: every pin was removed.
         LastPinnedTimelineModels = nil;
     }
     if (hide && models.count > 0) {
@@ -1576,9 +1576,8 @@ static BOOL PFBReadingStoreRestore(TFNItemsDataViewController* dataViewControlle
     return NO;
 }
 
-// scribeSection is not declared in the Twitter headers. This shim is only a
-// cast target: never instantiated, never messaged as a class, so no class
-// symbol is referenced.
+// Declares scribeSection, which the headers lack, so it can be asked of Twitter's
+// timeline; never created.
 @interface PFBReadingScribeShim : NSObject
 - (NSString*)scribeSection;
 @end

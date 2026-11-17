@@ -248,7 +248,7 @@ static NSInteger NearestAccentOption(UIColor* color) {
         [customSwatch.widthAnchor
             constraintEqualToAnchor:((PFBColorSwatchControl*)self.swatches.firstObject).widthAnchor],
 
-        // The hint sits beside the PILL half of the control (its top 40pt),
+        // The hint sits beside the pill half of the control (its top 40 pt),
         // not the radio circle below it.
         [customHint.leadingAnchor constraintEqualToAnchor:customSwatch.trailingAnchor constant:14],
         [customHint.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor constant:-16],
@@ -464,13 +464,11 @@ static NSInteger NearestAccentOption(UIColor* color) {
     [defaults removeObjectForKey:@"pfb_custom_accent_hex"];
     [defaults removeObjectForKey:@"pfb_color_theme_selectedColor"];
     [defaults removeObjectForKey:@"T1ColorSettingsPrimaryColorOptionKey"];
-    // Mark an explicit reset: fresh-install and post-reset share the same (empty)
-    // key state, but reset must revert to native while fresh install defaults to
-    // Twitter blue. PFBAccentIsActive reads this flag to tell the two apart.
+    // A fresh install and a reset leave the same empty keys, but a fresh install starts
+    // in Twitter blue and a reset goes back to Twitter's colors: this flag tells them apart.
     [defaults setBool:YES forKey:@"pfb_color_reset_done"];
-    // A reset means "no accent": turn the three accent toggles OFF too, so the
-    // toggle UI matches the reverted-to-native state (Selected tab, Switches,
-    // Twitter icon).
+    // A reset means no accent: Selected tab, Switches and Twitter icon go off too,
+    // so the toggles match what is on screen.
     [defaults setBool:NO forKey:@"tab_bar_theming"];
     [defaults setBool:NO forKey:@"color_pfb_switches"];
     [defaults setBool:NO forKey:@"color_twitter_icon_in_top_bar"];

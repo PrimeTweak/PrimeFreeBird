@@ -302,8 +302,8 @@ static void PFBNativeGlassSettle(void);
 // the splash simply fades out.
 
 static void stripLaunchRevealMask(UIView* view) {
-    // The X-shaped hole lives on the container subview's layer.mask; the top
-    // view itself is unmasked, but clear it too for safety.
+    // The X-shaped hole is a subview's mask; the view's own mask is cleared too, in
+    // case Twitter moves the hole there.
     view.layer.mask = nil;
     for (UIView* sub in view.subviews) {
         sub.layer.mask = nil;

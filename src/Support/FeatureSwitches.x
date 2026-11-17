@@ -187,8 +187,8 @@ static NSNumber* FeatureSwitchOverrideValueForKey(NSString* key) {
     if (!pfbSwitchIsAnswered(key)) {
         return nil;
     }
-    // Unlock Twitter's native premium color themes, so the accent the user picks
-    // is applied everywhere (links, buttons, highlights) by Twitter itself.
+    // Twitter's premium color themes, unlocked so the accent picked is applied
+    // everywhere (links, buttons, highlights) by Twitter itself.
     if ([key isEqualToString:@"app_customization_custom_primary_color_enabled"]) {
         PFBCOMPAT_ACTION(PFBCompat_premium_unlock, @"premium colors unlocked");
         return @YES;

@@ -490,7 +490,7 @@ static NSInteger pfbProfileTabIndex(id provider, NSInteger fallback) {
     return index == NSNotFound ? fallback : (NSInteger)index;
 }
 
-// The provider only *describes* the tabs; the controller is what selects
+// The provider only describes the tabs; the controller is what selects
 // one. T1ProfileViewController owns _t1_selectMainEntry:, and asking it
 // directly is what actually moves the profile.
 

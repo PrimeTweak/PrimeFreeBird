@@ -178,8 +178,8 @@ UIViewController* PFBOwningTopController(UIView* view);
 // draws the buttons of the controller's navigation item.
 BOOL PFBOnNativeGlassStack(UIViewController* controller);
 
-// Present the interactive "Log in to Web Session" screen. The completion fires with
-// YES once cookies were harvested and stored, NO if the user canceled.
+// Presents the "Log in to Web Session" screen. The completion gets YES once the
+// cookies are harvested and stored, NO when the screen is closed without them.
 void PFBPresentWebSessionLogin(void (^completion)(BOOL success));
 
 // Wipes the stored web session: the tokens in memory, and X's and Twitter's cookies and

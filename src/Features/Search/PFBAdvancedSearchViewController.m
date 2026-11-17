@@ -309,7 +309,7 @@ static NSString* PFBAdvLangName(NSString* code) {
     [self.navigationController pushViewController:step animated:YES];
 }
 
-// Filters default ON (the web form's default): absent key means included.
+// Filters are on by default, as on the web form: a missing key means included.
 static BOOL PFBAdvFilterOn(NSString* key) {
     NSUserDefaults* d = [NSUserDefaults standardUserDefaults];
     return ([d objectForKey:key] == nil) ? YES : [d boolForKey:key];

@@ -170,9 +170,8 @@ static void pfbPositionUnderline(UIView* root, UICollectionView* cv) {
     CGFloat t = f - i0;
     NSInteger abs0 = pfbTabHidden(i0) ? pfbNearestKeptAbs(i0, total) : i0;
     NSInteger abs1 = pfbTabHidden(i1) ? pfbNearestKeptAbs(i1, total) : i1;
-    // At rest, the bar itself knows which tab is selected, and that is what the
-    // reader is looking at. Deriving the answer from the pager is only needed
-    // while a swipe is in flight, between two tabs.
+    // At rest, the bar itself knows which tab is selected, the one on screen.
+    // The pager is only needed while a swipe is in flight, between two tabs.
     if (fabs(f - (CGFloat)llround(f)) < 0.02) {
         NSArray<NSIndexPath*>* picked = cv.indexPathsForSelectedItems;
         NSIndexPath* chosen = picked.count == 1 ? picked.firstObject : nil;

@@ -310,8 +310,8 @@ static void showReplySent(NSString* statusID) {
         [NSString stringWithFormat:@"https://x.com/intent/tweet?in_reply_to=%@", self.statusID];
     NSURL* url = [NSURL URLWithString:urlString];
     __weak typeof(self) weakSelf = self;
-    // Seed the session into this webview's cookie store, THEN load — so the compose page
-    // opens authenticated and never shows the login wall / black screen.
+    // The session goes into this web view's cookie store before the load, so the compose
+    // page opens signed in, never on the login wall or a black screen.
     PFBSeedReplyWebViewCookies(self.webView, ^{
         typeof(self) strongSelf = weakSelf;
         if (strongSelf && url) {
@@ -319,8 +319,8 @@ static void showReplySent(NSString* statusID) {
         }
     });
 
-    // Safety net: if the composer-ready message never arrives, the web view is revealed anyway
-    // so the user is never left staring at a spinner.
+    // Safety net: if the composer-ready message never arrives, the web view is revealed anyway,
+    // so a spinner never stays on screen alone.
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(8 * NSEC_PER_SEC)),
                    dispatch_get_main_queue(), ^{
                        [weakSelf revealWebView];
@@ -347,8 +347,8 @@ static void showReplySent(NSString* statusID) {
       didReceiveScriptMessage:(WKScriptMessage*)message {
     if ([message.name isEqualToString:@"pfbReady"]) {
         [self revealWebView];
-        // Fallback: if the icon extraction never delivers (x.com DOM change), still open the
-        // keyboard after 2.5s — without the bar — rather than leaving the user with no keyboard.
+        // Fallback: if the icons never arrive (x.com changed its page), the keyboard still
+        // opens after 2.5 s, without the bar, rather than not at all.
         __weak __typeof(self) weakSelf = self;
         dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(2.5 * NSEC_PER_SEC)),
                        dispatch_get_main_queue(), ^{
@@ -361,7 +361,7 @@ static void showReplySent(NSString* statusID) {
         if ([icons isKindOfClass:[NSArray class]]) {
             PFBBuildIconBar(icons, self.webView);
         }
-        // Focus AFTER the bar exists: the keyboard's first presentation then already includes it
+        // Focus once the bar exists: the keyboard's first presentation then already includes it
         // (one keyboard event, one layout).
         [self pfbFocusComposeIfNeeded];
     } else if ([message.name isEqualToString:@"pfbGeo"]) {
@@ -389,7 +389,7 @@ static void showReplySent(NSString* statusID) {
 - (void)pfbFocusComposeIfNeeded {
     if (gPFBDidRequestFocus || !gPFBReplyWebViewActive) { return; }
     gPFBDidRequestFocus = YES;
-    gPFBForceNextFocus = YES;  // consumed by the WKContentView swizzle for THIS focus only
+    gPFBForceNextFocus = YES;  // consumed by the WKContentView swizzle for this focus only
     [self.webView evaluateJavaScript:
         @"(function(){var c=document.querySelector('div[role=\"textbox\"]')"
         @"||document.querySelector('textarea');if(c){c.focus();}})();"

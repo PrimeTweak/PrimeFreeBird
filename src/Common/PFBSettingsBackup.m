@@ -109,7 +109,7 @@ static BOOL PFBValueIsPortable(id value) {
         }
         // A backup may name its keys with a legacy prefix.
         NSString* key = PFBCurrentKeyForLegacyKey(storedKey) ?: storedKey;
-        // Muted terms are the user's own words, never key names to rename.
+        // Muted terms are typed words, never key names to rename.
         BOOL keyedByTerm = [key isEqualToString:@"pfb_muted_expiry"] || [key isEqualToString:@"pfb_muted_span"];
         id value = keyedByTerm ? settings[storedKey] : PFBValueWithCurrentKeys(settings[storedKey]);
         if (PFBValueIsPortable(value)) {

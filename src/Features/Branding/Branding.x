@@ -473,8 +473,8 @@ static id PFBNamedVector(id image, id name) {
 @interface TFNFloatingActionButton : UIView
 @end
 
-// Tag set on the FAB's glyph image views so the UIImageView hook below can
-// recognize them in O(1) and bake swapped-in images white.
+// Marks the button's glyph views, so the UIImageView hook below knows them at once
+// and bakes any image swapped in white.
 static char kPFBFABGlyphKey;
 // Set while an effect is being installed here, so the setEffect: hook lets it
 // through. Without it that hook swallows and re-tints in a loop, and the material

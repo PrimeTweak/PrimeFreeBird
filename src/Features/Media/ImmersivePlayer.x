@@ -31,7 +31,7 @@ static const NSTimeInterval kPFBBarRevealDelay = 0.3;
 static NSTimeInterval gPFBLastUserTap = 0;
 static const NSTimeInterval kPFBUserTapGrace = 0.6;
 
-// Whether the reader paused the video now showing, which is also the request for
+// Whether a tap paused the video now showing, which is also the request for
 // the chrome: the app re-asserts alpha 1 on every piece under every playback state,
 // so only this flag tells a real request from the app's own.
 static BOOL gPFBWantPaused = NO;
@@ -240,7 +240,7 @@ static void pfbRestoreTimestamp(UIView* controls) {
 static BOOL gPFBSoundAllowed = NO;
 static BOOL gPFBFullScreenShown = NO;
 
-// Whether a video opens silent, as the reader chose.
+// Whether a video opens silent, as chosen in the settings.
 static BOOL pfbOpensMuted(void) {
     return [PFBSettings boolForKey:@"video_starts_muted"];
 }
@@ -1083,14 +1083,14 @@ static void pfbHandleScrubGesture(UIView* card, UILongPressGestureRecognizer* pr
 
 // MARK: - Raising the app's chrome on a pause
 
-// On a pause the reader asked for, the app's chrome is raised by sending the card
+// On a pause a tap asked for, the app's chrome is raised by sending the card
 // its own tap, checked when the bar mounts and on a short repeat behind that.
 
 // Spacing and number of the checks behind the mount signal: about 3 s of watch.
 static const NSTimeInterval kPFBRaiseTick = 0.05;
 static const NSInteger kPFBRaiseAttempts = 60;
 
-// Sends the card its own tap when the reader has paused and the app's chrome is
+// Sends the card its own tap when a tap has paused the video and the app's chrome is
 // down, past the grace after a real tap and within the budget and cooldown.
 // Returns YES when there is nothing left to watch, NO to look again.
 static BOOL pfbRaiseChromeIfDue(UIView* card) {
@@ -1302,8 +1302,8 @@ static void pfbStartRaiseWatch(UIView* card) {
 // MARK: - The app's chrome stays down while a video plays
 
 // None of these are unmounted between openings: the app drives them with alpha,
-// so the ramp back to alpha 1 is intercepted while the clean player is on and the
-// reader has not paused.
+// so the ramp back to alpha 1 is intercepted while the clean player is on and no
+// tap has paused the video.
 
 // Records the alpha the app asked for on a chrome view. YES when the view must stay
 // at 0 instead: a visible alpha while the chrome has not been asked for.

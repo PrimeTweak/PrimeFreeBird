@@ -48,8 +48,8 @@ static BOOL PFBVerifiedValue(id value) {
 
 %end
 
-// This wrapper reads the user's stored flags directly, past the user hooks above, so it
-// is hooked as well.
+// This wrapper reads an account's stored flags directly, past the TFSTwitterUser hooks
+// above, so it is hooked as well.
 %hook TFSTwitterUserSource
 
 - (id)isBlueVerified {
