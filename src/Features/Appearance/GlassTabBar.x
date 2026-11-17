@@ -782,8 +782,8 @@ static void PFBGlassLayOutBand(UIView* band) {
 }
 
 // With Clear bar on, the band is placed under the tab bar's platter, the glass at least 60 % as wide
-// as the bar, from its top to the bottom of the bar's container, and takes the bar's alpha; off, it
-// hides. Measured at its first placements.
+// as the bar, from its top to the window's bottom, in the bar's closest ancestor that reaches that
+// bottom, right under the branch holding the bar. It takes that branch's visibility; off, it hides.
 static void PFBGlassPlaceBand(UIView* glass) {
     if (!gPFBGlassBarClass || !glass) {
         return;
@@ -792,42 +792,63 @@ static void PFBGlassPlaceBand(UIView* glass) {
     for (NSUInteger up = 0; bar && up < 4 && ![bar isKindOfClass:gPFBGlassBarClass]; up++) {
         bar = bar.superview;
     }
-    UIView* host = bar.superview;
-    if (![bar isKindOfClass:gPFBGlassBarClass] || !host || CGRectGetWidth(glass.bounds) < 0.6 * CGRectGetWidth(bar.bounds)) {
+    if (![bar isKindOfClass:gPFBGlassBarClass] || !bar.superview || CGRectGetWidth(glass.bounds) < 0.6 * CGRectGetWidth(bar.bounds)) {
         return;
     }
     PFBCompatReach(PFBCompatPath_bottom_band);
     UIView* band = objc_getAssociatedObject(bar, kPFBGlassBandKey);
-    if (![PFBSettings boolForKey:@"show_bottom_fade"] || !bar.window) {
+    UIWindow* window = bar.window;
+    if (![PFBSettings boolForKey:@"show_bottom_fade"] || !window) {
         band.hidden = YES;
         return;
+    }
+    CGFloat windowBottom = CGRectGetMaxY(window.bounds);
+    UIView* branch = bar;
+    UIView* host = bar.superview;
+    NSUInteger climbed = 0;
+    while (host.superview && CGRectGetMaxY([host convertRect:host.bounds toView:nil]) < windowBottom - 0.5) {
+        branch = host;
+        host = host.superview;
+        climbed++;
     }
     if (!band) {
         band = PFBGlassMakeBand();
         objc_setAssociatedObject(bar, kPFBGlassBandKey, band, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     }
-    if (band.superview != host || [host.subviews indexOfObject:band] > [host.subviews indexOfObject:bar]) {
-        [host insertSubview:band belowSubview:bar];
+    if (band.superview != host || [host.subviews indexOfObject:band] > [host.subviews indexOfObject:branch]) {
+        [host insertSubview:band belowSubview:branch];
     }
-    CGFloat top = CGRectGetMinY([glass convertRect:glass.bounds toView:host]);
-    CGRect frame = CGRectMake(0.0, top, CGRectGetWidth(host.bounds), MAX(0.0, CGRectGetHeight(host.bounds) - top));
+    CGRect onScreen = [glass convertRect:glass.bounds toView:nil];
+    CGRect frame = [host convertRect:CGRectMake(CGRectGetMinX(window.bounds), CGRectGetMinY(onScreen), CGRectGetWidth(window.bounds),
+                                                MAX(0.0, windowBottom - CGRectGetMinY(onScreen)))
+                            fromView:nil];
     if (!CGRectEqualToRect(band.frame, frame)) {
         band.frame = frame;
     }
     PFBGlassLayOutBand(band);
-    band.hidden = bar.hidden;
-    band.alpha = bar.alpha;
+    BOOL hidden = NO;
+    CGFloat alpha = 1.0;
+    for (UIView* node = bar; node && node != host; node = node.superview) {
+        hidden = hidden || node.hidden;
+        alpha *= node.alpha;
+    }
+    band.hidden = hidden;
+    band.alpha = alpha;
     PFBCOMPAT_ACTION(PFBCompat_show_bottom_fade, @"fade drawn under the bottom bar");
     static NSUInteger measured;
     if (measured < 2 && !CGRectIsEmpty(frame)) {
         measured++;
         PFBCompatMeasure(@"bottom fade",
-                         [NSString stringWithFormat:@"band %@ in %@ %@, right under %@ %@; bar glass top %.0f, window %@; "
-                                                    @"blur %@ masked %@, color %@ rising as the square of the height",
-                                                    NSStringFromCGRect(CGRectIntegral(band.frame)), NSStringFromClass([host class]),
-                                                    NSStringFromCGRect(CGRectIntegral(host.frame)), NSStringFromClass([bar class]),
-                                                    NSStringFromCGRect(CGRectIntegral(bar.frame)), top,
-                                                    NSStringFromCGSize(host.window.bounds.size),
+                         [NSString stringWithFormat:@"band %@ on screen, in %@ %@ (%lu up from the bar's container %@ %@%@), "
+                                                    @"right under %@; bar glass top %.0f, window %@; blur %@ masked %@, color %@ "
+                                                    @"rising as the square of the height",
+                                                    NSStringFromCGRect(CGRectIntegral([band convertRect:band.bounds toView:nil])),
+                                                    NSStringFromClass([host class]),
+                                                    NSStringFromCGRect(CGRectIntegral([host convertRect:host.bounds toView:nil])),
+                                                    (unsigned long)climbed, NSStringFromClass([bar.superview class]),
+                                                    NSStringFromCGRect(CGRectIntegral([bar.superview convertRect:bar.superview.bounds toView:nil])),
+                                                    bar.superview.clipsToBounds ? @" clipping" : @"", NSStringFromClass([branch class]),
+                                                    CGRectGetMinY(onScreen), NSStringFromCGSize(window.bounds.size),
                                                     [((UIVisualEffectView*)band.subviews.firstObject).effect description] ?: @"none",
                                                     ((UIVisualEffectView*)band.subviews.firstObject).maskView ? @"yes" : @"no",
                                                     PFBGlassRGBA([PFBPalette currentBackgroundColor], band)],
