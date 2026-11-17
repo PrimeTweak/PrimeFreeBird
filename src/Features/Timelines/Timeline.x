@@ -382,19 +382,26 @@ static BOOL pfbScrollViewIsModal(UIScrollView* scrollView) {
 
 // Twitter's navigation paints an opaque band behind its top bar, with a line once the list scrolls
 // under it. With the option on, the band is cleared and its line hidden, and the lists beside it
-// take the soft effect. Home, Explore and Notifications keep their band and line: their tabs sit on it.
+// take the soft effect. Home, Explore, Notifications and Search keep their band and line: their tabs
+// sit on it.
 static BOOL gPFBBandWriting = NO;
 
 static BOOL pfbBandIsPainted(UIColor* color) {
     return color && CGColorGetAlpha(color.CGColor) > 0.01;
 }
 
-// Whether the band belongs to Home, Explore or Notifications, whose tab rows sit on it.
+// Whether the band belongs to Home, Explore, Notifications or Search, whose tab rows sit on it. Search
+// is the screen a query opens (measured by the tour), its results tabs under its search bar.
 static BOOL pfbBandHoldsTabs(UIView* band) {
     Class home = NSClassFromString(@"_TtC32TwitterHomeFeatureImplementation35HomeTimelineContainerViewController");
     Class explore = NSClassFromString(@"_TtC14T1TwitterSwift28GuideContainerViewController");
     Class notifications = NSClassFromString(@"T1NotificationsViewController");
+    Class search = NSClassFromString(@"TTSSearchContainerViewController");
     for (UIViewController* controller = PFBOwningController(band); controller; controller = controller.parentViewController) {
+        if (search && [controller isKindOfClass:search]) {
+            PFBCompatReach(PFBCompatPath_search_band);
+            return YES;
+        }
         if ((home && [controller isKindOfClass:home]) || (explore && [controller isKindOfClass:explore]) ||
             (notifications && [controller isKindOfClass:notifications])) {
             return YES;

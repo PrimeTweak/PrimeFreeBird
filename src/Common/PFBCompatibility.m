@@ -242,6 +242,7 @@ static const PFBCompatPathMeta kPaths[] = {
     {PFBCompatPath_glass_toast_width, PFBCompat_glass_toasts, "toast width"},
     {PFBCompatPath_glass_toast_button, PFBCompat_glass_toasts, "toast button"},
     {PFBCompatPath_glass_toast_layer, PFBCompat_glass_toasts, "toast layer"},
+    {PFBCompatPath_search_band, PFBCompat_hide_scroll_edge_blur, "Search band"},
     {PFBCompatPath_refresh_logo, PFBCompat_restore_twitter_names, "Home refresh logo"},
     {PFBCompatPath_refresh_animation, PFBCompat_restore_twitter_names, "Home refresh animation"},
     {PFBCompatPath_sensitive_box, PFBCompat_disable_sensitive_tweet_warnings, "sensitive box check"},
@@ -1242,7 +1243,6 @@ static const PFBCompatReq kReqs[] = {
     {PFBCompat_custom_tab_bar, "_TtC14T1TwitterSwift25TabCustomizationViewModel", "$navigationSettings"},
     {PFBCompat_custom_tab_bar, "_TtC14T1TwitterSwift25MainAppNavigationSettings", "$$__lazy_storage_$_tabCustomizationConfig"},
     {PFBCompat_glass_toasts, "XDSToastContentView", "$alternateActionButton"},
-    {PFBCompat_glass_toasts, "XDSToastContentView", "$detailLabel"},
     {PFBCompat_left_aligned_alerts, "_TtC13XDesignSystem16AlertContentView", "-layoutSubviews"},
     {PFBCompat_left_aligned_alerts, "_TtC13XDesignSystem16AlertContentView", "$titleLabel"},
     {PFBCompat_left_aligned_alerts, "_TtC13XDesignSystem16AlertContentView", "$messageLabel"},
@@ -2463,6 +2463,7 @@ static const PFBCompatClassText kClassTexts[] = {
     {PFBCompat_hide_scroll_edge_blur, "TwitterHomeFeatureImplementation.HomeTimelineContainerViewController"},
     {PFBCompat_hide_scroll_edge_blur, "T1TwitterSwift.GuideContainerViewController"},
     {PFBCompat_hide_scroll_edge_blur, "T1NotificationsViewController"},
+    {PFBCompat_hide_scroll_edge_blur, "TTSSearchContainerViewController"},
 };
 static const size_t kClassTextCount = sizeof(kClassTexts) / sizeof(kClassTexts[0]);
 

@@ -740,11 +740,20 @@ static CGFloat PFBNotifRestInset(UITableView* table) {
     return (CGFloat)rest.doubleValue;
 }
 
-// The panel's top: below the bars, lowered by a pull past the list's rest as the list's own
-// content is. A move the other way, as the jump Twitter makes after a refresh, leaves it at rest.
+// Whether a finger moves the list, or the list still glides or springs back from it.
+static BOOL PFBNotifListMoving(UITableView* table) {
+    return table.tracking || table.dragging || table.decelerating;
+}
+
+// The panel's top: below the bars, moved with the list as Twitter's own empty text is, down on a
+// pull and up on a push. A jump up with no finger on the list, as after a refresh, leaves it at rest.
 static CGFloat PFBNotifPanelTop(UITableView* table) {
     CGFloat rest = PFBNotifRestInset(table);
-    return rest + kPFBNotifEmptyTopInset + MAX(0.0, -table.contentOffset.y - rest);
+    CGFloat moved = -table.contentOffset.y - rest;
+    if (moved < 0.0 && !PFBNotifListMoving(table)) {
+        moved = 0.0;
+    }
+    return rest + kPFBNotifEmptyTopInset + moved;
 }
 
 // The panel sits behind the list, in its background view, so the list's jumps do not carry it.
@@ -788,9 +797,9 @@ static void PFBNotifLayoutEmptyPanel(UIView* panel, UITableView* table) {
 @implementation PFBNotifPanelRef
 @end
 
-// Each scroll of the list lays it out: the panel follows a pull there, in the same pass that
-// places the background view. A rise of more than a step at once, as at the end of a refresh,
-// glides in 0.2 s, as the list's own content does.
+// Each scroll of the list lays it out: the panel follows the list there, in the same pass that
+// places the background view. A rise of more than a step with no finger on the list, as at the end
+// of a refresh, glides in 0.2 s, as the list's own content does.
 %hook UITableView
 
 - (void)layoutSubviews {
@@ -805,7 +814,7 @@ static void PFBNotifLayoutEmptyPanel(UIView* panel, UITableView* table) {
     if (CGRectEqualToRect(frame, panel.frame)) {
         return;
     }
-    if (CGRectGetMinY(panel.frame) - CGRectGetMinY(frame) > 12.0) {
+    if (!PFBNotifListMoving((UITableView*)self) && CGRectGetMinY(panel.frame) - CGRectGetMinY(frame) > 12.0) {
         [UIView animateWithDuration:0.2
                               delay:0.0
                             options:UIViewAnimationOptionCurveEaseInOut | UIViewAnimationOptionBeginFromCurrentState

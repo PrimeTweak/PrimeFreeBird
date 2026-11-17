@@ -1,5 +1,5 @@
-// Glass toasts. On Twitter's own glass (12.44, Liquid Glass) the toast stays Twitter's, made solid: a layer
-// of the background color under its words, the words in the text colors, the button on a light gray pill.
+// Glass toasts. On Twitter's own glass (12.44, Liquid Glass) the toast stays Twitter's: a layer of the
+// background color under its words, the words in the tab bar's gray, the button on a light gray pill.
 // Otherwise the tweak's capsule at the top, as wide as its words, the button on the right.
 
 #import "Support/HookHelpers.h"
@@ -40,9 +40,9 @@ static const CGFloat kPFBGlassToastTwitterInset = 12.0;
 // The glass's own tint, with no scrim: 65 % of the background color, so what shows under the layer
 // stays light.
 static const CGFloat kPFBGlassToastTint = 0.65;
-// The layer under the words: the background color at 85 %. The glass alone lets about half of the
-// page show (measured); with the layer, a few percent.
-static const CGFloat kPFBGlassToastLayer = 0.85;
+// The layer under the words: the background color at 60 %. The glass alone lets about half of the
+// page show (measured); with the layer, 8 to 20 %, as much as Twitter's gray toast (measured).
+static const CGFloat kPFBGlassToastLayer = 0.60;
 // The button's pill: the text color at 7 %, the step Twitter's gray toast puts between pill and toast.
 static const CGFloat kPFBGlassToastButtonInk = 0.07;
 
@@ -299,44 +299,24 @@ static void PFBGlassToastColor(UIView* container, id toast) {
 // How deep the toast's words are looked for: past Twitter's glass and the views that host its content.
 static const NSInteger kPFBGlassToastWordsDepth = 16;
 
-// A part of Twitter's toast content, read by its name (read in the binary): the first shown content
-// that has it. nil when the toast has none; noted when Twitter no longer has that part.
-static id PFBGlassToastPart(UIView* container, const char* name, NSString* what) {
-    Class contentClass = NSClassFromString(@"XDSToastContentView");
-    Ivar ivar = contentClass ? class_getInstanceVariable(contentClass, name) : NULL;
-    if (!ivar) {
-        PFBCompatNoteFailure(PFBCompat_glass_toasts, [NSString stringWithFormat:@"Twitter's toast %@ not found", what]);
-        return nil;
-    }
-    __block id part = nil;
-    PFBWalkAllSubviews(container, kPFBGlassToastWordsDepth, ^(UIView* view) {
-      if (!part && !view.hidden && [view isKindOfClass:contentClass]) {
-          part = object_getIvar(view, ivar);
-      }
-    });
-    return part;
-}
-
-// On the layer, Twitter's own order of emphasis: the message, the button's title and the icon in the
-// text color, the line under the message in the lighter one. Set only when it differs.
-static void PFBGlassToastWords(UIView* container) {
-    id detail = PFBGlassToastPart(container, "detailLabel", @"detail line");
-    UIColor* text = [UIColor labelColor];
+// On the layer, every word and icon in the gray the tab bar gives unselected tabs: the text color
+// at 60 % (measured in the bar). Set only when it differs.
+static void PFBGlassToastGrayText(UIView* container) {
+    UIColor* gray = [[UIColor labelColor] colorWithAlphaComponent:0.6];
     PFBWalkAllSubviews(container, kPFBGlassToastWordsDepth, ^(UIView* view) {
       if ([view isKindOfClass:[UIButton class]]) {
           UIButton* button = (UIButton*)view;
-          if (![[button titleColorForState:UIControlStateNormal] isEqual:text]) {
-              [button setTitleColor:text forState:UIControlStateNormal];
+          if (![[button titleColorForState:UIControlStateNormal] isEqual:gray]) {
+              [button setTitleColor:gray forState:UIControlStateNormal];
           }
       } else if ([view isKindOfClass:[UILabel class]]) {
           UILabel* label = (UILabel*)view;
-          UIColor* color = label == detail ? [UIColor secondaryLabelColor] : text;
-          if (![label.textColor isEqual:color]) {
-              label.textColor = color;
+          if (![label.textColor isEqual:gray]) {
+              label.textColor = gray;
           }
       } else if ([view isKindOfClass:[UIImageView class]] && CGRectGetWidth(view.bounds) <= 28.0 &&
-                 ![view.tintColor isEqual:text]) {
-          view.tintColor = text;
+                 ![view.tintColor isEqual:gray]) {
+          view.tintColor = gray;
       }
     });
 }
@@ -363,14 +343,31 @@ static UIView* PFBGlassToastTwitterGlass(UIView* container) {
     return nil;
 }
 
-// The button on its light gray pill, Twitter's own pill shape (read in the binary: its background
-// color and corners); off, Twitter's own color comes back.
+// Twitter's toast button: a UIButton whose pill is its own background color and corners (read in the
+// binary). nil when the toast has none.
+static UIButton* PFBGlassToastButton(UIView* container) {
+    Class contentClass = NSClassFromString(@"XDSToastContentView");
+    Ivar ivar = contentClass ? class_getInstanceVariable(contentClass, "alternateActionButton") : NULL;
+    if (!ivar) {
+        PFBCompatNoteFailure(PFBCompat_glass_toasts, @"Twitter's toast button not found");
+        return nil;
+    }
+    __block UIButton* button = nil;
+    PFBWalkAllSubviews(container, kPFBGlassToastWordsDepth, ^(UIView* view) {
+      id part = !button && [view isKindOfClass:contentClass] ? object_getIvar(view, ivar) : nil;
+      if ([part isKindOfClass:[UIButton class]]) {
+          button = part;
+      }
+    });
+    return button;
+}
+
+// The button on its light gray pill; off, Twitter's own color comes back.
 static void PFBGlassToastButtonPill(UIView* container, BOOL light) {
-    id part = PFBGlassToastPart(container, "alternateActionButton", @"button");
-    if (![part isKindOfClass:[UIButton class]]) {
+    UIButton* button = PFBGlassToastButton(container);
+    if (!button) {
         return;
     }
-    UIButton* button = part;
     PFBCompatReach(PFBCompatPath_glass_toast_button);
     id twitterColor = objc_getAssociatedObject(button, kPFBGlassToastButtonColorKey);
     if (!light) {
@@ -499,8 +496,8 @@ static void PFBGlassToastFit(UIView* container) {
     }
 }
 
-// On Twitter's glass, Twitter's toast made solid: its glass tinted, the layer under its words, the words
-// in the text colors, the button on its pill. Without it, the container drawn as the capsule, the glass
+// On Twitter's glass, Twitter's toast: its glass tinted, the layer under its words, the words gray, the
+// button on its pill. Without it, the container drawn as the capsule, the glass
 // behind everything and the corners round. With the option off, Twitter's look comes back.
 static void PFBGlassToastDress(UIView* container, BOOL styled) {
     UIView* surface = objc_getAssociatedObject(container, kPFBGlassToastSurfaceKey);
@@ -534,9 +531,9 @@ static void PFBGlassToastDress(UIView* container, BOOL styled) {
         }
         PFBGlassToastTint(twitterGlass, styled);
         PFBGlassToastLayer(twitterGlass, YES);
-        PFBGlassToastWords(container);
+        PFBGlassToastGrayText(container);
         PFBGlassToastButtonPill(container, YES);
-        PFBCOMPAT_ACTION(PFBCompat_glass_toasts, @"Twitter's toast on a background-color layer, words in the text colors, button on a gray pill");
+        PFBCOMPAT_ACTION(PFBCompat_glass_toasts, @"Twitter's toast on a background-color layer, words in the bar's gray, button on a gray pill");
         return;
     }
     if (!surface) {
