@@ -3,7 +3,6 @@
 
 #import "Support/HookHelpers.h"
 #import "Features/Appearance/ThemeColor/PFBPalette.h"
-#import <sys/sysctl.h>
 
 @interface _TtCC11XNavigation14CollapseEngine14ScrollObserver : NSObject
 - (void)handlePan:(UIPanGestureRecognizer*)recognizer;
@@ -537,17 +536,17 @@ static void PFBGlassSizePillForLabels(void) {
     size->height = own + kPFBGlassExtraHeight;
 }
 
-static void PFBGlassApplyBarTint(BOOL atLaunch);
+static void PFBGlassApplyBarTint(void);
 
 // Before the first bar is built: the pill's height for Tab labels and the glass tint for Clear bar.
 void PFBGlassTabBarStart(void) {
     if (PFBNativeGlassAsked()) {
         PFBGlassSizePillForLabels();
-        PFBGlassApplyBarTint(YES);
+        PFBGlassApplyBarTint();
     }
 }
 
-// MARK: - Bottom fade
+// MARK: - Clear bar
 
 // Twitter's Liquid Glass tuning, reached by its exported addressor: since 12.44 the tab bar's glass
 // takes a 25 % tint in both themes, at 0x48 and 0x50 of it; 12.42.1 had none.
@@ -569,69 +568,16 @@ static double* PFBGlassTabBarTint(void) {
       BOOL matches = base[2] == 0.0 && base[3] == 0.0 && base[4] == 1.0 && base[5] == 1.0 && base[6] == 6.0 &&
                      base[7] == 1.0 && base[8] == 2.0;
       tint = matches ? base : NULL;
-      PFBCompatMeasure(@"bottom fade",
-                       [NSString stringWithFormat:@"tab bar tuning %@: tint %.2f/%.2f, frost %.1f/%.1f, saturation %.2f/%.2f, "
-                                                  @"edge blur %.1f, edge tint %.2f, pill blur %.1f",
-                                                  matches ? @"as measured" : @"moved", base[0], base[1], base[2],
-                                                  base[3], base[4], base[5], base[6], base[7], base[8]],
-                       2);
+      if (!matches) {
+          PFBCompatMeasure(@"bottom fade",
+                           [NSString stringWithFormat:@"tab bar tuning moved: tint %.2f/%.2f, frost %.1f/%.1f, saturation "
+                                                      @"%.2f/%.2f, edge blur %.1f, edge tint %.2f, pill blur %.1f",
+                                                      base[0], base[1], base[2], base[3], base[4], base[5], base[6], base[7],
+                                                      base[8]],
+                           2);
+      }
     });
     return tint;
-}
-
-// A color for the report, resolved for the view's appearance.
-static NSString* PFBGlassRGBA(UIColor* color, UIView* view) {
-    if (!color) {
-        return @"none";
-    }
-    CGFloat red = 0, green = 0, blue = 0, alpha = 0;
-    [[color resolvedColorWithTraitCollection:view.traitCollection] getRed:&red green:&green blue:&blue alpha:&alpha];
-    return [NSString stringWithFormat:@"rgba(%.0f, %.0f, %.0f, %.2f)", red * 255.0, green * 255.0, blue * 255.0, alpha];
-}
-
-// A view and its subviews to the given depth, for the report: class, size, color, alpha, mask.
-static NSString* PFBGlassDescribeTree(UIView* root, NSInteger depth) {
-    NSMutableArray<NSString*>* parts = [NSMutableArray array];
-    PFBWalkAllSubviews(root, depth, ^(UIView* view) {
-      if (parts.count >= 10) {
-          return;
-      }
-      NSString* name = NSStringFromClass([view class]);
-      CALayer* mask = view.maskView.layer ?: view.layer.mask;
-      [parts addObject:[NSString stringWithFormat:@"%@ %@%@%@%@%@", name.length > 28 ? [name substringFromIndex:name.length - 28] : name,
-                                                  NSStringFromCGSize(view.bounds.size),
-                                                  view.backgroundColor ? [@" " stringByAppendingString:PFBGlassRGBA(view.backgroundColor, view)] : @"",
-                                                  view.alpha < 1.0 ? [NSString stringWithFormat:@" alpha %.2f", view.alpha] : @"",
-                                                  view.hidden ? @" hidden" : @"",
-                                                  mask ? [NSString stringWithFormat:@" mask %@", NSStringFromClass([mask class])] : @""]];
-    });
-    return [parts componentsJoinedByString:@" > "];
-}
-
-// The first gradient at a layer or in its sublayers, for the report: its colors' alphas, its stops
-// and its direction.
-static NSString* PFBGlassDescribeGradient(CALayer* layer, NSInteger depth) {
-    if (!layer || depth < 0) {
-        return nil;
-    }
-    if ([layer isKindOfClass:[CAGradientLayer class]]) {
-        CAGradientLayer* gradient = (CAGradientLayer*)layer;
-        NSMutableArray<NSString*>* alphas = [NSMutableArray array];
-        for (id color in gradient.colors) {
-            [alphas addObject:[NSString stringWithFormat:@"%.2f", CGColorGetAlpha((__bridge CGColorRef)color)]];
-        }
-        return [NSString stringWithFormat:@"gradient %@ alphas [%@] stops [%@] from (%.2f, %.2f) to (%.2f, %.2f)",
-                                          NSStringFromCGRect(gradient.frame), [alphas componentsJoinedByString:@" "],
-                                          [gradient.locations componentsJoinedByString:@" "] ?: @"even",
-                                          gradient.startPoint.x, gradient.startPoint.y, gradient.endPoint.x, gradient.endPoint.y];
-    }
-    for (CALayer* sublayer in layer.sublayers) {
-        NSString* found = PFBGlassDescribeGradient(sublayer, depth - 1);
-        if (found) {
-            return found;
-        }
-    }
-    return nil;
 }
 
 // Twitter's tab bar glass, nil when no bar is on screen.
@@ -652,26 +598,6 @@ static UIView* PFBGlassBarGlass(void) {
       });
     });
     return found;
-}
-
-// A glass for the report: its effect and the color the effect is tinted with, its material's bytes,
-// and the views inside it.
-static NSString* PFBGlassDescribeGlass(UIView* glass) {
-    if (!glass) {
-        return @"no tab bar";
-    }
-    Ivar effectIvar = class_getInstanceVariable([glass class], "visualEffectView");
-    id effectView = effectIvar ? object_getIvar(glass, effectIvar) : nil;
-    UIVisualEffect* effect = [effectView isKindOfClass:[UIVisualEffectView class]] ? [(UIVisualEffectView*)effectView effect] : nil;
-    UIColor* tint = [effect respondsToSelector:@selector(tintColor)] ? ((UIColor * (*)(id, SEL)) objc_msgSend)(effect, @selector(tintColor)) : nil;
-    Ivar materialIvar = class_getInstanceVariable([glass class], "material");
-    NSMutableString* material = [NSMutableString string];
-    for (NSUInteger i = 0; materialIvar && i < 9; i++) {
-        [material appendFormat:@"%02x", ((const uint8_t*)(__bridge void*)glass + ivar_getOffset(materialIvar))[i]];
-    }
-    return [NSString stringWithFormat:@"effect %@ tint %@, material %@, inside %@", NSStringFromClass([effect class]) ?: @"none",
-                                      PFBGlassRGBA(tint, glass), material.length ? material : @"not read",
-                                      PFBGlassDescribeTree(glass, 2)];
 }
 
 // With Clear bar on, the tab bar's glass gets 12.42.1's untinted glass at its next layout, so a
@@ -700,9 +626,8 @@ static void PFBGlassTintBarGlass(UIView* glass) {
 }
 
 // Clear bar gives the bar 12.42.1's look, no tint; off, Twitter's 25 % comes back. Only those
-// two values are ever written. The report gets the bar glass's tint 5 s after launch, or a second
-// after a change.
-static void PFBGlassApplyBarTint(BOOL atLaunch) {
+// two values are ever written.
+static void PFBGlassApplyBarTint(void) {
     double* tint = PFBGlassTabBarTint();
     if (!tint) {
         return;
@@ -720,34 +645,19 @@ static void PFBGlassApplyBarTint(BOOL atLaunch) {
     } else {
         PFBCOMPAT_OBSERVE(PFBCompat_show_bottom_fade, @"bottom bar tint found");
     }
-    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)((atLaunch ? 5 : 1) * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
-      double* now = PFBGlassTabBarTint();
-      PFBCompatMeasure(@"bottom fade",
-                       [NSString stringWithFormat:@"%@, %@: tuning tint %.2f/%.2f; bar glass %@",
-                                                  show ? @"on" : @"off", atLaunch ? @"5 s after launch" : @"a second after the change",
-                                                  now ? now[0] : -1.0, now ? now[1] : -1.0, PFBGlassDescribeGlass(PFBGlassBarGlass())],
-                       6);
-    });
 }
 
 // MARK: - Bottom band
 
 // 12.42.1's band under its clear bar: from the bar's top to the screen's bottom, the page blurred
-// from about halfway down, under the background color rising as the square of the height. 12.44
-// builds none; this one sits right under the bar and follows it.
+// over the whole band, as Twitter's own bands blur, under the background color rising as the square
+// of the height. 12.44 builds none; this one sits right under the bar and follows it.
 static const void* kPFBGlassBandKey = &kPFBGlassBandKey;
 
 static UIView* PFBGlassMakeBand(void) {
     UIView* band = [[UIView alloc] initWithFrame:CGRectZero];
     band.userInteractionEnabled = NO;
     UIVisualEffectView* blur = [[UIVisualEffectView alloc] initWithEffect:[UIBlurEffect effectWithStyle:UIBlurEffectStyleRegular]];
-    UIView* blurMask = [[UIView alloc] initWithFrame:CGRectZero];
-    CAGradientLayer* blurRamp = [CAGradientLayer layer];
-    blurRamp.colors = @[ (id)UIColor.clearColor.CGColor, (id)UIColor.clearColor.CGColor,
-                         (id)[UIColor colorWithWhite:0 alpha:0.5].CGColor, (id)UIColor.blackColor.CGColor ];
-    blurRamp.locations = @[ @0.0, @0.1, @0.35, @0.6 ];
-    [blurMask.layer addSublayer:blurRamp];
-    blur.maskView = blurMask;
     [band addSubview:blur];
     UIView* color = [[UIView alloc] initWithFrame:CGRectZero];
     [color.layer addSublayer:[CAGradientLayer layer]];
@@ -760,7 +670,6 @@ static UIView* PFBGlassMakeBand(void) {
 static void PFBGlassLayOutBand(UIView* band) {
     UIVisualEffectView* blur = band.subviews.firstObject;
     UIView* color = band.subviews.lastObject;
-    CAGradientLayer* blurRamp = (CAGradientLayer*)blur.maskView.layer.sublayers.firstObject;
     CAGradientLayer* colorRamp = (CAGradientLayer*)color.layer.sublayers.firstObject;
     UIColor* background = [[PFBPalette currentBackgroundColor] resolvedColorWithTraitCollection:band.traitCollection];
     NSMutableArray* colors = [NSMutableArray array];
@@ -773,8 +682,6 @@ static void PFBGlassLayOutBand(UIView* band) {
     [CATransaction begin];
     [CATransaction setDisableActions:YES];
     blur.frame = band.bounds;
-    blur.maskView.frame = blur.bounds;
-    blurRamp.frame = blur.bounds;
     color.frame = band.bounds;
     colorRamp.frame = color.bounds;
     colorRamp.colors = colors;
@@ -811,11 +718,9 @@ static void PFBGlassPlaceBand(UIView* glass) {
     CGFloat windowBottom = CGRectGetMaxY(window.bounds);
     UIView* branch = bar;
     UIView* host = bar.superview;
-    NSUInteger climbed = 0;
     while (host.superview && CGRectGetMaxY([host convertRect:host.bounds toView:nil]) < windowBottom - 0.5) {
         branch = host;
         host = host.superview;
-        climbed++;
     }
     if (!band) {
         band = PFBGlassMakeBand();
@@ -841,26 +746,6 @@ static void PFBGlassPlaceBand(UIView* glass) {
     band.hidden = hidden;
     band.alpha = alpha;
     PFBCOMPAT_ACTION(PFBCompat_show_bottom_fade, @"fade drawn under the bottom bar");
-    static NSUInteger measured;
-    if (measured < 2 && !CGRectIsEmpty(frame)) {
-        measured++;
-        PFBCompatMeasure(@"bottom fade",
-                         [NSString stringWithFormat:@"band %@ on screen, in %@ %@ (%lu up from the bar's container %@ %@%@), "
-                                                    @"right under %@; bar glass top %.0f, window %@; blur %@ masked %@, inside %@; "
-                                                    @"color %@ rising as the square of the height",
-                                                    NSStringFromCGRect(CGRectIntegral([band convertRect:band.bounds toView:nil])),
-                                                    NSStringFromClass([host class]),
-                                                    NSStringFromCGRect(CGRectIntegral([host convertRect:host.bounds toView:nil])),
-                                                    (unsigned long)climbed, NSStringFromClass([bar.superview class]),
-                                                    NSStringFromCGRect(CGRectIntegral([bar.superview convertRect:bar.superview.bounds toView:nil])),
-                                                    bar.superview.clipsToBounds ? @" clipping" : @"", NSStringFromClass([branch class]),
-                                                    CGRectGetMinY(onScreen), NSStringFromCGSize(window.bounds.size),
-                                                    [((UIVisualEffectView*)band.subviews.firstObject).effect description] ?: @"none",
-                                                    ((UIVisualEffectView*)band.subviews.firstObject).maskView ? @"yes" : @"no",
-                                                    PFBGlassDescribeTree(band.subviews.firstObject, 1),
-                                                    PFBGlassRGBA([PFBPalette currentBackgroundColor], band)],
-                         8);
-    }
 }
 
 // A change to Clear bar reaches the bar on screen, which takes its new look at its next layout.
@@ -868,124 +753,11 @@ void PFBGlassRefreshBottomFade(void) {
     if (!PFBNativeGlassAsked()) {
         return;
     }
-    PFBGlassApplyBarTint(NO);
+    PFBGlassApplyBarTint();
     UIView* glass = PFBGlassBarGlass();
     PFBGlassTintBarGlass(glass);
     PFBGlassPlaceBand(glass);
     PFBRestyleGlassTabBars();
-}
-
-// A blur or color band of Twitter's edge treatment, for the report: its effect, the views and colors
-// inside it, its mask, and the gradient that fades it, so a band can be built the same way.
-static void PFBGlassDescribeBand(UIView* band, NSString* screen, NSString* place) {
-    Ivar effectIvar = class_getInstanceVariable([band class], "visualEffectView");
-    id effectView = effectIvar ? object_getIvar(band, effectIvar) : nil;
-    UIVisualEffect* effect = [effectView isKindOfClass:[UIVisualEffectView class]] ? [(UIVisualEffectView*)effectView effect] : nil;
-    NSString* effectText = effect ? [effect description] : @"none";
-    UIView* maskView = band.maskView;
-    CALayer* mask = maskView.layer ?: band.layer.mask;
-    NSString* gradient = PFBGlassDescribeGradient(mask, 3) ?: PFBGlassDescribeGradient(band.layer, 4) ?: @"no gradient";
-    PFBCompatMeasure(@"edge band",
-                     [NSString stringWithFormat:@"%@ %@ %@ alpha %.2f%@: effect %@; tree %@; mask %@ %@; %@", screen, place,
-                                                NSStringFromCGRect(CGRectIntegral([band convertRect:band.bounds toView:nil])),
-                                                band.alpha, band.hidden ? @" hidden" : @"",
-                                                effectText.length > 90 ? [effectText substringToIndex:90] : effectText,
-                                                PFBGlassDescribeTree(band, 3), mask ? NSStringFromClass([mask class]) : @"none",
-                                                mask ? NSStringFromCGRect(mask.frame) : @"", gradient],
-                     8);
-}
-
-// A screen's edge treatment for the report: its frame, its blur and color bands and where, where
-// its fade mask sits and how it fades, and its stack's applied configuration in full.
-static void PFBGlassDescribeEdge(UIView* treatment, NSString* name) {
-    if (!treatment.window) {
-        return;
-    }
-    Class blurClass = NSClassFromString(@"XDSBlur");
-    Class fadeClass = NSClassFromString(@"_TtC13XDesignSystem18ScrollEdgeFadeView");
-    CGFloat middle = CGRectGetHeight(treatment.window.bounds) / 2.0;
-    NSMutableArray<NSString*>* bands = [NSMutableArray array];
-    PFBWalkAllSubviews(treatment, 2, ^(UIView* band) {
-      BOOL blur = blurClass && [band isKindOfClass:blurClass];
-      BOOL fade = fadeClass && [band isKindOfClass:fadeClass];
-      if (band == treatment || (!blur && !fade)) {
-          return;
-      }
-      CGRect frame = [band convertRect:band.bounds toView:nil];
-      NSString* place = [NSString stringWithFormat:@"%@ at the %@", blur ? @"blur" : @"fade",
-                                                   CGRectGetMidY(frame) > middle ? @"bottom" : @"top"];
-      [bands addObject:[NSString stringWithFormat:@"%@ %.0f pt%@", place, CGRectGetHeight(frame),
-                                                  band.hidden || band.alpha < 0.01 ? @" hidden" : @""]];
-      PFBGlassDescribeBand(band, name, place);
-    });
-    Class maskClass = NSClassFromString(@"_TtC13XDesignSystem18ScrollEdgeFadeMask");
-    Ivar maskIvar = class_getInstanceVariable([treatment class], "fadeMask");
-    Ivar layerIvar = maskClass ? class_getInstanceVariable(maskClass, "gradientLayer") : NULL;
-    id mask = maskIvar ? object_getIvar(treatment, maskIvar) : nil;
-    id maskLayer = layerIvar && [mask isKindOfClass:maskClass] ? object_getIvar(mask, layerIvar) : nil;
-    NSString* masking = mask ? @"built, not on the list" : @"none";
-    for (UIView* view in [@[ treatment.superview ?: treatment ] arrayByAddingObjectsFromArray:treatment.superview.subviews]) {
-        if (maskLayer && view.layer.mask == maskLayer) {
-            masking = [NSString stringWithFormat:@"on %@", NSStringFromClass([view class])];
-        }
-    }
-    if ([maskLayer isKindOfClass:[CALayer class]]) {
-        masking = [masking stringByAppendingFormat:@", %@", PFBGlassDescribeGradient(maskLayer, 1) ?: @"no gradient"];
-    }
-    UINavigationController* stack = PFBOwningTopController(treatment).navigationController;
-    Class stackClass = NSClassFromString(@"XNAVNavigationController");
-    Ivar applied = stackClass ? class_getInstanceVariable(stackClass, "appliedConfiguration") : NULL;
-    Ivar next = stackClass ? class_getInstanceVariable(stackClass, "chromeFrozenScreen") : NULL;
-    NSMutableString* config = [NSMutableString string];
-    if (applied && next && [stack isKindOfClass:stackClass]) {
-        const uint8_t* bytes = (const uint8_t*)(__bridge void*)stack + ivar_getOffset(applied);
-        ptrdiff_t size = ivar_getOffset(next) - ivar_getOffset(applied);
-        for (ptrdiff_t i = 0; i < size && i < 64; i++) {
-            [config appendFormat:@"%02x%@", bytes[i], i % 8 == 7 ? @" " : @""];
-        }
-    }
-    PFBCompatMeasure(@"edge",
-                     [NSString stringWithFormat:@"%@: treatment %@; bands %@; mask %@; stack config %@", name,
-                                                NSStringFromCGRect(CGRectIntegral([treatment convertRect:treatment.bounds toView:nil])),
-                                                bands.count ? [bands componentsJoinedByString:@", "] : @"none", masking,
-                                                config.length ? config : @"not read"],
-                     12);
-}
-
-// Each screen's treatment is described once a launch, a second after its first layout on screen,
-// for up to 12 screens. Once, the configuration's automatic and disabled edge modes too.
-static void PFBGlassMeasureEdge(UIView* treatment) {
-    static NSMutableSet<NSString*>* seen;
-    static dispatch_once_t once;
-    dispatch_once(&once, ^{
-      seen = [NSMutableSet set];
-      NSMutableArray<NSString*>* modes = [NSMutableArray array];
-      for (NSString* mode in @[ @"automatic", @"disabled" ]) {
-          NSString* symbol =
-              [NSString stringWithFormat:@"$s11XNavigation23NavigationConfigurationV23ScrollEdgeTreatmentModeV%lu%@AEvau",
-                                         (unsigned long)mode.length, mode];
-          void* (*addressor)(void) = (void* (*)(void))dlsym(RTLD_DEFAULT, symbol.UTF8String);
-          const uint8_t* bytes = addressor ? (const uint8_t*)addressor() : NULL;
-          NSMutableString* hex = [NSMutableString string];
-          for (NSUInteger i = 0; bytes && i < 24; i++) {
-              [hex appendFormat:@"%02x%@", bytes[i], i % 8 == 7 && i < 23 ? @" " : @""];
-          }
-          [modes addObject:[NSString stringWithFormat:@"%@ %@", mode, bytes ? hex : @"not found"]];
-      }
-      PFBCompatMeasure(@"edge modes", [modes componentsJoinedByString:@"; "], 2);
-    });
-    NSString* name = NSStringFromClass([PFBOwningTopController(treatment) class]);
-    if (!name || !treatment.window || CGRectIsEmpty(treatment.bounds) || seen.count >= 12 || [seen containsObject:name]) {
-        return;
-    }
-    [seen addObject:name];
-    __weak UIView* weakTreatment = treatment;
-    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, NSEC_PER_SEC), dispatch_get_main_queue(), ^{
-      UIView* later = weakTreatment;
-      if (later) {
-          PFBGlassDescribeEdge(later, name);
-      }
-    });
 }
 
 // Twitter's classic settings pages, or the list of its new settings, anywhere in the stack.
@@ -1132,29 +904,9 @@ static double PFBGlassTabBarCollapse(UINavigationController* stack) {
 static BOOL gPFBGlassDragging;
 static const void* kPFBGlassBroughtBackKey = &kPFBGlassBroughtBackKey;
 
-// Twitter's tab bar showing in a window, and the size of its glass.
-static UIView* PFBGlassBarIn(UIWindow* window, CGSize* glassSize) {
-    __block UIView* found = nil;
-    __block CGSize size = CGSizeZero;
-    Class glassClass = NSClassFromString(@"XDSGlass");
-    PFBGlassFindClasses();
-    PFBWalkAllSubviews(window, 40, ^(UIView* view) {
-      if (!found && gPFBGlassBarClass && [view isKindOfClass:gPFBGlassBarClass]) {
-          found = view;
-          PFBWalkAllSubviews(view, 3, ^(UIView* inner) {
-            if (CGSizeEqualToSize(size, CGSizeZero) && glassClass && [inner isKindOfClass:glassClass]) {
-                size = inner.bounds.size;
-            }
-          });
-      }
-    });
-    *glassSize = size;
-    return found;
-}
-
 // A bar left collapsed with no finger on the screen, as Twitter hands Home back after its own
-// Search, is set back to shown and the stack applies its configuration again; a second later
-// the report gets whether it came back. At most twice a second per stack.
+// Search, is set back to shown and the stack applies its configuration again. At most twice a
+// second per stack.
 static BOOL PFBGlassBringBackTabBar(UINavigationController* stack) {
     BOOL readable = NO;
     double* progress = PFBGlassCollapseProgress(stack, &readable);
@@ -1164,7 +916,6 @@ static BOOL PFBGlassBringBackTabBar(UINavigationController* stack) {
         return NO;
     }
     objc_setAssociatedObject(stack, kPFBGlassBroughtBackKey, @(now), OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-    double was = progress[1];
     progress[1] = 0.0;
     PFBCOMPAT_ACTION(PFBCompat_no_tab_bar_hiding, @"collapsed tab bar brought back");
     __weak UINavigationController* weakStack = stack;
@@ -1173,22 +924,6 @@ static BOOL PFBGlassBringBackTabBar(UINavigationController* stack) {
       if ([weakStack respondsToSelector:update]) {
           ((void (*)(id, SEL, BOOL))objc_msgSend)(weakStack, update, NO);
       }
-    });
-    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, NSEC_PER_SEC), dispatch_get_main_queue(), ^{
-      UINavigationController* checked = weakStack;
-      if (!checked.view.window) {
-          return;
-      }
-      CGSize glass = CGSizeZero;
-      UIView* bar = PFBGlassBarIn(checked.view.window, &glass);
-      BOOL full = glass.width > glass.height * 1.5;
-      PFBCompatMeasure(@"always visible",
-                       [NSString stringWithFormat:@"brought back from collapse %.2f on %@: %@ a second later, "
-                                                  @"collapse %.2f, glass %.0f x %.0f",
-                                                  was, NSStringFromClass([checked.topViewController class]) ?: @"none",
-                                                  !bar ? @"no tab bar" : (full ? @"full" : @"still collapsed"),
-                                                  PFBGlassTabBarCollapse(checked), glass.width, glass.height],
-                       10);
     });
     return YES;
 }
@@ -1251,81 +986,6 @@ void PFBGlassRefreshAlwaysVisible(void) {
     });
 }
 
-// The screen whose scroll Twitter's collapse engine last followed, and when.
-static __weak UIViewController* gPFBGlassScrolled;
-static CFAbsoluteTime gPFBGlassScrolledAt;
-
-// Seconds since the process started, or -1 when unread.
-static double PFBGlassSinceLaunch(void) {
-    struct kinfo_proc info;
-    size_t length = sizeof(info);
-    int name[4] = {CTL_KERN, KERN_PROC, KERN_PROC_PID, getpid()};
-    if (sysctl(name, 4, &info, &length, NULL, 0) != 0 || length == 0) {
-        return -1.0;
-    }
-    struct timeval start = info.kp_proc.p_starttime;
-    return [NSDate date].timeIntervalSince1970 - (double)start.tv_sec - (double)start.tv_usec / 1e6;
-}
-
-// A stack as the pin reads it: its class, then for Twitter's glass stack the top bar and tab bar
-// mode bytes, the style word and the engine's tab bar collapse.
-static NSString* PFBGlassStackState(UINavigationController* stack) {
-    Class stackClass = NSClassFromString(@"XNAVNavigationController");
-    ptrdiff_t offset = PFBGlassAppliedConfigurationOffset();
-    if (!stack) {
-        return @"none";
-    }
-    if (offset < 0 || !stackClass || ![stack isKindOfClass:stackClass]) {
-        return NSStringFromClass([stack class]);
-    }
-    const uint8_t* configuration = (const uint8_t*)(__bridge void*)stack + offset;
-    uintptr_t style = 0;
-    memcpy(&style, configuration + 8, sizeof(style));
-    return [NSString stringWithFormat:@"%@ modes %u/%u, style %lu, collapse %.2f", NSStringFromClass([stack class]),
-                                      configuration[0], configuration[1], (unsigned long)style,
-                                      PFBGlassTabBarCollapse(stack)];
-}
-
-// Twitter's glass stacks showing in a window, each as its top screen and its state; tops gets the
-// top screens alone.
-static NSString* PFBGlassShowingStacks(UIWindow* window, NSString** tops) {
-    Class stackClass = NSClassFromString(@"XNAVNavigationController");
-    NSMutableArray<NSString*>* states = [NSMutableArray array];
-    NSMutableArray<NSString*>* screens = [NSMutableArray array];
-    NSMutableArray<UIViewController*>* queue = [NSMutableArray array];
-    if (window.rootViewController) {
-        [queue addObject:window.rootViewController];
-    }
-    for (NSUInteger i = 0; i < queue.count && i < 200 && states.count < 4; i++) {
-        UIViewController* controller = queue[i];
-        if (stackClass && [controller isKindOfClass:stackClass] && controller.isViewLoaded &&
-            controller.view.window && !controller.view.hidden) {
-            UINavigationController* stack = (UINavigationController*)controller;
-            NSString* top = NSStringFromClass([stack.topViewController class]) ?: @"none";
-            [screens addObject:top];
-            [states addObject:[NSString stringWithFormat:@"%@ on %@", top, PFBGlassStackState(stack)]];
-        }
-        [queue addObjectsFromArray:controller.childViewControllers];
-        if (controller.presentedViewController) {
-            [queue addObject:controller.presentedViewController];
-        }
-    }
-    *tops = screens.count ? [screens componentsJoinedByString:@", "] : @"none";
-    return states.count ? [states componentsJoinedByString:@" | "] : @"none";
-}
-
-// The screen in front of a window: the last one presented, or the top of its stack.
-static UIViewController* PFBGlassFrontScreen(UIWindow* window) {
-    UIViewController* screen = window.rootViewController;
-    while (screen.presentedViewController && !screen.presentedViewController.isBeingDismissed) {
-        screen = screen.presentedViewController;
-    }
-    if ([screen isKindOfClass:[UINavigationController class]]) {
-        screen = ((UINavigationController*)screen).topViewController ?: screen;
-    }
-    return screen;
-}
-
 // Whether nothing above the view hides it.
 static BOOL PFBGlassShowing(UIView* view) {
     for (UIView* level = view; level; level = level.superview) {
@@ -1337,15 +997,13 @@ static BOOL PFBGlassShowing(UIView* view) {
 }
 
 // Always visible keeps the bar full: its glass laid out as the round button, about as wide as tall
-// and far narrower than the bar, fails the option when it still shows so a second later. Each new
-// place it happens is measured: bar shown or hidden, screen in front, last screen scrolled, stacks.
+// and far narrower than the bar, fails the option when it still shows so a second later.
 static void PFBGlassCheckAlwaysVisible(UIView* glass) {
     static BOOL noted;
     static BOOL pending;
-    static NSMutableSet<NSString*>* places;
     CGSize size = glass.bounds.size;
-    if (size.height <= 0.0 || size.width <= 0.0 || size.width > size.height * 1.5 || !glass.window ||
-        !gPFBGlassBarClass) {
+    if (noted || pending || size.height <= 0.0 || size.width <= 0.0 || size.width > size.height * 1.5 ||
+        !glass.window || !gPFBGlassBarClass) {
         return;
     }
     UIView* bar = glass.superview;
@@ -1356,60 +1014,18 @@ static void PFBGlassCheckAlwaysVisible(UIView* glass) {
         ![PFBSettings boolForKey:@"no_tab_bar_hiding"]) {
         return;
     }
-    if (!pending && !noted) {
-        pending = YES;
-        __weak UIView* weakGlass = glass;
-        __weak UIView* weakBar = bar;
-        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, NSEC_PER_SEC), dispatch_get_main_queue(), ^{
-          pending = NO;
-          CGSize later = weakGlass.bounds.size;
-          BOOL collapsed = weakGlass.window && later.height > 0.0 && later.width <= later.height * 1.5;
-          BOOL showing = collapsed && PFBGlassShowing(weakBar);
-          if (showing && [PFBSettings boolForKey:@"no_tab_bar_hiding"]) {
-              noted = YES;
-              PFBCompatNoteFailure(PFBCompat_no_tab_bar_hiding, @"tab bar still collapsed a second later");
-          }
-          PFBCompatMeasure(@"always visible",
-                           [NSString stringWithFormat:@"a second after a collapse: %@",
-                                                      showing ? @"still collapsed" : (collapsed ? @"collapsed, hidden" : @"full")],
-                           10);
-        });
-    }
-    BOOL shown = PFBGlassShowing(bar);
-    UIViewController* scrolled = gPFBGlassScrolled;
-    NSString* tour = PFBCompatTourIsRunning() ? @", during the tour" : @"";
-    NSString* place = [NSString stringWithFormat:@"bar %@%@, front %@, last scrolled %@",
-                                                 shown ? @"showing" : @"hidden",
-                                                 gPFBGlassChromeHidden ? @" by the settings" : @"",
-                                                 NSStringFromClass([PFBGlassFrontScreen(glass.window) class]) ?: @"none",
-                                                 NSStringFromClass([scrolled class]) ?: @"none"];
-    NSString* tops = nil;
-    NSString* stacks = PFBGlassShowingStacks(glass.window, &tops);
-    NSString* key = [NSString stringWithFormat:@"%@%@, %@", place, tour, tops];
-    if (!places) {
-        places = [NSMutableSet set];
-    }
-    if (places.count >= 10 || [places containsObject:key]) {
-        return;
-    }
-    [places addObject:key];
-    static NSDateFormatter* clock;
-    static dispatch_once_t once;
-    dispatch_once(&once, ^{
-      clock = [[NSDateFormatter alloc] init];
-      clock.locale = [NSLocale localeWithLocaleIdentifier:@"en_US_POSIX"];
-      clock.dateFormat = @"HH:mm:ss";
+    pending = YES;
+    __weak UIView* weakGlass = glass;
+    __weak UIView* weakBar = bar;
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, NSEC_PER_SEC), dispatch_get_main_queue(), ^{
+      pending = NO;
+      CGSize later = weakGlass.bounds.size;
+      BOOL collapsed = weakGlass.window && later.height > 0.0 && later.width <= later.height * 1.5;
+      if (collapsed && PFBGlassShowing(weakBar) && [PFBSettings boolForKey:@"no_tab_bar_hiding"]) {
+          noted = YES;
+          PFBCompatNoteFailure(PFBCompat_no_tab_bar_hiding, @"tab bar still collapsed a second later");
+      }
     });
-    NSString* scroll = scrolled ? [NSString stringWithFormat:@" %.1f s before, stack %@",
-                                                             CFAbsoluteTimeGetCurrent() - gPFBGlassScrolledAt,
-                                                             PFBGlassStackState(scrolled.navigationController)]
-                                : @"";
-    NSString* line = [NSString
-        stringWithFormat:@"collapsed at %@ (+%.1f s%@): %@%@; stacks: %@; bar %@, glass %.0f x %.0f",
-                         [clock stringFromDate:[NSDate date]], PFBGlassSinceLaunch(), tour, place, scroll, stacks,
-                         NSStringFromCGRect(CGRectIntegral([bar convertRect:bar.bounds toView:nil])), size.width,
-                         size.height];
-    PFBCompatMeasure(@"always visible", line, 10);
 }
 
 // The settings can be left without their own exit running: a tab switch from a notification
@@ -1453,10 +1069,7 @@ static void PFBGlassCheckAlwaysVisible(UIView* glass) {
     UIGestureRecognizerState state = recognizer.state;
     if (state == UIGestureRecognizerStateBegan) {
         @try {
-            UIViewController* screen = PFBOwningController(recognizer.view);
-            gPFBGlassScrolled = screen;
-            gPFBGlassScrolledAt = CFAbsoluteTimeGetCurrent();
-            PFBGlassPinTabBar(screen.navigationController);
+            PFBGlassPinTabBar(PFBOwningController(recognizer.view).navigationController);
         } @catch (__unused id exception) {
         }
     }
@@ -1551,38 +1164,6 @@ static void PFBGlassCheckAlwaysVisible(UIView* glass) {
         PFBGlassCheckAlwaysVisible((UIView*)self);
         PFBGlassTintBarGlass((UIView*)self);
         PFBGlassPlaceBand((UIView*)self);
-    } @catch (__unused id exception) {
-    }
-}
-
-%end
-
-// Twitter's liquid navigation, which Always visible keeps off: a screen shown in it while the
-// option is on is measured, for the report to name.
-%hook XNAVLiquidNavigationController
-
-- (void)viewDidAppear:(BOOL)animated {
-    %orig;
-    @try {
-        UIViewController* top = ((UINavigationController*)self).topViewController;
-        if ([PFBSettings boolForKey:@"no_tab_bar_hiding"]) {
-            PFBCompatMeasure(@"always visible",
-                             [NSString stringWithFormat:@"liquid navigation in use while on, showing %@",
-                                                        NSStringFromClass([top class]) ?: @"nothing"],
-                             4);
-        }
-    } @catch (__unused id exception) {
-    }
-}
-
-%end
-
-%hook _TtC13XDesignSystem19ScrollEdgeTreatment
-
-- (void)layoutSubviews {
-    %orig;
-    @try {
-        PFBGlassMeasureEdge((UIView*)self);
     } @catch (__unused id exception) {
     }
 }

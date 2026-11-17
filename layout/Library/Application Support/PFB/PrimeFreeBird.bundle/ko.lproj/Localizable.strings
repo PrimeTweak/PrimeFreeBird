@@ -44,14 +44,14 @@
 
 /* ===== APPEARANCE — page ===== */
 "MODERN_SETTINGS_APPEARANCE_TITLE" = "모양";
-"MODERN_SETTINGS_APPEARANCE_SUBTITLE" = "스타일, 글꼴, 색상, 하단 바.";
+"MODERN_SETTINGS_APPEARANCE_SUBTITLE" = "스타일, 글꼴, 색상, 하단 바, 메뉴.";
 
 /* ===== Appearance › Style ===== */
 "APPEARANCE_GROUP_STYLE" = "스타일";
 "INTERFACE_STYLE_TITLE" = "화면 스타일";
 "INTERFACE_STYLE_SUBTITLE" = "표준 모양과 Liquid Glass 디자인 중에서 선택합니다.";
 "GLASS_TOASTS_TITLE" = "유리 토스트";
-"GLASS_TOASTS_DETAIL" = "Twitter 토스트를 상단의 유리 막대로 표시합니다.";
+"GLASS_TOASTS_DETAIL" = "Twitter 토스트를 하단 바와 같은 모습으로 표시합니다.";
 "HIDE_SCROLL_EDGE_BLUR_TITLE" = "부드러운 상단 바";
 "HIDE_SCROLL_EDGE_BLUR_DETAIL" = "선이 있는 단색 띠 대신 상단 바 아래 콘텐츠를 서서히 흐리게 합니다.";
 "CUSTOM_FONTS_TITLE" = "사용자 지정 글꼴";

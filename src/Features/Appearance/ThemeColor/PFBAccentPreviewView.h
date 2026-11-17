@@ -1,4 +1,4 @@
-// A sample of Twitter in the accent color, for the new look's Theme color: a small home screen
+// A sample of Twitter in the accent color, for the new look's Accent page: a small home screen
 // with the bird on top, the For you tab, a Tweet with a link, a mention and a hashtag, then the
 // tab bar beside the compose button.
 

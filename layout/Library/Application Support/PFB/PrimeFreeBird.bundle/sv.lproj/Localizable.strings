@@ -44,14 +44,14 @@
 
 /* ===== APPEARANCE — page ===== */
 "MODERN_SETTINGS_APPEARANCE_TITLE" = "Utseende";
-"MODERN_SETTINGS_APPEARANCE_SUBTITLE" = "Stil, typsnitt, färger och nedre fält.";
+"MODERN_SETTINGS_APPEARANCE_SUBTITLE" = "Stil, typsnitt, färger, nedre fält och meny.";
 
 /* ===== Appearance › Style ===== */
 "APPEARANCE_GROUP_STYLE" = "Stil";
 "INTERFACE_STYLE_TITLE" = "Visuell stil";
 "INTERFACE_STYLE_SUBTITLE" = "Välj mellan Standard-utseendet och Liquid Glass-designen.";
 "GLASS_TOASTS_TITLE" = "Glasnotiser";
-"GLASS_TOASTS_DETAIL" = "Visa Twitters notiser som ett glasfält högst upp.";
+"GLASS_TOASTS_DETAIL" = "Ge Twitters notiser samma utseende som nedre fältet.";
 "HIDE_SCROLL_EDGE_BLUR_TITLE" = "Mjuk toppfält";
 "HIDE_SCROLL_EDGE_BLUR_DETAIL" = "Tona ut innehåll under toppfältet i stället för ett fast band med en linje.";
 "CUSTOM_FONTS_TITLE" = "Anpassade typsnitt";

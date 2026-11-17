@@ -1,5 +1,5 @@
 // The sidebar's items as Twitter's panels: their names and glyphs, the ones shown or hidden from
-// the Sidebar page, and the ones Twitter built when it last rebuilt the sidebar.
+// the Menu page, and the ones Twitter built when it last rebuilt the sidebar.
 
 #import <UIKit/UIKit.h>
 

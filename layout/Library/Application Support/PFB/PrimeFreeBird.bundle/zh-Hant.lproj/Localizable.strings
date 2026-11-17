@@ -44,14 +44,14 @@
 
 /* ===== APPEARANCE — page ===== */
 "MODERN_SETTINGS_APPEARANCE_TITLE" = "外觀";
-"MODERN_SETTINGS_APPEARANCE_SUBTITLE" = "樣式、字體、顏色與底部列。";
+"MODERN_SETTINGS_APPEARANCE_SUBTITLE" = "樣式、字體、顏色、底部列與選單。";
 
 /* ===== Appearance › Style ===== */
 "APPEARANCE_GROUP_STYLE" = "樣式";
 "INTERFACE_STYLE_TITLE" = "視覺樣式";
 "INTERFACE_STYLE_SUBTITLE" = "在標準外觀和 Liquid Glass 設計之間選擇。";
 "GLASS_TOASTS_TITLE" = "玻璃提示";
-"GLASS_TOASTS_DETAIL" = "以頂部的玻璃列顯示 Twitter 的提示。";
+"GLASS_TOASTS_DETAIL" = "讓 Twitter 的提示採用底部列的外觀。";
 "HIDE_SCROLL_EDGE_BLUR_TITLE" = "柔和的頂部列";
 "HIDE_SCROLL_EDGE_BLUR_DETAIL" = "讓頂部列下方的內容漸漸淡出，而不是有線條的實色色帶。";
 "CUSTOM_FONTS_TITLE" = "自訂字體";

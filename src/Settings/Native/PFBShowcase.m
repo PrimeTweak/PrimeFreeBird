@@ -146,22 +146,12 @@ CGRect PFBShowcaseDockFrame(UIView* view) {
     }
     UIView* bar = PFBShowcaseTabBarUnder(view.window);
     CGRect frame = bar ? [bar convertRect:bar.bounds toView:view] : CGRectNull;
-    NSString* from = @"no tab bar";
     if (bar && PFBShowcaseShows(bar)) {
         dock.origin.y = MIN(CGRectGetMinY(dock), CGRectGetMinY(frame) - 12.0 - height);
-        from = @"above the showing tab bar";
     } else if (bar && CGRectGetWidth(frame) > 2 * CGRectGetHeight(frame) && CGRectGetHeight(frame) > 0 &&
                CGRectContainsRect(view.bounds, frame)) {
         dock = frame;
-        from = @"on the hidden tab bar";
-    } else if (bar) {
-        from = @"tab bar collapsed or off the page";
     }
-    PFBCompatMeasure(@"restore bar", [NSString stringWithFormat:@"%@ in a %.0f x %.0f page: %@, tab bar %@", from,
-                                                                CGRectGetWidth(view.bounds), CGRectGetHeight(view.bounds),
-                                                                NSStringFromCGRect(CGRectIntegral(dock)),
-                                                                bar ? NSStringFromCGRect(CGRectIntegral(frame)) : @"none"],
-                     6);
     return dock;
 }
 

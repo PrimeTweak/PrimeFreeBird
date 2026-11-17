@@ -17,9 +17,10 @@
 ## Liquid Glass
 
 - **Liquid Glass, enabled** — the stock app opts out of iOS 26's redesign; this switches it back on, or keeps the flat look.
-- **No blurred edge** — the redesign makes iOS draw a strip under every bar; a switch puts the stock look back.
+- **Soft top bar** — content fades under the top bar instead of a solid band with a line.
 - **Bar icons that match** — the settings gear, the search filters and the muted-words icon take the color of Twitter's own bar icons and keep it.
-- **Glass toasts** — Twitter's toasts show as a glass bar at the top of the screen.
+- **Glass toasts** — Twitter's toasts take the bottom bar's look.
+- **Bottom bar** — labels under the icons, a bar that never shrinks, and a clear bar over a fade.
 
 ## Color theme
 
@@ -49,6 +50,7 @@
 - **Hide topics** — topic Tweets and the "Topics to follow" carousel both go.
 - **Remember Home tab** — Home stays on the tab you last picked instead of going back to For You after 12 hours.
 - **Remember last screen** — after five minutes in another app, you come back to the screen you left, not to Home.
+- **Smooth refresh** — new Tweets fade in after a pull on Home.
 
 ## Media
 
@@ -83,12 +85,15 @@
 
 - **Grouped settings** — every page is split into labeled groups instead of one long list.
 - **Twitter's new settings look** — one switch turns on Twitter's redesigned settings, and PrimeFreeBird's settings follow the same look.
+- **Twitter wording** — the bird is back, animated on Home's pull to refresh, with “Tweet” and “Twitter” instead of “Post” and “X”.
+- **Menu** — choose which items Twitter's side menu shows.
 - **Lock Twitter** — Face ID or the passcode to open the app, with an Unlock button on the lock screen.
 - **Hide notifications** — the × on a notification, or the Tweet's menu, hides it; the eye at the top lists what is hidden.
 - **Clean screenshots** — an on/off switch for Twitter's screenshot detection.
 - **Clean links** — tracking parameters stripped from links you open, copy *or* share, profiles included.
 - **Block web ads** — pages opened in Twitter's in-app browser load without their ads, trackers, cookie banners, and pop-ups.
-- **French localization** — the settings and the new screens are in French, except the swatch names and the Compatibility tools.
+- **Compatibility** — after a Twitter update, a tour of the app checks every option and lists what broke.
+- **16 languages** — the settings, the Compatibility page and its tour, translated from English.
 
 # Build
 

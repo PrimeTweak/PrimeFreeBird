@@ -1,4 +1,4 @@
-// The Sidebar page: its line, the items in the sidebar and the hidden ones as two groups of glass
+// The Menu page: its line, the items in the sidebar and the hidden ones as two groups of glass
 // tiles, and Twitter's Restore to default on a glass bar in the tab bar's place. A tap moves an item
 // to the other group.
 

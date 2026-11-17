@@ -40,14 +40,14 @@
 
 /* ===== APPEARANCE — page ===== */
 "MODERN_SETTINGS_APPEARANCE_TITLE" = "Apparence";
-"MODERN_SETTINGS_APPEARANCE_SUBTITLE" = "Style, polices, couleurs et barre du bas.";
+"MODERN_SETTINGS_APPEARANCE_SUBTITLE" = "Style, polices, couleurs, barre du bas et menu.";
 
 /* ===== Appearance › Style ===== */
 "APPEARANCE_GROUP_STYLE" = "Style";
 "INTERFACE_STYLE_TITLE" = "Style visuel";
 "INTERFACE_STYLE_SUBTITLE" = "Choisissez entre Standard et Liquid Glass.";
 "GLASS_TOASTS_TITLE" = "Toasts en verre";
-"GLASS_TOASTS_DETAIL" = "Affiche les toasts de Twitter en barre de verre, en haut.";
+"GLASS_TOASTS_DETAIL" = "Donne aux toasts de Twitter l’apparence de la barre du bas.";
 "HIDE_SCROLL_EDGE_BLUR_TITLE" = "Barre du haut adoucie";
 "HIDE_SCROLL_EDGE_BLUR_DETAIL" = "Fait passer le contenu en fondu sous la barre du haut, au lieu d’une bande avec une ligne.";
 "CUSTOM_FONTS_TITLE" = "Polices personnalisées";

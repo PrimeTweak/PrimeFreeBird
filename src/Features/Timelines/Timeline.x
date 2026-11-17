@@ -1,4 +1,5 @@
-// Timeline options: content filters, muted words, languages, reading marker, bars, polls.
+// Timeline options: content filters, muted words, languages, reading marker, bars, polls and
+// the Home refresh fade.
 
 #import <QuartzCore/QuartzCore.h>
 
@@ -2083,8 +2084,8 @@ static BOOL PFBRefreshFadeOpen(CFTimeInterval now) {
 }
 
 // Called as Twitter hands Home new sections, before they show. Skipped while the list moves, where a
-// still picture would trail behind it. The report gets the first fades and skips.
-static void PFBRefreshFadeBegin(TFNItemsDataViewController* controller, NSString* via) {
+// still picture would trail behind it.
+static void PFBRefreshFadeBegin(TFNItemsDataViewController* controller) {
     CFTimeInterval now = CACurrentMediaTime();
     if (!PFBRefreshFadeOpen(now) || !PFBReadingIsHomeTimeline(controller)) {
         return;
@@ -2093,11 +2094,7 @@ static void PFBRefreshFadeBegin(TFNItemsDataViewController* controller, NSString
     if (!list.window || !list.superview || objc_getAssociatedObject(list, kPFBRefreshFadeKey)) {
         return;
     }
-    NSString* timing = gPFBRefreshLandedAt > gPFBRefreshPulledAt
-                           ? [NSString stringWithFormat:@"%.2f s after the refresh ended", now - gPFBRefreshLandedAt]
-                           : [NSString stringWithFormat:@"%.2f s into the refresh", now - gPFBRefreshPulledAt];
     if (list.tracking || list.dragging || list.decelerating) {
-        PFBCompatMeasure(@"refresh fade", [NSString stringWithFormat:@"skipped, list moving: %@, %@", via, timing], 6);
         return;
     }
     UIView* still = [list snapshotViewAfterScreenUpdates:NO];
@@ -2108,11 +2105,8 @@ static void PFBRefreshFadeBegin(TFNItemsDataViewController* controller, NSString
     still.userInteractionEnabled = NO;
     [list.superview insertSubview:still aboveSubview:list];
     objc_setAssociatedObject(list, kPFBRefreshFadeKey, still, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-    NSString* topBefore = PFBReadingTopVisibleEntryID(controller);
-    __weak TFNItemsDataViewController* weakController = controller;
     __weak UIScrollView* weakList = list;
     dispatch_async(dispatch_get_main_queue(), ^{
-      NSString* topAfter = PFBReadingTopVisibleEntryID(weakController);
       [UIView animateWithDuration:kPFBRefreshFadeDuration
           delay:0
           options:UIViewAnimationOptionCurveEaseInOut | UIViewAnimationOptionAllowUserInteraction
@@ -2126,11 +2120,6 @@ static void PFBRefreshFadeBegin(TFNItemsDataViewController* controller, NSString
                 objc_setAssociatedObject(laterList, kPFBRefreshFadeKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
             }
           }];
-      BOOL changed = topBefore && topAfter ? ![topBefore isEqualToString:topAfter] : topBefore != topAfter;
-      PFBCompatMeasure(@"refresh fade",
-                       [NSString stringWithFormat:@"faded: %@, %@; top Tweet %@ by the next pass", via, timing,
-                                                  changed ? @"changed" : @"unchanged"],
-                       6);
       PFBCOMPAT_ACTION(PFBCompat_refresh_fade, @"new Tweets faded in");
     });
 }
@@ -2157,7 +2146,6 @@ static void PFBRefreshFadeBegin(TFNItemsDataViewController* controller, NSString
 %hook TFNItemsDataViewController
 
 - (void)setSections:(NSArray*)sections restoreScrollPosition:(BOOL)restoreScrollPosition {
-    PFBRefreshFadeBegin(self, @"setSections:restoreScrollPosition:");
     BOOL keepPlace = restoreScrollPosition;
     NSArray* filtered = FilteredTimelineSections(self, sections);
     if (PFBReadingIsHomeTimeline(self)) {
@@ -2185,7 +2173,6 @@ static void PFBRefreshFadeBegin(TFNItemsDataViewController* controller, NSString
     reconfigureItemIdentifiers:(NSArray*)identifiers
               withRowAnimation:(long long)animation
                     completion:(id)completion {
-    PFBRefreshFadeBegin(self, @"updateSections:reconfigureItemIdentifiers:withRowAnimation:completion:");
     NSArray* filtered = FilteredTimelineSections(self, sections);
     if (PFBReadingMarkerAllowed(self)) {
         PFBReadingCaptureAnchor(self, filtered);
@@ -2194,13 +2181,9 @@ static void PFBRefreshFadeBegin(TFNItemsDataViewController* controller, NSString
     PFBReadingRescanSoon(self);
 }
 
+// Home's pull to refresh hands its new Tweets here, as measured on 12.44.
 - (void)setSections:(NSArray*)sections {
-    PFBRefreshFadeBegin(self, @"setSections:");
-    %orig;
-}
-
-- (void)updateSections:(NSArray*)sections withRowAnimation:(long long)animation completion:(id)completion {
-    PFBRefreshFadeBegin(self, @"updateSections:withRowAnimation:completion:");
+    PFBRefreshFadeBegin(self);
     %orig;
 }
 

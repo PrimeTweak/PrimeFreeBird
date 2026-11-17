@@ -44,14 +44,14 @@
 
 /* ===== APPEARANCE — page ===== */
 "MODERN_SETTINGS_APPEARANCE_TITLE" = "Aussehen";
-"MODERN_SETTINGS_APPEARANCE_SUBTITLE" = "Stil, Schriftarten, Farben und untere Leiste.";
+"MODERN_SETTINGS_APPEARANCE_SUBTITLE" = "Stil, Schriftarten, Farben, untere Leiste und Menü.";
 
 /* ===== Appearance › Style ===== */
 "APPEARANCE_GROUP_STYLE" = "Stil";
 "INTERFACE_STYLE_TITLE" = "Darstellung";
 "INTERFACE_STYLE_SUBTITLE" = "Wähle zwischen dem Standard-Look und dem Liquid-Glass-Design.";
 "GLASS_TOASTS_TITLE" = "Glas-Toasts";
-"GLASS_TOASTS_DETAIL" = "Zeigt die Toasts von Twitter als Glasleiste oben an.";
+"GLASS_TOASTS_DETAIL" = "Gibt den Toasts von Twitter das Aussehen der unteren Leiste.";
 "HIDE_SCROLL_EDGE_BLUR_TITLE" = "Weiche obere Leiste";
 "HIDE_SCROLL_EDGE_BLUR_DETAIL" = "Blendet Inhalte unter der oberen Leiste weich aus statt mit fester Fläche und Linie.";
 "CUSTOM_FONTS_TITLE" = "Benutzerdefinierte Schriftarten";

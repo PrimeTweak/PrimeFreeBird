@@ -44,14 +44,14 @@
 
 /* ===== APPEARANCE — page ===== */
 "MODERN_SETTINGS_APPEARANCE_TITLE" = "外観";
-"MODERN_SETTINGS_APPEARANCE_SUBTITLE" = "スタイル、フォント、カラー、下部バー。";
+"MODERN_SETTINGS_APPEARANCE_SUBTITLE" = "スタイル、フォント、カラー、下部バー、メニュー。";
 
 /* ===== Appearance › Style ===== */
 "APPEARANCE_GROUP_STYLE" = "スタイル";
 "INTERFACE_STYLE_TITLE" = "表示スタイル";
 "INTERFACE_STYLE_SUBTITLE" = "標準の見た目とLiquid Glassデザインから選びます。";
 "GLASS_TOASTS_TITLE" = "ガラスのトースト";
-"GLASS_TOASTS_DETAIL" = "Twitterのトーストを上部のガラスバーで表示します。";
+"GLASS_TOASTS_DETAIL" = "Twitterのトーストを下部バーと同じ見た目にします。";
 "HIDE_SCROLL_EDGE_BLUR_TITLE" = "やわらかいトップバー";
 "HIDE_SCROLL_EDGE_BLUR_DETAIL" = "線のある帯の代わりに、トップバーの下のコンテンツをふんわり消します。";
 "CUSTOM_FONTS_TITLE" = "カスタムフォント";

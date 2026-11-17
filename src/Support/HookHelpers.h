@@ -37,7 +37,7 @@ void PFBMarkEmptiedModuleChrome(NSArray* items, NSMutableIndexSet* removed);
 // Live square-avatar restyling (Avatars.x)
 void PFBApplySquareAvatarsSetting(void);
 
-// Custom theme color re-apply (Theme.x)
+// The chosen accent applied again (Theme.x)
 void PFBApplySelectedThemeColor(void);
 
 // Pushes the accent through Twitter's palette again, so the surfaces that follow it

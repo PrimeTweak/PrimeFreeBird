@@ -44,14 +44,14 @@
 
 /* ===== APPEARANCE — page ===== */
 "MODERN_SETTINGS_APPEARANCE_TITLE" = "Görünüm";
-"MODERN_SETTINGS_APPEARANCE_SUBTITLE" = "Stil, yazı tipleri, renkler ve alt çubuk.";
+"MODERN_SETTINGS_APPEARANCE_SUBTITLE" = "Stil, yazı tipleri, renkler, alt çubuk ve menü.";
 
 /* ===== Appearance › Style ===== */
 "APPEARANCE_GROUP_STYLE" = "Stil";
 "INTERFACE_STYLE_TITLE" = "Görsel stil";
 "INTERFACE_STYLE_SUBTITLE" = "Standart görünüm ile Liquid Glass tasarımı arasında seç.";
 "GLASS_TOASTS_TITLE" = "Cam bildirimler";
-"GLASS_TOASTS_DETAIL" = "Twitter bildirimlerini üstte cam bir çubuk olarak göster.";
+"GLASS_TOASTS_DETAIL" = "Twitter bildirimlerine alt çubuğun görünümünü ver.";
 "HIDE_SCROLL_EDGE_BLUR_TITLE" = "Yumuşak üst çubuk";
 "HIDE_SCROLL_EDGE_BLUR_DETAIL" = "Üst çubuğun altındaki içeriği çizgili düz bir bant yerine soldur.";
 "CUSTOM_FONTS_TITLE" = "Özel yazı tipleri";

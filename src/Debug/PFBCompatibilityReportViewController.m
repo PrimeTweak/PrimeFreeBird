@@ -108,17 +108,32 @@ static PFBReportRow* PFBReportRowMake(PFBReportRowKind kind, NSString* title, NS
     return row;
 }
 
+// A not tested option's line on the page, which already says the option is not seen yet: its reason
+// and what was seen before, without "during the check", "not seen yet" or a path note with none seen.
+static NSString* PFBReportNotTestedLine(NSString* detail, NSString* evidence) {
+    NSMutableArray<NSString*>* parts = [NSMutableArray array];
+    NSString* reason = [detail stringByReplacingOccurrencesOfString:@" during the check" withString:@""];
+    if (reason.length) {
+        [parts addObject:reason];
+    }
+    for (NSString* part in [evidence componentsSeparatedByString:@" \u00b7 "]) {
+        if (part.length && ![part isEqualToString:@"not seen yet"] && ![part hasPrefix:@"paths 0/"]) {
+            [parts addObject:part];
+        }
+    }
+    return parts.count ? [parts componentsJoinedByString:@" \u00b7 "] : nil;
+}
+
 // An option with a problem carries its reason under its name, and Off when it is off; a
-// working option shows its state on the right. A not tested one adds what was seen before,
-// as the copied report does.
+// working option shows its state on the right. A not tested one adds what was seen before.
 static PFBReportRow* PFBReportOptionRow(PFBCompatResult* result) {
     BOOL working = result.verdict == PFBCompatVerdictOK;
     NSString* off = PFBReportText(@"COMPAT_STATE_OFF");
     NSString* state = result.enabled ? PFBReportText(result.alwaysOn ? @"COMPAT_STATE_ALWAYS_ON" : @"COMPAT_STATE_ON") : off;
     NSString* value = result.internal ? nil : (working ? state : (result.enabled ? nil : off));
     NSString* detail = (!working || result.internal) ? result.detail : nil;
-    if (result.verdict == PFBCompatVerdictNotTested && result.evidence.length) {
-        detail = detail.length ? [NSString stringWithFormat:@"%@ \u00b7 %@", detail, result.evidence] : result.evidence;
+    if (result.verdict == PFBCompatVerdictNotTested) {
+        detail = PFBReportNotTestedLine(detail, result.evidence);
     }
     return PFBReportRowMake(PFBReportRowOption, result.title, value, detail);
 }

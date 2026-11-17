@@ -44,14 +44,14 @@
 
 /* ===== APPEARANCE — page ===== */
 "MODERN_SETTINGS_APPEARANCE_TITLE" = "Tampilan";
-"MODERN_SETTINGS_APPEARANCE_SUBTITLE" = "Gaya, font, warna, dan bilah bawah.";
+"MODERN_SETTINGS_APPEARANCE_SUBTITLE" = "Gaya, font, warna, bilah bawah, dan menu.";
 
 /* ===== Appearance › Style ===== */
 "APPEARANCE_GROUP_STYLE" = "Gaya";
 "INTERFACE_STYLE_TITLE" = "Gaya visual";
 "INTERFACE_STYLE_SUBTITLE" = "Pilih antara tampilan Standar dan desain Liquid Glass.";
 "GLASS_TOASTS_TITLE" = "Toast kaca";
-"GLASS_TOASTS_DETAIL" = "Tampilkan toast Twitter sebagai bilah kaca di atas.";
+"GLASS_TOASTS_DETAIL" = "Beri toast Twitter tampilan bilah bawah.";
 "HIDE_SCROLL_EDGE_BLUR_TITLE" = "Bilah atas lembut";
 "HIDE_SCROLL_EDGE_BLUR_DETAIL" = "Pudarkan konten di bawah bilah atas, bukan pita padat dengan garis.";
 "CUSTOM_FONTS_TITLE" = "Font khusus";

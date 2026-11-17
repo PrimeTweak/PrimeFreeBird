@@ -44,14 +44,14 @@
 
 /* ===== APPEARANCE — page ===== */
 "MODERN_SETTINGS_APPEARANCE_TITLE" = "Зовнішній вигляд";
-"MODERN_SETTINGS_APPEARANCE_SUBTITLE" = "Стиль, шрифти, кольори та нижня панель.";
+"MODERN_SETTINGS_APPEARANCE_SUBTITLE" = "Стиль, шрифти, кольори, нижня панель і меню.";
 
 /* ===== Appearance › Style ===== */
 "APPEARANCE_GROUP_STYLE" = "Стиль";
 "INTERFACE_STYLE_TITLE" = "Візуальний стиль";
 "INTERFACE_STYLE_SUBTITLE" = "Виберіть стандартний вигляд або дизайн Liquid Glass.";
 "GLASS_TOASTS_TITLE" = "Скляні сповіщення";
-"GLASS_TOASTS_DETAIL" = "Показувати сповіщення Twitter скляною панеллю вгорі.";
+"GLASS_TOASTS_DETAIL" = "Надати сповіщенням Twitter вигляд нижньої панелі.";
 "HIDE_SCROLL_EDGE_BLUR_TITLE" = "М’яка верхня панель";
 "HIDE_SCROLL_EDGE_BLUR_DETAIL" = "Плавно приховує вміст під верхньою панеллю замість суцільної смуги з лінією.";
 "CUSTOM_FONTS_TITLE" = "Власні шрифти";

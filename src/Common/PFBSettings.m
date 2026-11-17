@@ -43,8 +43,8 @@ static NSDictionary<NSString*, NSDictionary*>* PFBSettingsPages(void) {
                         @"subtitleDefault": @"x.com"
                     },
                     @{@"key": @"strip_url_tracking", @"default": @YES},
-                    @{@"key": @"always_open_safari", @"default": @NO},
                     @{@"key": @"new_inapp_webview", @"default": @YES},
+                    @{@"key": @"always_open_safari", @"default": @NO},
                     @{@"key": @"block_web_ads", @"default": @YES, @"disabledWhen": @"always_open_safari"}
                 ]
             },
@@ -135,9 +135,7 @@ static NSDictionary<NSString*, NSDictionary*>* PFBSettingsPages(void) {
                       @"default": @NO},
                     @{@"key": @"no_tab_bar_hiding", @"default": @YES},
                     @{@"key": @"show_bottom_fade", @"default": @NO},
-                    @{@"type": @"header",
-                      @"titleKey": @"APPEARANCE_GROUP_SIDEBAR",
-                      @"icon": @"column_split_stroke"},
+                    @{@"type": @"header", @"titleKey": @"APPEARANCE_GROUP_SIDEBAR"},
                     @{
                         @"titleKey": @"CUSTOM_SIDEBAR_OPTION_TITLE",
                         @"subtitleKey": @"CUSTOM_SIDEBAR_OPTION_SUBTITLE",

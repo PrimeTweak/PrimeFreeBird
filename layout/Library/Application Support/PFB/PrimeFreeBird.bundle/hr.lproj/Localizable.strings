@@ -44,14 +44,14 @@
 
 /* ===== APPEARANCE — page ===== */
 "MODERN_SETTINGS_APPEARANCE_TITLE" = "Izgled";
-"MODERN_SETTINGS_APPEARANCE_SUBTITLE" = "Stil, fontovi, boje i donja traka.";
+"MODERN_SETTINGS_APPEARANCE_SUBTITLE" = "Stil, fontovi, boje, donja traka i izbornik.";
 
 /* ===== Appearance › Style ===== */
 "APPEARANCE_GROUP_STYLE" = "Stil";
 "INTERFACE_STYLE_TITLE" = "Vizualni stil";
 "INTERFACE_STYLE_SUBTITLE" = "Odaberi između standardnog izgleda i dizajna Liquid Glass.";
 "GLASS_TOASTS_TITLE" = "Staklene obavijesti";
-"GLASS_TOASTS_DETAIL" = "Prikaži Twitterove obavijesti kao staklenu traku na vrhu.";
+"GLASS_TOASTS_DETAIL" = "Daj Twitterovim obavijestima izgled donje trake.";
 "HIDE_SCROLL_EDGE_BLUR_TITLE" = "Meka gornja traka";
 "HIDE_SCROLL_EDGE_BLUR_DETAIL" = "Postupno zatamni sadržaj ispod gornje trake umjesto pune trake s crtom.";
 "CUSTOM_FONTS_TITLE" = "Prilagođeni fontovi";

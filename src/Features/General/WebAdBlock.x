@@ -16,7 +16,6 @@ static PFBWebAdReports* gPFBWebAdReports;
 static BOOL gPFBWebAdLoading;
 static const void* kPFBWebAdViewKey = &kPFBWebAdViewKey;
 static const void* kPFBWebAdControllerKey = &kPFBWebAdControllerKey;
-static const void* kPFBWebAdBlockedKey = &kPFBWebAdBlockedKey;
 static NSString* const kPFBWebAdHandler = @"pfbWebAds";
 static const NSUInteger kPFBWebAdHasScript = 1;
 static const NSUInteger kPFBWebAdHasLists = 2;
@@ -164,90 +163,6 @@ static void pfbWebAdsLoad(void) {
     });
 }
 
-// The loads the lists block on a page, kept on its web view until the engine reports the page.
-static void pfbWebAdsBlocked(__unused id delegate, __unused SEL command, WKWebView* webView, NSString* identifier,
-                             id action, NSURL* url) {
-    if ([action respondsToSelector:NSSelectorFromString(@"blockedLoad")] && ![[action valueForKey:@"blockedLoad"] boolValue]) {
-        return;
-    }
-    if (![webView isKindOfClass:[WKWebView class]] || ![identifier hasPrefix:@"PFBWebAds."]) {
-        return;
-    }
-    NSMutableDictionary* page = objc_getAssociatedObject(webView, kPFBWebAdBlockedKey);
-    if (!page) {
-        page = [@{@"lists": [NSCountedSet set], @"urls": [NSMutableOrderedSet orderedSet]} mutableCopy];
-        objc_setAssociatedObject(webView, kPFBWebAdBlockedKey, page, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-    }
-    NSString* list = [[identifier pathExtension] length] ? [identifier.stringByDeletingPathExtension pathExtension] : identifier;
-    [page[@"lists"] addObject:list.length ? list : identifier];
-    NSString* address = [(url.host ?: @"") stringByAppendingString:url.path ?: @""];
-    NSMutableOrderedSet* urls = page[@"urls"];
-    if (urls.count < 6 && address.length) {
-        [urls addObject:[address substringToIndex:MIN(address.length, (NSUInteger)70)]];
-    }
-}
-
-// WebKit asks a navigation delegate once, when it is set, whether it hears of blocked loads.
-static void pfbWebAdsWatch(id delegate) {
-    SEL heard = NSSelectorFromString(@"_webView:contentRuleListWithIdentifier:performedAction:forURL:");
-    if ([delegate respondsToSelector:heard]) {
-        return;
-    }
-    if (class_addMethod([delegate class], heard, (IMP)pfbWebAdsBlocked, "v@:@@@@")) {
-        PFBCOMPAT_OBSERVE(PFBCompat_block_web_ads, @"blocked loads followed on %@", NSStringFromClass([delegate class]));
-    }
-}
-
-static NSInteger pfbWebAdsNumber(NSDictionary* body, NSString* key) {
-    return [body[key] isKindOfClass:[NSNumber class]] ? [body[key] integerValue] : 0;
-}
-
-static NSString* pfbWebAdsPageLine(NSString* host, NSDictionary* body, WKWebView* webView, BOOL listed) {
-    NSMutableArray<NSString*>* parts = [NSMutableArray array];
-    if (!listed) {
-        [parts addObject:@"block lists not on this page"];
-    }
-    [parts addObject:[NSString stringWithFormat:@"%ld page rules", (long)pfbWebAdsNumber(body, @"rules")]];
-    NSCountedSet* scripts = [NSCountedSet set];
-    for (id name in [body[@"scripts"] isKindOfClass:[NSArray class]] ? body[@"scripts"] : @[]) {
-        if ([name isKindOfClass:[NSString class]]) {
-            [scripts addObject:name];
-        }
-    }
-    NSMutableArray<NSString*>* names = [NSMutableArray array];
-    for (NSString* name in [scripts.allObjects sortedArrayUsingSelector:@selector(compare:)]) {
-        NSUInteger count = [scripts countForObject:name];
-        [names addObject:count > 1 ? [NSString stringWithFormat:@"%@ x%lu", name, (unsigned long)count] : name];
-    }
-    if (names.count) {
-        [parts addObject:[@"scripts " stringByAppendingString:[names componentsJoinedByString:@", "]]];
-    }
-    for (NSString* key in @[@"hidden", @"removed", @"styled", @"csp"]) {
-        NSInteger value = pfbWebAdsNumber(body, key);
-        if (value) {
-            [parts addObject:[NSString stringWithFormat:@"%@ %ld", key, (long)value]];
-        }
-    }
-    NSDictionary* page = webView ? objc_getAssociatedObject(webView, kPFBWebAdBlockedKey) : nil;
-    NSCountedSet* lists = page[@"lists"];
-    if (lists.count) {
-        NSUInteger total = 0;
-        NSMutableArray<NSString*>* byList = [NSMutableArray array];
-        for (NSString* list in [lists.allObjects sortedArrayUsingSelector:@selector(compare:)]) {
-            total += [lists countForObject:list];
-            [byList addObject:[NSString stringWithFormat:@"%@ x%lu", list, (unsigned long)[lists countForObject:list]]];
-        }
-        [parts addObject:[NSString stringWithFormat:@"blocked %lu (%@): %@", (unsigned long)total,
-                                                    [byList componentsJoinedByString:@", "],
-                                                    [[page[@"urls"] array] componentsJoinedByString:@", "]]];
-        objc_setAssociatedObject(webView, kPFBWebAdBlockedKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-    }
-    if ([body[@"locked"] isEqual:@YES]) {
-        [parts addObject:@"scroll locked"];
-    }
-    return [NSString stringWithFormat:@"%@: %@", host, [parts componentsJoinedByString:@"; "]];
-}
-
 @implementation PFBWebAdReports
 
 // A page's report, and a frame's only when it has errors; both come from the page's own world.
@@ -274,7 +189,6 @@ static NSString* pfbWebAdsPageLine(NSString* host, NSDictionary* body, WKWebView
     } else {
         PFBCOMPAT_OBSERVE(PFBCompat_block_web_ads, @"page engine ran, block lists not on the page");
     }
-    PFBCompatMeasure(@"web pages", pfbWebAdsPageLine(host, body, message.webView, listed), 30);
 }
 
 @end
@@ -298,13 +212,6 @@ static NSString* pfbWebAdsPageLine(NSString* host, NSDictionary* body, WKWebView
         objc_setAssociatedObject(view, kPFBWebAdViewKey, @(attached), OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     }
     return view;
-}
-
-- (void)setNavigationDelegate:(id<WKNavigationDelegate>)delegate {
-    if (delegate && pfbWebAdsWanted()) {
-        pfbWebAdsWatch(delegate);
-    }
-    %orig;
 }
 
 - (WKNavigation*)loadRequest:(NSURLRequest*)request {

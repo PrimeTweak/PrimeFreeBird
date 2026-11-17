@@ -610,7 +610,7 @@ static NSNumber* FeatureSwitchOverrideValueForKey(NSString* key) {
         }
     }
 
-    // Follow as set on the Sidebar page: its builder reads no tab list, only this ceiling on the
+    // Follow as set on the Menu page: its builder reads no tab list, only this ceiling on the
     // accounts followed, read for the drawer alone; under 1, no Follow item.
     if ([key isEqualToString:@"ios_dash_connect_max_followings_count"]) {
         BOOL shown = ![PFBSidebarItems isHidden:22];
@@ -618,7 +618,7 @@ static NSNumber* FeatureSwitchOverrideValueForKey(NSString* key) {
         return shown ? @1000000000 : @0;
     }
 
-    // Business shown on the Sidebar page: its drawer item and Twitter's other reader of this
+    // Business shown on the Menu page: its drawer item and Twitter's other reader of this
     // switch, isBusinessPromoNavEnabled, both see it on.
     if ([key isEqualToString:@"premium_business_ios_nav_promo_enabled"] && ![PFBSidebarItems isHidden:21]) {
         PFBCOMPAT_ACTION(PFBCompat_customize_sidebar, @"Business shown");
@@ -754,13 +754,13 @@ static NSNumber* FeatureSwitchOverrideValueForKey(NSString* key) {
         return @NO;
     }
 
-    // Creator Studio shown on the Sidebar page; Twitter reads this switch for the drawer alone.
+    // Creator Studio shown on the Menu page; Twitter reads this switch for the drawer alone.
     if ([key isEqualToString:@"creator_studio_nav_enabled"] && ![PFBSidebarItems isHidden:12]) {
         PFBCOMPAT_ACTION(PFBCompat_customize_sidebar, @"Creator Studio shown");
         return @YES;
     }
 
-    // Analytics shown on the Sidebar page; Twitter reads this switch for the drawer alone.
+    // Analytics shown on the Menu page; Twitter reads this switch for the drawer alone.
     if ([key isEqualToString:@"dash_items_account_analytics_enabled"] && [PFBSidebarItems showsAnalytics]) {
         return @YES;
     }
@@ -1073,7 +1073,7 @@ static BOOL pfbSkipsSensitiveWarnings(void) {
     return %orig;
 }
 
-// Analytics shown on the Sidebar page: Twitter shows it only to an account that is not Premium,
+// Analytics shown on the Menu page: Twitter shows it only to an account that is not Premium,
 // so its own check, and no other, finds the account not Premium.
 - (BOOL)isPremiumTierUser {
     if ([PFBSidebarItems isAnalyticsPremiumCheck:__builtin_return_address(0)]) {
@@ -1381,7 +1381,7 @@ static BOOL PFBDashAnswerApplies(BOOL glassNavigation) {
 
 %end
 
-// The sidebar's rebuild names each of some items once it keeps it: the Sidebar page offers
+// The sidebar's rebuild names each of some items once it keeps it: the Menu page offers
 // those, and an item hidden from it must not be named.
 %hook T1PanelIdentity
 
@@ -1395,7 +1395,7 @@ static BOOL PFBDashAnswerApplies(BOOL glassNavigation) {
 %end
 
 // The tab bar's panels as the drawer reads them, with Grok's shortcut and the items hidden
-// from the Sidebar page.
+// from the Menu page.
 static NSArray* PFBDashPanelIDs(NSArray* panelIDs) {
     if (![panelIDs isKindOfClass:[NSArray class]]) {
         return panelIDs;
@@ -1547,23 +1547,10 @@ static const char* kPFBGrokPillHiddenKey = "pfbGrokPillHidden";
 // MARK: - Sensitive media warnings
 
 // Twitter's sensitive box over a whole Tweet: for a possibly sensitive Tweet with media, Twitter
-// answers yes without the account gate above, which only covers a warning the author added. The
-// first Tweets shown in full are noted for the report.
-static BOOL pfbShowsSensitiveTweet(id model, BOOL sensitive) {
-    static NSUInteger noted;
+// answers yes without the account gate above, which only covers a warning the author added.
+static BOOL pfbShowsSensitiveTweet(BOOL sensitive) {
     PFBCompatReach(PFBCompatPath_sensitive_box);
-    if (!sensitive || !pfbSkipsSensitiveWarnings()) {
-        return NO;
-    }
-    if (noted < 3) {
-        noted++;
-        BOOL flagged = [model respondsToSelector:@selector(hasSensitiveMediaWarningsFlaggedByAuthor)] &&
-                       ((BOOL (*)(id, SEL))objc_msgSend)(model, @selector(hasSensitiveMediaWarningsFlaggedByAuthor));
-        PFBCompatMeasure(@"warnings", [NSString stringWithFormat:@"sensitive box left off a %@ Tweet (author's warning %@)",
-                                                                 NSStringFromClass([model class]), flagged ? @"yes" : @"no"],
-                         3);
-    }
-    return YES;
+    return sensitive && pfbSkipsSensitiveWarnings();
 }
 
 %hook TFNTwitterStatus
@@ -1591,7 +1578,7 @@ static BOOL pfbShowsSensitiveTweet(id model, BOOL sensitive) {
 
 - (BOOL)isPossiblySensitiveViewModelForAccount:(id)account {
     BOOL sensitive = %orig;
-    return pfbShowsSensitiveTweet(self, sensitive) ? NO : sensitive;
+    return pfbShowsSensitiveTweet(sensitive) ? NO : sensitive;
 }
 
 %end
@@ -1600,13 +1587,12 @@ static BOOL pfbShowsSensitiveTweet(id model, BOOL sensitive) {
 
 - (BOOL)isPossiblySensitiveViewModelForAccount:(id)account {
     BOOL sensitive = %orig;
-    return pfbShowsSensitiveTweet(self, sensitive) ? NO : sensitive;
+    return pfbShowsSensitiveTweet(sensitive) ? NO : sensitive;
 }
 
 %end
 
-// Twitter's box, still drawn with the option on, is noted once for the report with the views
-// around it.
+// Twitter's box still drawn with the option on: the report gets it once, with the views around it.
 %hook T1StatusSensitiveContentView
 
 - (void)layoutSubviews {

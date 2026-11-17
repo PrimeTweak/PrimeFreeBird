@@ -203,24 +203,33 @@ static void PFBRestoreNativeTabSelection(id controller) {
 
 %end
 
-%hook T1TabCustomizationViewController
-
-// Twitter titles its editor with a view holding the title and the account under it; opened from
-// the new look, the page takes its row's title alone, drawn as the new look draws its titles.
-- (void)viewDidLoad {
-    %orig;
-    PFBPrepareNativeTabSave(self);
-    UIViewController* editor = (UIViewController*)self;
+// Opened from the new look, Twitter's editor takes its row's title alone, drawn as the new look draws
+// its titles. Twitter's own title, with or without its account line, gives way to it.
+static void PFBTitleTabEditorAlone(UIViewController* editor) {
     if (![PFBCustomTabBarUtility editorShowsTitleAlone:editor]) {
         return;
     }
     NSString* title = [[PFBBundle sharedBundle] localizedStringForKey:@"CUSTOM_TAB_BAR_SETTINGS_NAVIGATION_TITLE"];
-    if (editor.navigationItem.titleView && title.length) {
-        PFBShowcaseSetTitle(editor, title);
-        PFBCOMPAT_ACTION(PFBCompat_custom_tab_bar, @"tab editor titled as its row");
-    } else {
-        PFBCOMPAT_OBSERVE(PFBCompat_custom_tab_bar, @"tab editor had no title to show alone");
+    UIView* shown = editor.navigationItem.titleView;
+    if (!title.length || ([shown isKindOfClass:[UILabel class]] && [((UILabel*)shown).text isEqualToString:title])) {
+        return;
     }
+    PFBShowcaseSetTitle(editor, title);
+    PFBCOMPAT_ACTION(PFBCompat_custom_tab_bar, @"tab editor titled as its row");
+}
+
+%hook T1TabCustomizationViewController
+
+- (void)viewDidLoad {
+    %orig;
+    PFBPrepareNativeTabSave(self);
+    PFBTitleTabEditorAlone((UIViewController*)self);
+}
+
+// The row asks for the title once the editor exists, which can be after Twitter loaded the page.
+- (void)viewWillAppear:(BOOL)animated {
+    %orig;
+    PFBTitleTabEditorAlone((UIViewController*)self);
 }
 
 - (void)didPressSaveButton {

@@ -44,14 +44,14 @@
 
 /* ===== APPEARANCE — page ===== */
 "MODERN_SETTINGS_APPEARANCE_TITLE" = "Apariencia";
-"MODERN_SETTINGS_APPEARANCE_SUBTITLE" = "Estilo, fuentes, colores y barra inferior.";
+"MODERN_SETTINGS_APPEARANCE_SUBTITLE" = "Estilo, fuentes, colores, barra inferior y menú.";
 
 /* ===== Appearance › Style ===== */
 "APPEARANCE_GROUP_STYLE" = "Estilo";
 "INTERFACE_STYLE_TITLE" = "Estilo visual";
 "INTERFACE_STYLE_SUBTITLE" = "Elige entre el aspecto Estándar y el diseño Liquid Glass.";
 "GLASS_TOASTS_TITLE" = "Avisos de cristal";
-"GLASS_TOASTS_DETAIL" = "Muestra los avisos de Twitter como una barra de cristal arriba.";
+"GLASS_TOASTS_DETAIL" = "Da a los avisos de Twitter el aspecto de la barra inferior.";
 "HIDE_SCROLL_EDGE_BLUR_TITLE" = "Barra superior suave";
 "HIDE_SCROLL_EDGE_BLUR_DETAIL" = "Difumina el contenido bajo la barra superior en lugar de una franja sólida con línea.";
 "CUSTOM_FONTS_TITLE" = "Fuentes personalizadas";

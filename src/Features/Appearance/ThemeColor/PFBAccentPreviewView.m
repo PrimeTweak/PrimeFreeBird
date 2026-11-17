@@ -1,4 +1,4 @@
-// A small home screen of Twitter in the accent color, laid out by hand on the Theme color card.
+// A small home screen of Twitter in the accent color, laid out by hand on the Accent page's card.
 
 #import "Features/Appearance/ThemeColor/PFBAccentPreviewView.h"
 #import "Common/PFBBundle.h"

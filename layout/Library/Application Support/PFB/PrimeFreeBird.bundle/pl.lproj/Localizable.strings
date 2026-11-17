@@ -44,14 +44,14 @@
 
 /* ===== APPEARANCE — page ===== */
 "MODERN_SETTINGS_APPEARANCE_TITLE" = "Wygląd";
-"MODERN_SETTINGS_APPEARANCE_SUBTITLE" = "Styl, czcionki, kolory i dolny pasek.";
+"MODERN_SETTINGS_APPEARANCE_SUBTITLE" = "Styl, czcionki, kolory, dolny pasek i menu.";
 
 /* ===== Appearance › Style ===== */
 "APPEARANCE_GROUP_STYLE" = "Styl";
 "INTERFACE_STYLE_TITLE" = "Styl wizualny";
 "INTERFACE_STYLE_SUBTITLE" = "Wybierz wygląd Standardowy lub projekt Liquid Glass.";
 "GLASS_TOASTS_TITLE" = "Szklane powiadomienia";
-"GLASS_TOASTS_DETAIL" = "Pokazuj powiadomienia Twittera jako szklany pasek u góry.";
+"GLASS_TOASTS_DETAIL" = "Nadaj powiadomieniom Twittera wygląd dolnego paska.";
 "HIDE_SCROLL_EDGE_BLUR_TITLE" = "Miękki górny pasek";
 "HIDE_SCROLL_EDGE_BLUR_DETAIL" = "Wygasza treść pod górnym paskiem zamiast pełnego pasa z linią.";
 "CUSTOM_FONTS_TITLE" = "Własne czcionki";

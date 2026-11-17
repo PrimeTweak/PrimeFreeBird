@@ -1,5 +1,5 @@
 // The Appearance page: interface style, fonts, accent color, dark mode style, the tab bar editor
-// and the Sidebar page.
+// and the Menu page.
 
 #import "Settings/Pages/PFBAppearanceSettingsViewController.h"
 #import <objc/message.h>
@@ -121,7 +121,7 @@ static NSInteger PFBInterfaceStyleCurrent(void) {
     [self.navigationController pushViewController:customTabBarVC animated:YES];
 }
 
-// The Sidebar page, titled as the Theme color page is in either look.
+// The Menu page, titled as the Accent page is in either look.
 - (void)showSidebarEditor:(NSDictionary*)sender {
     PFBSidebarViewController* sidebarVC = [[PFBSidebarViewController alloc] init];
     NSString* title = [[PFBBundle sharedBundle] localizedStringForKey:@"SIDEBAR_EDITOR_NAVIGATION_TITLE"];

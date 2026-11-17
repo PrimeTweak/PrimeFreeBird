@@ -46,8 +46,7 @@ function pfbWebAdsEngine(data) {
     };
     const magic = "pfb" + Math.random().toString(36).slice(2, 10);
     const mark = "data-" + magic;
-    const report = { t: window.top === window ? "page" : "frame", host, rules: 0, scripts: [], errors: [],
-        hidden: 0, removed: 0, styled: 0, csp: 0 };
+    const report = { t: window.top === window ? "page" : "frame", host, errors: [] };
     const fail = (what, error) => {
         if (report.errors.length < 6) {
             report.errors.push(String(what).slice(0, 80) + ": " + String((error && error.message) || error).slice(0, 80));
@@ -73,7 +72,6 @@ function pfbWebAdsEngine(data) {
             rules.push(rule.slice(0, -1));
         }
     }
-    report.rules = rules.length;
 
     // Patterns: /regex/flags, or text matched anywhere; an empty one matches everything.
     const pattern = (text) => {
@@ -738,7 +736,6 @@ function pfbWebAdsEngine(data) {
         const name = aliases[rule[1]] || rule[1];
         try {
             scriptlets[name](...rule.slice(2));
-            report.scripts.push(rule[1]);
         } catch (error) {
             fail(rule[1] + "(" + rule.slice(2).join(", ") + ")", error);
         }
@@ -961,16 +958,12 @@ function pfbWebAdsEngine(data) {
         const [action, arg] = rule.action;
         if (action === "remove") {
             node.remove();
-            report.removed++;
         } else if (action === "remove-class") {
             tokensOf(arg).forEach((token) => node.classList.remove(token));
-            report.styled++;
         } else if (action === "style") {
             node.setAttribute(rule.attribute, "");
-            report.styled++;
         } else {
             node.setAttribute(mark, "");
-            report.hidden++;
         }
     };
     const runProcedural = () => {
@@ -1005,7 +998,6 @@ function pfbWebAdsEngine(data) {
                 meta.content = policy;
                 document.head.prepend(meta);
             }
-            report.csp = policies.length;
             return true;
         };
         if (!insert()) {
@@ -1014,36 +1006,12 @@ function pfbWebAdsEngine(data) {
         }
     }
 
-    const scrollLocked = () => {
-        const root = document.scrollingElement || document.documentElement;
-        if (!root || !document.body || root.scrollHeight <= window.innerHeight * 1.2) {
-            return false;
-        }
-        return [document.documentElement, document.body].some((element) => {
-            const style = getComputedStyle(element);
-            return style.overflow === "hidden" || style.overflowY === "hidden" || style.position === "fixed";
-        });
-    };
     let sent = false;
     const send = () => {
         if (sent) {
             return;
         }
         sent = true;
-        try {
-            for (const rule of rules) {
-                if (rule[0] === "css") {
-                    report.hidden += document.querySelectorAll(rule[1]).length;
-                }
-            }
-        } catch (error) {
-            // A selector the page cannot read counts nothing.
-        }
-        try {
-            report.locked = scrollLocked();
-        } catch (error) {
-            report.locked = false;
-        }
         if (report.t === "page" || report.errors.length) {
             post(report);
         }

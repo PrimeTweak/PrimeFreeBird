@@ -44,14 +44,14 @@
 
 /* ===== APPEARANCE — page ===== */
 "MODERN_SETTINGS_APPEARANCE_TITLE" = "المظهر";
-"MODERN_SETTINGS_APPEARANCE_SUBTITLE" = "النمط والخطوط والألوان والشريط السفلي.";
+"MODERN_SETTINGS_APPEARANCE_SUBTITLE" = "النمط والخطوط والألوان والشريط السفلي والقائمة.";
 
 /* ===== Appearance › Style ===== */
 "APPEARANCE_GROUP_STYLE" = "النمط";
 "INTERFACE_STYLE_TITLE" = "النمط المرئي";
 "INTERFACE_STYLE_SUBTITLE" = "اختر بين المظهر القياسي وتصميم Liquid Glass.";
 "GLASS_TOASTS_TITLE" = "إشعارات زجاجية";
-"GLASS_TOASTS_DETAIL" = "عرض إشعارات تويتر كشريط زجاجي في الأعلى.";
+"GLASS_TOASTS_DETAIL" = "منح إشعارات تويتر مظهر الشريط السفلي.";
 "HIDE_SCROLL_EDGE_BLUR_TITLE" = "شريط علوي ناعم";
 "HIDE_SCROLL_EDGE_BLUR_DETAIL" = "تلاشي المحتوى تحت الشريط العلوي بدلًا من شريط صلب بخط.";
 "CUSTOM_FONTS_TITLE" = "خطوط مخصصة";
