@@ -582,9 +582,11 @@
 "HIDDEN_NOTIFS_UNTITLED" = "숨긴 알림";
 "HIDE_NOTIFICATIONS_TITLE" = "알림 숨기기";
 "HIDE_NOTIFICATIONS_DETAIL" = "×로 알림을 숨깁니다. 눈 아이콘에 목록이 있습니다.";
-"ACTIVITY_TAB_TITLE" = "활동 탭";
-"ACTIVITY_TAB_DETAIL" = "멘션을 포함한 모든 알림을 하나의 활동 탭에 표시합니다.";
-"ACTIVITY_TAB_NAME" = "활동";
+"UNIFIED_NOTIFICATIONS_TITLE" = "통합 알림";
+"UNIFIED_NOTIFICATIONS_DETAIL" = "알림과 멘션을 검색할 수 있는 하나의 목록으로 보여줍니다.";
+"NOTIF_SEARCH_PLACEHOLDER" = "알림 검색";
+"NOTIF_SEARCH_EMPTY_TITLE" = "결과 없음";
+"NOTIF_SEARCH_EMPTY_BODY" = "“%@”와(과) 일치하는 알림이 없습니다.";
 "NEW_TWITTER_SETTINGS_TITLE" = "새 트위터 설정";
 "NEW_TWITTER_SETTINGS_DETAIL" = "새로 디자인된 트위터 설정을 쓰고 PrimeFreeBird에도 같은 모양을 적용합니다.";
 "HIDE_TAB_FORYOU_TAB_NAME" = "탐색하기";

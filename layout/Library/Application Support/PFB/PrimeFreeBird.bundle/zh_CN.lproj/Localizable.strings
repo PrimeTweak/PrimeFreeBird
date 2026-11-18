@@ -582,9 +582,11 @@
 "HIDDEN_NOTIFS_UNTITLED" = "已隐藏的通知";
 "HIDE_NOTIFICATIONS_TITLE" = "隐藏通知";
 "HIDE_NOTIFICATIONS_DETAIL" = "用 × 隐藏通知。眼睛会列出它们。";
-"ACTIVITY_TAB_TITLE" = "动态标签";
-"ACTIVITY_TAB_DETAIL" = "在单个动态标签中显示所有通知，包括提及。";
-"ACTIVITY_TAB_NAME" = "动态";
+"UNIFIED_NOTIFICATIONS_TITLE" = "合并通知";
+"UNIFIED_NOTIFICATIONS_DETAIL" = "通知与提及合并为一个可搜索的列表。";
+"NOTIF_SEARCH_PLACEHOLDER" = "搜索通知";
+"NOTIF_SEARCH_EMPTY_TITLE" = "没有结果";
+"NOTIF_SEARCH_EMPTY_BODY" = "这里没有符合“%@”的通知。";
 "NEW_TWITTER_SETTINGS_TITLE" = "新版 Twitter 设置";
 "NEW_TWITTER_SETTINGS_DETAIL" = "使用 Twitter 重新设计的设置，并让 PrimeFreeBird 采用相同外观。";
 "HIDE_TAB_FORYOU_TAB_NAME" = "探索";

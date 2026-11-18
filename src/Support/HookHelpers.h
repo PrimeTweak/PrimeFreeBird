@@ -141,6 +141,12 @@ BOOL PFBNotifControllerOnNotificationsScreen(UIViewController* controller);
 BOOL PFBNotifViewOnNotificationsScreen(UIView* view);
 BOOL PFBNotifHideTweet(id status, UIView* source, UIViewController* screen);
 
+// The hidden-notifications empty panel, for other notices on a notifications list
+// (HiddenNotifications.x): made with its texts, given new ones, and put under the list's bars.
+UIView* PFBNotifEmptyPanel(NSString* title, NSString* body);
+void PFBNotifSetEmptyPanelText(UIView* panel, NSString* title, NSString* body);
+void PFBNotifPlaceEmptyPanel(UIView* panel, UITableView* table);
+
 // The color of the icons added to the top bars, resolved to a fixed color for the traits.
 UIColor* PFBBarIconColor(UITraitCollection* traits);
 

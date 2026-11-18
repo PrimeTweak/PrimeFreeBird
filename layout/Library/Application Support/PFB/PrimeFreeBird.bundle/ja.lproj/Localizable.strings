@@ -582,9 +582,11 @@
 "HIDDEN_NOTIFS_UNTITLED" = "非表示の通知";
 "HIDE_NOTIFICATIONS_TITLE" = "通知を非表示";
 "HIDE_NOTIFICATIONS_DETAIL" = "通知は×で非表示にできます。目のアイコンで一覧を表示します。";
-"ACTIVITY_TAB_TITLE" = "アクティビティタブ";
-"ACTIVITY_TAB_DETAIL" = "すべての通知を1つのアクティビティタブに表示します。";
-"ACTIVITY_TAB_NAME" = "アクティビティ";
+"UNIFIED_NOTIFICATIONS_TITLE" = "通知をまとめる";
+"UNIFIED_NOTIFICATIONS_DETAIL" = "通知とメンションを、検索できる1つのリストにまとめます。";
+"NOTIF_SEARCH_PLACEHOLDER" = "通知を検索";
+"NOTIF_SEARCH_EMPTY_TITLE" = "結果なし";
+"NOTIF_SEARCH_EMPTY_BODY" = "「%@」に一致する通知はありません。";
 "NEW_TWITTER_SETTINGS_TITLE" = "新しいTwitterの設定";
 "NEW_TWITTER_SETTINGS_DETAIL" = "リニューアルされたTwitterの設定を使い、PrimeFreeBirdも同じ見た目にします。";
 "HIDE_TAB_FORYOU_TAB_NAME" = "話題を検索";

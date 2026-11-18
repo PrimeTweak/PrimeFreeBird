@@ -582,9 +582,11 @@
 "HIDDEN_NOTIFS_UNTITLED" = "Gizli bildirim";
 "HIDE_NOTIFICATIONS_TITLE" = "Bildirimleri gizle";
 "HIDE_NOTIFICATIONS_DETAIL" = "Bir bildirimi ×’iyle gizle. Göz onları listeler.";
-"ACTIVITY_TAB_TITLE" = "Etkinlik sekmesi";
-"ACTIVITY_TAB_DETAIL" = "Bahsetmeler dahil tüm bildirimler tek bir Etkinlik sekmesinde.";
-"ACTIVITY_TAB_NAME" = "Etkinlik";
+"UNIFIED_NOTIFICATIONS_TITLE" = "Birleşik bildirimler";
+"UNIFIED_NOTIFICATIONS_DETAIL" = "Bildirimler ve bahsetmeler, aranabilir tek bir listede.";
+"NOTIF_SEARCH_PLACEHOLDER" = "Bildirimlerde ara";
+"NOTIF_SEARCH_EMPTY_TITLE" = "Sonuç yok";
+"NOTIF_SEARCH_EMPTY_BODY" = "Burada “%@” ile eşleşen bildirim yok.";
 "NEW_TWITTER_SETTINGS_TITLE" = "Yeni Twitter ayarları";
 "NEW_TWITTER_SETTINGS_DETAIL" = "Twitter’ın yeniden tasarlanan ayarlarını kullan ve PrimeFreeBird’e aynı görünümü ver.";
 "HIDE_TAB_FORYOU_TAB_NAME" = "Keşfet";

@@ -582,9 +582,11 @@
 "HIDDEN_NOTIFS_UNTITLED" = "Приховане сповіщення";
 "HIDE_NOTIFICATIONS_TITLE" = "Приховувати сповіщення";
 "HIDE_NOTIFICATIONS_DETAIL" = "Приховайте сповіщення його ×. Око показує їх список.";
-"ACTIVITY_TAB_TITLE" = "Вкладка «Активність»";
-"ACTIVITY_TAB_DETAIL" = "Одна вкладка «Активність» з усіма сповіщеннями, включно зі згадками.";
-"ACTIVITY_TAB_NAME" = "Активність";
+"UNIFIED_NOTIFICATIONS_TITLE" = "Єдині сповіщення";
+"UNIFIED_NOTIFICATIONS_DETAIL" = "Сповіщення та згадки в одному списку з пошуком.";
+"NOTIF_SEARCH_PLACEHOLDER" = "Пошук у сповіщеннях";
+"NOTIF_SEARCH_EMPTY_TITLE" = "Нічого не знайдено";
+"NOTIF_SEARCH_EMPTY_BODY" = "Тут немає сповіщень зі словами «%@».";
 "NEW_TWITTER_SETTINGS_TITLE" = "Нові налаштування Twitter";
 "NEW_TWITTER_SETTINGS_DETAIL" = "Використовує оновлені налаштування Twitter і надає PrimeFreeBird такого ж вигляду.";
 "HIDE_TAB_FORYOU_TAB_NAME" = "Огляд";

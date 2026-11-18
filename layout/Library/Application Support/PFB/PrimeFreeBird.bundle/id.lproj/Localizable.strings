@@ -582,9 +582,11 @@
 "HIDDEN_NOTIFS_UNTITLED" = "Notifikasi tersembunyi";
 "HIDE_NOTIFICATIONS_TITLE" = "Sembunyikan notifikasi";
 "HIDE_NOTIFICATIONS_DETAIL" = "Sembunyikan notifikasi dengan ×-nya. Ikon mata mencantumkannya.";
-"ACTIVITY_TAB_TITLE" = "Tab Aktivitas";
-"ACTIVITY_TAB_DETAIL" = "Satu tab Aktivitas berisi semua notifikasi, termasuk sebutan.";
-"ACTIVITY_TAB_NAME" = "Aktivitas";
+"UNIFIED_NOTIFICATIONS_TITLE" = "Notifikasi terpadu";
+"UNIFIED_NOTIFICATIONS_DETAIL" = "Notifikasi dan sebutan dalam satu daftar yang bisa dicari.";
+"NOTIF_SEARCH_PLACEHOLDER" = "Cari notifikasi";
+"NOTIF_SEARCH_EMPTY_TITLE" = "Tidak ada hasil";
+"NOTIF_SEARCH_EMPTY_BODY" = "Tidak ada notifikasi di sini yang cocok dengan “%@”.";
 "NEW_TWITTER_SETTINGS_TITLE" = "Pengaturan Twitter baru";
 "NEW_TWITTER_SETTINGS_DETAIL" = "Pakai pengaturan Twitter yang didesain ulang dan beri PrimeFreeBird tampilan yang sama.";
 "HIDE_TAB_FORYOU_TAB_NAME" = "Jelajahi";

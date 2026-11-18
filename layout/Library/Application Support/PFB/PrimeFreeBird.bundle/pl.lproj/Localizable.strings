@@ -582,9 +582,11 @@
 "HIDDEN_NOTIFS_UNTITLED" = "Ukryte powiadomienie";
 "HIDE_NOTIFICATIONS_TITLE" = "Ukryj powiadomienia";
 "HIDE_NOTIFICATIONS_DETAIL" = "Ukryj powiadomienie jego ×. Oko je wymienia.";
-"ACTIVITY_TAB_TITLE" = "Karta Aktywność";
-"ACTIVITY_TAB_DETAIL" = "Jedna karta Aktywność ze wszystkimi powiadomieniami, także wzmiankami.";
-"ACTIVITY_TAB_NAME" = "Aktywność";
+"UNIFIED_NOTIFICATIONS_TITLE" = "Ujednolicone powiadomienia";
+"UNIFIED_NOTIFICATIONS_DETAIL" = "Powiadomienia i wzmianki na jednej liście, którą można przeszukać.";
+"NOTIF_SEARCH_PLACEHOLDER" = "Szukaj w powiadomieniach";
+"NOTIF_SEARCH_EMPTY_TITLE" = "Brak wyników";
+"NOTIF_SEARCH_EMPTY_BODY" = "Żadne powiadomienie tutaj nie zawiera „%@”.";
 "NEW_TWITTER_SETTINGS_TITLE" = "Nowe ustawienia Twittera";
 "NEW_TWITTER_SETTINGS_DETAIL" = "Używa przeprojektowanych ustawień Twittera i nadaje PrimeFreeBird ten sam wygląd.";
 "HIDE_TAB_FORYOU_TAB_NAME" = "Eksploruj";

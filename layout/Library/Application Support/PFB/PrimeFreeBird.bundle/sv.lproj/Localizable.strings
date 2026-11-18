@@ -582,9 +582,11 @@
 "HIDDEN_NOTIFS_UNTITLED" = "Dold avisering";
 "HIDE_NOTIFICATIONS_TITLE" = "Dölj aviseringar";
 "HIDE_NOTIFICATIONS_DETAIL" = "Dölj en avisering med dess ×. Ögat listar dem.";
-"ACTIVITY_TAB_TITLE" = "Fliken Aktivitet";
-"ACTIVITY_TAB_DETAIL" = "En flik Aktivitet med alla aviseringar, omnämnanden inräknade.";
-"ACTIVITY_TAB_NAME" = "Aktivitet";
+"UNIFIED_NOTIFICATIONS_TITLE" = "Samlade aviseringar";
+"UNIFIED_NOTIFICATIONS_DETAIL" = "Aviseringar och omnämnanden i en lista som går att söka i.";
+"NOTIF_SEARCH_PLACEHOLDER" = "Sök i aviseringar";
+"NOTIF_SEARCH_EMPTY_TITLE" = "Inga resultat";
+"NOTIF_SEARCH_EMPTY_BODY" = "Ingen avisering här matchar ”%@”.";
 "NEW_TWITTER_SETTINGS_TITLE" = "Nya Twitter-inställningar";
 "NEW_TWITTER_SETTINGS_DETAIL" = "Använd Twitters omgjorda inställningar och ge PrimeFreeBird samma utseende.";
 "HIDE_TAB_FORYOU_TAB_NAME" = "Utforska";

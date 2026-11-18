@@ -829,6 +829,46 @@ static void PFBNotifLayoutEmptyPanel(UIView* panel, UITableView* table) {
 
 %end
 
+// Twitter's empty-state face for a notifications list: a heavy title over a gray line.
+UIView* PFBNotifEmptyPanel(NSString* titleText, NSString* bodyText) {
+    UIView* panel = [[UIView alloc] init];
+    panel.userInteractionEnabled = NO;    // never blocks a pull-to-refresh
+    panel.autoresizingMask = UIViewAutoresizingFlexibleWidth;
+    UILabel* title = [[UILabel alloc] init];
+    title.tag = kPFBNotifEmptyTitleTag;
+    title.font = PFBNotifEmptyFont(kPFBNotifEmptyTitleSize, YES);
+    title.textColor = [UIColor labelColor];
+    title.textAlignment = NSTextAlignmentNatural;
+    title.numberOfLines = 0;
+    [panel addSubview:title];
+    UILabel* body = [[UILabel alloc] init];
+    body.tag = kPFBNotifEmptyBodyTag;
+    body.font = PFBNotifEmptyFont(kPFBNotifEmptyBodySize, NO);
+    body.textColor = PFBNotifDetailColor();
+    body.textAlignment = NSTextAlignmentNatural;
+    body.numberOfLines = 0;
+    [panel addSubview:body];
+    PFBNotifSetEmptyPanelText(panel, titleText, bodyText);
+    return panel;
+}
+
+void PFBNotifSetEmptyPanelText(UIView* panel, NSString* title, NSString* body) {
+    ((UILabel*)[panel viewWithTag:kPFBNotifEmptyTitleTag]).text = title;
+    ((UILabel*)[panel viewWithTag:kPFBNotifEmptyBodyTag]).text = body;
+}
+
+// Behind the list's rows, under its bars, where the list's layout passes keep it.
+void PFBNotifPlaceEmptyPanel(UIView* panel, UITableView* table) {
+    if (panel.superview != PFBNotifPanelHost(table)) {
+        [PFBNotifPanelHost(table) addSubview:panel];
+        objc_setAssociatedObject(table, kPFBNotifRestInsetKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        PFBNotifPanelRef* ref = [[PFBNotifPanelRef alloc] init];
+        ref.panel = panel;
+        objc_setAssociatedObject(table, kPFBNotifPanelKey, ref, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    }
+    PFBNotifLayoutEmptyPanel(panel, table);
+}
+
 static void PFBNotifSyncEmptyState(id dataViewController) {
     if (!dataViewController) {
         return;
@@ -915,40 +955,15 @@ static void PFBNotifSyncEmptyState(id dataViewController) {
             return;
         }
 
-        UIView* panel = [[UIView alloc] init];
+        PFBBundle* bundle = [PFBBundle sharedBundle];
+        UIView* panel = PFBNotifEmptyPanel([bundle localizedStringForKey:@"HIDDEN_NOTIFS_EMPTY_TITLE"],
+                                           [bundle localizedStringForKey:@"HIDDEN_NOTIFS_EMPTY_BODY"]);
         panel.tag = kPFBNotifEmptyTag;
-        panel.userInteractionEnabled = NO;    // never blocks a pull-to-refresh
-        panel.autoresizingMask = UIViewAutoresizingFlexibleWidth;
-
-        UILabel* title = [[UILabel alloc] init];
-        title.tag = kPFBNotifEmptyTitleTag;
-        title.text = [[PFBBundle sharedBundle]
-                         localizedStringForKey:@"HIDDEN_NOTIFS_EMPTY_TITLE"];
-        title.font = PFBNotifEmptyFont(kPFBNotifEmptyTitleSize, YES);
-        title.textColor = [UIColor labelColor];
-        title.textAlignment = NSTextAlignmentNatural;
-        title.numberOfLines = 0;
-        [panel addSubview:title];
-
-        UILabel* body = [[UILabel alloc] init];
-        body.tag = kPFBNotifEmptyBodyTag;
-        body.text = [[PFBBundle sharedBundle]
-                        localizedStringForKey:@"HIDDEN_NOTIFS_EMPTY_BODY"];
-        body.font = PFBNotifEmptyFont(kPFBNotifEmptyBodySize, NO);
-        body.textColor = PFBNotifDetailColor();
-        body.textAlignment = NSTextAlignmentNatural;
-        body.numberOfLines = 0;
-        [panel addSubview:body];
 
         // Faded in rather than popped, and timed to land as the last row finishes
         // sliding out, so the two read as one motion instead of a flash.
         panel.alpha = 0.0;
-        [PFBNotifPanelHost(table) addSubview:panel];
-        objc_setAssociatedObject(table, kPFBNotifRestInsetKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-        PFBNotifPanelRef* ref = [[PFBNotifPanelRef alloc] init];
-        ref.panel = panel;
-        objc_setAssociatedObject(table, kPFBNotifPanelKey, ref, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-        PFBNotifLayoutEmptyPanel(panel, table);
+        PFBNotifPlaceEmptyPanel(panel, table);
         [UIView animateWithDuration:0.3
                               delay:0.15
                             options:UIViewAnimationOptionCurveEaseOut

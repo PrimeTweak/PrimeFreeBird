@@ -582,9 +582,11 @@
 "HIDDEN_NOTIFS_UNTITLED" = "Hidden notification";
 "HIDE_NOTIFICATIONS_TITLE" = "Hide notifications";
 "HIDE_NOTIFICATIONS_DETAIL" = "Hide a notification with its ×. The eye lists them.";
-"ACTIVITY_TAB_TITLE" = "Activity tab";
-"ACTIVITY_TAB_DETAIL" = "One Activity tab with every notification, mentions included.";
-"ACTIVITY_TAB_NAME" = "Activity";
+"UNIFIED_NOTIFICATIONS_TITLE" = "Unified notifications";
+"UNIFIED_NOTIFICATIONS_DETAIL" = "All and Mentions in one list you can search.";
+"NOTIF_SEARCH_PLACEHOLDER" = "Search notifications";
+"NOTIF_SEARCH_EMPTY_TITLE" = "No results";
+"NOTIF_SEARCH_EMPTY_BODY" = "No notification here matches “%@”.";
 "NEW_TWITTER_SETTINGS_TITLE" = "New Twitter settings";
 "NEW_TWITTER_SETTINGS_DETAIL" = "Use Twitter’s redesigned settings and give PrimeFreeBird the same look.";
 "HIDE_TAB_FORYOU_TAB_NAME" = "Explore";

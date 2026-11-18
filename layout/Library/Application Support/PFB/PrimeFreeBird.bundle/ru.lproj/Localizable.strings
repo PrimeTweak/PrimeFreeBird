@@ -582,9 +582,11 @@
 "HIDDEN_NOTIFS_UNTITLED" = "Скрытое уведомление";
 "HIDE_NOTIFICATIONS_TITLE" = "Скрывать уведомления";
 "HIDE_NOTIFICATIONS_DETAIL" = "Скройте уведомление его ×. Глаз показывает их список.";
-"ACTIVITY_TAB_TITLE" = "Вкладка «Активность»";
-"ACTIVITY_TAB_DETAIL" = "Одна вкладка «Активность» со всеми уведомлениями, включая упоминания.";
-"ACTIVITY_TAB_NAME" = "Активность";
+"UNIFIED_NOTIFICATIONS_TITLE" = "Единые уведомления";
+"UNIFIED_NOTIFICATIONS_DETAIL" = "Уведомления и упоминания в одном списке с поиском.";
+"NOTIF_SEARCH_PLACEHOLDER" = "Поиск по уведомлениям";
+"NOTIF_SEARCH_EMPTY_TITLE" = "Ничего не найдено";
+"NOTIF_SEARCH_EMPTY_BODY" = "Здесь нет уведомлений со словами «%@».";
 "NEW_TWITTER_SETTINGS_TITLE" = "Новые настройки Twitter";
 "NEW_TWITTER_SETTINGS_DETAIL" = "Использует обновлённые настройки Twitter и придаёт PrimeFreeBird тот же вид.";
 "HIDE_TAB_FORYOU_TAB_NAME" = "Обзор";

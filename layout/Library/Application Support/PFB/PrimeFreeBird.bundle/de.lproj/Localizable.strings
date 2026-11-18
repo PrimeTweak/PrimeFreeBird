@@ -582,9 +582,11 @@
 "HIDDEN_NOTIFS_UNTITLED" = "Ausgeblendete Mitteilung";
 "HIDE_NOTIFICATIONS_TITLE" = "Mitteilungen ausblenden";
 "HIDE_NOTIFICATIONS_DETAIL" = "Blende eine Mitteilung mit ihrem × aus. Das Auge listet sie auf.";
-"ACTIVITY_TAB_TITLE" = "Tab „Aktivität“";
-"ACTIVITY_TAB_DETAIL" = "Ein Tab „Aktivität“ mit allen Mitteilungen, Erwähnungen inklusive.";
-"ACTIVITY_TAB_NAME" = "Aktivität";
+"UNIFIED_NOTIFICATIONS_TITLE" = "Einheitliche Mitteilungen";
+"UNIFIED_NOTIFICATIONS_DETAIL" = "Mitteilungen und Erwähnungen in einer durchsuchbaren Liste.";
+"NOTIF_SEARCH_PLACEHOLDER" = "Mitteilungen durchsuchen";
+"NOTIF_SEARCH_EMPTY_TITLE" = "Keine Ergebnisse";
+"NOTIF_SEARCH_EMPTY_BODY" = "Keine Mitteilung hier enthält „%@“.";
 "NEW_TWITTER_SETTINGS_TITLE" = "Neue Twitter-Einstellungen";
 "NEW_TWITTER_SETTINGS_DETAIL" = "Nutzt die neu gestalteten Einstellungen von Twitter und gibt PrimeFreeBird denselben Look.";
 "HIDE_TAB_FORYOU_TAB_NAME" = "Entdecken";
