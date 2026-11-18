@@ -108,6 +108,8 @@
 "RESTORE_TWEET_BUTTON_TITLE" = "Класична кнопка твіта";
 "RESTORE_TWEET_BUTTON_DETAIL" = "Показує перо на кольоровому колі.";
 "RESTORE_TWEET_BUTTON_DETAIL_HELD" = "Не потрібно, поки кнопку твіта приховано.";
+"CLASSIC_REFRESH_TITLE" = "Класичне оновлення";
+"CLASSIC_REFRESH_DETAIL" = "Логотип лишається нерухомим, а коли ви тягнете для оновлення, повертається круг, що обертається.";
 
 /* ===== TIMELINES ===== */
 "MODERN_SETTINGS_TIMELINES_TITLE" = "Стрічки";
@@ -580,6 +582,9 @@
 "HIDDEN_NOTIFS_UNTITLED" = "Приховане сповіщення";
 "HIDE_NOTIFICATIONS_TITLE" = "Приховувати сповіщення";
 "HIDE_NOTIFICATIONS_DETAIL" = "Приховайте сповіщення його ×. Око показує їх список.";
+"ACTIVITY_TAB_TITLE" = "Вкладка «Активність»";
+"ACTIVITY_TAB_DETAIL" = "Одна вкладка «Активність» з усіма сповіщеннями, включно зі згадками.";
+"ACTIVITY_TAB_NAME" = "Активність";
 "NEW_TWITTER_SETTINGS_TITLE" = "Нові налаштування Twitter";
 "NEW_TWITTER_SETTINGS_DETAIL" = "Використовує оновлені налаштування Twitter і надає PrimeFreeBird такого ж вигляду.";
 "HIDE_TAB_FORYOU_TAB_NAME" = "Огляд";
@@ -749,6 +754,8 @@
 "CONFIRM_FOLLOW_ACTION" = "Відстежувати";
 "HIDE_NEW_TWEETS_PILL_TITLE" = "Приховати кнопку нових твітів";
 "HIDE_NEW_TWEETS_PILL_DETAIL" = "Прибирає кнопку, що повідомляє про нові твіти вгорі стрічки.";
+"REFRESH_FADE_TITLE" = "Плавне оновлення";
+"REFRESH_FADE_DETAIL" = "Плавно показує нові твіти, коли ви тягнете для оновлення.";
 "REFRESH_PILL_LABEL_DETAIL_HELD" = "Не потрібно, поки кнопку нових твітів приховано.";
 
 /* ===== COMPATIBILITY: behaviors with no toggle ===== */
@@ -760,7 +767,6 @@
 "EXPAND_TCO_LINKS_TITLE" = "Повні посилання";
 "REMOVE_RELATED_TWEETS_TITLE" = "Приховати пов’язані твіти";
 "KEEP_READING_POSITION_TITLE" = "Зберігати місце під час перезавантаження";
-"REFRESH_FADE_TITLE" = "Плавне оновлення";
 "CLASSIC_TWEET_DETAIL_TITLE" = "Класична сторінка твіта";
 "WEB_LOGIN_TITLE" = "Вебвхід";
 "SETTINGS_ENTRY_TITLE" = "PrimeFreeBird у Параметрах";

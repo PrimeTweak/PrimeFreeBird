@@ -108,6 +108,8 @@
 "RESTORE_TWEET_BUTTON_TITLE" = "زر التغريد الكلاسيكي";
 "RESTORE_TWEET_BUTTON_DETAIL" = "إظهار الريشة على دائرة ملونة.";
 "RESTORE_TWEET_BUTTON_DETAIL_HELD" = "غير مطلوب ما دام زر التغريد مخفيًا.";
+"CLASSIC_REFRESH_TITLE" = "تحديث كلاسيكي";
+"CLASSIC_REFRESH_DETAIL" = "إبقاء الشعار ثابتًا وإعادة الدائرة الدوارة عند السحب للتحديث.";
 
 /* ===== TIMELINES ===== */
 "MODERN_SETTINGS_TIMELINES_TITLE" = "الخطوط الزمنية";
@@ -580,6 +582,9 @@
 "HIDDEN_NOTIFS_UNTITLED" = "إشعار مخفي";
 "HIDE_NOTIFICATIONS_TITLE" = "إخفاء الإشعارات";
 "HIDE_NOTIFICATIONS_DETAIL" = "أخفِ إشعارًا بعلامة ×. تعرضها العين.";
+"ACTIVITY_TAB_TITLE" = "تبويب النشاط";
+"ACTIVITY_TAB_DETAIL" = "تبويب نشاط واحد يضم كل الإشعارات، بما فيها الإشارات.";
+"ACTIVITY_TAB_NAME" = "النشاط";
 "NEW_TWITTER_SETTINGS_TITLE" = "إعدادات تويتر الجديدة";
 "NEW_TWITTER_SETTINGS_DETAIL" = "استخدام إعدادات تويتر المعاد تصميمها ومنح PrimeFreeBird المظهر نفسه.";
 "HIDE_TAB_FORYOU_TAB_NAME" = "استكشاف";
@@ -749,6 +754,8 @@
 "CONFIRM_FOLLOW_ACTION" = "متابعة";
 "HIDE_NEW_TWEETS_PILL_TITLE" = "إخفاء زر التغريدات الجديدة";
 "HIDE_NEW_TWEETS_PILL_DETAIL" = "إزالة الزر الذي يعلن عن تغريدات جديدة في أعلى خطك الزمني.";
+"REFRESH_FADE_TITLE" = "تحديث سلس";
+"REFRESH_FADE_DETAIL" = "إظهار التغريدات الجديدة تدريجيًا عند السحب للتحديث.";
 "REFRESH_PILL_LABEL_DETAIL_HELD" = "غير مطلوب ما دام زر التغريدات الجديدة مخفيًا.";
 
 /* ===== COMPATIBILITY: behaviors with no toggle ===== */
@@ -760,7 +767,6 @@
 "EXPAND_TCO_LINKS_TITLE" = "روابط كاملة";
 "REMOVE_RELATED_TWEETS_TITLE" = "إخفاء التغريدات ذات الصلة";
 "KEEP_READING_POSITION_TITLE" = "الاحتفاظ بمكانك عند إعادة التحميل";
-"REFRESH_FADE_TITLE" = "تحديث سلس";
 "CLASSIC_TWEET_DETAIL_TITLE" = "صفحة التغريدة الكلاسيكية";
 "WEB_LOGIN_TITLE" = "تسجيل الدخول عبر الويب";
 "SETTINGS_ENTRY_TITLE" = "PrimeFreeBird في الإعدادات";

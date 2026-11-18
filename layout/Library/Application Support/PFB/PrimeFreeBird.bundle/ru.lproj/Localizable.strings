@@ -108,6 +108,8 @@
 "RESTORE_TWEET_BUTTON_TITLE" = "Классическая кнопка твита";
 "RESTORE_TWEET_BUTTON_DETAIL" = "Показывает перо на цветном круге.";
 "RESTORE_TWEET_BUTTON_DETAIL_HELD" = "Не нужно, пока кнопка твита скрыта.";
+"CLASSIC_REFRESH_TITLE" = "Классическое обновление";
+"CLASSIC_REFRESH_DETAIL" = "Логотип остаётся неподвижным, а когда вы тянете для обновления, возвращается вращающийся круг.";
 
 /* ===== TIMELINES ===== */
 "MODERN_SETTINGS_TIMELINES_TITLE" = "Ленты";
@@ -580,6 +582,9 @@
 "HIDDEN_NOTIFS_UNTITLED" = "Скрытое уведомление";
 "HIDE_NOTIFICATIONS_TITLE" = "Скрывать уведомления";
 "HIDE_NOTIFICATIONS_DETAIL" = "Скройте уведомление его ×. Глаз показывает их список.";
+"ACTIVITY_TAB_TITLE" = "Вкладка «Активность»";
+"ACTIVITY_TAB_DETAIL" = "Одна вкладка «Активность» со всеми уведомлениями, включая упоминания.";
+"ACTIVITY_TAB_NAME" = "Активность";
 "NEW_TWITTER_SETTINGS_TITLE" = "Новые настройки Twitter";
 "NEW_TWITTER_SETTINGS_DETAIL" = "Использует обновлённые настройки Twitter и придаёт PrimeFreeBird тот же вид.";
 "HIDE_TAB_FORYOU_TAB_NAME" = "Обзор";
@@ -749,6 +754,8 @@
 "CONFIRM_FOLLOW_ACTION" = "Читать";
 "HIDE_NEW_TWEETS_PILL_TITLE" = "Скрыть кнопку новых твитов";
 "HIDE_NEW_TWEETS_PILL_DETAIL" = "Убирает кнопку, сообщающую о новых твитах вверху ленты.";
+"REFRESH_FADE_TITLE" = "Плавное обновление";
+"REFRESH_FADE_DETAIL" = "Плавно показывает новые твиты, когда вы тянете для обновления.";
 "REFRESH_PILL_LABEL_DETAIL_HELD" = "Не нужно, пока кнопка новых твитов скрыта.";
 
 /* ===== COMPATIBILITY: behaviors with no toggle ===== */
@@ -760,7 +767,6 @@
 "EXPAND_TCO_LINKS_TITLE" = "Полные ссылки";
 "REMOVE_RELATED_TWEETS_TITLE" = "Скрыть похожие твиты";
 "KEEP_READING_POSITION_TITLE" = "Сохранять место при перезагрузке";
-"REFRESH_FADE_TITLE" = "Плавное обновление";
 "CLASSIC_TWEET_DETAIL_TITLE" = "Классическая страница твита";
 "WEB_LOGIN_TITLE" = "Веб-вход";
 "SETTINGS_ENTRY_TITLE" = "PrimeFreeBird в Настройках";

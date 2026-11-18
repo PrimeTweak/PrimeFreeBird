@@ -104,6 +104,8 @@
 "RESTORE_TWEET_BUTTON_TITLE" = "Bouton Tweet classique";
 "RESTORE_TWEET_BUTTON_DETAIL" = "Affiche la plume sur un cercle coloré.";
 "RESTORE_TWEET_BUTTON_DETAIL_HELD" = "Inutile tant que le bouton Tweet est masqué.";
+"CLASSIC_REFRESH_TITLE" = "Actualisation classique";
+"CLASSIC_REFRESH_DETAIL" = "Garde le logo immobile et ramène le cercle qui tourne quand vous tirez pour actualiser.";
 
 /* ===== TIMELINES ===== */
 "MODERN_SETTINGS_TIMELINES_TITLE" = "Fils";
@@ -576,6 +578,9 @@
 "HIDDEN_NOTIFS_UNTITLED" = "Notification masquée";
 "HIDE_NOTIFICATIONS_TITLE" = "Masquer des notifications";
 "HIDE_NOTIFICATIONS_DETAIL" = "Masquez une notification avec son ×. L’œil les liste.";
+"ACTIVITY_TAB_TITLE" = "Onglet Activité";
+"ACTIVITY_TAB_DETAIL" = "Un seul onglet Activité avec toutes les notifications, mentions comprises.";
+"ACTIVITY_TAB_NAME" = "Activité";
 "NEW_TWITTER_SETTINGS_TITLE" = "Nouveaux réglages Twitter";
 "NEW_TWITTER_SETTINGS_DETAIL" = "Utilise les réglages redessinés de Twitter et donne le même style à PrimeFreeBird.";
 "HIDE_TAB_FORYOU_TAB_NAME" = "Explorer";
@@ -745,6 +750,8 @@
 "CONFIRM_FOLLOW_ACTION" = "Suivre";
 "HIDE_NEW_TWEETS_PILL_TITLE" = "Masquer la pastille des nouveaux Tweets";
 "HIDE_NEW_TWEETS_PILL_DETAIL" = "Retire la pastille qui annonce les nouveaux Tweets en haut de votre fil.";
+"REFRESH_FADE_TITLE" = "Actualisation en douceur";
+"REFRESH_FADE_DETAIL" = "Fait apparaître les nouveaux Tweets en fondu quand vous tirez pour actualiser.";
 "REFRESH_PILL_LABEL_DETAIL_HELD" = "Inutile tant que la pastille des nouveaux Tweets est masquée.";
 
 /* ===== COMPATIBILITY: behaviors with no toggle ===== */
@@ -756,7 +763,6 @@
 "EXPAND_TCO_LINKS_TITLE" = "Liens complets";
 "REMOVE_RELATED_TWEETS_TITLE" = "Masquer les Tweets similaires";
 "KEEP_READING_POSITION_TITLE" = "Garder votre place au rechargement";
-"REFRESH_FADE_TITLE" = "Actualisation en douceur";
 "CLASSIC_TWEET_DETAIL_TITLE" = "Page de Tweet classique";
 "WEB_LOGIN_TITLE" = "Connexion web";
 "SETTINGS_ENTRY_TITLE" = "PrimeFreeBird dans les réglages";

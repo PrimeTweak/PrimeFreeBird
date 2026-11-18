@@ -334,8 +334,7 @@ static NSInteger NearestAccentOption(UIColor* color) {
     [self.paletteCard addSubview:self.colorName];
 
     // Under the cards, how the colors work: a tap shows one in the sample, the last opens any color.
-    PFBColorSwatchControl* wheel = [[PFBColorSwatchControl alloc] initRainbow];
-    wheel.userInteractionEnabled = NO;
+    UIView* wheel = [PFBColorSwatchControl rainbowMarkWithDiameter:18.0];
     wheel.frame = CGRectMake(6.0, 6.0, 18.0, 18.0);
     wheel.autoresizingMask = UIViewAutoresizingFlexibleTopMargin | UIViewAutoresizingFlexibleBottomMargin |
                              UIViewAutoresizingFlexibleLeftMargin | UIViewAutoresizingFlexibleRightMargin;

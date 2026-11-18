@@ -108,6 +108,8 @@
 "RESTORE_TWEET_BUTTON_TITLE" = "Klasik Tweet düğmesi";
 "RESTORE_TWEET_BUTTON_DETAIL" = "Tüyü renkli bir daire üzerinde göster.";
 "RESTORE_TWEET_BUTTON_DETAIL_HELD" = "Tweet düğmesi gizliyken gerekmez.";
+"CLASSIC_REFRESH_TITLE" = "Klasik yenileme";
+"CLASSIC_REFRESH_DETAIL" = "Yenilemek için çektiğinde logo sabit kalsın ve dönen daire geri gelsin.";
 
 /* ===== TIMELINES ===== */
 "MODERN_SETTINGS_TIMELINES_TITLE" = "Zaman akışları";
@@ -580,6 +582,9 @@
 "HIDDEN_NOTIFS_UNTITLED" = "Gizli bildirim";
 "HIDE_NOTIFICATIONS_TITLE" = "Bildirimleri gizle";
 "HIDE_NOTIFICATIONS_DETAIL" = "Bir bildirimi ×’iyle gizle. Göz onları listeler.";
+"ACTIVITY_TAB_TITLE" = "Etkinlik sekmesi";
+"ACTIVITY_TAB_DETAIL" = "Bahsetmeler dahil tüm bildirimler tek bir Etkinlik sekmesinde.";
+"ACTIVITY_TAB_NAME" = "Etkinlik";
 "NEW_TWITTER_SETTINGS_TITLE" = "Yeni Twitter ayarları";
 "NEW_TWITTER_SETTINGS_DETAIL" = "Twitter’ın yeniden tasarlanan ayarlarını kullan ve PrimeFreeBird’e aynı görünümü ver.";
 "HIDE_TAB_FORYOU_TAB_NAME" = "Keşfet";
@@ -749,6 +754,8 @@
 "CONFIRM_FOLLOW_ACTION" = "Takip et";
 "HIDE_NEW_TWEETS_PILL_TITLE" = "Yeni Tweetler düğmesini gizle";
 "HIDE_NEW_TWEETS_PILL_DETAIL" = "Zaman akışının üstünde yeni Tweetleri duyuran düğmeyi kaldır.";
+"REFRESH_FADE_TITLE" = "Yumuşak yenileme";
+"REFRESH_FADE_DETAIL" = "Yenilemek için çektiğinde yeni Tweetleri yumuşakça göster.";
 "REFRESH_PILL_LABEL_DETAIL_HELD" = "Yeni Tweetler düğmesi gizliyken gerekmez.";
 
 /* ===== COMPATIBILITY: behaviors with no toggle ===== */
@@ -760,7 +767,6 @@
 "EXPAND_TCO_LINKS_TITLE" = "Tam bağlantılar";
 "REMOVE_RELATED_TWEETS_TITLE" = "İlgili Tweetleri gizle";
 "KEEP_READING_POSITION_TITLE" = "Yeniden yüklemede yerini koru";
-"REFRESH_FADE_TITLE" = "Yumuşak yenileme";
 "CLASSIC_TWEET_DETAIL_TITLE" = "Klasik Tweet sayfası";
 "WEB_LOGIN_TITLE" = "Web girişi";
 "SETTINGS_ENTRY_TITLE" = "Ayarlar’da PrimeFreeBird";

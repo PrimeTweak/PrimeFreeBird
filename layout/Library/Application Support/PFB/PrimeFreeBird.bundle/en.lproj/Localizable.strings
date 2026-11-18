@@ -108,6 +108,8 @@
 "RESTORE_TWEET_BUTTON_TITLE" = "Classic Tweet button";
 "RESTORE_TWEET_BUTTON_DETAIL" = "Show the feather on a colored circle.";
 "RESTORE_TWEET_BUTTON_DETAIL_HELD" = "Not needed while the Tweet button is hidden.";
+"CLASSIC_REFRESH_TITLE" = "Classic refresh";
+"CLASSIC_REFRESH_DETAIL" = "Keep the logo still and bring back the spinning circle when you pull to refresh.";
 
 /* ===== TIMELINES ===== */
 "MODERN_SETTINGS_TIMELINES_TITLE" = "Timelines";
@@ -580,6 +582,9 @@
 "HIDDEN_NOTIFS_UNTITLED" = "Hidden notification";
 "HIDE_NOTIFICATIONS_TITLE" = "Hide notifications";
 "HIDE_NOTIFICATIONS_DETAIL" = "Hide a notification with its ×. The eye lists them.";
+"ACTIVITY_TAB_TITLE" = "Activity tab";
+"ACTIVITY_TAB_DETAIL" = "One Activity tab with every notification, mentions included.";
+"ACTIVITY_TAB_NAME" = "Activity";
 "NEW_TWITTER_SETTINGS_TITLE" = "New Twitter settings";
 "NEW_TWITTER_SETTINGS_DETAIL" = "Use Twitter’s redesigned settings and give PrimeFreeBird the same look.";
 "HIDE_TAB_FORYOU_TAB_NAME" = "Explore";
@@ -749,6 +754,8 @@
 "CONFIRM_FOLLOW_ACTION" = "Follow";
 "HIDE_NEW_TWEETS_PILL_TITLE" = "Hide new Tweets pill";
 "HIDE_NEW_TWEETS_PILL_DETAIL" = "Remove the pill that announces new Tweets at the top of your timeline.";
+"REFRESH_FADE_TITLE" = "Smooth refresh";
+"REFRESH_FADE_DETAIL" = "Fade new Tweets in after you pull to refresh.";
 "REFRESH_PILL_LABEL_DETAIL_HELD" = "Not needed while the new Tweets pill is hidden.";
 
 /* ===== COMPATIBILITY: behaviors with no toggle ===== */
@@ -760,7 +767,6 @@
 "EXPAND_TCO_LINKS_TITLE" = "Full links";
 "REMOVE_RELATED_TWEETS_TITLE" = "Hide related Tweets";
 "KEEP_READING_POSITION_TITLE" = "Keep your place on reload";
-"REFRESH_FADE_TITLE" = "Smooth refresh";
 "CLASSIC_TWEET_DETAIL_TITLE" = "Classic Tweet page";
 "WEB_LOGIN_TITLE" = "Web login";
 "SETTINGS_ENTRY_TITLE" = "PrimeFreeBird in Settings";

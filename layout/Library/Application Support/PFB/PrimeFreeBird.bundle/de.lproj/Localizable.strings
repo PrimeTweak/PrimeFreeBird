@@ -108,6 +108,8 @@
 "RESTORE_TWEET_BUTTON_TITLE" = "Klassischer Tweet-Button";
 "RESTORE_TWEET_BUTTON_DETAIL" = "Zeigt die Feder auf einem farbigen Kreis.";
 "RESTORE_TWEET_BUTTON_DETAIL_HELD" = "Nicht nötig, solange der Tweet-Button ausgeblendet ist.";
+"CLASSIC_REFRESH_TITLE" = "Klassisches Aktualisieren";
+"CLASSIC_REFRESH_DETAIL" = "Lässt das Logo stillstehen und bringt den drehenden Kreis zurück, wenn du zum Aktualisieren ziehst.";
 
 /* ===== TIMELINES ===== */
 "MODERN_SETTINGS_TIMELINES_TITLE" = "Timelines";
@@ -580,6 +582,9 @@
 "HIDDEN_NOTIFS_UNTITLED" = "Ausgeblendete Mitteilung";
 "HIDE_NOTIFICATIONS_TITLE" = "Mitteilungen ausblenden";
 "HIDE_NOTIFICATIONS_DETAIL" = "Blende eine Mitteilung mit ihrem × aus. Das Auge listet sie auf.";
+"ACTIVITY_TAB_TITLE" = "Tab „Aktivität“";
+"ACTIVITY_TAB_DETAIL" = "Ein Tab „Aktivität“ mit allen Mitteilungen, Erwähnungen inklusive.";
+"ACTIVITY_TAB_NAME" = "Aktivität";
 "NEW_TWITTER_SETTINGS_TITLE" = "Neue Twitter-Einstellungen";
 "NEW_TWITTER_SETTINGS_DETAIL" = "Nutzt die neu gestalteten Einstellungen von Twitter und gibt PrimeFreeBird denselben Look.";
 "HIDE_TAB_FORYOU_TAB_NAME" = "Entdecken";
@@ -749,6 +754,8 @@
 "CONFIRM_FOLLOW_ACTION" = "Folgen";
 "HIDE_NEW_TWEETS_PILL_TITLE" = "Hinweis auf neue Tweets ausblenden";
 "HIDE_NEW_TWEETS_PILL_DETAIL" = "Entfernt den Hinweis auf neue Tweets oben in deiner Timeline.";
+"REFRESH_FADE_TITLE" = "Sanftes Aktualisieren";
+"REFRESH_FADE_DETAIL" = "Blendet neue Tweets weich ein, wenn du zum Aktualisieren ziehst.";
 "REFRESH_PILL_LABEL_DETAIL_HELD" = "Nicht nötig, solange der Hinweis auf neue Tweets ausgeblendet ist.";
 
 /* ===== COMPATIBILITY: behaviors with no toggle ===== */
@@ -760,7 +767,6 @@
 "EXPAND_TCO_LINKS_TITLE" = "Vollständige Links";
 "REMOVE_RELATED_TWEETS_TITLE" = "Ähnliche Tweets ausblenden";
 "KEEP_READING_POSITION_TITLE" = "Position beim Neuladen behalten";
-"REFRESH_FADE_TITLE" = "Sanftes Aktualisieren";
 "CLASSIC_TWEET_DETAIL_TITLE" = "Klassische Tweet-Seite";
 "WEB_LOGIN_TITLE" = "Web-Anmeldung";
 "SETTINGS_ENTRY_TITLE" = "PrimeFreeBird in den Einstellungen";

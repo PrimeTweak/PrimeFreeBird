@@ -108,6 +108,8 @@
 "RESTORE_TWEET_BUTTON_TITLE" = "经典推文按钮";
 "RESTORE_TWEET_BUTTON_DETAIL" = "在彩色圆圈上显示羽毛。";
 "RESTORE_TWEET_BUTTON_DETAIL_HELD" = "推文按钮隐藏时无需此项。";
+"CLASSIC_REFRESH_TITLE" = "经典刷新";
+"CLASSIC_REFRESH_DETAIL" = "下拉刷新时，标志保持不动，并恢复旋转的圆圈。";
 
 /* ===== TIMELINES ===== */
 "MODERN_SETTINGS_TIMELINES_TITLE" = "时间线";
@@ -580,6 +582,9 @@
 "HIDDEN_NOTIFS_UNTITLED" = "已隐藏的通知";
 "HIDE_NOTIFICATIONS_TITLE" = "隐藏通知";
 "HIDE_NOTIFICATIONS_DETAIL" = "用 × 隐藏通知。眼睛会列出它们。";
+"ACTIVITY_TAB_TITLE" = "动态标签";
+"ACTIVITY_TAB_DETAIL" = "在单个动态标签中显示所有通知，包括提及。";
+"ACTIVITY_TAB_NAME" = "动态";
 "NEW_TWITTER_SETTINGS_TITLE" = "新版 Twitter 设置";
 "NEW_TWITTER_SETTINGS_DETAIL" = "使用 Twitter 重新设计的设置，并让 PrimeFreeBird 采用相同外观。";
 "HIDE_TAB_FORYOU_TAB_NAME" = "探索";
@@ -749,6 +754,8 @@
 "CONFIRM_FOLLOW_ACTION" = "关注";
 "HIDE_NEW_TWEETS_PILL_TITLE" = "隐藏新推文按钮";
 "HIDE_NEW_TWEETS_PILL_DETAIL" = "移除时间线顶部提示新推文的按钮。";
+"REFRESH_FADE_TITLE" = "平滑刷新";
+"REFRESH_FADE_DETAIL" = "下拉刷新时，以淡入方式显示新推文。";
 "REFRESH_PILL_LABEL_DETAIL_HELD" = "新推文按钮已隐藏时无需此项。";
 
 /* ===== COMPATIBILITY: behaviors with no toggle ===== */
@@ -760,7 +767,6 @@
 "EXPAND_TCO_LINKS_TITLE" = "完整链接";
 "REMOVE_RELATED_TWEETS_TITLE" = "隐藏相关推文";
 "KEEP_READING_POSITION_TITLE" = "重新加载时保留阅读位置";
-"REFRESH_FADE_TITLE" = "平滑刷新";
 "CLASSIC_TWEET_DETAIL_TITLE" = "经典推文页面";
 "WEB_LOGIN_TITLE" = "网页登录";
 "SETTINGS_ENTRY_TITLE" = "设置中的 PrimeFreeBird";

@@ -737,9 +737,10 @@ NSURL* PFBAccountAvatarURL(TFNTwitterAccount* account) {
             PFBGlassRefreshBottomFade();
         }
 
-        // None applies in full at once: Record activity is read at launch, the Tweet button
-        // keeps its glyph until it loads its icon again, and the glass bar sizes its pill at launch.
+        // None applies in full at once: Record activity and the Activity tab are read at launch, the
+        // Tweet button keeps its glyph until it reloads its icon, and the glass bar sizes its pill at launch.
         if ([key isEqualToString:@"restore_tweet_button"] || [key isEqualToString:@"debug_tools"] ||
+            [key isEqualToString:@"activity_tab"] ||
             ([key isEqualToString:@"restore_tab_labels"] && PFBNativeGlassAsked())) {
             [self showRestartRequiredAlert];
         }

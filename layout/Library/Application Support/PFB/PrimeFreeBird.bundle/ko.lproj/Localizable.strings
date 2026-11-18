@@ -108,6 +108,8 @@
 "RESTORE_TWEET_BUTTON_TITLE" = "클래식 트윗 버튼";
 "RESTORE_TWEET_BUTTON_DETAIL" = "색이 있는 원 위에 깃털을 보여줍니다.";
 "RESTORE_TWEET_BUTTON_DETAIL_HELD" = "트윗 버튼이 숨겨져 있는 동안에는 필요하지 않습니다.";
+"CLASSIC_REFRESH_TITLE" = "클래식 새로고침";
+"CLASSIC_REFRESH_DETAIL" = "당겨서 새로고침할 때 로고는 그대로 두고 회전하는 원을 다시 표시합니다.";
 
 /* ===== TIMELINES ===== */
 "MODERN_SETTINGS_TIMELINES_TITLE" = "타임라인";
@@ -580,6 +582,9 @@
 "HIDDEN_NOTIFS_UNTITLED" = "숨긴 알림";
 "HIDE_NOTIFICATIONS_TITLE" = "알림 숨기기";
 "HIDE_NOTIFICATIONS_DETAIL" = "×로 알림을 숨깁니다. 눈 아이콘에 목록이 있습니다.";
+"ACTIVITY_TAB_TITLE" = "활동 탭";
+"ACTIVITY_TAB_DETAIL" = "멘션을 포함한 모든 알림을 하나의 활동 탭에 표시합니다.";
+"ACTIVITY_TAB_NAME" = "활동";
 "NEW_TWITTER_SETTINGS_TITLE" = "새 트위터 설정";
 "NEW_TWITTER_SETTINGS_DETAIL" = "새로 디자인된 트위터 설정을 쓰고 PrimeFreeBird에도 같은 모양을 적용합니다.";
 "HIDE_TAB_FORYOU_TAB_NAME" = "탐색하기";
@@ -749,6 +754,8 @@
 "CONFIRM_FOLLOW_ACTION" = "팔로우";
 "HIDE_NEW_TWEETS_PILL_TITLE" = "새 트윗 버튼 숨기기";
 "HIDE_NEW_TWEETS_PILL_DETAIL" = "타임라인 상단에서 새 트윗을 알리는 버튼을 제거합니다.";
+"REFRESH_FADE_TITLE" = "부드러운 새로고침";
+"REFRESH_FADE_DETAIL" = "당겨서 새로고침할 때 새 트윗을 서서히 표시합니다.";
 "REFRESH_PILL_LABEL_DETAIL_HELD" = "새 트윗 버튼이 숨겨져 있는 동안에는 필요하지 않습니다.";
 
 /* ===== COMPATIBILITY: behaviors with no toggle ===== */
@@ -760,7 +767,6 @@
 "EXPAND_TCO_LINKS_TITLE" = "전체 링크";
 "REMOVE_RELATED_TWEETS_TITLE" = "관련 트윗 숨기기";
 "KEEP_READING_POSITION_TITLE" = "새로고침 시 위치 유지";
-"REFRESH_FADE_TITLE" = "부드러운 새로고침";
 "CLASSIC_TWEET_DETAIL_TITLE" = "클래식 트윗 화면";
 "WEB_LOGIN_TITLE" = "웹 로그인";
 "SETTINGS_ENTRY_TITLE" = "설정의 PrimeFreeBird";

@@ -108,6 +108,8 @@
 "RESTORE_TWEET_BUTTON_TITLE" = "Klasyczny przycisk Tweeta";
 "RESTORE_TWEET_BUTTON_DETAIL" = "Pokazuje pióro na kolorowym kółku.";
 "RESTORE_TWEET_BUTTON_DETAIL_HELD" = "Niepotrzebne, gdy przycisk Tweeta jest ukryty.";
+"CLASSIC_REFRESH_TITLE" = "Klasyczne odświeżanie";
+"CLASSIC_REFRESH_DETAIL" = "Logo stoi w miejscu, a gdy pociągasz, aby odświeżyć, wraca kręcące się kółko.";
 
 /* ===== TIMELINES ===== */
 "MODERN_SETTINGS_TIMELINES_TITLE" = "Osie czasu";
@@ -580,6 +582,9 @@
 "HIDDEN_NOTIFS_UNTITLED" = "Ukryte powiadomienie";
 "HIDE_NOTIFICATIONS_TITLE" = "Ukryj powiadomienia";
 "HIDE_NOTIFICATIONS_DETAIL" = "Ukryj powiadomienie jego ×. Oko je wymienia.";
+"ACTIVITY_TAB_TITLE" = "Karta Aktywność";
+"ACTIVITY_TAB_DETAIL" = "Jedna karta Aktywność ze wszystkimi powiadomieniami, także wzmiankami.";
+"ACTIVITY_TAB_NAME" = "Aktywność";
 "NEW_TWITTER_SETTINGS_TITLE" = "Nowe ustawienia Twittera";
 "NEW_TWITTER_SETTINGS_DETAIL" = "Używa przeprojektowanych ustawień Twittera i nadaje PrimeFreeBird ten sam wygląd.";
 "HIDE_TAB_FORYOU_TAB_NAME" = "Eksploruj";
@@ -749,6 +754,8 @@
 "CONFIRM_FOLLOW_ACTION" = "Obserwuj";
 "HIDE_NEW_TWEETS_PILL_TITLE" = "Ukryj przycisk nowych Tweetów";
 "HIDE_NEW_TWEETS_PILL_DETAIL" = "Usuwa przycisk zapowiadający nowe Tweety na górze osi czasu.";
+"REFRESH_FADE_TITLE" = "Płynne odświeżanie";
+"REFRESH_FADE_DETAIL" = "Płynnie pokazuje nowe Tweety, gdy pociągasz, aby odświeżyć.";
 "REFRESH_PILL_LABEL_DETAIL_HELD" = "Niepotrzebne, gdy przycisk nowych Tweetów jest ukryty.";
 
 /* ===== COMPATIBILITY: behaviors with no toggle ===== */
@@ -760,7 +767,6 @@
 "EXPAND_TCO_LINKS_TITLE" = "Pełne linki";
 "REMOVE_RELATED_TWEETS_TITLE" = "Ukryj powiązane Tweety";
 "KEEP_READING_POSITION_TITLE" = "Zachowaj miejsce przy przeładowaniu";
-"REFRESH_FADE_TITLE" = "Płynne odświeżanie";
 "CLASSIC_TWEET_DETAIL_TITLE" = "Klasyczna strona Tweeta";
 "WEB_LOGIN_TITLE" = "Logowanie przez sieć";
 "SETTINGS_ENTRY_TITLE" = "PrimeFreeBird w Ustawieniach";

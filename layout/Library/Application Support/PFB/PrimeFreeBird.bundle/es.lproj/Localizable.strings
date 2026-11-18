@@ -108,6 +108,8 @@
 "RESTORE_TWEET_BUTTON_TITLE" = "Botón de Tweet clásico";
 "RESTORE_TWEET_BUTTON_DETAIL" = "Muestra la pluma sobre un círculo de color.";
 "RESTORE_TWEET_BUTTON_DETAIL_HELD" = "No hace falta mientras el botón de Tweet esté oculto.";
+"CLASSIC_REFRESH_TITLE" = "Actualización clásica";
+"CLASSIC_REFRESH_DETAIL" = "Deja el logo quieto y recupera el círculo giratorio al deslizar para actualizar.";
 
 /* ===== TIMELINES ===== */
 "MODERN_SETTINGS_TIMELINES_TITLE" = "Cronologías";
@@ -580,6 +582,9 @@
 "HIDDEN_NOTIFS_UNTITLED" = "Notificación oculta";
 "HIDE_NOTIFICATIONS_TITLE" = "Ocultar notificaciones";
 "HIDE_NOTIFICATIONS_DETAIL" = "Oculta una notificación con su ×. El ojo las enumera.";
+"ACTIVITY_TAB_TITLE" = "Pestaña Actividad";
+"ACTIVITY_TAB_DETAIL" = "Una sola pestaña Actividad con todas las notificaciones, menciones incluidas.";
+"ACTIVITY_TAB_NAME" = "Actividad";
 "NEW_TWITTER_SETTINGS_TITLE" = "Nuevos ajustes de Twitter";
 "NEW_TWITTER_SETTINGS_DETAIL" = "Usa los ajustes rediseñados de Twitter y da a PrimeFreeBird el mismo aspecto.";
 "HIDE_TAB_FORYOU_TAB_NAME" = "Explorar";
@@ -749,6 +754,8 @@
 "CONFIRM_FOLLOW_ACTION" = "Seguir";
 "HIDE_NEW_TWEETS_PILL_TITLE" = "Ocultar aviso de Tweets nuevos";
 "HIDE_NEW_TWEETS_PILL_DETAIL" = "Quita el aviso que anuncia Tweets nuevos en la parte superior de tu cronología.";
+"REFRESH_FADE_TITLE" = "Actualización suave";
+"REFRESH_FADE_DETAIL" = "Muestra los Tweets nuevos con un fundido al deslizar para actualizar.";
 "REFRESH_PILL_LABEL_DETAIL_HELD" = "No hace falta mientras el aviso de Tweets nuevos esté oculto.";
 
 /* ===== COMPATIBILITY: behaviors with no toggle ===== */
@@ -760,7 +767,6 @@
 "EXPAND_TCO_LINKS_TITLE" = "Enlaces completos";
 "REMOVE_RELATED_TWEETS_TITLE" = "Ocultar Tweets relacionados";
 "KEEP_READING_POSITION_TITLE" = "Conservar tu lugar al recargar";
-"REFRESH_FADE_TITLE" = "Actualización suave";
 "CLASSIC_TWEET_DETAIL_TITLE" = "Página de Tweet clásica";
 "WEB_LOGIN_TITLE" = "Inicio de sesión web";
 "SETTINGS_ENTRY_TITLE" = "PrimeFreeBird en Ajustes";

@@ -408,6 +408,7 @@ static NSDictionary<NSString*, NSDictionary*>* PFBSettingsPages(void) {
                 @"settings": @[
                     @{@"type": @"header", @"titleKey": @"MESSAGES_GROUP_NOTIFICATIONS", @"icon": @"notifications_stroke"},
                     @{@"key": @"hide_notifications", @"default": @YES},
+                    @{@"key": @"activity_tab", @"default": @NO},
                     @{@"type": @"header", @"titleKey": @"MESSAGES_GROUP_CHAT", @"icon": @"chat_bubble_stroke"},
                     @{
                         @"key": @"hide_suggested_chats",
@@ -457,7 +458,7 @@ static NSDictionary<NSString*, NSDictionary*>* PFBSettingsPages(void) {
                 @"titleKey": @"MODERN_SETTINGS_BRANDING_TITLE",
                 @"subtitleKey": @"MODERN_SETTINGS_BRANDING_SUBTITLE",
                 @"settings": @[
-                    @{@"type": @"header", @"titleKey": @"BRANDING_GROUP_LABELS", @"icon": @"text_format"},
+                    @{@"type": @"header", @"titleKey": @"BRANDING_GROUP_LABELS", @"icon": @"quote_stroke"},
                     @{
                         @"key": @"restore_twitter_names",
                         @"default": @([PFBManager isTwitterBranded])

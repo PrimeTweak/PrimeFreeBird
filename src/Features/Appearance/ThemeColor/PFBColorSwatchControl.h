@@ -12,6 +12,8 @@ NS_ASSUME_NONNULL_BEGIN
 // marks once chosen. The rainbow one holds the custom color in its middle.
 - (instancetype)initRound;
 - (instancetype)initRainbow;
+// The rainbow option alone at a smaller size, as a mark beside text about the custom color.
++ (UIView*)rainbowMarkWithDiameter:(CGFloat)diameter;
 
 - (void)setSwatchColor:(UIColor*)color;
 - (void)setSwatchName:(NSString*)name;

@@ -108,6 +108,8 @@
 "RESTORE_TWEET_BUTTON_TITLE" = "クラシックなツイートボタン";
 "RESTORE_TWEET_BUTTON_DETAIL" = "色付きの円の上に羽根を表示します。";
 "RESTORE_TWEET_BUTTON_DETAIL_HELD" = "ツイートボタンを非表示にしている間は不要です。";
+"CLASSIC_REFRESH_TITLE" = "クラシックな更新";
+"CLASSIC_REFRESH_DETAIL" = "引っ張って更新するとき、ロゴを動かさず、回転する円を表示します。";
 
 /* ===== TIMELINES ===== */
 "MODERN_SETTINGS_TIMELINES_TITLE" = "タイムライン";
@@ -580,6 +582,9 @@
 "HIDDEN_NOTIFS_UNTITLED" = "非表示の通知";
 "HIDE_NOTIFICATIONS_TITLE" = "通知を非表示";
 "HIDE_NOTIFICATIONS_DETAIL" = "通知は×で非表示にできます。目のアイコンで一覧を表示します。";
+"ACTIVITY_TAB_TITLE" = "アクティビティタブ";
+"ACTIVITY_TAB_DETAIL" = "すべての通知を1つのアクティビティタブに表示します。";
+"ACTIVITY_TAB_NAME" = "アクティビティ";
 "NEW_TWITTER_SETTINGS_TITLE" = "新しいTwitterの設定";
 "NEW_TWITTER_SETTINGS_DETAIL" = "リニューアルされたTwitterの設定を使い、PrimeFreeBirdも同じ見た目にします。";
 "HIDE_TAB_FORYOU_TAB_NAME" = "話題を検索";
@@ -749,6 +754,8 @@
 "CONFIRM_FOLLOW_ACTION" = "フォロー";
 "HIDE_NEW_TWEETS_PILL_TITLE" = "新着ツイートのボタンを非表示";
 "HIDE_NEW_TWEETS_PILL_DETAIL" = "タイムラインの上部で新着ツイートを知らせるボタンを取り除きます。";
+"REFRESH_FADE_TITLE" = "なめらかな更新";
+"REFRESH_FADE_DETAIL" = "引っ張って更新したとき、新着ツイートをフェードインで表示します。";
 "REFRESH_PILL_LABEL_DETAIL_HELD" = "新着ツイートのボタンを非表示にしている間は不要です。";
 
 /* ===== COMPATIBILITY: behaviors with no toggle ===== */
@@ -760,7 +767,6 @@
 "EXPAND_TCO_LINKS_TITLE" = "完全なリンク";
 "REMOVE_RELATED_TWEETS_TITLE" = "関連ツイートを非表示";
 "KEEP_READING_POSITION_TITLE" = "再読み込み時に位置を維持";
-"REFRESH_FADE_TITLE" = "なめらかな更新";
 "CLASSIC_TWEET_DETAIL_TITLE" = "クラシックなツイート画面";
 "WEB_LOGIN_TITLE" = "ウェブログイン";
 "SETTINGS_ENTRY_TITLE" = "設定にPrimeFreeBird";

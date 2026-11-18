@@ -38,25 +38,31 @@ static const CGFloat kRoundDiameter = 28.0;
     return self;
 }
 
+// The circle of hues the custom color is drawn with.
+static CAGradientLayer* PFBRainbowLayer(void) {
+    NSMutableArray* hues = [NSMutableArray array];
+    for (NSNumber* hex in @[ @0xFF3B30, @0xFF9500, @0xFFCC00, @0x34C759, @0x00C7BE, @0x007AFF, @0xAF52DE,
+                             @0xFF2D55, @0xFF3B30 ]) {
+        unsigned int rgb = hex.unsignedIntValue;
+        [hues addObject:(id)[UIColor colorWithRed:((rgb >> 16) & 0xFF) / 255.0
+                                            green:((rgb >> 8) & 0xFF) / 255.0
+                                             blue:(rgb & 0xFF) / 255.0
+                                            alpha:1.0]
+                             .CGColor];
+    }
+    CAGradientLayer* rainbow = [CAGradientLayer layer];
+    rainbow.type = kCAGradientLayerConic;
+    rainbow.startPoint = CGPointMake(0.5, 0.5);
+    rainbow.endPoint = CGPointMake(0.5, 0.0);
+    rainbow.colors = hues;
+    return rainbow;
+}
+
 // A band of hues around a well that holds the custom color, empty until one is picked.
 - (instancetype)initRainbow {
     self = [self initRound];
     if (self) {
-        NSMutableArray* hues = [NSMutableArray array];
-        for (NSNumber* hex in @[ @0xFF3B30, @0xFF9500, @0xFFCC00, @0x34C759, @0x00C7BE, @0x007AFF, @0xAF52DE,
-                                 @0xFF2D55, @0xFF3B30 ]) {
-            unsigned int rgb = hex.unsignedIntValue;
-            [hues addObject:(id)[UIColor colorWithRed:((rgb >> 16) & 0xFF) / 255.0
-                                                green:((rgb >> 8) & 0xFF) / 255.0
-                                                 blue:(rgb & 0xFF) / 255.0
-                                                alpha:1.0]
-                                 .CGColor];
-        }
-        self.rainbow = [CAGradientLayer layer];
-        self.rainbow.type = kCAGradientLayerConic;
-        self.rainbow.startPoint = CGPointMake(0.5, 0.5);
-        self.rainbow.endPoint = CGPointMake(0.5, 0.0);
-        self.rainbow.colors = hues;
+        self.rainbow = PFBRainbowLayer();
         [self.pillView.layer addSublayer:self.rainbow];
         self.wellView = [[UIView alloc] init];
         self.wellView.userInteractionEnabled = NO;
@@ -64,6 +70,23 @@ static const CGFloat kRoundDiameter = 28.0;
         [self setSwatchNeutral];
     }
     return self;
+}
+
+// The band in proportion to the option's, the well letting the hues show through it.
++ (UIView*)rainbowMarkWithDiameter:(CGFloat)diameter {
+    UIView* mark = [[UIView alloc] initWithFrame:CGRectMake(0, 0, diameter, diameter)];
+    mark.userInteractionEnabled = NO;
+    mark.clipsToBounds = YES;
+    mark.layer.cornerRadius = diameter / 2.0;
+    CAGradientLayer* rainbow = PFBRainbowLayer();
+    rainbow.frame = mark.bounds;
+    [mark.layer addSublayer:rainbow];
+    CGFloat band = diameter * kRainbowBand / kRoundDiameter;
+    UIView* well = [[UIView alloc] initWithFrame:CGRectInset(mark.bounds, band, band)];
+    well.layer.cornerRadius = CGRectGetWidth(well.bounds) / 2.0;
+    well.backgroundColor = [[UIColor systemBackgroundColor] colorWithAlphaComponent:0.55];
+    [mark addSubview:well];
+    return mark;
 }
 
 // The color centered in the control, with the rainbow's well inside it.

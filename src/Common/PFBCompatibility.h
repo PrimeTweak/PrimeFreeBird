@@ -102,6 +102,7 @@ typedef NS_ENUM(NSInteger, PFBCompatOption) {
     PFBCompat_reply_in_webview,
     PFBCompat_flex_twitter,
     PFBCompat_hide_notifications,
+    PFBCompat_activity_tab,
     PFBCompat_enable_liquid_glass,
     PFBCompat_dark_mode_style,
     PFBCompat_accent_color,

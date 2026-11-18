@@ -108,6 +108,8 @@
 "RESTORE_TWEET_BUTTON_TITLE" = "Tombol Tweet klasik";
 "RESTORE_TWEET_BUTTON_DETAIL" = "Tampilkan bulu di atas lingkaran berwarna.";
 "RESTORE_TWEET_BUTTON_DETAIL_HELD" = "Tidak diperlukan selama tombol Tweet disembunyikan.";
+"CLASSIC_REFRESH_TITLE" = "Muat ulang klasik";
+"CLASSIC_REFRESH_DETAIL" = "Logo tetap diam dan lingkaran berputar kembali saat Anda menarik untuk menyegarkan.";
 
 /* ===== TIMELINES ===== */
 "MODERN_SETTINGS_TIMELINES_TITLE" = "Linimasa";
@@ -580,6 +582,9 @@
 "HIDDEN_NOTIFS_UNTITLED" = "Notifikasi tersembunyi";
 "HIDE_NOTIFICATIONS_TITLE" = "Sembunyikan notifikasi";
 "HIDE_NOTIFICATIONS_DETAIL" = "Sembunyikan notifikasi dengan ×-nya. Ikon mata mencantumkannya.";
+"ACTIVITY_TAB_TITLE" = "Tab Aktivitas";
+"ACTIVITY_TAB_DETAIL" = "Satu tab Aktivitas berisi semua notifikasi, termasuk sebutan.";
+"ACTIVITY_TAB_NAME" = "Aktivitas";
 "NEW_TWITTER_SETTINGS_TITLE" = "Pengaturan Twitter baru";
 "NEW_TWITTER_SETTINGS_DETAIL" = "Pakai pengaturan Twitter yang didesain ulang dan beri PrimeFreeBird tampilan yang sama.";
 "HIDE_TAB_FORYOU_TAB_NAME" = "Jelajahi";
@@ -749,6 +754,8 @@
 "CONFIRM_FOLLOW_ACTION" = "Ikuti";
 "HIDE_NEW_TWEETS_PILL_TITLE" = "Sembunyikan tombol Tweet baru";
 "HIDE_NEW_TWEETS_PILL_DETAIL" = "Hapus tombol yang mengumumkan Tweet baru di atas linimasa Anda.";
+"REFRESH_FADE_TITLE" = "Muat ulang halus";
+"REFRESH_FADE_DETAIL" = "Munculkan Tweet baru secara halus saat Anda menarik untuk menyegarkan.";
 "REFRESH_PILL_LABEL_DETAIL_HELD" = "Tidak diperlukan selama tombol Tweet baru disembunyikan.";
 
 /* ===== COMPATIBILITY: behaviors with no toggle ===== */
@@ -760,7 +767,6 @@
 "EXPAND_TCO_LINKS_TITLE" = "Tautan lengkap";
 "REMOVE_RELATED_TWEETS_TITLE" = "Sembunyikan Tweet terkait";
 "KEEP_READING_POSITION_TITLE" = "Tetap di posisi saat memuat ulang";
-"REFRESH_FADE_TITLE" = "Muat ulang halus";
 "CLASSIC_TWEET_DETAIL_TITLE" = "Halaman Tweet klasik";
 "WEB_LOGIN_TITLE" = "Masuk web";
 "SETTINGS_ENTRY_TITLE" = "PrimeFreeBird di Pengaturan";

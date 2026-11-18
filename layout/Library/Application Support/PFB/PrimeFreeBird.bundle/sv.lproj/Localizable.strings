@@ -108,6 +108,8 @@
 "RESTORE_TWEET_BUTTON_TITLE" = "Klassisk Tweet-knapp";
 "RESTORE_TWEET_BUTTON_DETAIL" = "Visa fjädern på en färgad cirkel.";
 "RESTORE_TWEET_BUTTON_DETAIL_HELD" = "Behövs inte medan Tweet-knappen är dold.";
+"CLASSIC_REFRESH_TITLE" = "Klassisk uppdatering";
+"CLASSIC_REFRESH_DETAIL" = "Låt logotypen stå still och ta tillbaka den snurrande cirkeln när du drar för att uppdatera.";
 
 /* ===== TIMELINES ===== */
 "MODERN_SETTINGS_TIMELINES_TITLE" = "Tidslinjer";
@@ -580,6 +582,9 @@
 "HIDDEN_NOTIFS_UNTITLED" = "Dold avisering";
 "HIDE_NOTIFICATIONS_TITLE" = "Dölj aviseringar";
 "HIDE_NOTIFICATIONS_DETAIL" = "Dölj en avisering med dess ×. Ögat listar dem.";
+"ACTIVITY_TAB_TITLE" = "Fliken Aktivitet";
+"ACTIVITY_TAB_DETAIL" = "En flik Aktivitet med alla aviseringar, omnämnanden inräknade.";
+"ACTIVITY_TAB_NAME" = "Aktivitet";
 "NEW_TWITTER_SETTINGS_TITLE" = "Nya Twitter-inställningar";
 "NEW_TWITTER_SETTINGS_DETAIL" = "Använd Twitters omgjorda inställningar och ge PrimeFreeBird samma utseende.";
 "HIDE_TAB_FORYOU_TAB_NAME" = "Utforska";
@@ -749,6 +754,8 @@
 "CONFIRM_FOLLOW_ACTION" = "Följ";
 "HIDE_NEW_TWEETS_PILL_TITLE" = "Dölj knappen för nya Tweets";
 "HIDE_NEW_TWEETS_PILL_DETAIL" = "Ta bort knappen som meddelar nya Tweets högst upp i tidslinjen.";
+"REFRESH_FADE_TITLE" = "Mjuk uppdatering";
+"REFRESH_FADE_DETAIL" = "Tona in nya Tweets när du drar för att uppdatera.";
 "REFRESH_PILL_LABEL_DETAIL_HELD" = "Behövs inte medan knappen för nya Tweets är dold.";
 
 /* ===== COMPATIBILITY: behaviors with no toggle ===== */
@@ -760,7 +767,6 @@
 "EXPAND_TCO_LINKS_TITLE" = "Fullständiga länkar";
 "REMOVE_RELATED_TWEETS_TITLE" = "Dölj relaterade Tweets";
 "KEEP_READING_POSITION_TITLE" = "Behåll din plats vid omladdning";
-"REFRESH_FADE_TITLE" = "Mjuk uppdatering";
 "CLASSIC_TWEET_DETAIL_TITLE" = "Klassisk Tweet-sida";
 "WEB_LOGIN_TITLE" = "Webbinloggning";
 "SETTINGS_ENTRY_TITLE" = "PrimeFreeBird i Inställningar";

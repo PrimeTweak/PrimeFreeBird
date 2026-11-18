@@ -108,6 +108,8 @@
 "RESTORE_TWEET_BUTTON_TITLE" = "Klasični gumb za tweet";
 "RESTORE_TWEET_BUTTON_DETAIL" = "Prikaži pero na obojenom krugu.";
 "RESTORE_TWEET_BUTTON_DETAIL_HELD" = "Nije potrebno dok je gumb za tweet skriven.";
+"CLASSIC_REFRESH_TITLE" = "Klasično osvježavanje";
+"CLASSIC_REFRESH_DETAIL" = "Logo ostaje miran, a kad povučeš za osvježavanje, vraća se krug koji se vrti.";
 
 /* ===== TIMELINES ===== */
 "MODERN_SETTINGS_TIMELINES_TITLE" = "Vremenske crte";
@@ -580,6 +582,9 @@
 "HIDDEN_NOTIFS_UNTITLED" = "Skrivena obavijest";
 "HIDE_NOTIFICATIONS_TITLE" = "Sakrij obavijesti";
 "HIDE_NOTIFICATIONS_DETAIL" = "Sakrij obavijest njezinim ×. Oko ih navodi.";
+"ACTIVITY_TAB_TITLE" = "Kartica Aktivnost";
+"ACTIVITY_TAB_DETAIL" = "Jedna kartica Aktivnost sa svim obavijestima, uključujući spominjanja.";
+"ACTIVITY_TAB_NAME" = "Aktivnost";
 "NEW_TWITTER_SETTINGS_TITLE" = "Nove postavke Twittera";
 "NEW_TWITTER_SETTINGS_DETAIL" = "Koristi Twitterove redizajnirane postavke i daj PrimeFreeBirdu isti izgled.";
 "HIDE_TAB_FORYOU_TAB_NAME" = "Istraži";
@@ -749,6 +754,8 @@
 "CONFIRM_FOLLOW_ACTION" = "Prati";
 "HIDE_NEW_TWEETS_PILL_TITLE" = "Sakrij gumb novih tweetova";
 "HIDE_NEW_TWEETS_PILL_DETAIL" = "Ukloni gumb koji najavljuje nove tweetove na vrhu vremenske crte.";
+"REFRESH_FADE_TITLE" = "Glatko osvježavanje";
+"REFRESH_FADE_DETAIL" = "Novi tweetovi postupno se pojavljuju kad povučeš za osvježavanje.";
 "REFRESH_PILL_LABEL_DETAIL_HELD" = "Nije potrebno dok je gumb novih tweetova skriven.";
 
 /* ===== COMPATIBILITY: behaviors with no toggle ===== */
@@ -760,7 +767,6 @@
 "EXPAND_TCO_LINKS_TITLE" = "Pune poveznice";
 "REMOVE_RELATED_TWEETS_TITLE" = "Sakrij povezane tweetove";
 "KEEP_READING_POSITION_TITLE" = "Zadrži mjesto pri ponovnom učitavanju";
-"REFRESH_FADE_TITLE" = "Glatko osvježavanje";
 "CLASSIC_TWEET_DETAIL_TITLE" = "Klasična stranica tweeta";
 "WEB_LOGIN_TITLE" = "Web-prijava";
 "SETTINGS_ENTRY_TITLE" = "PrimeFreeBird u Postavkama";
