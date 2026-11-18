@@ -168,8 +168,7 @@ static BOOL pfbSwitchIsAnswered(NSString* key) {
           @"ios_tweet_promote_button_sent_tweet_toast_enabled",
           @"ios_tweet_promote_button_third_party_boost_enabled",
           @"thirdparty_boost_author_view_button_enabled",
-          @"creator_studio_nav_enabled", @"creator_monetization_dashboard_enabled",
-          @"dash_items_account_analytics_enabled"
+          @"creator_studio_nav_enabled", @"creator_monetization_dashboard_enabled"
       ]];
     });
     return [keys containsObject:key] || pfbIsGrokBotSwitch(key) ||
@@ -769,11 +768,6 @@ static NSNumber* FeatureSwitchOverrideValueForKey(NSString* key) {
     // Creator Studio shown on the Menu page; Twitter reads this switch for the drawer alone.
     if ([key isEqualToString:@"creator_studio_nav_enabled"] && ![PFBSidebarItems isHidden:12]) {
         PFBCOMPAT_ACTION(PFBCompat_customize_sidebar, @"Creator Studio shown");
-        return @YES;
-    }
-
-    // Analytics shown on the Menu page; Twitter reads this switch for the drawer alone.
-    if ([key isEqualToString:@"dash_items_account_analytics_enabled"] && [PFBSidebarItems showsAnalytics]) {
         return @YES;
     }
 

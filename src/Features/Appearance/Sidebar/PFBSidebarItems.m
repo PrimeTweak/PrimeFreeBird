@@ -262,6 +262,7 @@ NSArray<NSNumber*>* PFBDashSnapshot(id content) {
     [self changed];
 }
 
+// Analytics On on the page, where the page offers it and the account has it.
 + (BOOL)showsAnalytics {
     return PFBSidebarIsOffered(kAnalyticsPanel) && ![self isHidden:kAnalyticsPanel];
 }

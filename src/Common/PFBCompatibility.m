@@ -1488,7 +1488,6 @@ static const PFBCompatFlag kFlags[] = {
     {PFBCompat_customize_sidebar, "ios_dash_connect_max_followings_count", NO},
     {PFBCompat_customize_sidebar, "creator_studio_nav_enabled", NO},
     {PFBCompat_customize_sidebar, "premium_business_ios_nav_promo_enabled", NO},
-    {PFBCompat_customize_sidebar, "dash_items_account_analytics_enabled", NO},
     {PFBCompat_explore_tabs, "ai_trends_ios_enable_news_tab", NO},
     {PFBCompat_hide_premium_offer, "ios_profile_analytics_upsell_enabled", NO},
     {PFBCompat_hide_premium_offer, "ios_profile_analytics_upsell_possible_enabled", NO},
