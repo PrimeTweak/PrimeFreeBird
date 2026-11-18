@@ -1885,7 +1885,7 @@ static const PFBCompatName kNames[] = {
     {PFBCompat_advanced_search, "Features/Search/AdvancedSearch.x", "window"},
     {PFBCompat_explore_tabs, "Features/Search/ExploreTabs.x", "window"},
     {PFBCompatOptionCount, "Features/Appearance/NavBarIcons.x", "boolValue"},
-    {PFBCompat_bar_repairs, "Features/Appearance/NavBarIcons.x", "NavigationBarSettings"},
+    {PFBCompat_bar_repairs, "Features/Appearance/NavBarIcons.x", "NavigationBarSettingsButton"},
     {PFBCompat_color_twitter_icon_in_top_bar, "Features/Appearance/Theme.x", "colorPalette"},
     {PFBCompat_color_twitter_icon_in_top_bar, "Features/Appearance/Theme.x", "currentColorPalette"},
     {PFBCompat_color_twitter_icon_in_top_bar, "Features/Appearance/Theme.x", "navigationBarLogoColor"},
