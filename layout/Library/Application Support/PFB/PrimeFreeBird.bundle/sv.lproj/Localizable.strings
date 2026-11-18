@@ -25,12 +25,12 @@
 "DISABLE_RTL_TITLE" = "Text från vänster till höger";
 "DISABLE_RTL_DETAIL" = "Visa text från vänster till höger, även på språk som skrivs från höger till vänster.";
 "HIDE_PREMIUM_OFFER_TITLE" = "Dölj Premium-uppmaningar";
-"HIDE_PREMIUM_OFFER_DETAIL" = "Ta bort knapparna ”Bli verifierad” och ”Uppgradera”.";
+"HIDE_PREMIUM_OFFER_DETAIL" = "Ta bort Twitters Premium-erbjudanden, som knapparna ”Bli verifierad” och ”Uppgradera”.";
 
 /* ===== General › Links ===== */
 "GENERAL_GROUP_LINKS" = "Länkar";
 "SHARING_DOMAIN_TITLE" = "Delningsdomän";
-"SHARING_DOMAIN_DETAIL" = "Adressen som används i länkar du delar.";
+"SHARING_DOMAIN_DETAIL" = "Välj adressen som används i länkar du delar.";
 "SHARING_DOMAIN_PROMPT_MESSAGE" = "Länkar du delar använder den här adressen. Lämna tomt för x.com.";
 "STRIP_URL_TRACKING_TITLE" = "Rena länkar";
 "STRIP_URL_TRACKING_DETAIL" = "Ta bort spårning från länkar du öppnar och från Twitter-länkar du delar eller kopierar.";
@@ -79,19 +79,22 @@
 "CUSTOM_TAB_BAR_OPTION_SUBTITLE" = "Välj vilka flikar som visas och i vilken ordning.";
 "APPEARANCE_GROUP_SIDEBAR" = "Meny";
 "CUSTOM_SIDEBAR_OPTION_TITLE" = "Meny";
-"CUSTOM_SIDEBAR_OPTION_SUBTITLE" = "Välj vilka objekt som visas i menyn.";
+"CUSTOM_SIDEBAR_OPTION_SUBTITLE" = "Välj vilka objekt som visas i kontomenyn.";
 "SIDEBAR_EDITOR_NAVIGATION_TITLE" = "Meny";
-"SIDEBAR_EDITOR_DETAIL" = "Tryck på ett objekt för att lägga till det i menyn eller ta bort det.";
+"SIDEBAR_EDITOR_DETAIL" = "Välj vilka objekt som visas i kontomenyn.";
 "SIDEBAR_SECTION_SHOWN" = "Visas";
 "SIDEBAR_SECTION_HIDDEN" = "Dolda";
 "SIDEBAR_ITEM_SHOWN" = "Visas";
 "SIDEBAR_ITEM_HIDDEN" = "Dold";
+"SIDEBAR_HINT_TAP" = "Tryck på ett objekt för att lägga till eller ta bort det";
+"SIDEBAR_HINT_GROK" = "Grok följer också Dölj Grok i menyn";
 "RESTORE_TAB_LABELS_TITLE" = "Fliketiketter";
 "RESTORE_TAB_LABELS_DETAIL" = "Visa etiketter under ikonerna.";
 "NO_TAB_BAR_HIDING_TITLE" = "Alltid synligt";
 "NO_TAB_BAR_HIDING_DETAIL" = "Låt inte det nedre fältet krympa eller tonas bort när du scrollar.";
 "SHOW_BOTTOM_FADE_TITLE" = "Toning nedtill";
 "SHOW_BOTTOM_FADE_DETAIL" = "Tona ut sidan under fältet för ett mjukare utseende bakom glaset.";
+"SHOW_BOTTOM_FADE_DETAIL_HELD" = "Kräver Liquid Glass – välj det under Stil › Visuell stil.";
 
 /* ===== BRANDING ===== */
 "MODERN_SETTINGS_BRANDING_TITLE" = "Profilering";
@@ -104,6 +107,7 @@
 "REFRESH_PILL_LABEL_DETAIL" = "Visa ett ord bredvid profilbilderna på pillret för nya Tweets.";
 "RESTORE_TWEET_BUTTON_TITLE" = "Klassisk Tweet-knapp";
 "RESTORE_TWEET_BUTTON_DETAIL" = "Visa fjädern på en färgad cirkel.";
+"RESTORE_TWEET_BUTTON_DETAIL_HELD" = "Behövs inte medan Tweet-knappen är dold.";
 
 /* ===== TIMELINES ===== */
 "MODERN_SETTINGS_TIMELINES_TITLE" = "Tidslinjer";
@@ -141,7 +145,7 @@
 "MODERN_SETTINGS_TWEETS_TITLE" = "Tweets";
 "MODERN_SETTINGS_TWEETS_SUBTITLE" = "Skriva, knappar, svar och känsligt innehåll.";
 "UNDO_TWEET_TITLE" = "Ångra Tweet";
-"UNDO_TWEET_TIMEOUT_DETAIL" = "Tid att ångra en Tweet efter att du skickat den.";
+"UNDO_TWEET_TIMEOUT_DETAIL" = "Välj hur länge du kan ångra en skickad Tweet.";
 "TWEET_CONFIRM_TITLE" = "Bekräfta Tweets";
 "TWEET_CONFIRM_DETAIL" = "Fråga innan du skickar en Tweet eller ett svar.";
 "LIKE_CONFIRM_TITLE" = "Bekräfta gilla-markeringar";
@@ -155,11 +159,11 @@
 "HIDE_DOWNVOTE_BUTTON_TITLE" = "Dölj nedröstningsknapp";
 "HIDE_DOWNVOTE_BUTTON_DETAIL" = "Ta bort nedröstningsknappen under Tweets.";
 "REPLY_SORTING_TITLE" = "Sortera svar";
-"REPLY_SORTING_DETAIL" = "Ordningen som svar öppnas i. Twitters sorteringsknapp finns kvar.";
+"REPLY_SORTING_DETAIL" = "Välj ordningen som svar öppnas i. Twitters sorteringsknapp finns kvar.";
 "RESTORE_REPLY_CONTEXT_TITLE" = "Raden ”Svarar till”";
 "RESTORE_REPLY_CONTEXT_DETAIL" = "Tar tillbaka den ovanför ett svar du öppnar.";
-"SHOW_QUOTE_COUNTS_TITLE" = "Citat och Retweets";
-"SHOW_QUOTE_COUNTS_DETAIL" = "Visa båda siffrorna i sin helhet överst på en Tweets citatskärm.";
+"SHOW_QUOTE_COUNTS_TITLE" = "Antal citat";
+"SHOW_QUOTE_COUNTS_DETAIL" = "Visa antalet citat och Retweets i sin helhet överst på en Tweets citatskärm.";
 "SHOW_TWEET_SOURCE_TITLE" = "Tweetens källa";
 "SHOW_TWEET_SOURCE_DETAIL" = "Visa appen som Tweeten skickades från bredvid tiden på en öppnad Tweet.";
 "SHOW_ACCOUNT_LOCATION_TITLE" = "Kontots plats";
@@ -200,7 +204,7 @@
 
 /* ===== PROFILES ===== */
 "MODERN_SETTINGS_PROFILES_TITLE" = "Profiler";
-"MODERN_SETTINGS_PROFILES_SUBTITLE" = "Följ-knappar, märken och profilflikar.";
+"MODERN_SETTINGS_PROFILES_SUBTITLE" = "Följningar, bios, profilflikar, märken och knappar.";
 "FOLLOW_CONFIRM_TITLE" = "Bekräfta följningar";
 "FOLLOW_CONFIRM_DETAIL" = "Fråga innan du följer ett konto.";
 "COPY_PROFILE_INFO_TITLE" = "Kopiera profilinfo";
@@ -214,7 +218,7 @@
 "HIDE_FOLLOW_BUTTON_TITLE" = "Dölj Följ-knappen";
 "HIDE_FOLLOW_BUTTON_DETAIL" = "Döljer Följ-knappen bredvid en Tweets författare. Profiler behåller sin.";
 "HIDE_MESSAGE_BUTTON_TITLE" = "Dölj Meddelande-knappen";
-"HIDE_MESSAGE_BUTTON_DETAIL" = "Ta bort Meddelande-knappen bredvid en Tweets författare.";
+"HIDE_MESSAGE_BUTTON_DETAIL" = "Ta bort Meddelande-knappen bredvid en Tweets författare. Profiler behåller sin.";
 /* Legacy key name: this row HIDES the Subscribe button. Do not rename the
    key — it is persisted in user defaults. */
 "RESTORE_FOLLOW_BUTTON_TITLE" = "Dölj Prenumerera-knappen";
@@ -234,7 +238,8 @@
 
 /* ===== MESSAGES ===== */
 "MODERN_SETTINGS_MESSAGES_TITLE" = "Meddelanden";
-"MODERN_SETTINGS_MESSAGES_SUBTITLE" = "Skrivande, röstmeddelanden och Grok.";
+"MODERN_SETTINGS_MESSAGES_SUBTITLE" = "Aviseringar, skrivande, röstmeddelanden och Grok.";
+"MESSAGES_GROUP_NOTIFICATIONS" = "Aviseringar";
 "MESSAGES_GROUP_CHAT" = "Chatt";
 "MESSAGES_GROUP_GROK" = "Grok";
 "HIDE_SUGGESTED_CHATS_TITLE" = "Dölj föreslagna chattar";
@@ -247,8 +252,8 @@
 "DOWNLOAD_VOICE_MESSAGES_DETAIL" = "Spara ett röstmeddelandes ljud med en lång tryckning efter att du spelat upp det.";
 
 /* ===== GROK ===== */
-"HIDE_GROK_ANALYZE_TITLE" = "Dölj analys- och frågeknappar";
-"HIDE_GROK_ANALYZE_DETAIL" = "Ta bort Groks knappar för att analysera och fråga.";
+"HIDE_GROK_ANALYZE_TITLE" = "Dölj Grok-knappar";
+"HIDE_GROK_ANALYZE_DETAIL" = "Ta bort Groks knappar från Tweets, profiler, chattar och markerad text.";
 "HIDE_GROK_SIDEBAR_TITLE" = "Dölj Grok i menyn";
 "HIDE_GROK_SIDEBAR_DETAIL" = "Ta bort Grok-genvägen från kontomenyn.";
 "HIDE_GROK_BOT_TITLE" = "Dölj Grok Bot";
@@ -302,6 +307,8 @@
 "THEME_SETTINGS_NAVIGATION_DETAIL" = "Välj en accentfärg. Bara du kan se den.";
 "THEME_SETTINGS_NAVIGATION_TITLE" = "Accentfärg";
 "THEME_CUSTOM_HINT" = "Välj valfri färg för länkar, knappar och markeringar.";
+"THEME_HINT_TAP" = "Tryck på en färg för att se den i förhandsvisningen";
+"THEME_HINT_CUSTOM" = "Tryck på den sista färgen för att välja en egen";
 "THEME_RESET_HINT" = "Tar bort accentfärgen överallt, även från den valda fliken, reglagen och Twitter-symbolen.";
 "THEME_RESET_CONFIRM_TITLE" = "Återställ accentfärg";
 "THEME_RESET_CONFIRM_MESSAGE" = "Accentfärgen går tillbaka till Twitters standard, och Vald flik, Reglage och Twitter-symbol slutar använda den. Dina övriga inställningar finns kvar.";
@@ -447,7 +454,7 @@
 "HIDE_TWEET_BUTTON_TITLE" = "Dölj Tweet-knappen";
 "HIDE_TWEET_BUTTON_DETAIL" = "Ta bort den flytande skrivknappen.";
 "SEND_SOUND_TITLE" = "Skickaljud";
-"SEND_SOUND_DETAIL" = "Ett ljud som spelas när en Tweet skickas.";
+"SEND_SOUND_DETAIL" = "Välj ett ljud som spelas när en Tweet skickas.";
 "SEND_SOUND_NONE" = "Inget";
 "SEND_SOUND_IMPORT_ACTION" = "Importera…";
 "SEND_SOUND_REMOVE_ACTION" = "Ta bort";
@@ -540,6 +547,7 @@
 "PROFILES_GROUP_INTERFACE" = "Gränssnitt";
 
 "PROFILE_INITIAL_TAB_TITLE" = "Öppna profiler på";
+"PROFILE_INITIAL_TAB_DETAIL" = "Välj fliken en profil öppnas på.";
 "PROFILE_TAB_DEFAULT" = "Standard";
 "PROFILE_TAB_REPLIES" = "Svar";
 "PROFILE_TAB_HIGHLIGHTS" = "Höjdpunkter";
@@ -571,13 +579,9 @@
 "HIDDEN_NOTIFS_UNHIDE" = "Visa";
 "HIDDEN_NOTIFS_UNTITLED" = "Dold avisering";
 "HIDE_NOTIFICATIONS_TITLE" = "Dölj aviseringar";
-"HIDE_NOTIFICATIONS_DETAIL" = "Dölj en med dess × eller via dess Tweets meny. Ögat högst upp listar dem.";
+"HIDE_NOTIFICATIONS_DETAIL" = "Dölj en avisering med dess ×. Ögat listar dem.";
 "NEW_TWITTER_SETTINGS_TITLE" = "Nya Twitter-inställningar";
 "NEW_TWITTER_SETTINGS_DETAIL" = "Använd Twitters omgjorda inställningar och ge PrimeFreeBird samma utseende.";
-"EXPLORE_TABS_CAPTION" = "Utforska-fältet";
-"EXPLORE_TABS_HINT" = "Tryck på en flik för att ta bort eller återställa den.";
-"EXPLORE_TABS_HIDDEN_COUNT" = "%lu dolda";
-"EXPLORE_TABS_NONE_HIDDEN" = "Inga dolda";
 "HIDE_TAB_FORYOU_TAB_NAME" = "Utforska";
 "HIDE_TAB_TRENDING_TAB_NAME" = "Trender";
 "HIDE_TAB_NEWS_TAB_NAME" = "Nyheter";
@@ -585,10 +589,13 @@
 "HIDE_TAB_ENTERTAINMENT_TAB_NAME" = "Underhållning";
 "HIDE_EXPLORE_ALL_TITLE" = "Dölj alla flikar";
 "HIDE_EXPLORE_ALL_DETAIL" = "Lämna bara sökfältet.";
-"CHOOSE_EXPLORE_TABS_TITLE" = "Välj flikar";
-"CHOOSE_EXPLORE_TABS_DETAIL" = "Välj vilka flikar som finns kvar i fältet.";
-"CHOOSE_EXPLORE_TABS_DETAIL_HELD" = "Behövs inte medan alla flikar är dolda.";
-"EXPLORE_TABS_KEEP_ONE" = "Behåll en flik, eller använd Dölj alla flikar.";
+"EXPLORE_TABS_TITLE" = "Flikar";
+"EXPLORE_TABS_SUBTITLE" = "Välj vilka flikar Utforska visar.";
+"EXPLORE_TABS_DETAIL" = "Välj vilka flikar Utforska visar.";
+"EXPLORE_TABS_DETAIL_HELD" = "Behövs inte medan alla flikar är dolda.";
+"EXPLORE_TABS_SECTION_SHOWN" = "I Utforska";
+"EXPLORE_TABS_HINT_TAP" = "Tryck på en flik för att dölja den eller ta tillbaka den";
+"EXPLORE_TABS_KEEP_ONE" = "Behåll en flik, eller använd Dölj alla flikar";
 "LAB_GROUP_SESSION" = "Webbsession";
 "LAB_GROUP_TOOLS" = "Felsökning";
 "LAB_GROUP_BACKUP" = "Säkerhetskopia";
@@ -729,7 +736,8 @@
 "TW_HOME_TIMELINE_TITLE" = "För dig";
 "TW_HOME_TIMELINE_LATEST_TITLE" = "Följer";
 "MEDIA_GROUP_LAYOUT" = "Layout";
-"BRANDING_GROUP_CLASSIC" = "Klassiska Twitter";
+"BRANDING_GROUP_LABELS" = "Etiketter";
+"BRANDING_GROUP_CLASSIC" = "Klassiskt";
 "VOICE_NOTE_FROM_VIDEO_TITLE" = "Röstmeddelande från en video";
 "VOICE_NOTE_FROM_VIDEO_DETAIL" = "Lägg till en knapp på ett inspelat röstmeddelande som byter dess ljud mot ljudet i en video från ditt bibliotek.";
 "VOICE_NOTE_FROM_VIDEO_BUTTON" = "Ersätt med en video";

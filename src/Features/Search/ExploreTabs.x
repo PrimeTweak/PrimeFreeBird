@@ -1,4 +1,4 @@
-// Choose Explore tabs: hides the chosen tabs and keeps the pager off their pages.
+// Explore tabs: hides the tabs hidden on the Tabs page and keeps the pager off their pages.
 
 #import "Support/HookHelpers.h"
 #import "Debug/PFBDebugger.h"
@@ -22,17 +22,14 @@ static BOOL pfbAnyTabHidden(void) {
     return NO;
 }
 
-// The two modes are asked for, not inferred: each has its own switch, and the
-// settings screen refuses to strike the last kept tab, so an empty bar cannot be
-// reached.
+// The two modes are asked for, not inferred: Hide all tabs has its own switch, and the
+// Tabs page refuses to hide the last kept tab, so an empty bar cannot be reached.
 BOOL pfbShouldHideAllTrends(void) {
     return [PFBSettings boolForKey:@"hide_explore_all"];
 }
 
 static BOOL pfbGranularActive(void) {
-    return ![PFBSettings boolForKey:@"hide_explore_all"]
-        && [PFBSettings boolForKey:@"choose_explore_tabs"]
-        && pfbAnyTabHidden();
+    return ![PFBSettings boolForKey:@"hide_explore_all"] && pfbAnyTabHidden();
 }
 
 // MARK: - tab mask helpers
@@ -366,7 +363,7 @@ static BOOL pfbApplyTabFilter(UIView* bar, UICollectionView* cv) {
         pfbNoteExploreAccessoryView((UIView*)self);
     }
     if (!pfbGranularActive()) {
-        PFBCOMPAT_OBSERVE(PFBCompat_choose_explore_tabs, @"Explore tabs found");
+        PFBCOMPAT_OBSERVE(PFBCompat_explore_tabs, @"Explore tabs found");
         return;
     }
 
@@ -374,7 +371,7 @@ static BOOL pfbApplyTabFilter(UIView* bar, UICollectionView* cv) {
     if (!cv) { return; }
 
     if (pfbApplyTabFilter((UIView*)self, cv)) {
-        PFBCOMPAT_ACTION(PFBCompat_choose_explore_tabs, @"chosen tabs kept");
+        PFBCOMPAT_ACTION(PFBCompat_explore_tabs, @"chosen tabs kept");
     }
 
     __weak UIView* wself = (UIView*)self;

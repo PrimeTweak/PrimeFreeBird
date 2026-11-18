@@ -25,12 +25,12 @@
 "DISABLE_RTL_TITLE" = "텍스트를 왼쪽에서 오른쪽으로 표시";
 "DISABLE_RTL_DETAIL" = "아랍어 등 오른쪽에서 왼쪽으로 쓰는 언어에서도 텍스트를 왼쪽에서 오른쪽으로 표시합니다.";
 "HIDE_PREMIUM_OFFER_TITLE" = "Premium 구독 권유 제거";
-"HIDE_PREMIUM_OFFER_DETAIL" = "'인증받기', '업그레이드' 버튼을 제거합니다.";
+"HIDE_PREMIUM_OFFER_DETAIL" = "'인증받기', '업그레이드' 버튼 같은 트위터의 프리미엄 안내를 제거합니다.";
 
 /* ===== General › Links ===== */
 "GENERAL_GROUP_LINKS" = "링크";
 "SHARING_DOMAIN_TITLE" = "공유 도메인";
-"SHARING_DOMAIN_DETAIL" = "공유하는 링크에 쓰이는 주소입니다.";
+"SHARING_DOMAIN_DETAIL" = "공유하는 링크에 쓰일 주소를 선택합니다.";
 "SHARING_DOMAIN_PROMPT_MESSAGE" = "공유하는 링크가 이 주소를 사용합니다. x.com을 쓰려면 비워 두세요.";
 "STRIP_URL_TRACKING_TITLE" = "깔끔한 링크";
 "STRIP_URL_TRACKING_DETAIL" = "여는 링크와, 공유하거나 복사하는 트위터 링크에서 추적 정보를 제거합니다.";
@@ -79,19 +79,22 @@
 "CUSTOM_TAB_BAR_OPTION_SUBTITLE" = "표시할 탭과 순서를 선택합니다.";
 "APPEARANCE_GROUP_SIDEBAR" = "메뉴";
 "CUSTOM_SIDEBAR_OPTION_TITLE" = "메뉴";
-"CUSTOM_SIDEBAR_OPTION_SUBTITLE" = "메뉴에 표시할 항목을 선택하세요.";
+"CUSTOM_SIDEBAR_OPTION_SUBTITLE" = "계정 메뉴에 표시할 항목을 선택하세요.";
 "SIDEBAR_EDITOR_NAVIGATION_TITLE" = "메뉴";
-"SIDEBAR_EDITOR_DETAIL" = "항목을 탭하여 메뉴에 추가하거나 제거하세요.";
+"SIDEBAR_EDITOR_DETAIL" = "계정 메뉴에 표시할 항목을 선택하세요.";
 "SIDEBAR_SECTION_SHOWN" = "표시됨";
 "SIDEBAR_SECTION_HIDDEN" = "숨겨짐";
 "SIDEBAR_ITEM_SHOWN" = "표시됨";
 "SIDEBAR_ITEM_HIDDEN" = "숨겨짐";
+"SIDEBAR_HINT_TAP" = "항목을 눌러 추가하거나 제거합니다";
+"SIDEBAR_HINT_GROK" = "Grok은 메뉴에서 Grok 제거 설정도 따릅니다";
 "RESTORE_TAB_LABELS_TITLE" = "탭 라벨";
 "RESTORE_TAB_LABELS_DETAIL" = "아이콘 아래에 라벨을 표시합니다.";
 "NO_TAB_BAR_HIDING_TITLE" = "항상 표시";
 "NO_TAB_BAR_HIDING_DETAIL" = "스크롤해도 하단 바가 작아지거나 흐려지지 않습니다.";
 "SHOW_BOTTOM_FADE_TITLE" = "하단 페이드";
 "SHOW_BOTTOM_FADE_DETAIL" = "바 아래 페이지를 흐려지게 해 유리 뒤가 더 부드럽게 보입니다.";
+"SHOW_BOTTOM_FADE_DETAIL_HELD" = "Liquid Glass가 필요합니다. 스타일 › 화면 스타일에서 선택하세요.";
 
 /* ===== BRANDING ===== */
 "MODERN_SETTINGS_BRANDING_TITLE" = "브랜딩";
@@ -104,6 +107,7 @@
 "REFRESH_PILL_LABEL_DETAIL" = "새 트윗 알림에서 프로필 사진 옆에 단어를 표시합니다.";
 "RESTORE_TWEET_BUTTON_TITLE" = "클래식 트윗 버튼";
 "RESTORE_TWEET_BUTTON_DETAIL" = "색이 있는 원 위에 깃털을 보여줍니다.";
+"RESTORE_TWEET_BUTTON_DETAIL_HELD" = "트윗 버튼이 숨겨져 있는 동안에는 필요하지 않습니다.";
 
 /* ===== TIMELINES ===== */
 "MODERN_SETTINGS_TIMELINES_TITLE" = "타임라인";
@@ -141,7 +145,7 @@
 "MODERN_SETTINGS_TWEETS_TITLE" = "트윗";
 "MODERN_SETTINGS_TWEETS_SUBTITLE" = "작성, 버튼, 답글, 민감한 콘텐츠.";
 "UNDO_TWEET_TITLE" = "트윗 취소하기";
-"UNDO_TWEET_TIMEOUT_DETAIL" = "트윗을 보낸 후 취소할 수 있는 시간입니다.";
+"UNDO_TWEET_TIMEOUT_DETAIL" = "보낸 트윗을 취소할 수 있는 시간을 선택합니다.";
 "TWEET_CONFIRM_TITLE" = "트윗 시 확인 창 표시";
 "TWEET_CONFIRM_DETAIL" = "트윗이나 답글을 보내기 전에 확인을 요청합니다.";
 "LIKE_CONFIRM_TITLE" = "'마음에 들어요' 확인 창 표시";
@@ -155,11 +159,11 @@
 "HIDE_DOWNVOTE_BUTTON_TITLE" = "다운보트 버튼 제거";
 "HIDE_DOWNVOTE_BUTTON_DETAIL" = "트윗 아래의 다운보트 버튼을 제거합니다.";
 "REPLY_SORTING_TITLE" = "답글 정렬하기";
-"REPLY_SORTING_DETAIL" = "답글이 열리는 순서입니다. 트위터의 정렬 버튼은 남습니다.";
+"REPLY_SORTING_DETAIL" = "답글이 열리는 순서를 선택합니다. 트위터의 정렬 버튼은 남습니다.";
 "RESTORE_REPLY_CONTEXT_TITLE" = "'답글 대상' 줄";
 "RESTORE_REPLY_CONTEXT_DETAIL" = "열린 답글 위에 이 줄을 다시 표시합니다.";
-"SHOW_QUOTE_COUNTS_TITLE" = "인용 및 리트윗";
-"SHOW_QUOTE_COUNTS_DETAIL" = "트윗의 인용 화면 상단에 두 숫자를 줄이지 않고 표시합니다.";
+"SHOW_QUOTE_COUNTS_TITLE" = "인용 수";
+"SHOW_QUOTE_COUNTS_DETAIL" = "트윗의 인용 화면 상단에 인용 수와 리트윗 수를 줄이지 않고 표시합니다.";
 "SHOW_TWEET_SOURCE_TITLE" = "트윗 출처";
 "SHOW_TWEET_SOURCE_DETAIL" = "열린 트윗의 시간 옆에 트윗을 보낸 앱을 표시합니다.";
 "SHOW_ACCOUNT_LOCATION_TITLE" = "계정 위치";
@@ -200,7 +204,7 @@
 
 /* ===== PROFILES ===== */
 "MODERN_SETTINGS_PROFILES_TITLE" = "프로필";
-"MODERN_SETTINGS_PROFILES_SUBTITLE" = "팔로우 버튼, 배지, 프로필 탭.";
+"MODERN_SETTINGS_PROFILES_SUBTITLE" = "팔로우, 자기소개, 프로필 탭, 배지, 버튼.";
 "FOLLOW_CONFIRM_TITLE" = "팔로우 시 확인 창 표시";
 "FOLLOW_CONFIRM_DETAIL" = "계정을 팔로우하기 전에 확인을 요청합니다.";
 "COPY_PROFILE_INFO_TITLE" = "프로필 정보 복사 버튼 표시";
@@ -214,7 +218,7 @@
 "HIDE_FOLLOW_BUTTON_TITLE" = "팔로우 버튼 제거";
 "HIDE_FOLLOW_BUTTON_DETAIL" = "트윗 작성자 옆의 팔로우 버튼을 제거합니다. 프로필의 버튼은 유지됩니다.";
 "HIDE_MESSAGE_BUTTON_TITLE" = "메시지 버튼 숨기기";
-"HIDE_MESSAGE_BUTTON_DETAIL" = "트윗 작성자 옆의 메시지 버튼을 제거합니다.";
+"HIDE_MESSAGE_BUTTON_DETAIL" = "트윗 작성자 옆의 메시지 버튼을 제거합니다. 프로필의 버튼은 남습니다.";
 /* Legacy key name: this row HIDES the Subscribe button. Do not rename the
    key — it is persisted in user defaults. */
 "RESTORE_FOLLOW_BUTTON_TITLE" = "구독 버튼 제거";
@@ -234,7 +238,8 @@
 
 /* ===== MESSAGES ===== */
 "MODERN_SETTINGS_MESSAGES_TITLE" = "메시지";
-"MODERN_SETTINGS_MESSAGES_SUBTITLE" = "입력 표시, 음성 메모, Grok.";
+"MODERN_SETTINGS_MESSAGES_SUBTITLE" = "알림, 입력 표시, 음성 메모, Grok.";
+"MESSAGES_GROUP_NOTIFICATIONS" = "알림";
 "MESSAGES_GROUP_CHAT" = "채팅";
 "MESSAGES_GROUP_GROK" = "Grok";
 "HIDE_SUGGESTED_CHATS_TITLE" = "추천 채팅 숨기기";
@@ -247,8 +252,8 @@
 "DOWNLOAD_VOICE_MESSAGES_DETAIL" = "재생한 후 길게 누르면 음성 메모의 오디오를 저장합니다.";
 
 /* ===== GROK ===== */
-"HIDE_GROK_ANALYZE_TITLE" = "분석 및 질문 버튼 제거";
-"HIDE_GROK_ANALYZE_DETAIL" = "Grok의 분석 버튼과 질문 버튼을 제거합니다.";
+"HIDE_GROK_ANALYZE_TITLE" = "Grok 버튼 숨기기";
+"HIDE_GROK_ANALYZE_DETAIL" = "트윗, 프로필, 채팅, 선택한 텍스트에서 Grok 버튼을 제거합니다.";
 "HIDE_GROK_SIDEBAR_TITLE" = "메뉴에서 Grok 제거";
 "HIDE_GROK_SIDEBAR_DETAIL" = "계정 메뉴에서 Grok 바로가기를 제거합니다.";
 "HIDE_GROK_BOT_TITLE" = "Grok Bot 숨기기";
@@ -302,6 +307,8 @@
 "THEME_SETTINGS_NAVIGATION_DETAIL" = "강조 색상을 선택하세요. 나만 볼 수 있습니다.";
 "THEME_SETTINGS_NAVIGATION_TITLE" = "강조 색상";
 "THEME_CUSTOM_HINT" = "링크, 버튼, 강조에 원하는 색상을 선택합니다.";
+"THEME_HINT_TAP" = "색상을 눌러 미리보기에서 확인합니다";
+"THEME_HINT_CUSTOM" = "마지막 색상을 눌러 원하는 색을 고릅니다";
 "THEME_RESET_HINT" = "선택한 탭, 스위치, 트위터 아이콘을 포함해 모든 곳에서 강조 색상을 제거합니다.";
 "THEME_RESET_CONFIRM_TITLE" = "강조 색상 복원";
 "THEME_RESET_CONFIRM_MESSAGE" = "강조 색상이 트위터 기본값으로 돌아가고, 선택한 탭·스위치·트위터 아이콘은 더 이상 이 색을 쓰지 않습니다. 다른 설정은 유지됩니다.";
@@ -447,7 +454,7 @@
 "HIDE_TWEET_BUTTON_TITLE" = "트윗 버튼 숨기기";
 "HIDE_TWEET_BUTTON_DETAIL" = "떠 있는 트윗 작성 버튼을 제거합니다.";
 "SEND_SOUND_TITLE" = "전송 사운드";
-"SEND_SOUND_DETAIL" = "트윗을 보낼 때 재생되는 사운드입니다.";
+"SEND_SOUND_DETAIL" = "트윗을 보낼 때 재생할 사운드를 선택합니다.";
 "SEND_SOUND_NONE" = "없음";
 "SEND_SOUND_IMPORT_ACTION" = "가져오기…";
 "SEND_SOUND_REMOVE_ACTION" = "제거";
@@ -540,6 +547,7 @@
 "PROFILES_GROUP_INTERFACE" = "인터페이스";
 
 "PROFILE_INITIAL_TAB_TITLE" = "프로필을 열 탭";
+"PROFILE_INITIAL_TAB_DETAIL" = "프로필이 열릴 탭을 선택합니다.";
 "PROFILE_TAB_DEFAULT" = "기본값";
 "PROFILE_TAB_REPLIES" = "답글";
 "PROFILE_TAB_HIGHLIGHTS" = "하이라이트";
@@ -571,13 +579,9 @@
 "HIDDEN_NOTIFS_UNHIDE" = "다시 표시";
 "HIDDEN_NOTIFS_UNTITLED" = "숨긴 알림";
 "HIDE_NOTIFICATIONS_TITLE" = "알림 숨기기";
-"HIDE_NOTIFICATIONS_DETAIL" = "×나 트윗 메뉴로 숨깁니다. 위의 눈 아이콘에 목록이 있습니다.";
+"HIDE_NOTIFICATIONS_DETAIL" = "×로 알림을 숨깁니다. 눈 아이콘에 목록이 있습니다.";
 "NEW_TWITTER_SETTINGS_TITLE" = "새 트위터 설정";
 "NEW_TWITTER_SETTINGS_DETAIL" = "새로 디자인된 트위터 설정을 쓰고 PrimeFreeBird에도 같은 모양을 적용합니다.";
-"EXPLORE_TABS_CAPTION" = "탐색하기 바";
-"EXPLORE_TABS_HINT" = "탭을 눌러 제거하거나 복원합니다.";
-"EXPLORE_TABS_HIDDEN_COUNT" = "%lu개 숨김";
-"EXPLORE_TABS_NONE_HIDDEN" = "숨긴 탭 없음";
 "HIDE_TAB_FORYOU_TAB_NAME" = "탐색하기";
 "HIDE_TAB_TRENDING_TAB_NAME" = "트렌드";
 "HIDE_TAB_NEWS_TAB_NAME" = "뉴스";
@@ -585,10 +589,13 @@
 "HIDE_TAB_ENTERTAINMENT_TAB_NAME" = "엔터테인먼트";
 "HIDE_EXPLORE_ALL_TITLE" = "모든 탭 숨기기";
 "HIDE_EXPLORE_ALL_DETAIL" = "검색창만 남깁니다.";
-"CHOOSE_EXPLORE_TABS_TITLE" = "탭 선택";
-"CHOOSE_EXPLORE_TABS_DETAIL" = "바에 남길 탭을 선택합니다.";
-"CHOOSE_EXPLORE_TABS_DETAIL_HELD" = "모든 탭이 숨겨져 있는 동안에는 필요하지 않습니다.";
-"EXPLORE_TABS_KEEP_ONE" = "탭을 하나 남기거나 모든 탭 숨기기를 사용하세요.";
+"EXPLORE_TABS_TITLE" = "탭";
+"EXPLORE_TABS_SUBTITLE" = "탐색하기에 표시할 탭을 선택합니다.";
+"EXPLORE_TABS_DETAIL" = "탐색하기에 표시할 탭을 선택합니다.";
+"EXPLORE_TABS_DETAIL_HELD" = "모든 탭이 숨겨져 있는 동안에는 필요하지 않습니다.";
+"EXPLORE_TABS_SECTION_SHOWN" = "탐색하기에 표시";
+"EXPLORE_TABS_HINT_TAP" = "탭을 눌러 숨기거나 다시 표시합니다";
+"EXPLORE_TABS_KEEP_ONE" = "탭을 하나 남기거나 모든 탭 숨기기를 사용하세요";
 "LAB_GROUP_SESSION" = "웹 세션";
 "LAB_GROUP_TOOLS" = "문제 해결";
 "LAB_GROUP_BACKUP" = "백업";
@@ -729,7 +736,8 @@
 "TW_HOME_TIMELINE_TITLE" = "추천";
 "TW_HOME_TIMELINE_LATEST_TITLE" = "팔로우 중";
 "MEDIA_GROUP_LAYOUT" = "레이아웃";
-"BRANDING_GROUP_CLASSIC" = "클래식 트위터";
+"BRANDING_GROUP_LABELS" = "표기";
+"BRANDING_GROUP_CLASSIC" = "클래식";
 "VOICE_NOTE_FROM_VIDEO_TITLE" = "동영상으로 음성 메모";
 "VOICE_NOTE_FROM_VIDEO_DETAIL" = "녹음한 음성 메모에, 그 소리를 보관함 동영상의 소리로 바꾸는 버튼을 추가합니다.";
 "VOICE_NOTE_FROM_VIDEO_BUTTON" = "동영상으로 바꾸기";

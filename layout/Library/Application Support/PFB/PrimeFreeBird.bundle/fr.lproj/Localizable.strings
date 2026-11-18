@@ -21,12 +21,12 @@
 "DISABLE_RTL_TITLE" = "Texte de gauche à droite";
 "DISABLE_RTL_DETAIL" = "Affiche le texte de gauche à droite, même pour les langues de droite à gauche.";
 "HIDE_PREMIUM_OFFER_TITLE" = "Masquer les offres Premium";
-"HIDE_PREMIUM_OFFER_DETAIL" = "Retire les boutons « Obtenir la certification » et « Mettre à niveau ».";
+"HIDE_PREMIUM_OFFER_DETAIL" = "Retire les offres Premium de Twitter, comme les boutons « Obtenir la certification » et « Mettre à niveau ».";
 
 /* ===== General › Links ===== */
 "GENERAL_GROUP_LINKS" = "Liens";
 "SHARING_DOMAIN_TITLE" = "Domaine de partage";
-"SHARING_DOMAIN_DETAIL" = "L’adresse utilisée dans les liens que vous partagez.";
+"SHARING_DOMAIN_DETAIL" = "Choisissez l’adresse utilisée dans les liens que vous partagez.";
 "SHARING_DOMAIN_PROMPT_MESSAGE" = "Les liens que vous partagez utilisent cette adresse. Laissez vide pour x.com.";
 "STRIP_URL_TRACKING_TITLE" = "Liens propres";
 "STRIP_URL_TRACKING_DETAIL" = "Retire le suivi des liens ouverts et des liens Twitter que vous partagez ou copiez.";
@@ -75,19 +75,22 @@
 "CUSTOM_TAB_BAR_OPTION_SUBTITLE" = "Choisissez les onglets affichés et leur ordre.";
 "APPEARANCE_GROUP_SIDEBAR" = "Menu";
 "CUSTOM_SIDEBAR_OPTION_TITLE" = "Menu";
-"CUSTOM_SIDEBAR_OPTION_SUBTITLE" = "Choisissez les éléments affichés dans le menu.";
+"CUSTOM_SIDEBAR_OPTION_SUBTITLE" = "Choisissez les éléments affichés dans le menu du compte.";
 "SIDEBAR_EDITOR_NAVIGATION_TITLE" = "Menu";
-"SIDEBAR_EDITOR_DETAIL" = "Touchez un élément pour l’ajouter au menu ou l’en retirer.";
+"SIDEBAR_EDITOR_DETAIL" = "Choisissez les éléments affichés dans le menu du compte.";
 "SIDEBAR_SECTION_SHOWN" = "Affichés";
 "SIDEBAR_SECTION_HIDDEN" = "Masqués";
 "SIDEBAR_ITEM_SHOWN" = "Affiché";
 "SIDEBAR_ITEM_HIDDEN" = "Masqué";
+"SIDEBAR_HINT_TAP" = "Touchez un élément pour l’ajouter ou le retirer";
+"SIDEBAR_HINT_GROK" = "Grok suit aussi Masquer le raccourci du menu";
 "RESTORE_TAB_LABELS_TITLE" = "Étiquettes des onglets";
 "RESTORE_TAB_LABELS_DETAIL" = "Affiche les étiquettes sous les icônes.";
 "NO_TAB_BAR_HIDING_TITLE" = "Toujours visible";
 "NO_TAB_BAR_HIDING_DETAIL" = "Ne réduit ni n’estompe la barre du bas au défilement.";
 "SHOW_BOTTOM_FADE_TITLE" = "Fondu du bas";
 "SHOW_BOTTOM_FADE_DETAIL" = "Estompe la page sous la barre, pour un rendu plus doux derrière le verre.";
+"SHOW_BOTTOM_FADE_DETAIL_HELD" = "Nécessite Liquid Glass — choisissez-le dans Style › Style visuel.";
 
 /* ===== BRANDING ===== */
 "MODERN_SETTINGS_BRANDING_TITLE" = "Image de marque";
@@ -97,9 +100,10 @@
 "RESTORE_TWITTER_NAMES_TITLE" = "Vocabulaire Twitter";
 "RESTORE_TWITTER_NAMES_DETAIL" = "Remet l’oiseau et remplace « X » par « Twitter », « Post » par « Tweet », et ainsi de suite.";
 "REFRESH_PILL_LABEL_TITLE" = "Texte de la pastille";
-"REFRESH_PILL_LABEL_DETAIL" = "Affiche un mot à côté des avatars sur la pastille des nouveaux Tweets.";
+"REFRESH_PILL_LABEL_DETAIL" = "Affiche un mot à côté des photos de profil sur la pastille des nouveaux Tweets.";
 "RESTORE_TWEET_BUTTON_TITLE" = "Bouton Tweet classique";
 "RESTORE_TWEET_BUTTON_DETAIL" = "Affiche la plume sur un cercle coloré.";
+"RESTORE_TWEET_BUTTON_DETAIL_HELD" = "Inutile tant que le bouton Tweet est masqué.";
 
 /* ===== TIMELINES ===== */
 "MODERN_SETTINGS_TIMELINES_TITLE" = "Fils";
@@ -137,7 +141,7 @@
 "MODERN_SETTINGS_TWEETS_TITLE" = "Tweets";
 "MODERN_SETTINGS_TWEETS_SUBTITLE" = "Rédaction, boutons, réponses et contenu sensible.";
 "UNDO_TWEET_TITLE" = "Annuler le Tweet";
-"UNDO_TWEET_TIMEOUT_DETAIL" = "Délai pour annuler un Tweet après l’envoi.";
+"UNDO_TWEET_TIMEOUT_DETAIL" = "Choisissez combien de temps vous pouvez annuler un Tweet envoyé.";
 "TWEET_CONFIRM_TITLE" = "Confirmer les Tweets";
 "TWEET_CONFIRM_DETAIL" = "Demande confirmation avant d’envoyer un Tweet ou une réponse.";
 "LIKE_CONFIRM_TITLE" = "Confirmer les J’aime";
@@ -151,11 +155,11 @@
 "HIDE_DOWNVOTE_BUTTON_TITLE" = "Masquer le bouton de vote négatif";
 "HIDE_DOWNVOTE_BUTTON_DETAIL" = "Retire le bouton de vote négatif sous les Tweets.";
 "REPLY_SORTING_TITLE" = "Trier les réponses";
-"REPLY_SORTING_DETAIL" = "L’ordre d’ouverture des réponses. Le bouton de tri de Twitter reste.";
+"REPLY_SORTING_DETAIL" = "Choisissez l’ordre d’ouverture des réponses. Le bouton de tri de Twitter reste.";
 "RESTORE_REPLY_CONTEXT_TITLE" = "Ligne « En réponse à »";
 "RESTORE_REPLY_CONTEXT_DETAIL" = "La remet au-dessus d’une réponse ouverte.";
-"SHOW_QUOTE_COUNTS_TITLE" = "Citations et Retweets";
-"SHOW_QUOTE_COUNTS_DETAIL" = "Affiche les deux nombres en entier en haut de l’écran des citations d’un Tweet.";
+"SHOW_QUOTE_COUNTS_TITLE" = "Nombres de citations";
+"SHOW_QUOTE_COUNTS_DETAIL" = "Affiche en entier les nombres de citations et de Retweets en haut de l’écran des citations d’un Tweet.";
 "SHOW_TWEET_SOURCE_TITLE" = "Source du Tweet";
 "SHOW_TWEET_SOURCE_DETAIL" = "Affiche, à côté de l’heure d’un Tweet ouvert, l’app d’où il a été envoyé.";
 "SHOW_ACCOUNT_LOCATION_TITLE" = "Pays du compte";
@@ -196,7 +200,7 @@
 
 /* ===== PROFILES ===== */
 "MODERN_SETTINGS_PROFILES_TITLE" = "Profils";
-"MODERN_SETTINGS_PROFILES_SUBTITLE" = "Boutons Suivre, badges et onglets des profils.";
+"MODERN_SETTINGS_PROFILES_SUBTITLE" = "Abonnements, bios, onglets des profils, badges et boutons.";
 "FOLLOW_CONFIRM_TITLE" = "Confirmer avant de suivre";
 "FOLLOW_CONFIRM_DETAIL" = "Demande confirmation avant de suivre un compte.";
 "COPY_PROFILE_INFO_TITLE" = "Copier les infos du profil";
@@ -210,7 +214,7 @@
 "HIDE_FOLLOW_BUTTON_TITLE" = "Masquer le bouton Suivre";
 "HIDE_FOLLOW_BUTTON_DETAIL" = "Retire le bouton Suivre à côté de l’auteur d’un Tweet. Les profils gardent le leur.";
 "HIDE_MESSAGE_BUTTON_TITLE" = "Masquer le bouton Message";
-"HIDE_MESSAGE_BUTTON_DETAIL" = "Retire le bouton Message à côté de l’auteur d’un Tweet.";
+"HIDE_MESSAGE_BUTTON_DETAIL" = "Retire le bouton Message à côté de l’auteur d’un Tweet. Les profils gardent le leur.";
 /* Legacy key name: this row HIDES the Subscribe button. Do not rename the
    key — it is persisted in user defaults. */
 "RESTORE_FOLLOW_BUTTON_TITLE" = "Masquer le bouton S’abonner";
@@ -230,7 +234,8 @@
 
 /* ===== MESSAGES ===== */
 "MODERN_SETTINGS_MESSAGES_TITLE" = "Messages";
-"MODERN_SETTINGS_MESSAGES_SUBTITLE" = "Saisie, messages vocaux et Grok.";
+"MODERN_SETTINGS_MESSAGES_SUBTITLE" = "Notifications, saisie, messages vocaux et Grok.";
+"MESSAGES_GROUP_NOTIFICATIONS" = "Notifications";
 "MESSAGES_GROUP_CHAT" = "Chat";
 "MESSAGES_GROUP_GROK" = "Grok";
 "HIDE_SUGGESTED_CHATS_TITLE" = "Masquer les discussions suggérées";
@@ -243,8 +248,8 @@
 "DOWNLOAD_VOICE_MESSAGES_DETAIL" = "Enregistre le son d’un message vocal d’un appui long, une fois écouté.";
 
 /* ===== GROK ===== */
-"HIDE_GROK_ANALYZE_TITLE" = "Masquer les boutons d’analyse et de question";
-"HIDE_GROK_ANALYZE_DETAIL" = "Retire les boutons d’analyse et de question de Grok.";
+"HIDE_GROK_ANALYZE_TITLE" = "Masquer les boutons Grok";
+"HIDE_GROK_ANALYZE_DETAIL" = "Retire les boutons de Grok des Tweets, des profils, des chats et du texte sélectionné.";
 "HIDE_GROK_SIDEBAR_TITLE" = "Masquer le raccourci du menu";
 "HIDE_GROK_SIDEBAR_DETAIL" = "Retire le raccourci Grok du menu du compte.";
 "HIDE_GROK_BOT_TITLE" = "Masquer Grok Bot";
@@ -298,6 +303,8 @@
 "THEME_SETTINGS_NAVIGATION_DETAIL" = "Choisissez une couleur d’accent. Vous seul pouvez la voir.";
 "THEME_SETTINGS_NAVIGATION_TITLE" = "Couleur d’accent";
 "THEME_CUSTOM_HINT" = "Choisissez n’importe quelle couleur pour les liens, les boutons et les mises en évidence.";
+"THEME_HINT_TAP" = "Touchez une couleur pour la voir dans l’aperçu";
+"THEME_HINT_CUSTOM" = "Touchez la dernière couleur pour choisir la vôtre";
 "THEME_RESET_HINT" = "Retire la couleur d’accent partout, y compris de l’onglet sélectionné, des interrupteurs et de l’icône Twitter.";
 "THEME_RESET_CONFIRM_TITLE" = "Restaurer la couleur d’accent";
 "THEME_RESET_CONFIRM_MESSAGE" = "La couleur d’accent revient à celle de Twitter, et Onglet sélectionné, Interrupteurs et Icône Twitter ne l’utilisent plus. Vos autres réglages restent.";
@@ -443,7 +450,7 @@
 "HIDE_TWEET_BUTTON_TITLE" = "Masquer le bouton Tweet";
 "HIDE_TWEET_BUTTON_DETAIL" = "Retire le bouton flottant de rédaction.";
 "SEND_SOUND_TITLE" = "Son d’envoi";
-"SEND_SOUND_DETAIL" = "Un son joué à l’envoi d’un Tweet.";
+"SEND_SOUND_DETAIL" = "Choisissez un son joué à l’envoi d’un Tweet.";
 "SEND_SOUND_NONE" = "Aucun";
 "SEND_SOUND_IMPORT_ACTION" = "Importer…";
 "SEND_SOUND_REMOVE_ACTION" = "Retirer";
@@ -536,6 +543,7 @@
 "PROFILES_GROUP_INTERFACE" = "Interface";
 
 "PROFILE_INITIAL_TAB_TITLE" = "Ouvrir les profils sur";
+"PROFILE_INITIAL_TAB_DETAIL" = "Choisissez l’onglet sur lequel un profil s’ouvre.";
 "PROFILE_TAB_DEFAULT" = "Par défaut";
 "PROFILE_TAB_REPLIES" = "Réponses";
 "PROFILE_TAB_HIGHLIGHTS" = "Tweets marquants";
@@ -567,13 +575,9 @@
 "HIDDEN_NOTIFS_UNHIDE" = "Réafficher";
 "HIDDEN_NOTIFS_UNTITLED" = "Notification masquée";
 "HIDE_NOTIFICATIONS_TITLE" = "Masquer des notifications";
-"HIDE_NOTIFICATIONS_DETAIL" = "Une notification se masque par son × ou le menu de son Tweet. L’œil en haut les liste.";
+"HIDE_NOTIFICATIONS_DETAIL" = "Masquez une notification avec son ×. L’œil les liste.";
 "NEW_TWITTER_SETTINGS_TITLE" = "Nouveaux réglages Twitter";
 "NEW_TWITTER_SETTINGS_DETAIL" = "Utilise les réglages redessinés de Twitter et donne le même style à PrimeFreeBird.";
-"EXPLORE_TABS_CAPTION" = "Barre d’Explorer";
-"EXPLORE_TABS_HINT" = "Touchez un onglet pour le retirer ou le remettre.";
-"EXPLORE_TABS_HIDDEN_COUNT" = "Masqués : %lu";
-"EXPLORE_TABS_NONE_HIDDEN" = "Aucun masqué";
 "HIDE_TAB_FORYOU_TAB_NAME" = "Explorer";
 "HIDE_TAB_TRENDING_TAB_NAME" = "Tendances";
 "HIDE_TAB_NEWS_TAB_NAME" = "Actualités";
@@ -581,10 +585,13 @@
 "HIDE_TAB_ENTERTAINMENT_TAB_NAME" = "Divertissement";
 "HIDE_EXPLORE_ALL_TITLE" = "Masquer tous les onglets";
 "HIDE_EXPLORE_ALL_DETAIL" = "Ne laisse que la barre de recherche.";
-"CHOOSE_EXPLORE_TABS_TITLE" = "Choisir les onglets";
-"CHOOSE_EXPLORE_TABS_DETAIL" = "Ne garde dans la barre que les onglets choisis.";
-"CHOOSE_EXPLORE_TABS_DETAIL_HELD" = "Inutile tant que tous les onglets sont masqués.";
-"EXPLORE_TABS_KEEP_ONE" = "Gardez un onglet, ou utilisez Masquer tous les onglets.";
+"EXPLORE_TABS_TITLE" = "Onglets";
+"EXPLORE_TABS_SUBTITLE" = "Choisissez les onglets affichés dans Explorer.";
+"EXPLORE_TABS_DETAIL" = "Choisissez les onglets affichés dans Explorer.";
+"EXPLORE_TABS_DETAIL_HELD" = "Inutile tant que tous les onglets sont masqués.";
+"EXPLORE_TABS_SECTION_SHOWN" = "Dans Explorer";
+"EXPLORE_TABS_HINT_TAP" = "Touchez un onglet pour le masquer ou le remettre";
+"EXPLORE_TABS_KEEP_ONE" = "Gardez un onglet, ou utilisez Masquer tous les onglets";
 "LAB_GROUP_SESSION" = "Session web";
 "LAB_GROUP_TOOLS" = "Dépannage";
 "LAB_GROUP_BACKUP" = "Sauvegarde";
@@ -725,7 +732,8 @@
 "TW_HOME_TIMELINE_TITLE" = "Pour vous";
 "TW_HOME_TIMELINE_LATEST_TITLE" = "Abonnements";
 "MEDIA_GROUP_LAYOUT" = "Mise en page";
-"BRANDING_GROUP_CLASSIC" = "Twitter classique";
+"BRANDING_GROUP_LABELS" = "Libellés";
+"BRANDING_GROUP_CLASSIC" = "Classique";
 "VOICE_NOTE_FROM_VIDEO_TITLE" = "Message vocal depuis une vidéo";
 "VOICE_NOTE_FROM_VIDEO_DETAIL" = "Ajoute un bouton au message vocal enregistré pour y mettre le son d’une vidéo.";
 "VOICE_NOTE_FROM_VIDEO_BUTTON" = "Remplacer par une vidéo";

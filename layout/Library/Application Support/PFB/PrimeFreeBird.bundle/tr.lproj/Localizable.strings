@@ -25,12 +25,12 @@
 "DISABLE_RTL_TITLE" = "Soldan sağa metin";
 "DISABLE_RTL_DETAIL" = "Metni, sağdan sola yazılan dillerde bile soldan sağa göster.";
 "HIDE_PREMIUM_OFFER_TITLE" = "Premium önerilerini gizle";
-"HIDE_PREMIUM_OFFER_DETAIL" = "‘Hesabını doğrulat’ ve ‘Yükselt’ düğmelerini gizle.";
+"HIDE_PREMIUM_OFFER_DETAIL" = "Twitter’ın Premium tekliflerini, örneğin ‘Hesabını doğrulat’ ve ‘Yükselt’ düğmelerini gizle.";
 
 /* ===== General › Links ===== */
 "GENERAL_GROUP_LINKS" = "Bağlantılar";
 "SHARING_DOMAIN_TITLE" = "Paylaşım alan adı";
-"SHARING_DOMAIN_DETAIL" = "Paylaştığın bağlantılarda kullanılan adres.";
+"SHARING_DOMAIN_DETAIL" = "Paylaştığın bağlantılarda kullanılan adresi seç.";
 "SHARING_DOMAIN_PROMPT_MESSAGE" = "Paylaştığın bağlantılar bu adresi kullanır. x.com için boş bırak.";
 "STRIP_URL_TRACKING_TITLE" = "Temiz bağlantılar";
 "STRIP_URL_TRACKING_DETAIL" = "Açtığın bağlantılardan ve paylaştığın ya da kopyaladığın Twitter bağlantılarından izlemeyi kaldır.";
@@ -79,19 +79,22 @@
 "CUSTOM_TAB_BAR_OPTION_SUBTITLE" = "Hangi sekmelerin hangi sırayla görüneceğini seç.";
 "APPEARANCE_GROUP_SIDEBAR" = "Menü";
 "CUSTOM_SIDEBAR_OPTION_TITLE" = "Menü";
-"CUSTOM_SIDEBAR_OPTION_SUBTITLE" = "Menüde hangi öğelerin görüneceğini seç.";
+"CUSTOM_SIDEBAR_OPTION_SUBTITLE" = "Hesap menüsünde hangi öğelerin görüneceğini seç.";
 "SIDEBAR_EDITOR_NAVIGATION_TITLE" = "Menü";
-"SIDEBAR_EDITOR_DETAIL" = "Menüye eklemek ya da çıkarmak için bir öğeye dokun.";
+"SIDEBAR_EDITOR_DETAIL" = "Hesap menüsünde hangi öğelerin görüneceğini seç.";
 "SIDEBAR_SECTION_SHOWN" = "Gösterilen";
 "SIDEBAR_SECTION_HIDDEN" = "Gizli";
 "SIDEBAR_ITEM_SHOWN" = "Gösteriliyor";
 "SIDEBAR_ITEM_HIDDEN" = "Gizli";
+"SIDEBAR_HINT_TAP" = "Eklemek ya da çıkarmak için bir öğeye dokun";
+"SIDEBAR_HINT_GROK" = "Grok, Menüde Grok’u gizle ayarına da uyar";
 "RESTORE_TAB_LABELS_TITLE" = "Sekme etiketleri";
 "RESTORE_TAB_LABELS_DETAIL" = "Simgelerin altında etiketleri göster.";
 "NO_TAB_BAR_HIDING_TITLE" = "Her zaman görünür";
 "NO_TAB_BAR_HIDING_DETAIL" = "Kaydırırken alt çubuğu küçültme ya da gizleme.";
 "SHOW_BOTTOM_FADE_TITLE" = "Alt solma";
 "SHOW_BOTTOM_FADE_DETAIL" = "Camın ardında daha yumuşak bir görünüm için çubuğun altındaki sayfayı soldur.";
+"SHOW_BOTTOM_FADE_DETAIL_HELD" = "Liquid Glass gerekir — Stil › Görsel stil altından seç.";
 
 /* ===== BRANDING ===== */
 "MODERN_SETTINGS_BRANDING_TITLE" = "Marka";
@@ -104,6 +107,7 @@
 "REFRESH_PILL_LABEL_DETAIL" = "Yeni Tweetler hapında profil resimlerinin yanında bir kelime göster.";
 "RESTORE_TWEET_BUTTON_TITLE" = "Klasik Tweet düğmesi";
 "RESTORE_TWEET_BUTTON_DETAIL" = "Tüyü renkli bir daire üzerinde göster.";
+"RESTORE_TWEET_BUTTON_DETAIL_HELD" = "Tweet düğmesi gizliyken gerekmez.";
 
 /* ===== TIMELINES ===== */
 "MODERN_SETTINGS_TIMELINES_TITLE" = "Zaman akışları";
@@ -141,7 +145,7 @@
 "MODERN_SETTINGS_TWEETS_TITLE" = "Tweetler";
 "MODERN_SETTINGS_TWEETS_SUBTITLE" = "Yazma, düğmeler, yanıtlar ve hassas içerik.";
 "UNDO_TWEET_TITLE" = "Tweeti geri al";
-"UNDO_TWEET_TIMEOUT_DETAIL" = "Gönderdikten sonra bir Tweeti iptal etme süresi.";
+"UNDO_TWEET_TIMEOUT_DETAIL" = "Gönderilen bir Tweeti ne kadar süre iptal edebileceğini seç.";
 "TWEET_CONFIRM_TITLE" = "Tweetleri onayla";
 "TWEET_CONFIRM_DETAIL" = "Tweet veya yanıt göndermeden önce onay iste.";
 "LIKE_CONFIRM_TITLE" = "Beğenileri onayla";
@@ -155,11 +159,11 @@
 "HIDE_DOWNVOTE_BUTTON_TITLE" = "Olumsuz oy düğmesini gizle";
 "HIDE_DOWNVOTE_BUTTON_DETAIL" = "Tweetlerin altındaki olumsuz oy düğmesini kaldır.";
 "REPLY_SORTING_TITLE" = "Yanıtları sıralama";
-"REPLY_SORTING_DETAIL" = "Yanıtların açıldığı sıra. Twitter’ın sıralama düğmesi kalır.";
+"REPLY_SORTING_DETAIL" = "Yanıtların açıldığı sırayı seç. Twitter’ın sıralama düğmesi kalır.";
 "RESTORE_REPLY_CONTEXT_TITLE" = "‘Yanıt olarak’ satırı";
 "RESTORE_REPLY_CONTEXT_DETAIL" = "Açtığın bir yanıtın üstüne geri getir.";
-"SHOW_QUOTE_COUNTS_TITLE" = "Alıntılar ve Retweetler";
-"SHOW_QUOTE_COUNTS_DETAIL" = "Bir Tweetin Alıntılar ekranının üstünde iki sayıyı da tam olarak göster.";
+"SHOW_QUOTE_COUNTS_TITLE" = "Alıntı sayıları";
+"SHOW_QUOTE_COUNTS_DETAIL" = "Bir Tweetin Alıntılar ekranının üstünde Alıntı ve Retweet sayılarını tam olarak göster.";
 "SHOW_TWEET_SOURCE_TITLE" = "Tweet kaynağı";
 "SHOW_TWEET_SOURCE_DETAIL" = "Açılan bir Tweetin saatinin yanında gönderildiği uygulamayı göster.";
 "SHOW_ACCOUNT_LOCATION_TITLE" = "Hesap konumu";
@@ -200,7 +204,7 @@
 
 /* ===== PROFILES ===== */
 "MODERN_SETTINGS_PROFILES_TITLE" = "Profiller";
-"MODERN_SETTINGS_PROFILES_SUBTITLE" = "Takip et düğmeleri, rozetler ve profil sekmeleri.";
+"MODERN_SETTINGS_PROFILES_SUBTITLE" = "Takipler, biyografiler, profil sekmeleri, rozetler ve düğmeler.";
 "FOLLOW_CONFIRM_TITLE" = "Takip onayı";
 "FOLLOW_CONFIRM_DETAIL" = "Bir hesabı takip etmeden önce onay iste.";
 "COPY_PROFILE_INFO_TITLE" = "Profil bilgilerini kopyala";
@@ -214,7 +218,7 @@
 "HIDE_FOLLOW_BUTTON_TITLE" = "Takip et düğmesini gizle";
 "HIDE_FOLLOW_BUTTON_DETAIL" = "Bir Tweetin yazarının yanındaki Takip et düğmesini gizler. Profillerdeki kalır.";
 "HIDE_MESSAGE_BUTTON_TITLE" = "Mesaj düğmesini gizle";
-"HIDE_MESSAGE_BUTTON_DETAIL" = "Tweet yazarının yanındaki Mesaj düğmesini kaldır.";
+"HIDE_MESSAGE_BUTTON_DETAIL" = "Tweet yazarının yanındaki Mesaj düğmesini kaldır. Profillerdeki kalır.";
 /* Legacy key name: this row HIDES the Subscribe button. Do not rename the
    key — it is persisted in user defaults. */
 "RESTORE_FOLLOW_BUTTON_TITLE" = "Abone ol düğmesini gizle";
@@ -234,7 +238,8 @@
 
 /* ===== MESSAGES ===== */
 "MODERN_SETTINGS_MESSAGES_TITLE" = "Mesajlar";
-"MODERN_SETTINGS_MESSAGES_SUBTITLE" = "Yazma, sesli notlar ve Grok.";
+"MODERN_SETTINGS_MESSAGES_SUBTITLE" = "Bildirimler, yazma, sesli notlar ve Grok.";
+"MESSAGES_GROUP_NOTIFICATIONS" = "Bildirimler";
 "MESSAGES_GROUP_CHAT" = "Sohbet";
 "MESSAGES_GROUP_GROK" = "Grok";
 "HIDE_SUGGESTED_CHATS_TITLE" = "Önerilen sohbetleri gizle";
@@ -247,8 +252,8 @@
 "DOWNLOAD_VOICE_MESSAGES_DETAIL" = "Sesli notu oynattıktan sonra uzun basarak sesini kaydet.";
 
 /* ===== GROK ===== */
-"HIDE_GROK_ANALYZE_TITLE" = "Analiz ve soru düğmelerini gizle";
-"HIDE_GROK_ANALYZE_DETAIL" = "Grok’un analiz et ve sor düğmelerini kaldır.";
+"HIDE_GROK_ANALYZE_TITLE" = "Grok düğmelerini gizle";
+"HIDE_GROK_ANALYZE_DETAIL" = "Grok’un düğmelerini Tweetlerden, profillerden, sohbetlerden ve seçili metinden kaldır.";
 "HIDE_GROK_SIDEBAR_TITLE" = "Menüde Grok’u gizle";
 "HIDE_GROK_SIDEBAR_DETAIL" = "Grok kısayolunu hesap menüsünden kaldır.";
 "HIDE_GROK_BOT_TITLE" = "Grok Bot’u gizle";
@@ -302,6 +307,8 @@
 "THEME_SETTINGS_NAVIGATION_DETAIL" = "Bir vurgu rengi seç. Bunu yalnızca sen görürsün.";
 "THEME_SETTINGS_NAVIGATION_TITLE" = "Vurgu rengi";
 "THEME_CUSTOM_HINT" = "Bağlantılar, düğmeler ve vurgular için istediğin rengi seç.";
+"THEME_HINT_TAP" = "Önizlemede görmek için bir renge dokun";
+"THEME_HINT_CUSTOM" = "Kendi rengini seçmek için son renge dokun";
 "THEME_RESET_HINT" = "Vurgu rengini seçili sekme, anahtarlar ve Twitter simgesi dahil her yerden kaldırır.";
 "THEME_RESET_CONFIRM_TITLE" = "Vurgu rengini geri yükle";
 "THEME_RESET_CONFIRM_MESSAGE" = "Vurgu rengi Twitter’ın varsayılanına döner; Seçili sekme, Anahtarlar ve Twitter simgesi onu kullanmayı bırakır. Diğer ayarların kalır.";
@@ -447,7 +454,7 @@
 "HIDE_TWEET_BUTTON_TITLE" = "Tweet düğmesini gizle";
 "HIDE_TWEET_BUTTON_DETAIL" = "Yüzen Tweet yazma düğmesini kaldır.";
 "SEND_SOUND_TITLE" = "Gönderme sesi";
-"SEND_SOUND_DETAIL" = "Bir Tweet gönderildiğinde çalan ses.";
+"SEND_SOUND_DETAIL" = "Bir Tweet gönderildiğinde çalan sesi seç.";
 "SEND_SOUND_NONE" = "Yok";
 "SEND_SOUND_IMPORT_ACTION" = "İçe aktar…";
 "SEND_SOUND_REMOVE_ACTION" = "Kaldır";
@@ -540,6 +547,7 @@
 "PROFILES_GROUP_INTERFACE" = "Arayüz";
 
 "PROFILE_INITIAL_TAB_TITLE" = "Profilleri şurada aç";
+"PROFILE_INITIAL_TAB_DETAIL" = "Bir profilin açılacağı sekmeyi seç.";
 "PROFILE_TAB_DEFAULT" = "Varsayılan";
 "PROFILE_TAB_REPLIES" = "Yanıtlar";
 "PROFILE_TAB_HIGHLIGHTS" = "Öne çıkanlar";
@@ -571,13 +579,9 @@
 "HIDDEN_NOTIFS_UNHIDE" = "Göster";
 "HIDDEN_NOTIFS_UNTITLED" = "Gizli bildirim";
 "HIDE_NOTIFICATIONS_TITLE" = "Bildirimleri gizle";
-"HIDE_NOTIFICATIONS_DETAIL" = "Birini ×’i veya Tweet menüsüyle gizle. Üstteki göz onları listeler.";
+"HIDE_NOTIFICATIONS_DETAIL" = "Bir bildirimi ×’iyle gizle. Göz onları listeler.";
 "NEW_TWITTER_SETTINGS_TITLE" = "Yeni Twitter ayarları";
 "NEW_TWITTER_SETTINGS_DETAIL" = "Twitter’ın yeniden tasarlanan ayarlarını kullan ve PrimeFreeBird’e aynı görünümü ver.";
-"EXPLORE_TABS_CAPTION" = "Keşfet çubuğu";
-"EXPLORE_TABS_HINT" = "Kaldırmak veya geri getirmek için bir sekmeye dokun.";
-"EXPLORE_TABS_HIDDEN_COUNT" = "%lu gizli";
-"EXPLORE_TABS_NONE_HIDDEN" = "Gizli yok";
 "HIDE_TAB_FORYOU_TAB_NAME" = "Keşfet";
 "HIDE_TAB_TRENDING_TAB_NAME" = "Gündem";
 "HIDE_TAB_NEWS_TAB_NAME" = "Haberler";
@@ -585,10 +589,13 @@
 "HIDE_TAB_ENTERTAINMENT_TAB_NAME" = "Eğlence";
 "HIDE_EXPLORE_ALL_TITLE" = "Tüm sekmeleri gizle";
 "HIDE_EXPLORE_ALL_DETAIL" = "Yalnızca arama çubuğunu bırak.";
-"CHOOSE_EXPLORE_TABS_TITLE" = "Sekmeleri seç";
-"CHOOSE_EXPLORE_TABS_DETAIL" = "Çubukta hangi sekmelerin kalacağını seç.";
-"CHOOSE_EXPLORE_TABS_DETAIL_HELD" = "Tüm sekmeler gizliyken gerekmez.";
-"EXPLORE_TABS_KEEP_ONE" = "Bir sekme bırak ya da Tüm sekmeleri gizle’yi kullan.";
+"EXPLORE_TABS_TITLE" = "Sekmeler";
+"EXPLORE_TABS_SUBTITLE" = "Keşfet’te hangi sekmelerin görüneceğini seç.";
+"EXPLORE_TABS_DETAIL" = "Keşfet’te hangi sekmelerin görüneceğini seç.";
+"EXPLORE_TABS_DETAIL_HELD" = "Tüm sekmeler gizliyken gerekmez.";
+"EXPLORE_TABS_SECTION_SHOWN" = "Keşfet’te";
+"EXPLORE_TABS_HINT_TAP" = "Gizlemek ya da geri getirmek için bir sekmeye dokun";
+"EXPLORE_TABS_KEEP_ONE" = "Bir sekme bırak ya da Tüm sekmeleri gizle’yi kullan";
 "LAB_GROUP_SESSION" = "Web oturumu";
 "LAB_GROUP_TOOLS" = "Sorun giderme";
 "LAB_GROUP_BACKUP" = "Yedekleme";
@@ -729,7 +736,8 @@
 "TW_HOME_TIMELINE_TITLE" = "Sana özel";
 "TW_HOME_TIMELINE_LATEST_TITLE" = "Takip ediliyor";
 "MEDIA_GROUP_LAYOUT" = "Düzen";
-"BRANDING_GROUP_CLASSIC" = "Klasik Twitter";
+"BRANDING_GROUP_LABELS" = "Etiketler";
+"BRANDING_GROUP_CLASSIC" = "Klasik";
 "VOICE_NOTE_FROM_VIDEO_TITLE" = "Videodan sesli not";
 "VOICE_NOTE_FROM_VIDEO_DETAIL" = "Kaydedilmiş bir sesli nota, sesini arşivindeki bir videonun sesiyle değiştiren bir düğme ekle.";
 "VOICE_NOTE_FROM_VIDEO_BUTTON" = "Bir videoyla değiştir";

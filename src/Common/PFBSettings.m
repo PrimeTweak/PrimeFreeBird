@@ -29,7 +29,6 @@ static NSDictionary<NSString*, NSDictionary*>* PFBSettingsPages(void) {
                     @{@"key": @"no_screenshot_detection", @"default": @YES},
                     @{@"type": @"header", @"titleKey": @"GENERAL_GROUP_APP", @"icon": @"device_phone"},
                     @{@"key": @"hide_premium_offer", @"default": @YES},
-                    @{@"key": @"hide_notifications", @"default": @YES},
                     @{@"key": @"show_scroll_indicator", @"default": @NO},
                     @{@"key": @"disable_rtl", @"default": @NO},
                     @{@"key": @"new_twitter_settings", @"default": @NO},
@@ -134,7 +133,7 @@ static NSDictionary<NSString*, NSDictionary*>* PFBSettingsPages(void) {
                     @{@"key": @"restore_tab_labels",
                       @"default": @NO},
                     @{@"key": @"no_tab_bar_hiding", @"default": @YES},
-                    @{@"key": @"show_bottom_fade", @"default": @NO},
+                    @{@"key": @"show_bottom_fade", @"default": @NO, @"disabledUnless": @"enable_liquid_glass"},
                     @{@"type": @"header", @"titleKey": @"APPEARANCE_GROUP_SIDEBAR"},
                     @{
                         @"titleKey": @"CUSTOM_SIDEBAR_OPTION_TITLE",
@@ -343,12 +342,12 @@ static NSDictionary<NSString*, NSDictionary*>* PFBSettingsPages(void) {
                         @"type": @"compactButton"
                     },
                     @{
-                        @"key": @"disable_articles",
-                        @"default": @NO
-                    },
-                    @{
                         @"key": @"disable_highlights",
                         @"default": @YES
+                    },
+                    @{
+                        @"key": @"disable_articles",
+                        @"default": @NO
                     },
                     @{
                         @"key": @"disable_videos_tab",
@@ -389,22 +388,24 @@ static NSDictionary<NSString*, NSDictionary*>* PFBSettingsPages(void) {
                       @"default": @NO},
                     @{@"key": @"hide_explore_all",
                       @"default": @NO},
-                    @{@"key": @"choose_explore_tabs",
-                      @"default": @YES,
-                      @"disabledWhen": @"hide_explore_all"},
-                    @{@"type": @"tabBar",
-                      @"key": @"explore_tabs",
-                      @"parentKey": @"choose_explore_tabs",
-                      @"hiddenWhen": @"hide_explore_all",
-                      @"captionKey": @"EXPLORE_TABS_CAPTION",
-                      @"hintKey": @"EXPLORE_TABS_HINT",
-                      @"tabKeys": PFBExploreTabKeys()}
+                    @{@"type": @"header", @"titleKey": @"EXPLORE_TABS_TITLE"},
+                    @{
+                        @"key": @"explore_tabs",
+                        @"titleKey": @"EXPLORE_TABS_TITLE",
+                        @"subtitleKey": @"EXPLORE_TABS_SUBTITLE",
+                        @"action": @"showExploreTabs:",
+                        @"opensPage": @YES,
+                        @"icon": @"column_split_stroke",
+                        @"type": @"button"
+                    }
                 ]
             },
             @"messages": @{
                 @"titleKey": @"MODERN_SETTINGS_MESSAGES_TITLE",
                 @"subtitleKey": @"MODERN_SETTINGS_MESSAGES_SUBTITLE",
                 @"settings": @[
+                    @{@"type": @"header", @"titleKey": @"MESSAGES_GROUP_NOTIFICATIONS", @"icon": @"notifications_stroke"},
+                    @{@"key": @"hide_notifications", @"default": @YES},
                     @{@"type": @"header", @"titleKey": @"MESSAGES_GROUP_CHAT", @"icon": @"chat_bubble_stroke"},
                     @{
                         @"key": @"hide_suggested_chats",
@@ -454,15 +455,7 @@ static NSDictionary<NSString*, NSDictionary*>* PFBSettingsPages(void) {
                 @"titleKey": @"MODERN_SETTINGS_BRANDING_TITLE",
                 @"subtitleKey": @"MODERN_SETTINGS_BRANDING_SUBTITLE",
                 @"settings": @[
-                    @{@"type": @"header", @"titleKey": @"BRANDING_GROUP_CLASSIC", @"icon": @"compose"},
-                    @{
-                        @"titleKey": @"APP_ICON_TITLE",
-                        @"subtitleKey": @"APP_ICON_SUBTITLE",
-                        @"action": @"showAppIconViewController:",
-                        @"opensPage": @YES,
-                        @"icon": @"device_phone",
-                        @"type": @"button"
-                    },
+                    @{@"type": @"header", @"titleKey": @"BRANDING_GROUP_LABELS", @"icon": @"text_format"},
                     @{
                         @"key": @"restore_twitter_names",
                         @"default": @([PFBManager isTwitterBranded])
@@ -472,13 +465,23 @@ static NSDictionary<NSString*, NSDictionary*>* PFBSettingsPages(void) {
                         @"default": @([PFBManager isTwitterBranded]),
                         @"disabledWhen": @"hide_new_tweets_pill"
                     },
+                    @{@"type": @"header", @"titleKey": @"BRANDING_GROUP_CLASSIC", @"icon": @"compose"},
                     @{
                         @"key": @"restore_tweet_button",
-                        @"default": @([PFBManager isTwitterBranded])
+                        @"default": @([PFBManager isTwitterBranded]),
+                        @"disabledWhen": @"hide_tweet_button"
                     },
                     @{
                         @"key": @"restore_refresh_sounds",
                         @"default": @NO
+                    },
+                    @{
+                        @"titleKey": @"APP_ICON_TITLE",
+                        @"subtitleKey": @"APP_ICON_SUBTITLE",
+                        @"action": @"showAppIconViewController:",
+                        @"opensPage": @YES,
+                        @"icon": @"device_phone",
+                        @"type": @"button"
                     }
                 ]
             },
@@ -616,6 +619,7 @@ static void PFBMigrateLegacyKeys(void) {
     PFBMigrateLegacyKeys();
     [self migrateUndoTweetToggle];
     [self migrateExploreTrendsSplit];
+    [self migrateChooseExploreTabs];
 
     NSUserDefaults* defaults = [NSUserDefaults standardUserDefaults];
     if ([defaults boolForKey:@"pfb_key_migration_v1_done"]) {
@@ -692,6 +696,23 @@ static void PFBMigrateLegacyKeys(void) {
     [defaults setBool:YES forKey:@"pfb_explore_split_migration_done"];
 }
 
+// Runs once: Choose tabs left the settings for the Tabs page, where the tabs stored are the choice.
+// A stored choose_explore_tabs = NO had every tab shown, so each tab is stored shown; the key is then
+// removed.
++ (void)migrateChooseExploreTabs {
+    NSUserDefaults* defaults = [NSUserDefaults standardUserDefaults];
+    id stored = [defaults objectForKey:@"choose_explore_tabs"];
+    if (!stored) {
+        return;
+    }
+    if (![stored boolValue]) {
+        for (NSString* tabKey in PFBExploreTabKeys()) {
+            [defaults setBool:NO forKey:tabKey];
+        }
+    }
+    [defaults removeObjectForKey:@"choose_explore_tabs"];
+}
+
 // Runs once: a stored undo_tweet = NO becomes undo_tweet_timeout = 0, which means
 // off, unless a timeout is already stored; undo_tweet is then removed.
 + (void)migrateUndoTweetToggle {
@@ -744,8 +765,8 @@ static NSDictionary* PFBKeylessDefaults(void) {
             // Carried by a pill rather than a row of its own, so the registry
             // holds no default for it.
             @"video_starts_muted": @YES,
-            // Carried by the Explore bar replica, same reason. Only the two that
-            // default to YES are named; the rest default to NO on their own.
+            // Carried by the Tabs page, same reason. Only the two that default to
+            // YES are named; the rest default to NO on their own.
             @"hide_tab_trending": @YES,
             @"hide_tab_entertainment": @YES,
         };

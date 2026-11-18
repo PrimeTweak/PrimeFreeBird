@@ -25,12 +25,12 @@
 "DISABLE_RTL_TITLE" = "Teks kiri-ke-kanan";
 "DISABLE_RTL_DETAIL" = "Tampilkan teks dari kiri ke kanan, bahkan untuk bahasa yang ditulis dari kanan ke kiri.";
 "HIDE_PREMIUM_OFFER_TITLE" = "Sembunyikan promosi Premium";
-"HIDE_PREMIUM_OFFER_DETAIL" = "Sembunyikan tombol 'Dapatkan verifikasi' dan 'Tingkatkan'.";
+"HIDE_PREMIUM_OFFER_DETAIL" = "Sembunyikan penawaran Premium Twitter, seperti tombol 'Dapatkan verifikasi' dan 'Tingkatkan'.";
 
 /* ===== General › Links ===== */
 "GENERAL_GROUP_LINKS" = "Tautan";
 "SHARING_DOMAIN_TITLE" = "Domain berbagi";
-"SHARING_DOMAIN_DETAIL" = "Alamat yang dipakai di tautan yang Anda bagikan.";
+"SHARING_DOMAIN_DETAIL" = "Pilih alamat yang dipakai di tautan yang Anda bagikan.";
 "SHARING_DOMAIN_PROMPT_MESSAGE" = "Tautan yang Anda bagikan memakai alamat ini. Biarkan kosong untuk x.com.";
 "STRIP_URL_TRACKING_TITLE" = "Tautan bersih";
 "STRIP_URL_TRACKING_DETAIL" = "Hapus pelacakan dari tautan yang Anda buka dan dari tautan Twitter yang Anda bagikan atau salin.";
@@ -79,19 +79,22 @@
 "CUSTOM_TAB_BAR_OPTION_SUBTITLE" = "Pilih tab yang muncul dan urutannya.";
 "APPEARANCE_GROUP_SIDEBAR" = "Menu";
 "CUSTOM_SIDEBAR_OPTION_TITLE" = "Menu";
-"CUSTOM_SIDEBAR_OPTION_SUBTITLE" = "Pilih item yang muncul di menu.";
+"CUSTOM_SIDEBAR_OPTION_SUBTITLE" = "Pilih item yang muncul di menu akun.";
 "SIDEBAR_EDITOR_NAVIGATION_TITLE" = "Menu";
-"SIDEBAR_EDITOR_DETAIL" = "Ketuk item untuk menambahkannya ke menu atau menghapusnya.";
+"SIDEBAR_EDITOR_DETAIL" = "Pilih item yang muncul di menu akun.";
 "SIDEBAR_SECTION_SHOWN" = "Ditampilkan";
 "SIDEBAR_SECTION_HIDDEN" = "Disembunyikan";
 "SIDEBAR_ITEM_SHOWN" = "Ditampilkan";
 "SIDEBAR_ITEM_HIDDEN" = "Disembunyikan";
+"SIDEBAR_HINT_TAP" = "Ketuk item untuk menambahkan atau menghapusnya";
+"SIDEBAR_HINT_GROK" = "Grok juga mengikuti Sembunyikan Grok di menu";
 "RESTORE_TAB_LABELS_TITLE" = "Label tab";
 "RESTORE_TAB_LABELS_DETAIL" = "Tampilkan label di bawah ikon.";
 "NO_TAB_BAR_HIDING_TITLE" = "Selalu terlihat";
 "NO_TAB_BAR_HIDING_DETAIL" = "Jangan perkecil atau pudarkan bilah bawah saat menggulir.";
 "SHOW_BOTTOM_FADE_TITLE" = "Pudar bawah";
 "SHOW_BOTTOM_FADE_DETAIL" = "Pudarkan halaman di bawah bilah agar tampilan di balik kaca lebih lembut.";
+"SHOW_BOTTOM_FADE_DETAIL_HELD" = "Perlu Liquid Glass — pilih di Gaya › Gaya visual.";
 
 /* ===== BRANDING ===== */
 "MODERN_SETTINGS_BRANDING_TITLE" = "Branding";
@@ -101,9 +104,10 @@
 "RESTORE_TWITTER_NAMES_TITLE" = "Istilah Twitter";
 "RESTORE_TWITTER_NAMES_DETAIL" = "Kembalikan burung, dan ganti 'X' dengan 'Twitter', 'postingan' dengan 'Tweet', dan seterusnya.";
 "REFRESH_PILL_LABEL_TITLE" = "Teks pill Tweet baru";
-"REFRESH_PILL_LABEL_DETAIL" = "Tampilkan kata di samping avatar pada pill Tweet baru.";
+"REFRESH_PILL_LABEL_DETAIL" = "Tampilkan kata di samping foto profil pada pill Tweet baru.";
 "RESTORE_TWEET_BUTTON_TITLE" = "Tombol Tweet klasik";
 "RESTORE_TWEET_BUTTON_DETAIL" = "Tampilkan bulu di atas lingkaran berwarna.";
+"RESTORE_TWEET_BUTTON_DETAIL_HELD" = "Tidak diperlukan selama tombol Tweet disembunyikan.";
 
 /* ===== TIMELINES ===== */
 "MODERN_SETTINGS_TIMELINES_TITLE" = "Linimasa";
@@ -141,7 +145,7 @@
 "MODERN_SETTINGS_TWEETS_TITLE" = "Tweet";
 "MODERN_SETTINGS_TWEETS_SUBTITLE" = "Menulis, tombol, balasan, dan konten sensitif.";
 "UNDO_TWEET_TITLE" = "Batalkan Tweet";
-"UNDO_TWEET_TIMEOUT_DETAIL" = "Waktu untuk membatalkan Tweet setelah dikirim.";
+"UNDO_TWEET_TIMEOUT_DETAIL" = "Pilih berapa lama Anda bisa membatalkan Tweet yang terkirim.";
 "TWEET_CONFIRM_TITLE" = "Konfirmasi Tweet";
 "TWEET_CONFIRM_DETAIL" = "Minta konfirmasi sebelum mengirim Tweet atau balasan.";
 "LIKE_CONFIRM_TITLE" = "Konfirmasi suka";
@@ -155,11 +159,11 @@
 "HIDE_DOWNVOTE_BUTTON_TITLE" = "Sembunyikan tombol downvote";
 "HIDE_DOWNVOTE_BUTTON_DETAIL" = "Hapus tombol downvote di bawah Tweet.";
 "REPLY_SORTING_TITLE" = "Mengurutkan balasan";
-"REPLY_SORTING_DETAIL" = "Urutan balasan saat dibuka. Tombol urutkan Twitter tetap ada.";
+"REPLY_SORTING_DETAIL" = "Pilih urutan balasan saat dibuka. Tombol urutkan Twitter tetap ada.";
 "RESTORE_REPLY_CONTEXT_TITLE" = "Baris 'Membalas'";
 "RESTORE_REPLY_CONTEXT_DETAIL" = "Kembalikan baris ini di atas balasan yang Anda buka.";
-"SHOW_QUOTE_COUNTS_TITLE" = "Kutipan dan Retweet";
-"SHOW_QUOTE_COUNTS_DETAIL" = "Tampilkan kedua angka secara lengkap di bagian atas layar Kutipan sebuah Tweet.";
+"SHOW_QUOTE_COUNTS_TITLE" = "Jumlah kutipan";
+"SHOW_QUOTE_COUNTS_DETAIL" = "Tampilkan jumlah Kutipan dan Retweet secara lengkap di bagian atas layar Kutipan sebuah Tweet.";
 "SHOW_TWEET_SOURCE_TITLE" = "Sumber Tweet";
 "SHOW_TWEET_SOURCE_DETAIL" = "Tampilkan aplikasi pengirim di samping waktu Tweet yang dibuka.";
 "SHOW_ACCOUNT_LOCATION_TITLE" = "Lokasi akun";
@@ -200,7 +204,7 @@
 
 /* ===== PROFILES ===== */
 "MODERN_SETTINGS_PROFILES_TITLE" = "Profil";
-"MODERN_SETTINGS_PROFILES_SUBTITLE" = "Tombol Ikuti, lencana, dan tab profil.";
+"MODERN_SETTINGS_PROFILES_SUBTITLE" = "Ikuti, bio, tab profil, lencana, dan tombol.";
 "FOLLOW_CONFIRM_TITLE" = "Konfirmasi mengikuti";
 "FOLLOW_CONFIRM_DETAIL" = "Minta konfirmasi sebelum mengikuti akun.";
 "COPY_PROFILE_INFO_TITLE" = "Salin info profil";
@@ -214,7 +218,7 @@
 "HIDE_FOLLOW_BUTTON_TITLE" = "Sembunyikan tombol Ikuti";
 "HIDE_FOLLOW_BUTTON_DETAIL" = "Sembunyikan tombol Ikuti di samping penulis Tweet. Profil tetap menampilkannya.";
 "HIDE_MESSAGE_BUTTON_TITLE" = "Sembunyikan tombol Pesan";
-"HIDE_MESSAGE_BUTTON_DETAIL" = "Hapus tombol Pesan di samping penulis Tweet.";
+"HIDE_MESSAGE_BUTTON_DETAIL" = "Hapus tombol Pesan di samping penulis Tweet. Profil tetap memilikinya.";
 /* Legacy key name: this row HIDES the Subscribe button. Do not rename the
    key — it is persisted in user defaults. */
 "RESTORE_FOLLOW_BUTTON_TITLE" = "Sembunyikan tombol Berlangganan";
@@ -234,7 +238,8 @@
 
 /* ===== MESSAGES ===== */
 "MODERN_SETTINGS_MESSAGES_TITLE" = "Pesan";
-"MODERN_SETTINGS_MESSAGES_SUBTITLE" = "Mengetik, pesan suara, dan Grok.";
+"MODERN_SETTINGS_MESSAGES_SUBTITLE" = "Notifikasi, mengetik, pesan suara, dan Grok.";
+"MESSAGES_GROUP_NOTIFICATIONS" = "Notifikasi";
 "MESSAGES_GROUP_CHAT" = "Chat";
 "MESSAGES_GROUP_GROK" = "Grok";
 "HIDE_SUGGESTED_CHATS_TITLE" = "Sembunyikan chat yang disarankan";
@@ -247,8 +252,8 @@
 "DOWNLOAD_VOICE_MESSAGES_DETAIL" = "Simpan audio pesan suara dengan tekan lama setelah memutarnya.";
 
 /* ===== GROK ===== */
-"HIDE_GROK_ANALYZE_TITLE" = "Sembunyikan tombol analisis dan tanya";
-"HIDE_GROK_ANALYZE_DETAIL" = "Hapus tombol analisis dan tanya dari Grok.";
+"HIDE_GROK_ANALYZE_TITLE" = "Sembunyikan tombol Grok";
+"HIDE_GROK_ANALYZE_DETAIL" = "Hapus tombol Grok dari Tweet, profil, chat, dan teks yang dipilih.";
 "HIDE_GROK_SIDEBAR_TITLE" = "Sembunyikan Grok di menu";
 "HIDE_GROK_SIDEBAR_DETAIL" = "Hapus pintasan Grok dari menu akun.";
 "HIDE_GROK_BOT_TITLE" = "Sembunyikan Grok Bot";
@@ -302,6 +307,8 @@
 "THEME_SETTINGS_NAVIGATION_DETAIL" = "Pilih warna aksen. Hanya Anda yang dapat melihatnya.";
 "THEME_SETTINGS_NAVIGATION_TITLE" = "Warna aksen";
 "THEME_CUSTOM_HINT" = "Pilih warna apa pun untuk tautan, tombol, dan sorotan.";
+"THEME_HINT_TAP" = "Ketuk warna untuk melihatnya di pratinjau";
+"THEME_HINT_CUSTOM" = "Ketuk warna terakhir untuk memilih warna Anda sendiri";
 "THEME_RESET_HINT" = "Menghapus warna aksen di mana pun, termasuk tab terpilih, sakelar, dan ikon Twitter.";
 "THEME_RESET_CONFIRM_TITLE" = "Pulihkan warna aksen";
 "THEME_RESET_CONFIRM_MESSAGE" = "Warna aksen kembali ke bawaan Twitter, dan Tab terpilih, Sakelar, serta Ikon Twitter berhenti memakainya. Pengaturan Anda yang lain tetap.";
@@ -447,7 +454,7 @@
 "HIDE_TWEET_BUTTON_TITLE" = "Sembunyikan tombol Tweet";
 "HIDE_TWEET_BUTTON_DETAIL" = "Hapus tombol tulis Tweet yang mengambang.";
 "SEND_SOUND_TITLE" = "Suara kirim";
-"SEND_SOUND_DETAIL" = "Suara yang diputar saat Tweet terkirim.";
+"SEND_SOUND_DETAIL" = "Pilih suara yang diputar saat Tweet terkirim.";
 "SEND_SOUND_NONE" = "Tidak ada";
 "SEND_SOUND_IMPORT_ACTION" = "Impor…";
 "SEND_SOUND_REMOVE_ACTION" = "Hapus";
@@ -540,6 +547,7 @@
 "PROFILES_GROUP_INTERFACE" = "Antarmuka";
 
 "PROFILE_INITIAL_TAB_TITLE" = "Buka profil di";
+"PROFILE_INITIAL_TAB_DETAIL" = "Pilih tab tempat profil dibuka.";
 "PROFILE_TAB_DEFAULT" = "Bawaan";
 "PROFILE_TAB_REPLIES" = "Balasan";
 "PROFILE_TAB_HIGHLIGHTS" = "Sorotan";
@@ -571,13 +579,9 @@
 "HIDDEN_NOTIFS_UNHIDE" = "Tampilkan";
 "HIDDEN_NOTIFS_UNTITLED" = "Notifikasi tersembunyi";
 "HIDE_NOTIFICATIONS_TITLE" = "Sembunyikan notifikasi";
-"HIDE_NOTIFICATIONS_DETAIL" = "Sembunyikan dengan × atau menu Tweet-nya. Mata di atas mencantumkannya.";
+"HIDE_NOTIFICATIONS_DETAIL" = "Sembunyikan notifikasi dengan ×-nya. Ikon mata mencantumkannya.";
 "NEW_TWITTER_SETTINGS_TITLE" = "Pengaturan Twitter baru";
 "NEW_TWITTER_SETTINGS_DETAIL" = "Pakai pengaturan Twitter yang didesain ulang dan beri PrimeFreeBird tampilan yang sama.";
-"EXPLORE_TABS_CAPTION" = "Bilah Jelajahi";
-"EXPLORE_TABS_HINT" = "Ketuk tab untuk menghapus atau memulihkannya.";
-"EXPLORE_TABS_HIDDEN_COUNT" = "%lu tersembunyi";
-"EXPLORE_TABS_NONE_HIDDEN" = "Tidak ada yang tersembunyi";
 "HIDE_TAB_FORYOU_TAB_NAME" = "Jelajahi";
 "HIDE_TAB_TRENDING_TAB_NAME" = "Tren";
 "HIDE_TAB_NEWS_TAB_NAME" = "Berita";
@@ -585,10 +589,13 @@
 "HIDE_TAB_ENTERTAINMENT_TAB_NAME" = "Hiburan";
 "HIDE_EXPLORE_ALL_TITLE" = "Sembunyikan semua tab";
 "HIDE_EXPLORE_ALL_DETAIL" = "Sisakan hanya bilah pencarian.";
-"CHOOSE_EXPLORE_TABS_TITLE" = "Pilih tab";
-"CHOOSE_EXPLORE_TABS_DETAIL" = "Pilih tab yang tetap di bilah.";
-"CHOOSE_EXPLORE_TABS_DETAIL_HELD" = "Tidak diperlukan selama semua tab disembunyikan.";
-"EXPLORE_TABS_KEEP_ONE" = "Sisakan satu tab, atau pakai Sembunyikan semua tab.";
+"EXPLORE_TABS_TITLE" = "Tab";
+"EXPLORE_TABS_SUBTITLE" = "Pilih tab yang ditampilkan Jelajahi.";
+"EXPLORE_TABS_DETAIL" = "Pilih tab yang ditampilkan Jelajahi.";
+"EXPLORE_TABS_DETAIL_HELD" = "Tidak diperlukan selama semua tab disembunyikan.";
+"EXPLORE_TABS_SECTION_SHOWN" = "Di Jelajahi";
+"EXPLORE_TABS_HINT_TAP" = "Ketuk tab untuk menyembunyikan atau memunculkannya kembali";
+"EXPLORE_TABS_KEEP_ONE" = "Sisakan satu tab, atau pakai Sembunyikan semua tab";
 "LAB_GROUP_SESSION" = "Sesi web";
 "LAB_GROUP_TOOLS" = "Pemecahan masalah";
 "LAB_GROUP_BACKUP" = "Cadangan";
@@ -729,7 +736,8 @@
 "TW_HOME_TIMELINE_TITLE" = "Untuk Anda";
 "TW_HOME_TIMELINE_LATEST_TITLE" = "Mengikuti";
 "MEDIA_GROUP_LAYOUT" = "Tata letak";
-"BRANDING_GROUP_CLASSIC" = "Twitter klasik";
+"BRANDING_GROUP_LABELS" = "Label";
+"BRANDING_GROUP_CLASSIC" = "Klasik";
 "VOICE_NOTE_FROM_VIDEO_TITLE" = "Pesan suara dari video";
 "VOICE_NOTE_FROM_VIDEO_DETAIL" = "Tambahkan tombol pada pesan suara yang direkam untuk mengganti suaranya dengan suara video dari pustaka Anda.";
 "VOICE_NOTE_FROM_VIDEO_BUTTON" = "Ganti dengan video";

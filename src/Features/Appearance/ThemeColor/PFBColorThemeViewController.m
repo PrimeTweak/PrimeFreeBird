@@ -116,6 +116,7 @@ static NSInteger NearestAccentOption(UIColor* color) {
 @property (nonatomic, weak) PFBColorSwatchControl* chosenSwatch;
 @property (nonatomic, strong) UILabel* colorName;
 @property (nonatomic, strong) PFBShowcaseButton* resetCapsule;
+@property (nonatomic, copy) NSArray<PFBShowcaseHintRow*>* hints;
 @end
 
 @implementation PFBColorThemeViewController
@@ -332,6 +333,22 @@ static NSInteger NearestAccentOption(UIColor* color) {
     self.colorName.font = PFBScaledFont([TwitterChirpFont(TwitterFontStyleSemibold) fontWithSize:15]);
     [self.paletteCard addSubview:self.colorName];
 
+    // Under the cards, how the colors work: a tap shows one in the sample, the last opens any color.
+    PFBColorSwatchControl* wheel = [[PFBColorSwatchControl alloc] initRainbow];
+    wheel.userInteractionEnabled = NO;
+    wheel.frame = CGRectMake(6.0, 6.0, 18.0, 18.0);
+    wheel.autoresizingMask = UIViewAutoresizingFlexibleTopMargin | UIViewAutoresizingFlexibleBottomMargin |
+                             UIViewAutoresizingFlexibleLeftMargin | UIViewAutoresizingFlexibleRightMargin;
+    UIView* wheelBox = [[UIView alloc] initWithFrame:CGRectMake(0, 0, 30.0, 30.0)];
+    [wheelBox addSubview:wheel];
+    self.hints = @[
+        [[PFBShowcaseHintRow alloc] initWithSymbol:@"hand.tap" text:[bundle localizedStringForKey:@"THEME_HINT_TAP"]],
+        [[PFBShowcaseHintRow alloc] initWithIconView:wheelBox text:[bundle localizedStringForKey:@"THEME_HINT_CUSTOM"]],
+    ];
+    for (PFBShowcaseHintRow* hint in self.hints) {
+        [scroll addSubview:hint];
+    }
+
     self.resetCapsule = [PFBShowcaseButton buttonWithStyle:PFBShowcaseButtonStyleGlass];
     self.resetCapsule.label = [bundle localizedTwitterStringForKey:@"SUBSCRIPTION_TAB_CUSTOMIZATION_RESTORE_BUTTON_TITLE"];
     self.resetCapsule.labelFont = PFBScaledFont([TwitterChirpFont(TwitterFontStyleSemibold) fontWithSize:17]);
@@ -349,7 +366,7 @@ static NSInteger NearestAccentOption(UIColor* color) {
 }
 
 // The line, the sample's card, then the colors' card: the bar as wide as the sample's screen and as
-// far from its card's edges, and the chosen color's name under it.
+// far from its card's edges, and the chosen color's name under it; the hints follow.
 - (void)viewDidLayoutSubviews {
     [super viewDidLayoutSubviews];
     UIScrollView* scroll = self.nativeScroll;
@@ -372,7 +389,8 @@ static NSInteger NearestAccentOption(UIColor* color) {
     self.colorName.frame = CGRectMake(kPFBAccentPreviewInset, nameTop, barWidth, nameHeight);
     self.paletteCard.frame =
         CGRectMake(side, CGRectGetMaxY(self.previewCard.frame) + kCardGap, inner, nameTop + nameHeight + 14.0);
-    scroll.contentSize = CGSizeMake(width, CGRectGetMaxY(self.paletteCard.frame) + 24.0);
+    CGFloat hintsBottom = PFBShowcaseLayoutHints(self.hints, CGRectGetMaxY(self.paletteCard.frame) + 24.0, width);
+    scroll.contentSize = CGSizeMake(width, hintsBottom + 24.0);
 
     // The cards scroll under the glass bar and stop clear of it.
     self.resetCapsule.frame = PFBShowcaseDockFrame(self.view);

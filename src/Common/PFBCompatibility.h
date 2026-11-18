@@ -83,7 +83,7 @@ typedef NS_ENUM(NSInteger, PFBCompatOption) {
     PFBCompat_advanced_search,
     PFBCompat_hide_trend_videos,
     PFBCompat_hide_explore_all,
-    PFBCompat_choose_explore_tabs,
+    PFBCompat_explore_tabs,
     PFBCompat_hide_typing_indicator,
     PFBCompat_hide_suggested_chats,
     PFBCompat_voice_transcription,

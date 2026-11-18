@@ -1,6 +1,6 @@
 // The Menu page: its line, the items in the sidebar and the hidden ones as two groups of glass
-// tiles, and Twitter's Restore to default on a glass bar in the tab bar's place. A tap moves an item
-// to the other group.
+// tiles, two hints, and Twitter's Restore to default on a glass bar in the tab bar's place. A tap
+// moves an item to the other group.
 
 #import "Features/Appearance/Sidebar/PFBSidebarViewController.h"
 #import "Common/PFBBundle.h"
@@ -179,6 +179,7 @@ static const CGFloat kTileRadius = 22.0;
 @property (nonatomic, strong) NSArray<PFBSidebarTile*>* tiles;
 @property (nonatomic, strong) PFBShowcaseButton* resetCapsule;
 @property (nonatomic, strong) UISelectionFeedbackGenerator* feedback;
+@property (nonatomic, copy) NSArray<PFBShowcaseHintRow*>* hints;
 @end
 
 @implementation PFBSidebarViewController
@@ -213,6 +214,16 @@ static const CGFloat kTileRadius = 22.0;
     [self.scroll addSubview:self.introLabel];
     self.shownGroup = [self groupTitled:@"SIDEBAR_SECTION_SHOWN"];
     self.hiddenGroup = [self groupTitled:@"SIDEBAR_SECTION_HIDDEN"];
+    // Under the tiles: a tap moves an item, and Grok's tile is the same choice as Hide menu shortcut.
+    self.hints = @[
+        [[PFBShowcaseHintRow alloc] initWithSymbol:@"hand.tap" text:[bundle localizedStringForKey:@"SIDEBAR_HINT_TAP"]],
+        [[PFBShowcaseHintRow alloc] initWithTwitterGlyph:[PFBSidebarItems glyphForPanel:PFBSidebarGrokPanel] ?: @"grok_stroke"
+                                          fallbackSymbol:@"sparkles"
+                                                    text:[bundle localizedStringForKey:@"SIDEBAR_HINT_GROK"]],
+    ];
+    for (PFBShowcaseHintRow* hint in self.hints) {
+        [self.scroll addSubview:hint];
+    }
 
     self.resetCapsule = [PFBShowcaseButton buttonWithStyle:PFBShowcaseButtonStyleGlass];
     self.resetCapsule.label = [bundle localizedTwitterStringForKey:@"SUBSCRIPTION_TAB_CUSTOMIZATION_RESTORE_BUTTON_TITLE"];
@@ -367,7 +378,8 @@ static const CGFloat kTileRadius = 22.0;
     }
     CGFloat bottom = [self layoutGroup:self.shownGroup tiles:shown top:CGRectGetMaxY(self.introLabel.frame) + 20.0];
     bottom = [self layoutGroup:self.hiddenGroup tiles:hidden top:bottom];
-    self.scroll.contentSize = CGSizeMake(width, bottom);
+    bottom = PFBShowcaseLayoutHints(self.hints, bottom, width);
+    self.scroll.contentSize = CGSizeMake(width, bottom + 24.0);
 }
 
 - (void)viewDidLayoutSubviews {

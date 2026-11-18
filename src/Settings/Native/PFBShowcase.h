@@ -89,4 +89,17 @@ static const CGFloat kPFBShowcaseRowLeading = 24.0;
 @property (nonatomic) NSInteger titleLines;
 @end
 
+// A line of help under a page's content, as Twitter lists them under its own editors: an icon in a
+// gray circle, then the line in gray.
+@interface PFBShowcaseHintRow : UIView
+- (instancetype)initWithSymbol:(NSString*)symbol text:(NSString*)text;
+// A Twitter glyph in the circle, the system symbol standing in where the app has none.
+- (instancetype)initWithTwitterGlyph:(nullable NSString*)glyph fallbackSymbol:(NSString*)symbol text:(NSString*)text;
+// A view of its own in the circle.
+- (instancetype)initWithIconView:(UIView*)icon text:(NSString*)text;
+@end
+
+// The hints one under the other from top, across the given width; returns the bottom of the last.
+CGFloat PFBShowcaseLayoutHints(NSArray<PFBShowcaseHintRow*>* hints, CGFloat top, CGFloat width);
+
 NS_ASSUME_NONNULL_END

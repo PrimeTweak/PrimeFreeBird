@@ -25,12 +25,12 @@
 "DISABLE_RTL_TITLE" = "نص من اليسار إلى اليمين";
 "DISABLE_RTL_DETAIL" = "عرض النص من اليسار إلى اليمين، حتى في اللغات التي تُكتب من اليمين إلى اليسار.";
 "HIDE_PREMIUM_OFFER_TITLE" = "إخفاء عروض Premium";
-"HIDE_PREMIUM_OFFER_DETAIL" = "إزالة زرّي 'وثِّق حسابك' و'ترقية'.";
+"HIDE_PREMIUM_OFFER_DETAIL" = "إزالة عروض Premium في تويتر، مثل زرّي 'وثِّق حسابك' و'ترقية'.";
 
 /* ===== General › Links ===== */
 "GENERAL_GROUP_LINKS" = "الروابط";
 "SHARING_DOMAIN_TITLE" = "نطاق المشاركة";
-"SHARING_DOMAIN_DETAIL" = "العنوان المستخدم في الروابط التي تشاركها.";
+"SHARING_DOMAIN_DETAIL" = "اختر العنوان المستخدم في الروابط التي تشاركها.";
 "SHARING_DOMAIN_PROMPT_MESSAGE" = "تستخدم الروابط التي تشاركها هذا العنوان. اتركه فارغًا لاستخدام x.com.";
 "STRIP_URL_TRACKING_TITLE" = "روابط نظيفة";
 "STRIP_URL_TRACKING_DETAIL" = "إزالة التتبع من الروابط التي تفتحها ومن روابط تويتر التي تشاركها أو تنسخها.";
@@ -79,19 +79,22 @@
 "CUSTOM_TAB_BAR_OPTION_SUBTITLE" = "اختر التبويبات التي تظهر وترتيبها.";
 "APPEARANCE_GROUP_SIDEBAR" = "القائمة";
 "CUSTOM_SIDEBAR_OPTION_TITLE" = "القائمة";
-"CUSTOM_SIDEBAR_OPTION_SUBTITLE" = "اختر العناصر التي تظهر في القائمة.";
+"CUSTOM_SIDEBAR_OPTION_SUBTITLE" = "اختر العناصر التي تظهر في قائمة الحساب.";
 "SIDEBAR_EDITOR_NAVIGATION_TITLE" = "القائمة";
-"SIDEBAR_EDITOR_DETAIL" = "انقر على عنصر لإضافته إلى القائمة أو إزالته منها.";
+"SIDEBAR_EDITOR_DETAIL" = "اختر العناصر التي تظهر في قائمة الحساب.";
 "SIDEBAR_SECTION_SHOWN" = "ظاهرة";
 "SIDEBAR_SECTION_HIDDEN" = "مخفية";
 "SIDEBAR_ITEM_SHOWN" = "ظاهر";
 "SIDEBAR_ITEM_HIDDEN" = "مخفي";
+"SIDEBAR_HINT_TAP" = "اضغط على عنصر لإضافته أو إزالته";
+"SIDEBAR_HINT_GROK" = "يتبع Grok أيضًا «إخفاء Grok من القائمة»";
 "RESTORE_TAB_LABELS_TITLE" = "تسميات التبويبات";
 "RESTORE_TAB_LABELS_DETAIL" = "عرض التسميات أسفل الأيقونات.";
 "NO_TAB_BAR_HIDING_TITLE" = "ظاهر دائمًا";
 "NO_TAB_BAR_HIDING_DETAIL" = "عدم تصغير الشريط السفلي أو تلاشيه عند التمرير.";
 "SHOW_BOTTOM_FADE_TITLE" = "التلاشي السفلي";
 "SHOW_BOTTOM_FADE_DETAIL" = "إخفاء الصفحة تحت الشريط تدريجيًا، لمظهر أنعم خلف الزجاج.";
+"SHOW_BOTTOM_FADE_DETAIL_HELD" = "يتطلب Liquid Glass — اختره من النمط › النمط المرئي.";
 
 /* ===== BRANDING ===== */
 "MODERN_SETTINGS_BRANDING_TITLE" = "الهوية";
@@ -101,9 +104,10 @@
 "RESTORE_TWITTER_NAMES_TITLE" = "مصطلحات تويتر";
 "RESTORE_TWITTER_NAMES_DETAIL" = "يعيد الطائر ويستبدل 'X' بـ'تويتر' و'منشور' بـ'تغريدة' وهكذا.";
 "REFRESH_PILL_LABEL_TITLE" = "نص شريط التغريدات الجديدة";
-"REFRESH_PILL_LABEL_DETAIL" = "عرض كلمة بجانب الصور الرمزية في شريط التغريدات الجديدة.";
+"REFRESH_PILL_LABEL_DETAIL" = "عرض كلمة بجانب صور الملف الشخصي في شريط التغريدات الجديدة.";
 "RESTORE_TWEET_BUTTON_TITLE" = "زر التغريد الكلاسيكي";
 "RESTORE_TWEET_BUTTON_DETAIL" = "إظهار الريشة على دائرة ملونة.";
+"RESTORE_TWEET_BUTTON_DETAIL_HELD" = "غير مطلوب ما دام زر التغريد مخفيًا.";
 
 /* ===== TIMELINES ===== */
 "MODERN_SETTINGS_TIMELINES_TITLE" = "الخطوط الزمنية";
@@ -141,7 +145,7 @@
 "MODERN_SETTINGS_TWEETS_TITLE" = "التغريدات";
 "MODERN_SETTINGS_TWEETS_SUBTITLE" = "الكتابة والأزرار والردود والمحتوى الحساس.";
 "UNDO_TWEET_TITLE" = "تراجع عن التغريدة";
-"UNDO_TWEET_TIMEOUT_DETAIL" = "مهلة إلغاء التغريدة بعد إرسالها.";
+"UNDO_TWEET_TIMEOUT_DETAIL" = "اختر المدة التي يمكنك فيها إلغاء تغريدة مُرسلة.";
 "TWEET_CONFIRM_TITLE" = "تأكيد التغريد";
 "TWEET_CONFIRM_DETAIL" = "طلب تأكيد قبل إرسال تغريدة أو رد.";
 "LIKE_CONFIRM_TITLE" = "تأكيد الإعجابات";
@@ -155,11 +159,11 @@
 "HIDE_DOWNVOTE_BUTTON_TITLE" = "إخفاء زر التصويت السلبي";
 "HIDE_DOWNVOTE_BUTTON_DETAIL" = "إزالة زر التصويت السلبي أسفل التغريدات.";
 "REPLY_SORTING_TITLE" = "فرز الردود";
-"REPLY_SORTING_DETAIL" = "ترتيب فتح الردود. يبقى زر الفرز في تويتر.";
+"REPLY_SORTING_DETAIL" = "اختر ترتيب فتح الردود. يبقى زر الفرز في تويتر.";
 "RESTORE_REPLY_CONTEXT_TITLE" = "سطر 'ردًا على'";
 "RESTORE_REPLY_CONTEXT_DETAIL" = "إعادته فوق الرد الذي تفتحه.";
-"SHOW_QUOTE_COUNTS_TITLE" = "الاقتباسات وإعادات التغريد";
-"SHOW_QUOTE_COUNTS_DETAIL" = "عرض العددين كاملين أعلى شاشة اقتباسات التغريدة.";
+"SHOW_QUOTE_COUNTS_TITLE" = "أعداد الاقتباسات";
+"SHOW_QUOTE_COUNTS_DETAIL" = "عرض عددي الاقتباسات وإعادات التغريد كاملين أعلى شاشة اقتباسات التغريدة.";
 "SHOW_TWEET_SOURCE_TITLE" = "مصدر التغريدة";
 "SHOW_TWEET_SOURCE_DETAIL" = "عرض التطبيق الذي أُرسلت منه التغريدة بجانب وقت التغريدة المفتوحة.";
 "SHOW_ACCOUNT_LOCATION_TITLE" = "موقع الحساب";
@@ -200,7 +204,7 @@
 
 /* ===== PROFILES ===== */
 "MODERN_SETTINGS_PROFILES_TITLE" = "الملفات الشخصية";
-"MODERN_SETTINGS_PROFILES_SUBTITLE" = "أزرار المتابعة والشارات وتبويبات الملف الشخصي.";
+"MODERN_SETTINGS_PROFILES_SUBTITLE" = "المتابعات والنبذات وتبويبات الملف الشخصي والشارات والأزرار.";
 "FOLLOW_CONFIRM_TITLE" = "تأكيد المتابعة";
 "FOLLOW_CONFIRM_DETAIL" = "طلب تأكيد قبل متابعة حساب.";
 "COPY_PROFILE_INFO_TITLE" = "نسخ معلومات الملف الشخصي";
@@ -214,7 +218,7 @@
 "HIDE_FOLLOW_BUTTON_TITLE" = "إخفاء زر المتابعة";
 "HIDE_FOLLOW_BUTTON_DETAIL" = "إزالة زر المتابعة بجانب كاتب التغريدة. تحتفظ الملفات الشخصية بزرها.";
 "HIDE_MESSAGE_BUTTON_TITLE" = "إخفاء زر الرسالة";
-"HIDE_MESSAGE_BUTTON_DETAIL" = "إزالة زر الرسالة بجوار كاتب التغريدة.";
+"HIDE_MESSAGE_BUTTON_DETAIL" = "إزالة زر الرسالة بجوار كاتب التغريدة. تحتفظ الملفات الشخصية بزرها.";
 /* Legacy key name: this row HIDES the Subscribe button. Do not rename the
    key — it is persisted in user defaults. */
 "RESTORE_FOLLOW_BUTTON_TITLE" = "إخفاء زر الاشتراك";
@@ -234,7 +238,8 @@
 
 /* ===== MESSAGES ===== */
 "MODERN_SETTINGS_MESSAGES_TITLE" = "الرسائل";
-"MODERN_SETTINGS_MESSAGES_SUBTITLE" = "الكتابة والرسائل الصوتية وGrok.";
+"MODERN_SETTINGS_MESSAGES_SUBTITLE" = "الإشعارات والكتابة والرسائل الصوتية وGrok.";
+"MESSAGES_GROUP_NOTIFICATIONS" = "الإشعارات";
 "MESSAGES_GROUP_CHAT" = "الدردشة";
 "MESSAGES_GROUP_GROK" = "Grok";
 "HIDE_SUGGESTED_CHATS_TITLE" = "إخفاء الدردشات المقترحة";
@@ -247,8 +252,8 @@
 "DOWNLOAD_VOICE_MESSAGES_DETAIL" = "حفظ صوت الرسالة الصوتية بضغطة مطولة بعد تشغيلها.";
 
 /* ===== GROK ===== */
-"HIDE_GROK_ANALYZE_TITLE" = "إخفاء أزرار التحليل والسؤال";
-"HIDE_GROK_ANALYZE_DETAIL" = "إزالة زرّي التحليل والسؤال في Grok.";
+"HIDE_GROK_ANALYZE_TITLE" = "إخفاء أزرار Grok";
+"HIDE_GROK_ANALYZE_DETAIL" = "إزالة أزرار Grok من التغريدات والملفات الشخصية والدردشات والنص المحدد.";
 "HIDE_GROK_SIDEBAR_TITLE" = "إخفاء Grok من القائمة";
 "HIDE_GROK_SIDEBAR_DETAIL" = "إزالة اختصار Grok من قائمة الحساب.";
 "HIDE_GROK_BOT_TITLE" = "إخفاء Grok Bot";
@@ -302,6 +307,8 @@
 "THEME_SETTINGS_NAVIGATION_DETAIL" = "اختر لون تمييز. أنت فقط من يراه.";
 "THEME_SETTINGS_NAVIGATION_TITLE" = "لون التمييز";
 "THEME_CUSTOM_HINT" = "اختر أي لون للروابط والأزرار والتمييز.";
+"THEME_HINT_TAP" = "اضغط على لون لرؤيته في المعاينة";
+"THEME_HINT_CUSTOM" = "اضغط على اللون الأخير لاختيار لونك";
 "THEME_RESET_HINT" = "يزيل لون التمييز من كل مكان، بما في ذلك التبويب المحدد والمفاتيح وأيقونة تويتر.";
 "THEME_RESET_CONFIRM_TITLE" = "استعادة لون التمييز";
 "THEME_RESET_CONFIRM_MESSAGE" = "يعود لون التمييز إلى لون تويتر الافتراضي، ويتوقف التبويب المحدد والمفاتيح وأيقونة تويتر عن استخدامه. تبقى إعداداتك الأخرى.";
@@ -447,7 +454,7 @@
 "HIDE_TWEET_BUTTON_TITLE" = "إخفاء زر التغريد";
 "HIDE_TWEET_BUTTON_DETAIL" = "إزالة زر كتابة التغريدة العائم.";
 "SEND_SOUND_TITLE" = "صوت الإرسال";
-"SEND_SOUND_DETAIL" = "صوت يُشغَّل عند إرسال تغريدة.";
+"SEND_SOUND_DETAIL" = "اختر صوتًا يُشغَّل عند إرسال تغريدة.";
 "SEND_SOUND_NONE" = "بلا";
 "SEND_SOUND_IMPORT_ACTION" = "استيراد…";
 "SEND_SOUND_REMOVE_ACTION" = "إزالة";
@@ -540,6 +547,7 @@
 "PROFILES_GROUP_INTERFACE" = "الواجهة";
 
 "PROFILE_INITIAL_TAB_TITLE" = "فتح الملفات الشخصية على";
+"PROFILE_INITIAL_TAB_DETAIL" = "اختر التبويب الذي يُفتح عليه الملف الشخصي.";
 "PROFILE_TAB_DEFAULT" = "افتراضي";
 "PROFILE_TAB_REPLIES" = "الردود";
 "PROFILE_TAB_HIGHLIGHTS" = "أبرز المحتوى";
@@ -571,13 +579,9 @@
 "HIDDEN_NOTIFS_UNHIDE" = "إظهار";
 "HIDDEN_NOTIFS_UNTITLED" = "إشعار مخفي";
 "HIDE_NOTIFICATIONS_TITLE" = "إخفاء الإشعارات";
-"HIDE_NOTIFICATIONS_DETAIL" = "أخفِ إشعارًا بعلامة × أو من قائمة تغريدته. تعرضها العين في الأعلى.";
+"HIDE_NOTIFICATIONS_DETAIL" = "أخفِ إشعارًا بعلامة ×. تعرضها العين.";
 "NEW_TWITTER_SETTINGS_TITLE" = "إعدادات تويتر الجديدة";
 "NEW_TWITTER_SETTINGS_DETAIL" = "استخدام إعدادات تويتر المعاد تصميمها ومنح PrimeFreeBird المظهر نفسه.";
-"EXPLORE_TABS_CAPTION" = "شريط الاستكشاف";
-"EXPLORE_TABS_HINT" = "اضغط على تبويب لإزالته أو استعادته.";
-"EXPLORE_TABS_HIDDEN_COUNT" = "المخفية: %lu";
-"EXPLORE_TABS_NONE_HIDDEN" = "لا شيء مخفي";
 "HIDE_TAB_FORYOU_TAB_NAME" = "استكشاف";
 "HIDE_TAB_TRENDING_TAB_NAME" = "الرائج";
 "HIDE_TAB_NEWS_TAB_NAME" = "الأخبار";
@@ -585,10 +589,13 @@
 "HIDE_TAB_ENTERTAINMENT_TAB_NAME" = "الترفيه";
 "HIDE_EXPLORE_ALL_TITLE" = "إخفاء كل التبويبات";
 "HIDE_EXPLORE_ALL_DETAIL" = "إبقاء شريط البحث فقط.";
-"CHOOSE_EXPLORE_TABS_TITLE" = "اختيار التبويبات";
-"CHOOSE_EXPLORE_TABS_DETAIL" = "اختر التبويبات التي تبقى في الشريط.";
-"CHOOSE_EXPLORE_TABS_DETAIL_HELD" = "غير مطلوب ما دامت كل التبويبات مخفية.";
-"EXPLORE_TABS_KEEP_ONE" = "أبقِ تبويبًا واحدًا، أو استخدم «إخفاء كل التبويبات».";
+"EXPLORE_TABS_TITLE" = "التبويبات";
+"EXPLORE_TABS_SUBTITLE" = "اختر التبويبات التي يعرضها استكشاف.";
+"EXPLORE_TABS_DETAIL" = "اختر التبويبات التي يعرضها استكشاف.";
+"EXPLORE_TABS_DETAIL_HELD" = "غير مطلوب ما دامت كل التبويبات مخفية.";
+"EXPLORE_TABS_SECTION_SHOWN" = "في استكشاف";
+"EXPLORE_TABS_HINT_TAP" = "اضغط على تبويب لإخفائه أو إعادته";
+"EXPLORE_TABS_KEEP_ONE" = "أبقِ تبويبًا واحدًا، أو استخدم «إخفاء كل التبويبات»";
 "LAB_GROUP_SESSION" = "جلسة الويب";
 "LAB_GROUP_TOOLS" = "استكشاف الأخطاء وإصلاحها";
 "LAB_GROUP_BACKUP" = "النسخ الاحتياطي";
@@ -729,7 +736,8 @@
 "TW_HOME_TIMELINE_TITLE" = "لك";
 "TW_HOME_TIMELINE_LATEST_TITLE" = "متابَعة";
 "MEDIA_GROUP_LAYOUT" = "التخطيط";
-"BRANDING_GROUP_CLASSIC" = "تويتر الكلاسيكي";
+"BRANDING_GROUP_LABELS" = "التسميات";
+"BRANDING_GROUP_CLASSIC" = "كلاسيكي";
 "VOICE_NOTE_FROM_VIDEO_TITLE" = "رسالة صوتية من فيديو";
 "VOICE_NOTE_FROM_VIDEO_DETAIL" = "إضافة زر إلى رسالة صوتية مسجّلة يستبدل صوتها بصوت فيديو من مكتبتك.";
 "VOICE_NOTE_FROM_VIDEO_BUTTON" = "استبدال بفيديو";

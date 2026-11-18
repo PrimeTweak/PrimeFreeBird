@@ -6,6 +6,7 @@
 #import "Settings/PFBModernSettingsCells.h"
 #import "Features/Timelines/PFBMutedWordsViewController.h"
 #import "Features/Branding/AppIcon/PFBAppIconViewController.h"
+#import "Features/Search/PFBExploreTabsViewController.h"
 #import "Common/PFBSettingsBackup.h"
 #import "Features/Appearance/CustomTabBar/PFBNativeTabSelectionStore.h"
 #import "Features/Appearance/ThemeColor/PFBPalette.h"
@@ -23,7 +24,7 @@
 @property (nonatomic, strong) PFBNativeSettingsPageRows* nativeRows;
 // The height each row last showed at, keyed by its registry entry.
 @property (nonatomic, strong) NSMapTable<NSDictionary*, NSNumber*>* rowHeights;
-// Redraws the rows whose `disabledWhen` names this key.
+// Redraws the rows whose `disabledWhen` or `disabledUnless` names this key.
 - (void)reloadRowsHeldBy:(NSString*)key;
 @end
 
@@ -229,8 +230,6 @@ NSURL* PFBAccountAvatarURL(TFNTwitterAccount* account) {
            forCellReuseIdentifier:@"ButtonCell"];
     [self.tableView registerClass:[PFBModernSettingsCompactButtonCell class]
            forCellReuseIdentifier:@"CompactButtonCell"];
-    [self.tableView registerClass:[PFBModernSettingsTabBarCell class]
-           forCellReuseIdentifier:@"TabBarCell"];
     [self.tableView registerClass:[PFBModernSettingsSessionCardCell class]
            forCellReuseIdentifier:@"SessionCardCell"];
     [self.tableView registerClass:[PFBModernSettingsButtonPairCell class]
@@ -346,20 +345,6 @@ NSURL* PFBAccountAvatarURL(TFNTwitterAccount* account) {
         [cell addSecondTarget:self action:NSSelectorFromString(toggleData[@"secondAction"])];
         return cell;
     }
-    if ([type isEqualToString:@"tabBar"]) {
-        PFBModernSettingsTabBarCell* cell =
-            [tableView dequeueReusableCellWithIdentifier:@"TabBarCell"
-                                            forIndexPath:indexPath];
-        NSArray* tabs = [self tabsForEntry:toggleData];
-        [cell configureWithTabs:tabs
-                        caption:[[PFBBundle sharedBundle]
-                                    localizedStringForKey:toggleData[@"captionKey"]]
-                           hint:[[PFBBundle sharedBundle]
-                                    localizedStringForKey:toggleData[@"hintKey"]]];
-        [cell setCountText:[self hiddenCountTextForTabs:tabs]];
-        [cell addTabTarget:self action:@selector(tabTapped:)];
-        return cell;
-    }
     if ([type isEqualToString:@"compactButton"]) {
         PFBModernSettingsCompactButtonCell* cell =
             [tableView dequeueReusableCellWithIdentifier:@"CompactButtonCell"
@@ -416,7 +401,8 @@ NSURL* PFBAccountAvatarURL(TFNTwitterAccount* account) {
         // still turns off, so it never stays on out of reach.
         BOOL waiting = [self rowIsWaiting:toggleData];
         NSString* blocker = toggleData[@"disabledWhen"];
-        BOOL overridden = blocker && [PFBSettings boolForKey:blocker];
+        NSString* needs = toggleData[@"disabledUnless"];
+        BOOL overridden = (blocker && [PFBSettings boolForKey:blocker]) || (needs && ![PFBSettings boolForKey:needs]);
         // While the row is held, its detail says why instead, when it has that text.
         NSString* heldKey = [NSString stringWithFormat:@"%@_DETAIL_HELD", key.uppercaseString];
         NSString* held = [[PFBBundle sharedBundle] localizedStringForKey:heldKey];
@@ -642,13 +628,13 @@ NSURL* PFBAccountAvatarURL(TFNTwitterAccount* account) {
     return [requires isEqualToString:@"web_session"] && !PFBHasUsableWebCredentials();
 }
 
-// A row another option holds must redraw the moment that option moves,
-// otherwise it stays enabled until the page is left.
+// A row another option holds, while that option is on or until it is, must redraw the moment
+// that option moves, otherwise it stays as it was until the page is left.
 - (void)reloadRowsHeldBy:(NSString*)key {
     NSMutableArray<NSIndexPath*>* paths = [NSMutableArray array];
     [self.visibleToggles enumerateObjectsUsingBlock:^(NSDictionary* entry,
                                                       NSUInteger row, BOOL* stop) {
-        if ([entry[@"disabledWhen"] isEqualToString:key]) {
+        if ([entry[@"disabledWhen"] isEqualToString:key] || [entry[@"disabledUnless"] isEqualToString:key]) {
             [paths addObject:[NSIndexPath indexPathForRow:(NSInteger)row inSection:0]];
         }
     }];
@@ -658,37 +644,6 @@ NSURL* PFBAccountAvatarURL(TFNTwitterAccount* account) {
     }
 }
 
-// The tabs of the Explore bar, in the order the app shows them. Each carries
-// the preference key that hides it.
-- (NSArray<NSDictionary*>*)tabsForEntry:(NSDictionary*)entry {
-    NSMutableArray* out = [NSMutableArray array];
-    for (NSString* key in entry[@"tabKeys"]) {
-        NSString* nameKey =
-            [NSString stringWithFormat:@"%@_TAB_NAME", key.uppercaseString];
-        [out addObject:@{
-            @"key" : key,
-            @"name" : [[PFBBundle sharedBundle] localizedStringForKey:nameKey]
-        }];
-    }
-    return out;
-}
-
-- (NSString*)hiddenCountTextForTabs:(NSArray<NSDictionary*>*)tabs {
-    NSUInteger hidden = 0;
-    for (NSDictionary* tab in tabs) {
-        if ([PFBSettings boolForKey:tab[@"key"]]) {
-            hidden++;
-        }
-    }
-    if (hidden == 0) {
-        return [[PFBBundle sharedBundle] localizedStringForKey:@"EXPLORE_TABS_NONE_HIDDEN"];
-    }
-    return [NSString
-        stringWithFormat:[[PFBBundle sharedBundle]
-                             localizedStringForKey:@"EXPLORE_TABS_HIDDEN_COUNT"],
-                         (unsigned long)hidden];
-}
-
 // The card acts on the session and then redraws: the rows that depend on it
 // have no other way to learn that it changed.
 - (void)sessionSignInTapped:(UIButton*)sender {
@@ -696,47 +651,6 @@ NSURL* PFBAccountAvatarURL(TFNTwitterAccount* account) {
       [self updateVisibleToggles];
       [self.tableView reloadData];
     });
-}
-
-- (void)tabTapped:(UIButton*)sender {
-    NSString* key = objc_getAssociatedObject(sender, @"tabKey");
-    if (!key) {
-        return;
-    }
-    UIView* walk = sender;
-    while (walk && ![walk isKindOfClass:[PFBModernSettingsTabBarCell class]]) {
-        walk = walk.superview;
-    }
-    PFBModernSettingsTabBarCell* host = (PFBModernSettingsTabBarCell*)walk;
-    NSIndexPath* hostPath = host ? [self.tableView indexPathForCell:host] : nil;
-    NSArray* allTabs = hostPath ? [self tabsForEntry:self.visibleToggles[hostPath.row]] : nil;
-
-    // Striking the last tab left would leave a bar with nothing in it, and a
-    // pager with nothing to show. Hiding all of Explore is a switch of its own,
-    // so the refusal points at it instead of silently doing it.
-    if (!([PFBSettings boolForKey:key])) {
-        NSUInteger kept = 0;
-        for (NSDictionary* tab in allTabs) {
-            if (![PFBSettings boolForKey:tab[@"key"]]) {
-                kept++;
-            }
-        }
-        if (kept <= 1) {
-            [host refuseTab:sender
-                withMessage:[[PFBBundle sharedBundle]
-                                localizedStringForKey:@"EXPLORE_TABS_KEEP_ONE"]];
-            return;
-        }
-    }
-
-    [[NSUserDefaults standardUserDefaults] setBool:![PFBSettings boolForKey:key]
-                                            forKey:key];
-    // Repainting the live cell keeps the strike-through immediate; reloading the
-    // row would flash the whole bar for one tap.
-    [host refreshTabs];
-    if (allTabs) {
-        [host setCountText:[self hiddenCountTextForTabs:allTabs]];
-    }
 }
 
 // The pill reads out its own state, so neither position has to be guessed.
@@ -842,9 +756,7 @@ NSURL* PFBAccountAvatarURL(TFNTwitterAccount* account) {
         // Only on the way on: turning one of these off gives the app back its
         // own behavior, which needs no warning, and a modal on every flip makes
         // the section unusable to settle.
-        if (sender.isOn && ([key isEqualToString:@"hide_explore_all"] ||
-                            [key isEqualToString:@"choose_explore_tabs"] ||
-                            [key isEqualToString:@"hide_tweet_button"])) {
+        if (sender.isOn && ([key isEqualToString:@"hide_explore_all"] || [key isEqualToString:@"hide_tweet_button"])) {
             [self showRestartInfoAlert];
         }
     }
@@ -863,6 +775,22 @@ NSURL* PFBAccountAvatarURL(TFNTwitterAccount* account) {
                                                              subtitle:self.account.displayUsername]];
     }
     [self.navigationController pushViewController:appIconVC animated:YES];
+}
+
+// The Tabs page of Search, titled as the App icon page is.
+- (void)showExploreTabs:(NSDictionary*)sender {
+    PFBExploreTabsViewController* tabsVC = [[PFBExploreTabsViewController alloc] init];
+    tabsVC.account = self.account;
+    NSString* title = [[PFBBundle sharedBundle] localizedStringForKey:@"EXPLORE_TABS_TITLE"];
+    if (self.nativeLook) {
+        PFBShowcaseSetTitle(tabsVC, title);
+    } else if (self.account) {
+        [tabsVC.navigationItem setTitleView:[objc_getClass("TFNTitleView") titleViewWithTitle:title
+                                                                                     subtitle:self.account.displayUsername]];
+    } else {
+        tabsVC.title = title;
+    }
+    [self.navigationController pushViewController:tabsVC animated:YES];
 }
 
 // MARK: - Muted words

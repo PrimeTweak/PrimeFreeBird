@@ -648,3 +648,113 @@ static const CGFloat kPFBShowcaseRowPadding = 13.0;
 }
 
 @end
+
+#pragma mark - Hint row
+
+// Twitter's hints: a 30 pt circle at the rows' margin, the line 17 pt after it, 44 pt a row.
+static const CGFloat kPFBHintCircle = 30.0;
+static const CGFloat kPFBHintGap = 17.0;
+static const CGFloat kPFBHintRowHeight = 44.0;
+
+@implementation PFBShowcaseHintRow {
+    UIView* _circle;
+    UIView* _icon;
+    UILabel* _line;
+    NSString* _symbolName;
+    NSString* _glyphName;
+}
+
+- (instancetype)initWithSymbol:(NSString*)symbol text:(NSString*)text {
+    return [self initWithTwitterGlyph:nil fallbackSymbol:symbol text:text];
+}
+
+- (instancetype)initWithTwitterGlyph:(nullable NSString*)glyph fallbackSymbol:(NSString*)symbol text:(NSString*)text {
+    UIImageView* image = [[UIImageView alloc] init];
+    image.contentMode = UIViewContentModeCenter;
+    self = [self initWithIconView:image text:text];
+    if (self) {
+        _symbolName = [symbol copy];
+        _glyphName = [glyph copy];
+        [self applyTheme];
+    }
+    return self;
+}
+
+- (instancetype)initWithIconView:(UIView*)icon text:(NSString*)text {
+    self = [super initWithFrame:CGRectZero];
+    if (self) {
+        _circle = [[UIView alloc] init];
+        _circle.layer.cornerRadius = kPFBHintCircle / 2.0;
+        _circle.userInteractionEnabled = NO;
+        _icon = icon;
+        _icon.userInteractionEnabled = NO;
+        [_circle addSubview:_icon];
+        _line = [[UILabel alloc] init];
+        _line.numberOfLines = 0;
+        _line.text = text;
+        [self addSubview:_circle];
+        [self addSubview:_line];
+        self.isAccessibilityElement = YES;
+        self.accessibilityLabel = text;
+        [self applyTheme];
+    }
+    return self;
+}
+
+// The symbol takes the text color; a Twitter glyph is baked in it, so both follow the appearance.
+- (void)applyTheme {
+    _circle.backgroundColor = [UIColor tertiarySystemFillColor];
+    _line.font = PFBScaledFont([TwitterChirpFont(TwitterFontStyleRegular) fontWithSize:14.5]);
+    _line.textColor = [UIColor secondaryLabelColor];
+    if (![_icon isKindOfClass:[UIImageView class]] || !_symbolName) {
+        return;
+    }
+    UIImageSymbolConfiguration* config = [UIImageSymbolConfiguration configurationWithPointSize:15
+                                                                                        weight:UIImageSymbolWeightMedium];
+    UIImage* symbol = [UIImage systemImageNamed:_symbolName withConfiguration:config];
+    UIImage* glyph = _glyphName && symbol ? PFBTwitterGlyphFor(_glyphName, symbol) : nil;
+    UIImageView* image = (UIImageView*)_icon;
+    image.image = glyph ?: symbol;
+    image.tintColor = PFBSettingsTextColor();
+}
+
+- (void)traitCollectionDidChange:(UITraitCollection*)previousTraitCollection {
+    [super traitCollectionDidChange:previousTraitCollection];
+    [self applyTheme];
+}
+
+- (CGFloat)textStart {
+    return kPFBShowcaseRowLeading + kPFBHintCircle + kPFBHintGap;
+}
+
+- (CGSize)sizeThatFits:(CGSize)size {
+    CGFloat room = MAX(0, size.width - [self textStart] - kPFBShowcaseRowLeading);
+    CGFloat text = ceil([_line sizeThatFits:CGSizeMake(room, CGFLOAT_MAX)].height);
+    return CGSizeMake(size.width, MAX(kPFBHintRowHeight, text + 12.0));
+}
+
+- (void)layoutSubviews {
+    [super layoutSubviews];
+    CGFloat width = CGRectGetWidth(self.bounds);
+    CGFloat midY = CGRectGetHeight(self.bounds) / 2.0;
+    BOOL rtl = self.effectiveUserInterfaceLayoutDirection == UIUserInterfaceLayoutDirectionRightToLeft;
+    _circle.frame = PFBShowcaseMirrored(
+        CGRectMake(kPFBShowcaseRowLeading, midY - kPFBHintCircle / 2.0, kPFBHintCircle, kPFBHintCircle), width, rtl);
+    _icon.frame = _circle.bounds;
+    CGFloat start = [self textStart];
+    _line.frame = PFBShowcaseMirrored(
+        CGRectMake(start, 0, MAX(0, width - start - kPFBShowcaseRowLeading), CGRectGetHeight(self.bounds)), width, rtl);
+    _line.textAlignment = rtl ? NSTextAlignmentRight : NSTextAlignmentLeft;
+}
+
+@end
+
+CGFloat PFBShowcaseLayoutHints(NSArray<PFBShowcaseHintRow*>* hints, CGFloat top, CGFloat width) {
+    CGFloat y = top;
+    for (PFBShowcaseHintRow* hint in hints) {
+        CGFloat height = [hint sizeThatFits:CGSizeMake(width, CGFLOAT_MAX)].height;
+        hint.frame = CGRectMake(0, y, width, height);
+        y += height;
+    }
+    return y;
+}

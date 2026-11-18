@@ -4,6 +4,7 @@
 #import "Support/HookHelpers.h"
 #import "Sideload/PFBWebLoginViewController.h"
 #import "Features/Appearance/Sidebar/PFBSidebarItems.h"
+#import "Support/PFBMenuProbe.h"
 
 // While set, -isSubscribedTo: (below) reports the account's genuine
 // subscription state instead of the forced premium tiers, so paths that need
@@ -184,6 +185,9 @@ static NSNumber* FeatureSwitchOverrideValueForKey(NSString* key) {
         return nil;
     }
     PFBCompatNoteSettingRead(key);
+    if (PFBMenuProbeRecording) {
+        PFBMenuProbeNoteSwitch(key);
+    }
     if (!pfbSwitchIsAnswered(key)) {
         return nil;
     }
@@ -687,8 +691,8 @@ static NSNumber* FeatureSwitchOverrideValueForKey(NSString* key) {
         return @YES;
     }
 
-    // Premium and verification upsells. Not all gate on !isPremiumTierUser, so every
-    // upsell surface is disabled here.
+    // Premium and verification offers, under Hide Premium prompts. Not all gate on
+    // !isPremiumTierUser, so every offer surface is answered here; off, Twitter's own values stand.
     if ([key isEqualToString:@"ios_profile_analytics_upsell_enabled"] ||
         [key isEqualToString:@"ios_profile_analytics_upsell_possible_enabled"] ||
         [key isEqualToString:@"ios_profile_upgrade_upsell_enabled"] ||
@@ -716,7 +720,11 @@ static NSNumber* FeatureSwitchOverrideValueForKey(NSString* key) {
         [key isEqualToString:@"ios_notifications_blue_verified_introductory_"
                              @"offer_prefix_visible"] ||
         [key isEqualToString:@"dash_items_download_grok_enabled"]) {
-        PFBCOMPAT_ACTION(PFBCompat_hide_upsells, @"upsell off");
+        if (![PFBSettings boolForKey:@"hide_premium_offer"]) {
+            PFBCOMPAT_OBSERVE(PFBCompat_hide_premium_offer, @"Premium offer switch read");
+            return nil;
+        }
+        PFBCOMPAT_ACTION(PFBCompat_hide_premium_offer, @"Premium offer off");
         return @NO;
     }
 
@@ -1066,11 +1074,17 @@ static BOOL pfbSkipsSensitiveWarnings(void) {
 // (isPremiumTierUser checks tiers 0/7/8, isVerifiedPremiumTierUser 0/8), so
 // forcing those tiers here unlocks premium from one stable seam.
 - (BOOL)isSubscribedTo:(NSUInteger)tier {
+    BOOL subscribed;
     if (!ReportGenuineSubscription && (tier == 0 || tier == 7 || tier == 8)) {
         PFBCOMPAT_ACTION(PFBCompat_premium_unlock, @"premium tier granted");
-        return YES;
+        subscribed = YES;
+    } else {
+        subscribed = %orig;
     }
-    return %orig;
+    if (PFBMenuProbeRecording) {
+        PFBMenuProbeNoteSubscription(tier, subscribed);
+    }
+    return subscribed;
 }
 
 // Analytics shown on the Menu page: Twitter shows it only to an account that is not Premium,
@@ -1321,6 +1335,15 @@ void PFBDashRefresh(void) {
 %hook T1DashContentController
 
 - (void)updateVisiblePanelIDs {
+    // The Menu probe's rebuilds are Twitter's own: the Menu page's checks stay out of them.
+    if (PFBMenuProbeRecording) {
+        PFBMenuProbeNoteContent(self);
+        BOOL saved = DashPanelIDQuery;
+        DashPanelIDQuery = YES;
+        %orig;
+        DashPanelIDQuery = saved;
+        return;
+    }
     // A nested update would clear the flag for the rest of the outer one.
     BOOL outer = !DashPanelIDQuery;
     if (!outer) {
@@ -1381,12 +1404,23 @@ static BOOL PFBDashAnswerApplies(BOOL glassNavigation) {
 
 %end
 
+BOOL PFBMenuProbeMenuOpen(void) {
+    return gPFBDashMenuOpen;
+}
+
+void PFBMenuProbeSetRealReads(BOOL subscription, BOOL gates) {
+    ReportGenuineSubscription = subscription;
+    ReportGenuineTabGates = gates;
+}
+
 // The sidebar's rebuild names each of some items once it keeps it: the Menu page offers
 // those, and an item hidden from it must not be named.
 %hook T1PanelIdentity
 
 + (NSString*)localizedNameForPanelID:(long long)panelID {
-    if (DashPanelIDQuery) {
+    if (DashPanelIDQuery && PFBMenuProbeRecording) {
+        PFBMenuProbeNoteNamed(panelID);
+    } else if (DashPanelIDQuery) {
         [PFBSidebarItems noteBuiltPanel:(NSInteger)panelID];
     }
     return %orig;
@@ -1399,6 +1433,9 @@ static BOOL PFBDashAnswerApplies(BOOL glassNavigation) {
 static NSArray* PFBDashPanelIDs(NSArray* panelIDs) {
     if (![panelIDs isKindOfClass:[NSArray class]]) {
         return panelIDs;
+    }
+    if (PFBMenuProbeRecording) {
+        return PFBMenuProbeAnswer(panelIDs);
     }
     [PFBSidebarItems recordTabPanelIDs:panelIDs];
     NSMutableArray* spoofed = [panelIDs mutableCopy];
