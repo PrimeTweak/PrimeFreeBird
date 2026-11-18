@@ -17,7 +17,7 @@ static NSUInteger gPFBSearchProbeScreens;
 static NSHashTable* gPFBSearchProbeCells;
 
 static void PFBSearchProbeLine(NSString* line) {
-    PFBCompatMeasure(kPFBSearchProbeTopic, line, 60);
+    PFBCompatMeasure(kPFBSearchProbeTopic, line, 90);
 }
 
 // A Swift class name without its module prefix.
@@ -95,6 +95,22 @@ static id PFBSearchProbeSend(id receiver, NSString* selectorName) {
     return [receiver respondsToSelector:selector] ? ((id (*)(id, SEL))objc_msgSend)(receiver, selector) : nil;
 }
 
+// The words a row yields for a search, and the place they came from.
+static NSString* PFBSearchProbeWords(id model, NSString** source) {
+    id text = PFBSearchProbeSend(PFBSearchProbeIvar(PFBSearchProbeIvar(model, "notification"), "richText"), @"text");
+    if ([text isKindOfClass:[NSString class]] && [text length]) {
+        *source = @"notification text";
+        return text;
+    }
+    text = PFBSearchProbeSend(PFBSearchProbeIvar(model, "status"), @"text");
+    if ([text isKindOfClass:[NSString class]] && [text length]) {
+        *source = @"Tweet text";
+        return text;
+    }
+    *source = @"none";
+    return nil;
+}
+
 // The words a notification row carries, from every place they could be read.
 static NSString* PFBSearchProbeRow(id model) {
     NSMutableArray<NSString*>* parts = [NSMutableArray array];
@@ -166,6 +182,41 @@ static void PFBSearchProbeList(NSArray* sections, NSString* entry) {
     }
 }
 
+// Every row the shown list holds, read the way hidden notifications reads them, and how many
+// of them yield words for a search.
+static void PFBSearchProbeRows(UITableView* table) {
+    id list = table.dataSource;
+    SEL itemSel = NSSelectorFromString(@"itemAtIndexPath:");
+    if (![list respondsToSelector:itemSel]) {
+        PFBSearchProbeLine([NSString stringWithFormat:@"rows: %@ gives no item", PFBSearchProbeName(list)]);
+        return;
+    }
+    NSMutableDictionary<NSString*, NSNumber*>* sources = [NSMutableDictionary dictionary];
+    NSMutableDictionary<NSString*, NSNumber*>* wordless = [NSMutableDictionary dictionary];
+    NSMutableSet<NSString*>* sampled = [NSMutableSet set];
+    NSInteger rows = 0;
+    for (NSInteger section = 0; section < table.numberOfSections; section++) {
+        for (NSInteger row = 0; row < [table numberOfRowsInSection:section]; row++) {
+            rows++;
+            id item = ((id (*)(id, SEL, id))objc_msgSend)(list, itemSel, [NSIndexPath indexPathForRow:row inSection:section]);
+            id model = PFBUnwrapDataViewItem(item) ?: item;
+            NSString* source = nil;
+            PFBSearchProbeWords(model, &source);
+            sources[source] = @(sources[source].integerValue + 1);
+            NSString* name = PFBSearchProbeName(model);
+            if ([source isEqualToString:@"none"]) {
+                wordless[name] = @(wordless[name].integerValue + 1);
+            }
+            if (![sampled containsObject:name] && sampled.count < 5) {
+                [sampled addObject:name];
+                PFBSearchProbeLine([NSString stringWithFormat:@"shown row %@: %@", name, PFBSearchProbeRow(model)]);
+            }
+        }
+    }
+    PFBSearchProbeLine([NSString stringWithFormat:@"shown rows %ld from %@: words from %@; none by kind %@", (long)rows,
+                                                  PFBSearchProbeName(list), sources, wordless]);
+}
+
 // One view: class, frame on screen, and whether it shows.
 static NSString* PFBSearchProbeView(UIView* view) {
     if (!view) {
@@ -193,6 +244,27 @@ static NSString* PFBSearchProbeTree(UIView* root, NSUInteger maxDepth) {
     NSMutableArray<NSString*>* parts = [NSMutableArray array];
     PFBSearchProbeWalk(root, 0, maxDepth, parts);
     return parts.count ? [parts componentsJoinedByString:@"; "] : @"none";
+}
+
+static UIView* PFBSearchProbeFindNamed(UIView* root, NSString* word) {
+    if ([NSStringFromClass([root class]) containsString:word]) {
+        return root;
+    }
+    for (UIView* sub in root.subviews) {
+        UIView* found = PFBSearchProbeFindNamed(sub, word);
+        if (found) {
+            return found;
+        }
+    }
+    return nil;
+}
+
+static NSString* PFBSearchProbeChain(Class cls) {
+    NSMutableArray<NSString*>* names = [NSMutableArray array];
+    for (; cls && names.count < 5; cls = class_getSuperclass(cls)) {
+        [names addObject:NSStringFromClass(cls)];
+    }
+    return [names componentsJoinedByString:@" < "];
 }
 
 static UITableView* PFBSearchProbeTable(UIView* root) {
@@ -240,7 +312,7 @@ static void PFBSearchProbeScreen(UIViewController* screen) {
     id segmented = PFBSearchProbeIvar(screen, "$__lazy_storage_$_segmentedController");
     UIView* tabBar = PFBSearchProbeSend(segmented, @"tabBarView");
     NSMutableArray<NSString*>* chain = [NSMutableArray array];
-    for (UIView* step = tabBar.superview; step && chain.count < 4; step = step.superview) {
+    for (UIView* step = tabBar.superview; step && chain.count < 7; step = step.superview) {
         [chain addObject:PFBSearchProbeView(step)];
     }
     SEL hideMode = NSSelectorFromString(@"tabBarHideMode");
@@ -262,6 +334,15 @@ static void PFBSearchProbeScreen(UIViewController* screen) {
                                                   table.adjustedContentInset.top, table.contentOffset.y,
                                                   PFBSearchProbeView(table.tableHeaderView), PFBSearchProbeName(table.dataSource)]);
     PFBSearchProbeLine([NSString stringWithFormat:@"screen tree: %@", PFBSearchProbeTree(screen.view, 3)]);
+    UIView* host = PFBSearchProbeFindNamed(screen.view, @"AccessoryStackView");
+    PFBSearchProbeLine([NSString stringWithFormat:@"accessory host %@: %@; tree %@", host ? PFBSearchProbeChain([host class]) : @"none",
+                                                  [host isKindOfClass:[UIStackView class]]
+                                                      ? [NSString stringWithFormat:@"%lu arranged", (unsigned long)((UIStackView*)host).arrangedSubviews.count]
+                                                      : @"not a stack",
+                                                  PFBSearchProbeTree(host, 4)]);
+    if (table) {
+        PFBSearchProbeRows(table);
+    }
 }
 
 // The words a shown notification cell holds: its spoken label and its view model's texts.
@@ -310,6 +391,29 @@ static void PFBSearchProbeCell(UITableViewCell* cell) {
 
 - (void)updateSections:(NSArray*)sections {
     PFBSearchProbeList(sections, @"update");
+    %orig;
+}
+
+- (void)updateSections:(NSArray*)sections completion:(id)completion {
+    PFBSearchProbeList(sections, @"update, completion");
+    %orig;
+}
+
+- (void)updateSections:(NSArray*)sections withRowAnimation:(NSInteger)animation {
+    PFBSearchProbeList(sections, @"update, animated");
+    %orig;
+}
+
+- (void)updateSections:(NSArray*)sections withRowAnimation:(NSInteger)animation completion:(id)completion {
+    PFBSearchProbeList(sections, @"update, animated, completion");
+    %orig;
+}
+
+- (void)updateSections:(NSArray*)sections
+    reconfigureItemIdentifiers:(id)identifiers
+              withRowAnimation:(NSInteger)animation
+                    completion:(id)completion {
+    PFBSearchProbeList(sections, @"update, reconfigured");
     %orig;
 }
 
