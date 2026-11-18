@@ -19,7 +19,8 @@ static const NSInteger PFBSidebarGrokPanel = 14;
 + (nullable NSString*)nameForPanel:(NSInteger)panelID;
 + (nullable NSString*)glyphForPanel:(NSInteger)panelID;
 
-// Out of the sidebar as chosen on the page, or by default; Grok by its own option.
+// Out of the sidebar as chosen on the page, or by default; Grok by its own option; an item the
+// account doesn't really have, always.
 + (BOOL)isHidden:(NSInteger)panelID;
 + (void)setPanel:(NSInteger)panelID hidden:(BOOL)hidden;
 // The page's items kept out of the sidebar, Grok's shortcut aside.
@@ -37,7 +38,8 @@ static const NSInteger PFBSidebarGrokPanel = 14;
 + (void)recordTabPanelIDs:(NSArray*)panelIDs;
 + (NSArray<NSNumber*>*)tabPanelIDs;
 
-// The page's tiles, in the sidebar's order: every item it offers, the tab bar's aside.
+// The page's tiles, in the sidebar's order: every item it offers that the account has, the tab
+// bar's aside.
 + (NSArray<NSNumber*>*)panelsForPage;
 
 // Around each update of the sidebar: the panels Twitter names while it rebuilds are the ones it

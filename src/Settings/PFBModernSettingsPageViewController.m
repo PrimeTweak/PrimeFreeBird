@@ -244,19 +244,9 @@ NSURL* PFBAccountAvatarURL(TFNTwitterAccount* account) {
 - (void)updateVisibleToggles {
     NSMutableArray* visible = [NSMutableArray array];
     for (NSDictionary* toggleData in self.toggles) {
-        // Two relations, opposite directions: a row appears while its parent is
-        // on, and disappears while its blocker is on.
+        // A row with a parent appears while the parent is on, its declared default included.
         NSString* parentKey = toggleData[@"parentKey"];
-        NSString* hiddenWhen = toggleData[@"hiddenWhen"];
-        BOOL show = YES;
-        if (parentKey) {
-            // The parent's own state, its declared default included.
-            show = [PFBSettings boolForKey:parentKey];
-        }
-        if (show && hiddenWhen && [PFBSettings boolForKey:hiddenWhen]) {
-            show = NO;
-        }
-        if (show) {
+        if (!parentKey || [PFBSettings boolForKey:parentKey]) {
             [visible addObject:toggleData];
         }
     }
@@ -1168,8 +1158,7 @@ NSURL* PFBAccountAvatarURL(TFNTwitterAccount* account) {
     NSMutableArray* indexPaths = [NSMutableArray array];
     [reference enumerateObjectsUsingBlock:^(NSDictionary* entry, NSUInteger row,
                                             BOOL* stop) {
-      if ([entry[@"parentKey"] isEqualToString:key] ||
-          [entry[@"hiddenWhen"] isEqualToString:key]) {
+      if ([entry[@"parentKey"] isEqualToString:key]) {
           [indexPaths addObject:[NSIndexPath indexPathForRow:(NSInteger)row
                                                    inSection:0]];
       }

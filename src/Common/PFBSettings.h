@@ -14,8 +14,8 @@
 + (BOOL)boolForKey:(NSString*)key;
 + (NSInteger)integerForKey:(NSString*)key;
 
-// Every option key the registry declares, across all pages, with the keys a row
-// carries beside its own (pillKey, tabKeys).
+// Every option key the registry declares, across all pages, with the pill keys rows carry
+// and the Explore tab keys the Tabs page sets.
 + (NSArray<NSString*>*)allOptionKeys;
 
 @end

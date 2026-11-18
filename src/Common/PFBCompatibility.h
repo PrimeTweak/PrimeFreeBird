@@ -97,6 +97,7 @@ typedef NS_ENUM(NSInteger, PFBCompatOption) {
     PFBCompat_restore_twitter_names,
     PFBCompat_refresh_pill_label,
     PFBCompat_restore_tweet_button,
+    PFBCompat_classic_refresh,
     PFBCompat_restore_refresh_sounds,
     PFBCompat_reply_in_webview,
     PFBCompat_flex_twitter,

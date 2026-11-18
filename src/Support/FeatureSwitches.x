@@ -4,7 +4,6 @@
 #import "Support/HookHelpers.h"
 #import "Sideload/PFBWebLoginViewController.h"
 #import "Features/Appearance/Sidebar/PFBSidebarItems.h"
-#import "Support/PFBMenuProbe.h"
 
 // While set, -isSubscribedTo: (below) reports the account's genuine
 // subscription state instead of the forced premium tiers, so paths that need
@@ -16,10 +15,7 @@ static __thread BOOL ReportGenuineSubscription = NO;
 // pool.
 static __thread BOOL ReportGenuineTabGates = NO;
 
-// Whether the account is really a premium subscriber, ignoring the forced
-// unlock — for switch-gated surfaces that have no premium-aware seam of their
-// own.
-static BOOL AccountIsGenuinelyPremium(void) {
+BOOL PFBAccountIsGenuinelyPremium(void) {
     if (![NSThread isMainThread]) {
         static dispatch_once_t offMain;
         dispatch_once(&offMain, ^{
@@ -88,6 +84,7 @@ static BOOL pfbSwitchIsAnswered(NSString* key) {
           @"hometimeline_pinned_tabs_management_pinnedsection_inline_limit",
           @"edit_tweet_ga_composition_enabled", @"edit_tweet_pdp_dialog_enabled",
           @"app_launch_animated_launch_screen_enabled",
+          @"ios_home_timeline_logo_pull_to_refresh_enabled",
           @"grok_translations_bio_inline_translation_is_enabled",
           @"grok_translations_bio_translation_is_enabled",
           @"grok_translations_post_inline_translation_is_enabled",
@@ -185,9 +182,6 @@ static NSNumber* FeatureSwitchOverrideValueForKey(NSString* key) {
         return nil;
     }
     PFBCompatNoteSettingRead(key);
-    if (PFBMenuProbeRecording) {
-        PFBMenuProbeNoteSwitch(key);
-    }
     if (!pfbSwitchIsAnswered(key)) {
         return nil;
     }
@@ -553,6 +547,16 @@ static NSNumber* FeatureSwitchOverrideValueForKey(NSString* key) {
         return nil;
     }
 
+    // Classic refresh: Home's logo stays still and the pull-to-refresh circle comes back.
+    if ([key isEqualToString:@"ios_home_timeline_logo_pull_to_refresh_enabled"]) {
+        if ([PFBSettings boolForKey:@"classic_refresh"]) {
+            PFBCOMPAT_ACTION(PFBCompat_classic_refresh, @"logo refresh off");
+            return @NO;
+        }
+        PFBCOMPAT_OBSERVE(PFBCompat_classic_refresh, @"read by Twitter");
+        return nil;
+    }
+
     // Voice notes: the transcript is rendered under the waveform, so a message
     // can be read instead of played.
     if ([key isEqualToString:@"xchat_voice_messages_transcription_enabled"]) {
@@ -758,7 +762,7 @@ static NSNumber* FeatureSwitchOverrideValueForKey(NSString* key) {
 
     // The Monetization entries gate purely on this switch with no premium check: kept for a
     // real subscriber, hidden behind the spoof.
-    if ([key isEqualToString:@"creator_monetization_dashboard_enabled"] && !AccountIsGenuinelyPremium()) {
+    if ([key isEqualToString:@"creator_monetization_dashboard_enabled"] && !PFBAccountIsGenuinelyPremium()) {
         return @NO;
     }
 
@@ -1074,17 +1078,11 @@ static BOOL pfbSkipsSensitiveWarnings(void) {
 // (isPremiumTierUser checks tiers 0/7/8, isVerifiedPremiumTierUser 0/8), so
 // forcing those tiers here unlocks premium from one stable seam.
 - (BOOL)isSubscribedTo:(NSUInteger)tier {
-    BOOL subscribed;
     if (!ReportGenuineSubscription && (tier == 0 || tier == 7 || tier == 8)) {
         PFBCOMPAT_ACTION(PFBCompat_premium_unlock, @"premium tier granted");
-        subscribed = YES;
-    } else {
-        subscribed = %orig;
+        return YES;
     }
-    if (PFBMenuProbeRecording) {
-        PFBMenuProbeNoteSubscription(tier, subscribed);
-    }
-    return subscribed;
+    return %orig;
 }
 
 // Analytics shown on the Menu page: Twitter shows it only to an account that is not Premium,
@@ -1335,15 +1333,6 @@ void PFBDashRefresh(void) {
 %hook T1DashContentController
 
 - (void)updateVisiblePanelIDs {
-    // The Menu probe's rebuilds are Twitter's own: the Menu page's checks stay out of them.
-    if (PFBMenuProbeRecording) {
-        PFBMenuProbeNoteContent(self);
-        BOOL saved = DashPanelIDQuery;
-        DashPanelIDQuery = YES;
-        %orig;
-        DashPanelIDQuery = saved;
-        return;
-    }
     // A nested update would clear the flag for the rest of the outer one.
     BOOL outer = !DashPanelIDQuery;
     if (!outer) {
@@ -1404,23 +1393,12 @@ static BOOL PFBDashAnswerApplies(BOOL glassNavigation) {
 
 %end
 
-BOOL PFBMenuProbeMenuOpen(void) {
-    return gPFBDashMenuOpen;
-}
-
-void PFBMenuProbeSetRealReads(BOOL subscription, BOOL gates) {
-    ReportGenuineSubscription = subscription;
-    ReportGenuineTabGates = gates;
-}
-
 // The sidebar's rebuild names each of some items once it keeps it: the Menu page offers
 // those, and an item hidden from it must not be named.
 %hook T1PanelIdentity
 
 + (NSString*)localizedNameForPanelID:(long long)panelID {
-    if (DashPanelIDQuery && PFBMenuProbeRecording) {
-        PFBMenuProbeNoteNamed(panelID);
-    } else if (DashPanelIDQuery) {
+    if (DashPanelIDQuery) {
         [PFBSidebarItems noteBuiltPanel:(NSInteger)panelID];
     }
     return %orig;
@@ -1433,9 +1411,6 @@ void PFBMenuProbeSetRealReads(BOOL subscription, BOOL gates) {
 static NSArray* PFBDashPanelIDs(NSArray* panelIDs) {
     if (![panelIDs isKindOfClass:[NSArray class]]) {
         return panelIDs;
-    }
-    if (PFBMenuProbeRecording) {
-        return PFBMenuProbeAnswer(panelIDs);
     }
     [PFBSidebarItems recordTabPanelIDs:panelIDs];
     NSMutableArray* spoofed = [panelIDs mutableCopy];

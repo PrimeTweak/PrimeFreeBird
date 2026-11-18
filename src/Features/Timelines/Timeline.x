@@ -2076,8 +2076,9 @@ void pfbReapplyTimelineFilter(void) {
 
 // MARK: - Home refresh fade
 
-// After a pull on Home, Twitter swaps the Tweets on screen in one frame once the refresh ends. In the
-// seconds around that, the list as it was is laid over the new one and faded out in 0.3 s.
+// After a pull on Home, Twitter swaps the Tweets on screen in one frame once the refresh ends. With
+// Smooth refresh on, in the seconds around that, the list as it was is laid over the new one and
+// faded out in 0.3 s.
 static CFTimeInterval gPFBRefreshPulledAt = -1000.0;
 static CFTimeInterval gPFBRefreshLandedAt = -1000.0;
 static const void* kPFBRefreshFadeKey = &kPFBRefreshFadeKey;
@@ -2093,7 +2094,8 @@ static BOOL PFBRefreshFadeOpen(CFTimeInterval now) {
 // still picture would trail behind it.
 static void PFBRefreshFadeBegin(TFNItemsDataViewController* controller) {
     CFTimeInterval now = CACurrentMediaTime();
-    if (!PFBRefreshFadeOpen(now) || !PFBReadingIsHomeTimeline(controller)) {
+    if (![PFBSettings boolForKey:@"refresh_fade"] || !PFBRefreshFadeOpen(now) ||
+        !PFBReadingIsHomeTimeline(controller)) {
         return;
     }
     UIScrollView* list = PFBListScrollView(controller);

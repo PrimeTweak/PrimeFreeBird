@@ -87,6 +87,9 @@ void PFBInstallPasteboardObserver(void);
 // gates (FeatureSwitches.x)
 BOOL PFBPanelIsGenuinelyAvailable(long long panelID);
 
+// Whether the account really pays for Premium, through the unlock (FeatureSwitches.x).
+BOOL PFBAccountIsGenuinelyPremium(void);
+
 // Web session cookie harvesting (WebCreateTweet.x)
 void PFBPrewarmWebCookiesIfNeeded(void);
 void PFBMaybeHandleHarvestWebView(__unsafe_unretained id webViewController);

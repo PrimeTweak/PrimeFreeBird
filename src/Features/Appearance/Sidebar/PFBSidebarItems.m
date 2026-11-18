@@ -10,6 +10,7 @@
 #import "Common/PFBBundle.h"
 #import "Common/PFBCompatibility.h"
 #import "Common/PFBSettings.h"
+#import "Support/HookHelpers.h"
 
 NSNotificationName const PFBSidebarItemsDidChangeNotification = @"PFBSidebarItemsDidChangeNotification";
 
@@ -23,6 +24,7 @@ static BOOL gPFBSidebarAnalyticsAsked;
 // Analytics is shown only to an account that is not Premium. In T1Twitter 12.44, the build with
 // this UUID, its builder asks once, from the call returning to this offset.
 static const NSInteger kAnalyticsPanel = 19;
+static const NSInteger kSubscriptionPanel = 15;
 static const uintptr_t kAnalyticsPremiumReturn = 0x9f6860;
 static const uint8_t kT1Twitter1244UUID[16] = {0xFF, 0x04, 0xD4, 0x03, 0x9F, 0x49, 0x3B, 0x14,
                                                0x87, 0x6C, 0xA8, 0xF7, 0xAD, 0x59, 0x18, 0x9F};
@@ -126,6 +128,28 @@ static BOOL PFBSidebarAccountIsBusiness(void) {
     return NO;
 }
 
+// Whether the account really has a panel: Money, Jobs and Community Notes by their real gates, as
+// the bottom bar's editor reads them; Analytics by its switch, for a personal account; the
+// subscription tile, under Hide Premium prompts, for a paying account only.
+static BOOL PFBSidebarIsAvailable(NSInteger panelID) {
+    switch (panelID) {
+        case 13:
+        case 16:
+        case 17:
+            return PFBPanelIsGenuinelyAvailable(panelID);
+        case kAnalyticsPanel: {
+            SEL reader = NSSelectorFromString(@"boolForKey:");
+            id switches = PFBSidebarAccountSwitches();
+            return [switches respondsToSelector:reader] && !PFBSidebarAccountIsBusiness() &&
+                   ((BOOL (*)(id, SEL, id))objc_msgSend)(switches, reader, @"dash_items_account_analytics_enabled");
+        }
+        case kSubscriptionPanel:
+            return ![PFBSettings boolForKey:@"hide_premium_offer"] || PFBAccountIsGenuinelyPremium();
+        default:
+            return YES;
+    }
+}
+
 // The choice made on the page for a panel, nil when none was made.
 static NSNumber* PFBSidebarChoice(NSInteger panelID) {
     NSString* key = PFBPanelIdentityAnswer(@"stringForPanelID:", panelID);
@@ -192,6 +216,9 @@ NSArray<NSNumber*>* PFBDashSnapshot(id content) {
     }
     if (!PFBSidebarIsOffered(panelID)) {
         return NO;
+    }
+    if (!PFBSidebarIsAvailable(panelID)) {
+        return YES;
     }
     NSNumber* choice = PFBSidebarChoice(panelID);
     return !(choice ? choice.boolValue : PFBSidebarShownByDefault(panelID));
@@ -272,15 +299,21 @@ NSArray<NSNumber*>* PFBDashSnapshot(id content) {
     }
 }
 
-// Twitter leaves a tab bar item out of its sidebar, so the page does too.
+// Twitter leaves a tab bar item out of its sidebar, so the page does too; an item the account
+// doesn't really have is left off.
 + (NSArray<NSNumber*>*)panelsForPage {
     NSArray<NSNumber*>* tabs = [self tabPanelIDs];
     NSMutableArray<NSNumber*>* panels = [NSMutableArray array];
     for (NSNumber* panel in [self catalog]) {
-        if (PFBSidebarIsOffered(panel.integerValue) && ![tabs containsObject:panel] &&
-            [self nameForPanel:panel.integerValue]) {
-            [panels addObject:panel];
+        if (!PFBSidebarIsOffered(panel.integerValue) || [tabs containsObject:panel] ||
+            ![self nameForPanel:panel.integerValue]) {
+            continue;
         }
+        if (!PFBSidebarIsAvailable(panel.integerValue)) {
+            PFBCOMPAT_ACTION(PFBCompat_customize_sidebar, @"item the account lacks left off the page");
+            continue;
+        }
+        [panels addObject:panel];
     }
     return panels;
 }
@@ -317,8 +350,7 @@ NSArray<NSNumber*>* PFBDashSnapshot(id content) {
             [self noteFailureOf:panel state:@"missing from the sidebar"];
         }
     }
-    if (built.count && [self showsAnalytics] && ![tabs containsObject:@(kAnalyticsPanel)] && !gPFBSidebarAnalyticsAsked &&
-        !PFBSidebarAccountIsBusiness()) {
+    if (built.count && [self showsAnalytics] && ![tabs containsObject:@(kAnalyticsPanel)] && !gPFBSidebarAnalyticsAsked) {
         [self noteFailureOf:@(kAnalyticsPanel) state:@"missing from the sidebar"];
     }
     if (!PFBSidebarIsOffered(kAnalyticsPanel) && PFBSidebarChoice(kAnalyticsPanel).boolValue) {

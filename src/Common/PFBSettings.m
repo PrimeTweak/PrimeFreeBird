@@ -193,6 +193,8 @@ static NSDictionary<NSString*, NSDictionary*>* PFBSettingsPages(void) {
                       @"default": @YES},
                     @{@"key": @"hide_new_tweets_pill",
                       @"default": @NO},
+                    @{@"key": @"refresh_fade",
+                      @"default": @YES},
                     @{@"key": @"hide_custom_timelines",
                       @"default": @YES},
                     @{@"key": @"unlimited_timeline_tabs",
@@ -470,6 +472,10 @@ static NSDictionary<NSString*, NSDictionary*>* PFBSettingsPages(void) {
                         @"key": @"restore_tweet_button",
                         @"default": @([PFBManager isTwitterBranded]),
                         @"disabledWhen": @"hide_tweet_button"
+                    },
+                    @{
+                        @"key": @"classic_refresh",
+                        @"default": @NO
                     },
                     @{
                         @"key": @"restore_refresh_sounds",
@@ -810,7 +816,6 @@ static NSDictionary* PFBKeylessDefaults(void) {
             if (setting[@"pillKey"]) {
                 [rowKeys addObject:setting[@"pillKey"]];
             }
-            [rowKeys addObjectsFromArray:setting[@"tabKeys"] ?: @[]];
             for (NSString* key in rowKeys) {
                 if (![keys containsObject:key]) {
                     [keys addObject:key];
@@ -818,6 +823,7 @@ static NSDictionary* PFBKeylessDefaults(void) {
             }
         }
     }
+    [keys addObjectsFromArray:PFBExploreTabKeys()];
     return keys;
 }
 
