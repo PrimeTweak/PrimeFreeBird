@@ -760,7 +760,7 @@ const PFBOptionFingerprint PFBOptionFingerprints[] = {
     {"tweet_confirm", "3b013d80"},
     {"tweet_to_image", "d3833d69"},
     {"undo_tweet_timeout", "3b013d80"},
-    {"unified_notifications", "221c9386"},
+    {"unified_notifications", "62621f9a"},
     {"unlimited_timeline_tabs", "6a0c1d66"},
     {"unrounded_counts", "f21fac20"},
     {"upload_full_hd_videos", "6a0c1d66"},

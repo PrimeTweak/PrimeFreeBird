@@ -253,7 +253,6 @@ static void PFBSearchSyncPanel(UITableView* table) {
 // The shown cells take the search at once; the others take it as the list lays them out.
 static void PFBSearchApply(UITableView* table, BOOL toTop) {
     id list = table.dataSource;
-    table.keyboardDismissMode = UIScrollViewKeyboardDismissModeOnDrag;
     [table beginUpdates];
     [table endUpdates];
     for (NSIndexPath* indexPath in table.indexPathsForVisibleRows) {
@@ -296,10 +295,11 @@ static UIColor* PFBSearchColor(CGFloat lightWhite, UIColor* dark) {
     }];
 }
 
-@interface PFBNotifSearchBar : UIView <UITextFieldDelegate>
+@interface PFBNotifSearchBar : UIView <UITextFieldDelegate, UIGestureRecognizerDelegate>
 @property (nonatomic, strong) UITextField* field;
 @property (nonatomic, strong) UIImageView* glyph;
 @property (nonatomic, weak) UIViewController* screen;
+@property (nonatomic, strong) UITapGestureRecognizer* outsideTap;
 @end
 
 @implementation PFBNotifSearchBar
@@ -370,6 +370,31 @@ static UIColor* PFBSearchColor(CGFloat lightWhite, UIColor* dark) {
     if (table) {
         PFBSearchApply(table, wasEmpty != (gPFBSearchQuery.length == 0));
     }
+}
+
+// While the keyboard is up, a drag on the list or a tap anywhere but the field puts it away; the
+// tap still reaches what it lands on, a notification or a button.
+- (void)textFieldDidBeginEditing:(UITextField*)textField {
+    PFBSearchShownList(self.screen.viewIfLoaded).keyboardDismissMode = UIScrollViewKeyboardDismissModeOnDrag;
+    if (!self.outsideTap) {
+        self.outsideTap = [[UITapGestureRecognizer alloc] initWithTarget:textField action:@selector(resignFirstResponder)];
+        self.outsideTap.cancelsTouchesInView = NO;
+        self.outsideTap.delegate = self;
+    }
+    [textField.window addGestureRecognizer:self.outsideTap];
+}
+
+- (void)textFieldDidEndEditing:(UITextField*)textField {
+    [self.outsideTap.view removeGestureRecognizer:self.outsideTap];
+}
+
+- (BOOL)gestureRecognizer:(UIGestureRecognizer*)gestureRecognizer shouldReceiveTouch:(UITouch*)touch {
+    return ![touch.view isDescendantOfView:self.field];
+}
+
+- (BOOL)gestureRecognizer:(UIGestureRecognizer*)gestureRecognizer
+    shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer*)otherGestureRecognizer {
+    return YES;
 }
 
 - (BOOL)textFieldShouldReturn:(UITextField*)textField {
