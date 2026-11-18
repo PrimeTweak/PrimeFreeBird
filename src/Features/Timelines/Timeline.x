@@ -380,10 +380,9 @@ static BOOL pfbScrollViewIsModal(UIScrollView* scrollView) {
 
 %end
 
-// Twitter's navigation paints an opaque band behind its top bar, with a line once the list scrolls
-// under it. With the option on, the band is cleared and its line hidden, and the lists beside it
-// take the soft effect. Home, Explore, Notifications and Search keep their band and line: their tabs
-// sit on it.
+// Twitter paints an opaque band behind its top bar, with a line once the list scrolls under it.
+// The option clears the band and hides the line so the lists take the soft effect; Home, Explore,
+// Notifications and Search keep both, as their tabs sit on them.
 static BOOL gPFBBandWriting = NO;
 
 static BOOL pfbBandIsPainted(UIColor* color) {
