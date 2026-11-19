@@ -757,7 +757,7 @@
 "HIDE_NEW_TWEETS_PILL_TITLE" = "Hinweis auf neue Tweets ausblenden";
 "HIDE_NEW_TWEETS_PILL_DETAIL" = "Entfernt den Hinweis auf neue Tweets oben in deiner Timeline.";
 "REFRESH_FADE_TITLE" = "Sanftes Aktualisieren";
-"REFRESH_FADE_DETAIL" = "Blendet neue Tweets weich ein, wenn du zum Aktualisieren ziehst.";
+"REFRESH_FADE_DETAIL" = "Blendet neue Tweets weich ein, wenn die Startseite aktualisiert wird.";
 "REFRESH_PILL_LABEL_DETAIL_HELD" = "Nicht nötig, solange der Hinweis auf neue Tweets ausgeblendet ist.";
 
 /* ===== COMPATIBILITY: behaviors with no toggle ===== */

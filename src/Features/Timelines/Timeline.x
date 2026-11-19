@@ -2075,18 +2075,23 @@ void pfbReapplyTimelineFilter(void) {
 
 // MARK: - Home refresh fade
 
-// After a pull on Home, Twitter swaps the Tweets on screen in one frame once the refresh ends. With
-// Smooth refresh on, in the seconds around that, the list as it was is laid over the new one and
-// faded out in 0.3 s.
+// When Home refreshes, from a pull or on its own at launch, Twitter swaps the Tweets on screen in one
+// frame as the refresh ends. With Smooth refresh on, in the seconds around that, the list as it was is
+// laid over the new one and faded out in 0.3 s.
 static CFTimeInterval gPFBRefreshPulledAt = -1000.0;
+static CFTimeInterval gPFBRefreshStartedAt = -1000.0;
 static CFTimeInterval gPFBRefreshLandedAt = -1000.0;
 static const void* kPFBRefreshFadeKey = &kPFBRefreshFadeKey;
 static const NSTimeInterval kPFBRefreshFadeDuration = 0.3;
 
-// Open from a pull until 2 s after its refresh ends, 15 s at most.
+// Open from a pull until 2 s after its refresh ends, 15 s at most. A refresh Twitter starts itself opens
+// it 1 s in: Home's first Tweets at launch come within 0.3 s of that start, its swap 3.5 s in (measured).
 static BOOL PFBRefreshFadeOpen(CFTimeInterval now) {
-    return (now - gPFBRefreshPulledAt < 15.0 && gPFBRefreshLandedAt < gPFBRefreshPulledAt) ||
-           now - gPFBRefreshLandedAt < 2.0;
+    if (gPFBRefreshStartedAt > gPFBRefreshPulledAt && now - gPFBRefreshStartedAt < 1.0) {
+        return NO;
+    }
+    CFTimeInterval began = MAX(gPFBRefreshPulledAt, gPFBRefreshStartedAt);
+    return (now - began < 15.0 && gPFBRefreshLandedAt < began) || now - gPFBRefreshLandedAt < 2.0;
 }
 
 // Called as Twitter hands Home new sections, before they show. Skipped while the list moves, where a
@@ -2138,12 +2143,15 @@ static void PFBRefreshFadeBegin(TFNItemsDataViewController* controller) {
     if (fromPull) {
         gPFBRefreshPulledAt = CACurrentMediaTime();
         PFBCOMPAT_OBSERVE(PFBCompat_refresh_fade, @"pull on Home seen");
+    } else {
+        gPFBRefreshStartedAt = CACurrentMediaTime();
+        PFBCOMPAT_OBSERVE(PFBCompat_refresh_fade, @"Home refresh started by Twitter seen");
     }
 }
 
 - (void)pullToRefreshControlDidEndRefreshing:(id)control {
     %orig;
-    if (gPFBRefreshPulledAt > gPFBRefreshLandedAt) {
+    if (MAX(gPFBRefreshPulledAt, gPFBRefreshStartedAt) > gPFBRefreshLandedAt) {
         gPFBRefreshLandedAt = CACurrentMediaTime();
     }
 }
@@ -2188,7 +2196,7 @@ static void PFBRefreshFadeBegin(TFNItemsDataViewController* controller) {
     PFBReadingRescanSoon(self);
 }
 
-// Home's pull to refresh hands its new Tweets here, as measured on 12.44.
+// Home's refreshes hand their new Tweets here, pulled or started by Twitter (measured).
 - (void)setSections:(NSArray*)sections {
     PFBRefreshFadeBegin(self);
     %orig;

@@ -757,7 +757,7 @@
 "HIDE_NEW_TWEETS_PILL_TITLE" = "新着ツイートのボタンを非表示";
 "HIDE_NEW_TWEETS_PILL_DETAIL" = "タイムラインの上部で新着ツイートを知らせるボタンを取り除きます。";
 "REFRESH_FADE_TITLE" = "なめらかな更新";
-"REFRESH_FADE_DETAIL" = "引っ張って更新したとき、新着ツイートをフェードインで表示します。";
+"REFRESH_FADE_DETAIL" = "ホームが更新されたとき、新着ツイートをフェードインで表示します。";
 "REFRESH_PILL_LABEL_DETAIL_HELD" = "新着ツイートのボタンを非表示にしている間は不要です。";
 
 /* ===== COMPATIBILITY: behaviors with no toggle ===== */

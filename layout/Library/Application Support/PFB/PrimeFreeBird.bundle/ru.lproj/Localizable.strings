@@ -757,7 +757,7 @@
 "HIDE_NEW_TWEETS_PILL_TITLE" = "Скрыть кнопку новых твитов";
 "HIDE_NEW_TWEETS_PILL_DETAIL" = "Убирает кнопку, сообщающую о новых твитах вверху ленты.";
 "REFRESH_FADE_TITLE" = "Плавное обновление";
-"REFRESH_FADE_DETAIL" = "Плавно показывает новые твиты, когда вы тянете для обновления.";
+"REFRESH_FADE_DETAIL" = "Плавно показывает новые твиты, когда Главная обновляется.";
 "REFRESH_PILL_LABEL_DETAIL_HELD" = "Не нужно, пока кнопка новых твитов скрыта.";
 
 /* ===== COMPATIBILITY: behaviors with no toggle ===== */

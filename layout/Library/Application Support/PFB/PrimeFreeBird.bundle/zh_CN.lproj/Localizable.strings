@@ -757,7 +757,7 @@
 "HIDE_NEW_TWEETS_PILL_TITLE" = "隐藏新推文按钮";
 "HIDE_NEW_TWEETS_PILL_DETAIL" = "移除时间线顶部提示新推文的按钮。";
 "REFRESH_FADE_TITLE" = "平滑刷新";
-"REFRESH_FADE_DETAIL" = "下拉刷新时，以淡入方式显示新推文。";
+"REFRESH_FADE_DETAIL" = "主页刷新时，以淡入方式显示新推文。";
 "REFRESH_PILL_LABEL_DETAIL_HELD" = "新推文按钮已隐藏时无需此项。";
 
 /* ===== COMPATIBILITY: behaviors with no toggle ===== */

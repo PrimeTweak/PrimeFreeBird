@@ -757,7 +757,7 @@
 "HIDE_NEW_TWEETS_PILL_TITLE" = "새 트윗 버튼 숨기기";
 "HIDE_NEW_TWEETS_PILL_DETAIL" = "타임라인 상단에서 새 트윗을 알리는 버튼을 제거합니다.";
 "REFRESH_FADE_TITLE" = "부드러운 새로고침";
-"REFRESH_FADE_DETAIL" = "당겨서 새로고침할 때 새 트윗을 서서히 표시합니다.";
+"REFRESH_FADE_DETAIL" = "홈이 새로고침될 때 새 트윗을 서서히 표시합니다.";
 "REFRESH_PILL_LABEL_DETAIL_HELD" = "새 트윗 버튼이 숨겨져 있는 동안에는 필요하지 않습니다.";
 
 /* ===== COMPATIBILITY: behaviors with no toggle ===== */

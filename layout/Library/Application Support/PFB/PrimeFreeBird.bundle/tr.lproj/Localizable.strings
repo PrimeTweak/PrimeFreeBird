@@ -757,7 +757,7 @@
 "HIDE_NEW_TWEETS_PILL_TITLE" = "Yeni Tweetler düğmesini gizle";
 "HIDE_NEW_TWEETS_PILL_DETAIL" = "Zaman akışının üstünde yeni Tweetleri duyuran düğmeyi kaldır.";
 "REFRESH_FADE_TITLE" = "Yumuşak yenileme";
-"REFRESH_FADE_DETAIL" = "Yenilemek için çektiğinde yeni Tweetleri yumuşakça göster.";
+"REFRESH_FADE_DETAIL" = "Anasayfa yenilendiğinde yeni Tweetleri yumuşakça göster.";
 "REFRESH_PILL_LABEL_DETAIL_HELD" = "Yeni Tweetler düğmesi gizliyken gerekmez.";
 
 /* ===== COMPATIBILITY: behaviors with no toggle ===== */

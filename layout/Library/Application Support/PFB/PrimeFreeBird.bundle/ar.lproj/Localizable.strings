@@ -757,7 +757,7 @@
 "HIDE_NEW_TWEETS_PILL_TITLE" = "إخفاء زر التغريدات الجديدة";
 "HIDE_NEW_TWEETS_PILL_DETAIL" = "إزالة الزر الذي يعلن عن تغريدات جديدة في أعلى خطك الزمني.";
 "REFRESH_FADE_TITLE" = "تحديث سلس";
-"REFRESH_FADE_DETAIL" = "إظهار التغريدات الجديدة تدريجيًا عند السحب للتحديث.";
+"REFRESH_FADE_DETAIL" = "إظهار التغريدات الجديدة تدريجيًا عند تحديث الرئيسية.";
 "REFRESH_PILL_LABEL_DETAIL_HELD" = "غير مطلوب ما دام زر التغريدات الجديدة مخفيًا.";
 
 /* ===== COMPATIBILITY: behaviors with no toggle ===== */

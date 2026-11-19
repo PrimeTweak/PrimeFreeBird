@@ -757,7 +757,7 @@
 "HIDE_NEW_TWEETS_PILL_TITLE" = "Hide new Tweets pill";
 "HIDE_NEW_TWEETS_PILL_DETAIL" = "Remove the pill that announces new Tweets at the top of your timeline.";
 "REFRESH_FADE_TITLE" = "Smooth refresh";
-"REFRESH_FADE_DETAIL" = "Fade new Tweets in after you pull to refresh.";
+"REFRESH_FADE_DETAIL" = "Fade new Tweets in when Home refreshes.";
 "REFRESH_PILL_LABEL_DETAIL_HELD" = "Not needed while the new Tweets pill is hidden.";
 
 /* ===== COMPATIBILITY: behaviors with no toggle ===== */

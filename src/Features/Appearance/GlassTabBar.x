@@ -1203,6 +1203,23 @@ static void PFBGlassCheckAlwaysVisible(void) {
 
 %end
 
+// As the finger drags, Twitter squeezes the bar's whole chrome toward its bottom edge, then springs it
+// back once the collapse is held off: a scale just under 1 with a shift down (measured down to 0.971
+// and 13 pt). Always visible keeps the chrome at its size; any other transform goes through.
+%hook _TtC11XNavigation25TabBarChromeContainerView
+
+- (void)setTransform:(CGAffineTransform)transform {
+    BOOL squeeze = transform.a > 0.9 && transform.a < 1.0 && fabs(transform.d - transform.a) < 0.001 && transform.b == 0.0 &&
+                   transform.c == 0.0 && fabs(transform.tx) < 0.5 && transform.ty >= 0.0;
+    if (squeeze && [PFBSettings boolForKey:@"no_tab_bar_hiding"]) {
+        transform = CGAffineTransformIdentity;
+        PFBCOMPAT_ACTION(PFBCompat_no_tab_bar_hiding, @"bar squeeze held off");
+    }
+    %orig(transform);
+}
+
+%end
+
 // Once per launch, a second after the first bar is on screen and at rest: whether it stands taller than
 // Twitter's height for the names.
 static void PFBGlassCheckBarHeight(UIView* bar) {

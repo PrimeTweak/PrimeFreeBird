@@ -757,7 +757,7 @@
 "HIDE_NEW_TWEETS_PILL_TITLE" = "Dölj knappen för nya Tweets";
 "HIDE_NEW_TWEETS_PILL_DETAIL" = "Ta bort knappen som meddelar nya Tweets högst upp i tidslinjen.";
 "REFRESH_FADE_TITLE" = "Mjuk uppdatering";
-"REFRESH_FADE_DETAIL" = "Tona in nya Tweets när du drar för att uppdatera.";
+"REFRESH_FADE_DETAIL" = "Tona in nya Tweets när Hem uppdateras.";
 "REFRESH_PILL_LABEL_DETAIL_HELD" = "Behövs inte medan knappen för nya Tweets är dold.";
 
 /* ===== COMPATIBILITY: behaviors with no toggle ===== */

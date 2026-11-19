@@ -757,7 +757,7 @@
 "HIDE_NEW_TWEETS_PILL_TITLE" = "Ukryj przycisk nowych Tweetów";
 "HIDE_NEW_TWEETS_PILL_DETAIL" = "Usuwa przycisk zapowiadający nowe Tweety na górze osi czasu.";
 "REFRESH_FADE_TITLE" = "Płynne odświeżanie";
-"REFRESH_FADE_DETAIL" = "Płynnie pokazuje nowe Tweety, gdy pociągasz, aby odświeżyć.";
+"REFRESH_FADE_DETAIL" = "Płynnie pokazuje nowe Tweety, gdy strona Główna się odświeża.";
 "REFRESH_PILL_LABEL_DETAIL_HELD" = "Niepotrzebne, gdy przycisk nowych Tweetów jest ukryty.";
 
 /* ===== COMPATIBILITY: behaviors with no toggle ===== */

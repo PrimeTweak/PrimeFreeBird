@@ -753,7 +753,7 @@
 "HIDE_NEW_TWEETS_PILL_TITLE" = "Masquer la pastille des nouveaux Tweets";
 "HIDE_NEW_TWEETS_PILL_DETAIL" = "Retire la pastille qui annonce les nouveaux Tweets en haut de votre fil.";
 "REFRESH_FADE_TITLE" = "Actualisation en douceur";
-"REFRESH_FADE_DETAIL" = "Fait apparaître les nouveaux Tweets en fondu quand vous tirez pour actualiser.";
+"REFRESH_FADE_DETAIL" = "Fait apparaître les nouveaux Tweets en fondu quand l’Accueil s’actualise.";
 "REFRESH_PILL_LABEL_DETAIL_HELD" = "Inutile tant que la pastille des nouveaux Tweets est masquée.";
 
 /* ===== COMPATIBILITY: behaviors with no toggle ===== */

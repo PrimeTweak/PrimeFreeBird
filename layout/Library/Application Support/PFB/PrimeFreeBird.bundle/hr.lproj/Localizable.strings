@@ -757,7 +757,7 @@
 "HIDE_NEW_TWEETS_PILL_TITLE" = "Sakrij gumb novih tweetova";
 "HIDE_NEW_TWEETS_PILL_DETAIL" = "Ukloni gumb koji najavljuje nove tweetove na vrhu vremenske crte.";
 "REFRESH_FADE_TITLE" = "Glatko osvježavanje";
-"REFRESH_FADE_DETAIL" = "Novi tweetovi postupno se pojavljuju kad povučeš za osvježavanje.";
+"REFRESH_FADE_DETAIL" = "Novi tweetovi postupno se pojavljuju kad se Naslovnica osvježi.";
 "REFRESH_PILL_LABEL_DETAIL_HELD" = "Nije potrebno dok je gumb novih tweetova skriven.";
 
 /* ===== COMPATIBILITY: behaviors with no toggle ===== */

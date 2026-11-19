@@ -757,7 +757,7 @@
 "HIDE_NEW_TWEETS_PILL_TITLE" = "Ocultar aviso de Tweets nuevos";
 "HIDE_NEW_TWEETS_PILL_DETAIL" = "Quita el aviso que anuncia Tweets nuevos en la parte superior de tu cronología.";
 "REFRESH_FADE_TITLE" = "Actualización suave";
-"REFRESH_FADE_DETAIL" = "Muestra los Tweets nuevos con un fundido al deslizar para actualizar.";
+"REFRESH_FADE_DETAIL" = "Muestra los Tweets nuevos con un fundido cuando Inicio se actualiza.";
 "REFRESH_PILL_LABEL_DETAIL_HELD" = "No hace falta mientras el aviso de Tweets nuevos esté oculto.";
 
 /* ===== COMPATIBILITY: behaviors with no toggle ===== */

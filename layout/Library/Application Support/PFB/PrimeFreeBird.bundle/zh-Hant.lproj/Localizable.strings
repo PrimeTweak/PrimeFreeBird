@@ -757,7 +757,7 @@
 "HIDE_NEW_TWEETS_PILL_TITLE" = "隱藏新推文按鈕";
 "HIDE_NEW_TWEETS_PILL_DETAIL" = "移除時間軸頂端通知新推文的按鈕。";
 "REFRESH_FADE_TITLE" = "平順重新整理";
-"REFRESH_FADE_DETAIL" = "下拉重新整理時，以淡入方式顯示新推文。";
+"REFRESH_FADE_DETAIL" = "首頁重新整理時，以淡入方式顯示新推文。";
 "REFRESH_PILL_LABEL_DETAIL_HELD" = "新推文按鈕隱藏時不需要。";
 
 /* ===== COMPATIBILITY: behaviors with no toggle ===== */

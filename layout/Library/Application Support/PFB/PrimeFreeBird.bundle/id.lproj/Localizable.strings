@@ -757,7 +757,7 @@
 "HIDE_NEW_TWEETS_PILL_TITLE" = "Sembunyikan tombol Tweet baru";
 "HIDE_NEW_TWEETS_PILL_DETAIL" = "Hapus tombol yang mengumumkan Tweet baru di atas linimasa Anda.";
 "REFRESH_FADE_TITLE" = "Muat ulang halus";
-"REFRESH_FADE_DETAIL" = "Munculkan Tweet baru secara halus saat Anda menarik untuk menyegarkan.";
+"REFRESH_FADE_DETAIL" = "Munculkan Tweet baru secara halus saat Beranda disegarkan.";
 "REFRESH_PILL_LABEL_DETAIL_HELD" = "Tidak diperlukan selama tombol Tweet baru disembunyikan.";
 
 /* ===== COMPATIBILITY: behaviors with no toggle ===== */

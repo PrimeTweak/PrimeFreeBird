@@ -50,7 +50,7 @@
 - **Hide topics** — topic Tweets and the "Topics to follow" carousel both go.
 - **Remember Home tab** — Home stays on the tab you last picked instead of going back to For You after 12 hours.
 - **Remember last screen** — after five minutes in another app, you come back to the screen you left, not to Home.
-- **Smooth refresh** — new Tweets fade in after a pull on Home.
+- **Smooth refresh** — new Tweets fade in when Home refreshes, after a pull or at launch.
 
 ## Media
 

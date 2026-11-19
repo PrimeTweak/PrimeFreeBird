@@ -757,7 +757,7 @@
 "HIDE_NEW_TWEETS_PILL_TITLE" = "Приховати кнопку нових твітів";
 "HIDE_NEW_TWEETS_PILL_DETAIL" = "Прибирає кнопку, що повідомляє про нові твіти вгорі стрічки.";
 "REFRESH_FADE_TITLE" = "Плавне оновлення";
-"REFRESH_FADE_DETAIL" = "Плавно показує нові твіти, коли ви тягнете для оновлення.";
+"REFRESH_FADE_DETAIL" = "Плавно показує нові твіти, коли Головна оновлюється.";
 "REFRESH_PILL_LABEL_DETAIL_HELD" = "Не потрібно, поки кнопку нових твітів приховано.";
 
 /* ===== COMPATIBILITY: behaviors with no toggle ===== */
