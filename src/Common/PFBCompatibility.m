@@ -1121,6 +1121,8 @@ static const PFBCompatReq kReqs[] = {
     {PFBCompat_restore_tweet_button, "UIVisualEffectView", "-willMoveToWindow:"},
     {PFBCompat_restore_tweet_button, "UIImageView", "-setImage:"},
     {PFBCompat_restore_tweet_button, "UIImageView", "-didMoveToSuperview"},
+    {PFBCompat_restore_tweet_button, "_TtC6Lottie19LottieAnimationView", "-didMoveToWindow"},
+    {PFBCompat_restore_tweet_button, "_TtC6Lottie19LottieAnimationView", "-setHidden:"},
     {PFBCompat_restore_tweet_button, "UIVisualEffectView", "-layoutSubviews"},
     {PFBCompat_restore_refresh_sounds, "TFNItemsDataViewController", "-scrollViewDidEndDragging:willDecelerate:"},
     {PFBCompat_restore_refresh_sounds, "TFNPullToRefreshControl", "-_setStatus:fromScrolling:"},

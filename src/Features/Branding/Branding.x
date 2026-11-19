@@ -769,19 +769,25 @@ static NSArray<UIImageView*>* PFBGlassComposeGlyphs(UIView* material) {
 
 // On Chat the same accessory holds the new-message button, labelled with Twitter's own string
 // for it (measured). That button keeps Twitter's glyph.
+static NSString* PFBGlassButtonLabel(UIView* host) {
+    static Class buttonClass;
+    buttonClass = buttonClass ?: NSClassFromString(@"XDSButton");
+    __block NSString* label = nil;
+    PFBWalkAllSubviews(host, 4, ^(UIView* view) {
+      if (!label && buttonClass && [view isKindOfClass:buttonClass]) {
+          label = view.accessibilityLabel ?: @"";
+      }
+    });
+    return label;
+}
+
 static BOOL PFBGlassIsChatButton(UIView* host) {
     static NSString* chatLabel;
-    static Class buttonClass;
     static dispatch_once_t once;
     dispatch_once(&once, ^{
       chatLabel = [[PFBBundle sharedBundle] localizedTwitterStringForKey:@"DM_INBOX_NEW_MESSAGE_ACCESSIBILITY_LABEL"];
-      buttonClass = NSClassFromString(@"XDSButton");
     });
-    __block BOOL chat = NO;
-    PFBWalkAllSubviews(host, 4, ^(UIView* view) {
-      chat = chat || ([view isKindOfClass:buttonClass] && [view.accessibilityLabel isEqualToString:chatLabel]);
-    });
-    return chat;
+    return [PFBGlassButtonLabel(host) isEqualToString:chatLabel];
 }
 
 // Tagged first, so what Twitter sets on it later turns into the feather too; Twitter's own image is
@@ -977,24 +983,55 @@ static void PFBGlassRestyleLater(UIView* host) {
     });
 }
 
-// Twitter's fade to a new glyph ends within 0.3 s (measured): a second after one comes in, every
-// glyph left on the compose button must be the feather.
+// The first glyph left on the compose button that is not the feather, nil when there is none.
+static UIImageView* PFBGlassWrongGlyph(UIView* host) {
+    UIVisualEffectView* material = host.window ? PFBGlassComposeMaterial(host) : nil;
+    if (!material || ![PFBSettings boolForKey:@"restore_tweet_button"] || !PFBGlassIsComposeHost(host) ||
+        PFBGlassIsChatButton(host)) {
+        return nil;
+    }
+    for (UIImageView* glyph in PFBGlassComposeGlyphs(material)) {
+        if (glyph.image != PFBGlassFeather()) {
+            return glyph;
+        }
+    }
+    return nil;
+}
+
+// Twitter's fade to a new glyph ends within 0.3 s (measured). A glyph still wrong a second after one
+// comes in, and the same one still wrong a second later, is a failure; a tab change between replaces it.
 static void PFBGlassCheckFeatherLater(UIView* host) {
     __weak UIView* weakHost = host;
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
-      UIView* alive = weakHost;
-      UIVisualEffectView* material = alive.window ? PFBGlassComposeMaterial(alive) : nil;
-      if (!material || ![PFBSettings boolForKey:@"restore_tweet_button"] || !PFBGlassIsComposeHost(alive) ||
-          PFBGlassIsChatButton(alive)) {
+      __weak UIImageView* suspect = PFBGlassWrongGlyph(weakHost);
+      if (!suspect) {
           return;
       }
-      for (UIImageView* glyph in PFBGlassComposeGlyphs(material)) {
-          if (glyph.image != PFBGlassFeather()) {
-              PFBCompatNoteFailure(PFBCompat_restore_tweet_button, @"Tweet button glyph not the feather a second later");
-              return;
-          }
-      }
+      dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+        UIView* alive = weakHost;
+        UIImageView* glyph = suspect;
+        if (glyph && alive && [glyph isDescendantOfView:alive] && PFBGlassWrongGlyph(alive) == glyph) {
+            PFBCompatNoteFailure(PFBCompat_restore_tweet_button, @"Tweet button glyph not the feather two seconds later");
+        }
+      });
     });
+}
+
+// Each glyph change of the glass compose button adds Twitter's Lottie morph between its own "+" and
+// Chat's icon (measured), drawn while both glyphs are hidden. With the classic button it is hidden:
+// the glass stays empty until the new glyph shows.
+static const void* kPFBGlassMorphKey = &kPFBGlassMorphKey;
+
+static UIView* PFBGlassMorphHost(UIView* view) {
+    static Class hostClass;
+    hostClass = hostClass ?: NSClassFromString(@"_TtC11XNavigation23TabBarAccessoryHostView");
+    UIView* level = view.superview;
+    for (NSInteger depth = 0; level && hostClass && depth < 14; depth++, level = level.superview) {
+        if ([level isKindOfClass:hostClass]) {
+            return PFBGlassIsComposeHost(level) ? level : nil;
+        }
+    }
+    return nil;
 }
 
 static void PFBGlassWatchHost(UIView* host) {
@@ -1013,6 +1050,28 @@ static void PFBGlassWatchHost(UIView* host) {
         ((id (*)(id, SEL, NSArray*, id))objc_msgSend)(host, registration, @[ style ], handler);
     }
 }
+
+%hook _TtC6Lottie19LottieAnimationView
+
+- (void)didMoveToWindow {
+    %orig;
+    UIView* view = (UIView*)self;
+    UIView* host = view.window && [PFBSettings boolForKey:@"restore_tweet_button"] ? PFBGlassMorphHost(view) : nil;
+    if (!host) {
+        return;
+    }
+    objc_setAssociatedObject(view, kPFBGlassMorphKey, @YES, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    view.hidden = YES;
+    PFBCOMPAT_ACTION(PFBCompat_restore_tweet_button, @"glass Tweet button morph hidden");
+    // Which buttons the morph played on, so a use of it beyond Chat's shows in the sheet.
+    PFBCompatMeasure(@"glass Tweet button morph", [NSString stringWithFormat:@"hidden on \"%@\"", PFBGlassButtonLabel(host)], 6);
+}
+
+- (void)setHidden:(BOOL)hidden {
+    %orig(hidden || (objc_getAssociatedObject(self, kPFBGlassMorphKey) && [PFBSettings boolForKey:@"restore_tweet_button"]));
+}
+
+%end
 
 %hook _TtC11XNavigation23TabBarAccessoryHostView
 
