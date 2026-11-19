@@ -2095,18 +2095,18 @@ static BOOL PFBRefreshFadeOpen(CFTimeInterval now) {
 }
 
 // Called as Twitter hands Home new sections, before they show. Skipped while the list moves, where a
-// still picture would trail behind it.
+// still picture would trail behind it. Each hand-over at rest is noted for its refresh, on or off.
 static void PFBRefreshFadeBegin(TFNItemsDataViewController* controller) {
     CFTimeInterval now = CACurrentMediaTime();
-    if (![PFBSettings boolForKey:@"refresh_fade"] || !PFBRefreshFadeOpen(now) ||
-        !PFBReadingIsHomeTimeline(controller)) {
+    if (!PFBRefreshFadeOpen(now) || !PFBReadingIsHomeTimeline(controller)) {
         return;
     }
     UIScrollView* list = PFBListScrollView(controller);
-    if (!list.window || !list.superview || objc_getAssociatedObject(list, kPFBRefreshFadeKey)) {
+    if (!list.window || !list.superview || list.tracking || list.dragging || list.decelerating) {
         return;
     }
-    if (list.tracking || list.dragging || list.decelerating) {
+    PFBCompatReach(gPFBRefreshStartedAt > gPFBRefreshPulledAt ? PFBCompatPath_refresh_fade_own : PFBCompatPath_refresh_fade_pull);
+    if (![PFBSettings boolForKey:@"refresh_fade"] || objc_getAssociatedObject(list, kPFBRefreshFadeKey)) {
         return;
     }
     UIView* still = [list snapshotViewAfterScreenUpdates:NO];
@@ -2145,7 +2145,6 @@ static void PFBRefreshFadeBegin(TFNItemsDataViewController* controller) {
         PFBCOMPAT_OBSERVE(PFBCompat_refresh_fade, @"pull on Home seen");
     } else {
         gPFBRefreshStartedAt = CACurrentMediaTime();
-        PFBCOMPAT_OBSERVE(PFBCompat_refresh_fade, @"Home refresh started by Twitter seen");
     }
 }
 

@@ -249,6 +249,8 @@ static const PFBCompatPathMeta kPaths[] = {
     {PFBCompatPath_refresh_logo, PFBCompat_restore_twitter_names, "Home refresh logo"},
     {PFBCompatPath_refresh_animation, PFBCompat_restore_twitter_names, "Home refresh animation"},
     {PFBCompatPath_sensitive_box, PFBCompat_disable_sensitive_tweet_warnings, "sensitive box check"},
+    {PFBCompatPath_refresh_fade_pull, PFBCompat_refresh_fade, "pull"},
+    {PFBCompatPath_refresh_fade_own, PFBCompat_refresh_fade, "Twitter's own refresh"},
 };
 static const size_t kPathCount = sizeof(kPaths) / sizeof(kPaths[0]);
 

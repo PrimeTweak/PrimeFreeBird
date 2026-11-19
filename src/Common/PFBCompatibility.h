@@ -278,6 +278,8 @@ typedef NS_ENUM(NSInteger, PFBCompatPath) {
     PFBCompatPath_refresh_logo,
     PFBCompatPath_sensitive_box,
     PFBCompatPath_refresh_animation,
+    PFBCompatPath_refresh_fade_pull,
+    PFBCompatPath_refresh_fade_own,
     PFBCompatPathCount,
 };
 
