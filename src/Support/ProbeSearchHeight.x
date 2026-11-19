@@ -1,6 +1,6 @@
-// Probe for the search field's height: Chat's own field in detail, and which constraint sizes the
-// room under Notifications' bar, each tried 16 pt taller then put back. Removed once read; its
-// lines go to the stethoscope report under the topic "probe search height".
+// Probe for the search field's height on Twitter 12.45: Chat's own field in detail, which constraint
+// sizes the room under Notifications' bar (each tried 16 pt taller, then put back), and the bytes the
+// tab bar options read. Removed once read; its lines go to the report as "probe search height".
 
 #import "Support/HookHelpers.h"
 #import <malloc/malloc.h>
@@ -183,6 +183,12 @@ static void PFBHeightProbeImages(UIView* root, NSUInteger depth, NSMutableArray<
 }
 
 static NSString* PFBHeightProbeField(UIView* input, UITraitCollection* traits) {
+    if ([input isKindOfClass:[UILabel class]]) {
+        UILabel* label = (UILabel*)input;
+        return [NSString stringWithFormat:@"label \"%@\" font %@ grows with text size %d; color %@", label.text,
+                                          PFBHeightProbeFont(label.font), label.adjustsFontForContentSizeCategory,
+                                          PFBHeightProbeColor(label.textColor, traits)];
+    }
     if (![input isKindOfClass:[UITextField class]]) {
         NSMutableArray<NSString*>* parts = [NSMutableArray array];
         for (UIView* sub in input.subviews) {
@@ -257,84 +263,175 @@ static UIView* PFBHeightProbeRow(UIView* root, CGRect zone) {
     return nil;
 }
 
-static NSString* PFBHeightProbeState(UIViewController* screen, UIView* zone, UIView* row) {
-    UIScrollView* list = PFBHeightProbeList(screen.view);
-    return [NSString stringWithFormat:@"zone %@; row %@; safe top %.1f; list inset %.1f adjusted %.1f", PFBHeightProbeView(zone),
-                                      PFBHeightProbeView(row), screen.view.safeAreaInsets.top, list.contentInset.top,
-                                      list.adjustedContentInset.top];
+static UITableView* PFBHeightProbeTable(UIView* root) {
+    if ([root isKindOfClass:[UITableView class]] && root.window && !root.hidden) {
+        return (UITableView*)root;
+    }
+    for (UIView* sub in root.subviews) {
+        UITableView* found = PFBHeightProbeTable(sub);
+        if (found) {
+            return found;
+        }
+    }
+    return nil;
 }
 
-// Each height constraint found is made 16 pt taller, read back once laid out, then put back.
-static void PFBHeightProbeTry(UIViewController* screen, UIView* zone, UIView* row, NSArray* levers, NSUInteger index) {
-    if (index >= levers.count || !screen.viewIfLoaded.window) {
-        PFBHeightProbeLine([NSString stringWithFormat:@"tries done; now %@", PFBHeightProbeState(screen, zone, row)]);
-        return;
-    }
-    NSString* name = levers[index][0];
-    NSLayoutConstraint* lever = levers[index][1];
-    CGFloat original = lever.constant;
-    lever.constant = original + 16.0;
+// The room, the row and the list as they stand now, found again each time.
+static NSString* PFBHeightProbeState(UIViewController* screen) {
+    UIView* zone = PFBHeightProbeFind(screen.view, @"AccessoryStackView", 2);
+    UIView* row = zone ? PFBHeightProbeRow(screen.view.window, [zone convertRect:zone.bounds toView:nil]) : nil;
+    UITableView* table = PFBHeightProbeTable(screen.view);
+    return [NSString stringWithFormat:@"on screen %d; zone %@; row %@; safe top %.1f; list %@ inset %.1f adjusted %.1f",
+                                      screen.viewIfLoaded.window != nil, PFBHeightProbeView(zone), PFBHeightProbeView(row),
+                                      screen.view.safeAreaInsets.top, PFBHeightProbeView(table), table.contentInset.top,
+                                      table.adjustedContentInset.top];
+}
+
+static void PFBHeightProbeRelayout(UIViewController* screen, id segmented) {
+    UIView* zone = PFBHeightProbeFind(screen.view, @"AccessoryStackView", 2);
+    [zone setNeedsLayout];
+    [zone.superview setNeedsLayout];
+    [[segmented isKindOfClass:[UIViewController class]] ? [(UIViewController*)segmented viewIfLoaded] : nil setNeedsLayout];
     [screen.view setNeedsLayout];
     [screen.view.window layoutIfNeeded];
-    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.5 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
-      PFBHeightProbeLine([NSString stringWithFormat:@"try %@ %.1f -> %.1f: %@", name, original, original + 16.0,
-                                                    PFBHeightProbeState(screen, zone, row)]);
-      lever.constant = original;
-      [screen.view setNeedsLayout];
-      [screen.view.window layoutIfNeeded];
-      dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.5 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
-        PFBHeightProbeTry(screen, zone, row, levers, index + 1);
+}
+
+// Each try sets its constraints, is read once laid out, then every value is put back.
+static void PFBHeightProbeTry(UIViewController* screen, id segmented, NSArray* tries, NSUInteger index) {
+    if (index >= tries.count || !screen.viewIfLoaded.window) {
+        PFBHeightProbeLine([NSString stringWithFormat:@"tries done; now %@", PFBHeightProbeState(screen)]);
+        return;
+    }
+    NSString* name = tries[index][0];
+    NSArray* changes = tries[index][1];
+    NSMutableArray* saved = [NSMutableArray array];
+    for (NSArray* change in changes) {
+        NSLayoutConstraint* c = change[0];
+        [saved addObject:@[ c, @(c.constant), @(c.priority) ]];
+        c.priority = [change[2] floatValue];
+        c.constant = [change[1] doubleValue];
+    }
+    PFBHeightProbeRelayout(screen, segmented);
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.6 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+      PFBHeightProbeLine([NSString stringWithFormat:@"try %@: %@", name, PFBHeightProbeState(screen)]);
+      for (NSArray* back in saved) {
+          NSLayoutConstraint* c = back[0];
+          c.constant = [back[1] doubleValue];
+          c.priority = [back[2] floatValue];
+      }
+      PFBHeightProbeRelayout(screen, segmented);
+      dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.6 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+        PFBHeightProbeLine([NSString stringWithFormat:@"back from %@: %@", name, PFBHeightProbeState(screen)]);
+        PFBHeightProbeTry(screen, segmented, tries, index + 1);
       });
     });
 }
 
-// Notifications: the room under the bar, the tab row's own room, and what holds their heights.
+static NSString* PFBHeightProbeHex(const uint8_t* bytes, NSUInteger count) {
+    NSMutableString* text = [NSMutableString string];
+    for (NSUInteger i = 0; i < count; i++) {
+        [text appendFormat:@"%02x%@", bytes[i], i % 8 == 7 && i + 1 < count ? @" " : @""];
+    }
+    return text;
+}
+
+// The bytes the tab bar options read on 12.45: the stack's applied configuration beside Twitter's
+// static ones, and the collapse engine's band, travel and progress.
+static void PFBHeightProbeNavigation(UINavigationController* stack) {
+    Class stackClass = NSClassFromString(@"XNAVNavigationController");
+    if (!stackClass || ![stack isKindOfClass:stackClass]) {
+        PFBHeightProbeLine([NSString stringWithFormat:@"stack is %@, not XNAVNavigationController", PFBHeightProbeName(stack)]);
+        return;
+    }
+    const uint8_t* base = (const uint8_t*)(__bridge void*)stack;
+    Ivar applied = class_getInstanceVariable(stackClass, "appliedConfiguration");
+    NSMutableArray<NSString*>* statics = [NSMutableArray array];
+    Class configClass = NSClassFromString(@"XNAVConfiguration");
+    Ivar configIvar = configClass ? class_getInstanceVariable(configClass, "configuration") : NULL;
+    for (NSString* name in @[ @"standardConfiguration", @"pinnedConfiguration", @"hiddenConfiguration", @"pinnedTransparentConfiguration" ]) {
+        SEL selector = NSSelectorFromString(name);
+        id config = configIvar && [configClass respondsToSelector:selector] ? ((id (*)(id, SEL))objc_msgSend)(configClass, selector) : nil;
+        if (config) {
+            [statics addObject:[NSString stringWithFormat:@"%@ %@", name,
+                                                          PFBHeightProbeHex((const uint8_t*)(__bridge void*)config + ivar_getOffset(configIvar), 16)]];
+        }
+    }
+    PFBHeightProbeLine([NSString stringWithFormat:@"applied @%td: %@; statics %@", applied ? ivar_getOffset(applied) : -1,
+                                                  applied ? PFBHeightProbeHex(base + ivar_getOffset(applied), 32) : @"none",
+                                                  [statics componentsJoinedByString:@"; "]]);
+    Ivar engineIvar = class_getInstanceVariable(stackClass, "collapseEngine");
+    void* engine = NULL;
+    if (engineIvar) {
+        memcpy(&engine, base + ivar_getOffset(engineIvar), sizeof(engine));
+    }
+    if (!engine || !malloc_zone_from_ptr(engine)) {
+        PFBHeightProbeLine([NSString stringWithFormat:@"collapse engine ivar %d, engine not made yet", engineIvar != NULL]);
+        return;
+    }
+    Class engineClass = object_getClass((__bridge id)engine);
+    Ivar band = class_getInstanceVariable(engineClass, "bottomChromeBand");
+    Ivar travel = class_getInstanceVariable(engineClass, "hiddenBarTravel");
+    Ivar progress = class_getInstanceVariable(engineClass, "collapseProgress");
+    double travelValue = 0, progressValues[2] = {0, 0};
+    if (travel) {
+        memcpy(&travelValue, (const uint8_t*)engine + ivar_getOffset(travel), sizeof(travelValue));
+    }
+    if (progress) {
+        memcpy(progressValues, (const uint8_t*)engine + ivar_getOffset(progress), sizeof(progressValues));
+    }
+    PFBHeightProbeLine([NSString stringWithFormat:@"engine %@: band @%td %@; travel %.2f; progress %.3f %.3f",
+                                                  NSStringFromClass(engineClass), band ? ivar_getOffset(band) : -1,
+                                                  band ? PFBHeightProbeHex((const uint8_t*)engine + ivar_getOffset(band), 32) : @"none",
+                                                  travelValue, progressValues[0], progressValues[1]]);
+}
+
+// Notifications: the room under the bar, what holds its height, then the tries.
 static void PFBHeightProbeNotifications(UIViewController* screen) {
     if (gPFBHeightProbeNotifications || !screen.viewIfLoaded.window) {
         return;
     }
     gPFBHeightProbeNotifications = YES;
+    PFBHeightProbeNavigation(screen.navigationController);
     UIView* zone = PFBHeightProbeFind(screen.view, @"AccessoryStackView", 2);
-    CGRect room = zone ? [zone convertRect:zone.bounds toView:nil] : CGRectZero;
-    UIView* row = PFBHeightProbeRow(screen.view.window, room);
     id segmented = PFBHeightProbeIvar(screen, "$__lazy_storage_$_segmentedController");
-    UIView* container = PFBHeightProbeIvar(segmented, "barContainerView");
     NSLayoutConstraint* containerHeight = PFBHeightProbeIvar(segmented, "barContainerHeightConstraint");
-    SEL barHeight = NSSelectorFromString(@"barHeight");
-    SEL maxHeight = NSSelectorFromString(@"maximumBarHeight");
-    PFBHeightProbeLine([NSString stringWithFormat:@"notifications: %@", PFBHeightProbeState(screen, zone, row)]);
-    PFBHeightProbeLine([NSString stringWithFormat:@"zone constraints: %@; zone chain %@", PFBHeightProbeConstraints(zone),
-                                                  PFBHeightProbeChain(zone, 4)]);
-    PFBHeightProbeLine([NSString stringWithFormat:@"segmented bar %.1f max %.1f; container %@ height %@; container chain %@",
-                                                  [segmented respondsToSelector:barHeight] ? ((CGFloat (*)(id, SEL))objc_msgSend)(segmented, barHeight) : -1,
-                                                  [segmented respondsToSelector:maxHeight] ? ((CGFloat (*)(id, SEL))objc_msgSend)(segmented, maxHeight) : -1,
-                                                  PFBHeightProbeView(container), PFBHeightProbeConstraint(containerHeight),
-                                                  PFBHeightProbeChain(container, 5)]);
-    PFBHeightProbeLine([NSString stringWithFormat:@"row fits %.1f autoresizing %d; constraints %@; chain %@", row.intrinsicContentSize.height,
-                                                  row.translatesAutoresizingMaskIntoConstraints, PFBHeightProbeConstraints(row),
-                                                  PFBHeightProbeChain(row, 8)]);
-    UIView* field = PFBHeightProbeFind(row, @"PFBNotifSearchBar", 1);
-    UITextField* text = (UITextField*)PFBHeightProbeFind(field, @"UITextField", 1);
-    PFBHeightProbeLine([NSString stringWithFormat:@"our field %@; text %@ font %@", PFBHeightProbeView(field), PFBHeightProbeView(text),
-                                                  PFBHeightProbeFont(text.font)]);
-    NSMutableArray* levers = [NSMutableArray array];
+    NSLayoutConstraint* zoneTop = nil;
+    for (NSLayoutConstraint* c in PFBHeightProbeTouching(zone)) {
+        if (c.firstItem == zone && c.firstAttribute == NSLayoutAttributeTop && [c.secondItem isKindOfClass:[UILayoutGuide class]]) {
+            zoneTop = c;
+        }
+    }
+    PFBHeightProbeLine([NSString stringWithFormat:@"notifications: %@", PFBHeightProbeState(screen)]);
+    PFBHeightProbeLine([NSString stringWithFormat:@"zone constraints: %@; zone top kept by %@; container height %@",
+                                                  PFBHeightProbeConstraints(zone), PFBHeightProbeName(zoneTop.secondItem),
+                                                  PFBHeightProbeConstraint(containerHeight)]);
+    NSMutableArray* tries = [NSMutableArray array];
     if ([containerHeight isKindOfClass:[NSLayoutConstraint class]]) {
-        [levers addObject:@[ @"container height", containerHeight ]];
+        [tries addObject:@[ @"container 60 required", @[ @[ containerHeight, @(containerHeight.constant + 16.0), @1000 ] ] ]];
     }
-    NSArray* owners = @[ @[ @"zone", zone ?: [NSNull null] ], @[ @"row", row ?: [NSNull null] ] ];
-    for (NSArray* owner in owners) {
-        if (![owner[1] isKindOfClass:[UIView class]]) {
-            continue;
-        }
-        for (NSLayoutConstraint* c in PFBHeightProbeTouching(owner[1])) {
-            if (c.firstItem == owner[1] && c.firstAttribute == NSLayoutAttributeHeight && !c.secondItem && c != containerHeight) {
-                [levers addObject:@[ [NSString stringWithFormat:@"%@ height", owner[0]], c ]];
-            }
-        }
+    if (zoneTop) {
+        [tries addObject:@[ @"zone top 16 higher", @[ @[ zoneTop, @(zoneTop.constant - 16.0), @(zoneTop.priority) ] ] ]];
     }
-    PFBHeightProbeLine([NSString stringWithFormat:@"levers to try: %lu", (unsigned long)levers.count]);
-    PFBHeightProbeTry(screen, zone, row, levers, 0);
+    if (zoneTop && [containerHeight isKindOfClass:[NSLayoutConstraint class]]) {
+        [tries addObject:@[ @"both", @[ @[ containerHeight, @(containerHeight.constant + 16.0), @1000 ],
+                                        @[ zoneTop, @(zoneTop.constant - 16.0), @(zoneTop.priority) ] ] ]];
+    }
+    PFBHeightProbeLine([NSString stringWithFormat:@"tries: %lu", (unsigned long)tries.count]);
+    PFBHeightProbeTry(screen, segmented, tries, 0);
 }
+
+// Chat under Liquid Glass shows a search button; the other look shows a search bar.
+%hook _TtC7DMInbox20InboxSearchBarButton
+
+- (void)layoutSubviews {
+    %orig;
+    __weak UIView* bar = (UIView*)self;
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+      PFBHeightProbeChat(bar);
+    });
+}
+
+%end
 
 %hook _TtC4DMUI14InboxSearchBar
 
@@ -353,7 +450,7 @@ static void PFBHeightProbeNotifications(UIViewController* screen) {
 - (void)viewDidAppear:(BOOL)animated {
     %orig;
     __weak UIViewController* screen = (UIViewController*)self;
-    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1.5 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(2.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
       PFBHeightProbeNotifications(screen);
     });
 }
