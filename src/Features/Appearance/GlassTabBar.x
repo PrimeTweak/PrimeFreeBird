@@ -347,6 +347,22 @@ static PFBGlassReserve PFBGlassApplyChromeReserve(void) {
     return found;
 }
 
+// The bytes an ivar spans: up to the next ivar of its own class, or to the end of the instance.
+static ptrdiff_t PFBGlassIvarSpan(Class cls, Ivar ivar) {
+    unsigned int count = 0;
+    Ivar* list = class_copyIvarList(cls, &count);
+    ptrdiff_t offset = ivar_getOffset(ivar);
+    ptrdiff_t next = (ptrdiff_t)class_getInstanceSize(cls);
+    for (unsigned int i = 0; i < count; i++) {
+        ptrdiff_t other = ivar_getOffset(list[i]);
+        if (other > offset && other < next) {
+            next = other;
+        }
+    }
+    free(list);
+    return next - offset;
+}
+
 // A stack's collapse engine keeps the bar's band (extent first, then a byte at 24 that is 0 once
 // set) and copies the extent into the hide travel: an engine made before the reserve changed is
 // brought in line. Only Twitter's own values, with or without the extra height, are replaced.
@@ -358,13 +374,11 @@ static void PFBGlassSyncEngineReserve(UINavigationController* stack, PFBGlassRes
     static dispatch_once_t once;
     dispatch_once(&once, ^{
       engineClass = NSClassFromString(@"_TtC11XNavigation14CollapseEngine");
-      Ivar engine = class_getInstanceVariable(NSClassFromString(@"XNAVNavigationController"),
-                                              "$__lazy_storage_$_collapseEngine");
+      Ivar engine = class_getInstanceVariable(NSClassFromString(@"XNAVNavigationController"), "collapseEngine");
       Ivar band = engineClass ? class_getInstanceVariable(engineClass, "bottomChromeBand") : NULL;
-      Ivar next = engineClass ? class_getInstanceVariable(engineClass, "progressMemory") : NULL;
       Ivar travel = engineClass ? class_getInstanceVariable(engineClass, "hiddenBarTravel") : NULL;
       // Extent, slide and opacity, then the byte, in the 32 bytes measured before the next field.
-      if (engine && band && next && travel && ivar_getOffset(next) - ivar_getOffset(band) == 32) {
+      if (engine && band && travel && PFBGlassIvarSpan(engineClass, band) == 32) {
           engineOffset = ivar_getOffset(engine);
           bandOffset = ivar_getOffset(band);
           travelOffset = ivar_getOffset(travel);
@@ -871,8 +885,7 @@ static ptrdiff_t PFBGlassAppliedConfigurationOffset(void) {
     dispatch_once(&once, ^{
       Class stack = NSClassFromString(@"XNAVNavigationController");
       Ivar applied = stack ? class_getInstanceVariable(stack, "appliedConfiguration") : NULL;
-      Ivar next = stack ? class_getInstanceVariable(stack, "chromeFrozenScreen") : NULL;
-      ptrdiff_t size = applied && next ? ivar_getOffset(next) - ivar_getOffset(applied) : 0;
+      ptrdiff_t size = applied ? PFBGlassIvarSpan(stack, applied) : 0;
       // 40 or 48 bytes as measured; a larger configuration is used only while the fingerprint of
       // Twitter's own configurations still puts the patched bytes in place.
       if (size == 40 || size == 48 || (size > 48 && PFBGlassConfigLayoutVerified())) {
@@ -897,8 +910,7 @@ static double* PFBGlassCollapseProgress(UINavigationController* stack, BOOL* rea
     static dispatch_once_t once;
     dispatch_once(&once, ^{
       engineClass = NSClassFromString(@"_TtC11XNavigation14CollapseEngine");
-      Ivar engine = class_getInstanceVariable(NSClassFromString(@"XNAVNavigationController"),
-                                              "$__lazy_storage_$_collapseEngine");
+      Ivar engine = class_getInstanceVariable(NSClassFromString(@"XNAVNavigationController"), "collapseEngine");
       Ivar progress = engineClass ? class_getInstanceVariable(engineClass, "collapseProgress") : NULL;
       if (engine && progress) {
           engineOffset = ivar_getOffset(engine);
