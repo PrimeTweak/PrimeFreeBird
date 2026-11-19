@@ -1,9 +1,8 @@
-// Probe for Twitter 12.45, removed once read: where the tab bar's twitch comes from. Each move of the
-// bar's tabs, selection lens or button is counted inside or outside Twitter's animation frames; the
-// first moves outside them, and two inside, are written with the chain of calls that made them.
+// Probe for Twitter 12.45, removed once read: what makes the tab bar twitch while Always visible holds
+// it. During each drag, every frame, the collapse driver's flags and springs are read, and every view
+// of the bar as drawn is compared with how it stood when the drag began.
 
 #import "Support/HookHelpers.h"
-#import <dlfcn.h>
 #import <objc/runtime.h>
 
 @interface _TtCC11XNavigation17DisplayLinkDriverP33_DC9744A9B855F36B00902ED7FE8B664F5Proxy : NSObject
@@ -14,19 +13,13 @@
 @end
 
 static NSString* const kPFBTwitchTopic = @"probe tab bar twitch";
-static const NSUInteger kPFBTwitchCap = 40;
-static const NSUInteger kPFBTwitchOutside = 8;
-static const NSUInteger kPFBTwitchInside = 2;
+static const NSUInteger kPFBTwitchCap = 90;
+static const NSUInteger kPFBTwitchDrags = 4;
+static const NSUInteger kPFBTwitchViewLines = 6;
+static const NSUInteger kPFBTwitchDriverLines = 6;
+static const NSUInteger kPFBTwitchPerLine = 8;
 static NSUInteger gPFBTwitchSeq;
 static CFAbsoluteTime gPFBTwitchStart;
-static NSUInteger gPFBTwitchTickDepth;
-static BOOL gPFBTwitchDragging;
-static CFAbsoluteTime gPFBTwitchDragEnd;
-static NSUInteger gPFBTwitchInsideMoves;
-static NSUInteger gPFBTwitchOutsideMoves;
-static NSUInteger gPFBTwitchInsideStacks;
-static NSUInteger gPFBTwitchOutsideStacks;
-static NSUInteger gPFBTwitchPans;
 
 static void PFBTwitchLine(NSString* line) {
     PFBCompatMeasure(kPFBTwitchTopic,
@@ -40,157 +33,237 @@ static NSString* PFBTwitchName(id object) {
     return dot.location == NSNotFound ? name : [name substringFromIndex:dot.location + 1];
 }
 
-// The calls that led here, as image and offset, with the nearest exported name when there is one.
-static NSString* PFBTwitchStack(void) {
-    NSArray<NSNumber*>* addresses = [NSThread callStackReturnAddresses];
-    NSMutableArray<NSString*>* frames = [NSMutableArray array];
-    for (NSUInteger i = 2; i < addresses.count && frames.count < 28; i++) {
-        void* address = (void*)addresses[i].unsignedLongValue;
-        Dl_info info;
-        if (!dladdr(address, &info) || !info.dli_fname) {
-            continue;
-        }
-        NSString* symbol = info.dli_sname ? [NSString stringWithUTF8String:info.dli_sname] : @"";
-        if (symbol.length > 60) {
-            symbol = [symbol substringToIndex:60];
-        }
-        [frames addObject:[NSString stringWithFormat:@"%@+0x%lx %@", [[NSString stringWithUTF8String:info.dli_fname] lastPathComponent],
-                                                     (unsigned long)((uintptr_t)address - (uintptr_t)info.dli_fbase), symbol]];
-    }
-    return [frames componentsJoinedByString:@" < "];
+static ptrdiff_t PFBTwitchOffset(Class cls, const char* name) {
+    Ivar ivar = cls ? class_getInstanceVariable(cls, name) : NULL;
+    return ivar ? ivar_getOffset(ivar) : -1;
 }
 
-// The tab bar controller's collapse driver: latch and target, read where Always visible reads them.
-static NSString* PFBTwitchDriver(UIView* view) {
-    static Class controllerClass;
-    static Class driverClass;
-    static ptrdiff_t driverOffset = -1, latchedOffset = -1, targetOffset = -1;
+// MARK: - the controller and its driver
+
+static Class gPFBTwitchControllerClass;
+static Class gPFBTwitchDriverClass;
+static Class gPFBTwitchBarClass;
+static ptrdiff_t gPFBTwitchContent = -1;
+static ptrdiff_t gPFBTwitchDriver = -1;
+static ptrdiff_t gPFBTwitchLatched = -1;
+static ptrdiff_t gPFBTwitchResizing = -1;
+static ptrdiff_t gPFBTwitchMorph = -1;
+static ptrdiff_t gPFBTwitchScale = -1;
+static ptrdiff_t gPFBTwitchResize = -1;
+static ptrdiff_t gPFBTwitchTarget = -1;
+static ptrdiff_t gPFBTwitchCatchingUp = -1;
+static __weak UIViewController* gPFBTwitchController;
+
+static void PFBTwitchFindOffsets(void) {
     static dispatch_once_t once;
     dispatch_once(&once, ^{
-      controllerClass = NSClassFromString(@"_TtC11XNavigation16TabBarController");
-      driverClass = NSClassFromString(@"_TtC11XNavigation20TabBarCollapseDriver");
-      Ivar driver = controllerClass ? class_getInstanceVariable(controllerClass, "$__lazy_storage_$_collapseDriver") : NULL;
-      Ivar latched = driverClass ? class_getInstanceVariable(driverClass, "isLatched") : NULL;
-      Ivar target = driverClass ? class_getInstanceVariable(driverClass, "progressTarget") : NULL;
-      driverOffset = driver ? ivar_getOffset(driver) : -1;
-      latchedOffset = latched ? ivar_getOffset(latched) : -1;
-      targetOffset = target ? ivar_getOffset(target) : -1;
+      gPFBTwitchControllerClass = NSClassFromString(@"_TtC11XNavigation16TabBarController");
+      gPFBTwitchDriverClass = NSClassFromString(@"_TtC11XNavigation20TabBarCollapseDriver");
+      gPFBTwitchBarClass = NSClassFromString(@"_TtC11XNavigation10TabBarView");
+      gPFBTwitchContent = PFBTwitchOffset(gPFBTwitchControllerClass, "contentContainerView");
+      gPFBTwitchDriver = PFBTwitchOffset(gPFBTwitchControllerClass, "$__lazy_storage_$_collapseDriver");
+      gPFBTwitchLatched = PFBTwitchOffset(gPFBTwitchDriverClass, "isLatched");
+      gPFBTwitchResizing = PFBTwitchOffset(gPFBTwitchDriverClass, "isResizing");
+      gPFBTwitchMorph = PFBTwitchOffset(gPFBTwitchDriverClass, "morphSpring");
+      gPFBTwitchScale = PFBTwitchOffset(gPFBTwitchDriverClass, "scaleSpring");
+      gPFBTwitchResize = PFBTwitchOffset(gPFBTwitchDriverClass, "resizeSpring");
+      gPFBTwitchTarget = PFBTwitchOffset(gPFBTwitchDriverClass, "progressTarget");
+      gPFBTwitchCatchingUp = PFBTwitchOffset(gPFBTwitchDriverClass, "isCatchingUpScale");
     });
-    UIResponder* next = view;
-    while (next && ![next isKindOfClass:controllerClass]) {
-        next = next.nextResponder;
+}
+
+static UIViewController* PFBTwitchController(void) {
+    PFBTwitchFindOffsets();
+    UIViewController* controller = gPFBTwitchController;
+    if (controller.viewIfLoaded.window) {
+        return controller;
     }
-    if (!next || driverOffset < 0 || latchedOffset < 0 || targetOffset < 0) {
-        return @"driver -";
+    for (UIScene* scene in UIApplication.sharedApplication.connectedScenes) {
+        if (![scene isKindOfClass:[UIWindowScene class]]) {
+            continue;
+        }
+        for (UIWindow* window in ((UIWindowScene*)scene).windows) {
+            __block UIView* bar = nil;
+            PFBWalkAllSubviews(window, 16, ^(UIView* view) {
+              if (!bar && gPFBTwitchBarClass && [view isKindOfClass:gPFBTwitchBarClass]) {
+                  bar = view;
+              }
+            });
+            for (UIResponder* next = bar; next; next = next.nextResponder) {
+                if ([next isKindOfClass:gPFBTwitchControllerClass]) {
+                    gPFBTwitchController = (UIViewController*)next;
+                    return (UIViewController*)next;
+                }
+            }
+        }
     }
-    void* driver = NULL;
-    memcpy(&driver, (const uint8_t*)(__bridge void*)next + driverOffset, sizeof(driver));
-    if (!driver || object_getClass((__bridge id)driver) != driverClass) {
+    return nil;
+}
+
+// A spring as its first three numbers, which hold where it is, how fast it goes and where it heads.
+static NSString* PFBTwitchSpring(const uint8_t* driver, ptrdiff_t offset) {
+    if (offset < 0) {
+        return @"-";
+    }
+    double values[3] = {0, 0, 0};
+    memcpy(values, driver + offset, sizeof(values));
+    return [NSString stringWithFormat:@"%.3f %.3f %.3f", values[0], values[1], values[2]];
+}
+
+static NSString* PFBTwitchDriverState(UIViewController* controller) {
+    if (!controller || gPFBTwitchDriver < 0) {
         return @"no driver";
     }
+    void* driver = NULL;
+    memcpy(&driver, (const uint8_t*)(__bridge void*)controller + gPFBTwitchDriver, sizeof(driver));
+    if (!driver || object_getClass((__bridge id)driver) != gPFBTwitchDriverClass) {
+        return @"no driver";
+    }
+    const uint8_t* d = (const uint8_t*)driver;
     double target = 0;
-    memcpy(&target, (const uint8_t*)driver + targetOffset, sizeof(target));
-    return [NSString stringWithFormat:@"driver latched %d target %.2f", ((const uint8_t*)driver)[latchedOffset], target];
+    if (gPFBTwitchTarget >= 0) {
+        memcpy(&target, d + gPFBTwitchTarget, sizeof(target));
+    }
+    return [NSString stringWithFormat:@"latched %d resizing %d catching up %d target %.2f | morph %@ | scale %@ | resize %@",
+                                      gPFBTwitchLatched >= 0 ? d[gPFBTwitchLatched] : 9, gPFBTwitchResizing >= 0 ? d[gPFBTwitchResizing] : 9,
+                                      gPFBTwitchCatchingUp >= 0 ? d[gPFBTwitchCatchingUp] : 9, target, PFBTwitchSpring(d, gPFBTwitchMorph),
+                                      PFBTwitchSpring(d, gPFBTwitchScale), PFBTwitchSpring(d, gPFBTwitchResize)];
 }
 
-// One move of a bar piece: counted, and written with its calls while the first ones last.
-static void PFBTwitchMove(UIView* view, NSString* what, NSString* from, NSString* to) {
-    if (![PFBSettings boolForKey:@"no_tab_bar_hiding"]) {
+// MARK: - the views as drawn
+
+static NSString* PFBTwitchLayer(UIView* view) {
+    CALayer* shown = view.layer.presentationLayer ?: view.layer;
+    CATransform3D t = shown.transform;
+    CALayer* mask = shown.mask ?: view.layer.mask;
+    NSString* maskText = @"";
+    if (mask) {
+        CALayer* maskShown = mask.presentationLayer ?: mask;
+        CGRect box = [maskShown isKindOfClass:[CAShapeLayer class]] && ((CAShapeLayer*)maskShown).path
+                         ? CGPathGetBoundingBox(((CAShapeLayer*)maskShown).path)
+                         : maskShown.frame;
+        maskText = [NSString stringWithFormat:@" mask %.1f,%.1f %.1fx%.1f", box.origin.x, box.origin.y, box.size.width, box.size.height];
+    }
+    NSArray<NSString*>* keys = view.layer.animationKeys;
+    return [NSString stringWithFormat:@"%.1f,%.1f %.1fx%.1f a%.2f%@ r%.1f%@%@", shown.position.x, shown.position.y, shown.bounds.size.width,
+                                      shown.bounds.size.height, shown.opacity,
+                                      CATransform3DIsIdentity(t) ? @""
+                                                                 : [NSString stringWithFormat:@" t %.3f %.3f %.1f %.1f", t.m11, t.m22, t.m41, t.m42],
+                                      shown.cornerRadius, maskText,
+                                      keys.count ? [@" anim " stringByAppendingString:[keys componentsJoinedByString:@","]] : @""];
+}
+
+static void PFBTwitchCollect(UIView* view, UIView* screens, NSUInteger depth, NSMutableDictionary<NSValue*, NSString*>* into) {
+    if (!view || view == screens || into.count >= 220) {
         return;
     }
-    BOOL inside = gPFBTwitchTickDepth > 0;
-    BOOL dragging = gPFBTwitchDragging || CFAbsoluteTimeGetCurrent() - gPFBTwitchDragEnd < 0.6;
-    if (inside) {
-        gPFBTwitchInsideMoves++;
-    } else {
-        gPFBTwitchOutsideMoves++;
+    into[[NSValue valueWithNonretainedObject:view]] = [NSString stringWithFormat:@"%@ %@", PFBTwitchName(view), PFBTwitchLayer(view)];
+    for (UIView* sub in depth ? view.subviews : @[]) {
+        PFBTwitchCollect(sub, screens, depth - 1, into);
     }
-    BOOL write = dragging && (inside ? gPFBTwitchInsideStacks++ < kPFBTwitchInside : gPFBTwitchOutsideStacks++ < kPFBTwitchOutside);
-    if (!write) {
+}
+
+static NSDictionary<NSValue*, NSString*>* PFBTwitchSnapshot(UIViewController* controller) {
+    NSMutableDictionary<NSValue*, NSString*>* now = [NSMutableDictionary dictionary];
+    void* screens = NULL;
+    if (gPFBTwitchContent >= 0) {
+        memcpy(&screens, (const uint8_t*)(__bridge void*)controller + gPFBTwitchContent, sizeof(screens));
+    }
+    PFBTwitchCollect(controller.view, (__bridge UIView*)screens, 12, now);
+    return now;
+}
+
+// MARK: - each drag
+
+static BOOL gPFBTwitchWatching;
+static CFAbsoluteTime gPFBTwitchWatchUntil;
+static NSUInteger gPFBTwitchDragCount;
+static NSUInteger gPFBTwitchViewWritten;
+static NSUInteger gPFBTwitchDriverWritten;
+static NSDictionary<NSValue*, NSString*>* gPFBTwitchBaseline;
+static NSString* gPFBTwitchLastDiff;
+static NSString* gPFBTwitchLastDriver;
+static NSString* gPFBTwitchRestDriver;
+static CADisplayLink* gPFBTwitchLink;
+
+@interface PFBTwitchTicker : NSObject
+@end
+
+@implementation PFBTwitchTicker
+
+// Each frame of a watched drag: the views that stand apart from the start of the drag, written when
+// that set changes.
+- (void)tick:(CADisplayLink*)link {
+    UIViewController* controller = PFBTwitchController();
+    if (!gPFBTwitchWatching || !controller || CFAbsoluteTimeGetCurrent() > gPFBTwitchWatchUntil) {
+        gPFBTwitchWatching = NO;
+        link.paused = YES;
         return;
     }
-    PFBTwitchLine([NSString stringWithFormat:@"%@ frame: %@ %@ %@ -> %@, %@ | %@", inside ? @"inside" : @"outside", PFBTwitchName(view), what, from, to,
-                                             PFBTwitchDriver(view), PFBTwitchStack()]);
-}
-
-#define PFBTWITCH_RECT(r) [NSString stringWithFormat:@"%.0f,%.0f %.0fx%.0f", (r).origin.x, (r).origin.y, (r).size.width, (r).size.height]
-#define PFBTWITCH_POINT(p) [NSString stringWithFormat:@"%.0f,%.0f", (p).x, (p).y]
-
-%hook _TtC11XNavigation14TabBarItemView
-
-- (void)setFrame:(CGRect)frame {
-    UIView* view = (UIView*)self;
-    if (!CGRectEqualToRect(view.frame, frame)) {
-        PFBTwitchMove(view, @"frame", PFBTWITCH_RECT(view.frame), PFBTWITCH_RECT(frame));
+    NSDictionary<NSValue*, NSString*>* now = PFBTwitchSnapshot(controller);
+    NSMutableArray<NSString*>* changes = [NSMutableArray array];
+    for (NSValue* key in now) {
+        NSString* before = gPFBTwitchBaseline[key];
+        if (before && ![before isEqualToString:now[key]]) {
+            [changes addObject:[NSString stringWithFormat:@"%@ -> %@", before, [now[key] substringFromIndex:[now[key] rangeOfString:@" "].location + 1]]];
+        } else if (!before) {
+            [changes addObject:[@"+ " stringByAppendingString:now[key]]];
+        }
     }
-    %orig;
-}
-
-- (void)setCenter:(CGPoint)center {
-    UIView* view = (UIView*)self;
-    if (!CGPointEqualToPoint(view.center, center)) {
-        PFBTwitchMove(view, @"center", PFBTWITCH_POINT(view.center), PFBTWITCH_POINT(center));
+    [changes sortUsingSelector:@selector(compare:)];
+    NSString* diff = [changes componentsJoinedByString:@" ; "];
+    if (!changes.count || [diff isEqualToString:gPFBTwitchLastDiff] || gPFBTwitchViewWritten >= kPFBTwitchViewLines * kPFBTwitchDrags) {
+        return;
     }
-    %orig;
-}
-
-%end
-
-%hook _TtC13XDesignSystem10LiquidLens
-
-- (void)setFrame:(CGRect)frame {
-    UIView* view = (UIView*)self;
-    if (!CGRectEqualToRect(view.frame, frame)) {
-        PFBTwitchMove(view, @"frame", PFBTWITCH_RECT(view.frame), PFBTWITCH_RECT(frame));
+    gPFBTwitchLastDiff = diff;
+    gPFBTwitchViewWritten++;
+    for (NSUInteger i = 0; i < changes.count && i < 2 * kPFBTwitchPerLine; i += kPFBTwitchPerLine) {
+        NSArray<NSString*>* part = [changes subarrayWithRange:NSMakeRange(i, MIN(kPFBTwitchPerLine, changes.count - i))];
+        PFBTwitchLine([NSString stringWithFormat:@"drag %lu, %lu views apart, %lu-%lu: %@", (unsigned long)gPFBTwitchDragCount,
+                                                 (unsigned long)changes.count, (unsigned long)i + 1, (unsigned long)(i + part.count),
+                                                 [part componentsJoinedByString:@" ; "]]);
     }
-    %orig;
 }
 
-- (void)setBounds:(CGRect)bounds {
-    UIView* view = (UIView*)self;
-    if (!CGSizeEqualToSize(view.bounds.size, bounds.size)) {
-        PFBTwitchMove(view, @"bounds", PFBTWITCH_RECT(view.bounds), PFBTWITCH_RECT(bounds));
+@end
+
+static void PFBTwitchStartWatching(void) {
+    UIViewController* controller = PFBTwitchController();
+    if (!controller || gPFBTwitchDragCount >= kPFBTwitchDrags || ![PFBSettings boolForKey:@"no_tab_bar_hiding"]) {
+        return;
     }
-    %orig;
-}
-
-- (void)setCenter:(CGPoint)center {
-    UIView* view = (UIView*)self;
-    if (!CGPointEqualToPoint(view.center, center)) {
-        PFBTwitchMove(view, @"center", PFBTWITCH_POINT(view.center), PFBTWITCH_POINT(center));
+    gPFBTwitchDragCount++;
+    gPFBTwitchBaseline = PFBTwitchSnapshot(controller);
+    gPFBTwitchLastDiff = nil;
+    gPFBTwitchWatching = YES;
+    gPFBTwitchWatchUntil = CFAbsoluteTimeGetCurrent() + 30.0;
+    gPFBTwitchRestDriver = gPFBTwitchRestDriver ?: PFBTwitchDriverState(controller);
+    PFBTwitchLine([NSString stringWithFormat:@"drag %lu began; driver %@", (unsigned long)gPFBTwitchDragCount, PFBTwitchDriverState(controller)]);
+    if (!gPFBTwitchLink) {
+        gPFBTwitchLink = [CADisplayLink displayLinkWithTarget:[PFBTwitchTicker new] selector:@selector(tick:)];
+        [gPFBTwitchLink addToRunLoop:[NSRunLoop mainRunLoop] forMode:NSRunLoopCommonModes];
     }
-    %orig;
+    gPFBTwitchLink.paused = NO;
 }
 
-%end
-
-%hook _TtC11XNavigation23TabBarAccessoryHostView
-
-- (void)setFrame:(CGRect)frame {
-    UIView* view = (UIView*)self;
-    if (!CGRectEqualToRect(view.frame, frame)) {
-        PFBTwitchMove(view, @"frame", PFBTWITCH_RECT(view.frame), PFBTWITCH_RECT(frame));
-    }
-    %orig;
-}
-
-- (void)setCenter:(CGPoint)center {
-    UIView* view = (UIView*)self;
-    if (!CGPointEqualToPoint(view.center, center)) {
-        PFBTwitchMove(view, @"center", PFBTWITCH_POINT(view.center), PFBTWITCH_POINT(center));
-    }
-    %orig;
-}
-
-%end
-
-// Twitter's animation frames, counted so a move inside one is told from a move outside.
 %hook _TtCC11XNavigation17DisplayLinkDriverP33_DC9744A9B855F36B00902ED7FE8B664F5Proxy
 
+// Before the hold and after Twitter's frame, the driver as it stands, while a drag is watched.
 - (void)handleTick:(CADisplayLink*)link {
-    gPFBTwitchTickDepth++;
+    UIViewController* controller = gPFBTwitchWatching ? PFBTwitchController() : nil;
+    NSString* before = controller ? PFBTwitchDriverState(controller) : nil;
     %orig;
-    gPFBTwitchTickDepth--;
+    if (!controller || gPFBTwitchDriverWritten >= kPFBTwitchDriverLines * kPFBTwitchDrags) {
+        return;
+    }
+    NSString* after = PFBTwitchDriverState(controller);
+    NSString* pair = [NSString stringWithFormat:@"before %@ || after %@", before, after];
+    if ([pair isEqualToString:gPFBTwitchLastDriver] || ([before isEqualToString:gPFBTwitchRestDriver] && [after isEqualToString:gPFBTwitchRestDriver])) {
+        return;
+    }
+    gPFBTwitchLastDriver = pair;
+    gPFBTwitchDriverWritten++;
+    PFBTwitchLine([NSString stringWithFormat:@"drag %lu frame: driver %@", (unsigned long)gPFBTwitchDragCount, pair]);
 }
 
 %end
@@ -199,25 +272,12 @@ static void PFBTwitchMove(UIView* view, NSString* what, NSString* from, NSString
 
 - (void)handlePan:(UIPanGestureRecognizer*)recognizer {
     UIGestureRecognizerState state = recognizer.state;
-    BOOL note = gPFBTwitchPans < 8;
     if (state == UIGestureRecognizerStateBegan) {
-        gPFBTwitchDragging = YES;
-        gPFBTwitchPans++;
-        if (note) {
-            PFBTwitchLine(@"pan began");
-        }
+        PFBTwitchStartWatching();
     }
     %orig;
-    if ((state == UIGestureRecognizerStateEnded || state == UIGestureRecognizerStateCancelled) && gPFBTwitchDragging) {
-        gPFBTwitchDragging = NO;
-        gPFBTwitchDragEnd = CFAbsoluteTimeGetCurrent();
-        if (!note) {
-            return;
-        }
-        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.8 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
-          PFBTwitchLine([NSString stringWithFormat:@"pan ended 0.8 s ago: moves inside frames %lu, outside %lu", (unsigned long)gPFBTwitchInsideMoves,
-                                                   (unsigned long)gPFBTwitchOutsideMoves]);
-        });
+    if (state == UIGestureRecognizerStateEnded || state == UIGestureRecognizerStateCancelled) {
+        gPFBTwitchWatchUntil = MIN(gPFBTwitchWatchUntil, CFAbsoluteTimeGetCurrent() + 0.8);
     }
 }
 

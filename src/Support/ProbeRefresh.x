@@ -1,6 +1,6 @@
 // Probe for Twitter 12.45, removed once read: why the first pull on Home after a launch is not faded.
-// Each pull and each way Home's list is handed sections around it are written, with the list's state
-// and whether a fade picture lay over the list just after.
+// Each pull, drawn or begun, and each way Home's list is handed sections around it are written, with
+// the list's state and whether a fade picture lay over the list just after.
 
 #import "Support/HookHelpers.h"
 #import <objc/message.h>
@@ -10,7 +10,7 @@ static NSString* const kPFBRefreshProbeTopic = @"probe smooth refresh";
 static const NSUInteger kPFBRefreshProbeCap = 70;
 static const NSUInteger kPFBRefreshProbePulls = 5;
 static const NSUInteger kPFBRefreshProbePerPull = 9;
-static const NSUInteger kPFBRefreshProbeLaunchCalls = 6;
+static const NSUInteger kPFBRefreshProbeLaunchCalls = 8;
 static NSUInteger gPFBRefreshProbeSeq;
 static CFAbsoluteTime gPFBRefreshProbeStart;
 static CFAbsoluteTime gPFBRefreshProbePulledAt = -1000;
@@ -20,6 +20,7 @@ static NSUInteger gPFBRefreshProbeThisPull;
 static NSUInteger gPFBRefreshProbeLaunchSeen;
 static NSUInteger gPFBRefreshProbeDepth;
 static BOOL gPFBRefreshProbeFull;
+static BOOL gPFBRefreshProbeRunning;
 static NSUInteger gPFBRefreshProbeFullSeen;
 
 static void PFBRefreshProbeLine(NSString* line) {
@@ -46,19 +47,23 @@ static BOOL PFBRefreshProbeOnHome(UIViewController* controller) {
     return NO;
 }
 
-static UIScrollView* PFBRefreshProbeList(UIViewController* controller) {
-    if (!controller.isViewLoaded) {
-        return nil;
+// The list in the controller's mounted views: a table or a collection view, never asked for by
+// getter, which would build one.
+static UIScrollView* PFBRefreshProbeFindList(UIView* view, NSUInteger depth) {
+    if ([view isKindOfClass:[UITableView class]] || [view isKindOfClass:[UICollectionView class]]) {
+        return (UIScrollView*)view;
     }
-    if ([controller.view isKindOfClass:[UIScrollView class]]) {
-        return (UIScrollView*)controller.view;
-    }
-    for (UIView* sub in controller.view.subviews) {
-        if ([sub isKindOfClass:[UIScrollView class]]) {
-            return (UIScrollView*)sub;
+    for (UIView* sub in depth ? view.subviews : @[]) {
+        UIScrollView* found = PFBRefreshProbeFindList(sub, depth - 1);
+        if (found) {
+            return found;
         }
     }
     return nil;
+}
+
+static UIScrollView* PFBRefreshProbeList(UIViewController* controller) {
+    return controller.isViewLoaded ? PFBRefreshProbeFindList(controller.view, 6) : nil;
 }
 
 static NSUInteger PFBRefreshProbeItems(id sections) {
@@ -124,13 +129,17 @@ static void PFBRefreshProbeCall(UIViewController* controller, NSString* method, 
     %orig;
     BOOL full = dragging && fraction >= 1.0;
     if (full && !gPFBRefreshProbeFull && gPFBRefreshProbeFullSeen++ < kPFBRefreshProbePulls) {
-        PFBRefreshProbeLine([NSString stringWithFormat:@"pull drawn to its end, fraction %.2f", fraction]);
+        gPFBRefreshProbePulledAt = CFAbsoluteTimeGetCurrent();
+        gPFBRefreshProbeThisPull = 0;
+        PFBRefreshProbeLine([NSString stringWithFormat:@"pull drawn to its end, fraction %.2f, while a refresh runs %d", fraction,
+                                                       gPFBRefreshProbeRunning]);
     }
     gPFBRefreshProbeFull = full;
 }
 
 - (void)pullToRefreshControl:(id)control didBeginRefreshingFromPull:(BOOL)fromPull {
     %orig;
+    gPFBRefreshProbeRunning = YES;
     if (fromPull) {
         gPFBRefreshProbePulledAt = CFAbsoluteTimeGetCurrent();
         gPFBRefreshProbePulls++;
@@ -144,6 +153,7 @@ static void PFBRefreshProbeCall(UIViewController* controller, NSString* method, 
 
 - (void)pullToRefreshControlDidEndRefreshing:(id)control {
     %orig;
+    gPFBRefreshProbeRunning = NO;
     gPFBRefreshProbeEndedAt = CFAbsoluteTimeGetCurrent();
     if (gPFBRefreshProbePulls <= kPFBRefreshProbePulls) {
         PFBRefreshProbeLine([NSString stringWithFormat:@"pull %lu ended, %.2f s after it began", (unsigned long)gPFBRefreshProbePulls,
