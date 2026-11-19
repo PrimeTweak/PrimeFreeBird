@@ -755,14 +755,46 @@ static UIVisualEffectView* PFBGlassComposeMaterial(UIView* host) {
     return found;
 }
 
-static UIImageView* PFBGlassComposeGlyph(UIView* material) {
-    __block UIImageView* found = nil;
+// Twitter puts each new glyph in a new image view and fades the old one out (measured), so the
+// glass can hold two for a moment.
+static NSArray<UIImageView*>* PFBGlassComposeGlyphs(UIView* material) {
+    NSMutableArray<UIImageView*>* found = [NSMutableArray array];
     PFBWalkAllSubviews(material, 8, ^(UIView* view) {
-      if (!found && [view isKindOfClass:[UIImageView class]] && ((UIImageView*)view).image) {
-          found = (UIImageView*)view;
+      if ([view isKindOfClass:[UIImageView class]] && ((UIImageView*)view).image) {
+          [found addObject:(UIImageView*)view];
       }
     });
     return found;
+}
+
+// On Chat the same accessory holds the new-message button, labelled with Twitter's own string
+// for it (measured). That button keeps Twitter's glyph.
+static BOOL PFBGlassIsChatButton(UIView* host) {
+    static NSString* chatLabel;
+    static Class buttonClass;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+      chatLabel = [[PFBBundle sharedBundle] localizedTwitterStringForKey:@"DM_INBOX_NEW_MESSAGE_ACCESSIBILITY_LABEL"];
+      buttonClass = NSClassFromString(@"XDSButton");
+    });
+    __block BOOL chat = NO;
+    PFBWalkAllSubviews(host, 4, ^(UIView* view) {
+      chat = chat || ([view isKindOfClass:buttonClass] && [view.accessibilityLabel isEqualToString:chatLabel]);
+    });
+    return chat;
+}
+
+// Tagged first, so what Twitter sets on it later turns into the feather too; Twitter's own image is
+// kept for when the option goes off.
+static void PFBGlassFeatherGlyph(UIImageView* glyph, UIImage* feather) {
+    objc_setAssociatedObject(glyph, kPFBGlassComposeGlyphKey, @YES, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    if (glyph.image == feather) {
+        return;
+    }
+    if (!objc_getAssociatedObject(glyph, kPFBGlassComposeOriginalKey)) {
+        objc_setAssociatedObject(glyph, kPFBGlassComposeOriginalKey, glyph.image, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    }
+    glyph.image = feather;
 }
 
 static UIColor* PFBGlassMaterialTint(UIVisualEffectView* material) {
@@ -888,15 +920,13 @@ static void PFBGlassComposeLook(UIView* host, BOOL compose) {
         return;
     }
     UIVisualEffectView* material = PFBGlassComposeMaterial(host);
-    UIImageView* glyph = material ? PFBGlassComposeGlyph(material) : nil;
-    if (!material || !glyph) {
+    NSArray<UIImageView*>* glyphs = material ? PFBGlassComposeGlyphs(material) : @[];
+    if (!material || !glyphs.count) {
         return;
     }
     id savedTint = objc_getAssociatedObject(material, kPFBGlassComposeTintKey);
-    UIImage* original = objc_getAssociatedObject(glyph, kPFBGlassComposeOriginalKey);
     objc_setAssociatedObject(host, kPFBGlassComposeTouchedKey, @YES, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     objc_setAssociatedObject(material, kPFBGlassComposeMaterialKey, @YES, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-    objc_setAssociatedObject(glyph, kPFBGlassComposeGlyphKey, @YES, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     UIColor* blue = PFBFABBlueColor();
     UIColor* tint = PFBGlassMaterialTint(material);
     if (!savedTint) {
@@ -906,11 +936,10 @@ static void PFBGlassComposeLook(UIView* host, BOOL compose) {
         PFBGlassTintMaterial(material, blue);
     }
     UIImage* feather = PFBGlassFeather();
-    if (feather && glyph.image != feather) {
-        if (!original) {
-            objc_setAssociatedObject(glyph, kPFBGlassComposeOriginalKey, glyph.image, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    if (feather && !PFBGlassIsChatButton(host)) {
+        for (UIImageView* glyph in glyphs) {
+            PFBGlassFeatherGlyph(glyph, feather);
         }
-        glyph.image = feather;
     }
     PFBCOMPAT_ACTION(PFBCompat_restore_tweet_button, @"glass Tweet button restyled");
 }
@@ -943,6 +972,26 @@ static void PFBGlassRestyleLater(UIView* host) {
           @try {
               PFBGlassStyleCompose(alive);
           } @catch (__unused id exception) {
+          }
+      }
+    });
+}
+
+// Twitter's fade to a new glyph ends within 0.3 s (measured): a second after one comes in, every
+// glyph left on the compose button must be the feather.
+static void PFBGlassCheckFeatherLater(UIView* host) {
+    __weak UIView* weakHost = host;
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+      UIView* alive = weakHost;
+      UIVisualEffectView* material = alive.window ? PFBGlassComposeMaterial(alive) : nil;
+      if (!material || ![PFBSettings boolForKey:@"restore_tweet_button"] || !PFBGlassIsComposeHost(alive) ||
+          PFBGlassIsChatButton(alive)) {
+          return;
+      }
+      for (UIImageView* glyph in PFBGlassComposeGlyphs(material)) {
+          if (glyph.image != PFBGlassFeather()) {
+              PFBCompatNoteFailure(PFBCompat_restore_tweet_button, @"Tweet button glyph not the feather a second later");
+              return;
           }
       }
     });
@@ -1018,6 +1067,27 @@ static void PFBGlassWatchHost(UIView* host) {
         }
         ancestor = ancestor.superview;
         depth++;
+    }
+}
+
+// Each new glyph of the glass compose button comes in a new image view, with no layout pass of
+// the host (measured): the host is styled again once the view is in, and checked a second later.
+- (void)didMoveToSuperview {
+    %orig;
+    static Class hostClass;
+    hostClass = hostClass ?: NSClassFromString(@"_TtC11XNavigation23TabBarAccessoryHostView");
+    if (!self.window || !hostClass) {
+        return;
+    }
+    UIView* level = self.superview;
+    for (NSInteger depth = 0; level && depth < 12; depth++, level = level.superview) {
+        if ([level isKindOfClass:hostClass]) {
+            if ([PFBSettings boolForKey:@"restore_tweet_button"]) {
+                PFBGlassRestyleLater(level);
+                PFBGlassCheckFeatherLater(level);
+            }
+            return;
+        }
     }
 }
 
