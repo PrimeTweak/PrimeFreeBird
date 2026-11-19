@@ -1018,9 +1018,160 @@ static void PFBGlassCheckFeatherLater(UIView* host) {
 }
 
 // Each glyph change of the glass compose button adds Twitter's Lottie morph between its own "+" and
-// Chat's icon (measured), drawn while both glyphs are hidden. With the classic button it is hidden:
-// the glass stays empty until the new glyph shows.
+// Chat's icon (measured), drawn while both glyphs are hidden. It plays one of four files of Twitter's
+// navigation bundle, loaded by name; in each the "+" is a layer of its own (read in 12.45).
 static const void* kPFBGlassMorphKey = &kPFBGlassMorphKey;
+static BOOL gPFBGlassMorphServed;
+
+static NSArray<NSString*>* PFBGlassMorphNames(void) {
+    return @[ @"ComposeToMessageCompose", @"MessageComposeToCompose", @"ComposeToMention", @"MentionToCompose" ];
+}
+
+// The feather as a PNG at 3x, in a data URL a Lottie file can carry.
+static NSDictionary* PFBGlassFeatherAsset(void) {
+    UIImage* feather = PFBGlassFeather();
+    if (!feather || feather.size.width < 1.0 || feather.size.height < 1.0) {
+        return nil;
+    }
+    UIGraphicsImageRendererFormat* format = [UIGraphicsImageRendererFormat preferredFormat];
+    format.scale = 3.0;
+    format.opaque = NO;
+    NSData* png = [[[UIGraphicsImageRenderer alloc] initWithSize:feather.size format:format]
+        PNGDataWithActions:^(__unused UIGraphicsImageRendererContext* context) {
+          [feather drawInRect:CGRectMake(0.0, 0.0, feather.size.width, feather.size.height)];
+        }];
+    if (!png) {
+        return nil;
+    }
+    return @{@"id" : @"pfb_feather", @"w" : @(lround(feather.size.width * 3.0)), @"h" : @(lround(feather.size.height * 3.0)), @"u" : @"",
+             @"p" : [@"data:image/png;base64," stringByAppendingString:[png base64EncodedStringWithOptions:0]], @"e" : @1};
+}
+
+static BOOL PFBGlassBox(NSDictionary* keyframe, CGRect* box) {
+    NSArray* shapes = [keyframe[@"s"] isKindOfClass:[NSArray class]] ? keyframe[@"s"] : nil;
+    NSArray* points = [shapes.firstObject isKindOfClass:[NSDictionary class]] ? shapes.firstObject[@"v"] : nil;
+    if (![points isKindOfClass:[NSArray class]] || !points.count) {
+        return NO;
+    }
+    CGFloat minX = CGFLOAT_MAX, minY = CGFLOAT_MAX, maxX = -CGFLOAT_MAX, maxY = -CGFLOAT_MAX;
+    for (NSArray* point in points) {
+        if (![point isKindOfClass:[NSArray class]] || point.count < 2) {
+            return NO;
+        }
+        CGFloat x = [point[0] doubleValue], y = [point[1] doubleValue];
+        minX = MIN(minX, x), minY = MIN(minY, y), maxX = MAX(maxX, x), maxY = MAX(maxY, y);
+    }
+    *box = CGRectMake(minX, minY, maxX - minX, maxY - minY);
+    return YES;
+}
+
+static NSDictionary* PFBGlassFade(double from, double to, double start, double end) {
+    return @{@"a" : @1, @"k" : @[ @{@"t" : @(start), @"s" : @[ @(from) ], @"o" : @{@"x" : @0, @"y" : @0}, @"i" : @{@"x" : @1, @"y" : @1}},
+                                  @{@"t" : @(end), @"s" : @[ @(to) ]} ]};
+}
+
+// The feather takes the "+" layer's path: same place, size and easing, as a picture parented to it.
+// Toward Chat it fades into the "+" Chat's icon keeps in its corner, and back out of it on return.
+// Toward or from the mention icon, whose "+" shrinks to a dot, it stands in for the "+" throughout.
+static BOOL PFBGlassFeatherMorph(NSMutableDictionary* animation, NSDictionary* asset) {
+    NSMutableArray* layers = [animation[@"layers"] isKindOfClass:[NSMutableArray class]] ? animation[@"layers"] : nil;
+    NSUInteger index = [layers indexOfObjectPassingTest:^BOOL(NSDictionary* layer, __unused NSUInteger i, __unused BOOL* stop) {
+      return [layer isKindOfClass:[NSDictionary class]] && [layer[@"ty"] isEqual:@4] && [layer[@"nm"] isKindOfClass:[NSString class]] &&
+             [layer[@"nm"] hasPrefix:@"Plus"];
+    }];
+    NSMutableDictionary* plus = index == NSNotFound ? nil : layers[index];
+    NSDictionary* path = nil;
+    for (NSDictionary* group in [plus[@"shapes"] isKindOfClass:[NSArray class]] ? plus[@"shapes"] : @[]) {
+        for (NSDictionary* item in [group isKindOfClass:[NSDictionary class]] && [group[@"it"] isKindOfClass:[NSArray class]] ? group[@"it"] : @[]) {
+            path = path ?: ([item isKindOfClass:[NSDictionary class]] && [item[@"ty"] isEqual:@"sh"] ? item : nil);
+        }
+    }
+    NSArray* keyframes = [path[@"ks"] isKindOfClass:[NSDictionary class]] ? path[@"ks"][@"k"] : nil;
+    CGRect first = CGRectZero, last = CGRectZero;
+    if (![keyframes isKindOfClass:[NSArray class]] || keyframes.count != 2 || ![keyframes[0] isKindOfClass:[NSDictionary class]] ||
+        ![keyframes[1] isKindOfClass:[NSDictionary class]] || !PFBGlassBox(keyframes[0], &first) || !PFBGlassBox(keyframes[1], &last) ||
+        ![plus[@"ks"] isKindOfClass:[NSMutableDictionary class]] || ![plus[@"ind"] isKindOfClass:[NSNumber class]]) {
+        return NO;
+    }
+    double start = [keyframes[0][@"t"] doubleValue], end = [keyframes[1][@"t"] doubleValue];
+    double big = MAX(MAX(first.size.width, first.size.height), MAX(last.size.width, last.size.height));
+    BOOL shrinking = first.size.width > last.size.width;
+    BOOL dot = MIN(first.size.width, last.size.width) < 3.0;
+    if (big < 1.0 || end <= start) {
+        return NO;
+    }
+    double third = 100.0 / 3.0;
+    NSDictionary* ease = @{@"i" : keyframes[0][@"i"] ?: @{@"x" : @1, @"y" : @1}, @"o" : keyframes[0][@"o"] ?: @{@"x" : @0, @"y" : @0}};
+    double scale0 = MAX(first.size.width, first.size.height) / big * third, scale1 = MAX(last.size.width, last.size.height) / big * third;
+    NSDictionary* place = @{@"a" : @1, @"k" : @[ @{@"t" : @(start), @"s" : @[ @(CGRectGetMidX(first)), @(CGRectGetMidY(first)), @0 ],
+                                                   @"i" : ease[@"i"], @"o" : ease[@"o"], @"to" : @[ @0, @0, @0 ], @"ti" : @[ @0, @0, @0 ]},
+                                                @{@"t" : @(end), @"s" : @[ @(CGRectGetMidX(last)), @(CGRectGetMidY(last)), @0 ]} ]};
+    NSDictionary* size = @{@"a" : @1, @"k" : @[ @{@"t" : @(start), @"s" : @[ @(scale0), @(scale0), @100 ], @"i" : ease[@"i"], @"o" : ease[@"o"]},
+                                               @{@"t" : @(end), @"s" : @[ @(scale1), @(scale1), @100 ]} ]};
+    double span = end - start;
+    double fadeStart = start + span * (shrinking ? 0.33 : 0.2), fadeEnd = start + span * (shrinking ? 0.53 : 0.33);
+    NSDictionary* featherOpacity = dot ? @{@"a" : @0, @"k" : @100} : PFBGlassFade(shrinking ? 100 : 0, shrinking ? 0 : 100, fadeStart, fadeEnd);
+    plus[@"ks"][@"o"] = dot ? @{@"a" : @0, @"k" : @0} : PFBGlassFade(shrinking ? 0 : 100, shrinking ? 100 : 0, fadeStart, fadeEnd);
+    NSInteger top = 0;
+    for (NSDictionary* layer in layers) {
+        top = MAX(top, [layer isKindOfClass:[NSDictionary class]] ? [layer[@"ind"] integerValue] : 0);
+    }
+    NSDictionary* feather = @{
+        @"ddd" : @0, @"ind" : @(top + 1), @"ty" : @2, @"nm" : @"Feather", @"refId" : asset[@"id"], @"parent" : plus[@"ind"], @"sr" : @1, @"ao" : @0,
+        @"bm" : @0, @"ip" : plus[@"ip"] ?: @(start), @"op" : plus[@"op"] ?: @(end + 1), @"st" : plus[@"st"] ?: @0,
+        @"ks" : @{@"o" : featherOpacity, @"r" : @{@"a" : @0, @"k" : @0}, @"p" : place,
+                  @"a" : @{@"a" : @0, @"k" : @[ @([asset[@"w"] doubleValue] / 2.0), @([asset[@"h"] doubleValue] / 2.0), @0 ]}, @"s" : size}
+    };
+    [layers insertObject:feather atIndex:index];
+    NSMutableArray* assets = [animation[@"assets"] isKindOfClass:[NSMutableArray class]] ? animation[@"assets"] : [NSMutableArray array];
+    [assets addObject:asset];
+    animation[@"assets"] = assets;
+    return YES;
+}
+
+// The copy handed to Twitter, written once per launch where the app keeps files it can rebuild. nil
+// keeps Twitter's own file.
+static NSURL* PFBGlassMorphURL(NSBundle* bundle, NSString* name, NSString* subpath) {
+    static NSMutableDictionary<NSString*, NSURL*>* written;
+    NSURL* done = written[name];
+    if (done && [done checkResourceIsReachableAndReturnError:nil]) {
+        return done;
+    }
+    NSString* folder = subpath.length ? [bundle.bundlePath stringByAppendingPathComponent:subpath] : bundle.bundlePath;
+    NSData* data = [NSData dataWithContentsOfFile:[folder stringByAppendingPathComponent:[name stringByAppendingPathExtension:@"json"]]];
+    NSMutableDictionary* animation = data ? [NSJSONSerialization JSONObjectWithData:data options:NSJSONReadingMutableContainers error:nil] : nil;
+    NSDictionary* asset = PFBGlassFeatherAsset();
+    if (![animation isKindOfClass:[NSMutableDictionary class]] || !asset || !PFBGlassFeatherMorph(animation, asset)) {
+        return nil;
+    }
+    NSURL* caches = [[NSFileManager defaultManager] URLsForDirectory:NSCachesDirectory inDomains:NSUserDomainMask].firstObject;
+    NSURL* copy = [caches URLByAppendingPathComponent:[NSString stringWithFormat:@"pfb-feather-%@.json", name]];
+    NSData* json = [NSJSONSerialization dataWithJSONObject:animation options:0 error:nil];
+    if (!json || ![json writeToURL:copy atomically:YES]) {
+        return nil;
+    }
+    written = written ?: [NSMutableDictionary dictionary];
+    written[name] = copy;
+    return copy;
+}
+
+%hook NSBundle
+
+- (NSURL*)URLForResource:(NSString*)name withExtension:(NSString*)extension subdirectory:(NSString*)subpath {
+    if (![extension isEqualToString:@"json"] || ![PFBGlassMorphNames() containsObject:name]) {
+        return %orig;
+    }
+    PFBCompatReach(PFBCompatPath_glass_tweet_morph);
+    NSURL* ours = [PFBSettings boolForKey:@"restore_tweet_button"] ? PFBGlassMorphURL(self, name, subpath) : nil;
+    if (!ours) {
+        return %orig;
+    }
+    gPFBGlassMorphServed = YES;
+    PFBCOMPAT_ACTION(PFBCompat_restore_tweet_button, @"glass Tweet button morph with the feather");
+    return ours;
+}
+
+%end
 
 static UIView* PFBGlassMorphHost(UIView* view) {
     static Class hostClass;
@@ -1051,12 +1202,14 @@ static void PFBGlassWatchHost(UIView* host) {
     }
 }
 
+// Once the feather copies are served the morph plays. Should Twitter load it some other way, it is
+// hidden instead: the glass stays empty until the new glyph shows.
 %hook _TtC6Lottie19LottieAnimationView
 
 - (void)didMoveToWindow {
     %orig;
     UIView* view = (UIView*)self;
-    UIView* host = view.window && [PFBSettings boolForKey:@"restore_tweet_button"] ? PFBGlassMorphHost(view) : nil;
+    UIView* host = view.window && !gPFBGlassMorphServed && [PFBSettings boolForKey:@"restore_tweet_button"] ? PFBGlassMorphHost(view) : nil;
     if (!host) {
         return;
     }

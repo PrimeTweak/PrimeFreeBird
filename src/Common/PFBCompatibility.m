@@ -251,6 +251,7 @@ static const PFBCompatPathMeta kPaths[] = {
     {PFBCompatPath_sensitive_box, PFBCompat_disable_sensitive_tweet_warnings, "sensitive box check"},
     {PFBCompatPath_refresh_fade_pull, PFBCompat_refresh_fade, "pull"},
     {PFBCompatPath_refresh_fade_own, PFBCompat_refresh_fade, "Twitter's own refresh"},
+    {PFBCompatPath_glass_tweet_morph, PFBCompat_restore_tweet_button, "feather morph"},
 };
 static const size_t kPathCount = sizeof(kPaths) / sizeof(kPaths[0]);
 
@@ -1123,6 +1124,7 @@ static const PFBCompatReq kReqs[] = {
     {PFBCompat_restore_tweet_button, "UIImageView", "-didMoveToSuperview"},
     {PFBCompat_restore_tweet_button, "_TtC6Lottie19LottieAnimationView", "-didMoveToWindow"},
     {PFBCompat_restore_tweet_button, "_TtC6Lottie19LottieAnimationView", "-setHidden:"},
+    {PFBCompat_restore_tweet_button, "NSBundle", "-URLForResource:withExtension:subdirectory:"},
     {PFBCompat_restore_tweet_button, "UIVisualEffectView", "-layoutSubviews"},
     {PFBCompat_restore_refresh_sounds, "TFNItemsDataViewController", "-scrollViewDidEndDragging:willDecelerate:"},
     {PFBCompat_restore_refresh_sounds, "TFNPullToRefreshControl", "-_setStatus:fromScrolling:"},
@@ -2018,6 +2020,10 @@ static const PFBCompatName kNames[] = {
     {PFBCompat_restore_tweet_button, "Features/Branding/Branding.x", "_TtC11XNavigation23TabBarAccessoryHostView"},
     {PFBCompat_restore_tweet_button, "Features/Branding/Branding.x", "XDSButton"},
     {PFBCompat_restore_tweet_button, "Features/Branding/Branding.x", "DM_INBOX_NEW_MESSAGE_ACCESSIBILITY_LABEL"},
+    {PFBCompat_restore_tweet_button, "Features/Branding/Branding.x", "ComposeToMessageCompose"},
+    {PFBCompat_restore_tweet_button, "Features/Branding/Branding.x", "MessageComposeToCompose"},
+    {PFBCompat_restore_tweet_button, "Features/Branding/Branding.x", "ComposeToMention"},
+    {PFBCompat_restore_tweet_button, "Features/Branding/Branding.x", "MentionToCompose"},
     {PFBCompat_hide_tweet_button, "Features/Branding/Branding.x", "_TtC11XNavigation25TabBarAccessoryButtonView"},
     {PFBCompat_restore_tab_labels, "Features/Appearance/GlassTabBar.x", "xdsDeprecated_customFontOfSize:weight:scalesWithDynamicType:"},
     {PFBCompat_no_tab_bar_hiding, "Features/Appearance/GlassTabBar.x", "XNAVNavigationController"},

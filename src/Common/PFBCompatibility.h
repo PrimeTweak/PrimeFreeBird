@@ -280,6 +280,7 @@ typedef NS_ENUM(NSInteger, PFBCompatPath) {
     PFBCompatPath_refresh_animation,
     PFBCompatPath_refresh_fade_pull,
     PFBCompatPath_refresh_fade_own,
+    PFBCompatPath_glass_tweet_morph,
     PFBCompatPathCount,
 };
 
