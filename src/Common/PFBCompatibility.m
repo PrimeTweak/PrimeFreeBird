@@ -1981,6 +1981,7 @@ static const PFBCompatName kNames[] = {
     {PFBCompat_unified_notifications, "Features/General/UnifiedNotifications.x", "titleTextModel"},
     {PFBCompat_unified_notifications, "Features/General/UnifiedNotifications.x", "attributedSubTextModel"},
     {PFBCompat_unified_notifications, "Features/General/UnifiedNotifications.x", "search_stroke"},
+    {PFBCompatOptionCount, "Features/General/UnifiedNotifications.x", "fontOfSize:"},
     {PFBCompatOptionCount, "Support/HookHelpers.m", "item"},
     {PFBCompat_reading_line, "Features/Timelines/Timeline.x", "entryID"},
     {PFBCompat_reading_line, "Features/Timelines/Timeline.x", "indexPathsForVisibleItems"},

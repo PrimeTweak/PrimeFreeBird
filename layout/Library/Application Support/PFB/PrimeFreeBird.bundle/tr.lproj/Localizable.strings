@@ -584,7 +584,7 @@
 "HIDE_NOTIFICATIONS_DETAIL" = "Bir bildirimi ×’iyle gizle. Göz onları listeler.";
 "UNIFIED_NOTIFICATIONS_TITLE" = "Birleşik bildirimler";
 "UNIFIED_NOTIFICATIONS_DETAIL" = "Bildirimler ve bahsetmeler, aranabilir tek bir listede.";
-"NOTIF_SEARCH_PLACEHOLDER" = "Bildirimlerde ara";
+"NOTIF_SEARCH_PLACEHOLDER" = "Ara";
 "NOTIF_SEARCH_EMPTY_TITLE" = "Sonuç yok";
 "NOTIF_SEARCH_EMPTY_BODY" = "Burada “%@” ile eşleşen bildirim yok.";
 "NEW_TWITTER_SETTINGS_TITLE" = "Yeni Twitter ayarları";

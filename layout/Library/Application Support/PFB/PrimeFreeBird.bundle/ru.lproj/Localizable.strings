@@ -584,7 +584,7 @@
 "HIDE_NOTIFICATIONS_DETAIL" = "Скройте уведомление его ×. Глаз показывает их список.";
 "UNIFIED_NOTIFICATIONS_TITLE" = "Единые уведомления";
 "UNIFIED_NOTIFICATIONS_DETAIL" = "Уведомления и упоминания в одном списке с поиском.";
-"NOTIF_SEARCH_PLACEHOLDER" = "Поиск по уведомлениям";
+"NOTIF_SEARCH_PLACEHOLDER" = "Поиск";
 "NOTIF_SEARCH_EMPTY_TITLE" = "Ничего не найдено";
 "NOTIF_SEARCH_EMPTY_BODY" = "Здесь нет уведомлений со словами «%@».";
 "NEW_TWITTER_SETTINGS_TITLE" = "Новые настройки Twitter";

@@ -584,7 +584,7 @@
 "HIDE_NOTIFICATIONS_DETAIL" = "أخفِ إشعارًا بعلامة ×. تعرضها العين.";
 "UNIFIED_NOTIFICATIONS_TITLE" = "إشعارات موحدة";
 "UNIFIED_NOTIFICATIONS_DETAIL" = "الإشعارات والإشارات في قائمة واحدة يمكن البحث فيها.";
-"NOTIF_SEARCH_PLACEHOLDER" = "البحث في الإشعارات";
+"NOTIF_SEARCH_PLACEHOLDER" = "بحث";
 "NOTIF_SEARCH_EMPTY_TITLE" = "لا توجد نتائج";
 "NOTIF_SEARCH_EMPTY_BODY" = "لا يوجد إشعار هنا يطابق «%@».";
 "NEW_TWITTER_SETTINGS_TITLE" = "إعدادات تويتر الجديدة";

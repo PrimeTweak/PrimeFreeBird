@@ -584,7 +584,7 @@
 "HIDE_NOTIFICATIONS_DETAIL" = "Приховайте сповіщення його ×. Око показує їх список.";
 "UNIFIED_NOTIFICATIONS_TITLE" = "Єдині сповіщення";
 "UNIFIED_NOTIFICATIONS_DETAIL" = "Сповіщення та згадки в одному списку з пошуком.";
-"NOTIF_SEARCH_PLACEHOLDER" = "Пошук у сповіщеннях";
+"NOTIF_SEARCH_PLACEHOLDER" = "Пошук";
 "NOTIF_SEARCH_EMPTY_TITLE" = "Нічого не знайдено";
 "NOTIF_SEARCH_EMPTY_BODY" = "Тут немає сповіщень зі словами «%@».";
 "NEW_TWITTER_SETTINGS_TITLE" = "Нові налаштування Twitter";

@@ -584,7 +584,7 @@
 "HIDE_NOTIFICATIONS_DETAIL" = "×로 알림을 숨깁니다. 눈 아이콘에 목록이 있습니다.";
 "UNIFIED_NOTIFICATIONS_TITLE" = "통합 알림";
 "UNIFIED_NOTIFICATIONS_DETAIL" = "알림과 멘션을 검색할 수 있는 하나의 목록으로 보여줍니다.";
-"NOTIF_SEARCH_PLACEHOLDER" = "알림 검색";
+"NOTIF_SEARCH_PLACEHOLDER" = "검색";
 "NOTIF_SEARCH_EMPTY_TITLE" = "결과 없음";
 "NOTIF_SEARCH_EMPTY_BODY" = "“%@”와(과) 일치하는 알림이 없습니다.";
 "NEW_TWITTER_SETTINGS_TITLE" = "새 트위터 설정";

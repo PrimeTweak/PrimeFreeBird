@@ -584,7 +584,7 @@
 "HIDE_NOTIFICATIONS_DETAIL" = "Ukryj powiadomienie jego ×. Oko je wymienia.";
 "UNIFIED_NOTIFICATIONS_TITLE" = "Ujednolicone powiadomienia";
 "UNIFIED_NOTIFICATIONS_DETAIL" = "Powiadomienia i wzmianki na jednej liście, którą można przeszukać.";
-"NOTIF_SEARCH_PLACEHOLDER" = "Szukaj w powiadomieniach";
+"NOTIF_SEARCH_PLACEHOLDER" = "Szukaj";
 "NOTIF_SEARCH_EMPTY_TITLE" = "Brak wyników";
 "NOTIF_SEARCH_EMPTY_BODY" = "Żadne powiadomienie tutaj nie zawiera „%@”.";
 "NEW_TWITTER_SETTINGS_TITLE" = "Nowe ustawienia Twittera";

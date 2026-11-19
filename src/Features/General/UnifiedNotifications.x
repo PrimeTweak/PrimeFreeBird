@@ -10,14 +10,14 @@
 #import <objc/message.h>
 #import <objc/runtime.h>
 
-// Twitter's own search field, as its Settings screen draws it: 40 pt high in the 44 pt row,
-// the glyph 17 pt in, the text 40 pt in, Chirp at 16.5 pt.
-static const CGFloat kPFBSearchFieldHeight = 40.0;
-static const CGFloat kPFBSearchSideInset = 20.0;
-static const CGFloat kPFBSearchGlyphLeft = 17.0;
-static const CGFloat kPFBSearchGlyphSize = 14.0;
+// Chat's search field, as measured on screen: 44 pt high with 16 pt margins, the glyph 16 pt in
+// and 16 pt wide, the text 40 pt in, Chirp at 16 pt once grown with the text size.
+static const CGFloat kPFBSearchFieldHeight = 44.0;
+static const CGFloat kPFBSearchSideInset = 16.0;
+static const CGFloat kPFBSearchGlyphLeft = 16.0;
+static const CGFloat kPFBSearchGlyphSize = 16.0;
 static const CGFloat kPFBSearchTextLeft = 40.0;
-static const CGFloat kPFBSearchFontSize = 16.5;
+static const CGFloat kPFBSearchFontSize = 15.5;
 static const NSInteger kPFBSearchPanelTag = 90318;
 
 static const char* kPFBSearchBarKey = "pfbSearchBar";
@@ -287,12 +287,26 @@ static UITableView* PFBSearchShownList(UIView* root) {
 
 // MARK: - the field
 
-// Twitter's field colors, measured on its own field in light; the system's in dark.
-static UIColor* PFBSearchColor(CGFloat lightWhite, UIColor* dark) {
+// Chat's field colors, measured on its own field in light; the system's in dark.
+static UIColor* PFBSearchColor(UIColor* light, UIColor* dark) {
     return [UIColor colorWithDynamicProvider:^UIColor*(UITraitCollection* traits) {
-      return traits.userInterfaceStyle == UIUserInterfaceStyleDark ? [dark resolvedColorWithTraitCollection:traits]
-                                                                     : [UIColor colorWithWhite:lightWhite alpha:1.0];
+      UIColor* color = traits.userInterfaceStyle == UIUserInterfaceStyleDark ? dark : light;
+      return [color resolvedColorWithTraitCollection:traits];
     }];
+}
+
+// The placeholder and glyph color: black at 30 % in light.
+static UIColor* PFBSearchHintColor(void) {
+    return PFBSearchColor([UIColor colorWithWhite:0.0 alpha:0.30], [UIColor placeholderTextColor]);
+}
+
+// Chirp as Twitter's font group makes it at 16 pt, set to the field's size and grown with the
+// text size.
+static UIFont* PFBSearchFont(void) {
+    Class groupClass = objc_getClass("TFNUIDefaultFontGroup");
+    TFNUIDefaultFontGroup* group = [groupClass respondsToSelector:@selector(sharedFontGroup)] ? [groupClass sharedFontGroup] : nil;
+    UIFont* base = [group respondsToSelector:@selector(fontOfSize:)] ? [group fontOfSize:16] : nil;
+    return PFBScaledFont([base ?: TwitterChirpFont(TwitterFontStyleRegular) fontWithSize:kPFBSearchFontSize]);
 }
 
 @interface PFBNotifSearchBar : UIView <UITextFieldDelegate, UIGestureRecognizerDelegate>
@@ -309,14 +323,15 @@ static UIColor* PFBSearchColor(CGFloat lightWhite, UIColor* dark) {
     if (self) {
         self.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
         NSString* placeholder = [[PFBBundle sharedBundle] localizedStringForKey:@"NOTIF_SEARCH_PLACEHOLDER"];
-        UIFont* font = PFBScaledFont([TwitterChirpFont(TwitterFontStyleRegular) fontWithSize:kPFBSearchFontSize]);
-        UIColor* gray = PFBSearchColor(169.0 / 255.0, [UIColor placeholderTextColor]);
+        UIFont* font = PFBSearchFont();
+        UIColor* gray = PFBSearchHintColor();
         _field = [[UITextField alloc] init];
-        _field.backgroundColor = PFBSearchColor(242.0 / 255.0, [UIColor tertiarySystemFillColor]);
+        _field.backgroundColor = PFBSearchColor([UIColor colorWithWhite:242.0 / 255.0 alpha:1.0], [UIColor tertiarySystemFillColor]);
         _field.layer.cornerRadius = kPFBSearchFieldHeight / 2.0;
+        _field.layer.cornerCurve = kCACornerCurveContinuous;
         _field.font = font;
         _field.textColor = [UIColor labelColor];
-        _field.tintColor = PFBBrandAccentColor();
+        _field.tintColor = [UIColor labelColor];
         _field.attributedPlaceholder = [[NSAttributedString alloc]
             initWithString:placeholder
                 attributes:@{NSFontAttributeName : font, NSForegroundColorAttributeName : gray}];
@@ -342,7 +357,7 @@ static UIColor* PFBSearchColor(CGFloat lightWhite, UIColor* dark) {
 
 // Twitter's search glyph bakes its color in, so it is drawn again with each appearance.
 - (void)applyGlyph {
-    UIColor* gray = [PFBSearchColor(169.0 / 255.0, [UIColor placeholderTextColor]) resolvedColorWithTraitCollection:self.traitCollection];
+    UIColor* gray = [PFBSearchHintColor() resolvedColorWithTraitCollection:self.traitCollection];
     if ([UIImage respondsToSelector:@selector(tfn_vectorImageNamed:fitsSize:fillColor:)]) {
         self.glyph.image = [UIImage tfn_vectorImageNamed:@"search_stroke"
                                                 fitsSize:CGSizeMake(kPFBSearchGlyphSize, kPFBSearchGlyphSize)

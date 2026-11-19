@@ -580,7 +580,7 @@
 "HIDE_NOTIFICATIONS_DETAIL" = "Masquez une notification avec son ×. L’œil les liste.";
 "UNIFIED_NOTIFICATIONS_TITLE" = "Notifications unifiées";
 "UNIFIED_NOTIFICATIONS_DETAIL" = "Notifications et mentions dans une seule liste où chercher.";
-"NOTIF_SEARCH_PLACEHOLDER" = "Rechercher des notifications";
+"NOTIF_SEARCH_PLACEHOLDER" = "Rechercher";
 "NOTIF_SEARCH_EMPTY_TITLE" = "Aucun résultat";
 "NOTIF_SEARCH_EMPTY_BODY" = "Aucune notification ici ne contient « %@ ».";
 "NEW_TWITTER_SETTINGS_TITLE" = "Nouveaux réglages Twitter";

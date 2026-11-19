@@ -584,7 +584,7 @@
 "HIDE_NOTIFICATIONS_DETAIL" = "Sakrij obavijest njezinim ×. Oko ih navodi.";
 "UNIFIED_NOTIFICATIONS_TITLE" = "Objedinjene obavijesti";
 "UNIFIED_NOTIFICATIONS_DETAIL" = "Obavijesti i spominjanja u jednom popisu koji možeš pretraživati.";
-"NOTIF_SEARCH_PLACEHOLDER" = "Pretraži obavijesti";
+"NOTIF_SEARCH_PLACEHOLDER" = "Traži";
 "NOTIF_SEARCH_EMPTY_TITLE" = "Nema rezultata";
 "NOTIF_SEARCH_EMPTY_BODY" = "Nijedna obavijest ovdje ne sadrži „%@”.";
 "NEW_TWITTER_SETTINGS_TITLE" = "Nove postavke Twittera";

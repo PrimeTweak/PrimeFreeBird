@@ -584,7 +584,7 @@
 "HIDE_NOTIFICATIONS_DETAIL" = "Dölj en avisering med dess ×. Ögat listar dem.";
 "UNIFIED_NOTIFICATIONS_TITLE" = "Samlade aviseringar";
 "UNIFIED_NOTIFICATIONS_DETAIL" = "Aviseringar och omnämnanden i en lista som går att söka i.";
-"NOTIF_SEARCH_PLACEHOLDER" = "Sök i aviseringar";
+"NOTIF_SEARCH_PLACEHOLDER" = "Sök";
 "NOTIF_SEARCH_EMPTY_TITLE" = "Inga resultat";
 "NOTIF_SEARCH_EMPTY_BODY" = "Ingen avisering här matchar ”%@”.";
 "NEW_TWITTER_SETTINGS_TITLE" = "Nya Twitter-inställningar";

@@ -584,7 +584,7 @@
 "HIDE_NOTIFICATIONS_DETAIL" = "Blende eine Mitteilung mit ihrem × aus. Das Auge listet sie auf.";
 "UNIFIED_NOTIFICATIONS_TITLE" = "Einheitliche Mitteilungen";
 "UNIFIED_NOTIFICATIONS_DETAIL" = "Mitteilungen und Erwähnungen in einer durchsuchbaren Liste.";
-"NOTIF_SEARCH_PLACEHOLDER" = "Mitteilungen durchsuchen";
+"NOTIF_SEARCH_PLACEHOLDER" = "Suchen";
 "NOTIF_SEARCH_EMPTY_TITLE" = "Keine Ergebnisse";
 "NOTIF_SEARCH_EMPTY_BODY" = "Keine Mitteilung hier enthält „%@“.";
 "NEW_TWITTER_SETTINGS_TITLE" = "Neue Twitter-Einstellungen";

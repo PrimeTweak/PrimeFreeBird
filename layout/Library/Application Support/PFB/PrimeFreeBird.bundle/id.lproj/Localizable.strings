@@ -584,7 +584,7 @@
 "HIDE_NOTIFICATIONS_DETAIL" = "Sembunyikan notifikasi dengan ×-nya. Ikon mata mencantumkannya.";
 "UNIFIED_NOTIFICATIONS_TITLE" = "Notifikasi terpadu";
 "UNIFIED_NOTIFICATIONS_DETAIL" = "Notifikasi dan sebutan dalam satu daftar yang bisa dicari.";
-"NOTIF_SEARCH_PLACEHOLDER" = "Cari notifikasi";
+"NOTIF_SEARCH_PLACEHOLDER" = "Cari";
 "NOTIF_SEARCH_EMPTY_TITLE" = "Tidak ada hasil";
 "NOTIF_SEARCH_EMPTY_BODY" = "Tidak ada notifikasi di sini yang cocok dengan “%@”.";
 "NEW_TWITTER_SETTINGS_TITLE" = "Pengaturan Twitter baru";
