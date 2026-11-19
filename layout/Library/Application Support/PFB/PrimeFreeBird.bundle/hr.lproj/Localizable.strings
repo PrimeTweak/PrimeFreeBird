@@ -136,12 +136,12 @@
 "HIDE_VERIFIED_TWEETS_TITLE" = "Sakrij potvrđene tweetove";
 "HIDE_VERIFIED_TWEETS_DETAIL" = "Ukloni tweetove potvrđenih računa koje ne pratiš. Profili i pretraživanje ih zadržavaju.";
 "HIDE_BLOCKED_RETWEETS_TITLE" = "Retweetovi";
-"HIDE_BLOCKED_RETWEETS_DETAIL" = "Odaberi koje retweetove vidiš; Nijedan vrijedi samo za Početnu. Tvoji uvijek ostaju.";
+"HIDE_BLOCKED_RETWEETS_DETAIL" = "Odaberi koje retweetove vidiš; Nijedan vrijedi samo za Naslovnicu. Tvoji uvijek ostaju.";
 "RETWEETS_SHOW_ALL" = "Svi";
 "RETWEETS_HIDE_BLOCKED" = "Ne od računa koji su te blokirali";
 "RETWEETS_HIDE_ALL" = "Nijedan";
 "HIDE_QUOTE_TWEETS_TITLE" = "Sakrij citirane tweetove";
-"HIDE_QUOTE_TWEETS_DETAIL" = "Ukloni citirane tweetove s Početne. Tvoji ostaju.";
+"HIDE_QUOTE_TWEETS_DETAIL" = "Ukloni citirane tweetove s Naslovnice. Tvoji ostaju.";
 
 /* ===== TWEETS ===== */
 "MODERN_SETTINGS_TWEETS_TITLE" = "Tweetovi";
@@ -470,17 +470,17 @@
 "TIMELINES_GROUP_SUGGESTIONS" = "Promocije";
 "TIMELINES_GROUP_CONTENT" = "Sadržaj";
 "TIMELINES_GROUP_POSITION" = "Položaj";
-"FORCE_FOLLOWING_TAB_TITLE" = "Zapamti karticu Početne";
-"FORCE_FOLLOWING_TAB_DETAIL" = "Zadrži Početnu na zadnjoj kartici umjesto povratka na Za vas nakon 12 sati.";
+"FORCE_FOLLOWING_TAB_TITLE" = "Zapamti karticu Naslovnice";
+"FORCE_FOLLOWING_TAB_DETAIL" = "Zadrži Naslovnicu na zadnjoj kartici umjesto povratka na Za vas nakon 12 sati.";
 "NO_FOCUS_LOST_TITLE" = "Zadrži mjesto";
 "NO_FOCUS_LOST_DETAIL" = "Ne osvježavaj vremensku crtu kad se vratiš iz druge aplikacije.";
 "NO_JUMP_BACK_HOME_TITLE" = "Zapamti zadnji zaslon";
-"NO_JUMP_BACK_HOME_DETAIL" = "Vrati se na zaslon koji si napustio, ne na Početnu, nakon 5 minuta odsutnosti.";
+"NO_JUMP_BACK_HOME_DETAIL" = "Vrati se na zaslon koji si napustio, ne na Naslovnicu, nakon 5 minuta odsutnosti.";
 "READING_LINE_TITLE" = "Oznaka čitanja";
 "READING_LINE_DETAIL" = "Označi gdje si stao u Praćenima kad se iznad pojave novi tweetovi.";
-"TIMELINES_GROUP_HOME" = "Početna";
+"TIMELINES_GROUP_HOME" = "Naslovnica";
 "UNLIMITED_TIMELINE_TABS_TITLE" = "Neograničene kartice vremenske crte";
-"UNLIMITED_TIMELINE_TABS_DETAIL" = "Ukloni ograničenje prikvačenih kartica Početne i dopusti svaku vrstu kartice.";
+"UNLIMITED_TIMELINE_TABS_DETAIL" = "Ukloni ograničenje prikvačenih kartica Naslovnice i dopusti svaku vrstu kartice.";
 "UNLIMITED_TIMELINE_TABS_DETAIL_HELD" = "Nije potrebno dok su prilagođene vremenske crte skrivene.";
 
 /* ===== MUTED WORDS ===== */

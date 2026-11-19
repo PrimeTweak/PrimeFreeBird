@@ -136,12 +136,12 @@
 "HIDE_VERIFIED_TWEETS_TITLE" = "Onaylı Tweetleri gizle";
 "HIDE_VERIFIED_TWEETS_DETAIL" = "Takip etmediğin onaylı hesapların Tweetlerini kaldır. Profiller ve arama onları gösterir.";
 "HIDE_BLOCKED_RETWEETS_TITLE" = "Retweetler";
-"HIDE_BLOCKED_RETWEETS_DETAIL" = "Hangi Retweetleri göreceğini seç; Hiçbiri yalnızca Ana Sayfa için geçerlidir. Seninkiler hep kalır.";
+"HIDE_BLOCKED_RETWEETS_DETAIL" = "Hangi Retweetleri göreceğini seç; Hiçbiri yalnızca Anasayfa için geçerlidir. Seninkiler hep kalır.";
 "RETWEETS_SHOW_ALL" = "Tümü";
 "RETWEETS_HIDE_BLOCKED" = "Seni engelleyen hesaplardan değil";
 "RETWEETS_HIDE_ALL" = "Hiçbiri";
 "HIDE_QUOTE_TWEETS_TITLE" = "Alıntı Tweetleri gizle";
-"HIDE_QUOTE_TWEETS_DETAIL" = "Alıntı Tweetleri Ana Sayfa’dan kaldır. Seninkiler kalır.";
+"HIDE_QUOTE_TWEETS_DETAIL" = "Alıntı Tweetleri Anasayfa’dan kaldır. Seninkiler kalır.";
 
 /* ===== TWEETS ===== */
 "MODERN_SETTINGS_TWEETS_TITLE" = "Tweetler";
@@ -470,17 +470,17 @@
 "TIMELINES_GROUP_SUGGESTIONS" = "Tanıtımlar";
 "TIMELINES_GROUP_CONTENT" = "İçerik";
 "TIMELINES_GROUP_POSITION" = "Konum";
-"FORCE_FOLLOWING_TAB_TITLE" = "Ana Sayfa sekmesini hatırla";
-"FORCE_FOLLOWING_TAB_DETAIL" = "12 saat sonra Sana özel’e dönmek yerine Ana Sayfa’yı son sekmende tut.";
+"FORCE_FOLLOWING_TAB_TITLE" = "Anasayfa sekmesini hatırla";
+"FORCE_FOLLOWING_TAB_DETAIL" = "12 saat sonra Sana özel’e dönmek yerine Anasayfa’yı son sekmende tut.";
 "NO_FOCUS_LOST_TITLE" = "Yerini koru";
 "NO_FOCUS_LOST_DETAIL" = "Başka bir uygulamadan döndüğünde zaman akışını yenileme.";
 "NO_JUMP_BACK_HOME_TITLE" = "Son ekranı hatırla";
-"NO_JUMP_BACK_HOME_DETAIL" = "5 dakika uzak kaldıktan sonra Ana Sayfa’ya değil, ayrıldığın ekrana dön.";
+"NO_JUMP_BACK_HOME_DETAIL" = "5 dakika uzak kaldıktan sonra Anasayfa’ya değil, ayrıldığın ekrana dön.";
 "READING_LINE_TITLE" = "Okuma işareti";
 "READING_LINE_DETAIL" = "Üstte yeni Tweetler geldiğinde Takip edilenler’de kaldığın yeri işaretle.";
-"TIMELINES_GROUP_HOME" = "Ana Sayfa";
+"TIMELINES_GROUP_HOME" = "Anasayfa";
 "UNLIMITED_TIMELINE_TABS_TITLE" = "Sınırsız zaman akışı sekmesi";
-"UNLIMITED_TIMELINE_TABS_DETAIL" = "Ana Sayfa’daki sabitlenmiş sekme sınırını kaldır ve her tür sekmeye izin ver.";
+"UNLIMITED_TIMELINE_TABS_DETAIL" = "Anasayfa’daki sabitlenmiş sekme sınırını kaldır ve her tür sekmeye izin ver.";
 "UNLIMITED_TIMELINE_TABS_DETAIL_HELD" = "Özel zaman akışları gizliyken gerekmez.";
 
 /* ===== MUTED WORDS ===== */
