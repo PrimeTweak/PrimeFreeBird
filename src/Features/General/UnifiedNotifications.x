@@ -1,6 +1,6 @@
 // Unified notifications: Notifications stays on All, which already lists every notification,
-// mentions included, and a search field takes the place of the All and Mentions row. Read once
-// per launch, as Twitter builds the screen once.
+// mentions included, and Chat's search field, in a room of Chat's height, takes the place of the
+// All and Mentions row. Read once per launch, as Twitter builds the screen once.
 
 #import "Support/HookHelpers.h"
 #import "Support/Helpers.h"
@@ -19,17 +19,21 @@ static const CGFloat kPFBSearchGlyphSize = 16.0;
 static const CGFloat kPFBSearchTextLeft = 40.0;
 static const CGFloat kPFBSearchFontSize = 15.5;
 static const NSInteger kPFBSearchPanelTag = 90318;
+// Chat's room under its bar, measured: the row is held at this height.
+static const CGFloat kPFBUnifiedRoomHeight = 60.0;
 
 static const char* kPFBSearchBarKey = "pfbSearchBar";
 static const char* kPFBSearchListKey = "pfbSearchList";
 static const char* kPFBSearchPanelKey = "pfbSearchPanel";
 static const char* kPFBSearchRowKey = "pfbSearchRow";
 static const char* kPFBSearchDroppedKey = "pfbSearchDropped";
+static const char* kPFBUnifiedRoomAskedKey = "pfbUnifiedRoomAsked";
 
 static NSString* gPFBSearchQuery;
 static NSMapTable* gPFBSearchCellWords;
 static NSMapTable* gPFBSearchModelWords;
 static BOOL gPFBSearchPanelPending;
+static NSLayoutConstraint* gPFBUnifiedRowHeight;
 
 static BOOL PFBUnifiedOn(void) {
     static BOOL on;
@@ -495,6 +499,38 @@ static void PFBUnifiedHoldPager(id segmented) {
     }
 }
 
+// The row's height constraint held at Chat's 60 pt: the navigation then leaves Chat's room under
+// the bar, and the list starts where Chat's does.
+static void PFBUnifiedHoldRow(id segmented) {
+    NSLayoutConstraint* height = PFBUnifiedObjectIvar(segmented, "barContainerHeightConstraint");
+    if (![height isKindOfClass:[NSLayoutConstraint class]]) {
+        PFBCompatMeasure(@"unified notifications", @"room not held: no row height constraint", 2);
+        return;
+    }
+    gPFBUnifiedRowHeight = height;
+    if (fabs(height.constant - kPFBUnifiedRoomHeight) > 0.1) {
+        height.constant = kPFBUnifiedRoomHeight;
+    }
+}
+
+// Once the screen shows, the navigation measures the held row again, the first time and whenever
+// the screen's row is a new one.
+static void PFBUnifiedMeasureRoom(UIViewController* screen) {
+    id segmented = PFBUnifiedObjectIvar(screen, "$__lazy_storage_$_segmentedController");
+    NSLayoutConstraint* height = PFBUnifiedObjectIvar(segmented, "barContainerHeightConstraint");
+    if (objc_getAssociatedObject(screen, kPFBUnifiedRoomAskedKey) && height == gPFBUnifiedRowHeight) {
+        return;
+    }
+    if (height != gPFBUnifiedRowHeight) {
+        PFBUnifiedHoldRow(segmented);
+    }
+    objc_setAssociatedObject(screen, kPFBUnifiedRoomAskedKey, @YES, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    SEL update = NSSelectorFromString(@"xnav_setNeedsNavigationConfigurationUpdateAnimated:");
+    if ([screen respondsToSelector:update]) {
+        ((void (*)(id, SEL, BOOL))objc_msgSend)(screen, update, NO);
+    }
+}
+
 static void PFBUnifiedInstall(UIViewController* screen) {
     UIView* zone = PFBUnifiedFindKind(screen.view, NSClassFromString(@"_TtC11XNavigation18AccessoryStackView"), 2);
     CGRect room = zone ? [zone convertRect:zone.bounds toView:nil] : CGRectNull;
@@ -541,6 +577,26 @@ static void PFBUnifiedInstall(UIViewController* screen) {
     }
 }
 
+- (void)viewDidAppear:(BOOL)animated {
+    %orig;
+    if (PFBUnifiedOn()) {
+        PFBUnifiedMeasureRoom((UIViewController*)self);
+    }
+}
+
+%end
+
+// Twitter sets the row back to its own height after load; the held row keeps Chat's.
+%hook NSLayoutConstraint
+
+- (void)setConstant:(CGFloat)constant {
+    if (self == gPFBUnifiedRowHeight && fabs(constant - kPFBUnifiedRoomHeight) > 0.1) {
+        constant = kPFBUnifiedRoomHeight;
+        PFBCOMPAT_ACTION(PFBCompat_unified_notifications, @"room kept at Chat's height");
+    }
+    %orig(constant);
+}
+
 %end
 
 // The row keeps the field over its own pieces, which Twitter lays out again on each pass.
@@ -556,11 +612,12 @@ static void PFBUnifiedInstall(UIViewController* screen) {
 
 %end
 
-// The screen opens on All, whatever tab it was set to open on.
+// The screen opens on All, whatever tab it was set to open on, and its row takes Chat's height.
 %hook _TtC10TFNUISwift29LegacySegmentedViewController
 
 - (void)viewDidLoad {
-    Ivar initial = PFBUnifiedOwns(self) ? class_getInstanceVariable(object_getClass(self), "initialSelectedIndex") : NULL;
+    BOOL owns = PFBUnifiedOwns(self);
+    Ivar initial = owns ? class_getInstanceVariable(object_getClass(self), "initialSelectedIndex") : NULL;
     if (initial) {
         NSInteger* stored = (NSInteger*)((uint8_t*)(__bridge void*)self + ivar_getOffset(initial));
         if (*stored > 0) {
@@ -569,6 +626,9 @@ static void PFBUnifiedInstall(UIViewController* screen) {
         }
     }
     %orig;
+    if (owns) {
+        PFBUnifiedHoldRow(self);
+    }
 }
 
 %end
