@@ -8,6 +8,9 @@
 - (void)handlePan:(UIPanGestureRecognizer*)recognizer;
 @end
 
+@interface _TtCC11XNavigation17DisplayLinkDriverP33_DC9744A9B855F36B00902ED7FE8B664F5Proxy : NSObject
+@end
+
 static Class gPFBGlassBarClass;
 static Class gPFBGlassItemClass;
 static Class gPFBGlassPortalClass;
@@ -1037,32 +1040,96 @@ static BOOL PFBGlassShowing(UIView* view) {
     return view != nil;
 }
 
-// Always visible keeps the bar full: its glass laid out as the round button, about as wide as tall
-// and far narrower than the bar, fails the option when it still shows so a second later.
-static void PFBGlassCheckAlwaysVisible(UIView* glass) {
+// Twitter 12.45 collapses the bar through its controller's collapse driver: latched with a target of
+// 1 to collapse, unlatched at 0 to show the bar full (measured). The controller seen with the bar.
+static __weak UIViewController* gPFBGlassTabController;
+static __weak UIView* gPFBGlassTabBarView;
+static Class gPFBGlassDriverClass;
+static ptrdiff_t gPFBGlassDriverOffset = -1;
+static ptrdiff_t gPFBGlassLatchedOffset = -1;
+static ptrdiff_t gPFBGlassTargetOffset = -1;
+
+static void PFBGlassNoteTabController(UIView* bar) {
+    gPFBGlassTabBarView = bar;
+    if (gPFBGlassTabController.viewIfLoaded.window) {
+        return;
+    }
+    Class controller = NSClassFromString(@"_TtC11XNavigation16TabBarController");
+    for (UIResponder* next = bar; next && controller; next = next.nextResponder) {
+        if ([next isKindOfClass:controller]) {
+            gPFBGlassTabController = (UIViewController*)next;
+            return;
+        }
+    }
+}
+
+// The driver's latch and target sit where the patch writes: a pointer to the driver, a 1-byte latch
+// and an 8-byte target, as measured. Any other layout keeps the hold off.
+static BOOL PFBGlassDriverLayoutFound(void) {
+    static BOOL found;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+      Class controller = NSClassFromString(@"_TtC11XNavigation16TabBarController");
+      gPFBGlassDriverClass = NSClassFromString(@"_TtC11XNavigation20TabBarCollapseDriver");
+      Ivar driver = controller ? class_getInstanceVariable(controller, "$__lazy_storage_$_collapseDriver") : NULL;
+      Ivar latched = gPFBGlassDriverClass ? class_getInstanceVariable(gPFBGlassDriverClass, "isLatched") : NULL;
+      Ivar target = gPFBGlassDriverClass ? class_getInstanceVariable(gPFBGlassDriverClass, "progressTarget") : NULL;
+      found = driver && latched && target && PFBGlassIvarSpan(controller, driver) == 8 &&
+              PFBGlassIvarSpan(gPFBGlassDriverClass, latched) == 1 && PFBGlassIvarSpan(gPFBGlassDriverClass, target) == 8;
+      if (found) {
+          gPFBGlassDriverOffset = ivar_getOffset(driver);
+          gPFBGlassLatchedOffset = ivar_getOffset(latched);
+          gPFBGlassTargetOffset = ivar_getOffset(target);
+      } else {
+          PFBCompatMeasure(@"always visible", @"hold off: Twitter's collapse driver not laid out as measured", 2);
+      }
+    });
+    return found;
+}
+
+// Before each frame Twitter animates, a collapse the driver was given is taken back: unlatched at a
+// target of 0, the bar has nothing to collapse toward.
+static void PFBGlassHoldTabBarOpen(void) {
+    UIViewController* controller = gPFBGlassTabController;
+    if (!controller || !PFBGlassDriverLayoutFound() || ![PFBSettings boolForKey:@"no_tab_bar_hiding"]) {
+        return;
+    }
+    void* driver = NULL;
+    memcpy(&driver, (const uint8_t*)(__bridge void*)controller + gPFBGlassDriverOffset, sizeof(driver));
+    if (!driver || object_getClass((__bridge id)driver) != gPFBGlassDriverClass) {
+        return;
+    }
+    uint8_t* latched = (uint8_t*)driver + gPFBGlassLatchedOffset;
+    double target = 0.0;
+    memcpy(&target, (uint8_t*)driver + gPFBGlassTargetOffset, sizeof(target));
+    if (*latched == 0 && target == 0.0) {
+        return;
+    }
+    *latched = 0;
+    target = 0.0;
+    memcpy((uint8_t*)driver + gPFBGlassTargetOffset, &target, sizeof(target));
+    PFBCOMPAT_ACTION(PFBCompat_no_tab_bar_hiding, @"tab bar collapse held off");
+}
+
+// Always visible keeps the bar full: a second after a scroll, a selection lens about as wide as tall,
+// the round button of the collapsed bar (measured 47 x 48 pt against 98 x 54 full), fails the option.
+static void PFBGlassCheckAlwaysVisible(void) {
     static BOOL noted;
-    static BOOL pending;
-    CGSize size = glass.bounds.size;
-    if (noted || pending || size.height <= 0.0 || size.width <= 0.0 || size.width > size.height * 1.5 ||
-        !glass.window || !gPFBGlassBarClass) {
+    if (noted || ![PFBSettings boolForKey:@"no_tab_bar_hiding"]) {
         return;
     }
-    UIView* bar = glass.superview;
-    for (NSUInteger hops = 0; bar && hops < 3 && ![bar isKindOfClass:gPFBGlassBarClass]; hops++) {
-        bar = bar.superview;
-    }
-    if (![bar isKindOfClass:gPFBGlassBarClass] || CGRectGetWidth(bar.bounds) < size.width * 2.0 ||
-        ![PFBSettings boolForKey:@"no_tab_bar_hiding"]) {
-        return;
-    }
-    pending = YES;
-    __weak UIView* weakGlass = glass;
-    __weak UIView* weakBar = bar;
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, NSEC_PER_SEC), dispatch_get_main_queue(), ^{
-      pending = NO;
-      CGSize later = weakGlass.bounds.size;
-      BOOL collapsed = weakGlass.window && later.height > 0.0 && later.width <= later.height * 1.5;
-      if (collapsed && PFBGlassShowing(weakBar) && [PFBSettings boolForKey:@"no_tab_bar_hiding"]) {
+      static Class lensClass;
+      lensClass = lensClass ?: NSClassFromString(@"_TtC13XDesignSystem10LiquidLens");
+      __block UIView* lens = nil;
+      PFBWalkAllSubviews(gPFBGlassTabBarView, 6, ^(UIView* inner) {
+        if (!lens && lensClass && [inner isKindOfClass:lensClass]) {
+            lens = inner;
+        }
+      });
+      CGSize size = lens.bounds.size;
+      if (!noted && size.height > 0.0 && size.width <= size.height * 1.3 && PFBGlassShowing(lens) &&
+          [PFBSettings boolForKey:@"no_tab_bar_hiding"]) {
           noted = YES;
           PFBCompatNoteFailure(PFBCompat_no_tab_bar_hiding, @"tab bar still collapsed a second later");
       }
@@ -1116,6 +1183,22 @@ static void PFBGlassCheckAlwaysVisible(UIView* glass) {
     }
     gPFBGlassDragging = state == UIGestureRecognizerStateBegan || state == UIGestureRecognizerStateChanged;
     %orig;
+    if (state == UIGestureRecognizerStateEnded || state == UIGestureRecognizerStateCancelled) {
+        PFBGlassCheckAlwaysVisible();
+    }
+}
+
+%end
+
+// Every frame Twitter animates passes through its display link: the bar's collapse is taken back first.
+%hook _TtCC11XNavigation17DisplayLinkDriverP33_DC9744A9B855F36B00902ED7FE8B664F5Proxy
+
+- (void)handleTick:(CADisplayLink*)link {
+    @try {
+        PFBGlassHoldTabBarOpen();
+    } @catch (__unused id exception) {
+    }
+    %orig;
 }
 
 %end
@@ -1161,6 +1244,7 @@ static void PFBGlassCheckBarHeight(UIView* bar) {
     %orig;
     @try {
         UIView* bar = (UIView*)self;
+        PFBGlassNoteTabController(bar);
         PFBGlassLiftBadges(bar);
         PFBGlassCheckBarHeight(bar);
         PFBCompatReach(PFBCompatPath_glass_tabs);
@@ -1229,7 +1313,6 @@ static void PFBGlassCheckBarHeight(UIView* bar) {
     %orig;
     @try {
         PFBGlassFindClasses();
-        PFBGlassCheckAlwaysVisible((UIView*)self);
         PFBGlassTintBarGlass((UIView*)self);
         PFBGlassPlaceBand((UIView*)self);
     } @catch (__unused id exception) {
