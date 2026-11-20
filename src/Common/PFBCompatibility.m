@@ -1990,6 +1990,7 @@ static const PFBCompatName kNames[] = {
     {PFBCompat_hide_notifications, "Features/General/HiddenNotifications.x", "tableView"},
     {PFBCompat_hide_notifications, "Features/General/HiddenNotifications.x", "notifications_stroke"},
     {PFBCompat_hide_notifications, "Features/General/HiddenNotifications.x", "_TtC6ChatUI18ChatEmptyStateView"},
+    {PFBCompat_hide_notifications, "Features/General/HiddenNotifications.x", "Chirp-Bold"},
     {PFBCompat_unified_notifications, "Features/General/UnifiedNotifications.x", "initialSelectedIndex"},
     {PFBCompat_unified_notifications, "Features/General/UnifiedNotifications.x", "$__lazy_storage_$_segmentedController"},
     {PFBCompat_notif_search_bar, "Features/General/UnifiedNotifications.x", "notification"},

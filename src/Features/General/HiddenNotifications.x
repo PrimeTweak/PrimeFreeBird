@@ -666,7 +666,7 @@ static const CGFloat kPFBNotifEmptyTitleSize = 18.0;
 static const CGFloat kPFBNotifEmptyBodySize = 16.0;
 static const CGFloat kPFBNotifEmptySideInset = 32.0;
 
-// Chirp as Twitter's font group gives it, bold for the title.
+// Chirp as Twitter's font group gives it; the title in Chirp Bold, as Chat's, not the group's heavier face.
 static UIFont* PFBNotifEmptyFont(CGFloat size, BOOL bold) {
     TFNUIDefaultFontGroup* fonts = (TFNUIDefaultFontGroup*)[PFBManager sharedFontGroup];
     if (!bold && [fonts respondsToSelector:@selector(fontOfSize:)]) {
@@ -675,7 +675,8 @@ static UIFont* PFBNotifEmptyFont(CGFloat size, BOOL bold) {
             return font;
         }
     }
-    return PFBScaledFont([TwitterChirpFont(bold ? TwitterFontStyleBold : TwitterFontStyleRegular) fontWithSize:size]);
+    UIFont* face = bold ? [UIFont fontWithName:@"Chirp-Bold" size:size] : nil;
+    return PFBScaledFont(face ?: [TwitterChirpFont(bold ? TwitterFontStyleBold : TwitterFontStyleRegular) fontWithSize:size]);
 }
 
 // The line's gray until Chat is read: the one measured in light, the system's secondary gray in dark.

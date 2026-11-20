@@ -708,7 +708,7 @@ const PFBOptionFingerprint PFBOptionFingerprints[] = {
     {"hide_made_on_x", "456527fb"},
     {"hide_message_button", "456527fb"},
     {"hide_new_tweets_pill", "b4db80db"},
-    {"hide_notifications", "93834d98"},
+    {"hide_notifications", "97da0f7a"},
     {"hide_premium_offer", "cd197a73"},
     {"hide_promoted", "2c5804f5"},
     {"hide_quote_tweets", "6812aa6c"},
