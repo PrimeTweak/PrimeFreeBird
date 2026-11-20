@@ -460,6 +460,7 @@ const PFBHookRecord PFBHookRecords[] = {
     {"_TtC32TwitterHomeFeatureImplementation35HomeTimelineContainerViewController", "viewDidAppear:", "Features/Timelines/Timeline.x"},
     {"_TtC32TwitterHomeFeatureImplementation35HomeTimelineContainerViewController", "viewWillAppear:", "Features/Timelines/QuickMutedWords.x"},
     {"_TtC6ChatUI18ChatEmptyStateView", "layoutSubviews", "Features/General/HiddenNotifications.x"},
+    {"_TtC6ChatUI18ChatEmptyStateView", "layoutSubviews", "Support/ProbeChatEmpty.x"},
     {"_TtC6ChatUI26MessageAttachmentAudioView", "didMoveToWindow", "Features/Media/MediaDownloads.x"},
     {"_TtC6ChatUI26MessageAttachmentAudioView", "layoutSubviews", "Features/Media/MediaDownloads.x"},
     {"_TtC6Lottie19LottieAnimationView", "didMoveToWindow", "Features/Branding/Branding.x"},
