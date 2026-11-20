@@ -252,6 +252,7 @@ static const PFBCompatPathMeta kPaths[] = {
     {PFBCompatPath_refresh_fade_pull, PFBCompat_refresh_fade, "pull"},
     {PFBCompatPath_refresh_fade_own, PFBCompat_refresh_fade, "Twitter's own refresh"},
     {PFBCompatPath_glass_tweet_morph, PFBCompat_restore_tweet_button, "feather morph"},
+    {PFBCompatPath_glass_collapse, PFBCompat_restore_tab_labels, "collapse"},
 };
 static const size_t kPathCount = sizeof(kPaths) / sizeof(kPaths[0]);
 
@@ -437,7 +438,7 @@ static const PFBCompatReq kReqs[] = {
     {PFBCompat_restore_tab_labels, "TFNCustomTabBar", "-layoutSubviews"},
     {PFBCompat_restore_tab_labels, "_TtC11XNavigation10TabBarView", "-layoutSubviews"},
     {PFBCompat_restore_tab_labels, "_TtC11XNavigation14TabBarItemView", "-layoutSubviews"},
-    {PFBCompat_restore_tab_labels, "XDSGlass", "-setBounds:"},
+    {PFBCompat_restore_tab_labels, "_TtC13XDesignSystem10LiquidLens", "-setBounds:"},
     {PFBCompat_glass_toasts, "TFNToastViewController", "-_tfn_toastWidth"},
     {PFBCompat_glass_toasts, "TFNToastViewController", "-_tfn_toastContainerFrame"},
     {PFBCompat_glass_toasts, "TFNToastViewController", "-_tfn_toastHorizontalPlacementBounds"},

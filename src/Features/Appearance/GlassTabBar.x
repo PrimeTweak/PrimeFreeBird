@@ -151,7 +151,7 @@ static void PFBGlassLift(UIView* view, CGFloat lift) {
 }
 
 // How far the bar has collapsed into its round button, from 0 shown in full to 1 collapsed,
-// as last read from its platter.
+// as last read from its lens.
 static CGFloat PFBGlassCollapseOf(UIView* bar) {
     NSNumber* collapse = bar ? objc_getAssociatedObject(bar, kPFBGlassCollapseKey) : nil;
     return collapse ? collapse.doubleValue : 0.0;
@@ -486,20 +486,39 @@ static CGFloat PFBGlassCollapsedHeight(void) {
     return height;
 }
 
-// Twitter collapses the bar by shrinking its platter frame by frame, from the bar's height to
-// the round button's. Each step sets how far the names have faded and the glyphs come down.
-static void PFBGlassFollowCollapse(UIView* platter, CGFloat height) {
-    UIView* bar = platter.superview.superview;
-    if (!gPFBGlassBarClass || ![bar isKindOfClass:gPFBGlassBarClass] ||
-        ![PFBSettings boolForKey:@"restore_tab_labels"]) {
+// Twitter's pill height, read through its addressor, which the lens keeps at rest; NULL when missing.
+static double* PFBGlassPillHeight(void) {
+    static double* height;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+      double* (*heightAt)(void) = (double* (*)(void))dlsym(
+          RTLD_DEFAULT, "$s11XNavigation13TabBarMetricsO10pillHeight12CoreGraphics7CGFloatVvau");
+      height = heightAt ? heightAt() : NULL;
+    });
+    return height;
+}
+
+// Twitter collapses the bar by shrinking its lens frame by frame, from the pill's height to the round
+// button's (64 to 48 pt with Tab labels, measured). Each step sets how far the names have faded and
+// the glyphs come down; a pressed lens, taller than the pill, leaves them in place.
+static void PFBGlassFollowCollapse(UIView* lens, CGFloat height) {
+    UIView* bar = lens.superview;
+    for (NSInteger level = 0; bar && level < 4 && ![bar isKindOfClass:gPFBGlassBarClass]; level++) {
+        bar = bar.superview;
+    }
+    if (!gPFBGlassBarClass || ![bar isKindOfClass:gPFBGlassBarClass]) {
         return;
     }
-    CGFloat full = CGRectGetHeight(bar.bounds);
+    double* full = PFBGlassPillHeight();
     CGFloat collapsed = PFBGlassCollapsedHeight();
-    if (collapsed <= 0.0 || full <= collapsed) {
+    if (!full || collapsed <= 0.0 || *full <= collapsed) {
         return;
     }
-    CGFloat collapse = MIN(1.0, MAX(0.0, (full - height) / (full - collapsed)));
+    PFBCompatReach(PFBCompatPath_glass_collapse);
+    if (![PFBSettings boolForKey:@"restore_tab_labels"]) {
+        return;
+    }
+    CGFloat collapse = MIN(1.0, MAX(0.0, (*full - height) / (*full - collapsed)));
     CGFloat previous = PFBGlassCollapseOf(bar);
     if (collapse == previous || (fabs(collapse - previous) < 0.02 && collapse > 0.0 && collapse < 1.0)) {
         return;
@@ -522,15 +541,13 @@ static void PFBGlassFollowCollapse(UIView* platter, CGFloat height) {
 // Twitter builds the bar's pill once, from its metrics: 54 pt high, the 62 pt bar less 4 pt above
 // and below. With Tab labels on at launch, the pill keeps those margins in the 72 pt bar.
 static void PFBGlassSizePillForLabels(void) {
-    double* (*heightAt)(void) = (double* (*)(void))dlsym(
-        RTLD_DEFAULT, "$s11XNavigation13TabBarMetricsO10pillHeight12CoreGraphics7CGFloatVvau");
     CGSize* (*sizeAt)(void) =
         (CGSize* (*)(void))dlsym(RTLD_DEFAULT, "$s11XNavigation13TabBarMetricsO8pillSizeSo6CGSizeVvau");
     double (*inset)(void) = (double (*)(void))dlsym(
         RTLD_DEFAULT, "$s11XNavigation13TabBarMetricsO13pillRestInset12CoreGraphics7CGFloatVvgZ");
     double (*barHeight)(void) = (double (*)(void))dlsym(
         RTLD_DEFAULT, "$s11XNavigation13TabBarMetricsO14expandedHeight12CoreGraphics7CGFloatVvgZ");
-    double* height = heightAt ? heightAt() : NULL;
+    double* height = PFBGlassPillHeight();
     CGSize* size = sizeAt ? sizeAt() : NULL;
     if (!height || !size || !inset || !barHeight) {
         PFBCompatMeasure(@"tab labels", @"Twitter's pill metrics not found", 4);
@@ -1313,14 +1330,27 @@ static void PFBGlassCheckBarHeight(UIView* bar) {
 
 %end
 
-// The bar's platter, shrunk by Twitter frame by frame as the bar collapses.
-%hook XDSGlass
+// The bar's selection lens, resized by Twitter each frame the bar collapses or opens.
+%hook _TtC13XDesignSystem10LiquidLens
 
 - (void)setBounds:(CGRect)bounds {
     %orig;
     @try {
         PFBGlassFindClasses();
         PFBGlassFollowCollapse((UIView*)self, CGRectGetHeight(bounds));
+    } @catch (__unused id exception) {
+    }
+}
+
+%end
+
+// The bar's platter, which Bottom fade's band follows.
+%hook XDSGlass
+
+- (void)setBounds:(CGRect)bounds {
+    %orig;
+    @try {
+        PFBGlassFindClasses();
         PFBGlassPlaceBand((UIView*)self);
     } @catch (__unused id exception) {
     }
