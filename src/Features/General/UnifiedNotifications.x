@@ -1,6 +1,6 @@
-// Unified notifications: Notifications stays on All, which already lists every notification, mentions
-// included, and the All and Mentions row gives way, in a room of Chat's height, to Chat's search field
-// with Search bar on, or to nothing. Both are read once per launch, as Twitter builds the screen once.
+// Unified notifications: Notifications stays on All, which lists every notification, mentions included.
+// The All and Mentions row gives way to Chat's search field in a room of Chat's height with Search bar on;
+// with it off, the row keeps only the gap above Chat's field. Both are read once per launch.
 
 #import "Support/HookHelpers.h"
 #import "Support/Helpers.h"
@@ -19,7 +19,7 @@ static const CGFloat kPFBSearchGlyphSize = 16.0;
 static const CGFloat kPFBSearchTextLeft = 40.0;
 static const CGFloat kPFBSearchFontSize = 15.5;
 static const NSInteger kPFBSearchPanelTag = 90318;
-// Chat's room under its bar, measured: the row is held at this height.
+// Chat's room under its bar, measured: 60 pt, its field centered in it.
 static const CGFloat kPFBUnifiedRoomHeight = 60.0;
 
 static const char* kPFBUnifiedCoverKey = "pfbUnifiedCover";
@@ -51,6 +51,12 @@ static BOOL PFBSearchOn(void) {
       on = PFBUnifiedOn() && [PFBSettings boolForKey:@"notif_search_bar"];
     });
     return on;
+}
+
+// The row's height: Chat's room with the field, or only the gap above Chat's field without it, so the
+// list starts where that field does.
+static CGFloat PFBUnifiedRoom(void) {
+    return PFBSearchOn() ? kPFBUnifiedRoomHeight : (kPFBUnifiedRoomHeight - kPFBSearchFieldHeight) / 2.0;
 }
 
 // The segmented screen of Notifications: the one whose tabs T1NotificationsViewController gives.
@@ -508,8 +514,8 @@ static void PFBUnifiedHoldPager(id segmented) {
     }
 }
 
-// The row's height constraint held at Chat's 60 pt: the navigation then leaves Chat's room under
-// the bar, and the list starts where Chat's does.
+// The row's height constraint held at the room: the navigation then leaves that room under the bar,
+// and the list starts there.
 static void PFBUnifiedHoldRow(id segmented) {
     NSLayoutConstraint* height = PFBUnifiedObjectIvar(segmented, "barContainerHeightConstraint");
     if (![height isKindOfClass:[NSLayoutConstraint class]]) {
@@ -517,8 +523,8 @@ static void PFBUnifiedHoldRow(id segmented) {
         return;
     }
     gPFBUnifiedRowHeight = height;
-    if (fabs(height.constant - kPFBUnifiedRoomHeight) > 0.1) {
-        height.constant = kPFBUnifiedRoomHeight;
+    if (fabs(height.constant - PFBUnifiedRoom()) > 0.1) {
+        height.constant = PFBUnifiedRoom();
     }
 }
 
@@ -543,7 +549,7 @@ static void PFBUnifiedMeasureRoom(UIViewController* screen) {
 static void PFBUnifiedInstall(UIViewController* screen) {
     UIView* zone = PFBUnifiedFindKind(screen.view, NSClassFromString(@"_TtC11XNavigation18AccessoryStackView"), 2);
     CGRect room = zone ? [zone convertRect:zone.bounds toView:nil] : CGRectNull;
-    if (!screen.view.window || CGRectGetHeight(room) < 20.0) {
+    if (!screen.view.window || CGRectGetHeight(room) < 1.0) {
         return;
     }
     PFBUnifiedRowRef* ref = objc_getAssociatedObject(screen, kPFBSearchRowKey);
@@ -573,7 +579,7 @@ static void PFBUnifiedInstall(UIViewController* screen) {
         PFBCOMPAT_ACTION(PFBCompat_notif_search_bar, @"search field in place of the tabs");
     } else if (!cover) {
         cover = [[UIView alloc] initWithFrame:row.bounds];
-        PFBCOMPAT_OBSERVE(PFBCompat_notif_search_bar, @"room under the bar left empty");
+        PFBCOMPAT_OBSERVE(PFBCompat_notif_search_bar, @"list starts at Chat's field top");
     }
     if (!cover.superview) {
         [row addSubview:cover];
@@ -604,13 +610,13 @@ static void PFBUnifiedInstall(UIViewController* screen) {
 
 %end
 
-// Twitter sets the row back to its own height after load; the held row keeps Chat's.
+// Twitter sets the row back to its own height after load; the held row keeps the room.
 %hook NSLayoutConstraint
 
 - (void)setConstant:(CGFloat)constant {
-    if (self == gPFBUnifiedRowHeight && fabs(constant - kPFBUnifiedRoomHeight) > 0.1) {
-        constant = kPFBUnifiedRoomHeight;
-        PFBCOMPAT_ACTION(PFBCompat_unified_notifications, @"room kept at Chat's height");
+    if (self == gPFBUnifiedRowHeight && fabs(constant - PFBUnifiedRoom()) > 0.1) {
+        constant = PFBUnifiedRoom();
+        PFBCOMPAT_ACTION(PFBCompat_unified_notifications, @"room kept at %.0f pt", constant);
     }
     %orig(constant);
 }
@@ -630,7 +636,7 @@ static void PFBUnifiedInstall(UIViewController* screen) {
 
 %end
 
-// The screen opens on All, whatever tab it was set to open on, and its row takes Chat's height.
+// The screen opens on All, whatever tab it was set to open on, and its row takes the room.
 %hook _TtC10TFNUISwift29LegacySegmentedViewController
 
 - (void)viewDidLoad {
