@@ -583,7 +583,10 @@
 "HIDE_NOTIFICATIONS_TITLE" = "Bildirimleri gizle";
 "HIDE_NOTIFICATIONS_DETAIL" = "Bir bildirimi ×’iyle gizle. Göz onları listeler.";
 "UNIFIED_NOTIFICATIONS_TITLE" = "Birleşik bildirimler";
-"UNIFIED_NOTIFICATIONS_DETAIL" = "Bildirimler ve bahsetmeler, aranabilir tek bir listede.";
+"UNIFIED_NOTIFICATIONS_DETAIL" = "Bildirimler ve bahsetmeler tek bir listede.";
+"NOTIF_SEARCH_BAR_TITLE" = "Arama çubuğu";
+"NOTIF_SEARCH_BAR_DETAIL" = "Bildirimleri listenin üstünden ara.";
+"NOTIF_SEARCH_BAR_DETAIL_HELD" = "Birleşik bildirimler gerekir.";
 "NOTIF_SEARCH_PLACEHOLDER" = "Ara";
 "NOTIF_SEARCH_EMPTY_TITLE" = "Sonuç yok";
 "NOTIF_SEARCH_EMPTY_BODY" = "Burada “%@” ile eşleşen bildirim yok.";

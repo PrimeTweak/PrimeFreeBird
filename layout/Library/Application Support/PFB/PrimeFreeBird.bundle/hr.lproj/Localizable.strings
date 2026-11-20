@@ -583,7 +583,10 @@
 "HIDE_NOTIFICATIONS_TITLE" = "Sakrij obavijesti";
 "HIDE_NOTIFICATIONS_DETAIL" = "Sakrij obavijest njezinim ×. Oko ih navodi.";
 "UNIFIED_NOTIFICATIONS_TITLE" = "Objedinjene obavijesti";
-"UNIFIED_NOTIFICATIONS_DETAIL" = "Obavijesti i spominjanja u jednom popisu koji možeš pretraživati.";
+"UNIFIED_NOTIFICATIONS_DETAIL" = "Obavijesti i spominjanja u jednom popisu.";
+"NOTIF_SEARCH_BAR_TITLE" = "Traka za pretraživanje";
+"NOTIF_SEARCH_BAR_DETAIL" = "Pretražuj obavijesti s vrha popisa.";
+"NOTIF_SEARCH_BAR_DETAIL_HELD" = "Potrebne su Objedinjene obavijesti.";
 "NOTIF_SEARCH_PLACEHOLDER" = "Traži";
 "NOTIF_SEARCH_EMPTY_TITLE" = "Nema rezultata";
 "NOTIF_SEARCH_EMPTY_BODY" = "Nijedna obavijest ovdje ne sadrži „%@”.";

@@ -583,7 +583,10 @@
 "HIDE_NOTIFICATIONS_TITLE" = "Скрывать уведомления";
 "HIDE_NOTIFICATIONS_DETAIL" = "Скройте уведомление его ×. Глаз показывает их список.";
 "UNIFIED_NOTIFICATIONS_TITLE" = "Единые уведомления";
-"UNIFIED_NOTIFICATIONS_DETAIL" = "Уведомления и упоминания в одном списке с поиском.";
+"UNIFIED_NOTIFICATIONS_DETAIL" = "Уведомления и упоминания в одном списке.";
+"NOTIF_SEARCH_BAR_TITLE" = "Строка поиска";
+"NOTIF_SEARCH_BAR_DETAIL" = "Поиск по уведомлениям в верхней части списка.";
+"NOTIF_SEARCH_BAR_DETAIL_HELD" = "Нужны «Единые уведомления».";
 "NOTIF_SEARCH_PLACEHOLDER" = "Поиск";
 "NOTIF_SEARCH_EMPTY_TITLE" = "Ничего не найдено";
 "NOTIF_SEARCH_EMPTY_BODY" = "Здесь нет уведомлений со словами «%@».";

@@ -583,7 +583,10 @@
 "HIDE_NOTIFICATIONS_TITLE" = "Mitteilungen ausblenden";
 "HIDE_NOTIFICATIONS_DETAIL" = "Blende eine Mitteilung mit ihrem × aus. Das Auge listet sie auf.";
 "UNIFIED_NOTIFICATIONS_TITLE" = "Einheitliche Mitteilungen";
-"UNIFIED_NOTIFICATIONS_DETAIL" = "Mitteilungen und Erwähnungen in einer durchsuchbaren Liste.";
+"UNIFIED_NOTIFICATIONS_DETAIL" = "Mitteilungen und Erwähnungen in einer Liste.";
+"NOTIF_SEARCH_BAR_TITLE" = "Suchleiste";
+"NOTIF_SEARCH_BAR_DETAIL" = "Durchsuche Mitteilungen oben in der Liste.";
+"NOTIF_SEARCH_BAR_DETAIL_HELD" = "Braucht Einheitliche Mitteilungen.";
 "NOTIF_SEARCH_PLACEHOLDER" = "Suchen";
 "NOTIF_SEARCH_EMPTY_TITLE" = "Keine Ergebnisse";
 "NOTIF_SEARCH_EMPTY_BODY" = "Keine Mitteilung hier enthält „%@“.";

@@ -103,6 +103,7 @@ typedef NS_ENUM(NSInteger, PFBCompatOption) {
     PFBCompat_flex_twitter,
     PFBCompat_hide_notifications,
     PFBCompat_unified_notifications,
+    PFBCompat_notif_search_bar,
     PFBCompat_enable_liquid_glass,
     PFBCompat_dark_mode_style,
     PFBCompat_accent_color,

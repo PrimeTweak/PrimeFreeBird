@@ -409,6 +409,7 @@ static NSDictionary<NSString*, NSDictionary*>* PFBSettingsPages(void) {
                     @{@"type": @"header", @"titleKey": @"MESSAGES_GROUP_NOTIFICATIONS", @"icon": @"notifications_stroke"},
                     @{@"key": @"hide_notifications", @"default": @YES},
                     @{@"key": @"unified_notifications", @"default": @NO},
+                    @{@"key": @"notif_search_bar", @"default": @NO, @"disabledUnless": @"unified_notifications"},
                     @{@"type": @"header", @"titleKey": @"MESSAGES_GROUP_CHAT", @"icon": @"chat_bubble_stroke"},
                     @{
                         @"key": @"hide_suggested_chats",

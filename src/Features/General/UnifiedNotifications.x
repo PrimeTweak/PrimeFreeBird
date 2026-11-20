@@ -1,6 +1,6 @@
-// Unified notifications: Notifications stays on All, which already lists every notification,
-// mentions included, and Chat's search field, in a room of Chat's height, takes the place of the
-// All and Mentions row. Read once per launch, as Twitter builds the screen once.
+// Unified notifications: Notifications stays on All, which already lists every notification, mentions
+// included, and the All and Mentions row gives way, in a room of Chat's height, to Chat's search field
+// with Search bar on, or to nothing. Both are read once per launch, as Twitter builds the screen once.
 
 #import "Support/HookHelpers.h"
 #import "Support/Helpers.h"
@@ -22,7 +22,7 @@ static const NSInteger kPFBSearchPanelTag = 90318;
 // Chat's room under its bar, measured: the row is held at this height.
 static const CGFloat kPFBUnifiedRoomHeight = 60.0;
 
-static const char* kPFBSearchBarKey = "pfbSearchBar";
+static const char* kPFBUnifiedCoverKey = "pfbUnifiedCover";
 static const char* kPFBSearchListKey = "pfbSearchList";
 static const char* kPFBSearchPanelKey = "pfbSearchPanel";
 static const char* kPFBSearchRowKey = "pfbSearchRow";
@@ -40,6 +40,15 @@ static BOOL PFBUnifiedOn(void) {
     static dispatch_once_t once;
     dispatch_once(&once, ^{
       on = [PFBSettings boolForKey:@"unified_notifications"];
+    });
+    return on;
+}
+
+static BOOL PFBSearchOn(void) {
+    static BOOL on;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+      on = PFBUnifiedOn() && [PFBSettings boolForKey:@"notif_search_bar"];
     });
     return on;
 }
@@ -196,7 +205,7 @@ static BOOL PFBSearchKeeps(id model) {
 
 // A list of the Notifications screen, settled once its screen is known.
 static BOOL PFBSearchOwnsList(id list) {
-    if (!PFBUnifiedOn() || ![list isKindOfClass:[UIViewController class]]) {
+    if (!PFBSearchOn() || ![list isKindOfClass:[UIViewController class]]) {
         return NO;
     }
     NSNumber* known = objc_getAssociatedObject(list, kPFBSearchListKey);
@@ -245,7 +254,7 @@ static void PFBSearchSyncPanel(UITableView* table) {
     NSString* title = [bundle localizedStringForKey:@"NOTIF_SEARCH_EMPTY_TITLE"];
     NSString* body = [NSString stringWithFormat:[bundle localizedStringForKey:@"NOTIF_SEARCH_EMPTY_BODY"], gPFBSearchQuery];
     if (!panel) {
-        panel = PFBNotifEmptyPanel(title, body);
+        panel = PFBNotifEmptyPanel(@"search_stroke", title, body);
         panel.tag = kPFBSearchPanelTag;
         objc_setAssociatedObject(table, kPFBSearchPanelKey, panel, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     } else {
@@ -270,7 +279,7 @@ static void PFBSearchApply(UITableView* table, BOOL toTop) {
     }
     PFBSearchSyncPanel(table);
     if (gPFBSearchQuery.length) {
-        PFBCOMPAT_ACTION(PFBCompat_unified_notifications, @"list searched");
+        PFBCOMPAT_ACTION(PFBCompat_notif_search_bar, @"list searched");
     }
 }
 
@@ -478,15 +487,15 @@ static void PFBUnifiedCollectRows(UIView* root, CGRect zone, UIView** best, CGFl
 @implementation PFBUnifiedRowRef
 @end
 
-// The row's own pieces give way to the field, which fills the row.
-static void PFBUnifiedCoverRow(UIView* row, PFBNotifSearchBar* bar) {
+// The row's own pieces give way to its cover, the field or an empty view, which fills the row.
+static void PFBUnifiedCoverRow(UIView* row, UIView* cover) {
     for (UIView* sub in row.subviews) {
-        if (sub != bar) {
+        if (sub != cover) {
             sub.hidden = YES;
         }
     }
-    bar.frame = row.bounds;
-    [row bringSubviewToFront:bar];
+    cover.frame = row.bounds;
+    [row bringSubviewToFront:cover];
 }
 
 // Sends the segmented screen to its first page and keeps the pager there.
@@ -553,18 +562,25 @@ static void PFBUnifiedInstall(UIViewController* screen) {
         ref.row = row;
         objc_setAssociatedObject(screen, kPFBSearchRowKey, ref, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     }
-    PFBNotifSearchBar* bar = objc_getAssociatedObject(row, kPFBSearchBarKey);
-    if (!bar) {
-        bar = [[PFBNotifSearchBar alloc] initWithFrame:row.bounds];
+    UIView* cover = objc_getAssociatedObject(row, kPFBUnifiedCoverKey);
+    if (!cover && PFBSearchOn()) {
+        PFBNotifSearchBar* bar = [[PFBNotifSearchBar alloc] initWithFrame:row.bounds];
         bar.screen = screen;
         if (gPFBSearchQuery.length) {
             bar.field.text = gPFBSearchQuery;
         }
-        [row addSubview:bar];
-        objc_setAssociatedObject(row, kPFBSearchBarKey, bar, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-        PFBCOMPAT_ACTION(PFBCompat_unified_notifications, @"search field in place of the tabs");
+        cover = bar;
+        PFBCOMPAT_ACTION(PFBCompat_notif_search_bar, @"search field in place of the tabs");
+    } else if (!cover) {
+        cover = [[UIView alloc] initWithFrame:row.bounds];
+        PFBCOMPAT_OBSERVE(PFBCompat_notif_search_bar, @"room under the bar left empty");
     }
-    PFBUnifiedCoverRow(row, bar);
+    if (!cover.superview) {
+        [row addSubview:cover];
+        objc_setAssociatedObject(row, kPFBUnifiedCoverKey, cover, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        PFBCOMPAT_ACTION(PFBCompat_unified_notifications, @"tabs taken off the row");
+    }
+    PFBUnifiedCoverRow(row, cover);
     PFBUnifiedHoldPager(PFBUnifiedObjectIvar(screen, "$__lazy_storage_$_segmentedController"));
 }
 
@@ -574,6 +590,8 @@ static void PFBUnifiedInstall(UIViewController* screen) {
     %orig;
     if (PFBUnifiedOn()) {
         PFBUnifiedInstall((UIViewController*)self);
+    } else {
+        PFBCOMPAT_OBSERVE(PFBCompat_notif_search_bar, @"held while Unified notifications is off");
     }
 }
 
@@ -599,14 +617,14 @@ static void PFBUnifiedInstall(UIViewController* screen) {
 
 %end
 
-// The row keeps the field over its own pieces, which Twitter lays out again on each pass.
+// The row keeps its cover over its own pieces, which Twitter lays out again on each pass.
 %hook _TtC10TFNUISwift25LegacySegmentedTabBarView
 
 - (void)layoutSubviews {
     %orig;
-    PFBNotifSearchBar* bar = objc_getAssociatedObject(self, kPFBSearchBarKey);
-    if (bar) {
-        PFBUnifiedCoverRow((UIView*)self, bar);
+    UIView* cover = objc_getAssociatedObject(self, kPFBUnifiedCoverKey);
+    if (cover) {
+        PFBUnifiedCoverRow((UIView*)self, cover);
     }
 }
 

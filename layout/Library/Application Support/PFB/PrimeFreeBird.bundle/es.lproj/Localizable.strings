@@ -583,7 +583,10 @@
 "HIDE_NOTIFICATIONS_TITLE" = "Ocultar notificaciones";
 "HIDE_NOTIFICATIONS_DETAIL" = "Oculta una notificación con su ×. El ojo las enumera.";
 "UNIFIED_NOTIFICATIONS_TITLE" = "Notificaciones unificadas";
-"UNIFIED_NOTIFICATIONS_DETAIL" = "Notificaciones y menciones en una sola lista que puedes buscar.";
+"UNIFIED_NOTIFICATIONS_DETAIL" = "Notificaciones y menciones en una sola lista.";
+"NOTIF_SEARCH_BAR_TITLE" = "Barra de búsqueda";
+"NOTIF_SEARCH_BAR_DETAIL" = "Busca notificaciones desde arriba de la lista.";
+"NOTIF_SEARCH_BAR_DETAIL_HELD" = "Requiere Notificaciones unificadas.";
 "NOTIF_SEARCH_PLACEHOLDER" = "Buscar";
 "NOTIF_SEARCH_EMPTY_TITLE" = "Sin resultados";
 "NOTIF_SEARCH_EMPTY_BODY" = "Ninguna notificación aquí contiene «%@».";

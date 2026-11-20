@@ -737,10 +737,10 @@ NSURL* PFBAccountAvatarURL(TFNTwitterAccount* account) {
             PFBGlassRefreshBottomFade();
         }
 
-        // None applies in full at once: Record activity and Unified notifications are read at launch, the
-        // Tweet button keeps its glyph until it reloads its icon, and the glass bar sizes its pill at launch.
+        // None applies in full at once: Record activity, Unified notifications and its search bar are read at
+        // launch, the Tweet button keeps its glyph until it reloads its icon, and the glass bar sizes its pill at launch.
         if ([key isEqualToString:@"restore_tweet_button"] || [key isEqualToString:@"debug_tools"] ||
-            [key isEqualToString:@"unified_notifications"] ||
+            [key isEqualToString:@"unified_notifications"] || [key isEqualToString:@"notif_search_bar"] ||
             ([key isEqualToString:@"restore_tab_labels"] && PFBNativeGlassAsked())) {
             [self showRestartRequiredAlert];
         }

@@ -583,7 +583,10 @@
 "HIDE_NOTIFICATIONS_TITLE" = "通知を非表示";
 "HIDE_NOTIFICATIONS_DETAIL" = "通知は×で非表示にできます。目のアイコンで一覧を表示します。";
 "UNIFIED_NOTIFICATIONS_TITLE" = "通知をまとめる";
-"UNIFIED_NOTIFICATIONS_DETAIL" = "通知とメンションを、検索できる1つのリストにまとめます。";
+"UNIFIED_NOTIFICATIONS_DETAIL" = "通知とメンションを1つのリストにまとめます。";
+"NOTIF_SEARCH_BAR_TITLE" = "検索バー";
+"NOTIF_SEARCH_BAR_DETAIL" = "リストの上から通知を検索できます。";
+"NOTIF_SEARCH_BAR_DETAIL_HELD" = "「通知をまとめる」が必要です。";
 "NOTIF_SEARCH_PLACEHOLDER" = "検索";
 "NOTIF_SEARCH_EMPTY_TITLE" = "結果なし";
 "NOTIF_SEARCH_EMPTY_BODY" = "「%@」に一致する通知はありません。";

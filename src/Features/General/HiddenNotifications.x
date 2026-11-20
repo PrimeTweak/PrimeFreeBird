@@ -642,67 +642,87 @@ static void PFBNotifRecordVerdict(id dataViewController, BOOL sawNotification,
 
 // MARK: - the empty panel
 
-// Two UILabels in a container, nothing borrowed: an internal view such as
-// TFNEmptyStateView carries invariants unknowable from outside, and a bad access
-// is not caught by @try. Anchored on the sweep's verdict.
+// A glyph over two centered labels in a container, laid out as Chat's empty inbox. Chat's view is only
+// read: an internal view carries invariants unknowable from outside, and a bad access is not caught by @try.
 
 static const NSInteger kPFBNotifEmptyTag = 90315;
 static const NSInteger kPFBNotifEmptyTitleTag = 90316;
 static const NSInteger kPFBNotifEmptyBodyTag = 90317;
+static const NSInteger kPFBNotifEmptyGlyphTag = 90319;
+static const void* kPFBNotifGlyphNameKey = &kPFBNotifGlyphNameKey;
+static const void* kPFBNotifGlyphDrawnKey = &kPFBNotifGlyphDrawnKey;
 
-// Declares textDetailsColor, the palette color of Twitter's secondary text, which
-// the headers lack, so it can be asked of Twitter's palette; never created.
-@interface PFBNotifPaletteShim : NSObject
-- (UIColor*)textDetailsColor;
-@end
+// Until Chat's empty inbox is read, the values measured on a capture of it: a 48 pt glyph, a 17 pt bold
+// title 16 pt under it, a 15 pt line 14 pt under that, wrapped 32 pt from each side.
+static const CGFloat kPFBNotifEmptyGlyphSize = 48.0;
+static const CGFloat kPFBNotifEmptyTitleSize = 17.0;
+static const CGFloat kPFBNotifEmptyBodySize = 15.0;
+static const CGFloat kPFBNotifEmptyTitleGap = 16.0;
+static const CGFloat kPFBNotifEmptyBodyGap = 14.0;
+static const CGFloat kPFBNotifEmptySideInset = 32.0;
 
-// The secondary gray Twitter draws with, taken from the live palette so it
-// follows light and dark. secondaryLabelColor is warmer and reads as a different
-// color beside the native empty state.
-static UIColor* PFBNotifDetailColor(void) {
-    Class settingsClass = objc_getClass("TAEColorSettings");
-    if (settingsClass) {
-        id settings = [settingsClass sharedSettings];
-        id current = [settings currentColorPalette];
-        id palette = [current colorPalette];
-        if ([palette respondsToSelector:@selector(textDetailsColor)]) {
-            UIColor* color = [(PFBNotifPaletteShim*)palette textDetailsColor];
-            if ([color isKindOfClass:[UIColor class]]) {
-                return color;
-            }
-        }
-    }
-    return [UIColor secondaryLabelColor];
-}
-
-// Twitter's empty-state face: Heavy for the title from Twitter's font group, as the
-// settings screens use it; Chirp Bold or Regular otherwise.
-static UIFont* PFBNotifEmptyFont(CGFloat size, BOOL heavy) {
-    id group = [PFBManager sharedFontGroup];
-    TFNUIDefaultFontGroup* fonts = (TFNUIDefaultFontGroup*)group;
-    if (heavy && [group respondsToSelector:@selector(heavyFontOfSize:)]) {
-        UIFont* font = [fonts heavyFontOfSize:size];
-        if ([font isKindOfClass:[UIFont class]]) {
-            return font;
-        }
-    }
-    if (!heavy && [group respondsToSelector:@selector(fontOfSize:)]) {
+// Chirp as Twitter's font group gives it, bold for the title.
+static UIFont* PFBNotifEmptyFont(CGFloat size, BOOL bold) {
+    TFNUIDefaultFontGroup* fonts = (TFNUIDefaultFontGroup*)[PFBManager sharedFontGroup];
+    if (!bold && [fonts respondsToSelector:@selector(fontOfSize:)]) {
         UIFont* font = [fonts fontOfSize:size];
         if ([font isKindOfClass:[UIFont class]]) {
             return font;
         }
     }
-    return heavy ? PFBScaledFont([TwitterChirpFont(TwitterFontStyleBold) fontWithSize:size])
-                 : PFBScaledFont([TwitterChirpFont(TwitterFontStyleRegular) fontWithSize:size]);
+    return PFBScaledFont([TwitterChirpFont(bold ? TwitterFontStyleBold : TwitterFontStyleRegular) fontWithSize:size]);
 }
 
-// Geometry and type taken from the native empty state: 18 pt of side inset, a
-// 30 pt title face, a 15 pt body face and an 8 pt gap between them.
-static const CGFloat kPFBNotifEmptyTopInset = 36.0;
-static const CGFloat kPFBNotifEmptySideInset = 18.0;
-static const CGFloat kPFBNotifEmptyGap = 8.0;
-static const CGFloat kPFBNotifEmptyTitleSize = 30.0;
-static const CGFloat kPFBNotifEmptyBodySize = 15.0;
+// Chat's empty inbox as Twitter lays it out, read off its own view and kept for later launches: the
+// glyph's size, each line's font and colors, the gaps, the width the lines wrap to and how far the
+// whole sits from the middle of the list.
+static NSString* const kPFBChatEmptyLayoutKey = @"PFBChatEmptyLayout";
+static NSDictionary* gPFBChatEmptyLayout;
+
+static NSDictionary* PFBChatEmptyLayout(void) {
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+      if (!gPFBChatEmptyLayout) {
+          gPFBChatEmptyLayout = [[NSUserDefaults standardUserDefaults] dictionaryForKey:kPFBChatEmptyLayoutKey];
+      }
+    });
+    return gPFBChatEmptyLayout;
+}
+
+static NSArray<NSNumber*>* PFBNotifColorParts(UIColor* color, UIUserInterfaceStyle style) {
+    UIColor* resolved = [color resolvedColorWithTraitCollection:[UITraitCollection traitCollectionWithUserInterfaceStyle:style]];
+    CGFloat r = 0.0, g = 0.0, b = 0.0, a = 0.0;
+    return [resolved getRed:&r green:&g blue:&b alpha:&a] ? @[ @(r), @(g), @(b), @(a) ] : @[];
+}
+
+// A color read in light and dark, given back as one that follows the appearance.
+static UIColor* PFBNotifColorFromParts(NSArray* light, NSArray* dark, UIColor* fallback) {
+    if (![light isKindOfClass:[NSArray class]] || ![dark isKindOfClass:[NSArray class]] || light.count != 4 || dark.count != 4) {
+        return fallback;
+    }
+    UIColor* lightColor = [UIColor colorWithRed:[light[0] doubleValue] green:[light[1] doubleValue] blue:[light[2] doubleValue] alpha:[light[3] doubleValue]];
+    UIColor* darkColor = [UIColor colorWithRed:[dark[0] doubleValue] green:[dark[1] doubleValue] blue:[dark[2] doubleValue] alpha:[dark[3] doubleValue]];
+    return [UIColor colorWithDynamicProvider:^UIColor*(UITraitCollection* traits) {
+      return traits.userInterfaceStyle == UIUserInterfaceStyleDark ? darkColor : lightColor;
+    }];
+}
+
+static NSDictionary* PFBNotifFontParts(UIFont* font) {
+    NSNumber* weight = font.fontDescriptor.fontAttributes[UIFontDescriptorTraitsAttribute][UIFontWeightTrait];
+    BOOL bold = (font.fontDescriptor.symbolicTraits & UIFontDescriptorTraitBold) != 0;
+    return @{@"name" : font.fontName ?: @"", @"size" : @(font.pointSize), @"weight" : weight ?: @(bold ? UIFontWeightBold : UIFontWeightRegular)};
+}
+
+// System fonts go by their weight, as their private names give Times; any other font by its name.
+static UIFont* PFBNotifFontFromParts(NSDictionary* parts, UIFont* fallback) {
+    NSString* name = [parts isKindOfClass:[NSDictionary class]] ? parts[@"name"] : nil;
+    CGFloat size = [parts[@"size"] doubleValue];
+    if (![name isKindOfClass:[NSString class]] || !name.length || size <= 0.0) {
+        return fallback;
+    }
+    UIFont* font = [name hasPrefix:@"."] ? [UIFont systemFontOfSize:size weight:[parts[@"weight"] doubleValue]] : [UIFont fontWithName:name size:size];
+    return font ?: fallback;
+}
 
 static const char* kPFBNotifRestInsetKey = "pfbNotifRestInset";
 static const char* kPFBNotifPanelKey = "pfbNotifPanel";
@@ -745,15 +765,18 @@ static BOOL PFBNotifListMoving(UITableView* table) {
     return table.tracking || table.dragging || table.decelerating;
 }
 
-// The panel's top: below the bars, moved with the list as Twitter's own empty text is, down on a
-// pull and up on a push. A jump up with no finger on the list, as after a refresh, leaves it at rest.
-static CGFloat PFBNotifPanelTop(UITableView* table) {
+// The panel's top: centered in the list between its bars as Chat's empty inbox is, then moved with the list
+// as Twitter's own empty text is, down on a pull and up on a push. A jump up with no finger on the list, as
+// after a refresh, leaves it at rest.
+static CGFloat PFBNotifPanelTop(UITableView* table, CGFloat height) {
     CGFloat rest = PFBNotifRestInset(table);
     CGFloat moved = -table.contentOffset.y - rest;
     if (moved < 0.0 && !PFBNotifListMoving(table)) {
         moved = 0.0;
     }
-    return rest + kPFBNotifEmptyTopInset + moved;
+    CGFloat bottom = CGRectGetHeight(table.bounds) - table.adjustedContentInset.bottom;
+    CGFloat center = (rest + bottom) / 2.0 + [PFBChatEmptyLayout()[@"offset"] doubleValue];
+    return center - height / 2.0 + moved;
 }
 
 // The panel sits behind the list, in its background view, so the list's jumps do not carry it.
@@ -767,26 +790,47 @@ static UIView* PFBNotifPanelHost(UITableView* table) {
     return table.backgroundView;
 }
 
-// Frames rather than Auto Layout, below the bars at rest, in the background view's space.
+// Frames rather than Auto Layout, in the background view's space: Chat's sizes, fonts, colors and gaps
+// once read, the measured ones before.
 static void PFBNotifLayoutEmptyPanel(UIView* panel, UITableView* table) {
+    UIImageView* glyph = (UIImageView*)[panel viewWithTag:kPFBNotifEmptyGlyphTag];
     UILabel* title = (UILabel*)[panel viewWithTag:kPFBNotifEmptyTitleTag];
     UILabel* body = (UILabel*)[panel viewWithTag:kPFBNotifEmptyBodyTag];
-    if (![title isKindOfClass:[UILabel class]] ||
-        ![body isKindOfClass:[UILabel class]]) {
+    if (![glyph isKindOfClass:[UIImageView class]] || ![title isKindOfClass:[UILabel class]] || ![body isKindOfClass:[UILabel class]]) {
         return;
     }
+    NSDictionary* chat = PFBChatEmptyLayout();
     CGFloat tableWidth = CGRectGetWidth(table.bounds);
-    CGFloat width = tableWidth - (kPFBNotifEmptySideInset * 2.0);
-    if (width < 80.0) {
-        return;                       // no room to read anything; leave as is
+    CGFloat wrap = MIN(tableWidth - kPFBNotifEmptySideInset, MAX([chat[@"wrapWidth"] doubleValue], tableWidth - kPFBNotifEmptySideInset * 2.0));
+    if (wrap < 80.0) {
+        return;    // no room to read anything; leave as is
     }
-    body.textColor = PFBNotifDetailColor();
-    CGSize titleSize = [title sizeThatFits:CGSizeMake(width, CGFLOAT_MAX)];
-    CGSize bodySize = [body sizeThatFits:CGSizeMake(width, CGFLOAT_MAX)];
-    title.frame = CGRectMake(0.0, 0.0, width, ceil(titleSize.height));
-    body.frame = CGRectMake(0.0, CGRectGetMaxY(title.frame) + kPFBNotifEmptyGap,
-                            width, ceil(bodySize.height));
-    panel.frame = CGRectMake(kPFBNotifEmptySideInset, PFBNotifPanelTop(table), width, CGRectGetMaxY(body.frame));
+    title.font = PFBNotifFontFromParts(chat[@"titleFont"], PFBNotifEmptyFont(kPFBNotifEmptyTitleSize, YES));
+    body.font = PFBNotifFontFromParts(chat[@"bodyFont"], PFBNotifEmptyFont(kPFBNotifEmptyBodySize, NO));
+    title.textColor = PFBNotifColorFromParts(chat[@"titleLight"], chat[@"titleDark"], [UIColor labelColor]);
+    body.textColor = PFBNotifColorFromParts(chat[@"bodyLight"], chat[@"bodyDark"], [UIColor secondaryLabelColor]);
+    glyph.tintColor = PFBNotifColorFromParts(chat[@"glyphLight"], chat[@"glyphDark"], title.textColor);
+    CGSize size = CGSizeMake([chat[@"glyphWidth"] doubleValue], [chat[@"glyphHeight"] doubleValue]);
+    if (size.width < 1.0 || size.height < 1.0) {
+        size = CGSizeMake(kPFBNotifEmptyGlyphSize, kPFBNotifEmptyGlyphSize);
+    }
+    NSString* name = objc_getAssociatedObject(panel, kPFBNotifGlyphNameKey);
+    NSString* drawn = [NSString stringWithFormat:@"%@ %.1fx%.1f", name, size.width, size.height];
+    if (name && ![objc_getAssociatedObject(glyph, kPFBNotifGlyphDrawnKey) isEqualToString:drawn] &&
+        [UIImage respondsToSelector:@selector(tfn_vectorImageNamed:fitsSize:fillColor:)]) {
+        UIImage* image = [UIImage tfn_vectorImageNamed:name fitsSize:size fillColor:[UIColor blackColor]];
+        glyph.image = [image isKindOfClass:[UIImage class]] ? [image imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate] : nil;
+        objc_setAssociatedObject(glyph, kPFBNotifGlyphDrawnKey, drawn, OBJC_ASSOCIATION_COPY_NONATOMIC);
+    }
+    CGFloat titleGap = chat ? [chat[@"titleGap"] doubleValue] : kPFBNotifEmptyTitleGap;
+    CGFloat bodyGap = chat ? [chat[@"bodyGap"] doubleValue] : kPFBNotifEmptyBodyGap;
+    CGSize titleSize = [title sizeThatFits:CGSizeMake(wrap, CGFLOAT_MAX)];
+    CGSize bodySize = [body sizeThatFits:CGSizeMake(wrap, CGFLOAT_MAX)];
+    glyph.frame = CGRectMake((tableWidth - size.width) / 2.0, 0.0, size.width, size.height);
+    title.frame = CGRectMake((tableWidth - wrap) / 2.0, CGRectGetMaxY(glyph.frame) + titleGap, wrap, ceil(titleSize.height));
+    body.frame = CGRectMake((tableWidth - wrap) / 2.0, CGRectGetMaxY(title.frame) + bodyGap, wrap, ceil(bodySize.height));
+    CGFloat height = CGRectGetMaxY(body.frame);
+    panel.frame = CGRectMake(0.0, PFBNotifPanelTop(table, height), tableWidth, height);
 }
 
 // The panel weakly, for the list's layout passes.
@@ -810,7 +854,7 @@ static void PFBNotifLayoutEmptyPanel(UIView* panel, UITableView* table) {
         return;
     }
     CGRect frame = panel.frame;
-    frame.origin.y = PFBNotifPanelTop((UITableView*)self);
+    frame.origin.y = PFBNotifPanelTop((UITableView*)self, CGRectGetHeight(frame));
     if (CGRectEqualToRect(frame, panel.frame)) {
         return;
     }
@@ -829,25 +873,23 @@ static void PFBNotifLayoutEmptyPanel(UIView* panel, UITableView* table) {
 
 %end
 
-// Twitter's empty-state face for a notifications list: a heavy title over a gray line.
-UIView* PFBNotifEmptyPanel(NSString* titleText, NSString* bodyText) {
+// One of Twitter's glyphs over a title and a line, all centered.
+UIView* PFBNotifEmptyPanel(NSString* glyphName, NSString* titleText, NSString* bodyText) {
     UIView* panel = [[UIView alloc] init];
     panel.userInteractionEnabled = NO;    // never blocks a pull-to-refresh
     panel.autoresizingMask = UIViewAutoresizingFlexibleWidth;
-    UILabel* title = [[UILabel alloc] init];
-    title.tag = kPFBNotifEmptyTitleTag;
-    title.font = PFBNotifEmptyFont(kPFBNotifEmptyTitleSize, YES);
-    title.textColor = [UIColor labelColor];
-    title.textAlignment = NSTextAlignmentNatural;
-    title.numberOfLines = 0;
-    [panel addSubview:title];
-    UILabel* body = [[UILabel alloc] init];
-    body.tag = kPFBNotifEmptyBodyTag;
-    body.font = PFBNotifEmptyFont(kPFBNotifEmptyBodySize, NO);
-    body.textColor = PFBNotifDetailColor();
-    body.textAlignment = NSTextAlignmentNatural;
-    body.numberOfLines = 0;
-    [panel addSubview:body];
+    objc_setAssociatedObject(panel, kPFBNotifGlyphNameKey, glyphName, OBJC_ASSOCIATION_COPY_NONATOMIC);
+    UIImageView* glyph = [[UIImageView alloc] init];
+    glyph.tag = kPFBNotifEmptyGlyphTag;
+    glyph.contentMode = UIViewContentModeCenter;
+    [panel addSubview:glyph];
+    for (NSNumber* tag in @[ @(kPFBNotifEmptyTitleTag), @(kPFBNotifEmptyBodyTag) ]) {
+        UILabel* label = [[UILabel alloc] init];
+        label.tag = tag.integerValue;
+        label.textAlignment = NSTextAlignmentCenter;
+        label.numberOfLines = 0;
+        [panel addSubview:label];
+    }
     PFBNotifSetEmptyPanelText(panel, titleText, bodyText);
     return panel;
 }
@@ -868,6 +910,91 @@ void PFBNotifPlaceEmptyPanel(UIView* panel, UITableView* table) {
     }
     PFBNotifLayoutEmptyPanel(panel, table);
 }
+
+// Chat's empty inbox at rest: its glyph, then its two lines, the topmost first, against the list it sits
+// in between that list's bars. Read again on each layout, kept when it changes.
+static void PFBNotifReadChatEmpty(UIView* empty) {
+    UIView* list = empty.superview;
+    while (list && ![list isKindOfClass:[UIScrollView class]]) {
+        list = list.superview;
+    }
+    UIScrollView* scroll = (UIScrollView*)list;
+    if (!empty.window || scroll.tracking || scroll.dragging || scroll.decelerating ||
+        (scroll && fabs(scroll.contentOffset.y + scroll.adjustedContentInset.top) > 0.5)) {
+        return;
+    }
+    __block UIImageView* glyph = nil;
+    NSMutableArray<UILabel*>* lines = [NSMutableArray array];
+    PFBWalkAllSubviews(empty, 6, ^(UIView* view) {
+      if (view.hidden || view.alpha < 0.01) {
+          return;
+      }
+      if ([view isKindOfClass:[UIImageView class]] && ((UIImageView*)view).image && CGRectGetWidth(view.bounds) > CGRectGetWidth(glyph.bounds)) {
+          glyph = (UIImageView*)view;
+      } else if ([view isKindOfClass:[UILabel class]] && ((UILabel*)view).text.length) {
+          [lines addObject:(UILabel*)view];
+      }
+    });
+    [lines sortUsingComparator:^NSComparisonResult(UILabel* one, UILabel* other) {
+      return [@(CGRectGetMinY([one convertRect:one.bounds toView:nil])) compare:@(CGRectGetMinY([other convertRect:other.bounds toView:nil]))];
+    }];
+    if (!glyph || lines.count < 2) {
+        PFBCompatMeasure(@"hidden notifications",
+                         [NSString stringWithFormat:@"Chat's empty state not read: glyph %d, %lu lines", glyph != nil, (unsigned long)lines.count], 2);
+        return;
+    }
+    UILabel* title = lines[0];
+    UILabel* body = lines[1];
+    CGRect g = [glyph convertRect:glyph.bounds toView:nil];
+    CGRect t = [title convertRect:title.bounds toView:nil];
+    CGRect b = [body convertRect:body.bounds toView:nil];
+    CGRect area = scroll ? UIEdgeInsetsInsetRect([scroll convertRect:scroll.bounds toView:nil],
+                                                 UIEdgeInsetsMake(scroll.adjustedContentInset.top, 0.0, scroll.adjustedContentInset.bottom, 0.0))
+                         : [empty convertRect:empty.bounds toView:nil];
+    BOOL template = glyph.image.renderingMode == UIImageRenderingModeAlwaysTemplate;
+    UIColor* glyphColor = template ? glyph.tintColor : title.textColor;
+    NSDictionary* layout = @{
+        @"glyphWidth" : @(CGRectGetWidth(g)),
+        @"glyphHeight" : @(CGRectGetHeight(g)),
+        @"glyphLight" : PFBNotifColorParts(glyphColor, UIUserInterfaceStyleLight),
+        @"glyphDark" : PFBNotifColorParts(glyphColor, UIUserInterfaceStyleDark),
+        @"titleFont" : PFBNotifFontParts(title.font),
+        @"titleLight" : PFBNotifColorParts(title.textColor, UIUserInterfaceStyleLight),
+        @"titleDark" : PFBNotifColorParts(title.textColor, UIUserInterfaceStyleDark),
+        @"bodyFont" : PFBNotifFontParts(body.font),
+        @"bodyLight" : PFBNotifColorParts(body.textColor, UIUserInterfaceStyleLight),
+        @"bodyDark" : PFBNotifColorParts(body.textColor, UIUserInterfaceStyleDark),
+        @"titleGap" : @(CGRectGetMinY(t) - CGRectGetMaxY(g)),
+        @"bodyGap" : @(CGRectGetMinY(b) - CGRectGetMaxY(t)),
+        @"wrapWidth" : @(MAX(CGRectGetWidth(t), CGRectGetWidth(b))),
+        @"offset" : @((CGRectGetMinY(g) + CGRectGetMaxY(b)) / 2.0 - CGRectGetMidY(area)),
+    };
+    if ([layout isEqualToDictionary:PFBChatEmptyLayout() ?: @{}]) {
+        return;
+    }
+    gPFBChatEmptyLayout = layout;
+    [[NSUserDefaults standardUserDefaults] setObject:layout forKey:kPFBChatEmptyLayoutKey];
+    PFBCompatMeasure(@"hidden notifications",
+                     [NSString stringWithFormat:@"Chat's empty state read: glyph %.1fx%.1f%@, title %@ %.1f, body %@ %.1f, gaps %.1f and %.1f, "
+                                                @"wrap %.1f, offset %.1f, area %.0f-%.0f",
+                                                CGRectGetWidth(g), CGRectGetHeight(g), template ? @" template" : @"", title.font.fontName,
+                                                title.font.pointSize, body.font.fontName, body.font.pointSize, CGRectGetMinY(t) - CGRectGetMaxY(g),
+                                                CGRectGetMinY(b) - CGRectGetMaxY(t), MAX(CGRectGetWidth(t), CGRectGetWidth(b)),
+                                                [layout[@"offset"] doubleValue], CGRectGetMinY(area), CGRectGetMaxY(area)],
+                     6);
+}
+
+%hook _TtC6ChatUI18ChatEmptyStateView
+
+- (void)layoutSubviews {
+    %orig;
+    @try {
+        PFBNotifReadChatEmpty((UIView*)self);
+    } @catch (__unused id exception) {
+    }
+}
+
+%end
 
 static void PFBNotifSyncEmptyState(id dataViewController) {
     if (!dataViewController) {
@@ -956,7 +1083,7 @@ static void PFBNotifSyncEmptyState(id dataViewController) {
         }
 
         PFBBundle* bundle = [PFBBundle sharedBundle];
-        UIView* panel = PFBNotifEmptyPanel([bundle localizedStringForKey:@"HIDDEN_NOTIFS_EMPTY_TITLE"],
+        UIView* panel = PFBNotifEmptyPanel(@"notifications_stroke", [bundle localizedStringForKey:@"HIDDEN_NOTIFS_EMPTY_TITLE"],
                                            [bundle localizedStringForKey:@"HIDDEN_NOTIFS_EMPTY_BODY"]);
         panel.tag = kPFBNotifEmptyTag;
 

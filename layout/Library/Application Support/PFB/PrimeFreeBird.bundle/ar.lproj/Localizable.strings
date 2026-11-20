@@ -583,7 +583,10 @@
 "HIDE_NOTIFICATIONS_TITLE" = "إخفاء الإشعارات";
 "HIDE_NOTIFICATIONS_DETAIL" = "أخفِ إشعارًا بعلامة ×. تعرضها العين.";
 "UNIFIED_NOTIFICATIONS_TITLE" = "إشعارات موحدة";
-"UNIFIED_NOTIFICATIONS_DETAIL" = "الإشعارات والإشارات في قائمة واحدة يمكن البحث فيها.";
+"UNIFIED_NOTIFICATIONS_DETAIL" = "الإشعارات والإشارات في قائمة واحدة.";
+"NOTIF_SEARCH_BAR_TITLE" = "شريط البحث";
+"NOTIF_SEARCH_BAR_DETAIL" = "ابحث في الإشعارات من أعلى القائمة.";
+"NOTIF_SEARCH_BAR_DETAIL_HELD" = "يتطلب خيار الإشعارات الموحدة.";
 "NOTIF_SEARCH_PLACEHOLDER" = "بحث";
 "NOTIF_SEARCH_EMPTY_TITLE" = "لا توجد نتائج";
 "NOTIF_SEARCH_EMPTY_BODY" = "لا يوجد إشعار هنا يطابق «%@».";

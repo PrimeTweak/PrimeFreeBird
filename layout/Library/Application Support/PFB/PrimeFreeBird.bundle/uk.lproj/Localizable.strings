@@ -583,7 +583,10 @@
 "HIDE_NOTIFICATIONS_TITLE" = "Приховувати сповіщення";
 "HIDE_NOTIFICATIONS_DETAIL" = "Приховайте сповіщення його ×. Око показує їх список.";
 "UNIFIED_NOTIFICATIONS_TITLE" = "Єдині сповіщення";
-"UNIFIED_NOTIFICATIONS_DETAIL" = "Сповіщення та згадки в одному списку з пошуком.";
+"UNIFIED_NOTIFICATIONS_DETAIL" = "Сповіщення та згадки в одному списку.";
+"NOTIF_SEARCH_BAR_TITLE" = "Рядок пошуку";
+"NOTIF_SEARCH_BAR_DETAIL" = "Пошук сповіщень у верхній частині списку.";
+"NOTIF_SEARCH_BAR_DETAIL_HELD" = "Потрібні «Єдині сповіщення».";
 "NOTIF_SEARCH_PLACEHOLDER" = "Пошук";
 "NOTIF_SEARCH_EMPTY_TITLE" = "Нічого не знайдено";
 "NOTIF_SEARCH_EMPTY_BODY" = "Тут немає сповіщень зі словами «%@».";

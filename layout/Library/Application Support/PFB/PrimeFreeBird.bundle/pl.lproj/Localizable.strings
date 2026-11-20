@@ -583,7 +583,10 @@
 "HIDE_NOTIFICATIONS_TITLE" = "Ukryj powiadomienia";
 "HIDE_NOTIFICATIONS_DETAIL" = "Ukryj powiadomienie jego ×. Oko je wymienia.";
 "UNIFIED_NOTIFICATIONS_TITLE" = "Ujednolicone powiadomienia";
-"UNIFIED_NOTIFICATIONS_DETAIL" = "Powiadomienia i wzmianki na jednej liście, którą można przeszukać.";
+"UNIFIED_NOTIFICATIONS_DETAIL" = "Powiadomienia i wzmianki na jednej liście.";
+"NOTIF_SEARCH_BAR_TITLE" = "Pasek wyszukiwania";
+"NOTIF_SEARCH_BAR_DETAIL" = "Szukaj powiadomień u góry listy.";
+"NOTIF_SEARCH_BAR_DETAIL_HELD" = "Wymaga opcji Ujednolicone powiadomienia.";
 "NOTIF_SEARCH_PLACEHOLDER" = "Szukaj";
 "NOTIF_SEARCH_EMPTY_TITLE" = "Brak wyników";
 "NOTIF_SEARCH_EMPTY_BODY" = "Żadne powiadomienie tutaj nie zawiera „%@”.";
