@@ -2075,27 +2075,24 @@ void pfbReapplyTimelineFilter(void) {
 
 // MARK: - Home refresh fade
 
-// When Home refreshes, from a pull or on its own at launch, Twitter swaps the Tweets on screen in one
-// frame as the refresh ends. With Smooth refresh on, in the seconds around that, the list as it was is
-// laid over the new one and faded out in 0.3 s.
+// When Home refreshes, from a pull or on its own at launch or from the Home tab, Twitter swaps the Tweets on
+// screen in one frame as the refresh ends. With Smooth refresh on, in the seconds around that, the list as it
+// was is laid over the new one and faded out in 0.3 s.
 static CFTimeInterval gPFBRefreshPulledAt = -1000.0;
 static CFTimeInterval gPFBRefreshStartedAt = -1000.0;
 static CFTimeInterval gPFBRefreshLandedAt = -1000.0;
 static const void* kPFBRefreshFadeKey = &kPFBRefreshFadeKey;
 static const NSTimeInterval kPFBRefreshFadeDuration = 0.3;
 
-// Open from a pull until 2 s after its refresh ends, 15 s at most. A refresh Twitter starts itself opens
-// it 1 s in: Home's first Tweets at launch come within 0.3 s of that start, its swap 3.5 s in (measured).
+// Open from the start of a refresh, pulled or started by Twitter, until 2 s after it ends, 15 s at most.
 static BOOL PFBRefreshFadeOpen(CFTimeInterval now) {
-    if (gPFBRefreshStartedAt > gPFBRefreshPulledAt && now - gPFBRefreshStartedAt < 1.0) {
-        return NO;
-    }
     CFTimeInterval began = MAX(gPFBRefreshPulledAt, gPFBRefreshStartedAt);
     return (now - began < 15.0 && gPFBRefreshLandedAt < began) || now - gPFBRefreshLandedAt < 2.0;
 }
 
 // Called as Twitter hands Home new sections, before they show. Skipped while the list moves, where a
-// still picture would trail behind it. Each hand-over at rest is noted for its refresh, on or off.
+// still picture would trail behind it, and on Home's first Tweets at launch, which replace an empty list.
+// Each hand-over at rest is noted for its refresh, on or off.
 static void PFBRefreshFadeBegin(TFNItemsDataViewController* controller) {
     CFTimeInterval now = CACurrentMediaTime();
     if (!PFBRefreshFadeOpen(now) || !PFBReadingIsHomeTimeline(controller)) {
@@ -2106,7 +2103,8 @@ static void PFBRefreshFadeBegin(TFNItemsDataViewController* controller) {
         return;
     }
     PFBCompatReach(gPFBRefreshStartedAt > gPFBRefreshPulledAt ? PFBCompatPath_refresh_fade_own : PFBCompatPath_refresh_fade_pull);
-    if (![PFBSettings boolForKey:@"refresh_fade"] || objc_getAssociatedObject(list, kPFBRefreshFadeKey)) {
+    if (PFBReadingItemCount(controller.sections) == 0 || ![PFBSettings boolForKey:@"refresh_fade"] ||
+        objc_getAssociatedObject(list, kPFBRefreshFadeKey)) {
         return;
     }
     UIView* still = [list snapshotViewAfterScreenUpdates:NO];
