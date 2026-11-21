@@ -722,18 +722,31 @@ static UIColor* PFBNotifColorFromParts(NSArray* light, NSArray* dark, UIColor* f
     }];
 }
 
+// A font kept by its whole descriptor, as Twitter's variable Chirp is named only for one instance.
 static NSDictionary* PFBNotifFontParts(UIFont* font) {
     NSNumber* weight = font.fontDescriptor.fontAttributes[UIFontDescriptorTraitsAttribute][UIFontWeightTrait];
     BOOL bold = (font.fontDescriptor.symbolicTraits & UIFontDescriptorTraitBold) != 0;
-    return @{@"name" : font.fontName ?: @"", @"size" : @(font.pointSize), @"weight" : weight ?: @(bold ? UIFontWeightBold : UIFontWeightRegular)};
+    NSData* descriptor = font ? [NSKeyedArchiver archivedDataWithRootObject:font.fontDescriptor requiringSecureCoding:YES error:nil] : nil;
+    return @{
+        @"name" : font.fontName ?: @"",
+        @"size" : @(font.pointSize),
+        @"weight" : weight ?: @(bold ? UIFontWeightBold : UIFontWeightRegular),
+        @"descriptor" : descriptor ?: [NSData data],
+    };
 }
 
-// System fonts go by their weight, as their private names give Times; any other font by its name.
+// The kept descriptor first; then system fonts by their weight, as their private names give Times, and any
+// other font by its name.
 static UIFont* PFBNotifFontFromParts(NSDictionary* parts, UIFont* fallback) {
     NSString* name = [parts isKindOfClass:[NSDictionary class]] ? parts[@"name"] : nil;
     CGFloat size = [parts[@"size"] doubleValue];
     if (![name isKindOfClass:[NSString class]] || !name.length || size <= 0.0) {
         return fallback;
+    }
+    NSData* data = [parts[@"descriptor"] isKindOfClass:[NSData class]] ? parts[@"descriptor"] : nil;
+    UIFontDescriptor* descriptor = data.length ? [NSKeyedUnarchiver unarchivedObjectOfClass:[UIFontDescriptor class] fromData:data error:nil] : nil;
+    if (descriptor) {
+        return [UIFont fontWithDescriptor:descriptor size:size];
     }
     UIFont* font = [name hasPrefix:@"."] ? [UIFont systemFontOfSize:size weight:[parts[@"weight"] doubleValue]] : [UIFont fontWithName:name size:size];
     return font ?: fallback;
@@ -811,10 +824,55 @@ static CGRect PFBNotifInkInView(UIImageView* view) {
     return CGRectMake(x + CGRectGetMinX(ink) * sx, y + CGRectGetMinY(ink) * sy, CGRectGetWidth(ink) * sx, CGRectGetHeight(ink) * sy);
 }
 
-// A label's first baseline from its top: UILabel centers its text in its height.
-static CGFloat PFBNotifFirstBaseline(UILabel* label) {
-    CGRect text = [label textRectForBounds:label.bounds limitedToNumberOfLines:label.numberOfLines];
-    return (CGRectGetHeight(label.bounds) - CGRectGetHeight(text)) / 2.0 + label.font.ascender;
+// A line of Chat's empty inbox is a label or, for the line under the title, a text view.
+static BOOL PFBNotifIsTextLine(UIView* view) {
+    return ([view isKindOfClass:[UILabel class]] && ((UILabel*)view).text.length) ||
+           ([view isKindOfClass:[UITextView class]] && ((UITextView*)view).text.length);
+}
+
+static UIFont* PFBNotifLineFont(UIView* line) {
+    if ([line isKindOfClass:[UILabel class]]) {
+        return ((UILabel*)line).font;
+    }
+    UITextView* text = (UITextView*)line;
+    return text.font ?: [text.attributedText attribute:NSFontAttributeName atIndex:0 effectiveRange:NULL];
+}
+
+static UIColor* PFBNotifLineColor(UIView* line) {
+    if ([line isKindOfClass:[UILabel class]]) {
+        return ((UILabel*)line).textColor;
+    }
+    UITextView* text = (UITextView*)line;
+    return text.textColor ?: [text.attributedText attribute:NSForegroundColorAttributeName atIndex:0 effectiveRange:NULL];
+}
+
+// The text's height and its first baseline from the line's top: a label centers its text in its height, a
+// text view sets it under its top inset.
+static CGFloat PFBNotifLineTextHeight(UIView* line) {
+    if ([line isKindOfClass:[UILabel class]]) {
+        UILabel* label = (UILabel*)line;
+        return CGRectGetHeight([label textRectForBounds:label.bounds limitedToNumberOfLines:label.numberOfLines]);
+    }
+    UITextView* text = (UITextView*)line;
+    return text.contentSize.height - text.textContainerInset.top - text.textContainerInset.bottom;
+}
+
+static CGFloat PFBNotifLineBaseline(UIView* line) {
+    UIFont* font = PFBNotifLineFont(line);
+    if ([line isKindOfClass:[UILabel class]]) {
+        return (CGRectGetHeight(line.bounds) - PFBNotifLineTextHeight(line)) / 2.0 + font.ascender;
+    }
+    return ((UITextView*)line).textContainerInset.top + font.ascender;
+}
+
+// The width a line wraps its words to.
+static CGFloat PFBNotifLineWrap(UIView* line) {
+    if ([line isKindOfClass:[UILabel class]]) {
+        return CGRectGetWidth(line.bounds);
+    }
+    UITextView* text = (UITextView*)line;
+    UIEdgeInsets inset = text.textContainerInset;
+    return CGRectGetWidth(text.bounds) - inset.left - inset.right - 2.0 * text.textContainer.lineFragmentPadding;
 }
 
 // Twitter's glyph drawn so its ink is as tall as Chat's, its ink kept with it; drawn again only when
@@ -1024,7 +1082,7 @@ void PFBNotifPlaceEmptyPanel(UIView* panel, UITableView* table) {
 }
 
 // Chat's empty inbox at rest: its glyph, then its two lines, the topmost first, placed from the screen's
-// middle. Read again on each layout, kept when it changes.
+// middle. Read again on each layout, kept when it changes; the fonts as they come back from what is kept.
 static void PFBNotifReadChatEmpty(UIView* empty) {
     UIView* list = empty.superview;
     while (list && ![list isKindOfClass:[UIScrollView class]]) {
@@ -1036,18 +1094,18 @@ static void PFBNotifReadChatEmpty(UIView* empty) {
         return;
     }
     __block UIImageView* glyph = nil;
-    NSMutableArray<UILabel*>* lines = [NSMutableArray array];
+    NSMutableArray<UIView*>* lines = [NSMutableArray array];
     PFBWalkAllSubviews(empty, 6, ^(UIView* view) {
       if (view.hidden || view.alpha < 0.01) {
           return;
       }
       if ([view isKindOfClass:[UIImageView class]] && ((UIImageView*)view).image && CGRectGetWidth(view.bounds) > CGRectGetWidth(glyph.bounds)) {
           glyph = (UIImageView*)view;
-      } else if ([view isKindOfClass:[UILabel class]] && ((UILabel*)view).text.length) {
-          [lines addObject:(UILabel*)view];
+      } else if (PFBNotifIsTextLine(view)) {
+          [lines addObject:view];
       }
     });
-    [lines sortUsingComparator:^NSComparisonResult(UILabel* one, UILabel* other) {
+    [lines sortUsingComparator:^NSComparisonResult(UIView* one, UIView* other) {
       return [@(CGRectGetMinY([one convertRect:one.bounds toView:nil])) compare:@(CGRectGetMinY([other convertRect:other.bounds toView:nil]))];
     }];
     CGRect inkInGlyph = glyph ? PFBNotifInkInView(glyph) : CGRectNull;
@@ -1058,45 +1116,52 @@ static void PFBNotifReadChatEmpty(UIView* empty) {
                          2);
         return;
     }
-    UILabel* title = lines[0];
-    UILabel* body = lines[1];
+    UIView* title = lines[0];
+    UIView* body = lines[1];
+    UIFont* titleFont = PFBNotifLineFont(title);
+    UIFont* bodyFont = PFBNotifLineFont(body);
+    UIColor* titleColor = PFBNotifLineColor(title);
+    UIColor* bodyColor = PFBNotifLineColor(body);
     CGFloat middle = CGRectGetHeight(empty.window.bounds) / 2.0;
     CGRect ink = [glyph convertRect:inkInGlyph toView:nil];
-    CGRect t = [title convertRect:title.bounds toView:nil];
-    CGRect b = [body convertRect:body.bounds toView:nil];
-    CGFloat titleBase = CGRectGetMinY(t) + PFBNotifFirstBaseline(title);
-    CGFloat titleLast = titleBase + CGRectGetHeight([title textRectForBounds:title.bounds limitedToNumberOfLines:title.numberOfLines]) -
-                        title.font.lineHeight;
-    CGFloat bodyBase = CGRectGetMinY(b) + PFBNotifFirstBaseline(body);
+    CGFloat titleBase = CGRectGetMinY([title convertRect:title.bounds toView:nil]) + PFBNotifLineBaseline(title);
+    CGFloat titleLast = titleBase + PFBNotifLineTextHeight(title) - titleFont.lineHeight;
+    CGFloat bodyBase = CGRectGetMinY([body convertRect:body.bounds toView:nil]) + PFBNotifLineBaseline(body);
+    CGFloat wrap = MAX(PFBNotifLineWrap(title), PFBNotifLineWrap(body));
     BOOL template = glyph.image.renderingMode == UIImageRenderingModeAlwaysTemplate;
-    UIColor* glyphColor = template ? glyph.tintColor : title.textColor;
+    UIColor* glyphColor = template ? glyph.tintColor : titleColor;
     NSDictionary* layout = @{
         @"glyphInk" : @(CGRectGetHeight(ink)),
         @"glyphMid" : @(CGRectGetMidY(ink) - middle),
         @"glyphLight" : PFBNotifColorParts(glyphColor, UIUserInterfaceStyleLight),
         @"glyphDark" : PFBNotifColorParts(glyphColor, UIUserInterfaceStyleDark),
-        @"titleFont" : PFBNotifFontParts(title.font),
-        @"titleLight" : PFBNotifColorParts(title.textColor, UIUserInterfaceStyleLight),
-        @"titleDark" : PFBNotifColorParts(title.textColor, UIUserInterfaceStyleDark),
+        @"titleFont" : PFBNotifFontParts(titleFont),
+        @"titleLight" : PFBNotifColorParts(titleColor, UIUserInterfaceStyleLight),
+        @"titleDark" : PFBNotifColorParts(titleColor, UIUserInterfaceStyleDark),
         @"titleBase" : @(titleBase - middle),
-        @"bodyFont" : PFBNotifFontParts(body.font),
-        @"bodyLight" : PFBNotifColorParts(body.textColor, UIUserInterfaceStyleLight),
-        @"bodyDark" : PFBNotifColorParts(body.textColor, UIUserInterfaceStyleDark),
+        @"bodyFont" : PFBNotifFontParts(bodyFont),
+        @"bodyLight" : PFBNotifColorParts(bodyColor, UIUserInterfaceStyleLight),
+        @"bodyDark" : PFBNotifColorParts(bodyColor, UIUserInterfaceStyleDark),
         @"bodyStep" : @(bodyBase - titleLast),
-        @"wrapWidth" : @(MAX(CGRectGetWidth(t), CGRectGetWidth(b))),
+        @"wrapWidth" : @(wrap),
     };
     if ([layout isEqualToDictionary:PFBChatEmptyLayout() ?: @{}]) {
         return;
     }
     gPFBChatEmptyLayout = layout;
     [[NSUserDefaults standardUserDefaults] setObject:layout forKey:kPFBChatEmptyLayoutKey];
+    UIFont* titleKept = PFBNotifFontFromParts(layout[@"titleFont"], nil);
+    UIFont* bodyKept = PFBNotifFontFromParts(layout[@"bodyFont"], nil);
     PFBCompatMeasure(@"hidden notifications",
-                     [NSString stringWithFormat:@"Chat's empty state read: glyph ink %.1f in %.0fx%.0f (image %.0fx%.0f, mode %ld%@), title %@ %.1f, "
-                                                @"body %@ %.1f, from the screen's middle: ink %.1f, title baseline %.1f, line %.1f under it, wrap %.1f",
+                     [NSString stringWithFormat:@"Chat's empty state read: glyph ink %.1f in %.0fx%.0f (image %.0fx%.0f, mode %ld%@), title %@ %@ %.1f "
+                                                @"(kept as %@ %.1f), body %@ %@ %.1f (kept as %@ %.1f), from the screen's middle: ink %.1f, "
+                                                @"title baseline %.1f, line %.1f under it, wrap %.1f",
                                                 CGRectGetHeight(ink), CGRectGetWidth(glyph.bounds), CGRectGetHeight(glyph.bounds), glyph.image.size.width,
-                                                glyph.image.size.height, (long)glyph.contentMode, template ? @", template" : @"", title.font.fontName,
-                                                title.font.pointSize, body.font.fontName, body.font.pointSize, CGRectGetMidY(ink) - middle,
-                                                titleBase - middle, bodyBase - titleLast, MAX(CGRectGetWidth(t), CGRectGetWidth(b))],
+                                                glyph.image.size.height, (long)glyph.contentMode, template ? @", template" : @"",
+                                                NSStringFromClass(title.class), titleFont.fontName, titleFont.pointSize, titleKept.fontName ?: @"none",
+                                                titleKept.pointSize, NSStringFromClass(body.class), bodyFont.fontName, bodyFont.pointSize,
+                                                bodyKept.fontName ?: @"none", bodyKept.pointSize, CGRectGetMidY(ink) - middle, titleBase - middle,
+                                                bodyBase - titleLast, wrap],
                      6);
 }
 
