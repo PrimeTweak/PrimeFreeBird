@@ -2090,9 +2090,9 @@ static BOOL PFBRefreshFadeOpen(CFTimeInterval now) {
     return (now - began < 15.0 && gPFBRefreshLandedAt < began) || now - gPFBRefreshLandedAt < 2.0;
 }
 
-// Called as Twitter hands Home new sections, before they show; skipped while the list moves and on Home's
-// first Tweets at launch. A hand-over during a fade starts it again from a new picture of the list, which
-// shows what the screen does. Each hand-over at rest is noted for its refresh, on or off.
+// Called from each of Twitter's three hand-overs of Home's sections, before they show; skipped while the list
+// moves and on Home's first Tweets at launch. A hand-over during a fade starts it again from a new picture
+// of the list, which shows what the screen does. Each hand-over at rest is noted for its refresh.
 static void PFBRefreshFadeBegin(TFNItemsDataViewController* controller) {
     CFTimeInterval now = CACurrentMediaTime();
     if (!PFBRefreshFadeOpen(now) || !PFBReadingIsHomeTimeline(controller)) {
@@ -2158,6 +2158,7 @@ static void PFBRefreshFadeBegin(TFNItemsDataViewController* controller) {
 %hook TFNItemsDataViewController
 
 - (void)setSections:(NSArray*)sections restoreScrollPosition:(BOOL)restoreScrollPosition {
+    PFBRefreshFadeBegin(self);
     BOOL keepPlace = restoreScrollPosition;
     NSArray* filtered = FilteredTimelineSections(self, sections);
     if (PFBReadingIsHomeTimeline(self)) {
@@ -2185,6 +2186,7 @@ static void PFBRefreshFadeBegin(TFNItemsDataViewController* controller) {
     reconfigureItemIdentifiers:(NSArray*)identifiers
               withRowAnimation:(long long)animation
                     completion:(id)completion {
+    PFBRefreshFadeBegin(self);
     NSArray* filtered = FilteredTimelineSections(self, sections);
     if (PFBReadingMarkerAllowed(self)) {
         PFBReadingCaptureAnchor(self, filtered);
@@ -2193,7 +2195,7 @@ static void PFBRefreshFadeBegin(TFNItemsDataViewController* controller) {
     PFBReadingRescanSoon(self);
 }
 
-// Home's refreshes hand their new Tweets here, pulled or started by Twitter (measured).
+// Home's refreshes hand their new Tweets here first, pulled or started by Twitter (measured).
 - (void)setSections:(NSArray*)sections {
     PFBRefreshFadeBegin(self);
     %orig;
