@@ -2082,7 +2082,63 @@ static CFTimeInterval gPFBRefreshPulledAt = -1000.0;
 static CFTimeInterval gPFBRefreshStartedAt = -1000.0;
 static CFTimeInterval gPFBRefreshLandedAt = -1000.0;
 static const void* kPFBRefreshFadeKey = &kPFBRefreshFadeKey;
-static const NSTimeInterval kPFBRefreshFadeDuration = 0.3;
+static NSString* const kPFBRefreshFadeAnimationKey = @"pfbRefreshFade";
+static const CFTimeInterval kPFBRefreshFadeDuration = 0.3;
+
+// At launch, the fade's animation is taken off one frame in (measured), which cut the fade. The still's layer
+// keeps it until its end, and notes each time it did.
+@interface PFBRefreshFadeLayer : CALayer
+@property (nonatomic) BOOL pfbFadeEnded;
+@end
+
+@implementation PFBRefreshFadeLayer
+
+- (BOOL)pfbKeepsFade {
+    if (self.pfbFadeEnded || ![self animationForKey:kPFBRefreshFadeAnimationKey]) {
+        return NO;
+    }
+    CALayer* shown = self.presentationLayer ?: self;
+    PFBCompatMeasure(@"smooth refresh", [NSString stringWithFormat:@"fade kept at %.1f when its animation was taken off", shown.opacity], 3);
+    return YES;
+}
+
+- (void)removeAllAnimations {
+    if (![self pfbKeepsFade]) {
+        [super removeAllAnimations];
+        return;
+    }
+    for (NSString* key in self.animationKeys) {
+        if (![key isEqualToString:kPFBRefreshFadeAnimationKey]) {
+            [super removeAnimationForKey:key];
+        }
+    }
+}
+
+- (void)removeAnimationForKey:(NSString*)key {
+    if ([key isEqualToString:kPFBRefreshFadeAnimationKey] && [self pfbKeepsFade]) {
+        return;
+    }
+    [super removeAnimationForKey:key];
+}
+
+@end
+
+@interface PFBRefreshFadeView : UIView
+@end
+
+@implementation PFBRefreshFadeView
+
++ (Class)layerClass {
+    return [PFBRefreshFadeLayer class];
+}
+
+@end
+
+static void PFBRefreshFadeEnd(UIView* still) {
+    ((PFBRefreshFadeLayer*)still.layer).pfbFadeEnded = YES;
+    [still removeFromSuperview];
+    [still.layer removeAnimationForKey:kPFBRefreshFadeAnimationKey];
+}
 
 // Open from the start of a refresh, pulled or started by Twitter, until 2 s after it ends, 15 s at most.
 static BOOL PFBRefreshFadeOpen(CFTimeInterval now) {
@@ -2090,9 +2146,9 @@ static BOOL PFBRefreshFadeOpen(CFTimeInterval now) {
     return (now - began < 15.0 && gPFBRefreshLandedAt < began) || now - gPFBRefreshLandedAt < 2.0;
 }
 
-// Called from each of Twitter's three hand-overs of Home's sections, before they show; skipped while the list
-// moves and on Home's first Tweets at launch. A hand-over during a fade starts it again from a new picture
-// of the list, which shows what the screen does. Each hand-over at rest is noted for its refresh.
+// Called as Twitter hands Home its sections, before they show; skipped while the list moves and on Home's first
+// Tweets at launch. A hand-over during a fade starts it again from a new picture of the list, which shows what
+// the screen does. Each hand-over at rest is noted for its refresh.
 static void PFBRefreshFadeBegin(TFNItemsDataViewController* controller) {
     CFTimeInterval now = CACurrentMediaTime();
     if (!PFBRefreshFadeOpen(now) || !PFBReadingIsHomeTimeline(controller)) {
@@ -2106,30 +2162,46 @@ static void PFBRefreshFadeBegin(TFNItemsDataViewController* controller) {
     if (PFBReadingItemCount(controller.sections) == 0 || ![PFBSettings boolForKey:@"refresh_fade"]) {
         return;
     }
-    UIView* still = [list snapshotViewAfterScreenUpdates:NO];
-    if (!still) {
+    UIView* picture = [list snapshotViewAfterScreenUpdates:NO];
+    if (!picture) {
         return;
     }
-    still.frame = list.frame;
+    UIView* still = [[PFBRefreshFadeView alloc] initWithFrame:list.frame];
     still.userInteractionEnabled = NO;
+    picture.frame = still.bounds;
+    [still addSubview:picture];
     [list.superview insertSubview:still aboveSubview:list];
-    [(UIView*)objc_getAssociatedObject(list, kPFBRefreshFadeKey) removeFromSuperview];
+    UIView* earlier = objc_getAssociatedObject(list, kPFBRefreshFadeKey);
+    if (earlier) {
+        PFBRefreshFadeEnd(earlier);
+    }
     objc_setAssociatedObject(list, kPFBRefreshFadeKey, still, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     __weak UIScrollView* weakList = list;
     dispatch_async(dispatch_get_main_queue(), ^{
-      [UIView animateWithDuration:kPFBRefreshFadeDuration
-          delay:0
-          options:UIViewAnimationOptionCurveEaseInOut | UIViewAnimationOptionAllowUserInteraction
-          animations:^{
-            still.alpha = 0.0;
-          }
-          completion:^(BOOL finished) {
-            [still removeFromSuperview];
-            UIScrollView* laterList = weakList;
-            if (laterList && objc_getAssociatedObject(laterList, kPFBRefreshFadeKey) == still) {
-                objc_setAssociatedObject(laterList, kPFBRefreshFadeKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-            }
-          }];
+      if (!still.superview) {
+          return;
+      }
+      CABasicAnimation* fade = [CABasicAnimation animationWithKeyPath:@"opacity"];
+      fade.fromValue = @1.0f;
+      fade.toValue = @0.0f;
+      fade.duration = kPFBRefreshFadeDuration;
+      fade.timingFunction = [CAMediaTimingFunction functionWithName:kCAMediaTimingFunctionEaseInEaseOut];
+      CFTimeInterval started = CACurrentMediaTime();
+      [CATransaction begin];
+      [CATransaction setCompletionBlock:^{
+        CFTimeInterval lasted = CACurrentMediaTime() - started;
+        if (still.superview && lasted < kPFBRefreshFadeDuration - 0.05) {
+            PFBCompatMeasure(@"smooth refresh", [NSString stringWithFormat:@"fade ended after %.0f ms", lasted * 1000.0], 3);
+        }
+        PFBRefreshFadeEnd(still);
+        UIScrollView* laterList = weakList;
+        if (laterList && objc_getAssociatedObject(laterList, kPFBRefreshFadeKey) == still) {
+            objc_setAssociatedObject(laterList, kPFBRefreshFadeKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        }
+      }];
+      still.layer.opacity = 0.0f;
+      [still.layer addAnimation:fade forKey:kPFBRefreshFadeAnimationKey];
+      [CATransaction commit];
       PFBCOMPAT_ACTION(PFBCompat_refresh_fade, @"new Tweets faded in");
     });
 }
@@ -2158,7 +2230,6 @@ static void PFBRefreshFadeBegin(TFNItemsDataViewController* controller) {
 %hook TFNItemsDataViewController
 
 - (void)setSections:(NSArray*)sections restoreScrollPosition:(BOOL)restoreScrollPosition {
-    PFBRefreshFadeBegin(self);
     BOOL keepPlace = restoreScrollPosition;
     NSArray* filtered = FilteredTimelineSections(self, sections);
     if (PFBReadingIsHomeTimeline(self)) {
@@ -2186,7 +2257,6 @@ static void PFBRefreshFadeBegin(TFNItemsDataViewController* controller) {
     reconfigureItemIdentifiers:(NSArray*)identifiers
               withRowAnimation:(long long)animation
                     completion:(id)completion {
-    PFBRefreshFadeBegin(self);
     NSArray* filtered = FilteredTimelineSections(self, sections);
     if (PFBReadingMarkerAllowed(self)) {
         PFBReadingCaptureAnchor(self, filtered);
@@ -2195,7 +2265,7 @@ static void PFBRefreshFadeBegin(TFNItemsDataViewController* controller) {
     PFBReadingRescanSoon(self);
 }
 
-// Home's refreshes hand their new Tweets here first, pulled or started by Twitter (measured).
+// Home's refreshes hand their new Tweets here, pulled or started by Twitter, and nowhere else (measured).
 - (void)setSections:(NSArray*)sections {
     PFBRefreshFadeBegin(self);
     %orig;
