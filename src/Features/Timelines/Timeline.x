@@ -2090,9 +2090,9 @@ static BOOL PFBRefreshFadeOpen(CFTimeInterval now) {
     return (now - began < 15.0 && gPFBRefreshLandedAt < began) || now - gPFBRefreshLandedAt < 2.0;
 }
 
-// Called as Twitter hands Home new sections, before they show. Skipped while the list moves, where a
-// still picture would trail behind it, and on Home's first Tweets at launch, which replace an empty list.
-// Each hand-over at rest is noted for its refresh, on or off.
+// Called as Twitter hands Home new sections, before they show; skipped while the list moves and on Home's
+// first Tweets at launch. A hand-over during a fade starts it again from a new picture of the list, which
+// shows what the screen does. Each hand-over at rest is noted for its refresh, on or off.
 static void PFBRefreshFadeBegin(TFNItemsDataViewController* controller) {
     CFTimeInterval now = CACurrentMediaTime();
     if (!PFBRefreshFadeOpen(now) || !PFBReadingIsHomeTimeline(controller)) {
@@ -2103,8 +2103,7 @@ static void PFBRefreshFadeBegin(TFNItemsDataViewController* controller) {
         return;
     }
     PFBCompatReach(gPFBRefreshStartedAt > gPFBRefreshPulledAt ? PFBCompatPath_refresh_fade_own : PFBCompatPath_refresh_fade_pull);
-    if (PFBReadingItemCount(controller.sections) == 0 || ![PFBSettings boolForKey:@"refresh_fade"] ||
-        objc_getAssociatedObject(list, kPFBRefreshFadeKey)) {
+    if (PFBReadingItemCount(controller.sections) == 0 || ![PFBSettings boolForKey:@"refresh_fade"]) {
         return;
     }
     UIView* still = [list snapshotViewAfterScreenUpdates:NO];
@@ -2114,6 +2113,7 @@ static void PFBRefreshFadeBegin(TFNItemsDataViewController* controller) {
     still.frame = list.frame;
     still.userInteractionEnabled = NO;
     [list.superview insertSubview:still aboveSubview:list];
+    [(UIView*)objc_getAssociatedObject(list, kPFBRefreshFadeKey) removeFromSuperview];
     objc_setAssociatedObject(list, kPFBRefreshFadeKey, still, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     __weak UIScrollView* weakList = list;
     dispatch_async(dispatch_get_main_queue(), ^{
@@ -2126,7 +2126,7 @@ static void PFBRefreshFadeBegin(TFNItemsDataViewController* controller) {
           completion:^(BOOL finished) {
             [still removeFromSuperview];
             UIScrollView* laterList = weakList;
-            if (laterList) {
+            if (laterList && objc_getAssociatedObject(laterList, kPFBRefreshFadeKey) == still) {
                 objc_setAssociatedObject(laterList, kPFBRefreshFadeKey, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
             }
           }];
