@@ -1008,9 +1008,9 @@ function pfbWebAdsEngine(data) {
         }
     }
 
-    // A wall against ad blockers is a layer floating over at least a quarter of the screen whose short text
-    // names an ad blocker. It is taken off with its dimmed backdrop and the page's scroll lock, as soon as it
-    // shows during the page's first minute, and reported.
+    // A wall against ad blockers is a layer floating over at least a quarter of the screen whose text names an
+    // ad blocker and stays a small part of the page's. It is taken off with its dimmed backdrop and the page's
+    // scroll lock, as soon as it shows during the page's first minute, and reported.
     const wallWords = /\bad[\s-]?block|bloqueur|bloqueador|werbeblocker|blocco (?:degli |della )?(?:annunci|pubblicit)|advertentieblokker|blokowani\w* reklam/i;
     let root = document.documentElement;
     const styleOf = (node) => N.getComputedStyle.call(window, node);
@@ -1037,13 +1037,14 @@ function pfbWebAdsEngine(data) {
             return [];
         }
     };
-    // The outermost positioned layer around a node that holds the words and little else.
-    const wallOf = (node) => {
+    // The outermost positioned layer around a node that holds the words and little else. TVA's holds 1,861
+    // characters, against 76,361 for its page (measured).
+    const wallOf = (node, limit) => {
         let wall = null;
         let length = 0;
         for (let link = node; inPage(link); link = link.parentElement) {
             const text = textOf(link);
-            if (text.length > 1500 || (wall && text.length > length + 80)) {
+            if (text.length > limit || (wall && text.length > length + 80)) {
                 break;
             }
             const position = styleOf(link).position;
@@ -1094,12 +1095,14 @@ function pfbWebAdsEngine(data) {
         }
         for (let pass = 0; pass < 3; pass++) {
             let wall = null;
+            let limit = 0;
             const seen = new Set();
             for (const [x, y] of [[0.5, 0.5], [0.5, 0.3], [0.5, 0.7]]) {
                 for (const node of stackAt(innerWidth * x, innerHeight * y)) {
                     if (!wall && inPage(node) && !seen.has(node) && floating(node)) {
                         seen.add(node);
-                        wall = wallOf(node);
+                        limit = limit || Math.max(1500, textOf(document.body).length / 4);
+                        wall = wallOf(node, limit);
                     }
                 }
             }
