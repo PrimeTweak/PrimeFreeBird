@@ -656,7 +656,7 @@ const PFBOptionFingerprint PFBOptionFingerprints[] = {
     {"always_open_safari", "b878838a"},
     {"auto_highest_load", "394fdb9c"},
     {"bar_repairs", "1dd7476b"},
-    {"block_web_ads", "88789971"},
+    {"block_web_ads", "1321cf32"},
     {"bypass_age_verification", "394fdb9c"},
     {"classic_refresh", "394fdb9c"},
     {"classic_tweet_detail", "394fdb9c"},

@@ -1,6 +1,6 @@
-// Block web ads: EasyList, EasyPrivacy and Fanboy's Annoyance list, made by tools/easylist-webkit.py
-// into WebKit content blockers compiled once by iOS, and into rules for web-ads-engine.js, which
-// runs at the start of each page. Both leave X's own pages alone, the tweak's web views included.
+// Block web ads: EasyList, EasyPrivacy and Fanboy's Annoyance list, made by tools/easylist-webkit.py into
+// WebKit content blockers compiled once by iOS, and into rules for web-ads-engine.js, which runs at the start
+// of each page and takes off walls against ad blockers. Both leave X's own pages alone, the tweak's included.
 
 #import <WebKit/WebKit.h>
 #import <objc/runtime.h>
@@ -165,7 +165,8 @@ static void pfbWebAdsLoad(void) {
 
 @implementation PFBWebAdReports
 
-// A page's report, and a frame's only when it has errors; both come from the page's own world.
+// A page's report, a frame's only when it has errors, and each wall against ad blockers taken off;
+// all come from the page's own world.
 - (void)userContentController:(WKUserContentController*)controller didReceiveScriptMessage:(WKScriptMessage*)message {
     NSDictionary* body = [message.body isKindOfClass:[NSDictionary class]] ? message.body : nil;
     NSString* host = [body[@"host"] isKindOfClass:[NSString class]] ? body[@"host"] : nil;
@@ -178,6 +179,13 @@ static void pfbWebAdsLoad(void) {
             NSString* text = [error substringToIndex:MIN([error length], (NSUInteger)170)];
             PFBCompatMeasure(@"web ads engine", [NSString stringWithFormat:@"%@: %@", host, text], 20);
         }
+    }
+    NSString* wall = [body[@"what"] isKindOfClass:[NSString class]] ? body[@"what"] : nil;
+    if ([body[@"t"] isEqual:@"wall"] && wall.length) {
+        wall = [wall substringToIndex:MIN(wall.length, (NSUInteger)120)];
+        PFBCompatMeasure(@"web ads walls", [NSString stringWithFormat:@"%@: %@", host, wall], 20);
+        PFBCOMPAT_ACTION(PFBCompat_block_web_ads, @"ad-blocker wall taken off");
+        return;
     }
     if (![body[@"t"] isEqual:@"page"]) {
         return;

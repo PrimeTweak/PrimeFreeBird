@@ -1,6 +1,6 @@
 // Block web ads, page engine: applies at the start of each page what WebKit's content blockers
-// cannot express (page scripts, hiding by text, styles, policies), from web-ads-page.json.
-// It runs before the page's own scripts and reports what it did to the pfbWebAds handler.
+// cannot express (page scripts, hiding by text, styles, policies), from web-ads-page.json, and takes
+// off the walls sites raise against ad blockers. It reports what it did to the pfbWebAds handler.
 function pfbWebAdsEngine(data) {
     "use strict";
     const host = String(location.hostname || "").toLowerCase();
@@ -32,6 +32,8 @@ function pfbWebAdsEngine(data) {
         createElement: Document.prototype.createElement,
         MutationObserver: window.MutationObserver,
         parse: JSON.parse,
+        getComputedStyle: window.getComputedStyle,
+        elementsFromPoint: Document.prototype.elementsFromPoint,
     };
     const listen = (target, type, handler, options) => N.listen.call(target, type, handler, options);
     const channel = window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.pfbWebAds;
@@ -1005,6 +1007,146 @@ function pfbWebAdsEngine(data) {
             observer.observe(document, { childList: true, subtree: true });
         }
     }
+
+    // A wall against ad blockers is a layer floating over at least a quarter of the screen whose short text
+    // names an ad blocker. It is taken off with its dimmed backdrop and the page's scroll lock, as soon as it
+    // shows during the page's first minute, and reported.
+    const wallWords = /\bad[\s-]?block|bloqueur|bloqueador|werbeblocker|blocco (?:degli |della )?(?:annunci|pubblicit)|advertentieblokker|blokowani\w* reklam/i;
+    let root = document.documentElement;
+    const styleOf = (node) => N.getComputedStyle.call(window, node);
+    const textOf = (node) => (String(node.textContent || "") + (node.shadowRoot ? String(node.shadowRoot.textContent || "") : "")).trim();
+    const inPage = (node) => node && node !== document.body && node !== root;
+    const share = (node) => {
+        const box = node.getBoundingClientRect();
+        const width = Math.max(0, Math.min(box.right, innerWidth) - Math.max(box.left, 0));
+        const height = Math.max(0, Math.min(box.bottom, innerHeight) - Math.max(box.top, 0));
+        return (width * height) / (innerWidth * innerHeight);
+    };
+    const floating = (node) => {
+        for (let link = node; inPage(link); link = link.parentElement) {
+            if (styleOf(link).position === "fixed") {
+                return true;
+            }
+        }
+        return false;
+    };
+    const stackAt = (x, y) => {
+        try {
+            return N.elementsFromPoint.call(document, x, y).slice(0, 8);
+        } catch (error) {
+            return [];
+        }
+    };
+    // The outermost positioned layer around a node that holds the words and little else.
+    const wallOf = (node) => {
+        let wall = null;
+        let length = 0;
+        for (let link = node; inPage(link); link = link.parentElement) {
+            const text = textOf(link);
+            if (text.length > 1500 || (wall && text.length > length + 80)) {
+                break;
+            }
+            const position = styleOf(link).position;
+            if ((position === "fixed" || position === "absolute") && wallWords.test(text)) {
+                wall = link;
+                length = text.length;
+            }
+        }
+        return wall && share(wall) >= 0.25 ? wall : null;
+    };
+    const describe = (node) => {
+        const kind = typeof node.className === "string" ? node.className.trim().split(/\s+/)[0] : "";
+        return (node.tagName.toLowerCase() + (node.id ? "#" + node.id : "") + (kind ? "." + kind : "")).slice(0, 60);
+    };
+    // What is left over most of the screen without words, once the wall is gone, is its backdrop.
+    const clearBackdrops = () => {
+        let cleared = 0;
+        for (const node of stackAt(innerWidth / 2, innerHeight / 2).slice(0, 4)) {
+            const style = styleOf(node);
+            const tinted = style.backgroundColor !== "rgba(0, 0, 0, 0)" && style.backgroundColor !== "transparent";
+            const blurred = (style.backdropFilter || style.webkitBackdropFilter || "none") !== "none";
+            if (inPage(node) && style.position === "fixed" && share(node) >= 0.8 && textOf(node).length < 20 && (tinted || blurred)) {
+                node.remove();
+                cleared++;
+            }
+        }
+        return cleared;
+    };
+    const freeScroll = () => {
+        let freed = false;
+        for (const node of [root, document.body]) {
+            const style = node && styleOf(node);
+            if (style && style.overflowY === "hidden") {
+                node.style.setProperty("overflow-y", "auto", "important");
+                freed = true;
+            }
+            if (style && node === document.body && style.position === "fixed") {
+                node.style.setProperty("position", "static", "important");
+                freed = true;
+            }
+        }
+        return freed;
+    };
+    let walls = 0;
+    const checkWalls = () => {
+        if (!document.body) {
+            return;
+        }
+        for (let pass = 0; pass < 3; pass++) {
+            let wall = null;
+            const seen = new Set();
+            for (const [x, y] of [[0.5, 0.5], [0.5, 0.3], [0.5, 0.7]]) {
+                for (const node of stackAt(innerWidth * x, innerHeight * y)) {
+                    if (!wall && inPage(node) && !seen.has(node) && floating(node)) {
+                        seen.add(node);
+                        wall = wallOf(node);
+                    }
+                }
+            }
+            if (!wall) {
+                break;
+            }
+            const words = (wallWords.exec(textOf(wall)) || [""])[0];
+            const what = describe(wall) + ' ("' + words + '")';
+            wall.remove();
+            const backdrops = clearBackdrops();
+            walls++;
+            if (walls <= 3) {
+                post({ t: "wall", host, what: what + (backdrops ? ", " + backdrops + " backdrop" : "") + (freeScroll() ? ", scroll freed" : "") });
+            }
+        }
+        if (walls) {
+            freeScroll();
+        }
+    };
+    // Frames smaller than a screen's corner, such as an ad's, are left alone.
+    whenReady(() => {
+        root = document.documentElement;
+        if (innerWidth < 200 || innerHeight < 200) {
+            return;
+        }
+        let waiting = false;
+        const observer = new N.MutationObserver(() => {
+            if (!waiting) {
+                waiting = true;
+                N.setTimeout(() => {
+                    waiting = false;
+                    checkWalls();
+                }, 100);
+            }
+        });
+        observer.observe(root, { childList: true, subtree: true, attributes: true, attributeFilter: ["class", "style"] });
+        let seconds = 60;
+        const every = () => {
+            checkWalls();
+            if (--seconds > 0) {
+                N.setTimeout(every, 1000);
+            } else {
+                observer.disconnect();
+            }
+        };
+        every();
+    });
 
     let sent = false;
     const send = () => {
