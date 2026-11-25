@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
-"""Turns EasyList, EasyPrivacy and Fanboy's Annoyance list (uBlock Origin edition) into Block web
-ads: WebKit content-blocker lists, and the rules of its page engine, web-ads-engine.js.
+"""Turns EasyList, EasyPrivacy and Fanboy's Annoyance list (uBlock Origin edition), then the tweak's own
+list, into Block web ads: WebKit content-blocker lists, and the rules of its page engine, web-ads-engine.js.
 
-Usage: easylist-webkit.py EASYLIST OUTPUT_DIR
+Usage: easylist-webkit.py EASYLIST OUTPUT_DIR [OWN_LIST]
 EASYLIST is an EasyList checkout (its easylist, easyprivacy and fanboy-annoyance-uBO templates are
-followed) or a single filter list. OUTPUT_DIR receives web-ads.json, web-ads-N.json and web-ads-page.json.
+followed) or a single filter list. OWN_LIST is the tweak's list, primefreebird-list.txt beside this
+script by default; its WebKit rules make web-ads-pfb-N.json, apart from EasyList's web-ads-N.json, so
+neither list's exceptions undo the other's rules. OUTPUT_DIR also receives web-ads.json and web-ads-page.json.
 
 Each list carries the exceptions that can apply to it and ends by leaving X's own pages alone;
 generic hiding, :has() selectors and the ping type have lists of their own. The page engine takes
@@ -490,12 +492,12 @@ def csp_rule(line, engine):
     return True
 
 
-def main(source, output):
+def build(lines, engine, trusted, generichide_sites):
+    """One list's WebKit lists, each a body and the exceptions that close it; its page rules go to engine."""
     made_rules_of = {"block": [], "exception": [], "generichide": [], "elemhide": []}
     generic, generic_allowed, site_allowed, specific = [], set(), {}, {}
-    engine, trusted, generichide_sites = Engine(), set(), set()
     skipped = 0
-    for raw in read_lines(source):
+    for raw in lines:
         line = raw.strip()
         if not line or line.startswith(("!", "[")):
             continue
@@ -567,20 +569,36 @@ def main(source, output):
         (blocks + hides[(False, False)], elemhide + exceptions),
         (ping_blocks, ping_exceptions + [rule for rule in exceptions if "resource-type" not in rule["trigger"]]),
     ]
+    print("block %d (ping %d), exceptions %d, generichide %d, elemhide %d, generic selectors %d, "
+          "hiding rules %d (:has %d), skipped %d"
+          % (len(blocks), len(ping_blocks), len(exceptions), len(generichide), len(elemhide), len(generic),
+             sum(len(rules) for rules in hides.values()), len(hides[(True, True)]) + len(hides[(False, True)]),
+             skipped))
+    return layouts
+
+
+def main(source, output, own):
+    engine, trusted, generichide_sites = Engine(), set(), set()
     closing = {"trigger": {"url-filter": ".*", "if-domain": X_DOMAINS}, "action": IGNORE}
     os.makedirs(output, exist_ok=True)
     for name in os.listdir(output):
-        if re.match(r"^web-ads(-\d+|-page)?\.json$", name):
+        if re.match(r"^web-ads(-pfb)?(-\d+|-page)?\.json$", name):
             os.remove(os.path.join(output, name))
     names, digest = [], hashlib.sha256()
-    for body, tail in layouts:
-        for start in range(0, len(body), RULES_PER_LIST):
-            text = json.dumps(body[start:start + RULES_PER_LIST] + tail + [closing], separators=(",", ":"))
-            digest.update(text.encode())
-            name = "web-ads-%d.json" % (len(names) + 1)
-            with open(os.path.join(output, name), "w", encoding="utf-8") as out:
-                out.write(text)
-            names.append(name)
+    sources = [("web-ads-%d.json", read_lines(source))]
+    if own:
+        sources.append(("web-ads-pfb-%d.json", read_lines(own)))
+    for pattern, lines in sources:
+        made = 0
+        for body, tail in build(lines, engine, trusted, generichide_sites):
+            for start in range(0, len(body), RULES_PER_LIST):
+                text = json.dumps(body[start:start + RULES_PER_LIST] + tail + [closing], separators=(",", ":"))
+                digest.update(text.encode())
+                made += 1
+                name = pattern % made
+                with open(os.path.join(output, name), "w", encoding="utf-8") as out:
+                    out.write(text)
+                names.append(name)
     with open(os.path.join(output, "web-ads.json"), "w", encoding="utf-8") as out:
         json.dump({"version": digest.hexdigest()[:12], "lists": names}, out)
     page = engine.data(trusted, generichide_sites)
@@ -589,14 +607,11 @@ def main(source, output):
     kinds = {}
     for rule in page["rules"]:
         kinds[rule[0]] = kinds.get(rule[0], 0) + 1
-    print("block %d (ping %d), exceptions %d, generichide %d, elemhide %d, generic selectors %d, "
-          "hiding rules %d (:has %d), lists %d, page rules %s, skipped %d"
-          % (len(blocks), len(ping_blocks), len(exceptions), len(generichide), len(elemhide), len(generic),
-             sum(len(rules) for rules in hides.values()), len(hides[(True, True)]) + len(hides[(False, True)]),
-             len(names), kinds, skipped))
+    print("lists %d, page rules %s" % (len(names), kinds))
 
 
 if __name__ == "__main__":
-    if len(sys.argv) != 3:
+    if len(sys.argv) not in (3, 4):
         sys.exit(__doc__)
-    main(sys.argv[1], sys.argv[2])
+    beside = os.path.join(os.path.dirname(os.path.abspath(__file__)), "primefreebird-list.txt")
+    main(sys.argv[1], sys.argv[2], sys.argv[3] if len(sys.argv) == 4 else beside if os.path.exists(beside) else None)

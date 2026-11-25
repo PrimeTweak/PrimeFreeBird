@@ -5,10 +5,12 @@
 #import "Common/PFBCompatibility.h"
 #import "Common/PFBSettings.h"
 #import <CoreGraphics/CoreGraphics.h>
+#import <WebKit/WebKit.h>
 #import <objc/runtime.h>
 #import <sys/utsname.h>
 #import "Debug/PFBDebugOverlayWindow.h"
 #import "Debug/PFBDebugTrigger.h"
+#import "Support/HookHelpers.h"
 
 // MARK: - gate
 
@@ -431,6 +433,12 @@ static NSString* PFBCaptureBlock(void) {
     return [NSString stringWithFormat:@"CAPTURE\n%@", gPFBLastCapture];
 }
 
+static NSString* gPFBLastWebPage;
+
+static NSString* PFBWebPageBlock(void) {
+    return gPFBLastWebPage.length ? [NSString stringWithFormat:@"WEB PAGE\n%@\n\n", gPFBLastWebPage] : @"";
+}
+
 static NSString* PFBDecisionBlock(void) {
     @synchronized(PFBDecisionRing()) {
         NSArray* ring = PFBDecisionRing();
@@ -452,6 +460,7 @@ NSString* PFBDebuggerReport(void) {
     [report appendString:@"\n"];
     [report appendString:PFBDecisionBlock()];
     [report appendString:@"\n"];
+    [report appendString:PFBWebPageBlock()];
     [report appendString:PFBCaptureBlock()];
     return report;
 }
@@ -512,7 +521,70 @@ void PFBDebuggerPresent(void) {
 
 // MARK: - capture
 
-// Captures the frontmost screen's view hierarchy, then presents the report.
+// The page open in Twitter's browser: the largest web view on screen showing a site other than X.
+static WKWebView* PFBWebPageIn(UIView* root) {
+    WKWebView* best = nil;
+    CGFloat area = 0.0;
+    NSMutableArray<UIView*>* pending = [NSMutableArray arrayWithObject:root];
+    while (pending.count) {
+        UIView* view = pending.lastObject;
+        [pending removeLastObject];
+        if (view.hidden || view.alpha < 0.01) {
+            continue;
+        }
+        if ([view isKindOfClass:[WKWebView class]]) {
+            WKWebView* web = (WKWebView*)view;
+            CGFloat size = CGRectGetWidth(web.bounds) * CGRectGetHeight(web.bounds);
+            if (web.URL.host.length && !PFBIsXDomain(web.URL.host) && size > area) {
+                best = web;
+                area = size;
+            }
+            continue;
+        }
+        [pending addObjectsFromArray:view.subviews];
+    }
+    return best;
+}
+
+// Block web ads' page inspector, web-inspect.js, run on that page for the report's WEB PAGE part, in a world
+// of its own so the page's scripts cannot change its answer. The report opens with the answer, or after 2 s.
+static void PFBInspectWebPage(WKWebView* web, void (^then)(void)) {
+    BOOL engine = NO;
+    for (WKUserScript* script in web.configuration.userContentController.userScripts) {
+        engine = engine || [script.source containsString:@"pfbWebAdsEngine("];
+    }
+    NSString* address = web.URL.absoluteString;
+    NSString* head = [NSString stringWithFormat:@"%@, Block web ads %@", [address substringToIndex:MIN(address.length, (NSUInteger)150)],
+                                                engine ? @"on this page" : @"not on this page"];
+    __block BOOL answered = NO;
+    void (^finish)(NSString*) = ^(NSString* body) {
+        if (answered) {
+            return;
+        }
+        answered = YES;
+        gPFBLastWebPage = [NSString stringWithFormat:@"%@\n%@", head, body];
+        then();
+    };
+    NSURL* scriptURL = [[PFBBundle sharedBundle] pathForFile:@"web-inspect.js"];
+    NSString* source = scriptURL ? [NSString stringWithContentsOfURL:scriptURL encoding:NSUTF8StringEncoding error:nil] : nil;
+    if (!source.length) {
+        finish(@"web-inspect.js missing");
+        return;
+    }
+    [web evaluateJavaScript:source
+                    inFrame:nil
+             inContentWorld:[WKContentWorld defaultClientWorld]
+          completionHandler:^(id result, NSError* error) {
+              finish([result isKindOfClass:[NSString class]] ? result
+                                                             : [@"no answer from the page: " stringByAppendingString:error.localizedDescription ?: @"empty"]);
+          }];
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(2 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+      finish(@"no answer from the page within 2 s");
+    });
+}
+
+// Captures the frontmost screen's view hierarchy and, when a web page is open in Twitter's browser, looks at
+// it too, then presents the report.
 void PFBDebuggerCaptureAndPresent(void) {
     if (!PFBDebugIsRecording()) {
         return;
@@ -531,7 +603,15 @@ void PFBDebuggerCaptureAndPresent(void) {
     UIView* root = top.viewIfLoaded ?: window;
     PFBCaptureView(root, 0, capture);
     gPFBLastCapture = capture;
-    PFBDebuggerPresent();
+    WKWebView* web = PFBWebPageIn(window);
+    if (!web) {
+        gPFBLastWebPage = nil;
+        PFBDebuggerPresent();
+        return;
+    }
+    PFBInspectWebPage(web, ^{
+      PFBDebuggerPresent();
+    });
 }
 
 // MARK: - install

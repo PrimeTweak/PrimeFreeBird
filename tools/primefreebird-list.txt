@@ -1,0 +1,17 @@
+! Title: PrimeFreeBird list
+! Description: Block web ads' own site fixes, kept apart from EasyList, EasyPrivacy and Fanboy's
+!   Annoyance list. Same syntax as uBlock Origin's lists; tools/easylist-webkit.py compiles it into
+!   web-ads-pfb-N.json and the page engine's rules.
+! Each entry: the date, the site, what was measured, and the rule, or the page engine's rule that covers it.
+
+! 2026-11-24 tvanouvelles.ca, journaldemontreal.com: wall against ad blockers, div.popup-adblocker,
+!   fixed over the whole screen, 1,861 characters on TVA, page scroll locked.
+!   Covered by the page engine's wall rule (web-ads-engine.js).
+
+! 2026-11-24 tvanouvelles.ca: empty top ad space, div.zoneTOP > div.header-banner-sticky >
+!   div.top-ad-multiplex-sticky (DFP), 255 px of gray under the header.
+!   Covered by the page engine's empty ad space rule (web-ads-engine.js).
+
+! 2026-11-24 journaldemontreal.com: empty top ad space div#banner.dfp-labeled, 150 px reserved, and an
+!   empty overlay dimming the screen by half, div#bannerOverlay.banner-overlay.
+!   Covered by the page engine's empty ad space rule (web-ads-engine.js).
