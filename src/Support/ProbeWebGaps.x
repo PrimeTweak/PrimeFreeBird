@@ -5,7 +5,7 @@
 #import "Support/HookHelpers.h"
 
 static NSString* const kPFBGapProbeTopic = @"probe gaps";
-static const NSUInteger kPFBGapProbeCap = 800;
+static const NSUInteger kPFBGapProbeCap = 1500;
 static const void* kPFBGapProbeAddedKey = &kPFBGapProbeAddedKey;
 static WKUserScript* gPFBGapProbeScript;
 

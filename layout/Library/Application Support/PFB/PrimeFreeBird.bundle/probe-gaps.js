@@ -1,6 +1,6 @@
 // Probe for empty ad spaces, removed once read: on each page and large frame, at its opening, its load and
-// 5 and 15 s later, the empty blocks at least 50 px high in its first eight screens, how they are made and
-// named, to the pfbGapProbe handler.
+// 5 and 15 s later, in its first eight screens, the blocks with nothing to see at least 50 px high and the
+// blocks named for ads, how they are made and named, to the pfbGapProbe handler.
 (function () {
     "use strict";
     const host = String(location.hostname || "").toLowerCase();
@@ -29,10 +29,10 @@
         return style.display !== "none" && style.visibility !== "hidden" && parseFloat(style.opacity) > 0.05;
     };
     const media = "img,video,canvas,svg,picture,object,embed,iframe";
-    // Words, pictures or frames a reader can see; an empty block has none.
+    // Words or pictures a reader can see; an empty block has none. A page script inside does not count.
+    const seenText = (node) => String(node.innerText || "").replace(/\s+/g, "").length;
     const content = (node) => {
-        const raw = String(node.textContent || "").replace(/\s+/g, "");
-        if (raw.length > 400 || String(node.innerText || "").replace(/\s+/g, "").length > 3) {
+        if (seenText(node) > 3) {
             return "text";
         }
         for (const item of [node].concat(Array.from(node.querySelectorAll(media)))) {
@@ -69,6 +69,9 @@
             ", margin " + style.marginTop + "/" + style.marginBottom + ", background " + style.backgroundColor + " image " + image +
             ", " + style.display + " " + style.position + (style.aspectRatio && style.aspectRatio !== "auto" ? ", ratio " + style.aspectRatio : ""));
         const inside = Array.from(node.querySelectorAll("*"));
+        const pictures = inside.filter((item) => item.matches(media) && item.tagName !== "IFRAME" && shown(item) &&
+            item.getBoundingClientRect().width >= 40 && item.getBoundingClientRect().height >= 40).length;
+        lines.push("  shown: text " + seenText(node) + ", pictures " + pictures + ", scripts " + node.querySelectorAll("script").length);
         const tags = {};
         inside.forEach((item) => {
             tags[item.tagName.toLowerCase()] = (tags[item.tagName.toLowerCase()] || 0) + 1;
@@ -125,6 +128,29 @@
         visit(document.body);
         return found;
     };
+    // The outermost blocks whose own names speak of ads, empty or not, in page order.
+    const namedBlocks = () => {
+        const found = [];
+        const reach = 8 * innerHeight;
+        const visit = (node) => {
+            for (const child of Array.from(node.children)) {
+                if (found.length >= 15 || /^(SCRIPT|STYLE|NOSCRIPT|TEMPLATE|LINK|META)$/.test(child.tagName) || !shown(child)) {
+                    continue;
+                }
+                const box = child.getBoundingClientRect();
+                if (box.top + scrollY > reach) {
+                    continue;
+                }
+                if (tokensOf(child).length && box.height >= 30) {
+                    found.push(child);
+                    continue;
+                }
+                visit(child);
+            }
+        };
+        visit(document.body);
+        return found;
+    };
     let last = "";
     let sent = 0;
     const snapshot = (moment) => {
@@ -135,6 +161,11 @@
         let lines = [innerWidth + "x" + innerHeight + " " + short(location.pathname, 50) + ", " + blocks.length + " empty blocks"];
         blocks.forEach((block, index) => {
             lines = lines.concat(describeBlock(block, index + 1));
+        });
+        const named = namedBlocks();
+        lines.push(named.length + " blocks named for ads");
+        named.forEach((block, index) => {
+            lines = lines.concat(describeBlock(block, "ad" + (index + 1)));
         });
         const key = lines.join("|");
         if (key === last) {
