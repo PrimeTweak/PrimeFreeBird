@@ -1,6 +1,6 @@
 // Block web ads: EasyList, EasyPrivacy and Fanboy's Annoyance list, made by tools/easylist-webkit.py into
-// WebKit content blockers compiled once by iOS, and into rules for web-ads-engine.js, which runs at the start
-// of each page and takes off walls against ad blockers. Both leave X's own pages alone, the tweak's included.
+// WebKit content blockers compiled once by iOS, and into rules for web-ads-engine.js, which runs at the start of
+// each page, takes off walls against ad blockers and folds empty ad spaces. Both leave X's own pages alone.
 
 #import <WebKit/WebKit.h>
 #import <objc/runtime.h>
@@ -165,8 +165,8 @@ static void pfbWebAdsLoad(void) {
 
 @implementation PFBWebAdReports
 
-// A page's report, a frame's only when it has errors, and each wall against ad blockers taken off;
-// all come from the page's own world.
+// A page's report, a frame's only when it has errors, each wall against ad blockers taken off and each empty
+// ad space folded; all come from the page's own world.
 - (void)userContentController:(WKUserContentController*)controller didReceiveScriptMessage:(WKScriptMessage*)message {
     NSDictionary* body = [message.body isKindOfClass:[NSDictionary class]] ? message.body : nil;
     NSString* host = [body[@"host"] isKindOfClass:[NSString class]] ? body[@"host"] : nil;
@@ -180,11 +180,16 @@ static void pfbWebAdsLoad(void) {
             PFBCompatMeasure(@"web ads engine", [NSString stringWithFormat:@"%@: %@", host, text], 20);
         }
     }
-    NSString* wall = [body[@"what"] isKindOfClass:[NSString class]] ? body[@"what"] : nil;
-    if ([body[@"t"] isEqual:@"wall"] && wall.length) {
-        wall = [wall substringToIndex:MIN(wall.length, (NSUInteger)120)];
-        PFBCompatMeasure(@"web ads walls", [NSString stringWithFormat:@"%@: %@", host, wall], 20);
-        PFBCOMPAT_ACTION(PFBCompat_block_web_ads, @"ad-blocker wall taken off");
+    NSString* what = [body[@"what"] isKindOfClass:[NSString class]] ? body[@"what"] : nil;
+    BOOL wall = [body[@"t"] isEqual:@"wall"];
+    if ((wall || [body[@"t"] isEqual:@"gap"]) && what.length) {
+        what = [what substringToIndex:MIN(what.length, (NSUInteger)120)];
+        PFBCompatMeasure(wall ? @"web ads walls" : @"web ads gaps", [NSString stringWithFormat:@"%@: %@", host, what], 20);
+        if (wall) {
+            PFBCOMPAT_ACTION(PFBCompat_block_web_ads, @"ad-blocker wall taken off");
+        } else {
+            PFBCOMPAT_ACTION(PFBCompat_block_web_ads, @"empty ad space folded");
+        }
         return;
     }
     if (![body[@"t"] isEqual:@"page"]) {

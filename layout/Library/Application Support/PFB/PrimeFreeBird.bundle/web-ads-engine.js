@@ -1122,26 +1122,110 @@ function pfbWebAdsEngine(data) {
             freeScroll();
         }
     };
+    // An empty ad space is a block named for ads, by its id or classes, that shows no words, picture or frame;
+    // it is folded with the empty blocks that only held it. A height made of padding is kept: it makes room for
+    // a fixed header or a picture still loading. TVA's and the Journal de Montréal's top slots are so (measured).
+    const adNames = /^(ad|ads|adv|advert|adverts|advertising|advertisement|adslot|adunit|adbox|adcontainer|adwrapper|gpt|dfp|pub|pubs|publicite|publicites|banner|banners|sponsor|sponsored|teads|outbrain|taboola|prebid|bigbox|leaderboard|billboard|halfpage)$/;
+    const adWord = (node) => {
+        const names = (node.id + " " + (typeof node.className === "string" ? node.className : "")).toLowerCase();
+        return names.split(/[^a-z0-9]+/).find((token) => adNames.test(token)) || "";
+    };
+    const shown = (node) => {
+        const style = styleOf(node);
+        return style.display !== "none" && style.visibility !== "hidden" && parseFloat(style.opacity) > 0.05;
+    };
+    const big = (node) => {
+        const box = node.getBoundingClientRect();
+        return box.width >= 40 && box.height >= 40;
+    };
+    const pictured = (node) => {
+        const image = styleOf(node).backgroundImage;
+        return node.matches("img,video,canvas,svg,picture,object,embed,iframe") || (image !== "none" && image.includes("url("));
+    };
+    const empty = (node) => {
+        if (String(node.innerText || "").replace(/\s+/g, "").length > 3) {
+            return false;
+        }
+        for (const item of [node].concat(Array.from(node.querySelectorAll("*")))) {
+            if (pictured(item) && big(item) && shown(item)) {
+                return false;
+            }
+        }
+        return true;
+    };
+    const roomOf = (node) => {
+        const style = styleOf(node);
+        return node.getBoundingClientRect().height - parseFloat(style.paddingTop) - parseFloat(style.paddingBottom);
+    };
+    const folded = new WeakSet();
+    let gaps = 0;
+    let gapsDue = true;
+    const fold = (node) => {
+        folded.add(node);
+        node.style.setProperty("display", "none", "important");
+    };
+    const checkGaps = () => {
+        if (!document.body) {
+            return;
+        }
+        const named = [];
+        for (const node of document.body.querySelectorAll("[id],[class]")) {
+            if (!folded.has(node) && adWord(node) && !named.some((outer) => outer.contains(node))) {
+                named.push(node);
+            }
+        }
+        for (const slot of named) {
+            if (!slot.isConnected || !shown(slot) || !empty(slot) || (roomOf(slot) < 30 && slot.getBoundingClientRect().height >= 30)) {
+                continue;
+            }
+            const word = adWord(slot);
+            let height = Math.max(0, roomOf(slot));
+            let outer = slot;
+            fold(slot);
+            for (let link = slot.parentElement, steps = 0; link && link !== document.body && steps < 3; link = link.parentElement, steps++) {
+                if (!shown(link) || !empty(link) || roomOf(link) < 30) {
+                    break;
+                }
+                height = Math.max(height, roomOf(link));
+                outer = link;
+                fold(link);
+            }
+            gaps++;
+            if (gaps <= 5 && height >= 30) {
+                post({ t: "gap", host, what: describe(outer) + ' ("' + word + '"), ' + Math.round(height) + " px" });
+            }
+        }
+    };
+
     // Frames smaller than a screen's corner, such as an ad's, are left alone.
     whenReady(() => {
         root = document.documentElement;
         if (innerWidth < 200 || innerHeight < 200) {
             return;
         }
+        // Empty ad spaces are looked for again only once blocks were added or renamed.
+        const checkAll = () => {
+            checkWalls();
+            if (gapsDue) {
+                gapsDue = false;
+                checkGaps();
+            }
+        };
         let waiting = false;
-        const observer = new N.MutationObserver(() => {
+        const observer = new N.MutationObserver((records) => {
+            gapsDue = gapsDue || records.some((record) => record.type === "childList" || record.attributeName === "class");
             if (!waiting) {
                 waiting = true;
                 N.setTimeout(() => {
                     waiting = false;
-                    checkWalls();
+                    checkAll();
                 }, 100);
             }
         });
         observer.observe(root, { childList: true, subtree: true, attributes: true, attributeFilter: ["class", "style"] });
         let seconds = 60;
         const every = () => {
-            checkWalls();
+            checkAll();
             if (--seconds > 0) {
                 N.setTimeout(every, 1000);
             } else {
