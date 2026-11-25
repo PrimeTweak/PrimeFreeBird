@@ -204,7 +204,7 @@ static void PFBNativeGlassSettle(void);
     } else if (%c(FLEXManager)) {
         PFBCOMPAT_OBSERVE(PFBCompat_flex_twitter, @"explorer available");
     }
-    // The debugger places its floating button only when debug_tools is on.
+    // The floating button only comes with debug_tools on; screenshots of web pages are inspected either way.
     PFBDebuggerInstall();
 
     dispatch_async(dispatch_get_main_queue(), ^{

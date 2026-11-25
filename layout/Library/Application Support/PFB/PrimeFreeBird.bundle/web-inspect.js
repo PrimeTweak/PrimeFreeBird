@@ -1,6 +1,6 @@
-// Block web ads' page inspector, run by the stethoscope on the page open in Twitter's browser: the page's size
-// and scroll lock, a wall against ad blockers with the page engine's verdict, empty blocks, blocks named for
-// ads with what the engine does with them, and the page's frames, for the report's WEB PAGE part.
+// Block web ads' page inspector, run on the page open in Twitter's browser by a screenshot or the stethoscope:
+// the page's size and scroll lock, a wall against ad blockers with the page engine's verdict, empty blocks, blocks
+// named for ads with what the engine does with them, and the page's frames, for the report's WEB PAGES part.
 (function () {
     "use strict";
     const lines = [];

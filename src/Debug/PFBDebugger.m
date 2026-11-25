@@ -433,10 +433,35 @@ static NSString* PFBCaptureBlock(void) {
     return [NSString stringWithFormat:@"CAPTURE\n%@", gPFBLastCapture];
 }
 
-static NSString* gPFBLastWebPage;
+// The last three web pages inspected, newest first, kept across launches.
+static NSString* const kPFBWebPagesKey = @"pfb_web_pages";
+
+static NSArray<NSString*>* PFBWebPages(void) {
+    NSMutableArray<NSString*>* pages = [NSMutableArray array];
+    for (id page in [[NSUserDefaults standardUserDefaults] arrayForKey:kPFBWebPagesKey]) {
+        if ([page isKindOfClass:[NSString class]]) {
+            [pages addObject:page];
+        }
+    }
+    return pages;
+}
+
+static void PFBKeepWebPage(NSString* page) {
+    NSMutableArray<NSString*>* pages = [PFBWebPages() mutableCopy];
+    [pages insertObject:page atIndex:0];
+    while (pages.count > 3) {
+        [pages removeLastObject];
+    }
+    [[NSUserDefaults standardUserDefaults] setObject:pages forKey:kPFBWebPagesKey];
+}
 
 static NSString* PFBWebPageBlock(void) {
-    return gPFBLastWebPage.length ? [NSString stringWithFormat:@"WEB PAGE\n%@\n\n", gPFBLastWebPage] : @"";
+    NSArray<NSString*>* pages = PFBWebPages();
+    if (!pages.count) {
+        return @"";
+    }
+    return [NSString stringWithFormat:@"WEB PAGES (last %lu, newest first)\n%@\n\n", (unsigned long)pages.count,
+                                      [pages componentsJoinedByString:@"\n\n"]];
 }
 
 static NSString* PFBDecisionBlock(void) {
@@ -546,15 +571,18 @@ static WKWebView* PFBWebPageIn(UIView* root) {
     return best;
 }
 
-// Block web ads' page inspector, web-inspect.js, run on that page for the report's WEB PAGE part, in a world
-// of its own so the page's scripts cannot change its answer. The report opens with the answer, or after 2 s.
-static void PFBInspectWebPage(WKWebView* web, void (^then)(void)) {
+// Block web ads' page inspector, web-inspect.js, run on that page for the report's WEB PAGES part, in a world
+// of its own so the page's scripts cannot change its answer. The answer is kept, or a note after 2 s.
+static void PFBInspectWebPage(WKWebView* web, NSString* trigger, void (^then)(void)) {
     BOOL engine = NO;
     for (WKUserScript* script in web.configuration.userContentController.userScripts) {
         engine = engine || [script.source containsString:@"pfbWebAdsEngine("];
     }
+    NSDateFormatter* formatter = [NSDateFormatter new];
+    formatter.dateFormat = @"yyyy-MM-dd HH:mm";
     NSString* address = web.URL.absoluteString;
-    NSString* head = [NSString stringWithFormat:@"%@, Block web ads %@", [address substringToIndex:MIN(address.length, (NSUInteger)150)],
+    NSString* head = [NSString stringWithFormat:@"%@, %@: %@, Block web ads %@", [formatter stringFromDate:[NSDate date]], trigger,
+                                                [address substringToIndex:MIN(address.length, (NSUInteger)150)],
                                                 engine ? @"on this page" : @"not on this page"];
     __block BOOL answered = NO;
     void (^finish)(NSString*) = ^(NSString* body) {
@@ -562,8 +590,10 @@ static void PFBInspectWebPage(WKWebView* web, void (^then)(void)) {
             return;
         }
         answered = YES;
-        gPFBLastWebPage = [NSString stringWithFormat:@"%@\n%@", head, body];
-        then();
+        PFBKeepWebPage([NSString stringWithFormat:@"%@\n%@", head, body]);
+        if (then) {
+            then();
+        }
     };
     NSURL* scriptURL = [[PFBBundle sharedBundle] pathForFile:@"web-inspect.js"];
     NSString* source = scriptURL ? [NSString stringWithContentsOfURL:scriptURL encoding:NSUTF8StringEncoding error:nil] : nil;
@@ -605,11 +635,10 @@ void PFBDebuggerCaptureAndPresent(void) {
     gPFBLastCapture = capture;
     WKWebView* web = PFBWebPageIn(window);
     if (!web) {
-        gPFBLastWebPage = nil;
         PFBDebuggerPresent();
         return;
     }
-    PFBInspectWebPage(web, ^{
+    PFBInspectWebPage(web, @"stethoscope", ^{
       PFBDebuggerPresent();
     });
 }
@@ -726,6 +755,17 @@ static void PFBInstallTrigger(void) {
 }
 
 void PFBDebuggerInstall(void) {
+    // A screenshot taken while a web page is open in Twitter's browser inspects that page, recording or not.
+    [[NSNotificationCenter defaultCenter] addObserverForName:UIApplicationUserDidTakeScreenshotNotification
+                                                      object:nil
+                                                       queue:NSOperationQueue.mainQueue
+                                                  usingBlock:^(__unused NSNotification* note) {
+                                                    UIWindow* window = PFBActiveWindow();
+                                                    WKWebView* web = window ? PFBWebPageIn(window) : nil;
+                                                    if (web) {
+                                                        PFBInspectWebPage(web, @"screenshot", nil);
+                                                    }
+                                                  }];
     if (!PFBDebugIsRecording()) {
         return;
     }

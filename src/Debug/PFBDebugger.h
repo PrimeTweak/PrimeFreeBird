@@ -1,4 +1,4 @@
-// The built-in debugger: hook health, a decision journal and a capture of the screen.
+// The built-in debugger: hook health, a decision journal, a capture of the screen and the web pages inspected.
 
 #import <UIKit/UIKit.h>
 
@@ -12,11 +12,11 @@ extern void PFBMark(UIView* view, NSString* origin);
 extern void PFBDebugLog(NSString* format, ...) NS_FORMAT_FUNCTION(1, 2);
 
 // Places the floating button when debug_tools is on, and again whenever Twitter comes
-// to the front without it. Called once at launch.
+// to the front without it; a screenshot of a web page inspects it either way. Called once at launch.
 extern void PFBDebuggerInstall(void);
 
-// Builds the full report as a string: environment, hook health, decision log
-// and — when a capture has been taken — the frozen hierarchy.
+// Builds the full report as a string: environment, hook health, decision log, the last
+// web pages inspected and, when a capture has been taken, the frozen hierarchy.
 extern NSString* PFBDebuggerReport(void);
 
 // Presents the diagnostics screen over whatever is frontmost. Called after a capture
